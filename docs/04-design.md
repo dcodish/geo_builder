@@ -1,6 +1,15 @@
 # 04 — Design & Architecture
 
-_Last updated: 2026-07-24 (S4.3 of [docs/24](archive/24-foundation-hardening-plan.md) — the layer map truthed-up to the built system; the original 2026-06-10 design text is kept where it still describes reality). Status: **built and in production** — everything below exists. The day-to-day working doctrine is [docs/17](17-design-rules.md); the solve-ladder contract is [docs/LADDER.md](LADDER.md); the 2026-07 architecture review, [docs/23](archive/23-architecture-review-2026-07.md), is archived history._
+_Status: **built and in production** — everything below exists. The day-to-day working doctrine is [docs/17](17-design-rules.md); the solve-ladder contract is [docs/LADDER.md](LADDER.md). Archived history: [docs/24](archive/24-foundation-hardening-plan.md), [docs/23](archive/23-architecture-review-2026-07.md)._
+
+## How this document is organised
+
+§1–§9 describe the system as a whole: principles, pipeline, data model, engine, input layer, rendering,
+theorems, stack and module layout. §10–§11 point at the ADR log. The rest is one section per mechanism —
+what it does, where it lives, and the ADRs that decided it — grouped by subsystem: parser chokepoints and
+gates; the submit gate; fold and replay; the knowledge pool; the configuration registry and searches; render
+and marks. The ORDER in which mechanisms fire is [LADDER.md](LADDER.md)'s contract, not this file's; how
+each mechanism came to be is in its ADR ([06](06-decisions.md)).
 
 ## 1. Guiding principles
 
@@ -9,29 +18,23 @@ _Last updated: 2026-07-24 (S4.3 of [docs/24](archive/24-foundation-hardening-pla
 - **Stability is structural.** Continuity between steps comes from persisting degrees of freedom and branch choices, not from after-the-fact smoothing heuristics.
 - **The LLM is optional and replaceable.** It sits behind a narrow boundary and handles only the inputs a free local parser can't.
 
-**The compiler lens (moved from docs/11, #1861).** The pipeline reads like a compiler (utterance → commands
-→ evaluation → SVG), but the system is an **incremental, order-normalizing constraint interpreter**: a
-statement's position in the list is presentation, not meaning; a relation is true when it holds in every
-valid configuration; and the front end resolves references against the current model. Its nearest
-relatives are a parametric-CAD kernel and SMT model enumeration, not a compiler. Four corrections to the
-plain compiler reading hold:
-1. **Re-mention is assertion, never redefinition.** A second mention of an id is almost always a given
-   about the existing object, not a "redefinition error". It lowers to constraints on that object, in one
-   place at the apply boundary (M1, [docs/17](17-design-rules.md) §4); `commandConflict` refuses only what
-   cannot be lowered. Ids are names, not declarations.
-2. **The parser may read the drawing, but only to resolve a pointing reference.** «המעגל הגדול»,
-   «הימני» and «נקודת ההשקה» are resolved from the drawn seed through `ParseContext`'s deictic fields,
-   and every such read emits a locking assertion. Coordinates never decide the meaning of a statement that
-   does not point ([docs/17](17-design-rules.md) §3b).
-3. **The stored artifact is source plus lowering.** A fact carries both its utterance and its lowered
-   commands, because the source is not deterministically recompilable (LLM steps, cost). An edited step
-   re-lowers against its own position's prefix ([ADR-241](06-decisions.md#adr-241)). On load, a step that
-   re-parses deterministically adopts the current lowering and an LLM step keeps its saved commands
-   (`refreshLoadedFigure`, [ADR-314](06-decisions.md#adr-314)); what remains is audited for drift and
-   dropped labels ([ADR-242](06-decisions.md#adr-242), [ADR-321](06-decisions.md#adr-321)).
-4. **The solve ladder is part of the semantics.** Constraint satisfaction runs through an ordered,
-   cross-layer ladder ([docs/LADDER.md](LADDER.md)). Which stage fired is observable
-   (`StepResult.ladder`) and contract-tested (`ladder-contract.test.ts`).
+**The compiler lens.** The pipeline reads like a compiler (utterance → commands → evaluation → SVG), but the
+system is an **incremental, order-normalizing constraint interpreter**: a statement's position in the list is
+presentation, not meaning; a relation is true when it holds in every valid configuration; and the front end
+resolves references against the current model (its nearest relatives are a parametric-CAD kernel and SMT model
+enumeration). Four corrections to the plain compiler reading hold:
+1. **Re-mention is assertion, never redefinition.** A second mention of an id is a given about the existing
+   object; it lowers to constraints on it in one place at the apply boundary (M1, [docs/17](17-design-rules.md)
+   §4), and `commandConflict` refuses only what cannot be lowered.
+2. **The parser may read the drawing, but only to resolve a pointing reference** («המעגל הגדול», «הימני»,
+   «נקודת ההשקה»), through `ParseContext`'s deictic fields, each read emitting a locking assertion
+   ([docs/17](17-design-rules.md) §3b).
+3. **The stored artifact is source plus lowering.** A fact carries its utterance and its lowered commands; an
+   edited step re-lowers against its own prefix (ADR-241); on load a deterministic step adopts the current
+   lowering and an LLM step keeps its saved commands (`refreshLoadedFigure`, ADR-314), audited for drift and
+   dropped labels (ADR-242, ADR-321).
+4. **The solve ladder is part of the semantics** ([docs/LADDER.md](LADDER.md)): the stage that fired is
+   observable (`StepResult.ladder`) and contract-tested (`ladder-contract.test.ts`).
 
 ## 2. Pipeline overview
 
@@ -79,19 +82,19 @@ The figure is a set of **objects**, each with a *definition* referencing earlier
 ## 4. Engine
 
 - **Topological evaluation:** order objects by dependency, compute each from its parents → coordinates. No template/shape recognition.
-- **Branches = alternatives:** when an object has N≥2 solutions, the branch index selects one. The "show another configuration" action re-samples the unstated magnitudes and steps the discrete choices (every cyclable branch among them), keeping a candidate that meets every given (FR-ALT-2; amended 2026-10-07, #1861). Enumerating branches is part of how alternatives are produced — for free, not as a special case.
-- **What the shape fingerprint reads ([ADR-065](06-decisions.md#adr-065), amended by [ADR-514](06-decisions.md#adr-514), #1005).** "Show another configuration" offers a candidate only when it is a genuinely DIFFERENT drawing, judged by a similarity-invariant fingerprint. That fingerprint reads **every extent the drawing has** — each pairwise distance between named points AND each drawn (non-`hidden`) circle's radius — normalised by their mean. The list is complete because only those two kinds of object carry a length of their own: a segment and a polygon edge ARE point pairs, an arc's radius is |centre − endpoint| between two named points, and a line has no extent. Reading points alone made the button answer "no other configuration" on «מעגל O» + «M מחוץ למעגל», whose only shape freedom is |OM| against the free radius.
-- **The view delta ([ADR-517](06-decisions.md#adr-517), #65).** Applying a new view is the one moment BOTH views exist, so what «show another configuration» changed is a pure comparison (`replay/viewDelta.ts`), never a second search. It is judged on **similarity-invariant** quantities — a point by its distances to the other named points over the drawing's mean extent, a circle by its radius over that mean — because two seeds may differ by a whole-figure rotation and scale under which every coordinate changes and the drawing does not. Discrete choices (branch, variant) are explicit in the facts and need no measurement. The stored note carries the view it describes, so it retires itself when the session leaves that view.
+- **Branches = alternatives:** when an object has N≥2 solutions, the branch index selects one. "Show another configuration" re-samples the unstated magnitudes and steps the discrete choices (every cyclable branch among them), keeping a candidate that meets every given (FR-ALT-2; #1861).
+- **What the shape fingerprint reads (ADR-065, ADR-514, #1005).** A candidate is offered only when it is a different drawing under a similarity-invariant fingerprint: every pairwise distance between named points and each drawn (non-`hidden`) circle's radius, over their mean — the only objects with an extent of their own.
+- **The view delta (ADR-517, #65).** What «show another configuration» changed is a pure comparison of the two views (`replay/viewDelta.ts`) on similarity-invariant quantities; discrete choices are explicit in the facts. The note carries the view it describes and retires when the session leaves it.
 - **Stability:** DOF parameters (free-point coords, on-object `t`) and branch indices **persist across steps**. A new constraint re-evaluates only what depends on it; unrelated objects keep their parameters, so the figure does not jump.
-- **Over-constraint / contradiction:** before committing a step, check satisfiability. If unsatisfiable, reject the step, keep the previous figure, and surface a clear message. This is general (not triangle-only as in the old code).
-- **A fact whose subject is gone ([ADR-483](06-decisions.md#adr-483), #926):** the fold asks `isSymbolBound` (in `engine/lower.ts`, beside the symbol table it reads) before applying a `set-var`; a value for a letter no statement binds is stamped into the same "no longer available" register as a point whose defining step was removed, so the row and the banner both say so. The table is whole-list, so a definition re-added anywhere binds it again. The ✎ edit seam (`app/editPipeline.ts`) compares the other rows' statuses before/after the replace and names any it orphaned, while still committing the edit.
-- **Where the solve budget is consulted ([ADR-515](06-decisions.md#adr-515), #259).** The cooperative wall-clock budget (`engine/solveBudget.ts`) is armed only around VIEW searches — "show another configuration", the auto-resolve config search, the submit gate's «כבר קיים» sample test — never around the primary submit fold ([ADR-281](06-decisions.md#adr-281)): a solvable figure must build whatever it costs. It is consulted at two granularities: between recruit experiments (`step.ts`) AND **inside the innermost loop, `nelderMead`'s descent in `evaluate.ts`** — because one experiment's joint solve is itself unbounded, and without the inner consult a 12 s budget let the #207 ladder run 32 s without checking once. Unarmed, the consult is a null check, so the engine is bit-for-bit unchanged. The knowledge pool (the shared detection sampler over the admissible set, read by the detect sweep and the values panel) is bounded by WORK, never seconds (`POOL_WORK_CAP`, [ADR-558](06-decisions.md#adr-558)) — see "Bounded, failing CLOSED" below (amended 2026-10-07, #1861).
-- **A refusal names what the rule matched ([ADR-528](06-decisions.md#adr-528), #1266/#1267).** A rule that recognised a construct and rejected it on the geometry answers through `Clarify` — the fifteen-member vocabulary `refusalOf` maps and `runSubmit` arms — never `not-handled`, which means "no rule owns this sentence" and costs a paid call to say nothing. A cevian's stated side («לצלע BC», «אל BC», "to side BC") has ONE reader, `statedSide`, called by the median, the altitude and the bisector; the bisector also CHECKS it, because the bisector from a vertex meets the opposite side and only that one. Its stated TRIANGLE («במשולש ABC», "in triangle ABC") has one reader too, `statedTriangle` ([ADR-540](06-decisions.md#adr-540), #1285): read before the letter hunt and removed from it, and not decoration — apex C in ring ABC IS ∠BCA, so the triangle form answers where the bare form must ask (`ambiguous-angle`), and a lone vertex letter that is not the segment's first letter is refused as `bisector-wrong-apex`, quoting both. The stated triangle is also INTRODUCED, by one step for every cevian rule ([ADR-571](06-decisions.md#adr-571), #1720): `cevianTriangle` wraps the median, altitude, their plural and the bisector rule, and prepends `triangle` when the sentence names one, the lowering references all three of its vertices, and the figure has no polygon on them — the altitude and classic median no longer carry copies. `statedTriangle` also reads the English forms those rules always read ("in ABC", "triangle ABC", uppercase labels only). Since [ADR-568](06-decisions.md#adr-568) (#1684) the vertex is read by ONE reader for both forms — the letter right after the angle word («זווית C», "angle C"), the triangle form keeping its lone-letter fallback — so the bare form refuses a wrong vertex too, and a vertex at the segment's far end is the angle at that existing point. A cevian with no stated side or triangle resolves its shape through `cevianShapeEdges`: one shape (a triangle, or a parallelogram's several heights under the draw-one steer) answers; shapes holding the apex that give it different opposite sides ask (`ambiguous-cevian`, quoting the sentence), unless the figure already puts the named foot on one candidate side.
-- **A bound’s aim is not its test ([ADR-529](06-decisions.md#adr-529), #1265).** ADR-390 aims a free bounded measure a visible gap inside its region so the drawing does not read as an equality — that aim is the residual and its tolerance, exactly as written, and the optimizer follows it. **Acceptance is a different question**, answered for the two bound kinds directly in `isSatisfied`: does the stated inequality hold, with the ≥-vs-> distinction carried from the parser through the command into the constraint (absent ⇒ strict)? A strict bound excludes its own value by more than an equality’s own tolerance can absorb, or «BC > 10» and «BC = 10» would both report satisfied. So a bound alone still draws visibly inside, and a later given pinning the measure ON its bound is honoured rather than refused. **The edge never enters the aim**: folding it into the residual moved the angle target and made «זווית ABC גדולה מ-40» unsolvable at 18 of 40 seeds (#281’s lock, measured mid-build). **The aim YIELDS ([ADR-547](06-decisions.md#adr-547), #1351):** acceptance moved but the joint cost's zero zone had not, so a given pinning the measure inside the aim band was out-pulled by the aim at 15 seeds in 16. Each driven solver now runs its whole ladder with the aim first — unchanged — and only when that accepts nothing and a bound is present runs it again with `jointCostTerm(…, aim = false)`, where a bound costs only its distance outside its own inequality (`boundShortfall`, the region `boundHolds` reads). The preference is lexicographically below every given, the ADR-097/ADR-238 retry-only shape; a bound alone never reaches the rung and still draws inside.
-- **A crossing is refused when its own letters make it an existing point ([ADR-531](06-decisions.md#adr-531), #1274).** The check sits INSIDE `cross`, the single emit point of the two-named-lines family, not at its three call sites — so a fourth spelling cannot reach `line-line-intersection` around it; the other emitters derive their pairs from a polygon and cannot produce the shape. It travels the `Clarify` road, so the refusal names the holder, quotes both carriers, keeps the student's text and spends no model call. The boundary is ADR-123's: this refuses a NEW letter at an occupied position, never two existing points the givens drive together. ADR-489's within-margin exemption is KEPT — no sentence reaches that shape now, but `rename` and `merge` still can.
-- **The letter-holder question ([ADR-520](06-decisions.md#adr-520), #238).** "Who holds this letter, and can it be taken back?" is answered in ONE place (`letterHolder`, `store/geoStore.ts`) and returned with every `target-taken` refusal — from `renameFacts` and `nameCentreFacts`, the only two guards that have that reason (swap and merge REQUIRE a taken target, so neither has one). Reclaimable means dropping the holder removes the letter **and nothing else**: nothing else mentions it, and every point the holder introduces that did not exist before it is that letter. Asked as a question about the figure rather than about a command kind, it covers the undone step, the deleted-then-recreated construction and the ADR-010 auto-dropped dependent without enumerating any of them. `reclaim` re-asks it before acting, so the offer can never become a quiet delete.
-- **A point-menu control declares its own colour ([ADR-520 Am. 2](06-decisions.md#adr-520), #1277).** `ctrlBtn` carries `color: var(--color-text)` rather than leaving it to the cascade: the swap offer sits inside the holder note's muted block and inherited `--color-text-muted`, so a live button read as disabled. Whether a `<button>` inherits `color` is UA behaviour this code does not control — measured both ways in the same app — so every menu control states its colour, and a future one nested in a coloured block cannot go quietly grey.
-- **Driven parameters are solved as jointly as they are coupled — no more ([ADR-557](06-decisions.md#adr-557), #1602).** `resolveDriven` sends a set of driven carriers to the joint Nelder–Mead only when they are COUPLED: a carrier among the transitive parents of another's constraint refs, in a cycle (a common tangent's two touch points), or co-driving (`also`). Independent carriers — two tangents from one point, «PA ו PB משיקים» — take the exact ADR-028 1-D root path one at a time in dependency order, each kept off the carriers already placed, and the result must pass the joint solver's strictest accept or the joint solver runs as before. Two further cost rules, both decided by meaning: an `on-segment-solved` rider driven by ⟂ / ∥ / collinear takes the **exact** roots of its degree-≤2 polynomial in t (the grid scan stays for every other condition), and a relation that **holds by construction** at the current and two sampled layouts claims no carrier (`driveOrCheck` keeps it a check). The lock counts joint-optimizer calls (`drivenSolveStats.joint`), never time.
+- **Over-constraint / contradiction:** before committing a step, check satisfiability. If unsatisfiable, reject the step, keep the previous figure, and surface a clear message.
+- **A fact whose subject is gone (ADR-483, #926):** the fold asks `isSymbolBound` (`engine/lower.ts`) before applying a `set-var`; a value for an unbound letter is stamped into the "no longer available" register, and a definition re-added anywhere binds it again. The ✎ edit seam (`app/editPipeline.ts`) names the rows an edit orphaned while committing it.
+- **Where the solve budget is consulted (ADR-515, #259).** The cooperative wall-clock budget (`engine/solveBudget.ts`) is armed only around view searches (the configuration searches, the submit gate's «כבר קיים» test), never the primary submit fold (ADR-281). It is consulted between recruit experiments (`step.ts`) and inside `nelderMead`'s descent (`evaluate.ts`); unarmed it is a null check. The knowledge pool is bounded by work, never seconds (`POOL_WORK_CAP`, ADR-558; see the knowledge pool).
+- **A refusal names what the rule matched (ADR-528, #1266/#1267).** A rule that recognised a construct and rejected it answers through `Clarify` (mapped by `refusalOf`, armed by `runSubmit`), never `not-handled`. A cevian's stated side has one reader, `statedSide`, shared by median, altitude and bisector (the bisector also checks it); its stated triangle has one, `statedTriangle` (ADR-540, #1285), so the triangle form answers where the bare form asks `ambiguous-angle`, and a wrong lone vertex is `bisector-wrong-apex`. `cevianTriangle` wraps every cevian rule and prepends `triangle` when the sentence names one the figure lacks (ADR-571, #1720). The bisector's vertex has one reader for both forms (ADR-568, #1684). A cevian with no stated side or triangle resolves through `cevianShapeEdges`: one shape answers; shapes giving the apex different opposite sides ask (`ambiguous-cevian`).
+- **A bound’s aim is not its test (ADR-529, #1265).** ADR-390's visible gap is the residual the optimizer follows; acceptance is `isSatisfied`'s direct test of the stated inequality, with ≥ vs > carried from the parser (absent ⇒ strict). The edge never enters the aim. **The aim yields (ADR-547, #1351):** when the ladder with the aim accepts nothing and a bound is present, it runs again with `jointCostTerm(…, aim = false)`, where a bound costs only `boundShortfall` (the region `boundHolds` reads) — retry-only, below every given (ADR-097/ADR-238).
+- **A crossing is refused when its own letters make it an existing point (ADR-531, #1274).** The check sits inside `cross`, the single emit point of the two-named-lines family, so no spelling reaches `line-line-intersection` around it; it travels the `Clarify` road. ADR-123's boundary holds, and ADR-489's within-margin exemption stays for `rename` and `merge`.
+- **The letter-holder question (ADR-520, #238).** `letterHolder` (`store/geoStore.ts`) answers who holds a letter and whether it can be taken back, returned with every `target-taken` refusal from `renameFacts` and `nameCentreFacts`. Reclaimable means dropping the holder removes that letter and nothing else; `reclaim` re-asks before acting.
+- **A point-menu control declares its own colour (ADR-520 Am. 2, #1277).** `ctrlBtn` carries `color: var(--color-text)` instead of inheriting `--color-text-muted`; whether a `<button>` inherits `color` is UA behaviour, so every menu control states it.
+- **Driven parameters are solved as jointly as they are coupled — no more (ADR-557, #1602).** `resolveDriven` sends driven carriers to the joint Nelder–Mead only when coupled (a parent of another's constraint refs, a cycle, or `also`); independent carriers take the exact ADR-028 1-D root path in dependency order, checked by the joint solver's accept. An `on-segment-solved` rider driven by ⟂ / ∥ / collinear takes the exact roots of its polynomial in t; a relation holding by construction claims no carrier (`driveOrCheck`). Locked by `drivenSolveStats.joint`.
 - **Fit transform:** map computed coordinates into the viewport; persist the transform so the view is stable across steps.
 
 ## 5. Input layer
@@ -99,57 +102,45 @@ The figure is a set of **objects**, each with a *definition* referencing earlier
 A single boundary: `utterance → command[]`.
 
 - **Primary — deterministic grammar parser.** Handles the common, bounded geometry phrasings in Hebrew and English (shapes, points-on, distances, angles, special lines). Free, offline, instant.
-- **Fallback — Claude API.** Only when the parser cannot confidently parse. Model: `claude-haiku-4-5` (sufficient for short structured extraction; far cheaper than Opus/Fable). Calls go through a **server-side proxy** that holds the key (never in the browser), is gated, and is rate-limited. `max_tokens` and prompt size kept minimal.
+- **Fallback — Claude API.** Only when the parser cannot confidently parse. Model: `claude-haiku-4-5`. Calls go through a **server-side proxy** that holds the key (never in the browser), is gated, and is rate-limited. `max_tokens` and prompt size kept minimal.
 - The engine is agnostic to which path produced the commands.
-- **The input preview seam carries bidi AND maths (#997, [ADR-504](06-decisions.md#adr-504)).** The shared
-  `InputArea`'s `preview` prop is fed by one previewer: the maths renderer when the line has maths, else
-  `inputPreview` — the student's own mixed Hebrew+Latin line through the bidi isolator with the live-tail rule,
-  shown only when isolation would change the layout. The box itself stays raw (isolates cannot live in an
-  editable value; forcing LTR is what #118 reverted). The 3-D twin is `inputPreview3` (ADR-3D-123).
-- **One vocabulary home (#361, [ADR-501](06-decisions.md#adr-501)).** `src/parser/lexicon.ts` holds the
-  keyword and token atoms the grammar composes from — and only atoms the grammar actually consumes. A rule's
-  keyword alternation (`INTERSECT_KW`, `BISECTOR_KW`, the parallel pre-test) is compiled from the lexicon
-  fragment, never spelled a second time; `lexicon-consumers.test.ts` fails on any exported atom nothing
-  composes from, the twin of the ratchet that fails on inline fragments growing. The 3-D grammar keeps its own
-  leaf (`src3d/lexicon/nouns3.ts`); the trees never share vocabulary by import.
-- **The number atom refuses a Hebrew particle's maqaf as a sign (#975, [ADR-505](06-decisions.md#adr-505)).**
+- **The input preview seam carries bidi AND maths (#997, ADR-504).** The shared `InputArea`'s `preview` prop
+  shows the maths renderer when the line has maths, else `inputPreview` (the bidi isolator with the live-tail
+  rule), only when isolation would change the layout; the box stays raw. The 3-D twin is `inputPreview3` (ADR-3D-123).
+- **One vocabulary home (#361, ADR-501).** `src/parser/lexicon.ts` holds the keyword and token atoms the grammar
+  consumes; a rule's alternation (`INTERSECT_KW`, `BISECTOR_KW`) is compiled from it, and
+  `lexicon-consumers.test.ts` fails on an atom nothing composes from. 3-D keeps its own leaf (`src3d/lexicon/nouns3.ts`).
+- **The number atom refuses a Hebrew particle's maqaf as a sign (#975, ADR-505).**
   `NUM` is `(?<![א-ת])-?\d+(?:\.\d+)?`: a hyphen glued to a preceding Hebrew letter («ל-90», «מ-5») is the
   particle, so the digits match unsigned; a hyphen after a space, `=`, `(`, `,` or at line start is a sign.
-  The guard is zero-width, so the atom stays capture-free and every consumer inherits it — "particle or
-  sign" is answered once, in the lexicon, never per rule.
-- **A name glyph is defined once, and a number never starts inside one (#1814, [ADR-600](06-decisions.md#adr-600)).**
-  `shell/indexedName.ts` holds the student's name alphabet (`NAME_LETTER`, Latin + Greek in both cases), an
-  `INDEX` (glued digits, `_1`/`_{1}`, subscript digits), `INDEXED_NAME`, and `UNGLUED` — the zero-width guard
+  The guard is zero-width, so every consumer inherits it.
+- **A name glyph is defined once, and a number never starts inside one (#1814, ADR-600).**
+  `shell/indexedName.ts` holds `NAME_LETTER`, `INDEX` (`_1`, `_{1}`, glued and subscript digits),
+  `INDEXED_NAME`, and `UNGLUED` — the zero-width guard
   "a number never begins glued to a name letter, an `_`, or inside another number". `lexicon.ts` re-exports
-  them; analytic's tokenizer test (`INDEXED_TOKEN`) is the same atom. The angle value reader composes
-  `UNGLUED + num` (it was an inline Latin-only lookbehind, #267) and declines when a value symbol is left
-  beside the number it took (a Greek glyph, or a single letter joined by an arithmetic operator — the
-  ADR-024 leftover guard at the reader). `normalizePointSubscript` folds `α_1` like `O_1`, and
-  `droppedGivenNumbers` blanks every name letter with its index before it extracts numbers.
-- **The span accountant has a `symbol` kind (#1814, ADR-600).** Every Greek glyph with its index, and in
-  Latin-only text a lone lowercase letter beside an operator, relation sign or digit, must be carried by a
-  command as a whole string value (`expr.var`, a measure name). The constant `π` is never a name: only a
-  rule that lowered it can pay for it, by declaring `consumed.symbols: ['π']` (the ADR-462 route) —
-  `measurePi`, `setRadius`'s size read and every circle a parsed size radius sizes.
-- **Contextual plurals resolve against a per-family context registry (#554, [ADR-503](06-decisions.md#adr-503)).**
-  A follow-up line that names no object of its own — «המשיקים נחתכים בנקודה E» — resolves the definite
-  plural against what the figure already holds, read off the construction into `ParseContext`: the
-  common-tangent family through `ctx.commonTangents`, the tangents-at-points family through
-  `ctx.tangentLines`. Exactly two candidates ⇒ build; more ⇒ a clarification of the ADR-490 family
-  naming the candidates (`tangents-ambiguous`), never a guess; fewer ⇒ not that rule. A family's
-  one-utterance form and its incremental twin emit the same commands, so the figure cannot depend on
-  which spelling the student chose.
+  them; analytic's `INDEXED_TOKEN` is the same atom. The angle value reader composes `UNGLUED + num` and
+  declines a value symbol left beside its number (ADR-024's leftover guard). `normalizePointSubscript` folds
+  `α_1` like `O_1`; `droppedGivenNumbers` blanks indexed names before extracting numbers. The span
+  accountant's `symbol` kind requires every Greek glyph with its index (and in Latin-only text a lone lowercase
+  letter beside an operator) to be carried as a whole value (`expr.var`, a measure name); `π` is paid for only
+  by a rule declaring `consumed.symbols: ['π']` (ADR-462) — `measurePi`, `setRadius`'s size read.
+- **Contextual plurals resolve against a per-family context registry (#554, ADR-503).** A line naming no
+  object of its own («המשיקים נחתכים בנקודה E») resolves against `ParseContext` — `ctx.commonTangents`,
+  `ctx.tangentLines`: two candidates build, more ask (`tangents-ambiguous`), fewer are not that rule. A
+  family's one-utterance and incremental forms emit the same commands.
 
 ## 6. Rendering
 
 - **Hand-rolled SVG via React**, drawn declaratively from the engine's computed figure. No imperative reconciler (that existed only because the old JSXGraph API was imperative).
-- Visual vocabulary: points, segments, polygons, circles, angle arcs, right-angle marks, equal-side ticks, labels, dashed special lines; smooth animation of moved points; pan/zoom/fit.
+- Visual vocabulary: points, segments, polygons, circles, angle arcs, right-angle marks, equal-side ticks, labels, dashed special lines; pan/zoom/fit. Equal-side ticks appear only in the opt-in relations layer, never at rest (FR-RN-1, ADR-W-118 B2). Smooth animation of moved points (FR-RN-3) is not built.
 - **Swappable:** consumes engine output only, so it can be replaced (e.g. with a library like Mafs) without engine changes.
 - **Export-friendly:** because the figure is already SVG, exporting it as an image (SVG/PNG) for the authoring use-case (Vision G6 / FR-HS-5) is straightforward — serialize the rendered SVG, or rasterize it to PNG.
 
 ## 7. Theorems
 
-`detect(figure)` predicates evaluate the computed figure and return matches (definite vs possible), sorted definite-first, shown bilingually. Grouped by figure type (triangle, quadrilateral, circle). The canonical catalog is [`07-theorem-reference.md`](07-theorem-reference.md) (the official bagrut list); **theorem IDs are the official bagrut numbers** (so surfaced theorems are citable), and detection targets the entries tagged _property_ / _converse_ — not definitions, area formulas, or the out-of-scope appendices.
+**The theorem surface is switched off by the operator** (#740, 2026-08-18; ruling B4 keeps it off). The engine below and its tests stay; students see nothing.
+
+`detect(figure)` is now `detectTheorems`: it folds the theorem table over a coordinate-free `MatchCtx` (the construction and the stated facts, never coordinates) and returns matches (certain vs possible), attributed to the stated fact that completed each premise, shown bilingually. Grouped by figure type (triangle, quadrilateral, circle). The canonical catalog is [`07-theorem-reference.md`](07-theorem-reference.md) (the official bagrut list); **theorem IDs are the official bagrut numbers** (so surfaced theorems are citable), and detection targets the entries tagged _property_ / _converse_ — not definitions, area formulas, or the out-of-scope appendices.
 
 ## 8. Tech stack
 
@@ -162,487 +153,223 @@ A single boundary: `utterance → command[]`.
 
 ```
 src/
-  engine/        the constructive core: types (dependency-graph model), geometry, solve (constraints:
-                 refs/residual/describe + constraintKey identity), apply (applyCommand reducer + eager
-                 carrier pick), evaluate (topological sweep + the numeric driven solvers), step
-                 (applyStep/applyCoupledStep + the failure ladder — contract in docs/LADDER.md, trace on
-                 StepResult.ladder), sample, verify (givens verifier), relations/detectShapes (read-only
-                 detection over the shared sample core), inscribe/variants, solveBudget,
-                 valuesPanel (the derived-values rows + the ask lane, over the ONE shared sample pool)
-                 - its SYMBOL lane (ADR-485, #929) reads the ADR-031 symbol table the #427 unit lane
-                   FILTERS, enumerated instead: every letter the student named is a quantity, so it gets
-                   a row (natun when valued, nigzar when the figure forces it) and is askable by name
-                   through the `var` query. One lane feeds both seams - never a second enumeration.
-                 - circles are named through `circleRef` (ADR-552, #1442): drawn circles only (a hidden
-                   scaffold circle gets no row), a visible centre by its letter, an unnamed one as
-                   "the circle" or its ADR-342 token; `render/valueRowText` words every row label.
-  parser/        parse.ts (deterministic bilingual grammar, ordered rules + post-pass chokepoints +
-                 honesty gates), catalog, context (buildParseCtx — the docs/17 §3b registry), scope,
-                 llm/llmShared (the LLM-fallback seam; re-parse + gate battery)
-                 - THE CLARIFICATION FAMILY (ADR-490, ADR-494): a rule may return a `Clarify` instead
-                   of commands, which `refusalOf` maps to a refusal reason of the SAME NAME and
-                   `submitPipeline` renders as an input note that keeps the text. `not-handled` is the
-                   escalation seam — right for a phrasing the grammar cannot READ, wrong for one it
-                   reads perfectly well that is missing a given. `isAmbiguityQuestion` is the explicit
-                   whitelist of clarifications `parseResolved` may not second-guess back into an
-                   escalation. It is deliberate, NOT derivable from the `Clarify` union: a member
-                   belongs when the asking rule CONSUMED the shape noun, and `ambiguous-angle` is
-                   excluded because that question can be the symptom of a dropped noun, which the
-                   ADR-264 Am. 1 split rescues (deriving it was tried in round #961 and refuted)
-  app/           submitPipeline.ts — the text→command orchestration, extracted from App.tsx and
-                 directly tested (S0.4)
-                 decideDeterministic.ts — the whole PRE-LLM lane as one pure verdict (ADR-546, #1395):
-                   runSubmit dispatches it, log-triage calls it; it never touches the store, logs, or
-                   calls the model (the auto-binds are simulated on a copy of the facts, and committed
-                   as the line's own `name-by-use` facts by `commitVerdict` — ADR-588)
-                 - THE COMMIT SEAMS AND THE POST-COMMIT SEARCH (ADR-518, #1041). Three store actions
-                   change the fact list; the configuration search is a property of the SEAM, and the
-                   list below is an assertion in `app/__tests__/issue-1041-edit-resolve.test.ts`,
-                   not a comment:
-
-                     commitCommands (submit)  → resolveAfterCommit, via submitPipeline
-                     replaceGroup   (✎ edit)  → resolveAfterCommit, via editPipeline   ← was missing
-                     removeGroup    (delete)  → EXEMPT, measured (see below)
-
-                   ADR-510 moved the search off-thread into the callers and re-armed only the submit
-                   one; `replaceGroup` kept a comment describing a connection that did not exist, and
-                   also resets the seed to 0 (ADR-484), so an edit discarded the student's working
-                   configuration and then did not search. `EditDeps.resolveAfterCommit` is REQUIRED,
-                   so `tsc` names every call site — the compile-time half of the inventory.
-                   `removeGroup` is exempt on measurement, not on taste: across 12 deletions, a
-                   satisfiable remainder was valid at seed 0 every time and a broken one had no valid
-                   seed at all, so no case exists where the search would rescue a recoverable figure.
-                   Siblings: 3-D wires its edit seam synchronously inside `replaceFact`
-                   (`seedForRequirements`); complex has no configuration search to wire. The general
-                   mechanism — a decision reachable from no test gets reproduced — is #1132
-                 - errorSubject.ts (ADR-487, #943): `utteranceForError(facts, status, raw)` — WHICH
-                   sentence a refusal is about. Pure over its three inputs; it exists because
-                   `humanizeError` is deliberately figure-free (ADR-228 Am.6), so the student's own
-                   wording must be handed to it by the layer that has the fact list. The link needs no
-                   plumbing: ADR-398 already makes the banner's `lastError` and the failing row's
-                   `status` the same string, so the owning fact is found by that identity
-                 - AGAINST WHAT (ADR-508, #943 half B): `otherUtteranceForError(facts, raw)` resolves
-                   the structured `[vs #<index>]` tail the fold appends to an over-constrained status
-                   into that earlier statement's words; `humanizeError(raw, t, said, other)` then
-                   renders the `_said_vs` variant («X» סותר את «Y»). The tail is an INDEX because
-                   statuses live by index and a dry-run trial shares the committed fold; the fold names
-                   none when no single earlier statement's removal restores feasibility, and the
-                   `_said` wording stands. The search itself runs in the fold's attribution pass (next
-                   bullet), only on a refused statement, through its own memo, never nested. It tries the
-                   statements AFTER the failing one first, latest first (ADR-554, #1203) — a later
-                   line can commit while an earlier row goes ✗, and the latest statement whose
-                   removal lets that row hold is the one that broke it — then the earlier ones
-                 - WHICH row owns it is decided one layer down (ADR-492, #956): `computeFold` runs an
-                   attribution pass after the deferral/poisoning/HOIST have settled, moving a refusal
-                   from the row that SHAPED a constraint to the row that VALUED its symbol when that
-                   row is later in the list — "the last statement that turned the figure infeasible".
-                   Attribution only: it changes no applied constraint and no drawn figure, and it is
-                   the fold-time twin of ADR-398's per-seed override. `symbolsConsumedBy` (engine/
-                   lower.ts) is the shared list of what reads the symbol table, derived from
-                   `lowerOne`'s own call sites so the two cannot drift
-                 - WHICH CONSTRAINT a refusal names (ADR-493, #920): `addedConstraints(prev, next)`
-                   in engine/step.ts is listed-added ∪ driven-added, and it feeds the two blame sites
-                   in `runFailureLadder`. `driveOrCheck` case (1) embeds an obligation in a carrier
-                   WITHOUT listing it, so a macro whose constraints all go that way adds nothing to
-                   `next.constraints` — and `blameNewStatement`, which bails on an empty list, then
-                   silently no-ops and the primary solve's violated set (an earlier given of the
-                   student's) reaches them verbatim. Blame only: the acceptance paths keep reading
-                   the listed slice, since what counts as "new" for ACCEPTANCE is a different question
-  replay/        core.ts — the PURE replay layer (S1.2): fold memo + deferral + HOIST + seed/config
-                 searches + the shared sample core; engine ← replay ← store enforced by test
-                 — naming.ts (ADR-588, #1697): the naming cores (rename / name-centre / step-aside,
-                   moved from the store)
-                   and `resolveBinds`: a line's `name-by-use` facts applied to the facts before it,
-                   at the head of every replay
-                 — the fold's ATTEMPT SCOPE (ADR-583, #1675/#1584): every per-fact apply goes through
-                   `attemptFact` — a fact the outermost fold already failed is a RE-attempt: answered
-                   from the scope's failure memo when its `solveSignature` is unchanged, else run under
-                   the deterministic `REATTEMPT_WORK_CAP` (executed units) and reported with its first
-                   failure verbatim when cut; the first attempt is never capped (ADR-281). A role
-                   re-reading's dry run (`decideDeterministic`) is capped likewise in charged units,
-                   inside one work epoch with the line's own dry run (`ROLE_READING_WORK_CAP`).
-                   A fold in which the cap CUT a re-attempt carries `reattemptCut` (ADR-586, #1770);
-                   `observeReattemptCuts` reports the cut folds a check read (computed or served from
-                   the fold/replay memo), and a check that concludes from failures — the configuration
-                   pool's `complete`, the gate seat sweep's `complete` — reads a cut as NOT finished
-                   (the student's own figure's fold is exempt in the pool: its cut is its row status).
-                 — the fold's RETRY PASS and CLAIM RULE (ADR-577, #1411): one lowering
-                   (`engineCmdsOf`) and one all-or-nothing apply (`tryApplyFact`) serve the in-order
-                   pass and the ADR-104 retry alike. The retry takes every red, enabled, non-forced,
-                   non-futile row — CREATING rows too (the 2-D half of ADR-W-089) — in list order to a
-                   fixpoint, except a row that would re-introduce a point ANOTHER statement claims and
-                   the figure lacks (its definition is gone: the removal/mute cascade). A FAILED row
-                   claims only the points it DEFINES (`introducedDefinedPointIds` — never a free point
-                   it would merely auto-create); a disabled or atomic-poisoned row still claims all.
-                   A node where a creating row landed on the retry carries `retriedCreating` and is
-                   never a #365 prefix-resume point, so the memo stays a pure cache. `evaluate`'s
-                   stuck branch names an absent operand («undefined point: A, B») and keeps
-                   «unresolved dependencies for:» for a genuine cycle
-                 — the config searches RANK rather than merely accept (ADR-486, #942): a view that
-                   stacks two named points is legal (ADR-123 — a forced coincidence must still draw)
-                   but is the LAST tier, below every separated one. `separatedView` is that predicate,
-                   consulted once each by searchAnotherView / firstSatisfyingSeed / findValidConfig
-  store/         geoStore.ts (Zustand + zundo: the fact list as source of truth, actions,
-                 rename/swap/merge; re-exports the replay layer), figureFile (save/load), loadAudit,
-                 geoWork/geoWorker (the Web-Worker seam)
-                 — the drawn figure is `(facts, seed)`: a STRUCTURAL edit (remove/removeGroup/
-                   replaceGroup/toggle/setGroupEnabled) resets the seed to 0 so re-entering a line
-                   reproduces its first result, while undo/load/rename keep it (ADR-484, #938). The
-                   satisfying-seed search runs whenever the figure does not build at the current seed
-                   (`Derived.sampledFailure`), not only when it builds and looks bad.
-  render/        transform + scene (pure figure→primitives) + Figure.tsx (declarative SVG, pan/zoom,
-                 hover picks); a pure consumer of engine output
-                 — #942 (ADR-486): points the geometry drove onto one spot are drawn as ONE label
-                   («B=D»); the merge is by label only, so ids, positions and hover targets are intact
-  theorems/      the authored theorem table + coverage disposition map + rank bands + audit harness
-  validation/    the differential coordinate oracle (engine-import-free; dev/CI only)
-  export/        question export (.docx)
-  i18n/          locales (he/en)
-server/          the shared LLM proxy + admin dashboards (parameterized by tool:; called by 2-D, 3-D and analytic)
-src3d/           the sibling 3-D product (pattern-copied, never imported — see CLAUDE.md §multi-product)
+  engine/      the constructive core: types (dependency-graph model), geometry, solve (constraints +
+               constraintKey identity), apply (applyCommand reducer), evaluate (topological sweep + the
+               driven solvers), step (applyStep/applyCoupledStep + the failure ladder, docs/LADDER.md),
+               sample, verify (givens verifier), relations/detectShapes, inscribe/variants, solveBudget,
+               valuesPanel (the derived-values rows + the ask lane, over the ONE shared sample pool)
+  parser/      parse.ts (bilingual grammar: ordered rules + post-pass chokepoints + honesty gates), catalog,
+               context (buildParseCtx — the docs/17 §3b registry), scope, llm/llmShared (the LLM-fallback seam)
+  app/         submitPipeline.ts (the text→command orchestration), decideDeterministic.ts (the whole pre-LLM
+               lane as one pure verdict), errorSubject.ts
+  replay/      core.ts — the pure replay layer: fold memo + deferral + HOIST + seed/config searches + the
+               shared sample core; naming.ts; engine ← replay ← store enforced by test
+  store/       geoStore.ts (Zustand + zundo: the fact list as source of truth, rename/swap/merge),
+               figureFile (save/load), loadAudit, geoWork/geoWorker (the Web-Worker seam)
+  render/      transform + scene (pure figure→primitives) + Figure.tsx (declarative SVG, pan/zoom, hover)
+  theorems/    the authored theorem table + coverage disposition map + rank bands + audit harness
+  validation/  the differential coordinate oracle (engine-import-free; dev/CI only)
+  export/      question export (.docx)
+  i18n/        locales (he/en)
+server/        the shared LLM proxy + admin dashboards (parameterized by tool:)
+src3d/         the sibling 3-D product (pattern-copied, never imported)
 ```
+
+Seams recorded against the layout:
+
+- **valuesPanel's symbol lane (ADR-485, #929)** reads the ADR-031 symbol table: every letter the student named
+  gets a row (natun when valued, nigzar when forced) and is askable through the `var` query. Circles are named
+  through `circleRef` (ADR-552, #1442) — drawn circles only, a visible centre by its letter, an unnamed one as
+  "the circle" or its ADR-342 token; `render/valueRowText` words every row label.
+- **The clarification family (ADR-490, ADR-494).** A rule may return a `Clarify`, which `refusalOf` maps to a
+  refusal reason of the same name and `submitPipeline` renders as a note that keeps the text; `not-handled` is the
+  escalation seam. `isAmbiguityQuestion` is the explicit whitelist `parseResolved` may not turn back into an
+  escalation (a member consumed the shape noun; `ambiguous-angle` is excluded, ADR-264 Am. 1).
+- **`decideDeterministic`** is dispatched by `runSubmit` and called by log-triage; its auto-binds are simulated on a
+  copy and committed as the line's own `name-by-use` facts by `commitVerdict` (ADR-588).
+- **The commit seams and the post-commit search (ADR-518, #1041).** The search is a property of the seam, asserted
+  in `app/__tests__/issue-1041-edit-resolve.test.ts`: `replaceGroup` searches like submit; `removeGroup` is exempt
+  on measurement. `EditDeps.resolveAfterCommit` is required, so `tsc` names every call site. 3-D wires its edit seam
+  inside `replaceFact` (`seedForRequirements`). The full inventory is ADR-522 (the submit gate, below); the general
+  mechanism is #1132.
+- **errorSubject.ts (ADR-487, #943).** `utteranceForError(facts, status, raw)` finds the sentence a refusal is
+  about for the figure-free `humanizeError` (ADR-228 Am.6), through ADR-398's identity of the banner's `lastError`
+  and the failing row's `status`. **Against what (ADR-508):** `otherUtteranceForError(facts, raw)` resolves the
+  fold's `[vs #<index>]` tail into the earlier statement's words, and `humanizeError(raw, t, said, other)` renders
+  `_said_vs` («X» סותר את «Y»), else `_said`. The search runs in the fold's attribution pass on a refused statement
+  only, later statements first, latest first (ADR-554, #1203).
+- **Which row owns a refusal (ADR-492, #956).** `computeFold`'s attribution pass moves a refusal from the row that
+  shaped a constraint to a later row that valued its symbol — attribution only. `symbolsConsumedBy`
+  (`engine/lower.ts`) is derived from `lowerOne`'s own call sites.
+- **Which constraint a refusal names (ADR-493, #920).** `addedConstraints(prev, next)` (engine/step.ts) is
+  listed-added ∪ driven-added and feeds the blame sites in `runFailureLadder`, because `driveOrCheck` can embed an
+  obligation without listing it in `next.constraints`, and `blameNewStatement` bails on an empty list. Acceptance
+  still reads the listed slice.
+- **replay/naming.ts (ADR-588, #1697)** holds the naming cores (rename / name-centre / step-aside) and
+  `resolveBinds`, applied at the head of every replay.
+- **The fold's attempt scope (ADR-583, #1675/#1584).** Every per-fact apply goes through `attemptFact`; a
+  re-attempt is answered from the failure memo when its `solveSignature` is unchanged, else capped by
+  `REATTEMPT_WORK_CAP` (the first attempt never is, ADR-281). A role re-reading's dry run (`decideDeterministic`)
+  is capped by `ROLE_READING_WORK_CAP`. A fold whose re-attempt was cut carries `reattemptCut` (ADR-586, #1770);
+  `observeReattemptCuts` reports it, and a check that concludes from failures (the pool's and the seat sweep's
+  `complete`) reads a cut as unfinished.
+- **The fold's retry pass and claim rule (ADR-577, #1411).** One lowering (`engineCmdsOf`) and one all-or-nothing
+  apply (`tryApplyFact`) serve the in-order pass and the ADR-104 retry, which takes every red, enabled, non-forced,
+  non-futile row (creating rows too — ADR-W-089) to a fixpoint, except a row re-introducing a point another
+  statement claims. A failed row claims only the points it defines (`introducedDefinedPointIds`); a node where a
+  creating row landed on the retry carries `retriedCreating` and is never a #365 resume point. `evaluate`'s stuck
+  branch names an absent operand («undefined point: A, B»).
+- **The config searches rank (ADR-486, #942).** A view stacking two named points is legal (ADR-123) but the last
+  tier; `separatedView` is consulted by searchAnotherView / firstSatisfyingSeed / findValidConfig. The renderer
+  draws such points as one label («B=D»), merged by label only.
+- **The drawn figure is `(facts, seed)` (ADR-484, #938).** A structural edit (remove/removeGroup/replaceGroup/
+  toggle/setGroupEnabled) resets the seed to 0; undo/load/rename keep it. The satisfying-seed search runs whenever
+  the figure does not build at the current seed (`Derived.sampledFailure`).
 
 ## 10. Build order (de-risk the core first) — *historical: all steps complete*
 
-> The full phased plan (scope, dependencies, requirement coverage, per-phase gates, milestones) is in the archived [`09-implementation-plan.md`](archive/09-implementation-plan.md). The list below is the summary.
-
-1. **Engine core slice** — dependency graph + topological eval + free/on-segment/intersection points + branch cycle. Prove it on fixtures (build + stability; a genuine two-branch construction; a contradiction) from hardcoded command lists. *Make-or-break.*
-2. **SVG renderer** for that slice.
-3. **Grammar parser** → commands (replaces the hardcoded list).
-4. **Expand** objects/constraints/special-lines to the full v1 scope.
-5. **Theorem detection.**
-6. **API fallback + proxy** + cost controls.
-7. **Polish + deploy.**
+Historical: the phased plan is the archived [`09-implementation-plan.md`](archive/09-implementation-plan.md), and what was built is recorded in the ADR log ([06](06-decisions.md)).
 
 ## 11. Key risks
 
-- **R1 — Engine expressiveness.** Does the constructive/branch model cover the v1 figure vocabulary cleanly? Mitigation: prove the slice (step 1) before building outward.
-- **R2 — Parser coverage vs. fallback rate.** If the grammar parser is too narrow, API usage (and cost) rises. Mitigation: design the grammar from real bagrut phrasings; measure fallback rate.
-- **R3 — Stability under attachment.** Keeping shared/derived geometry stable as constraints accumulate. Mitigation: persistent DOF/branch indices + the stability test.
+Historical: current risks and the decisions that answer them live in the ADR log ([06](06-decisions.md)).
 
-## The within-segment gate and its structural exemption (#944, [ADR-489](06-decisions.md#adr-489))
+## Parser chokepoints and gates
 
-`intersectionsWithinSegments` exists to catch a crossing that has wandered off the end of its segment —
-the signature of a wrong configuration, which the reflection sampler is meant to fix. It therefore
-assumes the crossing *could* be interior.
+### The clarification family, and where an ASK beats an escalation (#777, [ADR-490](06-decisions.md#adr-490))
 
-That assumption fails for exactly one construction shape: **the two carriers share a vertex**. «D = חיתוך
-AB ו-BC» names the crossing of AB and BC, and two segments meeting at B cross only at B — so "strictly
-inside both spans" is not a tight tolerance, it is unsatisfiable. `shareEndpoint` is the guard, and it is
-structural (does the construction give the carriers a common endpoint?) rather than numeric, because a
-wider `WITHIN_MARGIN` would re-admit the near-collapse basin #569 exists to catch.
+`not-handled` is the escalation seam: whatever reaches it becomes a paid LLM call — right for a sentence the
+grammar cannot *read*, wrong for one it reads but which is **missing a given**. A known phrasing with an operand
+genuinely absent returns a `Clarify` and asks, keeping the student's text: anything the tool supplied would be a
+given never stated (ADR-052). Members: `incompleteComparative` (#777) and the role-side ask (#775). A new member is
+registered **after** the rule that owns the complete form, and its absence is **structural** (an end-of-line
+anchor), never inferred from another rule failing.
 
-The question is asked at **three** sites and all three take the exemption: the gate itself,
-`segmentsCrossWithin` (the point-free sibling from ADR-383), and `reflectMaskForFailing`, which picks
-reflection culprits from the same test — an exempt meet is not failing, so it must not be blamed.
-## The measure-label seam and the display choice (#948, [ADR-488](06-decisions.md#adr-488))
+### Addressing an angle: one reader, many value kinds (#967, [ADR-496](06-decisions.md#adr-496))
 
-A symbolic measure becomes figure text at exactly one place — `measureLabelForms` in
-`src/engine/lower.ts`, reached from the fold's symbolic-measure branch in `src/replay/core.ts`.
-`measureLabelText` is now that function's `text` half, so the printed string and the switchable one
-cannot drift.
-
-The seam produces BOTH forms when they differ: `text` (the resolved number) and `letter` (the
-student's own expression), plus the `sym` they differ over. Three consequences, and each is the reason
-for a design choice rather than an incidental effect:
-
-- **The competing predicate is `letter !== undefined`**, derived from the builder itself. There is no
-  list of label kinds to keep in sync, so a future fourth kind starts offering the display chip with no
-  change to the chip code (docs/17 §3 — no second enumeration).
-- **The swap happens at the RENDER seam** (`applyDisplayMode`, called in `App.tsx` on the built
-  labels), never inside the fold. So `displayMode` never enters the replay memo's key: toggling is
-  instant even on a figure whose cold fold costs seconds, and the fold-memo rule (docs/08) is untouched.
-- **The choice is state, not geometry.** It lives beside `seed` in `geoStore` — in `partialize`, in
-  the temporal `equality`, cleared by `clear`, pruned on remove/replace — and never enters the ordered
-  fact list, so CLAUDE.md's `(facts, seed)` source-of-truth rule stands.
-
-In the save file the map is keyed by fact **position**, not fact id (`FigureFileDisplay.displayMode`).
-Fact ids DO survive a round trip here — `sanitizeFactIn` keeps them — but only when the file carries
-them; a hand-written or id-less file gets fresh nanoids and an id-keyed choice would then attach to the
-wrong row. Position is a property of the file itself and cannot drift, and it matches 3-D so the shared
-converters in `shell/displayMode.ts` have one usage shape.
-
-## The three label sources, and the rule they all obey (#955, [ADR-491](06-decisions.md#adr-491))
-
-A measure label on the 2-D canvas comes from one of three places:
-
-| source | when it runs | gate |
-| --- | --- | --- |
-| the fact seam — a symbolic measure's forms, an angle-alias name (`labelFrom` in `computeFold`) | inside the fold, **from the fact's success branch** — the in-order pass and the ADR-104 retry alike | the fact HELD |
-| #474's stated-magnitude pass | `runTail`, post-fold | `status[f.id] === 'ok'` |
-| the surviving-constraint fill | `runTail`, post-fold | the constraint survived |
-
-One rule: **a label is written from a fact only once the fact held.** Until ADR-491 the first source ran at
-the top of the per-fact loop, before `applyStep`, which is how a refused «∠ABC = α» came to print the `70°`
-that «α = 70» supplied on another line. A refused fact now writes nothing, and the key stays free for a
-surviving constraint to fill.
-
-The seam stays *inside* the fold on purpose: labels are fold state like `applied`, content-determined, so
-the fold memo (ADR-280) carries them correctly for every fact list sharing a node, and the #365 resume
-copies a prefix's maps verbatim. What may **not** ride the memo is fact identity — statuses are stored by
-index for exactly that reason — so no provenance field is stored on a label (the first attempt did, and a
-same-content replay under fresh ids lost its labels).
-
-**The verifier's last word.** After the labels are assembled, `checkLabels` (`engine/verify.ts`) holds
-every label that asserts a decimal to the drawn length / angle / area, at the verifier's own tolerance plus
-the half-unit the 2-dp print rounds away, and reports a disagreement as a violation (`figure.v.label`).
-Symbolic, exact and alias texts are the student's writing and are not measured; a measure already reported
-as a violated given is not reported twice. This runs on the assembled labels **whatever source produced
-them**, so a future fourth source that forgets the rule is caught on the first figure it lies about.
-
-**The rule to carry forward:** a new label source states which of these three shapes it is, and emits only
-from a fact that held or a constraint that survived. If it cannot know the outcome where it runs, it is in
-the wrong place.
-## The clarification family, and where an ASK beats an escalation (#777, [ADR-490](06-decisions.md#adr-490))
-
-`not-handled` is the escalation seam: whatever reaches it becomes a paid LLM call. That is the right
-destination for a sentence the grammar cannot *read* — and the wrong one for a sentence it reads
-perfectly well but which is **missing a given**.
-
-The distinction is worth stating because it decides the routing:
-
-| the utterance | destination |
-| --- | --- |
-| a phrasing the grammar does not know | `not-handled` → the LLM can legitimately try |
-| a phrasing the grammar knows, with an operand genuinely ABSENT | a `Clarify` → ask the student |
-
-In the second case anything the tool supplies is a given the student never stated (ADR-052), and asking
-the model to supply it only moves the invention one layer down — where it also becomes something the
-tool *teaches*. `incompleteComparative` (#777) and the role-side ask (#775) are the two members so far;
-both keep the student's text so the sentence is completed in place rather than retyped.
-
-The scoping discipline is the same for any future member: register the ask **after** the rule that owns
-the complete form, and make the absence **structural** (here, an end-of-line anchor after the factor, so
-a line carrying «מ…» cannot match) rather than inferred from the other rule having failed.
-
-## Addressing an angle: one reader, many value kinds (#967, [ADR-496](06-decisions.md#adr-496))
-
-An angle statement has two independent halves: **which angle** is named, and **what is said about it**.
-The value half is a family — a number, a Greek symbol, a word-number, a right-angle word, an acuteness, a
-bound, a range. The naming half was, until #967, a single spelling: the three-letter vertex triple.
-
-That asymmetry is a defect generator, and #831/[ADR-468](06-decisions.md#adr-468) had already named it
-once: when each value rule resolved the vertex for itself, only one of them ever grew the single-vertex
-lane, so «זווית A = α» fell between two rules that each handled half of it. The answer then was to make
-**`angleArms` the one place that answers "which angle is being named"**, so a rule decides only what its
-value *means*.
-
-#967 is the same shape one axis over — the naming half had one spelling where it should have had two —
-and it gets the same answer rather than a new rule per phrasing:
+An angle statement has two halves: **which angle** is named and **what is said about it**. **`angleArms` is the
+one place that answers which angle is named** (ADR-468, #831); every value rule reads through it — the numeric and
+symbolic lanes, `angleAcuteness` and `boundOperand` (ADR-500, #970). Naming by two sides is a mode of that reader:
 
 ```
 «הזווית בין BD ל-BA»  ──►  angleBetweenSides  ──►  { ray1: D, vertex: B, ray2: A }  ──►  the existing family
 ```
 
-Two segments that share exactly one endpoint **are** a vertex angle, so the mode resolves to the ordinary
-triple and every downstream layer — constraint, arc, value chip, verifier — is untouched. That equivalence
-is the whole fix; there is no new constraint kind and no new rendering path.
+Two segments sharing exactly one endpoint resolve to the ordinary triple, so constraint, arc, value chip and
+verifier are untouched. `boundOperand` carries a refusal channel rather than returning `null`, so a bound refuses
+by name as a value does.
 
-**The mode had to be added by hand to two rules — and that duplication is now retired**
-(#970, [ADR-500](06-decisions.md#adr-500)). When #967 landed, `angleArms` had only two callers (the
-numeric and symbolic value lanes), while `angleAcuteness` and `boundOperand` still kept their **own
-copies** of the triple/single-vertex lanes — the #831 remainder, never migrated. So the new mode was added
-to them explicitly and *additively*, leaving their existing lanes untouched so no reading changed, and the
-duplication was recorded here rather than left implicit: a fourth naming mode would have had to be copied
-three times, and the forgotten copy reproduces #831's defect exactly.
+**A lone vertex** is resolved by `resolveVertexAngle(v, ctx, exclude?)` (ADR-590, #1445) for every single-letter
+site — `angleArms`, the bare `B = 30`, the equality sides, the measure-sum terms, the bisector's forms — in place
+of their `nb.length !== 2` tests. Exactly two edges → that angle; else exactly one declared polygon
+(`ctx.polygons`) holding the vertex → its interior angle; else `ambiguous-angle` with `options` (every edge pair,
+less a straight pair stated via `onSegment`/`midpointOf`). A polygon-default reading goes to a reading sink owned
+by the outermost `parse`, which reports the winning commands' `angleReadings`; the submit path shows
+`input.vertexAngleReadAs` («הובן כ-∠ABC»). The parser stays a pure function of `(utterance, ctx)`.
 
-ADR-500 retired both copies. All three call sites now read through `angleArms`, and the migration was
-measured rather than assumed — a 498-case differential, 132 cells changed, **0 real regressions**, of which
-115 were a refusal *improving* from an escalation to a named clarification. Two things fall out that are
-worth keeping in view when the next mode is added:
+**Disjoint sides are refused.** Every 2-D angle constraint is vertex-anchored (`set-angle`, `-bound`, `-ratio`,
+`-order`, `-acuteness`, `measure-angle`), so two segments that never meet answer `angle-sides-disjoint`, quoting
+both — a clarification-family member. 3-D accepts them through its direction/`claim` substrate.
 
-- **A refusal channel is part of a reader's contract.** `boundOperand` could not carry one — its return
-  type had no room for it — so «הזווית בין BD ל-CA גדולה מ-40» escalated to the paid model while the
-  identical naming in a *value* statement was refused by name. Widening the type enumerated the five call
-  sites that had to propagate it; returning `null` would have preserved the silence and told no one.
-- **The chokepoint is only real when nothing else answers the same question.** #831 declared this
-  chokepoint and was still true of the code it touched; the guarantee failed because two rules that also
-  answered "which angle is named" were never brought in. A declared single reader with unmigrated callers
-  is not a chokepoint, it is a convention — and conventions are what #967 paid three edits for.
+#### The other half of the same statement: the VALUE (#969, [ADR-498](06-decisions.md#adr-498))
 
-**Which angle a lone vertex names is one function too** (#1445, [ADR-590](06-decisions.md#adr-590)).
-`resolveVertexAngle(v, ctx, exclude?)` answers it for every single-letter site — `angleArms` (so the value,
-symbol, acuteness and bound lanes), the bare `B = 30`, the equality sides, the measure-sum terms, the
-bisector's vertex form and both bisector apex reads — which until then each kept their own `nb.length !== 2`
-test. Its order: exactly two edges → that angle; else exactly one declared polygon (`ctx.polygons`, deduplicated
-by vertex set) holding the vertex → its interior angle (ring neighbours); else `ambiguous-angle` with
-`options` (every edge pair, less a straight pair the construction states via `onSegment`/`midpointOf`). A
-polygon-default reading is pushed to a **reading sink** owned by the outermost `parse` call; `parse` reports
-only the readings its winning commands name (`angleReadings` on the ok result), and the submit path turns
-them into the `input.vertexAngleReadAs` note («הובן כ-∠ABC»). The sink is reset when `parse` returns, so the
-parser stays a pure function of `(utterance, ctx)`.
-
-**The refusal is part of the capability.** Two segments that never meet have no vertex between them, and
-2-D has no line-line angle constraint — *every* angle constraint here is vertex-anchored
-(`set-angle`, `-bound`, `-ratio`, `-order`, `-acuteness`, `measure-angle`). So the honest answer is neither
-a guessed vertex nor an escalation (which hands the model the same invention to make): it is
-`angle-sides-disjoint`, quoting both segment names back — a member of the clarification family above, by
-the same reasoning. 3-D accepts these because it has a direction/`claim` substrate that 2-D does not; the
-parity is in the *addressing mode*, not in the constraint kinds behind it.
-### The other half of the same statement: the VALUE (#969, [ADR-498](06-decisions.md#adr-498))
-
-The section above unifies **which angle is named**. #969 was the same defect in the half it does not
-cover — **what is said about it** — and it is worth reading the two together, because the second one
-happened *while the first one's guarantee was true*.
-
-The value half splits by kind: a number goes to `angle`, a symbol to `measureAngle`. Until #969 they did
-not merely take different values, they **located** them differently:
-
-| | how it finds the value | copulas it accepts |
-| --- | --- | --- |
-| `angle` (numeric) | **positionally** — any standalone number in the line | all of them, implicitly; it never needed one |
-| `measureAngle` (symbolic) | **syntactically** — after a literal `=` | exactly one |
-
-So «זווית ABC = 2α» bound the symbol, and «זווית ABC היא 2α» fell through to the numeric lane, whose
-number scan found the **coefficient** `2` and committed 2° — the student's α gone, the line green.
-
-The repair is not a copula list. The numeric lane has no list to copy: a list would be incomplete against
-its sibling on the day it was written. Both kinds are located the same way instead —
+Both value kinds are located the same way:
 
 ```
 stripped ──► angleValueOf ──► { kind: 'num', … } ──► angle          (set-angle)
                           └─► { kind: 'sym', … } ──► measureAngle   (measure-angle)
 ```
 
-— with a symbolic value read as the **trailing expression** of the statement, exactly as a numeric one is
-a standalone number in it. Two guards are what let the `=` go, and both exist because a symbol is spelled
-like a label where a number is self-identifying: the symbolic read is **end-anchored** and must be
-**preceded by a non-letter**. Without them «זוית abc» reads as the value `c`, and "angle ABC is acute" as
-the value `e`.
-
-Three consequences worth stating, because each is a place the old shape leaked:
-
-- **A comparison is a region, not a value** — in *both* alphabets now. «זווית ABC גדולה מ-α» would have
+A number goes to `angle` and a symbol to `measureAngle`, each read as the **trailing expression** of the
+statement, so no copula list exists. The symbolic read is **end-anchored** and **preceded by a non-letter**, so a
+label is never read as a value. A comparison is a region, not a value, in both alphabets: «זווית ABC גדולה מ-α» would have
   been claimed as the equality ∠ABC = α once the `=` requirement went, so `COMPARES_WITH_SYMBOL` joins
-  [ADR-390](06-decisions.md#adr-390)'s numeric tripwire. Both bails live with the reader, not in one rule:
-  a guard only one lane applies is the exact shape of this bug.
-- **The numeric rule refuses a symbol instead of valuing it.** Reaching `angle` with a symbolic value means
-  the symbolic rule could not *name* the angle; committing the coefficient there would be #969 again. It
-  returns `null`, and the utterance escalates honestly.
-- **The naming modes come along for free.** #967's segment-pair mode was added to `angleArms` alone, so
-  «הזווית בין BD ל-BA היא 2α» binds the symbol with no new code. That is the property both halves of this
-  rule pair exist to have, and it is asserted in the locks rather than assumed.
+ADR-390's numeric tripwire, both bails living with the reader. The numeric rule returns `null` on a symbolic value
+instead of committing its coefficient, so the line escalates; naming modes come free through `angleArms`.
 
-The general lesson, and the reason this is documented next to its sibling rather than in its own section:
-**a chokepoint that unifies one half of a statement leaves the other half free to re-split.** #831 unified
-the naming half and said so; the value half stayed split for eleven months underneath that sentence.
-### The relation half: where the right-hand side starts (#976, [ADR-507](06-decisions.md#adr-507))
+#### The relation half: where the right-hand side starts (#976, [ADR-507](06-decisions.md#adr-507))
 
-**The verbose LENGTH frame routes by its connective** ([ADR-524](06-decisions.md#adr-524), [ADR-539](06-decisions.md#adr-539)).
-`normalizeVerboseLength` reads «אורך/הצלע/הקטע <seg> <connective> <value>» and asks one question of the
-connective — not what the sentence means, but WHICH rule owns it: a copula (the closed allowlist
-`LENGTH_COPULA`: nothing, «=», «הוא», «שווה ל») → `<seg> = <value>` for the equality rule; a relation
-(`LENGTH_RELATION`, built from the bound rule's own atoms — the glyphs, `CMP_BIG`/`CMP_SMALL`,
-`CMP_AT_LEAST`/`CMP_AT_MOST`, «בין») → the frame stripped and `<seg> <connective> <value>` handed verbatim
-to `measureBound`; anything else → untouched, failing closed. The two sets are disjoint by construction and
-never merged into one alternation — a relation word beside the copulas is how a bound became an equality
-(#1248, the P1). `CMP_AT_LEAST`/`CMP_AT_MOST` are the non-strict words («לפחות», «לכל היותר», "at least",
-"at most"): the bound rule lowers them with `minStrict: false` / `maxStrict: false`, the ADR-529 fields.
+**The verbose LENGTH frame routes by its connective** (ADR-524, ADR-539). `normalizeVerboseLength` reads
+«אורך/הצלע/הקטע <seg> <connective> <value>» and asks which rule owns the connective: a copula (`LENGTH_COPULA`:
+nothing, «=», «הוא», «שווה ל») → `<seg> = <value>` for the equality rule; a relation (`LENGTH_RELATION`, built from
+the bound rule's atoms — the glyphs, `CMP_BIG`/`CMP_SMALL`, `CMP_AT_LEAST`/`CMP_AT_MOST`, «בין») →
+`<seg> <connective> <value>` handed to `measureBound`; anything else → untouched. The two sets are disjoint by
+construction. `CMP_AT_LEAST`/`CMP_AT_MOST` lower with `minStrict: false` / `maxStrict: false` (ADR-529).
 
-**A ROLE noun in front of the segment composes instead of rewriting** ([ADR-574](06-decisions.md#adr-574), #1607).
-«האלכסון AC = 8», «התיכון AM הוא 5», «הגובה AH = 5» say what the segment IS as well as how long it is, so the
-lossless role-less rewrite above would drop a given. `roleLength` parses the two halves through the real
-grammar — the role half «<noun> XY» exactly as the role rule reads it alone (the diagonal claim, the median's
-midpoint, the altitude's foot, and their refusals), the length half through the SAME `routeLength` decision
-the plain frame uses (copula → equality, relation → bound, anything else → bow out, failing closed). Either
-half unreadable → the rule bows out and the line is read as before.
+**A role noun in front composes** (ADR-574, #1607): `roleLength` parses the role half «<noun> XY» as the role rule
+reads it alone, and the length half through the same `routeLength` decision; either half unreadable → it bows out.
+**A height as a magnitude** (ADR-575, #1443): a cevian phrase naming a side or apex but no segment is read by the
+cevian rule and the length lands on the segment it drew; a trapezoid's shape height is rewritten to the cevian
+phrase between its bases (`ctx.parallels`, ADR-169), while a parallelogram's or triangle's asks through
+`ambiguous-construct` with side-naming sentences carrying the value.
 
-**A HEIGHT AS A MAGNITUDE, with no segment named** ([ADR-575](06-decisions.md#adr-575), #1443). Two readings feed
-the same composer. A cevian PHRASE that names a side or an apex but no segment («הגובה לצלע BC הוא 4», «התיכון
-מ-A הוא 5») is read by the cevian rule alone, and the length lands on the segment that reading drew (apex to the
-foot or midpoint it minted). A SHAPE height («גובה הטרפז 4») is resolved against the declared polygons: a
-trapezoid's is rewritten to the cevian phrase between its bases (ADR-169's `ctx.parallels`) and composed, so the
-foot is minted and drawn by the altitude rule; a parallelogram's (two) and a triangle's (three) ASK through
-`ambiguous-construct`, offering side-naming sentences that carry the student's value and each build.
+**Word copulas.** The relation readers — `angleEquality`, `arcEquality`, `measureSum` — split on `=`;
+`normalizeWordEquality` (the #185 chokepoint) rewrites a word copula to `=` when a labelled angle reference follows
+— the bare «היא» / «הוא» / «שווה» and "is" / "are" beside «שווה ל» / "equals" / "is equal to". The label in the
+lookahead is the guard («היא זווית ישרה» keeps its lane); a copula before a bare number or a segment stays out.
+**Arcs take only the explicit spellings** (ADR-533, #1000): the arc keywords stay only in `שווה ל` / `equals` /
+`is equal to`, and `arcEquality` answers the bare form with an owned `arc-copula` clarification carrying the two
+labels — the channel of `cevian-wrong-side` and `crossing-already-named` — whose offered sentence is driven in the lock.
 
-ADR-498 stopped the VALUE lanes from locating by copula. The RELATION readers — `angleEquality`,
-`arcEquality`, `measureSum` — still split the line on the literal `=`, so «זווית ABC היא זווית DEF» was
-`not-handled` while «= זווית DEF» and «שווה לזווית DEF» worked. The seam has ONE home: `normalizeWordEquality`
-(the #185 chokepoint) rewrites a word copula to `=` when a labelled angle/arc reference follows — the bare
-«היא» / «הוא» / «שווה» and "is" / "are" now join «שווה ל» / "equals" / "is equal to" there, with an optional
-coefficient and article allowed in the lookahead. The **label requirement** in the lookahead is the guard:
-«היא זווית ישרה / קהה / חדה» and "is a right angle" carry an adjective, not a label, and keep their lanes; a
-copula before a value never reaches the seam. A copula before a bare number or a segment stays out by the
-2026-07-17 ruling (word equality is narrowed to angles/arcs and degree values). No relation rule knows a
-copula — a new spelling is a lookahead row here, never a regex in three rules.
+### A role noun is a claim: «אלכסון» (#966, [ADR-499](06-decisions.md#adr-499))
 
-**The bare copulas are ANGLES only** (#1000, [ADR-533](06-decisions.md#adr-533), operator ruling
-2026-09-14). ADR-507 admitted them for angle and arc references alike, in one step. That was never wrong
-for angles and never right for arcs: «זווית ABC היא זווית DEF» compares two MEASURES, while
-«קשת CD היא קשת DE» says one arc IS the other, which between two differently-named arcs is not a claim.
-The seam reads structure and this distinction is semantic, so it is drawn at the KEYWORD — the arc
-keywords come out of the two bare-copula rules, and stay in the two explicit ones (`שווה ל` /
-`equals` / `is equal to`), which are the canonical spellings.
+A role noun assigns a role, and a role is an assertion: «אלכסון AB» says *AB is a diagonal*. The claim is carried
+as a command and checked, never stripped as filler (the class of #536 and #859).
 
-**What the narrowed spellings meet is a refusal that TEACHES, not `not-handled`.** `not-handled` is the
-LLM escalation seam, and escalating a form the tool deliberately declines asks a paid model to accept
-the very spelling that was ruled out. `arcEquality` already owns *"this is an arc relation sentence"*,
-so the guard sits at its head and returns an owned `arc-copula` clarification carrying the two arc
-labels — the same channel as `cevian-wrong-side` and `crossing-already-named`. The offered sentence is
-the student’s own line with one word changed, and it is **driven** in the lock rather than written out
-beside the message, because a remedy that returns the same refusal is the #1156 failure mode.
+#### One predicate, two layers
 
-## A role noun is a claim: «אלכסון» (#966, [ADR-499](06-decisions.md#adr-499))
-
-Most nouns in this grammar NAME a thing: «קטע AB» says "the segment AB". A few instead assign a **role**,
-and a role is an assertion — «אלכסון AB» says *AB is a diagonal*, which is either true of the figure or
-not. The parser used to strip «אלכסון» as filler beside «קטע», so the claim never survived to be checked,
-and the tool drew the segment either way.
-
-That is a defect **generator**, not one bug: the same shape produced #536 (a stated collinear ORDER is
-neither enforced nor verified) and #859 (this noun's 3-D twin). Whenever a word carries an assertion and
-the pipeline treats it as a pointer, the assertion is silently dropped — and the failures are invisible in
-the prod logs by construction, because the student is told it worked.
-
-### One predicate, two layers
-
-`isRingDiagonal(ring, a, b)` in `geometry.ts` is the only place that answers *is this pair a diagonal of
-this ring* — a pair non-adjacent along it, wrap included. Two layers consult it, and the division of labour
-is not stylistic:
+`isRingDiagonal(ring, a, b)` in `geometry.ts` is the only test of *is this pair a diagonal of this ring*
+(non-adjacent, wrap included). Two layers consult it:
 
 | layer | judges | because |
 | --- | --- | --- |
-| `applyStep` | claims the figure can ALREADY contradict — some polygon holds both labels and none makes them a diagonal | an immediate refusal is what teaches; this is 3-D's #859 guard |
+| `applyStep` | claims the figure can ALREADY contradict — some polygon holds both labels and none makes them a diagonal | an immediate refusal teaches (3-D's #859 guard) |
 | the givens verifier | claims only the FINISHED figure can settle — no ring holds both labels | the shape is not yet known, so the claim is not yet false |
 
-The second row exists because of a measurement, not a preference. These two sequences are the *same shape*
-at the moment the diagonal is typed — no polygon holds both labels:
+This is ADR-104's deferral applied to a structural claim: «אלכסון AC · מלבן ABCD» stays green.
 
-```
-משולש ABC · משולש DEF · אלכסון AD     ← fresh ink called a diagonal of nothing   (must be caught)
-אלכסון AC · מלבן ABCD                 ← by the end, AC really IS a diagonal      (must stay green)
-```
+#### The refusals teach
 
-A single apply-time rule cannot separate them, and tightening the guard to refuse both rejects a correct
-order. Deferring separates them for free, because by verification time the figure has stopped changing.
-This is [ADR-104](06-decisions.md#adr-104)'s deferral principle applied to a **structural** claim rather
-than a metric one: a claim that is not yet checkable is not yet false.
+Two messages for two mistakes: *AB is not a diagonal of ABCD — it is a side*, and *ABC has no diagonals* (n = 3
+falls out of the same predicate). Both quote the statement.
 
-### The refusals teach
+#### What carries a claim, and what does not
 
-Two sentences, because they are two different mistakes: *"AB is not a diagonal of ABCD — it is a side"* and
-*"AB is not a diagonal — ABC has no diagonals"*. The second is not a special case in the code — with n = 3
-every pair of vertices is adjacent, so it falls out of the same predicate — but it is a special case in the
-*explanation*, and telling a student who drew it on a triangle that "AB is a side" would teach nothing.
-Both quote the statement, never internal state.
+The derived plural («אלכסונים», «אלכסוני ABCD») computes its pairs from the ring and is right by construction; the
+named pair form («AC ו-BD אלכסוני הריבוע») carries the claim.
 
-### What carries a claim, and what does not
+### A role noun is a claim, lowered once ([ADR-563](06-decisions.md#adr-563))
 
-The DERIVED plural («אלכסונים», «אלכסוני ABCD») computes its pairs from the ring and is right by
-construction — checking it would only re-verify our own arithmetic. The explicitly NAMED pair form
-(«AC ו-BD אלכסוני הריבוע») makes the same claim the singular does, and carries it.
+`src/parser/roleNouns.ts` is the one vocabulary of role nouns (chord, diameter, radius, tangent, leg, base,
+hypotenuse; Hebrew as whole words with clitics, English with uppercase labels). `roleOperands(s)` returns each noun
+with the pair(s) the words attach it to. `withRoleClaims` (`src/parser/parse.ts`) runs after the winning rule in
+`runRules`, before the circle post-passes (it replaced ADR-119's `withCarrierMembership`):
 
-## Telling a LABEL from a WORD in Hebrew (#968, [ADR-497](06-decisions.md#adr-497))
+- **chord** — both ends `point-on-circle`; **diameter** — plus `set-collinear` through the centre; the circle from
+  `circumscribingRef` / `directionalCircleRef` / `resolveOrIntroduceCircle({ implied })` or the winner's own;
+  several → `ambiguous-circle-ref`; an end at the centre → `centre-end`; a pair the rule defined a circle by
+  (`diameter`, a midpoint centre, a semicircle) is left to it.
+- **radius** — the other end on the circle whose centre is an end (else the sentence's circle); no circle →
+  `no-circle`, no centre end → `no-centre-end`.
+- **diagonal** (ADR-569) — `segment {diagonal: true}`, judged at apply (`diagonalClaimRefusal`) and by the
+  verifier; «אלכסוני» stays the `diagonals` rule's.
+- **tangent** — `'unread'` when the winner touched no circle, so `runRules` tries the next rule.
+- **hypotenuse / leg / base** — over the polygons holding the pair as a side: hypotenuse → `set-angle` 90 at the
+  third vertex; isosceles base → `set-equal` of the other two sides; trapezoid base or leg → `set-parallel`; a
+  triangle leg `ctx.roleSides` already makes one → nothing, else `leg-apex`; none → `no-polygon`, several →
+  `several-polygons`.
 
-The convention nudge (#779) lifts `abcd` to `ABCD`, checks the corrected sentence parses, and shows it
-without committing. #968 is the same mechanism one **alphabet** over — Israeli textbooks name vertices
-א-ב-ג-ד — and it runs into a problem the Latin half never had: **every construct noun in this grammar is
-also made of Hebrew letters.** «מלבן», «אלכסון», «זווית» and a label run like «אבגד» are the same script,
-so the detector cannot key on script at all.
+Refusals are `ParseResult` `role-claim` (`why`, noun, pair), mapped in `decideDeterministic.ts` to
+`input.roleClaim.<why>`. **Lines named by letters belong to the rule that reads them** (ADR-569):
+`specialPointMeet` derives a centre's lines from the shape only when no pair list follows
+(`letteredCentreLines`); named diagonals go to the lettered meet rule, named medians, altitudes and bisectors
+through their own rule, all or nothing.
 
-It keys on the alphabet **range** instead. Vertex labels are drawn from the START of the alphabet —
-א-ט ⇒ A-I, nine letters, more vertices than any figure here needs — exactly as Latin labels come from
-A-H. The geometry vocabulary essentially all carries a later letter:
+### Telling a LABEL from a WORD in Hebrew (#968, [ADR-497](06-decisions.md#adr-497))
+
+The convention nudge (#779) lifts `abcd` to `ABCD`, checks the corrected sentence parses, and shows it without
+committing. Hebrew-alphabet labels are told from words by the alphabet **range** — labels come from its start
+(א-ט ⇒ A-I), and geometry words carry a later letter:
 
 | token | letters | verdict |
 | --- | --- | --- |
@@ -653,359 +380,236 @@ A-H. The geometry vocabulary essentially all carries a later letter:
 | `זווית` | ז7 ו6 ו6 **י10 ת22** | word |
 | `בין` | ב2 **י10** ן14 | word |
 
-Two narrowings, both measured rather than assumed:
+Final forms fold first (ך→כ, ם→מ, ן→נ, ף→פ, ץ→צ — the lexicon's ADR-3D-035 trap one layer down), and only «ל» is stripped as a leading particle. The proof gate
+makes a misread harmless: a candidate that does not parse produces no suggestion. The alphabet itself is not
+supported (operator ruling): it would reach labels, RTL direction, export and every element id (`seg-AB`).
 
-- **Final forms fold first** (ך→כ, ם→מ, ן→נ, ף→פ, ץ→צ). They sit past ת in the code block, so an
-  unfolded read would place every one of them out of range by accident — right answer, wrong reason,
-  and it would break the moment a label used one. This is the lexicon's ADR-3D-035 final-letter trap
-  one layer down.
-- **Only «ל» is stripped as a leading particle.** The real input needs it («לבא» = "to בא"), and the
-  unstripped reading is preferred so «בד» stays the label BD. Widening the set to ב/ה/ו/מ/ש/כ was tried
-  and **rejected on measurement**: it rewrites «שווה» to «ש-FFE», forfeiting the nudge on any sentence
-  carrying that very common word, and buying nothing the real input needs.
+### A through-statement about a drawn circle is a reference ([ADR-548](06-decisions.md#adr-548))
 
-**The proof gate is what makes the heuristic safe to be wrong.** A misread token simply produces a
-candidate that does not parse, and the caller then says nothing at all — the student gets today's
-escalation. So the failure mode of a bad guess is a *missed suggestion*, never a wrong one, and never a
-rewritten sentence: nothing here is ever committed on the student's behalf.
+The circle definition rules (`circle`, `circumcircle` in `src/parser/parse.ts`) ask ADR-029's introduce-vs-resolve
+question through `circleThroughReference`: a reference when its named centre's circle exists, or when it says
+«המעגל» and a circle is drawn. It resolves through `circumscribingRef` → `directionalCircleRef` →
+`existingCircleRef` (ADR-443's tie-break); unbindable → `ambiguous-circle-ref`. It lowers to one `point-on-circle`
+per label (the M1 membership shared), a stated size as `set-radius`, and defers on any residue. `throughClause` is
+the one reader of the through list; a definition lowers one through point, a longer list is the circumcircle.
 
-Support for the alphabet itself is deliberately **not** built (operator ruling, 2026-09-10). It would
-have to reach labels, RTL text direction (the #549 class), export, and every deterministic element id
-(`seg-AB`) — a wide blast radius for a convention the notice can redirect in one line.
+**The membership seats the circle, not the point** ([ADR-576](06-decisions.md#adr-576)): before apply branch (c2)
+converts an existing free vertex to an `on-circle` rider, `reseatFreeCircle` moves the circle's unstated seat
+through it (one member: the centre slides along the ray; two: to the perpendicular bisector or the R-circles'
+crossing; three with a free radius: the circumcircle), re-deriving every member's θ. Guard: the centre is an
+unpinned, un-driven free point, the circle carries no `solve` or radius order, and nothing else names or depends on
+them; otherwise a colliding bearing takes the `nextTheta` slot (ADR-123).
 
-## An unstated choice is SAID (#973, [ADR-502](06-decisions.md#adr-502))
+### A tangency about the circle asks the shared resolver ([ADR-560](06-decisions.md#adr-560))
 
-The engine leaves an unstated choice free (ADR-052) and cyclable (ADR-138); this layer **names** it. One
-pure derivation, one table, one text builder, two render sites:
+`cornerTangentCircle` (`src/parser/parse.ts`) asks the shared seam: `existingCircleRef` binds a named-and-drawn
+circle, the one circle, or by ADR-443's tie-break; an unbindable unnamed reference asks through
+`ambiguousCircleAsk`; otherwise the sentence creates the circle — the corner construction when the touch points are
+free (a missing corner minted by its side's `segment`), else `resolveOrIntroduceCircle`. A created circle with no
+named centre carries `autoCenter` (ADR-342's anonymiser hides it until `name-center`), and its auto letter avoids
+the sentence's labels.
 
-- **`unstatedChoices(facts)`** (`engine/shapeVariants.ts`, the file that owns "which pair is unstated")
-  folds the enabled facts into the choices the tool is currently making. It is a table keyed on the fact's
-  commands — `equal-pair` (kite / isosceles: the drawn pairs read from the ACTIVE variant, pinned by a stated
-  equality on any variant's pair), `free-endpoint` (a base-less midsegment: which side the free end rides,
-  pinned by «G על PR»), `parallel-pair` (the isosceles trapezoid: the lowering assumed AB ∥ DC, pinned by a
-  stated ∥ on two ring sides). A new shape is a row — `midsegment-free` (#1368, [ADR-545](06-decisions.md#adr-545)) is one: with NOTHING named the whole configuration is unstated, so the row names the side the midsegment ended up PARALLEL to, which determines both endpoints. **Derived on every render** like `hasVariant`, so the
-  note appears with the fact, follows the cycle, and vanishes when a later fact pins the choice or the fact
-  is disabled, removed or broken. Nothing is stored.
-- **Two midsegments, two shapes, two counts (#1368, [ADR-545](06-decisions.md#adr-545)).** `midsegment` has TWO variants and `midsegment-free` THREE, and they are separate `VariantShape`s rather than one shape with a bigger count. `midsegment` is used when the student has already placed an endpoint on a side, so that side is **stated** and only the other is free; `midsegment-free` is «קטע אמצעים» with no arguments, where the choice is which of the three sides it is parallel to. Raising `midsegment` to 3 would let «show another configuration» move the student's endpoint **off the side they named** — a variant that contradicts a given, which inverts what the channel is for. **The rule the pair encodes: a variant explores what was not stated, never what was.**
-- **A gate that enumerates shapes is a chokepoint.** `droppedMidsegment` tested `shape === 'midsegment'` as a literal, so a new midsegment form read as a DROPPED one and a correctly-parsed utterance was refused. Consumers now ask `MIDSEGMENT_SHAPES` (exported by `shapeVariants.ts`), so a fourth form cannot silently fail a gate written when there were two. The failure mode is worth naming: an out-of-date gate refuses CORRECT input and reads exactly like a parser bug.
-- **The trapezoid's ring in force (#989, [ADR-506](06-decisions.md#adr-506)).** The `trapezoid` lowering makes
-  sides 0 and 2 of the ring it receives parallel, and `trapezoidRingInForce(ids, statedParallels)` (same file)
-  is the ONE reader of which ring that is: as named (AB ∥ DC for «טרפז ABCD»), rotated by one when a stated ∥
-  names sides 1/3 and none names 0/2 — so a stated pair PINS the assumption instead of stacking a second
-  parallel pair (a parallelogram under the morph flag). The replay pre-scan (the ADR-341 `trapRotate` seam)
-  lowers the fact on that ring and re-seats the isosceles macro's leg equality (tagged `trapezoidLegs`, the
-  ADR-239 `softPair` shape) onto the legs in force; the theorem spine's `parallelPairs` and `unstatedChoices`
-  (pinned ⇒ no note) read the same ring. In `apply.ts` the derived vertex is whichever ring vertex is still
-  missing (`trapezoidDerivedSlot`) and `trapezoidOffset` derives it so the ring's pair is parallel from every
-  seat — the trapezoid's ring is never rotated by the composition normaliser, because a rotation by one is
-  exactly what swapped the pair with typing order («משולש ABC» then «טרפז ABCD» drew BC ∥ AD). Not cyclable:
-  #973's ruling — an assumption the tool SAYS until the student states it.
-- **`unstatedChoiceText(choice, t)`** (`ui/unstatedChoice.ts`) builds the sentence in the student's
-  language: what is drawn, the canonical pinning sentence (a form the i18n net types as the next line and
-  asserts removes the note — measured, never assumed), and the cycle button's own label. Templates under
-  `steps.unstated*` / `steps.state*` in both locales; the kind list is a runtime export the net walks.
-- **Render:** on the fact's own row (persistent), plus one quiet cue beside «הציגו תצורה אחרת» with the
-  same sentences as its tooltip. The plain «טרפז ABCD» was excluded at first and joined on the first play
-  (#996, ADR-502 Am. 1) — the table gained a row, which is what the table is for. A suggested pin sentence is
-  always a bare next line (#997): a parenthesised Latin run inside a Hebrew sentence reorders in the box while
-  it is typed.
+### The hidden centre letter steps aside ([ADR-565](06-decisions.md#adr-565))
 
-## The knowledge pool of a DETERMINED figure is its admissible set (#434, [ADR-509](06-decisions.md#adr-509))
+An unnamed circle still carries an internal reference token (`O`, then `P`, `Q`, `K` — ADR-342): its id is
+`circle-O` and its anonymous centre `@ctr-O`. Every seam that parses a student sentence — `decideFromParse`, the ✎
+edit seam, the scenario mirror — first calls `stepAsideFacts(facts, typedLabels(utterance))` (`store/geoStore.ts`),
+re-lettering each hidden token the sentence types to an unused letter as a `step-aside` bind applied with
+`reletterHidden`. The student's letter is then an ordinary new letter: a reference («BO = 5») mints a free point,
+«מעגל O» declares a circle, «C על מעגל O» names an unnamed circle by use (ADR-347). Circles `autosInterchangeable`
+finds interchangeable (a crossing read as an unordered pair whose `branch` is seed, #1688; requirement records
+compared, ADR-567, #1709) are named in order; otherwise it asks.
 
-The relations layer's definite values, the values panel and the forced crossing dots all read ONE shared
-sample pool (`samplingJobs` / `sharedSamples`, `replay/core.ts` — the M3 "one sampler" law). Their
-knowledge gates ask "is this the same in every configuration?", and the pool is what "every" means.
+`nameCentreFacts` absorbs a target letter nothing places (a bare `free-point`, no vertex, first used after the
+circle), exposed through `ctx.freePoints` to `parseNameCenter`, the `nameCenter` rule and `impliedCircleBinding`; a
+radius sentence whose centre end is such a letter emits the implied circle (`radiusNamesCentre`).
 
-- **Under-determined figure (count > 0):** unchanged — every shape-variant config × 16 seeds, filtered by
-  the validity ladder; the gates need ≥ 4 valid samples before a NUMBER prints (ADR-295/#88).
-- **Determined figure (`freeDofCount === 0`, one variant):** the pool was ONE sample, on the theory that one
-  configuration is every configuration. Two things break that theory. A count is arithmetic and can lie
-  (the ADR-424 class — a redundancy pattern pushes it to 0 while the figure still moves with the seed:
-  «AB=BC=8» read 0 and printed ∠ABC = 31°, one seed's accident). And a seed can never reach a BRANCH or a
-  right-angle SEAT — the quarter-circle figure is rigid at each seat, yet the seat at B (admissible, one
-  «הציגו תצורה אחרת» press away) gives |AB| = 11.18 against the printed 18.03. So the pool is now the
-  **admissible set**: the current facts at every seed «הציגו תצורה אחרת» resamples (`CONFIG_SEEDS` = 24 —
-  [ADR-558](06-decisions.md#adr-558), #1599: at three seeds the SSA triangle's second shape, which the button
-  reaches at a few seeds of 24, was missing and its third side printed as definite), plus seeds {s, s+1, s+2} × every
-  discrete rewrite «הציגו תצורה אחרת» applies — every cyclable branch point's branches crossed with the seat
-  (`admissibleRewrites`) — kept only where `meetsRequirements` holds (the button's own bar). Reflection masks
-  are subsumed by the seed axis (measured on the corpus); the `inscribe` variant stays out (ADR-262).
-- **Bounded, failing CLOSED.** The cross product is capped (`ADMISSIBLE_REWRITE_CAP`); over the cap, or when
-  the WORK cap cuts the enumeration short (`POOL_WORK_CAP` `evaluateCore` calls over the sampling jobs —
-  never seconds, so the same input stops at the same job on every device; ADR-558), the pool is marked
-  **not determined** and `complete: false`, and the gates fall
-  back to their ≥ 4 floor — values and dots withheld, relations still read off the samples in hand — exactly
-  as an under-determined figure is treated. A partial set never prints a number the missing configuration
-  refutes.
-- **The gates trust a MEASUREMENT, not the count.** The pool carries `determined` (count 0 AND the set
-  complete), passed to `detectRelationsAcross` (`opts.determined`), `computeValuesPanel` and
-  `forcedCrossingKeys`; each keeps the count as its fallback for a hand-built pool. Nothing else changes:
-  a value that disagrees across the admissible set is withheld by the "same in every sample" test that
-  already existed; a genuinely determined figure's samples are identical and it prints as before.
-- **Cost:** a few replays per determined figure at panel/relations time in the worker, memoized per fact
-  list, never in the submit path. A rewrite that is INFEASIBLE pays the recruiter ladder to conclude it
-  (the #259 class — 96 s deadline-free on the quarter-circle figure); the work cap cuts that and the figure
-  falls to the not-determined branch above, and says so. The cap bounds the JOBS; the work it counts is a function of the input alone because **every memo hit
-  on the counted path is charged the work it saved** (#1605, [ADR-582](06-decisions.md#adr-582)): each memo
-  entry (replay cache, fold memo, drop-one search memo, the `evaluate` / `resolveDriven` / DOF memos)
-  carries a work ledger (`engine/solveBudget.ts` — its own `evaluateCore` units plus the entries it
-  touched), and inside a work EPOCH (the whole `sharedSamples` call) each entry is charged once — the first
-  touch, computed or hit. So the setup (the display-seed search, the base replays) charges the figure's own
-  fold before the cap is armed and a job re-reading it pays nothing, cold or warm, while a job touching any
-  other memo pays its recorded work warm exactly as it would compute it cold. A hit an armed budget cannot
-  afford is recomputed (aborting where a cold run would), and a budget-cut computation is never memoized. The UI-thread submit gate's «כבר קיים» test (`impliedByPrior`) keeps its wall-clock bound
-  (`sharedSamples(facts, { deadlineMs })`) — an interactive check that fails open — on the narrow three-seed set (the widened set doubled its main-thread cost). The work-path pool is memoized
-  whether complete or not (it is deterministic), so the values op after the detect sweep reuses it: one sweep
-  per facts, and the status line and the values panel read one verdict. While the values compute for the
-  current figure runs, an asked question's row reads «מחשב… התשובה תופיע כשהחישוב יסתיים» (`waitingNote`);
-  «לחצו «חשב ערכים»» only when nothing is running.
-- **The status cue reads the same pool (#1444, [ADR-556](06-decisions.md#adr-556)).** `figureDeterminacy`
-  (`replay/core.ts`) returns the pool's `determined` flag, the number of DISTINCT shapes in it — two samples
-  are one configuration when every labelled pairwise distance agrees up to one common scale (a mirror or a
-  re-placement is the same drawing; a different third side is not) — and `stable`: every sampled seed (a
-  `seedOfSample` side table, the `circlesOfSample` discipline, so it survives the pool's subset filters)
-  sees that same number. It knows nothing about WHY there is a second shape (seat, branch, root). It rides
-  `detectAll`, the always-on post-fact sweep the crossing dots already pay for — no new sampler, nothing in
-  the submit path — into the store's `determinacy` slot (facts-keyed, like `crossings`). `figureStatus`
-  (`app/figureStatus.ts`) maps it, the configuration note ADDED to the count: DOF > 0 → «דרגות חופש: N»;
-  DOF 0 with more than one shape → «דרגות חופש: 0 · יש N תצורות אפשריות — …» when stable, else «… יש יותר
-  מתצורה אחת — …»; DOF 0, one shape, pool complete → «✓ … נקבע במלואו»; DOF 0, one shape, pool cut by the
-  work cap → «דרגות חופש: 0 · האיור מורכב מדי כדי לבדוק אם יש לו תצורה נוספת» (ADR-558); no verdict yet →
-  «בודק…», claiming nothing. `stable` compares only the seeds that sampled the whole admissible set — the
-  extra current-facts seeds of ADR-558 add shapes to the count but are not whole-set samples. The values
-  panel carries the same `complete` flag and reads «האיור מורכב מדי לבדיקה מלאה — ייתכן שחסרים כאן ערכים»
-  instead of «אין עדיין ערכים קבועים …», which told the student to add sizes when the tool had run out.
-## The submit transaction: facts commit, the seed resolves after (#364, [ADR-510](06-decisions.md#adr-510))
+**A rule's own circle for a fresh letter is a naming candidate** (ADR-599, #1694): when the sentence names a point
+riding an unnamed circle (`namesUnnamedCircleMember`), the circle a rule introduces carries `implied: 'by-member'`
+beside `withImplicitCircles`' `implied: true` — `resolveOrIntroduceCircle`'s named branch and `circleOnDiameter`,
+which also states `set-collinear [A, X, B]`. `impliedCircleBinding` binds a by-member candidate only on a
+membership signal, with no sole-circle fallback. The #184 option is `presupposes`.
 
-- **The commit** (`commitCommands` / `replaceGroup`, `store/geoStore.ts`) is the facts alone, in one zundo
-  entry, at the student's CURRENT seed (an ✎ edit resets to 0 first — ADR-484). No synchronous seed search
-  runs inside it any more; `main-thread-sweeps.test.ts` records `firstSatisfyingSeed` at 0 on the store.
-- **The resolve** is the post-commit `resolveAfterCommit` (App) → `runViewResolve` (`app/resolveView.ts`) →
-  `geoWork.autoResolve` (the worker): `meetsRequirements` decides whether anything is wrong (statuses,
-  violations, extension orders, segment-meets, distinctness, convexity — a superset of the old trigger), and
-  `findValidConfig(facts, seed)` sweeps FROM THE CURRENT SEED (its first tier is `firstSatisfyingSeed`), so
-  the view the student holds is preferred over any other valid one (M2). The found view is applied under a
-  paused history, merging into the commit's entry — one undo removes the fact and restores the seed.
-- **What the student sees:** the violating configuration may paint for ONE frame before the worker's answer
-  lands (the flash the operator accepted, 2026-09-11) instead of a tab frozen for up to 2.5 s. While the
-  search runs, the keep-prior slot (#573) holds the last good view where it exists.
-## A free point's admissible region rides on the point (#556, [ADR-511](06-decisions.md#adr-511))
+**A naming by use is a fact of its line** ([ADR-588](06-decisions.md#adr-588), #1697): the decision's binds are
+committed as `name-by-use` facts at the head of the line's group (`commitVerdict`); `resolveBinds`
+(`replay/naming.ts`) applies each enabled one to the facts before it, so deleting, muting, editing or undoing the
+line removes the name. The naming core never collides: `nameCentreFacts` and `renameFacts` step a hidden token
+aside, `withAnonymousAutoCentres` re-picks a held token; `withMetricCentreBinding` is gone.
 
-- **Declaration.** A construction whose success needs a free operand on one side of a circle — the apex
-  of a tangent or a secant, a student's own «M מחוץ למעגל» / «M בתוך המעגל» — says so through the ADR-254
-  side record (`point-circle-side`), emitted right after the operand's own placement. The rule keeps its
-  default; the record is the statement's implication made explicit (ADR-052).
-- **Record.** The `point-circle-side` apply case (`engine/apply.ts`) is the family's ONE chokepoint: it
-  seeds a new free point on the stated side, re-seats an existing non-pinned one only when it is on the
-  wrong side, and in both cases writes the region onto the point — `FreePoint.region: { circle, side }[]`,
-  one entry per circle. A pinned point (the student's explicit placement) is never moved or annotated.
-- **Sampling.** `applySeed` (`engine/sample.ts`) judges each region-bound point on the SAMPLED figure's own
-  circle — one evaluate of the sampled construction, or of the prefix up to the point with the constraints
-  it can satisfy when the full figure cannot build — and re-seats a wrong-side sample radially with the
-  point's own rng (outside → [1.15, 1.8]·r, inside → [0.25, 0.7]·r). Deterministic per seed; seed 0 never
-  samples, so the drawing the student first sees is unchanged.
-- **Judgement stays where it was.** The verifier reports a contradicted side; `meetsRequirements` gates
-  «הציגו תצורה אחרת» on it. The sampler now proposes configurations that pass that bar instead of ones the
-  bar discards (the two-tangents figure lost 7 of 24 seeds that way).
-## The meeting re-seat is routed by a predicate (#260, [ADR-512](06-decisions.md#adr-512))
+### A foreign given is refused by the grammar, before any rule ([ADR-562](06-decisions.md#adr-562))
 
-- **The question, asked once.** `meetingCarriers(objects, cmd)` (`engine/apply.ts`) decides whether a
-  command asserts that a point is the MEETING of two carriers — a named segment-meet (`onSeg`), the
-  point-free crossing statement (`segments-cross`), a rider named onto a second host (a `set-collinear`
-  whose one on-segment rider's host differs from the other two points). `applyCommand` asks it before its
-  switch and calls `reseatLooseMeetEndpoint` (ADR-255) with the two carriers; no case calls the re-seat by
-  itself. A new member of the family is a row in the predicate, never a fourth call site.
-- **Which endpoint moves.** Every endpoint of both carriers is a candidate once the crossing lies off either
-  segment: fewest dependents first (the point the figure leans on least), the off-segment's own endpoints
-  first on a tie (so the older sites behave as before). Only a non-pinned free point that no constraint
-  references and no directive drives is ever moved; the aim is the ray from its mate through the other
-  carrier's midpoint, kept in general position and on the same side of every circle (ADR-253/254).
-- **Anchors.** The general-position test ignores the carriers' own on-segment riders — they follow the
-  endpoints, and the meeting rider is what the statement re-solves (a free rider sits at its host's
-  midpoint by default, exactly on the aim line).
-- **Positions ride along.** `reinterpretAsCollinear` (step.ts) passes the previous positions into
-  `applyCommand`, so the second-membership path sees where the crossing lies.
-## A declared polygon the givens force FLAT is said out loud (#945, [ADR-513](06-decisions.md#adr-513))
+`classifyOutOfScope` (`parser/scope.ts`) holds the vocabulary of the families another tool owns — `analytic` (axes,
+coordinates, slope, line equations, a quadrant) and `cross-app` (the solids, and a plane as an object via
+`planeObject`, which exempts «במישור …»). `foreignGiven` asks the same rules of the whole utterance at the top of
+`parse()`, beside the LaTeX and negation guards — and `parse` returns `{ ok: false, reason: 'foreign-given', category,
+phrase }`. Because it is `parse`, every seam inherits it: the submit lane (`decideFromParse` answers with
+`input.scope.foreign-given`, quoting `phrase` ahead of the family's pointer, logged as `scope:<category>`), the ✎
+edit seam, the scenario harness (`refusedSteps`) and log-triage. The pre-parse guard and the post-failure register
+read the same `RULES` entries.
 
-> **Superseded for the forced family by [ADR-602](06-decisions.md#adr-602) (#1849, operator ruling 2026-10-07,
-> [ADR-W-115](06w-decisions-workspace.md#adr-w-115)): a declared polygon the givens force flat is REFUSED.** See
-> "A declared polygon the givens force flat is refused" below. The channel described here stays as the net — it now
-> speaks only for a polygon that is NOT forced flat but is drawn below the floor at a sampled configuration (a stated
-> sliver under 1°, measured at 6e-5 on some of 24 seeds for 0.1°).
+### A trig function of an angle is decided whole, before any rule ([ADR-566](06-decisions.md#adr-566))
 
-- **The channel.** `Derived.degeneracies` (`replay/core.ts`) sits beside `coincidences` and `forcedOffArc`:
-  derived purely from the resolved construction on every replay, so a loaded figure and a typed one say
-  the same thing, and nothing is stored. The App shows it as an ⓘ notice — never a refusal, never amber.
-- **The predicate** (`engine/degeneracy.ts`, `degeneratePolygons`): for each declared polygon, the greatest
-  vertex offset from the line through its two most-separated vertices, over that separation — the same
-  measure the ADR-413 accept gate uses, judged against the polygon's OWN extent (a small polygon in a big
-  figure is judged by its own size), with `DEGENERATE_EXTENT_RATIO` calibrated on the 2-D corpus (the
-  ADR's table). The accept gate refuses a DRIVEN collapse below 1e-4; the notice covers the band above it
-  where a construction the givens force flat used to draw silently. Polygons only: a segment or circle
-  whose extent collapses is a coincidence of named points, which ADR-123's channel already says.
-- **Naming the statements** (`nameDegeneracies`, the ADR-492 prefix rule): walk the enabled statement
-  prefixes; the first that contains the polygon is its declaring statement, the first at which it is flat
-  is the responsible one. Runs only when a degeneracy exists, one replay per prefix, and never nests (a
-  prefix replay inside the scan reports the predicate alone). The engine carries fact ids and a number;
-  the wording is the chrome's, in the student's own words (`figure.degenerate`, He + En).
+`trigGiven` (`parser/parse.ts`) runs at the top of `parse()`, after the angle-alias rewrite, beside the proof-target
+and foreign-given guards: a line in which tan / tg / cot / ctg / sin / cos (or the Hebrew names, with a clitic) is
+applied to an angle belongs to it whole. The canonical shape (`trigLine`) — its value read by `NUMEXPR` — lowers to
+the arms' `segment`s plus a `measure-angle` whose `expr` is `{ value: <the angle in degrees> }` with no `text`: the
+literal path (`lowerOne` → `set-angle`), labelled by `measureLabelForms`' number branch, `fmtNum(value) + '°'`
+([ADR-572](06-decisions.md#adr-572), #1718; ADR-566 had `text: 'tan=2'`). cos goes through `acos`; the ratio is
+declared in `consumed.numbers` (ADR-462). Anything else returns `{ ok: false, reason: 'trig-given', why, fn, sentence }`
+— `sine-out-of-range`, `out-of-range` or `form` — answered by `decideFromParse` as `input.trigGiven.<why>`, never
+escalated. `NOTATION_WORDS` is the one list of Latin words the label-counting gates (`statedLabelTokens`, the span
+accountant) never read as labels.
 
-## A declared polygon the givens force flat is refused (#1849, [ADR-602](06-decisions.md#adr-602))
+### One shape-phrase reader ([ADR-595](06-decisions.md#adr-595))
 
-- **The ruling.** A flat line is not a triangle (operator, 2026-10-07; [ADR-W-115](06w-decisions-workspace.md#adr-w-115)
-  amends ADR-W-048). The line that completes the collapse is refused before it becomes a fact; the figure keeps
-  its prior state.
-- **Two seams, one class.** *The proof* — stage 0h, `forcedFlatPolygon` (`engine/metricFeasibility.ts`): every
-  linear length statement is a row in the unknowns |PQ|; a straightness equality |uv| = Σ ring arc (or |uw| + |wv|)
-  follows when its row lies in the row space of [A | b]; proven collinear sets sharing two points merge; a polygon
-  inside one merged set is flat in every configuration. It does not depend on where a solver stopped on a bent path
-  (the quadrilateral 1·1·1·3 drew at flatness 1.6e-3, three times the gate). *The observation* — stage 2d, the
-  accept gate's `collapsedPolygon`, its floor raised from 1e-4 to `DEGENERATE_EXTENT_RATIO` (5e-4): every collapse
-  the proof cannot read (an incidence, a stated collinearity) lands far below it.
-- **One message.** `collapsed: polygon A, B, C would be flat — <statement> cannot hold` from both seams (the ladder's
-  refusal uses it when the solution that existed flattened a declared polygon, at any stage). The fold reads the
-  polygon's declaring statement from `ownerByObjId` — the declaring half of #945's attribution, with no replay — and
-  appends `[vs #i]`; the submit note resolves it (`otherUtteranceForError`), so the student reads «AC = 8» סותר את
-  «משולש ABC» … וקו ישר אינו משולש. The noun follows the vertex count (triangle, quadrilateral, polygon).
-- **Defaults yield.** A collapse that only an unstated default forces («משולש שווה שוקיים ABC · AB = 4 · BC = 8»
-  at apex A) is refused at that default, and the variant rescue (ADR-573) seats the apex where the triangle is real.
+`src/parser/shapePhrase.ts`: `readShapePhrase(s)` → `{ noun, kind, arity, stated, consumed, unconsumed, strip, lower, cyclic }`.
+The noun decides the arity; an adjective is consumed only when the (noun, adjective) pair has a lowering, otherwise
+it stays in `unconsumed` for the leftover gate. `lowerShape(kind, ids)` is the standalone lowering;
+`inscribedPolygon`, `incircle` and `inscribedInPolygon` read through the same reader. `cyclic` carries analytic's
+`notCyclic` (a right trapezoid → rectangle), which `inscribedPolygon` turns into `inscribed-contradicts-noun`.
+Gates: `droppedShapeNoun` (a noun accounted only by a ring of its arity) and `droppedShapeAdjective`.
+`commandConflict` treats a generic `quadrilateral` / `triangle` over a declared ring as a supertype restatement.
 
-## What counts as "produced": a display-only command declares itself (#1011, [ADR-519](06-decisions.md#adr-519))
+### A point placement keeps its tail ([ADR-570](06-decisions.md#adr-570))
 
-`dryRunOutcome` answers one question — *did this line do anything?* — and it answers it by looking at the
-FIGURE: did the construction grow, did a degree of freedom go, did the scale become fixed, did a point
-move. When the answer is no everywhere, the student is told «זה כבר קיים באיור» and the line is not
-committed. That is right for a genuine restatement and it is how a stated given can never be silently
-swallowed.
+The point-on-carrier rules (`pointOnExtension`, `pointOnSegment`) match a prefix, so three seams carry the tail:
 
-**A display-only command breaks the assumption behind it.** Revealing a hidden centre, resolving a
-hidden circle, drawing a valueless angle arc — each changes what the student sees and touches none of
-the four signals. There is nothing in the figure for the gate to notice, so the gate has to be told.
+- **The condition clause** — `compoundSuchThat` splits on «כך ש» / "such that" and, after a point-placement subject
+  (`POINT_PLACEMENT`), on `GIVEN_AND` («ונתון כי / ש», «וידוע כי / ש»); each half parses through the real grammar,
+  all or nothing. A shape subject is not split (#108).
+- **The end qualifier** — `pointOnExtension` reads «מעבר ל(-)(נקודה) X» / "beyond X": the far end keeps the
+  carrier, the near end reverses it, another letter escalates.
+- **The net** — `droppedGivenRelations`'s exemption (b) holds only when the command introducing one of the
+  relation's labels carries every label of it (`K על המשך AB כך ש AB=BK`), so the clause fallback (ADR-264) and the
+  LLM lane are held to the same gate.
 
-It used to be told by a list written inside the gate, and the list grew one entry at a time as each
-display feature was found broken in play. Membership is now a **declared property** —
-`DISPLAY_ONLY` in `engine/types.ts`, beside the command union, typed against `AnyCommand['type']` so a
-non-existent kind is a compile error — and `dryRunOutcome` consults it. A new display command therefore
-inherits the answer at the moment it is written.
+### An existing label is context only through a reference ([ADR-597](06-decisions.md#adr-597))
 
-Two rules keep it honest:
+The span accountant's label pass lives in `src/parser/labelAccounting.ts` (`spanAccounting.ts` imports `parse.ts`,
+so the parser cannot import the accountant). Every stated label is **carried** by a command value, **masked** as
+notation, or an **existing label the lowering refers to**: a member or the centre of a referenced circle
+(`circle-X`, `ParseContext.circleMembers`); a circle's name when the lowering touches a circle; a vertex of a
+polygon the sentence names with its noun (`ParseContext.polygons`). Callers: `honestyGateReport` (commit and ✎
+seams; `GateCtx` carries `circleMembers` and `polygons`), the LLM second attempt in `submitPipeline`, and
+`parseResolved`, where an unaccounted existing label routes to the clause split (`splitStatements`, ADR-264; a new
+label stays `droppedNewLabels`'s question), whose `parseClause` asks again. `augmentParseCtx` registers a clause's
+anonymous centre (`@ctr-O`) with `centrePoint`, as `buildParseCtx` does. Widening the reference closure is the
+sanctioned direction; re-widening the exemption is not.
 
-- **An exact re-statement is excluded**, the same way `dataOnly` excludes one. Saying the same mark
-  twice genuinely has already been done, and a second arc drawn over the first would be the opposite
-  defect.
-- **It asserts nothing.** A display command must leave `freeDofCount` and the constraint list
-  unchanged; a command that removes freedom is a GIVEN and belongs in the ordinary lane, where the
-  geometry signals already see it. The lock asserts this, because the moment a "display" command starts
-  constraining, the gate is being told something false.
+### A crossing draws what its subject is ([ADR-592](06-decisions.md#adr-592))
 
-The membership is tested at the gate the app calls, never below it: #1011 reached a play session at all
-because the feature's own lock drove the store directly and never crossed `dryRunOutcome`.
+Only the frame decides whether a crossing's operand lines are drawn. The verb frame — `lineLineIntersection`'s
+lines-first and cut branches, and a role meet whose `crossingSubjectOf` is `'lines'` — inks its operands (the
+diagonals of «האלכסונים נפגשים בנקודה M» as plain segments). The noun frame — the point-first branch,
+`cross(…, 'point')`, a role meet with a noun head — inks nothing and ensures the endpoints as `ifAbsent` free
+points. Analytic reads the same rule (ADR-AG-241).
 
-## One fold rule: the dry run judges the list the commit saves ([ADR-578](06-decisions.md#adr-578))
+### A fixed-run rule consumes the whole label body ([ADR-601](06-decisions.md#adr-601))
 
-How ONE command enters the fact list is a single pure decision, `foldCommand` in `replay/core.ts`: an exact
-duplicate of an enabled fact is a no-op, of an UNTICKED fact re-enables it in place, a re-stated free point
-moves in place, a re-stated standalone circle resizes in place, anything else is appended. The store's commit
-(`foldFact`) and the submit dry run (`trialFacts`) both fold through it, so the trial is the committed list bar
-fact ids, and the dry run judges `trialChanges` — the facts the fold changed (by object identity, since
-`foldCommand` never reuses a changed fact's object) — never `all.slice(facts.length)`, which a re-enable leaves
-empty. A second copy of the rule is how #1 (ADR-320) and #1748 happened: each time the trial modelled a list
-the commit would not save.
+`labelRun(body, n)` returns the first run of exactly n labels and nothing about the rest of the body, so a rule
+whose operand is such a run therefore owes the ADR-024 leftover guard **at the run**: `unclaimedLabels(body, run,
+also)` (`parse.ts`) strips the run and every other label the rule accounted for (the crossing it names, the circle's
+centre, a through point); a non-empty answer returns `null`. The gates cannot backstop this because they exempt
+existing labels (the gate arm is #1833). Members: `lineMeetsCircle`, `extendOntoCircle`, `lineCutsCircleTwice`,
+`secantFarPoint`, and both spans of `circumcircleMeetsSegment`. `circleIsOnlyLocative(s)` is true when every circle
+mention is a sentence-opening «ב+מעגל [O]», so the circle is the scene, not an operand (docs/17 §3).
+`lineLineIntersection` reads with the En `FILLER` stripped. A locative that names its circle is accounted context
+(rule 5 of `labelAccounting.ts`) only when the figure already holds what it says.
 
-**The load refresh and the load audit judge through it too ([ADR-579](06-decisions.md#adr-579), #1604).** A saved
-step and today's re-parse are compared as `committedStepCommands(prefix, …)` on BOTH sides — the rows a commit of
-those commands onto the prefix would append — and a refreshed step is written as those rows, never the raw parse.
-The fixtures drift net (`fixtures.test.ts`) asks the same question. A raw parse that re-mentions an existing
-segment («PD חותך את AC בנקודה E» after «AC⊥DB») is a lowering the commit never stored; comparing to it made every
-such save read as «saved by an older version» and wrote the duplicate back as a second fact.
+## The submit gate and `decideDeterministic`
 
-An unticked row keeps the letters it introduces (ADR-010: muting is reversible). A DIFFERENTLY spelled
-statement over them is refused naming the row — «A, B, C שייכות לשורה המבוטלת «משולש ABC» — סמנו אותה שוב
-או מחקו אותה» (`errors.mutedRowOwns`) — instead of the generic «… כבר אינה זמינה».
+### The pre-LLM decision ([ADR-546](06-decisions.md#adr-546))
 
-## The pre-LLM decision ([ADR-546](06-decisions.md#adr-546))
+Everything up to the model call — store operations, the pre-parse guards, the parse and its #186/#539 auto-binds,
+every typed refusal, the scope register, the honesty battery, the dry run, the role re-readings, deferral and the
+seam guards — is `decideDeterministic2D` in `app/decideDeterministic.ts`, a pure function of
+`(facts, seed, view, utterance, locale)` returning a `Verdict2D` (store-op · refuse · commit · noop · escalate) with
+its binds, log events and note. `runSubmit` applies the verdict and `log-triage` calls the same function; the mirror
+test fails if `runSubmit` parses or refuses on its own, and the parity shards (`decide-parity-1395-*`) hold the corpus.
 
-`runSubmit` no longer decides. Everything up to the model call — store operations, the pre-parse guards,
-the parse and its #186/#539 auto-binds, every typed refusal, the scope register, the honesty battery, the dry
-run, the role re-readings, deferral and the seam guards — is `decideDeterministic2D` in
-`app/decideDeterministic.ts`, a pure function of `(facts, seed, view, utterance, locale)` returning a
-`Verdict2D` (store-op · refuse · commit · noop · escalate), with its binds, its log events and its note.
-`runSubmit` applies the verdict; `log-triage` calls the same function, so there is no mirror left to drift.
-A new pre-LLM branch belongs in the decision — the mirror test fails if `runSubmit` parses or refuses on its
-own — and the parity shards (`decide-parity-1395-*`) hold the whole corpus to the recorded behaviour.
+- **An unresolved operand** ([ADR-571](06-decisions.md#adr-571)): a dry run failing in the topological evaluator
+  answers `input.missingOperands` — the sentence and `missingOperandLetters`, the labels neither the figure nor the
+  batch defines — or `input.unresolvedSentence`; internal ids never reach the student.
+- **A word fraction or a wish** ([ADR-591](06-decisions.md#adr-591)): at the escalation seam
+  `parser/fractionTeach.ts` (`fractionTeachCandidate`) proposes the canonical line (word fraction as `p/q`, a side
+  resolved through `declaredPolygons` + `onSegment`/`midpointOf`); the decision proves it with
+  `decideFromParse(…, { teaching: true })` and adopts it only on a non-deferred `commit`, as a `refuse` carrying
+  `prefill` applied through `SubmitUi.setText`. #1358 hoists this seat into `shell/`.
+- **Deferral reads the fold's per-fact verdict** ([ADR-564](06-decisions.md#adr-564)): `deferralWorthwhile` decides
+  "waiting for givens" (ADR-104) vs refuse from the fold's per-fact classifier (`waits` in `computeFold`), recorded
+  before atomic poisoning (`FoldNode.concludedByIndex` → `Derived.concluded`). A line with a concluded member is
+  refused unless the figure has an unpinned right-angle seat (`unpinnedSeats`, shared with `seatRescue`; ADR-551
+  Am. 1) — and even then it is refused when the dry run's seat sweep finished and cured nothing (`StepOutcome.seatsExhausted`,
+  [ADR-584](06-decisions.md#adr-584), #1671). `seatSweep` is bounded by `SEAT_SWEEP_WORK_CAP` charged units; the
+  worker warms the rotated folds first (`seatSweepWarmup`; a transplanted fold carries `FoldNode.work`).
 
-**An unresolved operand is refused naming the sentence ([ADR-571](06-decisions.md#adr-571)).** When the dry run
-fails in the topological evaluator («unresolved dependencies for: …»), the decision answers `input.missingOperands`:
-the sentence, quoted, and `missingOperandLetters` — the point labels the batch references that neither the
-figure nor the batch (applied structurally) defines. With none to name it answers `input.unresolvedSentence`.
-Internal ids are never point labels, so none reaches the student.
+### A one-line compound is all or nothing: the clause-coverage gate ([ADR-598](06-decisions.md#adr-598))
 
-**A word fraction or a wish is taught, proved first ([ADR-591](06-decisions.md#adr-591)).** At the escalation
-seam, `parser/fractionTeach.ts` (`fractionTeachCandidate`, pure over the text and the `ParseContext`) proposes the
-canonical line — wrapper peeled, word fraction as `p/q`, «הצלע של ה<shape>» resolved per subject through
-`declaredPolygons` + `onSegment`/`midpointOf`. The decision then PROVES it by running itself on the proposal
-(`decideFromParse(…, { teaching: true })`, one level only) and adopts it only on a non-deferred `commit`. The
-verdict is a `refuse` carrying `prefill`; `runSubmit` replaces the input text through the optional
-`SubmitUi.setText`. This is the 2-D seat #1358 hoists into `shell/` with the imperative register.
+`src/app/clauseCoverage.ts`, called from `decideFromParse` (`decideDeterministic.ts`):
 
-**Deferral reads the fold's per-fact verdict ([ADR-564](06-decisions.md#adr-564)).** When the dry run
-errors, the decision asks `deferralWorthwhile` whether to commit the line as "waiting for givens" (ADR-104)
-or refuse it. The fold's classifier judges each failed FACT (`waits` in `computeFold`); the gate used to
-judge the LINE ("does some new constraint flex?"), so a line whose relation flexed was parked while one of
-its other members — a role noun's chord claim on a midpoint — had already been filed as a concluded
-contradiction. The fold now records that per-fact verdict from its first build, before atomic poisoning
-(`FoldNode.concludedByIndex` → `Derived.concluded`), and the gate refuses any line with a member in it —
-unless the figure has an unpinned right-angle seat (`unpinnedSeats`, shared with `seatRescue`): that verdict
-is taken at the current seat, and a seat the student never stated yields (ADR-551 Am. 1), so the post-commit
-config search gets the line — **unless the dry run's seat sweep FINISHED and cured nothing**
-(`StepOutcome.seatsExhausted`, [ADR-584](06-decisions.md#adr-584), #1671): then no unstated seat can yield and
-the line is refused like on any other figure. The gate's sweep (`seatSweep`) is bounded by a fixed amount of
-WORK in charged units (`SEAT_SWEEP_WORK_CAP`, replacing the 1.5 s clock — the same verdict on every device,
-cold or warm), and the submit path warms its rotated folds in the worker first (`seatSweepWarmup`; a
-transplanted fold carries its recorded work, `FoldNode.work`, so it is charged the same). The configuration
-search's seat tier keeps its wall-clock deadline. One claim therefore gets one verdict however it is spelled. On the submit path the read is a fold-memo hit:
-the dry run has just folded the same trial.
+- **Commit path** (`droppedClause`, after a clean honesty battery, before the dry run): the clauses from `clausesOf`
+  (`independence.ts`, the one splitter) are each lowered alone in the figure's context plus the earlier clauses
+  (`augmentParseCtx`). A clause is **covered** when a significant command of it (1) has a same-type whole-line
+  command naming all its labels, (2) defines an object the whole line defines (same `id`), (3) only declares an
+  existing object, or (4) is **entailed** — dry-run after the line, `empty` or `implied` (ADR-156 / ADR-542). An
+  uncovered clause refuses the line, `guided`, with `input.scope.split-statements`.
+- **Weak path** (`compoundNotHonoured`, after an honesty gate fired): a compound whose every clause lowers alone is
+  refused with the same message instead of escalating.
 
-## Re-reading a role-assigned letter run ([ADR-521](06-decisions.md#adr-521))
+`clausesOf` cuts at punctuation (not a decimal point), the explicit connectives, and «ו» before a Hebrew word or a
+label, never leaving a piece that only names points, and keeps a subject-less piece with the clause before it when
+the two read as a statement.
 
-Between the dry run and the refusal, the pre-LLM decision (`app/decideDeterministic.ts`) asks `app/roleReadings.ts` one question:
-*what else could that letter run have meant?*
+### What counts as "produced": a display-only command declares itself (#1011, [ADR-519](06-decisions.md#adr-519))
 
-The answer is produced by **rewriting the utterance** and handing it back to the same parser — so no
-rule grows a second convention, and the alternative is a sentence the student could have typed, which
-is also what is taught back to them. The module keys off the `arc` a construct emits, so it speaks for
-the whole family (`רבע מעגל`, `גזרה`) rather than for one rule.
+`dryRunOutcome` asks whether a line did anything — the construction grew, a DOF went, the scale was fixed, a point
+moved — and otherwise answers «זה כבר קיים באיור» without committing. A display-only command (revealing a hidden
+centre, resolving a hidden circle, a valueless angle arc) moves none of those signals, so membership is declared:
+`DISPLAY_ONLY` in `engine/types.ts`, typed against `AnyCommand['type']`. An exact restatement is excluded (as
+`dataOnly` excludes one), and a display command must leave `freeDofCount` and the constraint list unchanged. The
+lock tests at `dryRunOutcome`, the gate the app calls.
 
-| step | what it costs |
-| --- | --- |
-| no role run in the utterance | nothing — `roleReadings` returns `null` before any work |
-| ordering the readings | nothing — a probe over the figure the student ALREADY has |
-| a reading that builds | one dry run, because the probe put it first |
-| no reading more promising than the stated one | nothing — the refusal keeps today's cost |
+### One fold rule: the dry run judges the list the commit saves ([ADR-578](06-decisions.md#adr-578))
 
-The probe is the construct's PINNED central angle measured across the configurations already sampled;
-a construct that pins no angle (a general sector) leaves it unscored rather than inventing a target.
+`foldCommand` (`replay/core.ts`) decides how one command enters the fact list: an exact duplicate of an enabled fact
+is a no-op, of an unticked fact re-enables it, a re-stated free point moves in place, a re-stated standalone circle
+resizes in place, anything else appends. The commit (`foldFact`) and the dry run (`trialFacts`) fold through it, and
+the dry run judges `trialChanges` (by object identity), never `all.slice(facts.length)`; a second copy of the rule
+is the ADR-320 class. The load refresh
+and audit compare `committedStepCommands(prefix, …)` on both sides and write refreshed steps as those rows
+([ADR-579](06-decisions.md#adr-579), #1604); `fixtures.test.ts` asks the same. A differently spelled statement over
+an unticked row's letters is refused naming that row (`errors.mutedRowOwns`, ADR-010).
 
-**`produced` is not the adoption test.** It means something was built, not that the construct's promise
-holds, so an adopted reading is checked against that promise — equal radii, and the pinned angle
-(`honoursConstruct`). Answering a refusal with a wrong figure would be worse than the refusal.
+### Re-reading a role-assigned letter run ([ADR-521](06-decisions.md#adr-521))
 
-**A semicircle through three vertices picks its diameter the same way, but BEFORE the first dry run**
-([ADR-589](06-decisions.md#adr-589)). When the three letters of «חצי מעגל ABC» are vertices of one
-existing polygon (structurally not collinear), the `semicircle` rule reads all three ON the semicircle —
-a midpoint centre on a starting side, the third vertex a `point-on-circle`, the arc bulging toward it.
-`thalesReadings` rewrites the run into the explicit spelling «חצי מעגל שקוטרו XY העובר דרך Z» for each
-side and orders the three by Thales' probe (how far the angle at Z is from 90°, on the figure already
-drawn). They are tried best first — the first like any line, the others under the role-reading cap —
-because on an unseated right angle the parser's starting side could build and move the seat, while the
-probe-best side keeps it. The adopted sentence is taught; `honoursConstruct` also checks that every
-other `point-on-circle` of the arc's circle is at its radius. No side holds → the stated reading's own
-refusal. An explicit diameter («שקוטרו AB … דרך C») is never re-read.
+Between the dry run and the refusal, the decision (`app/decideDeterministic.ts`) asks `app/roleReadings.ts` what
+else the letter run could mean, by **rewriting the utterance** and re-parsing it, so no rule grows a second
+convention and the alternative is a sentence the student could type. It keys off the `arc` a construct emits,
+covering the family (`רבע מעגל`, `גזרה`). `roleReadings` returns `null` with no role run; readings are ordered by a
+probe of the construct's pinned central angle over configurations already sampled, so a reading that builds costs
+one dry run. `produced` is not the adoption test: `honoursConstruct` checks equal radii and the pinned angle.
 
-### The commit-seam inventory ([ADR-522](06-decisions.md#adr-522))
+**A semicircle through three vertices** ([ADR-589](06-decisions.md#adr-589)) is decided before the first dry run:
+the `semicircle` rule reads all three ON it (a `point-on-circle` for the third), and `thalesReadings` rewrites the
+run to «חצי מעגל שקוטרו XY העובר דרך Z» for each side, ordered by Thales' probe and tried best first under the
+role-reading cap; `honoursConstruct` also checks every other `point-on-circle` of the circle. An explicit diameter
+is never re-read.
 
-Six store actions reset the seed, and every one is a seam that must decide whether to launch the
-post-commit configuration search. The inventory is an assertion, not prose
-(`issue-1041-edit-resolve.test.ts`), because prose is what let #1041 and #1133 happen:
+### The submit transaction: facts commit, the seed resolves after (#364, [ADR-510](06-decisions.md#adr-510))
+
+- **The commit** (`commitCommands` / `replaceGroup`, `store/geoStore.ts`) is the facts alone, in one zundo entry, at
+  the current seed (an ✎ edit resets to 0 first, ADR-484); no seed search runs inside it
+  (`main-thread-sweeps.test.ts` records `firstSatisfyingSeed` at 0).
+- **The resolve** is `resolveAfterCommit` (App) → `runViewResolve` (`app/resolveView.ts`) → `geoWork.autoResolve`
+  (the worker): `meetsRequirements` decides whether anything is wrong, and `findValidConfig(facts, seed)` sweeps
+  from the current seed (M2). The found view merges into the commit's history entry, so one undo removes both.
+- The violating configuration may paint for one frame before the answer lands (operator-accepted); the keep-prior
+  slot (#573) holds the last good view meanwhile.
+
+#### The commit-seam inventory ([ADR-522](06-decisions.md#adr-522))
+
+Every store action that resets the seed decides whether to launch the post-commit search; the table is asserted in
+`issue-1041-edit-resolve.test.ts`:
 
 | action | what it does | search |
 | --- | --- | --- |
@@ -1013,387 +617,136 @@ post-commit configuration search. The inventory is an assertion, not prose
 | `replaceGroup` | a statement is replaced | yes — `runEditCommit` (#1041) |
 | `setGroupEnabled` | a group's tick flips | yes — `runSetGroupEnabled` (#1133) |
 | `toggle` | one fact's tick flips | yes — `runToggleFact` (no UI caller yet) |
-| `remove` | one fact is deleted | yes — `runRemoveFact` (measured: a partial group can strand) |
+| `remove` | one fact is deleted | yes — `runRemoveFact` (a partial group can strand) |
 | `removeGroup` | a whole statement is deleted | **exempt**, measured (ADR-518) |
 
-The rule the table encodes: **a seam that ADDS a requirement back searches; one that only relaxes need
-not.** Deleting a whole statement only relaxes. Re-enabling, and deleting one fact of a group, do not.
-
-## A through-statement about a drawn circle is a reference ([ADR-548](06-decisions.md#adr-548))
-
-The circle DEFINITION rules (`circle`, `circumcircle` in `src/parser/parse.ts`) now ask ADR-029's
-introduce-vs-resolve question before they mint anything, through one predicate,
-`circleThroughReference`: a through-statement is a REFERENCE when its centre is named and that circle
-exists, or when it says the definite «המעגל» / "the circle" and at least one circle is drawn. A reference
-resolves through the same seam every circle-consuming rule uses (`circumscribingRef` →
-`directionalCircleRef` → `existingCircleRef`, including the ADR-443 membership tie-break); several
-circles it cannot bind return the typed `ambiguous-circle-ref` ask.
-
-A reference lowers to one `point-on-circle` per through label — the lowering «X על המעגל» already has, so
-the apply-side M1 membership (idempotent, converting, or named as a contradiction) is shared, not copied.
-A stated numeric size rides along as `set-radius`. The path strips everything it reads and defers on any
-residue, so a second clause is never swallowed.
-
-The through clause is read by one reader, `throughClause` (every carrier spelling and every label of a
-list). A definition lowers exactly one through point; a longer list is the circumcircle (whose own rule
-now reads list separators) or it fails closed. The old "uppercase residue for the post-passes" allowance
-is gone: no post-pass ever claimed it.
-
-**The membership seats the circle, not the point ([ADR-576](06-decisions.md#adr-576)).** When the point a
-`point-on-circle` names already exists as a free vertex, apply.ts branch (c2) converts it to an `on-circle`
-rider. Before converting, `reseatFreeCircle` moves the circle's UNSTATED seat through it: with one member the centre slides along the ray
-from P until P is on the ring (the drawn size kept); with two, a free radius moves the centre to the perpendicular
-bisector and a stated one to the R-circles' crossing nearest it; with three, a free radius becomes the circumcircle. Every existing member's θ is re-derived so it stays put, and
-P then converts at its exact bearing. The guard is semantic: the centre is an unpinned, un-driven free point,
-the circle carries no `solve` or radius order, no constraint or side record names either, and no point other
-than a free member depends on them. Otherwise the projection seat stands, but a bearing that would land on an
-existing member takes the fresh `nextTheta` slot instead (ADR-123), so a default collision never refuses a
-satisfiable figure.
-
-## A tangency about the circle asks the shared resolver ([ADR-560](06-decisions.md#adr-560))
-
-`cornerTangentCircle` (two sides tangent to a circle, `src/parser/parse.ts`) no longer keeps its own copy of
-the bind-or-create question. It asks the same seam as every circle-consuming rule:
-
-- `existingCircleRef` binds when the circle is named and drawn, when there is one circle, or through the
-  ADR-443 tie-break. The touches are then stated on that circle.
-- An unnamed reference beside circles it cannot bind declines, and `ambiguousCircleAsk` asks which one.
-- Otherwise the sentence creates the circle. The **corner construction** (bisector, centre on it, feet)
-  is used when the touch points are free. It needs no drawn corner: a missing corner point is minted by
-  its side's `segment`. When a touch point is given (an arm tip or a placed point), it cannot be
-  redefined as a foot. Then `resolveOrIntroduceCircle` introduces the circle and the touches are stated
-  on it, exactly as on a drawn circle.
-
-A created circle whose centre the sentence does not name carries `autoCenter`, so the ADR-342
-anonymiser hides its centre until `name-center` promotes it. The resolver's auto letter avoids the
-sentence's own labels, because the anonymiser remaps every exact use of that letter.
-
-## The hidden centre letter steps aside ([ADR-565](06-decisions.md#adr-565))
-
-An unnamed circle still carries an internal reference token (`O`, then `P`, `Q`, `K` — ADR-342): its id is
-`circle-O` and its anonymous centre `@ctr-O`. The token is a typable letter that the student never saw, so it
-must never meet the student's letter. Every seam that parses a student sentence steps it aside first.
-`decideFromParse`, the ✎ edit seam and the scenario mirror call `stepAsideFacts(facts, typedLabels(utterance))`
-(`store/geoStore.ts`). It re-letters each hidden token the sentence types to a letter nobody uses — exact ids
-only, and the circle stays unnamed. The move travels as a `step-aside` bind that the caller applies with
-`reletterHidden`. After it, the student's letter is an ordinary new letter:
-
-- a reference («BO = 5», «AM חותך את CO») mints a free point;
-- «מעגל O» declares a new circle;
-- «C על מעגל O» names the unnamed circle by use through the ADR-347 seam. Two unnamed circles that
-  `autosInterchangeable` finds interchangeable are named in order. That check reads a circle-circle crossing as an
-  unordered pair whose `branch` is seed (ruling (b), #1688). Otherwise it asks which circle. It compares the
-  construction's requirement records too ([ADR-567](06-decisions.md#adr-567), #1709): a stated containment drives
-  nothing and lives only there, so a nested pair is told apart and asks; a disjoint pair is an unordered relation.
-
-Naming places a free point. `nameCentreFacts` absorbs a target letter that nothing places. Such a point has only a
-bare `free-point` definition, is no shape's vertex, and is first used after the circle exists. Its bare
-`free-point` is dropped, and the centre takes the letter. `ctx.freePoints` exposes these points to
-`parseNameCenter`, the `nameCenter` rule and `impliedCircleBinding`. A radius sentence («OB רדיוס», «הרדיוס OB»)
-whose centre end is such a letter emits the ADR-347 implied circle (`radiusNamesCentre`).
-
-**A rule's own circle for a fresh letter is a naming candidate ([ADR-599](06-decisions.md#adr-596), #1694).** When a
-sentence names a point that already rides an unnamed circle (`namesUnnamedCircleMember`), the circle a rule introduces
-for the student's fresh letter carries `implied: 'by-member'`, beside the `implied: true` reference that
-`withImplicitCircles` mints. The rules are `resolveOrIntroduceCircle`'s named branch (chord, tangent at a point, secant
-and its other callers) and `circleOnDiameter` («AD קוטר במעגל P» with A on a drawn circle). `impliedCircleBinding`
-walks every candidate in sentence order. A by-member candidate binds only on a membership signal: one signalled circle
-binds; the crossing of two interchangeable circles names the first; circles a statement tells apart ask. It has no
-sole-unnamed-circle fallback, so with no signal the creation stands as the new circle the letter declares.
-`circleOnDiameter`'s candidate also states `set-collinear [A, X, B]`, so it is a diameter whether or not it binds. The
-unrelated #184 option «a construct noun presupposes its circle» is called `presupposes`.
-
-**A naming by use is a fact of its line ([ADR-588](06-decisions.md#adr-588), #1697).** The decision's binds (the
-circle naming, the #539 point naming, the step-aside) are committed as `name-by-use` facts at the head of the line's
-own group (`commitVerdict`), never as store renames. `resolveBinds` (`replay/naming.ts`, where the naming cores now
-live) applies each enabled one, through the same core, to the facts BEFORE it — positional, so a prefix replay never
-sees a later name and a letter it freed can be minted again. Deleting, muting, editing or undoing the line removes
-the name; a refused line names nothing. The relabelling store operations rewrite the resolved list.
-
-The naming core never collides. `nameCentreFacts` and `renameFacts` step another circle's hidden token aside
-when the target letter is that token. `withAnonymousAutoCentres` re-picks a new unnamed circle's token when a
-drawn circle already holds it. `withMetricCentreBinding` (ADR-342's metric amendment) is gone.
-
-## A foreign given is refused by the grammar, before any rule ([ADR-562](06-decisions.md#adr-562))
-
-`classifyOutOfScope` (`parser/scope.ts`) holds the vocabulary of the families another tool owns — `analytic`
-(axes, coordinates, slope, line equations, and since #1655 a quadrant) and `cross-app` (the solids, and since
-#1656 a plane as an object, via the `planeObject` matcher that exempts the setting phrase «במישור …»). It ran
-only on a FAILED parse, so a rule that read the rest of the sentence committed it with the foreign operand
-absorbed. `foreignGiven` asks the same two rules of the utterance at the top of `parse()` — the placement and
-reason of the LaTeX and negation guards — and `parse` returns `{ ok: false, reason: 'foreign-given', category,
-phrase }`. Because it is `parse`, every seam inherits it: the submit lane (`decideFromParse` answers with
-`input.scope.foreign-given`, quoting `phrase` ahead of the family's unchanged pointer, logged as
-`scope:<category>`), the ✎ edit seam, the scenario harness (`refusedSteps`) and log-triage. One vocabulary:
-the pre-parse guard and the post-failure register read the same `RULES` entries.
-
-## A trig function of an angle is decided whole, before any rule ([ADR-566](06-decisions.md#adr-566))
-
-`trigGiven` (`parser/parse.ts`) runs at the top of `parse()`, after the angle-alias rewrite and beside the
-proof-target and foreign-given guards, for their reason: a rule that reads part of the sentence commits a
-different given. A line in which tan / tg / cot / ctg / sin / cos (or «טנגנס» / «קוטנגנס» / «קוסינוס» /
-«סינוס», with a clitic prefix) is applied to an angle — an angle noun in the line, or a label right after the
-function — belongs to it whole. The one canonical shape (`trigLine`: [lead-in] FN [of|של] [(] [angle noun]
-LABELS [)] copula VALUE, the value read by the shared `NUMEXPR` atom, optionally signed) lowers to the arms'
-`segment`s plus a `measure-angle` whose `expr` is `{ value: <the angle in degrees> }` with NO `text` — the
-existing literal-measure path (`lowerOne` → `set-angle`), so every downstream consumer sees an ordinary angle
-and the label is `measureLabelForms`' number branch, `fmtNum(value) + '°'` through the shared rounder
-(«63.43°»; [ADR-572](06-decisions.md#adr-572), #1718 — ADR-566 carried `text: 'tan=2'`). The fact row shows
-the utterance, so the sentence as typed is never lost. tan / cot map through the
-principal angle and add 180° when negative; cos through `acos`. The transformed ratio is declared in
-`consumed.numbers` (ADR-462), so the numbers gates account «√3», «-2», «3/4»; the span accountant credits a
-stated fraction sign-blind («-1/2» against −0.5), as its single-number pass always did (ADR-572). Anything else returns
-`{ ok: false, reason: 'trig-given', why, fn, sentence }` — `sine-out-of-range` (a sine outside (0, 1]),
-`out-of-range` (a cosine outside [−1, 1]), or `form` — answered by `decideFromParse` with `input.trigGiven.<why>`; it never reaches the
-angle rules and never escalates. `NOTATION_WORDS` (units + the Latin function names) is the one list of
-Latin words the label-counting gates (`statedLabelTokens`, the span accountant) never read as point labels.
-
-## A sine is a two-root angle choice; the configuration searches walk every variant ([ADR-573](06-decisions.md#adr-573))
-
-A sine in (0, 1) lowers through `trigGiven` to the same `measure-angle`, with `expr: { value: θ, roots: [θ,
-180° − θ] }` and `variant: 0`. A multi-root literal angle is a **variant command** (`engine/variants.ts`):
-`variantCountOf` is the root count, and `withVariant` sets `variant` AND rewrites `expr.value` to
-`roots[variant]`, so every reader of the value (the lowering to `set-angle`, the label's `fmtNum`, the
-verifier) sees the drawn angle and none of them knows a choice exists. `variantConfigs` samples across the roots
-as it does a shape-variant's pairs, so a relation true at one root is never reported forced.
-
-The variant dimension of the two configuration searches is ONE list, `variantAxes` (`replay/core.ts`): every
-enabled cyclable variant fact, in fact order, at most four.
-- **`variantRescue(facts, deadline)`** tries the other assignments of the axes — fewest changed facts first, so
-  the figure moves as little as possible — and returns the first rewritten fact list meeting every requirement
-  at seeds 0–5 (at most 32 assignments). It is the `seatRescue` shape and has the same two callers:
-  `findValidConfig`'s **variant tier** (after the seat tier, before the reflection masks — a wrong variant
-  fails at every seed) and `dryRunOutcome`'s curable test (a step whose error a variant cures commits; the new
-  fact's own choice settles in `settleVariantDefaults` at commit, an earlier fact's in the post-commit
-  `autoResolve`).
-- **`searchAnotherView`** walks the PRODUCT of the axes as an odometer (the first axis turns fastest): the
-  variant step `v` advances the mixed-radix assignment by `v`, so successive presses reach every combination.
-  It used to step only the first variant fact.
-
-The App's «הציגו תצורה אחרת» enablement reads the registry (below), so a figure the givens otherwise determine
-— the ambiguous case «AB = 4», «AC = 3», «sin∢ACB = 3/4» — still offers its choice. (#1600 / ADR-593 folded
-`variantRescue` into `choiceRescue` and the variant odometer into the one over every axis — next section.)
-
-## A variable statement waits for its letter ([ADR-562](06-decisions.md#adr-562))
-
-`isVariableStatement` (`set-var`, `measure-bound`, `measure-order`) and `unboundSubjectOf` in `engine/lower.ts`
-generalise #926's `set-var`-only question: the fold stamps any variable statement whose letter no statement binds
-into the waiting register, `classify` counts it as pending, and `dryRunOutcome` commits it as data. A relation
-whose letters are bound but in a form it cannot follow (`unenforceableRelation` — it lowers to nothing) gets an
-error status and is refused at submit. `lowerOne` scales a bound by a positive linear coefficient. A waiting row is not a failing one (Am. 1): `factsWaitingForLetter` — the same `unboundSubjectOf` over the same table — is read by `meetsRequirements` (a waiting row cannot fail a view, so no configuration search and no «no configuration» notice) and by the step list (a third row state, ⧗ waiting, beside ✓ / ✗ / ○).
-
-## One shape-phrase reader ([ADR-595](06-decisions.md#adr-595))
-
-`src/parser/shapePhrase.ts` reads a polygon NOUN with the shape-property adjectives stated on it
-(`readShapePhrase(s)` → `{ noun, kind, arity, stated, consumed, unconsumed, strip, lower, cyclic }`). The noun
-decides the arity; an adjective is consumed only when the (noun, adjective) pair has a lowering — «ישר זווית» on
-«משולש» (or with no noun) is a right triangle, on «טרפז» a right trapezoid, on «מרובע» nothing, so it stays in
-`unconsumed` and in the caller's sentence for the leftover gate to escalate. `lowerShape(kind, ids)` is the
-standalone lowering the shape macros emit; the inscription rules (`inscribedPolygon`, `incircle`,
-`inscribedInPolygon`'s container and inner shape) read through the same reader, so one sentence has one reading
-whether it stands alone or sits in an inscription. `cyclic` carries analytic's `notCyclic` (a right trapezoid
-→ rectangle), which `inscribedPolygon` turns into the `inscribed-contradicts-noun` refusal. Two gates back it:
-`droppedShapeNoun` accounts a noun only by a materialised ring of ITS arity, and `droppedShapeAdjective` asks the
-commands to carry each stated property. At the apply boundary, `commandConflict` treats a generic
-`quadrilateral` / `triangle` over an already-declared ring as a supertype restatement (a reference), never a
-redefinition.
-
-## A role noun is a claim, lowered once ([ADR-563](06-decisions.md#adr-563))
-
-`src/parser/roleNouns.ts` is the one vocabulary of role nouns (chord, diameter, radius, tangent, leg, base,
-hypotenuse — Hebrew with its clitics, matched as whole words so «מיתר» is never «יתר»; English with uppercase
-labels only). `roleOperands(s)` returns each noun with the pair(s) the WORDS attach it to: «<noun> XY», a plural
-list «המיתרים AB ו-CD», and for chord / diameter the predicate «XY מיתר» / "XY is a chord". A noun with no
-adjacent pair binds nothing.
-
-`withRoleClaims` (`src/parser/parse.ts`) runs after whichever rule won, in `runRules`, before the circle
-post-passes. It replaced ADR-119's word-presence `withCarrierMembership`. Each operand's claim:
-
-- **chord** — both ends `point-on-circle`; **diameter** — the same plus `set-collinear` through the centre;
-  the circle from `circumscribingRef` / `directionalCircleRef` / `resolveOrIntroduceCircle({ implied })`, or
-  the circle the winning rule itself creates. Several circles it cannot bind → `ambiguous-circle-ref`. An end
-  at that circle's centre → refused (`centre-end`). An end the winning rule already put on a circle is not
-  restated; a pair the rule defined a circle by (`diameter`, a midpoint centre, a semicircle's 180° arc) is
-  left to it.
-- **radius** — the circle whose centre is an end (else the sentence's circle); the other end on it, the centre
-  letter promoted if it names an unnamed centre (ADR-342). No circle → `no-circle`; no centre end →
-  `no-centre-end`.
-- **diagonal** ([ADR-569](06-decisions.md#adr-569)) — the ADR-499 claim `segment {diagonal: true}`, on the winner's
-  own segment of the pair when it drew one; judged at apply (`diagonalClaimRefusal`) and by the verifier once a
-  ring exists. The construct «אלכסוני» is not in the row: it is also the internal-tangent adjective, and
-  «AC ו-BD אלכסוני הריבוע» is the `diagonals` rule's, which flags its own pairs.
-- **tangent** — no lowering here: a winner that touched no circle read it as a bare segment, so the operand is
-  `'unread'` and `runRules` tries the next rule.
-- **hypotenuse / leg / base** — the polygons (declared, or created by the same line) holding the pair as a side,
-  where the role has content. One → its canonical sentence: hypotenuse → `set-angle` 90 at the third vertex; an
-  isosceles base → `set-equal` of the two other sides; a trapezoid base → `set-parallel` with the opposite
-  side; a trapezoid leg → `set-parallel` of its two neighbours; a triangle leg that the isosceles structure
-  (`ctx.roleSides`) already makes one → nothing; otherwise `leg-apex`. None → `no-polygon` (a base of none
-  names a side); several → `several-polygons`. The engine's existing default-yielding (the right-angle seat,
-  the isosceles apex variant, the trapezoid's assumed pair) judges these exactly as it judges the sentences.
-
-Refusals are `ParseResult` `role-claim` (`why`, the noun as typed, the pair), mapped in
-`decideDeterministic.ts` to `input.roleClaim.<why>`.
-
-**Lines named by letters belong to the rule that reads them** ([ADR-569](06-decisions.md#adr-569)). `specialPointMeet`
-derives a centre's two lines from the shape; when the family noun is followed by a pair list
-(`letteredCentreLines`: «האלכסונים AB ו-CD», «התיכונים AD ו-BE», "the medians AD and BE") it does not derive
-them. Diagonals go to the lettered meet rule (and the registry carries the claim); medians, altitudes and angle
-bisectors are distributed through their own rule («AD תיכון»), all or nothing, and the point is the crossing of
-the first two named lines. The ⊥-bisector family names sides, not lines, and keeps the derived form.
-
-## A side named by its role follows the configuration ([ADR-596](06-decisions.md#adr-596))
-
-`roleSideLine` (ADR-465) resolves «הבסיס» / «השוק» / «היתר» to letters at the configuration showing and re-parses
-the letter form, but the commands it returns carry a `roleSide: { role, ring, at }` binding (an optional field
-on `AnyCommand`, like `consumed`; the engine ignores it). `ring` is the triangle, `at` its distinguished vertex
-at parse time — the apex for base and legs, the right-angle vertex for the hypotenuse. No binding is attached
-when the sentence names a vertex of that triangle: typed letters stay literal.
-
-The roles themselves have one definition, `roleSidesOf(construction)` in `src/engine/roleSides.ts` (declared
-structure only — the right-triangle perp-offset, a ⟂ / 90° constraint, an equal-sides constraint). The parser
-context reads it, and so does the replay fold: for a role-bound fact, `boundCmdsOf` passes every lowered
-command through `resolveRoleSide` against the construction in force at that fact's apply (in-order pass and
-ADR-104 retry alike). Same vertex → unchanged; one other vertex → the triangle letters ROTATE along the bound
-ring by the step between them (canonical, so the result is independent of the cycling path); several, none
-the bound one → unchanged; none → the fact waits for the figure that declares the role (a later «AB = BC»).
-The theorem context resolves the same way, and the rename core renames the binding.
-
-## A point placement keeps its tail ([ADR-570](06-decisions.md#adr-570))
-
-The point-on-carrier rules (`pointOnExtension`, `pointOnSegment`) match a prefix and are not anchored, so whatever followed the carrier was never read. Three seams now carry the tail:
-
-- **The condition clause** — `compoundSuchThat` splits on «כך ש» / "such that" (as before) and, after a point-placement subject (`POINT_PLACEMENT`), on the given-conjunction `GIVEN_AND` («ונתון כי / ש», «וידוע כי / ש», "and it is given that"). Each half parses through the real grammar, all or nothing. A shape subject is not split: that is the #108 compound, taught as two steps.
-- **The end qualifier** — `pointOnExtension` reads «מעבר ל(-)(נקודה) X» / "beyond X": X the far end keeps the carrier; X the near end reverses it (E on the extension of CB); any other letter escalates the line whole.
-- **The net** — `droppedGivenRelations`'s exemption (b) holds only when the command that INTRODUCES one of the relation's labels itself carries every label of the relation (`K על המשך AB כך ש AB=BK` baked as t = 2). "Some label is introduced by any command" accounted «DE = DC» because E was introduced on BC. With the exemption narrowed, the parser's own clause fallback (ADR-264) reads «E על המשך BC ו-DE = DC» and «…, DE = DC», which consult the same gate, and every rule and the LLM lane are held to it.
-
-## An existing label is context only through a reference ([ADR-597](06-decisions.md#adr-597))
-
-The label pass of the span accountant lives in `src/parser/labelAccounting.ts`, so the parser can ask it as well as the commit seams (`spanAccounting.ts` imports `parse.ts`, so the parser cannot import the accountant). Every stated label must be **carried** by a command value, **masked** as notation (the area marker, a bound radius symbol, an angle alias), or be an **existing label the lowering refers to**:
-
-- a member or the centre of a circle the commands reference (`circle-X`, or its centre id) — `ParseContext.circleMembers`;
-- the name of a circle («במעגל O», "circle O") when the lowering touches a circle;
-- a vertex of an existing polygon the sentence names with its noun («במשולש ABC») when the commands carry one of its vertices — `ParseContext.polygons`.
-
-An existing label that none of these reach is unaccounted, exactly like a new one. Three callers ask one function: `honestyGateReport` (the grammar commit seam and the ✎ edit seam; `GateCtx` carries `circleMembers` and `polygons`), the LLM second attempt in `submitPipeline`, and `parseResolved`, where an unaccounted EXISTING (uppercase) label routes the line to the clause split (a new label stays the commit seam's `droppedNewLabels` question, and lowercase runs are read as labels only at the seams) (`splitStatements`, ADR-264), whose `parseClause` asks it again so a half-read clause cannot survive the split. `augmentParseCtx` registers a clause's anonymous circle centre (`@ctr-O`) by its token, with `centrePoint`, as `buildParseCtx` does, so a later clause's «C על המעגל» lands on `circle-O`. Widening the reference closure is the sanctioned direction when a real reference is found un-exempted; re-widening the exemption is not.
-
-## A one-line compound is all or nothing: the clause-coverage gate ([ADR-598](06-decisions.md#adr-598))
-
-`src/app/clauseCoverage.ts`, called from `decideFromParse` (`decideDeterministic.ts`) at two points:
-
-- **Commit path** (`droppedClause`, after the honesty battery is clean and before the dry run). The line's clauses come from `clausesOf` (`independence.ts`, the ONE splitter). Each is lowered ALONE, in the figure's context plus the clauses before it (`augmentParseCtx`). A clause that lowers is **covered** when any of its significant commands (scaffolding segments and free points aside):
-  1. has a same-type whole-line command naming all its labels;
-  2. defines an object the whole line also defines (same `id`);
-  3. only declares an object the figure already has (a reference by name); or
-  4. is **entailed**: dry-run after the whole line's commands, the outcome is `empty` or `implied` (ADR-156 / ADR-542). An error is not entailment, because a clause that cannot hold beside the line is not honoured.
-
-  An uncovered clause refuses the line, `guided`, with `input.scope.split-statements` listing every clause. A clause that does not lower alone is no evidence on this path: the honesty battery has already accounted every token.
-- **Weak path** (`compoundNotHonoured`, after an honesty gate fired). A compound whose every clause lowers alone in sequence is refused with the same message instead of escalating. A line whose pieces do not all read alone escalates as before.
-
-`clausesOf` cuts at punctuation (a full stop between digits is a decimal point), at the explicit connectives, and at «ו» before a Hebrew word or a label. It never leaves a piece that only names points («AC ו-BD», «D ו-E על BC», «נקודות F, G, H …»). It keeps a subject-less piece with the clause before it when that clause's subject plus the piece reads as a statement («AB … ומשיק למעגל P» → «AB משיק למעגל P»).
-
-## A stated side is a requirement record, checked at stage 0g′ and read wherever a point is placed ([ADR-549](06-decisions.md#adr-549), [ADR-594](06-decisions.md#adr-594))
-
-- **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`) — `circle-side`,
-  `polygon-side`, `line-side`, and since [ADR-567](06-decisions.md#adr-567) (#1709) `circle-position`: two circles'
-  stated containment or disjointness (`set-circle-position`, never the unstated bare-pair variant). The side prover
-  skips it; `autosInterchangeable` reads it. ONE definition of which commands state a side, `recordRequirement`
-  (`engine/requirements.ts`), is called by `applyCommand` (so every probe carries the records) and by
-  `applyStep` / `applyCoupledStep`'s single `withRequirements` stamp on an accepted result — so a record
-  survives every ladder rebuild (M1 reinterpretations, recruiter trials, ownership passes) without any of
-  them knowing the field. Absent when no side was stated, so every other figure is byte-identical.
-- **Prover.** `sideImpossibility(probed, cmd)` (`engine/sideFeasibility.ts`) at stage 0g′, after the
-  bound prover, and inside `constraintIsPending` beside the other three. It is STRUCTURAL: it reads which
-  object a point is (a rider, a crossing, a midpoint, a foot, a vertex), what defines a circle (its
-  through-point, its circumcentre's three points), `coincide` classes, and the constraints an M1 lowering
-  leaves (`length-radius`, `|OE| = r` against a stated radius, an `equal` radius pair, `collinear` /
-  `collinear-order`). The incoming command's own claim is read from its structural probe on an empty
-  construction, the `introducedPointIds` idiom — so a statement about an existing point, which `applyCommand`
-  alone may not reflect (`point-on-segment` on an existing id), is still seen.
-- **Message.** `impossible: «X» contradicts «Y»`, the NEW statement first — ADR-540's wire shape, rendered
-  by the same `errors.boundImpossible` sentence; the side vocabulary (`on circle`, `outside triangle`,
-  `on different sides of`, …) is translated by `STATEMENT_WORDS` in `i18n/humanizeError.ts` under
-  `errors.stmt.*`, with the #413 no-English property locked.
-- **Strict outside (#1487).** `pointOutsidePolygon(p, verts, margin)` (`engine/geometry.ts`) is the mirror
-  of the strict-inside test: not inside AND clear of every edge. The verifier and apply's seeding both use
-  it, with the same margins as their inside tests.
-- **Parser.** `regionSideFallback` no longer declines a region's own vertex («A בתוך המשולש ABC»): it
-  parses, and the prover refuses it with the reason, instead of «I didn't understand».
-- **Read wherever a point is placed ([ADR-594](06-decisions.md#adr-594), #1739).** The record is not only a
-  prover input: ONE definition, `sideShortfall(req, positions, circles, aim)` (`engine/requirements.ts`, 0 iff
-  `sideHolds`, the test `checkGivens` itself calls), is read by every stage that places a point — the 1-D
-  root pick (side-keeping roots first), a retry-only side steer as the last rung of both driven solvers, the
-  sampler's region seat (`seatStatedSides` in `applySeed`: circle, polygon and line sides, on a free point or
-  a free on-circle rider) and the knowledge pool (`sideSamples`). `FreePoint.region` (ADR-511) is retired —
-  the region rides the record, which survives every ladder rebuild, where the field vanished on an M1
-  conversion. So a satisfiable side holds in every configuration the tool offers, not only at lucky seeds.
-
-
-## The dev step-through panel ([ADR-581](06-decisions.md#adr-581))
-
-A DEV-only tool over the headless session harness `validation/replaySession.ts`. Open the dev server with
-`?steps` (`http://localhost:5173/?steps`): a panel beside the app takes a pasted utterance list, replays it
-through the real `parse → dryRun → commit → replay` path, lists each step's category, and draws the figure
-AS OF any selected step. "Load into the builder" puts that step's facts and seed into the live session, so a
-step-5 failure is re-tested without retyping steps 1–4.
-
-- **Facts, not figures.** The harness reports `factsAfter[k]` per step; `figureAtStep` re-derives the figure
-  from that prefix with the report's own seed rule — the same `(facts, seed) → figure` model the store uses.
-- **No second pipeline.** The panel only reads `replaySession`; it cannot drift from the submit decision tree
-  the harness mirrors.
-- **Never shipped.** `main.tsx` mounts it inside an `import.meta.env.DEV` conditional, which the production
-  build folds to `false`, dropping the lazy import and its chunk.
-
-## A crossing draws what its subject is ([ADR-592](06-decisions.md#adr-592))
-
-A crossing sentence has a FRAME, and only the frame decides whether its operand lines are drawn (#1751, operator rulings 2026-10-04). The verb frame — `lineLineIntersection`'s lines-first and cut branches, and a role meet whose `crossingSubjectOf` is `'lines'` (a meet verb, no point-first noun head) — inks its operands: the lettered pairs as before, and «האלכסונים נפגשים בנקודה M» the ring's two diagonals (plain segments: derived from the ring the sentence resolved, so no ADR-499 claim). The noun frame — the point-first branch, `cross(…, 'point')`, and the role meet with a noun head — inks nothing; it ensures its operands' endpoints as `ifAbsent` free points so the statement stands alone (an empty canvas, and the #943 drop-one re-fold, which never re-parses). Analytic reads the same rule (ADR-AG-241).
-
-## A fixed-run rule consumes the whole label body ([ADR-601](06-decisions.md#adr-601))
-
-`labelRun(body, n)` returns the FIRST run of exactly n labels and says nothing about the rest of the body. A rule
-whose operand is such a run therefore owes the ADR-024 leftover guard **at the run**: `unclaimedLabels(body, run,
-also)` (`parse.ts`) strips the run and every other label the rule accounted for (the crossing it names, the circle's
-centre, a through point), and a non-empty answer makes the rule return `null`. The sentence then falls to a rule
-that reads all of it, or escalates. The gates cannot be the backstop for this: they exempt every EXISTING label, so a
-stated pair of drawn points («BD» in «המיתרים AC ו-BD נפגשים») vanishes unseen (the gate arm is #1833). Members
-today: the line-meets-circle family (`lineMeetsCircle`, `extendOntoCircle`, `lineCutsCircleTwice`,
-`secantFarPoint`) and both spans of `circumcircleMeetsSegment`.
-
-The same rules take the circle as the meet verb's subject or object, never as the scene: `circleIsOnlyLocative(s)`
-is true when every circle mention is a sentence-opening «ב+מעגל [O]» / "in the circle [O]". That is the precedence
-half of the fix (docs/17 §3, keyword bow-outs): it is a statement about what the circle phrase IS, not a word test.
-`lineLineIntersection` reads with the lowercase En `FILLER` stripped, and a capitalised filler word too («In the
-circle, …»), so a word is never read as a two-letter line.
-
-A sentence-opening locative that NAMES its circle («במעגל O, המיתר AC …») is label-accounted context (rule 5 of
-`labelAccounting.ts`) exactly when the figure already holds what it says: at least two existing points carried, all
-on that circle. Otherwise the letter stays unaccounted, so the scene's membership is never dropped green.
-
-## The order of points on a circle is a sampled DOF ([ADR-601](06-decisions.md#adr-601))
-
-Free riders on a circle take golden-angle default slots (`nextTheta`), and the sampler holds a cluster of them
-(the vertices of an inscribed polygon, or three or more riders with no polygon on the circle) to a tight ±30°
-jitter so an inscribed shape keeps its spread. That jitter also kept the slots' CYCLIC ORDER, so the order the
-defaults happened to produce (four points typed A, B, C, D land in the order A, C, B, D) acted as a fixed given.
-`statedCyclicOrderSeat` (`engine/sample.ts`, called by `applySeed` for every seed but 0) treats the order as a
-discrete DOF of the sample: per circle with at least four tight riders, it deals the cluster's own slots in a
-cyclic order drawn (seeded) from the orders the construction's records allow. A declared polygon with at least four
-vertices in the cluster keeps its vertex order; two chords stated to meet within a segment (`line-line-intersection`
-with an `onSeg` flag, four distinct ends in the cluster) have alternating ends. When the records leave only the
-default order (up to reflection) the default is kept, and an unsatisfiable set keeps the default for the verifier.
-The seat runs before the jitter, so spread protection is unchanged; it adds no evaluate. Its reach is the seed
-sweep every view search already runs (ADR-106's post-commit `findValidConfig`, «הציגו תצורה אחרת»'s resample), so
-a requirement the default order misses is met at the first seed that deals a lawful order. It is the sampler's
-counterpart of the stated-side seat (ADR-594): a sampled DOF follows what was stated, and varies only where
-nothing was.
-
-## One registry of unstated discrete choices ([ADR-593](06-decisions.md#adr-593))
-
-An unstated discrete choice — which crossing, which side of an edge, which root, which vertex carries the right
-angle — is reachable by «הציגו תצורה אחרת», counted by the status line and judged by the values panel **only if
-it is registered** in `configurationAxes(facts, construction)` (`replay/core.ts`). Each axis is
-`{ kind, i, n, cur, set(cmd, digit) }`: the fact index that stores the choice, its count, its current digit and
-the rewrite. Kinds, in odometer order (first turns fastest):
+A seam that adds a requirement back searches; one that only relaxes need not.
+
+### The dev step-through panel ([ADR-581](06-decisions.md#adr-581))
+
+A DEV-only panel over `validation/replaySession.ts`, opened with `?steps` (`http://localhost:5173/?steps`): it
+replays a pasted utterance list through the real `parse → dryRun → commit → replay` path, lists each step's
+category, and draws the figure as of any step; "Load into the builder" loads that step's facts and seed. The harness
+reports `factsAfter[k]`; `figureAtStep` re-derives the figure with the `(facts, seed) → figure` model; the panel only
+reads `replaySession`. `main.tsx` mounts it under `import.meta.env.DEV`, which production folds to `false`.
+
+## Fold and replay
+
+### The within-segment gate and its structural exemption (#944, [ADR-489](06-decisions.md#adr-489))
+
+`intersectionsWithinSegments` catches a crossing that wandered off its segment (a wrong configuration the
+reflection sampler fixes). When the two carriers share a vertex the crossing can only be that vertex, so
+`shareEndpoint` exempts it structurally — a wider `WITHIN_MARGIN` would re-admit #569's near-collapse basin. The
+gate, `segmentsCrossWithin` (ADR-383) and `reflectMaskForFailing` all take the exemption.
+
+### A variable statement waits for its letter ([ADR-562](06-decisions.md#adr-562))
+
+`isVariableStatement` (`set-var`, `measure-bound`, `measure-order`) and `unboundSubjectOf` (`engine/lower.ts`) let
+the fold stamp any variable statement whose letter nothing binds into the waiting register; `classify` counts it
+pending and `dryRunOutcome` commits it as data. A bound-but-unfollowable relation (`unenforceableRelation`) errors
+and is refused at submit; `lowerOne` scales a bound by a positive linear coefficient. `factsWaitingForLetter` is
+read by `meetsRequirements` (a waiting row fails no view) and by the step list (⧗ waiting).
+
+### A side named by its role follows the configuration ([ADR-596](06-decisions.md#adr-596))
+
+`roleSideLine` (ADR-465) resolves «הבסיס» / «השוק» / «היתר» at the configuration showing, and its commands carry
+`roleSide: { role, ring, at }` (optional on `AnyCommand`, like `consumed`; the engine ignores it) — `ring` the
+triangle, `at` its apex or right-angle vertex — unless the sentence names a vertex. `roleSidesOf(construction)`
+(`src/engine/roleSides.ts`) is the one definition of the roles; the fold's `boundCmdsOf` passes each role-bound
+command through `resolveRoleSide` against the construction at that fact's apply: same vertex → unchanged; one other →
+the letters rotate along the ring; several, none the bound one → unchanged; none → the fact waits. The theorem context and the rename core follow the binding.
+
+### A stated side is a requirement record, checked at stage 0g′ and read wherever a point is placed ([ADR-549](06-decisions.md#adr-549), [ADR-594](06-decisions.md#adr-594))
+
+- **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`): `circle-side`, `polygon-side`,
+  `line-side`, and `circle-position` ([ADR-567](06-decisions.md#adr-567), #1709: stated containment or
+  disjointness, `set-circle-position`), which `autosInterchangeable` reads. `recordRequirement`
+  (`engine/requirements.ts`) is the one definition of which commands state a side, called by `applyCommand` and by
+  `applyStep` / `applyCoupledStep`'s `withRequirements` stamp, so a record survives every ladder rebuild.
+- **Prover.** `sideImpossibility(probed, cmd)` (`engine/sideFeasibility.ts`) at stage 0g′ and in
+  `constraintIsPending`, structural: what a point is (rider, crossing, midpoint, foot, vertex), a circle's defining
+  points, `coincide` classes, M1 constraints (`length-radius`, `|OE| = r`, an `equal` radius pair, `collinear` /
+  `collinear-order`); the incoming claim is read off an empty-construction probe (the `introducedPointIds` idiom),
+  so `point-on-segment` on an existing id is seen.
+- **Message.** `impossible: «X» contradicts «Y»`, new statement first, rendered by `errors.boundImpossible`; the
+  side words (`on circle`, `outside triangle`, `on different sides of`) are translated by `STATEMENT_WORDS`
+  (`i18n/humanizeError.ts`, `errors.stmt.*`).
+- **Strict outside** (#1487): `pointOutsidePolygon(p, verts, margin)` (`engine/geometry.ts`), used by the
+  verifier and apply's seeding. `regionSideFallback` parses a region's own vertex so the prover can refuse it.
+- **Read wherever a point is placed** (#1739): `sideShortfall(req, positions, circles, aim)`
+  (`engine/requirements.ts`, 0 iff `sideHolds`, which `checkGivens` calls) steers the 1-D root pick, a retry-only
+  rung of both driven solvers, the sampler's `seatStatedSides` in `applySeed`, and the knowledge pool
+  (`sideSamples`). `FreePoint.region` (ADR-511) is retired.
+
+### The meeting re-seat is routed by a predicate (#260, [ADR-512](06-decisions.md#adr-512))
+
+`meetingCarriers(objects, cmd)` (`engine/apply.ts`) decides whether a command asserts a point is the meeting of two
+carriers — `onSeg`, `segments-cross`, or a `set-collinear` whose rider is named onto a second host. `applyCommand`
+asks it before its switch and calls `reseatLooseMeetEndpoint` (ADR-255); a new member is a row in the predicate.
+The endpoint moved is a non-pinned, unreferenced, undriven free point, fewest dependents first, aimed through the
+other carrier's midpoint in general position and on the same side of every circle (ADR-253/254).
+`reinterpretAsCollinear` (step.ts) passes previous positions into `applyCommand`.
+
+### A declared polygon the givens force flat is refused (#1849, [ADR-602](06-decisions.md#adr-602))
+
+The line completing the collapse is refused before it becomes a fact ([ADR-W-115](06w-decisions-workspace.md#adr-w-115)
+amends ADR-W-048).
+
+- **The proof** — stage 0h, `forcedFlatPolygon` (`engine/metricFeasibility.ts`): linear length statements are rows
+  in the unknowns |PQ|; a straightness equality follows when its row lies in the row space of [A | b]; proven
+  collinear sets sharing two points merge; a polygon inside one is flat in every configuration. **The
+  observation** — stage 2d, the accept gate's `collapsedPolygon`, floor `DEGENERATE_EXTENT_RATIO` (5e-4).
+- **One message**, `collapsed: polygon A, B, C would be flat — <statement> cannot hold`, from both seams; the fold
+  reads the declaring statement from `ownerByObjId` and appends `[vs #i]`, resolved by `otherUtteranceForError`.
+- **Defaults yield**: a collapse only an unstated default forces is cured by the variant rescue (ADR-573).
+
+### A declared polygon the givens force FLAT is said out loud (#945, [ADR-513](06-decisions.md#adr-513))
+
+The net below ADR-602, for a polygon not forced flat but drawn below the floor at a sampled configuration.
+`Derived.degeneracies` (`replay/core.ts`), beside `coincidences` and `forcedOffArc`, is derived on every replay and
+shown as an ⓘ notice. `degeneratePolygons` (`engine/degeneracy.ts`) measures each declared polygon's greatest vertex
+offset from the line through its two most-separated vertices, over that separation (the ADR-413 accept gate's
+measure), against `DEGENERATE_EXTENT_RATIO`. `nameDegeneracies` walks the statement prefixes (the ADR-492 rule) for the declaring and
+responsible statements; the wording is `figure.degenerate`.
+
+## The knowledge pool
+
+### The knowledge pool of a DETERMINED figure is its admissible set (#434, [ADR-509](06-decisions.md#adr-509))
+
+The relations layer's definite values, the values panel and the forced crossing dots read one shared pool
+(`samplingJobs` / `sharedSamples`, `replay/core.ts` — M3's one sampler).
+
+- **Under-determined (count > 0):** every shape-variant config × 16 seeds through the validity ladder; ≥ 4 valid
+  samples before a number prints (ADR-295, #88).
+- **Determined (`freeDofCount === 0`, one variant):** a count can lie (the ADR-424 class) and a seed never reaches a branch or a seat, so the pool is the **admissible set** — the current facts at every seed
+  «הציגו תצורה אחרת» resamples (`CONFIG_SEEDS` = 24, [ADR-558](06-decisions.md#adr-558), #1599) plus seeds
+  {s, s+1, s+2} × every discrete rewrite (`admissibleRewrites`), kept where `meetsRequirements` holds; the
+  `inscribe` variant stays out (ADR-262).
+- **Bounded, failing CLOSED.** Over `ADMISSIBLE_REWRITE_CAP`, or when the work cap (`POOL_WORK_CAP` `evaluateCore`
+  calls) cuts the enumeration, the pool is **not determined** with `complete: false`, and the gates fall back to
+  the ≥ 4 floor.
+- **The gates trust a measurement, not the count:** `determined` (count 0 and complete) passes to
+  `detectRelationsAcross` (`opts.determined`), `computeValuesPanel` and `forcedCrossingKeys`.
+- **Work is a function of the input** ([ADR-582](06-decisions.md#adr-582), #1605): every memo entry (replay cache,
+  fold memo, drop-one memo, the `evaluate` / `resolveDriven` / DOF memos) carries a work ledger
+  (`engine/solveBudget.ts`), charged once per work epoch (the `sharedSamples` call), cold or warm; a budget-cut
+  computation is never memoized. The UI-thread «כבר קיים» test (`impliedByPrior`) keeps its fail-open wall-clock
+  bound (`sharedSamples(facts, { deadlineMs })`) on three seeds. The pool is memoized whether complete or not;
+  while values compute, an asked row reads `waitingNote`.
+- **The status cue reads the same pool** (#1444, [ADR-556](06-decisions.md#adr-556)): `figureDeterminacy`
+  (`replay/core.ts`) returns `determined`, the number of distinct shapes (pairwise distances equal up to one
+  scale), and `stable` (every sampled seed, via `seedOfSample` and the `circlesOfSample` discipline, sees that
+  number). It rides `detectAll` into the store's `determinacy` slot (facts-keyed, like `crossings`), and
+  `figureStatus` (`app/figureStatus.ts`) maps it to the status line (FR-ALT-6). The values panel reads the same
+  `complete` flag.
+
+## The configuration registry and searches
+
+### One registry of unstated discrete choices ([ADR-593](06-decisions.md#adr-593))
+
+An unstated discrete choice is reachable by «הציגו תצורה אחרת», counted by the status line and judged by the values
+panel only if registered in `configurationAxes(facts, construction)` (`replay/core.ts`). Each axis is
+`{ kind, i, n, cur, set(cmd, digit) }`; kinds in odometer order (first turns fastest):
 
 | Kind | Where it comes from | Stored as |
 |---|---|---|
@@ -1402,31 +755,102 @@ the rewrite. Kinds, in odometer order (first turns fastest):
 | `variant` | `variantAxes` (ADR-573) | `variant` (via `withVariant`) |
 | `seat` | `cyclableSeat` (ADR-481) | `rot` on the right triangle |
 
-Consumers, each a caller and never a restatement:
-- **`searchAnotherView`** walks ONE odometer over the product of every axis from the current assignment —
-  step k advances the mixed-radix assignment by k, at most 63 steps per press — so successive presses reach
-  every combination. (It used to step only the FIRST cyclable branch, after an everything-advances candidate
-  that on a 2×2 space toggles between two of the four shapes.)
-- **`admissibleRewrites`** (the knowledge pool of a determined figure) enumerates every axis but `variant`
-  (variants are sampled as constructions of their own by `variantConfigs`); over `ADMISSIBLE_REWRITE_CAP` it
-  fails closed.
-- **`choiceRescue`** (`findValidConfig`'s tier after the seat, and `dryRunOutcome`'s curable test) tries the
-  other assignments of the `variant` and `side` axes, fewest changes first. The seat and the branch keep their
-  own tiers so tier order — and every default drawing — is unchanged.
-- **`App.tsx`** enables the button when any axis exists or the figure has free DOFs.
+Consumers: `searchAnotherView` walks one odometer over every axis (step k advances by k, at most 63 steps per
+press); `admissibleRewrites` enumerates every axis but `variant` (sampled by `variantConfigs`), failing closed over
+`ADMISSIBLE_REWRITE_CAP`; `choiceRescue` (`findValidConfig`'s tier after the seat, and `dryRunOutcome`'s curable
+test) tries the `variant` and `side` axes, fewest changes first; `App.tsx` enables the button when any axis or free
+DOF exists.
 
-**The crossing count is evaluate's own selection.** `crossingChoice` (`engine/evaluate.ts`) returns the roots a
-line∩circle / circle∩circle point chooses among and the one it picks; `tryEval` draws the pick and
-`crossingBranchCount` (behind `branchCount`) counts the roots. An `avoid` that is one of the crossings, a single
-in-segment root or a tangent is determined (1); an `avoid` that is not a crossing — the parser's fallback for
-«הישר BC פוגש את מעגל A» when neither endpoint is on the circle — is an ordinary branch pick (ADR-470), so 2.
+**The crossing count is evaluate's own selection:** `crossingChoice` (`engine/evaluate.ts`) returns the roots and
+the pick, `tryEval` draws it, and `crossingBranchCount` (behind `branchCount`) counts; an `avoid` that is a
+crossing, a single in-segment root or a tangent is 1, an `avoid` that is not a crossing is an ordinary pick
+(ADR-470). **The composition side is stored:** `chooseComposition` keeps the away default, reads
+`edgeSide: 'toward'`, and records `SideChoice { type, ids, toward }`, carried by `withSideChoices` (the
+`withRequirements` discipline); `expandShapeVariant` carries `edgeSide`. A stated side wins through
+`meetsRequirements` and `choiceRescue`.
 
-**The composition side is stored, not recomputed.** `chooseComposition` keeps the away-from-existing-geometry
-default; when both sides are clean and off-edge geometry on a definite side makes them different figures, it
-reads `edgeSide: 'toward'` (take the other clean side) and records a `SideChoice { type, ids, toward }` on the
-result, which `withSideChoices` carries forward on every accepted step (the `withRequirements` discipline). A
-stacking side and a mirror-only composition record nothing. The registry maps a record back to the fact whose
-lowering reaches the composing command with the side set (a direct shape, or a shape-variant's base shape —
-`expandShapeVariant` carries `edgeSide`). The field is optional: a saved figure without it loads and draws
-unchanged. A STATED side wins: the search offers the other side only through `meetsRequirements`, and a default
-the stated side contradicts is cured by `choiceRescue`'s side axis.
+### A sine is a two-root angle choice; the configuration searches walk every variant ([ADR-573](06-decisions.md#adr-573))
+
+A sine in (0, 1) lowers through `trigGiven` to the same `measure-angle`, with `expr: { value: θ, roots: [θ,
+180° − θ] }` and `variant: 0`. A multi-root literal angle is a **variant command** (`engine/variants.ts`):
+`variantCountOf` is the root count, and `withVariant` sets `variant` AND rewrites `expr.value` to
+`roots[variant]`, so every reader of the value (the lowering to `set-angle`, the label's `fmtNum`, the verifier)
+sees the drawn angle. `variantConfigs` samples across the roots, so a relation true at one root is never reported
+forced. `variantAxes` (`replay/core.ts`) lists every enabled cyclable variant fact (at most four).
+`variantRescue(facts, deadline)` tries the other assignments,
+fewest changed facts first, for `findValidConfig`'s variant tier and `dryRunOutcome`'s curable test; a new fact's
+choice settles in `settleVariantDefaults`, an earlier fact's in `autoResolve`. ADR-593 (#1600) folded `variantRescue` into `choiceRescue`, and
+`searchAnotherView` walks the axes:
+the
+  variant step `v` advances the mixed-radix assignment by `v`, so successive presses reach every combination.
+
+### The order of points on a circle is a sampled DOF ([ADR-601](06-decisions.md#adr-601))
+
+Free riders on a circle take golden-angle slots (`nextTheta`), and the sampler holds a cluster to a ±30° jitter.
+`statedCyclicOrderSeat` (`engine/sample.ts`, called by `applySeed` for every seed but 0) deals a cluster of four or
+more tight riders its own slots in a seeded cyclic order drawn from the orders the records allow: a declared polygon
+keeps its vertex order; chords stated to meet within a segment (`line-line-intersection` with `onSeg`) alternate
+their ends; otherwise, or when unsatisfiable, the default stays. It runs before the jitter, adds no evaluate, and is
+reached by every view search's seed sweep (ADR-106) — the counterpart of the stated-side seat (ADR-594).
+
+### A free point's admissible region rides on the point (#556, [ADR-511](06-decisions.md#adr-511))
+
+A construction needing a free operand on one side of a circle (a tangent's or secant's apex, «M מחוץ למעגל») emits
+the ADR-254 side record `point-circle-side` after the operand's placement; its apply case (`engine/apply.ts`) seeds
+or re-seats a non-pinned point on that side. The sampling half — `applySeed` (`engine/sample.ts`) re-seating
+wrong-side samples, seed 0 never sampled — now reads the requirement record (ADR-594), which retired
+`FreePoint.region: { circle, side }[]`. The verifier reports a contradicted side and `meetsRequirements` gates the
+button on it.
+
+### An unstated choice is SAID (#973, [ADR-502](06-decisions.md#adr-502))
+
+The engine leaves an unstated choice free (ADR-052) and cyclable (ADR-138); this layer **names** it.
+
+- **`unstatedChoices(facts)`** (`engine/shapeVariants.ts`) folds the enabled facts into the choices the tool is
+  making, a table keyed on the fact's commands: `equal-pair` (kite / isosceles, pinned by a stated equality),
+  `free-endpoint` (a base-less midsegment's free end, pinned by «G על PR»), `parallel-pair` (the isosceles
+  trapezoid's assumed AB ∥ DC), `midsegment-free` ([ADR-545](06-decisions.md#adr-545), #1368: nothing named — the
+  side it is parallel to). Derived on every render like `hasVariant`; nothing is stored.
+- **Midsegment shapes.** `midsegment` (two variants: one endpoint stated) and `midsegment-free` (three) are separate
+  `VariantShape`s: a variant explores what was not stated, never what was. Gates ask `MIDSEGMENT_SHAPES` (from
+  `shapeVariants.ts`), never `shape === 'midsegment'` (`droppedMidsegment`).
+- **The trapezoid's ring in force** (#989, [ADR-506](06-decisions.md#adr-506)): the `trapezoid` lowering makes ring
+  sides 0 and 2 parallel, and `trapezoidRingInForce(ids, statedParallels)` is the one reader of which ring — as
+  named, rotated by one when a stated ∥ names sides 1/3 and none names 0/2. The replay pre-scan (`trapRotate`,
+  ADR-341) lowers on that ring and re-seats the leg equality (`trapezoidLegs`, the ADR-239 `softPair` shape);
+  `parallelPairs` and `unstatedChoices` read the same ring. In `apply.ts`, `trapezoidDerivedSlot` picks the missing
+  vertex and `trapezoidOffset` derives it; the composition normaliser never rotates the trapezoid's ring. Not
+  cyclable (#973's ruling).
+- **`unstatedChoiceText(choice, t)`** (`ui/unstatedChoice.ts`) builds the note — what is drawn, the pinning sentence
+  (a bare next line, #997), the cycle button's label — from `steps.unstated*` / `steps.state*`.
+- **Render:** on the fact's row, plus one cue beside «הציגו תצורה אחרת» (ADR-502 Am. 1, #996).
+
+## Render and marks
+
+### The measure-label seam and the display choice (#948, [ADR-488](06-decisions.md#adr-488))
+
+A symbolic measure becomes figure text at one place, `measureLabelForms` (`src/engine/lower.ts`), reached from the
+fold's symbolic-measure branch in `src/replay/core.ts`; `measureLabelText` is its `text` half. It yields `text`
+(the resolved number), `letter` (the student's expression) and the `sym` they differ over.
+
+- The competing predicate is `letter !== undefined`, so no list of label kinds exists.
+- The swap happens at the render seam (`applyDisplayMode`, in `App.tsx`), so `displayMode` never enters the replay
+  memo key.
+- The choice is state, not geometry: beside `seed` in `geoStore` (`partialize`, the temporal `equality`, cleared by
+  `clear`), outside the fact list, so `(facts, seed)` stays the source of truth.
+- In the save file it is keyed by fact position (`FigureFileDisplay.displayMode`), because `sanitizeFactIn` keeps
+  ids only when the file carries them; the converters are shared with 3-D in `shell/displayMode.ts`.
+
+### The three label sources, and the rule they all obey (#955, [ADR-491](06-decisions.md#adr-491))
+
+| source | when it runs | gate |
+| --- | --- | --- |
+| the fact seam — a symbolic measure's forms, an angle-alias name (`labelFrom` in `computeFold`) | inside the fold, from the fact's success branch — in-order pass and ADR-104 retry alike | the fact HELD |
+| #474's stated-magnitude pass | `runTail`, post-fold | `status[f.id] === 'ok'` |
+| the surviving-constraint fill | `runTail`, post-fold | the constraint survived |
+
+**A label is written from a fact only once the fact held** — after `applyStep`, so a refused «∠ABC = α» never
+prints the `70°` another line supplied. Labels are fold state like `applied` and ride the fold memo (ADR-280);
+fact identity does not, so no provenance is stored on a label. `checkLabels` (`engine/verify.ts`) then holds every
+decimal label to the drawn measure at the verifier's tolerance plus the print rounding, reporting `figure.v.label`
+whatever the source. A new label source states which of these three shapes it is.
