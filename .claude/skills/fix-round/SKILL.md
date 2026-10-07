@@ -138,6 +138,10 @@ over ~21 h); the parallel rounds #1721/#1736/#1767 built 5–12 items in 1.5–3
   shared suite lock themselves (`scripts/suite-lock.mjs`, in the git common dir every worktree sees). Any
   other vitest run an agent makes that takes more than a few seconds goes through
   `npm run test:locked -- npx vitest run <files>`. Waiting is printed; a dead holder is taken over.
+- **Pre-allocate ids per stream at dispatch.** Give each stream its own ADR ids (and requirement ids
+  where its product numbers them) in its brief, because parallel streams take the same next id. Expect
+  two streams to build the same sentence, and converge the duplicates onto one lowering when they are
+  integrated (#1616). Every brief also carries docs/22 §7's no-`git stash` rule.
 - **After a red run, re-run only the failing files** (by path, through the lock), then ONE confirming
   `test:fast`. Never re-run a whole lane or suite to check a one-file fix: #1751 spent 46 of its 75 min
   on six lane runs.
@@ -185,6 +189,9 @@ Each item, inside its stream:
    ([ADR-W-034](../../../docs/06w-decisions-workspace.md)). **Never overlap suite runs** — a
    `test:fast`, a lane or a full suite runs alone; overlapping doubled every gate in round #822. The
    suite lock enforces it (above); run the item's own heavy files through `npm run test:locked --`.
+   **`tsc -b` runs last, after every file the item touches exists, the lock included**: `vitest`
+   type-checks nothing, so a `tsc` run before the test file was written let test-only type errors reach
+   the batch gate (round #869).
 4b. **Report each phase to the round log** — every item agent's prompt carries its round number, item
    key and these lines, run from its own worktree (the log is shared):
    `node scripts/round-event.mjs emit <R> item <key> remeasure` at pickup · `fixing --note "<what the
@@ -347,6 +354,9 @@ sync, so the dashboard shows a link to this page. Emit `round playsheet` when yo
 sheet. The dashboard never carries the cases or the verdicts itself.
 
 ## Step 6 — readiness gate (standing rule 5)
+
+**Build, serve and pre-play the sheet with the `/playsheet` skill**; the items below are this round's
+own additions to it.
 
 Standing rule 5 (CLAUDE.md) governs — it is the same gate every "ready" report passes, and a round
 is not exempt. Start every server it names, `curl` each one, and quote the ports: the batch on

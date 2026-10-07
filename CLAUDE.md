@@ -14,7 +14,7 @@ Geo Builder is a family of four browser builders (2-D geometry, 3-D space, analy
 The defining interaction: a student adds information incrementally — "square ABCD" → "point G on AD" → "angle GBA = 37°" (G slides along AD until the angle holds) — and the figure forms and adapts as constraints accumulate. When a construction has more than one valid drawing, one is shown and the student can press a button to cycle to an alternative configuration.
 
 The pipeline is a compiler: **natural language → commands → constructive evaluation → rendered figure**
-([docs/11](docs/11-architecture-as-compiler.md)). Every object is defined in terms of earlier objects in a
+([docs/04 §1](docs/04-design.md#1-guiding-principles), "The compiler lens"). Every object is defined in terms of earlier objects in a
 dependency graph, classified by degrees of freedom — free point (2), point-on-object (1, the parameter that
 makes "G on AD" representable), derived point (0). Evaluation is topological. Every unstated magnitude or choice is a free degree of freedom (ADR-052);
 «הציגו תצורה אחרת» re-samples them all, branches and free magnitudes alike (02 FR-ALT-2). Stability is
@@ -43,7 +43,6 @@ The layering `engine ← replay ← store` is mechanically enforced by
 | `src-analytic/` | The analytic-geometry Builder: see [`src-analytic/CLAUDE.md`](src-analytic/CLAUDE.md) |
 | `shell/` | The shared chrome tree ([ADR-W-016](docs/06w-decisions-workspace.md#adr-w-016), [ADR-W-019](docs/06w-decisions-workspace.md#adr-w-019)): design tokens, bidi core, i18n bootstrap, save envelope + naming + load audit, symbol-palette core, app frame (header, About/privacy modal, banners, product switcher). Parameterized by the caller — no strings, no product knowledge, no `if (product === …)`. Consumed by all four products (docs/28 §5a) |
 | `server/` | The shared LLM proxy + admin dashboard, parameterized by `tool:` — never forked per product |
-| `archive/` | The old template-based implementation. Not compiled, not bundled, excluded from tests. Reference only |
 
 ## Where the current state lives
 
@@ -55,7 +54,7 @@ The layering `engine ← replay ← store` is mechanically enforced by
 - **`gh pr list`** — work that is finished and pushed but **not merged**: an open PR is a feature awaiting the operator's play-and-approve, and nothing else records it. Pushed is not the finish line ([ADR-W-007](docs/06w-decisions-workspace.md)).
 - **[`docs/DEPLOY-LOG.md`](docs/DEPLOY-LOG.md)** — canonical deploy history, one entry per `prod/YYYY-MM-DD` tag. It records what WAS deployed, never what is awaiting deploy — for that, compare the newest `prod/*` tag against `main` (the session-start hook reports both).
 
-Older narrative logs (docs/09, 09b, PROJECT-MEMORY) lag the ADR logs: background only, never status.
+`docs/archive/` holds finished plans and reviews: history, never status or rules.
 
 ## Standing rules
 
@@ -124,7 +123,7 @@ summary, not prose. The operator works down it without opening any other documen
    embedded screenshot, no typing) · **✅ verified** (record only); the published `report.html`
    carries the evidence, and the chat report keeps the 🎮 utterances copy-pasteable per rule 3.
 
-Enforced by the `Stop` hook [`scripts/ensure-test-server.mjs`](scripts/ensure-test-server.mjs), which fails
+How: the `/playsheet` skill. Enforced by the `Stop` hook `scripts/ensure-test-server.mjs`, which fails
 OPEN — a broken hook must never wedge a session.
 
 **6 — Requirements and design are DELIVERABLES.** A change to what the product PROMISES updates its
@@ -177,17 +176,17 @@ never silently built under a bug's banner.
   feature branch — and **branch in a worktree** when the tree has uncommitted work, never `git checkout`
   over it. Worktree paths, cleanup, and the `node_modules` junction hazard: [docs/22 §7](docs/22-workflow.md).
 - **`main` is the trunk** — always green, always deployable. **Deploys use only committed `main` state**, per
-  [docs/RUNBOOK.md](docs/RUNBOOK.md), each with a `prod/YYYY-MM-DD[-n]` tag and a DEPLOY-LOG entry.
+  [docs/RUNBOOK.md](docs/RUNBOOK.md), each with a `prod/YYYY-MM-DD[-n]` tag and a DEPLOY-LOG entry; a session runs them itself, never hands them back.
 - **Commit ⇒ push.** GitHub is the real backup and the only channel to the other machine.
 
 ## Multi-product workspace
 
-[ADR-266](docs/06-decisions.md#adr-266); registry and the adding-product-N+1 recipe: [docs/22-workflow.md §9](docs/22-workflow.md).
+[ADR-266](docs/06-decisions.md#adr-266); registry and the adding-product-N+1 recipe: [docs/22 §9](docs/22-workflow.md).
 
 One workspace, several sibling products: the **2-D Geo Builder** (`src/`, log 06, label `2d`), the **3-D Space
-Builder** (`src3d/`, log 06b, ids `ADR-3D-NNN`, label `3d`), the **complex-numbers Builder** (`src-complex/`,
-log 06d, ids `ADR-CX-NNN`, label `complex`), the **analytic-geometry Builder**
-(`src-analytic/`, log 06c, ids `ADR-AG-NNN`, label `analytic`) — all four deployed — plus the shared chrome
+Builder** (`src3d/`, log 06b, label `3d`), the **complex-numbers Builder** (`src-complex/`,
+log 06d, label `complex`), the **analytic-geometry Builder**
+(`src-analytic/`, log 06c, label `analytic`) — all four deployed — plus the shared chrome
 (`shell/`) and the **shared server** (`server/`, label `server`). Cross-product decisions go in
 `docs/06w-decisions-workspace.md` as `ADR-W-nnn`.
 

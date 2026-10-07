@@ -1,11 +1,11 @@
 ---
-name: classifier-blocks-pr-merge
+name: gh-pr-merge-works
 description: "gh pr merge WORKS — it is a local `git merge` into main that the classifier refuses; never tell the operator a merge is impossible without retrying gh pr merge first"
 metadata: 
   node_type: memory
   type: project
   originSessionId: f88aafe1-e903-48ea-aab6-e845d3cfac50
-  modified: 2026-09-14T17:24:33.421Z
+  modified: 2026-10-07T00:00:00.000Z
 ---
 
 **Corrected 2026-09-14 (PRs #1003/#1004). The earlier version of this note was wrong and cost a
@@ -26,10 +26,8 @@ you waiting for?"*. `gh pr merge 1003 --merge` then worked on the first try.
 **How to apply:** merge with `gh pr merge <n> --merge`. If the worktree for that branch still exists,
 `--delete-branch` fails on the local half *after the merge has already succeeded* — check
 `git log origin/main` before treating that error as a failed merge, then remove the worktree and
-delete the branch.
+delete the branch. In a stack, never `--delete-branch` before the whole stack has landed (docs/22 §4).
 
-**The general lesson, which is the part worth keeping:** a denial recorded in memory is an
-observation about one moment, not a capability boundary — see [[tool-denials-are-observations]].
-Before reporting "I can't", retry the canonical command *in this session*. Writing a stale denial
-into memory as a rule is worse than not recording it, because it silently converts a retryable
-refusal into a permanent one.
+**The general lesson:** a denial recorded in memory is an observation about one moment, not a
+capability boundary — see [[tool-denials-are-observations]]. Before reporting "I can't", retry the
+canonical command *in this session*.
