@@ -15276,3 +15276,63 @@ The row kept reading «תיכון לבסיס» with a ✓ while the figure drew 
 - The same holds for «במעגל, AC ו-BD נחתכים בנקודה E», «במעגל O המיתר AC חותך את המיתר BD בנקודה E» and "in the circle, chords AC and BD meet at E".
 - «מרובע ABCD» or «המרובע ABCD חסום במעגל O» typed after four points on a circle is drawn as a convex ABCD. Before, it was drawn self-crossing with the no-valid-configuration note.
 - After the step the points on the circle may move to a new order (the search picks the first configuration that meets the statement). «הציגו תצורה אחרת» on bare points on a circle now also shows them in other orders.
+
+## ADR-602 — A declared polygon the givens force flat is refused, naming the statement and the declaration: a length prover ahead of the ladder, the collapse floor raised onto the notice band, one message (#1849)
+
+**Status:** accepted · 2026-10-07 · bug (P1, 2-D, honesty class) · branch `fix/1849-2d-refuse-flat` · the 2-D slice of #1849 (3-D: ADR-3D-310, analytic: ADR-AG-247)
+**Requirements:** [02](02-requirements.md) FR-RN-13 — rewritten: a declared polygon the givens force flat is refused, not noticed; FR-EN-8 — one sentence (the refusal names the declaration as the other side) · **Design:** [04](04-design.md) § "A declared polygon the givens force flat is refused" (and the superseded note on § "…is said out loud"); [LADDER.md](LADDER.md) stage 0h (new) and stage 2d (the floor) · **LADDER stage:** **inserts at stage 0h** (`pre:flat`) and **changes stage 2d**'s collapse floor
+**Adopts** [ADR-W-115](06w-decisions-workspace.md#adr-w-115) (operator ruling 2026-10-07, amending ADR-W-048) · **Supersedes for declared polygons** [ADR-513](#adr-513)'s notice · **Extends** [ADR-413](#adr-413) (the floor) and [ADR-417](#adr-417) (the metric prover's equality case) · **Reuses** [ADR-508](#adr-508)'s `[vs #i]` tail and #945's declaring-statement attribution
+
+**The ruling.** *"refuse on all tools with a message since it contradicts ABC is a triangle and a flat line is not a triangle"* (operator, 2026-10-07, #1849).
+
+**Measured before** (`main` @ 3032fcbb, through `decideDeterministic2D` + the real gate `driveThroughGate`, LLM mocked, seed 0):
+
+| sequence | before |
+| --- | --- |
+| «משולש ABC» · «AB = 5» · «BC = 3» · «AC = 8» | commit, flatness 1.9e-4, notice «המצולע ABC התמוטט לקו — הנתונים מחייבים זאת: «משולש ABC», «AC = 8»» |
+| the same, typed AC, AB, BC | commit + notice naming «BC = 3» |
+| 4·4·8 · «AB : BC = 5 : 3 · AB : AC = 5 : 8» · «AC = AB + BC» · «AB = BC · AC = 2AB» · «היקף המשולש ABC = 16 · AC = 8» · «משולש שווה שוקיים ABC · AB = 4 · BC = 8» | commit + notice, flatness 1.0e-4–2.0e-4 |
+| «מרובע ABCD» · «AB = 1» · «BC = 1» · «CD = 1» · «AD = 3» | commit + notice (3.3e-4) |
+| «משולש ABC» · «D אמצע AB» · «D על AC» | refused (ADR-413): «D על AC» סותר את «D אמצע AB» — no word about the triangle |
+| «מרובע ABCD» · «AB מתלכד עם CD» | not read by 2-D's grammar — `not-handled`, escalates to the model |
+| «משולש ABC» · «זווית BAC = 3» / «= 1» / «= 0.1» | commit (0.1° with the notice at some seeds) |
+
+**The class (docs/17 §1).** *A set of givens that admits only a flat realisation of a DECLARED polygon is accepted as a figure*, because (a) the accept gate's collapse floor (1e-4) sat below where a solve the givens force flat settles (1e-4–2.3e-4 — the gate itself is why it stops there), and (b) the one exact argument available — the equality case of the triangle inequality — was deliberately let through by the metric prover as "ADR-413's concern", which the floor never caught.
+
+**What was tried first, and why it was not enough.** The plan's sketch — make the ADR-413 gate refuse the notice band — refuses every measured triangle at 24/24 seeds. It does not refuse the quadrilateral 1·1·1·3: the solver drew it at flatness **1.6e-3**, three times the raised floor, every length within its tolerance (2e-4 of the scale) because a bent path's sag is second order. A drawing is only as flat as the solver polished it; a floor cannot be calibrated against that. Lengths needed a proof.
+
+**Decision — two seams that already existed, one message.**
+
+1. **The proof, stage 0h** — `forcedFlatPolygon` (`engine/metricFeasibility.ts`, beside ADR-417/538/540's provers), called through `forcedFlatError` (`step.ts`) in `applyStepLadder` and `applyCoupledStepLadder`, and inside `constraintIsPending` so it is never a pending state. Every **linear** length statement becomes a row in the unknowns |PQ| — a pinned length, an equality, a ratio with its affine `add`, a signed length sum, a perimeter, a perimeter ratio — read from the check list and the solve directives alike. A relation c·x = 0 follows from a consistent system iff (c | 0) lies in the row space of [A | b]: one Gaussian elimination, scale-free, so the ratio form is the same proof as the pinned one. The candidates are each declared polygon's own straightness equalities — |uv| = the sum along a ring arc, and |uv| = |uw| + |wv| — each proving its vertices collinear; collinear sets that share two points merge; a polygon inside one merged set is flat in every configuration. It refuses only when the step's figure is proven flat and the prior figure was not, so the statement that completes the collapse is the one refused. Sound one way, like its siblings: an inconsistent system proves nothing (the solver reports it), a free length makes nothing follow, and no proof leaves the gate to judge the drawing.
+2. **The observation, stage 2d** — `collapsedPolygon`'s floor rises from 1e-4 to `DEGENERATE_EXTENT_RATIO` (5e-4): one ruler, one number. ADR-513's calibration of that number carries over — 2.2× above the forced family's worst seed, 46× below the thinnest ordinary corpus polygon. Everything the proof cannot read (an incidence, a stated collinearity, a coincidence) lands orders below it.
+3. **One message.** `collapsed: polygon A, B, C would be flat — <statement> cannot hold` (`collapsedPolygonError`), from the prover and from the failure ladder whenever the solution that existed — at the primary solve or any rescue stage — flattened a declared polygon. The step's error is `degenerate` (a rigid contradiction, ADR-537's flag). The fold appends `[vs #i]` naming the statement that **declared** the polygon, read from its own `ownerByObjId` (the declaring half of #945's attribution, structurally, no replay) — not the drop-one search, which on 5·3·8 would name «BC = 3», one of three lengths only jointly at fault. `humanizeError` picks the noun from the vertex count (`errors.polygonFlatTriangle` / `Quad` / `Polygon`, each with `_said` and `_said_vs`, He + En). The submit note now resolves the tail too (`otherUtteranceForError` in `runSubmit`): «לא ניתן: «AC = 8» סותר את «משולש ABC» — יחד עם שאר הנתונים הנקודות A, B, C היו על ישר אחד, וקו ישר אינו משולש.»
+
+**Measured after** (the same path; 24 seeds where stated):
+
+| sequence | after |
+| --- | --- |
+| 5·3·8, AC/AB/BC order, 4·4·8, the ratio form, 1·1·1·3 quadrilateral, «D אמצע AB · D על AC» | refused at **24/24** seeds, one message each, max replay 23–496 ms |
+| «AC = AB + BC», «AB = BC · AC = 2AB», «היקף … = 16 · AC = 8», «הנקודות A, B, C על ישר אחד», «מרובע ABCD · C על הישר AB · D על הישר AB», «ישר ABCD» on a quadrilateral, «triangle ABC» + 5·3·8 | refused at the door, naming the declaration |
+| «AB = 5 · BC = 3 · AC = 8 · משולש ABC» (declared last) | refused, «עם «משולש ABC» המשולש ABC היה נעשה קו ישר…» (no earlier declaration to name) |
+| 3°, 1°, 0.5°, 0.1° apex; 5·3·7.9; 5·3·7.99; 89° + 90° | build at **24/24** seeds (least flatness 2.2e-3, 6.7e-4, 3.4e-4, 6.1e-5, 7.7e-2, 2.4e-2, 1.7e-2) |
+| «AB = 5 · BC = 3 · AC = 8» with no polygon | builds — three collinear points are a figure |
+| «משולש שווה שוקיים ABC · AB = 4 · BC = 8» | the default apex is refused as a collapse; the variant rescue (ADR-573) seats apex C, a real 4·8·8 triangle — see *Found, not fixed* |
+| «∠ABC = 90 · ∠ACB = 90» | unchanged — ADR-537's tolerance-artefact refusal, naming the two angles |
+
+**Scope, stated.** The notice channel (`Derived.degeneracies`, ADR-513) is kept as the net. In 2-D it only ever spoke for declared polygons, so what it still covers is a polygon that is **not** forced flat but is drawn below the floor at a sampled configuration: a stated sub-degree sliver (0.1° drew at 6.1e-5 at some of 24 seeds; the figure is a real triangle, so it builds). ADR-537's angle needles keep their own message — the reason there is the angle sum, which the existing «∠ACB = 90» סותר את «∠ABC = 90» says better than "a line". «AB מתלכד עם CD» is not read by 2-D's grammar; the LLM would emit «C על הישר AB» · «D על הישר AB», which is refused (oracle-tested, unit lock).
+
+**Locks updated in place, with the ruling cited.** `replay/__tests__/issue-945-degenerate.test.ts` — four trigger-family cases asserted the notice (5·3·8, 4·4·8 with the 0.1° sliver, the responsible-statement order, the reload) and now assert the refusal; the sliver half asserts it builds above the floor. `engine/__tests__/issue-1328-tolerance-artefact.test.ts` — "the ADR-513 notice figures keep their NOTICE" now asserts 5·3·8 is refused by the collapse message (never as a tolerance artefact) and 0.1° builds. `i18n/__tests__/humanize-error.test.ts` gains the three collapse wordings (built by `collapsedPolygonError`). The ADR-413 locks (`collapse-gate.test.ts`, scenario `midpoint-membership-contradiction-refuses`) assert the refusal, not its wording, and pass unchanged.
+
+**New locks.** `app/__tests__/issue-1849-flat-polygon-refused.test.ts`: the prover over six algebraic forms, the quadrilateral's two routes and its three-collinear non-member, the five things it must not prove; the family refused at the door through `decideDeterministic2D` with the Hebrew note naming «X» and the declaration; the quadrilateral; the incidence family's unified message; the polygon declared last; the submit note through `runSubmit`; the false-refusal net (eight controls build, every polygon above the floor); the isosceles default apex rescued. Scenario `flat-triangle-refused-1849` (corpus 4): the operator's lines through the gate, the refusal's other side, and the 3° control. Parity rows `flat-triangle-1849` … `thin-triangle-control-1849` (ADR-W-115).
+
+**Sibling audit (docs/17 §1).** 3-D builds every refused row flat (measured through its parity lock) — ADR-3D-310's slice, carried as `knownGap … #1849`. Analytic already refuses each one (with its own message) — ADR-AG-247's slice. Complex has no declared polygon of this kind.
+
+**Found, not fixed.** The variant rescue's 1.5 s wall-clock budget (`choiceRescue`, ADR-573) cured «משולש שווה שוקיים ABC · AB = 4 · BC = 8» in 1.6 s on the dev machine, so at the door it commits or refuses depending on machine speed (the 4·4·9 twin, refused at the default apex by ADR-417, pays the same). Before this change the figure drew flat with the notice, which was also wrong (M4). Reported with #1849.
+
+**Perf (docs/17 §7).** The prover is one elimination over the figure's length rows per step (a few dozen unknowns at most) and runs only when a declared polygon and a length row exist. The forced family now refuses at the door instead of solving: 5·3·8 replays in ≤ 236 ms at every seed.
+
+**Behaviour change for a student:**
+- «משולש ABC · AB = 5 · BC = 3 · AC = 8» no longer draws a flat triangle with a notice. «AC = 8» is refused: «AC = 8» סותר את «משולש ABC» — the points would be on one line, and a line is not a triangle. The same for 4·4·8, either typing order, a ratio form, a sum, a perimeter, and a quadrilateral whose sides force it flat.
+- A stated collinearity or incidence that flattens a declared polygon («D אמצע AB · D על AC») now names the polygon («סותר את «משולש ABC»») instead of the earlier statement it collides with.
+- A refusal at the door now names the earlier statement it contradicts wherever the fold found one (ADR-508's tail, which the submit note used to drop).
+- Thin but real triangles (3°, 1°, a stated 0.1°) still build.

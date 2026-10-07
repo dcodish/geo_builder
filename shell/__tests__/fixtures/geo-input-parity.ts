@@ -1083,6 +1083,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'coordinate-restriction-circle-1832', family: 'topic', steps: ['x^2 + y^2 = 4, y > 0'], expect: 'refused', exception: 'X2' },
   { id: 'coordinate-restriction-param-control-1832', family: 'topic', steps: ['y = ax + 1, a > 0'], expect: 'builds', exception: 'X2', note: 'a genuine parameter keeps its domain' },
   { id: 'letter-bound-x-1832', family: 'lengths', steps: ['משולש ABC', 'AB = 3x', 'x > 2'], contextFor: { analytic: ['y = 2x + 1'] }, expect: 'builds', exception: 'X10', knownGap: [{ product: '3d', issue: '#1679' }], note: "2-D bounds its length letter x; in analytic x is the plane's coordinate, so the bound is refused (#1832)" },
+  // #1849 (ADR-W-115, operator ruling 2026-10-07): a DECLARED polygon the givens force flat is REFUSED in every builder — a flat line is not a triangle
+  { id: 'flat-triangle-1849', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1849' }], note: 'T30: 5 + 3 = 8, the only drawing is a line' },
+  { id: 'flat-triangle-reversed-1849', family: 'lengths', steps: ['משולש ABC', 'AC = 8', 'AB = 5', 'BC = 3'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1849' }] },
+  { id: 'flat-triangle-isosceles-1849', family: 'lengths', steps: ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1849' }] },
+  { id: 'flat-triangle-ratio-1849', family: 'lengths', steps: ['משולש ABC', 'AB : BC = 5 : 3', 'AB : AC = 5 : 8'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1849' }], note: 'the ratio form of 5·3·8' },
+  { id: 'flat-quadrilateral-lengths-1849', family: 'lengths', steps: ['מרובע ABCD', 'AB = 1', 'BC = 1', 'CD = 1', 'AD = 3'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1849' }] },
+  { id: 'thin-triangle-control-1849', family: 'lengths', steps: ['משולש ABC', 'זווית BAC = 3'], expect: 'builds', note: 'a thin triangle is still a triangle (ADR-413’s control)' },
+  // end #1849
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

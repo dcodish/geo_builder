@@ -3,7 +3,7 @@ import i18n from '@/i18n';
 import { humanizeError, PATTERNS, sanitizeIds, translateConstraintWords, translateParams, type Translate } from '@/i18n/humanizeError';
 import { describeConstraint } from '@/engine/solve';
 import { applyCommand } from '@/engine/apply';
-import { diagonalClaimRefusal } from '@/engine/step';
+import { collapsedPolygonError, diagonalClaimRefusal } from '@/engine/step';
 import type { Constraint } from '@/engine/types';
 
 // Use the real configured i18n instance (Hebrew-pinned, as the app runs) so the test
@@ -18,6 +18,12 @@ const hasHebrew = (s: string) => /[֐-׿]/.test(s);
  * site is added to the engine, add its raw shape here so coverage stays complete.
  */
 const CASES: { raw: string; contains: string[] }[] = [
+  // step.ts collapsedPolygonError (#1849, ADR-602) — a declared polygon the step would flatten; the noun is the
+  // polygon's own, so all three wordings (triangle, quadrilateral, polygon) and the no-statement form are exercised.
+  // Built by the engine's own function, never re-spelled here.
+  { raw: collapsedPolygonError(['A', 'B', 'C'], '|AC| = 8'), contains: ['ABC', 'A, B, C', 'משולש'] },
+  { raw: `${collapsedPolygonError(['A', 'B', 'C', 'D'], '|AD| = 3')} [vs #0]`, contains: ['ABCD', 'מרובע'] },
+  { raw: collapsedPolygonError(['A', 'B', 'C', 'D', 'E'], null), contains: ['ABCDE', 'מצולע'] },
   // metricFeasibility.ts (#420, ADR-417) — BOTH wordings: `keyOf` picks the triangle sentence for a
   // single intermediate point and the general path sentence for a longer cycle, so both are exercised.
   // Added by #983's coverage gate, which found this pattern carried no evidence row at all.

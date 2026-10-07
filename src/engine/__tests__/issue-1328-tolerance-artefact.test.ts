@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { factsOf } from '../../__tests__/scenario-pipeline';
-import { findValidConfig, firstSatisfyingSeed, meetsRequirements, replay } from '@/replay/core';
+import { COLLAPSED_VS, findValidConfig, firstSatisfyingSeed, meetsRequirements, replay } from '@/replay/core';
 import { applyStep, buildSymTab, degeneratePolygons, lowerOne, residualTolerance, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, withToleranceFactor } from '@/engine';
 import type { Command } from '@/engine';
 import { buildParseCtx, parse } from '@/parser';
@@ -88,16 +88,15 @@ describe('#1328 — the other direction, byte-identical: thin figures that are E
     expect(Math.abs(angleAt(fig, 'A', 'B', 'C') - 1)).toBeLessThan(0.01);
   });
 
-  it('the ADR-513 notice figures — 5·3·8 and a stated 0.1° — keep their NOTICE and are never refused: a flat exact solution is a real configuration', () => {
-    for (const seq of [
-      ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'],
-      ['משולש ABC', 'זווית BAC = 0.1'],
-    ]) {
-      const facts = factsOf(seq);
-      const fig = replay(facts, 0);
-      expect(fig.lastError, seq.join(' · ')).toBeNull();
-      expect(fig.degeneracies.map((d) => d.object), seq.join(' · ')).toEqual(['ABC']);
-    }
+  it('the ADR-513 notice figures: 5·3·8 is REFUSED as a flattened triangle (ruling 2026-10-07, ADR-602) — never as a tolerance artefact — and a stated 0.1° still builds', () => {
+    // Was: both kept their NOTICE ("a flat exact solution is a real configuration"). The operator's ruling of
+    // 2026-10-07 (#1849) reverses that for a declared polygon: a flat line is not a triangle. What this lock still
+    // guards is ADR-537's own boundary — neither figure is caught as a TOLERANCE ARTEFACT: 5·3·8 is refused by the
+    // length prover with the collapse message, and the 0.1° sliver is an exact solution that builds.
+    const forced = replay(factsOf(['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8']), 0);
+    expect(forced.lastError).toMatch(COLLAPSED_VS);
+    const sliver = replay(factsOf(['משולש ABC', 'זווית BAC = 0.1']), 0);
+    expect(sliver.lastError).toBeNull();
   });
 
   it('5·3·7.9 — an ordinary triangle above the trigger band — is untouched', () => {

@@ -43,6 +43,7 @@ import { geoWork, isCancelled } from '@/store/geoWork';
 import { unaccountedSpans } from '@/parser/spanAccounting';
 import { type DecideLog, type DecideNote, type Verdict2D, decideFromParse, decidePreParse } from './decideDeterministic';
 import { logDebug } from '@/debug/sessionLog';
+import { otherUtteranceForError } from './errorSubject';
 
 export interface SubmitUi {
   setInputNote(msg: string): void;
@@ -76,7 +77,7 @@ export interface SubmitDeps {
   /** Humanized engine error + retry hint (display-layer concern, injected). `said` is the student's
    *  own sentence, which becomes the refusal's SUBJECT where the engine fragment cannot identify the
    *  rejected statement (#943, ADR-487). */
-  explainError(raw: string | null | undefined, said?: string): string;
+  explainError(raw: string | null | undefined, said?: string, other?: string): string;
 }
 
 /**
@@ -117,7 +118,11 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     Object.fromEntries(
       Object.entries(p).map(([k, v]) => [k, v && typeof v === 'object' && 't' in v ? t((v as { t: string }).t) : v]),
     );
-  const noteText = (n: DecideNote) => ('explain' in n ? deps.explainError(n.explain, utterance) : t(n.key, resolveParams(n.params)));
+  // #1849 (ADR-602): a refusal at the door names the OTHER side too, when the fold could name one. The dry run's
+  // status carries the same `[vs #i]` tail the banner resolves (ADR-508), indexed into the committed facts the
+  // trial array shares — so the note says «AC = 8» סותר את «משולש ABC» instead of «AC = 8» against "an earlier given".
+  const noteText = (n: DecideNote) =>
+    'explain' in n ? deps.explainError(n.explain, utterance, otherUtteranceForError(store().facts, n.explain)) : t(n.key, resolveParams(n.params));
 
   const pre = decidePreParse(utterance, deps.view());
   if (pre?.kind === 'store-op') {
