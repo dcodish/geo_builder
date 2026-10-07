@@ -88,9 +88,7 @@ never as a contradiction or a refutation.
 
 - **Span accounting, and no `dropped*` gate — ever.** Every non-filler token span in a line is claimed by
   the parse, or the line is refused ([`FR-LN-1`](02d-requirements-complex.md)). The 2-D history is the
-  argument: per-symptom `dropped*` gates accumulate, each one narrow, and still leave holes — one of them
-  became a false positive that made a whole family unreachable in production. Verified 2026-09-05: no
-  `dropped*` gate exists in this tree.
+  argument: per-symptom `dropped*` gates accumulate, each one narrow, and still leave holes.
 - **A second mention of a name is a GIVEN, and that decision lives at ONE seam.** Rules ask
   `existingRef()` rather than each deciding for itself
   ([ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md)) — the difference
@@ -200,7 +198,7 @@ never as a contradiction or a refutation.
   holds is a numeric definition, which stage 3a **places** rather than searches (a name a closed number
   defines is not a free coordinate). A stated member claims its root by set membership. An indexed
   letter never enumerates (no z₁₁). Anything else keeps the ordinary equation, and ADR-CX-049's census.
-- **A question about a set's letter is asked of every member** ([ADR-CX-050](06d-decisions-complex.md#adr-cx-050)).
+- **A question about a set's letter is asked of every member** ([ADR-CX-050](06d-decisions-complex.md#adr-cx-050)). **⚠ Ruled to change (2026-10-07, ADR-W-118 B12 · #1867):** up to two differing values are shown, joined by «או», as in every builder. The text below describes the code until that ships.
   `lowerLines` publishes each enumerated set (`FoldInput.solutionSets`, letter → members), and stage 5d
   substitutes each member into the asked expression and hands every value, in every configuration, to
   the one predicate `knowledgeOf`. Values that differ inside one drawing are the set's own spread and
@@ -247,24 +245,22 @@ In a product whose defining interaction is entering a problem **line by line**, 
 difference between a tool that checks a student and one that contradicts them out of its own
 incompleteness. The 3-D builder refuses a claim its givens do not determine
 ([02b FR-CL-1](02b-requirements-3d.md), [ADR-3D-260](06b-decisions-3d.md#adr-3d-260)); the operator deferred
-a three-valued verdict for 3-D ([#909](https://github.com/dcodish/geo_builder/issues/909)); amended
-2026-10-07, #1861.
+a three-valued verdict for 3-D ([#909](https://github.com/dcodish/geo_builder/issues/909)).
 
 ## Boundaries
 
 `src-complex/` never imports `src/` or `src3d/`; the engine layer is **copied-never-shared, always**. It
-was the **first consumer of [`shell/`](04w-design-shell.md)** — created with this tree as its only
-consumer precisely so the shared chassis could be proven on a product that was not yet in production
+consumes the shared chrome in [`shell/`](04w-design-shell.md)
 ([ADR-W-016](06w-decisions-workspace.md#adr-w-016)).
 
 The standing sibling guarantee ([ADR-W-017](06w-decisions-workspace.md#adr-w-017)) is checked, not
 promised: `npm run check:siblings` refuses any change to `src/` or `src3d/` and builds both regardless of
-the diff, because a shared-surface edit can break them without touching one of their files. It takes ~10
-seconds and it does **not** replace `npm run test:full` — the builds prove the siblings compile, only the
-suite proves they behave.
+the diff, because a shared-surface edit can break them without touching one of their files. It does
+**not** replace `npm run test:full` — the builds prove the siblings compile, only the suite proves they
+behave.
 
 ## Known gap
 
-- ~~**`/complex-builder/api/*` is not reverse-proxied in production**, so the per-tool operator config is
-  silently inert there.~~ Resolved — **[#903](https://github.com/dcodish/geo_builder/issues/903)** is
-  closed; the directives went in (`deploy/apache-complex-builder.conf`; amended 2026-10-07, #1861).
+- **`/complex-builder/api/*` is reverse-proxied in production** by the directives in
+  `deploy/apache-complex-builder.conf`; the gap [#903](https://github.com/dcodish/geo_builder/issues/903)
+  recorded is closed.
