@@ -272,8 +272,10 @@ describe('honest refusals', () => {
       expect(v.error.key).toBe('unsatisfiable');
       expect(v.error.detail).toContain('זווית BAD = 40');
     }
-    // and the other order: the bisector is the statement refused
-    expect(refusalKey(['משולש ABC', 'BD חוצה זווית ABC', 'AD חוצה זווית BAC'])).toBe('unsatisfiable');
+    // and the other order: the bisector is the statement refused. One D on both feet is D = C, so «BD» is the side BC
+    // and the bisected angle ABC is 0 — the givens hold only on a FLAT triangle, refused as that collapse (#1849,
+    // ADR-AG-247), on the same line.
+    expect(refusalKey(['משולש ABC', 'BD חוצה זווית ABC', 'AD חוצה זווית BAC'])).toBe('polygon-collapsed');
   });
 
   it.each([

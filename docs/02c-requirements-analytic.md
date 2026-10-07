@@ -2444,3 +2444,11 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - «x הוא פרמטר» and "y is a parameter" are refused the same way.
 - A condition on any other letter is a parameter's domain, as before: «y = ax + 1, a > 0», «0 < k < 6».
 - Drawing only the allowed part of the curve (a ray, a half-circle) is [#1846](https://github.com/dcodish/geo_builder/issues/1846).
+
+**R172 — givens that force a declared polygon flat are refused, and the refusal says why**
+([ADR-AG-247](06c-decisions-analytic.md#adr-ag-247), [#1849](https://github.com/dcodish/geo_builder/issues/1849);
+workspace ruling ADR-W-115 — operator, 2026-10-07: *"a flat line is not a triangle"*).
+
+- When the givens hold only with a declared polygon's vertices on one line — «משולש ABC» · «AB = 5» · «BC = 3» · «AC = 8» (either order), 4-4-8, «מרובע ABCD» with B on its diagonal, «B על הקטע AC», «B אמצע AC», or coordinates «A(0,0)» «B(1,1)» «C(2,2)» — the line that completes the collapse is refused. The message names that line, the polygon and the sentence that declared it, and says a flat figure is not that shape. It is never «לא נמצאה תצורה», which would blame the search for what the givens themselves force, and the figure is never drawn flat.
+- This amends R105's message (the needle «AB = AC» · «∠ABC = 90» is the same collapse) and R64's pinned arm (a pinned flat ring, ADR-AG-129). A pinned CROSSED ring keeps its ring-order message.
+- A thin but real polygon is still drawn (5, 3, 7.9; a stated 3° apex), and a given that cannot hold even flat (5, 3, 8.1) keeps «לא נמצאה תצורה».

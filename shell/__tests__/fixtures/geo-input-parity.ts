@@ -1083,6 +1083,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'coordinate-restriction-circle-1832', family: 'topic', steps: ['x^2 + y^2 = 4, y > 0'], expect: 'refused', exception: 'X2' },
   { id: 'coordinate-restriction-param-control-1832', family: 'topic', steps: ['y = ax + 1, a > 0'], expect: 'builds', exception: 'X2', note: 'a genuine parameter keeps its domain' },
   { id: 'letter-bound-x-1832', family: 'lengths', steps: ['משולש ABC', 'AB = 3x', 'x > 2'], contextFor: { analytic: ['y = 2x + 1'] }, expect: 'builds', exception: 'X10', knownGap: [{ product: '3d', issue: '#1679' }], note: "2-D bounds its length letter x; in analytic x is the plane's coordinate, so the bound is refused (#1832)" },
+  // #1849 (ADR-W-115, operator ruling 2026-10-07): givens that force a DECLARED polygon flat are refused in every builder,
+  // naming the statements — a flat figure is not a triangle. Analytic column (ADR-AG-247); the 2-D and 3-D streams close their gaps.
+  { id: 'flat-polygon-1849-01', family: 'polygons', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1849' }, { product: '3d', issue: '#1849' }], note: '5 + 3 = 8: the only drawing is flat' },
+  { id: 'flat-polygon-1849-02', family: 'polygons', steps: ['משולש ABC', 'AC = 8', 'AB = 5', 'BC = 3'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1849' }, { product: '3d', issue: '#1849' }], note: 'the same lengths in the other order: the last one completes the collapse' },
+  { id: 'flat-polygon-1849-03', family: 'polygons', steps: ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1849' }, { product: '3d', issue: '#1849' }] },
+  { id: 'flat-polygon-1849-04', family: 'polygons', steps: ['מרובע ABCD', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1849' }, { product: '3d', issue: '#1849' }], note: 'B on the diagonal AC: the quadrilateral has a straight corner' },
+  { id: 'flat-polygon-1849-05', family: 'topic', steps: ['משולש ABC', 'A(0,0)', 'B(1,1)', 'C(2,2)'], contextFor: { '2d': ['משולש ABC'] }, expect: 'refused', exception: 'X1', only: ['analytic'], note: 'coordinates that put the vertices on one line — never drawn flat; 2-D refuses the coordinate itself (X1)' },
+  { id: 'flat-polygon-1849-06', family: 'polygons', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.9'], expect: 'builds', note: 'control: thin but a real triangle' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

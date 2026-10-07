@@ -8,7 +8,7 @@
  */
 import { fold, existingKindOf, type ApplyError, type ApplyNotice } from './apply';
 import { reportedDof } from './carriers';
-import { completingStatement, drawableAt, holdsOn, viewBox, type Figure } from './evaluate';
+import { collapsedByGivens, completingStatement, drawableAt, holdsOn, viewBox, type Figure } from './evaluate';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
 import { resolveToolLetters } from './toolLetters';
@@ -45,6 +45,13 @@ export interface LineFault {
   domain?: ApplyError['domain'];
   /** For a crossing already named: the two things that cross, as the grammar says them (#1416). */
   operands?: [string, string];
+  /**
+   * For a polygon the givens flatten (#1849, ADR-AG-247): its name as written (`ABC`), its noun (the registry's
+   * Hebrew key, as `ring.noun`), and the sentence that declared it — the second statement the refusal names.
+   */
+  polygon?: string;
+  shape?: string;
+  declared?: string;
 }
 
 /**
@@ -269,7 +276,30 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * figure is never shown as though it satisfied a given it does not
    * ([02c](../../docs/02c-requirements-analytic.md) honesty invariants).
    */
-  if (completing !== null && !faults.some((f) => f.index === completing && f.code === 'unsatisfiable')) {
+  /** Which line declared each polygon — the sentence a collapse refusal names beside the completing one (#1145). */
+  const declaredPolygonOn = new Map<string, number>();
+  facts.forEach((f, i) => {
+    if (f.t === 'polygon' && !declaredPolygonOn.has(f.id)) declaredPolygonOn.set(f.id, owner[i]);
+  });
+  /** The refusal for a declared polygon the givens flatten, on line `index` (#1849, ADR-AG-247). */
+  const collapseFault = (index: number, ringId: string): LineFault | null => {
+    const o = objectById(construction, ringId);
+    const at = declaredPolygonOn.get(ringId);
+    if (!o || o.kind !== 'polygon' || at === undefined) return null;
+    return { index, code: 'polygon-collapsed', detail: lines[index], polygon: o.vertices.join(''), ...(o.noun ? { shape: o.noun } : {}), declared: lines[at] };
+  };
+  /**
+   * THE GIVENS FORCE A DECLARED POLYGON FLAT (#1849, ADR-AG-247 — operator ruling 2026-10-07, ADR-W-115: refuse,
+   * in every builder, naming the statements). The drop-one probe names the statement that COMPLETED the
+   * contradiction; when the contradiction is that the givens hold only on a collapsed ring of a declared polygon —
+   * the thin-ring arm's evidence, read over the window the configuration search already walked — the refusal says
+   * so. «לא נמצאה תצורה» would tell the student the search missed, when the givens themselves are what flatten it.
+   * A given that cannot hold even flat («AC = 8.1» on 5 and 3) leaves no such evidence and keeps the search's words.
+   */
+  const flattened = completing !== null ? collapsedByGivens(construction, seed) : [];
+  const flatFault = completing !== null && flattened.length > 0 ? collapseFault(completing, flattened[0]) : null;
+  if (flatFault) faults.push(flatFault);
+  else if (completing !== null && !faults.some((f) => f.index === completing && f.code === 'unsatisfiable')) {
     faults.push({ index: completing, code: 'unsatisfiable', detail: lines[completing] });
   }
   for (const k of completing === null ? figure.unsatisfied : []) {
@@ -471,19 +501,31 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * drawn and `app/shapeWarnings.ts` names the trapezoid and the line that forced it.
    */
   if (completing === null && figure.ringFaults.length > 0 && reportedDof(construction, figure.carrierDof) === 0) {
-    /** Which line declared each polygon — the line the refusal belongs on (#1145). */
-    const declaredPolygonOn = new Map<string, number>();
-    facts.forEach((f, i) => {
-      if (f.t === 'polygon' && !declaredPolygonOn.has(f.id)) declaredPolygonOn.set(f.id, owner[i]);
-    });
     const alreadyFaulted = new Set(faults.map((f) => f.index));
     for (const rf of figure.ringFaults) {
       if (rf.violation === 'trapezoid-is-parallelogram') continue; // drawn with a warning, never refused
-      const index = declaredPolygonOn.get(rf.id);
-      if (index === undefined) continue; // no line owns it — nothing honest to say about it
-      if (alreadyFaulted.has(index)) continue;
-      alreadyFaulted.add(index);
-      faults.push({ index, code: 'ring-contradicts-noun', detail: lines[index] });
+      const declared = declaredPolygonOn.get(rf.id);
+      if (declared === undefined) continue; // no line owns it — nothing honest to say about it
+      /**
+       * A PINNED RING THAT IS FLAT is #1849's collapse (ADR-AG-247): refused on the line that COMPLETED it — the last
+       * of the declaration and the lines that place its vertices — naming the polygon, like the metric-forced member
+       * above. «משולש ABC» · «A(0,0)» · «B(1,1)» · «C(2,2)» refuses «C(2,2)»; in the other order, «משולש ABC». A
+       * CROSSED pinned ring is not flat: it keeps ADR-AG-129's message, on the declaring line.
+       */
+      if (rf.violation === 'degenerate') {
+        const o = objectById(construction, rf.id);
+        const vertexLines = o && o.kind === 'polygon' ? o.vertices.map((v) => pinnedBy.get(v) ?? lineOf.get(v) ?? -1) : [];
+        const index = Math.max(declared, ...vertexLines);
+        if (alreadyFaulted.has(index) || alreadyFaulted.has(declared)) continue;
+        const fault = collapseFault(index, rf.id);
+        if (!fault) continue;
+        alreadyFaulted.add(index);
+        faults.push(fault);
+        continue;
+      }
+      if (alreadyFaulted.has(declared)) continue;
+      alreadyFaulted.add(declared);
+      faults.push({ index: declared, code: 'ring-contradicts-noun', detail: lines[declared] });
     }
   }
   /**
