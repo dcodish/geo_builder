@@ -6,9 +6,9 @@
     "CLAUDE.md became invisible to the ADR-resolution guard while it reported green.",
     "Adding a doc, a product, an ADR log or an orientation file means editing THIS file.",
     "",
-    "The two grandfather lists (index.grandfathered, frIds.grandfathered) are asserted EXACT, not",
+    "The grandfather lists (index.grandfathered, frIds.grandfathered, frIds.duplicatesGrandfathered) are asserted EXACT, not",
     "'at most': a new omission fails the suite rather than joining a growing list of exceptions.",
-    "They shrink to empty as #904 Phases 2-3 land, and each names the issue that will empty it."
+    "They shrink to empty as their issues land (#904 Phases 2-3; #1861 step 4), and each names the issue that will empty it."
   ],
   "version": 1,
   "orientationFiles": {
@@ -25,7 +25,10 @@
       "",
       "$raiseLog is the data series that ADR keeps referring to: every raise appends date, file, new",
       "value, size at the time and why, so the growth curve stays visible and the next raise is argued",
-      "from data rather than memory."
+      "from data rather than memory.",
+      "",
+      ".claude/memory/MEMORY.md joined on 2026-10-07 (ADR-W-118 C2): the auto-memory index loads into every session too,",
+      "and it is the file that grew to 16 KB unguarded while these four were held."
     ],
     "$raiseLog": [
       {
@@ -41,6 +44,13 @@
         "to": 24000,
         "sizeAtChange": 19956,
         "why": "#904 Step 3. Measured: +2,607 B over 28 days (~93 B/day), and ALL of it structural -- products 3 and 4, the shell/ tree, standing rule 5, the fix-round machinery. Zero chronology. The 44 B left was a wall, not a cadence. 24000 restores roughly six weeks between forced prunes; the growth drivers (adding two products) are largely spent, so the real rate should fall. Operator ruling."
+      },
+      {
+        "date": "2026-10-07",
+        "file": ".claude/memory/MEMORY.md",
+        "to": 1300,
+        "sizeAtChange": 1075,
+        "why": "ADR-W-118 C2 / #1861. First ceiling. The index had grown to 16,444 B of rules and incident notes loaded into every session with no guard, and some of them steered sessions after they stopped being true. C2 cut it to six harness notes (1,075 B) and ruled a size guard. Set at the cut size + ~20%: room for one or two more harness notes. The next RULE-shaped note is meant to hit the wall and go to docs/17, docs/22 or the RUNBOOK instead, which is where C2 put the rules."
       }
     ],
     "CLAUDE.md": {
@@ -54,6 +64,9 @@
     },
     "src-analytic/CLAUDE.md": {
       "ceiling": 10000
+    },
+    ".claude/memory/MEMORY.md": {
+      "ceiling": 1300
     }
   },
   "adrLogs": {
@@ -147,10 +160,89 @@
       "EMPTY as of #904 Step 5 (2026-09-05) and asserted exact. The one entry it ever held, FR-RV-7, was a",
       "real dangling reference this guard found on the day it was written: cited by FR-RV-4, defined",
       "nowhere. It was never a missing requirement -- FR-RV-6 IS the bounded-object-universe rule it meant",
-      "to cite -- so the fix was to repoint the citation, not to invent an FR to satisfy the guard."
+      "to cite -- so the fix was to repoint the citation, not to invent an FR to satisfy the guard.",
+      "",
+      "UNIQUENESS (#987, widened by #1861 C4). A definition is '**' + the id + ' (' (a tier) or ' —' (a title inside the",
+      "bold). The tier-only matcher it replaced, '**FR-X (Tier)**', saw 83 of the 104 definitions in docs/02, so two",
+      "duplicates there were invisible. 'localIds' adds a doc's own id family, checked within that doc: 02c's analytic",
+      "requirements are '**R<n> — …'. 'duplicatesGrandfathered' is EXACT (id -> number of definitions): renumbering an",
+      "id breaks the citations in shipped ADRs, so the spec rewrite (#1861 step 4) empties it, and a new duplicate fails."
     ],
     "issue": 904,
-    "grandfathered": []
+    "grandfathered": [],
+    "localIds": {
+      "docs/02c-requirements-analytic.md": "R"
+    },
+    "duplicateIssue": 1861,
+    "duplicatesGrandfathered": {
+      "FR-IN-7d": 2,
+      "FR-IN-9": 2,
+      "R122": 2,
+      "R59": 2,
+      "R60": 3,
+      "R61": 3,
+      "R92": 2
+    }
+  },
+  "supersession": {
+    "$comment": [
+      "A SUPERSEDED ADR POINTS TO ITS SUCCESSOR (#1861 C4, ADR-W-118). When an ADR body says one of these verbs and,",
+      "within 'window' characters with no other ADR id and no clause break (, ; . ) or 'nothing') between, names",
+      "ADR-<id>, that target's heading plus the next 'blockLines' lines (where the Status line sits) must carry",
+      "'Superseded' (any case), '⚠', or the successor's id. The audit found ADR-513 replaced by ADR-602 with no",
+      "marker; the measurement on 2026-10-07 found 21 more unmarked targets, all stamped in the same commit",
+      "(\" · **⚠ [Partly] superseded by [ADR-N](#adr-n) (date):** clause\" on the Status line, or a line under the",
+      "heading where there is no Status line). Checked over EVERY ADR, not from a cut-over: the stamps are done.",
+      "The clause-break rule is load-bearing: without it «the pass this replaces), [ADR-367]» and «Supersedes nothing;",
+      "extends [ADR-3D-110]» read as supersessions (measured)."
+    ],
+    "verbs": [
+      "Supersedes",
+      "supersedes",
+      "Reverses",
+      "reverses",
+      "Withdraws",
+      "withdraws",
+      "Replaces",
+      "replaces"
+    ],
+    "window": 45,
+    "blockLines": 6
+  },
+  "ladders": {
+    "$comment": [
+      "AN ADR THAT NAMES A LADDER APPEARS IN IT (#1861 C4). For an ADR at or above its log's contractFrom, a",
+      "ladder-claim field ('fields': **Design:**, **LADDER stage:**, **Ladder:**, **Stage:** / **Stage.**) whose value",
+      "does not start with 'none' and names a ladder file ('<name>.md' or 'docs/<name>') obliges that file to",
+      "contain the ADR's id. A bare word ('LADDER unchanged', 3-D, which has no ladder file) is not a citation.",
+      "Measured 2026-10-07: 27 citations, 3 missing (ADR-489, ADR-542, ADR-551); all three were placed in",
+      "docs/LADDER.md after reading the code they describe, so nothing is grandfathered."
+    ],
+    "files": {
+      "LADDER": "docs/LADDER.md",
+      "LADDER-CX": "docs/LADDER-CX.md"
+    },
+    "fields": [
+      "Design",
+      "LADDER stage",
+      "Ladder",
+      "Stage"
+    ]
+  },
+  "instructionFiles": {
+    "$comment": [
+      "INSTRUCTION FILES NEVER POINT AT AN ARCHIVED OR DELETED DOC (#1861 C4). These are the files a session",
+      "follows as instructions: every orientationFiles entry, plus every .md under the roots below. A link or a",
+      "'docs/…/*.md' path in them must resolve on disk and must not lead into 'archive' (docs/archive/ holds",
+      "history, never rules). A deleted file (PROJECT-MEMORY, 09b, 14) fails the existence half by itself, so no",
+      "list of deleted names is kept: the next deletion is caught without editing this file."
+    ],
+    "roots": [
+      ".claude/skills",
+      ".claude/agents",
+      ".claude/memory"
+    ],
+    "archive": "docs/archive/"
   },
   "docGate": {
     "$comment": [

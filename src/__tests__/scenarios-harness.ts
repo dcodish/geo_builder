@@ -85,7 +85,7 @@ export function run(steps: Step[]): Derived {
 
 // ── the seed-sweep oracle ──────────────────────────────────────────────────
 /**
- * Seed-sweep oracle ([docs/15-hardening-plan.md](../../docs/15-hardening-plan.md) A2 / TST-1).
+ * Seed-sweep oracle ([docs/archive/15-hardening-plan.md](../../docs/archive/15-hardening-plan.md) A2 / TST-1).
  *
  * The `run` check tests each scenario at ONE seed (the app's default, `firstSatisfyingSeed`). But the
  * dominant historical escape class is *wrong-configuration-at-another-seed* — a figure that builds clean

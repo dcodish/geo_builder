@@ -19,7 +19,7 @@
  *
  * ## Authored, not generated — and that is the load-bearing part
  *
- * [docs/19 §4b](../../docs/19-analytic-geometry-tool.md) specified this substrate when it deferred
+ * [docs/19 §4b](../../docs/archive/19-analytic-geometry-tool.md) specified this substrate when it deferred
  * the feature: *"an authored technique table … teacher knowledge, not engine knowledge"*. The formula
  * a teacher writes is what a student must reproduce for marks. Rendering one out of the code would
  * produce something correct and **unlike anything in their notebook** — the engine computes a
@@ -31,7 +31,7 @@
  *
  * ## The boundary it must not cross
  *
- * [docs/19 §9](../../docs/19-analytic-geometry-tool.md): *"The trace must EXPLAIN, never PLAN. It
+ * [docs/19 §9](../../docs/archive/19-analytic-geometry-tool.md): *"The trace must EXPLAIN, never PLAN. It
  * answers 'how was THIS reached', over a row already on screen. It must not answer 'how COULD you
  * reach X' for something not yet determined — that is a planner, and it grows by increments."*
  *

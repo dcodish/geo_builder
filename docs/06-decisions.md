@@ -693,7 +693,7 @@ This requires a **pinned-vs-free distinction on points** that the engine current
 
 ## ADR-048 — Dragging is a soft reseed (not a pin); "where can it go" is the alternatives mechanism scoped to one point
 
-**Status:** Accepted (2026-06-17) · design; **implementation deferred to Phase 8 (interaction)** · refines [ADR-011](#adr-011)/[ADR-018](#adr-018); satisfies [FR-RN-5](02-requirements.md), [FR-RN-9](02-requirements.md), US-9
+**Status:** Accepted (2026-06-17) · design; **implementation deferred to Phase 8 (interaction)** · refines [ADR-011](#adr-011)/[ADR-018](#adr-018); satisfies [FR-RN-5](02-requirements.md), [FR-RN-9](02-requirements.md), US-9 · **⚠ Superseded by [ADR-475](#adr-475) (2026-09-02, operator ruling):** magnitude dialing is a decided non-feature; the radius slider this entry's 2026-06-20 amendment shipped is removed.
 
 **Context.** Phase 8 will let a student drag a point on the canvas. The question was what a drag *means* in a constructive, constraint-driven engine — and a second, related idea the operator raised: when selecting a point to reposition, **show where it is allowed to go**. Two ways a drag could be modelled: (a) it **pins** the point at the drop location (a fixed coordinate), or (b) it is a **hint** — re-solve the figure with the point preferring that spot, but leave it free to move under later constraints. (a) collides with the product's defining interaction (a dragged point would stop participating in the figure's residual freedom and couldn't be re-driven), and it duplicates the *typed* pin (`A = (x,y)`, [ADR-011](#adr-011)).
 
@@ -2330,6 +2330,8 @@ The dashboard (`server/admin.ts`) gives `out-of-scope` its own outcome bucket (n
 
 ## ADR-162 — Detect IMPLICIT geometry: a shared edge universe for equal-segments + emergent shapes
 
+**⚠ Partly superseded by [ADR-167](#adr-167) (2026-07-01):** the `onHostEdges` whitelist of point kinds is replaced by a geometric split; the shared edge universe stands.
+
 **Context.** Right after the shape badges shipped ([ADR-161](#adr-161)) the operator found the deeper bug they really meant: **detection only ever considered DECLARED objects**, so anything a student sees *implicitly on the page* was invisible. Two reports, one root cause: (1) `טרפז ABCD חסום במעגל` → `E על AB` → `ED מקביל ל BC` makes a **parallelogram EBCD** (sides `EB`=part of `AB`, `BC`, `CD`, `DE`) with **no `polygon` object**, so the shape detector never saw it; (2) with `AB` a diameter through centre `O`, the radii **`OA`/`OB`** are the two halves of `AB`, but "view relations" never marked them equal because its equal-**segment** universe was `pointNeighbors` (drawn segments + polygon edges) only. The equal-**angle** universe already did the right thing — it adds `visibleLineEdges` + `onHostEdges` (on-segment/midpoint/foot ↔ host endpoints) to `pointNeighbors`.
 
 **Decision.** Introduce one shared **implicit edge universe** — `figureEdges(c)` in `relations.ts` = `pointNeighbors` + `onHostEdges` + `visibleLineEdges`, canonicalised/deduped — and feed it to BOTH layers:
@@ -2356,7 +2358,7 @@ The dashboard (`server/admin.ts`) gives `out-of-scope` its own outcome bucket (n
 
 ## ADR-164 — A single-vertex angle ("∠B = 90") resolves its arms when unambiguous, else asks for three letters
 
-**Status:** Accepted (2026-06-30)
+**Status:** Accepted (2026-06-30) · **⚠ Partly superseded by [ADR-590](#adr-590) (2026-10-05, operator ruling):** a vertex of exactly one declared polygon names that polygon's angle, however many edges leave it; any other vertex with more than two edges still asks.
 
 **Context.** Stating an angle required all three letters (`∠ABC = 90`, vertex = middle). A student naturally writes `∠B = 90` / `זווית B = 90`, which fell through the grammar to the LLM — wasteful and unreliable for an in-grammar intent. The acuteness rule ([ADR-108](#adr-108)) already resolves a single-vertex angle's two arms from the figure (`ctx.neighbors`), but only when the vertex has exactly two edges; the value-based `angle` rule did not. The operator asked: support `∠B = 90`, but **only** when there is exactly one angle at B; if B has several edges (several possible angles), don't guess — tell the student to name all three letters.
 
@@ -3002,6 +3004,8 @@ With this, the impossible ⟂ hard-fails; the store keeps the prior figure (F st
 
 ## ADR-211 — a special quadrilateral surfaces its own PROPERTY family (the shape justifies its theorems)
 
+**⚠ Partly superseded by [ADR-213](#adr-213) (2026-07-04):** the quad property theorems are main (headline) entries, no longer folded into the background family.
+
 **Context.** Operator (2026-07-04, ADR-209 working mode): *"when I show a quad shape, the relevant theorems should appear. in מקבילית which I just tested they don't."* A drawn parallelogram surfaced only the generic co-interior #8 (`parallelFacts` → the parallels family) — its own defining properties (opposite sides equal, diagonals bisect, opposite angles equal, consecutive angles = 180°) never appeared, because the special-quadrilateral **property** families (07 #39/41/43/46/48/50/52/55/56) were simply never tabled. `THEOREM_TABLE`'s only quad entries were the cyclic ones (#87/#201). This is a genuine coverage gap (Phase-6b quad family), not a gating bug — the root fix is to add the family, not to patch the one shape.
 
 **Decision.** Table the special-quadrilateral **property** theorems (type P), each folded into the existing `quad` **background** family (the `types.ts` doc already named "the parallelogram property bundle" as the canonical background fold — the design always intended it) at tier `certain`:
@@ -3497,7 +3501,7 @@ Design decision (operator): a bagrut book often DESCRIBES what the student sees 
 
 ## ADR-242 — load-time honesty audit: a figure file's stored lowering is checked against the CURRENT parser (drift + dropped labels)
 
-**Status.** Accepted (2026-07-06). Operator: a file saved on the server drew the same broken figure when loaded locally ("uploading a file doesn't really run through the steps… some validation should be made"). *Files: `src/store/loadAudit.ts` (new), `src/App.tsx` (`loadFigureFile`), i18n (`file.loadAudit`), `load-audit.test.ts`.*
+**Status.** Accepted (2026-07-06). Operator: a file saved on the server drew the same broken figure when loaded locally ("uploading a file doesn't really run through the steps… some validation should be made"). *Files: `src/store/loadAudit.ts` (new), `src/App.tsx` (`loadFigureFile`), i18n (`file.loadAudit`), `load-audit.test.ts`.* · **⚠ Amended by [ADR-314](#adr-314) (2026-07-13):** load now re-lowers each step first; this warning fires only for what the refresh could not fix.
 
 **What load does (unchanged, by design).** A `.geo.json` stores utterance + lowered commands per fact; load replays the COMMANDS (deterministic restore: an LLM step never re-escalates, `cmd.branch` survives — ADR-232). So the file is a parser-output snapshot: a parser fix never reaches an old file, and a partial lowering (the ADR-240 file) replays broken everywhere while re-parsing IDENTICALLY — the fixtures net's drift check alone certifies such a file healthy.
 
@@ -13083,7 +13087,7 @@ The derived pin was refused at EVERY seed in one entry order and built in the ot
 
 ## ADR-548 — A through-statement about a DRAWN circle is a reference: «המעגל עובר דרך A [ו-B]» puts the points on it, and a definition never drops a through label (#1438)
 
-**Status:** accepted, 2026-09-27 · **Issue:** [#1438](https://github.com/dcodish/geo_builder/issues/1438) (bug, `P1`, `2d`) · round [#1469](https://github.com/dcodish/geo_builder/issues/1469)
+**Status:** accepted, 2026-09-27 · **Issue:** [#1438](https://github.com/dcodish/geo_builder/issues/1438) (bug, `P1`, `2d`) · round [#1469](https://github.com/dcodish/geo_builder/issues/1469) · **⚠ Partly superseded by [ADR-549](#adr-549) (2026-09-27):** a side contradiction is refused at stage 0g′, no longer left to the verifier's amber warning.
 **Requirements:** [02](02-requirements.md) — **FR-IN-12** (new): «המעגל» means the circle already drawn; a definition names every point it passes through or is not committed · **Design:** [04](04-design.md) — "A through-statement about a drawn circle is a reference" · **LADDER stage:** none (parser; the lowering reuses the existing apply-side `point-on-circle`)
 **Completes** [ADR-029](#adr-029) (introduce-vs-resolve) for the circle DEFINITION rules · **cites** [ADR-443](#adr-443) (membership tie-break, `ambiguous-circle-ref`), #111, #215, #430 (the same class fixed rule by rule), #779 (fail-closed residue)
 

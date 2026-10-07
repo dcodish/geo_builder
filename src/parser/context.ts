@@ -1,6 +1,6 @@
 /**
  * The figure → parser context builder — the SINGLE source of truth for what the app tells the parser
- * about the current figure ([docs/15-hardening-plan.md](../../docs/15-hardening-plan.md) A3 / TST-2).
+ * about the current figure ([docs/archive/15-hardening-plan.md](../../docs/archive/15-hardening-plan.md) A3 / TST-2).
  *
  * This was re-implemented three times (App's `parseCtx`, scenarios' `ctxOf`, the triage harness's
  * `ctxFrom`) and the copies drifted: the triage mirror was missing `parallels` (ADR-169), so it

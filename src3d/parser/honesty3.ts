@@ -1,5 +1,5 @@
 /**
- * Honesty gates on the 3-D LLM commit path (S2.3 of docs/24-foundation-hardening-plan.md — the 2-D
+ * Honesty gates on the 3-D LLM commit path (S2.3 of docs/archive/24-foundation-hardening-plan.md — the 2-D
  * gate battery COPIED as a pattern per docs/20 §12, never imported).
  *
  * The seam they guard: out-of-grammar input escalates to the LLM (`llm3.ts`), whose canonical lines are

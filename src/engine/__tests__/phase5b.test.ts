@@ -1,5 +1,5 @@
 /**
- * Phase-5b acceptance gate (docs/09-implementation-plan.md §Phase 5b).
+ * Phase-5b acceptance gate (docs/archive/09-implementation-plan.md §Phase 5b).
  *
  * Lines as constructive scaffolding (angle bisector, perpendicular, parallel,
  * through) + the points they produce (line∩line, foot of perpendicular,

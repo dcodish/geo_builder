@@ -1,5 +1,5 @@
 /**
- * Phase-5c engine unit tests (docs/09-implementation-plan.md §Phase 5c).
+ * Phase-5c engine unit tests (docs/archive/09-implementation-plan.md §Phase 5c).
  * Circle primitives: a circle (centre + radius), points on it (inscribed),
  * antipode/diameter, arc midpoint, line∩circle, and the tangent line. The
  * corpus Q5–Q7 reproduction (from typed utterances) lives in phase5c.corpus.test.ts.

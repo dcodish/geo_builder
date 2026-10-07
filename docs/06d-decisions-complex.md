@@ -1193,7 +1193,7 @@ cannot close ([ADR-CX-019](#adr-cx-019)).
 
 **Status:** Accepted · **Issue:** [#680](https://github.com/dcodish/geo_builder/issues/680) ·
 **Stage:** LADDER-CX 1b (lowering) and 1c (exact argument solve) · **Supersedes nothing; refines**
-[ADR-CX-005](#adr-cx-005)
+[ADR-CX-005](#adr-cx-005) · **⚠ Partly superseded by [ADR-CX-042](#adr-cx-042) (2026-09-24):** Decision 4 is reversed: the solutions of `X^n = …` are X₁..Xₙ, and an existing member must be its solution or the line is refused.
 
 **Context.** [ADR-CX-019](#adr-cx-019) measured the cutover gate and found nine capabilities the
 prototype reads and v2 did not. Eight were grammar. The ninth was structural: the prototype's

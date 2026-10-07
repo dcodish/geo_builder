@@ -1,5 +1,5 @@
 /**
- * Parser shadow-matrix guard ([docs/15-hardening-plan.md](../../../docs/15-hardening-plan.md) A1 / PAR-11).
+ * Parser shadow-matrix guard ([docs/archive/15-hardening-plan.md](../../../docs/archive/15-hardening-plan.md) A1 / PAR-11).
  *
  * `parse()` is first-match-wins over the ordered `RULES` array. Ordering is defended only by hand-written
  * cases, so the recurring parser bug class (ADR-119 parallel-chords, ADR-077, ADR-166's parser half, and
@@ -84,7 +84,7 @@ describe('parser shadow-matrix — catalog corpus', () => {
   });
 
   it('the divergent shadow-pair SET equals the checked-in allowlist (HARD gate — `vitest -u` cannot absorb it)', () => {
-    // The plan's A1 design (docs/15-hardening-plan.md): "assert the set of (winner → shadowed-rule) pairs
+    // The plan's A1 design (docs/archive/15-hardening-plan.md): "assert the set of (winner → shadowed-rule) pairs
     // equals a checked-in allowlist". The snapshots above give readable per-utterance diffs, but a blanket
     // `vitest -u` regenerates them — a genuine new shadow could be silently re-pinned (review 2026-07-03,
     // M2). This assertion has no snapshot to update: a NEW pair fails CI with both rule names; fix the

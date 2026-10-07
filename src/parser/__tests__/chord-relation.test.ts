@@ -1,5 +1,5 @@
 /**
- * chord + a relation tail no longer swallows the length ([docs/15-hardening-plan.md] C3 / PAR-1).
+ * chord + a relation tail no longer swallows the length ([docs/archive/15-hardening-plan.md] C3 / PAR-1).
  *
  * The `chord`/`מיתר` rule ran before every measure rule and grabbed only the first label pair, silently
  * discarding a trailing "= 6" (the operator's `מיתר AB=2`). Fix: `chord` bails when the utterance carries a

@@ -1,5 +1,5 @@
 /**
- * Multiple independent GIVENS in one line ([docs/15-hardening-plan.md] C6 / PAR-2).
+ * Multiple independent GIVENS in one line ([docs/archive/15-hardening-plan.md] C6 / PAR-2).
  *
  * A single relation rule half-parsed a comma/and-joined givens list and silently dropped the earlier
  * given: `distanceConstraint` anchors its value to `$` (kept only the trailing clause) and `angle` grabbed

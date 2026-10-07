@@ -12,7 +12,7 @@
  * Positions are not stored — they're part of the derived view (`replay`), so
  * undo history stays minimal and state/coordinates can't drift apart.
  *
- * See docs/04-design.md §executeCommand and docs/09-implementation-plan.md §Phase 3.
+ * See docs/04-design.md §executeCommand and docs/archive/09-implementation-plan.md §Phase 3.
  */
 
 import { create } from 'zustand';

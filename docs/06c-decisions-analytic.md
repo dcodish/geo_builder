@@ -294,6 +294,8 @@ is the chrome and the doctrine, never the geometry.
 
 ## ADR-AG-005 — The input language, the naming conventions, and the THREE kinds of inequality (2026-09-03)
 
+**⚠ Partly superseded by [ADR-AG-018](#adr-ag-018) (2026-09-15):** D6's second bullet, the one-parabola-one-ellipse limit. The anonymity it states stands.
+
 **Context.** Asked whether the plan was buildable, the honest answer was "enough to start, not enough
 to finish V0": [docs/19](archive/19-analytic-geometry-tool.md) §2c/§2d carried a *construct set* and a
 *vocabulary list*, which is not a grammar. Every sibling has the layer above that — `catalog.ts`,
@@ -842,6 +844,8 @@ must match `src/`'s spelling; the analytic catalog answers to its own corpus.
 ---
 
 ## ADR-AG-013 — B4 BUILT: derived points over stated parents, and the sort that was not needed (#1028)
+
+**⚠ Partly superseded by [ADR-AG-035](#adr-ag-035) (2026-09-15):** the shape nouns refused here as `out-of-scope` now build from the shape registry, which honours their givens.
 
 **Requirements:** [02c §8](02c-requirements-analytic.md) (new — the «lines and points» corpus and its
 families F16/F17); P4 (the DOF cue, unchanged by derived points). **Design:**
@@ -2165,7 +2169,7 @@ which is a mechanism rather than a rule. [#1060](https://github.com/dcodish/geo_
 ## ADR-AG-032 — A CARRIER is not a stated object (#1076)
 
 **Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-029](#adr-ag-029) (#1073) ·
-**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067)
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067) · **⚠ Partly superseded by [ADR-AG-041](#adr-ag-041) (2026-09-15):** the panel half is reversed: the data panel shows slopes, not the carrier.
 
 **Requirements:** [02c](02c-requirements-analytic.md) §9 R56. **Design:**
 [04c](04c-design-analytic.md) "A point on an object".
@@ -8056,7 +8060,7 @@ The pre-played sheet (20 cases, 8 red) and the operator ruling of the same day. 
 
 ## ADR-AG-168 — One curve-operand resolver: named, contextual, equation and plural spellings of «on» and «crossing» (#1429)
 
-**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1510. Numbered 168 because 167 was minted the same day on `feat/1504-circle-tangency`.
+**Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1510. Numbered 168 because 167 was minted the same day on `feat/1504-circle-tangency`. · **⚠ Partly superseded by [ADR-AG-170](#adr-ag-170) Amendment 2 (2026-09-29, operator ruling):** a digit and a Roman numeral are one name, but mixing them is refused; «P על המעגל 1» beside circle I is no longer read as I.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R119 (crossing spellings noted) · **Design:** [04c](04c-design-analytic.md#a-point-on-an-object-and-the-carrier-that-holds-it-adr-ag-029-adr-ag-032)
 
@@ -8361,7 +8365,7 @@ The pre-played sheet (20 cases, 8 red) and the operator ruling of the same day. 
 
 ## ADR-AG-185 — «בנקודות A ו-B»: both crossings in one sentence take the canonical order (#1512)
 
-**Status:** accepted · 2026-09-30 · operator ruling 2026-09-29 on #1512, option **(a)** — *"arbitrary, and the user can change the letters if he wants"* · round #1571 · feature → PR
+**Status:** accepted · 2026-09-30 · operator ruling 2026-09-29 on #1512, option **(a)** — *"arbitrary, and the user can change the letters if he wants"* · round #1571 · feature → PR · **⚠ Partly superseded by [ADR-AG-197](#adr-ag-197) (2026-10-01, operator ruling on #1539):** the pair now swaps under «הציגו תצורה אחרת»; "never cycled" is withdrawn.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R85 — amended: one sentence may name both crossings; first letter = first root, second = second; never cycled; a pair that does not meet twice is refused on the sentence · **Design:** [04c](04c-design-analytic.md) — "Both crossings in one sentence are the two ordinal sentences" (after the ADR-AG-157 paragraph)
 

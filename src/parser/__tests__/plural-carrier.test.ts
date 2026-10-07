@@ -1,5 +1,5 @@
 /**
- * Plural carrier nouns for N-points-on-N-segments ([docs/15-hardening-plan.md] C7 / PAR-8).
+ * Plural carrier nouns for N-points-on-N-segments ([docs/archive/15-hardening-plan.md] C7 / PAR-8).
  *
  * `pointsOnSegments` (ADR-076) reads UPPERCASE labels only and correctly ignores the noun word, so
  * "F, G, H on sides AB, AC, CB" already worked. But when the plural noun contains a `segment`-rule keyword
