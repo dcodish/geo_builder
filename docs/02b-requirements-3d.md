@@ -4,6 +4,13 @@ _The contract for `src3d/`, live at `/3d-builder/`. Registered in [`DOCS.json`](
 `3d` product's requirements doc ([ADR-W-041](06w-decisions-workspace.md#adr-w-041)). Decisions:
 [06b](06b-decisions-3d.md) (`ADR-3D-NNN`). Build plan (archived history): [docs/20](archive/20-space-vectors-tool.md)._
 
+**How this document is organised.** Requirements are grouped by what a student meets: the two lanes and the
+space model, reading a statement (read, asked, refused), the vector and equation lanes, claims, rendering, and
+coverage. Ids run in order within a topic and never change when a block moves. Each requirement is its promise,
+at most a few examples, and a **Sources** line: the reasoning, incidents and tests live in those ADRs and
+issues (`ADR-3D-NNN` in [06b](06b-decisions-3d.md), `ADR-W-NNN` in [06w](06w-decisions-workspace.md), bare
+`ADR-NNN` in [06](06-decisions.md)).
+
 ## What this document owns — and what it deliberately does not
 
 The product answers the bagrut **space/vectors** question (שאלון 572 Q2): vectors in the geometric
@@ -12,19 +19,15 @@ as its siblings: **the student types the givens, the tool reproduces the figure 
 never solves the exam question.**
 
 **This is a contract, not a catalogue.** The construct inventory is
-[`src3d/parser/catalog3.ts`](../src3d/parser/catalog3.ts) — 230 entries, machine-checked by a guard test
-that asserts every one parses in **both** Hebrew and English. Re-listing constructs here would create a
-second copy that *can* drift, while the catalogue cannot. This document owns the layer above: what the
-figure promises, what a claim means, what may never be invented, and how the tool refuses.
-
-Shared surfaces — the suite chrome, the ask lane and data panel, save/load, export, bidi — are
-[02w](02w-requirements-workspace.md). Quality attributes are
-[03](03-nonfunctional-requirements.md).
+[`src3d/parser/catalog3.ts`](../src3d/parser/catalog3.ts), machine-checked to parse in **both** Hebrew and
+English; re-listing constructs here would create a second copy that *can* drift. This document owns the
+layer above: what the figure promises, what a claim means, what may never be invented, and how the tool
+refuses. Shared surfaces — the suite chrome, the ask lane and data panel, save/load, export, bidi — are
+[02w](02w-requirements-workspace.md). Quality attributes are [03](03-nonfunctional-requirements.md).
 
 > **A note on the id scheme.** The areas below are letters-only (`FR-SP`, `FR-VC`, …) rather than the
 > obvious `FR-3D-*`. The FR-resolution guard matches `FR-[A-Z]+-\d+`, so an id containing a digit in its
-> area would be **invisible** to it — unresolvable by omission rather than checked, which is precisely
-> the enumeration failure [#904](https://github.com/dcodish/geo_builder/issues/904) exists to close.
+> area would be **invisible** to it — the enumeration failure [#904](https://github.com/dcodish/geo_builder/issues/904) exists to close.
 
 IDs are stable references. "Must" = the product is dishonest or broken without it; "Should" = desirable;
 "Later" = not yet.
@@ -69,160 +72,100 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
 - **FR-SP-1 (Must)** — The product supports **two lanes over one model**: a **geometric** lane, where the
   student names basis vectors on a solid (`נסמן: AB=u…`) and reasoning is affine, and an **algebraic**
   lane of R³ coordinates, parametric lines and plane equations. A figure may use both; the lane is a
-  property of the *statement*, never a mode the student must select. *(Realised — [docs/20](archive/20-space-vectors-tool.md) §4.)*
+  property of the *statement*, never a mode the student must select.
+  - Sources: [docs/20](archive/20-space-vectors-tool.md) §4.
 
 ## The space model
 
 - **FR-SP-2 (Must)** — **Under-determination is welcome.** An unstated dimension stays a free degree of
   freedom that resamples on "another configuration", while everything the student *did* pin stands still.
-  A figure that is not fully determined is a normal state, not an error.
-  **Corollary (operator ruling 2026-09-11, [ADR-3D-244](06b-decisions-3d.md#adr-3d-244)):** a stated shape is
-  *respected* — the nodes it needs are created, carrying exactly the degrees of freedom the shape leaves
-  open. A corner the shape does not determine is minted free (and drivable by later givens), never refused
-  and never invented at a specific value.
+  A stated shape is *respected*: a corner the shape does not determine is minted free (and drivable by later
+  givens), never refused and never invented at a specific value.
+  - Sources: ADR-3D-244 (operator ruling 2026-09-11).
 - **FR-SP-3 (Must)** — **Defaults yield to statements; nothing unstated is ever invented.** A prism not
-  stated to be right is **oblique**. A qualifier the parser recognises must be one it can lower — a
-  recognised-but-dropped qualifier is a silent given, the same cardinal sin as drawing a figure that
-  violates the givens. *(The 3-D form of [ADR-052](06-decisions.md#adr-052).)*
+  stated to be right is **oblique**. A recognised-but-dropped qualifier is a silent given.
+  - Sources: ADR-052 (this is its 3-D form).
 - **FR-SP-4 (Must)** — **Gauge is not knowledge.** A figure's placement, rotation and scale are a gauge.
-  An unanchored figure — no equation plane, parametric line, coordinate point, pin, solid, revolution or
-  circle — is normalised onto the floor at the end of the solve (first point at the origin, first edge
-  along +x, the first three points on the floor), so «הציגו תצורה אחרת» changes only its shape
-  ([ADR-3D-272](06b-decisions-3d.md#adr-3d-272), operator: *"Keep it flat on the floor"*; amended
-  2026-10-07, #1861). The consequence is the honesty rule the whole product rests on: **a number drawn on the
-  canvas must be seed-invariant knowledge.** One drawing's values are not a given, and printing them is
-  dishonest. *(Realised — the landing funnel classifies which gauge components are provably free;
-  `landing-funnel.test.ts` is its lock. The shared statement is [FR-DP-3](02w-requirements-workspace.md).)*
+  An unanchored figure is normalised onto the floor, so «הציגו תצורה אחרת» changes only its shape (operator:
+  *"Keep it flat on the floor"*). **A number drawn on the canvas must be seed-invariant knowledge** — the
+  shared statement is [FR-DP-3](02w-requirements-workspace.md).
+  - Sources: ADR-3D-272, #1861.
 - **FR-SP-5 (Must)** — **A statement about an EXISTING object is a given, not a re-creation.** The same
-  utterance drives a free figure or verifies a determined one, decided when it is applied. *(The "M1
-  duality", the most productive pattern in this tree — reach for it before adding a construct.)*
-  **Which side of the duality a statement falls on is decided by the FIGURE's freedom — never by the
-  statement's spelling.** Two utterances that name the same relation must reach the same lane: an angle
-  between two segments is a given whether or not the segments meet, and whichever endpoint each was
-  written from. A drive available for one phrasing and not its synonym refutes the student on the
-  strength of how they wrote it. *(Realised for the angle family — [ADR-3D-217](06b-decisions-3d.md#adr-3d-217),
-  #909; `seg-angle-drive-909.test.ts`.)*
-  **An angle sentence means one quantity on every figure.** «הזווית BAD היא θ» / «∠BAD = θ» is the angle AT A
-  between the rays to B and D (0–180°); «הזווית בין AB לבין AD היא θ» is the angle between the two lines
-  (≤ 90°). On typed points, on a solid the statement drives, and on a point with a parameter, the vertex form
-  accepts a true obtuse angle («135» where ∠BAD = 135°) and refuses its supplement; the line form accepts 45
-  on the same corner. *(Realised — [ADR-3D-290](06b-decisions-3d.md#adr-3d-290), #1573;
-  `issue-1573-vertex-angle-semantics.test.ts`.)*
-  **A relation to the COORDINATE FRAME drives a free figure on its own.** «מישור ABCD מקביל לציר z»,
-  «…מאונך למישור xy», «…מקביל למישור xz», «המרובע ABCD מונח במישור [xz]» turn a figure nothing else
-  anchors until the statement holds — it is never refused because the default drawing happens to lie flat.
-  Genuinely false statements (four typed points that span no such plane; two frame statements that
-  contradict each other) are still refused. *(Realised — [ADR-3D-281](06b-decisions-3d.md#adr-3d-281),
-  #1550; `issue-1550.test.ts`, `fixtures3/coord-frame-axis-drive-1550.geo3.json`.)*
-  **A coordinate restated on an existing point is honoured or refused, never ignored.** «B(3,7,8)» after
-  «B(0,7,8)» — or «M(3, n, p)» on a midpoint that sits at x = 1 — is refused and names the statement, exactly
-  as «B = (3,7,8)» is; on a solid it moves the figure instead. A true restatement stays green, and a
-  component left symbolic or unstated is not checked. **A coordinate that pins a point's free freedom places
-  the point, whatever the point sits on:** «K על AB · K(1,0,0)» puts K at the midpoint; «D(3,0,0)» after «D על
-  החלק החיובי של ציר ה-x» puts D at (3,0,0); «P על הישר l1 · P(3, n, p)» puts P at (3,0,0) on l1; «P על המישור π
-  · P(1,2,0)» places P on π; «B(n, 4, p)» after «B(1, t, 2)» gives t = 4 — in either spelling (`D(…)` or
-  `D = (…)`), and everything built from the point follows it. A coordinate off what the point sits on is
-  refused «בדקו את החישוב»; one that does not fix the point (a single coordinate of a point on a plane) is
-  refused as the tool's limit, below — nothing unstated is invented. *(Realised — [ADR-3D-292](06b-decisions-3d.md#adr-3d-292),
-  #1561, and [ADR-3D-293](06b-decisions-3d.md#adr-3d-293), #1615 — one mechanism for every such point;
-  `issue-1561-coord-determines.test.ts`, `issue-1615-one-mechanism.test.ts`.)* *(Realised —
-  [ADR-3D-282](06b-decisions-3d.md#adr-3d-282), #1546; `issue-1546-silent-point-pin.test.ts`.)*
-  **A vector or dot product stated on existing points is honoured or refused, never ignored.** «u = (7,7,7)»
-  where u = AB is (2,0,0), «AB = (5,5,5)» or «AB = (5, n, p)» over typed A and B, and «u·v = 24» where u·v = 0
-  are refused with the same message as a false coordinate; on a cube or a free vector the statement still
-  moves the figure. A true restatement stays green, and a component left symbolic or unstated is not
-  checked. *(Realised — [ADR-3D-284](06b-decisions-3d.md#adr-3d-284), #1560; `issue-1560-vector-pin-claims.test.ts`.)*
-  **A length, angle, length ratio or ⊥/∥-to-plane given is judged whatever else is on the canvas.** With a
-  sphere or cone of unstated size present, «|AB| = 5» where |AB| is 2, «|AB| = 3|AD|», «הזווית BAD היא 40»
-  where the angle is 90°, and «AE ⊥ BCD» / «AE ∥ BCD» that do not hold are refused with the same message
-  as a false coordinate, and a true one stays green. «|SO| = 4» on a cone whose height was never stated is
-  refused too (operator ruling 2026-09-29): a stated length does not yet set a revolution's size (#1569). On
-  a solid the same statement still drives the solid. *(Realised — [ADR-3D-285](06b-decisions-3d.md#adr-3d-285),
-  #1567; `issue-1567-pin-arbiters.test.ts`.)*
-  **A refusal never tells a student who may be right that they miscalculated.** A given the tool cannot yet
-  make hold — «|SO| = 4» on a cone of unstated height (parked with the cone's design, #1569), a single
-  coordinate of a point on a plane («P על המישור π · P(1, n, p)») — is refused with «הכלי עדיין לא יודע …, ולכן הוא לא נוסף — זו מגבלה של הכלי», naming the point or the solid.
-  «בדקו את החישוב» is kept for a given the student's own data contradicts: a typed point restated elsewhere,
-  a coordinate the definition fixes, the wrong side of a stated axis, a spot off the rider's segment. *(Realised —
-  [ADR-3D-291](06b-decisions-3d.md#adr-3d-291), #1590; `issue-1590-given-not-drivable.test.ts`.)*
+  utterance drives a free figure or verifies a determined one, decided when it is applied. This is the "M1
+  duality", and these rules hold it:
+  - **The FIGURE's freedom decides the side, never the statement's spelling** — an angle between two
+    segments is a given whether or not they meet, whichever endpoint each was written from.
+  - **An angle sentence means one quantity on every figure:** «∠BAD = θ» is the angle AT A (0–180°);
+    «הזווית בין AB לבין AD היא θ» is the angle between the lines (≤ 90°).
+  - **A relation to the COORDINATE FRAME drives a free figure on its own** («מישור ABCD מקביל לציר z»);
+    a genuinely false one is still refused.
+  - **A coordinate restated, or a vector or dot product stated, on existing points is honoured or refused,
+    never ignored**, and a coordinate that pins a point's free freedom places the point, whatever it sits on
+    («K על AB · K(1,0,0)» puts K at the midpoint).
+  - **A length, angle, ratio or ⊥/∥-to-plane given is judged whatever else is on the canvas.**
+  - For the coordinate, vector and measure rules: a true restatement stays green, an unstated or symbolic
+    component is not checked, and on a solid or a free figure the statement drives instead.
+  - **A refusal never tells a student who may be right that they miscalculated:** a given the tool cannot
+    yet make hold («|SO| = 4» on a cone of unstated height) is refused as the tool's limit («… זו מגבלה של
+    הכלי»); «בדקו את החישוב» is kept for a given the student's own data contradicts.
+  - Sources: ADR-3D-217, ADR-3D-281, ADR-3D-282, ADR-3D-284, ADR-3D-285, ADR-3D-290, ADR-3D-291,
+    ADR-3D-292, ADR-3D-293; #909, #1546, #1550, #1560, #1561, #1567, #1569, #1573, #1590, #1615.
 - **FR-SP-6 (Must)** — **A stated new label must land on the figure.** A decomposition that loses a point
   the student named is **refused, naming the label** — never committed with the point missing. A label
-  that already exists is context, not a drop. *(Realised — `droppedNewLabels3`, `honesty3.test.ts`.)*
-- **FR-SP-10 (Should)** — **One line may declare a solid AND a construct on it.** «קובייה ABCD עם אלכסון AC'»
-  builds both; the student writes the sentence they were going to write anyway rather than splitting it to
-  suit the grammar. Every solid and every construct the tool already reads compose by construction — the
-  reading is a SPLIT into the two rules that own the halves, never a table of supported pairs. Where the
-  construct is ambiguous the composed form inherits its half's question: «עם אלכסון ראשי» on a box names
-  none of the four space diagonals, so it ASKS (ADR-052), and a clarify is never flattened into a pick.
-  *(Realised — [ADR-3D-237](06b-decisions-3d.md#adr-3d-237), #893; the 2-D counterpart is ADR-430/#461.)*
+  that already exists is context, not a drop.
+- **FR-SP-12 (Must)** — **A ⟂-to-plane statement with ONE new letter creates exactly what it
+  determines.** When the known endpoint sits **off** the plane («SO גובה הפירמידה»), the new letter is
+  the foot of the perpendicular, on the plane ([ADR-3D-146](06b-decisions-3d.md#adr-3d-146), #579). When it
+  lies **in** the plane (decided structurally), the new letter is a free point on the normal, its height
+  and side free DOF ([FR-SP-2](#the-space-model)) — never minted **on** the known point.
+  - Sources: ADR-3D-146, ADR-3D-268; #579, #1499.
 
-- **FR-SP-11 (Must)** — **A relation the tool reads is read for every OPERAND KIND it is meaningful for.**
-  A student who has seen «הישר ℓ מוכל במישור π» accepted expects «C מוכלת במישור π» — the same relation,
-  said about a point — to be accepted too, and a frame that serves one kind and silently escalates
-  another is indistinguishable to them from the tool not knowing the relation at all. So a relation's
-  operand coverage is a promise, not an implementation detail: **membership** («מוכל ב…», «נמצא ב…»,
-  «מונח על…», "is contained in", "lies in", the verbless «E במישור ABC» / "E in plane ABC" — #1608,
-  [ADR-3D-298](06b-decisions-3d.md#adr-3d-298) — and the container-headed «המישור π מכיל את …») reads a point
-  and a line alike, in **both languages and both frames**, and lowers each to the command that kind
-  already has. Where a kind genuinely has no meaning under a relation the answer is a **refusal**, never
-  silence: a point has no direction, so «C מאונך למישור π1» is refused rather than escalated. The
-  corollary that matters in review: a relation extended to a new spelling must be extended for every kind
-  at once, and a relation extended to a new kind must serve every spelling at once — which is only
-  affordable because the frame reads its sides through the shared operand reader (ADR-3D-100).
-  *(Realised — [ADR-3D-238](06b-decisions-3d.md#adr-3d-238), #963; the frame itself is
-  [ADR-3D-189](06b-decisions-3d.md#adr-3d-189), #614.)*
+## Reading a statement — read, asked, refused
+
+- **FR-SP-8 (Must)** — **Case in labels: where the anchor proves a run is a label, it is read as one;
+  elsewhere the convention is taught, never guessed.** Point labels are uppercase by convention, and 3-D
+  carries case-significant tokens 2-D lacks (axes x/y/z, parameters k/m/t, vector names u/v/w, R vs r,
+  ℓ), so a blanket case-fold is not available. A lowercase run reads as a label only where an anchor proves
+  it (an angle or point noun, the head of a coordinate definition, the single-letter subject of a midpoint statement);
+  elsewhere — a SOLID noun included — it is **taught**, never sent to the paid fallback.
+  - Sources: ADR-3D-039, ADR-3D-092, ADR-3D-223, ADR-3D-226, ADR-3D-287; #181, #353, #498, #924, #1523,
+    #1861.
 - **FR-SP-9 (Must)** — **An UNDER-SPECIFIED statement is told what is missing; only an UNSUPPORTED one is
   told the tool cannot do it.** The two are different failures and must not share a voice: a student who
   wrote a sentence the tool understands but cannot pin down needs to know *which detail* to add, while
-  "this is not supported" sends them away from a form that works. So a statement the parser RECOGNISES as
-  ambiguous surfaces a typed clarification that **names the alternatives in the student's own notation**
-  — «זווית A» on a vertex where three edges meet lists the angles it could mean — and never escalates to
-  the LLM lane, whose job is to guess, nor borrows the scope register's unsupported wording. The
-  corollary that keeps this honest: **the tool asks only when the figure really is ambiguous.** Where the
-  same sentence has exactly one reading, it is resolved and built — asking there would make the
-  clarification's own sentence untrue, and a single reading is not a guess.
-  *(Realised — [ADR-3D-239](06b-decisions-3d.md#adr-3d-239), #866; the earlier members of the family are
-  ADR-3D-131, #836's main-diagonal ask, and #467's ambiguous height.)*
-- **FR-SP-12 (Must)** — **A ⟂-to-plane statement with ONE new letter creates exactly what it
-  determines.** When the known endpoint sits **off** the plane («SO גובה הפירמידה»), the new letter is
-  the foot of the perpendicular, on the plane ([ADR-3D-146](06b-decisions-3d.md#adr-3d-146), #579). When
-  it lies **in** the plane — decided structurally, never off a sampled drawing — the statement fixes only
-  a *direction*, so the new letter is a free point on the normal through the known one: its height and
-  side are free DOF that vary across configurations until a later given (a length, a coordinate) drives
-  them ([FR-SP-2](#the-space-model)/[FR-SP-3](#the-space-model)). It is never minted **on** the known
-  point: a zero segment drawn green asserts a perpendicular the figure does not have.
-  *(Realised — [ADR-3D-268](06b-decisions-3d.md#adr-3d-268), #1499.)*
+  "this is not supported" sends them away from a form that works. A clarification names the alternatives
+  in the student's notation and never escalates to the LLM lane; the tool asks only when the figure really
+  is ambiguous.
+  - Sources: ADR-3D-131, ADR-3D-239; #467, #836, #866.
+- **FR-SP-10 (Should)** — **One line may declare a solid AND a construct on it.** «קובייה ABCD עם אלכסון AC'»
+  builds both; the student writes the sentence they were going to write anyway rather than splitting it to
+  suit the grammar. An ambiguous half keeps its question («עם אלכסון ראשי» on a box ASKS — ADR-052).
+  - Sources: ADR-3D-237, #893; the 2-D counterpart is ADR-430, #461.
+- **FR-SP-11 (Must)** — **A relation the tool reads is read for every OPERAND KIND it is meaningful for.**
+  A student who has seen «הישר ℓ מוכל במישור π» accepted expects «C מוכלת במישור π» — the same relation,
+  said about a point — to be accepted too, and a frame that serves one kind and silently escalates
+  another is indistinguishable to them from the tool not knowing the relation at all. Where a kind has no
+  meaning under a relation (a point has no direction) the answer is a **refusal**, never silence.
+  - Sources: ADR-3D-100, ADR-3D-189, ADR-3D-238, ADR-3D-298; #614, #963, #1608.
 - **FR-SP-13 (Must)** — **A point placement keeps its condition.** «D על BC ונתון כי AD = AC» states two
-  givens, and both are honoured: D rides BC and AD = AC drives it. The condition is a given whichever
-  connector introduces it — «כך ש», «ונתון כי / ש», «וידוע כי / ש», «ו-», a comma, "such that", "and it is
-  given that" — and so is a distance tail («D על AB במרחק 3 מ-A»). A ratio of the rider itself
-  («K על AA' כך ש-AK = 2KA'») keeps its ratio reading. A condition the tool cannot read declines the whole
-  line; it never commits the placement alone. A stated pair relation («AD = AC», «AD ⊥ BC») that no
-  committed command carries is refused, naming it — on every statement seam, the model's included. The
-  2-D twin is FR-IN-4d. *(Realised — [ADR-3D-296](06b-decisions-3d.md#adr-3d-296), #1730.)*
+  givens, and both are honoured: D rides BC and AD = AC drives it. A condition the tool cannot read declines
+  the whole line, and a stated pair relation no committed command carries is refused, naming it. The 2-D
+  twin is FR-IN-4d.
+  - Sources: ADR-3D-296, #1730.
 - **FR-SP-14 (Must)** — **One coordinate of a point can be stated and asked.** «x_B = 3», «x_{B}=3», «B_x = 3»,
   «שיעור ה-x של (נקודה) B הוא 3», «x של B הוא 3», «שיעור ה-x של B שווה ל-3» and "the x-coordinate of B is 3"
   state B's x and nothing else: on a new B the point is created with x = 3 and its y and z free (they move
   on «הציגו תצורה אחרת»); on a solid's vertex the solid follows; on a typed point a false value is refused
-  and a true one stays green. The same frame takes a sign («…חיובי», «x_B > 0», «x_B < 0»). A letter value
-  («x_B = 2t») is refused by name rather than guessed, and a comparison with a number other than zero
-  («x_B > x_D», «y_B < 6») is not read yet. The question is the statement with its value dropped — «x_B»,
-  «x_{B} = ?», «מהו שיעור ה-x של B?» — and the row reads «x_B = 1», a sign (`+?`), or «not determined», from the
-  panel's own per-coordinate judgement. *(Realised — [ADR-3D-299](06b-decisions-3d.md#adr-3d-299), #1547.)*
+  and a true one stays green. A sign is read too; a letter value («x_B = 2t») is refused by name. The
+  question is the statement with its value dropped («x_B», «מהו שיעור ה-x של B?»).
+  - Sources: ADR-3D-299, #1547.
 - **FR-SP-15 (Must)** — **A shape's adjective is honoured, and a circle through a polygon passes through every
   vertex.** An adjective stated on a polygon noun («טרפז ישר זווית», «טרפז שווה שוקיים», «משולש ישר זווית», "isosceles
   trapezoid", "right triangle") is drawn, standalone and inside an inscription in either direction; one the noun
-  cannot carry («מרובע ישר זווית») is never dropped — the line goes to the model. A quadrilateral inscribed in a
-  circle is drawn as the cyclic member of its own family (a trapezoid becomes isosceles, a parallelogram a
-  rectangle, a rhombus a square, a kite a right kite), with a notice naming what it became, and every vertex is on
-  the circle. A right trapezoid inscribed in a circle is refused, naming the right trapezoid and the rectangle a
-  circle would force (the 2026-10-01 ruling on #1554). The 2-D twin is FR-EN-14. *(Realised —
-  [ADR-3D-307](06b-decisions-3d.md#adr-3d-307), #1792; a quadrilateral's incircle is #1838.)*
-  **The shape draws its own ink and nothing else:** the condition a noun or adjective entails (an isosceles
-  trapezoid's equal diagonals, a right pyramid's equal lateral edges, a regular tetrahedron's equal edges) is
-  honoured and judged, but it draws no segment the student did not name — «טרפז שווה שוקיים ABCD» draws the
-  ring, never the diagonal AC. A student's own «|AC| = |BD|» still draws AC. *(Realised —
-  [ADR-3D-308](06b-decisions-3d.md#adr-3d-308), #1844.)*
+  cannot carry («מרובע ישר זווית») is never dropped — the line goes to the model. A quadrilateral in a circle is
+  drawn as its family's cyclic member, with a notice; a right trapezoid in a circle is refused. A shape's own
+  condition draws no segment the student did not name. The 2-D twin is FR-EN-14.
+  - Sources: ADR-3D-307, ADR-3D-308; #1554, #1792, #1838 (a quadrilateral's incircle), #1844.
 
 ## Vectors — the geometric lane
 
@@ -232,356 +175,203 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   vectors, and a vector equation a free figure can satisfy is a GIVEN.** Where `XY = k·ZW` has both a
   vector and a length reading the tool asks which was meant (FR-VC-1, [ADR-3D-249](06b-decisions-3d.md#adr-3d-249)) —
   but a student who has already answered is not asked again: an explicit `→`/`⃗`/`⟶`, or the word
-  «וקטור»/`vector`, commits the sentence to the vector lane. **Every spelling of the marking is equal** — in the grammar AND on the step row, which renders the four spellings identically, with the arrow typeset over the letters and the marking the student typed consumed rather than shown twice ([ADR-3D-252](06b-decisions-3d.md#adr-3d-252), #1194) —
-  and the character the refusal message TEACHES is one the palette offers and the parser accepts — a
-  remedy the tool cannot itself type is a dead end, not a remedy. On a figure with free dimensions the
-  marked statement **drives** («טרפז ABCD» + «DC→ = 3AB→» draws a trapezoid whose DC really is 3·AB,
-  at every configuration), exactly as a length equation and a length ratio do; refusing it against
-  proportions the tool sampled itself would be [ADR-052](06-decisions.md#adr-052)’s cardinal sin. The
-  same holds for the named-vector spelling («נסמן: AB = u» then «DC = 3u»). A marked statement the
-  figure genuinely cannot satisfy — two perpendicular edges of a box — is still **refused**, because
-  reaching the vector lane is not the same as being believed. *(Realised —
-  [ADR-3D-250](06b-decisions-3d.md#adr-3d-250), #1183/#1185; `issue-1183-vector-marked.test.ts`.)*
-
-  **And the student sees the notation BEFORE they commit** ([ADR-3D-255](06b-decisions-3d.md#adr-3d-255),
-  [#1195](https://github.com/dcodish/geo_builder/issues/1195)). The strip under the input shows a marked
-  line the way the step row will show it — `DC⃗ = 3AB⃗` — so the marking is visibly understood while it can
-  still be corrected. **Only for a line the student MARKED:** the preview runs on unparsed text, so the gate
-  is the arrow or the word they typed, never a guess. An unmarked «DC=3AB» previews nothing, because the tool
-  does not yet know whether that sentence is about vectors — and «אורך AB = 5» never grows an arrow, which
-  would assert vector-ness the statement never had.
-
-  **It shows the arrow ITSELF, not the character that stands for it**
-  ([ADR-3D-255](06b-decisions-3d.md#adr-3d-255-am-1--the-preview-renders-a-node-not-a-string-1312) Am. 1,
-  [#1312](https://github.com/dcodish/geo_builder/issues/1312)). The arrow is typeset as one mark spanning
-  both letters, exactly as the step row typesets it — never `U+20D7` shown as a character, which is a
-  COMBINING mark and would sit over the last letter alone. So a marked line previews **whenever the
-  rendering differs from the characters in the box**, including one already typed with `⃗`: the box is a
-  plain text field and can never show a spanning arrow, so that is precisely the line that needs the strip.
-  A line the tool would render identically to what is already in the box still previews nothing.
+  «וקטור»/`vector`, commits the sentence to the vector lane. Every spelling of the marking is equal; a marked
+  statement the figure cannot satisfy is refused. The input strip previews a marked line's notation
+  (`DC⃗ = 3AB⃗`) before commit, only for a line the student marked.
+  - Sources: ADR-052, ADR-3D-249, ADR-3D-250, ADR-3D-252, ADR-3D-255; #1183, #1185, #1194, #1195, #1312.
 - **FR-VC-1b (Must)** — **A vector can START a figure, and the word «וקטור» draws a vector.** The
   vectors unit opens on an empty canvas, so «וקטור AB» must build there: both endpoints are
   introduced as free points ([ADR-052](06-decisions.md#adr-052) — an unstated position is a free DOF
   that moves on «הציגו תצורה אחרת», never a fixed default), and the student can name what they drew
-  in the next line («נסמן: AB = u»). Before this the tool was solid-first: every vector lane
-  presupposed a figure that already existed, so the first lesson of the unit could not be typed.
-
-  **The word is not decoration.** «וקטור AB» draws an ARROW — a direction the figure records — not a
-  plain segment; a stated meaning is never silently dropped. The word and an explicit `→`/`⃗` mark
-  the same thing (FR-VC-1a), so there is one notion of "the student said vector" and not two.
-
-  **Only on an empty canvas, and only for a vector.** Once any figure exists, a pair with two unknown
-  endpoints is still refused by name — «קטע QZ» is a typo, and inventing two points for it would hide
-  the mistake the student needs to see. A bare «קטע AB» on an empty canvas also stays refused: that
-  lane feeds shape-completion and role rules which ask *which points already exist*, so it is a
-  separate question. *(Realised — [ADR-3D-253](06b-decisions-3d.md#adr-3d-253), #1184;
-  `issue-1184-vector-starts-a-figure.test.ts`. **Not yet:** a vector declared from its COMPONENTS with
-  no points at all — «נתון: v = (10,-5,0)» — which needs the positionless-vector design in
-  [#1188](https://github.com/dcodish/geo_builder/issues/1188).)*
+  in the next line («נסמן: AB = u»). Once a figure exists, a pair with two unknown endpoints is refused by
+  name. **Not yet:** a vector given only by components, which needs the design in #1188.
+  - Sources: ADR-052, ADR-3D-253; #1184, #1188.
 - **FR-VC-1c (Must)** — **A stated magnitude on a free vector is a GIVEN, and the figure honours it.**
   After «וקטור AB» the endpoints are free, so «אורך AB = 5» (or «וקטור AB = 5», «AB = 5», «|u| = 5») moves
-  them until |AB| = 5 holds, and keeps holding on «הציגו תצורה אחרת». What was not stated (the vector's
-  direction, where it sits) keeps varying. The same holds for any statement the drive understands about
-  never-positioned points: two lengths, a coordinate, an angle. The one-line «וקטור AB = 5» on an empty
-  canvas draws the same figure as the two-line form. A second, conflicting magnitude is refused naming the
-  statement it conflicts with; a magnitude on points whose positions were stated is still checked and
-  refused when wrong. *(Realised — [ADR-3D-260](06b-decisions-3d.md#adr-3d-260), #1311;
-  `issue-1311-free-pair-length-drive.test.ts`, fixtures `free-vector-length-1311` and
-  `free-vector-length-oneline-1311`.)*
+  them until |AB| = 5 holds, and keeps holding on «הציגו תצורה אחרת». What was not stated keeps varying; a
+  conflicting magnitude is refused, naming the statement it conflicts with.
+  - Sources: ADR-3D-260, #1311.
 - **FR-VC-2 (Must)** — Support **at most one symbolic parameter** in a vector expression, pinned by a
-  given through root-finding. *(Two unknowns in one expression is a known boundary — issue #301, superseded by the open #1551.)*
+  given through root-finding. Two unknowns in one expression is a known boundary.
+  - Sources: #301, superseded by #1551.
 - **FR-VC-2a (Must)** — **A POWER in a coordinate component is supported where the solver can pin it,
   and refused BY NAME where it cannot.** On a figure carrying a solid, `C(p², p, 0)` builds and the
-  relation `x = y²` holds. On a figure with no solid there is nothing to pin the exponent in, and the
-  statement is **refused with a message naming what is missing** — never accepted with the power
-  quietly discarded, which would state a given the student did not give. *(Realised —
-  [ADR-3D-218](06b-decisions-3d.md#adr-3d-218), #898; `power-needs-solid-898.test.ts`. The guidance
-  register carries the same precondition, so the hint cannot promise what the next line refuses.)*
+  relation `x = y²` holds. With no solid it is refused by name, never accepted with the power discarded.
+  - Sources: ADR-3D-218, #898.
 - **FR-VC-2b (Must)** — **A student can give a VALUE to any letter the figure carries, whatever introduced
   it.** «p = 3» is honoured whether `p` was born as a vec-def ratio («SN = k·SC»), in a coordinate
   («C(p²,1,0)»), in a vector or pair injection, in a line or plane equation, as the algebraic lane's
-  parameter, as an angle label («∠SAB = α») or as the name of a free component («C(p,1,0)», #814). A
-  letter with more than one owner receives the value at every owner. A value the figure cannot satisfy is
-  **refused, naming the statement**; a letter the figure does not carry is refused as unknown — never a
-  silent no-op. *(Realised — [ADR-3D-219](06b-decisions-3d.md#adr-3d-219), #902; `issue-902.test.ts`,
-  `fixtures3/coord-symbol-value-902.geo3.json`.)* **The same holds for a stated SIGN** («k חיובי»,
-  «k שלילי»): it is honoured for every kind of letter the figure defines, selecting among the roots where
-  the symbol is pinned and choosing which half of the free range where it is not — a sign is the student
-  saying WHICH branch they meant, and a default that survived it would assert a given they never gave
-  (ADR-052). A sign no letter in the figure can carry is refused as unknown; one this kind of letter
-  genuinely cannot expose (a rider parameter, confined to (0,1) by its own membership) says exactly that.
-  *(Realised — [ADR-3D-236](06b-decisions-3d.md#adr-3d-236), #930/#922.)*
+  parameter, as an angle label («∠SAB = α») or as the name of a free component («C(p,1,0)», #814). A value
+  the figure cannot satisfy is refused naming the statement, an unknown letter as unknown; a stated sign
+  («k חיובי») is honoured the same way.
+  - Sources: ADR-052, ADR-3D-219, ADR-3D-236; #814, #902, #922, #930.
 - **FR-VC-2c (Must)** — **A value whose letter is no longer defined is a fact in error, and the change that
   undefined it says so.** When the row that introduced the letter («∠SAB = α», «C(p²,1,0)», «SN = k·SC»)
   is deleted, muted or edited away, the value row («α = 70», «p = 3», «k = 1/2») stays in the list, is
   marked as not in effect with a reason naming the letter, and the figure does not pretend the value
   applies; the delete / mute / edit is committed as asked but reports the rows it left without effect,
-  in the student's wording — never a bare success. The value **takes effect again by itself** when a
-  definition is back, even one added after the value row — and so does **any constraint typed before
-  the points it names**: «∠SAB = 70» above the pyramid that declares A and B takes effect once the
-  pyramid exists, to a fixpoint over such rows ([ADR-3D-257](06b-decisions-3d.md#adr-3d-257), #1327 — the
-  operator's #1242 ruling, *"the diagram should either respect all input or refuse to build"*) — **and so
-  does a row that CREATES a point**: «M אמצע SA» above the pyramid builds, with M at the midpoint of SA,
-  once the pyramid declares S and A, and a row that leans on M settles after it
-  ([ADR-3D-259](06b-decisions-3d.md#adr-3d-259), #1339, operator 2026-09-21: *"yes - it should"*; the
-  cross-product rule is [ADR-W-089](06w-decisions-workspace.md#adr-w-089)). A row naming a point no line
-  declares stays visibly red. The same report
-  serves a relation on a point whose defining row is gone — one class, one seam. Suite rule:
-  [ADR-W-044](06w-decisions-workspace.md#adr-w-044). *(Realised — [ADR-3D-220](06b-decisions-3d.md#adr-3d-220),
-  #926; `issue-926.test.ts`.)*
+  in the student's wording — never a bare success. It takes effect again by itself when a definition is
+  back, and so does any row typed before the points it names, a point-creating row included.
+  - Sources: ADR-3D-220, ADR-3D-257, ADR-3D-259, ADR-W-044, ADR-W-089; #926, #1242, #1327, #1339.
 - **FR-VC-2d (Must)** — **A SYMBOLIC ANGLE may carry a coefficient, and no copula decides whether a
   statement is understood.** «זווית ABC = 2α» states that the angle is twice the letter's value, and a
   value later given to the letter drives it accordingly — the form a question uses when two angles stand
-  in a stated ratio. The **naming** and the **copula** are shared vocabulary, not a rule's private list:
-  «היא», «הוא», «שווה», «שווה ל-», `=`, "is" and "equals" are interchangeable, and «זווית», «הזווית»,
-  `∠`, "angle" and "the angle" name the same thing — so a spelling accepted for one angle statement is
-  accepted for every angle statement. Two angles wearing the same letter with the **same** coefficient
-  are equal; with **different** coefficients they state a **ratio** and must not be pinned equal, since
-  that would assert a given the student never gave. *(Realised —
-  [ADR-3D-241](06b-decisions-3d.md#adr-3d-241), #977; the letter-binding it builds on is
-  [ADR-3D-052](06b-decisions-3d.md#adr-3d-052).)*
+  in a stated ratio. One letter with different coefficients states a ratio, never an equality.
+  - Sources: ADR-3D-052, ADR-3D-241; #977.
+- **FR-VC-3 (Must)** — **NO CAS.** Every "symbolic" feature is a numeric root-find, a closed form, or a
+  linear solve. Anything beyond that is refused and escalated to the operator, not approximated.
+  - Sources: operator authority, D3 above; [docs/20 §10](archive/20-space-vectors-tool.md).
+- **FR-VC-4 (Must)** — **No cross product is surfaced to a student.** The curriculum has none; it may be
+  used internally, never shown or taught. *(Operator authority.)*
 - **FR-VC-4a (Must)** — **What the student STATED about vectors is shown, even when nothing is
   measurable yet.** «נסמן: AB = u» and «DC = 3u» on a free trapezoid are true at every configuration,
   so the data panel lists them in vector notation — `u = AB⃗`, `DC⃗ = 3u` — and leads with them, because
   the panel’s own hint promises «בכתיב וקטורי, בקואורדינטות ובגדלים» in that order and vector notation is
-  the one of the three that needs no determined figure at all.
-
-  Every other row in that panel is a MEASUREMENT and needs a number the figure holds still; a figure
-  with free dimensions has none, so the panel used to report that it knew nothing while the student was
-  looking at two things they had just written down. **A given is not a measurement**, and a panel that
-  can only report measurements is not reporting what the student knows.
-
-  **Stated only** (operator ruling, 2026-09-19: *"we need to keep it simple enough. so only stated
-  vectors. anything else, the user can ask for specifically"*) — a figure with no vector statement gets
-  no rows here, however much else it knows, and derived vector facts stay the ask lane’s. *(Realised —
-  [ADR-3D-254](06b-decisions-3d.md#adr-3d-254), #1196; `issue-1196-stated-vector-rows.test.ts`.)*
-
-- **FR-VC-3 (Must)** — **NO CAS.** Every "symbolic" feature is a numeric root-find, a closed form, or a
-  linear solve. Anything needing symbolic solving beyond that is **refused and escalated to the operator**,
-  not approximated. This bound is what keeps the engine's answers trustworthy. *(Operator authority,
-  D3 above; first recorded in [docs/20 §10](archive/20-space-vectors-tool.md).)*
-- **FR-VC-4 (Must)** — **No cross product is surfaced to a student.** The curriculum has none; it may be
-  used internally, never shown or taught. *(Operator authority.)*
+  the one of the three that needs no determined figure at all. Stated only (operator: *"only stated
+  vectors. anything else, the user can ask for specifically"*).
+  - Sources: ADR-3D-254, #1196.
 
 ## Equations — the algebraic lane
 
 - **FR-EQ-1 (Must)** — Accept **planes and lines by equation** and by the standard textbook framings, in
   both the verb-headed and noun-headed forms a student actually writes («ℓ חותך את π בנקודה A» and
-  «A נקודת החיתוך של ℓ עם π» are the same fact). *(A rule carrying one frame silently drops the other on a
-  capability the engine already has — a recurring trap in this tree.)*
+  «A נקודת החיתוך של ℓ עם π» are the same fact).
 - **FR-EQ-2 (Must)** — **Roots are branches.** Where a pinned parameter has several solutions, each is a
   valid configuration the student can cycle, exactly as elsewhere in the suite.
 - **FR-EQ-3 (Must)** — **`no-roots` is an honest contradiction, never a fake point.** When a stated
   parameter cannot be satisfied, the figure **refuses and names the statement** — it never invents a
-  nearby value to keep drawing. The discrimination is the *residual*, not the wording: only a genuinely
-  impossible figure refuses. *(Realised — `refusal-honesty.test.ts`.)*
+  nearby value to keep drawing. Only a genuinely impossible figure refuses.
 - **FR-EQ-4 (Must)** — **A value is shown only when it is the same in EVERY configuration.** When a
   pinned parameter has several roots, an answer (the ask lane), a data-panel row, a verified claim and an
   offered crossing dot are each judged against **every root the student can cycle** with «הציגו תצורה
   אחרת» — never against a subset — so pressing the button can never turn a withheld value into a fact.
-  A value that is the same on every root (an angle equal at m = ±√2) is answered; one that differs on
-  any root is withheld. A crossing dot is offered by its own invariance: a crossing that does not move
-  with the parameter is offered even when the parameter itself is not forced. *(Realised —
-  [ADR-3D-283](06b-decisions-3d.md#adr-3d-283), #1474; `issue-1474-branch-coverage.test.ts`.)*
+  - Sources: ADR-3D-283, #1474.
 - **FR-EQ-4a (Should)** — **A point with EXACTLY TWO configurations lists both in the data panel.** When
   the givens leave a point exactly two admissible positions — the same two at every sampled configuration
   (S above or below the plane, «SM⊥ABC» + «|SM| = 4») — the panel prints one row per configuration,
   «S₁(1.33, 7/2, 3.33)» and «S₂(−4.33, 7/2, −2.33)», each row a WHOLE admissible point (components are
   never mixed across configurations), in a fixed order that does not change with the configuration on
-  screen. **Only two** (operator ruling 2026-09-29: *"many exams ask questions that have 2 options. but
-  not more than 2"*): three or more configurations, or a pair that moves with the sample, keep the «?»
-  form of FR-EQ-4. The canvas label keeps the «?» form too, because the node shows one configuration.
-  *(Realised — [ADR-3D-289](06b-decisions-3d.md#adr-3d-289), #1506;
-  `issue-1506-two-configurations.test.ts`.)*
+  screen. Only two (operator: *"many exams ask questions that have 2 options. but not more than 2"*).
+  - Sources: ADR-3D-289, #1506.
 - **FR-EQ-4b (Should)** — **A parameter's roots are written as the student writes the answer.** When the
   givens leave a figure parameter more than one value, the data panel and the ask lane both list every
   root: a pair that are negatives of each other reads **«m = ±√2»**; every other set repeats the symbol
   before each root, ascending — **«m = -2, m = 4»**, **«m = -2, m = 0, m = 4»** — never a set
-  «{-2, 4}». The two surfaces print the same text, and the ask row never prints the symbol twice
-  (operator ruling 2026-09-30). *(Realised — [ADR-3D-303](06b-decisions-3d.md#adr-3d-303), #1591;
-  `issue-1591-param-solutions.test.ts`.)*
+  «{-2, 4}».
+  - Sources: ADR-3D-303, #1591.
 
 ## Claims — the student's answer, never a driver
 
 - **FR-CL-1 (Must)** — **A claim is verified, not obeyed.** When a student asserts a value or relation,
   the tool checks it against the figure across **several seeded configurations** and **refuses it
-  (`claim-refuted`) when it is wrong**. A claim must never reshape the figure to become true — that would
-  make the tool agree with the student instead of checking them. **A claim is only ever judged against
-  what the student stated.** A statement about a part the tool sampled (a free plane, a free line, the
-  figure's placement against the axes, a never-positioned point, a rider on a plane, a line or a
-  bisector ray, a partly-given coordinate) that no drive honours is refused as
-  *not yet determined*, naming that part, and never as wrong
-  ([ADR-3D-260](06b-decisions-3d.md#adr-3d-260) — one rule; #508, #552, #512 and #1311 are its carriers,
-  and [ADR-3D-267](06b-decisions-3d.md#adr-3d-267) delivers the drive for the remaining point carriers).
-  **A relation between two planes given by equations** (an angle, ⟂, ∥) is checked the same way: it is
-  refused when false and its value is drawn only when it holds. When a plane's equation carries the
-  figure's parameter in its normal, the relation instead **pins the parameter** (its roots are the figure's
-  configurations), and a parameter on some other plane never affects it
-  ([ADR-3D-263](06b-decisions-3d.md#adr-3d-263), #1439). The same holds for **every closed relation between
-  two objects given by equations or coordinates** — two planes coinciding, a line lying in a plane, two lines
-  meeting or coinciding, a distance between any two of them: when an object carries the parameter in what the
-  relation reads (a normal or offset, a direction or anchor), the relation **determines the parameter**, and
-  when no value of it can satisfy the relation the refusal names the statement rather than calling it wrong.
-  A relation that holds **for every value** of the parameter determines nothing — the parameter stays free
-  and «הציגו תצורה אחרת» varies it ([ADR-3D-286](06b-decisions-3d.md#adr-3d-286), #1472).
+  (`claim-refuted`) when it is wrong**. A claim never reshapes the figure. A statement about a part the
+  tool sampled that no drive honours is refused as *not yet determined*, naming that part, never as wrong.
+  A relation between objects given by equations or coordinates, where one carries the figure's parameter in
+  what the relation reads, determines the parameter instead; one that holds for every value leaves it free.
+  - Sources: ADR-3D-260, ADR-3D-263, ADR-3D-267, ADR-3D-286; #508, #512, #552, #1311, #1439, #1472.
 - **FR-CL-2 (Must)** — **No claim can escape by hiding inside a composite.** Every claim is recorded on
   the construction and verified on evaluation, so a claim arriving as part of a larger command is checked
-  like any other. *(Realised — `Construction3.claims`, verified in `derive3`.)* A **role noun** is a claim
-  of the same kind: «אלכסון AB» / «אלכסון ראשי AB» is checked at the apply moment when one solid can judge
-  it, and **again on the final figure** for every solid that holds both letters — a pair no solid holds
-  stays unjudged, never refused ([ADR-3D-203](06b-decisions-3d.md#adr-3d-203),
-  [ADR-3D-246](06b-decisions-3d.md#adr-3d-246)). The claim travels with the noun into every sentence that
-  names pairs after it: «האלכסונים AC ו-BD נפגשים בנקודה E» draws and claims both pairs, and E is where the
-  pairs **the sentence names** meet — never a midpoint of one of them, and never a parallelogram the student
-  did not state. Two named segments that do not meet in the figure are refused, naming both
-  ([ADR-3D-297](06b-decisions-3d.md#adr-3d-297), #1728; the 2-D twin is ADR-569).
+  like any other. A role noun («אלכסון AB») is a claim too, judged again on the final figure; named
+  diagonals that meet in E put E where they meet, and segments that do not meet are refused, naming both.
+  - Sources: ADR-3D-203, ADR-3D-246, ADR-3D-297, #1728; the 2-D twin is ADR-569.
 - **FR-CL-2a (Must)** — **A segment RATIO is one notation with two separators.** «BE/ED = 1:3» and
   «BE:ED = 1:3» are the same statement and are read identically, in every combination of the two
-  separators and with a bare number on the right («AB/BC = 2»); `/` is how a textbook writes it. A
-  spelling the grammar reads is listed in the catalog, which is the coverage map as well as the panel.
-  Both `p` and `q` are **positive** — «AB:BC = 0:3» states that a segment has zero length and is not
-  read as a ratio. *(Realised — [ADR-3D-251](06b-decisions-3d.md#adr-3d-251), #1163;
-  `issue-1163-ratio-separators.test.ts`. The 2-D sibling this restores parity with is `segmentRatio`.)*
+  separators and with a bare number on the right («AB/BC = 2»); `/` is how a textbook writes it. Both
+  terms are positive.
+  - Sources: ADR-3D-251, #1163; parity with 2-D's `segmentRatio`.
 - **FR-CL-3 (Must)** — **A refusal names the student's statement, not internal state**
   ([FR-SU-5](02w-requirements-workspace.md)).
 - **FR-CL-4 (Must)** — **A measure the student can STATE, they can ASK.** Every angle between objects
   (planes by name or by points, named lines, the plural «הזווית בין המישורים X ו-Y») and every
   solid-of-revolution measure (volume, lateral area, total surface) that the tool checks as a given is
   answered as a question with the value dropped: «הזווית בין המישורים π1 ו-π2» → 54.74°, «נפח החרוט» →
-  100π. A revolution measure is written as a multiple of π. An object the figure lacks gets a note naming
-  an object; an unstated size is undetermined (ADR-052). *(Realised —
-  [ADR-3D-279](06b-decisions-3d.md#adr-3d-279), #1449; `issue-1449-ask-lane.test.ts`, whose catalog walk
-  is the class guard.)*
+  100π.
+  - Sources: ADR-052, ADR-3D-279, #1449.
 
 ## Rendering
 
 - **FR-RD-1 (Must)** — **Textbook-grade wireframe the student can orbit**, with hidden edges dashed the
   way a textbook draws them, so a solid reads as a solid rather than a tangle of lines.
 - **FR-RD-2 (Must)** — **Vector notation renders as notation** (arrows, vector pairs), and mathematical
-  text as mathematics — a power as a power, not `p^2`. *(Realised — `VecMath.tsx` and the shared
-  `shell/math.tsx`, [ADR-W-040](06w-decisions-workspace.md#adr-w-040).)*
+  text as mathematics — a power as a power, not `p^2`.
+  - Sources: ADR-W-040.
 - **FR-RD-3 (Should)** — **A number appears on the canvas only when FR-SP-4 permits it** — invariant
-  across the sampled gauge. This is the rendering face of the same honesty rule.
+  across the sampled gauge.
 - **FR-RD-4 (Must)** — **One arc per wedge; the value wins once stated.** An angle the student marked
   draws ONE arc at its vertex whatever combination of records carries it — a name («∠SAB = α»), a value
-  («∠SAB = 70»), or both, in either order. The arc reads the **stated value** once one exists («70°») and
-  the **letter** until then («α»); it never prints both, and never two labels at one pixel. A right-angle
-  value draws the textbook knee and no arc, even when the angle was first named. Two genuinely different
-  wedges at one vertex draw two arcs. Suite rule: [ADR-W-045](06w-decisions-workspace.md#adr-w-045).
-  *(Realised — [ADR-3D-221](06b-decisions-3d.md#adr-3d-221), #923; `issue-923-917.test.ts`,
-  `pyramid-named-valued-angle-923.geo3.json`.)*
-- **FR-RD-15 (Must)** — **A stated angle is painted only where it holds.** A value on an arc, and a right-angle
-  knee, appear only while the drawn figure satisfies the given. When an edit breaks it («הזווית BAD היא 135»,
-  then D moved so the corner is 45°) the row is marked broken and the canvas shows **no value** at that corner
-  (operator ruling 2026-09-30). A line angle is drawn on its ≤ 90° side. *(Realised — [ADR-3D-290](06b-decisions-3d.md#adr-3d-290),
-  #1592; `issue-1573-vertex-angle-semantics.test.ts`. The dihedral lane already did — ADR-3D-263.)*
+  («∠SAB = 70»), or both, in either order. A right-angle value draws the knee and no arc.
+  - Sources: ADR-3D-221, ADR-W-045, #923.
+- **FR-RD-5 (Must)** — **A stated angle is marked where the segments MEET.** «הזווית בין AC' לבין BD' היא
+  55» on segments that genuinely cross draws the arc + value at the crossing, exactly as a shared-vertex
+  angle draws it at the vertex; a stated angle between segments that are **skew**, parallel, or would
+  meet only beyond the drawn ink draws **nothing** on the canvas (the R³ honesty rule — a mark there
+  would assert an intersection the figure does not have) and stays in the data panel.
+  - Sources: ADR-3D-222, #917.
 - **FR-RD-6 (Should)** — **A parameter the student VALUED offers a display choice; one they never
   valued is never replaced.** A bagrut question is worked in parts: part 1 reasons with «α» and a later
   part supplies 70, so which form belongs on the figure depends on where in the question the student
-  is — which the tool cannot infer and must not guess. Once they state the value themselves, the figure
-  shows it (FR-RD-4) **and the line that valued it carries a chip that sends the figure back to the
-  letter**, per parameter, kept across «הצג תצורה אחרת» and a save/load round trip. The chip appears
-  only where the two forms actually COMPETE on a surface — a surface that showed the letter before the
-  value arrived and the value after it — so a letter nothing draws offers no choice. And a parameter the
-  student did **not** value is never substituted: even when the figure determines it, the canvas keeps
-  their letter and the computed value stays in the data panel. That second half is an honesty invariant
-  — a value the student never wrote must not appear on the figure as though they had. One rule for every
-  builder ([ADR-W-047](06w-decisions-workspace.md#adr-w-047)). *(Realised for the angle arc —
-  [ADR-3D-233](06b-decisions-3d.md#adr-3d-233), #925/#937; `issue-937-param-display-chip.test.ts`. The
-  coordinate lane's panel chip is a later adoption.)*
-- **FR-RD-7 (Should)** — **A figure whose givens force a solid FLAT says so, naming the statements.** When the stated givens collapse a named solid's defining extent — «פירמידה SABCD שבסיסה ריבוע» with «∠BAS = 40» and «∠DAS = 50», where `cos²40° + cos²50° ≡ 1` puts the apex exactly in the base plane — the tool must not hand back a flat quadrilateral with every fact green and say nothing. It shows a **notice** naming the student's own statements («זווית BAS = 40» and «זווית DAS = 50»), not the solid's declaration and not a bare number of degrees of freedom. Explicitly **not a refusal**: every given is honoured and the drawing is the only one that satisfies them, so withholding it would be the opposite error. The test is coplanarity relative to the figure's own scale, so it is uniform over every solid — a prism of zero height and a tetrahedron whose apex falls into its base are the same fact — while shapes that are flat by definition (the 2-D vector lane) are exempt. One rule for every builder — [ADR-W-048](06w-decisions-workspace.md#adr-w-048); the 2-D half is #945. *(Realised — [ADR-3D-234](06b-decisions-3d.md#adr-3d-234), #936.)* **Forced by an incidence is not forced by the givens** (#1815): a flat polygon that only an incidence on a point riding a side can flatten — «משולש ABC · M על AB · M אמצע BC» — is **refused**, naming both statements and the polygon (2-D's ADR-413 verdict). *(Realised — [ADR-3D-309](06b-decisions-3d.md#adr-3d-309).)* **A declared polygon is never drawn flat** (#1849, operator ruling 2026-10-07, ADR-W-115 — reverses the notice above for declared polygons): when the givens force a declared polygon («משולש ABC», «מרובע ABCD», «מחומש …») onto one line, whatever forced it — lengths («AB = 5 · BC = 3 · AC = 8»), a stated coincidence («AB מתלכד עם CD»), an incidence on a rider, or a polygon declared over points that already lie on one line («A(0,0,0) · B(1,0,0) · C(2,0,0) · משולש ABC») — the line that completes the collapse is **refused**, naming the statements responsible and saying why: a straight line is not a triangle. A thin but real polygon builds. The notice stays for a SOLID the givens flatten (the pyramid above). *(Realised — [ADR-3D-310](06b-decisions-3d.md#adr-3d-310); one rule for every builder, [ADR-W-115](06w-decisions-workspace.md#adr-w-115); the 2-D one is [ADR-602](06-decisions.md#adr-602). Amended 2026-10-07, #1861: the duplicate workspace note is folded in here.)*
-- **FR-RD-8 (Should)** — **A stated LENGTH is drawn beside its segment.** «AB = 5» writes the 5 at AB's midpoint on the canvas, not only in the data panel — the honesty invariant *"everything the student stated is visible on the figure"* applied to the magnitude lane, which previously held for a stated distance (a labelled witness line) and a stated angle (a labelled arc) but not for the commonest kind of all. **Stated only:** a length the givens merely determine stays in the panel, because putting derived numbers on the drawing turns it into an answer sheet. **Always drawn, including on a hidden (dashed) back edge** — a number that appears and disappears as the figure orbits reads as the tool losing the given. A restated length («AB = 5» then «BA = 5») is one statement and one label. Relational givens («|AB| = 2|CD|») are deliberately out: which segment would carry the text has no obvious right answer. *(Realised — [ADR-3D-235](06b-decisions-3d.md#adr-3d-235), #918.)*
+  is — which the tool cannot infer and must not guess. The valuing line carries a chip back to the
+  letter; an unvalued letter stays on the canvas. Built for the angle arc; the coordinate lane's panel
+  chip is a later adoption.
+  - Sources: ADR-3D-233, ADR-W-047; #925, #937.
+- **FR-RD-7 (Should)** — **A figure whose givens force a solid FLAT says so, naming the statements.** When the
+  stated givens collapse a named solid's defining extent — «פירמידה SABCD שבסיסה ריבוע» with «∠BAS = 40» and
+  «∠DAS = 50», where `cos²40° + cos²50° ≡ 1` puts the apex exactly in the base plane — the tool must not hand back
+  a flat quadrilateral with every fact green and say nothing. For a solid this is a notice, not a refusal.
+  **A declared polygon is never drawn flat:** the line that collapses one («AB = 5 · BC = 3 · AC = 8» on
+  «משולש ABC», or an incidence on a rider) is refused, naming the statements — a straight line is not a
+  triangle.
+  - Sources: ADR-3D-234, ADR-3D-309, ADR-3D-310, ADR-W-048, ADR-W-115, ADR-413, ADR-602; #936, #945, #1815,
+    #1849, #1861.
+- **FR-RD-8 (Should)** — **A stated LENGTH is drawn beside its segment.** «AB = 5» writes the 5 at AB's midpoint
+  on the canvas, not only in the data panel — the honesty invariant *"everything the student stated is visible on
+  the figure"* applied to the magnitude lane, which previously held for a stated distance (a labelled witness line)
+  and a stated angle (a labelled arc) but not for the commonest kind of all. Stated only, and drawn on a hidden
+  edge too.
+  - Sources: ADR-3D-235, #918.
 - **FR-RD-9 (Should)** — **The freedom cue counts what is actually still free.** «דרגות חופש שטרם נקבעו»
   is an estimate, but an honest one: the six placement DOFs the sampler varies once an absolute object is
   on the canvas are **counted** (they are real — «הציגו תצורה אחרת» moves them), and what a stated
   relation consumes is **measured on the resolved figure, never inferred from a count** — a relation the
   construction already satisfies (a parallelogram's second parallel pair, a kite's mirrored sides)
-  consumes nothing. ([ADR-3D-247](06b-decisions-3d.md#adr-3d-247), [ADR-3D-248](06b-decisions-3d.md#adr-3d-248).)
-- **FR-RD-5 (Must)** — **A stated angle is marked where the segments MEET.** «הזווית בין AC' לבין BD' היא
-  55» on segments that genuinely cross draws the arc + value at the crossing, exactly as a shared-vertex
-  angle draws it at the vertex; a stated angle between segments that are **skew**, parallel, or would
-  meet only beyond the drawn ink draws **nothing** on the canvas (the R³ honesty rule — a mark there
-  would assert an intersection the figure does not have) and stays in the data panel. A stated 90° is
-  the knee, never an arc labelled 90°. The mark follows the meeting, not the spelling. *(Realised —
-  [ADR-3D-222](06b-decisions-3d.md#adr-3d-222), #917; `issue-923-917.test.ts`,
-  `box-seg-angle-cross-917.geo3.json`.)*
+  consumes nothing.
+  - Sources: ADR-3D-247, ADR-3D-248.
 - **FR-RD-10 (Must)** — **A stated right angle against a PLANE is the knee.** «π1 ניצב ל-π2», «המישור
   ABC ניצב למישור ABB'», «הזווית בין המישורים π1 ו-π2 היא 90» — and the line × plane spellings at 90°
   («הזווית בין AA' למישור ABC היא 90», «הזווית בין הישר ℓ1 למישור π1 היא 90») — draw the textbook knee:
   for two planes at the seam, one arm in each plane perpendicular to the seam; for a line and a plane at
-  their crossing. Never nothing, and never an arc labelled «90°». Named and point-run planes alike, and
-  **always shown** — not gated by «ארגון נתונים», as a ⟂ between segments is not (operator ruling
-  2026-09-27). Drawn only where the right angle holds on the drawn figure, so a refused statement leaves
-  no knee. *(Realised — [ADR-3D-264](06b-decisions-3d.md#adr-3d-264), #1475;
-  `issue-1475-plane-knee.test.ts`.)*
+  their crossing. Always shown (not gated by «ארגון נתונים»), and only where the right angle holds.
+  - Sources: ADR-3D-264, #1475.
 - **FR-RD-11 (Should)** — **«הצג בניה»: the construction that measures an angle between planes.** Every
   fact row that states an angle between two planes (a value, a letter, or «ניצב») carries a chip, **off by
-  default**. When on, the canvas draws the plane angle that measures the dihedral: a meeting point on the
-  planes' common line, and from it a perpendicular to that line in each plane, with the stated angle
-  marked between them (a knee at 90°) and a knee against the common line on each leg. The first leg comes
-  from a **meaningful point** — a vertex of a triangle/face plane not on the common line (the one whose
-  foot falls inside the shared edge; on a tie, the face over the base — the apex S of «הפאה SBC»), else a
-  named point lying on a plane; with neither (equation planes) a default point and legs of a fixed on-screen
-  length. The meeting point is **named with the first free letter** (not any point's letter; re-chosen when
-  the student later uses it; gone with the chip) — a display name, never a fact. Drawn even while «ארגון
-  נתונים» is closed; only while the angle holds, so a refused angle offers no chip. Undoable, saved with
-  the figure, carried by a share link, and removed with its row (operator rulings 2026-09-27).
-  *(Realised — [ADR-3D-265](06b-decisions-3d.md#adr-3d-265), #1476;
-  `issue-1476-dihedral-construction.test.ts`.)*
-  **Line × plane** (#1491): a row stating an angle between a line (a named line or a segment) and a plane
-  carries the same chip. When on it draws a point P on the line (the segment's own endpoint off the plane —
-  S for «SA», C' for «AC'» — else a named point lying on the line, else a default point), its height PH to
-  the plane with a knee at H, and the projection XH from the crossing X, with the stated angle marked at X.
-  An unnamed X or H takes the first free letter, as above. At exactly 90° P, H and X are collinear, so the
-  chip draws nothing extra and the right-angle knee stays (operator ruling 2026-09-27). *(Realised —
-  [ADR-3D-280](06b-decisions-3d.md#adr-3d-280); `issue-1491-line-plane-construction.test.ts`.)*
+  default**. When on, it draws the plane angle that measures the dihedral; a line × plane row gets the
+  same chip (the height to the plane and its projection). Its points are display names, never facts.
+  - Sources: ADR-3D-265, ADR-3D-280; #1476, #1491.
 - **FR-RD-12 (Must)** — **A stated angle between OBJECTS is always marked on the figure.** An angle the
   student stated between two planes («הזווית בין הפאה SBC לבסיס ABC היא 60»), between a line or segment
   and a plane («זווית בין ישר ℓ למישור π = 45», «הזווית בין SA למישור ABCD היא 50»), or NAMED with a
   letter («… היא α») draws its arc and its value — or its letter — on the canvas **whether «ארגון נתונים»
-  is open or closed**, like a vertex angle, an angle between equation planes, and the FR-RD-10 knee. This
-  reverses the #542 panel gate for givens (operator ruling 2026-09-27): a stated given is visible on the
-  figure. At 90° it is the knee (FR-RD-10); with the FR-RD-11 chip on, the construction's arc replaces it,
-  so the angle is marked once. *(Realised — [ADR-3D-266](06b-decisions-3d.md#adr-3d-266), #1486;
-  `issue-1486-stated-angle-shows.test.ts`.)*
+  is open or closed**, like a vertex angle, an angle between equation planes, and the FR-RD-10 knee.
+  - Sources: ADR-3D-266; #542, #1486.
 - **FR-RD-13 (Must)** — **A face or base the student NAMED shows as that face.** A plane first mentioned
   as «הפאה SBC» / «הבסיס ABC» (en *the face / the base*) draws only its polygon by default; «המישור SBC»
-  keeps the full patch. The first mention decides, and the «מישורים» toggle in the data panel still
-  switches either one; the choice survives undo, save/load and share. *(Realised —
-  [ADR-3D-278](06b-decisions-3d.md#adr-3d-278), #1485; `issue-1485-face-default.test.ts`.)*
+  keeps the full patch.
+  - Sources: ADR-3D-278, #1485.
 - **FR-RD-14 (Must)** — **A plane's display chip lives on the FIRST row that mentions it.** The first
   fact row whose sentence names a drawn plane — a declaration («מישור ABCD») or a relation («מישור ABCD
-  מקביל לציר z», «BE מוכל במישור ABCD») — carries that plane's chip («פאה בלבד» …). Later rows that
-  mention the same plane carry none: one chip per plane. Deleting that row moves the chip to the next row
-  that mentions the plane; a refused (amber) row carries none. The «מישורים» section of the data panel
-  still toggles every drawn plane. *(Operator ruling 2026-09-29 on #1550, amending the #847 ruling of
-  2026-08-31. Realised — [ADR-3D-281](06b-decisions-3d.md#adr-3d-281); `issue-1550.test.ts`,
-  `issue-842.test.ts`, `issue-847.test.ts`.)*
+  מקביל לציר z», «BE מוכל במישור ABCD») — carries that plane's chip («פאה בלבד» …). Later mentions carry
+  none.
+  - Sources: ADR-3D-281; #847, #1550.
+- **FR-RD-15 (Must)** — **A stated angle is painted only where it holds.** A value on an arc, and a right-angle
+  knee, appear only while the drawn figure satisfies the given.
+  - Sources: ADR-3D-263, ADR-3D-290, #1592.
 
 ## Coverage
 
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
-  reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it.
-  *(Realised — [docs/20](archive/20-space-vectors-tool.md) §14, V8 complete. The documented remaining niche is
-  low-frequency and coordinate-expressible: orthoscheme. The dihedral face↔base angle is supported —
-  [ADR-3D-266](06b-decisions-3d.md#adr-3d-266), `angle-operand-cluster.test.ts`; amended 2026-10-07, #1861.)*
-- **FR-SP-8 (Must)** — **Case in labels: where the anchor proves a run is a label, it is read as one;
-  elsewhere the convention is taught, never guessed.** Point labels are uppercase by convention, and 3-D
-  carries case-significant tokens 2-D lacks (axes x/y/z, parameters k/m/t, vector names u/v/w, R vs r,
-  ℓ), so a blanket case-fold is not available. A lowercase run **parses like its uppercase twin** in a
-  position only a label can occupy — after the angle glyph/word or a point/vertex noun (#181), at the
-  head of a coordinate definition («c(p²,0,1)», #924), or as the single-letter SUBJECT of a midpoint
-  statement («x אמצע SA», «x is the midpoint of SA», #1523 — axis letters included, since an axis is never
-  a midpoint). A sentence that auto-names a point («אמצע SA») does so only when it says nothing else: a
-  word it cannot read declines the line, never vanishes from it. An un-anchored lowercase run («ab = 5»,
-  «ac ⊥ bd», «תיבה abcd») is **taught** — the corrected spelling is shown (#353) — and is never sent to
-  the paid fallback. The case-significant lanes are byte-unchanged: `t(m-2,m,m+2)` in a line equation is
-  the parameter, «נקודה x» stays the student's to disambiguate. *(Realised —
-  [ADR-3D-039](06b-decisions-3d.md#adr-3d-039), [ADR-3D-092](06b-decisions-3d.md#adr-3d-092),
-  [ADR-3D-223](06b-decisions-3d.md#adr-3d-223), [ADR-3D-287](06b-decisions-3d.md#adr-3d-287); `lowercase-labels.test.ts`, `lowercase-nudge.test.ts`,
-  `issue-924.test.ts`, `issue-1523-autoname-whole-utterance.test.ts`. A SOLID noun is not an anchor — the #353/#498 ruling, reaffirmed 2026-09-07 when #924 closed
-  ([04b](04b-design-3d.md)) — so «תיבה abcda'b'c'd'» is taught by the nudge
-  ([ADR-3D-226](06b-decisions-3d.md#adr-3d-226)); amended 2026-10-07, #1861.)*
+  reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it. The
+  documented remaining niche is orthoscheme.
+  - Sources: [docs/20](archive/20-space-vectors-tool.md) §14; ADR-3D-266; #1861.
 
 ## Non-goals
 

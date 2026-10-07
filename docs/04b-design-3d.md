@@ -6,6 +6,12 @@ _How the 3-D product is built. Registered in [`DOCS.json`](../DOCS.json) as the 
 **What it must promise** is [02b](02b-requirements-3d.md). Decisions are [06b](06b-decisions-3d.md);
 the build plan and its corpus reading, [docs/20](archive/20-space-vectors-tool.md), are archived history. This is the *how*.
 
+**How this document is organised.** After the layer map (*Shape*), the chapters follow a statement through
+the product: reading and applying it, solving the figure and judging claims, the submit decision, and what
+the student sees (canvas, data panel, input preview); the known gaps close it. Each section states the
+current mechanism, where it lives, and the ADRs that hold its history (`ADR-3D-NNN` ids resolve in
+[06b](06b-decisions-3d.md), bare `ADR-NNN` in [06](06-decisions.md); `#NNN` is the issue).
+
 ## Shape
 
 | Layer | What it is |
@@ -19,378 +25,119 @@ The tree **copies patterns from `src/`, it never imports them** — 2-D and 3-D 
 an abstraction over both would leak ([`BOUNDARIES.json`](../BOUNDARIES.json), operator authority). The
 shared chrome ([04w](04w-design-shell.md)) is the one sanctioned shared code.
 
-## The parser is context-free — deliberately, and it is the better architecture
+## Reading and applying a statement
 
-`parse3.ts` has **no `ParseContext`**: rules match text and nothing else, and *resolution happens at
-apply*. Verified — zero `ParseContext`/`ctx.` references in the file.
+### The parser is context-free — deliberately, and it is the better architecture
 
-This is the opposite of 2-D, where the parser carries figure context, and the divergence is intentional
-([docs/17 §3b](17-design-rules.md)). Deciding what a name refers to at **apply** time rather than parse
-time is what makes [`FR-SP-5`](02b-requirements-3d.md)'s M1 duality possible: the same utterance drives a
-free figure or verifies a determined one, because the decision is taken where the figure is known. A
-context-carrying parser has to guess earlier, with less information.
+`parse3.ts` has **no `ParseContext`** (no `ParseContext`/`ctx.` reference in the file): rules match text,
+and *resolution happens at apply*, where the figure is known — the opposite of 2-D, by design
+([docs/17 §3b](17-design-rules.md)). That seam is what makes [`FR-SP-5`](02b-requirements-3d.md)'s M1
+duality possible. **Reach for M1 duality before adding a construct.**
 
-Consequence for anyone adding a rule: **reach for M1 duality before adding a construct.** It is the most
-productive pattern in this tree precisely because the seam exists.
+**The normalisation seam and case (ADR-3D-039, ADR-3D-223).** `normalize3` is the one boundary every rule
+reads: format controls stripped, primes and minus unified, script transitions split. **The prime fold is
+one set** (ADR-3D-300): `PRIME_GLYPHS3` / `foldPrimes3` in `lexicon/marks3.ts` (′ ’ ‘ \` ´ and the Hebrew geresh ׳, ʹ, ʼ → `'`),
+called by `normalize3`, the ask lane's `parseQuery`, the LLM sequence gate and the rename dialog, and read by
+the bidi run alphabet — no reader spells its own prime class. Lowercase labels are uplifted by
+`upliftLowercaseLabels`, the ONE chokepoint, only where an anchor proves a label (the angle glyph/word,
+a point/vertex noun, a `label(…)` coordinate at the head of a definition, the single-letter subject of a midpoint statement — ADR-3D-287); a solid noun is not an anchor (#353/#498).
+`midpoint-auto`, the one rule in `parse3` that INVENTS a point's name, matches a full anchored frame
+(`MID_HE`/`MID_EN`, shared with the anchor), so a word it does not own declines the line.
 
-**The normalisation seam and case ([ADR-3D-039](06b-decisions-3d.md#adr-3d-039), [ADR-3D-223](06b-decisions-3d.md#adr-3d-223)).**
-`normalize3` is the one boundary every rule reads: format controls stripped, primes and minus unified,
-script transitions split. **The prime fold is one set** ([ADR-3D-300](06b-decisions-3d.md#adr-3d-300)):
-`PRIME_GLYPHS3` / `foldPrimes3` in `lexicon/marks3.ts` (′ ’ ‘ \` ´ and the Hebrew geresh ׳, ʹ, ʼ → `'`),
-called by `normalize3`, the ask lane's `parseQuery`, the LLM sequence gate, the rename dialog, and read by
-the bidi run alphabet — no reader spells its own prime class — and lowercase labels uplifted by `upliftLowercaseLabels`, the ONE chokepoint,
-only in positions an anchor proves are labels (the angle glyph/word, a point/vertex noun, the head of a
-coordinate definition, the single-letter subject of a midpoint statement — [ADR-3D-287](06b-decisions-3d.md#adr-3d-287)).
-New label-demanding positions join that function, never a rule. **An auto-name arm consumes the whole
-utterance** (ADR-3D-287): a rule that INVENTS a point's name (`midpoint-auto`, the one such arm in
-`parse3`) matches a full anchored frame — the noun phrase and its two labels, nothing else — never a count
-of label tokens, so a word it does not own declines the line instead of being read around. The frame
-(`MID_HE`/`MID_EN`) is spelled once and shared by the rule and the anchor. What no anchor
-proves is left to the #353 convention nudge in `scope3.ts` (`upperCasedLabelCandidate3`, consulted by
-`App3` before the LLM seam), which teaches the spelling rather than guessing it.
+**Case is taught, never silently accepted** (ADR-3D-226). What no anchor proves goes to the #353 nudge in
+`scope3.ts` (`upperCasedLabelCandidate3`, consulted by `App3` before the LLM seam). It lifts a label-shaped
+run of two or more characters — never an English prose word (`NOUN_EN`/`EN_STOP`, from `parse3`) — runs
+only on a failed parse, and fires only if the candidate parses.
 
-## The solver — a coordinate-injection pivot, not a general CAS
-
-`solve3.ts` handles the case the corpus actually asks for: a gauge-free figure built in the geometric
-lane receives **absolute givens mid-session** (a point coordinate, a vector value), and the engine solves
-for the **similarity** — translate, rotate, scale — *plus* the figure's free shape dimensions that realise
-them. Numerically: least-squares over the dims, Levenberg–Marquardt with a central-difference Jacobian,
-seed-rotated multi-start.
-
-**The sampling law inside the solve (#863, [ADR-3D-245](06b-decisions-3d.md#adr-3d-245)).** A quantity that
-depends only on `(construction, seed)` — a solid's seeded dims, any `sample(seed, key, …)` — is derived
-**once per resolve** and threaded into the residual (`sampledSolidDims`), never re-derived per iteration:
-the pivot's residual runs hundreds of thousands of times per solve, and one figure paid 2 M redundant samples
-for three values. `rng.ts` exports `sampleStats` (the twin of 2-D's `sampleStats.sweeps`), so a lock asserts a
-figure's resolve costs O(distinct keys) calls — a count ceiling, never a wall-clock one. The free-line /
-free-plane resolvers still sample inside the same residual; measured at ~0.1 s on the worst fixture and left,
-with the counter making any growth visible.
-
-**One solve per configuration (#863, [ADR-3D-304](06b-decisions-3d.md#adr-3d-304)).** `resolve3` is a pure
-function of `(construction, seed, paramValue)`, so it is memoized AT that chokepoint — a WeakMap keyed on the
-construction's identity (`apply` clones, never mutates), bounded per figure. Every consumer that asks for a
-configuration (the derive, the claim verifier, the data panel, the ask lane, all through `knowledgeSamples3`)
-shares one solve; no consumer keeps its own sample memo beside it. `resolveStats3` counts real resolves and
-hits, so a lock asserts "the panel re-solves nothing the derive already solved" by count.
-
-This is the concrete meaning of [`FR-VC-3`](02b-requirements-3d.md)'s **NO CAS** bound. Every "symbolic"
-feature here is a numeric root-find, a closed form, or a linear solve; anything beyond that goes back to
-the operator rather than being approximated. The bound is what makes the answers trustworthy — an
-approximate symbolic result would be indistinguishable, to a student, from a correct one.
-
-**A symbolic coordinate lives in one of two structurally different lanes, and the lane decides what can
-be expressed.** With a solid present the component becomes a pivot **pin** carrying the full affine form,
-exponents included; with no solid it becomes a `coord-sym` point whose components are stored as a
-degree-1 `{k, p}`. They are different objects, not one object evaluated two ways — so a capability
-present in one is not automatically present in the other, and the narrower lane must **refuse what it
-cannot hold rather than narrow it silently**. A lossy lowering is the worst outcome available: it looks
-like success and states a given the student never gave. See [ADR-3D-218](06b-decisions-3d.md#adr-3d-218)
-(#898), where a component reducer summing coefficients and never reading exponents drew «C(p²,p,0)» as
-«C(p,p,0)».
-
-**A letter has one ADDRESS registry, and a pin on it is keyed by the letter.** Six mechanisms can own a
-symbol — a vec-def's ratio («SN = k·SC»), a pivot pin symbol (a point/vector/pair injection or an equation
-written in the letter, `pinSymsOf`), the algebraic lane's figure parameter (`c.param`), a labelled angle,
-a named free component («D(3,p,0)», `partialNames`), and a named on-segment rider parameter
-(«E על SA כך ש-SE = t·SA», `riderNames`). `symbolOwnersOf` (`types.ts`) lists a letter's
-owners in one place, and every statement addressed to a letter («p = 3», «p חיובי») is applied to each of
-them. `symbolPins` is keyed by the symbol's **name**: the relation pins (∥/⟂/length/seg-*) are inherently
-vec-def pins and drive a symbol-defined point; the `value` pin is lane-agnostic and each lane reads it back
-on its own terms — the vec-def lane as the point's k; the **pivot as a substitution** (`openPinSymsOf` is
-the unknown layout — a value-pinned symbol holds no slot, so the layout, the start spread, the seed
-anchors, the continuation walk and the DOF cue shrink by it together); the parameter lane as its one
-admissible root (`pinningGivens` counts it, and `paramRoots` returns the stated value only if every
-geometric pinning given admits it — otherwise the honest `no-roots`, blamed on the statement). A named
-component takes a value through the injection command that bound the name (M1). See
-[ADR-3D-219](06b-decisions-3d.md#adr-3d-219) (#902), where the pins were keyed by the vec-def **index** that
-introduced a symbol, so a coordinate-born letter had no representable pin and «p = 3» refused a letter the
-student had used two lines earlier.
-
-**A rider's ratio clause is read by the RIDER, not by the utterance that declared it.** An on-segment
-point carries a parameter `t`, and a statement relating its host's parts *determines* `t` in closed form
-— no solving. Two shapes exist and both live in `onSegmentRatio.ts`: the host's two **halves** against
-each other (`|aR| = k·|Rb|`, `riderPairsT`) and one half against the **whole** host (`|aR| = k·|ab|`,
-`riderWholeSide`/`riderWholeT`). Pairs match as SETS, because a length pair is unordered. The parameter is
-confined to the OPEN interval: «R על ab» is itself a given, so a coefficient placing the rider at or beyond
-an endpoint contradicts the membership in the same sentence and is **refused** — never clamped, and never
-dropped. A coefficient written as a LETTER binds the name only (`riderNames`); the rider keeps sampling as
-before, and a later value reaches it through the same `symbolOwnersOf` registry as every other lane. See
-[ADR-3D-224](06b-decisions-3d.md#adr-3d-224) (#921), where the whole-host shape was readable in no spelling
-of the clause, so «E על SA כך ש-SE = t·SA» built a free rider and silently discarded the ratio — while the
-same statement typed as its own fact built and pinned correctly all along.
-
-**Both shapes, and either kind of coefficient, are read at ONE chokepoint.** `riderRatioRetarget` sits at
-`applyCommand3Inner`'s entry and rewrites a ratio statement into the `point-on-segment3` given it is,
-before any stage of the ladder sees it — so the three command shapes the same sentence can arrive as
-(`vec-rel`, `length-rel`, the `length-ratio` claim) share one semantics. It used to read only the
-**halves** shape and to reject a symbolic coefficient outright, which left the whole-host shape reachable
-from parse3's clause rule alone: «E על SA» followed by «SE = t·SA» — the incremental order this product is
-built around — refused, and so did its numeric twin «SE = 0.5·SA», one line apart from the halves spelling
-that worked. A **letter** coefficient is read in the stated orientation only (`1/t` is not a name, so the
-flipped spelling is not guessed at), and reaching an existing free rider it binds the name and nothing
-else, exactly as the clause does. See [ADR-3D-231](06b-decisions-3d.md#adr-3d-231) (#932).
-
-**A VALUED parameter's two forms compete on one surface, and the student picks.** `degText` is the one
-rule for what an arc reads, so it is also where the choice lands: a symbol whose valuing row is set to
-`letter` reads its letter instead of its value, and everything else is byte-identical. The resolver
-rides the `App3 → Figure3 → buildScene3` seam that `planeDisplay` already uses.
-
-**Which row carries a plane's chip is DERIVED, not stored (#1550, [ADR-3D-281](06b-decisions-3d.md#adr-3d-281),
-amending ADR-3D-197).** `store/planeChips.ts`: the FIRST `ok` fact whose sentence names a drawn plane
-carries its chip — declaration or relation; later mentions carry none; delete that row and the next
-mentioning row inherits it. "Which planes does this sentence name" is ONE structural function,
-`planesNamedBy` — plane operands (`plane-run` / `plane-named`) at any depth, a field named `plane`, a
-declaration's `name`, and the bare `ids` of the four kinds whose id list IS a plane — never a switch over
-command types. `App3` passes status (#847: an amber row owns nothing) and the figure's drawn planes (a
-plane the sentence only measures against has no chip). The data panel's «מישורים» section still lists
-every drawn plane with the same toggle.
-
-**A plane's display default is DERIVED, not stored.** `planeDisplay` holds only the student's toggles;
-an absent key means the plane's own default, which `defaultPlaneDisplay3(c, name)` reads from
-`Construction3.faceNamed` — the point-run planes whose first mention was a face/base noun (the operand
-carries `face: true`, and `materializePlaneRun` records it only where it creates the plane). The
-renderer, the store's toggle cycle and both panel labels read that one helper, so a save file needs no
-new field: the default re-derives from the facts on load. See [ADR-3D-278](06b-decisions-3d.md#adr-3d-278) (#1485).
-Which rows OFFER the choice is derived, never listed: `collectWedges` (moved out of `buildScene3` so the
-fact list can read it too — one collection, two readers) yields the wedges, `competingArcSymbols` picks
-those carrying BOTH a label and a value, and `store/paramChips.ts` puts the chip on the enabled fact
-whose `symbol-value` command named such a symbol. The choice itself is `displayMode` in the store,
-keyed by that fact's id — and by its INDEX in the save file, because a load re-parses utterances into
-fresh ids. See [ADR-3D-233](06b-decisions-3d.md#adr-3d-233) (#925/#937) and the cross-product rule
-[ADR-W-047](06w-decisions-workspace.md#adr-w-047).
-
-**A refusal names a cause the figure does not contradict.** When a statement is addressed to a letter, the
-two questions *"does the figure carry this letter?"* and *"does this lane expose what the statement asks
-for?"* have separate answers and separate codes: `unknown-symbol` for the first, `sign-not-selectable` for
-the second. See [ADR-3D-225](06b-decisions-3d.md#adr-3d-225) (#922), where one code answered both and told
-a student the figure had never heard of a letter it had just been given.
-
-**Case is taught, never silently accepted — and the two mechanisms divide the work by ANCHOR.** Node
-labels are uppercase; lowercase is the vector/parameter/coordinate namespace, so 3-D cannot take a blanket
-case-insensitive read. `normalize3`'s uplift (`upliftLowercaseLabels`) lifts a run only where an ANCHOR
-proves it is a label — an angle glyph, a point noun, or a `label(…)` coordinate at the sentence start
-([ADR-3D-223](06b-decisions-3d.md#adr-3d-223)); everything else is the NUDGE's business, which offers the
-corrected spelling and lets the student retype it. A solid noun is deliberately **not** an anchor (the
-#353/#498 ruling, reaffirmed 2026-09-07), so «תיבה abcd» is taught rather than auto-lettered. The nudge
-lifts any label-shaped run of two or more characters — never a single letter, and never an English prose
-word (`NOUN_EN`/`EN_STOP`, reused from `parse3`) — and is PROOF-BASED: it runs only on a failed parse and
-fires only if the candidate parses, so a genuine gap is never masked as a style complaint. See
-[ADR-3D-226](06b-decisions-3d.md#adr-3d-226) (#924 arm 2), where a four-character cap was one vertex list
-too short and sent «תיבה abcda'b'c'd'» to the paid LLM lane.
-
-## Gauge, and why the landing funnel exists
-
-A figure's placement, rotation and scale are a **gauge** — free unless something absolute pins them. An
-unanchored figure (no absolute object, solid, revolution or circle) is normalised onto the floor at the end
-of `resolve3`, so «הציגו תצורה אחרת» changes only its shape ([ADR-3D-272](06b-decisions-3d.md#adr-3d-272);
-amended 2026-10-07, #1861). The
-**landing funnel** classifies which gauge components are *provably* free, and that classification is what
-licenses [`FR-SP-4`](02b-requirements-3d.md): a number may be drawn only if it survives the gauge being
-resampled. Without the funnel the engine could not distinguish "this length is 5" from "this length is 5
-*in the drawing I happen to have chosen*", and printing the second is dishonest.
-
-**The pivot's residual families are ONE list (#1550, [ADR-3D-281](06b-decisions-3d.md#adr-3d-281)).**
-`pivotFamilies3(c)` (evaluate.ts) names every residual family `solvePivot` consumes and the LANE that
-solves it: `anchor` (injections and scalar givens — step 1, the normal solve), `plane-eq` (step 3, the
-equation-plane drive), `frame` (step 3b — a figure ring or operand against the ABSOLUTE frame: a named
-line, a coordinate plane or axis; satisfied by turning the figure), `membership` (step 4, the
-transactional membership drive). The pivot's entry gate and every step's trigger read that list, so a
-family can no longer be admitted without a solve lane — `coordPlanePins` was, for two months, and a
-coordinate-frame given on a figure nothing else anchored solved nothing. A row's `drivesAlone` says
-whether its presence alone (no anchor) triggers the lane; `false` is FAILURE PATH ONLY — the lane runs
-when the relation is unmet on the current placement, so a figure that already satisfies it is untouched.
-The coordinate-frame row is failure-path: its unmet test is the claim's own predicate
-(`coordPlaneRelHolds`, operands.ts) at the claim's own tolerance (`CLAIM_REL_TOL`), so "the drive
-thinks it holds" ⟺ "the verifier accepts it". `issue-1550.test.ts` locks totality structurally: every
-`c.*Pins` / `figure*(c)` family `solve3.ts` reads must be a registry row.
-
-**The #512 frame verdict is per placement COMPONENT.** `placementSampledParts` publishes whether the funnel
-sampled the translation and the rotation separately (`placementSampled` is their disjunction). A frame
-claim is softened to `placement-not-fixed` only when a component it READS was sampled: an operand
-reference («BD' ⊥ מישור [xy]») reads the whole placement, as before; the ring form's ∥ / ⟂ reads only
-the rotation, which its own drive solved — so when it fails, the givens contradict each other and the
-refusal says so rather than asking for a placing given that would not help.
-
-## Relations as a disposition map
+### Relations as a disposition map
 
 `relationTable.ts` maps each `relation × operand-kind` pair to a status and the actions it licenses
-(`drive`, `claim`, or unsupported) rather than scattering that knowledge across rules. Two properties
-follow: a relation the engine cannot yet drive is **claim-gated** instead of silently mis-driven, and the
-map is enumerable — which is how [docs/26](archive/26-3d-relations-plan.md)'s program could be closed against a
-list rather than against intuition.
+(`drive`, `claim`, or unsupported), so an undrivable relation is **claim-gated** rather than mis-driven, and
+the map is enumerable ([docs/26](archive/26-3d-relations-plan.md)). `operands.ts` resolves operand
+*thunks*, so a rule names what it wants without knowing how it is produced.
 
-`operands.ts` resolves operand *thunks*, so a rule names what it wants without knowing how that operand
-will be produced.
+**A relation's lane is decided by its OPERANDS, never by its word** (#1439, ADR-3D-263). Between two
+absolute objects a relation pins the figure parameter when an operand carries it **in what the relation
+reads** (ADR-3D-286, #1472: ⟂ / ∥ / angle read directions; coincidence, containment, intersection and
+distance read positions too), and is a claim otherwise. One list, `paramPinningRels` (`claimPinsParam`,
+`operandCarriesParam`), feeds the root-find; each pin's residual is the verifier's own function on the
+operands rebuilt at the candidate value (`operandAtParam`). A residual that vanishes at every scan sample
+is **not** a pin (the identity guard). The claim is always recorded, and a number drawn from it shows only
+when it holds (`DIRECTION_REL_TOL`).
 
-**A relation's lane is decided by its OPERANDS, never by its word** (#1439,
-[ADR-3D-263](06b-decisions-3d.md#adr-3d-263)). Between two absolute objects a relation either pins the
-figure parameter or is a claim, and the deciding question is whether an operand carries the parameter **in
-what the relation reads** ([ADR-3D-286](06b-decisions-3d.md#adr-3d-286), #1472): ⟂ / ∥ / an angle read
-directions (a normal, a line's direction); coincidence, containment, intersection and distance read
-positions too (a plane's offset, a line's anchor, a coordinate point). One list, `paramPinningRels`, read
-from the recorded claims (`claimPinsParam`, `operandCarriesParam`), feeds the root-find, and each pin's
-residual is the verifier's own function on the operands rebuilt at the candidate value (`operandAtParam`),
-with the verifier's predicate filtering the roots (the open half of «נחתכים», a distance's parallel branch).
-A relation whose residual vanishes at every scan sample holds for every value and is **not** a pin (the
-identity guard) — the parameter stays a sampled DOF. Every such relation also records its claim, so whatever
-lane it solves in, the verifier is the final arbiter. The plane
-column once decided by the word instead: «הזווית בין המישורים» went to a list only the root-find read (with
-no parameter, checked by nothing and drawn as knowledge), while «ניצב» / «מקביל» went to the claim lane even
-when a normal carried the parameter. A number the renderer prints from such a relation is drawn only when
-the relation holds on the drawn figure, through the verifier's own tolerance (`DIRECTION_REL_TOL`).
+**A pin is a driver; the claim beside it is the arbiter** (ADR-3D-282, #1546). A pin acts only where the
+pivot owns something that moves its object (a solid's gauge and dims, a pin symbol, a free rider), so
+every pin family that can land elsewhere records its claim: `coords-eq` for the existing-id `point3` pin,
+`vec-val` for `inject-vector` and `inject-pair` (one `VecAtom` form), `dot-val` for `dot-given`
+(ADR-3D-284, #1560); and (ADR-3D-285, #1567) `length` → `length-eq`, `seg-angle` → `angle-seg-eq`,
+`vangle` → `vertex-angle-eq`, `length-rel` → `length-rel`, `seg-perp/par-plane` → `perp-plane`/`par-plane`.
+A given's claim carries `given: true`; **the placed-figure rule is claim-level**, at the head of
+`holdsAt`: a `given` claim is judged on a placed figure only, and at the displayed seed the pin-owner guard
+answers (`injection-unsatisfiable` for a coordinate pin, `givens-contradict` otherwise). So
+`freeDims(c) > 0` decides only whether a pin is ADDED, and the store's `size-on-solid` boundary exempts a
+magnitude recorded as a pin's arbiter.
 
-**A pin is a driver; the claim beside it is the arbiter** ([ADR-3D-282](06b-decisions-3d.md#adr-3d-282), #1546).
-A pin acts only where the pivot owns something that moves its object — a solid's gauge and dims, a pin
-symbol, a free rider. A coordinate point, a coord-sym point and a derived point are not pivot unknowns, so a
-pin on one is never solved against. Every pin family that can land on such an object therefore records the
-claim it drives toward: `coords-eq` for the existing-id `point3` pin, `vec-val` for `inject-vector` and
-`inject-pair` (one `VecAtom` form, so «u = (…)» and «AB = (…)» are one statement), `dot-val` for
-`dot-given` ([ADR-3D-284](06b-decisions-3d.md#adr-3d-284), #1560). Components are nullable: unstated or
-symbolic ones are unchecked, and a statement with no numeric component records no claim. A given's claim
-carries `given: true` (unlike the student's answer «K = (…)»), and **the placed-figure rule is a CLAIM-LEVEL
-rule**, at the head of `holdsAt`, not a case per kind: a `given` claim is judged on a PLACED figure only — at
-a configuration where the pivot found no placement it holds vacuously, and at the displayed seed the
-pin-owner guard gives the verdict (`injection-unsatisfiable` for a coordinate pin, `givens-contradict`
-naming the statements otherwise; newest owner only). A new pin family gains its arbiter by recording a claim
-with the flag. The scalar pins join the same seam ([ADR-3D-285](06b-decisions-3d.md#adr-3d-285), #1567):
-`length` records `length-eq`, `seg-angle` records `angle-seg-eq` (the angle between lines, |cos|),
-`vangle` records `vertex-angle-eq` (the vertex angle, 0–180°, the quantity the pin drives), `length-rel` records `length-rel`, and `seg-perp/par-plane` records `perp-plane`/`par-plane` — so
-routing on `freeDims(c) > 0`, which counts a revolution's unstated size the pivot never drives, decides only
-whether a pin is ADDED, never whether the statement is judged. The store's `size-on-solid` boundary exempts a
-magnitude recorded as a pin's arbiter (its own pin drove the size), as it already exempted #1447's
-volume/area pivot lane.
-
-**Two angle claims, chosen by the parser, never by apply** ([ADR-3D-290](06b-decisions-3d.md#adr-3d-290), #1573).
-A vertex-named angle («∠BAD», «זווית BAD», «זווית A», a valued angle mark) lowers to `vertex-angle-eq
+**Two angle claims, chosen by the parser, never by apply** (ADR-3D-290, #1573). A vertex-named angle
+(«∠BAD», «זווית A», a valued angle mark) lowers to `vertex-angle-eq
 {vertex, p, q, deg}`; «הזווית בין … לבין …» over two point pairs lowers to `angle-seg-eq`. Apply routes by
-the kind — `vertex-angle-eq` → `vangle`, `angle-seg-eq` → `seg-angle`, whatever letters the segments share —
-and the claim, the coord-sym root-find (`paramGivens`), the wedge collection and the knees each read the
-quantity of their kind. `vertexAngleDeg` / `lineAngleDeg` / `ANGLE_TOL_DEG` in `claims.ts` are the one measure
-and tolerance, shared by the verifier and the canvas. Still open: a revolution's size driven by a stated length (#1569, parked).
+the kind — `vertex-angle-eq` → `vangle`, `angle-seg-eq` → `seg-angle` — and the claim, the coord-sym
+root-find (`paramGivens`), the wedges and the knees each read their kind's quantity. `vertexAngleDeg` /
+`lineAngleDeg` / `ANGLE_TOL_DEG` in `claims.ts` are the one measure and tolerance for verifier and canvas.
 
-**One mechanism places a point from a coordinate given, whatever it sits on** ([ADR-3D-293](06b-decisions-3d.md#adr-3d-293),
-#1615; it generalises ADR-3D-292). The existing-id `point3` path records the pin and its `given: true` arbiter as
-before and, when the point has `solvable` entries in the sampled-carrier table (`carrierParams3` — a segment's
-`t`, a line's or plane's offset, a partial point's coordinate, a ratio, the bisector distance), the stated
-components in `c.coordDeterminations` — coordinates, never a parameter value, because line and plane offsets are
-measured from a seed-dependent seat. `resolve3` runs `solveCoordDeterminations` after the free-carrier fixpoint,
-only where the pivot owns nothing (no solid, no `free3` point — there the pin enrolls the rider): it probes the
-point through FRESH point passes at parameters 0 and at each unit parameter (the placements are linear, so this is
-exact; fresh, because a line or plane rider is seated around the centroid of what is already placed), solves the
-stated components by the normal equations, and publishes `Resolved3.coordDetermined`: `determined` (one solution
-strictly inside each range — placed through `riderTOverride` in one more fresh pass, so dependents follow),
-`contradicts`, or `open` (underdetermined, or on a range boundary). The coord-sym point is the one kind outside
-the table — its letter is the figure parameter — and keeps `readCoordGiven` → `symbol-value`.
+**One mechanism places a point from a coordinate given, whatever it sits on** (ADR-3D-293, #1615;
+generalising ADR-3D-292). Beside the `point3` pin and its arbiter, a point with `solvable` entries in
+`carrierParams3` records the stated components in `c.coordDeterminations`. Where the pivot owns nothing (no
+solid, no `free3` point), `resolve3` runs `solveCoordDeterminations` after the free-carrier fixpoint: it
+probes the point at parameter 0 and each unit parameter (placements are linear), solves by the normal
+equations, and publishes `Resolved3.coordDetermined` — `determined` (placed through `riderTOverride`),
+`contradicts`, or `open`. A coord-sym point keeps `readCoordGiven` → `symbol-value`.
 
-**A declared action must hold for every spelling of its row, and the SHAPE of a pin kind is not a
-semantic rule.** `'angle|segment|segment'` declared `drive-dims` while `apply.ts` delivered it only when
-`claim.a1 === claim.a2` — not a geometric condition, but the shape of the one pin kind that existed
-(`vangle` = vertex + two rays). Everything else fell through to the claim lane and was refuted against a
-sampled figure. The lesson generalises past this row: when a statement fails to fit an existing pin, the
-question is whether the relation needs **its own pin kind**, never whether the statement can be turned
-away. Reuse is checked on the residual's MEANING, not its field list — `cos-angle` carries the right two
-operands and the wrong (signed) quantity, and a drive that targets something other than what its verifier
-measures produces figures its own claim then refutes. See [ADR-3D-217](06b-decisions-3d.md#adr-3d-217).
+**A declared action must hold for every spelling of its row** (ADR-3D-217). `'angle|segment|segment'`
+declares `drive-dims`, so `apply.ts` drives it through its own pin kind rather than only when
+`claim.a1 === claim.a2` (the shape of `vangle`). A statement that fits no pin may need its own pin kind;
+reuse is judged on the residual's MEANING (`cos-angle` has the right operands and a signed quantity).
 
-**A frame's operand coverage is part of the relation, and the guard that limits it must say what it is
-about.** #963 (ADR-3D-238) is the cheapest possible illustration. The containment frame (#614) read its
-sides through the shared operand reader and served a LINE; a POINT fell out here:
+**A frame's operand coverage is part of the relation** (#963, ADR-3D-238). The containment frame (#614)
+serves a point as membership (`on-planes`, ADR-3D-015); the "a point has no direction" bail applies to
+perp, parallel and angle only. **The verb is optional; the plane noun is not** (#1608, ADR-3D-298):
+beside `membership`/`pointRelPlane` («על»), the verbless «ב-» / "in plane" is admitted in
+`CONTAINED_SPLIT`, the frame `planeRelGiven` and `lineRelGiven` share, only before an explicit plane noun
+(held in a lookahead).
 
-```ts
-if (a.op.kind === 'point' || b.op.kind === 'point') return null; // a point has no direction
-```
+**Vocabulary is not a rule's private property** (#977, ADR-3D-241). The angle noun and the copula are shared
+constants, so `angle ABC`, `the angle ABC` and «שווה» read alike in every angle rule (2-D: #969, ADR-498).
+**A field that is both an identity and a display string will be read as the wrong one** (#986, ADR-3D-242):
+the angle mark keeps `label` (the binding letter `symbolOwnersOf` matches) apart from `coef`; display text
+is composed once (`angleMarkText`), and carriers keep the split — `Wedge.label` is shown, `Wedge.sym` is
+matched — so the panel never prints `α = 60°` beside an `α = 30°`.
 
-The comment is accurate and the guard is correctly placed — for **perp, parallel and angle**. It is the
-wrong guard for **containment**, which is not a direction relation at all: a point inside a plane is
-membership, and `on-planes` has existed since ADR-3D-015. One guard reasoning about direction was
-silently deciding a question about containment, so a student could write «הישר ℓ מוכל במישור π» and be
-understood, then write «C מוכלת במישור π» — the same relation about a point — and be escalated to the
-paid model.
-
-Two things generalise, and both are cheap to check in review:
-
-- **A bail whose comment names a PROPERTY must be scoped to the relations that property governs.** The
-  comment here was not stale or wrong; it was true of the relations it was written for and had quietly
-  acquired jurisdiction over one it was never about. That is harder to spot than a wrong comment, because
-  reading the line tells you nothing is amiss.
-- **The defect's axis is not always the one in the report.** #963 was filed as *"membership exists only in
-  English"* with eight Hebrew rows. Measured, Hebrew «C על המישור π1» always worked and English "C lies
-  **in** plane π1" was equally broken — the axis was the *frame*, not the language. Fixed as filed it
-  would have been a list of Hebrew spellings that still left an English row failing; fixed at the frame it
-  is one edit serving every spelling in both languages. Whenever a report's axis is a language, a spelling
-  or a single input, measure the neighbouring cells before believing it (the FR-SP-11 promise is written
-  against the corrected axis, not the reported one).
-- **The verb is optional; the plane noun is not** (#1608, [ADR-3D-298](06b-decisions-3d.md#adr-3d-298)).
-  «נקודה E במישור ABC» fell between two owners: `membership`/`pointRelPlane` read «על» with an optional
-  verb, and `CONTAINED_SPLIT` read «ב…» only after a verb. The verbless «ב-» (and English "in plane") is
-  admitted in `CONTAINED_SPLIT` itself — the frame `planeRelGiven` and `lineRelGiven` share — so a point,
-  a segment and a named line all gain it at once and the operand kind decides the lowering. The bare
-  preposition counts as a connective only before an explicit plane noun (מישור / פאה / בסיס, plane / face
-  / base), held in a lookahead so the noun still reaches the operand reader; «C ב-AB» is not a containment
-  sentence.
-**Vocabulary is not a rule's private property** (#977, [ADR-3D-241](06b-decisions-3d.md#adr-3d-241)).
-Two rules read angle statements, and each carried its own inline copy of the angle NOUN and the COPULA.
-The copies had drifted before anyone noticed: one accepted a bare `angle ABC` and the other demanded
-`the angle ABC`, and neither knew «שווה». The student's sentence was therefore understood or refused
-according to which rule happened to read it — a coin-flip they cannot see and cannot learn.
-
-The repair is the one #969/[ADR-498](06-decisions.md#adr-498) reached in 2-D, and it is worth stating as a
-rule of thumb rather than an incident: **when two rules must agree about a word, the word gets a name.**
-A shared constant makes drift impossible; a comment asking the next author to keep two regexes in step
-does not. The corollary for review is cheap to apply — if a rule contains a literal list of spellings,
-ask which other rule needs the same list.
-
-**A field that is both an identity and a display string will be read as the wrong one** (#986,
-[ADR-3D-242](06b-decisions-3d.md#adr-3d-242)). ADR-3D-241 gave the angle mark two fields — `label`, the
-binding letter that `symbolOwnersOf` and the reused-label equality match on, and `coef`, part of what the
-student wrote. Every display surface wants the *expression*; each one reached for `label`, because that is
-the field that looks like a name. The canvas drew «α» on an angle being solved to 2α, and the panel printed
-`α = 60°` beside an `α = 30°`.
-
-The repair is not "remember which consumer wants which": it is to compose the display text **once**
-(`angleMarkText`, beside the type) and to give every downstream carrier the same split — `Wedge.label` is
-what is shown, `Wedge.sym` is what is matched. That second half is not optional. Making the arc read «2α»
-without it would have silently broken the #937 chip, whose set is compared against the facts' letters: a
-set holding «2α» matches nothing and the chip vanishes. One display bug fixed, another introduced, neither
-caught by a test that checks the record rather than the render.
-
-Note also what the copula is *for*: nothing. It carries no meaning the tool needs, which is exactly why it
-must never be the thing that decides whether a statement is understood.
-
-### Adding a relation: the registration surfaces and the non-negotiables (moved from docs/26 §5 and §7, #1861)
+#### Adding a relation: the registration surfaces and the non-negotiables (moved from docs/26 §5 and §7, #1861)
 
 A relation, or a new operand kind for one, touches fifteen surfaces. Its PR checks each one or says why
 it does not apply:
 
 1. **The parser rule**, or a thin wrapper over the shared relation frame, plus the **shadow matrix**
-   (`parser/__tests__/shadow-matrix3.test.ts`): the snapshot changes by addition only, and a changed
-   existing row is a regression to explain.
+   (`parser/__tests__/shadow-matrix3.test.ts`): the snapshot changes by addition only.
 2. **`catalog3.ts` entries in Hebrew and English.** The guard test covers parseability.
-3. **`COMMAND_SAVEABLE`** (`store/figureFile3.ts`), an exhaustive record, so the compiler catches a
-   missing entry.
+3. **`COMMAND_SAVEABLE`** (`store/figureFile3.ts`), an exhaustive record.
 4. **The apply case and `claimRefsError`** (`engine/apply.ts`), compile-guarded.
 5. **Engine routing.** A new pin family is a row of `pivotFamilies3` (`evaluate.ts`; totality locked by
-   `issue-1550.test.ts`, [ADR-3D-281](06b-decisions-3d.md#adr-3d-281)). It also passes the `invariantOnly`
-   and `planeDrive` gates and `solvePivot`'s early return (`solve3.ts`). These are runtime paths; the
-   battery covers them.
+   `issue-1550.test.ts`, ADR-3D-281). It also passes the `invariantOnly` and `planeDrive` gates and
+   `solvePivot`'s early return (`solve3.ts`).
 6. **`scalePinned`** if the relation carries units. Distances do; angles never do.
 7. **`freeDofCount3`** accounting.
 8. **The landing funnel.** A relation that fixes the placement must be seen by `translationGaugeFree3`
-   and the rotation question (`evaluate.ts`), so the funnel does not resample a placement the relation
-   fixed. One that fixes nothing leaves the placement sampled.
-9. **Marks and surfacing.** A new source of a 90° angle gets its knee (free when the relation lowers to
-   an existing kind). The relation surfaces in the data view and the query lane (`dataView.ts`,
-   `queries.ts`): the operator's *"and show that"*.
+   and the rotation question (`evaluate.ts`); one that fixes nothing leaves the placement sampled.
+9. **Marks and surfacing.** A new source of a 90° angle gets its knee. The relation surfaces in the data
+   view and the query lane (`dataView.ts`, `queries.ts`): the operator's *"and show that"*.
 10. **The parameter pin.** When either operand can carry the figure parameter, `paramPinningRels`
     (`operands.ts`, through `claimPinsParam` and `operandCarriesParam`) must admit the relation, with
     what it reads declared: direction or position. `pinningGivens` and `paramRoots` read that one list
-    ([ADR-3D-286](06b-decisions-3d.md#adr-3d-286)). Real exams pin m by ∥, ⟂ and distance; 2010-Q3 is a
-    distance between parametric lines.
-11. **The `fixtures3/` drift net** stays green. It runs automatically, but run it.
-12. **The LLM lane.** Add prompt few-shots (`PROMPT_EXAMPLES_3D` in `parser/llm3.ts`, each re-parsed by a
+    (ADR-3D-286).
+11. **The `fixtures3/` drift net** stays green.
+12. **The LLM lane.** Prompt few-shots (`PROMPT_EXAMPLES_3D` in `parser/llm3.ts`, each re-parsed by a
     contract test) and `scope3.ts` guidance for the neighbouring unsupported forms. The log-triage replay
-    calls the app's own decision (`app/triageReplay3.ts`,
-    [ADR-3D-305](06b-decisions-3d.md#adr-3d-305)), so it needs no separate edit.
+    calls the app's own decision (`app/triageReplay3.ts`, ADR-3D-305).
 13. **i18n** for every new notice or refusal, in both locales.
 14. **Budget.** Each drive states its worst-case multiplier ([docs/17](17-design-rules.md) §7).
 15. **`RELATION_TABLE` totality** (`relationTable.ts`) stays green. Cells flip in the same PR as their
@@ -399,232 +146,41 @@ it does not apply:
 **The non-negotiables.**
 - A new relation changes no existing lowering, and it changes the shadow snapshot by addition only.
 - **M1 duality per relation.** A relation that only verifies is not finished: with a sampled placement
-  its claim is refused on nearly every seed ([ADR-3D-095](06b-decisions-3d.md#adr-3d-095)).
+  its claim is refused on nearly every seed (ADR-3D-095).
 - Every drive path lands through the landing funnel. **No new per-path guards, ever.**
 - Both locales and both orders are read, and a noun never decides the reading.
-- **The chokepoint registry shrinks.** Rule bodies collapse onto the shared core, and the lexical and
-  semantic logic lives once. A rule's *name* may persist as a thin wrapper, because the shadow matrix's
-  diagnostic value is worth more than the count.
+- **The chokepoint registry shrinks.** The lexical and semantic logic lives once; a rule's *name* may
+  persist as a thin wrapper for the shadow matrix's diagnostic value.
 - **Corpus-driven, not speculative.** A cell no exam or session needs stays `planned`, and an
-  `out-of-scope` cell says why (a coincidence as a DRIVER waits for a real exam that needs it).
+  `out-of-scope` cell says why.
 
-## The symbol registries — one address, one display, derived from each other
+### The symbol registries — one address, one display, derived from each other
 
-A letter a student names is answered in two places, and they are deliberately different questions.
-`symbolOwnersOf` is the **address** registry ([#902](06b-decisions-3d.md#adr-3d-217)): what does this
-letter denote — a vec-def's ratio, a pin's open coordinate, the algebraic parameter, an angle mark, a
-named component ([#814](06b-decisions-3d.md#adr-3d-175)), an on-segment rider's parameter
-([#921](06b-decisions-3d.md#adr-3d-224))? A statement addressed to a letter reaches EVERY owner: that is
-what sharing a name means. `figureSymbolsOf` is the **display** registry — which letters the data panel
-and the ask lane show — and it is **derived from the address one**
-([ADR-3D-230](06b-decisions-3d.md#adr-3d-230)): a letter the student bound is displayable, whatever lane
-consumed it. It used to list a hand-written subset, and the subset fell three kinds behind, so «t = 1/2»
-vanished from the panel while «p = 3» survived. What varies per owner kind is only HOW the letter is
-PRICED, and that lives with the panel, one branch each, each using the resolver that already exists. The
-knowledge discipline is shared and unchanged: an undetermined letter reads `?` in every lane.
+`symbolOwnersOf` (`types.ts`) is the **address** registry (#902, ADR-3D-219): a letter's owners — a vec-def's
+ratio («SN = k·SC»), a pivot pin symbol (`pinSymsOf`), the algebraic lane's parameter (`c.param`), a
+labelled angle, a named free component (`partialNames`, #814, ADR-3D-175), or a named rider parameter
+(`riderNames`, #921). A statement addressed to a letter («p = 3», «p חיובי») reaches EVERY owner. `figureSymbolsOf`, the
+**display** registry for the panel and the ask lane, is **derived from the address one** (ADR-3D-230); only
+the pricing differs per owner kind, and an undetermined letter reads `?` in every lane.
 
-**The ask lane reads a measure question WITH THE STATEMENT GRAMMAR.** `angleAskOperands` and
-`revolutionAskOf` (parse3.ts) parse the question plus a placeholder `= 1` and keep only the relation it
-lowers to: the two operands of an angle, or the solid and measure of a revolution claim. `parseQuery`
-turns those into `angle-ops` (measured by `angleBetweenOperands`, the verifier's own reading) and `rev`
-(measured by `revolutionMeasure` in claims.ts, the verifier's own formulas). A spelling the statement
-lane learns is therefore askable the same day, and the check and the answer share one geometry. The older
-point-run angle heads stay first and keep their answers. See [ADR-3D-279](06b-decisions-3d.md#adr-3d-279) (#1449).
+`symbolPins` is keyed by the symbol's **name**: the relation pins drive a symbol-defined point; the `value`
+pin is read by each lane on its own terms — the vec-def lane as the point's k, the **pivot as a
+substitution** (`openPinSymsOf` is the unknown layout; a value-pinned symbol holds no slot), the parameter
+lane as its one admissible root (`pinningGivens` counts it; `paramRoots` returns it only if every pinning
+given admits it, else the honest `no-roots`). A named component takes a value through the injection that
+bound the name. **A refusal names a cause the figure does not contradict** (ADR-3D-225, #922):
+`unknown-symbol` for a letter the figure lacks, `sign-not-selectable` for what the lane cannot expose.
 
-## Claims
+**The ask lane reads a measure question WITH THE STATEMENT GRAMMAR** (ADR-3D-279, #1449).
+`angleAskOperands` and `revolutionAskOf` (parse3.ts) parse the question plus a placeholder `= 1` and keep
+the relation it lowers to; `parseQuery` turns those into `angle-ops` (measured by `angleBetweenOperands`)
+and `rev` (measured by `revolutionMeasure` in claims.ts) — the verifier's own geometry, so a spelling the
+statement lane learns is askable the same day.
 
-Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape by
-arriving inside a composite command**. `claims.ts` checks each against four deterministic seeds
-(`claimSeeds`) — the multi-sample discipline that makes a coincidence refutable.
+### A stated quad shape has three arms, and the middle one always CREATES the corner (#587/#601/#985)
 
-**The diagonal claim's two layers ([ADR-3D-203](06b-decisions-3d.md#adr-3d-203), [ADR-3D-246](06b-decisions-3d.md#adr-3d-246), #978).**
-«אלכסון AB» / «אלכסון ראשי AB» is a claim about a solid, answered by ONE predicate — `diagonalClaimVerdict`
-in `baseShapes.ts`, beside the face/space diagonal enumerators: the solids holding both letters judge the
-pair, the claim holds when every judging solid has it as a diagonal of the claimed kind, and `null` means
-no solid can judge it yet. The apply arm (`segment3`, guarded to a single solid) refuses on `false` — the
-teaching refusal; `derive3` asks the same predicate again over the FINAL figure for every ok diagonal row
-after the fold and the symbol-retry pass, so the case the apply moment could not judge (two solids on the
-canvas, the pair inside one of them) gets the same `not-a-diagonal { a, b, kind }` on its own row, and
-`submit` refuses it through the fold with the same words. A pair reaching a free point or straddling two
-solids stays accepted: not yet checkable is not yet false.
-
-**A named meeting point is a crossing, judged on the figure ([ADR-3D-297](06b-decisions-3d.md#adr-3d-297), #1728).**
-Two named diagonals («האלכסונים AC ו-BD נפגשים בנקודה E») lower to the two claimed `segment3 {diagonal}` and
-`seg-crossing3`, whose point kind `seg-cross` is evaluated in closed form (`lineCrossing3`: the midpoint of the
-lines' closest approach). The named-quad form (`diag-intersection`) uses the same kind for its 1st↔3rd and
-2nd↔4th diagonals — the midpoint of one diagonal was exact only for a parallelogram. `derive3` checks the
-sentence's claim that the segments meet with `mutualHolds('intersecting')`, bounded, at the verify tolerance —
-the predicate the stated «AC ו-BD נחתכים» claim uses — and refuses `segments-do-not-meet { id, s1, s2 }`.
-
-**A change that orphans a row, and the symbol retry pass ([ADR-3D-220](06b-decisions-3d.md#adr-3d-220), #926).**
-`derive3` applies each fact through one `applyFact` (count-delta attribution included) and then re-applies,
-in a bounded pass to a fixpoint, every row still red that a DRY RUN shows would now succeed
-([ADR-3D-257](06b-decisions-3d.md#adr-3d-257), #1327 — widened from the `unknown-symbol`-only pass of
-ADR-3D-220; [ADR-3D-259](06b-decisions-3d.md#adr-3d-259), #1339 — widened again to rows that CREATE a
-point). The retry is safe for a creating row («M אמצע SA» above its solid) because it is a POST-pass over
-red rows only: a row that referenced M before M existed is itself red and is retried after M, in list
-order, pass after pass, and a green row cannot have depended on a point that did not exist — so the
-ADR-104 stranding hazard, which belongs to the in-order fold, cannot occur here
-([ADR-W-089](06w-decisions-workspace.md#adr-w-089)). The predicate (`retryWouldSucceed`) is measured on a
-scratch copy (`applyCommand3` is pure), never read off a list of command kinds, and only already-red
-rows are touched. The store's `remove` / `toggle` / `replaceFact` fold before and after and report, as
-`dependents-broken { items, cause }`, every OTHER row the change took from green to red — judged on the
-fold's own per-row status, never on a second dependency walk, so the symbol lanes and the point lanes
-are one class. `replaceFact` still returns `true` for a committed edit; the report is `lastError`.
-
-**Knowledge samples — seeds cover the gauge, enumeration covers the branches ([ADR-3D-283](06b-decisions-3d.md#adr-3d-283), #1474).**
-Every knowledge lane — the ask lane (`answerQuery`), the data panel (`dataView`), the claim verifier
-(`verifyClaim`) — takes its samples from ONE sampler, `knowledgeSamples3(c, baseSeeds)` in
-`evaluate.ts`: each base seed × every value of `paramConfigValues3` (the parameter's effective branch
-pool, the list «הציגו תצורה אחרת» cycles), each configuration resolved at its base seed's gauge with an
-explicit `resolve3(c, s, { paramValue })`. The base-seed lists (`querySeeds3`, `panelSeeds3`,
-`claimSeeds`) are unchanged and sample only the GAUGE — placement, free dims, an unpinned m. **Never rely
-on seed offsets for branch coverage**: `chooseParam` picks `pool[seed % n]`, and the old offsets
-(1013, 2027, 3041 — all ≡ 2 mod 3) covered every two-root pool by accident, two of three roots, and three
-of four. Every agreement gate reads the whole sample array (`every`), never a fixed `[0]/[1]/[2]`.
-`paramIsKnowledge` answers only for m's OWN value (and the per-line echo, where it is exact); it is not a
-proxy for a derived object. The crossing offer (`openCrossings3`) asks its own question per crossing —
-the same point in every configuration at the drawing's gauge (`Resolved3.seed`): the branch pool for a
-pinned m, probe values (`openParamProbes3`) for an unpinned one — memoised per resolve so an orbit frame
-never re-resolves. Cost: ×n resolves per panel/ask for an n-root figure, ×1 for 0/1-root figures.
-
-**Two configurations print as two rows ([ADR-3D-289](06b-decisions-3d.md#adr-3d-289), #1506).** The
-panel's point loop still judges each coordinate per component (#827: seed agreement AND agreement across
-`pivot.pointRoots`). When a point is not fully determined, `twoConfigurations3` (`dataView.ts`, exported)
-asks the pool one more question: deduplicated per sample (`sameConfig`, 1e-3 of the point's size — the
-pool stores one entry per solution and repeats configurations), are there EXACTLY two members at every
-sample of `knowledgeSamples3`, the SAME two throughout, with the drawn position one of them? If so the
-`points` list carries `S₁(…)` / `S₂(…)` — each row one root printed whole through `coordStr`, never a
-component-wise mix — in place of the partial `S(?, 7/2, ?)` row, ordered canonically (larger on the first
-axis where they differ) so the labels never follow pool order or the drawn branch. `pointCoords` (the
-canvas label and the ask lane's point answer) is unchanged: the #827 partial form. Anything else — one
-member at some sample, three or more, a pair that moves with the seed (a continuum sampled twice) —
-returns `null` and the row stays the partial form.
-
-## Rendering
-
-Orthographic orbit, with hidden edges dashed the way a textbook draws them, decided by **numeric outward
-normals** rather than a painter's-algorithm approximation. `scene3.ts` is pure and React-free;
-`Figure3.tsx` mounts it. Vector notation (arrows, pairs) is `notation.ts`; general math text comes from
-the shared [`shell/math.tsx`](04w-design-shell.md).
-
-**The stated-angle arc lane ([ADR-3D-221](06b-decisions-3d.md#adr-3d-221), [ADR-3D-222](06b-decisions-3d.md#adr-3d-222),
-[ADR-3D-227](06b-decisions-3d.md#adr-3d-227)).**
-Vertex arcs are ONE map keyed by wedge — the vertex plus its two ray **DIRECTIONS**, matched order-free
-within ±1.5° per ray, so two spellings of one physical corner («∠EAS» and «∠BAS» with E on AB) are one
-wedge and draw one arc. Directions, not point ids, and a tolerance predicate, not a rounded key: rounding
-puts a quantization boundary mid-wedge and double-draws the corners that straddle it. A wedge whose points
-do not resolve falls back to id identity. Every producer — `vangle` pins,
-`vertex-angle-eq` claims, `angleMarks` — feeds it and it emits once per wedge, reading `degText`
-(the value once stated, the letter until then; the same rule the object-angle lane uses). A stated angle
-between two segments (every `angle-seg-eq` claim, which each `seg-angle` pin records as its arbiter — a shared
-endpoint included) is anchored on `meetingPoint` from `rightAngles.ts` — the one answer the knee uses for "do
-these meet" — drawn on its ≤ 90° side, and draws nothing for skew or off-ink pairs. **A stated value is painted
-only where it holds** ([ADR-3D-290](06b-decisions-3d.md#adr-3d-290), #1592): the vertex arc, the segment-angle
-arc and the stated knee each ask the verifier's own measure on the drawn positions first; a broken given shows
-no value (a marker's letter still shows), as the dihedral lane already did (ADR-3D-263). `wedgeArc` is
-the one arc geometry (13 points), and its RADIUS is a screen quantity
-([ADR-3D-229](06b-decisions-3d.md#adr-3d-229)): a producer records the wedge and a builder, and the
-radius is chosen once after the viewport fit as `min(ARC_PX, ARM_FRAC × shortest PROJECTED arm) / k`,
-with the value placed a fixed pixel gap outside the projected arc. The arc's ANCHOR takes part in the
-fit; its points do not, since they are chosen from `k`. **Every annotation this builder emits is sized
-in pixels** — the knee (#374), the witness and vector and axis and point labels, the crossing dots, and
-now the arc, which was the last world-sized one.
-
-**One dihedral geometry ([ADR-3D-264](06b-decisions-3d.md#adr-3d-264)).** Everything drawn about the
-angle between two planes reads `dihedralGeometry` (`render/dihedral.ts`): the foot on the seam (nearest
-the centroid of the vertices two point runs share — the shared edge's midpoint — else nearest the
-figure's centre) and the two unit arms, each in its own plane and ⟂ to the seam, oriented into each run's
-material (`dihedralAnchors`). The named-plane arc, the object-angle arc and the right-angle knee all call
-it. A RIGHT value never reaches an arc lane: `rightAngles3` reads every `plane-rel` ⟂ / 90° claim (and the
-line × plane 90° spellings) through `operandPairKnee`, gated on the verifier's own predicate
-(`relDeviation` ≤ `DIRECTION_REL_TOL`), and it is not gated on the data panel. A dihedral knee carries no
-`planeN` — both its arms are fixed by the seam, so the legibility rotation must not touch them.
-
-**Line × plane construction ([ADR-3D-280](06b-decisions-3d.md#adr-3d-280)).** The same chip, state and
-scene lane serve a line × plane angle: `dihedralsStatedBy` also yields a `line-rel` angle over a planar
-operand and a `line-plane-angle`, normalized exactly as the object-angle arc lane normalizes them (so its
-`pairKey` cede still works), and `buildScene3` dispatches on the resolved geometry. A line-ish × planar
-pair goes to `linePlaneConstruction` (dihedral.ts): X the crossing, P a named point on the line off the
-plane (else `fallbackLen` along it), H its foot. The scene emits PH and XH dashed, the knee at H into the
-knee lane, the arc at X into the arc lane, and H (plus an unnamed P) as `SceneDihedral3.extra` points. Only
-pairs a construction was actually DRAWN for cede their stated knee (`drawnConstr`), so a right line × plane
-pair, which constructs nothing, keeps its knee.
-
-**Dihedral construction ([ADR-3D-265](06b-decisions-3d.md#adr-3d-265)).** `dihedralConstruction` (same
-module) extends `dihedralGeometry` with a FOOT chosen from a meaningful point — a point run's vertex off the
-seam (inside the shared edge first, then the face over the base via `solidBaseRings`, then the first-named
-plane), else a named point on a non-run plane, else the geometry's own foot with `legLen: null`. The chip
-state is `dihedralShown: Record<factId, true>` (`store/dihedralChips.ts`, the #937 `displayMode` shape:
-undoable, pruned to live facts, saved by fact INDEX as `dihedralConstruction`, carried by the session and
-share-link payloads); `dihedralChipsByFact` derives chip ownership from the fact list (ok rows whose command
-states a planar × planar `plane-rel` angle / ⟂, or the legacy `plane-angle`). App3 passes the switched-on
-pairs to `buildScene3` (`dihedralShown`), which emits `Scene3.constructions` (dashed legs, the foot, an
-edge extension, the foot's letter), pushes the two seam knees (and a third at 90°) into the knee lane and
-the stated arc into the arc lane — and the other lanes CEDE a constructed pair (`rightAngles3`'s
-`constructed` argument, the two dihedral arc lanes' `pairKey` check), so the angle is marked once. Not
-panel-gated. The foot's letter is a render-time DISPLAY LABEL from `engine/freeLetter.ts` (the builder's one
-free-letter pool, shared with `midpoint-auto`), never a fact.
-
-**The object-angle lane is not panel-gated ([ADR-3D-266](06b-decisions-3d.md#adr-3d-266)).** `buildScene3`'s
-object-angle lane (one `objectAngleArc` over an operand pair, ADR-3D-185) reads only STATED records —
-`plane-rel` / `line-rel` angle claims, `relMarks`, `linePlaneMarks` and the valued `line-plane-angle` pin or
-claim — so it draws unconditionally; the former `showObjectAngles` flag (fed from «ארגון נתונים») is gone
-from `buildScene3`, `Figure3` and `App3`. Nothing the canvas draws depends on the data panel's state except
-the coordinate labels it feeds (`coordLabels`). A right value still cedes to the knee, and a constructed
-pair still cedes to its construction.
-
-**Row direction ([ADR-3D-228](06b-decisions-3d.md#adr-3d-228)).** A display row's base direction is a
-CONTENT decision and comes from `textDir3` — the shared seam 2-D's box and the shared `InputArea`
-preview already use — never from `dir="auto"`, which keys off the first strong character and so gives an
-LTR base to every fact opening with a Latin point label. Under an LTR base the isolated technical runs are
-neutral objects and the Hebrew words between them reverse against each other, so the row states something
-the student did not type. The decision lives in `factRowDir3` (`render/FactRow3.tsx`) beside the content
-routing, and an inventory lock bans `dir="auto"` in `src3d/` and `src-complex/` outside editable fields.
-Structural renderers carry their own direction: `VecMath` wraps a Hebrew row in an RTL container and emits
-each expression as one `<math dir="ltr">` island, so the row orders as Hebrew while the mathematics inside
-each island reads forward.
-
-## The clarification family: under-specified is not unsupported (#866, [ADR-3D-239](06b-decisions-3d.md#adr-3d-239))
-
-A statement can fail in three ways that feel identical to whoever wrote it and are completely different
-to us:
-
-| | what it is | what the student needs to hear |
-| --- | --- | --- |
-| **unsupported** | the tool does not implement this | say so — the scope register's voice |
-| **under-specified** | understood, but it does not pin one figure | which detail to add |
-| **unknown** | the grammar does not own the sentence | escalate (the LLM lane) |
-
-Collapsing the middle row into either neighbour is a recurring defect, and each direction fails
-differently. Read as *unsupported*, a student is sent away from a form that works. Read as *unknown*, the
-line escalates to the paid model — whose job is to guess, which is precisely the guess the ambiguity was
-refusing to make; #836 measured the LLM answering «אלכסון ראשי» by **picking one** of four, and #866
-measured the vertex-only bisector reaching no register at all, so its message came from the model rather
-than from any decision of ours.
-
-**Where each half lives.** `parse3` is context-free by design (see above), so it can recognise an
-ambiguity but cannot enumerate the alternatives — those depend on the figure. The division is therefore
-fixed: the **parser** returns a *typed* refusal carrying whatever the sentence itself supplied (the
-vertex, the rider, the letter), and the **store** — which holds the construction — derives the candidates
-and composes the message. `ambiguous-main-diagonal` (#836) and `ambiguous-angle-vertex` (#866) are the
-same shape, and a third member should be built by copying it rather than by inventing a fourth route.
-
-**The rule that keeps an ask honest: only ask when the figure is genuinely ambiguous.** #866's message
-says *"more than one angle meets at A"*. On a triangle exactly one does — so the sentence would be false,
-and the tool would be demanding a disambiguation it does not need. Where the figure yields exactly one
-reading, the statement is **resolved and built**: one reading is not a guess. Concretely the store
-rebuilds the canonical sentence and runs it through `parse3`, so the grammar stays the only authority on
-meaning and no command is ever synthesised outside it; the student's own wording stays on the fact.
-
-This is also where 3-D and 2-D legitimately diverge. 2-D's [ADR-164](06-decisions.md#adr-164) resolves
-«זווית A» from the figure unconditionally, because a 2-D vertex almost never carries more than two edges.
-3-D does not port that rule — it asks whenever the figure gives more than one reading. The products agree
-wherever the figures agree, and differ exactly where 3-D has information 2-D does not.
-## A stated quad shape has three arms, and the middle one always CREATES the corner (#587/#601/#985)
-
-`quad-shape` dispatches on **how many corners already exist** — in `apply`, not in the parser, because
-`parse3` is context-free and cannot know:
+`quad-shape` dispatches on **how many corners already exist** — in `apply`, because `parse3` is
+context-free:
 
 | unknown corners | arm | what it means |
 | --- | --- | --- |
@@ -632,202 +188,315 @@ wherever the figures agree, and differ exactly where 3-D has information 2-D doe
 | 1 | **completion** — the corner is CREATED; the family only decides *how* (derived, or minted carrying the freedom the shape leaves open) |
 | 0 | **statement** about existing points — the constraints M1-route to claims, so a false one is refused |
 
-The middle arm is where the families genuinely differ, and the difference is geometric rather than a
-matter of which nouns we chose to support. `quadCornerDef` in `baseShapes.ts` is that difference written
-as the family table's **second column** — beside `quadShapeConstraints`, which is what each family *states*,
-it says how each family's one missing corner is *created* ([ADR-3D-244](06b-decisions-3d.md#adr-3d-244)):
+`quadCornerDef` in `baseShapes.ts`, beside `quadShapeConstraints` (what each family *states*), says how
+each family's missing corner is *created* (ADR-3D-244): the **parallelogram family** — the parallelogram
+point (`parallelogram-point`, ADR-3D-152); the **kite** — the reflection of the opposite corner across the
+neighbours' diagonal, read from the ring (`reflect-line`, ADR-3D-240); the **trapezoid** — a
+`scaled-offset` point, `anchor + k·(to − from)`, with **k free**, so `DC ∥ AB` holds by construction and k
+resamples and is driven by the rider lane (#820); a general **quad** — a plane rider on the known three
+(2 DOF, as #774's mixed run).
 
-- **parallelogram family** (square, rectangle, rhombus, parallelogram) — the corner IS the parallelogram
-  point. [ADR-3D-152](06b-decisions-3d.md#adr-3d-152).
-- **kite** — the corner is determined too, but by a *different* closed form: the reflection of the
-  opposite corner across the diagonal through its two neighbours. That is why widening the
-  parallelogram arm's list would have been wrong and a construct was needed
-  ([ADR-3D-240](06b-decisions-3d.md#adr-3d-240)), and why the corner is read from the **ring** rather
-  than from the letters' order.
-- **trapezoid** — one relation, one freedom. The corner is a `scaled-offset` point, `anchor + k·(to − from)`,
-  with **k free**: DC ∥ AB holds by construction, and the ratio the student never stated is a sampled DOF
-  that resamples on «הציגו תצורה אחרת» and that the pivot's rider lane (#820) drives when a later given reads
-  it. It is the parallelogram corner with its coefficient released — k = 1 *is* the parallelogram point —
-  and it is the same kind 2-D uses for the same corner. ADR-3D-152 refused this case as an "unstated
-  given"; that read under-determination as an error, which FR-SP-2 says it is not. The operator's ruling
-  (2026-09-11): *"when a user asks for a shape, we respect it and create nodes as needed with dof."*
-  [ADR-3D-244](06b-decisions-3d.md#adr-3d-244).
-- general **quad** — nothing stated beyond flatness: a plane rider on the known three (2 DOF), which is how
-  #774's mixed run already minted «מרובע ABCD»'s corner — that noun never reached this arm, and now the arm
-  answers the same way it would have.
+**A relation that must PLACE a point is absorbed into the point's construction**: a rider's position is
+sampled, so a ∥ pin on it could only verify, turning `unknown-point` into `claim-refuted` (ADR-3D-191).
+`scaled-offset` keeps k a real DOF — counted, sampled, and driven like an `on-segment`
+point's `t`. The two `PointDef` twins say it in one line:
+`parallelogram-point` is `scaled-offset` with k = 1. **A helper-needing derived point is a KIND**, so no
+helper ink appears: a `vec-rel` command would draw its carrier segment (a diagonal `BD`; #984, ADR-3D-256).
 
-**Why the first attempt at the trapezoid failed, and what it teaches.** Minting the corner as a plane rider
-and then lowering `DC ∥ AB` moves the refusal from `unknown-point` to `claim-refuted`: a rider's position is
-**sampled**, not part of the pivot's unknown vector, so a ∥ pin can only *verify* it against the sample —
-[ADR-3D-191](06b-decisions-3d.md#adr-3d-191)'s finding from a second direction. A relation that must *place*
-a point has to be absorbed into the point's own construction, leaving only the genuine remainder free.
+#### One shape phrase, and a circle through a ring (#1792, [ADR-3D-307](06b-decisions-3d.md#adr-3d-307))
 
-**The lesson worth carrying:** a refusal shared by several families can be hiding a member that does not
-belong in it. #587's arm refused three families with one condition, and two of those refusals were right
-for a reason the third did not share. When a family list is the guard, the question to ask is whether
-every member fails for the *same* reason — the kite failed only because the arm knew one closed form.
+`src3d/lexicon/shapePhrase3.ts` holds the noun and adjective spelling and which pairs exist: **the noun
+decides the arity, and an adjective is consumed only where `parse3` has a lowering**; an unconsumed one
+declines the rule, never dropped. `statedQuadBase` and the triangle qualifiers read it. The right trapezoid
+lowers to `quad-shape trapezoid` plus a **soft** AD ⟂ AB carrying its `ring`, which derive3 retires when a
+right angle is stated at any corner of that ring (M4; the #116 default, ring-scoped).
 
-**A point determined UP TO a scalar becomes a kind with the scalar free.** `scaled-offset` carries the
-trapezoid's DC ∥ AB in its construction and leaves k as a real DOF — counted, sampled, and driven through
-the same rider lane as an `on-segment` point's `t`. The two `PointDef` twins say it in one line:
-`parallelogram-point` is `scaled-offset` with k = 1.
+**A circle through a ring is a claim about the ring.** `circle3 {circum}` fits its centre to the ring, and:
+- **the lowering** — `polygonCircle3` emits the noun's `CYCLIC_MEMBER` fix (the #305 registry): rhombus →
+  square, parallelogram → rectangle, kite → right kite, trapezoid → equal diagonals (equal legs also hold on
+  a parallelogram), generic quad → `concyclic`; `notices.ts` derives `inscribed-constrained`;
+- **the backstop** — `apply` records one `concyclic` claim per vertex past the third, so a ring nothing
+  made cyclic is refuted rather than drawn.
 
-**A derived point that needs a helper should usually become a KIND.** `reflect-line` exists rather than
-minting a foot point and a `vec-rel`, because the helper would appear on the canvas as visible work the
-student never asked for. The composition is still available and still correct; what the kind buys is the
-absence of ink.
+The circle rewrites the ring's `quad-general` preference (#615) to the cyclic member, marked `right` by a
+stated right angle. A right trapezoid in a circle (`cyclic.forced = rectangle`) is refused by `parse3` as
+`inscribed-contradicts-noun` (#1554); a quadrilateral's incircle refuses `incircle-needs-triangle` (#1838).
 
-**And it is not only points — the same rule caught a segment (#984).** The parallelogram arm derived its
-corner by issuing a `vec-rel` command, which emits a **carrier segment** for the vector it relates. That
-carrier is the student's own object when they named a vector («נסמן: AB = u»); here it was scaffolding,
-and it drew a diagonal `BD` nobody asked for on all four nouns. [ADR-3D-257](06b-decisions-3d.md#adr-3d-257)
-gives that corner the kind `parallelogram-point` too, so both one-unknown arms now derive their corner the
-same way and neither emits ink. **The general form: when a construction reaches for a COMMAND to compute
-something, it inherits everything that command does for a student — including what it draws.**
+**A shape's own condition carries its provenance (#1844, [ADR-3D-308](06b-decisions-3d.md#adr-3d-308)).**
+Every shape lowering — `quadShapeConstraints`, the `CYCLIC_MEMBER` fix, the adjectives, a base noun,
+«שווה מקצועות», a pentagon's circle — emits its relation commands (`length-rel`, `cos-angle`, `mutual-rel`,
+`concyclic`) through ONE seam, `shapeInternal3` in `baseShapes.ts`, stamped `origin: 'shape'`. They drive
+and are judged as typed relations are (pin, `given: true` arbiter, claim); apply skips only a sentence's
+side effects — the auto-drawn segment and a `mutual-rel` plane-run's patch. Persisted in a fact's `cmds`;
+locked by `issue-1844-shape-internal-origin.test.ts`.
 
-### One shape phrase, and a circle through a ring (#1792, [ADR-3D-307](06b-decisions-3d.md#adr-3d-307))
+### A point placement keeps its tail (#1730, [ADR-3D-296](06b-decisions-3d.md#adr-3d-296))
 
-A polygon is stated as a **shape phrase** — a noun and the adjectives on it — and `src3d/lexicon/shapePhrase3.ts`
-is where the two meet. It knows only spelling and which (noun, adjective) pairs exist: **the noun decides the
-arity, and an adjective is consumed only where `parse3` has a lowering** (triangle × right / isosceles /
-equilateral, trapezoid × right / isosceles). An unconsumed adjective declines the rule, so the line escalates;
-it is never dropped. `statedQuadBase` and the triangle qualifiers read the lexicon's words, so the "ONE
-vocabulary" rule now covers adjectives too.
+`onSegment` («X על YZ») is anchored: after the carrier comes nothing, a distance tail, or a connector
+(`PLACEMENT_CONNECTOR`) and a condition. A whole ratio of the rider (`WHOLE_RATIO`) keeps the ratio lane
+(a baked `t`, or the #921 letter); any other is read by `readCondition3` —
+the ordinary rule list, all or nothing, where a bare pair equation is a LENGTH (`CONDITION_LENGTHS`). The
+rider stays free and the condition drives it; an unread tail declines the line. The net is
+`droppedGivenRelations3` in `lostGivens3`: a stated pair relation must be carried by a command that states
+something, and the number gate ignores the digit in a command's `type` name.
 
-The right trapezoid lowers to `quad-shape trapezoid` plus a **soft** AD ⟂ AB that carries its `ring`: derive3
-retires it when the student states a right angle at any corner of that ring (M4), the ring-scoped form of the
-#116 right-triangle default.
+### One coordinate of a point (#1547, [ADR-3D-299](06b-decisions-3d.md#adr-3d-299))
 
-**A circle through a ring is a claim about the ring.** `circle3 {circum}` fits its centre to the ring, so the
-figure must make the ring cyclic, and two mechanisms do it:
+«x_B = 3» is «B(3, ·, ·)» (analytic's ADR-AG-042 identity): `componentGiven` lowers it to a `point3` whose
+other components are null with no `syms` — an existing id takes the M1 pin and the `coords-eq` claim, a new
+id is the ADR-3D-094 `partial` point. One frame table, `COMPONENT_FRAMES`, is read by the value tail, the
+sign tail (formerly `signGiven`) and the ask head (`componentAskOf`). The answer is `dataView`'s per-axis
+decision (`pointComps`, beside `pointCoords`); a `partial` point's stated components are placed absolutely.
 
-- **the lowering** — `polygonCircle3` emits the noun's `CYCLIC_MEMBER` fix (the #305 registry the right pyramid
-  already reads): rhombus → square, parallelogram → rectangle, kite → right kite, trapezoid → equal diagonals,
-  generic quad → `concyclic`; a pentagon puts each vertex past the third on the circle through the first three.
-  `notices.ts` derives `inscribed-constrained` from the circle and the stated shape;
-- **the backstop** — `apply` records one `concyclic` claim per vertex past the third for every such circle,
-  whatever produced the line, so a ring nothing made cyclic is refuted rather than drawn.
+### Who may introduce a point: the drawing registers (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253))
 
-**Why the trapezoid's fix is equal diagonals.** Equal legs with AB ∥ DC also hold on every parallelogram, and a
-free flat ring solves onto that branch from a generic start. Equal diagonals on a trapezoid leave only the
-isosceles trapezoid and the rectangle — both cyclic. A constraint that "characterises" a shape must do so
-*among the shapes the solver can reach*, not only among the ones a textbook draws.
+A **carrier** («נסמן: AB = u») never introduces its own subject (`v7-t1`); only a **drawing register** —
+`segment3 {bare}` and `draw-arrow` — may introduce points. Both refuse a pair with two unknown endpoints
+(the typo guard) except where `canStartFigure(c)` holds (no points, no solids), and that exception is
+applied to the arrow lane only: `segment3 {bare}` feeds shape-completion and role rules that ask which
+points exist (#601, #978). `canStartFigure` is the named predicate the next register asks.
 
-**The #615 preference is judged against what was stated in total.** «Draw a מקבילית visibly as a parallelogram»
-is false for a parallelogram inscribed in a circle, which IS a rectangle. The circle rewrites the ring's
-`quad-general` preference to the cyclic member, and a right angle stated at a corner marks it `right`; otherwise
-the preference fails at every seed and the sweep pays its full budget before yielding.
+## Solving the figure and judging claims
 
-A right trapezoid in a circle cannot be itself (`cyclic.forced = rectangle`): `parse3` refuses it with
-`inscribed-contradicts-noun` before any rule reads a label (the #1554 ruling). A quadrilateral's **incircle**
-still refuses `incircle-needs-triangle` — #1838.
+### The solver — a coordinate-injection pivot, not a general CAS
 
-**A shape's own condition carries its provenance (#1844, [ADR-3D-308](06b-decisions-3d.md#adr-3d-308)).** Every
-shape lowering — `quadShapeConstraints`, the `CYCLIC_MEMBER` fix, the trapezoid and triangle adjectives, a
-prism's or a right pyramid's base noun, «שווה מקצועות», a pentagon's circle — emits ordinary relation commands
-(`length-rel`, `cos-angle`, `mutual-rel`, `concyclic`) through ONE seam, `shapeInternal3` in
-`baseShapes.ts`, which stamps them `origin: 'shape'`. They drive and are judged exactly as a typed relation is
-(pin, `given: true` arbiter, claim — the solver never reads the field); what apply skips is the side effect of
-a stated SENTENCE: the operands' auto-drawn segment (`length-rel`, `cos-angle`, `mutual-rel`) and a
-`mutual-rel` plane-run's materialised patch. This is the #984 rule above arriving at relations: the equal
-DIAGONALS #1792 chose for the isosceles trapezoid drew AC because `length-rel` draws its lhs pair for a student.
-The marker is persisted in saved files (a fact's `cmds`); the lock that no lowering emits an unmarked relation
-or a non-edge segment is the sweep in `issue-1844-shape-internal-origin.test.ts`.
+`solve3.ts` handles what the corpus asks for: a gauge-free figure built in the geometric lane receives
+**absolute givens mid-session** (a point coordinate, a vector value), and the engine solves for the
+**similarity** — translate, rotate, scale — *plus* the free shape dimensions that realise them:
+least-squares over the dims, Levenberg–Marquardt with a central-difference Jacobian, seed-rotated
+multi-start. It is the concrete meaning of [`FR-VC-3`](02b-requirements-3d.md)'s NO CAS: a numeric
+root-find, a closed form, or a linear solve, nothing more.
 
-## The submit decision (#1394, [ADR-3D-258](06b-decisions-3d.md#adr-3d-258))
+**The sampling law inside the solve (#863, [ADR-3D-245](06b-decisions-3d.md#adr-3d-245)).** A quantity that
+depends only on `(construction, seed)` — a solid's seeded dims, any `sample(seed, key, …)` — is derived once
+per resolve and threaded into the residual (`sampledSolidDims`). `rng.ts` exports `sampleStats` (2-D's
+`sampleStats.sweeps` twin), so a lock asserts O(distinct keys) calls — a count ceiling, never a wall clock.
+The free-line / free-plane resolvers still sample inside the residual.
 
-`store3.submit` decides nothing itself: `decideSubmit3(state, utterance)` returns a `Verdict3` (rename ·
-not-understood · refused · already-stated · record) and `submit` dispatches it. The decision is pure — the
-fact id is injected — so #1358's register can ask "would you accept this line?" without the store moving.
-The three statement seams share their pieces: `readStatement3` (the grammar plus the #866 repair and the
-#516 typed refusals), `lostGivens3` (the honesty gates), and `decideCommands3` (gates → twin → derive →
-search), which the LLM lane's `submitSteps` also ends in. A new branch belongs in the decision; the parity
-lock replays 1,500 sequences against the recorded behaviour.
+**One solve per configuration (#863, [ADR-3D-304](06b-decisions-3d.md#adr-3d-304)).** `resolve3` is a pure
+function of `(construction, seed, paramValue)`, memoized at that chokepoint (a WeakMap on the construction's
+identity — `apply` clones, never mutates). Every consumer shares it through `knowledgeSamples3`;
+`resolveStats3` counts resolves and hits.
+
+**A symbolic coordinate lives in one of two lanes** (ADR-3D-218, #898): with a solid, a pivot **pin**
+carrying the full affine form, exponents included; with none, a `coord-sym` point stored as a degree-1
+`{k, p}`. The narrower lane **refuses what it cannot hold rather than narrowing it silently**.
+
+**A rider's ratio clause is read by the RIDER** (ADR-3D-224, #921). An on-segment
+point carries a parameter `t`, and a statement relating its host's parts *determines* `t` in closed form
+— no solving. `onSegmentRatio.ts` reads the two **halves** (`|aR| = k·|Rb|`, `riderPairsT`) and a half
+against the **whole** (`|aR| = k·|ab|`, `riderWholeSide`/`riderWholeT`), pairs as SETS, with `t` confined
+to the open interval — an endpoint-or-beyond coefficient is refused, never clamped. A LETTER coefficient
+binds the name only (`riderNames`). **One chokepoint** (ADR-3D-231, #932): `riderRatioRetarget`, at
+`applyCommand3Inner`'s entry, rewrites a ratio statement into its `point-on-segment3` given, so `vec-rel`,
+`length-rel` and the `length-ratio` claim share one semantics; a letter is read in the stated orientation
+only (`1/t` is not a name).
+
+### Gauge, and why the landing funnel exists
+
+A figure's placement, rotation and scale are a **gauge**. An unanchored figure (no absolute object, solid,
+revolution or circle) is normalised onto the floor at the end of `resolve3` (ADR-3D-272). The **landing
+funnel** classifies which gauge components are *provably* free, which licenses
+[`FR-SP-4`](02b-requirements-3d.md): a number is drawn only if it survives the gauge being resampled.
+
+**The pivot's residual families are ONE list (#1550, [ADR-3D-281](06b-decisions-3d.md#adr-3d-281)).**
+`pivotFamilies3(c)` (evaluate.ts) names every residual family `solvePivot` consumes and its solve LANE:
+`anchor` (step 1, the normal solve), `plane-eq` (step 3), `frame` (step 3b — against the ABSOLUTE frame,
+satisfied by turning the figure), `membership` (step 4, the transactional membership drive). The entry gate
+and every trigger read that list, so no family (`coordPlanePins` among them) lacks a lane. `drivesAlone`
+says whether presence alone triggers the lane; `false` means FAILURE PATH ONLY. The coordinate-frame row's
+unmet test is the claim's own predicate (`coordPlaneRelHolds`) at `CLAIM_REL_TOL`. `issue-1550.test.ts`
+locks totality: every `c.*Pins` / `figure*(c)` family `solve3.ts` reads is a row.
+
+**The #512 frame verdict is per placement COMPONENT.** `placementSampledParts` publishes translation and
+rotation separately (`placementSampled` is their disjunction); a frame claim softens to
+`placement-not-fixed` only when a component it READS was sampled.
+
+### A never-positioned point is a pivot unknown (#1311, [ADR-3D-260](06b-decisions-3d.md#adr-3d-260))
+
+A `free3` point («וקטור AB» on an empty canvas, «קטע BE» from a known B, a mixed shape run) carries three
+unstated DOF that are **pivot unknowns**: each coordinate is a #820 rider-lane entry keyed
+`freeCoordKey(id, axis)` in `riderTs`, anchored at its canonical sample. `evaluateSolidsAndPoints` places a
+driven coordinate, and the pivot runs on a solid-less figure that holds one (`hasFreePoint3`). The apply
+fork drives a scalar statement when `freeDims(c) > 0` or it names a `free3` point (`claimPointIds`);
+`lengthClaim` lowers a marked «וקטור AB = 5» to the one-word form's arrow. A candidate the anchors left just
+above `ACCEPT` is polished on the primary residuals alone and kept only if that closes it without collapsing
+a solid (a free coordinate's anchor equilibrium sits higher than a rider's, which moves within `[0, 1]`).
+
+**The not-determined rule** (`sampledCarrierVerdict`, `store3.ts`): a failing claim that reads a sampled
+carrier (a free plane, a free line, the frame placement, a free point) is refused naming it, never
+`claim-refuted`. Two rows read only a `given: true` arbiter and answer `given-not-drivable`, the tool's limit
+(ADR-3D-291, #1590): a point whose free parameter stayed sampled (`carrierParams3` keys the pivot did not
+drive, or a coord-sym letter with no root) unless `Resolved3.coordDetermined` answered `contradicts` or
+`determined` (ADR-3D-293) or `statedDataAdmits` finds a contradiction; and the apex of a cone or cylinder
+of unstated height.
+
+### The sampled-carrier table and the one frame rule (#1498, [ADR-3D-267](06b-decisions-3d.md#adr-3d-267))
+
+**The frame rule.** `gaugeFramePoint3` (types.ts, beside `GAUGE_KINDS`) is the one answer to whether the
+pivot's similarity applies to a point; the final placement and every residual (`laneAt` in `residualsFor`)
+read it, so a residual sees the drawn figure's frame.
+
+**The carrier table.** `carrierParams3` (`engine/carriers.ts`) enumerates every sampled point-DOF — keys,
+bounds, anchor seeding, drivability — and both `freeDofCount3` and the pivot's rider lane fold it, so a
+carrier cannot be counted yet undrivable (the ADR-052 smell): `on-plane`, `on-line`, `bisector-ray` and
+`partial` riders enroll in the drive. Plane/line riders enroll as offsets from their sampled seat;
+not-drivable rows: a side-point's height and riders of free planes/lines (#557).
+
+**A host bound is restored, not only enforced** (#1735, ADR-3D-306). `offHost` (in `degenerate()`) rejects a
+converged candidate outside `[lo, hi]`; when the pool is otherwise empty, an acceptance site re-seats the
+discarded off-host riders (`reseatOffHost`) and re-solves the rest, judged by the site's own acceptance —
+the cold-start loop, the dims widening, `collect()` and the `invariantOnly` loop.
+
+**The ⟂-from-an-in-plane-point disposition** (#1499, ADR-3D-268). `seg-plane-rel`'s one-new-letter funnel
+asks `structurallyOnRun3`: off-plane keeps ADR-3D-146's foot; in-plane mints a `free3` letter driven by the
+⟂. `degenerate()` rejects a NON-flat solid's ring at zero area (2-D ADR-413's rule in R³); a FLAT ring's
+collapse goes to a **frozen-dims retry** with the shape fixed at the seed's sample.
+
+**Which givens forced the collapse** (#1815, ADR-3D-309). `collapseIsStated` re-solves `[gauge | dims]`
+without the rider rows; if the ring opens, an incidence invented the collapse, and the empty pool marked
+`collapse: { ring, riderKeys }` reaches `pivot.collapse`, where `derive3` refuses `polygon-collapsed`
+(`err.polygonCollapsed`).
+
+**A declared polygon collapsed is refused, whatever forced it** (#1849, ADR-3D-310, ADR-W-115).
+`settleFlatRings` (formerly `preferUncollapsed`) keeps solutions with every declared ring open, then tries
+the frozen-dims retry and the **open-figure retry** (`openSolveOn(null)`, passing `degenerate`); with
+nothing open, the pool is marked `collapse: { ring, riderKeys, forced }` — `forced: false` names the riders'
+statements, `forced: true` the ring's own pin owners (`err.polygonForced` / `err.polygonForcedAlone`). A
+polygon over existing points records a `polygon-open` claim (`given`), judged by `ringCollapsed3`; a sliver
+(`ringOpenness3` < 1e-2) is released and counts as collapsed if it lands flat. A flattened SOLID keeps the
+#936 notice.
+
+### Claims
+
+Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape inside a
+composite command**; `claims.ts` checks each against four deterministic seeds (`claimSeeds`).
+
+**The diagonal claim's two layers ([ADR-3D-203](06b-decisions-3d.md#adr-3d-203), [ADR-3D-246](06b-decisions-3d.md#adr-3d-246), #978).**
+One predicate, `diagonalClaimVerdict` (`baseShapes.ts`), judges «אלכסון AB» over the solids holding both
+letters (`null`: none can judge yet). The `segment3` apply arm refuses on `false`; `derive3` re-asks over the
+final figure and reports `not-a-diagonal { a, b, kind }`, which `submit` refuses through the fold.
+
+**A named meeting point is a crossing, judged on the figure ([ADR-3D-297](06b-decisions-3d.md#adr-3d-297), #1728).**
+«האלכסונים AC ו-BD נפגשים בנקודה E» lowers to two claimed `segment3 {diagonal}` and `seg-crossing3`, whose
+`seg-cross` point is closed-form (`lineCrossing3`), as is `diag-intersection`; `derive3` checks
+`mutualHolds('intersecting')` and refuses `segments-do-not-meet { id, s1, s2 }`.
+
+**A change that orphans a row, and the symbol retry pass ([ADR-3D-220](06b-decisions-3d.md#adr-3d-220), #926).**
+`derive3` applies each fact through `applyFact`, then re-applies to a fixpoint every red row a dry run
+(`retryWouldSucceed`, on a scratch copy — `applyCommand3` is pure) shows would succeed (ADR-3D-257, #1327;
+ADR-3D-259, #1339); red rows only, so ADR-104's stranding hazard cannot occur (ADR-W-089). `remove` /
+`toggle` / `replaceFact` report every other row they turned red as `dependents-broken { items, cause }`;
+`replaceFact` still returns `true`, with the report in `lastError`.
+
+**Knowledge samples — seeds cover the gauge, enumeration covers the branches ([ADR-3D-283](06b-decisions-3d.md#adr-3d-283), #1474).**
+`answerQuery`, `dataView` and `verifyClaim` all sample through `knowledgeSamples3(c, baseSeeds)`
+(`evaluate.ts`): each base seed × every value of `paramConfigValues3`, via
+`resolve3(c, s, { paramValue })`. `querySeeds3`, `panelSeeds3` and `claimSeeds` sample only the gauge;
+branch coverage never rides seed offsets (`chooseParam` picks `pool[seed % n]`), and agreement gates read
+`every` sample, never `[0]/[1]/[2]`. `paramIsKnowledge` answers only for m's own value. `openCrossings3`
+asks per crossing at `Resolved3.seed`, with `openParamProbes3` for an unpinned m.
+
+**Two configurations print as two rows ([ADR-3D-289](06b-decisions-3d.md#adr-3d-289), #1506).**
+`twoConfigurations3` (`dataView.ts`) asks whether a not-fully-determined point has EXACTLY two members
+(`sameConfig`) — the same two at every sample, the drawn one among them, judged beside #827's
+`pivot.pointRoots` check. If so `points` carries `S₁(…)` / `S₂(…)`, each printed whole by `coordStr`,
+instead of `S(?, 7/2, ?)`; `pointCoords` keeps the partial form; anything else returns `null`.
+
+## The submit decision and refusals
+
+### The submit decision (#1394, [ADR-3D-258](06b-decisions-3d.md#adr-3d-258))
+
+`store3.submit` decides nothing: `decideSubmit3(state, utterance)` returns a `Verdict3` (rename ·
+not-understood · refused · already-stated · record) and `submit` dispatches it. The decision is pure, so
+#1358's register can ask "would you accept this line?". The statement seams share `readStatement3` (the
+grammar plus the #866 repair and the #516 typed refusals), `lostGivens3` (the honesty gates) and
+`decideCommands3` (gates → twin → derive → search), where the LLM lane's `submitSteps` also ends. A new
+branch belongs in the decision; a parity lock replays recorded sequences.
 
 **The App's pre-LLM lane is one function too (#1692, [ADR-3D-305](06b-decisions-3d.md#adr-3d-305)).**
-`src3d/app/decideDeterministic3` wraps `decideSubmit3` with the two registers App3 consults on
-`not-understood` — the #353 lowercase nudge, then the ADR-3D-040 guidance register — and returns either a
-`Verdict3` or `guided`. App3 dispatches it (`dispatchVerdict`, the store action `submit` is built on); the
-LLM lane's step decision is `decideSteps3`, which `submitSteps` dispatches. `/log-triage` replays a 3-D
-session through `src3d/app/triageReplay3` — it CALLS both functions, so a new step in the App's decision
-reaches the triage report the day it is written. `refusalCategory3` sorts a refused verdict into guided /
-clarify / refused for that report, as a Record over every store-level refusal code.
+`src3d/app/decideDeterministic3` wraps `decideSubmit3` with the registers App3 consults on `not-understood`
+(the #353 nudge, then the ADR-3D-040 guidance register) and returns a `Verdict3` or `guided`, dispatched by
+`dispatchVerdict`; the LLM lane's step decision is `decideSteps3`. `/log-triage` replays a session through
+`src3d/app/triageReplay3`, which CALLS both; `refusalCategory3` sorts refusals into guided / clarify /
+refused.
 
-## A point placement keeps its tail (#1730, [ADR-3D-296](06b-decisions-3d.md#adr-3d-296))
+### The clarification family: under-specified is not unsupported (#866, [ADR-3D-239](06b-decisions-3d.md#adr-3d-239))
 
-`onSegment` («X על YZ») is anchored: after the carrier comes nothing, a distance tail («במרחק 3 מ-A»), or
-a connector (`PLACEMENT_CONNECTOR` — «כך ש», «ונתון כי/ש», «וידוע כי/ש», «ו-», a comma, the English
-forms) and a condition. A condition that is a whole ratio of the rider (`WHOLE_RATIO`) keeps the ratio lane
-(a baked `t`, or the #921 letter); any other is read by `readCondition3` — the ordinary rule list, all or
-nothing, with one difference: a bare pair equation is a LENGTH there (`CONDITION_LENGTHS`), as it always
-was inside a ratio clause. The rider stays free and the condition drives it. An unread tail declines the
-line. The net behind it is `droppedGivenRelations3` in `lostGivens3`: a stated pair relation must be
-carried by one command that states something — a free rider and plain ink do not vouch for it — and the
-number gate no longer counts the digit in a command's `type` name as a payload.
+| | what it is | what the student needs to hear |
+| --- | --- | --- |
+| **unsupported** | the tool does not implement this | say so — the scope register's voice |
+| **under-specified** | understood, but it does not pin one figure | which detail to add |
+| **unknown** | the grammar does not own the sentence | escalate (the LLM lane) |
 
-## One coordinate of a point (#1547, [ADR-3D-299](06b-decisions-3d.md#adr-3d-299))
+`parse3`, being context-free, returns a *typed* refusal carrying what the sentence supplied; the **store**
+derives the candidates from the construction and composes the message. `ambiguous-main-diagonal` (#836)
+and `ambiguous-angle-vertex` (#866) share that shape. Where the figure yields one reading, the store rebuilds
+the canonical sentence and runs it through `parse3`, so the grammar stays the only authority. Unlike 2-D's
+ADR-164, 3-D asks whenever the figure gives more than one reading.
 
-«x_B = 3» is «B(3, ·, ·)» with y and z unstated (analytic's ADR-AG-042 identity): `componentGiven` lowers
-it to a `point3` whose other two components are null and carry no `syms`, so the engine needs nothing new
-— an existing id takes the M1 pin and the #1546 `coords-eq` claim, a new id is the ADR-3D-094 `partial`
-point. One frame table (`COMPONENT_FRAMES`: the Hebrew noun form, the bare «x של B», the subscript both
-ways, English) is read by the value tail, the sign tail (the former `signGiven`) and the ask head
-(`componentAskOf`), so the three cannot drift apart. The answer comes from `dataView`'s per-axis decision
-(`pointComps`, beside `pointCoords`); without a frame, a `partial` point's STATED components are the one
-thing judged, because they are placed absolutely and never by the gauge.
+## What the student sees
 
-## Known gaps
+### Rendering
 
-Recorded here because a design doc that omits its weakest properties is not describing the system.
+Orthographic orbit, hidden edges dashed by **numeric outward normals**, not a painter's algorithm.
+`scene3.ts` is pure and React-free; `Figure3.tsx` mounts it. Vector notation is `notation.ts`; math text is
+the shared [`shell/math.tsx`](04w-design-shell.md). **Every annotation is sized in pixels.**
 
-- **A symbolic line-equation given resolves in ~12 s**, and the *canonical* spelling is the slowest path.
-  **[#863](https://github.com/dcodish/geo_builder/issues/863).**
-- ~~**The DOF cue does not count the six placement DOFs** the sampler now varies.~~ Resolved — the cue's
-  counting rule below ([ADR-3D-247](06b-decisions-3d.md#adr-3d-247), #370).
+**The stated-angle arc lane ([ADR-3D-221](06b-decisions-3d.md#adr-3d-221), [ADR-3D-222](06b-decisions-3d.md#adr-3d-222),
+[ADR-3D-227](06b-decisions-3d.md#adr-3d-227)).**
+Vertex arcs are ONE map keyed by wedge — the vertex plus its two ray DIRECTIONS, matched order-free within
+±1.5° — fed by `vangle` pins, `vertex-angle-eq` claims and `angleMarks`, emitting once per wedge and reading
+`degText` (the value once stated, the letter until then). An `angle-seg-eq` arc sits on `meetingPoint`
+(`rightAngles.ts`, the knee's own answer), on its ≤ 90° side, and is absent for skew or off-ink pairs. A
+stated value is painted only where the verifier's measure holds (ADR-3D-290, #1592). `wedgeArc` is the one
+arc geometry; its radius is `min(ARC_PX, ARM_FRAC × shortest PROJECTED arm) / k` (ADR-3D-229).
 
-## The DOF cue: measured, not inferred (#370, #990 — [ADR-3D-247](06b-decisions-3d.md#adr-3d-247), [ADR-3D-248](06b-decisions-3d.md#adr-3d-248))
+**One dihedral geometry ([ADR-3D-264](06b-decisions-3d.md#adr-3d-264)).** `dihedralGeometry`
+(`render/dihedral.ts`) gives the foot on the seam and two unit arms ⟂ to it, oriented by
+`dihedralAnchors`. `rightAngles3` draws every `plane-rel` ⟂ / 90° claim's knee through `operandPairKnee`,
+gated on `relDeviation` ≤ `DIRECTION_REL_TOL`, never on the panel; a dihedral knee carries no `planeN`.
 
-`freeDofCount3` («דרגות חופש שטרם נקבעו») is an estimate by design, and its rule is the ADR-3D-124 one:
-**the count reads the resolution, never a second opinion about it.** Two terms follow that rule now:
+**Line × plane construction ([ADR-3D-280](06b-decisions-3d.md#adr-3d-280)).** `dihedralsStatedBy` also yields
+`line-rel` angles over a planar operand and `line-plane-angle`, normalised for the `pairKey` cede;
+`buildScene3` sends them to `linePlaneConstruction`: P on the line (else `fallbackLen` along it), H its foot,
+X the crossing, with H as `SceneDihedral3.extra`. Only pairs actually drawn cede their knee (`drawnConstr`).
 
-- **Placement.** When the figure's placement is SAMPLED — an absolute object on the canvas and the
-  translation gauge still free, which is `placementSampled3`, the sampler's own predicate — the six
-  placement DOFs are real and counted (the operator's 2026-08-13 ruling: *count them*). The gauge allowance
-  absolute pins consume before they cost shape drops from the full similarity gauge (7) to the scale alone
-  (1); a floating figure with no absolute object is byte-identical. The cue jumps by +6 the moment the first
-  absolute object is typed, and a plane pin then lowers it (ADR-3D-060 monotonicity across the term).
-- **What the scalar pins consume.** `− scalarPins.length` subtracted one shape dim per pin unconditionally;
-  in `quad-shape`'s one-unknown arm the corner's construction already encodes the family relation (a
-  parallelogram point, a reflection), so its lowered pins hold by construction and consume nothing — the
-  cue read 0 where the triangle still had 2. The pivot now records `scalarConsumed` on every solution: the
-  numeric RANK of the scalar residuals' response to a relative nudge of each shape dim (`numericRank`, a
-  relative pivot threshold with a round-off floor, so a residual that holds to 1e-16 contributes no rank and
-  two pins that move together contribute one). Lazy and memoised — the cue is the only reader, so the
-  residual evaluations happen on the display path, never on a submit. The pin count is the fallback only
-  where no solution recorded the measure.
+**Dihedral construction ([ADR-3D-265](06b-decisions-3d.md#adr-3d-265)).** `dihedralConstruction` picks the
+foot from a meaningful point (a run's vertex off the seam, preferring the face over the base via
+`solidBaseRings`; else a named point on a non-run plane; else the geometry's own foot with
+`legLen: null`). Chip state is `dihedralShown: Record<factId, true>` (`store/dihedralChips.ts`, the
+`displayMode` shape, saved by fact index), owned per `dihedralChipsByFact` (including the legacy `plane-angle`). `buildScene3` takes
+`dihedralShown` and emits `Scene3.constructions`; other lanes cede via `constructed` and `pairKey`. The
+foot's letter comes from `engine/freeLetter.ts` (shared with `midpoint-auto`) — a display label, never a fact.
 
-## The degeneracy notice (#936, [ADR-3D-234](06b-decisions-3d.md#adr-3d-234))
+**The object-angle lane is not panel-gated ([ADR-3D-266](06b-decisions-3d.md#adr-3d-266)).** `objectAngleArc`
+(ADR-3D-185) reads only stated records — `plane-rel` / `line-rel` claims, `relMarks`, `linePlaneMarks` —
+and draws unconditionally; there is no `showObjectAngles` flag in `buildScene3`, `Figure3` or `App3`. Only
+`coordLabels` depend on the panel.
 
-`degenerateSolids` joins the existing `buildNotices3` channel rather than opening a new one, which buys
-the channel's two standing properties for free: it is **derived purely from the construction plus the
-resolved sample**, so a typed figure and a loaded one behave identically and undo/redo need no plumbing;
-and it needs no submit-path wiring at all.
+**A VALUED parameter's two forms compete on one surface, and the student picks** (ADR-3D-233, #925/#937;
+ADR-W-047). A symbol whose valuing row is set to `letter` reads its letter in `degText`. `collectWedges`
+yields the wedges, `competingArcSymbols` the symbols with both a label and a value, and
+`store/paramChips.ts` puts the chip on the fact whose `symbol-value` named one. The choice is `displayMode`,
+keyed by fact id (by INDEX in the save file), carried on `App3 → Figure3 → buildScene3` beside `planeDisplay`.
 
-Three pieces:
+**Which row carries a plane's chip is DERIVED, not stored** (#1550, ADR-3D-281, amending ADR-3D-197).
+`store/planeChips.ts`: the first `ok` fact naming a drawn plane carries its chip; later mentions carry none
+and inherit it when that row goes, and `App3` passes row status (#847: an amber row owns nothing).
+`planesNamedBy` is the one structural reader — `plane-run` / `plane-named` operands at any depth, a field `plane`, a declaration's
+`name`, and the `ids` of the four plane kinds.
 
-- `flatnessRatio(pts)` — greatest out-of-plane deviation ÷ greatest vertex separation. Scale-free, and
-  the plane is chosen by the **widest-spread normal** so three nearly-collinear vertices cannot fake a
-  collapse.
-- `FLAT_BY_DESIGN` — the `polygon3/4/5` V8-g lane, exempt because those kinds never had an extent.
-- `causesFor(c, ids)` — the stated `scalarPins` whose points all lie in the solid. This is what makes
-  the notice name «זווית BAS = 40» rather than «פירמידה SABCD»: the declaration is not a pin.
+**A plane's display default is DERIVED, not stored** (ADR-3D-278, #1485). `planeDisplay` holds only toggles;
+`defaultPlaneDisplay3(c, name)` reads `Construction3.faceNamed`, recorded by `materializePlaneRun` from an
+operand's `face: true`, so the default re-derives on load.
 
-`DEGENERATE_FLAT_RATIO` is calibrated against the near-miss family, not against comfortable figures —
-the ADR carries the table and the corpus sweep is kept as a lock.
-## The stated-magnitude lane (#918, [ADR-3D-235](06b-decisions-3d.md#adr-3d-235))
+**Row direction (ADR-3D-228).** A row's base direction comes from `textDir3` (the seam shared with 2-D and
+`InputArea`), never `dir="auto"`, which is banned in `src3d/` and `src-complex/` outside editable fields;
+the decision is `factRowDir3` (`render/FactRow3.tsx`). `VecMath` emits each expression as a
+`<math dir="ltr">` island inside the row.
 
-Three kinds of stated magnitude reach the canvas, and they now share one principle: **what the student
-said is drawn where they said it, in amber, in screen space.**
+### The stated-magnitude lane (#918, [ADR-3D-235](06b-decisions-3d.md#adr-3d-235))
 
 | kind | scene record | shape |
 | --- | --- | --- |
@@ -835,205 +504,46 @@ said is drawn where they said it, in amber, in screen space.**
 | angle | `SceneAngle3` | arc **+** value |
 | **length** | **`SceneMeasure3`** | **value only** — the segment is already drawn |
 
-`SceneMeasure3` is deliberately the smallest of the three: a position, the text, and the pair it
-belongs to. A witness-shaped record would draw a second line over the segment's own ink.
+The lengths come from `statedLengths` (`engine/dataView.ts`), shared with the panel and keyed by the
+unordered pair; not gated by `showWitnesses` or by edge visibility.
 
-The list comes from `statedLengths` in `engine/dataView.ts`, **exported and shared with the data
-panel** rather than re-derived in the renderer — one answer to "what did the student state", so the
-canvas and the panel cannot disagree. Keyed by the unordered pair, which is what makes a restatement one
-label.
+### The degeneracy notice (#936, [ADR-3D-234](06b-decisions-3d.md#adr-3d-234))
 
-Not gated by `showWitnesses` (a stated given is not a debug overlay) and not gated by edge visibility
-(the operator's ruling — see the ADR).
+`degenerateSolids` joins `buildNotices3`, derived from the construction and the resolved sample:
+`flatnessRatio(pts)` (out-of-plane deviation ÷ vertex separation, widest-spread normal); `FLAT_BY_DESIGN`
+exempts `polygon3/4/5`; `causesFor(c, ids)` names the stated `scalarPins` in the solid. The threshold is
+`DEGENERATE_FLAT_RATIO`.
 
-## Who may introduce a point: the drawing registers (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253))
+### The DOF cue: measured, not inferred (#370, #990 — [ADR-3D-247](06b-decisions-3d.md#adr-3d-247), [ADR-3D-248](06b-decisions-3d.md#adr-3d-248))
 
-Most commands that mention a pair are **carriers** — «נסמן: AB = u» draws the vector's segment before
-naming it — and a carrier may never introduce its own subject, or a NAMING would mint what it claims to
-name (`v7-t1` locks that refusal). Only a **drawing register**, where the student's whole sentence *is*
-the object, may introduce points: `segment3 {bare}` and `draw-arrow`.
+`freeDofCount3` («דרגות חופש שטרם נקבעו») reads the resolution, never a second opinion (ADR-3D-124). When
+the placement is sampled (`placementSampled3`) the six placement DOFs are counted and the gauge allowance
+drops from 7 to 1 (ADR-3D-060). Scalar pins consume what `scalarConsumed` measures — the `numericRank` of
+their residuals' response to each shape dim, lazily on the display path — with `− scalarPins.length` as
+the fallback.
 
-Both registers refuse a pair with two unknown endpoints, and that refusal is the typo guard: «קטע QZ»
-names the label the student got wrong instead of inventing two points. `canStartFigure(c)` — no points,
-no solids — is the one exception, and it is exactly where the guard has nothing to protect: an empty
-canvas has nothing to have mistyped against.
-
-**It is applied to the ARROW lane only, and the scope was measured rather than assumed.** Widening the
-bare-segment lane too moves two locks that encode decisions which should stand:
-
-| widened lane | what moves |
-| --- | --- |
-| `draw-arrow` | nothing — an arrow is not an input to any other rule |
-| `segment3 {bare}` | «קטע AB» + «דלתון ABCD» stops being a DECLARATION and takes the completion arm with two unknowns (#601); «אלכסון AB» before any solid stops being refused although no solid exists for it to be a diagonal of (#978) |
-
-The difference is structural, not a preference: the segment lane feeds shape-completion and role rules
-that ask *which points already exist*, so widening it changes what THEY do. `canStartFigure` is a named
-predicate either way, so the next register that needs this asks the same question in the same place, and
-a bare segment on an empty canvas remains its own question rather than a side effect of this one.
-
-**What still cannot start a figure**: a vector given by its COMPONENTS with no points at all
-(«נתון: v = (10,-5,0)»). `Construction3.vectors` is `Map<name, {from, to}>` — a vector IS a point pair —
-so this needs the positionless-vector design in
-[#1188](https://github.com/dcodish/geo_builder/issues/1188), including the pedagogical question of how an
-object with no position is drawn.
-## A never-positioned point is a pivot unknown (#1311, [ADR-3D-260](06b-decisions-3d.md#adr-3d-260))
-
-A `free3` point (minted by «וקטור AB» on an empty canvas, by «קטע BE» from a known B, or by a mixed shape
-run) carries three DOF the student never stated. They are **pivot unknowns**, not samples: each coordinate
-is an entry in the #820 rider lane, keyed `freeCoordKey(id, axis)` in the same `riderTs` record, anchored
-at its canonical sample (so what the givens leave free still varies with the seed) and started there.
-Membership is the lane's measured probe, so a free point no residual reads costs nothing and changes
-nothing. `evaluateSolidsAndPoints` places a driven coordinate where the pivot put it (the rider override's
-twin), and the pivot runs on a solid-less figure that holds a free point (`hasFreePoint3`).
-
-Two seams route a statement there, and both ask what the **statement** names, never the solver's state:
-the apply fork drives a scalar statement when `freeDims(c) > 0` or the statement names a `free3` point
-(`claimPointIds`, a structural walk over the claim); and `lengthClaim` lowers a marked «וקטור AB = 5» to
-the arrow the one-word form draws, so one line mints and drives exactly what two lines do.
-
-**The release.** The anchors choose the basin; they never decide whether the givens hold. A collected
-candidate whose primary error the anchors' pull left just above `ACCEPT` (below 1e-6) is polished on the
-primary residuals alone and kept only if that closes it without collapsing a solid. A free coordinate can
-travel a figure-width where a rider moves within `[0, 1]`, so its anchor equilibrium sits higher.
-
-**The not-determined rule** (`sampledCarrierVerdict`, `store3.ts`) is the net under the drive: a failing
-claim that reads a carrier whose freedom was sampled (a free plane, a free line, the frame placement, a
-free point, in that order) is refused naming the carrier, never `claim-refuted`. It is one loop over
-carrier rows; adding a carrier is adding a row, and it judges what a claim READS, not how its value varies
-across seeds (the three-valued verdict #909 deferred is not built). Two rows read only a stated GIVEN (a
-`given: true` arbiter) and answer `given-not-drivable` — the tool's limit, named
-([ADR-3D-291](06b-decisions-3d.md#adr-3d-291), #1590): a point whose free parameter the resolution left
-sampled (`carrierParams3` keys the pivot did not drive, or a coord-sym letter with no root) — unless the
-closed-form solve answered `contradicts` or `determined` (`Resolved3.coordDetermined`, ADR-3D-293) or, for a
-coord-sym point, `statedDataAdmits` finds its definition already contradicts the given; and the
-apex of a cone or cylinder whose height was never stated. An answer keeps the register it had.
-
-**Not driven yet:** a length on a free point after a solid's scale given (#754 owns the size; the rule makes
-it honest), and the DOF cue still counts a driven free vector's six coordinates as free (fail-open).
-
-## The sampled-carrier table and the one frame rule (#1498, [ADR-3D-267](06b-decisions-3d.md#adr-3d-267))
-
-**The frame rule.** Whether the pivot's similarity applies to a point is asked in one place —
-`gaugeFramePoint3` (types.ts, beside `GAUGE_KINDS`): gauge-frame kinds ride the gauge, Lane-A absolute
-points (typed coordinates, an equation-plane rider) do not. The final placement always answered it this
-way; every in-solve residual family now reads points through one accessor (`laneAt` in `residualsFor`)
-built on the same predicate, so a residual sees exactly the frame the drawn figure will be in. The
-drift this closes: the residual accessor gauged *everything*, so a pin relating a solid vertex to a
-typed coordinate compared two frames and refused a true given as the student's contradiction.
-
-**The carrier table.** `carrierParams3` (`engine/carriers.ts`) is the one enumeration of every sampled
-point-DOF: per kind, its rider-lane keys, bounds, anchor seeding, and drivability. Both readers fold it —
-`freeDofCount3` (the count) and the pivot's rider-lane candidates (the drive) — so a carrier can no
-longer be counted yet undrivable (the ADR-052 conformance smell; before, `on-plane`, `on-line`,
-`bisector-ray` and `partial` were counted and never enrolled). Plane/line riders enroll as **offsets from
-their sampled seat** (0 = the seat, so an undriven figure is byte-identical); a bisector rider as its
-distance from the apex (positive — the ray's bound); a `partial`'s stated sign given becomes its lane
-bound. Recorded as not-drivable in the table itself: a side-point's height (its side bound is not
-static) and riders of free planes/lines (#557 re-seats them after the pivot). Enrollment stays the
-measured probe.
-
-**A host bound is restored, not only enforced** (#1735, [ADR-3D-306](06b-decisions-3d.md#adr-3d-306)). A
-bounded carrier's `[lo, hi]` is not inside the solve: `offHost` (the #820 half of `degenerate()`) rejects a
-candidate after it converged. A given the figure can satisfy by sliding the rider **or** by growing its host
-(«משולש ABC · D על AB · AD = 3», the size unstated) is reached the cheap way — LM's minimum-norm step spends
-the deficit on `t` and lands past the host's end — so every exact candidate used to be discarded and the empty
-pool reached the student as `givens-contradict`. So an acceptance site keeps each exact candidate it discarded
-ONLY for an off-host rider, and on the failure path `reseatOffHost` pins those riders back at their seed
-samples while the gauge, dims and other riders adapt, then releases on the site's own residuals; the result is
-judged by the site's ordinary acceptance, so a re-seat cannot invent a solution. It fires only when the pool is
-otherwise empty — after the frozen-dims retry, whose recursive solve has the same chance — so every figure that
-built before is bit-identical. Sites: the cold-start loop, the dims widening, `collect()` (the #797/#818
-continuations) and the `invariantOnly` dims-only loop.
-
-**The ⟂-from-an-in-plane-point disposition** (#1499, [ADR-3D-268](06b-decisions-3d.md#adr-3d-268)). The
-`seg-plane-rel` one-new-letter funnel asks `structurallyOnRun3` — position-free, recursive: is the known
-endpoint forced into the run's plane by its definition? Off-plane keeps ADR-3D-146's foot; in-plane mints
-the new letter `free3` with the ⟂ as the driving pin, height and side free (two residuals, three
-coordinates). Two solver guards keep that honest: `degenerate()` rejects a NON-flat solid's ring driven
-to zero AREA (Newell ≤ 1e-4·span² — 2-D ADR-413's rule in R³), while a FLAT solid's collapse — which a
-student's givens may FORCE («AB מתלכד עם CD» on a quad — refused for a declared polygon, ADR-3D-310 below) — is
-judged on the accepted pool: when every solution flattened a ring and riders are enrolled, a
-**frozen-dims retry** re-solves with the shape fixed at the seed's sample, where the collapse basin does
-not exist and only the statement's own carriers move; its non-collapsed figure is preferred. The same
-retry also answers a joint solve that finds nothing at all.
-
-**Which givens forced the collapse** (#1815, [ADR-3D-309](06b-decisions-3d.md#adr-3d-309)). When the
-retry finds no open figure either, the flat one is **attributed**, not assumed stated. The #820 enrollment
-probe records which residual rows the enrolled riders read (the incidences on a rider); `collapseIsStated`
-re-solves `[gauge | dims]` on the other rows only (anchored to the seed's dims, then released and accepted
-at 1e-20, so a metric sliver cannot pass for an open figure), both mirrors when a row is chiral. If that
-reduced system holds with the ring open, an incidence invented the collapse: `solvePivot` returns an empty
-pool marked `collapse: { ring, riderKeys }`, `resolve3` carries it on `pivot.collapse`, and `derive3`
-refuses the newest pin owner `polygon-collapsed`, naming the incidences and the riders' minting statements
-(`err.polygonCollapsed`). If the reduced system is still flat («AB = 5 · BC = 3 · AC = 8»), the givens force
-it, and the line is refused as below (ADR-3D-310; amended 2026-10-07, #1861). With no placement, `derive3`'s claim pass skips claims owned by statements
-that took part in the solve — a claim cannot be refuted by a figure that has none — so the guard speaks.
-
-**A declared polygon collapsed is refused, whatever forced it** (#1849, [ADR-3D-310](06b-decisions-3d.md#adr-3d-310);
-operator ruling 2026-10-07, ADR-W-115). `settleFlatRings` (formerly `preferUncollapsed`) judges every pool
-that holds a flat kind, riders or not: the solutions with every declared ring open are kept (a collapsed
-member is dropped, so it is never a configuration to cycle to); with none, the frozen-dims retry (riders) and
-then the **open-figure retry** — the attribution's anchored search run on every row, `openSolveOn(null)`,
-admitting an exact figure with its rings open and passing `degenerate` — are offered the problem, because the
-unanchored joint solve can drift a dim the givens leave free into the collapse («AC = 8 · BC = 3» at seeds
-5 and 7). With nothing open, the pool comes back empty and marked `collapse: { ring, riderKeys, forced }`.
-The attribution now picks only the statements: `forced: false` (an incidence invented it) names the riders'
-statements as before; `forced: true` names the pin owners on the ring's own vertices that read no rider
-(«AB = 5», «BC = 3» beside the refused «AC = 8»; never «CD = 4» on a rider D), with the wording
-`err.polygonForced` / `err.polygonForcedAlone` («— וקו ישר אינו משולש»). A polygon declared over points that
-all exist (the #116 binding path) records a `polygon-open` claim (`given`), verified by the one predicate
-`ringCollapsed3` (vec3.ts) that the pivot uses too; a failing one is refused `polygon-collapsed` naming the
-statements that first placed its vertices. The #936 notice for a flattened SOLID is unchanged. An anchored solve
-can hold a metric-forced flatness at a **sliver**, because the height enters only to second order. So a solution
-whose declared ring is thin (`ringOpenness3` < 1e-2) is released on its own residuals, with the gauge frozen
-where its path froze it. If the release lands exact and collapsed, the solution counts as collapsed («AB : BC = 5 : 3 · AB : AC = 5 : 8»).
-
-## The data panel has two kinds of row (#1196, [ADR-3D-254](06b-decisions-3d.md#adr-3d-254))
-
-Every field of `DataPanel` used to be a **measurement** — coordinates, a vector's components and
-magnitude, a plane's equation, a pinned symbol — and each is computed by sampling three configurations
-and keeping only what agrees. That is the honesty gate, and it is why a figure with free dimensions
-correctly reports nothing: there is no number it holds still.
-
-`stated` is the other kind: a **given**, true at every configuration, needing no sampling at all. It is
-composed from the construction (`c.vectors` for the naming rows, the `vec-eq` claims for the relation
-rows) rather than from the resolved samples, which is the structural difference between the two kinds.
+### The data panel has two kinds of row (#1196, [ADR-3D-254](06b-decisions-3d.md#adr-3d-254))
 
 | kind | source | needs a determined figure |
 | --- | --- | --- |
 | measurement (`points`, `vectors`, `planes`, `params`, `relations`, `mutual`) | three sampled configurations, intersected | yes |
 | given (`stated`) | the construction | no |
 
-**`panelIsEmpty` counts both**, for #296's reason: the guard and the render must read emptiness the same
-way, or the panel hides knowledge it has. A figure whose only knowledge is its stated vector relations is
-exactly the case that reported a false "nothing to show".
-
-**Where the composer lives.** In the engine, beside the rows it belongs to — `dataView` already composes
-display text and the layering runs `render → engine`, never back. The one thing it must agree with the
-renderer about is which arrow a finished row carries, and that comes from `lexicon/marks3`, the leaf that
-imports nothing and exists so the grammar and the display cannot drift about a marking (#1194).
-
-**Adding a section is a decision, not a drive-by.** `bidi3.test.ts` asserts the section COUNT along with
-`dir: 'app'` on every one, because each section is a place a direction can be forgotten — and it caught
-exactly that here: `stated` first shipped as `dir: 'ltr'`, since its rows are pure LTR and pinning them
-looks obviously right. That is the list-wide override #559 exists to prevent; the bidi layer places an
-LTR run inside an RTL base correctly, and a section that decides for itself is how that stopped.
+`stated` comes from `c.vectors` and the `vec-eq` claims; `panelIsEmpty` counts both kinds (#296). The
+composer sits in the engine (`render → engine`); a row's arrow comes from `lexicon/marks3`. `bidi3.test.ts`
+asserts the section count and `dir: 'app'` on each (never a section-level `dir: 'ltr'`, #559). Every
+measurement field of `DataPanel` keeps only what agrees across the samples.
 
 **A parameter's roots: one join, two surfaces (#1591, [ADR-3D-303](06b-decisions-3d.md#adr-3d-303)).**
-`formatBranches` returns the per-root value strings, ascending (`['±√2']` for a symmetric pair), and
-`branchAnswer(sym, branches)` joins them with `, ${sym} = ` — the ANSWER half of «m = -2, m = 4». The
-panel's `params` row prints `${sym} = ${answer}`; the ask lane returns the answer and App3's row prints
-`${question} = ${answer}`. Both callers go through `branchAnswer`, so they cannot disagree (#480) and the
-row never carries the symbol twice (#1746's class).
+`formatBranches` returns the ascending per-root strings (`['±√2']` for a symmetric pair) and
+`branchAnswer(sym, branches)` joins them with `, ${sym} = `. The panel's `params` row prints
+`${sym} = ${answer}` and App3's ask row `${question} = ${answer}`, both through `branchAnswer` (#480, #1746).
 
-## The input preview composes, and who may import whom (#1195, [ADR-3D-255](06b-decisions-3d.md#adr-3d-255))
+### The input preview composes, and who may import whom (#1195, [ADR-3D-255](06b-decisions-3d.md#adr-3d-255))
 
-The strip under the input box **returns a NODE, not a string** — `inputPreviewNode3` in
-`render/FactRow3.tsx`, beside the step row's `FactRowText3` (Am. 1, #1312). Returning a string was the
-original defect: `U+20D7` is an internal marker that `VecMath` STRIPS and replaces with a `<mover>`
-spanning the pair, so a string sink displayed it as a combining mark over the last letter alone.
-
-It routes three ways, and which branch is taken decides how the text is prepared:
+The strip under the input box returns a NODE — `inputPreviewNode3` in `render/FactRow3.tsx`, beside
+`FactRowText3` (Am. 1, #1312) — because `VecMath` replaces the `U+20D7` marker with a `<mover>` spanning the
+pair:
 
 | branch | gate | prepared how |
 | --- | --- | --- |
@@ -1042,31 +552,18 @@ It routes three ways, and which branch is taken decides how the text is prepared
 | plain | — | isolated, `null` when isolation changes nothing |
 
 **Every `VecMath` caller gates it, and the gate is the caller's** ([ADR-3D-301](06b-decisions-3d.md#adr-3d-301), #1543).
-`VecMath` is lexical — its `PAIR` regex arrows any two-label run — so whether a pair IS a vector is decided
-upstream, once per surface, all three in `FactRow3.tsx`: the step row by the parsed commands
-(`isVectorFact3`), the preview by what was typed (`isVectorMarked3`), and the ask echo (`askEchoNode3`)
-by the question's own parse — `QueryResult.echo` is `'vector'` iff `parseQuery` bound an operand as a
-vector atom (`|AB|`, `AB·CD`, `∠(AB,CD)`, bare `AB`), and `'plain'` for a length by word, a distance, a
-plane, or a question not understood. The non-vector branch of the echo is the step row's.
+`VecMath`'s `PAIR` regex arrows any two-label run, so each surface in `FactRow3.tsx` decides: the step row
+by its commands (`isVectorFact3`), the preview by the typed text (`isVectorMarked3`), the ask echo
+(`askEchoNode3`) by `QueryResult.echo` — `'vector'` iff `parseQuery` bound a vector atom (`|AB|`, `AB·CD`,
+`∠(AB,CD)`, bare `AB`), else `'plain'`.
 
-**The vector branch must NOT pre-isolate.** `VecMath` isolates at the render event itself
-([ADR-3D-184](06b-decisions-3d.md#adr-3d-184)) and its tokenizer reads LRI/PDI as `op` tokens — measured,
-«וקטור AB = 5» isolated first tokenizes as `op ⁦ · pair AB · … · op ⁩`. The mathematics and plain branches
-isolate first, which is #1152's rule and still right for them: there the isolate characters ride through
-untouched, while the reverse could reorder the equation.
+**The vector branch must NOT pre-isolate**: `VecMath` isolates itself (ADR-3D-184) and would read LRI/PDI as
+`op` tokens (`op ⁦ · pair AB · … · op ⁩`). The routing never lives in an `App3.tsx` callback (#900). Box and
+preview both take their direction from `textDir3` on the raw text (#868; ADR-3D-255 Am. 2).
 
-**The routing lives beside the row's, in `FactRow3.tsx`, and not in an `App3.tsx` callback.** That file
-exists because #900 found exactly this decision written as a ternary in a callback, *"invisible to every
-test"* — and #1195 then wrote the preview's routing as a ternary in a callback, where #1312 hid. The
-The base DIRECTION is deliberately NOT computed there: box and preview both resolve through `textDir3`
-on the raw text, which is #868's pinned property. Since #1195 the two can display different text, so
-that property may now be over-fitted — measured in #1314 and kept: the raw-text direction is correct (ADR-3D-255 Am. 2).
-
-**`vectorNotation` stays in `render/notation.ts`, not in `i18n/bidi.ts`.** `i18n/bidi.ts` imports
-**nothing but the `lexicon/` leaf** (the prime set, ADR-3D-300) — it is a leaf in effect, which is what lets `parser/`, `engine/` and `render/` all depend on it — so
-having it reach into `render` would invert the dependency. `render` already depends downward on `i18n`
-and `lexicon`, so the composed function sits there, beside `factDisplay3`, which is also the function
-its lock compares against.
+**`vectorNotation` stays in `render/notation.ts`, not in `i18n/bidi.ts`**, which imports only the
+`lexicon/` leaf (ADR-3D-300) so that `parser/`, `engine/` and `render/` can all depend on it; `render`
+depends on `i18n` and `lexicon`, and `factDisplay3` is its lock's reference.
 
 | layer | imports | why |
 | --- | --- | --- |
@@ -1075,14 +572,22 @@ its lock compares against.
 | `render/notation` | `lexicon`, `i18n` | the notation transform; the display layer is the consumer |
 | `render/FactRow3` | `lexicon`, `i18n`, `render/*` | the ROUTING — which renderer a surface uses, for both surfaces |
 
-**Three gates, three different questions, and they must not be confused:**
-
 | surface | what it can ask | gate |
 | --- | --- | --- |
 | step row (`factDisplay3`) | the COMMANDS exist | `isVectorFact3` |
 | input preview (`inputPreviewNode3`) | only the RAW TEXT — no command yet | `isVectorMarked3` |
 | `vectorNotation` itself | — | **none; it is unconditional** |
 
-That last row is the one to remember: `vectorNotation` will arrow «אורך AB = 5» and a bare `DC=3AB`
-given the chance. Every caller supplies the honesty gate, and a new caller that forgets asserts
-vector-ness the student never claimed.
+`vectorNotation` would arrow «אורך AB = 5» or a bare `DC=3AB`; every caller supplies the honesty gate.
+
+## Known gaps
+
+- **A symbolic line-equation given resolves in ~12 s**, and the *canonical* spelling is the slowest path.
+  **[#863](https://github.com/dcodish/geo_builder/issues/863).**
+- A revolution's size driven by a stated length (#1569, parked).
+- A length on a free point after a solid's scale given is not driven (#754 owns the size; the not-determined
+  rule makes it honest), and the DOF cue still counts a driven free vector's six coordinates as free
+  (fail-open). The three-valued verdict #909 deferred is not built.
+- A vector given by its COMPONENTS with no points at all («נתון: v = (10,-5,0)») cannot start a figure:
+  `Construction3.vectors` is `Map<name, {from, to}>` — a vector IS a point pair — so this needs the
+  positionless-vector design in [#1188](https://github.com/dcodish/geo_builder/issues/1188).
