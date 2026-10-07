@@ -803,6 +803,12 @@ knowledge gates ask "is this the same in every configuration?", and the pool is 
   `applyCommand`, so the second-membership path sees where the crossing lies.
 ## A declared polygon the givens force FLAT is said out loud (#945, [ADR-513](06-decisions.md#adr-513))
 
+> **Superseded for the forced family by [ADR-602](06-decisions.md#adr-602) (#1849, operator ruling 2026-10-07,
+> [ADR-W-115](06w-decisions-workspace.md#adr-w-115)): a declared polygon the givens force flat is REFUSED.** See
+> "A declared polygon the givens force flat is refused" below. The channel described here stays as the net — it now
+> speaks only for a polygon that is NOT forced flat but is drawn below the floor at a sampled configuration (a stated
+> sliver under 1°, measured at 6e-5 on some of 24 seeds for 0.1°).
+
 - **The channel.** `Derived.degeneracies` (`replay/core.ts`) sits beside `coincidences` and `forcedOffArc`:
   derived purely from the resolved construction on every replay, so a loaded figure and a typed one say
   the same thing, and nothing is stored. The App shows it as an ⓘ notice — never a refusal, never amber.
@@ -818,6 +824,26 @@ knowledge gates ask "is this the same in every configuration?", and the pool is 
   is the responsible one. Runs only when a degeneracy exists, one replay per prefix, and never nests (a
   prefix replay inside the scan reports the predicate alone). The engine carries fact ids and a number;
   the wording is the chrome's, in the student's own words (`figure.degenerate`, He + En).
+
+## A declared polygon the givens force flat is refused (#1849, [ADR-602](06-decisions.md#adr-602))
+
+- **The ruling.** A flat line is not a triangle (operator, 2026-10-07; [ADR-W-115](06w-decisions-workspace.md#adr-w-115)
+  amends ADR-W-048). The line that completes the collapse is refused before it becomes a fact; the figure keeps
+  its prior state.
+- **Two seams, one class.** *The proof* — stage 0h, `forcedFlatPolygon` (`engine/metricFeasibility.ts`): every
+  linear length statement is a row in the unknowns |PQ|; a straightness equality |uv| = Σ ring arc (or |uw| + |wv|)
+  follows when its row lies in the row space of [A | b]; proven collinear sets sharing two points merge; a polygon
+  inside one merged set is flat in every configuration. It does not depend on where a solver stopped on a bent path
+  (the quadrilateral 1·1·1·3 drew at flatness 1.6e-3, three times the gate). *The observation* — stage 2d, the
+  accept gate's `collapsedPolygon`, its floor raised from 1e-4 to `DEGENERATE_EXTENT_RATIO` (5e-4): every collapse
+  the proof cannot read (an incidence, a stated collinearity) lands far below it.
+- **One message.** `collapsed: polygon A, B, C would be flat — <statement> cannot hold` from both seams (the ladder's
+  refusal uses it when the solution that existed flattened a declared polygon, at any stage). The fold reads the
+  polygon's declaring statement from `ownerByObjId` — the declaring half of #945's attribution, with no replay — and
+  appends `[vs #i]`; the submit note resolves it (`otherUtteranceForError`), so the student reads «AC = 8» סותר את
+  «משולש ABC» … וקו ישר אינו משולש. The noun follows the vertex count (triangle, quadrilateral, polygon).
+- **Defaults yield.** A collapse that only an unstated default forces («משולש שווה שוקיים ABC · AB = 4 · BC = 8»
+  at apex A) is refused at that default, and the variant rescue (ADR-573) seats the apex where the triangle is real.
 
 ## What counts as "produced": a display-only command declares itself (#1011, [ADR-519](06-decisions.md#adr-519))
 

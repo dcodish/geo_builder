@@ -1731,3 +1731,7 @@ over all four (ADR-041).
 ### `indexed-angle-names-decline-1814` — «∠ABC = α1 · ∠ACB = α2» after «משולש ABC» is declined, never drawn as 1° and 2° (#1814, ADR-600)
 
 **Guards against:** a symbol in an angle's value slot being read as its digits. The operator's line «∠ABC = α1» drew angle B as 1° (and «α2» as 2°), green, because the angle reader's guard against a name's subscript digit was Latin-only and every honesty gate defined a name as Latin. **Asserts** that both lines are refused by the parser as `not-handled` (the LLM fallback's seam) and that the triangle keeps no angle constraint. The class matrix (Greek and capital-Greek indexes, «α_1», «α 1», the comparisons, «π/3», «α + 40», the split misfire on «שטח המשולש ABC = S1», the accountant's `symbol` kind) is `src/app/__tests__/issue-1814-indexed-name-value.test.ts`.
+
+### `flat-triangle-refused-1849` — «משולש ABC · AB = 5 · BC = 3 · AC = 8»: the closing side is refused, naming «משולש ABC» (#1849, ADR-602)
+
+**Guards against:** a declared polygon the givens force flat being drawn as one. The operator's ruling (2026-10-07) reverses ADR-W-048's notice for declared polygons: a flat line is not a triangle. **Asserts** that «AC = 8» is refused by the submit gate as a flattened triangle ABC whose other side is «משולש ABC», and that the thin-but-legitimate 3° triangle still commits. The class matrix (both orders, 4·4·8, a ratio, a sum, a perimeter, a quadrilateral, the incidence family, the default-apex isosceles, the controls) is `src/app/__tests__/issue-1849-flat-polygon-refused.test.ts`.

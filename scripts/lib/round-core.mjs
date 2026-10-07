@@ -1,5 +1,5 @@
 /**
- * #1853 (ADR-W-115) — the LIVE ROUND DASHBOARD (tracking only), pure half: the event vocabulary, its validation, and
+ * #1853 (ADR-W-116) — the LIVE ROUND DASHBOARD (tracking only), pure half: the event vocabulary, its validation, and
  * the fold from an append-only event log to the one state document the dashboard page renders.
  * Tracking only (operator ruling 2026-10-07): the end-of-round report and play sheet stay their own page.
  *

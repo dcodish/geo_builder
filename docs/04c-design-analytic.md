@@ -200,6 +200,18 @@ a ring fault and ADR-AG-008’s `does-not-exist`. The latter names what the stud
 and is the better answer, so the ring arm sits after the vacancy loop — the only position from which it
 can see what has already been said — and skips any line already in `faults`.
 
+**A collapse the givens force is its own fault** ([ADR-AG-247](06c-decisions-analytic.md#adr-ag-247), #1849). The
+evidence is the thin-ring arm's (ADR-AG-143): when every residual is met and the tightened re-solve flattens a declared
+ring, `evaluate` records the ring in `Figure.collapsedRings` — only when every given is measured and holds on that flat
+configuration (non-null, finite, within `SATISFIED_EPS`, and no measure equation met as 0 = 0 against the flat figure's
+span), so a ratio a flat figure satisfies vacuously is not a collapse. `derive` reads it with `collapsedByGivens(c, seed)` over
+the window `drawableAt` walked (`seed … seed + DRAWABLE_TRIES`, all memo hits on the refusal path) and, when the drop-one
+probe named a completing statement, raises `polygon-collapsed` on that line instead of `unsatisfiable`, carrying
+`polygon` (the vertex name), `shape` (the noun) and `declared` (the declaring sentence). The pinned arm above (#1170)
+raises the same code for a `degenerate` ring, on the last of the declaration and the lines placing its vertices; a
+`crossed` ring keeps `ring-contradicts-noun` on the declaring line. `submit.ts` spreads the three fields into the
+`InputError` at both refusal sites (submit, un-mute), and `errorText` renders `errPolygonCollapsed`.
+
 **A fault is also the refusal.** `decideSubmit` dry-runs the whole list with the new line appended and
 refuses when a fault lands on that line, so raising a fault in `derive` is what makes a line not be
 recorded. There is no second refusal mechanism to keep in step, which is why an operator ruling of

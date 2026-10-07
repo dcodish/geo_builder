@@ -10,6 +10,10 @@
  * The gate: a declared ring that is THIN triggers a re-solve of the same system under a tightened
  * tolerance; a needle bought with slack collapses there and is reported as unsatisfied, blamed on the
  * last given that touches the ring. A genuine thin triangle is an exact solution and keeps its shape.
+ *
+ * **#1849 (ADR-AG-247) renamed the refusal, not the verdict.** The needle is the givens forcing triangle ABC flat
+ * (B onto C), so the operator's 2026-10-07 ruling (ADR-W-115) says so: `polygon-collapsed`, naming the polygon and
+ * «משולש ABC», on the SAME line — «∠ABC = 90», the statement that completed it — instead of «לא נמצאה תצורה».
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
@@ -26,16 +30,16 @@ const side = (lines: string[], seed: number, a: string, b: string) => {
 };
 
 describe('#1334 — the needle is refused at EVERY seed, never drawn green', () => {
-  it('every seed 0–7 reports the figure as unsatisfiable — none shows it whole', () => {
+  it('every seed 0–7 refuses the figure as flattened — none shows it whole', () => {
     for (let seed = 0; seed < 8; seed++) {
       const faults = codes(NEEDLE, seed);
-      expect(faults.some((f) => f.startsWith('unsatisfiable@')), `seed ${seed}: ${JSON.stringify(faults)}`).toBe(true);
+      expect(faults.some((f) => f.startsWith('polygon-collapsed@')), `seed ${seed}: ${JSON.stringify(faults)}`).toBe(true);
     }
   });
 
   it('the seeds that accepted the needle before (0, 2, 3) now blame the statement that completed the contradiction — «∠ABC = 90»', () => {
     for (const seed of [0, 2, 3]) {
-      expect(codes(NEEDLE, seed), `seed ${seed}`).toContain('unsatisfiable@2');
+      expect(codes(NEEDLE, seed), `seed ${seed}`).toContain('polygon-collapsed@2');
       /*
        * …and the figure they hold IS a needle — the report is about a real collapse, not a false positive. Judged by the
        * product's own thinness bar (`THIN_SIN_TOL`, the trigger of the re-solve above), not a ratio fitted to the
@@ -51,14 +55,14 @@ describe('#1334 — the needle is refused at EVERY seed, never drawn green', () 
 
   it('EVERY seed blames «∠ABC = 90» and only it — the drop-one probe names the completing statement whatever basin the solve reached (#1492, ADR-AG-231)', () => {
     // Before the probe the blame read the residual snapshot: «AB = AC» at seeds 1 and 5, both lines at 4, 6 and 7.
-    for (let seed = 0; seed < 8; seed++) expect(codes(NEEDLE, seed), `seed ${seed}`).toEqual(['unsatisfiable@2']);
+    for (let seed = 0; seed < 8; seed++) expect(codes(NEEDLE, seed), `seed ${seed}`).toEqual(['polygon-collapsed@2']);
   });
 
   it('the submit gate refuses the third line at EVERY seed — including the seeds where the solver blames «AB = AC», because a line that turns a green figure red is the line to refuse', () => {
     for (let seed = 0; seed < 8; seed++) {
       const v = decideSubmit('∠ABC = 90', ['משולש ABC', 'AB = AC'], seed);
       expect(v.kind, `seed ${seed}`).toBe('refused');
-      expect(v.kind === 'refused' && v.error.key, `seed ${seed}`).toBe('unsatisfiable');
+      expect(v.kind === 'refused' && v.error.key, `seed ${seed}`).toBe('polygon-collapsed');
       expect(v.kind === 'refused' && v.error.detail, `seed ${seed}: names the student's sentence`).toBe('∠ABC = 90');
     }
   });

@@ -167,7 +167,7 @@ own worktree. Items sharing a chokepoint are stacked in one stream. Test runs qu
 question to the operator is asked in plain text, never as a blocking prompt, so the other streams keep
 landing. Round #1776, sequential and stalled overnight on a question about the next round, took ~21 h.
 
-**The live dashboard ([ADR-W-115](06w-decisions-workspace.md#adr-w-115), #1853):** the operator follows a
+**The live dashboard ([ADR-W-116](06w-decisions-workspace.md#adr-w-116), #1853):** the operator follows a
 round's progress on one private page, from any device. It is **tracking only**: what is in the round,
 what each item is about, and where it is now. The end-of-round report and play sheet stay Step 5b's own
 page, unchanged; the dashboard only links to it. Every actor appends one line per phase change to an

@@ -28,10 +28,11 @@ import {
   metricImpossibilityError,
   obtuseSideImpossibility,
   obtuseSideImpossibilityError,
+  forcedFlatPolygon,
 } from './metricFeasibility';
 import { sideImpossibility, sideImpossibilityError } from './sideFeasibility';
 import { recordRequirement, requirementsField } from './requirements';
-import { degeneratePolygons, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
+import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
 import { applySeed, freeDofs } from './sample';
 import { constraintKey, constraintRefs, describeConstraint, solvedOnSegmentCandidates } from './solve';
 
@@ -326,13 +327,45 @@ function newConstraintsNonVacuous(c: Construction, positions: Map<Id, Vec>, newC
  * the polygon's own span (1e-4) — a numeric collapse sits orders of magnitude below it, the thinnest
  * legitimately-constructible triangle orders above.
  */
+/**
+ * #1849 ([ADR-602](../../docs/06-decisions.md#adr-602)) — the refusal a collapsed DECLARED polygon gets:
+ * `collapsed: polygon A, B, C would be flat — |AC| = 8 cannot hold`. The vertices are comma-separated so the
+ * humaniser can count them (a triangle, a quadrilateral, a polygon) and list them; `what` is the student's new
+ * statement as `describeConstraint` names it, absent when the step added no constraint (a shape declared over
+ * points the givens already put on one line). Exported for the humaniser's coverage lock.
+ */
+export function collapsedPolygonError(vertices: readonly Id[], what: string | null): string {
+  return `collapsed: polygon ${vertices.join(', ')} would be flat${what ? ` — ${what} cannot hold` : ''}`;
+}
+/**
+ * #1849 (ADR-602): the stage-0h refusal — the step's figure has a declared polygon its LENGTH givens prove flat
+ * (`forcedFlatPolygon`) and the prior figure did not. The comparison keeps the refusal on the statement that
+ * completes the collapse: a figure already flat before this step (none can be committed, but a load is not a
+ * proof) never makes an unrelated statement the culprit. Every enforced constraint is read — the check list and
+ * the solve directives alike, where an earlier length may have become a carrier's drive.
+ */
+export function forcedFlatError(prev: Construction, next: Construction): string | null {
+  const all = (c: Construction) => [...c.constraints, ...drivenConstraintsOf(c)];
+  const proof = forcedFlatPolygon(next.objects, all(next));
+  if (!proof || forcedFlatPolygon(prev.objects, all(prev))) return null;
+  const added = addedConstraints(prev, next);
+  return collapsedPolygonError(proof.polygon, added.length ? describeConstraint(describeNewStatement(added)) : null);
+}
 function collapsedPolygon(c: Construction, positions: Map<Id, Vec>): boolean {
   // The one flatness ruler (`polygonFlatness`) — an all-coincident ring answers null, which is the
   // coincidence machinery's concern, not this gate's.
   return degeneratePolygons(c, positions, COLLAPSED_POLYGON_RATIO).length > 0;
 }
-/** ADR-413's floor: a numeric collapse sits orders of magnitude below, the thinnest legit triangle orders above. */
-const COLLAPSED_POLYGON_RATIO = 1e-4;
+/**
+ * ADR-413's floor, RAISED to the notice band's ceiling by #1849 ([ADR-602](../../docs/06-decisions.md#adr-602),
+ * operator ruling 2026-10-07, [ADR-W-115](../../docs/06w-decisions-workspace.md#adr-w-115)). It was 1e-4, and a
+ * construction the givens FORCE flat — «משולש ABC» with sides 5, 3 and 8 — settled just above it (1e-4–2.3e-4 over
+ * seeds 0–7) and drew, with ADR-513's notice. The ruling reverses ADR-W-048 for declared polygons: a flat figure is
+ * not a triangle, so the line that completes the collapse is REFUSED. One ruler, one number: the band the notice
+ * calibrated (ADR-513 — 2.2× above the forced family's worst seed, 2.8× below the nearest legitimate thin triangle,
+ * 46× below the thinnest ordinary corpus polygon) is now the refusal floor.
+ */
+const COLLAPSED_POLYGON_RATIO = DEGENERATE_EXTENT_RATIO;
 
 /**
  * #1328 (ADR-537): a declared polygon that is THIN and whose constraints hold only by the tolerance's
@@ -613,9 +646,15 @@ function runFailureLadder(
   // #1328 (ADR-537): did ANY stage find a solution the accept gate refused as not a figure? Then the
   // refusal below is a rigid contradiction (a solution exists and is degenerate), whichever stage saw it.
   let refusedAsNotAFigure = primary.ok;
+  // #1849 (ADR-602): the first declared polygon a rescue stage's solution FLATTENED — a solution that holds every
+  // given and is a line, which is the refusal's reason whichever stage found it.
+  let collapsedSeen: Id[] | undefined;
   const gate = (c: Construction, pos: Map<Id, Vec>): boolean => {
     const ok = stepAccepted(c, pos, newCons);
-    if (!ok) refusedAsNotAFigure = true;
+    if (!ok) {
+      refusedAsNotAFigure = true;
+      collapsedSeen ??= degeneratePolygons(c, pos, COLLAPSED_POLYGON_RATIO)[0]?.vertices;
+    }
     return ok;
   };
   const baseline = obligationsOf(next);
@@ -698,11 +737,18 @@ function runFailureLadder(
   // solve directives lists none, and both messages below were being built from an empty set.
   const blameCons = addedConstraints(prev, next);
   const vacuousErr = blameCons.length ? `over-constrained: ${describeConstraint(describeNewStatement(blameCons))} cannot hold` : 'over-constrained';
+  // #1849 (ADR-602): when the solution that EXISTED flattened a DECLARED polygon, the refusal says so — the
+  // student's statement cannot hold because the polygon would be a line, and a line is not a triangle (the
+  // operator's ruling, 2026-10-07). One shape for every collapse the gate refuses: forced by lengths
+  // («AB = 5 · BC = 3 · AC = 8»), by a sum, a ratio, or invented by an incidence («D אמצע AB · D על AC»,
+  // ADR-413). The fold names the polygon's declaring statement as the other side (`[vs #i]`).
+  const flatPoly = (primary.ok ? degeneratePolygons(next, primary.positions, COLLAPSED_POLYGON_RATIO)[0]?.vertices : undefined) ?? collapsedSeen;
+  const flatErr = flatPoly ? collapsedPolygonError(flatPoly, blameCons.length ? describeConstraint(describeNewStatement(blameCons)) : null) : null;
   // #1328 (ADR-537): when the PRIMARY solve succeeded and the step-accept gate refused it — a vacuous
   // satisfaction (#7), a collapsed polygon (#408), a tolerance artefact (#1328) — a solution EXISTS and is
   // not a figure. That is a rigid contradiction, never "waiting for more givens": the fold's classifier
   // must not file it as pending on the strength of the figure still having freedom.
-  return { ok: false, error: primary.ok ? vacuousErr : blameNewStatement(primary.error, blameCons, primary.violated), construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:refuse`], ...(refusedAsNotAFigure ? { degenerate: true as const } : {}) };
+  return { ok: false, error: flatErr ?? (primary.ok ? vacuousErr : blameNewStatement(primary.error, blameCons, primary.violated)), construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:refuse`], ...(refusedAsNotAFigure ? { degenerate: true as const } : {}) };
 }
 
 /**
@@ -931,6 +977,11 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   if (angleErr) {
     return { ok: false, error: angleSumImpossibilityError(angleErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
+  // #1849 (ADR-602), stage 0h: the EQUALITY the metric prover lets through — a declared polygon its length givens
+  // force flat («משולש ABC» · «AB = 5» · «BC = 3» · «AC = 8»). Proven, so the refusal does not depend on where the
+  // solver stops on a bent path (operator ruling 2026-10-07: a flat line is not a triangle).
+  const flatErr = forcedFlatError(prev, probed);
+  if (flatErr) return { ok: false, error: flatErr, construction: prev, positions: prevPositions, ladder: ['pre:flat'], degenerate: true };
 
   // #1712 (ADR-587): the fifth member — a stated measure no configuration can take on its own
   // («∢ABC = -2», «∢ABC > 200», «AB = -3»). Read on the step's NEW constraints only, so an older fact is
@@ -1113,6 +1164,9 @@ function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult
   if (rangeErr) {
     return { ok: false, error: measureRangeImpossibilityError(rangeErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
+  // #1849 (ADR-602): a coupled line can complete a forced collapse as well as a single statement can.
+  const flatErr = forcedFlatError(prev, next);
+  if (flatErr) return { ok: false, error: flatErr, construction: prev, positions: prevPositions, ladder: ['pre:flat'], degenerate: true };
   const res = evaluate(next);
   if (res.ok && stepAccepted(next, res.positions, newCons)) {
     const owned = ensureOwnership(next, newCons, res.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF

@@ -328,11 +328,26 @@ describe('the battery — supported cells exercised end-to-end', () => {
   });
 
   it('coincident|segment|segment + |segment|line — «מתלכדים» builds, both locales', () => {
+    // #1849 (ADR-3D-310, operator ruling 2026-10-07): this cell was locked on «מרובע ABCD · AB מתלכד עם CD»,
+    // which can only hold with the quadrilateral flat — now refused (below). The cell is exercised on two
+    // sides of DIFFERENT polygons, where the coincidence leaves both open, and the lines must coincide.
+    for (const [quads, rel] of [[['משולש ABC', 'משולש DEF'], 'AB מתלכד עם DE'], [['triangle ABC', 'triangle DEF'], 'AB coincides with DE']] as const) {
+      for (const u of [...quads, rel]) submit(u);
+      expect(state().lastError, rel).toBeNull();
+      const p = derive3(state().facts, state().seed).resolved.positions;
+      const d = vsub(p.get('B')!, p.get('A')!);
+      for (const q of ['D', 'E']) {
+        const w = vsub(p.get(q)!, p.get('A')!);
+        expect(vnorm(vcross(d, w)) / Math.max(vnorm(d) * Math.max(vnorm(w), 1), 1e-12), `${q} on line AB`).toBeLessThan(1e-6);
+      }
+      state().clear();
+    }
+    // the two sides of ONE quadrilateral coincide only if it is flat — refused, naming the statement (#1849)
     for (const u of ['מרובע ABCD', 'AB מתלכד עם CD']) submit(u);
-    expect(state().lastError).toBeNull();
+    expect(state().lastError).toMatchObject({ code: 'polygon-collapsed', stated: 'AB מתלכד עם CD', ring: 'ABCD', forced: true });
     state().clear();
     for (const u of ['quadrilateral ABCD', 'AB coincides with CD']) submit(u);
-    expect(state().lastError).toBeNull();
+    expect(state().lastError).toMatchObject({ code: 'polygon-collapsed', ring: 'ABCD', forced: true });
   });
 
   it('parallel|segment|segment — the DIRECTED given drives (the form that used to be refused)', () => {

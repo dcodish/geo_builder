@@ -14,7 +14,7 @@
  */
 
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { angleSumImpossibility, boundImpossibility, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
+import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
@@ -628,6 +628,12 @@ function foldForSearch(facts: Fact[]): FoldNode {
 }
 /** #943: the structured tail an over-constrained status carries once the other side is known — `[vs #<fact index>]`. */
 export const OVER_CONSTRAINED_VS = /^over-constrained: (.+) cannot hold(?: \[vs #(\d+)\])?$/;
+/**
+ * #1849 ([ADR-602](docs/06-decisions.md#adr-602)) — a DECLARED polygon the step would flatten
+ * (`collapsedPolygonError`, step.ts), with the same optional `[vs #<fact index>]` tail. Group 1 is the
+ * comma-separated vertex list, group 3 the tail's index.
+ */
+export const COLLAPSED_VS = /^collapsed: polygon (.+?) would be flat(?: — (.+) cannot hold)?(?: \[vs #(\d+)\])?$/;
 
 /**
  * #1675/#1584 ([ADR-583](docs/06-decisions.md#adr-583)) — ONE ATTEMPT SCOPE PER OUTERMOST FOLD.
@@ -1668,6 +1674,28 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
    * never-on-green guarantee; each direction keeps its own cap of 8, so an earlier counterpart named today
    * is never starved by later lines.
    */
+  /**
+   * #1849 ([ADR-602](docs/06-decisions.md#adr-602), operator ruling 2026-10-07) — A FLATTENED POLYGON'S OTHER
+   * SIDE IS THE STATEMENT THAT DECLARED IT. The ruling's own sentence: the line is refused *because it
+   * contradicts «משולש ABC» — a flat line is not a triangle*. So the counterpart is not found by a drop-one
+   * search (on 5·3·8 that would name «BC = 3», one of three lengths that are only jointly at fault) but read
+   * from the fold's own provenance: `ownerByObjId` already records which statement first put the polygon in
+   * the figure — the declaring half of #945's attribution (ADR-513), structurally, with no replay. A polygon
+   * the refused line itself declares has no earlier statement, and the message names the line alone.
+   */
+  if (attribute && hoistDepth === 0) {
+    for (const f of failedFacts) {
+      const st = status[f.id];
+      if (typeof st !== 'string') continue;
+      const m = COLLAPSED_VS.exec(st);
+      if (!m || m[3] !== undefined) continue;
+      const poly = cur.objects.find((o) => o.kind === 'polygon' && o.vertices.join(', ') === m[1]);
+      const declared = poly ? ownerByObjId.get(poly.id) : undefined;
+      if (declared === undefined || !facts[declared]?.enabled || groupKey(facts[declared]) === groupKey(f)) continue;
+      const tagged = `${st} [vs #${declared}]`;
+      for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
+    }
+  }
   if (attribute && hoistDepth === 0) {
     const ownerIdx = new Set(ownerByConKey.values());
     const searched = new Set<string>();
@@ -2050,6 +2078,8 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   // across seeds (the free apex changes both angles), which is not whether it can reach zero; the
   // polygon's own angle sum proves it cannot.
   if (angleSumImpossibility(probe.objects, probe.constraints)) return false;
+  // #1849 (ADR-602): a declared polygon the length givens PROVE flat — no later given can unflatten it.
+  if (forcedFlatPolygon(probe.objects, [...probe.constraints, ...drivenConstraintsOf(probe)])) return false;
   // #1335 (ADR-540): the bound twin — «BC > 10» · «BC = 4». The residual moves (the triangle is
   // free), which is not whether it can reach zero; a bound and a value of the same measure that
   // exclude each other cannot be rescued by any later given.

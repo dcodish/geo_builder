@@ -82,6 +82,15 @@ export type Claim3 =
    */
   | { type: 'par-plane'; seg: [Id, Id]; plane: [Id, Id, Id]; given?: true }
   | { type: 'collinear3'; ids: Id[] } // E, C, A' on one line
+  /**
+   * #1849 (ADR-3D-310) — a polygon DECLARED over points that already exist («A(0,0,0) · B(1,0,0) · C(2,0,0)»
+   * then «משולש ABC», or «D אמצע AB» then «משולש ADB») is a statement ABOUT them (M1, #116): its ring is
+   * open. It drives nothing (the points are already defined), so it is verified, and a ring the givens hold
+   * on one line is refused — a flat figure is not a triangle (operator ruling 2026-10-07, ADR-W-115). The
+   * pivot judges a polygon the declaration MINTED; this is the same rule for one it bound. `given`: judged
+   * on placed figures only, like every arbiter of a given.
+   */
+  | { type: 'polygon-open'; ids: Id[]; given: true }
   | { type: 'length-eq'; a: Id; b: Id; value: number; given?: true } // AB = 3 (all points pinned ⇒ a CHECK)
   | { type: 'area-eq'; ids: [Id, Id, Id]; value: number } // שטח ABC = 4.5
   // #1546 (ADR-3D-282): a component is `null` when the statement left it UNSTATED or SYMBOLIC («B(3, n, p)»
@@ -1755,9 +1764,11 @@ export type EngineError3 =
   // sides, plane equations) — the givens contradict each other, and the message names which.
   | { code: 'givens-contradict'; stated: string; others: string[] }
   // #1815 (ADR-3D-309): the same finding when the only figures satisfying the givens FLATTEN a declared
-  // polygon that only an incidence forced flat — named by the statements and the polygon (noun by its
-  // vertex count, and its letters), both on the student's figure.
-  | { code: 'polygon-collapsed'; stated: string; others: string[]; sides: number; ring: string }
+  // polygon — named by the statements and the polygon (noun by its vertex count, and its letters), both
+  // on the student's figure. #1849 (ADR-3D-310): every such collapse is refused; `forced` says the
+  // non-incidence givens force the flatness on their own (lengths 5·3·8, a stated coincidence) rather
+  // than an incidence on a rider inventing it, which changes only the wording.
+  | { code: 'polygon-collapsed'; stated: string; others: string[]; sides: number; ring: string; forced?: true }
   | { code: 'sign-unsatisfiable'; id: Id } // no pivot solution has the stated coordinate sign
   | { code: 'no-such-solid'; id: string } // a volume/area claim names a solid kind the figure doesn't have (or has twice)
   | { code: 'free-size-claim'; id: string } // a numeric volume/area claim on a solid whose dims are unstated

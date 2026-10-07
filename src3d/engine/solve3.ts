@@ -22,7 +22,7 @@ import { carrierParams3 } from './carriers';
 import { evalAffine, gaugeFramePoint3, openPinSymsOf, pinSymsOf, symbolValueOf, type Construction3, type Id, type LinExpr, type Positions3, type ScalarPin, type SolidKind, type SolidObj } from './types';
 import { componentValue, distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { figureLineRels, figurePlaneLinePerps } from './freeLine';
-import { add3, bisectorDir3, cross3, dist3, dot3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
+import { add3, bisectorDir3, cross3, dist3, dot3, ringCollapsed3, ringOpenness3, runNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 export interface GaugeParams {
   /** [tx, ty, tz, rx, ry, rz (axis-angle), logScale, ...dims] */
@@ -217,16 +217,21 @@ export interface PivotResult {
 }
 
 /**
- * #1815 (ADR-3D-309) — why a pool came back EMPTY when the empty answer is an invented collapse: the
- * flat ring every solution flattened, and the carrier keys of the riders whose incidences forced it.
- * The store names the statements behind both (the refusal must name the student's statements, never
- * internal state); a plain contradiction carries no record.
+ * #1815 (ADR-3D-309) / #1849 (ADR-3D-310) — why a pool came back EMPTY when the empty answer is a
+ * collapsed declared polygon: the flat ring every solution flattened, the carrier keys of the enrolled
+ * riders, and WHICH givens forced it. `forced: false` — an incidence on a rider invented the flatness
+ * (the givens without those incidences leave the ring open), so the rider statements are named.
+ * `forced: true` — the other givens force it on their own («AB = 5 · BC = 3 · AC = 8», a stated
+ * coincidence), so those are named. Either way it is refused: a flat figure is not a triangle (operator
+ * ruling 2026-10-07, ADR-W-115). The store names the statements (never internal state); a plain
+ * contradiction carries no record.
  */
 export interface InventedCollapse3 {
   ring: Id[];
   riderKeys: string[];
+  forced: boolean;
 }
-/** A solve's pool — the solutions, plus the #1815 record when it is empty because of an invented collapse. */
+/** A solve's pool — the solutions, plus the #1815/#1849 record when it is empty because of a collapse. */
 export type PivotPool = PivotResult[] & { readonly collapse?: InventedCollapse3 };
 
 /**
@@ -1213,13 +1218,12 @@ export function solvePivot(
       // coplanar on purpose.
       if (!FLAT_SOLID_KINDS.has(solid.kind) && pts.length >= 4 && maxD > 1e-12 && offPlaneSpread(pts) <= 1e-4 * maxD) return true;
       // #1499 — the #872 gate's zero-AREA face, for the NON-flat kinds only. A 3-D solid's ring
-      // driven collinear is never a figure. A FLAT solid (the 2-D vector lane) is deliberately NOT
-      // rejected here: a student can FORCE its ring collinear («מרובע ABCD» then «AB מתלכד עם CD»),
-      // and FR-RD-7's rule is that a forced-flat figure is DRAWN, never refused — so the flat kinds'
-      // collapse is judged after the solve (`collapsedRing` below): a pool whose every solution
-      // collapsed retries with the dims frozen and prefers a non-collapsed figure, and keeps the
-      // collapsed one only when the givens that are not incidences on a rider force it (#1815,
-      // `collapseIsStated`; an incidence-invented collapse is refused).
+      // driven collinear is never a figure. A declared polygon (a FLAT kind) collapsed is not a figure
+      // either (#1849, ADR-3D-310) — but it is judged after the solve (`settleFlatRings` below), not
+      // here, because the refusal must say WHICH givens forced the flatness: a pool whose every solution
+      // collapsed retries with the dims frozen and prefers a non-collapsed figure, and otherwise comes
+      // back empty with the record naming the ring and whether an incidence on a rider (#1815) or the
+      // other givens forced it.
       if (!FLAT_SOLID_KINDS.has(solid.kind) && pts.length >= 3 && maxD > 1e-12 && norm3(runNormal(pts)) <= 1e-4 * maxD * maxD) return true;
     }
     return false;
@@ -1336,19 +1340,25 @@ export function solvePivot(
    * are judged by one predicate despite their different unknown vectors.
    */
   /** The first flat solid whose ring this solution collapsed (#1815: the refusal names it), or null. */
-  const collapsedRingOf = (r: Pick<PivotResult, 'dims' | 'riderTs'>): SolidObj | null => {
-    const pos = evalCanonical(r.dims, undefined, r.riderTs ? new Map(Object.entries(r.riderTs)) : undefined);
+  const collapsedRingOf = (r: Pick<PivotResult, 'dims' | 'riderTs' | 'symbols'>): SolidObj | null => {
+    // #1849: a V8-c solution is judged where it stands — its coupled symbols placed, as evaluate places them
+    const override = coupled && r.symbols ? new Map(coupled.syms.map((s, i) => [s, r.symbols![i]])) : undefined;
+    const pos = evalCanonical(r.dims, override, r.riderTs ? new Map(Object.entries(r.riderTs)) : undefined);
     for (const solid of c.solids) {
       if (!FLAT_SOLID_KINDS.has(solid.kind)) continue;
-      const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
-      if (pts.length < 3) continue;
-      let maxD = 0;
-      for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) maxD = Math.max(maxD, norm3(sub3(pts[j], pts[i])));
-      if (maxD > 1e-12 && norm3(runNormal(pts)) <= 1e-4 * maxD * maxD) return solid;
+      if (ringCollapsed3(solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p))) return solid;
     }
     return null;
   };
-  const collapsedRing = (r: Pick<PivotResult, 'dims' | 'riderTs'>): boolean => collapsedRingOf(r) !== null;
+  const collapsedRing = (r: Pick<PivotResult, 'dims' | 'riderTs' | 'symbols'>): boolean => collapsedRingOf(r) !== null;
+  /** #1849: the declared polygon whose ring is least open in this solution (the released-sliver refusal names it). */
+  const thinnestRingOf = (r: Pick<PivotResult, 'dims' | 'riderTs' | 'symbols'>): SolidObj => {
+    const override = coupled && r.symbols ? new Map(coupled.syms.map((s, i) => [s, r.symbols![i]])) : undefined;
+    const pos = evalCanonical(r.dims, override, r.riderTs ? new Map(Object.entries(r.riderTs)) : undefined);
+    const flat = c.solids.filter((s) => FLAT_SOLID_KINDS.has(s.kind));
+    const openness = (s: SolidObj) => ringOpenness3(s.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p));
+    return flat.reduce((a, b) => (openness(b) < openness(a) ? b : a));
+  };
   /**
    * #1815 (ADR-3D-309, amends ADR-3D-268 part 2) — WHICH GIVENS FORCED THE COLLAPSE.
    *
@@ -1364,12 +1374,22 @@ export function solvePivot(
    * incidence: not a figure, refused (an empty pool marked `collapse`, so the step keeps its prior figure
    * and the store names the statements). If
    * every reduced solution is still collapsed (or none is found), the non-incidence givens force it —
-   * «AB = 5 · BC = 3 · AC = 8» — and FR-RD-7 draws it, exactly as before. One bounded solve on the
-   * failure path only; it never recurses (no rider rows remain to remove).
+   * «AB = 5 · BC = 3 · AC = 8». One bounded solve on the failure path only; it never recurses (no rider
+   * rows remain to remove). #1849 (ADR-3D-310): both answers are now refused — this decides only WHICH
+   * statements the refusal names (the rider incidences, or the givens that force the flatness).
    */
   const collapseIsStated = (): boolean => {
     const mask = riderRowMask;
     if (!mask || !mask.some(Boolean)) return true;
+    return openSolveOn(mask) === null;
+  };
+  /**
+   * The anchored open search behind both questions below: from four dim starts, anchor the dims to the
+   * seed's sample (the anchor steers away from the collapse basin), then RELEASE on the chosen rows and
+   * accept only an exact solution whose declared rings are all open. `mask` drops the rows it marks (the
+   * rider incidences, for the attribution); `null` keeps every row (#1849: the open-figure retry).
+   */
+  const openSolveOn = (mask: boolean[] | null): { x: number[]; mirror: boolean } | null => {
     const ringCollapsedAt = (x: number[]): boolean =>
       collapsedRing({
         dims: x.slice(7, 7 + nDims),
@@ -1384,7 +1404,7 @@ export function solvePivot(
       // a layout that moved since the probe cannot be attributed: judge it on every row (today's answer)
       return (x: number[]): number[] => {
         const r = f(x);
-        return r.length === mask.length ? r.filter((_, k) => !mask[k]) : r;
+        return mask && r.length === mask.length ? r.filter((_, k) => !mask[k]) : r;
       };
     };
     // the mirrored placement is a second problem only when some reduced row is chiral — measured at two
@@ -1406,28 +1426,106 @@ export function solvePivot(
         // residual floors where the anchor's pull balances it — so a loose acceptance would read that
         // sliver as "an open figure exists" (measured: it did, at 1e-10). An honest open figure
         // converges quadratically far below `EXACT`; a sliver cannot reach it.
-        const x = pm(x0) < EXACT ? x0 : leastSquares(fm, leastSquares(anchored, x0).x).x;
-        if (pm(x) < EXACT && !ringCollapsedAt(x)) return false;
+        // #1849: the full-row retry on an `invariantOnly` figure keeps that path's gauge FROZEN at identity —
+        // freed, the release falls into the scale→0 basin (every incidence holds on a figure shrunk onto a
+        // point; measured: «משולש ABC · D על AB · D אמצע AC» at seed 15 "solved" with every vertex at the origin)
+        const frozenGauge = mask === null && invariantOnly;
+        const lift = (y: number[]): number[] => (frozenGauge ? [0, 0, 0, 0, 0, 0, 0, ...y] : y);
+        const drop = (x: number[]): number[] => (frozenGauge ? x.slice(7) : x);
+        const x = pm(x0) < EXACT ? x0 : lift(leastSquares((y) => fm(lift(y)), leastSquares((y) => anchored(lift(y)), drop(x0)).x).x);
+        // the full-row retry admits a FIGURE, so it passes every gate a figure passes (a rider on its host,
+        // no collapsed solid); the attribution's reduced system only asks whether the ring can be open
+        if (pm(x) < EXACT && !ringCollapsedAt(x) && (mask !== null || !degenerate(x))) return { x, mirror };
       }
     }
-    return true;
+    return null;
   };
   /**
-   * The retry trigger above, applied to a candidate pool: [] means "keep what you have"; a marked
-   * empty pool (`collapse` set) means every solution collapsed a flat ring that the incidence-free
-   * givens leave open (#1815) — the caller returns it, and the step is refused naming the statements.
+   * #1849 (ADR-3D-310) — THE OPEN-FIGURE RETRY. The unanchored joint solve lets a dim the givens leave free
+   * drift to wherever LM's null-space puts it, and for a declared polygon that can be the collapse:
+   * «משולש ABC · AC = 8 · BC = 3» came back FLAT at seeds 5 and 7 of 0–7 (AB = 5 exactly, though any AB
+   * in (5, 11) satisfies both lengths) — drawn flat before this, and a false refusal once a flat ring is
+   * refused. So when every solution collapsed a declared ring, the anchored open search runs on EVERY row:
+   * an open exact figure near the seed's sample is a solution like any other. Failure path only.
    */
-  const preferUncollapsed = (rs: PivotResult[]): PivotPool => {
-    if (rs.length === 0 || nRider === 0 || nDims === 0 || probe || coupled) return [];
-    if (!c.solids.some((s) => FLAT_SOLID_KINDS.has(s.kind))) return [];
-    if (!rs.every(collapsedRing)) return [];
-    const frozen = retryFrozenDims();
-    if (frozen.length > 0 && !frozen.every(collapsedRing)) return frozen;
-    if (collapseIsStated()) return [];
-    const ring = collapsedRingOf(rs[0])!.ids;
-    return Object.assign([] as PivotResult[], { collapse: { ring: [...ring], riderKeys: riders.map((r) => r.id) } });
+  const openFigureRetry = (): PivotResult[] => {
+    if (coupled) return []; // the V8-c symbol slots are not in this search's layout
+    const found = openSolveOn(null);
+    if (!found) return [];
+    const { x, mirror } = found;
+    const g = { ...unpack(x), mirror };
+    return [{
+      transform: (p) => applyGauge(p, g), mirror, dims: x.slice(7, 7 + nDims),
+      ...(nPinSym > 0 ? { pinSymbols: pinSymbolsAt(x) } : {}),
+      ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, x[riderBase + i]])) } : {}),
+      scalarConsumed: scalarConsumedAt(x, mirror),
+      err: residualsFor(mirror)(x).reduce((sum, v) => sum + v * v, 0),
+      x: [...x],
+    }];
   };
-  const isInvented = (pool: PivotPool): boolean => pool.collapse !== undefined;
+  /**
+   * #1849 (ADR-3D-310, operator ruling 2026-10-07, ADR-W-115; amends ADR-3D-309 / ADR-3D-268 part 2) —
+   * A DECLARED POLYGON COLLAPSED FLAT IS NOT A FIGURE, whatever forced it. Applied to a candidate pool:
+   * [] means "keep what you have" (no solution collapsed a declared polygon); a non-empty pool is the
+   * admissible part — the solutions with every declared ring open, from this pool or from the
+   * frozen-dims retry (#1499); a marked empty pool (`collapse` set) means no admissible solution exists,
+   * and the caller returns it so the step is refused naming the statements.
+   *
+   * Before this, a pool whose every solution collapsed was KEPT unless an incidence on a rider had
+   * invented the collapse (#1815): «AB = 5 · BC = 3 · AC = 8» and «מרובע ABCD · AB מתלכד עם CD» were
+   * drawn flat — ADR-W-048's "a notice, not a refusal", and 3-D did not even give the notice. The
+   * attribution (`collapseIsStated`) now chooses only WHICH statements the refusal names, never
+   * whether it refuses; with no enrolled rider there is nothing to attribute and it costs nothing.
+   */
+  /**
+   * #1849 (ADR-3D-310 Am.) — A SLIVER THE ANCHOR HELD OPEN IS NOT AN OPEN FIGURE. An accepted solution is
+   * exact only to the acceptance floor (1e-10 / 1e-12), and the anchored solves (the `invariantOnly` REG
+   * pull, the rider lane) balance their pull against the residuals there. A metric-forced flatness admits a
+   * height only to SECOND order, so that equilibrium is a sliver: «AB : BC = 5 : 3 · AB : AC = 5 : 8» was
+   * accepted with C 0.004 off line AB (openness 1.5e-3, above the 1e-4 collapse line) and drawn as a
+   * "triangle". ADR-3D-309 met the same sliver in the attribution and answered it with a strict release; this
+   * is that answer applied to the pool. A solution whose declared ring is THIN (openness under the #936
+   * notice's 1e-2 band) is released on its own residuals alone (the gauge stays frozen where its path froze
+   * it); if the released figure is exact and collapsed, the open one was the anchor's, and it is judged
+   * collapsed. A genuinely thin triangle (3°, 5·3·7.99) is exact where it stands and stays open.
+   */
+  const SLIVER_BAND = 1e-2;
+  const EXACT_RELEASE = 1e-20;
+  const fullLen = 7 + nDims + nSym + nPinSym + nRider;
+  const anchorSliver = (r: PivotResult): boolean => {
+    if (coupled || r.x.length !== fullLen) return false;
+    const pos = evalCanonical(r.dims, undefined, r.riderTs ? new Map(Object.entries(r.riderTs)) : undefined);
+    const thin = c.solids.some(
+      (s) => FLAT_SOLID_KINDS.has(s.kind) && ringOpenness3(s.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p)) < SLIVER_BAND,
+    );
+    if (!thin) return false;
+    const f = residualsFor(r.mirror);
+    const lift = (y: number[]): number[] => (invariantOnly ? [0, 0, 0, 0, 0, 0, 0, ...y] : y);
+    const x = lift(leastSquares((y) => f(lift(y)), invariantOnly ? r.x.slice(7) : [...r.x]).x);
+    const err = f(x).reduce((sum, v) => sum + v * v, 0);
+    return err < EXACT_RELEASE && collapsedRing({
+      dims: x.slice(7, 7 + nDims),
+      ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((rd, i) => [rd.id, x[riderBase + i]])) } : {}),
+    });
+  };
+  const settleFlatRings = (rs: PivotResult[]): PivotPool => {
+    if (rs.length === 0 || probe) return [];
+    if (!c.solids.some((s) => FLAT_SOLID_KINDS.has(s.kind))) return [];
+    const open = rs.filter((r) => !collapsedRing(r) && !anchorSliver(r));
+    if (open.length === rs.length) return [];
+    if (open.length > 0) return open; // a collapsed member is not a configuration to cycle to
+    const frozenOpen = retryFrozenDims().filter((r) => !collapsedRing(r) && !anchorSliver(r));
+    if (frozenOpen.length > 0) return frozenOpen;
+    const reopened = openFigureRetry();
+    if (reopened.length > 0) return reopened;
+    // the attribution's reduced re-solve reads the rider rows; with none (or a V8-c layout) the
+    // non-incidence givens are all there is, so they forced it
+    const forced = nRider === 0 || coupled !== undefined || collapseIsStated();
+    // the ring the refusal names: the one collapsed, or (a released sliver) the thinnest declared one
+    const ring = (collapsedRingOf(rs[0]) ?? thinnestRingOf(rs[0])).ids;
+    return Object.assign([] as PivotResult[], { collapse: { ring: [...ring], riderKeys: riders.map((r) => r.id), forced } });
+  };
+  const isCollapse = (pool: PivotPool): boolean => pool.collapse !== undefined;
 
   if (invariantOnly) {
     // #820: with a rider in the lane there IS something to flex, so the immediate answer below does
@@ -1506,8 +1604,8 @@ export function solvePivot(
         scalarConsumed: scalarConsumedAt([0, 0, 0, 0, 0, 0, 0, ...bx], false), // #990
         x: [0, 0, 0, 0, 0, 0, 0, ...bx],
       }];
-      const uncollapsed = preferUncollapsed(invSol); // #1499: a flat ring the solve collapsed, retried
-      if (isInvented(uncollapsed)) return uncollapsed; // #1815: the collapse was invented by an incidence
+      const uncollapsed = settleFlatRings(invSol); // #1499 / #1849: a declared ring the solve collapsed — retried, else refused
+      if (isCollapse(uncollapsed)) return uncollapsed; // #1815 / #1849 (ADR-3D-310): no open figure — refused
       return uncollapsed.length > 0 ? uncollapsed : invSol;
     };
     /**
@@ -2019,12 +2117,12 @@ export function solvePivot(
     // re-seated onto their hosts (the frozen retry's own recursive solve has already had this chance).
     for (const stage of reseatStages) stage();
   }
-  // #1499: …or it found only figures that collapse a flat solid's ring — prefer a figure that
-  // satisfies the givens without the collapse, and keep the flat one only when the givens that are NOT
-  // incidences on a rider force it (#1815: an incidence-invented collapse is refused).
+  // #1499: …or it found figures that collapse a declared polygon's ring — keep only the open ones, or a
+  // figure the frozen-dims retry finds open; with none, the pool is empty and marked (#1849, ADR-3D-310:
+  // a flat figure is refused whatever forced it; #1815's attribution picks the statements it names).
   {
-    const uncollapsed = preferUncollapsed(results);
-    if (isInvented(uncollapsed) || uncollapsed.length > 0) return uncollapsed;
+    const uncollapsed = settleFlatRings(results);
+    if (isCollapse(uncollapsed) || uncollapsed.length > 0) return uncollapsed;
   }
   return results;
 }

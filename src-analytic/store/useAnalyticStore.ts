@@ -144,6 +144,8 @@ export type InputError =
   /** A construct that cannot exist in this figure, which has no freedom left to try (#1058). */
   | { key: 'does-not-exist'; detail: string; existing?: string }
   | { key: 'ring-contradicts-noun'; detail: string }
+  /** #1849 (ADR-AG-247) — the givens flatten a declared polygon: its name, its noun (registry key) and its declaring sentence. */
+  | { key: 'polygon-collapsed'; detail: string; polygon?: string; shape?: string; declared?: string }
   /** #1554 ruling 1 (ADR-AG-198) — a noun no circle can pass around, said to be inscribed: both nouns, registry keys. */
   | { key: 'inscribed-contradicts-noun'; detail: string; shape?: string; forced?: string }
   /** A vertex that does not name an angle on its own — no shape through it, or several (#1049). */

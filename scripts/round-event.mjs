@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * #1853 (ADR-W-115) — the LIVE ROUND DASHBOARD (tracking only), I/O half. One append-only event log per round; every
+ * #1853 (ADR-W-116) — the LIVE ROUND DASHBOARD (tracking only), I/O half. One append-only event log per round; every
  * actor in the round writes to it, and the orchestrator projects it onto the published dashboard.
  *
  *   node scripts/round-event.mjs emit <round> round <phase> [--note "…"] [--data '{…}']

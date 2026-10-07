@@ -492,3 +492,179 @@ export function measureRangeImpossibilityError(m: MeasureRangeImpossibility): st
     ? `impossible: ${m.statement} — an angle measures between 0° and 180°`
     : `impossible: ${m.statement} — a length is never negative`;
 }
+
+/**
+ * A DECLARED POLYGON THE LENGTH GIVENS FORCE FLAT (#1849, [ADR-602](../../docs/06-decisions.md#adr-602)).
+ *
+ * The operator's ruling (2026-10-07, [ADR-W-115](../../docs/06w-decisions-workspace.md#adr-w-115)): when the givens
+ * force «משולש ABC» flat, the line that completes the collapse is REFUSED — a flat line is not a triangle. The
+ * equality case the metric prover above deliberately lets through («AB = 5 · BC = 3 · AC = 8») is exactly that
+ * member, and it is a THEOREM, not a measurement: |AC| = |AB| + |BC| holds only with B on segment AC.
+ *
+ * Why a prover and not the accept gate alone. The gate judges the drawing (`collapsedPolygon`, step.ts), and a
+ * drawing of a forced-flat figure is only as flat as the solver polished it: every length meets its tolerance
+ * (2e-4 of the scale) on a bent path whose sag is second order, so «AB = BC = CD = 1 · AD = 3» drew a
+ * «quadrilateral» at flatness 1.6e-3 — three times the gate — with every row green (measured, 2026-10-07). The
+ * proof does not depend on where the solver stopped.
+ *
+ * **The mechanism — a linear implication over segment lengths.** Every LINEAR length statement is a row in the
+ * unknowns x_PQ = |PQ|: a pinned length, an equality, a ratio (with its affine `add`), a signed sum («AC = AB +
+ * BC»), a perimeter, a perimeter ratio. A relation c·x = 0 FOLLOWS from a consistent system iff the row (c | 0)
+ * lies in the row space of [A | b] — one Gaussian elimination, scale-free, so a ratio form («AB : BC = 5 : 3 ·
+ * AB : AC = 5 : 8») is the same proof as the pinned one. The candidate relations are a polygon's own straightness
+ * equalities: |uv| = the length of a ring arc from u to v (every vertex of that arc then lies on segment uv, in
+ * order), and |uv| = |uw| + |wv| for any third vertex w. Proven collinear sets that share two points lie on one
+ * line and merge; a polygon whose every vertex lands in one merged set is flat in EVERY configuration.
+ *
+ * Sound one way, like its siblings: a proof refuses; no proof proves nothing, and the accept gate still judges
+ * the drawing. An inconsistent system proves anything, so it proves nothing here (the solver reports it). Only
+ * lengths are read — an angle-forced collapse is the angle-sum prover's and ADR-537's, an incidence-forced one
+ * the gate's (it lands far below the floor).
+ */
+export interface ForcedFlatPolygon {
+  /** the polygon's vertex run */
+  polygon: Id[];
+  /** one straightness equality the givens imply, as |uv| = |…| + |…| (for the record and the lock) */
+  relation: string;
+}
+
+/** Relative tolerance of the elimination — far below any length a student types differently («7.99» vs 8). */
+const LIN_TOL = 1e-9;
+
+/** The rows of the linear length system: coefficients over segment keys, and the right-hand side. */
+function lengthRows(constraints: readonly Constraint[]): { coefs: Map<string, number>; rhs: number }[] {
+  const key = (a: Id, b: Id) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const rows: { coefs: Map<string, number>; rhs: number }[] = [];
+  const row = (terms: [Id, Id, number][], rhs: number) => {
+    if (!Number.isFinite(rhs)) return;
+    const coefs = new Map<string, number>();
+    for (const [a, b, k] of terms) {
+      if (a === b || !Number.isFinite(k)) return; // a zero-length operand is the degenerate-operand gate's business
+      const kk = key(a, b);
+      coefs.set(kk, (coefs.get(kk) ?? 0) + k);
+    }
+    for (const [kk, v] of coefs) if (v === 0) coefs.delete(kk);
+    if (coefs.size) rows.push({ coefs, rhs });
+  };
+  const ring = (ids: readonly Id[], k: number): [Id, Id, number][] => ids.map((id, i) => [id, ids[(i + 1) % ids.length]!, k]);
+  for (const c of constraints) {
+    switch (c.type) {
+      case 'distance': row([[c.a, c.b, 1]], c.value); break;
+      case 'equal': row([[c.a, c.b, 1], [c.c, c.d, -1]], 0); break;
+      case 'ratio': row([[c.a, c.b, 1], [c.c, c.d, -c.k]], c.add ?? 0); break;
+      case 'perimeter': if (c.ids.length >= 3) row(ring(c.ids, 1), c.value); break;
+      case 'perimeter-ratio': if (c.ids1.length >= 3 && c.ids2.length >= 3) row([...ring(c.ids1, 1), ...ring(c.ids2, -c.k)], 0); break;
+      case 'measure-sum':
+        if (c.unit === 'length' && c.points.length === 2 * c.coefs.length) row(c.coefs.map((k, i) => [c.points[2 * i]!, c.points[2 * i + 1]!, k]), c.target);
+        break;
+      default: break;
+    }
+  }
+  return rows;
+}
+
+/** Row-reduce [A | b] once; `reduces(c)` answers whether (c | 0) lies in its row space. Null when inconsistent. */
+function rowSpace(rows: { coefs: Map<string, number>; rhs: number }[]): ((target: Map<string, number>) => boolean) | null {
+  const vars = [...new Set(rows.flatMap((r) => [...r.coefs.keys()]))];
+  const col = new Map(vars.map((v, i) => [v, i]));
+  const n = vars.length;
+  // each row: n coefficients + the rhs, normalised so its largest entry is 1 (scale-free tolerance)
+  const norm = (r: number[]) => {
+    const m = Math.max(...r.map(Math.abs));
+    return m > 0 ? r.map((x) => x / m) : r;
+  };
+  const basis: { pivot: number; r: number[] }[] = [];
+  const reduce = (r: number[]): number[] => {
+    let out = [...r];
+    for (const { pivot, r: b } of basis) {
+      const f = out[pivot]!;
+      if (f !== 0) out = out.map((x, i) => x - f * b[i]!);
+    }
+    return out.map((x) => (Math.abs(x) < LIN_TOL ? 0 : x));
+  };
+  for (const r of rows) {
+    const dense = new Array<number>(n + 1).fill(0);
+    for (const [k, v] of r.coefs) dense[col.get(k)!] = v;
+    dense[n] = r.rhs;
+    const red = norm(reduce(norm(dense)));
+    let pivot = -1;
+    for (let i = 0; i < n; i++) if (Math.abs(red[i]!) > LIN_TOL && (pivot < 0 || Math.abs(red[i]!) > Math.abs(red[pivot]!))) pivot = i;
+    if (pivot < 0) {
+      if (Math.abs(red[n]!) > LIN_TOL) return null; // 0 = b ≠ 0: inconsistent — proves anything, so nothing
+      continue;
+    }
+    const p = red[pivot]!;
+    const unit = red.map((x) => x / p);
+    for (const bRow of basis) {
+      const f = bRow.r[pivot]!;
+      if (f !== 0) bRow.r = bRow.r.map((x, i) => x - f * unit[i]!);
+    }
+    basis.push({ pivot, r: unit });
+  }
+  return (target) => {
+    const dense = new Array<number>(n + 1).fill(0);
+    for (const [k, v] of target) {
+      const i = col.get(k);
+      if (i === undefined) return false; // a length no given mentions is free — nothing can force it
+      dense[i] = v;
+    }
+    return reduce(norm(dense)).every((x) => x === 0);
+  };
+}
+
+/** The first declared polygon the linear length givens force flat, or null. */
+export function forcedFlatPolygon(objects: readonly GeoObject[], constraints: readonly Constraint[]): ForcedFlatPolygon | null {
+  const polys = objects.filter((o): o is Extract<GeoObject, { kind: 'polygon' }> => o.kind === 'polygon' && o.vertices.length >= 3);
+  if (!polys.length) return null;
+  const rows = lengthRows(constraints);
+  if (rows.length === 0) return null;
+  const implied = rowSpace(rows);
+  if (!implied) return null;
+  const key = (a: Id, b: Id) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  for (const o of polys) {
+    const V = o.vertices;
+    const n = V.length;
+    if (new Set(V).size !== n) continue;
+    const lines: Set<Id>[] = [];
+    let relation = '';
+    /** |u v| = Σ over the chain's consecutive pairs ⇒ the chain is collinear, in order. */
+    const tryChain = (chain: Id[]) => {
+      const u = chain[0]!, v = chain[chain.length - 1]!;
+      const c = new Map<string, number>([[key(u, v), 1]]);
+      for (let i = 0; i + 1 < chain.length; i++) {
+        const k = key(chain[i]!, chain[i + 1]!);
+        c.set(k, (c.get(k) ?? 0) - 1);
+      }
+      if (!implied(c)) return;
+      lines.push(new Set(chain));
+      if (!relation) relation = `|${u}${v}| = ${chain.slice(0, -1).map((p, i) => `|${p}${chain[i + 1]}|`).join(' + ')}`;
+    };
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++) {
+        // both ring arcs between V[i] and V[j]
+        const fwd = V.slice(i, j + 1);
+        const back = [...V.slice(j), ...V.slice(0, i + 1)].reverse();
+        if (fwd.length >= 3) tryChain(fwd);
+        if (back.length >= 3) tryChain(back);
+        // any third vertex as the middle of a straight angle
+        for (let w = 0; w < n; w++) if (w !== i && w !== j && !(j - i === 2 && w === i + 1)) tryChain([V[i]!, V[w]!, V[j]!]);
+      }
+    if (!lines.length) continue;
+    // two collinear sets that share two points lie on ONE line
+    let merged = true;
+    while (merged) {
+      merged = false;
+      for (let a = 0; a < lines.length && !merged; a++)
+        for (let b = a + 1; b < lines.length && !merged; b++) {
+          const shared = [...lines[a]!].filter((p) => lines[b]!.has(p)).length;
+          if (shared >= 2) {
+            for (const p of lines[b]!) lines[a]!.add(p);
+            lines.splice(b, 1);
+            merged = true;
+          }
+        }
+    }
+    if (lines.some((L) => V.every((p) => L.has(p)))) return { polygon: [...V], relation };
+  }
+  return null;
+}

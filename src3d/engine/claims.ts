@@ -11,7 +11,7 @@ import { knowledgeSamples3, lineAtParam, planeAtParam, type Resolved3 } from './
 import { CLAIM_REL_TOL, containmentDeviation, coordPlaneRelHolds, DIRECTION_REL_TOL, lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { atomVec, evalExpr } from './vecExpr';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
-import { bisectorDir3, cross3, dist3, dot3, runNormal, norm3, normalize3, sub3, v3, type Vec3 } from './vec3';
+import { bisectorDir3, cross3, dist3, dot3, ringCollapsed3, runNormal, norm3, normalize3, sub3, v3, type Vec3 } from './vec3';
 import type { Claim3, Construction3, RevolutionObj } from './types';
 
 /** Claim tolerance. Closed-form figures verify to ~1e-15; a figure placed by the V4
@@ -139,6 +139,12 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       const n = cross3(e1, e2);
       if (norm3(n) <= REL_TOL * Math.max(norm3(e1) * norm3(e2), 1e-12)) return false;
       return Math.abs(dot3(d, n)) <= REL_TOL * Math.max(norm3(d) * norm3(n), 1);
+    }
+    // #1849 (ADR-3D-310): a polygon declared over existing points — its ring must be open
+    case 'polygon-open': {
+      const ps = claim.ids.map((id) => pos.get(id));
+      if (ps.some((p) => !p)) return false;
+      return !ringCollapsed3(ps as Vec3[]);
     }
     case 'collinear3': {
       const ps = claim.ids.map((id) => pos.get(id));

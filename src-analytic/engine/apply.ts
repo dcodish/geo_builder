@@ -103,6 +103,16 @@ export type ApplyErrorCode =
    */
   | 'ring-contradicts-noun'
   /**
+   * THE GIVENS FORCE A DECLARED POLYGON FLAT (#1849, ADR-AG-247; workspace ruling ADR-W-115). «משולש ABC» ·
+   * «AB = 5» · «BC = 3» · «AC = 8»: the three lengths hold only with B on AC, and a flat figure is not a
+   * triangle. The line that COMPLETES the collapse is refused, naming the polygon and the sentence that declared
+   * it — never «לא נמצאה תצורה», which says the search missed when the givens themselves are what flatten it.
+   * Emitted by `derive` only: for a figure with freedom, when the thin-ring arm saw the givens hold on a collapsed
+   * ring (`collapsedByGivens`); for a pinned one, when the pinned ring is `degenerate` (a CROSSED pinned ring
+   * stays `ring-contradicts-noun`).
+   */
+  | 'polygon-collapsed'
+  /**
    * «זווית B ישרה» where the vertex alone does not name an angle (#1049).
    *
    * A vertex names an angle only when the figure says which two rays meet there. With no shape

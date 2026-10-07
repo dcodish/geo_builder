@@ -23,6 +23,13 @@
  * circumcentre, so one line carries a ring fault and ADR-AG-008's `does-not-exist` at once.
  * `does-not-exist` names what the student actually asked for and is the truer message; a second,
  * differently-worded refusal on the same line is noise. Asserted below as ONE message, by code.
+ *
+ * ## #1849 (ADR-AG-247) — the flat member has its own message
+ *
+ * The operator's 2026-10-07 ruling (ADR-W-115) made a declared polygon the givens flatten a refusal in every builder,
+ * naming the polygon and the statements. A pinned DEGENERATE ring is that collapse: it is refused as
+ * `polygon-collapsed`, on the line that COMPLETED it (the last of the declaration and the lines placing its
+ * vertices). A pinned CROSSED ring is not flat and keeps this file's `ring-contradicts-noun`, on the declaring line.
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
@@ -34,15 +41,15 @@ describe('#1170 — the operator’s own figure', () => {
   /** His exact five lines, with the `D(1,0)` he actually typed. A, D and B are collinear. */
   const HIS = ['A(0,0)', 'B(4,0)', 'C(1,1)', 'D(1,0)', 'מרובע ABCD'];
 
-  it('is refused, on the line that named the shape', () => {
+  it('is refused on the line that named the shape — the line that completed the collapse (#1849)', () => {
     expect(derive(HIS).faults).toEqual([
-      { index: 4, code: 'ring-contradicts-noun', detail: 'מרובע ABCD' },
+      { index: 4, code: 'polygon-collapsed', detail: 'מרובע ABCD', polygon: 'ABCD', shape: 'מרובע', declared: 'מרובע ABCD' },
     ]);
   });
 
   it('is refused at the SUBMIT gate too — the line is never recorded', () => {
     const verdict = decideSubmit('מרובע ABCD', HIS.slice(0, 4), 0);
-    expect(verdict).toMatchObject({ kind: 'refused', error: { key: 'ring-contradicts-noun' } });
+    expect(verdict).toMatchObject({ kind: 'refused', error: { key: 'polygon-collapsed', polygon: 'ABCD', declared: 'מרובע ABCD' } });
   });
 
   /**
@@ -70,8 +77,9 @@ describe('#1170 — degenerate and crossed are one ruling', () => {
     ]);
   });
 
+  // #1849 (ADR-AG-247): a pinned FLAT ring is the givens flattening the polygon — `polygon-collapsed`, on the line that completed it.
   it('a pinned collinear triangle is refused', () => {
-    expect(codesOf(['A(0,0)', 'B(1,0)', 'C(2,0)', 'משולש ABC'])).toEqual(['ring-contradicts-noun']);
+    expect(codesOf(['A(0,0)', 'B(1,0)', 'C(2,0)', 'משולש ABC'])).toEqual(['polygon-collapsed']);
   });
 });
 

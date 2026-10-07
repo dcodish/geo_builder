@@ -122,6 +122,14 @@ const subjectIdsOf = (parsed: { facts: readonly Fact[] }): string[] => {
   });
 };
 
+/**
+ * #1849 (ADR-AG-247) — a flattened polygon's refusal carries the polygon, its noun and the sentence that declared it,
+ * so the message names BOTH statements: the one refused and the declaration it flattens. Spread from the fault at
+ * every site that turns one into a refusal (submit, un-mute), never re-derived.
+ */
+const collapseFields = (f: Derivation['faults'][number]) =>
+  f.code === 'polygon-collapsed' ? { polygon: f.polygon, shape: f.shape, declared: f.declared } : {};
+
 /** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
 const definingLineOf = (lines: readonly string[], id: string): string | null => {
   for (const l of lines) {
@@ -306,6 +314,7 @@ function decideOnce(
         key: fault.code, detail: fault.detail, existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example, host: fault.host, domain: fault.domain,
         ...(fault.operands ? { operands: fault.operands } : {}),
         ...(fault.options ? { options: fault.options } : {}),
+        ...collapseFields(fault),
         ...(reused && definedBy ? { reusedId: reused, definedBy } : {}),
       } as InputError,
     };
@@ -509,6 +518,7 @@ export function decideToggle(
         key: fault.code, detail: lines[index], existing: fault.existing, expected: fault.expected, holder: fault.holder, example: fault.example,
         ...(fault.operands ? { operands: fault.operands } : {}),
         ...(fault.options ? { options: fault.options } : {}),
+        ...collapseFields(fault),
       } as InputError,
     };
   }

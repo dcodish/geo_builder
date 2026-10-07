@@ -7,39 +7,50 @@
  * vertices are collinear to 1.9e-4 of its own extent, every fact `ok`, no notice — the triangle inequality
  * holds with equality, the accept gate (ADR-413, 1e-4) is one order of magnitude below, and nothing said a
  * word. The predicate, the calibration and the corpus sweep are the ADR's deliverable; this file is its lock.
+ *
+ * REVERSED FOR DECLARED POLYGONS by the operator's ruling of 2026-10-07 (#1849, [ADR-602](../../../docs/06-decisions.md#adr-602),
+ * [ADR-W-115](../../../docs/06w-decisions-workspace.md#adr-w-115)): *"refuse on all tools with a message since it
+ * contradicts ABC is a triangle and a flat line is not a triangle"*. The four trigger-family cases below asserted the
+ * NOTICE and now assert the REFUSAL — updated in place, the ruling cited at each. The notice channel itself stays as
+ * the net (a flat declared polygon that ever reached the display would still be said), and the false-positive net
+ * below is unchanged: the same calibration is now the refusal floor.
  */
 import { describe, expect, it } from 'vitest';
 import { factsOf } from '@/__tests__/scenario-pipeline';
-import { replay } from '@/replay/core';
+import { COLLAPSED_VS, replay } from '@/replay/core';
 import { DEGENERATE_EXTENT_RATIO, degeneratePolygons } from '@/engine';
 import he from '@/i18n/locales/he.json';
 import en from '@/i18n/locales/en.json';
 
-const said = (facts: ReturnType<typeof factsOf>, ids: string[]) => ids.map((id) => facts.find((f) => f.id === id)?.utterance);
 
-describe('#945 — the trigger family: givens that force a declared polygon flat', () => {
-  it('sides that meet the triangle inequality with equality (5, 3, 8) → exactly one notice naming the declaration and the closing side', () => {
+/** The utterances whose rows carry a non-ok status. */
+const refusedRows = (facts: ReturnType<typeof factsOf>, fig: ReturnType<typeof replay>) => [...new Set(facts.filter((f) => fig.status[f.id] !== 'ok').map((f) => f.utterance))];
+
+describe('#945 — the trigger family: givens that force a declared polygon flat (REFUSED since the 2026-10-07 ruling, ADR-602)', () => {
+  it('sides that meet the triangle inequality with equality (5, 3, 8) → the closing side is refused, naming the declaration', () => {
+    // Was: exactly one notice naming «משולש ABC» and «AC = 8», every fact ok. Ruling 2026-10-07 (#1849): refused.
     const facts = factsOf(['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8']);
     const fig = replay(facts, 0);
-    expect(fig.lastError, 'a notice, never a refusal').toBeNull();
-    for (const s of Object.values(fig.status)) expect(s).toBe('ok');
-    expect(fig.degeneracies).toHaveLength(1);
-    expect(fig.degeneracies[0].object).toBe('ABC');
-    expect(fig.degeneracies[0].ratio).toBeLessThan(DEGENERATE_EXTENT_RATIO);
-    expect(said(facts, fig.degeneracies[0].statements), 'the declaring statement, then the one that closed the triangle').toEqual(['משולש ABC', 'AC = 8']);
+    const m = COLLAPSED_VS.exec(fig.lastError ?? '');
+    expect(m, `refused as a flattened polygon: ${fig.lastError}`).not.toBeNull();
+    expect(m![1]).toBe('A, B, C');
+    expect(facts[Number(m![3])]?.utterance, 'the other side is the statement that declared the triangle').toBe('משולש ABC');
+    expect(refusedRows(facts, fig), 'only the closing side').toEqual(['AC = 8']);
+    expect(fig.pending, 'a contradiction, never "add the remaining givens"').toBe(false);
+    expect(fig.degeneracies, 'nothing flat is drawn, so there is nothing to notice').toEqual([]);
   });
 
-  it('the isosceles twin (4, 4, 8) and a stated sliver of 0.1° trip the same predicate — the drawing IS a line', () => {
-    for (const seq of [
-      ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8'],
-      ['משולש ABC', 'זווית BAC = 0.1'],
-    ]) {
-      const facts = factsOf(seq);
-      const fig = replay(facts, 0);
-      expect(fig.lastError, seq.join(' · ')).toBeNull();
-      expect(fig.degeneracies.map((d) => d.object), seq.join(' · ')).toEqual(['ABC']);
-      expect(fig.degeneracies[0].statements.length, 'names the student’s statements').toBeGreaterThan(0);
-    }
+  it('the isosceles twin (4, 4, 8) is refused the same way; a stated sliver of 0.1° is a REAL triangle and builds, drawn above the floor', () => {
+    // Was: both tripped the notice. Ruling 2026-10-07: the forced member is refused; the sliver is not forced flat —
+    // a 0.1° triangle exists — so the gate's ladder draws it thicker than the floor, silently.
+    const forced = factsOf(['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8']);
+    const f1 = replay(forced, 0);
+    expect(f1.lastError).toMatch(COLLAPSED_VS);
+    expect(refusedRows(forced, f1)).toEqual(['AC = 8']);
+    const sliver = replay(factsOf(['משולש ABC', 'זווית BAC = 0.1']), 0);
+    expect(sliver.lastError).toBeNull();
+    expect(sliver.degeneracies).toEqual([]);
+    expect(degeneratePolygons(sliver.construction, sliver.positions, 1)[0]?.ratio).toBeGreaterThan(DEGENERATE_EXTENT_RATIO);
   });
 
   it('two right angles (90 + 90) are NOT a member: since #1328 (ADR-537) the second is REFUSED as over-constrained — a needle the tolerance bought is not a figure, so there is nothing to notice', () => {
@@ -56,16 +67,20 @@ describe('#945 — the trigger family: givens that force a declared polygon flat
     expect(degeneratePolygons(fig.construction, fig.positions, 1)[0]?.ratio).toBeGreaterThan(DEGENERATE_EXTENT_RATIO);
   });
 
-  it('the statements are the student’s units: the responsible one is the LAST of the shortest flat prefix', () => {
+  it('the statements are the student’s units: the refused one is the statement that COMPLETES the collapse, in either typing order', () => {
+    // Was: the notice named «BC = 3» as the responsible statement. Ruling 2026-10-07: that statement is refused.
     const facts = factsOf(['משולש ABC', 'AC = 8', 'AB = 5', 'BC = 3']);
     const fig = replay(facts, 0);
-    expect(said(facts, fig.degeneracies[0].statements)).toEqual(['משולש ABC', 'BC = 3']);
+    expect(fig.lastError).toMatch(COLLAPSED_VS);
+    expect(refusedRows(facts, fig)).toEqual(['BC = 3']);
   });
 
-  it('the notice survives save/load: it is derived from the construction, nothing is stored', () => {
+  it('the refusal survives save/load: it is derived from the statements, nothing is stored', () => {
+    // Was: the notice survived reload. Ruling 2026-10-07: the refusal does, byte-identically.
     const facts = factsOf(['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8']);
     const reloaded = facts.map((f) => ({ ...f }));
-    expect(replay(reloaded, 0).degeneracies.map((d) => d.object)).toEqual(['ABC']);
+    expect(replay(reloaded, 0).lastError).toBe(replay(facts, 0).lastError);
+    expect(replay(reloaded, 0).lastError).toMatch(COLLAPSED_VS);
   });
 });
 

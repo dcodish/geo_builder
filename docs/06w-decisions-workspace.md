@@ -2423,6 +2423,7 @@ importing it; what they share is this ADR and `shell/`.
 **Operator ruling:** 2026-09-08 (`/decisions` pass on #936)
 **Requirements:** [02b](02b-requirements-3d.md) FR-RD-7 (new) · **Design:** [04b](04b-design-3d.md) — the notice channel
 **Adoptions:** 3-D — [ADR-3D-234](06b-decisions-3d.md#adr-3d-234), this PR. 2-D — #945, which cites this rule rather than re-deciding it.
+**Amended by:** [ADR-W-115](#adr-w-115) (operator ruling 2026-10-07, #1849) — for a **declared polygon** the givens force flat, the rule below is REVERSED: every builder refuses the line that completes the collapse, naming the statements (*"a flat line is not a triangle"*). The notice stays for objects that are not declared polygons.
 
 **Context.** The operator, playing round #931's T12: *"the image collapsed to a 2d diagram."* He was
 right about what he saw and the tool was right too — «∠BAS = 40» + «∠DAS = 50» at a right-angled corner
@@ -5396,7 +5397,7 @@ Fails before: 2 of 8 (concurrency and takeover) with the link step neutered so t
 **Not built (#1813 stays open):** splitting the ~40 heaviest test files. It only shortens the full suite (~14.7 → ~8.5 min, about twice per round), it is the most work, and docs/08 records that splitting a scenario's oracles across files re-pays the cold solve.
 
 
-## ADR-W-115 — A fix round's progress is tracked on one live dashboard, folded from an event log every worktree writes (#1853)
+## ADR-W-116 — A fix round's progress is tracked on one live dashboard, folded from an event log every worktree writes (#1853)
 
 **Status:** accepted · 2026-10-07 · PR for #1853. Rulings cited:
 - **2026-10-07, operator:** *"I vision a dashboard (html) where I see what open issues are included in this round and what each issue is about. I want to see the progress of the workflow which includes the full flow until all issues are completed and i get the test sheet."*
@@ -5439,3 +5440,26 @@ Also exercised end to end: a published demo replaying round #1845 (real composit
 - **Folding the play sheet and verdicts into the dashboard.** Built first, cut by the operator's scope ruling: the report stays manual, as today.
 
 **Not built.** An `ArtifactData` allow rule in `.claude/settings.json`. Whether an unattended round's sync writes prompt for approval depends on the session's permission mode, and adding the rule is the operator's call (PR heads-up).
+
+## ADR-W-115 — A declared polygon the givens force flat is REFUSED in every builder; the flat-figure notice stays only for what is not a declared polygon (#1849, amends ADR-W-048)
+
+**Status:** accepted · 2026-10-07 · **Issue:** #1849 (bug, P1, honesty class) · **Amends:** [ADR-W-048](#adr-w-048) · **Supersedes:** #1835 (3-D notice) and #1836 (analytic build-with-notice), folded into #1849
+**Operator ruling:** 2026-10-07, on the round-#1845 play sheet (T30, T31), transcribed on #1849 as «Operator ruling — 2026-10-07»:
+
+> *"refuse on all tools with a message since it contradicts ABC is a triangle and a flat line is not a triangle"*
+
+**Requirements:** [02](02-requirements.md) FR-RN-13 (rewritten: refused, not noticed) and FR-EN-8 (one sentence) · [02b](02b-requirements-3d.md) FR-RD-7 (a workspace note: the declared-polygon half is reversed; the 3-D slice owns the rest) · **Design:** none at workspace level (each product's own: [04](04-design.md) for 2-D) · **Adoptions:** 2-D — [ADR-602](06-decisions.md#adr-602). 3-D — ADR-3D-310. Analytic — ADR-AG-247. Each product cites this rule rather than re-deciding it.
+
+**What it reverses.** ADR-W-048 ruled (2026-09-08) that a figure whose givens force a named object flat is drawn, with a notice naming the statements — *"a notice, not a refusal … refusing would be the opposite error"*. The operator has now ruled the other way for **declared polygons**: «משולש ABC» says the figure is a triangle, and a flat line is not one, so the givens that flatten it contradict the declaration. The ruling is option (b) of #1849's question, chosen over (a) keeping ADR-W-048 and (c) refusing only the named polygon while drawing a stated coincidence.
+
+**The rule, stated once for every builder.**
+
+1. When the givens force a **declared polygon** («משולש», «מרובע», any named polygon, including one declared through a macro) to collapse onto a line, the builder **refuses the line that completes the collapse**, before it becomes a fact, and keeps the prior figure.
+2. The message names the statements and says why: the refused line and the polygon's declaration («AC = 8» סותר את «משולש ABC»), and that the figure would no longer be a triangle (or quadrilateral, or polygon).
+3. The family is every route to a collapse: lengths that meet a triangle inequality with equality (5·3·8, 4·4·8, either typing order, a ratio form, a sum, a perimeter), a stated coincidence or collinearity inside the polygon («מרובע ABCD · AB מתלכד עם CD»), and an incidence that only a flat figure satisfies (2-D's ADR-413, 3-D's ADR-3D-309).
+4. **Not refused:** a thin polygon that is still a polygon (a 3° apex; ADR-413's control). A collapse that only an unstated DEFAULT forces (an isosceles apex the student did not choose) is the default's to yield (docs/17 M4), not a refusal of the figure.
+5. **The notice stays where nothing was declared.** ADR-W-048's notice keeps its scope for objects that are not declared polygons — a solid whose apex the givens put in its base plane (the #936 case, 3-D) — and, in each product, as the net for a declared polygon that is NOT forced flat but is drawn below the product's floor at a sampled configuration. Each product ADR states which of these it has.
+
+**Unchanged from ADR-W-048:** copied, never imported (each product derives its own predicate and calibration); the tolerance is relative to the polygon's own extent; the corpus sweep is a lock; the false-refusal net — an ordinary figure must still build — is the half that matters.
+
+**Parity (ADR-W-108).** One row family in `shell/__tests__/fixtures/geo-input-parity.ts`, `expect: 'refused'` for 5·3·8 (both orders), 4·4·8, the ratio form and the 1·1·1·3 quadrilateral, and `expect: 'builds'` for the 3° control. Analytic already refuses every refused row (measured 2026-10-07); 3-D builds them and carries `knownGap … #1849` until ADR-3D-310 lands. T31's sentence «AB מתלכד עם CD» is not read by 2-D's grammar (it goes to the model), so its row belongs to the slices that read it.

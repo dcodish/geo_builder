@@ -15,7 +15,7 @@ import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Co
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
-import { evalLengthExpr } from './lengths';
+import { evalLengthExpr, type LengthExpr } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
@@ -120,6 +120,13 @@ export interface Figure {
    * not be shown as though it satisfied its givens. See {@link ringFaultsOf}.
    */
   ringFaults: RingFault[];
+  /**
+   * Declared polygons whose givens HOLD here only on a COLLAPSED ring (#1849, ADR-AG-247): the thin-ring arm
+   * (#1334, ADR-AG-143) met every residual, re-solved under the tightened tolerance, and the ring went flat.
+   * That is the givens forcing the polygon flat — not a search that missed — so `derive` refuses the line
+   * that completed it as a collapse. Absent when none (and on a figure built by hand).
+   */
+  collapsedRings?: Id[];
   /** Freedom the OBJECT carriers still have after the constraints — what the DOF cue reports. */
   carrierDof: number;
   /** Per point: what the student's OWN givens fix about it — the canvas label (#1032). */
@@ -2061,6 +2068,8 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
   }
 
   const unsatisfied: Constraint[] = [];
+  /** Declared rings the givens hold on only COLLAPSED (the thin-ring arm below, #1334) — #1849's evidence. */
+  const collapsedRings: Id[] = [];
   // The figure as SAMPLED, before any solve moves it — the reference a collapse is measured against (ADR-AG-213).
   const sampledEnv = env;
   let free = seeded;
@@ -2526,8 +2535,34 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
       const tight = withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => solveMultiStart([system.toVec(free, env)], system.residualsAt));
       const posT = place(c, system.envAt(tight.values), system.asMap(tight.values));
       const collapsed = new Set(ringFaultsOf(c, (id) => posT.get(id)).filter((f) => f.violation === 'degenerate').map((f) => f.id));
+      /**
+       * …and is the flat ring a configuration where every given is MEASURED and HOLDS (#1849, ADR-AG-247)? Only then
+       * is it the givens forcing the polygon flat. A given that cannot be read on the flat figure — a ratio over an
+       * area that is now zero («S_{ABD} / S_{ABC} = 2» with D on BC: 0/0) — was met by nothing, and its contradiction
+       * is not a collapse; it keeps the search's words. Nor is an equation of measures that ALL vanish there: «היחס בין
+       * שטח המשולש ABD לשטח המשולש ABC הוא 2:1» lowers to S_ABD = 2·S_ABC, which a flat figure meets as 0 = 0 — the
+       * statement is not what holds. `span` is the flat figure's own extent, so `vanishes` is scale-free (ADR-AG-021).
+       * Recorded as evidence only; the refusal below is unchanged.
+       */
+      const envT = system.envAt(tight.values);
+      const scaleT = residualScale(c, sampledEnv);
+      const atT = (id: Id) => posT.get(id) ?? null;
+      const lineAtT = lineAtOf(c, envT, atT);
+      const span = figureScale(posT, envT, sys.syms);
+      const vanishes = (le: LengthExpr, dim: number) => {
+        const v = evalLengthExpr(le, atT, envT, lineAtT);
+        return v !== null && Math.abs(v) <= SATISFIED_EPS * Math.max(1, span) ** dim;
+      };
+      const heldFlat = c.constraints.every((k) => {
+        const r = residual(k, atT, envT, curveAtOf(c, envT, atT), lineAtT, scaleT);
+        if (r === null || !r.every((v) => Number.isFinite(v) && Math.abs(v) <= SATISFIED_EPS)) return false;
+        if (k.t !== 'length-eq') return true;
+        const dim = [...k.left.terms, ...k.right.terms].some((t) => t.kind === 'area') ? 2 : 1;
+        return !(vanishes(k.left, dim) && vanishes(k.right, dim));
+      });
       for (const ring of thin) {
         if (!collapsed.has(ring.id)) continue;
+        if (heldFlat) collapsedRings.push(ring.id);
         const vertices = new Set<Id>(ring.vertices);
         const k = [...c.constraints].reverse().find((con) => mentionsAny(con, vertices));
         if (k && !unsatisfied.includes(k)) unsatisfied.push(k);
@@ -2755,6 +2790,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
       },
     ),
     carrierDof: figureDofOf(c, sys, solvedVec),
+    ...(collapsedRings.length > 0 ? { collapsedRings } : {}),
     usedSymbols: [...usedSymbols(c)],
     ...(choiceSeed !== seed ? { choiceSeed } : {}),
     provenance: Object.fromEntries(
@@ -3398,6 +3434,22 @@ export function completingStatement(
     }
   }
   return null;
+}
+
+/**
+ * WHICH DECLARED POLYGONS THE GIVENS FORCE FLAT (#1849, ADR-AG-247) — the rings the thin-ring arm found the givens
+ * holding on only collapsed (`Figure.collapsedRings`), over the window `drawableAt` walks from `seed`. In order of
+ * first appearance, so the ring a refusal names is a function of the input and the seed alone.
+ *
+ * Called only on the refusal path, where `drawableAt` found nothing whole and so evaluated this whole window
+ * already: every lookup is a memo hit (ADR-AG-144), never a new solve.
+ */
+export function collapsedByGivens(c: Construction, seed: number): Id[] {
+  const out: Id[] = [];
+  for (let s = seed; s <= seed + DRAWABLE_TRIES; s += 1) {
+    for (const id of evaluate(c, s).collapsedRings ?? []) if (!out.includes(id)) out.push(id);
+  }
+  return out;
 }
 
 export function holdsInEveryConfiguration(c: Construction, ks: readonly Constraint[]): boolean {

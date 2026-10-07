@@ -1,5 +1,5 @@
 /**
- * #1853 (ADR-W-115) — the live round dashboard (tracking only): every actor in a round appends phase
+ * #1853 (ADR-W-116) — the live round dashboard (tracking only): every actor in a round appends phase
  * events to one log, and the dashboard is a fold of that log.
  *
  * The fold is held directly (it is the page's whole content). The log is held through the REAL CLI in

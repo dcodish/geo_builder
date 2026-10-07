@@ -74,7 +74,7 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
   or died mid-flight*; a session that finds an open `in-round` issue at start reports it instead
   of starting a new round.
 
-## Step 1b — open the live dashboard (ADR-W-115, #1853)
+## Step 1b — open the live dashboard (ADR-W-116, #1853)
 
 The operator follows the round's PROGRESS on one page, from any device. It is **tracking only**
 (operator ruling 2026-10-07, #1853): what is in the round, what each item is about, and where it is
@@ -323,7 +323,7 @@ Two things the page must actually do, because they are why it exists:
 it is still the validation signal. The issue copy, the chat copy and the page carry the **same case
 list** — two versions that differ is how a case gets skipped.
 
-**Hand the report to the dashboard** (ADR-W-115): once the page above is published, emit
+**Hand the report to the dashboard** (ADR-W-116): once the page above is published, emit
 `node scripts/round-event.mjs emit <R> round awaiting-play --data '{"reportUrl":"<its URL>"}'` and
 sync, so the dashboard shows a link to this page. Emit `round playsheet` when you start writing the
 sheet. The dashboard never carries the cases or the verdicts itself.

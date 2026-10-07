@@ -128,6 +128,13 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #1815 (ADR-3D-309): 2-D's «X סותר את Y — אי אפשר לקיים את שניהם יחד» frame, with the geometric reason
     case 'polygon-collapsed': {
       const shape = t(`err.polygonNoun.${err.sides}`, { ring: err.ring });
+      // #1849 (ADR-3D-310): a flatness the givens force on their own — named together, and why it is refused
+      if (err.forced) {
+        const kind = t(`err.polygonKind.${err.sides}`);
+        return err.others.length > 0
+          ? t('err.polygonForced', { stated: err.stated, others: quoteList(err.others), shape, kind })
+          : t('err.polygonForcedAlone', { stated: err.stated, shape, kind });
+      }
       return err.others.length > 0
         ? t('err.polygonCollapsed', { stated: err.stated, others: quoteList(err.others), shape })
         : t('err.polygonCollapsedAlone', { stated: err.stated, shape });
