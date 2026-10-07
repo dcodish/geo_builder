@@ -208,12 +208,7 @@ async function run() {
   await writeFile(path.join(outDir, 'report.html'), renderReport({ sheet, results, generatedAt }));
   await writeFile(
     path.join(outDir, 'manifest.json'),
-    // `shots` lets `round-event.mjs sheet` join each case to its uploaded screenshots (#1853).
-    JSON.stringify(
-      { sheet: sheet.name, generatedAt, results: results.map((r) => ({ id: r.id, problems: r.problems, shots: r.shots })) },
-      null,
-      2,
-    ),
+    JSON.stringify({ sheet: sheet.name, generatedAt, results: results.map((r) => ({ id: r.id, problems: r.problems })) }, null, 2),
   );
 
   const failed = results.filter((r) => r.problems.length > 0);

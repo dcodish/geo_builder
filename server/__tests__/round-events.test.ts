@@ -1,6 +1,6 @@
 /**
- * #1853 (ADR-W-115) — the live round dashboard: every actor in a round appends phase events to one log,
- * and the dashboard is a fold of that log.
+ * #1853 (ADR-W-115) — the live round dashboard (tracking only): every actor in a round appends phase
+ * events to one log, and the dashboard is a fold of that log.
  *
  * The fold is held directly (it is the page's whole content). The log is held through the REAL CLI in
  * real concurrent processes, because "agents in different worktrees all land in one log, whole lines,
@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 // @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
 import { ITEM_PHASES, ROUND_PHASES, fold, parseLog, statsLine, validateEvent } from '../../scripts/lib/round-core.mjs';
 // @ts-expect-error — plain-JS tooling module
-import { logPath, sheetData } from '../../scripts/round-event.mjs';
+import { logPath } from '../../scripts/round-event.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CLI = join(ROOT, 'scripts', 'round-event.mjs');
@@ -43,6 +43,13 @@ describe('#1853 — the fold is the dashboard', () => {
     expect(s.items[1].issues).toEqual([1805, 1806]);
     expect(s.items[0]).toMatchObject({ title: 'A', about: 'what A is', route: 'bug', phase: 'gates' });
     expect(s.title).toBe('fix-round 2026-10-07');
+  });
+
+  it('the end-of-round report is a LINK the round hands over, not content the dashboard carries', () => {
+    const s = fold([round('compose'), round('awaiting-play', { data: { reportUrl: 'https://claude.ai/artifact/x' } })]);
+    expect(s.reportUrl).toBe('https://claude.ai/artifact/x');
+    expect(Object.keys(s)).not.toContain('sheet');
+    expect(validateEvent({ t: t(), kind: 'sheet', data: { cases: [] } })[0]).toMatch(/unknown kind «sheet»/);
   });
 
   it('`since` is when the item ENTERED its phase — a repeated phase with a new note does not reset it', () => {
@@ -84,7 +91,7 @@ describe('#1853 — the fold is the dashboard', () => {
   });
 
   it('the stepper and the item pills are the declared vocabularies, in order', () => {
-    expect(ROUND_PHASES.map((p: { id: string }) => p.id)).toEqual(['compose', 'execute', 'batch', 'land', 'playsheet', 'awaiting-play', 'played']);
+    expect(ROUND_PHASES.map((p: { id: string }) => p.id)).toEqual(['compose', 'execute', 'batch', 'land', 'playsheet', 'awaiting-play']);
     expect(ITEM_PHASES.filter((p: { terminal?: boolean }) => p.terminal).map((p: { id: string }) => p.id)).toEqual(['landed', 'pr', 'escalated', 'skipped', 'closed']);
   });
 });
@@ -105,26 +112,6 @@ describe('#1853 — an event the page could not place is refused, not dropped', 
     expect(events).toHaveLength(1);
     expect(rejected).toBe(2);
     expect(fold(events, { rejected }).rejected).toBe(2);
-  });
-});
-
-describe('#1853 — the play sheet joins the spec, the driver verdict and the uploaded screenshots', () => {
-  const spec = {
-    name: 'round-x',
-    title: 'סבב',
-    cases: [
-      { id: 'T1', title: 'a', class: 'play', product: '2d', base: 'http://localhost:5173', path: '/', lines: ['משולש ABC'], lookFor: 'x', before: 'y' },
-      { id: 'T2', title: 'b', class: 'verified', product: '2d', base: 'http://localhost:5174', path: '/', lines: ['l'], lookFor: 'z', expectRefusal: 'חדה' },
-    ],
-  };
-  it('each case carries its server URL with its path, its mechanical verdict and its shot URLs', () => {
-    const manifest = { generatedAt: '2026-10-07 10:00', results: [{ id: 'T1', problems: [], shots: [{ file: 'T1-1.png', label: 'line 1' }, { file: 'T1-2.png', label: 'line 2' }] }] };
-    const d = sheetData(spec, manifest, { 'T1-1.png': 'https://claude.ai/x/1' });
-    expect(d.cases[0]).toMatchObject({ url: 'http://localhost:5173/', problems: [], shots: [{ label: 'line 1', url: 'https://claude.ai/x/1' }] });
-    expect(d.cases[1]).toMatchObject({ refusal: true, problems: null, shots: [] }); // not driven: no verdict claimed
-  });
-  it('a sheet published before the driver ran still lists every case', () => {
-    expect(sheetData(spec, null, null).cases.map((c: { id: string }) => c.id)).toEqual(['T1', 'T2']);
   });
 });
 
@@ -195,7 +182,7 @@ describe('#1853 — the log in real processes', () => {
       const page = join(dir, 'page.html');
       expect(run('page', '9', '--out', page).status).toBe(0);
       const html = readFileSync(page, 'utf8');
-      expect(html).toContain('<title>סבב תיקונים #9</title>');
+      expect(html).toContain('<title>מעקב סבב #9</title>');
       expect(html).not.toContain('{{TITLE}}');
       // The artifact CSP blocks every other host silently — the template loads nothing external.
       expect(html).not.toMatch(/<script[^>]+src=|<link[^>]+href=/);

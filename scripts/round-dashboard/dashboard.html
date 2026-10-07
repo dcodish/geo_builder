@@ -1,27 +1,27 @@
 <title>{{TITLE}}</title>
 <!--
-  #1853 (ADR-W-115) — the LIVE ROUND DASHBOARD. One template for every round: published once per round
-  by the fix-round skill (`node scripts/round-event.mjs page <round> --out …`), declared with
-  capabilities {db:{}}, and filled by the orchestrator writing `round/state` (the fold of the round's
-  event log). Verdicts the operator gives on the play sheet live in `verdicts/<case id>`, where a later
-  session reads them back. Nothing round-specific is in this file except the title.
+  #1853 (ADR-W-115) — the LIVE ROUND DASHBOARD. Tracking only: what is in the round, what each item is
+  about, and where it is now. The end-of-round report and play sheet stay their own page (Step 5b), which
+  this one only links to. One template for every round: published once per round by the fix-round skill
+  (`node scripts/round-event.mjs page <round> --out …`), declared with capabilities {db:{}}, and filled
+  by the orchestrator writing `round/state` (the fold of the round's event log). Nothing round-specific
+  is in this file except the title.
 -->
 <style>
-/* Layout: one reading column — status header, pipeline stepper, item ledger, play sheet, activity. */
+/* Layout: one reading column — status header, pipeline stepper, item ledger, activity. */
 :root{
-  --bg:#faf9f7;--card:#ffffff;--ink:#20242e;--muted:#69707d;--line:#e3e0da;--accent:#3d5a80;--code:#f1efe9;
+  --bg:#faf9f7;--card:#ffffff;--ink:#20242e;--muted:#69707d;--line:#e3e0da;--accent:#3d5a80;
   --ok:#1a7f42;--bad:#b3382c;--warn:#b45309;--work:#3d5a80;--idle:#9aa1ad;
-  --chip-play:#7c3aed;--chip-look:#b45309;--chip-verified:#1a7f42;
   --font-ui:system-ui,'Segoe UI',Arial,sans-serif;--font-mono:ui-monospace,'Cascadia Mono',Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#181a20;--card:#20232c;--ink:#e8e6e1;--muted:#9aa1ad;--line:#333845;--accent:#8fb3d9;--code:#262a34;
+  --bg:#181a20;--card:#20232c;--ink:#e8e6e1;--muted:#9aa1ad;--line:#333845;--accent:#8fb3d9;
   --ok:#4fc47f;--bad:#e0705f;--warn:#e0a353;--work:#8fb3d9;--idle:#5d6472;
-  --chip-play:#b79df5;--chip-look:#e0a353;--chip-verified:#4fc47f;color-scheme:dark}}
+  color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#181a20;--card:#20232c;--ink:#e8e6e1;--muted:#9aa1ad;--line:#333845;--accent:#8fb3d9;--code:#262a34;
+  --bg:#181a20;--card:#20232c;--ink:#e8e6e1;--muted:#9aa1ad;--line:#333845;--accent:#8fb3d9;
   --ok:#4fc47f;--bad:#e0705f;--warn:#e0a353;--work:#8fb3d9;--idle:#5d6472;
-  --chip-play:#b79df5;--chip-look:#e0a353;--chip-verified:#4fc47f;color-scheme:dark}
+  color-scheme:dark}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);margin:0;padding-block:24px;padding-inline:16px;line-height:1.55}
 main{max-width:900px;margin-inline:auto;display:flex;flex-direction:column;gap:28px}
 h1{font-size:1.5rem;margin:0;text-wrap:balance}
@@ -32,20 +32,22 @@ a{color:var(--accent)}
 header{display:flex;flex-direction:column;gap:10px}
 .meta{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.9rem;color:var(--muted);margin:0}
 .stale{color:var(--warn);font-weight:600}
+.report{display:inline-block;font-weight:600;border:1px solid var(--accent);border-radius:6px;padding:4px 12px;text-decoration:none}
+.report:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .bar{height:10px;border-radius:999px;background:var(--line);overflow:hidden;display:flex}
 .bar span{display:block;height:100%}
 .bar .s-ok{background:var(--ok)}.bar .s-pr{background:var(--accent)}.bar .s-bad{background:var(--bad)}.bar .s-skip{background:var(--idle)}.bar .s-ready{background:var(--ok);opacity:.4}
 .tally{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none;font-size:.88rem;font-variant-numeric:tabular-nums}
 .tally li{border:1px solid var(--line);border-radius:6px;padding:2px 10px;background:var(--card)}
 /* stepper */
-.steps{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:0;padding:0;list-style:none;counter-reset:s}
+.steps{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;margin:0;padding:0;list-style:none}
 .steps li{display:flex;flex-direction:column;gap:4px;font-size:.82rem;color:var(--muted);min-width:0}
 .steps li::before{content:"";height:6px;border-radius:3px;background:var(--line)}
 .steps li.done::before{background:var(--ok)}
 .steps li.now::before{background:var(--work)}
 .steps li.now{color:var(--ink);font-weight:600}
 .steps time{font-size:.75rem;font-variant-numeric:tabular-nums}
-@media (max-width:560px){.steps{grid-template-columns:repeat(4,minmax(0,1fr));row-gap:10px}}
+@media (max-width:560px){.steps{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:10px}}
 /* items */
 .items{display:flex;flex-direction:column;gap:8px}
 details.item{background:var(--card);border:1px solid var(--line);border-radius:8px}
@@ -62,31 +64,6 @@ details.item>summary:focus-visible{outline:2px solid var(--accent);outline-offse
 .facts{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.85rem;color:var(--muted);margin:0}
 ol.tl{margin:0;padding-inline-start:18px;font-size:.85rem;display:flex;flex-direction:column;gap:2px}
 ol.tl time{color:var(--muted);font-variant-numeric:tabular-nums;margin-inline-end:6px}
-/* play sheet */
-.sheet{display:flex;flex-direction:column;gap:14px}
-.case{background:var(--card);border:1px solid var(--line);border-inline-start:4px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
-.case.pass{border-inline-start-color:var(--ok)}.case.fail{border-inline-start-color:var(--bad)}
-.case h3{margin:0;font-size:1rem;text-wrap:balance}
-.badge{font-size:.76rem;border-radius:999px;padding:2px 10px;color:#fff;margin-inline-end:6px;white-space:nowrap}
-.badge.play{background:var(--chip-play)}.badge.look{background:var(--chip-look)}.badge.verified{background:var(--chip-verified)}
-.case p{margin:0}
-.server,.before,.mech{font-size:.88rem;color:var(--muted)}
-.mech.bad{color:var(--bad);font-weight:600}
-.lines{position:relative}
-.lines pre .ln{display:block;text-align:start}
-.lines pre{background:var(--code);border-radius:6px;padding:10px 12px;margin:0;font-size:.95rem;overflow-x:auto;white-space:pre}
-button{font:inherit;font-size:.85rem;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:6px;padding:3px 10px;cursor:pointer}
-button:hover{border-color:var(--accent)}
-button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-button[aria-pressed="true"].v-pass{background:var(--ok);border-color:var(--ok);color:#fff}
-button[aria-pressed="true"].v-fail{background:var(--bad);border-color:var(--bad);color:#fff}
-.copy{position:absolute;inset-block-start:6px;inset-inline-end:6px}
-.verdict{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.verdict input{flex:1 1 200px;min-width:0;font:inherit;font-size:.88rem;padding:3px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
-.shots{display:flex;flex-wrap:wrap;gap:8px}
-.shots figure{margin:0;flex:1 1 220px;max-width:100%}
-.shots img{display:block;width:100%;border:1px solid var(--line);border-radius:6px}
-.shots figcaption{font-size:.78rem;color:var(--muted)}
 /* activity + empty */
 ul.feed{margin:0;padding:0;list-style:none;font-size:.85rem;display:flex;flex-direction:column;gap:3px}
 ul.feed li{display:flex;gap:10px;align-items:baseline}
@@ -102,6 +79,7 @@ ul.feed .what{min-width:0;overflow-wrap:anywhere}
     <p class="meta" id="meta"><span>ממתין לנתונים מהסשן…</span></p>
     <div class="bar" id="bar" role="img" aria-label="התקדמות"></div>
     <ul class="tally" id="tally"></ul>
+    <p id="report" hidden></p>
   </header>
 
   <section aria-labelledby="pipe-h">
@@ -116,13 +94,6 @@ ul.feed .what{min-width:0;overflow-wrap:anywhere}
     </div>
   </section>
 
-  <section aria-labelledby="sheet-h" id="sheet-sec">
-    <h2 id="sheet-h">דף הבדיקה</h2>
-    <div class="sheet" id="sheet">
-      <div class="empty">דף הבדיקה (T1…Tn) יופיע כאן בסוף הסבב, אחרי שכל המקרים הורצו בדפדפן. לכל מקרה תוכלו לסמן עבר / נכשל ולהוסיף הערה.</div>
-    </div>
-  </section>
-
   <section aria-labelledby="feed-h">
     <h2 id="feed-h">פעילות אחרונה</h2>
     <ul class="feed" id="feed"><li class="muted">עדיין אין אירועים.</li></ul>
@@ -133,14 +104,13 @@ ul.feed .what{min-width:0;overflow-wrap:anywhere}
 (() => {
   const ROUND = [
     ['compose', 'הרכבה'], ['execute', 'תיקון'], ['batch', 'בדיקת אצווה'], ['land', 'הטמעה'],
-    ['playsheet', 'דף בדיקה'], ['awaiting-play', 'ממתין לך'], ['played', 'נבדק'],
+    ['playsheet', 'דף בדיקה'], ['awaiting-play', 'ממתין לך'],
   ];
   const ITEM = {
     queued: ['בתור', 'idle'], remeasure: ['מדידה מחדש', 'work'], fixing: ['בתיקון', 'work'], gates: ['בדיקות', 'work'],
     ready: ['מוכן לאצווה', 'warn'], landed: ['ב-main', 'ok'], pr: ['PR פתוח', 'ok'], escalated: ['הועבר אליך', 'bad'],
     skipped: ['דולג', 'idle'], closed: ['כבר תוקן', 'idle'],
   };
-  const CLS = { play: ['🎮', 'לשחק'], look: ['👁', 'להסתכל'], verified: ['✅', 'אומת'] };
   const REPO = 'https://github.com/dcodish/geo_builder';
   /** A sync older than this, mid-round, is shown as stale — the page is only as live as the session. */
   const STALE_MIN = 20;
@@ -169,7 +139,6 @@ ul.feed .what{min-width:0;overflow-wrap:anywhere}
   const issueLink = (n) => el('a', { href: `${REPO}/issues/${n}`, target: '_blank', rel: 'noopener', class: 'num' }, `#${n}`);
 
   let state = null;
-  let verdicts = {};
   let db = null;
   const open = new Set(); // expanded items survive a redraw
 
@@ -177,7 +146,6 @@ ul.feed .what{min-width:0;overflow-wrap:anywhere}
     if (!state) return;
     renderHeader();
     renderItems();
-    renderSheet();
     renderFeed();
   }
 
@@ -188,7 +156,7 @@ ul.feed .what{min-width:0;overflow-wrap:anywhere}
     meta.replaceChildren();
     if (state.title) meta.append(bdi(state.title));
     if (state.issueUrl) meta.append(el('a', { href: state.issueUrl, target: '_blank', rel: 'noopener' }, 'גיליון הסבב'));
-    const live = state.phase && !['awaiting-play', 'played'].includes(state.phase);
+    const live = state.phase && state.phase !== 'awaiting-play';
     const stale = live && state.updatedAt && Date.now() - Date.parse(state.updatedAt) > STALE_MIN * 60000;
     meta.append(el('span', { class: stale ? 'stale' : null, title: state.updatedAt || '' },
       `עדכון אחרון ${ago(state.updatedAt)}${stale ? ' — ייתכן שהסשן לא מסנכרן' : ''}`));
@@ -208,8 +176,11 @@ ul.feed .what{min-width:0;overflow-wrap:anywhere}
     const at = Object.fromEntries((state.phases || []).map((p) => [p.id, p.at]));
     const nowIdx = ROUND.findIndex(([id]) => id === state.phase);
     $('steps').replaceChildren(...ROUND.map(([id, he], i) =>
-      el('li', { class: i < nowIdx || state.phase === 'played' ? 'done' : i === nowIdx ? 'now' : null, 'aria-current': i === nowIdx ? 'step' : null },
+      el('li', { class: i < nowIdx ? 'done' : i === nowIdx ? 'now' : null, 'aria-current': i === nowIdx ? 'step' : null },
         el('span', { text: he }), el('time', { text: hhmm(at[id]) }))));
+    const rep = $('report');
+    rep.hidden = !state.reportUrl;
+    if (state.reportUrl) rep.replaceChildren(el('a', { class: 'report', href: state.reportUrl, target: '_blank', rel: 'noopener', text: 'לדף הבדיקה של הסבב ←' }));
   }
 
   function renderItems() {
@@ -248,83 +219,14 @@ ul.feed .what{min-width:0;overflow-wrap:anywhere}
     }));
   }
 
-  function renderSheet() {
-    const sh = state.sheet;
-    if (!sh || !(sh.cases || []).length) return;
-    // Cases group by their section (batch on main, then one per PR); a sheet without sections groups by server.
-    const groups = new Map();
-    for (const cs of sh.cases) {
-      const g = cs.section || cs.url.replace(/^(https?:\/\/[^/]+).*$/, '$1');
-      if (!groups.has(g)) groups.set(g, []);
-      groups.get(g).push(cs);
-    }
-    // A redraw must not eat a note being typed: keep the focused field's text and caret.
-    const act = document.activeElement;
-    const keep = act && act.id && act.id.startsWith('note-') ? { id: act.id, value: act.value, pos: act.selectionStart } : null;
-    const tally = sh.cases.reduce((a, cs) => ((a[verdicts[cs.id]?.verdict || 'open']++), a), { pass: 0, fail: 0, open: 0 });
-    $('sheet').replaceChildren(
-      el('p', { class: 'meta' }, el('span', { text: sh.title || '' }), el('span', { text: `עבר ${tally.pass} · נכשל ${tally.fail} · פתוח ${tally.open}` }),
-        sh.generatedAt && el('span', { text: `הורץ בדפדפן ${sh.generatedAt}` })),
-      ...[...groups].flatMap(([g, cases]) => [el('h3', { class: 'muted', text: g }), ...cases.map(caseEl)]),
-    );
-    if (keep) {
-      const n = document.getElementById(keep.id);
-      if (n) { n.value = keep.value; n.focus(); try { n.setSelectionRange(keep.pos, keep.pos); } catch {} }
-    }
-  }
-
-  function caseEl(cs) {
-    const v = verdicts[cs.id] || {};
-    const [icon, clsHe] = CLS[cs.class] || ['', cs.class];
-    const text = [...cs.lines, ...(cs.asks || []), ...(cs.after || []).filter((s) => s.type).map((s) => s.type)].join('\n');
-    const pre = el('pre', { dir: 'rtl' }, ...text.split('\n').map((ln) => el('span', { dir: 'auto', class: 'ln', text: ln })));
-    const copy = el('button', { class: 'copy', type: 'button', text: 'העתקה' });
-    copy.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(text); copy.textContent = 'הועתק'; }
-      catch { const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r); copy.textContent = 'סומן — Ctrl+C'; }
-      setTimeout(() => (copy.textContent = 'העתקה'), 1800);
-    });
-    const mech = cs.problems === null ? null : cs.problems.length === 0
-      ? el('p', { class: 'mech', text: '✓ נבדק מכנית על ידי הכלי' })
-      : el('p', { class: 'mech bad' }, '✗ ', bdi(cs.problems.join(' · ')));
-    const note = el('input', { type: 'text', id: `note-${cs.id}`, placeholder: 'הערה (לא חובה)', value: v.note || '', 'aria-label': `הערה ל-${cs.id}` });
-    const btn = (val, label) => {
-      const b = el('button', { type: 'button', class: `v-${val}`, 'aria-pressed': String(v.verdict === val), text: label });
-      b.addEventListener('click', () => saveVerdict(cs.id, v.verdict === val ? null : val, note.value));
-      return b;
-    };
-    note.addEventListener('change', () => saveVerdict(cs.id, v.verdict || null, note.value));
-    const toggles = (cs.after || []).filter((s) => s.toggle !== undefined).map((s) => el('p', { text: `☐ לחצו על תיבת הסימון בשורה ${s.toggle} ברשימת הנתונים` }));
-    return el('article', { class: `case ${v.verdict || ''}`, id: cs.id },
-      el('h3', {}, el('span', { class: `badge ${cs.class}`, text: `${icon} ${clsHe}` }), `${cs.id} · `, bdi(cs.title), cs.refusal ? ' (סירוב)' : ''),
-      el('p', { class: 'server' }, 'שרת: ', el('a', { href: cs.url, target: '_blank', rel: 'noopener', class: 'ltr', text: cs.url })),
-      el('div', { class: 'lines' }, pre, copy),
-      ...toggles,
-      el('p', {}, el('strong', { text: 'מה בודקים: ' }), bdi(cs.lookFor)),
-      cs.before && el('p', { class: 'before' }, el('strong', { text: 'לפני: ' }), bdi(cs.before)),
-      mech,
-      (cs.shots || []).length > 0 && el('div', { class: 'shots' }, ...cs.shots.map((s) => el('figure', {}, el('img', { src: s.url, alt: s.label, loading: 'lazy' }), el('figcaption', { text: s.label })))),
-      db && el('div', { class: 'verdict' }, btn('pass', 'עבר'), btn('fail', 'נכשל'), note),
-    );
-  }
-
   function renderFeed() {
     const f = state.feed || [];
     if (!f.length) return;
     $('feed').replaceChildren(...f.slice(0, 15).map((e) => el('li', {}, el('time', { text: hhmm(e.t) }),
       el('span', { class: 'what' },
         e.kind === 'item' ? el('bdi', { class: 'num', text: `#${e.item}` }) : null,
-        e.kind === 'item' ? ` ← ${(ITEM[e.phase] || [e.phase])[0]}` : e.kind === 'round' ? `הסבב ← ${(ROUND.find(([id]) => id === e.phase) || [, e.phase])[1]}` : e.kind === 'sheet' ? 'דף הבדיקה פורסם' : 'הערה',
+        e.kind === 'item' ? ` ← ${(ITEM[e.phase] || [e.phase])[0]}` : e.kind === 'round' ? `הסבב ← ${(ROUND.find(([id]) => id === e.phase) || [, e.phase])[1]}` : 'הערה',
         e.note ? ' — ' : '', bdi(e.note)))));
-  }
-
-  async function saveVerdict(id, verdict, note) {
-    if (!db) return;
-    const body = { verdict, note: note || '', at: new Date().toISOString() };
-    verdicts = { ...verdicts, [id]: body };
-    renderSheet();
-    try { await db.doc(`verdicts/${id}`).set(body); }
-    catch (e) { const m = $('meta'); m.append(el('span', { class: 'stale', text: `השמירה של ${id} נכשלה (${e.code || e.message}) — נסו שוב` })); }
   }
 
   (async () => {
@@ -338,10 +240,6 @@ ul.feed .what{min-width:0;overflow-wrap:anywhere}
       state = snap.data();
       render();
     }, (e) => $('meta').append(el('span', { class: 'stale', text: `החיבור לנתונים נקטע (${e.code || ''})` })));
-    db.collection('verdicts').onSnapshot((qs) => {
-      verdicts = Object.fromEntries(qs.docs.map((d) => [d.id, d.data()]));
-      if (state) renderSheet();
-    });
     // "ago" labels and the stale warning age without a new snapshot.
     setInterval(() => state && renderHeader(), 60000);
   })();

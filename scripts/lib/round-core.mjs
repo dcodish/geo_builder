@@ -1,6 +1,7 @@
 /**
- * #1853 (ADR-W-115) — the LIVE ROUND DASHBOARD, pure half: the event vocabulary, its validation, and
+ * #1853 (ADR-W-115) — the LIVE ROUND DASHBOARD (tracking only), pure half: the event vocabulary, its validation, and
  * the fold from an append-only event log to the one state document the dashboard page renders.
+ * Tracking only (operator ruling 2026-10-07): the end-of-round report and play sheet stay their own page.
  *
  * WHY A LOG AND A FOLD: only a Claude session can write the page's database, but a round's item agents
  * run in the background in their own worktrees. So every actor APPENDS one line per phase change to a
@@ -20,7 +21,6 @@ export const ROUND_PHASES = [
   { id: 'land', he: 'הטמעה' },
   { id: 'playsheet', he: 'דף בדיקה' },
   { id: 'awaiting-play', he: 'ממתין לך' },
-  { id: 'played', he: 'נבדק' },
 ];
 
 /**
@@ -47,7 +47,8 @@ const TERMINAL = new Set(ITEM_PHASES.filter((p) => p.terminal).map((p) => p.id))
 const ITEM_KEY = /^\d+(\+\d+)*$/;
 /** The item fields a `data` payload may set. Anything else is refused at emit time, never folded. */
 const ITEM_FIELDS = ['title', 'about', 'plan', 'route', 'stream', 'issues', 'sha', 'pr', 'adrs', 'deviations', 'branch'];
-const ROUND_FIELDS = ['title', 'issueUrl', 'dashboardUrl', 'note'];
+/** `reportUrl` is the end-of-round report page (fix-round Step 5b), which the dashboard only links to. */
+const ROUND_FIELDS = ['title', 'issueUrl', 'reportUrl'];
 
 /**
  * Refuses an event the fold could not place. Returns the problems (empty = valid). Called by the CLI
@@ -66,12 +67,10 @@ export function validateEvent(ev) {
     if (!ITEM_IDS.has(ev.phase)) p.push(`unknown item phase «${ev.phase}» — one of ${[...ITEM_IDS].join(', ')}`);
     p.push(...unknownFields(ev.data, ITEM_FIELDS));
     if (ev.data?.route !== undefined && !['bug', 'feature'].includes(ev.data.route)) p.push('route must be bug or feature');
-  } else if (ev.kind === 'sheet') {
-    if (!Array.isArray(ev.data?.cases)) p.push('a sheet event carries data.cases');
   } else if (ev.kind === 'note') {
     if (typeof ev.note !== 'string' || !ev.note) p.push('a note event carries a note');
   } else {
-    p.push(`unknown kind «${ev.kind}» — round, item, sheet or note`);
+    p.push(`unknown kind «${ev.kind}» — round, item or note`);
   }
   return p;
 }
@@ -108,11 +107,10 @@ export function fold(events, { round, rejected = 0 } = {}) {
     round: round ?? null,
     title: null,
     issueUrl: null,
-    dashboardUrl: null,
+    reportUrl: null,
     phase: null,
     phases: ROUND_PHASES.map((p) => ({ id: p.id, he: p.he, at: null })),
     items: [],
-    sheet: null,
     feed: [],
     startedAt: null,
     updatedAt: null,
@@ -139,7 +137,7 @@ export function fold(events, { round, rejected = 0 } = {}) {
     state.startedAt ??= ev.t;
     state.updatedAt = ev.t;
     if (ev.kind === 'round') {
-      Object.assign(state, pick(ev.data, ['title', 'issueUrl', 'dashboardUrl']));
+      Object.assign(state, pick(ev.data, ROUND_FIELDS));
       state.phase = ev.phase;
       // Reaching a phase marks it and fills any earlier phase the round passed without announcing.
       const idx = ROUND_PHASES.findIndex((p) => p.id === ev.phase);
@@ -156,8 +154,6 @@ export function fold(events, { round, rejected = 0 } = {}) {
       if (it.phase !== ev.phase || it.since === null) it.since = ev.t;
       it.phase = ev.phase;
       it.timeline.push({ t: ev.t, phase: ev.phase, note: ev.note ?? null });
-    } else if (ev.kind === 'sheet') {
-      state.sheet = { ...ev.data, at: ev.t };
     }
     state.feed.push({ t: ev.t, kind: ev.kind, item: ev.item ?? null, phase: ev.phase ?? null, note: ev.note ?? null });
   }

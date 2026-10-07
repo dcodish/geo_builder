@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 /**
- * #1853 (ADR-W-115) — the LIVE ROUND DASHBOARD, I/O half. One append-only event log per round; every
+ * #1853 (ADR-W-115) — the LIVE ROUND DASHBOARD (tracking only), I/O half. One append-only event log per round; every
  * actor in the round writes to it, and the orchestrator projects it onto the published dashboard.
  *
  *   node scripts/round-event.mjs emit <round> round <phase> [--note "…"] [--data '{…}']
  *   node scripts/round-event.mjs emit <round> item <key> <phase> [--note "…"] [--data '{…}']
  *   node scripts/round-event.mjs note <round> "<text>"
- *   node scripts/round-event.mjs sheet <round> --spec <sheet.json> [--manifest <manifest.json>] [--shots <map.json>]
  *   node scripts/round-event.mjs state <round> [--out <file>]     — the folded state document (JSON)
  *   node scripts/round-event.mjs page <round> --out <file>        — the dashboard page, titled for this round
  *   node scripts/round-event.mjs watch <round>                    — one line per new event (for Monitor)
@@ -57,14 +56,6 @@ function parseArgs(argv) {
   return { pos, flags };
 }
 
-const readJson = (file, what) => {
-  try {
-    return JSON.parse(readFileSync(file, 'utf8'));
-  } catch (e) {
-    fail(`cannot read ${what} ${file}: ${e.message}`);
-  }
-};
-
 function append(round, ev) {
   const problems = validateEvent(ev);
   if (problems.length) fail(`refused (${problems.join('; ')})`);
@@ -79,47 +70,12 @@ export function readState(round) {
   return fold(events, { round: Number(round), rejected });
 }
 
-/**
- * The play sheet as the page renders it: the tracked spec's cases, each joined to the driver's
- * mechanical verdict (`manifest.json`) and to its screenshots' uploaded URLs (`--shots`, a map from
- * the driver's file name to the asset URL the publish returned). Missing halves are simply absent —
- * a sheet published before the driver ran still lists its cases.
- */
-export function sheetData(spec, manifest, shots) {
-  const resultOf = new Map((manifest?.results ?? []).map((r) => [r.id, r]));
-  return {
-    title: spec.title ?? spec.name,
-    name: spec.name,
-    generatedAt: manifest?.generatedAt ?? null,
-    cases: spec.cases.map((c) => {
-      const r = resultOf.get(c.id);
-      return {
-        id: c.id,
-        title: c.title,
-        class: c.class,
-        section: c.section ?? null,
-        url: `${c.base}${c.path ?? ''}`,
-        lines: c.lines ?? [],
-        asks: c.asks ?? [],
-        after: c.after ?? [],
-        lookFor: c.lookFor,
-        before: c.before ?? null,
-        refusal: Boolean(c.expectRefusal),
-        problems: r ? r.problems : null,
-        shots: (r?.shots ?? []).filter((s) => shots?.[s.file]).map((s) => ({ label: s.label, url: shots[s.file] })),
-      };
-    }),
-  };
-}
-
 const short = (ev) =>
   ev.kind === 'item'
     ? `#${ev.item} → ${ev.phase}${ev.note ? ` · ${ev.note}` : ''}`
     : ev.kind === 'round'
       ? `round → ${ev.phase}${ev.note ? ` · ${ev.note}` : ''}`
-      : ev.kind === 'sheet'
-        ? `play sheet → ${ev.data.cases.length} cases`
-        : `note · ${ev.note}`;
+      : `note · ${ev.note}`;
 
 function watch(round) {
   const file = logPath(round);
@@ -147,7 +103,7 @@ function watch(round) {
 
 function main(argv) {
   const [cmd, round, ...rest] = argv;
-  if (!cmd || !round || !/^\d+$/.test(round)) fail('usage: round-event.mjs <emit|note|sheet|state|page|watch|path> <round#> …');
+  if (!cmd || !round || !/^\d+$/.test(round)) fail('usage: round-event.mjs <emit|note|state|page|watch|path> <round#> …');
   const { pos, flags } = parseArgs(rest);
   const t = new Date().toISOString();
   const data = flags.data !== undefined ? (() => {
@@ -165,12 +121,6 @@ function main(argv) {
     else fail('emit takes `round <phase>` or `item <key> <phase>`');
   } else if (cmd === 'note') {
     append(round, { t, kind: 'note', note: pos.join(' ') });
-  } else if (cmd === 'sheet') {
-    if (!flags.spec) fail('sheet needs --spec');
-    const spec = readJson(flags.spec, 'sheet spec');
-    const manifest = flags.manifest ? readJson(flags.manifest, 'manifest') : null;
-    const shots = flags.shots ? readJson(flags.shots, 'shots map') : null;
-    append(round, { t, kind: 'sheet', data: sheetData(spec, manifest, shots) });
   } else if (cmd === 'state') {
     const state = readState(round);
     const json = JSON.stringify(state, null, 1);
@@ -180,7 +130,7 @@ function main(argv) {
     } else console.log(json);
   } else if (cmd === 'page') {
     if (!flags.out) fail('page needs --out');
-    const title = `סבב תיקונים #${round}`;
+    const title = `מעקב סבב #${round}`;
     writeFileSync(flags.out, readFileSync(TEMPLATE, 'utf8').replaceAll('{{TITLE}}', () => title));
     console.log(flags.out);
   } else if (cmd === 'watch') {

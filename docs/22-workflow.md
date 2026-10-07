@@ -168,8 +168,9 @@ question to the operator is asked in plain text, never as a blocking prompt, so 
 landing. Round #1776, sequential and stalled overnight on a question about the next round, took ~21 h.
 
 **The live dashboard ([ADR-W-115](06w-decisions-workspace.md#adr-w-115), #1853):** the operator follows a
-round on ONE private page, from composition to play sheet and from any device. That page is also the
-Step-5b report, so there is no second artifact. Every actor appends one line per phase change to an
+round's progress on one private page, from any device. It is **tracking only**: what is in the round,
+what each item is about, and where it is now. The end-of-round report and play sheet stay Step 5b's own
+page, unchanged; the dashboard only links to it. Every actor appends one line per phase change to an
 event log in the git common dir (`node scripts/round-event.mjs emit …`), which every worktree shares.
 The page renders a pure fold of that log (`scripts/lib/round-core.mjs`), and the orchestrator pushes
 the fold into the page's database on every wake, woken mid-item by a `Monitor` on `round-event.mjs

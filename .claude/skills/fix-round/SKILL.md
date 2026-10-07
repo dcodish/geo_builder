@@ -76,8 +76,10 @@ recognize is a labeling error → Skipped + a comment asking. The round itself N
 
 ## Step 1b — open the live dashboard (ADR-W-115, #1853)
 
-The operator follows the round on ONE page from composition to play sheet, from any device. It is
-the Step 5b report too: there is no second artifact. The round's progress lives in an append-only
+The operator follows the round's PROGRESS on one page, from any device. It is **tracking only**
+(operator ruling 2026-10-07, #1853): what is in the round, what each item is about, and where it is
+now. The end-of-round report and play sheet stay Step 5b's own page, unchanged; this one only links to
+it. The round's progress lives in an append-only
 event log (`scripts/round-event.mjs`, in the git common dir, so every worktree writes the same file);
 the page is a fold of that log, pushed into its database by this session. `<R>` below is the round
 issue's number.
@@ -107,7 +109,7 @@ issue's number.
    turns it into a warning past 20 min mid-round, so a stalled sync is visible, never silent.
 
 Vocabulary (refused at emit time if misspelt): round `compose → execute → batch → land → playsheet →
-awaiting-play → played`; item `queued → remeasure → fixing → gates → ready`, ending `landed | pr |
+awaiting-play`; item `queued → remeasure → fixing → gates → ready`, ending `landed | pr |
 escalated | skipped | closed` (closed = already fixed at re-measure). `--note` is one line of what is
 happening now, in plain words; `--data` may set `sha`, `pr`, `adrs`, `branch`, `deviations`.
 
@@ -298,23 +300,10 @@ It is not optional and not overnight-only: the operator reads a round's output i
 and often on the other PC, so the handover cannot be this session's chat. **Publish it BEFORE Step 5's final
 `gh issue edit`** so the URL lands in the ledger rather than only in chat.
 
-**That artifact is the Step 1b dashboard, filled in — not a new page** ([ADR-W-115](../../../docs/06w-decisions-workspace.md#adr-w-115),
-#1853). The template (`scripts/round-dashboard/dashboard.html`) already renders both halves below from
-the round log; do not hand-write a separate report. To fill it:
+Before writing the page, load the **`artifact-design`** skill, and **`artifact-capabilities`** for the
+verdict store below — do not hand-roll either.
 
-1. Write the sheet spec and pre-play it (`npm run playsheet -- --sheet <spec>`, ADR-W-092). Give each
-   case a `section` (`batch — on main`, `PR #N`) so the page groups by route.
-2. Upload the driver's screenshots to the dashboard's asset store (Artifact `asset: true`,
-   `file_paths` ≤ 25 per call, `url` = the dashboard) and write a JSON map from each driver file name
-   (`T3-line-2.png`) to the `url` the upload returned.
-3. `node scripts/round-event.mjs sheet <R> --spec <spec> --manifest reports/playsheets/<name>/manifest.json --shots <map>`,
-   then `emit <R> round playsheet`, and sync (Step 1b rule 4).
-4. At Step 5's label swap, `emit <R> round awaiting-play` and sync once more. The page's verdicts land
-   in its `verdicts` collection, one doc per case id: `{verdict: "pass" | "fail" | null, note, at}` —
-   a later session reads them with `ArtifactData list` on that collection.
-
-The `stats:` line in the ledger is `round-event.mjs state`'s own summary line — the ledger and the page
-fold the same log, so they cannot disagree. The page carries two halves, in this order:
+The page carries two halves, in this order:
 
 1. **The round report** — per item: issue → route → commit SHA or PR# · ADR id(s) · the one-line gate
    record · the **deviations from plan** line; then **Escalated**, **Skipped**, and the `stats:` line.
@@ -333,6 +322,11 @@ Two things the page must actually do, because they are why it exists:
 **The artifact is a surface, never a replacement.** The round issue stays the durable ledger and closing
 it is still the validation signal. The issue copy, the chat copy and the page carry the **same case
 list** — two versions that differ is how a case gets skipped.
+
+**Hand the report to the dashboard** (ADR-W-115): once the page above is published, emit
+`node scripts/round-event.mjs emit <R> round awaiting-play --data '{"reportUrl":"<its URL>"}'` and
+sync, so the dashboard shows a link to this page. Emit `round playsheet` when you start writing the
+sheet. The dashboard never carries the cases or the verdicts itself.
 
 ## Step 6 — readiness gate (standing rule 5)
 
@@ -363,5 +357,4 @@ land over unreconciled external `origin/main` movement · leave outcomes, deviat
 out of the ledger (chat is not a record) · finish with the `in-round` label still on · report a
 play sheet whose servers are not running, whose cases are not numbered, or whose heads-up items
 send the operator to an ADR to find out what changed · finish without publishing the report (Step 5b)
-or without its URL in the round issue · let the dashboard go unsynced through a wake (Step 1b rule 4) ·
-publish a second report page beside the dashboard.
+or without its URL in the round issue · let the dashboard go unsynced through a wake (Step 1b rule 4).
