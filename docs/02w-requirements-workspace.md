@@ -20,13 +20,14 @@ The surfaces a student meets in **every** builder, and the operator surface behi
 **It does not own product geometry.** What a *figure* must do lives in each product's own requirements
 doc ([02](02-requirements.md) for 2-D, [02b](02b-requirements-3d.md) for 3-D, [02c](02c-requirements-analytic.md)
 for analytic, [02d](02d-requirements-complex.md) for complex). Where a shared mechanism generalises a promise a product doc already made, this document says
-so rather than restating it — the prose duplication [docs/28 §1c](28-product-unification.md) identified
+so rather than restating it — the prose duplication [docs/28 §1c](archive/28-product-unification.md) identified
 as the real defect.
 
 **Why these were unwritten until 2026-09-05.** The audit behind [#904](https://github.com/dcodish/geo_builder/issues/904)
 found the entire shared surface — including a 1,248-line admin dashboard and an answer-giving lane in
 all four builders — with **no requirement anywhere**. Its rulings existed only as D1–D10 inside
-[docs/28](28-product-unification.md), a *plan*: a plan finishes, a contract stands.
+[docs/28](archive/28-product-unification.md), a *plan*: a plan finishes, a contract stands. The rulings still in
+force now live here, in *Suite rulings* below (moved in #1861).
 
 IDs are stable references. "Must" = the suite is broken without it; "Should" = desirable; "Later" =
 not yet; "Withdrawn" = out of scope, with the reason and new owner named.
@@ -45,7 +46,7 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
 
 - **FR-SU-1 (Must)** — **One look.** Every builder renders the same design tokens and the same palette,
   so a student who learns one interface has learned all of them. *(Realised — `shell/theme.ts`;
-  rulings D2/D3, [docs/28 §4a](28-product-unification.md).)* **⚠ Ruled to change (2026-10-07, ADR-W-118 B8 · #1596):** «✓ הציור נקבע במלואו» appears only when exactly one figure exists, in every builder. The text below describes the code until that ships. **One wording for one state**: «✓ הציור נקבע במלואו על ידי הנתונים», «דרגות חופש: N», «חושב…», the ask button «שאלו», and the undo/redo/clear/another/About row read the same in every builder (He and En), and the About opens once on a first visit in all four. *(Operator ruling 2026-09-27; realised — [ADR-W-098](06w-decisions-workspace.md#adr-w-098), #1453.)* The empty-canvas example chips show their math typeset, like the fact rows. *(#1530, [ADR-W-100](06w-decisions-workspace.md#adr-w-100).)*
+  rulings D2/D3, *Suite rulings* below, moved from docs/28 §4a.)* **⚠ Ruled to change (2026-10-07, ADR-W-118 B8 · #1596):** «✓ הציור נקבע במלואו» appears only when exactly one figure exists, in every builder. The text below describes the code until that ships. **One wording for one state**: «✓ הציור נקבע במלואו על ידי הנתונים», «דרגות חופש: N», «חושב…», the ask button «שאלו», and the undo/redo/clear/another/About row read the same in every builder (He and En), and the About opens once on a first visit in all four. *(Operator ruling 2026-09-27; realised — [ADR-W-098](06w-decisions-workspace.md#adr-w-098), #1453.)* The empty-canvas example chips show their math typeset, like the fact rows. *(#1530, [ADR-W-100](06w-decisions-workspace.md#adr-w-100).)*
 - **FR-SU-2 (Must)** — **A visible builder switcher**, present in every builder, listing the suite from
   the machine registry ([`products.json`](../products.json)) rather than from code. A builder marked not
   enabled **never appears in a shipped page** — the promise that no chip can point at a 404. *(Realised —
@@ -57,7 +58,7 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   are visible too — save/load in the tool row, language and About as buttons on the suite bar — in the
   same order everywhere; there is no overflow menu. *(Realised — `AppFrame.tsx`,
   `ToolButton.tsx`; D4 as amended by #706; amended 2026-10-07, #1861: the `⋯` menu was retired,
-  [docs/28](28-product-unification.md) D4 amendment, 2026-08-17.)*
+  D4 amendment of 2026-08-17, *Suite rulings* below.)*
 - **FR-SU-5 (Must)** — **One voice for refusals and notices.** A refusal, a warning and a notice look and
   read the same in every builder; error text names the conflicting *statement*, never internal state.
   *(Realised — `shell/frame/Banner.tsx`.)* A message may interpolate only what the student typed or the figure shows — never an engine id or noun. *(Checked — [ADR-W-096](06w-decisions-workspace.md#adr-w-096); 3-D locked, the rest #1522.)*
@@ -65,12 +66,17 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   sidebar. *(Realised — D7.)*
 - **FR-SU-7 (Should)** — **A manual screen per builder, in one chrome.** Each builder documents its own
   language; the frame around that documentation is identical. **A section shows a SAMPLE, and the sample is chosen rather than sliced:** the guide caps each section so it teaches rather than inventories, the entries it shows first are marked and not merely written first, and **every remaining row is one click away** — a coverage map two thirds of which a student cannot reach is not a guide. The note under a capped section says the tool has more COMMANDS there, never "more phrasings of these", because what is hidden are separate capabilities. *(Realised — `ManualScreen.tsx`; D9; [ADR-W-074](06w-decisions-workspace.md#adr-w-074), #1275. The six are CHOSEN to span six different CAPABILITIES, not six phrasings of one — a section that leads with four ways to state an angle teaches a student that the tool does one thing. Operator-approved per section, 2026-09-22, and a capped section featuring fewer than six fails the suite ([ADR-W-074](06w-decisions-workspace.md#adr-w-074) Am. 1, #1347). **A tool advertises only its OWN syntax:** coordinate placement left the 2-D catalog, because it belongs to the analytic Builder (#1245).)* **The guide speaks the student's language, not the builders':** no design-doc section, issue or decision number, "DOF", or name of the machinery (grammar, parser, engine, tier/layer, how a line is solved) in any guide entry, section title, or the refusal that points a student at the guide; a curriculum term («פרבולה קנונית») is not jargon. *(Realised — `guideJargon` in `ManualScreen.tsx`, a lock per builder; [ADR-W-101](06w-decisions-workspace.md#adr-w-101), #1456.)*
-- **FR-SU-8 (Should)** — **Quick commands adapt to the moment:** large chips on an empty canvas, a compact
-  row once the student is building — so the affordance teaches at the point of not-knowing and gets out of
-  the way afterwards. *(Realised — `QuickChips.tsx` + `InputArea.tsx`; D9b.)*
-- **FR-SU-9 (Should)** — **Tablet is supported.** In portrait the data panel becomes an overlay while the
-  canvas and input stay side by side; phones are explicitly out of scope
-  ([NFR-US-4](03-nonfunctional-requirements.md)). *(D10.)*
+- **FR-SU-8 (Should)** — **Quick commands sit on the empty canvas:** large chips, so the affordance teaches
+  at the point of not-knowing. ~~A compact row once the student is building~~ was withdrawn by the
+  operator on 2026-09-16 (#1105, [ADR-AG-064](06c-decisions-analytic.md#adr-ag-064)): *"on the input
+  panel, I dont want to see the chips"*. *(Realised — `QuickChips.tsx`; D9b as amended, *Suite rulings*
+  below; amended 2026-10-07, #1861.)*
+- **FR-SU-9 (Should)** — **Tablet is supported**; phones are explicitly out of scope
+  ([NFR-US-4](03-nonfunctional-requirements.md)). Below 900px every builder stacks one column: the input,
+  then the figure, then the fact list, then the data panel, so the input and the top of the figure share
+  the first screen. *(Realised — `shell/frame/Workbench.tsx`,
+  [ADR-W-112](06w-decisions-workspace.md#adr-w-112), #1459, which superseded D10's portrait overlay;
+  amended 2026-10-07, #1861.)*
 - **FR-SU-10 (Should)** — **The figure's name is one component**, mounted identically everywhere, so
   naming, renaming and the saved-file name agree across builders. *(Realised — `FigureName.tsx`.)*
 - **FR-SU-11 (Should)** — **Every builder's About says the same kinds of things:** what the tool is,
@@ -83,6 +89,111 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   its mathematical symbol whichever way it was entered: the `≥` button inserts `≥`, and a typed `>=` is
   recorded (row, save file, export, log) as `≥`. A button may insert a keyboard form only when its
   grammar does not read the glyph, and must say so. *(Realised — [ADR-W-095](06w-decisions-workspace.md#adr-w-095), #1348.)*
+- **FR-SU-13 (Must)** — **A point's letter is changed where the point is.** In every builder, clicking a point opens one small popover at it. The student types the new letter, and Enter or ✓ applies it; nothing goes through the main input. A letter already in use is never merged onto: the popover says it is taken, quotes the statement that holds it in the student's own words, and offers to **exchange** the two letters («החליפו בין A ל-B»), in both directions, whichever point was clicked first. The exchange keeps every statement, keeps the drawing where it is (only the letters change places), and is undone in one step, like a rename. The same exchange can be typed («החלף בין A ל-B» / "swap A and B"). *(Realised for 2-D, 3-D and analytic — `shell/frame/LetterPopover.tsx`, [ADR-W-105](06w-decisions-workspace.md#adr-w-105), #1631; operator, 2026-10-01: «we want that same mechanism now for analytics and also for the 3d tool». Analytic: [ADR-AG-192](06c-decisions-analytic.md#adr-ag-192); amended 2026-10-07, #1861.)*
+- **FR-SU-14 (Must)** — **A segment is hidden or dashed where it is.** In every builder that lets a student click a segment, the click opens one small menu at it: «הסתירו קטע / הציגו קטע» and «מקווקו / רציף», with the builder's own items below (2-D: «החליפו קצוות»; analytic: the measurements). A hidden segment is not drawn, but it stays in the figure: every statement, reference, measurement and question about it still works, and the menu, reached from a faint mark on the line, shows it again. Un-hiding a dashed segment brings it back dashed. The choice is saved with the figure and comes back when the file is opened. *(Realised for 2-D and the analytic builder — `shell/frame/SegmentMenu.tsx`, [ADR-W-106](06w-decisions-workspace.md#adr-w-106), #1653; operator, 2026-10-02: «in the analytic tool we dont have an option to click on a segment and hide it like we have in 2d». In the analytic builder one «בטל» also undoes a hide; in 2-D it is undone from the menu. 3-D's edges have no click menu yet, see ADR-W-106.)*
+- **FR-SU-15 (Must)** — **A claim to prove is never drawn as a given.** **⚠ Ruled to change (2026-10-07, ADR-W-118 B14/D3 · #1870):** the complex builder refuses a proof-verb line like the others, while keeping its claim check for a bare statement. The text below describes the code until that ships. In every builder, a line that asks the student to PROVE something — «הוכיחו כי …», «הוכח ש …», «הראו כי …», «יש להוכיח …», "prove that …", "show that …", with or without an item marker («א.», «(1)») and also when it follows a given on the same line («נתון AB = AC. הוכיחו כי AB ⊥ AC») — is refused, and nothing of the line is recorded. The refusal says that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and quotes the claim so the student knows which part to leave out. «כי» and «ש» in their other senses («נתון כי …», «כך ש-…») and «הראו» as "show me" are never refused for this. *(Realised for 2-D, 3-D and analytic — `shell/proofTarget.ts`, [ADR-W-107](06w-decisions-workspace.md#adr-w-107), #1666; operator, 2026-10-02 on #1649: «all refused with explanation». Analytic refused first, #1618.)*
+- **FR-SU-16 (Must)** — **A plane-geometry sentence gets the same answer in every builder that reads plane geometry.** When a student types a plane-geometry sentence, the 2-D builder and the analytic builder give the same verdict: both build it, both refuse it, or both ask the same kind of question. The 2-D builder's verdict is the reference. The 3-D builder is to give the same verdict for the core plane families: polygons, lengths, angles, midpoints and ratios, cevians, parallel and perpendicular, and area — that parity is **parked, not realised**: most of 3-D's known-gap rows are owned by #1679, which is in the icebox (as are 2-D's own phrasing gaps, #1677) (amended 2026-10-07, #1861: [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B15). The exceptions are topic families that one builder reads by design: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, and free points in 3-D. A builder that does not read such a family answers it honestly, with a refusal, a question or the model, and never draws it as something else. A known difference is listed with the issue that will remove it. *(Realised as a cross-product lock — `shell/__tests__/fixtures/geo-input-parity.ts`, [ADR-W-108](06w-decisions-workspace.md#adr-w-108), #1649; operator, 2026-10-02: «we need a rule that ensures consistency in data input» and «analytics and 2d should have same user experience».)*
+
+## Suite rulings (moved from docs/28 §4/§4a, #1861)
+
+The operator's rulings of 2026-08-16 on how the builders relate ([ADR-W-018](06w-decisions-workspace.md#adr-w-018)),
+and the interface rulings D1–D10 taken one at a time the same day, with their later amendments. The FR
+lines above are the testable promises; this section is the ruling each rests on. Each ruling's state was
+checked against the code on 2026-10-07.
+
+### One learned interface (docs/28 §4)
+
+> *"i will eventually have 4 or maybe even more builders that should all look and feel the same but in
+> reality they are accessed via different links. we might have a toolbar on the ui to switch between
+> them but thats it. so from a user pov he should be familiar with the tool and how to use it and what
+> to expect."* (operator, 2026-08-16)
+
+- **Separate builders at separate links.** Each builder keeps its own entry, build, `dist-*` directory
+  and production path. Moving between builders is an ordinary link in the shared switcher. **One app
+  with modes is rejected, not deferred**: it would change both shipped products' entry, routing, store
+  bootstrap and deploy topology, and it cannot be delivered incrementally.
+- **The switcher is shared chrome, driven by data, never by imports.** The roster is configuration
+  ([`products.json`](../products.json)), because `shell/` may not import a product tree (FR-SU-0, FR-SU-2).
+- **The bar is "familiar", not "identical".** A student who has used one builder finds the next one's
+  *frame* already learned: the header, the input box and palette, the fact list, configuration cycling,
+  save and load, and the voice of a refusal. The subject matter inside differs by design. For plane
+  geometry the bar is higher: the verdict and the display follow 2-D (FR-SU-16;
+  [ADR-W-108](06w-decisions-workspace.md#adr-w-108); [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B1).
+- **"What to expect" is a testable contract, not a style guide.** A control a student learned in one
+  builder that is missing, misplaced or subtly different in another breaks the ruling. The cross-product
+  locks ([04w](04w-design-shell.md), the pattern formerly docs/28 §5c) are how it is checked.
+- **`shell/` does not assume one product per page.** Nothing uses this; keeping the frame parameterized
+  costs nothing and keeps "we chose not to" from becoming "we cannot".
+
+### The interface rulings D1–D10 (docs/28 §4a)
+
+- **D1 — Three columns, the data panel opt-in on its own side.** 3-D's structure with 2-D's visual
+  design: input and fact list at the reading start, the canvas in the middle, the data panel at the end,
+  separating "what I typed" from "what the figure knows". *In force* (FR-SU-3, `Workbench.tsx`).
+- **D2 — Styling. Superseded by the operator, 2026-08-18: shared COMPONENTS, not shared values.** *"the
+  look is different so it cannot be the same code base — it's not really shared"*. Every chrome surface is
+  one `shell/` component mounted by every builder, and each product passes content (symbols,
+  placeholders, handlers, rows), never its own chrome. The engine boundary is unchanged: canvases,
+  parsers and stores stay per product ([ADR-W-003](06w-decisions-workspace.md#adr-w-003)). The original
+  ruling (Tailwind carrying 2-D's token values) is history.
+- **D3 — One colour palette, 2-D's values**: slate neutrals, blue-600 primary, violet accent,
+  ok/warn/danger (`shell/theme.ts`, FR-SU-1). A builder's identity is the switcher's active state, not
+  its colours. Calibrated 2026-08-17 (#706): 2-D's palette is the base, plus a polish pass on hierarchy,
+  spacing and affordances. **The SYMBOL palette is not identical** (operator: *"we need to ensure that
+  only relevant symbols appear per tool"*): a shared core plus a per-builder extension, and a builder
+  never offers a glyph it refuses in every position (#525, #511). *In force.*
+- **D4 — The header follows the level model. Done; the `⋯` menu is retired.** *A control lives at the
+  level of the thing it acts on* (operator, 2026-08-17):
+  - Level 1, the **suite bar** (which tool): the builder strip, the interface language, About.
+  - Level 2, the **tool row** (this session): the builder's title beside its session actions; save and
+    load are visible buttons there.
+  - Level 3, the **surface** (one surface): figure actions under the canvas (D7), the palette with the
+    input box, row operations with the fact list.
+
+  The switcher is a visible strip with every builder inline; past its inline limit the tail folds into
+  «עוד ▾». The figure's name sits centred above the canvas, and the tool row's actions cluster at the
+  reading start. The `⋯` menu was retired on 2026-08-17 (*"there are 2 options there that can be on the
+  toolbar as is"*): hiding is never the default again. The titles are the curriculum's subject names,
+  and a builder's title and strip label are the same name: הנדסת המישור, הנדסת המרחב, מספרים מרוכבים
+  (and analytic's גאומטריה אנליטית). *Realised* (FR-SU-4, `AppFrame.tsx`, `Switcher.tsx`).
+- **D5 — The input area: one preview doing both jobs, and a wrap-selection palette.** The preview renders
+  the maths and isolates the bidi, and shows only when either job applies. A palette button wraps the
+  selection; an empty selection is a caret insert. *In force* (`InputArea.tsx`, `shell/symbols.ts`).
+- **D6 — The fact list: disable, edit in place and delete, in every builder.** Disabling answers "what if
+  I hadn't said this?" and is reversible; deleting answers "I typed that by mistake"; editing keeps the
+  statement's position, because order is meaningful in a construction. An edited line re-parses through
+  the same gates as a typed one. Re-enabling or committing an edit is gated on each product's own refusal
+  surface, and editing a muted line rewrites its text only, gating for real on re-enable. *Realised* in
+  all four builders (`FactList.tsx`; `shell/__tests__/fact-list-ops-parity-1548.test.ts`).
+- **D7 — Every figure action lives under the canvas**, in every builder: *things I do to the figure*
+  beneath the drawing, *things I said* in the input column. The cost was accepted: undo and redo sit one
+  column away from the list they rewind. *In force* (FR-SU-6). The freedom cue moved into the data panel's
+  head-line (D8).
+- **D8 — The data panel: one skeleton, one control, per-builder rows.** The same sections in the same
+  order in every builder (points · measures · relations · parameters · ask), each filling only the rows
+  that apply; an empty section is absent (`DataPanel.tsx`). Its head-line carries the freedom count
+  («דרגות חופש: N»), never a per-DOF listing or a configuration count; a contradiction stays on the
+  always-visible strip (operator, 2026-08-18). **One control opens the panel.**
+  **⚠ Ruled to change (2026-10-07, ADR-W-118 B15/D4 · #1871):** that control is a «נתונים» checkbox in
+  all four builders, with a "computing" state where the values are expensive. Today every builder opens
+  the panel with the shared head button, and 2-D also keeps a separate compute button. **Binding
+  whatever the control:** the panel prints a value only when it is knowledge (FR-DP-3).
+- **D9 — A separate manual SCREEN per builder, plus quick commands in the app** (operator: *"it should be
+  a separate screen altogether for each tool with examples of how to enter commands … the tool should
+  have some quick commands"*). The manual teaches; the quick commands do. **The manual stays
+  catalog-backed**: every catalog entry appears in it, and every example it prints runs through the
+  real parser in the test suite. About and the privacy note are a small modal mounted by every builder
+  (FR-SU-7, FR-SU-11). *In force.*
+- **D9b — Quick commands: big chips on the empty canvas. Half withdrawn.** The empty-state half stands,
+  and every chip shown on the empty canvas builds there ([ADR-3D-288](06b-decisions-3d.md#adr-3d-288)).
+  The other half, a compact strip above the input once a figure exists, was withdrawn by the operator on
+  2026-09-16 (#1105, [ADR-AG-064](06c-decisions-analytic.md#adr-ag-064)) on seeing it built for the first
+  time: *"on the input panel, I dont want to see the chips. behavior should be like 2d and 3d tools"*.
+  Analytic was the only builder that had built that half (FR-SU-8).
+- **D10 — Tablet. Superseded by [ADR-W-112](06w-decisions-workspace.md#adr-w-112)** (#1459, operator
+  2026-09-27: *"Input above the canvas"*). Below 900px every builder stacks one column (input, figure,
+  fact list, data panel); the portrait overlay of the data panel is gone. Tablets stay in scope and
+  phones out of it (NFR-US-4, FR-SU-9).
 
 ## The data panel and the ask lane
 
@@ -291,8 +402,3 @@ Operator-facing, never student-facing. Privacy properties are governed by
 - **How the shared tree is built** — [04w](04w-design-shell.md);
   the seeding rule and boundary edges are [ADR-W-016](06w-decisions-workspace.md#adr-w-016) and
   [`BOUNDARIES.json`](../BOUNDARIES.json).
-
-- **FR-SU-13 (Must)** — **A point's letter is changed where the point is.** In every builder, clicking a point opens one small popover at it. The student types the new letter, and Enter or ✓ applies it; nothing goes through the main input. A letter already in use is never merged onto: the popover says it is taken, quotes the statement that holds it in the student's own words, and offers to **exchange** the two letters («החליפו בין A ל-B»), in both directions, whichever point was clicked first. The exchange keeps every statement, keeps the drawing where it is (only the letters change places), and is undone in one step, like a rename. The same exchange can be typed («החלף בין A ל-B» / "swap A and B"). *(Realised for 2-D, 3-D and analytic — `shell/frame/LetterPopover.tsx`, [ADR-W-105](06w-decisions-workspace.md#adr-w-105), #1631; operator, 2026-10-01: «we want that same mechanism now for analytics and also for the 3d tool». Analytic: [ADR-AG-192](06c-decisions-analytic.md#adr-ag-192); amended 2026-10-07, #1861.)*
-- **FR-SU-14 (Must)** — **A segment is hidden or dashed where it is.** In every builder that lets a student click a segment, the click opens one small menu at it: «הסתירו קטע / הציגו קטע» and «מקווקו / רציף», with the builder's own items below (2-D: «החליפו קצוות»; analytic: the measurements). A hidden segment is not drawn, but it stays in the figure: every statement, reference, measurement and question about it still works, and the menu, reached from a faint mark on the line, shows it again. Un-hiding a dashed segment brings it back dashed. The choice is saved with the figure and comes back when the file is opened. *(Realised for 2-D and the analytic builder — `shell/frame/SegmentMenu.tsx`, [ADR-W-106](06w-decisions-workspace.md#adr-w-106), #1653; operator, 2026-10-02: «in the analytic tool we dont have an option to click on a segment and hide it like we have in 2d». In the analytic builder one «בטל» also undoes a hide; in 2-D it is undone from the menu. 3-D's edges have no click menu yet, see ADR-W-106.)*
-- **FR-SU-15 (Must)** — **A claim to prove is never drawn as a given.** **⚠ Ruled to change (2026-10-07, ADR-W-118 B14/D3 · #1870):** the complex builder refuses a proof-verb line like the others, while keeping its claim check for a bare statement. The text below describes the code until that ships. In every builder, a line that asks the student to PROVE something — «הוכיחו כי …», «הוכח ש …», «הראו כי …», «יש להוכיח …», "prove that …", "show that …", with or without an item marker («א.», «(1)») and also when it follows a given on the same line («נתון AB = AC. הוכיחו כי AB ⊥ AC») — is refused, and nothing of the line is recorded. The refusal says that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and quotes the claim so the student knows which part to leave out. «כי» and «ש» in their other senses («נתון כי …», «כך ש-…») and «הראו» as "show me" are never refused for this. *(Realised for 2-D, 3-D and analytic — `shell/proofTarget.ts`, [ADR-W-107](06w-decisions-workspace.md#adr-w-107), #1666; operator, 2026-10-02 on #1649: «all refused with explanation». Analytic refused first, #1618.)*
-- **FR-SU-16 (Must)** — **A plane-geometry sentence gets the same answer in every builder that reads plane geometry.** When a student types a plane-geometry sentence, the 2-D builder and the analytic builder give the same verdict: both build it, both refuse it, or both ask the same kind of question. The 2-D builder's verdict is the reference. The 3-D builder is to give the same verdict for the core plane families: polygons, lengths, angles, midpoints and ratios, cevians, parallel and perpendicular, and area — that parity is **parked, not realised**: most of 3-D's known-gap rows are owned by #1679, which is in the icebox (as are 2-D's own phrasing gaps, #1677) (amended 2026-10-07, #1861: [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B15). The exceptions are topic families that one builder reads by design: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, and free points in 3-D. A builder that does not read such a family answers it honestly, with a refusal, a question or the model, and never draws it as something else. A known difference is listed with the issue that will remove it. *(Realised as a cross-product lock — `shell/__tests__/fixtures/geo-input-parity.ts`, [ADR-W-108](06w-decisions-workspace.md#adr-w-108), #1649; operator, 2026-10-02: «we need a rule that ensures consistency in data input» and «analytics and 2d should have same user experience».)*

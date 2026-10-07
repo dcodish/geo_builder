@@ -1,6 +1,6 @@
-# RUNBOOK — operating & deploying Geo Builder (2-D + 3-D) on themathbible.com
+# RUNBOOK — operating & deploying the four builders and the proxy on themathbible.com
 
-The single ops entry point. Deep 2-D proxy detail (one-time setup, env file, security notes) lives in [deploy/README.md](../deploy/README.md) — this file is the day-to-day procedure + troubleshooting index for **both** apps.
+The single ops entry point. Deep 2-D proxy detail (one-time setup, env file, security notes) lives in [deploy/README.md](../deploy/README.md) — this file is the day-to-day procedure + troubleshooting index for **all four** builders and the proxy.
 
 ## The moving parts
 
@@ -17,11 +17,13 @@ The single ops entry point. Deep 2-D proxy detail (one-time setup, env file, sec
 | Proxy env (key, admin creds, log paths) | — (hand-edited) | `/var/www/geo-proxy/geo-proxy.env` (mode 600) | read by the service |
 
 - **Server:** `ssh root@themathbible.com` (74.208.61.39). Plesk on Ubuntu 22.04. **Apache serves everything; nginx is OFF** — never touch `vhost_nginx.conf`.
-- **One proxy serves both apps** (`server/parseHandler.ts` binds them): LLM fallback (`/api/parse`, body `tool:'3d'` selects the 3-D prompt), usage-event sinks (`events.jsonl` + `events-3d.jsonl` via `EVENTS_3D_LOG_PATH`), and the two admin dashboards.
+- **One proxy serves all four builders** (`server/parseHandler.ts` binds them): LLM fallback (`/api/parse`, the body's `tool:` selects the builder's prompt), usage-event sinks (one `events*.jsonl` per builder that logs — see *Logs & data*), and the two admin dashboards.
 - **Admin dashboards:** `https://themathbible.com/geo-builder/admin` and `…/3d-builder/admin` (→ proxy path `/admin3`, `ADMIN_3D_BASE`). Same credentials (in the env file).
 - **Apache directives** (reverse-proxy lines): sources in [deploy/apache-geo-builder.conf](../deploy/apache-geo-builder.conf) + [deploy/apache-3d-builder.conf](../deploy/apache-3d-builder.conf) + [deploy/apache-complex-builder.conf](../deploy/apache-complex-builder.conf) + [deploy/apache-analytic-builder.conf](../deploy/apache-analytic-builder.conf). **Store them in Plesk's GUI field** (*Domains → themathbible.com → Apache & nginx Settings → Additional directives for HTTPS*) so a Plesk regeneration doesn't drop them; direct edits to `vhost_ssl.conf` do NOT survive regeneration.
 
   **There is no CLI for this — it needs the operator's hands** (verified 2026-09-06 on Plesk Obsidian 18.0.80.6): `plesk bin site --help` exposes only *PHP* directives, and `/usr/local/psa/bin/apache` covers only modules and MPM. The GUI field is **DB-backed and authoritative** — its contents were confirmed byte-identical to the live `vhost_ssl.conf` — which is why hand-editing that file is the one thing never to do: it works instantly and reverts silently at the next regeneration, the exact failure [#903](https://github.com/dcodish/geo_builder/issues/903) exists to prevent. A session needing a directive **prepares the exact block and escalates**; it does not improvise. Before pasting, confirm the field already holds the existing proxies (`/hw/`, `/akinator`, `/bagrut`, `/akinator2`, the builder lanes) and **append** — replacing it takes four live apps down with it.
+
+  **Preparing the block** (#1572): read the live `/var/www/vhosts/system/themathbible.com/conf/vhost_ssl.conf` over ssh, read-only, and diff it against `deploy/apache-*.conf`. Give the operator only the missing directives, to append at the end, because a block computed from the repo alone duplicates lines already live. When he pastes his draft back, check every required line is in it before he applies; he once dropped the one line that mattered. After he applies: `npm run deploy:preflight` and `curl -sI` per prefix.
 
 ### Adding a builder: its proxy rule is a DEPLOY STEP, not an afterthought (#903, [ADR-W-043](06w-decisions-workspace.md#adr-w-043))
 
@@ -55,6 +57,13 @@ names any builder the config cannot reach.
 
 Deploy **only committed state on `main`** ([docs/22 §5](22-workflow.md)).
 
+**A session runs the deploy itself and never hands it back** (operator, 2026-08-19: *"never ask me to
+deploy. you have the permissions and tools for that"*). The commands are allowlisted in
+`.claude/settings.json`; a denial is retried in its canonical minimal form, more than once. The one
+terminal case is the work PC: `Connection refused` on port 22 while 443 serves is the work network
+(2026-09-02). Finish everything up to the upload, hand off through git, and deploy from home. Write no
+`prod/*` tag and no DEPLOY-LOG entry until the upload has happened.
+
 **Which steps to run is a MEASUREMENT, never a question about which files changed**
 ([ADR-W-058](06w-decisions-workspace.md#adr-w-058), [#1130](https://github.com/dcodish/geo_builder/issues/1130)):
 
@@ -65,6 +74,12 @@ npm run deploy:preflight      # builds the proxy, reads the live artifacts, prob
 It names each artifact `MATCHES live`, `DIFFERS — push required` or `STALE BUILD` (built before its own source last changed — rebuild, then re-run; [ADR-W-061](06w-decisions-workspace.md#adr-w-061)), and **exits non-zero whenever
 anything differs** so the verdict cannot be skimmed past on the way to the commands below. Push
 exactly what it names; leave the rest alone.
+
+**`DIFFERS` means "live was built from another commit", not "this product changed".** Every bundle
+bakes in `__BUILD__` (short sha + date, ADR-146), so one commit changes all four static hashes. Push
+what it names anyway, so each product's release id is right. Before telling the operator what changed,
+measure it: `git diff --name-only <last prod tag>..HEAD -- src/ src3d/ src-complex/ src-analytic/ shell/`
+(2026-09-20). A product you did not rebuild reads `MATCHES live` because it was compared with itself.
 
 **It also probes every ROUTE** ([ADR-W-103](06w-decisions-workspace.md#adr-w-103), #1279) — on 2026-09-20 every hash
 was green while `/analytic-builder/api/parse` answered 404, because its conf was never pasted into Plesk.
@@ -86,12 +101,14 @@ the fix is always the Plesk paste below, never an edit to `vhost_ssl.conf`.
 
 ```sh
 # 0. Gates on the exact tree being deployed
-npx vitest run           # full suite green
-npm run build            # 2-D (tsc -b + vite)   — skip if 2-D unchanged
-npm run build:3d         # 3-D                    — skip if 3-D unchanged
-npm run build:complex    # complex                — skip if src-complex/ unchanged
-npm run build:analytic   # analytic               — skip if src-analytic/ unchanged
-npm run build:proxy      # always — it is ~30 ms, and the preflight decides whether to PUSH it
+npm run test:full        # the full suite; green ONLY if reports/suite-verdict.json says green for this sha, dirty: false
+# Build all; `npm run deploy:preflight` decides what is stale — push exactly what it names.
+npm run build            # 2-D (tsc -b + vite)
+npm run build:3d         # 3-D
+npm run build:complex    # complex
+npm run build:analytic   # analytic
+npm run build:proxy      # the proxy (~30 ms)
+npm run deploy:preflight # re-run after building
 
 # 1. 2-D static
 scp -r dist/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/geo-builder/
@@ -110,7 +127,7 @@ ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/complex-
 scp -r dist-analytic/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/analytic-builder/
 ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/analytic-builder && mv -f analytic.html index.html'
 
-# 2b. homepage — ONLY when the tool links / landing page changed. EDIT THE TRACKED COPY
+# 2d. homepage — ONLY when the tool links / landing page changed. EDIT THE TRACKED COPY
 #     (deploy/homepage/index.html), commit, then upload it — never hand-edit on the server,
 #     or the repo copy silently stops being canonical (adopted 2026-08-15, complex-card link):
 scp deploy/homepage/index.html root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/index.html
@@ -201,9 +218,14 @@ curl -sI https://themathbible.com/g/aaaaaaaaaaaa | grep -i x-robots-tag   # noin
 ## Verify (every deploy)
 
 - `ssh root@themathbible.com 'curl -s http://127.0.0.1:8788/healthz'` → `ok`
-- Both pages load over HTTPS; `index.html` references the **new** bundle hash and the bundle returns 200.
+- Every deployed builder's page loads over HTTPS; its `index.html` references the **new** bundle hash and the bundle returns 200.
 - A quick in-grammar utterance builds (no proxy call); if the proxy changed, an out-of-grammar utterance builds too (and shows in the Anthropic Console usage).
 - Admin dashboards log in and show the visit.
+- **A new WRITE path is verified at its destination.** After deploying anything that writes somewhere new
+  (a log sink, a store, an upload or cache path), send one real request through the deployed path and look
+  at the file it should have written. A 2xx proves nothing where the writer has a `catch {}`: analytic's
+  sink answered 204 while writing nothing, with every artifact `MATCHES live` (#1363). The preflight now
+  does this for the events sinks; anything else is probed by hand.
 
 ## Record it (every deploy — non-optional)
 
@@ -221,15 +243,17 @@ git push origin --tags
 | App renders with old behaviour after a deploy | **Browser cache kept the old `index.html`** → hard-refresh; long-term the `<Directory>` cache block in `apache-geo-builder.conf` (no-cache HTML, immutable assets) |
 | LLM fallback answers "service busy" | `LLM_DAILY_MAX` hit (usually a bot) → `journalctl -u geo-proxy | grep 'daily limit'`; tune in `geo-proxy.env` + restart |
 | Dev machine: a "fixed" bug still reproduces | **Stale dev server** (predates the fix) → restart `npm run dev` (the ADR-115 lesson) |
-| Dev machine: tests hang / ESM loads take seconds | Dropbox cloud-filter on `node_modules` → the junction fix; **`npm ci` clobbers the junction**, use `npm install` (PROJECT-MEMORY operational notes) |
-| Serving a WORKTREE branch: `vite dev` fails `Cannot find package '@babel/core'` | A feature **worktree's `node_modules` is a junction** to the main tree's; the dev server's React/Babel plugin can't resolve `@babel/core` across it (`build` uses esbuild, so it works). → **Don't `vite dev` a worktree; use `build` + `vite preview`** (recipe below). |
+| Serving a WORKTREE branch: `vite dev` fails `Cannot find package '@babel/core'` | The worktree's `node_modules` is **linked** to the main tree's, which is never allowed ([docs/22 §7](22-workflow.md): `git worktree remove` follows the link and destroys the shared copy). → Remove the link and run `npm install` in the worktree; `vite dev` then works there. |
 | Local feature server: BLANK page, `#root` empty, JS request returns `Content-Type: text/html` | **Base-path mismatch.** `vite build` bakes `base:'/geo-builder/'` into `index.html`, but `vite preview` serves at `/` (`command==='serve'`), so the browser fetches `/geo-builder/assets/*.js` → SPA-fallback `index.html`. HTTP is 200 (misleading) — **check the JS `Content-Type`, not the status.** → rebuild with `--base=/`. |
 | A `/`-leading CLI arg becomes `/Program Files/Git/...` | **git-bash MSYS path conversion** mangles `--base=/`. → run it from **PowerShell** (or `MSYS_NO_PATHCONV=1`, or `--base=./`). |
-| Local git weirdness (phantom modified files, fsck errors) | Dropbox corrupting `.git` → `git fetch` from GitHub to backfill; GitHub is the source of truth |
+| Local git weirdness (phantom modified files, fsck errors) | `git fetch` from GitHub to backfill; GitHub is the source of truth (the repo left Dropbox on 2026-07-23 for exactly this) |
+| `scp -r dist*/*` dies mid-upload (`Connection closed … port 22`) while `ssh` works | Transient (prod/2026-09-18). **Check the server before retrying**: a half-written tree serves a page whose bundle 404s, so compare its `index.html` with the local one. Fallback, one stream: `tar cz -C dist-3d . \| ssh -o ServerAliveInterval=15 root@themathbible.com 'tar xz -C <dir>'`. It carries the LOCAL uid (`197608`), so then run `chown -R root:root .` and `find . -type f -exec chmod 644 {} \;` in `<dir>`; `scp` needs neither |
 
 ## Serving a feature-branch worktree locally (for operator play-testing)
 
-A git worktree's `node_modules` is a junction, so `vite dev` breaks (Babel, above) — serve a production **preview** instead. From the worktree, **via PowerShell** (so `--base=/` isn't mangled):
+> **The normal route is now a dev server per PR worktree** (the `/playsheet` skill, `scripts/play-servers.ps1`): a worktree gets its own `npm install` and never a linked `node_modules` ([docs/22 §7](22-workflow.md)), so `vite dev` works there. The preview recipe below is only for a static production preview.
+
+To serve a production **preview** of a worktree: from the worktree, **via PowerShell** (so `--base=/` isn't mangled):
 
 ```powershell
 node node_modules/vite/bin/vite.js build --base=/          # base=/ so preview (served at /) matches
@@ -244,7 +268,7 @@ Old hashed bundles are never deleted by `scp`, so the fastest rollback is redepl
 
 ```sh
 git checkout prod/<previous-tag>   # in a worktree, not the shared tree
-npm install && npx vitest run && npm run build   # (and/or build:3d / build:proxy)
+npm install && npm run test:full && npm run build   # (and/or build:3d / build:proxy); read reports/suite-verdict.json
 # then the standard deploy steps for the affected artifact(s)
 ```
 

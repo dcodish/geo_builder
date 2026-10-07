@@ -4,7 +4,7 @@ _The analytic track's OWN ADR log (ids `ADR-AG-NNN`), separate from the sibling 
 [docs/22 §9](22-workflow.md) ("Isolation rules"): parallel session streams must not race on one ADR numbering sequence. Same
 conventions otherwise: every significant decision gets an entry. The contract is
 [02c](02c-requirements-analytic.md) (what) and [04c](04c-design-analytic.md) (how); the finished build plan was
-[19-analytic-geometry-tool.md](19-analytic-geometry-tool.md)._
+[19-analytic-geometry-tool.md](archive/19-analytic-geometry-tool.md)._
 
 ---
 
@@ -12,7 +12,7 @@ conventions otherwise: every significant decision gets an entry. The contract is
 
 **Context.** The analytic tool was registered in the workspace ([docs/22 §9](22-workflow.md)) and
 deliberately queued **last** ([ADR-CX-001](06d-decisions-complex.md#adr-cx-001) D5, "we will leave
-analytic to the end"). Its plan, [docs/19](19-analytic-geometry-tool.md), was drafted 2026-07-06 off
+analytic to the end"). Its plan, [docs/19](archive/19-analytic-geometry-tool.md), was drafted 2026-07-06 off
 a **three-exam** sample and had stood at `PROPOSED` ever since, blocked on one open decision (§6):
 does the tool *verify* a claimed locus equation, or *derive* it? Everything downstream — above all
 how big the equation layer has to be — turned on that answer, so nothing could be planned.
@@ -21,13 +21,13 @@ An operator session on 2026-09-03 supplied the real corpus (`בגרויות 572.
 פרץ collection: **twenty** consecutive Q1s, קיץ א' 2021 → קיץ ב' 2026, with the author's own
 per-exam topic index). Reading all twenty changed three premises and dissolved the deadlock.
 
-**What the twenty-exam reading established** (full tallies in [docs/19 §2](19-analytic-geometry-tool.md)):
+**What the twenty-exam reading established** (full tallies in [docs/19 §2](archive/19-analytic-geometry-tool.md)):
 
 1. **There is no figure.** 17 of 20 questions print no drawing at all; two of them explicitly
    *instruct the student to draw* (`סרטטו במערכת צירים אחת סקיצה…`, `שרטטו את שתי האפשרויות`). This
    inverts the sibling products' value proposition — the 2-D and 3-D tools reproduce a printed
    figure, this one **draws the figure the exam withholds**. Same finding as the complex tool's
-   "the Gauss plane is a drawing the exam never prints" ([docs/27 §1](27-complex-numbers-tool.md)).
+   "the Gauss plane is a drawing the exam never prints" ([docs/27 §1](archive/27-complex-numbers-tool.md)).
 2. **Every conic in twenty exams is canonical.** Parabola always `y²=2px` on the x-axis; ellipse
    always `x²/a²+y²/b²=1` centred at the origin. No hyperbola, no rotated conic, no translated
    conic — and the formula sheet agrees (§3 of the plan: its whole analytic section is two
@@ -70,7 +70,7 @@ curriculum-level profiles" — [docs/22 §9](22-workflow.md)) is a V2+ question 
 left open; V0/V1 target 572 only. Nor does it decide the URL, the deploy path, or whether the tool
 reveals an answer after a wrong attempt — all deferred to the first build session.
 
-**Consequences.** [docs/19](19-analytic-geometry-tool.md) is rewritten from `PROPOSED` to the
+**Consequences.** [docs/19](archive/19-analytic-geometry-tool.md) is rewritten from `PROPOSED` to the
 decision-complete plan of record. `src-analytic/` moves from `plannedTrees` to `trees` in
 `BOUNDARIES.json` when the first file lands, not before.
 
@@ -112,7 +112,7 @@ the exam's own currency.
    *names the target*, so the table is indexed by target kind — line equation · circle equation ·
    conic equation · point coordinates · locus equation · parameter value · length/angle/area. About
    8 kinds × 3–5 routes ≈ 30 authored entries.
-2. **No relevance problem.** [docs/18 R3](18-theorem-relevance-plan.md) — "'prioritized' was never
+2. **No relevance problem.** [docs/18 R3](archive/18-theorem-relevance-plan.md) — "'prioritized' was never
    designed or tested" — cannot occur: a menu scoped to one named target is four items long.
 3. **Availability is decidable, not evidential.** The engine already knows whether `B` and `D` are
    determined, so ✓/✗ per route is a fact. No L1/L2/L3 evidence machinery is needed, and the lane
@@ -140,15 +140,15 @@ decisions):
 - **Route order is authored and constant** — the textbook order, never re-sorted by which route the
   engine would actually take. A ranked menu leaks the intended solution path; a fixed one cannot.
 - **No route card ever prints a value.** The tool holds the number; it does not say it. This is the
-  2-D no-reveal boundary ([docs/18 §2](18-theorem-relevance-plan.md), the conclusion-side rules)
+  2-D no-reveal boundary ([docs/18 §2](archive/18-theorem-relevance-plan.md), the conclusion-side rules)
   transplanted, and it is why D3's split is drawn at *currency* rather than at *difficulty*.
 
 **Authorship.** The route table is **teacher knowledge, not engine knowledge** — the
-`PRINCIPLE_TABLE` model ([docs/18 §6](18-theorem-relevance-plan.md)): a readable catalog in the
+`PRINCIPLE_TABLE` model ([docs/18 §6](archive/18-theorem-relevance-plan.md)): a readable catalog in the
 operator's voice, bound to the code table by an integrity test, growing by operator direction. It
 doubles as the coverage map of the technique inventory, the way `catalog.ts` does for input.
 
-**Consequences.** [docs/19 §4b](19-analytic-geometry-tool.md) records the lane; §7 adds the pedagogy
+**Consequences.** [docs/19 §4b](archive/19-analytic-geometry-tool.md) records the lane; §7 adds the pedagogy
 phases R1 (routes) and R2 (notices) as a **second axis** alongside V0–V4 — the route lane needs the
 V0 substrate but not the loci, so it does not renumber the capability slices. Still open, unchanged:
 whether an answer is ever revealed after a wrong claim.
@@ -227,7 +227,7 @@ the operator's voice, bound to a readable catalog by an integrity test) · every
 overall tool. So it needs to have its specific chips that lead to the page, and the look and feel of
 the input and data and grid and so on is exactly like the other tools we have."*
 
-This is already the plan of record — [docs/28 §5](28-product-unification.md) Phase 4 is *"analytic
+This is already the plan of record — [docs/28 §5](archive/28-product-unification.md) Phase 4 is *"analytic
 geometry starts on the shared floor… the first product that never has to re-derive the doctrine or
 re-implement the chrome, which is the whole return on this work."* And the floor is **built**: all
 three shipped products now import `shell/` (`BOUNDARIES.json` carries `src → shell`, `src3d → shell`
@@ -237,7 +237,7 @@ and `src-complex → shell` as asserted-real edges), the canvas cluster is one c
 ([ADR-W-021](06w-decisions-workspace.md#adr-w-021)) is the roster every builder's switcher renders as
 data.
 
-**What was missing is not a decision — it is a gate.** Nothing in [docs/19](19-analytic-geometry-tool.md)
+**What was missing is not a decision — it is a gate.** Nothing in [docs/19](archive/19-analytic-geometry-tool.md)
 said conformance is part of *shipping V0*, and "make it match the others" is exactly the item that
 slips to a follow-up when a new product is being built fast. This ADR fixes that: **V0 does not pass
 its gate until the checklist below is green.** The corpus gate (קיץ א' 2022) and this one are one
@@ -258,7 +258,7 @@ gate, not two.
 3. **Mount the shared frame, do not re-implement it** — `AppFrame`, `Switcher`, `Workbench`,
    `InputArea`, `FactList`, `DataPanel`, `AskLane`, `QuickChips`, `SymbolRow`, `ToolButton`,
    `FigureName`, `Banner`, `Modal`, `ManualScreen`, plus `theme`, `bidi`, `format`, `i18n`, `save`,
-   `symbols`, `export/`. The [docs/28 §4a](28-product-unification.md) rulings D1–D10 apply as
+   `symbols`, `export/`. The [docs/28 §4a](archive/28-product-unification.md) rulings D1–D10 apply as
    written — three columns with the data panel opt-in on its own side (D1), the shared palette (D3),
    the header with its overflow menu (D4), one input preview (D5), fact-list disable/edit/delete
    (D6), every figure action under the canvas (D7), the one data-panel skeleton and gate (D8), a
@@ -285,7 +285,7 @@ gate, not two.
    `analytic` GitHub label (created 2026-09-03), and the server's `tool: 'analytic'` value, log sink
    and `DashboardProfile`.
 
-**What conformance does NOT mean.** [docs/28 §2](28-product-unification.md) stands: engine, model,
+**What conformance does NOT mean.** [docs/28 §2](archive/28-product-unification.md) stands: engine, model,
 solver, replay, scene, parser rules and catalogs are **copied, never shared**; locale files, the ADR
 log, fixtures, the deploy target, the CI lane and the save-file suffix stay per-product. Uniformity
 is the chrome and the doctrine, never the geometry.
@@ -295,14 +295,14 @@ is the chrome and the doctrine, never the geometry.
 ## ADR-AG-005 — The input language, the naming conventions, and the THREE kinds of inequality (2026-09-03)
 
 **Context.** Asked whether the plan was buildable, the honest answer was "enough to start, not enough
-to finish V0": [docs/19](19-analytic-geometry-tool.md) §2c/§2d carried a *construct set* and a
+to finish V0": [docs/19](archive/19-analytic-geometry-tool.md) §2c/§2d carried a *construct set* and a
 *vocabulary list*, which is not a grammar. Every sibling has the layer above that — `catalog.ts`,
-`catalog3.ts`, [docs/27 §10](27-complex-numbers-tool.md)'s "generic sentence families" — and it is
+`catalog3.ts`, [docs/27 §10](archive/27-complex-numbers-tool.md)'s "generic sentence families" — and it is
 what a build session hits in hour one. A second gap sat underneath it: the corpus does not only *pin*
 parameters, it **bounds** them, in 14 of the 20 exams, and `src3d`'s transplanted model covers only
 the pinning.
 
-This ADR closes both. The language itself is [docs/19 §10](19-analytic-geometry-tool.md), extracted
+This ADR closes both. The language itself is [docs/19 §10](archive/19-analytic-geometry-tool.md), extracted
 from the same twenty exams; the decisions are here.
 
 **D6 — naming, taken from what the corpus already does.**
@@ -332,7 +332,7 @@ points in the pipeline, and fail in three different ways:
 | Kind | Corpus form | Where it acts | Failure mode |
 |---|---|---|---|
 | **1. Parameter domain** | `a הוא פרמטר חיובי` · `t פרמטר קטן מ-9` · `0<k<6` · `a≠0` | **Declaration.** A precondition on the symbol, not a given to be satisfied. It **filters the roots** of every later pin — roots outside the domain were never candidates and are dropped silently | An empty admissible set is an honest contradiction *of the pin*, reported against the pinning statement |
-| **2. Branch selector** | `שיעור ה-y של B קטן מ-6` · `שיעור ה-x של M קטן משיעור ה-x של A` · `r<R` · `a<13` | **After solving.** An ordinary given that picks among branches already computed — the 3-D sign-given mechanism ([docs/20 §2](20-space-vectors-tool.md), «שיעור ה-z חיובי») | Selecting no branch is a contradiction named against the selector, never an empty figure |
+| **2. Branch selector** | `שיעור ה-y של B קטן מ-6` · `שיעור ה-x של M קטן משיעור ה-x של A` · `r<R` · `a<13` | **After solving.** An ordinary given that picks among branches already computed — the 3-D sign-given mechanism ([docs/20 §2](archive/20-space-vectors-tool.md), «שיעור ה-z חיובי») | Selecting no branch is a contradiction named against the selector, never an empty figure |
 | **3. Sweep range** | `A היא נקודה כלשהי על מעגל II כך ש-−1.5 ≤ שיעור ה-y של A ≤ 1.5` | **Sampling.** Bounds a *free* DOF's interval. Never affects determinacy | None — it narrows a sweep; its consumer is the locus lane, which paints and verifies the trace only over the range |
 
 **Why the distinction is load-bearing, not pedantry.** Conflating them produces exactly the bugs this
@@ -371,7 +371,7 @@ values show behind the student's checkbox.)
 sentences — `נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9`, `נתון הישר l1: y=x`, `נתונה הנקודה A(2,6)` —
 puts them on axes, in Hebrew or English, with the data panel carrying what is fixed by the data.
 Families F1 (points, parameters allowed in coordinates), F3 (lines by equation), F5 (circles by
-equation), F6 (canonical conics) and F11 (parameter declaration) of [docs/19 §10](19-analytic-geometry-tool.md).
+equation), F6 (canonical conics) and F11 (parameter declaration) of [docs/19 §10](archive/19-analytic-geometry-tool.md).
 
 **Three engineering decisions worth recording, because they shaped everything above them:**
 
@@ -396,7 +396,7 @@ equation), F6 (canonical conics) and F11 (parameter declaration) of [docs/19 §1
   `נתונ(ה|ים|ות)?` silently dropped the commonest form — eleven tests failed at once. The
   `מאונ[ךכ]` class from the 3-D tree ([ADR-W-004](06w-decisions-workspace.md#adr-w-004): carry the
   class across rather than pay it twice) on a different letter. Predicted in
-  [docs/19 §10a](19-analytic-geometry-tool.md); still shipped, because knowing about a class is not
+  [docs/19 §10a](archive/19-analytic-geometry-tool.md); still shipped, because knowing about a class is not
   the same as writing the alternation out.
 - **A case-insensitive Roman-numeral class ate real input.** `[IVX]{1,3}` with the `i` flag read the
   `x` of «the circle x²+y²−2ax−2x=0» as a numeral and swallowed the equation. Numerals are matched
@@ -549,7 +549,7 @@ Re-founding later costs every slice built on the old shape as well."*
 
 Eleven days passed and nothing was built on either shape, so the moment is intact. The operator
 re-affirmed the ruling on 2026-09-15 and directed that the **re-founding is the next slice**, ahead of
-the relations (tangency, intersections, the pin) that [docs/19 §7](19-analytic-geometry-tool.md) had
+the relations (tangency, intersections, the pin) that [docs/19 §7](archive/19-analytic-geometry-tool.md) had
 sequenced first.
 
 **Measured, not assumed.** The three corpus questions in [02c §5](02c-requirements-analytic.md) were run
@@ -619,7 +619,7 @@ it honest.
 | **B2 — the joint solve** | Per-constraint residuals, the joint minimisation, roots as branches, `no-roots` as an honest contradiction | A partly-anchored shape draws generically and anchors as coordinates arrive (R2/R3) |
 | **B3 — the shape vocabulary** | Shape nouns carrying their own constraints, sides addressable as lines, vertices derived from intersections, the axes as objects | **§5a and §5c build**, both possibilities cycled, nothing silently defaulted |
 
-The relations lane ([docs/19 §7](19-analytic-geometry-tool.md) V0's tangency/intersection/pin) is
+The relations lane ([docs/19 §7](archive/19-analytic-geometry-tool.md) V0's tangency/intersection/pin) is
 **not cancelled and not re-sequenced away** — it lands on B1's object layer, where a tangency is a
 relation between two objects rather than a special case of two equations. Its corpus gate (קיץ א' 2022)
 stands.
@@ -776,7 +776,7 @@ drift.
 ## ADR-AG-012 — The analytic tool is a FOURTH ENGINE, and the 2-D tree is not touched for it (2026-09-15)
 
 **Requirements:** [02c](02c-requirements-analytic.md) R4 (reaffirmed, and its cost re-priced); the
-"471 ↔ 572 profile split" in [§5 Deliberately still open](19-analytic-geometry-tool.md) is **not**
+"471 ↔ 572 profile split" in [§5 Deliberately still open](archive/19-analytic-geometry-tool.md) is **not**
 settled by this. **Design:** none (internal) — this confirms the existing boundary rather than
 changing one; [04c](04c-design-analytic.md) "Boundaries" already states it.
 
@@ -792,7 +792,7 @@ already contemplates *"ONE engine with curriculum-level profiles"*, and the over
 80% for this corpus.
 
 **A premise of the original plan fell during that measurement, and it is recorded because it will
-mislead the next reader otherwise.** [docs/19 §6](19-analytic-geometry-tool.md) calls the coordinate
+mislead the next reader otherwise.** [docs/19 §6](archive/19-analytic-geometry-tool.md) calls the coordinate
 substrate *"New core #1 … the deepest departure from the 2-D tool"*, and
 [`src-analytic/CLAUDE.md`](../src-analytic/CLAUDE.md) warns of *"the gauge inversion"*. Measured, the
 2-D tool **already consumes the gauge**: with `נקודה A ב-(1,3)` stated, `A` sits at exactly `(1,3)` at
@@ -835,7 +835,7 @@ Two things keep that from becoming "port the whole tool":
   placement, shape detection and the verifier are synthetic-tool concerns with no analytic counterpart.
 
 **What is NOT decided here.** The 471 ↔ 572 profile split *within* the analytic product
-([docs/19 §5](19-analytic-geometry-tool.md)) is untouched — this ruling is about which tree owns the
+([docs/19 §5](archive/19-analytic-geometry-tool.md)) is untouched — this ruling is about which tree owns the
 capability, not about how one tree serves two curricula. And nothing here says the copied constructs
 must match `src/`'s spelling; the analytic catalog answers to its own corpus.
 
@@ -2800,7 +2800,7 @@ decide how a student refers to one of two anonymous conics. #1057 held the quest
 the candidates — a display ordinal, letting the student name them, ordering by entry — and said the
 corpus was the only real evidence.
 
-**The corpus answers it, and the answer was already written down.** [docs/19](19-analytic-geometry-tool.md)
+**The corpus answers it, and the answer was already written down.** [docs/19](archive/19-analytic-geometry-tool.md)
 §4a, from the survey of twenty exams: *"**No exam in twenty carries two parabolas or two ellipses; at
 most one of each per figure**"*. So there is no convention to find and none to invent. Inventing
 «האליפסה הראשונה» would put the student in front of a phrase the exam never uses, which is exactly
@@ -3511,10 +3511,10 @@ the helper now bounds each handler at the next prop.
 
 ## ADR-AG-064 — The drawing surface is MEASURED, and the chrome is the suite's (#1103, #1106, #1105, #1107)
 
-**Status:** accepted, 2026-09-16 · **Withdraws** [docs/28 §D9b](28-product-unification.md)'s compact-strip half
+**Status:** accepted, 2026-09-16 · **Withdraws** [docs/28 §D9b](archive/28-product-unification.md)'s compact-strip half
 
 **Requirements:** none (conformance — 02c already promises the suite chrome). **Design:**
-[28 §D9b](28-product-unification.md) amended; the D1 Workbench contract gains an inside-the-card rule.
+[28 §D9b](archive/28-product-unification.md) amended; the D1 Workbench contract gains an inside-the-card rule.
 
 **Context.** Four reports from one side-by-side comparison with 2-D, all of them *"make it look like
 the other tools"*. They are one decision because they are one cause: **the D1 contract locks the CARD
@@ -3940,7 +3940,7 @@ ever revealed after a wrong claim"* — there are no claims
 
 **Context.** מקומות גיאומטריים is the most-asked construct in the corpus — **13 of 20** sampled 572
 Q1s — and the shape is always one of four: ישר ×4 · פרבולה ×5 · מעגל ×3 · אליפסה ×1. It is the V1
-lane of [docs/19 §7](19-analytic-geometry-tool.md) and had never been designed past a sentence.
+lane of [docs/19 §7](archive/19-analytic-geometry-tool.md) and had never been designed past a sentence.
 Operator, opening the session: *"we need to discuss the part of מקומות גיאומטריים of the analytical
 tool. how would you address this?"*
 
@@ -3956,7 +3956,7 @@ each:
 | …plus `MA = 5` | `carrierDof = 0`, M pinned |
 
 `carrierDofOf` + `freeRank` + `solveLM` already give the locus as a **detector and a point sampler**.
-[docs/19 §6](19-analytic-geometry-tool.md) called this *"new core #3 — the locus sweep"*; it is not a
+[docs/19 §6](archive/19-analytic-geometry-tool.md) called this *"new core #3 — the locus sweep"*; it is not a
 new core, and the plan's own best guess ("a locus **is** a swept free DOF") turns out to understate
 it — the freedom is not merely analogous, it is the same number the DOF cue already prints.
 
@@ -4033,7 +4033,7 @@ already carries a `point-line` measure term, which is the parabola.
    defined by the input"* — so showing a locus equation needed **no** amendment; it is D3′'s knowledge
    contract with decision 4 supplying the knowledge predicate. (b) [02c](02c-requirements-analytic.md)
    contains no occurrence of "verify" and was therefore already consistent with this ruling; the stale
-   charter lived only in this ADR and in [docs/19](19-analytic-geometry-tool.md) §4 and §5. (c) The
+   charter lived only in this ADR and in [docs/19](archive/19-analytic-geometry-tool.md) §4 and §5. (c) The
    [ADR-AG-005](#adr-ag-005) open item *"whether an answer is ever revealed after a wrong claim"*
    closes: there is no claim.
 
@@ -5956,7 +5956,7 @@ The ruling's own table, driven end to end through `derive`: each noun's extent, 
 
 ## ADR-AG-112 — The analytic Builder gets the LLM fallback, and the proxy routes by registry (#1251)
 
-**Requirements:** [02c](02c-requirements-analytic.md) — an unrecognised sentence is escalated rather than refused outright; the tool's promise now matches 2-D's and 3-D's. **Design:** [04c](04c-design-analytic.md) — the fallback seam; [28](28-shared-chrome.md) — the proxy's per-tool routing. **LADDER stage:** after the deterministic parse, before the refusal is shown. No engine, solver or render change.
+**Requirements:** [02c](02c-requirements-analytic.md) — an unrecognised sentence is escalated rather than refused outright; the tool's promise now matches 2-D's and 3-D's. **Design:** [04c](04c-design-analytic.md) — the fallback seam; [28](archive/28-product-unification.md) — the proxy's per-tool routing. **LADDER stage:** after the deterministic parse, before the refusal is shown. No engine, solver or render change.
 
 **Operator ruling, 2026-09-19**, playing round #1244 (T19 asked whether this tool had an LLM connection):
 
@@ -6253,7 +6253,7 @@ AD תיכון לצלע BC                    OK (5 facts)
 
 The last row is the point. The capability was complete; only the **spellings** were missing — and one of the missing ones is what a student actually writes, because they have already written «משולש ABC» and the side has no name in their head.
 
-**And 2-D answers all of them**, which is the framing that lifts this above tail work: a sibling disparity is read as a bug, and the working sibling is the template ([cross-product-disparity](../.claude/memory/cross-product-disparity-is-a-wiring-smell.md)).
+**And 2-D answers all of them**, which is the framing that lifts this above tail work: a sibling disparity is read as a bug, and the working sibling is the template ([docs/22 §10](22-workflow.md)).
 
 ### Why the triangle could never have worked
 
@@ -8265,7 +8265,7 @@ The pre-played sheet (20 cases, 8 red) and the operator ruling of the same day. 
 
 **Requirements:** [02c](02c-requirements-analytic.md) R81 — the givens list offers the suite's three row operations · **Design:** [04c](04c-design-analytic.md) — the active projection, and the `toggle` log action
 
-**Context.** [docs/28](28-product-unification.md) D6 ruled *disable, edit in place and delete — all three, in every builder*, and B5 (#670) built the shared chrome (`shell/frame/FactList.tsx`) that renders each control only when the product passes its handler. This builder joined after B5 and mounted the chrome with `onEditCommit` and `onDelete` only; its store held `lines` and nothing else, so the chrome — correctly — drew no checkbox. Nothing in the suite checked that every builder passes all three, which is how the gap shipped.
+**Context.** [docs/28](archive/28-product-unification.md) D6 ruled *disable, edit in place and delete — all three, in every builder*, and B5 (#670) built the shared chrome (`shell/frame/FactList.tsx`) that renders each control only when the product passes its handler. This builder joined after B5 and mounted the chrome with `onEditCommit` and `onDelete` only; its store held `lines` and nothing else, so the chrome — correctly — drew no checkbox. Nothing in the suite checked that every builder passes all three, which is how the gap shipped.
 
 **Decision.** (1) The store gains `disabled: number[]` — indexes into `lines`, complex's shape. It rides the undo history (a mute is a step), the save file (`disabled`, omitted when empty, so older saves are unchanged), the session persistence and the share link; `removeLine` shifts it, `clearAll` empties it, `restore` range-checks it. (2) **The ACTIVE projection** (`app/active.ts`: `activeOf`, `rowOf`): the figure is derived from the unmuted lines, and every consumer that took "the lines" — `derive`, `decideSubmit`, the fallback, «הציגו תצורה אחרת», the ask lane — now takes the active list and needs no knowledge of muting (to each of them a muted line was never said). Only the fact list shows the whole list, and `rowOf` translates a derivation's per-line results (faults, tool-chosen names) back to rows. The engine is untouched. (3) **The gates, per D6 rulings (a) and (b):** muting always applies — a dependent line then faults on its OWN row, reversibly (this builder's rows carry their own status, the 3-D shape); **un-muting** faces the typed-line gate (`decideToggle`): the line returns at its position, and if it faults or a fault APPEARS that was not there before (compared by sentence and code, since later active indexes shift), the row stays muted and the refusal names the line — `decideSubmit`'s #1334 rule for a line that is not last. **Editing a muted row** rewrites text only, but it must still parse (`decideEdit`, extracted from `App.tsx` so its lock calls it). (4) The load audit replays the figure the student will see (active lines, faults mapped to rows) and also names a MUTED line that no longer parses — it would be refused on un-mute, and the drift net exists for exactly that.
 

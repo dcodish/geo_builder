@@ -46,7 +46,8 @@ aggregates.
    LLM_DAILY_MAX=500           # hard cap on Haiku calls/day (cost backstop, SEC-2, ~$1.25/day worst-case); tune to taste
    IP_HASH_SALT=<long-random-string>
    EVENTS_LOG_PATH=/var/www/geo-proxy/events.jsonl
-   EVENTS_RETENTION_DAYS=7     # drop usage events older than this (privacy, SEC-7); unset = 7 (default-on, ADR-278); an explicit 0 = keep forever
+   # EVENTS_RETENTION_DAYS: leave UNSET in prod. Unset = 30 days (ADR-W-110), the number every
+   # privacy note states (privacy, SEC-7); an explicit 0 = keep forever.
    ADMIN_USERNAME=<pick-a-name>
    ADMIN_PASSWORD=<pick-a-strong-password>
    ADMIN_COOKIE_SECRET=<long-random-string>
@@ -60,25 +61,18 @@ aggregates.
    scp deploy/geo-proxy.service root@themathbible.com:/etc/systemd/system/
    ssh root@themathbible.com 'systemctl daemon-reload && systemctl enable --now geo-proxy && systemctl status geo-proxy --no-pager'
    ```
-4. Add the reverse-proxy rule from `deploy/apache-geo-builder.conf` (the six ProxyPass lines).
-   **PREFERRED — via Plesk (survives regeneration):** *Domains → themathbible.com → Apache & nginx
-   Settings → "Additional directives for HTTPS"* → paste the lines → OK (Plesk validates + reloads).
-   Storing them in Plesk's own field means a later SSL renew / "Repair" / hosting-setting change that
-   REGENERATES `vhost_ssl.conf` keeps them — the direct-file append below does NOT survive that (see the
-   caveat under Notes). Only fall back to editing the file directly if the GUI field is unavailable:
-   ```sh
-   CONF=/var/www/vhosts/system/themathbible.com/conf/vhost_ssl.conf
-   cp -a "$CONF" "$CONF.bak-$(date +%s)"
-   cat deploy/apache-geo-builder.conf >> "$CONF"   # NOT durable — Plesk regen drops it
-   apache2ctl -t && systemctl reload apache2       # never reload on a failed configtest
-   ```
+4. Add the reverse-proxy rule from `deploy/apache-geo-builder.conf` through **Plesk's
+   "Additional directives for HTTPS" field**, never by editing `vhost_ssl.conf`: a hand edit works at
+   once and reverts silently at the next Plesk regeneration. The procedure — reading the live conf,
+   preparing only the missing lines, appending them, verifying each route — is in
+   [docs/RUNBOOK.md](../docs/RUNBOOK.md) ("The moving parts" → Apache directives, and "Adding a builder").
 
 ## Each deploy (Phase C)
 
 From the project root on the dev machine:
 
 ```sh
-npm test                 # 1387 green
+npm run test:full        # green only when reports/suite-verdict.json says so for this sha
 npm run build            # dist/  (subpath /geo-builder/ baked in)
 npm run build:proxy      # dist-server/proxy.mjs  (self-contained, ~504 KB)
 
@@ -127,9 +121,9 @@ ssh root@themathbible.com 'systemctl restart geo-proxy'
 - **Data & privacy (SEC-7) — a tool for minors.** Production stores only lean events:
   a salted **hash** of the IP (never the raw address) plus the student's utterance text
   and outcome — no snapshots, no names. `EVENTS_RETENTION_DAYS` (above) drops events past
-  that age (applied at most once/day); **unset means the 7-day default** (retention fails
-  toward privacy, ADR-278 — the operator's ladder is 7 d now, ~30 d once there is real
-  traffic); only an explicit `0` keeps events forever. `IP_HASH_SALT` never falls back to a
+  that age (applied at most once per UTC day, per file); **unset means the 30-day default**
+  (retention fails toward privacy, ADR-278; raised from 7 to 30 days by ADR-W-110, and every
+  builder's privacy note states 30); only an explicit `0` keeps events forever. `IP_HASH_SALT` never falls back to a
   committed constant — unset means a random per-boot salt (visitor ids reset each restart),
   so always set a stable secret. The verbose **debug log** (`logs/debug-log.jsonl`, full figure snapshots) is
   **dev-only** — it is written by the Vite dev plugin, NOT by this production server, so no
@@ -151,8 +145,8 @@ ssh root@themathbible.com 'systemctl restart geo-proxy'
   block in `apache-geo-builder.conf` fixes it (no-cache HTML, immutable assets). For
   a one-off check, hard-refresh (`Ctrl+Shift+R`). Old bundles are left in place so
   in-flight cached pages don't break; they age out as caches revalidate.
-- **Persistence caveat:** the ProxyPass lines are appended directly to
-  `vhost_ssl.conf`. If a future Plesk domain reconfigure regenerates that file and
-  drops them, the static app keeps working but the LLM fallback 404s (the client
-  degrades gracefully to "couldn't understand"). Re-append from
-  `deploy/apache-geo-builder.conf`, or add them via the Plesk GUI to be safe.
+- **Persistence caveat:** ProxyPass lines appended directly to `vhost_ssl.conf` are dropped
+  when Plesk regenerates that file; the static app keeps working but the LLM fallback 404s
+  (the client degrades gracefully to "couldn't understand"). Restore them through the Plesk
+  field, per [docs/RUNBOOK.md](../docs/RUNBOOK.md), and run `npm run deploy:preflight`, which
+  probes every route.

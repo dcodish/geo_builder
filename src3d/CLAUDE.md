@@ -13,7 +13,7 @@ adds only what is specific to 3-D.
 A **second app** in this repo for the bagrut **space/vectors** question (Q2): geometric `u,v,w` vectors on
 solids, plus algebraic R³ lines and planes. **Contract:** [02b](../docs/02b-requirements-3d.md) (what) ·
 [04b](../docs/04b-design-3d.md) (how) · decisions [06b](../docs/06b-decisions-3d.md), ids `ADR-3D-NNN`;
-[docs/20](../docs/20-space-vectors-tool.md) is the finished build plan. Issue label `3d`.
+the finished build plan, [docs/20](../docs/archive/20-space-vectors-tool.md), is archived history. Issue label `3d`.
 Deployed at `themathbible.com/3d-builder/` (admin dashboard at `/admin3`).
 
 ## Hard boundaries (operator authority — [docs/22 §9](../docs/22-workflow.md) "Isolation rules" + [`BOUNDARIES.json`](../BOUNDARIES.json))
@@ -23,7 +23,7 @@ Deployed at `themathbible.com/3d-builder/` (admin dashboard at `/admin3`).
    rejects it. `vite.config.3d.ts` deliberately defines no alias.
 2. **3-D work never touches 2-D artifacts** — not the 2-D locale files, not `docs/06-decisions.md`, not the
    2-D status text. Decisions go in 06b; orientation updates go in this file.
-3. **NO CAS** (docs/20 §10 D3). Anything needing symbolic solving beyond a 1–2-DOF numeric root-find goes back to the
+3. **NO CAS** (02b ruling D3). Anything needing symbolic solving beyond a 1–2-DOF numeric root-find goes back to the
    operator. Every "symbolic" feature here is a numeric root-find, a closed form, or a linear solve.
 4. **No cross product.** The curriculum has none. It may be used internally, never surfaced to a student.
 

@@ -28,6 +28,8 @@ gh issue view <NN> --json body -q '.body' | head -3   # ← never skip: confirm 
 
 A heredoc into `--body "$(cat <<'EOF' … EOF)"` also works. The verify step is the part that matters — a filing failure here is silent and costs the whole diagnosis.
 
+**The title leads with his words.** Its first clause is the sentence the operator typed, in Hebrew «guillemets»; the class name goes after the dash. He finds his reports by scanning titles for his own words, and re-reports one he cannot see (#1323).
+
 **Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3`; one *product* — `2d` | `3d` | `analytic` | `complex` | `server` | `workspace`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the issue's fix plan is approved for autonomous execution (by the operator's explicit approval, or because every line of its `## What the student will see` is `[asked]`/`[ruled]`/`[2-D]` — §2d, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)), `icebox` on a closed, parked issue (never one that shows something false), `in-round` on a fix-round's round issue while the round executes (an open `in-round` issue with no session running it = a round died mid-flight — [ADR-W-013](06w-decisions-workspace.md)), and `awaiting-play` on the same issue from round-finish until the operator validates the batch (§2d).
 
 **What each type means** (#1763). The type is decided by what the STUDENT experiences, not by the size of the change:
@@ -35,7 +37,9 @@ A heredoc into `--body "$(cat <<'EOF' … EOF)"` also works. The verify step is 
 - **`feature`** — the product cannot do something it should: a sentence it does not read, a capability or surface that does not exist. A "bug" diagnosed as a missing capability is relabelled `feature`. Route: always a PR, played and approved (§4).
 - **`debt`** — the product is right for the student, but the code makes the next change harder, slower or riskier. Nothing a student sees or can do changes. Examples: duplicated mechanisms to hoist into `shell/`, machinery to retire or tidy, performance nobody sees, audits and conformance checks, follow-up bookkeeping, umbrella hardening programmes. Route: straight to `main` like a bug (no PR, no play gate — there is nothing for the operator to judge); its gates are the same tests. Priority: **P3 by default**; **P2 when it blocks other scheduled work** (e.g. a hoist that stops a fourth copy from being written). The moment a debt item would change what a student sees, it is not debt — split that part out as a `bug` or `feature`.
 
-**"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. **Found work is proposed, not queued** (CLAUDE.md rule 7): a session files what it finds as `needs-operator` with a proposed priority, and never arms it or makes it P1 itself — except a figure drawn green for givens that cannot hold, which is filed P1 and announced at once. ([14-backlog.md](14-backlog.md) is fully migrated as of 2026-09-05, #907 — it is now a historical record. ADR prose is still swept opportunistically.)
+**"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. **Found work is proposed, not queued** (CLAUDE.md rule 7): a session files what it finds as `needs-operator` with a proposed priority, and never arms it or makes it P1 itself — except a figure drawn green for givens that cannot hold, which is filed P1 and announced at once. ([14-backlog.md](https://github.com/dcodish/geo_builder/blob/6dcdff48/docs/14-backlog.md) was fully migrated as of 2026-09-05, #907, and deleted in #1861. ADR prose is still swept opportunistically.) An ADR that parks an arm in its "not built" table gets its successor filed in the same pass and linked from the close comment, because an arm that lives only in an ADR is invisible to the queue and comes back as a re-report (#1284).
+
+**`icebox` is parked, not dead.** A parked issue is closed "not planned" with a comment saying it is reopened when a student hits it or the operator asks; `/log-triage` reopens one when the prod logs show a student hitting it (#1804). Nothing that shows something false is ever parked: a wrong figure, a false "contradicts", a silent misread, a guide sentence that fails.
 
 **Prod-log triage findings follow the same taxonomy:** the log-triage agent/skill classifies each cluster `bug` vs `feature` with a proposed priority, **files the `bug` clusters as issues immediately** (deduped against open issues), and holds `feature` clusters as recommendations — those are filed as issues only once the operator approves them for building (then built via the feature route, §4).
 
@@ -47,6 +51,8 @@ A heredoc into `--body "$(cat <<'EOF' … EOF)"` also works. The verify step is 
 
 Honesty violations outrank capability gaps: a wrong figure teaches a student something false; a refusal only inconveniences them.
 
+**Grade by the class, never by the reach.** A figure drawn green for givens that cannot hold is P1 however unlikely the input. "It takes a mistake to reach" describes the honesty class, since a student's mistyped contradiction is exactly when the tool must refuse (#1328). Reachability may lower a P2 or P3, never a P1.
+
 ## 2b. Triage-first: a reported issue is QUEUED, never auto-fixed (operator directive, 2026-07-10 — ADR-265 Am. 1)
 
 The operator raises issues **while testing**, often several per pass. If the reporting session starts fixing immediately, the operator is forced to feed one issue at a time and parallel fixes overwrite each other in the shared tree. So the reporting session's job is **triage, not repair**:
@@ -55,6 +61,10 @@ The operator raises issues **while testing**, often several per pass. If the rep
 2. **Diagnose to the class level** (per [docs/17](17-design-rules.md)): reproduce from the logs, find the root cause, classify `bug` vs `feature`, set the priority.
 3. **Write the analysis into the issue** (a comment or the body): root cause, the class it belongs to, a concrete fix plan (mechanism, files, tests, blast radius), open questions for the operator — and a closing **`## What the student will see`** section: one line per student-visible change, tagged `[asked]` (quote the operator), `[ruled]` (link the ruling), `[2-D]` (2-D's behaviour measured at a named commit) or `[proposed]`; "none" for a mechanism-only plan. Never describe what 2-D or another builder does without measuring it. A `[proposed]` line is an open question: the issue is `needs-operator` (CLAUDE.md rule 7, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)).
 4. **STOP — do not implement.** No branch, no code, no "it's a one-liner" exceptions. Reply to the operator with the classification + plan and move to the next report.
+
+**Search and read before filing a plan, or presenting anything as open.**
+- **Search for the capability, not only the symptom.** Search open and closed issues (`icebox` included, `--limit 200`) for his sentence AND for the capability it sits on, and read the "not built" tables of the ADRs they link. A re-report is often a parked arm, and an armed prerequisite may already hold a ruling the new plan would contradict (#1284; #1303 vs #1154). He cannot correct a contradiction with a ruling he is not shown. A claimed filing ("filed and fixed next") is checked the same way: it may never have been opened (#1119).
+- **Read the issue, not the body.** Bodies and titles are written once. The ruling may sit in a comment, or on a sibling issue the plan names, and the work may already have shipped. Read the whole comment run and `git log -- <module>` before listing it as open, adding `needs-operator`, or shipping past it (#509, #659, #1279, #1590). When the code and the body disagree, the code wins; when the scope has moved, retitle the issue to the work that is left and say why in a comment.
 
 **A ruling is transcribed under ONE heading.** When the operator's answer to an escalation or an open question is written onto the issue — by the `/decisions` pass or by the session resolving a round's escalation — the comment opens with `## Operator ruling — YYYY-MM-DD`, verbatim ([ADR-W-073](06w-decisions-workspace.md#adr-w-073)). `scripts/queue-hygiene.mjs` reads that shape (and the handful measured from older threads) as an answer; a pass that invents its own phrasing is how a ruled thread is reported to the operator as still waiting on them (#1325).
 
@@ -157,7 +167,8 @@ pressed), the screenshots are audited and READ by the session, and a mechanicall
 its fix — the operator never receives a red sheet. Each case is classed **🎮 play** (operator judgment) ·
 **👁 look** (judge from the embedded screenshot) · **✅ verified** (record only); the driver's
 `report.html` with the screenshots IS the published artifact's play-sheet half, and the operator's
-sitting covers 🎮 fully, 👁 by eye, ✅ not at all.
+sitting covers 🎮 fully, 👁 by eye, ✅ not at all. How to build, serve and pre-play a sheet: the
+`/playsheet` skill.
 `/status-update`'s "Waiting on you" section surfaces the whole loop: plans awaiting `auto-ok`, PRs
 awaiting play, rounds in flight, rounds awaiting validation.
 
@@ -201,7 +212,13 @@ Steps 1–3 run in the reporting session; steps 4–6 run **only in a dedicated 
 5. **Update the contract** ([ADR-W-041](06w-decisions-workspace.md#adr-w-041), §3b) — a fix that changes what the product PROMISES updates its requirements doc, one that changes HOW it is built updates its design doc, **in the same commit**. Most bug fixes restore a promise rather than change one, so most answer `none (internal)` — but the ADR must say so explicitly.
 6. **Land it:** small/contained fixes commit **directly to `main`** with `Fixes #NN` in the message (auto-closes the issue). Large, risky, or multi-session fixes go through a PR (§4 steps 4–6).
 
-*(A step here used to read "status/docs updates as today (CLAUDE.md current-state, PROJECT-MEMORY session log)". It is gone: [ADR-W-002](06w-decisions-workspace.md#adr-w-002) moved status OUT of CLAUDE.md — a guard test now rejects it — and PROJECT-MEMORY lags the ADR logs. The current-state homes are the ADR log tail, the issue queue and DEPLOY-LOG.)*
+**A closing keyword closes, whatever surrounds it.** GitHub matches `close`/`fix`/`resolve` (any tense) followed by `#NNN` anywhere in a commit or PR body, inside a negation or a quotation too: "Does NOT close #920" closed #920 (round #961). To keep an issue open, write it without the pattern ("#920 stays open"), then check `gh issue view N --json state` after the push.
+
+**The `Allow-sibling-edit:` trailer.** `npm run check:siblings` (`scripts/check-sibling-safety.mjs`) fails a change that edits another product's tree or a shared surface unless someone says why. Locally the reason can be the `ALLOW_SIBLING_EDIT` env var; for CI it is a commit trailer, `Allow-sibling-edit: <one sentence>`, and an empty value fails. Git reads trailers from the last paragraph only, and rejects that whole paragraph if any line in it is not `Key: value`. So put the trailer on the line directly above `Co-Authored-By:` with no blank line between, and put `Closes #N` / `Fixes #N` (no colon) in their own paragraph above the block (#1031, PR #1352). Check before pushing with the guard's own query: `git log --format='%(trailers:key=Allow-sibling-edit,valueonly,unfold=true)' origin/main..HEAD`. If `%(trailers)` with no key prints nothing, the paragraph was rejected.
+
+**Reading a gate.** Chain gates with `&&`, never `;`, so a red gate reds the task. Quote the decisive line (the totals line, `sibling-safety: PASS`) after reading it, not after grepping for it. `reports/suite-verdict.json` counts only for the `sha` it names, so compare it with HEAD (PR #1116). A screenshot taken as evidence is read (2026-08-17). Redirect a long run to a file and read the file: a pipe through `Select-Object` or `head` holds everything until the run ends and looks exactly like a hang (2026-09-22).
+
+*(A step here used to read "status/docs updates as today (CLAUDE.md current-state, PROJECT-MEMORY session log)". It is gone: [ADR-W-002](06w-decisions-workspace.md#adr-w-002) moved status OUT of CLAUDE.md — a guard test now rejects it — and PROJECT-MEMORY was deleted in #1861. The current-state homes are the ADR log tail, the issue queue and DEPLOY-LOG.)*
 
 ## 3b. The contract step: requirements and design ([ADR-W-041](06w-decisions-workspace.md#adr-w-041))
 
@@ -221,6 +238,8 @@ Both routes carry it, because the contract was the one artifact with **no home a
 - **Requirements** changes when what the product **promises a student** changes: a new construct, a changed refusal, a new honesty guarantee, or an existing FR whose *status* is now wrong (a `(Later)` that shipped).
 - **Design** changes when **how it is built** changes: a new module or layer, a new stage in the solve ladder, a moved boundary, a new shared surface.
 - **`none (internal)` is a first-class answer and most ADRs use it.** A refactor, a perf fix, or a solver change behind an unchanged promise genuinely alters no contract. This matters: if an FR id were the only acceptable answer, sessions would invent FRs to pass the gate, and an inflated requirements doc lies with more words than a stale one.
+
+**The next ADR id is max + 1 over the whole log, at every heading level**: `grep -oE "^#+ ADR-<PREFIX>-[0-9]+" <log> | grep -oE "[0-9]+$" | sort -n | tail -1`. The logs are not in numeric order and mix `##` with `###`, so the last heading under-counts (round #1332). Compute it before any code comment cites the id; after merging parallel branches, re-run `npm run test:docs` on the merged tip, the one place a cross-branch collision shows. A renumber rewrites only the lines that name your own issue, and `git status` must list no file you did not touch, because a blanket `sed` rewrote 35 references to the real ids (2026-09-30).
 
 **Which document** — [`DOCS.json`](../DOCS.json) is the registry (per product: requirements doc, design doc, or a `null` with the issue that will write it). The scheme mirrors the ADR logs: `02`/`02b`/`02c`/`02d` requirements and `04`/`04b`/`04c`/`04d` design, with **`02w`/`04w`** owning the shared surfaces (the `shell/` chrome, the admin dashboard, the ask lane) so they are written once rather than restated in four product docs.
 
@@ -251,6 +270,7 @@ Applies to feature requests **and** bug reports reclassified as capability gaps.
    sibling-safety one. The operator's play stays the acceptance judgment (does the design feel
    right); it stops being the first line of defence against mechanical breakage.
 6. **Operator gate:** the operator plays with it (dev server / screenshots) and approves; then merge to `main` (squash or merge-commit, either is fine; keep `Closes #NN`).
+   **Merging a stack:** never pass `--delete-branch` until the whole stack has landed. Deleting a base branch closes the PR stacked on it, and a closed PR cannot be reopened or retargeted while its base is gone (round #800). Merge the base, `gh pr edit N --base main`, resolve against the new `main`, merge, repeat; delete the branches at the end. To recover, push the tip back (`git push origin <sha>:refs/heads/<branch>`), then `gh pr reopen N` and retarget.
 7. Deploy from `main` when ready (§5).
 
 **An operator "commit and deploy now" waives ONLY the play-and-approve gate (step 6), never the PR itself** (operator ruling, 2026-07-11: "even if I say commit+deploy — a PR must be written for future tracking"). In that mode: build on the branch as usual, open the PR, **self-merge immediately**, and deploy — the PR remains the permanent tracking record (reviewable diff, CI run, discussion anchor). Committing feature work directly to `main` is never the right reading of a deploy instruction. (The 2026-07-11 fix-session batch predates this ruling and went to `main` directly — commit `b54b155`; its tracking lives in the issues + ADRs 268–274.)
@@ -259,7 +279,7 @@ Applies to feature requests **and** bug reports reclassified as capability gaps.
 
 - **`main` is the trunk** — always green (CI), always deployable. `rebuild-foundation` is retired; sessions work on `main` + topic branches. *(Migrated 2026-07-10: main fast-forwarded to the rebuild-foundation head.)*
 - **Deploy only committed state** from `main`, following **[RUNBOOK.md](RUNBOOK.md)**. The old habit of deploying an uncommitted working tree is retired — commit (or PR-merge) first, so every prod bundle is reconstructable.
-- **Every deploy gets:** a git tag `prod/YYYY-MM-DD[-n]` on the deployed commit, **and** an entry in **[DEPLOY-LOG.md](DEPLOY-LOG.md)** (date, tag, commit, which app(s), bundle hash, one-line what-changed). The deploy log is canonical — PROJECT-MEMORY no longer accumulates deploy entries (a session-log line may reference the tag).
+- **Every deploy gets:** a git tag `prod/YYYY-MM-DD[-n]` on the deployed commit, **and** an entry in **[DEPLOY-LOG.md](DEPLOY-LOG.md)** (date, tag, commit, which app(s), bundle hash, one-line what-changed). The deploy log is canonical; its bottom table holds the untagged deploys made before adoption.
 - Why it matters here specifically: log-triage re-runs prod utterances against HEAD, silently assuming prod ≈ HEAD; the tag + log make "what is actually live?" answerable (the ADR-115 "stale dev server" class, prod edition).
 
 ## 6. One-time GitHub setup (done at adoption)
@@ -285,7 +305,13 @@ working tree**, and an uncommitted change in it belongs to whoever commits next.
 - **Never `git checkout` a different branch in the shared tree while it carries another session's
   uncommitted work** — use a **worktree** (`git worktree add`); the shared tree stays on `main`. Verify
   the branch in the *same compound command* as any write, because a parallel session can switch it
-  mid-flight.
+  mid-flight (e.g. `test "$(git branch --show-current)" = "main" && git merge --ff-only …`; 2026-08-13).
+- **Worktree git commands use `git -C <worktree-path>`.** The Bash tool's cwd resets to the project root
+  between turns, so a bare `git commit` after a turn boundary runs in the shared tree (2026-08-17).
+- **`git stash` is one stack for every worktree** (`refs/stash` belongs to the repository). While more
+  than one worktree is active, never stash: for a fails-before check, save a patch (`git diff > ../x.patch`,
+  `git checkout -- <paths>`, run, `git apply ../x.patch`), and say so in every parallel agent's brief.
+  Parallel agents have popped each other's work (#1619).
 - **Worktrees and ALL scratch/temp dirs live OUTSIDE the repo tree** — under the machine's OS temp,
   project-scoped: `"$TMPDIR"/claude/geo-wt/<branch>` for worktrees (derive the path from
   `$TMPDIR`/`%TEMP%`; never hardcode `C:\Users\<name>\…`), and the session scratchpad for loose files.
@@ -356,6 +382,7 @@ All four builders are deployed. `products.json` is the only record of deploy sta
 - The **shared server is the one deliberate sharing point** — parameterized by a `tool:` field (`server/parseHandler`, `handleLog`, admin `DashboardProfile`), never forked per product. It imports from BOTH product trees on purpose; that coupling is recorded in the manifest as an `allowed` edge, so it can never be mistaken for the violation it superficially resembles. A product never imports the server back — it talks to the proxy over HTTP.
 - **Every directory carries a layer** — `engine` (reasons about points/lines/planes/DOF/constraints; copied, never shared), `lexicon` (vocabulary, noun→shape), `shell` (everything else). Classification is total: an unclassified directory fails the test. Whether a non-`engine` layer may be *physically* shared is deliberately undecided — see ADR-W-003's trigger. Before copying a file because the sibling tree has one like it, apply the copy tripwire ([17 §2](17-design-rules.md), item 8).
 - **A diagnosed bug class is checked against the sibling product** and the answer stated in the ADR ([ADR-W-004](06w-decisions-workspace.md#adr-w-004)) — the products copy patterns by design, so they copy defects by design.
+- **Count the copies before writing a product-local mechanism.** If one sibling has the same concern, match its shape. If two do, yours is the third: it belongs in `shell/`, parameterized, with the cross-product lock of [04w](04w-design-shell.md) "How a cross-product wiring guard is written" ([ADR-W-071](06w-decisions-workspace.md#adr-w-071)), and that cost goes in the plan up front (#1353 → #1358). What a student sees converges on 2-D (§10); a sibling whose behaviour looks better is a question for the operator, never the session's call (CLAUDE.md rule 7).
 - The 2-D locale files, ADR logs, and status text of one product are never touched by another product's work.
 - The full suite (`npm run test:full`, green read from `reports/suite-verdict.json`) remains the bar **before any deploy** and for changes to the shared surface; the per-product lanes are for the edit-push loop.
 
@@ -377,7 +404,9 @@ All four builders are deployed. `products.json` is the only record of deploy sta
 - **Adding or changing a sentence form in one builder** means one of:
   - a parity row, where every builder already agrees;
   - a known-gap row naming the issue that ports it (`knownGap: [{ product, issue: '#NNNN' }]`). When the port lands the row fails with "move it to the parity rows", so the list only shrinks;
-  - an `EXCEPTIONS` family, X1–X10: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, free points in 3-D, x or y as a length in analytic (ADR-W-109). A new family is an ADR-W decision, never a quiet edit.
+  - an `EXCEPTIONS` family, X1–X10: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, free points in 3-D, x or y as a length in analytic (ADR-W-109). A new family is an ADR-W decision, never a quiet edit. **Vectors (X7) are 3-D only by design:** they belong to the space unit, so 2-D has none, and a vector is never ported to `src/` or filed as a parity gap (operator, 2026-09-18, #1184).
 - **The catalog check** makes this reach every guide sentence. Each builder's catalog sentence is a step of some row, belongs to a topic exception, or sits on `UNCOVERED_CATALOG`. That allowlist is a ratchet: it may shrink, never grow.
 - **Display follows 2-D too** (ruling B1, 2026-10-07, [ADR-W-118](06w-decisions-workspace.md#adr-w-118)): for plane geometry, marks, labels, label text and status wording follow 2-D. A display behaviour 2-D lacks lands in 2-D first or needs an operator ruling; a recorded exception names its ruling. There is no display lock yet, so this rule is checked by reading: before building anything a student sees in a non-2-D builder, measure what 2-D does.
 - **Warn both ways** ([ADR-W-117](06w-decisions-workspace.md#adr-w-117) §8): when the operator asks a non-2-D builder for behaviour that differs from 2-D, say so before building; when a 2-D change would change what the other builders should do, ask whether it applies to them.
+- **A refusal in another builder is measured against 2-D first.** Run the identical sequence through 2-D (`factsOf` → `replayFacts`, or the real submit) and read what it produced. If 2-D builds it, the work is "port 2-D's mechanism", with that mechanism written into the plan as the template, and not a scope question for the operator (#985). A claim about what 2-D does is measured too, before it is cited: 2-D may refuse the same form, or mean something different by the same mark (#1240, #1241).
+- **Canvas = inputs, panel = computed** ([ADR-W-047](06w-decisions-workspace.md#adr-w-047), every builder; the recorded exceptions are ADR-W-118 B6/B7). This is settled: a canvas label that differs from the panel only because the panel shows a derived value is the rule working, never a question to file (re-affirmed 2026-09-29, #1563).

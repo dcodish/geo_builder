@@ -1,82 +1,28 @@
 ---
 name: heredoc-eats-backslashes
-description: "Bash heredocs in this harness silently drop backslashes and eat backticks as command substitution — write source files with the Write tool, and do string surgery from a .cjs script file, never `node -e` inline"
-metadata: 
+description: "Content written through a shell in this harness is silently corrupted (heredocs halve backslashes, backticks run, `$` patterns in String.replace, Python \\u escapes, PowerShell mojibakes Hebrew) — write files with the Write tool and do string surgery from an asserted .cjs script"
+metadata:
   node_type: memory
   type: feedback
   originSessionId: 79d8e913-3646-42eb-939a-24700cb56522
-  modified: 2026-09-28T10:58:22.919Z
+  modified: 2026-10-07T00:00:00.000Z
 ---
 
-Writing file content through a Bash heredoc in this harness **corrupts it silently**. Two distinct
-failure modes, both hit repeatedly in round #869:
+Every route below reports success while the content is wrong, and `tsc` catches only some of it.
 
-- **Backslashes are halved even in a QUOTED heredoc** (`<<'EOF'`). `s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')`
-  arrived as `/[.*+?^${}()|[\]\]/g, '\$&'` — an unterminated regex literal. A `join('\n')` written into a
-  `.cjs` file arrived as a real newline, so a later `includes()` anchor never matched and the script
-  aborted half-applied.
-- **Backticks inside a double-quoted `node -e "…"` run as command substitution.** Every `` `foo` `` in a
-  doc comment vanished, leaving *"Typed, not : the sentence was…"* in committed source, plus a spray of
-  `foo: command not found` in the output that is easy to read past because the script still prints "ok".
-
-**Why:** the command string is preprocessed before bash sees it, so heredoc quoting is not the protection
-it normally is. It fails *quietly* — `tsc` catches the broken regex, but a mangled comment or a
-half-applied edit does not, and the "success" line still prints.
+- **Bash heredocs halve backslashes, even quoted (`<<'EOF'`),** and backticks inside a double-quoted
+  `node -e "…"` run as command substitution (round #869).
+- **`String.replace(from, to)` expands `$&`, `` $` ``, `$'` in `to`.** A replacement ending in a regex `$`
+  before a backtick pasted the whole file prefix in (#777, round #1332). Always `s.replace(from, () => to)`.
+- **A Python edit script turns `⁦` into the invisible character itself.** Double the backslash, then
+  assert the code point is absent from the file (#1296, #1315).
+- **PowerShell `Get-Content | .Replace() | Set-Content` mojibakes Hebrew** unless both ends pass
+  `-Encoding utf8`; a filed issue body came out garbled (#1504).
 
 **How to apply:**
-- New or rewritten source/test/doc files → the **Write tool**. Not a heredoc.
-- String surgery on an existing file → write a **`.cjs` script file** (the repo is `"type": "module"`, so
-  `.js` fails with *"require is not defined"*), then `node script.cjs`. Keep backslashes and backticks out
-  of the script body where possible.
-- Make every replacement **anchored and asserted** (`if (!s.includes(anchor)) throw`) so a mangled anchor
-  aborts before writing instead of applying half the edits — that guard is what saved `notices.ts`.
-- After any scripted edit, **read the changed lines back** before committing. Two mangled comments in
-  round #869 were caught only by reading; nothing else would have.
-
-**A third mode, and this one destroys the FILE, not a comment (2026-09-09, #777):**
-`String.prototype.replace(from, to)` treats a `$` sequence inside the REPLACEMENT string as a
-substitution pattern: `$&` is the match, ``$``` is everything BEFORE it, and `$'` everything after.
-A replacement whose text ended in a regex anchor — `\s*$` followed by a closing backtick — made
-`replace` splice the entire file-before-the-match into `parse.ts`, so the file got its own header
-inserted mid-line and `tsc` reported six unrelated syntax errors. Nothing in the script warned; it
-printed its success line.
-
-**Always pass a FUNCTION replacement** — `s.replace(from, () => to)` — in these edit scripts. A function
-return value is used literally, so no `$` sequence can be special. It costs nothing and removes the whole
-class.
-
-**A fourth mode — a PYTHON edit script turns `\uXXXX` into the real character (2026-09-21, #1296/#1315):**
-`⁦` inside an ordinary Python string literal is not four characters, it is the character. So an edit
-script carrying replacement text through a normal `'…'`/`"""…"""` literal writes **literal invisible
-controls** into the source. It happened twice in one session, in two different files, and both times the
-diff looked perfect — `const LRI = '⁦';` renders identically to `const LRI = '⁦';` in every view.
-
-It matters here beyond aesthetics: `shell/bidi.ts` states the rule in as many words — *"Written by CODE
-POINT, never literally: typed as themselves they are invisible in this source file, so a later edit cannot
-see what it is changing"* — so the corruption silently violates a discipline the module depends on. `tsc`
-is green, the tests pass, nothing warns.
-
-**How to apply:** in a Python edit script, double the backslash (`'\\u2066'`) or build it with
-`chr(92)+'u2066'`; and afterwards **assert the absence**, not just eyeball the diff:
-
-```
-python -c "import io; s=io.open(PATH,encoding='utf-8').read(); print(chr(0x2066) in s or chr(0x2069) in s)"
-```
-
-That one line is what caught both. The general form: after a scripted edit that carries Unicode, grep the
-file for the literal code point you meant to write as an escape.
-
-**A fifth mode — PowerShell `Get-Content -Raw | .Replace() | Set-Content` mojibakes Hebrew (2026-09-28, #1504):**
-`Get-Content` without `-Encoding utf8` reads a BOM-less UTF-8 file through the ANSI codepage, so every
-Hebrew character arrives as two Latin-1 bytes; `Set-Content -Encoding utf8` then faithfully encodes the
-garbage. The round-trip was done only to substitute an issue number into an issue body, and `gh issue
-create` filed the mojibake — the tool printed the issue URL, success as ever. Caught only because the
-harness diffed the file afterwards; repaired with `gh issue edit --body-file` from a Write-tool file.
-
-**How to apply:** never round-trip a UTF-8 file through PowerShell string surgery. Substitute
-placeholders by rewriting the whole file with the **Write tool** (it's one call), or read/write with
-`-Encoding utf8` on BOTH ends if a script is unavoidable — and after filing anything user-visible from a
-scripted file, `gh issue view --json body` the Hebrew line back.
-
-Related: [[gh-body-at-dash-eats-issues]] — same class, same lesson (the tool reports success while the
-content is gone).
+- New or rewritten files: the **Write tool**.
+- Surgery on an existing file: a `.cjs` script file (the repo is `"type": "module"`), every anchor asserted
+  (`if (!s.includes(anchor)) throw`) so a mangled anchor aborts before writing.
+- Afterwards, read the changed lines back and run `git diff --stat`: a file that grew by thousands of lines
+  is the `$` signature. After filing anything from a scripted file, `gh issue view --json body` the Hebrew back.
+- `gh` bodies go through `--body-file` (docs/22 §1).

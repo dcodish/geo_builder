@@ -35,7 +35,8 @@ without redoing my work.
 3. **Only then report** — stating what I attempted and what the config says, with observation and
    inference clearly separated. Never assert a mechanism for a denial I have not tested.
 
-Corollary: never let a denial become a hand-back either — see [[deploys-are-mine-to-run]].
+Corollary: never let a denial become a hand-back either — a session runs the deploy itself
+(docs/RUNBOOK.md, "Standard deploy").
 
 Corollary: this is the same failure as writing a plausible-but-unverified diagnosis into a bug report.
 The rule is `docs/17`'s "state the root cause" applied to my own tooling — do not narrate a cause I have

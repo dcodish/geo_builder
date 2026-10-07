@@ -4,7 +4,7 @@ _How the 3-D product is built. Registered in [`DOCS.json`](../DOCS.json) as the 
 ([ADR-W-041](06w-decisions-workspace.md#adr-w-041))._
 
 **What it must promise** is [02b](02b-requirements-3d.md). Decisions are [06b](06b-decisions-3d.md);
-the build plan and its corpus reading are [docs/20](20-space-vectors-tool.md). This is the *how*.
+the build plan and its corpus reading, [docs/20](archive/20-space-vectors-tool.md), are archived history. This is the *how*.
 
 ## Shape
 
@@ -216,7 +216,7 @@ refusal says so rather than asking for a placing given that would not help.
 `relationTable.ts` maps each `relation × operand-kind` pair to a status and the actions it licenses
 (`drive`, `claim`, or unsupported) rather than scattering that knowledge across rules. Two properties
 follow: a relation the engine cannot yet drive is **claim-gated** instead of silently mis-driven, and the
-map is enumerable — which is how [docs/26](26-3d-relations-plan.md)'s program could be closed against a
+map is enumerable — which is how [docs/26](archive/26-3d-relations-plan.md)'s program could be closed against a
 list rather than against intuition.
 
 `operands.ts` resolves operand *thunks*, so a rule names what it wants without knowing how that operand
@@ -356,6 +356,57 @@ caught by a test that checks the record rather than the render.
 
 Note also what the copula is *for*: nothing. It carries no meaning the tool needs, which is exactly why it
 must never be the thing that decides whether a statement is understood.
+
+### Adding a relation: the registration surfaces and the non-negotiables (moved from docs/26 §5 and §7, #1861)
+
+A relation, or a new operand kind for one, touches fifteen surfaces. Its PR checks each one or says why
+it does not apply:
+
+1. **The parser rule**, or a thin wrapper over the shared relation frame, plus the **shadow matrix**
+   (`parser/__tests__/shadow-matrix3.test.ts`): the snapshot changes by addition only, and a changed
+   existing row is a regression to explain.
+2. **`catalog3.ts` entries in Hebrew and English.** The guard test covers parseability.
+3. **`COMMAND_SAVEABLE`** (`store/figureFile3.ts`), an exhaustive record, so the compiler catches a
+   missing entry.
+4. **The apply case and `claimRefsError`** (`engine/apply.ts`), compile-guarded.
+5. **Engine routing.** A new pin family is a row of `pivotFamilies3` (`evaluate.ts`; totality locked by
+   `issue-1550.test.ts`, [ADR-3D-281](06b-decisions-3d.md#adr-3d-281)). It also passes the `invariantOnly`
+   and `planeDrive` gates and `solvePivot`'s early return (`solve3.ts`). These are runtime paths; the
+   battery covers them.
+6. **`scalePinned`** if the relation carries units. Distances do; angles never do.
+7. **`freeDofCount3`** accounting.
+8. **The landing funnel.** A relation that fixes the placement must be seen by `translationGaugeFree3`
+   and the rotation question (`evaluate.ts`), so the funnel does not resample a placement the relation
+   fixed. One that fixes nothing leaves the placement sampled.
+9. **Marks and surfacing.** A new source of a 90° angle gets its knee (free when the relation lowers to
+   an existing kind). The relation surfaces in the data view and the query lane (`dataView.ts`,
+   `queries.ts`): the operator's *"and show that"*.
+10. **The parameter pin.** When either operand can carry the figure parameter, `paramPinningRels`
+    (`operands.ts`, through `claimPinsParam` and `operandCarriesParam`) must admit the relation, with
+    what it reads declared: direction or position. `pinningGivens` and `paramRoots` read that one list
+    ([ADR-3D-286](06b-decisions-3d.md#adr-3d-286)). Real exams pin m by ∥, ⟂ and distance; 2010-Q3 is a
+    distance between parametric lines.
+11. **The `fixtures3/` drift net** stays green. It runs automatically, but run it.
+12. **The LLM lane.** Add prompt few-shots (`PROMPT_EXAMPLES_3D` in `parser/llm3.ts`, each re-parsed by a
+    contract test) and `scope3.ts` guidance for the neighbouring unsupported forms. The log-triage replay
+    calls the app's own decision (`app/triageReplay3.ts`,
+    [ADR-3D-305](06b-decisions-3d.md#adr-3d-305)), so it needs no separate edit.
+13. **i18n** for every new notice or refusal, in both locales.
+14. **Budget.** Each drive states its worst-case multiplier ([docs/17](17-design-rules.md) §7).
+15. **`RELATION_TABLE` totality** (`relationTable.ts`) stays green. Cells flip in the same PR as their
+    battery rows (`src3d/__tests__/relation-battery.test.ts`).
+
+**The non-negotiables.**
+- A new relation changes no existing lowering, and it changes the shadow snapshot by addition only.
+- **M1 duality per relation.** A relation that only verifies is not finished: with a sampled placement
+  its claim is refused on nearly every seed ([ADR-3D-095](06b-decisions-3d.md#adr-3d-095)).
+- Every drive path lands through the landing funnel. **No new per-path guards, ever.**
+- Both locales and both orders are read, and a noun never decides the reading.
+- **The chokepoint registry shrinks.** Rule bodies collapse onto the shared core, and the lexical and
+  semantic logic lives once. A rule's *name* may persist as a thin wrapper, because the shadow matrix's
+  diagnostic value is worth more than the count.
+- **Corpus-driven, not speculative.** A cell no exam or session needs stays `planned`, and an
+  `out-of-scope` cell says why (a coincidence as a DRIVER waits for a real exam that needs it).
 
 ## The symbol registries — one address, one display, derived from each other
 

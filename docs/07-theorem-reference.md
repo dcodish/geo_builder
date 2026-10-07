@@ -2,6 +2,8 @@
 
 _Last updated: 2026-06-10. Source: `docs/5pts_GeometryList_Teachers.pdf` — the official bagrut 5-unit (תכנית חדשה) teacher list of theorems citable without proof. This is the **canonical source** for the theorem-surfacing feature (FR-TH-\*)._
 
+_Reading the PDF: it is copy-protected, so the Read tool refuses it. Extract the text with PyMuPDF (`import fitz`) and write it to a UTF-8 file, since the Windows console's cp1255 chokes on the symbols._
+
 ## How this maps to the engine
 
 - **IDs = the official theorem numbers** (1–109). Surfacing a theorem with its bagrut number makes it citable by students — directly serving the "understand why the data was given / how to approach the solution" goal (Vision G4).

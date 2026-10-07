@@ -1,6 +1,6 @@
 # 06b — Decision log: the 3-D space/vectors tool (`/3d-builder/`)
 
-_The 3-D track's OWN ADR log (ids `ADR-3D-NNN`), separate from [06-decisions.md](06-decisions.md) **by design** — [docs/22 §9](22-workflow.md) ("Isolation rules") and [`BOUNDARIES.json`](../BOUNDARIES.json): two parallel session streams must not race on one ADR numbering sequence. Same conventions otherwise: every significant decision gets an entry. The contract is [02b](02b-requirements-3d.md) (what) and [04b](04b-design-3d.md) (how); the finished build plan was [20-space-vectors-tool.md](20-space-vectors-tool.md)._
+_The 3-D track's OWN ADR log (ids `ADR-3D-NNN`), separate from [06-decisions.md](06-decisions.md) **by design** — [docs/22 §9](22-workflow.md) ("Isolation rules") and [`BOUNDARIES.json`](../BOUNDARIES.json): two parallel session streams must not race on one ADR numbering sequence. Same conventions otherwise: every significant decision gets an entry. The contract is [02b](02b-requirements-3d.md) (what) and [04b](04b-design-3d.md) (how); the finished build plan was [20-space-vectors-tool.md](archive/20-space-vectors-tool.md)._
 
 ---
 
@@ -8,7 +8,7 @@ _The 3-D track's OWN ADR log (ids `ADR-3D-NNN`), separate from [06-decisions.md]
 
 **Context.** V0 builds the second app end-to-end thin (docs/20 §8): entry + build at `/3d-builder/`, `Vec3` engine with cube/box/right-prism constructs, SVG projection renderer with textbook hidden-edge dashing + orbit, store clone, first parser rules. Several small decisions were made while realising it:
 
-1. **Layout: `src3d/` beside `src/`, zero imports between them.** The chassis transplants as *patterns* (store/replay, parser rule pipeline, i18n policy, DOM-free render tests) — copied, never extracted into shared modules while the 2-D bug-fix stream is active (docs/20 §12 rule 1). One repo, one test suite, one `node_modules`.
+1. **Layout: `src3d/` beside `src/`, zero imports between them.** The chassis transplants as *patterns* (store/replay, parser rule pipeline, i18n policy, DOM-free render tests) — copied, never extracted into shared modules while the 2-D bug-fix stream is active (docs/22 §9). One repo, one test suite, one `node_modules`.
 2. **Build: a second Vite config (`vite.config.3d.ts`), not a multi-page single build.** The two apps need different `base` paths (`/geo-builder/` vs `/3d-builder/`), which one Vite build cannot produce. Entry `3d.html` at repo root → `dist-3d/`; dev needs no separate server (the main `npm run dev` serves `/3d.html`). **Deploy note:** rollup keeps the entry's filename, so the deploy step copies `dist-3d/3d.html` → `httpdocs/3d-builder/index.html` (a rename, nothing more).
 3. **Canonical prime is ASCII `'`** (`A'`) everywhere in ids/commands; the parser normalises U+2032 `′` and `’` on input, and the renderer displays `′` typographically. One form stored, ever (docs/20 §11 risk).
 4. **The camera is orthographic, orbit-only, and NEVER part of the figure.** `{yaw, pitch}` + zoom live in component state — outside the store, outside undo, outside save (when save arrives). Home view = yaw −60°, pitch 20° (the ¾ textbook view). "Show another configuration" resamples the FIGURE's free DOFs; orbit changes only the viewpoint — two controls, two concepts, deliberately not mixed.
@@ -16,7 +16,7 @@ _The 3-D track's OWN ADR log (ids `ADR-3D-NNN`), separate from [06-decisions.md]
 6. **Free-DOF policy transplanted (ADR-052 + ADR-101):** a cube's edge is pure similarity gauge → fixed at 1 and rightly NOT resampled (a rescale is invisible after fit); a box's depth/height and a prism's base-triangle shape + height ARE shape DOFs → sampled per `(seed, object-identity key)` — keying by identity, not insertion order, is what makes stability structural (the first-class regression test).
 7. **V0 honesty refusals:** `מנסרה` without `ישרה`/right is *not-handled* (an oblique prism is real geometry we don't draw yet — assuming "right" would assert an unstated given); a stated ratio clause that doesn't fit its segment refuses rather than silently dropping the ratio. Both locked by parser tests.
 8. **The store derives, never caches:** unlike the 2-D store (expensive replay → derived state cached in the store), V0's `derive3(facts, seed)` is closed-form and cheap, so the figure is computed by `useMemo`/tests on demand. Undo restores `{facts, seed}` and *everything* follows — the derived/undo desync class is impossible by construction. Revisit only if replay ever grows a real solver cost.
-9. **Own i18n instance** (`i18next.createInstance` + `I18nextProvider`), own locale files under `src3d/i18n/` — the 2-D `he.json`/`en.json` are never touched (docs/20 §12 rule 2), and the instances can't clobber each other in the shared vitest process.
+9. **Own i18n instance** (`i18next.createInstance` + `I18nextProvider`), own locale files under `src3d/i18n/` — the 2-D `he.json`/`en.json` are never touched (docs/22 §9), and the instances can't clobber each other in the shared vitest process.
 10. **No new dependencies.** The renderer decision (docs/20 D2) held: the whole app builds on the existing React/Zustand/i18next stack — `dist-3d` is ~69 KB gzipped.
 
 **Gate (docs/20 §8 V0):** `קובייה ABCD` / `cube ABCD` → an orbitable textbook cube (12 edges, exactly the far vertex's 3 dashed); right prism likewise; box/prism/free-t resample under "show another configuration" while stated facts (midpoint, AK=2KA′) hold; stability regression green; 46 src3d tests + full suite green, `tsc -b` + both builds clean.
@@ -296,7 +296,7 @@ Parser: `planeThroughBare` (after the `:`-carrying plane rules) + `pointRelPlane
 
 _(ADR numbers 016/017 were minted by a concurrent work-PC session — the usage dashboard + `u·v=0` — so this V8-a slice takes 018.)_
 
-**Context.** The [V8 legacy-572 roadmap](20-space-vectors-tool.md#14-v8--full-legacy-572-coverage) (from the [full corpus audit](21-572-coverage-audit.md)) opens with the two cheapest, highest-friction gaps. **(S3)** Legacy exams routinely name a pyramid's apex FIRST (`SABCD`, `EABCD`, `OBCD`, `SABC`) — but the solid template treats the LAST id as the apex (base ring first, [ADR-3D-011](#adr-3d-011)), so an apex-first name silently made a base vertex the apex and every later `SA`/`SM` reference was wrong. **(G3)** The point `E מפגש האלכסונים של הפאה/הבסיס` (intersection of the diagonals of a face/base — ~4 exams: 2018-קיץ-ב, 2019-קיץ-ב, 2019-קיץ, 2021-חורף-א) had no representation.
+**Context.** The [V8 legacy-572 roadmap](archive/20-space-vectors-tool.md#14-v8--full-legacy-572-coverage) (from the [full corpus audit](archive/21-572-coverage-audit.md)) opens with the two cheapest, highest-friction gaps. **(S3)** Legacy exams routinely name a pyramid's apex FIRST (`SABCD`, `EABCD`, `OBCD`, `SABC`) — but the solid template treats the LAST id as the apex (base ring first, [ADR-3D-011](#adr-3d-011)), so an apex-first name silently made a base vertex the apex and every later `SA`/`SM` reference was wrong. **(G3)** The point `E מפגש האלכסונים של הפאה/הבסיס` (intersection of the diagonals of a face/base — ~4 exams: 2018-קיץ-ב, 2019-קיץ-ב, 2019-קיץ, 2021-חורף-א) had no representation.
 
 **Decisions.**
 - **Apex orientation at the parse seam** (`orientPyramid`): reorder pyramid ids to `[base ring…, apex]`. The robust signal is an EXPLICIT named base (`שבסיסה ABCD` / `whose base ABCD`) → the apex is the remaining id (handles the non-consecutive `OBCDE` = base OBCD + apex E, where a letter-only heuristic fails). Fallback for a bare name: apex-first iff removing the first token leaves a consecutive alphabetical base run AND removing the last does not (`SABC`→apex S; `ABCDS`/`ABCDT` keep their apex-last reading — regression-safe, idempotent). Solid vertices are read from the **FIRST label run** (`firstLabelRun`), so a `שבסיסה ABCD` clause that re-names the base no longer inflates the vertex count. Pure parser change — no engine/template change; kind selection (square/rect/right) is unaffected by reordering.
@@ -584,7 +584,7 @@ Parser `rightPyramidPoint` (He + En; the apex = the on-segment point wherever it
 
 **Decision.** On Save, the app prompts for a file name (bilingual `actions.saveNamePrompt`); `namedFigureFileName3` sanitizes illegal filename characters, strips a typed extension, appends `-vectors` unless already present (`2026summer` → `2026summer-vectors.json`), and falls back to the date-stamped `figure-3d-YYYY-MM-DD.geo3.json` default for an empty/cancelled input. `SAVE_SUFFIX_3D = 'vectors'` is this product's copy of the per-product constant (docs/22 §9 registry — never imported across `src/` ↔ `src3d/`). Load stays content-based (`app` marker + `schemaVersion`), so old `.geo3.json` files keep loading; the `fixtures3/` net is untouched. Locked by the name-builder tests in `figure-file3.test.ts`.
 
-## ADR-3D-037 — A persistent figure NAME (issue #42, the 2-D ADR-286 twin, COPIED per docs/20 §12)
+## ADR-3D-037 — A persistent figure NAME (issue #42, the 2-D ADR-286 twin, COPIED per docs/22 §9)
 
 **Status:** Accepted (2026-07-11; issue #42). *Files: `src3d/store/store3.ts` (`figureName`/`setFigureName` — outside the undo slice, reset by `clear`), `src3d/store/figureFile3.ts` (`figureNameFromFileName3` — the `namedFigureFileName3` inverse dropping `.json`/`.geo3` + the `-vectors` suffix; a provenance-only `name` field in the file), `src3d/App3.tsx` (header inline-editable title input `dir="auto"`; save uses the set name — no prompt — and adopts a prompted one; load names the figure from the FILENAME per the operator ruling), locales `actions.namePlaceholder`.*
 
@@ -620,7 +620,7 @@ Locked by `issue72-phrasing.test.ts` (exact prod utterances, parse + build: the 
 
 ## ADR-3D-040 — The 3-D guidance register: non-constructive input answers with "what to do instead" (issue #73, the 2-D ADR-289 twin)
 
-**Status:** Accepted (2026-07-11; issue #73 — baseline log-triage, operator-approved). *Files: `src3d/parser/scope3.ts` (COPIED pattern per docs/20 §12 — never shared), `src3d/App3.tsx` (guidance short-circuit BEFORE the LLM escalation + a sky-toned note distinct from the amber error), `src3d/i18n/locales` (`scope.<category>`), `src3d/__tests__/scope3.test.ts`.*
+**Status:** Accepted (2026-07-11; issue #73 — baseline log-triage, operator-approved). *Files: `src3d/parser/scope3.ts` (COPIED pattern per docs/22 §9 — never shared), `src3d/App3.tsx` (guidance short-circuit BEFORE the LLM escalation + a sky-toned note distinct from the amber error), `src3d/i18n/locales` (`scope.<category>`), `src3d/__tests__/scope3.test.ts`.*
 
 Families, each from verbatim prod utterances: **`valueless-query`** («הזווית בין הישר AC' לבין המישור ABCD», «∠DEF=?», «מצא את הזווית» — the ADR-3D-027 reproduce-verify charter made student-facing: state the value and it is enforced/verified); **`cross-app`** (bare «מעגל»/«מלבן»/«מעוין»/«חסום במעגל» → the 2-D Geo Builder; the message also shows the SUPPORTED in-space circle form); **`bare-solid`** (bare «פירמידה»/«מנסרה» — the deliberate ADR-3D-008 refusal upgraded to say WHAT to add); **`ui-command`** («סימון זווית ישרה D» → state the given «זווית D = 90»).
 
@@ -668,7 +668,7 @@ Analytics: `source:'scope'`, `result:'scope:<category>'` — the PROFILE_3D dash
 
 **Why not a blanket `/i`.** 3-D has CASE-SIGNIFICANT tokens 2-D lacks — the axes x/y/z, the figure parameters k/m/t (ADR-3D-032: a lowercase letter IS the parameter), vector names u/v/w, the ADR-304-precedent R vs r, ℓ — so making every rule case-insensitive would create real ambiguities, exactly the trap the issue names.
 
-**Fix (the copied 2-D pattern, per docs/20 §12 — never an import).** `normalize3` gains ONE chokepoint pass, `upliftLowercaseLabels`: a lowercase run (with digits/primes, lists joined by ,/ו/and) is uppercased only where an ANCHOR proves label position — the angle glyph `∠∡∢` or the angle word «זו?וית», or an explicit point/vertex noun («ה?קודקוד», «ה?נקודה/נקודות», En point/vertex). The lone axis letters x/y/z never uplift even in label position (a student's «נקודה x» stays theirs to disambiguate), and after an ENGLISH anchor a run must not be an English function word ("angle of…", "point of intersection"). Everything outside an anchor is byte-unchanged — vector naming (`נסמן: AB=u`), sign givens (`שיעור ה-z`), `k הוא פרמטר`, `M(k,1,3)`, plane equations. New label-demanding anchors join the chokepoint, never per-rule.
+**Fix (the copied 2-D pattern, per docs/22 §9 — never an import).** `normalize3` gains ONE chokepoint pass, `upliftLowercaseLabels`: a lowercase run (with digits/primes, lists joined by ,/ו/and) is uppercased only where an ANCHOR proves label position — the angle glyph `∠∡∢` or the angle word «זו?וית», or an explicit point/vertex noun («ה?קודקוד», «ה?נקודה/נקודות», En point/vertex). The lone axis letters x/y/z never uplift even in label position (a student's «נקודה x» stays theirs to disambiguate), and after an ENGLISH anchor a run must not be an English function word ("angle of…", "point of intersection"). Everything outside an anchor is byte-unchanged — vector naming (`נסמן: AB=u`), sign givens (`שיעור ה-z`), `k הוא פרמטר`, `M(k,1,3)`, plane equations. New label-demanding anchors join the chokepoint, never per-rule.
 
 **Locks:** `lowercase-labels.test.ts` — the two exact prod utterances ≡ their uppercase twins (the axis `x` in the same sentence survives), list + prime forms, En mirrors, and the no-theft set over every case-significant lane.
 
@@ -678,7 +678,7 @@ Analytics: `source:'scope'`, `result:'scope:<category>'` — the PROFILE_3D dash
 
 **Class.** #84 gave the 2-D sink what a session replay needs (the LLM's committed commands + `action` lines) and stopped at the app boundary — so a 3-D `source:llm, result:ok` row said *that* the LLM built something, never *what*, and every later step of that session was unreplayable. Measured: 15/54 3-D sessions (28%) held an llm-built step; 44 submits (20%) sat downstream of one, permanently `? UNVERIFIED`.
 
-**Fix (parameterize the shared thing, never fork it — the ADR-3D-016 discipline, and docs/20 §12 copying for the app code).**
+**Fix (parameterize the shared thing, never fork it — the ADR-3D-016 discipline, and docs/22 §9 copying for the app code).**
 1. **`commands` on the llm submit:** App3's LLM log site adds `commands: steps` — the canonical LINES `submitSteps` re-parsed onto the figure (3-D's faithful "what committed"; 2-D logs engine command objects — `loggedCommands` in the harness documents both shapes). Same privacy class as the utterance, capped at 900 chars in the lean sink.
 2. **`action` lines:** delete / show-another / undo / redo / clear / **load** (a file load replaces the figure — the replay must know) each log one lean line; `analyticsSubmit3` forwards them exactly like the 2-D sink.
 3. **`session3d` follows:** clear/undo/redo ride a zundo-like history (the #189 pattern); an llm step our grammar misses replays its logged canonical lines through `parse3` (parser drift caught — the scenarios' mocked-LLM form) while the verdict still reports OUR coverage honestly; delete/show-another/load and pre-#182 llm steps keep degrading honestly.
@@ -708,7 +708,7 @@ Analytics: `source:'scope'`, `result:'scope:<category>'` — the PROFILE_3D dash
 
 **Class.** The named `M אמצע BB'` parsed since V0; the un-named `אמצע BB'` (prod: a cube edge midpoint with no student-given letter) fell through to the paid LLM. The 2-D app closed this in #184 via `freeLabel` at parse time — but `parse3` is deliberately CONTEXT-FREE (App3 mirrors that), so the 3-D twin cannot pick a letter at parse.
 
-**Fix.** A tiny `midpoint-auto {a,b}` command: the parser's existing `midpoint` rule gains a 2-token branch (He `אמצע XY`, En `midpoint/middle of XY`; primes tolerated), and APPLY — which knows the taken ids — picks the first free letter (M preferred, the students' midpoint convention; the 2-D `freeLabel` pattern copied per docs/20 §12) and delegates to the ordinary `point-on-segment3` t=½. Deterministic under replay (the pick depends only on the fact prefix), serializable (schema whitelist +1), no renderer/DOF change (the construction only ever holds the delegated on-segment point).
+**Fix.** A tiny `midpoint-auto {a,b}` command: the parser's existing `midpoint` rule gains a 2-token branch (He `אמצע XY`, En `midpoint/middle of XY`; primes tolerated), and APPLY — which knows the taken ids — picks the first free letter (M preferred, the students' midpoint convention; the 2-D `freeLabel` pattern copied per docs/22 §9) and delegates to the ordinary `point-on-segment3` t=½. Deterministic under replay (the pick depends only on the fact prefix), serializable (schema whitelist +1), no renderer/DOF change (the construction only ever holds the delegated on-segment point).
 
 **Locks:** `auto-midpoint.test.ts` — the exact prod sequence (cube → `אמצע BB'` → M at the true midpoint), M-taken fallback to N, the named form byte-unchanged, unknown endpoints refuse, He+En parse; the catalog guard covers the new entry both locales.
 
@@ -888,7 +888,7 @@ Locked by `angle-measures.test.ts`; catalog3 +2.
 The one inequality-flavoured thing that existed — a stated plane SIDE (ADR-3D-015) — is enforced *constructively*: an on-plane point is BORN on the stated side (its sampled offset is multiplied by the side's sign), so it can never leave. Elegant, and it does not generalize: the angle in `60 < α < 90` is a nonlinear function of several free solid dims, not a coordinate whose sign can be fixed at birth.
 
 **Decision — build the missing layer, with bounds as its first client.**
-- `Construction3.requirements: Requirement3[]` (first kind `angle-bound`), and `meetsRequirements3(c, seed)` — the 3-D sibling of the 2-D predicate. Patterns are COPIED from `src/`, never imported (docs/20 §12).
+- `Construction3.requirements: Requirement3[]` (first kind `angle-bound`), and `meetsRequirements3(c, seed)` — the 3-D sibling of the 2-D predicate. Patterns are COPIED from `src/`, never imported (docs/22 §9).
 - `firstSatisfyingSeed3` + `seedForRequirements`: **submit lands on a configuration that satisfies the stated bounds**, and `resample` searches forward for the next one — `store3.ts`'s blind `seed + 1` is gone. A requirement-free figure returns immediately, so every existing figure is unchanged and pays nothing.
 - **The measure keeps its DOF.** A bound restricts which configuration may be shown; it never determines a value. So the angle still varies across configurations (locked by a test), and no value is ever reported for it — the ADR-052 discipline.
 - No configuration within budget ⇒ the honest `bound-unsatisfiable` refusal with keep-prior, never a drawing that contradicts the given.
@@ -1266,7 +1266,7 @@ The failure was never unknown: `derive3` had already recorded it per fact in `st
 
 Only ENABLED rows are audited — a deliberately disabled row is not part of the figure, so its failure is not something the load should warn about.
 
-**Relation to the 2-D audit.** `src/store/loadAudit.ts` (ADR-242) audits a different axis of the same honesty problem: its `dropped` / `drift` findings compare the stored lowering against the *current parser*. That check presumes the figure builds at all. This one asks whether it does — they are complementary, and the 3-D app now has the more fundamental half. Pattern copied, not imported (docs/20 §12). The `dropped`/`drift` half remains available to 3-D if a file ever needs it.
+**Relation to the 2-D audit.** `src/store/loadAudit.ts` (ADR-242) audits a different axis of the same honesty problem: its `dropped` / `drift` findings compare the stored lowering against the *current parser*. That check presumes the figure builds at all. This one asks whether it does — they are complementary, and the 3-D app now has the more fundamental half. Pattern copied, not imported (docs/22 §9). The `dropped`/`drift` half remains available to 3-D if a file ever needs it.
 
 Locked by `load-audit3.test.ts`: the unbuildable case (asserting the pre-fix state explicitly — deserialize ok, `lastError` null, zero positions — so the regression is visible in the test itself), a healthy file auditing clean, a partially-broken file naming the 1-based failing row without claiming unbuildable, a disabled broken row being ignored, and the empty-file edge.
 
@@ -1359,7 +1359,7 @@ Locked by `oblique-any-base.test.ts` (the reported utterances build oblique He+E
 - **«ישרה» emits its base family's `CYCLIC_FIX`** as ordinary relations (the ADR-110 macro pattern, no new construct for four of the five): right angle for rhombus/parallelogram/kite, equal legs for the trapezoid, and `concyclic` for the general quad.
 - **The concyclicity residual is the SIGNED opposite-angle form `cos A + cos C = 0`**, deliberately *not* Ptolemy. Ptolemy's `|AC|·|BD| − |AB|·|CD| − |BC|·|AD|` is non-negative, so it **touches** zero rather than crossing it and the least-squares descent stalls a visible ~1e-3 short — measured, not theorized (the general-quad lateral edges disagreed at the 3rd decimal until the form changed). This is the [ADR-3D-006](#adr-3d-006) touch-zero lesson recurring in a new place.
 - **One base vocabulary.** `statedQuadBase` answers "which base did the student state?" for every rule, so a base a rule RECOGNISES is exactly one it can LOWER — the [ADR-3D-084](#adr-3d-084) class (a noun the positive-test chain did not happen to test took the "no noun was stated" path) cannot recur. `droppedShapeNoun3` now reads the same registry instead of keeping its own kind lists, which had kite and trapezoid marked permanently `unsupported`.
-- **A new NON-ERROR channel: build notices** (`notices.ts` → `Derived3.notices` → App3). There was no way to say "the step committed, and here is what changed"; `guidanceNote` is refusal-only and an error would be wrong (nothing failed). Derived from the construction, so a typed figure and a loaded one show the same thing, and undo/redo stay consistent. The 2-D `coincidences` notice is the pattern copied (docs/20 §12 — copied, never imported).
+- **A new NON-ERROR channel: build notices** (`notices.ts` → `Derived3.notices` → App3). There was no way to say "the step committed, and here is what changed"; `guidanceNote` is refusal-only and an error would be wrong (nothing failed). Derived from the construction, so a typed figure and a loaded one show the same thing, and undo/redo stay consistent. The 2-D `coincidences` notice is the pattern copied (docs/22 §9 — copied, never imported).
 
 **The boundary.** The auto-fix consumes FREE DOFs only. A stated value contradicting concyclicity (`מעוין` + `∠DAB = 60` + `ישרה` — a cyclic rhombus needs 90°) is a genuine over-constraint and refuses, keep-prior. Unstated defaults yield; statements never do (ADR-052 / ADR-114).
 
@@ -2001,7 +2001,7 @@ a green ✓.
 **Sibling audit** (docs/17 §1 / ADR-W-004). **`src/` HAS this class** — measured, not assumed:
 `מלבן ABCD עם אלכסונים` commits a bare rectangle, the diagonals gone, and none of 2-D's seven deterministic
 gates asks the general question. Narrower than 3-D's only by luck — the other three phrasings happen to be
-`not-handled`. Filed as **#456** with the port plan (copied as a pattern per docs/20 §12, never imported),
+`not-handled`. Filed as **#456** with the port plan (copied as a pattern per docs/22 §9, never imported),
 not fixed here: different product, different lane, different log.
 
 **Blast radius.** Additive. Shadow matrix: pure addition (2 catalog rows, **0 changed winners**). Locked by
@@ -2097,7 +2097,7 @@ whose neutral characters the bidi algorithm resolves to the paragraph direction 
 3-D messages are unusually dense with precisely that content: primed label runs (`ABCDA'B'C'D'`),
 coordinate triples, plane equations, parametric lines.
 
-**Copied as a pattern, never imported** (docs/20 §12 rule 1) — `src3d/` shares no code with `src/`, and
+**Copied as a pattern, never imported** (docs/22 §9) — `src3d/` shares no code with `src/`, and
 `server/__tests__/isolation.test.ts` enforces it. The port is deliberate rather than mechanical in two
 places:
 
@@ -2205,7 +2205,7 @@ itself with *"the bagrut answers are clean numbers"*. That is false exactly wher
 lives: a root of a quadratic residual is a surd by default, which is how `√2` reached the operator as
 `1.414`. The canvas now uses the panel's `cleanMag` (integer / `p/q` / surd / 2 decimals). Note the
 **boundary this exposes**: a component here is `−2−√2`, a rational + surd *sum*, which no tier can render
-and which must not grow one — that is the docs/20 §12 rule 3 no-CAS line. It needs no rendering, because
+and which must not grow one — that is the docs/22 §9 no-CAS line. It needs no rendering, because
 a figure with an unforced parameter shows `m-2` instead, which states it exactly in the student's own
 notation.
 
@@ -2336,7 +2336,7 @@ rendered isolated, which is what 2-D ended up with (`#77`/`#40`) and which 3-D h
 open on #482 rather than guessed at.
 
 **The 2-D twin has the same structure** (`src/i18n/bidi.ts` is a post-processor too) and is labelled on the
-issue. Not fixed here: this ADR is 3-D, the pattern is copied and never imported (docs/20 §12 rule 1), and
+issue. Not fixed here: this ADR is 3-D, the pattern is copied and never imported (docs/22 §9), and
 2-D's fact rows were not what the operator reported.
 
 ## ADR-3D-122 — the ℓ∩π crossing is OFFERED, and the offer is gated on knowledge
@@ -2428,7 +2428,7 @@ now assert **palette ⊆ CORE ∪ delimiters**. Adding a button without teaching
 which is the only version of this fix that survives the next author. `RUN_CORE`/`RUN_DELIMS` are exported
 for that test alone; nothing branches on them at runtime.
 
-**Both trees, copied not shared** (docs/20 §12 rule 1). 2-D's `bidiSegments` is also the `.docx` export's
+**Both trees, copied not shared** (docs/22 §9). 2-D's `bidiSegments` is also the `.docx` export's
 run-splitter ([ADR-431](06-decisions.md#adr-431) Am. 1), so the boundary correction lands in Word output too.
 
 **Half (b) of #482 is still open and still needs an operator ruling** — the input box cannot take isolate
@@ -2630,7 +2630,7 @@ enumerates KNOWN vocabulary: `planarPolygon`'s bow-outs for the special-line and
 `rightTriangle`'s prism/pyramid bow-out, the honesty gates' noun lists. An enumerating guard **fails
 open on a word it has never met**, and a typo of a significant modifier is by definition such a word
 (the `src3d/CLAUDE.md` register: *an enumeration is not a rule*). The products copy the ADR-024 leftover
-discipline by design (docs/20 §12), so they copied its defect too — this is the second half of one
+discipline by design (docs/22 §9), so they copied its defect too — this is the second half of one
 finding, not two bugs.
 
 **The mechanism.** `declLeftover` is the fail-closed half: after a rule has consumed its own vocabulary
@@ -2734,7 +2734,7 @@ standalone is a prefix+noun, so the generator needs no vocabulary of its own and
 store half only, so the text the student had just cleared stayed on screen. 2-D closed exactly this in #146
 by routing its button through one handler resetting both owners; 3-D never received the fix — the same
 defect, a product apart, which is the recurring cost of copying patterns rather than sharing them (and still
-the right trade, per docs/20 §12). Display and language preferences stay untouched: clearing a figure is not
+the right trade, per docs/22 §9). Display and language preferences stay untouched: clearing a figure is not
 a request to put the panels back.
 
 **#491** — #481 correctly replaced the canvas's private 3-decimal rounder with the panel's shared formatter,
@@ -2744,7 +2744,7 @@ fallback is now the caller's to choose while every exact tier stays shared; aski
 trade away a surd. What this deliberately does NOT do is make a mixed triple uniform: `(-0.586, √2, 3.414)`
 prints the one component that HAS an exact form as that form. Rendering all three as decimals to look tidy
 would assert that none of them are exact, which is false, and the alternative — growing `trySurd` into a
-general symbolic form for `√2−2` — is the docs/20 §12 no-CAS boundary. **Flagged for the operator as a
+general symbolic form for `√2−2` — is the docs/22 §9 no-CAS boundary. **Flagged for the operator as a
 presentation call**: the mixed rendering is a pedagogy question, and only the precision half was a defect.
 
 ### ADR-3D-128 — Reading the figure: a latin angle label refused with guidance, a flat figure read face-on, and the leftover spin spent on legibility (#394, #5, #385)
@@ -4559,7 +4559,7 @@ and the operator's figure end to end with `G` strictly inside `CC'`) plus the re
 
 **Operator (2026-08-17):** *"2-D has the rotate and align options. 3-D doesn't — maybe it should."*
 
-**Context.** [docs/28](../docs/28-unification.md) §4a D7 recorded the viewport controls as differing
+**Context.** [docs/28](archive/28-product-unification.md) §4a D7 recorded the viewport controls as differing
 **by nature** between the builders — 2-D pan/zoom/rotate/flips vs 3-D orbit/pan/zoom/reset (#533) — and
 that framing is right as far as it goes: orbit already gives free rotation, so 3-D does not need a
 rotate control. What it does not give is the **align** half: snapping to a canonical orientation. A
@@ -9593,7 +9593,7 @@ marks that carry no coefficient. Its coefficient row is added here.
 
 **Why the round's own tests missed the original defect.** #977 shipped 115 tests that asserted the
 *command* (`{label:'α', coef:2}`) and the *driven angle* (60°), and never asserted **what is drawn**. The
-record was right the whole time. That is [docs/17](17-design-rules.md)'s drive-the-reported-path rule in
+record was right the whole time. That is the [`/playsheet` skill](../.claude/skills/playsheet/SKILL.md)'s drive-the-reported-path rule in
 its display form: **a display fact must be asserted on the display builder's own output.** Every
 assertion in `issue-986.test.ts` comes from `collectWedges`, `dataView` or `competingArcSymbols`.
 
@@ -11606,7 +11606,7 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 
 ## ADR-3D-294 — A taken letter names its holder and offers the swap; «החלף בין A ל-B» exchanges two letters (#1631, #1302)
 
-**Status:** accepted · 2026-10-01 · feature (PR, `feat/1631-letter-popover`) · #1302 armed 2026-09-21 (*"arm them"*) and #1631 approved 2026-10-01 (*"we want that same mechanism now for analytics and also for the 3d tool"*), each `auto-ok` as transcription. **Extends** [ADR-3D-211](#adr-3d-211) (the rename) with 2-D's swap ([ADR-122](06-decisions.md#adr-122), [ADR-532](06-decisions.md#adr-532)), PATTERN copied (docs/20 §12). **Shares** the popover with 2-D through `shell/` ([ADR-W-105](06w-decisions-workspace.md#adr-w-105)).
+**Status:** accepted · 2026-10-01 · feature (PR, `feat/1631-letter-popover`) · #1302 armed 2026-09-21 (*"arm them"*) and #1631 approved 2026-10-01 (*"we want that same mechanism now for analytics and also for the 3d tool"*), each `auto-ok` as transcription. **Extends** [ADR-3D-211](#adr-3d-211) (the rename) with 2-D's swap ([ADR-122](06-decisions.md#adr-122), [ADR-532](06-decisions.md#adr-532)), PATTERN copied (docs/22 §9). **Shares** the popover with 2-D through `shell/` ([ADR-W-105](06w-decisions-workspace.md#adr-w-105)).
 
 **Requirements:** docs/02w FR-SU-13 (new; the promise is workspace-wide and 3-D realises it here — docs/02b carries no rename requirement of its own, ADR-3D-211 having recorded it as a decision only) · **Design:** none (internal) beyond docs/04w "The letter popover".
 

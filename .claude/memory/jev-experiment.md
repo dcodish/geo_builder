@@ -8,7 +8,7 @@ metadata:
   modified: 2026-10-02T14:18:38.768Z
 ---
 
-Jev (TypeSafe AI, `jev-1.13.0`, a choice/score/noul decision model, not a generator) was tested 2026-10-02 as a "did you mean" for lines the parser rejects. It is accurate (≈82% first guess on real Hebrew lines, near-perfect request-type routing) but would rescue only ~3–4 of 22 truly rejected lines, because most rejections are missing capabilities rather than wording. It is parked as **#1674 (P3)**, which has the full numbers and the candidate uses (smarter refusal messages, log triage).
+Jev (TypeSafe AI, `jev-1.13.0`, a choice/score/noul decision model, not a generator) was tested 2026-10-02 as a "did you mean" for lines the parser rejects. It is accurate (≈82% first guess on real Hebrew lines, near-perfect request-type routing) but would rescue only ~3–4 of 22 truly rejected lines, because most rejections are missing capabilities rather than wording. It is parked as **#1674**, now closed with the `icebox` label, which has the full numbers and the candidate uses (smarter refusal messages, log triage).
 
 - Harness: `C:\projects\jev-experiment\` (`build-dataset*.ts`, `run-jev.mjs --tool 2d|3d [--live]`, hand labels in `data/labels-*.json`). It is **not in git** and exists only on the home PC. The API key is in its `.env`. Run it as `node --env-file=C:/projects/jev-experiment/.env C:/projects/jev-experiment/run-jev.mjs …`.
 - **The operator approved any Jev calls and sending logged utterances to Jev** (2026-10-02). This is unlike the Anthropic-fallback rule, which still needs per-call approval.

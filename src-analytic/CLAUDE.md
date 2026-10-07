@@ -13,8 +13,8 @@ work) and `gh issue list --label analytic`. A guard test rejects dated progress 
 The **fourth** app in this repo, for the bagrut **analytic-geometry** question (שאלון 572 Q1): the
 coordinate plane, with points, lines, circles and canonical conics as objects carrying equations.
 **Contract:** [02c](../docs/02c-requirements-analytic.md) (what) · [04c](../docs/04c-design-analytic.md) (how) ·
-decisions `ADR-AG-NNN` in [06c](../docs/06c-decisions-analytic.md); [docs/19](../docs/19-analytic-geometry-tool.md)
-is the finished build plan. Issue label `analytic`.
+decisions `ADR-AG-NNN` in [06c](../docs/06c-decisions-analytic.md); [docs/19](../docs/archive/19-analytic-geometry-tool.md)
+is the finished build plan, archived history. Issue label `analytic`.
 
 Deployed at `/analytic-builder/` (`products.json` is the deploy record).
 
@@ -55,7 +55,7 @@ this tool *supplies* the one the exam withholds.
 | `engine/statedMeasures.ts` | What the student stated, for the canvas |
 | `engine/locus.ts` · `crossings.ts` | Locus tracer; crossings offered as sentences |
 | `app/` | The submit path, the ask lane, panel rows, session persistence |
-| `parser/` | `parseAnalytic.ts` (the docs/19 §10 families) + `catalogAnalytic.ts`, the coverage map with a guard test asserting every entry parses in He **and** En |
+| `parser/` | `parseAnalytic.ts` (the 02c §3a families) + `catalogAnalytic.ts`, the coverage map with a guard test asserting every entry parses in He **and** En |
 | `render/` | `scene.ts` (pure: isotropic, Y-flipped transform + axes) + `Figure.tsx` |
 | `store/`, `App.tsx`, `i18n/` | Lines as the source of truth; the shared frame mounted; He/En resources |
 | `debug/`, `ui/` | The dual-sink session log; About, privacy and palette content |

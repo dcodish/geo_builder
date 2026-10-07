@@ -142,7 +142,7 @@ results and needs the same scrutiny as a rule change.
 ## 4. The designed mechanisms (where the general answer lives)
 
 > **The cross-layer solve ladder is written down in [docs/LADDER.md](LADDER.md)** (S0.2 of
-> [docs/24](24-foundation-hardening-plan.md)): the exact stage order from pre-gates to seed sweeps,
+> [docs/24](archive/24-foundation-hardening-plan.md)): the exact stage order from pre-gates to seed sweeps,
 > with the `StepResult.ladder` trace as its observable and `ladder-contract.test.ts` as its lock.
 > Every future mechanism ADR states "inserts at stage N.x" and updates that file.
 
@@ -215,6 +215,10 @@ statement is asserting a given the student never gave.
 
 1. **Reproduce from the log** (`logs/debug-log.jsonl` locally; the production sink records submits
    only) through the real `parse-with-context → facts → replay` path — a scratch script, not the UI.
+   The dev log is the operator's exact run: grep it for his utterance, read its `result`, and rebuild
+   the figure from the nearest `kind: "figure"` line, never from a screenshot, which shows the end state
+   after rows were deleted (#1351). Never write "could not reproduce" before reading it. One file per
+   builder: `debug-log.jsonl`, `-3d`, `-analytic`, `-complex`.
 2. **State the class** (§1) and **grep for siblings** — in this product *and in the sibling product*.
 3. **Locate the mechanism**: which of M1–M4 (or which missing mechanism) should own this? If the answer
    is "none — it's genuinely local", say so in the ADR and prove it by showing the class has one member.
@@ -256,6 +260,10 @@ statement is asserting a given the student never gave.
 - Before adding a solver feature, measure one `replay` of the hardest locked scenario before/after and
   put both numbers in the ADR. A correctness feature that doubles replay cost needs the operator's
   sign-off, not silence.
+- A work-count budget charges every memo hit the work it saved, or proves no memo is reachable, because a
+  hit counted as zero makes the verdict depend on cache warmth. Its determinism lock runs cold, then warm,
+  on a figure whose cost sits in memoized calls, and asserts equal work, not only an equal verdict
+  ([ADR-558](06-decisions.md#adr-558) → #1605).
 
 ## 8. Escalation template (when the right fix is too big for the session)
 
@@ -263,3 +271,58 @@ Post to the operator, verbatim structure: **Class** (one sentence) · **Mechanis
 the missing one) · **Full fix** (files, risk, rough size) · **What stays broken meanwhile** (honest) ·
 **Recommendation**. Do not attach a patch. The operator decides; the size of the correct fix is not a reason
 to avoid it (CLAUDE.md rule 1) — the only acceptable deferral is the operator's explicit one.
+
+## 9. Plans, locks and roots are hypotheses
+
+A root cause, a fix plan, a lock and a gate are each written from one reading of one case. Each is a
+separate claim, and each is measured before anything is built on it. The measurement is usually one
+probe; building on a wrong claim costs a session.
+
+- **Measure before diagnosing.** Run the case and print the real state before a root cause goes into an
+  issue, and put the measurement in the issue, because a plausible reading of the code was wrong twice in
+  one round (#848, #850). For anything visual, measure the rendered result, never `textContent`.
+- **Measure at the student's entry point.** Probe the store action or submit pipeline the click goes
+  through, never the pure function it wraps, because the guards between them change the outcome (#874).
+  Say in the issue which path was measured.
+- **Measure the remedy.** Run the original failing case and show before and after. New unit tests prove
+  only the mechanism you wrote; an inert fix closes the issue while the harm stands (#909).
+- **Measure the plan's "therefore".** Restate the plan as cause → therefore → symptom and print the state
+  at the "therefore" before building: it is the cheapest claim to falsify, and it can make the whole build
+  worthless (#920).
+- **Run the plan's predicate on its own case.** Print every term of the predicate over the reported
+  sequence before writing code. If the reported case fails it, the fix is a no-op and the item escalates
+  with that table (#999).
+- **A lock is a claim too.** Before implementing a demanded lock, ask what the code does at that input now
+  and whether the demanded verdict is honest; for a range or bound, measure what is ACHIEVABLE, not what
+  is SAMPLED, or the lock refuses correct input (#909). A gate or oracle with an early return asserts an
+  exercised-counter moved, or it passes by checking nothing (#174, #912).
+- **Follow the measured mechanism, not a lock that contradicts it.** When a plan's lock fails and the plan's
+  own mechanism predicts that failure, the lock is a question for the operator: record it as not honoured,
+  with the measurement, and never widen the mechanism to reach it (#999 → #1346). If the mechanism predicts
+  the lock passes and it fails, the build is what is wrong, not the lock. Either way CLAUDE.md rule 7 governs
+  what a student sees.
+- **Grep the locks before building.** Search the tests and ADRs that name the plan's chokepoint — for a
+  port, the sibling's tests for the literal sentence — for an assertion recording an earlier ruling. A plan
+  that reverses one escalates that arm with both rulings quoted (#924, #1274 vs #944).
+- **A red suite may be the gate working.** When a new invariant turns tests red, measure each failing
+  scenario on the pre-change baseline first. If the old figure was wrong, re-base the test and keep the old
+  figure as a refusal lock; never relax the gate to restore green (#872).
+- **Try the neighbouring spelling.** Before calling a refused or dropped given a missing capability, enter
+  the same statement in every spelling the product accepts (the two-fact form, the clause form, the numeric
+  or symbolic twin). If one works, it is a two-spellings bug on the bug route (#921).
+- **Test the framing, not just the facts.** Before an escalation reaches the operator, measure the near-miss
+  neighbour and ask whether the given should have been honoured rather than refused better. A cited ADR may
+  cover a narrower case, a named baseline (2-D included) may not do what is claimed, and a deferral's stated
+  reason is checkable (#909, #1240, #1242, #1266).
+- **A taught remedy is a grammar claim.** A message that teaches a spelling has a lock that submits every
+  spelling it names through the real submit path, with the message and the accepted set read from one
+  source (#1156 → #1183).
+- **State it twice.** When a fix adds a record that a store attributes by a before/after count, measure the
+  same letter stated twice, the second time contradicting: a replacement changes no count, so the blame
+  lands on an innocent earlier fact (#902).
+- **A lock calls the decision; it never re-implements it.** A reproduction stays green through the change
+  that kills the feature. Extract an inline decision into a module that both the component and the lock
+  call (#1102; the §3 registry row).
+- **A solver change needs a seed sweep.** Measure the 24-seed whole-rate on the issue's figure and on a
+  control, and drive the reported sequence in the page with per-line timing; locks pass at 2/24 as well as
+  at 24/24. Under ~20/24, or a line over ~2 s, is a finding (ADR-AG-144).

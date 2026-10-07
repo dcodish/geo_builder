@@ -62,9 +62,9 @@ Group the surviving utterances into **intent clusters** — the construct or phr
 ## Step 3 — cross-reference coverage
 
 For each cluster, check what already exists so the recommendation is precise and root-cause (docs/17 — a construct, not a one-off patch):
-- Catalogs: `src3d/parser/catalog3.ts` (3-D), `src/parser/catalog.ts` (2-D), `src-analytic/parser/catalogAnalytic.ts` (analytic).
+- Catalogs — **the live coverage map**, one per product: `src3d/parser/catalog3.ts` (3-D), `src/parser/catalog.ts` (2-D), `src-analytic/parser/catalogAnalytic.ts` (analytic).
 - **Analytic buckets (ADR-W-083):** `not-handled` → ▶ LIVE; `out-of-scope` → ⊘ declined; every other refusal (the ruled `bad-equation` / `unknown-reference` / `bad-arity` and the unruled codes) → ⚠ review. The first analytic report should COUNT how the review codes distribute — that is the ruling's revisit trigger.
-- 3-D: `docs/21-572-coverage-audit.md`, `docs/20-space-vectors-tool.md` §14, `docs/06b-decisions-3d.md`. 2-D: `src/parser/catalog.ts` (the coverage map), `docs/02-requirements.md`, `docs/06-decisions.md`.
+- 3-D: `docs/02b-requirements-3d.md`, `docs/06b-decisions-3d.md`; the 2026-07 corpus sweep `docs/archive/21-572-coverage-audit.md` and `docs/archive/20-space-vectors-tool.md` §14 are history (what was planned then), never current coverage. 2-D: `docs/02-requirements.md`, `docs/06-decisions.md`.
 - Say whether a gap is a planned slice, a documented deferral, or genuinely new, and which existing rule/pattern a fix would mirror.
 
 ## Step 4 — classify, file bugs, ranked recommendation, then STOP for approval
@@ -91,4 +91,5 @@ Summarize the top recommendations inline (and they're already persisted in the r
 - **Prioritize by all-time `users`, but spend attention on the `▶ NEW` rows** — `↩ carried over` was already put in front of the operator. Don't re-argue it unless a decision is pending or a new row changes its weight.
 - Keep the classifier in `triage.mjs` in sync with `server/admin.ts` — nothing guards the `admin.ts` bucket mirror. The submit verdicts need no syncing: each replay calls its App's decision (see above), and `src/parser/__tests__/triage-mirror.test.ts` guards that wiring.
 - **The icebox is checked before filing, every run** (#1804). A parked issue a student has now hit is reopened, never re-filed as a new issue. Re-filing loses its diagnosis and plan, and breaks the promise the parking was approved on.
+- **A `⇗ would-escalate` row can be a GATE false positive**, not a partial parse: the commands carry every stated value and the honesty gate is wrong (`E=(-1,7)` read as a dropped `1` because the number scanner ignored the sign, #1161). Measure the parse and each gate separately before classifying; a gate false positive is fixed at the gate's chokepoint, never at the construct that surfaced it.
 - A **`⊘ guided`** or **`⇗ would-escalate`** row is not a gap. If you want to change what the tool does there, that's a product decision (the scope register / a gate) — raise it as such, don't file it as missing grammar.

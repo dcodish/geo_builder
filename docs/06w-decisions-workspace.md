@@ -102,7 +102,7 @@ relaxed, and then there is no guard at all.
 
 ## ADR-W-003 — Product boundaries are a machine-readable manifest, and directory classification is total
 
-**Status:** Accepted (2026-08-08) · **Issue:** #453 · **Amends:** [ADR-266](06-decisions.md#adr-266), docs/20 §12 · **Guard:** `server/__tests__/isolation.test.ts`
+**Status:** Accepted (2026-08-08) · **Issue:** #453 · **Amends:** [ADR-266](06-decisions.md#adr-266), docs/22 §9 · **Guard:** `server/__tests__/isolation.test.ts`
 
 **Context.** The isolation rule — product trees never import each other — was enforced by a test that
 **hard-coded exactly two edges** (`src` ↔ `src3d`) and asserted nothing else. Three gaps followed from the
@@ -681,7 +681,7 @@ REFUSED, and the check passed once it was reverted.
 ## ADR-W-018 — Product unification: four-plus builders, one learned interface (2026-08-16)
 
 **Status:** accepted, 2026-08-16 · **Operator rulings throughout** · **Plan of record:**
-[docs/28](28-product-unification.md) · **Umbrella:** [#648](https://github.com/dcodish/geo_builder/issues/648)
+[docs/28](archive/28-product-unification.md) · **Umbrella:** [#648](https://github.com/dcodish/geo_builder/issues/648)
 
 **Context.** The operator, on three shipped/rebuilding tools: *"we now have 3 tools but each has its
 own ui and look and feel is a bit different so they don't feel like one tool… should we continue on
@@ -1470,7 +1470,7 @@ LAST command's status, so the ubiquitous `npm run test:full 2>&1 | tail -40` rea
 whatever the suite did. That exact line gated the `prod/2026-08-25-2` deploy (the suite genuinely
 was green, and nothing in the mechanism would have said so had it not been). Its sibling — a gate
 chain composed with `;` instead of `&&` — had already burned a session and is recorded in the
-`gate-lines-are-read-not-matched` memory. Two failures of discipline at one seam is a design signal,
+"Reading a gate" rule of [docs/22 §3](22-workflow.md). Two failures of discipline at one seam is a design signal,
 not a reminder to try harder.
 
 Note what is **not** the defect: round #768 escalated this issue rather than patching, having measured
@@ -1617,7 +1617,7 @@ that reads as "verified" would recreate the exact overconfidence it exists to fi
 
 **Honesty rule this carries.** A session may claim it "tested in the app" only for what it actually
 drove and looked at. Everything else is headless verification and must be described as such — the
-distinction the play sheet now draws for the operator (`.claude/memory/no-browser-self-test.md`).
+distinction the play sheet now draws for the operator ([`/playsheet` skill](../.claude/skills/playsheet/SKILL.md) §3).
 
 Workflow text: docs/22 §4 steps 4–5. Command: `npm run smoke:visual [-- --app 2d|3d|complex] [-- --base URL]`.
 
@@ -1920,7 +1920,7 @@ tagged *"(Later)"* — and the doc was edited on 2026-07-19, three weeks after t
 without anyone looking at it. A session planning from that doc would conclude the feature does not exist.
 
 This is [ADR-W-018](#adr-w-018)'s rule ("branching on product identity inside a shared module is a fork
-wearing a shared file's name") and [docs/28](28-product-unification.md) §1c's finding ("the doctrine is
+wearing a shared file's name") and [docs/28](archive/28-product-unification.md) §1c's finding ("the doctrine is
 duplicated in PROSE — which is the real defect") one layer up: a rule with no mechanical home is a rule
 held by memory, and memory lost.
 
@@ -2418,7 +2418,7 @@ a later change.
 The remaining adoptions, each its own issue with its own product ADR: **2-D**'s angle and length chips,
 the **3-D coordinate lane** (panel-competing — the first non-canvas chip, and the case that proves the
 predicate is not canvas-specific), and **complex**, whose render side is still unmeasured (#937's design
-pass measured its parser only, and says so). Per docs/20 §12 each copies the pattern rather than
+pass measured its parser only, and says so). Per docs/22 §9 each copies the pattern rather than
 importing it; what they share is this ADR and `shell/`.
 
 ## ADR-W-048 — A figure whose givens force a named object FLAT says so, in the student's own words (#936, #945)
@@ -2450,7 +2450,7 @@ Two things the ruling settled explicitly:
 **Both products.** The operator ruled for 2-D as well, wider than the session's own recommendation
 (which was 3-D first, 2-D on evidence). Recorded as his decision, not the session's.
 
-**Copied, never imported** (docs/20 §12): products never share code, so one rule lands as two
+**Copied, never imported** (docs/22 §9): products never share code, so one rule lands as two
 independently derived implementations, each with its own calibration. #945 must **measure its own 2-D
 trigger family** rather than transposing the 3-D one — a collapsed polygon is not the same predicate as
 a coplanar solid, and the corpora differ.
@@ -2579,7 +2579,7 @@ class open for the next affordance and the next product.
 
 1. **3-D opts in:** the crossing-offer group and the point hit ring carry `data-noexport`
    (`src3d/render/Figure3.tsx`).
-2. **The class is closed by a lock per product, never a shared import** (docs/20 §12): each product
+2. **The class is closed by a lock per product, never a shared import** (docs/22 §9): each product
    renders its figure with EVERY chrome affordance its renderer takes as a prop switched ON, strips the
    markup the way the rasteriser does, and asserts the ink equals its chrome-free render —
    `src/render/__tests__/clean-export.test.tsx` (crossing offers, highlight overlay + accents, promotable
@@ -3099,7 +3099,7 @@ Run against the tree **before** the deletion, it failed naming exactly `_scratch
 
 ## ADR-W-060 — A math span is bracket-balanced; a bracket whose partner is outside it is text (#1208)
 
-**Requirements:** [19](19-…)/[02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown; no new row. **Design:** the shared renderer's span boundaries. **Product:** workspace (`shell/`), reported in analytic. **LADDER stage:** display only.
+**Requirements:** [19](archive/19-analytic-geometry-tool.md)/[02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown; no new row. **Design:** the shared renderer's span boundaries. **Product:** workspace (`shell/`), reported in analytic. **LADDER stage:** display only.
 
 **Operator, 2026-09-18, playing T8:** *"the x of point P is not shown correctly. the y of point P is the right presentation"* — on a row reading `P = (14/3, 31/3)` with the y stacked and the x flat.
 
@@ -3172,7 +3172,7 @@ Demonstrated end to end: a freshly built bundle compares normally; touching one 
 
 ## ADR-W-062 — The longest match that RENDERS wins, not the first one that matches (#1217)
 
-**Requirements:** [19](19-analytic-geometry-tool.md)/[02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown; no new row. **Design:** the shared renderer's tokenizer precedence. **Product:** workspace (`shell/`), reported in analytic, fixed for all four.
+**Requirements:** [19](archive/19-analytic-geometry-tool.md)/[02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown; no new row. **Design:** the shared renderer's tokenizer precedence. **Product:** workspace (`shell/`), reported in analytic, fixed for all four.
 
 **Operator, 2026-09-19, playing T21:** *"the mathml on the row below textbox and the input rows are not working. This rule of using mathml is for all shapes so why does it work on circle but not elipeses? it is also the same rule for all tools (2d/3d/complex)"*.
 
@@ -3227,7 +3227,7 @@ It also repairs a row this workspace shipped hours earlier: #1212's ellipse equa
 
 ## ADR-W-063 — The leading peel takes whatever sits before the unmatched bracket (#1229)
 
-**Requirements:** [19](19-analytic-geometry-tool.md)/[02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown; no new row. **Design:** the shared renderer's span boundaries. **LADDER stage:** presentation only — `shell/math.tsx`, no product code. **Extends** [ADR-W-060](#adr-w-060) (#1208).
+**Requirements:** [19](archive/19-analytic-geometry-tool.md)/[02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown; no new row. **Design:** the shared renderer's span boundaries. **LADDER stage:** presentation only — `shell/math.tsx`, no product code. **Extends** [ADR-W-060](#adr-w-060) (#1208).
 
 Split out of #1217 rather than fixed inside it, and the reason is the whole decision.
 
@@ -3425,7 +3425,7 @@ So the taxonomy above was not yet a decision procedure for 2-D: the same sentenc
 
 The question put to him was short: **when «D = חיתוך AB ו-BC» draws the right point under a second name, is the honest answer the refusal (3-D's behaviour since ADR-3D-183) or the merged label «B=D» plus the notice (#944, shipped)?** Both resolve #944's original complaint — the contradiction between two surfaces — and only one of them can be the tool's answer. He chose the refusal, which makes the rule at the top of this ADR true in all three trees without exception.
 
-**Why an ADR-W rather than three quiet copies.** Three trees now answer one question, and they reached the answer at three different dates by three different routes. The next person to touch any of them needs the rule, not one tree's version of it — and the audit table above is the evidence that "port it" was checked rather than assumed ([[cross-product-disparity-is-a-wiring-smell]] in the operator's own terms). The 2-D collision is the same evidence working in the other direction: the audit found the cell missing, and the locks found out why.
+**Why an ADR-W rather than three quiet copies.** Three trees now answer one question, and they reached the answer at three different dates by three different routes. The next person to touch any of them needs the rule, not one tree's version of it — and the audit table above is the evidence that "port it" was checked rather than assumed ([docs/22 §10](22-workflow.md) in the operator's own terms). The 2-D collision is the same evidence working in the other direction: the audit found the cell missing, and the locks found out why.
 
 ## ADR-W-067 — The fix-round cap is 20 items, and the escalation stop becomes a RATE (#1290, amends ADR-W-028)
 
@@ -3566,7 +3566,7 @@ ADR-W-054's reasoning and it is unchanged — only its reach is, from overnight 
 ## ADR-W-069 — The input's live preview typesets MATHEMATICS, in every builder (#1152)
 
 **Status:** accepted, 2026-09-20 · **Issue:** #1152 (bug, P2, `workspace` + `analytic`) · operator report 2026-09-16 · round #1292
-**Requirements:** [02c](02c-requirements-analytic.md) / [02b](02b-requirements-3d.md) — the input strip · **Design:** [28](28-product-unification.md) §the preview seam
+**Requirements:** [02c](02c-requirements-analytic.md) / [02b](02b-requirements-3d.md) — the input strip · **Design:** [28](archive/28-product-unification.md) §the preview seam
 **Third surface of** [#1082](https://github.com/dcodish/geo_builder/issues/1082)'s ruling, after [#1097](https://github.com/dcodish/geo_builder/issues/1097) chased it into a second panel
 
 **The report.** Typing «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9»: *"on data input — the bidi text should also be MathML so the squared needs to show nice."* The strip under the box already repairs the bidi; it rendered that repaired sentence as plain text, so `(x-3)^2` kept its caret a few pixels above a fact row showing a real superscript — the student's own equation, two ways, in two elements.
@@ -3589,7 +3589,7 @@ ADR-W-054's reasoning and it is unchanged — only its reach is, from overnight 
 ## ADR-W-070 — A leading SIGN belongs to the technical run; a maqaf does not (#1296)
 
 **Status:** accepted, 2026-09-21 · **Issue:** #1296 (bug, P2, `workspace`)
-**Requirements:** none (internal — this restores a promise the display was breaking, it does not change one) · **Design:** [28](28-product-unification.md#5a-how-this-is-executed--branch-strategy-and-the-work-items)
+**Requirements:** none (internal — this restores a promise the display was breaking, it does not change one) · **Design:** [28](archive/28-product-unification.md#5a-how-this-is-executed--branch-strategy-and-the-work-items)
 **Extends** [ADR-W-016](#adr-w-016)'s shared bidi core with the one case its span selection never had
 
 **The report.** Operator, 2026-09-20, typing `(-2,4)` into the analytic tool: *"I cannot enter the coordinates in a normal way. the bidi keeps interfering and i dont know how to get around it"*.
@@ -3631,7 +3631,7 @@ The gap's first character is the awkward case: a gap is closed by a Hebrew lette
 ## ADR-W-071 — A cross-product wiring guard asserts BEHAVIOUR, never a source location (#1315)
 
 **Status:** accepted, 2026-09-21 · **Issue:** #1315 (bug, P1 trunk-honesty, `3d`)
-**Requirements:** none (internal — no student-facing behaviour changes) · **Design:** [28](28-product-unification.md)
+**Requirements:** none (internal — no student-facing behaviour changes) · **Design:** [28](archive/28-product-unification.md)
 **Supersedes** the source-scanning half of [#1152](https://github.com/dcodish/geo_builder/issues/1152)'s parity guard · **applies** [ADR-W-053](#adr-w-053) to a guard that was itself the reproduction
 
 **How it surfaced.** `main` was RED on `6144da4f` and nobody had reported it. Found while gating unrelated work; `origin/main` was at the same commit, so every session's `test:full` was failing.
@@ -3817,7 +3817,7 @@ each of the four product trees (24). `docs/02w` FR-SU-7 extended.
 ## ADR-W-076 — The sequence gate is ONE algorithm in `shell/`, and analytic finally has one (#1356)
 
 **Status:** accepted, 2026-09-22 · **Issue:** [#1356](https://github.com/dcodish/geo_builder/issues/1356) (bug, `P2`, `analytic`) · step 2 of the operator's 2026-09-22 plan (#1359): *"we want the llm to work in the same mechanism as it is in 2d and 3d where it works well"*, under his standing rule that the tools share as much of the design and pedagogy as possible (#1358)
-**Requirements:** none (internal — the promise is the existing honesty invariant) · **Design:** [28 §5d](28-product-unification.md#5d-the-sequence-gate-adr-w-076) (new section)
+**Requirements:** none (internal — the promise is the existing honesty invariant) · **Design:** [28 §5d](archive/28-product-unification.md#5d-the-sequence-gate-adr-w-076) (new section)
 
 **The rule.** *Never reorder the letters of a point sequence — the sequence IS the statement.* «ADB» says D lies between A and B; «ABD» says B does. 2-D [#536](https://github.com/dcodish/geo_builder/issues/536) was a production P1 where the model alphabetised a stated betweenness and the figure committed **the negation of the student's given**. 3-D hit the same class and copied the fix (#555 / ADR-3D-173).
 
@@ -4681,7 +4681,7 @@ the way the list reaches that shape.
 ## ADR-W-090 — The privacy note is a DECLARATION of the product's data sinks, held to its real wiring by one cross-product lock (#1426)
 
 **Status:** accepted, 2026-09-27 · **Issue:** [#1426](https://github.com/dcodish/geo_builder/issues/1426) (bug, `P1`, `workspace` + `analytic`) · operator ruling 2026-09-27 (/decisions pass): *"Fix + add AI clause"* · round [#1469](https://github.com/dcodish/geo_builder/issues/1469)
-**Requirements:** [03](03-nonfunctional-requirements.md) NFR-SE-3 (extended: every builder's note names every sink; the four notes tabled) · **Design:** [04w](04w-design-shell.md) "The privacy note is a declaration" · [28](28-product-unification.md) §5c (a new live instance)
+**Requirements:** [03](03-nonfunctional-requirements.md) NFR-SE-3 (extended: every builder's note names every sink; the four notes tabled) · **Design:** [04w](04w-design-shell.md) "The privacy note is a declaration" · [28](archive/28-product-unification.md) §5c (a new live instance)
 
 **The report.** An external review of prod found 2-D logging every step to `/api/log` and saying so. It did
 not check the other builders. Triage did. Analytic's note read «המשפטים שאתם מקלידים נשמרים בדפדפן שלכם» /
@@ -4756,7 +4756,7 @@ space.
 ## ADR-W-091 — The About content is a DECLARATION with one shared layout, and every builder's try steps must build (#1477)
 
 **Status:** accepted, 2026-09-27 · **Issue:** [#1477](https://github.com/dcodish/geo_builder/issues/1477) (feature, `P3`, `workspace`) · operator ruling 2026-09-27: *"i dont want to approve text - just make it include what the 2d has."* · round #1478
-**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-11 (new: every builder's About carries the same sections, and its sample lines build) · **Design:** [04w](04w-design-shell.md) "The About content is a declaration" · [28](28-product-unification.md) §5c (a new live instance)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-11 (new: every builder's About carries the same sections, and its sample lines build) · **Design:** [04w](04w-design-shell.md) "The About content is a declaration" · [28](archive/28-product-unification.md) §5c (a new live instance)
 
 **The report.** The operator, playing round #1469: *"the text on the 2d tool is more detailed then the rest
 of the tools so we should add to the other tools content like the 2d has"*. Measured on `cab06da2`: 2-D's
@@ -5285,7 +5285,7 @@ The class has two halves. One mechanism (the prune marker) silently covered only
 
 **Status:** accepted · 2026-10-04 · round #1753 · amends [ADR-W-040](#adr-w-040) (the shared math-text core). Operator report, 2026-09-29, analytic: *"the x_B>x_D in input is not shown mathml"*.
 
-**Requirements:** none (internal) — no requirement row names the subscript spelling; this makes the existing typesetting promise hold for the spelling the catalogs already teach. · **Design:** [28](28-product-unification.md) §5a, the utterance-input row — a subscript is typeset in either spelling. **Product:** shell (all four builders).
+**Requirements:** none (internal) — no requirement row names the subscript spelling; this makes the existing typesetting promise hold for the spelling the catalogs already teach. · **Design:** [28](archive/28-product-unification.md) §5a, the utterance-input row — a subscript is typeset in either spelling. **Product:** shell (all four builders).
 
 **Context.** Every product's given rows, previews and traces go through `shell/math` (`hasMath` + `mathHtml`, with `shell/mathExpr` for expression spans). Its subscript rule was braces-only: `SUB = [A-Za-z]_\{…\}`, `hasMath`'s `_\{` clause, and the `id _ { id }` branch of the expression parser. The braced form is what the `x_{}` chip inserts. The **bare** form is the catalogs' canonical spelling (analytic `x_B > x_D`, `x_A = 5`, `y_A < 0`; 3-D `x_B = 3`) and what students and the LLM type. Measured on `c098af9b`: `x_B>x_D`, `x_B = 3`, `S_ABC = 12` all gave `hasMath: false` and rendered as plain text, and `(x_A+x_B)/2` matched as an expression span and was refused whole. The form the tool teaches was the one it could not typeset.
 
@@ -5308,7 +5308,7 @@ The class has two halves. One mechanism (the prune marker) silently covered only
 **Status:** accepted · 2026-10-04 · round #1753 (feature, PR). Ruling cited:
 - **2026-09-27, /decisions pass on #1459:** *"Input above the canvas"* — chosen over pinning the input to the bottom, scrolling to the figure after each add, or leaving it.
 
-**Requirements:** [03](03-nonfunctional-requirements.md) NFR-US-4 — on a narrow screen the input is above the figure and the figure stays in view after «הוסף». · **Design:** [28](28-product-unification.md) §5a, the utterance-input row — the `Workbench`'s `inputZone` / `factsZone` split. **Product:** shell (all four builders).
+**Requirements:** [03](03-nonfunctional-requirements.md) NFR-US-4 — on a narrow screen the input is above the figure and the figure stays in view after «הוסף». · **Design:** [28](archive/28-product-unification.md) §5a, the utterance-input row — the `Workbench`'s `inputZone` / `factsZone` split. **Product:** shell (all four builders).
 
 **Context.** Below the shared stack breakpoint (`(max-width: 900px)`), `shell/frame/Workbench.tsx` stacked canvas → input zone → data. Measured on `c098af9b` with Playwright, before any add: at 810×1080 (a portrait tablet, in scope) analytic's input was at y = 1092, below the fold, and complex's at 1036–1078; at 390×844 2-D's was at 1084 and 3-D's at 971. A student had to scroll to type and then scroll back to see what the line did.
 
@@ -5531,7 +5531,7 @@ The same audit sampled the issues opened from 2026-10-05 to 10-07 (#1786–#1860
 **Consequences.**
 - Fewer items arm themselves, and rounds escalate more. Questions that used to be answered by default now reach the operator as `needs-operator`.
 - The `/decisions` pass changes its aim. It used to aim at "enough armed work to run rounds without him"; it now aims at "no product question left unasked".
-- The memory notes "plan mechanism beats plan locks", "ship the mechanism, file the judgement" and "parked arms need successor issues" are read under this rule. They move into docs/22 when the memory is reorganised (#1861, C2).
+- The memory notes "plan mechanism beats plan locks", "ship the mechanism, file the judgement" and "parked arms need successor issues" are read under this rule. When the memory was reorganised (#1861, C2) they went to: "plan mechanism beats plan locks" → [docs/17 §9](17-design-rules.md); "ship the mechanism, file the judgement" → deleted, covered by CLAUDE.md rule 7; "parked arms need successor issues" → [docs/22 §1](22-workflow.md).
 
 ## ADR-W-118 — The rulings of 2026-10-07: 2-D is the reference for display too, the honesty invariant names values not relations, and the docs are reorganised (#1861)
 

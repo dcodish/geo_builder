@@ -4,14 +4,14 @@ _The complex-numbers track's OWN ADR log (ids `ADR-CX-NNN`), separate from the s
 design** — [docs/22 §9](22-workflow.md) ("Isolation rules"): parallel session streams must not race on one ADR numbering sequence.
 Same conventions otherwise: every significant decision gets an entry. The contract is
 [02d](02d-requirements-complex.md) (what) and [04d](04d-design-complex.md) (how); the finished build plan was
-[27-complex-numbers-tool.md](27-complex-numbers-tool.md) (its §10/§10b grammar tables move into 02d, #1861)._
+[27-complex-numbers-tool.md](archive/27-complex-numbers-tool.md) (its §10/§10b grammar tables move into 02d, #1861)._
 
 ---
 
 ## ADR-CX-001 — Product accepted; planning decisions D1–D5 resolved (2026-08-14)
 
 **Context.** The product was registered in the workspace ([docs/22 §9](22-workflow.md)) with no plan.
-An operator planning session produced [docs/27](27-complex-numbers-tool.md) — a corpus reading of
+An operator planning session produced [docs/27](archive/27-complex-numbers-tool.md) — a corpus reading of
 eight 572 exams (2011–2024) plus the formula-sheet contract — which posed five decisions. The
 operator resolved all five the same day (issue
 [#583](https://github.com/dcodish/geo_builder/issues/583)).
@@ -51,7 +51,7 @@ literals + the polar↔cartesian toggle).
 **Status:** Accepted (operator, same session as ADR-CX-001)
 
 **Context.** Debating prototype-now vs define-first, the operator supplied one exam question
-(image; transcribed in [docs/27 §2b](27-complex-numbers-tool.md)) with the ruling: *"from a
+(image; transcribed in [docs/27 §2b](archive/27-complex-numbers-tool.md)) with the ruling: *"from a
 pedagogy POV, I would like the user to be able to enter the inputs from this question and have the
 tool visualize the location of points and calculations."* The question turns out to exercise all
 six corpus archetypes at once, ending with five roots of `Z⁵ = Z₁·Z₂³·Z₄` (= Z₂⁵ by construction)
@@ -97,7 +97,7 @@ ad-hoc grammar lists (D2 + the ADR-CX-002 deltas) named forms by example; nothin
 generalization each example stands for, which is exactly how a parser grows case-by-case patches
 (the 2-D tool's original sin, docs/13).
 
-**Decision.** [docs/27 §10](27-complex-numbers-tool.md) is the authoritative grammar contract:
+**Decision.** [docs/27 §10](archive/27-complex-numbers-tool.md) is the authoritative grammar contract:
 **thirteen sentence families (F1–F13)**, each defined generically (any names, any comparator, any
 arity, any parameter expression — not a specific question's phrasing), each carrying at least two
 corpus witnesses, each assigned to its build slice. Two cross-cutting principles govern all of
@@ -273,7 +273,7 @@ parameter set, never drivers** — the 3-D `Requirement3` rule. `engine/model.ts
 ## ADR-CX-007 — The grammar contract is re-derived from ELEVEN exams; nine sentence families were missing (2026-08-15)
 
 **Status:** Accepted (operator plan approval, 2026-08-15) · **Extends** [ADR-CX-003](#adr-cx-003) ·
-**Plan of record:** [docs/27 §10](27-complex-numbers-tool.md)
+**Plan of record:** [docs/27 §10](archive/27-complex-numbers-tool.md)
 
 **Context.** ADR-CX-003 made the input language a contract of generic sentence families F1–F13, each
 carrying at least two corpus witnesses, with the anti-patch rule that *a new question fitting no
@@ -288,7 +288,7 @@ the measurement that matters: **only two questions map end to end. Nine contain 
 with no family**, and the gaps are not exotic — five of them carry three or four independent witnesses
 each. The families were not wrong; the sample was too small to reveal them.
 
-**Decision.** [docs/27 §10](27-complex-numbers-tool.md) gains nine families and names three deferrals,
+**Decision.** [docs/27 §10](archive/27-complex-numbers-tool.md) gains nine families and names three deferrals,
 each with its witness count and its build slice:
 
 | id | family | witnesses |
@@ -366,7 +366,7 @@ and both engines are playable side by side; the final PR flips the default and d
 Slices are foundation-first (operator ruling) — value core, solver, replay, parser, then the
 visualization layer — so the invisible work lands before the visible work sits on top of it.
 
-**Consequences.** The C0–C5 slice plan in [docs/27 §9](27-complex-numbers-tool.md) is replaced by
+**Consequences.** The C0–C5 slice plan in [docs/27 §9](archive/27-complex-numbers-tool.md) is replaced by
 S0–S7. The prototype's issues stay closed: they were correctly fixed for the architecture that existed,
 and the rebuild is not a claim that those fixes were wrong. #607 is closed by the tier-1 solver rather
 than by the joint-Newton follow-up its own body proposed.
