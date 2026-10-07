@@ -6,7 +6,7 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-10-06",
+  "updatedAt": "2026-10-07",
   "slow": [
     "src-analytic/__tests__/issue-1353-imperatives-taught.test.ts",
     "src-analytic/__tests__/issue-1473-perf-budget.test.ts",
@@ -77,6 +77,7 @@
     "src3d/__tests__/issue-1560-vector-pin-claims.test.ts",
     "src3d/__tests__/issue-1735-rider-host-reseat.test.ts",
     "src3d/__tests__/issue-1792-shape-phrase.test.ts",
+    "src3d/__tests__/issue-1815-collapse-attribution.test.ts",
     "src3d/__tests__/issue-814.test.ts",
     "src3d/__tests__/issue-815.test.ts",
     "src3d/__tests__/issue-816.test.ts",
