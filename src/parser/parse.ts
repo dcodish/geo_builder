@@ -19,8 +19,8 @@
  * no digits). Keywords are bilingual; the same rule matches either language.
  */
 
-import { MIDSEGMENT_SHAPES, RADIUS_VAR, type RoleSideBinding, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
-import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW } from './lexicon';
+import { MIDSEGMENT_SHAPES, RADIUS_VAR, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
+import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -2614,14 +2614,39 @@ function angleValueOf(stripped: string): AngleValue | null {
   // through to `angleAliasRule` / an honest escalation instead of a silent wrong given.
   // #1698 (ADR-566): a QUOTIENT is one value. «∢ABC = 90/2» used to read its numerator alone (90°) and
   // leave «/2» behind, unread — the same truncation that drew «cos∢ACB = 3/4» as 3°.
-  const numM = stripped.match(new RegExp(String.raw`(?<![A-Za-z])` + num + String.raw`(?:\s*\/\s*` + num + ')?'));
+  // #1814 (ADR-600): the guard is the shared `UNGLUED`, not an inline Latin-only lookbehind. Spelled
+  // `(?<![A-Za-z])`, it let the index of a GREEK name through («∠ABC = α1» drew 1°, «β2» 2°, «Α1» 1°), and
+  // with no digit lookbehind a blocked «a12» restarted at its «2».
+  const numM = stripped.match(new RegExp(UNGLUED + num + String.raw`(?:\s*\/\s*` + UNGLUED + num + ')?'));
   if (numM) {
     const den = numM[2] !== undefined ? parseFloat(numM[2]) : 1;
     if (den === 0) return null;
-    return { kind: 'num', value: parseFloat(numM[1]) / den, rest: stripped.replace(numM[0], ' ') };
+    const rest = stripped.replace(numM[0], ' ');
+    // #1814 — THE LEFTOVER GUARD (ADR-024, at the reader). #969 made the number positional: any standalone
+    // number in the line. So when the value is an EXPRESSION — «α + 40», «x + 10», «π/2», «α 1» — the
+    // number was taken and the symbol left behind in `rest`, which `angleArms` never reads: «∠ABC = α + 40»
+    // drew 40°. A value symbol still standing beside the number means the value is not a number, and this
+    // rule cannot represent `symbol ± number`; decline, and the line escalates whole.
+    if (VALUE_SYMBOL_LEFT.test(rest)) return null;
+    return { kind: 'num', value: parseFloat(numM[1]) / den, rest };
   }
   return null;
 }
+
+/**
+ * #1814 (ADR-600) — a VALUE SYMBOL left beside a number the angle reader took:
+ *  - any Greek glyph, π included, with or without an index — 2-D's points are Latin, so a Greek letter
+ *    in an angle statement is a value. The one exception is a capital glued to a Latin label run, the
+ *    «ΔABC» spelling of a triangle's name;
+ *  - a single Latin letter (optionally indexed, either case) joined to the value by an arithmetic operator
+ *    («x + 10», «10·k», «a1 / 2», and «X + 10», which the lowercase-label lift would otherwise have
+ *    proposed). Not a lone letter as such: «זווית d=90» names the VERTEX d (#45), and an «=» is not
+ *    arithmetic. A minus glued to a Hebrew letter is a particle's maqaf (#975).
+ */
+const VALUE_OP = String.raw`(?:[+*/·×]|(?<![א-ת])-)`;
+const VALUE_SYMBOL_LEFT = new RegExp(
+  String.raw`${GREEK_LETTER}(?![A-Z])|(?<![A-Za-z])[A-Za-z]${INDEX}?(?![A-Za-z])\s*${VALUE_OP}|${VALUE_OP}\s*[A-Za-z]${INDEX}?(?![A-Za-z])`,
+);
 
 const angle: Rule = (s, ctx) => {
   if (!/(?:angle|∠|זוו?ית)/i.test(s)) return null;
@@ -3858,7 +3883,7 @@ const measurePi: Rule = (s) => {
   const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*π`));
   if (!m) return null;
   const c = m[3] ? parseFloat(m[3]) : 1;
-  return [{ type: 'measure-length', a: up(m[1]), b: up(m[2]), expr: { value: c * Math.PI, text: `${c === 1 ? '' : m[3]}π` } }];
+  return [{ type: 'measure-length', a: up(m[1]), b: up(m[2]), expr: { value: c * Math.PI, text: `${c === 1 ? '' : m[3]}π` }, consumed: PI_CONSUMED }];
 };
 
 // ── AREA measures & relations ([ADR-118](docs/06-decisions.md#adr-118)) ────────────────────────────────
@@ -4579,7 +4604,7 @@ const RADIUS_WORD = String.raw`(?:radius|רדיוס\S*)`;
  * radius symbol — ADR-034). A symbol pins the variable R to the concrete default radius via
  * a `set-var`, so a later "AC = 1.6R" resolves to |AC| = 1.6·radius while still labelling "1.6R".
  */
-const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: boolean; sym?: string; varCmd?: SymbolicCommand; statedSize?: number } => {
+const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: boolean; sym?: string; varCmd?: SymbolicCommand; statedSize?: number; consumed?: Consumed } => {
   // A QUOTIENT radius — "רדיוס 35/√32", "שרדיוסו √32/5" (#77, the shared NUMEXPR atom). Checked BEFORE the
   // bare-number form, which would otherwise read "רדיוס 35" and silently drop the "/√32".
   const rFrac = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*(?:=|:|הוא|שווה|\bis\b)?\s*${NUMEXPR('r')}`, 'i'));
@@ -4598,9 +4623,17 @@ const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: b
   const rVar = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*(?:is\s+|הוא\s+)?(?:=\s*)?([A-Za-z])(?![A-Za-z\d])`));
   if (rVar) return { radius: RADIUS_DEFAULT, numeric: false, symbolic: true, sym: rVar[1], varCmd: { type: 'set-var', name: RADIUS_VAR, value: RADIUS_DEFAULT } };
   const sized = circleSizeRadius(s);
-  if (sized !== null) return { radius: sized.r, numeric: true, symbolic: false, statedSize: sized.stated };
+  if (sized !== null) return { radius: sized.r, numeric: true, symbolic: false, statedSize: sized.stated, ...(sized.pi ? { consumed: PI_CONSUMED } : {}) };
   return { radius: RADIUS_DEFAULT, numeric: false, symbolic: false };
 };
+
+/**
+ * #1814 (ADR-600) — the π a size read is DECLARED consumed (`consumed.symbols`, the ADR-462 route). π is a
+ * constant, not a name: lowered into a radius it leaves no trace in the payload, and the span accountant
+ * accepts it only from the rule that read it. Every command a parsed radius sizes spreads this.
+ */
+const PI_CONSUMED: Consumed = { symbols: ['π'] };
+const piDeclared = (r: { consumed?: Consumed }): { consumed?: Consumed } => (r.consumed ? { consumed: r.consumed } : {});
 
 // He circumference forms, LONGEST first so the possessive suffix ("שהיקפו" = "whose circumference is") is
 // consumed whole — matching just "היקף" would leave a dangling "ו" before the value. A circle's perimeter
@@ -4619,7 +4652,7 @@ const AREA_WORD = String.raw`(?:ששטחו|שטחו|שטח|area)`;
  * the only place that knows «6» became r = 0.9549; without carrying it out, `droppedGivenNumbers` can only
  * hunt for the literal 6 among the payloads, find nothing, and refuse a correct parse.
  */
-const circleSizeRadius = (s: string): { r: number; stated: number } | null => {
+const circleSizeRadius = (s: string): { r: number; stated: number; pi: boolean } | null => {
   /**
    * The COEFFICIENT the student actually typed, before the π factor and before the transform — the «6»
    * of «6π» and of a bare «6». `readVal` returns the evaluated magnitude (6π ≈ 18.85), which is not what
@@ -4632,6 +4665,7 @@ const circleSizeRadius = (s: string): { r: number; stated: number } | null => {
       after.match(new RegExp(String.raw`^\s*(?:circle|מעגל)?\s*[A-Z]\d*\s+(${COEF})`, 'i'));
     return m ? parseFloat(m[1]) : null;
   };
+  let pi = false; // #1814: whether the value read carried the constant π (declared by the caller)
   const readVal = (after: string): number | null => {
     // copula-anchored first — skips a digit-bearing circle label ("circle O2 is 6π") the glued form would
     // misread; else the number glued right after the possessive suffix ("שהיקפו 6π").
@@ -4645,6 +4679,7 @@ const circleSizeRadius = (s: string): { r: number; stated: number } | null => {
     const named = after.match(new RegExp(String.raw`^\s*(?:circle|מעגל)?\s*[A-Z]\d*\s+(${COEF})\s*[*·]?\s*(π|pi)?`, 'i'));
     const m = cop ?? glued ?? named;
     if (!m) return null;
+    pi = !!m[2];
     return parseFloat(m[1]) * (m[2] ? Math.PI : 1);
   };
   // A circle SIZED by its DIAMETER — "diameter 10" / "מעגל קוטר 10" / "מעגל בקוטר 10" (r = d/2). The value
@@ -4656,19 +4691,19 @@ const circleSizeRadius = (s: string): { r: number; stated: number } | null => {
   );
   if (dm) {
     const v = parseFloat(dm[1]) * (dm[2] ? Math.PI : 1);
-    if (v > 0) return { r: v / 2, stated: parseFloat(dm[1]) };
+    if (v > 0) return { r: v / 2, stated: parseFloat(dm[1]), pi: !!dm[2] };
   }
   const cm = s.match(new RegExp(CIRCUMFERENCE_WORD, 'i'));
   if (cm) {
     const after = s.slice(cm.index! + cm[0].length);
     const v = readVal(after);
-    if (v !== null && v > 0) return { r: v / (2 * Math.PI), stated: statedCoef(after) ?? v };
+    if (v !== null && v > 0) return { r: v / (2 * Math.PI), stated: statedCoef(after) ?? v, pi };
   }
   const am = s.match(new RegExp(AREA_WORD, 'i'));
   if (am) {
     const after = s.slice(am.index! + am[0].length);
     const v = readVal(after);
-    if (v !== null && v > 0) return { r: Math.sqrt(v / Math.PI), stated: statedCoef(after) ?? v };
+    if (v !== null && v > 0) return { r: Math.sqrt(v / Math.PI), stated: statedCoef(after) ?? v, pi };
   }
   return null;
 };
@@ -4987,7 +5022,7 @@ const circle: Rule = (s, ctx) => {
   // +4-gap default drew a second bare circle overlapping the first, visually asserting intersections
   // the student never stated). Placement only; the centre stays a free sampled DOF.
   const apart = (ctx.circles ?? []).length > 0;
-  return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius * adj, ...(freeRadius ? { freeRadius: true } : {}), ...(auto ? { autoCenter: true } : {}), ...(apart ? { apart: true } : {}) }];
+  return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius * adj, ...piDeclared(r), ...(freeRadius ? { freeRadius: true } : {}), ...(auto ? { autoCenter: true } : {}), ...(apart ? { apart: true } : {}) }];
 };
 
 /**
@@ -5184,7 +5219,7 @@ const circleSizeExisting: Rule = (s, ctx) => {
   }
   // #784 (ADR-462): the lowering DECLARES the number it read, because it is the only thing that knows
   // «6» became r = 0.9549. The gate then asks instead of hunting for a literal that cannot be there.
-  return [{ type: 'set-radius', circle: circleId(center), value: sized.r, consumed: { numbers: [sized.stated] } }];
+  return [{ type: 'set-radius', circle: circleId(center), value: sized.r, consumed: { numbers: [sized.stated], ...(sized.pi ? PI_CONSUMED : {}) } }];
 };
 
 /**
@@ -5482,7 +5517,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // default. A SYMBOLIC "radius R" is also free, with R left UNVALUED so an "AB = √2R" couples to the
   // radius DOF (ADR-071); only a NUMERIC radius is fixed. (Matches the bare-`circle` rule.)
   const freeRadius = !r.numeric;
-  const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, ...(freeRadius ? { freeRadius: true } : {}), ...(hidden ? { hidden: true } : {}), ...(named ? {} : { autoCenter: true }) }];
+  const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, ...piDeclared(r), ...(freeRadius ? { freeRadius: true } : {}), ...(hidden ? { hidden: true } : {}), ...(named ? {} : { autoCenter: true }) }];
   // A GENERAL quad's vertex angles are UNSTATED (ADR-052) — the convex spread is only a STARTING
   // position, so the vertices stay FREE (samplable + drivable to a convex constraint-satisfying figure).
   // A RIGID cyclic shape (square/rect/rhombus) has angles INTRINSIC to the shape → fixed. A TRAPEZOID is
@@ -5682,7 +5717,7 @@ const regularPolygon: Rule = (s, ctx) => {
   const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
   const circ = circleId(center);
   const cmds: AnyCommand[] = [
-    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(named ? {} : { autoCenter: true }) },
+    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...piDeclared(r), ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(named ? {} : { autoCenter: true }) },
   ];
   ids.forEach((id, i) => {
     const deg = 90 + (360 * i) / n; // start at the top, equal 360/n spacing; theta PINNED (rigid corners)
@@ -5904,7 +5939,7 @@ const semicircle: Rule = (s, ctx) => {
       ];
     }
     const cmds: AnyCommand[] = [
-      { type: 'circle', id: circ, center, radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(namedC ? {} : { autoCenter: true }) },
+      { type: 'circle', id: circ, center, radius: r.radius, ...piDeclared(r), ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(namedC ? {} : { autoCenter: true }) },
     ];
     if (r.varCmd) cmds.push(r.varCmd);
     const members = membersOfCenter(ctx, center);
@@ -5978,7 +6013,7 @@ const semicircle: Rule = (s, ctx) => {
     return cmds;
   }
   const cmds: AnyCommand[] = [
-    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(namedC || centreFirst ? {} : { autoCenter: true }) },
+    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...piDeclared(r), ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(namedC || centreFirst ? {} : { autoCenter: true }) },
   ];
   if (r.varCmd) cmds.push(r.varCmd);
   const members = membersOfCenter(ctx, center);
@@ -6039,7 +6074,7 @@ const quarterCircle: Rule = (s, ctx) => {
   const [a, b] = named ? [named[1], named[2]] : (endsRun ?? (fresh.length === 2 ? fresh : ['A', 'B']));
   const circ = circleId(center);
   const cmds: AnyCommand[] = [
-    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(named || namedC ? {} : { autoCenter: true }) },
+    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...piDeclared(r), ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(named || namedC ? {} : { autoCenter: true }) },
   ];
   if (r.varCmd) cmds.push(r.varCmd);
   const exists = (p: string) => (ctx.points ?? []).some((q) => up(q) === up(p));
@@ -6113,7 +6148,7 @@ const sector: Rule = (s, ctx) => {
   }
   const circ = circleId(center);
   const cmds: AnyCommand[] = [
-    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(run || namedC ? {} : { autoCenter: true }) },
+    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...piDeclared(r), ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(run || namedC ? {} : { autoCenter: true }) },
   ];
   if (r.varCmd) cmds.push(r.varCmd);
   const members = membersOfCenter(ctx, center);
@@ -10362,8 +10397,11 @@ const normalizeAreaSubscript = (s: string): string =>
  * underscore silently truncates it to just `O` (the `_1` dropped, e.g. "circle O_1" rendered as "O"). A
  * common paste/typing habit, so fix it at the boundary: rewrite `X_1` / `X_{1}` → `X1` for every label.
  * Scoped to a letter + `_` + DIGITS, so it can't touch the area marker's `S_{ABC}` (uppercase LETTERS).
+ * #1814 (ADR-600): any NAME letter, Greek too, so «α_1» ≡ «α1» (one sentence, one verdict). Latin-only, the
+ * underscore form slipped past every guard that knows «α1» and read as 1°.
  */
-const normalizePointSubscript = (s: string): string => s.replace(/([A-Za-z])_\{?(\d+)\}?/g, '$1$2');
+const POINT_SUBSCRIPT = new RegExp(String.raw`(${NAME_LETTER})_\{?(\d+)\}?`, 'g');
+const normalizePointSubscript = (s: string): string => s.replace(POINT_SUBSCRIPT, '$1$2');
 
 /** The circle a command CONSUMES (references but doesn't define), or null. */
 const consumedCircleId = (cmd: AnyCommand): Id | null =>
@@ -10994,7 +11032,9 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
   // runs are invisible to it.
   const blank = (m: string): string => ' '.repeat(m.length);
   const counted = raw.replace(/(?<![\d.,])(?<!פי\s)\d+\s+(?=(?!פעמים)[א-ת]+(?:ים|ות)(?![א-ת])|(?!times\b)[A-Za-z][a-z]+s(?![A-Za-z]))/g, blank);
-  const s = counted.replace(/[A-Za-z]\d*/g, blank);
+  // #1814 (ADR-600): a NAME's index is never a magnitude, whatever alphabet the name is in. Latin-only, the
+  // «1» of «α1» counted as a stated number and the bogus value 1° paid for it.
+  const s = counted.replace(new RegExp(String.raw`${NAME_LETTER}\d*`, 'g'), blank);
   // #1161 (ADR-523) — the scan is SIGN-AWARE. A stated number’s leading minus belongs to the number:
   // «E=(-1,7)» states −1, and reading it unsigned hunted for an account for +1, found only −1 among
   // the payloads, and reported a dropped given against a parse that was perfectly faithful. That is a
@@ -11085,7 +11125,7 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
     if (spans.some(([x, y]) => i >= x && i < y)) continue;
     const neg = negAt(i); // #1161 — the sign is part of the stated number
     const n = (neg ? -1 : 1) * parseFloat(m[0]);
-    const rest = s.slice(i + m[0].length);
+    const rest = counted.slice(i + m[0].length); // `counted` still carries the π that `s` blanked, at the same index
     const cands = [n];
     if (/^\s*π/.test(rest)) cands.push(n / 2, Math.sqrt(n)); // nπ — circumference/area sizes lower to a radius
     if (/^\s*%/.test(rest)) cands.push(n / 100); // n% — lowers to a fraction

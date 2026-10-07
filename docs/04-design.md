@@ -93,6 +93,20 @@ A single boundary: `utterance → command[]`.
   particle, so the digits match unsigned; a hyphen after a space, `=`, `(`, `,` or at line start is a sign.
   The guard is zero-width, so the atom stays capture-free and every consumer inherits it — "particle or
   sign" is answered once, in the lexicon, never per rule.
+- **A name glyph is defined once, and a number never starts inside one (#1814, [ADR-600](06-decisions.md#adr-600)).**
+  `shell/indexedName.ts` holds the student's name alphabet (`NAME_LETTER`, Latin + Greek in both cases), an
+  `INDEX` (glued digits, `_1`/`_{1}`, subscript digits), `INDEXED_NAME`, and `UNGLUED` — the zero-width guard
+  "a number never begins glued to a name letter, an `_`, or inside another number". `lexicon.ts` re-exports
+  them; analytic's tokenizer test (`INDEXED_TOKEN`) is the same atom. The angle value reader composes
+  `UNGLUED + num` (it was an inline Latin-only lookbehind, #267) and declines when a value symbol is left
+  beside the number it took (a Greek glyph, or a single letter joined by an arithmetic operator — the
+  ADR-024 leftover guard at the reader). `normalizePointSubscript` folds `α_1` like `O_1`, and
+  `droppedGivenNumbers` blanks every name letter with its index before it extracts numbers.
+- **The span accountant has a `symbol` kind (#1814, ADR-600).** Every Greek glyph with its index, and in
+  Latin-only text a lone lowercase letter beside an operator, relation sign or digit, must be carried by a
+  command as a whole string value (`expr.var`, a measure name). The constant `π` is never a name: only a
+  rule that lowered it can pay for it, by declaring `consumed.symbols: ['π']` (the ADR-462 route) —
+  `measurePi`, `setRadius`'s size read and every circle a parsed size radius sizes.
 - **Contextual plurals resolve against a per-family context registry (#554, [ADR-503](06-decisions.md#adr-503)).**
   A follow-up line that names no object of its own — «המשיקים נחתכים בנקודה E» — resolves the definite
   plural against what the figure already holds, read off the construction into `ParseContext`: the

@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { decideSubmit } from '../app/submit';
 import { derive } from '../engine/derive';
 import { INDEXED_TOKEN, paramRegister } from '../engine/carriers';
+import { INDEXED_NAME_RE } from '../../shell/indexedName';
 import { parseExpr } from '../engine/expr';
 import { parseLengthExpr } from '../engine/lengths';
 
@@ -42,6 +43,10 @@ describe('#1785 — the tokenizer boundary', () => {
   it('INDEXED_TOKEN names an index on a lone letter, Latin or Greek', () => {
     for (const s of ['S1', 'a2', 'α1', 'A1', 'S_1', 'S_{1}', 'S₁', 'y = m1 x + 2']) expect(INDEXED_TOKEN.test(s), s).toBe(true);
     for (const s of ['2a', 'AB', 'cos', '40', 'x^2', 'A', '2S']) expect(INDEXED_TOKEN.test(s), s).toBe(false);
+  });
+  it('#1814 (ADR-600): INDEXED_TOKEN IS the shared atom — one name glyph for both builders, capital Greek included', () => {
+    expect(INDEXED_TOKEN).toBe(INDEXED_NAME_RE);
+    for (const s of ['Α1', 'Δ1', 'θ₂']) expect(INDEXED_TOKEN.test(s), s).toBe(true);
   });
 });
 

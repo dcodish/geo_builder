@@ -35,6 +35,7 @@ import { curveParentOf, parentsOf } from './derived';
 import { evalExpr, exprText, symbolsOf, type Env, type Expr } from './expr';
 import { constraintRefs, dirRefs, freeDirectionSymbol } from './solve';
 import { UNBOUNDED, circleDefPoints, type Construction, type Domain, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
+import { INDEXED_NAME_RE } from '../../shell/indexedName';
 
 /**
  * The plane's own coordinates. A curve is the zero set of `f(x, y; params)`, so `x` and `y` occur
@@ -84,11 +85,11 @@ export const POINT_TOKEN = /(?<![A-Za-z])[A-Z](?:[0-9₀-₉]+|_\{?\d+\}?)?(?![A
  * with an index, standing alone. The expression tokenizer refuses it (`expr.ts`, the index boundary) because the tool
  * has no indexed-name symbol and juxtaposition would read it as letter × index; a value reader that finds its source
  * unreadable tests this to DECLINE (`not-handled`, the LLM fallback's seam) instead of answering `bad-equation` about a
- * name the student spelled correctly. Pure and product-free on purpose: 2-D carries the same class (#1814), and when
- * it adopts this test it is the second copy — the point at which it moves to `shell/` (BOUNDARIES.json: shell is
- * seeded by surfaces implemented ≥ 2 times).
+ * name the student spelled correctly. 2-D carries the same class (#1814), so the test now lives ONCE in
+ * `shell/indexedName` (ADR-600, the third-copy rule): the shared atom also admits a capital Greek letter («Α1»), and
+ * a Greek neighbour bounds the name like a Latin one.
  */
-export const INDEXED_TOKEN = /(?<![A-Za-z])[A-Za-zα-ω](?:[0-9₀-₉]+|_\{?\d+\}?)(?![A-Za-z])/;
+export const INDEXED_TOKEN = INDEXED_NAME_RE;
 
 /**
  * The kind of freedom an object carries *itself* — as opposed to the freedom it inherits from the

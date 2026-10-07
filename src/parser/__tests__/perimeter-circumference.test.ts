@@ -19,7 +19,7 @@ const cmds = (u: string) => {
 
 describe('point-label subscript O_1 → O1 (ADR-228 A)', () => {
   it('circle O_1 keeps its subscript AND reads the circumference', () => {
-    expect(cmds('מעגל O_1 שהיקפו 6π')).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 3 }]);
+    expect(cmds('מעגל O_1 שהיקפו 6π')).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 3, consumed: { symbols: ['π'] } }]);
   });
   it('O_{1} braces form normalises too', () => {
     expect(cmds('circle O_{1} radius 5')).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 5 }]);
@@ -33,7 +33,8 @@ describe('point-label subscript O_1 → O1 (ADR-228 A)', () => {
 });
 
 describe('circle sized by circumference / area (ADR-228 B)', () => {
-  const r3 = [{ type: 'circle', id: 'circle-O', center: 'O', radius: 3 }];
+  // #1814 (ADR-600): a size read through π DECLARES the π it consumed (`consumed.symbols`) — the span accountant's only payer for it
+  const r3 = [{ type: 'circle', id: 'circle-O', center: 'O', radius: 3, consumed: { symbols: ['π'] } }];
   it('circumference 6π (He, possessive שהיקפו) ⇒ radius 3', () => {
     expect(cmds('מעגל O שהיקפו 6π')).toEqual(r3);
   });
@@ -122,22 +123,22 @@ describe('tangent circles: stated names + circumference on an existing circle (A
   it('circumference on an EXISTING circle → set-radius (not a duplicate circle), with the "pi" word', () => {
     // circle O1 already exists in context ⇒ "היקף מעגל O1 הוא 6pi" flexes it via set-radius.
     const r = parse('היקף מעגל O1 הוא 6pi', { circles: ['O1'] });
-    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O1', value: 3, consumed: { numbers: [6] } }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O1', value: 3, consumed: { numbers: [6], symbols: ['π'] } }]);
   });
   it('circumference on a NON-existing circle still CREATES it (via the circle rule)', () => {
     const r = parse('מעגל O1 שהיקפו 6pi', { circles: [] });
-    expect(r.ok && r.commands).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 3 }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 3, consumed: { symbols: ['π'] } }]);
   });
   it('AREA on an existing circle → set-radius (√(A/π)): "שטח מעגל O2 הוא 81π" ⇒ r=9', () => {
     const r = parse('שטח מעגל O2 הוא 81π', { circles: ['O2'] });
-    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9, consumed: { numbers: [81] } }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9, consumed: { numbers: [81], symbols: ['π'] } }]);
   });
   it('area on an existing circle WITHOUT the "מעגל" word (bare known-circle label): "שטח O2 הוא 81π"', () => {
     const r = parse('שטח O2 הוא 81π', { circles: ['O2'] });
-    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9, consumed: { numbers: [81] } }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9, consumed: { numbers: [81], symbols: ['π'] } }]);
   });
   it('a bare "שטח O2" whose label is NOT a known circle bows out (does not set a radius)', () => {
-    expect(cmds('שטח O2 הוא 81π')).not.toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9, consumed: { numbers: [81] } }]);
+    expect(cmds('שטח O2 הוא 81π')).not.toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9, consumed: { numbers: [81], symbols: ['π'] } }]);
   });
   it('a POLYGON area "שטח ABC = 13" stays an area even when a circle O exists (not a circle size)', () => {
     const r = parse('שטח המשולש ABC הוא 13', { circles: ['O'] });
@@ -147,14 +148,14 @@ describe('tangent circles: stated names + circumference on an existing circle (A
   // the LLM because the value reader needed the number right after the keyword or after a copula).
   it('copula-less "היקף מעגל O1 6pi" on an existing circle → set-radius 3', () => {
     const r = parse('היקף מעגל O1 6pi', { circles: ['O1'] });
-    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O1', value: 3, consumed: { numbers: [6] } }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O1', value: 3, consumed: { numbers: [6], symbols: ['π'] } }]);
   });
   it('copula-less "שטח מעגל O2 81π" on an existing circle → set-radius 9', () => {
     const r = parse('שטח מעגל O2 81π', { circles: ['O2'] });
-    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9, consumed: { numbers: [81] } }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9, consumed: { numbers: [81], symbols: ['π'] } }]);
   });
   it('copula-less creation "מעגל O1 שהיקפו 6π" unaffected (still a radius-3 circle)', () => {
     const r = parse('מעגל O1 שהיקפו 6π', { circles: [] });
-    expect(r.ok && r.commands).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 3 }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 3, consumed: { symbols: ['π'] } }]);
   });
 });

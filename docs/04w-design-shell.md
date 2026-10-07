@@ -373,6 +373,10 @@ A `SymbolSpec` whose face (`label`) is one character inserts exactly that charac
 
 `shell/conjunction.ts` `foldConjunctionSpacing` turns «AB ו- BC», «AB ו -BC» and «AB ו - BC» into «AB ו-BC». It is a PARSER-boundary fold, not a store one: 2-D `normalizeUtterance`, 3-D `normalize3` and analytic `orthography` call it, and the stored line stays as typed. A glued «ו-» always folds; a hyphen with a space before it folds only before a name-shaped token, so a minus sign («2 ו -3», «ו -y = x», «a ו -a») is never absorbed into the conjunction. The cross-builder lock is the parity rows `conj-space-*-1691-*`.
 
+## Indexed names ([ADR-600](06-decisions.md#adr-600))
+
+`shell/indexedName.ts` is the student's name alphabet, once: `NAME_LETTER` (Latin, and Greek in both cases), `INDEX` (glued digits, `_1` / `_{1}`, subscript digits), `INDEXED_NAME` («S1», «α1», «Α1» — one letter with an index, standing alone) and `UNGLUED`, the zero-width guard that a number never begins glued to a name letter, after an `_`, or inside another number. It is pure regex source with no product knowledge. 2-D re-exports it from `src/parser/lexicon.ts` (the angle value reader, the subscript fold and the number gate compose it); analytic's tokenizer test `INDEXED_TOKEN` (`src-analytic/engine/carriers.ts`, #1785) is `INDEXED_NAME_RE`. The cross-builder lock is the parity rows `indexed-*-1785` and `*-1814`.
+
 ## Student-facing text ([ADR-W-096](06w-decisions-workspace.md#adr-w-096))
 
 `shell/studentText.ts` `studentFacingViolations(values, { typed, names })` judges the VALUES a message interpolates, never its template, since a template may quote a worked example. A value may name what the student typed (case-insensitive) or what the figure shows; an id-shaped token (`~x`, `@x`, `#x`, `kind-Id`), an untyped English word, or an unknown capital label is a violation. Each product runs it over its own refusal corpus through its own humanizer. 3-D's is `src3d/i18n/errorText3.ts`; the other three are #1522.

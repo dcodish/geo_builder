@@ -1317,6 +1317,12 @@ export type SymbolicCommand =
 export interface Consumed {
   /** Stated numbers this command read and transformed (the raw 6 behind `set-radius value:0.9549`). */
   numbers?: number[];
+  /**
+   * Stated value SYMBOLS this command read and lowered into a number (#1814, ADR-600): the π of «6π» behind
+   * `set-radius value:3`. A constant leaves no trace in the payload, so only the rule that lowered it can
+   * say so — and nothing else may pay for it in the span accountant.
+   */
+  symbols?: string[];
   /** Verb ids from `VERB_GATES` this command satisfies BY CONSTRUCTION rather than by token. */
   verbs?: string[];
 }
