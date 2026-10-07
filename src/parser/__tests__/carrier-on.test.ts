@@ -1,5 +1,5 @@
 /**
- * A point ON a diameter / radius carrier ([docs/15-hardening-plan.md] C5 / PAR-5).
+ * A point ON a diameter / radius carrier ([docs/archive/15-hardening-plan.md] C5 / PAR-5).
  *
  * Two coupled defects made "נקודה D על הרדיוס OB" / "E על הקוטר AB" silently drop the rider point:
  *   1. The `על\b` guards were DEAD — JS `\b` never fires between a Hebrew letter (ל, not \w) and a

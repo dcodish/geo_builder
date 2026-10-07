@@ -1,5 +1,5 @@
 /**
- * 3-D parser shadow-matrix guard (S2.3 of [docs/24-foundation-hardening-plan.md](../../../docs/24-foundation-hardening-plan.md) —
+ * 3-D parser shadow-matrix guard (S2.3 of [docs/archive/24-foundation-hardening-plan.md](../../../docs/archive/24-foundation-hardening-plan.md) —
  * the 2-D A1/PAR-11 guard COPIED as a pattern per docs/20 §12, never imported).
  *
  * `parse3()` is first-match-wins over the ordered `RULES` array (~80 rules). Ordering is defended only

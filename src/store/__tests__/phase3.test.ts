@@ -1,5 +1,5 @@
 /**
- * Phase-3 acceptance gate (docs/09-implementation-plan.md §Phase 3).
+ * Phase-3 acceptance gate (docs/archive/09-implementation-plan.md §Phase 3).
  * Fact-list store: replay pipeline, keep-prior-on-error, undo/redo, clear,
  * alternatives, and per-fact select/deselect/delete (ADR-010). Plus i18n
  * key-parity. The engine is exercised through the store exactly as the UI drives it.

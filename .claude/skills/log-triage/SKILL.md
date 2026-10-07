@@ -64,7 +64,7 @@ Group the surviving utterances into **intent clusters** — the construct or phr
 For each cluster, check what already exists so the recommendation is precise and root-cause (docs/17 — a construct, not a one-off patch):
 - Catalogs — **the live coverage map**, one per product: `src3d/parser/catalog3.ts` (3-D), `src/parser/catalog.ts` (2-D), `src-analytic/parser/catalogAnalytic.ts` (analytic).
 - **Analytic buckets (ADR-W-083):** `not-handled` → ▶ LIVE; `out-of-scope` → ⊘ declined; every other refusal (the ruled `bad-equation` / `unknown-reference` / `bad-arity` and the unruled codes) → ⚠ review. The first analytic report should COUNT how the review codes distribute — that is the ruling's revisit trigger.
-- 3-D: `docs/02b-requirements-3d.md`, `docs/06b-decisions-3d.md`; the 2026-07 corpus sweep `docs/archive/21-572-coverage-audit.md` and `docs/archive/20-space-vectors-tool.md` §14 are history (what was planned then), never current coverage. 2-D: `docs/02-requirements.md`, `docs/06-decisions.md`.
+- 3-D: `docs/02b-requirements-3d.md`, `docs/06b-decisions-3d.md`; the 2026-07 corpus sweep (docs/21) and the build plan's §14 (docs/20) are archived history (what was planned then; see the archive table in docs/README.md), never current coverage. 2-D: `docs/02-requirements.md`, `docs/06-decisions.md`.
 - Say whether a gap is a planned slice, a documented deferral, or genuinely new, and which existing rule/pattern a fix would mirror.
 
 ## Step 4 — classify, file bugs, ranked recommendation, then STOP for approval

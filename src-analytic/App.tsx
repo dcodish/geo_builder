@@ -6,7 +6,7 @@
  * the V0 acceptance gate: [ADR-AG-004](../docs/06c-decisions-analytic.md#adr-ag-004) makes suite
  * conformance half of what V0 must pass, because "make it match the others" is the item that slips
  * to a follow-up when a new product is being built fast. This product is the first born after the
- * shared chassis existed ([docs/28 §5](../docs/28-product-unification.md) Phase 4), and mounting
+ * shared chassis existed ([docs/28 §5](../docs/archive/28-product-unification.md) Phase 4), and mounting
  * rather than re-deriving the chrome is the whole return on that work.
  */
 import { useCallback, useMemo, useState, useRef, useEffect, useLayoutEffect, type ChangeEvent, type CSSProperties } from 'react';

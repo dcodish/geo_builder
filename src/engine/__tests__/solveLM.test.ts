@@ -1,6 +1,6 @@
 /**
  * Characterization + capability tests for the LM least-squares module (`solveLM.ts`) —
- * the S3.2 stage (b) numerics enabler (docs/25-joint-solve-design.md §4): the 3-D
+ * the S3.2 stage (b) numerics enabler (docs/archive/25-joint-solve-design.md §4): the 3-D
  * pivot solver's Levenberg–Marquardt pattern ported into the 2-D engine so joint
  * component solving can go past the ~6–8 DOF ceiling where Nelder–Mead stalls
  * (ADR-281). The 10-DOF truss test demonstrates exactly that gap: a reference NM

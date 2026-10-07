@@ -1,5 +1,5 @@
 /**
- * Verifier tolerance ladder — PINNED ([docs/15-hardening-plan.md](../../../docs/15-hardening-plan.md) A4 / TST-6).
+ * Verifier tolerance ladder — PINNED ([docs/archive/15-hardening-plan.md](../../../docs/archive/15-hardening-plan.md) A4 / TST-6).
  *
  * The 2026-07-02 review flagged that the givens verifier's incidence tolerance (`onCircleTol = max(0.05,
  * 2%·r)`, [verify.ts](../verify.ts)) is ~100× looser than the solver's own accept tolerance — and on the

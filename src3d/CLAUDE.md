@@ -13,7 +13,7 @@ adds only what is specific to 3-D.
 A **second app** in this repo for the bagrut **space/vectors** question (Q2): geometric `u,v,w` vectors on
 solids, plus algebraic R³ lines and planes. **Contract:** [02b](../docs/02b-requirements-3d.md) (what) ·
 [04b](../docs/04b-design-3d.md) (how) · decisions [06b](../docs/06b-decisions-3d.md), ids `ADR-3D-NNN`;
-the finished build plan, [docs/20](../docs/archive/20-space-vectors-tool.md), is archived history. Issue label `3d`.
+the finished build plan (docs/20) is archived; see the archive table in [docs/README](../docs/README.md). Issue label `3d`.
 Deployed at `themathbible.com/3d-builder/` (admin dashboard at `/admin3`).
 
 ## Hard boundaries (operator authority — [docs/22 §9](../docs/22-workflow.md) "Isolation rules" + [`BOUNDARIES.json`](../BOUNDARIES.json))

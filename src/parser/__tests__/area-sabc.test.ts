@@ -1,5 +1,5 @@
 /**
- * Area reference of a polygon whose FIRST vertex is "S" ([docs/15-hardening-plan.md] C8 / PAR-6).
+ * Area reference of a polygon whose FIRST vertex is "S" ([docs/archive/15-hardening-plan.md] C8 / PAR-6).
  *
  * `areaReferences` had a `seen` Set that was declared but never populated, so the compact S-notation scan
  * re-read the tail of a verbose S-cornered polygon name: "שטח מרובע SABC הוא 20" produced a phantom SECOND

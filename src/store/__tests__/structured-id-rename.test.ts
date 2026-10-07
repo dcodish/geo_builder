@@ -1,5 +1,5 @@
 /**
- * Structured-id-aware rename/swap ([docs/15-hardening-plan.md] C9 / PAR-9).
+ * Structured-id-aware rename/swap ([docs/archive/15-hardening-plan.md] C9 / PAR-9).
  *
  * `renameInCommand` rewrote only whole-field single-letter matches, so a point letter EMBEDDED in a
  * structured id — `circle-O`, `bis-XYZ`, `tan-O`, `sec-EO`, `line-XY` — survived a rename of that letter.
