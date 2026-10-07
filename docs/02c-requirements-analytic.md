@@ -1473,6 +1473,16 @@ when the whole set came back the same, and a parameterised union still answers k
 component's equation printed as *the* locus is a confident claim about a strict subset — the one
 thing this product may not do.
 
+**The locus is drawn only where the givens allow it**
+([ADR-AG-245](06c-decisions-analytic.md#adr-ag-245),
+[#1817](https://github.com/dcodish/geo_builder/issues/1817)). A stated region — a coordinate range
+(«x_B > 1» · «x_B < 3»), a sign («שיעור ה-y של B חיובי»), a quadrant, a side («D על הצלע AB»), an order
+between measures («MA > 5») — holds on every position the trace paints, exactly as it holds on the one
+configuration the canvas shows: the trace is the allowed pieces of the curve, each ending where the
+region ends, and a component the region excludes entirely is neither drawn nor named. The row still
+names the carrier curve and prints its equation (the exam asks for the equation of the curve the
+points lie on); it never prints an extent read off the drawing.
+
 **R25a — the object the student asked for is ON SCREEN**
 ([ADR-AG-120](06c-decisions-analytic.md#adr-ag-120),
 [#1198](https://github.com/dcodish/geo_builder/issues/1198)). The view is fitted to everything that

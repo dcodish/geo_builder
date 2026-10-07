@@ -504,7 +504,7 @@ export interface SceneKnowledge {
    * The traced loci to draw, in WORLD coordinates (#1137) — the caller owns them for the same reason
    * it owns `marks`: they belong to the ask lane, which the renderer cannot see.
    */
-  loci?: Array<{ points: Array<{ x: number; y: number }>; closed: boolean; label?: string }>;
+  loci?: Array<{ points: Array<{ x: number; y: number }>; closed: boolean; starts?: number[]; label?: string }>;
   /**
    * The student's per-segment display choices (#1653), keyed by {@link segKey} — the store's record,
    * handed in like the others. A hidden segment is still in the figure; only its ink goes.
@@ -786,8 +786,10 @@ export function buildScene(
     .filter((l) => l.points.length >= 2)
     .map((l) => {
       const pts = l.points.map((p) => [t.sx(p.x), t.sy(p.y)] as const);
+      // A stroke begins at 0 and at every `starts` index: the pen lifts across a stretch the givens exclude (#1817).
+      const lift = new Set(l.starts ?? []);
       const d =
-        pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join('') +
+        pts.map(([x, y], i) => `${i === 0 || lift.has(i) ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join('') +
         (l.closed ? 'Z' : '');
       const mid = pts[Math.floor(pts.length / 2)];
       return { d, closed: l.closed, label: l.label ? { text: lbl(l.label), x: mid[0], y: mid[1] } : null };

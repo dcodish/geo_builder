@@ -175,8 +175,12 @@ export interface Answer {
    * be 2 lines … both should appear since they are the answer together"* (operator, 2026-09-28).
    * `label` carries the component's own equation on a multi-part answer, so the canvas can say which
    * line is which; a single component keeps the row's whole value as its label, as before.
+   *
+   * `points` are the component's DRAWN positions — its admissible pieces end to end (#1817, ADR-AG-245) — and
+   * `starts` the indices at which a new stroke begins, so a component the givens cut («MA > 5»: two rays of one line)
+   * stays ONE component, named once, drawn with the pen lifted across the excluded stretch. Absent ⇒ one stroke.
    */
-  locus?: { components: Array<{ points: Array<{ x: number; y: number }>; closed: boolean; label?: string }> };
+  locus?: { components: Array<{ points: Array<{ x: number; y: number }>; closed: boolean; starts?: number[]; label?: string }> };
   /**
    * Is the mark currently DRAWN? (#1118, operator ruling 2026-09-16.)
    *
@@ -415,13 +419,23 @@ export function ask(
     return {
       question,
       value,
+      /**
+       * THE ALLOWED PIECES ARE DRAWN, never the walk (#1817, ADR-AG-245): a stated region cuts the trace exactly where
+       * it cuts the configuration. The row above is the CARRIER's (the walk's fit) and prints no extent — a piece's
+       * ends are positions of the configuration being shown, and printing them would be a claim about one seed.
+       */
       locus: {
-        components: res.components.map((cp, i) => ({
-          points: cp.trace.points,
-          closed: cp.trace.closed,
-          // On a union, each drawn curve says which part of the answer it is.
-          ...(res.components.length > 1 ? { label: parts[i].eq ?? kindWord(parts[i].kind, 1) } : {}),
-        })),
+        components: res.components.map((cp, i) => {
+          const pieces = cp.trace.pieces;
+          const starts = pieces.slice(1).map((_, k) => pieces.slice(0, k + 1).reduce((n, pc) => n + pc.points.length, 0));
+          return {
+            points: pieces.flatMap((pc) => pc.points),
+            closed: pieces.length === 1 && pieces[0].closed,
+            ...(starts.length > 0 ? { starts } : {}),
+            // On a union, each drawn curve says which part of the answer it is.
+            ...(res.components.length > 1 ? { label: parts[i].eq ?? kindWord(parts[i].kind, 1) } : {}),
+          };
+        }),
       },
     };
   }

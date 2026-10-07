@@ -31,19 +31,36 @@
  * So: solve once, step along the null space of the Jacobian by a fixed arclength, re-solve, repeat —
  * outward in both directions, to the view box or to closure.
  */
-import { carrierSystem, choiceSeedOf, drawableAt, viewBox, type CarrierSystem } from './evaluate';
+import { admissibleAt, carrierSystem, choiceSeedOf, drawableAt, resolvedAt, viewBox, type CarrierSystem } from './evaluate';
 import { agreeingUnion, shapeOfTrace, type LocusShape } from './locusFit';
-import { resolveChoices, solveLM, SOLVE_TOL } from './solve';
+import { solveLM, SOLVE_TOL } from './solve';
 import type { Env } from './expr';
 import type { Pt } from './derived';
 import { isFree, type Construction, type Id } from './types';
 
-/** One traced curve: the point's positions in walk order, and whether the walk came back. */
+/** One drawable stretch of a locus — a polyline, closed only when the whole closed curve is allowed. */
+export interface LocusPiece {
+  points: Pt[];
+  closed: boolean;
+}
+
+/**
+ * One traced curve: the WALK (every position the freedom reaches, in walk order) and the PIECES of it the givens
+ * allow (#1817, ADR-AG-245).
+ *
+ * The two are different things with different consumers. The walk is the CARRIER curve: the fit, the determinacy
+ * gate and discovery's duplicate test read it, because the equation belongs to the whole curve — the exam asks
+ * «משוואת המקום הגיאומטרי שעליו נמצאות הנקודות», and a short allowed arc may be too little of a curve to identify.
+ * The pieces are what may be DRAWN: a stated region («x_B > 1», «A ברביע הראשון», «D על הצלע AB», «MA > 5») holds on
+ * the configuration `evaluate` shows, so it must hold on every position the trace paints.
+ */
 export interface LocusTrace {
-  /** The traced point's positions, ordered along the curve — a polyline the renderer can draw. */
+  /** The walk: the traced point's positions, ordered along the curve, whatever the selectors say. */
   points: Pt[];
   /** Did the walk return to its start? A circle and an ellipse close; a line and a parabola do not. */
   closed: boolean;
+  /** The stretches of the walk at which the figure is ADMISSIBLE (`admissibleAt`) — the only thing drawn. */
+  pieces: LocusPiece[];
 }
 
 export interface TraceOptions {
@@ -58,6 +75,19 @@ export interface TraceOptions {
 }
 
 const DEFAULTS = { step: 0.35, maxSteps: 220 };
+
+/**
+ * How many corrected bisections refine one boundary of an admissible piece (#1817). Six halve a step to a 64th:
+ * with the step a 160th of the walk room (four views wide), the end lands within ~4e-4 of the view's diagonal.
+ */
+const BISECT_STEPS = 6;
+
+/** One walked position: the carrier vector, the traced point, and whether the figure there is admissible. */
+interface Sample {
+  x: number[];
+  p: Pt;
+  ok: boolean;
+}
 
 /**
  * How much wider than the view the walk is allowed to go — see `locusOf`.
@@ -178,10 +208,12 @@ export function traceLocus(
    *
    * The seed is the one the caller traced at, so the option walked here is the option drawn there.
    */
-  const c: Construction = {
-    ...raw,
-    constraints: resolveChoices(raw.constraints, choiceSeedOf(raw, opts.seed ?? 0)),
-  };
+  /*
+   * …and the SELECTORS with them (#1817, ADR-AG-245): `resolvedAt` is `evaluate`'s own resolution, so every step of
+   * the walk is judged against the region givens the canvas was judged with.
+   */
+  const seed = opts.seed ?? 0;
+  const c: Construction = resolvedAt(raw, seed, choiceSeedOf(raw, seed));
   /**
    * THE STEP IS A FRACTION OF THE VIEW, not a fixed number of units.
    *
@@ -204,11 +236,19 @@ export function traceLocus(
   if (x0.some((v) => !Number.isFinite(v))) return null;
   if (nullDirection(x0, sys.residualsAt) === null) return null;
 
-  const at = (x: number[]): Pt | null => {
-    const p = sys.positionsAt(x).get(id);
-    return p && Number.isFinite(p.x) && Number.isFinite(p.y) ? p : null;
+  /**
+   * One position of the walk, JUDGED (#1817, ADR-AG-245): the traced point, and whether the figure there is one the
+   * student described — `admissibleAt`, the configuration's own validity predicate, called on the positions the step
+   * already computed. Never a second reading of the selectors.
+   */
+  const judge = (x: number[]): { p: Pt | null; ok: boolean } => {
+    const pos = sys.positionsAt(x);
+    const q = pos.get(id);
+    const p = q && Number.isFinite(q.x) && Number.isFinite(q.y) ? q : null;
+    return { p, ok: p !== null && admissibleAt(c, pos, sys.envAt(x)) };
   };
-  const origin = at(x0);
+  const o0 = judge(x0);
+  const origin = o0.p;
   if (!origin) return null;
 
   const inBounds = (p: Pt) =>
@@ -216,8 +256,8 @@ export function traceLocus(
     (p.x >= opts.bounds.minX && p.x <= opts.bounds.maxX && p.y >= opts.bounds.minY && p.y <= opts.bounds.maxY);
 
   /** One direction of the walk, outward from the start. */
-  const walk = (sign: 1 | -1): { pts: Pt[]; closed: boolean } => {
-    const pts: Pt[] = [];
+  const walk = (sign: 1 | -1): { pts: Sample[]; closed: boolean } => {
+    const pts: Sample[] = [];
     let x = [...x0];
     // The previous direction, so the walk keeps going the way it was going. Without it the null
     // vector's SIGN is arbitrary at every step — RREF has no memory — and the trace would reverse
@@ -245,7 +285,7 @@ export function traceLocus(
         x = res.values;
       }
 
-      const p = at(x);
+      const { p, ok } = judge(x);
       if (!p) break;
       // CLOSURE: the walk came back to where it started. Checked against the ORIGIN only, and only
       // after enough steps that the first few cannot trigger it.
@@ -268,20 +308,98 @@ export function traceLocus(
         if (pts.length > 0) break;
         continue;
       }
-      pts.push(p);
+      // An INADMISSIBLE step does not end the walk (#1817): the allowed set can be two rays («MA > 5»), and the
+      // walk must cross the gap to reach the second. It is recorded, judged, and left out of the pieces.
+      pts.push({ x, p, ok });
     }
     return { pts, closed: false };
   };
 
+  /**
+   * THE BOUNDARY, REFINED (#1817). Between the last admissible step and the first inadmissible one the edge of the
+   * allowed set lies somewhere inside one step — up to a 160th of the walk room, visible at «x_B > 1». Bisect the
+   * carrier vector, re-correcting onto the constraint set with the same `solveLM` each time, and keep the last
+   * admissible position. At most `BISECT_STEPS` solves per crossing; a corrector that fails keeps what it has.
+   */
+  const boundary = (inside: number[], outside: number[]): Pt | null => {
+    let a = inside;
+    let b = outside;
+    let best: Pt | null = null;
+    for (let k = 0; k < BISECT_STEPS; k += 1) {
+      const mid = a.map((v, i) => (v + b[i]) / 2);
+      const r = solveLM(mid, sys.residualsAt, 40);
+      if (!r.ok) break;
+      const j = judge(r.values);
+      if (!j.p) break;
+      if (j.ok) {
+        a = r.values;
+        best = j.p;
+      } else {
+        b = r.values;
+      }
+    }
+    return best;
+  };
+
+  /**
+   * THE WALK, SPLIT INTO ITS ADMISSIBLE PIECES (#1817). An inadmissible step closes the current piece and the next
+   * admissible one opens a new piece, each end refined by `boundary`. On a CLOSED walk the last sample neighbours the
+   * first, so an allowed arc running across the start is one piece, not two.
+   */
+  const piecesOf = (ss: Sample[], closed: boolean): LocusPiece[] => {
+    if (ss.length === 0) return [];
+    if (ss.every((q) => q.ok)) return [{ points: ss.map((q) => q.p), closed }];
+    const out: Pt[][] = [];
+    let cur: Pt[] | null = null;
+    for (let i = 0; i < ss.length; i += 1) {
+      const q = ss[i];
+      const prev = i > 0 ? ss[i - 1] : null;
+      if (q.ok) {
+        if (!cur) {
+          cur = [];
+          if (prev) {
+            const b = boundary(q.x, prev.x);
+            if (b) cur.push(b);
+          }
+        }
+        cur.push(q.p);
+      } else if (cur) {
+        const b = boundary(prev!.x, q.x);
+        if (b) cur.push(b);
+        out.push(cur);
+        cur = null;
+      }
+    }
+    if (cur) out.push(cur);
+    if (closed && ss.length > 1) {
+      const first = ss[0];
+      const last = ss[ss.length - 1];
+      if (first.ok && last.ok && out.length > 1) {
+        const tail = out.pop()!;
+        out[0] = [...tail, ...out[0]];
+      } else if (first.ok && !last.ok) {
+        const b = boundary(first.x, last.x);
+        if (b) out[0].unshift(b);
+      } else if (!first.ok && last.ok) {
+        const b = boundary(last.x, first.x);
+        if (b) out[out.length - 1].push(b);
+      }
+    }
+    return out.filter((pp) => pp.length >= 2).map((points) => ({ points, closed: false }));
+  };
+
   // The START ITSELF may be out of view (see the walk's bounds note) — it is a position of the point,
   // not a privileged one, and including it would draw a line from off-screen into the trace.
-  const head = inBounds(origin) ? [origin] : [];
+  const head: Sample[] = inBounds(origin) ? [{ x: x0, p: origin, ok: o0.ok }] : [];
   const fwd = walk(1);
-  if (fwd.closed) return { points: [...head, ...fwd.pts], closed: true };
+  if (fwd.closed) {
+    const ring = [...head, ...fwd.pts];
+    return { points: ring.map((q) => q.p), closed: true, pieces: piecesOf(ring, true) };
+  }
   const back = walk(-1);
   // Backward run reversed, then the start, then forward — one polyline in curve order.
-  const points = [...back.pts.slice().reverse(), ...head, ...fwd.pts];
-  return points.length > 0 ? { points, closed: false } : null;
+  const line = [...back.pts.slice().reverse(), ...head, ...fwd.pts];
+  return line.length > 0 ? { points: line.map((q) => q.p), closed: false, pieces: piecesOf(line, false) } : null;
 }
 
 
@@ -292,7 +410,7 @@ export function traceLocus(
  * locus, and «המקום הגיאומטרי של A» about a pinned `A` should say so rather than draw a dot.
  */
 export function hasLocus(raw: Construction, env: Env, id: Id, start: Map<Id, Pt>, seed = 0): boolean {
-  const c: Construction = { ...raw, constraints: resolveChoices(raw.constraints, choiceSeedOf(raw, seed)) };
+  const c: Construction = resolvedAt(raw, seed, choiceSeedOf(raw, seed));
   const sys = carrierSystem(c, env, { params: 'fixed' });
   if (sys.ids.length === 0) return false;
   const x0 = sys.toVec(start);
@@ -372,11 +490,32 @@ function distToPolyline(p: Pt, pts: readonly Pt[]): number {
   return best;
 }
 
+/**
+ * WHAT MAY BE DRAWN of the locus (#1817, ADR-AG-245) — the walked union, with every component the givens exclude
+ * entirely removed.
+ *
+ * The fit, the determinacy gate and discovery all ran on the WALKS (`walkedLocusOf`), because the equation belongs to
+ * the carrier curve and a short allowed arc can be too little of it to identify. What leaves this function is what
+ * the row names and the canvas draws, so a component with no admissible piece leaves both: a union whose second
+ * line the selectors rule out reads «ישר», not «שני ישרים». Nothing admissible anywhere is no locus at all.
+ */
 export function locusOf(
   c: Construction,
   id: Id,
   seeds: readonly [number, number] = [0, 1],
   bounds?: TraceOptions['bounds'],
+): LocusResult | null {
+  const walked = walkedLocusOf(c, id, seeds, bounds);
+  if (!walked) return null;
+  const components = walked.components.filter((cp) => cp.trace.pieces.length > 0);
+  return components.length > 0 ? { components } : null;
+}
+
+function walkedLocusOf(
+  c: Construction,
+  id: Id,
+  seeds: readonly [number, number],
+  bounds: TraceOptions['bounds'] | undefined,
 ): LocusResult | null {
   // One drawable figure per configuration — discovery and the gate visit the same seeds, so the
   // solves are shared rather than repeated.
@@ -455,7 +594,7 @@ export function locusOf(
     const first = traceLocus(c, f.env, id, start, { bounds: room, seed });
     if (!first || first.points.length < 2) return null;
     const comps = [first];
-    const resolved: Construction = { ...c, constraints: resolveChoices(c.constraints, choiceSeedOf(c, seed)) };
+    const resolved: Construction = resolvedAt(c, seed, choiceSeedOf(c, seed));
     const sys = carrierSystem(resolved, f.env, { params: 'fixed' });
     if (sys.ids.length === 0) return comps;
     const near = Math.hypot(room.maxX - room.minX, room.maxY - room.minY) / 100;
