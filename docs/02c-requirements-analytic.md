@@ -62,7 +62,7 @@ expected by heart. No hyperbola appears in twenty sampled exams.
   ([ADR-W-118](06w-decisions-workspace.md#adr-w-118) B5: *"we dont solve it for you means we dont show you
   step-by-step solutions"*).
 - **The technique trace explains, never plans** ([ADR-AG-062](06c-decisions-analytic.md#adr-ag-062), #1053; R84,
-  R100). *(Whether B5 changes this trace is not yet ruled.)*
+  R100). *(Ruled 2026-10-07: *"the tool shows what equation was used as a final step but not a step-by-step solution for how we got all numbers"* — the trace stays.)*
 - The tool grades nothing: there is no claim lane ([ADR-AG-072](06c-decisions-analytic.md#adr-ag-072); operator:
   *"I dont want a validation tool"*).
 - **The knowledge gate carries the whole honesty boundary:** a row prints a value only when it is knowledge (R3,

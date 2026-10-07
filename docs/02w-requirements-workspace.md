@@ -195,6 +195,63 @@ checked against the code on 2026-10-07.
   fact list, data panel); the portrait overlay of the data panel is gone. Tablets stay in scope and
   phones out of it (NFR-US-4, FR-SU-9).
 
+## Cross-builder behaviour — the one table (#1861, ruling B3)
+
+**This table is the single place to look up how a student-visible behaviour works in each builder.** The
+principles behind each row are in [docs/10](10-pedagogy.md). For plane geometry, 2-D is the reference
+for input **and** display (P12, [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B1). Every cell
+that differs from 2-D carries one of these statuses:
+
+| Status | Meaning |
+| --- | --- |
+| **Same** | Every builder behaves alike |
+| **Ruled** | A difference the operator decided (the ruling is cited) |
+| **Ruled change** | He has ruled; the code has not caught up; the issue is named |
+| **Gap** | A known difference with an open or parked issue |
+| **Open** | Not ruled. Ask him before building anything that touches it (CLAUDE.md rule 7) |
+
+Before building anything a student sees in a non-2-D builder, find its row. A new behaviour with no row is
+**Open**. Measured 2026-10-07 at `de335e5c`, from the audit's cross-tool pass and the code.
+
+| Behaviour | 2-D | 3-D | Analytic | Complex | Status |
+| --- | --- | --- | --- | --- | --- |
+| Plane-geometry sentence verdicts | reference | core families; most gaps parked | locked to 2-D | n/a (not plane geometry) | **Ruled** — ADR-W-108; 3-D parity parked (#1679, icebox; B15) |
+| Givens list: mute, edit, delete | shared list | same | same | same | **Same** |
+| Undo / redo | yes | yes | yes | yes | **Same** |
+| Letter popover and swap | yes | yes | yes | n/a | **Same** (ADR-W-105) |
+| Data-panel control | «חשב ערכים» button | «נתונים» checkbox | «הצג נתונים» | «נתונים» | **Ruled change** — one «נתונים» checkbox with a computing state (D4, #1871) |
+| A stated length on the figure | label | label | label | stated numbers plotted | **Same** |
+| A stated angle | arc with value or letter | arc | arc | n/a | **Same** |
+| A right angle | knee | knee | knee (also for an asked-for height) | n/a | **Same** |
+| A stated equality «AB = AC» at rest | nothing | nothing | ticks | n/a | **Ruled change** — nothing at rest anywhere (B2, #1805) |
+| The opt-in relations layer | yes (hover) | none | none | none | **Ruled** — 2-D only; not ported (operator, 2026-10-07: "no need to port this capability"). Elsewhere relations live in the givens list |
+| Parallel marks | none | none | none | n/a | **Same** |
+| The area label | «13» | — | «S=13» | — | **Ruled change** — «S=13» everywhere (B9, #1865) |
+| A computed value on the canvas | opt-in layer only | coordinates while the panel is open | a circle centre's coordinates when known | every plotted reading | **Ruled** — canvas = inputs (ADR-W-047); exceptions per docs/10 P5. **Ruled change**: complex (B6, D1, #1862); analytic foci and directrix (B7, #1863) |
+| Letter ↔ value chip | yes | yes | no | no | **Gap** — analytic #1725 (icebox); complex follows from B6 (#1862) |
+| «✓ הציור נקבע במלואו» | only when one figure fits | whenever nothing is free | whenever nothing is free | whenever nothing is free | **Ruled change** — 2-D's rule everywhere (B8, #1596) |
+| Note for a choice the tool made | yes | n/a | no | n/a | **Ruled change** — port to analytic (B10, #1864) |
+| «הציגו תצורה אחרת» wording | locked | same | same | same | **Same** (ADR-W-098) |
+| Two possible values | not shown | both, as S₁/S₂ | both, with «או» | withheld | **Ruled change** — both, with «או», everywhere (B12, #1867). Three or more: no value shown; the student cycles configurations (operator, 2026-10-07) |
+| "Not understood" refusal | «לא הצלחתי לקרוא את זה עדיין — נסו…» | «לא הצלחתי להבין את הנתון…» | «לא הצלחתי להבין את המשפט» | as analytic | **Ruled change** — 2-D's wording everywhere (B13, #1868) |
+| "The tool's limit, not your mistake" | no | yes | no | no | **Ruled change** — everywhere (B13, #1868) |
+| Student-text check (ADR-W-096) | no | yes | no | no | **Gap** — #1522 (icebox) |
+| Restated fact «כבר נובע…» | yes | yes | yes | no | **Gap** — #1565 |
+| Two points on one spot | refused or redrawn | same | same | not measured | **Same** for 2-D/3-D/analytic (ADR-W-066/072); complex **Open** |
+| A declared polygon forced flat | refused | refused | refused | n/a | **Same** (ADR-W-115) |
+| A proof target «הוכיחו כי» | refused | refused | refused | checked as a claim | **Ruled change** — refuse proof verbs, keep the bare-claim check (B14, D3, #1870) |
+| AI fallback for unread input | yes | yes | yes | none | **Ruled change** — build it (B14, #1869) |
+| Save, load, share link | shared | same | same | same | **Same** |
+| Image export | yes | yes | yes | yes | **Same** |
+| Question export «הורידו שאלה» | yes | yes | no | no | **Ruled change** — every builder (B16, #1872) |
+| Empty state | «מה בונים היום?» | same | its own title and hint | same as 2-D | **Ruled change** — shared title, analytic keeps its hint (B15, #1871) |
+| Hide a segment | menu, not undoable | no menu | menu, undoable | n/a | **Ruled change** — 2-D becomes undoable (B15, #1871); 3-D **Ruled** n/a |
+| Header, suite bar, About | shared frame | same | same | same | **Same** |
+| Language toggle and RTL | shared | same | same | same | **Same** (bidi: three kits held by one fixture) |
+| Commands panel / manual | shared | same | same | same | **Same** |
+| Symbol palette | shared core + extension | same | same | same | **Same** (drift tracked: #725, #1828) |
+| Theorem surfacing | engine only; surface off | none | formula trace | formula sheet in the panel | **Ruled** — off (#740, B4) |
+
 ## The data panel and the ask lane
 
 The pedagogy boundary of each product still governs *what* may be answered; these are promises about the

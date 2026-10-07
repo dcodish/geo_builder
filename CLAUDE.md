@@ -233,7 +233,7 @@ Start at [`docs/README.md`](docs/README.md). The ones you will actually need:
 [17-design-rules](docs/17-design-rules.md) (fixing without degrading the codebase — operator authority),
 [22-workflow](docs/22-workflow.md), [08-testing-strategy](docs/08-testing-strategy.md),
 [LADDER](docs/LADDER.md) (the solve-ladder contract; every mechanism ADR names its stage),
-[10-pedagogy](docs/10-pedagogy.md) (the operator's rulings in ADR-W-118 win where it differs), and the ADR logs.
+[10-pedagogy](docs/10-pedagogy.md) (the charter: read it before building anything a student sees), and the ADR logs.
 
 **Validation corpus:** `docs/sample questions/` holds real bagrut problems (text + image). The work is
 corpus-driven — we reproduce each *figure* (never solve it) and compare against the official image.
