@@ -178,6 +178,8 @@ export function errorText(error: InputError, t: Translate): string {
     'kind-mismatch': 'errKindMismatch',
     'does-not-exist': 'errDoesNotExist',
     'ring-contradicts-noun': 'errRingContradictsNoun',
+    // #1849 (ADR-AG-247) — the givens flatten a declared polygon: the polygon and both statements named
+    'polygon-collapsed': 'errPolygonCollapsed',
     'inscribed-contradicts-noun': 'errInscribedContradictsNoun',
     // #1407 — a vertex in SEVERAL shapes gets the three-letter name it needs; in none, the general form.
     // #1445 (ADR-AG-243) — several angles at the vertex: the refusal LISTS them.
@@ -239,6 +241,8 @@ export function errorText(error: InputError, t: Translate): string {
     definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '',
     // #1554 ruling 1 (ADR-AG-198): the two nouns, in each locale's spelling (the registry key is the Hebrew).
     shapeHe: 'shape' in error ? (error.shape ?? '') : '',
+    polygon: 'polygon' in error ? (error.polygon ?? '') : '',
+    declared: 'declared' in error ? (error.declared ?? '') : '',
     forcedHe: 'forced' in error ? (error.forced ?? '') : '',
     shapeEn: 'shape' in error ? enNoun(error.shape) : '',
     forcedEn: 'forced' in error ? enNoun(error.forced) : '',

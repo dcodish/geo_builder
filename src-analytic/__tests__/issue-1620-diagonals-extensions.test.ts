@@ -167,7 +167,9 @@ describe('#1620 — «המשכי הצלעות AD ו-BC נפגשים בנקודה
   });
 
   it('parallel sides have no crossing: refused on the line that says they meet', () => {
-    expect(faultsOf(['מרובע ABCD', 'AD ∥ BC', 'המשכי הצלעות AD ו-BC נפגשים בנקודה E'])).toEqual(['2:unsatisfiable']);
+    // Parallel lines meet only when they are ONE line, which puts all four vertices on it: the givens hold only on a
+    // flat quadrilateral, refused as that collapse (#1849, ADR-AG-247) on the same line.
+    expect(faultsOf(['מרובע ABCD', 'AD ∥ BC', 'המשכי הצלעות AD ו-BC נפגשים בנקודה E'])).toEqual(['2:polygon-collapsed']);
   });
 
   it('1/5: the inscribed quadrilateral and E(0,14) — D is where AE meets the circle, past D', () => {

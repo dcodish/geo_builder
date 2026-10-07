@@ -304,6 +304,11 @@ const he = {
   errInscribedContradictsNoun:
     '{{shapeHe}} לא יכול להיות חסום במעגל: "{{detail}}". מעגל שעובר דרך ארבעת הקודקודים הופך אותו ל{{forcedHe}}, ' +
     'ו{{forcedHe}} אינו {{shapeHe}}. אם הצורה היא {{forcedHe}}, כתבו «{{forcedHe}} ABCD חסום במעגל».',
+  // #1849 (ADR-AG-247, ADR-W-115) — the givens flatten a declared polygon. Names the refused sentence, the polygon
+  // and the sentence that declared it, and says WHY: a flat figure is not that noun. Never «לא נמצאה תצורה».
+  errPolygonCollapsed:
+    '"{{detail}}" משטיח את {{polygon}}: יחד עם הנתונים הקודמים הוא מחייב שהקודקודים ייפלו על ישר אחד, ' +
+    'וצורה שטוחה אינה {{shapeHe}} — כפי שקובע "{{declared}}". "{{detail}}" לא נוסף.',
   errRingContradictsNoun:
     'הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "{{detail}}". אפשר לשנות את סדר האותיות ' +
     'כך שהצלעות לא ייחתכו, או לשנות את השיעורים — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.',
@@ -725,6 +730,9 @@ const en: typeof he = {
   errInscribedContradictsNoun:
     'A {{shapeEn}} cannot be inscribed in a circle: "{{detail}}". A circle around it would make it a {{forcedEn}}, ' +
     'and a {{forcedEn}} is not a {{shapeEn}}. If the shape is a {{forcedEn}}, write "{{forcedEn}} ABCD is inscribed in a circle".',
+  errPolygonCollapsed:
+    '"{{detail}}" flattens {{polygon}}: together with the earlier givens it forces the vertices onto one line, ' +
+    'and a flat figure is not the {{shapeEn}} that "{{declared}}" declares. "{{detail}}" was not added.',
   errRingContradictsNoun:
     'The points you gave do not form that shape in this order: "{{detail}}". Reorder the letters so ' +
     'the sides do not cross, or change the coordinates — as written the vertices fall on one line or the shape folds over itself.',

@@ -216,7 +216,10 @@ describe('#1158/#1166 — a declared polygon is drawn as the ring its noun promi
     expect(d.figure.ringFaults).toEqual([
       { id: 'poly-ABC', noun: 'משולש', violation: 'degenerate' },
     ]);
-    expect(d.faults).toEqual([{ index: 0, code: 'ring-contradicts-noun', detail: 'משולש ABC' }]);
+    // #1849 (ADR-AG-247): a pinned FLAT ring is the givens flattening the polygon — `polygon-collapsed`, on the line that completed it («C(2,0)», line 3), naming the polygon and its declaring sentence.
+    expect(d.faults).toEqual([
+      { index: 3, code: 'polygon-collapsed', detail: 'C(2,0)', polygon: 'ABC', shape: 'משולש', declared: 'משולש ABC' },
+    ]);
   });
 
   /**

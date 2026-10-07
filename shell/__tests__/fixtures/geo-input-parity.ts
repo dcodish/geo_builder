@@ -663,9 +663,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1849 (operator ruling 2026-10-07, ADR-W-115; 3-D ADR-3D-310) — a DECLARED polygon the givens force flat is
   // refused on the line that completes the collapse, in every builder: "a flat line is not a triangle". The 2-D
   // gap is this issue's own 2-D stream (today 2-D builds it flat with ADR-W-048's notice); it closes there.
-  { id: 'flat-polygon-1849-538', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1849' }], note: '5 + 3 = 8: only a flat triangle' },
-  { id: 'flat-polygon-1849-538-rev', family: 'lengths', steps: ['משולש ABC', 'AC = 8', 'BC = 3', 'AB = 5'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1849' }] },
-  { id: 'flat-polygon-1849-448', family: 'lengths', steps: ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1849' }] },
+  { id: 'flat-polygon-1849-538', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', note: '5 + 3 = 8: only a flat triangle' },
+  { id: 'flat-polygon-1849-538-rev', family: 'lengths', steps: ['משולש ABC', 'AC = 8', 'BC = 3', 'AB = 5'], expect: 'refused' },
+  { id: 'flat-polygon-1849-448', family: 'lengths', steps: ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8'], expect: 'refused' },
   { id: 'flat-polygon-1849-coincide', family: 'polygons', steps: ['מרובע ABCD', 'AB מתלכד עם CD'], expect: 'refused', exception: 'X7', note: 'two sides of one quadrilateral on one line (T31); «מתלכד» is 3-D vocabulary (X7)' },
   { id: 'flat-polygon-1849-thin-control', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.9'], expect: 'builds', note: 'thin but a real triangle — the control' },
   { id: 'incircle-in', family: 'inscribed', steps: ['משולש ABC', 'במשולש ABC חסום מעגל'], expect: 'builds', exception: 'X8' },
@@ -1092,13 +1092,21 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'coordinate-restriction-param-control-1832', family: 'topic', steps: ['y = ax + 1, a > 0'], expect: 'builds', exception: 'X2', note: 'a genuine parameter keeps its domain' },
   { id: 'letter-bound-x-1832', family: 'lengths', steps: ['משולש ABC', 'AB = 3x', 'x > 2'], contextFor: { analytic: ['y = 2x + 1'] }, expect: 'builds', exception: 'X10', knownGap: [{ product: '3d', issue: '#1679' }], note: "2-D bounds its length letter x; in analytic x is the plane's coordinate, so the bound is refused (#1832)" },
   // #1849 (ADR-W-115, operator ruling 2026-10-07): a DECLARED polygon the givens force flat is REFUSED in every builder — a flat line is not a triangle
-  { id: 'flat-triangle-1849', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1849' }], note: 'T30: 5 + 3 = 8, the only drawing is a line' },
-  { id: 'flat-triangle-reversed-1849', family: 'lengths', steps: ['משולש ABC', 'AC = 8', 'AB = 5', 'BC = 3'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1849' }] },
-  { id: 'flat-triangle-isosceles-1849', family: 'lengths', steps: ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1849' }] },
-  { id: 'flat-triangle-ratio-1849', family: 'lengths', steps: ['משולש ABC', 'AB : BC = 5 : 3', 'AB : AC = 5 : 8'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1849' }], note: 'the ratio form of 5·3·8' },
-  { id: 'flat-quadrilateral-lengths-1849', family: 'lengths', steps: ['מרובע ABCD', 'AB = 1', 'BC = 1', 'CD = 1', 'AD = 3'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1849' }] },
+  { id: 'flat-triangle-1849', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', note: 'T30: 5 + 3 = 8, the only drawing is a line' },
+  { id: 'flat-triangle-reversed-1849', family: 'lengths', steps: ['משולש ABC', 'AC = 8', 'AB = 5', 'BC = 3'], expect: 'refused' },
+  { id: 'flat-triangle-isosceles-1849', family: 'lengths', steps: ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8'], expect: 'refused' },
+  { id: 'flat-triangle-ratio-1849', family: 'lengths', steps: ['משולש ABC', 'AB : BC = 5 : 3', 'AB : AC = 5 : 8'], expect: 'refused', note: 'the ratio form of 5·3·8' },
+  { id: 'flat-quadrilateral-lengths-1849', family: 'lengths', steps: ['מרובע ABCD', 'AB = 1', 'BC = 1', 'CD = 1', 'AD = 3'], expect: 'refused' },
   { id: 'thin-triangle-control-1849', family: 'lengths', steps: ['משולש ABC', 'זווית BAC = 3'], expect: 'builds', note: 'a thin triangle is still a triangle (ADR-413’s control)' },
   // end #1849
+  // #1849 (ADR-W-115, operator ruling 2026-10-07): givens that force a DECLARED polygon flat are refused in every builder,
+  // naming the statements — a flat figure is not a triangle. Analytic column (ADR-AG-247); the 2-D and 3-D streams close their gaps.
+  { id: 'flat-polygon-1849-01', family: 'polygons', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', note: '5 + 3 = 8: the only drawing is flat' },
+  { id: 'flat-polygon-1849-02', family: 'polygons', steps: ['משולש ABC', 'AC = 8', 'AB = 5', 'BC = 3'], expect: 'refused', note: 'the same lengths in the other order: the last one completes the collapse' },
+  { id: 'flat-polygon-1849-03', family: 'polygons', steps: ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8'], expect: 'refused' },
+  { id: 'flat-polygon-1849-04', family: 'polygons', steps: ['מרובע ABCD', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', note: 'B on the diagonal AC: the quadrilateral has a straight corner' },
+  { id: 'flat-polygon-1849-05', family: 'topic', steps: ['משולש ABC', 'A(0,0)', 'B(1,1)', 'C(2,2)'], contextFor: { '2d': ['משולש ABC'] }, expect: 'refused', exception: 'X1', only: ['analytic'], note: 'coordinates that put the vertices on one line — never drawn flat; 2-D refuses the coordinate itself (X1)' },
+  { id: 'flat-polygon-1849-06', family: 'polygons', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.9'], expect: 'builds', note: 'control: thin but a real triangle' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
