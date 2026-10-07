@@ -1366,6 +1366,31 @@ also that this fit is **not** `conic.ts`'s exact six-coefficient solve, which ta
 probes of a *known* equation; a cloud needs least squares plus a canonicity check, and a traced ray
 will fit happily as a full line.
 
+### The trace honours the givens: the walk is judged, the pieces are drawn ([ADR-AG-245](06c-decisions-analytic.md#adr-ag-245), #1817)
+
+The walk is a second producer of positions — the only renderer that paints MANY positions of a point
+— so it passes every step through the validity the one drawn configuration passes. `evaluate.ts`
+exports the two halves and the walk calls them, never a copy: `resolvedAt` (the per-seed resolution
+`evaluate` itself uses — constraint choices, region choices, cycled crossing pairs) and `admissibleAt`
+(`selectorsHold` plus the hard ring faults of `ringFaultsOf`, over the positions the step already
+computed).
+
+- **The walk is unchanged.** It runs to the room, to closure or to the budget; an inadmissible step is
+  recorded and does not end it, so an allowed set of two rays («MA > 5») is reached on both sides.
+- **`LocusTrace` carries both:** `points` (the walk) and `pieces` (its admissible stretches). Each
+  boundary is refined by bisection on the carrier vector, re-corrected with `solveLM` (≤ 6 solves per
+  crossing); a closed walk whose allowed arc runs across its start joins last piece to first.
+- **The fit, the determinacy gate and discovery's duplicate test read the walk.** The equation belongs
+  to the carrier curve, and a short allowed arc can be too little to identify; deduping against pieces
+  would make every probe landing in an excluded stretch pay a full walk.
+- **The drawing reads the pieces.** `locusOf` drops a component with no admissible piece (from the
+  drawing and the row); the ask lane hands each component to the canvas as one entry whose `starts`
+  lift the pen across excluded stretches, so a component cut in two is still ONE part of the answer
+  with one label. The row text is unchanged — it never prints a piece's extent.
+- A one-sided constraint bound (ADR-AG-178's hinge rows) already ends the walk at its kink inside the
+  corrector; measured on the bounded crossing «…וחותך את הצלע AB בנקודה F», the walk ends at A and B
+  with no stalled steps, so the clip adds nothing there.
+
 ### It rides the ask lane, and widens one field
 
 «המקום הגיאומטרי של P» is an ask sentence, so the lane of "The ask lane" and the record/view

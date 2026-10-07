@@ -108,7 +108,7 @@ export const drawnMarks = (rows: readonly Answer[]): Array<{ from: { x: number; 
  */
 export const drawnLoci = (
   rows: readonly Answer[],
-): Array<{ points: Array<{ x: number; y: number }>; closed: boolean; label?: string }> =>
+): Array<{ points: Array<{ x: number; y: number }>; closed: boolean; starts?: number[]; label?: string }> =>
   rows
     .filter((a) => a.locus && a.shown !== false)
     // One drawn curve per CONNECTED COMPONENT (#1500). A single-component locus keeps the row's
@@ -117,6 +117,7 @@ export const drawnLoci = (
       a.locus!.components.map((cp, i) => ({
         points: cp.points,
         closed: cp.closed,
+        ...(cp.starts ? { starts: cp.starts } : {}),
         label: cp.label ?? (i === 0 ? (a.value ?? undefined) : undefined),
       })),
     );

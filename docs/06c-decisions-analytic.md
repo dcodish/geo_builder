@@ -2158,6 +2158,7 @@ which is a mechanism rather than a rule. [#1060](https://github.com/dcodish/geo_
 (axis tangency) depends on the same thing.
 
 **Consequences.** `src-analytic` +7 tests.
+
 ## ADR-AG-032 — A CARRIER is not a stated object (#1076)
 
 **Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-029](#adr-ag-029) (#1073) ·
@@ -2220,6 +2221,7 @@ boundedness ruling intact through the widening.
 **Consequences.** `src-analytic` 337 → 343 tests. «y=x²» is still refused `out-of-scope` — a
 translated conic, outside ADR-AG-005's four-family scope, and an honest refusal rather than
 anything this changed.
+
 ## ADR-AG-033 — The segment NOUN is optional, and naming a segment INTRODUCES its endpoints (#1074)
 
 **Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-013](#adr-ag-013) (declaration vs reference) ·
@@ -2260,6 +2262,7 @@ that ADR-AG-013 had already drawn this line correctly and filed segments on the 
 **Consequences.** «EF» on an empty figure introduces two 2-DOF vertices and draws the segment —
 dof 4, the figure movable under «הציגו תצורה אחרת», exactly as «משולש ABC» behaves. `src-analytic`
 343 → 349 tests.
+
 ## ADR-AG-034 — A QUADRANT is a region, and a region SEEDS rather than filters (#1071)
 
 **Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-011](#adr-ag-011) (#1033, the half-axis) ·
@@ -2362,6 +2365,7 @@ coordinates printed as if they were given.
 **Consequences.** `src-analytic` 714 → 720 tests. The mark appears for every drawn circle, including
 one the student stated bare; a CARRIER circle (ADR-AG-032) has no mark because it has no outline
 either.
+
 ## ADR-AG-039 — A shape's vertices are DISTINCT, and that is a region rather than a given (#1077)
 
 **Status:** accepted, 2026-09-15 · **Fixes a defect in** [ADR-AG-035](#adr-ag-035) ·
@@ -4573,6 +4577,7 @@ So one key, used by every comparison site (`namesOption`, the duplicate absorb, 
 **Counter-direction, asserted:** a parallelogram's pair is a real given, so restating it is still absorbed as «כבר ידוע» — a fix that made every parallel record would have swapped one dishonest message for another.
 
 **Consequences.** `assumed?: true` on the `relation` constraint, `canonicalConstraint`/`sameConstraint` (`solve.ts`), `assumedParallel` + `displacedAssumption` (`shapes.ts`), one arm in `apply.ts`, one in `decideSubmit`. `issue-1159-trapezoid-pair.test.ts` (12). Analytic lane 81 files / 1237 tests — none of `options`, `named-shape`, `shapes`, `lowering`, `panel` moved, which was this issue's stated escalation trigger.
+
 ## ADR-AG-083 — A constraint's CURVE references are checked like its point references (#1150 + #1145)
 
 **Requirements:** [02c](02c-requirements-analytic.md) — none added; this restores an existing promise (the honesty invariant: a given parses to a constraint, escalates, or errors, but never vanishes). **Design:** [04c](04c-design-analytic.md) — *the apply boundary's reference check*. **LADDER stage:** the apply boundary, beside the point-reference refusal it completes.
@@ -4683,6 +4688,7 @@ Sign is not normalised: `-4x + 3y = 0`, exactly as the ruling wrote it. A conven
 **Four sentences, written out, not one templated noun.** Hebrew gender carries through the whole clause — «הנקודה … הוגדרה» against «הישר … הוגדר» — so slotting a noun into one sentence would be wrong in three cases of four. An anonymous curve (`curve-<hash>`) gets the **kind-free** wording: it has no name the student wrote, so no noun would be true.
 
 **Consequences.** `fractionClearingFactor` (`format.ts`), one scaling in `lineText`; `RefKind`/`refKindOf`/`unknownRef` (`apply.ts`), `expected` threaded through `derive` → `submit` → the store, four locale strings per language. `issue-1180-1179-equation-and-noun.test.ts` (14) — asserting the **rendered** sentence through the real locale, because a key that exists proves nothing about what a student reads. Analytic lane 84 files / 1278 tests.
+
 ## ADR-AG-086 — A locus is traced at the configuration being SHOWN, and a neighbour it cannot measure is skipped (#1176)
 
 **Requirements:** [02c](02c-requirements-analytic.md) R87 — unchanged in what it promises; this is the implementation failing to keep it. **Design:** [04c](04c-design-analytic.md) — *the locus lane*. **LADDER stage:** the ask lane's read of the figure.
@@ -5324,6 +5330,7 @@ The component renders it with **`slopeVertical`, the string the «שיפועים
 ### The field exists for the next one
 
 `fact` is a union with one member today. [#1227](https://github.com/dcodish/geo_builder/issues/1227) is already queued behind it: the locus of a DETERMINED point is that point, or a finite set of points, and it currently returns the same `null` with the same false message. It joins this union rather than growing a parallel mechanism.
+
 ## ADR-AG-099 — A sweep that closes a class must match the word's other form (#1214, amends ADR-AG-092)
 
 **Requirements:** [02c](02c-requirements-analytic.md) **R99** — a heading names what its rows ARE, in the student's own word; extended from the section heading to the labels inside it. **Design:** [04c](04c-design-analytic.md) — the curve row. **LADDER stage:** display only.
@@ -5362,6 +5369,7 @@ The tooltip names no kind, so it needs no fourth string and cannot reintroduce t
 ### The operator's own example cannot happen yet
 
 «נתוני הישר» will not appear: a line returns no `details` and renders no disclosure (ADR-AG-097, asserted at T23). The three kinds that fold are circle, parabola and ellipse. [#1219](https://github.com/dcodish/geo_builder/issues/1219) would give a line a fold, and the table gains its fourth entry then — which is why the lock is written against `curveParts` rather than a hardcoded three.
+
 ## ADR-AG-100 — The input preview typesets what it previews, and isolates before it does (#1215)
 
 **Requirements:** [02c](02c-requirements-analytic.md) — mathematics is typeset wherever it is shown (the #1097/#1208 rule), extended to the input preview; no new row. **Design:** [04c](04c-design-analytic.md) — the input area's preview seam. **LADDER stage:** display only.
@@ -5404,6 +5412,7 @@ The bidi previewer stays as the fallback and is not the lesser path: `hasMath` i
 ### A brittle lock, widened rather than deleted
 
 `bidi-wiring.test.ts` matched a seam with `\{[^}]*`, which stops at the FIRST `}` — so the moment the expression contained nested JSX (`<MathText text={s} />`) it went red on a change that kept the wiring it guards. A matcher that cannot survive a legitimate edit to the thing it protects will be deleted by whoever hits it next, so it counts braces now. The rule it encodes was right and is untouched.
+
 ## ADR-AG-101 — «Another configuration» compares the whole figure, not only its points (#1220)
 
 **Requirements:** [02c](02c-requirements-analytic.md) — «הציגו תצורה אחרת» reaches every configuration the givens allow; no new row. **Design:** [04c](04c-design-analytic.md) — the configuration search's sameness test. **LADDER stage:** configuration search; no engine or solve change.
@@ -5441,6 +5450,7 @@ The *message* is what makes this wrong rather than merely unhelpful. This functi
 ### The anti-lock matters as much as the fix
 
 A fix that loosened this until everything differed would trade a button that never moves for one that always claims success. `src-analytic/__tests__/issue-1220-curve-configuration.test.ts` (6) therefore asserts both directions: the operator's parabola finds another configuration **and `p` actually differs there**, while a fully stated triangle still answers `found: false`, and a stated line does too — which is the normalisation guard read from the other side.
+
 ## ADR-AG-102 — The working states its intermediate, and each statement gets a row (#1221, amends ADR-AG-094)
 
 **Requirements:** [02c](02c-requirements-analytic.md) **R100** — the working is shown and can be folded; this adds that it must be *complete*. **Design:** [04c](04c-design-analytic.md) — the technique traces. **LADDER stage:** display only.
@@ -5477,6 +5487,7 @@ Split rather than `white-space: pre-line`, deliberately: each row is then typese
 - **«y - (0)» is gone.** Pre-existing and surfaced by this work: the bracket around `a.y` was chosen by **`b.y`**'s sign, so `A(0,0)`, `B(3,-6)` printed `y - (0)`. A zero is never bracketed; a genuine negative still is.
 
 `techniques.test.ts`'s #1053 assertion was updated rather than worked around — it is the lock for the behaviour this ADR changes, and it now records why (it injects `fmtNum`, so it reads `1.33` where the product reads `4/3`).
+
 ## ADR-AG-103 — A figure the student BUILDS is visible, not only one they open (#1225, amends ADR-AG-096)
 
 **Requirements:** [02c](02c-requirements-analytic.md) **R101** — extended from *opens* to *builds*. **Design:** [04c](04c-design-analytic.md) — the canvas view's lifetime. **LADDER stage:** view state; no engine, solve or display change.
@@ -5522,6 +5533,7 @@ after a fact changes the box     0/8       8/8      ← the defect, and the fix
 A unit test cannot reach `App.tsx`'s view state (no extracted component — the constraint ADR-AG-094 and ADR-AG-096 both record), so `issue-1225-view-follows-figure.test.ts` (6) locks the PREDICATE, including the anti-lock that a zoom onto the figure's centre survives, and the ADR carries the driven measurement.
 
 One belief this corrected on the way: a figure that merely GROWS is not a failure mode, because `viewBox` takes its half-extents from the current figure — at zoom 1 a grown figure still fits. What hides it is a stale centre or a stale zoom. A first draft of the lock asserted otherwise and would have frozen a false belief into the suite.
+
 ## ADR-AG-104 — A coordinate the student wrote is shown, even when it is not a number (#1226)
 
 **Requirements:** [02c](02c-requirements-analytic.md) — honesty: everything the student stated is visible on the figure; no new row. **Design:** [04c](04c-design-analytic.md) — the point row's open form. **LADDER stage:** display only; nothing is computed that was not computed already.
@@ -5848,6 +5860,7 @@ The negative controls are the half that matters: every well-formed spelling in b
 `issue-1231-degenerate-role.test.ts` (27). Analytic lane green.
 
 **Sequencing note for what follows:** #1222 and #1165 widen this same rule (the apex-fronted form, cevians by triangle, the angle bisector). They must be built **on top of** this gate — porting 2-D's cevians without it would carry 2-D's own missing altitude gate into this tree.
+
 ## ADR-AG-111 — The noun decides the extent, and a bounded one draws only the segment (#1236 + #1234)
 
 **Requirements:** [02c](02c-requirements-analytic.md) R6 (amended) — «משוואת …» accepts every noun that names a straight object, and the noun states what is drawn. **Design:** [04c](04c-design-analytic.md) — the equation rule's noun registry, and the fold's extent resolution. **LADDER stage:** parse (recognition + extent) and the fold (the inherited extent). No solver or renderer change. **Extends** ADR-AG-019 / ADR-AG-023 / ADR-AG-060; **cites** the `stated: false` carrier convention (#1076).
@@ -6066,6 +6079,7 @@ A second flag (`drawn` beside `listed`) was considered and **rejected**: it woul
 ### Consequences
 
 `app/panelRows.ts` (new — the decision and its docblock), `App.tsx` (calls it).
+
 ## ADR-AG-115 — A described position is named by the point that occupies it, never by an invented letter (#1167)
 
 > **Amended by [ADR-AG-184](#adr-ag-184)** (#1270, operator 2026-09-20): a CANONICAL circle's centre is a real point `O` the tool declares, unless a letter is already there — so the "no letter at all" row below now holds for a non-canonical circle.
@@ -6118,6 +6132,7 @@ Every assertion on the **equation** — what that file exists to guard — is un
 ### Consequences
 
 `engine/crossings.ts` (`pointAt` extracted, `centresOf` calls it), `app/curveText.ts` (the four sites ask instead of inventing), `App.tsx` (supplies the figure's answer).
+
 ## ADR-AG-114 — A noun gate may not claim a tail that is not an equation (#1246)
 
 **Requirements:** none (internal) — no promise changes; a refusal stops naming the wrong thing. **Design:** [04c](04c-design-analytic.md) — `matchCurve`'s claim gate. **LADDER stage:** parse. No engine, solver or render change. **Completes** the #1059 guard; **repairs** a regression of [ADR-AG-111](#adr-ag-111).
@@ -6752,6 +6767,7 @@ A student writing a sentence is refused; the same student writing the symbolic f
 **Measured after.** Every copula spelling builds the identical figure to its `=` twin. Every bound — «גדול מ», «קטן מ», «לפחות», «לכל היותר», `>`, «פי 2» — is still not an equality and still commits no `AB = 10`. «AD הוא תיכון לצלע BC», «M הוא אמצע AB», «שיפוע AB הוא 2», «הישר l1 הוא y=2x+1» are all still read by their own rules, and both area readings are exactly what they were before.
 
 **Consequences.** `src-analytic/parser/parseAnalytic.ts` (+`COPULA_WORDS`, `HE_IS` derived from it, `LENGTH_EQ` widened, the precedence guard). `issue-1260-length-copula.test.ts` (39): the copula spellings asserted as EQUAL to the `=` form rather than as spelled-out expectations, on the parse and on the built figure; #1128's spelling table finished with a copula; the six bound rows as the #1248 regression, one tree over; the four neighbouring rules; and the area guard from both sides — the polygon declaration kept, and #1075's area term not taken. `shell/__tests__/length-copula-parity.test.ts` (14) is the drift net the duplication needs: it reads each tree's real pattern out of its source and runs it, so the two trees cannot come to disagree about what "is" means. The vocabulary is duplicated rather than shared because the `lexicon` layer's cross-product sharing is recorded UNDECIDED in `BOUNDARIES.json` (ADR-W-003), and `shell/` may not import a product tree in any case (ADR-W-016 rule 2).
+
 ## ADR-AG-128 — The configuration search PREFERS spread, it does not merely accept validity (#1174)
 
 **Status:** accepted, 2026-09-20 · **Issue:** #1174 (bug, P2, `analytic`) · operator reports 2026-09-17, twice, on two different figures · round #1292
@@ -6787,6 +6803,7 @@ otherwise = selectors hold           → the existing fallback
 **Measured after.** Seed 0 opens on 25.4° · 19.7° · 15.9°, and all of seeds 0–7 clear 15° on all three figures. A pinned 1°-triangle («A(0,0)» «B(10,0)» «C(5,0.1)» «משולש ABC») is still drawn, unmoved and without a fault — the preference never becomes a requirement. «הציגו תצורה אחרת» still walks **ten distinct configurations** in ten presses on each free figure, and a determined figure still answers honestly that there is no other one: the preference narrows what may be shown without collapsing the variety, which is the #1282 failure this could otherwise have reproduced.
 
 **Consequences.** `engine/rings.ts` (+`minInteriorAngleOf`, +`SPREAD_MIN_DEG`); `engine/evaluate.ts` (`drawableAt` gains the opt-in parameter, a mode-keyed cache and the fourth tier); `engine/derive.ts` (one call opts in). `issue-1174-spread-preference.test.ts` (16): the three figures well-spread at every one of the first eight starts; **the un-preferred sweep asserted to still find the sliver**, so the lock cannot go vacuous if a later change happens to make seed 0 pretty on its own; the forced sliver still drawn; the gate's default asserted to be the un-preferred answer and a free coordinate still reported unknown; and the variety measured as distinct pictures rather than as a seed list.
+
 ## ADR-AG-129 — A pinned ring that contradicts its noun is REFUSED, not silently drawn (#1170)
 
 **Status:** accepted, 2026-09-20 · **Issue:** #1170 (bug, P2, `analytic`) · operator ruling 2026-09-17 · round #1292
@@ -6820,6 +6837,7 @@ decideSubmit(…)    record                                                     
 **Three locks moved, deliberately.** Two are named `#1170 boundary` in `issue-1158-1166-polygon-noun-validity.test.ts` and were written in as many words for this moment — *"when it lands, this line is what changes"*; their `ringFaults` half is untouched and only the `faults` line moves, from silence to the refusal. The third, `derived.test.ts`'s *"but ABDC is a DIFFERENT quadrilateral"*, keeps its claim and changes its **fixture**: it pinned four points in convex position, where only one cyclic order is a simple ring, so once a pinned crossed ring is refused the figure could no longer reach the eight sides that lock is about. Its points now put `D` inside triangle `ABC`, where `ABCD` and `ABDC` are both simple — the identity claim tested on its own rather than through a ring the tool declines — and a companion row states the other half explicitly: a reordering that crosses is refused, not merged away.
 
 **Consequences.** `engine/apply.ts` (+the code), `i18n/index.ts` (+he/en), `App.tsx` and `store/useAnalyticStore.ts` (+the mapping), `engine/derive.ts` (the arm, and the note in its old slot). `issue-1170-pinned-ring-refused.test.ts` (9): his own figure on both surfaces, the intended concave quad as the counter-direction, both members of the ruling, the single-message reconciliation, and the freedom gate asserted with the precondition that makes it non-vacuous.
+
 ## ADR-AG-130 — The crossing module judges degeneracy RELATIVELY (#1235)
 
 **Status:** accepted, 2026-09-20 · **Issue:** #1235 (bug, P3, `analytic`) · split from the 2026-09-19 spurious-ring report · round #1292
@@ -8032,6 +8050,7 @@ The pre-played sheet (20 cases, 8 red) and the operator ruling of the same day. 
 **Deliberately not built.** «נתון כי …» (the analytic-wide «נתון כי» opener gap — not tangency's). A touch point on a LINE or axis tangency («מעגל M משיק לציר ה-x בנקודה T») — declined, not dropped; its own capability. «המעגלים משיקים לציר ה-x» without names (which circles?) — declined.
 
 **Consequences.** `parser/parseAnalytic.ts` (`readCircleSubject`, `peelMods`, `TANGENT_BRANCH`, `parseCircleAt` rewritten; the separate subject regexes gone), `engine/derived.ts` (`touch-point`, `curveParentsOf`, `touchPoint`), `engine/sameDerivation.ts`, `engine/apply.ts` (`at`, two-curve existence check), `engine/solve.ts` (concentric floor, `describeRule`, curve refs), `engine/types.ts` (`inDomain` floor, `tangent-circles.at`), `engine/evaluate.ts` (`openBoundFloor`, `spanOf`), `app/submit.ts` (restated-centre hint), `parser/catalogAnalytic.ts` (two rows, not featured). Lock: `issue-1504-circle-tangency.test.ts`.
+
 ## ADR-AG-168 — One curve-operand resolver: named, contextual, equation and plural spellings of «on» and «crossing» (#1429)
 
 **Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1510. Numbered 168 because 167 was minted the same day on `feat/1504-circle-tangency`.
@@ -8045,6 +8064,7 @@ The pre-played sheet (20 cases, 8 red) and the operator ruling of the same day. 
 **Measured.** The issue's 18-row table green through real `parse → derive`; 23 locks (`issue-1429-curve-operand.test.ts`) including the identity arm both ways, the ambiguous refusals, #1175/#1255 unchanged, and no refusal containing `curve-anon`.
 
 **Consequences.** `parser/parseAnalytic.ts` (`incidenceOn` widened + delegation, `INTERSECT_JOIN`, `intersectionSpellings`, `withLineNoun`, `ROMAN_OF_DIGIT`), `engine/solve.ts` (`on-curve.eqSrc/eq`, canonical key), `engine/apply.ts` (`resolveCurveByEq`, the on-curve resolution step, `crossing-kind`), `engine/types.ts`, `parser/catalogAnalytic.ts`. Lock: `issue-1429-curve-operand.test.ts`.
+
 ## ADR-AG-169 — Radius, focus, directrix and perimeter: sayable and askable (#1432)
 
 **Status:** accepted · 2026-09-28 · external prod review relayed by the operator (2026-09-27) · round #1510. Numbered 169 beside the round's parallel branches (167 on `feat/1504`, 168 on `fix/1429`).
@@ -9321,6 +9341,7 @@ The 16/5 line «הצלע CB מקבילה לציר ה-x, וחותכת את ציר
 - The perpendicular bisector's tool-lettered midpoint has no naming form for the rename (`rename-not-typed`); naming it first («M אמצע AB») works.
 
 **Consequences.** `engine/derived.ts` (`foot`, `FootLine`), `engine/sameDerivation.ts`, `engine/solve.ts` (`describeRule`), `engine/types.ts` (`PerpRef`, `on-kind.foot`, `line-at.drawn`), `engine/apply.ts` (the `on-kind` perpendicular arm, the carrier upgrade, a foot's line-object parent, `HostRef` `perpendicular`), `engine/evaluate.ts` (a carrier is not stated), `engine/derive.ts` (`resolveMints` for a derived point), `parser/parseAnalytic.ts` (`parsePerpendicular`, `perpendicularRef`, `THROUGH_LINE_FIRST_HE`, the crossing tail, the «הקטע» relation operand, `RELATION_EN`), `parser/frameAnalytic.ts` (the piece shared subject; the «הקטע» noun kept), `app/rename.ts` (`namingCandidates`), `app/errorText.ts` + `i18n` (the perpendicular host), `parser/catalogAnalytic.ts` (ten entries). Sibling check (docs/17 §1): 2-D is the reference and has the foot, the perpendicular bisector and the hidden-line crossing; it lacks «… חותך אותה בנקודה D», «הישר העובר דרך … וחותך …», «E על האנך» and introducing F in «הקטע EF מקביל ל-AC» — recorded as #1677 rows; 3-D has no feet (#1679).
+
 ## ADR-AG-208 — An extension is a selector; named diagonals meet where they are named; the midsegment names its midpoints as 2-D does; «כך ש-» is a condition, never dropped (#1620 S3)
 
 **Status:** accepted · 2026-10-02 · slice C stream S3 (branch `feat/1620-s3-diagonals-extensions` off `feat/1620-construction-vocabulary` = `main` @ 92881500).
@@ -9355,6 +9376,7 @@ The 16/5 line «הצלע CB מקבילה לציר ה-x, וחותכת את ציר
 - 2-D's two defects above (#1682, #1683) — not mirrored.
 
 **Consequences.** `engine/types.ts` (`Selector.beyond`, `meet-of.noun` / `named`, the `vertices-on-axes` fact), `engine/solve.ts` (`Constraint.all`), `engine/evaluate.ts` (`beyondParam`, the judge, the seeding, `holds` reads `all`), `engine/apply.ts` (`meet-of`, `area-of`, `vertices-on-axes`, `not-a-diagonal`), `engine/shapes.ts` (`ringsNamed` refinements), `engine/derive.ts` (`resolveFresh`; a choice's blame through `all`), `parser/parseAnalytic.ts` (the extension rules, named diagonals, `parseDiagonalDecl`, `parseMidsegment`, `parseVerticesOnAxes`, `FRESH_PREFIX`, the concurrency head), `parser/frameAnalytic.ts` (`conditionClauses`), the catalog (ten rows), store / errorText / i18n (`not-a-diagonal`). Sibling check (docs/17 §1): 2-D is the reference and has every capability; its two honesty defects are filed (#1682, #1683). 3-D answers these sentences `not-handled` (#1679's parity scope).
+
 ## ADR-AG-206 — The exam's construction imperatives are taught as the sentence they build; the corpus counts what the student confirms (#1620)
 
 **Status:** accepted · 2026-10-02 · operator ruling 2026-10-01 on #1620 (*the exam's construction imperatives are taught, not accepted as typed — the ADR-W-030 pattern*) · stream S1 of slice C, branch `feat/1620-s1-imperatives` off `feat/1620-construction-vocabulary` @ 92881500.
@@ -9524,6 +9546,7 @@ Also measured: the S4 cevian foot was a FREE point plus constraints, so adding �
 **Not done.** The bare tail «… בנקודה K» (without «פוגש את הצלע») is not read — an earlier rule claims «X בנקודה K»; the rename never writes it. A student-NAMED cevian foot («AD גובה לצלע BC») is still a free point plus constraints (ADR-AG-109), so it can still move a free triangle (ADR-AG-209's open item, now confined to that path).
 
 **Consequences.** `engine/toolLetters.ts` (new), `engine/derive.ts` (`resolveFresh` removed, `resolveMints` coordinate-only, the minted filter), `engine/cevian.ts` (`toolFootRule`, `toolFootFacts`), `engine/types.ts` (`cevian-of.hypotenuse`, `.toolFoot`), `engine/apply.ts` (the `cevian-of` hypotenuse and tool-foot arms, two codes), `parser/parseAnalytic.ts` (`toolPoint` at the S2/S3/S4 sites, `FOOT_TAIL`, `TO_HYP`, the perpendicular bisector's tail; `FRESH_PREFIX` re-exported), `app/rename.ts`, `app/errorText.ts`, `i18n/index.ts`, `store/useAnalyticStore.ts`, `parser/catalogAnalytic.ts` (one row — diff the built proxy before deploy).
+
 ## ADR-AG-210 — A radius names an unnamed centre, a reference states the circle it names, and a bare relation mints its new letters — by 2-D's rule (#1670, #1686)
 
 **Status:** accepted · 2026-10-02.
@@ -9770,6 +9793,7 @@ Recommendation: (c) when the figure has a length variable x, else (b). Option (a
 - `parser/catalogAnalytic.ts`: 17 He/En entries (E1 carries the four sentences it lowers).
 - `ui/symbols.ts`, `i18n/index.ts`: the three chips.
 - `App.tsx`: the panel's parameter label.
+
 ## ADR-AG-219 — The circle and tangent sentences 2-D reads, and two fresh circles named by order (#1622 slice E3, #1693)
 
 **Status:** accepted · 2026-10-03 · slice E stream E3 (branch `feat/1622-e3-circles-tangents` off `feat/1620-construction-vocabulary` @ 5dab4a4a). Standing rulings applied, no new question asked:
@@ -10071,6 +10095,7 @@ Other locks touched:
 - Seven catalog rows, He and En.
 - The palette lock.
 - The 471 ratchet measures **254/263 lines · 38/46 questions** (from 251 · 35): 13/4, 14/4 and 23/4 fully land.
+
 ## ADR-AG-214 — The ratio of two measures and the area notation S_{…} are givens: one `length-eq`, no new solver (#1621 slice D, stream D1)
 
 **Status:** accepted · 2026-10-03.
@@ -10163,6 +10188,7 @@ The 16/5, 17/4, 18/4 and 20/4 lines already landed after slice C. This ADR locks
 - the corpus line by line: 6/5, 7/4 (refusal and notation), 16/5, 17/4, 18/4, 20/4.
 
 `symbols-module.test.ts`: the `S_{}` proof (totality-guarded), and its held row removed. Parity: the seven rows. **Fails before: 21 of 27.** The six that already passed are the four corpus questions that landed after slice C, the length ratio by «/», and the subscripted-name guard.
+
 ## ADR-AG-220 — Arcs are central angles on the resolved circle; a semicircle, a quarter circle and a sector are arcs drawn on a hidden circle; a diameter from a point names its far end (#1622 E4)
 
 **Status:** accepted · 2026-10-03 · stream E4 of slice E (#1622), branch `feat/1622-e4-chords-arcs` off `feat/1620-construction-vocabulary` @ 5dab4a4a. Standing rulings applied: analytic gives 2-D's verdict for plane geometry (operator 2026-10-02, #1649); the #1622 arc rows are PORTED, not excepted (operator 2026-10-02 on #1622); a reference states the named circle it names (ADR-AG-210); the tool's letters are 2-D's (ADR-AG-211); every unstated magnitude is a free DOF (ADR-052); a palette chip ships with its notation (ADR-AG-212, #1696).
@@ -10204,6 +10230,7 @@ The 16/5, 17/4, 18/4 and 20/4 lines already landed after slice C. This ADR locks
 - **Angle sums outside arcs** («∠A + ∠B = 180») are still `bad-equation`: `arc-sum` is over central angles only.
 
 **Consequences.** `engine/types.ts` (`arc` object + fact, `ArcDef`, `arc-of`, `arc-mid`, `sector`, `hidden` on `circle-at` / `circle-thru`), `engine/solve.ts` (`arc-sum`: refs, curve refs, describe, residual), `engine/carriers.ts`, `engine/evaluate.ts` (`arcOf`, `Figure.arcs`, hidden circles unstated), `engine/apply.ts` (`arc`, `arc-of`, `arc-mid`, `sector`, `arcHost`, `onCircle`, `unhidden`, `createdCircleFacts` generalising `touchedCircleFacts`), `engine/toolLetters.ts` (`end`, `diameter-end`), `app/rename.ts` (`diameterNamingCandidates`), `parser/parseAnalytic.ts` (`parseArcFamily`, first after the coordinate compare), `parser/catalogAnalytic.ts` (16 rows, not featured — the LLM vocabulary grows by them; the proxy bundles the catalogue, so diff the built proxy before deploy), `render/scene.ts`, `render/Figure.tsx`, `ui/symbols.ts` + `i18n` (`symArc`), `shell/__tests__/fixtures/geo-input-parity.ts`. Sibling check (docs/17 §1): 2-D is the reference; 3-D has no circles of this kind (X8).
+
 ## ADR-AG-217 — The shapes and points 2-D reads: a bare run, the regular and five-to-eight-sided polygons, a shape that states its size, a shape inscribed in a triangle, and the point forms (#1622 slice E1)
 
 **Status:** accepted · 2026-10-03 · stream E1 of slice E (#1622), branch `feat/1622-e1-shapes-points` off `feat/1620-construction-vocabulary` @ 5dab4a4a. Standing rulings applied, none new: *analytic gives the same experience as 2-D for plane geometry* (2026-10-02 — 2-D's verdict and its introduced points are the reference, its rules copied, never imported); *a point the student did not name takes 2-D's letter* ([ADR-AG-211](#adr-ag-211)); *a reference states the circle it names* ([ADR-AG-210](#adr-ag-210)); every unstated magnitude is a free DOF ([ADR-052](06-decisions.md#adr-052)); D7's three inequalities ([ADR-AG-005](#adr-ag-005)). The issue body's "not ported by design: unnamed auto-constructs" predates the ADR-AG-211 ruling and the 2026-10-02 parity ruling that put these rows on #1622 as gaps; the unlettered shape and line follow ADR-AG-211.
@@ -11436,3 +11463,32 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Consequences.** `engine/expr.ts` (`tokenize`, `INDEXED_LETTER_RE`, `INDEX_START_RE`); `engine/carriers.ts` (`INDEXED_TOKEN`); `parser/parseAnalytic.ts` (`measureValue` → `'declined'`, `unreadable` at fourteen sites); `shell/__tests__/fixtures/geo-input-parity.ts` (five rows); docs 02c R164, 04c.
 
 **Amended by [ADR-600](06-decisions.md#adr-600) (#1814, round #1845):** `INDEXED_TOKEN` is now the shared `shell/indexedName` `INDEXED_NAME_RE` (2-D is the second copy) — behaviour-identical except that a capital Greek letter («Α1») is an indexed name too and a Greek neighbour bounds the name like a Latin one. Measured: «∠ABC = Α1» and «שטח המשולש ABC = Α1» move from `bad-equation` (a refusal about a correctly spelled name) to the decline every other indexed name gets; the analytic tests (234 files) are unchanged.
+
+## ADR-AG-245 — The trace honours the givens: the locus walk judges every step with the configuration's own validity predicate (#1817)
+
+**Date:** 2026-10-07 · **Status:** accepted · fix-round #1845 (bug, P1), branch `fix/1817-locus-admissible`. #1817 `auto-ok` 2026-10-07 (audit comment on the issue). Replaces PR-0 of #1138's plan. #1138's plan pre-named **ADR-AG-244** for this content, but #1785 took 244 (round #1831), so this is 245 and #1138's PR-1 takes the next free id.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R87 — one paragraph: the locus is drawn only where the givens allow it; the row names the carrier and prints no extent. · **Design:** [04c](04c-design-analytic.md), "The locus lane" → "The trace honours the givens: the walk is judged, the pieces are drawn". · **LADDER stage:** none — the tracer's presentation stage only (`locus.ts` after each corrected step, and the ask lane's drawing). No solve-ladder stage changes; `evaluate`'s per-seed resolution is lifted into a function unchanged.
+
+**Context.** Operator, 2026-10-06: «נקודה B · B על הישר y = x · x_B > 1 · x_B < 3» showed B at (1.14, 1.14), inside the range, while «המקום הגיאומטרי של B» drew the line over x ∈ [−2.38, 3.50]. חורף 2024 with «שיעור ה-y של B חיובי» drew the whole parabola, lower half included.
+
+**Re-measured at pickup (tip `e17a7d1e`) — the plan's table reproduced exactly**, through `derive → ask`, counting drawn points that fail the stated region by independent arithmetic: the line 106/160 (selectors typed before the carrier, and the English spelling, the same), `x_B > 1` alone 92/160, חורף 2024 139/278 (both spellings), the circle with `y_A > 0` 34/68, `A ברביע הראשון` 51/68, `x_A > 1` 45/68, the bisector with `y_M > 0` 46/113, `MA < 3` 89/113, `MA > 5` 11/113 (one line across the gap), «D על הצלע AB» 92/113, and the derived midpoint downstream of it 206/227. The shown configuration obeyed every region; the trace obeyed none. The cause the plan names is what fires.
+
+**The class.** *A stated region (any D7 kind-2 selector: coordinate comparison, axis side, on-side `between`, sign or order of a measure, in-polygon, line-side, acute, …) about any point of the figure is enforced on the one configuration `evaluate` draws, but not on the set of positions the locus walk paints.* `traceLocus` is a second producer of positions: it resolved the constraint choices but never the selectors, and its only admission test was the walk room.
+
+**Decision (docs/17 M3 — the same walk, filtered; no new sampler).**
+1. `evaluate.ts` exports **`resolvedAt(raw, seed, choiceSeed)`**, the resolution `evaluate` applies (constraint choices, region choices, cycled crossing pairs). `evaluateUncached` now calls it instead of inlining it, and the tracer, `hasLocus` and discovery call it in place of their own `resolveChoices` spread. It also exports **`selectorsHold`** (the one reading of `failingSelectors`; the solve's `selectorsHoldAt` calls it) and **`admissibleAt(c, pos, env)`** = `selectorsHold` ∧ no hard ring fault of `ringFaultsOf` at those positions. `isHardRingFault` is shared with `hardRingFaults`, which `admittedFigure` reads. Called, never copied.
+2. **`traceLocus` judges every corrected step** on the positions the step already computed. The walk itself is unchanged: an inadmissible step is recorded and does not end it. `LocusTrace` gains **`pieces`**, the admissible stretches of the walk. Each boundary is refined by **bisection** on the carrier vector with `solveLM` re-correction (`BISECT_STEPS` = 6 per crossing). On a closed walk, the arc across the start is joined into one piece. `points` stays the walk (the plan's `walk`; the name is kept so the #1137/#1500 locks run unedited).
+3. **The fit, the determinacy gate and discovery's duplicate test keep reading the walk.** The equation belongs to the carrier; a short allowed arc can be too little to identify (ADR-AG-072 §9's 23° arc); and deduping against pieces would make every probe in an excluded stretch pay a full walk. `locusOf` (now a thin filter over the private `walkedLocusOf`) **drops a component with no admissible piece**, so it leaves the drawing and the row alike.
+4. **The ask lane draws the pieces.** There is still one answer component per locus component. Its `points` are its pieces end to end, and **`starts`** gives the indices where a new stroke begins. `drawnLoci` carries `starts`, and `scene.ts` emits a fresh `M` there (one SVG path, pen lifted). So a component the region cuts in two («MA > 5») is still one part of the answer, labelled once. The #1500 union also keeps exactly two components where its triangle collapses at G = O: a one-step gap at the degenerate point, which is no triangle.
+5. **The row is unchanged** (the plan's option (a); no ruling was given by pickup). It names the carrier and prints its equation; nothing derived from a piece's extent is printed. Whether the kind word should mark a part («חלק מישר», option (b)) stays the plan's open question, a two-line follow-up.
+
+**Measured after** (same probes): every case 0 bad points. The line: x ∈ [1.00, 3.00], one stroke, ends within 1e-3 of the box diagonal of x = 1 and x = 3. חורף 2024: y ∈ (0, 10.20], «פרבולה · y² = 8x». The circle: the quadrant is one arc, `y_A > 0` the semicircle, `x_A > 1` one arc across the start. «D על הצלע AB»: x ∈ [0, 4]; N: x ∈ [0, 2]. `MA < 3`: |y| ≤ 2.22. `MA > 5`: two strokes, |y| ≥ 3.03, row «ישר · x - 4 = 0». Unrestricted figures (the bisector, the circle on diameter AB, חורף 2024 without the selector; seeds 0–2) are byte-identical to `main`: same rows, same point counts and extents. **Risk 4 measured:** the bounded crossing «הישר העובר דרך הנקודה E מקביל לציר ה-y וחותך את הצלע AB בנקודה F» (ADR-AG-178's hinge) already ends the walk at A and B with zero stalled steps; the clip adds nothing there and the hinge is untouched.
+
+**Perf (docs/17 §7).** `admissibleAt` is O(selectors + polygons) per step on positions already computed; bisection costs ≤ 6 solves per boundary crossing; discovery adds no walks. `ask` on חורף 2024, median of 12 runs back to back on one machine: **50.5 → 51.3 ms**; with «שיעור ה-y של B חיובי» **41.3 → 42.5 ms**; the line with two selectors 2.3 → 2.3 ms; `MA > 5` 2.7 → 3.1 ms.
+
+**Sibling audit.** Every other analytic renderer draws one configuration (`evaluate` → `drawableAt`, validity-filtered) or reads the admitted pool (ADR-AG-197); the trace was the only producer of many positions. 2-D and 3-D have no locus tracer (grep: vocabulary only, in `src/parser/parse.ts` and `src/theorems/table.ts`) — class absent. Complex draws a constant-modulus circle and has no restriction grammar: `Re z > 0`, `Re(z) > 0`, `Im z > 0` and `|z| = 2, Re z > 0` all answer `not-handled` (a visible refusal; nothing is silently dropped) — class absent; its locus lane is #681. ADR-W-108 is not engaged (no sentence's reading changes). The parser-side sibling the triage found (a restriction on a stated CURVE read as a parameter domain on `x`/`y`) is a different mechanism, in #1832's lane, and is not touched here.
+
+**Locks.** `src-analytic/__tests__/issue-1817-trace-honours-givens.test.ts` — the plan's eight, every assertion a property checked by independent arithmetic through `derive → ask` / `locusOf`: (1) the line in three spellings (as typed, selectors first, English), one stroke, ends refined; (2) חורף 2024 in both spellings, plus the both-halves guard without the selector; (3) the circle: quadrant, semicircle, the wrap-join across the start; (4) «D על הצלע AB» and the derived midpoint; (5) `MA > 5`: two strokes in one component, the walk crossing the gap, the renderer handed the lift; (6) `MA < 3`; (7) seeds 0–5 for (1) and (2); (8) unrestricted figures: pieces = the walk, no `starts`, rows byte-equal, main's extents. The existing locus locks (#1137, #1176, #1198, #1210, #1224, #1259, #1301, #1500) pass unedited. **Fails before: 21 of 23** (the source patch reverse-applied; the two that pass are the unchanged-behaviour guards, lock 2’s both-halves case and lock 8’s extents).
+
+**Consequences.** `src-analytic/engine/evaluate.ts` (`resolvedAt`, `selectorsHold`, `admissibleAt`, `isHardRingFault`), `src-analytic/engine/locus.ts` (`LocusPiece`, `LocusTrace.pieces`, `BISECT_STEPS`, the judged walk, `walkedLocusOf`), `src-analytic/app/ask.ts` and `app/answers.ts` (`starts`), `src-analytic/render/scene.ts` (pen lift); docs 02c R87, 04c.

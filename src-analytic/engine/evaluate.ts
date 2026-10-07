@@ -1566,6 +1566,44 @@ export function choiceSeedOf(c: Construction, seed: number): number {
 }
 
 /**
+ * THE CONSTRUCTION AS ONE CONFIGURATION JUDGES IT (#1817, ADR-AG-245) — every discrete freedom resolved: the
+ * constraint choices (#1049), the region choices (#1708) and the cycled crossing pairs (#1539), at `seed` and its
+ * choice seed. `evaluate` resolves here and nowhere else, and so does the locus walk, so the trace is judged against
+ * the SAME selector set the canvas was judged with — never a second reading of which option a seed takes.
+ */
+export function resolvedAt(raw: Construction, seed: number, choiceSeed = seed): Construction {
+  return {
+    ...raw,
+    constraints: resolveChoices(raw.constraints, choiceSeed),
+    selectors: resolveSelectorChoices(cycledPairs(raw.selectors, seed), choiceSeed),
+  };
+}
+
+/** Do the (resolved) selectors of `c` all hold at these positions? The one reading of a region given. */
+export function selectorsHold(c: Construction, pos: Map<Id, Pt>, env: Env): boolean {
+  return c.selectors.length === 0 || failingSelectors(c, pos, env).length === 0;
+}
+
+/** A ring fault that makes a configuration INVALID — every one but the trapezoid-is-parallelogram WARNING. */
+function isHardRingFault(r: RingFault): boolean {
+  return r.violation !== 'trapezoid-is-parallelogram';
+}
+
+/**
+ * IS THIS A POSITION OF THE FIGURE THE STUDENT DESCRIBED? (#1817, ADR-AG-245) — validity at positions, for a caller
+ * that produces positions without `evaluate`: the selectors hold (`selectorsHold`) and every declared ring keeps the
+ * promise its noun makes (`ringFaultsOf`, hard faults only — `admittedFigure`'s two position-level terms). The
+ * constraints are the caller's to have solved.
+ *
+ * `c` must be resolved (`resolvedAt`). The locus walk is the caller it exists for: it paints MANY positions of a point,
+ * and each must pass the judge the one drawn configuration passes, or the trace shows places the givens rule out.
+ */
+export function admissibleAt(c: Construction, pos: Map<Id, Pt>, env: Env): boolean {
+  if (!selectorsHold(c, pos, env)) return false;
+  return !ringFaultsOf(c, (id) => pos.get(id)).some(isHardRingFault);
+}
+
+/**
  * A SHAPE THE TOOL CREATED IS FITTED TO THE FIGURE IT JOINS before the figure is solved (#1647, ADR-AG-202).
  *
  * A tangency sentence with no circle creates one (ADR-AG-198 ruling b): an equation circle whose centre and
@@ -1753,7 +1791,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
    * narrowed an earlier statement. The constraints arrive already bounded; the solve, the validity check
    * and the knowledge gate still see one truth.
    */
-  const c: Construction = { ...raw, constraints: resolveChoices(raw.constraints, choiceSeed), selectors: resolveSelectorChoices(cycledPairs(raw.selectors, seed), choiceSeed) };
+  const c: Construction = resolvedAt(raw, seed, choiceSeed);
   let env = foldSignSelectors(c, sampleEnv(c, seed));
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];
@@ -2065,7 +2103,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
    */
   const ownFree = new Set(ids);
   const selectorsHoldAt = (system: CarrierSystem, x: number[]): boolean =>
-    c.selectors.length === 0 || failingSelectors(c, system.positionsAt(x), system.envAt(x)).length === 0;
+    c.selectors.length === 0 || selectorsHold(c, system.positionsAt(x), system.envAt(x));
   const separatedFrom = (system: CarrierSystem, x: number[]): number[][] => [
     ...swappedStarts(system, x),
     ...chordStarts(system, x),
@@ -3381,7 +3419,7 @@ export function holdsInEveryConfiguration(c: Construction, ks: readonly Constrai
  * which is drawn and named rather than refused (ADR-AG-189 Amendment 1).
  */
 export function hardRingFaults(f: Figure): RingFault[] {
-  return f.ringFaults.filter((r) => r.violation !== 'trapezoid-is-parallelogram');
+  return f.ringFaults.filter(isHardRingFault);
 }
 
 /**
