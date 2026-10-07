@@ -3,6 +3,15 @@
 _The contract for what every builder shares. Registered in [`DOCS.json`](../DOCS.json) as the
 `workspace` product's requirements doc ([ADR-W-041](06w-decisions-workspace.md#adr-w-041))._
 
+## How this document is organised
+
+By what a student meets in every builder: the governing rule; the suite chrome (the frame, the words a student
+reads, typing a statement, acting on the canvas); the data panel and the ask lane; save and load;
+discoverability; export; the admin surface; language and display. Each requirement is its bold promise, the
+clauses still part of it, any ⚠ marker, and a **Sources** line naming the ADRs and issues that hold its history.
+*Suite rulings* holds the operator rulings these promises rest on, and *Cross-builder behaviour — the one
+table* is the one place that says which builder does what, so a requirement here does not repeat it.
+
 ## What this document owns
 
 The surfaces a student meets in **every** builder, and the operator surface behind them:
@@ -19,15 +28,8 @@ The surfaces a student meets in **every** builder, and the operator surface behi
 
 **It does not own product geometry.** What a *figure* must do lives in each product's own requirements
 doc ([02](02-requirements.md) for 2-D, [02b](02b-requirements-3d.md) for 3-D, [02c](02c-requirements-analytic.md)
-for analytic, [02d](02d-requirements-complex.md) for complex). Where a shared mechanism generalises a promise a product doc already made, this document says
-so rather than restating it — the prose duplication [docs/28 §1c](archive/28-product-unification.md) identified
-as the real defect.
-
-**Why these were unwritten until 2026-09-05.** The audit behind [#904](https://github.com/dcodish/geo_builder/issues/904)
-found the entire shared surface — including a 1,248-line admin dashboard and an answer-giving lane in
-all four builders — with **no requirement anywhere**. Its rulings existed only as D1–D10 inside
-[docs/28](archive/28-product-unification.md), a *plan*: a plan finishes, a contract stands. The rulings still in
-force now live here, in *Suite rulings* below (moved in #1861).
+for analytic, [02d](02d-requirements-complex.md) for complex). Where a shared mechanism generalises a promise a
+product doc already made, this document says so rather than restating it.
 
 IDs are stable references. "Must" = the suite is broken without it; "Should" = desirable; "Later" =
 not yet; "Withdrawn" = out of scope, with the reason and new owner named.
@@ -38,61 +40,85 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   labels, and content arrive as data; a shared module may never branch on product identity, because
   "a fork wearing a shared file's name" ([ADR-W-016](06w-decisions-workspace.md#adr-w-016)) reintroduces
   exactly the divergence the tree exists to remove. The student-visible consequence is the testable one:
-  **a change to shared chrome either changes every builder or is not a shared change.** *(Realised —
-  enforced by [`BOUNDARIES.json`](../BOUNDARIES.json)'s forbidden `shell → product` edges and
-  `server/__tests__/isolation.test.ts`.)*
+  **a change to shared chrome either changes every builder or is not a shared change.**
+  - Sources: ADR-W-016; the enforced edges are [`BOUNDARIES.json`](../BOUNDARIES.json).
 
 ## The suite — one learned interface
 
-- **FR-SU-1 (Must)** — **One look.** Every builder renders the same design tokens and the same palette,
-  so a student who learns one interface has learned all of them. *(Realised — `shell/theme.ts`;
-  rulings D2/D3, *Suite rulings* below, moved from docs/28 §4a.)* **⚠ Ruled to change (2026-10-07, ADR-W-118 B8 · #1596):** «✓ הציור נקבע במלואו» appears only when exactly one figure exists, in every builder. The text below describes the code until that ships. **One wording for one state**: «✓ הציור נקבע במלואו על ידי הנתונים», «דרגות חופש: N», «חושב…», the ask button «שאלו», and the undo/redo/clear/another/About row read the same in every builder (He and En), and the About opens once on a first visit in all four. *(Operator ruling 2026-09-27; realised — [ADR-W-098](06w-decisions-workspace.md#adr-w-098), #1453.)* The empty-canvas example chips show their math typeset, like the fact rows. *(#1530, [ADR-W-100](06w-decisions-workspace.md#adr-w-100).)*
+### The frame
+
+- **FR-SU-1 (Must)** — **One look.** Every builder renders the same design tokens and the same palette, so a student who learns one interface has learned all of them. **⚠ Ruled to change (2026-10-07, ADR-W-118 B8 · #1596):** «✓ הציור נקבע במלואו» appears only when exactly one figure exists, in every builder. The text below describes the code until that ships. **One wording for one state**: «✓ הציור נקבע במלואו על ידי הנתונים», «דרגות חופש: N», «חושב…», the ask button «שאלו», and the undo/redo/clear/another/About row read the same in every builder (He and En), and the About opens once on a first visit in all four. The empty-canvas example chips show their math typeset, like the fact rows. Sources: rulings D2/D3 (*Suite rulings* below), [ADR-W-098](06w-decisions-workspace.md#adr-w-098), #1453, [ADR-W-100](06w-decisions-workspace.md#adr-w-100), #1530.
 - **FR-SU-2 (Must)** — **A visible builder switcher**, present in every builder, listing the suite from
   the machine registry ([`products.json`](../products.json)) rather than from code. A builder marked not
-  enabled **never appears in a shipped page** — the promise that no chip can point at a 404. *(Realised —
-  `shell/frame/Switcher.tsx`, [ADR-W-021](06w-decisions-workspace.md#adr-w-021); the analytic builder is
-  `enabled: true`, deployed since `prod/2026-09-16` — amended 2026-10-07, #1861: [ADR-AG-007](06c-decisions-analytic.md) lifted.)* On a phone, where the strip scrolls inside itself, the **current** builder's tab is always in view. *(#1458, [ADR-W-097](06w-decisions-workspace.md#adr-w-097).)*
+  enabled **never appears in a shipped page** — the promise that no chip can point at a 404. On a phone,
+  where the strip scrolls inside itself, the **current** builder's tab is always in view.
+  - Sources: [ADR-W-021](06w-decisions-workspace.md#adr-w-021), [ADR-AG-007](06c-decisions-analytic.md),
+    [ADR-W-097](06w-decisions-workspace.md#adr-w-097), #1458, #1861.
 - **FR-SU-3 (Must)** — **One three-zone workbench:** input, canvas, and an **opt-in** data panel on its
-  own side. The zones do not move between builders. *(Realised — `shell/frame/Workbench.tsx`; D1.)*
+  own side. The zones do not move between builders.
+  - Sources: ruling D1 (*Suite rulings* below).
 - **FR-SU-4 (Should)** — **One header and tool row.** Primary session actions are visible; secondary ones
   are visible too — save/load in the tool row, language and About as buttons on the suite bar — in the
-  same order everywhere; there is no overflow menu. *(Realised — `AppFrame.tsx`,
-  `ToolButton.tsx`; D4 as amended by #706; amended 2026-10-07, #1861: the `⋯` menu was retired,
-  D4 amendment of 2026-08-17, *Suite rulings* below.)*
-- **FR-SU-5 (Must)** — **One voice for refusals and notices.** A refusal, a warning and a notice look and
-  read the same in every builder; error text names the conflicting *statement*, never internal state.
-  *(Realised — `shell/frame/Banner.tsx`.)* A message may interpolate only what the student typed or the figure shows — never an engine id or noun. *(Checked — [ADR-W-096](06w-decisions-workspace.md#adr-w-096); 3-D locked, the rest #1522.)*
+  same order everywhere; there is no overflow menu.
+  - Sources: ruling D4 (*Suite rulings* below), #706, #1861.
 - **FR-SU-6 (Should)** — **Every figure action lives under the canvas**, not scattered between header and
-  sidebar. *(Realised — D7.)*
-- **FR-SU-7 (Should)** — **A manual screen per builder, in one chrome.** Each builder documents its own
-  language; the frame around that documentation is identical. **A section shows a SAMPLE, and the sample is chosen rather than sliced:** the guide caps each section so it teaches rather than inventories, the entries it shows first are marked and not merely written first, and **every remaining row is one click away** — a coverage map two thirds of which a student cannot reach is not a guide. The note under a capped section says the tool has more COMMANDS there, never "more phrasings of these", because what is hidden are separate capabilities. *(Realised — `ManualScreen.tsx`; D9; [ADR-W-074](06w-decisions-workspace.md#adr-w-074), #1275. The six are CHOSEN to span six different CAPABILITIES, not six phrasings of one — a section that leads with four ways to state an angle teaches a student that the tool does one thing. Operator-approved per section, 2026-09-22, and a capped section featuring fewer than six fails the suite ([ADR-W-074](06w-decisions-workspace.md#adr-w-074) Am. 1, #1347). **A tool advertises only its OWN syntax:** coordinate placement left the 2-D catalog, because it belongs to the analytic Builder (#1245).)* **The guide speaks the student's language, not the builders':** no design-doc section, issue or decision number, "DOF", or name of the machinery (grammar, parser, engine, tier/layer, how a line is solved) in any guide entry, section title, or the refusal that points a student at the guide; a curriculum term («פרבולה קנונית») is not jargon. *(Realised — `guideJargon` in `ManualScreen.tsx`, a lock per builder; [ADR-W-101](06w-decisions-workspace.md#adr-w-101), #1456.)*
-- **FR-SU-8 (Should)** — **Quick commands sit on the empty canvas:** large chips, so the affordance teaches
-  at the point of not-knowing. ~~A compact row once the student is building~~ was withdrawn by the
-  operator on 2026-09-16 (#1105, [ADR-AG-064](06c-decisions-analytic.md#adr-ag-064)): *"on the input
-  panel, I dont want to see the chips"*. *(Realised — `QuickChips.tsx`; D9b as amended, *Suite rulings*
-  below; amended 2026-10-07, #1861.)*
+  sidebar.
+  - Sources: ruling D7.
 - **FR-SU-9 (Should)** — **Tablet is supported**; phones are explicitly out of scope
   ([NFR-US-4](03-nonfunctional-requirements.md)). Below 900px every builder stacks one column: the input,
   then the figure, then the fact list, then the data panel, so the input and the top of the figure share
-  the first screen. *(Realised — `shell/frame/Workbench.tsx`,
-  [ADR-W-112](06w-decisions-workspace.md#adr-w-112), #1459, which superseded D10's portrait overlay;
-  amended 2026-10-07, #1861.)*
+  the first screen.
+  - Sources: [ADR-W-112](06w-decisions-workspace.md#adr-w-112), #1459 (supersedes ruling D10), #1861.
 - **FR-SU-10 (Should)** — **The figure's name is one component**, mounted identically everywhere, so
-  naming, renaming and the saved-file name agree across builders. *(Realised — `FigureName.tsx`.)*
+  naming, renaming and the saved-file name agree across builders.
+
+### The words a student reads
+
+- **FR-SU-5 (Must)** — **One voice for refusals and notices.** A refusal, a warning and a notice look and
+  read the same in every builder; error text names the conflicting *statement*, never internal state.
+  A message may interpolate only what the student typed or the figure shows — never an engine id or noun.
+  - Sources: [ADR-W-096](06w-decisions-workspace.md#adr-w-096), #1522.
+- **FR-SU-7 (Should)** — **A manual screen per builder, in one chrome.** Each builder documents its own
+  language; the frame around that documentation is identical. **A section shows a SAMPLE, and the sample is
+  chosen rather than sliced:** the guide caps each section so it teaches rather than inventories, the entries
+  it shows first are marked and not merely written first, and **every remaining row is one click away** — a
+  coverage map two thirds of which a student cannot reach is not a guide. The note under a capped section says
+  the tool has more COMMANDS there, never "more phrasings of these", because what is hidden are separate
+  capabilities. The six are CHOSEN to span six different CAPABILITIES, not six phrasings of one. **A tool
+  advertises only its OWN syntax.** **The guide speaks the student's language, not the builders':** no
+  design-doc section, issue or decision number, "DOF", or name of the machinery (grammar, parser, engine,
+  tier/layer, how a line is solved) in any guide entry, section title, or the refusal that points a student at
+  the guide; a curriculum term («פרבולה קנונית») is not jargon.
+  - Sources: ruling D9, [ADR-W-074](06w-decisions-workspace.md#adr-w-074) (and Am. 1), #1275, #1347, #1245,
+    [ADR-W-101](06w-decisions-workspace.md#adr-w-101), #1456.
+- **FR-SU-8 (Should)** — **Quick commands sit on the empty canvas:** large chips, so the affordance teaches
+  at the point of not-knowing. ~~A compact row once the student is building~~ was withdrawn by the
+  operator: *"on the input panel, I dont want to see the chips"*.
+  - Sources: ruling D9b (*Suite rulings* below), [ADR-AG-064](06c-decisions-analytic.md#adr-ag-064), #1105, #1861.
 - **FR-SU-11 (Should)** — **Every builder's About says the same kinds of things:** what the tool is,
   who it is for, that the figure builds one given at a time and adapts, that it draws and does not
   solve, alternative configurations where the builder has them, a «try this» sequence, and the author
   credit — in Hebrew and English. **Every sample line builds** when typed in order on an empty
-  canvas. *(Realised — `shell/frame/about.tsx`, [ADR-W-091](06w-decisions-workspace.md#adr-w-091),
-  #1477.)*
+  canvas.
+  - Sources: [ADR-W-091](06w-decisions-workspace.md#adr-w-091), #1477.
+
+### Typing a statement
+
 - **FR-SU-12 (Must)** — **A symbol button types the symbol on its face**, and a comparison is recorded as
   its mathematical symbol whichever way it was entered: the `≥` button inserts `≥`, and a typed `>=` is
   recorded (row, save file, export, log) as `≥`. A button may insert a keyboard form only when its
-  grammar does not read the glyph, and must say so. *(Realised — [ADR-W-095](06w-decisions-workspace.md#adr-w-095), #1348.)*
-- **FR-SU-13 (Must)** — **A point's letter is changed where the point is.** In every builder, clicking a point opens one small popover at it. The student types the new letter, and Enter or ✓ applies it; nothing goes through the main input. A letter already in use is never merged onto: the popover says it is taken, quotes the statement that holds it in the student's own words, and offers to **exchange** the two letters («החליפו בין A ל-B»), in both directions, whichever point was clicked first. The exchange keeps every statement, keeps the drawing where it is (only the letters change places), and is undone in one step, like a rename. The same exchange can be typed («החלף בין A ל-B» / "swap A and B"). *(Realised for 2-D, 3-D and analytic — `shell/frame/LetterPopover.tsx`, [ADR-W-105](06w-decisions-workspace.md#adr-w-105), #1631; operator, 2026-10-01: «we want that same mechanism now for analytics and also for the 3d tool». Analytic: [ADR-AG-192](06c-decisions-analytic.md#adr-ag-192); amended 2026-10-07, #1861.)*
-- **FR-SU-14 (Must)** — **A segment is hidden or dashed where it is.** In every builder that lets a student click a segment, the click opens one small menu at it: «הסתירו קטע / הציגו קטע» and «מקווקו / רציף», with the builder's own items below (2-D: «החליפו קצוות»; analytic: the measurements). A hidden segment is not drawn, but it stays in the figure: every statement, reference, measurement and question about it still works, and the menu, reached from a faint mark on the line, shows it again. Un-hiding a dashed segment brings it back dashed. The choice is saved with the figure and comes back when the file is opened. *(Realised for 2-D and the analytic builder — `shell/frame/SegmentMenu.tsx`, [ADR-W-106](06w-decisions-workspace.md#adr-w-106), #1653; operator, 2026-10-02: «in the analytic tool we dont have an option to click on a segment and hide it like we have in 2d». In the analytic builder one «בטל» also undoes a hide; in 2-D it is undone from the menu. 3-D's edges have no click menu yet, see ADR-W-106.)*
-- **FR-SU-15 (Must)** — **A claim to prove is never drawn as a given.** **⚠ Ruled to change (2026-10-07, ADR-W-118 B14/D3 · #1870):** the complex builder refuses a proof-verb line like the others, while keeping its claim check for a bare statement. The text below describes the code until that ships. In every builder, a line that asks the student to PROVE something — «הוכיחו כי …», «הוכח ש …», «הראו כי …», «יש להוכיח …», "prove that …", "show that …", with or without an item marker («א.», «(1)») and also when it follows a given on the same line («נתון AB = AC. הוכיחו כי AB ⊥ AC») — is refused, and nothing of the line is recorded. The refusal says that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and quotes the claim so the student knows which part to leave out. «כי» and «ש» in their other senses («נתון כי …», «כך ש-…») and «הראו» as "show me" are never refused for this. *(Realised for 2-D, 3-D and analytic — `shell/proofTarget.ts`, [ADR-W-107](06w-decisions-workspace.md#adr-w-107), #1666; operator, 2026-10-02 on #1649: «all refused with explanation». Analytic refused first, #1618.)*
-- **FR-SU-16 (Must)** — **A plane-geometry sentence gets the same answer in every builder that reads plane geometry.** When a student types a plane-geometry sentence, the 2-D builder and the analytic builder give the same verdict: both build it, both refuse it, or both ask the same kind of question. The 2-D builder's verdict is the reference. The 3-D builder is to give the same verdict for the core plane families: polygons, lengths, angles, midpoints and ratios, cevians, parallel and perpendicular, and area — that parity is **parked, not realised**: most of 3-D's known-gap rows are owned by #1679, which is in the icebox (as are 2-D's own phrasing gaps, #1677) (amended 2026-10-07, #1861: [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B15). The exceptions are topic families that one builder reads by design: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, and free points in 3-D. A builder that does not read such a family answers it honestly, with a refusal, a question or the model, and never draws it as something else. A known difference is listed with the issue that will remove it. *(Realised as a cross-product lock — `shell/__tests__/fixtures/geo-input-parity.ts`, [ADR-W-108](06w-decisions-workspace.md#adr-w-108), #1649; operator, 2026-10-02: «we need a rule that ensures consistency in data input» and «analytics and 2d should have same user experience».)*
+  grammar does not read the glyph, and must say so.
+  - Sources: [ADR-W-095](06w-decisions-workspace.md#adr-w-095), #1348.
+- **FR-SU-15 (Must)** — **A claim to prove is never drawn as a given.** **⚠ Ruled to change (2026-10-07, ADR-W-118 B14/D3 · #1870):** the complex builder refuses a proof-verb line like the others, while keeping its claim check for a bare statement. The text below describes the code until that ships. In every builder, a line that asks the student to PROVE something — «הוכיחו כי …», «הוכח ש …», «הראו כי …», «יש להוכיח …», "prove that …", "show that …", with or without an item marker («א.», «(1)») and also when it follows a given on the same line («נתון AB = AC. הוכיחו כי AB ⊥ AC») — is refused, and nothing of the line is recorded. The refusal says that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and quotes the claim so the student knows which part to leave out. «כי» and «ש» in their other senses («נתון כי …», «כך ש-…») and «הראו» as "show me" are never refused for this. Sources: [ADR-W-107](06w-decisions-workspace.md#adr-w-107), #1666, #1649, #1618.
+- **FR-SU-16 (Must)** — **A plane-geometry sentence gets the same answer in every builder that reads plane geometry.** When a student types a plane-geometry sentence, the 2-D builder and the analytic builder give the same verdict: both build it, both refuse it, or both ask the same kind of question. The 2-D builder's verdict is the reference. The 3-D builder is to give the same verdict for the core plane families: polygons, lengths, angles, midpoints and ratios, cevians, parallel and perpendicular, and area — that parity is **parked, not realised**: most of 3-D's known-gap rows are owned by #1679, which is in the icebox (as are 2-D's own phrasing gaps, #1677). The exceptions are topic families that one builder reads by design: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, and free points in 3-D. A builder that does not read such a family answers it honestly, with a refusal, a question or the model, and never draws it as something else. A known difference is listed with the issue that will remove it. The operator's ruling: «analytics and 2d should have same user experience».
+  - Sources: [ADR-W-108](06w-decisions-workspace.md#adr-w-108), #1649, [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B15, #1861.
+
+### Acting on the canvas
+
+- **FR-SU-13 (Must)** — **A point's letter is changed where the point is.** In every builder, clicking a point opens one small popover at it. The student types the new letter, and Enter or ✓ applies it; nothing goes through the main input. A letter already in use is never merged onto: the popover says it is taken, quotes the statement that holds it in the student's own words, and offers to **exchange** the two letters («החליפו בין A ל-B»), in both directions, whichever point was clicked first. The exchange keeps every statement, keeps the drawing where it is (only the letters change places), and is undone in one step, like a rename. The same exchange can be typed («החלף בין A ל-B» / "swap A and B").
+  - Sources: [ADR-W-105](06w-decisions-workspace.md#adr-w-105), [ADR-AG-192](06c-decisions-analytic.md#adr-ag-192), #1631, #1861.
+- **FR-SU-14 (Must)** — **A segment is hidden or dashed where it is.** In every builder that lets a student click a segment, the click opens one small menu at it: «הסתירו קטע / הציגו קטע» and «מקווקו / רציף», with the builder's own items below (2-D: «החליפו קצוות»; analytic: the measurements). A hidden segment is not drawn, but it stays in the figure: every statement, reference, measurement and question about it still works, and the menu, reached from a faint mark on the line, shows it again. Un-hiding a dashed segment brings it back dashed. The choice is saved with the figure and comes back when the file is opened.
+  - Sources: [ADR-W-106](06w-decisions-workspace.md#adr-w-106), #1653.
 
 ## Suite rulings (moved from docs/28 §4/§4a, #1861)
 
@@ -219,7 +245,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | Givens list: mute, edit, delete | shared list | same | same | same | **Same** |
 | Undo / redo | yes | yes | yes | yes | **Same** |
 | Letter popover and swap | yes | yes | yes | n/a | **Same** (ADR-W-105) |
-| Data-panel control | «חשב ערכים» button | «נתונים» checkbox | «הצג נתונים» | «נתונים» | **Ruled change** — one «נתונים» checkbox with a computing state (D4, #1871) |
+| Data-panel control | the shared panel head toggle, plus a separate «חשב ערכים» compute button | the shared panel head toggle («נתונים» / «הצגה») | the shared panel head toggle, labelled «הצג נתונים» | the shared panel head toggle («נתונים») | **Ruled change** — one «נתונים» control everywhere, with a computing state where values are expensive; 2-D's separate compute button goes (D4, #1871) |
 | A stated length on the figure | label | label | label | stated numbers plotted | **Same** |
 | A stated angle | arc with value or letter | arc | arc | n/a | **Same** |
 | A right angle | knee | knee | knee (also for an asked-for height) | n/a | **Same** |
@@ -258,22 +284,22 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
 **channel**.
 
 - **FR-DP-1 (Must)** — **The ask lane is always present.** Never behind a button, never gated on a
-  computation having run, and it does not vanish when the student adds a fact. Before this was shared,
-  2-D rendered it inside the values block — so it existed only after «חשב ערכים» ran and disappeared on
-  the next line. *(Realised — `shell/frame/AskLane.tsx`, [ADR-W-038](06w-decisions-workspace.md#adr-w-038).)*
+  computation having run, and it does not vanish when the student adds a fact.
+  - Sources: [ADR-W-038](06w-decisions-workspace.md#adr-w-038).
 - **FR-DP-2 (Must)** — **Asking is the pull.** Nothing expensive is computed until the student actually
-  asks; opening the panel computes nothing. *(Realised — ADR-W-038.)*
+  asks; opening the panel computes nothing.
+  - Sources: ADR-W-038.
 - **FR-DP-3 (Must)** — **The panel reports what the FIGURE knows, never what one drawing happens to
   show.** A value is displayed only when it is invariant across the figure's residual freedom; a number
   true only of the current sample is not knowledge and must not be printed. This is the shared statement
-  of the honesty rule each product enforces in its own engine, and it is the reason the panel can be
-  trusted at all. *(Generalises the 2-D reveal contract, [FR-RV-5](02-requirements.md); 3-D states it as
-  "a number drawn on the canvas must be seed-invariant knowledge". What the CANVAS carries is a separate
-  rule — the student's inputs, [ADR-W-047](06w-decisions-workspace.md#adr-w-047), with the recorded
-  exceptions of [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B7; amended 2026-10-07, #1861.)*
+  of the honesty rule each product enforces in its own engine. What the CANVAS carries is a separate
+  rule — the student's inputs, with recorded exceptions.
+  - Sources: [ADR-W-047](06w-decisions-workspace.md#adr-w-047), [ADR-W-118](06w-decisions-workspace.md#adr-w-118)
+    B7, #1861; generalises the 2-D reveal contract, [FR-RV-5](02-requirements.md).
 - **FR-DP-4 (Must)** — **Answers are product-shaped; the lane is not.** A length with units, a vector
   equation and a complex modulus are genuinely different answers, and each product owns its rows. What is
-  shared is the box, the submit, the palette and the always-there rule. *(Realised — ADR-W-038.)*
+  shared is the box, the submit, the palette and the always-there rule.
+  - Sources: ADR-W-038.
 - **FR-DP-5 (Should)** — **The panel is opt-in** and never surfaces a geometric fact unbidden — the
   boundary that keeps students reaching their own conclusions ([10-pedagogy](10-pedagogy.md)).
 
@@ -281,38 +307,33 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
 
 - **FR-SL-1 (Must)** — **Every saved file carries an envelope** — an app marker and an integer version —
   and a foreign or future file **refuses gracefully with a clear bilingual message** rather than producing
-  a corrupt figure. *(Realised — `shell/save.ts`; the complex builder ignored `version` entirely before
-  the shared envelope.)*
+  a corrupt figure.
 - **FR-SL-2 (Must)** — **A save never silently overwrites.** Files are named `<name>-<suffix>.json` per
-  product, with a date-stamped fallback. *(Realised — issue #20, [ADR-274](06-decisions.md#adr-274).)*
+  product, with a date-stamped fallback.
+  - Sources: [ADR-274](06-decisions.md#adr-274), #20.
 - **FR-SL-3 (Must)** — **The load reports what it could not restore.** A partially-restorable file loads
-  and *says what was lost*; it neither fails silently nor pretends completeness. *(Realised —
-  [ADR-242](06-decisions.md#adr-242); each product translates its own reasons.)*
+  and *says what was lost*; it neither fails silently nor pretends completeness. Each product translates its
+  own reasons.
+  - Sources: [ADR-242](06-decisions.md#adr-242).
 - **FR-SL-4 (Should)** — **The file body is the product's own replay inputs, not its positions**, so a
-  later engine that lays the same facts out differently still loads the file. *(Generalises
-  [FR-HS-10](02-requirements.md).)*
+  later engine that lays the same facts out differently still loads the file.
+  - Sources: generalises [02](02-requirements.md) FR-HS-10.
 - **FR-SL-5 (Must)** — **A builder opens EMPTY.** Every load — from the switcher, a bookmark, or a
   refresh — starts with a clean canvas and an empty list; **no product restores a previous session on
   its own.** One rule for all builders, so a student opening a tool to start a new question is never
-  evaluated against a figure they did not build. *(Operator ruling 2026-09-06 —
-  [ADR-W-046](06w-decisions-workspace.md#adr-w-046), #919. **Amended 2026-09-21
-  ([ADR-W-078](06w-decisions-workspace.md#adr-w-078), #1238):** a session may now be PERSISTED and
-  OFFERED (FR-SL-6) — what is forbidden is restoring it without being asked. The clause "no product
-  tree reads or writes a session key" narrows accordingly: storage is reached through ONE module,
-  `shell/session/persist.ts`, and never directly from a product tree. Lock:
-  `src-complex/__tests__/no-session-restore-919.test.ts`, asserting both directions.)*
+  evaluated against a figure they did not build. A session may be PERSISTED and OFFERED (FR-SL-6) — what
+  is forbidden is restoring it without being asked. Storage is reached through ONE module,
+  `shell/session/persist.ts`, and never directly from a product tree.
+  - Sources: [ADR-W-046](06w-decisions-workspace.md#adr-w-046), #919,
+    [ADR-W-078](06w-decisions-workspace.md#adr-w-078), #1238.
 - **FR-SL-6 (Must)** — **Unsaved work survives a reload as an OFFER.** When a builder loads and a
   recent session exists, it says so and gives the student two choices — continue where they left off,
-  or start fresh — and does nothing until one is chosen. A student who switches apps, takes a call or
-  locks their phone does not lose an hour's figure; a student who came to start a new question is not
-  handed an old one. The stored payload is the product's own save envelope, so **restoring is
-  loading**: a statement the tool can no longer rebuild is reported by the load audit (FR-SL-3), never
-  dropped in silence, and positions are still never stored (FR-SL-4). A session is offered for a
-  bounded window and is forgotten when the student starts fresh or clears the canvas; storage that is
-  unavailable, blocked or full simply means no offer. *(Operator ruling 2026-09-21 —
-  [ADR-W-078](06w-decisions-workspace.md#adr-w-078), #1238; un-withdraws [02](02-requirements.md)
-  FR-HS-4 in this form only. Locks: `shell/__tests__/session-persist-1238.test.ts`, the cross-product
-  `session-offer-1238.test.ts` in each tree, and a meta-lock over the shared checks.)*
+  or start fresh — and does nothing until one is chosen. The stored payload is the product's own save
+  envelope, so **restoring is loading**: a statement the tool can no longer rebuild is reported by the
+  load audit (FR-SL-3), never dropped in silence, and positions are still never stored (FR-SL-4). A
+  session is offered for a bounded window and is forgotten when the student starts fresh or clears the
+  canvas; storage that is unavailable, blocked or full simply means no offer.
+  - Sources: ADR-W-078, #1238; un-withdraws [02](02-requirements.md) FR-HS-4 in this form only.
 - **FR-SL-7 (Should)** — **A figure travels as a LINK.** A teacher can copy the current figure as a
   single URL, send it over an ordinary channel (WhatsApp), and a student who taps it lands in the
   builder **with that figure, fully editable** — no account, no download, no "open with". The figure
@@ -324,14 +345,9 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
   refusal and the load audit (FR-SL-3). The same button is the student's way to hand work back. A
   link that arrives while the student **already has work on the canvas asks before replacing it** —
   the same rule as FR-SL-6, for the same reason: work a student cannot get back is never discarded
-  on their behalf. *(Realised in ALL FOUR builders —
-  [ADR-W-079](06w-decisions-workspace.md#adr-w-079) (#1189, 2-D) and
-  [ADR-W-080](06w-decisions-workspace.md#adr-w-080) (#1372, the three siblings); realises
-  [02](02-requirements.md) FR-HS-6. Measured per product: 2-D worst case 1,162 characters over its
-  fixture corpus, 3-D 1,008 over its 31, analytic 407 for a real 13-line session — against a 2,000
-  threshold. A short link through the proxy, with a preview image, is
-  [#1374](https://github.com/dcodish/geo_builder/issues/1374) and deliberately separate — it would
-  put figures on a server, which this does not.)*
+  on their behalf.
+  - Sources: [ADR-W-079](06w-decisions-workspace.md#adr-w-079), #1189,
+    [ADR-W-080](06w-decisions-workspace.md#adr-w-080), #1372; realises [02](02-requirements.md) FR-HS-6.
 - **FR-SL-8 (Should)** — **A shared figure has a SHORT link and shows a picture of itself.** The link
   a teacher sends is short enough to look trustworthy in a chat — a long opaque blob reads as
   phishing to a teenager, a parent or a school — and chat clients that preview links show the
@@ -341,27 +357,27 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
   privacy note says so plainly rather than going stale. A stored share is **append-only** — nothing
   can overwrite or alter a figure someone already holds a link to, so a link means the same figure
   forever — and ids are unguessable, so the store cannot be walked. Storage is bounded by an
-  allocation; past it a new share is **refused with a reason** and links already sent keep working,
-  because silently deleting an old figure to make room is the one failure a teacher could not
-  diagnose. FR-SL-7's long link remains as the offline fallback and whenever the store cannot be
-  reached. *(Realised — [ADR-W-081](06w-decisions-workspace.md#adr-w-081), #1374. Operator ruling
-  2026-09-23: 2 GB allocated, usage tracked on the admin dashboard rather than by push alert;
-  measured at ~50 KB a share, so ~40,000 shares.)* The operator is **warned before it fills**: the
-  admin dashboard shows a banner from 80% of the allocation, red from 95%, saying what refuses at 100%,
-  and every store-full refusal writes a line to the proxy journal. No lower cap and no eviction — a
-  warning only, by operator ruling. *(Realised — [ADR-W-104](06w-decisions-workspace.md#adr-w-104), #1380.)*
+  allocation (2 GB, by operator ruling); past it a new share is **refused with a reason** and links
+  already sent keep working, because silently deleting an old figure to make room is the one failure a
+  teacher could not diagnose. FR-SL-7's long link remains as the offline fallback and whenever the store
+  cannot be reached. The operator is **warned before it fills**: the admin dashboard shows a banner from
+  80% of the allocation, red from 95%, saying what refuses at 100%, and every store-full refusal writes a
+  line to the proxy journal. No lower cap and no eviction — a warning only, by operator ruling.
+  - Sources: [ADR-W-081](06w-decisions-workspace.md#adr-w-081), #1374,
+    [ADR-W-104](06w-decisions-workspace.md#adr-w-104), #1380.
 - **FR-SL-9 (Must)** — **An arriving figure is bounded.** A link, a short link, a file or a restored
   session is input from someone else, so its size is checked on ARRIVAL — never trusted because the
   sender's tool would not have emitted it. A figure over a stated ceiling (characters, inflated bytes,
-  and statements — measured at ~2.5× the largest real figure) is **refused before anything replays**,
-  with a message that says it is too large to open rather than calling it broken, and the student's
-  canvas is left as it was. The share store refuses to hold what the builders would refuse to open.
-  *(Realised in all four builders and the store — [ADR-W-082](06w-decisions-workspace.md#adr-w-082), #1379.)*
+  and statements) is **refused before anything replays**, with a message that says it is too large to
+  open rather than calling it broken, and the student's canvas is left as it was. The share store refuses
+  to hold what the builders would refuse to open.
+  - Sources: [ADR-W-082](06w-decisions-workspace.md#adr-w-082), #1379.
 - **FR-SL-10 (Must)** — **A shared figure never becomes a search result.** Every `/g/` response — the
   page, its preview image, and the dead-link answer — tells search engines not to index it, because the
   page's title is whatever the uploader typed, and an indexable one would put a stranger's words on a
   themathbible.com result. The chat-app preview (FR-SL-8) is unaffected: it reads the page, it does not
-  index it. *(Realised — [ADR-W-084](06w-decisions-workspace.md#adr-w-084), #1384.)*
+  index it.
+  - Sources: [ADR-W-084](06w-decisions-workspace.md#adr-w-084), #1384.
 
 ## Discoverability
 
@@ -372,8 +388,8 @@ engine. Owned by the site-root files in `deploy/homepage/` and by each builder's
   AI answer and training crawlers included (operator ruling, #1384: reach is the point of a free tool),
   and names a sitemap; a sitemap listing the homepage and **every** builder in `products.json`; a site
   icon a browser and a search result can show; and **one host** — `www.` redirects to the apex rather
-  than serving a second copy. *(Realised — [ADR-W-084](06w-decisions-workspace.md#adr-w-084), #1384; the
-  `www.` redirect is a hosting-panel setting, see [RUNBOOK](RUNBOOK.md).)*
+  than serving a second copy.
+  - Sources: ADR-W-084, #1384.
 - **FR-DI-2 (Should)** — **Every builder's page says what it is, without JavaScript.** Its HTML carries
   a title and description in the operator-approved wording (Hebrew only — one URL per builder, no
   English variant is indexed), a canonical URL from the product registry, a link-preview card whose
@@ -381,36 +397,35 @@ engine. Owned by the site-root files in `deploy/homepage/` and by each builder's
   that do not run JavaScript, which is most AI crawlers — a readable block saying what the tool is, how
   to use it, and **the product's own featured catalog examples**, which the app replaces when it
   starts. A builder with no page cannot be built. The homepage carries the same, and promises nothing
-  a tool does not currently do. *(Realised — [ADR-W-085](06w-decisions-workspace.md#adr-w-085), #1383.)*
-
+  a tool does not currently do.
+  - Sources: [ADR-W-085](06w-decisions-workspace.md#adr-w-085), #1383.
 - **FR-DI-3 (Should)** — **A student searching for GeoGebra can find an honest comparison.** One page,
   `/geogebra/`, says what the tools do differently (the question's own sentences, not tools or command
   syntax) **and where GeoGebra is the better tool**, in wording the operator approved sentence by
   sentence. It names GeoGebra only to compare — no logo, nothing imitating its identity, and a line
   saying the site is not affiliated. Every example on it builds, and its «open the example» link opens
   that figure. Claims about GeoGebra are re-checked against GeoGebra's own site before any edit.
-  *(Realised — [ADR-W-086](06w-decisions-workspace.md#adr-w-086), #1386.)*
+  - Sources: [ADR-W-086](06w-decisions-workspace.md#adr-w-086), #1386.
 
 ## Export
 
 - **FR-EX-1 (Should)** — **A clean, print-ready image** of the current figure, from every builder, on a
-  white background at export resolution rather than screen resolution. *(Realised — `shell/export/svgToPng.ts`;
-  generalises [FR-HS-5](02-requirements.md).)*
+  white background at export resolution rather than screen resolution.
+  - Sources: generalises [02](02-requirements.md) FR-HS-5.
 - **FR-EX-2 (Should)** — **⚠ Ruled to change (2026-10-07, ADR-W-118 B16 · #1872):** «הורידו שאלה» is offered in every builder, the analytic and complex builders included; today only 2-D and 3-D offer it. The text below describes the code until that ships. **The built question as a document**, laying out the figure beside the student's
   own numbered givens, Hebrew RTL correct in Word. **Deterministic — never LLM-generated**: the givens are
-  the student's own words in entry order. *(Realised — `shell/export/questionDoc.ts`; generalises
-  [FR-HS-11](02-requirements.md).)*
+  the student's own words in entry order.
+  - Sources: generalises [02](02-requirements.md) FR-HS-11.
 - **FR-EX-3 (Must)** — **A downloaded image never contains on-screen chrome, in every builder.** What is
   painted only to be interacted with — hover marks, crossing offers, hit rings, hidden-item ghosts,
   selection accents, edit affordances — is not part of the figure and never reaches a worksheet. The
   contract is one shared strip (`[data-noexport]` + the `data-export-*` accent reverts in
   `shell/export/svgToPng.ts`); the opt-in is each renderer's tagging, and each product carries a lock
   that renders its figure with every chrome affordance ON and asserts the stripped ink is its chrome-free
-  render — so a product cannot ship untagged chrome by forgetting to opt in. *(Realised —
-  [ADR-W-051](06w-decisions-workspace.md#adr-w-051), [ADR-AG-151](06c-decisions-analytic.md#adr-ag-151); a
-  `clean-export.test.tsx` in every builder that exports an image, over `shell/export/exportMarkup.ts`, and
-  that list is READ from `products.json` by `shell/__tests__/clean-export-registry-1391.test.ts`, so a new
-  builder cannot ship an export without one.)*
+  render — so a product cannot ship untagged chrome by forgetting to opt in. A new builder cannot ship an
+  image export without that lock.
+  - Sources: [ADR-W-051](06w-decisions-workspace.md#adr-w-051), [ADR-AG-151](06c-decisions-analytic.md#adr-ag-151),
+    #1391.
 
 ## The admin surface
 
@@ -418,39 +433,35 @@ Operator-facing, never student-facing. Privacy properties are governed by
 [NFR-SE-1…3](03-nonfunctional-requirements.md) and are not restated here.
 
 - **FR-AD-1 (Must)** — **The dashboard is password-protected**, with a signed, expiring session cookie
-  verified on every request. *(Realised — `server/admin.ts`.)*
+  verified on every request.
 - **FR-AD-2 (Should)** — **It reports what students actually typed** — traffic, parse-outcome breakdown,
   language split, top utterances, and per-session timelines in entry order — because the queue is
-  prioritised by measured demand, not intuition ([docs/22 §2](22-workflow.md)). *(Realised.)*
+  prioritised by measured demand, not intuition ([docs/22 §2](22-workflow.md)).
 - **FR-AD-3 (Must)** — **Config may CHOOSE AMONG what the code already supports; it may never ASSERT
   support the code lacks.** This is the non-negotiable line on the operator surface. A product id absent
-  from the registry is refused, so builder N+1 cannot be conjured from a form field. *(Realised —
-  `server/adminConfig.ts`, [ADR-W-018](06w-decisions-workspace.md#adr-w-018) decision 7.)*
+  from the registry is refused, so builder N+1 cannot be conjured from a form field.
+  - Sources: [ADR-W-018](06w-decisions-workspace.md#adr-w-018) decision 7.
 - **FR-AD-4 (Must)** — **A featured quick command is validated at SAVE time against that tool's own
-  grammar** and refused, naming the entry and the reason, if it does not parse. Otherwise the admin page
-  becomes a way to hand a student a command that fails. *(Realised for the lane whose parser the server
-  can run; for the others a quick command is refused as **unsupported — honestly, not silently**.)*
+  grammar** and refused, naming the entry and the reason, if it does not parse. For a tool whose parser
+  the server cannot run, a quick command is refused as **unsupported — honestly, not silently**.
 
 ## Language and display
 
 - **FR-WI-1 (Must)** — **RTL Hebrew is the default in every builder**, English available, and toggling
-  updates layout direction. *(Realised — `shell/i18n.ts`.)*
+  updates layout direction.
 - **FR-WI-2 (Must)** — **An LTR technical run inside an RTL sentence never reverses.** `z1 = 3+4i`,
-  `y = -2x + 8` and `ℓ1` read correctly inside a Hebrew refusal. Each builder had to learn this
-  separately; it is now three kits — `shell/bidi.ts` (analytic and complex), `src/i18n/bidi.ts` (2-D)
-  and `src3d/i18n/bidi.ts` (3-D) — held together by one shared fixture table,
-  `shell/__tests__/fixtures/issue-1296-rows.ts`, that every product asserts. *(Realised; amended
-  2026-10-07, #1861: the 2-D and 3-D copies have not moved onto `shell/bidi.ts`.)*
+  `y = -2x + 8` and `ℓ1` read correctly inside a Hebrew refusal. Every builder is held to one shared
+  fixture table of these cases.
+  - Sources: #1296, #1861; the three bidi kits and their table are [04w](04w-design-shell.md).
 - **FR-WI-3 (Should)** — **One display-number format** across builders, so the same quantity never appears
-  with different precision in two tools. *(Realised — `shell/format.ts`, operator ruling 2026-08-18.)*
+  with different precision in two tools.
 - **FR-WI-4 (Must)** — **Every builder can name every builder.** The switcher resolves its labels through
-  each consuming product's own i18n, so a missing key is a blank chip *in that product*. *(Realised;
-  the failure surfaces in a different product from the omission, which is why it is stated here.)*
+  each consuming product's own i18n, so a missing key is a blank chip *in that product*.
 - **FR-WI-5 (Must)** — **A statement row reads in the direction of its CONTENT, in every builder.** A
   row with no Hebrew letter («∠ABC = 90», «|AB| = 5») is LTR, so a leading `∠` stays in front. A row
   with Hebrew is RTL, even when it opens with a Latin label («K על AB»). The same holds in the row's
-  edit box. *(Realised — `shell/frame/FactList.tsx` takes each product's `textDir` and sets the
-  direction itself, [ADR-W-088](06w-decisions-workspace.md#adr-w-088).)*
+  edit box.
+  - Sources: [ADR-W-088](06w-decisions-workspace.md#adr-w-088).
 
 ## Not owned here
 
