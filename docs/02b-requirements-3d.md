@@ -180,6 +180,11 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   the circle. A right trapezoid inscribed in a circle is refused, naming the right trapezoid and the rectangle a
   circle would force (the 2026-10-01 ruling on #1554). The 2-D twin is FR-EN-14. *(Realised —
   [ADR-3D-307](06b-decisions-3d.md#adr-3d-307), #1792; a quadrilateral's incircle is #1838.)*
+  **The shape draws its own ink and nothing else:** the condition a noun or adjective entails (an isosceles
+  trapezoid's equal diagonals, a right pyramid's equal lateral edges, a regular tetrahedron's equal edges) is
+  honoured and judged, but it draws no segment the student did not name — «טרפז שווה שוקיים ABCD» draws the
+  ring, never the diagonal AC. A student's own «|AC| = |BD|» still draws AC. *(Realised —
+  [ADR-3D-308](06b-decisions-3d.md#adr-3d-308), #1844.)*
 
 ## Vectors — the geometric lane
 

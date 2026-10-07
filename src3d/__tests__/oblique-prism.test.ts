@@ -75,12 +75,14 @@ describe('#295 — bare parallelogram prism parses to an oblique parallelepiped'
 describe('#321 — the parallelogram FAMILY builds oblique: base noun → מקבילון + its constraints', () => {
   const IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
   const SOLID = { type: 'solid', kind: 'prism4', oblique: true, ids: IDS };
-  const EQUAL_SIDES = { type: 'length-rel', a1: 'A', b1: 'B', rhs: { pair: ['A', 'D'] }, c: 1 };
+  // #1844 (ADR-3D-308): the base noun's own conditions are shape-internal — marked, so they draw nothing
+  const EQUAL_SIDES = { type: 'length-rel', a1: 'A', b1: 'B', rhs: { pair: ['A', 'D'] }, c: 1, origin: 'shape' };
   const RIGHT_CORNER = {
     type: 'cos-angle',
     u: { kind: 'pair', from: 'A', to: 'B' },
     v: { kind: 'pair', from: 'A', to: 'D' },
     cos: 0,
+    origin: 'shape',
   };
 
   it('«מנסרה שבסיסה מעוין» → parallelepiped + equal adjacent sides', () => {
@@ -103,7 +105,7 @@ describe('#321 — the parallelogram FAMILY builds oblique: base noun → מקב
   it('labelled «מנסרה שבסיסה מעוין KLMN» keeps the given ids in the constraint too', () => {
     const r = parse3('מנסרה שבסיסה מעוין KLMN');
     expect(r.ok).toBe(true);
-    expect(r.ok && r.commands[1]).toEqual({ type: 'length-rel', a1: 'K', b1: 'L', rhs: { pair: ['K', 'N'] }, c: 1 });
+    expect(r.ok && r.commands[1]).toEqual({ type: 'length-rel', a1: 'K', b1: 'L', rhs: { pair: ['K', 'N'] }, c: 1, origin: 'shape' });
   });
 
   it('«מקבילון שבסיסו מעוין» — the NAMED oblique solid also takes the base constraint', () => {
