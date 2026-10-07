@@ -154,6 +154,20 @@ export function runRingOrder(pts: Vec3[]): Vec3[] {
   return withAngle.map((x) => x.p);
 }
 
+/**
+ * #1499 / #1849 (ADR-3D-310) — has this declared polygon's ring COLLAPSED onto a line? Its greatest
+ * spanning normal is at most 1e-4 of its own span squared (scale-free). The ONE predicate behind the
+ * pivot's flat-ring judgement (`solvePivot`) and the `polygon-open` claim of a polygon declared over
+ * existing points, so the two lanes cannot disagree about what "flat" means. A ring shrunk to a point is
+ * the coincidence gates' business, not this one's.
+ */
+export function ringCollapsed3(pts: Vec3[]): boolean {
+  if (pts.length < 3) return false;
+  let maxD = 0;
+  for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) maxD = Math.max(maxD, norm3(sub3(pts[j], pts[i])));
+  return maxD > 1e-12 && norm3(runNormal(pts)) <= 1e-4 * maxD * maxD;
+}
+
 export function runNormal(pts: Vec3[]): Vec3 {
   if (pts.length < 3) return v3(0, 0, 0);
   let best = v3(0, 0, 0);

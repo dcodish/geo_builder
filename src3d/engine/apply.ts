@@ -677,6 +677,7 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
     case 'par-plane': // #833: the ∥ twin validates identically — both are segment × 3-point plane
       return missingPoint(c, [...claim.seg, ...claim.plane]);
     case 'collinear3':
+    case 'polygon-open': // #1849
       return missingPoint(c, claim.ids);
     case 'length-eq':
       return missingPoint(c, [claim.a, claim.b]);
@@ -1113,7 +1114,16 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
             drew = true;
           }
         }
-        return { ok: true, next: drew ? nextRef : c };
+        // #1849 (ADR-3D-310): ...and the statement's MEANING — the ring is open — is verified, never dropped:
+        // a polygon bound over points the givens hold on one line is refused (M1 duality: the declaration
+        // that would mint a free polygon verifies a determined one). Recorded once per ring, whatever the
+        // vertex order the student wrote.
+        const sameRing = (ids: readonly Id[]): boolean => ids.length === nRef && cmd.ids.every((id) => ids.includes(id));
+        if (c.claims.some((k) => k.type === 'polygon-open' && sameRing(k.ids)) || c.solids.some((s) => sameRing(s.ids))) {
+          return { ok: true, next: drew ? nextRef : c };
+        }
+        nextRef.claims.push({ type: 'polygon-open', ids: [...cmd.ids], given: true });
+        return { ok: true, next: nextRef };
       }
       // #774 (ADR-3D-172): the MIXED run — some labels exist, some are new. Ownership is explicit
       // and total (docs/17: one rule owns the form, never an accident downstream): all-new declares

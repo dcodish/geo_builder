@@ -660,6 +660,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1815 (ADR-3D-309, 2-D ADR-413) — a rider's incidence that holds only on a FLAT triangle is refused, not drawn flat
   { id: 'rider-midpoint-collapse-1815', family: 'midpoint-ratio', steps: ['משולש ABC', 'M על AB', 'M אמצע BC'], expect: 'refused', note: 'M on AB and the midpoint of BC only when ABC is flat' },
   { id: 'rider-midpoint-collapse-mirror-1815', family: 'midpoint-ratio', steps: ['משולש ABC', 'D על AB', 'D אמצע AC'], expect: 'refused' },
+  // #1849 (operator ruling 2026-10-07, ADR-W-115; 3-D ADR-3D-310) — a DECLARED polygon the givens force flat is
+  // refused on the line that completes the collapse, in every builder: "a flat line is not a triangle". The 2-D
+  // gap is this issue's own 2-D stream (today 2-D builds it flat with ADR-W-048's notice); it closes there.
+  { id: 'flat-polygon-1849-538', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1849' }], note: '5 + 3 = 8: only a flat triangle' },
+  { id: 'flat-polygon-1849-538-rev', family: 'lengths', steps: ['משולש ABC', 'AC = 8', 'BC = 3', 'AB = 5'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1849' }] },
+  { id: 'flat-polygon-1849-448', family: 'lengths', steps: ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1849' }] },
+  { id: 'flat-polygon-1849-coincide', family: 'polygons', steps: ['מרובע ABCD', 'AB מתלכד עם CD'], expect: 'refused', exception: 'X7', note: 'two sides of one quadrilateral on one line (T31); «מתלכד» is 3-D vocabulary (X7)' },
+  { id: 'flat-polygon-1849-thin-control', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.9'], expect: 'builds', note: 'thin but a real triangle — the control' },
   { id: 'incircle-in', family: 'inscribed', steps: ['משולש ABC', 'במשולש ABC חסום מעגל'], expect: 'builds', exception: 'X8' },
   { id: 'length-noun-q2', family: 'lengths', steps: ['משולש ABC', 'אורך AB=BC'], expect: 'builds', note: "3-D's own spelling of an equal length (Q2): builds in all three" },
   // #1650 — a tangency typed first creates its circle (was refused in 2-D at the audit; both build now)

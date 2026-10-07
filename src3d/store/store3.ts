@@ -643,10 +643,50 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
       const owner = facts.find((f) => f.enabled && f.cmds.some((cmd) => 'id' in cmd && cmd.id === id));
       if (owner) riderOwnerIds.add(owner.id);
     }
-    const namesRider = (v: unknown): boolean =>
-      typeof v === 'string' ? riderPoints.has(v) : typeof v === 'object' && v !== null && Object.values(v).some(namesRider);
-    for (const f of facts) if (riderOwnerIds.has(f.id) || (pinOwnerIds.has(f.id) && f.cmds.some(namesRider))) collapseOwnerIds.add(f.id);
+    const names = (set: ReadonlySet<string>) => {
+      const walk = (v: unknown): boolean =>
+        typeof v === 'string' ? set.has(v) : typeof v === 'object' && v !== null && Object.values(v).some(walk);
+      return walk;
+    };
+    const namesRider = names(riderPoints);
+    if (!resolved.pivot.collapse.forced) {
+      for (const f of facts) if (riderOwnerIds.has(f.id) || (pinOwnerIds.has(f.id) && f.cmds.some(namesRider))) collapseOwnerIds.add(f.id);
+    } else {
+      /**
+       * #1849 (ADR-3D-310) — a collapse the NON-incidence givens force («AB = 5 · BC = 3 · AC = 8», «AB
+       * מתלכד עם CD»): the statements named are the pins on the collapsed polygon's own vertices that read
+       * no rider — the lengths, the coincidence — so «CD = 4» on a rider D beside 5·3·8 is not blamed, nor
+       * is a given on another object. Their claims are skipped exactly as #1815's are: the figure the claim
+       * pass would read is the unsolved sample, never a figure of the givens.
+       */
+      const namesRing = names(new Set(resolved.pivot.collapse.ring));
+      for (const f of facts) if (pinOwnerIds.has(f.id) && f.cmds.some(namesRing) && !f.cmds.some(namesRider)) collapseOwnerIds.add(f.id);
+    }
+    const blamed = [...pinOwnerIds].pop();
+    if (blamed !== undefined) collapseOwnerIds.add(blamed); // the line that completed the collapse is always named
   }
+  /**
+   * #1849 (ADR-3D-310) — a polygon declared over EXISTING points whose ring the givens hold on one line
+   * (the `polygon-open` claim failed). Refused in the same words as a declared polygon the pivot found
+   * collapsed, naming the declaration and the statements that placed its vertices — the first statement
+   * naming each one («A(0,0,0)», «D אמצע AB») — never internal state.
+   */
+  const boundPolygonCollapsed = (factId: string, ids: readonly Id[]): EngineError3 => {
+    const placedBy = new Set<string>();
+    const mentions = (id: string) => {
+      const walk = (v: unknown): boolean =>
+        typeof v === 'string' ? v === id : typeof v === 'object' && v !== null && Object.values(v).some(walk);
+      return walk;
+    };
+    for (const id of ids) {
+      const first = facts.find((f) => f.enabled && f.cmds.some(mentions(id)));
+      if (first) placedBy.add(first.id);
+    }
+    return {
+      code: 'polygon-collapsed', stated: facts.find((f) => f.id === factId)?.utterance ?? '',
+      others: namedStatements(placedBy, factId), sides: ids.length, ring: ids.join(''), forced: true,
+    };
+  };
   if (paramContradiction) {
     const blamed = paramPinOwners[paramPinOwners.length - 1];
     if (status[blamed] === 'ok')
@@ -693,7 +733,10 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
           }
         }
         if (!verifyClaim(claim, c, seed)) {
-          status[owner.factId] = sampledCarrierVerdict(claim, c, resolved) ?? { code: 'claim-refuted' };
+          status[owner.factId] =
+            claim.type === 'polygon-open'
+              ? boundPolygonCollapsed(owner.factId, claim.ids)
+              : (sampledCarrierVerdict(claim, c, resolved) ?? { code: 'claim-refuted' });
           break;
         }
       }
@@ -725,6 +768,7 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
       ? {
           code: 'polygon-collapsed', stated: f.utterance, others: namedStatements(collapseOwnerIds, blamedPinOwner),
           sides: collapse.ring.length, ring: collapse.ring.join(''),
+          ...(collapse.forced ? { forced: true as const } : {}),
         }
       : coordPinOwnerIds.has(blamedPinOwner)
         ? { code: 'injection-unsatisfiable' }

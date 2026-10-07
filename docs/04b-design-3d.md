@@ -922,6 +922,22 @@ refuses the newest pin owner `polygon-collapsed`, naming the incidences and the 
 it and it is drawn (FR-RD-7). With no placement, `derive3`'s claim pass skips claims owned by statements
 that took part in the solve — a claim cannot be refuted by a figure that has none — so the guard speaks.
 
+**A declared polygon collapsed is refused, whatever forced it** (#1849, [ADR-3D-310](06b-decisions-3d.md#adr-3d-310);
+operator ruling 2026-10-07, ADR-W-115). `settleFlatRings` (formerly `preferUncollapsed`) judges every pool
+that holds a flat kind, riders or not: the solutions with every declared ring open are kept (a collapsed
+member is dropped, so it is never a configuration to cycle to); with none, the frozen-dims retry (riders) and
+then the **open-figure retry** — the attribution's anchored search run on every row, `openSolveOn(null)`,
+admitting an exact figure with its rings open and passing `degenerate` — are offered the problem, because the
+unanchored joint solve can drift a dim the givens leave free into the collapse («AC = 8 · BC = 3» at seeds
+5 and 7). With nothing open, the pool comes back empty and marked `collapse: { ring, riderKeys, forced }`.
+The attribution now picks only the statements: `forced: false` (an incidence invented it) names the riders'
+statements as before; `forced: true` names the pin owners on the ring's own vertices that read no rider
+(«AB = 5», «BC = 3» beside the refused «AC = 8»; never «CD = 4» on a rider D), with the wording
+`err.polygonForced` / `err.polygonForcedAlone` («— וקו ישר אינו משולש»). A polygon declared over points that
+all exist (the #116 binding path) records a `polygon-open` claim (`given`), verified by the one predicate
+`ringCollapsed3` (vec3.ts) that the pivot uses too; a failing one is refused `polygon-collapsed` naming the
+statements that first placed its vertices. The #936 notice for a flattened SOLID is unchanged.
+
 ## The data panel has two kinds of row (#1196, [ADR-3D-254](06b-decisions-3d.md#adr-3d-254))
 
 Every field of `DataPanel` used to be a **measurement** — coordinates, a vector's components and
