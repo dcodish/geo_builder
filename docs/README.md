@@ -67,7 +67,7 @@ design, `02w`/`04w` for shared surfaces), registered in [`DOCS.json`](../DOCS.js
 | # | Document | What it covers |
 |---|---|---|
 | 07 | [Theorem Reference](07-theorem-reference.md) | The official bagrut theorem list (109 + appendices), bilingual, IDs + role tags. **Byte-matched against `THEOREM_TABLE` by a test** |
-| 10 | [Pedagogy](10-pedagogy.md) | The pedagogy charter (being rewritten for all four builders, #1861) |
+| 10 | [Pedagogy](10-pedagogy.md) | **The pedagogy charter for all four builders**: each principle with the operator's own words and reason, then where the tools differ. Read it before building anything a student sees. The cross-tool behaviour table is in [02w](02w-requirements-workspace.md) |
 | 12 | [Letter Placement](12-letter-placement.md) | The two levers that decide a figure's lettering: naming order and orientation |
 | 29 | [Complex formula sheet](29-complex-formula-reference.md) | The official formula sheet, transcribed. **Byte-matched against the formula table by a test** |
 | — | [`sample questions/`](sample%20questions/) | Real bagrut problems (text + image), the validation corpus. `theorem-ground-truth.md` there is read by a test |
@@ -87,6 +87,7 @@ never for *what is true now*: each carries a banner naming where its live parts 
 | # | Document | What replaced it |
 |---|---|---|
 | 09 | [Implementation Plan](archive/09-implementation-plan.md) | The ADR logs and the issue queue |
+| 10 (2026-06) | [Pedagogy, first version](archive/10-pedagogy-2026-06.md) | [10](10-pedagogy.md), the charter. Kept for the theorem feature's design intent (switched off, #740) |
 | 11 | [Architecture as a Compiler](archive/11-architecture-as-compiler.md) | [04 §1](04-design.md#1-guiding-principles), "The compiler lens" |
 | 13 | [Design Audit (2026-06-17)](archive/13-design-audit-2026-06-17.md) | Its directions became ADR-043…047 |
 | 15 | [Hardening Plan (2026-07-02)](archive/15-hardening-plan.md) | Done; its items shipped as ADR-170…207 |
