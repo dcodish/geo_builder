@@ -233,6 +233,21 @@ export const PATTERNS: Pattern[] = [
   // evaluate.ts:887 — `|AB| = |AD| references an unknown point`
   { re: /^(.+) references an unknown point$/, key: 'errors.unknownPoint', params: (m) => ({ what: m[1] }), saysSubject: true },
 
+  // step.ts collapsedPolygonError (#1849, ADR-602) — `collapsed: polygon A, B, C would be flat — |AC| = 8 cannot hold`,
+  // with the fold's optional `[vs #i]` naming the statement that DECLARED the polygon. The operator's ruling
+  // (2026-10-07) is the sentence: the line contradicts «משולש ABC», because a flat line is not a triangle — so the
+  // noun is the polygon's own (a triangle, a quadrilateral, a polygon), counted from the vertex list.
+  {
+    re: /^collapsed: polygon (.+?) would be flat(?: — (.+) cannot hold)?(?: \[vs #\d+\])?$/,
+    key: 'errors.polygonFlatTriangle',
+    keyOf: (m) => {
+      const n = m[1].split(', ').length;
+      return n === 3 ? 'errors.polygonFlatTriangle' : n === 4 ? 'errors.polygonFlatQuad' : 'errors.polygonFlatPolygon';
+    },
+    params: (m) => ({ poly: m[1].split(', ').join(''), points: m[1], what: m[2] ?? '' }),
+    saysSubject: true,
+    namesOther: true,
+  },
   // evaluate.ts:891 — `over-constrained: |AC| = 9 cannot hold`; #943 half B: the fold may append the
   // structured tail ` [vs #<fact index>]` naming the conflicting earlier statement — matched here so
   // `what` stays the bare reason, and resolved to words by the display layer (`otherUtteranceForError`).

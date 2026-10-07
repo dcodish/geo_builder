@@ -49,7 +49,7 @@ import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-ha
 import { ctxOf } from './scenario-pipeline';
 import { gateVerdict } from './submit-gate';
 import { parse } from '@/parser';
-import { computeValues, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
+import { COLLAPSED_VS, computeValues, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
 import { drivenSolveStats } from '@/engine/evaluate';
 
@@ -3640,6 +3640,26 @@ export const SCENARIOS_4: Scenario[] = [
       }
       expect(fig.construction.constraints, 'no angle value was invented').toEqual([]);
       for (const id of ['A', 'B', 'C']) expect(fig.positions.has(id), `the triangle keeps ${id}`).toBe(true);
+    },
+  },
+  {
+    id: 'flat-triangle-refused-1849',
+    title: '#1849 (ADR-602): «משולש ABC · AB = 5 · BC = 3 · AC = 8» — the closing side is REFUSED naming «משולש ABC» (a line is not a triangle); a thin 3° triangle still builds',
+    guards:
+      "Operator ruling 2026-10-07 on #1849 (playing round #1845's T30/T31): *\"refuse on all tools with a message since it contradicts ABC is a triangle and a flat line is not a triangle\"* — reversing ADR-W-048's notice for declared polygons (ADR-W-115). Measured on 3032fcbb through decideDeterministic2D + the real gate: «AC = 8» committed, the triangle drawn at flatness 1.9e-4 with the notice «המצולע ABC התמוטט לקו — הנתונים מחייבים זאת: «משולש ABC», «AC = 8»». Root cause: the step-accept gate's collapse floor (1e-4) sat below where a forced-flat solve settles, so a declared polygon the givens force flat was a SOLUTION, and the length equality the metric prover lets through was never proven. Fix (ADR-602): a stage-0h prover over the linear length statements (`forcedFlatPolygon`), the gate's floor raised to the notice band (5e-4), one refusal message from both seams, and the fold naming the polygon's declaring statement as the other side. The class matrix (both orders, 4·4·8, a ratio, a sum, a perimeter, a quadrilateral, the incidence family, the default-apex isosceles, the controls) is src/app/__tests__/issue-1849-flat-polygon-refused.test.ts.",
+    // The refused line never becomes a fact, so it is driven through the submit gate in `check`, not listed as a step.
+    steps: ['משולש ABC', 'AB = 5', 'BC = 3'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC', 'AB = 5', 'BC = 3']);
+      const v = gateVerdict(facts, 'AC = 8');
+      expect(v.kind === 'refused' && v.reason, '«AC = 8» is refused before it becomes a fact').toBe('error');
+      const m = COLLAPSED_VS.exec(v.kind === 'refused' ? v.detail ?? '' : '');
+      expect(m?.[1], 'as a flattened triangle ABC').toBe('A, B, C');
+      expect(facts[Number(m?.[3])]?.utterance, 'the other side is the statement that declared the triangle').toBe('משולש ABC');
+      // the control: a thin but real triangle on the same prefix's declaration still builds
+      const thin = gateVerdict(factsOf(['משולש ABC']), 'זווית BAC = 3');
+      expect(thin.kind, 'the 3° triangle (ADR-413’s control) commits').toBe('commit');
     },
   },
 ];
