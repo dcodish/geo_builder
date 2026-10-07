@@ -1,6 +1,6 @@
 /**
  * THEOREM_COVERAGE — the full-catalog disposition map (theorem-discovery v2, T1;
- * [docs/18 §4](../../docs/18-theorem-relevance-plan.md)).
+ * [docs/18 §4](../../docs/archive/18-theorem-relevance-plan.md)).
  *
  * The `catalog.ts` pattern applied to theorems: every citable id in
  * [07-theorem-reference.md](../../docs/07-theorem-reference.md) gets exactly ONE explicit,
@@ -10,7 +10,7 @@
  * structural equivalences (`tabled` ⇔ present in `THEOREM_TABLE`; `no-reveal` ⇔ the ADR-208
  * forbidden set; `supplemental` ⇔ the Appendix ids ADR-217 chose NOT to keep).
  *
- * `planned` slices follow the T2 fill order ([18 §10](../../docs/18-theorem-relevance-plan.md)),
+ * `planned` slices follow the T2 fill order ([18 §10](../../docs/archive/18-theorem-relevance-plan.md)),
  * which itself follows the measured corpus frequency (the fill-order report,
  * `reports/theorem-fill-order.md` — regenerate via the env-gated spec in
  * `__tests__/fill-order.test.ts`). A slice tag is an authoring aid, not a contract — T2 may

@@ -10234,7 +10234,7 @@ const showCenter: Rule = (s, ctx) => {
   return [...resolved.prepend, { type: 'name-center', center: up(resolved.center) }];
 };
 
-// EXPORTED for the shadow-matrix guard test only ([docs/15-hardening-plan.md](../../docs/15-hardening-plan.md)
+// EXPORTED for the shadow-matrix guard test only ([docs/archive/15-hardening-plan.md](../../docs/archive/15-hardening-plan.md)
 // A1 / PAR-11): the test runs EVERY rule against a corpus (not stopping at the first match) to detect a
 // later, more-specific rule whose output diverges from the earlier winner's — the first-match-wins
 // shadowing class behind ADR-119/077/166. Not part of the runtime API; `parse()` is the only entry point.

@@ -13,8 +13,8 @@ work) and `gh issue list --label analytic`. A guard test rejects dated progress 
 The **fourth** app in this repo, for the bagrut **analytic-geometry** question (שאלון 572 Q1): the
 coordinate plane, with points, lines, circles and canonical conics as objects carrying equations.
 **Contract:** [02c](../docs/02c-requirements-analytic.md) (what) · [04c](../docs/04c-design-analytic.md) (how) ·
-decisions `ADR-AG-NNN` in [06c](../docs/06c-decisions-analytic.md); [docs/19](../docs/archive/19-analytic-geometry-tool.md)
-is the finished build plan, archived history. Issue label `analytic`.
+decisions `ADR-AG-NNN` in [06c](../docs/06c-decisions-analytic.md). The finished build plan (docs/19) is
+archived; see the archive table in [docs/README](../docs/README.md). Issue label `analytic`.
 
 Deployed at `/analytic-builder/` (`products.json` is the deploy record).
 

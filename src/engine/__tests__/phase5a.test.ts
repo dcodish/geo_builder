@@ -1,5 +1,5 @@
 /**
- * Phase-5a acceptance gate (docs/09-implementation-plan.md §Phase 5a).
+ * Phase-5a acceptance gate (docs/archive/09-implementation-plan.md §Phase 5a).
  * General quadrilateral + parallelogram + arbitrary segment + line∩line
  * intersection, then **reproduce corpus Q1** (parallelogram ABCD, diagonal AC,
  * E on AC, segments BE & BD) end-to-end from typed utterances.

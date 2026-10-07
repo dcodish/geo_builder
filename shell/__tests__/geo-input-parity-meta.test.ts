@@ -11,6 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EXCEPTIONS,
+  GAP_ISSUES,
   PARITY_ROWS,
   PRODUCTS,
   UNCOVERED_CATALOG,
@@ -63,7 +64,7 @@ describe('#1649 — the rows are well formed', () => {
 
   it('a known gap with no filed issue is rejected (no `to-file:` placeholder can be committed)', () => {
     const row = { id: 'x', family: 'lengths', steps: ['משולש ABC', 'AB = 6'], expect: 'builds', knownGap: [{ product: '3d', issue: 'to-file:3d-x' }] } as unknown as ParityRow;
-    expect(rowFaults([row])).toEqual([expect.stringMatching(/names no filed issue/)]);
+    expect(rowFaults([row], {})).toEqual([expect.stringMatching(/names no filed issue/)]);
   });
 
   it('the seed is the size the audit asked for: parity, known-gap and exception rows in every product', () => {
@@ -89,6 +90,50 @@ describe('#1649 — the rows are well formed', () => {
     expect(PARITY_ROWS.some((r) => r.expect !== 'builds')).toBe(true);
     expect(PARITY_ROWS.some((r) => PRODUCTS.some((p) => roleOf(r, p) === 'must-refuse'))).toBe(true);
     expect(PARITY_ROWS.some((r) => r.knownGap?.length)).toBe(true);
+  });
+});
+
+/**
+ * #1861 C4 (ADR-W-118 B15): EVERY KNOWN GAP NAMES OPEN WORK, OR SAYS IT IS PARKED.
+ *
+ * The audit found 258 of the gap entries citing issues that were closed or in the icebox, so the rows claimed
+ * scheduled work that nobody was scheduled to do. The issue states are a snapshot in the fixture (`GAP_ISSUES`)
+ * because a test cannot call GitHub; these cases show `rowFaults` holds the rows to it in both directions.
+ */
+describe('#1861 — a known gap names an open issue, or is parked', () => {
+  const gapRow = (gap: Record<string, unknown>) =>
+    ({ id: 'g', family: 'lengths', steps: ['משולש ABC', 'AB = 6'], expect: 'builds', knownGap: [{ product: '3d', ...gap }] }) as unknown as ParityRow;
+
+  it('the real rows exercise both states (the checks below are not vacuous)', () => {
+    const gaps = PARITY_ROWS.flatMap((r) => r.knownGap ?? []);
+    expect(gaps.some((g) => g.parked)).toBe(true);
+    expect(gaps.some((g) => !g.parked)).toBe(true);
+    expect(Object.values(GAP_ISSUES)).toContain('open');
+    expect(Object.values(GAP_ISSUES).some((s) => s !== 'open')).toBe(true);
+  });
+
+  it('a gap on a closed or iceboxed issue that is not parked is a fault', () => {
+    expect(rowFaults([gapRow({ issue: '#1' })], { '#1': 'closed' })).toEqual([expect.stringMatching(/which is closed — mark the gap `parked: true`/)]);
+    expect(rowFaults([gapRow({ issue: '#1' })], { '#1': 'icebox' })).toEqual([expect.stringMatching(/which is icebox — mark the gap `parked: true`/)]);
+    expect(rowFaults([gapRow({ issue: '#1', parked: true })], { '#1': 'icebox' })).toEqual([]);
+  });
+
+  it('a parked gap on an open issue is a fault', () => {
+    expect(rowFaults([gapRow({ issue: '#2', parked: true })], { '#2': 'open' })).toEqual([expect.stringMatching(/is parked, but #2 is open/)]);
+    expect(rowFaults([gapRow({ issue: '#2' })], { '#2': 'open' })).toEqual([]);
+  });
+
+  it('a gap on an issue the snapshot does not list, and a snapshot entry that owns no gap, are faults', () => {
+    expect(rowFaults([gapRow({ issue: '#3' })], {})).toEqual([expect.stringMatching(/names #3, which GAP_ISSUES does not list/)]);
+    expect(rowFaults([gapRow({ issue: '#3' })], { '#3': 'open', '#4': 'closed' })).toEqual([expect.stringMatching(/GAP_ISSUES lists #4, which owns no known gap/)]);
+  });
+
+  it('the broken variant: the real rows with every `parked` stripped fail once per parked gap', () => {
+    const parked = PARITY_ROWS.flatMap((r) => (r.knownGap ?? []).filter((g) => g.parked)).length;
+    const stripped = PARITY_ROWS.map((r) => (r.knownGap ? { ...r, knownGap: r.knownGap.map(({ parked: _p, ...g }) => g) } : r));
+    const faults = rowFaults(stripped);
+    expect(faults).toHaveLength(parked);
+    for (const f of faults) expect(f).toMatch(/mark the gap `parked: true`/);
   });
 });
 

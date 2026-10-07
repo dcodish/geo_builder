@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { SCENARIOS } from './scenarios-corpus';
 
 /**
- * Scenario-doc parity ([docs/15-hardening-plan.md](../../docs/15-hardening-plan.md) A6 / TST-7, ADR-174).
+ * Scenario-doc parity ([docs/archive/15-hardening-plan.md](../../docs/archive/15-hardening-plan.md) A6 / TST-7, ADR-174).
  * Every scenario in `SCENARIOS` must be indexed in [docs/test-scenarios.md](../../docs/test-scenarios.md)
  * — the operator's human-readable regression audit trail (repo standing rule). The index had drifted ~34
  * behind the code; this guard fails CI if any id is unindexed, so it can never silently drift again.

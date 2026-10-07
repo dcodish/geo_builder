@@ -1,7 +1,7 @@
 /**
  * Phase 6 — theorem surfacing: the data model.
  *
- * A pure, read-only consumer of the engine (the [Phase-6 plan](docs/16-theorems-plan.md), sibling to
+ * A pure, read-only consumer of the engine (the [Phase-6 plan](docs/archive/16-theorems-plan.md), sibling to
  * `detectRelations`/`detectShapes`). `detectTheorems(facts, construction, shapes)` re-derives, from the
  * student's STATED givens, the bagrut theorems those givens *announce* — never anything the engine
  * DERIVED (the stated-vs-derived principle, plan §2). The match path is symbolic: no `replay`/`evaluate`

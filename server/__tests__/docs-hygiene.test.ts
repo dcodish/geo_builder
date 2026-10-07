@@ -25,9 +25,17 @@
  *
  * ## Grandfather lists are asserted EXACT
  *
- * `index.grandfathered` and `frIds.grandfathered` use `toEqual`, not "at most". A new violation fails,
- * and so does fixing one without shrinking the list. They are the record of a known debt (#904 Phases
- * 2-3), not a place for exceptions to accumulate — the mechanism that lets a guard rot into decoration.
+ * `index.grandfathered`, `frIds.grandfathered` and `frIds.duplicatesGrandfathered` use `toEqual`, not "at most".
+ * A new violation fails, and so does fixing one without shrinking the list. They are the record of a known debt
+ * (#904 Phases 2-3; #1861 step 4), not a place for exceptions to accumulate — the mechanism that lets a guard
+ * rot into decoration.
+ *
+ * ## The #1861 C4 guards (ADR-W-119)
+ *
+ * A superseded ADR says so; requirement ids are unique; an ADR that names a ladder appears in it; instruction
+ * files point at live docs; MEMORY.md has a ceiling (an `orientationFiles` entry). Each reads its enumeration
+ * from DOCS.json and opens with a NEGATIVE CONTROL that plants its defect in a synthetic string: a guard that
+ * passes by checking nothing is the failure the audit found repeatedly.
  */
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
@@ -215,6 +223,76 @@ describe('orientation files stay orientation files (ADR-W-002)', () => {
   });
 });
 
+/**
+ * INSTRUCTION FILES NEVER POINT AT AN ARCHIVED OR DELETED DOC (#1861 C4).
+ *
+ * A session follows these files as instructions, so a link in one is an instruction to read that file. After the
+ * C1 reorganisation two product CLAUDE.md files still sent sessions to their archived build plans, which
+ * contradict the specs that replaced them. Every link and every `docs/…/*.md` path must resolve on disk and must
+ * not lead into `docs/archive/`. A deleted doc fails the existence half by itself, so no list of deleted names is
+ * kept: the next deletion is caught without editing anything.
+ */
+const INSTR = DOCS.instructionFiles as { roots: string[]; archive: string };
+
+function instructionRefFaults(file: string, text: string, existsRel: (p: string) => boolean): string[] {
+  const faults = new Set<string>();
+  const check = (cited: string, target: string) => {
+    if (target.startsWith(INSTR.archive)) faults.add(`${file} → ${cited}: archived history, not an instruction`);
+    else if (!existsRel(target)) faults.add(`${file} → ${cited}: no such file`);
+  };
+  // markdown links, resolved against the file's own folder (src3d/CLAUDE.md links ../docs/…)
+  for (const m of text.matchAll(/\]\((?![a-z]+:)([^)#\s]+\.md)(?:#[^)]*)?\)/g)) {
+    check(m[1], path.posix.normalize(path.posix.join(path.posix.dirname(file), m[1])));
+  }
+  // a bare repo path in prose or code spans, which is read from the repo root
+  for (const m of text.matchAll(/(?<![\w./-])docs\/[\w./-]*?\.md/g)) check(m[0], m[0]);
+  return [...faults];
+}
+
+const instructionFiles = (): string[] => {
+  const walk = (dir: string): string[] =>
+    fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(`${dir}/${e.name}`) : e.name.endsWith('.md') ? [`${dir}/${e.name}`] : [],
+    );
+  return [...new Set([...ORIENTATION.map(([f]) => f), ...INSTR.roots.flatMap(walk)])].sort();
+};
+
+describe('instruction files never point at an archived or deleted doc (#1861 C4)', () => {
+  it('the reference reader catches an archived link, an archived path and a deleted file (negative control)', () => {
+    const live = (p: string) => p === 'docs/README.md' || p === 'docs/22-workflow.md';
+    expect(
+      instructionRefFaults(
+        'src3d/CLAUDE.md',
+        [
+          'the plan, [docs/20](../docs/archive/20-space-vectors-tool.md), is history',
+          'see `docs/archive/21-572-coverage-audit.md`',
+          'the log lives in docs/PROJECT-MEMORY.md',
+          'live: [README](../docs/README.md), `docs/22-workflow.md`, [web](https://example.com/x.md)',
+          '`docs/archive/` holds finished plans', // the folder, named: not a link to a file
+        ].join('\n'),
+        live,
+      ),
+    ).toEqual([
+      'src3d/CLAUDE.md → ../docs/archive/20-space-vectors-tool.md: archived history, not an instruction',
+      'src3d/CLAUDE.md → docs/archive/21-572-coverage-audit.md: archived history, not an instruction',
+      'src3d/CLAUDE.md → docs/PROJECT-MEMORY.md: no such file',
+    ]);
+  });
+
+  it('every link and docs path in an instruction file resolves to a live doc', () => {
+    const files = instructionFiles();
+    expect(files, 'the orientation files and the skill/agent/memory roots').toEqual(expect.arrayContaining(['CLAUDE.md', '.claude/memory/MEMORY.md']));
+    expect(files.length, 'no instruction files found — the roots moved').toBeGreaterThan(10);
+    const faults = files.flatMap((f) => instructionRefFaults(f, read(f), exists));
+    expect(
+      faults,
+      `an instruction file points a session at a doc that is archived (history, never rules) or gone. Point it at ` +
+        `the live home the archive banner names, or, where the history is the point, name it in plain text ` +
+        `("the finished build plan is archived; see docs/README's archive table").`,
+    ).toEqual([]);
+  });
+});
+
 describe('the documentation registry is total (ADR-W-041)', () => {
   it('every products.json id has a DOCS.json entry', () => {
     const missing = PRODUCTS.products
@@ -265,18 +343,58 @@ describe('docs/README.md indexes every document (ADR-W-041)', () => {
   });
 });
 
-describe('every FR id resolves to a definition (ADR-W-041)', () => {
-  it('cited FR ids are defined in a registered requirements doc', () => {
-    const reqDocs = entries<Record<string, unknown>>(DOCS.products)
-      .map(([, cfg]) => cfg.requirements as string | null)
-      .filter((p): p is string => Boolean(p));
-    expect(reqDocs.length, 'no requirements docs registered').toBeGreaterThan(0);
+/** An FR id. The workspace-wide requirement family; a doc's own family is DOCS.json `frIds.localIds`. */
+const FR_ID = String.raw`FR-[A-Z]+-\d+[a-z]*`;
 
-    // A DEFINITION is the bold declaration form (**FR-XX-N (Tier)**); everything else is a citation.
+/**
+ * Every requirement DEFINITION in `text`, id → 1-based lines. A definition is `**` + the id + ` (` (a tier:
+ * `**FR-IN-4 (Must)**`, `**FR-HS-9 (Could — planned)**`) or ` —` (a title inside the bold: `**FR-IN-4d (Must) —`
+ * starts with the tier, `**FR-HS-4 — WITHDRAWN`, `**R59 — …`). Everything else is a citation: `**FR-REF-1** idea`,
+ * `**R13** — the open question`, `**R60 amendment`. The tier-only form `**FR-X (Tier)**` the uniqueness check
+ * used to match saw 83 of docs/02's 104 definitions, so FR-IN-7d and FR-IN-9 were each defined twice unseen.
+ */
+const definitionsIn = (text: string, idPattern: string): Map<string, number[]> => {
+  const out = new Map<string, number[]>();
+  const re = new RegExp(String.raw`\*\*(${idPattern})(?= \(| —)`, 'g');
+  text.split('\n').forEach((line, i) => {
+    for (const m of line.matchAll(re)) out.set(m[1], [...(out.get(m[1]) ?? []), i + 1]);
+  });
+  return out;
+};
+
+/** The registered requirements docs, deduplicated (the workspace and the server share 02w). */
+const REQ_DOCS = [
+  ...new Set(
+    entries<Record<string, unknown>>(DOCS.products)
+      .map(([, cfg]) => cfg.requirements as string | null)
+      .filter((p): p is string => Boolean(p)),
+  ),
+];
+
+describe('every FR id resolves to a definition (ADR-W-041)', () => {
+  it('the definition reader sees every declaration form and no citation (negative control)', () => {
+    const text = [
+      '- **FR-AB-1 (Must)** — tier form',
+      '- **FR-AB-2 (Must) — a title inside the bold.** text',
+      '**FR-AB-3 — WITHDRAWN (2026-09-06)** text',
+      '- **FR-AB-4 (Could — planned)** — text',
+      'the **FR-AB-5** idea, and a plain FR-AB-6 citation',
+      '**R7 — a local definition**',
+      '2. **R8** — an open question that cites it',
+      '**R9 amendment (2026-09-21)**',
+    ].join('\n');
+    expect([...definitionsIn(text, FR_ID).keys()]).toEqual(['FR-AB-1', 'FR-AB-2', 'FR-AB-3', 'FR-AB-4']);
+    expect([...definitionsIn(text, String.raw`R\d+[a-z]*`).keys()]).toEqual(['R7']);
+    // the duplicate the tier-only matcher could not see: one definition in each form
+    expect(definitionsIn('- **FR-AB-2 (Should)** — x\n- **FR-AB-2 (Must) — y.** z', FR_ID).get('FR-AB-2')).toEqual([1, 2]);
+  });
+
+  it('cited FR ids are defined in a registered requirements doc', () => {
+    expect(REQ_DOCS.length, 'no requirements docs registered').toBeGreaterThan(0);
+
+    // A DEFINITION is the bold declaration form (`definitionsIn`); everything else is a citation.
     const defined = new Set<string>();
-    for (const doc of reqDocs) {
-      for (const m of read(doc).matchAll(/\*\*(FR-[A-Z]+-\d+[a-z]*)/g)) defined.add(m[1]);
-    }
+    for (const doc of REQ_DOCS) for (const id of definitionsIn(read(doc), FR_ID).keys()) defined.add(id);
 
     // The lookbehind is load-bearing: without it `NFR-SE-1` reads as a citation of `FR-SE-1`.
     // That false positive appeared twice in the audit that produced #904.
@@ -301,35 +419,38 @@ describe('every FR id resolves to a definition (ADR-W-041)', () => {
   // twice in 02b, and every citation of them was ambiguous while the suite reported green. An enumeration
   // checked one way and unchecked the other is the ADR-W-041 class itself. Defined at most once, across
   // every registered requirements doc together (an id is a workspace-wide name, not a per-file one).
-  it('every FR id is DEFINED at most once across the registered requirements docs', () => {
-    // Deduplicated: two products may legitimately register ONE requirements doc (the workspace and the
-    // shell share 02w), and a shared doc is not a doc that defines its ids twice.
-    const reqDocs = [
-      ...new Set(
-        entries<Record<string, unknown>>(DOCS.products)
-          .map(([, cfg]) => cfg.requirements as string | null)
-          .filter((p): p is string => Boolean(p)),
-      ),
-    ];
+  //
+  // #1861 C4 widened it to every declaration form (`definitionsIn`) and to each doc's LOCAL id family (02c's
+  // `R<n>`, DOCS.json `frIds.localIds`), where R59, R60, R61, R92 and R122 were each defined two or three times.
+  // Deduplicated docs: two products may legitimately register ONE requirements doc (the workspace and the
+  // shell share 02w), and a shared doc is not a doc that defines its ids twice.
+  it('every requirement id is DEFINED once: FR ids across the registered docs, a local id within its doc', () => {
     const where = new Map<string, string[]>();
-    for (const doc of reqDocs) {
-      const lines = read(doc).split('\n');
-      lines.forEach((line, i) => {
-        for (const m of line.matchAll(/\*\*(FR-[A-Z]+-\d+[a-z]*) \((?:Must|Should|Could|Later|Won't)\)\*\*/g)) {
-          const list = where.get(m[1]) ?? [];
-          list.push(`${doc}:${i + 1}`);
-          where.set(m[1], list);
-        }
-      });
+    const add = (doc: string, defs: Map<string, number[]>) => {
+      for (const [id, lines] of defs) where.set(id, [...(where.get(id) ?? []), ...lines.map((l) => `${doc}:${l}`)]);
+    };
+    for (const doc of REQ_DOCS) add(doc, definitionsIn(read(doc), FR_ID));
+    const local = entries<string>(DOCS.frIds.localIds);
+    expect(local.length, 'DOCS.json frIds.localIds is empty').toBeGreaterThan(0);
+    for (const [doc, prefix] of local) {
+      const defs = definitionsIn(read(doc), String.raw`${escapeRe(prefix)}\d+[a-z]*`);
+      expect(defs.size, `no ${prefix}<n> definitions in ${doc} — the definition form changed`).toBeGreaterThan(50);
+      add(doc, defs);
     }
-    expect(where.size, 'no FR definitions found — the definition matcher is broken').toBeGreaterThan(0);
-    const duplicates = [...where].filter(([, sites]) => sites.length > 1).map(([id, sites]) => `${id} → ${sites.join(', ')}`).sort();
+    expect(where.size, 'no FR definitions found — the definition matcher is broken').toBeGreaterThan(300);
+
+    const duplicates = Object.fromEntries(
+      [...where].filter(([, sites]) => sites.length > 1).map(([id, sites]) => [id, sites.length]),
+    );
+    const sites = Object.keys(duplicates).map((id) => `${id} → ${where.get(id)!.join(', ')}`);
     expect(
       duplicates,
-      `FR ids defined more than once. Two definitions under one id are two promises with one name, and every ` +
-        `citation of that id is ambiguous. Renumber the NEWER definition (the older id is already cited from shipped ADRs) ` +
-        `and update its citations in the same commit.`,
-    ).toEqual([]);
+      `requirement ids defined more than once (id → definitions; sites: ${sites.join(' · ')}). Two definitions ` +
+        `under one id are two promises with one name, and every citation of that id is ambiguous. Renumber the ` +
+        `NEWER definition (the older id is already cited from shipped ADRs) and update its citations in the same ` +
+        `commit. Expected exactly DOCS.json frIds.duplicatesGrandfathered (emptied by #${DOCS.frIds.duplicateIssue}); ` +
+        `if you FIXED one, shrink the list.`,
+    ).toEqual(DOCS.frIds.duplicatesGrandfathered);
   });
 });
 
@@ -359,6 +480,197 @@ describe('new ADRs declare their requirements and design impact (ADR-W-041)', ()
         `**Design:** lines — naming the FR ids / design sections touched, or the words ` +
         `"none (internal)". Earlier ADRs are grandfathered by id, so this never asks you to ` +
         `backfill history. See ADR-W-041.`,
+    ).toEqual([]);
+  });
+});
+
+/** One `^#+ ADR-…` heading and what follows it, up to the next one. */
+interface AdrSection {
+  log: string;
+  id: string;
+  /** a DECLARATION (`ADR-N — title`), as opposed to an amendment or a bare wrapper heading */
+  decl: boolean;
+  /** the heading plus the next `n` lines — where a Status line and its stamps sit */
+  block: (n: number) => string;
+  body: string;
+}
+
+const sectionsOf = (log: string, text: string): AdrSection[] => {
+  const lines = text.split('\n');
+  const headRe = new RegExp(String.raw`^#+\s*(${ADR_ID})\b`);
+  const declRe = new RegExp(String.raw`^#+\s*${ADR_ID}\s+—`);
+  const heads = lines.flatMap((l, i) => {
+    const m = l.match(headRe);
+    return m ? [{ id: m[1], i, decl: declRe.test(l) }] : [];
+  });
+  return heads.map((h, k) => {
+    const end = heads[k + 1]?.i ?? lines.length; // a block never reads into the next entry
+    return {
+      log,
+      id: h.id,
+      decl: h.decl,
+      block: (n: number) => lines.slice(h.i, Math.min(h.i + 1 + n, end)).join('\n'),
+      body: lines.slice(h.i + 1, end).join('\n'),
+    };
+  });
+};
+
+const LOG_TEXTS: [string, string][] = ADR_LOGS.map(([log]) => [log, read(log)]);
+
+/**
+ * A SUPERSEDED ADR POINTS TO ITS SUCCESSOR (#1861 C4, ADR-W-118).
+ *
+ * ADR-513 was superseded by ADR-602 and said nothing, so a session reading 513 built on a withdrawn rule. A
+ * supersession is a claim the SUCCESSOR makes, so it is read off the successor's body: one of DOCS.json
+ * `supersession.verbs`, then, within `window` characters with no clause break (`, ; . )` or "nothing") before
+ * it, an ADR id. The clause-break rule is measured, not tidy: without it «the pass this replaces), [ADR-367]»
+ * and «Supersedes nothing; extends [ADR-3D-110]» read as supersessions.
+ */
+const SUP = DOCS.supersession as { verbs: string[]; window: number; blockLines: number };
+
+function supersessionTargets(body: string): string[] {
+  const verb = new RegExp(String.raw`\b(?:${SUP.verbs.map(escapeRe).join('|')})\b`, 'g');
+  const id = new RegExp(String.raw`${ADR_ID}\b`);
+  const out: string[] = [];
+  for (const m of body.matchAll(verb)) {
+    const rest = body.slice(m.index! + m[0].length);
+    const hit = rest.match(id);
+    if (!hit || hit.index! > SUP.window) continue;
+    if (/[,;.)]|\bnothing\b/.test(rest.slice(0, hit.index))) continue;
+    out.push(hit[0]);
+  }
+  return out;
+}
+
+/** Every successor → target pair whose target's heading block carries no back-pointer. */
+function supersessionFaults(logs: [string, string][]): { pairs: number; faults: string[] } {
+  const sections = logs.flatMap(([log, text]) => sectionsOf(log, text));
+  const declared = new Map(sections.filter((s) => s.decl).map((s) => [s.id, s]));
+  const seen = new Set<string>();
+  const faults: string[] = [];
+  for (const s of sections) {
+    for (const target of supersessionTargets(s.body)) {
+      const key = `${s.id} → ${target}`;
+      if (target === s.id || seen.has(key)) continue;
+      seen.add(key);
+      const t = declared.get(target);
+      if (!t) {
+        faults.push(`${key}: ${s.log} supersedes an ADR no log declares`);
+        continue;
+      }
+      const block = t.block(SUP.blockLines);
+      if (!/superseded/i.test(block) && !block.includes('⚠') && !new RegExp(String.raw`${escapeRe(s.id)}\b`).test(block)) {
+        faults.push(`${key}: ${target} (${t.log}) does not say it is superseded`);
+      }
+    }
+  }
+  return { pairs: seen.size, faults };
+}
+
+describe('a superseded ADR points to its successor (#1861 C4)', () => {
+  it('the claim reader finds supersessions and skips what is not one (negative control)', () => {
+    expect(supersessionTargets('**Status:** accepted · **Supersedes:** [ADR-048](#adr-048) · x')).toEqual(['ADR-048']);
+    expect(supersessionTargets('This **reverses ADR-211\'s background-fold choice**')).toEqual(['ADR-211']);
+    expect(supersessionTargets('**Withdraws** [ADR-3D-002](#adr-3d-002) decision 1')).toEqual(['ADR-3D-002']);
+    expect(supersessionTargets('**Supersedes nothing; extends [ADR-3D-110](#adr-3d-110)**')).toEqual([]);
+    expect(supersessionTargets('(`withCarrierMembership`, the word-presence pass this replaces), [ADR-367](#adr-367)')).toEqual([]);
+    expect(supersessionTargets('the ring in force replaces the ids at lowering, the ADR-341 rotation')).toEqual([]);
+    expect(supersessionTargets('supersedes a clause that runs on for far longer than the window allows ADR-100')).toEqual([]);
+  });
+
+  it('an unstamped target is a fault, and a stamp, a ⚠ or the successor id clears it (negative control)', () => {
+    const log = (status: string) => [
+      'docs/x.md',
+      ['## ADR-1 — the old rule', '', status, '', '## ADR-2 — the new rule', '', '**Status:** accepted · **Supersedes:** [ADR-1](#adr-1)'].join('\n'),
+    ] as [string, string];
+    expect(supersessionFaults([log('**Status:** accepted')]).faults).toEqual([expect.stringMatching(/^ADR-2 → ADR-1: ADR-1 .* does not say it is superseded/)]);
+    expect(supersessionFaults([log('**Status:** accepted · **⚠ Superseded by [ADR-2](#adr-2) (2026-10-07):** x')]).faults).toEqual([]);
+    expect(supersessionFaults([log('**Status:** accepted · amended by ADR-2')]).faults).toEqual([]);
+    const orphan: [string, string] = ['docs/y.md', '## ADR-5 — x\n\n**Supersedes** [ADR-4](#adr-4)'];
+    expect(supersessionFaults([orphan]).faults).toEqual([expect.stringMatching(/supersedes an ADR no log declares/)]);
+  });
+
+  it('every superseded ADR, in every log, carries a back-pointer in its heading block', () => {
+    const { pairs, faults } = supersessionFaults(LOG_TEXTS);
+    expect(pairs, 'no supersession claims parsed — the verb list or the log format changed').toBeGreaterThan(20);
+    expect(
+      faults,
+      `an ADR is superseded, reversed, withdrawn or replaced by a later one and its heading block (the heading and ` +
+        `the next ${SUP.blockLines} lines) says nothing. Stamp the TARGET's Status line: ` +
+        `" · **⚠ Superseded by [ADR-N](#adr-n) (date):** <what changed>" — "Partly superseded" when only a clause ` +
+        `goes. A session reading the old entry must learn from it that it no longer holds.`,
+    ).toEqual([]);
+  });
+});
+
+/**
+ * AN ADR THAT NAMES A LADDER APPEARS IN IT (#1861 C4).
+ *
+ * docs/LADDER.md says every mechanism ADR "must state 'inserts at stage N.x' and update this file". ADR-551
+ * named LADDER as its design home and LADDER had no row for it. From each log's `contractFrom` on (the ADRs
+ * bound to carry a Design line), a ladder-claim field (DOCS.json `ladders.fields`) whose value does not start
+ * with "none" and names a ladder file obliges that file to contain the ADR's id.
+ */
+const LADDERS = DOCS.ladders as { files: Record<string, string>; fields: string[] };
+
+function ladderCitations(body: string): string[] {
+  const field = new RegExp(String.raw`\*\*(?:${LADDERS.fields.map(escapeRe).join('|')})[:.]\*\*([^\n]*)`, 'g');
+  const out = new Set<string>();
+  for (const m of body.matchAll(field)) {
+    const value = m[1].split(/\*\*[^*\n]{1,30}[:.]\*\*/)[0]; // up to the next bold field on the line
+    if (/^\s*none\b/i.test(value)) continue;
+    for (const name of Object.keys(LADDERS.files)) {
+      if (new RegExp(String.raw`(?<![\w-])${escapeRe(name)}\.md\b|docs/${escapeRe(name)}(?![\w-])`).test(value)) out.add(name);
+    }
+  }
+  return [...out];
+}
+
+function ladderFaults(logs: [string, string][], ladderText: (name: string) => string): { cited: number; faults: string[] } {
+  let cited = 0;
+  const faults: string[] = [];
+  for (const [log, text] of logs) {
+    const cfg = Object.fromEntries(ADR_LOGS)[log] ?? { idPrefix: '', contractFrom: 0 };
+    const own = new RegExp(String.raw`^ADR-${escapeRe(cfg.idPrefix)}(\d+)$`);
+    for (const s of sectionsOf(log, text)) {
+      const n = s.id.match(own);
+      if (!n || Number(n[1]) < cfg.contractFrom) continue;
+      for (const name of ladderCitations(s.body)) {
+        cited += 1;
+        if (!new RegExp(String.raw`${escapeRe(s.id)}\b`).test(ladderText(name))) {
+          faults.push(`${s.id} (${log}) names ${LADDERS.files[name]}, which never mentions it`);
+        }
+      }
+    }
+  }
+  return { cited, faults };
+}
+
+describe('an ADR that names a ladder appears in it (#1861 C4)', () => {
+  it('the citation reader takes a named file, and not a bare word or a "none" (negative control)', () => {
+    expect(ladderCitations('**Design:** docs/LADDER (stage 0, the pre-ladder provers)')).toEqual(['LADDER']);
+    expect(ladderCitations('**Design:** [04](04-design.md) · [LADDER](LADDER.md) stage 5')).toEqual(['LADDER']);
+    expect(ladderCitations('**Ladder:** stage 0d′ ([LADDER-CX](LADDER-CX.md))')).toEqual(['LADDER-CX']);
+    expect(ladderCitations('**Design:** docs/04b — the derive; LADDER unchanged')).toEqual([]);
+    expect(ladderCitations('**LADDER stage:** none — pre-ladder. `docs/LADDER.md` needs no edit.')).toEqual([]);
+    expect(ladderCitations('**Design:** [04](04-design.md). **LADDER stage:** parse.')).toEqual([]);
+  });
+
+  it('a cited ladder that never mentions the ADR is a fault (negative control)', () => {
+    const log: [string, string] = ['docs/06-decisions.md', '## ADR-9000 — x\n\n**Design:** [LADDER](LADDER.md) stage 0'];
+    expect(ladderFaults([log], () => 'no rows here').faults).toEqual([expect.stringMatching(/^ADR-9000 .* names docs\/LADDER\.md, which never mentions it/)]);
+    expect(ladderFaults([log], () => '| 0z | the prover ([ADR-9000](06-decisions.md#adr-9000)) |').faults).toEqual([]);
+  });
+
+  it('every ladder an ADR names lists that ADR', () => {
+    for (const p of Object.values(LADDERS.files)) expect(exists(p), `${p} is missing`).toBe(true);
+    const { cited, faults } = ladderFaults(LOG_TEXTS, (name) => read(LADDERS.files[name]));
+    expect(cited, 'no ladder citations parsed — the field list or the log format changed').toBeGreaterThan(20);
+    expect(
+      faults,
+      `these ADRs name a ladder as where their mechanism lives, and the ladder has no row for them. Add the row ` +
+        `at the stage the ADR names, after reading the code it describes (the ladder is the ORDER the mechanisms ` +
+        `fire in), or correct the ADR's Design line if it never touched the ladder.`,
     ).toEqual([]);
   });
 });

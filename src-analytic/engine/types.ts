@@ -5,7 +5,7 @@
  * invariant, carried over): positions are never stored, so undo cannot desync. What is different
  * here — and it is the deepest difference from the synthetic tool — is that **the gauge is
  * pinned**. There is an absolute coordinate frame, so a coordinate is KNOWLEDGE rather than one
- * sample's accident ([docs/19 §6](../../docs/19-analytic-geometry-tool.md)). The honesty gate
+ * sample's accident ([docs/19 §6](../../docs/archive/19-analytic-geometry-tool.md)). The honesty gate
  * moves accordingly: what must be checked is no longer "is this position meaningful" but "is this
  * value invariant across every admissible parameter value".
  *

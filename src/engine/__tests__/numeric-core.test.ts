@@ -1,6 +1,6 @@
 /**
  * CHARACTERIZATION locks for the untested numeric core of the 2-D engine
- * (slice S0.3 of docs/24-foundation-hardening-plan.md).
+ * (slice S0.3 of docs/archive/24-foundation-hardening-plan.md).
  *
  * These tests lock the CURRENT observed behaviour of the low-level numeric
  * primitives — `nelderMead`, `argMin`, `drivenRoots`, `multiStartSolve`,

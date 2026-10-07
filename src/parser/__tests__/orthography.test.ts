@@ -1,5 +1,5 @@
 /**
- * Orthography normalization at the parse boundary ([docs/15-hardening-plan.md] C1 / PAR-7).
+ * Orthography normalization at the parse boundary ([docs/archive/15-hardening-plan.md] C1 / PAR-7).
  *
  * Word/PDF paste the Hebrew MAQAF `־` (U+05BE) where the grammar expects an ASCII hyphen, and copy
  * invisible bidi/zero-width control chars into mixed He/Latin text — both silently broke the parser's

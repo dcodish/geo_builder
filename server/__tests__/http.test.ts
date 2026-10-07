@@ -1,5 +1,5 @@
 /**
- * clientIp / rate-limiter unit tests ([docs/15-hardening-plan.md](../../docs/15-hardening-plan.md) B1 / SEC-1).
+ * clientIp / rate-limiter unit tests ([docs/archive/15-hardening-plan.md](../../docs/archive/15-hardening-plan.md) B1 / SEC-1).
  *
  * The security review found `clientIp` trusted the FIRST X-Forwarded-For entry, but Apache
  * `mod_proxy_http` APPENDS the real peer — so the first entry is client-forgeable and the limiter

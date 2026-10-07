@@ -13,7 +13,7 @@ sibling: **the student types the givens, the tool reproduces the figure and veri
 solves the exam question.**
 
 **Contract, not catalogue.** The sentence families the language is built from are the appendix
-*Grammar families* below (moved from docs/27 §10 and §10b), which is the authoritative grammar contract.
+*Grammar families* below, which is the authoritative grammar contract.
 What parses today is the catalogue, [`src-complex/parser/catalog.ts`](../src-complex/parser/catalog.ts),
 the coverage map. The formula
 sheet is [docs/29](29-complex-formula-reference.md) — **byte-matched against the formula table by a
@@ -28,6 +28,15 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
 (`FR-[A-Z]+-\d+`). "Must" = the product is dishonest or broken without it; "Should" = desirable;
 "Later" = not yet.
 
+## How this document is organised
+
+The promises are grouped by what a student meets: **The figure** (the Gauss plane and what it shows),
+**Exactness and configuration** (what is exact, solution sets, parameters, the number forms read),
+**Knowledge and claims** (what the panel prints and how a claim is answered) and **Input honesty**
+(nothing dropped, refusals, radicals), then the **Non-goals** and the appendix **Grammar families**. Each
+requirement is one promise, any ruled change not yet shipped, and a Sources line naming the ADRs and issues
+behind it; their history is in [06d](06d-decisions-complex.md).
+
 ## The figure
 
 - **FR-GP-1 (Must)** — **The Gauss plane is always drawn.** The exam prints no diagram; producing it is
@@ -37,7 +46,8 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   it is a promise about correctness, not only a design choice.)*
 - **FR-GP-3 (Must)** — **A display transform never reaches the parser or the engine.** The
   polar↔cartesian toggle and the `n` stepper are **view state** — outside the store and outside undo — so
-  changing how a number is *shown* can never change what was *stated*. *(ADR-CX-001 D3.)*
+  changing how a number is *shown* can never change what was *stated*.
+  - Sources: ADR-CX-001 D3
 - **FR-GP-4 (Should)** — **The cartesian view reads in radicals, not decimals, when each part is
   readable.** `2cis120` reads «z₁ = -1+√3i», `2cis45` reads «√2+√2i», and `z^5 = 100`'s real root
   reads «⁵√100». Each part (real, imaginary) is judged on its own: a part that needs **at most one** root
@@ -46,23 +56,26 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   is a decimal the whole reading is the decimal with `≈` (`cis18` reads «≈ 0.95+0.31i»). A value with no
   radical form this product knows (cos 20°) keeps its decimal with `≈`, so the display never invents an
   exact value. A part that is zero is not written: «-2», «2i», never «-2+0i». The polar view is
-  unaffected. *(Operator, #1404 and its 2026-09-25 ruling; realised — [ADR-CX-046](06d-decisions-complex.md#adr-cx-046).)*
+  unaffected.
+  - Sources: [ADR-CX-046](06d-decisions-complex.md#adr-cx-046), #1404 (operator ruling)
 - **FR-GP-5 (Must)** — **The inside/on/outside count is of the OTHER numbers.** A stated polygon shades
   its interior, and the strip under the canvas counts the plotted numbers against it, never its own corners
   (they lie on it by definition). A corner that is also a solution of an equation («z^3 = 8», then the
   triangle z1z2z3) is one of the numbers asked about and still counts. A polygon with nothing else to count
-  shows no strip. *(Realised — [ADR-CX-053](06d-decisions-complex.md#adr-cx-053), #1425.)*
-
+  shows no strip.
+  - Sources: [ADR-CX-053](06d-decisions-complex.md#adr-cx-053), #1425
 - **FR-GP-6 (Must)** — **The grid covers what is on screen.** In both views the gridlines, rings, rays and
   axis numbers span the whole visible canvas, at every zoom and on a canvas wider than it is tall, and
-  their step grows as the view zooms out. *(Realised — [ADR-W-094](06w-decisions-workspace.md#adr-w-094), #1465.)*
+  their step grows as the view zooms out.
+  - Sources: [ADR-W-094](06w-decisions-workspace.md#adr-w-094), #1465
 
 ## Exactness and configuration
 
 - **FR-CN-1 (Must)** — **The multiplicative core is answered EXACTLY, not numerically.** Products,
   quotients, powers and roots are decided by exact linear algebra over ℚ rather than by iteration, so a
   modulus or argument the givens force is reported without drift. Sums, areas, distances and series are
-  the numeric residue. *(Realised — [ADR-CX-006](06d-decisions-complex.md).)*
+  the numeric residue.
+  - Sources: [ADR-CX-006](06d-decisions-complex.md)
 - **FR-CN-2 (Must)** — **NO CAS.** The exact core is bounded linear algebra over two vector spaces.
   Anything wanting general symbolic algebra is refused and escalated to the operator, never approximated.
   *(Operator authority.)*
@@ -70,42 +83,41 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   enumerates a real solution set, and "show another configuration" walks that set — so a question asking
   for *all* possibilities can be seen, not just described. **A numeric equation's roots are
   configurations too**: `z1² − 4z1 + 13 = 0` (one NUMBER z₁ that is a root) is two drawings, and the
-  button walks both. *(Amended — [ADR-CX-049](06d-decisions-complex.md#adr-cx-049); the fresh-letter
-  `z² − 4z + 13 = 0` is a solution set since [ADR-CX-050](06d-decisions-complex.md#adr-cx-050), FR-CN-6.)*
+  button walks both. The fresh-letter `z² − 4z + 13 = 0` is a solution set instead (FR-CN-6).
+  - Sources: [ADR-CX-049](06d-decisions-complex.md#adr-cx-049), [ADR-CX-050](06d-decisions-complex.md#adr-cx-050)
 - **FR-CN-4 (Must)** — **A default is a starting value, never a fixed one.** An unstated magnitude is a
   free degree of freedom: it must move on "another configuration" or when a later given forces it. Free
   DOF has **one** definition — the nullspace dimension — read by the cue, the knowledge gates and the
-  sampler alike, so the three can never disagree. *(The complex form of [ADR-052](06-decisions.md#adr-052).)*
-  A sign-free parameter's SIGN is part of its freedom (FR-CN-7): it is sampled, never assumed positive.
-  *(Amended — [ADR-CX-045](06d-decisions-complex.md#adr-cx-045).)* A free polygon's starting drawing
-  reads as the shape it names: «משולש ABC» is never a sliver and «מרובע ABCD» is convex, while every vertex
-  stays free. *(Amended — [ADR-CX-052](06d-decisions-complex.md#adr-cx-052), #1424.)*
+  sampler alike, so the three can never disagree. A sign-free parameter's SIGN is part of its freedom
+  (FR-CN-7): it is sampled, never assumed positive. A free polygon's starting drawing reads as the shape
+  it names: «משולש ABC» is never a sliver and «מרובע ABCD» is convex, while every vertex stays free.
+  - Sources: [ADR-052](06-decisions.md#adr-052) (this is its complex form),
+    [ADR-CX-045](06d-decisions-complex.md#adr-cx-045), [ADR-CX-052](06d-decisions-complex.md#adr-cx-052), #1424
 - **FR-CN-5 (Must)** — **A second mention of a name is a GIVEN, not a redefinition.** Re-stating `z1`
-  adds information about the existing number; it never silently replaces it. *(Realised —
-  [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md).)*
+  adds information about the existing number; it never silently replaces it.
+  - Sources: [ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md)
 - **FR-CN-6 (Must)** — **The solutions of an equation on a bare letter ARE its indexed names.** `z³ = 8`
   plots z₁, z₂, z₃ (in argument order from the principal solution), every one a name the student can
   write in the next sentence. **The spelling does not matter**: `z³ − 8 = 0`, `z³ + 8 = 0`, `2z³ = 16`
   read exactly as `z³ = …`. **A polynomial equation up to degree 4** in a fresh letter, with number
   coefficients, is a solution set too: `z² − 4z + 13 = 0` plots z₁ = 2+3i and z₂ = 2−3i (in argument
-  order), exactly where the roots allow — `|z₁| = √13`. A repeated root is one solution. A letter
-  that already carries an index (`z1² − 4z1 + 13 = 0`) is ONE number, never a set, so no doubled
-  subscript (z₁₁) is ever printed. A polynomial whose coefficients name other numbers or parameters, or
-  of degree 5 or more, keeps the one-point reading of FR-CN-3. A number the student already named z₂ is a claim that it is ONE OF the
-  solutions (set membership, [ADR-CX-044](06d-decisions-complex.md#adr-cx-044)): if it is, it keeps its
-  place and the unstated names take the remaining solutions in argument order; if it is not, the
-  equation is **refused**, naming the student's statement, in either entry order. So a question that states z₁, z₂… and then solves an equation over them is refused
-  unless those numbers are its solutions (operator ruling, #1367, with the §2b part ד cost shown).
-  The bare letter then names the SET, not a number: any later line that uses it (`z = 1+i`, `|z| = 2`,
-  or a second equation such as `z^3 = 1` after `z^3 = 8`) is **refused**, and the refusal says that the
-  letter names that equation's solutions. It never says the two statements contradict each other.
-  Combining two equations on one letter is not offered (operator ruling on #1428, 2026-09-27; #1466).
-  A QUESTION about the bare letter (`Re(z)`, `|z|`) is asked of every solution: it prints when they all
-  agree (`|z| = 1` for `z³ = 1`, `Re(z) = 2` for `z² − 4z + 13 = 0`), and otherwise says the value
-  differs between the solutions and names one to ask about.
-  *(Realised — [ADR-CX-042](06d-decisions-complex.md#adr-cx-042),
-  [ADR-CX-048](06d-decisions-complex.md#adr-cx-048); amended — [ADR-CX-050](06d-decisions-complex.md#adr-cx-050), #1434.)*
-
+  order), exactly where the roots allow — `|z₁| = √13`. A repeated root is one solution.
+  - A letter that already carries an index (`z1² − 4z1 + 13 = 0`) is ONE number, never a set, so no
+    doubled subscript (z₁₁) is ever printed. A polynomial whose coefficients name other numbers or
+    parameters, or of degree 5 or more, keeps the one-point reading of FR-CN-3.
+  - A number the student already named z₂ is a claim that it is ONE OF the solutions: if it is, it keeps
+    its place and the unstated names take the remaining solutions in argument order; if it is not, the
+    equation is **refused**, naming the student's statement, in either entry order.
+  - The bare letter then names the SET, not a number: any later line that uses it (`z = 1+i`, `|z| = 2`,
+    or a second equation such as `z^3 = 1` after `z^3 = 8`) is **refused**, and the refusal says that the
+    letter names that equation's solutions. It never says the two statements contradict each other.
+    Combining two equations on one letter is not offered.
+  - A QUESTION about the bare letter (`Re(z)`, `|z|`) is asked of every solution: it prints when they all
+    agree (`|z| = 1` for `z³ = 1`, `Re(z) = 2` for `z² − 4z + 13 = 0`), and otherwise says the value
+    differs between the solutions and names one to ask about. **⚠ Ruled to change (2026-10-07, ADR-W-118 B12 · #1867):** up to two differing values are shown, joined by «או», as in every builder. The text below describes the code until that ships.
+  - Sources: [ADR-CX-042](06d-decisions-complex.md#adr-cx-042), [ADR-CX-044](06d-decisions-complex.md#adr-cx-044),
+    [ADR-CX-048](06d-decisions-complex.md#adr-cx-048), [ADR-CX-050](06d-decisions-complex.md#adr-cx-050),
+    #1367, #1428 and #1466 (operator rulings), #1434
 - **FR-CN-7 (Must)** — **A real parameter's sign follows its use.** A parameter that stands as a
   SIZE — a modulus (`|z1| = 9r`), anything inside `|…|`, a circle's radius, a measure's value, a scale
   factor multiplying a complex number (`z2 = r·z1`) — is **positive**. A parameter in any other use — an
@@ -113,7 +125,7 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   (`z1 = u`) — is **any real**: `u^5 = -32` gives u = −2, and «z1 = a + b·i · z1 ברביע השני» holds with
   a < 0. An even power of a negative (`u^4 = -16`) has no real solution and is refused. Mixed use is a
   size. The value shown carries the sign (`u = -2`, and `u = ±2` when the configurations disagree).
-  *(Operator ruling 2026-09-24; realised — [ADR-CX-045](06d-decisions-complex.md#adr-cx-045).)*
+  - Sources: [ADR-CX-045](06d-decisions-complex.md#adr-cx-045) (operator ruling)
 - **FR-CN-8 (Must)** — **A letter declared complex is complex in every line.** «u מספר מרוכב» /
   «u is a complex number» makes u, u₁, u₂… complex exactly as z and w are, in every line before or
   after it: `u^5 = 32` then draws the five roots u₁..u₅ in either order. The declaration is a TYPE, not
@@ -121,8 +133,8 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   letter used where only a real can stand (a size such as `|z1| = 9r`, a radius, a length, an angle)
   cannot also be declared complex. The refusal names that statement, in either order. A letter the
   figure SOLVED as a real parameter carries a note under its first line saying so and teaching the
-  declaration, and only when that declaration would be accepted. *(Operator proposal, #1405; realised —
-  [ADR-CX-047](06d-decisions-complex.md#adr-cx-047).)*
+  declaration, and only when that declaration would be accepted.
+  - Sources: [ADR-CX-047](06d-decisions-complex.md#adr-cx-047), #1405 (operator proposal)
 - **FR-CN-9 (Must)** — **A true given is never refused as a contradiction, and «could not decide» is
   never «wrong».** Typed numbers relate to each other exactly: «z1 = 2+3i · z2 = -2+3i · z1·z2 = -13» is
   accepted, and so is every true product, quotient, power, conjugate, rotation and rational rescale of
@@ -130,23 +142,23 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   numbers is decided exactly — «w ממשי» for w = (2+3i)(2−3i) holds, 3+4i and 3−4i are conjugates. When
   the engine genuinely cannot decide (a direction with no exact relation to the others, such as
   1+√2i), a given is accepted and listed as undecided, and a claim reads «unknown» — never a refusal,
-  never ✗. *(#1481, operator ruling P1; realised — [ADR-CX-057](06d-decisions-complex.md#adr-cx-057).)*
+  never ✗.
+  - Sources: [ADR-CX-057](06d-decisions-complex.md#adr-cx-057), #1481 (operator ruling)
 - **FR-CN-10 (Must)** — **The symbolic cartesian form reads as the textbook writes it.** **⚠ Ruled to change (2026-10-07, ADR-W-118 B6/D1 · #1862):** the canvas shows the number as the student typed it (its polar form in the polar view) and the computed values go to the data panel — a letter the student did not value is never replaced, so «z₁ = a+bi» does not become «z₁ = 3+bi» on the canvas. The text below describes the code until that ships. «z1 = a+bi»,
   «z = x+yi», «z1 = a-bi», «z1 = a+ib», «w = c+di» define a number from two real parameters, with no
   `*`. The number reads «z₁ = a+bi» in the cartesian view while a and b are free (the polar view prints
   no value), «z₁ = 3+bi» once a = 3 is forced, and exactly as the literal 3+4i once both are. A glued
   `i` whose other letter is a complex number («zi») is ambiguous and is refused with the explicit
-  product offered («z*i»); `pi` is never read as p·i. *(#1365, operator ruling 2026-09-24; realised —
-  [ADR-CX-058](06d-decisions-complex.md#adr-cx-058). Counting the number's freedom as two rather than
-  four is #1410, closed and parked in the icebox.)*
+  product offered («z*i»); `pi` is never read as p·i.
+  - Sources: [ADR-CX-058](06d-decisions-complex.md#adr-cx-058), #1365 (operator ruling), #1410
 - **FR-CN-11 (Must)** — **The trigonometric form is the same number as cis.** «z1 = 2(cos45 + i sin45)»,
   «z1 = √2(cos45 + i·sin45)», «z1 = cos45 + i sin45» (r omitted is 1), with `i·sin`, `i*sin`,
   `sin45·i`, the `°` or without it, a signed or parenthesised angle, and a symbolic one
   («r(cosθ + i sinθ)»), read exactly as «2cis45» / «r cis θ» does — the same facts, and the student's
   line stays as typed. A form whose two angles differ («cos45 + i sin30») is refused naming both angles,
   never read as either. Angles are read the way `cis` reads them: degrees (radians such as `π/4` are
-  read by neither). *(#1534, operator ruling 2026-10-04; realised —
-  [ADR-CX-059](06d-decisions-complex.md#adr-cx-059).)*
+  read by neither).
+  - Sources: [ADR-CX-059](06d-decisions-complex.md#adr-cx-059), #1534 (operator ruling)
 
 ## Knowledge and claims
 
@@ -154,10 +166,10 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   «הארגומנט של w») is a question like «|w|»: answered from the exact argument carrier when the
   direction is fixed in every configuration, withheld (with the reason) for a free direction, and a
   solution-set letter reports its spread; the argument of a number KNOWN to be 0 says 0 has no
-  direction, never «not determined». Every question may carry a frame — «מהו …», «חשבו את …», «what is …»
+  direction, never «not determined». **⚠ Ruled to change (2026-10-07, ADR-W-118 B12 · #1867):** up to two differing values are shown, joined by «או», as in every builder. The rest of this requirement describes the code until that ships. Every question may carry a frame — «מהו …», «חשבו את …», «what is …»
   before, «?» / «= ?» after — for every ask kind alike, and a statement in a frame is never recorded as a
-  given. *(#1437; realised — [ADR-CX-055](06d-decisions-complex.md#adr-cx-055), Amendment 1.)*
-
+  given.
+  - Sources: [ADR-CX-055](06d-decisions-complex.md#adr-cx-055) Amendment 1, #1437
 - **FR-KN-1 (Must)** — **⚠ Ruled to change (2026-10-07, ADR-W-118 B12 · #1867):** a quantity with two possible values shows both, joined by «או», as in every other tool — here too for a question about a solution-set letter (FR-CN-6). The text below describes the code until that ships. **A number printed on screen is knowledge**: invariant across every valid
   configuration, with its gauge pinned. **The figure shows everything; the panel prints only what was
   asked for, and only what is known.** A value true of the current drawing but not forced by the givens
@@ -165,8 +177,8 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   Invariance is ASKED, never counted: the value is compared across every configuration, so a value two
   roots share prints (`Re z = 2`) and one they do not is withheld as differing. When the tool cannot
   prove it has found every configuration it says so — «ייתכן שיש לערך כמה אפשרויות — הוא אינו נקבע
-  בוודאות» — and prints nothing. *(Amended — operator ruling 2026-09-27,
-  [ADR-CX-049](06d-decisions-complex.md#adr-cx-049).)*
+  בוודאות» — and prints nothing.
+  - Sources: [ADR-CX-049](06d-decisions-complex.md#adr-cx-049) (operator ruling)
 - **FR-KN-2 (Must)** — **A claim is the student's answer: verified, never obeyed.** A claim never
   reshapes the figure to become true. **⚠ Ruled to change (2026-10-07, ADR-W-118 B14/D3 · #1870):** a line
   that asks the student to PROVE something («הוכיחו כי …») is refused like in the other builders
@@ -178,27 +190,27 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
 
   The third exists because **a claim about a direction the givens leave free is not wrong, it is
   unanswered** — and marking it ✗ would tell a student their correct answer was incorrect because they
-  had not finished entering the question. In a product whose defining interaction is entering a problem
-  **line by line**, that distinction is the difference between a tool that checks a student and one that
-  contradicts them out of its own incompleteness. *(Realised — `src-complex/model/claim.ts`. The 3-D
-  builder refuses a claim its givens do not determine ([02b FR-CL-1](02b-requirements-3d.md),
-  [ADR-3D-260](06b-decisions-3d.md#adr-3d-260)); the operator deferred a three-valued verdict for 3-D
-  ([#909](https://github.com/dcodish/geo_builder/issues/909)); amended 2026-10-07, #1861.)*
+  had not finished entering the question.
+  - Sources: #1861. The 3-D builder refuses a claim its givens do not determine
+    ([02b FR-CL-1](02b-requirements-3d.md), [ADR-3D-260](06b-decisions-3d.md#adr-3d-260)); the operator
+    deferred a three-valued verdict for 3-D ([#909](https://github.com/dcodish/geo_builder/issues/909)).
 - **FR-KN-4 (Must)** — **The engine states WHAT happened; the reading layer words it.** A verdict carries
   a structured reason code, not a sentence, so the same fact reads correctly in Hebrew and English and
-  the wording can improve without touching the engine. *(Realised — `model/why.ts`, #716.)*
+  the wording can improve without touching the engine.
+  - Sources: #716
 - **FR-KN-5 (Must)** — **⚠ Ruled to change (2026-10-07, ADR-W-118 B6/D1 · #1862):** a letter the student did not value is never replaced on the canvas — `|z₂| = 18r` stays «18r» there, and its value (10) is in the data panel. The text below describes the code until that ships. **A real parameter is visible.** Every parameter the figure mentions is listed
   in the data panel: its exact value when the givens force it (`u^5 = 32` → `u = 2`), «חופשי» when they
   do not. It can be asked (`r`, `9r`), and wherever a solved parameter would print inside another value,
   its value is printed instead (`|z₂| = 18r` with r = 5/9 reads 10). An accepted given never leaves
-  nothing on screen. *(Realised — [ADR-CX-043](06d-decisions-complex.md#adr-cx-043), #1389/#1390.)*
+  nothing on screen.
+  - Sources: [ADR-CX-043](06d-decisions-complex.md#adr-cx-043), #1389, #1390
 
 ## Input honesty
 
 - **FR-LN-1 (Must)** — **Nothing stated is ever silently dropped.** Every non-filler token span in the
   student's line is claimed by the parse, or the line is **refused**. There is exactly one mechanism —
-  span accounting — and **no `dropped*` gate is ever added**: the 2-D history shows those accumulate as
-  per-symptom patches and still leave holes ([ADR-CX-009](06d-decisions-complex.md) §2).
+  span accounting — and **no `dropped*` gate is ever added**.
+  - Sources: [ADR-CX-009](06d-decisions-complex.md) §2
 - **FR-LN-2 (Must)** — **A refusal names the student's statement**, never internal state
   ([FR-SU-5](02w-requirements-workspace.md)), and reads correctly in an RTL sentence with LTR
   mathematics inside it ([FR-WI-2](02w-requirements-workspace.md)).
@@ -214,10 +226,11 @@ IDs are stable references, and their areas are letters-only so the FR-resolution
   attached to an operand stays its power («x³», «2³√8»). The word «שורש» before a number or a
   parenthesis is the √ sign («שורש 3», the 2-D #105 ruling); «שורש של 3» is refused with the √
   spelling of the student's own line and a pointer to the √ button (the 2-D #246 guidance). The √
-  palette chip wraps the selection. *(#1435; realised — [ADR-CX-056](06d-decisions-complex.md#adr-cx-056),
-  amendment 1.)*
+  palette chip wraps the selection.
+  - Sources: [ADR-CX-056](06d-decisions-complex.md#adr-cx-056) amendment 1, #1435
 - **FR-LN-3 (Should)** — **Series are in scope**, being part of the corpus question rather than an
-  extension of it. *(docs/27 §2.)*
+  extension of it.
+  - Sources: [docs/27](archive/27-complex-numbers-tool.md) §2
 
 ## Non-goals
 

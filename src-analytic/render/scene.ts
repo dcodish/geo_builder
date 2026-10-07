@@ -2,7 +2,7 @@
  * The pure scene builder — world → screen, with the axes as first-class furniture.
  *
  * No React here, and no engine internals: it takes a `Figure` and produces drawable primitives.
- * The renderer is a pure consumer, so it stays swappable ([docs/19 §6](../../docs/19-analytic-geometry-tool.md)).
+ * The renderer is a pure consumer, so it stays swappable ([docs/19 §6](../../docs/archive/19-analytic-geometry-tool.md)).
  *
  * The transform is **isotropic and Y-flipped** — one world unit is the same number of pixels on
  * both axes, or a circle draws as an ellipse and the whole product lies about its subject.

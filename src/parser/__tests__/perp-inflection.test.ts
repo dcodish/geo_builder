@@ -1,5 +1,5 @@
 /**
- * Hebrew final-letter inflection of the perpendicular keywords ([docs/15-hardening-plan.md] C2 / PAR-3).
+ * Hebrew final-letter inflection of the perpendicular keywords ([docs/archive/15-hardening-plan.md] C2 / PAR-3).
  *
  * מאונך / אנך end in kaf-sofit (ך); their plurals swap it for a regular kaf — מאונכים / אנכים — a
  * DIFFERENT code point, so the singular-only keyword sets matched none of them. The exact ADR-119 scenario

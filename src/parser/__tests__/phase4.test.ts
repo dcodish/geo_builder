@@ -1,5 +1,5 @@
 /**
- * Phase-4 acceptance gate (docs/09-implementation-plan.md §Phase 4).
+ * Phase-4 acceptance gate (docs/archive/09-implementation-plan.md §Phase 4).
  * Parser table tests across the current vocabulary in Hebrew + English, negative
  * cases returning 'not-handled' (the boundary where the Phase-7 fallback
  * escalates), an end-to-end parse→engine check, and a coverage measure.

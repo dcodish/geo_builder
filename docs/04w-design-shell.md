@@ -570,15 +570,16 @@ The caller mounts it once per opening (`key`), so typed text, the note and the o
 | --- | --- |
 | `Verdict` | `builds` (recorded, or already known) · `refused` (an owned refusal) · `asks` (a clarifying question: 2-D `clarify`, analytic and 3-D `ambiguous-*`) · `not-handled` (the line would go to the model) |
 | `StepRunner` | the product's REAL submit decision over an empty canvas, carrying the figure forward; one verdict per step |
-| `ParityRow` | `steps` (context, then the sentence under test), `expect`, optional `contextFor` (another context for one product, the sentence unchanged), `exception`, `only`, `knownGap` |
+| `ParityRow` | `steps` (context, then the sentence under test), `expect`, optional `contextFor` (another context for one product, the sentence unchanged), `exception`, `only`, `knownGap` (`{ product, issue, parked? }`) |
+| `GAP_ISSUES` | the state (`open` / `closed` / `icebox`) of every issue that owns a gap: a dated `gh issue view` snapshot, because a test cannot call GitHub ([ADR-W-119](06w-decisions-workspace.md#adr-w-119)) |
 | `EXCEPTIONS` X1–X10 (X10: [ADR-W-109](06w-decisions-workspace.md#adr-w-109)) | per family: the builders that read it, the builders that must not BUILD it (`mustRefuse`), whether it is a topic outside plane geometry, and its sentence patterns |
 | `parityFaults(runners)` | per row and product: an early return; a context line that does not build; an expected product off `expect`; a known gap that now gives `expect` ("move it to the parity rows"); a `mustRefuse` product that builds |
 | `catalogCoverageFaults(product, sentences)` | each construction sentence of the catalog is a step of a row the product takes part in, a topic-family sentence the product reads, or on `UNCOVERED_CATALOG` (a ratchet under `UNCOVERED_CEILING`) |
-| `rowFaults()` | the rows themselves: unique ids, issues named, exception patterns matched, `only` and `contextFor` used where they are checked |
+| `rowFaults()` | the rows themselves: unique ids, issues named, exception patterns matched, `only` and `contextFor` used where they are checked; every gap's issue listed in `GAP_ISSUES`, a gap on a closed or iceboxed issue `parked`, no parked gap on an open issue, no snapshot entry that owns no gap |
 
 **The runners.**
 - 2-D: `decideDeterministic2D`, applying binds, the batch commit or the store operation as `runSubmit` does.
 - Analytic: `decideSubmit`, appending on `record`.
 - 3-D: `decideSubmit3`, carrying facts and seed.
 
-The model is never called. **The meta-lock** runs the same checks against an oracle built from the rows, and against that oracle with one defect each: an early return, always-builds, always-refuses, swapped asks/refused, a known gap that heals, a broken context, an excluded builder that absorbs. Each is caught.
+The model is never called. **The meta-lock** runs the same checks against an oracle built from the rows, and against that oracle with one defect each: an early return, always-builds, always-refuses, swapped asks/refused, a known gap that heals, a broken context, an excluded builder that absorbs. Each is caught. The issue-state rule is shown the same way: a gap on a closed issue left unparked, a parked gap on an open issue, an issue the snapshot does not list, a snapshot entry that owns no gap, and the real rows with every `parked` stripped (one fault per parked gap).

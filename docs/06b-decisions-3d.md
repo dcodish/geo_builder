@@ -27,6 +27,8 @@ _The 3-D track's OWN ADR log (ids `ADR-3D-NNN`), separate from [06-decisions.md]
 
 ## ADR-3D-002 — V1: the geometric-vector lane (2026-07-06)
 
+**⚠ Partly superseded by [ADR-3D-295](#adr-3d-295) (2026-10-02, operator ruling):** decision 1's last clause is withdrawn: a proof-verb prefix («הוכיחו כי …») is refused, never stripped and read as a claim.
+
 **Context.** docs/20 §8 V1: named basis vectors, the bounded symbolic layer, vector-expression claims, ⊥-to-plane/collinearity claims, centroid — gated on 2020-Q2 א–ב + 2023-Q2 א–ב reproducing end-to-end from typed He/En utterances. Both gates pass (`src3d/__tests__/scenarios3.test.ts`).
 
 **Decisions:**
@@ -46,6 +48,8 @@ _The 3-D track's OWN ADR log (ids `ADR-3D-NNN`), separate from [06-decisions.md]
 ---
 
 ## ADR-3D-003 — named vectors show on the figure: arrow-above + underline notation, direction chevron, auto-drawn segment (2026-07-06)
+
+**⚠ Partly superseded by [ADR-3D-195](#adr-3d-195) (2026-08-31):** the notation clause: a declared name is underlined only, a point pair arrowed only. The auto-draw, shaft and arrowhead clauses stand.
 
 **Context.** Operator (after the V1 gate): *"when marking a vector w, we should show it with the arrow and underline."* V1 bound names but showed nothing on the canvas — and the named pairs themselves (KC, KB in 2020-Q2) weren't even drawn, since they're not solid edges.
 
@@ -468,6 +472,8 @@ Parser `circleTangentLine` (`מעגל A משיק לישר BC בנקודה F` / E
 
 ## ADR-3D-030 — a stated plane EQUATION is an M1 GIVEN: it drives the free gauge/dims (2026-07-09)
 
+**⚠ Partly superseded by [ADR-3D-118](#adr-3d-118) (2026-08-09):** the predicate of Am. 2 (#371): a parameter's value is knowledge only when the givens leave one branch.
+
 **Context.** Follow-up to the ADR-3D-026 Am. parse fix — operator: "we need to support also the M1 thing you mentioned." `plane-eq` was verify-only (V4, ADR-3D-007): on a coordinate-FREE תיבה, `מישור A'B'C'D' הוא x-4y-8z-142=0` parsed but refused `claim-refuted` — yet per M1 a statement about existing objects is a GIVEN, and a plane equation on an unpinned solid should PLACE it (the same information-flows-backward shape as coordinate injections and ADR-3D-027's angle).
 
 **Decision — plane-eq becomes a pivot pin AND stays a recorded claim (belt + braces):**
@@ -609,7 +615,7 @@ Same decision shape as [ADR-286](06-decisions.md#adr-286) — one control is bot
 
 ## ADR-3D-039 — The #72 phrasing batch: connect-imperative, diagonal noun, ink arrow, the אורך disambiguator, ⟂-to-the-base (baseline log-triage)
 
-**Status:** Accepted (2026-07-11; issue #72 — five context-verified prod gaps, operator-approved batch). *Files: `src3d/parser/parse3.ts` (`bareSegment` prefixes, `drawArrow`, `perpToBase`, `lengthRel` bare-pair RHS), `src3d/engine/types.ts` (+`arrows`, +2 commands), `src3d/engine/apply.ts` (`draw-arrow`, `perp-to-base`), `src3d/render/scene3.ts` + `Figure3.tsx` (unnamed-arrow overlay), `catalog3.ts` (+5), `issue72-phrasing.test.ts`.*
+**Status:** Accepted (2026-07-11; issue #72 — five context-verified prod gaps, operator-approved batch). *Files: `src3d/parser/parse3.ts` (`bareSegment` prefixes, `drawArrow`, `perpToBase`, `lengthRel` bare-pair RHS), `src3d/engine/types.ts` (+`arrows`, +2 commands), `src3d/engine/apply.ts` (`draw-arrow`, `perp-to-base`), `src3d/render/scene3.ts` + `Figure3.tsx` (unnamed-arrow overlay), `catalog3.ts` (+5), `issue72-phrasing.test.ts`.* · **⚠ Partly superseded by [ADR-3D-253](#adr-3d-253) (2026-09-20):** item 2's note that the vector word keeps its segment reading; «וקטור AB» now draws an arrow.
 
 1. **`נחבר את D'F` / `אלכסון BD'`** — the connect-imperative and the diagonal noun join `bareSegment`'s prefix set (a diagonal IS a segment — pure ink, no construct; the final-ם slip `אלכסום` admitted per the ADR-3D-035 `מאונ[כך]` precedent).
 2. **`חץ A'C`** — a new `draw-arrow` command records an UNNAMED ink arrow in `Construction3.arrows` (a sibling of `segments`, rendered on the ADR-3D-003 vector overlay with the label suppressed) — it never joins the declared basis, so `need-basis` counting is untouched. The vector WORD (`וקטור AB`) deliberately keeps its established normalize3-stripped segment reading.
@@ -3762,6 +3768,8 @@ and a free line still showing only its name.
 
 ## ADR-3D-152 — a stated flat QUAD SHAPE is ONE command with three apply arms (#587)
 
+**⚠ Partly superseded by [ADR-3D-244](#adr-3d-244) (2026-09-11):** the under-determined families are minted with their freedom, never refused; the one-command arm stands.
+
 Operator, playing round #582/#584: on «פירמידה ABCDS שבסיסה ריבוע», *"«ABCD ריבוע» also fails (in
 this case ABCD is already a square — but the error message says it doesn't recognize it)."*
 
@@ -6180,7 +6188,7 @@ containment on bound points still refusing).
 ## ADR-3D-192 — A PLANE'S TOGGLE BELONGS TO THE ROW THAT DREW IT, AND A REDUNDANT CONTAINMENT SAYS SO (#842)
 
 **Status:** accepted, 2026-08-31. Closes the half of #839 that [ADR-3D-191](#adr-3d-191) did not —
-steps 3 and 4 of that plan, filed as #842 rather than left closed inside a "fixed" issue.
+steps 3 and 4 of that plan, filed as #842 rather than left closed inside a "fixed" issue. · **⚠ Partly superseded by [ADR-3D-197](#adr-3d-197) (2026-08-31):** clause 2: a relation never owns a plane.
 
 **What the operator actually saw first**, playing `prod/2026-08-31`:
 
@@ -6689,6 +6697,8 @@ BD of the BOTTOM ring on pyramid, prism and box (the prism's top ring being the 
 re-issuing is idempotent; and both refusals hold.
 
 ## ADR-3D-200 — «אלכסון ראשי» NAMES NONE OF FOUR: THE ROLE PHRASE ASKS (#836)
+
+**⚠ Partly superseded by [ADR-3D-203](#adr-3d-203) (2026-09-01):** with letters given, the role word is a stronger claim, not redundant: «אלכסון ראשי AC» refuses where «אלכסון AC» builds.
 
 **Context.** Prod session `u1y60bg6` — the user's entire session was one line:
 
@@ -11208,7 +11218,7 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 
 - **The noun is display, never identity.** The flag rides the operand, so everything that compares operands or statements by their JSON reads it through one rule: `operandKey` / `meaningKey` (operands.ts) drop `face: true` (another command's `face` id list is kept). They are used by the scene and knee-lane pair keys, the arc dedupe, the pin/claim dedupe (`dedupDeep`) and the store's already-stated check. So «המישור SBC…» after «הפאה SBC…» is still already stated, and one relation named both ways is one pair. `sameOperand` already compared ids only. #524's lock («הפאה SBC … is the same statement») asserted deep-equal commands; it now asserts the same meaning (`meaningKey`) plus the carried flag, the intent it always had.
 
-**Rejected.** (B) Plane chips on the relation row. This reverses ADR-3D-197 and reopens plane ownership; the operator chose (A).
+**Rejected.** (B) Plane chips on the relation row. It would reverse ADR-3D-197 and reopen plane ownership; the operator chose (A).
 
 **Measured.** On main `d3f08a4c`, the reported sequence drew SBC and ABC with 4-corner patches. On the fix they draw 3-corner faces; the «המישור» spelling still draws 4.
 

@@ -4,7 +4,7 @@
  * imported: product trees are isolated (docs/20 §12, enforced by
  * `server/__tests__/isolation.test.ts`).
  *
- * Why it exists (docs/25-joint-solve-design.md §4, S3.2 stage (b)): the engine's driven
+ * Why it exists (docs/archive/25-joint-solve-design.md §4, S3.2 stage (b)): the engine's driven
  * solvers ride Nelder–Mead, which stalls past ~6–8 DOF (ADR-281); LM's damped
  * Gauss–Newton steps converge quadratically near a root and handle the 8–12+ DOF joint
  * component solves the design calls for. This module is the standalone numerics slice —

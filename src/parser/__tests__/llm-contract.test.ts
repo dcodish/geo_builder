@@ -1,5 +1,5 @@
 /**
- * LLM-fallback contract tests ([docs/15-hardening-plan.md] C10 / PAR-10 + TST-3).
+ * LLM-fallback contract tests ([docs/archive/15-hardening-plan.md] C10 / PAR-10 + TST-3).
  *
  * The LLM never emits engine JSON — it emits CANONICAL command STRINGS that the deterministic parser
  * re-reads (llm.ts). So the fallback is only as good as (a) the few-shot examples in the prompt actually

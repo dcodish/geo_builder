@@ -1,5 +1,5 @@
 /**
- * Phase-5c corpus gate (docs/09-implementation-plan.md §Phase 5c).
+ * Phase-5c corpus gate (docs/archive/09-implementation-plan.md §Phase 5c).
  * Reproduce the figures of corpus Q5, Q6, Q7 — three circle problems — end to
  * end from typed He/En utterances (we play the parser, then build & assert
  * structure; we never solve the algebra). The grammar + engine + renderer were

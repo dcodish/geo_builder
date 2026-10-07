@@ -1,5 +1,5 @@
 /**
- * Phase-2 acceptance gate (docs/09-implementation-plan.md §Phase 2).
+ * Phase-2 acceptance gate (docs/archive/09-implementation-plan.md §Phase 2).
  * Transform unit tests, scene-builder "figure → expected nodes", and a
  * DOM-free static render of <Figure> (react-dom/server — no jsdom needed).
  * Fixtures reuse the Phase-1 F1 (square + point on a side) and F2 (two-branch)
