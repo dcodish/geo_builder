@@ -936,7 +936,10 @@ statements as before; `forced: true` names the pin owners on the ring's own vert
 `err.polygonForced` / `err.polygonForcedAlone` («— וקו ישר אינו משולש»). A polygon declared over points that
 all exist (the #116 binding path) records a `polygon-open` claim (`given`), verified by the one predicate
 `ringCollapsed3` (vec3.ts) that the pivot uses too; a failing one is refused `polygon-collapsed` naming the
-statements that first placed its vertices. The #936 notice for a flattened SOLID is unchanged.
+statements that first placed its vertices. The #936 notice for a flattened SOLID is unchanged. An anchored solve
+can hold a metric-forced flatness at a **sliver**, because the height enters only to second order. So a solution
+whose declared ring is thin (`ringOpenness3` < 1e-2) is released on its own residuals, with the gauge frozen
+where its path froze it. If the release lands exact and collapsed, the solution counts as collapsed («AB : BC = 5 : 3 · AB : AC = 5 : 8»).
 
 ## The data panel has two kinds of row (#1196, [ADR-3D-254](06b-decisions-3d.md#adr-3d-254))
 

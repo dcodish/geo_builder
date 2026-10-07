@@ -162,10 +162,15 @@ export function runRingOrder(pts: Vec3[]): Vec3[] {
  * the coincidence gates' business, not this one's.
  */
 export function ringCollapsed3(pts: Vec3[]): boolean {
-  if (pts.length < 3) return false;
+  return ringOpenness3(pts) <= 1e-4;
+}
+/** How OPEN a ring is: its greatest spanning normal over its span squared (0 = on one line). Infinity for a
+ *  ring too small to judge (fewer than 3 points, or shrunk onto a point). */
+export function ringOpenness3(pts: Vec3[]): number {
+  if (pts.length < 3) return Infinity;
   let maxD = 0;
   for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) maxD = Math.max(maxD, norm3(sub3(pts[j], pts[i])));
-  return maxD > 1e-12 && norm3(runNormal(pts)) <= 1e-4 * maxD * maxD;
+  return maxD > 1e-12 ? norm3(runNormal(pts)) / (maxD * maxD) : Infinity;
 }
 
 export function runNormal(pts: Vec3[]): Vec3 {
