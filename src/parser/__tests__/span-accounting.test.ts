@@ -146,7 +146,9 @@ describe('ADR-453 — the enforcing verdict', () => {
 
   it('the LOWERED forms stay clean — halved, percent, ratio pair (no false refusal)', () => {
     expect(unaccountedSpans('נקודה E על AC ב-40%', [{ type: 'point-on-segment', id: 'E', a: 'A', b: 'C', t: 0.4 } as AnyCommand])).toEqual([]);
-    expect(unaccountedSpans('מעגל שהיקפו 6π', [{ type: 'circle', id: 'circle-O', center: 'O', radius: 3 } as AnyCommand])).toEqual([]);
+    // #1814 (ADR-600): the π is paid for by the rule's DECLARATION (`consumed.symbols`), as the circle rule emits it
+    expect(unaccountedSpans('מעגל שהיקפו 6π', [{ type: 'circle', id: 'circle-O', center: 'O', radius: 3, consumed: { symbols: ['π'] } } as AnyCommand])).toEqual([]);
+    expect(unaccountedSpans('מעגל שהיקפו 6π', [{ type: 'circle', id: 'circle-O', center: 'O', radius: 3 } as AnyCommand])).toEqual([{ kind: 'symbol', text: 'π' }]);
   });
 
   // ---- retargeted from droppedGivenRelations (ADR-264) --------------------------------------

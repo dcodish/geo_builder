@@ -336,6 +336,8 @@ export const SHAPE_NOUNS_HE = ['משולש', 'מרובע', 'ריבוע', 'מלב
 export const SHAPE_NOUNS_EN = ['triangle', 'quadrilateral', 'square', 'rectangle', 'rhombus', 'trapezoid', 'parallelogram', 'kite', 'pentagon', 'hexagon', 'heptagon', 'octagon', 'nonagon', 'decagon', 'polygon'];
 const SHAPE_NOUN = new RegExp(`(?:${SHAPE_NOUNS_HE.join('|')})|\\b(?:${SHAPE_NOUNS_EN.join('|')})\\b`, 'i');
 const tidy = (p: string) => p.replace(/\s+/g, ' ').trim().replace(/[.,;]+$/, '');
+/** A text that ENDS on a shape noun (any clitic before it) — the noun's labels are what follows it. */
+const SHAPE_NOUN_LAST = new RegExp(`(?:${SHAPE_NOUNS_HE.join('|')})$|\\b(?:${SHAPE_NOUNS_EN.join('|')})$`, 'i');
 
 export function splitGuidance(utterance: string): ScopeMatch | null {
   const s = utterance.trim();
@@ -353,6 +355,15 @@ export function splitGuidance(utterance: string): ScopeMatch | null {
   if (op <= 0) return null;
   let cut = op;
   while (cut > 0 && /[A-Za-z0-9\s]/.test(s[cut - 1])) cut--; // keep the operand with its operator
+  // #1814 (ADR-600): the walk-back must not take a shape's OWN labels. When the head ends on a bare shape
+  // noun, the run just walked over is that noun's name — «שטח המשולש ABC = S1» is ONE noun phrase («the area
+  // of triangle ABC») with its value, not «שטח המשולש» + «ABC = S1». Give the shape its labels back; the
+  // line is two statements only if a subject of its own still stands before the operator («משולש ABC AB=AC»).
+  if (SHAPE_NOUN_LAST.test(tidy(s.slice(0, cut)))) {
+    const own = s.slice(cut).match(/^\s*[A-Z][A-Z0-9]*/);
+    if (own) cut += own[0].length;
+    if (!/[A-Za-z0-9]/.test(s.slice(cut, op))) return null;
+  }
   const head = tidy(s.slice(0, cut));
   const tail = tidy(s.slice(cut));
   if (head.length < 2 || tail.length < 2 || !SHAPE_NOUN.test(head)) return null;

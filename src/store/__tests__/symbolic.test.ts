@@ -232,7 +232,8 @@ describe('segment-length ratio "AE/ED = 2/3"', () => {
 describe('π constant', () => {
   it('"AB = 2π" is a concrete length (≈ 6.28), not a free variable', () => {
     const r = parse('AB = 2π');
-    expect(r.ok && r.commands[0]).toEqual({ type: 'measure-length', a: 'A', b: 'B', expr: { value: 2 * Math.PI, text: '2π' } });
+    // #1814 (ADR-600): the rule declares the constant it lowered, so the span accountant can pay for π
+    expect(r.ok && r.commands[0]).toEqual({ type: 'measure-length', a: 'A', b: 'B', expr: { value: 2 * Math.PI, text: '2π' }, consumed: { symbols: ['π'] } });
     const d = replay(facts('quadrilateral ABCD', 'AB = 2π'));
     expect(d.lastError).toBeNull();
     expect(len(d.positions, 'A', 'B')).toBeCloseTo(2 * Math.PI, 4);

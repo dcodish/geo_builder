@@ -15140,3 +15140,49 @@ The row kept reading «תיכון לבסיס» with a ✓ while the figure drew 
 - `src/engine/types.ts`: `implied?: boolean | 'by-member'` (inert in the engine).
 
 **Behaviour change for a student:** after «שני מעגלים נחתכים בנקודות A ו-B», a chord, diameter or tangent sentence that names a new circle letter through A or B («AD מיתר במעגל P») names one of the two drawn circles; it no longer draws a third circle. The operator's exact eew5ezi5 sequence builds with two circles and E beyond A.
+
+
+## ADR-600 — A name's index is never a value, and the gates see every name glyph (#1814)
+
+**Status:** accepted · 2026-10-07 · bug (P1, 2-D, honesty class) · branch `fix/1814-indexed-names-2d` · round #1845 · amends [ADR-386](#adr-386) (#267's guard), [ADR-498](#adr-498) (#969's positional value), [ADR-453](#adr-453) (the span accountant)
+
+**Requirements:** [02-requirements.md](02-requirements.md) FR-IN-4h: a Greek or indexed name in a value slot is declined, never read as its digits; an expression value the line cannot represent, and a comparison against one, likewise · **Design:** [04-design.md](04-design.md) § "A name glyph is defined once" and § "The span accountant has a `symbol` kind"; [04w-design-shell.md](04w-design-shell.md) § "Indexed names"
+
+**LADDER stage:** parse only (the reader and the commit-seam battery). No fold, solver or replay change.
+
+**Builds on** [ADR-386](#adr-386) / #267, [ADR-498](#adr-498) / #969, [ADR-453](#adr-453), [ADR-462](#adr-462) (declared accounts), [ADR-505](#adr-505) / #975 (the lexicon atom is the total place), [ADR-AG-244](06c-decisions-analytic.md#adr-ag-244) (analytic #1785, the first copy).
+
+**Re-measured at pickup** (e17a7d1e, through `decideDeterministic2D`, LLM mocked): the plan's tables (measured at fa1d2492) held row for row. «∠ABC = α1», «β2», «φ2», «θ2», «Α1», «Δ1», «α_1», «α12», «α 1», «∠ABC > α1», «< α1», «גדולה מ-α1», the multi-statement and «נסמן»/"denote" forms, «π/3», «π/2», «α1 / 2», «α + 40» and «x + 10» all **committed** a `set-angle` value the student never stated. #1702 has not landed («זוית A1 = α1» still escapes only by #1702's false `dropped:A1`).
+
+**Class.** *An angle value slot holding a symbol the number grammar does not own (an indexed name, a Greek letter, the constant π, a symbolic expression) is read as its bare digits, and the honesty gates cannot see the dropped glyph, because each of them defines "a name" as Latin only.*
+
+**Root cause.** Three Latin-only copies of "what a name is": (1) `angleValueOf`'s #267 guard `(?<![A-Za-z])` let a Greek index through and, with no digit lookbehind, restarted inside a blocked «a12»; (2) `droppedGivenNumbers` blanked `[A-Za-z]\d*`, so the «1» of «α1» was a stated number the bogus 1° paid for; (3) the span accountant had no token kind for a Greek glyph at all. And #969's positional value read takes any standalone number, so a symbol beside it stayed in `rest`, unread.
+
+**Decision.**
+1. **One name glyph, shared** — `shell/indexedName.ts`: `GREEK_LETTER`, `NAME_LETTER` (Latin + Greek, both cases), `INDEX` (glued digits, `_1`/`_{1}`, subscript digits), `INDEXED_NAME`/`INDEXED_NAME_RE`, and `UNGLUED` (a number never begins glued to a name letter, after `_`, or inside another number). `lexicon.ts` re-exports the atoms the grammar consumes. This is copy 2 of analytic's `INDEXED_TOKEN` (#1785), so per the third-copy rule it lives in `shell/`; analytic switches to it in the follow-up commit (below).
+2. **The reader** composes `UNGLUED + num` for both the numerator and the denominator, and carries a **leftover guard** (ADR-024, at the reader): if a value symbol is still standing beside the number it took — any Greek glyph (except a capital glued to a Latin label run, «ΔABC»), or a single Latin letter (either case, optionally indexed) joined by an arithmetic operator — it returns null. The rule cannot represent `symbol ± number`, so it declines and the line escalates whole. A lone lowercase letter is NOT a symbol here («זווית d=90» names the vertex d, #45). The symbolic branch is unchanged (it still requires a bare trailing VAR, so «α1» is not a symbol either).
+3. **The subscript fold** (`normalizePointSubscript`) composes `NAME_LETTER`, so «α_1» ≡ «α1».
+4. **The number gate** blanks `NAME_LETTER\d*` (an index is never a magnitude); its nπ lookahead now reads the length-preserving `counted` text, which still carries the π.
+5. **The span accountant gains a `symbol` kind.** Every Greek glyph with its index, and in Latin-only text a lone lowercase letter beside an operator, relation sign or digit, must be carried by a command as a whole string value (`expr.var`, a measure name), or be a symbol the figure bound (radius symbol, angle alias — the label pass's notation mask). **π is never a name**: only a declaration pays for it — the new `Consumed.symbols` (ADR-462's route). Declared by `measurePi` («AB = 2π»), `setRadius`'s size read and every circle a parsed size radius sizes (`piDeclared`, seven emission sites). Index digits glued to a name letter are no longer extracted as numbers by the accountant either.
+6. **The split misfire (D).** `splitGuidance`'s walk-back no longer takes a shape's own labels: when the head ends on a bare shape noun, the label run after it is given back, and the line is two statements only if a subject of its own still stands before the operator. «שטח המשולש ABC = S1» / «היקף המשולש ABC = P1» / «שטח הריבוע ABCD = S1» now get the verdict their siblings («שטח ABC = S1», «… הוא S1») already had: `not-handled`. «משולש ABC AB=AC» now splits as «משולש ABC» + «AB=AC» (it was «משולש» + «ABC AB=AC»).
+
+**Measured after** (same probe, e17a7d1e + this change): every row of the plan's first and second tables is `not-handled` (escalate); «∠ABC = x + 10» and «∠ABC = X + 10» too (the uppercase twin was added when the lowercase-label lift turned «x + 10» into a refusal teaching «X + 10» — a taught remedy that would itself have committed); the misfired refusals are `not-handled`; the ALIAS follow-ups lose their false `number:1` and keep only #1702's `dropped:A1`. Every control in the plan's "honest today" list is unchanged — with **one deliberate exception**: «∠ABC = π» (#1837) committed `measure-angle var: "π"` (the constant read as a free variable) and now escalates with `dropped:symbol:π`. This builds no reading of it (#1837 still decides 180° vs decline); it stops claiming a constant as a name.
+
+**False-flag net: zero changed verdicts.** Every catalog sentence (he + en, empty canvas) and every typed step of the scenario corpus (parsed against its real prefix, then the full honesty battery) — 1735 inputs — gives the same verdict on this branch as on e17a7d1e: 1718 byte-identical, 16 differing only by the new `consumed.symbols: ['π']` declaration, 1 new (this fix's own scenario). The decide-parity goldens drift in shard 4 on 8 cases, all π-size scenarios, and every one re-hashes to its recorded value with the declaration stripped — no behaviour moved; the batch re-records.
+
+**Not done (measured, recorded):** the plan's optional experiment of putting `UNGLUED` into the global `NUM` atom was not run — the reader-local `UNGLUED` closes every measured member, and the gates (arms 4–5) are the backstop for readers nobody audits. Indexed names as first-class measures (question 1) and radians (question 2) stay the operator's.
+
+**Sibling audit.** *2-D:* only the angle reader commits wrong values; length/area/perimeter/radius/ratio/setVar readers are end-anchored and decline (re-measured: «AB = α1», «|AB| = α1», «AB:AC = α1», «מעגל O ברדיוס α1», «S_{ABC} = σ1» → not-handled, unchanged). *Analytic:* the same class through its tokenizer, fixed by ADR-AG-244 (#1785); it now imports the shared atom. *3-D:* declines every member (the parity rows below run in all three builders).
+
+**Locks.**
+- `src/app/__tests__/issue-1814-indexed-name-value.test.ts` (calls `decideDeterministic2D`, `accountUtterance`, `splitGuidance`): 22 must-not-commit lines, «a12», the operator's three-line sequence through `driveThroughGate`, the alias line, 4 split lines + the positive split control, 7 accountant unit tests, 19 must-not-change controls.
+- `shell/__tests__/indexed-name-1814.test.ts`: the atoms themselves.
+- Scenario `indexed-angle-names-decline-1814` (corpus 4), indexed in `docs/test-scenarios.md`.
+- Parity rows: the `knownGap 2d → #1814` on `indexed-area-1785`, `indexed-area-point-1785`, `indexed-angle-1785` removed; `indexed-angle-greek-sub-1814` and `angle-cmp-indexed-1814` added (`not-handled` in every builder).
+- `lexical-ratchet.test.ts`: `parse2Label` 334 → 333.
+- Expectation updates that are declarations, not exemptions: `perimeter-circumference.test.ts`, `symbolic.test.ts` (the commands now carry `consumed.symbols: ['π']`), `span-accounting.test.ts` (the hand-built 6π circle carries the declaration; without it π is reported).
+- No `.geo.json` fixture: the essence of the fix is a decline.
+
+**Consequences.** `shell/indexedName.ts` (new); `src/parser/lexicon.ts`, `parse.ts` (reader, `VALUE_SYMBOL_LEFT`, subscript fold, number gate, `PI_CONSUMED`/`piDeclared`), `spanAccounting.ts` (`symbol` kind), `scope.ts` (`splitGuidance`), `src/engine/types.ts` (`Consumed.symbols`, inert in the engine).
+
+**Behaviour change for a student:** «∠ABC = α1» (and every Greek-indexed, subscripted, compared or expression value) no longer draws a 1° angle: the line goes to the fallback. «שטח המשולש ABC = S1» is no longer told to split into two lines. «∠ABC = π» no longer silently makes π a free letter; it goes to the fallback.

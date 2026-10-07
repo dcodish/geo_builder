@@ -3623,6 +3623,25 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'indexed-angle-names-decline-1814',
+    title: '#1814 (ADR-600): «משולש ABC · ∠ABC = α1 · ∠ACB = α2» — both indexed angle names are declined (escalated), never drawn as 1° and 2°',
+    guards:
+      "Operator report (#1814): after «משולש ABC», «∠ABC = α1» drew angle B as 1°, and «∠ACB = α2» drew C as 2°, both green. Measured on e17a7d1e through decideDeterministic2D (LLM mocked): `set-angle value: 1`, and the same for every Greek index, «α_1», «α 1», «∠ABC > α1» (an inequality as an equality), «π/3» (3°) and «α + 40» (40°). Root cause: the angle reader's #267 guard against a subscript digit was spelled Latin-only, with no digit lookbehind; the positional value read (#969) left a symbol beside its number unread; and every honesty gate defined a name as Latin, so the dropped glyph was invisible. Fix (ADR-600): the shared name alphabet (`shell/indexedName`: NAME_LETTER, INDEXED_NAME, UNGLUED) at the reader, a leftover-symbol guard, the Greek-aware subscript fold and number gate, and a `symbol` kind in the span accountant (π paid for only by a rule's declaration). Both lines are now `not-handled` (the LLM fallback's seam); the triangle stays free. The class matrix (22 must-not-commit lines, the controls, the split misfire, the accountant) is src/app/__tests__/issue-1814-indexed-name-value.test.ts.",
+    // A `not-handled` line never becomes a fact (it escalates), so the operator's lines 2–3 are driven through the
+    // submit gate in `check` rather than listed as steps (refusedSteps holds parser REFUSALS, not declines).
+    steps: ['משולש ABC'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC']);
+      for (const line of ['∠ABC = α1', '∠ACB = α2']) {
+        const v = gateVerdict(facts, line);
+        expect(v.kind === 'refused' && [v.reason, v.detail], `«${line}» is declined by the grammar (escalated), never committed`).toEqual(['parse', 'not-handled']);
+      }
+      expect(fig.construction.constraints, 'no angle value was invented').toEqual([]);
+      for (const id of ['A', 'B', 'C']) expect(fig.positions.has(id), `the triangle keeps ${id}`).toBe(true);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

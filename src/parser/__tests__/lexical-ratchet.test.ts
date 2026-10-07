@@ -25,7 +25,8 @@ const count = (src: string, literal: string): number => src.split(literal).lengt
 const CEILINGS = {
   // #1790 (ADR-595): the inscription rules read their shape through src/parser/shapePhrase.ts and the incircle's
   // circumscribes pattern composes the LABEL atom — lowered to the measured count (342 → 334, earlier drift included).
-  parse2Label: 334, // '[A-Za-z]\d*' in parse.ts
+  // #1814 (ADR-600): the number gate's subscript blank composes NAME_LETTER (shell/indexedName) — 334 → 333.
+  parse2Label: 333, // '[A-Za-z]\d*' in parse.ts
   parse2Num: 31, //    '\d+(?:\.\d+)?' in parse.ts
   parse3Label: 163, // '[A-Z]\d*' in parse3.ts
   // #513 (ADR-3D-135) swept parse3's number fragment onto the new `UNUM` atom while widening the

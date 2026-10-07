@@ -40,6 +40,13 @@ export const ULABEL = String.raw`[A-Z]\d*`;
  *  consumer — the `(?<![A-Za-z])` guard some rules add blocks a LATIN label, not a Hebrew particle. */
 export const NUM = String.raw`(?<![א-ת])-?\d+(?:\.\d+)?`;
 
+// ── Name glyphs (#1814, ADR-600) ──────────────────────────────────────────────────────────────────
+/** The student's name alphabet (Latin + Greek), an index on a name, and `UNGLUED` — where a number may
+ *  begin. Shared with analytic through `shell/indexedName` (the third-copy rule): a guard that keeps a value
+ *  out of a name composes `UNGLUED`, and is never re-spelled per reader (the Latin-only `(?<![A-Za-z])` of
+ *  #267 is how «∠ABC = α1» read as 1°). Only the atoms the grammar consumes are re-exported (#361). */
+export { GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED } from '../../shell/indexedName';
+
 // ── Keywords (bilingual, morphology handled ONCE) ────────────────────────────────────────────────
 /** Hebrew kaf in both positional forms — the ADR-3D-035 recorded trap (`מאונ[ךכ]` — a final-ך-only
  *  gate silently rejects the plural `מאונכים`, where kaf is medial). */

@@ -42,10 +42,56 @@
 import type { AnyCommand } from '@/engine';
 import { normalizeUtterance } from './parse';
 import { unaccountedLabels, type LabelAccountCtx } from './labelAccounting';
+import { GREEK_LETTER, INDEX } from './lexicon';
 
 export interface UnaccountedSpan {
-  kind: 'label' | 'number' | 'relation' | 'unknown-word';
+  kind: 'label' | 'number' | 'relation' | 'symbol' | 'unknown-word';
   text: string;
+}
+
+/**
+ * #1814 (ADR-600) — VALUE SYMBOLS, the token kind the accountant never had. Its word pattern is Hebrew +
+ * lowercase Latin and its labels are Latin capitals, so a Greek glyph was invisible to every pass: a rule
+ * that read «∠ABC = α 1» as 1° or «∠ABC = π/3» as 3° dropped the glyph and the battery saw nothing missing.
+ *  - every Greek glyph with its index («α», «α1», «Α1», «π») — except a capital glued to a Latin label
+ *    run, the «ΔABC» spelling of a triangle's name;
+ *  - in LATIN-ONLY text, a lone lowercase letter (optionally indexed) adjacent to an operator, a relation
+ *    sign or a digit («AB = 3x», «x = 4», «x + 10»): that is a value symbol, not the article «a». In Hebrew
+ *    text a lowercase run is a label word already (#779) and the label pass owns it.
+ * A symbol is accounted when a command CARRIES it as a whole string value (`expr.var`, a measure name, a
+ * bound symbol) — case-blind for a Latin letter that is also a lowercase vertex («angle d = 90»). The
+ * constant π is the exception: it is never a name, so only a rule that DECLARES it consumed
+ * (`consumed.symbols`, the ADR-462 route) pays for it. A red here is a missing declaration, never an
+ * exemption (docs/17 §2.1).
+ */
+const GREEK_SYMBOL = new RegExp(String.raw`${GREEK_LETTER}${INDEX}?(?![A-Z])`, 'g');
+const LATIN_SYMBOL = new RegExp(String.raw`(?<![A-Za-z])[a-z]${INDEX}?(?![A-Za-z])`, 'g');
+const SYMBOL_NEIGHBOUR = /[=<>≤≥+\-*/·×÷^\d]/;
+const PI = 'π';
+
+function valueSymbols(s: string): string[] {
+  const out = (s.match(GREEK_SYMBOL) ?? []).slice();
+  if (!/[֐-׿]/.test(s)) {
+    for (const m of s.matchAll(LATIN_SYMBOL)) {
+      const before = s.slice(0, m.index!).trimEnd().slice(-1);
+      const after = s.slice(m.index! + m[0].length).trimStart().slice(0, 1);
+      if ((before && SYMBOL_NEIGHBOUR.test(before)) || (after && SYMBOL_NEIGHBOUR.test(after))) out.push(m[0]);
+    }
+  }
+  return out;
+}
+
+/** The symbols the commands carry: whole string values (π excluded), plus every declared `consumed.symbols`. */
+function carriedSymbols(commands: AnyCommand[]): { values: Set<string>; declared: string[] } {
+  const values = new Set<string>();
+  const collect = (v: unknown): void => {
+    if (typeof v === 'string') values.add(v);
+    else if (Array.isArray(v)) v.forEach(collect);
+    else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => k !== 'type' && k !== 'consumed' && collect(x));
+  };
+  commands.forEach(collect);
+  values.delete(PI);
+  return { values, declared: commands.flatMap((c) => c.consumed?.symbols ?? []) };
 }
 
 /** Words that carry no geometric content — safe to leave unclaimed. Deliberately conservative:
@@ -190,8 +236,9 @@ export function accountUtterance(utterance: string, commands: AnyCommand[], actx
       ratioPairs.add(m[2]);
     }
   }
-  for (const n of s.match(/(?<![֐-׿])-?\d+(?:\.\d+)?/g) ?? []) {
-    if (/[A-Z]\d*/.test(n)) continue; // part of a label like O1 (already handled)
+  // A digit glued to a NAME letter is that name's index (#1814): «O1» is the label pass's, «α1» the symbol
+  // pass's — never a stated number the bogus value «1» could pay for.
+  for (const n of s.match(/(?<![֐-׿A-Za-zΑ-Ωα-ω_])-?\d+(?:\.\d+)?/g) ?? []) {
     if (ratioPairs.has(n.replace(/^-/, ''))) continue;
     const v = Math.abs(Number(n));
     const hit = cmdNumbers.some(
@@ -208,6 +255,21 @@ export function accountUtterance(utterance: string, commands: AnyCommand[], actx
   const hasConstraint = commands.some((c) => /^set-|^measure-|coincide|circle|polygon|segment|point|line|diameter|midpoint|foot|inscribe|area|perimeter/.test(c.type));
   for (const sym of s.match(REL) ?? []) {
     if (!hasConstraint) out.push({ kind: 'relation', text: sym });
+  }
+  // value symbols (#1814) — carried as a whole value, or (π) declared; a declaration pays for ONE occurrence
+  const { values: symVals, declared } = carriedSymbols(commands);
+  const declaredLeft = [...declared];
+  // a symbol the figure has BOUND (a radius symbol «r», #54; an angle alias, ADR-386) is a measure name the
+  // student is using — the same notation the label pass masks
+  const bound = new Set([...(actx.radiusSymbols ?? []), ...(actx.angleAliases ?? [])]);
+  for (const sym of valueSymbols(s)) {
+    if (sym !== PI && (bound.has(sym) || symVals.has(sym) || (/^[a-z]/.test(sym) && symVals.has(sym.toUpperCase())))) continue;
+    const i = declaredLeft.indexOf(sym);
+    if (i >= 0) {
+      declaredLeft.splice(i, 1);
+      continue;
+    }
+    out.push({ kind: 'symbol', text: sym });
   }
   // words — a run the label pass above classified as notation is not a word (#779)
   for (const word of s.match(/[֐-׿a-z][֐-׿a-z'"-]*/g) ?? []) {
