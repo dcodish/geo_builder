@@ -1,9 +1,10 @@
 # 06d — Decision log: the complex-numbers tool (`src-complex/`)
 
 _The complex-numbers track's OWN ADR log (ids `ADR-CX-NNN`), separate from the sibling logs **by
-design** — docs/20 §12 rule 3: parallel session streams must not race on one ADR numbering sequence.
-Same conventions otherwise: every significant decision gets an entry; the plan of record is
-[27-complex-numbers-tool.md](27-complex-numbers-tool.md)._
+design** — [docs/22 §9](22-workflow.md) ("Isolation rules"): parallel session streams must not race on one ADR numbering sequence.
+Same conventions otherwise: every significant decision gets an entry. The contract is
+[02d](02d-requirements-complex.md) (what) and [04d](04d-design-complex.md) (how); the finished build plan was
+[27-complex-numbers-tool.md](27-complex-numbers-tool.md) (its §10/§10b grammar tables move into 02d, #1861)._
 
 ---
 
@@ -806,7 +807,7 @@ quantities remain open on #623.**
 ## ADR-CX-015 — A plotted number carries a READING, composed once (2026-08-16)
 
 **Status:** Accepted · **Slice:** S5 (#622), before the visualization layer · **Ladder:** stage 5d
-· **Fixes:** [#675](https://github.com/dcodish/geo_builder/issues/675)
+· **Fixes:** [#675](https://github.com/dcodish/geo_builder/issues/675) · **⚠ Ruled to change 2026-10-07 (ADR-W-118 B6/D1 · #1862):** the canvas shows what the student typed; computed readings go to the panel
 
 ### The report
 
@@ -1781,7 +1782,7 @@ design; a stopgap panel built here would be work that programme would delete.
 ## ADR-CX-028 — «הורידו שאלה» is NOT built here: the question document is 2-D and 3-D only (#745)
 
 **Status:** accepted, 2026-08-19 · **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745)
-· operator ruling, 2026-08-19: *"הורידו שאלה should be in 3d but not in complex"*
+· operator ruling, 2026-08-19: *"הורידו שאלה should be in 3d but not in complex"* · **⚠ Ruled to change 2026-10-07 (ADR-W-118 B16 · #1872):** «הורידו שאלה» is built in every builder, complex included
 
 **Context.** #745 moved the question-document composer and the clean-export rasteriser into `shell/`
 ([ADR-W-027](06w-decisions-workspace.md#adr-w-027)) so a capability that had been trapped in `src/`
@@ -2581,7 +2582,7 @@ under names that are not the solutions' own; the `2b-capstone` fixture ends at p
 [#1390](https://github.com/dcodish/geo_builder/issues/1390) (bug, `P1`) +
 [#1389](https://github.com/dcodish/geo_builder/issues/1389) (feature, `P2`), built as ONE item per the
 ruling · round [#1397](https://github.com/dcodish/geo_builder/issues/1397) · **amends**
-[ADR-CX-041](#adr-cx-041) ("What this does NOT do")
+[ADR-CX-041](#adr-cx-041) ("What this does NOT do") · **⚠ Ruled to change 2026-10-07 (ADR-W-118 B6/D1 · #1862):** a letter the student did not value is never replaced on the canvas
 **Requirements:** [02d](02d-requirements-complex.md) FR-KN-5 (new): a real parameter is shown and askable
 · **Design:** [04d](04d-design-complex.md) — "A solved parameter has ONE exact value" · **Ladder:** stage 5d
 ([LADDER-CX](LADDER-CX.md))
@@ -3083,7 +3084,7 @@ both orders with the exact Hebrew sentence, `z^2=4 · z^2=-4`, `w^2=4 · w^2=9`,
 the issue comment) · **Issue:** [#1427](https://github.com/dcodish/geo_builder/issues/1427) (bug, `P1`,
 `complex`) · round [#1469](https://github.com/dcodish/geo_builder/issues/1469) · **amends**
 [ADR-CX-014](#adr-cx-014) (the knowledge predicate) and [ADR-CX-006](#adr-cx-006)'s "branches are what
-"show another" walks"
+"show another" walks" · **⚠ Ruled to change 2026-10-07 (ADR-W-118 B12 · #1867):** two possible values are shown both, joined by «או»
 **Requirements:** [02d](02d-requirements-complex.md) FR-KN-1 (amended: invariance is asked over every
 configuration, and an incompletely known set is said to be one) · FR-CN-3 (amended: a numeric equation's
 other roots are configurations too) · **Design:** [04d](04d-design-complex.md), "Knowledge is decidable"
@@ -3489,7 +3490,7 @@ The pre-played sheet (PR #1515, 20 cases, 6 red) found five classes. Each is fix
 
 ## ADR-CX-058 — «z1 = a+bi»: a glued `i` is a coefficient times i, and a number defined by parameters reads as its definition (#1365)
 
-**Status:** accepted, 2026-10-04 (operator ruling 2026-09-24, option (c) of the round-#1382 escalation) ·
+**Status:** accepted, 2026-10-04 (operator ruling 2026-09-24, option (c) of the round-#1382 escalation) · · **⚠ Ruled to change 2026-10-07 (ADR-W-118 B6/D1 · #1862):** a letter the student did not value is never replaced on the canvas
 **Issue:** [#1365](https://github.com/dcodish/geo_builder/issues/1365) (feature, `complex`, PR) · round #1736
 **Requirements:** [02d](02d-requirements-complex.md) FR-CN-10 (new): the symbolic cartesian form reads as the textbook writes it ·
 **Design:** [04d](04d-design-complex.md), "A glued `i` is a coefficient times i" and "A number DEFINED by real parameters reads as its definition" ·

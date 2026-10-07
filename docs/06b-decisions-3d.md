@@ -1,6 +1,6 @@
 # 06b — Decision log: the 3-D space/vectors tool (`/3d-builder/`)
 
-_The 3-D track's OWN ADR log (ids `ADR-3D-NNN`), separate from [06-decisions.md](06-decisions.md) **by design** — docs/20 §12 rule 3: two parallel session streams must not race on one ADR numbering sequence. Same conventions otherwise: every significant decision gets an entry; the plan of record is [20-space-vectors-tool.md](20-space-vectors-tool.md)._
+_The 3-D track's OWN ADR log (ids `ADR-3D-NNN`), separate from [06-decisions.md](06-decisions.md) **by design** — [docs/22 §9](22-workflow.md) ("Isolation rules") and [`BOUNDARIES.json`](../BOUNDARIES.json): two parallel session streams must not race on one ADR numbering sequence. Same conventions otherwise: every significant decision gets an entry. The contract is [02b](02b-requirements-3d.md) (what) and [04b](04b-design-3d.md) (how); the finished build plan was [20-space-vectors-tool.md](20-space-vectors-tool.md)._
 
 ---
 
@@ -11070,7 +11070,7 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 
 **Status:** accepted · 2026-09-28 · operator rulings 2026-09-27 (Option A, and again in the /decisions pass: *"Keep it flat on the floor"*) · round #1510
 
-**Requirements:** none (internal) · **Design:** this entry
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-4 (amended 2026-10-07, #1861) · **Design:** this entry
 
 **Context.** T35: *"image is not proportional"* — |AB| = 5 drew shorter than |AC| = 3. The 3-D figure was exactly right; the whole triangle tumbled edge-on to the camera at 3 of 4 seeds, because once a driven given ran the solve, the six rigid-motion values rode «הציגו תצורה אחרת» with the real freedom. The class: every free planar figure in 3-D carrying a driven given.
 
@@ -12031,7 +12031,7 @@ The degradation policy is deliberately unchanged (a line this code does not comm
 
 ## ADR-3D-309 — A collapse an incidence invented is refused; a collapse the givens force is drawn (#1815)
 
-**Status:** accepted · 2026-10-07 · bug (P1, honesty) · round #1845 · branch `fix/1815-invented-collapse` off `main` @ e17a7d1e · amends [ADR-3D-268](#adr-3d-268) part 2 · implements the #1815 plan (2026-10-06), mechanism C · *amended by [ADR-3D-310](#adr-3d-310): the forced collapse it kept drawing is refused too (#1849)*
+**Status:** accepted · 2026-10-07 · bug (P1, honesty) · round #1845 · branch `fix/1815-invented-collapse` off `main` @ e17a7d1e · amends [ADR-3D-268](#adr-3d-268) part 2 · implements the #1815 plan (2026-10-06), mechanism C · *amended by [ADR-3D-310](#adr-3d-310): the forced collapse it kept drawing is refused too (#1849)* · **⚠ Superseded for declared polygons by [ADR-3D-310](#adr-3d-310) (2026-10-07):** a collapse the givens force is refused too, not drawn
 
 **Requirements:** [docs/02b](02b-requirements-3d.md) FR-RD-7 gains a sentence: a flatness only an incidence on a rider can produce is refused, naming both statements; a flatness the other givens force is still drawn · **Design:** [docs/04b](04b-design-3d.md) § "The ⟂-from-an-in-plane-point disposition", new paragraph *Which givens forced the collapse* · **LADDER stage:** solve (the pool decision, failure path only) + derive (the refusal's routing and wording).
 

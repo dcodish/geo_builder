@@ -41,6 +41,10 @@ write a file, and aggregate other people's traffic.
 | `admin.ts` | The password-protected dashboard over `events.jsonl` |
 | `adminConfig.ts` | Operator-editable per-tool config, validated at save time |
 | `http.ts` | Client IP and rate-limiter helpers, shared by every handler |
+| `llm/harness.ts` | The one LLM request harness: model, tool, prompt skeleton and response reader, composed from each product's prompt spec (#1359) |
+| `toolRouting.ts` | Which events file a `tool:` tag belongs in, derived from `products.json` (#1243) |
+| `shareStore.ts` | The share store: `POST …/api/share` stores a figure's fragment + PNG; `GET /g/<id>` serves the preview page (#1374) |
+| `shareProxy.ts` | The **dev** host of the share store's handlers, as a Vite plugin |
 
 **Dev and prod run the same handler.** `llmProxy.ts` (Vite middleware) and `standalone.ts` (production)
 are two *hosts* of `parseHandler.ts`, not two implementations — so a behaviour that works in development
@@ -59,12 +63,14 @@ bundle. A product talks to the proxy over HTTP or not at all.
 
 The request body carries a `tool:` field, and the handler selects that product's prompt builder. This is
 **the one deliberate sharing point in the workspace**: `server/` is allowed to import
-`src/parser/llmShared` and `src3d/parser/llmShared3` (an explicitly-allowed edge in `BOUNDARIES.json`,
+`src/parser/llmShared`, `src3d/parser/llmShared3` and `src-analytic/parser/llmSharedAnalytic` (an explicitly-allowed edge in `BOUNDARIES.json`,
 listed so the coupling is visible rather than folklore).
 
-**Currently two of the four builders use this lane.** 2-D posts without a `tool` (the default) and 3-D
-posts `tool: '3d'`. **Complex and analytic do not call it at all** — they ship deterministic parsers with
-no LLM fallback, so nothing in those trees posts to `/api/parse`. The parameterization is what keeps
+**Currently three of the four builders use this lane.** 2-D posts without a `tool` (the default), 3-D
+posts `tool: '3d'` and analytic posts `tool: 'analytic'` (`src-analytic/parser/llmAnalytic.ts`). **Complex
+does not call it yet** — it ships a deterministic parser with no LLM fallback, so nothing in that tree
+posts to `/api/parse` (amended 2026-10-07, #1861). **⚠ Ruled to change (2026-10-07, ADR-W-118 B14 · #1869):**
+complex gets the LLM fallback through this lane. The parameterization is what keeps
 adding a lane cheap; it is not evidence that all four use one.
 
 `adminConfig.ts` is the other direction: it *imports a product's parser* (the complex grammar, which is

@@ -75,14 +75,14 @@ never as a contradiction or a refutation.
 
 ## Shape
 
-| Layer | Size | What it is |
-|---|---|---|
-| `parser/` | ~2,500 lines | Sentence-family rules; **span accounting** is the only drop-prevention mechanism |
-| `replay/` | ~1,650 | The fold from ordered lines to a figure |
-| `solve/` | ~1,645 | The ℚ-linear core, the knowledge gates, tiering |
-| `model/` · `value/` | ~1,900 | Claims, verdicts and reason codes; the value layer |
-| `scene/` · `render/` | ~1,200 | The Gauss plane |
-| `app/` · `store/` · `ui/` · `formulas/` | ~1,190 | Line derivation, the Zustand store, chrome glue, the formula table |
+| Layer | What it is |
+|---|---|
+| `parser/` | Sentence-family rules; **span accounting** is the only drop-prevention mechanism |
+| `replay/` | The fold from ordered lines to a figure |
+| `solve/` | The ℚ-linear core, the knowledge gates, tiering |
+| `model/` · `value/` | Claims, verdicts and reason codes; the value layer |
+| `scene/` · `render/` | The Gauss plane |
+| `app/` · `store/` · `ui/` · `formulas/` | Line derivation, the Zustand store, chrome glue, the formula table |
 
 ## Design rules with teeth
 
@@ -123,8 +123,10 @@ never as a contradiction or a refutation.
   only as a whole additive term. A form with two different angles is left as typed, refuses, and the
   submit path names both angles (`trigAngleMismatch`, `trig-mismatch`).
 - **A number DEFINED by real parameters reads as its definition** (`model/cartesianForm.ts`;
-  [ADR-CX-058](06d-decisions-complex.md#adr-cx-058)). `z1 = a+bi` is carried as a free unknown plus a
-  numeric relation (making it a function of a and b in the solver is #1410), so its exact carriers
+  [ADR-CX-058](06d-decisions-complex.md#adr-cx-058)). **⚠ Ruled to change (2026-10-07, ADR-W-118 B6/D1 ·
+  #1862):** the canvas shows what the student typed and never substitutes a letter they did not value;
+  computed values go to the panel. The text below describes the code until that ships. `z1 = a+bi` is carried as a free unknown plus a
+  numeric relation (making it a function of a and b in the solver is #1410, closed and parked in the icebox), so its exact carriers
   know nothing. Stage 5d reads the student's own definition instead — any `name = E` with E free of
   complex names and affine in its parameters over the Gaussian rationals — substitutes every parameter
   whose value is a known exact rational, and prints «z₁ = a+bi» / «z₁ = 3+bi» in the cartesian view
@@ -152,7 +154,9 @@ never as a contradiction or a refutation.
   is an equation in `r`, solved as its own small system over the parameter atoms, not a contradiction.
   A solved parameter is drawn at its value and leaves the free basis. The argument half holds the other
   end: a turn-unknown pinned to a non-whole constant is always a contradiction.
-- **A solved parameter has ONE exact value** ([ADR-CX-043](06d-decisions-complex.md#adr-cx-043)). Tier 1
+- **A solved parameter has ONE exact value** ([ADR-CX-043](06d-decisions-complex.md#adr-cx-043)).
+  **⚠ Ruled to change (2026-10-07, ADR-W-118 B6/D1 · #1862):** the canvas keeps the student's `18r`; the
+  substituted value is the panel's. The text below describes the code until that ships. Tier 1
   publishes `paramValues` (each determined parameter as an exact `ExpVec`), and `substituteSolvedParams` is the
   only way a solved atom leaves a modulus: `knownModulus`, the drawn reading, the «פרמטרים» panel section
   (`Derived2.params`) and the ask lane all read it, so none can print `18r` for a number the givens made
@@ -241,8 +245,10 @@ entering the question.
 
 In a product whose defining interaction is entering a problem **line by line**, that distinction is the
 difference between a tool that checks a student and one that contradicts them out of its own
-incompleteness. It is the design decision from this tree most worth copying — the 3-D builder collapses
-`unknown` into `refuted`, which is [#909](https://github.com/dcodish/geo_builder/issues/909).
+incompleteness. The 3-D builder refuses a claim its givens do not determine
+([02b FR-CL-1](02b-requirements-3d.md), [ADR-3D-260](06b-decisions-3d.md#adr-3d-260)); the operator deferred
+a three-valued verdict for 3-D ([#909](https://github.com/dcodish/geo_builder/issues/909)); amended
+2026-10-07, #1861.
 
 ## Boundaries
 
@@ -259,6 +265,6 @@ suite proves they behave.
 
 ## Known gap
 
-- **`/complex-builder/api/*` is not reverse-proxied in production**, so the per-tool operator config is
-  silently inert there. **[#903](https://github.com/dcodish/geo_builder/issues/903)** — an Apache
-  conf gap, not a code one, and the "silently" is the part that matters.
+- ~~**`/complex-builder/api/*` is not reverse-proxied in production**, so the per-tool operator config is
+  silently inert there.~~ Resolved — **[#903](https://github.com/dcodish/geo_builder/issues/903)** is
+  closed; the directives went in (`deploy/apache-complex-builder.conf`; amended 2026-10-07, #1861).

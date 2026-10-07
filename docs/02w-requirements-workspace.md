@@ -18,8 +18,8 @@ The surfaces a student meets in **every** builder, and the operator surface behi
 | Shared i18n, bidi isolation, number display | `shell/` | `FR-WI-*` |
 
 **It does not own product geometry.** What a *figure* must do lives in each product's own requirements
-doc ([02](02-requirements.md) for 2-D, [02c](02c-requirements-analytic.md) for analytic; `02b`/`02d`
-pending). Where a shared mechanism generalises a promise a product doc already made, this document says
+doc ([02](02-requirements.md) for 2-D, [02b](02b-requirements-3d.md) for 3-D, [02c](02c-requirements-analytic.md)
+for analytic, [02d](02d-requirements-complex.md) for complex). Where a shared mechanism generalises a promise a product doc already made, this document says
 so rather than restating it — the prose duplication [docs/28 §1c](28-product-unification.md) identified
 as the real defect.
 
@@ -45,17 +45,19 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
 
 - **FR-SU-1 (Must)** — **One look.** Every builder renders the same design tokens and the same palette,
   so a student who learns one interface has learned all of them. *(Realised — `shell/theme.ts`;
-  rulings D2/D3, [docs/28 §4a](28-product-unification.md).)* **One wording for one state**: «✓ הציור נקבע במלואו על ידי הנתונים», «דרגות חופש: N», «חושב…», the ask button «שאלו», and the undo/redo/clear/another/About row read the same in every builder (He and En), and the About opens once on a first visit in all four. *(Operator ruling 2026-09-27; realised — [ADR-W-098](06w-decisions-workspace.md#adr-w-098), #1453.)* The empty-canvas example chips show their math typeset, like the fact rows. *(#1530, [ADR-W-100](06w-decisions-workspace.md#adr-w-100).)*
+  rulings D2/D3, [docs/28 §4a](28-product-unification.md).)* **⚠ Ruled to change (2026-10-07, ADR-W-118 B8 · #1596):** «✓ הציור נקבע במלואו» appears only when exactly one figure exists, in every builder. The text below describes the code until that ships. **One wording for one state**: «✓ הציור נקבע במלואו על ידי הנתונים», «דרגות חופש: N», «חושב…», the ask button «שאלו», and the undo/redo/clear/another/About row read the same in every builder (He and En), and the About opens once on a first visit in all four. *(Operator ruling 2026-09-27; realised — [ADR-W-098](06w-decisions-workspace.md#adr-w-098), #1453.)* The empty-canvas example chips show their math typeset, like the fact rows. *(#1530, [ADR-W-100](06w-decisions-workspace.md#adr-w-100).)*
 - **FR-SU-2 (Must)** — **A visible builder switcher**, present in every builder, listing the suite from
   the machine registry ([`products.json`](../products.json)) rather than from code. A builder marked not
   enabled **never appears in a shipped page** — the promise that no chip can point at a 404. *(Realised —
   `shell/frame/Switcher.tsx`, [ADR-W-021](06w-decisions-workspace.md#adr-w-021); the analytic builder is
-  `enabled: false` + `devOnly`, [ADR-AG-007](06c-decisions-analytic.md).)* On a phone, where the strip scrolls inside itself, the **current** builder's tab is always in view. *(#1458, [ADR-W-097](06w-decisions-workspace.md#adr-w-097).)*
+  `enabled: true`, deployed since `prod/2026-09-16` — amended 2026-10-07, #1861: [ADR-AG-007](06c-decisions-analytic.md) lifted.)* On a phone, where the strip scrolls inside itself, the **current** builder's tab is always in view. *(#1458, [ADR-W-097](06w-decisions-workspace.md#adr-w-097).)*
 - **FR-SU-3 (Must)** — **One three-zone workbench:** input, canvas, and an **opt-in** data panel on its
   own side. The zones do not move between builders. *(Realised — `shell/frame/Workbench.tsx`; D1.)*
 - **FR-SU-4 (Should)** — **One header and tool row.** Primary session actions are visible; secondary ones
-  live behind a single overflow menu, in the same order everywhere. *(Realised — `AppFrame.tsx`,
-  `ToolButton.tsx`; D4 as amended by #706.)*
+  are visible too — save/load in the tool row, language and About as buttons on the suite bar — in the
+  same order everywhere; there is no overflow menu. *(Realised — `AppFrame.tsx`,
+  `ToolButton.tsx`; D4 as amended by #706; amended 2026-10-07, #1861: the `⋯` menu was retired,
+  [docs/28](28-product-unification.md) D4 amendment, 2026-08-17.)*
 - **FR-SU-5 (Must)** — **One voice for refusals and notices.** A refusal, a warning and a notice look and
   read the same in every builder; error text names the conflicting *statement*, never internal state.
   *(Realised — `shell/frame/Banner.tsx`.)* A message may interpolate only what the student typed or the figure shows — never an engine id or noun. *(Checked — [ADR-W-096](06w-decisions-workspace.md#adr-w-096); 3-D locked, the rest #1522.)*
@@ -98,7 +100,9 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
   true only of the current sample is not knowledge and must not be printed. This is the shared statement
   of the honesty rule each product enforces in its own engine, and it is the reason the panel can be
   trusted at all. *(Generalises the 2-D reveal contract, [FR-RV-5](02-requirements.md); 3-D states it as
-  "a number drawn on the canvas must be seed-invariant knowledge".)*
+  "a number drawn on the canvas must be seed-invariant knowledge". What the CANVAS carries is a separate
+  rule — the student's inputs, [ADR-W-047](06w-decisions-workspace.md#adr-w-047), with the recorded
+  exceptions of [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B7; amended 2026-10-07, #1861.)*
 - **FR-DP-4 (Must)** — **Answers are product-shaped; the lane is not.** A length with units, a vector
   equation and a complex modulus are genuinely different answers, and each product owns its rows. What is
   shared is the box, the submit, the palette and the always-there rule. *(Realised — ADR-W-038.)*
@@ -224,7 +228,7 @@ engine. Owned by the site-root files in `deploy/homepage/` and by each builder's
 - **FR-EX-1 (Should)** — **A clean, print-ready image** of the current figure, from every builder, on a
   white background at export resolution rather than screen resolution. *(Realised — `shell/export/svgToPng.ts`;
   generalises [FR-HS-5](02-requirements.md).)*
-- **FR-EX-2 (Should)** — **The built question as a document**, laying out the figure beside the student's
+- **FR-EX-2 (Should)** — **⚠ Ruled to change (2026-10-07, ADR-W-118 B16 · #1872):** «הורידו שאלה» is offered in every builder, the analytic and complex builders included; today only 2-D and 3-D offer it. The text below describes the code until that ships. **The built question as a document**, laying out the figure beside the student's
   own numbered givens, Hebrew RTL correct in Word. **Deterministic — never LLM-generated**: the givens are
   the student's own words in entry order. *(Realised — `shell/export/questionDoc.ts`; generalises
   [FR-HS-11](02-requirements.md).)*
@@ -265,7 +269,10 @@ Operator-facing, never student-facing. Privacy properties are governed by
   updates layout direction. *(Realised — `shell/i18n.ts`.)*
 - **FR-WI-2 (Must)** — **An LTR technical run inside an RTL sentence never reverses.** `z1 = 3+4i`,
   `y = -2x + 8` and `ℓ1` read correctly inside a Hebrew refusal. Each builder had to learn this
-  separately; it is now one mechanism. *(Realised — `shell/bidi.ts`.)*
+  separately; it is now three kits — `shell/bidi.ts` (analytic and complex), `src/i18n/bidi.ts` (2-D)
+  and `src3d/i18n/bidi.ts` (3-D) — held together by one shared fixture table,
+  `shell/__tests__/fixtures/issue-1296-rows.ts`, that every product asserts. *(Realised; amended
+  2026-10-07, #1861: the 2-D and 3-D copies have not moved onto `shell/bidi.ts`.)*
 - **FR-WI-3 (Should)** — **One display-number format** across builders, so the same quantity never appears
   with different precision in two tools. *(Realised — `shell/format.ts`, operator ruling 2026-08-18.)*
 - **FR-WI-4 (Must)** — **Every builder can name every builder.** The switcher resolves its labels through
@@ -281,11 +288,11 @@ Operator-facing, never student-facing. Privacy properties are governed by
 
 - **Product geometry, constructs and refusal semantics** — each product's own requirements doc.
 - **Privacy, cost, security and performance** — [03-nonfunctional-requirements](03-nonfunctional-requirements.md).
-- **How the shared tree is built** — `04w` (pending, [#904](https://github.com/dcodish/geo_builder/issues/904));
+- **How the shared tree is built** — [04w](04w-design-shell.md);
   the seeding rule and boundary edges are [ADR-W-016](06w-decisions-workspace.md#adr-w-016) and
   [`BOUNDARIES.json`](../BOUNDARIES.json).
 
-- **FR-SU-13 (Must)** — **A point's letter is changed where the point is.** In every builder, clicking a point opens one small popover at it. The student types the new letter, and Enter or ✓ applies it; nothing goes through the main input. A letter already in use is never merged onto: the popover says it is taken, quotes the statement that holds it in the student's own words, and offers to **exchange** the two letters («החליפו בין A ל-B»), in both directions, whichever point was clicked first. The exchange keeps every statement, keeps the drawing where it is (only the letters change places), and is undone in one step, like a rename. The same exchange can be typed («החלף בין A ל-B» / "swap A and B"). *(Realised for 2-D and 3-D — `shell/frame/LetterPopover.tsx`, [ADR-W-105](06w-decisions-workspace.md#adr-w-105), #1631; operator, 2026-10-01: «we want that same mechanism now for analytics and also for the 3d tool». The analytic builder is #1631 part 3.)*
+- **FR-SU-13 (Must)** — **A point's letter is changed where the point is.** In every builder, clicking a point opens one small popover at it. The student types the new letter, and Enter or ✓ applies it; nothing goes through the main input. A letter already in use is never merged onto: the popover says it is taken, quotes the statement that holds it in the student's own words, and offers to **exchange** the two letters («החליפו בין A ל-B»), in both directions, whichever point was clicked first. The exchange keeps every statement, keeps the drawing where it is (only the letters change places), and is undone in one step, like a rename. The same exchange can be typed («החלף בין A ל-B» / "swap A and B"). *(Realised for 2-D, 3-D and analytic — `shell/frame/LetterPopover.tsx`, [ADR-W-105](06w-decisions-workspace.md#adr-w-105), #1631; operator, 2026-10-01: «we want that same mechanism now for analytics and also for the 3d tool». Analytic: [ADR-AG-192](06c-decisions-analytic.md#adr-ag-192); amended 2026-10-07, #1861.)*
 - **FR-SU-14 (Must)** — **A segment is hidden or dashed where it is.** In every builder that lets a student click a segment, the click opens one small menu at it: «הסתירו קטע / הציגו קטע» and «מקווקו / רציף», with the builder's own items below (2-D: «החליפו קצוות»; analytic: the measurements). A hidden segment is not drawn, but it stays in the figure: every statement, reference, measurement and question about it still works, and the menu, reached from a faint mark on the line, shows it again. Un-hiding a dashed segment brings it back dashed. The choice is saved with the figure and comes back when the file is opened. *(Realised for 2-D and the analytic builder — `shell/frame/SegmentMenu.tsx`, [ADR-W-106](06w-decisions-workspace.md#adr-w-106), #1653; operator, 2026-10-02: «in the analytic tool we dont have an option to click on a segment and hide it like we have in 2d». In the analytic builder one «בטל» also undoes a hide; in 2-D it is undone from the menu. 3-D's edges have no click menu yet, see ADR-W-106.)*
-- **FR-SU-15 (Must)** — **A claim to prove is never drawn as a given.** In every builder, a line that asks the student to PROVE something — «הוכיחו כי …», «הוכח ש …», «הראו כי …», «יש להוכיח …», "prove that …", "show that …", with or without an item marker («א.», «(1)») and also when it follows a given on the same line («נתון AB = AC. הוכיחו כי AB ⊥ AC») — is refused, and nothing of the line is recorded. The refusal says that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and quotes the claim so the student knows which part to leave out. «כי» and «ש» in their other senses («נתון כי …», «כך ש-…») and «הראו» as "show me" are never refused for this. *(Realised for 2-D, 3-D and analytic — `shell/proofTarget.ts`, [ADR-W-107](06w-decisions-workspace.md#adr-w-107), #1666; operator, 2026-10-02 on #1649: «all refused with explanation». Analytic refused first, #1618.)*
-- **FR-SU-16 (Must)** — **A plane-geometry sentence gets the same answer in every builder that reads plane geometry.** When a student types a plane-geometry sentence, the 2-D builder and the analytic builder give the same verdict: both build it, both refuse it, or both ask the same kind of question. The 2-D builder's verdict is the reference. The 3-D builder gives the same verdict for the core plane families: polygons, lengths, angles, midpoints and ratios, cevians, parallel and perpendicular, and area. The exceptions are topic families that one builder reads by design: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, and free points in 3-D. A builder that does not read such a family answers it honestly, with a refusal, a question or the model, and never draws it as something else. A known difference is listed with the issue that will remove it. *(Realised as a cross-product lock — `shell/__tests__/fixtures/geo-input-parity.ts`, [ADR-W-108](06w-decisions-workspace.md#adr-w-108), #1649; operator, 2026-10-02: «we need a rule that ensures consistency in data input» and «analytics and 2d should have same user experience».)*
+- **FR-SU-15 (Must)** — **A claim to prove is never drawn as a given.** **⚠ Ruled to change (2026-10-07, ADR-W-118 B14/D3 · #1870):** the complex builder refuses a proof-verb line like the others, while keeping its claim check for a bare statement. The text below describes the code until that ships. In every builder, a line that asks the student to PROVE something — «הוכיחו כי …», «הוכח ש …», «הראו כי …», «יש להוכיח …», "prove that …", "show that …", with or without an item marker («א.», «(1)») and also when it follows a given on the same line («נתון AB = AC. הוכיחו כי AB ⊥ AC») — is refused, and nothing of the line is recorded. The refusal says that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and quotes the claim so the student knows which part to leave out. «כי» and «ש» in their other senses («נתון כי …», «כך ש-…») and «הראו» as "show me" are never refused for this. *(Realised for 2-D, 3-D and analytic — `shell/proofTarget.ts`, [ADR-W-107](06w-decisions-workspace.md#adr-w-107), #1666; operator, 2026-10-02 on #1649: «all refused with explanation». Analytic refused first, #1618.)*
+- **FR-SU-16 (Must)** — **A plane-geometry sentence gets the same answer in every builder that reads plane geometry.** When a student types a plane-geometry sentence, the 2-D builder and the analytic builder give the same verdict: both build it, both refuse it, or both ask the same kind of question. The 2-D builder's verdict is the reference. The 3-D builder is to give the same verdict for the core plane families: polygons, lengths, angles, midpoints and ratios, cevians, parallel and perpendicular, and area — that parity is **parked, not realised**: most of 3-D's known-gap rows are owned by #1679, which is in the icebox (as are 2-D's own phrasing gaps, #1677) (amended 2026-10-07, #1861: [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B15). The exceptions are topic families that one builder reads by design: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, and free points in 3-D. A builder that does not read such a family answers it honestly, with a refusal, a question or the model, and never draws it as something else. A known difference is listed with the issue that will remove it. *(Realised as a cross-product lock — `shell/__tests__/fixtures/geo-input-parity.ts`, [ADR-W-108](06w-decisions-workspace.md#adr-w-108), #1649; operator, 2026-10-02: «we need a rule that ensures consistency in data input» and «analytics and 2d should have same user experience».)*

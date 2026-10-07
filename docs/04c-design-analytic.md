@@ -4,12 +4,13 @@ _How the analytic product is built. Registered in [`DOCS.json`](../DOCS.json) as
 design doc ([ADR-W-041](06w-decisions-workspace.md#adr-w-041))._
 
 **What it must promise** is [02c](02c-requirements-analytic.md) — the V1 pedagogy and requirements
-captured live from the operator. Decisions are [06c](06c-decisions-analytic.md); the plan of record is
-[docs/19](19-analytic-geometry-tool.md).
+captured live from the operator. Decisions are [06c](06c-decisions-analytic.md). 02c and this doc are the
+contract; [docs/19](19-analytic-geometry-tool.md) is the finished build plan (history), and where it
+differs, they win (amended 2026-10-07, #1861).
 
 > **Status: DEPLOYED since `prod/2026-09-16`** at `/analytic-builder/` (`products.json` `enabled: true`; the
 > [ADR-AG-007](06c-decisions-analytic.md) hold was lifted by the operator — [DEPLOY-LOG](DEPLOY-LOG.md)
-> 2026-09-16). Requirements 02c are still marked IN PROGRESS; that is a doc status, not a deploy status.
+> 2026-09-16).
 
 ## What is different about this product
 
@@ -20,16 +21,14 @@ from the ruling that **text is the only source of givens**: where an exam leans 
 given, that is a defect in the exam, not a gap the tool should paper over
 ([02c](02c-requirements-analytic.md) P2/P3).
 
-## Shape — the smallest of the four trees
+## Shape
 
-| Layer | Size | What it is |
-|---|---|---|
-| `engine/` | ~1,200 lines | `expr` (the numeric expression layer), `conic`, `curves`, `apply`, `carriers` (the DOF contract), `evaluate`, `derive`, `types` |
-| `parser/` | ~400 | `parseAnalytic.ts` + `catalogAnalytic.ts` |
-| `render/` | ~215 | `scene.ts` (pure) + `Figure.tsx` |
-| `store/` | ~120 | Zustand, the ordered fact list as source of truth |
-
-Roughly 2,350 source lines against `src/`'s 42,000 — this is a V0, not a peer.
+| Layer | What it is |
+|---|---|
+| `engine/` | `expr` (the numeric expression layer), `conic`, `curves`, `apply`, `carriers` (the DOF contract), `evaluate`, `derive`, `types` |
+| `parser/` | `parseAnalytic.ts` + `catalogAnalytic.ts` |
+| `render/` | `scene.ts` (pure) + `Figure.tsx` |
+| `store/` | Zustand, the ordered fact list as source of truth |
 
 ## The image carries no chrome ([ADR-AG-151](06c-decisions-analytic.md#adr-ag-151))
 
@@ -1163,14 +1162,9 @@ applied to the fourth.
 
 ## Known gaps
 
-- **Test coverage is still thin by the workspace's standards, though less so** — 3 test files and ~713
-  test lines against ~2,650 source lines (110 tests), where the mature trees run better than 1:1. B1
-  added the DOF-contract suite and a second catalog guard. Appropriate for a V0 in build, and worth
-  stating plainly so it is a known position rather than an oversight discovered later.
-- **`02c` is still marked IN PROGRESS**, though less of it is open than was. It was captured live from an
-  operator session and its decisions are not all ratified as `ADR-AG-NNN` yet; where it and
-  [docs/19](19-analytic-geometry-tool.md) disagree, docs/19 is authoritative until they are. **Ratified
-  since:** R1/R2/R5 — the object-first model and the tier-3 solve
+- ~~**`02c` is still marked IN PROGRESS**~~ — resolved: 02c and 04c are the contract, and where
+  [docs/19](19-analytic-geometry-tool.md) differs, they win (amended 2026-10-07, #1861). **Ratified
+  along the way:** R1/R2/R5 — the object-first model and the tier-3 solve
   ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009)) — and the teacher lane, 02c §7
   ([ADR-AG-010](06c-decisions-analytic.md#adr-ag-010)).
 - **The equation-first descriptions above have been rewritten** for the object model
@@ -1770,9 +1764,9 @@ heaviest line (a parameter-free equation refitted in every Jacobian column).
 
 `src-analytic/debug/sessionLogAnalytic.ts` fire-and-forgets one JSON line per event to the shared Vite dev
 plugin (`server/logProxy.ts`) at `${BASE_URL}api/log`, tagged `tool:'analytic'`, which routes it to
-`logs/debug-log-analytic.jsonl`. **Dev only by its own gate** — the tool IS deployed (`prod/2026-09-16`), but unlike its 2-D and 3-D
-siblings this module has no production analytics sink (the `/analytic-builder/api/…` Apache directives were
-never applied — DEPLOY-LOG 2026-09-16), and the `import.meta.env.DEV` early return is the whole of that posture.
+`logs/debug-log-analytic.jsonl`. **Dual-sink, like its 2-D and 3-D siblings** ([ADR-W-077](06w-decisions-workspace.md#adr-w-077),
+#1243): in DEV the full debug trace; in PROD the lean per-submit usage event, posted through `shell/usageLog.ts`
+tagged `tool:'analytic'` (amended 2026-10-07, #1861).
 
 **What it records, and why that set is a complete reconstruction.** The session here IS the line list — the
 store's source of truth is `(lines, seed)` and the figure is replayed from it — so nothing derived needs
@@ -2454,12 +2448,11 @@ No new constraint kind and no new solver: every form lowers to the `length-eq` t
 
 ## The stated-measure layer ([ADR-AG-225](06c-decisions-analytic.md#adr-ag-225), #1714)
 
+- **⚠ Ruled to change (2026-10-07, ADR-W-118 B2 · #1805):** a stated equality (two plain lengths, an `angle-ratio` with k = 1) draws no tick or arc at rest; it stays in the givens list, drawn only in an opt-in relations layer. The text below describes the code until that ships.
 - **What was stated.** `engine/statedMeasures.ts` `statedMeasures(construction, origin, choiceSeed)` reads the constraints a SENTENCE added: `length-eq` with one plain length against a value side, or two plain lengths (an equality); `angle` (degrees, or the angle a `tan` / `cos` fixes); `angle-ratio` with k = 1; a `relation` ⊥ whose point pairs share one end (a knee); the cevian's `perpendicular` (#1241, ADR-AG-237) — a knee at the shared end, else at the FOOT: the end of one pair that an `on-line-2pt` incidence puts on the other pair's line, its legs toward the other end and along the line (`alt` names the line's second point; `statedScene` runs the knee toward whichever is farther, so a foot on an endpoint still has a leg); a derived `foot` object onto a line through two points (every producer of that rule is a sentence about a perpendicular; a foot on an axis or a line object has no named point to run along and draws none); a foot's knee also claims the two corner keys at its vertex, so a restatement or «זווית ADB ישרה» adds none; `area`; a one-term `arc-sum`; and the option a `choice` resolved to at `Figure.choiceSeed`. `origin` comes from the fold's `constraintFact` and the parser's `Fact.definition` flag (a shape row's or a congruence's givens), so a noun's definition is not marked but its resolved choice is. A value is a `{ num }` when its symbols are all valued by `param-eq` (to a fixpoint), else `{ text }` in the student's notation (`statedText`). A measure stated twice keeps a number over a letter, otherwise the later one.
 - **Where it travels.** `derive` → `Derivation.stated` → `App` → `buildScene(…, { stated })` → `Scene.stated` (`marks`, `ticks`, `labels`). A stated length rides `SceneSegment.label`, which replaced `FigureSegment.pinnedLength` (retired with `pinnedLengths`).
 - **One planar mark geometry.** `shell/marks.ts` — `rightAngleKnee`, `angleArcPoints`, `wedgeBisector`, `equalTickSegments`, `unitOf`, `markFitScale` — is shared with 2-D's `Figure.tsx` / `scene.ts` (byte-identical markup) and used for analytic's #1048 knee. The checks live once in `shell/__tests__/fixtures/mark-geometry-rows.ts` (docs/28 §5c), with a meta-lock and a thin lock per tree.
-- **Placement.** `statedScene` in `render/scene.ts` draws an 18 px arc and a 10 px knee shrunk into a short corner by `markFitScale`, and turns every value into a `LabelRequest`: an angle's value outside its arc along the bisector, an area's «S=…» on its centroid, an arc's value on the minor arc stepping inward. They are placed in ONE `placeSceneLabels` call with the stated lengths (#1717's collision-avoiding rule; `placeLengthLabels` is its adapter), so no value lands on another. `render/Figure.tsx` writes them as it writes the lengths and paints the marks in 2-D's measure blue.
-
-- **Placement.** `statedScene` in `render/scene.ts`: an 18 px arc and a 10 px knee shrunk into a short corner by `markFitScale`; an angle's value outside its arc on the bisector; an area's «S=…» at the centroid; an arc's value on the minor arc's midpoint nudged toward the centre. `render/Figure.tsx` paints the layer in 2-D's measure blue.
+- **Placement.** `statedScene` in `render/scene.ts` draws an 18 px arc and a 10 px knee shrunk into a short corner by `markFitScale`, and turns every value into a `LabelRequest`: an angle's value outside its arc along the bisector, an area's «S=…» on its centroid, an arc's value on the minor arc stepping inward. They are placed in ONE `placeSceneLabels` call with the stated lengths (#1717's collision-avoiding rule; `placeLengthLabels` is its adapter), so no value lands on another. A value bound to a mark carries BOUNDED candidates (ADR-AG-228, #1733): an angle's within 2.5 arc radii of its vertex (bisector, ±25°/±50° inside the span, then the reflex side), an area's inside its ring, an arc's in its band; angle values are placed first so lengths yield to them, an angle value may cross its own arms, and with nothing clear it keeps the first spot that covers no point label. `render/Figure.tsx` writes them as it writes the lengths and paints the marks in 2-D's measure blue.
 
 ## One value gate; up to two values ([ADR-AG-226](06c-decisions-analytic.md#adr-ag-226), #1716)
 
@@ -2473,5 +2466,3 @@ No new constraint kind and no new solver: every form lowers to the `length-eq` t
 - **The choice stays put.** `drawableAt` compares `choiceOptions(c, choiceSeed)` for its preference walk: once the first figure is valid, a candidate that took other options is skipped, so a narrow option is drawn rather than walked away from.
 - **Which option is drawn.** `derive` hands `statedMeasures` a `resolve` that picks the first option that holds on the drawn figure (`holdsOn`), so a label never describes an option the figure did not take.
 - **The panel.** `trigAngles(constraints)` lists each trig-stated angle. `panelKnowledge.angles` reads its measured value through `knownValue`, and `App.tsx` renders the «זוויות» section with `valueText` + `angleText`.
-
-- **Placement.** `statedScene` in `render/scene.ts` draws an 18 px arc and a 10 px knee shrunk into a short corner by `markFitScale`, and turns every value into a `LabelRequest`: an angle's value outside its arc along the bisector, an area's «S=…» on its centroid, an arc's value on the minor arc stepping inward. They are placed in ONE `placeSceneLabels` call with the stated lengths (#1717's collision-avoiding rule; `placeLengthLabels` is its adapter), so no value lands on another. A value bound to a mark carries BOUNDED candidates (ADR-AG-228, #1733): an angle's within 2.5 arc radii of its vertex (bisector, ±25°/±50° inside the span, then the reflex side), an area's inside its ring, an arc's in its band; angle values are placed first so lengths yield to them, an angle value may cross its own arms, and with nothing clear it keeps the first spot that covers no point label. `render/Figure.tsx` writes them as it writes the lengths and paints the marks in 2-D's measure blue.

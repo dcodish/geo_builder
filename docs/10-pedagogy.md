@@ -1,6 +1,14 @@
 # 10 — Pedagogy
 
-_Last updated: 2026-06-13._
+> **Being rewritten as the charter for all four builders (#1861, operator ruling B3).** Until then, where
+> this document differs from the operator's rulings recorded in
+> [ADR-W-118](06w-decisions-workspace.md#adr-w-118), **the rulings win**. Three differences to know now:
+> - Theorem surfacing is **switched off** by the operator (#740). §3–§5 describe a surface students do not
+>   see; the engine and its tests stay (B4).
+> - "We don't solve it for you" means **no step-by-step solutions**. An answer the givens determine may be
+>   shown when the student asks, never unbidden on the canvas, and the working is never shown (B5).
+> - The canvas shows what the student stated; computed values go in the data panel (ADR-W-047), and a
+>   stated relation such as AB = AC is never drawn as a mark at rest (B2).
 
 This is the **pedagogical charter** for Geo Builder: what we want students to *learn* by using it, the teaching principles each feature is meant to serve, and — most concretely — the **construction → theorem** payload that the theorem feature ([Phase 6](09-implementation-plan.md#phase-6--theorems)) must deliver. Where [01-vision](01-vision.md) says *what the product is* and [02-requirements](02-requirements.md) says *what it must do*, this document says **why, in learning terms** — and is the place to record every pedagogical intention as it comes up, so they aren't scattered across ADRs and chat.
 
@@ -137,10 +145,13 @@ Recorded so they aren't lost; not commitments.
 
 ## עקרונות — the principles catalog (T5, ADR-248)
 
+_**Session-drafted, awaiting the operator's review** (ADR-248 §3 wrote these eight in an overnight run;
+ruling B4). The 💡 PRINCIPLES lane is switched off with the theorem surface (#740)._
+
 _The operator-editable source of truth for the 💡 PRINCIPLES lane (docs/18 §6): the teacher's tips —
 "whenever X is given, or emerges from the diagram, think about Y." Each row is one principle;
 `PRINCIPLE_TABLE` (src/theorems/principles.ts) must match this table BYTE-FOR-BYTE (an integrity test
-enforces it, the 07 pattern applied to the operator's own text). To add or rephrase a principle, edit
+enforces it, the 07 pattern applied to text the operator owns). To add or rephrase a principle, edit
 here AND in the table — the test fails until both agree. Intent archetypes are principles whose
 trigger is a givens-constellation and whose tip is a direction-QUESTION; they never instantiate
 objects and never see the question text (the D5 guardrails)._

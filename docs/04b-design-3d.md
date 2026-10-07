@@ -8,12 +8,12 @@ the build plan and its corpus reading are [docs/20](20-space-vectors-tool.md). T
 
 ## Shape
 
-| Layer | Size | What it is |
-|---|---|---|
-| `engine/` | 22 files, ~13,900 lines | `Vec3` core, solids, the apply reducer, `derive3`/`resolve3`, the solver, the relation disposition map, the operand resolver |
-| `parser/` | 7 files, ~5,700 lines | `parse3.ts` (context-free rules), `catalog3.ts` (the coverage map), `llmShared3.ts` (the 3-D prompt) |
-| `render/` | 9 files, ~2,500 lines | Orthographic-orbit SVG: `scene3.ts` (pure) + `Figure3.tsx`, plus vector notation |
-| `store/` | 5 files, ~1,500 lines | Zustand + `zundo`, derive-on-demand, keep-prior-on-error, `.geo3.json` save/load |
+| Layer | What it is |
+|---|---|
+| `engine/` | `Vec3` core, solids, the apply reducer, `derive3`/`resolve3`, the solver, the relation disposition map, the operand resolver |
+| `parser/` | `parse3.ts` (context-free rules), `catalog3.ts` (the coverage map), `llmShared3.ts` (the 3-D prompt) |
+| `render/` | Orthographic-orbit SVG: `scene3.ts` (pure) + `Figure3.tsx`, plus vector notation |
+| `store/` | Zustand + `zundo`, derive-on-demand, keep-prior-on-error, `.geo3.json` save/load |
 
 The tree **copies patterns from `src/`, it never imports them** — 2-D and 3-D geometry differ in kind, so
 an abstraction over both would leak ([`BOUNDARIES.json`](../BOUNDARIES.json), operator authority). The
@@ -180,7 +180,10 @@ too short and sent «תיבה abcda'b'c'd'» to the paid LLM lane.
 
 ## Gauge, and why the landing funnel exists
 
-A figure's placement, rotation and scale are a **gauge** — free unless something absolute pins them. The
+A figure's placement, rotation and scale are a **gauge** — free unless something absolute pins them. An
+unanchored figure (no absolute object, solid, revolution or circle) is normalised onto the floor at the end
+of `resolve3`, so «הציגו תצורה אחרת» changes only its shape ([ADR-3D-272](06b-decisions-3d.md#adr-3d-272);
+amended 2026-10-07, #1861). The
 **landing funnel** classifies which gauge components are *provably* free, and that classification is what
 licenses [`FR-SP-4`](02b-requirements-3d.md): a number may be drawn only if it survives the gauge being
 resampled. Without the funnel the engine could not distinguish "this length is 5" from "this length is 5
@@ -726,13 +729,6 @@ thing judged, because they are placed absolutely and never by the gauge.
 
 Recorded here because a design doc that omits its weakest properties is not describing the system.
 
-- **The claim verdict is two-valued** — `verifyClaim` returns a boolean, so "the givens forbid it" and
-  "the givens leave it free" both surface as `claim-refuted`. In a product entered line by line that
-  tells a student their correct answer is wrong because they had not finished typing, and it contradicts
-  [`FR-SP-2`](02b-requirements-3d.md) ("under-determination is welcome") in the claim lane specifically.
-  The complex builder solves this with a three-valued verdict.
-  **[#909](https://github.com/dcodish/geo_builder/issues/909)** — the requirement in 02b deliberately
-  describes today's behaviour, not the desired one.
 - **A symbolic line-equation given resolves in ~12 s**, and the *canonical* spelling is the slowest path.
   **[#863](https://github.com/dcodish/geo_builder/issues/863).**
 - ~~**The DOF cue does not count the six placement DOFs** the sampler now varies.~~ Resolved — the cue's
@@ -904,7 +900,7 @@ endpoint forced into the run's plane by its definition? Off-plane keeps ADR-3D-1
 the new letter `free3` with the ⟂ as the driving pin, height and side free (two residuals, three
 coordinates). Two solver guards keep that honest: `degenerate()` rejects a NON-flat solid's ring driven
 to zero AREA (Newell ≤ 1e-4·span² — 2-D ADR-413's rule in R³), while a FLAT solid's collapse — which a
-student may legitimately FORCE («AB מתלכד עם CD» on a quad; FR-RD-7 draws a forced-flat figure) — is
+student's givens may FORCE («AB מתלכד עם CD» on a quad — refused for a declared polygon, ADR-3D-310 below) — is
 judged on the accepted pool: when every solution flattened a ring and riders are enrolled, a
 **frozen-dims retry** re-solves with the shape fixed at the seed's sample, where the collapse basin does
 not exist and only the statement's own carriers move; its non-collapsed figure is preferred. The same
@@ -919,7 +915,7 @@ reduced system holds with the ring open, an incidence invented the collapse: `so
 pool marked `collapse: { ring, riderKeys }`, `resolve3` carries it on `pivot.collapse`, and `derive3`
 refuses the newest pin owner `polygon-collapsed`, naming the incidences and the riders' minting statements
 (`err.polygonCollapsed`). If the reduced system is still flat («AB = 5 · BC = 3 · AC = 8»), the givens force
-it and it is drawn (FR-RD-7). With no placement, `derive3`'s claim pass skips claims owned by statements
+it, and the line is refused as below (ADR-3D-310; amended 2026-10-07, #1861). With no placement, `derive3`'s claim pass skips claims owned by statements
 that took part in the solve — a claim cannot be refuted by a figure that has none — so the guard speaks.
 
 **A declared polygon collapsed is refused, whatever forced it** (#1849, [ADR-3D-310](06b-decisions-3d.md#adr-3d-310);

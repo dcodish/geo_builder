@@ -1,5 +1,7 @@
 # 19 — Analytic-geometry tool (a sibling app): corpus reading, chassis fit, the build plan
 
+**History.** Analytic is deployed (prod/2026-09-16). The contract is 02c/04c; where this plan differs from them, they win. (#1861)
+
 _Drafted 2026-07-06 from an operator question ("I want to build a similar tool for analytical geometry —
 is it a different tool altogether?"). **Rewritten 2026-09-03** against the real corpus — twenty
 consecutive 572 Q1s instead of the original three-exam sample — which changed three premises and

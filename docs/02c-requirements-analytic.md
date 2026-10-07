@@ -1,6 +1,6 @@
 # 02c — Requirements: the analytic-geometry tool (`src-analytic/`)
 
-**Status: IN PROGRESS — and this is the product's standing requirements doc.** Captured live from an
+**Status: standing — this is the product's requirements contract.** Captured live from an
 operator session (2026-09-04) while the thoughts were still being given, and promoted from `19a` into
 the `02c` slot by [ADR-W-041](06w-decisions-workspace.md#adr-w-041) (2026-09-05, operator ruling).
 
@@ -10,8 +10,9 @@ The original header said this file *"folds into 19 and is deleted"* once its dec
 requirements are a **standing contract** and [docs/19](19-analytic-geometry-tool.md) is its build
 **plan** — a plan finishes and becomes history, a contract does not. Ratification therefore changes
 this file's *status line*, not its existence; the analytic sections of `docs/19` fold into **here**,
-not the reverse. Until a section is ratified, [docs/19](19-analytic-geometry-tool.md) stays
-authoritative where the two disagree.
+not the reverse. 02c is the analytic contract (with [04c](04c-design-analytic.md) for the how);
+[docs/19](19-analytic-geometry-tool.md) is the finished build plan (history), and where the two differ,
+02c wins (amended 2026-10-07, #1861).
 
 Read it as *the operator's intent plus its consequences*, with the open questions marked. Where a
 consequence is mine rather than theirs, it says so.
@@ -140,8 +141,9 @@ One pair is ACCEPTED by operator ruling (2026-09-29, Am. 2): a circle under the 
 a = b ellipse — «נתונה אליפסה I שמשוואתה x²+y²=16» records as ellipse I, with coinciding foci.)*
 
 **R8 — Coordinates are written `A(2,6)`.** *(Operator ruling: comma, not semicolon.)*
-**OPEN:** the exam prints `A(3;5)`. Does the semicolon *parse* (with the comma as the taught form, the
-`²`/`^` split ruled in #511), or is it *refused*? The two build differently.
+**Resolved** (amended 2026-10-07, #1861): the exam's semicolon *parses* — `A(2;10)` reads as `A(2,10)`,
+the comma stays the taught form ([ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), #1618; locked by
+`src-analytic/__tests__/issue-1618-sentence-frame.test.ts`).
 
 **R9 — Picture references are recognised and ignored.** «כמתואר בציור», «לפי הציור», «כמתואר בשרטוט»,
 «ראו ציור» parse to **nothing**, are tolerated **inline and trailing** (they hang off sentences that do
@@ -320,13 +322,21 @@ exception** (operator, 2026-09-21, #1339/#1340: *"yes - it should"*): «M אמצ
 naming the reference ([ADR-AG-156](06c-decisions-analytic.md#adr-ag-156); the cross-product rule is
 [ADR-W-089](06w-decisions-workspace.md#adr-w-089)).
 
-**R20 — Objects can display their equations on the canvas, behind a toggle, with STATED and DERIVED
-visually distinguished.** *(Operator: "so user can see what he entered and what was derived from it —
-same logic as in the 3-D tool.")* The distinction is the point; the toggle is the mechanism. It is the
-panel's «k = -3» versus «t = ?» split, moved onto the canvas.
+**R20 — The canvas carries what the student's givens state; what is DERIVED from the figure is in the
+data panel.** *(Operator: "so user can see what he entered and what was derived from it — same logic as
+in the 3-D tool"; ruled precisely 2026-09-15: *"Anything that is derived from the figure should stay in
+the data panel"*, re-affirmed 2026-09-29, #1563 — [ADR-AG-016](06c-decisions-analytic.md#adr-ag-016);
+amended 2026-10-07, #1861.)* The distinction is the point: the canvas is the question, the panel the
+answer. Recorded exceptions ([ADR-W-118](06w-decisions-workspace.md#adr-w-118) B7): a computed circle
+centre's coordinates, written whenever the givens determine them
+([ADR-AG-036](06c-decisions-analytic.md#adr-ag-036)). **⚠ Ruled to change (2026-10-07, ADR-W-118 B7 ·
+#1863):** a parabola's focus and directrix and an ellipse's foci are marked on the canvas, with their
+values when determined. Until that ships, the canvas marks none of them.
 
-**R21 — A derived equation IS often the exam's answer, and showing it is correct.** *(Operator ruling,
-2026-09-04, overruling an earlier draft of this requirement that would have gated it.)*
+**R21 — A derived equation IS often the exam's answer, and showing it — in the data panel (R20) — is
+correct.** *(Operator ruling, 2026-09-04, overruling an earlier draft of this requirement that would have
+gated it; the canvas half is superseded by [ADR-AG-016](06c-decisions-analytic.md#adr-ag-016), amended
+2026-10-07, #1861.)*
 
 The concern was that Q3 part א asks «מצא את משוואת המעגל החוסם», so a canvas labelling the circumcircle
 has answered the question. The ruling: **this is the same case as the 3-D tool, and for a student the
@@ -336,13 +346,13 @@ transferable has been given away. Precedent in the product already:
 [ADR-3D-032](06b-decisions-3d.md#adr-3d-032) prints a derived plane equation on a determined figure.
 
 **The positive framing, which is the feature's real value: the derived equation is a CHECK.** The
-student works part א by hand, and the canvas agrees or it does not. Agreement confirms; disagreement
+student works part א by hand, and the panel agrees or it does not. Agreement confirms; disagreement
 says look again *without saying where* — which is the right amount of help, and the strongest thing
 this tool does for a student working alone. *(Framing, mine; the ruling is the operator's.)*
 
-**Consequence: the toggle's job is legibility, not protection.** It exists so the canvas is not
-cluttered with an equation on every object. That collapses most of open ruling 5 — a single global
-«הצג משוואות» is likely enough, and per-object display can wait for a case that demands it.
+**Consequence:** no equation toggle is needed — a derived equation is not on the canvas at all, so
+open ruling 5 is resolved by [ADR-AG-016](06c-decisions-analytic.md#adr-ag-016) (amended 2026-10-07,
+#1861).
 
 **R22 — The equation display doubles as a DETERMINACY signal, and that is the pedagogy.** The
 circumcircle of a not-yet-determined triangle has a seed-dependent equation — not knowledge, so it
@@ -383,7 +393,9 @@ mutate the figure. The 2-D tool's `dryRunOutcome` already has this shape (apply 
 facts without committing), so it is copied rather than invented. It rides the ask channel
 [ADR-AG-002](06c-decisions-analytic.md#adr-ag-002) reserved, which #741 unified across the builders.
 
-**R25 — An ask obeys `isKnowledge` exactly as the canvas does.** Ask for the circumcircle of a triangle
+**R25 — An ask obeys `isKnowledge`, the honesty gate the canvas also passes** (the canvas is gated by
+provenance as well — it carries what the givens state, [ADR-AG-016](06c-decisions-analytic.md#adr-ag-016);
+amended 2026-10-07, #1861). Ask for the circumcircle of a triangle
 that is not yet determined and the answer is *open*, never a seed-dependent equation printed as fact.
 No second honesty mechanism — and the ask lane inherits R22's teaching: the answer arrives precisely
 when the givens suffice.
@@ -567,11 +579,12 @@ a **named result that crosses parts**, where a quantity *derived* in part א bec
 
 ## 6 — Open rulings
 
-1. **R8** — semicolon coordinates: parsed-but-untaught, or refused?
+1. ~~**R8** — semicolon coordinates: parsed-but-untaught, or refused?~~ — **parsed**: `A(2;10)` ≡ `A(2,10)`
+   ([ADR-AG-187](06c-decisions-analytic.md#adr-ag-187)); amended 2026-10-07, #1861.
 2. **R13** — a parametric equation whose *kind* changes with the parameter: what does the tool do?
 3. **R17** — may a stated shape noun narrow a parameter's domain?
 4. **R18** — DOF reporting: passive only, or may it prompt?
-5. **R20** — equation toggle: a single global «הצג משוואות» is likely enough now that R21 makes it a legibility control rather than a gate. Per-object display only if a case demands it.
+5. ~~**R20** — equation toggle: a single global «הצג משוואות» is likely enough now that R21 makes it a legibility control rather than a gate. Per-object display only if a case demands it.~~ — resolved by [ADR-AG-016](06c-decisions-analytic.md#adr-ag-016): a derived equation is in the data panel, not on the canvas; amended 2026-10-07, #1861.
 6. ~~**R5 / 5b** — where V1 stops: tier 2 vs tier 3~~ — **tier 3, by transplant**
    ([ADR-AG-009](06c-decisions-analytic.md#adr-ag-009)). Still open: **part ג of 5b in or out.**
 7. **R28** — what bounds "all computable" in the data panel: pairwise, named-only, or grouped?
@@ -1400,8 +1413,10 @@ the choice open, and both roots stay listed and reachable for it (R72).
 «הישר l1 חותך את המעגל I בנקודות A ו-B» and «A ו-B נקודות החיתוך של הישר l1 עם המעגל I» (and the plural
 verb «…נחתכים בנקודות A ו-B», and English) name both crossings at once: the FIRST letter is the first root
 of the order above and the second letter the second — the operator's ruling, exactly what the two ordinal
-sentences would say. The assignment is fixed: «הציגו תצורה אחרת» never swaps it, and a student who wants
-the other assignment swaps the letters in the sentence (the points stay; the letters move). The sentence
+sentences would say. Which letter takes which root is a choice: «הציגו תצורה אחרת» swaps it whenever more
+than one assignment exists, the stated order being the first drawing's (operator, #1539: *"should always
+swap if there are more than 1 option"*; [ADR-AG-197](06c-decisions-analytic.md#adr-ag-197) §8; amended
+2026-10-07, #1861). The sentence
 states TWO points, so a pair that does not meet in two points is refused on that sentence — a line that
 misses the conic or touches it, and two straight lines (which meet once).
 **Amended by [ADR-AG-236](06c-decisions-analytic.md#adr-ag-236) (#1416): two conics have the order too.** A
@@ -2414,9 +2429,9 @@ The touch sentence «הצלעות AO, BO ו-AB משיקות למעגל בנקו�
 - A trig given writes the angle it fixes, in degrees: «tan∢BAO = 2» → «63.43°» (never «tan=2»); «cos∢ABC = 0.5» → «60°».
 - A stated right angle («זווית ABC ישרה», «∢ABC = 90», «AB ⊥ BC») draws the square knee, never «90°». «משולש ישר-זווית ABC» draws the knee at the vertex the configuration chose, and it moves with «הציגו תצורה אחרת».
 - A stated altitude or perpendicular («AD גובה לצלע BC», «AD גובה במשולש ABC», «הגובה מ-A לצלע BC», «D רגל האנך מ-A ל-BC») draws one knee at its FOOT — on the side, or on its extension when the foot falls outside it (#1241, ADR-AG-237). Stating it again, or adding «זווית ADB ישרה», still draws one. A 90° the tool derived (a right angle that comes out of coordinates, Thales' angle, a median) draws none.
-- A stated length is written on its segment in the student's own form: «AB = 5» → «5», «AB = 3a» → «3a».
-- A stated equality marks both members: «AB = AC» one tick on each, «∢ABC = ∢ACB» one arc on each; a second equality class draws two.
-- «שטח המשולש ABC הוא 13» writes «S=13» inside the triangle; «⌢AC = 60°» writes «60°» on the arc, never at the centre.
+- A stated length is written on its segment in the student's own form: «AB = 5» → «5», «AB = 3a» → «3a». Known gap: a value with nothing free is written as a number — `d_BC=6√5` reads «13.42» ([#1806](https://github.com/dcodish/geo_builder/issues/1806)).
+- **⚠ Ruled to change (2026-10-07, ADR-W-118 B2 · #1805):** a stated equality draws no mark at rest; it stays in the givens list, and is drawn only in an opt-in relations layer. The text below describes the code until that ships. A stated equality marks both members: «AB = AC» one tick on each, «∢ABC = ∢ACB» one arc on each; a second equality class draws two.
+- «שטח המשולש ABC הוא 13» writes «S=13» inside the triangle (the standard in every tool — ADR-W-118 B9; 2-D adopts it, #1865); «⌢AC = 60°» writes «60°» on the arc, never at the centre.
 - Each value sits AT its mark (#1733, ADR-AG-228): an angle's value next to its arc, never farther than 2.5 times the arc's radius from the vertex; an area's inside its shape; an arc's along the arc. A length label moves out of an angle value's way, and no value covers a point's label.
 - A shape noun's own definition is not marked («מלבן ABCD» draws no knees, «מעוין ABCD» no ticks), and a value the tool computed is never written on the canvas: it is in the data panel.
 

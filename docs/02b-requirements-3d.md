@@ -49,9 +49,12 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   stated to be right is **oblique**. A qualifier the parser recognises must be one it can lower — a
   recognised-but-dropped qualifier is a silent given, the same cardinal sin as drawing a figure that
   violates the givens. *(The 3-D form of [ADR-052](06-decisions.md#adr-052).)*
-- **FR-SP-4 (Must)** — **Gauge is not knowledge.** A figure's placement, rotation and scale are a gauge,
-  sampled freely unless something absolute is present (an equation plane, a parametric line, a coordinate
-  point, a pin). The consequence is the honesty rule the whole product rests on: **a number drawn on the
+- **FR-SP-4 (Must)** — **Gauge is not knowledge.** A figure's placement, rotation and scale are a gauge.
+  An unanchored figure — no equation plane, parametric line, coordinate point, pin, solid, revolution or
+  circle — is normalised onto the floor at the end of the solve (first point at the origin, first edge
+  along +x, the first three points on the floor), so «הציגו תצורה אחרת» changes only its shape
+  ([ADR-3D-272](06b-decisions-3d.md#adr-3d-272), operator: *"Keep it flat on the floor"*; amended
+  2026-10-07, #1861). The consequence is the honesty rule the whole product rests on: **a number drawn on the
   canvas must be seed-invariant knowledge.** One drawing's values are not a given, and printing them is
   dishonest. *(Realised — the landing funnel classifies which gauge components are provably free;
   `landing-funnel.test.ts` is its lock. The shared statement is [FR-DP-3](02w-requirements-workspace.md).)*
@@ -251,7 +254,7 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   `issue-1311-free-pair-length-drive.test.ts`, fixtures `free-vector-length-1311` and
   `free-vector-length-oneline-1311`.)*
 - **FR-VC-2 (Must)** — Support **at most one symbolic parameter** in a vector expression, pinned by a
-  given through root-finding. *(Two unknowns in one expression is a known boundary — issue #301.)*
+  given through root-finding. *(Two unknowns in one expression is a known boundary — issue #301, superseded by the open #1551.)*
 - **FR-VC-2a (Must)** — **A POWER in a coordinate component is supported where the solver can pin it,
   and refused BY NAME where it cannot.** On a figure carrying a solid, `C(p², p, 0)` builds and the
   relation `x = y²` holds. On a figure with no solid there is nothing to pin the exponent in, and the
@@ -321,7 +324,7 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
 - **FR-VC-3 (Must)** — **NO CAS.** Every "symbolic" feature is a numeric root-find, a closed form, or a
   linear solve. Anything needing symbolic solving beyond that is **refused and escalated to the operator**,
   not approximated. This bound is what keeps the engine's answers trustworthy. *(Operator authority,
-  [docs/20 §12](20-space-vectors-tool.md).)*
+  [docs/20 §10 D3](20-space-vectors-tool.md).)*
 - **FR-VC-4 (Must)** — **No cross product is surfaced to a student.** The curriculum has none; it may be
   used internally, never shown or taught. *(Operator authority.)*
 
@@ -431,8 +434,7 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   value draws the textbook knee and no arc, even when the angle was first named. Two genuinely different
   wedges at one vertex draw two arcs. Suite rule: [ADR-W-045](06w-decisions-workspace.md#adr-w-045).
   *(Realised — [ADR-3D-221](06b-decisions-3d.md#adr-3d-221), #923; `issue-923-917.test.ts`,
-  `pyramid-named-valued-angle-923.geo3.json`. The identity of a wedge is by point ids; the
-  alternate-spelling collapse 2-D does by ray direction is filed separately.)*
+  `pyramid-named-valued-angle-923.geo3.json`.)*
 - **FR-RD-15 (Must)** — **A stated angle is painted only where it holds.** A value on an arc, and a right-angle
   knee, appear only while the drawn figure satisfies the given. When an edit breaks it («הזווית BAD היא 135»,
   then D moved so the corner is 45°) the row is marked broken and the canvas shows **no value** at that corner
@@ -452,8 +454,7 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   builder ([ADR-W-047](06w-decisions-workspace.md#adr-w-047)). *(Realised for the angle arc —
   [ADR-3D-233](06b-decisions-3d.md#adr-3d-233), #925/#937; `issue-937-param-display-chip.test.ts`. The
   coordinate lane's panel chip is a later adoption.)*
-- **FR-RD-7 (Should)** — **A figure whose givens force a solid FLAT says so, naming the statements.** When the stated givens collapse a named solid's defining extent — «פירמידה SABCD שבסיסה ריבוע» with «∠BAS = 40» and «∠DAS = 50», where `cos²40° + cos²50° ≡ 1` puts the apex exactly in the base plane — the tool must not hand back a flat quadrilateral with every fact green and say nothing. It shows a **notice** naming the student's own statements («זווית BAS = 40» and «זווית DAS = 50»), not the solid's declaration and not a bare number of degrees of freedom. Explicitly **not a refusal**: every given is honoured and the drawing is the only one that satisfies them, so withholding it would be the opposite error. The test is coplanarity relative to the figure's own scale, so it is uniform over every solid — a prism of zero height and a tetrahedron whose apex falls into its base are the same fact — while shapes that are flat by definition (the 2-D vector lane) are exempt. One rule for every builder — [ADR-W-048](06w-decisions-workspace.md#adr-w-048); the 2-D half is #945. *(Realised — [ADR-3D-234](06b-decisions-3d.md#adr-3d-234), #936.)* **Forced by an incidence is not forced by the givens** (#1815): a flat polygon that only an incidence on a point riding a side can flatten — «משולש ABC · M על AB · M אמצע BC» — is **refused**, naming both statements and the polygon (2-D's ADR-413 verdict); a flatness the other givens force on their own («AB = 5 · BC = 3 · AC = 8», «AB מתלכד עם CD») is still drawn. *(Realised — [ADR-3D-309](06b-decisions-3d.md#adr-3d-309).)* **A declared polygon is never drawn flat** (#1849, operator ruling 2026-10-07, ADR-W-115 — reverses the notice above for declared polygons): when the givens force a declared polygon («משולש ABC», «מרובע ABCD», «מחומש …») onto one line, whatever forced it — lengths («AB = 5 · BC = 3 · AC = 8»), a stated coincidence («AB מתלכד עם CD»), an incidence on a rider, or a polygon declared over points that already lie on one line («A(0,0,0) · B(1,0,0) · C(2,0,0) · משולש ABC») — the line that completes the collapse is **refused**, naming the statements responsible and saying why: a straight line is not a triangle. A thin but real polygon builds. The notice stays for a SOLID the givens flatten (the pyramid above). *(Realised — [ADR-3D-310](06b-decisions-3d.md#adr-3d-310).)*
-  - **Workspace note — amended by [ADR-W-115](06w-decisions-workspace.md#adr-w-115) (operator ruling 2026-10-07, #1849):** for a **declared polygon** the givens force flat («AB = 5 · BC = 3 · AC = 8», «מרובע ABCD · AB מתלכד עם CD»), every builder now **refuses** the line that completes the collapse, naming the statements — *"a flat line is not a triangle"*. The notice above stays for what is not a declared polygon (a solid's apex in its base plane, #936). The 3-D realisation is ADR-3D-310; the 2-D one [ADR-602](06-decisions.md#adr-602).
+- **FR-RD-7 (Should)** — **A figure whose givens force a solid FLAT says so, naming the statements.** When the stated givens collapse a named solid's defining extent — «פירמידה SABCD שבסיסה ריבוע» with «∠BAS = 40» and «∠DAS = 50», where `cos²40° + cos²50° ≡ 1` puts the apex exactly in the base plane — the tool must not hand back a flat quadrilateral with every fact green and say nothing. It shows a **notice** naming the student's own statements («זווית BAS = 40» and «זווית DAS = 50»), not the solid's declaration and not a bare number of degrees of freedom. Explicitly **not a refusal**: every given is honoured and the drawing is the only one that satisfies them, so withholding it would be the opposite error. The test is coplanarity relative to the figure's own scale, so it is uniform over every solid — a prism of zero height and a tetrahedron whose apex falls into its base are the same fact — while shapes that are flat by definition (the 2-D vector lane) are exempt. One rule for every builder — [ADR-W-048](06w-decisions-workspace.md#adr-w-048); the 2-D half is #945. *(Realised — [ADR-3D-234](06b-decisions-3d.md#adr-3d-234), #936.)* **Forced by an incidence is not forced by the givens** (#1815): a flat polygon that only an incidence on a point riding a side can flatten — «משולש ABC · M על AB · M אמצע BC» — is **refused**, naming both statements and the polygon (2-D's ADR-413 verdict). *(Realised — [ADR-3D-309](06b-decisions-3d.md#adr-3d-309).)* **A declared polygon is never drawn flat** (#1849, operator ruling 2026-10-07, ADR-W-115 — reverses the notice above for declared polygons): when the givens force a declared polygon («משולש ABC», «מרובע ABCD», «מחומש …») onto one line, whatever forced it — lengths («AB = 5 · BC = 3 · AC = 8»), a stated coincidence («AB מתלכד עם CD»), an incidence on a rider, or a polygon declared over points that already lie on one line («A(0,0,0) · B(1,0,0) · C(2,0,0) · משולש ABC») — the line that completes the collapse is **refused**, naming the statements responsible and saying why: a straight line is not a triangle. A thin but real polygon builds. The notice stays for a SOLID the givens flatten (the pyramid above). *(Realised — [ADR-3D-310](06b-decisions-3d.md#adr-3d-310); one rule for every builder, [ADR-W-115](06w-decisions-workspace.md#adr-w-115); the 2-D one is [ADR-602](06-decisions.md#adr-602). Amended 2026-10-07, #1861: the duplicate workspace note is folded in here.)*
 - **FR-RD-8 (Should)** — **A stated LENGTH is drawn beside its segment.** «AB = 5» writes the 5 at AB's midpoint on the canvas, not only in the data panel — the honesty invariant *"everything the student stated is visible on the figure"* applied to the magnitude lane, which previously held for a stated distance (a labelled witness line) and a stated angle (a labelled arc) but not for the commonest kind of all. **Stated only:** a length the givens merely determine stays in the panel, because putting derived numbers on the drawing turns it into an answer sheet. **Always drawn, including on a hidden (dashed) back edge** — a number that appears and disappears as the figure orbits reads as the tool losing the given. A restated length («AB = 5» then «BA = 5») is one statement and one label. Relational givens («|AB| = 2|CD|») are deliberately out: which segment would carry the text has no obvious right answer. *(Realised — [ADR-3D-235](06b-decisions-3d.md#adr-3d-235), #918.)*
 - **FR-RD-9 (Should)** — **The freedom cue counts what is actually still free.** «דרגות חופש שטרם נקבעו»
   is an estimate, but an honest one: the six placement DOFs the sampler varies once an absolute object is
@@ -526,8 +527,9 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
 
 - **FR-SP-7 (Should)** — **Every 2009–2024 exam's space/vectors INPUT is expressible.** The tool
   reproduces the figure and verifies claims for the whole legacy corpus; it does not solve any of it.
-  *(Realised — [docs/20](20-space-vectors-tool.md) §14, V8 complete. Documented remaining niches are
-  low-frequency and coordinate-expressible: orthoscheme and the dihedral face↔base angle.)*
+  *(Realised — [docs/20](20-space-vectors-tool.md) §14, V8 complete. The documented remaining niche is
+  low-frequency and coordinate-expressible: orthoscheme. The dihedral face↔base angle is supported —
+  [ADR-3D-266](06b-decisions-3d.md#adr-3d-266), `angle-operand-cluster.test.ts`; amended 2026-10-07, #1861.)*
 - **FR-SP-8 (Must)** — **Case in labels: where the anchor proves a run is a label, it is read as one;
   elsewhere the convention is taught, never guessed.** Point labels are uppercase by convention, and 3-D
   carries case-significant tokens 2-D lacks (axes x/y/z, parameters k/m/t, vector names u/v/w, R vs r,
@@ -542,8 +544,9 @@ IDs are stable references. "Must" = the product is dishonest or broken without i
   the parameter, «נקודה x» stays the student's to disambiguate. *(Realised —
   [ADR-3D-039](06b-decisions-3d.md#adr-3d-039), [ADR-3D-092](06b-decisions-3d.md#adr-3d-092),
   [ADR-3D-223](06b-decisions-3d.md#adr-3d-223), [ADR-3D-287](06b-decisions-3d.md#adr-3d-287); `lowercase-labels.test.ts`, `lowercase-nudge.test.ts`,
-  `issue-924.test.ts`, `issue-1523-autoname-whole-utterance.test.ts`. Whether a SOLID noun should become an anchor — «תיבה abcda'b'c'd'», a run the
-  nudge cannot lift — is escalated on #924: two rulings collide there.)*
+  `issue-924.test.ts`, `issue-1523-autoname-whole-utterance.test.ts`. A SOLID noun is not an anchor — the #353/#498 ruling, reaffirmed 2026-09-07 when #924 closed
+  ([04b](04b-design-3d.md)) — so «תיבה abcda'b'c'd'» is taught by the nudge
+  ([ADR-3D-226](06b-decisions-3d.md#adr-3d-226)); amended 2026-10-07, #1861.)*
 
 ## Non-goals
 

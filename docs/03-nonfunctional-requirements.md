@@ -14,7 +14,7 @@ Quality attributes and constraints. IDs are stable references (`NFR-<area>-<n>`)
 ## Stability (a hard requirement, not a nice-to-have)
 
 - **NFR-ST-1** — When a new fact is added, objects already on screen **must not visibly jump or rearrange** beyond what the new constraint strictly requires. Visual continuity between steps is essential to the product (see [Vision](01-vision.md)).
-- **NFR-ST-2** — Cycling alternatives changes only the affected branch; unrelated parts of the figure stay put.
+- **NFR-ST-2** — «הציגו תצורה אחרת» draws another figure that satisfies every given: it re-samples the unstated magnitudes and choices (FR-ALT-2, [ADR-052](06-decisions.md#adr-052)), so any part of the figure the givens leave free may move. The stability promise (NFR-ST-1) is about ADDING a fact. (amended 2026-10-07, #1861: FR-ALT-2)
 - **NFR-ST-3** — Stability is achieved structurally (persistent degrees-of-freedom and branch indices), and is regression-tested (a test asserts bounded per-object movement between steps).
 
 ## Performance
@@ -52,7 +52,7 @@ For capabilities that are expensive (extra LLM spend) or commercial (premium/pai
 ## Security & privacy
 
 - **NFR-SE-1** — The Claude API key is **never shipped to the browser**; all API calls go through a server-side proxy that holds the key.
-- **NFR-SE-2** — The proxy is gated (e.g. a per-class access code) and rate-limited per client, so an exposed endpoint cannot be abused to run up cost.
+- **NFR-SE-2** — The proxy is gated (e.g. a per-class access code — not built, 2026-10-07 audit; [04s](04s-design-server.md) explains why the gate is a global daily ceiling instead) and rate-limited per client, so an exposed endpoint cannot be abused to run up cost.
 - **NFR-SE-3** — No accounts, no names, no student personal identifiers. The server keeps a **minimal usage-event log** for product improvement ([ADR-179](06-decisions.md#adr-179), [ADR-278](06-decisions.md#adr-278)): the typed utterance (math text only), locale/outcome, and a salted-HMAC **visitor hash — never the raw IP**. Retention is **finite by default** (`EVENTS_RETENTION_DAYS`; **default 30 days for every product's log** — operator 2026-07-11 started at 7, operator 2026-10-02 raised it to 30, [ADR-W-110](06w-decisions-workspace.md#adr-w-110) — and each product's file is pruned on its own, so no log outlives the window); every builder's privacy note states that same number; and the salt never falls back to a committed constant (unset ⇒ random per-boot). A short privacy note is shown **in-app** in **every** builder, in the About modal the shared frame opens from the suite bar (`shell/frame/AppFrame.tsx`), and it **names every place the student's input can leave the browser for** — the usage log, the model fallback (an external AI service that receives the statements the tool did not understand), the short-link store. Where each note lives, and what it must disclose, is measured from the product's wiring by the privacy-disclosure lock ([ADR-W-090](06w-decisions-workspace.md#adr-w-090)):
 
   | builder | note (he + en) | declaration | discloses (2026-09-27) |

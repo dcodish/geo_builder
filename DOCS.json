@@ -115,7 +115,7 @@
     "analytic": {
       "requirements": "docs/02c-requirements-analytic.md",
       "design": "docs/04c-design-analytic.md",
-      "note": "Requirements 02c (IN PROGRESS, promoted from 19a), design 04c. V0 in build and deliberately not deployed (ADR-AG-007)."
+      "note": "Requirements 02c, design 04c -- these two are the contract. Deployed since prod/2026-09-16. docs/19 is the finished build plan."
     },
     "workspace": {
       "requirements": "docs/02w-requirements-workspace.md",

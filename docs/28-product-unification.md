@@ -1,5 +1,9 @@
 # 28 — Product unification: making three tools feel and behave like one
 
+> **Status (2026-10-07, #1861): delivered except Phase 2** — the conformance matrix, #663 and #664, still
+> open; umbrella #648 is closed. §5b–§5d (live design) move to 04w and the still-live D-rulings to 02w in
+> #1861; this document then becomes history. The original status follows.
+>
 > **Status: PLAN OF RECORD — accepted by [ADR-W-018](06w-decisions-workspace.md#adr-w-018)
 > (2026-08-16), merged via PR #660. Execution began 2026-08-17 with A1 (#673, the `shell/` tree —
 > [ADR-W-019](06w-decisions-workspace.md#adr-w-019)).** Tracking issue
