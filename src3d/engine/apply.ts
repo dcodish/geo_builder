@@ -1220,7 +1220,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         }
         let acc: Construction3 = next;
         for (let i = 1; i < baseN; i++) {
-          const r = applyCommand3(acc, { type: 'length-rel', a1: apex, b1: base[0], rhs: { pair: [apex, base[i]] }, c: 1 });
+          const r = applyCommand3(acc, { type: 'length-rel', a1: apex, b1: base[0], rhs: { pair: [apex, base[i]] }, c: 1, origin: 'shape' });
           if (!r.ok) return r;
           acc = r.next;
         }
@@ -2104,7 +2104,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // a stated relation draws its operands (the ADR-3D-035 rule — the statement must leave ink);
       // #584: a point-run operand materialises its plane like the sibling relation cases (the App3
       // display toggle already enumerated mutual-rel runs — the toggle now has a patch behind it)
-      for (const op of [cmd.a, cmd.b]) {
+      // #1844 (ADR-3D-308): ...unless the relation is a shape's own condition, which names no operand
+      for (const op of cmd.origin ? [] : [cmd.a, cmd.b]) {
         if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
         if (op.kind === 'plane-run') materializePlaneRun(next, op.ids, op.face === true);
       }
@@ -2771,7 +2772,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const missing = missingPoint(c, [cmd.a1, cmd.b1, ...pair2]);
       if (missing) return { ok: false, error: missing };
       const next = clone(c);
-      if (!hasSegment(next, cmd.a1, cmd.b1)) next.segments.push([cmd.a1, cmd.b1]);
+      // #1844 (ADR-3D-308): a STATED relation draws its lhs pair; a shape's own condition (an isosceles
+      // trapezoid's equal diagonals) names no segment, so it leaves no ink — it still drives and is judged.
+      if (!cmd.origin && !hasSegment(next, cmd.a1, cmd.b1)) next.segments.push([cmd.a1, cmd.b1]);
       for (const end of [cmd.a1, cmd.b1, ...pair2]) {
         const def = next.points.get(end);
         if (def?.kind === 'vec-defined') {
@@ -3034,8 +3037,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const err = firstAtomError(c, [cmd.u, cmd.v]);
       if (err) return { ok: false, error: err };
       const next = clone(c);
-      drawAtom(next, cmd.u);
-      drawAtom(next, cmd.v);
+      if (!cmd.origin) {
+        // #1844 (ADR-3D-308): a stated angle draws its arms; a shape's own corner condition names none
+        drawAtom(next, cmd.u);
+        drawAtom(next, cmd.v);
+      }
       if (Math.abs(cmd.cos) < 1e-9) noteStatedRightAngle(next, cmd.u, cmd.v); // #1792
       // ADR-3D-056 (#286): a PERPENDICULAR whose one arm carries a free symbol-defined point (E on AS
       // via `AE=t·AS`) PINS that symbol — E slides to the foot of the perpendicular. Otherwise the ⊥ was

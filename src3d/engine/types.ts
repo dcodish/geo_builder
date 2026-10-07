@@ -968,6 +968,17 @@ export interface OnLineCommand {
   line: string;
 }
 
+/**
+ * #1844 (ADR-3D-308) — WHO said a relation command. Absent: the student stated it as a sentence about its
+ * operands («|AC| = |BD|»), so its operands are ink (the ADR-3D-035 rule) and it is judged as a given.
+ * `'shape'`: a shape NOUN or ADJECTIVE lowered to it («טרפז שווה שוקיים ABCD» → |AC| = |BD|) — the condition is
+ * still a given (it drives and is judged exactly as before; the solver never reads this field), but its
+ * operands were never named, so no apply side effect that belongs to a stated SENTENCE fires: no auto-drawn
+ * segment, no materialised plane. Set in ONE place, {@link shapeInternal3} in `baseShapes.ts`, by every
+ * shape lowering; honoured at every apply site that draws a relation's operands.
+ */
+export type CommandOrigin3 = 'shape';
+
 export type Command3 =
   // |EN| = (√6/4)·|w| — a stated LENGTH relation (|a1b1| = c·|rhs|); rhs is a point
   // pair or a NAMED vector (resolved to its pair at apply). Drives a symbol / the
@@ -975,7 +986,8 @@ export type Command3 =
   // `soft` (#424): a named-shape macro's DEFAULT equal pair — an isosceles triangle's apex, which the
   // student did not choose. Dropped in derive3 when an EXPLICIT equal pair on the same triangle is
   // stated, so the stated pair wins instead of stacking into an equilateral (M4 / ADR-114).
-  | { type: 'length-rel'; a1: Id; b1: Id; rhs: { pair: [Id, Id] } | { vec: string }; c: number; soft?: boolean }
+  // `origin` (#1844): see {@link CommandOrigin3} — a shape's own condition, not a sentence about its operands.
+  | { type: 'length-rel'; a1: Id; b1: Id; rhs: { pair: [Id, Id] } | { vec: string }; c: number; soft?: boolean; origin?: CommandOrigin3 }
   // |w| = 2 — a numeric magnitude on a NAMED vector; apply resolves the pair and
   // delegates to the ordinary length given (claim when pinned, driving pin when free)
   | { type: 'vec-mag'; name: string; value: number }
@@ -1022,7 +1034,7 @@ export type Command3 =
   //     half of the closed relations. An inequality has no residual; it is sample-and-gated.
   //   · a similarity-invariant DRIVE (`mutual` ScalarPin) for the closed half when both operands
   //     ride the gauge, so a free-dim figure is flexed into the stated position (M1 duality).
-  | { type: 'mutual-rel'; rel: MutualRel3; a: Operand3; b: Operand3 }
+  | { type: 'mutual-rel'; rel: MutualRel3; a: Operand3; b: Operand3; origin?: CommandOrigin3 }
   // S3 (#378): ⟂ / ∥ / angle / coincident with a PLANE on at least one side — «המישור ABC מקביל
   // למישור A'B'C'», «π1 ניצב ל-π2», «AB מקביל למישור π». Lowered to a recorded claim ALWAYS plus,
   // per the frame classifier: a similarity-invariant DRIVE when both sides ride the gauge, a pivot
@@ -1087,8 +1099,8 @@ export type Command3 =
   // (vertex ⇒ pairs) · `קוסינוס הזווית בין הוקטורים w ו-u הוא √35/10` (named vectors).
   // `ring` (#1792): the polygon a SOFT default right angle belongs to — a right trapezoid's. An explicit
   // right angle at any vertex of that ring retires it (derive3); absent, the ring is the angle's own three labels.
-  | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number; soft?: boolean; ring?: Id[] }
-  | { type: 'concyclic'; ids: Id[] } // #305: A,B,C,D on one circle (the right-pyramid base fix) // `soft` (issue #116): a right-triangle's DEFAULT right-angle vertex, dropped in derive3 when an explicit ∠=90 on the same triangle is stated (M4 defaults-yield)
+  | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number; soft?: boolean; ring?: Id[]; origin?: CommandOrigin3 }
+  | { type: 'concyclic'; ids: Id[]; origin?: CommandOrigin3 } // #305: A,B,C,D on one circle (the right-pyramid base fix) // `soft` (issue #116): a right-triangle's DEFAULT right-angle vertex, dropped in derive3 when an explicit ∠=90 on the same triangle is stated (M4 defaults-yield)
   // V8-f (G9): a CHAIN of dot products all equal — `u·v = v·w = u·w`. Apply lowers to
   // pairwise dot-eq relations (drive on a free figure, else verify).
   | { type: 'dot-eq-chain'; ops: [VecAtom, VecAtom][] }

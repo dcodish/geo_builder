@@ -49,6 +49,21 @@ export const QUAD_BASE_DIMS: Record<QuadBase, number> = {
   quad: 4,
 };
 
+/** The relation commands a shape lowering may emit — the four kinds that carry {@link CommandOrigin3}. */
+export type ShapeRelation3 = Extract<Command3, { type: 'length-rel' | 'cos-angle' | 'mutual-rel' | 'concyclic' }>;
+
+/**
+ * #1844 ([ADR-3D-308](../../docs/06b-decisions-3d.md#adr-3d-308)) — THE seam every shape lowering passes its
+ * conditions through: a noun or an adjective («טרפז שווה שוקיים», «ישרה», «שווה מקצועות», «חסום במעגל») lowered
+ * to relation commands states the SHAPE, not a sentence about the operands those relations happen to read.
+ * Stamped `origin: 'shape'`, the commands drive and are judged exactly as before (the solver never reads the
+ * field), but apply skips the side effects that belong to a stated sentence: the operands' auto-drawn ink.
+ * Without it the isosceles trapezoid's equal DIAGONALS (#1792) drew AC, which nobody named.
+ */
+export function shapeInternal3<T extends ShapeRelation3>(cmds: readonly T[]): T[] {
+  return cmds.map((k) => ({ ...k, origin: 'shape' as const }));
+}
+
 /**
  * #587 (ADR-3D-152): the constraint set a stated FLAT quad shape lowers to, on the ring `[a,b,c,d]`.
  *
@@ -68,15 +83,19 @@ export const QUAD_BASE_DIMS: Record<QuadBase, number> = {
  * DRAWS its operands, which for a polygon's own sides is a no-op — asserted, not assumed.
  */
 export function quadShapeConstraints(base: QuadBase, ring: Id[]): Command3[] {
+  return shapeInternal3(quadShapeRelations(base, ring));
+}
+
+function quadShapeRelations(base: QuadBase, ring: Id[]): ShapeRelation3[] {
   const [a, b, c, d] = ring;
   /** |xy| = |zw| — the equal-side driver. */
-  const eq = (x: Id, y: Id, z: Id, w: Id): Command3 => ({ type: 'length-rel', a1: x, b1: y, rhs: { pair: [z, w] }, c: 1 });
+  const eq = (x: Id, y: Id, z: Id, w: Id): ShapeRelation3 => ({ type: 'length-rel', a1: x, b1: y, rhs: { pair: [z, w] }, c: 1 });
   /** ∠xyz = 90°, stated at the MIDDLE letter like every other angle in this tree. */
-  const right = (x: Id, y: Id, z: Id): Command3 => ({
+  const right = (x: Id, y: Id, z: Id): ShapeRelation3 => ({
     type: 'cos-angle', u: { kind: 'pair', from: y, to: x }, v: { kind: 'pair', from: y, to: z }, cos: 0,
   });
   /** xy ∥ zw. */
-  const par = (x: Id, y: Id, z: Id, w: Id): Command3 => ({
+  const par = (x: Id, y: Id, z: Id, w: Id): ShapeRelation3 => ({
     type: 'mutual-rel', rel: 'parallel', a: { kind: 'segment', a: x, b: y }, b: { kind: 'segment', a: z, b: w },
   });
   switch (base) {

@@ -32,7 +32,8 @@
             "to": "C"
           },
           "cos": 0,
-          "soft": true
+          "soft": true,
+          "origin": "shape"
         }
       ]
     },

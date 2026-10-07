@@ -29,7 +29,7 @@ import { quadNoun3, readShapePhrase3, SHAPE_ADJ_EN_ANY3, SHAPE_ADJ_WORDS3, type 
 // #1545 (ADR-3D-300): the ONE prime fold lives in the vocabulary leaf; re-exported so every parser-side
 // reader (the ask lane, the LLM sequence gate) reaches it through the normaliser that applies it.
 export { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';
-import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
+import { CYCLIC_MEMBER, shapeInternal3, type QuadBase, type ShapeRelation3 } from '../engine/baseShapes';
 import { riderPairsT, riderWholeSide, riderWholeT } from '../engine/onSegmentRatio';
 
 export type ParseResult3 =
@@ -717,9 +717,10 @@ const obliquePrism: Rule = (s) => {
   if (!ids) return null;
   const cmds: Command3[] = [{ type: 'solid', kind, ids, oblique: true }];
   const [a, b, , d] = ids; // base ring a-b-c-d: adjacent sides at `a` are a–b and a–d
-  if (bn === 4 && (rhombus || square)) cmds.push({ type: 'length-rel', a1: a, b1: b, rhs: { pair: [a, d] }, c: 1 });
+  // #1844: the base noun's own conditions — shape-internal, so they draw nothing of their own
+  if (bn === 4 && (rhombus || square)) cmds.push(...shapeInternal3([{ type: 'length-rel', a1: a, b1: b, rhs: { pair: [a, d] }, c: 1 }]));
   if (bn === 4 && (rect || square))
-    cmds.push({ type: 'cos-angle', u: { kind: 'pair', from: a, to: b }, v: { kind: 'pair', from: a, to: d }, cos: 0 });
+    cmds.push(...shapeInternal3([{ type: 'cos-angle', u: { kind: 'pair', from: a, to: b }, v: { kind: 'pair', from: a, to: d }, cos: 0 }]));
   // #424: a TRIANGLE base's stated qualifier, on the same macro footing as the quad family above
   // (`prism3e` already IS equilateral, so only the template-less isosceles needs constraints).
   // #435: a stated RIGHT angle lowers for either triangular kind.
@@ -879,13 +880,13 @@ function quadShapeCommands(s: string, base: QuadBase, ring: Id[], already: Comma
 /** {@link quadShapeCommands} over a phrase already read. */
 function quadAdjCommands(phrase: ShapePhrase3 | null, base: QuadBase, ring: Id[], already: Command3[]): Command3[] {
   if (base !== 'trapezoid' || !phrase) return [];
-  const out: Command3[] = [];
-  if (phrase.consumed.includes('isosceles')) out.push(...cyclicFixCommands('trapezoid', ring));
+  const out: ShapeRelation3[] = [];
+  if (phrase.consumed.includes('isosceles')) out.push(...cyclicFixRelations('trapezoid', ring));
   if (phrase.consumed.includes('right')) {
     const [a, b, , d] = ring;
     out.push({ type: 'cos-angle', u: { kind: 'pair', from: a, to: d }, v: { kind: 'pair', from: a, to: b }, cos: 0, soft: true, ring: [...ring] });
   }
-  return out.filter((k) => !already.some((c) => sameLengthRel(c, k)));
+  return shapeInternal3(out).filter((k) => !already.some((c) => sameLengthRel(c, k)));
 }
 
 /** Two `length-rel` commands over the same first pair — the de-duplication `quadShapeCommands` always did. */
@@ -910,10 +911,10 @@ function sameLengthRel(x: Command3, y: Command3): boolean {
  */
 function triShapeCommands(spec: TriSpec, ring: Id[], apexHint?: Id): Command3[] {
   const [a, b, c] = ring;
-  const rel = (a1: Id, b1: Id, pair: [Id, Id], soft?: boolean): Command3 => ({
+  const rel = (a1: Id, b1: Id, pair: [Id, Id], soft?: boolean): ShapeRelation3 => ({
     type: 'length-rel', a1, b1, rhs: { pair }, c: 1, ...(soft ? { soft: true } : {}),
   });
-  const out: Command3[] = [];
+  const out: ShapeRelation3[] = [];
   // #435: right-angledness. The vertex is the caller's hint, else the MIDDLE letter — in `ABC` the
   // angle named by the middle letter is ∠ABC. `soft` so a later explicit angle wins (M4 / ADR-114).
   const rightVertex = apexHint ?? b;
@@ -933,7 +934,7 @@ function triShapeCommands(spec: TriSpec, ring: Id[], apexHint?: Id): Command3[] 
     const [p, q] = ring.filter((v) => v !== apex);
     out.push(rel(apex, p, [apex, q], true));
   }
-  return out;
+  return shapeInternal3(out); // #1844: the triangle's own conditions, never a sentence about its sides
 }
 
 /** (base x rightness) → the kind naming that pair. Rightness is a MODIFIER of ANY base (ADR-3D-090). */
@@ -957,6 +958,10 @@ const QUAD_PYRAMID_KIND: Record<QuadBase, { free: SolidKind; right: SolidKind }>
  * A contradiction with a STATED value stays an honest over-constraint refusal (ADR-052 / ADR-114).
  */
 function cyclicFixCommands(base: QuadBase, ring: Id[]): Command3[] {
+  return shapeInternal3(cyclicFixRelations(base, ring)); // #1844: equal DIAGONALS are the shape's, not a drawn pair
+}
+
+function cyclicFixRelations(base: QuadBase, ring: Id[]): ShapeRelation3[] {
   const fix = CYCLIC_MEMBER[base].fix;
   switch (fix.kind) {
     case 'none':
@@ -1003,8 +1008,8 @@ const rightPyramid: Rule = (s) => {
     const solid = cmds[0];
     if (cmds.length !== 1 || solid.type !== 'solid' || solid.kind !== 'tetra') return null;
     const [a, b, c3, d] = solid.ids;
-    const rel = (a1: Id, b1: Id): Command3 => ({ type: 'length-rel', a1, b1, rhs: { pair: [a, b] }, c: 1 });
-    return [solid, rel(a, c3), rel(a, d), rel(b, c3), rel(b, d), rel(c3, d)];
+    const rel = (a1: Id, b1: Id): ShapeRelation3 => ({ type: 'length-rel', a1, b1, rhs: { pair: [a, b] }, c: 1 });
+    return [solid, ...shapeInternal3([rel(a, c3), rel(a, d), rel(b, c3), rel(b, d), rel(c3, d)])];
   };
   // #305 (ADR-3D-090): ANY stated quad base x rightness, from the registry. A right form over a
   // base that is not cyclic by default carries its family's CYCLIC_FIX, so it BUILDS (constrained,
@@ -1013,7 +1018,7 @@ const rightPyramid: Rule = (s) => {
     const kind = right ? QUAD_PYRAMID_KIND[base].right : QUAD_PYRAMID_KIND[base].free;
     const cmds: Command3[] = [{ type: 'solid', kind, ids }];
     // the base's OWN defining constraint (a rhombus is a parallelogram ring + equal adjacent sides)
-    if (base === 'rhombus') cmds.push({ type: 'length-rel', a1: ids[0], b1: ids[1], rhs: { pair: [ids[0], ids[3]] }, c: 1 });
+    if (base === 'rhombus') cmds.push(...shapeInternal3([{ type: 'length-rel', a1: ids[0], b1: ids[1], rhs: { pair: [ids[0], ids[3]] }, c: 1 }]));
     if (right) cmds.push(...cyclicFixCommands(base, ids.slice(0, 4)));
     cmds.push(...quadShapeCommands(s, base, ids.slice(0, 4), cmds)); // #424: `שבסיסה טרפז שווה שוקיים`
     return withEqEdges(cmds);
@@ -4360,7 +4365,7 @@ function inscribedContradiction3(s: string): { shape: string; forced: string } |
  */
 function cyclicRingCommands(base: QuadBase | null, ring: Id[], already: Command3[]): Command3[] {
   if (ring.length === 4) return cyclicFixCommands(base ?? 'quad', ring).filter((k) => !already.some((c) => sameLengthRel(c, k)));
-  if (ring.length === 5) return ring.slice(3).map((v): Command3 => ({ type: 'concyclic', ids: [ring[0], ring[1], ring[2], v] }));
+  if (ring.length === 5) return shapeInternal3(ring.slice(3).map((v): ShapeRelation3 => ({ type: 'concyclic', ids: [ring[0], ring[1], ring[2], v] })));
   return [];
 }
 

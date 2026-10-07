@@ -668,6 +668,18 @@ A right trapezoid in a circle cannot be itself (`cyclic.forced = rectangle`): `p
 `inscribed-contradicts-noun` before any rule reads a label (the #1554 ruling). A quadrilateral's **incircle**
 still refuses `incircle-needs-triangle` — #1838.
 
+**A shape's own condition carries its provenance (#1844, [ADR-3D-308](06b-decisions-3d.md#adr-3d-308)).** Every
+shape lowering — `quadShapeConstraints`, the `CYCLIC_MEMBER` fix, the trapezoid and triangle adjectives, a
+prism's or a right pyramid's base noun, «שווה מקצועות», a pentagon's circle — emits ordinary relation commands
+(`length-rel`, `cos-angle`, `mutual-rel`, `concyclic`) through ONE seam, `shapeInternal3` in
+`baseShapes.ts`, which stamps them `origin: 'shape'`. They drive and are judged exactly as a typed relation is
+(pin, `given: true` arbiter, claim — the solver never reads the field); what apply skips is the side effect of
+a stated SENTENCE: the operands' auto-drawn segment (`length-rel`, `cos-angle`, `mutual-rel`) and a
+`mutual-rel` plane-run's materialised patch. This is the #984 rule above arriving at relations: the equal
+DIAGONALS #1792 chose for the isosceles trapezoid drew AC because `length-rel` draws its lhs pair for a student.
+The marker is persisted in saved files (a fact's `cmds`); the lock that no lowering emits an unmarked relation
+or a non-edge segment is the sweep in `issue-1844-shape-internal-origin.test.ts`.
+
 ## The submit decision (#1394, [ADR-3D-258](06b-decisions-3d.md#adr-3d-258))
 
 `store3.submit` decides nothing itself: `decideSubmit3(state, utterance)` returns a `Verdict3` (rename ·

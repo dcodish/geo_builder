@@ -27,7 +27,8 @@
               "D"
             ]
           },
-          "c": 1
+          "c": 1,
+          "origin": "shape"
         },
         {
           "type": "circle3",
@@ -76,7 +77,8 @@
             "F",
             "G",
             "H"
-          ]
+          ],
+          "origin": "shape"
         }
       ]
     }
