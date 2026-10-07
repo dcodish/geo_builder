@@ -1,7 +1,7 @@
 # 10 — Pedagogy: the charter for all four builders
 
-> **Draft for the operator's review** (#1861 step 3). Built from his own words. Where text was written by
-> a session and no ruling stands behind it, it says so, marked *session-drafted*.
+> Built from the operator's own words and reviewed by him on 2026-10-07 (#1861). The one passage still
+> written by a session with no ruling behind it is marked *session-drafted* (§4).
 
 The operator asked for this document in these words:
 
@@ -24,11 +24,13 @@ The operator asked for this document in these words:
 
 ## 1. Why the tool exists
 
-*Session-drafted, awaiting the operator.* Bagrut geometry questions print a figure. Students copy it
-without reading the givens that produce it. The tool reverses that: the student enters the givens, one at
-a time, and watches the figure build from them.
+Bagrut geometry questions print a figure. Students copy it without reading the givens that produce it.
+The tool reverses that: the student enters the givens, one at a time, and watches the figure build from
+them. In his words, on reviewing this charter:
 
-His closest words:
+> *"Im not sure in what context i wrote this but this is the purpose of the tool (one of them). to have students enter and understand each input items and not just copy the image from the text book."* (2026-10-07, #1861)
+
+And for the builders whose exam prints no figure:
 - *"from a pedagogy POV, I would like the user to be able to enter the inputs from this question and have
   the tool visualize the location of points and calculations."* (2026-08-14, ADR-CX-002)
 - *"the base is geometry with coordinates, because that is how the bagrut is built"* (analytic,
@@ -119,10 +121,12 @@ His closest words:
 - **His words:**
   - *"when an angle of segment are given, we need to put those values on the sement or angle like the 2d tool does"* (2026-10-03, #1714)
   - On the equality ticks a session added beyond that request: *"I dont remember asking for the markers on the sides of the isosceles triangle. we dont need them."* … *"remove entirely. i never asked for this"* (2026-10-06, #1805)
-- **Why:** no stated reason beyond the request itself. *Session reading:* the resting figure should look like the question. A mark the student did not ask for is a clue the student did not ask for.
+- **Why:** *"this is because the books dont have this data and the objective is not to have a tool that allows the student to mark segments. at least for now. so we dont have ticks and no parallel lines by default unless like in the 2d tool, a user wants to use the show equal segments button"* (2026-10-07, #1861)
 - **For a feature:**
   - A stated length, angle, area or letter, and the right-angle knee, appear on the figure.
-  - A stated relation (AB = AC, ∥) is in the givens list. It is drawn only in an opt-in relations layer, never as a mark at rest (B2, every builder).
+  - A stated relation (AB = AC, ∥) is in the givens list, never a mark at rest (B2, every builder).
+  - Only 2-D has the opt-in «הצג צלעות וזוויות שוות» layer that draws them on request. The other builders do not get it: *"no need to port this capability"* (2026-10-07).
+  - The tool is not a tool for marking segments, *"at least for now"*.
   - An area reads «S=13» (B9, every builder).
 
 ### P7 — Answers are pulled, never pushed, and never step by step
@@ -132,12 +136,13 @@ His closest words:
   - *"we show the values and equations once they are defined by the input … we show in data panel."* (2026-09-03, ADR-AG-003)
   - *"when I select to see a distance or an equation of a line, I want the relevant formula to be shown on screen, so we don't just show the result — we show what to use to get to this result."* (2026-09-15, ADR-AG-062). He chose the level that shows the formula with this figure's numbers, without the arithmetic.
   - *"I don't want a guessing game. we either show or not. I think we need to show the equation if we can determine it"* (2026-09-16, ADR-AG-072)
+  - On whether the formula trace breaks B5: *"the tool shows what equation was used as a final step but not a step-by-step solution for how we got all numbers"* (2026-10-07, #1861)
 - **Why:** *"this is how I want students to get used to organizing their data"*; *"we show what to use to get to this result"*.
 - **For a feature:**
   - Nothing appears unbidden on the canvas.
   - The data panel opens on request.
   - A value appears only when the givens determine it.
-  - A formula may show this figure's numbers. The working (the arithmetic, the steps) never shows.
+  - The equation used may show, as the final step, with this figure's numbers. How every number was reached (the arithmetic, the intermediate steps) never shows.
 
 ### P8 — Two possible values are both shown
 - **His words:**
@@ -145,10 +150,11 @@ His closest words:
   - *"if there are 2 options, we always show up to 2 options."* (2026-10-03, ADR-AG-226)
   - *"there should be 2 lines for this loci and both should appear since they are the answer together and not just one of them"* (ADR-AG-166)
   - *"complex should also show both values - so it should follow all of the tools"* (2026-10-07, B12)
-- **Why:** *"because many exams ask questions that have 2 options"*.
+- **More than two:** *"up to 2. if there are 3 and more, dont show options and the user can switch between configs. in exams, i never saw a case where tsudent was expected to find 3 possible solutions"* (2026-10-07, #1861)
+- **Why:** *"because many exams ask questions that have 2 options"*; *"in exams, i never saw a case where tsudent was expected to find 3 possible solutions"*.
 - **For a feature:**
   - Show up to two values, joined by «או», in every builder (#1867).
-  - More than two possible values: not ruled. Treat it as `[proposed]` and ask him.
+  - Three or more: show no value. The student switches between configurations with «הציגו תצורה אחרת».
 
 ### P9 — A refusal teaches the reason
 - **His words:**
@@ -239,7 +245,7 @@ His closest words:
 
 ### 2-D geometry
 - **The reference** for plane geometry: its verdicts, its drawing and its wording (P12).
-- **The relations layer.** Equal sides and angles show when the student opts in and points at them. A declared shape's own equalities show when the layer is on.
+- **The relations layer.** Equal sides and angles show when the student opts in («הצג צלעות וזוויות שוות») and points at them; a declared shape's own equalities show when the layer is on. **2-D only** (P6).
 - **Vectors are not part of 2-D, by design.** They belong to the space unit (#1184).
 
 ### 3-D space
@@ -267,9 +273,9 @@ His closest words:
 ## 4. Session-drafted text awaiting the operator
 
 These passages have no ruling behind them yet. Treat them as `[proposed]`.
-- §1's thesis, "copy the figure vs read the givens". It originates in docs/01 and the first version of this document (2026-06), both written by sessions.
-- The *session reading* lines in P6.
 - The eight principle tips below.
+
+(§1's thesis and P6's reason were confirmed in his words on 2026-10-07.)
 
 ---
 

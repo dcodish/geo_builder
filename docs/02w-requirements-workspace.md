@@ -224,7 +224,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | A stated angle | arc with value or letter | arc | arc | n/a | **Same** |
 | A right angle | knee | knee | knee (also for an asked-for height) | n/a | **Same** |
 | A stated equality «AB = AC» at rest | nothing | nothing | ticks | n/a | **Ruled change** — nothing at rest anywhere (B2, #1805) |
-| The opt-in relations layer | yes (hover) | none | none | none | **Open** — whether the other builders get one is not ruled; until then relations live in the givens list |
+| The opt-in relations layer | yes (hover) | none | none | none | **Ruled** — 2-D only; not ported (operator, 2026-10-07: "no need to port this capability"). Elsewhere relations live in the givens list |
 | Parallel marks | none | none | none | n/a | **Same** |
 | The area label | «13» | — | «S=13» | — | **Ruled change** — «S=13» everywhere (B9, #1865) |
 | A computed value on the canvas | opt-in layer only | coordinates while the panel is open | a circle centre's coordinates when known | every plotted reading | **Ruled** — canvas = inputs (ADR-W-047); exceptions per docs/10 P5. **Ruled change**: complex (B6, D1, #1862); analytic foci and directrix (B7, #1863) |
@@ -232,7 +232,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | «✓ הציור נקבע במלואו» | only when one figure fits | whenever nothing is free | whenever nothing is free | whenever nothing is free | **Ruled change** — 2-D's rule everywhere (B8, #1596) |
 | Note for a choice the tool made | yes | n/a | no | n/a | **Ruled change** — port to analytic (B10, #1864) |
 | «הציגו תצורה אחרת» wording | locked | same | same | same | **Same** (ADR-W-098) |
-| Two possible values | not shown | both, as S₁/S₂ | both, with «או» | withheld | **Ruled change** — both, with «או», everywhere (B12, #1867) |
+| Two possible values | not shown | both, as S₁/S₂ | both, with «או» | withheld | **Ruled change** — both, with «או», everywhere (B12, #1867). Three or more: no value shown; the student cycles configurations (operator, 2026-10-07) |
 | "Not understood" refusal | «לא הצלחתי לקרוא את זה עדיין — נסו…» | «לא הצלחתי להבין את הנתון…» | «לא הצלחתי להבין את המשפט» | as analytic | **Ruled change** — 2-D's wording everywhere (B13, #1868) |
 | "The tool's limit, not your mistake" | no | yes | no | no | **Ruled change** — everywhere (B13, #1868) |
 | Student-text check (ADR-W-096) | no | yes | no | no | **Gap** — #1522 (icebox) |

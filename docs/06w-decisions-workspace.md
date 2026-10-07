@@ -5605,6 +5605,15 @@ This entry is the citable source for each ruling until the pedagogy charter (doc
 - ⚠ markers now sit wherever a product doc describes a behaviour these rulings change but no code has changed yet. They read "Ruled to change (2026-10-07, ADR-W-118 Bx · #NNNN)", so a session neither preserves the old behaviour nor builds the new one unasked.
 - The product changes are the issues listed above. None is armed until its plan exists. Under ADR-W-117 a plan whose every outcome line is `[ruled]` may be armed.
 
+**ADR-W-118 Amendment 1 (2026-10-07): the operator's answers on reviewing the charter (#1879).** Verbatim:
+- **The thesis (docs/10 §1):** *"Im not sure in what context i wrote this but this is the purpose of the tool (one of them). to have students enter and understand each input items and not just copy the image from the text book."*
+- **Why relations are not marked at rest:** *"this is because the books dont have this data and the objective is not to have a tool that allows the student to mark segments. at least for now. so we dont have ticks and no parallel lines by default unless like in the 2d tool, a user wants to use the show equal segments button"*
+- **The analytic formula trace vs B5:** *"the tool shows what equation was used as a final step but not a step-by-step solution for how we got all numbers"*
+- **2-D's opt-in relations layer for the other builders:** *"no need to port this capability"*
+- **More than two possible values:** *"up to 2. if there are 3 and more, dont show options and the user can switch between configs. in exams, i never saw a case where tsudent was expected to find 3 possible solutions"*
+
+So: §1's thesis and P6's reason are his; the trace (ADR-AG-062) stays; the relations layer stays 2-D only; and with three or more values no value is shown and the student cycles configurations.
+
 ## ADR-W-119 — The C4 documentation guards: a superseded ADR says so, requirement ids are unique, a cited ladder lists its ADR, instruction files point at live docs, a parity gap names open work or is parked, MEMORY.md has a ceiling (#1861)
 
 **Status:** accepted · 2026-10-07 · process (#1861 step 5) · implements ruling C4 of [ADR-W-118](#adr-w-118), and B15 for the parity rows.
