@@ -10,7 +10,10 @@
  * The fix attributes the collapse: the figure is re-solved without the residual rows the riders read
  * (the incidences). If that reduced figure can be open, an incidence invented the collapse — refused,
  * naming both statements (`err.polygonCollapsed`). If the reduced figure is still flat, the
- * non-incidence givens force it («AB = 5 · BC = 3 · AC = 8») and it is drawn, as before (FR-RD-7).
+ * non-incidence givens force it («AB = 5 · BC = 3 · AC = 8») — drawn under ADR-3D-309, and REFUSED since
+ * #1849 (ADR-3D-310, operator ruling 2026-10-07: "a flat line is not a triangle"), naming the givens that
+ * force it. The attribution now picks only the statements named. The new family's own locks are in
+ * `issue-1849-flat-polygon-refused.test.ts`; the must-build list below is flipped in place.
  * Everything goes through the real submit decision `decideSubmit3`; the per-fix unit test reads the
  * pivot's own record through `resolve3`.
  */
@@ -75,6 +78,19 @@ function refusesCollapse(lines: readonly string[], seed: number, stated: string,
   return msg;
 }
 
+/**
+ * #1849 (ADR-3D-310): refused at line `at` with the FORCED wording — `stated` and every one of `others`
+ * named — and the standing figure keeps its ring open.
+ */
+function refusesForced(lines: readonly string[], seed: number, at: number, stated: string, others: readonly string[], ring: readonly string[]): void {
+  const r = run(lines, seed);
+  expect(r.refusedAt, `seed ${seed}: refused at «${lines[at]}» (got ${r.kind} at ${r.refusedAt})`).toBe(at);
+  expect(r.error, `seed ${seed}`).toMatchObject({ code: 'polygon-collapsed', stated, forced: true, ring: ring.join('') });
+  const msg = errorText3(he, r.error)!;
+  for (const o of others) expect(msg).toContain(`«${o}»`);
+  expect(ringArea(derive3(r.st.facts, r.st.seed).positions, ring), `seed ${seed}: the standing figure is open`).toBeGreaterThan(0.01);
+}
+
 /** Builds at `seed`: every line records, every fact is ok. Returns the ring's area ratio. */
 function builds(lines: readonly string[], seed: number, ring: readonly string[]): number {
   const r = run(lines, seed);
@@ -134,28 +150,40 @@ describe('#1815 — an incidence that only a flat triangle satisfies is refused'
   });
 });
 
-describe('#1815 — a flatness the givens themselves force is still drawn (FR-RD-7)', () => {
-  it.each<[string, string[]]>([
-    ['5 · 3 · 8', ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8']],
-    ['4 · 4 · 8', ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8']],
-  ])('the degenerate triangle %s builds at all 24 seeds', (_name, lines) => {
-    for (const seed of SEEDS_24) expect(builds(lines, seed, ['A', 'B', 'C'])).toBeLessThan(1e-4);
-  }, 300_000);
+/**
+ * FLIPPED by #1849 (ADR-3D-310, operator ruling 2026-10-07 on #1849: "refuse on all tools with a message since
+ * it contradicts ABC is a triangle and a flat line is not a triangle"). Under ADR-3D-309 these were the
+ * must-build list — "a flatness the givens themselves force is still drawn" (ADR-W-048's notice, FR-RD-7).
+ * Each is now refused on the line that completes the collapse, naming the givens that force it.
+ */
+describe('#1815 → #1849 — a flatness the givens themselves force is REFUSED (was: drawn)', () => {
+  it.each<[string, string[], string, string[]]>([
+    ['5 · 3 · 8', ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8'], 'AC = 8', ['AB = 5', 'BC = 3']],
+    ['4 · 4 · 8', ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8'], 'AC = 8', ['AB = 4', 'BC = 4']],
+  ])('the degenerate triangle %s is refused at all 24 seeds (was: built flat)', (_name, lines, stated, others) => {
+    for (const seed of SEEDS_24) refusesForced(lines, seed, 3, stated, others, ['A', 'B', 'C']);
+  }, 120_000);
 
-  it.each<[string, string[]]>([
-    ['the rider last', ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8', 'D על AB', 'CD = 4']],
-    ['the rider first', ['משולש ABC', 'D על AB', 'CD = 4', 'AB = 5', 'BC = 3', 'AC = 8']],
-  ])('5 · 3 · 8 with a rider and a length on it builds (%s) — the incidence-free givens are flat', (_name, lines) => {
-    for (const seed of [0, 1]) expect(builds(lines, seed, ['A', 'B', 'C'])).toBeLessThan(1e-4);
+  it.each<[string, string[], number]>([
+    ['the rider last — refused at «AC = 8», before the rider', ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8', 'D על AB', 'CD = 4'], 3],
+    ['the rider first', ['משולש ABC', 'D על AB', 'CD = 4', 'AB = 5', 'BC = 3', 'AC = 8'], 5],
+  ])('5 · 3 · 8 with a rider and a length on it is refused (%s; was: built flat in ~13 s)', (_name, lines, at) => {
+    // the rider-first context costs ~2.5 s a run (the rider solves before the refusal); the 24-seed sweep is
+    // the ADR-3D-310 measurement, the suite keeps six seeds
+    for (const seed of at === 3 ? SEEDS_24 : SEEDS_24.slice(0, 6)) refusesForced(lines, seed, at, 'AC = 8', ['AB = 5', 'BC = 3'], ['A', 'B', 'C']);
+    // «CD = 4» reads the rider D, so it takes no part in forcing the flatness and is not named
+    expect(errorText3(he, run(lines, 0).error)).not.toContain('«CD = 4»');
   }, 300_000);
 
   it.each<[string, string[]]>([
     ['Hebrew', ['מרובע ABCD', 'AB מתלכד עם CD']],
     ['English', ['quadrilateral ABCD', 'AB coincides with CD']],
-  ])('a stated coincidence of two sides is drawn (%s)', (_name, lines) => {
-    for (const seed of SEEDS_24) builds(lines, seed, ['A', 'B', 'C', 'D']);
+  ])('a stated coincidence of two sides of one quadrilateral is refused (%s; was: drawn)', (_name, lines) => {
+    for (const seed of SEEDS_24) refusesForced(lines, seed, 1, lines[1], [], ['A', 'B', 'C', 'D']);
   }, 120_000);
+});
 
+describe('#1815 — an open figure with a rider still builds open', () => {
   it.each<[string, string[]]>([
     ['a rider length (#1735)', ['משולש ABC', 'D על AB', 'AD = 3']],
     ['a placement condition (#1730)', ['משולש ABC', 'D על BC ונתון כי AD = AC']],
@@ -188,9 +216,14 @@ describe('#1815 — the pivot records an invented collapse (unit)', () => {
     expect(pivot?.collapse?.riderKeys.join(',')).toBe('M');
   });
 
-  it('a metric-forced collapse with a rider: solved, flat, and no record', () => {
+  it('the invented record is marked not forced', () => {
+    expect(resolve3(build(['משולש ABC', 'M על AB', 'M אמצע BC']), 0).pivot?.collapse?.forced).toBe(false);
+  });
+
+  it('a metric-forced collapse with a rider: no solution, and the record says the other givens forced it (#1849; was: solved flat, no record)', () => {
     const pivot = resolve3(build(['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 8', 'D על AB', 'CD = 4']), 0).pivot;
-    expect(pivot?.solutions).toBeGreaterThan(0);
-    expect(pivot?.collapse).toBeUndefined();
+    expect(pivot?.solutions).toBe(0);
+    expect(pivot?.collapse?.ring.join('')).toBe('ABC');
+    expect(pivot?.collapse?.forced).toBe(true);
   }, 60_000);
 });
