@@ -657,6 +657,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── the step-1 audit's seed (#1649 §D), re-measured on c6a412aa — rows not already a catalog row above ──
   { id: 'on-side', family: 'points-incidence', steps: ['מלבן ABCD', 'E על הצלע DC'], expect: 'builds' },
   { id: 'ratio', family: 'midpoint-ratio', steps: ['משולש ABC', 'D על AB', 'AD:DB = 1:2'], expect: 'builds' },
+  // #1815 (ADR-3D-309, 2-D ADR-413) — a rider's incidence that holds only on a FLAT triangle is refused, not drawn flat
+  { id: 'rider-midpoint-collapse-1815', family: 'midpoint-ratio', steps: ['משולש ABC', 'M על AB', 'M אמצע BC'], expect: 'refused', note: 'M on AB and the midpoint of BC only when ABC is flat' },
+  { id: 'rider-midpoint-collapse-mirror-1815', family: 'midpoint-ratio', steps: ['משולש ABC', 'D על AB', 'D אמצע AC'], expect: 'refused' },
   { id: 'incircle-in', family: 'inscribed', steps: ['משולש ABC', 'במשולש ABC חסום מעגל'], expect: 'builds', exception: 'X8' },
   { id: 'length-noun-q2', family: 'lengths', steps: ['משולש ABC', 'אורך AB=BC'], expect: 'builds', note: "3-D's own spelling of an equal length (Q2): builds in all three" },
   // #1650 — a tangency typed first creates its circle (was refused in 2-D at the audit; both build now)

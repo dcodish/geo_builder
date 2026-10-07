@@ -907,9 +907,20 @@ to zero AREA (Newell ≤ 1e-4·span² — 2-D ADR-413's rule in R³), while a FL
 student may legitimately FORCE («AB מתלכד עם CD» on a quad; FR-RD-7 draws a forced-flat figure) — is
 judged on the accepted pool: when every solution flattened a ring and riders are enrolled, a
 **frozen-dims retry** re-solves with the shape fixed at the seed's sample, where the collapse basin does
-not exist and only the statement's own carriers move; its non-collapsed figure is preferred, and the
-flat one stands only when nothing else satisfies the givens. The same retry also answers a joint solve
-that finds nothing at all.
+not exist and only the statement's own carriers move; its non-collapsed figure is preferred. The same
+retry also answers a joint solve that finds nothing at all.
+
+**Which givens forced the collapse** (#1815, [ADR-3D-309](06b-decisions-3d.md#adr-3d-309)). When the
+retry finds no open figure either, the flat one is **attributed**, not assumed stated. The #820 enrollment
+probe records which residual rows the enrolled riders read (the incidences on a rider); `collapseIsStated`
+re-solves `[gauge | dims]` on the other rows only (anchored to the seed's dims, then released and accepted
+at 1e-20, so a metric sliver cannot pass for an open figure), both mirrors when a row is chiral. If that
+reduced system holds with the ring open, an incidence invented the collapse: `solvePivot` returns an empty
+pool marked `collapse: { ring, riderKeys }`, `resolve3` carries it on `pivot.collapse`, and `derive3`
+refuses the newest pin owner `polygon-collapsed`, naming the incidences and the riders' minting statements
+(`err.polygonCollapsed`). If the reduced system is still flat («AB = 5 · BC = 3 · AC = 8»), the givens force
+it and it is drawn (FR-RD-7). With no placement, `derive3`'s claim pass skips claims owned by statements
+that took part in the solve — a claim cannot be refuted by a figure that has none — so the guard speaks.
 
 ## The data panel has two kinds of row (#1196, [ADR-3D-254](06b-decisions-3d.md#adr-3d-254))
 

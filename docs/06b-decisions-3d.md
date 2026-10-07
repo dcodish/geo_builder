@@ -617,6 +617,7 @@ Same decision shape as [ADR-286](06-decisions.md#adr-286) — one control is bot
 4. **`אנך יורד מMלבסיס`** (the prod form, fully glued) — a new `perp-to-base {from}` command: apply resolves the base by the seg-plane-rel sentinel rule (single solid, ids first ring), MINTS the first unused label for the foot (parse3 is context-free — the mint must live at apply, deterministic per prefix), and delegates to the V8-e `height-to-face` foot machinery. No solid → honest `unknown-plane: base` refusal.
 
 Locked by `issue72-phrasing.test.ts` (exact prod utterances, parse + build: the box drive, the pyramid foot ⟂-on-base, the no-solid refusal, the basis-untouched arrow).
+
 ## ADR-3D-040 — The 3-D guidance register: non-constructive input answers with "what to do instead" (issue #73, the 2-D ADR-289 twin)
 
 **Status:** Accepted (2026-07-11; issue #73 — baseline log-triage, operator-approved). *Files: `src3d/parser/scope3.ts` (COPIED pattern per docs/20 §12 — never shared), `src3d/App3.tsx` (guidance short-circuit BEFORE the LLM escalation + a sky-toned note distinct from the amber error), `src3d/i18n/locales` (`scope.<category>`), `src3d/__tests__/scope3.test.ts`.*
@@ -650,6 +651,7 @@ Analytics: `source:'scope'`, `result:'scope:<category>'` — the PROFILE_3D dash
 **Class (route, don't refuse).** On a right square pyramid `ABCDS` the student typed `∠SDB` (×3) and `∠SDB=α` trying to SEE/NAME the angle; `scope3` classified the bare `∠XYZ` as a `valueless-query` and the tool did nothing. Naming an angle is a pedagogy/visualization act — it should draw the angle, never refuse. The machinery already existed (`scene3.wAngles` draws stated angles; `dataView` derives seed-invariant values); the fix routes a valueless named-angle to it.
 
 **Fix.** A new `angle-mark` command — a pure MARKER: it draws the arc at the middle vertex (+ its two arms) and consumes NO DOF, drives nothing, verifies nothing. `apply` records it in `Construction3.angleMarks` (idempotent per wedge; a later `∠SDB=α` UPGRADES an existing bare marker's display label). Parser: `angleMarker` lowers bare `∠XYZ` → a marker and `∠XYZ = <letter>` → a marker labelled with the letter (α); a NUMERIC RHS stays the driving `vertexAngleClaim` (runs first), a `?`/bare-`=` stays a scope question. `scope3`'s valueless-query pattern now matches only the genuine question forms (`∠DEF?`/`∠DEF=`/`∠DEF=?`), letting `∠DEF` and `∠DEF=α` build. Rendering: `scene3` draws the marker's arc carrying the display label (α) — but NEVER a single-seed numeric value (the ADR-3D-030 knowledge rule). The measure is a `dataView` derivation, printed (`∠SDB = 35.26°` / `α = 35.26°`) ONLY when it agrees across all sampled seeds (a determined figure — the same gate as `|u|=|v|`); an under-determined figure draws the arc with no value. **Decisions settled (the issue's open questions):** the marker is a real undoable fact (the student typed it, expects it in the figure + export); the `α` on `∠XYZ=α` is a pure DISPLAY name, never a driving parameter (safe — `∠XYZ=α` previously just escalated, so no conflict with the ADR-3D-032 parameter-α path). Locked by `angle-marker.test.ts` (routing, determined cube → value, under-determined pyramid → arc-only) + the `23mxaquw` scenario.
+
 ## ADR-3D-044 — Right prisms over more bases + the parallelepiped (issue #117)
 
 **Status:** Accepted (2026-07-14; issue #117, operator request; feature PR). *Files: `src3d/engine/types.ts` (6 new `SolidKind`s); `src3d/engine/apply.ts` (`prismBaseN`/`prismRing` generic topology, VERTEX_COUNT/DIM_COUNT); `src3d/engine/evaluate.ts` (`solidDims`/`solidPositions`); `src3d/parser/parse3.ts` (`rightPrism` dispatcher + `parallelepiped`); `src3d/parser/catalog3.ts`; `src3d/__tests__/prism-bases.test.ts` + scenarios.*
@@ -846,6 +848,7 @@ Locked by `perp-drives-symbol.test.ts` (EO⊥AS = 90° across a seed sweep, E on
 **Amends ADR-3D-058.** The LLM honesty rule is corrected from "a prism with no `ישרה` is NOT expressible" to "a prism NOT stated right is OBLIQUE — never emit a right/`ישרה` prism the student did not ask for (a parallelogram-base prism with no `ישרה` is `מקבילון`)." The misleading `'a prism whose base is a parallelogram' → []` few-shot becomes `→ ['מקבילון']`; a new genuinely-unexpressible example (`'a prism'`, no base → `[]`) keeps the empty-list lesson. The #290 honesty assertion (no example maps a non-right freeform to a right prism) still holds.
 
 **Locks:** `oblique-prism.test.ts` — `מנסרה שבסיסה מקבילית` / `prism with a parallelogram base` → `parallelepiped` (labelled + default); the `ישרה` form stays `prism4`; a non-parallelogram base refuses; end-to-end the bare form builds oblique (5 DOF) and `המנסרה ישרה` pins it right (3 DOF, top face above the base). Catalog +1; the PAR-10 + #290 honesty contracts stay green.
+
 ## ADR-3D-063 — An angle EQUALITY is statable, and a reused label MEANS it (issue #271, the M4 defaults/statement class)
 
 **Operator report (prod, 2026-07-22).** «when I tried saying that angle SAB = angle SAD it failed. I wanted to tell it that angle SAB = angle SAD = alpha (using the symbol).»
@@ -1296,6 +1299,7 @@ This is the docs/17 §2.2 class — *one relation reachable through only one phr
 **A regression caught in flight, worth recording.** The first cut of the atom put its triple regex in a plain template literal instead of `String.raw`, so `\s+` collapsed to `s+`. `∠SAB = ∠SAD` still passed (that branch has no `\s`), while `זווית SAB שווה לזווית SAD` silently stopped parsing — a form that had worked for months. The probe caught it because it exercised the must-not-change forms alongside the new ones; the lock now asserts all three spellings explicitly.
 
 Locked by `angle-phrase.test.ts` (11 — both languages of the reported wording, the `נתון ש` framing, noun interchangeability, declared-vector operands, mixed forms, and the unchanged triple / chained-label / numeric-RHS / distinct-point behaviours). 7 of the 11 verified failing against the pre-fix parser; the other 4 are the must-not-change guards. Catalog +1.
+
 ### ADR-3D-089 — Obliqueness is a MODIFIER of any prism kind, not a base-specific template (#349)
 
 **Class.** *A property that applies uniformly across a family is implemented as one member's bespoke template, so every other member of the family is unreachable — and the refusal is then rationalized as a geometric limit.* The sibling of ADR-3D-069 (one grammar for a coefficient, where a carve-out HID the gap) and ADR-3D-071 (a proxy signal standing in for the semantic fact): here the proxy was "which KIND is it" for the question "is the top ring translated straight up, or freely".
@@ -1364,6 +1368,7 @@ Locked by `oblique-any-base.test.ts` (the reported utterances build oblique He+E
 **Locks moved deliberately.** `pyramid-rhombus-base.test.ts` asserted the old representation (a rhombus base as `pyramidPar` + a constraint — it is its own registry base now) and the old refusal ("right + rhombus DEFERS"). The latter recorded a MISSING CAPABILITY, not a desired behaviour; it is inverted with the reason in-file, and the honesty requirement it protected — a stated shape is never silently dropped — is now met by *building* the shape and asserted as such. The shadow-matrix snapshot changed by **pure addition** (50 lines added, 0 changed): no existing utterance changed which rule claims it.
 
 Locked by `right-pyramid-any-base.test.ts` (30: every base × He/En builds with equal lateral edges at four seeds; each base stays in its own family — a kite never renders as a rhombus, a trapezoid's legs equalize while its bases stay unequal, a parallelogram keeps a free aspect; the oblique forms keep a genuinely free apex; the notice fires for exactly the bases that changed and stays silent for square/rectangle; the over-constraint boundary both ways; the legacy kinds' dim vectors unchanged; registry totality; `ringCircumcentre` exactness) + the updated #304 locks; catalog +5.
+
 ### ADR-3D-092 — A lowercase NODE label that doesn't parse gets the CONVENTION nudge, not an LLM call (#353)
 
 **Operator ruling (2026-07-26).** *"For the 3D case we can insist on uppercase and give a message asking the nodes to be upper case and parameters as lowercase — except for the plane equation we have open where aX+bY+cZ+D=0 are not nodes"*, and separately: angle measures are **Greek** (a latin `a` is not an acceptable angle label, so `60<a<90` needed no work).
@@ -1381,6 +1386,7 @@ The message states both halves of the convention (nodes uppercase; vectors/param
 **Not built in 2-D**, deliberately — the 2-D grammar already accepts lowercase, so the nudge would be unreachable there; see [ADR-404](06-decisions.md#adr-404).
 
 Locked by `lowercase-nudge.test.ts` (8: the reported case with the corrected spelling; `am=u+v`/`ab=5`; a single letter left alone; the plane-equation carve-out; a genuine gap NOT masked; the #181 uplift still winning where it applies; the pattern register untouched).
+
 ## ADR-3D-093 — A knee marks every right angle the figure ASSERTS, not a whitelist of point kinds (issue #307)
 
 **Status:** Accepted (2026-07-24; feature). *Files: `src3d/render/rightAngles.ts` (new), `src3d/render/planeGeom.ts` (new, extracted), `src3d/render/scene3.ts`; `src3d/__tests__/right-angle-knee.test.ts`.*
@@ -1419,6 +1425,7 @@ Everything else already worked: the `l1`→`ℓ1` canonicalization ([ADR-3D-038]
 **Boundaries held.** A plane equation is still never stolen (the `t(…)` tail remains the discriminator), and two distinct parameters in one line stay refused (the no-CAS boundary, D3).
 
 Locked by `origin-line.test.ts` (7: the prod utterance; equality with the explicit-origin lowering; the named/prefixed/bare forms He+En; point-pair membership intact; the anchored form unchanged; no plane-equation theft; the two-param refusal); catalog +1.
+
 ### ADR-3D-094 — a NEW point with partially-known coordinates is a `partial` point, never a refusal (issue #276)
 
 **Class (the M1 dual, third edition).** «A membership/partial-coordinate statement about a NEW id refuses instead of CREATING the id as a free rider on its carrier — while the identical statement about an EXISTING id works.» Members already closed: on-plane (ADR-3D-015), on-line (ADR-3D-031). The axis member (prod, log-triage 2026-07-22): «הקודקוד D נמצא על החלק החיובי של ציר ה-x» lowers to `point3 {x:null, y:0, z:0}` + a sign-given; an EXISTING id becomes a partial pivot PIN (works), a NEW id fell through to the `symbolic-new-point` refusal — but with NO symbol letters the nulls aren't under-determination, they are simply UNSTATED components (ADR-052: free DOFs).
@@ -3752,6 +3759,7 @@ that no line form carries a digit on any under-determined figure, with a counter
 empty; and the four regressions this must not cause — a numeric parametric line echoing verbatim, a
 symbolic one still echoing its `src`, a determined absolute figure DOES print its derived line's numbers,
 and a free line still showing only its name.
+
 ## ADR-3D-152 — a stated flat QUAD SHAPE is ONE command with three apply arms (#587)
 
 Operator, playing round #582/#584: on «פירמידה ABCDS שבסיסה ריבוע», *"«ABCD ריבוע» also fails (in
@@ -3835,6 +3843,7 @@ as measured GEOMETRY at four seeds, non-degeneracy asserted first; the DOF table
 three arms including completion for a non-מלבן noun and the ADR-052 refusal for an underdetermined one;
 `rect-complete`'s three frozen phrasings byte-identical to each other and to the general rule's output;
 the legacy command still applying for old saves. Catalog + shadow-matrix snapshot additive.
+
 ## ADR-3D-158 — a shape is what it says, and ONLY what it says (#612, #615)
 
 Two halves of one rule, found together while the operator played PR #604.
@@ -3902,6 +3911,7 @@ the figure provably untouched (no pins accumulated, no point moved), and the nam
 error only afterwards; `QUAD_IMPLIES` asserted as a table including the exclusive trapezoid; each of five
 nouns drawing visibly as itself at the store's own chosen seed and across three resamples; the
 right-trapezoid sibling specifically; and the preference yielding for both forced-givens cases.
+
 ## ADR-3D-153 — `ישר החיתוך` is ONE rule, and a colliding line name auto-indexes (#333)
 
 Operator: *"I think we dont have a solution for `ישר החיתוך`. we need this construct."* and *"I cannot
@@ -3957,6 +3967,7 @@ operator's exact two-`ℓ` sequence coexisting as `ℓ` + `ℓ1` with the notice
 including with the operands in the other order; the nameless form building with NO rename notice; explicit
 `ℓ1`/`ℓ2` unchanged; an undeclared π still refusing honestly. Catalog gains three phrasings; the shadow
 snapshot's only deletions are the retired rule's name.
+
 ## ADR-3D-154 — the panel's relation scan is ONE universe, ONE loop (#577, #558)
 
 Operator (prod, 2026-08-14): a figure holds a plane ABCD and a vector FG that are geometrically
@@ -4018,6 +4029,7 @@ order; segment⟂plane; `contained` distinguished from `parallel`; the multi-see
 tetra earns no row); all three flood-control rules including edge×edge silence; the #558 cell on an
 UNDRAWN edge plus the pre-#558 drawn-edge workaround agreeing; and the S4 and plane×plane columns
 asserted unchanged, the plane pair sharing two points among them.
+
 ## ADR-3D-155 — the view gauge has THREE components: orbit, zoom, and pan (#533)
 
 Operator (prod): with a box carrying `AC=(10,0,0)`, the solid renders in the top third of the canvas
@@ -4078,6 +4090,7 @@ zoom-about-pointer invariant asserted as "the point under the cursor maps to its
 no-op, and in/out being exact inverses; exactly one pan group wrapping ALL figure content; the reset
 button outside it; and the load-bearing one — `buildScene3` takes no pan parameter and emits identical
 scenes, so nothing derived from the scene can drift when the frame moves.
+
 ## ADR-3D-159 — a ratio belongs to the RIDER, not to the sentence that declared it (#748)
 
 **Operator report (2026-08-19, prod).** «מקבילון» / «E על AA'» / «AE=2*EA'» — the third line came back
@@ -4813,6 +4826,7 @@ rule (the widened head steals nothing); «נפח = 11» names nothing and is not
 resolves to the declared pyramid with a non-zero volume (**the defect, stated**); «= 0» no longer
 reads as true; unknown letters refuse by name; two pyramids ask; and the base run and the full run
 value identically, which is the two-lanes-one-answer property.
+
 ## ADR-3D-170 — a Hebrew↔Latin SCRIPT TRANSITION is a token boundary, at the normaliser (#773)
 
 **Context — found by `/log-triage` on the prod window 2026-08-19…24.** What production saw:
@@ -4931,6 +4945,7 @@ Locks: `src3d/__tests__/issue-754.test.ts` (the operator's cube sequence at seve
 agreement incl. the vector route, knowledge gating both before and after, the contradiction and the
 consistent second edge, the volume-exact-while-proportions-vary acceptance property, prism route
 unchanged); fixture `fixtures3/cube-stated-size-754.geo3.json`.
+
 ## ADR-3D-173 — the 3-D LLM seam gains the SEQUENCE gate (#555; the ADR-441 port)
 
 **2026-08-27 · round #800.** Class, from the #536/ADR-441 sibling audit: a statement whose
@@ -4956,6 +4971,7 @@ makes it rarer.
 
 Locks: `src3d/parser/__tests__/issue-555.test.ts` (restored vertex-angle run, reversal, primes,
 ambiguity, pair exemption, superset exemption, byte-identical pass-through).
+
 ## ADR-3D-172 — a MIXED shape-declaration run has an owner: bind the known, mint the undeclared (#774)
 
 **2026-08-27 · round #800.** Prod (sessions `bg01evje`, `sce6w3j4`): «משולש SEC» on a pyramid whose S
@@ -5488,6 +5504,7 @@ Locks: `src3d/__tests__/issue-818.test.ts` (both sign forms at a ten-seed batter
 operator's 4 / 1017 / 2031, the panel string, the positive sign untouched, the unsatisfiable refusal,
 six resamples all honouring the sign), `issue-814.test.ts` tightened back to the panel, and
 `fixtures3/pyramid-sign-branch-818.geo3.json` saved AT seed 1017 through the real load path.
+
 ## ADR-3D-180 — A DRIVEN PLACEMENT IS KNOWLEDGE, AND ITS LEFTOVER FREEDOM IS SAMPLED: the gate asks, the resolver slides (#803; extends ADR-3D-101 and the #639 gate)
 
 **2026-08-30 · round #822.** Operator, 2026-08-27, the #801 exercise continued with its workaround:
@@ -5568,6 +5585,7 @@ from the same entry; the sliding cube on a line — coordinates vary by seed, th
 prints, the face plane refuses; the sliding cube on a plane — nothing prints; the figure-internal
 frozen case silent; the sign selecting the slide's side at six seeds) and
 `fixtures3/prism-pin-driven-803.geo3.json` (the operator's sequence through the real load path).
+
 ## ADR-3D-181 — NO FRAME IS NOT «לא נקבע»: a frameless plane query reports its shape and names what is missing (#813)
 
 **2026-08-30 · round #822.** Operator, 2026-08-29: «קובייה ABCDA'B'C'D'», «|AB| = 4», «DB», «AB = u»,
@@ -5622,6 +5640,7 @@ Locks: `src3d/__tests__/issue-813.test.ts` — the operator's sequence (the note
 equal to the scalar lane's own answers, the ∥ relation), the frameless-then-framed progression (one
 coordinate → framed «לא נקבע», three → the equation), a bare run, the no-scale case (note alone), and a
 genuinely under-determined framed plane still «לא נקבע».
+
 ### ADR-3D-177 Am. 1 — ∥ DRAWS THE NAMED PLANE'S RING, exactly as ⟂ does (#821; operator ruling 2026-08-30)
 
 **The ruling.** ADR-3D-177 deliberately did not harmonise what the two relations DRAW and filed #821
@@ -5641,6 +5660,7 @@ splitter's spellings; `ACD||AB` was `not-handled` before.
 Locks: `src3d/__tests__/issue-821.test.ts` — the operator's three phrasings draw the triangle, the
 matrix (relation × arity × order × notation × locale) always draws the ring, the sentinel stays undrawn,
 and the pyramid end-to-end carries the ACD edges in the construction.
+
 ## ADR-3D-182 — A PERPENDICULARITY BETWEEN OBJECTS THAT SHARE A VERTEX IS REPORTED: one universe for the panel's derived relations (#811; the #558/#577 class, third member)
 
 **2026-08-30 · round #822.** Operator, 2026-08-29, playing #754: «קובייה ABCDA'B'C'D'», «|AB| = 4»,
@@ -5691,6 +5711,7 @@ over a coordinate-free `MatchCtx` with no universe partition — not present. *C
 
 Locks: `src3d/__tests__/issue-811.test.ts` — the operator's sequence (three rows, position row still
 suppressed), both controls, the no-flood cube, the adjacent non-⟂ pair, the vector/segment dedupe.
+
 ## ADR-3D-183 — A DERIVED POINT THAT LANDS ON AN EXISTING NAMED POINT IS NOT MINTED: affirm the geometry, refuse the name (#769; operator ruling 2026-08-25)
 
 **2026-08-30 · round #822.** Surfaced while building #755/#756: «תיבה ABCDA'B'C'D'», «E אמצע BB'»,
@@ -6235,6 +6256,7 @@ class, not the reported point); and seed-invariance at seeds 0/1/3/17/42 — the
 **Sibling check (ADR-W-004).** 2-D has no plane objects, so defect 3 has no 2-D twin. Defect 4's
 class — *a true statement that changed nothing is silently inert* — does exist there and is already
 answered by the `coincidences` notice (ADR-123) and #612's `redundantShapes`; no new 2-D gap found.
+
 ## ADR-3D-193 — ∥-TO-PLANE LOWERS TO A CLAIM, EXACTLY AS ⟂ DOES (#833)
 
 **Status:** accepted, 2026-08-31.
@@ -6299,6 +6321,7 @@ no-`no-solution` cross-product property; and the stated segment still drawn (#82
 **Sibling check (ADR-W-004).** 2-D has no planes, so this lane has no 2-D twin. The general class —
 *a relation table advertising an action no code implements* — is worth a sweep in both products; not
 done here, and not claimed to be. Filed as #845 rather than absorbed silently.
+
 ## ADR-3D-194 — A COORDINATE IS KNOWLEDGE ONLY IF THE ADMISSIBLE POOL AGREES, NOT MERELY THE SEEDS (#827)
 
 **Status:** accepted, 2026-08-31.
@@ -6452,6 +6475,7 @@ apart in silence. That drift, not either convention, was the actual defect.
 
 **Noticed, not fixed here:** on `AA'` the stretchy arrow spans only `AA`, leaving the prime outside
 it, where ADR-3D-003 specifies the whole pair name. Filed as #852 rather than folded in.
+
 ## ADR-3D-196 — AN EQUATION INSIDE A HEBREW ROW IS ONE ISLAND, SO IT READS FORWARD (#848)
 
 **Status:** accepted, 2026-08-31. Amends [ADR-3D-190](#adr-3d-190) Am. 1 — the third report on the
@@ -6504,6 +6528,7 @@ expression; a fraction row stays one island.
 
 **On STRUCTURE AND ORDER, never `textContent`** — stated as a requirement rather than a preference,
 because a textContent lock would have passed on all three broken builds.
+
 ## ADR-3D-197 — A RELATION NEVER OWNS A PLANE; EVERY DRAWN PLANE IS REACHABLE FROM THE PANEL (#847)
 
 **Status:** accepted, 2026-08-31. **Supersedes clause 2 of [ADR-3D-192](#adr-3d-192).** **Amended by [ADR-3D-281](#adr-3d-281)** (#1550, operator ruling 2026-09-29): the chip now lives on the FIRST row that mentions the plane, relation or declaration; the non-ok half stands.
@@ -6662,6 +6687,7 @@ lower to `quad-diagonals` with the sentinel; «אלכסוני ABCD» names its r
 belongs to `diagIntersection` and the singular «אלכסון AC'» is still a segment; the diagonals are AC and
 BD of the BOTTOM ring on pyramid, prism and box (the prism's top ring being the trap); no point is minted;
 re-issuing is idempotent; and both refusals hold.
+
 ## ADR-3D-200 — «אלכסון ראשי» NAMES NONE OF FOUR: THE ROLE PHRASE ASKS (#836)
 
 **Context.** Prod session `u1y60bg6` — the user's entire session was one line:
@@ -6729,6 +6755,7 @@ pyramid's none and an odd prism's none, and is checked against a solid the parse
 its pairs lies on a face); «אלכסון ראשי AC'» lowers to byte-identical commands to «אלכסון AC'» and draws
 on a real cube; **the four #449 siblings are asserted byte-identical to before**, so the family rule is
 provably extended rather than rewritten; and the three #438 declaration forms are asserted unchanged.
+
 ## ADR-3D-202 — THE DECLARED-VS-LOWERED SWEEP: ONE HOLLOW ROW, AND A RATCHET THAT KEEPS IT HONEST (#845)
 
 **Context.** #833 was a ∥-to-plane statement, true by construction, refused `no-solution`. The part worth
@@ -7314,6 +7341,7 @@ plus `src3d/__tests__/issue-853-already-known.test.ts` (8 tests): one figure per
 channel with the right `rel` and no legacy kind anywhere; subjects carry student letters and never a `~`
 or `@` machinery id; #500's driven relation still silent; the i18n ratchet; and the retired keys asserted
 gone from both locales.
+
 ### ADR-3D-210 — the Jacobian belongs to x, not to the iteration (#520)
 
 **Context.** `leastSquares` exits early only on `err < 1e-24`. Any solve whose error FLOORS above that —
@@ -8857,6 +8885,7 @@ the re-blamed refusal asserted **unconditionally** on an isolated construction r
 
 **No fixture.** The essence is bespoke (an equivalence between paths), and `GEN_FIXTURES3` currently
 rewrites the entire seeded corpus on any addition — the defect #916 fixes in this same round.
+
 ### ADR-3D-232 — A fixture generator writes what is MISSING, and losing a schema generation's load coverage FAILS (#916)
 
 **Status:** accepted, 2026-09-08 (fix-round #946, item 5) · **Issue:** #916 · **Approved:** operator, 2026-09-08 (*"Approve both"*)
@@ -9067,6 +9096,7 @@ as a bug. Re-author it with a non-complementary pair (e.g. 50/60) before it is p
 **Revolutions are out of scope, deliberately.** Cones and cylinders live in `c.revolutions`, a separate
 carrier with its own extent notion and no measured case. The predicate covers every polyhedral solid
 uniformly; extending it to revolutions wants its own measurement rather than a guessed threshold.
+
 ### ADR-3D-235 — A stated LENGTH is drawn beside its segment, from the same list the data panel reads (#918)
 
 **Status:** accepted, 2026-09-09 (fix-round #949, item 4) · **Issue:** #918 · **Operator ruling:** 2026-09-06 (`/decisions` pass)
@@ -9199,6 +9229,7 @@ owns is still refused (asserted on the store's `lastError`, because the submit g
 becomes a fact — the 3-D twin of what [ADR-495](06-decisions.md#adr-495) documents for 2-D), while the
 same sentence on a real symbol is accepted; and a second ratio symbol keeps its own default, so a sign
 never leaks across symbols.
+
 ## ADR-3D-237 — «<solid> ABCD עם <construct>»: the 3-D half of the shape-plus-construct family (#893)
 
 **Status:** accepted, 2026-09-10 (round #962) · **Issue:** #893
@@ -9324,6 +9355,7 @@ spellings too).
 **Sibling recorded, not fixed:** the whole-face form («משולש ACS מונח על מישור π2», a POLYGON contained in
 a plane) is still not-handled. It is #532 capability 2 and is scoped there; this ADR deliberately did not
 widen to it, since a face is a different operand kind with its own lowering question (one fact or N).
+
 ## ADR-3D-239 — «זווית A» IN 3-D IS UNDER-SPECIFIED, NOT UNSUPPORTED — and one candidate is not ambiguous (#866)
 
 **Status:** accepted, 2026-09-10 · **Issue:** #866 (the #343 remainder, split out in round #864)
@@ -9398,6 +9430,7 @@ student's utterance preserved on the fact.
 while the English «AD bisects ∠BAC» builds. Pre-existing and **symmetric** — the vertex-only twin here
 mirrors the three-letter form's spelling set exactly, so this ADR introduces no new asymmetry — but it is
 the #963 class (one language's spelling missing where the sibling's works) and is filed as #979.
+
 ## ADR-3D-240 — A KITE'S FOURTH CORNER IS DETERMINED, BY A DIFFERENT CLOSED FORM (#601)
 
 **Status:** accepted, 2026-09-10 · **Issue:** #601 (the #587 remainder, split out in round #596)
@@ -9449,6 +9482,7 @@ the parallelogram point. Fixture `fixtures3/kite-corner-completion-601.geo3.json
 `polygon4` declaration, so a general quad's fourth corner is a free sampled vertex rather than a
 completion. That is the ADR-052-correct behaviour and it was checked rather than inferred from the issue's
 prose, which grouped quad with trapezoid as a *refusal*.
+
 ## ADR-3D-241 — ONE COPULA VOCABULARY, ONE ANGLE NOUN, AND A COEFFICIENT ON THE SYMBOL (#977)
 
 **Status:** accepted, 2026-09-10 · **Issue:** #977 (filed on the operator's mid-round direction, round #974)
@@ -10128,6 +10162,7 @@ arrow AB       → draw-arrow        ✗ unknown-point: A
 **Measured after.** «וקטור AB», «חץ AB» and `arrow AB` each build on an empty canvas, drawing an arrow between two free points; «וקטור AB» then «נסמן: AB = u» puts `u` in the basis in two lines; the arrow moves across configurations. «קטע QZ» and «חץ QZ» after a single point are still refused naming Q. «הוקטור A'C» on a cube draws an arrow; «וקטור אלכסון AC» keeps the segment lane, because the diagonal claim is not a vector statement; «קטע AC» is unchanged.
 
 **Consequences.** `engine/apply.ts` (+`canStartFigure`, +`mintFree`, the arrow lane); `parser/parse3.ts` (`bareSegment` returns `draw-arrow` for a marked, non-diagonal pair). `issue-1184-vector-starts-a-figure.test.ts` (12) drives the STORE, never the parser alone — `parse3-v4.test.ts` has a passing test for a sentence that has never built, and that is the failure mode this file exists not to repeat. `issue72-phrasing.test.ts`'s vector-word assertion is flipped in place, with the ruling that moved it, rather than deleted.
+
 ### ADR-3D-254 — The data panel shows what the student STATED about vectors (#1196)
 
 **Status:** accepted, 2026-09-20 · **Issue:** #1196 (feature, P2, `3d`) · operator report + scope rulings 2026-09-18/19 · round #1292
@@ -10958,6 +10993,10 @@ itself, so the funnel minted a degenerate point. What the statement determines t
    the frozen-dims retry (part 3) is offered the problem, its non-collapsed figure is preferred, and
    the flat figure stands only when nothing else satisfies the givens — then the collapse was stated,
    not invented. 2-D's ADR-413 `collapsedPolygon` is the same rule with the same exception.
+   *Amended by [ADR-3D-309](#adr-3d-309) (#1815): "nothing else satisfies" means the givens FORCE the
+   flatness, not that it was stated — an incidence on a rider can force it. The flat figure now stands only
+   when the givens without the rider incidences are flat too; otherwise it is refused. The sentence about
+   2-D is also corrected there: ADR-413 has no such exception.*
 
 3. **The frozen-dims failure-path retry (the V8-c / ADR-3D-030 retry shape).** At seeds where the collapse
    basin captured *every* start, rejecting the collapse left 0 solutions — a false refusal of a
@@ -11987,3 +12026,36 @@ The degradation policy is deliberately unchanged (a line this code does not comm
 **Locks.** `src3d/__tests__/issue-1844-shape-internal-origin.test.ts` — the five reported lines at seeds 0–7: every status ok, no segment outside the solids' edges, and |AC| = |BD| on the figure (the condition still drives); the marked condition is still pinned and judged (`given: true`); the controls «טרפז שווה שוקיים ABCD» · «|AC| = |BD|» and «טרפז ABCD» · «|AC| = |BD|» draw AC; apply-level pairs for `length-rel` / `cos-angle` / `mutual-rel` (unmarked draws its operands, marked draws nothing, identical pins/claims/requirements); `quadShapeConstraints` marks every family; the sweep — 76 shape lines (7 quad nouns × {bare, inscribed} × He/En, right and free pyramids and prisms on every quad base, the trapezoid adjectives, triangle adjectives on triangles, pyramids and prisms, the regular tetrahedron, the pentagon in a circle) — every relation command marked and no non-edge segment, with an exercised counter (≥ 50 recorded, ≥ 40 relations). Without the fix 11 of its 13 cases fail (the five instances on `['AC']`). Rule 4: the essence is "draws no AC", a bespoke assertion, so the lock file is the regression coverage; the existing `trapezoid-circumcircle-1792` fixture carries the exact line.
 
 **Behaviour change for a student:** «טרפז שווה שוקיים ABCD», «טרפז ABCD חסום במעגל» and «פירמידה ישרה שבסיסה טרפז שווה שוקיים» no longer draw the diagonal AC; the trapezoid is still isosceles. Typing «|AC| = |BD|» still draws AC.
+
+## ADR-3D-309 — A collapse an incidence invented is refused; a collapse the givens force is drawn (#1815)
+
+**Status:** accepted · 2026-10-07 · bug (P1, honesty) · round #1845 · branch `fix/1815-invented-collapse` off `main` @ e17a7d1e · amends [ADR-3D-268](#adr-3d-268) part 2 · implements the #1815 plan (2026-10-06), mechanism C
+
+**Requirements:** [docs/02b](02b-requirements-3d.md) FR-RD-7 gains a sentence: a flatness only an incidence on a rider can produce is refused, naming both statements; a flatness the other givens force is still drawn · **Design:** [docs/04b](04b-design-3d.md) § "The ⟂-from-an-in-plane-point disposition", new paragraph *Which givens forced the collapse* · **LADDER stage:** solve (the pool decision, failure path only) + derive (the refusal's routing and wording).
+
+**Context (re-measured at e17a7d1e through `decideSubmit3`, nothing mocked).** The plan's table held. «משולש ABC · M על AB · M אמצע BC» built green with A, B and C collinear (area ratio 4e-8, every fact `ok`). The same happened with «AB = 3» first (7.7–9.9 s for the last line, area 2e-18), with the mirror slot «D על AB · D אמצע AC», with an extra rider «E על BC», with the long Hebrew form, and with the English form. The reverse order («M אמצע BC» then «M על AB») was refused `claim-refuted`. Must-build controls were green: 5·3·8 and 4·4·8 (flat at 2e-7), 5·3·8 plus «D על AB · CD = 4» in both orders, «מרובע ABCD · AB מתלכד עם CD», #1735's «D על AB · AD = 3», #1730's placement tail, and #1499's ⟂.
+
+**Root cause.** ADR-3D-268 part 2 kept a pool whose every solution collapsed a flat ring (after the frozen-dims retry also found nothing open) on the inference *"nothing else satisfies the givens, so the collapse was stated"*. That inference is false. "Nothing else satisfies" means the givens **force** the flatness. It does not mean the student **stated** it. An incidence on a rider can force it: M on AB and the midpoint of BC at once. That ADR also said 2-D's ADR-413 "is the same rule with the same exception". 2-D has no such exception. It refuses this family. **Class:** *an incidence given that can only be met by flattening a declared flat polygon is accepted, because "every solution found is collapsed" is read as "the collapse was stated".*
+
+**Decision.**
+1. **Attribute the collapse (`collapseIsStated`, solve3).** The #820 enrollment probe now keeps the **row mask** of the residual rows each enrolled rider reads (the incidences), or `null` when the row layout moves under the probe. When `preferUncollapsed` meets an all-collapsed pool and the frozen retry finds nothing open, the figure is re-solved over `[gauge | dims]` on the rows **no rider reads**. Each solve is anchored to the seed's dims, then released on the reduced rows alone and accepted only at Σr² < 1e-20, from four dim starts. Both mirrors are tried only when a reduced row is chiral, which is measured, not listed. If the reduced system holds with the ring **open**, an incidence invented the collapse, and the pool returns empty and is marked `collapse: { ring, riderKeys }`. If every reduced solution is flat, or none is found, the collapse is stated and the figure is drawn exactly as before. The solve is bounded and non-recursive, and runs on the failure path only. Both consumer sites (the `invariantOnly` result and the end of `solvePivot`) return the marked pool.
+2. **Why a strict release.** With the anchor alone (accept at 1e-10), 5·3·8 + «D על AB · CD = 4» was **wrongly refused**: the anchor holds a metric-forced figure at a sliver, because the lengths tolerate a height only to second order. Released, that sliver converges exactly onto the flat triangle (Σr² ≈ 2e-25, collapsed) and the figure is drawn. A genuinely open reduced figure, such as a free triangle with or without «AB = 3», holds at the start or converges quadratically.
+3. **The refusal names the statements.** `resolve3` carries the record as `pivot.collapse`. `derive3` resolves the rider keys to their points through the one carrier table (`carrierParams3`). The statements the collapse is attributed to are each rider's minting statement plus the pin owners whose commands name a rider. A metric pin beside them («AB = 3») is not named. Claims owned by those statements are skipped in the claim pass: a claim cannot be refuted by a figure that has none. The pin-owner guard then refuses the newest pin owner with the new code `polygon-collapsed {stated, others, sides, ring}`. The new keys are `err.polygonCollapsed` / `err.polygonCollapsedAlone` / `err.polygonNoun.{3,4,5}` in he + en, mirroring 2-D's `overConstrained_said_vs` frame: «לא ניתן: «M אמצע BC» סותר את «M על AB» — אי אפשר לקיים את שניהם יחד: הם מתקיימים רק אם המשולש ABC שטוח (כל קודקודיו על ישר אחד).» The polygon is named by a noun that depends on its vertex count, plus its letters, and both are on the figure (ADR-W-096).
+4. **ADR-3D-268 part 2 is amended.** A flat ring all of whose solutions collapsed stands only when the givens **without the rider incidences** are flat too. Its sentence about 2-D is corrected: ADR-413 refuses at every accept site, with no forced-flat exception. The metric-forced family (FR-RN-13 in 2-D) is the one 3-D keeps drawing.
+
+**Deviations from the plan.**
+- *The claim-pass skip is scoped to the attributed collapse, not to every empty pivot.* The plan stated the skip for every `pivot.solutions === 0`. Built that way, `test:fast` went red in **15 locks across 10 files** (exam gates «a wrong K is refused», «the WRONG decomposition is refused with claim-refuted», #614/#840 false containments, #748/#1156/#1590 rider ratios, #1550, #1183, #1523). The #1394 golden drifted 8 sequences from `claim-refuted` to `givens-contradict`. In each one a pin carries its own claim as the **arbiter** (the ADR-3D-030 pin-and-claim pattern), so a student's wrong answer is refuted in the verify-your-answer register by design. The skip therefore keys on the engine's own finding (`pivot.collapse`), with zero drift.
+- *Lock 6 (the reverse order) refuses, but keeps `claim-refuted`.* In that order M is a **derived** midpoint, so «M על AB» lowers to a `collinear3` claim, with no rider, no pin and no solve. This mechanism cannot reach it. The verdict was already a refusal (never green); only its wording differs from 2-D. Filed as **#1847** (P3) with two options. The lock asserts the refusal and the unchanged triangle.
+
+**Measured** (e17a7d1e → this branch; `decideSubmit3`, last line):
+- Reported family, **24/24 seeds refused** `polygon-collapsed`: the reported sequence, «AB = 3» first, mirror slot, extra rider, long Hebrew, English. The standing triangle stays open at every seed (area ratio > 0.1, keep-prior).
+- «AB = 3» first: **6.2–9.9 s green-flat → 0.15–0.19 s refused** (A/B, two rounds, seeds 0–1).
+- Must-build, after: 5·3·8 and 4·4·8 **24/24** (flat ≤ 2.2e-7, drawn); 5·3·8 + «D על AB · CD = 4» **24/24 in both orders** (48 runs, flat 4e-8 to 2.2e-7); «מרובע ABCD · AB מתלכד עם CD» He + En **24/24**; #1735, #1730 and #1499 open at seeds 0–3 (and their own 24-seed locks green).
+- Timing of the untouched paths (A/B, same machine, two rounds): 5·3·8 last line 0.40–0.60 s base vs 0.40–0.46 s; the 5·3·8 + rider last line 10.7–15.9 s base vs 12.6–13.8 s (inside the base's own spread); #1735 3.4–4.6 s vs 3.4–3.7 s; `fixtures3.test.ts` 15.04 / 15.71 s base vs 15.97 / 15.23 s.
+- The #1394 golden: **zero drift**. Only the new sequences this ADR's test adds appear as new keys (re-recorded at the batch).
+
+**Locks.** `src3d/__tests__/issue-1815-collapse-attribution.test.ts` (20): the six refusals at 24 seeds with both statements named and the triangle kept, the exact He and En text, the extra rider not named, «AB = 3» not named and under 1 s, the reverse-order refusal, the must-build list (24 seeds, except 5·3·8 + rider at seeds 0–1 in the suite for time; the 48-run sweep above is the measurement), and the unit pair through `resolve3` (an invented collapse carries `pivot.collapse` with ring ABC and rider M; the metric-forced one solves with no record). Parity rows `rider-midpoint-collapse-1815` and `rider-midpoint-collapse-mirror-1815` (family `midpoint-ratio`, `expect: 'refused'`) are green in 2-D, analytic and 3-D. Fixtures-first: none, because the essence is a refusal.
+
+**Sibling audit.** 2-D has the gate (ADR-413, at every accept site). Analytic refuses the family `unsatisfiable` through its own solver. The three collapse predicates stay engine-layer copies (ADR-W-048, "copied, never imported"). The parity rows carry the cross-product guarantee. Found while measuring and left to the plan's own "separate issues" list: 3-D draws the metric-forced 5·3·8 silently (ADR-3D-234 exempts flat kinds), and analytic refuses that triangle while 2-D builds it.
+
+**Behaviour change for a student:** «M על AB» followed by «M אמצע BC» (or any point on one side declared the midpoint of another) is now refused, naming both sentences and saying the triangle would have to be flat. Before, a flattened "triangle" was drawn with every row green. A triangle the student's own lengths force flat (5, 3, 8) is still drawn.

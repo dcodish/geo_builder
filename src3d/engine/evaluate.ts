@@ -40,7 +40,7 @@ import {
   resolveOperand,
   symMemberDrives,
 } from './operands';
-import { applyGauge, scalePinned, solvePivot, type MemberPin, type PivotResult } from './solve3';
+import { applyGauge, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3 } from './vecExpr';
 import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
@@ -396,7 +396,7 @@ export interface Resolved3 {
    *  the pool holds more than one solution, since that is the only case where a coordinate can be a
    *  branch choice. A coordinate is knowledge only when these agree; without it, a deterministic
    *  branch pick reads seed-stable and prints as fact. */
-  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this). */ scalarConsumed?: () => { dims: number; block: number } } | null;
+  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this). */ scalarConsumed?: () => { dims: number; block: number }; /** #1815 (ADR-3D-309): no solution because every one collapsed a flat ring that only a rider's incidence forced. */ collapse?: InventedCollapse3 } | null;
   /** #930 (ADR-3D-236) — each vec-def RATIO symbol's solved value («SN = k·SC» → k), so a consumer can
    *  read what the branch pick actually chose. The sign verifier needs it: without it a correctly
    *  honoured «k חיובי» reported `sign-unsatisfiable`, because the verifier knew how to read a figure
@@ -1817,7 +1817,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
     const EC = (dims: number[], override?: Map<string, number>, riderTs?: ReadonlyMap<Id, number>) =>
       evalCanonical(dims, true, override, riderTs);
 
-    const applySolutions = (solutions: PivotResult[]): void => {
+    const applySolutions = (solutions: PivotPool): void => {
       const satisfiesSigns = (sol: PivotResult): boolean => {
         const p2 = evalCanonical(sol.dims, false, overrideOf(sol), ridersOf(sol));
         // #325: a sign given on a PIN symbol (`t פרמטר חיובי` after `B(2t,t,k)`) selects
@@ -1907,7 +1907,8 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
           ...(Object.keys(pointRoots).length > 0 ? { pointRoots } : {}),
         };
       } else {
-        pivot = { solutions: 0, chosen: -1, err: Infinity };
+        // #1815 (ADR-3D-309): an empty pool that is an INVENTED collapse says so, for the refusal's wording
+        pivot = { solutions: 0, chosen: -1, err: Infinity, ...(solutions.collapse ? { collapse: solutions.collapse } : {}) };
       }
       resolveSymObjects(); // #801: the lines/planes written in a pin symbol follow the solution, always
     };
