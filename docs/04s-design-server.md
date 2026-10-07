@@ -69,7 +69,7 @@ listed so the coupling is visible rather than folklore).
 **Currently three of the four builders use this lane.** 2-D posts without a `tool` (the default), 3-D
 posts `tool: '3d'` and analytic posts `tool: 'analytic'` (`src-analytic/parser/llmAnalytic.ts`). **Complex
 does not call it yet** — it ships a deterministic parser with no LLM fallback, so nothing in that tree
-posts to `/api/parse` (amended 2026-10-07, #1861). **⚠ Ruled to change (2026-10-07, ADR-W-118 B14 · #1869):**
+posts to `/api/parse` (#1861). **⚠ Ruled to change (2026-10-07, ADR-W-118 B14 · #1869):**
 complex gets the LLM fallback through this lane. The parameterization is what keeps
 adding a lane cheap; it is not evidence that all four use one.
 
@@ -132,7 +132,7 @@ own grammar at save time and refused by name if it does not parse.
 
 Declared in [`BOUNDARIES.json`](../BOUNDARIES.json) and enforced by `server/__tests__/isolation.test.ts`:
 
-- **allowed:** `server → src`, `server → src3d`, `server → src-complex` — the binding points above.
+- **allowed:** `server → src`, `server → src3d`, `server → src-complex`, `server → src-analytic` (the analytic prompt spec, #1251, registered by #1359) — the binding points above.
 - **forbidden:** every product tree `→ server` (the key path), and `server ↔ shell` in both directions
   (the proxy has no UI; browser chrome must not pull in key handling).
 
@@ -141,12 +141,10 @@ here: a violation introduced by any product fails that product's own lane.
 
 ## The type gate — closed 2026-09-05
 
-For most of this tree's life it was **not typechecked**: absent from [`tsconfig.json`](../tsconfig.json)'s
-`include`, and `build.mjs` uses esbuild, which strips types without checking them — so the one tree
-running as a long-lived production service was the only one `tsc -b` never saw.
+`server` is in [`tsconfig.json`](../tsconfig.json)'s `include`, so `tsc -b` checks it: `build.mjs` uses
+esbuild, which strips types without checking them, so the build alone would not (#904).
 
-Closed in #904 Phase 4: `server` is in `include`, and the three errors that had accumulated are fixed at
-their seams. The interesting one is [`parseHandler.ts`](../server/parseHandler.ts): the prompt builders
+The one seam worth knowing is [`parseHandler.ts`](../server/parseHandler.ts): the prompt builders
 own the request as plain data and deliberately import no SDK types (they ship in browser bundles), so
 their `as const` makes every array readonly where the SDK wants mutable `string[]`. That mismatch is a
 **boundary** concern, so the widening lives at the seam that knows this data is an SDK request — typed as
@@ -155,9 +153,8 @@ pulling SDK types into a product tree.
 
 ## The one LLM request harness ([ADR-W-075](06w-decisions-workspace.md#adr-w-075))
 
-The proxy serves every product that escalates, and until #1359 each of them shipped its own copy of the
-request: three declarations of the model, three of the 1024-token budget, three of the `emit_steps`
-tool, three copies of the same four-section prompt skeleton.
+The proxy serves every product that escalates, and the request is built once (#1359): one declaration of
+the model, the 1024-token budget, the `emit_steps` tool and the four-section prompt skeleton.
 
 ```
 server/llm/harness.ts          the model, the budget, the tool schema, the skeleton,
@@ -181,8 +178,7 @@ structurally typed at the import, so a drifted product shape is a compile error 
 **What is deliberately NOT shared.** Each product's rule lines, its intro (the three copies wrap the
 opening sentence at different points), its vocabulary, its examples, and the two strings that describe
 the tool to the model. Those go to the model and shape its answers; unifying them is a prompt change,
-not a refactor, and it would land in tools that work. The extraction changed no prompt byte, verified
-against goldens captured before the first edit.
+not a refactor, and it would land in tools that work.
 
 **The client half lives elsewhere.** The sequence gate and the honesty-gate battery run on the steps
 after they return, in the browser, and belong in `shell/` — which every product may import and the
@@ -203,20 +199,19 @@ anything else ->  400, written nowhere
 ```
 
 The table is **derived from `products.json`**, not written out — so builder N+1 is routable the day it
-is registered, and a totality lock fails the suite if one ever is not. Before #1243 this was
-`tool === '3d' ? 3-D : 2-D`, whose else-arm silently swallowed every other product.
+is registered, and a totality lock fails the suite if one ever is not. It is not a conditional such as
+`tool === '3d' ? 3-D : 2-D`, whose else-arm silently swallows every other product (#1243).
 
 **An unknown tag is refused, never defaulted.** A wrong destination is invisible from the client, so
 the only safe answer to a tag the server does not recognise is to refuse it. The dev trace's router
-(`logProxy.ts`) reached the same conclusion first; this is the production sink catching up.
+(`logProxy.ts`) refuses the same way.
 
 **Known inconsistency, recorded rather than unified:** `parseHandler` treats an empty-string `tool` as
-2-D; both event routers refuse it. Changing the parse path is a live-behaviour change and was out of
-scope for the routing fix.
+2-D; both event routers refuse it. Changing the parse path is a live-behaviour change.
 
 ## Dashboards and triage read every registered product ([ADR-W-083](06w-decisions-workspace.md#adr-w-083))
 
-The router files each product's events under its own name; the two READERS of those files now follow the
+The router files each product's events under its own name; the two READERS of those files follow the
 same registry:
 
 | reader | per product | a product it cannot read yet |
