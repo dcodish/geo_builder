@@ -19,7 +19,8 @@ describe('ADR-3D-318 — already-defined names letters, never an engine id', () 
     useGeo3.getState().submit('ריבוע ABCD חסום במעגל');
     const err = useGeo3.getState().lastError;
     expect(err?.code).toBe('already-defined');
-    const text = errorText3((k, o) => i18n3d.t(k, o) as string, err!);
+    // the renderer isolates the student's letters for RTL (U+2066…U+2069); read the text without the isolates
+    const text = (errorText3((k, o) => i18n3d.t(k, o) as string, err!) ?? '').replace(/[\u2066-\u2069]/g, '');
     expect(text).toContain('«ABCD»');
     expect(text).not.toContain('circle-');
   });
