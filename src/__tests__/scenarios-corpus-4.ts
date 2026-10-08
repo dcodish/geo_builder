@@ -3712,6 +3712,24 @@ export const SCENARIOS_4: Scenario[] = [
       expect(reverse.violations.map((v) => v.messageKey)).toEqual(['figure.v.trapezoidMorph']);
     },
   },
+  {
+    id: 'pentagon-incircle-refused-1891',
+    title: '#1891 (ADR-606): «מעגל חסום במחומש ABCDE» on an empty canvas is REFUSED as a known tool limit — nothing is drawn, the model is never asked',
+    guards:
+      "The operator's prod run (2026-10-08, session yln1uwxa): 2-D's inscription direction test knew only the 3- and 4-gon nouns, so «מעגל חסום במחומש ABCDE» escalated to the model, which answered «מחומש ABCDE»; the object gate read #835's `place` flag as payload and a bare pentagon committed green with the stated circle gone (other canned answers drew the circle through all five vertices). Operator rulings 2026-10-08: the circle through the vertices is never drawn for «מעגל חסום ב…», and (W19) the refusal is «הכלי עדיין לא יודע לשרטט מעגל חסום במחומש — זו מגבלה של הכלי.» until #1908 builds pentagon incircles. The step is declared refused with its side count; the submit-path surface (the message, 0 model calls, every spelling, the object-gate seam) is src/app/__tests__/issue-1891-ngon-incircle.test.ts.",
+    steps: ['מעגל חסום במחומש ABCDE'],
+    refusedSteps: [
+      {
+        step: 1,
+        reason: 'incircle-not-drawn',
+        with: { sides: 5 },
+        why: 'operator rulings 2026-10-08 on #1891 (both builders; W19 known-limit sentence): a pentagon incircle is refused until #1908 builds it',
+      },
+    ],
+    check(fig) {
+      expect(fig.construction.objects, 'nothing is drawn').toEqual([]);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

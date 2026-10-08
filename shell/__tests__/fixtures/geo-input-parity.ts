@@ -258,6 +258,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1888': 'open',
   '#1904': 'open',
   '#1905': 'open',
+  '#1903': 'open',
 };
 
 export interface ParityRow {
@@ -1177,6 +1178,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'role-clause-1904-01', family: 'cevians-centres', steps: ['משולש ABC', 'AD גובה לצלע BC שהוא גם תיכון'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1905' }, { product: '3d', issue: '#1905' }], note: 'analytic and 3-D hand it to the model; reading the relative clause is #1905' },
   { id: 'role-clause-1904-02', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון לצלע BC שהוא גם גובה'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1905' }, { product: '3d', issue: '#1904' }], note: '3-D records the median alone until its port (#1904 item B′)' },
   { id: 'unread-tail-1889-02', family: 'intersections', steps: ['מרובע ABCD', 'AC ו-BD נפגשים בנקודה E שהיא אמצע BD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1905' }, { product: '3d', issue: '#1679', parked: true }], note: 'analytic reads both parts (E is the midpoint); 2-D reads no relative clause, so it refuses the line whole — reading it is #1905' },
+  // #1891 (ADR-606, ADR-3D-311; operator rulings 2026-10-08): a circle inscribed in a pentagon is refused as a known tool
+  // limit (W19) until #1908 draws it. 3-D circle geometry is X8 (its own lock); analytic still asks its model (#1903).
+  { id: 'pentagon-incircle-1891', family: 'circles', steps: ['מעגל חסום במחומש ABCDE'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1903' }] },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

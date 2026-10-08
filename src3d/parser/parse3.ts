@@ -22,10 +22,10 @@ import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
-import { MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
+import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX } from '../lexicon/nouns3';
 import { foldPrimes3, VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
-import { quadNoun3, readShapePhrase3, SHAPE_ADJ_EN_ANY3, SHAPE_ADJ_WORDS3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
+import { POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_WORDS3, statedPolygonArity3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
 // #1545 (ADR-3D-300): the ONE prime fold lives in the vocabulary leaf; re-exported so every parser-side
 // reader (the ask lane, the LLM sequence gate) reaches it through the normaliser that applies it.
 export { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';
@@ -73,7 +73,10 @@ export type ParseResult3 =
   | { ok: false; reason: 'component-symbolic'; component: string }
   // #1792 (ADR-3D-307): the #1554 ruling — a shape inscribed in a circle that the circle would turn into
   // ANOTHER noun («טרפז ישר זווית ABCD חסום במעגל»: a rectangle). Refused naming both; never escalated.
-  | { ok: false; reason: 'inscribed-contradicts-noun'; shape: string; forced: string };
+  | { ok: false; reason: 'inscribed-contradicts-noun'; shape: string; forced: string }
+  // #1891 (ADR-3D-311): a circle inscribed in a polygon of `sides` whose incircle the engine does not draw.
+  // Refused before any rule (the store words it per `incircleRefusal3`); never escalated.
+  | { ok: false; reason: 'incircle-not-drawn'; sides: number };
 
 const NOT_HANDLED: ParseResult3 = { ok: false, reason: 'not-handled' };
 
@@ -4286,11 +4289,13 @@ const rightTriangle: Rule = (s) => {
   return [{ type: 'solid', kind: 'polygon3', ids }, ...triShapeCommands(statedTriShape(s), ids, mid)];
 };
 
-/** The polygon nouns an inscription statement can name — one alternation per language, shared by the
- *  container-marker test and the ring reader below so the two can never drift (the 2-D ADR-245 lesson:
- *  a noun missing from one list silently built the CONVERSE figure). */
-const POLY_WORDS_HE3 = 'משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע';
-const POLY_WORDS_EN3 = String.raw`triangle|quad\w*|square|rectangle|rhombus|trapez\w*|parallelogram|kite|polygon`;
+/** The polygon nouns an inscription statement can name — the LEXICON's one alternation per language
+ *  (#1891): the private copy that lived here lacked «מחומש», and a noun missing from one list silently
+ *  built the CONVERSE figure (the 2-D ADR-245 lesson). */
+const POLY_WORDS_HE3 = POLY_NOUN_HE3;
+const POLY_WORDS_EN3 = POLY_NOUN_EN3;
+/** A solid noun, for a sentence whose ring may be a solid rather than a polygon («מעגל חסום בפירמידה SABCD»). */
+const SOLID_WORD3 = /מנסרה|פי?רמידה|תיבה|קובי|טטר|ארבעו|\b(?:prism|pyramid|box|cube|cuboid|tetrahedr\w*)\b/i;
 
 /** An inscription sentence: an inscribe/circumscribe verb and a circle. */
 function isInscription3(s: string): boolean {
@@ -4307,6 +4312,10 @@ function isInscription3(s: string): boolean {
  * noun missed it, so the verb fallback made the CIRCLE the container and drew a circumcircle for a
  * sentence about an incircle. Hebrew puts the adjective after the noun («במשולש ישר זווית»), so the
  * marker always touches the noun there.
+ *
+ * #1891: the English marker takes EVERY word between "in" and the noun as the phrase ("in the given
+ * triangle", "in this triangle", "in regular pentagon"), not an adjective list: a word the list lacked
+ * broke the marker the same way the adjective did before #1792, and drew the circumcircle.
  */
 function circleContains3(s: string, ring: readonly Id[]): boolean | null {
   const polyRe = new RegExp(`${POLY_WORDS_HE3}|${POLY_WORDS_EN3}`, 'i');
@@ -4315,12 +4324,12 @@ function circleContains3(s: string, ring: readonly Id[]): boolean | null {
   // spelling one form of a subject written several ways); everything downstream already worked.
   const nounIdx = s.search(polyRe);
   const runIdx = ring.length ? s.indexOf(ring.join('')) : -1;
-  const adj = String.raw`(?:(?:${SHAPE_ADJ_EN_ANY3})\s+)*`;
+  const phraseWords = String.raw`(?:(?!circle\b)[a-z][a-z'-]*\s+){0,4}?`;
   // which side carries the "in" marker — the CONTAINER. With no noun, the marker rides the RUN itself
   // («מעגל חסום ב-ABCD»), which is the bare-run twin of `בתוך ה?<noun>`.
   const polyContainer =
     new RegExp(
-      String.raw`(?:ב|בתוך\s+ה?)(?:${POLY_WORDS_HE3})|\bin(?:side)?\s+(?:an?\s+|the\s+)?${adj}(?:${POLY_WORDS_EN3})`,
+      String.raw`(?:ב|בתוך\s+ה?)(?:${POLY_WORDS_HE3})|\bin(?:side)?\s+${phraseWords}(?:${POLY_WORDS_EN3})`,
       'i',
     ).test(s) ||
     (nounIdx < 0 && ring.length > 0 &&
@@ -4349,6 +4358,26 @@ function inscribedContradiction3(s: string): { shape: string; forced: string } |
   const phrase = readShapePhrase3(s);
   if (!phrase || phrase.cyclic === 'yes') return null;
   return circleContains3(s, firstLabelRun(s)) === true ? phrase.cyclic : null;
+}
+
+/**
+ * #1891 (ADR-3D-311) — a circle INSCRIBED IN a polygon whose incircle the engine does not draw: the number
+ * of sides, or null. Context-free and read before any rule (the shape of {@link inscribedContradiction3}),
+ * so the lettered, unlettered and adjective-bearing sentences are all refused alike and the model is never
+ * asked: before this, a pentagon line that no rule read went to the model, whose answer was re-read by a
+ * grammar that drew the circle through the vertices, and a lettered one was read in the wrong direction.
+ *
+ * The arity is the polygon NOUN's; the generic «מצולע» / polygon, or no noun at all, takes the run's length.
+ * With no polygon noun, a sentence that names a SOLID is left to the rules (its run is the solid's).
+ */
+function uninscribableIncircle3(s: string): number | null {
+  if (!isInscription3(s)) return null;
+  const ring = firstLabelRun(s);
+  const noun = statedPolygonArity3(s);
+  if (noun === null && SOLID_WORD3.test(s)) return null;
+  const sides = typeof noun === 'number' ? noun : ring.length >= 3 ? ring.length : null;
+  if (sides === null || INCIRCLE_RING_ARITIES3.has(sides)) return null;
+  return circleContains3(s, ring) === false ? sides : null;
 }
 
 /**
@@ -4474,7 +4503,9 @@ const planarPolygon: Rule = (s) => {
   // #1792: a quad or pentagon noun reads its ADJECTIVES through the shape phrase. One the noun lowers
   // («טרפז ישר זווית», «טרפז שווה שוקיים») lowers beside `quad-shape`; one it cannot («מרובע ישר זווית»)
   // declines the rule, so the line escalates instead of committing the polygon without it.
-  const phrase = kind === 'polygon3' ? null : readShapePhrase3(s);
+  // #1891: and so does a TRIANGLE, so «משוכלל» / "regular" (which 3-D draws on a square alone) declines the
+  // rule on every noun rather than being dropped on the one whose adjectives `statedTriShape` reads.
+  const phrase = readShapePhrase3(s);
   if (phrase && phrase.unconsumed.length > 0) return null;
   const lowered = quadShapeCommand(kind === 'polygon4' ? quadBase : null, ids);
   if (lowered.length) return [...lowered, ...(quadBase ? quadAdjCommands(phrase, quadBase, ids, lowered) : [])];
@@ -4954,6 +4985,9 @@ export function parse3(utterance: string): ParseResult3 {
   if (!s) return NOT_HANDLED;
   if (!VEC_MARKED && /^([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*$/.test(s))
     return { ok: false, reason: 'ambiguous-vector-length' };
+  // #1891: an incircle the engine does not draw — read before any rule, so no form of it reaches the model
+  const incircleSides = uninscribableIncircle3(s);
+  if (incircleSides !== null) return { ok: false, reason: 'incircle-not-drawn', sides: incircleSides };
   // #1792: read BEFORE any rule (and so before any label), so every form of the sentence is refused alike
   const contradiction = inscribedContradiction3(s);
   if (contradiction) return { ok: false, reason: 'inscribed-contradicts-noun', ...contradiction };

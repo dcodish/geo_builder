@@ -150,6 +150,10 @@
     "missingOperands": "«{{sentence}}»: {{points}} עדיין לא בסרטוט, ולכן אין על מה לבנות את המשפט הזה. הגדירו קודם את הנקודות האלה — למשל את הצורה שהן קודקודיה.",
     "unresolvedSentence": "«{{sentence}}»: המשפט הזה נשען על משהו שעדיין לא בסרטוט, ולכן לא נבנה. הגדירו קודם את מה שהוא מתייחס אליו.",
     "bisectorWrongApex": "חוצה הזווית יוצא מ-{{apex}}, אבל הזווית שנכתבה היא בקודקוד {{stated}}. בדקו איזה קודקוד התכוונתם.",
+    "incircleKnownLimit": "הכלי עדיין לא יודע לשרטט מעגל חסום ב{{shape}} — זו מגבלה של הכלי.",
+    "incircleShape5": "מחומש",
+    "incircleShape6": "משושה",
+    "incircleShapeMany": "מצולע עם יותר משש צלעות",
     "inscribedContradictsNoun": "{{shape}} לא יכול להיות חסום במעגל: \"{{detail}}\". מעגל שעובר דרך ארבעת הקודקודים הופך אותו ל{{forced}}, ו{{forced}} אינו {{shape}}. אם הצורה היא {{forced}}, כתבו «{{forced}} ABCD חסום במעגל».",
     "shapeNoun": {
       "right-trapezoid": "טרפז ישר זווית",

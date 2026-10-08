@@ -28,22 +28,38 @@
 /** The quad nouns, in the precedence the one quad vocabulary has always used (specific → generic). */
 export type QuadNoun3 = 'square' | 'rectangle' | 'rhombus' | 'parallelogram' | 'kite' | 'trapezoid' | 'quad';
 /** Every polygon noun a phrase can name. */
-export type ShapeNoun3 = QuadNoun3 | 'triangle' | 'pentagon';
-/** The shape-property adjectives. */
-export type ShapeAdj3 = 'right' | 'isosceles' | 'equilateral';
+export type ShapeNoun3 = QuadNoun3 | 'triangle' | 'pentagon' | 'hexagon';
+/** The shape-property adjectives. #1891: «משוכלל» / "regular" joins them, so it is never dropped. */
+export type ShapeAdj3 = 'right' | 'isosceles' | 'equilateral' | 'regular';
 
-/** Each quad noun's words — the regexes `statedQuadBase` used, unchanged (byte-identical reading). */
-const QUAD_NOUN_RE: ReadonlyArray<readonly [QuadNoun3, RegExp, RegExp]> = [
-  ['square', /ריבוע/, /\bsquare\b/i],
-  ['rectangle', /מלבן/, /\brectang/i],
-  ['rhombus', /מעויי?ן/, /\brhombus\b/i],
-  ['parallelogram', /מקבילית/, /\bparallelogram\b/i],
-  ['kite', /דלתון/, /\bkite\b/i],
-  ['trapezoid', /טרפז/, /\btrapez/i],
-  ['quad', /מרובע/, /\bquadrilateral\b/i],
+/** Each quad noun's words (Hebrew, English), in the precedence the one quad vocabulary has always used. */
+const QUAD_NOUN_WORDS: ReadonlyArray<readonly [QuadNoun3, string, string]> = [
+  ['square', 'ריבוע', 'square'],
+  ['rectangle', 'מלבן', String.raw`rectang\w*`],
+  ['rhombus', 'מעויי?ן', 'rhombus'],
+  ['parallelogram', 'מקבילית', 'parallelogram'],
+  ['kite', 'דלתון', 'kite'],
+  ['trapezoid', 'טרפז', String.raw`trapez\w*`],
+  ['quad', 'מרובע', 'quadrilateral'],
 ];
+/** The regexes `statedQuadBase` used, built from the words above (the same reading). */
+const QUAD_NOUN_RE: ReadonlyArray<readonly [QuadNoun3, RegExp, RegExp]> = QUAD_NOUN_WORDS.map(
+  ([noun, he, en]) => [noun, new RegExp(he), new RegExp(String.raw`\b${en}\b`, 'i')] as const,
+);
 const TRIANGLE_RE = /משולש|\btriangle\b/i;
 const PENTAGON_RE = /מחומש|\bpentagon\b/i;
+const HEXAGON_RE = /משושה|\bhexagon\b/i;
+const GENERIC_POLY_RE = /מצולע|\bpolygon\b/i;
+
+/**
+ * #1891 (ADR-3D-311) — THE polygon-noun alternation an inscription sentence can name, one per language: the
+ * triangle, every quad noun, the pentagon, the hexagon and the generic «מצולע» / polygon. Built from the
+ * noun words above, so the inscription's container marker and the shape-phrase reader cannot drift apart
+ * again: `parse3`'s private copy lacked «מחומש», and «מעגל חסום במחומש ABCDE» drew the circle through the
+ * vertices (ADR-245's lesson, a noun missing from one list builds the CONVERSE figure).
+ */
+export const POLY_NOUN_HE3 = ['משולש', ...QUAD_NOUN_WORDS.map(([, he]) => he), 'מחומש', 'משושה', 'מצולע'].join('|');
+export const POLY_NOUN_EN3 = ['triangle', ...QUAD_NOUN_WORDS.map(([, , en]) => en), String.raw`quads?`, 'pentagon', 'hexagon', 'polygon'].join('|');
 
 /** The quad noun a sentence states, or null — THE one quad vocabulary (#305/#587). */
 export function quadNoun3(s: string): QuadNoun3 | null {
@@ -51,8 +67,22 @@ export function quadNoun3(s: string): QuadNoun3 | null {
   return null;
 }
 
+/**
+ * #1891 — the vertex count the polygon NOUN of `s` names: 3–6, `'any'` for the generic «מצולע» / polygon
+ * (its label run decides), or null when no polygon noun is stated.
+ */
+export function statedPolygonArity3(s: string): number | 'any' | null {
+  if (quadNoun3(s)) return 4;
+  if (TRIANGLE_RE.test(s)) return 3;
+  if (PENTAGON_RE.test(s)) return 5;
+  if (HEXAGON_RE.test(s)) return 6;
+  return GENERIC_POLY_RE.test(s) ? 'any' : null;
+}
+
 /** The English polygon nouns an adjective may stand before (used to bind the English «right»). */
-const EN_POLY = String.raw`triangles?|trapez\w*|quadrilaterals?|quads?|squares?|rectangles?|rhombus(?:es)?|parallelograms?|kites?|pentagons?|polygons?`;
+const EN_POLY = String.raw`triangles?|trapez\w*|quadrilaterals?|quads?|squares?|rectangles?|rhombus(?:es)?|parallelograms?|kites?|pentagons?|hexagons?|polygons?`;
+/** The Hebrew flat-polygon nouns as whole words, with the article / prefixes — what a «משוכלל» may follow. */
+const HE_POLY_WORD = String.raw`(?<![א-ת])[ובלכשמה]{0,3}(?:${POLY_NOUN_HE3})(?![א-ת])`;
 
 /**
  * Each adjective's words, He/En. «ישר זווית» in every spelling the tree admits (`זו?וית`, a hyphen or
@@ -63,16 +93,23 @@ export const SHAPE_ADJ_WORDS3: Readonly<Record<ShapeAdj3, string>> = {
   right: String.raw`ישר\s*[-\s]?\s*זו?וית|\bright[-\s]?angled\b|\bright\b(?=[-\s]+(?:${EN_POLY})\b)`,
   isosceles: String.raw`שווה[\s-]?שוקיים|\bisosceles\b`,
   equilateral: String.raw`שווה[\s-]?צלעות|כל\s+מקצועותיה\s+שוו|\bequilateral\b`,
+  // #1891: «משוכלל» / "regular" on a FLAT polygon only: after the Hebrew noun (a label run may sit between),
+  // before the English one. "regular tetrahedron" and "regular (square) pyramid" state a SOLID's own
+  // regularity, never the base's (the "right prism" rule, #435), so an English noun that heads a solid is
+  // excluded, and «פירמידה משוכללת» is not a polygon's.
+  regular: String.raw`(?<=${HE_POLY_WORD}\s+(?:[A-Z]\d*'?(?:\s*,?\s*[A-Z]\d*'?)*\s+)?)ה?משוכלל(?:ת|ים|ות)?(?![א-ת])|\bregular\b(?=[-\s]+(?:${EN_POLY})\b(?![-\s]+(?:pyramids?|prisms?)\b))`,
 };
-/** Any English shape adjective, for a container marker that must allow one before its noun ("in right triangle"). */
-export const SHAPE_ADJ_EN_ANY3 = String.raw`right(?:[-\s]?angled)?|isosceles|equilateral`;
 
-const ADJ_ORDER: readonly ShapeAdj3[] = ['right', 'equilateral', 'isosceles'];
+const ADJ_ORDER: readonly ShapeAdj3[] = ['right', 'equilateral', 'isosceles', 'regular'];
 
 /** Which adjectives each noun can LOWER. A trapezoid takes ONE (a right isosceles trapezoid is a rectangle). */
 const REFINES: Partial<Record<ShapeNoun3, { readonly adjs: readonly ShapeAdj3[]; readonly max: number }>> = {
   triangle: { adjs: ['right', 'equilateral', 'isosceles'], max: 3 },
   trapezoid: { adjs: ['right', 'isosceles'], max: 1 },
+  // #1891: a regular quadrilateral IS a square, so on a square the word is a tautology with nothing to lower.
+  // Everywhere else «משוכלל» is UNCONSUMED (3-D draws no regular triangle or pentagon): the caller declines
+  // (FR-SP-15), and `droppedShapeAdjective3` watches the word on every seam.
+  square: { adjs: ['regular'], max: 1 },
 };
 
 /** A phrase no circle can pass around without turning it into another noun (analytic's `notCyclic`). */
@@ -84,7 +121,7 @@ export interface ShapePhrase3 {
   /** the noun the phrase states (null: only adjectives — a bare «ישר זווית» reads as a triangle) */
   readonly noun: ShapeNoun3 | null;
   /** vertex count, decided by the NOUN (a bare adjective is a triangle's) */
-  readonly arity: 3 | 4 | 5;
+  readonly arity: 3 | 4 | 5 | 6;
   /** every adjective the sentence states */
   readonly stated: readonly ShapeAdj3[];
   /** the adjectives this noun lowers */
@@ -101,14 +138,15 @@ export interface ShapePhrase3 {
  */
 export function readShapePhrase3(s: string): ShapePhrase3 | null {
   // quad nouns first — the one-vocabulary precedence (`statedTriShape` defers to a stated quad noun)
-  const noun: ShapeNoun3 | null = quadNoun3(s) ?? (TRIANGLE_RE.test(s) ? 'triangle' : PENTAGON_RE.test(s) ? 'pentagon' : null);
+  const noun: ShapeNoun3 | null =
+    quadNoun3(s) ?? (TRIANGLE_RE.test(s) ? 'triangle' : PENTAGON_RE.test(s) ? 'pentagon' : HEXAGON_RE.test(s) ? 'hexagon' : null);
   const stated = ADJ_ORDER.filter((a) => new RegExp(SHAPE_ADJ_WORDS3[a], 'i').test(s));
   if (!noun && !stated.length) return null;
   const base: ShapeNoun3 = noun ?? 'triangle';
   const refines = REFINES[base];
   const consumed = refines ? stated.filter((a) => refines.adjs.includes(a)).slice(0, refines.max) : [];
   const unconsumed = stated.filter((a) => !consumed.includes(a));
-  const arity: 3 | 4 | 5 = base === 'triangle' ? 3 : base === 'pentagon' ? 5 : 4;
+  const arity: 3 | 4 | 5 | 6 = base === 'triangle' ? 3 : base === 'pentagon' ? 5 : base === 'hexagon' ? 6 : 4;
   const forces = consumed.map((a) => NOT_CYCLIC[`${base}:${a}`]).find((x) => x !== undefined);
   return { noun, arity, stated, consumed, unconsumed, cyclic: forces ?? 'yes' };
 }

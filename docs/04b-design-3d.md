@@ -222,6 +222,15 @@ The circle rewrites the ring's `quad-general` preference (#615) to the cyclic me
 stated right angle. A right trapezoid in a circle (`cyclic.forced = rectangle`) is refused by `parse3` as
 `inscribed-contradicts-noun` (#1554); a quadrilateral's incircle refuses `incircle-needs-triangle` (#1838).
 
+**One noun list, and an incircle the engine does not draw (#1891, [ADR-3D-311](06b-decisions-3d.md#adr-3d-311)).**
+The inscription's container marker reads the lexicon's `POLY_NOUN_HE3/EN3` (triangle, every quad noun, pentagon,
+hexagon, «מצולע»); in English it takes every word between "in" and the noun as the phrase ("the given", "this",
+"regular"). `parse3` asks `uninscribableIncircle3` before any rule: a circle inside a ring whose size is not in
+`INCIRCLE_RING_ARITIES3` (engine/types, the one constant apply's `circle3` check reads) → `incircle-not-drawn`,
+worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `incircle-known-limit`). «משוכלל» /
+"regular" is the lexicon's `regular` adjective, scoped to a flat polygon noun, consumed on `square` only;
+`droppedShapeAdjective3` accounts for it by a square or an equal-sides lowering on the ring.
+
 **A shape's own condition carries its provenance (#1844, [ADR-3D-308](06b-decisions-3d.md#adr-3d-308)).**
 Every shape lowering — `quadShapeConstraints`, the `CYCLIC_MEMBER` fix, the adjectives, a base noun,
 «שווה מקצועות», a pentagon's circle — emits its relation commands (`length-rel`, `cos-angle`, `mutual-rel`,

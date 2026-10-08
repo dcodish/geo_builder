@@ -1805,7 +1805,20 @@ export type EngineError3 =
   | { code: 'placement-not-fixed' }
   // #442: only a TANGENTIAL polygon has an incircle, and every triangle is one. A best-fit circle for a
   // general quad would be tangent to nothing — refuse rather than draw a figure that lies.
-  | { code: 'incircle-needs-triangle' };
+  | { code: 'incircle-needs-triangle' }
+  // #1891 (ADR-3D-311): a circle inscribed in a polygon of `sides` ≥ 5 — a tool limit, named as one (the W19
+  // ruling's known-limit frame). Interim until pentagon and hexagon incircles are built (#1908).
+  | { code: 'incircle-known-limit'; sides: number };
+
+/**
+ * #1891 (ADR-3D-311) — the ring sizes whose INCIRCLE the engine draws. ONE constant, read by apply's
+ * `circle3` check and by `parse3`'s pre-rule refusal, so the two cannot disagree. #1838 widens it to {3, 4}.
+ */
+export const INCIRCLE_RING_ARITIES3: ReadonlySet<number> = new Set([3]);
+
+/** The refusal for an incircle of a `sides`-ring the engine does not draw: a quad keeps #442's message. */
+export const incircleRefusal3 = (sides: number): EngineError3 =>
+  sides === 4 ? { code: 'incircle-needs-triangle' } : { code: 'incircle-known-limit', sides };
 
 export type ApplyResult3 = { ok: true; next: Construction3 } | { ok: false; error: EngineError3 };
 

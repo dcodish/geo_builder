@@ -71,6 +71,9 @@ export type ParseResult =
   // through the four vertices forces `forced` (a rectangle), which is not `shape`. Refused naming both nouns
   // (the #1554 ruling of 2026-10-01; analytic's `inscribed-contradicts-noun`), never escalated.
   | { ok: false; reason: 'inscribed-contradicts-noun'; shape: string; forced: string }
+  // #1891 (ADR-606): a circle inscribed in a polygon of `sides` ≥ 5 — 2-D draws no such incircle yet. Refused
+  // with the W19 known-limit sentence, never escalated (the model could only drop the circle or misplace it).
+  | { ok: false; reason: 'incircle-not-drawn'; sides: number }
   | { ok: false; reason: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: string; shapes: string[]; side: string }
   // #1666 (ADR-561, ADR-W-107): a PROOF TARGET — «הוכיחו כי AB ⊥ AC», "prove that …" — is what the student
   // must SHOW, never a given. Every rule used to read the claim inside it and lower it as a constraint.
@@ -330,7 +333,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -5328,11 +5331,35 @@ const INSCRIBED_ANGLES: Record<string, number[] | null> = {
   kite: [90, 340, 270, 200],
 };
 
+/** Polygon name → vertex count. "regular triangle/quadrilateral" route to equilateral/square. */
+const POLY_NAME_N: Record<string, number> = {
+  triangle: 3, quadrilateral: 4,
+  pentagon: 5, hexagon: 6, heptagon: 7, octagon: 8, nonagon: 9, decagon: 10, hendecagon: 11, dodecagon: 12,
+};
+/**
+ * Hebrew polygon names (n ≥ 5). מחומש=5 משושה=6 משובע=7 מתומן/משומן=8 מתושע=9 מעושר=10.
+ *
+ * #835: `מתומן` is the standard modern-Hebrew octagon and was absent from EVERY list — this table, the
+ * strip regex, `SHAPE_NOUNS_HE`, the span accountant and the geometry-word gate — so a real geometry word
+ * was refused as `scope:unrelated` ("not about geometry"). The entry that was here, `משומן`, is a
+ * legitimate but uncommon variant that also reads as "greased". Both parse; `מתומן` is the primary.
+ */
+const HE_POLY_NAME_N: Record<string, number> = {
+  מחומש: 5, משושה: 6, משובע: 7, מתומן: 8, משומן: 8, מתושע: 9, מעושר: 10,
+};
+
+/** The n-gon nouns (n ≥ 5) of the tables above, per language — composed, never re-spelled (#1891). */
+const NGON_WORDS_EN = Object.entries(POLY_NAME_N).filter(([, n]) => n >= 5).map(([w]) => w).join('|');
+const NGON_WORDS_HE = Object.keys(HE_POLY_NAME_N).join('|');
+
 /** The polygon words an inscription statement can name, one alternation per language — shared by the
  *  container-marker and order tests below so the list can't drift between them (a missing word here
- *  mis-routed "מעגל חסום בדלתון" to the CONVERSE — the kite inscribed in a circle). */
-const POLY_WORDS_EN = String.raw`triangle|quad\w*|square|rectangle|rhombus|trapez\w*|parallelogram|kite|polygon`;
-const POLY_WORDS_HE = 'משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע';
+ *  mis-routed "מעגל חסום בדלתון" to the CONVERSE — the kite inscribed in a circle). #1891 (ADR-606): the
+ *  n-gon nouns are COMPOSED in from the n-gon lane's own tables — the list knew only the 3- and 4-gons, so
+ *  «מעגל חסום במחומש ABCDE» decided no direction and reached a model whose answer could draw the circle
+ *  through the vertices. */
+const POLY_WORDS_EN = String.raw`triangle|quad\w*|square|rectangle|rhombus|trapez\w*|parallelogram|kite|polygon|${NGON_WORDS_EN}`;
+const POLY_WORDS_HE = `משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע|${NGON_WORDS_HE}`;
 
 /**
  * Is this a *circle* inscribed in a *polygon* (the incircle), rather than a
@@ -5358,6 +5385,36 @@ const isCircleInPolygon = (s: string): boolean => {
   const polyIdx = s.search(new RegExp(`${POLY_WORDS_EN}|${POLY_WORDS_HE}`, 'i'));
   return circIdx >= 0 && polyIdx >= 0 && circIdx < polyIdx;
 };
+
+/** The ring sizes whose INCIRCLE 2-D draws (a triangle, a tangential quadrilateral — Pitot). */
+const INCIRCLE_ARITIES = new Set([3, 4]);
+
+/**
+ * #1891 ([ADR-606](../../docs/06-decisions.md#adr-606)) — a circle INSCRIBED IN a polygon whose incircle 2-D
+ * does not draw: the number of sides (≥ 5), or null. The sides come from the n-gon noun, from «מצולע» /
+ * polygon plus its run, or from a bare run of five or more labels; the direction from the ב / "in" marker
+ * ({@link isCircleInPolygon}, or the run carrying it: «מעגל חסום ב-ABCDE») or the polygon-subject
+ * «מחומש ABCDE חוסם מעגל». The `incircle` rule refuses it before any model is asked: a model's answer
+ * could only drop the circle or draw it through the vertices, and no gate can check its direction.
+ */
+function uninscribableIncircle(s: string): number | null {
+  if (!/incircle|inscrib\w*|חסום|circumscrib\w*|חוסם/i.test(s) || !/incircle|\bcircle\b|מעגל/i.test(s)) return null;
+  const he = Object.entries(HE_POLY_NAME_N).find(([w]) => s.includes(w))?.[1];
+  const en = Object.entries(POLY_NAME_N).find(([w]) => new RegExp(String.raw`\b${w}\b`, 'i').test(s))?.[1];
+  const runs = (s.match(LABEL_RUN_G) ?? []).map((r) => r.match(rx(ULABEL, 'g'))?.length ?? 0);
+  const longest = Math.max(0, ...runs);
+  const named = he ?? en;
+  const generic = named === undefined && (/מצולע|\bpolygon\b/i.test(s) || !new RegExp(POLY_WORDS_HE + '|' + POLY_WORDS_EN, 'i').test(s));
+  const sides = named ?? (generic && longest >= 5 ? longest : null);
+  if (sides === null || INCIRCLE_ARITIES.has(sides)) return null;
+  // the circle is INSIDE: an inscribe verb (never the «circum-» of "circumscribed") with the polygon as the
+  // container, the polygon-subject «<polygon> ABCDE חוסם מעגל», or the marker riding a bare run
+  const circleInside =
+    (/incircle|(?<!circum)inscrib\w*|חסום/i.test(s) && isCircleInPolygon(s)) ||
+    new RegExp(String.raw`(?:${POLY_WORDS_EN}|${POLY_WORDS_HE})(?:\s+\S+)?\s+${LABEL}.*?(?:circumscrib\w*|חוסם).*?(?:circle|מעגל)`, 'i').test(s) ||
+    (named === undefined && /(?:ב|בתוך\s+ה?)-?\s*[A-Z]{5,}\b|\bin(?:side)?\s+[A-Z]{5,}\b/.test(s));
+  return circleInside ? sides : null;
+}
 
 /** "triangle ABC inscribed in circle O" / "טרפז ABCD חסום במעגל" — circle + on-circle vertices + edges. */
 const inscribedPolygon: Rule = (s, ctx) => {
@@ -5645,23 +5702,6 @@ const inscribedInPolygon: Rule = (s, ctx) => {
   if (!allExist) cmds.push(...cont.lower(contIds)); // create the container unless it's already drawn (M1 reuse)
   cmds.push({ type: 'inscribe', shape, ids, container: contIds, containerKind: contN === 3 ? 'triangle' : 'quad', variant: 0 });
   return cmds;
-};
-
-/** Polygon name → vertex count. "regular triangle/quadrilateral" route to equilateral/square. */
-const POLY_NAME_N: Record<string, number> = {
-  triangle: 3, quadrilateral: 4,
-  pentagon: 5, hexagon: 6, heptagon: 7, octagon: 8, nonagon: 9, decagon: 10, hendecagon: 11, dodecagon: 12,
-};
-/**
- * Hebrew polygon names (n ≥ 5). מחומש=5 משושה=6 משובע=7 מתומן/משומן=8 מתושע=9 מעושר=10.
- *
- * #835: `מתומן` is the standard modern-Hebrew octagon and was absent from EVERY list — this table, the
- * strip regex, `SHAPE_NOUNS_HE`, the span accountant and the geometry-word gate — so a real geometry word
- * was refused as `scope:unrelated` ("not about geometry"). The entry that was here, `משומן`, is a
- * legitimate but uncommon variant that also reads as "greased". Both parse; `מתומן` is the primary.
- */
-const HE_POLY_NAME_N: Record<string, number> = {
-  מחומש: 5, משושה: 6, משובע: 7, מתומן: 8, משומן: 8, מתושע: 9, מעושר: 10,
 };
 
 /**
@@ -6230,6 +6270,9 @@ const sector: Rule = (s, ctx) => {
  * → a circle through it. Distinct from "triangle inscribed in a circle".
  */
 const incircle: Rule = (s, ctx) => {
+  // #1891 (ADR-606): an incircle of a polygon 2-D does not inscribe is refused here, before any model
+  const sides = uninscribableIncircle(s);
+  if (sides !== null) return { clarify: 'incircle-not-drawn', sides };
   // The INCIRCLE of a polygon (triangle / quad / trapezoid / rhombus / square / rectangle / parallelogram):
   // EITHER "circle inscribed in <polygon>" (circle-in-polygon) …
   // An incircle statement is about a CIRCLE inscribed in a polygon — so a circle noun must be present. Without
@@ -12003,8 +12046,9 @@ function parseResolved(s: string, ctx: ParseContext): ParseResult {
     // comment directly below already states the rule ("a clarification is a rule's genuine question —
     // propagate it, never second-guess it with a split"); this makes the condition agree with it.
     // #1790 (ADR-595): `inscribed-contradicts-noun` is a refusal ABOUT the noun — the rule read it, and
-    // re-splitting would only let a clause half-parse the sentence the ruling refuses. One reason, here only.
-    (!whole.ok && whole.reason !== 'not-handled' && whole.reason !== 'inscribed-contradicts-noun' && !isAmbiguityQuestion(whole.reason) && droppedShapeNoun(s, [], ctx))
+    // re-splitting would only let a clause half-parse the sentence the ruling refuses. #1891 (ADR-606): the
+    // known-limit incircle refusal is the same kind (it read the noun to count the sides): `NOUN_REFUSALS`.
+    (!whole.ok && whole.reason !== 'not-handled' && !NOUN_REFUSALS.has(whole.reason) && !isAmbiguityQuestion(whole.reason) && droppedShapeNoun(s, [], ctx))
   ) {
     return splitStatements(s, ctx) ?? regionSideFallback(s, ctx) ?? { ok: false, reason: 'not-handled' };
   }
@@ -12287,8 +12331,10 @@ const BARE_SHAPE_TYPES = new Set([
   'trapezoid', 'triangle', 'right-triangle', 'polygon',
 ]);
 /** A shape declaration's OWN identity. A key past these is payload the shape is carrying for the
- *  student (`square.side`), which accounts for a stated magnitude the same way a separate command does. */
-const BARE_SHAPE_KEYS = new Set(['type', 'ids']);
+ *  student (`square.side`), which accounts for a stated magnitude the same way a separate command does.
+ *  #1891 (ADR-606): `place` is identity — #835's bare n-gon "states a five-sided figure and nothing more" —
+ *  so a model answer that kept only «מחומש ABCDE» and lost the stated circle read as payload, and committed. */
+const BARE_SHAPE_KEYS = new Set(['type', 'ids', 'place']);
 /** Nouns that name an OBJECT OF THEIR OWN — something a bare shape declaration can never be. A shape's
  *  own PROPERTY (right-angled, isosceles, convex) is deliberately absent: `shape-variant` and the
  *  convexity gates own those, and double-gating would refuse working input. Both Hebrew forms of the
@@ -12461,6 +12507,10 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
   return { ok: false, reason: 'not-handled' };
 }
 
+/** Refusals ABOUT the shape noun: the rule read the noun in order to refuse, so the dropped-noun gate must
+ *  not overrule them (#1790's `inscribed-contradicts-noun`; #1891's `incircle-not-drawn`, ADR-606). */
+const NOUN_REFUSALS: ReadonlySet<string> = new Set(['inscribed-contradicts-noun', 'incircle-not-drawn']);
+
 /**
  * A rule's CLARIFY result, as the parse refusal it becomes.
  *
@@ -12495,6 +12545,7 @@ function refusalOf(res: Clarify): ParseResult {
     return { ok: false, reason: 'crossing-already-named', holder: res.holder, id: res.id, s1: res.s1, s2: res.s2 };
   if (res.clarify === 'arc-copula') return { ok: false, reason: 'arc-copula', a: res.a, b: res.b };
   if (res.clarify === 'inscribed-contradicts-noun') return { ok: false, reason: 'inscribed-contradicts-noun', shape: res.shape, forced: res.forced };
+  if (res.clarify === 'incircle-not-drawn') return { ok: false, reason: 'incircle-not-drawn', sides: res.sides };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 
