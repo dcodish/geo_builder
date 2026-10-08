@@ -55,7 +55,7 @@ describe('#1888 — no catalog construct drops a trailing qualifier green', () =
         if (!doc.supported) continue;
         const ex = lang === 'he' ? doc.he : doc.en;
         const v = await decideEmpty(ex, lang);
-        if (v.kind === 'refuse' && /unread-part/.test(String(v.logs.at(-1)?.result))) refusedBase.push(ex);
+        if (v.kind === 'refuse' && /unread-(?:part|role)/.test(String(v.logs.at(-1)?.result))) refusedBase.push(ex);
         if (v.kind !== 'commit') continue;
         base++;
         const letters = [...new Set(ex.match(/[A-Z]\d*/g) ?? [])];

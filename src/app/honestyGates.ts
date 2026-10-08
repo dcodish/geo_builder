@@ -41,6 +41,7 @@ import { unaccountedSpans } from '@/parser/spanAccounting';
 import type { AnyCommand, Id } from '@/engine';
 import type { ParseContext } from '@/parser';
 import { unreadParts, type UnreadReport } from './unreadParts';
+import { unreadRoles, type RoleReport } from './unreadRoles';
 
 /**
  * Every gate that is a pure function of `(utterance, commands)`. Exported as a MAP, not as a sequence
@@ -92,6 +93,10 @@ export interface GateReport {
   unaccounted: { kind: string; text: string }[];
   /** #1888 (ADR-603): the label runs no reading depends on, and the line's parts when they are lost PARTS */
   unread: UnreadReport | null;
+  /** #1904 (ADR-604): the cevian role words no reading depends on — the word sibling of `unread` */
+  unreadRole: RoleReport | null;
+  /** true when every gate that predates the read-extent members (#1888, #1904) is clean: only a lost part or role fired */
+  onlyReadExtent: boolean;
   /**
    * Everything left unread, as the STUDENT'S OWN tokens — never a gate name and never internal state
    * (the honesty invariant: an error names the statement, not the machinery). A seam that refuses
@@ -152,6 +157,9 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
   // no substitution changes was never read («ב-B», «שהיא אמצע BD», «על AB»), however well its letters ride
   // other commands. Re-read in the seam's own context (`pctx` / `ectx`), so it is context-carrying.
   const unread = unreadParts(utterance, commands, ctx);
+  // THE WORD SIBLING (#1904, ADR-604): a cevian role word («גובה», «תיכון», «חוצה זווית») the reading does not depend
+  // on — deleting it leaves the lowering unchanged — was dropped, however well the family-presence gates account it.
+  const unreadRole = unreadRoles(utterance, commands, ctx);
 
   const clean =
     unaccounted.length === 0 &&
@@ -163,7 +171,19 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     droppedWordRels.length === 0 &&
     !droppedCmp &&
     droppedConstruct.length === 0 &&
-    unread === null;
+    unread === null &&
+    unreadRole === null;
+  const onlyReadExtent =
+    !clean &&
+    unaccounted.length === 0 &&
+    dropped.length === 0 &&
+    droppedNums.length === 0 &&
+    droppedRels.length === 0 &&
+    droppedVerbs.length === 0 &&
+    droppedCompound.length === 0 &&
+    droppedWordRels.length === 0 &&
+    !droppedCmp &&
+    droppedConstruct.length === 0;
 
   const items = [
     ...dropped.map(String),
@@ -175,6 +195,7 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     ...droppedConstruct,
     ...unaccounted.map((x) => x.text),
     ...(unread?.items ?? []),
+    ...(unreadRole?.items ?? []),
   ].filter((s, i, a) => s.trim().length > 0 && a.indexOf(s) === i);
 
   return {
@@ -189,6 +210,8 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     droppedConstruct,
     unaccounted,
     unread,
+    unreadRole,
+    onlyReadExtent,
     items,
   };
 }

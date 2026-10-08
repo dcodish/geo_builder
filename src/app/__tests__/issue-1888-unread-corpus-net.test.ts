@@ -4,7 +4,8 @@
  * does not read.
  *
  * Every step is taken against its REAL prefix context (the figure the steps before it built), with the commands
- * the real parse→fact path committed for it — the plan's measurement, as a lock. A step this flags is a working
+ * the real parse→fact path committed for it — the plan's measurement, as a lock. #1904 (ADR-604) runs its role-word
+ * member over the same steps. A step this flags is a working
  * line the new member would refuse: that is a red test, never a row to silence. Exercised floor: the net must
  * have checked at least 1400 committed steps (measured at pickup: 1465), so it cannot pass by checking nothing.
  */
@@ -17,6 +18,7 @@ import { parse } from '@/parser';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
 import { loweringKey, unreadParts } from '../unreadParts';
+import { unreadRoles } from '../unreadRoles';
 
 const FIXTURES = path.resolve(__dirname, '../../__tests__/fixtures');
 
@@ -48,6 +50,7 @@ describe('#1888 — the read-extent member refuses no working step of the corpus
         }),
     ];
     let checked = 0;
+    let withRole = 0;
     const flagged: string[] = [];
     for (const c of cases) {
       for (const g of groups(c.facts)) {
@@ -59,10 +62,16 @@ describe('#1888 — the read-extent member refuses no working step of the corpus
         checked++;
         const u = unreadParts(g.utterance, g.cmds, ctx);
         if (u) flagged.push(`[${c.name}] «${g.utterance}» → ${u.items.join(', ')}`);
+        // #1904 (ADR-604): the role-word member, over the same steps
+        if (/גוב|גבה|תיכו|חוצ|altitude|height|median|bisect/i.test(g.utterance)) withRole++;
+        const role = unreadRoles(g.utterance, g.cmds, ctx);
+        if (role) flagged.push(`[${c.name}] «${g.utterance}» → role ${role.items.join(', ')}`);
       }
     }
-    console.info(`#1888 corpus net: ${checked} committed steps checked, ${flagged.length} flagged`);
+    console.info(`#1888 corpus net: ${checked} committed steps checked (${withRole} with a role word), ${flagged.length} flagged`);
     expect(flagged).toEqual([]);
     expect(checked, 'the net exercised the corpus').toBeGreaterThanOrEqual(1400);
+    // measured at pickup: 1485 steps, 38 holding a cevian role word
+    expect(withRole, 'the role-word member met real role words').toBeGreaterThanOrEqual(35);
   }, 600_000);
 });

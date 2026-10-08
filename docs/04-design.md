@@ -580,6 +580,16 @@ member `unreadParts` (`src/app/unreadParts.ts`, in `honestyGateReport`, so both 
   (`-more` with further parts) when the lost tail is one vertex of a `right-triangle` the read part lowered to, else
   `input.scope.split-statements`. The ✎ seam refuses with `steps.editDropped`, the lost parts as its items.
 
+#### A role word the reading never read ([ADR-604](06-decisions.md#adr-604))
+
+The word sibling, `unreadRoles` (`src/app/unreadRoles.ts`, in the battery): each cevian role word (`CEVIAN_NOUNS_HE` /
+`_EN` in `lexicon.ts`, composed into ADR-430's `CONSTRUCT_NOUNS`, plus `BISECT_KW`'s stem) is DELETED with its clitics
+and the line re-read (`readWords`); a word whose deletion changes nothing was not read; the same role twice read
+together is a co-reference. At submit, when only the read-extent members fired (`GateReport.onlyReadExtent`),
+`lostRoleNote` teaches `input.scope.split-roles` — one line per role, the side from the lowering, every line proved to
+parse in turn — else the parts cut before the later role word. Where an older gate fired too, the line keeps its
+weak path (W21). The ⟂ verb row reads «אנך»; the existing-segment ⊥-bisector declares `VERB_PERPENDICULAR`.
+
 ### What counts as "produced": a display-only command declares itself (#1011, [ADR-519](06-decisions.md#adr-519))
 
 `dryRunOutcome` asks whether a line did anything — the construction grew, a DOF went, the scale was fixed, a point

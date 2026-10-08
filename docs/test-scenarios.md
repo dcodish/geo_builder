@@ -1739,3 +1739,7 @@ over all four (ADR-041).
 ### `unread-part-taught-lines-1888` — the lines a lost-part refusal teaches build: «משולש ABC» · «∠ABC = 90°», the compound controls, and #1889 typed one per line (#1888, #1889, ADR-603)
 
 **Guards against:** a refusal that teaches lines the builder refuses, and the read-extent gate refusing a compound whose every part is read. The operator's rulings (2026-10-08) refuse «משולש ABC ישר זווית ב-B» and «…בנקודה E שהיא אמצע BD» / «…E על AB» whole, and teach «משולש ABC» then «∠ABC = 90°». **Asserts** that the taught lines build with the right angle at B, that «AB = 4, BC = 3» and «D על AC כך ש-AD = DC» commit, and that «EG ו-FH נפגשים בנקודה K» · «K אמצע FH» builds K on both diagonals and at FH's midpoint. The refusals (decision verdicts, with the exact notes, the class and the ✎ seam) are locked in `src/app/__tests__/issue-1888-unread-part.test.ts`.
+
+### `two-roles-one-per-line-1904` — the lines a lost-role refusal teaches build: «AD גובה לצלע BC» · «AD תיכון לצלע BC» in both orders, a bisector then a median, a median then «⟂» (#1904, ADR-604)
+
+**Guards against:** a refusal that teaches lines the builder cannot build. The operator's rulings (2026-10-08) refuse «AD גובה לצלע BC שהוא גם תיכון» whole and teach one line per role. **Asserts** that, typed one per line in either order, the segment is both roles: perpendicular to the side, through its midpoint, and bisecting the apex angle. The refusals are locked in `src/app/__tests__/issue-1904-unread-role.test.ts`.

@@ -125,6 +125,14 @@ export const TANGENT_KW = String.raw`(?:${wordForm('משיק', 'tangent')})`;
  *  {@link enWord} in `VERB_GATES`, where the boundary discipline matters; this is the RULE keyword. */
 export const BISECT_KW = String.raw`bisector|חוצ`;
 
+/**
+ * The CEVIAN role nouns — altitude, median, angle bisector — as one atom (#1904, ADR-604). ADR-430's construct-noun
+ * gate composes them into `CONSTRUCT_NOUNS`, and the honesty battery's role-word member reads them per OCCURRENCE
+ * (`src/app/unreadRoles.ts`). Bare alternations: a caller adds its own boundaries and clitics.
+ */
+export const CEVIAN_NOUNS_HE = String.raw`גובה|גבהי|תיכו[ןנ]|חוצ[הת]?[-\s]?זו?וית`;
+export const CEVIAN_NOUNS_EN = String.raw`altitude|height|median|bisect\w*`;
+
 // ── Gate-neutral vocabulary (#497 — the fail-closed leftover gate) ───────────────────────────────
 /** Hebrew tokens a shape rule may legitimately leave unconsumed: bare connectives/copulas a construct
  *  sentence wraps around its nouns, plus the convexity adjectives a POST-PASS (`withStatedConvexity`),

@@ -256,6 +256,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1842': 'open',
   '#1858': 'open',
   '#1888': 'open',
+  '#1904': 'open',
   '#1905': 'open',
 };
 
@@ -1172,6 +1173,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'unread-vertex-1888-01', family: 'angles', steps: ['משולש ABC ישר זווית ב-B'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1888' }, { product: 'analytic', issue: '#1888' }], note: '2-D taught «משולש ABC» then «∠ABC = 90°»; 3-D records the right angle at B, analytic hands it to the model' },
   { id: 'unread-vertex-1888-02', family: 'angles', steps: ['משולש ABC ישר זווית ב-C'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1888' }, { product: 'analytic', issue: '#1888' }], note: 'any vertex — even C, where the default angle already sits' },
   { id: 'unread-tail-1889-01', family: 'intersections', steps: ['מרובע ABCD', 'AC ו-BD נפגשים בנקודה E על AB'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }, { product: 'analytic', issue: '#1888' }] },
+  // #1904 (ADR-604, operator rulings 2026-10-08): a second ROLE the reading drops refuses the line, teaching one line per role
+  { id: 'role-clause-1904-01', family: 'cevians-centres', steps: ['משולש ABC', 'AD גובה לצלע BC שהוא גם תיכון'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1905' }, { product: '3d', issue: '#1905' }], note: 'analytic and 3-D hand it to the model; reading the relative clause is #1905' },
+  { id: 'role-clause-1904-02', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון לצלע BC שהוא גם גובה'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1905' }, { product: '3d', issue: '#1904' }], note: '3-D records the median alone until its port (#1904 item B′)' },
   { id: 'unread-tail-1889-02', family: 'intersections', steps: ['מרובע ABCD', 'AC ו-BD נפגשים בנקודה E שהיא אמצע BD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1905' }, { product: '3d', issue: '#1679', parked: true }], note: 'analytic reads both parts (E is the midpoint); 2-D reads no relative clause, so it refuses the line whole — reading it is #1905' },
 ];
 

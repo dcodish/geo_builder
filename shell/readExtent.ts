@@ -262,3 +262,46 @@ export function cutAtReading<L>(
   // a list of one part is no split to show: the caller keeps its own path
   return lost.length && parts.length > 1 ? { parts, lost, cuts } : null;
 }
+
+/**
+ * THE WORD CLASS (#1904, ADR-604) — a ROLE WORD the reading never read.
+ *
+ * «AD גובה לצלע BC שהוא גם תיכון» lowers to the median alone: every LABEL is read, so the label probe sees
+ * nothing, but the altitude is gone. A word is not substituted (a sibling role word lets a higher-priority
+ * rule win, which reads as "changed"); it is DELETED, with its clitics: **an occurrence is read when deleting
+ * it changes the lowering or fails the read.** Co-reference: the same word stated twice («…תיכון … שהוא גם
+ * תיכון»), where deleting every one of them changes the lowering, is exempt.
+ *
+ * @param word a global pattern for one occurrence: its whole match is the span deleted (clitics included), its
+ *   group 1 the word itself
+ * @param classOf the co-reference class of a word (default: the word, lower-cased) — a builder maps its spellings
+ *   of one role («גובה», «altitude») to one class
+ */
+export function readWords<L>(text: string, lowering: L, reader: Reader<L>, word: RegExp, classOf: (w: string) => string = (w) => w.toLowerCase()): RunReading {
+  const occ: Occurrence[] = [...text.matchAll(globalOf(word))].map((m) => ({
+    text: m[0].trim(),
+    at: m.index! + (m[0].length - m[0].trimStart().length),
+    end: m.index! + m[0].trimEnd().length,
+    parts: [classOf((m[1] ?? m[0]).trim())],
+  }));
+  const without = (spans: readonly Occurrence[]): string => {
+    let out = text;
+    for (const s of [...spans].sort((a, b) => b.at - a.at)) out = `${out.slice(0, s.at)} ${out.slice(s.end)}`;
+    return out.replace(/\s{2,}/g, ' ').trim();
+  };
+  const changes = (spans: readonly Occurrence[]): boolean => {
+    const r = reader.read(without(spans));
+    return r === null || !reader.same(r, lowering);
+  };
+  const read: Occurrence[] = [];
+  const unread: Occurrence[] = [];
+  const exempt: Occurrence[] = [];
+  for (const o of occ) {
+    if (changes([o])) read.push(o);
+    else {
+      const twins = occ.filter((p) => p.parts[0] === o.parts[0]);
+      (twins.length > 1 && changes(twins) ? exempt : unread).push(o);
+    }
+  }
+  return { read, unread, exempt };
+}

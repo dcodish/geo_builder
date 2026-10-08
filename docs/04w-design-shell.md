@@ -266,7 +266,9 @@ it teaches scores zero, so the gate can never brush off a sentence the tool acce
 - `readLabelRuns(text, lowering, probe)` — `{ read, unread, exempt }`: a run is read when replacing one of its letters (a letter of the line, else a fresh one outside the line and `figureLabels`; a figure letter is never a stand-in — a rule that names a new point falls back to its default name when the letter is taken) changes the lowering or fails the read. A co-reference is exempt here; `probe.exempt` adds the builder's own.
 - `locate(text, clauses)` and `cutAtReading(text, clauses, runs, readerFor)` — the parts in the student's words: each clause, an offending one cut at the shortest prefix that holds every read run and reads the same; read with the clauses before it when it has no cut alone; null when an unread run sits inside a statement.
 
-The 2-D member is `src/app/unreadParts.ts` ([ADR-603](06-decisions.md#adr-603)). Lock: `shell/__tests__/read-extent-1888.test.ts`, on a toy reader.
+- `readWords(text, lowering, reader, word, classOf?)` — the WORD class ([ADR-604](06-decisions.md#adr-604)): an occurrence is read when deleting it (the whole match, clitics included) changes the lowering; one class (`classOf`) stated twice and read together is a co-reference.
+
+The 2-D members are `src/app/unreadParts.ts` ([ADR-603](06-decisions.md#adr-603)) and `src/app/unreadRoles.ts` (ADR-604). Locks: `shell/__tests__/read-extent-1888.test.ts` and `read-extent-1904.test.ts`, on toy readers.
 
 ### Geometry-input parity ([ADR-W-108](06w-decisions-workspace.md#adr-w-108))
 

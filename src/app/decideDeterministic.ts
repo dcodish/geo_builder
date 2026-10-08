@@ -51,6 +51,7 @@ import {
 import { independentConstructs } from './independence';
 import { compoundNotHonoured, droppedClause } from './clauseCoverage';
 import { lostPartNote } from './unreadParts';
+import { lostRoleNote } from './unreadRoles';
 import { applyCommand, type AnyCommand, type Command, type Construction, type Id, type Vec } from '@/engine';
 import {
   type Fact,
@@ -810,12 +811,21 @@ export async function decideFromParse(
       // cut where the reading stops. Never escalated, whatever else fired: *"a line that loses a part gets the
       // existing one-input-per-line message"*, and *"refuse it too"* when the drawing happens to agree. An unread
       // label INSIDE a statement (read labels after it) is a lost operand, not a lost part: the weak path below.
-      const lost = gates.unread?.cut ? lostPartNote(gates.unread.cut) : null;
+      // #1904 (ADR-604): a cevian ROLE the reading never read («AD גובה לצלע BC שהוא גם תיכון» lowered to the median
+      // alone) refuses the whole line, teaching one line per role (operator ruling W22). Only where nothing older
+      // fired: a line an older gate already sends to the AI keeps going there (W21 — «…שהוא גם חוצה זווית»).
+      const role = gates.unreadRole && gates.onlyReadExtent ? lostRoleNote(utterance, r.commands, gates.unreadRole, pctx) : null;
+      if (role) {
+        return refuse('guided', { source: 'scope', result: 'scope:split-statements:unread-role', commands: r.commands }, role);
+      }
+      // W21 holds for the label refusal too: where an older gate already caught the lost role, the line keeps its AI path
+      const aiPath = gates.unreadRole !== null && !gates.onlyReadExtent;
+      const lost = gates.unread?.cut && !aiPath ? lostPartNote(gates.unread.cut) : null;
       if (lost) {
         return refuse('guided', { source: 'scope', result: 'scope:split-statements:unread-part', commands: r.commands }, lost);
       }
       weak = 'dropped'; // a typo dropped a stated label/number/relation/verb/compound-structure/object → escalate rather than commit the partial parse
-      logs.push({ source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct, ...unaccounted.map((x) => `${x.kind}:${x.text}`), ...(gates.unread?.items ?? []).map((x) => `unread:${x}`)].join(',')}`, commands: r.commands, intermediate: true });
+      logs.push({ source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct, ...unaccounted.map((x) => `${x.kind}:${x.text}`), ...(gates.unread?.items ?? []).map((x) => `unread:${x}`), ...(gates.unreadRole?.items ?? []).map((x) => `unread-role:${x}`)].join(',')}`, commands: r.commands, intermediate: true });
       // #1798 / #553 (ADR-598): the dropped content belongs to a COMPOUND whose every clause reads on its own —
       // «F אמצע DO, O - חיתוך של AC ו-BD». All or nothing: refused whole with the shared message listing the
       // clauses, instead of a paid call that would re-read the compound the ruling says to type line by line.
