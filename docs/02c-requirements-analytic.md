@@ -684,7 +684,10 @@ a sentence the tool parsed.
 **R91 — a shape noun promises a RING, and every configuration drawn honours it**. A crossed or collapsed ring is never drawn or offered; a concave or thin one is honest. A ring the givens PIN crossed or flat is refused, whatever else in the figure is free — the ring's own freedom decides, never the figure's ([ADR-AG-249](06c-decisions-analytic.md#adr-ag-249)).
 - «נקודה Q» · «A(0,0)» · «B(4,0)» · «C(1,3)» · «D(3,3)» · «טרפז ABCD» → «טרפז ABCD» refused (`errRingContradictsNoun`), as without «נקודה Q»
 - the same points, «טרפז ABDC» → drawn
-- Sources: #1158, #1166, ADR-052, ADR-AG-129, #1929.
+- A ring declared over points a shape already placed, in an order that crosses wherever the givens hold, is refused, not drawn — on the line that completes it, either order ([ADR-AG-250](06c-decisions-analytic.md#adr-ag-250)): «ריבוע ABCD» · «מרובע ACBD» → «מרובע ACBD» refused; «מרובע ACBD» · «ריבוע ABCD» → «ריבוע ABCD» refused
+- «ריבוע ABCD» · «מרובע ADCB» → drawn; a ring with a free vertex («משולש ABC» · «נקודה D» · «מרובע ABCD») → drawn simple
+- Never on samples alone: «A(k,0)» · «B(4,0)» · «C(1,3)» · «D(3,3)» · «טרפז ABCD» (simple for k > 4) → drawn. Known gap (#1927): «טרפז ABCD» · «מרובע ACBD» is still drawn crossed — a trapezoid's shape has a free ratio, so the crossing is not proven
+- Sources: #1158, #1166, ADR-052, ADR-AG-129, #1929, #1927.
 
 **R92 — among the configurations it MAY show, the tool opens on one that is not a sliver**. A preference, never a requirement; coordinates that force a bad ring refuse the line (operator ruling), never «לא נמצאה תצורה».
 - «משולש ABC» → not a 1.4° wedge when a 25° triangle is two presses away

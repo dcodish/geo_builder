@@ -85,6 +85,11 @@ export interface RingFault {
    * `derive` refuses. Absent: not measured.
    */
   ringDof?: number;
+  /**
+   * The freedom of the ring's SHAPE up to an affine map (#1927, ADR-AG-250), filled like `ringDof`: `0` proves a ring
+   * crossed here is crossed in every configuration the givens allow. Absent: not measured.
+   */
+  shapeDof?: number;
 }
 
 /**

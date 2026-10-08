@@ -767,6 +767,17 @@ coordinates: `figureDofOf` − `freeRank` over the equations plus `read`'s rows,
 or line-pinned vertex counts as what it is. It is a lazy, non-enumerable getter (only the figure `derive` keeps is
 ranked; a discarded walk candidate pays nothing). The arm fires on `hardRingFaults(figure)` with `ringDof === 0`.
 
+**…or with the walk's evidence that the ring is crossed wherever the givens hold** ([ADR-AG-250](06c-decisions-analytic.md#adr-ag-250), #1927).
+`drawableAt`'s walk reads every candidate it already evaluates: one whose givens, selectors and named objects hold is
+*valid but for its rings*; per declared ring it counts the candidates drawing it crossed and notes any drawing it simple
+(a flat one answers neither way). When nothing is whole, a ring crossed in at least `FORCED_RING_FLOOR` (4) and simple
+in none is `Figure.forcedCrossed`, and the figure returned is a copy of the first valid candidate drawing it crossed
+(never a fallback whose solve stopped short). Samples are not proof, so the arm also needs `RingFault.shapeDof === 0`:
+the freedom of the ring's affine coordinates over its own widest vertex triangle, by `tangentFreedomOf` (projection onto
+the constraints' tangent space, tolerance relative to the read's own scale — a stacked `freeRank` read round-off as
+freedom). An affine map keeps every proper crossing, so 0 proves it. The arm adds those `crossed` faults; `decideSubmit`
+re-attributes a fault that appeared to the submitted line, so the ring-first order refuses the shape line.
+
 *Identifiers:* `seed … seed + DRAWABLE_TRIES` · `shape` · `declared` · `degenerate` · `crossed` · `ring-contradicts-noun` · `InputError`
 
 ### A forced coincidence is refused; a configuration-dependent one is not ([ADR-AG-125](06c-decisions-analytic.md#adr-ag-125))
