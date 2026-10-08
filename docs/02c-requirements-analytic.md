@@ -382,10 +382,11 @@ From the «lines and points» corpus (§8), numbered onward.
 - «מרכז המעגל M נמצא על ציר ה-y», «הנקודה B נמצאת מחוץ למעגל»
 - Sources: ADR-AG-193, #1619, #1598.
 
-**R131 — a polygon inscribed in a circle, a circle inscribed in a polygon, the points where its sides touch, and «חד זוויות»** Every shape noun can be inscribed (a cyclic parallelogram is drawn as a rectangle); the converse touches every side; «חד זוויות» holds in every configuration.
+**R131 — a polygon inscribed in a circle, a circle inscribed in a polygon, the points where its sides touch, and «חד זוויות»** Every shape noun can be inscribed (a cyclic parallelogram is drawn as a rectangle); the converse touches every side; «חד זוויות» holds in every configuration. **Except a noun no circle passes around (a right trapezoid):** in one sentence (R135), or as a ring already declared and then inscribed — and the reverse, inscribed and then declared — it is refused, naming both statements, in every inscription spelling.
 - «מרובע ABCD חסום במעגל שמרכזו M»
 - «במשולש AOB חסום מעגל שמרכזו C» → C where the bisectors meet
-- Sources: ADR-AG-194, #1619, #1554.
+- «טרפז ישר זווית ABCD» · «ABCD חסום במעגל» → refused: «לא ניתן: «ABCD חסום במעגל» סותר את «טרפז ישר זווית ABCD» — אי אפשר לקיים את שניהם יחד. …»; the reverse order refuses «טרפז ישר זווית ABCD»
+- Sources: ADR-AG-194, #1619, #1554, ADR-AG-252, #1918.
 
 **R131 amendment — a quadrilateral's incircle on a named centre, the side list, and the sentence with no letters**. The sentence with no letters is lettered by the tool (ABCD), as in 2-D.
 - «במרובע ABCD חסום מעגל O», «מעגל M משיק לצלעות AB, BC, CD ו-DA»
@@ -448,9 +449,9 @@ From the «lines and points» corpus (§8), numbered onward.
 - «טרפז ABCD» · «BC מקביל ל-AD» → the figure rotates
 - Sources: #1159.
 
-**R126 — a trapezoid keeps exactly one pair of parallel sides, or the page says it no longer does**. *(Operator: "when i wrote c=90 it accepted but then i got a rectangle.")* When the givens force a parallelogram, an amber warning names the trapezoid and the forcing line.
+**R126 — a trapezoid keeps exactly one pair of parallel sides, or the page says it no longer does**. *(Operator: "when i wrote c=90 it accepted but then i got a rectangle.")* When the givens force a parallelogram, an amber warning names the trapezoid and the forcing line. A circle through a declared right trapezoid is not this warning: it is refused (R131).
 - «טרפז ישר זווית ABCO» · «∠C = 90» · «∠O = 90» → «הטרפז ABCO כבר אינו טרפז…»
-- Sources: ADR-AG-189, #1627, ADR-157, ADR-165.
+- Sources: ADR-AG-189, #1627, ADR-157, ADR-165, ADR-AG-252.
 
 **R103 — a named cevian ACTUALLY REACHES its side, and may reach the side's extension**. D on BC and the role's property, in every configuration; the foot is on the LINE, beyond the side for an obtuse triangle.
 - «AD גובה לצלע BC»

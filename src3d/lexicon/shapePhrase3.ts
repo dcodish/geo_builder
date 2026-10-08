@@ -80,6 +80,17 @@ const NOT_CYCLIC: Readonly<Record<string, { readonly shape: string; readonly for
   'trapezoid:right': { shape: 'rightTrapezoid', forced: 'rectangle' },
 };
 
+/**
+ * #1918 (ADR-3D-313) — THE one "no circle passes around it" lookup, for a noun and ONE adjective it carries.
+ * `readShapePhrase3` asks it of a sentence that states both the phrase and its circle; the engine asks it of a
+ * ring DECLARED with that phrase on one line and inscribed on another (either order). One table, two readers,
+ * so the one-line and two-line forms cannot drift apart. Null when a circle may pass around the phrase.
+ */
+export function notCyclic3(noun: ShapeNoun3 | null, adj: ShapeAdj3 | undefined): { readonly shape: string; readonly forced: string } | null {
+  if (!noun || !adj) return null;
+  return NOT_CYCLIC[`${noun}:${adj}`] ?? null;
+}
+
 export interface ShapePhrase3 {
   /** the noun the phrase states (null: only adjectives — a bare «ישר זווית» reads as a triangle) */
   readonly noun: ShapeNoun3 | null;
@@ -109,6 +120,6 @@ export function readShapePhrase3(s: string): ShapePhrase3 | null {
   const consumed = refines ? stated.filter((a) => refines.adjs.includes(a)).slice(0, refines.max) : [];
   const unconsumed = stated.filter((a) => !consumed.includes(a));
   const arity: 3 | 4 | 5 = base === 'triangle' ? 3 : base === 'pentagon' ? 5 : 4;
-  const forces = consumed.map((a) => NOT_CYCLIC[`${base}:${a}`]).find((x) => x !== undefined);
+  const forces = consumed.map((a) => notCyclic3(base, a)).find((x) => x !== null);
   return { noun, arity, stated, consumed, unconsumed, cyclic: forces ?? 'yes' };
 }

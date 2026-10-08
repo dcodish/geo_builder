@@ -4,6 +4,7 @@ import { humanizeError, PATTERNS, sanitizeIds, translateConstraintWords, transla
 import { describeConstraint } from '@/engine/solve';
 import { applyCommand } from '@/engine/apply';
 import { collapsedPolygonError, diagonalClaimRefusal } from '@/engine/step';
+import { notCyclicImpossibilityError } from '@/engine/cyclicFeasibility';
 import type { Constraint } from '@/engine/types';
 
 // Use the real configured i18n instance (Hebrew-pinned, as the app runs) so the test
@@ -24,6 +25,9 @@ const CASES: { raw: string; contains: string[] }[] = [
   { raw: collapsedPolygonError(['A', 'B', 'C'], '|AC| = 8'), contains: ['ABC', 'A, B, C', 'משולש'] },
   { raw: `${collapsedPolygonError(['A', 'B', 'C', 'D'], '|AD| = 3')} [vs #0]`, contains: ['ABCD', 'מרובע'] },
   { raw: collapsedPolygonError(['A', 'B', 'C', 'D', 'E'], null), contains: ['ABCDE', 'מצולע'] },
+  // cyclicFeasibility.ts (#1918, ADR-607) — a circle through a ring declared a right trapezoid; the reason clause is a
+  // nested translation built from the shape-noun keys. Built by the engine's own function, never re-spelled here.
+  { raw: `${notCyclicImpossibilityError({ ring: ['A', 'B', 'C', 'D'], shape: 'right-trapezoid', forced: 'rectangle' })} [vs #0]`, contains: ['טרפז ישר זווית', 'למלבן'] },
   // metricFeasibility.ts (#420, ADR-417) — BOTH wordings: `keyOf` picks the triangle sentence for a
   // single intermediate point and the general path sentence for a longer cycle, so both are exercised.
   // Added by #983's coverage gate, which found this pattern carried no evidence row at all.

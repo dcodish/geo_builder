@@ -64,10 +64,16 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     case 'component-symbolic':
       return t('err.componentSymbolic', { component: err.component });
     // #1792 (the #1554 ruling): name both shapes and quote the sentence — 2-D/analytic's wording, 3-D keys.
+    // #1918 (ADR-3D-313, the operator's 2026-10-08 ruling): the TWO-line form — the ring declared on one line and
+    // the circle stated on another, either order — names both statements in 2-D's over-constrained frame (B1).
     case 'inscribed-contradicts-noun':
-      return t('err.inscribedContradictsNoun', {
-        sentence: err.sentence, shape: t(`notice.shape.${err.shape}`), forced: t(`notice.shape.${err.forced}`),
-      });
+      return err.other
+        ? t('err.inscribedContradictsNounVs', {
+            sentence: err.sentence ?? '', other: err.other, shape: t(`notice.shape.${err.shape}`), forced: t(`notice.shape.${err.forced}`),
+          })
+        : t('err.inscribedContradictsNoun', {
+            sentence: err.sentence ?? '', shape: t(`notice.shape.${err.shape}`), forced: t(`notice.shape.${err.forced}`),
+          });
     // #926: the change went through; this names the rows it left without effect (they stay, marked).
     case 'dependents-broken':
       return t('err.dependentsBroken', { cause: err.cause, items: err.items });
@@ -92,6 +98,10 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #612 (ADR-3D-158): name BOTH shapes — the honesty invariant is that a refusal names the
     // student's own statement and what the figure actually holds, never internal state.
     case 'shape-less-specific':
+      return t('err.shapeLessSpecific', { stated: t(`notice.shape.${err.stated}`), actual: t(`notice.shape.${err.actual}`) });
+    // #1918 (ADR-3D-313): a noun no quadrilateral can carry together with the one already known — the same words
+    // (the ruled reuse of `err.shapeLessSpecific`): what the ring is known to be, and the name it does not take.
+    case 'shape-disjoint':
       return t('err.shapeLessSpecific', { stated: t(`notice.shape.${err.stated}`), actual: t(`notice.shape.${err.actual}`) });
     case 'unknown-point':
       return t('err.unknownPoint', { id: err.id });

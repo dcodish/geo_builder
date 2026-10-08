@@ -34,6 +34,7 @@
  * one case.
  */
 import { applyCommand } from './apply';
+import { isSideRecord, type SideRecord } from './requirements';
 import type { Command, Construction, GeoObject, Id, SideRequirement } from './types';
 
 export interface SideImpossibility {
@@ -203,10 +204,8 @@ class Structure {
   }
 }
 
-const sideText = (r: SideRequirement): string =>
-  r.kind === 'circle-position'
-    ? `${circleName(r.a)} ${r.relation} ${circleName(r.b)}` // never reached: the prover reads sides only
-    : r.kind === 'circle-side'
+const sideText = (r: SideRecord): string =>
+  r.kind === 'circle-side'
     ? `${r.id} ${r.side} circle ${circleName(r.circle)}`
     : r.kind === 'polygon-side'
       ? `${r.id} ${r.side} ${polyNoun(r.poly)} ${r.poly.join('')}`
@@ -223,21 +222,30 @@ function assertedObjects(cmd: Command | undefined): GeoObject[] {
 }
 
 /**
+ * #1918 ([ADR-607](../../docs/06-decisions.md#adr-607)): the same STRUCTURAL "is this point on that circle" reader,
+ * for the not-cyclic prover (`cyclicFeasibility.ts`) — one notion of on-a-circle for both stage-0 members.
+ */
+export function onCircleReader(probed: Construction, cmd?: Command): (p: Id, circ: Id) => boolean {
+  const s = new Structure(probed, assertedObjects(cmd));
+  return (p, circ) => s.onCircle(p, circ) !== null;
+}
+
+/**
  * The first stated side the probed construction structurally contradicts, or null. `probed` is the
  * figure WITH `cmd` applied (so its requirement records include `cmd`'s own side, if it states one);
  * `cmd` is read again only for the claim it asserts about an existing point.
  */
 export function sideImpossibility(probed: Construction, cmd?: Command): SideImpossibility | null {
   // the stated SIDES only — a circle-position record (#1709) is no side, and this prover has nothing to say about it
-  const reqs = probed.requirements?.filter((r) => r.kind !== 'circle-position');
+  const reqs = probed.requirements?.filter(isSideRecord);
   if (!reqs?.length) return null;
   const s = new Structure(probed, assertedObjects(cmd));
-  const isNew = (r: SideRequirement): boolean =>
+  const isNew = (r: SideRecord): boolean =>
     !!cmd &&
     ((r.kind === 'circle-side' && cmd.type === 'point-circle-side' && cmd.id === r.id && cmd.circle === r.circle && cmd.side === r.side) ||
       (r.kind === 'polygon-side' && cmd.type === 'point-polygon-side' && cmd.id === r.id && cmd.side === r.side && ringKey(cmd.poly) === ringKey(r.poly)) ||
       (r.kind === 'line-side' && cmd.type === 'points-line-side' && pairKey(cmd.a, cmd.b) === pairKey(r.a, r.b) && cmd.rel === r.rel && cmd.subjects.join() === r.subjects.join()));
-  const hit = (placed: string, r: SideRequirement): SideImpossibility => ({ placed, side: sideText(r), sideIsNew: isNew(r) });
+  const hit = (placed: string, r: SideRecord): SideImpossibility => ({ placed, side: sideText(r), sideIsNew: isNew(r) });
 
   for (const r of reqs) {
     if (r.kind === 'circle-side') {

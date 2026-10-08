@@ -50,6 +50,9 @@ const factsOf = (lines: string[]): unknown[] =>
 /** The circle the sentence binds to or states (ADR-AG-196): `create` with no circle, `about` with one. */
 const SENT = '⟨the-circle⟩';
 const onAll = (ids: string[], curve: string) => ids.map((id) => ({ t: 'constraint', k: { t: 'on-curve', id, curve } }));
+/** The ring an INSCRIPTION declares carries the mark that it is on a circle (#1918, ADR-AG-252) — the declaration's facts, marked. */
+const inscribedRing = (facts: unknown[]): unknown[] =>
+  facts.map((f) => ((f as { t: string }).t === 'polygon' ? { ...(f as object), cyclic: true } : f));
 
 describe('#1619 B2 — the 471 corpus questions build the exam`s own figure', () => {
   it('1/5 — «מרובע ABCD חסום במעגל שמשוואתו …»: A, B, C and the free D all on (x−2)² + (y+2)² = 100', () => {
@@ -154,7 +157,7 @@ describe('#1619 B2 — every spelling lowers to the sentences it is made of', ()
   // the computed circle through the first three when it has none.
   it('the bare circle is computed through the first three vertices and the fourth is ON it', () => {
     expect(factsOf(['מרובע ABCD חסום במעגל'])).toEqual([
-      ...factsOf(['מרובע ABCD']),
+      ...inscribedRing(factsOf(['מרובע ABCD'])),
       {
         t: 'the-circle',
         create: [
@@ -170,7 +173,7 @@ describe('#1619 B2 — every spelling lowers to the sentences it is made of', ()
     const on = onAll;
     // A circle the sentence DESCRIBES binds to a circle with that centre / that equation, else is stated (ADR-AG-196).
     expect(factsOf(['המרובע ABCD חסום במעגל שמרכזו M'])).toEqual([
-      ...factsOf(['מרובע ABCD']),
+      ...inscribedRing(factsOf(['מרובע ABCD'])),
       {
         t: 'the-circle',
         create: [...factsOf(['מעגל שמרכזו M']), ...on(['A', 'B', 'C', 'D'], 'circle-at-M')],
@@ -180,7 +183,7 @@ describe('#1619 B2 — every spelling lowers to the sentences it is made of', ()
     ]);
     const eq = factsOf(['מעגל שמשוואתו (x−2)² + (y+2)² = 100']);
     expect(factsOf(['מרובע ABCD חסום במעגל שמשוואתו (x−2)² + (y+2)² = 100'])).toEqual([
-      ...factsOf(['מרובע ABCD']),
+      ...inscribedRing(factsOf(['מרובע ABCD'])),
       {
         t: 'the-circle',
         create: [...eq, ...on(['A', 'B', 'C', 'D'], (eq[0] as { id: string }).id)],
@@ -189,7 +192,8 @@ describe('#1619 B2 — every spelling lowers to the sentences it is made of', ()
       },
     ]);
     expect(factsOf(['משולש ABC חסום במעגל שקוטרו AC'])).toEqual([
-      ...factsOf(['משולש ABC', 'מעגל שקוטרו AC']),
+      ...inscribedRing(factsOf(['משולש ABC'])),
+      ...factsOf(['מעגל שקוטרו AC']),
       ...on(['B'], 'circle-diam-AC'),
     ]);
   });

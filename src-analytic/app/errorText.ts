@@ -181,6 +181,8 @@ export function errorText(error: InputError, t: Translate): string {
     // #1849 (ADR-AG-247) — the givens flatten a declared polygon: the polygon and both statements named
     'polygon-collapsed': 'errPolygonCollapsed',
     'inscribed-contradicts-noun': 'errInscribedContradictsNoun',
+    // #1918 (ADR-AG-252) — the same contradiction in two sentences: 2-D's over-constrained frame, both statements named
+    'inscribed-contradicts-declared': 'errInscribedContradictsDeclared',
     // #1407 — a vertex in SEVERAL shapes gets the three-letter name it needs; in none, the general form.
     // #1445 (ADR-AG-243) — several angles at the vertex: the refusal LISTS them.
     'ambiguous-angle': error.key === 'ambiguous-angle' && (error.options?.length ?? 0) > 1 ? 'errAmbiguousAngleOptions' : error.key === 'ambiguous-angle' && error.example ? 'errAmbiguousAngleArms' : 'errAmbiguousAngle',

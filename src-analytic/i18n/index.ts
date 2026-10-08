@@ -304,6 +304,11 @@ const he = {
   errInscribedContradictsNoun:
     '{{shapeHe}} לא יכול להיות חסום במעגל: "{{detail}}". מעגל שעובר דרך ארבעת הקודקודים הופך אותו ל{{forcedHe}}, ' +
     'ו{{forcedHe}} אינו {{shapeHe}}. אם הצורה היא {{forcedHe}}, כתבו «{{forcedHe}} ABCD חסום במעגל».',
+  // #1918 (ADR-AG-252; operator ruling 2026-10-08) — the noun and the inscription in TWO sentences, either order. 2-D's
+  // over-constrained frame (#1868) naming both statements, with #1554's reason clause (B1: copied, never imported).
+  errInscribedContradictsDeclared:
+    'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. ' +
+    'הסיבה: מעגל שעובר דרך ארבעת הקודקודים הופך {{shapeHe}} ל{{forcedHe}}, ו{{forcedHe}} אינו {{shapeHe}}.',
   // #1849 (ADR-AG-247, ADR-W-115) — the givens flatten a declared polygon. Names the refused sentence, the polygon
   // and the sentence that declared it, and says WHY: a flat figure is not that noun. Never «לא נמצאה תצורה».
   errPolygonCollapsed:
@@ -730,6 +735,9 @@ const en: typeof he = {
   errInscribedContradictsNoun:
     'A {{shapeEn}} cannot be inscribed in a circle: "{{detail}}". A circle around it would make it a {{forcedEn}}, ' +
     'and a {{forcedEn}} is not a {{shapeEn}}. If the shape is a {{forcedEn}}, write "{{forcedEn}} ABCD is inscribed in a circle".',
+  errInscribedContradictsDeclared:
+    "Can't do that: «{{detail}}» contradicts «{{declared}}» — they can't both hold. " +
+    'The reason: a circle through the four vertices would make a {{shapeEn}} a {{forcedEn}}, and a {{forcedEn}} is not a {{shapeEn}}.',
   errPolygonCollapsed:
     '"{{detail}}" flattens {{polygon}}: together with the earlier givens it forces the vertices onto one line, ' +
     'and a flat figure is not the {{shapeEn}} that "{{declared}}" declares. "{{detail}}" was not added.',

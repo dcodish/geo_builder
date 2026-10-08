@@ -2829,7 +2829,9 @@ function evaluateSolidsAndPoints(
     const dims = dimOverride ? dimOverride.slice(dimCursor, dimCursor + own.length) : own;
     dimCursor += own.length;
     const ps = solidPositions(solid.kind, dims, origin, solid.oblique);
-    solid.ids.forEach((id, j) => pos.set(id, ps[j]));
+    // #1918 (ADR-3D-313): a SEATED base takes the generator's ring one place round, so its parallel pair
+    // (a trapezoid's) lands on the sides the student stated parallel. Only the base ring moves.
+    solid.ids.forEach((id, j) => pos.set(id, ps[solid.seat && j < 4 ? (j + 3) % 4 : j]));
   });
 
   c.revolutions.forEach((rev, i) => {

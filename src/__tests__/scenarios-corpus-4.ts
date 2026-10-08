@@ -48,6 +48,9 @@ import type { Scenario } from './scenarios-harness';
 import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-harness';
 import { ctxOf } from './scenario-pipeline';
 import { gateVerdict } from './submit-gate';
+import i18n from '@/i18n';
+import { humanizeError } from '@/i18n/humanizeError';
+import { otherUtteranceForError } from '@/app/errorSubject';
 import { parse } from '@/parser';
 import { COLLAPSED_VS, computeValues, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
@@ -3660,6 +3663,33 @@ export const SCENARIOS_4: Scenario[] = [
       // the control: a thin but real triangle on the same prefix's declaration still builds
       const thin = gateVerdict(factsOf(['משולש ABC']), 'זווית BAC = 3');
       expect(thin.kind, 'the 3° triangle (ADR-413’s control) commits').toBe('commit');
+    },
+  },
+  {
+    id: 'right-trapezoid-circle-refused-1918',
+    title: '#1918 (ADR-607): «טרפז ישר זווית ABCD» and «ABCD חסום במעגל», in EITHER order, is REFUSED naming both statements (a circle makes a right trapezoid a rectangle)',
+    guards:
+      "Operator ruling 2026-10-08 on #1918 (\"Refuse in both\"): a right trapezoid cannot be inscribed in a circle, so the refusal tells the truth in every builder — 2-D changes too. Measured on 5edeeca1 through decideDeterministic2D: «טרפז ישר זווית ABCD» · «ABCD חסום במעגל» COMMITTED and drew a rectangle with the amber «ABCD הוגדר כטרפז, אך כעת…»; the reverse order refused with «'C' is already defined», naming no statement; the one-line sentence was already refused (ADR-595). Root cause: the not-cyclic check read the noun and the circle only inside ONE sentence (the parser's shape-phrase reader); stated in two, nothing asked. Fix (ADR-607): the right-trapezoid lowering records its phrase (`kind`), the engine keeps it as a `declared-shape` record, and a stage-0 prover refuses the circle (or the noun) whichever comes second, in the over-constrained frame with the #1554 reason. The spelling matrix, English, load and controls are src/app/__tests__/issue-1918-right-trapezoid-circle.test.ts.",
+    // The refused line never becomes a fact, so each order is driven through the submit gate in `check`.
+    steps: ['טרפז ישר זווית ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const reason = 'הסיבה: מעגל שעובר דרך ארבעת הקודקודים הופך טרפז ישר זווית למלבן, ומלבן אינו טרפז ישר זווית.';
+      const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
+      for (const [first, second] of [
+        ['טרפז ישר זווית ABCD', 'ABCD חסום במעגל'],
+        ['ABCD חסום במעגל', 'טרפז ישר זווית ABCD'],
+      ]) {
+        const facts = factsOf([first]);
+        const v = gateVerdict(facts, second);
+        expect(v.kind === 'refused' && v.reason, `«${second}» after «${first}» is refused before it becomes a fact`).toBe('error');
+        const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+        expect(humanizeError(detail, he, second, otherUtteranceForError(facts, detail)).replace(/[\u2066-\u2069]/g, ''), 'the exact words, naming both statements (bidi isolates aside)').toBe(
+          `לא ניתן: «${second}» סותר את «${first}» — אי אפשר לקיים את שניהם יחד. ${reason}`,
+        );
+      }
+      // the control: a plain trapezoid in a circle still commits
+      expect(gateVerdict(factsOf(['טרפז ABCD']), 'ABCD חסום במעגל').kind, '«טרפז ABCD» · «ABCD חסום במעגל» commits').toBe('commit');
     },
   },
 ];

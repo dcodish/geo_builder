@@ -11,7 +11,8 @@ import { FREE_LINE_TOKEN } from './freeLine';
 import { riderPairsT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { CYCLIC_MEMBER, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
+import { CYCLIC_MEMBER, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadImplies, quadPyramidDimCount, quadsDisjoint, quadShapeConstraints, type QuadBase } from './baseShapes';
+import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { claimPointIds, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import { firstFreeLetter } from './freeLetter';
 import { carrierParams3, readCoordGiven } from './carriers';
@@ -145,7 +146,7 @@ function clone(c: Construction3): Construction3 {
     arrows: c.arrows.map(([f, t]) => [f, t] as [Id, Id]),
     segments: [...c.segments],
     requirements: [...c.requirements],
-    quadShapes: c.quadShapes.map((q) => ({ base: q.base, ids: [...q.ids] })),
+    quadShapes: c.quadShapes.map((q) => ({ base: q.base, ids: [...q.ids], ...(q.adj ? { adj: q.adj } : {}) })),
     redundantShapes: c.redundantShapes.map((q) => ({ base: q.base, ids: [...q.ids] })),
     angleMarks: [...c.angleMarks],
     planes: new Map(c.planes),
@@ -240,14 +241,38 @@ const sameRing = (x: Id[], y: Id[]): boolean => x.length === y.length && [...x].
  * on the strength of one sampled configuration is the class of dishonesty this tree exists to avoid.
  */
 function knownQuadShape(c: Construction3, ids: Id[]): QuadBase | null {
-  for (const s of c.quadShapes) if (sameRing(s.ids, ids)) return s.base;
-  for (const sld of c.solids) {
-    const spec = (QUAD_PYRAMIDS as Partial<Record<SolidKind, { base: QuadBase; right: boolean }>>)[sld.kind];
-    if (!spec) continue;
-    const ring = sld.ids.slice(0, 4);
-    if (ring.length === 4 && sameRing(ring, ids)) return spec.base;
+  // #1918: through the one declared-ring reader — a flat statement first, then a pyramid's base (the order
+  // the two sources were always read in)
+  return declaredQuads3(c).find((q) => sameRing([...q.ids], ids))?.base ?? null;
+}
+
+/**
+ * #1918 (ADR-3D-313) — a circle THROUGH every vertex of a ring declared with a phrase no circle can pass
+ * around (`notCyclic3`: a right trapezoid would become a rectangle). The FR-SP-15 refusal, asked of the two
+ * statements wherever they arrive: the one-line form is the parser's (`inscribedContradiction3`); here the
+ * ring was declared on one line and the circle stated on another, in either order. `against` names which
+ * earlier statement the refused line contradicts, so the store can quote it:
+ *  - `'noun'`: a circle is being stated, and the ring's DECLARATION admits none;
+ *  - `'circle'`: a declaration is being stated (`phrase`), and a circle already passes through the ring.
+ */
+function inscribedNounContradiction(
+  c: Construction3,
+  ring: readonly Id[],
+  against: 'noun' | 'circle',
+  phrase?: { base: QuadBase; adj?: ShapeAdj3 },
+): EngineError3 | null {
+  if (against === 'noun') {
+    for (const q of declaredQuads3(c)) {
+      if (!sameRing([...q.ids], [...ring])) continue;
+      const f = notCyclic3(q.base, q.adj);
+      if (f) return { code: 'inscribed-contradicts-noun', shape: f.shape, forced: f.forced, ring: [...ring], against };
+    }
+    return null;
   }
-  return null;
+  const f = phrase ? notCyclic3(phrase.base, phrase.adj) : null;
+  if (!f) return null;
+  const circled = c.circles3.some((k) => k.def.kind === 'circum' && sameRing(k.def.ring, [...ring]));
+  return circled ? { code: 'inscribed-contradicts-noun', shape: f.shape, forced: f.forced, ring: [...ring], against } : null;
 }
 
 /**
@@ -283,9 +308,9 @@ function noteStatedRightAngle(next: Construction3, u: VecAtom, v: VecAtom): void
 }
 
 /** #612/#615: remember the stated shape, and require its drawing to stay visibly general. */
-function recordShape(c: Construction3, base: QuadBase, ids: [Id, Id, Id, Id]): Construction3 {
+function recordShape(c: Construction3, base: QuadBase, ids: [Id, Id, Id, Id], adj?: ShapeAdj3): Construction3 {
   const next = clone(c);
-  if (!next.quadShapes.some((s) => sameRing(s.ids, ids))) next.quadShapes.push({ base, ids: [...ids] });
+  if (!next.quadShapes.some((s) => sameRing(s.ids, ids))) next.quadShapes.push({ base, ids: [...ids], ...(adj ? { adj } : {}) });
   // #615: only a shape with room to be drawn wrongly needs the gate — a square has no freedom left,
   // and a general `quad` has no more-specific sibling it is obliged to avoid looking like.
   if (QUAD_BASE_DIMS[base] > 0 &&
@@ -1250,6 +1275,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         edges: edgeIndices(cmd.kind).map(([i, j]) => [at(i), at(j)] as [Id, Id]),
         faces: faceIndices(cmd.kind).map((ring) => ring.map(at)),
         ...(cmd.oblique ? { oblique: true as const } : {}),
+        ...(cmd.baseAdj && isQuadPyramid(cmd.kind) ? { baseAdj: cmd.baseAdj } : {}), // #1918
+        ...(cmd.baseSeat && isQuadPyramid(cmd.kind) ? { seat: 1 as const } : {}), // #1918
       };
       const solidIndex = next.solids.length;
       next.solids.push(solid);
@@ -2873,7 +2900,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // The three arms of a stated flat quad shape, dispatched on how many corners already exist —
       // HERE and not in the parser, because `parse3` is context-free and cannot know.
       const unknowns = cmd.ids.filter((id) => !c.points.has(id));
-      const constraints = quadShapeConstraints(cmd.base, cmd.ids);
+      // #1918 (ADR-3D-313): the ring the family's RELATIONS are read on — one place round when the trapezoid's
+      // parallel pair is the stated other pair (`seat`, set by derive3's pre-scan). Its ink, its declaration
+      // and its record keep the ring as the student named it.
+      const pairRing: [Id, Id, Id, Id] = cmd.seat ? [cmd.ids[1], cmd.ids[2], cmd.ids[3], cmd.ids[0]] : cmd.ids;
+      const constraints = quadShapeConstraints(cmd.base, pairRing);
       /** Lower the family's constraint set; M1 routes each command to a drive or a verification. */
       const lower = (from: Construction3): ApplyResult3 => {
         let r: ApplyResult3 = { ok: true, next: from };
@@ -2897,6 +2928,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // ריבוע» on a pyramid's square base). The constraints M1-route to claims on a determined
       // figure, so a FALSE statement is refused by claim verification rather than drawn.
       if (unknowns.length === 0) {
+        // #1918 (ADR-3D-313, FR-SP-15): a circle already passes through every vertex, and the phrase admits none
+        // (a right trapezoid would be a rectangle) — the declaration contradicts the circle line, either order.
+        const noCircle = inscribedNounContradiction(c, cmd.ids, 'circle', { base: cmd.base, adj: cmd.adj });
+        if (noCircle) return { ok: false, error: noCircle };
         // #612 (ADR-3D-158), operator ruling 2026-08-15 — "naming error". Before lowering anything,
         // ask what the ring is ALREADY KNOWN to be. Structural knowledge only (a solid's base kind, or
         // a shape stated earlier) — never a measurement, so this can only fire on a shape the figure
@@ -2916,12 +2951,16 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
             }
             return { ok: false, error: { code: 'shape-less-specific', stated: cmd.base, actual: known } };
           }
-          // NOT implied ⇒ the statement is new information (a rectangle told it is a square). It
-          // drives, exactly as before — refusing here would mean a student could never SPECIALISE a
+          // #1918 (ADR-3D-313): NO quadrilateral is both — a trapezoid (exactly one parallel pair) and any
+          // parallelogram-family shape or kite. Driving would draw the earlier noun's shape green under a name
+          // it can never carry, so the statement contradicts the earlier one and is refused, naming both.
+          if (quadsDisjoint(known, cmd.base)) return { ok: false, error: { code: 'shape-disjoint', stated: cmd.base, actual: known } };
+          // NOT implied, and compatible ⇒ the statement is new information (a rectangle told it is a square).
+          // It drives, exactly as before — refusing here would mean a student could never SPECIALISE a
           // shape they had already drawn, which is ADR-052 upside down.
         }
         const r = lower(c);
-        return r.ok ? { ok: true, next: recordShape(drawRing(r.next), cmd.base, cmd.ids) } : r;
+        return r.ok ? { ok: true, next: recordShape(drawRing(r.next), cmd.base, cmd.ids, cmd.adj) } : r;
       }
 
       // ARM 2 — exactly one unknown corner. The corner is CREATED either way; the family only decides HOW
@@ -2942,7 +2981,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // position is SAMPLED, not part of the pivot's unknown vector, so the pin could only VERIFY DC ∥ AB
       // and refused `claim-refuted` — ADR-3D-191's finding, arriving from a second direction.
       if (unknowns.length === 1) {
-        const def = quadCornerDef(cmd.base, cmd.ids, cmd.ids.indexOf(unknowns[0]));
+        const def = quadCornerDef(cmd.base, pairRing, pairRing.indexOf(unknowns[0]));
         const withCorner = clone(c);
         if (def.kind === 'on-plane') materializePlaneRun(withCorner, cmd.ids.filter((id) => id !== unknowns[0]));
         withCorner.points.set(unknowns[0], def);
@@ -2951,7 +2990,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // corner satisfies its family's relation by construction, so the same lowering verifies green
         // and leaves the rest free.
         const r = lower(withCorner);
-        return r.ok ? { ok: true, next: recordShape(drawRing(r.next), cmd.base, cmd.ids) } : r;
+        return r.ok ? { ok: true, next: recordShape(drawRing(r.next), cmd.base, cmd.ids, cmd.adj) } : r;
       }
 
       // ARM 1 — two or more unknown corners: a DECLARATION. The flat `polygon4` is itself the
@@ -2960,7 +2999,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const declared = applyCommand3(c, { type: 'solid', kind: 'polygon4', ids: cmd.ids });
       if (!declared.ok) return declared;
       const r = lower(declared.next);
-      return r.ok ? { ok: true, next: recordShape(drawRing(r.next), cmd.base, cmd.ids) } : r;
+      return r.ok ? { ok: true, next: recordShape(drawRing(r.next), cmd.base, cmd.ids, cmd.adj) } : r;
     }
 
     case 'dot-given': {
@@ -3010,6 +3049,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (!c.planes.has(cmd.def.plane) && !c.pointPlanes.has(cmd.def.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.def.plane } };
       }
       if (cmd.touch && c.points.has(cmd.touch)) return { ok: false, error: { code: 'already-defined', id: cmd.touch } };
+      // #1918 (ADR-3D-313, FR-SP-15): a circle through a ring DECLARED with a phrase no circle passes around (a
+      // right trapezoid — it would be a rectangle) is refused here, whatever spelling or route stated it.
+      if (cmd.def.kind === 'circum' && cmd.def.ring.length === 4) {
+        const noun = inscribedNounContradiction(c, cmd.def.ring, 'noun');
+        if (noun) return { ok: false, error: noun };
+      }
       const next = clone(c);
       next.circles3.push({ id: cmd.id, def: cmd.def });
       // #1792 — the BACKSTOP, total over every route (grammar rule or LLM line): a circle THROUGH a ring of

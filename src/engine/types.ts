@@ -1000,7 +1000,11 @@ export type SideRequirement =
    *  pair is disjoint (unordered). Recorded so the figure itself says which circle holds which — before, the
    *  statement lived only in its fact command, and the interchangeable-pair test (`autosInterchangeable`)
    *  read a nested pair as two identical circles. The unstated bare-pair variant (`relation: 'any'`) records nothing. */
-  | { kind: 'circle-position'; relation: 'contained' | 'disjoint'; a: Id; b: Id };
+  | { kind: 'circle-position'; relation: 'contained' | 'disjoint'; a: Id; b: Id }
+  /** #1918 ([ADR-607](../../docs/06-decisions.md#adr-607)): a ring DECLARED as a shape phrase no circle can pass
+   *  around (`NOT_CYCLIC`) — «טרפז ישר זווית ABCD». Recorded so the stage-0 prover sees the declaration whichever
+   *  order the circle and the noun arrive in; not a side, so no side reader consumes it. */
+  | { kind: 'declared-shape'; ring: Id[]; shape: string };
 
 export interface Construction {
   objects: GeoObject[];
@@ -1046,7 +1050,11 @@ export type Command =
   | { type: 'parallelogram'; ids: [Id, Id, Id, Id] }
   | { type: 'rectangle'; ids: [Id, Id, Id, Id] }
   | { type: 'rhombus'; ids: [Id, Id, Id, Id] }
-  | { type: 'trapezoid'; ids: [Id, Id, Id, Id] }
+  // `kind` (#1918, ADR-607): the refined shape PHRASE the noun was declared with, stamped by the parser's
+  // lowering only when that phrase cannot stand on a circle (`NOT_CYCLIC`, shapeKinds.ts) — «טרפז ישר זווית ABCD»
+  // → 'right-trapezoid'. It changes nothing the step builds; it is recorded (requirements.ts) so a circle
+  // through the ring, stated in either order, is refused by the stage-0 prover (cyclicFeasibility.ts).
+  | { type: 'trapezoid'; ids: [Id, Id, Id, Id]; kind?: string }
   | { type: 'triangle'; ids: [Id, Id, Id]; declaredAs?: string }
   // Right angle at the LAST id. `rot` (#566, ADR-445) is the SOLVE-CHOSEN seat of the unstated right
   // angle — like `branch`, never parser-emitted: the config search sets it when the default seat admits

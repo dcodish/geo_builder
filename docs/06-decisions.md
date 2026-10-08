@@ -15340,3 +15340,38 @@ The row kept reading «תיכון לבסיס» with a ✓ while the figure drew 
 - A stated collinearity or incidence that flattens a declared polygon («D אמצע AB · D על AC») now names the polygon («סותר את «משולש ABC»») instead of the earlier statement it collides with.
 - A refusal at the door now names the earlier statement it contradicts wherever the fold found one (ADR-508's tail, which the submit note used to drop).
 - Thin but real triangles (3°, 1°, a stated 0.1°) still build.
+
+## ADR-607 — A circle through a ring declared a right trapezoid is refused in either order, naming both statements (#1918)
+
+**Status:** accepted · 2026-10-08 · bug (2-D arm of #1918, fix round #1940) · the 2-D slice of the operator's "Refuse in both" ruling (3-D: ADR-3D-313; analytic: ADR-AG-252)
+**Requirements:** [02](02-requirements.md) FR-EN-14 — gains the exception: a ring declared a right trapezoid and inscribed in a circle, in either order, is refused naming both statements · **Design:** [LADDER.md](LADDER.md) stage 0g″ (new); none further (an existing seam, a new member) · **LADDER stage:** **inserts at stage 0g″** (`pre:impossible`), also in `applyCoupledStep` and `constraintIsPending`
+**Adopts** the operator ruling of 2026-10-08 on #1918 · **Extends** [ADR-595](#adr-595) (the one-line refusal, `input.inscribedContradictsNoun`) to two lines · **Reuses** [ADR-549](#adr-549)'s requirement records and `onCircle` reader, [ADR-508](#adr-508)'s `[vs #i]` tail and [ADR-602](#adr-602)'s declaring-statement attribution, and #1868's ruled over-constrained frame (`errors.overConstrained_said_vs`) with the #1554 ruled reason · **Supersedes** the #1790 Arm C behaviour for this one pair (the amber `figure.v.trapezoidMorph` after «ABCD חסום במעגל»)
+
+**The ruling.** Asked (rule 7, cross-tool) whether «טרפז ישר זווית ABCD · ABCD חסום במעגל» should keep 2-D's amber rectangle or take 3-D's FR-SP-15 refusal, the operator chose **"Refuse in both"**: a right trapezoid cannot be inscribed in a circle, so the refusal tells the truth in every builder.
+
+**Measured before** (`main` @ 5edeeca1, `decideDeterministic2D` + `commitVerdict`, LLM mocked):
+
+| sequence | before |
+| --- | --- |
+| «טרפז ישר זווית ABCD» · «ABCD חסום במעגל» (also «מעגל חוסם את BCDA») | commit; a rectangle with the amber «ABCD הוגדר כטרפז, אך כעת…» at every seed |
+| «ABCD חסום במעגל» · «טרפז ישר זווית ABCD» | refused «'C' is already defined — it can't be redefined as something different» (names no statement) |
+| «טרפז ישר זווית ABCD חסום במעגל» | refused `input.inscribedContradictsNoun` (ADR-595) |
+
+**The class (docs/17 §1).** *A shape phrase no circle can pass around was checked only when the noun and the circle arrived in ONE sentence; stated in two sentences, either order, nothing asked.* The parser's shape-phrase reader holds the not-cyclic fact, but it sees one sentence. The noun line's lowering (`trapezoid` + `AD ⟂ AB`) recorded nothing a later line could read: the right adjective left no structural mark, unlike the isosceles one (`trapezoidLegs`).
+
+**Decision.**
+
+1. **One table, in the engine.** `NOT_CYCLIC` moves to `engine/shapeKinds.ts` (the engine may not import the parser); `parser/shapePhrase.ts` reads it from there, so the one-line refusal and the two-line refusal answer from one row.
+2. **The declaration is recorded.** `lowerShape('right-trapezoid')` stamps the `trapezoid` command with `kind: 'right-trapezoid'` — only for a phrase the table names, so nothing else's commands change. `sideRequirementOf` turns it into a `declared-shape` requirement record (the ADR-549 channel that survives every ladder path); it is not a side, so `isSideRecord` excludes it and no side reader sees it.
+3. **The prover, stage 0g″.** `notCyclicImpossibility` (`engine/cyclicFeasibility.ts`) fires when a recorded ring is put on one circle: a `concyclic` constraint over its four vertices (checked or driven), or every vertex structurally on one circle (0g′'s `onCircle`, exported as `onCircleReader`). The ring is a vertex set, so «מעגל חוסם את BCDA» is the same ring. The incoming command rides the probe, so both orders are one case: the circle line is refused after the noun; the noun line is refused after the circle (ahead of `commandConflict`, so the internal «'C' is already defined» never reaches the student). It runs in `applyStepLadder`, `applyCoupledStepLadder` and `constraintIsPending` (a structural contradiction is never "waiting for givens"). Structural only: an angle or a length that forces the rectangle (`טרפז ABCD · זווית DAB = 90 · …`) is not a declaration and keeps the amber warning.
+4. **One message, two ruled halves.** The wire is the over-constrained family's (`over-constrained: a circle through the vertices of right-trapezoid ABCD forces a rectangle cannot hold`), so the display uses #1868's ruled frame `errors.overConstrained_said_vs`. Its reason is the #1554 ruled clause, the new key `errors.notCyclicReason`, filled with the existing `input.shapeNoun.*` names through a new `nested` field on humanizer patterns (a param that is itself a translated sentence). The other side: the fold tags the statement that DECLARED the phrase (read from the fact list, ADR-602's provenance pattern); in the reverse order the drop-one search (ADR-508) names the circle's statement.
+
+**Where it lives, and load.** In the engine step, so replay sees it: a saved figure holding both lines re-lowers on load (ADR-232), the noun line gains its `kind`, and the circle row fails with the same message naming the noun line. The noun line stays green.
+
+**Measured after** (the same path): both orders, «ABCD חסום במעגל», «ABCD חסום במעגל O», «מעגל חוסם את ABCD / BCDA», «המרובע ABCD חסום במעגל», «ABCD בר חסימה», "ABCD is inscribed in a circle", "a circle circumscribes ABCD", "ABCD is cyclic", «טרפז ישר זווית BCDA»: refused, for example «לא ניתן: «ABCD חסום במעגל» סותר את «טרפז ישר זווית ABCD» — אי אפשר לקיים את שניהם יחד. הסיבה: מעגל שעובר דרך ארבעת הקודקודים הופך טרפז ישר זווית למלבן, ומלבן אינו טרפז ישר זווית.» Unchanged: the one-line sentence (ADR-595); «טרפז ABCD» and «טרפז שווה שוקיים ABCD» in a circle commit; the angle route keeps its amber warning. «מעגל חוסם את ABCD» typed before any ring escalates, as it did (2-D's grammar reads that spelling only over a drawn ring).
+
+**Locks.** `app/__tests__/issue-1918-right-trapezoid-circle.test.ts`: the reported pair in both orders with the exact Hebrew and English; every spelling in either order; English input; a saved figure re-lowered on load; the unchanged neighbours; the prover on hand-built constructions and the single table. Scenario `right-trapezoid-circle-refused-1918` (corpus 4): both orders through the submit gate with the exact Hebrew, and the plain-trapezoid control. `issue-1790-shape-phrase.test.ts`'s Arm C row now expects the refusal. `humanize-error.test.ts` gains the wire row. The two fixtures that declare «טרפז ישר זווית ABCD» (`trapezoid-altitude`, `issue-497-right-trapezoid-typo`) re-save their `trapezoid` command with `kind` (the parser-drift net's expected change; neither has a circle, so their figures are unchanged).
+
+**Sibling audit.** 3-D: the same refusal in the same words, built by the stream agent (ADR-3D-313). Analytic: ADR-AG-252 (the `notCyclic` registry column). Complex: n/a, it has no declared polygons. The pair's parity rows belong to the stream agent.
+
+**Behaviour change for a student:** «טרפז ישר זווית ABCD» with «ABCD חסום במעגל» (any spelling, either order) no longer draws a rectangle with a warning, and no longer says «'C' is already defined». The second line is refused, naming both statements and why.

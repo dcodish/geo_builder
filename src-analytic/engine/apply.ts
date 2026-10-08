@@ -113,6 +113,14 @@ export type ApplyErrorCode =
    */
   | 'polygon-collapsed'
   /**
+   * A NOUN NO CIRCLE PASSES AROUND, AND AN INSCRIPTION, IN TWO SENTENCES (#1918, ADR-AG-252; operator ruling
+   * 2026-10-08 "Refuse in both"). «טרפז ישר זווית ABCD» · «ABCD חסום במעגל», in either order: the second statement is
+   * refused naming both — the one-sentence form's refusal (`inscribed-contradicts-noun`, ADR-AG-198) reached across
+   * sentences. `shape`/`forced` are registry keys (`notCyclic`), `ring` the polygon's id; `derive` adds the other
+   * sentence.
+   */
+  | 'inscribed-contradicts-declared'
+  /**
    * «זווית B ישרה» where the vertex alone does not name an angle (#1049).
    *
    * A vertex names an angle only when the figure says which two rays meet there. With no shape
@@ -285,6 +293,10 @@ export interface ApplyError {
   host?: HostRef;
   /** For `out-of-domain`: the bound the stated value violates (#1432 am. 1). */
   domain?: Domain;
+  /** For `inscribed-contradicts-declared` (#1918): the declared noun, the noun a circle would force, and the ring. */
+  shape?: string;
+  forced?: string;
+  ring?: Id;
 }
 
 /** How a found curve can be called in a sentence — its name, or (unnamed) its equation. */
@@ -3660,6 +3672,23 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         };
       }
       const prior = found?.same;
+      /*
+       * A CIRCLE THROUGH A RING ITS NOUN FORBIDS, STATED IN TWO SENTENCES (#1918, ADR-AG-252). The one-sentence form
+       * is refused at the parser (ADR-AG-198); here the same rule reads the ring's two structural declarations — the
+       * noun some sentence gave it (its row's `notCyclic`) and an inscription some sentence made — whichever arrives
+       * second. Derived from the registry column, never a listed pair; never from a measurement of one drawing.
+       */
+      const circleless =
+        f.t === 'polygon' ? ((f.noun && shapeRow(f.noun)?.notCyclic ? f.noun : undefined) ?? (prior?.kind === 'polygon' ? prior.circleless : undefined)) : undefined;
+      const cyclic = f.t === 'polygon' && (f.cyclic || (prior?.kind === 'polygon' && prior.cyclic));
+      if (prior && circleless && cyclic) {
+        return {
+          ok: false,
+          error: { code: 'inscribed-contradicts-declared', detail: f.src, shape: circleless, forced: shapeRow(circleless)!.notCyclic!, ring: f.id },
+        };
+      }
+      /** The ring's circle facts, carried onto the object so a later sentence is held against them. */
+      const circleFlags = { ...(cyclic ? { cyclic: true as const } : {}), ...(circleless ? { circleless } : {}) };
       if (prior) {
         // M1: restating the same construction is absorbed — no duplicate row, no re-creation. This
         // is what lets a later section of a question name what an earlier one established.
@@ -3686,10 +3715,13 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
               effect: 'narrowed',
               next: {
                 ...c,
-                objects: c.objects.map((o) => (o.id === f.id ? { ...prior, noun: f.noun } : o)),
+                objects: c.objects.map((o) => (o.id === f.id ? { ...prior, noun: f.noun, ...circleFlags } : o)),
               },
             };
           }
+          // Absorbed — but what it said about a circle through the ring is kept (#1918): a later sentence answers to it.
+          const flagged = prior.kind === 'polygon' && (!!circleFlags.cyclic !== !!prior.cyclic || circleFlags.circleless !== prior.circleless);
+          if (flagged) return { ok: true, effect: 'known', next: { ...c, objects: c.objects.map((o) => (o.id === f.id ? { ...prior, ...circleFlags } : o)) } };
           return { ok: true, effect: 'known', next: c };
         }
         return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
@@ -3724,7 +3756,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           ? { kind: 'derived', id: f.id, rule: f.rule }
           : f.t === 'segment'
             ? { kind: 'segment', id: f.id, a: f.a, b: f.b }
-            : { kind: 'polygon', id: f.id, vertices: f.vertices, noun: f.noun };
+            : { kind: 'polygon', id: f.id, vertices: f.vertices, noun: f.noun, ...circleFlags };
       return { ok: true, effect: 'created', next: { ...c, objects: [...c.objects, made] } };
     }
   }

@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-08T17:23:39.887Z",
+  "seed": 1,
+  "facts": [
+    {
+      "utterance": "טרפז ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "trapezoid",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AD ∥ BC",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "D"
+        },
+        {
+          "type": "segment3",
+          "a": "B",
+          "b": "C"
+        },
+        {
+          "type": "mutual-rel",
+          "rel": "parallel",
+          "a": {
+            "kind": "segment",
+            "a": "A",
+            "b": "D"
+          },
+          "b": {
+            "kind": "segment",
+            "a": "B",
+            "b": "C"
+          }
+        }
+      ]
+    }
+  ]
+}

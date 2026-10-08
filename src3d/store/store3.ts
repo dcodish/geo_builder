@@ -22,7 +22,7 @@
 
 import { create } from 'zustand';
 import type { PlaneDisplayMode3Map } from './figureFile3';
-import { buildNotices3, type BuildNotice3 } from '../engine/notices';
+import { buildNotices3, shapeWarnings3, type BuildNotice3, type ShapeWarning3 } from '../engine/notices';
 import { normalizeLabel3, renameFacts3, renamePlaneDisplay3, renameQueries3, swapSession3, type RenameResult3, type SwapResult3 } from './rename3';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
@@ -31,7 +31,7 @@ import { findProofTarget } from '../../shell/proofTarget';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, freeDims } from '../engine/apply';
-import { spaceDiagonals, diagonalClaimVerdict } from '../engine/baseShapes';
+import { spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { scalePinned } from '../engine/solve3';
 import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
@@ -62,6 +62,9 @@ export interface Derived3 {
   status: Record<string, FactStatus3>;
   /** #305 (ADR-3D-090): non-error "built, and here is what changed" messages, derived from the figure. */
   notices: BuildNotice3[];
+  /** #1918 (ADR-3D-313): what the DRAWN figure shows that a stated noun says it cannot be (a declared
+   *  trapezoid drawn as a parallelogram) — the amber mismatch channel, derived per render. */
+  shapeWarnings: ShapeWarning3[];
 }
 
 export type StoreError3 =
@@ -83,10 +86,8 @@ export type StoreError3 =
   /** #1547 (ADR-3D-299): «x_B = 2t» — one coordinate given a SYMBOLIC value, recognised and not yet
    *  supported. Typed, so it never escalates; `component` is the student's own component («x_B»). */
   | { code: 'component-symbolic'; component: string }
-  /** #1792 (the #1554 ruling): a shape a circle cannot pass around without turning it into `forced` — a
-   *  right trapezoid in a circle is a rectangle. `shape`/`forced` are `notice.shape.*` keys; `sentence` is
-   *  the line as typed. Typed, so it never escalates. */
-  | { code: 'inscribed-contradicts-noun'; shape: string; forced: string; sentence: string }
+  // #1792's `inscribed-contradicts-noun` is an ENGINE error since #1918 (ADR-3D-313): the parser raises it for
+  // the one-line form and apply for the two-line form — one code, so it lives in `EngineError3`.
   /** The LLM decomposition lost part of the stated input (docs/24 S2.3 honesty gates) — `items` names
    *  the dropped labels/magnitudes; nothing was committed. */
   | { code: 'dropped-given'; items: string }
@@ -431,6 +432,27 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
       }
     }
   }
+  /**
+   * #1918 (ADR-3D-313, the port of 2-D's ADR-506): WHICH pair of a declared trapezoid is its parallel pair is
+   * read here, order-free and before the fold, from every ∥ the student stated (never a shape's own lowered
+   * relation, `origin: 'shape'`). A trapezoid whose OTHER two sides were stated parallel, and not its named
+   * pair, is SEATED one place round on every route — the flat relation and missing-corner arms (`seat`) and a
+   * pyramid's generated base (`baseSeat`) — so undo, load and a later ∥ all land on the same drawing.
+   */
+  const statedParallels: [string, string, string, string][] = [];
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    for (const cmd of f.cmds)
+      if (cmd.type === 'mutual-rel' && cmd.rel === 'parallel' && !cmd.origin && cmd.a.kind === 'segment' && cmd.b.kind === 'segment')
+        statedParallels.push([cmd.a.a, cmd.a.b, cmd.b.a, cmd.b.b]);
+  }
+  const reseated = (ring: readonly string[]): boolean => trapezoidRingInForce3(ring, statedParallels)[0] !== ring[0];
+  const seated = (cmd: Command3): Command3 => {
+    if (statedParallels.length === 0) return cmd;
+    if (cmd.type === 'quad-shape' && cmd.base === 'trapezoid' && reseated(cmd.ids)) return { ...cmd, seat: 1 };
+    if (cmd.type === 'solid' && QUAD_PYRAMIDS[cmd.kind]?.base === 'trapezoid' && reseated(cmd.ids.slice(0, 4))) return { ...cmd, baseSeat: 1 };
+    return cmd;
+  };
   const droppedSoft = (cmd: Command3): boolean => {
     if (cmd.type === 'cos-angle') {
       if (!cmd.soft || cmd.u.kind !== 'pair' || cmd.v.kind !== 'pair') return false;
@@ -477,7 +499,7 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
     let probe = c;
     for (const cmd of f.cmds) {
       if (droppedSoft(cmd)) continue; // an explicit ∠=90 on this triangle superseded the soft default
-      const r = applyCommand3(probe, cmd);
+      const r = applyCommand3(probe, seated(cmd));
       if (!r.ok) return r.error;
       probe = r.next;
     }
@@ -532,7 +554,7 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
     let probe = c;
     for (const cmd of f.cmds) {
       if (droppedSoft(cmd)) continue;
-      const r = applyCommand3(probe, cmd);
+      const r = applyCommand3(probe, seated(cmd));
       if (!r.ok) return r.error;
       probe = r.next;
     }
@@ -1023,10 +1045,27 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
     }
   }
 
+  // #1918 (ADR-3D-313): a circle-through-a-declared-ring refusal names BOTH statements — the refused line and
+  // the earlier one it contradicts. Apply knows rings, not lines, so the lines are read here from the list: the
+  // first enabled fact that declared the ring (`against: 'noun'`) or stated the circle through it ('circle').
+  const sameRingIds = (x: readonly string[], y: readonly string[]) => x.length === y.length && [...x].sort().join() === [...y].sort().join();
+  const declares = (cmd: Command3, ring: readonly string[], against: 'noun' | 'circle'): boolean =>
+    against === 'circle'
+      ? cmd.type === 'circle3' && cmd.def.kind === 'circum' && sameRingIds(cmd.def.ring, ring)
+      : (cmd.type === 'quad-shape' && sameRingIds(cmd.ids, ring)) ||
+        (cmd.type === 'solid' && QUAD_PYRAMIDS[cmd.kind] !== undefined && sameRingIds(cmd.ids.slice(0, 4), ring));
+  for (const f of facts) {
+    const st = status[f.id];
+    if (typeof st !== 'object' || st.code !== 'inscribed-contradicts-noun' || !st.ring || !st.against) continue;
+    const { ring, against } = st;
+    const other = facts.find((g) => g.id !== f.id && g.enabled && status[g.id] === 'ok' && g.cmds.some((k) => declares(k, ring, against)));
+    status[f.id] = { ...st, sentence: f.utterance, ...(other ? { other: other.utterance } : {}) };
+  }
+
   // #850: the notice lane's numeric gate needs sampled configurations. `resolved` is the one this
   // derive already computed — no extra solve on the hot path; the branch guard inside reads the
   // admissible pool this sample already carries (`pivot.pointRoots`, built for #827).
-  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved]) };
+  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved]), shapeWarnings: shapeWarnings3(c, positions) };
 }
 
 export interface Geo3State {

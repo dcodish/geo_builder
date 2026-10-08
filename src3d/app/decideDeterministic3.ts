@@ -63,7 +63,6 @@ const STORE_CATEGORY3: Record<StoreOwnCode3, RefusalCategory3> = {
   'ambiguous-angle-vertex': 'clarify',
   'not-understood': 'refused', // never a `refused` verdict — `decideSubmit3` returns it as its own kind
   'component-symbolic': 'refused', // recognised, not yet supported (#1547) — kept visible for review
-  'inscribed-contradicts-noun': 'refused', // #1792: the #1554 ruling — the sentence contradicts itself
   'dropped-given': 'refused',
   'dependents-broken': 'refused',
   'rename-refused': 'refused',

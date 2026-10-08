@@ -128,7 +128,12 @@ const subjectIdsOf = (parsed: { facts: readonly Fact[] }): string[] => {
  * every site that turns one into a refusal (submit, un-mute), never re-derived.
  */
 const collapseFields = (f: Derivation['faults'][number]) =>
-  f.code === 'polygon-collapsed' ? { polygon: f.polygon, shape: f.shape, declared: f.declared } : {};
+  f.code === 'polygon-collapsed'
+    ? { polygon: f.polygon, shape: f.shape, declared: f.declared }
+    : // #1918 (ADR-AG-252) — a circle through a ring its noun forbids, in two sentences: both nouns and the other sentence.
+      f.code === 'inscribed-contradicts-declared'
+      ? { shape: f.shape, forced: f.forced, declared: f.declared }
+      : {};
 
 /** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
 const definingLineOf = (lines: readonly string[], id: string): string | null => {

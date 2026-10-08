@@ -22,7 +22,7 @@
  *
  * The template is 3-D's #424 "ONE vocabulary" (`statedTriShape`) and analytic's shape registry.
  */
-import type { AnyCommand, Id } from '@/engine';
+import { NOT_CYCLIC, type AnyCommand, type Id } from '@/engine';
 
 /** The polygon nouns, in detection precedence (the order every former private ladder used). */
 export type ShapeNoun = 'triangle' | 'square' | 'rectangle' | 'rhombus' | 'kite' | 'trapezoid' | 'parallelogram' | 'quad';
@@ -72,8 +72,9 @@ const REFINES: Partial<Record<ShapeNoun, Partial<Record<ShapeAdj, ShapeKind>>>> 
   trapezoid: { right: 'right-trapezoid', isosceles: 'isosceles-trapezoid' },
 };
 
-/** A noun no circle can pass around without turning it into another noun (analytic's `notCyclic`). */
-const NOT_CYCLIC: Partial<Record<ShapeKind, ShapeKind>> = { 'right-trapezoid': 'rectangle' };
+/** A noun no circle can pass around without turning it into another noun (analytic's `notCyclic`) — the engine's
+ *  ONE table (#1918, ADR-607: the engine refuses the same pair stated in two lines, so both read it). */
+const notCyclic = (kind: ShapeKind): ShapeKind | undefined => NOT_CYCLIC[kind] as ShapeKind | undefined;
 
 /** The standalone lowering of each kind — the commands the shape macros emit (parse.ts calls these). */
 export function lowerShape(kind: ShapeKind, v: readonly Id[]): AnyCommand[] {
@@ -104,7 +105,9 @@ export function lowerShape(kind: ShapeKind, v: readonly Id[]): AnyCommand[] {
       return [{ type: 'shape-variant', shape: 'kite', ids: q4, variant: 0 }];
     case 'right-trapezoid':
       return [
-        { type: 'trapezoid', ids: q4 },
+        // `kind` records the declared phrase for the engine's not-cyclic prover (#1918, ADR-607): «ABCD חסום במעגל»
+        // on a later line is refused like the one-line sentence. Stamped only where the table says it matters.
+        { type: 'trapezoid', ids: q4, ...(notCyclic(kind) ? { kind } : {}) },
         { type: 'set-perpendicular', a: v[0], b: v[3], c: v[0], d: v[1] }, // AD ⟂ AB ⇒ right angles at A and D
       ];
     case 'isosceles-trapezoid':
@@ -153,7 +156,7 @@ export function readShapePhrase(s: string): ShapePhrase | null {
   const used = stated.find((a) => refines[a] !== undefined);
   const kind: ShapeKind = used ? refines[used]! : base;
   const unconsumed = stated.filter((a) => a !== used);
-  const forces = NOT_CYCLIC[kind];
+  const forces = notCyclic(kind);
   const strip = (text: string): string => {
     let out = text;
     if (noun) out = out.replace(re(SHAPE_NOUN_WORDS[noun], 'gi'), ' ');

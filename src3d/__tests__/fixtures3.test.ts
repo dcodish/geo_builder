@@ -300,6 +300,12 @@ const SEEDED: SeededCorpus = {
   // #1545 (ADR-3D-300) — the #1541 figure typed with the Hebrew GERESH «׳» (U+05F3) as the prime, every
   // line. Before: the cube refused «bad-solid» (the label run stopped at ׳, so the top ring duplicated the base).
   'geresh-prime-cube-1545.geo3.json': ['קוביה ABCDA׳B׳C׳D׳', 'מישור A׳B׳C׳D׳ הוא x+4y-8z-126=0', 'B(0,7,8)'],
+
+  // #1918 (ADR-3D-313) — the operator's third sequence: a stated pair of the trapezoid's OTHER two sides becomes its
+  // parallel pair (2-D's ADR-506). Before: both pairs drawn parallel, green, at 24/24. The drawn geometry (AD ∥ BC,
+  // AB ∦ DC, no warning, along the configuration walk) is asserted in issue-1918-trapezoid-identity.test.ts.
+  'trapezoid-reseat-1918.geo3.json': ['טרפז ABCD', 'AD ∥ BC'],
+  'right-trapezoid-reseat-1918.geo3.json': ['טרפז ישר זווית ABCD', 'AD ∥ BC'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

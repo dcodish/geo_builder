@@ -3990,6 +3990,9 @@ function cyclicFacts(noun: string | undefined, run: string, tail: string | undef
     .filter((v) => !host.through.includes(v))
     .map((id): Fact => ({ t: 'constraint', k: { t: 'on-curve', id, curve: host.id }, src: line }));
   const created = [...host.facts, ...on].map((f) => ({ ...f, src: line }));
+  // The ring is said to be inscribed (#1918, ADR-AG-252): marked on its polygon fact, so a noun declared in another
+  // sentence — before or after this one — is held against it at M1, where the one-sentence form is held above.
+  const ringFacts = shape.facts.map((g): Fact => (g.t === 'polygon' ? { ...g, cyclic: true, src: line } : { ...g, src: line }));
   /*
    * WHICH circle (ADR-AG-196): «חסום במעגל» with no description is THE circle — the figure's one circle when
    * it has one; a circle the sentence describes («שמרכזו M», «שמשוואתו …») is that circle when the figure
@@ -4004,14 +4007,14 @@ function cyclicFacts(noun: string | undefined, run: string, tail: string | undef
       ? maker.centre
       : host.facts.find((g): g is Extract<Fact, { t: 'derived' }> => g.t === 'derived' && g.rule.t === 'circle-centre')?.id;
   const match = !t ? undefined : centre ? { centre } : maker?.t === 'curve' ? { eq: maker.curve.eq } : null;
-  if (match === null || (t && /^ה?חדש$/.test(t))) return made([...shape.facts.map((g) => ({ ...g, src: line })), ...created]);
+  if (match === null || (t && /^ה?חדש$/.test(t))) return made([...ringFacts, ...created]);
   // Bound to a circle the figure has, an equation in the description is a statement about it too (#1633).
   const about: Fact[] = [
     ...(maker?.t === 'curve' ? [{ t: 'circle-eq' as const, circleId: CIRCLE_SENTINEL, eq: maker.curve.eq, src: line }] : []),
     ...shape.vertices.map((id): Fact => ({ t: 'constraint', k: { t: 'on-curve', id, curve: CIRCLE_SENTINEL }, src: line })),
   ];
   return made([
-    ...shape.facts.map((g) => ({ ...g, src: line })),
+    ...ringFacts,
     { t: 'the-circle', create: created, about, ...(match ? { match } : {}), src: line },
   ]);
 }

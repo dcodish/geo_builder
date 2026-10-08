@@ -255,6 +255,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1807': 'open',
   '#1842': 'open',
   '#1858': 'open',
+  '#1926': 'open',
 };
 
 export interface ParityRow {
@@ -1165,6 +1166,18 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // naming the statements — a flat figure is not a triangle. Analytic column (ADR-AG-247); the 2-D and 3-D streams close their gaps.
   { id: 'flat-polygon-1849-04', family: 'polygons', steps: ['מרובע ABCD', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1858' }, { product: '3d', issue: '#1858' }], note: 'B on the diagonal AC: the quadrilateral has a straight corner' },
   { id: 'flat-polygon-1849-05', family: 'topic', steps: ['משולש ABC', 'A(0,0)', 'B(1,1)', 'C(2,2)'], contextFor: { '2d': ['משולש ABC'] }, expect: 'refused', exception: 'X1', only: ['analytic'], note: 'coordinates that put the vertices on one line — never drawn flat; 2-D refuses the coordinate itself (X1)' },
+  // #1918 (ADR-607 / ADR-3D-313 / ADR-AG-252, operator ruling 2026-10-08 "Refuse in both"): a declared trapezoid keeps its
+  // identity. A circle through a declared right trapezoid is refused in either order (3-D locks its refusal in
+  // issue-1918-trapezoid-identity.test.ts — X8 leaves circles out of 3-D's plain rows); a trapezoid forced into a
+  // parallelogram builds with the amber warning; a stated other pair re-seats the trapezoid's pair; a trapezoid and a
+  // parallelogram-family shape are refused (analytic's re-declaration answers «כבר ידוע» / records — #1926).
+  { id: 'trapezoid-1918-inscribed', family: 'inscribed', steps: ['טרפז ישר זווית ABCD', 'ABCD חסום במעגל'], expect: 'refused', exception: 'X8', note: 'a circle through a right trapezoid makes it a rectangle' },
+  { id: 'trapezoid-1918-inscribed-rev', family: 'inscribed', steps: ['ABCD חסום במעגל', 'טרפז ישר זווית ABCD'], expect: 'refused', exception: 'X8', note: 'the reverse order: the noun line is refused' },
+  { id: 'trapezoid-1918-morph', family: 'polygons', steps: ['טרפז שווה שוקיים ABCD', 'זווית DAB = 90'], expect: 'builds', note: 'builds, with the amber «no longer a trapezoid» warning' },
+  { id: 'trapezoid-1918-reseat', family: 'parallel-perpendicular', steps: ['טרפז ABCD', 'AD ∥ BC'], expect: 'builds', note: 'AD and BC become the parallel pair' },
+  { id: 'trapezoid-1918-redeclare', family: 'polygons', steps: ['מקבילית ABCD', 'טרפז ABCD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1926' }], note: 'no quadrilateral is both' },
+  { id: 'trapezoid-1918-redeclare-rev', family: 'polygons', steps: ['טרפז ABCD', 'מקבילית ABCD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1926' }] },
+  // end #1918
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
