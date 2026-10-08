@@ -3277,14 +3277,29 @@ export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0):
     if (!pool.determined && pool.samples.length < IMPLIED_MIN_SAMPLES) return false;
     if (pool.samples.length === 0) return false;
 
-    for (const positions of pool.samples) {
-      for (const con of added) {
+    const holdsAt = (positions: Map<Id, Vec>): boolean =>
+      added.every((con) => {
         if (constraintRefs(con).some((id) => !positions.has(id))) return false; // cannot be established
         const get = (id: Id) => positions.get(id) as Vec;
         const r = residual(con, get);
         if (!Number.isFinite(r)) return false;
-        if (Math.abs(r) > residualTolerance(con, constraintScale(con, get))) return false; // NOT entailed
-      }
+        return Math.abs(r) <= residualTolerance(con, constraintScale(con, get)); // else NOT entailed
+      });
+    if (!pool.samples.every(holdsAt)) return false;
+
+    // #1922 (ADR-605, amending ADR-542): "satisfied everywhere the figure can be" must range over the TOOL'S OWN
+    // unstated choices too (ADR-052). The pool varies the variants always, but the branch/side/seat axes only on
+    // a determined figure, and ADR-502's parallel pair never — so a given true only by the tool's default («AB ∥
+    // DC» on «טרפז ABCD», «AC ⊥ BC» on «משולש ישר זווית ABC») read as entailed and was dropped. The same residual
+    // question is asked at the other answer of each choice the pool did not vary. Only a line that has already
+    // passed the pool pays for it — exactly the lines that answered «כבר קיים» before.
+    const alternatives = choiceAlternatives(facts, before.construction, pool);
+    if (alternatives === null) return false; // over the cap: the choice space cannot be walked — fail open
+    const deadline = Date.now() + SAMPLE_BUDGET_MS;
+    for (const alt of alternatives) {
+      if (Date.now() > deadline) return false; // not established in time — fail open
+      if (!meetsRequirements(alt, seed)) continue; // not a configuration of the figure (the pool's own bar, ADR-558)
+      if (!holdsAt(replay(alt, seed).positions)) return false;
     }
     return true;
   } catch {
@@ -3612,6 +3627,32 @@ export function admissibleRewrites(facts: Fact[], c: Construction, cap = ADMISSI
   for (let k = 1; k < total; k++) {
     const fc = withAssignment(facts, axes, advanceAssignment(axes, k));
     if (fc.some((f, i) => f !== facts[i])) out.push(fc);
+  }
+  return out;
+}
+/**
+ * #1922 ([ADR-605](docs/06-decisions.md#adr-605)): the OTHER answers of every unstated choice the shared pool
+ * ({@link samplingJobs}) did not vary — the alternatives the restatement check ({@link impliedByPrior}) must also
+ * ask, so that a given true only by the tool's default (ADR-052) is never read as entailed.
+ * - The registry's branch/side/seat axes ({@link admissibleRewrites}) when the pool is not `determined` — a
+ *   determined pool already holds them; `variant` is always in the pool ({@link variantConfigs}).
+ * - ADR-502's NON-CYCLABLE choices ({@link unstatedChoices}): a trapezoid's parallel pair, as the facts with the
+ *   OTHER pair stated (sides 1 and 3 of the ring) — exactly the input {@link trapezoidRingInForce} rotates the
+ *   ring by, so the alternative is the figure the student gets by typing that pair (ADR-506).
+ * The current facts are not included. `null` = the registry's product is over its cap (the caller fails open).
+ * The next non-cyclable choice is a row here.
+ */
+export function choiceAlternatives(facts: Fact[], c: Construction, pool: Pick<SharedSamples, 'determined'>): Fact[][] | null {
+  const out: Fact[][] = [];
+  if (!pool.determined) {
+    const rewrites = admissibleRewrites(facts, c);
+    if (rewrites === null) return null;
+    out.push(...rewrites.slice(1));
+  }
+  for (const choice of unstatedChoices(facts)) {
+    if (choice.kind !== 'parallel-pair') continue;
+    const [a, b, cc, d] = choice.ids;
+    out.push(trialFacts(facts, [{ type: 'set-parallel', a: b, b: cc, c: d, d: a }]));
   }
   return out;
 }

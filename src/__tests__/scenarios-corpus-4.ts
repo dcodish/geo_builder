@@ -3695,6 +3695,23 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'restated-default-pair-is-recorded-1922',
+    title: '#1922 (ADR-605): «טרפז ABCD · AB ∥ DC · AD ∥ BC» — «AB ∥ DC» is RECORDED (it was true only by the tool’s default pair), so «AD ∥ BC» shows the amber trapezoid-morph warning instead of drawing AB ∦ DC green',
+    guards:
+      "Operator report (#1922, P1 by ruling 2026-10-08). Measured on 5edeeca1 through decideDeterministic2D + commitVerdict + runViewResolve: «AB ∥ DC» answered «זה כבר קיים באיור» (ADR-542's door) and was not recorded; «AD ∥ BC» then re-seated the trapezoid (ADR-506) and the final figure had sin∠(AB, DC) = 0.549 on a green figure. Root cause: the restatement check judged entailment over a sample pool that never varies the tool's own unstated choices (ADR-502's parallel pair; the branch/side/seat axes on a figure with free DOF), so a given true only by the default of an unstated choice (ADR-052) read as entailed. Fix (ADR-605): `impliedByPrior` also asks the residual question at the other answer of every choice the pool did not vary (`choiceAlternatives`). The class matrix (isosceles and right trapezoids, «∠A + ∠D = 180», «AD ⊥ DC», the right-triangle seat «AC ⊥ BC» and its spellings, the kept forced restatements, stability, the ✎ edit seam) is src/replay/__tests__/issue-1922-choice-entailment.test.ts.",
+    steps: ['טרפז ABCD', 'AB ∥ DC', 'AD ∥ BC'],
+    expectViolations: true,
+    check(fig) {
+      allStepsOk(fig);
+      expect(gateVerdict(factsOf(['טרפז ABCD']), 'AB ∥ DC').kind, '«AB ∥ DC» is recorded, never «כבר קיים»').toBe('commit');
+      expect(fig.violations.map((v) => v.messageKey), 'both pairs parallel: exactly the amber trapezoid-morph warning').toEqual(['figure.v.trapezoidMorph']);
+      expect(Math.abs(angle(at(fig, 'B'), at(fig, 'A'), at(fig, 'D')) + angle(at(fig, 'A'), at(fig, 'D'), at(fig, 'C')) - 180), 'AB ∥ DC is drawn').toBeLessThan(1e-3);
+      // the reverse order reaches the same end state
+      const reverse = replay(factsOf(['טרפז ABCD', 'AD ∥ BC', 'AB ∥ DC']));
+      expect(reverse.violations.map((v) => v.messageKey)).toEqual(['figure.v.trapezoidMorph']);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */
