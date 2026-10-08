@@ -34,8 +34,8 @@ describe('#1495 — a SIDE as the subject lowers to exactly the side-equation se
 
   /*
    * The converse names its subject pair, so it DRAWS it (#1639, ADR-AG-198) — by its noun: «הישר CD» the line, a
-   * bare «CD» the segment. And a bare «CD» is no longer rewritten as «הישר CD» (#1636): it is «P על CD», whose
-   * extent M1 inherits from the figure.
+   * bare «CD» the segment. And a bare «CD» is not rewritten as «הישר CD» (#1636): it is «P על CD», which is the
+   * segment CD, as 2-D reads it (#1892, ADR-AG-248).
    */
   const line = { t: 'line-2pt', a: 'C', b: 'D', src: '' };
   const segment = { t: 'segment', id: 'seg-CD', a: 'C', b: 'D', ref: true, src: '' };

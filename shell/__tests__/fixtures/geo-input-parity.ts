@@ -1165,6 +1165,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // naming the statements — a flat figure is not a triangle. Analytic column (ADR-AG-247); the 2-D and 3-D streams close their gaps.
   { id: 'flat-polygon-1849-04', family: 'polygons', steps: ['מרובע ABCD', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1858' }, { product: '3d', issue: '#1858' }], note: 'B on the diagonal AC: the quadrilateral has a straight corner' },
   { id: 'flat-polygon-1849-05', family: 'topic', steps: ['משולש ABC', 'A(0,0)', 'B(1,1)', 'C(2,2)'], contextFor: { '2d': ['משולש ABC'] }, expect: 'refused', exception: 'X1', only: ['analytic'], note: 'coordinates that put the vertices on one line — never drawn flat; 2-D refuses the coordinate itself (X1)' },
+  // ── #1892 (ADR-AG-248): a point on a BARE pair («D על AB») is the segment, as 2-D reads it; the order of the givens never changes the verdict ──
+  { id: 'bare-on-pair-length-1892', family: 'points-incidence', steps: ['נקודה A', 'נקודה B', 'D על AB', 'AB = 4', 'AD = 5'], expect: 'refused', exception: 'X9', note: 'analytic rode the line and drew D beyond B before #1892' },
+  { id: 'bare-on-pair-length-holds-1892', family: 'points-incidence', steps: ['נקודה A', 'נקודה B', 'D על AB', 'AB = 4', 'AD = 3'], expect: 'builds', exception: 'X9' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

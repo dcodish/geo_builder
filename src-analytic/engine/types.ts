@@ -195,15 +195,6 @@ export type Fact =
    * …» states THIS line's equation — the curve takes the line's place, never a second object beside it.
    */
   | (FactBase & { t: 'line-2pt'; a: Id; b: Id })
-  /**
-   * The EXTENT of a bare pair in an incidence (#1636, #1640, ADR-AG-198) — «CD עובר דרך מרכז המעגל», «O על
-   * BC». The noun decides when there is one («הצלע/הקטע» the segment, «הישר» the line); with none the pair
-   * inherits the extent of the object it refers to, and only M1 can see that: when the figure draws a piece
-   * over `a`–`b` at the time of the statement, the point lies BETWEEN them (the `between` selector «הצלע BC»
-   * carries); when it draws none, the line reading stands and this adds nothing. A piece drawn LATER never
-   * narrows it — the extent belongs to the statement.
-   */
-  | (FactBase & { t: 'extent-of'; id: Id; a: Id; b: Id })
   | (FactBase & { t: 'polygon'; id: Id; vertices: Id[]; noun?: string })
   /**
    * A statement that must HOLD rather than an object that exists (#1016) — «שטח המשולש ABC הוא 20».
