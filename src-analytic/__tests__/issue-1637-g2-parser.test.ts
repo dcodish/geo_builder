@@ -169,7 +169,7 @@ describe('#1640 + #1636 — the extent belongs to the statement', () => {
       const v = decideSubmit(line, lines, 0);
       return v.kind === 'refused' ? v.error.key : v.kind;
     };
-    // The noun decides when there is one; a bare pair takes what the figure draws.
+    // The noun decides when there is one; a bare pair is the segment, drawn or not (#1892, ADR-AG-248, as 2-D).
     expect(['P על הצלע AB', 'P על הקטע AB', 'P על הישר AB', 'P על AB'].map((l) => kind(l, drawn))).toEqual([
       'unsatisfiable',
       'unsatisfiable',
@@ -180,12 +180,13 @@ describe('#1640 + #1636 — the extent belongs to the statement', () => {
       'unsatisfiable',
       'unsatisfiable',
       'already-follows',
-      'already-follows',
+      'unsatisfiable',
     ]);
   });
 
   it('a segment drawn LATER never narrows an earlier statement about the line', () => {
-    expect(play(['A(0,0)', 'B(4,0)', 'P(6,0)', 'P על AB', 'AB']).verdicts).toEqual(['record', 'record', 'record', 'already-follows', 'record']);
+    // A bare «P על AB» is the segment itself now (#1892, ADR-AG-248): a typed P beyond B is refused on its own line.
+    expect(play(['A(0,0)', 'B(4,0)', 'P(6,0)', 'P על AB', 'AB']).verdicts).toEqual(['record', 'record', 'record', 'refused:unsatisfiable', 'record']);
     expect(play(['A(0,0)', 'B(4,0)', 'נקודה P', 'P על הישר AB', 'P(6,0)', 'AB']).verdicts.at(-1)).toBe('record');
   });
 });

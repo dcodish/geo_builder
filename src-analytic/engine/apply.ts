@@ -3441,16 +3441,6 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       });
     }
 
-    /**
-     * A bare pair's extent in an incidence (#1636, #1640, ADR-AG-198) — inherited from what the figure draws
-     * over the pair NOW: a drawn piece puts the point between its ends (the `between` selector «הצלע BC»
-     * carries, so a point that cannot lie on the piece is refused on this line); no piece leaves the line.
-     */
-    case 'extent-of': {
-      if (f.id === f.a || f.id === f.b || !drawnPieceOver(c, f.a, f.b)) return { ok: true, effect: 'known', next: c };
-      return applyFact(c, { t: 'selector', sel: { kind: 'between', id: f.id, a: f.a, b: f.b }, src: f.src });
-    }
-
     case 'role-of':
       return applyRoleOf(c, f);
 
@@ -4099,7 +4089,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
  * length given about the same letters — «C מחלקת את AB ביחס 3:2» places C ON AB (that mints, as in 2-D) and its ratio
  * rides along, where «AB:BC = 2:3» alone has no minting fact and stays refused, as in 2-D.
  */
-const MINT_COMPANIONS: ReadonlySet<Fact['t']> = new Set<Fact['t']>(['segment', 'line-2pt', 'extent-of', 'selector', 'declare']);
+const MINT_COMPANIONS: ReadonlySet<Fact['t']> = new Set<Fact['t']>(['segment', 'line-2pt', 'selector', 'declare']);
 const isMintCompanion = (f: Fact): boolean => MINT_COMPANIONS.has(f.t) || (f.t === 'constraint' && f.k.t === 'length-eq');
 
 /** A length side 2-D mints for: a number, or segments ADDED with no coefficient («AB», «AB + BC», «5») — not «2CD», «AB:BC». */

@@ -1196,6 +1196,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'trapezoid-1918-redeclare', family: 'polygons', steps: ['מקבילית ABCD', 'טרפז ABCD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1926' }], note: 'no quadrilateral is both' },
   { id: 'trapezoid-1918-redeclare-rev', family: 'polygons', steps: ['טרפז ABCD', 'מקבילית ABCD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1926' }] },
   // end #1918
+  // ── #1892 (ADR-AG-248): a point on a BARE pair («D על AB») is the segment, as 2-D reads it; the order of the givens never changes the verdict ──
+  { id: 'bare-on-pair-length-1892', family: 'points-incidence', steps: ['נקודה A', 'נקודה B', 'D על AB', 'AB = 4', 'AD = 5'], expect: 'refused', exception: 'X9', note: 'analytic rode the line and drew D beyond B before #1892' },
+  { id: 'bare-on-pair-length-holds-1892', family: 'points-incidence', steps: ['נקודה A', 'נקודה B', 'D על AB', 'AB = 4', 'AD = 3'], expect: 'builds', exception: 'X9' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

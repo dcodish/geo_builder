@@ -6815,7 +6815,10 @@ function parseConstraint(raw: string): RuleOutcome {
     const [, id, noun, operandRaw] = on;
     const operand = trim(operandRaw);
     // The noun decides the bound — the captured one, or the registry noun in front of the operand's pair («על השוק AD»).
-    const bounded = extentOfNoun(noun) === 'segment' || BOUNDED_NOUN.test(operand);
+    // A BARE pair («D על AB», no noun) is the segment, as «על הקטע AB» is and as 2-D reads it (#1892, ADR-AG-248,
+    // superseding ADR-AG-198 2(b)): only «הישר AB» names the line, and only «המשך AB» the extension.
+    const barePair = !noun && new RegExp(`^${NAME}${NAME}$`).test(operand);
+    const bounded = extentOfNoun(noun) === 'segment' || BOUNDED_NOUN.test(operand) || barePair;
     // A role noun's claim is stated beside the incidence (#1651, ADR-AG-200).
     const claims: ClaimSink = { out: [], src: line };
     /**
@@ -6844,12 +6847,10 @@ function parseConstraint(raw: string): RuleOutcome {
           { t: 'declare', id, src: line },
           { t: 'constraint', k: rest, src: line },
         ];
-        // The bound, and ONLY when the noun carried one — the operator's ruling.
-        if (bounded) {
+        // The bound: a segment noun, or a bare pair (#1892). A bare pair whose subject is one of its own ends
+        // («A על AB») carries no bound — it already follows, as it always has.
+        if (bounded && !(barePair && (id === rest.a || id === rest.b))) {
           facts.push({ t: 'selector', sel: { kind: 'between', id, a: rest.a, b: rest.b }, src: line });
-        } else if (!noun && new RegExp(`^${NAME}${NAME}$`).test(operand)) {
-          // NO noun (#1636, ADR-AG-198): the pair inherits the extent of what the figure draws over it — M1's call.
-          facts.push({ t: 'extent-of', id, a: rest.a, b: rest.b, src: line });
         }
         return made([...facts, ...claims.out]);
       }
@@ -8590,7 +8591,7 @@ const OBJ_EQ = /^(?:ה?ישר\s+|(?:the\s+)?line\s+)?([^=]+=[^=]+)$/i;
 /** «ישר העובר דרך הנקודה (-3,7)» · «ישר שעובר ב-P» · "a line through P" — a line given by one point. */
 const OBJ_THROUGH = /^(?:ה?ישר\s+(?:ה|ש)?עובר(?:ת)?\s+(?:דרך|ב-?)\s*|(?:a\s+|the\s+)?line\s+(?:that\s+)?(?:passes\s+|passing\s+|going\s+)?through\s+)(.+)$/i;
 
-/** A pair object as the canonical sentence writes it — with its noun, or bare (the extent then inherited at M1). */
+/** A pair object as the canonical sentence writes it — with its noun, or bare (then the segment, as «על AB» reads: #1892, ADR-AG-248). */
 const pairText = (o: { noun: string; a: Id; b: Id }): string => `${o.noun ? `${o.noun} ` : ''}${o.a}${o.b}`;
 
 function lineObject(raw: string): LineObject | null {
@@ -8602,8 +8603,8 @@ function lineObject(raw: string): LineObject | null {
     return slot ? { k: 'through', slot } : null;
   }
   const pair = OBJ_PAIR.exec(t);
-  // A BARE pair keeps no noun (#1636): «CD עובר דרך …» inherits CD's extent from the figure at M1, so it is not
-  // rewritten as «הישר CD», which would decide the extent here, blind.
+  // A BARE pair keeps no noun: «CD עובר דרך …» lowers to the bare «P על CD», which is the segment CD (#1892,
+  // ADR-AG-248) — one reading for the bare pair, decided by the point-on rule, never re-decided here.
   if (pair && pair[2] !== pair[3]) return { k: 'pair', noun: pair[1] ? heNoun(pair[1]) : '', a: pair[2], b: pair[3] };
   const named = OBJ_NAMED.exec(t);
   if (named) return { k: 'named', name: named[1] ?? named[2] };

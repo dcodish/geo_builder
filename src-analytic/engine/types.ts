@@ -196,15 +196,6 @@ export type Fact =
    */
   | (FactBase & { t: 'line-2pt'; a: Id; b: Id })
   /**
-   * The EXTENT of a bare pair in an incidence (#1636, #1640, ADR-AG-198) — «CD עובר דרך מרכז המעגל», «O על
-   * BC». The noun decides when there is one («הצלע/הקטע» the segment, «הישר» the line); with none the pair
-   * inherits the extent of the object it refers to, and only M1 can see that: when the figure draws a piece
-   * over `a`–`b` at the time of the statement, the point lies BETWEEN them (the `between` selector «הצלע BC»
-   * carries); when it draws none, the line reading stands and this adds nothing. A piece drawn LATER never
-   * narrows it — the extent belongs to the statement.
-   */
-  | (FactBase & { t: 'extent-of'; id: Id; a: Id; b: Id })
-  /**
    * `cyclic` (#1918, ADR-AG-252): the sentence says this ring is INSCRIBED IN A CIRCLE («ABCD חסום במעגל», «מעגל חוסם
    * את ABCD», "ABCD is inscribed in a circle") — set by the parser's one inscription lowering (`cyclicFacts`), so M1
    * can hold the inscription against a noun no circle passes around when the two arrive in different sentences.

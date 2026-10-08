@@ -240,8 +240,10 @@ The LLM suggest lane (ADR-W-030) is held against #1297; the lexicon stays out of
 
 `pieceFacts(noun, a, b)` is the one piece declaration (`line-2pt { a, b }` or `segment { …, ref: true }`), emitted
 after a sentence's facts (`TangentTargets.pieces`, `sideClauses`). The extent is decided at M1 against the prior
-construction: the crossing's bounded promotion (`drawnPieceOver`) and a bare pair's `extent-of { id, a, b }`
-(`lineObject`, `pairText`). `orthography` folds format controls (`stripFormatControls`), bullets and the spaced
+construction: the crossing's bounded promotion (`drawnPieceOver`). A bare pair in a point-on sentence is decided in
+the parser, not at M1: it carries the `between` selector «הקטע AB» carries, except when the subject is one of its ends
+([ADR-AG-248](06c-decisions-analytic.md#adr-ag-248), #1892; `lineObject` and `pairText` lower the converse to that
+bare «P על CD»). `orthography` folds format controls (`stripFormatControls`), bullets and the spaced
 conjunction (`shell/conjunction`, [ADR-AG-239](06c-decisions-analytic.md#adr-ag-239)). A tangency with no circle
 applies `touchedCircleFacts` (tool symbols, `toolSymbol`), and `theCircle` binds `{ inscribed: ring }`; created
 shapes start fitted ([ADR-AG-202](06c-decisions-analytic.md#adr-ag-202): `fitCreatedShapes`, `shapedObjectOf`). A
@@ -376,7 +378,7 @@ foot is derived (`toolFootFacts`, `engine/cevian.ts`), named after the fact thro
 `statingNamedCircle` (`declare`, `param radiusSymbol(M)` > 0, `circle-at-M`); an `on-kind` circle with no circle
 creates one (`touchedCircleFacts`). **New letters, last**: after the fixpoints, `foldPass` adds `free` points for a
 line whose failures are all point references in minting forms (`mintedByReference`) or companions (`segment`,
-`line-2pt`, `extent-of`, `selector`, `declare`); a `perpendicular` is not one, and the triangle form states its
+`line-2pt`, `selector`, `declare`); a `perpendicular` is not one, and the triangle form states its
 triangle first (`clauseFacts`).
 
 *Identifiers:* `circle-at-<letter>` · `create` · `chordFacts` · `on-kind { circle }` · `tangent-line-at`
