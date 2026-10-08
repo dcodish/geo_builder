@@ -1025,6 +1025,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'ex-vector', family: 'topic', steps: ['משולש ABC', 'וקטור AB'], expect: 'builds', exception: 'X7' },
   // ── #1616 rulings of 2026-10-03 (ADR-AG-222) ──
   { id: 'ex-position-above-1706', family: 'topic', steps: ['נקודה A', 'נקודה D', 'D מעל A'], expect: 'builds', exception: 'X1', only: ['analytic'], note: "#1706: y_D > y_A on analytic's fixed axes; 2-D does not read screen orientation" },
+  { id: 'ex-crossed-ring-free-elsewhere-1929', family: 'topic', steps: ['משולש EFG', 'טרפז ABCD', 'A(0,0)', 'B(4,0)', 'C(1,3)', 'D(3,3)'], contextFor: { '2d': [] }, expect: 'refused', exception: 'X1', only: ['analytic'], note: "#1929 (ADR-AG-249): the coordinate that completes a pinned crossed ring is refused whatever else in the figure is free — the ring's own freedom decides, never the figure's. 3-D's half is #1923's (same round): only: ['analytic'] until it lands" },
   { id: 'ex-position-below-1706', family: 'topic', steps: ['נקודה A', 'נקודה D', 'D מתחת ל-A'], expect: 'builds', exception: 'X1', only: ['analytic'] },
   { id: 'ex-position-right-1706', family: 'topic', steps: ['נקודה B', 'נקודה C', 'C מימין ל-B'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '2-D refuses it as input.scope.orientation' },
   { id: 'ex-position-left-1706', family: 'topic', steps: ['נקודה B', 'נקודה C', 'C משמאל ל-B'], expect: 'builds', exception: 'X1', only: ['analytic'] },

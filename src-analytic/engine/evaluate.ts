@@ -127,6 +127,14 @@ export interface Figure {
    * that completed it as a collapse. Absent when none (and on a figure built by hand).
    */
   collapsedRings?: Id[];
+  /**
+   * Declared polygons the configuration walk found CROSSED in every valid candidate it evaluated (#1927, ADR-AG-250):
+   * `drawableAt` found nothing whole, and among at least {@link FORCED_RING_FLOOR} candidates whose givens, selectors
+   * and named objects all held, this ring was crossed in each and simple in none. That is the givens placing its
+   * vertices in a crossing order — a ring over a shape's points («ריבוע ABCD · מרובע ACBD») — and `derive` refuses the
+   * line that completed it when the ring's `shapeDof` is 0 (samples are evidence; the affine argument is the proof). Set only on the fallback figure `drawableAt` returns; absent otherwise.
+   */
+  forcedCrossed?: Id[];
   /** Freedom the OBJECT carriers still have after the constraints — what the DOF cue reports. */
   carrierDof: number;
   /** Per point: what the student's OWN givens fix about it — the canvas label (#1032). */
@@ -653,6 +661,191 @@ function figureDofOf(c: Construction, sys: CarrierSystem, x: number[]): number {
   if (n === 0) return 0;
   if (c.constraints.length === 0) return n;
   return freeRank(x, sys.equalitiesAt);
+}
+
+/**
+ * A HARD ring fault carries the ring's OWN freedom (#1929, ADR-AG-249), so `derive` refuses a ring the givens pin
+ * whatever else in the figure is free. A valid ring, or the trapezoid warning, pays nothing.
+ *
+ * **Measured LAZILY, once** (#1874, *"we cannot slow down anything"*): `drawableAt`'s walk evaluates many candidates
+ * that carry a crossed ring and are discarded; ranking each one cost a crossed-parallelogram submit ~2 ms of 5.
+ * Only the figure `derive` keeps is ever asked. Non-enumerable, so a fault still compares and serialises as the
+ * three fields it always had.
+ */
+function withRingDof(rf: RingFault, c: Construction, sys: CarrierSystem, x: number[]): RingFault {
+  if (!isHardRingFault(rf)) return rf;
+  const o = objectById(c, rf.id);
+  if (!o || o.kind !== 'polygon') return rf;
+  const vertices = o.vertices;
+  let memo: { v: number | undefined } | undefined;
+  Object.defineProperty(rf, 'ringDof', {
+    enumerable: false,
+    get: () => {
+      if (!memo) {
+        const dof = freedomOf(c, sys, x, (pos) =>
+          vertices.flatMap((v) => {
+            const p = pos.get(v);
+            return p ? [p.x, p.y] : [Number.NaN, Number.NaN];
+          }),
+        );
+        memo = { v: dof === null ? undefined : dof };
+      }
+      return memo.v;
+    },
+  });
+  /**
+   * …and the freedom of its SHAPE UP TO AN AFFINE MAP (#1927, ADR-AG-250): `read` = every vertex's affine coordinates
+   * over a base triangle of the ring's own vertices (the most spread one at `x`). `0` means every configuration the
+   * givens allow is an affine image of this one — a shape's points (square, rectangle, parallelogram, rhombus, a
+   * midpoint, a regular polygon) — and an affine map keeps every proper crossing, so a ring crossed here is crossed
+   * in all of them: proof, not sampling. A ring whose shape can still change («A(k,0)»'s trapezoid, simple for k > 4
+   * though the sampler never draws one) is not proven, and is never refused on the walk's samples alone.
+   */
+  let shapeMemo: { v: number | undefined } | undefined;
+  Object.defineProperty(rf, 'shapeDof', {
+    enumerable: false,
+    get: () => {
+      if (!shapeMemo) {
+        const at0 = sys.positionsAt(x);
+        const base = affineBase(vertices.map((v) => at0.get(v)));
+        // An affine coordinate is dimensionless, so a genuine rate of change is about 1 / the ring's span.
+        const span = Math.max(
+          0,
+          ...vertices.flatMap((u) =>
+            vertices.map((w) => {
+              const p = at0.get(u);
+              const q = at0.get(w);
+              return p && q ? Math.hypot(p.x - q.x, p.y - q.y) : 0;
+            }),
+          ),
+        );
+        const dof =
+          base === null || !(span > 0)
+            ? null
+            : tangentFreedomOf(sys, x, (pos) => {
+                const [a, b, cc] = base.map((i) => pos.get(vertices[i]));
+                if (!a || !b || !cc) return vertices.flatMap(() => [Number.NaN, Number.NaN]);
+                const ux = b.x - a.x, uy = b.y - a.y, vx = cc.x - a.x, vy = cc.y - a.y;
+                const det = ux * vy - uy * vx;
+                return vertices.flatMap((v) => {
+                  const q = pos.get(v);
+                  if (!q || det === 0) return [Number.NaN, Number.NaN];
+                  const wx = q.x - a.x, wy = q.y - a.y;
+                  return [(wx * vy - wy * vx) / det, (ux * wy - uy * wx) / det];
+                });
+              }, 1 / span);
+        shapeMemo = { v: dof === null ? undefined : dof };
+      }
+      return shapeMemo.v;
+    },
+  });
+  return rf;
+}
+
+/**
+ * How many independent directions the quantities `read` returns move in, ALONG the constraint manifold at `x` (#1927,
+ * ADR-AG-250) — `freedomOf`'s question, asked by projection rather than by a stacked rank: the `read` rows' gradients
+ * minus their component in the equations' row space, ranked at a tolerance relative to the size `unit` of a genuine change (a constant row is noise, not a scale).
+ * Measured: a stacked elimination at `freeRank`'s 1e-9 read a rectangle's (fixed) affine coordinates as free, because
+ * the residue of a dependent row is round-off at the scale of the EQUATIONS, not of the read. `null` when `read`
+ * cannot place a value nearby.
+ */
+function tangentFreedomOf(
+  sys: CarrierSystem,
+  x: number[],
+  read: (pos: Map<Id, Pt>, env: Env) => number[],
+  /** The size of a GENUINE rate of change of `read`; a residue below a millionth of it is round-off. */
+  unit: number,
+): number | null {
+  const n = x.length;
+  if (n === 0) return 0;
+  let unplaced = false;
+  const jac = (f: (v: number[]) => number[]): number[][] => {
+    const rows: number[][] = [];
+    for (let j = 0; j < n; j += 1) {
+      const h = Math.max(1e-6, Math.abs(x[j]) * 1e-6);
+      const up = [...x];
+      const dn = [...x];
+      up[j] += h;
+      dn[j] -= h;
+      const fu = f(up);
+      const fd = f(dn);
+      fu.forEach((u, i) => {
+        if (!Number.isFinite(u) || !Number.isFinite(fd[i])) unplaced = true;
+        (rows[i] ??= new Array(n).fill(0))[j] = (u - fd[i]) / (2 * h);
+      });
+    }
+    return rows;
+  };
+  const E = jac(sys.equalitiesAt);
+  const R = jac((v) => read(sys.positionsAt(v), sys.envAt(v)));
+  if (unplaced) return null;
+  const dot = (a: number[], b: number[]) => a.reduce((s, ai, i) => s + ai * b[i], 0);
+  /** Modified Gram–Schmidt: the orthonormal basis of `rows` beyond `basis`, keeping a row whose residue exceeds `tol`. */
+  const extend = (basis: number[][], rows: number[][], tol: number): number => {
+    let added = 0;
+    for (const row of rows) {
+      const v = [...row];
+      for (const q of basis) {
+        const k = dot(v, q);
+        for (let i = 0; i < n; i += 1) v[i] -= k * q[i];
+      }
+      const norm = Math.sqrt(dot(v, v));
+      if (norm > tol) {
+        basis.push(v.map((vi) => vi / norm));
+        added += 1;
+      }
+    }
+    return added;
+  };
+  const scale = (rows: number[][]) => Math.max(1e-12, ...rows.map((row) => Math.sqrt(dot(row, row))));
+  const basis: number[][] = [];
+  extend(basis, E, 1e-9 * scale(E));
+  return extend(basis, R, 1e-6 * Math.max(unit, scale(R)));
+}
+
+/** The three vertices (indices) spanning the largest triangle — the ring's own affine frame; `null` when flat. */
+function affineBase(pts: ReadonlyArray<Pt | undefined>): [number, number, number] | null {
+  let best: [number, number, number] | null = null;
+  let area = 0;
+  for (let i = 0; i < pts.length; i += 1)
+    for (let j = i + 1; j < pts.length; j += 1)
+      for (let k = j + 1; k < pts.length; k += 1) {
+        const a = pts[i], b = pts[j], q = pts[k];
+        if (!a || !b || !q) return null;
+        const s = Math.abs((b.x - a.x) * (q.y - a.y) - (b.y - a.y) * (q.x - a.x));
+        if (s > area) { area = s; best = [i, j, k]; }
+      }
+  return area > 0 ? best : null;
+}
+
+/**
+ * THE FREEDOM OF ONE PART OF THE FIGURE (#1929, ADR-AG-249) — how many directions the quantities `read` returns can
+ * still move in under the constraints, whatever the rest of the figure does.
+ *
+ * Computed as the figure's freedom minus its freedom with `read`'s values held as well: `figureDofOf` −
+ * `freeRank` over the equations plus `read`'s rows. Rank-aware, so a vertex pinned by two lines, a derived vertex
+ * and a parameter-carrying point all count as what they are; and a freedom ELSEWHERE (an unrelated free point, a
+ * free circle) cancels out of the difference. `read` is generic: the ring's vertices for #1929, a line's own
+ * position for its sibling (#1932). `null` when `read` cannot place a value near `x`.
+ */
+export function freedomOf(
+  c: Construction,
+  sys: CarrierSystem,
+  x: number[],
+  read: (pos: Map<Id, Pt>, env: Env) => number[],
+): number | null {
+  const all = figureDofOf(c, sys, x);
+  if (all === 0) return 0;
+  /** A value `read` cannot place in some nearby configuration is UNMEASURED (`null`), never "held": a NaN row would
+   *  poison the rank and read as no freedom, which is the false refusal this must never produce. */
+  let unplaced = false;
+  const held = freeRank(x, (v) => {
+    const rows = read(sys.positionsAt(v), sys.envAt(v));
+    if (rows.some((n) => !Number.isFinite(n))) unplaced = true;
+    return [...sys.equalitiesAt(v), ...rows.map((n) => (Number.isFinite(n) ? n : 0))];
+  });
+  return unplaced ? null : Math.max(0, all - held);
 }
 
 /**
@@ -2788,7 +2981,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
         const p = points.find((q) => q.id === id);
         return p ? { x: p.x, y: p.y } : undefined;
       },
-    ),
+    ).map((rf) => withRingDof(rf, c, sys, [...solvedVec])),
     carrierDof: figureDofOf(c, sys, solvedVec),
     ...(collapsedRings.length > 0 ? { collapsedRings } : {}),
     usedSymbols: [...usedSymbols(c)],
@@ -2814,6 +3007,12 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
  * How far the DRAWABLE search looks — the same budget `derive` gives the figure it shows.
  */
 const DRAWABLE_TRIES = 24;
+
+/**
+ * How many valid-but-for-the-ring configurations the walk must have seen before "crossed in every one" is evidence
+ * (#1927, ADR-AG-250) — the floor 2-D's `forcedCrossingKeys` uses, so a thin pool fails open (records as before).
+ */
+const FORCED_RING_FLOOR = 4;
 
 /**
  * Per construction, the drawable figure at each seed. The panel asks per coordinate per point, and
@@ -2974,12 +3173,36 @@ export function drawableAt(
    * one the ruling cycles to. So once the first figure is VALID, a candidate counts only if it took the same options;
    * validity itself (a first figure that is not whole) still walks to any option, as before.
    */
+  /**
+   * THE WALK'S RING EVIDENCE (#1927, ADR-AG-250) — no new search: every candidate this walk evaluates is read once.
+   * A candidate VALID but for its rings (givens hold, selectors hold, nothing vacant) is a configuration the givens
+   * allow; per declared ring, did ANY such candidate draw it simple? `noteRings` records it; the fallback figure
+   * carries the rings crossed in at least `FORCED_RING_FLOOR` of them and simple in none (`forcedCrossed`). A
+   * candidate where the ring is FLAT answers neither way — it is not a simple ring, and flatness is ADR-AG-247's
+   * (measured: «משולש ABC · D אמצע BC · E אמצע AC · מרובע ABED» is crossed at 24 seeds and flat at one).
+   */
+  const validButRings: Figure[] = [];
+  const crossedIn = new Map<Id, number>();
+  const simpleSomewhere = new Set<Id>();
+  const noteRings = (f: Figure) => {
+    if (!f.selectorsOk || f.vacant.length > 0 || f.unsatisfied.length > 0) return;
+    validButRings.push(f);
+    const hard = new Map(f.ringFaults.filter(isHardRingFault).map((rf) => [rf.id, rf.violation]));
+    for (const o of c.objects) {
+      if (o.kind !== 'polygon') continue;
+      const v = hard.get(o.id);
+      if (v === 'crossed') crossedIn.set(o.id, (crossedIn.get(o.id) ?? 0) + 1);
+      else if (v === undefined) simpleSomewhere.add(o.id);
+    }
+  };
+  noteRings(first);
   const firstOptions = choiceOptions(c, first.choiceSeed ?? seed);
   const sameChoices = (f: Figure, s: number) => !whole(first) || choiceOptions(c, f.choiceSeed ?? s) === firstOptions;
   if (!preferred(first)) {
     for (let extra = 1; extra <= budget; extra += 1) {
       const candidate = evaluate(c, seed + extra);
       if (!sameChoices(candidate, seed + extra)) continue;
+      noteRings(candidate);
       if (preferred(candidate)) {
         chosen = candidate;
         fallback = candidate;
@@ -2994,6 +3217,18 @@ export function drawableAt(
       if (!fallback && candidate.selectorsOk) fallback = candidate;
     }
     if (!preferred(chosen)) chosen = wholeSeparated ?? wholeFallback ?? fallback ?? chosen;
+    if (!whole(chosen)) {
+      const forced = [...crossedIn].filter(([id, n]) => n >= FORCED_RING_FLOOR && !simpleSomewhere.has(id)).map(([id]) => id);
+      /**
+       * A copy: `evaluate`'s figure is memoised and shared, and this is the WALK's finding, not that seed's. And the
+       * figure it rides on is one whose GIVENS HOLD (the first valid candidate that draws a forced ring crossed), never a fallback
+       * whose solve stopped short: the walk has just shown every given can hold with the ring crossed, so a figure that breaks one would
+       * have `derive` blame a given (`unsatisfiable`, or ADR-AG-247's collapse when that stop was flat — measured on
+       * «מקבילית ABCD · מרובע ACBD» at seeds 3 and 6) for what is the ring's order.
+       */
+      const crossedHere = (f: Figure) => f.ringFaults.some((rf) => rf.violation === 'crossed' && forced.includes(rf.id));
+      if (forced.length > 0) chosen = { ...(validButRings.find(crossedHere) ?? chosen), forcedCrossed: forced };
+    }
   }
   perSeed.set(key, chosen);
   return chosen;
