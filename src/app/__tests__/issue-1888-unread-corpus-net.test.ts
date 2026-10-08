@@ -12,10 +12,11 @@ import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { SCENARIOS } from '@/__tests__/scenarios-corpus';
-import { ctxOf, factsOf, scenarioFacts } from '@/__tests__/scenarios-harness';
+import { ctxOf, scenarioFacts } from '@/__tests__/scenarios-harness';
+import { parse } from '@/parser';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
-import { unreadParts } from '../unreadParts';
+import { loweringKey, unreadParts } from '../unreadParts';
 
 const FIXTURES = path.resolve(__dirname, '../../__tests__/fixtures');
 
@@ -41,9 +42,9 @@ describe('#1888 — the read-extent member refuses no working step of the corpus
       ...readdirSync(FIXTURES)
         .filter((n) => n.endsWith('.geo.json'))
         .map((file) => {
-          const saved = JSON.parse(readFileSync(path.join(FIXTURES, file), 'utf8')) as { facts: { group: string; utterance: string }[] };
-          const steps = [...new Map(saved.facts.map((f) => [f.group, f.utterance])).values()];
-          return { name: `fixture:${file}`, facts: factsOf(steps), typed: new Set(steps) };
+          // a fixture's saved facts ARE what was committed (some steps by the model, which no re-parse reproduces)
+          const saved = JSON.parse(readFileSync(path.join(FIXTURES, file), 'utf8')) as { facts: Fact[] };
+          return { name: `fixture:${file}`, facts: saved.facts, typed: new Set(saved.facts.map((f) => f.utterance ?? '')) };
         }),
     ];
     let checked = 0;
@@ -51,11 +52,16 @@ describe('#1888 — the read-extent member refuses no working step of the corpus
     for (const c of cases) {
       for (const g of groups(c.facts)) {
         if (!c.typed.has(g.utterance)) continue; // a model step or a naming, not a line the grammar read
+        const ctx = ctxOf(g.before);
+        // only a step the GRAMMAR committed: the line re-reads, in its real prefix, to the commands it holds
+        const r = parse(g.utterance, ctx);
+        if (!r.ok || loweringKey(r.commands) !== loweringKey(g.cmds)) continue;
         checked++;
-        const u = unreadParts(g.utterance, g.cmds, ctxOf(g.before));
+        const u = unreadParts(g.utterance, g.cmds, ctx);
         if (u) flagged.push(`[${c.name}] «${g.utterance}» → ${u.items.join(', ')}`);
       }
     }
+    console.info(`#1888 corpus net: ${checked} committed steps checked, ${flagged.length} flagged`);
     expect(flagged).toEqual([]);
     expect(checked, 'the net exercised the corpus').toBeGreaterThanOrEqual(1400);
   }, 600_000);
