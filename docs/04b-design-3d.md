@@ -414,6 +414,18 @@ grammar plus the #866 repair and the #516 typed refusals), `lostGivens3` (the ho
 `decideCommands3` (gates → twin → derive → search), where the LLM lane's `submitSteps` also ends. A new
 branch belongs in the decision; a parity lock replays recorded sequences.
 
+**A part the reading never read (#1888, [ADR-3D-316](06b-decisions-3d.md#adr-3d-316)).** On the deterministic lane
+(`decideSubmit3` → `decideCommands3` with `readExtent`, and the ✎ `replaceFact`) the honesty verdict
+`honestyRefusal3` runs `lostGivens3` plus `unreadParts3` (`src3d/store/unreadParts3.ts`), the 3-D member over
+`shell/readExtent.ts` (ADR-W-120): each label run (primes included) is substituted and re-read with `parse3`; a run
+no substitution changes is unread. Exempt: a co-reference (shell) and a run right after a polygon, circle, base or face noun
+(qualifiers allowed between, never a vertex noun) whose letters are on the figure or carried by the reading (3-D's scene name:
+«…במשולש SBC», «פירמידה SABC שבסיסה משולש ABC»). 3-D reads no compound, so the line is one clause, cut at the
+shortest prefix that reads the same (`cutAtReading`): a lost tail is `split-statements` (`err.splitStatements`,
+2-D's text) or, when the read part is a bare right triangle and the tail one of its vertices, `right-angle-vertex`
+(`err.rightAngleVertex`, the taught lines). An unread run with read labels after it joins `dropped-given`. The LLM
+lane (`decideSteps3`) is not re-read: its commands are the model's, not a reading of the utterance.
+
 **The App's pre-LLM lane is one function too (#1692, [ADR-3D-305](06b-decisions-3d.md#adr-3d-305)).**
 `src3d/app/decideDeterministic3` wraps `decideSubmit3` with the registers App3 consults on `not-understood`
 (the #353 nudge, then the ADR-3D-040 guidance register) and returns a `Verdict3` or `guided`, dispatched by

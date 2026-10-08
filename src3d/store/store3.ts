@@ -28,6 +28,7 @@ import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { ingestTypedText } from '../../shell/bidi';
 import { findProofTarget } from '../../shell/proofTarget';
+import { lostPart3, unreadParts3, type LostPart3 } from './unreadParts3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, freeDims } from '../engine/apply';
@@ -90,6 +91,10 @@ export type StoreError3 =
   /** The LLM decomposition lost part of the stated input (docs/24 S2.3 honesty gates) — `items` names
    *  the dropped labels/magnitudes; nothing was committed. */
   | { code: 'dropped-given'; items: string }
+  /** #1888 (ADR-3D-316, the operator's rulings of 2026-10-08): a line that loses a PART — a tail the reading never
+   *  read («…ב-B») — is refused whole with the one-input-per-line message listing the parts (`all`), or, for the
+   *  «<triangle> ישר זווית ב-<V>» syntax, the two lines that build it. Typed, so it never escalates. */
+  | LostPart3
   /** #926 (ADR-3D-220, ADR-W-044): a change to one row — deleted, muted or edited (`cause`, the row's
    *  wording BEFORE the change) — took OTHER rows from green to red: `items` quotes them. The change IS
    *  committed (the student asked for it) and the rows stay in the list, marked; this is the report that
@@ -1197,6 +1202,21 @@ function lostGivens3(utterance: string, commands: readonly Command3[], prior: Co
 }
 
 /**
+ * The honesty verdict of one stated line (#1888, ADR-3D-316): the token gates ({@link lostGivens3}) and, on the
+ * DETERMINISTIC lane only (`readExtent`: the commands came from reading this utterance, so a re-read is
+ * comparable), the read-extent member — does the reading depend on every label the student typed? A lost PART
+ * refuses with the one-input-per-line message (2-D's ADR-603, ported), before any other gate's naming; a lost
+ * operand (an unread label with read labels after it) joins `dropped-given`'s items.
+ */
+function honestyRefusal3(utterance: string, commands: readonly Command3[], prior: Construction3, readExtent: boolean): NonNullable<StoreError3> | null {
+  const lost = lostGivens3(utterance, commands, prior);
+  const unread = readExtent ? unreadParts3(utterance, commands, [...prior.points.keys()]) : null;
+  if (unread?.cut) return lostPart3(unread.cut);
+  const items = [...lost, ...(unread?.unread ?? []).map((o) => o.text)].filter((x, i, a) => a.indexOf(x) === i);
+  return items.length > 0 ? { code: 'dropped-given', items: items.join(', ') } : null;
+}
+
+/**
  * THE 3-D SUBMIT DECISION (#1394) — "would you accept this line?", asked without accepting it.
  *
  * `store3.submit` used to intercept renames, parse, run the honesty gates, detect twins, derive, run
@@ -1234,7 +1254,7 @@ export function decideSubmit3(
   if (rw?.kind === 'rename') return { kind: 'rename', from: rw.from, to: rw.to };
   const read = readStatement3(st, utterance);
   if (!read.ok) return read.error.code === 'not-understood' ? { kind: 'not-understood' } : { kind: 'refused', error: read.error };
-  return decideCommands3(st, utterance, read.commands, { twins: true, seedSearch: true }, newId);
+  return decideCommands3(st, utterance, read.commands, { twins: true, seedSearch: true, readExtent: true }, newId);
 }
 
 /**
@@ -1246,7 +1266,7 @@ export function decideCommands3(
   st: { facts: Fact3[]; seed: number },
   utterance: string,
   commands: readonly Command3[],
-  opts: { twins: boolean; seedSearch: boolean },
+  opts: { twins: boolean; seedSearch: boolean; readExtent?: boolean },
   newId: () => string = () => nanoid(8),
 ): Verdict3 {
   const { facts, seed } = st;
@@ -1257,8 +1277,9 @@ export function decideCommands3(
   // green ✓, and the label/number gates knew but were only ever asked on the LLM seam
   // (ADR-3D-147). The catalog corpus is asserted gate-clean in honesty3.test.ts, so the canonical
   // phrasings never pay this check with a false refusal.
-  const lost = lostGivens3(utterance, commands, derive3(facts, seed).construction);
-  if (lost.length > 0) return { kind: 'refused', error: { code: 'dropped-given', items: lost.join(', ') } };
+  // #1888 (ADR-3D-316): and the read-extent member, on the deterministic lane (`opts.readExtent`).
+  const refusal = honestyRefusal3(utterance, commands, derive3(facts, seed).construction, opts.readExtent ?? false);
+  if (refusal) return { kind: 'refused', error: refusal };
   // #613 (ADR-W-031, operator ruling 2026-08-16: "if a fact is already known - it should not be
   // added. this is true to all tools") — a RESTATED fact succeeds and appends no row. M1
   // idempotency is at APPLY, where a statement about existing objects correctly returns the
@@ -1392,9 +1413,10 @@ export const useGeo3 = create<Geo3State>()(
         // The honesty gates read "prior" as the OTHER facts — the edited statement's own old
         // labels are exactly what the edit may be renaming, so they must count as new here.
         const rest = facts.filter((f) => f.id !== factId);
-        const lostDet = lostGivens3(utterance, parsed.commands, derive3(rest, seed).construction);
-        if (lostDet.length > 0) {
-          set({ lastError: { code: 'dropped-given', items: lostDet.join(', ') } });
+        // #1888 (ADR-3D-316): the commands came from reading the edit, so the read-extent member runs here too.
+        const refusal = honestyRefusal3(utterance, parsed.commands, derive3(rest, seed).construction, true);
+        if (refusal) {
+          set({ lastError: refusal });
           return false;
         }
         // Same id, same position, same enabled state — only the statement changes. A MUTED fact's

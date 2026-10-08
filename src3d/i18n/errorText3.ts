@@ -57,6 +57,14 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
         : t('err.ambiguousAngleVertexBare', { vertex: err.vertex });
     case 'dropped-given':
       return t('err.droppedGiven', { items: err.items });
+    // #1888 (ADR-3D-316): a line that lost a part — 2-D's one-input-per-line text (ADR-W-118 B1), the parts in the
+    // student's own words; the «<triangle> ישר זווית ב-<V>» syntax is taught the two lines that build it.
+    case 'split-statements':
+      return t('err.splitStatements', { all: err.all });
+    case 'right-angle-vertex':
+      return err.rest
+        ? t('err.rightAngleVertexMore', { triangle: err.triangle, angle: err.angle, rest: err.rest })
+        : t('err.rightAngleVertex', { triangle: err.triangle, angle: err.angle });
     // #1666: the tool draws the givens; a claim to prove is named and left out.
     case 'proof-target':
       return t('err.proofTarget', { sentence: err.sentence });

@@ -466,7 +466,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-009', family: 'polygons', steps: ['ABCD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-010', family: 'polygons', steps: ['דלתון ABCD'], expect: 'builds' },
   { id: 'cat-2d-011', family: 'polygons', steps: ['משולש שווה שוקיים ABC'], expect: 'builds' },
-  { id: 'cat-2d-012', family: 'lengths', steps: ['ABC משולש שווה שוקיים (AB=AC)'], expect: 'builds' },
+  { id: 'cat-2d-012', family: 'lengths', steps: ['ABC משולש שווה שוקיים (AB=AC)'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1888' }], note: '3-D does not read the parenthetical (it drew «(AB=BC)» with apex A too), so ADR-3D-316 refuses it — "refuse it too" (#1888); reading it in 3-D is found work' },
   { id: 'cat-2d-013', family: 'polygons', steps: ['ריבוע ABCD שצלעו הוא 1'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-014', family: 'polygons', steps: ['ריבוע שצלעו 4'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-015', family: 'lengths', steps: ['מלבן במידות 4*6'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
@@ -780,7 +780,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'circle-numeral-on', family: 'circles', steps: ['נתון מעגל I', 'P על המעגל I'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1257' }] },
 
   // ── known gaps the audit seeded (B2), re-measured ──
-  { id: 'frame-paren', family: 'frame', steps: ['המרובע ABCD הוא טרפז (AB ∥ CD)'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1676' }] },
+  { id: 'frame-paren', family: 'frame', steps: ['המרובע ABCD הוא טרפז (AB ∥ CD)'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1676' }, { product: '3d', issue: '#1888' }], note: '3-D does not read the parenthetical («(AD ∥ BC)» drew AB ∥ CD), so ADR-3D-316 refuses it (#1888)' },
   { id: 'frame-dash', family: 'frame', steps: ['מעגל O', 'O – מרכז המעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#1676' }] },
   { id: 'frame-noun-after', family: 'frame', steps: ['המרובע ABCD מלבן'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1676' }] },
   { id: 'frame-figure', family: 'frame', steps: ['בסרטוט שלפניך מתואר משולש ABC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1676' }, { product: '3d', issue: '#1679', parked: true }] },
@@ -1169,9 +1169,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'flat-polygon-1849-04', family: 'polygons', steps: ['מרובע ABCD', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1858' }, { product: '3d', issue: '#1858' }], note: 'B on the diagonal AC: the quadrilateral has a straight corner' },
   { id: 'flat-polygon-1849-05', family: 'topic', steps: ['משולש ABC', 'A(0,0)', 'B(1,1)', 'C(2,2)'], contextFor: { '2d': ['משולש ABC'] }, expect: 'refused', exception: 'X1', only: ['analytic'], note: 'coordinates that put the vertices on one line — never drawn flat; 2-D refuses the coordinate itself (X1)' },
   // #1888 / #1889 (ADR-603, ADR-W-120, operator rulings 2026-10-08): a line that loses a PART is refused whole, in every builder.
-  // 2-D lands first; the 3-D (item B) and analytic (item C) streams close their gaps.
-  { id: 'unread-vertex-1888-01', family: 'angles', steps: ['משולש ABC ישר זווית ב-B'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1888' }, { product: 'analytic', issue: '#1888' }], note: '2-D taught «משולש ABC» then «∠ABC = 90°»; 3-D records the right angle at B, analytic hands it to the model' },
-  { id: 'unread-vertex-1888-02', family: 'angles', steps: ['משולש ABC ישר זווית ב-C'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1888' }, { product: 'analytic', issue: '#1888' }], note: 'any vertex — even C, where the default angle already sits' },
+  // 2-D lands first; 3-D closes its gap with item B (ADR-3D-316); the analytic (item C) stream closes its own.
+  { id: 'unread-vertex-1888-01', family: 'angles', steps: ['משולש ABC ישר זווית ב-B'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1888' }], note: '2-D and 3-D teach «משולש ABC» then «∠ABC = 90°» (3-D: ADR-3D-316); analytic hands it to the model' },
+  { id: 'unread-vertex-1888-02', family: 'angles', steps: ['משולש ABC ישר זווית ב-C'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1888' }], note: 'any vertex — even C, where the default angle already sits' },
   { id: 'unread-tail-1889-01', family: 'intersections', steps: ['מרובע ABCD', 'AC ו-BD נפגשים בנקודה E על AB'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }, { product: 'analytic', issue: '#1888' }] },
   // #1904 (ADR-604, operator rulings 2026-10-08): a second ROLE the reading drops refuses the line, teaching one line per role
   { id: 'role-clause-1904-01', family: 'cevians-centres', steps: ['משולש ABC', 'AD גובה לצלע BC שהוא גם תיכון'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1905' }, { product: '3d', issue: '#1905' }], note: 'analytic and 3-D hand it to the model; reading the relative clause is #1905' },

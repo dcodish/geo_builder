@@ -65,6 +65,8 @@ const STORE_CATEGORY3: Record<StoreOwnCode3, RefusalCategory3> = {
   'component-symbolic': 'refused', // recognised, not yet supported (#1547) — kept visible for review
   'inscribed-contradicts-noun': 'refused', // #1792: the #1554 ruling — the sentence contradicts itself
   'dropped-given': 'refused',
+  'split-statements': 'guided', // #1888: a lost part — answered with the one-input-per-line pointer (2-D's `scope:split-statements`)
+  'right-angle-vertex': 'guided', // #1888: the right-angle-at-vertex syntax, taught the two lines that build it
   'dependents-broken': 'refused',
   'rename-refused': 'refused',
   'swap-refused': 'refused',
