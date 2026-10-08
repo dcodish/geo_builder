@@ -1169,9 +1169,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'flat-polygon-1849-05', family: 'topic', steps: ['משולש ABC', 'A(0,0)', 'B(1,1)', 'C(2,2)'], contextFor: { '2d': ['משולש ABC'] }, expect: 'refused', exception: 'X1', only: ['analytic'], note: 'coordinates that put the vertices on one line — never drawn flat; 2-D refuses the coordinate itself (X1)' },
   // #1888 / #1889 (ADR-603, ADR-W-120, operator rulings 2026-10-08): a line that loses a PART is refused whole, in every builder.
   // 2-D lands first; the 3-D (item B) and analytic (item C) streams close their gaps.
-  { id: 'unread-vertex-1888-01', family: 'angles', steps: ['משולש ABC ישר זווית ב-B'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1888' }, { product: 'analytic', issue: '#1888' }], note: '2-D taught «משולש ABC» then «∠ABC = 90°»; 3-D records the right angle at B, analytic hands it to the model' },
-  { id: 'unread-vertex-1888-02', family: 'angles', steps: ['משולש ABC ישר זווית ב-C'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1888' }, { product: 'analytic', issue: '#1888' }], note: 'any vertex — even C, where the default angle already sits' },
-  { id: 'unread-tail-1889-01', family: 'intersections', steps: ['מרובע ABCD', 'AC ו-BD נפגשים בנקודה E על AB'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }, { product: 'analytic', issue: '#1888' }] },
+  { id: 'unread-vertex-1888-01', family: 'angles', steps: ['משולש ABC ישר זווית ב-B'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1888' }], note: '2-D and analytic teach «משולש ABC» then «∠ABC = 90°»; 3-D records the right angle at B' },
+  { id: 'unread-vertex-1888-02', family: 'angles', steps: ['משולש ABC ישר זווית ב-C'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1888' }], note: 'any vertex — even C, where the default angle already sits' },
+  { id: 'unread-tail-1889-01', family: 'intersections', steps: ['מרובע ABCD', 'AC ו-BD נפגשים בנקודה E על AB'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'unread-tail-1889-02', family: 'intersections', steps: ['מרובע ABCD', 'AC ו-BD נפגשים בנקודה E שהיא אמצע BD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1905' }, { product: '3d', issue: '#1679', parked: true }], note: 'analytic reads both parts (E is the midpoint); 2-D reads no relative clause, so it refuses the line whole — reading it is #1905' },
 ];
 

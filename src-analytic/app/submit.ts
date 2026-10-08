@@ -29,6 +29,7 @@ import type { ApplyNotice } from '../engine/apply';
 import { factsWithin, type Fact } from '../engine/types';
 import { activeOf, rowOf } from './active';
 import { namesOfKind, nearMissOf, withName } from './nearMiss';
+import { declinedPart, unreadPart, type LostPart } from './lostPart';
 
 /** What a recorded line tells the student (#1350) — the engine's notice, without the line index. */
 export type RecordNotice = ApplyNotice;
@@ -146,6 +147,25 @@ const definingLineOf = (lines: readonly string[], id: string): string | null => 
   return null;
 };
 
+/** The figure's letters — never a stand-in for a substituted label (`shell/readExtent.ts`). */
+const figureLabelsOf = (d: Derivation): string[] => d.construction.objects.map((o) => o.id).filter((id) => /^[A-Z]d*$/.test(id));
+
+/** #1888 / #1889 (ADR-AG-251) — the refusal a lost part gets: the whole line, with its parts in the student's words. */
+const lostPartRefusal = (line: string, lost: LostPart): SubmitVerdict => ({
+  kind: 'refused',
+  error: { key: 'split-statements', detail: line, parts: lost.parts, ...(lost.teach ? { teach: lost.teach } : {}) },
+});
+
+/**
+ * #1888 / #1889 (ADR-AG-251, ADR-W-120) — DOES THE LINE LOSE A PART? One question for both seams that take a typed
+ * line (`decideSubmit`, `decideEdit`). A parsed line is asked whether its reading read every label it typed (arm 1);
+ * a line the tool reads in part is refused whole rather than drawn without that part. `'inside'` is a lost operand,
+ * not a lost part: 2-D hands that to the model (ADR-603), and so does this.
+ */
+export function lostPartOf(line: string, facts: readonly Fact[], figureLabels: readonly string[]): LostPart | 'inside' | null {
+  return unreadPart(line, facts, figureLabels);
+}
+
 /**
  * Decide what `raw` does, given the lines already accepted.
  *
@@ -258,10 +278,32 @@ function decideOnce(
 
   const parsed = parseLine(line);
   if (!parsed.ok) {
+    /**
+     * #1888 / #1889 (ADR-AG-251) — A DECLINED LINE WHOSE REST IS A LOST PART. «משולש ABC ישר זווית ב-B» and «…בנקודה E
+     * על AB» are declined whole, so they used to reach the model: the operator ruled them refused with the one-input-
+     * per-line message, in every builder. The longest prefix this same decision would accept is the part that was
+     * read; a rest of labels it already carries, with no word that says anything, is the part that was not.
+     */
+    if (parsed.code === 'not-handled') {
+      const lost = declinedPart(line, (prefix) => {
+        const k = decideOnce(prefix, lines, seed, current).kind;
+        return k === 'record' || k === 'already-known' || k === 'already-follows';
+      });
+      if (lost) return lostPartRefusal(line, lost);
+    }
     // #1175 — a refusal that carries WHO is already there must not lose them on the way to the UI.
     // Spread rather than listed field-by-field, so the next code that carries context arrives intact.
     return { kind: 'refused', error: { ...parsed, ok: undefined, key: parsed.code } as unknown as InputError };
   }
+
+  /**
+   * #1888 / #1889 (ADR-AG-251) — A PART THE READING NEVER READ. «C מחלקת את AB ביחס 3:2 ב-B» parsed to the ratio alone:
+   * the trailing «ב-B» changed nothing, and B rode the ratio. Asked before the fold — it is a question about the
+   * reading, and a refusal here costs nothing.
+   */
+  const lost = lostPartOf(line, parsed.facts, figureLabelsOf(current));
+  if (lost === 'inside') return { kind: 'refused', error: { key: 'not-handled', detail: line } };
+  if (lost) return lostPartRefusal(line, lost);
 
   /**
    * Dry-run the WHOLE list with the new line appended: a statement is acceptable only if the figure
@@ -542,7 +584,13 @@ export function decideEdit(
   seed: number,
   seedNames: Readonly<Record<string, string>> = {},
 ): boolean {
-  if (disabled.includes(index)) return parseLine(next.trim()).ok;
+  // #1888 / #1889 (ADR-AG-251): an edit that loses a part is refused, as the typed line is (ADR-W-006: one gate, both seams).
+  const parsed = parseLine(next.trim());
+  if (!parsed.ok) return false;
+  // the other rows' letters keep the probe's stand-in fresh (no fold needed: they are only excluded)
+  const letters = lines.flatMap((l, j) => (j === index ? [] : (l.match(/[A-Z]d*/g) ?? [])));
+  if (lostPartOf(next.trim(), parsed.facts, letters) !== null) return false;
+  if (disabled.includes(index)) return true;
   const edited = lines.map((l, j) => (j === index ? next : l));
   const at = rowOf(lines.length, disabled).indexOf(index);
   return !derive(activeOf(edited, disabled), seed, seedNames).faults.some((f) => f.index === at);

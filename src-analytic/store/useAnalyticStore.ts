@@ -78,6 +78,11 @@ export interface AskedQuestion {
 export type InputError =
   /** No rule matched — the LLM-escalation seam. */
   | { key: 'not-handled'; detail: string }
+  /**
+   * #1888 / #1889 (ADR-AG-251, ADR-W-120) — the line LOSES A PART: a part the reading never read. Refused whole with the
+   * one-input-per-line message, `parts` in the student's words; `teach` when the lost part is a right triangle's vertex.
+   */
+  | { key: 'split-statements'; detail: string; parts: string[]; teach?: { triangle: string; angle: string } }
   /** A rule matched and its equation would not parse. */
   | { key: 'bad-equation'; detail: string }
   /** Understood, and deliberately outside this product's scope (a rotated conic, a hyperbola). */
