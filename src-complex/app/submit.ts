@@ -165,7 +165,12 @@ function unreadRefusal(parsed: Extract<ReturnType<typeof parseLineV2>, { ok: fal
   // #1534 — `cos45 + i sin30` is a trigonometric form with two angles: name them, it is not unreadable
   const trig = trigAngleMismatch(line);
   if (trig) return { key: 'trig-mismatch', detail: line, cos: trig.cos, sin: trig.sin };
-  if (parsed.reason === 'unaccounted') return { key: 'unaccounted', detail: parsed.items.join(', ') };
+  if (parsed.reason === 'unaccounted') {
+    // #1890 (W20): a negation the grammar could not read is worded as one — 2-D's sentence
+    return parsed.negation
+      ? { key: 'negation', detail: parsed.items.join(', '), word: parsed.negation }
+      : { key: 'unaccounted', detail: parsed.items.join(', ') };
+  }
   const suggestion = wordRootSuggestion(line, lines);
   if (suggestion) return { key: 'word-root', detail: line, suggestion };
   const product = gluedISuggestion(line, lines);

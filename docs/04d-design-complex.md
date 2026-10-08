@@ -89,6 +89,12 @@ never as a contradiction or a refutation.
 - **Span accounting, and no `dropped*` gate — ever.** Every non-filler token span in a line is claimed by
   the parse, or the line is refused ([`FR-LN-1`](02d-requirements-complex.md)). The 2-D history is the
   argument: per-symptom `dropped*` gates accumulate, each one narrow, and still leave holes.
+  **A rule that searches for a keyword claims only the spans it read — never `claimAll` after a search**
+  ([ADR-CX-060](06d-decisions-complex.md#adr-cx-060)). `quadrantGiven` is the pattern: claim the name, the
+  noun, the ordinal. The property sentences (type, «לכל n», minimal n) read their property through ONE
+  reader, `readProperty`, which claims one property word plus the meaning-free structure around it
+  (number noun, «על הציר», «הינו»). Which sentence a refusal is worded with is decided after the
+  accounting, from the unread spans (`negationAmong` → `errNegation`); it never makes a rule read more.
 - **A second mention of a name is a GIVEN, and that decision lives at ONE seam.** Rules ask
   `existingRef()` rather than each deciding for itself
   ([ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md)) — the difference

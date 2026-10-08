@@ -100,7 +100,7 @@ export const COMPLEX_KW = String.raw`(?:${HE_PREFIX}${MEM}ספר${HE_SUFFIX} ${H
 export const REAL_KW = String.raw`(?:${HE_PREFIX}${MEM}${MEM}שי${HE_SUFFIX}|real)`;
 
 /** «מדומה טהור» — pure imaginary. */
-export const IMAGINARY_KW = String.raw`(?:${HE_PREFIX}${MEM}דומה(?: ${HE_PREFIX}טהור${HE_SUFFIX})?|pure imaginary|imaginary)`;
+export const IMAGINARY_KW = String.raw`(?:${HE_PREFIX}${MEM}דומה(?: ${HE_PREFIX}טהור${HE_SUFFIX})?|pure(?:ly)? imaginary|imaginary)`;
 
 /**
  * «ה-» before a LATIN letter: «ה-n המינימלי».
@@ -150,6 +150,31 @@ export const MINIMAL_KW = String.raw`(?:${HE_PREFIX}${MEM}ינימלי|${HE_PREF
 
 /** «שעבורו» / «for which» — the relative that binds the quantified n to the statement. */
 export const FOR_WHICH_KW = String.raw`(?:${HE_PREFIX}ש?עבור[וםן]?|${HE_PREFIX}ש?בו|for which|such that)`;
+
+/**
+ * #1890 (ADR-CX-060) — «על הציר» / «ציר» / "axis": the AXIS phrase of a type claim. «z1 על הציר הממשי»
+ * says no more than «z1 ממשי»; the reader claims the phrase so the property word is what carries the
+ * meaning, and anything else in the tail is left for the accountant to refuse.
+ */
+export const AXIS_KW = String.raw`(?:על\s+${HE_PREFIX}ציר|${HE_PREFIX}ציר|axis)`;
+
+/**
+ * #1890 — the FORMAL copula «הינו / הינה / הינם / הינן». Read by the property reader only: widening
+ * {@link COPULA_KW} with it would start accepting «z1 הינו מספר מרוכב» in the declaration rule.
+ */
+export const FORMAL_COPULA_KW = String.raw`(?:הינ(?:ו|ה|ם|ן))`;
+
+/** #1890 — «זה לזה» / "(of|to) each other": the reciprocal tail of the conjugates sentence. */
+export const EACH_OTHER_KW = String.raw`(?:זה\s+לזה|זו\s+לזו|(?:(?:of|to)\s+)?each\s+other)`;
+
+/**
+ * #1890 (ADR-CX-060) — a NEGATION word: «לא», «אינו», «איננו», «אין» (with a ש/ו/ה prefix: «שאינו»,
+ * «שלא»), "not", "isn't", "non-". The vocabulary is 2-D's (`statedNegation`, src/parser/scope.ts —
+ * copied, never imported), widened only by the Hebrew relative prefix. It does not make a rule read
+ * anything: span accounting refuses the unread word, and this atom only picks the sentence the refusal
+ * is worded with (W20). A rule never claims it, because complex has no negated claim.
+ */
+export const NEGATION_KW = String.raw`(?:[שוה]?(?:לא|אינ[הוםן]|איננ[הו]|אין)|≠|not|isn't|isnt|aren't|doesn't|non)`;
 
 /** «צמוד» — conjugate. */
 export const CONJUGATE_KW = String.raw`(?:${HE_PREFIX}צמוד${HE_SUFFIX}|conjugates?)`;
@@ -343,6 +368,10 @@ export const ATOM_SOURCES: Readonly<Record<string, string>> = {
   REAL_KW,
   IMAGINARY_KW,
   CONJUGATE_KW,
+  AXIS_KW,
+  FORMAL_COPULA_KW,
+  EACH_OTHER_KW,
+  NEGATION_KW,
   CONJ_OF_KW,
   RECIPROCAL_OF_KW,
   RE_OF_KW,

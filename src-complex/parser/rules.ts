@@ -86,6 +86,11 @@ import {
   COMPLEX_KW,
   CONJUGATE_KW,
   COPULA_KW,
+  AXIS_KW,
+  EACH_OTHER_KW,
+  FORMAL_COPULA_KW,
+  NEGATION_KW,
+  NUMBER_NOUN_KW,
   POLYGON_KW,
   QUADRILATERAL_KW,
   RADIUS_KW,
@@ -111,7 +116,64 @@ import {
   rx,
 } from './lexicon';
 import { normalize } from './normalize';
-import { type Claim, claimAll, unaccountedText } from './span';
+import { type Claim, type Unaccounted, claimAll, unaccountedSpans } from './span';
+
+/** A claim over `text` found at offset `at` of the normalized line. */
+const claimAt = (at: number, index: number, text: string): Claim => ({ start: at + index, end: at + index + text.length });
+
+/** Every non-empty match of an atom inside `s[at, end)`, as claims in the line's coordinates. */
+const claimsOf = (atom: string, s: string, at: number, end = s.length): Claim[] =>
+  [...s.slice(at, end).matchAll(rx(atom, 'giu'))]
+    .filter((m) => m[0].length > 0)
+    .map((m) => claimAt(at, m.index ?? 0, m[0]));
+
+/**
+ * #1890 (ADR-CX-060) — THE PROPERTY READER: which of the two sheet-decidable properties a tail states,
+ * and exactly the words it read to say so.
+ *
+ * Five property sentences used to find their keyword ANYWHERE in the line and then claim the whole
+ * line, which bypassed span accounting — «z1 אינו ממשי» was recorded as «z1 ממשי» under ✓. This
+ * reader claims ONE property word (imaginary tested first, as before) and the meaning-free structure
+ * around it — the number noun, the axis phrase, the formal copula — and nothing else. Whatever it did
+ * not read (a negation, a sign, «שונה מאפס», a second statement) is left for the accountant to refuse.
+ */
+const readProperty = (
+  s: string,
+  at: number,
+  end = s.length,
+): { readonly prop: 'real' | 'imaginary'; readonly claims: Claim[] } | null => {
+  const tail = s.slice(at, end);
+  const im = tail.match(rx(IMAGINARY_KW));
+  const hit = im ?? tail.match(rx(REAL_KW));
+  if (!hit) return null;
+  return {
+    prop: im ? 'imaginary' : 'real',
+    claims: [
+      claimAt(at, hit.index ?? 0, hit[0]),
+      ...claimsOf(NUMBER_NOUN_KW, s, at, end),
+      ...claimsOf(AXIS_KW, s, at, end),
+      ...claimsOf(FORMAL_COPULA_KW, s, at, end),
+    ],
+  };
+};
+
+/**
+ * #1890 (W20) — the negation word among the spans a parse left unread, if any.
+ *
+ * It decides only the WORDING of a refusal that span accounting already made: a negated line is
+ * told complex cannot read a negation yet, in 2-D's sentence, rather than the generic «לא את: אינו».
+ * Matched on the normalized line so «isn't» (three tokens) is one word, and only where an unread
+ * span lies inside the match — a negation some rule did read could never be blamed.
+ */
+const negationAmong = (normalized: string, unread: readonly Unaccounted[]): string | null => {
+  const re = rx(`(?<![\\p{L}\\p{N}])${NEGATION_KW}(?![\\p{L}\\p{N}])`, 'giu');
+  for (const m of normalized.matchAll(re)) {
+    const start = m.index ?? 0;
+    const end = start + m[0].length;
+    if (unread.some((u) => u.span.start >= start && u.span.end <= end)) return m[0];
+  }
+  return null;
+};
 
 export interface ParsedLine {
   readonly constraints: Constraint[];
@@ -183,6 +245,8 @@ export type ParseOutcome =
       readonly reason: 'unaccounted';
       readonly normalized: string;
       readonly items: string[];
+      /** #1890 (W20) — the unread word is a NEGATION: the refusal says so, in 2-D's sentence */
+      readonly negation?: string;
     };
 
 const empty = (): ParsedLine => ({
@@ -256,18 +320,33 @@ const solutionSelection: Rule = (s) => {
   if (!rx(SOLUTION_KW).test(s)) return null;
   const nameFirst = s.match(rx(`^(${NAME})\\s+(.*)$`));
   const nameLast = s.match(rx(`^(.*?)\\s+(${NAME})$`));
-  const placement = nameFirst ? { raw: nameFirst[1], rest: nameFirst[2] } : nameLast ? { raw: nameLast[2], rest: nameLast[1] } : null;
+  const placement = nameFirst
+    ? { raw: nameFirst[1], nameAt: 0, rest: nameFirst[2], restAt: s.length - nameFirst[2].length }
+    : nameLast
+      ? { raw: nameLast[2], nameAt: s.length - nameLast[2].length, rest: nameLast[1], restAt: 0 }
+      : null;
   if (!placement) return null;
-  const { rest } = placement;
-  if (!rx(QUADRANT_KW).test(rest)) return null;
+  const { rest, restAt } = placement;
+  const sol = rest.match(rx(SOLUTION_KW));
+  const kw = rest.match(rx(QUADRANT_KW));
+  if (!sol || !kw) return null;
   const found = ORDINALS.find(([re]) => re.test(rest));
-  if (!found) return null;
+  const ord = found ? rest.match(found[0]) : null;
+  if (!found || !ord) return null;
   const name = canonName(placement.raw);
+  // #1890 (ADR-CX-060): claim ONLY what was read — the name, the solution noun, the quadrant noun and
+  // its ordinal, as `quadrantGiven` does. Claiming the whole line read «z0 הוא הפתרון שאינו ברביע
+  // השלישי» as the selection IN quadrant III.
   return {
     ...empty(),
     declares: [name],
     selections: [{ name, filter: { kind: 'quadrant', name, q: found[1], src: s }, src: s }],
-    claims: [claimAll(s)],
+    claims: [
+      { start: placement.nameAt, end: placement.nameAt + placement.raw.length },
+      claimAt(restAt, sol.index ?? 0, sol[0]),
+      claimAt(restAt, kw.index ?? 0, kw[0]),
+      claimAt(restAt, ord.index ?? 0, ord[0]),
+    ],
   };
 };
 
@@ -618,30 +697,45 @@ function refNames(e: Expr): string[] {
  * answer, never a driver"*).
  */
 const conjugatesClaim: Rule = (s) => {
-  const m = s.match(rx(`^(${NAME})\\s*${AND_KW}\\s*(${NAME})\\s+.*${CONJUGATE_KW}`));
+  const m = s.match(rx(`^((${NAME})\\s*${AND_KW}\\s*(${NAME}))\\s+(.*)$`));
   if (!m) return null;
+  const tailAt = s.length - m[4].length;
+  const conj = m[4].match(rx(CONJUGATE_KW));
+  if (!conj) return null;
+  const [a, b] = [canonName(m[2]), canonName(m[3])];
+  // #1890 (ADR-CX-060): the subject pair, the conjugate word and «זה לזה» — never the whole line, which
+  // read «z1 ו-z2 אינם צמודים» as the conjugates claim and dropped «ו-|z1| = 5» after it.
   return {
     ...empty(),
-    declares: [canonName(m[1]), canonName(m[2])],
-    assertions: [{ kind: 'conjugates' as const, a: canonName(m[1]), b: canonName(m[2]), src: s }],
-    claims: [claimAll(s)],
+    declares: [a, b],
+    assertions: [{ kind: 'conjugates' as const, a, b, src: s }],
+    claims: [
+      { start: 0, end: m[1].length },
+      claimAt(tailAt, conj.index ?? 0, conj[0]),
+      ...claimsOf(EACH_OTHER_KW, s, tailAt),
+    ],
   };
 };
 
+/**
+ * F10 — «w ממשי», «z1 מדומה טהור», «z1 ו-z2 ממשיים»: one property, one subject or an «ו» pair.
+ *
+ * #1890 (ADR-CX-060): the property is read by {@link readProperty}, which claims only the words it
+ * understood; a negation, a sign, «שונה מאפס» or a second statement is left for the accountant. The
+ * pair is read as typed — one assertion per subject — where the old rule dropped the second name.
+ */
 const typeClaim: Rule = (s) => {
-  const m = s.match(rx(`^(${NAME})\\s+${COPULA_KW}(.*)$`));
+  const m = s.match(rx(`^((${NAME})(?:\\s*${AND_KW}\\s*(${NAME}))?)\\s+${COPULA_KW}(.*)$`));
   if (!m) return null;
-  const name = canonName(m[1]);
-  const tail = m[2];
-  // the imaginary test runs FIRST: «מדומה טהור» contains no real-keyword, but an English
-  // "pure imaginary" must not be caught by a laxer real rule if one is ever added above it
-  if (rx(IMAGINARY_KW).test(tail)) {
-    return { ...empty(), declares: [name], assertions: [{ kind: 'imaginary' as const, name, src: s }], claims: [claimAll(s)] };
-  }
-  if (rx(REAL_KW).test(tail)) {
-    return { ...empty(), declares: [name], assertions: [{ kind: 'real' as const, name, src: s }], claims: [claimAll(s)] };
-  }
-  return null;
+  const read = readProperty(s, s.length - m[4].length);
+  if (!read) return null;
+  const names = [m[2], m[3]].filter((n): n is string => n !== undefined).map(canonName);
+  return {
+    ...empty(),
+    declares: names,
+    assertions: names.map((name) => ({ kind: read.prop, name, src: s })),
+    claims: [{ start: 0, end: m[1].length }, ...read.claims],
+  };
 };
 
 // --- F6: objects ------------------------------------------------------------
@@ -975,10 +1069,6 @@ const exponentKN = (text: string): { k: number; c: number } | null => {
   return Number.isFinite(k) && k !== 0 ? { k, c } : null;
 };
 
-/** Which of the two sheet-decidable properties the tail states, if either. */
-const propertyOf = (tail: string): 'real' | 'imaginary' | null =>
-  rx(IMAGINARY_KW).test(tail) ? 'imaginary' : rx(REAL_KW).test(tail) ? 'real' : null;
-
 /**
  * F12 — «לכל n טבעי, w^(4n) ממשי» / «for every natural n, w^(4n) is real», in either word order.
  *
@@ -992,20 +1082,24 @@ const forallPower: Rule = (s, scope) => {
   // terms» — every noun-plus-modifier phrase in this grammar needs both orders spelled.
   const quantifier = `${FORALL_KW}\\s+(?:${NATURAL_KW}\\s+)?n(?:\\s+${NATURAL_KW})?`;
   const power = `(${NAME})\\s*\\^\\s*([^\\s]+?)`;
+  // #1890 (ADR-CX-060): the head (quantifier, power, copula) and the trailing quantifier are captured
+  // whole so the property tail's offsets are known — groups: 1 head · 2 name · 3 exponent · 4 tail ·
+  // 5 trailing quantifier (the English order only). The tail is read by `readProperty`, never claimed whole.
   const m =
-    s.match(rx(`^${quantifier}\\s*,?\\s*${power}\\s+${COPULA_KW}(.+)$`)) ??
-    s.match(rx(`^${power}\\s+${COPULA_KW}(.+?)\\s+${quantifier}$`));
+    s.match(rx(`^(${quantifier}\\s*,?\\s*${power}\\s+${COPULA_KW})(.+)$`)) ??
+    s.match(rx(`^(${power}\\s+${COPULA_KW})(.+?)(\\s+${quantifier})$`));
   if (!m) return null;
-  const name = canonName(m[1]);
+  const name = canonName(m[2]);
   if (!isComplexName(name, scope)) return null;
-  const exp = exponentKN(m[2]);
-  const prop = propertyOf(m[3]);
-  if (!exp || !prop) return null;
+  const exp = exponentKN(m[3]);
+  const tailEnd = s.length - (m[5]?.length ?? 0);
+  const read = readProperty(s, m[1].length, tailEnd);
+  if (!exp || !read) return null;
   return {
     ...empty(),
     declares: [name],
-    assertions: [{ kind: 'forall-power' as const, name, k: exp.k, c: exp.c, prop, src: s }],
-    claims: [claimAll(s)],
+    assertions: [{ kind: 'forall-power' as const, name, k: exp.k, c: exp.c, prop: read.prop, src: s }],
+    claims: [{ start: 0, end: m[1].length }, { start: tailEnd, end: s.length }, ...read.claims],
   };
 };
 
@@ -1020,22 +1114,24 @@ const minimalPower: Rule = (s, scope) => {
   const m = s.match(
     rx(
       // «ה-n המינימלי» against «the minimal n» — the same both-orders rule as every other modifier here
-      `^${OF_A}(?:${HE_THE_VAR}n\\s*${MINIMAL_KW}|${MINIMAL_KW}\\s+n)\\s+${FOR_WHICH_KW}\\s+(${NAME})\\s*\\^\\s*n\\s+` +
-        `${COPULA_KW}(.+?)\\s+${EQUATES_KW}\\s*(\\d+)$`,
+      // #1890: groups 1 head · 2 name · 3 property tail · 4 «הוא N» · 5 N — the tail is read, not claimed whole
+      `^(${OF_A}(?:${HE_THE_VAR}n\\s*${MINIMAL_KW}|${MINIMAL_KW}\\s+n)\\s+${FOR_WHICH_KW}\\s+(${NAME})\\s*\\^\\s*n\\s+` +
+        `${COPULA_KW})(.+?)(\\s+${EQUATES_KW}\\s*(\\d+))$`,
     ),
   );
   if (!m) return null;
-  const name = canonName(m[1]);
+  const name = canonName(m[2]);
   if (!isComplexName(name, scope)) return null;
-  const prop = propertyOf(m[2]);
-  if (!prop) return null;
+  const tailEnd = s.length - m[4].length;
+  const read = readProperty(s, m[1].length, tailEnd);
+  if (!read) return null;
   return {
     ...empty(),
     declares: [name],
     assertions: [
-      { kind: 'minimal-power' as const, name, prop, stated: Number(m[3]), src: s },
+      { kind: 'minimal-power' as const, name, prop: read.prop, stated: Number(m[5]), src: s },
     ],
-    claims: [claimAll(s)],
+    claims: [{ start: 0, end: m[1].length }, { start: tailEnd, end: s.length }, ...read.claims],
   };
 };
 
@@ -1140,8 +1236,14 @@ export function parseLineV2(raw: string, scope: ComplexScope = NO_SCOPE): ParseO
   for (const { rule } of RULES) {
     const line = rule(normalized, scope);
     if (!line) continue;
-    const items = unaccountedText(normalized, line.claims);
-    if (items.length) return { ok: false, reason: 'unaccounted', normalized, items };
+    const unread = unaccountedSpans(normalized, line.claims);
+    if (unread.length) {
+      const items = unread.map((u) => u.span.text);
+      const negation = negationAmong(normalized, unread);
+      return negation
+        ? { ok: false, reason: 'unaccounted', normalized, items, negation }
+        : { ok: false, reason: 'unaccounted', normalized, items };
+    }
     return { ok: true, line, normalized };
   }
   return { ok: false, reason: 'not-handled', normalized };

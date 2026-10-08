@@ -3648,3 +3648,70 @@ Also: the power keeps its parentheses; the line is recorded verbatim through `su
 disagreeing second mention is refused exactly as the cis spelling is; three mismatch refusals naming
 both angles (he wording); the non-rewrites; and radian parity with cis. Fixtures
 `trig-form-1534`, `trig-form-sqrt2-1534`.
+
+## ADR-CX-060 — A sentence that finds a keyword claims only the words it read (#1890)
+
+**Status:** accepted, 2026-10-08 (operator rulings 2026-10-08: "we need to fix", and W20 on the wording) ·
+**Issue:** [#1890](https://github.com/dcodish/geo_builder/issues/1890) (bug, P1, `complex`) · round #1940
+**Requirements:** [02d](02d-requirements-complex.md) FR-LN-1 (a keyword sentence claims only what it read; the negation wording), the F8, F10 and F12 grammar rows ·
+**Design:** [04d](04d-design-complex.md), "Design rules with teeth", the span-accounting bullet ·
+**Ladder:** stages 0b and 0c ([LADDER-CX](LADDER-CX.md))
+
+**The defect.** «z1 אינו ממשי», «z1 לא ממשי», «z1 is not real» were recorded as `real:z1` and drawn on
+the real axis under ✓; «z1 על הציר הממשי החיובי» drew z₁ at −2.45 in configuration 2; «r מספר ממשי
+שונה מאפס» dropped «שונה מאפס»; «z1 ו-z2 אינם צמודים» drew conjugates; «z0 הוא הפתרון שאינו ברביע
+השלישי» selected the root IN quadrant III. Measured at 5edeeca1 through `submitLine`.
+
+**The class.** Five property sentences — `typeClaim`, `conjugatesClaim`, `forallPower`, `minimalPower`
+(the last two through `propertyOf`) and `solutionSelection` — found their keyword anywhere in the line
+and then returned `claimAll(s)`, bypassing span accounting, the one honesty mechanism (FR-LN-1,
+ADR-CX-009 §2). A census inserted «אינו» / «חיובי» / «שונה מאפס» (or "not" / "positive" / "nonzero")
+at every token boundary of every catalog line and the F10/F5b controls: 1,254 variants, **186 parsed
+`ok`**, all in exactly those five rules. Every other rule refused the inserted word.
+
+**Siblings.** 2-D refuses a negation pre-parse (`statedNegation`, key `input.scope.negation`), analytic
+refuses (`not-handled` / `bad-operand`), and 3-D's grammar does not own these sentences. The class is
+complex-only.
+
+**Decision.**
+1. **One property reader**, `readProperty` (rules.ts), replaces `propertyOf` and the inline tests in
+   `typeClaim`. It returns the property and the spans it read: ONE property word (imaginary tested
+   first, as before) plus the meaning-free structure around it — the number noun (`NUMBER_NOUN_KW`),
+   the axis phrase (`AXIS_KW`, new) and the formal copula «הינו» (`FORMAL_COPULA_KW`, new, read by this
+   reader only, so the declaration rule does not start accepting «z1 הינו מספר מרוכב»).
+2. Each of the five rules claims its own anchored structure (subject, quantifier, power, «הוא N», the
+   solution noun, the quadrant and its ordinal) plus the reader's spans — never `claimAll` after a
+   search. `quadrantGiven` was already the pattern. `conjugatesClaim` claims the pair, the conjugate
+   word and «זה לזה» (`EACH_OTHER_KW`, new).
+3. `typeClaim`'s subject is `NAME (ו NAME)?`, one assertion per subject: «z1 ו-z2 ממשיים» reads as
+   typed, the same as «z1 ממשי» + «z2 ממשי». «purely imaginary» joins `IMAGINARY_KW`, so the two
+   accepted spellings «z1 הינו מספר ממשי» and «z1 is purely imaginary» keep reading.
+4. **The wording (W20).** An unread NEGATION is refused with 2-D's sentence, its examples swapped for
+   complex lines that read: «עדיין אי אפשר לקלוט שלילה ("{{word}}"). ניתן לציין מה כן נתון — למשל "z1
+   מדומה טהור" או "arg(z1) = 30°".» (`errNegation`, key `negation`). 2-D's last clause ("the shape
+   stays free…") is 2-D-specific and dropped, as ruled. The choice is made after the accounting:
+   `parseLineV2` asks `negationAmong` whether an unread span lies inside a negation word
+   (`NEGATION_KW`: 2-D's vocabulary, copied, plus the ש/ו/ה prefix so «שאינו» / «שלא» count, and
+   "non"). It never makes a rule read anything. Every other unread qualifier keeps `errUnaccounted`.
+   Both taught examples are driven through `submitLine` in the lock.
+
+**Not built** (each a capability for the operator): a negated claim, a half-axis (positive / negative
+real) claim, a nonzero parameter, and two statements on one line. Complex has no representation for
+any of them today — no negated `Claim` kind or exclusion filter, no `≠` on a parameter — so they are
+refused, not read.
+
+**Cost.** One extra regex pass per refused line (`negationAmong`); the reader runs three atom scans
+over a short tail. No solve change.
+
+**Consequences.** `parser/rules.ts` (`readProperty`, `claimsOf`, `negationAmong`; the five rules),
+`parser/lexicon.ts` (`AXIS_KW`, `FORMAL_COPULA_KW`, `EACH_OTHER_KW`, `NEGATION_KW`; "purely imaginary"),
+`app/submit.ts` (`unreadRefusal`), `store/useComplexStore.ts` + `app/errorText.ts` + `i18n/index.ts`
+(`negation` / `errNegation`, he + en). A saved file, share link or resumed session holding a
+now-refused line loads without it, under the existing partial-load notice. The proxy bundles
+`parseLineV2`, so it needs a redeploy at deploy.
+
+**Locks.** `src-complex/__tests__/issue-1890-property-claims.test.ts`: the issue's exact sequences
+through `submitLine` (refusal key, Hebrew text, nothing recorded, nothing drawn); the per-spelling
+table (39 lines + 3 selections); «z1 ו-z2 ממשיים» ≡ «z1 ממשי» + «z2 ממשי»; the unchanged controls
+and verdicts; the two taught examples read; and the census as a permanent class guard (0 variants
+parse `ok`).

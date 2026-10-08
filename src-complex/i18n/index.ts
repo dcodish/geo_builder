@@ -35,6 +35,8 @@ const he = {
   errIncompatible: 'המשפט לא נוסף — אינו מתיישב עם: "{{detail}}"',
   errImpossible: 'המשפט לא נוסף — הוא לא יכול להתקיים: "{{detail}}"',
   errUnaccounted: 'הבנתי חלק מהשורה, אבל לא את: {{detail}}',
+  // #1890 (W20) — 2-D's negation sentence (input.scope.negation), with examples that read in this tool
+  errNegation: 'עדיין אי אפשר לקלוט שלילה ("{{word}}"). ניתן לציין מה כן נתון — למשל "z1 מדומה טהור" או "arg(z1) = 30°".',
   // #1405 — a letter declared complex, used where only a real number can stand
   errComplexAsReal: 'המשפט לא נוסף — {{letter}} הוגדר כמספר מרוכב, אבל "{{detail}}" משתמש בו כמספר ממשי (גודל או זווית)',
   // #1428 — a statement the figure cannot use, with the reason the fold knows (whyText)
@@ -271,6 +273,7 @@ const en: typeof he = {
   errIncompatible: 'Statement not added — it cannot hold together with: "{{detail}}"',
   errImpossible: 'Statement not added — it cannot hold at all: "{{detail}}"',
   errUnaccounted: 'I read part of the line, but not: {{detail}}',
+  errNegation: 'Negation ("{{word}}") is not supported yet. State what IS given instead — e.g. "z1 is pure imaginary" or "arg(z1) = 30°".',
   errComplexAsReal: 'Statement not added — {{letter}} is declared a complex number, but "{{detail}}" uses it as a real number (a size or an angle)',
   errRefused: 'Statement "{{detail}}" not added — {{reason}}',
   errWordRoot: 'Write the root with the √ symbol — there is a √ button under «Symbols». E.g. "{{suggestion}}" instead of "{{detail}}".',
