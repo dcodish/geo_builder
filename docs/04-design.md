@@ -245,6 +245,16 @@ given never stated (ADR-052). Members: `incompleteComparative` (#777) and the ro
 registered **after** the rule that owns the complete form, and its absence is **structural** (an end-of-line
 anchor), never inferred from another rule failing.
 
+### An incircle 2-D does not draw, and a bare n-gon in the object gate (#1891, [ADR-606](06-decisions.md#adr-606))
+
+The inscription noun lists (`POLY_WORDS_HE/EN`) compose the n-gon lane's own tables (`POLY_NAME_N`,
+`HE_POLY_NAME_N`), so `isCircleInPolygon` decides the direction for «מחומש/משושה/מתומן» too. The `incircle` rule
+first asks `uninscribableIncircle`: an n ≥ 5 polygon (from the noun, from «מצולע» plus its run, or a bare run of five
+or more labels) with the circle inside → the `incircle-not-drawn` clarify, refused at the pre-LLM decision with
+`input.incircleKnownLimit`. It joins `inscribed-contradicts-noun` in `NOUN_REFUSALS`, the refusals the dropped-noun
+gate must not overrule. In `droppedConstructNoun`, `BARE_SHAPE_KEYS` holds `place`: #835's bare n-gon flag is the
+shape's identity, not payload, so a model answer of a bare n-gon accounts for no stated construct.
+
 ### Addressing an angle: one reader, many value kinds (#967, [ADR-496](06-decisions.md#adr-496))
 
 An angle statement has two halves: **which angle** is named and **what is said about it**. **`angleArms` is the
@@ -527,6 +537,8 @@ seam guards — is `decideDeterministic2D` in `app/decideDeterministic.ts`, a pu
 its binds, log events and note. `runSubmit` applies the verdict and `log-triage` calls the same function; the mirror
 test fails if `runSubmit` parses or refuses on its own, and the parity shards (`decide-parity-1395-*`) hold the corpus.
 
+- **An incircle 2-D does not draw** ([ADR-606](06-decisions.md#adr-606)): `incircle-not-drawn` → `refuse('guided')`,
+  logged `incircle-not-drawn:<sides>` so log-triage counts the demand; never escalated.
 - **An unresolved operand** ([ADR-571](06-decisions.md#adr-571)): a dry run failing in the topological evaluator
   answers `input.missingOperands` — the sentence and `missingOperandLetters`, the labels neither the figure nor the
   batch defines — or `input.unresolvedSentence`; internal ids never reach the student.

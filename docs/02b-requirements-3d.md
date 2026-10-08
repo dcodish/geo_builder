@@ -164,8 +164,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   trapezoid", "right triangle") is drawn, standalone and inside an inscription in either direction; one the noun
   cannot carry («מרובע ישר זווית») is never dropped — the line goes to the model. A quadrilateral in a circle is
   drawn as its family's cyclic member, with a notice; a right trapezoid in a circle is refused. A shape's own
-  condition draws no segment the student did not name. The 2-D twin is FR-EN-14.
-  - Sources: ADR-3D-307, ADR-3D-308; #1554, #1792, #1838 (a quadrilateral's incircle), #1844.
+  condition draws no segment the student did not name. The 2-D twin is FR-EN-14. A circle inscribed in a pentagon
+  or hexagon (any spelling, lettered or not) is refused before the model with «הכלי עדיין לא יודע לשרטט מעגל חסום
+  במחומש — זו מגבלה של הכלי.» (the noun filled in); nothing is drawn. «משוכלל» / "regular" on a flat polygon is an
+  adjective 3-D draws only on a square: elsewhere the line goes to the model, and an answer that drops it is refused.
+  - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891.
 
 ## Vectors — the geometric lane
 

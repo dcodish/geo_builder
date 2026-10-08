@@ -160,7 +160,9 @@ export function droppedShapeAdjective3(utterance: string, commands: Command3[]):
   // not only on "triangle", and "right-angled" wherever it stands. "right prism" is not a shape adjective.
   const eq = s.match(/שווה[\s-]?צלעות|שווה[\s-]?שוקיים|\bequilateral\b|\bisosceles\b/i);
   const rt = s.match(new RegExp(SHAPE_ADJ_WORDS3.right, 'i'));
-  if (!eq && !rt) return [];
+  // #1891: «משוכלל» / "regular" on a flat polygon (the lexicon scopes it: never a solid's own regularity)
+  const reg = s.match(new RegExp(SHAPE_ADJ_WORDS3.regular, 'i'));
+  if (!eq && !rt && !reg) return [];
   // #1792 — PER PHRASE, not kind-blind (2-D ADR-595 arm 4's fix, 3-D edition): an adjective is a property
   // of ITS polygon, so only a constraint ON a ring the commands name can carry it — an unrelated `⟂` or
   // equal pair stated in the same line must not account for «ישר זווית». Generous where the line names no
@@ -185,6 +187,20 @@ export function droppedShapeAdjective3(utterance: string, commands: Command3[]):
         (c.u.kind === 'pair' && c.v.kind === 'pair' ? onRing([c.u.from, c.u.to, c.v.from, c.v.to]) : true),
     );
     if (!accounted) lost.push(rt[0]);
+  }
+  // #1891: regularity is accounted for by what makes the ring regular in 3-D's vocabulary — a SQUARE on a
+  // quad ring, an equal-sides lowering on a triangle ring (or a kind equilateral by construction). Nothing
+  // accounts for it on a pentagon or a hexagon, which 3-D cannot draw regular.
+  if (reg) {
+    const arity = readShapePhrase3(s)?.arity ?? 3;
+    const accounted =
+      (arity === 4 && commands.some((c) => c.type === 'quad-shape' && c.base === 'square' && onRing([...c.ids]))) ||
+      (arity === 3 && commands.some(
+        (c) =>
+          (c.type === 'length-rel' && c.c === 1 && !c.soft && ('pair' in c.rhs ? onRing([c.a1, c.b1, ...c.rhs.pair]) : true)) ||
+          (c.type === 'solid' && EQUILATERAL_BY_KIND.has(c.kind)),
+      ));
+    if (!accounted) lost.push(reg[0]);
   }
   return lost;
 }

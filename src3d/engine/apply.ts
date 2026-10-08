@@ -12,7 +12,7 @@ import { riderPairsT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
 import { CYCLIC_MEMBER, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
-import { claimPointIds, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
+import { claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import { firstFreeLetter } from './freeLetter';
 import { carrierParams3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, ScalarPin, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
@@ -3000,8 +3000,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // about the polygon the student already drew, never a re-creation of its vertices).
         const missingRing = missingPoint(c, cmd.def.ring);
         if (missingRing) return { ok: false, error: missingRing };
-        if (cmd.def.kind === 'incircle' && cmd.def.ring.length !== 3)
-          return { ok: false, error: { code: 'incircle-needs-triangle' } };
+        if (cmd.def.kind === 'incircle' && !INCIRCLE_RING_ARITIES3.has(cmd.def.ring.length))
+          return { ok: false, error: incircleRefusal3(cmd.def.ring.length) };
       } else if (cmd.def.kind === 'tangent-line') {
         if (!c.points.has(cmd.def.center)) return { ok: false, error: { code: 'unknown-point', id: cmd.def.center } };
         if (!c.lines.has(cmd.def.line) && !c.pointLines.has(cmd.def.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.def.line } };

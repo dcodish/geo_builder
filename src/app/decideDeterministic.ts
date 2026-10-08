@@ -432,6 +432,16 @@ export async function decideFromParse(
       { key: 'input.inscribedContradictsNoun', params: { detail: utterance.trim(), shape: { t: `input.shapeNoun.${r.shape}` }, forced: { t: `input.shapeNoun.${r.forced}` } } },
     );
   }
+  /**
+   * #1891 ([ADR-606](../../docs/06-decisions.md#adr-606)): «מעגל חסום במחומש ABCDE» — an incircle of a polygon
+   * 2-D does not draw yet. Refused with the W19 known-limit sentence, the polygon's noun filled in, under its
+   * own log result so log-triage counts the demand. Never escalated: in prod the model's answer dropped the
+   * circle, and other answers draw it through the vertices; no gate can check a model's direction.
+   */
+  if (!r.ok && r.reason === 'incircle-not-drawn') {
+    const shape = r.sides === 5 ? 'input.incircleShape5' : r.sides === 6 ? 'input.incircleShape6' : 'input.incircleShapeMany';
+    return refuse('guided', { source: 'parser', result: `incircle-not-drawn:${r.sides}` }, { key: 'input.incircleKnownLimit', params: { shape: { t: shape } } });
+  }
   // #1285: the same channel — the angle's stated vertex is not the bisector's own first letter.
   if (!r.ok && r.reason === 'bisector-wrong-apex') {
     return refuse('guided', { source: 'parser', result: `bisector-wrong-apex:${r.apex}:${r.stated}` }, { key: 'input.bisectorWrongApex', params: { apex: r.apex, stated: r.stated } });

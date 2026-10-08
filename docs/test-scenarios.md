@@ -1735,3 +1735,7 @@ over all four (ADR-041).
 ### `flat-triangle-refused-1849` — «משולש ABC · AB = 5 · BC = 3 · AC = 8»: the closing side is refused, naming «משולש ABC» (#1849, ADR-602)
 
 **Guards against:** a declared polygon the givens force flat being drawn as one. The operator's ruling (2026-10-07) reverses ADR-W-048's notice for declared polygons: a flat line is not a triangle. **Asserts** that «AC = 8» is refused by the submit gate as a flattened triangle ABC whose other side is «משולש ABC», and that the thin-but-legitimate 3° triangle still commits. The class matrix (both orders, 4·4·8, a ratio, a sum, a perimeter, a quadrilateral, the incidence family, the default-apex isosceles, the controls) is `src/app/__tests__/issue-1849-flat-polygon-refused.test.ts`.
+
+### `pentagon-incircle-refused-1891` — «מעגל חסום במחומש ABCDE» is refused as a known tool limit (#1891, ADR-606)
+
+**Guards against:** a circle inscribed in a pentagon reaching the model, whose answer dropped the circle (the operator's prod run) or drew it through the vertices. **Asserts** that the operator's exact line on an empty canvas is refused by the parser as `incircle-not-drawn` with five sides, and that nothing is drawn. The submit-path matrix is `src/app/__tests__/issue-1891-ngon-incircle.test.ts`.

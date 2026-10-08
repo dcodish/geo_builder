@@ -19,6 +19,12 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       return t('err.boundUnsatisfiable', { id: err.id });
     case 'incircle-needs-triangle': // #442 — only a tangential polygon has an incircle
       return t('err.incircleNeedsTriangle');
+    // #1891 (the W19 ruling): a pentagon / hexagon incircle is a known TOOL limit, named as one; seven or
+    // more sides gets the ruled «…במצולע עם יותר משש צלעות» noun.
+    case 'incircle-known-limit':
+      return t('err.incircleKnownLimit', {
+        shape: t(err.sides === 5 ? 'err.incircleShape5' : err.sides === 6 ? 'err.incircleShape6' : 'err.incircleShapeMany'),
+      });
     case 'ambiguous-vector-length':
       /**
        * #1156 — the apply-level refusal carries the student's OWN pairs, so the two spellings that

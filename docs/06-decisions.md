@@ -15340,3 +15340,27 @@ The row kept reading «תיכון לבסיס» with a ✓ while the figure drew 
 - A stated collinearity or incidence that flattens a declared polygon («D אמצע AB · D על AC») now names the polygon («סותר את «משולש ABC»») instead of the earlier statement it collides with.
 - A refusal at the door now names the earlier statement it contradicts wherever the fold found one (ADR-508's tail, which the submit note used to drop).
 - Thin but real triangles (3°, 1°, a stated 0.1°) still build.
+
+## ADR-606 — A circle inscribed in a polygon of five or more sides is refused before the model, and a bare n-gon is bare to the object gate (#1891)
+
+**Status:** accepted · 2026-10-08 · bug (P1, 2-D + 3-D, honesty class) · branch `fix/1891-polygon-incircle` · fix round #1940 · the 2-D slice of #1891 (3-D: [ADR-3D-311](06b-decisions-3d.md#adr-3d-311))
+**Requirements:** [02](02-requirements.md) FR-EN-14 — a circle inscribed in a polygon of five or more sides is refused; nothing is drawn · **Design:** [04](04-design.md) § "An incircle 2-D does not draw, and a bare n-gon in the object gate" and § "The pre-LLM decision" · **LADDER stage:** none (parser and submit gate)
+
+**The rulings.** *"the issue with מעגל חסום במחומש ABCDE is also on the 2d tool. so we need to fix both"* (operator, 2026-10-08): the circle through the vertices is never drawn for «מעגל חסום ב…», and within this P1 the outcome is an honest refusal. W19 (same day): until pentagon and hexagon incircles are built (#1908), the refusal is the known-limit sentence «הכלי עדיין לא יודע לשרטט מעגל חסום במחומש — זו מגבלה של הכלי.», the polygon's noun filled in; seven or more sides is «…במצולע עם יותר משש צלעות…».
+
+**Measured before** (`main` @ 5edeeca1, `runSubmit`, `fetch` stubbed). Every pentagon/hexagon inscription spelling (lettered, unlettered after «מחומש ABCDE», «משוכלל», English, container-first, polygon-subject, «מצולע», the bare run) escalated `not-handled`. His prod run (session yln1uwxa) committed the model's answer «מחומש ABCDE»: a bare pentagon, green, the circle gone. Canned answers «A, B, C, D ו-E על מעגל» drew the circle through all five vertices, green.
+
+**The class (docs/17 §1).** *An inscription sentence about a polygon whose noun the direction reader's own list lacks is decided by word order or not at all* (ADR-245's lesson: a noun missing from one list builds the converse). In 2-D it went to a model, and no gate can check a model's direction. Second seam: `droppedConstructNoun` (ADR-430) counted a shape as bare only on keys `{type, ids}`, so #835's `place` flag read as payload and a decomposition that lost the stated circle (or «אלכסונים», «גובה») committed.
+
+**Decision.**
+1. **One noun list.** `POLY_WORDS_HE/EN` compose the n-gon tables (`POLY_NAME_N`, `HE_POLY_NAME_N`, moved above them); no third spelling.
+2. **Refused before the model.** `uninscribableIncircle`, asked first by the `incircle` rule: an n ≥ 5 polygon (noun, «מצולע» + run, or a bare run of five or more labels) with the circle inside (the inscribe verb with the polygon as container, the polygon-subject «… חוסם מעגל», or the ב/"in" marker on a bare run) → `incircle-not-drawn` → `refuse('guided')` with `input.incircleKnownLimit`, logged `incircle-not-drawn:<sides>`. It joins `inscribed-contradicts-noun` in `NOUN_REFUSALS`, so the dropped-noun gate does not turn it back into `not-handled`. The circum direction («מחומש ABCDE חסום במעגל», "circle circumscribed about pentagon …") still escalates; no new capability.
+3. **`place` is identity.** `BARE_SHAPE_KEYS` = `{type, ids, place}`.
+
+**Measured after.** Every refused line above: `input.incircleKnownLimit`, 0 model calls, no facts. «מחומש ABCDE עם אלכסונים» / «מחומש ABCDE חסום במעגל» / «משושה ABCDEF עם אלכסונים» / «מחומש ABCDE וגובה מ-A» answered with the bare n-gon → `input.labelsDropped` naming the word. The triangle, square, trapezoid and kite incircles, «מחומש ABCDE», «מחומש משוכלל ABCDE», «משושה ABCDEF» build without the model; «ריבוע DEFG חסום במחומש ABCDE» keeps escalating.
+
+**Not covered (escalated on the issue).** «מחומש משוכלל ABCDE חסום במעגל» answered «מחומש משוכלל ABCDE» still commits with the stated circle hidden: the regular polygon's hidden scaffold circle accounts for «מעגל» in the object gate. The plan said to escalate rather than widen if `place` did not cover it.
+
+**Sibling check.** 3-D has the class (ADR-3D-311). Analytic escalates the same sentence to its model (cross-tool, ADR-W-117 §8; not in the ruling). Locks: `src/app/__tests__/issue-1891-ngon-incircle.test.ts` and the scenario in `scenarios-corpus-4.ts`.
+
+**Behaviour change for a student:** «מעגל חסום במחומש ABCDE» (and the hexagon, «מצולע», a bare run of five letters) is refused with «הכלי עדיין לא יודע לשרטט מעגל חסום במחומש — זו מגבלה של הכלי.» instead of going to the model; a model answer that keeps only a bare five-, six- or eight-sided polygon and drops a stated construct is refused naming it.

@@ -40,7 +40,7 @@ import { carrierParams3, statedDataAdmits } from '../engine/carriers';
 import { dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
 import { meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
-import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
+import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { parse3, parseRewrite3 } from '../parser/parse3';
 
@@ -1176,7 +1176,9 @@ function readStatement3(
                 ? { code: 'component-symbolic', component: parsed.component }
                 : parsed.reason === 'inscribed-contradicts-noun'
                   ? { code: 'inscribed-contradicts-noun', shape: parsed.shape, forced: parsed.forced, sentence: utterance.trim() }
-                  : { code: 'not-understood' },
+                  : parsed.reason === 'incircle-not-drawn'
+                    ? incircleRefusal3(parsed.sides) // #1891: apply's own refusal, so both seams word it alike
+                    : { code: 'not-understood' },
   };
 }
 
