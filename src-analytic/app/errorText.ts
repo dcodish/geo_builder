@@ -153,6 +153,8 @@ export function errorText(error: InputError, t: Translate): string {
     'bad-equation': 'errBadEquation',
     'out-of-scope': 'errOutOfScope',
     'proof-target': 'errProofTarget',
+    // #1888 / #1889 (ADR-AG-251) — a line that loses a part: its parts listed, or the right angle's two lines taught
+    'split-statements': error.key === 'split-statements' && error.teach ? 'errRightAngleVertex' : 'errSplitStatements',
     'reserved-coordinate': 'errReservedCoordinate',
     'bad-arity': 'errBadArity',
     'repeated-vertex': 'errRepeatedVertex',
@@ -241,6 +243,9 @@ export function errorText(error: InputError, t: Translate): string {
     other: 'other' in error ? error.other : '',
     reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '',
     definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '',
+    all: error.key === 'split-statements' ? error.parts.map((p, i) => `(${i + 1}) ${p}`).join('  ') : '',
+    triangle: error.key === 'split-statements' && error.teach ? error.teach.triangle : '',
+    angle: error.key === 'split-statements' && error.teach ? error.teach.angle : '',
     // #1554 ruling 1 (ADR-AG-198): the two nouns, in each locale's spelling (the registry key is the Hebrew).
     shapeHe: 'shape' in error ? (error.shape ?? '') : '',
     polygon: 'polygon' in error ? (error.polygon ?? '') : '',

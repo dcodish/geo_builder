@@ -173,6 +173,9 @@ const he = {
   errNotHandled: 'לא הצלחתי להבין את המשפט: "{{detail}}"',
   errBadEquation: 'לא הצלחתי לקרוא את המשוואה: "{{detail}}"',
   errOutOfScope: 'המשפט מובן, אך אינו נתמך בכלי הזה: "{{detail}}"',
+  // #1888 / #1889 (ADR-AG-251) — 2-D's text (`input.scope.split-statements`, `right-angle-vertex`), ADR-W-118 B1
+  errSplitStatements: 'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. זיהינו כאן שני נתונים — נסו להקליד אותם בשני שלבים: {{all}}',
+  errRightAngleVertex: 'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו קודם «משולש {{triangle}}», ואחר כך בשורה נפרדת «∠{{angle}} = 90°».',
   errProofTarget:
     'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "{{detail}}"',
   errConflict: 'המשפט לא נוסף — הוא סותר את מה שכבר נקבע: "{{detail}}"',
@@ -625,6 +628,8 @@ const en: typeof he = {
   errNotHandled: 'I could not understand the statement: "{{detail}}"',
   errBadEquation: 'I could not read the equation: "{{detail}}"',
   errOutOfScope: 'Understood, but not supported in this tool: "{{detail}}"',
+  errSplitStatements: 'One given per line — that way the tool can build and verify each one separately. We spotted two givens here; try entering them as two steps: {{all}}',
+  errRightAngleVertex: 'One given per line — that way the tool can build and verify each one separately. Write «triangle {{triangle}}» first, and then, on a separate line, «∠{{angle}} = 90°».',
   errProofTarget:
     'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "{{detail}}"',
   errConflict: 'Not added — it contradicts what is already fixed: "{{detail}}"',

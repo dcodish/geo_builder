@@ -236,6 +236,17 @@ The LLM suggest lane (ADR-W-030) is held against #1297; the lexicon stays out of
 
 *Identifiers:* `record` · `imperativeCandidates` · `already-known` · `already-follows`
 
+### A line that loses a part ([ADR-AG-251](06c-decisions-analytic.md#adr-ag-251), #1888, #1889; [ADR-W-120](06w-decisions-workspace.md#adr-w-120))
+
+`app/lostPart.ts`, asked by `decideOnce` (`app/submit.ts`) and by `decideEdit` through `lostPartOf`: one question for both typed seams.
+
+- **Arm 1, a parsed line.** `unreadPart` runs the shared probe (`shell/readExtent.ts` `readLabelRuns`) with `parseLine` as the reader and the facts without `src` as the lowering. The frame is context-free, so one reader serves every clause; the whole line is the one clause `cutAtReading` cuts. A tail gives `split-statements`; an unread run with read labels after it gives `not-handled` (the model, as in 2-D). Asked before the fold: it is a question about the reading.
+- **Arm 2, a declined line.** `declinedPart`: the LONGEST word-boundary prefix that the same decision would record (or answer as already known). Its rest must carry at least one label, only labels the prefix's facts carry, and nothing else with a construction signal (`hasConstructionSignal` over `VOCABULARY_ANALYTIC`, no digit). No word list is added.
+- **The taught form.** `rightAngleTeach`: the read part is a triangle whose right angle the reading left open (a three-way `choice` of perpendiculars) and the lost part is one of its vertices. The refusal carries `teach: { triangle, angle }`, the angle named with the vertex in the middle.
+- **Text.** `errSplitStatements` and `errRightAngleVertex` (`i18n/index.ts`) carry 2-D's text (ADR-W-118 B1).
+
+*Identifiers:* `split-statements` · `unreadPart` · `declinedPart` · `lostPartOf`
+
 ### What a sentence draws, and whose extent it is ([ADR-AG-198](06c-decisions-analytic.md#adr-ag-198), #1639, #1640, #1636, #1641, #1643)
 
 `pieceFacts(noun, a, b)` is the one piece declaration (`line-2pt { a, b }` or `segment { …, ref: true }`), emitted
