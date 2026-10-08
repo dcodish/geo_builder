@@ -1180,7 +1180,7 @@ function dependentsBroken(before: Fact3[], after: Fact3[], seed: number, changed
 function readStatement3(
   st: { facts: Fact3[]; seed: number },
   utterance: string,
-): { ok: true; commands: Command3[] } | { ok: false; error: NonNullable<StoreError3> } {
+): { ok: true; commands: Command3[]; unread: string[] } | { ok: false; error: NonNullable<StoreError3> } {
   // #1666 (ADR-3D-295): a PROOF TARGET is refused BEFORE the grammar, at the one reader both statement
   // seams share (`submit`, the ✎ edit). It used to parse: ADR-3D-002 stripped «הוכיחו כי» / "prove that" and
   // read the claim, which since the T2 addendum DRIVES a free figure — so the figure was made to satisfy
@@ -1208,7 +1208,7 @@ function readStatement3(
       if (flat.flat && (!flat.reading || parsed.commands.length !== 1 || !isBareAltitude3(utterance)))
         return { ok: false, error: { code: 'not-understood' } };
     }
-    return { ok: true, commands: parsed.commands };
+    return { ok: true, commands: parsed.commands, unread: parsed.unread ?? [] };
   }
   // #516: every TYPED refusal keeps its identity — only a genuine `not-handled` may read as
   // not-understood, because not-understood is what the App escalates to the LLM lane.
@@ -1237,9 +1237,9 @@ function readStatement3(
  * The honesty gates, ONE list for every statement seam (#424 / #438 / #440 / #535, ADR-3D-147): what a
  * stated line names that the commands never carry. `prior` is the figure the line is added to.
  */
-function lostGivens3(utterance: string, commands: readonly Command3[], prior: Construction3): string[] {
+function lostGivens3(utterance: string, commands: readonly Command3[], prior: Construction3, unread: readonly string[] = []): string[] {
   const cmds = [...commands];
-  return [
+  const lost = [
     ...droppedNewLabels3(utterance, cmds, [...prior.points.keys()], [...prior.vectors.keys()]),
     ...droppedGivenNumbers3(utterance, cmds),
     ...droppedShapeNoun3(utterance, cmds), // #587 / ADR-3D-084: a stated base shape the lane cannot lower
@@ -1247,6 +1247,9 @@ function lostGivens3(utterance: string, commands: readonly Command3[], prior: Co
     ...droppedConstructNoun3(utterance, cmds), // #438/#440: a stated OBJECT never materialised
     ...droppedGivenRelations3(utterance, cmds), // #1730: a stated pair relation no command carries
   ];
+  // #1902 (ADR-3D-312): the words the answering rule could not read («שווה צלעת») — reported only when no
+  // other gate fired, so a line a gate already refuses keeps its exact message («…שמרכזו M» → «M»).
+  return lost.length > 0 ? lost : [...unread];
 }
 
 /**
@@ -1287,7 +1290,7 @@ export function decideSubmit3(
   if (rw?.kind === 'rename') return { kind: 'rename', from: rw.from, to: rw.to };
   const read = readStatement3(st, utterance);
   if (!read.ok) return read.error.code === 'not-understood' ? { kind: 'not-understood' } : { kind: 'refused', error: read.error };
-  return decideCommands3(st, utterance, read.commands, { twins: true, seedSearch: true }, newId);
+  return decideCommands3(st, utterance, read.commands, { twins: true, seedSearch: true, unread: read.unread }, newId);
 }
 
 /**
@@ -1299,7 +1302,7 @@ export function decideCommands3(
   st: { facts: Fact3[]; seed: number },
   utterance: string,
   commands: readonly Command3[],
-  opts: { twins: boolean; seedSearch: boolean },
+  opts: { twins: boolean; seedSearch: boolean; unread?: readonly string[] },
   newId: () => string = () => nanoid(8),
 ): Verdict3 {
   const { facts, seed } = st;
@@ -1310,7 +1313,7 @@ export function decideCommands3(
   // green ✓, and the label/number gates knew but were only ever asked on the LLM seam
   // (ADR-3D-147). The catalog corpus is asserted gate-clean in honesty3.test.ts, so the canonical
   // phrasings never pay this check with a false refusal.
-  const lost = lostGivens3(utterance, commands, derive3(facts, seed).construction);
+  const lost = lostGivens3(utterance, commands, derive3(facts, seed).construction, opts.unread);
   if (lost.length > 0) return { kind: 'refused', error: { code: 'dropped-given', items: lost.join(', ') } };
   // #613 (ADR-W-031, operator ruling 2026-08-16: "if a fact is already known - it should not be
   // added. this is true to all tools") — a RESTATED fact succeeds and appends no row. M1
@@ -1359,13 +1362,15 @@ export function decideSteps3(
 ): Verdict3 {
   const utterance = ingestTypedText(rawUtterance); // #751 (ADR-W-029)
   const all: Command3[] = [];
+  const unread: string[] = []; // #1902: a model line with a word its rule could not read refuses the step
   for (const step of steps) {
     const p = parse3(step);
     if (!p.ok) return { kind: 'not-understood' }; // an LLM step the parser can't read — refuse whole
     all.push(...p.commands);
+    unread.push(...(p.unread ?? []));
   }
   if (all.length === 0) return { kind: 'not-understood' };
-  return decideCommands3(st, utterance, all, { twins: false, seedSearch: false }, newId);
+  return decideCommands3(st, utterance, all, { twins: false, seedSearch: false, unread }, newId);
 }
 
 export const useGeo3 = create<Geo3State>()(
@@ -1445,7 +1450,7 @@ export const useGeo3 = create<Geo3State>()(
         // The honesty gates read "prior" as the OTHER facts — the edited statement's own old
         // labels are exactly what the edit may be renaming, so they must count as new here.
         const rest = facts.filter((f) => f.id !== factId);
-        const lostDet = lostGivens3(utterance, parsed.commands, derive3(rest, seed).construction);
+        const lostDet = lostGivens3(utterance, parsed.commands, derive3(rest, seed).construction, parsed.unread);
         if (lostDet.length > 0) {
           set({ lastError: { code: 'dropped-given', items: lostDet.join(', ') } });
           return false;

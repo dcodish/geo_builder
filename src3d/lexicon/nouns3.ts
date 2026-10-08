@@ -45,16 +45,26 @@ export const POLYGON_HE = [
  *  student asking «שטח מישור DBB'D'» right after typing «מישור DBB'D'» into the fact list. */
 export const PLANE_HE = ['מישור'];
 
-/** Qualifiers: rightness, the equal-sides family, the edge family. */
-export const QUALIFIER_HE = [
-  'ישר(?:ה|ים|ות)?', 'זו?וית', 'זו?ויות', 'שוו?ה', 'שוו[יו]ם', 'צלעות', 'שוקיים', 'מקצועות(?:יו|יה)?',
-];
+/**
+ * A SOLID's own qualifier PHRASES, the ones the solid readers lower (#1902, ADR-3D-312) — never single words.
+ * The declaration gate used to count every qualifier WORD as read («ישר», «שווה», «זווית», «צלעות»…), so a word
+ * no reader consumed passed: «משולש שווה ABC» and «טרפז ישר ABCD» drew the bare shape, green. A shape's own
+ * adjectives are the shape-phrase lexicon's (`SHAPE_ADJ_WORDS3`); these are the solid's:
+ *  - its RIGHTNESS: the solid noun, an optional label run or base adjective («מנסרה משולשת ישרה»), «ישר(ה)»;
+ *  - its EQUAL EDGES: «שווה מקצועות», «(ש)כל מקצועותיו/יה שווים (זה לזה)».
+ */
+export const SOLID_QUALIFIER_HE = [
+  String.raw`(?<![א-ת])[ובלכשמה]{0,3}(?:${SOLID_HE.join('|')})(?:\s+(?:[A-Z][A-Z0-9']*|[ובלכשמה]{0,3}(?:${POLYGON_HE.join('|')})))?\s+ה?ישר(?:ה|ים|ות)?(?![א-ת])`,
+  String.raw`(?<![א-ת])שוו?ה[\s-]?מקצועות(?![א-ת])`,
+  String.raw`(?<![א-ת])(?:ש?כל\s+)?מקצועות(?:יו|יה)?\s+שוו(?:ים|ות|ה)?(?:\s+זה\s+לזה)?(?![א-ת])`,
+].join('|');
 
 /** The base clause and a solid's own parts. */
 export const PART_HE = ['שבסיס[הו]', 'בסיס(?:ה|ו|ים)?', 'קודקוד(?:ה|ו|ים)?', 'פאה', 'פאות'];
 
-/** Every word the DECLARATION family reads — the union, in the order the parser listed them. */
-export const DECL_WORDS_HE = [...SOLID_HE, ...POLYGON_HE, ...QUALIFIER_HE, ...PART_HE].join('|');
+/** Every word the DECLARATION family reads — the union, in the order the parser listed them. #1902: the
+ *  qualifier WORDS left it; a qualifier is read only as a phrase a reader lowers ({@link SOLID_QUALIFIER_HE}). */
+export const DECL_WORDS_HE = [...SOLID_HE, ...POLYGON_HE, ...PART_HE].join('|');
 
 export const DECL_WORDS_EN = String.raw`prisms?|pyramids?|box(?:es)?|cuboids?|cubes?|parallelepipeds?|tetrahedr(?:on|a)|triangles?|triangular|quadrilaterals?|quads?|squares?|rectangles?|rhombus(?:es)?|parallelograms?|trapez\w*|kites?|pentagons?|hexagons?|polygons?|right|angled|isosceles|equilateral|regular|bases?|edges?|vert(?:ex|ices)|faces?`;
 

@@ -255,6 +255,13 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   `shapeWarnings`; `App3` renders it as an amber `Banner kind="notice"` (`role="status"`) with 2-D's
   `figure.mismatch` / `figure.v.trapezoidMorph` words copied into 3-D's `warn.*` keys. `buildNotices3` drops a
   warned ring's `inscribed-constrained` / `base-constrained` notice.
+**The inscription accounts for every word (#1902, [ADR-3D-312](06b-decisions-3d.md#adr-3d-312)).** `polygonCircle3`
+removes its own spans, each marked: the ring, a named circle's letter, the verb, the circle noun, the container
+marker and `phrase.strip` (the noun and the adjectives it consumed, 2-D's `ShapePhrase.strip`). What is left goes
+through `unreadWords3`, the closure ADR-3D-125's `declLeftover` shares: a prefix letter counts as filler only glued
+to a removed span. The words go out as `parse3`'s `unread` (a per-rule slot, `UNREAD3`). The declaration gate
+reads a qualifier only as a phrase a reader lowers (`SHAPE_ADJ_WORDS3` + nouns3's `SOLID_QUALIFIER_HE`: a solid's
+rightness and equal edges), never word by word. `normalize3` folds «שוה» → «שווה».
 
 **A shape's own condition carries its provenance (#1844, [ADR-3D-308](06b-decisions-3d.md#adr-3d-308)).**
 Every shape lowering — `quadShapeConstraints`, the `CYCLIC_MEMBER` fix, the adjectives, a base noun,
@@ -455,7 +462,9 @@ instead of `S(?, 7/2, ?)`; `pointCoords` keeps the partial form; anything else r
 not-understood · refused · already-stated · record) and `submit` dispatches it. The decision is pure, so
 #1358's register can ask "would you accept this line?". The statement seams share `readStatement3` (the
 grammar plus the #866 repair and the #516 typed refusals), `lostGivens3` (the honesty gates) and
-`decideCommands3` (gates → twin → derive → search), where the LLM lane's `submitSteps` also ends. A new
+`decideCommands3` (gates → twin → derive → search), where the LLM lane's `submitSteps` also ends. A parse's
+`unread` words (#1902) flow through `lostGivens3`, reported as `dropped-given` only when no other gate fired; the
+LLM lane collects them from every model line. A new
 branch belongs in the decision; a parity lock replays recorded sequences.
 
 **The App's pre-LLM lane is one function too (#1692, [ADR-3D-305](06b-decisions-3d.md#adr-3d-305)).**

@@ -1211,6 +1211,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'crossed-ring-1927-06', family: 'polygons', steps: ['ריבוע ABCD', 'מרובע ADCB'], expect: 'builds', note: 'the simple order — the control' },
   { id: 'crossed-ring-1927-07', family: 'polygons', steps: ['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABDE'], expect: 'builds', note: 'the midpoint ring in its simple order — the control' },
   // end #1927
+  // #1902 (ADR-3D-312): an unread word in an inscription is never dropped. 3-D refuses it naming the word (its own lock,
+  // X8); 2-D and analytic escalate it to their models. «שוה» reads as «שווה» in every builder (ADR-405's fold).
+  { id: 'inscription-unread-word-1902', family: 'circles', steps: ['מעגל חסום במשולש שווה צלעת ABC'], expect: 'not-handled', exception: 'X8' },
+  { id: 'defective-equal-sides-1902', family: 'polygons', steps: ['משולש שוה צלעות ABC'], expect: 'builds' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
