@@ -164,6 +164,42 @@ export function runRingOrder(pts: Vec3[]): Vec3[] {
 export function ringCollapsed3(pts: Vec3[]): boolean {
   return ringOpenness3(pts) <= 1e-4;
 }
+
+/**
+ * #1923 (ADR-3D-314) — does this ring CROSS ITSELF? Two NON-adjacent sides properly cross: each separates the
+ * other's endpoints, strictly, in the plane the four endpoints share. Beside `ringCollapsed3` so the ring checks
+ * live in one place. Only a PROPER crossing counts — a vertex that merely touches another side, a collapsed ring
+ * (the collapse predicate's business) or two sides that are skew in space (they never meet) is not one; this is
+ * analytic's `properlyCross` (ADR-AG-129) in R³. Scale-free tolerances; deterministic.
+ */
+export function ringSelfCrossing3(pts: Vec3[]): boolean {
+  const n = pts.length;
+  if (n < 4) return false;
+  let span = 0;
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) span = Math.max(span, norm3(sub3(pts[j], pts[i])));
+  if (span < 1e-12) return false;
+  const eps = 1e-9 * span * span;
+  /** the signed side of `p` against the line ab, measured along the plane normal `nrm` */
+  const side = (a: Vec3, b: Vec3, p: Vec3, nrm: Vec3) => dot3(cross3(sub3(b, a), sub3(p, a)), nrm) / norm3(nrm);
+  const crosses = (a: Vec3, b: Vec3, c: Vec3, d: Vec3): boolean => {
+    // the plane of the two sides — skew sides never meet
+    const nrm = runNormal([a, b, c, d]);
+    if (norm3(nrm) < eps) return false; // all four on one line: a collapse, not a crossing
+    const unit = scale3(nrm, 1 / norm3(nrm));
+    if (Math.abs(dot3(sub3(c, a), unit)) > 1e-9 * span || Math.abs(dot3(sub3(d, a), unit)) > 1e-9 * span || Math.abs(dot3(sub3(b, a), unit)) > 1e-9 * span) return false;
+    const d1 = side(a, b, c, nrm);
+    const d2 = side(a, b, d, nrm);
+    const d3 = side(c, d, a, nrm);
+    const d4 = side(c, d, b, nrm);
+    return ((d1 > eps && d2 < -eps) || (d1 < -eps && d2 > eps)) && ((d3 > eps && d4 < -eps) || (d3 < -eps && d4 > eps));
+  };
+  for (let i = 0; i < n; i++)
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue; // adjacent through the closing side
+      if (crosses(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n])) return true;
+    }
+  return false;
+}
 /** How OPEN a ring is: its greatest spanning normal over its span squared (0 = on one line). Infinity for a
  *  ring too small to judge (fewer than 3 points, or shrunk onto a point). */
 export function ringOpenness3(pts: Vec3[]): number {

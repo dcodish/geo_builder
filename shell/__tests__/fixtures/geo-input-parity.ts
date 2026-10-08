@@ -1215,6 +1215,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // X8); 2-D and analytic escalate it to their models. «שוה» reads as «שווה» in every builder (ADR-405's fold).
   { id: 'inscription-unread-word-1902', family: 'circles', steps: ['מעגל חסום במשולש שווה צלעת ABC'], expect: 'not-handled', exception: 'X8' },
   { id: 'defective-equal-sides-1902', family: 'polygons', steps: ['משולש שוה צלעות ABC'], expect: 'builds' },
+  // #1923 (ADR-3D-314, ADR-AG-129): a polygon declared over coordinate points whose ring crosses itself is refused in
+  // analytic's words. Coordinates are X1 (2-D has no coordinate frame).
+  { id: 'crossed-ring-1923', family: 'topic', steps: ['טרפז ABCD', 'A(0,0)', 'B(4,0)', 'C(1,3)', 'D(3,3)'], contextFor: { '2d': ['טרפז ABCD'] }, expect: 'refused', exception: 'X1', only: ['analytic'], note: 'the coordinate that makes sides BC and DA cross is refused; 3-D (z = 0, both orders) is locked in issue-1923-crossed-ring.test.ts; 2-D refuses the coordinate itself (X1)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

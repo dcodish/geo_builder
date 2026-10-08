@@ -418,6 +418,15 @@ polygon over existing points records a `polygon-open` claim (`given`), judged by
 (`ringOpenness3` < 1e-2) is released and counts as collapsed if it lands flat. A flattened SOLID keeps the
 #936 notice.
 
+**A declared polygon over fixed points must be a simple ring** (#1923, [ADR-3D-314](06b-decisions-3d.md#adr-3d-314)).
+`ringSelfCrossing3` (vec3.ts, beside `ringCollapsed3`) asks whether two non-adjacent sides properly cross in the
+plane their endpoints share (touching, collapsed and skew are not crossings). `derive3`, after the claim pass, asks
+it of every declared ring in its declared order — flat `polygon4/5` solids, bound `polygon-open` rings and
+`declaredQuads3`'s flat rings — but only when every vertex is coordinate-fixed (`coordinateFixers3`: a `coord`
+point, a full `coords-eq` given, or a 0-DOF derived point of `DERIVED_POINT_KINDS3` over fixed points). The latest
+of the declaring fact and the facts that fixed its vertices is refused `ring-crossed` (`err.ringContradictsNoun`,
+analytic's text); a row already red keeps its own message.
+
 ### Claims
 
 Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape inside a

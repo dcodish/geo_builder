@@ -343,9 +343,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   a flat quadrilateral with every fact green and say nothing. For a solid this is a notice, not a refusal.
   **A declared polygon is never drawn flat:** the line that collapses one («AB = 5 · BC = 3 · AC = 8» on
   «משולש ABC», or an incidence on a rider) is refused, naming the statements — a straight line is not a
-  triangle.
-  - Sources: ADR-3D-234, ADR-3D-309, ADR-3D-310, ADR-W-048, ADR-W-115, ADR-413, ADR-602; #936, #945, #1815,
-    #1849, #1861.
+  triangle. **A declared polygon over points fixed by coordinates is never drawn crossed:** when its ring, in the
+  order named, crosses itself («A(0,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD»), the line that completed it
+  — the declaration, or the coordinate typed last — is refused in analytic's words. A ring with a free vertex is
+  drawn simple by choice of configuration, never refused.
+  - Sources: ADR-3D-234, ADR-3D-309, ADR-3D-310, ADR-3D-314, ADR-W-048, ADR-W-115, ADR-413, ADR-602, ADR-AG-129;
+    #936, #945, #1815, #1849, #1861, #1923.
 - **FR-RD-8 (Should)** — **A stated LENGTH is drawn beside its segment.** «AB = 5» writes the 5 at AB's midpoint
   on the canvas, not only in the data panel — the honesty invariant *"everything the student stated is visible on
   the figure"* applied to the magnitude lane, which previously held for a stated distance (a labelled witness line)

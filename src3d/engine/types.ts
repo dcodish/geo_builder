@@ -1800,6 +1800,10 @@ export type EngineError3 =
   // non-incidence givens force the flatness on their own (lengths 5·3·8, a stated coincidence) rather
   // than an incidence on a rider inventing it, which changes only the wording.
   | { code: 'polygon-collapsed'; stated: string; others: string[]; sides: number; ring: string; forced?: true }
+  /** #1923 (ADR-3D-314): a polygon DECLARED over points fixed by coordinates whose ring, in the order named, crosses
+   *  itself — not that shape. `stated` is the line that completed it (the declaration, or the coordinate that came
+   *  last). Analytic's `ring-contradicts-noun` (ADR-AG-129), worded as analytic's. */
+  | { code: 'ring-crossed'; stated: string }
   | { code: 'sign-unsatisfiable'; id: Id } // no pivot solution has the stated coordinate sign
   | { code: 'no-such-solid'; id: string } // a volume/area claim names a solid kind the figure doesn't have (or has twice)
   | { code: 'free-size-claim'; id: string } // a numeric volume/area claim on a solid whose dims are unstated
