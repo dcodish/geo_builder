@@ -12138,3 +12138,28 @@ The degradation policy is deliberately unchanged (a line this code does not comm
 **Not changed.** «משולש ABC ישר זווית» with no vertex keeps 3-D's default (not ruled). #1889's lines stay `not-understood` in 3-D (#1679, parked). "right triangle ABC at B" is not read by 3-D and goes to the model, as before.
 
 **Behaviour change for a student:** «משולש ABC ישר זווית ב-A» (any vertex) is refused and taught «משולש ABC», then «∠CAB = 90°», instead of being drawn with the right angle at B. A «ב-X» tail the tool does not read on an isosceles triangle, a trapezoid, a prism or a box is refused with the one-input-per-line message listing the two parts.
+
+## ADR-3D-317 — A role word the reading never read refuses the line in 3-D; the taught lines are offered only when they record (#1904)
+
+**Status:** accepted · 2026-10-08 · bug (P1 class, 3-D, honesty) · round #1940 (item B′ of #1904's plan, stacked on ADR-3D-316) · the 3-D port of [ADR-604](06-decisions.md#adr-604) under [ADR-W-120](06w-decisions-workspace.md#adr-w-120) · amends [ADR-3D-316](#adr-3d-316) (`honestyRefusal3` asks the role member first)
+
+**Requirements:** [02b-requirements-3d.md](02b-requirements-3d.md) FR-SP-17 (new) · [02w-requirements-workspace.md](02w-requirements-workspace.md), the row "A one-line compound that loses a part" · **Design:** [04b-design-3d.md](04b-design-3d.md) § "The submit decision" → "A role word the reading never read"
+
+**The rulings (operator, 2026-10-08).** #1888's *"a line that loses a part gets the existing one-input-per-line message"* and *"Refuse it too"*; #1904's W22 *"Teach the lines"* («כתבו כל תפקיד בשורה נפרדת: «AD גובה לצלע BC», ואחר כך «AD תיכון לצלע BC».», the student's letters and roles, a lock driving the taught lines in 2-D and 3-D); W21: lines that go to the model today keep going there.
+
+**Measured at the 2-D item's tip** (`444d6cc2` plus ADR-3D-316, `decideSubmit3` after «משולש ABC»): the plan's 25 3-D drops, re-run — the median recorded alone under «…שהוא גם גובה / חוצה זווית (A) / אנך (ל-BC) / מאונך ל-BC», «…ו-AD גובה», «…והגובה AD», «…שמאונך לה», «…ומאונך לה», «…וגם גובה», «…שגם הוא גובה», «…, שהוא גם גובה», «…שחוצה / וחוצה את זווית A», «…חוצה את BC»; and "AD is the altitude to BC and also the median" / "…that is also a median" recorded the altitude only. Every one is caught. False-refusal nets, both members: 0 of 468 catalog examples (58 with a role word), 0 of 202 fixture steps, 0 of 384 dev-log lines; over the 1,437 distinct lines of the decide-submit3 parity golden, 2 flags, both already refused `dropped-given` and unchanged («פירמידה ABCD עם גובה», "the sphere through A B C D").
+
+**Root cause.** 3-D's median rule fires on «תיכון» and reads nothing else; every label is read, so ADR-3D-316's probe is blind; `droppedConstructNoun3` accounts «גובה» and «תיכון» together by family presence; 3-D has no verb gate, so a ⟂ word drops too.
+
+**Decision.**
+1. **The member, `src3d/store/unreadRoles3.ts`.** The shell's `readWords` (deletion with clitics, co-reference by role class) with `parse3`. Vocabulary, no new words: `CEVIAN_NOUNS3_HE/_EN` (now the atom `CONSTRUCT_NOUNS` is composed from), the bisect verb stem «חוצ…», and `PERP_WORDS3` (now the atom `PERP_SPLIT` is composed from), without «ניצב», the leg noun.
+2. **First in `honestyRefusal3`, deterministic lane and ✎ edit.** A lost role refuses whatever else fired (as 2-D's member does).
+3. **The refusal.** `split-roles` (`err.splitRoles`, 2-D's text) when the line states two noun roles, the reading names the side, and both taught lines RECORD through `decideSubmit3` on the figure, one after the other; else 2-D's fallback, `split-statements`, the line cut before the later role word, moved back over its connective; a «ו-AD» / "and AD" subject goes with the second part (the plan's cut rule: «(1) AD תיכון לצלע BC  (2) ו-AD גובה»). A bare verb or a ⟂ word is never taught (2-D: same).
+
+**Deviation, measured (W22 in 3-D).** The Hebrew lines 3-D reads all state the median FIRST. Taught in the student's order, «AD תיכון לצלע BC» then «AD גובה לצלע BC» is refused by 3-D today (`already-defined D`: the altitude rule cannot land on an existing D), and «AD חוצה זווית A» after the median asks which angle (`ambiguous-angle-vertex`). So the proof fails and those lines get the parts list, not the lesson; the English altitude-first lines are taught. Teaching the reverse order, or making the altitude and bisector lines read an existing D, is a product question for the operator, recorded on #1904; nothing here guesses it.
+
+**Locks.** `src3d/__tests__/issue-1904-unread-role3.test.ts`: the 22 Hebrew and English drops with their parts and `guided` category; the reported line's exact Hebrew; the two English lines taught, with the exact text; **the taught lines driven** (AD ⟂ BC and BD = DC at three seeds); the median-first pair proven unbuildable and so not offered; the ✎ seam; controls («AD גובה לצלע BC», «AD תיכון לצלע BC», «AD חוצה זווית A», «AD גובה»); the catalog (≥ 50 role-word examples) and fixture nets at 0. Parity row `role-clause-1904-02` loses its 3-D gap; `-01` keeps 3-D's #1905 gap (3-D does not read the altitude-first line; it goes to the model, W21).
+
+**Not changed.** Lines 3-D does not read («AD גובה לצלע BC שהוא גם תיכון», «AD גובה וחוצה זווית») still go to the model (W21; #1906 checks the answer).
+
+**Behaviour change for a student:** «משולש ABC» · «AD תיכון לצלע BC שהוא גם גובה» (and the measured spellings) is refused with «…נסו להקליד אותם בשני שלבים: (1) AD תיכון לצלע BC  (2) שהוא גם גובה» instead of drawing a median that is not perpendicular. "AD is the altitude to BC that is also a median" is taught «AD is the altitude to BC», then «AD is the median to BC».

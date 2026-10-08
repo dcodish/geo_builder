@@ -426,6 +426,14 @@ shortest prefix that reads the same (`cutAtReading`): a lost tail is `split-stat
 (`err.rightAngleVertex`, the taught lines). An unread run with read labels after it joins `dropped-given`. The LLM
 lane (`decideSteps3`) is not re-read: its commands are the model's, not a reading of the utterance.
 
+**A role word the reading never read (#1904, [ADR-3D-317](06b-decisions-3d.md#adr-3d-317)).** `honestyRefusal3` asks
+`unreadRoles3` (`src3d/store/unreadRoles3.ts`) FIRST: the shell's word class (`readWords`) deletes each cevian noun
+(`CEVIAN_NOUNS3_HE/_EN`, composed into `CONSTRUCT_NOUNS`), bisect verb stem or ⟂ word (`PERP_WORDS3`, composed into
+`PERP_SPLIT`; «ניצב» left out, it is the leg noun) with its clitics and re-reads with `parse3`. An unread one refuses
+`split-roles` (`err.splitRoles`, 2-D's W22 text) when the line states two noun roles, the reading names the side, and
+the two taught lines both RECORD through `decideSubmit3` on the figure in turn; else `split-statements` with the line
+cut before the later role word (back over its connective; a «ו-AD» / "and AD" subject goes with the second part).
+
 **The App's pre-LLM lane is one function too (#1692, [ADR-3D-305](06b-decisions-3d.md#adr-3d-305)).**
 `src3d/app/decideDeterministic3` wraps `decideSubmit3` with the registers App3 consults on `not-understood`
 (the #353 nudge, then the ADR-3D-040 guidance register) and returns a `Verdict3` or `guided`, dispatched by

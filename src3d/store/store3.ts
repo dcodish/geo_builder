@@ -29,6 +29,7 @@ import { nanoid } from 'nanoid';
 import { ingestTypedText } from '../../shell/bidi';
 import { findProofTarget } from '../../shell/proofTarget';
 import { lostPart3, unreadParts3, type LostPart3 } from './unreadParts3';
+import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, freeDims } from '../engine/apply';
@@ -95,6 +96,8 @@ export type StoreError3 =
    *  read («…ב-B») — is refused whole with the one-input-per-line message listing the parts (`all`), or, for the
    *  «<triangle> ישר זווית ב-<V>» syntax, the two lines that build it. Typed, so it never escalates. */
   | LostPart3
+  /** #1904 (ADR-3D-317, ruling W22): a lost ROLE word — taught one line per role (`split-roles`), else the parts. */
+  | LostRole3
   /** #926 (ADR-3D-220, ADR-W-044): a change to one row — deleted, muted or edited (`cause`, the row's
    *  wording BEFORE the change) — took OTHER rows from green to red: `items` quotes them. The change IS
    *  committed (the student asked for it) and the rows stay in the list, marked; this is the report that
@@ -1207,12 +1210,36 @@ function lostGivens3(utterance: string, commands: readonly Command3[], prior: Co
  * comparable), the read-extent member — does the reading depend on every label the student typed? A lost PART
  * refuses with the one-input-per-line message (2-D's ADR-603, ported), before any other gate's naming; a lost
  * operand (an unread label with read labels after it) joins `dropped-given`'s items.
+ *
+ * #1904 (ADR-3D-317): first, the role-word member — a cevian or ⟂ word the reading never read («AD תיכון לצלע BC
+ * שהוא גם גובה») refuses the line whatever else fired, teaching one line per role when the taught lines are PROVED
+ * to record on this figure (`decideSubmit3`, line after line), else listing the parts.
  */
-function honestyRefusal3(utterance: string, commands: readonly Command3[], prior: Construction3, readExtent: boolean): NonNullable<StoreError3> | null {
+function honestyRefusal3(
+  utterance: string,
+  commands: readonly Command3[],
+  st: { facts: Fact3[]; seed: number },
+  readExtent: boolean,
+): NonNullable<StoreError3> | null {
+  const prior = derive3(st.facts, st.seed).construction;
+  const roles = readExtent ? unreadRoles3(utterance, commands) : null;
+  if (roles) {
+    const proves = (lines: string[]): boolean => {
+      let cur = st;
+      return lines.every((l) => {
+        const v = decideSubmit3(cur, l, () => `taught-${cur.facts.length}`);
+        if (v.kind !== 'record') return false;
+        cur = { facts: v.facts, seed: v.seed };
+        return true;
+      });
+    };
+    const note = lostRole3(utterance, commands, roles, proves);
+    if (note) return note;
+  }
   const lost = lostGivens3(utterance, commands, prior);
   const unread = readExtent ? unreadParts3(utterance, commands, [...prior.points.keys()]) : null;
   if (unread?.cut) return lostPart3(unread.cut);
-  const items = [...lost, ...(unread?.unread ?? []).map((o) => o.text)].filter((x, i, a) => a.indexOf(x) === i);
+  const items = [...lost, ...(unread?.unread ?? []).map((o) => o.text), ...(roles?.unread ?? []).map((o) => o.text)].filter((x, i, a) => a.indexOf(x) === i);
   return items.length > 0 ? { code: 'dropped-given', items: items.join(', ') } : null;
 }
 
@@ -1278,7 +1305,7 @@ export function decideCommands3(
   // (ADR-3D-147). The catalog corpus is asserted gate-clean in honesty3.test.ts, so the canonical
   // phrasings never pay this check with a false refusal.
   // #1888 (ADR-3D-316): and the read-extent member, on the deterministic lane (`opts.readExtent`).
-  const refusal = honestyRefusal3(utterance, commands, derive3(facts, seed).construction, opts.readExtent ?? false);
+  const refusal = honestyRefusal3(utterance, commands, { facts, seed }, opts.readExtent ?? false);
   if (refusal) return { kind: 'refused', error: refusal };
   // #613 (ADR-W-031, operator ruling 2026-08-16: "if a fact is already known - it should not be
   // added. this is true to all tools") — a RESTATED fact succeeds and appends no row. M1
@@ -1414,7 +1441,7 @@ export const useGeo3 = create<Geo3State>()(
         // labels are exactly what the edit may be renaming, so they must count as new here.
         const rest = facts.filter((f) => f.id !== factId);
         // #1888 (ADR-3D-316): the commands came from reading the edit, so the read-extent member runs here too.
-        const refusal = honestyRefusal3(utterance, parsed.commands, derive3(rest, seed).construction, true);
+        const refusal = honestyRefusal3(utterance, parsed.commands, { facts: rest, seed }, true);
         if (refusal) {
           set({ lastError: refusal });
           return false;

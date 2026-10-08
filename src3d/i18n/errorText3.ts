@@ -61,6 +61,9 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // student's own words; the «<triangle> ישר זווית ב-<V>» syntax is taught the two lines that build it.
     case 'split-statements':
       return t('err.splitStatements', { all: err.all });
+    // #1904 (ADR-3D-317, ruling W22): a lost role — one line per role, the taught lines proved to record first.
+    case 'split-roles':
+      return t('err.splitRoles', { first: err.first, second: err.second });
     case 'right-angle-vertex':
       return err.rest
         ? t('err.rightAngleVertexMore', { triangle: err.triangle, angle: err.angle, rest: err.rest })
