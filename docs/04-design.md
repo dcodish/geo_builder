@@ -569,6 +569,14 @@ centre, resolving a hidden circle, a valueless angle arc) moves none of those si
 `dataOnly` excludes one), and a display command must leave `freeDofCount` and the constraint list unchanged. The
 lock tests at `dryRunOutcome`, the gate the app calls.
 
+The «כבר קיים» arm ahead of the change-signals (`impliedByPrior`, ADR-542) asks whether every added constraint holds
+in every configuration of the prior figure. Since [ADR-605](06-decisions.md#adr-605) (#1922) that includes the other
+answers of the tool's unstated choices the shared pool does not vary — `choiceAlternatives`: the registry's
+branch/side/seat rewrites when the pool is not `determined`, and each open trapezoid parallel pair as the facts with
+the other pair stated. Each alternative is replayed at the current seed, skipped if it fails `meetsRequirements`, and
+a failing residual makes the line not implied. Only a line the pool already judged implied pays for it; over the
+registry cap, past the clock or on a throw it fails open.
+
 ### One fold rule: the dry run judges the list the commit saves ([ADR-578](06-decisions.md#adr-578))
 
 `foldCommand` (`replay/core.ts`) decides how one command enters the fact list: an exact duplicate of an enabled fact

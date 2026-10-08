@@ -167,6 +167,7 @@
  "scenario:isosceles-base-median-follows-config-1810": "99f24ceb6c302071",
  "scenario:indexed-angle-names-decline-1814": "bc2ee590fd453753",
  "scenario:flat-triangle-refused-1849": "dccd8c928208ed16",
+ "scenario:restated-default-pair-is-recorded-1922": "bb84afabe17bef87",
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",
  "fixture:defining-interaction.geo.json": "453b283f490e90b0",
  "fixture:equilateral-inscribed.geo.json": "d8a2b3c24fc515b8",

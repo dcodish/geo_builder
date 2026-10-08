@@ -15340,3 +15340,34 @@ The row kept reading «תיכון לבסיס» with a ✓ while the figure drew 
 - A stated collinearity or incidence that flattens a declared polygon («D אמצע AB · D על AC») now names the polygon («סותר את «משולש ABC»») instead of the earlier statement it collides with.
 - A refusal at the door now names the earlier statement it contradicts wherever the fold found one (ADR-508's tail, which the submit note used to drop).
 - Thin but real triangles (3°, 1°, a stated 0.1°) still build.
+
+## ADR-605 — A restatement true only by the tool's own choice is recorded: the «כבר קיים» check asks the other answer of every unstated choice the pool does not vary (#1922)
+
+**Status:** accepted · 2026-10-08 · bug (P1, 2-D, honesty class) · round [#1940](https://github.com/dcodish/geo_builder/issues/1940) · branch `fix/1922-choice-entailment`
+**Requirements:** [02](02-requirements.md) FR-EN-9 (extended — entailment ranges over the tool's unstated choices; FR-HS-13) · **Design:** [04](04-design.md) § "What counts as produced" (the «כבר קיים» arm's alternatives); [LADDER.md](LADDER.md) stage 5, "The restatement check" · **LADDER stage:** reads stage 5 at the submit gate (no solver change)
+**Amends** [ADR-542](#adr-542) · **Reuses** [ADR-593](#adr-593)'s registry (`admissibleRewrites`), [ADR-502](#adr-502)/[ADR-506](#adr-506)'s parallel-pair choice (`unstatedChoices`, `trapezoidRingInForce`), [ADR-558](#adr-558)'s bar (`meetsRequirements`)
+
+**The report.** «טרפז ABCD» · «AB ∥ DC» · «AD ∥ BC». Measured at `5edeeca1` through `decideDeterministic2D` → `commitVerdict` → the App's post-commit `runViewResolve`: «AB ∥ DC» answered «זה כבר קיים באיור — אין מה להוסיף.» and was not recorded; «AD ∥ BC» then re-seated the pair (ADR-506) and the final figure had sin∠(AB, DC) = 0.549, green. The step row meanwhile kept saying «הכלי הניח ש-AB ∥ DC… כתבו למשל «AB מקביל ל-DC»» — the very line the door had just refused.
+
+**The class (docs/17 §1).** *"Already drawn" was decided by entailment over a sample pool that never varies the tool's own unstated choices*, so "true by the default of an unstated choice" (ADR-052) read as "entailed". `sharedSamples` always samples variants, but the registry's branch/side/seat axes only on a `determined` figure, and ADR-502's trapezoid pair (not cyclable, ADR-506) never. Members measured at `5edeeca1`, each «כבר קיים» and later drawn false on a green figure: «AB מקביל ל-DC», «DC ∥ AB», «טרפז שווה שוקיים ABCD · AB ∥ DC» (sin 0.471), «טרפז ישר זווית ABCD · AB ∥ DC» (0.489), «טרפז ABCD · ∠A + ∠D = 180» (213.3° after «AD ∥ BC»), «טרפז ישר זווית ABCD · AD ⊥ DC» (∠D = 119.3°), and the right-triangle seat: «משולש ישר זווית ABC · AC ⊥ BC» (also «BC ⊥ AC», «AC מאונך ל-BC», «∠A + ∠B = 90») · «AB = 3» · «BC = 5» moved the right angle to A, so ∠C = 36.9°.
+
+**Decision — one change, in `impliedByPrior`.** After the pool has said "satisfied everywhere", the same residual question is asked at the other answers of every open choice the pool did not vary — `choiceAlternatives(facts, c, pool)` beside `admissibleRewrites`:
+- the registry's branch/side/seat rewrites (`admissibleRewrites`) when `pool.determined` is false (a determined pool already holds them; variants are always in it); `null` over the cap fails open;
+- each open `parallel-pair` choice (`unstatedChoices`), as the facts with the OTHER pair stated (`set-parallel` on ring sides 1 and 3) — exactly the input `trapezoidRingInForce` rotates the ring by, so the alternative is the figure the student gets by typing that pair.
+
+Each alternative is replayed at the seed; one failing `meetsRequirements` is not a configuration and is skipped; a failing residual at a kept one makes the line NOT implied. A missing point, a non-finite residual, the clock (`SAMPLE_BUDGET_MS`, the gate's own) or a throw also mean not implied (ADR-542's mandatory fail-open). `dryRunOutcome` is unchanged: a line that is not implied reaches `grew` and commits. The ✎ edit seam (`editPipeline`) asks the same function, so it is covered too. The next non-cyclable choice is one row in `choiceAlternatives`.
+
+**Measured after** (same path):
+- The reported lines: all three commit; the end figure has exactly `figure.v.trapezoidMorph` («ABCD הוגדר כטרפז, אך כעת שני זוגות הצלעות הנגדיות מקבילים — זה כבר לא טרפז…») and the post-commit search exhausts, so `figure.noValidConfig` shows — the reverse order's behaviour at `5edeeca1`. The same for every trapezoid member above. «טרפז ABCD» · «AB ∥ DC» clears the step-row note (`unstatedChoices` 1 → 0).
+- The right-triangle members: recorded, and «BC = 5» is refused with `errors.hypotenuseImpossible` («לא ייתכן: מול הזווית הישרה ב-C נמצא היתר AB…») — exactly what the «∠ACB = 90» spelling gets at `5edeeca1`.
+- Kept «כבר קיים» (forced by the givens): «ריבוע ABCD · AB ∥ DC», «משולש ABC · ∠ABC = 90 · AB ⊥ BC» (the #999 lock), «משולש ישר זווית ABC · ∠ACB = 90 · AC ⊥ BC», «טרפז ABCD · ∠A + ∠B + ∠C + ∠D = 360», «טרפז ישר זווית ABCD · AD ⊥ AB» (`noop-exists`).
+- **Stability:** recording «AB ∥ DC» (plain, isosceles, right trapezoid), «AC ⊥ BC» and «∠A + ∠D = 180» moves no point (max Δ = 0). **Not** «טרפז ישר זווית ABCD · AD ⊥ DC»: recording it re-seats D and C (0.26 at seed 0, up to 7.8 at seed 1) — exactly as its other spelling «∠ADC = 90» already does at `5edeeca1` (a solver re-seat of a constraint that holds at the drawn figure). Reported as found work, not this mechanism.
+- **Timing** (#1874): `decideDeterministic2D` on the #999 rows and the reported lines, before and after on one machine, two runs each — within noise (e.g. «∠ABC = 90 · AB ⊥ BC» 142–151 ms before, 144–149 ms after; every other row ≤ 2 ms both). Only a line the pool judged implied pays for the alternatives.
+
+**Sibling audit.** 3-D and analytic both record «AB ∥ DC» already (measured in the plan, both orders); the class is 2-D's alone. 02w unchanged.
+
+**Consequences.** `replay/core.ts` (`choiceAlternatives`, the alternatives loop in `impliedByPrior`). Locks: `replay/__tests__/issue-1922-choice-entailment.test.ts` (the class matrix through `impliedByPrior` and through decide → commit → `runViewResolve`, the kept rows, stability, the edit seam); scenario `restated-default-pair-is-recorded-1922` (corpus 4). `issue-999-implied-restatement`, `issue-989-trapezoid-pair` unchanged.
+
+**Behaviour change for a student:**
+- «טרפז ABCD» · «AB ∥ DC» is now its own step instead of «זה כבר קיים באיור», and the note «הכלי הניח ש-AB ∥ DC…» disappears. Then «AD ∥ BC» shows the amber «זה כבר לא טרפז» warning and the no-valid-configuration note, instead of drawing AB not parallel to DC on a green figure. The same for the isosceles and right trapezoids, «∠A + ∠D = 180» and «AD ⊥ DC».
+- «משולש ישר זווית ABC» · «AC ⊥ BC» (and «BC ⊥ AC», «AC מאונך ל-BC», «∠A + ∠B = 90») is recorded; a later «BC = 5» after «AB = 3» is refused as longer than the hypotenuse, as «∠ACB = 90» already is.
