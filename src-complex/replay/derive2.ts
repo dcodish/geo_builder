@@ -418,6 +418,12 @@ export interface FoldInput {
    * — «Re(z)», «|z|» — is asked of every member, and prints only when the members agree.
    */
   readonly solutionSets?: ReadonlyMap<string, readonly string[]>;
+  /**
+   * #1894 (ADR-CX-061) — real-parameter letters a line typed as real («a ממשי»). Never a point: each is
+   * sampled as a parameter (so the parameters section lists it), its claim row holds by type, and its
+   * claim never drives.
+   */
+  readonly realTyped?: readonly string[];
 }
 
 /**
@@ -469,7 +475,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
     aliases = new Map<string, string>(),
     selections = [],
     solutionSets = new Map<string, readonly string[]>(),
+    realTyped = [],
   } = input;
+  const realLetters = new Set(realTyped);
   /**
    * #688 — DRIVE OR CHECK. Tier 1 is solved once to learn what the OTHER lines determined; a claim whose
    * subject that solve left FREE then contributes its constraint rows and tier 1 is re-solved with them.
@@ -488,7 +496,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
   const { signed } = paramSigns({ constraints, objects, measures });
   // #1481 — the literal atoms' degrees are fixed constants: tier 1 decides an opaque atom with them
   const t1Base = solveTier1(constraints, signed, literalSample);
-  const driveRows = claimDriveRows(assertions, t1Base);
+  // #1894 — a claim about a real-parameter letter is checked by its type, never driven: driving it
+  // would make the letter a complex unknown, the phantom point this lane exists to prevent
+  const driveRows = claimDriveRows(assertions.filter((a) => !('name' in a) || !realLetters.has(a.name)), t1Base);
   const t1 = driveRows.length ? solveTier1([...constraints, ...driveRows], signed, literalSample) : t1Base;
 
   const baseSample = new Map(literalSample);
@@ -506,6 +516,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
   for (const m of measures) {
     for (const p of paramsOf(m.rhs)) if (!baseSample.has(p)) baseSample.set(p, paramSample(p, seed));
   }
+  // #1894 — «a ממשי» may be the only mention of `a`: it is still a parameter the figure states (FR-KN-5)
+  for (const p of realTyped) if (!baseSample.has(p)) baseSample.set(p, paramSample(p, seed));
   /**
    * #1366 — a parameter the givens DETERMINE is drawn at its solved value, and is not a free DOF.
    *
@@ -1884,7 +1896,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     configCompleteness: completeness,
     canCycle: configCount > 1 || closure.remainingDof > 0,
     emptiedBy,
-    claims: verifyClaims(assertions, t1, branch),
+    claims: verifyClaims(assertions, t1, branch, realLetters),
     formulas: t1.inconsistent ? [] : surfacedFormulas(constraints, enumeratedConfigCount),
   };
 }

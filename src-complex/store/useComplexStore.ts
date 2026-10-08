@@ -74,7 +74,9 @@ export type InputError =
    */
   | { key: 'refused'; detail: string; why: Why }
   /** v2 read part of the line and could not account for the rest — it names the student's own words */
-  | { key: 'unaccounted'; detail: string };
+  | { key: 'unaccounted'; detail: string }
+  /** #1890 (W20) — the unread word is a negation: 2-D's sentence, naming the word */
+  | { key: 'negation'; detail: string; word: string };
 
 /** Save format (suffix `-complex.json`, the per-product convention): the SOURCE LINES in
  * order — loading replays them through the real parse path, so a saved session doubles as

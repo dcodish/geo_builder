@@ -3648,3 +3648,140 @@ Also: the power keeps its parentheses; the line is recorded verbatim through `su
 disagreeing second mention is refused exactly as the cis spelling is; three mismatch refusals naming
 both angles (he wording); the non-rewrites; and radian parity with cis. Fixtures
 `trig-form-1534`, `trig-form-sqrt2-1534`.
+
+## ADR-CX-060 — A sentence that finds a keyword claims only the words it read (#1890)
+
+**Status:** accepted, 2026-10-08 (operator rulings 2026-10-08: "we need to fix", and W20 on the wording) ·
+**Issue:** [#1890](https://github.com/dcodish/geo_builder/issues/1890) (bug, P1, `complex`) · round #1940
+**Requirements:** [02d](02d-requirements-complex.md) FR-LN-1 (a keyword sentence claims only what it read; the negation wording), the F8, F10 and F12 grammar rows ·
+**Design:** [04d](04d-design-complex.md), "Design rules with teeth", the span-accounting bullet ·
+**Ladder:** stages 0b and 0c ([LADDER-CX](LADDER-CX.md))
+
+**The defect.** «z1 אינו ממשי», «z1 לא ממשי», «z1 is not real» were recorded as `real:z1` and drawn on
+the real axis under ✓; «z1 על הציר הממשי החיובי» drew z₁ at −2.45 in configuration 2; «r מספר ממשי
+שונה מאפס» dropped «שונה מאפס»; «z1 ו-z2 אינם צמודים» drew conjugates; «z0 הוא הפתרון שאינו ברביע
+השלישי» selected the root IN quadrant III. Measured at 5edeeca1 through `submitLine`.
+
+**The class.** Five property sentences — `typeClaim`, `conjugatesClaim`, `forallPower`, `minimalPower`
+(the last two through `propertyOf`) and `solutionSelection` — found their keyword anywhere in the line
+and then returned `claimAll(s)`, bypassing span accounting, the one honesty mechanism (FR-LN-1,
+ADR-CX-009 §2). A census inserted «אינו» / «חיובי» / «שונה מאפס» (or "not" / "positive" / "nonzero")
+at every token boundary of every catalog line and the F10/F5b controls: 1,254 variants, **186 parsed
+`ok`**, all in exactly those five rules. Every other rule refused the inserted word.
+
+**Siblings.** 2-D refuses a negation pre-parse (`statedNegation`, key `input.scope.negation`), analytic
+refuses (`not-handled` / `bad-operand`), and 3-D's grammar does not own these sentences. The class is
+complex-only.
+
+**Decision.**
+1. **One property reader**, `readProperty` (rules.ts), replaces `propertyOf` and the inline tests in
+   `typeClaim`. It returns the property and the spans it read: ONE property word (imaginary tested
+   first, as before) plus the meaning-free structure around it — the number noun (`NUMBER_NOUN_KW`),
+   the axis phrase (`AXIS_KW`, new) and the formal copula «הינו» (`FORMAL_COPULA_KW`, new, read by this
+   reader only, so the declaration rule does not start accepting «z1 הינו מספר מרוכב»).
+2. Each of the five rules claims its own anchored structure (subject, quantifier, power, «הוא N», the
+   solution noun, the quadrant and its ordinal) plus the reader's spans — never `claimAll` after a
+   search. `quadrantGiven` was already the pattern. `conjugatesClaim` claims the pair, the conjugate
+   word and «זה לזה» (`EACH_OTHER_KW`, new).
+3. `typeClaim`'s subject is `NAME (ו NAME)?`, one assertion per subject: «z1 ו-z2 ממשיים» reads as
+   typed, the same as «z1 ממשי» + «z2 ממשי». «purely imaginary» joins `IMAGINARY_KW`, so the two
+   accepted spellings «z1 הינו מספר ממשי» and «z1 is purely imaginary» keep reading.
+4. **The wording (W20).** An unread NEGATION is refused with 2-D's sentence, its examples swapped for
+   complex lines that read: «עדיין אי אפשר לקלוט שלילה ("{{word}}"). ניתן לציין מה כן נתון — למשל "z1
+   מדומה טהור" או "arg(z1) = 30°".» (`errNegation`, key `negation`). 2-D's last clause ("the shape
+   stays free…") is 2-D-specific and dropped, as ruled. The choice is made after the accounting:
+   `parseLineV2` asks `negationAmong` whether an unread span lies inside a negation word
+   (`NEGATION_KW`: 2-D's vocabulary, copied, plus the ש/ו/ה prefix so «שאינו» / «שלא» count, and
+   "non"). It never makes a rule read anything. Every other unread qualifier keeps `errUnaccounted`.
+   Both taught examples are driven through `submitLine` in the lock.
+
+**Not built** (each a capability for the operator): a negated claim, a half-axis (positive / negative
+real) claim, a nonzero parameter, and two statements on one line. Complex has no representation for
+any of them today — no negated `Claim` kind or exclusion filter, no `≠` on a parameter — so they are
+refused, not read.
+
+**Cost.** One extra regex pass per refused line (`negationAmong`); the reader runs three atom scans
+over a short tail. No solve change.
+
+**Consequences.** `parser/rules.ts` (`readProperty`, `claimsOf`, `negationAmong`; the five rules),
+`parser/lexicon.ts` (`AXIS_KW`, `FORMAL_COPULA_KW`, `EACH_OTHER_KW`, `NEGATION_KW`; "purely imaginary"),
+`app/submit.ts` (`unreadRefusal`), `store/useComplexStore.ts` + `app/errorText.ts` + `i18n/index.ts`
+(`negation` / `errNegation`, he + en). A saved file, share link or resumed session holding a
+now-refused line loads without it, under the existing partial-load notice. The proxy bundles
+`parseLineV2`, so it needs a redeploy at deploy.
+
+**Locks.** `src-complex/__tests__/issue-1890-property-claims.test.ts`: the issue's exact sequences
+through `submitLine` (refusal key, Hebrew text, nothing recorded, nothing drawn); the per-spelling
+table (39 lines + 3 selections); «z1 ו-z2 ממשיים» ≡ «z1 ממשי» + «z2 ממשי»; the unchanged controls
+and verdicts; the two taught examples read; and the census as a permanent class guard (0 variants
+parse `ok`).
+
+## ADR-CX-061 — A letter is a point only when the figure reads it as a number (#1894)
+
+**Status:** accepted, 2026-10-08 (operator rulings 2026-10-08: approved as found work; raised to P1; "Keep a ✓ row") ·
+**Issue:** [#1894](https://github.com/dcodish/geo_builder/issues/1894) (bug, P1, `complex`) · round #1940
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-8 (a real letter is never a point; «a ממשי» types it), the F6 grammar row (a polygon's name) ·
+**Design:** [04d](04d-design-complex.md), "Design rules with teeth", the "A declaration is a type" bullet ·
+**Ladder:** stages 0b and 0c ([LADDER-CX](LADDER-CX.md))
+
+**The defect.** «a ממשי», «a מספר ממשי», «r מספר ממשי», «a is real» each drew a free point «a» on the
+real axis (+1.89 / −1.94 by configuration). «r = 2 · r ממשי» drew a point «r» at 1.63 while the panel
+said r = 2 — a false value on the canvas. With the 2022 exam lines, «a ממשי» first added a point and a
+second configuration. «a ברביע הראשון», «arg a = 45», «arg a < 45», «a ו-b צמודים זה לזה» drew free
+points too. After `z^6 = 1`, «מצולע I z1z2z3z4z5z6» drew a free point «I» and a seven-vertex polygon
+(«מצולע II …» an eight-vertex one with «I» twice). Measured on ADR-CX-060's tip through `submitLine`.
+
+**The class.** A sentence brought into the figure a name it read without asking whether the figure
+reads that name as a number. Two seams:
+1. Five rules — `typeClaim`, `quadrantGiven`, `argumentRelation`, `argumentInequality`,
+   `conjugatesClaim` — put the captured name into `declares` with no type test, although by ADR-CX-004
+   and FR-CN-8 a letter outside z/w is a real parameter unless declared complex. `forallPower`,
+   `minimalPower`, `sequenceList` and `genericPolar` already asked. A census swapping each z/w name in
+   every catalog example for `a`: 10 statement variants declared `a`; after the fix, none.
+2. The shape phrase `(?:noun\s+)?(RUN)`, spelled inline in five rules, let `RUN`'s whitespace tolerance
+   read the polygon's NAME as its first vertex.
+
+**Decision.**
+1. One predicate, `isRealLetter(name, scope)` (= not `isComplexName` and a declarable parameter
+   letter). `quadrantGiven`, both arms of `argumentRelation` and `argumentInequality`, and
+   `conjugatesClaim` decline a real letter, so the line ends `not-handled`, as F9 and F12 already do.
+   `argumentQuery` declares only a complex name (no student-visible change: asks never enact
+   `declares`).
+2. `typeClaim`, per subject: a complex name is the claim, as ADR-CX-060 left it. A real letter with
+   «ממשי» is the real parameter's TYPE statement (02d F1): a new `ParsedLine.realTyped`, never
+   `declares`. A real letter with «מדומה טהור» is not read. **The claim row stays** (operator ruling):
+   the `real` assertion is kept, and `verifyClaims` answers it from the type — `holds`, `prop-holds` —
+   for a letter in the figure's `realTyped`. `claimDriveRows` never sees it, because driving it would
+   make the letter a complex unknown again.
+3. `lowerLines` passes `realTyped` to the fold (`FoldInput.realTyped`); `foldConstraints` samples each
+   such letter beside the parameters that objects and measures mention, so the parameters section lists
+   it (FR-KN-5) — «a — חופשי», or r = 2 once stated. No point.
+4. **One shape phrase**, `shapePhrase()`, replaces the five inline spellings (`namedShape`,
+   `circumscribedCircle`, `measureRelation`, `measureQuery`, `measureRatio` / `measureTerm`). After
+   «מצולע» it recognises a polygon-name slot, `POLYGON_NAME_KW` (roman numerals, validated
+   case-sensitively), only before a run of three or more vertices. `shapeClaims` claims everything but
+   the name, so the accountant refuses the line naming it: «הבנתי חלק מהשורה, אבל לא את: I». Giving
+   the name a meaning is #623's G5-1 feature (it claims the same slot); this fix builds no reading.
+
+**Unchanged.** «z1 ממשי»; «a מספר מרוכב» · «a ממשי» (a is complex, so the claim stands and a is drawn on
+the real axis); «המשולש Az1z2» (A is a vertex the student named); «המצולע z1z2z3z4z5z6». A selection
+«a הוא הפתרון ברביע הרביעי» binds a to a root, as before; its free-DOF listing is #1822's neighbour,
+not this issue.
+
+**Siblings.** 2-D refuses «מצולע I ABCDEF» (`not-handled`): it has no roman-numeral polygon name. The
+real-parameter convention is complex-only. No sibling gap.
+
+**Cost.** One predicate call per rule match and one regex scan per shape line. No solve change.
+
+**Consequences.** `parser/rules.ts`, `parser/lexicon.ts` (`POLYGON_NAME_KW`), `app/deriveLines.ts`,
+`replay/derive2.ts`, `solve/claims.ts`. A saved file, share link or resumed session holding a
+newly refused line loads without it under the existing partial-load notice. The proxy bundles
+`parseLineV2`, so it needs a redeploy at deploy.
+
+**Locks.** `src-complex/__tests__/phantom-letter-1894.test.ts`: the issue's lines (no point, the
+parameter listed, the ✓ row holding), «r = 2 · r ממשי» across seeds, the pair forms, the 2022 exam with
+«a ממשי» / «a מספר ממשי» first deriving exactly what it derives without it (points, `configCount`,
+`freeDof`, `params`, the «מהו z1» row) at 24 seeds, the English mirror, the five refusals and their
+acceptance once declared complex, the controls, the polygon-name refusals, and two class guards (the
+catalog swap census; «I» after the polygon noun in every shape sentence). #1818 is open, so the
+fixture the plan named waits for it; the equivalence test carries the lock.
