@@ -255,6 +255,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1807': 'open',
   '#1842': 'open',
   '#1858': 'open',
+  '#1927': 'open',
 };
 
 export interface ParityRow {
@@ -1165,6 +1166,17 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // naming the statements — a flat figure is not a triangle. Analytic column (ADR-AG-247); the 2-D and 3-D streams close their gaps.
   { id: 'flat-polygon-1849-04', family: 'polygons', steps: ['מרובע ABCD', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1858' }, { product: '3d', issue: '#1858' }], note: 'B on the diagonal AC: the quadrilateral has a straight corner' },
   { id: 'flat-polygon-1849-05', family: 'topic', steps: ['משולש ABC', 'A(0,0)', 'B(1,1)', 'C(2,2)'], contextFor: { '2d': ['משולש ABC'] }, expect: 'refused', exception: 'X1', only: ['analytic'], note: 'coordinates that put the vertices on one line — never drawn flat; 2-D refuses the coordinate itself (X1)' },
+  // #1927 (ADR-W-121, ADR-608): a declared ring over points the figure already placed, in an order that crosses in
+  // every configuration, is REFUSED in every builder with analytic's errRingContradictsNoun. The 2-D column lands
+  // first (ADR-608); analytic and 3-D close their gaps under #1927's items B and C.
+  { id: 'crossed-ring-1927-01', family: 'polygons', steps: ['ריבוע ABCD', 'מרובע ACBD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1927' }, { product: '3d', issue: '#1927' }], note: 'the square’s points in a crossing order' },
+  { id: 'crossed-ring-1927-02', family: 'polygons', steps: ['מלבן ABCD', 'מרובע ABDC'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1927' }, { product: '3d', issue: '#1927' }] },
+  { id: 'crossed-ring-1927-03', family: 'polygons', steps: ['מלבן ABCD', 'טרפז ABDC'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1927' }, { product: '3d', issue: '#1927' }] },
+  { id: 'crossed-ring-1927-04', family: 'polygons', steps: ['מרובע ABDC', 'מלבן ABCD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1927' }, { product: '3d', issue: '#1927' }], note: 'the ring first: the shape line completes the crossing' },
+  { id: 'crossed-ring-1927-05', family: 'polygons', steps: ['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABED'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1927' }, { product: '3d', issue: '#1927' }], note: 'points placed by other givens' },
+  { id: 'crossed-ring-1927-06', family: 'polygons', steps: ['ריבוע ABCD', 'מרובע ADCB'], expect: 'builds', note: 'the simple order — the control' },
+  { id: 'crossed-ring-1927-07', family: 'polygons', steps: ['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABDE'], expect: 'builds', note: 'the midpoint ring in its simple order — the control' },
+  // end #1927
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

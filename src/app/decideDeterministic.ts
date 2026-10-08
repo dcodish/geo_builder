@@ -56,6 +56,7 @@ import {
   autoNamedLabels,
   deferralWorthwhile,
   dryRunOutcome,
+  forcedCrossedRing,
   nameCentreFacts,
   renameFacts,
   replay,
@@ -567,6 +568,17 @@ export async function decideFromParse(
       });
       if (drop) {
         return refuse('guided', { source: 'scope', result: 'scope:split-statements:dropped-clause', commands: r.commands }, { key: drop.messageKey, params: drop.params });
+      }
+      // #1927 (ADR-608, ADR-W-121): a ring declared over points the figure already placed, in an order that crosses
+      // in EVERY configuration, is refused naming the line — before any dry run, so it precedes ADR-157's raw
+      // redefinition refusal of a shape over existing vertices, and it never escalates (the parse was right).
+      const crossedRing = forcedCrossedRing(facts, r.commands, seed);
+      if (crossedRing) {
+        return refuse(
+          'conflict',
+          { source: 'parser', result: 'ring-contradicts-noun', detail: crossedRing.join(''), commands: r.commands },
+          { key: 'input.ringContradictsNoun', params: { detail: utterance.trim() } },
+        );
       }
       // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
       // the commit, and every later replay of this content then run at TAIL speed on the main thread

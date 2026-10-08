@@ -560,6 +560,22 @@ test fails if `runSubmit` parses or refuses on its own, and the parity shards (`
 label, never leaving a piece that only names points, and keeps a subject-less piece with the clause before it when
 the two read as a statement.
 
+### A ring over placed points that crosses everywhere is refused before the dry run ([ADR-608](06-decisions.md#adr-608))
+
+`forcedCrossedRing` (`replay/core.ts`, beside `impliedByPrior`) is called from `decideFromParse` (after the
+clause-coverage gate, before the prefold and the first `dryRunOutcome`) and from `runEditCommit` (beside
+`impliedByPrior`, against the prefix facts). It reads the rings the line declares — `declaredRings(cmd)` plus a
+top-level `polygon` of 4 or more ids — keeps those whose every vertex is already placed, drops any that is simple in
+the figure on screen (one test, no pool), and asks the prior figure's `sharedSamples` pool (the UI-thread narrow
+gate, as `impliedByPrior`) whether the ring **properly** crosses in every sample: two non-adjacent sides meeting at a
+point interior to both, with a tolerance relative to the ring's extent (a touching vertex is not a crossing, unlike
+`ringSimple`). The floor is `forcedCrossingKeys`'s: a determined pool, or at least 4 samples. Reading the prior pool
+is sound because the line's own constraints only narrow the configurations. A hit refuses `conflict`, log
+`ring-contradicts-noun`, note `input.ringContradictsNoun` with `detail` = the line (analytic's
+`errRingContradictsNoun` text, verbatim), and never escalates; it precedes ADR-157's redefinition refusal. The test
+helper `gateVerdict` mirrors it (reason `crossed-ring`). The predicate is 2-D's own: `BOUNDARIES.json` keeps engine
+layers `copied-never-shared`.
+
 ### What counts as "produced": a display-only command declares itself (#1011, [ADR-519](06-decisions.md#adr-519))
 
 `dryRunOutcome` asks whether a line did anything — the construction grew, a DOF went, the scale was fixed, a point

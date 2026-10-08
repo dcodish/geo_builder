@@ -3292,6 +3292,93 @@ export function impliedByPrior(facts: Fact[], commands: AnyCommand[], seed = 0):
   }
 }
 
+/**
+ * Two non-adjacent sides of the ring PROPERLY cross — they meet at a point interior to both (#1927). Strict on
+ * purpose: `ringSimple` counts a touch (a vertex on another side, a collinear overlap) as a crossing, which is
+ * right for the convexity default and wrong for a refusal — a touching vertex is never refused. The tolerance
+ * is relative to the ring's own extent, so the verdict does not depend on the figure's scale.
+ */
+function ringProperlyCrossed(pts: Vec[]): boolean {
+  const n = pts.length;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of pts) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+  const span = Math.hypot(maxX - minX, maxY - minY);
+  if (!(span > 0) || !Number.isFinite(span)) return false;
+  const eps = 1e-9 * span * span;
+  const side = (o: Vec, a: Vec, b: Vec) => {
+    const z = (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    return z > eps ? 1 : z < -eps ? -1 : 0;
+  };
+  for (let i = 0; i < n; i++)
+    for (let j = i + 1; j < n; j++) {
+      if (j === i + 1 || (i === 0 && j === n - 1)) continue; // adjacent sides share a vertex
+      const a = pts[i], b = pts[(i + 1) % n], c = pts[j], d = pts[(j + 1) % n];
+      if (side(c, d, a) * side(c, d, b) < 0 && side(a, b, c) * side(a, b, d) < 0) return true;
+    }
+  return false;
+}
+
+/** The pool must hold this many samples before "crossed in every sample" may mean FORCED — `forcedCrossingKeys`'
+ *  floor (a determined figure is exempt: its one configuration is every configuration). */
+const FORCED_RING_MIN_SAMPLES = 4;
+
+/**
+ * A RING DECLARED OVER POINTS THE FIGURE HAS ALREADY PLACED, IN AN ORDER THAT CROSSES IN EVERY CONFIGURATION
+ * (#1927, [ADR-608](docs/06-decisions.md#adr-608), [ADR-W-121](docs/06w-decisions-workspace.md#adr-w-121)).
+ *
+ * «ריבוע ABCD · מרובע ACBD» names four points the square already placed, in an order whose sides cross. No
+ * configuration of the figure makes that ring simple, so the line is refused rather than drawn folded over
+ * itself. This is `impliedByPrior`'s refutation twin: the same question, asked of the same pool, over the PRIOR
+ * figure's sampled configurations (M3, one sampler — never a new search). Reading the prior pool is sound: the
+ * line's own constraints can only narrow the configurations, so a ring crossed in every prior configuration is
+ * crossed in every configuration the line could leave.
+ *
+ * The rings read are the ones the line DECLARES (`declaredRings` — a named shape, directly or through its
+ * expansion) plus a top-level `polygon` of 4 or more ids («מחומש ACEBD»), and only those whose every vertex is
+ * already placed before the step. A ring with a vertex the line itself creates is a configuration choice, never
+ * this question.
+ *
+ * **Fails open**, like its twin: a ring simple in the figure on screen (the prefilter — one test, no pool), a
+ * thin pool, a sample missing a vertex, any throw → `null`, and the line goes on as today.
+ *
+ * @returns the offending ring's ids, or `null`.
+ */
+export function forcedCrossedRing(facts: Fact[], commands: AnyCommand[], seed = 0): Id[] | null {
+  try {
+    const seen = new Set<string>();
+    const declared: Id[][] = [];
+    for (const cmd of commands) {
+      const own = cmd.type === 'polygon' ? [(cmd as { ids?: Id[] }).ids ?? []] : [];
+      for (const ids of [...declaredRings(cmd), ...own]) {
+        if (ids.length < 4 || new Set(ids).size !== ids.length) continue;
+        const key = ringKey(ids);
+        if (!seen.has(key)) { seen.add(key); declared.push(ids); }
+      }
+    }
+    if (declared.length === 0) return null; // a line that declares no ring pays nothing — not even the replay
+    const placed = replay(facts, seed).positions;
+    const rings = declared.filter(
+      (ids) =>
+        ids.every((id) => placed.has(id)) && // a vertex this line creates — a choice, not this question
+        ringProperlyCrossed(ids.map((id) => placed.get(id) as Vec)), // the prefilter: simple on screen ⇒ simple somewhere
+    );
+    if (rings.length === 0) return null;
+    const pool = sharedSamples(facts, { deadlineMs: SAMPLE_BUDGET_MS }); // the UI-thread gate, as `impliedByPrior`
+    if (pool.samples.length === 0) return null;
+    if (!pool.determined && pool.samples.length < FORCED_RING_MIN_SAMPLES) return null;
+    for (const ids of rings) {
+      const forced = pool.samples.every((pos) => {
+        const pts = ids.map((id) => pos.get(id));
+        return pts.every(Boolean) && ringProperlyCrossed(pts as Vec[]);
+      });
+      if (forced) return ids;
+    }
+    return null;
+  } catch {
+    return null; // fails open, always
+  }
+}
+
 export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): StepOutcome {
   // ALL THREE label kinds (#162): the gate predates ADR-118's `areas`, so a lone symbolic area label
   // («שטח משולש AFO הוא 9b» — correctly no constraint, ADR-031/118) counted as nothing and the

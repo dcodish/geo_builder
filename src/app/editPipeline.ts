@@ -21,7 +21,7 @@ import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabe
 import { autoNamedLabels, groupKey, nameByUseCommands, nameCentreFacts, renameFacts, replay, resolveBinds, stepAsideFacts, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
 import type { DecideBind } from './decideDeterministic';
 import { honestyGateReport } from './honestyGates';
-import { impliedByPrior } from '@/replay/core';
+import { forcedCrossedRing, impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
 import { findProofTarget } from '../../shell/proofTarget';
 
@@ -157,6 +157,14 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
    */
   const bindCmds = nameByUseCommands(binds);
   const prefixFacts = bindCmds.length ? trialFacts(prefixRaw, bindCmds) : prefixRaw; // #1697: with the edit's own naming
+  // #1927 (ADR-608): the crossed-ring refusal, on this seam too, through the same predicate and against the same
+  // PREFIX facts — an edit that makes a row declare a ring the figure's placed points can only cross is refused
+  // inline with the submit seam's text (ADR-W-006).
+  if (forcedCrossedRing(prefixFacts, r.commands, store().seed)) {
+    logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-ring-contradicts-noun', commands: r.commands });
+    setInputNote(t('input.ringContradictsNoun', { detail: editText.trim() }));
+    return false;
+  }
   if (impliedByPrior(prefixFacts, r.commands, store().seed)) {
     logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-implied-restatement', commands: r.commands });
     setInputNote(t('input.alreadyDrawn'));

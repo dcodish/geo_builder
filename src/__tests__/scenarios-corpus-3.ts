@@ -44,7 +44,8 @@ import { isGeoPoint, detectRelations } from '@/engine';
 import type { Id, Vec } from '@/engine';
 
 import type { Scenario } from './scenarios-harness';
-import { at, dist, angle, allStepsOk, centreOf, convexQuad } from './scenarios-harness';
+import { at, dist, angle, allStepsOk, centreOf, convexQuad, factsOf } from './scenarios-harness';
+import { gateVerdict } from './submit-gate';
 
 export const SCENARIOS_3: Scenario[] = [
   {
@@ -1463,10 +1464,15 @@ export const SCENARIOS_3: Scenario[] = [
       'משולש CED',
       'A על CD',
       'B על CE',
-      'מרובע ABDE בר חסימה', // the LLM canonical line for "מרובע ABDE חסום במעגל", re-parsed with context
+      // #1927 (ADR-608, ADR-W-121): written «מרובע ABDE» until 2026-10-08 — with A on CD and B on CE that ring crosses in
+      // every configuration (BD and EA are cevians), so the line is now refused at the door. The concyclic
+      // mechanism this scenario guards is order-free, so it is locked on the simple ring ABED; the refusal is asserted below.
+      'מרובע ABED בר חסימה', // the LLM canonical line for "מרובע ABED חסום במעגל", re-parsed with context
     ],
     check(fig) {
       allStepsOk(fig); // no detach / over-constraint
+      const v = gateVerdict(factsOf(['משולש CED', 'A על CD', 'B על CE']), 'מרובע ABDE בר חסימה');
+      expect(v.kind === 'refused' && v.reason, 'the crossing order ABDE is refused (#1927)').toBe('crossed-ring');
       // A stays ON segment CD (not re-pinned to a fresh circle): collinear C-A-D.
       const C = at(fig, 'C'), D = at(fig, 'D');
       const A = at(fig, 'A');

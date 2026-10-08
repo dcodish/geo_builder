@@ -265,6 +265,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | Restated fact «כבר נובע…» | yes | yes | yes | no | **Gap** — #1565 |
 | Two points on one spot | refused or redrawn | same | same | not measured | **Same** for 2-D/3-D/analytic (ADR-W-066/072); complex **Open** |
 | A declared polygon forced flat | refused | refused | refused | n/a | **Same** (ADR-W-115) |
+| A declared polygon whose placed vertices cross in every configuration | refused (ADR-608) | recorded green | recorded, nothing said | n/a | **Ruled change** — refused everywhere with one message (ADR-W-121, #1927); 3-D and analytic follow |
 | A proof target «הוכיחו כי» | refused | refused | refused | checked as a claim | **Ruled change** — refuse proof verbs, keep the bare-claim check (B14, D3, #1870) |
 | AI fallback for unread input | yes | yes | yes | none | **Ruled change** — build it (B14, #1869) |
 | Save, load, share link | shared | same | same | same | **Same** |

@@ -5634,3 +5634,22 @@ So: §1's thesis and P6's reason are his; the trace (ADR-AG-062) stays; the rela
 **Not built: "an operator ruling never says Requirements: none".** Measured over the four product logs from their cut-overs: 485 headings, 96 with "Requirements: none", and 8 of those carry an operator-ruling marker (ADR-523, 546, 584; ADR-3D-226, 258, 304, 306; ADR-AG-074). At most three rule on what a student sees (3D-226, 3D-304, 3D-306, each arguing an existing FR already covers it). The rest are rulings on process or mechanism (*"Rework first, then all four"*, *"a fixed amount of work, never the clock"*), a ruling cited from another ADR, or an operator report. A text marker cannot tell a ruling on what a student sees from one on how the tool is built, so the guard would fire mostly on correct entries; a guard that does that gets relaxed (ADR-W-042). The precise signal is rule 7's `What the student will see` line ([ADR-W-117](#adr-w-117)): a `[ruled]` or `[asked]` line is a student-visible change and cannot sit beside "Requirements: none". ADRs do not carry those lines today; whether they should is the operator's decision.
 
 **Also in this step** (ruled in step 2): code comments that cited an archived doc by its old path now say `docs/archive/<name>`, 46 citations in 35 files. Short citations such as "docs/28 §5c" are unchanged; they resolve by grep.
+
+## ADR-W-121 — A declared polygon whose placed vertices cross in every configuration is REFUSED in every builder, naming the line, with one message (#1927; the crossed sibling of ADR-W-115)
+
+**Status:** accepted · 2026-10-08 · **Issue:** #1927 (bug, P1, honesty class) · round #1940 · **Adopted by:** [ADR-608](06-decisions.md#adr-608) (2-D). Analytic and 3-D adopt it under #1927 items B and C (3-D on #1923's build).
+**Operator ruling:** 2026-10-08, on #1927 («Operator ruling — 2026-10-08»): he confirmed P1 with the outcome in the issue body —
+
+> *a declared polygon whose vertices, already placed, form a crossed ring is refused naming the declaration, in every builder, with analytic's `errRingContradictsNoun`. Never green, never a raw error.*
+
+**Requirements:** [02w](02w-requirements-workspace.md) behaviour table, row "A declared polygon whose placed vertices cross in every configuration" (Ruled change); [02](02-requirements.md) FR-EN-16 · **Design:** each product's own predicate (2-D: [04](04-design.md) § "A ring over placed points that crosses everywhere is refused before the dry run"); `BOUNDARIES.json` keeps engine layers `copied-never-shared`, so the predicate is per product, never shared.
+
+**Context.** Measured at 5edeeca1: «ריבוע ABCD · מרובע ACBD» drew the crossed ring with «לא נמצאה תצורה…» in 2-D and recorded green in 3-D and analytic; the pentagram «מחומש ACEBD» on a regular pentagon drew green in 2-D with no note. ADR-W-115 ruled the flat member of this family (a declared polygon forced onto a line); this is its crossed member.
+
+**Decision.**
+1. **The rule.** A ring declared over points the figure has already placed, in an order that crosses in **every** configuration the builder samples, is refused on the line that completes it — the declaration, or the shape line that places the points of an earlier ring — quoting that line.
+2. **One message:** analytic's `errRingContradictsNoun`, verbatim, in every builder (he + en). The coordinate clause stays until the operator rules a coordinate-free variant.
+3. **"Every configuration" is each builder's existing knowledge sampler** (M3), never a new search; only proper crossings count (a touching vertex is never refused); a thin pool or any doubt fails open and the line builds as today.
+4. **Not this rule:** a ring with a free vertex (a configuration choice), and lines already refused with another honest message (3-D `claim-refuted`, `shape-less-specific`, `givens-contradict`; analytic «לא נמצאה תצורה שבה מתקיים…»), which keep it.
+
+**Consequences.** The 2-D arm lands first (ADR-608); the parity rows `crossed-ring-1927-01…05` carry known gaps for analytic and 3-D until items B and C land. #1914 must compare rings by cyclic order (`ringKey`), not by vertex set.

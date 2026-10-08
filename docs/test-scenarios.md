@@ -867,8 +867,9 @@ avoids `ctx.points`, so the second circle gets a fresh centre (P).
 **Asserts:** all steps OK; two distinct centres O, P exist; triangle ABC's three vertices lie on the 2nd circle (centre P).
 
 ### `cyclic-quad-existing-vertices` — inscribing a quad whose 4 vertices already exist (ADR-041)
-**Steps:** `משולש CED`, `A על CD`, `B על CE`, `מרובע ABDE בר חסימה` (the last is the LLM canonical line for
-"מרובע ABDE חסום במעגל", re-parsed with context).
+**Steps:** `משולש CED`, `A על CD`, `B על CE`, `מרובע ABED בר חסימה` (the last is the LLM canonical line for
+"מרובע ABED חסום במעגל", re-parsed with context). Until #1927 (ADR-608) the ring was written ABDE, which crosses in every
+configuration and is now refused at the door — the check asserts that refusal; concyclicity is order-free.
 **Guards against:** the quad re-placing A, B, D, E as **fresh on-circle points** — detaching A from segment
 CD and B from CE. The new `concyclic` constraint instead draws/hides the circumcircle through three of them
 and drives a free DOF (A's slide on CD) until all four share the circle.
@@ -1735,3 +1736,7 @@ over all four (ADR-041).
 ### `flat-triangle-refused-1849` — «משולש ABC · AB = 5 · BC = 3 · AC = 8»: the closing side is refused, naming «משולש ABC» (#1849, ADR-602)
 
 **Guards against:** a declared polygon the givens force flat being drawn as one. The operator's ruling (2026-10-07) reverses ADR-W-048's notice for declared polygons: a flat line is not a triangle. **Asserts** that «AC = 8» is refused by the submit gate as a flattened triangle ABC whose other side is «משולש ABC», and that the thin-but-legitimate 3° triangle still commits. The class matrix (both orders, 4·4·8, a ratio, a sum, a perimeter, a quadrilateral, the incidence family, the default-apex isosceles, the controls) is `src/app/__tests__/issue-1849-flat-polygon-refused.test.ts`.
+
+### `crossed-ring-over-placed-points-1927` — «ריבוע ABCD · מרובע ACBD»: a ring over the placed points that crosses in every configuration is refused, quoting the line (#1927, ADR-608)
+
+**Guards against:** a polygon declared over points the figure already placed, in an order whose sides cross in every configuration, being drawn folded over itself (with «לא נמצאה תצורה…», or green with no note for a generic polygon), or refused with a raw «D כבר מוגדרת…». **Asserts** that «מרובע ACBD» on a square, and «מרובע ABDC» and «טרפז ABDC» on a rectangle, are refused by the submit gate before they become facts, that the prior figure does not move, and that the He and En texts are analytic's `errRingContradictsNoun` word for word; «מרובע ADCB» still commits. The class matrix (every member both orders, the pentagram, the ✎ seam, the free-vertex controls) is `src/app/__tests__/issue-1927-crossed-ring.test.ts`.
