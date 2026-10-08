@@ -1048,7 +1048,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'meet-medians-1715', family: 'intersections', steps: ['משולש ABC', 'התיכון מ-A והתיכון מ-B נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }], note: 'E is the centroid' },
   { id: 'meet-perp-bisectors-1715', family: 'intersections', steps: ['משולש ABC', 'האנך האמצעי לצלע AB והאנך האמצעי לצלע BC נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }], note: 'E is the circumcentre' },
   { id: 'meet-perpendicular-drawn-1715', family: 'intersections', steps: ['משולש ABC', 'האנך מ-C ל-AB', 'חוצה זוית B והאנך מ-C ל-AB נפגשים בנקודה E'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }], note: '«האנך מ-C ל-AB» refers to the drawn perpendicular (ADR-AG-207)' },
-  { id: 'meet-same-line-twice-1715', family: 'intersections', steps: ['משולש ABC', 'חוצה זוית B וחוצה הזווית B נפגשים בנקודה E'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }], note: 'one line twice names no point; 2-D builds a point on it' },
+  { id: 'meet-same-line-twice-1715', family: 'intersections', steps: ['משולש ABC', 'חוצה זוית B וחוצה הזווית B נפגשים בנקודה E'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'one line twice names no point; 2-D refuses it since round #1940' },
   { id: 'meet-parallel-1715', family: 'intersections', steps: ['מלבן ABCD', 'הישר AB והישר CD נפגשים בנקודה E'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   // ── #1607 (ADR-574): a role noun before a length keeps the role AND the length ──
   { id: 'role-length-diagonal-1607', family: 'lengths', steps: ['מקבילית ABCD', 'האלכסון AC = 8'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1679', parked: true }] },
@@ -1203,11 +1203,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1927 (ADR-W-121, ADR-608): a declared ring over points the figure already placed, in an order that crosses in
   // every configuration, is REFUSED in every builder with analytic's errRingContradictsNoun. The 2-D column lands
   // first (ADR-608); analytic and 3-D close their gaps under #1927's items B and C.
-  { id: 'crossed-ring-1927-01', family: 'polygons', steps: ['ריבוע ABCD', 'מרובע ACBD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1927' }, { product: '3d', issue: '#1927' }], note: 'the square’s points in a crossing order' },
-  { id: 'crossed-ring-1927-02', family: 'polygons', steps: ['מלבן ABCD', 'מרובע ABDC'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1927' }, { product: '3d', issue: '#1927' }] },
-  { id: 'crossed-ring-1927-03', family: 'polygons', steps: ['מלבן ABCD', 'טרפז ABDC'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1927' }, { product: '3d', issue: '#1927' }] },
-  { id: 'crossed-ring-1927-04', family: 'polygons', steps: ['מרובע ABDC', 'מלבן ABCD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1927' }, { product: '3d', issue: '#1927' }], note: 'the ring first: the shape line completes the crossing' },
-  { id: 'crossed-ring-1927-05', family: 'polygons', steps: ['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABED'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1927' }, { product: '3d', issue: '#1927' }], note: 'points placed by other givens' },
+  { id: 'crossed-ring-1927-01', family: 'polygons', steps: ['ריבוע ABCD', 'מרובע ACBD'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1927' }], note: 'the square’s points in a crossing order' },
+  { id: 'crossed-ring-1927-02', family: 'polygons', steps: ['מלבן ABCD', 'מרובע ABDC'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1927' }] },
+  { id: 'crossed-ring-1927-03', family: 'polygons', steps: ['מלבן ABCD', 'טרפז ABDC'], expect: 'refused', note: '3-D and analytic refuse it too (a rectangle is no trapezoid: #1918, #1927)' },
+  { id: 'crossed-ring-1927-04', family: 'polygons', steps: ['מרובע ABDC', 'מלבן ABCD'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1927' }], note: 'the ring first: the shape line completes the crossing' },
+  { id: 'crossed-ring-1927-05', family: 'polygons', steps: ['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABED'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1927' }], note: 'points placed by other givens' },
   { id: 'crossed-ring-1927-06', family: 'polygons', steps: ['ריבוע ABCD', 'מרובע ADCB'], expect: 'builds', note: 'the simple order — the control' },
   { id: 'crossed-ring-1927-07', family: 'polygons', steps: ['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABDE'], expect: 'builds', note: 'the midpoint ring in its simple order — the control' },
   // end #1927
