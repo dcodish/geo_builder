@@ -19,6 +19,7 @@ import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectB
 import { SOLVE_TOL, resolveChoices } from './solve';
 import { NO_STATED_MEASURES, statedMeasures, type StatedMeasures } from './statedMeasures';
 import { incidenceWords } from './crossings';
+import { shapeRow } from './shapes';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
 /** The point ids an incidence constraint is ABOUT — how a crossing is recognised (#1254). */
@@ -52,6 +53,8 @@ export interface LineFault {
   polygon?: string;
   shape?: string;
   declared?: string;
+  /** For a circle through a ring its noun forbids (#1918, ADR-AG-252): the noun the circle would force (registry key). */
+  forced?: string;
 }
 
 /**
@@ -152,13 +155,25 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   // Said on the circle's row only when the name was actually GIVEN — a default that yielded to a letter
   // already in the figure named nothing, and the list must not claim it did (#1263's rule).
   for (const i of centred.offered) if (effects[i] === 'created') minted.push({ index: owner[i], id: CENTRE_LETTER });
+  /**
+   * THE OTHER STATEMENT a circle-through-a-forbidding-noun refusal names (#1918, ADR-AG-252): the refused line is the
+   * inscription → the sentence that declared the noun; the refused line is the noun → the sentence that inscribed the
+   * ring. Read off the parsed facts (the student's own lines), first such line wins.
+   */
+  const inscribedAgainst = (e: ApplyError, at: number): Partial<LineFault> => {
+    if (e.code !== 'inscribed-contradicts-declared' || !e.ring) return {};
+    const rings = facts.map((f, j) => ({ f, j })).filter((x): x is { f: Extract<Fact, { t: 'polygon' }>; j: number } => x.f.t === 'polygon' && x.f.id === e.ring);
+    const refusedIsInscription = rings.some(({ f, j }) => owner[j] === at && f.cyclic);
+    const other = rings.find(({ f, j }) => owner[j] !== at && (refusedIsInscription ? !!f.noun && !!shapeRow(f.noun)?.notCyclic : !!f.cyclic));
+    return { shape: e.shape, forced: e.forced, ...(other ? { declared: lines[owner[other.j]] } : {}) };
+  };
   const reported = new Set<string>();
   errors.forEach((e, i) => {
     if (!e) return;
     const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null, e.options ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}) });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...inscribedAgainst(e, owner[i]) });
   });
 
   /**

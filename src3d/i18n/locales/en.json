@@ -165,6 +165,7 @@
     "paramRolesConflated": "the letter {{letter}} is used both as the running parameter (outside the parentheses) and as a component inside them — it isn't clear which you meant. Pick a different letter for the running parameter, e.g. x=t({{letter}}-1, 5-{{letter}}, -2)",
     "componentSymbolic": "A single coordinate with a letter value («{{component}}») is not supported yet — give it a number, e.g. {{component}} = 3",
     "inscribedContradictsNoun": "A {{shape}} cannot be inscribed in a circle: «{{sentence}}». A circle through every vertex would make it a {{forced}}, and a {{forced}} is not a {{shape}}. If the shape is a {{forced}}, write \"{{forced}}\" instead of \"{{shape}}\".",
+    "inscribedContradictsNounVs": "Can't do that: «{{sentence}}» contradicts «{{other}}» — they can't both hold. The reason: a circle through the four vertices would make a {{shape}} a {{forced}}, and a {{forced}} is not a {{shape}}.",
     "proofTarget": "That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{sentence}}»",
     "droppedGiven": "The statement was not added to the figure, because we could not draw: {{items}}. Try splitting it into shorter givens or rephrasing",
     "noPrismToMakeRight": "there is no prism in the figure to make right — build a prism or a parallelepiped first",
@@ -258,6 +259,10 @@
   },
   "load.unbuildable": "The file opened, but no step could be rebuilt in this version ({{count}} steps) — it may have been saved by a newer build. The steps are kept exactly as saved.",
   "load.partial": "The file opened, but {{count}} step(s) could not be rebuilt (step {{steps}}) — they are flagged in the list. The steps are kept exactly as saved.",
+  "warn": {
+    "mismatch": "The figure may not match what you described:",
+    "trapezoidMorph": "{{quad}} was declared a trapezoid, but both pairs of opposite sides are now parallel — it is no longer a trapezoid. To change the shape, edit or delete the trapezoid step."
+  },
   "notice": {
     "baseConstrained": "For the pyramid to be right, the base ({{ids}}) was constrained from a {{from}} to a {{to}}.",
     "inscribedConstrained": "For the circle to pass through every vertex, {{ids}} was constrained from a {{from}} to a {{to}}.",

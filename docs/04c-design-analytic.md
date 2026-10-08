@@ -246,7 +246,11 @@ conjunction (`shell/conjunction`, [ADR-AG-239](06c-decisions-analytic.md#adr-ag-
 applies `touchedCircleFacts` (tool symbols, `toolSymbol`), and `theCircle` binds `{ inscribed: ring }`; created
 shapes start fitted ([ADR-AG-202](06c-decisions-analytic.md#adr-ag-202): `fitCreatedShapes`, `shapedObjectOf`). A
 non-cyclic noun refuses `inscribed-contradicts-noun { shape, forced }` (`ShapeRow.notCyclic`, `cyclicFacts`,
-`errInscribedContradictsNoun`).
+`errInscribedContradictsNoun`). The same pair in TWO sentences, either order, is refused at M1
+([ADR-AG-252](06c-decisions-analytic.md#adr-ag-252), #1918): `cyclicFacts` marks the ring's polygon fact `cyclic`, the
+polygon object carries `cyclic` and `circleless` (the declared `notCyclic` noun), and the statement that would make
+both true fails `inscribed-contradicts-declared { shape, forced, ring }`; `derive` adds the other sentence as
+`declared` (`errInscribedContradictsDeclared`).
 
 *Identifiers:* `errorText` · `θ_<object>.<part>` · `tangent-curve` · `about` · `the-circle` · `ref` · `line-AB` · `line-BA` · `line-at { through: a, dir: points a→b, name: 'AB' }` · `objects` · `NAME_LIST` · `distributeClauses` · `param θ_circle-touched.r > 0` · `circle-touched` · `θ_circle-touched.{a,b,r}` · `θ_` · `circleId` · `match` · `centre-of { circleId }` · `evaluateUncached` · `shapeHe/forcedHe` · `shapeEn/forcedEn` · `A = [(3/5, 4/5)] או (4, -2)` · `… (2- ,4) או` · `x_{B}` · `namedRow` · `pointText` · `scalarText` · `<text>` · `direction: ltr` · `<svg>`
 

@@ -22,6 +22,7 @@ import type { Vec3 } from './vec3';
 // #587: the quad-base vocabulary is defined ONCE, in the base registry — the flat `quad-shape` command
 // names the same seven families the solid lane's bases do. Type-only, so the cycle is erased at compile.
 import type { QuadBase } from './baseShapes';
+import type { ShapeAdj3 } from '../lexicon/shapePhrase3';
 
 export type Id = string;
 
@@ -372,6 +373,12 @@ export interface SolidCommand {
    * so exactly ONE oblique code path exists in the engine.
    */
   oblique?: true;
+  /** #1918 (ADR-3D-313): the adjective a quad pyramid's BASE phrase consumed («שבסיסה טרפז ישר זווית» →
+   *  'right') — the solid twin of `quad-shape`'s `adj`, so a declared base answers the same questions. */
+  baseAdj?: ShapeAdj3;
+  /** #1918 (ADR-3D-313): a trapezoid pyramid's parallel pair re-seated onto sides 1/3 of the base ring — set
+   *  only by `derive3`'s pre-scan (see `quad-shape`'s `seat`), never typed or saved. */
+  baseSeat?: 1;
 }
 
 /**
@@ -1084,7 +1091,14 @@ export type Command3 =
   // context-free and only apply knows: all-new ⇒ declare + lower `quadShapeConstraints`; exactly one
   // unknown ⇒ complete that corner from the family's definition, then lower; all known ⇒ a STATEMENT
   // about existing points, lowered the same way and M1-routed to verification.
-  | { type: 'quad-shape'; base: QuadBase; ids: [Id, Id, Id, Id] }
+  // #1918 (ADR-3D-313): `adj` is the ADJECTIVE the noun phrase consumed («טרפז ישר זווית» → 'right') — recorded
+  // on the declaration so a circle stated through the ring on another line can be asked whether the phrase
+  // admits one (`notCyclic3`). The adjective's own constraints still ride beside it as relation commands.
+  //
+  // `seat` (#1918, ADR-3D-313) is never typed or saved: `derive3`'s order-free pre-scan sets it on a TRAPEZOID
+  // when the student stated the OTHER two sides parallel (and not the named pair), so the trapezoid's one
+  // parallel pair is the stated one — sides 1/3 of the ring as named instead of 0/2 (2-D's ADR-506).
+  | { type: 'quad-shape'; base: QuadBase; ids: [Id, Id, Id, Id]; adj?: ShapeAdj3; seat?: 1 }
   | { type: 'dot-given'; v1: string; v2: string; value: number } // u·v = 24 (V7 T2)
   // BD = (-4,5,12) — a pair-vector injection (V7 T2). #794 (ADR-3D-168): components take the same
   // grammar as point3 — number | null (placeholder letter) | affine symbolic via symExprs
@@ -1159,6 +1173,12 @@ export interface SolidObj {
   /** #349: this prism is OBLIQUE — see {@link SolidCommand.oblique}. Topology is identical to the
    *  right prism of the same kind (same ring), so only the dims and positions differ. */
   oblique?: true;
+  /** #1918: see {@link SolidCommand.baseAdj}. */
+  baseAdj?: ShapeAdj3;
+  /** #1918: the base ring's generated positions are SEATED one place round — id `i` (i < 4) takes the
+   *  generator's vertex `(i + 3) % 4` — so the generator's parallel pair lands on sides 1/3 of the ring as
+   *  named. The ids, faces and every name stay as the student wrote them. See {@link SolidCommand.baseSeat}. */
+  seat?: 1;
 }
 
 export type PointDef =
@@ -1288,7 +1308,7 @@ export interface Construction3 {
   requirements: Requirement3[];
   /** #612 (ADR-3D-158): the quad shapes the figure is KNOWN to have, as stated — the structural
    *  record the naming-error check reads. Never a measurement of one drawing. */
-  quadShapes: { base: QuadBase; ids: Id[] }[];
+  quadShapes: { base: QuadBase; ids: Id[]; adj?: ShapeAdj3 }[];
   /** #612: shape statements that were TRUE and already known, so they changed nothing. Recorded so
    *  the notice is DERIVED from the construction like every other one, surviving reload and undo. */
   redundantShapes: { base: QuadBase; ids: Id[] }[];
@@ -1708,6 +1728,17 @@ export type EngineError3 =
   // «ABCD מלבן» on a base the figure knows is a square. Operator ruling: a naming error, not a
   // redundancy. Carries both shapes so the message can name them.
   | { code: 'shape-less-specific'; stated: QuadBase; actual: QuadBase }
+  // #1918 (ADR-3D-313): the ring is already known to be a shape that NO quadrilateral is at the same time as
+  // the noun stated — a trapezoid (exactly one parallel pair) told it is a parallelogram, or the reverse.
+  // Derived from `QUAD_IMPLIES` (no row implies both), never a listed pair. Worded as `shape-less-specific`.
+  | { code: 'shape-disjoint'; stated: QuadBase; actual: QuadBase }
+  // #1792 / #1918 (ADR-3D-313): a shape no circle can pass around without turning it into `forced` (a right
+  // trapezoid in a circle is a rectangle). Raised by the parser for the one-line form and by apply for a ring
+  // DECLARED with the phrase on one line and inscribed on another, in either order. `shape`/`forced` are
+  // `notice.shape.*` keys. `sentence` is the refused line and `other` the earlier line it contradicts — both
+  // filled by the store from the fact list (apply knows rings, not lines); `against` says which earlier
+  // statement that is: the ring's declaring noun, or the circle through it.
+  | { code: 'inscribed-contradicts-noun'; shape: string; forced: string; ring?: Id[]; against?: 'noun' | 'circle'; sentence?: string; other?: string }
   /**
    * «AA'=3BC» — a bare-label ratio between two pairs that are NOT a rider and its host (#1156).
    *

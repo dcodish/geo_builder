@@ -16,6 +16,7 @@
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
 import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
+import { NOT_CYCLIC_VS, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
 import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
@@ -1696,6 +1697,24 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
     }
   }
+  /**
+   * #1918 ([ADR-607](docs/06-decisions.md#adr-607)) — the same provenance for a circle through a ring declared a
+   * right trapezoid: the other side is the statement that DECLARED the phrase (its command carries the record), read
+   * from the fact list, never searched for. When the refused line is itself the declaration (the circle came first),
+   * nothing is tagged here and the drop-one search below names the circle's statement.
+   */
+  if (attribute && hoistDepth === 0) {
+    for (const f of failedFacts) {
+      const st = status[f.id];
+      if (typeof st !== 'string') continue;
+      const m = NOT_CYCLIC_VS.exec(st);
+      if (!m || m[4] !== undefined) continue;
+      const declared = facts.findIndex((g) => g.enabled && g.cmd.type === 'trapezoid' && g.cmd.kind === m[1] && spellsRing(g.cmd.ids, m[2]));
+      if (declared < 0 || groupKey(facts[declared]) === groupKey(f)) continue;
+      const tagged = `${st} [vs #${declared}]`;
+      for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
+    }
+  }
   if (attribute && hoistDepth === 0) {
     const ownerIdx = new Set(ownerByConKey.values());
     const searched = new Set<string>();
@@ -2091,6 +2110,8 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   // #1470 (ADR-549): the side twin — a stated side and a statement that structurally puts the point
   // elsewhere. No later given can move a point off the circle it rides.
   if (cmds.some((cmd) => sideImpossibility(probe, cmd))) return false;
+  // #1918 (ADR-607): a circle through a ring declared a right trapezoid — no later given makes it cyclic.
+  if (cmds.some((cmd) => notCyclicImpossibility(probe, cmd))) return false;
   return newCons.some((con) => {
     const vals: number[] = [];
     for (const s of [0, 1, 2, 3, 4]) {

@@ -846,6 +846,19 @@ export default function App3() {
                         : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
             </div>
           ))}
+          {/* #1918 (ADR-3D-313): the amber MISMATCH banner — 2-D's `figure.mismatch` (ADR-165), copied: a declared
+              trapezoid the drawing shows with both pairs parallel. Derived per render, so it holds while the
+              drawing is a parallelogram and clears on the edit, mute or delete that makes it a trapezoid again. */}
+          {!busy && derived.shapeWarnings.length > 0 && (
+            <Banner kind="notice">
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>⚠ {t('warn.mismatch')}</div>
+              <ul style={{ margin: 0, paddingInlineStart: 18 }}>
+                {derived.shapeWarnings.map((w) => (
+                  <li key={`${w.kind}-${w.ids.join('')}`}>{t('warn.trapezoidMorph', { quad: w.ids.join('') })}</li>
+                ))}
+              </ul>
+            </Banner>
+          )}
           {lastNotice && !lastError && !busy && (
             <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {t('notice.alreadyStated', { utterance: lastNotice.utterance })}

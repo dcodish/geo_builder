@@ -58,3 +58,4 @@ export type { ValueRow, AreaClassRow, ValuesPanelResult } from './valuesPanel';
 
 export { degeneratePolygons, polygonFlatness, DEGENERATE_EXTENT_RATIO, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
 export type { DegeneratePolygon } from './degeneracy';
+export { NOT_CYCLIC } from './shapeKinds';

@@ -17,7 +17,8 @@
           "B",
           "C",
           "D"
-        ]
+        ],
+        "kind": "right-trapezoid"
       },
       "enabled": true
     },

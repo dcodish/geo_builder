@@ -10,6 +10,7 @@
 import type { Command, Construction, Id, SideRequirement, Vec } from './types';
 import type { ResolvedCircle } from './evaluate';
 import { dist, pointInPolygon, pointOutsidePolygon } from './geometry';
+import { NOT_CYCLIC } from './shapeKinds';
 
 /** The record a command states, or null when it states no side. */
 export function sideRequirementOf(cmd: Command): SideRequirement | null {
@@ -18,6 +19,8 @@ export function sideRequirementOf(cmd: Command): SideRequirement | null {
   if (cmd.type === 'points-line-side') return { kind: 'line-side', a: cmd.a, b: cmd.b, subjects: [...cmd.subjects], rel: cmd.rel };
   // #1709 (ADR-567): a STATED mutual position of two circles; the unstated bare-pair variant states nothing
   if (cmd.type === 'set-circle-position' && cmd.relation !== 'any') return { kind: 'circle-position', relation: cmd.relation, a: cmd.a, b: cmd.b };
+  // #1918 (ADR-607): a ring declared as a phrase no circle can pass around («טרפז ישר זווית ABCD»)
+  if (cmd.type === 'trapezoid' && cmd.kind && NOT_CYCLIC[cmd.kind]) return { kind: 'declared-shape', ring: [...cmd.ids], shape: cmd.kind };
   return null;
 }
 
@@ -36,9 +39,10 @@ export function recordRequirement(prior: readonly SideRequirement[] | undefined,
 /** The `requirements` field to spread into a construction — omitted when empty, so a figure without a stated side is byte-identical to before. */
 export const requirementsField = (reqs: SideRequirement[]): { requirements?: SideRequirement[] } => (reqs.length ? { requirements: reqs } : {});
 
-/** A stated SIDE of a region — the three kinds the ADR-254 family states (a circle's mutual position is not one). */
-export type SideRecord = Exclude<SideRequirement, { kind: 'circle-position' }>;
-export const isSideRecord = (r: SideRequirement): r is SideRecord => r.kind !== 'circle-position';
+/** A stated SIDE of a region — the three kinds the ADR-254 family states (a circle's mutual position is not one,
+ *  nor a declared shape phrase, #1918). */
+export type SideRecord = Exclude<SideRequirement, { kind: 'circle-position' } | { kind: 'declared-shape' }>;
+export const isSideRecord = (r: SideRequirement): r is SideRecord => r.kind !== 'circle-position' && r.kind !== 'declared-shape';
 /** The construction's stated sides (#1739, ADR-594) — empty for every figure without one. */
 export const sideRecordsOf = (c: Construction): SideRecord[] => (c.requirements ?? []).filter(isSideRecord);
 

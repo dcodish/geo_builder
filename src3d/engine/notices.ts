@@ -15,13 +15,50 @@
  * it needs no plumbing through the submit path.
  */
 
-import { CYCLIC_MEMBER, CYCLIC_MEMBER_NAME, QUAD_PYRAMIDS } from './baseShapes';
+import { CYCLIC_MEMBER, CYCLIC_MEMBER_NAME, declaredQuads3, QUAD_PYRAMIDS, quadShapeDrawn } from './baseShapes';
 import { claimPinsParam, isSelfDetermined, lineDirCarriesParam, operandLabel, planeNormalCarriesParam } from './operands';
 import type { QuadBase } from './baseShapes';
 import { cross3, dot3, norm3, sub3 } from './vec3';
 import type { Vec3 } from './vec3';
 import type { Resolved3 } from './evaluate';
-import type { Construction3, Id, Operand3, SolidKind } from './types';
+import type { Construction3, Id, Operand3, Positions3, SolidKind } from './types';
+
+/**
+ * #1918 (ADR-3D-313) — the FIGURE-MISMATCH channel: what the drawing on screen shows that a stated noun says
+ * it cannot be. 2-D's `violations` (`figure.mismatch`, ADR-165) and analytic's `shapeWarnings` (ADR-AG-189
+ * Am. 1) are the same channel. Not a notice ("here is what changed, as you asked") and not a refusal (the line
+ * committed): the student said two things the drawing cannot both show, and the page says so while it holds.
+ */
+export type ShapeWarning3 = {
+  /** A declared TRAPEZOID drawn with both pairs of opposite sides parallel — it is no longer a trapezoid. */
+  readonly kind: 'trapezoid-morph';
+  /** The ring, as the student lettered its declaration. */
+  readonly ids: readonly Id[];
+};
+
+/** |sin| of 1° — 2-D's `verify.ts` parallel test, so the three builders agree on what "drawn parallel" is. */
+const SIN_1DEG = Math.sin(Math.PI / 180);
+
+/**
+ * #1918 (ADR-3D-313): every declared trapezoid (flat or a pyramid's base, `declaredQuads3`) whose DRAWN
+ * configuration has both pairs of opposite sides parallel. It reads what is on screen — never a search verdict
+ * (the #1071 lesson) — so it holds exactly while the drawing is a parallelogram and clears when an edit, mute or
+ * delete makes it a trapezoid again. Pure over (construction, positions); `derive3` asks it per render.
+ */
+export function shapeWarnings3(c: Construction3, positions: Positions3): ShapeWarning3[] {
+  const out: ShapeWarning3[] = [];
+  const key = (ids: readonly Id[]) => [...ids].sort().join(',');
+  const seen = new Set<string>();
+  for (const q of declaredQuads3(c)) {
+    if (q.base !== 'trapezoid' || seen.has(key(q.ids))) continue;
+    const ring = q.ids.map((id) => positions.get(id));
+    if (ring.some((p) => !p)) continue; // unresolvable: nothing on screen to judge
+    if (!quadShapeDrawn('parallelogram', ring as Vec3[], SIN_1DEG)) continue;
+    seen.add(key(q.ids));
+    out.push({ kind: 'trapezoid-morph', ids: [...q.ids] });
+  }
+  return out;
+}
 
 /**
  * The relations that can be «true, and already known» (#853). The list is the SOURCE, not a copy:
@@ -470,6 +507,11 @@ function degenerateSolids(c: Construction3, samples: readonly Resolved3[]): Buil
  */
 export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = []): BuildNotice3[] {
   const out: BuildNotice3[] = [];
+  // #1918 (ADR-3D-313; #1915 step 2, "out of family, no pair"): a ring the drawing shows as a parallelogram
+  // carries the trapezoid warning, and «…הוגבל מ־טרפז ל־טרפז שווה שוקיים» beside it would contradict it — so a
+  // warned ring gets no cyclic-member notice. Judged on the drawn configuration, as the warning is.
+  const warned = samples[0] ? shapeWarnings3(c, samples[0].positions).map((w) => [...w.ids].sort().join(',')) : [];
+  const isWarned = (ids: readonly Id[]) => warned.includes([...ids].sort().join(','));
   // #375: derived from the pin's own flag, so it survives save/load and undo exactly like every notice
   for (const pin of c.planeLinePerps) {
     if (pin.statedAsPlane) out.push({ kind: 'line-called-plane', ids: [...pin.ids], line: pin.line });
@@ -488,6 +530,7 @@ export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = 
     if (!spec?.right) continue;
     const entry = CYCLIC_MEMBER[spec.base];
     if (entry.fix.kind === 'none') continue; // square / rectangle are cyclic already — nothing changed
+    if (isWarned(s.ids.slice(0, 4))) continue; // #1918
     out.push({ kind: 'base-constrained', ids: [...s.ids], from: spec.base, to: CYCLIC_MEMBER_NAME[spec.base] });
   }
   // #1792: the same registry, reached by a circle through a stated quad's vertices. Derived from the
@@ -495,8 +538,11 @@ export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = 
   for (const k of c.circles3) {
     if (k.def.kind !== 'circum' || k.def.ring.length !== 4) continue;
     const ring = k.def.ring;
-    const stated = c.quadShapes.find((q) => q.ids.length === 4 && q.ids.every((id) => ring.includes(id)));
+    // #1918: through the one declared-ring reader — the FLAT declarations, as before (a pyramid's base under a
+    // circle is not this notice's case, and widening it would be a message nobody asked for)
+    const stated = declaredQuads3(c).find((q) => q.solid === undefined && q.ids.length === 4 && q.ids.every((id) => ring.includes(id)));
     if (!stated || CYCLIC_MEMBER[stated.base].fix.kind === 'none') continue;
+    if (isWarned(ring)) continue; // #1918
     out.push({ kind: 'inscribed-constrained', ids: [...ring], from: stated.base, to: CYCLIC_MEMBER_NAME[stated.base] });
   }
   // #853 (ADR-3D-209): everything that says «true, and already known» — one predicate, one channel.

@@ -1142,7 +1142,8 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     quadEdges(objects, a, b, c, d, cmd.type);
     let acc: Construction = { ...prev, objects, constraints };
     for (const sub of shapeConstraints(cmd.type as Parameters<typeof shapeConstraints>[0], ids)) acc = applyCommand(acc, sub, pos);
-    return acc;
+    // the shape command's OWN record (#1918, ADR-607: a declared right trapezoid) — the sub-commands state none
+    return { ...acc, ...requirementsField(recordRequirement(acc.requirements, cmd)) };
   }
 
   // #260 (ADR-512): a statement that makes a point the MEETING of two carriers re-seats a genuinely loose

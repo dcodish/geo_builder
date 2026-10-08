@@ -25,7 +25,7 @@ import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind,
 import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX } from '../lexicon/nouns3';
 import { foldPrimes3, VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
-import { POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_WORDS3, statedPolygonArity3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
+import { POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_EN_ANY3, SHAPE_ADJ_WORDS3, statedPolygonArity3, type ShapeAdj3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
 // #1545 (ADR-3D-300): the ONE prime fold lives in the vocabulary leaf; re-exported so every parser-side
 // reader (the ask lane, the LLM sequence gate) reaches it through the normaliser that applies it.
 export { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';
@@ -1019,7 +1019,9 @@ const rightPyramid: Rule = (s) => {
   // with a build notice) instead of deferring -- superseding #304's right+rhombus bail.
   const quadPyramid = (ids: Id[], base: QuadBase): Command3[] | null => {
     const kind = right ? QUAD_PYRAMID_KIND[base].right : QUAD_PYRAMID_KIND[base].free;
-    const cmds: Command3[] = [{ type: 'solid', kind, ids }];
+    // #1918 (ADR-3D-313): the base's declared adjective rides on the solid, as on a flat `quad-shape`
+    const baseAdj = declaredAdj3(readShapePhrase3(s), base);
+    const cmds: Command3[] = [{ type: 'solid', kind, ids, ...(baseAdj ? { baseAdj } : {}) }];
     // the base's OWN defining constraint (a rhombus is a parallelogram ring + equal adjacent sides)
     if (base === 'rhombus') cmds.push(...shapeInternal3([{ type: 'length-rel', a1: ids[0], b1: ids[1], rhs: { pair: [ids[0], ids[3]] }, c: 1 }]));
     if (right) cmds.push(...cyclicFixCommands(base, ids.slice(0, 4)));
@@ -4142,13 +4144,21 @@ const mutualPositionClaim: Rule = (s0) => {
  * the three arms applies (declare / complete a corner / verify a statement) depends on which corners
  * already exist, and `parse3` is context-free — only apply knows.
  */
-function quadShapeCommand(base: QuadBase | null, ids: Id[]): Command3[] {
+function quadShapeCommand(base: QuadBase | null, ids: Id[], phrase: ShapePhrase3 | null = null): Command3[] {
   // `quad` is the generic noun (`מרובע`) — it states NOTHING beyond four-sidedness, which the plain
   // `polygon4` declaration already says. Lowering it too would only swap the declaring command (and
   // with it #586's bare-run byte-identity) for no semantic gain, so the six SHAPE nouns route here
   // and the generic one keeps the path it has always taken.
   if (!base || base === 'quad' || ids.length !== 4) return [];
-  return [{ type: 'quad-shape', base, ids: ids as [Id, Id, Id, Id] }];
+  // #1918 (ADR-3D-313): the declaration carries the adjective its phrase consumed, so a circle stated through
+  // the ring on ANOTHER line can still be asked whether the phrase admits one
+  const adj = declaredAdj3(phrase, base);
+  return [{ type: 'quad-shape', base, ids: ids as [Id, Id, Id, Id], ...(adj ? { adj } : {}) }];
+}
+
+/** #1918: the adjective a quad noun's phrase CONSUMED (the trapezoid takes one), for its declaration. */
+function declaredAdj3(phrase: ShapePhrase3 | null, base: QuadBase): ShapeAdj3 | undefined {
+  return phrase && phrase.noun === base ? phrase.consumed[0] : undefined;
 }
 
 /** `ABEC מלבן` / `ABEC is a rectangle` — the RECTANGLE instance of `quad-shape` (#587). */
@@ -4458,7 +4468,7 @@ const polygonCircle3: Rule = (s) => {
   // the ring itself (its arm 1), exactly as it does on the bare-declaration rule. #1792: and the
   // adjective the noun carries («טרפז שווה שוקיים») lowers beside it.
   const base = polyKind === 'polygon4' ? statedQuadBase(s) : null;
-  const lowered = quadShapeCommand(base, ring);
+  const lowered = quadShapeCommand(base, ring, phrase);
   const poly: Command3[] = lowered.length
     ? [...lowered, ...(base ? quadAdjCommands(phrase, base, ring, lowered) : [])]
     : [{ type: 'solid', kind: polyKind, ids: ring }, ...triShapeCommands(shape, ring)];
@@ -4507,7 +4517,7 @@ const planarPolygon: Rule = (s) => {
   // rule on every noun rather than being dropped on the one whose adjectives `statedTriShape` reads.
   const phrase = readShapePhrase3(s);
   if (phrase && phrase.unconsumed.length > 0) return null;
-  const lowered = quadShapeCommand(kind === 'polygon4' ? quadBase : null, ids);
+  const lowered = quadShapeCommand(kind === 'polygon4' ? quadBase : null, ids, phrase);
   if (lowered.length) return [...lowered, ...(quadBase ? quadAdjCommands(phrase, quadBase, ids, lowered) : [])];
   return [{ type: 'solid', kind, ids }, ...triShapeCommands(shape, ids)];
 };

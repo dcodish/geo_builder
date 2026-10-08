@@ -151,6 +151,12 @@ interface Pattern {
    * are jointly at fault, and the wording must not pretend otherwise.
    */
   namesOther?: true;
+  /**
+   * #1918 (ADR-607) — a param that is itself a TRANSLATED sentence: `key` rendered with each of `params` resolved as
+   * a translation key. Lets a refusal reuse a ruled frame (`errors.overConstrained_said_vs`) with a ruled reason
+   * clause, instead of a second copy of the frame.
+   */
+  nested?: (m: RegExpMatchArray) => Record<string, { key: string; params: Record<string, string> }>;
 }
 
 // Order matters only where one pattern's text is a prefix of another's; each regex below is
@@ -245,6 +251,16 @@ export const PATTERNS: Pattern[] = [
       return n === 3 ? 'errors.polygonFlatTriangle' : n === 4 ? 'errors.polygonFlatQuad' : 'errors.polygonFlatPolygon';
     },
     params: (m) => ({ poly: m[1].split(', ').join(''), points: m[1], what: m[2] ?? '' }),
+    saysSubject: true,
+    namesOther: true,
+  },
+  // cyclicFeasibility.ts (#1918, ADR-607) — `over-constrained: a circle through the vertices of right-trapezoid ABCD
+  // forces a rectangle cannot hold`: the over-constrained frame (the #1868 ruled «X» סותר את «Y»), its reason the
+  // #1554 ruled explanation, built from the shape-noun names ADR-595's one-line refusal already uses.
+  {
+    re: /^over-constrained: a circle through the vertices of (\S+) \S+ forces a (\S+) cannot hold(?: \[vs #\d+\])?$/,
+    key: 'errors.overConstrained',
+    nested: (m) => ({ what: { key: 'errors.notCyclicReason', params: { shape: `input.shapeNoun.${m[1]}`, forced: `input.shapeNoun.${m[2]}` } } }),
     saysSubject: true,
     namesOther: true,
   },
@@ -357,9 +373,15 @@ export function humanizeError(raw: string | null | undefined, t: Translate, said
     // the very same English words («collinear points must be distinct …»), so translating first would
     // stop them matching. Every param goes through the pass — it only touches known fragment words, so a
     // non-fragment param (a circle letter, an id) is untouched.
-    const translated = params
-      ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t)]))
-      : undefined;
+    const nested = p.nested?.(m);
+    const translated =
+      params || nested
+        ? {
+            ...(params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t)])) : {}),
+            // #1918: a sentence param — its own key, each inner param a translation key
+            ...(nested ? Object.fromEntries(Object.entries(nested).map(([k, n]) => [k, t(n.key, Object.fromEntries(Object.entries(n.params).map(([pk, pv]) => [pk, t(pv)])))])) : {}),
+          }
+        : undefined;
     const key = p.keyOf ? p.keyOf(m) : p.key;
     // #943: the student's own sentence becomes the SUBJECT where the template's own subject cannot
     // identify which statement was refused. Still a pure mapping (ADR-228 Am.6) — the sentence is an

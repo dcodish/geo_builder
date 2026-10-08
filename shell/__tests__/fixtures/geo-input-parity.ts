@@ -259,6 +259,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1904': 'open',
   '#1905': 'open',
   '#1903': 'open',
+  '#1926': 'open',
 };
 
 export interface ParityRow {
@@ -1181,6 +1182,18 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1891 (ADR-606, ADR-3D-311; operator rulings 2026-10-08): a circle inscribed in a pentagon is refused as a known tool
   // limit (W19) until #1908 draws it. 3-D circle geometry is X8 (its own lock); analytic still asks its model (#1903).
   { id: 'pentagon-incircle-1891', family: 'circles', steps: ['מעגל חסום במחומש ABCDE'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1903' }] },
+  // #1918 (ADR-607 / ADR-3D-313 / ADR-AG-252, operator ruling 2026-10-08 "Refuse in both"): a declared trapezoid keeps its
+  // identity. A circle through a declared right trapezoid is refused in either order (3-D locks its refusal in
+  // issue-1918-trapezoid-identity.test.ts — X8 leaves circles out of 3-D's plain rows); a trapezoid forced into a
+  // parallelogram builds with the amber warning; a stated other pair re-seats the trapezoid's pair; a trapezoid and a
+  // parallelogram-family shape are refused (analytic's re-declaration answers «כבר ידוע» / records — #1926).
+  { id: 'trapezoid-1918-inscribed', family: 'inscribed', steps: ['טרפז ישר זווית ABCD', 'ABCD חסום במעגל'], expect: 'refused', exception: 'X8', note: 'a circle through a right trapezoid makes it a rectangle' },
+  { id: 'trapezoid-1918-inscribed-rev', family: 'inscribed', steps: ['ABCD חסום במעגל', 'טרפז ישר זווית ABCD'], expect: 'refused', exception: 'X8', note: 'the reverse order: the noun line is refused' },
+  { id: 'trapezoid-1918-morph', family: 'polygons', steps: ['טרפז שווה שוקיים ABCD', 'זווית DAB = 90'], expect: 'builds', note: 'builds, with the amber «no longer a trapezoid» warning' },
+  { id: 'trapezoid-1918-reseat', family: 'parallel-perpendicular', steps: ['טרפז ABCD', 'AD ∥ BC'], expect: 'builds', note: 'AD and BC become the parallel pair' },
+  { id: 'trapezoid-1918-redeclare', family: 'polygons', steps: ['מקבילית ABCD', 'טרפז ABCD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1926' }], note: 'no quadrilateral is both' },
+  { id: 'trapezoid-1918-redeclare-rev', family: 'polygons', steps: ['טרפז ABCD', 'מקבילית ABCD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1926' }] },
+  // end #1918
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

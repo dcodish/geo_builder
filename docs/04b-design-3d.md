@@ -231,6 +231,31 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
 "regular" is the lexicon's `regular` adjective, scoped to a flat polygon noun, consumed on `square` only;
 `droppedShapeAdjective3` accounts for it by a square or an equal-sides lowering on the ring.
 
+**What a ring was DECLARED to be, and the trapezoid's identity (#1918, [ADR-3D-313](06b-decisions-3d.md#adr-3d-313)).**
+- **The declared adjective.** A quad declaration records the adjective its phrase consumed: `quad-shape.adj`
+  for a flat ring, `solid.baseAdj` (→ `SolidObj.baseAdj`) for a quad pyramid's base. `declaredQuads3(c)`
+  (`baseShapes.ts`) is the ONE reader of "what was this ring declared to be" — `knownQuadShape`, the
+  circle-through-a-ring refusal, the build notices and the warning all ask it.
+- **The two-line circle refusal.** `notCyclic3(noun, adj)` (`lexicon/shapePhrase3.ts`) is the lookup
+  `readShapePhrase3` uses too. `apply` refuses `circle3 {circum}` through a declared ring the lookup rejects
+  (`against: 'noun'`), and a declaration of such a ring that a circum circle already passes through
+  (`against: 'circle'`). `derive3` fills `sentence` (the refused line) and `other` (the first enabled fact that
+  declared the ring, or stated its circle), so `err.inscribedContradictsNounVs` — 2-D's over-constrained frame —
+  names both statements. The one-line form keeps `err.inscribedContradictsNoun`.
+- **The disjoint re-declaration.** ARM 3's `known` split refuses `shape-disjoint` when no row of `QUAD_IMPLIES`
+  implies both the known shape and the stated noun (`quadsDisjoint`); worded by `err.shapeLessSpecific`.
+- **The pair in force.** `trapezoidRingInForce3(ring, stated)`: sides 0/2 of the ring as named, unless the
+  student stated sides 1/3 parallel and not 0/2. `derive3`'s order-free pre-scan reads the stated ∥ (segment
+  `mutual-rel parallel`, never `origin: 'shape'`) and SEATS the declaration: `quad-shape.seat` reads the family's
+  relation and its missing corner on the ring one place round (ink, declaration and record keep the student's
+  ring), and `solid.baseSeat` → `SolidObj.seat` maps the generator's base ring one place round in
+  `evaluateSolidsAndPoints` (the one id ← generated-vertex mapping). Never saved: a load re-reads it.
+- **The warning.** `shapeWarnings3(c, positions)` (`notices.ts`) lists every declared trapezoid whose DRAWN ring
+  has both pairs parallel at |sin| < sin 1° (`quadShapeDrawn('parallelogram')`). `derive3` returns it as
+  `shapeWarnings`; `App3` renders it as an amber `Banner kind="notice"` (`role="status"`) with 2-D's
+  `figure.mismatch` / `figure.v.trapezoidMorph` words copied into 3-D's `warn.*` keys. `buildNotices3` drops a
+  warned ring's `inscribed-constrained` / `base-constrained` notice.
+
 **A shape's own condition carries its provenance (#1844, [ADR-3D-308](06b-decisions-3d.md#adr-3d-308)).**
 Every shape lowering — `quadShapeConstraints`, the `CYCLIC_MEMBER` fix, the adjectives, a base noun,
 «שווה מקצועות», a pentagon's circle — emits its relation commands (`length-rel`, `cos-angle`, `mutual-rel`,

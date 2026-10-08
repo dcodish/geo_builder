@@ -204,7 +204,12 @@ export type Fact =
    * narrows it — the extent belongs to the statement.
    */
   | (FactBase & { t: 'extent-of'; id: Id; a: Id; b: Id })
-  | (FactBase & { t: 'polygon'; id: Id; vertices: Id[]; noun?: string })
+  /**
+   * `cyclic` (#1918, ADR-AG-252): the sentence says this ring is INSCRIBED IN A CIRCLE («ABCD חסום במעגל», «מעגל חוסם
+   * את ABCD», "ABCD is inscribed in a circle") — set by the parser's one inscription lowering (`cyclicFacts`), so M1
+   * can hold the inscription against a noun no circle passes around when the two arrive in different sentences.
+   */
+  | (FactBase & { t: 'polygon'; id: Id; vertices: Id[]; noun?: string; cyclic?: true })
   /**
    * A statement that must HOLD rather than an object that exists (#1016) — «שטח המשולש ABC הוא 20».
    *
@@ -666,7 +671,13 @@ export type GeoObject =
    * this ring IS, which the vertex list alone cannot answer. Absent for a polygon that arrived
    * some other way.
    */
-  | { kind: 'polygon'; id: Id; vertices: Id[]; noun?: string }
+  /**
+   * What the ring's sentences said about a CIRCLE through it (#1918, ADR-AG-252), read structurally from the
+   * statements and never from a drawing: `cyclic` — an inscription sentence put it on a circle; `circleless` — a
+   * sentence declared it a noun no circle can pass around (the registry key whose row carries `notCyclic`). M1
+   * refuses the statement that would make both true.
+   */
+  | { kind: 'polygon'; id: Id; vertices: Id[]; noun?: string; cyclic?: true; circleless?: string }
   /**
    * A circle given by its CENTRE POINT and a radius — «נתון מעגל O» (#1060).
    *

@@ -25,7 +25,8 @@
 
 import { sample } from './rng';
 import { dist3, dot3, norm3, ringCircumcentre2, sub3, type Vec3 } from './vec3';
-import type { Command3, Id, PointDef, SolidKind } from './types';
+import type { Command3, Construction3, Id, PointDef, SolidKind } from './types';
+import type { ShapeAdj3 } from '../lexicon/shapePhrase3';
 
 /** The quadrilateral base shapes a solid can stand on. */
 export type QuadBase = 'square' | 'rectangle' | 'rhombus' | 'parallelogram' | 'kite' | 'trapezoid' | 'quad';
@@ -181,6 +182,16 @@ export const QUAD_IMPLIES: Record<QuadBase, QuadBase[]> = {
 
 /** Does a genuine `have` also count as a `want`? (`quad` is implied by everything.) */
 export const quadImplies = (have: QuadBase, want: QuadBase): boolean => QUAD_IMPLIES[have].includes(want);
+
+/**
+ * #1918 (ADR-3D-313): can ONE quadrilateral be both an `x` and a `y`? Read off {@link QUAD_IMPLIES}: yes when
+ * some shape implies both (a kite and a rectangle meet in the square). Under the exclusive trapezoid reading
+ * the trapezoid meets no member of the parallelogram family — and no kite, since a kite with a parallel pair
+ * is a rhombus. A statement naming a shape disjoint from what the ring is already known to be cannot DRIVE
+ * the ring there: it contradicts the earlier noun, whatever the drawing. Derived, never a list of pairs.
+ */
+export const quadsDisjoint = (x: QuadBase, y: QuadBase): boolean =>
+  !(Object.keys(QUAD_IMPLIES) as QuadBase[]).some((k) => quadImplies(k, x) && quadImplies(k, y));
 
 /**
  * #615 (ADR-3D-158): does a DRAWN ring actually have this shape? Measured from positions — the same
@@ -470,6 +481,48 @@ export const QUAD_PYRAMIDS: Partial<Record<SolidKind, { base: QuadBase; right: b
   pyramidQuad: { base: 'quad', right: false },
   pyramidQuadR: { base: 'quad', right: true },
 };
+
+/**
+ * #1918 (ADR-3D-313, the 3-D port of 2-D's ADR-506 / analytic's R93) — WHICH pair of a declared trapezoid is
+ * its parallel pair. The noun names a ring, not a pair: by default the pair is sides 0/2 of the ring as named
+ * (AB ∥ DC for «טרפז ABCD»). A pair of the OTHER two sides (1/3: BC, DA) that the student STATED parallel,
+ * with none stated on 0/2, is the pair in force — the ring is read one place round. With both pairs stated the
+ * ring stays as named (and the drawing is no trapezoid; the warning says so). `stated` are the student's own
+ * segment ∥ statements, each as `[a, b, c, d]` for ab ∥ cd, in any letter order.
+ */
+export function trapezoidRingInForce3(ring: readonly Id[], stated: readonly (readonly [Id, Id, Id, Id])[]): Id[] {
+  if (ring.length !== 4) return [...ring];
+  const side = (i: number): [Id, Id] => [ring[i], ring[(i + 1) % 4]];
+  const samePair = (p: readonly Id[], q: readonly Id[]) => (p[0] === q[0] && p[1] === q[1]) || (p[0] === q[1] && p[1] === q[0]);
+  const statedPar = (i: number, j: number): boolean =>
+    stated.some(([a, b, c, d]) =>
+      (samePair([a, b], side(i)) && samePair([c, d], side(j))) || (samePair([a, b], side(j)) && samePair([c, d], side(i))));
+  return !statedPar(0, 2) && statedPar(1, 3) ? [ring[1], ring[2], ring[3], ring[0]] : [...ring];
+}
+
+/**
+ * #1918 (ADR-3D-313) — every quad ring the figure DECLARES, with its noun and the adjective its phrase
+ * consumed: a flat `quad-shape` statement and a quad pyramid's base alike. THE one reader of "what was this
+ * ring declared to be" — the naming check (`knownQuadShape`), the circle-through-a-ring refusal, the build
+ * notices and the trapezoid warning all ask it, so no route can become a second, drifting reader.
+ * Structural only: what was stated, never what one drawing happens to show.
+ */
+export interface DeclaredQuad3 {
+  readonly base: QuadBase;
+  readonly ids: readonly Id[];
+  readonly adj?: ShapeAdj3;
+  /** the index in `c.solids` when the ring is a pyramid's base; absent for a flat statement */
+  readonly solid?: number;
+}
+export function declaredQuads3(c: Pick<Construction3, 'quadShapes' | 'solids'>): DeclaredQuad3[] {
+  const out: DeclaredQuad3[] = c.quadShapes.map((q) => ({ base: q.base, ids: q.ids, ...(q.adj ? { adj: q.adj } : {}) }));
+  c.solids.forEach((sld, i) => {
+    const spec = QUAD_PYRAMIDS[sld.kind];
+    if (!spec || sld.ids.length < 4) return;
+    out.push({ base: spec.base, ids: sld.ids.slice(0, 4), ...(sld.baseAdj ? { adj: sld.baseAdj } : {}), solid: i });
+  });
+  return out;
+}
 
 /** Is this kind a 4-base pyramid (any base × right/free apex)? The one predicate every
  *  hand-maintained "which kinds are quad pyramids" list in the engine now defers to. */

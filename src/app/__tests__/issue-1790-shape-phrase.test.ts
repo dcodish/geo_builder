@@ -24,8 +24,7 @@ import { driveThroughGate } from '../../__tests__/submit-gate';
 import { parse } from '@/parser';
 import { readShapePhrase } from '@/parser/shapePhrase';
 import { droppedShapeNoun, droppedShapeAdjective } from '@/parser/parse';
-import type { AnyCommand, Command, Vec } from '@/engine';
-import { checkGivens } from '@/engine/verify';
+import type { AnyCommand, Vec } from '@/engine';
 
 type Verdict = Awaited<ReturnType<typeof decideDeterministic2D>>;
 
@@ -184,15 +183,13 @@ describe('#1790 Arm C — restating an already-declared ring with the generic wo
     expect(v.kind, JSON.stringify(v).slice(0, 300)).toBe('commit');
   });
 
-  it('«טרפז ישר זווית ABCD» · «ABCD חסום במעגל» draws with the amber "no longer a trapezoid" (ADR-165, #1627), never "already defined"', async () => {
+  // #1918 (ADR-607, operator ruling 2026-10-08 "Refuse in both"): this pair used to draw the rectangle with the amber
+  // "no longer a trapezoid"; it is now refused naming both statements, like the one-line sentence. Never "already defined".
+  it('«טרפז ישר זווית ABCD» · «ABCD חסום במעגל» is refused naming the declaring statement (ADR-607), never "already defined"', async () => {
     const v = await decide(['טרפז ישר זווית ABCD'], 'ABCD חסום במעגל');
-    expect(v.kind).toBe('commit');
-    if (v.kind !== 'commit') return;
-    const facts = commit('ABCD חסום במעגל', v.commands);
-    const f = replay(facts, 0);
-    expect(f.lastError).toBeNull();
-    const v2 = checkGivens(facts.map((x) => x.cmd as Command), f.positions, f.circles, f.construction);
-    expect(v2.map((x) => x.messageKey)).toContain('figure.v.trapezoidMorph');
+    expect(v.kind).toBe('refuse');
+    expect(JSON.stringify(v)).toMatch(/a circle through the vertices of right-trapezoid ABCD forces a rectangle cannot hold \[vs #0\]/);
+    expect(JSON.stringify(v)).not.toMatch(/already defined|poly-/);
   });
 
   it('the restated ring keeps its declared noun', async () => {

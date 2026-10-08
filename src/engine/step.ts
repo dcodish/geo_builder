@@ -31,6 +31,7 @@ import {
   forcedFlatPolygon,
 } from './metricFeasibility';
 import { sideImpossibility, sideImpossibilityError } from './sideFeasibility';
+import { notCyclicImpossibility, notCyclicImpossibilityError } from './cyclicFeasibility';
 import { recordRequirement, requirementsField } from './requirements';
 import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
 import { applySeed, freeDofs } from './sample';
@@ -1020,6 +1021,14 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
     return { ok: false, error: sideImpossibilityError(sideErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
 
+  // #1918 (ADR-607): a circle through a ring DECLARED as a phrase no circle can pass around — «טרפז ישר זווית ABCD»
+  // with «ABCD חסום במעגל», in either order. Structural (the declaration record and the stated circle, never the
+  // drawing), so the one-line refusal (ADR-595) and the two-line one are one rule; the operator's 2026-10-08 ruling.
+  const cyclicErr = notCyclicImpossibility(probed, cmd);
+  if (cyclicErr) {
+    return { ok: false, error: notCyclicImpossibilityError(cyclicErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  }
+
   // #966 (ADR-499) — A ROLE CLAIM IS CHECKED AGAINST THE FIGURE THAT IS ALREADY THERE.
   //
   // «אלכסון AB» on «מלבן ABCD» names a SIDE, and «אלכסון AB» on a triangle names a diagonal of a shape
@@ -1167,6 +1176,9 @@ function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult
   // #1849 (ADR-602): a coupled line can complete a forced collapse as well as a single statement can.
   const flatErr = forcedFlatError(prev, next);
   if (flatErr) return { ok: false, error: flatErr, construction: prev, positions: prevPositions, ladder: ['pre:flat'], degenerate: true };
+  // #1918 (ADR-607): a coupled run can state the circle through a declared right trapezoid as well as one statement can.
+  const cyclicErr = notCyclicImpossibility(next);
+  if (cyclicErr) return { ok: false, error: notCyclicImpossibilityError(cyclicErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   const res = evaluate(next);
   if (res.ok && stepAccepted(next, res.positions, newCons)) {
     const owned = ensureOwnership(next, newCons, res.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF
