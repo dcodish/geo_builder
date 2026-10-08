@@ -263,7 +263,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | "The tool's limit, not your mistake" | no | yes | no | no | **Ruled change** — everywhere (B13, #1868) |
 | Student-text check (ADR-W-096) | no | yes | no | no | **Gap** — #1522 (icebox) |
 | Restated fact «כבר נובע…» | yes | yes | yes | no | **Gap** — #1565 |
-| A one-line compound that loses a part («משולש ABC ישר זווית ב-B», «…בנקודה E שהיא אמצע BD») | refused whole, parts listed; the right-angle syntax taught (ADR-603) | records it, the angle elsewhere | refused whole, parts listed; the right-angle syntax taught; «…שהיא אמצע BD» reads both parts and builds (ADR-AG-251) | n/a | **Ruled change** — refused in every builder (2026-10-08, #1888/#1889, ADR-W-120); 3-D: #1888; a dropped ROLE word (#1904, ADR-604) the same way |
+| A one-line compound that loses a part («משולש ABC ישר זווית ב-B», «…בנקודה E שהיא אמצע BD») | refused whole, parts listed; the right-angle syntax taught (ADR-603) | refused whole, parts listed; the right-angle syntax taught (ADR-3D-316); «…בנקודה E…» not read (#1679) | refused whole, parts listed; the right-angle syntax taught; «…שהיא אמצע BD» reads both parts and builds (ADR-AG-251) | n/a | **Ruled change** — refused in every builder (2026-10-08, #1888/#1889, ADR-W-120); a dropped ROLE word the same way (#1904: 2-D ADR-604, 3-D ADR-3D-317) |
 | Two points on one spot | refused or redrawn | same | same | not measured | **Same** for 2-D/3-D/analytic (ADR-W-066/072); complex **Open** |
 | A declared polygon forced flat | refused | refused | refused | n/a | **Same** (ADR-W-115) |
 | A declared polygon over coordinate points, crossed | n/a (no coordinates) | refused | refused | n/a | **Same** (ruled, #1923: ADR-3D-314, ADR-AG-129) |

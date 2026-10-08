@@ -158,6 +158,21 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   the whole line, and a stated pair relation no committed command carries is refused, naming it. The 2-D
   twin is FR-IN-4d.
   - Sources: ADR-3D-296, #1730.
+- **FR-SP-16 (Must)** — **A line that loses a part is refused whole, never drawn without it.** A part of the line
+  the reading did not read — a vertex locative («משולש ABC שווה שוקיים ב-B», «טרפז ABCD ישר זווית ב-B», «…ב-A» on
+  a prism) — refuses the line with 2-D's one-input-per-line message, listing the parts in the student's words
+  cut where the reading stops («(1) משולש ABC שווה שוקיים  (2) ב-B»), **even where the drawing happens to agree**.
+  «משולש ABC ישר זווית ב-<V>» is taught instead: «כתבו קודם «משולש ABC», ואחר כך בשורה נפרדת «∠ABC = 90°».», the
+  angle named at the student's vertex. The ✎ editor refuses the same edits. A scene the statement lives in
+  («…במשולש SBC» on a pyramid, «פירמידה SABC שבסיסה משולש ABC») is context, not a part. The 2-D twin is FR-IN-4g.
+  - Sources: ADR-3D-316, ADR-W-120; #1888 (operator rulings 2026-10-08).
+- **FR-SP-17 (Must)** — **A role the reading drops refuses the line.** A cevian or ⟂ word the reading did not read
+  («AD תיכון לצלע BC שהוא גם גובה», «…שמאונך לה», "…that is also a median") refuses the line whole, never recording AD
+  with one role only. The refusal teaches one line per role («כתבו כל תפקיד בשורה נפרדת: «AD is the altitude to BC», ואחר
+  כך «AD is the median to BC».») when those lines record on the figure, and otherwise lists the parts («(1) AD תיכון לצלע
+  BC  (2) שהוא גם גובה»). The ✎ editor refuses the same edits. A role word stated twice and read once is not a loss.
+  The 2-D twin is FR-IN-4g.
+  - Sources: ADR-3D-317; #1904 (operator rulings 2026-10-08, W22).
 - **FR-SP-14 (Must)** — **One coordinate of a point can be stated and asked.** «x_B = 3», «x_{B}=3», «B_x = 3»,
   «שיעור ה-x של (נקודה) B הוא 3», «x של B הוא 3», «שיעור ה-x של B שווה ל-3» and "the x-coordinate of B is 3"
   state B's x and nothing else: on a new B the point is created with x = 3 and its y and z free (they move

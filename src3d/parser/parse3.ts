@@ -399,8 +399,12 @@ const primeAll = (ts: Id[]) => ts.map((t) => `${t}'`);
 // alternative beside it got this right (`אלכסו[ןנ]`); the median did not, and this tree folds no final
 // letters (it spells both forms out everywhere else). A stated median that no command produced was
 // therefore ungated — the exact #438/#440 class the gate exists to close, left open for one noun.
-export const CONSTRUCT_NOUNS =
-  /מעגל|אלכסו[ןנ]|גובה|גבהי|תיכו[ןנ]|חוצ[הת]?[-\s]?זו?וית|\b(?:circle|diagonal|altitude|height|median|bisect\w*)\b/i;
+/** The CEVIAN role nouns (altitude, median, angle bisector) as one atom (#1904, ADR-3D-317): composed into
+ *  {@link CONSTRUCT_NOUNS} here, and read per OCCURRENCE by the role-word member (`store/unreadRoles3.ts`).
+ *  Bare alternations: a caller adds its own boundaries and clitics. */
+export const CEVIAN_NOUNS3_HE = String.raw`גובה|גבהי|תיכו[ןנ]|חוצ[הת]?[-\s]?זו?וית`;
+export const CEVIAN_NOUNS3_EN = String.raw`altitude|height|median|bisect\w*`;
+export const CONSTRUCT_NOUNS = new RegExp(String.raw`מעגל|אלכסו[ןנ]|${CEVIAN_NOUNS3_HE}|\b(?:circle|diagonal|${CEVIAN_NOUNS3_EN})\b`, 'i');
 
 /**
  * Every word the declaration family itself reads: the solid nouns, the base/flat-shape nouns, the
@@ -2992,7 +2996,10 @@ const linePerpPlane: Rule = (s) => {
 // wherever one is: «מאונכים» for a plural subject, «מאונכת» for a feminine one (which is exactly what
 // «הפאה» takes). `מקביל(?:ים|ות|ה)?` below already carried its full set; ⟂ carried only the plural, so
 // the face/base vocabulary would have parsed its operands and then failed on the verb.
-const PERP_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מאונ[ךכ](?:ים|ות|ת)?|ניצב(?:ים|ות|ה)?|אנך|⊥|perpendicular)\s*(?:ל(?=\S)|to\s+)?-?\s*/;
+/** The ⟂ predicate words without «ניצב» (#1904, ADR-3D-317): «ניצב» is also the LEG noun, so the role-word member
+ *  (`store/unreadRoles3.ts`) reads only these, and {@link PERP_SPLIT} adds it back. */
+export const PERP_WORDS3 = String.raw`מאונ[ךכ](?:ים|ות|ת)?|אנך|⊥|perpendicular`;
+const PERP_SPLIT = new RegExp(String.raw`\s*(?:(?:is|are)\s+)?(?:${PERP_WORDS3}|ניצב(?:ים|ות|ה)?)\s*(?:ל(?=\S)|to\s+)?-?\s*`);
 // #821: `||` is how the operator TYPED ∥ («ACD||AB») — an Israeli keyboard has no ∥ glyph (the #493 argument).
 const PAR_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מקביל(?:ים|ות|ה)?|∥|\|\||parallel)\s*(?:ל(?=\S)|to\s+)?-?\s*/;
 

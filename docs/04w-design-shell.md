@@ -268,7 +268,7 @@ it teaches scores zero, so the gate can never brush off a sentence the tool acce
 
 - `readWords(text, lowering, reader, word, classOf?)` — the WORD class ([ADR-604](06-decisions.md#adr-604)): an occurrence is read when deleting it (the whole match, clitics included) changes the lowering; one class (`classOf`) stated twice and read together is a co-reference.
 
-The 2-D members are `src/app/unreadParts.ts` ([ADR-603](06-decisions.md#adr-603)) and `src/app/unreadRoles.ts` (ADR-604). Locks: `shell/__tests__/read-extent-1888.test.ts` and `read-extent-1904.test.ts`, on toy readers.
+The 2-D members are `src/app/unreadParts.ts` ([ADR-603](06-decisions.md#adr-603)) and `src/app/unreadRoles.ts` (ADR-604); the 3-D member is `src3d/store/unreadParts3.ts` ([ADR-3D-316](06b-decisions-3d.md#adr-3d-316)). Locks: `shell/__tests__/read-extent-1888.test.ts` and `read-extent-1904.test.ts`, on toy readers.
 
 ### Geometry-input parity ([ADR-W-108](06w-decisions-workspace.md#adr-w-108))
 
