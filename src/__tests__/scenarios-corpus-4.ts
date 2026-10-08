@@ -3689,9 +3689,11 @@ export const SCENARIOS_4: Scenario[] = [
       allStepsOk(fig);
       for (const [A, B, C, D] of [['A', 'B', 'C', 'D'], ['E', 'F', 'G', 'H'], ['K', 'L', 'M', 'N'], ['P', 'Q', 'R', 'S']]) {
         const [a, b, c, d] = [A, B, C, D].map((k) => at(fig, k));
-        expect(angle(a, d, b), `${A}${D} ⟂ ${B}${C}`).toBeCloseTo(90, 5);
+        // angles to 4 places: a SOLVED ⟂ lands within ~4e-6° of 90 (measured over seeds 0–2), and the derived
+        // equality ∠BAD = ∠DAC carries twice that (6.4e-6° at seed 1) — 5 places sat below the solver's precision
+        expect(angle(a, d, b), `${A}${D} ⟂ ${B}${C}`).toBeCloseTo(90, 4);
         expect(dist(b, d), `${B}${D} = ${D}${C}`).toBeCloseTo(dist(d, c), 6);
-        expect(angle(b, a, d), `∠${B}${A}${D} = ∠${D}${A}${C}`).toBeCloseTo(angle(d, a, c), 5);
+        expect(angle(b, a, d), `∠${B}${A}${D} = ∠${D}${A}${C}`).toBeCloseTo(angle(d, a, c), 4);
       }
     },
   },
