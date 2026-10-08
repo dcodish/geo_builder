@@ -302,7 +302,7 @@ export function scalePinned(c: Construction3): boolean {
  * #872 — the FLAT kinds: coplanar by definition, so the volume gate must never judge them.
  * `polygon3/4/5` are V8-g's 2-D vector lane, modelled as "solids" to reuse the dims sampler.
  */
-const FLAT_SOLID_KINDS: ReadonlySet<SolidKind> = new Set<SolidKind>(['polygon3', 'polygon4', 'polygon5']);
+export const FLAT_SOLID_KINDS: ReadonlySet<SolidKind> = new Set<SolidKind>(['polygon3', 'polygon4', 'polygon5']);
 
 /**
  * #872 — how far the vertices stray from ONE plane, in absolute units.

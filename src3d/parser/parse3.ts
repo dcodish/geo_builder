@@ -2001,21 +2001,57 @@ const heightOfSolid: Rule = (s) => {
     if (!seg) return null;
     return [{ type: 'height-to-face', id: seg[2], from: seg[1], face: [faceM[1], faceM[2], faceM[3]] }];
   }
-  // The value slots compose from the UNUM atom (the docs/24 S2.1 lexical ratchet), so these three
-  // are built RegExps rather than literals.
-  const m =
-    s.match(new RegExp(String.raw`^(?:המקצוע\s+|הצלע\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?(?:גובה|אנך)(?:\s+(?:בפירמידה|במנסרה|הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?(?:\s*,?\s*(?:\1\2\s*)?(?:ואורכו|אורכו|הוא|=)\s*(${UNUM}))?\s*$`)) ??
-    s.match(new RegExp(String.raw`^([A-Z]\d*'?)([A-Z]\d*'?)\s+is\s+the\s+(?:height|altitude)(?:\s+of\s+the\s+(?:pyramid|prism))?(?:\s*,?\s*(?:and\s+its\s+length\s+is|=)\s*(${UNUM}))?\s*$`, 'i')) ??
-    // #1448: the noun-first named spelling — «גובה הפירמידה SO = 4».
-    s.match(new RegExp(String.raw`^ה?גובה\s+(?:הפירמידה|המנסרה)\s+([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:,?\s*(?:הוא|=)\s*(${UNUM}))?\s*$`));
-  if (!m) return null;
-  const role: Command3 = { type: 'seg-plane-rel', rel: 'perp', a: m[1], b: m[2], plane: [] };
+  const h = readHeight3(s);
+  if (!h) return null;
+  const role: Command3 = { type: 'seg-plane-rel', rel: 'perp', a: h.a, b: h.b, plane: [] };
   // #1448: the value rides the same sentence — the claim the two-line spelling always stated.
-  if (m[3] !== undefined) {
-    return [role, { type: 'claim', claim: { type: 'length-eq', a: m[1], b: m[2], value: Number(m[3]) } }];
+  if (h.value !== undefined) {
+    return [role, { type: 'claim', claim: { type: 'length-eq', a: h.a, b: h.b, value: h.value } }];
   }
   return [role];
 };
+
+/** What a named-height sentence says, beyond its two letters (#1907): the noun, a named solid, a value. */
+interface HeightStatement3 {
+  a: string;
+  b: string;
+  /** the noun is «גובה» / height / altitude — not «אנך», which names a perpendicular and no altitude */
+  altitude: boolean;
+  /** the sentence names the solid it is the height OF («גובה הפירמידה», "of the prism") */
+  ofSolid: boolean;
+  value?: number;
+}
+
+function readHeight3(s: string): HeightStatement3 | null {
+  // The value slots compose from the UNUM atom (the docs/24 S2.1 lexical ratchet), so these three
+  // are built RegExps rather than literals. Named groups: positional indices shift as a pattern grows.
+  const L = String.raw`[A-Z]\d*'?`;
+  const m =
+    s.match(new RegExp(String.raw`^(?:המקצוע\s+|הצלע\s+)?(?<a>${L})(?<b>${L})\s+(?:הוא\s+)?(?<noun>גובה|אנך)(?<solid>\s+(?:בפירמידה|במנסרה|הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?(?:\s*,?\s*(?:\k<a>\k<b>\s*)?(?:ואורכו|אורכו|הוא|=)\s*(?<value>${UNUM}))?\s*$`)) ??
+    s.match(new RegExp(String.raw`^(?<a>${L})(?<b>${L})\s+is\s+the\s+(?<noun>height|altitude)(?<solid>\s+of\s+the\s+(?:pyramid|prism))?(?:\s*,?\s*(?:and\s+its\s+length\s+is|=)\s*(?<value>${UNUM}))?\s*$`, 'i')) ??
+    // #1448: the noun-first named spelling — «גובה הפירמידה SO = 4».
+    s.match(new RegExp(String.raw`^ה?(?<noun>גובה)(?<solid>\s+(?:הפירמידה|המנסרה))\s+(?<a>${L})(?<b>${L})\s*(?:,?\s*(?:הוא|=)\s*(?<value>${UNUM}))?\s*$`));
+  const g = m?.groups;
+  if (!g) return null;
+  return {
+    a: g.a,
+    b: g.b,
+    altitude: g.noun !== 'אנך',
+    ofSolid: g.solid !== undefined,
+    ...(g.value !== undefined ? { value: Number(g.value) } : {}),
+  };
+}
+
+/**
+ * #1907 (ADR-3D-315) — is this line a BARE altitude statement, «AD גובה» / «AD הוא גובה» / "AD is the
+ * altitude"? Context-free (the figure decides the rest, in the store): the sentence names no solid and no
+ * value, and its noun is the altitude, not «אנך». These are the forms 2-D reads as a polygon's altitude;
+ * on a flat figure every other height sentence goes to the AI, as it does in 2-D.
+ */
+export function isBareAltitude3(utterance: string): boolean {
+  const h = readHeight3(normalize3(utterance));
+  return !!h && h.altitude && !h.ofSolid && h.value === undefined;
+}
 
 /** #72: `חץ A'C` / `arrow A'C` — draw the pair as an UNNAMED ink arrow (the named-basis lane
  *  stays `נסמן: AB = u`; an unnamed arrow never joins the basis). The vector WORD (`וקטור AB`)

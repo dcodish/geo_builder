@@ -763,6 +763,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'bisector-named', family: 'cevians-centres', steps: ['משולש AOC', 'OD חוצה זווית AOC'], expect: 'builds' },
   // ── #1620 S4 (ADR-AG-209): the cevian family's remaining spellings, as 2-D reads them ──
   { id: 'cevian-named-only', family: 'cevians-centres', steps: ['משולש ABC', 'AD גובה'], expect: 'builds' },
+  // #1907 (ADR-3D-315): the bare altitude onto a foot already on the opposite side — 2-D drops it there (3-D refused the triangle as flat)
+  { id: 'cevian-named-foot-on-side', family: 'cevians-centres', steps: ['משולש ABC', 'D על BC', 'AD גובה'], expect: 'builds' },
   { id: 'cevian-to-side', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון לצלע BC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cevian-plural-respectively', family: 'cevians-centres', steps: ['משולש OBC', 'OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1685' }, { product: '3d', issue: '#1679', parked: true }], note: '471 corpus 7/4, as S1 teaches its imperative' },
   { id: 'bisector-copula', family: 'cevians-centres', steps: ['משולש CMD', 'AM הוא חוצה זווית CMD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1685' }, { product: '3d', issue: '#1679', parked: true }], note: '471 corpus 22/5' },
@@ -1028,7 +1030,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'ex-position-aside-1706', family: 'topic', steps: ['A ו-D על ציר ה-y (D מעל A), B ו-C על ציר ה-x (C מימין ל-B)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: 'corpus 6/5 line 3: the position words inside the asides' },
   { id: 'ex-median-equation-1662', family: 'topic', steps: ['משולש ABC', 'משוואת התיכון AD היא y=x'], expect: 'builds', exception: 'X2', note: '#1662: the median claim is kept — D is the midpoint of BC' },
   { id: 'ex-altitude-equation-ask-1662', family: 'topic', steps: ['משולש ABC', 'משולש ABE', 'משוואת הגובה AD היא y=x'], expect: 'asks', exception: 'X2', note: '#1662: two triangles have the vertex A and neither side holds D' },
-  { id: 'cevian-foot-on-side-1662', family: 'cevians-centres', steps: ['משולש ABC', 'משולש ABE', 'D על BC', 'AD גובה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the triangle whose opposite side holds D (2-D measured: commits)' },
+  { id: 'cevian-foot-on-side-1662', family: 'cevians-centres', steps: ['משולש ABC', 'משולש ABE', 'D על BC', 'AD גובה'], expect: 'builds', note: 'the triangle whose opposite side holds D (2-D measured: commits; 3-D since #1907, ADR-3D-315)' },
   { id: 'obtuse-triangle-1708', family: 'polygons', steps: ['משולש קהה זווית ABC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }], note: '#1708: one of the three angles is obtuse — a choice over the vertices' },
   { id: 'obtuse-triangle-hyphen-1708', family: 'polygons', steps: ['משולש קהה-זווית ABC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }] },
   { id: 'obtuse-triangle-letters-first-1708', family: 'polygons', steps: ['ABC משולש קהה זווית'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }] },
