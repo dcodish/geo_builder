@@ -840,8 +840,10 @@ export async function decideFromParse(
       if (role) {
         return refuse('guided', { source: 'scope', result: 'scope:split-statements:unread-role', commands: r.commands }, role);
       }
-      // W21 holds for the label refusal too: where an older gate already caught the lost role, the line keeps its AI path
-      const aiPath = gates.unreadRole !== null && !gates.onlyReadExtent;
+      // W21 holds for the label refusal too: where an OLDER gate already caught a drop (a lost role, a dropped new
+      // label: «גובה המשולש לצלע AB הוא CD»), the line keeps the path it had — the AI — and the read-extent refusal
+      // speaks only for what nothing else saw (the lines ruled on #1888/#1889 all committed green before)
+      const aiPath = !gates.onlyReadExtent;
       const lost = gates.unread?.cut && !aiPath ? lostPartNote(gates.unread.cut) : null;
       if (lost) {
         return refuse('guided', { source: 'scope', result: 'scope:split-statements:unread-part', commands: r.commands }, lost);

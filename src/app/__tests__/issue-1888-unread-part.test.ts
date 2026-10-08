@@ -190,11 +190,34 @@ describe('still works — a compound whose every part is read commits as before 
     [['משולש ABC'], 'במשולש ABC, AD תיכון'],
     [['מעגל O', 'A על מעגל O', 'B על מעגל O'], 'AB מיתר במעגל O'],
     [['משולש ABC'], 'מעגל חוסם את המשולש ABC'],
+    // round #1940 batch: angle-named bisectors of a centre sentence are READ (the rule used to build A's and B's
+    // whatever was named, so the probe flagged them); the parity rows cat-2d-043 and meet-bisectors-cut-1715
+    [['משולש ABC'], 'E חיתוך חוצי הזוויות BAC ו-BCA'],
+    [['משולש ABC'], 'חוצה הזווית B וחוצה הזווית C נחתכים בנקודה E'],
+    [['משולש ABC'], 'חוצי הזוויות A ו-C נחתכים בנקודה E'],
+    [['משולש ABC'], 'E is where the bisectors of BAC and BCA meet'],
+    [['משולש ABC'], 'I מפגש חוצי הזוויות במשולש ABC'],
   ] as [string[], string][])('«%s» · «%s» commits', async (prefix, line) => {
     await drive(prefix);
     const v = await decideHere(line);
     expect(v.kind, JSON.stringify(v).slice(0, 300)).toBe('commit');
     expect(llmParseMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('a centre sentence builds the bisectors of the angles it NAMES (the read-extent probe’s first catch in the grammar)', () => {
+  it.each([
+    ['E חיתוך חוצי הזוויות BAC ו-BCA', ['A', 'C']],
+    ['חוצה הזווית B וחוצה הזווית C נחתכים בנקודה E', ['B', 'C']],
+    ['חוצי הזוויות A ו-C נחתכים בנקודה E', ['A', 'C']],
+    ['E is where the bisectors of BAC and BCA meet', ['A', 'C']],
+  ])('«%s» → bisectors at %s', async (line, vertices) => {
+    await drive(['משולש ABC']);
+    const f = replay(st().facts, st().seed);
+    const r = parse(line, buildParseCtx(f.construction, f.positions));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.commands.filter((c) => c.type === 'bisector').map((c) => (c as { vertex: string }).vertex)).toEqual(vertices);
   });
 });
 

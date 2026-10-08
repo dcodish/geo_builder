@@ -15376,6 +15376,8 @@ The row kept reading «תיכון לבסיס» with a ✓ while the figure drew 
 
 **Sibling audit.** 3-D records «…ב-C» with the right angle at B (72 of 336 catalog sweeps drop): item B, `knownGap … #1888`. Analytic declines rather than drops, except 9 sweep lines: item C. Both reuse `shell/readExtent.ts`.
 
+**Amendment 1 (round #1940 batch, 2-D parity thin lock).** The probe flagged two honest parity rows, cat-2d-043 «משולש ABC» · «E חיתוך חוצי הזוויות BAC ו-BCA» and meet-bisectors-cut-1715 «…חוצה הזווית B וחוצה הזווית C נחתכים בנקודה E». The probe was right about the READING: `specialPointMeet` built the bisectors of A and B whatever angles were named, so no substitution changed it; the incentre came out right only because any two bisectors meet there. Root fix in the grammar, the angle-named twin of [ADR-569](#adr-569)'s lettered lines: `namedTriangleAngles` reads the named angles (a vertex, or three letters at a vertex of the triangle) and the two distinct ones are the bisectors built (same scaffolding, same incentre). Measured over all 645 parity rows against main: only the ruled rows change. And the label refusal (like the role refusal, W21) now speaks only when no older gate fired: «גובה המשולש לצלע AB הוא CD» and «האנך מהקודקוד C לצלע AB חותך אותה בנקודה D», which drop a NEW label the older gate already catches, keep their AI path as on main instead of a «(2) הוא CD» split. Every ruled line committed green on main, so none of them moves.
+
 **Found, not fixed.** «D על BC שהיא אמצע BC» reads the midpoint and not the incidence before it: an unread run inside the statement, so it escalates (§5) rather than splitting. A label-free lost part («AD גובה לצלע BC שהוא גם תיכון») is #1904's member (ADR-604).
 
 **Behaviour change for a student:**
