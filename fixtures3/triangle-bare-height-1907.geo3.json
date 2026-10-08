@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-08T17:13:37.489Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AD גובה",
+      "cmds": [
+        {
+          "type": "seg-plane-rel",
+          "rel": "perp",
+          "a": "A",
+          "b": "D",
+          "plane": []
+        }
+      ]
+    }
+  ]
+}

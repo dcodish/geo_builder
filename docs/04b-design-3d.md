@@ -353,6 +353,16 @@ asks `structurallyOnRun3`: off-plane keeps ADR-3D-146's foot; in-plane mints a `
 ⟂. `degenerate()` rejects a NON-flat solid's ring at zero area (2-D ADR-413's rule in R³); a FLAT ring's
 collapse goes to a **frozen-dims retry** with the shape fixed at the seed's sample.
 
+**The base sentinel names a solid's base; a flat polygon has none** (#1907, ADR-3D-315). `seg-plane-rel`
+with `plane: []` resolves to the single solid's base ring — unless that solid is a `FLAT_SOLID_KINDS`
+polygon, where `flatHeightReading3` (apply.ts) reads the line as 2-D does: first letter the apex (a ring
+vertex), the foot on the opposite side (the unique ∥ partner of an edge through the apex among the
+figure's `mutual` ∥ requirements, else the ring's first side not touching the apex). A new foot lowers to
+`altitude-foot`; an existing point structurally on that side lowers to the M1 `cos-angle` 0 given. No
+reading ⇒ the reducer refuses (`unknown-plane` `base`), and `readStatement3` answers `not-understood`
+(the AI lane) for that and for every height sentence that is not a bare altitude (`isBareAltitude3`:
+not «אנך», no named solid, no value). The parse is unchanged, so saved figures do not drift.
+
 **Which givens forced the collapse** (#1815, ADR-3D-309). `collapseIsStated` re-solves `[gauge | dims]`
 without the rider rows; if the ring opens, an incidence invented the collapse, and the empty pool marked
 `collapse: { ring, riderKeys }` reaches `pivot.collapse`, where `derive3` refuses `polygon-collapsed`

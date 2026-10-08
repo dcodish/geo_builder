@@ -16,6 +16,7 @@ import { claimPointIds, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } f
 import { firstFreeLetter } from './freeLetter';
 import { carrierParams3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, ScalarPin, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
+import { FLAT_SOLID_KINDS } from './solve3';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
   // #305 (ADR-3D-090): every quad pyramid is a 4-ring + apex, whatever its base or top
@@ -991,6 +992,67 @@ export function structurallyOnRun3(c: Construction3, run: Id[], q: Id, seen: Set
     default:
       return false;
   }
+}
+
+/**
+ * #1907 (ADR-3D-315) — a HEIGHT ON A FLAT POLYGON is the polygon's altitude, never a perpendicular to it.
+ *
+ * The base sentinel (`seg-plane-rel` with `plane: []`, «AD גובה» / «AS ניצב לבסיס») names *the base of
+ * the single solid*. A flat polygon (`FLAT_SOLID_KINDS`) is modelled as a "solid" only to reuse the dims
+ * sampler; it has no base and no apex, so resolving the sentinel to its own plane drew AD perpendicular
+ * to the triangle, green — D off BC and off the plane — and refused «D על BC · AD גובה» as a collapsed
+ * triangle. 02w FR-SU-16: a reading this builder does not have is never drawn as something else.
+ *
+ * What the sentence means on a flat figure is what 2-D reads (`altitude` in `src/parser/parse.ts`):
+ * the first letter is the apex, a ring vertex; the second is the foot on the side OPPOSITE it —
+ * - a NEW letter becomes the foot of the perpendicular on that side (`altitude-foot`, the command
+ *   «AD גובה לצלע BC» already builds);
+ * - an EXISTING point structurally on that side becomes the M1 lowering «AD ⟂ BC» (a cos-angle given:
+ *   it drives a free figure and verifies a determined one), so «D על BC · AD גובה» is D as the foot.
+ * The side is 2-D's rule (`oppositePolygonEdges` + ADR-169's `oppositeParallelBase`): the unique side
+ * parallel to an edge through the apex when the figure knows exactly one such pair (a trapezoid's
+ * bases), otherwise the first side of the ring that does not touch the apex.
+ *
+ * `{ flat: false }` — not a sentinel ⟂ on a flat figure; the caller's solid path is unchanged.
+ * `reading: null` — flat, but no altitude reading (the apex is not a vertex, the foot is a vertex or off
+ * the opposite sides): the statement store's gate sends that line to the AI, as 2-D does, and the
+ * reducer refuses it rather than draw it ⟂ the polygon.
+ */
+export function flatHeightReading3(c: Construction3, cmd: Command3): { flat: false } | { flat: true; reading: Command3 | null } {
+  if (cmd.type !== 'seg-plane-rel' || cmd.plane.length !== 0 || cmd.rel !== 'perp' || c.solids.length !== 1) return { flat: false };
+  const solid = c.solids[0];
+  if (!FLAT_SOLID_KINDS.has(solid.kind)) return { flat: false };
+  const ring = solid.ids;
+  const apex = cmd.a, foot = cmd.b;
+  if (!ring.includes(apex) || ring.includes(foot)) return { flat: true, reading: null };
+  const opposite: [Id, Id][] = [];
+  for (let i = 0; i < ring.length; i++) {
+    const e: [Id, Id] = [ring[i], ring[(i + 1) % ring.length]];
+    if (!e.includes(apex)) opposite.push(e);
+  }
+  if (c.points.has(foot)) {
+    const side = opposite.find((e) => structurallyOnRun3(c, e, foot));
+    if (!side) return { flat: true, reading: null };
+    return { flat: true, reading: { type: 'cos-angle', u: { kind: 'pair', from: apex, to: foot }, v: { kind: 'pair', from: side[0], to: side[1] }, cos: 0 } };
+  }
+  const side = oppositeParallelBase3(c, apex) ?? opposite[0];
+  if (!side) return { flat: true, reading: null };
+  return { flat: true, reading: { type: 'altitude-foot', id: foot, from: apex, a: side[0], b: side[1] } };
+}
+
+/** 2-D's `oppositeParallelBase` over the figure's stated ∥ segment pairs (a trapezoid's own condition is one):
+ *  the partner of the one pair edge that carries the apex, when exactly one such base exists. */
+function oppositeParallelBase3(c: Construction3, apex: Id): [Id, Id] | null {
+  const cands: [Id, Id][] = [];
+  for (const r of c.requirements) {
+    if (r.kind !== 'mutual' || r.rel !== 'parallel' || r.a.kind !== 'segment' || r.b.kind !== 'segment') continue;
+    const e1: [Id, Id] = [r.a.a, r.a.b], e2: [Id, Id] = [r.b.a, r.b.b];
+    const in1 = e1.includes(apex), in2 = e2.includes(apex);
+    if (in1 === in2) continue;
+    const other = in1 ? e2 : e1;
+    if (!cands.some((x) => sameRing(x, other))) cands.push(other);
+  }
+  return cands.length === 1 ? cands[0] : null;
 }
 
 function placeholderYields(c: Construction3, cmd: Command3): Construction3 | null {
@@ -2668,6 +2730,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // plane: [] is the הבסיס/"the base" sentinel — resolve it HERE (the one
       // chokepoint) to the single solid's base ring; every kind lists its base first
       if (cmd.plane.length === 0 && c.solids.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+      // #1907 (ADR-3D-315): a flat polygon has no base — its height is its altitude (2-D's reading)
+      const flat = flatHeightReading3(c, cmd);
+      if (flat.flat) return flat.reading ? applyCommand3(c, flat.reading) : { ok: false, error: { code: 'unknown-plane', id: 'base' } };
       const plane = cmd.plane.length === 0 ? c.solids[0].ids.slice(0, 3) : cmd.plane;
       const missingPlane = missingPoint(c, plane);
       if (missingPlane) return { ok: false, error: missingPlane };

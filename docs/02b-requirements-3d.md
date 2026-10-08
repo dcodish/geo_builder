@@ -117,8 +117,14 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   determines.** When the known endpoint sits **off** the plane («SO גובה הפירמידה»), the new letter is
   the foot of the perpendicular, on the plane ([ADR-3D-146](06b-decisions-3d.md#adr-3d-146), #579). When it
   lies **in** the plane (decided structurally), the new letter is a free point on the normal, its height
-  and side free DOF ([FR-SP-2](#the-space-model)) — never minted **on** the known point.
-  - Sources: ADR-3D-146, ADR-3D-268; #579, #1499.
+  and side free DOF ([FR-SP-2](#the-space-model)) — never minted **on** the known point. **On a flat
+  polygon** (a triangle, quadrilateral or pentagon, which has no base), a bare height is the polygon's
+  **altitude**, read as 2-D reads it: «משולש ABC · AD גובה» puts D on BC, in the plane, AD ⟂ BC, the knee
+  at D; a trapezoid's height drops on its parallel base, another quadrilateral's on the first side not
+  touching the apex; a point already on that side («D על BC · AD גובה») is the foot. A height form 2-D
+  does not read on a flat figure («AD אנך», a valued height, an apex that is not a vertex) goes to the AI.
+  Never a perpendicular to the polygon's own plane.
+  - Sources: ADR-3D-146, ADR-3D-268, ADR-3D-315; #579, #1499, #1907.
 
 ## Reading a statement — read, asked, refused
 

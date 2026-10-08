@@ -30,7 +30,7 @@ import { ingestTypedText } from '../../shell/bidi';
 import { findProofTarget } from '../../shell/proofTarget';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
-import { applyCommand3, freeDims } from '../engine/apply';
+import { applyCommand3, flatHeightReading3, freeDims } from '../engine/apply';
 import { spaceDiagonals, diagonalClaimVerdict } from '../engine/baseShapes';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { scalePinned } from '../engine/solve3';
@@ -42,7 +42,7 @@ import { namedPointAt } from '../engine/crossings3';
 import { meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
 import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
-import { parse3, parseRewrite3 } from '../parser/parse3';
+import { isBareAltitude3, parse3, parseRewrite3 } from '../parser/parse3';
 
 export interface Fact3 {
   id: string;
@@ -1158,7 +1158,19 @@ function readStatement3(
     const only = angleCandidatesAt(st, parsed.vertex);
     if (only.length === 1) parsed = parse3(`${parsed.vertex}${parsed.rider} חוצה זווית ${only[0]}`);
   }
-  if (parsed.ok) return { ok: true, commands: parsed.commands };
+  if (parsed.ok) {
+    // #1907 (ADR-3D-315): a height stated against the base of a FLAT polygon is that polygon's altitude,
+    // and only the bare forms 2-D reads say which one («AD גובה»). Any other — «AD אנך», a valued height,
+    // a named solid, an apex that is not a vertex — goes to the AI, as in 2-D: never drawn ⟂ the polygon.
+    // The figure is asked only when the line carries the base sentinel, so no other line pays the fold.
+    const sentinel = parsed.commands.find((k) => k.type === 'seg-plane-rel' && k.plane.length === 0);
+    if (sentinel) {
+      const flat = flatHeightReading3(derive3(st.facts, st.seed).construction, sentinel);
+      if (flat.flat && (!flat.reading || parsed.commands.length !== 1 || !isBareAltitude3(utterance)))
+        return { ok: false, error: { code: 'not-understood' } };
+    }
+    return { ok: true, commands: parsed.commands };
+  }
   // #516: every TYPED refusal keeps its identity — only a genuine `not-handled` may read as
   // not-understood, because not-understood is what the App escalates to the LLM lane.
   return {
