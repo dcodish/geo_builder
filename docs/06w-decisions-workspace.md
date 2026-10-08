@@ -5634,3 +5634,19 @@ So: §1's thesis and P6's reason are his; the trace (ADR-AG-062) stays; the rela
 **Not built: "an operator ruling never says Requirements: none".** Measured over the four product logs from their cut-overs: 485 headings, 96 with "Requirements: none", and 8 of those carry an operator-ruling marker (ADR-523, 546, 584; ADR-3D-226, 258, 304, 306; ADR-AG-074). At most three rule on what a student sees (3D-226, 3D-304, 3D-306, each arguing an existing FR already covers it). The rest are rulings on process or mechanism (*"Rework first, then all four"*, *"a fixed amount of work, never the clock"*), a ruling cited from another ADR, or an operator report. A text marker cannot tell a ruling on what a student sees from one on how the tool is built, so the guard would fire mostly on correct entries; a guard that does that gets relaxed (ADR-W-042). The precise signal is rule 7's `What the student will see` line ([ADR-W-117](#adr-w-117)): a `[ruled]` or `[asked]` line is a student-visible change and cannot sit beside "Requirements: none". ADRs do not carry those lines today; whether they should is the operator's decision.
 
 **Also in this step** (ruled in step 2): code comments that cited an archived doc by its old path now say `docs/archive/<name>`, 46 citations in 35 files. Short citations such as "docs/28 §5c" are unchanged; they resolve by grep.
+
+## ADR-W-120 — A line that loses a part is refused in every builder; what the reading read is measured once, in `shell/readExtent.ts` (#1888, #1889)
+
+**Status:** accepted · 2026-10-08 · cross-builder rule + shared module · round #1940 · 2-D lands first ([ADR-603](06-decisions.md#adr-603)); 3-D and analytic port it as items B and C of #1888's plan
+
+**Requirements:** [02w-requirements-workspace.md](02w-requirements-workspace.md), the behaviour row "A one-line compound that loses a part" (**Ruled change**) · **Design:** [04w-design-shell.md](04w-design-shell.md) § "Read extent"
+
+**The ruling (operator, 2026-10-08).** *"A line that loses a part gets the existing one-input-per-line message (`input.scope.split-statements`), in every builder"* — his choice of "every builder" for #1888 and #1889; *"Only when a part is lost"*: a compound whose every part is honoured keeps working (ADR-598). *"Refuse it too"*: an unread part is refused even when the drawing happens to satisfy it. *"Teach the right form"* for «משולש ABC ישר זווית ב-<V>».
+
+**Decision.**
+1. **The rule, every builder.** A part of the line that the winning reading did not read is never dropped green: the line is refused whole with the builder's port of 2-D's message (2-D's text, ADR-W-118 B1), listing the parts cut where the reading stops — or, for the right-angle-vertex syntax, teaching the two lines.
+2. **One measurement, in `shell/`.** `shell/readExtent.ts` would otherwise be the third copy (2-D, 3-D, analytic; docs/22 §9). It knows no product and returns no strings: `readLabelRuns` (the substitution probe, with the co-reference exemption and a caller's own exemption hook), `locate` and `cutAtReading` (the parts). Each builder passes its own `read(text) → lowering | null`, its own equality and its own label pattern (3-D's labels carry primes).
+   **Word class** ([ADR-604](06-decisions.md#adr-604), #1904): `readWords` measures a ROLE WORD by deletion (a sibling word would let another rule win), with a co-reference exemption by class.
+3. **What is not shared.** Each builder's exemptions (2-D's scene name reads its own label accountant), its clause splitter (2-D's `clausesOf`; #1904's plan moves the lexical half here when 3-D needs it), and its message key.
+
+**Consequences.** A builder that reads both parts (analytic's «…E שהיא אמצע BD») keeps building: the rule is about lost parts, not two-part lines. The parity rows `unread-vertex-1888-01/02`, `unread-tail-1889-01/02` carry the remaining gaps (3-D, analytic: #1888; 2-D reading a relative clause: #1905).

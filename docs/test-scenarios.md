@@ -1735,3 +1735,11 @@ over all four (ADR-041).
 ### `flat-triangle-refused-1849` — «משולש ABC · AB = 5 · BC = 3 · AC = 8»: the closing side is refused, naming «משולש ABC» (#1849, ADR-602)
 
 **Guards against:** a declared polygon the givens force flat being drawn as one. The operator's ruling (2026-10-07) reverses ADR-W-048's notice for declared polygons: a flat line is not a triangle. **Asserts** that «AC = 8» is refused by the submit gate as a flattened triangle ABC whose other side is «משולש ABC», and that the thin-but-legitimate 3° triangle still commits. The class matrix (both orders, 4·4·8, a ratio, a sum, a perimeter, a quadrilateral, the incidence family, the default-apex isosceles, the controls) is `src/app/__tests__/issue-1849-flat-polygon-refused.test.ts`.
+
+### `unread-part-taught-lines-1888` — the lines a lost-part refusal teaches build: «משולש ABC» · «∠ABC = 90°», the compound controls, and #1889 typed one per line (#1888, #1889, ADR-603)
+
+**Guards against:** a refusal that teaches lines the builder refuses, and the read-extent gate refusing a compound whose every part is read. The operator's rulings (2026-10-08) refuse «משולש ABC ישר זווית ב-B» and «…בנקודה E שהיא אמצע BD» / «…E על AB» whole, and teach «משולש ABC» then «∠ABC = 90°». **Asserts** that the taught lines build with the right angle at B, that «AB = 4, BC = 3» and «D על AC כך ש-AD = DC» commit, and that «EG ו-FH נפגשים בנקודה K» · «K אמצע FH» builds K on both diagonals and at FH's midpoint. The refusals (decision verdicts, with the exact notes, the class and the ✎ seam) are locked in `src/app/__tests__/issue-1888-unread-part.test.ts`.
+
+### `two-roles-one-per-line-1904` — the lines a lost-role refusal teaches build: «AD גובה לצלע BC» · «AD תיכון לצלע BC» in both orders, a bisector then a median, a median then «⟂» (#1904, ADR-604)
+
+**Guards against:** a refusal that teaches lines the builder cannot build. The operator's rulings (2026-10-08) refuse «AD גובה לצלע BC שהוא גם תיכון» whole and teach one line per role. **Asserts** that, typed one per line in either order, the segment is both roles: perpendicular to the side, through its midpoint, and bisecting the apex angle. The refusals are locked in `src/app/__tests__/issue-1904-unread-role.test.ts`.

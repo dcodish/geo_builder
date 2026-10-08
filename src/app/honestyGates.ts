@@ -39,6 +39,9 @@ import {
 } from '@/parser';
 import { unaccountedSpans } from '@/parser/spanAccounting';
 import type { AnyCommand, Id } from '@/engine';
+import type { ParseContext } from '@/parser';
+import { unreadParts, type UnreadReport } from './unreadParts';
+import { unreadRoles, type RoleReport } from './unreadRoles';
 
 /**
  * Every gate that is a pure function of `(utterance, commands)`. Exported as a MAP, not as a sequence
@@ -47,8 +50,10 @@ import type { AnyCommand, Id } from '@/engine';
  * `droppedRegionSubject` appear here because they ARE context-free and the net measures them, even
  * though only the LLM path consults them today.
  *
- * The context-carrying gates (`droppedNewLabels`, `introducedNewLabels`, `unaccountedSpans`) are
- * deliberately out — they need the figure's existing points, which is not this map's input shape.
+ * The context-carrying gates (`droppedNewLabels`, `introducedNewLabels`, `unaccountedSpans`, and #1888's
+ * `unreadParts`, which re-reads the line in the seam's own parse context) are deliberately out — they need
+ * the figure, which is not this map's input shape. The read-extent member is netted over the corpus by
+ * `issue-1888-unread-corpus-net.test.ts`.
  */
 export const CONTEXT_FREE_GATES: Record<string, (u: string, cmds: AnyCommand[]) => unknown[] | boolean> = {
   droppedComparison,
@@ -86,6 +91,12 @@ export interface GateReport {
   droppedCmp: boolean;
   droppedConstruct: string[];
   unaccounted: { kind: string; text: string }[];
+  /** #1888 (ADR-603): the label runs no reading depends on, and the line's parts when they are lost PARTS */
+  unread: UnreadReport | null;
+  /** #1904 (ADR-604): the cevian role words no reading depends on — the word sibling of `unread` */
+  unreadRole: RoleReport | null;
+  /** true when every gate that predates the read-extent members (#1888, #1904) is clean: only a lost part or role fired */
+  onlyReadExtent: boolean;
   /**
    * Everything left unread, as the STUDENT'S OWN tokens — never a gate name and never internal state
    * (the honesty invariant: an error names the statement, not the machinery). A seam that refuses
@@ -100,7 +111,7 @@ export interface GateReport {
  * Every gate runs — the report is a full account, not a first-failure short-circuit — because both the
  * debug line and the refusal message want everything left unread, not merely the first thing found.
  */
-export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx: GateCtx): GateReport {
+export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx: GateCtx & ParseContext): GateReport {
   const pts = ctx.points ?? [];
   const radiusSymbols = (ctx.radiusSymbols ?? []).map((x) => x.name);
   // The accountant's context. A bound radius symbol and an angle alias are notation; an EXISTING point is
@@ -141,8 +152,29 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
   // category at a time. It JOINS the family rather than replacing it until the retirement differential
   // proves it reproduces each exemption set (#758).
   const unaccounted = unaccountedSpans(utterance, commands, actx);
+  // READ EXTENT (#1888 / #1889, ADR-603): every gate above accounts TOKENS — a label is read wherever a command
+  // carries it. This one asks the READING: does the lowering depend on each label run the student typed? A run
+  // no substitution changes was never read («ב-B», «שהיא אמצע BD», «על AB»), however well its letters ride
+  // other commands. Re-read in the seam's own context (`pctx` / `ectx`), so it is context-carrying.
+  const unread = unreadParts(utterance, commands, ctx);
+  // THE WORD SIBLING (#1904, ADR-604): a cevian role word («גובה», «תיכון», «חוצה זווית») the reading does not depend
+  // on — deleting it leaves the lowering unchanged — was dropped, however well the family-presence gates account it.
+  const unreadRole = unreadRoles(utterance, commands, ctx);
 
   const clean =
+    unaccounted.length === 0 &&
+    dropped.length === 0 &&
+    droppedNums.length === 0 &&
+    droppedRels.length === 0 &&
+    droppedVerbs.length === 0 &&
+    droppedCompound.length === 0 &&
+    droppedWordRels.length === 0 &&
+    !droppedCmp &&
+    droppedConstruct.length === 0 &&
+    unread === null &&
+    unreadRole === null;
+  const onlyReadExtent =
+    !clean &&
     unaccounted.length === 0 &&
     dropped.length === 0 &&
     droppedNums.length === 0 &&
@@ -162,6 +194,8 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     ...droppedWordRels,
     ...droppedConstruct,
     ...unaccounted.map((x) => x.text),
+    ...(unread?.items ?? []),
+    ...(unreadRole?.items ?? []),
   ].filter((s, i, a) => s.trim().length > 0 && a.indexOf(s) === i);
 
   return {
@@ -175,6 +209,9 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     droppedCmp,
     droppedConstruct,
     unaccounted,
+    unread,
+    unreadRole,
+    onlyReadExtent,
     items,
   };
 }

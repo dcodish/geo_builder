@@ -3661,6 +3661,39 @@ export const SCENARIOS_4: Scenario[] = [
       const thin = gateVerdict(factsOf(['משולש ABC']), 'זווית BAC = 3');
       expect(thin.kind, 'the 3° triangle (ADR-413’s control) commits').toBe('commit');
     },
+  },  {
+    id: 'unread-part-taught-lines-1888',
+    title: '#1888 / #1889 (ADR-603): the lines a lost-part refusal teaches BUILD — «משולש ABC» · «∠ABC = 90°» (the right angle at B), the compound controls «AB = 4, BC = 3» · «D על AC כך ש-AD = DC», and #1889 typed one per line («…נפגשים בנקודה K» · «K אמצע FH»)',
+    guards:
+      "Operator rulings 2026-10-08 (#1888, #1889): «משולש ABC ישר זווית ב-B» and «AC ו-BD נפגשים בנקודה E שהיא אמצע BD» / «…E על AB» are refused whole — a line that loses a part gets the one-input-per-line message («Only when a part is lost»; «Refuse it too» when the drawing happens to agree) — and the right-angle syntax TEACHES «משולש ABC», then «∠ABC = 90°» («Teach the right form»). Measured on 5edeeca1: each committed green with the part gone (the right angle at C; E not the midpoint; E off AB). Root cause: every gate on the commit path accounts TOKENS, not READINGS — a label counts as read wherever any command carries it — and ADR-598's clause gate sees only the pieces clausesOf cuts. Fix (ADR-603, ADR-W-120): a measured read-extent probe (shell/readExtent.ts) joins the honesty battery at both 2-D seams; the refusal lists the parts cut where the reading stops. This scenario locks the ALLOWED side: the taught remedy (a message teaching a spelling the builder refuses is a red lock), the ruling's compound controls, and #1889's parts typed one per line. The refusals (decision verdicts, not parses) are src/app/__tests__/issue-1888-unread-part.test.ts.",
+    steps: ['משולש ABC', '∠ABC = 90°', 'AB = 4, BC = 3', 'D על AC כך ש-AD = DC', 'מרובע EFGH', 'EG ו-FH נפגשים בנקודה K', 'K אמצע FH'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), 'the right angle is at B, where the student named it').toBeCloseTo(90, 6);
+      expect(dist(at(fig, 'A'), at(fig, 'B')), 'AB = 4').toBeCloseTo(4, 6);
+      expect(dist(at(fig, 'B'), at(fig, 'C')), 'BC = 3').toBeCloseTo(3, 6);
+      expect(dist(at(fig, 'A'), at(fig, 'D')), 'AD = DC').toBeCloseTo(dist(at(fig, 'D'), at(fig, 'C')), 6);
+      expect(dist(at(fig, 'A'), at(fig, 'D')) + dist(at(fig, 'D'), at(fig, 'C')), 'D on AC').toBeCloseTo(dist(at(fig, 'A'), at(fig, 'C')), 6);
+      const [E, F, G, H, K] = ['E', 'F', 'G', 'H', 'K'].map((k) => at(fig, k));
+      expect(dist(F, K), 'K is the midpoint of FH').toBeCloseTo(dist(K, H), 6);
+      expect(dist(F, K) + dist(K, H), 'K on FH').toBeCloseTo(dist(F, H), 6);
+      expect(dist(E, K) + dist(K, G), 'K on EG').toBeCloseTo(dist(E, G), 6);
+    },
+  },  {
+    id: 'two-roles-one-per-line-1904',
+    title: '#1904 (ADR-604): the lines a lost-role refusal teaches BUILD — «AD גובה לצלע BC» · «AD תיכון לצלע BC» (both orders), a bisector then a median, a median then «⟂»: the segment is both, every time',
+    guards:
+      "Operator rulings 2026-10-08 (#1904): «משולש ABC» · «AD גובה לצלע BC שהוא גם תיכון» is refused whole (it committed the median alone, green — AD not perpendicular to BC), and W22: the refusal teaches one line per role, «AD גובה לצלע BC», ואחר כך «AD תיכון לצלע BC». Root cause: the median rule fires on «תיכון» anywhere and reads nothing else, while every gate accounts role words by family presence (ADR-430: one midpoint accounts «גובה» and «תיכון» together), never per occurrence. Fix (ADR-604): a role-word member of the honesty battery deletes each cevian word and re-reads the line (shell/readExtent.ts, the word class). This scenario locks the taught remedy: typed one per line, in either order, the segment is both roles (AD ⊥ BC, BD = DC, ∠BAD = ∠DAC). The refusals (decision verdicts) are src/app/__tests__/issue-1904-unread-role.test.ts.",
+    steps: ['משולש ABC', 'AD גובה לצלע BC', 'AD תיכון לצלע BC', 'משולש EFG', 'EH תיכון לצלע FG', 'EH גובה לצלע FG', 'משולש KLM', 'KN חוצה זווית K', 'KN תיכון לצלע LM', 'משולש PQR', 'PS תיכון לצלע QR', 'PS ⟂ QR'],
+    check: (fig) => {
+      allStepsOk(fig);
+      for (const [A, B, C, D] of [['A', 'B', 'C', 'D'], ['E', 'F', 'G', 'H'], ['K', 'L', 'M', 'N'], ['P', 'Q', 'R', 'S']]) {
+        const [a, b, c, d] = [A, B, C, D].map((k) => at(fig, k));
+        expect(angle(a, d, b), `${A}${D} ⟂ ${B}${C}`).toBeCloseTo(90, 5);
+        expect(dist(b, d), `${B}${D} = ${D}${C}`).toBeCloseTo(dist(d, c), 6);
+        expect(angle(b, a, d), `∠${B}${A}${D} = ∠${D}${A}${C}`).toBeCloseTo(angle(d, a, c), 5);
+      }
+    },
   },
 ];
 

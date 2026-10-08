@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, RADIUS_VAR, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
-import { NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -9561,8 +9561,11 @@ const perpBisector: Rule = (s, ctx) => {
     const [c, d] = names;
     return [
       { type: 'segment', a: c, b: d }, // idempotent — keep the segment drawn
-      { type: 'set-equal', a: c, b: a, c, d: b }, // |CA| = |CB| → C on the ⊥-bisector of AB
-      { type: 'set-equal', a: d, b: a, c: d, d: b }, // |DA| = |DB| → D on it too ⇒ line CD is the ⊥-bisector
+      // |CA| = |CB| and |DA| = |DB| → C and D both on the ⊥-bisector of AB ⇒ line CD IS it. The pair of equalities is
+      // the ⟂, declared (ADR-462) on both, so the ⟂ verb row — which reads «אנך» since #1904 (ADR-604) — finds its
+      // evidence and its operands (CD, AB) in the lowering
+      { type: 'set-equal', a: c, b: a, c, d: b, consumed: { verbs: [VERB_PERPENDICULAR] } },
+      { type: 'set-equal', a: d, b: a, c: d, d: b, consumed: { verbs: [VERB_PERPENDICULAR] } },
     ];
   }
   // Otherwise CONSTRUCT: the midpoint of AB + the drawn ⟂ line there; a leading name → markers on it.
@@ -12290,8 +12293,8 @@ const BARE_SHAPE_KEYS = new Set(['type', 'ids']);
  *  own PROPERTY (right-angled, isosceles, convex) is deliberately absent: `shape-variant` and the
  *  convexity gates own those, and double-gating would refuse working input. Both Hebrew forms of the
  *  final nun are spelled out — this tree folds no final letters (cf. `נחתך`/`נחתכ`, :1180). */
-const CONSTRUCT_NOUNS =
-  /מעגל|אלכסו[ןנ]|גובה|גבהי|תיכו[ןנ]|חוצ[הת]?[-\s]?זו?וית|\b(?:circle|diagonal|altitude|height|median|bisect\w*)\b/i;
+// #1904 (ADR-604): the cevian members are one lexicon atom, read per occurrence by the role-word member too
+const CONSTRUCT_NOUNS = new RegExp(String.raw`מעגל|אלכסו[ןנ]|${CEVIAN_NOUNS_HE}|\b(?:circle|diagonal|${CEVIAN_NOUNS_EN})\b`, 'i');
 
 /**
  * A stated CONSTRUCT NOUN that no command produced — issue #456, [ADR-430](../../docs/06-decisions.md#adr-430).
@@ -13029,6 +13032,7 @@ const gate = (g: Omit<VerbGate, 'present'>): VerbGate => ({ ...g, present: gateP
  */
 export const VERB_TANGENT = 'משיק/tangent';
 export const VERB_PARALLEL = 'מקביל/parallel';
+export const VERB_PERPENDICULAR = 'מאונך/perpendicular';
 
 export const VERB_GATES: VerbGate[] = [
   // "tan- : a REFERENCE to a drawn tangent line ("המשיק חותך…" → line:"tan-A"); tanaux-/tanmid- : the
@@ -13042,7 +13046,9 @@ export const VERB_GATES: VerbGate[] = [
   // `parallelogram` is listed EXPLICITLY: the macro does encode the parallel pairs, so it is genuine
   // evidence — it simply has to be evidence by intent rather than by substring coincidence (#771).
   gate({ verb: VERB_PARALLEL, he: ['מקביל'], en: [['parallel']], satisfied: family('parallel', 'parallelogram') }),
-  gate({ verb: 'מאונך/perpendicular', he: [`מאונ${KAF}`], en: [['perpendicular']], satisfied: family('perpendicular', 'foot', 'right-triangle', 'altitude') }),
+  // #1904 (ADR-604): the ⟂ row reads «אנך» too — the grammar reads it as ⟂, so a stated «…שהוא גם אנך» the
+  // lowering lost is a dropped given, exactly as its twin «…שהוא גם מאונך» already was
+  gate({ verb: VERB_PERPENDICULAR, he: [`מאונ${KAF}`, `אנ${KAF}`], en: [['perpendicular']], satisfied: family('perpendicular', 'foot', 'right-triangle', 'altitude') }),
 ];
 /**
  * WORD-form RELATION givens (#210, ADR-360) — the fourth dropped-given sibling: a relation stated as a

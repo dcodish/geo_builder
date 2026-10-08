@@ -258,6 +258,18 @@ it teaches scores zero, so the gate can never brush off a sentence the tool acce
 
 **The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/proof-target-rows.ts`. Each builder's thin lock hands over a `ProofGate`: its REAL submit decision on a figure with A, B and C, answering `{ proof, recorded, text }`. The rows check that every spelling is refused as a proof target, recorded by none and quoted by the refusal, and that the negatives are never refused as one. The meta-lock proves each check can fail.
 
+### Read extent ([ADR-W-120](06w-decisions-workspace.md#adr-w-120))
+
+`shell/readExtent.ts` measures which parts of a line a builder's reading READ. It is pure and knows no product; the caller passes a `Reader` (`read(text) → lowering | null`, `same`) in its own context.
+
+- `labelRuns(text, run?, label?)` — the label runs, located (default `[A-Z]d*` glued; 3-D passes its primes).
+- `readLabelRuns(text, lowering, probe)` — `{ read, unread, exempt }`: a run is read when replacing one of its letters (a letter of the line, else a fresh one outside the line and `figureLabels`; a figure letter is never a stand-in — a rule that names a new point falls back to its default name when the letter is taken) changes the lowering or fails the read. A co-reference is exempt here; `probe.exempt` adds the builder's own.
+- `locate(text, clauses)` and `cutAtReading(text, clauses, runs, readerFor)` — the parts in the student's words: each clause, an offending one cut at the shortest prefix that holds every read run and reads the same; read with the clauses before it when it has no cut alone; null when an unread run sits inside a statement.
+
+- `readWords(text, lowering, reader, word, classOf?)` — the WORD class ([ADR-604](06-decisions.md#adr-604)): an occurrence is read when deleting it (the whole match, clitics included) changes the lowering; one class (`classOf`) stated twice and read together is a co-reference.
+
+The 2-D members are `src/app/unreadParts.ts` ([ADR-603](06-decisions.md#adr-603)) and `src/app/unreadRoles.ts` (ADR-604). Locks: `shell/__tests__/read-extent-1888.test.ts` and `read-extent-1904.test.ts`, on toy readers.
+
 ### Geometry-input parity ([ADR-W-108](06w-decisions-workspace.md#adr-w-108))
 
 `shell/__tests__/fixtures/geo-input-parity.ts` holds the rows and the checks once (docs/28 §5c). `shell/` imports no product, so no single test runs two builders. Equality is carried **transitively**: each row states `expect`, the verdict the reference gives. The 2-D thin lock asserts 2-D gives it, and every other thin lock asserts the same literal.
