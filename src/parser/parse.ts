@@ -1553,6 +1553,29 @@ const MEET_VERB_RE = /נפגש|נחתכ|מצטלב|\b(?:meet|intersect|cross)\b/
 const crossingSubjectOf = (s: string, pointFirst: boolean): CrossingSubject =>
   !pointFirst && MEET_VERB_RE.test(s) ? 'lines' : 'point';
 
+/**
+ * #1888 (ADR-603 Am.) — the angles a centre sentence of the bisector family NAMES, read against its triangle. Every
+ * label run of the sentence except the result point and the shape qualifier is a named angle: a vertex («הזווית B»)
+ * or three letters with a vertex in the middle and the triangle's other two at its ends («BAC»). Returns the first two
+ * distinct angles as [arm, vertex, arm], `null` when the sentence names fewer than two distinct ones (the triangle's
+ * own default stands), `'invalid'` when a named angle is not one of the triangle's.
+ */
+function namedTriangleAngles(s: string, poly: readonly Id[], result: Id, shapeRun: string | undefined): [Id, Id, Id][] | null | 'invalid' {
+  if (poly.length !== 3) return null;
+  const text = shapeRun ? s.replace(shapeRun, ' ') : s;
+  const runs = [...text.matchAll(/(?<![A-Za-z])(?:[A-Z]\d*)+(?![A-Za-z])/g)].map((m) => m[0].match(/[A-Z]\d*/g) ?? []);
+  const named = runs.filter((r) => !(r.length === 1 && r[0] === result));
+  const out: [Id, Id, Id][] = [];
+  for (const r of named) {
+    const v = r.length === 1 ? r[0] : r.length === 3 ? r[1] : null;
+    if (!v || !poly.includes(v)) return 'invalid';
+    const arms = poly.filter((x) => x !== v);
+    if (r.length === 3 && !(arms.includes(r[0]) && arms.includes(r[2]) && r[0] !== r[2])) return 'invalid';
+    if (!out.some((t) => t[1] === v)) out.push(r.length === 3 ? [r[0], v, r[2]] : [arms[0], v, arms[1]]);
+  }
+  return out.length >= 2 ? out.slice(0, 2) : null;
+}
+
 const specialPointMeet: Rule = (s, ctx) => {
   if (!/מפגש|נפגש|נחתכ|חיתוך|concurren|intersection\s+of|\bmeet\b/i.test(s)) return null; // a MEETING statement
   const fam = CENTER_FAMILIES.find((f) => f.he.test(s) || f.en.test(s));
@@ -1713,6 +1736,26 @@ const specialPointMeet: Rule = (s, ctx) => {
     ];
   }
   if (fam.key === 'bisector') {
+    /**
+     * #1888 (ADR-603 Am.) — ANGLES THE SENTENCE NAMES ARE THE STUDENT'S, the angle-named twin of #1683's lettered
+     * lines. «E חיתוך חוצי הזוויות BAC ו-BCA», «חוצה הזווית B וחוצה הזווית C נחתכים בנקודה E» built the bisectors of
+     * A and B whatever angles were named — even letters on no triangle («…הזוויות BAC ו-QZX» committed) — so the
+     * reading never read them (the read-extent probe measured it). The named angles are read: a vertex letter or a
+     * three-letter angle at a vertex of the triangle; two distinct ones are the bisectors that cross. A named
+     * angle that is not one of the triangle's escalates whole, as #1683's unreadable pair does. Same scaffolding,
+     * same incentre: only what the bisectors are BUILT from follows the sentence.
+     */
+    const named2 = namedTriangleAngles(s, poly, X, shapeM?.[1]);
+    if (named2 === 'invalid') return 'stop';
+    if (named2) {
+      const [[p1, v1, q1], [p2, v2, q2]] = named2;
+      const n1 = `bis-${p1}${v1}${q1}`, n2 = `bis-${p2}${v2}${q2}`;
+      return [...declared,
+        { type: 'bisector', id: n1, vertex: v1, p: p1, q: q1 },
+        { type: 'bisector', id: n2, vertex: v2, p: p2, q: q2 },
+        { type: 'line-intersection', id: X, line1: n1, line2: n2 }, // the incentre
+      ];
+    }
     const b1 = `bis-${A}${B}${C}`, b2 = `bis-${B}${A}${C}`; // bisector Lines (scaffolding — not visible)
     return [...declared,
       { type: 'bisector', id: b1, vertex: A, p: B, q: C },

@@ -575,7 +575,7 @@ member `unreadParts` (`src/app/unreadParts.ts`, in `honestyGateReport`, so both 
   that has no cut alone (a statement the splitter cut in two, a fragment such as «ואת AB») is read with the clauses
   before it, as typed. A clause that reads alone and lost everything is listed whole. An unread run with read runs
   after it in its statement has no cut: the weak path.
-- **The verdict** (`decideFromParse`, the `!gates.clean` branch): parts → refuse `guided`,
+- **The verdict** (`decideFromParse`, the `!gates.clean` branch, only when no older gate fired — `GateReport.onlyReadExtent`; otherwise the line keeps its weak path): parts → refuse `guided`,
   `scope:split-statements:unread-part`, never escalated. `lostPartNote` picks `input.scope.right-angle-vertex`
   (`-more` with further parts) when the lost tail is one vertex of a `right-triangle` the read part lowered to, else
   `input.scope.split-statements`. The ✎ seam refuses with `steps.editDropped`, the lost parts as its items.
