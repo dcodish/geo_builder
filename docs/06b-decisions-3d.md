@@ -12139,7 +12139,7 @@ The degradation policy is deliberately unchanged (a line this code does not comm
 
 **Status:** accepted · 2026-10-08 · bug (P1, honesty) · branch `fix/1918-trapezoid-identity` off `main` @ 5edeeca1 · fix round #1940 · implements the operator rulings of 2026-10-08 on #1918 ("P1"; "Refuse in both") · 2-D arm [ADR-607](06-decisions.md#adr-607), analytic arm [ADR-AG-252](06c-decisions-analytic.md#adr-ag-252) · amends [ADR-3D-307](#adr-3d-307) and [ADR-3D-158](#adr-3d-158)
 
-**Requirements:** [docs/02b](02b-requirements-3d.md) FR-SP-15 (the two-line and reverse-order refusal) and new FR-SP-16 (a trapezoid keeps exactly one parallel pair, or the page says so; a stated other pair re-seats it; a disjoint re-declaration is refused) · [docs/02w](02w-requirements-workspace.md) behaviour table, new row "A declared trapezoid forced into a parallelogram" · **Design:** [docs/04b](04b-design-3d.md) § "One shape phrase, and a circle through a ring", new paragraph *What a ring was DECLARED to be, and the trapezoid's identity* · **LADDER stage:** apply (the two refusals) + derive (the order-free seat pre-scan, the line attribution, the warning) + evaluate (the seated base mapping).
+**Requirements:** [docs/02b](02b-requirements-3d.md) FR-SP-15 (the two-line and reverse-order refusal) and new FR-SP-18 (a trapezoid keeps exactly one parallel pair, or the page says so; a stated other pair re-seats it; a disjoint re-declaration is refused) · [docs/02w](02w-requirements-workspace.md) behaviour table, new row "A declared trapezoid forced into a parallelogram" · **Design:** [docs/04b](04b-design-3d.md) § "One shape phrase, and a circle through a ring", new paragraph *What a ring was DECLARED to be, and the trapezoid's identity* · **LADDER stage:** apply (the two refusals) + derive (the order-free seat pre-scan, the line attribution, the warning) + evaluate (the seated base mapping).
 
 **The rulings.** 2026-10-08: P1 — *3-D does what 2-D does for a declared trapezoid forced into a parallelogram, and never draws it silently green; where FR-SP-15 promises a refusal, it refuses.* Then, asked whether a circle through a declared right trapezoid is refused or warned: **"Refuse in both"** — refused in 2-D, 3-D and analytic, either order, naming both statements.
 
@@ -12278,3 +12278,13 @@ The degradation policy is deliberately unchanged (a line this code does not comm
 **Not changed.** Lines 3-D does not read («AD גובה לצלע BC שהוא גם תיכון», «AD גובה וחוצה זווית») still go to the model (W21; #1906 checks the answer).
 
 **Behaviour change for a student:** «משולש ABC» · «AD תיכון לצלע BC שהוא גם גובה» (and the measured spellings) is refused with «…נסו להקליד אותם בשני שלבים: (1) AD תיכון לצלע BC  (2) שהוא גם גובה» instead of drawing a median that is not perpendicular. "AD is the altitude to BC that is also a median" is taught «AD is the altitude to BC», then «AD is the median to BC».
+
+## ADR-3D-318 — `already-defined` names the student's letters, never an engine id (round #1940)
+
+**Status:** accepted · 2026-10-08 · round #1940 (batch integration) · **Requirements:** none (internal: the honesty invariant already promises it) · **Design:** none (internal)
+
+**Context.** The batch's full suite found `student-text-1455` red: 3-D refused a second circle through a ring with «circle-ABCD» כבר מוגדר בציור, an engine id the student never typed. It is pre-existing on `main` @ 5edeeca1 («דלתון ABCD חסום במעגל» · «ריבוע ABCD חסום במעגל»); #1902's new test arrays only fed the sweep the sequence that reaches it.
+
+**Decision.** `errorText3` renders an `already-defined` id through `studentLetters3`: a kind-prefixed id (`circle-`, `plane-`, …) shows its own letters; a bare label is unchanged. The message's words are unchanged (`err.alreadyDefined`).
+
+**Locks.** `src3d/__tests__/already-defined-letters-1940.test.ts`; `student-text-1455` green again.

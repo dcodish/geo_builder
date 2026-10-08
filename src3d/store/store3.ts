@@ -1376,6 +1376,10 @@ function honestyRefusal3(
   unreadWords: readonly string[] = [],
 ): NonNullable<StoreError3> | null {
   const prior = derive3(st.facts, st.seed).construction;
+  // ADR-603 Am. 1, ported (round #1940): the read-extent members speak only where no older gate fired. A word the
+  // older gates already name («שקוטרו», «M») keeps its own refusal; the parts / roles lists never pre-empt it.
+  const lost = lostGivens3(utterance, commands, prior, unreadWords);
+  if (lost.length > 0) return { code: 'dropped-given', items: lost.join(', ') };
   const roles = readExtent ? unreadRoles3(utterance, commands) : null;
   if (roles) {
     const proves = (lines: string[]): boolean => {
@@ -1390,10 +1394,9 @@ function honestyRefusal3(
     const note = lostRole3(utterance, commands, roles, proves);
     if (note) return note;
   }
-  const lost = lostGivens3(utterance, commands, prior, unreadWords);
   const unread = readExtent ? unreadParts3(utterance, commands, [...prior.points.keys()]) : null;
   if (unread?.cut) return lostPart3(unread.cut);
-  const items = [...lost, ...(unread?.unread ?? []).map((o) => o.text), ...(roles?.unread ?? []).map((o) => o.text)].filter((x, i, a) => a.indexOf(x) === i);
+  const items = [...(unread?.unread ?? []).map((o) => o.text), ...(roles?.unread ?? []).map((o) => o.text)].filter((x, i, a) => a.indexOf(x) === i);
   return items.length > 0 ? { code: 'dropped-given', items: items.join(', ') } : null;
 }
 

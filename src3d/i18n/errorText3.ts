@@ -5,6 +5,12 @@
 import { MAX_FIGURE_STATEMENTS } from '../../shell/save';
 import type { StoreError3 } from '../store/store3';
 
+/** ADR-3D-318: an engine id's student-facing letters — `circle-ABCD` → `ABCD`; a bare label is itself. */
+export function studentLetters3(id: string): string {
+  const m = /^[a-z]+-(.+)$/.exec(id);
+  return m ? m[1] : id;
+}
+
 /** #492/#425: the student's own statements, quoted and comma-joined, for a refusal that names the
  *  conflict. Quoting keeps a multi-word utterance readable as ONE item in the list. */
 const quoteList = (items: string[]): string => items.map((s) => (s === '…' ? s : `«${s}»`)).join(', ');
@@ -110,8 +116,10 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #1302 / #1631: a swap we understood and declined — named by the two letters the student typed.
     case 'swap-refused':
       return t(`err.swap.${err.reason}`, { a: err.a, b: err.b });
+    // ADR-3D-318 (round #1940): an engine id («circle-ABCD», «plane-ABC») never reaches the student — the honesty
+    // invariant names what they typed, so a kind-prefixed id renders as its own letters («ABCD»).
     case 'already-defined':
-      return t('err.alreadyDefined', { id: err.id });
+      return t('err.alreadyDefined', { id: studentLetters3(err.id) });
     // #612 (ADR-3D-158): name BOTH shapes — the honesty invariant is that a refusal names the
     // student's own statement and what the figure actually holds, never internal state.
     // #1923 (ADR-3D-314): analytic's `errRingContradictsNoun`, word for word — the line that completed the crossing.

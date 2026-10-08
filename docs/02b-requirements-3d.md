@@ -195,7 +195,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   nothing is drawn and the model is not asked. «שוה» reads as «שווה». A shape declaration with a qualifier word no
   reader lowers («משולש שווה ABC», «טרפז ישר ABCD») is not drawn without it: the line goes to the model.
   - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311, ADR-3D-312, ADR-3D-313; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891, #1902, #1918.
-- **FR-SP-16 (Must)** — **A trapezoid keeps exactly one pair of parallel sides, or the page says it no longer
+- **FR-SP-18 (Must)** — **A trapezoid keeps exactly one pair of parallel sides, or the page says it no longer
   does.** When the givens force a declared trapezoid (flat, or a pyramid's base) to be drawn with both pairs of
   opposite sides parallel, the figure is drawn and an amber warning names the trapezoid while that holds — 2-D's
   words; no cyclic-member notice stands beside it. A pair of its OTHER two sides that the student states parallel
