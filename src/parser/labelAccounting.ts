@@ -53,9 +53,19 @@ export interface LabelAccountCtx {
   polygons?: string[][];
 }
 
-const POLY_NOUN_RUN =
-  /(?:משולש|מרובע|ריבוע|מלבן|מעוין|מעויין|טרפז|דלתון|מקבילית|מחומש|משושה|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|kite|parallelogram|pentagon|hexagon)\s+((?:[A-Z]\d*\s*){3,})/gi;
-const CIRCLE_NAME = /(?:מעגל|circle)\s+([A-Z]\d*)(?![A-Za-z\d])/gi;
+/** The polygon nouns a sentence names a shape with («במשולש ABC») — rule 4's scene nouns. */
+const POLY_NOUNS = 'משולש|מרובע|ריבוע|מלבן|מעוין|מעויין|טרפז|דלתון|מקבילית|מחומש|משושה|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|kite|parallelogram|pentagon|hexagon';
+const CIRCLE_NOUNS = 'מעגל|circle';
+const POLY_NOUN_RUN = new RegExp(`(?:${POLY_NOUNS})\\s+((?:[A-Z]\\d*\\s*){3,})`, 'gi');
+const CIRCLE_NAME = new RegExp(`(?:${CIRCLE_NOUNS})\\s+([A-Z]\\d*)(?![A-Za-z\\d])`, 'gi');
+const SCENE_NOUN_BEFORE = new RegExp(`(?:${POLY_NOUNS}|${CIRCLE_NOUNS})\\s*$`, 'i');
+
+/**
+ * #1888 (ADR-603): does the text END with a scene noun — a polygon or circle noun, glued prefixes allowed
+ * («במשולש », «המעגל »)? The label run right after one NAMES the scene the statement lives in; it is
+ * context, read through rules 2–4 below, never a given of its own. The same nouns rules 3 and 4 read.
+ */
+export const endsWithSceneNoun = (textBefore: string): boolean => SCENE_NOUN_BEFORE.test(textBefore);
 /** A sentence-opening locative that names its circle — «במעגל O …», "in (the) circle O …" (rule 5). */
 const LOCATIVE_CIRCLE_NAME = /^\s*(?:ב(?:ה)?מעגל|[Ii]n\s+(?:the\s+|a\s+)?circle)\s+([A-Z]\d*)(?![A-Za-z\d])/;
 
@@ -117,12 +127,16 @@ export function referencedContextLabels(s: string, commands: AnyCommand[], actx:
     const about = [...carried].filter((p) => existing.has(p) && p !== x);
     if (circle && about.length >= 2 && about.every((p) => members.has(p))) out.add(x);
   }
-  // 4 — a polygon named by its noun, when it is an EXISTING polygon and the lowering touches it.
+  // 4 — a polygon named by its noun, when it is an EXISTING polygon and the lowering touches it. #1888 (ADR-603):
+  // a TRIANGLE whose three vertices all exist is one too, declared or not — three points always span a triangle,
+  // so «EF קטע אמצעים במשולש DCA» names its scene by its existing corners (the sanctioned direction above).
   const polys = (actx.polygons ?? []).map((v) => new Set(v.map((x) => x.toUpperCase())));
+  const existingPts = new Set((actx.existingPoints ?? []).map((p) => p.toUpperCase()));
   for (const m of s.matchAll(POLY_NOUN_RUN)) {
     const run = (m[1].match(/[A-Z]\d*/g) ?? []).map((x) => x.toUpperCase());
     const ring = polys.find((p) => p.size === run.length && run.every((x) => p.has(x)));
-    if (ring && run.some((x) => carried.has(x))) for (const x of run) out.add(x);
+    const spanned = run.length === 3 && new Set(run).size === 3 && run.every((x) => existingPts.has(x));
+    if ((ring || spanned) && run.some((x) => carried.has(x))) for (const x of run) out.add(x);
   }
   return out;
 }

@@ -560,6 +560,26 @@ test fails if `runSubmit` parses or refuses on its own, and the parity shards (`
 label, never leaving a piece that only names points, and keeps a subject-less piece with the clause before it when
 the two read as a statement.
 
+#### A part the reading never read ([ADR-603](06-decisions.md#adr-603), [ADR-W-120](06w-decisions-workspace.md#adr-w-120))
+
+The clause gate sees only the pieces `clausesOf` cuts, and every token gate counts a label read wherever a command
+carries it, so «משולש ABC ישר זווית ב-B» and «…בנקודה E שהיא אמצע BD» committed with the part gone. The battery
+member `unreadParts` (`src/app/unreadParts.ts`, in `honestyGateReport`, so both seams) MEASURES the reading:
+
+- **The probe** (`shell/readExtent.ts` `readLabelRuns`): each label run has one letter at a time replaced (a letter of
+  the line, else a fresh one on neither the line nor the figure) and the line re-read in the seam's context; a run no substitution
+  changes was not read. Exempt: a co-reference (a single letter also read as a single-letter run) and a scene name
+  (the run after a polygon or circle noun — `endsWithSceneNoun` — whose letters `referencedContextLabels` reads).
+- **The parts** (`cutAtReading`): the clauses, each read alone in the figure plus the clauses before it; an offending
+  clause is cut at the shortest word-boundary prefix that holds every read run and lowers byte-identically. A clause
+  that has no cut alone (a statement the splitter cut in two, a fragment such as «ואת AB») is read with the clauses
+  before it, as typed. A clause that reads alone and lost everything is listed whole. An unread run with read runs
+  after it in its statement has no cut: the weak path.
+- **The verdict** (`decideFromParse`, the `!gates.clean` branch): parts → refuse `guided`,
+  `scope:split-statements:unread-part`, never escalated. `lostPartNote` picks `input.scope.right-angle-vertex`
+  (`-more` with further parts) when the lost tail is one vertex of a `right-triangle` the read part lowered to, else
+  `input.scope.split-statements`. The ✎ seam refuses with `steps.editDropped`, the lost parts as its items.
+
 ### What counts as "produced": a display-only command declares itself (#1011, [ADR-519](06-decisions.md#adr-519))
 
 `dryRunOutcome` asks whether a line did anything — the construction grew, a DOF went, the scale was fixed, a point

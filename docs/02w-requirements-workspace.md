@@ -263,6 +263,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | "The tool's limit, not your mistake" | no | yes | no | no | **Ruled change** — everywhere (B13, #1868) |
 | Student-text check (ADR-W-096) | no | yes | no | no | **Gap** — #1522 (icebox) |
 | Restated fact «כבר נובע…» | yes | yes | yes | no | **Gap** — #1565 |
+| A one-line compound that loses a part («משולש ABC ישר זווית ב-B», «…בנקודה E שהיא אמצע BD») | refused whole, parts listed; the right-angle syntax taught (ADR-603) | records it, the angle elsewhere | hands it to the model, or reads both parts | n/a | **Ruled change** — refused in every builder (2026-10-08, #1888/#1889, ADR-W-120); 3-D and analytic: #1888 |
 | Two points on one spot | refused or redrawn | same | same | not measured | **Same** for 2-D/3-D/analytic (ADR-W-066/072); complex **Open** |
 | A declared polygon forced flat | refused | refused | refused | n/a | **Same** (ADR-W-115) |
 | A proof target «הוכיחו כי» | refused | refused | refused | checked as a claim | **Ruled change** — refuse proof verbs, keep the bare-claim check (B14, D3, #1870) |

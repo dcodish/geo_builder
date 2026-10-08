@@ -15340,3 +15340,45 @@ The row kept reading «תיכון לבסיס» with a ✓ while the figure drew 
 - A stated collinearity or incidence that flattens a declared polygon («D אמצע AB · D על AC») now names the polygon («סותר את «משולש ABC»») instead of the earlier statement it collides with.
 - A refusal at the door now names the earlier statement it contradicts wherever the fold found one (ADR-508's tail, which the submit note used to drop).
 - Thin but real triangles (3°, 1°, a stated 0.1°) still build.
+
+## ADR-603 — A part of the line the reading never read refuses the line: a measured read-extent member joins the honesty battery (#1888, #1889, #1833)
+
+**Status:** accepted · 2026-10-08 · bug (P1, 2-D, honesty class) · branch `fix/1888-unread-part` · round #1940 (item A of #1888's plan) · **amends [ADR-598](#adr-598)** (the hole it left, and its "adds nothing" exception) · the cross-builder rule and the shared module are [ADR-W-120](06w-decisions-workspace.md#adr-w-120)
+
+**Requirements:** [02-requirements.md](02-requirements.md) FR-IN-4g: "dropped" now includes a part the reading did not read (a vertex locative, a relative clause, an incidence on a named point), refused even where the drawing happens to agree; the right-angle-vertex syntax is taught · **Design:** [04-design.md](04-design.md) § "A one-line compound is all or nothing" → "A part the reading never read" · **LADDER stage:** the submit decision, ahead of stage 0 ([LADDER.md](LADDER.md), the note under stage 0): a battery member at both 2-D commit seams. No engine or solver change.
+
+**Cites** [ADR-461](#adr-461) (one battery, both seams), [ADR-597](#adr-597) (`referencedContextLabels`, the scene exemption), [ADR-598](#adr-598) (`clausesOf`, the shared message), [ADR-W-006](06w-decisions-workspace.md#adr-w-006) (derive, don't duplicate)
+
+**The rulings (operator, 2026-10-08).** #1888: *"the syntax משולש ABC ישר זווית ב-B should be rejected. this is not how you define the right angle and should never appear"*; asked whether every two-input line splits, *"Only when a part is lost"*. #1889: *"these are 2 inputs in one line and we should ask to separate"*. Follow-ups: an unread part that happens to hold — *"Refuse it too"*; his own case — *"Teach the right form"*, with the text «בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו קודם «משולש ABC», ואחר כך בשורה נפרדת «∠ABC = 90°».», letters filled per vertex.
+
+**Measured before** (main @ 5edeeca1, `decideDeterministic2D`, LLM mocked): «משולש ABC ישר זווית ב-B» (also ב-A, ב-C, after «משולש ABC», after «AB ⟂ BC») committed `right-triangle [A,B,C]` with the angle at C; «מרובע ABCD» · «AC ו-BD נפגשים בנקודה E שהיא אמצע BD» and «…E על AB» committed the crossing alone (E not the midpoint, E off AB). The ✎ edit seam committed all of them, and ADR-598's own flagship «AB מקביל ל-CD ו-D על BC» (`droppedClause` ran only at submit).
+
+**Root cause / class (docs/17 §1).** *A stated label the winning reading never looks at is dropped while the line commits green.* Every gate on the commit path accounts **tokens**, not **readings**: a label counts as read wherever any command carries it. `shapeMacro` strips its vocabulary and `removeClaimed` erases every occurrence of a claimed vertex, so «ב-B» left a bare particle; `lineLineIntersection` never reads past its point label; `clausesOf` cuts neither «ב-B» nor «שהיא», so ADR-598's gate saw one clause; and on the comma form ADR-598's trace rule (2) counted «E אמצע BD» traced because the line defines the same E. Grammar-wide: 455 of 888 catalog examples with a trailing qualifier from their own labels committed byte-identical (86 of 111 Hebrew constructs drop «ב-X»).
+
+**Decision.**
+1. **The probe** (`shell/readExtent.ts`, ADR-W-120): for each label run, substitute one letter at a time (a letter of the line, else a fresh one on neither the line nor the figure — never a figure letter: «אלכסוני הריבוע נפגשים בנקודה M» with M swapped for an existing letter falls back to the rule's default name M and reads as unchanged, measured on the corpus) and re-read the line in the seam's own context. A run no substitution changes was not read. Exempt: a co-reference (a single letter the line also reads as a single-letter run) and, in 2-D, a **scene name** — the run right after a polygon or circle noun whose letters ADR-597's `referencedContextLabels` already reads as context («במשולש ABC», «במעגל O»; `endsWithSceneNoun`, composed from the accountant's own noun lists). Rule 4 of `labelAccounting.ts` is widened, ADR-597's sanctioned direction, to a triangle whose three vertices all exist (declared or not): the corpus's one false flag, «EF קטע אמצעים במשולש DCA», named its scene by existing corners.
+2. **One battery member** (`unreadParts`, `src/app/unreadParts.ts`) in `honestyGateReport`, context-carrying (out of `CONTEXT_FREE_GATES`). Both seams get it.
+3. **The parts.** The line's clauses (`clausesOf`), each read alone in the figure plus the clauses before it; an offending clause is cut **where its reading stops** — the shortest word-boundary prefix that holds every read run and lowers byte-identically. A clause the splitter cut out of a statement («האלכסונים AC» · «BD נפגשים…»), or a fragment that does not read alone («ואת AB»), is cut together with the clauses before it, as typed. A clause that reads alone and lost everything is listed whole, as ADR-598 lists it. A list of one part is no split: the weak path.
+4. **Submit seam** (`decideFromParse`, the `!gates.clean` branch, before `compoundNotHonoured`): a lost part refuses the whole line, `guided`, log `scope:split-statements:unread-part`, never escalated. The note is `input.scope.split-statements` with the parts — except where the lost tail names a vertex of the right triangle its reading built: then `input.scope.right-angle-vertex` (the ruled text; ∠ with the vertex in the middle and its two neighbours in the triangle's name), or `…-more` with the line's other parts numbered on from (3). Decided by the reading, never the spelling, so «right triangle ABC at B» and «…שהזווית הישרה שלו ב-B» are taught too.
+5. **An unread run INSIDE a statement** (read runs after it: #1833 row 2, «AC ו-BD ו-AB נפגשים בנקודה E») is a lost operand, not a lost part: today's weak path, `escalate` `weak = dropped` ([2-D]).
+6. **✎ edit seam:** nothing to wire — the battery refuses with `steps.editDropped`, its items the lost part in the student's words («ב-B», «שהיא אמצע BD», «D על BC»).
+7. **Amends ADR-598.** Its `droppedClause` stays (it still covers a clause that carries no label). Its entailment exception ("adds nothing") excuses a part that was **read** and restated, never one that was **not read** (*"Refuse it too"*).
+
+**#1833.** Both of its arms are replaced by this member (no `unclaimedLabels` in `lineLineIntersection`, no pair accounting): rows 1, 3, 4 are tails and are refused; row 2 escalates, as its plan said.
+
+**Measured after.**
+- The operator's sequences and every listed real spelling (Hebrew and English) refuse with the plan's parts; the controls («AB = 4, AC = 3», «D על AB כך ש-AD = 3», «D על BC כך ש-BD = DC», «AC ו-BD נפגשים בנקודה E», «משולש ABC ישר זווית») commit.
+- **Catalog sweep**, both locales: 0 of 264 committing examples refused; of the qualifier lines, 49 still commit byte-identical — 41 co-references that restate a point («בנקודה M ב-M») and 8 synthetic empty-canvas lines with no spare letter (listed as the measured residual in the sweep lock).
+- **Corpus false-refusal net:** CORPUS_RESULT.
+- **Perf:** 78 ms for the probe over the 264 catalog lines; the reported lines decide in 1–44 ms.
+
+**Locks.** `src/app/__tests__/issue-1888-unread-part.test.ts` (the operator's sequences with the exact notes and no LLM call, every listed spelling, #1833's rows, the controls, the scene exemption, the ✎ seam, the taught lines building with the right angle at the named vertex); `issue-1888-qualifier-sweep.test.ts` (the class, both locales); `issue-1888-unread-corpus-net.test.ts` (0 flags, floor 1400 steps); `shell/__tests__/read-extent-1888.test.ts`; scenario `unread-part-taught-lines-1888` (corpus-4); parity rows `unread-vertex-1888-01/02`, `unread-tail-1889-01/02`.
+
+**Sibling audit.** 3-D records «…ב-C» with the right angle at B (72 of 336 catalog sweeps drop): item B, `knownGap … #1888`. Analytic declines rather than drops, except 9 sweep lines: item C. Both reuse `shell/readExtent.ts`.
+
+**Found, not fixed.** «D על BC שהיא אמצע BC» reads the midpoint and not the incidence before it: an unread run inside the statement, so it escalates (§5) rather than splitting. A label-free lost part («AD גובה לצלע BC שהוא גם תיכון») is #1904's member (ADR-604).
+
+**Behaviour change for a student:**
+- «משולש ABC ישר זווית ב-B» (any vertex) is no longer drawn with the right angle at C: it is refused, teaching «משולש ABC» and then «∠ABC = 90°».
+- A line with a trailing part the tool does not read («…בנקודה E שהיא אמצע BD», «…E על AB», «…ש-AE = EC») is refused, listing the parts — even when the drawing would happen to agree.
+- In the ✎ editor, the same edits are refused inline, naming the unread part.

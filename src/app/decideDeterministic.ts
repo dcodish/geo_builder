@@ -50,6 +50,7 @@ import {
 } from '@/parser';
 import { independentConstructs } from './independence';
 import { compoundNotHonoured, droppedClause } from './clauseCoverage';
+import { lostPartNote } from './unreadParts';
 import { applyCommand, type AnyCommand, type Command, type Construction, type Id, type Vec } from '@/engine';
 import {
   type Fact,
@@ -803,8 +804,18 @@ export async function decideFromParse(
       // become a second analytics `submit` (else the dashboard double-counts the utterance). See sessionLog.
       logs.push({ source: 'parser', result: `weak:${outcome.reason}`, detail: outcome.detail, commands: r.commands, intermediate: true });
     } else {
+      // #1888 / #1889 (ADR-603, operator rulings 2026-10-08): a PART of the line the reading never read — a vertex
+      // locative («משולש ABC ישר זווית ב-B»), a relative clause («…בנקודה E שהיא אמצע BD»), an incidence on the
+      // named point («…E על AB») — refuses the whole line with the one-input-per-line message, listing the parts
+      // cut where the reading stops. Never escalated, whatever else fired: *"a line that loses a part gets the
+      // existing one-input-per-line message"*, and *"refuse it too"* when the drawing happens to agree. An unread
+      // label INSIDE a statement (read labels after it) is a lost operand, not a lost part: the weak path below.
+      const lost = gates.unread?.cut ? lostPartNote(gates.unread.cut) : null;
+      if (lost) {
+        return refuse('guided', { source: 'scope', result: 'scope:split-statements:unread-part', commands: r.commands }, lost);
+      }
       weak = 'dropped'; // a typo dropped a stated label/number/relation/verb/compound-structure/object → escalate rather than commit the partial parse
-      logs.push({ source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct, ...unaccounted.map((x) => `${x.kind}:${x.text}`)].join(',')}`, commands: r.commands, intermediate: true });
+      logs.push({ source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct, ...unaccounted.map((x) => `${x.kind}:${x.text}`), ...(gates.unread?.items ?? []).map((x) => `unread:${x}`)].join(',')}`, commands: r.commands, intermediate: true });
       // #1798 / #553 (ADR-598): the dropped content belongs to a COMPOUND whose every clause reads on its own —
       // «F אמצע DO, O - חיתוך של AC ו-BD». All or nothing: refused whole with the shared message listing the
       // clauses, instead of a paid call that would re-read the compound the ruling says to type line by line.
