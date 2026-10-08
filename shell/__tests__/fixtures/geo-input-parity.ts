@@ -1169,6 +1169,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1891 (ADR-606, ADR-3D-311; operator rulings 2026-10-08): a circle inscribed in a pentagon is refused as a known tool
   // limit (W19) until #1908 draws it. 3-D circle geometry is X8 (its own lock); analytic still asks its model (#1903).
   { id: 'pentagon-incircle-1891', family: 'circles', steps: ['מעגל חסום במחומש ABCDE'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1903' }] },
+  // #1902 (ADR-3D-312): an unread word in an inscription is never dropped. 3-D refuses it naming the word (its own lock,
+  // X8); 2-D and analytic escalate it to their models. «שוה» reads as «שווה» in every builder (ADR-405's fold).
+  { id: 'inscription-unread-word-1902', family: 'circles', steps: ['מעגל חסום במשולש שווה צלעת ABC'], expect: 'not-handled', exception: 'X8' },
+  { id: 'defective-equal-sides-1902', family: 'polygons', steps: ['משולש שוה צלעות ABC'], expect: 'builds' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

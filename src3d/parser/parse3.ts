@@ -23,7 +23,7 @@ import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
-import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX } from '../lexicon/nouns3';
+import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX, SOLID_QUALIFIER_HE } from '../lexicon/nouns3';
 import { foldPrimes3, VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
 import { POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_WORDS3, statedPolygonArity3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
 // #1545 (ADR-3D-300): the ONE prime fold lives in the vocabulary leaf; re-exported so every parser-side
@@ -33,7 +33,9 @@ import { CYCLIC_MEMBER, shapeInternal3, type QuadBase, type ShapeRelation3 } fro
 import { riderPairsT, riderWholeSide, riderWholeT } from '../engine/onSegmentRatio';
 
 export type ParseResult3 =
-  | { ok: true; commands: Command3[] }
+  // #1902 (ADR-3D-312): `unread` — words of the sentence the answering rule did not read (the inscription rule
+  // reports them); the store refuses the line naming them once every other gate has passed. Absent = none.
+  | { ok: true; commands: Command3[]; unread?: string[] }
   | { ok: false; reason: 'not-handled' }
   // bare `AS = AB` — vector equation or length equality? NEVER assumed (operator rule):
   // the student is asked to write וקטור AS = וקטור AB (or with the ⃗ arrow), or |AS| = |AB|.
@@ -231,6 +233,10 @@ export function normalize3(s: string): string {
       // enumerated: they hit the fail-closed declaration gate and escalate to the LLM, whose job is
       // typos. Guarded on both sides so it can never fire inside another word («זוויות» is untouched).
       .replace(/(?<![א-ת])זוות(?![א-ת])/g, 'זווית')
+      // «שוה» → «שווה» (#1902, ADR-405's third fold — #498 ported the other two): the defective spelling of
+      // the equal-sides word. The declaration gate admitted it (`שוו?ה`) but no reader did, so «משולש שוה
+      // צלעות ABC» drew a scalene triangle, green. Guarded on both sides, so «שוהה» is untouched.
+      .replace(/(?<![א-ת])(ו?)שוה(?![א-ת])/g, '$1שווה')
       .replace(/½/g, '1/2')
       .replace(/¼/g, '1/4')
       .replace(/¾/g, '3/4')
@@ -436,16 +442,46 @@ const removeClaimedRuns = (s: string, ids: Id[]): string => {
 function declLeftover(s: string, ids: Id[], consumed?: RegExp): boolean {
   let rest = removeClaimedRuns(s, ids);
   if (consumed) rest = rest.replace(consumed, ' ');
-  rest = rest.replace(CONSTRUCT_NOUNS, ' ').replace(DECL_VOCAB, ' ');
-  for (const t of rest.match(/[A-Za-z0-9']+|[א-ת]+/g) ?? []) {
-    if (/\d/.test(t)) return true; // a stated magnitude this family cannot express
-    if (/^[A-Za-z]/.test(t)) {
-      if (!NEUTRAL3_EN.test(t)) return true; // an unclaimed label, or an unknown English word
-    } else if (!NEUTRAL3_HE.test(t) && !NEUTRAL3_HE.test(t.replace(/^[ובלכשמה]{1,3}/, '')) && !HE_PREFIX_REMNANT3.test(t)) {
-      return true; // a Hebrew word nothing in this family knows — content, not filler
+  // #1902: a qualifier counts as read only inside a PHRASE a reader lowers — the shape's adjectives and the
+  // solid's own rightness / equal edges — never as a loose word («משולש שווה ABC» declines, as 2-D escalates it)
+  rest = rest.replace(QUALIFIER_PHRASES3, ' ').replace(CONSTRUCT_NOUNS, ' ').replace(DECL_VOCAB, ' ');
+  return unreadWords3(rest, 'any').length > 0;
+}
+
+/** The qualifier PHRASES the readers lower (#1902): the shape-phrase adjectives and the solid's own. */
+const QUALIFIER_PHRASES3 = new RegExp([...Object.values(SHAPE_ADJ_WORDS3), SOLID_QUALIFIER_HE].join('|'), 'gi');
+
+/** A removed span's mark, so a prefix letter it left behind is known to be glued to it (#1902). */
+const SPAN3 = '\u0001';
+
+/**
+ * #1902 (ADR-3D-312) — THE closure shared by ADR-3D-125's declaration gate and the inscription rule: the words
+ * of `rest` (the sentence with every span its reader consumed already removed) that no reader read — a
+ * number, an English word that is not filler, a Hebrew word that is neither filler nor a prefix left behind.
+ * Neighbouring unread words are joined by a space, in sentence order («שווה צלעת»), so a refusal names them
+ * as typed. `remnant`: `'any'` accepts any free prefix-letter word (the declaration gate's long-standing
+ * tolerance); `'glued'` only one a span was removed right beside (`SPAN3`, a hyphen allowed) — «שוה» is
+ * spelled with prefix letters only, and a free word is content.
+ */
+function unreadWords3(rest: string, remnant: 'any' | 'glued'): string[] {
+  const out: string[] = [];
+  let lastEnd = -1;
+  for (const m of rest.matchAll(/[A-Za-z0-9']+|[א-ת]+/g)) {
+    const t = m[0];
+    const at = m.index ?? 0;
+    let unread: boolean;
+    if (/\d/.test(t)) unread = true; // a stated magnitude this family cannot express
+    else if (/^[A-Za-z]/.test(t)) unread = !NEUTRAL3_EN.test(t); // an unclaimed label, or an unknown English word
+    else {
+      const glued = remnant === 'any' || new RegExp(`^[-־]?${SPAN3}`).test(rest.slice(at + t.length));
+      unread = !NEUTRAL3_HE.test(t) && !NEUTRAL3_HE.test(t.replace(/^[ובלכשמה]{1,3}/, '')) && !(glued && HE_PREFIX_REMNANT3.test(t));
     }
+    if (!unread) { lastEnd = -1; continue; }
+    if (out.length > 0 && lastEnd >= 0 && /^[\s\-־]*$/.test(rest.slice(lastEnd, at))) out[out.length - 1] += ` ${t}`;
+    else out.push(t);
+    lastEnd = at + t.length;
   }
-  return false;
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -4421,6 +4457,27 @@ function cyclicRingCommands(base: QuadBase | null, ring: Id[], already: Command3
  * adjective the noun lowers is lowered, and one it cannot («מרובע ישר זווית») declines the rule (the line
  * escalates; the adjective is never dropped). A circle through a ring of four or more makes the ring cyclic.
  */
+/**
+ * #1902 — the words of an inscription sentence `polygonCircle3` did not read. Removed, each marked as a span:
+ * the ring's letters, a named circle's letter, the verb in every inflection {@link isInscription3} admits, the
+ * circle noun with its prefixes, the container marker, and the shape phrase's own words (`phrase.strip`: its
+ * noun and the adjectives it consumed). What is left must be filler, or a prefix glued to a removed span.
+ */
+function inscriptionUnread3(s: string, ring: readonly Id[], circleLetter: Id | null, phrase: ShapePhrase3 | null): string[] {
+  const mark = SPAN3;
+  let rest = s.replace(new RegExp(RUN.source, 'g'), (r) => ((r.match(TOKEN) ?? []).every((t) => ring.includes(t)) ? mark : r));
+  if (circleLetter) rest = rest.replace(new RegExp(String.raw`(?<![A-Za-z])${circleLetter}(?![A-Za-z0-9'])`), mark);
+  if (phrase) rest = phrase.strip(rest, mark);
+  rest = rest
+    .replace(/[ובלכשמה]{0,3}(?:חסומ(?:ה|ים|ות)?|חסום|חוסמ(?:ת|ים|ות)?|חוסם)(?![א-ת])|\b(?:inscrib\w*|circumscrib\w*)/gi, mark)
+    .replace(/[ובלכשמה]{0,3}מעגל(?![א-ת])|\bcircles?\b/gi, mark)
+    .replace(/(?<![א-ת])ו?בתוך(?![א-ת])|\b(?:inside|about|around)\b/gi, mark);
+  return unreadWords3(rest, 'glued');
+}
+
+/** #1902 — the words the inscription rule that answered this parse could not read (reset per rule, see `parse3`). */
+let UNREAD3: string[] = [];
+
 const polygonCircle3: Rule = (s) => {
   if (!isInscription3(s)) return null;
   const ring = firstLabelRun(s);
@@ -4463,6 +4520,12 @@ const polygonCircle3: Rule = (s) => {
     ? [...lowered, ...(base ? quadAdjCommands(phrase, base, ring, lowered) : [])]
     : [{ type: 'solid', kind: polyKind, ids: ring }, ...triShapeCommands(shape, ring)];
   const cyclic = circleIsContainer ? cyclicRingCommands(base, ring, poly) : [];
+  // #1902 (ADR-3D-312): the rule accounts for the WHOLE sentence. It was the one declaration rule outside
+  // ADR-3D-125's fail-closed gate, so every word it did not read was discarded: «מעגל חסום במשולש שווה צלעת
+  // ABC» drew a scalene triangle's incircle, green. A word left over is reported (`parse3` returns it as
+  // `unread`, and the store refuses the line naming it once every other gate has passed) — a typed refusal,
+  // never a decline, so the model is not asked to guess at a word no gate can watch on its seam.
+  UNREAD3 = inscriptionUnread3(s, ring, named?.[1] ?? null, phrase);
   return [...poly, ...cyclic, { type: 'circle3', id, def }];
 };
 
@@ -4961,6 +5024,7 @@ let CONDITION_LENGTHS = false;
  */
 function readCondition3(body: string): Command3[] | null {
   const was = CONDITION_LENGTHS;
+  const unreadWas = UNREAD3; // #1902: a condition's read never leaves its slot behind
   CONDITION_LENGTHS = true;
   try {
     for (const rule of RULES) {
@@ -4970,6 +5034,7 @@ function readCondition3(body: string): Command3[] | null {
     return null;
   } finally {
     CONDITION_LENGTHS = was;
+    UNREAD3 = unreadWas;
   }
 }
 
@@ -4992,8 +5057,9 @@ export function parse3(utterance: string): ParseResult3 {
   const contradiction = inscribedContradiction3(s);
   if (contradiction) return { ok: false, reason: 'inscribed-contradicts-noun', ...contradiction };
   for (const rule of RULES) {
+    UNREAD3 = [];
     const commands = rule(s);
-    if (commands) return { ok: true, commands };
+    if (commands) return UNREAD3.length ? { ok: true, commands, unread: UNREAD3 } : { ok: true, commands };
   }
   // #516: no rule matched, but a rule RECOGNIZED an ambiguity — that is a refusal with a
   // clarification, never `not-handled` (which escalates to the LLM lane, whose job is to guess).

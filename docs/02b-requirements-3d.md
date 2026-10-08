@@ -168,7 +168,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   or hexagon (any spelling, lettered or not) is refused before the model with «הכלי עדיין לא יודע לשרטט מעגל חסום
   במחומש — זו מגבלה של הכלי.» (the noun filled in); nothing is drawn. «משוכלל» / "regular" on a flat polygon is an
   adjective 3-D draws only on a square: elsewhere the line goes to the model, and an answer that drops it is refused.
-  - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891.
+  A word in an inscription sentence the tool does not read refuses the line, naming it («…לא הצלחנו לצייר: שווה צלעת…»);
+  nothing is drawn and the model is not asked. «שוה» reads as «שווה». A shape declaration with a qualifier word no
+  reader lowers («משולש שווה ABC», «טרפז ישר ABCD») is not drawn without it: the line goes to the model.
+  - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311, ADR-3D-312; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891, #1902.
 
 ## Vectors — the geometric lane
 

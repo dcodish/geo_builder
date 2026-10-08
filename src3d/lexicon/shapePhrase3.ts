@@ -130,7 +130,21 @@ export interface ShapePhrase3 {
   readonly unconsumed: readonly ShapeAdj3[];
   /** 'yes', or the shape a circle through every vertex would force (the sentence then contradicts itself) */
   readonly cyclic: 'yes' | { readonly shape: string; readonly forced: string };
+  /**
+   * #1902 (ADR-3D-312): `text` with exactly the words this phrase READ removed (its noun, and the adjectives
+   * it consumed), each replaced by `mark` (default a space). An unconsumed adjective stays. 2-D's
+   * `ShapePhrase.strip` (ADR-595), this lexicon's third copy.
+   */
+  strip(text: string, mark?: string): string;
 }
+
+/** Each noun's own words, as a global regex for {@link ShapePhrase3.strip}. */
+const NOUN_SPAN: Readonly<Record<ShapeNoun3, RegExp>> = {
+  ...(Object.fromEntries(QUAD_NOUN_WORDS.map(([n, he, en]) => [n, new RegExp(String.raw`${he}|\b${en}\b`, 'gi')])) as Record<QuadNoun3, RegExp>),
+  triangle: new RegExp(TRIANGLE_RE.source, 'gi'),
+  pentagon: new RegExp(PENTAGON_RE.source, 'gi'),
+  hexagon: new RegExp(HEXAGON_RE.source, 'gi'),
+};
 
 /**
  * Read the shape phrase of `s` (ONE polygon phrase per sentence — the inscription and declaration rules).
@@ -148,5 +162,11 @@ export function readShapePhrase3(s: string): ShapePhrase3 | null {
   const unconsumed = stated.filter((a) => !consumed.includes(a));
   const arity: 3 | 4 | 5 | 6 = base === 'triangle' ? 3 : base === 'pentagon' ? 5 : base === 'hexagon' ? 6 : 4;
   const forces = consumed.map((a) => NOT_CYCLIC[`${base}:${a}`]).find((x) => x !== undefined);
-  return { noun, arity, stated, consumed, unconsumed, cyclic: forces ?? 'yes' };
+  const strip = (text: string, mark = ' '): string => {
+    // the adjectives first: «משוכלל» is read only where its noun stands before it (a lookbehind)
+    let out = text;
+    for (const a of consumed) out = out.replace(new RegExp(SHAPE_ADJ_WORDS3[a], 'gi'), mark);
+    return noun ? out.replace(NOUN_SPAN[noun], mark) : out;
+  };
+  return { noun, arity, stated, consumed, unconsumed, cyclic: forces ?? 'yes', strip };
 }
