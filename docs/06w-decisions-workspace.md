@@ -5650,3 +5650,21 @@ So: §1's thesis and P6's reason are his; the trace (ADR-AG-062) stays; the rela
 3. **What is not shared.** Each builder's exemptions (2-D's scene name reads its own label accountant), its clause splitter (2-D's `clausesOf`; #1904's plan moves the lexical half here when 3-D needs it), and its message key.
 
 **Consequences.** A builder that reads both parts (analytic's «…E שהיא אמצע BD») keeps building: the rule is about lost parts, not two-part lines. The parity rows `unread-vertex-1888-01/02`, `unread-tail-1889-01/02` carry the remaining gaps (3-D, analytic: #1888; 2-D reading a relative clause: #1905).
+## ADR-W-121 — A declared polygon whose placed vertices cross in every configuration is REFUSED in every builder, naming the line, with one message (#1927; the crossed sibling of ADR-W-115)
+
+**Status:** accepted · 2026-10-08 · **Issue:** #1927 (bug, P1, honesty class) · round #1940 · **Adopted by:** [ADR-608](06-decisions.md#adr-608) (2-D). Analytic and 3-D adopt it under #1927 items B and C (3-D on #1923's build).
+**Operator ruling:** 2026-10-08, on #1927 («Operator ruling — 2026-10-08»): he confirmed P1 with the outcome in the issue body —
+
+> *a declared polygon whose vertices, already placed, form a crossed ring is refused naming the declaration, in every builder, with analytic's `errRingContradictsNoun`. Never green, never a raw error.*
+
+**Requirements:** [02w](02w-requirements-workspace.md) behaviour table, row "A declared polygon whose placed vertices cross in every configuration" (Ruled change); [02](02-requirements.md) FR-EN-16 · **Design:** each product's own predicate (2-D: [04](04-design.md) § "A ring over placed points that crosses everywhere is refused before the dry run"); `BOUNDARIES.json` keeps engine layers `copied-never-shared`, so the predicate is per product, never shared.
+
+**Context.** Measured at 5edeeca1: «ריבוע ABCD · מרובע ACBD» drew the crossed ring with «לא נמצאה תצורה…» in 2-D and recorded green in 3-D and analytic; the pentagram «מחומש ACEBD» on a regular pentagon drew green in 2-D with no note. ADR-W-115 ruled the flat member of this family (a declared polygon forced onto a line); this is its crossed member.
+
+**Decision.**
+1. **The rule.** A ring declared over points the figure has already placed, in an order that crosses in **every** configuration the builder samples, is refused on the line that completes it — the declaration, or the shape line that places the points of an earlier ring — quoting that line.
+2. **One message:** analytic's `errRingContradictsNoun`, verbatim, in every builder (he + en). The coordinate clause stays until the operator rules a coordinate-free variant.
+3. **"Every configuration" is each builder's existing knowledge sampler** (M3), never a new search; only proper crossings count (a touching vertex is never refused); a thin pool or any doubt fails open and the line builds as today.
+4. **Not this rule:** a ring with a free vertex (a configuration choice), and lines already refused with another honest message (3-D `claim-refuted`, `shape-less-specific`, `givens-contradict`; analytic «לא נמצאה תצורה שבה מתקיים…»), which keep it.
+
+**Consequences.** The 2-D arm lands first (ADR-608); the parity rows `crossed-ring-1927-01…05` carry known gaps for analytic and 3-D until items B and C land. #1914 must compare rings by cyclic order (`ringKey`), not by vertex set.

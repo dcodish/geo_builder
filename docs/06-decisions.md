@@ -15500,3 +15500,46 @@ Each alternative is replayed at the seed; one failing `meetsRequirements` is not
 **Sibling audit.** 3-D: the same refusal in the same words, built by the stream agent (ADR-3D-313). Analytic: ADR-AG-252 (the `notCyclic` registry column). Complex: n/a, it has no declared polygons. The pair's parity rows belong to the stream agent.
 
 **Behaviour change for a student:** «טרפז ישר זווית ABCD» with «ABCD חסום במעגל» (any spelling, either order) no longer draws a rectangle with a warning, and no longer says «'C' is already defined». The second line is refused, naming both statements and why.
+## ADR-608 — A ring declared over points the figure already placed, in an order that crosses in every configuration, is refused at both commit seams, naming the line (#1927)
+
+**Status:** accepted · 2026-10-08 · bug (P1, 2-D, honesty class) · branch `fix/1927-crossed-ring-2d` · round #1940 · the 2-D arm (item A) of #1927 (analytic and 3-D: items B and C, not in this change)
+**Requirements:** [02](02-requirements.md) FR-EN-16 — a declared polygon whose placed vertices cross in every configuration is refused, naming the line · **Design:** [04](04-design.md) § "A ring over placed points that crosses everywhere is refused before the dry run"; [LADDER.md](LADDER.md) stage 5, "The crossed-ring check" · **LADDER stage:** reads stage 5 at the submit gate, beside ADR-542's restatement check
+**Adopts** [ADR-W-121](06w-decisions-workspace.md#adr-w-121) · **Twin of** [ADR-542](#adr-542) (`impliedByPrior`: the same pool, the opposite verdict) · **Precedes** [ADR-157](#adr-157)'s redefinition refusal for these lines
+
+**The ruling.** The outcome in #1927's body, which the operator confirmed on 2026-10-08 («Operator ruling — 2026-10-08»): *a declared polygon whose vertices, already placed, form a crossed ring is refused naming the declaration, in every builder, with analytic's `errRingContradictsNoun`. Never green, never a raw error.* The text ships verbatim, including «או לשנות את השיעורים», which does not fit 2-D; a coordinate-free variant is his call (lock note on #1927).
+
+**Measured before** (`main` @ 5edeeca1, `decideDeterministic2D` → `commitVerdict` → the App's `runViewResolve`, no model call):
+
+| sequence | before |
+| --- | --- |
+| «ריבוע ABCD · מרובע ACBD», «מלבן ABCD · מרובע ABDC», «ריבוע ABCD · AB = 4 · מרובע ACBD», the parallelogram, rhombus, trapezoid and kite rows, «משולש ABC · D אמצע BC · E אמצע AC · מרובע ABED», «משושה משוכלל ABCDEF · מרובע ACFD» | committed; the crossed ring drawn with «לא נמצאה תצורה…» (the post-commit search exhausted, 1 ms–2.5 s) |
+| «מחומש משוכלל ABCDE · מחומש ACEBD» (a pentagram) | committed **green, no note** — a generic `polygon` is outside `POLYGON_SHAPES`, so `polygonsConvex` never looked at it |
+| «מלבן ABCD · טרפז ABDC», «ריבוע ABCD · טרפז ACBD», «ריבוע ABCD · מקבילית ACBD» | refused raw: «D/B כבר מוגדרת ולא ניתן להגדיר אותה מחדש…» (ADR-157's vertex-set test) |
+| «מרובע ACBD · ריבוע ABCD», «מרובע ABDC · מלבן ABCD», «טרפז ABDC · מלבן ABCD» (ring first) | refused raw: «C כבר מוגדרת…» |
+
+In every member the ring crosses at every sample of the prior figure's pool (3/3 determined, 16/16, or 32/32 for the kite). The controls do not: «ריבוע ABCD · מרובע ADCB» 0/3, the midpoint ring ABDE 0/16, and a ring with a free vertex 4–9 of 15–16.
+
+**The class (docs/17 §1).** *A polygon declared over points the figure has already placed is accepted without asking whether those points, in that order, can form a simple ring in any configuration.* The convexity requirement (FR-EN-16, `polygonsConvex`) only steers the post-commit search, which exhausts into the note, and does not cover a top-level `polygon` at all; a specific noun instead meets ADR-157's vertex-set test, which reads ABDC as "the declared ABCD" and answers with a raw redefinition.
+
+**Decision.** `forcedCrossedRing(facts, commands, seed)` in `src/replay/core.ts`, beside `impliedByPrior` and asking the same pool:
+
+1. **The rings** are the ones the line declares: `declaredRings(cmd)` (a named shape, directly or through its macro expansion) plus a top-level `polygon` of 4 or more ids, kept only when every vertex is already placed before the step. A vertex the line itself creates makes the ring a configuration choice, never this question.
+2. **Prefilter:** a ring simple in the figure on screen is simple in at least one configuration, so it costs one test and no pool.
+3. **The forced reading:** the prior figure's `sharedSamples(facts, { deadlineMs })` (the UI-thread narrow gate `impliedByPrior` uses — M3, no new search). The ring is refused only when it **properly** crosses at every sample, under `forcedCrossingKeys`'s floor (a determined pool, or at least 4 samples). Proper means two non-adjacent sides meet at a point interior to both, with a tolerance relative to the ring's extent; `ringSimple` counts a touch as a crossing, and a touching vertex must never be refused. The prior pool is sound because the line's own constraints only narrow the configurations; it also covers the ring-first rows, where the earlier ring holds the points simple in its order and the shape's ring crosses at 16/16.
+4. **Fails open** on a thin pool, a sample missing a vertex, or any throw: the line goes on as today.
+5. **Both commit seams** (ADR-W-006): `decideFromParse` after the clause-coverage gate and before the prefold and the first `dryRunOutcome`, refusing `conflict` with log `ring-contradicts-noun` and note `input.ringContradictsNoun` (`detail` = the line), never escalating; `runEditCommit`, beside `impliedByPrior` against the prefix facts, with the same text as the inline note. The test helper `gateVerdict` mirrors the submit seam (reason `crossed-ring`).
+6. **The key** `input.ringContradictsNoun` (he + en) is analytic's `errRingContradictsNoun`, word for word (`src-analytic/i18n/index.ts`).
+
+The predicate is 2-D's own. `BOUNDARIES.json` classes engine layers `copied-never-shared`, as ADR-W-115 did for the flat family; 3-D and analytic answer the same question in their own trees (#1927 items B and C).
+
+**Measured after** (the same path): every row in the table above is refused at its last line with the exact He and En text, nothing is committed, the prior figure does not move, and the model is never called. The controls (ADCB, ABDE, «משולש ABC · נקודה D · מרובע ABCD», «קטע AC · קטע BD · מרובע ABCD», four points on a circle) commit as before.
+
+**False-refusal sweep and cost (#1874, "we cannot slow down anything").** Every step of every 2-D scenario in the four corpus chunks and every saved fixture in `src/__tests__/fixtures/` (1,537 lines) was run through `forcedCrossedRing` against its own prefix. **One hit:** corpus-3's `cyclic-quad-existing-vertices` typed «מרובע ABDE בר חסימה» with A on CD and B on CE — the cevians BD and EA cross in every configuration, and main drew it crossed with «לא נמצאה תצורה…», so it is a member of the class, not a false refusal. That scenario guards ADR-041's concyclic constraint, which is order-free; it is locked on the simple ring ABED (builds at main and now) and asserts the ABDE refusal (updated in place, the ruling cited). Cost: a line that declares no ring returns before any work (the replay moved behind the ring read); over the 1,537 lines the predicate took 13 ms in all, at most 2.8 ms on one line («מרובע EBAD חסום במעגל O»). On the members the pool costs 0–340 ms (the kite), where the post-commit search it replaces cost 1 ms–2.5 s and ended in the note.
+
+**Locks.** `src/app/__tests__/issue-1927-crossed-ring.test.ts` (through `runSubmit` with the App's resolve wiring and through `runEditCommit`; every member both orders, the pentagram, the exact texts, the controls, the ✎ seam). Scenario `crossed-ring-over-placed-points-1927` (corpus 4). Parity rows `crossed-ring-1927-01…07` (`-01…-05` carry known gaps for analytic and 3-D, owned by #1927).
+
+**Coordination.** #1914 (a lowering for a shape over existing vertices) must compare rings by `ringKey` (cyclic order), never by vertex set, or «מרובע ABDC · מלבן ABCD» could "refine" a ring in another order. This check runs before the dry run either way.
+
+**Behaviour change for a student:**
+- «ריבוע ABCD · מרובע ACBD» (and every row above, in both orders, and the pentagram) is refused on the last line with «הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "מרובע ACBD". …» instead of a folded drawing, a green pentagram or «D כבר מוגדרת…».
+- The ✎ editor refuses the same edit inline with the same text.

@@ -55,6 +55,7 @@ import { parse } from '@/parser';
 import { COLLAPSED_VS, computeValues, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
 import { drivenSolveStats } from '@/engine/evaluate';
+import i18n from '@/i18n';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -3758,6 +3759,32 @@ export const SCENARIOS_4: Scenario[] = [
       }
       // the control: a plain trapezoid in a circle still commits
       expect(gateVerdict(factsOf(['טרפז ABCD']), 'ABCD חסום במעגל').kind, '«טרפז ABCD» · «ABCD חסום במעגל» commits').toBe('commit');
+    },
+  },
+  {
+    id: 'crossed-ring-over-placed-points-1927',
+    title: '#1927 (ADR-608): «ריבוע ABCD · מרובע ACBD», «מלבן ABCD · מרובע ABDC», «מלבן ABCD · טרפז ABDC» — the ring over the placed points crosses in every configuration, so the last line is REFUSED quoting it (analytic’s errRingContradictsNoun, verbatim); the simple order builds',
+    guards:
+      "Operator ruling on #1927: *\"refused naming the declaration, in every builder, with analytic's errRingContradictsNoun … Never green, never a raw error\"*. Measured on 5edeeca1 through decideDeterministic2D → commitVerdict → the App's runViewResolve: «מרובע ACBD» / «מרובע ABDC» committed, the crossed ring drawn with «לא נמצאה תצורה…»; «טרפז ABDC» refused raw «D כבר מוגדרת…» (ADR-157); the pentagram «מחומש ACEBD» drawn green with no note. Root cause: a polygon declared over points the figure already placed was accepted without asking whether those points, in that order, can form a simple ring in ANY configuration — the convexity requirement only steered the post-commit search, and did not cover a generic polygon at all. Fix (ADR-608): `forcedCrossedRing`, impliedByPrior's refutation twin over the same prior sample pool, refuses at both commit seams before the dry run. The class matrix (every member both orders, the pentagram, the ✎ seam, the free-vertex controls) is src/app/__tests__/issue-1927-crossed-ring.test.ts.",
+    // The refused lines never become facts, so they are driven through the submit gate in `check`, not listed as steps.
+    steps: ['ריבוע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      // bidi isolates around the labels stripped (the i18n post-processor adds them for display)
+      const bare = (x: string) => x.replace(/[⁦-⁩]/g, '');
+      const he = (line: string) => bare(i18n.t('input.ringContradictsNoun', { detail: line, lng: 'he' }));
+      const en = (line: string) => bare(i18n.t('input.ringContradictsNoun', { detail: line, lng: 'en' }));
+      for (const [prefix, line] of [['ריבוע ABCD', 'מרובע ACBD'], ['מלבן ABCD', 'מרובע ABDC'], ['מלבן ABCD', 'טרפז ABDC']] as const) {
+        const facts = factsOf([prefix]);
+        const shown = replay(facts).positions;
+        const v = gateVerdict(facts, line);
+        expect(v.kind === 'refused' && v.reason, `«${prefix} · ${line}»: the last line is refused before it becomes a fact`).toBe('crossed-ring');
+        expect(replay(facts).positions, 'the prior figure does not move').toEqual(shown);
+        expect(he(line)).toBe(`הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "${line}". אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את השיעורים — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`);
+        expect(en(line)).toBe(`The points you gave do not form that shape in this order: "${line}". Reorder the letters so the sides do not cross, or change the coordinates — as written the vertices fall on one line or the shape folds over itself.`);
+      }
+      // the control: the square's own points in a simple order still build
+      expect(gateVerdict(factsOf(['ריבוע ABCD']), 'מרובע ADCB').kind, '«מרובע ADCB» commits').toBe('commit');
     },
   },
 ];

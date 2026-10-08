@@ -867,8 +867,9 @@ avoids `ctx.points`, so the second circle gets a fresh centre (P).
 **Asserts:** all steps OK; two distinct centres O, P exist; triangle ABC's three vertices lie on the 2nd circle (centre P).
 
 ### `cyclic-quad-existing-vertices` — inscribing a quad whose 4 vertices already exist (ADR-041)
-**Steps:** `משולש CED`, `A על CD`, `B על CE`, `מרובע ABDE בר חסימה` (the last is the LLM canonical line for
-"מרובע ABDE חסום במעגל", re-parsed with context).
+**Steps:** `משולש CED`, `A על CD`, `B על CE`, `מרובע ABED בר חסימה` (the last is the LLM canonical line for
+"מרובע ABED חסום במעגל", re-parsed with context). Until #1927 (ADR-608) the ring was written ABDE, which crosses in every
+configuration and is now refused at the door — the check asserts that refusal; concyclicity is order-free.
 **Guards against:** the quad re-placing A, B, D, E as **fresh on-circle points** — detaching A from segment
 CD and B from CE. The new `concyclic` constraint instead draws/hides the circumcircle through three of them
 and drives a free DOF (A's slide on CD) until all four share the circle.
@@ -1752,3 +1753,6 @@ over all four (ADR-041).
 ### `right-trapezoid-circle-refused-1918` — «טרפז ישר זווית ABCD» with «ABCD חסום במעגל», in either order, is refused naming both statements (#1918, ADR-607)
 
 **Guards against:** the not-cyclic check reading the noun and the circle only inside one sentence. The operator's ruling (2026-10-08, "Refuse in both"): a circle through a right trapezoid's vertices makes it a rectangle, so 2-D no longer draws the rectangle with an amber warning. **Asserts** that in both orders the second line is refused by the submit gate with the exact Hebrew «לא ניתן: «X» סותר את «Y» — … הסיבה: מעגל שעובר דרך ארבעת הקודקודים הופך טרפז ישר זווית למלבן, ומלבן אינו טרפז ישר זווית.», and that a plain trapezoid in a circle still commits. The class matrix (every inscription spelling, a ring's letters in another order, English, a saved figure re-lowered on load, the angle-route amber unchanged, the prover on hand-built constructions) is `src/app/__tests__/issue-1918-right-trapezoid-circle.test.ts`.
+### `crossed-ring-over-placed-points-1927` — «ריבוע ABCD · מרובע ACBD»: a ring over the placed points that crosses in every configuration is refused, quoting the line (#1927, ADR-608)
+
+**Guards against:** a polygon declared over points the figure already placed, in an order whose sides cross in every configuration, being drawn folded over itself (with «לא נמצאה תצורה…», or green with no note for a generic polygon), or refused with a raw «D כבר מוגדרת…». **Asserts** that «מרובע ACBD» on a square, and «מרובע ABDC» and «טרפז ABDC» on a rectangle, are refused by the submit gate before they become facts, that the prior figure does not move, and that the He and En texts are analytic's `errRingContradictsNoun` word for word; «מרובע ADCB» still commits. The class matrix (every member both orders, the pentagram, the ✎ seam, the free-vertex controls) is `src/app/__tests__/issue-1927-crossed-ring.test.ts`.

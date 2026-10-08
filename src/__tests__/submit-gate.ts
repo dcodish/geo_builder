@@ -26,7 +26,7 @@
  * throws (the #567 layering split that created `scenario-pipeline.ts`).
  */
 import { parse, droppedNewLabels, droppedGivenNumbers } from '@/parser';
-import { useGeoStore, dryRunOutcome, deferralWorthwhile, replay, seatSweepWarmup } from '@/store/geoStore';
+import { useGeoStore, dryRunOutcome, deferralWorthwhile, forcedCrossedRing, replay, seatSweepWarmup } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
 import { ctxOf } from './scenario-pipeline';
@@ -41,7 +41,10 @@ export type GateRefusal =
    *  refused pre-commit with a note, the line stays in the box, no fact and no red row */
   | 'error'
   /** parsed and committed nothing NEW: a re-entry ("already drawn") or an unreadable no-op */
-  | 'empty';
+  | 'empty'
+  /** #1927 (ADR-608): a ring declared over placed points that crosses in every configuration — refused before
+   *  the dry run with `input.ringContradictsNoun`; `detail` is the ring */
+  | 'crossed-ring';
 
 export type GateVerdict =
   | { kind: 'commit'; commands: AnyCommand[] }
@@ -63,6 +66,9 @@ export function gateVerdict(facts: Fact[], utterance: string, seed = 0): GateVer
   if (droppedNewLabels(utterance, r.commands, ctx.points ?? []).length > 0 || droppedGivenNumbers(utterance, r.commands).length > 0) {
     return { kind: 'refused', reason: 'honesty-gate' };
   }
+  // #1927 (ADR-608): the app refuses a ring over placed points that crosses in every configuration before the dry run.
+  const crossed = forcedCrossedRing(facts, r.commands, seed);
+  if (crossed) return { kind: 'refused', reason: 'crossed-ring', detail: crossed.join('') };
   // #1671 (ADR-584): the app warms the seat sweep's rotated folds (in the worker) before the dry run — mirrored here.
   for (const fc of seatSweepWarmup(facts, r.commands, seed)) replay(fc, seed);
   const outcome = dryRunOutcome(facts, r.commands, seed);
