@@ -1373,7 +1373,7 @@ function honestyRefusal3(
   commands: readonly Command3[],
   st: { facts: Fact3[]; seed: number },
   readExtent: boolean,
-  unread: readonly string[] = [],
+  unreadWords: readonly string[] = [],
 ): NonNullable<StoreError3> | null {
   const prior = derive3(st.facts, st.seed).construction;
   const roles = readExtent ? unreadRoles3(utterance, commands) : null;
@@ -1390,7 +1390,7 @@ function honestyRefusal3(
     const note = lostRole3(utterance, commands, roles, proves);
     if (note) return note;
   }
-  const lost = lostGivens3(utterance, commands, prior, unread);
+  const lost = lostGivens3(utterance, commands, prior, unreadWords);
   const unread = readExtent ? unreadParts3(utterance, commands, [...prior.points.keys()]) : null;
   if (unread?.cut) return lostPart3(unread.cut);
   const items = [...lost, ...(unread?.unread ?? []).map((o) => o.text), ...(roles?.unread ?? []).map((o) => o.text)].filter((x, i, a) => a.indexOf(x) === i);

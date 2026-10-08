@@ -59,6 +59,15 @@ export const SOLID_QUALIFIER_HE = [
   String.raw`(?<![א-ת])(?:ש?כל\s+)?מקצועות(?:יו|יה)?\s+שוו(?:ים|ות|ה)?(?:\s+זה\s+לזה)?(?![א-ת])`,
 ].join('|');
 
+/**
+ * The qualifier WORDS (rightness, the equal-sides family, the edge family). The declaration gate never reads these
+ * word by word any more (#1902, ADR-3D-312: it reads phrases, `SOLID_QUALIFIER_HE` + `SHAPE_ADJ_WORDS3`); the one
+ * reader left is the read-extent scene exemption (#1888, ADR-3D-316, `unreadParts3`), where they may follow a scene noun.
+ */
+export const QUALIFIER_HE = [
+  'ישר(?:ה|ים|ות)?', 'זו?וית', 'זו?ויות', 'שוו?ה', 'שוו[יו]ם', 'צלעות', 'שוקיים', 'מקצועות(?:יו|יה)?',
+];
+
 /** The base clause and a solid's own parts. */
 export const PART_HE = ['שבסיס[הו]', 'בסיס(?:ה|ו|ים)?', 'קודקוד(?:ה|ו|ים)?', 'פאה', 'פאות'];
 
