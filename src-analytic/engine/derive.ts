@@ -8,7 +8,7 @@
  */
 import { fold, existingKindOf, type ApplyError, type ApplyNotice } from './apply';
 import { reportedDof } from './carriers';
-import { collapsedByGivens, completingStatement, drawableAt, holdsOn, viewBox, type Figure } from './evaluate';
+import { collapsedByGivens, completingStatement, drawableAt, hardRingFaults, holdsOn, viewBox, type Figure } from './evaluate';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
 import { resolveToolLetters } from './toolLetters';
@@ -473,9 +473,16 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    *
    * `ringFaultsOf` has SEEN this since #1158/#1166; `drawableAt` uses it to choose a configuration,
    * which is what fixed both of those. What was missing is the case where there is nothing to
-   * choose: every figure this fires on has **`reportedDof = 0`**, because with the preference in the
-   * search a figure that still has freedom never arrives here carrying a ring fault. The student
+   * choose: the RING has no freedom left (`RingFault.ringDof === 0`, #1929, ADR-AG-249). The student
    * pinned the coordinates, and those coordinates are what make the ring collapsed or crossed.
+   *
+   * **The ring's own freedom, never the figure's** (#1929). This arm used to wait for the whole figure to
+   * reach `reportedDof = 0`, on the premise that "a figure that still has freedom never arrives here
+   * carrying a ring fault". That holds only when the freedom belongs to the ring: «נקודה Q» typed first —
+   * or a free circle, a free line, an unrelated triangle — left the figure 1–2 DOF and the same pinned
+   * bow-tie recorded green. `evaluate`'s `freedomOf` measures the ring's vertices alone, rank-aware, so a
+   * freedom elsewhere cancels out and a vertex pinned by two lines, a midpoint or a parameter counts as what
+   * it is. A ring that can still move (`ringDof > 0`) is the configuration search's business, as before.
    *
    * That is also why the message is about the RING and not about a failed search:
    * «לא נמצאה תצורה שבה מתקיים» would be false on a determined figure — there was only ever one
@@ -500,10 +507,10 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * a true trapezoid wherever one exists (`drawableAt`'s `whole()`), and when none does the figure is
    * drawn and `app/shapeWarnings.ts` names the trapezoid and the line that forced it.
    */
-  if (completing === null && figure.ringFaults.length > 0 && reportedDof(construction, figure.carrierDof) === 0) {
+  const pinnedRingFaults = hardRingFaults(figure).filter((rf) => rf.ringDof === 0);
+  if (completing === null && pinnedRingFaults.length > 0) {
     const alreadyFaulted = new Set(faults.map((f) => f.index));
-    for (const rf of figure.ringFaults) {
-      if (rf.violation === 'trapezoid-is-parallelogram') continue; // drawn with a warning, never refused
+    for (const rf of pinnedRingFaults) {
       const declared = declaredPolygonOn.get(rf.id);
       if (declared === undefined) continue; // no line owns it — nothing honest to say about it
       /**

@@ -78,6 +78,13 @@ export interface RingFault {
   id: Id;
   noun?: string;
   violation: RingViolation;
+  /**
+   * The RING'S OWN freedom in this configuration (#1929, ADR-AG-249): how far its vertices can still move under
+   * the constraints, whatever the rest of the figure does. Filled by `evaluate` for a HARD fault only (a valid
+   * figure pays nothing), lazily and non-enumerable (`evaluate`'s `withRingDof`); `0` is a ring the givens pin, which
+   * `derive` refuses. Absent: not measured.
+   */
+  ringDof?: number;
 }
 
 /**

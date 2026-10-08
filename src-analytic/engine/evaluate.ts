@@ -656,6 +656,68 @@ function figureDofOf(c: Construction, sys: CarrierSystem, x: number[]): number {
 }
 
 /**
+ * A HARD ring fault carries the ring's OWN freedom (#1929, ADR-AG-249), so `derive` refuses a ring the givens pin
+ * whatever else in the figure is free. A valid ring, or the trapezoid warning, pays nothing.
+ *
+ * **Measured LAZILY, once** (#1874, *"we cannot slow down anything"*): `drawableAt`'s walk evaluates many candidates
+ * that carry a crossed ring and are discarded; ranking each one cost a crossed-parallelogram submit ~2 ms of 5.
+ * Only the figure `derive` keeps is ever asked. Non-enumerable, so a fault still compares and serialises as the
+ * three fields it always had.
+ */
+function withRingDof(rf: RingFault, c: Construction, sys: CarrierSystem, x: number[]): RingFault {
+  if (!isHardRingFault(rf)) return rf;
+  const o = objectById(c, rf.id);
+  if (!o || o.kind !== 'polygon') return rf;
+  const vertices = o.vertices;
+  let memo: { v: number | undefined } | undefined;
+  Object.defineProperty(rf, 'ringDof', {
+    enumerable: false,
+    get: () => {
+      if (!memo) {
+        const dof = freedomOf(c, sys, x, (pos) =>
+          vertices.flatMap((v) => {
+            const p = pos.get(v);
+            return p ? [p.x, p.y] : [Number.NaN, Number.NaN];
+          }),
+        );
+        memo = { v: dof === null ? undefined : dof };
+      }
+      return memo.v;
+    },
+  });
+  return rf;
+}
+
+/**
+ * THE FREEDOM OF ONE PART OF THE FIGURE (#1929, ADR-AG-249) — how many directions the quantities `read` returns can
+ * still move in under the constraints, whatever the rest of the figure does.
+ *
+ * Computed as the figure's freedom minus its freedom with `read`'s values held as well: `figureDofOf` −
+ * `freeRank` over the equations plus `read`'s rows. Rank-aware, so a vertex pinned by two lines, a derived vertex
+ * and a parameter-carrying point all count as what they are; and a freedom ELSEWHERE (an unrelated free point, a
+ * free circle) cancels out of the difference. `read` is generic: the ring's vertices for #1929, a line's own
+ * position for its sibling (#1932). `null` when `read` cannot place a value near `x`.
+ */
+export function freedomOf(
+  c: Construction,
+  sys: CarrierSystem,
+  x: number[],
+  read: (pos: Map<Id, Pt>, env: Env) => number[],
+): number | null {
+  const all = figureDofOf(c, sys, x);
+  if (all === 0) return 0;
+  /** A value `read` cannot place in some nearby configuration is UNMEASURED (`null`), never "held": a NaN row would
+   *  poison the rank and read as no freedom, which is the false refusal this must never produce. */
+  let unplaced = false;
+  const held = freeRank(x, (v) => {
+    const rows = read(sys.positionsAt(v), sys.envAt(v));
+    if (rows.some((n) => !Number.isFinite(n))) unplaced = true;
+    return [...sys.equalitiesAt(v), ...rows.map((n) => (Number.isFinite(n) ? n : 0))];
+  });
+  return unplaced ? null : Math.max(0, all - held);
+}
+
+/**
  * Do the branch selectors hold here?
  *
  * They consume no freedom, so they cannot be solved FOR — they are a filter over configurations the
@@ -2788,7 +2850,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
         const p = points.find((q) => q.id === id);
         return p ? { x: p.x, y: p.y } : undefined;
       },
-    ),
+    ).map((rf) => withRingDof(rf, c, sys, [...solvedVec])),
     carrierDof: figureDofOf(c, sys, solvedVec),
     ...(collapsedRings.length > 0 ? { collapsedRings } : {}),
     usedSymbols: [...usedSymbols(c)],

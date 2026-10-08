@@ -761,6 +761,12 @@ loop and skips lines already in `faults`. A collapse the givens force is `polygo
 ([ADR-AG-247](06c-decisions-analytic.md#adr-ag-247): `Figure.collapsedRings`, `collapsedByGivens(c, seed)`,
 `errPolygonCollapsed`). A fault is also the refusal: `decideSubmit` refuses when one lands on the new line.
 
+**The pinned-ring arm reads the RING'S freedom, never the figure's** ([ADR-AG-249](06c-decisions-analytic.md#adr-ag-249), #1929).
+`evaluate` gives each HARD ring fault `RingFault.ringDof` = `freedomOf(c, sys, x, read)` with `read` = the ring's vertex
+coordinates: `figureDofOf` − `freeRank` over the equations plus `read`'s rows, so freedom elsewhere cancels and a derived
+or line-pinned vertex counts as what it is. It is a lazy, non-enumerable getter (only the figure `derive` keeps is
+ranked; a discarded walk candidate pays nothing). The arm fires on `hardRingFaults(figure)` with `ringDof === 0`.
+
 *Identifiers:* `seed … seed + DRAWABLE_TRIES` · `shape` · `declared` · `degenerate` · `crossed` · `ring-contradicts-noun` · `InputError`
 
 ### A forced coincidence is refused; a configuration-dependent one is not ([ADR-AG-125](06c-decisions-analytic.md#adr-ag-125))
