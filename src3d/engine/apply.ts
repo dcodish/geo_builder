@@ -11,7 +11,7 @@ import { FREE_LINE_TOKEN } from './freeLine';
 import { riderPairsT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { CYCLIC_MEMBER, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, QUAD_PYRAMIDS, quadCornerDef, quadImplies, quadPyramidDimCount, quadsDisjoint, quadShapeConstraints, type QuadBase } from './baseShapes';
+import { CYCLIC_MEMBER, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadImplies, quadPyramidDimCount, quadsDisjoint, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import { firstFreeLetter } from './freeLetter';

@@ -25,7 +25,7 @@ import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind,
 import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX } from '../lexicon/nouns3';
 import { foldPrimes3, VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
-import { POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_EN_ANY3, SHAPE_ADJ_WORDS3, statedPolygonArity3, type ShapeAdj3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
+import { POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_WORDS3, statedPolygonArity3, type ShapeAdj3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
 // #1545 (ADR-3D-300): the ONE prime fold lives in the vocabulary leaf; re-exported so every parser-side
 // reader (the ask lane, the LLM sequence gate) reaches it through the normaliser that applies it.
 export { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';

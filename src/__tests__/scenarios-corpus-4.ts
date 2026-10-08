@@ -55,7 +55,6 @@ import { parse } from '@/parser';
 import { COLLAPSED_VS, computeValues, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
 import { drivenSolveStats } from '@/engine/evaluate';
-import i18n from '@/i18n';
 
 export const SCENARIOS_4: Scenario[] = [
   {
