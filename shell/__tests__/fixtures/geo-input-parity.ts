@@ -1178,6 +1178,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'trapezoid-1918-redeclare', family: 'polygons', steps: ['מקבילית ABCD', 'טרפז ABCD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1926' }], note: 'no quadrilateral is both' },
   { id: 'trapezoid-1918-redeclare-rev', family: 'polygons', steps: ['טרפז ABCD', 'מקבילית ABCD'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1926' }] },
   // end #1918
+  // #1923 (ADR-3D-314, ADR-AG-129): a polygon declared over coordinate points whose ring crosses itself is refused in
+  // analytic's words. Coordinates are X1 (2-D has no coordinate frame).
+  { id: 'crossed-ring-1923', family: 'topic', steps: ['טרפז ABCD', 'A(0,0)', 'B(4,0)', 'C(1,3)', 'D(3,3)'], contextFor: { '2d': ['טרפז ABCD'] }, expect: 'refused', exception: 'X1', only: ['analytic'], note: 'the coordinate that makes sides BC and DA cross is refused; 3-D (z = 0, both orders) is locked in issue-1923-crossed-ring.test.ts; 2-D refuses the coordinate itself (X1)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

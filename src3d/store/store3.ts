@@ -31,13 +31,13 @@ import { findProofTarget } from '../../shell/proofTarget';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, freeDims } from '../engine/apply';
-import { spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
+import { declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { scalePinned } from '../engine/solve3';
 import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
-import { dot3, norm3, sub3, type Vec3 } from '../engine/vec3';
+import { dot3, norm3, ringSelfCrossing3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
 import { meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
 import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
@@ -371,6 +371,66 @@ const paramPinKey = (c: Construction3): string =>
  * a seed sweep touches many seeds, and 32 entries cover the ADR-3D-053 search window.
  */
 const deriveMemo3 = new WeakMap<readonly Fact3[], Map<number, Derived3>>();
+
+/**
+ * The 0-DOF DERIVED point kinds (#769, ADR-3D-183) — a point placed by a closed form from other objects. A free
+ * rider of the same kind (`on-segment` with no `t`, `scaled-offset` with no `k`) is NOT derived; each reader
+ * excludes it. Read by the derived-point coincidence refusal and by #1923's coordinate-fixed test.
+ */
+const DERIVED_POINT_KINDS3: ReadonlySet<string> = new Set([
+  'on-segment', 'seg-cross', 'centroid', 'in-span', 'right-apex', 'foot-plane', 'foot-line', 'line-plane', 'plane-cut',
+  'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'vec-defined', 'vec-pair',
+  // #984: the parallelogram corner was a `vec-defined` point until ADR-3D-257 gave it its own
+  // kind — it stays in this set, or the rename would silently drop its coincidence refusal.
+  'parallelogram-point',
+  // #985: its released-ratio twin — derived only when the ratio is STATED; free-ratio is a rider (below).
+  'scaled-offset',
+]);
+
+/**
+ * #1923 (ADR-3D-314) — is this point FIXED BY COORDINATES, and by which facts? The ruled scope of the crossed-ring
+ * refusal ("fixed points"): such a point cannot move, so the drawn ring is the only ring. A point is fixed when
+ *  - it was minted at numeric coordinates (`coord`);
+ *  - a recorded coordinate given states all three components (`coords-eq`, verified by the claim pass); or
+ *  - it is a 0-DOF DERIVED point whose every input is a point fixed in the same sense (a midpoint of two
+ *    coordinate points). An input that is not a point (a plane, a line, a symbol) is not judged: not fixed.
+ * Never a measurement — a point that merely sits still at this seed is not fixed. Returns the facts that minted or
+ * placed it (for the blame: the LATEST of them completed the ring), or null when it is not fixed.
+ */
+function coordinateFixers3(c: Construction3, facts: readonly Fact3[], id: Id, seen: Set<Id> = new Set()): Set<string> | null {
+  if (seen.has(id)) return null;
+  seen.add(id);
+  const def = c.points.get(id);
+  if (!def) return null;
+  const by = new Set<string>();
+  const minter = facts.find((f) => f.enabled && f.cmds.some((k) => 'id' in k && k.id === id));
+  if (minter) by.add(minter.id);
+  const pinned = c.claims.some((k) => k.type === 'coords-eq' && k.id === id && k.x !== null && k.y !== null && k.z !== null);
+  if (pinned) {
+    for (const f of facts)
+      if (f.enabled && f.cmds.some((k) => k.type === 'point3' && k.id === id)) by.add(f.id);
+    return by;
+  }
+  if (def.kind === 'coord') return by;
+  if (!DERIVED_POINT_KINDS3.has(def.kind)) return null;
+  if (def.kind === 'on-segment' && def.t === undefined) return null; // a free rider
+  if (def.kind === 'scaled-offset' && def.k === undefined) return null; // a free-ratio corner
+  const inputs: string[] = [];
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') inputs.push(v);
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (typeof v === 'object' && v !== null) Object.entries(v).forEach(([k, x]) => k !== 'kind' && walk(x));
+  };
+  walk(def);
+  if (inputs.length === 0) return null;
+  for (const q of inputs) {
+    if (!c.points.has(q)) return null; // a plane, a line or a symbol: not judged here
+    const sub = coordinateFixers3(c, facts, q, seen);
+    if (!sub) return null;
+    sub.forEach((x) => by.add(x));
+  }
+  return by;
+}
 
 export function derive3(facts: Fact3[], seed: number): Derived3 {
   const per = deriveMemo3.get(facts);
@@ -797,6 +857,51 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
         : { code: 'givens-contradict', stated: f.utterance, others: namedStatements(pinOwnerIds, blamedPinOwner) };
   }
 
+  /**
+   * #1923 (ADR-3D-314) — A DECLARED POLYGON OVER POINTS FIXED BY COORDINATES MUST BE A SIMPLE RING. Analytic's
+   * ADR-AG-129 in R³: «A(0,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD» names a ring whose sides BC and DA
+   * cross — not a trapezoid, not any quadrilateral — and it recorded green. Every declared ring is asked, in the
+   * order its declaration named it: a flat polygon (created, or bound over existing points) and a stated quad shape
+   * (`declaredQuads3`; a pyramid's base is generated simple). Only when EVERY vertex is coordinate-fixed
+   * (`coordinateFixers3`) — such a ring cannot move, so the drawn ring is the only one; a ring with a free vertex is
+   * the configuration preference's business, never a refusal. The line that COMPLETED it is refused: the latest of
+   * the declaration and the statements that fixed its vertices. Run after the claim pass, so a truer message (a
+   * rectangle's own claim refuted) wins, as in analytic.
+   */
+  {
+    const rings: Id[][] = [
+      ...c.solids.filter((s) => s.kind === 'polygon4' || s.kind === 'polygon5').map((s) => s.ids),
+      ...c.claims.flatMap((k) => (k.type === 'polygon-open' && k.ids.length >= 4 ? [k.ids] : [])),
+      ...declaredQuads3(c).filter((q) => q.solid === undefined).map((q) => [...q.ids]),
+    ];
+    const sameRing = (x: readonly Id[], y: readonly Id[]) => x.length === y.length && [...x].sort().join() === [...y].sort().join();
+    const declares = (k: Command3, ring: readonly Id[]) =>
+      ((k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && sameRing(k.ids, ring));
+    const seenRings = new Set<string>();
+    for (const ring of rings) {
+      if (seenRings.has(ring.join())) continue;
+      seenRings.add(ring.join());
+      const pts = ring.map((id) => positions.get(id));
+      if (pts.some((p) => !p) || !ringSelfCrossing3(pts as Vec3[])) continue;
+      const by = new Set<string>();
+      let fixed = true;
+      for (const id of ring) {
+        const f = coordinateFixers3(c, facts, id);
+        if (!f) {
+          fixed = false;
+          break;
+        }
+        f.forEach((x) => by.add(x));
+      }
+      if (!fixed) continue;
+      const declaring = facts.find((f) => f.enabled && status[f.id] === 'ok' && f.cmds.some((k) => declares(k, ring)));
+      if (declaring) by.add(declaring.id);
+      // the LATEST of them completed the ring; if that line is already red (a truer message), it keeps its own
+      const blamed = [...facts].reverse().find((f) => f.enabled && by.has(f.id));
+      if (blamed && status[blamed.id] === 'ok') status[blamed.id] = { code: 'ring-crossed', stated: blamed.utterance };
+    }
+  }
+
   // #769 (ADR-3D-183) — A DERIVED POINT THAT LANDS ON AN EXISTING NAMED POINT IS NOT MINTED. The
   // student made two claims — "there is a crossing of AC' with plane ADE" (true) and "call it G, a new
   // point" (false: it is A, which defines the plane). The refusal affirms the geometry and refuses the
@@ -805,15 +910,7 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
   // minted it), never from a list of minting command types. The judgement is the click-offer's own
   // (`namedPointAt`), so the OFFER lane and the TYPED lane answer one question the same way (#653).
   {
-    const DERIVED = new Set([
-      'on-segment', 'seg-cross', 'centroid', 'in-span', 'right-apex', 'foot-plane', 'foot-line', 'line-plane', 'plane-cut',
-      'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'vec-defined', 'vec-pair',
-      // #984: the parallelogram corner was a `vec-defined` point until ADR-3D-257 gave it its own
-      // kind — it stays in this set, or the rename would silently drop its coincidence refusal.
-      'parallelogram-point',
-      // #985: its released-ratio twin — derived only when the ratio is STATED; free-ratio is a rider (below).
-      'scaled-offset',
-    ]);
+    const DERIVED = DERIVED_POINT_KINDS3;
     const order = [...c.points.keys()];
     const minter = new Map<Id, string>();
     for (const f of facts) for (const cmd of f.cmds) if ('id' in cmd && typeof cmd.id === 'string' && !minter.has(cmd.id)) minter.set(cmd.id, f.id);

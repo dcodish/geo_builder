@@ -97,6 +97,9 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       return t('err.alreadyDefined', { id: err.id });
     // #612 (ADR-3D-158): name BOTH shapes — the honesty invariant is that a refusal names the
     // student's own statement and what the figure actually holds, never internal state.
+    // #1923 (ADR-3D-314): analytic's `errRingContradictsNoun`, word for word — the line that completed the crossing.
+    case 'ring-crossed':
+      return t('err.ringContradictsNoun', { detail: err.stated });
     case 'shape-less-specific':
       return t('err.shapeLessSpecific', { stated: t(`notice.shape.${err.stated}`), actual: t(`notice.shape.${err.actual}`) });
     // #1918 (ADR-3D-313): a noun no quadrilateral can carry together with the one already known — the same words
