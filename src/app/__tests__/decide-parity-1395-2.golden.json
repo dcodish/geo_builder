@@ -56,7 +56,7 @@
  "scenario:altitude-to-named-side": "f61afb680d5808c3",
  "scenario:named-midsegment-keeps-its-endpoint-names": "45e16b7d146fdcee",
  "scenario:named-altitude-keyword-first-keeps-foot": "06895607e951dfcc",
- "scenario:altitude-in-trapezoid-drops-to-opposite-base": "b8e3054625463f50",
+ "scenario:altitude-in-trapezoid-drops-to-opposite-base": "4cc99913cd9e269f",
  "scenario:midsegment-in-trapezoid-joins-leg-midpoints": "aa35e831233eb2e8",
  "scenario:bagrut-chord-diameter-perp-session": "47b5588035ef7756",
  "scenario:point-on-chord-named-carrier": "28410716de21cd4e",

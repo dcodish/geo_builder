@@ -67,7 +67,7 @@
  "scenario:point-on-arc-no-midpoint-word": "6a86b392367cd83a",
  "scenario:arc-resolves-to-circle-holding-both-endpoints": "a328aa382a10f14a",
  "scenario:second-inscribed-circle-fresh-centre": "aac2251d625e9afa",
- "scenario:cyclic-quad-existing-vertices": "15065be89e89587f",
+ "scenario:cyclic-quad-existing-vertices": "f690e83630d0d5ca",
  "scenario:circle-through-four-existing-points": "d927df618c91db30",
  "scenario:circumcircle-of-existing-points": "952f39387173595f",
  "scenario:alpha-less-than-beta-reshapes": "093eae5575efc565"

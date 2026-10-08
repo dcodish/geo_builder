@@ -28,7 +28,7 @@
  "scenario:area-ratio-reshapes": "b943d80bd44e3576",
  "scenario:emergent-parallelogram-between-segments": "56f3b919b2a6d513",
  "scenario:right-triangle-explicit-angle-reseats-right-vertex": "013e403625a620f7",
- "scenario:trapezoid-constraint-morph-flags-amber": "d05b05398ddaf851",
+ "scenario:trapezoid-constraint-morph-flags-amber": "5b7cd3ef7b8ae032",
  "scenario:single-vertex-angle-on-triangle-vertex": "df73c3f61e02da16",
  "scenario:circle-circumference-sizes-radius": "23749c42e64e3271",
  "scenario:tangent-circles-named-then-circumference": "42302f3ce7af6334",
@@ -170,6 +170,9 @@
  "scenario:unread-part-taught-lines-1888": "ae92885dc230764a",
  "scenario:two-roles-one-per-line-1904": "e3e336264c01258c",
  "scenario:restated-default-pair-is-recorded-1922": "bb84afabe17bef87",
+ "scenario:pentagon-incircle-refused-1891": "44a9bdb8ef6d26ae",
+ "scenario:right-trapezoid-circle-refused-1918": "bca4dfdefe34fa4e",
+ "scenario:crossed-ring-over-placed-points-1927": "cae126bc7bb65c52",
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",
  "fixture:defining-interaction.geo.json": "453b283f490e90b0",
  "fixture:equilateral-inscribed.geo.json": "d8a2b3c24fc515b8",
@@ -185,7 +188,7 @@
  "fixture:issue-1771-semicircle-three-vertices.geo.json": "b552c6788800a8ff",
  "fixture:issue-1790-incircle-right-triangle.geo.json": "be13a8024bd6f3aa",
  "fixture:issue-260-two-host-membership.geo.json": "167ca5c3e43619c1",
- "fixture:issue-497-right-trapezoid-typo.geo.json": "2038594394a49fa7",
+ "fixture:issue-497-right-trapezoid-typo.geo.json": "a45b0bed598dbd4a",
  "fixture:issue-556-two-tangents-free-apex.geo.json": "57c0f2f25d1d0349",
  "fixture:issue-572-load-collapse.geo.json": "9d868b1d175cae07",
  "fixture:issue-760-point-at-distance.geo.json": "ad608c1cc5046eb6",
@@ -197,5 +200,5 @@
  "fixture:issue-989-trapezoid-after-triangle.geo.json": "0703ef8c37579057",
  "fixture:issue-989-trapezoid-stated-pair.geo.json": "5ac9c9b206c76b86",
  "fixture:parallel-chords.geo.json": "54f8605ea57acfa6",
- "fixture:trapezoid-altitude.geo.json": "abbbf2a8308ff3fa"
+ "fixture:trapezoid-altitude.geo.json": "15aef81809001d5b"
 }
