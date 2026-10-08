@@ -166,4 +166,11 @@ export const verifyClaims = (
   claims: readonly Claim[],
   t1: Tier1Result,
   branch: Branch | undefined,
-): CheckedClaim[] => claims.map((c) => verifyClaim(c, t1, branch));
+  /** #1894 (ADR-CX-061) — letters typed as REAL parameters: «a ממשי» about one holds by its type */
+  realLetters: ReadonlySet<string> = new Set(),
+): CheckedClaim[] =>
+  claims.map((c) =>
+    c.kind === 'real' && realLetters.has(c.name)
+      ? { claim: c, verdict: { status: 'holds', why: { code: 'prop-holds', name: c.name, prop: 'real' } } }
+      : verifyClaim(c, t1, branch),
+  );

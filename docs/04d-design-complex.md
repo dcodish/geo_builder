@@ -184,6 +184,13 @@ never as a contradiction or a refutation.
   declared letter in a real slot, and it is reported against the declaration (`declared-complex-real`)
   and refused by the gate with the statement named (`complex-as-real`). The teaching note on a solved
   parameter (`app/paramNote.ts`) is offered only when the declaration it teaches passes that same gate.
+  **Every rule that would bring a name into the figure asks its type first** (`isRealLetter`, i.e.
+  `isComplexName(name, scope)`; [ADR-CX-061](06d-decisions-complex.md#adr-cx-061)): a real-parameter letter
+  is never declared. «a ממשי» reports `realTyped`, which the fold samples as a parameter and whose claim
+  holds by type and never drives; the quadrant, argument and conjugates sentences decline a real letter.
+  **There is one shape phrase, `shapePhrase()`**: the noun, and after «מצולע» the polygon-name slot
+  (`POLYGON_NAME_KW`), recognised so a name is never a vertex and left unclaimed (`shapeClaims`) until
+  G5-1 reads it.
 - **A solution set claims its names** ([ADR-CX-042](06d-decisions-complex.md#adr-cx-042)). `X^n = …` on a fresh
   letter lowers to X₁ pinned to the principal root and Xₖ pinned `(k−1)/n` of a turn from it — always,
   whether or not the student already holds some Xₖ. That makes claiming the name the consistency

@@ -214,6 +214,8 @@ export function lowerLines(
   const exprQueries: ExprQuery[] = [];
   const argQueries: ArgQuery[] = [];
   const sequences: SequenceStatement[] = [];
+  /** #1894 — real-parameter letters typed as real («a ממשי»): listed as parameters, never drawn */
+  const realTyped: string[] = [];
   const atoms = new Map<string, number>();
   const untranslated: Untranslated[] = [];
   /** #694 — the selections this figure states, each with the set it picks from. */
@@ -362,6 +364,7 @@ export function lowerLines(
     exprQueries.push(...r.line.exprQueries);
     argQueries.push(...r.line.argQueries);
     sequences.push(...r.line.sequences);
+    for (const n of r.line.realTyped) if (!realTyped.includes(n)) realTyped.push(n);
     for (const [k, v] of r.line.atoms) atoms.set(k, v);
   });
 
@@ -390,6 +393,7 @@ export function lowerLines(
     sequences,
     selections,
     solutionSets,
+    realTyped,
   };
 }
 

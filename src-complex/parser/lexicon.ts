@@ -219,6 +219,14 @@ export const QUADRILATERAL_KW = String.raw`(?:${HE_PREFIX}${MEM}רובע|quadril
 /** «מצולע» / «polygon» — any arity. */
 export const POLYGON_KW = String.raw`(?:${HE_PREFIX}${MEM}צולע|polygon)`;
 
+/**
+ * #1894 (ADR-CX-061) — a polygon's NAME, the exam's «מצולע I» / «מצולע II»: a roman numeral. The rule
+ * flags are case-insensitive, so the capture is validated case-sensitively in `rules.ts`, the way
+ * `splitRun` validates labels. Recognised only after {@link POLYGON_KW} and before a run of three or more
+ * vertices, and never claimed: until #623's G5-1 gives the name a meaning, the accountant refuses it.
+ */
+export const POLYGON_NAME_KW = String.raw`(?:[IVX]+)`;
+
 /** «מעגל» / «circle». */
 export const CIRCLE_KW = String.raw`(?:${HE_PREFIX}${MEM}עגל|circle)`;
 
@@ -405,6 +413,7 @@ export const ATOM_SOURCES: Readonly<Record<string, string>> = {
   TRIANGLE_KW,
   QUADRILATERAL_KW,
   POLYGON_KW,
+  POLYGON_NAME_KW,
   CIRCLE_KW,
   CIRCUMSCRIBED_KW,
   CENTER_KW,

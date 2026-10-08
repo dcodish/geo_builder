@@ -92,6 +92,7 @@ import {
   NEGATION_KW,
   NUMBER_NOUN_KW,
   POLYGON_KW,
+  POLYGON_NAME_KW,
   QUADRILATERAL_KW,
   RADIUS_KW,
   RUN,
@@ -117,6 +118,14 @@ import {
 } from './lexicon';
 import { normalize } from './normalize';
 import { type Claim, type Unaccounted, claimAll, unaccountedSpans } from './span';
+
+/**
+ * #1894 (ADR-CX-061) — is this (canonical) name a REAL-PARAMETER letter in this figure? A letter outside
+ * the z/w family, not a point label and not declared complex (ADR-CX-004, FR-CN-8). Every rule that would
+ * bring a name into the figure as a number asks this first: a real letter is never a point.
+ */
+const isRealLetter = (name: string, scope: ComplexScope): boolean =>
+  !isComplexName(name, scope) && isDeclarableName(name);
 
 /** A claim over `text` found at offset `at` of the normalized line. */
 const claimAt = (at: number, index: number, text: string): Claim => ({ start: at + index, end: at + index + text.length });
@@ -230,6 +239,12 @@ export interface ParsedLine {
    * fold draws a typed name as a free number only when nothing else in the figure claims the letter.
    */
   readonly typed: string[];
+  /**
+   * #1894 (ADR-CX-061) — real-parameter letters the line TYPES as real: «a ממשי» / «a מספר ממשי».
+   * Not an existence and not a point: the fold lists the letter under parameters, and its claim row
+   * is checked against the type.
+   */
+  readonly realTyped: string[];
   readonly claims: Claim[];
   /** angle atoms a cartesian literal introduced, with the degrees they stand for */
   readonly atoms: Map<string, number>;
@@ -264,6 +279,7 @@ const empty = (): ParsedLine => ({
   selections: [],
   declares: [],
   typed: [],
+  realTyped: [],
   claims: [],
   atoms: new Map(),
 });
@@ -351,7 +367,7 @@ const solutionSelection: Rule = (s) => {
 };
 
 /** F5 — «z1 ברביע הראשון» / «z1 in the first quadrant». A filter, never a driver. */
-const quadrantGiven: Rule = (s) => {
+const quadrantGiven: Rule = (s, scope) => {
   // The two languages order the noun and the ordinal differently — «ברביע הראשון» against «in the
   // first quadrant» — so the rule requires BOTH to be present in the tail rather than fixing a word
   // order. Spelling one order would refuse half the register: the ADR-3D-145 class.
@@ -373,6 +389,8 @@ const quadrantGiven: Rule = (s) => {
   const kw = rest.match(rx(QUADRANT_KW));
   if (!kw) return null;
   const name = canonName(placement.raw);
+  // #1894 (ADR-CX-061) — a quadrant is where a complex number lies; a real-parameter letter is not read
+  if (isRealLetter(name, scope)) return null;
   const found = ORDINALS.find(([re]) => re.test(rest));
   if (!found) return null;
   const ord = rest.match(found[0]);
@@ -405,17 +423,21 @@ const quadrantGiven: Rule = (s) => {
  * not say the one quantity this product is built around. A question never creates a point: the name
  * is span bookkeeping only, and an undefined name reads honestly open.
  */
-const argumentQuery: Rule = (s) => {
+const argumentQuery: Rule = (s, scope) => {
   const m = s.match(rx(`^${ARG_KW}\\s*(?:${OF_KW}\\s+)?\\(?\\s*(${NAME})\\s*\\)?$`));
   if (!m) return null;
   const name = canonName(m[1]);
-  return { ...empty(), argQueries: [{ name, src: s }], declares: [name], claims: [claimAll(s)] };
+  // #1894 — only a name the figure reads as a NUMBER is declared (asks never enact `declares` today)
+  const declares = isRealLetter(name, scope) ? [] : [name];
+  return { ...empty(), argQueries: [{ name, src: s }], declares, claims: [claimAll(s)] };
 };
 
-const argumentRelation: Rule = (s) => {
+const argumentRelation: Rule = (s, scope) => {
   const two = s.match(rx(`^${ARG_KW}\\s*(${NAME})\\s*([+-])\\s*${ARG_KW}\\s*(${NAME})\\s*=\\s*(-?\\d+)$`));
   if (two) {
     const [, a, sign, b, deg] = two;
+    // #1894 (ADR-CX-061) — an argument belongs to a complex number; a real-parameter letter is not read
+    if (isRealLetter(canonName(a), scope) || isRealLetter(canonName(b), scope)) return null;
     if (sign === '-') {
       return {
         ...empty(),
@@ -445,6 +467,7 @@ const argumentRelation: Rule = (s) => {
   const one = s.match(rx(`^${ARG_KW}\\s*(${NAME})\\s*=\\s*(-?\\d+)$`));
   if (!one) return null;
   const name = canonName(one[1]);
+  if (isRealLetter(name, scope)) return null;
   return {
     ...empty(),
     declares: [name],
@@ -527,11 +550,12 @@ const genericPolar: Rule = (s, scope) => {
 const CMP = String.raw`(?:<=|>=|≤|≥|<|>)`;
 const isBelow = (op: string): boolean => op === '<' || op === '<=' || op === '≤';
 
-const argumentInequality: Rule = (s) => {
+const argumentInequality: Rule = (s, scope) => {
   // «90 < arg z1 < 180» — a two-sided window, in the exam's own order
   const both = s.match(rx(`^(-?\\d+)\\s*(${CMP})\\s*${ARG_KW}\\s*(${NAME})\\s*(${CMP})\\s*(-?\\d+)$`));
   if (both) {
     const [, lo, opLo, name, opHi, hi] = both;
+    if (isRealLetter(canonName(name), scope)) return null; // #1894 — an argument is a complex number's
     // the left comparator points INTO the window, so «90 < arg z» is a lower bound and «90 > arg z» an upper one
     const low = isBelow(opLo) ? Number(lo) : Number(hi);
     const high = isBelow(opLo) ? Number(hi) : Number(lo);
@@ -547,6 +571,7 @@ const argumentInequality: Rule = (s) => {
   if (!one) return null;
   const [, raw, op, deg] = one;
   const name = canonName(raw);
+  if (isRealLetter(name, scope)) return null;
   return {
     ...empty(),
     declares: [name],
@@ -696,13 +721,15 @@ function refNames(e: Expr): string[] {
  * answer correct, which is the opposite of the point (`src3d/CLAUDE.md`: *"CLAIMS are the student's
  * answer, never a driver"*).
  */
-const conjugatesClaim: Rule = (s) => {
+const conjugatesClaim: Rule = (s, scope) => {
   const m = s.match(rx(`^((${NAME})\\s*${AND_KW}\\s*(${NAME}))\\s+(.*)$`));
   if (!m) return null;
   const tailAt = s.length - m[4].length;
   const conj = m[4].match(rx(CONJUGATE_KW));
   if (!conj) return null;
   const [a, b] = [canonName(m[2]), canonName(m[3])];
+  // #1894 (ADR-CX-061) — conjugates are complex numbers; a real-parameter letter is not read
+  if (isRealLetter(a, scope) || isRealLetter(b, scope)) return null;
   // #1890 (ADR-CX-060): the subject pair, the conjugate word and «זה לזה» — never the whole line, which
   // read «z1 ו-z2 אינם צמודים» as the conjugates claim and dropped «ו-|z1| = 5» after it.
   return {
@@ -724,15 +751,24 @@ const conjugatesClaim: Rule = (s) => {
  * understood; a negation, a sign, «שונה מאפס» or a second statement is left for the accountant. The
  * pair is read as typed — one assertion per subject — where the old rule dropped the second name.
  */
-const typeClaim: Rule = (s) => {
+const typeClaim: Rule = (s, scope) => {
   const m = s.match(rx(`^((${NAME})(?:\\s*${AND_KW}\\s*(${NAME}))?)\\s+${COPULA_KW}(.*)$`));
   if (!m) return null;
   const read = readProperty(s, s.length - m[4].length);
   if (!read) return null;
   const names = [m[2], m[3]].filter((n): n is string => n !== undefined).map(canonName);
+  /**
+   * #1894 (ADR-CX-061) — the subject's TYPE decides what the line is. A real-parameter letter with
+   * «ממשי» is the 02d F1 declaration of a real parameter: no point (`realTyped`, never `declares`), and
+   * the claim row stays (operator ruling 2026-10-08), checked against the type — always ✓. A real
+   * letter cannot be pure imaginary, so that line is not read.
+   */
+  const real = names.filter((n) => isRealLetter(n, scope));
+  if (real.length && read.prop !== 'real') return null;
   return {
     ...empty(),
-    declares: names,
+    declares: names.filter((n) => !real.includes(n)),
+    realTyped: real,
     assertions: names.map((name) => ({ kind: read.prop, name, src: s })),
     claims: [{ start: 0, end: m[1].length }, ...read.claims],
   };
@@ -768,11 +804,50 @@ const SHAPES: readonly (readonly [string, number | null])[] = [
   [POLYGON_KW, null],
 ];
 
-const objectLine = (o: FigureObject, s: string): ParsedLine => ({
+/** Any shape noun, as one alternation. */
+const SHAPE_NOUN = `(?:${SHAPES.map(([kw]) => kw).join('|')})`;
+/** A run of THREE or more vertices — the only thing a polygon's name may stand before. */
+const RUN3 = `${RUN_ATOM}(?:\\s*\\*?\\s*${RUN_ATOM}){2,}`;
+/** «מצולע I» before a run — the polygon-name slot (#623's G5-1 reads it; here it is recognised, not read). */
+const NAMED_POLYGON = `${POLYGON_KW}\\s+${POLYGON_NAME_KW}\\s+(?=${RUN3})`;
+
+/**
+ * #1894 (ADR-CX-061) — THE shape phrase before a run, one spelling for every sentence that names a
+ * figure: the noun, and after «מצולע» an optional NAME slot. Without the slot the run's whitespace
+ * tolerance read «מצולע I z1…z6» as a seven-vertex polygon with a free point «I». The slot is
+ * recognised so the name is never a vertex, and {@link shapeClaims} leaves it unclaimed so the
+ * accountant refuses the line naming it, until G5-1 gives the name a meaning.
+ */
+const shapePhrase = (noun: string = SHAPE_NOUN): string =>
+  noun === SHAPE_NOUN || noun === POLYGON_KW ? `(?:${NAMED_POLYGON}|${noun}\\s+)` : `${noun}\\s+`;
+
+/**
+ * The claims of a line read through {@link shapePhrase}: everything but each polygon NAME. Null when a
+ * name slot holds something that is not a roman numeral in capitals (the rule flags fold case) — the
+ * rule then declines, as it did when such a letter failed `splitRun`.
+ */
+const shapeClaims = (s: string): Claim[] | null => {
+  const holes: Claim[] = [];
+  for (const m of s.matchAll(rx(`${POLYGON_KW}\\s+(${POLYGON_NAME_KW})\\s+(?=${RUN3})`, 'giu'))) {
+    if (!/^[IVX]+$/u.test(m[1])) return null;
+    const end = (m.index ?? 0) + m[0].trimEnd().length;
+    holes.push({ start: end - m[1].length, end });
+  }
+  const out: Claim[] = [];
+  let at = 0;
+  for (const h of holes) {
+    if (h.start > at) out.push({ start: at, end: h.start });
+    at = h.end;
+  }
+  if (at < s.length) out.push({ start: at, end: s.length });
+  return out;
+};
+
+const objectLine = (o: FigureObject, s: string, claims: Claim[] = [claimAll(s)]): ParsedLine => ({
   ...empty(),
   objects: [o],
   declares: objectDeclares(o),
-  claims: [claimAll(s)],
+  claims,
 });
 
 /**
@@ -784,16 +859,19 @@ const objectLine = (o: FigureObject, s: string): ParsedLine => ({
  */
 const namedShape: Rule = (s) => {
   for (const [kw, arity] of SHAPES) {
-    const m = s.match(rx(`^${kw}\\s+(${RUN})$`));
+    const m = s.match(rx(`^${shapePhrase(kw)}(${RUN})$`));
     if (!m) continue;
     const points = splitRun(m[1]);
     if (arity !== null && points.length !== arity) return null;
     if (points.length < 2) return null;
+    const claims = shapeClaims(s);
+    if (!claims) return null;
     return objectLine(
       points.length === 2
         ? { kind: 'segment', points, src: s }
         : { kind: 'polygon', points, src: s },
       s,
+      claims,
     );
   }
   return null;
@@ -827,11 +905,10 @@ const bareRun: Rule = (s) => {
  * the register.
  */
 const circumscribedCircle: Rule = (s) => {
-  const shapeNoun = `(?:${SHAPES.map(([kw]) => kw).join('|')})`;
   const m = s.match(
     rx(
       `^${OF_A}(?:${CIRCLE_KW}\\s+${CIRCUMSCRIBED_KW}|${CIRCUMSCRIBED_KW}\\s+${CIRCLE_KW})\\s+` +
-        `${ACCUSATIVE_KW}${OF_A}(?:${shapeNoun}\\s+)?(${RUN})$`,
+        `${ACCUSATIVE_KW}${OF_A}${shapePhrase()}?(${RUN})$`,
     ),
   );
   if (!m) return null;
@@ -840,7 +917,9 @@ const circumscribedCircle: Rule = (s) => {
   // family (F11), and asserting it here would let a false statement draw a circle that fits three of
   // the four points and silently ignore the fourth.
   if (points.length !== 3) return null;
-  return objectLine({ kind: 'circumcircle', points, src: s }, s);
+  const claims = shapeClaims(s);
+  if (!claims) return null;
+  return objectLine({ kind: 'circumcircle', points, src: s }, s, claims);
 };
 
 /**
@@ -881,10 +960,9 @@ const MEASURE_NOUNS: readonly (readonly [string, MeasureKind])[] = [
  * is why there is no second sentence shape for "verify that the area is 150r²".
  */
 const measureRelation: Rule = (s, scope) => {
-  const shapeNoun = `(?:${SHAPES.map(([kw]) => kw).join('|')})`;
   for (const [kw, kind] of MEASURE_NOUNS) {
     const m = s.match(
-      rx(`^${kw}\\s+${ACCUSATIVE_KW}${OF_A}(?:${shapeNoun}\\s+)?(${RUN})\\s*${EQUATES_KW}\\s*(.+)$`),
+      rx(`^${kw}\\s+${ACCUSATIVE_KW}${OF_A}${shapePhrase()}?(${RUN})\\s*${EQUATES_KW}\\s*(.+)$`),
     );
     if (!m) continue;
     const points = splitRun(m[1]);
@@ -895,11 +973,13 @@ const measureRelation: Rule = (s, scope) => {
     if (!rhs) return null;
     // #1405 — a length, perimeter or area is a real magnitude; a bare complex number is not a value of one
     if (hasBareComplexRef(rhs)) return null;
+    const claims = shapeClaims(s);
+    if (!claims) return null;
     return {
       ...empty(),
       measures: [{ kind, points, rhs, src: s }],
       declares: points.filter((n) => !isOrigin(n)),
-      claims: [claimAll(s)],
+      claims,
     };
   }
   return null;
@@ -912,19 +992,20 @@ const measureRelation: Rule = (s, scope) => {
  * only a sentence that states none is read as a question.
  */
 const measureQuery: Rule = (s) => {
-  const shapeNoun = `(?:${SHAPES.map(([kw]) => kw).join('|')})`;
   for (const [kw, kind] of MEASURE_NOUNS) {
-    const m = s.match(rx(`^${kw}\\s+${ACCUSATIVE_KW}${OF_A}(?:${shapeNoun}\\s+)?(${RUN})$`));
+    const m = s.match(rx(`^${kw}\\s+${ACCUSATIVE_KW}${OF_A}${shapePhrase()}?(${RUN})$`));
     if (!m) continue;
     const points = splitRun(m[1]);
     const arity = MEASURE_ARITY[kind];
     if (points.length < arity.min) return null;
     if (arity.exact !== undefined && points.length !== arity.exact) return null;
+    const claims = shapeClaims(s);
+    if (!claims) return null;
     return {
       ...empty(),
       queries: [{ kind, points, src: s }],
       declares: points.filter((n) => !isOrigin(n)),
-      claims: [claimAll(s)],
+      claims,
     };
   }
   return null;
@@ -938,26 +1019,26 @@ const measureQuery: Rule = (s) => {
  * spelled twice — a second spelling is how the two would come to disagree about what «היקף» means.
  */
 const measureRatio: Rule = (s) => {
-  const shapeNoun = `(?:${SHAPES.map(([kw]) => kw).join('|')})`;
-  const phrase = `(?:${MEASURE_NOUNS.map(([kw]) => kw).join('|')})\\s+${ACCUSATIVE_KW}${OF_A}(?:${shapeNoun}\\s+)?${RUN}`;
+  const phrase = `(?:${MEASURE_NOUNS.map(([kw]) => kw).join('|')})\\s+${ACCUSATIVE_KW}${OF_A}${shapePhrase()}?${RUN}`;
   const m = s.match(rx(`^${OF_A}${RATIO_KW}\\s+${BETWEEN_KW}(${phrase})\\s+${TO_KW}(${phrase})$`));
   if (!m) return null;
   const one = measureTerm(m[1]);
   const two = measureTerm(m[2]);
   if (!one || !two) return null;
+  const claims = shapeClaims(s);
+  if (!claims) return null;
   return {
     ...empty(),
     ratios: [{ numerator: one, denominator: two, src: s }],
     declares: [...one.points, ...two.points].filter((n) => !isOrigin(n)),
-    claims: [claimAll(s)],
+    claims,
   };
 };
 
 /** One measure phrase — «שטח Oz1z2» — as the query it denotes, or null when the arity is wrong. */
 const measureTerm = (text: string): MeasureQuery | null => {
-  const shapeNoun = `(?:${SHAPES.map(([kw]) => kw).join('|')})`;
   for (const [kw, kind] of MEASURE_NOUNS) {
-    const m = text.match(rx(`^${kw}\\s+${ACCUSATIVE_KW}${OF_A}(?:${shapeNoun}\\s+)?(${RUN})$`));
+    const m = text.match(rx(`^${kw}\\s+${ACCUSATIVE_KW}${OF_A}${shapePhrase()}?(${RUN})$`));
     if (!m) continue;
     const points = splitRun(m[1]);
     const arity = MEASURE_ARITY[kind];
