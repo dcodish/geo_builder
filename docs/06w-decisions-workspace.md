@@ -5668,3 +5668,24 @@ So: §1's thesis and P6's reason are his; the trace (ADR-AG-062) stays; the rela
 4. **Not this rule:** a ring with a free vertex (a configuration choice), and lines already refused with another honest message (3-D `claim-refuted`, `shape-less-specific`, `givens-contradict`; analytic «לא נמצאה תצורה שבה מתקיים…»), which keep it.
 
 **Consequences.** The 2-D arm lands first (ADR-608); the parity rows `crossed-ring-1927-01…05` carry known gaps for analytic and 3-D until items B and C land. #1914 must compare rings by cyclic order (`ringKey`), not by vertex set.
+
+## ADR-W-122 — Decisions are put to the operator on a published HTML page, never in the chat, because the terminal scrambles RTL Hebrew
+
+**Status:** accepted · 2026-10-09 · **Issue:** none (workflow; raised by the operator mid-pass) · **Amends:** the `/decisions` skill, Step 3 (which used `AskUserQuestion`).
+**Operator ruling:** 2026-10-09, mid-`/decisions` pass, after four decisions had been asked in the chat —
+
+> *"from now on, decisions should be in an html artifact. the rtl and hebrew are wrong in vscode and I might give wrong answers"*
+
+**Requirements:** none (internal — no student-visible behaviour) · **Design:** [`.claude/skills/decisions/SKILL.md`](../.claude/skills/decisions/SKILL.md) Step 3.
+
+**Context.** A product decision is almost always about a Hebrew sentence: the utterance a student types, or the refusal they read. The chat question chrome (VS Code extension and terminal alike) renders an RTL run with embedded Latin letters, `∠`, `°` and `·` in the wrong visual order, so «מעגל חסום ב-ABC» and «מעגל חסום במשולש ABC» — two options that differ only in one word, and whose *difference is the whole decision* — can reach him looking alike or reordered. He was being asked to choose between figures he could not reliably read. Four decisions in the 2026-10-09 pass had already been taken that way before he stopped it; they were re-checked and stand, because each turned on an English description of the outcome rather than on telling two Hebrew strings apart.
+
+**Decision.**
+1. **Every decision in a `/decisions` pass goes on one published HTML artifact**, one card per decision, answered by tapping on the page. `AskUserQuestion` is **never** used for a decision whose text contains Hebrew, nor for a pass's set of decisions. A single question with no Hebrew in it (a priority, a yes/no on an English outcome) may still be asked in the chat.
+2. **Hebrew is isolated, not merely present.** Each Hebrew run sits in a block with `direction: rtl` and `unicode-bidi: isolate`, and its outcome goes on a separate LTR line beneath — never inline after the Hebrew. This is the actual fix; a page that interleaves the two reproduces the defect it exists to avoid.
+3. **The answers are stored, not typed back.** The page declares `capabilities: {db: {}, user: {}}` and writes `rulings/<key>` (`choice`, `label`, `note`, `at`); the session reads them with the `ArtifactData` tool. The store is verified with one probe write-then-delete **before** the link is handed over.
+4. **The page is a ballot, never the record.** Step 4 is unchanged in substance: each answer is transcribed to its GitHub issue as it arrives, under the canonical `## Operator ruling — YYYY-MM-DD` heading. A tapped answer that was never transcribed is a ruling the next session cannot find.
+5. **The displayed option letter equals the stored value**, so a ruling quoted back as "I picked A" cannot be transcribed as another option.
+6. **Pacing becomes his.** The whole set ships at once and he works it at his own speed, so the old "stop every ~6 decisions" rule is dropped — it existed because the chat forced a serial interrogation.
+
+**Consequences.** A pass costs one page build before the first question, and the dossier work (Steps 1–2) is unchanged — it is still done in full before he is asked anything. The same reasoning already governs the play sheet, whose evidence ships as a published `report.html` ([ADR-W-092](#adr-w-092)): anything the operator must *read in Hebrew* to judge belongs on a rendered page, not in terminal text. Where a future surface needs his judgement on Hebrew (a wording review, a refusal sweep), it follows this ADR rather than inventing its own channel.

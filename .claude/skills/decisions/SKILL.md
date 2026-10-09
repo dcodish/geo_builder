@@ -91,31 +91,51 @@ is worse than no ruling, because it gets recorded and then built.
 
 ---
 
-## Step 3 — ask, one at a time
+## Step 3 — ask in an HTML artifact, never in the chat
 
-Use `AskUserQuestion`. **One decision per question. Never bundle.**
+**Every decision goes to him on a published HTML page, one card per decision, with the answers tapped on
+the page** ([ADR-W-122](../../../docs/06w-decisions-workspace.md)). **Never `AskUserQuestion` for a
+decision whose text contains Hebrew, and never for a pass's set of decisions.** His ruling of 2026-10-09:
+*"the rtl and hebrew are wrong in vscode and I might give wrong answers"* — the terminal and the question
+chrome reorder RTL runs, so a Hebrew option reaches him scrambled and he answers the wrong one. A wrong
+ruling is worse than no ruling: it gets recorded, then built.
 
-- **Plain language in the question; precision in the transcription.** The operator is deciding what the
-  product should DO. Mechanism names belong in the comment written afterwards, not in the question.
-- **Recommendation first, labeled `(Recommended)`.**
+**How the page is built:** load the `artifact-design` and `artifact-capabilities` skills, declare
+`capabilities: {db: {}, user: {}}`, write each answer to a `rulings/<key>` document (`choice`, `label`,
+`note`, `at`), and read them back with the `ArtifactData` tool. Verify the store with one probe
+write-then-delete before handing over the link — a page that cannot save is a pass with no record.
+
+- **Hebrew is isolated, not just present.** Every Hebrew run sits in its own block with `direction: rtl`
+  and `unicode-bidi: isolate`, and the outcome goes on its own LTR line beneath it — never inline after
+  the Hebrew, where the bidi algorithm reorders it. Mixed Latin letters (`ABCD`), `∠`, `°` and `·` inside
+  a Hebrew sentence are exactly what breaks in the chat; isolation is what fixes it.
+- **One card = one decision.** Never bundle two decisions into one question. A card with several
+  sub-questions (one model, five answers) gives each its own saved answer.
+- **Plain language on the page; precision in the transcription.** He is deciding what the product should
+  DO. Mechanism names belong in the comment written afterwards, not on the card.
+- **Recommendation first, labeled "Recommended".**
 - **Always include the real "leave it as it is" option** when that is a genuine choice — it usually is.
   Omitting it manufactures consent for a change.
-- Use the `preview` field when the decision is about something visible — a message's wording, a layout,
-  two phrasings of a refusal. Seeing it beats describing it.
-- **Hebrew is the product's default.** When the decision is about student-facing text, show the Hebrew.
-- If an answer opens a follow-up, **ask it immediately** rather than banking it — the context is loaded
-  now and will not be later.
-- If the operator's answer fits no option, take it as given. Their words win over the menu.
+- **Show, don't describe.** Every card carries a "today, at HEAD" block: the utterance, then what the
+  tool does with it now. For a wording decision, show the full sentence in both forms.
+- **The displayed option letter must equal the stored value.** If the card shows `A` and saves `B`, a
+  ruling quoted back as "I picked A" is transcribed wrong.
+- **A free-text note per card**, so an answer that fits no option still arrives in his own words.
+- Each card names **what it unblocks**, so he can see which answers free the most work.
 
-**Decision fatigue is real.** After every ~6 decisions, stop and offer to continue, pause, or finish with
-the rest deferred. A tired ruling is a bad ruling, and it gets recorded permanently.
+**Pacing is his, not the pass's.** The page carries every decision at once and he works it at his own
+speed, so do not ration questions or stop every six — but do not wait in silence either: read the store
+when he says he is done, or when he answers some and asks what is left.
+
+**If his answer fits no option**, take it as given. His words win over the menu.
 
 ---
 
 ## Step 4 — transcribe each ruling IMMEDIATELY
 
-**Before asking the next question.** Never batch to the end: a session that dies mid-pass must leave
-every answered decision already recorded on GitHub.
+**As each answer arrives, before reading the next one off the page.** Never batch to the end: a session
+that dies mid-pass must leave every answered decision already recorded on GitHub. The page is a ballot,
+not the record — a tapped answer that was never transcribed is a ruling the next session cannot find.
 
 Per ruling:
 
