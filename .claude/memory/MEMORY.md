@@ -8,3 +8,4 @@ Working rules live in CLAUDE.md, docs/17, docs/22, docs/RUNBOOK.md and the skill
 - [Tier JSON machine drift](tier-json-machine-drift.md) — a test-tiers.json diff is a real membership change, but it varies per machine and per run
 - [Jev experiment](jev-experiment.md) — the parked "did you mean" model: where the harness and key live, and what the operator pre-approved
 - [Promo video plan](promo-video-plan.md) — the operator's parked teacher-video project: format, storyboard, open questions
+- [Browser probes hit the live LLM](browser-probes-hit-live-llm.md) — stub /api/parse in any Playwright probe of the dev server
