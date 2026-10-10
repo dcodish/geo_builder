@@ -3788,6 +3788,34 @@ export const SCENARIOS_4: Scenario[] = [
       expect(gateVerdict(factsOf(['ריבוע ABCD']), 'מרובע ADCB').kind, '«מרובע ADCB» commits').toBe('commit');
     },
   },
+  {
+    id: 'bare-run-incircle-1941',
+    title:
+      '#1941 (ADR-609): «משולש ABC» · «מעגל חסום ב-ABC» — a ring named by its LETTERS draws the INSCRIBED circle, tangent to all three sides, never the circle through the vertices',
+    guards:
+      "Round #1940's stream C found it and the session measured it; filed P1 (a figure drawn green while contradicting the givens). Measured on 8e0debff through parse with the prefix's context: «מעגל חסום ב-ABC» emitted a single \`circumcircle\` — the circle THROUGH A, B, C, green and verifier-clean — and «מעגל חסום ב-ABCD» emitted \`circumcircle + set-concyclic + quadrilateral\`; the control «מעגל חסום במשולש ABC» drew the incircle. Root cause (ADR-609): \`isCircleInPolygon\`, the ONE direction test every inscription sentence consults, needs a polygon NOUN in both of its container tests, so a noun-less sentence fell through to an index comparison requiring \`polyIdx >= 0\` that it can never satisfy, returned false, and \`inscribedPolygon\` built the CONVERSE figure. Fix: one \`markerOnBareRun\` spelling shared with ADR-606's arity reader, plus the implied noun read back through the one shape-phrase reader so the \`incircle\` rule lowers the bare run exactly as the lettered noun. Operator ruling 2026-10-09 (option A, \"Draw the incircle\"). The spelling matrix, the convergence assertion and the disjointness battery are src/parser/__tests__/issue-1941-bare-run-incircle.test.ts.",
+    steps: ['משולש ABC', 'מעגל חסום ב-ABC'],
+    check(fig) {
+      allStepsOk(fig);
+      const verts = ['A', 'B', 'C'].map((id) => at(fig, id));
+      expect(fig.circles.size, 'exactly one circle — the incircle').toBe(1);
+      const { center, r } = [...fig.circles.values()][0];
+      expect(r).toBeGreaterThan(1e-3);
+      // tangency: the centre is one radius from the LINE of every side …
+      for (let i = 0; i < 3; i++) {
+        const [a, b] = [verts[i], verts[(i + 1) % 3]];
+        const len = dist(a, b);
+        const d = Math.abs((b.y - a.y) * (center.x - a.x) - (b.x - a.x) * (center.y - a.y)) / len;
+        expect(d, 'the circle touches every side').toBeCloseTo(r, 4);
+      }
+      // … and NO vertex is on it (the circumcircle — the bug — would put all three at exactly r)
+      for (const v of verts) expect(dist(v, center), 'no vertex rides the circle').toBeGreaterThan(r * 1.05);
+      // the 4-letter twin and the converse reading, through the same gate the app uses
+      expect(gateVerdict(factsOf(['ריבוע ABCD']), 'מעגל חסום ב-ABCD').kind).toBe('commit');
+      const converse = gateVerdict(factsOf(['משולש ABC']), 'ABC חסום במעגל');
+      expect(converse.kind === 'commit' && converse.commands.some((c) => c.type === 'circumcircle'), 'the opposite direction still draws the circle through the vertices').toBe(true);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

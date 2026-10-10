@@ -5405,6 +5405,16 @@ const POLY_WORDS_EN = String.raw`triangle|quad\w*|square|rectangle|rhombus|trape
 const POLY_WORDS_HE = `משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע|${NGON_WORDS_HE}`;
 
 /**
+ * The "in" marker riding a BARE LETTER RUN — a ring named by its letters alone, with no polygon noun to
+ * carry the preposition: «מעגל חסום ב-ABC», «מעגל חסום בתוך ABCDE», "circle inscribed in ABCD". `min` is the
+ * shortest run that counts. **ONE spelling of this test**, shared by the direction reader
+ * ({@link isCircleInPolygon}) and the arity reader ({@link uninscribableIncircle}) — #1941: the second copy
+ * is how the direction reader stayed blind to a spelling the arity reader already knew.
+ */
+const markerOnBareRun = (s: string, min = 3): boolean =>
+  new RegExp(String.raw`(?:ב|בתוך\s+ה?)-?\s*[A-Z]{${min},}\b|\bin(?:side)?\s+(?:an?\s+|the\s+)?[A-Z]{${min},}\b`).test(s);
+
+/**
  * Is this a *circle* inscribed in a *polygon* (the incircle), rather than a
  * polygon inscribed in a circle? The CONTAINER is the noun carrying the "in"
  * preposition — Hebrew's ב prefix ("מעגל חסום במשולש", "במרובע ABCD חסום מעגל")
@@ -5424,6 +5434,14 @@ const isCircleInPolygon = (s: string): boolean => {
   ).test(s);
   const circContainer = /(?:ב|בתוך\s+ה?)מעגל|\bin(?:side)?\s+(?:an?\s+|the\s+)?circle/i.test(s);
   if (polyContainer !== circContainer) return polyContainer;
+  // Neither NOUN carries the marker — but a RING NAMED ONLY BY ITS LETTERS can carry it too:
+  // «מעגל חסום ב-ABC» / "circle inscribed in ABCD" ({@link markerOnBareRun}). #1941: the index fallback
+  // below needs a polygon noun (`polyIdx >= 0`), which a noun-less sentence can never have, so every bare-run
+  // incircle decided "not a circle in a polygon" and `inscribedPolygon` built the CONVERSE — the circle
+  // THROUGH A, B, C. When the circle is inscribed and the marker rides the run, the circle is INSIDE: the
+  // opposite reading («ABC חסום במעגל») puts the marker on «מעגל», which is `circContainer` and already
+  // returned above, so the two readings stay disjoint.
+  if (!circContainer && /incircle|(?<!circum)inscrib\w*|חסום/i.test(s) && /incircle|\bcircle\b|מעגל/i.test(s) && markerOnBareRun(s)) return true;
   const circIdx = s.search(/incircle|\bcircle\b|מעגל/i);
   const polyIdx = s.search(new RegExp(`${POLY_WORDS_EN}|${POLY_WORDS_HE}`, 'i'));
   return circIdx >= 0 && polyIdx >= 0 && circIdx < polyIdx;
@@ -5455,7 +5473,7 @@ function uninscribableIncircle(s: string): number | null {
   const circleInside =
     (/incircle|(?<!circum)inscrib\w*|חסום/i.test(s) && isCircleInPolygon(s)) ||
     new RegExp(String.raw`(?:${POLY_WORDS_EN}|${POLY_WORDS_HE})(?:\s+\S+)?\s+${LABEL}.*?(?:circumscrib\w*|חוסם).*?(?:circle|מעגל)`, 'i').test(s) ||
-    (named === undefined && /(?:ב|בתוך\s+ה?)-?\s*[A-Z]{5,}\b|\bin(?:side)?\s+[A-Z]{5,}\b/.test(s));
+    (named === undefined && markerOnBareRun(s, 5));
   return circleInside ? sides : null;
 }
 
@@ -6305,6 +6323,27 @@ const sector: Rule = (s, ctx) => {
   return cmds;
 };
 
+/** The circle/inscription words {@link incircle} consumes — the noun, the vertices and the centre are read
+ *  from what is LEFT. ONE spelling, shared by the arity inference for a letters-only ring
+ *  ({@link bareRingPhrase}) and by the rule's own leftover guard (#1941; docs/17 §3). */
+const INCIRCLE_FILLER = String.raw`incircle|inscrib\w*|חסום|circumscrib\w*|חוסם|polygon|circles?|מעגל\w*|cent(?:er|re)\w*|ה?מרכז\w*|בתוך|\binside\b|radius|רדיוס\S*`;
+
+/**
+ * #1941 ([ADR-609](../../docs/06-decisions.md#adr-609)) — the container ring of an incircle sentence named
+ * only by its LETTERS: «מעגל חסום ב-ABC», "circle inscribed in ABCD". There is no polygon noun for
+ * {@link readShapePhrase} to read, so the RUN's length states the arity the noun would have — 3 ⇒ triangle,
+ * 4 ⇒ quadrilateral, the same inference `inscribedPolygon` makes for the converse «ABCD חסום במעגל». The
+ * implied noun is read back through the ONE shape-phrase reader rather than hand-rolling a phrase, so the
+ * lowering, the strip and the leftover guard all behave exactly as for the lettered «מעגל חסום במשולש ABC».
+ * Five letters or more never reach here: {@link uninscribableIncircle} refuses them first (ADR-606).
+ */
+const bareRingPhrase = (s: string): ShapePhrase | null => {
+  if (!markerOnBareRun(s)) return null;
+  const bare = dropCircleRef(s).replace(new RegExp(INCIRCLE_FILLER, 'gi'), ' ');
+  const implied = labelRun(bare, 4) ? 'מרובע' : labelRun(bare, 3) ? 'משולש' : null;
+  return implied ? readShapePhrase(implied) : null;
+};
+
 /**
  * "circle inscribed in triangle ABC" / "incircle of triangle ABC" / "מעגל חסום במשולש ABC", OR the
  * triangle-first phrasing "triangle DEF circumscribes the circle" / "משולש DEF חוסם את המעגל" — the
@@ -6335,7 +6374,8 @@ const incircle: Rule = (s, ctx) => {
   // arity and its stated adjective refines the container («במשולש ישר זווית ABC» is a RIGHT triangle). This
   // used to be a private noun-only ladder, so every adjective here was silently dropped. (Every triangle has
   // an incircle; a quad needs to be TANGENTIAL, which the construction below flexes it to be — Pitot.)
-  const phrase = readShapePhrase(s);
+  // #1941: a ring named only by its letters («מעגל חסום ב-ABC») states its arity in the RUN, not in a noun.
+  const phrase = readShapePhrase(s) ?? bareRingPhrase(s);
   if (!phrase?.noun) return null;
   const n = phrase.arity;
   const taken = ctx.points ?? []; // auto-named points must dodge labels already in the figure
@@ -6344,10 +6384,7 @@ const incircle: Rule = (s, ctx) => {
   const incLabel = incenterLabel(s);
   // Only the phrase's OWN words are consumed (the noun + the adjective it lowers); an adjective it cannot lower
   // on this noun stays, and the leftover guard below escalates the line (#1790).
-  let rest = phrase.strip(dropCircleRef(s)).replace(
-    /incircle|inscrib\w*|חסום|circumscrib\w*|חוסם|polygon|circles?|מעגל\w*|cent(?:er|re)\w*|ה?מרכז\w*|בתוך|\binside\b|radius|רדיוס\S*/gi,
-    ' ',
-  );
+  let rest = phrase.strip(dropCircleRef(s)).replace(new RegExp(INCIRCLE_FILLER, 'gi'), ' ');
   if (namedC) rest = rest.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ');
   if (incLabel) rest = rest.replace(new RegExp(String.raw`\b${incLabel}\b`, 'gi'), ' ');
   // A SYMBOLIC radius («radius r») names the incircle's own radius — the binding post-pass attaches the letter

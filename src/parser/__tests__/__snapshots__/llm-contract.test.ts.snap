@@ -954,6 +954,28 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle",
     ],
   },
+  "circle inscribed in ABC": {
+    "en": [
+      "triangle",
+      "bisector",
+      "bisector",
+      "line-intersection",
+      "foot",
+      "circle-through",
+      "foot",
+      "foot",
+    ],
+    "he": [
+      "triangle",
+      "bisector",
+      "bisector",
+      "line-intersection",
+      "foot",
+      "circle-through",
+      "foot",
+      "foot",
+    ],
+  },
   "circle inscribed in kite ABCD": {
     "en": [
       "shape-variant",

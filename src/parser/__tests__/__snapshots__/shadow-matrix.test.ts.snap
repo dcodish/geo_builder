@@ -1682,6 +1682,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "circle inscribed in ABC",
+    "winner": "incircle",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל חסום ב-ABC",
+    "winner": "incircle",
+  },
+  {
+    "lang": "en",
     "text": "the tangent at A and the tangent at C to circle O meet at D",
     "winner": "twoTangentsMeet",
   },
