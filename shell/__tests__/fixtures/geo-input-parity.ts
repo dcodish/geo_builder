@@ -258,7 +258,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1888': 'open',
   '#1905': 'open',
   '#1903': 'open',
-  '#1927': 'open',
   '#1961': 'open',
   '#1969': 'open',
 };
@@ -1215,15 +1214,21 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'bare-on-pair-length-1892', family: 'points-incidence', steps: ['נקודה A', 'נקודה B', 'D על AB', 'AB = 4', 'AD = 5'], expect: 'refused', exception: 'X9', note: 'analytic rode the line and drew D beyond B before #1892' },
   { id: 'bare-on-pair-length-holds-1892', family: 'points-incidence', steps: ['נקודה A', 'נקודה B', 'D על AB', 'AB = 4', 'AD = 3'], expect: 'builds', exception: 'X9' },
   // #1927 (ADR-W-121, ADR-608): a declared ring over points the figure already placed, in an order that crosses in
-  // every configuration, is REFUSED in every builder with analytic's errRingContradictsNoun. The 2-D column lands
-  // first (ADR-608); analytic and 3-D close their gaps under #1927's items B and C.
-  { id: 'crossed-ring-1927-01', family: 'polygons', steps: ['ריבוע ABCD', 'מרובע ACBD'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1927' }], note: 'the square’s points in a crossing order' },
-  { id: 'crossed-ring-1927-02', family: 'polygons', steps: ['מלבן ABCD', 'מרובע ABDC'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1927' }] },
+  // every configuration, is REFUSED in every builder with the one shared message. The 2-D column landed first (ADR-608);
+  // analytic (ADR-AG-250, ADR-AG-256) and 3-D (ADR-3D-322) closed their gaps under #1927.
+  { id: 'crossed-ring-1927-01', family: 'polygons', steps: ['ריבוע ABCD', 'מרובע ACBD'], expect: 'refused', note: 'the square’s points in a crossing order' },
+  { id: 'crossed-ring-1927-02', family: 'polygons', steps: ['מלבן ABCD', 'מרובע ABDC'], expect: 'refused' },
   { id: 'crossed-ring-1927-03', family: 'polygons', steps: ['מלבן ABCD', 'טרפז ABDC'], expect: 'refused', note: '3-D and analytic refuse it too (a rectangle is no trapezoid: #1918, #1927)' },
-  { id: 'crossed-ring-1927-04', family: 'polygons', steps: ['מרובע ABDC', 'מלבן ABCD'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1927' }], note: 'the ring first: the shape line completes the crossing' },
-  { id: 'crossed-ring-1927-05', family: 'polygons', steps: ['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABED'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1927' }], note: 'points placed by other givens' },
+  { id: 'crossed-ring-1927-04', family: 'polygons', steps: ['מרובע ABDC', 'מלבן ABCD'], expect: 'refused', note: 'the ring first: the shape line completes the crossing' },
+  { id: 'crossed-ring-1927-05', family: 'polygons', steps: ['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABED'], expect: 'refused', note: 'points placed by other givens' },
   { id: 'crossed-ring-1927-06', family: 'polygons', steps: ['ריבוע ABCD', 'מרובע ADCB'], expect: 'builds', note: 'the simple order — the control' },
   { id: 'crossed-ring-1927-07', family: 'polygons', steps: ['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABDE'], expect: 'builds', note: 'the midpoint ring in its simple order — the control' },
+  // #1927's 2026-10-09 ruling, "search first, refuse last" (ADR-W-121 Am. 2026-10-10; ADR-613, ADR-3D-322, ADR-AG-256):
+  // a kite may be a dart, on which ABDC is simple, so no builder refuses it; a trapezoid's other orders can never be
+  // simple, whatever its free ratio, so every builder refuses them.
+  { id: 'crossed-ring-1927-08', family: 'polygons', steps: ['דלתון ABCD', 'מרובע ABDC'], expect: 'builds', note: 'a dart saves the ring: search first, never refused (2-D and analytic draw the dart)' },
+  { id: 'crossed-ring-1927-09', family: 'polygons', steps: ['טרפז ABCD', 'מרובע ACBD'], expect: 'refused', note: 'a trapezoid’s free ratio cannot save the ring' },
+  { id: 'crossed-ring-1927-10', family: 'polygons', steps: ['מרובע ACBD', 'טרפז ABCD'], expect: 'refused', note: 'the ring first' },
   // end #1927
   // #1953 (ADR-618 / ADR-3D-324 / ADR-AG-259): a ring restated in another reading — rotated or reversed — is the same
   // polygon, so it is accepted and adds no row in every builder (2-D «זה כבר קיים באיור», analytic «כבר ידוע», 3-D the #613

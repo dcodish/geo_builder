@@ -33,9 +33,9 @@ import { humanizeError } from '@/i18n/humanizeError';
 
 const strip = (s: string) => s.replace(/[⁦-⁩‎‏]/g, '');
 const HE = (line: string) =>
-  `הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "${line}". אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את השיעורים — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`;
+  `הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "${line}". אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`;
 const EN = (line: string) =>
-  `The points you gave do not form that shape in this order: "${line}". Reorder the letters so the sides do not cross, or change the coordinates — as written the vertices fall on one line or the shape folds over itself.`;
+  `The points you gave do not form that shape in this order: "${line}". Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.`;
 const NO_CONFIG_HE = () => strip(i18n.t('figure.noValidConfig', { lng: 'he' }) as string);
 
 /** Play `lines` through the submit door with the App's resolve wiring; the notes the student saw on the LAST line. */
@@ -103,7 +103,6 @@ const MEMBERS: string[][] = [
   ['מקבילית ABCD', 'מרובע ACBD'],
   ['מעוין ABCD', 'מרובע ABDC'],
   ['טרפז ABCD', 'מרובע ACBD'],
-  ['דלתון ABCD', 'מרובע ABDC'],
   ['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABED'],
   ['משושה משוכלל ABCDEF', 'מרובע ACFD'],
   ['מחומש משוכלל ABCDE', 'מחומש ACEBD'],
@@ -144,6 +143,48 @@ describe('#1927 — every member of the class, both orders, is refused naming it
       expect(llmParseMock).not.toHaveBeenCalled();
     });
   }
+});
+
+/** Do two non-adjacent sides of the ring properly cross at these positions? */
+function crossed(ids: string[], at: Map<string, { x: number; y: number }>): boolean {
+  const p = ids.map((id) => at.get(id)!);
+  const side = (o: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.sign((a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x));
+  const n = p.length;
+  for (let i = 0; i < n; i++)
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;
+      const [a, b, c, d] = [p[i], p[(i + 1) % n], p[j], p[(j + 1) % n]];
+      if (side(c, d, a) * side(c, d, b) < 0 && side(a, b, c) * side(a, b, d) < 0) return true;
+    }
+  return false;
+}
+
+/**
+ * SEARCH FIRST, REFUSE LAST (the operator's ruling of 2026-10-09 on #1927, [ADR-613](../../../docs/06-decisions.md#adr-613)).
+ * *"Refuse only when nothing the student wrote can save it."* A kite may be a DART, and on a dart ABDC is a simple ring:
+ * the ruling names this row — 2-D must not refuse it, and draws the dart (as analytic does). The prior pool held only
+ * convex kites because FR-EN-16's convexity is a DEFAULT, and the second ring is the statement it yields to.
+ */
+describe('#1927 — search first: a ring a configuration branch can save is drawn, never refused', () => {
+  for (const lines of [['דלתון ABCD', 'מרובע ABDC'], ['מרובע ABDC', 'דלתון ABCD']]) {
+    it(`«${lines.join(' · ')}» commits, and both rings are drawn simple (the kite as a dart)`, async () => {
+      const r = await play(lines);
+      expect(r.notes, 'no refusal, no exhausted search').toEqual([]);
+      expect(r.facts.length).toBeGreaterThan(r.before.facts.length);
+      const at = r.positions as Map<string, { x: number; y: number }>;
+      expect(crossed(['A', 'B', 'C', 'D'], at), 'the kite ring').toBe(false);
+      expect(crossed(['A', 'B', 'D', 'C'], at), 'the declared ring ABDC').toBe(false);
+      expect(llmParseMock).not.toHaveBeenCalled();
+    });
+  }
+
+  it('the convexity default yields only to a ring that orders the same points differently — the shapes that are convex whenever simple stay refused', async () => {
+    for (const lines of [['ריבוע ABCD', 'מרובע ACBD'], ['טרפז ABCD', 'מרובע ACBD'], ['מעוין ABCD', 'מרובע ABDC']]) {
+      const r = await play(lines);
+      expect(r.notes, lines.join(' · ')).toEqual([HE(lines[lines.length - 1])]);
+    }
+  });
 });
 
 describe('#1927 — controls commit exactly as before', () => {

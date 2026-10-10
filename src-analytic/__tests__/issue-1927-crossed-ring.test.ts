@@ -42,7 +42,7 @@ describe('#1927 — the operator’s rows are refused with the ring message', ()
     expect(r?.at).toBe(1);
     expect(r?.error).toMatchObject({ key: 'ring-contradicts-noun', detail: 'מרובע ACBD' });
     expect(errorText(r!.error, t)).toBe(
-      'הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "מרובע ACBD". אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את השיעורים — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.',
+      'הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "מרובע ACBD". אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.',
     );
     expect(errorText(r!.error, tEn)).toContain('מרובע ACBD');
     // Nothing is committed: the prior figure is the square alone, unchanged.
@@ -78,6 +78,11 @@ describe('#1927 — the class, both orders, one ring at a time', () => {
     [['מרובע ABED', 'משולש ABC', 'D אמצע BC', 'E אמצע AC'], 'E אמצע AC'],
     // #1923's leak, a pinned crossed ring beside an unrelated free point (ADR-AG-249 already refuses it).
     [['A(0,0)', 'B(4,0)', 'C(1,3)', 'D(3,3)', 'נקודה E', 'טרפז ABCD'], 'טרפז ABCD'],
+    // ADR-AG-256 — the trapezoid members, once a known gap: a trapezoid's side ratio is free (`shapeDof` 1), so no
+    // affine proof — and nothing the student wrote can save the ring (a simple trapezoid is convex, and its other
+    // orders cross). The search ran over every free quantity and found no simple drawing: "refuse last".
+    [['טרפז ABCD', 'מרובע ACBD'], 'מרובע ACBD'],
+    [['מרובע ACBD', 'טרפז ABCD'], 'טרפז ABCD'],
   ];
 
   it.each(CLASS)('%j → refused at the last line, at every seed', (seq, line) => {
@@ -109,25 +114,16 @@ describe('#1927 — the class, both orders, one ring at a time', () => {
   });
 
   /**
-   * SAMPLES ARE NOT PROOF. «A(k,0)»'s trapezoid is crossed at every sampled k (the sweep is ±4) and simple for k > 4 — a
-   * satisfiable figure. Its shape can change (`shapeDof` 1), so the walk's samples alone never refuse it.
+   * SEARCH FIRST, REFUSE LAST (ADR-AG-256). «A(k,0)»'s trapezoid is crossed at every k the default window draws and
+   * simple for k > 4 — a satisfiable figure. It is never refused, and it is DRAWN simple: the search reaches past the
+   * window (#1939's own lock is `issue-1939-ring-search.test.ts`).
    */
-  it('a ring whose shape can still change is never refused on samples alone', () => {
+  it('a ring a free parameter can save is never refused, and is drawn simple', () => {
     const seq = ['A(k,0)', 'B(4,0)', 'C(1,3)', 'D(3,3)', 'טרפז ABCD'];
-    for (const seed of SEEDS) expect(play(seq, seed), `seed ${seed}`).toBeNull();
-    const rf = derive(seq).figure.ringFaults.find((f) => f.id === 'poly-ABCD');
-    expect(rf?.shapeDof).toBeGreaterThan(0);
-  });
-});
-
-/**
- * NOT DELIVERED (reported on #1927): a trapezoid's shape has a free ratio (`shapeDof` 1), so its crossing in ACBD is
- * not proven by an affine argument, and refusing on the walk's samples would also refuse «A(k,0)»'s satisfiable
- * trapezoid. These still record, with the unspoken `crossed` fault, as on `main` — a known gap awaiting the operator.
- */
-describe('#1927 — known gap: the trapezoid members', () => {
-  it.each([[['טרפז ABCD', 'מרובע ACBD']], [['מרובע ACBD', 'טרפז ABCD']]])('%j still records (gap)', (seq) => {
-    expect(play(seq)).toBeNull();
+    for (const seed of SEEDS) {
+      expect(play(seq, seed), `seed ${seed}`).toBeNull();
+      expect(derive(seq, seed).figure.ringFaults, `seed ${seed}`).toEqual([]);
+    }
   });
 });
 

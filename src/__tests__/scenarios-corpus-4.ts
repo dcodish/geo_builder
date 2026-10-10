@@ -3782,8 +3782,8 @@ export const SCENARIOS_4: Scenario[] = [
         const v = gateVerdict(facts, line);
         expect(v.kind === 'refused' && v.reason, `«${prefix} · ${line}»: the last line is refused before it becomes a fact`).toBe('crossed-ring');
         expect(replay(facts).positions, 'the prior figure does not move').toEqual(shown);
-        expect(he(line)).toBe(`הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "${line}". אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את השיעורים — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`);
-        expect(en(line)).toBe(`The points you gave do not form that shape in this order: "${line}". Reorder the letters so the sides do not cross, or change the coordinates — as written the vertices fall on one line or the shape folds over itself.`);
+        expect(he(line)).toBe(`הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "${line}". אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`);
+        expect(en(line)).toBe(`The points you gave do not form that shape in this order: "${line}". Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.`);
       }
       // the control: the square's own points in a simple order are never refused — since #1953 (ADR-618) they are
       // the square's own ring restated, a no-op («כבר קיים»), where they committed a second row before
@@ -3907,6 +3907,34 @@ export const SCENARIOS_4: Scenario[] = [
       // the crossing order is another ring, and stays #1927's refusal
       const crossed = gateVerdict(facts, 'מרובע ACBD');
       expect(crossed.kind === 'refused' && crossed.reason, '«מרובע ACBD» is still refused').toBe('crossed-ring');
+    },
+  },
+  {
+    id: 'crossed-ring-search-first-1927',
+    title:
+      '#1927 (ADR-613, "search first, refuse last"): «דלתון ABCD · מרובע ABDC» — a kite may be a DART, and on a dart ABDC is a simple ring, so the line COMMITS and the figure draws the dart with both rings simple; «טרפז ABCD · מרובע ACBD» stays refused, quoting the line',
+    guards:
+      "Operator ruling on #1927, 2026-10-09: *\"Search first, refuse last … Refuse only when nothing the student wrote can save it\"* — and, by name, 2-D must not refuse «דלתון ABCD · מרובע ABDC». Measured on e0f4260c: ADR-608 refused it, because the prior pool it read is filtered by FR-EN-16's convexity DEFAULT, which never admits the dart. Root cause: the pool's soundness argument (the line's constraints only narrow the configurations) fails when the line itself is the statement a DEFAULT yields to — a second declared ring ordering the same points differently cannot be simple while the first is convex. Fix (ADR-613): `convexityYields` holds both rings to simplicity in `polygonsConvex` (the #441 stated-concave rule), and `forcedCrossedRing` searches that branch with `findValidConfig` before refusing. A square, rectangle, rhombus, parallelogram or trapezoid is convex whenever simple, so its crossed rows stay refused. The wording is the operator's confirmed text («או לשנות את מקומות הנקודות»). The class matrix is src/app/__tests__/issue-1927-crossed-ring.test.ts.",
+    steps: ['דלתון ABCD', 'מרובע ABDC'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(gateVerdict(factsOf(['דלתון ABCD']), 'מרובע ABDC').kind, '«מרובע ABDC» after the kite commits').toBe('commit');
+      const facts = factsOf(['דלתון ABCD', 'מרובע ABDC']);
+      const found = findValidConfig(facts, 0);
+      expect(found, 'a configuration meeting every requirement exists (the dart)').not.toBeNull();
+      const shown = replay(found!.facts, found!.seed).positions;
+      const crosses = (ids: string[]) => {
+        const p = ids.map((id) => shown.get(id)!);
+        const side = (o: Vec, a: Vec, b: Vec) => Math.sign((a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x));
+        return [[0, 2], [1, 3]].some(([i, j]) => {
+          const [a, b, c, d] = [p[i], p[(i + 1) % 4], p[j], p[(j + 1) % 4]];
+          return side(c, d, a) * side(c, d, b) < 0 && side(a, b, c) * side(a, b, d) < 0;
+        });
+      };
+      expect(crosses(['A', 'B', 'C', 'D']), 'the kite ring is simple (a dart)').toBe(false);
+      expect(crosses(['A', 'B', 'D', 'C']), 'the declared ring ABDC is simple').toBe(false);
+      // nothing can save a trapezoid's other order: refused, quoting the line
+      expect(gateVerdict(factsOf(['טרפז ABCD']), 'מרובע ACBD')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
     },
   },
 ];

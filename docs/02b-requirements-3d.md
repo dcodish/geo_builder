@@ -374,7 +374,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «משולש ABC», or an incidence on a rider) is refused, naming the statements — a straight line is not a
   triangle. **A declared polygon over points fixed by coordinates is never drawn crossed:** when its ring, in the
   order named, crosses itself («A(0,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD»), the line that completed it
-  — the declaration, or the coordinate typed last — is refused in analytic's words. A ring with a free vertex is
+  — the declaration, or the coordinate typed last — is refused in analytic's words. **The same holds for points a
+  SHAPE placed** («ריבוע ABCD · מרובע ACBD», a cube's «מרובע ACBD», the midpoint ring «מרובע ABED», and the ring
+  first, «מרובע ABDC · מלבן ABCD»): when the ring crosses at every claim sample and no configuration branch can save
+  it, the line that completed it is refused with the same words. A ring a dart could save («דלתון ABCD · מרובע ABDC»)
+  is never refused (the operator's "search first, refuse last", 2026-10-09). A ring with a free vertex is
   drawn simple by choice of configuration, never refused. **Nor is one drawn off one plane:** a flat polygon
   declared over points the figure has already PLACED — typed coordinates, a coordinate given, a derived point over
   those, or a solid's vertex — whose vertices do not lie in one plane («A(0,0,0) · B(4,0,0) · C(4,3,0) · D(0,3,5) ·
@@ -383,8 +387,8 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   so — the shape is flat and these vertices are not in one plane («מרובע הוא צורה שטוחה, והקודקודים A, B, C, A'
   אינם נמצאים במישור אחד — ולכן …»). A ring with at least one
   FREE vertex is BUILT, that point driven into the plane — an unstated freedom is never an error.
-  - Sources: ADR-3D-234, ADR-3D-309, ADR-3D-310, ADR-3D-314, ADR-3D-319, ADR-3D-325, ADR-W-048, ADR-W-115, ADR-413,
-    ADR-602, ADR-AG-129, ADR-052; #936, #945, #1815, #1849, #1861, #1923, #1928, #1935, #1978.
+  - Sources: ADR-3D-234, ADR-3D-309, ADR-3D-310, ADR-3D-314, ADR-3D-319, ADR-3D-322, ADR-3D-325, ADR-W-048, ADR-W-115, ADR-W-121,
+    ADR-413, ADR-602, ADR-AG-129, ADR-052; #936, #945, #1815, #1849, #1861, #1923, #1927, #1928, #1935, #1978.
 - **FR-RD-8 (Should)** — **A stated LENGTH is drawn beside its segment.** «AB = 5» writes the 5 at AB's midpoint
   on the canvas, not only in the data panel — the honesty invariant *"everything the student stated is visible on
   the figure"* applied to the magnitude lane, which previously held for a stated distance (a labelled witness line)

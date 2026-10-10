@@ -695,8 +695,10 @@ a sentence the tool parsed.
 - the same points, «טרפז ABDC» → drawn
 - A ring declared over points a shape already placed, in an order that crosses wherever the givens hold, is refused, not drawn — on the line that completes it, either order ([ADR-AG-250](06c-decisions-analytic.md#adr-ag-250)): «ריבוע ABCD» · «מרובע ACBD» → «מרובע ACBD» refused; «מרובע ACBD» · «ריבוע ABCD» → «ריבוע ABCD» refused
 - «ריבוע ABCD» · «מרובע ADCB» → drawn; a ring with a free vertex («משולש ABC» · «נקודה D» · «מרובע ABCD») → drawn simple
-- Never on samples alone: «A(k,0)» · «B(4,0)» · «C(1,3)» · «D(3,3)» · «טרפז ABCD» (simple for k > 4) → drawn. Known gap (#1927): «טרפז ABCD» · «מרובע ACBD» is still drawn crossed — a trapezoid's shape has a free ratio, so the crossing is not proven
-- Sources: #1158, #1166, ADR-052, ADR-AG-129, #1929, #1927.
+- **Search first, refuse last** (operator, 2026-10-09; [ADR-AG-256](06c-decisions-analytic.md#adr-ag-256)): a ring a free parameter can make simple is DRAWN simple — «A(k,0)» · «B(4,0)» · «C(1,3)» · «D(3,3)» · «טרפז ABCD» (a trapezoid only for k > 4) → drawn with k > 4, never crossed and never refused, the parameter searched past the sampler's default window (#1939)
+- A ring nothing the student wrote can save is refused even when its shape has a free ratio: «טרפז ABCD» · «מרובע ACBD» → «מרובע ACBD» refused; «מרובע ACBD» · «טרפז ABCD» → «טרפז ABCD» refused
+- A kite may be a dart: «דלתון ABCD» · «מרובע ABDC» → drawn, ABDC simple
+- Sources: #1158, #1166, ADR-052, ADR-AG-129, #1929, #1927, #1939.
 
 **R92 — among the configurations it MAY show, the tool opens on one that is not a sliver**. A preference, never a requirement; coordinates that force a bad ring refuse the line (operator ruling), never «לא נמצאה תצורה».
 - «משולש ABC» → not a 1.4° wedge when a 25° triangle is two presses away

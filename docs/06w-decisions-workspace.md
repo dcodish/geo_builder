@@ -5652,7 +5652,7 @@ So: §1's thesis and P6's reason are his; the trace (ADR-AG-062) stays; the rela
 **Consequences.** A builder that reads both parts (analytic's «…E שהיא אמצע BD») keeps building: the rule is about lost parts, not two-part lines. The parity rows `unread-vertex-1888-01/02`, `unread-tail-1889-01/02` carry the remaining gaps (3-D, analytic: #1888; 2-D reading a relative clause: #1905).
 ## ADR-W-121 — A declared polygon whose placed vertices cross in every configuration is REFUSED in every builder, naming the line, with one message (#1927; the crossed sibling of ADR-W-115)
 
-**Status:** accepted · 2026-10-08 · **Issue:** #1927 (bug, P1, honesty class) · round #1940 · **Adopted by:** [ADR-608](06-decisions.md#adr-608) (2-D). Analytic and 3-D adopt it under #1927 items B and C (3-D on #1923's build).
+**Status:** accepted · 2026-10-08 · amended 2026-10-10 (below) · **Issue:** #1927 (bug, P1, honesty class) · rounds #1940, #1983 · **Adopted by:** [ADR-608](06-decisions.md#adr-608) and [ADR-613](06-decisions.md#adr-613) (2-D), [ADR-AG-250](06c-decisions-analytic.md#adr-ag-250) and [ADR-AG-256](06c-decisions-analytic.md#adr-ag-256) (analytic), [ADR-3D-322](06b-decisions-3d.md#adr-3d-322) (3-D).
 **Operator ruling:** 2026-10-08, on #1927 («Operator ruling — 2026-10-08»): he confirmed P1 with the outcome in the issue body —
 
 > *a declared polygon whose vertices, already placed, form a crossed ring is refused naming the declaration, in every builder, with analytic's `errRingContradictsNoun`. Never green, never a raw error.*
@@ -5668,6 +5668,18 @@ So: §1's thesis and P6's reason are his; the trace (ADR-AG-062) stays; the rela
 4. **Not this rule:** a ring with a free vertex (a configuration choice), and lines already refused with another honest message (3-D `claim-refuted`, `shape-less-specific`, `givens-contradict`; analytic «לא נמצאה תצורה שבה מתקיים…»), which keep it.
 
 **Consequences.** The 2-D arm lands first (ADR-608); the parity rows `crossed-ring-1927-01…05` carry known gaps for analytic and 3-D until items B and C land. #1914 must compare rings by cyclic order (`ringKey`), not by vertex set.
+
+**Amendment — 2026-10-10 (search first, refuse last; one wording).** Two operator rulings of 2026-10-09 on #1927, both owed here:
+
+> *"Search first, refuse last. When a letter in the sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the student wrote can save it."*
+
+and the shared text, confirmed on the decisions page ([ADR-W-122](#adr-w-122)) after the chat answer was held: **«או לשנות את מקומות הנקודות»** ("or move the points") replaces «או לשנות את השיעורים», one string in every builder.
+
+What changes in the Decision above:
+- **§1 and §3 — the refusal is gated on a failed SEARCH, not on the sampler or on affine rigidity.** A ring is refused only when a search over every free quantity the sentence exposes — a coordinate letter, a free ratio, a configuration branch — finds no simple drawing. Where the search finds one, the figure is DRAWN that way (never refused, never drawn crossed): #1939's «A(k,0) · B(4,0) · C(1,3) · D(3,3) · טרפז ABCD» draws k > 4, and «דלתון ABCD · מרובע ABDC» draws the dart. Each builder's existing sampler is still the evidence; what is new is that a DEFAULT the sampler applies (2-D's convexity, analytic's parameter window) is searched past before it can make a refusal. An affine proof (analytic's `shapeDof === 0`) stays sufficient, no longer necessary. Option (b), refusing on samples alone, was rejected as the worse defect: it tells a student who is right that they are wrong.
+- **§2 — the coordinate clause is ruled.** The text is now true in every builder: a coordinate student moves a point by retyping it, a 2-D student by changing the construction that placed it. One string, not a per-family variant (B1 of [ADR-W-118](#adr-w-118)).
+
+Adopted by [ADR-613](06-decisions.md#adr-613) (2-D: a ring that makes the convexity default yield is searched with `findValidConfig` first), [ADR-AG-256](06c-decisions-analytic.md#adr-ag-256) (analytic: the walk is re-run past the parameter window; #1939) and [ADR-3D-322](06b-decisions-3d.md#adr-3d-322) (3-D: shape-placed rings, refused only when no partner ring could be a dart). The parity rows `crossed-ring-1927-01…10` now hold in all three builders. **Gaps left, filed:** 3-D draws neither the dart nor a coordinate letter past its window (#1986); 2-D's config search has no concave branch for a free quadrilateral, so «מרובע ABCD · מרובע ABDC» stays refused there (#1987).
 
 ## ADR-W-122 — Decisions are put to the operator on a published HTML page, never in the chat, because the terminal scrambles RTL Hebrew
 

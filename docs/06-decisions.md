@@ -15763,3 +15763,32 @@ The pentagram line itself is already refused at both commit seams by ADR-608 (re
 **Behaviour change for a student:**
 - «ריבוע ABCD» · «מרובע ADCB» (or any rotated or reversed reading, and «משולש ABC» · «משולש ACB») shows «זה כבר קיים באיור — אין מה להוסיף.» and adds no row (was: a second row, no note).
 - «ריבוע ABCD» · «ריבוע BCDA» (and the same for rectangle, rhombus, parallelogram, and a trapezoid read from C or backwards) shows the same note (was: refused with «'D' is already defined …»).
+
+## ADR-613 — Search first, refuse last: a ring the convexity DEFAULT hid is searched before ADR-608 refuses it, and the shared ring message says «או לשנות את מקומות הנקודות» (#1927)
+
+**Status:** accepted · 2026-10-10 · bug (P1, 2-D, honesty class) · branch `fix/1927-crossed-ring-search` · fix round #1983 · amends [ADR-608](#adr-608) · adopts [ADR-W-121](06w-decisions-workspace.md#adr-w-121)'s amendment of 2026-10-10
+**Requirements:** [02](02-requirements.md) FR-EN-16 — the refusal fires only when no configuration the sentence allows draws the ring simple; a kite whose second ring needs a dart is drawn as one · **Design:** [04](04-design.md) § "A ring over placed points that crosses everywhere is refused before the dry run", its "Search first, refuse last" paragraph; [LADDER.md](LADDER.md) stage 5, "The crossed-ring check" · **LADDER stage:** reads stage 5 at the submit gate (unchanged), and asks stage 6's `findValidConfig` only for a ring that makes a default yield
+
+**The rulings.** Both on #1927, 2026-10-09. (1) *"Search first, refuse last. When a letter in the sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the student wrote can save it."* — and by name: *"2-D item A must not refuse [«דלתון ABCD · מרובע ABDC»] either … provided 2-D searches before refusing."* (2) The shared text `ringContradictsNoun` replaces «או לשנות את השיעורים» with **«או לשנות את מקומות הנקודות»** ("or move the points"), one string in every builder — confirmed on the decisions page ([ADR-W-122](06w-decisions-workspace.md#adr-w-122)) after the chat answer was held.
+
+**Measured before** (`e0f4260c`, `forcedCrossedRing` and the App's submit door). «דלתון ABCD · מרובע ABDC» was refused with the ring message: the prior pool held 32/32 convex kites, ABDC crossed in each. «מרובע ABDC · דלתון ABCD» committed. Every other ADR-608 member was refused, as ruled.
+
+**Root cause / class.** *ADR-608 read the PRIOR pool on the argument that "the line's own constraints only narrow the configurations" — but that pool is filtered by FR-EN-16's convexity, which is a DEFAULT, and the line declaring a second ring over the same points in another order is exactly the statement that default must yield to (M4).* Points in convex position have one simple order, so while the kite is held convex ABDC can only cross; a dart is a valid kite (ADR-426), and on it ABDC is simple. The refusal therefore read a pool that excluded the configuration the student's sentence asks for.
+
+**Decision.**
+1. **`convexityYields(facts, extra?)`** (`replay/core.ts`) — every declared ring that another declared ring re-orders: a ring R yields when some other ring R' over a subset of R's letters orders them differently from the order R induces on them. A ring stated convex («קמור», `set-polygon-convexity`) never yields. It is not a list of shapes: a square, rectangle, rhombus, parallelogram or trapezoid is convex whenever simple, so yielding lets nothing new through for them.
+2. **`polygonsConvex`** holds a yielded ring to SIMPLICITY only (the #441 stated-concave branch, `ringSimple`), so the post-commit search may draw the dart and must keep both rings simple.
+3. **`forcedCrossedRing`**, after the prior pool says "crossed everywhere": when the line's ring would make an earlier ring yield, it asks `findValidConfig` (the search the App runs after a commit) of the trial facts. A configuration found there means the ring is not forced — the line commits and the post-commit search draws it. Otherwise ADR-608's refusal stands.
+4. **The wording**: `input.ringContradictsNoun` (he + en) in the ruled text; 3-D's `err.ringContradictsNoun` and analytic's `errRingContradictsNoun` change in the same commit (ADR-3D-322, ADR-AG-256).
+
+**Measured after** (the same paths). «דלתון ABCD · מרובע ABDC» commits, and the figure shown has the kite as a dart with ABDC simple (`findValidConfig`'s reflection tier). The square, rectangle, rhombus, parallelogram and trapezoid members stay refused; the extra search costs 0–4 ms on them (it finds nothing), and ~1.3 s on the kite, where it replaces a refusal with the drawing the post-commit search then reuses. Every ADR-608 lock passes with the new text.
+
+**Not fixed, reported.** «מרובע ABCD · מרובע ABDC» (four free points) is still refused, unchanged from `main`: the same search finds no concave quadrilateral (2 raw seeds in 200 are concave; `findValidConfig` sweeps 40, and a free quadrilateral has no reflection dimension). Analytic draws it. Filed #1987 (`needs-operator`, proposed P2).
+
+**Sibling audit.** Analytic and 3-D are this ruling's other arms (ADR-AG-256, ADR-3D-322). #1968 (this round) narrows a generic polygon to simplicity in the same predicate; the two meet in `polygonsConvex` and compose (both reduce to `ringSimple`).
+
+**Locks.** `src/app/__tests__/issue-1927-crossed-ring.test.ts` — the kite rows, both orders, commit with both rings simple; the convex-when-simple shapes stay refused; every ADR-608 member and control, with the new text. Scenario `crossed-ring-search-first-1927` (corpus 4). Parity rows `crossed-ring-1927-08…10`.
+
+**Behaviour change for a student:**
+- «דלתון ABCD · מרובע ABDC» is drawn — the kite as a dart, ABDC a simple ring — instead of refused.
+- The ring refusal now ends «…או לשנות את מקומות הנקודות — …» ("…or move the points — …") instead of «או לשנות את השיעורים».

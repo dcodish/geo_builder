@@ -3401,12 +3401,22 @@ export function forcedCrossedRing(facts: Fact[], commands: AnyCommand[], seed = 
     const pool = sharedSamples(facts, { deadlineMs: SAMPLE_BUDGET_MS }); // the UI-thread gate, as `impliedByPrior`
     if (pool.samples.length === 0) return null;
     if (!pool.determined && pool.samples.length < FORCED_RING_MIN_SAMPLES) return null;
+    let trial: Fact[] | null = null;
     for (const ids of rings) {
       const forced = pool.samples.every((pos) => {
         const pts = ids.map((id) => pos.get(id));
         return pts.every(Boolean) && ringProperlyCrossed(pts as Vec[]);
       });
-      if (forced) return ids;
+      if (!forced) continue;
+      // SEARCH FIRST, REFUSE LAST (ADR-613): the prior pool is filtered by FR-EN-16's convexity DEFAULT, and this
+      // very ring makes that default yield on an earlier ring over its points (`convexityYields`) — so the prior
+      // pool never held the branch where the earlier ring is a dart and this one is simple. Search that branch with
+      // the one config search the app runs after a commit; a drawing found there is drawn, never refused.
+      if (convexityYields(facts, [ids]).size > convexityYields(facts).size) {
+        trial ??= trialFacts(facts, commands);
+        if (findValidConfig(trial, seed) !== null) continue;
+      }
+      return ids;
     }
     return null;
   } catch {
@@ -4318,25 +4328,75 @@ function declaredRings(cmd: AnyCommand): DeclaredRing[] {
 /** A ring's identity up to rotation and reversal — the engine's one definition (#1953, ADR-618). */
 export { ringKey };
 
+/**
+ * WHICH DECLARED RINGS' CONVEXITY DEFAULT YIELDS (#1927, [ADR-613](docs/06-decisions.md#adr-613) — the operator's
+ * "search first, refuse last", 2026-10-09).
+ *
+ * Convexity is FR-EN-16's DEFAULT for a named ring (M4: a default yields to a statement). A second declared ring
+ * over some of the same points, in another order, is such a statement: points in convex position have exactly
+ * ONE simple order — the hull's — so while the ring R is convex, a ring R' over a subset of R's points that orders
+ * them differently from R must cross. «דלתון ABCD · מרובע ABDC» is the case the operator ruled: on a dart, ABDC is
+ * a simple ring, and analytic draws it so. So R is held to SIMPLICITY instead of convexity (the stated-concave
+ * branch's rule, #441), and when R' covers exactly R's points the relation is symmetric and both yield.
+ *
+ * Not a carve-out by shape: a square, rectangle, rhombus, parallelogram or trapezoid is convex whenever it is
+ * simple, so yielding lets nothing new through for them and the crossed ring stays crossed in every
+ * configuration (ADR-608 still refuses it); the kite and the general quadrilateral can be darts, and now are
+ * when the student's own rings ask for it. A ring STATED convex («קמור») never yields: the statement wins.
+ *
+ * @returns the `ringKey`s of the rings that yield.
+ */
+function convexityYields(facts: Fact[], extra: Id[][] = []): Set<string> {
+  const statedConvex = new Set<string>();
+  const rings: Id[][] = [];
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    if (f.cmd.type === 'set-polygon-convexity') {
+      const c = f.cmd as { ids: Id[]; convex: boolean };
+      if (c.convex) statedConvex.add(ringKey(c.ids));
+      continue;
+    }
+    rings.push(...declaredRings(f.cmd));
+  }
+  rings.push(...extra);
+  const out = new Set<string>();
+  for (const r of rings) {
+    const key = ringKey(r);
+    if (statedConvex.has(key) || out.has(key)) continue;
+    const own = new Set(r);
+    for (const q of rings) {
+      if (q.length < 4 || !q.every((id) => own.has(id))) continue;
+      const sub = new Set(q);
+      if (ringKey(r.filter((id) => sub.has(id))) !== ringKey(q)) { out.add(key); break; }
+    }
+  }
+  return out;
+}
+
 export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean {
   // #441: convexity is the default only where the student stated NOTHING. A polygon stated concave is
   // exempt here — otherwise the requirement would be unsatisfiable and the figure could never draw —
   // and `checkGivens` enforces the statement instead. A stated-concave ring must still be SIMPLE, which
   // is the part of this guard that was never about convexity: `ringSimple` keeps rejecting the tangled
   // drawing, so "concave" buys the dart and nothing else.
+  //
+  // #1927 (ADR-613): the default yields to a second STATEMENT the same way — a ring another declared ring
+  // orders differently over its points (`convexityYields`) can only be simple, never convex, while that
+  // ring is simple too, so both are held to simplicity and the dart is reachable.
   const statedConcave = new Set<string>();
   for (const f of facts) {
     if (!f.enabled || f.cmd.type !== 'set-polygon-convexity') continue;
     const c = f.cmd as { ids: Id[]; convex: boolean };
     if (!c.convex) statedConcave.add(ringKey(c.ids));
   }
+  const yields = convexityYields(facts);
   for (const f of facts) {
     if (!f.enabled) continue;
     // #443: the rings the fact DECLARES — directly, or through the macro it expands into.
     for (const { ids, convex } of declaredRings(f.cmd)) {
-    // #1968: the simple floor — a ring stated concave (#441), or a top-level `polygon` (ADR-616), may be
-    // concave but never crossed.
-    if (!convex || statedConcave.has(ringKey(ids))) {
+    // #1968: the simple floor — a ring stated concave (#441), a top-level `polygon` (ADR-616), or a ring whose
+    // convexity default yields to another declared ring (#1927, ADR-613) may be concave but never crossed.
+    if (!convex || statedConcave.has(ringKey(ids)) || yields.has(ringKey(ids))) {
       const pts0 = ids.map((id) => positions.get(id));
       if (pts0.some((p) => !p)) continue;
       if (!ringSimple(pts0 as Vec[])) return false;

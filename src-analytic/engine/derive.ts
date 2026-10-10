@@ -551,13 +551,18 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * points, `ringDof > 0`), but in every valid candidate `drawableAt`'s walk evaluated it crossed and nowhere was it
    * simple (`Figure.forcedCrossed`), AND its shape is fixed up to an affine map (`shapeDof === 0`), which PROVES the
    * crossing in every configuration rather than in the ones sampled. «ריבוע ABCD · מרובע ACBD» is that: the square's
-   * points in a crossing order. «A(k,0) · B(4,0) · C(1,3) · D(3,3) · טרפז ABCD» is not — crossed at every sampled k,
-   * simple for k > 4 — and is never refused on samples. Crossed only — a flat ring with freedom is ADR-AG-247's
-   * `collapsedByGivens`. One ring at a time, never the figure.
+   * points in a crossing order. Crossed only — a flat ring with freedom is ADR-AG-247's `collapsedByGivens`. One ring
+   * at a time, never the figure.
+   *
+   * SEARCH FIRST, REFUSE LAST (#1927 / #1939, ADR-AG-256, the operator's ruling of 2026-10-09): the affine proof is
+   * sufficient, no longer necessary. `drawableAt` sets `forcedCrossed` only after it has searched every free quantity
+   * the sentence exposes — the walk over the free points, and the parameters past the default window — and found no
+   * simple drawing. «A(k,0) · B(4,0) · C(1,3) · D(3,3) · טרפז ABCD» is found simple at k > 4 and drawn; «טרפז ABCD ·
+   * מרובע ACBD» has no simple drawing whatever its free ratio, and is refused here.
    */
   const forcedCrossed = new Set(figure.forcedCrossed ?? []);
   const pinnedRingFaults = hardRingFaults(figure).filter(
-    (rf) => rf.ringDof === 0 || (rf.violation === 'crossed' && forcedCrossed.has(rf.id) && rf.shapeDof === 0),
+    (rf) => rf.ringDof === 0 || (rf.violation === 'crossed' && forcedCrossed.has(rf.id)),
   );
   if (completing === null && pinnedRingFaults.length > 0) {
     const alreadyFaulted = new Set(faults.map((f) => f.index));
