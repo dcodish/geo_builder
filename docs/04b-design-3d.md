@@ -427,6 +427,19 @@ point, a full `coords-eq` given, or a 0-DOF derived point of `DERIVED_POINT_KIND
 of the declaring fact and the facts that fixed its vertices is refused `ring-crossed` (`err.ringContradictsNoun`,
 analytic's text); a row already red keeps its own message.
 
+**And it must lie in ONE PLANE** (#1928, [ADR-3D-319](06b-decisions-3d.md#adr-3d-319)). `ringSkew3` (vec3.ts, the
+third ring predicate) measures the spread of a ring's vertices along the normal of its best-spanning triple
+(`runNormal`) over its greatest pairwise distance — 0 for a flat ring, scale-free, and 0 for a ring with no plane
+at all, which is the collapse predicate's business. `derive3` asks it of the same `declaredRings3` enumeration,
+against `CLAIM_REL_TOL`, under a WIDER scope than the crossing check: `placementFixers3(…, solidVertex: true)`
+also counts a vertex of a NON-FLAT solid as placed, because that solid's shape fixes it up to similarity
+(`coordinateFixers3` is the same walk with the solid arm off, which keeps ADR-3D-314's narrower ruled scope). The
+ring must additionally be skew at EVERY claim sample (`knowledgeSamples3(c, claimSeeds(seed))`, skipping an
+unplaced sample per ADR-3D-284 and failing open with none), so a free magnitude that could flatten it is never
+called a contradiction. The completing line is refused `givens-contradict` — the existing key, since reordering
+the letters cannot flatten four non-coplanar points. **Order at the site: collapse → skew → crossing**; a skew ring
+has no plane in which to judge a crossing.
+
 ### Claims
 
 Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape inside a

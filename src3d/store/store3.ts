@@ -35,13 +35,13 @@ import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from '
 import { applyCommand3, flatHeightReading3, freeDims } from '../engine/apply';
 import { declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
-import { scalePinned } from '../engine/solve3';
-import { checkInSpan, componentValue, firstSatisfyingSeed3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
-import { verifyClaim } from '../engine/claims';
+import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
+import { checkInSpan, componentValue, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
+import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
-import { dot3, norm3, ringSelfCrossing3, sub3, type Vec3 } from '../engine/vec3';
+import { dot3, norm3, ringSelfCrossing3, ringSkew3, sub3, type Vec3 } from '../engine/vec3';
 import { namedPointAt } from '../engine/crossings3';
-import { meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
+import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
 import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
 import { isBareAltitude3, parse3, parseRewrite3 } from '../parser/parse3';
@@ -404,8 +404,21 @@ const DERIVED_POINT_KINDS3: ReadonlySet<string> = new Set([
  *    coordinate points). An input that is not a point (a plane, a line, a symbol) is not judged: not fixed.
  * Never a measurement — a point that merely sits still at this seed is not fixed. Returns the facts that minted or
  * placed it (for the blame: the LATEST of them completed the ring), or null when it is not fixed.
+ *
+ * #1928 (ADR-3D-319) widened the SAME walk for the skew check, which the operator ruled over a larger scope
+ * ("fixed points … including points fixed by other givens", 2026-10-08): with `solidVertex`, a vertex of a
+ * NON-FLAT solid counts as placed too, because that solid's shape fixes the vertex's position up to similarity —
+ * no configuration of «קובייה ABCDA'B'C'D'» brings A, B, C and A' into one plane. A FLAT solid's vertex is not
+ * placed in that sense (its own ring is the configuration), and the crossed-ring check keeps the narrow,
+ * coordinate-only scope its ADR-3D-314 controls lock. One walk, two scopes — never two copies.
  */
-function coordinateFixers3(c: Construction3, facts: readonly Fact3[], id: Id, seen: Set<Id> = new Set()): Set<string> | null {
+function placementFixers3(
+  c: Construction3,
+  facts: readonly Fact3[],
+  id: Id,
+  solidVertex: boolean,
+  seen: Set<Id> = new Set(),
+): Set<string> | null {
   if (seen.has(id)) return null;
   seen.add(id);
   const def = c.points.get(id);
@@ -420,6 +433,16 @@ function coordinateFixers3(c: Construction3, facts: readonly Fact3[], id: Id, se
     return by;
   }
   if (def.kind === 'coord') return by;
+  if (def.kind === 'solid-vertex') {
+    const owner = c.solids[def.solid];
+    if (!solidVertex || owner === undefined || FLAT_SOLID_KINDS.has(owner.kind)) return null;
+    // the SOLID placed this vertex, and its command carries `ids`, not `id` — so the minter lookup above never
+    // finds it, and the refusal would name no statement at all. A solid vertex cannot predate its solid, so the
+    // first enabled fact that names the letter in a ring is that declaration.
+    const decl = facts.find((f) => f.enabled && f.cmds.some((k) => 'ids' in k && Array.isArray(k.ids) && (k.ids as unknown[]).includes(id)));
+    if (decl) by.add(decl.id);
+    return by;
+  }
   if (!DERIVED_POINT_KINDS3.has(def.kind)) return null;
   if (def.kind === 'on-segment' && def.t === undefined) return null; // a free rider
   if (def.kind === 'scaled-offset' && def.k === undefined) return null; // a free-ratio corner
@@ -433,12 +456,16 @@ function coordinateFixers3(c: Construction3, facts: readonly Fact3[], id: Id, se
   if (inputs.length === 0) return null;
   for (const q of inputs) {
     if (!c.points.has(q)) return null; // a plane, a line or a symbol: not judged here
-    const sub = coordinateFixers3(c, facts, q, seen);
+    const sub = placementFixers3(c, facts, q, solidVertex, seen);
     if (!sub) return null;
     sub.forEach((x) => by.add(x));
   }
   return by;
 }
+
+/** #1923 (ADR-3D-314)'s narrow reading: fixed BY COORDINATES only — a solid's vertex is not in its ruled scope. */
+const coordinateFixers3 = (c: Construction3, facts: readonly Fact3[], id: Id): Set<string> | null =>
+  placementFixers3(c, facts, id, false);
 
 export function derive3(facts: Fact3[], seed: number): Derived3 {
   const per = deriveMemo3.get(facts);
@@ -866,48 +893,120 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
   }
 
   /**
-   * #1923 (ADR-3D-314) — A DECLARED POLYGON OVER POINTS FIXED BY COORDINATES MUST BE A SIMPLE RING. Analytic's
-   * ADR-AG-129 in R³: «A(0,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD» names a ring whose sides BC and DA
-   * cross — not a trapezoid, not any quadrilateral — and it recorded green. Every declared ring is asked, in the
-   * order its declaration named it: a flat polygon (created, or bound over existing points) and a stated quad shape
-   * (`declaredQuads3`; a pyramid's base is generated simple). Only when EVERY vertex is coordinate-fixed
-   * (`coordinateFixers3`) — such a ring cannot move, so the drawn ring is the only one; a ring with a free vertex is
-   * the configuration preference's business, never a refusal. The line that COMPLETED it is refused: the latest of
-   * the declaration and the statements that fixed its vertices. Run after the claim pass, so a truer message (a
-   * rectangle's own claim refuted) wins, as in analytic.
+   * THE DECLARED RINGS, and who completed each — the one enumeration the ring checks share (docs/17 M3).
+   * A ring is DECLARED when the student named a flat shape over named letters, in that order: a flat polygon
+   * (created, or bound over existing points) and a stated quad shape (`declaredQuads3`; a pyramid's base is
+   * generated simple, so it carries no declaration of its own).
    */
-  {
-    const rings: Id[][] = [
+  const declaredRings3: Id[][] = (() => {
+    const all: Id[][] = [
       ...c.solids.filter((s) => s.kind === 'polygon4' || s.kind === 'polygon5').map((s) => s.ids),
       ...c.claims.flatMap((k) => (k.type === 'polygon-open' && k.ids.length >= 4 ? [k.ids] : [])),
       ...declaredQuads3(c).filter((q) => q.solid === undefined).map((q) => [...q.ids]),
     ];
-    const sameRing = (x: readonly Id[], y: readonly Id[]) => x.length === y.length && [...x].sort().join() === [...y].sort().join();
-    const declares = (k: Command3, ring: readonly Id[]) =>
-      ((k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && sameRing(k.ids, ring));
     const seenRings = new Set<string>();
-    for (const ring of rings) {
+    const out: Id[][] = [];
+    for (const ring of all) {
       if (seenRings.has(ring.join())) continue;
       seenRings.add(ring.join());
-      const pts = ring.map((id) => positions.get(id));
-      if (pts.some((p) => !p) || !ringSelfCrossing3(pts as Vec3[])) continue;
-      const by = new Set<string>();
-      let fixed = true;
-      for (const id of ring) {
-        const f = coordinateFixers3(c, facts, id);
-        if (!f) {
-          fixed = false;
-          break;
-        }
-        f.forEach((x) => by.add(x));
-      }
-      if (!fixed) continue;
-      const declaring = facts.find((f) => f.enabled && status[f.id] === 'ok' && f.cmds.some((k) => declares(k, ring)));
-      if (declaring) by.add(declaring.id);
-      // the LATEST of them completed the ring; if that line is already red (a truer message), it keeps its own
-      const blamed = [...facts].reverse().find((f) => f.enabled && by.has(f.id));
-      if (blamed && status[blamed.id] === 'ok') status[blamed.id] = { code: 'ring-crossed', stated: blamed.utterance };
+      out.push(ring);
     }
+    return out;
+  })();
+  const sameRing3 = (x: readonly Id[], y: readonly Id[]) => x.length === y.length && [...x].sort().join() === [...y].sort().join();
+  const declaresRing3 = (k: Command3, ring: readonly Id[]) =>
+    ((k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && sameRing3(k.ids, ring));
+  /**
+   * The LINE THAT COMPLETED this ring: the latest enabled fact among its declaration and the statements that
+   * placed its vertices. Returns it with the others it conflicts with, or null when some vertex is not placed in
+   * the requested scope (`solidVertex`) — a ring with a free vertex is the configuration's business, never a refusal.
+   */
+  const ringBlame3 = (ring: readonly Id[], solidVertex: boolean): { blamed: Fact3; by: Set<string> } | null => {
+    const by = new Set<string>();
+    for (const id of ring) {
+      const f = placementFixers3(c, facts, id, solidVertex);
+      if (!f) return null;
+      f.forEach((x) => by.add(x));
+    }
+    const declaring = facts.find((f) => f.enabled && status[f.id] === 'ok' && f.cmds.some((k) => declaresRing3(k, ring)));
+    if (declaring) by.add(declaring.id);
+    const blamed = [...facts].reverse().find((f) => f.enabled && by.has(f.id));
+    return blamed ? { blamed, by } : null;
+  };
+
+  /**
+   * #1928 (ADR-3D-319) — A DECLARED POLYGON OVER PLACED POINTS MUST LIE IN ONE PLANE. Amends ADR-3D-310, which
+   * checked a declared ring for COLLAPSE and nothing else: «A(0,0,0) · B(4,0,0) · C(4,3,0) · D(0,3,5) · מרובע ABCD»
+   * recorded green as a *skew* quadrilateral — D five units off the plane of A, B, C — and «מלבן ABCD» on the same
+   * points recorded too, because a rectangle's own claims (three right angles) all hold on that skew ring. Nothing
+   * asked the question a polygon answers by definition: a flat shape is FLAT (ADR-3D-172, "planarity is the shape's
+   * meaning", already says so for a corner the declaration mints).
+   *
+   * Scope is the operator's ruling of 2026-10-08, with its boundary against #1935 ruled on 2026-10-09: every vertex
+   * must be PLACED (`placementFixers3` with its solid arm — a coordinate, a coordinate given, a 0-DOF derived point,
+   * or a non-flat solid's vertex), so the givens genuinely cannot hold. A ring with at least one FREE vertex is
+   * BUILT, its free point driven into the plane (#1935) — never refused here.
+   *
+   * AND the ring must be skew at EVERY claim sample, not merely at the displayed seed: the claims' own invariance
+   * bar (`claimSeeds` × every parameter branch), so a free magnitude that could flatten the ring at some
+   * configuration is never called a contradiction. A sample the pivot left unplaced is not a figure and is skipped,
+   * `holdsAt`'s given rule (ADR-3D-284); with no placed sample the check fails open.
+   *
+   * Refused on the line that COMPLETED the ring, with the existing `givens-contradict` wording — #1923's
+   * `errRingContradictsNoun` would be false here, since it offers reordering the letters and no order makes four
+   * non-coplanar points flat. Ordered collapse → skew → crossing: a skew ring has no plane to judge a crossing in.
+   */
+  for (const ring of declaredRings3) {
+    const pts = ring.map((id) => positions.get(id));
+    if (pts.some((p) => !p) || ringSkew3(pts as Vec3[]) <= CLAIM_REL_TOL) continue;
+    const blame = ringBlame3(ring, true);
+    if (!blame || status[blame.blamed.id] !== 'ok') continue;
+    let placed = 0;
+    let flatSomewhere = false;
+    for (const r of knowledgeSamples3(c, claimSeeds(seed))) {
+      if (r.pivot !== null && r.pivot.solutions === 0) continue; // not a figure (ADR-3D-284)
+      placed++;
+      const at = ring.map((id) => r.positions.get(id));
+      if (at.some((p) => !p) || ringSkew3(at as Vec3[]) <= CLAIM_REL_TOL) {
+        flatSomewhere = true;
+        break;
+      }
+    }
+    if (placed === 0 || flatSomewhere) continue; // fail open: the ring can be flat, or there is no figure to judge
+    status[blame.blamed.id] = {
+      code: 'givens-contradict',
+      stated: blame.blamed.utterance,
+      others: namedStatements(blame.by, blame.blamed.id),
+    };
+  }
+
+  /**
+   * #1923 (ADR-3D-314) — A DECLARED POLYGON OVER POINTS FIXED BY COORDINATES MUST BE A SIMPLE RING. Analytic's
+   * ADR-AG-129 in R³: «A(0,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD» names a ring whose sides BC and DA
+   * cross — not a trapezoid, not any quadrilateral — and it recorded green. Only when EVERY vertex is
+   * coordinate-fixed (`coordinateFixers3`) — such a ring cannot move, so the drawn ring is the only one; a ring with
+   * a free vertex, or one a SHAPE alone determines, is outside the ruled scope. The line that COMPLETED it is
+   * refused. Run after the claim pass, so a truer message (a rectangle's own claim refuted) wins, as in analytic.
+   */
+  for (const ring of declaredRings3) {
+    const pts = ring.map((id) => positions.get(id));
+    if (pts.some((p) => !p) || !ringSelfCrossing3(pts as Vec3[])) continue;
+    const by = new Set<string>();
+    let fixed = true;
+    for (const id of ring) {
+      const f = coordinateFixers3(c, facts, id);
+      if (!f) {
+        fixed = false;
+        break;
+      }
+      f.forEach((x) => by.add(x));
+    }
+    if (!fixed) continue;
+    const declaring = facts.find((f) => f.enabled && status[f.id] === 'ok' && f.cmds.some((k) => declaresRing3(k, ring)));
+    if (declaring) by.add(declaring.id);
+    // the LATEST of them completed the ring; if that line is already red (a truer message), it keeps its own
+    const blamed = [...facts].reverse().find((f) => f.enabled && by.has(f.id));
+    if (blamed && status[blamed.id] === 'ok') status[blamed.id] = { code: 'ring-crossed', stated: blamed.utterance };
   }
 
   // #769 (ADR-3D-183) — A DERIVED POINT THAT LANDS ON AN EXISTING NAMED POINT IS NOT MINTED. The

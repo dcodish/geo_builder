@@ -200,6 +200,38 @@ export function ringSelfCrossing3(pts: Vec3[]): boolean {
     }
   return false;
 }
+/**
+ * #1928 (ADR-3D-319) — how SKEW a ring is: the spread of its vertices ALONG the normal of its best-spanning
+ * triple (`runNormal`), over the ring's extent (its greatest pairwise distance). 0 for a flat ring, and
+ * scale-free, so the caller judges it against one RELATIVE tolerance — `CLAIM_REL_TOL`, the number the claims
+ * already use (vec3 holds no tolerances of its own, and importing `operands` here would be a cycle).
+ *
+ * Third of the three ring predicates, beside `ringCollapsed3` (ADR-3D-310) and `ringSelfCrossing3` (ADR-3D-314),
+ * so "is this ring the shape it was declared to be" is answered in one place. A ring with no plane at all
+ * (fewer than 4 vertices, collinear, coincident, shrunk onto a point) is 0: that is the COLLAPSE predicate's
+ * business, and reporting skew for it would blame the wrong statement. `solve3`'s private `offPlaneSpread` is
+ * this measure in absolute units against a differently chosen plane; it serves the solver's own collapse band
+ * and is deliberately left alone.
+ */
+export function ringSkew3(pts: Vec3[]): number {
+  if (pts.length < 4) return 0; // a triangle is flat by construction
+  let span = 0;
+  for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) span = Math.max(span, norm3(sub3(pts[j], pts[i])));
+  if (span < 1e-12) return 0;
+  const nrm = runNormal(pts);
+  const mag = norm3(nrm);
+  if (mag < 1e-12) return 0; // no plane: collinear or coincident
+  const unit = scale3(nrm, 1 / mag);
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const p of pts) {
+    const h = dot3(sub3(p, pts[0]), unit);
+    lo = Math.min(lo, h);
+    hi = Math.max(hi, h);
+  }
+  return (hi - lo) / span;
+}
+
 /** How OPEN a ring is: its greatest spanning normal over its span squared (0 = on one line). Infinity for a
  *  ring too small to judge (fewer than 3 points, or shrunk onto a point). */
 export function ringOpenness3(pts: Vec3[]): number {
