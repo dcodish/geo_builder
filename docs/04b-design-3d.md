@@ -447,7 +447,10 @@ also counts a vertex of a NON-FLAT solid as placed, because that solid's shape f
 (`coordinateFixers3` is the same walk with the solid arm off, which keeps ADR-3D-314's narrower ruled scope). The
 ring must additionally be skew at EVERY claim sample (`knowledgeSamples3(c, claimSeeds(seed))`, skipping an
 unplaced sample per ADR-3D-284 and failing open with none), so a free magnitude that could flatten it is never
-called a contradiction. The completing line is refused `givens-contradict` — the existing key, since reordering
+called a contradiction. The completing line is refused `ring-not-flat` (`err.ringNotFlat`, [ADR-3D-325](06b-decisions-3d.md#adr-3d-325),
+#1978) — the same `stated`/`others` as the general `givens-contradict` it first reused, plus the vertex count (the
+noun, `err.polygonKind`) and the vertices, so the sentence says the shape is flat and these corners are not; with no
+other statement to name it falls back to `givensContradictAlone`. Never `ringContradictsNoun`, since reordering
 the letters cannot flatten four non-coplanar points. **Order at the site: collapse → skew → crossing**; a skew ring
 has no plane in which to judge a crossing.
 

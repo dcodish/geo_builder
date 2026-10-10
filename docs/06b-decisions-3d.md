@@ -12290,7 +12290,7 @@ The degradation policy is deliberately unchanged (a line this code does not comm
 **Locks.** `src3d/__tests__/already-defined-letters-1940.test.ts`; `student-text-1455` green again.
 ## ADR-3D-319 — A polygon declared over PLACED points must lie in one plane (#1928)
 
-**Status:** accepted · 2026-10-10 · bug (P1, honesty) · branch `fix/1928-skew-ring` off `main` @ 8e0debff · fix round #1959 · implements the operator's 2026-10-08 ruling on #1928 (P1; the body's outcome stands — *"refused, naming the declaration … Never drawn green"*) · amends [ADR-3D-310](#adr-3d-310) and extends [ADR-3D-314](#adr-3d-314) · the boundary against #1935 is the operator's ruling of 2026-10-09 ([ADR-W-122](06w-decisions-workspace.md#adr-w-122)'s pass)
+**Status:** accepted · 2026-10-10 · bug (P1, honesty) · branch `fix/1928-skew-ring` off `main` @ 8e0debff · fix round #1959 · implements the operator's 2026-10-08 ruling on #1928 (P1; the body's outcome stands — *"refused, naming the declaration … Never drawn green"*) · amends [ADR-3D-310](#adr-3d-310) and extends [ADR-3D-314](#adr-3d-314) · the boundary against #1935 is the operator's ruling of 2026-10-09 ([ADR-W-122](06w-decisions-workspace.md#adr-w-122)'s pass) · **Amended by [ADR-3D-325](#adr-3d-325)** (#1978, operator ruling 2026-10-10): decision 6's words — the skew ring gets its own code `ring-not-flat` and a sentence saying the shape is flat; the verdict and the blame stand
 
 **Requirements:** [docs/02b](02b-requirements-3d.md) FR-RD-7 — a declared polygon over placed points is never drawn off one plane; the line that completed it is refused · **Design:** [docs/04b](04b-design-3d.md), the *A declared polygon over fixed points* paragraph gains *And it must lie in ONE PLANE* — the predicate, the wider scope, the sample gate and the order of the three ring checks · **LADDER stage:** derive (a verifier after the claim pass; no new solve). 02w: none (3-D only — 2-D and analytic have no third coordinate).
 
@@ -12344,3 +12344,27 @@ The degradation policy is deliberately unchanged (a line this code does not comm
 **Sibling audit.** 2-D is the reference and is unchanged. The ∥ form is refused in both, and is pinned, not taught. Analytic's gap on «AE גובה» after a trapezoid is ADR-3D-315's already-reported found work and is not touched here.
 
 **Behaviour change for a student:** «משולש ABC» · «מ-A מורידים אנך לבסיס» now drops the foot onto BC with a real, non-zero altitude, where before E sat exactly on top of A — two labels on one dot and a zero-length height drawn green; a trapezoid drops on its parallel base. A length may now be stated on such an altitude («אורך AE = 3», «גובה מנקודה A לבסיס 4»), which was refused as a contradiction. «מ-D מורידים אנך לבסיס» where D is a free point or a rider on a side is now refused instead of drawing a perpendicular to the polygon's own plane, as 2-D refuses it.
+
+## ADR-3D-325 — The skew-ring refusal says a polygon is flat and these vertices are not (#1978)
+
+**Status:** accepted · 2026-10-10 · bug (P3) · branch `fix/1978-skew-ring-flat-wording` off `main` @ e0f4260c · fix round #1983 · implements the operator's ruling of 2026-10-10 on #1978 (option A of the decisions page, "lead with the rule"; the refusal itself stands, ruled on #1977) · amends decision 6 of [ADR-3D-319](#adr-3d-319)
+
+**Requirements:** [docs/02b](02b-requirements-3d.md) FR-RD-7 — the skew-ring refusal says the polygon is flat and its vertices are not in one plane · **Design:** [docs/04b](04b-design-3d.md), the *And it must lie in ONE PLANE* paragraph names the new code `ring-not-flat` in place of `givens-contradict` · **LADDER stage:** none (wording of an existing derive verifier). 02w: none (3-D only).
+
+**Context (re-measured at `e0f4260c`, `decideSubmit3`, seed 0; no model call).** «קובייה ABCDA'B'C'D'» · «מרובע ABCA'» refused the second line with «הנתונים סותרים זה את זה — אין גוף שמקיים את «מרובע ABCA'» יחד עם «קובייה ABCDA'B'C'D'»», as the issue reported. It names both statements but never the property that failed.
+
+**Root cause.** ADR-3D-319's skew arm deliberately reused the general `givens-contradict` code, whose sentence is about *any* unsatisfiable pin set and so cannot say which property failed. Rewording that code would make its other callers (#425's angle pins, the pin-owner refusal of `store3`) claim a flatness problem they do not have — its only callers are those and this arm, enumerated at pickup.
+
+**Decision.**
+1. **Its own code.** The skew arm in `derive3` now records `{ code: 'ring-not-flat', stated, others, sides, vertices }` — the same `stated`/`others` as before (same line, same `namedStatements`), plus the ring's vertex count and its vertices in declared order. The verdict, the blamed line, the sample gate and the order collapse → skew → crossing are unchanged. Every ring `declaredRings3` enumerates reaches it, quadrilateral or pentagon, so the noun is a parameter.
+2. **The operator's sentence, verbatim.** `err.ringNotFlat`: «{{kind}} הוא צורה שטוחה, והקודקודים {{vertices}} אינם נמצאים במישור אחד — ולכן «{{stated}}» לא מתקיים יחד עם {{others}}.» — `kind` from the existing `err.polygonKind` table by vertex count (ADR-3D-310's noun, the same one `polygon-collapsed` uses), `vertices` comma-joined, `others` the quoted list as before. English: "A {{kind}} is a flat shape, and the vertices {{vertices}} do not lie in one plane — so «{{stated}}» cannot hold together with {{others}}."
+3. **No other statement to name.** The ruled sentence names a second statement; when `others` is empty (one line both placed every vertex and declared the ring) the general `givensContradictAlone` text stands, unchanged from today.
+4. **Nothing else moves.** `givens-contradict` keeps its key and text for every other caller; `ring-crossed` (`ringContradictsNoun`) is untouched.
+
+**Measured after.** The reported pair reads «מרובע הוא צורה שטוחה, והקודקודים A, B, C, A' אינם נמצאים במישור אחד — ולכן «מרובע ABCA'» לא מתקיים יחד עם «קובייה ABCDA'B'C'D'».». The coordinate pentagon reads «מחומש הוא צורה שטוחה, והקודקודים A, B, C, D, E …»; the pyramid «מרובע SABC» and the coordinate rows carry it too. #425's contradictory angles keep their `givens-contradict` text byte for byte; the crossed trapezoid keeps `ring-crossed`.
+
+**Locks.** `src3d/__tests__/issue-1978-skew-ring-flat-wording.test.ts` — the operator's sequence and his exact sentence (He and En), the pentagon's noun in both languages, #1928's coordinate / pyramid / rectangle rows, the no-other-statement fallback, a non-skew `givens-contradict` byte-identical, `ring-crossed` untouched, the cube's flat section still recording. `issue-1928-skew-polygon.test.ts` now asserts the new code and text on its class rows. Fixtures-first: none — the essence is a refusal's text, which needs the bespoke assertion. Parity: none (a third coordinate; 2-D and analytic have no skew ring).
+
+**Sibling audit.** 2-D, analytic, complex: n/a — a ring in the plane is flat by construction.
+
+**Behaviour change for a student:** a flat shape named over corners that cannot lie in one plane is still refused on the same line, but the message now says why — «מרובע הוא צורה שטוחה, והקודקודים … אינם נמצאים במישור אחד» — and still names both statements, instead of only «הנתונים סותרים זה את זה».
