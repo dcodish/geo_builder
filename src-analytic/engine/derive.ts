@@ -398,16 +398,27 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * is that escalation, ruled: «P נקודת החיתוך של הישר AB עם הישר CD» on his own figure put P exactly on
    * B, with `faults: []`, and the sheet used that very figure as its CONTROL.
    *
-   * **The freedom predicate is the vacancy pass’s, for the same reason** (right above): silent while
-   * the figure can still move — another configuration may separate them, and #1273 is what will prefer
-   * it — reported once it cannot. That is the ruling’s own two branches, and it is why this sits here
-   * rather than in the parser: whether a coincidence is FORCED is a question about the figure.
+   * **THE PAIR'S OWN FREEDOM, NEVER THE FIGURE'S** (#1938, ADR-AG-254). The ruling's two branches are
+   * *"P and B must be on the same location"* versus *"one of them has a degree of freedom"* — a question
+   * about the PAIR. This arm borrowed the vacancy pass's whole-figure predicate (`reportedDof === 0`) as
+   * an approximation of it, and the approximation leaked exactly where #1929's ring arm leaked: «נקודה Q»
+   * typed first — any unrelated free point, line or circle — left the figure 1–2 DOF, the check never
+   * fired, and a second name was minted onto an existing point, green, with two labels on one dot. So the
+   * predicate is `Figure.separationDof(crossing, holder) === 0`: the freedom of the SEPARATION of those two
+   * points along the constraints, where a freedom elsewhere cancels out. On a determined figure it is 0 for
+   * every pair, so every figure this already refused is refused identically.
+   *
+   * The second branch keeps its silence, and keeps it for the right reason: a crossing whose carriers can
+   * still move off the holder has `separationDof > 0`, another configuration may separate them, and #1273
+   * is what will prefer it. Unmeasured (`undefined` — a point this configuration cannot place) is read as
+   * free: a false refusal is the worse defect. This is why the arm sits here rather than in the parser —
+   * whether a coincidence is FORCED is a question about the figure.
    *
    * Scoped to a point a sentence CROSSED into being — two incidences and a declaration. A midpoint or
    * a foot landing on an existing point is the same family and is deliberately left for the wider
    * ruling; refusing them here would reach past what was measured.
    */
-  if (freedom === 0) {
+  {
     const xs = figure.points.map((q) => q.x);
     const ys = figure.points.map((q) => q.y);
     const span = Math.max(1e-9, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
@@ -440,7 +451,11 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
         if (q.id === pt.id) return false;
         const qi = ownerLine(q.id);
         if (qi !== undefined && qi > index) return false; // only a point that was ALREADY there
-        return Math.hypot(q.x - pt.x, q.y - pt.y) < near;
+        if (!(Math.hypot(q.x - pt.x, q.y - pt.y) < near)) return false;
+        // …and FORCED there, not merely coincident in this configuration (#1938): asked of the pair, so an
+        // unrelated free point cannot silence it and a crossing free to move off `q` is still not accused.
+        // Asked only of a pair already found near, so a figure with no coincidence ranks nothing.
+        return figure.separationDof?.(pt.id, q.id) === 0;
       });
       if (!holder) continue;
       // The refusal names the two operands (#1416) — read off the crossing's own incidences, never assumed lines.

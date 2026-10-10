@@ -722,9 +722,12 @@ a sentence the tool parsed.
 - «זוית», «מעויין», «שוה» → read as «זווית», «מעוין», «שווה»
 - Sources: ADR-AG-155, #1407.
 
-**R60 — a crossing that lands on a point the figure ALREADY HAS is refused, naming it**. The crossing is affirmed and the name refused; a line crossed with itself gets an owned refusal (operator ruling).
+**R60 — a crossing that lands on a point the figure ALREADY HAS is refused, naming it**. The crossing is affirmed and the name refused; a line crossed with itself gets an owned refusal (operator ruling). The refusal is **the PAIR's business, whatever else in the figure is free** — the freedom of the separation of the crossing and the holder decides, never the figure's ([ADR-AG-254](06c-decisions-analytic.md#adr-ag-254)); a crossing that can still move off the holder keeps its silence, and «הציגו תצורה אחרת» may separate them.
 - «P נקודת החיתוך של הישר AB עם הישר CD» where it is `B` → refused, naming B
-- Sources: ADR-AG-125, ADR-W-066, #1175, #1255, ADR-AG-140, #1273.
+- «נקודה Q» · «A(0,0)» · «B(4,0)» · «D(0,4)» · «E(0,2)» · «F(4,2)» · «P נקודת החיתוך של הישר AD עם הישר EF» → refused, naming E, exactly as without «נקודה Q»
+- the line that FORCES the coincidence is refused too, with the figure still free: «A(0,0)» · «D(0,4)» · «F(4,2)» · «נקודה E» · «P נקודת החיתוך של הישר AD עם הישר EF» (drawn) · «E על ציר ה-y» → refused
+- a crossing genuinely free to move off the point it sits on still records (a free circle's «AC חותך את המעגל בנקודה E» on A — its own refusal is #1893's, a different sentence)
+- Sources: ADR-AG-125, ADR-W-066, #1175, #1255, ADR-AG-140, #1273, ADR-AG-254, #1938.
 
 **R60 — two positions the solver cannot tell apart are ONE position, and a determined point's locus is that point**. *(Operator: "a cluster inside solver resolution is not an option set".)* The tolerance derives from the solve's own stopping rule.
 - «המקום הגיאומטרי של M» on a determined M → «נקודה · (4, 0)»
