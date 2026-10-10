@@ -3785,3 +3785,79 @@ parameter listed, the ✓ row holding), «r = 2 · r ממשי» across seeds, th
 acceptance once declared complex, the controls, the polygon-name refusals, and two class guards (the
 catalog swap census; «I» after the polygon noun in every shape sentence). #1818 is open, so the
 fixture the plan named waits for it; the equivalence test carries the lock.
+
+## ADR-CX-062 — The subject reader asks the floor, not the length (#1948)
+
+**Status:** accepted, 2026-10-10 · class completion of [ADR-CX-061](#adr-cx-061) ·
+**Issue:** [#1948](https://github.com/dcodish/geo_builder/issues/1948) (bug, P3, `complex`) · round #1959
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-8 (the declaration row: which names a sentence may take as its subject) ·
+**Design:** [04d](04d-design-complex.md), "Design rules with teeth", the "A declaration is a type" bullet ·
+**Ladder:** stage 0b ([LADDER-CX](LADDER-CX.md))
+
+**The defect.** ADR-CX-061 closed the one-letter form; the multi-letter spelling was untouched. Measured
+on `8e0debff` through `submitLine` + `deriveLines`: «foo ממשי», «foo is real», «foo מספר ממשי» and «foo
+הוא מספר ממשי» each drew a free point «foo» at 2.09 on the real axis (2 configurations) and marked the
+claim ✓. So did «foo מדומה טהור» / «foo is pure imaginary» (on the imaginary axis), «foo ברביע הראשון»,
+«arg foo = 45», «arg foo < 45», «90 < arg foo < 180», «arg foo - arg bar = 90» (two points) and «foo
+ו-bar צמודים זה לזה» (two points).
+
+**Why ADR-CX-061's guard never fired.** It asks each rule `isRealLetter(name, scope)` — *"is this a REAL
+parameter letter?"* — which is `!isComplexName(name, scope) && isDeclarableName(name)`, and
+`isDeclarableName`'s floor is one letter plus an optional index. A multi-letter word is neither complex
+nor declarable, so it failed **both** halves of a two-sided test and no rule stopped it. The same hole
+swallowed every other non-name: a glued capital pair («AB ממשי» drew a point «ab») and the reserved
+constants, which `isDeclarableName` excludes on purpose — «i ממשי» drew a point «i» and reported ✓
+**real**, which is false, and «o ממשי» drew a point «o» away from the origin.
+
+**The class.** Not "words of length ≥ 2": *a rule asking a negative test where the question is positive.*
+The honest question is the one `declaration` has always asked of «u מספר מרוכב» — **does this figure read
+this name as a number at all?** Length was never the question; the floor is.
+
+**Decision.** One **subject reader**, `readSubjects(scope, ...raw)` in `parser/rules.ts`: it canonicalises
+the captured names and returns `null` — declining the line — unless every one of them clears
+`isDeclarableName`, widened by the families the student declared complex. Every rule that takes a `NAME`
+as its subject calls it, once, before anything else it does with that name, so the one-letter and
+multi-letter forms cannot drift apart again (the second copy of a test is how they diverged in the first
+place). `isRealLetter` keeps its ADR-CX-061 job — telling a real parameter from a complex name — and is
+now only ever reached for a name that is already on the floor.
+
+The rules that share the reader, from ADR-CX-061's census, all covered: `typeClaim`, `quadrantGiven`,
+`argumentRelation` (both arms), `argumentInequality` (both arms), `conjugatesClaim`, `solutionSelection`
+and `argumentQuery`. `declaration` already applied the floor itself and is the precedent. `genericPolar`,
+`forallPower`, `minimalPower`, `sequenceList` and `sequenceFirstTerms` require `isComplexName`, which is
+stricter, and the shape and measure rules read runs through `splitRun`/`shapePhrase`, not a subject —
+neither family is reachable by this defect.
+
+Two of those were not minting a point and are covered for the same reason the reader exists:
+- `solutionSelection` — «foo הוא הפתרון ברביע הרביעי» was **accepted and then bound nothing**: a stated
+  given vanished silently (the honesty invariant), and without roots it read `impossible`. It now refuses.
+- `argumentQuery` — a question never enacts `declares`, so nothing was drawn, but its `declares` was
+  computed from the negative test too. It now uses the positive one, `isComplexName(name, scope)`. The ask
+  itself stays readable and still answers honestly open: no student-visible change.
+
+**The refusal reuses ADR-CX-061's key**, `not-handled` — «לא הצלחתי להבין את המשפט: "…"» — with no new
+wording and no locale change. One message for one class.
+
+**Unchanged — the false-refusal net.** Length stopped mattering, so every *multi-character* name the
+figure does read as a number still works: «A1 ממשי», «z12 ממשי», «arg A1 = 45», «Z1 ממשי», «a12 ממשי»
+(a multi-character real parameter: no point, listed, ✓ row), and a declared family with an index —
+«u מספר מרוכב» · «u2 ממשי» / «u12 ברביע הראשון». Measured: a multi-letter *word* cannot be introduced as
+a number at all — «foo מספר מרוכב» was already refused before this fix, because `declaration` applies the
+floor — so refusing «foo ממשי» is the only end that does not invent a number the student never gave.
+ADR-CX-061's own cases are unchanged throughout.
+
+**Siblings.** The real-parameter / declared-family convention (ADR-CX-004) is complex-only; 2-D and 3-D
+have no subject reader of this kind. Not plane geometry, so no docs/22 §10 row.
+
+**Cost.** One predicate call per rule match, in the parser. No solve change.
+
+**Consequences.** `parser/rules.ts` only. A saved file, share link or resumed session holding a newly
+refused line loads without it under the existing partial-load notice (FR-SL-3). The proxy bundles
+`parseLineV2`, so it needs a redeploy at deploy.
+
+**Locks.** `src-complex/__tests__/phantom-word-1948.test.ts`: the refused table, per rule and per
+spelling, each asserting the `not-handled` key, no line kept, no point at three seeds, no parameter and
+no claim; the roots untouched after «z^6 = 1»; the glued pair and the reserved constants; «arg foo» still
+readable with an empty `declares`; the false-refusal net above; ADR-CX-061's cases unchanged; and two
+class guards — the catalog census with every z/w name swapped for «foo» (nothing declared), and every
+subject-reading sentence crossed with `foo` / `bar2` / `AB` / `i` / `o`.
