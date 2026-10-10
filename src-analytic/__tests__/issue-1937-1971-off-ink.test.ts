@@ -54,6 +54,23 @@ describe('#1937 — the operator’s concave quadrilateral: both spellings draw 
     expect(noun.verdicts).toEqual(verb.verdicts);
     expect(noun.pt('O')).toEqual(verb.pt('O'));
     expect(noun.ext).toEqual(verb.ext);
+    // Ruled 2026-10-10: outside the quadrilateral the noun spelling draws the two diagonals too — the same figure.
+    expect(noun.d.figure.segments).toEqual(verb.d.figure.segments);
+  });
+
+  it('Ruled 2026-10-10: outside, BOTH spellings draw the solid diagonals AC and BD', () => {
+    for (const line of ['אלכסוני המרובע נפגשים בנקודה O', 'O מפגש האלכסונים במרובע ABCD']) {
+      const keys = play([...CONCAVE, line]).d.figure.segments.map((s) => [...s.ends].sort().join(''));
+      expect(keys, line).toEqual(expect.arrayContaining(['AC', 'BD']));
+      expect(keys.filter((k) => k === 'AC' || k === 'BD'), `${line}: each once`).toHaveLength(2);
+    }
+  });
+
+  it('Ruled 2026-10-10: inside, #1751 stands — the noun spelling draws the point only, the verb spelling the diagonals', () => {
+    const keys = (line: string) => play([...CONVEX, line]).d.figure.segments.map((s) => [...s.ends].sort().join(''));
+    expect(keys('O מפגש האלכסונים במרובע ABCD')).not.toEqual(expect.arrayContaining(['AC']));
+    expect(keys('O מפגש האלכסונים במרובע ABCD')).not.toEqual(expect.arrayContaining(['BD']));
+    expect(keys('אלכסוני המרובע נפגשים בנקודה O')).toEqual(expect.arrayContaining(['AC', 'BD']));
   });
 
   it('the letter spellings agree with the role spellings', () => {
