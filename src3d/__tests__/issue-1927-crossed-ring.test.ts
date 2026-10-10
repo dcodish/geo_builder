@@ -80,8 +80,9 @@ describe('#1927 the class — a shape-placed ring crossed in every configuration
   });
 
   it('a saved list holding such a ring loads with the declaration row failed', () => {
-    const facts = play(['ריבוע ABCD', 'מרובע ADCB']).st.facts; // the simple order, recorded
-    const crossed: Fact3 = { ...facts[1], id: 'x', utterance: 'מרובע ACBD', cmds: [{ type: 'solid', kind: 'polygon4', ids: ['A', 'C', 'B', 'D'] }] };
+    // the square's own recorded row is the template (since #1953, ADR-3D-324, a restated simple order adds no row)
+    const facts = play(['ריבוע ABCD']).st.facts;
+    const crossed: Fact3 = { ...facts[0], id: 'x', utterance: 'מרובע ACBD', cmds: [{ type: 'solid', kind: 'polygon4', ids: ['A', 'C', 'B', 'D'] }] };
     expect(derive3([facts[0], crossed], 0).status.x).toEqual({ code: 'ring-crossed', stated: 'מרובע ACBD' });
   });
 });
@@ -98,17 +99,24 @@ describe('#1927 one ring is one cyclic order — the false reasons are gone', ()
     expect(play(['ריבוע ABCD', 'ריבוע ACBD']).kinds).toEqual(['record', 'refused']);
   });
 
-  it.each([[['ריבוע ABCD', 'ריבוע ADCB']], [['ריבוע ABCD', 'ריבוע CDAB']], [['פירמידה SABCD', 'ריבוע ABCD']]])(
+  // since #1953 (ADR-3D-324) a ring the figure already declares, read from another vertex or reversed, is that
+  // fact's restatement: «already stated», no second row — and never refused
+  it.each([[['ריבוע ABCD', 'ריבוע ADCB']], [['ריבוע ABCD', 'ריבוע CDAB']]])(
     '%j — the same ring read from another vertex or reversed is still the same ring',
     (lines) => {
-      expect(play(lines).kinds).toEqual(['record', 'record']);
+      expect(play(lines).kinds).toEqual(['record', 'already-stated']);
     },
   );
+  it('["פירמידה SABCD","ריבוע ABCD"] — a face the solid placed is the same ring, recorded', () => {
+    expect(play(['פירמידה SABCD', 'ריבוע ABCD']).kinds).toEqual(['record', 'record']);
+  });
 });
 
 describe('#1927 controls and the ruled boundary', () => {
+  it('["ריבוע ABCD","מרובע ADCB"] — the simple order is never refused; since #1953 it is the square restated', () => {
+    expect(play(['ריבוע ABCD', 'מרובע ADCB']).kinds).toEqual(['record', 'already-stated']);
+  });
   it.each([
-    [['ריבוע ABCD', 'מרובע ADCB']],
     [['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABDE']],
     [['משולש ABC', 'מרובע ABCD']],
   ])('%j records, the ring simple', (lines) => {
