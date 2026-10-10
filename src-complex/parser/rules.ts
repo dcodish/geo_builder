@@ -127,6 +127,31 @@ import { type Claim, type Unaccounted, claimAll, unaccountedSpans } from './span
 const isRealLetter = (name: string, scope: ComplexScope): boolean =>
   !isComplexName(name, scope) && isDeclarableName(name);
 
+/**
+ * #1948 (ADR-CX-062) — THE SUBJECT READER. The canonical names a sentence takes as its SUBJECT, or
+ * `null` to decline the line.
+ *
+ * A subject must be a name this figure can read as a NUMBER at all: the {@link isDeclarableName}
+ * floor `declaration` has always applied to «u מספר מרוכב» — a z/w name, a point label, or a
+ * one-letter (optionally indexed) parameter that is not `i` or `o` — widened by the families the
+ * student declared complex.
+ *
+ * #1894 asked each rule «is this a REAL letter?», and that test is `!isComplexName && isDeclarableName`:
+ * a word that is not a name at all («foo», «AB») and the reserved constants («i», «o») failed BOTH
+ * halves, so no rule stopped them and they entered the figure as free complex points — «foo ממשי»
+ * drew a point «foo» at 2.09, «i ממשי» drew a point «i» and marked the claim ✓ real. **Length was
+ * never the question; the floor is.** Every subject-reading rule asks HERE, once, so the one-letter
+ * and the multi-letter forms cannot drift apart again.
+ */
+const readSubjects = (
+  scope: ComplexScope,
+  ...raw: readonly (string | undefined)[]
+): string[] | null => {
+  const names = raw.filter((n): n is string => n !== undefined).map(canonName);
+  if (!names.length) return null;
+  return names.every((n) => isDeclarableName(n) || isComplexName(n, scope)) ? names : null;
+};
+
 /** A claim over `text` found at offset `at` of the normalized line. */
 const claimAt = (at: number, index: number, text: string): Claim => ({ start: at + index, end: at + index + text.length });
 
@@ -330,7 +355,7 @@ const declaration: Rule = (s, scope) => {
  * The filter is built by the SAME ordinal vocabulary F5 uses, so the two can never disagree about
  * what «הרביעי» means; the shared part is deliberately the predicate, not the sentence.
  */
-const solutionSelection: Rule = (s) => {
+const solutionSelection: Rule = (s, scope) => {
   // The solution noun, definite: «הפתרון» / «the solution». Indefinite «פתרון» is not this
   // sentence — it does not point at a set that already exists.
   if (!rx(SOLUTION_KW).test(s)) return null;
@@ -349,7 +374,12 @@ const solutionSelection: Rule = (s) => {
   const found = ORDINALS.find(([re]) => re.test(rest));
   const ord = found ? rest.match(found[0]) : null;
   if (!found || !ord) return null;
-  const name = canonName(placement.raw);
+  // #1948 (ADR-CX-062) — the selection binds its subject to one of the roots, so the subject must be a
+  // name the figure reads as a number: «foo הוא הפתרון ברביע הרביעי» was accepted and then bound
+  // nothing, which drops a stated given silently.
+  const subjects = readSubjects(scope, placement.raw);
+  if (!subjects) return null;
+  const [name] = subjects;
   // #1890 (ADR-CX-060): claim ONLY what was read — the name, the solution noun, the quadrant noun and
   // its ordinal, as `quadrantGiven` does. Claiming the whole line read «z0 הוא הפתרון שאינו ברביע
   // השלישי» as the selection IN quadrant III.
@@ -388,7 +418,9 @@ const quadrantGiven: Rule = (s, scope) => {
   const restAt = placement.restAt;
   const kw = rest.match(rx(QUADRANT_KW));
   if (!kw) return null;
-  const name = canonName(placement.raw);
+  const subjects = readSubjects(scope, placement.raw); // #1948 (ADR-CX-062)
+  if (!subjects) return null;
+  const [name] = subjects;
   // #1894 (ADR-CX-061) — a quadrant is where a complex number lies; a real-parameter letter is not read
   if (isRealLetter(name, scope)) return null;
   const found = ORDINALS.find(([re]) => re.test(rest));
@@ -427,8 +459,10 @@ const argumentQuery: Rule = (s, scope) => {
   const m = s.match(rx(`^${ARG_KW}\\s*(?:${OF_KW}\\s+)?\\(?\\s*(${NAME})\\s*\\)?$`));
   if (!m) return null;
   const name = canonName(m[1]);
-  // #1894 — only a name the figure reads as a NUMBER is declared (asks never enact `declares` today)
-  const declares = isRealLetter(name, scope) ? [] : [name];
+  // #1894 — only a name the figure reads as a NUMBER is declared (asks never enact `declares` today).
+  // #1948 (ADR-CX-062): the positive test, not the real-letter one — «arg foo» and «arg i» fell
+  // through the latter. The ask itself stays readable and answers honestly open, as it always has.
+  const declares = isComplexName(name, scope) ? [name] : [];
   return { ...empty(), argQueries: [{ name, src: s }], declares, claims: [claimAll(s)] };
 };
 
@@ -436,6 +470,7 @@ const argumentRelation: Rule = (s, scope) => {
   const two = s.match(rx(`^${ARG_KW}\\s*(${NAME})\\s*([+-])\\s*${ARG_KW}\\s*(${NAME})\\s*=\\s*(-?\\d+)$`));
   if (two) {
     const [, a, sign, b, deg] = two;
+    if (!readSubjects(scope, a, b)) return null; // #1948 (ADR-CX-062)
     // #1894 (ADR-CX-061) — an argument belongs to a complex number; a real-parameter letter is not read
     if (isRealLetter(canonName(a), scope) || isRealLetter(canonName(b), scope)) return null;
     if (sign === '-') {
@@ -466,7 +501,9 @@ const argumentRelation: Rule = (s, scope) => {
   }
   const one = s.match(rx(`^${ARG_KW}\\s*(${NAME})\\s*=\\s*(-?\\d+)$`));
   if (!one) return null;
-  const name = canonName(one[1]);
+  const subjects = readSubjects(scope, one[1]); // #1948 (ADR-CX-062)
+  if (!subjects) return null;
+  const [name] = subjects;
   if (isRealLetter(name, scope)) return null;
   return {
     ...empty(),
@@ -555,6 +592,7 @@ const argumentInequality: Rule = (s, scope) => {
   const both = s.match(rx(`^(-?\\d+)\\s*(${CMP})\\s*${ARG_KW}\\s*(${NAME})\\s*(${CMP})\\s*(-?\\d+)$`));
   if (both) {
     const [, lo, opLo, name, opHi, hi] = both;
+    if (!readSubjects(scope, name)) return null; // #1948 (ADR-CX-062)
     if (isRealLetter(canonName(name), scope)) return null; // #1894 — an argument is a complex number's
     // the left comparator points INTO the window, so «90 < arg z» is a lower bound and «90 > arg z» an upper one
     const low = isBelow(opLo) ? Number(lo) : Number(hi);
@@ -570,7 +608,9 @@ const argumentInequality: Rule = (s, scope) => {
   const one = s.match(rx(`^${ARG_KW}\\s*(${NAME})\\s*(${CMP})\\s*(-?\\d+)$`));
   if (!one) return null;
   const [, raw, op, deg] = one;
-  const name = canonName(raw);
+  const subjects = readSubjects(scope, raw); // #1948 (ADR-CX-062)
+  if (!subjects) return null;
+  const [name] = subjects;
   if (isRealLetter(name, scope)) return null;
   return {
     ...empty(),
@@ -727,7 +767,9 @@ const conjugatesClaim: Rule = (s, scope) => {
   const tailAt = s.length - m[4].length;
   const conj = m[4].match(rx(CONJUGATE_KW));
   if (!conj) return null;
-  const [a, b] = [canonName(m[2]), canonName(m[3])];
+  const pair = readSubjects(scope, m[2], m[3]); // #1948 (ADR-CX-062)
+  if (!pair) return null;
+  const [a, b] = pair;
   // #1894 (ADR-CX-061) — conjugates are complex numbers; a real-parameter letter is not read
   if (isRealLetter(a, scope) || isRealLetter(b, scope)) return null;
   // #1890 (ADR-CX-060): the subject pair, the conjugate word and «זה לזה» — never the whole line, which
@@ -756,7 +798,8 @@ const typeClaim: Rule = (s, scope) => {
   if (!m) return null;
   const read = readProperty(s, s.length - m[4].length);
   if (!read) return null;
-  const names = [m[2], m[3]].filter((n): n is string => n !== undefined).map(canonName);
+  const names = readSubjects(scope, m[2], m[3]); // #1948 (ADR-CX-062)
+  if (!names) return null;
   /**
    * #1894 (ADR-CX-061) — the subject's TYPE decides what the line is. A real-parameter letter with
    * «ממשי» is the 02d F1 declaration of a real parameter: no point (`realTyped`, never `declares`), and

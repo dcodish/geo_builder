@@ -123,7 +123,6 @@ describe('#1890 — the per-spelling table', () => {
     ['z1 is real or imaginary', 'unaccounted', 'real'],
     ['z1 has real part 3', 'unaccounted', 'has, part, 3'],
     ['z1 מספר ממשי גדול מ-2', 'unaccounted', 'גדול, מ, -, 2'],
-    ['let z1 be real', 'unaccounted', 'z1'],
     ['w ממשי טהור', 'unaccounted', 'טהור'],
     ['z1 ממשי בלבד', 'unaccounted', 'בלבד'],
     ['z1 is real valued', 'unaccounted', 'valued'],
@@ -137,6 +136,19 @@ describe('#1890 — the per-spelling table', () => {
     ['z1 לא ברביע הראשון', 'negation', 'לא', 'לא'],
     ['z1 is not in the first quadrant', 'negation', 'not', 'not'],
   ];
+  // #1948 (ADR-CX-062) — moved out of the table, which carries one message template per key. This row
+  // read «unaccounted: z1» because the subject reader took «let» for the subject and left «z1», the one
+  // word the figure DOES know, as the unread one. The name floor refuses «let», so the whole sentence is
+  // not understood and reaches the LLM seam — the honest answer, and the key the rest of the class uses.
+  it('«let z1 be real» — the unsupported phrasing is not understood, and never blames «z1»', () => {
+    expect(play('let z1 be real')).toBe(false);
+    const e = store().lastError;
+    expect(e?.key).toBe('not-handled');
+    expect(e && 'detail' in e ? e.detail : '').toBe('let z1 be real');
+    expect(shown('he')).not.toContain(UNREAD_HE('z1'));
+    expect(store().lines).toHaveLength(0);
+  });
+
   it.each(TABLE.map(([l, k, d, w]) => [l, k, d, w ?? ''] as [string, string, string, string]))('«%s» → %s (%s)', (line, key, detail, word) => {
     expect(play(line)).toBe(false);
     const e = store().lastError;

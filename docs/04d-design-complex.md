@@ -188,6 +188,15 @@ never as a contradiction or a refutation.
   `isComplexName(name, scope)`; [ADR-CX-061](06d-decisions-complex.md#adr-cx-061)): a real-parameter letter
   is never declared. «a ממשי» reports `realTyped`, which the fold samples as a parameter and whose claim
   holds by type and never drives; the quadrant, argument and conjugates sentences decline a real letter.
+  **And there is one subject reader, `readSubjects(scope, …)`** ([ADR-CX-062](06d-decisions-complex.md#adr-cx-062)):
+  every rule that takes a `NAME` as its subject — `typeClaim`, `quadrantGiven`, `argumentRelation`,
+  `argumentInequality`, `conjugatesClaim`, `solutionSelection`, `argumentQuery` — goes through it before
+  it does anything with that name, and it declines the line unless every captured name clears the
+  `isDeclarableName` floor `declaration` applies, widened by the declared families. The test is POSITIVE
+  for a reason: `isRealLetter` is two negatives, so a word that is not a name («foo»), a glued pair
+  («AB») and the reserved constants (`i`, `o`) failed both halves and fell through into the figure as
+  free points. Length is never the question; the floor is, and asking it once is what keeps the
+  one-letter and multi-letter forms from drifting apart.
   **There is one shape phrase, `shapePhrase()`**: the noun, and after «מצולע» the polygon-name slot
   (`POLYGON_NAME_KW`), recognised so a name is never a vertex and left unclaimed (`shapeClaims`) until
   G5-1 reads it.
