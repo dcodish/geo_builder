@@ -109,6 +109,12 @@ write-then-delete before handing over the link — a page that cannot save is a 
   and `unicode-bidi: isolate`, and the outcome goes on its own LTR line beneath it — never inline after
   the Hebrew, where the bidi algorithm reorders it. Mixed Latin letters (`ABCD`), `∠`, `°` and `·` inside
   a Hebrew sentence are exactly what breaks in the chat; isolation is what fixes it.
+- **ONE UTTERANCE PER LINE. Never join several on one line** — not with «·», not with commas, not at all
+  ([ADR-W-122](../../../docs/06w-decisions-workspace.md) point 2a, amended 2026-10-10 after exactly this
+  failure). «טרפז ABCD · E על BC · AE גובה» is a *single* RTL run, so the algorithm reorders the segments
+  around the separators and **the order of the steps — the one thing the card is asking about — comes out
+  wrong**. Isolation does not save it: the reordering happens *inside* the isolate. Stack the utterances,
+  one block each, in the order typed, exactly as the play sheet does in its code blocks.
 - **One card = one decision.** Never bundle two decisions into one question. A card with several
   sub-questions (one model, five answers) gives each its own saved answer.
 - **Plain language on the page; precision in the transcription.** He is deciding what the product should
