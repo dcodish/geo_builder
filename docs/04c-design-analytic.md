@@ -863,6 +863,7 @@ its ends are `engine/lines.ts`'s `isVertical` / `isHorizontal` with `VERTICAL_TO
   diagonals are parallel. ADR-AG-021's segment interval survives as a **preference** in `drawableAt`: a configuration
   whose meet is on both diagonals beats one whose meet needs an extension. That is the strength the old vacancy had,
   so a figure that can be drawn crossed still opens crossed and is judged as before.
+- **Ruled 2026-10-10: the noun spelling draws the diagonals when the meet is off them.** `evaluate` asks `offInkExtensions` over the two diagonal spans alone. When a stretch is owed, it adds the diagonals the figure does not draw yet, under `segmentIdOf`, the verb spelling's ids, so the two spellings' figures are identical. Inside, #1751 stands.
 - **The attribution.** A `meet-of` names its point on its own line in `derive`'s `lineOf`, so a vacancy of it is
   reported like any other named point and is never recorded silently.
 - **The extension.** Decoration, like `constructionOf`: `evaluate` computes `Figure.extensions` from

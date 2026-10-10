@@ -440,7 +440,7 @@ From the «lines and points» corpus (§8), numbered onward.
 
 **R62 — a diagonal is an object, and a concurrency point has a verb**. Vertices are optional when the figure has one shape to mean, refused otherwise.
 - «אלכסוני המרובע ABCD נפגשים בנקודה O» ≡ «O מפגש האלכסונים במרובע ABCD»
-- The diagonals MEET where their LINES cross, as in the 2-D tool (operator ruling 2026-10-09, #1937). On a concave quadrilateral O is drawn outside the shape, with the diagonal extended, dashed, out to it (R176). Both spellings give the same verdict and the same O. A figure that can be drawn with its diagonals crossing is still drawn that way.
+- The diagonals MEET where their LINES cross, as in the 2-D tool (operator ruling 2026-10-09, #1937). On a concave quadrilateral O is drawn outside the shape, with the diagonal extended, dashed, out to it (R176). Both spellings give the same verdict and the same O. **Ruled 2026-10-10:** when O falls outside, the noun spelling also draws the two diagonals, so both spellings give the same figure. Inside, the noun spelling draws the point only (#1751). A figure that can be drawn with its diagonals crossing is still drawn that way.
 - Sources: ADR-AG-037, ADR-AG-182, ADR-AG-255.
 
 **R75 — naming a shape draws it**. With its noun's givens, absorbed if already there; «שטח ABC הוא 6» draws nothing.

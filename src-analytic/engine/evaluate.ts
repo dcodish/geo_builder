@@ -22,6 +22,7 @@ import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type Rin
 import { angleAt, dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { carryingLines } from './carryingLines';
+import { segmentIdOf } from './cevian';
 import { offInkExtensions } from '../../shell/offInk';
 import { curveByName, inDomain, isFree, objectById, type ArcDef, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type OrderSide, type Selector } from './types';
 
@@ -3017,6 +3018,39 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
    * shared planar one (`shell/offInk`), over the ink this figure draws — its segments and its stated lines.
    */
   const placedAt = new Map(points.map((p) => [p.id, p] as const));
+  /*
+   * **Ruled 2026-10-10 (#1937, ADR-AG-255):** a diagonal meet that falls OFF its diagonals draws the two diagonals
+   * themselves, whichever spelling named it, so «O מפגש האלכסונים» and «אלכסוני המרובע נפגשים בנקודה O» give the
+   * same figure there. Inside, #1751 (ADR-AG-241) stands: the noun spelling draws the point only. "Off" is the shared
+   * off-ink decision itself, asked over the diagonals' spans alone: a stretch is owed exactly when the meet is beyond one.
+   */
+  const drawnKeys = new Set(segments.map((s) => [...s.ends].sort().join('|')));
+  for (const o of c.objects) {
+    if (o.kind !== 'derived' || o.rule.t !== 'diagonals') continue;
+    const m = placedAt.get(o.id);
+    const [a, b, cc, d] = o.rule.v.map((id) => placedAt.get(id));
+    if (!m || !a || !b || !cc || !d) continue;
+    const off = offInkExtensions(
+      [
+        { p: m, a, b: cc },
+        { p: m, a: b, b: d },
+      ],
+      [],
+    );
+    if (off.length === 0) continue;
+    for (const [i, j] of [
+      [0, 2],
+      [1, 3],
+    ] as const) {
+      const ends: [Id, Id] = [o.rule.v[i], o.rule.v[j]];
+      const key = [...ends].sort().join('|');
+      if (drawnKeys.has(key)) continue;
+      drawnKeys.add(key);
+      const pa = placedAt.get(ends[0])!;
+      const pb = placedAt.get(ends[1])!;
+      segments.push({ id: segmentIdOf(ends[0], ends[1]), a: { x: pa.x, y: pa.y }, b: { x: pb.x, y: pb.y }, ends });
+    }
+  }
   const extensions = offInkExtensions(
     carryingLines(c).flatMap((k) => {
       const p = placedAt.get(k.id);
