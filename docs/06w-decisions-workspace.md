@@ -5369,7 +5369,7 @@ On a phone (out of scope, NFR-US-4) only the top third of the figure shares the 
 
 ## ADR-W-114 — A fix round runs its items in parallel, test runs queue on one lock, and a question never pauses the round (#1813)
 
-**Status:** accepted · 2026-10-06 · the remaining round-speed items of #1813 (file splitting stays open). Ruling cited:
+**Status:** accepted · 2026-10-06 · the remaining round-speed items of #1813 (file splitting stays open). · **Amended by [ADR-W-123](#adr-w-123) (2026-10-10):** the lock serves its waiters in arrival order (#1949). Ruling cited:
 - **2026-10-06, operator:** *"the goal is to dramatically reduce the testing time so we can speed up the rounds"*. Asked whether to build the remaining items, the operator answered *"now"*.
 
 **Requirements:** none (internal). · **Design:** [08](08-testing-strategy.md) "Two tiers": test runs queue on one lock. [22](22-workflow.md) §2d: execution is parallel by chokepoint stream. **Product:** workspace (test tooling and the fix-round workflow).
@@ -5689,3 +5689,22 @@ So: §1's thesis and P6's reason are his; the trace (ADR-AG-062) stays; the rela
 6. **Pacing becomes his.** The whole set ships at once and he works it at his own speed, so the old "stop every ~6 decisions" rule is dropped — it existed because the chat forced a serial interrogation.
 
 **Consequences.** A pass costs one page build before the first question, and the dossier work (Steps 1–2) is unchanged — it is still done in full before he is asked anything. The same reasoning already governs the play sheet, whose evidence ships as a published `report.html` ([ADR-W-092](#adr-w-092)): anything the operator must *read in Hebrew* to judge belongs on a rendered page, not in terminal text. Where a future surface needs his judgement on Hebrew (a wording review, a refusal sweep), it follows this ADR rather than inventing its own channel.
+
+## ADR-W-123 — The shared suite lock is FIRST COME, FIRST SERVED: waiters queue on FIFO tickets
+
+**Status:** accepted · 2026-10-10 · **Issue:** #1949 (debt, P3, workspace) · round #1959 · **Amends:** [ADR-W-114](#adr-w-114), which made the one-lock-across-worktrees rule but left acquisition unordered.
+**Operator ruling:** none owed. A student sees nothing here — `scripts/suite-lock.mjs` is session tooling, so this is mechanism, which a session decides alone ([ADR-W-117](#adr-w-117) / CLAUDE.md rule 7). The plan was armed `auto-ok` under [ADR-W-014](#adr-w-014) Am. 1.
+
+**Requirements:** none (internal) · **Design:** none (internal)
+
+**Context.** ADR-W-114 made every test run across every worktree queue on one lock, but the wait was only a poll loop — `sleepSync(POLL_MS)`, 2000 ms by default — with no queue and no ordering. The lock therefore went to whichever waiter happened to poll in the window after a release, so a waiter's wait had **no bound and no fairness**: with eleven streams contending, one stream of round #1940 waited about an hour. The unfairness is structural, not a bad run: measured at 8e0debff with two waiters on an isolated lock path, the waiter that **arrived first** but polled every 1500 ms lost to the waiter that arrived second and polled every 25 ms, three times out of three. Stale-holder reclaim (`MAX_HOLD_MS`, pid liveness) already worked and was never the problem.
+
+**Decision.**
+1. **A waiter takes a ticket.** On entry it writes `<lock>.queue/<arrival ms>.<pid>` — beside the lock, in the git common dir every worktree already shares, so there is **one** line and not one per tree. Arrival time orders the line; the pid breaks a tie between two waiters that arrived in the same millisecond, giving every process the same total order.
+2. **Only the head of the line attempts the lock.** A waiter whose ticket is not the lowest live one just sleeps, so no one can jump the queue however fast it polls.
+3. **The holder keeps its place until it releases**, and the head is computed *skipping the holder's own ticket* — so the waiter behind a holder still reaches the stale-holder takeover, and `MAX_HOLD_MS` reclaim is untouched by the new ordering.
+4. **A dead waiter's ticket is reclaimed** by any waiter that notices, using `isPidAlive` — the SAME pid test the stale-holder path uses, so a process is never dead for the queue and alive for the lock. A ticket has no timeout of its own: a long wait must not cost a waiter its place, which is the whole point.
+5. **Ordering only; exclusion is unchanged.** The lock is still published by hard-linking a fully written draft onto the lock name, so a lost or doubled ticket can misorder the line but can never let two runs overlap. The poll loop stays the wait primitive — only the *decision* to attempt the lock changed.
+6. **Re-entry still bypasses the queue entirely.** A command run with `GEO_SUITE_LOCK_HELD=1` (the holder's own child, as in `test:locked -- npm run test:full`) takes no ticket and waits for nothing.
+
+**Consequences.** A stream's wait is now bounded by the runs ahead of it instead of by luck, which is what makes a parallel round's gate times predictable. The waiting line reads `… N ahead of you`, so a session can see its position instead of guessing. `<lock>.queue/` is left in place when the line empties — one empty directory in the git common dir, never committed, and deliberately never deleted so a waiter's ticket write cannot race a cleanup. The locks live in `server/__tests__/suite-lock.test.ts`: three waiters served in arrival order though the first polls 60× slower, a killed waiter's ticket reclaimed rather than wedging the line, and the re-entry escape taking no ticket — alongside the four ADR-W-114 stale-lock tests, which pass unchanged.
