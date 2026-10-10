@@ -41,7 +41,7 @@
 
 import { expect } from 'vitest';
 import { replay } from '@/store/geoStore';
-import { isGeoPoint, freeDofCount, detectRelations, detectShapes } from '@/engine';
+import { isGeoPoint, freeDofCount, detectRelations, detectShapes, ringSimple } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 
 import type { Scenario } from './scenarios-harness';
@@ -3871,6 +3871,19 @@ export const SCENARIOS_4: Scenario[] = [
         expect(dist(ext[0].a, end), 'from the side’s nearer end').toBeLessThan(1e-6);
         expect(dist(ext[0].b, e), 'out to the foot').toBeLessThan(1e-6);
       }
+    id: 'inscribed-octagon-never-crossed-1968',
+    title:
+      '#1968 (ADR-616): «מתומן ABCDEFGH חסום במעגל» — no press of «הציגו תצורה אחרת» draws the octagon self-crossing',
+    guards:
+      "Found in round #1959 (ADR-610's Not-covered note) and ruled by the operator on 2026-10-10, option B: a generic polygon must be SIMPLE, never self-crossing. Measured on e0f4260c through firstSatisfyingSeed + searchAnotherView: 6 of 24 presses drew the inscribed octagon crossed (the issue measured 4 of 13). Root cause (ADR-616): `declaredRings` exempted a top-level `polygon` from the convexity default whole (ADR-472, 'an arbitrary ring, which may legitimately be concave'), and the exemption bought the CROSSED ring with the concave one. Fix: every declared ring is read, and a top-level polygon carries the SIMPLE floor (the stated-concave branch's own `ringSimple` test). The unit matrix is src/replay/__tests__/issue-1968-ring-simple-floor.test.ts.",
+    steps: ['מתומן ABCDEFGH חסום במעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const ids = 'ABCDEFGH'.split('');
+      for (const view of pressAll(factsOf(['מתומן ABCDEFGH חסום במעגל']), 24)) {
+        expect(ringSimple(ids.map((id) => at(view, id))), 'every view the button offers is a simple octagon').toBe(true);
+      }
+      expect(ringSimple(ids.map((id) => at(fig, id))), 'and so is the default').toBe(true);
     },
   },
 ];
