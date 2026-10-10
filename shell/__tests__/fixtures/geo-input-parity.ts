@@ -261,6 +261,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1926': 'open',
   '#1927': 'open',
   '#1961': 'open',
+  '#1969': 'open',
 };
 
 export interface ParityRow {
@@ -1232,6 +1233,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1923 (ADR-3D-314, ADR-AG-129): a polygon declared over coordinate points whose ring crosses itself is refused in
   // analytic's words. Coordinates are X1 (2-D has no coordinate frame).
   { id: 'crossed-ring-1923', family: 'topic', steps: ['טרפז ABCD', 'A(0,0)', 'B(4,0)', 'C(1,3)', 'D(3,3)'], contextFor: { '2d': ['טרפז ABCD'] }, expect: 'refused', exception: 'X1', only: ['analytic'], note: 'the coordinate that makes sides BC and DA cross is refused; 3-D (z = 0, both orders) is locked in issue-1923-crossed-ring.test.ts; 2-D refuses the coordinate itself (X1)' },
+  // #1941 (ADR-609) and #1891 (ADR-610), round #1959: a bare letter run is a container for an inscribed
+  // circle, and an n-gon inscribed in a circle BUILDS with its circle drawn. Measured on the round's tip:
+  // 3-D lowers the bare run exactly as it lowers the noun spelling (no direction defect there) and reads
+  // the plain inscribed n-gon as `concyclic` + `circle3`; analytic reads no inscription sentence (#1969),
+  // and 3-D has no regular n-gon (#1679's existing park, as cat-2d-019 already records).
+  { id: 'cat-2d-inscribed-bare-run-1941', family: 'inscribed', steps: ['משולש ABC', 'מעגל חסום ב-ABC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1969' }] },
+  { id: 'cat-2d-inscribed-ngon-plain-1891', family: 'inscribed', steps: ['מחומש ABCDE חסום במעגל'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1969' }] },
+  { id: 'cat-2d-inscribed-ngon-regular-1891', family: 'inscribed', steps: ['מחומש משוכלל ABCDE חסום במעגל'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1969' }, { product: '3d', issue: '#1679', parked: true }], note: '3-D has no regular n-gon at all; analytic reads no inscription sentence (#1969)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
