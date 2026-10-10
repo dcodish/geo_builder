@@ -15686,6 +15686,7 @@ A list beginning at **(3)**, with no (1) and no (2) anywhere on screen, introduc
 **Cost.** One pass over the carriers per scene build, O(carriers × drawn ink). No replay or solver change.
 
 **Locks.** `src/__tests__/issue-1971-off-ink-extension.test.ts` holds the trapezoid, the obtuse triangle, a foot on its side, an extension point the ink already reaches, the convex diagonal meet, a six-seed check that a stretch exists exactly when E is beyond DC, and the `carryingLines` table. The scenario `height-foot-beyond-side-dashed-1971` is in `scenarios-corpus-4.ts`, swept over every shown seed. `shell/__tests__/offInk.test.ts` holds the geometry.
+
 ## ADR-616 — A declared ring is never offered self-crossing: a top-level polygon carries the SIMPLE floor, not a whole exemption (#1968)
 
 **Status:** accepted · 2026-10-10 · bug (P3, 2-D) · branch `fix/1968-generic-polygon-simple` · fix round #1983 · **amends [ADR-472](#adr-472)** (#443 — the code comment called it "ADR-479"; corrected) · closes the gap [ADR-608](#adr-608) recorded for the pentagram and [ADR-610](#adr-610)'s **Not covered** note
@@ -15722,6 +15723,7 @@ The pentagram line itself is already refused at both commit seams by ADR-608 (re
 **Behaviour change for a student:**
 - «מתומן ABCDEFGH חסום במעגל»: pressing «הציגו תצורה אחרת» never draws the octagon with its sides crossing (it did on about one press in four). The first view is unchanged.
 - Nothing else a student can type changes: every pentagon and hexagon view was already simple, and the pentagram line is still refused with ADR-608's message.
+
 ## ADR-618 — A ring the figure already declares is read in its declared spelling: a polygon restated rotated or reversed takes the verdict its declared spelling takes (#1953)
 
 **Status:** accepted · 2026-10-10 · bug (P3, 2-D, 3-D, analytic) · branch `fix/1953-restated-ring` off `main` @ e0f4260c · fix round #1983 · twins [ADR-3D-324](06b-decisions-3d.md#adr-3d-324), [ADR-AG-259](06c-decisions-analytic.md#adr-ag-259) · reuses `ringKey` ([ADR-W-121](06w-decisions-workspace.md#adr-w-121))

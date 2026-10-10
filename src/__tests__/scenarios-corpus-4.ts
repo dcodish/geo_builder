@@ -3872,6 +3872,9 @@ export const SCENARIOS_4: Scenario[] = [
         expect(dist(ext[0].a, end), 'from the side’s nearer end').toBeLessThan(1e-6);
         expect(dist(ext[0].b, e), 'out to the foot').toBeLessThan(1e-6);
       }
+    },
+  },
+  {
     id: 'inscribed-octagon-never-crossed-1968',
     title:
       '#1968 (ADR-616): «מתומן ABCDEFGH חסום במעגל» — no press of «הציגו תצורה אחרת» draws the octagon self-crossing',
@@ -3885,6 +3888,9 @@ export const SCENARIOS_4: Scenario[] = [
         expect(ringSimple(ids.map((id) => at(view, id))), 'every view the button offers is a simple octagon').toBe(true);
       }
       expect(ringSimple(ids.map((id) => at(fig, id))), 'and so is the default').toBe(true);
+    },
+  },
+  {
     id: 'restated-ring-any-reading-1953',
     title: '#1953 (ADR-618): «ריבוע ABCD» · «מרובע ADCB» — a polygon restated in another reading of its ring (rotated or reversed) answers «זה כבר קיים באיור» and adds no row, exactly as the declared spelling does',
     guards:

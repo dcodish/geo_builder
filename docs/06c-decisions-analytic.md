@@ -11756,6 +11756,7 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Cost.** One pass over the carriers per `evaluate`, O(carriers × ink), with no solver change. A determined concave figure walks up to 8 extra seeds in `drawableAt` looking for a crossing configuration. That is the walk the vacancy term already paid for the same figure.
 
 **Locks.** `src-analytic/__tests__/issue-1937-1971-off-ink.test.ts` holds both #1937 spellings through `decideSubmit` (record, O at (2,2), one extension C→O), the convergence assertion, the letter spellings, the projected scene, the convex control, the #1083 kite opening crossed, the round #1959 T20 trapezoid, a foot on its side, an obtuse triangle's height, and a point on a drawn line. `shell/__tests__/offInk.test.ts` holds the geometry. `derived.test.ts`'s #1043 locks are re-based on the ruling, and its #1058 "names what does not exist" lock now uses the collinear circumcentre.
+
 ## ADR-AG-259 — A `distinct` selector is a set: a ring restated in another order is «כבר ידוע», like its polygon (#1953)
 
 **Status:** accepted · 2026-10-10 · bug (P3) · branch `fix/1953-restated-ring` off `main` @ e0f4260c · fix round #1983 · the analytic twin of [ADR-618](06-decisions.md#adr-618) (ADR-W-118 B1)
@@ -11774,6 +11775,7 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 
 **Behaviour change for a student:**
 - After «ריבוע ABCD», «מרובע ADCB» / «מרובע BCDA» (and «משולש ABC» · «משולש ACB», a rectangle or trapezoid restated from another vertex) show «זה כבר ידוע מהנתונים שכתבתם, ולכן לא הוספתי שורה נוספת…» and add no row (was: a second row).
+
 ## ADR-AG-260 — A trapezoid noun and a parallelogram-family noun on one ring are refused, in either order (#1926)
 
 **Date:** 2026-10-10 · **Status:** accepted · fix round #1983 (stream F). Operator rulings on #1926: 2026-10-08 *"Approve all three"* (the outcome: refused, as 2-D refuses a trapezoid re-declared over a parallelogram), and 2026-10-08 *"3-D's sentence"* (the wording). Ports 2-D's [ADR-157](06-decisions.md#adr-157) verdict; the analytic twin of 3-D's [ADR-3D-313](06b-decisions-3d.md) re-declaration arm (#1918). Amends [ADR-AG-189](#adr-ag-189) (Amendment 2, below it).

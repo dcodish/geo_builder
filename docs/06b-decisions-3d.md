@@ -12366,6 +12366,7 @@ A crossing order has another ring key and is never a twin (#1927's refusal); a l
 
 **Behaviour change for a student:**
 - After «ריבוע ABCD», «מרובע ABCD» / «מרובע ADCB» / «מרובע BCDA» / «ריבוע BCDA» (and the same for a triangle, rectangle, pentagon or a trapezoid read from C) add no row and show «הנתון הזה כבר נאמר («ריבוע ABCD») — הציור לא השתנה ולא נוספה שורה» (was: a second row, no note).
+
 ## ADR-3D-325 — The skew-ring refusal says a polygon is flat and these vertices are not (#1978)
 
 **Status:** accepted · 2026-10-10 · bug (P3) · branch `fix/1978-skew-ring-flat-wording` off `main` @ e0f4260c · fix round #1983 · implements the operator's ruling of 2026-10-10 on #1978 (option A of the decisions page, "lead with the rule"; the refusal itself stands, ruled on #1977) · amends decision 6 of [ADR-3D-319](#adr-3d-319)
