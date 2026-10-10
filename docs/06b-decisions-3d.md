@@ -12344,3 +12344,25 @@ The degradation policy is deliberately unchanged (a line this code does not comm
 **Sibling audit.** 2-D is the reference and is unchanged. The ∥ form is refused in both, and is pinned, not taught. Analytic's gap on «AE גובה» after a trapezoid is ADR-3D-315's already-reported found work and is not touched here.
 
 **Behaviour change for a student:** «משולש ABC» · «מ-A מורידים אנך לבסיס» now drops the foot onto BC with a real, non-zero altitude, where before E sat exactly on top of A — two labels on one dot and a zero-length height drawn green; a trapezoid drops on its parallel base. A length may now be stated on such an altitude («אורך AE = 3», «גובה מנקודה A לבסיס 4»), which was refused as a contradiction. «מ-D מורידים אנך לבסיס» where D is a free point or a rider on a side is now refused instead of drawing a perpendicular to the polygon's own plane, as 2-D refuses it.
+
+## ADR-3D-324 — A ring an enabled fact already declares is that fact's twin: a polygon restated in any reading, or by the generic word, adds no row (#1953)
+
+**Status:** accepted · 2026-10-10 · bug (P3) · branch `fix/1953-restated-ring` off `main` @ e0f4260c · fix round #1983 · the 3-D twin of [ADR-618](06-decisions.md#adr-618) and ADR-595 (ADR-W-118 B1) · extends the #613 twin rule ([ADR-W-031](06w-decisions-workspace.md))
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-19 (new) — a polygon restated is the polygon already there · **Design:** [04b](04b-design-3d.md) "The submit decision" — `ringRestatementTwin3`.
+
+**Measured before** (`main` @ e0f4260c, `decideDeterministic3` — what App3 dispatches — and in a real browser at `/3d.html` with `/api` blocked). After «ריבוע ABCD»: «מרובע ABCD», «מרובע BCDA», «מרובע ADCB», «ריבוע BCDA» each **recorded a second row** with no note; «משולש ABC» · «משולש ACB», «מלבן ABCD» · «מלבן ADCB», «מחומש ABCDE» · «מחומש EDCBA» the same. «ריבוע ABCD» · «ריבוע ABCD» answered `already-stated`: no row, and 3-D's own #613 note «הנתון הזה כבר נאמר («ריבוע ABCD») — הציור לא השתנה ולא נוספה שורה».
+
+**Correcting the record.** #1953's table says 3-D gives *no note* for the exact restatement. Measured, it shows the #613 note above (screen-read in the browser). So the plan's "3-D gains 2-D's note" rests on a premise that is not what 3-D does; the wording question (2-D's sentence vs 3-D's, under ADR-W-118 B1, for every restatement and not only polygons) is filed as #1990 and **not** decided here. What this ADR builds is the half that needs no wording decision: a restated ring adds no row and shows the restatement note 3-D already shows.
+
+**Class.** The same as ADR-618: *a ring is compared by its spelling.* `sameStatement` compares the lowered commands, so a rotated or reversed reading, or the generic word over a named shape, is never a twin.
+
+**Decision.** `decideCommands3`'s twin is `sameStatement`, else `ringRestatementTwin3`: a line that is a single ring declaration (`quad-shape`, `rect-complete`, a flat `polygon3/4/5`) over a ring an existing fact declares, up to rotation and reversal (`ringKey3`, 2-D's `ringKey` copied by design — the engine layer is never shared):
+- a **generic** word refers to the declared ring, so its twin is that fact — only when the fact is **enabled**, because re-enabling a muted «ריבוע ABCD» for a typed «מרובע» would state a square the student never said;
+- the **same shape** in a reading it is symmetric under (square, rectangle, rhombus, parallelogram, general quad; the trapezoid only in the readings that keep its named pair, as ADR-618) is re-spelled to the declared spelling and is the twin exactly when that spelling is.
+A crossing order has another ring key and is never a twin (#1927's refusal); a less specific shape word («מלבן» over a square) keeps `shape-less-specific` in every reading.
+
+**Locks.** `src3d/__tests__/issue-1953-restated-ring3.test.ts` (each line above → `already-stated`, no row, the note quoting the declaring line; the trapezoid's other pair still records; the crossing order is never a twin; the less-specific refusal in two readings; the muted declaration is not re-enabled by a generic word); parity rows `restated-ring-1953-01…05`. **Re-based, not relaxed:** `issue-587-quad-shape.test.ts` ARM 3 asserted that «ABCD מרובע» over «ריבוע ABCD» appends a row; it now asserts no row and the `already-stated` notice — the asked behaviour.
+
+**Behaviour change for a student:**
+- After «ריבוע ABCD», «מרובע ABCD» / «מרובע ADCB» / «מרובע BCDA» / «ריבוע BCDA» (and the same for a triangle, rectangle, pentagon or a trapezoid read from C) add no row and show «הנתון הזה כבר נאמר («ריבוע ABCD») — הציור לא השתנה ולא נוספה שורה» (was: a second row, no note).

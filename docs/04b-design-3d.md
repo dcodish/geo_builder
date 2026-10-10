@@ -495,7 +495,9 @@ instead of `S(?, 7/2, ?)`; `pointCoords` keeps the partial form; anything else r
 not-understood · refused · already-stated · record) and `submit` dispatches it. The decision is pure, so
 #1358's register can ask "would you accept this line?". The statement seams share `readStatement3` (the
 grammar plus the #866 repair and the #516 typed refusals), `lostGivens3` (the honesty gates) and
-`decideCommands3` (gates → twin → derive → search), where the LLM lane's `submitSteps` also ends. A parse's
+`decideCommands3` (gates → twin → derive → search), where the LLM lane's `submitSteps` also ends. The twin is
+`sameStatement` (spelling), else `ringRestatementTwin3` (#1953, [ADR-3D-324](06b-decisions-3d.md#adr-3d-324)): a single
+ring declaration over a ring an enabled fact declares, up to rotation and reversal (`ringKey3`). A parse's
 `unread` words (#1902) flow through `lostGivens3`, reported as `dropped-given` only when no other gate fired; the
 LLM lane collects them from every model line. A new
 branch belongs in the decision; a parity lock replays recorded sequences.

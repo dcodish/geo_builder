@@ -25,7 +25,7 @@ import { DISPLAY_ONLY } from '@/engine';
 import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents } from '@/engine/types';
-import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
 import { resolveBinds } from './naming';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -4315,14 +4315,8 @@ function declaredRings(cmd: AnyCommand): DeclaredRing[] {
  * another configuration" must not surface them (ADR-018 — alternatives are valid *drawings*).
  * Triangles (3 vertices, always convex/simple) are skipped — only 4+-gons are checked.
  */
-/** A ring's identity, independent of where the cycle starts or which way round it is read. */
-export function ringKey(ids: Id[]): string {
-  const n = ids.length;
-  const rots: string[] = [];
-  for (const seq of [ids, [...ids].reverse()])
-    for (let i = 0; i < n; i++) rots.push(seq.slice(i).concat(seq.slice(0, i)).join(','));
-  return rots.sort()[0];
-}
+/** A ring's identity up to rotation and reversal — the engine's one definition (#1953, ADR-618). */
+export { ringKey };
 
 export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean {
   // #441: convexity is the default only where the student stated NOTHING. A polygon stated concave is

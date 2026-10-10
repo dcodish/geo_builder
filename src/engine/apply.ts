@@ -11,7 +11,7 @@
 import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, Vec } from './types';
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
-import { add, circleCircleIntersect, circumcenter, dist, footOnLine, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringSimple, scale, sub } from './geometry';
+import { add, circleCircleIntersect, circumcenter, dist, footOnLine, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringKey, ringSimple, scale, sub } from './geometry';
 import { constraintKey, constraintRefs, residual, residualTolerance } from './solve';
 import { evaluateCore } from './evaluate';
 import { applySeed } from './sample';
@@ -461,6 +461,58 @@ export function shapeLowersToConstraints(prev: Construction, cmd: Command): bool
 }
 
 /**
+ * The ring-declaring commands whose statement is the SAME under every rotation and reversal of the ring —
+ * the dihedral symmetry of the shape the word names. A bare polygon / quadrilateral / triangle asserts only
+ * its ring; a square, rectangle, rhombus or parallelogram is symmetric under the whole dihedral group of
+ * the quadrilateral (its opposite sides pair up the same way read from any vertex, in either direction).
+ * The trapezoid is symmetric under HALF of that group: the readings that keep its two named sides opposite
+ * each other as a pair («CDAB», «DCBA» say AB ∥ CD again; «BCDA» says BC ∥ DA — a different statement,
+ * ADR-506). Every other shape whose vertex order is SEMANTIC — the right triangle (right angle at the last
+ * id, ADR-223), the variant shapes (apex, equal pair) — is absent: reading it in another spelling changes
+ * what it says, so it is never re-spelled.
+ */
+const RING_SYMMETRIC: ReadonlySet<Command['type']> = new Set<Command['type']>(['polygon', 'quadrilateral', 'triangle', 'square', 'rectangle', 'rhombus', 'parallelogram']);
+
+/** Does reading ring `v` as `ids[i] = v[(r + dir·i) mod n]` say the same thing for this command type? */
+function sameStatementUnder(type: Command['type'], n: number, r: number, dir: 1 | -1): boolean {
+  if (RING_SYMMETRIC.has(type)) return true;
+  // side i of the reading is side (r + i) of the ring (dir +1) or side (r − i − 1) (dir −1): the named pair
+  // (sides 0 and 2) stays a pair of opposite sides exactly when that offset is even.
+  if (type === 'trapezoid') return n === 4 && (dir === 1 ? r : r - 1) % 2 === 0;
+  return false;
+}
+
+/**
+ * #1953 ([ADR-618](../../docs/06-decisions.md#adr-618)) — A RING ALREADY DECLARED IS READ IN ITS DECLARED SPELLING.
+ *
+ * «ריבוע ABCD» · «מרובע ADCB»: the second line names the same polygon read the other way round, but the
+ * engine identified a polygon by its SPELLING (`poly-ADCB` ≠ `poly-ABCD`), so the restatement built a
+ * second polygon object, the step "grew", and the line committed as a new row instead of «כבר קיים». The
+ * same spelling had always been recognised (ADR-595's supertype restatement keeps the existing polygon).
+ *
+ * A ring is a cycle: it is the same ring under any rotation or reversal (`ringKey`, ADR-W-121), and a
+ * crossing order («ACBD») is a different ring. So a command whose statement is symmetric under the ring's
+ * rotations and reversals (`RING_SYMMETRIC`), over a ring the figure already declares in another
+ * spelling, is re-spelled to the declared one — and from there it takes exactly the verdict the declared
+ * spelling takes: an identical restatement is the friendly no-op, a supertype word is ADR-595's reference,
+ * a different specific shape stays ADR-157's refusal. The verdict no longer depends on where the student
+ * started reading the ring, or in which direction.
+ */
+function declaredRingSpelling(prev: Construction, cmd: Command): Command | null {
+  if (!('ids' in cmd) || !(RING_SYMMETRIC.has(cmd.type) || cmd.type === 'trapezoid')) return null;
+  const ids = cmd.ids as Id[];
+  const n = ids.length;
+  if (n < 3 || new Set(ids).size !== n) return null;
+  const key = ringKey(ids);
+  const ring = prev.objects.find((o) => o.kind === 'polygon' && o.vertices.length === n && ringKey(o.vertices) === key);
+  if (!ring || ring.kind !== 'polygon' || ring.vertices.every((v, i) => v === ids[i])) return null;
+  const r = ring.vertices.indexOf(ids[0]);
+  const dir: 1 | -1 = ids[1] === ring.vertices[(r + 1) % n] ? 1 : -1; // same ring key ⇒ one of the two directions
+  if (!sameStatementUnder(cmd.type, n, r, dir)) return null;
+  return { ...cmd, ids: [...ring.vertices] } as Command;
+}
+
+/**
  * Pick the cyclic rotation of a shape's vertex list that puts existing points on
  * *free* slots, not derived ones — so a shape built on an existing edge attaches
  * regardless of where that edge sits in the name (ADR-013, amendment). A polygon
@@ -471,6 +523,8 @@ export function shapeLowersToConstraints(prev: Construction, cmd: Command): bool
  * rotates only when it strictly reduces derived-slot clashes.
  */
 export function normalizeShapeComposition(prev: Construction, cmd: Command): Command {
+  const declared = declaredRingSpelling(prev, cmd);
+  if (declared) return declared;
   const slots = derivedSlotsOf(prev, cmd);
   if (!slots || !('ids' in cmd)) return cmd;
   const ids = cmd.ids as Id[];

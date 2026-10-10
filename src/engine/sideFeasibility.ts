@@ -35,6 +35,7 @@
  */
 import { applyCommand } from './apply';
 import { isSideRecord, type SideRecord } from './requirements';
+import { ringKey } from './geometry';
 import type { Command, Construction, GeoObject, Id, SideRequirement } from './types';
 
 export interface SideImpossibility {
@@ -49,13 +50,6 @@ export interface SideImpossibility {
 const circleName = (id: Id): string => (id.startsWith('circle-') ? id.slice('circle-'.length) : id);
 const polyNoun = (poly: Id[]): string => (poly.length === 3 ? 'triangle' : 'polygon');
 const pairKey = (a: Id, b: Id): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
-/** A polygon ring up to rotation and reflection — «ABC» and «BCA» are one region. */
-function ringKey(poly: Id[]): string {
-  const n = poly.length;
-  const cands: string[] = [];
-  for (const ring of [poly, [...poly].reverse()]) for (let k = 0; k < n; k++) cands.push([...ring.slice(k), ...ring.slice(0, k)].join(','));
-  return cands.sort()[0];
-}
 
 /** Union-find over `coincide` statements — a point stated to coincide with another shares its incidences. */
 function coincideClasses(c: Construction): (id: Id) => Set<Id> {

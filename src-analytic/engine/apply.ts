@@ -3625,8 +3625,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (missing !== undefined) return { ok: false, error: { code: 'unknown-reference', detail: missing, expected: 'point' } };
       }
       // Compared structurally: the union's members have different shapes, and a field-by-field test
-      // would have to be extended by hand for each new kind — the drift ADR-043 names.
-      const dup = c.selectors.some((s) => JSON.stringify(s) === JSON.stringify(f.sel));
+      // would have to be extended by hand for each new kind — the drift ADR-043 names. Compared by IDENTITY
+      // (`selectorIdentity`), so a «distinct» set restated in another order is the same selector (#1953).
+      const dup = c.selectors.some((s) => selectorIdentity(s) === selectorIdentity(f.sel));
       if (dup) return { ok: true, effect: 'known', next: c };
       return {
         ok: true,
@@ -3842,6 +3843,17 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       return { ok: true, effect: 'created', next: { ...c, objects: [...c.objects, made] } };
     }
   }
+}
+
+/**
+ * A selector's identity (#1953, [ADR-AG-259](../../docs/06c-decisions-analytic.md#adr-ag-259)). Structural, except
+ * that a `distinct` selector is a SET of points: «מרובע ADCB» after «ריבוע ABCD» asks for the same four points
+ * to be distinct, and its ids arrive in the ring's typed order. Compared by spelling, that restatement was a NEW
+ * selector, the line read `created`, and it recorded a second row while the polygon itself (whose id is already
+ * canonical over the ring's rotations and reversals) was absorbed.
+ */
+function selectorIdentity(sel: Selector): string {
+  return JSON.stringify(sel.kind === 'distinct' ? { ...sel, ids: [...sel.ids].sort() } : sel);
 }
 
 /**

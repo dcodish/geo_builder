@@ -15722,3 +15722,42 @@ The pentagram line itself is already refused at both commit seams by ADR-608 (re
 **Behaviour change for a student:**
 - «מתומן ABCDEFGH חסום במעגל»: pressing «הציגו תצורה אחרת» never draws the octagon with its sides crossing (it did on about one press in four). The first view is unchanged.
 - Nothing else a student can type changes: every pentagon and hexagon view was already simple, and the pentagram line is still refused with ADR-608's message.
+## ADR-618 — A ring the figure already declares is read in its declared spelling: a polygon restated rotated or reversed takes the verdict its declared spelling takes (#1953)
+
+**Status:** accepted · 2026-10-10 · bug (P3, 2-D, 3-D, analytic) · branch `fix/1953-restated-ring` off `main` @ e0f4260c · fix round #1983 · twins [ADR-3D-324](06b-decisions-3d.md#adr-3d-324), [ADR-AG-259](06c-decisions-analytic.md#adr-ag-259) · reuses `ringKey` ([ADR-W-121](06w-decisions-workspace.md#adr-w-121))
+
+**Requirements:** [02](02-requirements.md) FR-EN-9 — a polygon restated with its letters rotated or reversed is the same no-op «כבר קיים» as in its declared spelling · **Design:** [04](04-design.md) "One shape-phrase reader" — `ringKey` and the declared-spelling re-read in `normalizeShapeComposition`.
+
+**The report.** Operator, playing round #1940 T11: *"on second line - since the shape was already known, we should have a note saying this input adds no information."*
+
+**Measured before** (`main` @ e0f4260c, `decideDeterministic2D` → `commitVerdict`, the AI mocked):
+
+| after | line | 2-D |
+| --- | --- | --- |
+| «ריבוע ABCD» | «מרובע ABCD» / «ריבוע ABCD» | «זה כבר קיים באיור», no row |
+| «ריבוע ABCD» | «מרובע BCDA» / «מרובע ADCB» / «מרובע DCBA» | **a second row**, no note |
+| «ריבוע ABCD» | «ריבוע BCDA» | refused, raw «'D' is already defined …» |
+| «משולש ABC» | «משולש ACB» / «משולש CBA» | **a second row**, no note |
+| «טרפז ABCD» | «טרפז CDAB» | refused, raw «'A' is already defined …» |
+
+**Class (docs/17 §1).** *A statement that declares a polygon is compared by the SPELLING of its ring, so the same polygon read from another vertex or in the other direction is treated as a new one.* Two symptoms of one identity: a generic word built a second polygon object (`poly-ADCB` beside `poly-ABCD`), so the dry run's change signals saw the object count grow and committed it; a symmetric shape's derived corners were computed in the new spelling, so `commandConflict` saw them clash with the placed points (ADR-157's refusal, in engine words).
+
+**Decision.** One mechanism, at the step's spelling chokepoint. `normalizeShapeComposition` (which already chooses the spelling a shape is built in, ADR-013) first asks `declaredRingSpelling`: if the command's ring is a polygon the figure already declares, up to rotation and reversal (`ringKey`), and the command's statement is the same under that reading, the command is re-spelled to the declared ring. From there it takes whatever verdict the declared spelling takes — an identical restatement is the friendly no-op, a supertype word is ADR-595's reference, a different specific shape stays ADR-157's refusal. The verdict no longer depends on where the student started reading the ring.
+
+- *Which readings say the same thing* is a property of the word, declared once (`RING_SYMMETRIC`): a bare polygon / quadrilateral / triangle, a square, rectangle, rhombus or parallelogram are symmetric under every rotation and reversal. The trapezoid is symmetric under the half that keeps its named sides a pair of opposite sides («CDAB», «DCBA» say AB ∥ CD; «BCDA» says BC ∥ DA, a different statement — ADR-506), `sameStatementUnder`. The right triangle (right angle at the last id, ADR-223) and the variant shapes are absent, so they are never re-spelled.
+- A crossing order («ACBD») has another `ringKey` and is never re-read: it stays ADR-608's refusal.
+- `ringKey` has ONE definition in the engine (`engine/geometry.ts`); `replay/core.ts` re-exports it and `sideFeasibility.ts` imports it — the two private copies are gone. Not a new chokepoint list: `RING_SYMMETRIC` sits beside `DERIVED_SLOTS`, whose comment already declared the same rotation invariance.
+
+**Measured after** (the same path): every line in the table above answers `noop` with `input.alreadyDrawn` and adds no row; «מרובע ACBD» is still `input.ringContradictsNoun`; «טרפז BCDA» / «טרפז ADCB» keep their refusal; «מלבן BCDA» over a square gives the same answer as «מלבן ABCD» (see found work).
+
+**Sibling audit.** 3-D had the same class in its twin rule (spelling-equality, #613) and also added a row for the supertype word in the declared spelling: [ADR-3D-324](06b-decisions-3d.md#adr-3d-324). Analytic's polygon id was already canonical over rotations and reversals; its `distinct` selector was compared by spelling: [ADR-AG-259](06c-decisions-analytic.md#adr-ag-259). The parser's `cevianTriangle` keys a triangle by its letter SET, correct for n = 3 and untouched.
+
+**Interaction with #1927 (stream B).** ADR-608's controls asserted that «ריבוע ABCD» · «מרובע ADCB» COMMITS. Re-based, not relaxed: that line is now a restatement (`noop`) and is still never refused; the ✎-seam test edits the midpoint ring's row instead (crossed-ring-1927-05's ring).
+
+**Found, filed `needs-operator`, not built.** #1988 — «ריבוע ABCD» · «מלבן ABCD» (a less specific shape word over a named shape) is refused with the engine's raw «'C' is already defined» in every spelling. #1989 — analytic «ריבוע BCDA» still records (redundant definition constraints lower its freedom count). #1990 — 3-D's restatement note wording vs 2-D's.
+
+**Locks.** `src/app/__tests__/issue-1953-restated-ring.test.ts` (the operator's lines, every rotation and reversal, every symmetric shape, the trapezoid's half group both ways, the crossing order untouched, the declared-spelling controls, the mechanism); scenario `restated-ring-any-reading-1953` (corpus 4); parity rows `restated-ring-1953-01…05`; ADR-608's two re-based controls.
+
+**Behaviour change for a student:**
+- «ריבוע ABCD» · «מרובע ADCB» (or any rotated or reversed reading, and «משולש ABC» · «משולש ACB») shows «זה כבר קיים באיור — אין מה להוסיף.» and adds no row (was: a second row, no note).
+- «ריבוע ABCD» · «ריבוע BCDA» (and the same for rectangle, rhombus, parallelogram, and a trapezoid read from C or backwards) shows the same note (was: refused with «'D' is already defined …»).

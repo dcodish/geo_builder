@@ -265,6 +265,20 @@ export function circleCircleIntersect(c1: Vec, r1: number, c2: Vec, r2: number):
  * A TRIANGLE has no diagonals at all (every pair of its vertices is an edge), and that falls out of the
  * adjacency test rather than being special-cased: with n = 3 every pair is adjacent.
  */
+/**
+ * A ring's identity, independent of where the cycle starts or which way round it is read
+ * ([ADR-W-121](../../docs/06w-decisions-workspace.md#adr-w-121), #1953 / [ADR-618](../../docs/06-decisions.md#adr-618)):
+ * «ABCD», «BCDA» and «ADCB» name ONE polygon, while «ACBD» (a crossing order) is a different ring.
+ * The one definition in the engine — the replay layer and the side-feasibility check read this one.
+ */
+export function ringKey(ids: readonly Id[]): string {
+  const n = ids.length;
+  const rots: string[] = [];
+  for (const seq of [[...ids], [...ids].reverse()])
+    for (let i = 0; i < n; i++) rots.push(seq.slice(i).concat(seq.slice(0, i)).join(','));
+  return rots.sort()[0];
+}
+
 export function isRingDiagonal(ring: Id[], a: Id, b: Id): boolean {
   const i = ring.indexOf(a);
   const j = ring.indexOf(b);

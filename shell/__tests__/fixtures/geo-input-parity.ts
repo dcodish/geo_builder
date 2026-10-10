@@ -1226,6 +1226,15 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'crossed-ring-1927-06', family: 'polygons', steps: ['ריבוע ABCD', 'מרובע ADCB'], expect: 'builds', note: 'the simple order — the control' },
   { id: 'crossed-ring-1927-07', family: 'polygons', steps: ['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABDE'], expect: 'builds', note: 'the midpoint ring in its simple order — the control' },
   // end #1927
+  // #1953 (ADR-618 / ADR-3D-324 / ADR-AG-259): a ring restated in another reading — rotated or reversed — is the same
+  // polygon, so it is accepted and adds no row in every builder (2-D «זה כבר קיים באיור», analytic «כבר ידוע», 3-D the #613
+  // restatement note). `builds` covers "already known"; the no-row half is locked per product in each issue-1953 test.
+  { id: 'restated-ring-1953-01', family: 'polygons', steps: ['ריבוע ABCD', 'מרובע ADCB'], expect: 'builds', note: 'the operator’s T11 line — reversed' },
+  { id: 'restated-ring-1953-02', family: 'polygons', steps: ['ריבוע ABCD', 'מרובע BCDA'], expect: 'builds', note: 'rotated' },
+  { id: 'restated-ring-1953-03', family: 'polygons', steps: ['ריבוע ABCD', 'ריבוע BCDA'], expect: 'builds', note: '2-D refused «D is already defined» before #1953' },
+  { id: 'restated-ring-1953-04', family: 'polygons', steps: ['משולש ABC', 'משולש ACB'], expect: 'builds' },
+  { id: 'restated-ring-1953-05', family: 'polygons', steps: ['טרפז ABCD', 'טרפז CDAB'], expect: 'builds', note: 'AB ∥ CD read from C — the same pair' },
+  // end #1953
   // #1902 (ADR-3D-312): an unread word in an inscription is never dropped. 3-D refuses it naming the word (its own lock,
   // X8); 2-D and analytic escalate it to their models. «שוה» reads as «שווה» in every builder (ADR-405's fold).
   { id: 'inscription-unread-word-1902', family: 'circles', steps: ['מעגל חסום במשולש שווה צלעת ABC'], expect: 'not-handled', exception: 'X8' },

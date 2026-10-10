@@ -147,12 +147,19 @@ describe('#1927 — every member of the class, both orders, is refused naming it
 });
 
 describe('#1927 — controls commit exactly as before', () => {
-  it('the simple order and the midpoint ring ABDE build with no note', async () => {
-    for (const lines of [['ריבוע ABCD', 'מרובע ADCB'], ['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABDE']]) {
-      const r = await play(lines);
-      expect(r.notes, lines.join(' · ')).toEqual([]);
-      expect(r.facts.length).toBeGreaterThan(r.before.facts.length);
-    }
+  it('the midpoint ring ABDE builds with no note', async () => {
+    const lines = ['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABDE'];
+    const r = await play(lines);
+    expect(r.notes, lines.join(' · ')).toEqual([]);
+    expect(r.facts.length).toBeGreaterThan(r.before.facts.length);
+  });
+
+  // #1953 (ADR-618) re-based this control: the square's own ring in a simple order is a RESTATEMENT, so it is
+  // never refused here and adds no row — it answers «כבר קיים» (was: committed as a second row).
+  it('the square read in a simple order is never refused — it is a restatement (#1953)', async () => {
+    const r = await play(['ריבוע ABCD', 'מרובע ADCB']);
+    expect(r.notes).toEqual([strip(i18n.t('input.alreadyDrawn', { lng: 'he' }) as string)]);
+    expect(r.facts.length, 'no new row').toBe(r.before.facts.length);
   });
 
   it('a ring with a free vertex is a configuration choice, never this refusal — it commits', async () => {
@@ -188,19 +195,21 @@ describe('#1927 — the ✎ edit seam refuses the same rows inline, with the sam
     return { deps, notes, resolves };
   }
 
-  it('editing «מרובע ADCB» into «מרובע ACBD» on a square is refused, and nothing changes', async () => {
-    await play(['ריבוע ABCD', 'מרובע ADCB']);
+  // #1953 (ADR-618): on a square, «מרובע ADCB» is now a restatement and never becomes a row, so the row edited
+  // here is the midpoint ring's (crossed-ring-1927-05's ring, in its simple order).
+  it('editing «מרובע ABDE» into «מרובע ABED» on the midpoint ring is refused, and nothing changes', async () => {
+    await play(['משולש ABC', 'D אמצע BC', 'E אמצע AC', 'מרובע ABDE']);
     const st = useGeoStore.getState();
     const key = groupKey(st.facts[st.facts.length - 1]);
     const before = st.facts;
     const { deps, notes, resolves } = editDeps();
-    expect(runEditCommit(key, 'מרובע ACBD', deps)).toBe(false);
-    expect(notes.at(-1)).toBe(HE('מרובע ACBD'));
+    expect(runEditCommit(key, 'מרובע ABED', deps)).toBe(false);
+    expect(notes.at(-1)).toBe(HE('מרובע ABED'));
     expect(useGeoStore.getState().facts, 'the step list is untouched').toBe(before);
     expect(resolves.n, 'no search is launched for a refused edit').toBe(0);
     // the control: editing it into another simple order commits
     const ok = editDeps();
-    expect(runEditCommit(key, 'מרובע ABCD', ok.deps)).toBe(true);
+    expect(runEditCommit(key, 'מרובע BDEA', ok.deps)).toBe(true);
     expect(llmParseMock).not.toHaveBeenCalled();
   });
 });
