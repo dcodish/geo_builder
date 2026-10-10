@@ -211,6 +211,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   or kite), or the reverse, is refused naming both shapes. The twin of analytic R126 + R93 and of 2-D ADR-165 /
   ADR-506 / ADR-157.
   - Sources: ADR-3D-313; #1918.
+- **FR-SP-19 (Must)** — **A polygon restated is the polygon already there.** A line that only declares a ring the
+  figure already declares — the same letters read from another vertex or the other way round («ריבוע ABCD» ·
+  «מרובע ADCB», «משולש ABC» · «משולש ACB»), or the generic word over a named shape («מרובע ABCD» over a square) —
+  adds no row and shows the restatement note, exactly as the same line in the same spelling does (#613). A
+  reading that changes what a shape says (a trapezoid read so its OTHER pair is named) is a new statement, and a
+  crossing order is a different ring (#1927 refuses it). The twin of 2-D FR-EN-9 and analytic R45.
+  - Sources: ADR-3D-324; #1953.
 
 ## Vectors — the geometric lane
 

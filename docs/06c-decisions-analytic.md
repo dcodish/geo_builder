@@ -11718,3 +11718,22 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Locks.** `src-analytic/__tests__/issue-1938-coincidence-own-freedom.test.ts`: the operator's two sequences as a PAIR, asserting the same `derive` fault and the same `decideSubmit` object in both orders (that pair is the fix, stated as a test); the evidence (`carrierDof` 2, `separationDof` 0); the twelve class rows first and last, each asserting the row really left freedom behind; #1254's T18 and equation members with a free point first; the later-line forcing row; and the **false-refusal net** — #1254's wholly free figure, #1893's free circle and #1909's free parabola (the coincidence really there, `separationDof > 0`, the line records), #1254's own control, and the operator's figure with the crossing clear of E. Parity row `ex-coincident-crossing-free-elsewhere-1938` (X1, `only: ['analytic']`): the forcing line «E על ציר ה-y» is refused.
 
 **Consequences.** `engine/evaluate.ts` (`Figure.separationDof`, `withSeparationDof`); `engine/derive.ts` (the arm's gate and its docblock); the lock; the parity row; docs 02c R60, 04c. **Found, reported not fixed:** the vacancy arm's identical leak (above, beside #1937); and the re-attributed `detail` of a coincidence refusal completed by a LATER line reads as though that line gave the second name («המשפט "E(0,2)" היה נותן לה שם שני») — pre-existing at 0 DOF, now reachable with freedom left.
+
+## ADR-AG-259 — A `distinct` selector is a set: a ring restated in another order is «כבר ידוע», like its polygon (#1953)
+
+**Status:** accepted · 2026-10-10 · bug (P3) · branch `fix/1953-restated-ring` off `main` @ e0f4260c · fix round #1983 · the analytic twin of [ADR-618](06-decisions.md#adr-618) (ADR-W-118 B1)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R45 — a polygon restated with its letters rotated or reversed → «זה כבר ידוע…», no second row · **Design:** [04c](04c-design-analytic.md) — `selectorIdentity`, beside the construction register's `already-known`.
+
+**Measured before** (`main` @ e0f4260c, `decideSubmit`, and in a real browser at `/analytic.html`). After «ריבוע ABCD»: «מרובע ABCD» → `already-known`; «מרובע ADCB», «מרובע BCDA» → **`record`**, a second row. «משולש ABC» · «משולש ACB», «מלבן ABCD» · «מלבן ADCB», «טרפז ABCD» · «טרפז CDAB» → `record` too.
+
+**Root cause.** The polygon itself was absorbed — its id is canonical over the ring's rotations and reversals (`polygonId`, the parser), so `sameReference` already answered `known`. But every ring sentence also emits a `distinct` selector over its vertices **in the typed order**, and `applyFact` compared selectors by `JSON.stringify`: «A,D,C,B» is not «A,B,C,D», so the selector was `created` and the line recorded. The class is ADR-618's — *a ring compared by its spelling* — surfacing in the one fact that still carried the spelling.
+
+**Decision.** `selectorIdentity(sel)`: structural, except that a `distinct` selector is compared as the SET of points it is (sorted ids). It is the identity the dedupe reads; the stored selector is unchanged. Every `distinct` selector gains it, so «A ≠ B» restated as «B ≠ A» is absorbed too — the same claim.
+
+**Not covered — filed #1989.** «ריבוע ABCD» · «ריבוע BCDA» still records: the rotated square's own definition constraints are not structurally the declared ones, and the entailment gate fails on freedom (`carrierDof` 4 → 3, redundant constraints counted as independent — the analytic twin of 2-D's #1007).
+
+**Locks.** `src-analytic/__tests__/issue-1953-restated-ring.test.ts` (each line above → `already-known`; «מרובע DCBA» over «מרובע ABCD»; the crossing order still refused); parity rows `restated-ring-1953-01…05`.
+
+**Behaviour change for a student:**
+- After «ריבוע ABCD», «מרובע ADCB» / «מרובע BCDA» (and «משולש ABC» · «משולש ACB», a rectangle or trapezoid restated from another vertex) show «זה כבר ידוע מהנתונים שכתבתם, ולכן לא הוספתי שורה נוספת…» and add no row (was: a second row).

@@ -223,7 +223,9 @@ describe('#587 — the three apply arms', () => {
     const n = state().facts.length;
     submit('ABCD מרובע');
     expect(state().lastError).toBe(null);
-    expect(state().facts).toHaveLength(n + 1);
+    // #1953 (ADR-3D-324): the generic word over the declared ring restates it — accepted, and no second row
+    expect(state().facts).toHaveLength(n);
+    expect(state().lastNotice?.code).toBe('already-stated');
     build(0);
   });
 });

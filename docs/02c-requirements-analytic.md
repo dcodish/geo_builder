@@ -601,6 +601,7 @@ a sentence the tool parsed.
 
 **R45 — a statement that adds nothing is SAID, not silently swallowed or silently duplicated**. Informational, never an error; a restatement that NARROWS is recorded.
 - a repeated given → «זה כבר ידוע…», no second row
+- a polygon restated with its letters rotated or reversed («ריבוע ABCD» · «מרובע ADCB») → «זה כבר ידוע…», no second row ([ADR-AG-259](06c-decisions-analytic.md#adr-ag-259))
 - «a הוא פרמטר» then «a<13» → recorded
 - Sources: ADR-AG-020.
 

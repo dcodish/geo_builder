@@ -236,6 +236,10 @@ The LLM suggest lane (ADR-W-030) is held against #1297; the lexicon stays out of
 
 *Identifiers:* `record` · `imperativeCandidates` · `already-known` · `already-follows`
 
+A restatement is `known` when every fact of the line is absorbed in `applyFact`; a selector is compared by
+`selectorIdentity`, which reads a `distinct` selector as the SET it is, so a ring restated in another order is
+absorbed like its polygon (whose id is already canonical over rotations and reversals) ([ADR-AG-259](06c-decisions-analytic.md#adr-ag-259)).
+
 ### A line that loses a part ([ADR-AG-251](06c-decisions-analytic.md#adr-ag-251), #1888, #1889; [ADR-W-120](06w-decisions-workspace.md#adr-w-120))
 
 `app/lostPart.ts`, asked by `decideOnce` (`app/submit.ts`) and by `decideEdit` through `lostPartOf`: one question for both typed seams.

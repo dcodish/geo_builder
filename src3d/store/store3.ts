@@ -1359,6 +1359,64 @@ const sameStatement = (a: readonly Command3[], b: readonly Command3[]): boolean 
   a.length === b.length && meaningKey(a) === meaningKey(b); // #1485: «הפאה SBC» restates «המישור SBC»
 
 /**
+ * A ring's identity up to rotation and reversal (ADR-W-121; 2-D's `ringKey`, copied by design — the engine
+ * layer is never shared, BOUNDARIES.json). «ABCD», «BCDA», «ADCB» are one ring; a crossing order is another.
+ */
+const ringKey3 = (ids: readonly Id[]): string => {
+  const rots: string[] = [];
+  for (const seq of [[...ids], [...ids].reverse()]) for (let i = 0; i < seq.length; i++) rots.push([...seq.slice(i), ...seq.slice(0, i)].join(','));
+  return rots.sort()[0];
+};
+/** The ring a command DECLARES — a flat polygon, a stated quad shape, a completed rectangle — or null. */
+const declaredRingOf3 = (k: Command3): readonly Id[] | null =>
+  k.type === 'quad-shape' || k.type === 'rect-complete' || (k.type === 'solid' && (k.kind === 'polygon3' || k.kind === 'polygon4' || k.kind === 'polygon5')) ? k.ids : null;
+/** Quad bases whose statement is the same under every rotation and reversal of the ring (2-D's `RING_SYMMETRIC`). */
+const RING_SYMMETRIC_BASES: ReadonlySet<string> = new Set(['square', 'rectangle', 'rhombus', 'parallelogram', 'quad']);
+/** Does reading the declared ring `ring` as `cmd.ids` say the same thing? (The trapezoid: only the readings that
+ *  keep its named sides a pair of opposite sides — 2-D's `sameStatementUnder`, ADR-618.) */
+const sameReading3 = (cmd: Command3, ring: readonly Id[]): boolean => {
+  if (cmd.type === 'rect-complete') return true;
+  if (cmd.type !== 'quad-shape') return false;
+  if (RING_SYMMETRIC_BASES.has(cmd.base)) return true;
+  if (cmd.base !== 'trapezoid' || cmd.seat) return false;
+  const r = ring.indexOf(cmd.ids[0]);
+  const dir = cmd.ids[1] === ring[(r + 1) % 4] ? 1 : -1;
+  return (dir === 1 ? r : r - 1) % 2 === 0;
+};
+
+/**
+ * #1953 ([ADR-3D-324](../../docs/06b-decisions-3d.md#adr-3d-324)) — A RING ALREADY DECLARED, RESTATED, IS THE SAME
+ * STATEMENT (2-D's ADR-618 and ADR-595, ported per ADR-W-118 B1).
+ *
+ * `sameStatement` compares SPELLINGS, so «ריבוע ABCD» · «מרובע ABCD» (the supertype word) and «ריבוע ABCD» ·
+ * «מרובע ADCB» (the ring read the other way) each appended a row that states nothing new. The fact that already
+ * declares the ring is the twin when the line is a single ring declaration over the same ring (`ringKey3`):
+ *  - a GENERIC polygon («מרובע», «משולש», «מחומש») over it refers to it — only an ENABLED declaration, since
+ *    re-enabling a muted «ריבוע ABCD» because the student typed «מרובע» would state a square they never said;
+ *  - the same shape in a reading the shape is symmetric under, re-spelled to the declared spelling, is the twin
+ *    exactly when the declared spelling is.
+ * A crossing order has another ring key and is never a twin (that is #1927's refusal).
+ */
+function ringRestatementTwin3(facts: readonly Fact3[], commands: readonly Command3[]): Fact3 | undefined {
+  if (commands.length !== 1) return undefined;
+  const cmd = commands[0];
+  const ring = declaredRingOf3(cmd);
+  if (!ring || new Set(ring).size !== ring.length) return undefined;
+  const key = ringKey3(ring);
+  const generic = cmd.type === 'solid';
+  for (const f of facts) {
+    const declared = f.cmds.map(declaredRingOf3).find((r) => r !== null && r.length === ring.length && ringKey3(r) === key);
+    if (!declared) continue;
+    if (generic) {
+      if (f.enabled) return f;
+      continue;
+    }
+    if (sameReading3(cmd, declared) && sameStatement(f.cmds, [{ ...cmd, ids: [...declared] } as Command3])) return f;
+  }
+  return undefined;
+}
+
+/**
  * #926 (ADR-3D-220, ADR-W-044) — what a change to ONE row did to the OTHERS. A delete, a mute or an edit
  * of `changed` is committed as asked, but the rows it took from green to red — a value whose letter it
  * used to define, a relation on a point it used to introduce — are reported, quoted in the student's own
@@ -1571,7 +1629,7 @@ export function decideCommands3(
   // This is the store-level rule 2-D has always had in `foldFact`, which is why this is a port and
   // not a new mechanism. A disabled twin is RE-ENABLED rather than duplicated (2-D's FR-EN-9).
   if (opts.twins) {
-    const twin = facts.find((f) => sameStatement(f.cmds, commands));
+    const twin = facts.find((f) => sameStatement(f.cmds, commands)) ?? ringRestatementTwin3(facts, commands);
     if (twin) {
       return {
         kind: 'already-stated',

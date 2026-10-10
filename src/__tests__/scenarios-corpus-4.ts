@@ -3784,8 +3784,9 @@ export const SCENARIOS_4: Scenario[] = [
         expect(he(line)).toBe(`הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "${line}". אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את השיעורים — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`);
         expect(en(line)).toBe(`The points you gave do not form that shape in this order: "${line}". Reorder the letters so the sides do not cross, or change the coordinates — as written the vertices fall on one line or the shape folds over itself.`);
       }
-      // the control: the square's own points in a simple order still build
-      expect(gateVerdict(factsOf(['ריבוע ABCD']), 'מרובע ADCB').kind, '«מרובע ADCB» commits').toBe('commit');
+      // the control: the square's own points in a simple order are never refused — since #1953 (ADR-618) they are
+      // the square's own ring restated, a no-op («כבר קיים»), where they committed a second row before
+      expect(gateVerdict(factsOf(['ריבוע ABCD']), 'מרובע ADCB').kind, '«מרובע ADCB» is a restatement').toBe('noop');
     },
   },
   {
@@ -3844,6 +3845,25 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.max(...ps) - Math.min(...ps), 'unequal sides, as ruled').toBeGreaterThan(1e-2);
       // and the OPPOSITE direction keeps ADR-606's refusal
       expect(gateVerdict(factsOf([]), 'מעגל חסום במחומש ABCDE').kind).toBe('refused');
+    },
+  },
+  {
+    id: 'restated-ring-any-reading-1953',
+    title: '#1953 (ADR-618): «ריבוע ABCD» · «מרובע ADCB» — a polygon restated in another reading of its ring (rotated or reversed) answers «זה כבר קיים באיור» and adds no row, exactly as the declared spelling does',
+    guards:
+      "Operator, playing round #1940 T11: *\"on second line - since the shape was already known, we should have a note saying this input adds no information.\"* Measured on e0f4260c through decideDeterministic2D → commitVerdict: «מרובע ADCB» / «מרובע BCDA» after «ריבוע ABCD», and «משולש ACB» after «משולש ABC», committed a second row with no note; «ריבוע BCDA» was refused with the internal «'D' is already defined …». Root cause (ADR-618): the engine identified a polygon by its SPELLING, so a ring read from another vertex or the other way round built a second polygon object and the step 'grew'. Fix: `normalizeShapeComposition` reads a ring the figure already declares in its declared spelling (`ringKey`, ADR-W-121) whenever the word is symmetric under that reading. The class matrix (every reading, every symmetric shape, the trapezoid's half-group, the crossing order untouched) is src/app/__tests__/issue-1953-restated-ring.test.ts.",
+    // the restatement never becomes a fact, so it is driven through the submit gate in `check`, not listed as a step
+    steps: ['ריבוע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['ריבוע ABCD']);
+      for (const line of ['מרובע ADCB', 'מרובע BCDA', 'ריבוע BCDA', 'מרובע ABCD']) {
+        expect(gateVerdict(facts, line).kind, `«ריבוע ABCD» · «${line}» is a restatement`).toBe('noop');
+      }
+      expect(gateVerdict(factsOf(['משולש ABC']), 'משולש ACB').kind, '«משולש ABC» · «משולש ACB» is a restatement').toBe('noop');
+      // the crossing order is another ring, and stays #1927's refusal
+      const crossed = gateVerdict(facts, 'מרובע ACBD');
+      expect(crossed.kind === 'refused' && crossed.reason, '«מרובע ACBD» is still refused').toBe('crossed-ring');
     },
   },
 ];

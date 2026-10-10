@@ -479,6 +479,10 @@ it stays in `unconsumed` for the leftover gate. `lowerShape(kind, ids)` is the s
 `notCyclic` (a right trapezoid → rectangle), which `inscribedPolygon` turns into `inscribed-contradicts-noun`.
 Gates: `droppedShapeNoun` (a noun accounted only by a ring of its arity) and `droppedShapeAdjective`.
 `commandConflict` treats a generic `quadrilateral` / `triangle` over a declared ring as a supertype restatement.
+A ring is compared by `ringKey` (`engine/geometry.ts`, the one definition; ADR-W-121): `normalizeShapeComposition`
+re-spells a ring command over a ring the figure already declares to the declared spelling whenever the word is
+symmetric under that reading (`RING_SYMMETRIC`; the trapezoid only under the readings that keep its named pair,
+`sameStatementUnder`), so a rotated or reversed restatement takes its declared spelling's verdict ([ADR-618](06-decisions.md#adr-618)).
 
 ### A point placement keeps its tail ([ADR-570](06-decisions.md#adr-570))
 
