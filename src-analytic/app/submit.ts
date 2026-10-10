@@ -134,7 +134,10 @@ const collapseFields = (f: Derivation['faults'][number]) =>
     : // #1918 (ADR-AG-252) — a circle through a ring its noun forbids, in two sentences: both nouns and the other sentence.
       f.code === 'inscribed-contradicts-declared'
       ? { shape: f.shape, forced: f.forced, declared: f.declared }
-      : {};
+      : // #1926 (ADR-AG-260) — a ring re-declared as a shape its noun excludes: both nouns.
+        f.code === 'shape-excluded'
+        ? { actual: f.actual, stated: f.stated }
+        : {};
 
 /** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
 const definingLineOf = (lines: readonly string[], id: string): string | null => {

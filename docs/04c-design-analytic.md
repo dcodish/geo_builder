@@ -757,7 +757,10 @@ Ring promises — simple, open, and not-a-parallelogram for the trapezoid family
 `PARALLEL_SIN_TOL` = `COLLAPSED_SIN_TOL`) — are `engine/rings.ts` `ringViolation(vertices, noun)`. `ringFaultsOf`
 records them and `drawableAt`'s `whole()` rejects them, but the exclusion is never refused (Amendment 1, 2-D ADR-165):
 `app/shapeWarnings.ts` `shapeWarningsOf(lines, d)` reads `d.figure.ringFaults` and `App.tsx` shows a shared
-`Banner kind="notice"`.
+`Banner kind="notice"`. A second NOUN is not a given (ADR-AG-260, #1926): `engine/shapes.ts` `nounsExclude(a, b)` —
+one noun `promisesOneParallelPair`, the other's row `assertsBothParallelPairs` (read off its givens, never listed) —
+and `applyFact`'s polygon arm refuses the later declaration `shape-excluded { actual, stated }` before M1 absorbs it
+(`errShapeExcluded`).
 
 *Identifiers:* `current` · `freeCoord` · `{A: G}` · `{A: B, B: A}` · `rewriteLineMap` · `*-not-typed` · `letter → seed name` · `derive(lines, seed, seedNames)` · `dispatchRename` · `dispatchSwap`
 

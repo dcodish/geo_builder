@@ -312,6 +312,9 @@ const he = {
   errInscribedContradictsDeclared:
     'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. ' +
     'הסיבה: מעגל שעובר דרך ארבעת הקודקודים הופך {{shapeHe}} ל{{forcedHe}}, ו{{forcedHe}} אינו {{shapeHe}}.',
+  // #1926 (ADR-AG-260; operator ruling 2026-10-08 "3-D's sentence") — a ring re-declared as a shape its noun excludes,
+  // either order. 3-D's `err.shapeLessSpecific`, word for word (B1: copied, never imported).
+  errShapeExcluded: 'הצורה כבר ידועה כ־{{actualHe}} — ולכן אינה נקראת {{statedHe}}. מחקו את הנתון הקודם אם התכוונתם {{statedHe}}.',
   // #1849 (ADR-AG-247, ADR-W-115) — the givens flatten a declared polygon. Names the refused sentence, the polygon
   // and the sentence that declared it, and says WHY: a flat figure is not that noun. Never «לא נמצאה תצורה».
   errPolygonCollapsed:
@@ -743,6 +746,7 @@ const en: typeof he = {
   errInscribedContradictsDeclared:
     "Can't do that: «{{detail}}» contradicts «{{declared}}» — they can't both hold. " +
     'The reason: a circle through the four vertices would make a {{shapeEn}} a {{forcedEn}}, and a {{forcedEn}} is not a {{shapeEn}}.',
+  errShapeExcluded: 'The figure is already known to be a {{actualEn}}, so it is not called a {{statedEn}}. Remove the earlier given if you meant {{statedEn}}.',
   errPolygonCollapsed:
     '"{{detail}}" flattens {{polygon}}: together with the earlier givens it forces the vertices onto one line, ' +
     'and a flat figure is not the {{shapeEn}} that "{{declared}}" declares. "{{detail}}" was not added.',

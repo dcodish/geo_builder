@@ -55,6 +55,9 @@ export interface LineFault {
   declared?: string;
   /** For a circle through a ring its noun forbids (#1918, ADR-AG-252): the noun the circle would force (registry key). */
   forced?: string;
+  /** For a ring re-declared as a shape its noun excludes (#1926, ADR-AG-260): the ring's noun and the refused one (registry keys). */
+  actual?: string;
+  stated?: string;
 }
 
 /**
@@ -173,7 +176,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null, e.options ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...inscribedAgainst(e, owner[i]) });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]) });
   });
 
   /**

@@ -291,6 +291,34 @@ export const promisesOneParallelPair = (noun: string | undefined): boolean =>
   noun !== undefined && ONE_PARALLEL_PAIR_NOUNS.has(normalizeShapeNoun(noun));
 
 /**
+ * Does this noun's ROW assert BOTH pairs of opposite sides parallel (#1926, ADR-AG-260)?
+ *
+ * Read off the row's givens over a probe ring `ABCD` — two stated (never `assumed`) `parallel` relations, one
+ * per pair of opposite sides — so a noun added to `SHAPES` is classified by what it asserts, never by a list.
+ * Today: «מקבילית», «מלבן», «ריבוע», «מעוין».
+ */
+export const assertsBothParallelPairs = (noun: string | undefined): boolean => {
+  const row = noun === undefined ? null : shapeRow(noun);
+  if (!row || row.arity !== 4) return false;
+  const pairKey = (a: Id, b: Id) => [a, b].sort().join('');
+  const sides = (c: Constraint): [string, string] | null =>
+    c.t === 'relation' && c.rel === 'parallel' && !c.assumed && c.u.k === 'points' && c.v.k === 'points'
+      ? [pairKey(c.u.a, c.u.b), pairKey(c.v.a, c.v.b)]
+      : null;
+  const held = row.givens(['A', 'B', 'C', 'D']).map(sides).filter((s): s is [string, string] => s !== null);
+  const holds = (p: string, q: string) => held.some(([x, y]) => (x === p && y === q) || (x === q && y === p));
+  return holds('AB', 'CD') && holds('AD', 'BC');
+};
+
+/**
+ * TWO NOUNS NO QUADRILATERAL CAN CARRY AT ONCE (#1926, ADR-AG-260): one promises exactly one pair of parallel
+ * sides (`promisesOneParallelPair`), the other's row asserts both pairs. Symmetric. Derived from the table —
+ * the analytic twin of 3-D's "no member in common" (#1918, ADR-3D-313) and 2-D's ADR-157 refusal.
+ */
+export const nounsExclude = (a: string | undefined, b: string | undefined): boolean =>
+  (promisesOneParallelPair(a) && assertsBothParallelPairs(b)) || (promisesOneParallelPair(b) && assertsBothParallelPairs(a));
+
+/**
  * Is this noun the GENERIC one for its arity — «משולש», «מרובע» — asserting nothing but the ring?
  *
  * Read off the row rather than listed, so a future generic noun needs no second registration. It
