@@ -895,6 +895,26 @@ The engine leaves an unstated choice free (ADR-052) and cyclable (ADR-138); this
 
 ## Render and marks
 
+### An off-ink construction point's dashed extension ([ADR-612](06-decisions.md#adr-612), [ADR-W-124](06w-decisions-workspace.md#adr-w-124), #1971, #1937)
+
+The extension is render-time **decoration**, not a dependency-graph object. It has no id and no letter, it is never
+a fact, and it is recomputed for every configuration, because whether a foot lands beyond its side depends on the
+configuration. Two halves:
+
+- **Which lines.** `carryingLines` (`src/engine/carryingLines.ts`) reads, from the construction alone, every line
+  through two named points that a point is DEFINED to lie on: a foot's side, a segment point's segment, both lines
+  of a crossing, a `through` line under a line-object crossing. It is an exhaustive switch over `GeoPointKind`, so a
+  new point kind must answer it. A point on a line by accident has no carrier.
+- **When.** `shell/offInk.ts` `offInkExtensions` is the shared planar geometry. A point inside its carrier's span
+  gets nothing. A point beyond it gets the stretch from the span's nearer end, minus any ink already drawn on that
+  line. A point not on its carrier in this configuration gets nothing.
+
+`buildScene` publishes the result as `Scene.extensions` from the drawn points, segments and lines (a polygon is
+never stroked, so its sides count through their segments). `Figure.tsx` paints it dashed in the segment colour, with
+no hit-target.
+
+*Identifiers:* `carryingLines` · `offInkExtensions` · `Scene.extensions` · `data-role="extension"`
+
 ### The measure-label seam and the display choice (#948, [ADR-488](06-decisions.md#adr-488))
 
 A symbolic measure becomes figure text at one place, `measureLabelForms` (`src/engine/lower.ts`), reached from the

@@ -305,26 +305,19 @@ export function orthocentre(a: Pt, b: Pt, c: Pt): Pt | null {
 }
 
 /**
- * A quadrilateral's diagonal meet — AC ∩ BD, **as segments**.
+ * A quadrilateral's diagonal meet — where the LINES AC and BD cross.
  *
- * `null` when the diagonals are parallel, and `null` when the supporting lines cross somewhere that
- * is not on both diagonals. The second half is the point (#1043): «מפגש האלכסונים» names the meet of
- * two *segments*, and answering it with the line–line formula invents a point for every concave
- * quadrilateral. Measured on `A(0,0) B(4,0) C(1,1) D(0,4)`: the old form returned `(2,2)`, which sits
- * at `t = 2` along a diagonal `AC` that ends at `(1,1)` — twice past its own endpoint, committed with
- * no fault, drawn, and printed in the panel as a coordinate the student can read off the figure.
+ * **Operator ruling 2026-10-09 (#1937, ADR-AG-255, superseding ADR-AG-021's segment reading):** *"Lines, and show
+ * why. Follow 2-D: the diagonals are lines. Draw O at (2,2) and extend both diagonals, dashed, out to it."* So on
+ * the concave `A(0,0) B(4,0) C(1,1) D(0,4)` the meet is `(2,2)` — at `t = 2` along AC — and the figure shows WHY it
+ * sits outside the shape: the diagonal is extended, dashed, out to it (`carryingLines` + `shell/offInk`). ADR-AG-021
+ * refused that point as invented; the ruling reads «נפגשים» as the lines meeting, as 2-D does, and the honesty the
+ * old reading protected is kept by drawing the extension rather than by withholding the point.
  *
- * Both parameters come from the SAME determinant, so the two are consistent by construction rather
- * than by two separate solves that could disagree near-degenerately.
- *
- * The interval is CLOSED. `t = 0` or `t = 1` means the crossing lands exactly on a vertex — a
- * degenerate quadrilateral, but one whose diagonals genuinely do touch there, so it is a meet rather
- * than an absence. Stated explicitly and tested, rather than left to whichever way the tolerance
- * happened to fall.
- *
- * `null` here is VACANCY, not a fault: `evalRule` propagates it and the point is reported absent at
- * this configuration ([ADR-AG-008](../../docs/06c-decisions-analytic.md#adr-ag-008)) — never `NaN`,
- * never invented.
+ * `null` only when the diagonals are PARALLEL — then no line meets the other, at any configuration, and the point
+ * is vacant ([ADR-AG-008](../../docs/06c-decisions-analytic.md#adr-ag-008)), never `NaN`, never invented. The
+ * parallel test is RELATIVE, scaled by the diagonals' own length, so a figure spanning 3 units is judged as one
+ * spanning 3000.
  */
 export function diagonalMeet(a: Pt, b: Pt, c: Pt, d: Pt): Pt | null {
   const r = { x: c.x - a.x, y: c.y - a.y };
@@ -335,14 +328,6 @@ export function diagonalMeet(a: Pt, b: Pt, c: Pt, d: Pt): Pt | null {
   const qx = b.x - a.x;
   const qy = b.y - a.y;
   const t = (qx * s.y - qy * s.x) / den; // along AC
-  const u = (qx * r.y - qy * r.x) / den; // along BD, from the same determinant
-  /**
-   * A RELATIVE tolerance, scaled the way the parallel test above already is. A bare absolute
-   * epsilon would mean something different on a figure spanning 3 units than on one spanning 3000,
-   * and the corpus contains both.
-   */
-  const eps = 1e-9;
-  if (t < -eps || t > 1 + eps || u < -eps || u > 1 + eps) return null;
   return { x: a.x + t * r.x, y: a.y + t * r.y };
 }
 

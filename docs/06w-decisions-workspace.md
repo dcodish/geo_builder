@@ -5717,3 +5717,20 @@ He is right, and the failure is instructive: **isolation fixes a Hebrew run agai
 6. **Re-entry still bypasses the queue entirely.** A command run with `GEO_SUITE_LOCK_HELD=1` (the holder's own child, as in `test:locked -- npm run test:full`) takes no ticket and waits for nothing.
 
 **Consequences.** A stream's wait is now bounded by the runs ahead of it instead of by luck, which is what makes a parallel round's gate times predictable. The waiting line reads `… N ahead of you`, so a session can see its position instead of guessing. `<lock>.queue/` is left in place when the line empties — one empty directory in the git common dir, never committed, and deliberately never deleted so a waiter's ticket write cannot race a cleanup. The locks live in `server/__tests__/suite-lock.test.ts`: three waiters served in arrival order though the first polls 60× slower, a killed waiter's ticket reclaimed rather than wedging the line, and the re-entry escape taking no ticket — alongside the four ADR-W-114 stale-lock tests, which pass unchanged.
+
+
+## ADR-W-124 — An off-ink construction point gets its carrying line extended, dashed, to meet it, in every planar builder (#1937, #1971)
+
+**Status:** accepted · 2026-10-10 · fix round #1983 (stream A) · **Product ADRs:** [ADR-612](06-decisions.md#adr-612) (2-D), [ADR-AG-255](06c-decisions-analytic.md#adr-ag-255) (analytic). 3-D is not built here, see #1984.
+**Requirements:** [02](02-requirements.md) FR-RN-15; [02c](02c-requirements-analytic.md) R176 · **Design:** [04](04-design.md) § "An off-ink construction point's dashed extension"; [04c](04c-design-analytic.md) § "The diagonals are lines; an off-ink point's dashed extension"
+
+**The rule (operator, 2026-10-10, #1971, generalising his 2026-10-09 ruling on #1937):** *any construction point that lands off the drawn ink gets the carrying line extended, dashed, to meet it.* A labelled dot floating beside the figure is the confusion the honesty rule exists to prevent.
+
+**What it means, in every builder.**
+- A **carrier** is a line through two named points that the construction DEFINES the point to lie on. Each product reads its carriers from its own dependency graph, because that is engine knowledge and is copied, never shared (`BOUNDARIES.json`).
+- **When** a stretch is owed is ONE shared decision, `shell/offInk.ts` `offInkExtensions`. A point inside the span gets nothing. A point beyond it gets the stretch from the nearer end, minus ink already on the line. A point not on its carrier in this configuration gets nothing.
+- It is **decoration**: no id, no letter, never a fact, and recomputed for every configuration.
+
+**Why `shell/`.** Two products need the same geometry at once, and the planar mark kit (`shell/marks.ts`) is the precedent: pure screen or world vector maths with no product knowledge. 3-D is not a consumer. Its geometry is spatial and its dashing already means "hidden" (docs/20 §6.4), so it needs its own decision.
+
+**3-D.** Measured on this branch: «טרפז ABCD» · «AE גובה» puts E at (0.00, 0.74, 0) past D(0.03, 0.74, 0), with nothing drawn to it. Filed as #1984 (`needs-operator`, proposed P3, not armed), with the open question named: how an extension should look in a builder where dashed already means hidden. There is no parity row. The verdicts agree in all three builders, so a known-gap row would fail as "now builds", and a display gap has no lock yet (docs/22 §10).

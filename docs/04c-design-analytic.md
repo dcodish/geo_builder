@@ -857,6 +857,23 @@ its ends are `engine/lines.ts`'s `isVertical` / `isHorizontal` with `VERTICAL_TO
 
 ## Text, scene, labels and marks
 
+### The diagonals are lines; an off-ink point's dashed extension ([ADR-AG-255](06c-decisions-analytic.md#adr-ag-255), [ADR-W-124](06w-decisions-workspace.md#adr-w-124), #1937, #1971)
+
+- **The meet.** `diagonalMeet` (`engine/derived.ts`) is the crossing of the diagonal LINES. It is vacant only when the
+  diagonals are parallel. ADR-AG-021's segment interval survives as a **preference** in `drawableAt`: a configuration
+  whose meet is on both diagonals beats one whose meet needs an extension. That is the strength the old vacancy had,
+  so a figure that can be drawn crossed still opens crossed and is judged as before.
+- **The attribution.** A `meet-of` names its point on its own line in `derive`'s `lineOf`, so a vacancy of it is
+  reported like any other named point and is never recorded silently.
+- **The extension.** Decoration, like `constructionOf`: `evaluate` computes `Figure.extensions` from
+  `engine/carryingLines.ts`, which covers the derived rules (exhaustive over `DerivedRule`) and the `on-line-2pt`
+  incidences. It then applies `shell/offInk.ts` `offInkExtensions` over the figure's segments and stated lines.
+  `buildScene` projects it to `Scene.extensions`, and `Figure.tsx` paints it dashed in the segment colour, always on
+  and with no hit-target. 2-D's half is the same decision over its own graph (04 § "An off-ink construction point's
+  dashed extension").
+
+*Identifiers:* `diagonalMeet` · `diagonalMeetsCross` · `carryingLines` · `offInkExtensions` · `Figure.extensions`
+
 ### Notation has one owner ([ADR-AG-148](06c-decisions-analytic.md#adr-ag-148))
 
 `app/curveText.ts` is the equation-notation module; `engine/expr.ts`'s `exprText` is the algebraic printer. Numeric

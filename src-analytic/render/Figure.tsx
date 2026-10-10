@@ -54,7 +54,7 @@ export function Figure({
    */
   onCentre?: (offerId: string, screen: { x: number; y: number }) => void;
 }) {
-  const { width, height, axes, curves, segments, arcs, construction, points, crossings, measures, loci } = scene;
+  const { width, height, axes, curves, segments, arcs, construction, extensions, points, crossings, measures, loci } = scene;
   /** #1598: a centre offer asks for a letter (`onCentre`); every other ring adds its sentence (`onCrossing`). */
   const ringClick = (k: Scene['crossings'][number], e: { clientX: number; clientY: number }) =>
     k.centreOf && onCentre ? onCentre(k.id, { x: e.clientX, y: e.clientY }) : onCrossing?.(k.sentence, { x: k.wx, y: k.wy });
@@ -143,6 +143,14 @@ export function Figure({
           </g>
         </g>
       )}
+
+      {/* #1937/#1971 (ADR-AG-255): a construction point off the drawn ink gets its carrying line extended, DASHED, out
+          to it — the segments' own ink, so it reads as that line continued. Decoration: no id, no hit-target. */}
+      <g data-testid="analytic-extensions" stroke={CURVE} strokeWidth={2} strokeLinecap="round" strokeDasharray="6 5" pointerEvents="none">
+        {(extensions ?? []).map((e, i) => (
+          <line key={`ext-${i}`} data-role="extension" x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} />
+        ))}
+      </g>
 
       {/* segments — stated segments and polygon sides (#1028). Drawn BEFORE the curves and points so
           a vertex dot and a curve both sit on top of the ink rather than under it. */}

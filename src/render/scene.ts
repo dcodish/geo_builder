@@ -15,7 +15,8 @@ import { len, rot90, sub, unit } from '@/engine/geometry';
 import { formatMeasure, formatAngle } from '@/format';
 import { visibleCoincidences } from './pointDescriptions';
 import { MARK_FIT_FRACTION, MIN_MARK_SCALE, markFitScale } from '../../shell/marks';
-import { resolveCircle, resolveDrawnLines, orientArc, type DefiniteAngle, type DefiniteLength, type RelationsResult, type ResolvedCircle } from '@/engine';
+import { offInkExtensions } from '../../shell/offInk';
+import { carryingLines, resolveCircle, resolveDrawnLines, orientArc, type DefiniteAngle, type DefiniteLength, type RelationsResult, type ResolvedCircle } from '@/engine';
 
 export interface ScenePoint {
   id: Id;
@@ -178,6 +179,18 @@ export interface Scene {
   lines: SceneLine[];
   measures: SceneMeasure[];
   angleMarks: SceneAngleMark[];
+  /**
+   * #1971/#1937 ([ADR-612](docs/06-decisions.md#adr-612)) — the DASHED stretches that carry a construction point's
+   * line out to it when the point lands off the drawn ink (a height's foot beyond its side's end). Decoration: no
+   * id, no hit-target, recomputed per configuration; `shell/offInk` decides, `carryingLines` says which lines.
+   */
+  extensions: SceneExtension[];
+}
+
+/** A dashed extension (world, y-up): from the end of the drawn ink toward the off-ink point. */
+export interface SceneExtension {
+  a: Vec;
+  b: Vec;
 }
 
 /**
@@ -449,6 +462,21 @@ export function buildScene(
   // robust to branch/DOF changes no static id choice at the lowering could be.
   markCoveredSegments(segments);
 
+  // #1971/#1937 (ADR-612): an off-ink construction point gets its carrying line extended, dashed, to meet it — only
+  // for a point that is DRAWN, along a line the dependency graph says it lies on, minus the ink already there.
+  const shown = new Set(points.map((p) => p.id));
+  const extensions: SceneExtension[] = offInkExtensions(
+    carryingLines(c).flatMap((k) => {
+      const p = positions.get(k.id);
+      const a = positions.get(k.a);
+      const b = positions.get(k.b);
+      return shown.has(k.id) && p && a && b ? [{ p, a, b }] : [];
+    }),
+    // The ink is the drawn segments and lines — a polygon is never stroked here (its sides are segments).
+    segments.map((s) => ({ a: s.a, b: s.b })),
+    lines.map((l) => ({ anchor: l.anchor, dir: l.dir })),
+  ).map((e) => ({ a: e.from, b: e.to }));
+
   // Measure labels (ADR-031): a length sits at its segment's midpoint, nudged
   // perpendicular to the OUTSIDE (away from the figure's centroid); an angle sits
   // at its vertex, nudged along the interior bisector of its two rays.
@@ -510,7 +538,7 @@ export function buildScene(
     if (v && p1 && p2 && len(sub(p1, v)) > 1e-9 && len(sub(p2, v)) > 1e-9) angleMarks.push({ vertex: v, p1, p2, right: m.right });
   }
 
-  return { points, segments, polygons, circles, arcs, lines, measures, angleMarks };
+  return { points, segments, polygons, circles, arcs, lines, measures, angleMarks, extensions };
 }
 
 /**

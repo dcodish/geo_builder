@@ -338,26 +338,26 @@ describe('the honesty gate reaches derived points too', () => {
 });
 
 /**
- * #1043 — «מפגש האלכסונים» is the meet of two SEGMENTS, not of their supporting lines.
+ * #1043 → #1937 — «מפגש האלכסונים» is where the diagonals' LINES meet.
  *
- * From a Codex review, and confirmed by measurement before the fix: a concave quadrilateral got a
- * point at `t = 2` along a diagonal that ends at `t = 1` — committed with no fault, drawn, and
- * printed in the data panel as a coordinate the student can read off the figure. An invented point
- * is the same class of defect as a dropped given: the figure says something the sentence does not.
+ * #1043 (ADR-AG-021) read the diagonals as segments and left a concave quadrilateral's meet out. The operator
+ * reversed that on 2026-10-09 (#1937, ADR-AG-255): *"Lines, and show why. Follow 2-D: the diagonals are lines. Draw
+ * O at (2,2) and extend both diagonals, dashed, out to it."* These locks are re-based on the ruling; the point is
+ * absent only when the diagonals are parallel.
  */
-describe('#1043 — the diagonal meet lies ON both diagonals', () => {
+describe('#1937 — the diagonal meet is where the diagonal LINES cross', () => {
   const at = (pts: Record<string, { x: number; y: number }>) => (id: string) => pts[id] ?? null;
 
-  it('is absent for a concave quadrilateral whose diagonals do not cross', () => {
-    // The reported figure. Before the fix this returned (2,2): AC runs (0,0)→(1,1), so t = 2 is
-    // twice past its own endpoint.
-    expect(diagonalMeet({ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 4 })).toBeNull();
+  it('exists for a concave quadrilateral — the operator’s figure, O = (2,2), twice along AC', () => {
+    const m = diagonalMeet({ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 4 });
+    expect(m?.x).toBeCloseTo(2, 9);
+    expect(m?.y).toBeCloseTo(2, 9);
   });
 
-  it('is absent for the reviewer’s own figure too', () => {
-    expect(
-      diagonalMeet({ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 0.5, y: 0.5 }, { x: 0, y: 2 }),
-    ).toBeNull();
+  it('exists for the #1043 reviewer’s figure too — at (1,1)', () => {
+    const m = diagonalMeet({ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 0.5, y: 0.5 }, { x: 0, y: 2 });
+    expect(m?.x).toBeCloseTo(1, 9);
+    expect(m?.y).toBeCloseTo(1, 9);
   });
 
   it('still meets for a convex quadrilateral, where the diagonals really do cross', () => {
@@ -372,41 +372,28 @@ describe('#1043 — the diagonal meet lies ON both diagonals', () => {
     expect(m).not.toBeNull();
   });
 
-  it('accepts a crossing exactly ON a vertex — the interval is CLOSED', () => {
-    // A(0,0) B(4,0) C(2,2) D(0,4): BD runs (4,0)→(0,4) and passes exactly through C, so the meet
-    // sits at t = 1 — the far ENDPOINT of diagonal AC. The diagonals genuinely touch there, so it is
-    // a meet rather than an absence. Ruled explicitly rather than left to whichever way the
-    // tolerance happened to fall.
+  it('a crossing exactly ON a vertex is still a meet', () => {
     const m = diagonalMeet({ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 2, y: 2 }, { x: 0, y: 4 });
-    expect(m).not.toBeNull();
     expect(m?.x).toBeCloseTo(2, 9);
     expect(m?.y).toBeCloseTo(2, 9);
   });
 
-  it('is absent when the diagonals are parallel — unchanged', () => {
+  it('is absent when the diagonals are parallel — no line meets the other', () => {
     expect(diagonalMeet({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 2 }, { x: 3, y: 2 })).toBeNull();
   });
 
   it('scales: a large thin quadrilateral is judged the same way as a small one', () => {
     // Relative tolerance, not absolute — the corpus has figures spanning 3 units and 3000.
-    const small = diagonalMeet({ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 4 }, { x: 0, y: 4 });
-    const big = diagonalMeet(
-      { x: 0, y: 0 },
-      { x: 4000, y: 0 },
-      { x: 4000, y: 4000 },
-      { x: 0, y: 4000 },
-    );
-    expect(small).not.toBeNull();
-    expect(big).not.toBeNull();
+    const big = diagonalMeet({ x: 0, y: 0 }, { x: 4000, y: 0 }, { x: 4000, y: 4000 }, { x: 0, y: 4000 });
     expect(big?.x).toBeCloseTo(2000, 6);
+    expect(diagonalMeet({ x: 0, y: 0 }, { x: 4000, y: 0 }, { x: 8000, y: 8000 }, { x: 12000, y: 8000 })).toBeNull();
   });
 
-  it('reports the point ABSENT through the rule evaluator, never NaN', () => {
-    // The vacancy path: `evalRule` propagates null and the figure reports the point absent at this
-    // configuration — ADR-AG-008's distinction, applied here.
-    const pts = { A: { x: 0, y: 0 }, B: { x: 4, y: 0 }, C: { x: 1, y: 1 }, D: { x: 0, y: 4 } };
-    const out = evalRule({ t: 'diagonals', v: ['A', 'B', 'C', 'D'] }, at(pts));
-    expect(out).toBeNull();
+  it('a parallel pair is ABSENT through the rule evaluator, never NaN', () => {
+    const pts = { A: { x: 0, y: 0 }, B: { x: 1, y: 0 }, C: { x: 2, y: 2 }, D: { x: 3, y: 2 } };
+    expect(evalRule({ t: 'diagonals', v: ['A', 'B', 'C', 'D'] }, at(pts))).toBeNull();
+    const concave = { A: { x: 0, y: 0 }, B: { x: 4, y: 0 }, C: { x: 1, y: 1 }, D: { x: 0, y: 4 } };
+    expect(evalRule({ t: 'diagonals', v: ['A', 'B', 'C', 'D'] }, at(concave))).toEqual({ x: 2, y: 2 });
   });
 });
 
@@ -423,10 +410,8 @@ describe('#1043 — the diagonal meet lies ON both diagonals', () => {
 describe('#1058 — vacancy needs a predicate', () => {
   const codes = (lines: string[]) => derive(lines, 0).faults.map((f) => f.code);
 
-  it('reports the concave diagonal meet — the operator’s reported figure', () => {
-    expect(codes(['A(0,0)', 'B(4,0)', 'C(1,1)', 'D(0,4)', 'G מפגש האלכסונים במרובע ABCD'])).toEqual([
-      'does-not-exist',
-    ]);
+  it('the concave diagonal meet EXISTS since #1937 (ADR-AG-255) — the lines meet at (2,2)', () => {
+    expect(codes(['A(0,0)', 'B(4,0)', 'C(1,1)', 'D(0,4)', 'G מפגש האלכסונים במרובע ABCD'])).toEqual([]);
   });
 
   it('reports the wider class the issue named — a collinear circumcentre', () => {
@@ -438,8 +423,8 @@ describe('#1058 — vacancy needs a predicate', () => {
   it('names WHAT does not exist, so the message can say it', () => {
     // The same `existing` token #1046 introduced for a name clash, reused rather than re-invented —
     // the locale renders «מפגש האלכסונים», never `derived:diagonals`.
-    const d = derive(['A(0,0)', 'B(4,0)', 'C(1,1)', 'D(0,4)', 'G מפגש האלכסונים במרובע ABCD'], 0);
-    expect(d.faults[0].existing).toBe('derived:diagonals');
+    const d = derive(['A(0,0)', 'B(1,1)', 'C(2,2)', 'P מפגש האנכים האמצעיים במשולש ABC'], 0);
+    expect(d.faults[0].existing).toBe('derived:circumcentre');
   });
 
   it('stays SILENT while the figure can still move — ADR-AG-008 intact', () => {
