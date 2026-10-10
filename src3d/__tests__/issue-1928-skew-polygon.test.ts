@@ -49,21 +49,23 @@ describe('#1928 the reported sequence, verbatim', () => {
     const r = play([...PTS, 'מרובע ABCD']);
     expect(r.kinds).toEqual(['record', 'record', 'record', 'record', 'refused']);
     expect(r.error).toEqual({
-      code: 'givens-contradict',
+      code: 'ring-not-flat',
       stated: 'מרובע ABCD',
       others: ['A(0,0,0)', 'B(4,0,0)', 'C(4,3,0)', '…'],
+      sides: 4,
+      vertices: ['A', 'B', 'C', 'D'],
     });
     // keep-prior: the four coordinate points stand, the declaration is not in the list
     expect(r.st.facts.map((f) => f.utterance)).toEqual(PTS);
   });
 
-  it('the existing `givens-contradict` wording, in both languages — no new key', () => {
+  it('#1978 (ADR-3D-325): the ruled flat-shape wording, in both languages', () => {
     const r = play([...PTS, 'מרובע ABCD']);
     expect(errorText3(he, r.error)).toBe(
-      'הנתונים סותרים זה את זה — אין גוף שמקיים את «מרובע ABCD» יחד עם «A(0,0,0)», «B(4,0,0)», «C(4,3,0)», …',
+      'מרובע הוא צורה שטוחה, והקודקודים A, B, C, D אינם נמצאים במישור אחד — ולכן «מרובע ABCD» לא מתקיים יחד עם «A(0,0,0)», «B(4,0,0)», «C(4,3,0)», ….',
     );
     expect(errorText3(en, r.error)).toBe(
-      'The givens contradict each other — no figure satisfies «מרובע ABCD» together with «A(0,0,0)», «B(4,0,0)», «C(4,3,0)», …',
+      'A quadrilateral is a flat shape, and the vertices A, B, C, D do not lie in one plane — so «מרובע ABCD» cannot hold together with «A(0,0,0)», «B(4,0,0)», «C(4,3,0)», ….',
     );
   });
 
@@ -77,8 +79,8 @@ describe('#1928 the reported sequence, verbatim', () => {
       cmds: [{ type: 'solid', kind: 'polygon4', ids: ['A', 'B', 'C', 'D'] }],
       enabled: true,
     };
-    expect(derive3([...facts, skew], 0).status.x).toEqual({
-      code: 'givens-contradict',
+    expect(derive3([...facts, skew], 0).status.x).toMatchObject({
+      code: 'ring-not-flat',
       stated: 'מרובע ABCD',
       others: ['A(0,0,0)', 'B(4,0,0)', 'C(4,3,0)', '…'],
     });
@@ -109,12 +111,12 @@ describe('#1928 the class — a declared flat polygon over placed, non-coplanar 
     const r = play(lines as string[]);
     expect(r.kinds.slice(0, -1).every((k) => k === 'record')).toBe(true);
     expect(r.kinds[r.kinds.length - 1]).toBe('refused');
-    expect(r.error).toEqual({ code: 'givens-contradict', stated, others });
+    expect(r.error).toMatchObject({ code: 'ring-not-flat', stated, others }); // #1978: its own code since ADR-3D-325
   });
 
-  it('the solid rows name the solid, as the ruling words them', () => {
+  it('the solid rows name the solid, as the ruling words them (#1978: with the flat-shape reason)', () => {
     expect(errorText3(he, play(["קובייה ABCDA'B'C'D'", "מרובע ABCA'"]).error)).toBe(
-      'הנתונים סותרים זה את זה — אין גוף שמקיים את «מרובע ABCA\'» יחד עם «קובייה ABCDA\'B\'C\'D\'»',
+      "מרובע הוא צורה שטוחה, והקודקודים A, B, C, A' אינם נמצאים במישור אחד — ולכן «מרובע ABCA'» לא מתקיים יחד עם «קובייה ABCDA'B'C'D'».",
     );
   });
 });

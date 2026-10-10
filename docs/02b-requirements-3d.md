@@ -379,10 +379,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   declared over points the figure has already PLACED — typed coordinates, a coordinate given, a derived point over
   those, or a solid's vertex — whose vertices do not lie in one plane («A(0,0,0) · B(4,0,0) · C(4,3,0) · D(0,3,5) ·
   מרובע ABCD», «קובייה ABCDA'B'C'D' · מרובע ABCA'») is refused on the line that completed it, naming the
-  declaration and the statements that placed its points; a polygon is flat by definition. A ring with at least one
+  declaration and the statements that placed its points; a polygon is flat by definition, and the message says
+  so — the shape is flat and these vertices are not in one plane («מרובע הוא צורה שטוחה, והקודקודים A, B, C, A'
+  אינם נמצאים במישור אחד — ולכן …»). A ring with at least one
   FREE vertex is BUILT, that point driven into the plane — an unstated freedom is never an error.
-  - Sources: ADR-3D-234, ADR-3D-309, ADR-3D-310, ADR-3D-314, ADR-3D-319, ADR-W-048, ADR-W-115, ADR-413, ADR-602,
-    ADR-AG-129, ADR-052; #936, #945, #1815, #1849, #1861, #1923, #1928, #1935.
+  - Sources: ADR-3D-234, ADR-3D-309, ADR-3D-310, ADR-3D-314, ADR-3D-319, ADR-3D-325, ADR-W-048, ADR-W-115, ADR-413,
+    ADR-602, ADR-AG-129, ADR-052; #936, #945, #1815, #1849, #1861, #1923, #1928, #1935, #1978.
 - **FR-RD-8 (Should)** — **A stated LENGTH is drawn beside its segment.** «AB = 5» writes the 5 at AB's midpoint
   on the canvas, not only in the data panel — the honesty invariant *"everything the student stated is visible on
   the figure"* applied to the magnitude lane, which previously held for a stated distance (a labelled witness line)

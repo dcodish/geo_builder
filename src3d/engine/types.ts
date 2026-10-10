@@ -1804,6 +1804,10 @@ export type EngineError3 =
    *  itself — not that shape. `stated` is the line that completed it (the declaration, or the coordinate that came
    *  last). Analytic's `ring-contradicts-noun` (ADR-AG-129), worded as analytic's. */
   | { code: 'ring-crossed'; stated: string }
+  /** #1978 (ADR-3D-325): a polygon DECLARED over placed points that no configuration makes coplanar (ADR-3D-319's
+   *  skew arm). Same verdict and the same `stated`/`others` as the `givens-contradict` it used to reuse, plus the
+   *  reason: `sides` names the shape (its noun by vertex count) and `vertices` the corners off one plane. */
+  | { code: 'ring-not-flat'; stated: string; others: string[]; sides: number; vertices: string[] }
   | { code: 'sign-unsatisfiable'; id: Id } // no pivot solution has the stated coordinate sign
   | { code: 'no-such-solid'; id: string } // a volume/area claim names a solid kind the figure doesn't have (or has twice)
   | { code: 'free-size-claim'; id: string } // a numeric volume/area claim on a solid whose dims are unstated

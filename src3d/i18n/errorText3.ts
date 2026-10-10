@@ -177,6 +177,18 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
         ? t('err.polygonCollapsed', { stated: err.stated, others: quoteList(err.others), shape })
         : t('err.polygonCollapsedAlone', { stated: err.stated, shape });
     }
+    // #1978 (ADR-3D-325): the skew ring says WHICH property failed — a polygon is flat, these corners are not —
+    // in the operator's ruled sentence of 2026-10-10, with both statements still named. With no other statement
+    // to name, the sentence has no second half, so the general wording stands (as today).
+    case 'ring-not-flat':
+      return err.others.length > 0
+        ? t('err.ringNotFlat', {
+            kind: t(`err.polygonKind.${err.sides}`),
+            vertices: err.vertices.join(', '),
+            stated: err.stated,
+            others: quoteList(err.others),
+          })
+        : t('err.givensContradictAlone', { stated: err.stated });
     case 'givens-contradict':
       return err.others.length > 0
         ? t('err.givensContradict', { stated: err.stated, others: quoteList(err.others) })

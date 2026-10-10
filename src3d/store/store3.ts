@@ -952,7 +952,9 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
    * configuration is never called a contradiction. A sample the pivot left unplaced is not a figure and is skipped,
    * `holdsAt`'s given rule (ADR-3D-284); with no placed sample the check fails open.
    *
-   * Refused on the line that COMPLETED the ring, with the existing `givens-contradict` wording — #1923's
+   * Refused on the line that COMPLETED the ring. #1978 (ADR-3D-325) gave it its own code, `ring-not-flat`, whose
+   * sentence says the shape is flat and these corners are not (it used the general `givens-contradict` wording,
+   * which never said which property failed; that code's other callers keep it unchanged). #1923's
    * `errRingContradictsNoun` would be false here, since it offers reordering the letters and no order makes four
    * non-coplanar points flat. Ordered collapse → skew → crossing: a skew ring has no plane to judge a crossing in.
    */
@@ -974,9 +976,11 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
     }
     if (placed === 0 || flatSomewhere) continue; // fail open: the ring can be flat, or there is no figure to judge
     status[blame.blamed.id] = {
-      code: 'givens-contradict',
+      code: 'ring-not-flat',
       stated: blame.blamed.utterance,
       others: namedStatements(blame.by, blame.blamed.id),
+      sides: ring.length,
+      vertices: [...ring],
     };
   }
 
