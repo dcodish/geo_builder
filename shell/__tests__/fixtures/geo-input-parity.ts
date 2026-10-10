@@ -765,6 +765,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cevian-named-only', family: 'cevians-centres', steps: ['משולש ABC', 'AD גובה'], expect: 'builds' },
   // #1907 (ADR-3D-315): the bare altitude onto a foot already on the opposite side — 2-D drops it there (3-D refused the triangle as flat)
   { id: 'cevian-named-foot-on-side', family: 'cevians-centres', steps: ['משולש ABC', 'D על BC', 'AD גובה'], expect: 'builds' },
+  /*
+   * #1945 (ADR-AG-253) — the two rows #1907's stream parked for want of an analytic issue: a HEIGHT's host is
+   * any ring with a side opposite the apex, not a triangle alone. 2-D drops it onto the trapezoid's parallel
+   * base (DC) and onto the parallelogram's first opposite side (BC); analytic refused both as
+   * `cevian-no-triangle` until this issue, and 3-D reads them through ADR-3D-315's flat-polygon reader.
+   */
+  { id: 'cevian-height-trapezoid', family: 'cevians-centres', steps: ['טרפז ABCD', 'AE גובה'], expect: 'builds' },
+  { id: 'cevian-height-parallelogram', family: 'cevians-centres', steps: ['מקבילית ABCD', 'AE גובה'], expect: 'builds' },
   { id: 'cevian-to-side', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון לצלע BC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cevian-plural-respectively', family: 'cevians-centres', steps: ['משולש OBC', 'OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1685' }, { product: '3d', issue: '#1679', parked: true }], note: '471 corpus 7/4, as S1 teaches its imperative' },
   { id: 'bisector-copula', family: 'cevians-centres', steps: ['משולש CMD', 'AM הוא חוצה זווית CMD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1685' }, { product: '3d', issue: '#1679', parked: true }], note: '471 corpus 22/5' },

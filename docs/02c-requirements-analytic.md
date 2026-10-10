@@ -468,6 +468,11 @@ From the «lines and points» corpus (§8), numbered onward.
 - «OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה»
 - Sources: ADR-AG-209, #1284, #1222, #1240, #1263.
 
+**R103d — a HEIGHT is drawn on any ring that has a side opposite the apex, and which side is 2-D's choice**. *(ADR-W-118 B1: 2-D is the reference for the verdict and for the drawing.)* The trapezoid's parallel base ([ADR-169](06-decisions.md#adr-169)), else the ring's first opposite side (the draw-one steer, [ADR-263](06-decisions.md#adr-263)); a diagonal is never a target. Two shapes giving the apex different sides ASK. `cevian-no-triangle` is kept for a figure with no such side, and the **median** keeps the triangle-only host, because 2-D defers it on a ring.
+- «טרפז ABCD» · «AE גובה» → the foot on DC · «מקבילית ABCD» · «AE גובה» → the foot on BC
+- «מרובע ABCD» · «משולש ABC» · «AE גובה» → asks which shape · «נקודה A» · «AD גובה» → refused · «מקבילית ABCD» · «AE תיכון» → refused
+- Sources: ADR-AG-253, #1945, #1907, ADR-W-118, ADR-263, ADR-169.
+
 **R103c — the tool's letters are 2-D's, and «תיכון ליתר» never assumes the right angle**. **M** for a midpoint, **H** for a foot (F is the focus letter here); with only «משולש ישר-זווית ABC», «תיכון ליתר» ASKS which side is the hypotenuse.
 - Sources: ADR-AG-211, #1620, #1222, #1281, #1689.
 

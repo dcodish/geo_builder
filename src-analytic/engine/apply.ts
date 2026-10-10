@@ -1419,6 +1419,60 @@ function applyRoleOf(c: Construction, f: Extract<Fact, { t: 'role-of' }>): Apply
   return applyFact(c, say(says));
 }
 
+/** One unordered pair of vertices, as a comparable key. */
+const edgeKey = (e: readonly [Id, Id]): string => [e[0], e[1]].sort().join('|');
+const sameEdge = (a: readonly [Id, Id], b: readonly [Id, Id]): boolean => edgeKey(a) === edgeKey(b);
+
+/**
+ * THE SIDES OF A RING THAT LIE OPPOSITE `apex` (#1945, [ADR-AG-253](../../docs/06c-decisions-analytic.md#adr-ag-253)).
+ *
+ * The real EDGES of the ring that do not touch the apex — the bases a height from it can drop onto. A triangle
+ * yields exactly one; a quadrilateral or an n-gon yields several, all of them genuine heights. Only ring edges are
+ * walked, so a DIAGONAL can never come out of this: a height drops to a side, never across the figure (2-D reached
+ * the same rule from the same complaint, [ADR-263](../../docs/06-decisions.md#adr-263)'s `oppositePolygonEdges` —
+ * a ported ruling, not shared code).
+ */
+const oppositeRingEdges = (ring: readonly Id[], apex: Id): [Id, Id][] => {
+  const out: [Id, Id][] = [];
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    if (a === apex || b === apex) continue; // an edge touching the apex is adjacent, not opposite
+    if (out.some((e) => sameEdge(e, [a, b]))) continue;
+    out.push([a, b]);
+  }
+  return out;
+};
+
+/**
+ * THE PARALLEL BASE A TRAPEZOID'S HEIGHT DROPS ONTO (#1945; 2-D's [ADR-169](../../docs/06-decisions.md#adr-169)).
+ *
+ * Among the ring's OWN parallel pairs — both operands edges of this ring, the trapezoid's assumed seat (#1159)
+ * included — the partner of the edge that carries the apex. Exactly one such base ⇒ it is the one the height
+ * means; none (a triangle, a kite, a plain quadrilateral) or several (a parallelogram's two pairs) ⇒ null, and
+ * the caller falls back to the ring's first opposite side. 2-D reads the same preference from its global parse
+ * context; read here off the apex's own ring, which is what keeps a stated parallel ELSEWHERE in the figure from
+ * pulling a triangle's height off its opposite side (measured at `8e0debff`: 2-D's does — reported as found work).
+ */
+function ringParallelBase(c: Construction, ring: readonly Id[], apex: Id, opposite: readonly [Id, Id][]): [Id, Id] | null {
+  const ringEdge = (e: readonly [Id, Id]): boolean =>
+    ring.some((x, i) => sameEdge([x, ring[(i + 1) % ring.length]], e));
+  const cands: [Id, Id][] = [];
+  for (const k of c.constraints) {
+    if (k.t !== 'relation' || k.rel !== 'parallel' || k.u.k !== 'points' || k.v.k !== 'points') continue;
+    const e1: [Id, Id] = [k.u.a, k.u.b];
+    const e2: [Id, Id] = [k.v.a, k.v.b];
+    if (!ringEdge(e1) || !ringEdge(e2)) continue;
+    const in1 = e1.includes(apex);
+    const in2 = e2.includes(apex);
+    if (in1 === in2) continue; // the apex on both (degenerate) or on neither (a leg apex) — not this pair's base
+    const other = in1 ? e2 : e1;
+    if (!opposite.some((e) => sameEdge(e, other))) continue;
+    if (!cands.some((e) => sameEdge(e, other))) cands.push(other);
+  }
+  return cands.length === 1 ? cands[0] : null;
+}
+
 /**
  * Does the figure already put `id` on the line of `u`/`v`? — an incidence it states («D על BC»), or a derived point
  * defined on that pair (its midpoint, the foot of a perpendicular onto it). Read off the construction, never a sample.
@@ -3306,16 +3360,31 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
 
     /**
      * A CEVIAN WHOSE TARGET THE FIGURE DETERMINES (#1240, #1222; ADR-AG-209) — «AD גובה», «תיכון מנקודה A»,
-     * «גובה לצלע BC». The triangles of the figure that hold the named apex (or both ends of the named side)
-     * are the candidates; one target builds through the one lowering, several ask, none refuses.
+     * «גובה לצלע BC». The shapes of the figure that hold the named apex (or the triangles holding both ends of
+     * the named side) are the candidates; one target builds through the one lowering, several ask, none refuses.
+     *
+     * A HEIGHT'S HOST IS ANY RING WITH A SIDE OPPOSITE THE APEX (#1945, ADR-AG-253) — a trapezoid, a
+     * parallelogram, a rectangle, a rhombus, a square, a kite, a plain quadrilateral, an n-gon — not a triangle
+     * alone. «טרפז ABCD» · «AE גובה» is a height the figure determines, and refusing it as `cevian-no-triangle`
+     * reported "there is no triangle" about a sentence that never needed one. The MEDIAN is NOT widened with it:
+     * 2-D hosts the height on any ring (its ADR-263 draw-one steer) and defers the median there (measured at
+     * `8e0debff` through `parse` + `buildParseCtx`), so «AE תיכון» on a quadrilateral keeps its refusal.
      */
     case 'cevian-of': {
       const targets = new Map<string, { apex: Id; u: Id; v: Id }>();
       let openRight = false;
       // Both named («גובה מ-A לצלע BC בנקודה D»): nothing to resolve.
       if (f.apex && f.side) targets.set('named', { apex: f.apex, u: f.side[0], v: f.side[1] });
+      /** A height named from its apex, which any ring can host; every other cevian resolves in a triangle. */
+      const ringHost = f.role === 'altitude' && f.apex !== undefined && !f.side && !f.hypotenuse;
+      /** Per shape holding the apex: its opposite sides, as a signature — two shapes that disagree are an ask. */
+      const shapes = new Map<string, string>();
+      /** Every candidate side, deduped, in declaration order — the union 2-D's `cevianShapeEdges` draws one from. */
+      const union: [Id, Id][] = [];
+      let parallelBase: [Id, Id] | null = null;
       for (const o of f.apex && f.side ? [] : c.objects) {
-        if (o.kind !== 'polygon' || o.vertices.length !== 3) continue;
+        if (o.kind !== 'polygon' || o.vertices.length < 3) continue;
+        if (o.vertices.length !== 3 && !ringHost) continue;
         const ring = o.vertices;
         if (f.hypotenuse) {
           // The right angle the figure STATES — a constraint, never the noun's open choice (ADR-052: never assume C).
@@ -3335,17 +3404,40 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           if (f.apex && f.apex !== apex) continue;
           targets.set(`${apex}|${[u, v].sort().join('')}`, { apex, u, v });
         } else if (f.apex && ring.includes(f.apex)) {
-          const [u, v] = ring.filter((x) => x !== f.apex);
-          targets.set(`${f.apex}|${[u, v].sort().join('')}`, { apex: f.apex, u, v });
+          const own = oppositeRingEdges(ring, f.apex);
+          if (own.length === 0) continue; // a ring that gives the apex no opposite side hosts no height
+          if (!ringHost) {
+            const [u, v] = own[0];
+            targets.set(`${f.apex}|${[u, v].sort().join('')}`, { apex: f.apex, u, v });
+            continue;
+          }
+          shapes.set([...ring].sort().join(''), own.map(edgeKey).sort().join(','));
+          for (const e of own) if (!union.some((x) => sameEdge(x, e))) union.push(e);
+          parallelBase ??= ringParallelBase(c, ring, f.apex, own);
         }
       }
       /*
-       * THE FOOT NARROWS THE APEX (#1662, operator ruling 2026-10-03; ADR-AG-222). A cevian named by its two ends («AD
-       * גובה», «משוואת התיכון AD היא …») is drawn in the triangle with vertex A whose opposite side CONTAINS D: when the
-       * figure already puts D on one candidate's side, the others are not what the sentence names. 2-D reads «AD גובה»
-       * after «D על BC» in the same way (measured: it commits). A foot on no candidate's side narrows nothing.
+       * WHICH OF THE CANDIDATE SIDES THE HEIGHT MEANS (#1945, ADR-AG-253) — 2-D's resolution, ported, in its order
+       * of authority (each step measured at `8e0debff` through `parse` + `buildParseCtx` over `replay`):
+       *  1. THE FOOT NARROWS IT (#1662, operator ruling 2026-10-03; ADR-AG-222) — when the figure already puts the
+       *     named foot on one candidate side, the others are not what the sentence names. Kept AHEAD of the
+       *     trapezoid's base, because this tree's ruling reads the student's own incidence and the base below is
+       *     only the noun's assumption (#1159), which yields to what they state. (2-D orders these the other way;
+       *     the one sequence that separates them — «טרפז ABCD» · «E על BC» · «AE גובה» — draws E on top of C there.)
+       *  2. THE TRAPEZOID'S PARALLEL BASE (2-D's ADR-169) — a height drops onto the base opposite the one its apex
+       *     sits on, so «טרפז ABCD» · «AE גובה» lands on DC, not on BC.
+       *  3. ONE SHAPE'S SEVERAL HEIGHTS: DRAW ONE (2-D's ADR-263 operator steer) — a parallelogram's height from A
+       *     is genuinely ambiguous but real, so the ring's FIRST opposite side (BC after «מקבילית ABCD») is drawn
+       *     rather than refused. Two SHAPES that give the apex different sides are two different statements, and
+       *     those ask (#1684 / ADR-AG-209's `ambiguous-cevian`): «מרובע ABCD» · «משולש ABC» · «AE גובה» asks.
+       * Every other cevian keeps the triangle-only resolution, and the foot narrows between triangles as before.
        */
-      if (f.apex && !f.side && !f.hypotenuse && targets.size > 1) {
+      if (ringHost) {
+        const onFoot = union.filter((e) => footOnPair(c, f.foot, e[0], e[1]));
+        const pick = onFoot.length === 1 ? onFoot[0] : parallelBase ?? (new Set(shapes.values()).size > 1 ? 'ask' : union[0]);
+        if (pick === 'ask') return { ok: false, error: { code: 'ambiguous-cevian', detail: f.src } };
+        if (pick) targets.set(`${f.apex}|${edgeKey(pick)}`, { apex: f.apex!, u: pick[0], v: pick[1] });
+      } else if (f.apex && !f.side && !f.hypotenuse && targets.size > 1) {
         const onSide = [...targets].filter(([, t]) => footOnPair(c, f.foot, t.u, t.v));
         if (onSide.length > 0) {
           targets.clear();

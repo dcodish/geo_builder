@@ -1151,6 +1151,19 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'the altitude from A in triangle ABC',
     needs: ['A(1,6)', 'B(-3,0)', 'C(5,0)'],
   },
+  /*
+   * THE HEIGHT IS NOT A TRIANGLE'S ALONE (#1945, ADR-AG-253). The row above shows the triangle; this one
+   * shows the HOST the card was silent about — any ring with a side opposite the apex. On a trapezoid the
+   * height drops onto the parallel base DC (2-D's ADR-169), on a parallelogram onto BC; «AE גובה» after
+   * «טרפז ABCD» was refused as "there is no triangle" until this issue.
+   */
+  {
+    category: 'derived',
+    family: 'F16',
+    he: 'AE גובה',
+    en: 'AE is the altitude',
+    needs: ['A(0,0)', 'B(6,0)', 'C(5,3)', 'D(1,3)', 'טרפז ABCD'],
+  },
   {
     category: 'derived',
     family: 'F16',
