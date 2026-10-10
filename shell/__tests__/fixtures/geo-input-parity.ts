@@ -260,6 +260,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1903': 'open',
   '#1926': 'open',
   '#1927': 'open',
+  '#1961': 'open',
 };
 
 export interface ParityRow {
@@ -512,6 +513,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'hypotenuse-median-named', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'תיכון ליתר AB'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'isosceles-base-median-1810', family: 'cevians-centres', steps: ['משולש שווה שוקיים ABC', 'תיכון לבסיס'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1807' }, { product: '3d', issue: '#1679', parked: true }], note: 'ADR-596 / #1810: the base follows the configuration in 2-D; analytic reads the role per choice option (#1807) — one contract, a role-named side follows the configuration' },
   { id: 'hypotenuse-no-right-angle', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון ליתר'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  // #1944 (ADR-3D-321): the dropped-perpendicular imperative on a flat polygon. 2-D commits [foot, segment] onto the
+  // side opposite the apex (a trapezoid's parallel base); 3-D did mint the foot ON the apex, green, and now agrees.
+  { id: 'perp-to-base-flat-1944', family: 'cevians-centres', steps: ['משולש ABC', 'מ-A מורידים אנך לבסיס'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1961' }] },
+  { id: 'perp-to-base-trapezoid-1944', family: 'cevians-centres', steps: ['טרפז ABCD', 'מ-A מורידים אנך לבסיס'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1961' }], note: 'the foot drops on the PARALLEL base (CD in 2-D, DC in 3-D), not on the first side of the ring' },
   { id: 'cat-2d-052', family: 'cevians-centres', steps: ['גובה מ-A במשולש ABC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-053', family: 'cevians-centres', steps: ['משולש ABC', 'אנך אמצעי ל-AB'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-054', family: 'midpoint-ratio', steps: ['קטע האמצעים לצלע BC במשולש ABC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },

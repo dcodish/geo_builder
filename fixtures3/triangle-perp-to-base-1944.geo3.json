@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-10T02:56:33.396Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מ-A מורידים אנך לבסיס",
+      "cmds": [
+        {
+          "type": "perp-to-base",
+          "from": "A"
+        }
+      ]
+    },
+    {
+      "utterance": "אורך AE = 3",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "E"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "E",
+            "value": 3
+          }
+        }
+      ]
+    }
+  ]
+}

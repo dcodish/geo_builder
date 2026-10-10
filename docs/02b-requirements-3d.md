@@ -124,7 +124,14 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   touching the apex; a point already on that side («D על BC · AD גובה») is the foot. A height form 2-D
   does not read on a flat figure («AD אנך», a valued height, an apex that is not a vertex) goes to the AI.
   Never a perpendicular to the polygon's own plane.
-  - Sources: ADR-3D-146, ADR-3D-268, ADR-3D-315; #579, #1499, #1907.
+  **The dropped-perpendicular imperative reads the same base.** «מ-A מורידים אנך לבסיס» / «אנך יורד מ-A
+  לבסיס» / «גובה מנקודה A לבסיס» / "drop a perpendicular from A to the base" on a flat polygon builds the
+  **altitude** from that vertex — the foot auto-minted **on the side opposite it** (the same side the bare
+  height picks) and the segment drawn, as 2-D does — and that altitude can carry a stated length. The foot
+  is never minted **on the apex**, and the line is never drawn perpendicular to the polygon's own plane. An
+  apex the host names no opposite side for (a free point, or a rider on a side) is **refused**, as 2-D
+  refuses it. A SOLID's base is unchanged: the foot drops on the base face.
+  - Sources: ADR-3D-146, ADR-3D-268, ADR-3D-315, ADR-3D-321; #579, #1499, #1907, #1944.
 
 ## Reading a statement — read, asked, refused
 
