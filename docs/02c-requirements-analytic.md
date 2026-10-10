@@ -450,7 +450,7 @@ From the «lines and points» corpus (§8), numbered onward.
 - «טרפז ABCD» · «BC מקביל ל-AD» → the figure rotates
 - Sources: #1159.
 
-**R126 — a trapezoid keeps exactly one pair of parallel sides, or the page says it no longer does**. *(Operator: "when i wrote c=90 it accepted but then i got a rectangle.")* When the givens force a parallelogram, an amber warning names the trapezoid and the forcing line. A circle through a declared right trapezoid is not this warning: it is refused (R131).
+**R126 — a trapezoid keeps exactly one pair of parallel sides, or the page says it no longer does**. *(Operator: "when i wrote c=90 it accepted but then i got a rectangle.")* When the givens force a parallelogram, an amber warning names the trapezoid and the forcing line. A circle through a declared right trapezoid is not this warning: it is refused (R131). Nor is a second noun: a trapezoid noun stated on a ring declared as a parallelogram-family shape (parallelogram, rectangle, square, rhombus), or the reverse, is refused naming both («הצורה כבר ידועה כ־מקבילית — ולכן אינה נקראת טרפז…», ADR-AG-260, #1926).
 - «טרפז ישר זווית ABCO» · «∠C = 90» · «∠O = 90» → «הטרפז ABCO כבר אינו טרפז…»
 - Sources: ADR-AG-189, #1627, ADR-157, ADR-165, ADR-AG-252.
 

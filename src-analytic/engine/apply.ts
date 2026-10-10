@@ -22,7 +22,7 @@ import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr } from '
 import { curveParentsOf, parentsOf, type DerivedRule, type FootLine } from './derived';
 import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, sineAngle, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
-import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, promisesOneParallelPair, rightAngleAt, ringsNamed, shapeRow } from './shapes';
+import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounsExclude, promisesOneParallelPair, rightAngleAt, ringsNamed, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { RESERVED_SYMBOLS, radiusSymbol, toolSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
@@ -120,6 +120,12 @@ export type ApplyErrorCode =
    * sentence.
    */
   | 'inscribed-contradicts-declared'
+  /**
+   * A RING RE-DECLARED AS A SHAPE ITS NOUN EXCLUDES (#1926, ADR-AG-260; ported from 2-D's ADR-157, the wording 3-D's
+   * #1918 ships): «מקבילית ABCD» · «טרפז ABCD», in either order. `actual` is the ring's noun, `stated` the refused
+   * line's — both registry keys. Decided by `nounsExclude`, never a listed pair.
+   */
+  | 'shape-excluded'
   /**
    * «זווית B ישרה» where the vertex alone does not name an angle (#1049).
    *
@@ -297,6 +303,9 @@ export interface ApplyError {
   shape?: string;
   forced?: string;
   ring?: Id;
+  /** For `shape-excluded` (#1926): the noun the ring is known as, and the noun the refused line stated (registry keys). */
+  actual?: string;
+  stated?: string;
 }
 
 /** How a found curve can be called in a sentence — its name, or (unnamed) its equation. */
@@ -3771,6 +3780,16 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       /** The ring's circle facts, carried onto the object so a later sentence is held against them. */
       const circleFlags = { ...(cyclic ? { cyclic: true as const } : {}), ...(circleless ? { circleless } : {}) };
+      /*
+       * A NOUN THE RING'S NOUN EXCLUDES (#1926, ADR-AG-260). «מקבילית ABCD» · «טרפז ABCD»: the same ring, so M1 would
+       * absorb it as `known` and keep the first noun — a parallelogram reported as "already" a trapezoid, or (the
+       * reverse) a second noun's givens taken as forcing givens. No quadrilateral is both, so the second declaration is
+       * refused, in either order and every spelling the polygon rule reads. Forcing GIVENS keep ADR-AG-189 Am. 1's
+       * warning; only a second NOUN is refused here.
+       */
+      if (prior?.kind === 'polygon' && f.t === 'polygon' && prior.noun && f.noun && nounsExclude(prior.noun, f.noun)) {
+        return { ok: false, error: { code: 'shape-excluded', detail: f.src, actual: normalizeShapeNoun(prior.noun), stated: normalizeShapeNoun(f.noun) } };
+      }
       if (prior) {
         // M1: restating the same construction is absorbed — no duplicate row, no re-creation. This
         // is what lets a later section of a question name what an earlier one established.
