@@ -59,13 +59,24 @@ export interface UnreadReport {
 const numbered = (parts: readonly string[], from = 1): string => parts.map((p, i) => `(${i + from}) ${p}`).join('  ');
 
 /**
- * The refusal a lost part gets: the one shared one-input-per-line message listing the parts (ADR-598's key and
- * format) — except where the lost tail names the RIGHT ANGLE'S VERTEX of the triangle its reading built
- * («משולש ABC ישר זווית ב-B», "right triangle ABC at B"). That syntax is TAUGHT instead (operator ruling
- * 2026-10-08, #1888 follow-up 2: *"Teach the right form"*): the two lines that build it — the triangle, then
- * the angle at the named vertex with its two neighbours in the triangle's name (∠ABC for ב-B, ∠CAB for ב-A,
- * ∠BCA for ב-C). Decided by the READING (the read part lowered to a right triangle, the tail is one of its
- * vertices), never by the spelling. Further parts of the line follow, numbered on.
+ * The lines the right-angle message TEACHES. The locale string carries them as items (1) and (2) of the list,
+ * because their nouns («משולש», «triangle», «∠… = 90°») are localized vocabulary and not the student's words;
+ * everything the student typed past them continues the SAME list from here (#1957, ADR-611).
+ */
+const TAUGHT_LINES = 2;
+
+/**
+ * The refusal a lost part gets: the one shared one-input-per-line message listing EVERY part of the line as one
+ * numbered list from (1) (ADR-598's key and format, the numbering ruled 2026-10-09 — ADR-611) — except where the
+ * lost tail names the RIGHT ANGLE'S VERTEX of the triangle its reading built («משולש ABC ישר זווית ב-B»,
+ * "right triangle ABC at B"). That syntax is TAUGHT instead (operator ruling 2026-10-08, #1888 follow-up 2:
+ * *"Teach the right form"*): the two lines that build it — the triangle, then the angle at the named vertex with
+ * its two neighbours in the triangle's name (∠ABC for ב-B, ∠CAB for ב-A, ∠BCA for ב-C). Decided by the READING
+ * (the read part lowered to a right triangle, the tail is one of its vertices), never by the spelling.
+ *
+ * ONE FORMAT, both branches (#1957): the taught pair is items (1) and (2) of the same numbered list, and the
+ * line's further parts continue it from (3) — never a second list, never a list that starts where the student
+ * can see no (1). A message added to this family inherits the format instead of inventing a third shape.
  */
 export function lostPartNote(cut: PartsCut<string>): { key: string; params: Record<string, string> } {
   for (const c of cut.cuts) {
@@ -76,13 +87,22 @@ export function lostPartNote(cut: PartsCut<string>): { key: string; params: Reco
       (x): x is AnyCommand & { ids: string[] } => x.type === 'right-triangle' && Array.isArray((x as { ids?: unknown }).ids) && (x as { ids: string[] }).ids.includes(v),
     );
     if (!tri || tri.ids.length !== 3) continue;
+    // The taught pair REPLACES `parts[c.part]` (the read prefix) and `parts[c.part + 1]` (its tail), and the
+    // message puts it at (1) and (2) — true only when nothing the student typed comes before it. Measured: a
+    // right-triangle lowering always opens the line. Anything else falls to the plain list, which numbers every
+    // part in the order it was typed, so no stated part can be mis-ordered or lost.
+    if (c.part !== 0) continue;
     const i = tri.ids.indexOf(v);
     const angle = `${tri.ids[(i + 2) % 3]}${v}${tri.ids[(i + 1) % 3]}`;
-    const rest = cut.parts.filter((_, k) => k !== c.part && k !== c.part + 1);
-    const params = { triangle: tri.ids.join(''), angle };
-    return rest.length
-      ? { key: 'input.scope.right-angle-vertex-more', params: { ...params, rest: numbered(rest, 3) } }
-      : { key: 'input.scope.right-angle-vertex', params };
+    const rest = cut.parts.slice(TAUGHT_LINES);
+    return {
+      key: 'input.scope.right-angle-vertex',
+      params: {
+        triangle: tri.ids.join(''),
+        angle,
+        more: rest.length ? `  ${numbered(rest, TAUGHT_LINES + 1)}` : '',
+      },
+    };
   }
   return { key: 'input.scope.split-statements', params: { first: cut.parts[0], second: cut.parts[1], all: numbered(cut.parts) } };
 }
