@@ -3370,7 +3370,7 @@ const FORCED_RING_MIN_SAMPLES = 4;
  * crossed in every configuration the line could leave.
  *
  * The rings read are the ones the line DECLARES (`declaredRings` — a named shape, directly or through its
- * expansion) plus a top-level `polygon` of 4 or more ids («מחומש ACEBD»), and only those whose every vertex is
+ * expansion, and a top-level `polygon` of 4 or more ids such as «מחומש ACEBD»), and only those whose every vertex is
  * already placed before the step. A ring with a vertex the line itself creates is a configuration choice, never
  * this question.
  *
@@ -3384,8 +3384,7 @@ export function forcedCrossedRing(facts: Fact[], commands: AnyCommand[], seed = 
     const seen = new Set<string>();
     const declared: Id[][] = [];
     for (const cmd of commands) {
-      const own = cmd.type === 'polygon' ? [(cmd as { ids?: Id[] }).ids ?? []] : [];
-      for (const ids of [...declaredRings(cmd), ...own]) {
+      for (const { ids } of declaredRings(cmd)) {
         if (ids.length < 4 || new Set(ids).size !== ids.length) continue;
         const key = ringKey(ids);
         if (!seen.has(key)) { seen.add(key); declared.push(ids); }
@@ -4258,7 +4257,7 @@ export function commandObjectIds(cmd: AnyCommand): Id[] {
 const POLYGON_SHAPES = new Set(['square', 'rectangle', 'rhombus', 'parallelogram', 'trapezoid', 'quadrilateral']);
 
 /**
- * #443 (ADR-479) — EVERY polygon ring a fact DECLARES, macros included.
+ * #443 ([ADR-472](docs/06-decisions.md#adr-472)) — EVERY polygon ring a fact DECLARES, macros included.
  *
  * `polygonsConvex` used to read `cmd.ids` off facts whose `cmd.type` is in `POLYGON_SHAPES`. A named
  * shape declared through a MACRO — kite, isosceles, iso-trapezoid, midsegment ([ADR-138](docs/06-decisions.md#adr-138)),
@@ -4272,23 +4271,33 @@ const POLYGON_SHAPES = new Set(['square', 'rectangle', 'rhombus', 'parallelogram
  * of the macro's OWN EXPANSION, by the same rule applied to the expanded commands. A macro that lowers
  * to a polygon inherits the guard by construction.
  *
- * A synthesised `polygon` counts only INSIDE an expansion. A bare `polygon` command is the student
- * drawing an arbitrary ring («מצולע ABCDE»), which may legitimately be concave and is a separate
- * question; a macro's `polygon` is the boundary of a shape the student NAMED, which is exactly what this
- * default is about.
+ * A synthesised `polygon` inside an expansion is the boundary of a shape the student NAMED, which is exactly
+ * what the convexity default is about. A TOP-LEVEL `polygon` was exempt from that default as "an arbitrary
+ * ring, which may legitimately be concave" — and the exemption bought the CROSSED ring with the concave one.
+ * #1968 ([ADR-616](docs/06-decisions.md#adr-616), operator ruling 2026-10-10, option B): *a crossed ring is not
+ * a drawing of the shape under any reading*. So every ring a fact declares is read here, each with the
+ * requirement it carries: `convex` for a named shape, and the SIMPLE floor (never self-crossing, may be
+ * concave) for the top-level `polygon`. The floor is not a second rule — it is the stated-concave branch's
+ * own test (#441), which was always "the part of this guard that was never about convexity".
  *
  * Memoized on the command object (immutable through the fold), because this runs per candidate
  * configuration inside `meetsRequirements` and `expandInscribe` enumerates placements.
  */
-const declaredRingsMemo = new WeakMap<object, Id[][]>();
-function declaredRings(cmd: AnyCommand): Id[][] {
+/** A ring a fact declares, and what the view search requires of it: convex, or only simple (#1968). */
+interface DeclaredRing {
+  ids: Id[];
+  convex: boolean;
+}
+const declaredRingsMemo = new WeakMap<object, DeclaredRing[]>();
+function declaredRings(cmd: AnyCommand): DeclaredRing[] {
   const cached = declaredRingsMemo.get(cmd as object);
   if (cached) return cached;
-  const out: Id[][] = [];
+  const out: DeclaredRing[] = [];
   const take = (c: AnyCommand, inExpansion: boolean) => {
-    if (!POLYGON_SHAPES.has(c.type) && !(inExpansion && c.type === 'polygon')) return;
+    const generic = c.type === 'polygon' && !inExpansion;
+    if (!POLYGON_SHAPES.has(c.type) && c.type !== 'polygon') return;
     const ids = (c as { ids?: Id[] }).ids;
-    if (ids && ids.length >= 4) out.push(ids);
+    if (ids && ids.length >= 4) out.push({ ids, convex: !generic });
   };
   take(cmd, false);
   // The explicit-equality / on-segment lists only choose WHICH variant is emitted; every variant of a
@@ -4330,8 +4339,10 @@ export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean 
   for (const f of facts) {
     if (!f.enabled) continue;
     // #443: the rings the fact DECLARES — directly, or through the macro it expands into.
-    for (const ids of declaredRings(f.cmd)) {
-    if (statedConcave.has(ringKey(ids))) {
+    for (const { ids, convex } of declaredRings(f.cmd)) {
+    // #1968: the simple floor — a ring stated concave (#441), or a top-level `polygon` (ADR-616), may be
+    // concave but never crossed.
+    if (!convex || statedConcave.has(ringKey(ids))) {
       const pts0 = ids.map((id) => positions.get(id));
       if (pts0.some((p) => !p)) continue;
       if (!ringSimple(pts0 as Vec[])) return false;

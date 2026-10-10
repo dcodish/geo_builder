@@ -608,8 +608,8 @@ weak path (W21). The ⟂ verb row reads «אנך»; the existing-segment ⊥-bis
 
 `forcedCrossedRing` (`replay/core.ts`, beside `impliedByPrior`) is called from `decideFromParse` (after the
 clause-coverage gate, before the prefold and the first `dryRunOutcome`) and from `runEditCommit` (beside
-`impliedByPrior`, against the prefix facts). It reads the rings the line declares — `declaredRings(cmd)` plus a
-top-level `polygon` of 4 or more ids — keeps those whose every vertex is already placed, drops any that is simple in
+`impliedByPrior`, against the prefix facts). It reads the rings the line declares — `declaredRings(cmd)`, which since
+[ADR-616](06-decisions.md#adr-616) includes a top-level `polygon` of 4 or more ids — keeps those whose every vertex is already placed, drops any that is simple in
 the figure on screen (one test, no pool), and asks the prior figure's `sharedSamples` pool (the UI-thread narrow
 gate, as `impliedByPrior`) whether the ring **properly** crosses in every sample: two non-adjacent sides meeting at a
 point interior to both, with a tolerance relative to the ring's extent (a touching vertex is not a crossing, unlike

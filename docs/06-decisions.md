@@ -15657,3 +15657,40 @@ A list beginning at **(3)**, with no (1) and no (2) anywhere on screen, introduc
 - A line that puts a right triangle at a named vertex together with other facts now reads as one numbered list from (1) — «(1) משולש ABC  (2) ∠ABC = 90°  (3) AB = 4» — instead of two prose instructions followed by a list that starts at (3).
 - «משולש ABC ישר זווית ב-B» on its own now shows the same two lines as a numbered list, «(1) משולש ABC  (2) ∠ABC = 90°», rather than as a sentence. Same two lines, same teaching.
 - Nothing else changes: the same lines are refused, the same lines build, and the plain split list is word for word what it was.
+
+## ADR-616 — A declared ring is never offered self-crossing: a top-level polygon carries the SIMPLE floor, not a whole exemption (#1968)
+
+**Status:** accepted · 2026-10-10 · bug (P3, 2-D) · branch `fix/1968-generic-polygon-simple` · fix round #1983 · **amends [ADR-472](#adr-472)** (#443 — the code comment called it "ADR-479"; corrected) · closes the gap [ADR-608](#adr-608) recorded for the pentagram and [ADR-610](#adr-610)'s **Not covered** note
+**Requirements:** [02](02-requirements.md) FR-EN-16 — no declared ring is ever drawn self-crossing (Ruled change) · **Design:** [LADDER.md](LADDER.md) stage 6, `meetsRequirements` → `polygonsConvex`; [04](04-design.md) § "A ring over placed points that crosses everywhere is refused before the dry run" (`declaredRings` now carries the top-level polygon itself) · **LADDER stage:** 6 (the view-search requirement predicate) — no new stage, no new search
+**Adopts** the operator ruling of 2026-10-10 on #1968, option B
+
+**The ruling.** *"A crossed ring is not a drawing of the shape under any reading, while a concave one may be exactly what the student wants."* A generic polygon must be SIMPLE and may stay concave; a named one is convex (the convex half is [#1916](https://github.com/dcodish/geo_builder/issues/1916), [ADR-617](#adr-617)).
+
+**Measured before** (`main` @ `e0f4260c`, `firstSatisfyingSeed` + `searchAnotherView` — the press — over 24 presses, and `replay` over seeds 0–23):
+
+| sequence | first view | presses crossed | seeds crossed |
+| --- | --- | --- | --- |
+| «מתומן ABCDEFGH חסום במעגל» | simple | **6 / 24** (the issue: 4 / 13) | 5 / 24 |
+| «מתומן ABCDEFGH» | simple | 0 / 24 | 1 / 24 |
+| «מחומש / משושה … חסום במעגל» | simple | 0 / 24 | 0 / 24 |
+| «מחומש משוכלל ABCDE · מחומש ACEBD» (built past the door) | crossed | — | `meetsRequirements` **true** |
+
+The pentagram line itself is already refused at both commit seams by ADR-608 (re-measured: it still is); what was left was the requirement predicate calling the crossed fold displayable.
+
+**Root cause / class (docs/17 §1).** *A ring the convexity default does not list is exempt from every requirement on its shape, so the view search offers it self-crossing.* `declaredRings` (ADR-472) read a top-level `polygon` as «מצולע ABCDE», "an arbitrary ring, which may legitimately be concave", and skipped it whole — the exemption bought the crossed ring along with the concave one. The inscribed n-gon ([ADR-610](#adr-610)), the bare n-gon noun (#835) and the pentagram all lower to that command, so all three were reachable.
+
+**Decision.** `declaredRings` returns **every** ring a fact declares, each with what the view search requires of it: `convex` for a named shape (directly, or through its macro's expansion — unchanged), and the **SIMPLE floor** for a top-level `polygon`. The floor is not a new rule: it is the stated-concave branch's own `ringSimple` test (#441), so «X קעור» and the top-level ring now share one code path, and `forcedCrossedRing` (ADR-608) drops its separate `own` list because `declaredRings` now carries the top-level ring itself. No chokepoint list grew (`POLYGON_SHAPES` is untouched); no sampler, search or budget changed (M3).
+
+**Measured after** (same path): «מתומן ABCDEFGH חסום במעגל» simple at the default and at **24 / 24** presses, each meeting the givens, and the button still offers 24 views (ADR-052: the free angles stay free); the hexagon in a circle and the bare octagon likewise; the pentagram's fold now fails `meetsRequirements`. Press time: at most 2 ms (before: 1 ms) — `ringSimple` is O(n²) on an 8-ring.
+
+**Corpus re-measure for false flags (as ADR-472 did).** Every scenario of `scenarios-corpus-1…4` and every `fixtures/*.geo.json` (432 figures) was folded at its `firstSatisfyingSeed`: 11 carry a top-level `polygon` (the n-gon scenarios and the eight #1891 fixtures), and all 11 are simple — indeed convex — and meet requirements. No figure's chosen configuration moves.
+
+**What «מצולע» is today (measured).** «מצולע ABCDE», «מצולע קעור ABCDE» and "polygon ABCDE" are `not-handled`, and the model's canonical lines re-parse through the same parser, so every top-level `polygon` that reaches the engine today comes from an **n-gon noun**. The concave freedom the ruling keeps for «מצולע» is therefore unchanged by construction — nothing reads that word yet; a future reader of it inherits this floor.
+
+**Sibling audit.** Grepped every reader of `declaredRings` (`polygonsConvex`, `forcedCrossedRing`) and every `polygon` emitter (`ringOnCircle`, the bare-noun lowering, the re-entry lowering): all reach the predicate through `declaredRings`. **Analytic:** class absent — `ringViolation` (`src-analytic/engine/rings.ts`) already rejects a crossed declared ring (R91). **3-D:** the flat-ring preference tier checks collapsed faces only; it reads no 6- or 8-gon, and its pentagon/quadrilateral rings are #1916's item ([ADR-3D-323](06b-decisions-3d.md#adr-3d-323)), whose convex predicate subsumes this floor. **Complex:** no polygons.
+
+**Locks.** `src/replay/__tests__/issue-1968-ring-simple-floor.test.ts` (the predicate on hand-built crossed / concave / convex rings, #441's stated-concave exemption both ways, the operator's sequence over 24 presses, the hexagon and bare-octagon class rows, the pentagram's fold). Scenario `inscribed-octagon-never-crossed-1968` (corpus 4), the operator's exact line with every view of 24 presses asserted simple.
+
+**Behaviour change for a student:**
+- «מתומן ABCDEFGH חסום במעגל»: pressing «הציגו תצורה אחרת» never draws the octagon with its sides crossing (it did on about one press in four). The first view is unchanged.
+- Nothing else a student can type changes: every pentagon and hexagon view was already simple, and the pentagram line is still refused with ADR-608's message.
