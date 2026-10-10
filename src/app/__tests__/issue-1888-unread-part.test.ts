@@ -61,7 +61,17 @@ const split = (...parts: string[]) => ({
   key: 'input.scope.split-statements',
   params: { first: parts[0], second: parts[1], all: parts.map((p, i) => `(${i + 1}) ${p}`).join('  ') },
 });
-const taught = (triangle: string, angle: string) => ({ key: 'input.scope.right-angle-vertex', params: { triangle, angle } });
+const taught = (triangle: string, angle: string, more = '') => ({ key: 'input.scope.right-angle-vertex', params: { triangle, angle, more } });
+
+/** The note as the student reads it: the locale string with the params filled in, as `t()` renders it. */
+type NoteLike = { readonly key?: string; readonly params?: Record<string, unknown>; readonly explain?: string };
+const renderNote = (lang: 'he' | 'en', note: NoteLike): string => {
+  expect(note.key, 'a guided refusal carries a translation key, never raw prose').toBeTruthy();
+  const loc = (lang === 'he' ? heLocale : enLocale).input.scope as Record<string, string>;
+  let out = loc[note.key!.replace('input.scope.', '')];
+  for (const [k, v] of Object.entries(note.params ?? {})) out = out.split(`{{${k}}}`).join(String(v));
+  return out;
+};
 
 beforeEach(() => {
   st().clear();
@@ -87,25 +97,28 @@ describe('#1888 — «משולש ABC ישר זווית ב-<V>» is refused whole
     await expectRefused(prefix, line, taught('ABC', angle));
   });
 
-  it('further parts of the line follow, numbered on', async () => {
-    await expectRefused(['משולש ABC'], 'משולש ABC ישר זווית ב-B ו-AB = 4', {
-      key: 'input.scope.right-angle-vertex-more',
-      params: { triangle: 'ABC', angle: 'ABC', rest: '(3) AB = 4' },
-    });
+  // #1957 (ADR-611): the taught pair IS items (1) and (2) of the list, so a further part continues the same
+  // list from (3) — there is no separate key and no second «ואחר כך».
+  it('further parts of the line continue the SAME list', async () => {
+    await expectRefused(['משולש ABC'], 'משולש ABC ישר זווית ב-B ו-AB = 4', taught('ABC', 'ABC', '  (3) AB = 4'));
   });
 
+  // #1957 (ADR-611, the operator's 2026-10-09 ruling "Number the parts" — one list, however many parts there
+  // are): the frame is the ruled single-list text, and the `-more` variant is GONE. One key, one format.
   it('the message is the operator’s text, the letters filled in, in both locales', () => {
     const he = heLocale.input.scope as Record<string, string>;
-    expect(he['right-angle-vertex'].replace('{{triangle}}', 'ABC').replace('{{angle}}', 'ABC')).toBe(
-      'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו קודם «משולש ABC», ואחר כך בשורה נפרדת «∠ABC = 90°».',
+    expect(he['right-angle-vertex'].replace('{{triangle}}', 'ABC').replace('{{angle}}', 'ABC').replace('{{more}}', '')).toBe(
+      'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו בשורות נפרדות: (1) משולש ABC  (2) ∠ABC = 90°',
     );
     const en = enLocale.input.scope as Record<string, string>;
-    for (const k of ['right-angle-vertex', 'right-angle-vertex-more']) {
-      expect(en[k], k).toContain('{{triangle}}');
-      expect(en[k], k).toContain('{{angle}}');
+    for (const [name, loc] of [['he', he], ['en', en]] as [string, Record<string, string>][]) {
+      expect(loc['right-angle-vertex'], name).toContain('{{triangle}}');
+      expect(loc['right-angle-vertex'], name).toContain('{{angle}}');
+      expect(loc['right-angle-vertex'], name).toContain('{{more}}');
+      expect(loc, `${name}: one key, one format — the prose-plus-tail variant is gone`).not.toHaveProperty('right-angle-vertex-more');
+      expect(loc['right-angle-vertex'], `${name}: the taught pair is numbered on screen`).toContain('(1) ');
+      expect(loc['right-angle-vertex'], `${name}: the taught pair is numbered on screen`).toContain('(2) ');
     }
-    expect(he['right-angle-vertex-more']).toContain('{{rest}}');
-    expect(en['right-angle-vertex-more']).toContain('{{rest}}');
   });
 
   // TAUGHT REMEDIES ARE HYPOTHESES (#1183): the two lines the message teaches must BUILD, with the right angle at
@@ -123,6 +136,49 @@ describe('#1888 — «משולש ABC ישר זווית ב-<V>» is refused whole
     const dot = (P.x - V.x) * (Q.x - V.x) + (P.y - V.y) * (Q.y - V.y);
     expect(Math.abs(dot) / (Math.hypot(P.x - V.x, P.y - V.y) * Math.hypot(Q.x - V.x, Q.y - V.y))).toBeLessThan(1e-6);
     expect(llmParseMock).not.toHaveBeenCalled();
+  });
+});
+
+// #1957 (ADR-611) — ONE numbered list, from (1), however many parts the line has. BEFORE (measured at 24d49167):
+// the taught triangle line and angle line were prose and the extras were numbered from (3), so the student read a
+// list beginning at (3) with no (1) or (2) anywhere, introduced by a second «ואחר כך:». The operator's ruling of
+// 2026-10-09 ("Number the parts — one list, however many parts there are") is this shape.
+describe('#1957 — the one-fact-per-line refusal reads as one numbered list from (1)', () => {
+  const head = { he: '(1) משולש ABC  (2) ∠ABC = 90°', en: '(1) triangle ABC  (2) ∠ABC = 90°' };
+  it.each([
+    ['משולש ABC ישר זווית ב-B', [] as string[]],
+    ['משולש ABC ישר זווית ב-B ו-AB = 4', ['(3) AB = 4']],
+    ['משולש ABC ישר זווית ב-B ו-AB = 4 ו-BC = 3', ['(3) AB = 4', '(4) BC = 3']],
+    ['משולש ABC ישר זווית ב-B, AB = 4, BC = 3', ['(3) AB = 4', '(4) BC = 3']],
+    ['right triangle ABC at B and AB = 4', ['(3) AB = 4']],
+  ] as [string, string[]][])('«%s» → (1) (2) %s, in he and en', async (line, tail) => {
+    await drive([]);
+    const v = await decideHere(line);
+    expect(v.kind, JSON.stringify(v).slice(0, 300)).toBe('refuse');
+    if (v.kind !== 'refuse') return;
+    for (const lang of ['he', 'en'] as const) {
+      const msg = renderNote(lang, v.note);
+      // the taught pair is on screen AS items (1) and (2) — the numbers the list used to start past
+      expect(msg, lang).toContain(head[lang]);
+      for (const item of tail) expect(msg, `${lang}: ${item}`).toContain(item);
+      expect(msg, `${lang}: the list stops where the line stops`).not.toContain(`(${tail.length + 3})`);
+      expect(msg, `${lang}: no placeholder left unfilled`).not.toContain('{{');
+    }
+    // no SECOND list and no second connector: one «כתבו בשורות נפרדות:», nothing after it but the list
+    expect(renderNote('he', v.note), 'no second «ואחר כך»').not.toContain('ואחר כך');
+    expect(renderNote('en', v.note), 'no second "After that"').not.toContain('After that');
+  });
+
+  // the sibling branch already numbered from (1); its output must be byte-identical to today (#1957's plan)
+  it('the plain split list is unchanged', async () => {
+    await drive(['מרובע ABCD']);
+    const v = await decideHere('AB מקביל ל-CD ו-D על BC');
+    expect(v.kind).toBe('refuse');
+    if (v.kind !== 'refuse') return;
+    expect(v.note).toEqual(split('AB מקביל ל-CD', 'D על BC'));
+    expect(renderNote('he', v.note)).toBe(
+      'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. זיהינו כאן שני נתונים — נסו להקליד אותם בשני שלבים: (1) AB מקביל ל-CD  (2) D על BC',
+    );
   });
 });
 

@@ -589,8 +589,11 @@ member `unreadParts` (`src/app/unreadParts.ts`, in `honestyGateReport`, so both 
   after it in its statement has no cut: the weak path.
 - **The verdict** (`decideFromParse`, the `!gates.clean` branch, only when no older gate fired — `GateReport.onlyReadExtent`; otherwise the line keeps its weak path): parts → refuse `guided`,
   `scope:split-statements:unread-part`, never escalated. `lostPartNote` picks `input.scope.right-angle-vertex`
-  (`-more` with further parts) when the lost tail is one vertex of a `right-triangle` the read part lowered to, else
-  `input.scope.split-statements`. The ✎ seam refuses with `steps.editDropped`, the lost parts as its items.
+  when the lost tail is one vertex of a `right-triangle` the read part lowered to, else `input.scope.split-statements`.
+  **One format, both keys** ([ADR-611](06-decisions.md#adr-611)): every part of the line is ONE numbered list from (1).
+  The taught pair is items (1) and (2) — their nouns are localized vocabulary, so the locale string carries those two
+  numbers and `{{more}}` continues the same list from `TAUGHT_LINES + 1`; the taught branch is taken only when the
+  right-triangle clause OPENS the line, so nothing the student typed can precede item (1). The ✎ seam refuses with `steps.editDropped`, the lost parts as its items.
 
 #### A role word the reading never read ([ADR-604](06-decisions.md#adr-604))
 

@@ -15612,3 +15612,48 @@ The predicate is 2-D's own. `BOUNDARIES.json` classes engine layers `copied-neve
 - The same for «משושה»/«מתומן»/`n-gon` and the English spellings, regular and plain.
 - «בר-חסימה» keeps the circle hidden, and a regular n-gon stated alone keeps its circle hidden, both as at HEAD.
 - «מעגל חסום במחומש ABCDE» — the opposite direction — keeps ADR-606's refusal. Unchanged.
+## ADR-611 — The one-fact-per-line refusal is ONE numbered list, from (1): the taught right-angle pair is items (1) and (2), not prose the list starts past (#1957)
+
+**Status:** accepted · 2026-10-10 · bug (P3, 2-D, wording) · branch `fix/1957-numbered-parts` · fix round #1959 · **amends [ADR-598](#adr-598)** (which owns the shared one-input-per-line message and its format) and [ADR-603](#adr-603) point 4 (which numbered the further parts “on from (3)”)
+**Requirements:** [02](02-requirements.md) FR-IN-4g — the taught right-angle form becomes items (1) and (2) of the one numbered list, and further parts continue it from (3) (Ruled change — wording) · **Design:** [04](04-design.md) § “A part the reading never read” → the verdict bullet (one format, both keys) · **LADDER stage:** none (the submit decision’s refusal text; no engine, solver or ladder change)
+**Adopts** the operator ruling of 2026-10-09 · **Keeps** [ADR-603](#adr-603)’s 2026-10-08 teaching (*“Teach the right form”*) intact, as items (1) and (2)
+
+**The ruling.** Asked on the `/decisions` page of 2026-10-09 ([ADR-W-122](06w-decisions-workspace.md#adr-w-122) — a Hebrew-content decision put to him on a rendered RTL page, so it stands), with the full message shown in each variant, the operator chose **option A, “Number the parts”**:
+
+> *“One list, however many parts there are.”*
+
+He was shown, and chose, this exact form:
+
+> בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו בשורות נפרדות: (1) משולש ABC  (2) ∠ABC = 90°  (3) AB = 4
+
+Rejected: approving the shipped text, and dropping the trailing clause to name only the two parts the tool can teach (which would leave the student’s third fact unmentioned — against the honesty invariant).
+
+**Measured before** (`main` @ `24d49167`, re-measured at this branch’s tip through `decideDeterministic2D`, the LLM mocked, rendered through both locales):
+
+| line | what the student read |
+| --- | --- |
+| «משולש ABC ישר זווית ב-B ו-AB = 4» | «… כתבו קודם «משולש ABC», ואחר כך בשורה נפרדת «∠ABC = 90°». ואחר כך: (3) AB = 4» |
+| «… ו-AB = 4 ו-BC = 3» (and the comma form) | the same, ending «ואחר כך: (3) AB = 4  (4) BC = 3» |
+| “right triangle ABC at B and AB = 4” | “… After that: (3) AB = 4” |
+
+A list beginning at **(3)**, with no (1) and no (2) anywhere on screen, introduced by a second «ואחר כך:».
+
+**Root cause / class (docs/17 §1).** *`lostPartNote` had two messages for one situation and they formatted differently.* `right-angle-vertex-more` was written as prose-plus-tail, and its `numbered(rest, 3)` call hardcoded the offset the prose only implied — the two parts the message teaches were sentence text, so the numbering could not start where the list visibly started. The sibling branch (`input.scope.split-statements`) already called `numbered(cut.parts)`: every part, numbered from (1). The class is the message **format**, not this one string; left alone, the next message added to this family would have invented a third shape.
+
+**Decision.**
+
+1. **One key, one format.** `right-angle-vertex-more` is **gone**: `input.scope.right-angle-vertex` carries the whole family, in the ruled single-list form — a lead sentence, «כתבו בשורות נפרדות:» / “Write them on separate lines:”, then one numbered list. The no-extra-parts branch becomes a two-item list too. (That was the one judgement the plan left to measurement: measured, the list reads better, and the ruling’s own words are “in both the right-angle-vertex branch and the plain split branch”.)
+2. **The taught pair is items (1) and (2), carried by the locale string.** Their nouns («משולש» / “triangle”, «∠… = 90°») are localized vocabulary, not the student’s words, so they cannot be assembled in `unreadParts.ts`. The string holds `(1) משולש {{triangle}}  (2) ∠{{angle}} = 90°{{more}}`, and `{{more}}` (renamed from `{{rest}}`, matching `split-statements`’ whole-list sense) continues the SAME list from `TAUGHT_LINES + 1` — a named constant beside the two items it counts, never a bare `3`.
+3. **The offset is made true, not assumed.** The taught pair replaces `parts[c.part]` and `parts[c.part + 1]`, so placing it at (1) and (2) is honest only when the right-triangle clause OPENS the line. Measured: it always does (the lowering needs the triangle first). The branch now requires `c.part === 0` and otherwise falls through to the plain list, which numbers every part in the order it was typed — so no reachable input can read a mis-ordered list, and no stated part can go unmentioned.
+4. **`split-statements` is untouched** — it was already right, and its output is locked byte-identical.
+
+**Measured after** (the same path, both locales): «משולש ABC ישר זווית ב-B ו-AB = 4» → «בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו בשורות נפרדות: (1) משולש ABC  (2) ∠ABC = 90°  (3) AB = 4», the ruled form byte for byte; the four-part and comma forms continue to (4); the bare «משולש ABC ישר זווית ב-B» ends at (2); English reads “… Write them on separate lines: (1) triangle ABC  (2) ∠ABC = 90°  (3) AB = 4”. No second «ואחר כך» anywhere. The verdict, the log (`scope:split-statements:unread-part`), the ✎ seam’s `steps.editDropped` and the “never escalated” guarantee are unchanged — only the words changed.
+
+**Locks.** `src/app/__tests__/issue-1888-unread-part.test.ts`: the `{{rest}}` assertion is replaced by `{{more}}` plus `not.toHaveProperty('right-angle-vertex-more')` (the deliberate-format proof the plan named); the frame is pinned to the ruled Hebrew text; a new `#1957` describe renders the real refusal for a two-, three- and four-part line, in he and en, asserting `(1)`, `(2)`, `(3)`, no number past the last part, no unfilled placeholder and no second «ואחר כך»; and the `split-statements` rendering is asserted byte-identical to today.
+
+**Sibling audit (rule 7, cross-tool).** 3-D ports this message (`err.rightAngleVertex` / `err.rightAngleVertexMore`, with its own `numbered(rest, 3)` in `src3d/store/unreadParts3.ts`) and carries the same “starts at (3)” shape; analytic has the taught form but no further-parts variant at all (#1947). Whether the new Hebrew wording applies to them is **his** call, not this session’s ([ADR-W-117](06w-decisions-workspace.md#adr-w-117) § cross-tool; [ADR-W-122](06w-decisions-workspace.md#adr-w-122) — a ruling whose content is Hebrew is re-asked, not inherited), so it is filed, not built. Complex has no such message.
+
+**Behaviour change for a student:**
+- A line that puts a right triangle at a named vertex together with other facts now reads as one numbered list from (1) — «(1) משולש ABC  (2) ∠ABC = 90°  (3) AB = 4» — instead of two prose instructions followed by a list that starts at (3).
+- «משולש ABC ישר זווית ב-B» on its own now shows the same two lines as a numbered list, «(1) משולש ABC  (2) ∠ABC = 90°», rather than as a sentence. Same two lines, same teaching.
+- Nothing else changes: the same lines are refused, the same lines build, and the plain split list is word for word what it was.
