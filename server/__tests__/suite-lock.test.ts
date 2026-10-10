@@ -7,17 +7,19 @@
  * processes and read the order they ran in, because mutual exclusion is a property of processes, not of
  * a function.
  *
+ * #1949 (ADR-W-123) — and they queue IN ARRIVAL ORDER. The last describe covers the FIFO tickets.
+ *
  * It lives in `server/__tests__/` for the `isolation.test.ts` reason: it runs in every per-product lane,
  * and this script belongs to no product.
  */
 import { describe, expect, it } from 'vitest';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 // @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
-import { MAX_HOLD_MS, acquireSync, isStale } from '../../scripts/suite-lock.mjs';
+import { MAX_HOLD_MS, acquireSync, isStale, nextInLine, parseTicket, pruneQueue } from '../../scripts/suite-lock.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CLI = join(ROOT, 'scripts', 'suite-lock.mjs');
@@ -119,6 +121,141 @@ describe('#1813 — the lock in real processes', () => {
     try {
       const r = spawnSync(process.execPath, [CLI, 'node', '-e', '0'], { env, timeout: 10_000 });
       expect(r.status).toBe(0);
+      expect(JSON.parse(readFileSync(lock, 'utf8')).label, 'the parent’s lock is untouched').toBe('parent');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const waitFor = async (pred: () => boolean, what: string) => {
+  for (let i = 0; i < 600; i++) {
+    if (pred()) return;
+    await sleep(25);
+  }
+  throw new Error(`timed out waiting for ${what}`);
+};
+
+describe('#1949 — the queue is first come, first served', () => {
+  it('the earliest arrival is next, with the pid breaking a same-millisecond tie', () => {
+    const q = [
+      { name: '200.7', seq: 200, pid: 7 },
+      { name: '100.9', seq: 100, pid: 9 },
+      { name: '100.4', seq: 100, pid: 4 },
+    ];
+    expect(nextInLine(q).name).toBe('100.4');
+  });
+
+  it('the holder keeps its place but is skipped, so the waiter behind it still reaches the lock', () => {
+    const q = [
+      { name: '100.4', seq: 100, pid: 4 }, // the holder: arrived first, still in line
+      { name: '200.7', seq: 200, pid: 7 },
+    ];
+    expect(nextInLine(q, 4).name, 'the waiter behind the holder').toBe('200.7');
+  });
+
+  it('a file in the queue dir that is not a ticket is ignored', () => {
+    expect(parseTicket('100.4')).toEqual({ name: '100.4', seq: 100, pid: 4 });
+    expect(parseTicket('README')).toBeNull();
+    expect(parseTicket('100.4.draft')).toBeNull();
+  });
+
+  it('pruneQueue drops the dead and keeps the live, by the SAME pid test the stale-lock path uses', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'geo-lock-'));
+    const lock = join(dir, 'geo-suite.lock');
+    const queue = `${lock}.queue`;
+    mkdirSync(queue, { recursive: true });
+    const gone = `1.${deadPid()}`;
+    const mine = `2.${process.pid}`;
+    for (const n of [gone, mine]) writeFileSync(join(queue, n), '{}');
+    try {
+      const live = pruneQueue(lock, [parseTicket(gone), parseTicket(mine)]);
+      expect(live.map((t: { name: string }) => t.name)).toEqual([mine]);
+      expect(readdirSync(queue), 'the dead ticket’s file is reclaimed, not just filtered').toEqual([mine]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('three waiters run in ARRIVAL order even when the first one polls 60× slower (#1949)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'geo-lock-'));
+    const lock = join(dir, 'geo-suite.lock');
+    const queue = `${lock}.queue`;
+    const log = join(dir, 'log.txt');
+    const gate = join(dir, 'open-the-gate');
+    const worker = join(dir, 'worker.cjs');
+    writeFileSync(
+      worker,
+      `const fs=require('fs');fs.appendFileSync(${JSON.stringify(log)},process.argv[2]+'\\n');` +
+        `const t=Date.now();while(Date.now()-t<60){}`,
+    );
+    // The holder keeps the lock until the gate file appears, so the three waiters queue in a KNOWN order.
+    // It is a FILE, not `node -e`: the CLI spawns with a shell on Windows, which mangles `&&` and `<`.
+    const holderScript = join(dir, 'holder.cjs');
+    writeFileSync(
+      holderScript,
+      `const fs=require('fs');const s=(ms)=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);` +
+        `const t=Date.now();while(!fs.existsSync(${JSON.stringify(gate)})&&Date.now()-t<20000)s(20);`,
+    );
+    const start = (cmd: string[], poll: number) => {
+      const env: NodeJS.ProcessEnv = { ...process.env, GEO_SUITE_LOCK_PATH: lock, GEO_SUITE_LOCK_POLL_MS: String(poll) };
+      delete env.GEO_SUITE_LOCK_HELD;
+      const p = spawn(process.execPath, [CLI, ...cmd], { env, stdio: 'ignore' });
+      return { pid: p.pid as number, done: new Promise<number>((r) => p.on('exit', (c) => r(c ?? 1))) };
+    };
+    const ticketed = (pid: number) => existsSync(queue) && readdirSync(queue).some((n) => n.endsWith(`.${pid}`));
+    try {
+      const holder = start(['node', holderScript], 25);
+      await waitFor(() => existsSync(lock), 'the holder to take the lock');
+      // A arrives FIRST but polls every 1500 ms; B and C arrive after it and poll every 25 ms. Before
+      // the FIFO tickets, B and C took the lock inside A's sleep — the unfairness this test locks out.
+      const a = start(['node', worker, 'A'], 1500);
+      await waitFor(() => ticketed(a.pid), 'A to take a ticket');
+      const b = start(['node', worker, 'B'], 25);
+      await waitFor(() => ticketed(b.pid), 'B to take a ticket');
+      const c = start(['node', worker, 'C'], 25);
+      await waitFor(() => ticketed(c.pid), 'C to take a ticket');
+      writeFileSync(gate, '');
+      expect(await Promise.all([holder.done, a.done, b.done, c.done])).toEqual([0, 0, 0, 0]);
+      expect(readFileSync(log, 'utf8').trim().split('\n')).toEqual(['A', 'B', 'C']);
+      expect(existsSync(lock), 'the last run released the lock').toBe(false);
+      expect(readdirSync(queue), 'every run gave up its place in line').toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('a ticket left behind by a killed waiter is reclaimed, never a wedge in the line', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'geo-lock-'));
+    const lock = join(dir, 'geo-suite.lock');
+    const queue = `${lock}.queue`;
+    mkdirSync(queue, { recursive: true });
+    // Arrival time 1: ahead of every real waiter, for ever — unless its dead pid is noticed.
+    const ghost = join(queue, `1.${deadPid()}`);
+    writeFileSync(ghost, JSON.stringify({ pid: 1, label: 'killed waiter', at: 1 }));
+    const env: NodeJS.ProcessEnv = { ...process.env, GEO_SUITE_LOCK_PATH: lock, GEO_SUITE_LOCK_POLL_MS: '25' };
+    delete env.GEO_SUITE_LOCK_HELD;
+    try {
+      const r = spawnSync(process.execPath, [CLI, 'node', '-e', '0'], { env, timeout: 15_000 });
+      expect(r.status, 'the next in line ran instead of waiting on a dead waiter').toBe(0);
+      expect(existsSync(ghost), 'the dead waiter’s ticket was reclaimed').toBe(false);
+      expect(existsSync(lock)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('the re-entry escape bypasses the queue entirely — a nested run takes no ticket', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'geo-lock-'));
+    const lock = join(dir, 'geo-suite.lock');
+    writeFileSync(lock, JSON.stringify({ pid: process.pid, label: 'parent', at: Date.now() }));
+    const env = { ...process.env, GEO_SUITE_LOCK_PATH: lock, GEO_SUITE_LOCK_HELD: '1' };
+    try {
+      const r = spawnSync(process.execPath, [CLI, 'node', '-e', '0'], { env, timeout: 10_000 });
+      expect(r.status).toBe(0);
+      expect(existsSync(`${lock}.queue`), 'a nested run never joins the line').toBe(false);
       expect(JSON.parse(readFileSync(lock, 'utf8')).label, 'the parent’s lock is untouched').toBe('parent');
     } finally {
       rmSync(dir, { recursive: true, force: true });
