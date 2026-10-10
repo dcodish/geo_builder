@@ -1,27 +1,341 @@
 {
-  "name": "round-1983",
-  "title": "Fix round #1983 — six items landed on main (2026-10-10): both P1s, crossed and restated rings",
-  "cases": [
-    { "id": "T1", "title": "Analytic: on a concave quadrilateral the diagonals' meeting point O is drawn, with the diagonal extended dashed out to it", "class": "look", "product": "analytic", "base": "http://localhost:5173", "path": "/analytic.html", "lines": ["A(0,0)", "B(4,0)", "C(1,1)", "D(0,4)", "מרובע ABCD", "אלכסוני המרובע נפגשים בנקודה O"], "lookFor": "O drawn at (2,2) outside the shape; diagonals AC and BD solid; AC continues DASHED from C out to O", "before": "The line was accepted green and O was never drawn" },
-    { "id": "T2", "title": "Analytic: the «מפגש» spelling draws the same figure", "class": "look", "product": "analytic", "base": "http://localhost:5173", "path": "/analytic.html", "lines": ["A(0,0)", "B(4,0)", "C(1,1)", "D(0,4)", "מרובע ABCD", "O מפגש האלכסונים במרובע ABCD"], "lookFor": "Accepted. Identical to T1: O at (2,2), both diagonals solid, AC extended dashed from C to O", "before": "Refused as «does not exist»" },
-    { "id": "T3", "title": "Analytic: inside a convex quadrilateral the «מפגש» spelling still marks the point only (regression guard)", "class": "look", "product": "analytic", "base": "http://localhost:5173", "path": "/analytic.html", "lines": ["A(0,0)", "B(4,0)", "C(4,4)", "D(0,4)", "מרובע ABCD", "O מפגש האלכסונים במרובע ABCD"], "lookFor": "O at (2,2) inside the square; NO diagonals and NO dashed line", "before": "unchanged" },
-    { "id": "T4", "title": "2-D: a trapezoid's height whose foot lands beyond the top side gets that side extended, dashed", "class": "play", "product": "2d", "base": "http://localhost:5173", "path": "/", "lines": ["טרפז ABCD", "AE גובה"], "cycles": 3, "lookFor": "Whenever E lands beyond D (or C), side DC continues DASHED out to E; when E lands on DC, no dashed line. Press «הציגו תצורה אחרת» to see both", "before": "E floated beside the shape with nothing joining it to DC" },
-    { "id": "T5", "title": "Analytic: the same for a trapezoid given by coordinates", "class": "look", "product": "analytic", "base": "http://localhost:5173", "path": "/analytic.html", "lines": ["נקודה A(0,0)", "נקודה B(6,0)", "נקודה C(5,3)", "נקודה D(1,3)", "טרפז ABCD", "AE גובה"], "lookFor": "E at (0,3); a dashed stretch from D(1,3) to E", "before": "E floated at (0,3) with nothing joining it" },
-    { "id": "T6", "title": "REFUSAL — 2-D: a quadrilateral in a crossing order over a square's points, with the new wording", "class": "play", "product": "2d", "base": "http://localhost:5173", "path": "/", "lines": ["ריבוע ABCD", "מרובע ACBD"], "expectRefusal": "או לשנות את מקומות הנקודות", "lookFor": "The second line is refused; the message ends «…או לשנות את מקומות הנקודות — …»", "before": "The same refusal, ending «…או לשנות את השיעורים…»" },
-    { "id": "T7", "title": "2-D: a kite plus a second ring in another order is drawn as a dart, not refused", "class": "play", "product": "2d", "base": "http://localhost:5173", "path": "/", "lines": ["דלתון ABCD", "מרובע ABDC"], "lookFor": "Both lines accepted; the kite is drawn as a dart (concave) and neither ABCD nor ABDC crosses itself", "before": "The second line was refused with the crossed-ring message" },
-    { "id": "T8", "title": "REFUSAL — 3-D: the same crossing order over a square is refused", "class": "play", "product": "3d", "base": "http://localhost:5173", "path": "/3d.html", "lines": ["ריבוע ABCD", "מרובע ACBD"], "expectRefusal": "לא יוצרות את הצורה הזאת", "lookFor": "«מרובע ACBD» is refused with the same ring message as 2-D", "before": "Accepted green, drawn crossed" },
-    { "id": "T9", "title": "Analytic: a trapezoid with a free letter k is drawn as a real trapezoid", "class": "play", "product": "analytic", "base": "http://localhost:5173", "path": "/analytic.html", "lines": ["A(k,0)", "B(4,0)", "C(1,3)", "D(3,3)", "טרפז ABCD"], "cycles": 2, "lookFor": "A real (uncrossed) trapezoid with A to the right of B (k > 4); «הציגו תצורה אחרת» still moves k", "before": "A crossed bow-tie, drawn green" },
-    { "id": "T10", "title": "REFUSAL — 3-D: a square re-declared as a parallelogram in a crossing order", "class": "play", "product": "3d", "base": "http://localhost:5173", "path": "/3d.html", "lines": ["ריבוע ABCD", "מקבילית ACBD"], "lookFor": "The second line is refused (the parallelogram claim fails on ACBD). Judge the wording: it is the existing check-the-calculation refusal, not the crossed-ring message", "before": "Accepted with a false «a square is already a parallelogram»" },
-    { "id": "T11", "title": "2-D: an inscribed octagon is never drawn self-crossing", "class": "play", "product": "2d", "base": "http://localhost:5173", "path": "/", "lines": ["מתומן ABCDEFGH חסום במעגל"], "cycles": 12, "lookFor": "On every press of «הציגו תצורה אחרת» the octagon's sides never cross, and the shape changes", "before": "About one press in four drew it self-crossing" },
-    { "id": "T12", "title": "2-D: a pentagon stated concave stays concave and never crosses (regression guard)", "class": "look", "product": "2d", "base": "http://localhost:5173", "path": "/", "lines": ["מחומש ABCDE קעור"], "cycles": 4, "lookFor": "Concave on every press, never self-crossing", "before": "unchanged" },
-    { "id": "T13", "title": "2-D: a square restated with its letters reversed adds no row", "class": "play", "product": "2d", "base": "http://localhost:5173", "path": "/", "lines": ["ריבוע ABCD", "מרובע ADCB"], "expect": ["זה כבר קיים באיור"], "lookFor": "«זה כבר קיים באיור — אין מה להוסיף.» and still ONE row", "before": "A second row with no note" },
-    { "id": "T14", "title": "2-D: the same square started from another corner", "class": "play", "product": "2d", "base": "http://localhost:5173", "path": "/", "lines": ["ריבוע ABCD", "ריבוע BCDA"], "expect": ["זה כבר קיים באיור"], "lookFor": "The same note and one row", "before": "Refused with the internal «'D' is already defined…»" },
-    { "id": "T15", "title": "3-D: the reversed restatement gets 3-D's own note", "class": "play", "product": "3d", "base": "http://localhost:5173", "path": "/3d.html", "lines": ["ריבוע ABCD", "מרובע ADCB"], "expect": ["כבר נאמר"], "lookFor": "«הנתון הזה כבר נאמר («ריבוע ABCD») — הציור לא השתנה ולא נוספה שורה» and one row", "before": "A second row with no note" },
-    { "id": "T16", "title": "Analytic: a triangle restated in another order", "class": "play", "product": "analytic", "base": "http://localhost:5173", "path": "/analytic.html", "lines": ["משולש ABC", "משולש ACB"], "expect": ["זה כבר ידוע"], "lookFor": "«זה כבר ידוע מהנתונים שכתבתם…» and one row", "before": "A second row" },
-    { "id": "T17", "title": "REFUSAL — 3-D: a quadrilateral on a cube's non-flat corners says it must be flat", "class": "play", "product": "3d", "base": "http://localhost:5173", "path": "/3d.html", "lines": ["קובייה ABCDA'B'C'D'", "מרובע ABCA'"], "expectRefusal": "צורה שטוחה", "lookFor": "«מרובע הוא צורה שטוחה, והקודקודים A, B, C, A' אינם נמצאים במישור אחד — ולכן «מרובע ABCA'» לא מתקיים יחד עם «קובייה ABCDA'B'C'D'».»; the cube stays drawn", "before": "«הנתונים סותרים זה את זה — אין גוף שמקיים…»" },
-    { "id": "T18", "title": "REFUSAL — 3-D: a pentagon is named a pentagon in that message", "class": "play", "product": "3d", "base": "http://localhost:5173", "path": "/3d.html", "lines": ["A(0,0,0)", "B(4,0,0)", "C(4,3,0)", "D(2,5,1)", "E(0,3,0)", "מחומש ABCDE"], "expectRefusal": "מחומש הוא צורה שטוחה", "lookFor": "The last line is refused with «מחומש הוא צורה שטוחה…» — never «מרובע»", "before": "The generic «הנתונים סותרים זה את זה…»" },
-    { "id": "T19", "title": "REFUSAL — Analytic: a parallelogram is not called a trapezoid", "class": "play", "product": "analytic", "base": "http://localhost:5173", "path": "/analytic.html", "lines": ["מקבילית ABCD", "טרפז ABCD"], "expectRefusal": "הצורה כבר ידועה כ־מקבילית", "lookFor": "«הצורה כבר ידועה כ־מקבילית — ולכן אינה נקראת טרפז. מחקו את הנתון הקודם אם התכוונתם טרפז.»", "before": "«already known» — a parallelogram treated as a trapezoid" },
-    { "id": "T20", "title": "REFUSAL — Analytic: a rectangle is not an isosceles trapezoid", "class": "play", "product": "analytic", "base": "http://localhost:5173", "path": "/analytic.html", "lines": ["מלבן ABCD", "טרפז שווה שוקיים ABCD"], "expectRefusal": "הצורה כבר ידועה כ־מלבן", "lookFor": "Refused, naming מלבן and טרפז שווה שוקיים", "before": "Accepted, drawing a rectangle with no warning" },
-    { "id": "T21", "title": "Analytic: a trapezoid made a parallelogram by its sides keeps the amber warning (regression guard)", "class": "look", "product": "analytic", "base": "http://localhost:5173", "path": "/analytic.html", "lines": ["טרפז ABCD", "AD ∥ BC", "AB ∥ DC"], "lookFor": "All three lines are recorded and the amber «no longer a trapezoid» warning still appears", "before": "unchanged" }
-  ]
+ "name": "round-1983",
+ "title": "Fix round #1983 — six items landed on main (2026-10-10): both P1s, crossed and restated rings",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "Analytic: on a concave quadrilateral the diagonals' meeting point O is drawn, with the diagonal extended dashed out to it",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "C(1,1)",
+    "D(0,4)",
+    "מרובע ABCD",
+    "אלכסוני המרובע נפגשים בנקודה O"
+   ],
+   "lookFor": "O drawn at (2,2) outside the shape; diagonals AC and BD solid; AC continues DASHED from C out to O",
+   "before": "The line was accepted green and O was never drawn"
+  },
+  {
+   "id": "T2",
+   "title": "Analytic: the «מפגש» spelling draws the same figure",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "C(1,1)",
+    "D(0,4)",
+    "מרובע ABCD",
+    "O מפגש האלכסונים במרובע ABCD"
+   ],
+   "lookFor": "Accepted. Identical to T1: O at (2,2), both diagonals solid, AC extended dashed from C to O",
+   "before": "Refused as «does not exist»"
+  },
+  {
+   "id": "T3",
+   "title": "Analytic: inside a convex quadrilateral the «מפגש» spelling still marks the point only (regression guard)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "C(4,4)",
+    "D(0,4)",
+    "מרובע ABCD",
+    "O מפגש האלכסונים במרובע ABCD"
+   ],
+   "lookFor": "O at (2,2) inside the square; NO diagonals and NO dashed line",
+   "before": "unchanged"
+  },
+  {
+   "id": "T4",
+   "title": "2-D: a trapezoid's height whose foot lands beyond the top side gets that side extended, dashed",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "טרפז ABCD",
+    "AE גובה"
+   ],
+   "cycles": 3,
+   "lookFor": "Whenever E lands beyond D (or C), side DC continues DASHED out to E; when E lands on DC, no dashed line. Press «הציגו תצורה אחרת» to see both",
+   "before": "E floated beside the shape with nothing joining it to DC"
+  },
+  {
+   "id": "T5",
+   "title": "Analytic: the same for a trapezoid given by coordinates",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נקודה A(0,0)",
+    "נקודה B(6,0)",
+    "נקודה C(5,3)",
+    "נקודה D(1,3)",
+    "טרפז ABCD",
+    "AE גובה"
+   ],
+   "lookFor": "E at (0,3); a dashed stretch from D(1,3) to E",
+   "before": "E floated at (0,3) with nothing joining it"
+  },
+  {
+   "id": "T6",
+   "title": "REFUSAL — 2-D: a quadrilateral in a crossing order over a square's points, with the new wording",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "מרובע ACBD"
+   ],
+   "expectRefusal": "או לשנות את מקומות הנקודות",
+   "lookFor": "The second line is refused; the message ends «…או לשנות את מקומות הנקודות — …»",
+   "before": "The same refusal, ending «…או לשנות את השיעורים…»"
+  },
+  {
+   "id": "T7",
+   "title": "2-D: a kite plus a second ring in another order is drawn as a dart, not refused",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "דלתון ABCD",
+    "מרובע ABDC"
+   ],
+   "lookFor": "Both lines accepted; the kite is drawn as a dart (concave) and neither ABCD nor ABDC crosses itself",
+   "before": "The second line was refused with the crossed-ring message"
+  },
+  {
+   "id": "T8",
+   "title": "REFUSAL — 3-D: the same crossing order over a square is refused",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "ריבוע ABCD",
+    "מרובע ACBD"
+   ],
+   "expectRefusal": "לא יוצרות את הצורה הזאת",
+   "lookFor": "«מרובע ACBD» is refused with the same ring message as 2-D",
+   "before": "Accepted green, drawn crossed"
+  },
+  {
+   "id": "T9",
+   "title": "Analytic: a trapezoid with a free letter k is drawn as a real trapezoid",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(k,0)",
+    "B(4,0)",
+    "C(1,3)",
+    "D(3,3)",
+    "טרפז ABCD"
+   ],
+   "cycles": 2,
+   "lookFor": "A real (uncrossed) trapezoid with A to the right of B (k > 4); «הציגו תצורה אחרת» still moves k",
+   "before": "A crossed bow-tie, drawn green"
+  },
+  {
+   "id": "T10",
+   "title": "REFUSAL — 3-D: a square re-declared as a parallelogram in a crossing order",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "ריבוע ABCD",
+    "מקבילית ACBD"
+   ],
+   "lookFor": "The second line is refused (the parallelogram claim fails on ACBD). Judge the wording: it is the existing check-the-calculation refusal, not the crossed-ring message",
+   "before": "Accepted with a false «a square is already a parallelogram»",
+   "expectRefusal": "בדקו את החישוב"
+  },
+  {
+   "id": "T11",
+   "title": "2-D: an inscribed octagon is never drawn self-crossing",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מתומן ABCDEFGH חסום במעגל"
+   ],
+   "cycles": 12,
+   "lookFor": "On every press of «הציגו תצורה אחרת» the octagon's sides never cross, and the shape changes",
+   "before": "About one press in four drew it self-crossing"
+  },
+  {
+   "id": "T12",
+   "title": "2-D: a pentagon stated concave stays concave and never crosses (regression guard)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מחומש ABCDE קעור"
+   ],
+   "cycles": 4,
+   "lookFor": "Concave on every press, never self-crossing",
+   "before": "unchanged"
+  },
+  {
+   "id": "T13",
+   "title": "2-D: a square restated with its letters reversed adds no row",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "מרובע ADCB"
+   ],
+   "lookFor": "«זה כבר קיים באיור — אין מה להוסיף.» and still ONE row",
+   "before": "A second row with no note",
+   "expectRefusal": "זה כבר קיים באיור"
+  },
+  {
+   "id": "T14",
+   "title": "2-D: the same square started from another corner",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "ריבוע BCDA"
+   ],
+   "lookFor": "The same note and one row",
+   "before": "Refused with the internal «'D' is already defined…»",
+   "expectRefusal": "זה כבר קיים באיור"
+  },
+  {
+   "id": "T15",
+   "title": "3-D: the reversed restatement gets 3-D's own note",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "ריבוע ABCD",
+    "מרובע ADCB"
+   ],
+   "expect": [
+    "כבר נאמר"
+   ],
+   "lookFor": "«הנתון הזה כבר נאמר («ריבוע ABCD») — הציור לא השתנה ולא נוספה שורה» and one row",
+   "before": "A second row with no note"
+  },
+  {
+   "id": "T16",
+   "title": "Analytic: a triangle restated in another order",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "משולש ACB"
+   ],
+   "expect": [
+    "זה כבר ידוע"
+   ],
+   "lookFor": "«זה כבר ידוע מהנתונים שכתבתם…» and one row",
+   "before": "A second row"
+  },
+  {
+   "id": "T17",
+   "title": "REFUSAL — 3-D: a quadrilateral on a cube's non-flat corners says it must be flat",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "מרובע ABCA'"
+   ],
+   "expectRefusal": "צורה שטוחה",
+   "lookFor": "«מרובע הוא צורה שטוחה, והקודקודים A, B, C, A' אינם נמצאים במישור אחד — ולכן «מרובע ABCA'» לא מתקיים יחד עם «קובייה ABCDA'B'C'D'».»; the cube stays drawn",
+   "before": "«הנתונים סותרים זה את זה — אין גוף שמקיים…»"
+  },
+  {
+   "id": "T18",
+   "title": "REFUSAL — 3-D: a pentagon is named a pentagon in that message",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "A(0,0,0)",
+    "B(4,0,0)",
+    "C(4,3,0)",
+    "D(2,5,1)",
+    "E(0,3,0)",
+    "מחומש ABCDE"
+   ],
+   "expectRefusal": "מחומש הוא צורה שטוחה",
+   "lookFor": "The last line is refused with «מחומש הוא צורה שטוחה…» — never «מרובע»",
+   "before": "The generic «הנתונים סותרים זה את זה…»"
+  },
+  {
+   "id": "T19",
+   "title": "REFUSAL — Analytic: a parallelogram is not called a trapezoid",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מקבילית ABCD",
+    "טרפז ABCD"
+   ],
+   "expectRefusal": "הצורה כבר ידועה כ־מקבילית",
+   "lookFor": "«הצורה כבר ידועה כ־מקבילית — ולכן אינה נקראת טרפז. מחקו את הנתון הקודם אם התכוונתם טרפז.»",
+   "before": "«already known» — a parallelogram treated as a trapezoid"
+  },
+  {
+   "id": "T20",
+   "title": "REFUSAL — Analytic: a rectangle is not an isosceles trapezoid",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "מלבן ABCD",
+    "טרפז שווה שוקיים ABCD"
+   ],
+   "expectRefusal": "הצורה כבר ידועה כ־מלבן",
+   "lookFor": "Refused, naming מלבן and טרפז שווה שוקיים",
+   "before": "Accepted, drawing a rectangle with no warning"
+  },
+  {
+   "id": "T21",
+   "title": "Analytic: a trapezoid made a parallelogram by its sides keeps the amber warning (regression guard)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "טרפז ABCD",
+    "AD ∥ BC",
+    "AB ∥ DC"
+   ],
+   "lookFor": "All three lines are recorded and the amber «no longer a trapezoid» warning still appears",
+   "before": "unchanged"
+  }
+ ]
 }
