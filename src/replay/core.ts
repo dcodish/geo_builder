@@ -4356,7 +4356,9 @@ function convexityYields(facts: Fact[], extra: Id[][] = []): Set<string> {
       if (c.convex) statedConvex.add(ringKey(c.ids));
       continue;
     }
-    rings.push(...declaredRings(f.cmd));
+    // the rings that carry the convexity DEFAULT — a top-level `polygon` (ADR-616) carries only the simple floor,
+    // so it neither yields nor makes another ring yield
+    rings.push(...declaredRings(f.cmd).filter((r) => r.convex).map((r) => r.ids));
   }
   rings.push(...extra);
   const out = new Set<string>();
