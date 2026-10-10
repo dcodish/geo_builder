@@ -789,7 +789,12 @@ ranked; a discarded walk candidate pays nothing). The arm fires on `hardRingFaul
 *valid but for its rings*; per declared ring it counts the candidates drawing it crossed and notes any drawing it simple
 (a flat one answers neither way). When nothing is whole, a ring crossed in at least `FORCED_RING_FLOOR` (4) and simple
 in none is `Figure.forcedCrossed`, and the figure returned is a copy of the first valid candidate drawing it crossed
-(never a fallback whose solve stopped short). Samples are not proof, so the arm also needs `RingFault.shapeDof === 0`:
+(never a fallback whose solve stopped short). **Search first** ([ADR-AG-256](06c-decisions-analytic.md#adr-ag-256), #1939): before a
+ring is called forced, a ring whose shape is not affinely fixed (`shapeDof !== 0`) in a figure with a free parameter
+sends the walk round again with the parameters' reach widened (`evaluate(c, seed, reach)`, `RING_REACHES` 4/16/64 ×
+`RING_REACH_TRIES` 8 — a deterministic work budget): a whole figure found there is the one drawn, and a ring drawn simple
+anywhere is not forced. Once that search has failed, `forcedCrossed` is refused whatever the ring's `shapeDof` (the
+superseded gate below required the affine proof). Samples are not proof, so the arm also needed `RingFault.shapeDof === 0`:
 the freedom of the ring's affine coordinates over its own widest vertex triangle, by `tangentFreedomOf` (projection onto
 the constraints' tangent space, tolerance relative to the read's own scale — a stacked `freeRank` read round-off as
 freedom). An affine map keeps every proper crossing, so 0 proves it. The arm adds those `crossed` faults; `decideSubmit`

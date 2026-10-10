@@ -438,6 +438,18 @@ point, a full `coords-eq` given, or a 0-DOF derived point of `DERIVED_POINT_KIND
 of the declaring fact and the facts that fixed its vertices is refused `ring-crossed` (`err.ringContradictsNoun`,
 analytic's text); a row already red keeps its own message.
 
+**…and over points a shape placed, when nothing can save it** (#1927, [ADR-3D-322](06b-decisions-3d.md#adr-3d-322)).
+When some vertex is not coordinate-fixed, the same loop widens the scope to `placementFixers3(…, solidVertex, flatSolid)`
+— any solid's vertex, a flat one included — and asks two things before refusing: the ring is crossed at EVERY claim
+sample (`knowledgeSamples3(c, claimSeeds(seed))`, unplaced samples skipped, none placed fails open), and every OTHER
+declared ring over a superset of its letters that orders them differently (the "partner" whose convexity forces the
+crossing) is a quadrilateral with a pair of opposite sides parallel at every sample — convex whenever simple. A partner
+that could be a dart (a kite, a general quadrilateral) fails the check open: a valid drawing exists that 3-D does not
+draw. The blame is the latest of the ring's ordered declaration, its placers and its partners' declarations, so the
+ring-first order refuses the shape line. **One ring is one cyclic order** (`ringKeyIds3`, apply.ts): a polygon bound
+over existing points, `recordShape` and `knownQuadShape` all match rings by cyclic order, never by letter set — a
+square's letters in another order are another ring.
+
 **And it must lie in ONE PLANE** (#1928, [ADR-3D-319](06b-decisions-3d.md#adr-3d-319)). `ringSkew3` (vec3.ts, the
 third ring predicate) measures the spread of a ring's vertices along the normal of its best-spanning triple
 (`runNormal`) over its greatest pairwise distance — 0 for a flat ring, scale-free, and 0 for a ring with no plane

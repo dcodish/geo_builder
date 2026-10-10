@@ -244,7 +244,12 @@ const sameRing = (x: Id[], y: Id[]): boolean => x.length === y.length && [...x].
 function knownQuadShape(c: Construction3, ids: Id[]): QuadBase | null {
   // #1918: through the one declared-ring reader — a flat statement first, then a pyramid's base (the order
   // the two sources were always read in)
-  return declaredQuads3(c).find((q) => sameRing([...q.ids], ids))?.base ?? null;
+  //
+  // #1927 (ADR-3D-322): KNOWN AS THE SAME CYCLIC ORDER, never only the same letters. A shape is a property of a ring,
+  // and «ACBD» over a square's letters is another ring (crossed, two of its sides the square's diagonals): matched by
+  // letters, «ריבוע ABCD · מקבילית ACBD» was refused as "a square is already a parallelogram" — a false reason — and
+  // «ריבוע ABCD · ריבוע ACBD» passed as redundant. The same ring read from another vertex or reversed still matches.
+  return declaredQuads3(c).find((q) => q.ids.length === ids.length && ringKeyIds3([...q.ids]) === ringKeyIds3(ids))?.base ?? null;
 }
 
 /**
@@ -308,14 +313,21 @@ function noteStatedRightAngle(next: Construction3, u: VecAtom, v: VecAtom): void
   });
 }
 
-/** #612/#615: remember the stated shape, and require its drawing to stay visibly general. */
+/**
+ * #612/#615: remember the stated shape, and require its drawing to stay visibly general.
+ *
+ * #1927 (ADR-3D-322): one shape per RING — a cyclic order — never per letter set. «טרפז ABDC · מלבן ABCD» names two
+ * rings over the same letters; keyed by letters, the rectangle was never recorded, so nothing knew the second ring
+ * existed and the crossing it forces on the first could not be blamed on the line that completed it.
+ */
 function recordShape(c: Construction3, base: QuadBase, ids: [Id, Id, Id, Id], adj?: ShapeAdj3): Construction3 {
   const next = clone(c);
-  if (!next.quadShapes.some((s) => sameRing(s.ids, ids))) next.quadShapes.push({ base, ids: [...ids], ...(adj ? { adj } : {}) });
+  const sameOrder = (x: readonly Id[]) => x.length === ids.length && ringKeyIds3(x) === ringKeyIds3(ids);
+  if (!next.quadShapes.some((s) => sameOrder(s.ids))) next.quadShapes.push({ base, ids: [...ids], ...(adj ? { adj } : {}) });
   // #615: only a shape with room to be drawn wrongly needs the gate — a square has no freedom left,
   // and a general `quad` has no more-specific sibling it is obliged to avoid looking like.
   if (QUAD_BASE_DIMS[base] > 0 &&
-      !next.requirements.some((r) => r.kind === 'quad-general' && sameRing(r.ids, ids)))
+      !next.requirements.some((r) => r.kind === 'quad-general' && sameOrder(r.ids)))
     next.requirements.push({ kind: 'quad-general', base, ids: [...ids] });
   return next;
 }
@@ -1110,6 +1122,14 @@ function oppositeParallelBase3(c: Construction3, apex: Id): [Id, Id] | null {
   return cands.length === 1 ? cands[0] : null;
 }
 
+/** A ring's identity up to where its cycle starts and which way round it is read (#1927, 2-D's `ringKey`). */
+export function ringKeyIds3(ids: readonly Id[]): string {
+  const n = ids.length;
+  const rots: string[] = [];
+  for (const seq of [[...ids], [...ids].reverse()]) for (let i = 0; i < n; i++) rots.push(seq.slice(i).concat(seq.slice(0, i)).join(','));
+  return rots.sort()[0];
+}
+
 function placeholderYields(c: Construction3, cmd: Command3): Construction3 | null {
   const id = (cmd as { id?: unknown }).id;
   if (typeof id !== 'string') return null;
@@ -1233,9 +1253,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         }
         // #1849 (ADR-3D-310): ...and the statement's MEANING — the ring is open — is verified, never dropped:
         // a polygon bound over points the givens hold on one line is refused (M1 duality: the declaration
-        // that would mint a free polygon verifies a determined one). Recorded once per ring, whatever the
-        // vertex order the student wrote.
-        const sameRing = (ids: readonly Id[]): boolean => ids.length === nRef && cmd.ids.every((id) => ids.includes(id));
+        // that would mint a free polygon verifies a determined one). Recorded once per ring.
+        //
+        // #1927 (ADR-3D-322): ONE RING IS ONE CYCLIC ORDER, never one letter set. Matched by letters alone, «מרובע ACBD»
+        // after «ריבוע ABCD» was recorded as the square's own ring and dropped — so the crossing it names was never
+        // asked about, and it recorded green. The same ring read from another vertex or the other way round is still
+        // the same ring (`ringKeyIds3`); another ORDER over the same letters is a new declaration.
+        const sameRing = (ids: readonly Id[]): boolean => ids.length === nRef && ringKeyIds3(ids) === ringKeyIds3(cmd.ids);
         if (c.claims.some((k) => k.type === 'polygon-open' && sameRing(k.ids)) || c.solids.some((s) => sameRing(s.ids))) {
           return { ok: true, next: drew ? nextRef : c };
         }

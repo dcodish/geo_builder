@@ -45,10 +45,10 @@ describe('#1923 the reported sequences, verbatim', () => {
     expect(r.kinds).toEqual(['record', 'record', 'record', 'record', 'refused']);
     expect(r.error).toEqual({ code: 'ring-crossed', stated: noun });
     expect(errorText3(he, r.error)).toBe(
-      `הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: «${noun}». אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את השיעורים — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`,
+      `הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: «${noun}». אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`,
     );
     expect(errorText3(en, r.error)).toBe(
-      `The points you gave do not form that shape in this order: «${noun}». Reorder the letters so the sides do not cross, or change the coordinates — as written the vertices fall on one line or the shape folds over itself.`,
+      `The points you gave do not form that shape in this order: «${noun}». Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.`,
     );
   });
 
@@ -96,10 +96,16 @@ describe('#1923 the controls — unchanged', () => {
     expect(play(['A(0,0,0)', 'B(4,0,0)', 'C(1,3,0)', 'מרובע ABCD']).kinds).toEqual(['record', 'record', 'record', 'record']);
   });
 
+  /**
+   * Once outside this ADR's ruled scope, now refused by #1927 (ADR-3D-322, the operator's ruling of 2026-10-08 on
+   * shape-placed rings) — with the same code and words. Their own lock is `issue-1927-crossed-ring.test.ts`.
+   */
   it.each([[['ריבוע ABCD', 'מרובע ACBD']], [['מלבן ABCD', 'מרובע ABDC']], [["קובייה ABCDA'B'C'D'", 'מרובע ACBD']]])(
-    '%j — a crossing a SHAPE determines (no coordinates) is outside the ruled scope: unchanged',
+    '%j — a crossing a SHAPE determines is refused too, since #1927 (ADR-3D-322)',
     (lines) => {
-      expect(play(lines).kinds).toEqual(['record', 'record']);
+      const r = play(lines);
+      expect(r.kinds).toEqual(['record', 'refused']);
+      expect(r.error).toEqual({ code: 'ring-crossed', stated: lines[1] });
     },
   );
 

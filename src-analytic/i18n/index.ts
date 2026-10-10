@@ -319,7 +319,7 @@ const he = {
     'וצורה שטוחה אינה {{shapeHe}} — כפי שקובע "{{declared}}". "{{detail}}" לא נוסף.',
   errRingContradictsNoun:
     'הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "{{detail}}". אפשר לשנות את סדר האותיות ' +
-    'כך שהצלעות לא ייחתכו, או לשנות את השיעורים — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.',
+    'כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.',
   errReservedCoordinate:
     'האותיות x ו-y שמורות לצירי מערכת הצירים, ולכן אי אפשר להשתמש בהן כנעלם בשיעורי נקודה: "{{detail}}". ' +
     'אפשר להשתמש באות אחרת, למשל M(3,t).',
@@ -748,7 +748,7 @@ const en: typeof he = {
     'and a flat figure is not the {{shapeEn}} that "{{declared}}" declares. "{{detail}}" was not added.',
   errRingContradictsNoun:
     'The points you gave do not form that shape in this order: "{{detail}}". Reorder the letters so ' +
-    'the sides do not cross, or change the coordinates — as written the vertices fall on one line or the shape folds over itself.',
+    'the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.',
   errReservedCoordinate:
     'The letters x and y name the axes, so they cannot be a point\'s unknown: "{{detail}}". ' +
     'Use another letter — for example M(3,t).',

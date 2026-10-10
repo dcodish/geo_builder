@@ -620,6 +620,16 @@ is sound because the line's own constraints only narrow the configurations. A hi
 helper `gateVerdict` mirrors it (reason `crossed-ring`). The predicate is 2-D's own: `BOUNDARIES.json` keeps engine
 layers `copied-never-shared`.
 
+**Search first, refuse last** ([ADR-613](06-decisions.md#adr-613), the operator's ruling of 2026-10-09). The prior pool
+is filtered by `meetsRequirements`, and so by FR-EN-16's convexity DEFAULT. A second declared ring over some of a
+ring's points in another order is a statement that default yields to (points in convex position have one simple
+order), so `convexityYields(facts)` names every declared ring that another declared ring re-orders, and
+`polygonsConvex` holds those to simplicity only — the stated-concave rule of #441. A stated «קמור» never yields. When
+the ring the line declares would make such a ring yield, the prior pool never held that branch, so `forcedCrossedRing`
+asks `findValidConfig` of the trial facts before refusing; a configuration found there commits, and the post-commit
+search draws it («דלתון ABCD · מרובע ABDC» → the dart). A square, rectangle, rhombus, parallelogram or trapezoid is
+convex whenever simple, so the search finds nothing for them in a few milliseconds and the refusal stands.
+
 ### What counts as "produced": a display-only command declares itself (#1011, [ADR-519](06-decisions.md#adr-519))
 
 `dryRunOutcome` asks whether a line did anything — the construction grew, a DOF went, the scale was fixed, a point

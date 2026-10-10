@@ -32,7 +32,7 @@ import { lostPart3, unreadParts3, type LostPart3 } from './unreadParts3';
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
-import { applyCommand3, flatHeightReading3, freeDims } from '../engine/apply';
+import { applyCommand3, flatHeightReading3, freeDims, ringKeyIds3 } from '../engine/apply';
 import { declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
@@ -418,6 +418,12 @@ function placementFixers3(
   id: Id,
   solidVertex: boolean,
   seen: Set<Id> = new Set(),
+  /**
+   * #1927 (ADR-3D-322): a FLAT solid's vertex counts as placed too — the crossed-ring question's scope, where the
+   * shape («ריבוע ABCD») places its points up to the shape's own freedom and the claim samples read that freedom.
+   * The skew check keeps it off: a flat solid's own ring is its configuration there.
+   */
+  flatSolid = false,
 ): Set<string> | null {
   if (seen.has(id)) return null;
   seen.add(id);
@@ -435,7 +441,7 @@ function placementFixers3(
   if (def.kind === 'coord') return by;
   if (def.kind === 'solid-vertex') {
     const owner = c.solids[def.solid];
-    if (!solidVertex || owner === undefined || FLAT_SOLID_KINDS.has(owner.kind)) return null;
+    if (!solidVertex || owner === undefined || (!flatSolid && FLAT_SOLID_KINDS.has(owner.kind))) return null;
     // the SOLID placed this vertex, and its command carries `ids`, not `id` — so the minter lookup above never
     // finds it, and the refusal would name no statement at all. A solid vertex cannot predate its solid, so the
     // first enabled fact that names the letter in a ring is that declaration.
@@ -456,7 +462,7 @@ function placementFixers3(
   if (inputs.length === 0) return null;
   for (const q of inputs) {
     if (!c.points.has(q)) return null; // a plane, a line or a symbol: not judged here
-    const sub = placementFixers3(c, facts, q, solidVertex, seen);
+    const sub = placementFixers3(c, facts, q, solidVertex, seen, flatSolid);
     if (!sub) return null;
     sub.forEach((x) => by.add(x));
   }
@@ -983,11 +989,40 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
   /**
    * #1923 (ADR-3D-314) — A DECLARED POLYGON OVER POINTS FIXED BY COORDINATES MUST BE A SIMPLE RING. Analytic's
    * ADR-AG-129 in R³: «A(0,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD» names a ring whose sides BC and DA
-   * cross — not a trapezoid, not any quadrilateral — and it recorded green. Only when EVERY vertex is
-   * coordinate-fixed (`coordinateFixers3`) — such a ring cannot move, so the drawn ring is the only one; a ring with
-   * a free vertex, or one a SHAPE alone determines, is outside the ruled scope. The line that COMPLETED it is
+   * cross — not a trapezoid, not any quadrilateral — and it recorded green. When EVERY vertex is coordinate-fixed
+   * (`coordinateFixers3`) the ring cannot move, so the drawn ring is the only one. The line that COMPLETED it is
    * refused. Run after the claim pass, so a truer message (a rectangle's own claim refuted) wins, as in analytic.
+   *
+   * #1927 (ADR-3D-322, ADR-W-121 and its 2026-10-09 amendment — "search first, refuse last") — and a ring over points
+   * a SHAPE placed («ריבוע ABCD · מרובע ACBD», a cube's «מרובע ACBD», the midpoint ring «מרובע ABED») is refused too,
+   * on two conditions, both of which must hold:
+   *  1. **Crossed at every claim sample** — the claims' own invariance bar (`claimSeeds` × every parameter branch),
+   *     the skew check's reading (ADR-3D-319): a free magnitude that could uncross the ring is never a contradiction.
+   *     A sample the pivot left unplaced is skipped; with none placed the check fails open.
+   *  2. **No configuration branch the samples cannot reach could save it.** Another declared ring over a superset of
+   *     these points, ordering them differently («ריבוע ABCD» for «מרובע ACBD»), makes the crossing a matter of that
+   *     ring's convexity, and the claim samples draw it convex. It is PROVEN convex whenever simple only when it is a
+   *     quadrilateral with a pair of opposite sides parallel at every sample (the parallelogram family, a trapezoid):
+   *     then no configuration saves the ring and it is refused. A kite or a general quadrilateral may be a DART, on
+   *     which the other order is simple (the operator's ruling names «דלתון ABCD · מרובע ABDC»): 3-D does not draw
+   *     that branch, so the check fails open rather than refuse a figure a valid drawing exists for.
+   * The status goes on the latest of the declaration, the statements that placed its vertices, and the ring that
+   * forced the order — so the ring-first order («מרובע ABDC · מלבן ABCD») refuses the shape line that completed it.
    */
+  const ringKey3 = ringKeyIds3;
+  /** Does fact `f` declare exactly this ring, in this cyclic order (never only the same letters, #1914's rule)? */
+  const declaresOrdered3 = (f: Fact3, ring: readonly Id[]) =>
+    f.cmds.some((k) => (k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && k.ids.length === ring.length && ringKey3(k.ids) === ringKey3(ring));
+  /** Two opposite sides of a 4-ring parallel at these positions — a simple ring with such a pair is convex. */
+  const oppositeParallel3 = (at: (Vec3 | undefined)[]): boolean => {
+    if (at.length !== 4 || at.some((p) => !p)) return false;
+    const [a, b, cc, d] = at as Vec3[];
+    const par = (u: Vec3, v: Vec3) => {
+      const x = norm3({ x: u.y * v.z - u.z * v.y, y: u.z * v.x - u.x * v.z, z: u.x * v.y - u.y * v.x });
+      return x <= CLAIM_REL_TOL * Math.max(norm3(u) * norm3(v), 1e-12);
+    };
+    return par(sub3(b, a), sub3(cc, d)) || par(sub3(d, a), sub3(cc, b));
+  };
   for (const ring of declaredRings3) {
     const pts = ring.map((id) => positions.get(id));
     if (pts.some((p) => !p) || !ringSelfCrossing3(pts as Vec3[])) continue;
@@ -1001,8 +1036,36 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
       }
       f.forEach((x) => by.add(x));
     }
-    if (!fixed) continue;
-    const declaring = facts.find((f) => f.enabled && status[f.id] === 'ok' && f.cmds.some((k) => declaresRing3(k, ring)));
+    if (!fixed) {
+      // #1927 — the shape-placed scope, read over the claim samples
+      by.clear();
+      let placedAll = true;
+      for (const id of ring) {
+        const f = placementFixers3(c, facts, id, true, new Set(), true);
+        if (!f) {
+          placedAll = false;
+          break;
+        }
+        f.forEach((x) => by.add(x));
+      }
+      if (!placedAll) continue; // a free vertex: the configuration's business, never a refusal
+      const own = new Set(ring);
+      const partners = declaredRings3.filter(
+        (r) => r !== ring && ring.every((id) => r.includes(id)) && ringKey3(r.filter((id) => own.has(id))) !== ringKey3(ring),
+      );
+      let placed = 0;
+      let saved = false;
+      for (const r of knowledgeSamples3(c, claimSeeds(seed))) {
+        if (r.pivot !== null && r.pivot.solutions === 0) continue; // not a figure (ADR-3D-284)
+        placed++;
+        const at = ring.map((id) => r.positions.get(id));
+        if (at.some((p) => !p) || !ringSelfCrossing3(at as Vec3[])) { saved = true; break; }
+        if (partners.some((p) => !oppositeParallel3(p.map((id) => r.positions.get(id))))) { saved = true; break; }
+      }
+      if (placed === 0 || saved) continue; // fail open: a simple drawing may exist
+      for (const p of partners) for (const f of facts) if (f.enabled && status[f.id] === 'ok' && declaresOrdered3(f, p)) by.add(f.id);
+    }
+    const declaring = facts.find((f) => f.enabled && status[f.id] === 'ok' && declaresOrdered3(f, ring));
     if (declaring) by.add(declaring.id);
     // the LATEST of them completed the ring; if that line is already red (a truer message), it keeps its own
     const blamed = [...facts].reverse().find((f) => f.enabled && by.has(f.id));
