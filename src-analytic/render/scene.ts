@@ -382,6 +382,12 @@ export interface Scene {
   /** The drawn arcs (#1622 E4) — a semicircle, a quarter circle, a sector — as SVG path data in screen space. */
   arcs: SceneArc[];
   construction: SceneConstruction[];
+  /**
+   * #1937/#1971 (ADR-AG-255) — the DASHED extensions, projected: a construction point that lands off the drawn ink
+   * (a height's foot beyond its side, a concave quadrilateral's diagonal meet) has its carrying line extended to it.
+   * Decoration — no id, no hit-target — and ALWAYS drawn, unlike `construction`, which waits for «הצג בנייה».
+   */
+  extensions: Array<{ x1: number; y1: number; x2: number; y2: number }>;
   points: ScenePoint[];
   /**
    * The crossings the student could PROMOTE to a point (#1025).
@@ -814,6 +820,7 @@ export function buildScene(
     segments,
     arcs,
     construction,
+    extensions: (fig.extensions ?? []).map((e) => ({ x1: t.sx(e.a.x), y1: t.sy(e.a.y), x2: t.sx(e.b.x), y2: t.sy(e.b.y) })),
     points,
     crossings,
     measures,

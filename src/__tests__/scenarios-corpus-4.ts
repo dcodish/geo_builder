@@ -55,6 +55,7 @@ import { parse } from '@/parser';
 import { COLLAPSED_VS, computeValues, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
 import { drivenSolveStats } from '@/engine/evaluate';
+import { buildScene } from '@/render/scene';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -3844,6 +3845,32 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.max(...ps) - Math.min(...ps), 'unequal sides, as ruled').toBeGreaterThan(1e-2);
       // and the OPPOSITE direction keeps ADR-606's refusal
       expect(gateVerdict(factsOf([]), 'מעגל חסום במחומש ABCDE').kind).toBe('refused');
+    },
+  },
+  {
+    id: 'height-foot-beyond-side-dashed-1971',
+    title: '«טרפז ABCD · AE גובה» — a foot beyond its side gets the side extended, dashed, out to it (#1971, ADR-612)',
+    guards:
+      "#1971 + #1937 (ADR-612, operator rulings 2026-10-09/10): a construction point that lands off the drawn ink was a labelled dot floating beside the figure — «AE גובה» on a trapezoid put E on the LINE DC beyond D with nothing joining it. The rule: the carrying line is extended, dashed, from the side's nearer end to the point; a foot ON its side gets nothing. Asserted per configuration (the seed sweep reaches feet on either side of the span).",
+    steps: ['טרפז ABCD', 'AE גובה'],
+    check(fig) {
+      allStepsOk(fig);
+      const [a, d, c, e] = ['A', 'D', 'C', 'E'].map((id) => at(fig, id));
+      // the height itself: E on the line DC, AE ⟂ DC
+      const dc = { x: c.x - d.x, y: c.y - d.y };
+      const L = Math.hypot(dc.x, dc.y);
+      expect(Math.abs(dc.x * (e.y - d.y) - dc.y * (e.x - d.x)) / L, 'E on the line DC').toBeLessThan(1e-6);
+      expect(Math.abs(dc.x * (e.x - a.x) + dc.y * (e.y - a.y)) / L, 'AE ⟂ DC').toBeLessThan(1e-6 * Math.max(1, dist(a, e)));
+      const t = (dc.x * (e.x - d.x) + dc.y * (e.y - d.y)) / (L * L);
+      const ext = buildScene(fig.construction, fig.positions).extensions;
+      if (t >= -1e-6 && t <= 1 + 1e-6) {
+        expect(ext, 'a foot ON its side draws no extension').toEqual([]);
+      } else {
+        const end = t < 0 ? d : c;
+        expect(ext, 'one dashed stretch').toHaveLength(1);
+        expect(dist(ext[0].a, end), 'from the side’s nearer end').toBeLessThan(1e-6);
+        expect(dist(ext[0].b, e), 'out to the foot').toBeLessThan(1e-6);
+      }
     },
   },
 ];

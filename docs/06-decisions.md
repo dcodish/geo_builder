@@ -15657,3 +15657,32 @@ A list beginning at **(3)**, with no (1) and no (2) anywhere on screen, introduc
 - A line that puts a right triangle at a named vertex together with other facts now reads as one numbered list from (1) — «(1) משולש ABC  (2) ∠ABC = 90°  (3) AB = 4» — instead of two prose instructions followed by a list that starts at (3).
 - «משולש ABC ישר זווית ב-B» on its own now shows the same two lines as a numbered list, «(1) משולש ABC  (2) ∠ABC = 90°», rather than as a sentence. Same two lines, same teaching.
 - Nothing else changes: the same lines are refused, the same lines build, and the plain split list is word for word what it was.
+
+
+## ADR-612 — An off-ink construction point gets its carrying line extended, dashed, to meet it (#1971, #1937)
+
+**Status:** accepted · 2026-10-10 · bug (P3, 2-D + analytic) · fix round #1983 (stream A) · branch `fix/1937-dashed-extension` · implements the cross-product rule [ADR-W-124](06w-decisions-workspace.md#adr-w-124) · analytic twin [ADR-AG-255](06c-decisions-analytic.md#adr-ag-255)
+**Requirements:** [02](02-requirements.md) FR-RN-15 — a construction point beyond the drawn piece of its line gets that line drawn on, dashed, to it (Ruled change — display) · **Design:** [04](04-design.md) § "An off-ink construction point's dashed extension" · **LADDER stage:** none (render-time decoration; no engine, solver or ladder change)
+
+**The rulings.** On 2026-10-10 (#1971), option A: *extend the side, dashed, out to the foot*, and the generalisation: *"any construction point that lands off the drawn ink gets the carrying line extended, dashed, to meet it."* The 2026-10-09 ruling on #1937 (*"Lines, and show why"*) is the case it generalises.
+
+**Measured before** (`origin/main` @ `e0f4260c`, `driveThroughGate` → `replay` → `buildScene`). «טרפז ABCD» · «AE גובה» puts E at (0, 4) while DC runs D(1,4) → C(4.6,4), and nothing is drawn between D and E. 2-D does NOT clip the foot. The issue asked this to be measured first, and parity holds with analytic, so both tools change. «משולש ABC» · «זווית B = 120» · «AD גובה» does the same past B.
+
+**Class (docs/17 §1).** *A point the construction defines on a line through two named points is drawn wherever the givens put it, and nothing connects it to the drawn ink when it lands beyond that ink.* The members are a height's foot, a segment point placed past an end, a crossing of two lines past their segments, and a line-object crossing on a `through` line.
+
+**Decision.**
+1. **Decoration, not an object.** The extension has no id and no letter, is never a fact, and is recomputed for every configuration. Whether a foot lands beyond its side depends on the configuration, and a free trapezoid can move it inside on «הציגו תצורה אחרת». As a dependency-graph object it would need a lowering and a replay identity, and it would have to vanish when the point moves inside. The decision is taken once for 2-D and analytic.
+2. **Which lines: the engine.** `src/engine/carryingLines.ts` `carryingLines` is an exhaustive switch over `GeoPointKind`. It covers `foot`, `on-segment`, `on-segment-solved` and `midpoint` (their two points), `line-line-intersection` (both pairs), and `line-intersection`, `on-line` and `line-circle` (a `through` line's two points). Shape vertices, circle points and centres carry none. A new point kind must answer it, or the build fails.
+3. **When: the shared geometry.** `shell/offInk.ts` `offInkExtensions` decides. A point inside its carrier's span gets nothing. A point beyond it gets the stretch from the span's nearer end, minus the ink already drawn along that line. A point not on its carrier in this configuration gets nothing. `buildScene` passes the drawn points, the segments and the visible lines (a polygon is never stroked here), and publishes `Scene.extensions`. `Figure.tsx` draws each one dashed in the segment colour, with no hit-target.
+
+**Measured after.** The trapezoid draws one dashed stretch from D(1,4) to E(0,4). The obtuse triangle draws one from B to D. «משולש שווה צלעות ABC» · «AD גובה» draws none. «קטע AB» · «E על המשך AB» draws none, because BE is already drawn. A convex «מרובע ABCD» · «אלכסוני המרובע נפגשים בנקודה O» draws none.
+
+**What the student sees.**
+- `[asked]` A height's foot beyond its side has the side extended, dashed, out to it, and so does any other construction point that lands off the drawn ink.
+- `[2-D]` A foot on its side, and the convex diagonal meet, are unchanged.
+
+**Sibling audit.** Analytic has the same class and changes with this one ([ADR-AG-255](06c-decisions-analytic.md#adr-ag-255)). 3-D has it too: its trapezoid foot lands past D with nothing drawn. That is filed as #1984 (`needs-operator`, proposed P3), because 3-D already uses dashing to mean "hidden behind a face". There is no parity row: the verdicts agree in all three builders, and the gap is in display, which has no lock yet (docs/22 §10).
+
+**Cost.** One pass over the carriers per scene build, O(carriers × drawn ink). No replay or solver change.
+
+**Locks.** `src/__tests__/issue-1971-off-ink-extension.test.ts` holds the trapezoid, the obtuse triangle, a foot on its side, an extension point the ink already reaches, the convex diagonal meet, a six-seed check that a stretch exists exactly when E is beyond DC, and the `carryingLines` table. The scenario `height-foot-beyond-side-dashed-1971` is in `scenarios-corpus-4.ts`, swept over every shown seed. `shell/__tests__/offInk.test.ts` holds the geometry.

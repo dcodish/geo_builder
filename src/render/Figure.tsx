@@ -631,6 +631,28 @@ export function Figure({
             );
           })}
 
+          {/* #1971/#1937 (ADR-612): a construction point off the drawn ink — a height's foot beyond its side's end —
+              gets its carrying line extended, DASHED, out to it. Decoration: no id, no hit-target, no menu. */}
+          {scene.extensions.map((ex, i) => {
+            const a = transform.toScreen(ex.a);
+            const b = transform.toScreen(ex.b);
+            return (
+              <line
+                key={`ext-${i}`}
+                data-role="extension"
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke="#334155"
+                strokeWidth={stroke}
+                strokeLinecap="round"
+                strokeDasharray={`${6 / view.zoom} ${5 / view.zoom}`}
+                pointerEvents="none"
+              />
+            );
+          })}
+
           {/* Shapes are drawn as outlines only: every edge is a `segment`, so the
               figure is just its lines. Polygons stay in the scene (for future
               hit-testing) but are not filled or stroked. A selected fact is shown

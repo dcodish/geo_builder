@@ -188,7 +188,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * This loop and `isKnowledge` used to advance the seed by different rules, so the panel could
    * report on a configuration the canvas never drew. One sampler now answers both — and it also
    * prefers a configuration in which every object the student NAMED exists, which is the half the
-   * operator found: «אלכסוני המרובע נפגשים בנקודה O» has no `O` when the diagonals cross only when
+   * operator found: «אלכסוני המרובע נפגשים בנקודה O» had no `O` when the diagonals crossed only when
    * extended, and drawing that figure while another has the point is a poor choice rather than an
    * honest one.
    */
@@ -359,6 +359,12 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   facts.forEach((top, i) => {
     for (const f of factsWithin(top)) {
       if (namesObject(f) && !lineOf.has(f.id)) lineOf.set(f.id, owner[i]);
+      /*
+       * «אלכסוני המרובע נפגשים בנקודה O» names O through the ring M1 resolves (#1937, ADR-AG-255): a `meet-of` is not a
+       * naming fact, so its point had no line, the vacancy pass below skipped it, and a point that could not exist was
+       * recorded green and never drawn. The point is the sentence's, whichever spelling minted it.
+       */
+      if (f.t === 'meet-of' && !lineOf.has(f.id)) lineOf.set(f.id, owner[i]);
       // «BD קוטר» names the circle it creates without an id of its own (#1324) — the one formula M1 mints it by.
       if (f.t === 'diameter-of') {
         const id = diameterCircleId(f.a, f.b);

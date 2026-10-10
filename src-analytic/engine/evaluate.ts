@@ -21,6 +21,8 @@ import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
 import { angleAt, dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
+import { carryingLines } from './carryingLines';
+import { offInkExtensions } from '../../shell/offInk';
 import { curveByName, inDomain, isFree, objectById, type ArcDef, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type OrderSide, type Selector } from './types';
 
 export interface FigurePoint {
@@ -104,6 +106,13 @@ export interface Figure {
   /** The drawn arcs (#1622 E4) — absent on a figure built by hand, read as none. */
   arcs?: FigureArc[];
   construction: FigureConstruction[];
+  /**
+   * #1937/#1971 (ADR-AG-255) — the DASHED stretches that carry a construction point's line out to it when the point
+   * lands off the drawn ink (a height's foot beyond its side, a concave quadrilateral's diagonal meet). Decoration,
+   * like `construction`: no id, never in the fact list, recomputed per configuration. Absent on a hand-built
+   * figure, read as none.
+   */
+  extensions?: Array<{ a: Pt; b: Pt }>;
   /** Objects that do not exist at this parameter value — named, never silently dropped. */
   vacant: Vacancy[];
   /** Constraints the solve could NOT meet. Non-empty means the figure must not be shown as if it
@@ -3002,6 +3011,27 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
       }
     }
   }
+  /*
+   * #1937/#1971 (ADR-AG-255, the operator's 2026-10-09/10 rulings): an off-ink construction point gets its carrying
+   * line extended, dashed, to meet it. The lines come from the construction (`carryingLines`); the decision is the
+   * shared planar one (`shell/offInk`), over the ink this figure draws — its segments and its stated lines.
+   */
+  const placedAt = new Map(points.map((p) => [p.id, p] as const));
+  const extensions = offInkExtensions(
+    carryingLines(c).flatMap((k) => {
+      const p = placedAt.get(k.id);
+      const a = placedAt.get(k.a);
+      const b = placedAt.get(k.b);
+      return p && a && b ? [{ p, a, b }] : [];
+    }),
+    segments.map((s) => ({ a: s.a, b: s.b })),
+    curves.flatMap((cv) => {
+      if (!cv.stated || cv.curve.kind !== 'line') return [];
+      const { a, b, c: c0 } = cv.curve;
+      const nn = a * a + b * b;
+      return nn > 1e-24 ? [{ anchor: { x: (-a * c0) / nn, y: (-b * c0) / nn }, dir: { x: -b, y: a } }] : [];
+    }),
+  ).map((e) => ({ a: e.from, b: e.to }));
   const figure: Figure = {
     env,
     points,
@@ -3009,6 +3039,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
     segments,
     arcs,
     construction,
+    extensions,
     vacant,
     unsatisfied,
     // Reported as the STATED selectors (a cycled pair's ordinal is the sentence's own object), so `derive`
@@ -3121,8 +3152,9 @@ export function drawableAt(
    * The second half was found by the operator asking why a figure of his had a second answer
    * (#1083). It did not: in that configuration the point `O` — «אלכסוני המרובע נפגשים בנקודה O» —
    * was VACANT, because `A` and `C` had landed on the same side of `BD` and the diagonals crossed
-   * only when extended. ADR-AG-021 is right to leave `O` out of such a figure; what is wrong is
-   * SHOWING that figure while another one has every point the student asked for.
+   * only when extended. (ADR-AG-021 then left `O` out of such a figure; since ADR-AG-255 the diagonals are LINES and
+   * `O` exists there, drawn with its dashed extension — the preference below still governs every other vacancy.)
+   * What is wrong is SHOWING a figure with a vacancy while another one has every point the student asked for.
    *
    * A vacancy is still not an error (ADR-AG-008) — it is a preference, applied only when a better
    * configuration exists inside the budget.
@@ -3194,14 +3226,31 @@ export function drawableAt(
    * force («שיעור ה-x של Y הוא 0») stacks at every seed and is drawn from the remembered tier.
    */
   const separated = (f: Figure) => stackedPairs(f).length === 0;
-  const preferred = (f: Figure) => whole(f) && (!preferSpread || (spread(f) && separated(f)));
+  /**
+   * …and A DIAGONAL MEET THAT LIES ON BOTH DIAGONALS IS PREFERRED, never required (#1937, ADR-AG-255).
+   *
+   * The operator ruled on 2026-10-09 that «האלכסונים נפגשים» is where the diagonal LINES meet (`diagonalMeet`), so a
+   * concave quadrilateral's meet exists and is drawn with its dashed extension. Under the old SEGMENT reading
+   * (ADR-AG-021) such a configuration was VACANT, and the vacancy term above steered every figure that COULD be drawn
+   * with crossing diagonals onto one that was. That steering is kept at exactly its old strength, as a tier: a
+   * configuration whose meet needs an extension is remembered and drawn only when nothing inside the walk has the
+   * diagonals crossing. So a figure HEAD drew with its diagonals crossing — the operator's own kite (#1083), whose C
+   * the panel reads as (−5, −5) — is drawn and judged as before, and only a figure with NO crossing configuration
+   * (the #1937 concave ring) changes: from a missing O to O with its extension. Both callers apply it, as they
+   * applied the vacancy it replaces.
+   */
+  const meetsOnDiagonals = (f: Figure) => diagonalMeetsCross(c, f);
+  const wholeOn = (f: Figure) => whole(f) && meetsOnDiagonals(f);
+  const preferred = (f: Figure) => wholeOn(f) && (!preferSpread || (spread(f) && separated(f)));
 
   const first = evaluate(c, seed);
   let chosen = first;
   // The tiers, weakest last: a whole SEPARATED figure beats a whole stacked one, which is merely narrow
   // or stacked but still beats one with a vacancy, which still beats one that fails a selector outright.
-  let wholeSeparated: Figure | null = whole(first) && (!preferSpread || separated(first)) ? first : null;
-  let wholeFallback: Figure | null = whole(first) ? first : null;
+  let wholeSeparated: Figure | null = wholeOn(first) && (!preferSpread || separated(first)) ? first : null;
+  let wholeFallback: Figure | null = wholeOn(first) ? first : null;
+  // #1937: whole, but a diagonal meet sits on the diagonals' extension — drawn only if no crossing figure turns up.
+  let wholeExtended: Figure | null = whole(first) ? first : null;
   let fallback: Figure | null = first.selectorsOk ? first : null;
   /**
    * A DETERMINED figure that is whole but narrow has nowhere to walk TO (ADR-AG-144): with no freedom
@@ -3255,15 +3304,17 @@ export function drawableAt(
         fallback = candidate;
         wholeFallback = candidate;
         wholeSeparated = candidate;
+        wholeExtended = candidate;
         break;
       }
-      if (!wholeSeparated && whole(candidate) && (!preferSpread || separated(candidate))) wholeSeparated = candidate;
-      if (!wholeFallback && whole(candidate)) wholeFallback = candidate;
+      if (!wholeSeparated && wholeOn(candidate) && (!preferSpread || separated(candidate))) wholeSeparated = candidate;
+      if (!wholeFallback && wholeOn(candidate)) wholeFallback = candidate;
+      if (!wholeExtended && whole(candidate)) wholeExtended = candidate;
       // Second best: the selectors hold and something the student named is missing. Remembered, so a
       // figure with a vacancy still beats one that fails a selector outright.
       if (!fallback && candidate.selectorsOk) fallback = candidate;
     }
-    if (!preferred(chosen)) chosen = wholeSeparated ?? wholeFallback ?? fallback ?? chosen;
+    if (!preferred(chosen)) chosen = wholeSeparated ?? wholeFallback ?? wholeExtended ?? fallback ?? chosen;
     if (!whole(chosen)) {
       const forced = [...crossedIn].filter(([id, n]) => n >= FORCED_RING_FLOOR && !simpleSomewhere.has(id)).map(([id]) => id);
       /**
@@ -3280,6 +3331,33 @@ export function drawableAt(
   perSeed.set(key, chosen);
   return chosen;
 }
+/**
+ * Does every diagonal meet in this figure lie ON both of its diagonals (#1937, ADR-AG-255)? Closed, relative — the
+ * interval ADR-AG-021 used, kept as the PREFERENCE `drawableAt` applies now that the meet is read on the lines.
+ */
+function diagonalMeetsCross(c: Construction, f: Figure): boolean {
+  const at = (id: Id) => f.points.find((p) => p.id === id);
+  for (const o of c.objects) {
+    if (o.kind !== 'derived' || o.rule.t !== 'diagonals') continue;
+    const m = at(o.id);
+    if (!m) continue;
+    const [a, b, cc, d] = o.rule.v.map(at);
+    if (!a || !b || !cc || !d) continue;
+    for (const [p, q] of [
+      [a, cc],
+      [b, d],
+    ] as const) {
+      const dx = q.x - p.x;
+      const dy = q.y - p.y;
+      const n2 = dx * dx + dy * dy;
+      if (!(n2 > 1e-24)) continue;
+      const t = ((m.x - p.x) * dx + (m.y - p.y) * dy) / n2;
+      if (t < -1e-9 || t > 1 + 1e-9) return false;
+    }
+  }
+  return true;
+}
+
 /**
  * When two INDEPENDENT solves have found the same answer (#1083).
  *

@@ -440,7 +440,8 @@ From the «lines and points» corpus (§8), numbered onward.
 
 **R62 — a diagonal is an object, and a concurrency point has a verb**. Vertices are optional when the figure has one shape to mean, refused otherwise.
 - «אלכסוני המרובע ABCD נפגשים בנקודה O» ≡ «O מפגש האלכסונים במרובע ABCD»
-- Sources: ADR-AG-037, ADR-AG-182.
+- The diagonals MEET where their LINES cross, as in the 2-D tool (operator ruling 2026-10-09, #1937). On a concave quadrilateral O is drawn outside the shape, with the diagonal extended, dashed, out to it (R176). Both spellings give the same verdict and the same O. A figure that can be drawn with its diagonals crossing is still drawn that way.
+- Sources: ADR-AG-037, ADR-AG-182, ADR-AG-255.
 
 **R75 — naming a shape draws it**. With its noun's givens, absorbed if already there; «שטח ABC הוא 6» draws nothing.
 - «שטח המשולש ABC הוא 7» → the triangle drawn
@@ -824,6 +825,10 @@ a sentence the tool parsed.
 - «AB = 3a» → «3a»
 - **⚠ Ruled to change (2026-10-07, ADR-W-118 B2 · #1805):** a stated equality draws no mark at rest; it stays in the givens list, and is drawn only in an opt-in relations layer. The text below describes the code until that ships. A stated equality marks both members: «AB = AC» one tick on each, «∢ABC = ∢ACB» one arc on each; a second equality class draws two.
 - Sources: ADR-AG-225, #1714, ADR-W-047, #1241, ADR-AG-237, #1806, ADR-W-118, #1805, #1865, #1733, ADR-AG-228.
+
+**R176 — a construction point off the drawn ink gets its line extended, dashed, to meet it, as in the 2-D tool**. *(Operator rulings 2026-10-09 and 2026-10-10: "Lines, and show why".)* A point the construction puts on a line through two named points (a height's foot, a diagonal meet, a crossing) that lands beyond the drawn piece gets that line drawn on, dashed, from the end of the ink out to it. A point on the drawn piece gets nothing.
+- «טרפז ABCD» · «AE גובה» with E past D → DC extended, dashed, from D to E
+- Sources: ADR-AG-255, ADR-W-124, #1937, #1971.
 
 **R25a — the object the student asked for is ON SCREEN**. A collapsed trace does not widen the frame, and the frame stays put across «הציגו תצורה אחרת» (ADR-AG-137).
 - *"fit once, then the frame is the student's"*
