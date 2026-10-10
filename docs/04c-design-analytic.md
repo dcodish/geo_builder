@@ -799,12 +799,21 @@ re-attributes a fault that appeared to the submitted line, so the ring-first ord
 
 ### A forced coincidence is refused; a configuration-dependent one is not ([ADR-AG-125](06c-decisions-analytic.md#adr-ag-125))
 
-A crossing on an existing point is refused by position only when no configuration separates them (the vacancy
-predicate, in `derive`). Structurally, in `parseIntersection` ([ADR-AG-116](06c-decisions-analytic.md#adr-ag-116),
+A crossing on an existing point is refused by position only when no configuration separates them. Structurally, in
+`parseIntersection` ([ADR-AG-116](06c-decisions-analytic.md#adr-ag-116),
 [ADR-AG-140](06c-decisions-analytic.md#adr-ag-140)): one shared letter is `crossing-already-named`, both letters
 `self-crossing`.
 
-*Identifiers:* `SOLVE_TOL`
+**The positional arm reads the PAIR's freedom, never the figure's** ([ADR-AG-254](06c-decisions-analytic.md#adr-ag-254), #1938).
+It used to borrow the vacancy pass's whole-figure predicate (`reportedDof === 0`), which leaked exactly as the ring arm's
+copy did (#1929): one unrelated free point left the figure 1–2 DOF and a second name was minted onto an existing point,
+green. `evaluate` gives every figure `Figure.separationDof(a, b)` = `freedomOf(c, sys, x, read)` with `read` = the
+separation `b − a` — lazy, memoised per unordered pair, non-enumerable, like `RingFault.ringDof` — and `derive` asks it
+only of a pair it has already found within `near`, so a figure with no coincidence ranks nothing. `0` is "forced
+together"; `> 0` and `undefined` (unplaceable) both keep the silence, because a false refusal is the worse defect.
+On a determined figure it is 0 for every pair, so every figure this already refused is refused identically.
+
+*Identifiers:* `SOLVE_TOL` · `separationDof` · `freedomOf`
 
 ## Knowledge gates
 

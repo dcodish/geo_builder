@@ -137,6 +137,20 @@ export interface Figure {
   forcedCrossed?: Id[];
   /** Freedom the OBJECT carriers still have after the constraints — what the DOF cue reports. */
   carrierDof: number;
+  /**
+   * ARE THESE TWO POINTS FORCED ONTO ONE SPOT? (#1938, ADR-AG-254) — the freedom of the SEPARATION
+   * `b − a` along the constraints, by {@link freedomOf}: `0` means no configuration the givens allow
+   * can move them apart, so a coincidence here is a coincidence for ever. A freedom ELSEWHERE in the
+   * figure (an unrelated free point) cancels out of it, which is the whole reason it exists.
+   *
+   * `undefined` is UNMEASURED — one of the two cannot be placed nearby — and must be read as "not
+   * proven forced", never as "forced": the false refusal is the worse defect (ADR-AG-249's rule).
+   *
+   * **Lazy, memoised per pair, non-enumerable**, exactly like `RingFault.ringDof` and for the same
+   * reason (#1874): a rank is paid only for a pair some caller actually asks about, and a figure
+   * still compares and serialises as the fields it always had. Absent on a figure built by hand.
+   */
+  separationDof?: (a: Id, b: Id) => number | undefined;
   /** Per point: what the student's OWN givens fix about it — the canvas label (#1032). */
   provenance: Record<Id, PointProvenance>;
   /** The register symbols some object or constraint reads (#1343) — the ones a configuration is made of. */
@@ -740,6 +754,38 @@ function withRingDof(rf: RingFault, c: Construction, sys: CarrierSystem, x: numb
     },
   });
   return rf;
+}
+
+/**
+ * A FIGURE CAN SAY WHETHER TWO OF ITS POINTS ARE FORCED TOGETHER (#1938, ADR-AG-254) — {@link Figure.separationDof}.
+ *
+ * `read` is the separation `b − a`, so `freedomOf` answers about THAT pair and an unrelated freedom cancels out: the
+ * question a coincidence refusal has always been asking («if P and B must be on the same location … it should be
+ * refused», the operator's 2026-09-20 T18 ruling) rather than the whole figure's DOF, which only ever approximated it.
+ *
+ * Lazy, memoised per unordered pair and non-enumerable, like {@link withRingDof} and for the same reasons (#1874): a
+ * figure that nothing asks pays nothing, `drawableAt`'s discarded candidates pay nothing, and a figure still compares
+ * and serialises as the fields it always had.
+ */
+function withSeparationDof(f: Figure, c: Construction, sys: CarrierSystem, x: number[]): Figure {
+  const memo = new Map<string, number | undefined>();
+  Object.defineProperty(f, 'separationDof', {
+    enumerable: false,
+    value: (a: Id, b: Id): number | undefined => {
+      const key = a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
+      if (!memo.has(key)) {
+        const dof = freedomOf(c, sys, x, (pos) => {
+          const p = pos.get(a);
+          const q = pos.get(b);
+          // A point this configuration cannot place is UNMEASURED, never "held" — `freedomOf`'s own rule.
+          return p && q ? [q.x - p.x, q.y - p.y] : [Number.NaN, Number.NaN];
+        });
+        memo.set(key, dof === null ? undefined : dof);
+      }
+      return memo.get(key);
+    },
+  });
+  return f;
 }
 
 /**
@@ -2956,7 +3002,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
       }
     }
   }
-  return {
+  const figure: Figure = {
     env,
     points,
     curves,
@@ -2990,6 +3036,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed): Figur
       points.map((p) => [p.id, provenanceOf(c, p.id, env, curves) ?? { x: { known: false }, y: { known: false } }]),
     ),
   };
+  return withSeparationDof(figure, c, sys, [...solvedVec]);
 }
 
 // ---------------------------------------------------------------------------
