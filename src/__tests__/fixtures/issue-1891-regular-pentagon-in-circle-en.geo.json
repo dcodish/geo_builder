@@ -1,0 +1,99 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "en",
+  "savedAt": "2026-10-10T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "regular pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "freeRadius": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "regular pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O",
+        "theta": 1.5707963267948966
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "regular pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O",
+        "theta": 2.827433388230814
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.3",
+      "utterance": "regular pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O",
+        "theta": 4.084070449666731
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.4",
+      "utterance": "regular pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-O",
+        "theta": 5.340707511102648
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.5",
+      "utterance": "regular pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "E",
+        "circle": "circle-O",
+        "theta": 6.5973445725385655
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.6",
+      "utterance": "regular pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "polygon",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E"
+        ]
+      },
+      "enabled": true
+    }
+  ]
+}

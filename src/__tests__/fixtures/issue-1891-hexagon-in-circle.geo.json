@@ -1,0 +1,118 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-10T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "משושה ABCDEF חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "freeRadius": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "משושה ABCDEF חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O",
+        "theta": 1.5707963267948966,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "משושה ABCDEF חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O",
+        "theta": 2.4814028930528074,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.3",
+      "utterance": "משושה ABCDEF חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O",
+        "theta": 3.4466458532861926,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.4",
+      "utterance": "משושה ABCDEF חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-O",
+        "theta": 4.466525207495053,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.5",
+      "utterance": "משושה ABCDEF חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "E",
+        "circle": "circle-O",
+        "theta": 5.541040955679389,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.6",
+      "utterance": "משושה ABCDEF חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "F",
+        "circle": "circle-O",
+        "theta": 6.670193097839198,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.7",
+      "utterance": "משושה ABCDEF חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "polygon",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E",
+          "F"
+        ]
+      },
+      "enabled": true
+    }
+  ]
+}

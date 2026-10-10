@@ -1,0 +1,104 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "en",
+  "savedAt": "2026-10-10T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "freeRadius": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O",
+        "theta": 1.5707963267948966,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O",
+        "theta": 2.66352420630439,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.3",
+      "utterance": "pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O",
+        "theta": 3.838206676777095,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.4",
+      "utterance": "pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-O",
+        "theta": 5.0948437382130125,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.5",
+      "utterance": "pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "E",
+        "circle": "circle-O",
+        "theta": 6.433435390612141,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.6",
+      "utterance": "pentagon ABCDE inscribed in a circle",
+      "group": "g0",
+      "cmd": {
+        "type": "polygon",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E"
+        ]
+      },
+      "enabled": true
+    }
+  ]
+}

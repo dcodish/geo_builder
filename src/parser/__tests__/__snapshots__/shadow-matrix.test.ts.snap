@@ -1722,6 +1722,26 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "regular pentagon ABCDE inscribed in a circle",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "מחומש משוכלל ABCDE חסום במעגל",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "pentagon ABCDE inscribed in a circle",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "מחומש ABCDE חסום במעגל",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "en",
     "text": "cyclic quadrilateral ABCD",
     "winner": "inscribedPolygon",
   },

@@ -5447,6 +5447,137 @@ const isCircleInPolygon = (s: string): boolean => {
   return circIdx >= 0 && polyIdx >= 0 && circIdx < polyIdx;
 };
 
+/**
+ * The vocabulary an INSCRIPTION sentence sits in — stripped before the subject's labels are read.
+ * ONE spelling, shared by `inscribedPolygon`'s bare-run branch and its n-gon branch (#1891; docs/17 §3).
+ */
+const INSCRIBED_STRIP =
+  /inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך|\bin\b|\ba\b|\bthe\b/gi;
+
+/**
+ * The vertex count an n-gon NOUN states: the English table, the Hebrew table, or an `n-gon` form —
+ * never a fourth spelling (docs/17 §3). Read by `regularPolygon` and by `inscribedPolygon`'s n-gon
+ * branch, so the arity a sentence states cannot differ between "regular pentagon ABCDE" and
+ * "regular pentagon ABCDE inscribed in a circle" (#1891).
+ */
+function ngonArity(s: string): number | null {
+  for (const [name, k] of Object.entries(POLY_NAME_N)) if (new RegExp(String.raw`\b${name}\b`, 'i').test(s)) return k;
+  for (const [name, k] of Object.entries(HE_POLY_NAME_N)) if (s.includes(name)) return k;
+  const g = s.match(/\b(\d+)\s*-?\s*gon\b/i);
+  return g ? parseInt(g[1], 10) : null;
+}
+
+/**
+ * THE n-gon-on-a-circle scaffold (n ≥ 5), emitted in ONE place for every caller: the circle, one
+ * `point-on-circle` per vertex, the ring. Both `regularPolygon` (an undrawn circumscribing circle) and
+ * `inscribedPolygon`'s n-gon branch (a DRAWN one) lower through it.
+ *
+ * #1891 ([ADR-610](../../docs/06-decisions.md#adr-610)): this was `regularPolygon`'s private tail, and the
+ * inscribed reading did not exist — every «מחומש ABCDE חסום במעגל» escalated, a model answered with the bare
+ * noun, and the hidden scaffold circle then "accounted for" the stated «מעגל» in the object gate, so the
+ * figure committed GREEN WITH NO CIRCLE. A second copy of this lowering is how such a divergence becomes
+ * invisible, so there is one.
+ *
+ * `regular` is the ONE behavioural difference: a regular n-gon is rigid up to similarity, so its θ are
+ * PINNED at the equal 360/n spacing; a plain one states nothing about its vertex angles, so the same spread
+ * is only a STARTING position and the θ stay FREE — «הציגו תצורה אחרת» re-samples the ring's shape
+ * ([ADR-052](../../docs/06-decisions.md#adr-052)), exactly as `CYCLIC_QUAD_ANGLES` does for a general
+ * cyclic quad. `hidden` is the inscribed-vs-cyclic distinction, never a property of the caller.
+ */
+function ringOnCircle(opts: {
+  ids: Id[];
+  center: string;
+  r: ReturnType<typeof parseRadius>;
+  named: boolean;
+  regular: boolean;
+  hidden: boolean;
+  /** An EXISTING circle to put the ring on: no `circle` command is emitted, so a radius already stated on
+   *  it is not silently reset to a free one (§6 honesty — the 3-/4-gon path's `bound` branch). */
+  existing?: Id;
+}): AnyCommand[] {
+  const { ids, center, r, named, regular, hidden, existing } = opts;
+  const n = ids.length;
+  const circ = circleId(existing ?? center);
+  const cmds: AnyCommand[] = existing
+    ? []
+    : [
+        {
+          type: 'circle',
+          id: circ,
+          center: up(center),
+          radius: r.radius,
+          ...piDeclared(r),
+          ...(r.numeric ? {} : { freeRadius: true }), // an unstated size is a free DOF (ADR-052)
+          ...(hidden ? { hidden: true } : {}),
+          ...(named ? {} : { autoCenter: true }),
+        },
+      ];
+  const degs = regular ? Array.from({ length: n }, (_, i) => 90 + (360 * i) / n) : cyclicSpread(n);
+  ids.forEach((id, i) => {
+    cmds.push({ type: 'point-on-circle', id, circle: circ, theta: (degs[i] * Math.PI) / 180, ...(regular ? {} : { free: true }) });
+  });
+  cmds.push({ type: 'polygon', ids });
+  return cmds;
+}
+
+/**
+ * A CONVEX but IRREGULAR default spread of n vertices around the circle (n ≥ 5) — the generalisation of
+ * {@link CYCLIC_QUAD_ANGLES} to n sides (#1891).
+ *
+ * Two properties, each load-bearing:
+ *  - **Convex ORDER.** The gaps are all positive and sum to exactly 360°, so the vertices go once round the
+ *    circle in ring order and A→B→…→A is a proper simple n-gon, never a crossed one. This is the same
+ *    reason the quad's spread is ordered rather than a golden-angle one, which interleaved its vertices.
+ *  - **UNEQUAL gaps.** A chord grows monotonically with its central angle, so strictly increasing gaps give
+ *    n strictly different sides. The equal 360/n spread would draw a REGULAR n-gon, which silently asserts
+ *    equal sides and equal angles the student never stated ([ADR-052](../../docs/06-decisions.md#adr-052)) —
+ *    exactly the «מרובע ABCD חסום במעגל»-draws-a-square trap `CYCLIC_QUAD_ANGLES` exists to avoid, and
+ *    exactly what the operator's ruling asks for ("a visible circle with five free vertices on it, **unequal
+ *    sides**, re-samplable").
+ *
+ * It is only a STARTING position: every θ this feeds is `free`, so «הציגו תצורה אחרת» re-samples the ring.
+ */
+const cyclicSpread = (n: number): number[] => {
+  const w = Array.from({ length: n }, (_, i) => 1 + (0.3 * i) / (n - 1)); // strictly increasing, all positive
+  const total = w.reduce((a, b) => a + b, 0);
+  let at = 90; // from the top, as the regular spread is
+  return w.map((g) => {
+    const deg = at;
+    at += (360 * g) / total;
+    return deg;
+  });
+};
+
+/** Every vertex of the ring is already in the figure. */
+const ringAllExist = (ctx: ParseContext, ids: Id[]): boolean => ids.every((id) => (ctx.points ?? []).includes(id));
+
+/**
+ * The EXISTING circle an inscription must BIND its vertices to instead of creating one of its own: the
+ * student's named circle the figure already has, or an unnamed definite reference. Never when the vertices
+ * already exist, and never when a radius is STATED — binding then would silently drop the stated size
+ * (§6 honesty; #53 owns the size-given-on-an-inscribe reading).
+ *
+ * #1891: ONE spelling, so an n-gon cannot re-declare a circle the figure already has — which would reset
+ * its radius to a free one — while a quad correctly binds to it.
+ */
+function boundInscribeCircle(s: string, ctx: ParseContext, ids: Id[], named: string | null, r: ReturnType<typeof parseRadius>): Id | null {
+  const namedExisting = named != null && (ctx.circles ?? []).some((c) => up(c) === up(named)) ? up(named) : null;
+  return namedExisting ?? (ringAllExist(ctx, ids) || r.numeric || r.symbolic ? null : existingCircleRef(s, ctx));
+}
+
+/**
+ * The circle these vertices ALREADY ride, when RE-inscribing them must REUSE it
+ * ([ADR-156](../../docs/06-decisions.md#adr-156), #462): re-issuing «מרובע ABCD חסום במעגל» must not mint a
+ * second circle with a fresh auto-centre on the same circumcentre (the "O and P on the same point" bug).
+ *
+ * #1891: measured at pickup — the n-gon branch minted `circle-P` on top of `circle-O` on the second
+ * «מחומש ABCDE חסום במעגל» until it asked this question too. One spelling, both paths.
+ */
+function reusedInscribeCircle(ctx: ParseContext, ids: Id[], named: string | null): Id | null {
+  const onCircle = circleContaining(ctx, ids, named);
+  return ringAllExist(ctx, ids) && onCircle && (!named || up(named) === up(onCircle)) ? up(onCircle) : null;
+}
+
 /** The ring sizes whose INCIRCLE 2-D draws (a triangle, a tangential quadrilateral — Pitot). */
 const INCIRCLE_ARITIES = new Set([3, 4]);
 
@@ -5477,6 +5608,51 @@ function uninscribableIncircle(s: string): number | null {
   return circleInside ? sides : null;
 }
 
+/**
+ * #1891 ([ADR-610](../../docs/06-decisions.md#adr-610)) — an n-gon of FIVE OR MORE sides inscribed in a
+ * circle: «מחומש ABCDE חסום במעגל», «מחומש משוכלל ABCDE חסום במעגל», «משושה ABCDEF בר חסימה», the English
+ * twins and the `n-gon` forms. Returns null when the sentence names no n-gon noun, so the 3-/4-gon path
+ * below is untouched.
+ *
+ * Operator rulings 2026-10-09: *"Show the circle."* (the regular n-gon's scaffold circle IS its
+ * circumcircle, so «חסום במעגל» draws it — it committed green with no circle) and *"Build it too."* (the
+ * plain n-gon inscribed in a circle draws the circle and places n free vertices on it, as «מרובע ABCD חסום
+ * במעגל» already does for four — one sentence shape must not give a circle for the regular noun and a
+ * refusal for the plain one).
+ */
+function inscribedNgon(s: string, ctx: ParseContext, hidden: boolean): AnyCommand[] | 'stop' | null {
+  const n = ngonArity(s);
+  if (n === null || n < 5) return null; // not an n-gon subject — the 3-/4-gon readings own the line
+  const regular = /\bregular\b|משוכלל/i.test(s) || /\b\d+\s*-?\s*gon\b/i.test(s);
+  const r = parseRadius(s);
+  const named = circleCenter(s);
+  // The subject's labels are what is LEFT after the polygon phrase and the inscription vocabulary go —
+  // both existing strip lists, neither re-spelled here.
+  let rest = dropCircleRef(s).replace(POLY_STRIP, ' ').replace(INSCRIBED_STRIP, ' ');
+  if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
+  // The radius is read, so neither its symbol nor its value is leftover — the 3-/4-gon path's own treatment
+  // (ADR-034, #54, #497). Without it «מחומש ABCDE חסום במעגל שרדיוסו 5» refused a line its 4-gon twin reads.
+  if (r.symbolic) rest = rest.replace(new RegExp(String.raw`\b[Rr]\b${r.sym && !/^[Rr]$/.test(r.sym) ? String.raw`|\b${r.sym}\b` : ''}`, 'g'), ' ');
+  rest = stripConsumedNumber(rest, r.numeric);
+  // The named vertices, or — «מחומש משוכלל חסום במעגל», unlabelled, n known from the noun — auto-named.
+  const ids =
+    labelRun(rest, n) ??
+    (!namesVertices(rest) && !shapeLeftover(rest) ? autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])]) : null);
+  if (!ids) return null;
+  if (shapeLeftover(removeClaimed(rest, ids))) return 'stop'; // a second statement rides the line — escalate
+  // The two existing-circle questions the 3-/4-gon path asks, asked here through the SAME readers.
+  const reused = reusedInscribeCircle(ctx, ids, named);
+  if (reused) {
+    // ADR-156 / #462: a clean RE-ENTRY — the ring plus idempotent membership, minting nothing.
+    return [{ type: 'polygon', ids }, ...ids.map((id): AnyCommand => ({ type: 'point-on-circle', id, circle: circleId(reused) }))];
+  }
+  const existing = boundInscribeCircle(s, ctx, ids, named, r) ?? undefined;
+  const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
+  // «בר-חסימה» / "cyclic" / "inscribable" keeps the circle HIDDEN — the vertices are concyclic and the circle
+  // is not drawn — exactly as it does for a triangle or a quad at HEAD. «חסום» / "inscribed" draws it.
+  return ringOnCircle({ ids, center, r, named: named != null, regular, hidden, existing });
+}
+
 /** "triangle ABC inscribed in circle O" / "טרפז ABCD חסום במעגל" — circle + on-circle vertices + edges. */
 const inscribedPolygon: Rule = (s, ctx) => {
   if (!/inscrib\w*|חסום|בר[\s-]?חסימה|\bcyclic\b|concyclic/i.test(s)) return null; // inscribed / inscribable / cyclic / בר-חסימה
@@ -5485,6 +5661,14 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // 180°), but the circumscribing circle is NOT drawn — only the polygon. (vs "inscribed"/"חסום",
   // which draws the circle.)
   const hidden = /בר[\s-]?חסימה|\bcyclic\b|concyclic|inscribable/i.test(s);
+  // #1891 (ADR-610): an n-gon SUBJECT (five sides or more) — «מחומש ABCDE חסום במעגל»,
+  // «מחומש משוכלל ABCDE חסום במעגל», "regular 7-gon ABCDEFG inscribed in a circle". Asked BEFORE the
+  // shape-phrase reader, whose lexicon stops at the 3- and 4-gon nouns: this rule used to cap its subject at
+  // four sides (`INSCRIBED_KIND`, the generic branch's own "or a 5+-gon, which this rule can't lower", and a
+  // bare run read as 3 or 4), so every n-gon inscription escalated. The arity is the ONE n-gon reader and the
+  // lowering the ONE scaffold emitter, so the regular and inscribed readings cannot drift apart.
+  const ngon = inscribedNgon(s, ctx, hidden);
+  if (ngon) return ngon;
   // #1790 (ADR-595): the shape is read by the ONE shape-phrase reader — the noun decides the arity, an
   // adjective only modifies the noun. This used to be a private ladder that tested «ישר זווית» BEFORE the
   // noun, so «טרפז ישר זווית חסום במעגל» built a right TRIANGLE. A right triangle inscribed in a circle IS
@@ -5517,10 +5701,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
     // No explicit shape word ("ABCD חסום במעגל" / "ABCD בר חסימה") — infer from a bare label
     // run: 4 letters ⇒ quadrilateral, 3 ⇒ triangle. Keeps the inscribed-vs-cyclic distinction
     // deterministic (drawn vs hidden circle) instead of falling through to the LLM.
-    const bare = dropCircleRef(s).replace(
-      /inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך|\bin\b|\ba\b|\bthe\b/gi,
-      ' ',
-    );
+    const bare = dropCircleRef(s).replace(INSCRIBED_STRIP, ' ');
     kind = labelRun(bare, 4) ? 'quad' : labelRun(bare, 3) ? 'triangle' : null;
   }
   if (!kind) return null;
@@ -5620,9 +5801,9 @@ const inscribedPolygon: Rule = (s, ctx) => {
   //  - a stated RADIUS excludes it: «חסום במעגל שרדיוסו 5» is also a statement about the circle's SIZE,
   //    and binding alone would silently drop it (§6 honesty). That case keeps its existing behaviour;
   //    #53 owns the size-given-on-an-inscribe reading.
-  const allExist = ids.every((id) => (ctx.points ?? []).includes(id));
-  const namedExisting = named != null && (ctx.circles ?? []).some((c) => up(c) === up(named)) ? up(named) : null;
-  const bound = namedExisting ?? (allExist || r.numeric || r.symbolic ? null : existingCircleRef(s, ctx));
+  // #1891: both existing-circle questions are the SHARED readers the n-gon branch asks too.
+  const allExist = ringAllExist(ctx, ids);
+  const bound = boundInscribeCircle(s, ctx, ids, named, r);
   if (bound != null) {
     const boundCirc = circleId(bound);
     return [
@@ -5640,8 +5821,8 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // inscribe must not mint a duplicate circumcircle with a fresh auto-centre (O→P→Q stacking on the same
   // circumcentre — the "O and P on the same point" bug). Only the shape is re-asserted (deterministic ids →
   // no duplicate). Skipped when the student named a DIFFERENT circle than the one they're on. [ADR-156]
-  const onCircle = circleContaining(ctx, ids, named);
-  if (allExist && onCircle && (!named || up(named) === up(onCircle))) {
+  const onCircle = reusedInscribeCircle(ctx, ids, named);
+  if (onCircle) {
     // #462: the reuse REFERENCES the circle it reused instead of emitting nothing for it. ADR-156 is
     // right about the outcome it defends (no stacked duplicate centres O→P→Q), but it achieved that by
     // making the lowering UNDER-REPORT the sentence — «מרובע ABCD חסום במעגל» lowered to two idempotent
@@ -5800,10 +5981,7 @@ const regularPolygon: Rule = (s, ctx) => {
     return { clarify: 'polygon-not-supported', noun: (s.match(/בעל\s*(\d+)\s*צלעות|\bwith\s+(\d+)\s+sides\b/i) ?? [])[0] ?? s.trim() };
   }
   const isRegular = /\bregular\b|משוכלל/i.test(s) || /\b\d+\s*-?\s*gon\b/i.test(s);
-  let n: number | null = null;
-  for (const [name, k] of Object.entries(POLY_NAME_N)) if (new RegExp(String.raw`\b${name}\b`, 'i').test(s)) { n = k; break; }
-  if (n === null) for (const [name, k] of Object.entries(HE_POLY_NAME_N)) if (s.includes(name)) { n = k; break; }
-  if (n === null) { const g = s.match(/\b(\d+)\s*-?\s*gon\b/i); if (g) n = parseInt(g[1], 10); }
+  let n: number | null = ngonArity(s); // the ONE n-gon noun reader (#1891)
   // #835 — the BARE-noun lane. A polygon noun with no regularity marker states an n-sided figure and
   // nothing else. For the three supported nouns that builds a GENERIC n-gon below (free vertices, no
   // equal sides/angles); for any other it is refused BY NAME here, rather than escalating to the LLM,
@@ -5853,17 +6031,10 @@ const regularPolygon: Rule = (s, ctx) => {
   ];
   if (n === 4) return [{ type: 'square', ids: [ids[0], ids[1], ids[2], ids[3]] }];
   // n ≥ 5: vertices on a HIDDEN circle at equal spacing; free radius unless a numeric one is given.
+  // #1891 (ADR-610): the lowering is THE shared scaffold emitter — `inscribedPolygon`'s n-gon branch emits
+  // the same scaffold with the circle DRAWN, and a second copy of it is how the two readings drifted apart.
   const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
-  const circ = circleId(center);
-  const cmds: AnyCommand[] = [
-    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...piDeclared(r), ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(named ? {} : { autoCenter: true }) },
-  ];
-  ids.forEach((id, i) => {
-    const deg = 90 + (360 * i) / n; // start at the top, equal 360/n spacing; theta PINNED (rigid corners)
-    cmds.push({ type: 'point-on-circle', id, circle: circ, theta: (deg * Math.PI) / 180 });
-  });
-  cmds.push({ type: 'polygon', ids });
-  return cmds;
+  return ringOnCircle({ ids, center, r, named: named != null, regular: true, hidden: true });
 };
 
 /**

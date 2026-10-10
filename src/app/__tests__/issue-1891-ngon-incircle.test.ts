@@ -94,6 +94,15 @@ describe('#1891 — the n-gon incircle is refused before the model', () => {
   });
 });
 
+/**
+ * #1891, SECOND PASS ([ADR-610](../../../docs/06-decisions.md#adr-610)) — two rows below were re-based, not relaxed.
+ * «מחומש ABCDE חסום במעגל» (the pentagon in a circle, the CIRCUM direction) escalated to the model when ADR-606
+ * shipped, so it was locked here as "still goes to the model" and as a dropped-noun gate row. The operator then
+ * ruled it BUILDS (2026-10-09, Q2: *"Build it too."*), so the line is deterministic now and the model — and with it
+ * that gate — never sees it. The rows for the lines that DO still escalate («מעגל חוסם את…», the English
+ * circumscribed form, the polygon-in-polygon) are untouched, and ADR-610's own locks assert what it now builds.
+ * The opposite direction «מעגל חסום במחומש ABCDE» keeps every refusal below.
+ */
 describe('#1891 — a model answer that keeps only a bare n-gon is refused naming what it dropped', () => {
   it('the object gate reads `place` as the n-gon\'s identity, not payload', () => {
     const bare = parse('מחומש ABCDE', {});
@@ -102,7 +111,6 @@ describe('#1891 — a model answer that keeps only a bare n-gon is refused namin
   });
   it.each([
     ['מחומש ABCDE עם אלכסונים', ['מחומש ABCDE'], 'אלכסונים'],
-    ['מחומש ABCDE חסום במעגל', ['מחומש ABCDE'], 'מעגל'],
     ['משושה ABCDEF עם אלכסונים', ['משושה ABCDEF'], 'אלכסונים'],
   ])('«%s» answered %j', async (line, answer, word) => {
     const r = await play([line], answer);
@@ -121,7 +129,7 @@ describe('#1891 — what still works', () => {
       expect(r.added).toBeGreaterThan(0);
     },
   );
-  it.each(['מחומש ABCDE חסום במעגל', 'מעגל חוסם את מחומש ABCDE', 'circle circumscribed about pentagon ABCDE', 'ריבוע DEFG חסום במחומש ABCDE'])(
+  it.each(['מעגל חוסם את מחומש ABCDE', 'circle circumscribed about pentagon ABCDE', 'ריבוע DEFG חסום במחומש ABCDE'])(
     '«%s» (no circle inside a pentagon) still goes to the model',
     async (line) => {
       const r = await play([line], []);

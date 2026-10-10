@@ -1448,6 +1448,26 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "parallelogram",
     ],
   },
+  "pentagon ABCDE inscribed in a circle": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "polygon",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "polygon",
+    ],
+  },
   "perimeter of ABC = 20": {
     "en": [
       "set-perimeter",
@@ -1581,6 +1601,26 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     ],
   },
   "regular pentagon ABCDE": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "polygon",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "polygon",
+    ],
+  },
+  "regular pentagon ABCDE inscribed in a circle": {
     "en": [
       "circle",
       "point-on-circle",

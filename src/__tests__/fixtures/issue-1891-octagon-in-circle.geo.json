@@ -1,0 +1,146 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-10T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מתומן ABCDEFGH חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "freeRadius": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "מתומן ABCDEFGH חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O",
+        "theta": 1.5707963267948966,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "מתומן ABCDEFGH חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O",
+        "theta": 2.2537512514883296,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.3",
+      "utterance": "מתומן ABCDEFGH חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O",
+        "theta": 2.965975672954339,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.4",
+      "utterance": "מתומן ABCDEFGH חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-O",
+        "theta": 3.7074695911929236,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.5",
+      "utterance": "מתומן ABCDEFGH חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "E",
+        "circle": "circle-O",
+        "theta": 4.478233006204084,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.6",
+      "utterance": "מתומן ABCDEFGH חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "F",
+        "circle": "circle-O",
+        "theta": 5.27826591798782,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.7",
+      "utterance": "מתומן ABCDEFGH חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "G",
+        "circle": "circle-O",
+        "theta": 6.107568326544132,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.8",
+      "utterance": "מתומן ABCDEFGH חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "H",
+        "circle": "circle-O",
+        "theta": 6.96614023187302,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.9",
+      "utterance": "מתומן ABCDEFGH חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "polygon",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E",
+          "F",
+          "G",
+          "H"
+        ]
+      },
+      "enabled": true
+    }
+  ]
+}

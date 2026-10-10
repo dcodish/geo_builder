@@ -3816,6 +3816,36 @@ export const SCENARIOS_4: Scenario[] = [
       expect(converse.kind === 'commit' && converse.commands.some((c) => c.type === 'circumcircle'), 'the opposite direction still draws the circle through the vertices').toBe(true);
     },
   },
+  {
+    id: 'inscribed-ngon-draws-its-circle-1891',
+    title:
+      '#1891 (ADR-610): «מחומש משוכלל ABCDE חסום במעגל» draws the regular pentagon AND its circumcircle — never green with no circle; the plain «מחומש ABCDE חסום במעגל» builds too, with unequal sides',
+    guards:
+      "Escalated out of round #1940 and ruled by the operator on 2026-10-09: Q1 \"Show the circle.\" and Q2 \"Build it too.\". Measured on e503ec52 through parse with the prefix's context: EVERY inscribed-n-gon sentence escalated \`not-handled\` — regular and plain, מחומש/משושה/מתומן, the English twins, the n-gon forms — so the model answered with the bare noun and \`regularPolygon\`'s HIDDEN scaffold circle 'accounted for' the stated «מעגל» in the object gate: the figure committed GREEN WITH NO CIRCLE. Root cause (ADR-610): \`inscribedPolygon\` capped its SUBJECT at four sides (INSCRIBED_KIND, the generic branch's own 'or a 5+-gon, which this rule can't lower', a bare run read as 3 or 4) — the reading did not exist, and the gate was only the last net, which is why ADR-430 is untouched. Fix: one arity reader and one scaffold emitter shared with \`regularPolygon\`, θ pinned for a regular subject and free for a plain one, and \`cyclicSpread\` (the generalisation of CYCLIC_QUAD_ANGLES) so the plain default is convex but NOT regular — the equal spread drew an equilateral pentagon, a default asserting a given the student never gave. The matrix (drawn vs hidden per n and language, θ, re-entry and bound-circle parity with the 3-/4-gon path, stability, the stated radius, the ADR-606 regressions) is src/parser/__tests__/issue-1891-inscribed-ngon.test.ts.",
+    steps: ['מחומש משוכלל ABCDE חסום במעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const ids = ['A', 'B', 'C', 'D', 'E'];
+      // the circle the student asked for is DRAWN, not a hidden scaffold
+      expect(fig.circles.size, 'one circle').toBe(1);
+      const circle = fig.construction.objects.find((o) => o.kind === 'circle') as undefined | { hidden?: boolean };
+      expect(circle, 'the circle is in the construction').toBeTruthy();
+      expect(circle!.hidden, 'and it is VISIBLE — this is the ruling').toBeFalsy();
+      const { center, r } = [...fig.circles.values()][0];
+      for (const id of ids) expect(dist(at(fig, id), center), id + ' is on the circle').toBeCloseTo(r, 4);
+      // regular: five equal sides
+      const sides = ids.map((id, i) => dist(at(fig, id), at(fig, ids[(i + 1) % 5])));
+      for (const len of sides) expect(len, 'the pentagon is regular').toBeCloseTo(sides[0], 4);
+      // the PLAIN twin builds too, and is NOT regular (the Q2 ruling)
+      const plain = replay(factsOf(['מחומש ABCDE חסום במעגל']));
+      expect(plain.lastError, 'the plain pentagon builds').toBe(null);
+      expect(plain.circles.size, 'with its own visible circle').toBe(1);
+      const ps = ids.map((id, i) => dist(at(plain, id), at(plain, ids[(i + 1) % 5])));
+      expect(Math.max(...ps) - Math.min(...ps), 'unequal sides, as ruled').toBeGreaterThan(1e-2);
+      // and the OPPOSITE direction keeps ADR-606's refusal
+      expect(gateVerdict(factsOf([]), 'מעגל חסום במחומש ABCDE').kind).toBe('refused');
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */
