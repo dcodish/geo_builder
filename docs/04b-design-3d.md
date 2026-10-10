@@ -404,6 +404,17 @@ reading ⇒ the reducer refuses (`unknown-plane` `base`), and `readStatement3` a
 (the AI lane) for that and for every height sentence that is not a bare altitude (`isBareAltitude3`:
 not «אנך», no named solid, no value). The parse is unchanged, so saved figures do not drift.
 
+**…and the dropped-perpendicular imperative reads the same base** (#1944, ADR-3D-321). `perp-to-base`
+(«מ-A מורידים אנך לבסיס», «גובה מנקודה A לבסיס») resolved the base the same wrong way — `c.solids[0]`'s
+first three ids, the flat host's OWN plane — so `height-to-face` minted the foot on the apex itself
+(|EA| = 0, a zero-length altitude drawn green). The side rule is now **one function, `flatBaseSide3`**,
+which both lanes call, so the sentinel height and the imperative cannot answer the same question twice;
+`flatHost3` is the shared premise (the figure's one `FLAT_SOLID_KINDS` solid) and `oppositeSides3` the
+ring walk. The gate asks the **degeneracy, not the spelling**: it fires when the face being dropped onto
+lies wholly in the flat host's ring (the unstated sentinel, and a face named from it), lowers to
+`altitude-foot`, and still appends the `len` claim; an apex that is not a ring vertex refuses
+(`unknown-plane` `base`). A ⟂ from a point off the ring, and every solid's base, keep their reading.
+
 **Which givens forced the collapse** (#1815, ADR-3D-309). `collapseIsStated` re-solves `[gauge | dims]`
 without the rider rows; if the ring opens, an incidence invented the collapse, and the empty pool marked
 `collapse: { ring, riderKeys }` reaches `pivot.collapse`, where `derive3` refuses `polygon-collapsed`

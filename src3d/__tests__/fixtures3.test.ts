@@ -310,6 +310,14 @@ const SEEDED: SeededCorpus = {
   // AB ∦ DC, no warning, along the configuration walk) is asserted in issue-1918-trapezoid-identity.test.ts.
   'trapezoid-reseat-1918.geo3.json': ['טרפז ABCD', 'AD ∥ BC'],
   'right-trapezoid-reseat-1918.geo3.json': ['טרפז ישר זווית ABCD', 'AD ∥ BC'],
+
+  // #1944 (ADR-3D-321) — «מ-A מורידים אנך לבסיס» on a FLAT polygon is the polygon's altitude, as 2-D reads it.
+  // Before: the foot was minted exactly on A (|EA| = 0 at every seed), a zero-length altitude drawn green with two
+  // labels on one dot, and a stated «אורך AE» then refused as a contradiction. The drawing (the foot ON the opposite
+  // side, distinct from A, the trapezoid's parallel base) is asserted in issue-1944-perp-to-base-flat.test.ts; these
+  // two are the build + drift net, with the stated length the degenerate figure could not carry.
+  'triangle-perp-to-base-1944.geo3.json': ['משולש ABC', 'מ-A מורידים אנך לבסיס', 'אורך AE = 3'],
+  'trapezoid-perp-to-base-1944.geo3.json': ['טרפז ABCD', 'מ-A מורידים אנך לבסיס', 'אורך AE = 3'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

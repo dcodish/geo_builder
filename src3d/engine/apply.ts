@@ -1034,9 +1034,8 @@ export function structurallyOnRun3(c: Construction3, run: Id[], q: Id, seen: Set
  *   «AD גובה לצלע BC» already builds);
  * - an EXISTING point structurally on that side becomes the M1 lowering «AD ⟂ BC» (a cos-angle given:
  *   it drives a free figure and verifies a determined one), so «D על BC · AD גובה» is D as the foot.
- * The side is 2-D's rule (`oppositePolygonEdges` + ADR-169's `oppositeParallelBase`): the unique side
- * parallel to an edge through the apex when the figure knows exactly one such pair (a trapezoid's
- * bases), otherwise the first side of the ring that does not touch the apex.
+ * The side is `flatBaseSide3` below — the one resolution this lane shares with ADR-3D-321's
+ * «מ-A מורידים אנך לבסיס», so the two cannot drift into two answers for the same question.
  *
  * `{ flat: false }` — not a sentinel ⟂ on a flat figure; the caller's solid path is unchanged.
  * `reading: null` — flat, but no altitude reading (the apex is not a vertex, the foot is a vertex or off
@@ -1044,25 +1043,56 @@ export function structurallyOnRun3(c: Construction3, run: Id[], q: Id, seen: Set
  * reducer refuses it rather than draw it ⟂ the polygon.
  */
 export function flatHeightReading3(c: Construction3, cmd: Command3): { flat: false } | { flat: true; reading: Command3 | null } {
-  if (cmd.type !== 'seg-plane-rel' || cmd.plane.length !== 0 || cmd.rel !== 'perp' || c.solids.length !== 1) return { flat: false };
-  const solid = c.solids[0];
-  if (!FLAT_SOLID_KINDS.has(solid.kind)) return { flat: false };
-  const ring = solid.ids;
+  if (cmd.type !== 'seg-plane-rel' || cmd.plane.length !== 0 || cmd.rel !== 'perp') return { flat: false };
+  const host = flatHost3(c);
+  if (!host) return { flat: false };
   const apex = cmd.a, foot = cmd.b;
-  if (!ring.includes(apex) || ring.includes(foot)) return { flat: true, reading: null };
-  const opposite: [Id, Id][] = [];
-  for (let i = 0; i < ring.length; i++) {
-    const e: [Id, Id] = [ring[i], ring[(i + 1) % ring.length]];
-    if (!e.includes(apex)) opposite.push(e);
-  }
+  const opposite = oppositeSides3(host, apex);
+  if (opposite === null || host.includes(foot)) return { flat: true, reading: null };
   if (c.points.has(foot)) {
     const side = opposite.find((e) => structurallyOnRun3(c, e, foot));
     if (!side) return { flat: true, reading: null };
     return { flat: true, reading: { type: 'cos-angle', u: { kind: 'pair', from: apex, to: foot }, v: { kind: 'pair', from: side[0], to: side[1] }, cos: 0 } };
   }
-  const side = oppositeParallelBase3(c, apex) ?? opposite[0];
+  const side = flatBaseSide3(c, host, apex);
   if (!side) return { flat: true, reading: null };
   return { flat: true, reading: { type: 'altitude-foot', id: foot, from: apex, a: side[0], b: side[1] } };
+}
+
+/** The figure's one FLAT polygon host and its ring, or `null` — the premise every reading below shares. */
+export function flatHost3(c: Construction3): readonly Id[] | null {
+  if (c.solids.length !== 1) return null;
+  const solid = c.solids[0];
+  return FLAT_SOLID_KINDS.has(solid.kind) ? solid.ids : null;
+}
+
+/** The host ring's sides that do not touch `apex`, in ring order — `null` when the apex is not a vertex. */
+function oppositeSides3(ring: readonly Id[], apex: Id): [Id, Id][] | null {
+  if (!ring.includes(apex)) return null;
+  const opposite: [Id, Id][] = [];
+  for (let i = 0; i < ring.length; i++) {
+    const e: [Id, Id] = [ring[i], ring[(i + 1) % ring.length]];
+    if (!e.includes(apex)) opposite.push(e);
+  }
+  return opposite;
+}
+
+/**
+ * **Which side of a flat host is "the base", relative to a named apex — the ONE resolution** every
+ * base-directed ⟂ on a flat polygon reads: ADR-3D-315's sentinel height («AD גובה») and ADR-3D-321's
+ * «מ-A מורידים אנך לבסיס». It is 2-D's rule (`oppositePolygonEdges` + ADR-169's `oppositeParallelBase`),
+ * and keeping it in one function is what stops the two lanes drifting into two different answers for the
+ * same sentence (docs/17, the chokepoint registry).
+ *
+ * The unique side parallel to an edge through the apex when the figure knows exactly one such pair (a
+ * trapezoid's bases — a parallelogram knows two, so it falls through), otherwise the first side of the
+ * ring that does not touch the apex. `null` — the apex is not a ring vertex, so the host names no
+ * opposite side and the caller refuses honestly rather than inventing one.
+ */
+export function flatBaseSide3(c: Construction3, ring: readonly Id[], apex: Id): [Id, Id] | null {
+  const opposite = oppositeSides3(ring, apex);
+  if (opposite === null) return null;
+  return oppositeParallelBase3(c, apex) ?? opposite[0] ?? null;
 }
 
 /** 2-D's `oppositeParallelBase` over the figure's stated ∥ segment pairs (a trapezoid's own condition is one):
@@ -1756,6 +1786,36 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         }
       }
       if (!foot) return { ok: false, error: { code: 'already-defined', id: 'foot' } };
+      /**
+       * #1944 ([ADR-3D-321](../../docs/06b-decisions-3d.md)) — ADR-3D-315's rule, one lane further.
+       *
+       * A FLAT polygon has no base: it is modelled as a "solid" only to reuse the dims sampler, so
+       * resolving "the base" to its first three ids names the polygon's OWN plane — and the foot of the
+       * perpendicular from one of its vertices onto that plane is **that vertex**. «משולש ABC · מ-A
+       * מורידים אנך לבסיס» therefore minted E exactly on A (measured: |EA| = 0 at every seed), drew a
+       * zero-length altitude GREEN with two labels on one dot, and then refused «אורך AE = 3» as a
+       * contradiction. The same held for every flat host (triangle, trapezoid, parallelogram, rectangle,
+       * square, general quad, pentagon) and every spelling of the line.
+       *
+       * What the sentence means on a flat figure is what 2-D reads (measured at `24d49167`: `[foot,
+       * segment]` onto the side opposite the apex): the altitude. The side comes from `flatBaseSide3` —
+       * the resolution the sentinel height already uses — so both lanes answer one question once.
+       *
+       * The gate asks the DEGENERACY, not the spelling: it fires when the plane being dropped onto is
+       * the flat host's own (the unstated sentinel, or a face named from its ring — «גובה מנקודה A
+       * לבסיס ABC» was degenerate too), and an apex that is not a ring vertex is then refused, because
+       * the host names no side opposite it — 2-D answers those sentences `not-handled`. A ⟂ onto a plane
+       * that is NOT the flat host's own, and every solid's base, keep their existing reading.
+       */
+      const host = flatHost3(c);
+      if (host && face.every((id) => host.includes(id))) {
+        const side = flatBaseSide3(c, host, from);
+        // the apex is not a vertex of the host: it names no opposite side, so refuse rather than invent one
+        if (!side) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+        const flat = applyCommand3(c, { type: 'altitude-foot', id: foot, from, a: side[0], b: side[1] });
+        if (!flat.ok || cmd.len === undefined) return flat;
+        return applyCommand3(flat.next, { type: 'claim', claim: { type: 'length-eq', a: from, b: foot, value: cmd.len } });
+      }
       const made = applyCommand3(c, { type: 'height-to-face', id: foot, from, face });
       // #1448: «גובה הפירמידה 4» — the phrase carried its value; the claim lands on apex→foot,
       // whose letter exists only now. The same two commands the two-line spelling always was.
