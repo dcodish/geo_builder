@@ -151,6 +151,15 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   the glyph that was typed.
   - Sources: [ADR-3D-329](06b-decisions-3d.md#adr-3d-329), #1912; the prime fold ADR-3D-300 is the same
     seam one symbol over.
+- **FR-SP-21 (Must)** — **A point given with TWO coordinates sends the student to the analytic Builder, in
+  2-D's words.** «A(0,0)», «A = (1, 2)», «נקודה A(1,2)», «הנקודה E נמצאת ב-(-1,7)», «A(2;10)» and «A = 3,4»
+  are a point in the PLANE, which is the analytic Builder's construct — so the answer is the pointer, not
+  «לא הצלחתי להבין את הנתון», and it is given before any model call: «מיקום נקודה לפי שיעורים נעשה בכלי
+  «גאומטריה אנליטית» …», the same sentence 2-D gives ([FR-SU-5](02w-requirements-workspace.md),
+  ADR-W-118 B1). A point with THREE coordinates is this tool's own sentence and is untouched, as are plane
+  and line equations. Nothing is added to the figure.
+  - Sources: [ADR-3D-330](06b-decisions-3d.md#adr-3d-330), #1954 (operator report 2026-10-09); the 2-D
+    rule is ADR-553, #1245.
 - **FR-SP-9 (Must)** — **An UNDER-SPECIFIED statement is told what is missing; only an UNSUPPORTED one is
   told the tool cannot do it.** The two are different failures and must not share a voice: a student who
   wrote a sentence the tool understands but cannot pin down needs to know *which detail* to add, while

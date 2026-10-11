@@ -30,6 +30,14 @@ export type ScopeCategory3 =
   | 'unrelated'
   | 'valueless-query'
   | 'cross-app'
+  /**
+   * #1954 ([ADR-3D-330](../../docs/06b-decisions-3d.md#adr-3d-330)) — a point given with exactly TWO
+   * coordinates. Operator report, 2026-10-09: *"on 3d tool, when i enter A(0,0) I get an error. I should
+   * be sent to the analytics tool."* A planar coordinate is the analytic Builder's construct (2-D's
+   * `coordinate-point`, ADR-553), and the answer is 2-D's message word for word (ADR-W-118 B1). A THREE-
+   * coordinate point is 3-D's own sentence and is never touched.
+   */
+  | 'coordinate-point'
   | 'bare-solid'
   | 'ui-command'
   | 'oblique-prism'
@@ -67,6 +75,22 @@ interface ScopeRule3 {
   patterns: RegExp[];
 }
 
+/**
+ * #1954 — a PLANAR coordinate, i.e. a coordinate TUPLE OF LENGTH TWO. The fragments are 2-D's
+ * (`src/parser/scope.ts`, ADR-553), copied per `BOUNDARIES.json` — the register itself is a per-product
+ * copy by design (docs/20 §12), and the SENTENCE is the same one.
+ *
+ * The arity is the whole decision, and it is carried by the pattern rather than by a count: `COORD_PAIR3`
+ * closes its bracket after the SECOND coordinate, so «A(0,0,0)» — 3-D's own point — cannot match it, and
+ * the bracket-less form adds a lookahead that refuses a third coordinate («A = 0,0,0»). That is why this
+ * is not a carve-out in a chokepoint list but a sentence family of its own: *a point in the plane*.
+ */
+const COORD3 = String.raw`[-−+]?\s*\d+(?:\.\d+)?`;
+const COORD_PAIR3 = String.raw`\(\s*${COORD3}\s*[,;]\s*${COORD3}\s*\)`;
+const COORD_LABEL3 = String.raw`(?<![A-Za-z\d])[A-Za-z]\d*'?`;
+/** the joiners a student puts between the label and the pair: «=», «:», "at", "is at", «ב-», «בנקודה» */
+const COORD_JOIN3 = String.raw`(?:=|:|\bis\s+at\b|\bat\b|ב-?|בנקודה)`;
+
 const RULES3: ScopeRule3[] = [
   {
     /**
@@ -82,6 +106,32 @@ const RULES3: ScopeRule3[] = [
       /[A-Z]\d*'?\s*\((?=[^()]*,[^()]*,)[^()]*(?:[a-w]\s*\/|\/\s*[a-w])/,
       // …or one whose component wraps a symbol in parentheses: «C(2(p+1), 1, 0)»
       /[A-Z]\d*'?\s*\([^()]*\d\s*\([^()]*[a-w]/,
+    ],
+  },
+  {
+    /**
+     * #1954 — a point given with exactly TWO coordinates → the analytic Builder, with 2-D's message.
+     *
+     * Placed beside `component-arithmetic` because both read a coordinate TUPLE, and after it because
+     * that rule's own patterns require a 3-tuple (two commas): the two can never both match. Three
+     * shapes, 2-D's (ADR-553):
+     *  1. a label, an optional joiner, a parenthesised PAIR — «A(0,0)», «A = (1, 2)», «A ב-(0,0)»,
+     *     «A(2;10)» (the Israeli semicolon);
+     *  2. a label, a REQUIRED joiner, a bare pair — «A = 3,4», "A at 0,0". The trailing lookahead is
+     *     3-D's own addition: a THIRD coordinate («A = 0,0,0») is not a planar point;
+     *  3. a point noun with a pair later in the sentence — «נקודה A(1,2)», «הנקודה E נמצאת ב-(-1,7)».
+     *
+     * What this must never steal, and why it cannot: a 3-D point («A(0,0,0)», «B(2,15,-8)», «B(2t,t,k)»),
+     * a plane or a line by equation («y = 2x + 1», «מישור x+2y-2z+28=0»), a parametric line's direction
+     * («x=(8,-1,-1)+t(k+1,0,k-3)») and a vector component — every one of them is a 3-tuple, a symbol, or
+     * carries no parenthesised pair of numbers at all. The register only runs on a FAILED parse, and the
+     * #73 no-theft sweep holds every catalog3 sentence against it in both locales.
+     */
+    category: 'coordinate-point',
+    patterns: [
+      new RegExp(String.raw`${COORD_LABEL3}\s*${COORD_JOIN3}?\s*${COORD_PAIR3}`, 'i'),
+      new RegExp(String.raw`${COORD_LABEL3}\s*${COORD_JOIN3}\s*${COORD3}\s*,\s*${COORD3}(?![\d.])(?!\s*[,;])`, 'i'),
+      new RegExp(String.raw`(?:נקוד|\bpoints?\b)[^()]*${COORD_PAIR3}`, 'i'),
     ],
   },
   {

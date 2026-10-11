@@ -549,6 +549,15 @@ cut before the later role word (back over its connective; a «ו-AD» / "and AD"
 `src3d/app/triageReplay3`, which CALLS both; `refusalCategory3` sorts refusals into guided / clarify /
 refused.
 
+**The wrong-tool families in that register** are `cross-app` (a bare 2-D noun → the 2-D Geo Builder) and,
+since #1954 ([ADR-3D-330](06b-decisions-3d.md#adr-3d-330)), `coordinate-point` — a point given with
+exactly TWO coordinates → the analytic Builder, in 2-D's own sentence (ADR-W-118 B1; the byte-equality lock
+is `shell/__tests__/coordinate-point-parity-1954.test.ts`, since neither tree may import the other). The
+**arity is carried by the pattern, not by a count**: `COORD_PAIR3` closes its bracket after the second
+coordinate and the bracket-less form refuses a third, so «A(0,0,0)», a vector component, a plane equation
+and a parametric direction can never reach it. It sits beside `component-arithmetic` (#509), the register's
+other coordinate-tuple rule, whose own patterns require a 3-tuple — the two are disjoint by construction.
+
 ### The clarification family: under-specified is not unsupported (#866, [ADR-3D-239](06b-decisions-3d.md#adr-3d-239))
 
 | | what it is | what the student needs to hear |

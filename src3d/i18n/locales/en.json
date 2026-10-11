@@ -239,6 +239,7 @@
   "scope": {
     "unrelated": "No geometric construction detected here. Describe a solid or a given — e.g. \"box ABCDA'B'C'D'\" or \"point M midpoint of AB\".",
     "valueless-query": "This tool draws and verifies givens — it does not solve. To act on an angle, state a value: e.g. \"the angle between line AC' and plane ABCD is 30\", and it will be enforced or verified.",
+    "coordinate-point": "Placing a point by its coordinates is done in the \"$t(switcherAnalytic)\" tool — click \"$t(switcherAnalytic)\" at the top of the screen. There you write E(-1,7). Here, describe the figure itself — e.g. \"triangle ABC\" or \"point D on AB\".",
     "cross-app": "Plane geometry (circle, rectangle, rhombus, inscribed-in-circle…) is built in the 2-D tool: themathbible.com/geo-builder. A circle IN SPACE is supported here in the form \"circle centered at O tangent to line AB at B\".",
     "bare-solid": "A pyramid or prism needs its base: e.g. \"pyramid SABCD with a square base\" or \"right triangular prism ABC\". A cube, box or tetrahedron builds without details.",
     "ui-command": "Marks appear automatically from the givens — instead of asking for a mark, state the given itself: e.g. \"angle D = 90\".",

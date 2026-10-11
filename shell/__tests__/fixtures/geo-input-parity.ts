@@ -1011,6 +1011,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'e4-diameter-from-contextual', family: 'chords-arcs', steps: ['מעגל O', 'F על מעגל O', 'קוטר מנקודה F'], expect: 'builds', exception: 'X8' },
   // ── exception rows: the builders outside the family must answer honestly, never build ──
   { id: 'ex-coordinate-point', family: 'topic', steps: ['נתונה הנקודה A(2,6)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '3-D spells a point A(2,-2,6), so only analytic reads this spelling' },
+  { id: 'ex-coordinate-point-planar-1954', family: 'topic', steps: ['A(0,0)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: "#1954: the bare spelling the operator typed into 3-D. A PLANAR coordinate is analytic's; since #1954 both 2-D and 3-D answer it with the same «…נעשה בכלי «גאומטריה אנליטית»» pointer before the model — the refusal itself is locked per product (src3d/__tests__/issue-1954-coordinate-point.test.ts), because X1 lists 3-D among the builders that READ coordinates and this row cannot express the arity split" },
   { id: 'ex-axis', family: 'topic', steps: ['C על ציר ה-x'], expect: 'builds', exception: 'X1' },
   { id: 'ex-origin', family: 'topic', steps: ['O ראשית הצירים'], expect: 'builds', exception: 'X1', only: ['analytic'] },
   { id: 'ex-quadrant-1655', family: 'topic', steps: ['במשולש AOB חסום מעגל שמרכזו C (הנקודה C נמצאת ברביע השני)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '#1655: 2-D used to draw the incircle and drop the quadrant' },
