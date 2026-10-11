@@ -62,6 +62,7 @@ import { CENTRE_SENTINEL, CIRCLE_SENTINEL, CIRCLE_SLOT_SENTINELS, UNBOUNDED, typ
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow, BARE_POLYGON_NOT_BUILT } from '../engine/shapes';
 import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
+import { unreadScript } from '../../shell/inputScript';
 import {
   centreClauses,
   describedCircles,
@@ -108,6 +109,14 @@ export type ParseFailure =
    * must never become a constraint.
    */
   | { code: 'proof-target'; detail: string }
+  /**
+   * #1919 (ADR-626, the operator's ruling of 2026-10-08: *"we only support english or hebrew … rejected.
+   * in all tools"*) — a letter this tool cannot read. Analytic had no member of the class: it handed
+   * «משולש ДЖФ» to the model, where 2-D and 3-D drew A, B, C. It joins for ONE verdict (ADR-W-118 B1).
+   * `name` is a run that could be a point name, `word` a word in another language; the shared rule is
+   * `shell/inputScript`, after the glyph fold's look-alike row.
+   */
+  | { code: 'unread-name' | 'unread-word'; detail: string }
   /**
    * A coordinate written in `x` or `y` — «M(3,y)» (#1039).
    *
@@ -7191,6 +7200,10 @@ export function parseLine(raw: string): ParseResult {
   // must leave out; nothing of the line is recorded, as before.
   const proof = findProofTarget(line) ?? findProofTarget(unwrap(line));
   if (proof) return { ok: false, code: 'proof-target', detail: proof.sentence };
+  // #1919: the shared input-script rule, called where the proof target is — before every rule and before
+  // the model. The detail is the student's own run(s); `orthography` has already folded the look-alikes.
+  const unread = unreadScript(line);
+  if (unread) return { ok: false, code: `unread-${unread.kind}`, detail: unread.detail };
   // An angle the student NAMES (#1622 E5, ADR-AG-221) — read with its verb, before the lead-in is unwrapped.
   const label = parseAngleLabel(line);
   if (label) return label.ok ? made(label.facts.map((f) => ({ ...f, src: typed }))) : label;

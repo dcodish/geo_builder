@@ -1265,6 +1265,17 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'glyph-degree-ordinal-1912', family: 'angles', steps: ['משולש ABC', '∠ABC = 40º'], expect: 'builds', note: 'º U+00BA' },
   { id: 'glyph-degree-ring-1912', family: 'angles', steps: ['משולש ABC', '∠ABC = 40˚'], expect: 'builds', note: '˚ U+02DA' },
   { id: 'glyph-root-word-1912', family: 'lengths', steps: ['משולש ABC', 'אורך AB הוא שורש 2'], expect: 'builds', note: 'the word «שורש» before a value is √ (#105)' },
+  // #1919 (ADR-626 / ADR-3D-328) — A LETTER THE TOOL CANNOT READ IS REFUSED BY NAME, in every builder
+  // (operator ruling 2026-10-08: *"we only support english or hebrew … rejected. in all tools"*). 2-D and
+  // 3-D DREW these as A, B, C …; analytic handed them to the model. Greek stays math, and the Cyrillic
+  // look-alikes fold, so those two rows are the controls that keep the rule from overreaching.
+  { id: 'unread-name-1919', family: 'polygons', steps: ['משולש ДЖФ'], expect: 'refused', note: 'Cyrillic with no Latin twin: 2-D committed A, B, C, 3-D recorded A, B, C' },
+  { id: 'unread-name-square-1919', family: 'polygons', steps: ['ריבוע ДЖФИ'], expect: 'refused' },
+  { id: 'unread-name-arabic-1919', family: 'polygons', steps: ['משולש ابج'], expect: 'refused', note: 'any script the label grammar cannot read, not only Cyrillic' },
+  { id: 'unread-name-point-1919', family: 'points-incidence', steps: ['משולש ABC', 'נקודה Ж על AB'], expect: 'refused', note: 'anywhere in the line, not only a shape’s vertex list' },
+  { id: 'unread-word-1919', family: 'frame', steps: ['треугольник ABC'], expect: 'refused', note: 'a WORD in another language takes the other ruled sentence' },
+  { id: 'unread-greek-vertex-1919', family: 'polygons', steps: ['משולש ΓΔΘ'], expect: 'not-handled', note: 'Greek is math (the ruling), so a Greek vertex name goes to the model as in 2-D — 3-D recorded A, B, C before #1919' },
+  { id: 'unread-lookalike-1919', family: 'polygons', steps: ['משולש КМО'], expect: 'builds', note: 'the Cyrillic look-alikes fold to K, M, O (the ruling: «fold them silently») — 2-D always did; 3-D recorded A, B, C and analytic read nothing' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

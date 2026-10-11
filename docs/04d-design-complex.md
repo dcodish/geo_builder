@@ -271,6 +271,13 @@ a three-valued verdict for 3-D ([#909](https://github.com/dcodish/geo_builder/is
 
 ## Boundaries
 
+**A letter this tool cannot read** (#1919, [ADR-626](06-decisions.md#adr-626)) is refused in `submitLine`,
+before the ask routing and before the grammar, by the shared rule `unreadScript` (`shell/inputScript.ts`) —
+with the same two sentences the other builders use (`errUnreadName`, `errUnreadWord`), quoting the letters as
+typed, where the generic `not-handled` sentence used to answer. This tree still calls NO glyph fold (a
+superscript digit is an exponent here, #1912) and does not need to: the rule folds the look-alike LETTERS
+itself and never judges a modifier letter, so «zⁿ» and «Xₖ» reach the grammar untouched.
+
 `src-complex/` never imports `src/` or `src3d/`; the engine layer is **copied-never-shared, always**. It
 consumes the shared chrome in [`shell/`](04w-design-shell.md)
 ([ADR-W-016](06w-decisions-workspace.md#adr-w-016)).

@@ -24,6 +24,7 @@ import { honestyGateReport } from './honestyGates';
 import { forcedCrossedRing, impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
 import { findProofTarget } from '../../shell/proofTarget';
+import { unreadScript } from '../../shell/inputScript';
 
 export interface EditDeps {
   t: (key: string, opts?: Record<string, unknown>) => string;
@@ -82,6 +83,13 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   const proof = findProofTarget(editText);
   if (proof) {
     setInputNote(t('input.scope.proof-target', { sentence: proof.sentence }));
+    return false;
+  }
+  // #1919 (ADR-626): an edit is a statement too — a letter the tool cannot read is refused here exactly
+  // as at submit, with the same shared rule and the same two sentences.
+  const unread = unreadScript(editText);
+  if (unread) {
+    setInputNote(t(`input.scope.unread-${unread.kind}`, { detail: unread.detail }));
     return false;
   }
   // #1673 (ADR-565): a hidden circle token the edit types steps aside first, exactly as at submit

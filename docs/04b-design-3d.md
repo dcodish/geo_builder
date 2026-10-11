@@ -49,6 +49,16 @@ a point/vertex noun, a `label(…)` coordinate at the head of a definition, the 
 `midpoint-auto`, the one rule in `parse3` that INVENTS a point's name, matches a full anchored frame
 (`MID_HE`/`MID_EN`, shared with the anchor), so a word it does not own declines the line.
 
+**A letter the tool cannot read is refused by name** (#1919, [ADR-3D-328](06b-decisions-3d.md#adr-3d-328)).
+`readStatement3` — the one reader submit and the ✎ edit share — asks `unreadScript` (`shell/inputScript.ts`,
+the shared rule all four builders call) right after `findProofTarget`, and answers
+`{ code: 'unread-name' | 'unread-word', detail }` with the student's own letters quoted, typed so it never
+escalates. The look-alike LETTERS are folded by the rule itself, so «משולש КМО» records K, M, O while
+«משולש ДЖФ» is refused. One gate was also made total: `declLeftover` tokenizes Latin and Hebrew only, so a
+GREEK vertex name was invisible to it and «משולש ΓΔΘ» recorded A, B, C — a Greek letter left in a
+declaration now makes the gate decline, which hands the line to the model, 2-D's verdict for it. The
+measure rules read Greek as they did, so «α < β» keeps its own typed refusal.
+
 **Case is taught, never silently accepted** (ADR-3D-226). What no anchor proves goes to the #353 nudge in
 `scope3.ts` (`upperCasedLabelCandidate3`, consulted by `App3` before the LLM seam). It lifts a label-shaped
 run of two or more characters — never an English prose word (`NOUN_EN`/`EN_STOP`, from `parse3`) — runs

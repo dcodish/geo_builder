@@ -34,9 +34,12 @@
  * and ˚ fold only directly after a digit: both are letter-like glyphs (a masculine ordinal indicator
  * and a combining-style ring) that can legitimately stand inside a word.
  *
- * NOT folded here, on purpose: the uppercase CYRILLIC homoglyphs (А/В/С/…). Whether a non-Latin letter
- * folds to its Latin twin or the line is refused by name is the question #1919 is deciding, and 2-D's
- * `CYRILLIC_TO_LATIN` stays where it is until that ruling lands.
+ * THE LOOK-ALIKE LETTERS (#1919, the operator's ruling of 2026-10-08: *"Fold them silently"*). The
+ * uppercase Cyrillic homoglyphs (А В С Е Н К М О Р Т Х) are the Latin letters they render as, so «משולש
+ * КМО» is the triangle KMO in every builder — this was 2-D's private `CYRILLIC_TO_LATIN` until #1919
+ * ruled, and it is the LAST row for the reason the order note below gives: it is exactly where 2-D has
+ * always applied it. A non-Latin letter with NO Latin twin folds to nothing and is refused by name
+ * instead — {@link unreadScriptRuns} in `shell/inputScript.ts`, which runs right after this table.
  */
 
 /** One fold: the pattern, its replacement, and why the symbol is the same intent. */
@@ -44,6 +47,22 @@ export interface GlyphFold {
   readonly why: string;
   readonly apply: (s: string) => string;
 }
+
+/**
+ * The uppercase Cyrillic letters that are visual twins of a Latin uppercase (#45 / ADR-299, #1919) —
+ * only the unambiguous look-alikes, so a label pasted with a homoglyph reads as the letter it looks like.
+ */
+const LOOKALIKE_LETTERS: Record<string, string> = {
+  А: 'A', В: 'B', С: 'C', Е: 'E', Н: 'H', К: 'K', М: 'M', О: 'O', Р: 'P', Т: 'T', Х: 'X',
+};
+
+/**
+ * Fold every look-alike LETTER onto its Latin twin — the letter half of the table, exported on its own
+ * because the input-script check (`shell/inputScript.ts`) must fold the twins before it judges a
+ * letter unreadable, and it serves complex too, which deliberately never calls {@link foldGlyphs}.
+ */
+export const foldLookalikeLetters = (s: string): string =>
+  s.replace(/[АВСЕНКМОРТХ]/g, (ch) => LOOKALIKE_LETTERS[ch]);
 
 /** The keyboard `<` as the angle sign — 2-D's guard (ADR-381), the one place it is spelled. */
 const foldKeyboardAngle = (s: string): string =>
@@ -82,6 +101,10 @@ export const GLYPH_FOLDS: readonly GlyphFold[] = [
   {
     why: 'the Hebrew word «שורש» before a number or «(» is √ (#105) — «שורש של», where no value follows, is left to the rules',
     apply: (s) => s.replace(/שורש\s*(?=[\d(])/g, '√'),
+  },
+  {
+    why: 'an uppercase CYRILLIC homoglyph (А/В/С/…) is the Latin letter it renders as (#45, #1919) — the student typed a label, not a Russian word',
+    apply: foldLookalikeLetters,
   },
 ];
 

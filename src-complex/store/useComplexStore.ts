@@ -30,6 +30,13 @@ import { ingestTypedText } from '../../shell/bidi';
 
 export type InputError =
   | { key: 'not-handled' | 'parse-error'; detail: string }
+  /**
+   * #1919 (ADR-626, the operator's ruling of 2026-10-08: *"we only support english or hebrew … rejected.
+   * in all tools"*) — a letter this tool cannot read. Complex never DREW such a letter's figure (the
+   * silent drop is 2-D's and 3-D's), but it answered «ДЖФ = 2 + i» with the generic "I did not
+   * understand": its share of the ruling is the WORDING, which names the letters. `shell/inputScript`.
+   */
+  | { key: 'unread-name' | 'unread-word'; detail: string }
   | { key: 'duplicate-name'; detail: string }
   /** the loaded file belongs to another builder — its `app` marker is named (shell/save envelope) */
   | { key: 'wrong-app'; detail: string }

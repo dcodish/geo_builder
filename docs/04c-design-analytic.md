@@ -200,6 +200,11 @@ deeper (`MAX_FRAME_DEPTH = 2`). Structural readings run before `parseClause`, pa
 `bad-operand`), keeping separators (`Segment.sep`) and rejecting a bare-name group (`isBareName`); shape nouns come
 from `SHAPES` / `EN_SHAPE`; `unwrap`, `shapeClauses` and `originClauses` (`(0,0)`, named by `resolveMints`) fill the
 rest; `viaCanonical` calls `parseClause` directly; a proof target is `proof-target`.
+A letter the tool cannot read is
+`unread-name` / `unread-word` (#1919, [ADR-626](06-decisions.md#adr-626)): `unreadScript`
+(`shell/inputScript.ts`) is asked right after the proof target, so the line never reaches a rule and never
+reaches the model, and the two refusals are worded from `errRenameBadName` and `errUnreadWord`. The
+look-alike letters fold first, in `orthography`'s `foldGlyphs`, so «משולש КМО» now reads as KMO and records.
 
 **Entailment is judged over configurations** ([ADR-AG-188](06c-decisions-analytic.md#adr-ag-188)): the line's
 constraints (`Derivation.constraintLine`) must hold across the pool (`evaluate.holdsInEveryConfiguration`, with

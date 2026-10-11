@@ -151,6 +151,10 @@ A student types on a keyboard and the exam is typeset. Both reach one internal f
 - Any curve outside R174's closed family.
 - A request to prove («הוכיחו כי …», «הראו כי …»). It is refused as a claim to prove and never recorded
   as a given ([FR-SU-15](02w-requirements-workspace.md)).
+- A letter or a word in a script this tool does not read — Cyrillic with no Latin twin, Arabic, an
+  accented Latin letter. It is refused quoting the letters as typed, in the same two sentences every builder
+  uses ([FR-SU-18](02w-requirements-workspace.md)), and no longer handed to the model. A look-alike letter
+  folds to its Latin twin first («משולש КМО» reads as KMO), and Greek stays mathematics.
 
 ### 8b — Two new input families (F16, F17)
 

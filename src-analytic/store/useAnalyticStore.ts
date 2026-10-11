@@ -89,6 +89,8 @@ export type InputError =
   | { key: 'out-of-scope'; detail: string }
   /** A claim to PROVE, never a given (#1618; the shared rule since #1666, `shell/proofTarget`) — `detail` is the proof sentence. */
   | { key: 'proof-target'; detail: string }
+  /** #1919 — a letter the tool cannot read; `detail` is the run(s) as typed (`shell/inputScript`). */
+  | { key: 'unread-name' | 'unread-word'; detail: string }
   /** `x` or `y` used as a point's unknown — they are the plane's own variables (#1039). */
   | { key: 'reserved-coordinate'; detail: string }
   /** A shape noun and a vertex count that disagree (#1042). */

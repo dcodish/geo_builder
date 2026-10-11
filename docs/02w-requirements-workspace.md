@@ -120,6 +120,20 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   at the parser boundary, not in the saved line.
   - Sources: [ADR-3D-329](06b-decisions-3d.md#adr-3d-329), #1912; the earlier per-builder halves
     ADR-299 (#45), ADR-381 (#237), ADR-318 (#105), [ADR-AG-187](06c-decisions-analytic.md#adr-ag-187) (#1555).
+- **FR-SU-18 (Must)** — **The tool reads Hebrew and English, and a letter it cannot read is refused by
+  name — never replaced.** A letter or a word in any other script is rejected in all four builders, with the
+  letters the student typed quoted back: as a point name, «"ДЖФ" אינו שם של נקודה. שם נקודה הוא אות לטינית
+  גדולה, אפשר עם ספרה — למשל G או A1.», and otherwise «הכלי קורא עברית ואנגלית בלבד — "…" אינו באחת מהן.
+  נסו לכתוב את השורה בעברית או באנגלית.». It is never drawn under substituted names and never sent to the
+  model. Two things stay readable: **Greek is mathematics** (α, β, γ, π, θ as measure names, «ΔABC»), and a
+  **look-alike letter folds silently** to its Latin twin (FR-SU-17's table: «משולש КМО» is the triangle
+  KMO). A Greek letter used as a VERTEX name is each builder's own verdict, as today — 2-D and 3-D hand it
+  to the model. Hebrew-alphabet labels keep the 2-D builder's own corrected-sentence note
+  ([02](02-requirements.md) FR-IN-4b). A superscript or subscript letter, a prime and the ordinal degree
+  glyph are notation, not a script, and read as they always did. The operator's ruling: «we only support
+  english or hebrew so any letter or mention of anything that is not in these languages is rejected. in all
+  tools».
+  - Sources: [ADR-626](06-decisions.md#adr-626), [ADR-3D-328](06b-decisions-3d.md#adr-3d-328), #1919.
 - **FR-SU-15 (Must)** — **A claim to prove is never drawn as a given.** **⚠ Ruled to change (2026-10-07, ADR-W-118 B14/D3 · #1870):** the complex builder refuses a proof-verb line like the others, while keeping its claim check for a bare statement. The text below describes the code until that ships. In every builder, a line that asks the student to PROVE something — «הוכיחו כי …», «הוכח ש …», «הראו כי …», «יש להוכיח …», "prove that …", "show that …", with or without an item marker («א.», «(1)») and also when it follows a given on the same line («נתון AB = AC. הוכיחו כי AB ⊥ AC») — is refused, and nothing of the line is recorded. The refusal says that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and quotes the claim so the student knows which part to leave out. «כי» and «ש» in their other senses («נתון כי …», «כך ש-…») and «הראו» as "show me" are never refused for this. Sources: [ADR-W-107](06w-decisions-workspace.md#adr-w-107), #1666, #1649, #1618.
 - **FR-SU-16 (Must)** — **A plane-geometry sentence gets the same answer in every builder that reads plane geometry.** When a student types a plane-geometry sentence, the 2-D builder and the analytic builder give the same verdict: both build it, both refuse it, or both ask the same kind of question. The 2-D builder's verdict is the reference. The 3-D builder is to give the same verdict for the core plane families: polygons, lengths, angles, midpoints and ratios, cevians, parallel and perpendicular, and area — that parity is **parked, not realised**: most of 3-D's known-gap rows are owned by #1679, which is in the icebox (as are 2-D's own phrasing gaps, #1677). The exceptions are topic families that one builder reads by design: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, and free points in 3-D. A builder that does not read such a family answers it honestly, with a refusal, a question or the model, and never draws it as something else. A known difference is listed with the issue that will remove it. The operator's ruling: «analytics and 2d should have same user experience».
   - Sources: [ADR-W-108](06w-decisions-workspace.md#adr-w-108), #1649, [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B15, #1861.

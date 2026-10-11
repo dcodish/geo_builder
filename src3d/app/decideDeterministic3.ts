@@ -57,6 +57,8 @@ export type RefusalCategory3 = 'guided' | 'clarify' | 'refused';
 type StoreOwnCode3 = Exclude<NonNullable<StoreError3>, EngineError3>['code'];
 const STORE_CATEGORY3: Record<StoreOwnCode3, RefusalCategory3> = {
   'proof-target': 'guided', // #1666: what the student must PROVE, answered with the pointer (2-D's `scope:proof`)
+  'unread-name': 'guided', // #1919: a letter the tool cannot read, answered with the point-name sentence
+  'unread-word': 'guided', // #1919: a word in another language, answered with the Hebrew-and-English sentence
   'ambiguous-vector-length': 'clarify',
   'param-roles-conflated': 'clarify',
   'ambiguous-main-diagonal': 'clarify',

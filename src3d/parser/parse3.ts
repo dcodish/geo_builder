@@ -455,6 +455,12 @@ function declLeftover(s: string, ids: Id[], consumed?: RegExp): boolean {
   // #1902: a qualifier counts as read only inside a PHRASE a reader lowers — the shape's adjectives and the
   // solid's own rightness / equal edges — never as a loose word («משולש שווה ABC» declines, as 2-D escalates it)
   rest = rest.replace(QUALIFIER_PHRASES3, ' ').replace(CONSTRUCT_NOUNS, ' ').replace(DECL_VOCAB, ' ');
+  // #1919 (ADR-3D-328): a GREEK letter left in a DECLARATION is unread — Greek is notation in this grammar
+  // (an angle name, «ΔABC»), never a vertex name, and `unreadWords3` tokenizes only Latin and Hebrew, so
+  // «משולש ΓΔΘ» read as UNLABELLED and recorded A, B, C. It declines instead and the line goes to the model,
+  // which is 2-D's verdict for it (its span accountant reads Γ, Δ, Θ as dropped symbols). ONLY this gate is
+  // made total: the measure rules keep reading Greek as they did, so «α < β» keeps its own typed refusal.
+  if (/[\u0370-\u03FF]/.test(rest)) return true;
   return unreadWords3(rest, 'any').length > 0;
 }
 

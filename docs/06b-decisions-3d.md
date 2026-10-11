@@ -12457,3 +12457,24 @@ That single 2-D change is the RULED class applied inside 2-D — the operator ap
 - Analytic: «<ABC = 40°», «∠ABC = 40º», «∠ABC = 40˚», «אורך AB הוא שורש 2» and «AB = שורש 8» are read instead of refused.
 - 2-D: «זווית ABC גדולה מ-40º» (an angle BOUND with the look-alike degree glyph) is read as «> 40°» instead of being sent to the model. It is 2-D's only changed verdict; its equality forms already read the glyph and are byte-identical.
 - Every builder: the fact row still shows exactly what was typed, and the complex Builder is untouched.
+
+## ADR-3D-328 — A letter the tool cannot read is refused by name, and a Greek vertex name goes to the model as in 2-D (#1919)
+
+**Status:** accepted · 2026-10-11 · bug (P2, 2-D, 3-D) · branch `fix/1919-non-latin-letters-not-dropped` off `fix/1912-3d-perp-symbol-u27c2` @ ad8df1d3 · fix round #1992 · **the 3-D arm of [ADR-626](06-decisions.md#adr-626)**, which holds the full decision, the ruling and the measurements · completes [ADR-3D-329](#adr-3d-329)'s deferred Cyrillic row (#1912)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-21 (new) · [02w](02w-requirements-workspace.md) FR-SU-18 (new) · **Design:** [04b](04b-design-3d.md) the normalisation seam · [04w](04w-design-shell.md) *The input-script rule* · **LADDER stage:** none (an input-boundary refusal)
+
+**Measured before** (`ad8df1d3`, `decideSubmit3`, the model mocked). «משולש ДЖФ» RECORDED `polygon3 ["A","B","C"]` and «ריבוע ДЖФИ» `square ["A","B","C","D"]`: a letter outside the label alphabet is invisible to `declLeftover`, so the shape read as UNLABELLED and `planarPolygon` used its default names. Greek was invisible the same way — «משולש ΓΔΘ», «משולש ΑΒΓ» and «משולש αβγ» all recorded A, B, C, where 2-D escalates all three (`weak:dropped`). «משולש КМО» recorded A, B, C too, because #1912 left the look-alike LETTERS to this issue.
+
+**Decision** (the 3-D half of ADR-626).
+1. `readStatement3` — the one reader submit and the ✎ edit share — asks the shared `unreadScript` right after `findProofTarget` and answers the typed `{ code: 'unread-name' | 'unread-word', detail }`, so the line never reaches the grammar and never escalates. `STORE_CATEGORY3` classes both as `guided`, and `errorText3` words them from `err.unreadName` / `err.unreadWord` — 2-D's sentences verbatim ([ADR-W-118](06w-decisions-workspace.md#adr-w-118) B1).
+2. The look-alike letters now fold here, because they live in the shared table `normalize3` already calls: «משולש КМО» records K, M, O.
+3. **One gate made total:** `declLeftover` declines when a GREEK letter is left in a declaration. Greek is notation in this grammar (a measure name, «ΔABC»), never a vertex name, so the line goes to the model — 2-D's verdict. Deliberately NOT in `unreadWords3`, which the inscription rule shares: tokenizing Greek there turned «α < β» from its own typed refusal (`unknown-symbol`) into a model call, which the parity rows caught.
+
+**Locks.** `src3d/__tests__/unread-letters-1919.test.ts` (the shared rows through `decideSubmit3`, both sentences he + en, the look-alike fold, the three Greek rows declining, the declaration controls, and the catalog census). Parity rows `unread-*-1919`.
+
+**Behaviour change for a student:**
+- «משולש ДЖФ» is refused, naming Д, Ж and Ф, instead of drawing a triangle A, B, C — likewise every shape noun, «נקודה Д», «M אמצע Д» and the rest of ADR-626's table.
+- «משולש КМО» draws K, M, O, as 2-D does.
+- «משולש ΓΔΘ», «משולש ΑΒΓ» and «משולש αβγ» go to the model instead of drawing A, B, C.
+- «α = 30», «60 < α < 90», «α < β» and every Greek measure sentence are unchanged.

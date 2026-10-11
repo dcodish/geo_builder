@@ -3937,6 +3937,33 @@ export const SCENARIOS_4: Scenario[] = [
       expect(gateVerdict(factsOf(['טרפז ABCD']), 'מרובע ACBD')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
     },
   },
+  {
+    id: 'unread-letters-refused-by-name-1919',
+    title:
+      '#1919 (ADR-626): «משולש ДЖФ» — letters the tool cannot read are refused BY NAME, never silently drawn as triangle A, B, C; «משולש КМО», the look-alikes, still build as K, M, O',
+    guards:
+      'Found by the #1912 plan pass and ruled P2 by the operator (2026-10-08): «we only support english or hebrew so any letter or mention of anything that is not in these languages is rejected. in all tools», with «Keep Greek as math» and, for the Cyrillic look-alikes, «Fold them silently». Measured at ad8df1d3 through parse → replay and through decideDeterministic2D: «משולש ДЖФ» COMMITTED A, B, C, seg-AB, seg-BC, seg-AC, poly-ABC — the three Cyrillic letters silently replaced by three the student never typed, with a green ✓ — and so did «ריבוע ДЖФИ», «מחומש ДЖФИЛ», «משולש ישר זווית ДЖФ», «משולש ابج» and «משולש ÉÜÇ»; 3-D recorded A, B, C the same way. Root cause (one class, both trees): a letter outside the label alphabet is invisible to every gate that counts labels — 2-D’s namesVertices, the fail-closed shapeLeftover, statedLabelTokens and the span accountant, 3-D’s declLeftover — so a shape noun followed by such letters read as UNLABELLED and the noun’s default names were drawn. Fix: one shared rule (shell/inputScript.ts) called at every builder’s statement seam and at 2-D’s parse boundary, after the glyph fold’s look-alike row (shell/glyphFold.ts, #1912) — so a letter with a Latin twin folds silently and a letter without one is named back to the student. The cross-builder matrix is shell/__tests__/fixtures/unread-letter-rows.ts with its four thin locks.',
+    steps: ['משולש ДЖФ', 'משולש КМО'],
+    refusedSteps: [
+      {
+        step: 1,
+        reason: 'unread-script',
+        with: { kind: 'name', detail: 'ДЖФ' },
+        why: 'the operator’s ruling of 2026-10-08: a letter the tool cannot read is refused, naming it, never replaced by A, B, C',
+      },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // the refused line drew NOTHING: no A, B or C from «משולש ДЖФ», and no Cyrillic letter anywhere
+      const ids = [...fig.positions.keys()];
+      expect(ids.sort(), 'only the look-alike triangle K, M, O is on the figure').toEqual(['K', 'M', 'O']);
+      expect(ids.filter((id) => /[\u0400-\u04FF]/.test(id)), 'no Cyrillic letter is ever a point id').toEqual([]);
+      // the look-alikes are the SAME triangle the Latin spelling builds (the ruling: fold them silently)
+      expect(Object.keys(replay(factsOf(['משולש КМО'])).construction.objects).sort()).toEqual(
+        Object.keys(replay(factsOf(['משולש KMO'])).construction.objects).sort(),
+      );
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

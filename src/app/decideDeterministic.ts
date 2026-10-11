@@ -69,6 +69,7 @@ import {
 } from '@/store/geoStore';
 import { spanShadow } from '@/parser/spanAccounting';
 import { findProofTarget } from '../../shell/proofTarget';
+import { unreadScript } from '../../shell/inputScript';
 import { honestyGateReport } from './honestyGates';
 import { honoursConstruct, roleReadings, thalesReadings } from './roleReadings';
 import { solveBudget, work, withWorkBudget, withWorkEpoch } from '@/engine/solveBudget';
@@ -219,6 +220,20 @@ export function decidePreParse(utterance: string, view: DecideView): Verdict2D |
   const proof = findProofTarget(utterance);
   if (proof) {
     return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:proof' }], note: { key: 'input.scope.proof-target', params: { sentence: proof.sentence } } };
+  }
+  // A letter this tool cannot read (#1919, ADR-626) — «משולש ДЖФ» COMMITTED triangle A, B, C, because a
+  // letter outside the label alphabet is invisible to every gate that counts labels, so the shape read as
+  // unlabelled and the noun's default names were drawn with a green ✓. The student's three letters
+  // vanished. Refused here, PRE-parse, for the proof target's reason and the honesty invariant's: a
+  // stated name is never silently replaced. The rule is shared by all four builders
+  // (`shell/inputScript`), after the glyph fold's look-alike row — «משולש КМО» is still KMO.
+  const unread = unreadScript(utterance);
+  if (unread) {
+    return {
+      kind: 'refuse', category: 'guided', preParse: true, binds: [],
+      logs: [{ source: 'scope', result: `scope:unread-${unread.kind}` }],
+      note: { key: `input.scope.unread-${unread.kind}`, params: { detail: unread.detail } },
+    };
   }
   const negated = statedNegation(utterance);
   if (negated) {
