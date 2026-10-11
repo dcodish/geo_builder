@@ -9,7 +9,7 @@
 
 import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Polygon, SideChoice, SolveDirective, Vec } from './types';
 import { LEN_EPS, edgeSideToward, isGeoPoint, isOrderConstraint } from './types';
-import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
+import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeExclusion, shapeExclusionError, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
 import { lower } from './lower';
 import { carrierParams, crossingBranchCount, evaluate, evaluateTightened, resolveDriven, resolveDrivenMemo, drivenConstraintsOf, setCarrierVals } from './evaluate';
 import type { EvalResult } from './evaluate';
@@ -1027,6 +1027,15 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   const cyclicErr = notCyclicImpossibility(probed, cmd);
   if (cyclicErr) {
     return { ok: false, error: notCyclicImpossibilityError(cyclicErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  }
+
+  // #1985 (ADR-619): a noun that EXCLUDES the one the ring is already declared as — «מקבילית ABCD» ·
+  // «טרפז ABCD», in either order and in any reading of the ring. Structural (the two declarations, never
+  // the drawing), so it is refused ahead of the restatement and redefinition arms below and the student
+  // reads which noun the figure already carries instead of «C כבר מוגדרת…». Operator ruling 2026-10-10.
+  const excluded = shapeExclusion(prev, cmd);
+  if (excluded) {
+    return { ok: false, error: shapeExclusionError(excluded), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
 
   // #966 (ADR-499) — A ROLE CLAIM IS CHECKED AGAINST THE FIGURE THAT IS ALREADY THERE.

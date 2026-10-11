@@ -3854,6 +3854,11 @@ the legacy command still applying for old saves. Catalog + shadow-matrix snapsho
 
 ## ADR-3D-158 — a shape is what it says, and ONLY what it says (#612, #615)
 
+**⚠ Partly superseded by [ADR-3D-326](#adr-3d-326) (2026-10-11):** the "naming error" half is gone. A noun the
+declared shape IMPLIES is a restatement, not a mis-naming — every square IS a rectangle (operator ruling on
+#1988, 2026-10-10). The rest of this entry stands: the statement is never absorbed as an inert drive, a noun
+that ADDS information drives, and the drawing obeys ADR-052.
+
 Two halves of one rule, found together while the operator played PR #604.
 
 **#612 — the student's side.** On «פירמידה ABCDS שבסיסה ריבוע» every following quad noun committed
@@ -12420,3 +12425,84 @@ A crossing order has another ring key and is never a twin (#1927's refusal); a l
 - «ריבוע ABCD · מרובע ACBD» (and the rectangle, cube, parallelogram, rhombus, trapezoid and midpoint rows, and the ring first) is refused on the line that made the ring cross, with the ring message, instead of drawn crossed and green.
 - «ריבוע ABCD · מקבילית ACBD» says its claim does not hold, not "a square is already a parallelogram"; «ריבוע ABCD · ריבוע ACBD» is refused, not accepted as redundant.
 - The ring message ends «…או לשנות את מקומות הנקודות…».
+
+## ADR-3D-326 — A noun the declared shape already implies is a restatement, not a naming error: `shape-less-specific` is retired (#1988)
+
+**Status:** accepted · 2026-10-11 · bug (P3, 3-D) · branch `fix/1988-shape-noun-implied-or-excluded` off `main` @ 06fc51dd · fix round #1992 · twin [ADR-619](06-decisions.md#adr-619) · **⚠ supersedes the "naming error" half of [ADR-3D-158](#adr-3d-158)** · extends [ADR-3D-324](#adr-3d-324) · keeps [ADR-3D-313](#adr-3d-313) · realises [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B1/B13
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-19 — any noun the declared one implies restates the ring and adds no row, in any reading; FR-SP-18's exclusion refusal is unchanged · **Design:** [04b](04b-design-3d.md) § "A quad noun over a ring the figure already knows" — one `quadImplies` read by apply's arm and by the store's restatement rule
+
+**The ruling (2026-10-10, decisions page, #1988).** *Option A — "already there" in every builder.* A true, less specific shape word over a named shape is a restatement; 2-D and 3-D answer their already-there note, and no new row is added. Rejected: refusing in all three builders with a corrected sentence; leaving 3-D stating that a square is not a rectangle.
+
+**Measured before** (`main` @ 06fc51dd, through `decideSubmit3`):
+
+| after | line | 3-D at 06fc51dd |
+| --- | --- | --- |
+| «ריבוע ABCD» | «מלבן ABCD» / «מעוין ABCD» / «מקבילית ABCD» / «דלתון ABCD» | refused `shape-less-specific` — «הצורה כבר ידועה כ־ריבוע — ולכן אינה נקראת מלבן. מחקו את הנתון הקודם אם התכוונתם מלבן.» |
+| «מלבן ABCD» / «מעוין ABCD» | «מקבילית ABCD» | the same refusal |
+| «ריבוע ABCD» | «מרובע ABCD» | `already-stated`, no row (ADR-3D-324) |
+
+**Class (docs/17 §1).** *A statement that is TRUE of the figure is refused as an error because it is less specific than what the figure is already known to be.* ADR-3D-158 read the operator's 2026-08-15 ruling as splitting the implication arm in two — the same noun redundant, a less specific noun a "naming error". The sentence that implements the second half asserts something false of the geometry: every square IS a rectangle, a rhombus, a parallelogram and a kite. There is one situation here, not two.
+
+**Decision.** The implication arm has ONE outcome. `applyCommand3`'s all-known quad arm records the statement in `redundantShapes` whenever `quadImplies(known, cmd.base)` — no longer only when the nouns are equal — and returns the figure untouched, so `buildNotices3` tells the student it added nothing. The `shape-less-specific` error code is removed from `EngineError3` and from `errorText3`; the `err.shapeLessSpecific` sentence stays, because ADR-3D-313's `shape-disjoint` was ruled to use those same words.
+
+**No new row,** in both lanes:
+- the **store's** restatement rule (`ringRestatementTwin3`, ADR-3D-324) is the second reader of the same `quadImplies`. Its generic arm was a KIND test (`cmd.type === 'solid'`); «מרובע» is only the extreme case of implication (`QUAD_IMPLIES`'s `quad` row), so the arm is now the predicate itself and «ריבוע ABCD» · «מלבן ABCD» is as much a twin as «ריבוע ABCD» · «מרובע ABCD». The ENABLED rule carries over unchanged: an implied noun never re-enables a muted declaration, which would state a square the student never said.
+- the **model's** lane (`decideSteps3`, no twin rule) commits the line green with the already-known notice instead of refusing it — the engine's answer, so the two lanes cannot disagree about what the sentence means.
+
+**Any reading of the ring.** A restatement must not change what the line SAYS, so a reading other than the declared spelling passes only `quadImpliesInEveryReading`: a **trapezoid** names one pair of opposite sides as the parallel one (ADR-3D-313's `seat`), so «טרפז ABCD» · «טרפז BCDA» is still new information and still records; a **kite** names one diagonal as its axis, but the only bases that imply `kite` without being one are the rhombus and the square, whose four equal sides make either diagonal the axis — so «ריבוע ABCD» · «דלתון CDAB» is a restatement. Both facts are read off the table and asserted by the guard test, not assumed.
+
+**Measured after** (the same path): every row above answers `already-stated` with no row and the restatement note naming the line that declared the ring. «מלבן ABCD» · «ריבוע ABCD» still drives (ADR-052 — specialising is new information). «מקבילית ABCD» · «טרפז ABCD» is still `shape-disjoint` in the ruled words. «טרפז ABCD» · «טרפז BCDA» still records.
+
+**Not changed, deliberately: the WORDING.** The ruling quotes 2-D's «זה כבר קיים באיור — אין מה להוסיף.», but measured at HEAD each builder has its own already-there note (3-D: «הנתון הזה כבר נאמר («…») — הציור לא השתנה ולא נוספה שורה»; analytic: «זה כבר ידוע מהנתונים שכתבתם…»), and whether 3-D's note — for **every** restated fact, not only polygons — becomes 2-D's is the open question **#1990**, which this item's own plan points at for it. Changing it here for polygons alone would split 3-D's own voice and pre-empt that ruling. So this ADR routes the verdict and leaves the sentence to #1990.
+
+**Sibling audit.** 2-D had the mirror defect — no hierarchy at all, so both directions leaked the engine's redefinition throw: [ADR-619](06-decisions.md#adr-619), this item's other arm. Analytic already answers «כבר ידוע» here (ADR-AG-259); its one measured gap, «ריבוע ABCD» · «דלתון ABCD» recording because its table does not derive square ⇒ kite, is reported, not built (the ruling leaves analytic unchanged).
+
+**Locks.** `src3d/__tests__/issue-1988-implied-shape-noun.test.ts` (the issue's lines, every reading, the model lane's own derive, the muted-declaration rule, and the kite/trapezoid guards on `quadImpliesInEveryReading`); `issue-612-615-shape-naming.test.ts` re-based — the implied nouns are restatements, `shape-disjoint` keeps the refusal, and what #612 actually fixed (no inert pins, no absorbed drive, specialising still drives) is asserted unchanged; `issue-1953-restated-ring3.test.ts` re-based; parity rows `implied-noun-1988-01…07`.
+
+**Expected golden drift.** `decide-submit3-parity-1394` records a verdict per sequence; every sequence whose `suite` states a noun an earlier one implies moves from `refused` to `already-stated`. That re-record belongs to the batch.
+
+**Behaviour change for a student:**
+- «ריבוע ABCD» · «מלבן ABCD» / «מעוין ABCD» / «מקבילית ABCD» / «דלתון ABCD», «מלבן ABCD» · «מקבילית ABCD», «מעוין ABCD» · «מקבילית ABCD» / «דלתון ABCD», and any reading of each, are accepted as restatements — the restatement note, no row — instead of refused «הצורה כבר ידועה כ־ריבוע — ולכן אינה נקראת מלבן…».
+- The same lines on a solid's base («פירמידה ABCDS שבסיסה ריבוע» · «מלבן ABCD») are likewise no longer refused; as for the identical noun today, the row is kept and carries the «הצורה כבר ידועה מנתון קודם» notice.
+- Nothing else changes: an excluding noun is still refused naming both, a narrowing noun still drives, and a trapezoid read so the other pair is named is still a new statement.
+
+## ADR-3D-327 — A crossing order of a convex ring's letters is refused for its ORDER, whatever noun it carries: the structural proof speaks before the claim pass (#1991)
+
+**Status:** accepted · 2026-10-11 · bug (P3, 3-D) · branch `fix/1991-crossed-ring-message-parity` off `fix/1988-shape-noun-implied-or-excluded` @ 80cf0c9b · fix round #1992 · twin [ADR-AG-261](06c-decisions-analytic.md#adr-ag-261) · amends [ADR-3D-322](#adr-3d-322) · adopts [ADR-W-121](06w-decisions-workspace.md#adr-w-121) and its 2026-10-09 amendment · 2-D reference [ADR-608](06-decisions.md#adr-608) / [ADR-613](06-decisions.md#adr-613)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-20 — a declared ring that reorders a ring whose noun is convex whenever simple is refused with the shared ring message, whatever noun it carries · **Design:** [04b](04b-design-3d.md) § "What a ring was DECLARED to be", the crossed-ring paragraph · **LADDER stage:** derive (the status pass), before the claim pass
+
+**The ruling (2026-10-10, decisions page, #1991).** Option **A: 2-D's crossed-shape message everywhere.** He rejected keeping the three different messages, and rejected a new noun-specific sentence.
+
+**Measured before** (`main` @ 06fc51dd, through `decideSubmit3`):
+
+| lines | 3-D at 06fc51dd |
+| --- | --- |
+| «ריבוע ABCD» · «מקבילית ACBD» | `claim-refuted` — «הטענה לא מתקיימת בציור — בדקו את החישוב» |
+| «ריבוע ABCD» · «טרפז ACBD» | `claim-refuted` |
+| «מלבן ABCD» · «מקבילית ACBD» | `claim-refuted` |
+| «ריבוע ABCD» · «מלבן ACBD» | `givens-contradict` |
+| «ריבוע ABCD» · «מרובע ACBD» | `ring-crossed` — the shared message (ADR-3D-322) |
+
+**Class (docs/17 §1).** *A ring the student spelled in a crossing order is refused for the arithmetic of the noun's relations instead of for its order, because the ring-order test's EVIDENCE is unavailable exactly when the noun's own relations are what cannot hold.* The plan read this as a pure ordering problem (the claim pass runs first). The measurement is sharper and worth recording: ADR-3D-322 proves the crossing over the CLAIM SAMPLES, and with a specific noun the pivot finds no placement at all — measured, every one of the sequences above has `pivot.solutions === 0` and **zero placed samples**, where that pass rightly fails open ("search first, refuse last": there is no figure of the givens to read a crossing in). Reordering the passes alone would therefore have changed nothing.
+
+**Decision.** Add the STRUCTURAL proof, which needs no figure, and run it before the claim pass so no verdict has to be overridden.
+
+1. **`convexWhenSimple(base)`** (`engine/baseShapes.ts`), read off `quadShapeConstraints`' own relation set: a base is convex whenever simple when it asserts a pair of opposite sides parallel, a right angle, or all four sides equal. That is every base but the **kite** (which may be a DART) and the bare **quadrilateral**. 2-D's ADR-613 states the same fact in words.
+2. **The pass** (`derive3`, after the retry fixpoint, before the claim pass): group the declared rings by their LETTER SET; when a group holds two or more distinct cyclic orders and any of them is convex-when-simple, the others cross in every configuration — four points in convex position admit exactly one simple cyclic order. The LATEST of the group's declaring facts is refused `ring-crossed` with its own utterance, exactly as ADR-3D-322 blames the ring-first order's shape line.
+3. **Search first, refuse last** is kept by the predicate itself, not by a sample budget: a kite or a bare-quadrilateral partner answers false, so the operator's «דלתון ABCD · מרובע ABDC» is never refused on this ground. A ring with nothing to contradict it («מקבילית ACBD» alone) is drawn.
+4. **No override list.** Running before the claim pass means the claim pass's own guard (`status[factId] !== 'ok'` → skip) and the pin-owner guard do the precedence for free. ADR-3D-322's sample-based pass stays exactly where it is, for the cases where it already works.
+
+**Measured after** (the same path): every row above answers `ring-crossed` with the shared sentence, at seeds 0–5, with the prior figure untouched and nothing committed. «מקבילית ACBD» alone, «מרובע ACBD» alone and «דלתון ABCD · מרובע ABDC» still record. «ריבוע ABCD» · «מרובע ADCB» is still the restatement.
+
+**The class, beyond the report.** The predicate closed siblings nobody reported: «מעוין ABCD» · «מקבילית ACBD», «טרפז ABCD» · «מקבילית ACBD», and the ring-first order «מקבילית ACBD» · «ריבוע ABCD» — each was `claim-refuted` or `polygon-collapsed` and is now the ring message.
+
+**Sibling audit.** Analytic had the same class with a different evidence gate (its walk records ring evidence only from candidates where every given holds): [ADR-AG-261](06c-decisions-analytic.md#adr-ag-261), this item's other arm. 2-D is the reference and is unchanged — ADR-608's `forcedCrossedRing` runs at the submit gate, before the dry run, so the noun's own constraints never get in front of it. Complex declares no polygons.
+
+**Locks.** `src3d/__tests__/issue-1991-crossed-ring-specific-noun.test.ts` (the reported rows in both languages, the ring-first order, seeds 0–5, the search-first controls, and the `convexWhenSimple` classification over the whole family table); parity rows `crossed-ring-1991-01…05`.
+
+**Behaviour change for a student:**
+- «ריבוע ABCD» · «מקבילית ACBD» (and «טרפז ACBD», «מלבן ACBD»; «מלבן ABCD» / «מעוין ABCD» / «טרפז ABCD» · «מקבילית ACBD») is refused «הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: «…». אפשר לשנות את סדר האותיות…» instead of «הטענה לא מתקיימת בציור — בדקו את החישוב» or the contradicting-givens sentence.
+- The same holds when the crossing ring is stated FIRST: the shape line that completed it is refused.
+- Nothing else changes: a reordered ring nothing contradicts is still drawn, and a kite partner is still never refused.

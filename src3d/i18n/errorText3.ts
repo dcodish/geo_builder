@@ -125,10 +125,9 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #1923 (ADR-3D-314): analytic's `errRingContradictsNoun`, word for word — the line that completed the crossing.
     case 'ring-crossed':
       return t('err.ringContradictsNoun', { detail: err.stated });
-    case 'shape-less-specific':
-      return t('err.shapeLessSpecific', { stated: t(`notice.shape.${err.stated}`), actual: t(`notice.shape.${err.actual}`) });
-    // #1918 (ADR-3D-313): a noun no quadrilateral can carry together with the one already known — the same words
-    // (the ruled reuse of `err.shapeLessSpecific`): what the ring is known to be, and the name it does not take.
+    // #1918 (ADR-3D-313): a noun no quadrilateral can carry together with the one already known — what the ring
+    // is known to be, and the name it does not take. The key keeps the `shapeLessSpecific` name it was written
+    // under; #1988 (ADR-3D-326) retired the other caller, not the sentence.
     case 'shape-disjoint':
       return t('err.shapeLessSpecific', { stated: t(`notice.shape.${err.stated}`), actual: t(`notice.shape.${err.actual}`) });
     case 'unknown-point':

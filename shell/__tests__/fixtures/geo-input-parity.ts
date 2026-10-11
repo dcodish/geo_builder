@@ -1210,6 +1210,22 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'trapezoid-1918-redeclare', family: 'polygons', steps: ['מקבילית ABCD', 'טרפז ABCD'], expect: 'refused', note: 'no quadrilateral is both' },
   { id: 'trapezoid-1918-redeclare-rev', family: 'polygons', steps: ['טרפז ABCD', 'מקבילית ABCD'], expect: 'refused' },
   // end #1918
+  // ── #1988 + #1985 (ADR-619, ADR-3D-326; operator rulings 2026-10-10): a SECOND shape noun over the same ring is
+  // judged by the quadrilateral hierarchy, in both directions. A noun the declared one IMPLIES is a true restatement
+  // and adds nothing («זה כבר קיים באיור», analytic's «כבר ידוע», 3-D's restatement note); a noun that EXCLUDES it is refused
+  // with the ruled sentence («הצורה כבר ידועה כ־… — ולכן אינה נקראת …»), which the two #1918 rows above already carry for
+  // «מקבילית»/«טרפז». Both directions are one table, so both are locked here.
+  { id: 'implied-noun-1988-01', family: 'polygons', steps: ['ריבוע ABCD', 'מלבן ABCD'], expect: 'builds', note: 'every square IS a rectangle — a restatement, no row' },
+  { id: 'implied-noun-1988-02', family: 'polygons', steps: ['ריבוע ABCD', 'מעוין ABCD'], expect: 'builds' },
+  { id: 'implied-noun-1988-03', family: 'polygons', steps: ['ריבוע ABCD', 'מקבילית ABCD'], expect: 'builds' },
+  { id: 'implied-noun-1988-04', family: 'polygons', steps: ['ריבוע ABCD', 'דלתון ABCD'], expect: 'builds', note: 'a square is a kite too' },
+  { id: 'implied-noun-1988-05', family: 'polygons', steps: ['מלבן ABCD', 'מקבילית ABCD'], expect: 'builds' },
+  { id: 'implied-noun-1988-06', family: 'polygons', steps: ['מעוין ABCD', 'מקבילית ABCD'], expect: 'builds' },
+  { id: 'implied-noun-1988-07', family: 'polygons', steps: ['ריבוע ABCD', 'מלבן BCDA'], expect: 'builds', note: 'any reading of the same ring (ADR-618)' },
+  { id: 'excluded-noun-1985-01', family: 'polygons', steps: ['ריבוע ABCD', 'טרפז ABCD'], expect: 'refused', note: 'no quadrilateral is both' },
+  { id: 'excluded-noun-1985-02', family: 'polygons', steps: ['מקבילית ABCD', 'טרפז שווה שוקיים ABCD'], expect: 'refused' },
+  { id: 'excluded-noun-1985-03', family: 'polygons', steps: ['טרפז ABCD', 'ריבוע ABCD'], expect: 'refused' },
+  // end #1988 + #1985
   // ── #1892 (ADR-AG-248): a point on a BARE pair («D על AB») is the segment, as 2-D reads it; the order of the givens never changes the verdict ──
   { id: 'bare-on-pair-length-1892', family: 'points-incidence', steps: ['נקודה A', 'נקודה B', 'D על AB', 'AB = 4', 'AD = 5'], expect: 'refused', exception: 'X9', note: 'analytic rode the line and drew D beyond B before #1892' },
   { id: 'bare-on-pair-length-holds-1892', family: 'points-incidence', steps: ['נקודה A', 'נקודה B', 'D על AB', 'AB = 4', 'AD = 3'], expect: 'builds', exception: 'X9' },
@@ -1229,6 +1245,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'crossed-ring-1927-08', family: 'polygons', steps: ['דלתון ABCD', 'מרובע ABDC'], expect: 'builds', note: 'a dart saves the ring: search first, never refused (2-D and analytic draw the dart)' },
   { id: 'crossed-ring-1927-09', family: 'polygons', steps: ['טרפז ABCD', 'מרובע ACBD'], expect: 'refused', note: 'a trapezoid’s free ratio cannot save the ring' },
   { id: 'crossed-ring-1927-10', family: 'polygons', steps: ['מרובע ACBD', 'טרפז ABCD'], expect: 'refused', note: 'the ring first' },
+  // #1991 (ADR-3D-327, ADR-AG-261; operator ruling 2026-10-10, option A): the same ring, declared with a SPECIFIC
+  // noun. 3-D answered «בדקו את החישוב» (claim-refuted) or «givens-contradict» and analytic «לא נמצאה תצורה»;
+  // all three now show 2-D's crossed-shape message. «מקבילית ACBD» ALONE still builds (search first).
+  { id: 'crossed-ring-1991-01', family: 'polygons', steps: ['ריבוע ABCD', 'מקבילית ACBD'], expect: 'refused', note: 'the play-sheet T10 line' },
+  { id: 'crossed-ring-1991-02', family: 'polygons', steps: ['ריבוע ABCD', 'טרפז ACBD'], expect: 'refused' },
+  { id: 'crossed-ring-1991-03', family: 'polygons', steps: ['ריבוע ABCD', 'מלבן ACBD'], expect: 'refused' },
+  { id: 'crossed-ring-1991-04', family: 'polygons', steps: ['מלבן ABCD', 'מקבילית ACBD'], expect: 'refused' },
+  { id: 'crossed-ring-1991-05', family: 'polygons', steps: ['מקבילית ACBD'], expect: 'builds', note: 'nothing placed it yet: the ring is simply drawn — the control' },
   // end #1927
   // #1953 (ADR-618 / ADR-3D-324 / ADR-AG-259): a ring restated in another reading — rotated or reversed — is the same
   // polygon, so it is accepted and adds no row in every builder (2-D «זה כבר קיים באיור», analytic «כבר ידוע», 3-D the #613

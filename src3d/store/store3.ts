@@ -33,7 +33,7 @@ import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, flatHeightReading3, freeDims, ringKeyIds3 } from '../engine/apply';
-import { declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
+import { convexWhenSimple, declaredQuads3, spaceDiagonals, diagonalClaimVerdict, quadImplies, quadImpliesInEveryReading, QUAD_PYRAMIDS, trapezoidRingInForce3, type QuadBase } from '../engine/baseShapes';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { checkInSpan, componentValue, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
@@ -685,6 +685,57 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
     const latest = retryError(f);
     if (latest !== null) status[f.id] = latest;
   }
+  /**
+   * #1991 ([ADR-3D-327](../../docs/06b-decisions-3d.md#adr-3d-327)) — TWO DECLARED RINGS OVER THE SAME LETTERS IN
+   * DIFFERENT CYCLIC ORDERS, ONE OF THEM CONVEX WHENEVER SIMPLE: the other crosses in every configuration.
+   *
+   * «ריבוע ABCD» · «מקבילית ACBD» was refused «הטענה לא מתקיימת בציור — בדקו את החישוב» (`claim-refuted`), and
+   * «מלבן ACBD» with `givens-contradict` — both telling the student their arithmetic is wrong when the mistake is
+   * the order of four letters. The operator's ruling of 2026-10-10 (#1991, option A): 2-D's crossed-shape message
+   * everywhere.
+   *
+   * WHY #1927's PASS COULD NOT SAY IT. ADR-3D-322 proves the crossing over the CLAIM SAMPLES, and a specific noun's
+   * own relations are claims that cannot hold, so the pivot finds no placement: measured at 06fc51dd, every one of
+   * these sequences has `pivot.solutions === 0` and ZERO placed samples, where that pass rightly fails open — there
+   * is no figure of the givens to read a crossing in. The evidence here is STRUCTURAL instead and needs no figure at
+   * all: four points in convex position admit exactly one simple cyclic order, so a ring declared with a noun that
+   * is convex whenever simple (`convexWhenSimple` — everything but the kite and the bare quadrilateral) PROVES that
+   * every other cyclic order of its letters crosses. Run BEFORE the claim pass, so the structural reason speaks and
+   * the claim verdict never has to be overridden; "search first, refuse last" is kept by the predicate itself — a
+   * kite partner may be a DART, on which the other order is simple, and is never refused here.
+   *
+   * Blamed on the LATEST of the two declarations — the line that completed the contradiction — exactly as
+   * ADR-3D-322 blames the ring-first order's shape line.
+   */
+  {
+    const ringsByLetters = new Map<string, { ids: Id[]; convex: boolean }[]>();
+    const letterKey = (ids: readonly Id[]) => [...ids].sort().join('');
+    const addRing = (ids: readonly Id[], convex: boolean) => {
+      if (ids.length !== 4 || new Set(ids).size !== 4) return;
+      const k = letterKey(ids);
+      const list = ringsByLetters.get(k) ?? [];
+      if (!list.some((r) => ringKeyIds3(r.ids) === ringKeyIds3(ids))) list.push({ ids: [...ids], convex });
+      else if (convex) list.find((r) => ringKeyIds3(r.ids) === ringKeyIds3(ids))!.convex = true;
+      ringsByLetters.set(k, list);
+    };
+    for (const q of declaredQuads3(c)) addRing(q.ids, convexWhenSimple(q.base));
+    for (const sld of c.solids) if (sld.kind === 'polygon4') addRing(sld.ids, false); // a bare «מרובע» promises nothing
+    /** Does fact `f` declare exactly this ring, in this cyclic order? (ADR-3D-322's own reader.) */
+    const declaresRingOrdered = (f: Fact3, ring: readonly Id[]) =>
+      f.cmds.some((k) => (k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && k.ids.length === ring.length && ringKeyIds3(k.ids) === ringKeyIds3(ring));
+    for (const list of ringsByLetters.values()) {
+      if (list.length < 2) continue;
+      for (const crossed of list) {
+        if (!list.some((other) => other !== crossed && other.convex)) continue;
+        const involved = facts.filter((f) => f.enabled && list.some((r) => declaresRingOrdered(f, r.ids)));
+        const blamed = involved[involved.length - 1];
+        if (!blamed || status[blamed.id] !== 'ok') continue;
+        status[blamed.id] = { code: 'ring-crossed', stated: blamed.utterance };
+        break;
+      }
+    }
+  }
+
   // #978 (ADR-3D-246): the VERIFIER arm of the «אלכסון» claim (#859 / ADR-3D-203). The apply moment
   // judges the claim only when ONE solid holds both letters; with two solids on the canvas, or a pair the
   // figure could not yet place, the claim was accepted and never revisited — «אלכסון AB» on a cube's edge
@@ -996,6 +1047,9 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
    * cross — not a trapezoid, not any quadrilateral — and it recorded green. When EVERY vertex is coordinate-fixed
    * (`coordinateFixers3`) the ring cannot move, so the drawn ring is the only one. The line that COMPLETED it is
    * refused. Run after the claim pass, so a truer message (a rectangle's own claim refuted) wins, as in analytic.
+ * #1991 (ADR-3D-327) narrows that: where the crossing is STRUCTURAL — a convex-when-simple ring reordered — the pass
+ * above speaks BEFORE the claim pass, because the operator ruled the order message wins there (2026-10-10). This one
+ * keeps its place, for the rings whose figure the pivot can still place.
    *
    * #1927 (ADR-3D-322, ADR-W-121 and its 2026-10-09 amendment — "search first, refuse last") — and a ring over points
    * a SHAPE placed («ריבוע ABCD · מרובע ACBD», a cube's «מרובע ACBD», the midpoint ring «מרובע ABED») is refused too,
@@ -1437,6 +1491,9 @@ const ringKey3 = (ids: readonly Id[]): string => {
 /** The ring a command DECLARES — a flat polygon, a stated quad shape, a completed rectangle — or null. */
 const declaredRingOf3 = (k: Command3): readonly Id[] | null =>
   k.type === 'quad-shape' || k.type === 'rect-complete' || (k.type === 'solid' && (k.kind === 'polygon3' || k.kind === 'polygon4' || k.kind === 'polygon5')) ? k.ids : null;
+/** The quad NOUN a declaring command states — `'quad'` for a bare polygon, which every quad implies (#1988). */
+const declaredBaseOf3 = (k: Command3): QuadBase | null =>
+  k.type === 'quad-shape' ? k.base : k.type === 'rect-complete' ? 'rectangle' : k.type === 'solid' && k.kind === 'polygon4' ? 'quad' : null;
 /** Quad bases whose statement is the same under every rotation and reversal of the ring (2-D's `RING_SYMMETRIC`). */
 const RING_SYMMETRIC_BASES: ReadonlySet<string> = new Set(['square', 'rectangle', 'rhombus', 'parallelogram', 'quad']);
 /** Does reading the declared ring `ring` as `cmd.ids` say the same thing? (The trapezoid: only the readings that
@@ -1463,6 +1520,12 @@ const sameReading3 = (cmd: Command3, ring: readonly Id[]): boolean => {
  *  - the same shape in a reading the shape is symmetric under, re-spelled to the declared spelling, is the twin
  *    exactly when the declared spelling is.
  * A crossing order has another ring key and is never a twin (that is #1927's refusal).
+ *
+ * #1988 ([ADR-3D-326](../../docs/06b-decisions-3d.md#adr-3d-326), operator ruling 2026-10-10) — AND a noun the
+ * declared one already IMPLIES. «מרובע» is only the extreme case of that (`QUAD_IMPLIES`'s `quad` row), so the
+ * generic arm is no longer a kind test: «ריבוע ABCD» · «מלבן ABCD» is as much a restatement as «ריבוע ABCD» ·
+ * «מרובע ABCD», and the engine says so too (`applyCommand3` records it redundant). One predicate for both,
+ * so the two cannot drift apart; the ENABLED rule carries over for the same reason.
  */
 function ringRestatementTwin3(facts: readonly Fact3[], commands: readonly Command3[]): Fact3 | undefined {
   if (commands.length !== 1) return undefined;
@@ -1470,11 +1533,27 @@ function ringRestatementTwin3(facts: readonly Fact3[], commands: readonly Comman
   const ring = declaredRingOf3(cmd);
   if (!ring || new Set(ring).size !== ring.length) return undefined;
   const key = ringKey3(ring);
-  const generic = cmd.type === 'solid';
+  const stated = declaredBaseOf3(cmd);
+  const sameKey = (k: Command3) => {
+    const r = declaredRingOf3(k);
+    return r !== null && r.length === ring.length && ringKey3(r) === key;
+  };
   for (const f of facts) {
-    const declared = f.cmds.map(declaredRingOf3).find((r) => r !== null && r.length === ring.length && ringKey3(r) === key);
-    if (!declared) continue;
-    if (generic) {
+    const declaring = f.cmds.find(sameKey);
+    if (!declaring) continue;
+    const declared = declaredRingOf3(declaring)!;
+    const base = declaredBaseOf3(declaring);
+    // The declared noun already implies the stated one ⇒ the line restates the ring and adds nothing — but only
+    // in a reading that says the same thing: «טרפז ABCD» · «טרפז BCDA» names the OTHER pair as the parallel one
+    // (ADR-3D-313's seat), which is new information, not a restatement.
+    const sameSpelling = declared.length === ring.length && declared.every((v, i) => v === ring[i]);
+    const readingSame = sameSpelling || sameReading3(cmd, declared);
+    if (stated !== null && base !== null && (readingSame ? quadImplies(base, stated) : quadImpliesInEveryReading(base, stated))) {
+      if (f.enabled) return f;
+      continue;
+    }
+    // a GENERIC polygon of any arity («משולש», «מחומש»): its own ring is all it says, in every reading
+    if (cmd.type === 'solid') {
       if (f.enabled) return f;
       continue;
     }

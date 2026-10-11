@@ -3937,6 +3937,40 @@ export const SCENARIOS_4: Scenario[] = [
       expect(gateVerdict(factsOf(['טרפז ABCD']), 'מרובע ACBD')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
     },
   },
+
+  {
+    id: 'second-shape-noun-over-a-ring-1988-1985',
+    title: 'A second shape noun over a declared ring: implied restates, excluding refuses',
+    guards:
+      "#1988 + #1985 (ADR-619), operator rulings 2026-10-10. Measured on 06fc51dd through decideDeterministic2D: «ריבוע ABCD» · «מלבן ABCD» and «מקבילית ABCD» · «טרפז ABCD» were both refused with the engine's own «'C' is already defined …» — a letter the engine chose, not the statement in conflict (the honesty invariant). Root cause: 2-D judged a second shape noun by whose derived corner it would rebuild, and had no reading of the quadrilateral hierarchy at all — ADR-595 covered only the one noun («מרובע») that implies nothing. Fix: ONE table (QUAD_IMPLIES, shapeKinds.ts) read in both directions — an IMPLIED noun is re-spelled to the generic ring command (ADR-595's own path, so «כבר קיים» with no row), an EXCLUDING one is refused by a stage-0 prover with the ruled sentence. A pair that is neither (a rhombus over a rectangle) stays ADR-157's refusal. The class matrix is src/app/__tests__/issue-1988-1985-second-shape-noun.test.ts.",
+    steps: ['מקבילית ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const para = factsOf(['מקבילית ABCD']);
+      // #1985 — the operator's pair: refused, naming BOTH nouns and no engine id
+      const v = gateVerdict(para, 'טרפז ABCD');
+      expect(v, '«טרפז ABCD» over a declared parallelogram is refused').toMatchObject({ kind: 'refused', reason: 'error' });
+      const he = i18n.getFixedT('he');
+      const said = humanizeError((v as { detail?: string }).detail, he as never).replace(/[⁦-⁩]/g, '');
+      expect(said).toBe('הצורה כבר ידועה כ־מקבילית — ולכן אינה נקראת טרפז. מחקו את הנתון הקודם אם התכוונתם טרפז.');
+      expect(said, 'never an engine id or a vertex the engine picked').not.toMatch(/poly-|already defined/);
+      // the reverse order, and the trapezoid variants, are the same refusal
+      for (const line of ['טרפז שווה שוקיים ABCD', 'טרפז ישר זווית ABCD', 'טרפז CDAB'])
+        expect(gateVerdict(para, line).kind, line).toBe('refused');
+      expect(gateVerdict(factsOf(['טרפז ABCD']), 'מקבילית ABCD').kind, 'and the reverse order').toBe('refused');
+      // #1988 — an IMPLIED noun commits nothing and is never refused as a redefinition
+      const sq = factsOf(['ריבוע ABCD']);
+      for (const line of ['מלבן ABCD', 'מעוין ABCD', 'מקבילית ABCD', 'דלתון ABCD', 'מלבן BCDA'])
+        expect(gateVerdict(sq, line), line).toEqual({ kind: 'noop' });
+      // and the declared square is still a square afterwards
+      const poly = replay(sq).construction.objects.find((o) => o.kind === 'polygon');
+      expect(poly && 'declaredAs' in poly && poly.declaredAs).toBe('square');
+      // the control: neither implied nor excluded keeps ADR-157's refusal
+      const rect = factsOf(['מלבן ABCD']);
+      expect(gateVerdict(rect, 'מעוין ABCD')).toMatchObject({ kind: 'refused', reason: 'error' });
+      expect((gateVerdict(rect, 'מעוין ABCD') as { detail?: string }).detail).toMatch(/already defined/);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

@@ -157,7 +157,14 @@
     "ringContradictsNoun": "The points you gave do not form that shape in this order: \"{{detail}}\". Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.",
     "shapeNoun": {
       "right-trapezoid": "right trapezoid",
-      "rectangle": "rectangle"
+      "rectangle": "rectangle",
+      "square": "square",
+      "rhombus": "rhombus",
+      "parallelogram": "parallelogram",
+      "kite": "kite",
+      "trapezoid": "trapezoid",
+      "isosceles-trapezoid": "isosceles trapezoid",
+      "quadrilateral": "quadrilateral"
     },
     "sentenceSelfConflict": "\"{{sentence}}\": this sentence defines {{id}} twice, as two different things, so it was not added.",
     "ambiguousCevian": "\"{{sentence}}\": vertex {{apex}} belongs to several shapes ({{shapes}}), each with a different side opposite it — so it is unclear which side {{kind}} drops to. Name the side (e.g. \"to side {{side}}\") or the triangle (e.g. \"in triangle {{shape}}\").",
@@ -297,6 +304,7 @@
     "polygonFlatPolygon_said": "Can't do that: with «{{said}}», polygon {{poly}} would become a straight line — {{points}} would lie on one line, and a line is not a polygon. Check the givens.",
     "polygonFlatPolygon_said_vs": "Can't do that: «{{said}}» contradicts «{{other}}» — with the other givens, {{points}} would lie on one line, and a line is not a polygon. Check the givens.",
     "overConstrained": "Can't do that: {{what}} contradicts an earlier given — they can't both hold.",
+    "shapeExcluded": "The figure is already known to be a {{actual}}, so it is not called a {{stated}}. Remove the earlier given if you meant {{stated}}.",
     "overConstrained_said": "Can't do that: «{{said}}» contradicts an earlier given — they can't both hold. The reason: {{what}}.",
     "overConstrained_said_vs": "Can't do that: «{{said}}» contradicts «{{other}}» — they can't both hold. The reason: {{what}}.",
     "notCyclicReason": "a circle through the four vertices would make a {{shape}} a {{forced}}, and a {{forced}} is not a {{shape}}",

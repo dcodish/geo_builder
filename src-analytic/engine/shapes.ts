@@ -311,6 +311,31 @@ export const assertsBothParallelPairs = (noun: string | undefined): boolean => {
 };
 
 /**
+ * IS A SIMPLE RING OF THIS NOUN NECESSARILY CONVEX (#1991,
+ * [ADR-AG-261](../../docs/06c-decisions-analytic.md#adr-ag-261))? 2-D's ADR-613 states the same fact in words:
+ * *"a square, rectangle, rhombus, parallelogram or trapezoid is convex whenever simple"*; 3-D's twin is
+ * `convexWhenSimple` in its `baseShapes.ts`.
+ *
+ * Read off the row's own givens, so a noun added to `SHAPES` is classified by what it asserts. Three sufficient
+ * reasons, each an elementary fact about quadrilaterals: a pair of OPPOSITE SIDES PARALLEL (assumed or stated —
+ * «טרפז» promises *a* pair either way), a RIGHT ANGLE, or ALL FOUR SIDES EQUAL (`equalSides`). «מרובע» asserts
+ * nothing and «דלתון» may be a DART, so both answer false — which is what keeps "search first, refuse last"
+ * (ADR-AG-256) intact: a ring another order could save is never refused on this ground.
+ *
+ * WHY IT MATTERS: four points in convex position admit exactly ONE simple cyclic order, so a declared ring whose
+ * noun is convex-when-simple PROVES that every other cyclic order of its letters crosses — with no figure to read.
+ */
+export const convexWhenSimple = (noun: string | undefined): boolean => {
+  const row = noun === undefined ? null : shapeRow(noun);
+  if (!row || row.arity !== 4) return false;
+  if (row.equalSides) return true;
+  const g = row.givens(['A', 'B', 'C', 'D']);
+  const says = (c: Constraint, rel: 'parallel' | 'perpendicular'): boolean =>
+    (c.t === 'relation' && c.rel === rel) || (c.t === 'choice' && c.options.some((o) => says(o, rel)));
+  return g.some((c) => says(c, 'parallel') || says(c, 'perpendicular'));
+};
+
+/**
  * TWO NOUNS NO QUADRILATERAL CAN CARRY AT ONCE (#1926, ADR-AG-260): one promises exactly one pair of parallel
  * sides (`promisesOneParallelPair`), the other's row asserts both pairs. Symmetric. Derived from the table —
  * the analytic twin of 3-D's "no member in common" (#1918, ADR-3D-313) and 2-D's ADR-157 refusal.

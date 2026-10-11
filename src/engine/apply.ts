@@ -12,6 +12,7 @@ import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, 
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
 import { add, circleCircleIntersect, circumcenter, dist, footOnLine, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringKey, ringSimple, scale, sub } from './geometry';
+import { QUAD_IMPLIES, quadImplies, quadImpliesInEveryReading, quadsExclude, type QuadKind } from './shapeKinds';
 import { constraintKey, constraintRefs, residual, residualTolerance } from './solve';
 import { evaluateCore } from './evaluate';
 import { applySeed } from './sample';
@@ -513,6 +514,105 @@ function declaredRingSpelling(prev: Construction, cmd: Command): Command | null 
 }
 
 /**
+ * THE SHAPE NOUN A LINE STATES, as a {@link QuadKind} — or null when the line declares no quadrilateral
+ * ([ADR-619](../../docs/06-decisions.md#adr-619)).
+ *
+ * One reader for every spelling the parser can emit: a dedicated command type names itself, a
+ * `quadrilateral` carries a variant macro's noun in `declaredAs` ('kite', #770) and otherwise says only
+ * «מרובע», and a `trapezoid` carries its refined phrase in `kind` ('right-trapezoid', ADR-607). So "what
+ * does this line say the ring is" is answered in one place, exactly as `declaredQuadKind` answers "what is
+ * the ring already known to be".
+ */
+export function statedQuadKind(cmd: Command): QuadKind | null {
+  if (!('ids' in cmd) || (cmd.ids as Id[]).length !== 4) return null;
+  switch (cmd.type) {
+    case 'square':
+    case 'rectangle':
+    case 'rhombus':
+    case 'parallelogram':
+      return cmd.type;
+    case 'trapezoid':
+      return (cmd.kind as QuadKind | undefined) ?? 'trapezoid';
+    case 'quadrilateral':
+      return (cmd.declaredAs as QuadKind | undefined) ?? 'quadrilateral';
+    default:
+      return null;
+  }
+}
+
+/**
+ * WHAT A RING IS ALREADY KNOWN TO BE — the `declaredAs` of the polygon over the same CYCLE (`ringKey`,
+ * ADR-618, so any rotation or reversal of the declared spelling is the same ring), or null when no polygon
+ * declares it. A crossing order («ACBD») is a different ring and is never matched here.
+ */
+export function declaredQuadKind(prev: Construction, ids: readonly Id[]): QuadKind | null {
+  if (ids.length !== 4 || new Set(ids).size !== 4) return null;
+  const key = ringKey(ids as Id[]);
+  const ring = prev.objects.find((o) => o.kind === 'polygon' && o.vertices.length === 4 && ringKey(o.vertices) === key);
+  if (!ring || ring.kind !== 'polygon') return null;
+  const declared = ring.declaredAs ?? 'quadrilateral';
+  // A `declaredAs` the hierarchy does not know (a future noun) reads as the generic ring rather than
+  // crashing the lookup — the table is the only list, so an unknown kind implies nothing but «מרובע».
+  return declared in QUAD_IMPLIES ? (declared as QuadKind) : 'quadrilateral';
+}
+
+/**
+ * #1988 ([ADR-619](../../docs/06-decisions.md#adr-619)) — A NOUN THE RING'S OWN NOUN ALREADY IMPLIES IS A
+ * RESTATEMENT, not a redefinition.
+ *
+ * «ריבוע ABCD» · «מלבן ABCD»: every square IS a rectangle, so the second line adds nothing — yet the engine
+ * built the rectangle's derived corner over the square's existing one and threw «'C' is already defined».
+ * ADR-595 had already settled the general case of this («מרובע» over any declared ring) for the ONE noun
+ * that implies nothing; the hierarchy (`QUAD_IMPLIES`) is the same statement for every other.
+ *
+ * Expressed as a REWRITE, not as a new conflict carve-out: the line is re-spelled to the generic ring
+ * command over the declared spelling, after which it takes exactly the path «מרובע ABCD» takes — apply's
+ * `addObj` keeps the existing polygon and its `declaredAs`, the step produces nothing new, and the submit
+ * pipeline answers «זה כבר קיים באיור». One predicate, one path, and the ADR-157 refusal of a genuine
+ * re-declaration is untouched: an EXCLUDING noun is refused upstream (`shapeExclusion`) and a NARROWING one
+ * still lowers to its constraints.
+ */
+function impliedShapeRestatement(prev: Construction, cmd: Command): Command | null {
+  const stated = statedQuadKind(cmd);
+  if (!stated || !('ids' in cmd)) return null;
+  const ids = cmd.ids as Id[];
+  const declared = declaredQuadKind(prev, ids);
+  if (!declared || declared === stated) return null;
+  const key = ringKey(ids);
+  const ring = prev.objects.find((o) => o.kind === 'polygon' && o.vertices.length === 4 && ringKey(o.vertices) === key);
+  if (!ring || ring.kind !== 'polygon') return null;
+  // The student's own READING has to say the implied thing too: in the declared spelling the class
+  // implication is the whole question, in any other reading only a noun that names no particular pair of
+  // sides survives it (`quadImpliesInEveryReading`). A trapezoid read the other way round is a different
+  // statement, not a restatement (ADR-506, ADR-618).
+  const sameSpelling = ring.vertices.every((v, i) => v === ids[i]);
+  if (!(sameSpelling ? quadImplies(declared, stated) : quadImpliesInEveryReading(declared, stated))) return null;
+  return { type: 'quadrilateral', ids: [...ring.vertices] as [Id, Id, Id, Id] };
+}
+
+/**
+ * #1985 ([ADR-619](../../docs/06-decisions.md#adr-619)) — TWO NOUNS NO QUADRILATERAL CAN CARRY AT ONCE, over
+ * one ring: «מקבילית ABCD» · «טרפז ABCD», in either order and in any reading of the ring.
+ *
+ * Structural, read from the declarations alone — never from the drawing — so the refusal is the same at every
+ * seed, and a ring that merely LOOKS like a trapezoid at one configuration is never refused. Returns the two
+ * nouns, newest second; `shapeExclusionError` is its wire message. The operator's 2026-10-10 ruling on #1985,
+ * with the sentence he chose for analytic on 2026-10-08 (ADR-AG-260) and 3-D's `shape-disjoint` (ADR-3D-313).
+ */
+export function shapeExclusion(prev: Construction, cmd: Command): { actual: QuadKind; stated: QuadKind } | null {
+  const stated = statedQuadKind(cmd);
+  if (!stated || !('ids' in cmd)) return null;
+  const actual = declaredQuadKind(prev, cmd.ids as Id[]);
+  if (!actual || !quadsExclude(actual, stated)) return null;
+  return { actual, stated };
+}
+
+/** The wire message `humanizeError` renders as the ruled sentence («הצורה כבר ידועה כ־… — ולכן אינה נקראת …»). */
+export function shapeExclusionError(m: { actual: QuadKind; stated: QuadKind }): string {
+  return `shape-excluded: the figure is already known to be a ${m.actual}, so it is not a ${m.stated}`;
+}
+
+/**
  * Pick the cyclic rotation of a shape's vertex list that puts existing points on
  * *free* slots, not derived ones — so a shape built on an existing edge attaches
  * regardless of where that edge sits in the name (ADR-013, amendment). A polygon
@@ -523,6 +623,11 @@ function declaredRingSpelling(prev: Construction, cmd: Command): Command | null 
  * rotates only when it strictly reduces derived-slot clashes.
  */
 export function normalizeShapeComposition(prev: Construction, cmd: Command): Command {
+  // #1988 (ADR-619): a noun the ring's own noun already implies is a RESTATEMENT — re-spelled to the
+  // generic ring command, which is the path ADR-595's «מרובע» already takes. Before the spelling fold
+  // below, because the rewrite already reads the declared spelling.
+  const implied = impliedShapeRestatement(prev, cmd);
+  if (implied) return implied;
   const declared = declaredRingSpelling(prev, cmd);
   if (declared) return declared;
   const slots = derivedSlotsOf(prev, cmd);

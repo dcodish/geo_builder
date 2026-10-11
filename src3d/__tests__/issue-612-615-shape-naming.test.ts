@@ -8,6 +8,13 @@
  * (2026-08-15): a less specific name is a **naming error**; the same name is **redundant** and must say
  * so.
  *
+ * **#1988 (ADR-3D-326), operator ruling 2026-10-10 — the naming-error half is RETIRED.** A square IS a
+ * rectangle, so «ריבוע ABCD» · «מלבן ABCD» is a true restatement, not a mis-naming: every IMPLIED noun now
+ * takes the redundancy path the identical noun always took (a notice, the figure untouched, no row), and
+ * `shape-less-specific` is gone. What #612 actually fixed survives unchanged: the noun is never absorbed as
+ * an inert drive, a noun that ADDS information still drives, and a noun that EXCLUDES the declared one is
+ * refused (`shape-disjoint`, #1918).
+ *
  * **#615, the tool's side.** Found while implementing that ruling: the flat lane lowered to constraint
  * sets only, so the remaining dims came from `polygon4`'s generic sampling and the solver stopped
  * wherever the residual hit zero — «מקבילית ABCD» drew at 89.4° (a rectangle) and «טרפז ABCD» drew
@@ -46,23 +53,26 @@ describe("#612 — the operator's exact sequence", () => {
     for (const id of ['A', 'B', 'C', 'D', 'S']) expect(dist3(P(d, id), P(before, id))).toBeLessThan(1e-9);
   });
 
-  it('«מלבן ABCD» on a square base is a NAMING ERROR (the ruling)', () => {
-    submit('פירמידה ABCDS שבסיסה ריבוע');
-    submit('מלבן ABCD');
-    expect(state().lastError).toEqual({ code: 'shape-less-specific', stated: 'rectangle', actual: 'square' });
-  });
+  // #1988 (ADR-3D-326): every noun a square IMPLIES is the SAME redundancy — true, already known, no row.
+  // «מרובע ABCD» is left out: the generic word is a flat-polygon declaration, not a quad noun, and ADR-3D-324 owns it.
+  it.each(['מלבן ABCD', 'מעוין ABCD', 'מקבילית ABCD', 'דלתון ABCD'])(
+    '«%s» on a square base is a true RESTATEMENT — never an error, and the figure is untouched',
+    (line) => {
+      submit('פירמידה ABCDS שבסיסה ריבוע');
+      const before = derived();
+      submit(line);
+      expect(state().lastError, 'a square IS all of these — nothing to refuse').toBeNull();
+      const d = derived();
+      expect(d.notices.some((n) => n.kind === 'already-known' && n.rel === 'shape'), 'and the student is told it adds nothing').toBe(true);
+      expect(d.construction.scalarPins.length).toBe(before.construction.scalarPins.length);
+      for (const id of ['A', 'B', 'C', 'D', 'S']) expect(dist3(P(d, id), P(before, id))).toBeLessThan(1e-9);
+    },
+  );
 
-  it('«מעוין ABCD» likewise — the ruling is about specificity, not about one noun', () => {
+  it('a noun no square can carry IS still refused, naming both shapes (#1918)', () => {
     submit('פירמידה ABCDS שבסיסה ריבוע');
-    submit('מעוין ABCD');
-    expect(state().lastError).toEqual({ code: 'shape-less-specific', stated: 'rhombus', actual: 'square' });
-  });
-
-  it('the refusal names BOTH shapes, so the message can say what the figure actually is', () => {
-    submit('פירמידה ABCDS שבסיסה ריבוע');
-    submit('דלתון ABCD');
-    const err = state().lastError;
-    expect(err && 'stated' in err && 'actual' in err, 'an honest refusal names the conflict').toBe(true);
+    submit('טרפז ABCD');
+    expect(state().lastError).toEqual({ code: 'shape-disjoint', stated: 'trapezoid', actual: 'square' });
   });
 });
 
@@ -79,11 +89,13 @@ describe('#612 — what a naming error is NOT: a statement that ADDS information
     expect(dist3(A, B)).toBeCloseTo(dist3(B, C), 4);
   });
 
-  it('and the ring is KNOWN as the more specific shape afterwards — so the reverse is now an error', () => {
+  it('and the ring is KNOWN as the more specific shape afterwards — so the reverse adds nothing (#1988)', () => {
     submit('פירמידה ABCDS שבסיסה מלבן');
     submit('ריבוע ABCD');
+    const rows = state().facts.length;
     submit('מלבן ABCD');
-    expect(state().lastError).toEqual({ code: 'shape-less-specific', stated: 'rectangle', actual: 'square' });
+    expect(state().lastError, 'a square IS a rectangle').toBeNull();
+    expect(state().facts.length, 'and it adds no row').toBe(rows);
   });
 
   it('a shape stated on a FRESH ring is not a naming error against itself', () => {

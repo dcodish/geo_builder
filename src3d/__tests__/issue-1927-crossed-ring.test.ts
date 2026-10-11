@@ -88,11 +88,17 @@ describe('#1927 the class — a shape-placed ring crossed in every configuration
 });
 
 describe('#1927 one ring is one cyclic order — the false reasons are gone', () => {
-  it('«ריבוע ABCD · מקבילית ACBD» is no longer "a square is already a parallelogram" — its claim is refuted', () => {
+  /**
+   * #1991 (ADR-3D-327, operator ruling 2026-10-10) — RE-BASED, not relaxed. This row recorded `claim-refuted`
+   * («בדקו את החישוב»), the arithmetic's words for an order mistake. A square's four points admit exactly ONE
+   * simple cyclic order, so ACBD crosses in every configuration and the line is refused for its ORDER — the same
+   * message «מרובע ACBD» already got. The #1991 matrix is `issue-1991-crossed-ring-specific-noun.test.ts`.
+   */
+  it('«ריבוע ABCD · מקבילית ACBD» is no longer "a square is already a parallelogram" — it is refused for its ORDER', () => {
     const r = play(['ריבוע ABCD', 'מקבילית ACBD']);
     expect(r.kinds).toEqual(['record', 'refused']);
-    expect(r.error).not.toMatchObject({ code: 'shape-less-specific' });
-    expect(r.error).toMatchObject({ code: 'claim-refuted' });
+    expect(r.error).not.toMatchObject({ code: 'shape-disjoint' });
+    expect(r.error).toMatchObject({ code: 'ring-crossed', stated: 'מקבילית ACBD' });
   });
 
   it('«ריבוע ABCD · ריבוע ACBD» is no longer accepted as a redundant restatement', () => {

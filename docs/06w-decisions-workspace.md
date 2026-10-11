@@ -5567,7 +5567,7 @@ This entry is the citable source for each ruling until the pedagogy charter (doc
 - **B10 — A choice the tool made is said, never as if forced.** 2-D's notes are ported to analytic (#1864). The right-angle seat notice stays withdrawn.
 - **B11 — ADR-517's «נשמר: הענף של E» is reworded in a student's words** (#1866). The new text is the operator's to approve.
 - **B12 — Two possible values are shown both, joined by «או», in every tool.** *"complex should also show both values - so it should follow all of the tools"* (#1867). This supersedes ADR-CX-049's withholding.
-- **B13 — One refusal voice.** Each refusal kind has one wording, with 2-D as the reference. "The tool's limit, not your mistake" applies everywhere (#1868).
+- **B13 — One refusal voice.** Each refusal kind has one wording, with 2-D as the reference. "The tool's limit, not your mistake" applies everywhere (#1868). *Realised for the second-shape-noun refusals by [ADR-619](06-decisions.md#adr-619) and [ADR-3D-326](06b-decisions-3d.md#adr-3d-326) (#1988, #1985): 2-D adopts the sentence analytic and 3-D already use for a noun that excludes the declared shape, and all three answer "already there" for one it implies. The already-there NOTE's own wording is still per-builder — that is #1990.*
 - **B14 + D3 — Complex gets the LLM fallback (#1869) and the proof-verb refusal (#1870).** A bare statement keeps its claim check.
 - **B15 — Small alignments, all approved.**
   - The analytic empty state uses the shared title.

@@ -11828,3 +11828,41 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 - «A(k,0) · B(4,0) · C(1,3) · D(3,3) · טרפז ABCD» draws a real trapezoid (k beyond 4) instead of a bow-tie.
 - «טרפז ABCD · מרובע ACBD» (either order) is refused with the ring message instead of recorded with a crossed ring.
 - The ring message ends «…או לשנות את מקומות הנקודות…».
+
+## ADR-AG-261 — A crossing order of a convex ring's letters is refused for its ORDER, whatever noun it carries: the structural proof speaks over «לא נמצאה תצורה» (#1991)
+
+**Status:** accepted · 2026-10-11 · bug (P3, analytic) · branch `fix/1991-crossed-ring-message-parity` off `fix/1988-shape-noun-implied-or-excluded` @ 80cf0c9b · fix round #1992 · twin [ADR-3D-327](06b-decisions-3d.md#adr-3d-327) · amends [ADR-AG-250](#adr-ag-250) and [ADR-AG-256](#adr-ag-256) · adopts [ADR-W-121](06w-decisions-workspace.md#adr-w-121) and its 2026-10-09 amendment · 2-D reference [ADR-608](06-decisions.md#adr-608) / [ADR-613](06-decisions.md#adr-613)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R91 gains a bullet — a declared ring that reorders a ring whose noun is convex whenever simple is refused with `errRingContradictsNoun`, whatever noun it carries · **Design:** [04c](04c-design-analytic.md) § the ring-fault arm, the structural crossed-order paragraph · **LADDER stage:** derive (the fault pass), before the given-attribution arms
+
+**The ruling (2026-10-10, decisions page, #1991).** Option **A: 2-D's crossed-shape message everywhere.** He rejected keeping the three different messages, and rejected a new noun-specific sentence.
+
+**Measured before** (`main` @ 06fc51dd, through `decideSubmit`):
+
+| lines | analytic at 06fc51dd |
+| --- | --- |
+| «ריבוע ABCD» · «מקבילית ACBD» | `unsatisfiable` — «לא נמצאה תצורה שבה מתקיים: "מקבילית ACBD"» |
+| «ריבוע ABCD» · «טרפז ACBD» / «מלבן ACBD» | `unsatisfiable` |
+| «מלבן ABCD» · «מקבילית ACBD» | `unsatisfiable` |
+| «ריבוע ABCD» · «מרובע ACBD» | `ring-contradicts-noun` — the shared message (ADR-AG-250/256) |
+
+**Class (docs/17 §1).** *A ring the student spelled in a crossing order is refused with the search's words instead of for its order, because the ring-order test's EVIDENCE is unavailable exactly when the noun's own relations are what cannot hold.* The plan read this as an ordering problem ("route to the crossed-ring refusal before the generic unsatisfiable message"); the measurement is different and worth recording. `completing` is already **null** here (no single line's removal admits a figure), so the ring arm DOES run — and finds nothing, because `drawableAt`'s `noteRings` records ring evidence only from candidates where every GIVEN holds (`unsatisfied.length === 0`). With the second noun's own relations unsatisfiable there is no such candidate: measured at 06fc51dd, `forcedCrossed` is empty and `hardRingFaults` reports the ring crossed with `ringDof = 4`, which the `pinnedRingFaults` filter rightly drops. So the fix is the EVIDENCE, not the order.
+
+**Decision.** Add the STRUCTURAL proof, which needs no figure.
+
+1. **`convexWhenSimple(noun)`** (`engine/shapes.ts`), read off the row's own givens: a noun is convex whenever simple when it asserts a pair of opposite sides parallel (assumed or stated — «טרפז» promises *a* pair either way), a right angle, or all four sides equal (`equalSides`). That is every quad noun but **«מרובע»** (which asserts nothing) and **«דלתון»** (which may be a DART). 2-D's ADR-613 states the same fact in words; 3-D's twin is `convexWhenSimple` in its `baseShapes.ts`.
+2. **The pass** (`derive`, before the drop-one probe's arms): group the DECLARED polygons by their letter SET. Analytic's polygon id is already canonical over rotations and reversals (ADR-AG-259), so two ids over the same letters ARE two cyclic orders. When any of them is convex-when-simple the others cross in every configuration — four points in convex position admit exactly one simple cyclic order — and the LATEST of the group's declaring lines is faulted `ring-contradicts-noun`.
+3. **It silences the given-attribution arms**, on ADR-AG-240's own rule: when one statement is named, the givens that fail in the compromise configuration are that contradiction read twice, not a second culprit. Without this the square's own line would go red for the order of the other ring. (Measured before: `faults` held an `unsatisfiable` on BOTH lines; after: one fault, on the declaring line.)
+4. **Search first, refuse last** is kept by the predicate itself, not by a search budget: «דלתון ABCD» · «מרובע ABDC» answers false and is still drawn as a dart, and a reordered ring with nothing to contradict it («מקבילית ACBD» alone) is still drawn.
+5. A line that already carries a truer message keeps it (the pass returns null rather than stacking a second fault).
+
+**Measured after** (the same path): every row above answers `ring-contradicts-noun` with the shared sentence, at seeds 0–5, with exactly one fault, on the declaring line. The ring-first order refuses the shape line that completed it. «מקבילית ACBD», «מרובע ACBD» and «טרפז ACBD» alone still record; «דלתון ABCD» · «מרובע ABDC» still records; «ריבוע ABCD» · «מרובע ADCB» is still the restatement.
+
+**Sibling audit.** 3-D had the same class with a different evidence gate (its proof runs over the claim samples, and the pivot finds no placement at all): [ADR-3D-327](06b-decisions-3d.md#adr-3d-327), this item's other arm. 2-D is the reference and is unchanged — `forcedCrossedRing` runs at the submit gate, before the dry run, so the noun's own constraints never get in front of it. Complex declares no polygons.
+
+**Locks.** `src-analytic/__tests__/issue-1991-crossed-ring-specific-noun.test.ts` (the reported rows in both languages, the single fault on the declaring line, the ring-first order, seeds 0–5, the search-first controls, and the `convexWhenSimple` classification over every quad row of `SHAPES`); parity rows `crossed-ring-1991-01…05`.
+
+**Behaviour change for a student:**
+- «ריבוע ABCD» · «מקבילית ACBD» (and «טרפז ACBD», «מלבן ACBD»; «מלבן ABCD» / «מעוין ABCD» · «מקבילית ACBD») is refused «הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "…". אפשר לשנות את סדר האותיות…» instead of «לא נמצאה תצורה שבה מתקיים: "…"», and only that line goes red — the earlier shape line stays green.
+- The same holds when the crossing ring is stated FIRST: the shape line that completed it is refused.
+- Nothing else changes: a reordered ring nothing contradicts is still drawn, and a kite partner is still never refused.

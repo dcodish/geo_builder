@@ -244,6 +244,18 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   names both statements. The one-line form keeps `err.inscribedContradictsNoun`.
 - **The disjoint re-declaration.** ARM 3's `known` split refuses `shape-disjoint` when no row of `QUAD_IMPLIES`
   implies both the known shape and the stated noun (`quadsDisjoint`); worded by `err.shapeLessSpecific`.
+- **A CROSSING ORDER of the same letters** (#1991, [ADR-3D-327](06b-decisions-3d.md#adr-3d-327)). `convexWhenSimple(base)`
+  — read off `quadShapeConstraints`' relation set: a parallel pair, a right angle, or four equal sides; false for the
+  kite and the bare quadrilateral — makes the crossing STRUCTURAL. `derive3` groups the declared rings by letter SET
+  after the retry fixpoint and BEFORE the claim pass: a group with two cyclic orders, one of them convex-when-simple,
+  refuses the LATEST declaring fact `ring-crossed`. Running first is why no verdict has to be overridden; ADR-3D-322's
+  sample-based pass stays where it is, for the rings whose figure the pivot can still place.
+- **The IMPLIED re-declaration** (#1988, [ADR-3D-326](06b-decisions-3d.md#adr-3d-326)). The same split's other arm
+  has ONE outcome: `quadImplies(known, cmd.base)` records the statement in `redundantShapes` and returns the figure
+  untouched, so `buildNotices3` says it added nothing. `shape-less-specific` is gone from `EngineError3`. The store's
+  `ringRestatementTwin3` reads the SAME `quadImplies` so no row is added, and in a reading other than the declared
+  spelling the stricter `quadImpliesInEveryReading` (a noun that names one pair of sides does not survive an
+  arbitrary reading).
 - **The pair in force.** `trapezoidRingInForce3(ring, stated)`: sides 0/2 of the ring as named, unless the
   student stated sides 1/3 parallel and not 0/2. `derive3`'s order-free pre-scan reads the stated ∥ (segment
   `mutual-rel parallel`, never `origin: 'shape'`) and SEATS the declaration: `quad-shape.seat` reads the family's
@@ -512,7 +524,9 @@ not-understood · refused · already-stated · record) and `submit` dispatches i
 grammar plus the #866 repair and the #516 typed refusals), `lostGivens3` (the honesty gates) and
 `decideCommands3` (gates → twin → derive → search), where the LLM lane's `submitSteps` also ends. The twin is
 `sameStatement` (spelling), else `ringRestatementTwin3` (#1953, [ADR-3D-324](06b-decisions-3d.md#adr-3d-324)): a single
-ring declaration over a ring an enabled fact declares, up to rotation and reversal (`ringKey3`). A parse's
+ring declaration over a ring an enabled fact declares, up to rotation and reversal (`ringKey3`), whose noun that
+fact's noun already IMPLIES (#1988, `quadImplies` / `quadImpliesInEveryReading` — the generic word is that
+predicate's `quad` row, no longer a kind test). A parse's
 `unread` words (#1902) flow through `lostGivens3`, reported as `dropped-given` only when no other gate fired; the
 LLM lane collects them from every model line. A new
 branch belongs in the decision; a parity lock replays recorded sequences.
