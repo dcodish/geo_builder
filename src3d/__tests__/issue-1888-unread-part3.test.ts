@@ -41,8 +41,10 @@ function run(lines: string[]): St {
 const render = (lng: string, err: StoreError3) =>
   (errorText3(i18n3d.getFixedT(lng) as (k: string, o?: Record<string, unknown>) => string, err) ?? '').replace(/[⁦-⁩]/g, '');
 
+// #1962 (ADR-3D-331, the operator's ruling of 2026-10-10): the taught pair is now items (1) and (2) of ONE
+// numbered list, as 2-D reads since ADR-611 — the prose «כתבו קודם … ואחר כך בשורה נפרדת …» is gone.
 const TEACH = (tri: string, angle: string) =>
-  `בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו קודם «משולש ${tri}», ואחר כך בשורה נפרדת «∠${angle} = 90°».`;
+  `בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו בשורות נפרדות: (1) משולש ${tri}  (2) ∠${angle} = 90°`;
 const SPLIT = (all: string) => `בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. זיהינו כאן שני נתונים — נסו להקליד אותם בשני שלבים: ${all}`;
 
 describe('#1888 — «משולש ABC ישר זווית ב-<V>» is refused and taught, any vertex, any figure before it', () => {
@@ -60,9 +62,10 @@ describe('#1888 — «משולש ABC ישר זווית ב-<V>» is refused and t
       const verdict = decideSubmit3(st, `משולש ABC ישר זווית ב-${v}`, id);
       expect(verdict.kind).toBe('refused');
       if (verdict.kind !== 'refused') return;
-      expect(verdict.error).toEqual({ code: 'right-angle-vertex', triangle: 'ABC', angle, rest: '' });
+      expect(verdict.error).toEqual({ code: 'right-angle-vertex', triangle: 'ABC', angle, more: '' });
       expect(render('he', verdict.error)).toBe(TEACH('ABC', angle));
-      expect(render('en', verdict.error)).toContain(`«∠${angle} = 90°»`);
+      // #1962: the ruled list has no guillemets around the taught items — they are items (1) and (2)
+      expect(render('en', verdict.error)).toContain(`(2) ∠${angle} = 90°`);
       // answered on purpose, never escalated to the model
       expect(refusalCategory3(verdict.error)).toBe('guided');
       expect(decideDeterministic3(st, `משולש ABC ישר זווית ב-${v}`, id).kind).toBe('refused');
@@ -88,7 +91,7 @@ describe('#1888 — «משולש ABC ישר זווית ב-<V>» is refused and t
 
   it('a different triangle name teaches its own letters', () => {
     const v = decideSubmit3(EMPTY, 'משולש KLM ישר זווית ב-K', id);
-    expect(v.kind === 'refused' && v.error).toEqual({ code: 'right-angle-vertex', triangle: 'KLM', angle: 'MKL', rest: '' });
+    expect(v.kind === 'refused' && v.error).toEqual({ code: 'right-angle-vertex', triangle: 'KLM', angle: 'MKL', more: '' });
   });
 });
 
@@ -109,7 +112,7 @@ describe('#1888 — the other measured 3-D drops are refused with the one-input-
     useGeo3.getState().submit('משולש ABC');
     const fid = useGeo3.getState().facts[0].id;
     expect(useGeo3.getState().replaceFact(fid, 'משולש ABC ישר זווית ב-A')).toBe(false);
-    expect(useGeo3.getState().lastError).toEqual({ code: 'right-angle-vertex', triangle: 'ABC', angle: 'CAB', rest: '' });
+    expect(useGeo3.getState().lastError).toEqual({ code: 'right-angle-vertex', triangle: 'ABC', angle: 'CAB', more: '' });
     expect(useGeo3.getState().facts[0].utterance).toBe('משולש ABC');
   });
 

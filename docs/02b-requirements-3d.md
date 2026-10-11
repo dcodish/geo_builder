@@ -186,10 +186,15 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   the reading did not read — a vertex locative («משולש ABC שווה שוקיים ב-B», «טרפז ABCD ישר זווית ב-B», «…ב-A» on
   a prism) — refuses the line with 2-D's one-input-per-line message, listing the parts in the student's words
   cut where the reading stops («(1) משולש ABC שווה שוקיים  (2) ב-B»), **even where the drawing happens to agree**.
-  «משולש ABC ישר זווית ב-<V>» is taught instead: «כתבו קודם «משולש ABC», ואחר כך בשורה נפרדת «∠ABC = 90°».», the
-  angle named at the student's vertex. The ✎ editor refuses the same edits. A scene the statement lives in
+  «משולש ABC ישר זווית ב-<V>» is taught instead, as the first two items of that SAME one list:
+  «כתבו בשורות נפרדות: (1) משולש ABC  (2) ∠ABC = 90°», the angle named at the student's vertex, and anything
+  else the line said continuing the list from (3). One numbered list from (1), whatever the line holds —
+  never a second list and never a list starting where the student can see no (1); it is the same list and
+  the same words 2-D shows. The ✎ editor refuses the same edits. A scene the statement lives in
   («…במשולש SBC» on a pyramid, «פירמידה SABC שבסיסה משולש ABC») is context, not a part. The 2-D twin is FR-IN-4g.
-  - Sources: ADR-3D-316, ADR-W-120; #1888 (operator rulings 2026-10-08).
+  - Sources: ADR-3D-316, ADR-W-120; #1888 (operator rulings 2026-10-08); the numbered single list is
+    [ADR-3D-331](06b-decisions-3d.md#adr-3d-331) / #1962 (operator ruling 2026-10-10), porting
+    [ADR-611](06-decisions.md#adr-611).
 - **FR-SP-17 (Must)** — **A role the reading drops refuses the line.** A cevian or ⟂ word the reading did not read
   («AD תיכון לצלע BC שהוא גם גובה», «…שמאונך לה», "…that is also a median") refuses the line whole, never recording AD
   with one role only. The refusal teaches one line per role («כתבו כל תפקיד בשורה נפרדת: «AD is the altitude to BC», ואחר
