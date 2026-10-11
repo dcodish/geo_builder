@@ -223,6 +223,16 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   A noun that ADDS information still drives (FR-SP-2), and one that EXCLUDES the declared shape is still refused
   naming both (FR-SP-18). The twin of 2-D FR-EN-9 and analytic R45.
   - Sources: ADR-3D-324, ADR-3D-326; #1953, #1988.
+- **FR-SP-20 (Must)** — **A crossing ORDER of a ring's letters is refused for its order, whatever noun it carries.**
+  When two declared rings spell the same four letters in different cyclic orders and either noun is convex whenever
+  simple (every quad noun but «דלתון» and the bare «מרובע»), the other order crosses in every configuration — four
+  points in convex position admit exactly one simple cyclic order. The line that COMPLETED the pair is refused with
+  the shared ring message («הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: …»), in either order and whatever the
+  second noun: «ריבוע ABCD» · «מקבילית ACBD» / «טרפז ACBD» / «מלבן ACBD», «מלבן ABCD» · «מקבילית ACBD» — never
+  «בדקו את החישוב» and never the contradicting-givens sentence. **Search first, refuse last** (FR-SP-15's rule):
+  a «דלתון» or bare-«מרובע» partner may be a dart or concave, so the other order is drawn, and a reordered ring
+  nothing contradicts is always drawn. The 2-D twin is FR-EN-16 and the analytic twin is R91.
+  - Sources: ADR-3D-322, ADR-3D-327; #1927, #1991.
 
 ## Vectors — the geometric lane
 

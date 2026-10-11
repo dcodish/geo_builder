@@ -19,7 +19,7 @@ import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectB
 import { SOLVE_TOL, resolveChoices } from './solve';
 import { NO_STATED_MEASURES, statedMeasures, type StatedMeasures } from './statedMeasures';
 import { incidenceWords } from './crossings';
-import { shapeRow } from './shapes';
+import { convexWhenSimple, shapeRow } from './shapes';
 
 /** What went wrong with one line — a parse refusal or an apply refusal, with the line's own text. */
 /** The point ids an incidence constraint is ABOUT — how a crossing is recognised (#1254). */
@@ -210,6 +210,49 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   facts.forEach((f, i) => {
     if (f.t === 'point' && !errors[i]) pinnedBy.set(f.id, owner[i]); // the LAST line to place it
   });
+
+  /**
+   * #1991 ([ADR-AG-261](../../docs/06c-decisions-analytic.md#adr-ag-261)) — TWO DECLARED RINGS OVER THE SAME LETTERS
+   * IN DIFFERENT CYCLIC ORDERS, ONE OF THEM CONVEX WHENEVER SIMPLE: the other crosses in every configuration.
+   *
+   * «ריבוע ABCD» · «מקבילית ACBD» was refused «לא נמצאה תצורה שבה מתקיים: "מקבילית ACBD"», telling the student the
+   * search missed when the mistake is the order of four letters. The operator's ruling of 2026-10-10 (#1991,
+   * option A): 2-D's crossed-shape message everywhere — `errRingContradictsNoun`, which the generic «מרובע ACBD»
+   * already gets here.
+   *
+   * WHY ADR-AG-250's PASS COULD NOT SAY IT. Its evidence is the walk's: `noteRings` records only candidates where
+   * every GIVEN holds (`unsatisfied.length === 0`), so when the second noun's OWN relations are what cannot hold
+   * there is no such candidate — measured at 06fc51dd, `forcedCrossed` is empty and `hardRingFaults` reports the
+   * ring crossed with `ringDof = 4`, which the `pinnedRingFaults` filter rightly drops. The evidence here is
+   * STRUCTURAL and needs no figure: four points in convex position admit exactly one simple cyclic order, so a ring
+   * declared with a noun that is convex whenever simple (`convexWhenSimple`) PROVES that every other cyclic order
+   * of its letters crosses. "Search first, refuse last" is kept by the predicate — a «דלתון» or a bare «מרובע»
+   * partner may be a dart or concave and is never refused on this ground.
+   *
+   * Blamed on the LATEST of the two declarations — the line that completed the contradiction — and it SILENCES the
+   * given-attribution arms below, on ADR-AG-240's rule: when one statement is named, the givens that fail in the
+   * compromise configuration are that contradiction read twice, not a second culprit.
+   */
+  const ringOrderFault: LineFault | null = (() => {
+    const declaredAt = new Map<string, number>();
+    facts.forEach((f, i) => {
+      if (f.t === 'polygon' && !errors[i] && !declaredAt.has(f.id)) declaredAt.set(f.id, owner[i]);
+    });
+    const byLetters = new Map<string, { id: string; convex: boolean }[]>();
+    for (const o of construction.objects) {
+      if (o.kind !== 'polygon' || o.vertices.length !== 4 || !declaredAt.has(o.id)) continue;
+      const key = [...o.vertices].sort().join('');
+      byLetters.set(key, [...(byLetters.get(key) ?? []), { id: o.id, convex: convexWhenSimple(o.noun) }]);
+    }
+    for (const group of byLetters.values()) {
+      if (group.length < 2 || !group.some((g) => g.convex)) continue;
+      const at = Math.max(...group.map((g) => declaredAt.get(g.id)!));
+      if (faults.some((f) => f.index === at)) return null; // a truer message is already on that line
+      return { index: at, code: 'ring-contradicts-noun' as const, detail: lines[at] };
+    }
+    return null;
+  })();
+  if (ringOrderFault) faults.push(ringOrderFault);
   const completing =
     figure.unsatisfied.length > 0
       ? completingStatement(
@@ -260,7 +303,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * not a second, earlier culprit. Measured over the corpus: three already-refused figures («AB = AC» ·
    * «∠ABC = 90» on «משולש ABC») would otherwise blame «משולש ABC» too.
    */
-  if (completing === null && !figure.selectorsOk && (reportedDof(construction, figure.carrierDof) === 0 || figure.unsatisfied.length === 0)) {
+  if (!ringOrderFault && completing === null && !figure.selectorsOk && (reportedDof(construction, figure.carrierDof) === 0 || figure.unsatisfied.length === 0)) {
     const blamed = new Set<number>();
     // Only the sentences whose selector FAILED (#1268): a triangle's `distinct` did not make a crossing's
     // ordinal impossible. Without the per-selector verdict, every selector line, as before.
@@ -314,13 +357,13 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * so. «לא נמצאה תצורה» would tell the student the search missed, when the givens themselves are what flatten it.
    * A given that cannot hold even flat («AC = 8.1» on 5 and 3) leaves no such evidence and keeps the search's words.
    */
-  const flattened = completing !== null ? collapsedByGivens(construction, seed) : [];
-  const flatFault = completing !== null && flattened.length > 0 ? collapseFault(completing, flattened[0]) : null;
+  const flattened = !ringOrderFault && completing !== null ? collapsedByGivens(construction, seed) : [];
+  const flatFault = flattened.length > 0 ? collapseFault(completing!, flattened[0]) : null;
   if (flatFault) faults.push(flatFault);
-  else if (completing !== null && !faults.some((f) => f.index === completing && f.code === 'unsatisfiable')) {
+  else if (!ringOrderFault && completing !== null && !faults.some((f) => f.index === completing && f.code === 'unsatisfiable')) {
     faults.push({ index: completing, code: 'unsatisfiable', detail: lines[completing] });
   }
-  for (const k of completing === null ? figure.unsatisfied : []) {
+  for (const k of !ringOrderFault && completing === null ? figure.unsatisfied : []) {
     /**
      * Which constraint IS this, in the construction (#1079)?
      *

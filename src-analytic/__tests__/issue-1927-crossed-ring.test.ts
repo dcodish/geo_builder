@@ -128,12 +128,19 @@ describe('#1927 — the class, both orders, one ring at a time', () => {
 });
 
 describe('#1927 — unchanged', () => {
+  /**
+   * #1991 ([ADR-AG-261](../../docs/06c-decisions-analytic.md#adr-ag-261), operator ruling 2026-10-10) — RE-BASED,
+   * not relaxed. These three rows recorded «לא נמצאה תצורה», which is the search's words for an order mistake:
+   * a square's four points admit exactly ONE simple cyclic order, so ACBD crosses in every configuration. They now
+   * carry the SAME ring message the generic «מרובע ACBD» above already carried, and only the declaring line
+   * is faulted. The #1991 matrix is `issue-1991-crossed-ring-specific-noun.test.ts`.
+   */
   it.each([
     [['ריבוע ABCD', 'טרפז ACBD'], 'טרפז ACBD'],
     [['ריבוע ABCD', 'מקבילית ACBD'], 'מקבילית ACBD'],
     [['מלבן ABCD', 'ריבוע ACBD'], 'ריבוע ACBD'],
-  ])('%j keeps «לא נמצאה תצורה שבה מתקיים»', (seq, line) => {
-    expect(play(seq)?.error).toMatchObject({ key: 'unsatisfiable', detail: line });
+  ])('%j is refused for its ORDER (#1991), never with the search’s words', (seq, line) => {
+    expect(play(seq)?.error).toMatchObject({ key: 'ring-contradicts-noun', detail: line });
   });
 
   it.each([

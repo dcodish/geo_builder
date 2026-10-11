@@ -12466,3 +12466,43 @@ A crossing order has another ring key and is never a twin (#1927's refusal); a l
 - «ריבוע ABCD» · «מלבן ABCD» / «מעוין ABCD» / «מקבילית ABCD» / «דלתון ABCD», «מלבן ABCD» · «מקבילית ABCD», «מעוין ABCD» · «מקבילית ABCD» / «דלתון ABCD», and any reading of each, are accepted as restatements — the restatement note, no row — instead of refused «הצורה כבר ידועה כ־ריבוע — ולכן אינה נקראת מלבן…».
 - The same lines on a solid's base («פירמידה ABCDS שבסיסה ריבוע» · «מלבן ABCD») are likewise no longer refused; as for the identical noun today, the row is kept and carries the «הצורה כבר ידועה מנתון קודם» notice.
 - Nothing else changes: an excluding noun is still refused naming both, a narrowing noun still drives, and a trapezoid read so the other pair is named is still a new statement.
+
+## ADR-3D-327 — A crossing order of a convex ring's letters is refused for its ORDER, whatever noun it carries: the structural proof speaks before the claim pass (#1991)
+
+**Status:** accepted · 2026-10-11 · bug (P3, 3-D) · branch `fix/1991-crossed-ring-message-parity` off `fix/1988-shape-noun-implied-or-excluded` @ 80cf0c9b · fix round #1992 · twin [ADR-AG-261](06c-decisions-analytic.md#adr-ag-261) · amends [ADR-3D-322](#adr-3d-322) · adopts [ADR-W-121](06w-decisions-workspace.md#adr-w-121) and its 2026-10-09 amendment · 2-D reference [ADR-608](06-decisions.md#adr-608) / [ADR-613](06-decisions.md#adr-613)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-20 — a declared ring that reorders a ring whose noun is convex whenever simple is refused with the shared ring message, whatever noun it carries · **Design:** [04b](04b-design-3d.md) § "What a ring was DECLARED to be", the crossed-ring paragraph · **LADDER stage:** derive (the status pass), before the claim pass
+
+**The ruling (2026-10-10, decisions page, #1991).** Option **A: 2-D's crossed-shape message everywhere.** He rejected keeping the three different messages, and rejected a new noun-specific sentence.
+
+**Measured before** (`main` @ 06fc51dd, through `decideSubmit3`):
+
+| lines | 3-D at 06fc51dd |
+| --- | --- |
+| «ריבוע ABCD» · «מקבילית ACBD» | `claim-refuted` — «הטענה לא מתקיימת בציור — בדקו את החישוב» |
+| «ריבוע ABCD» · «טרפז ACBD» | `claim-refuted` |
+| «מלבן ABCD» · «מקבילית ACBD» | `claim-refuted` |
+| «ריבוע ABCD» · «מלבן ACBD» | `givens-contradict` |
+| «ריבוע ABCD» · «מרובע ACBD» | `ring-crossed` — the shared message (ADR-3D-322) |
+
+**Class (docs/17 §1).** *A ring the student spelled in a crossing order is refused for the arithmetic of the noun's relations instead of for its order, because the ring-order test's EVIDENCE is unavailable exactly when the noun's own relations are what cannot hold.* The plan read this as a pure ordering problem (the claim pass runs first). The measurement is sharper and worth recording: ADR-3D-322 proves the crossing over the CLAIM SAMPLES, and with a specific noun the pivot finds no placement at all — measured, every one of the sequences above has `pivot.solutions === 0` and **zero placed samples**, where that pass rightly fails open ("search first, refuse last": there is no figure of the givens to read a crossing in). Reordering the passes alone would therefore have changed nothing.
+
+**Decision.** Add the STRUCTURAL proof, which needs no figure, and run it before the claim pass so no verdict has to be overridden.
+
+1. **`convexWhenSimple(base)`** (`engine/baseShapes.ts`), read off `quadShapeConstraints`' own relation set: a base is convex whenever simple when it asserts a pair of opposite sides parallel, a right angle, or all four sides equal. That is every base but the **kite** (which may be a DART) and the bare **quadrilateral**. 2-D's ADR-613 states the same fact in words.
+2. **The pass** (`derive3`, after the retry fixpoint, before the claim pass): group the declared rings by their LETTER SET; when a group holds two or more distinct cyclic orders and any of them is convex-when-simple, the others cross in every configuration — four points in convex position admit exactly one simple cyclic order. The LATEST of the group's declaring facts is refused `ring-crossed` with its own utterance, exactly as ADR-3D-322 blames the ring-first order's shape line.
+3. **Search first, refuse last** is kept by the predicate itself, not by a sample budget: a kite or a bare-quadrilateral partner answers false, so the operator's «דלתון ABCD · מרובע ABDC» is never refused on this ground. A ring with nothing to contradict it («מקבילית ACBD» alone) is drawn.
+4. **No override list.** Running before the claim pass means the claim pass's own guard (`status[factId] !== 'ok'` → skip) and the pin-owner guard do the precedence for free. ADR-3D-322's sample-based pass stays exactly where it is, for the cases where it already works.
+
+**Measured after** (the same path): every row above answers `ring-crossed` with the shared sentence, at seeds 0–5, with the prior figure untouched and nothing committed. «מקבילית ACBD» alone, «מרובע ACBD» alone and «דלתון ABCD · מרובע ABDC» still record. «ריבוע ABCD» · «מרובע ADCB» is still the restatement.
+
+**The class, beyond the report.** The predicate closed siblings nobody reported: «מעוין ABCD» · «מקבילית ACBD», «טרפז ABCD» · «מקבילית ACBD», and the ring-first order «מקבילית ACBD» · «ריבוע ABCD» — each was `claim-refuted` or `polygon-collapsed` and is now the ring message.
+
+**Sibling audit.** Analytic had the same class with a different evidence gate (its walk records ring evidence only from candidates where every given holds): [ADR-AG-261](06c-decisions-analytic.md#adr-ag-261), this item's other arm. 2-D is the reference and is unchanged — ADR-608's `forcedCrossedRing` runs at the submit gate, before the dry run, so the noun's own constraints never get in front of it. Complex declares no polygons.
+
+**Locks.** `src3d/__tests__/issue-1991-crossed-ring-specific-noun.test.ts` (the reported rows in both languages, the ring-first order, seeds 0–5, the search-first controls, and the `convexWhenSimple` classification over the whole family table); parity rows `crossed-ring-1991-01…05`.
+
+**Behaviour change for a student:**
+- «ריבוע ABCD» · «מקבילית ACBD» (and «טרפז ACBD», «מלבן ACBD»; «מלבן ABCD» / «מעוין ABCD» / «טרפז ABCD» · «מקבילית ACBD») is refused «הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: «…». אפשר לשנות את סדר האותיות…» instead of «הטענה לא מתקיימת בציור — בדקו את החישוב» or the contradicting-givens sentence.
+- The same holds when the crossing ring is stated FIRST: the shape line that completed it is refused.
+- Nothing else changes: a reordered ring nothing contradicts is still drawn, and a kite partner is still never refused.

@@ -698,6 +698,11 @@ a sentence the tool parsed.
 - **Search first, refuse last** (operator, 2026-10-09; [ADR-AG-256](06c-decisions-analytic.md#adr-ag-256)): a ring a free parameter can make simple is DRAWN simple — «A(k,0)» · «B(4,0)» · «C(1,3)» · «D(3,3)» · «טרפז ABCD» (a trapezoid only for k > 4) → drawn with k > 4, never crossed and never refused, the parameter searched past the sampler's default window (#1939)
 - A ring nothing the student wrote can save is refused even when its shape has a free ratio: «טרפז ABCD» · «מרובע ACBD» → «מרובע ACBD» refused; «מרובע ACBD» · «טרפז ABCD» → «טרפז ABCD» refused
 - A kite may be a dart: «דלתון ABCD» · «מרובע ABDC» → drawn, ABDC simple
+- The second ring's NOUN never changes the answer ([ADR-AG-261](06c-decisions-analytic.md#adr-ag-261), #1991): when either
+  ring's noun is convex whenever simple — every quad noun but «מרובע» and «דלתון» — the other cyclic order crosses in
+  every configuration and is refused with the same message, on the line that completed the pair: «ריבוע ABCD» ·
+  «מקבילית ACBD» / «טרפז ACBD» / «מלבן ACBD» and «מלבן ABCD» · «מקבילית ACBD» → the second line refused
+  (`errRingContradictsNoun`), never «לא נמצאה תצורה»; and only that line — the earlier shape line stays green
 - Sources: #1158, #1166, ADR-052, ADR-AG-129, #1929, #1927, #1939.
 
 **R92 — among the configurations it MAY show, the tool opens on one that is not a sliver**. A preference, never a requirement; coordinates that force a bad ring refuse the line (operator ruling), never «לא נמצאה תצורה».

@@ -1245,6 +1245,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'crossed-ring-1927-08', family: 'polygons', steps: ['דלתון ABCD', 'מרובע ABDC'], expect: 'builds', note: 'a dart saves the ring: search first, never refused (2-D and analytic draw the dart)' },
   { id: 'crossed-ring-1927-09', family: 'polygons', steps: ['טרפז ABCD', 'מרובע ACBD'], expect: 'refused', note: 'a trapezoid’s free ratio cannot save the ring' },
   { id: 'crossed-ring-1927-10', family: 'polygons', steps: ['מרובע ACBD', 'טרפז ABCD'], expect: 'refused', note: 'the ring first' },
+  // #1991 (ADR-3D-327, ADR-AG-261; operator ruling 2026-10-10, option A): the same ring, declared with a SPECIFIC
+  // noun. 3-D answered «בדקו את החישוב» (claim-refuted) or «givens-contradict» and analytic «לא נמצאה תצורה»;
+  // all three now show 2-D's crossed-shape message. «מקבילית ACBD» ALONE still builds (search first).
+  { id: 'crossed-ring-1991-01', family: 'polygons', steps: ['ריבוע ABCD', 'מקבילית ACBD'], expect: 'refused', note: 'the play-sheet T10 line' },
+  { id: 'crossed-ring-1991-02', family: 'polygons', steps: ['ריבוע ABCD', 'טרפז ACBD'], expect: 'refused' },
+  { id: 'crossed-ring-1991-03', family: 'polygons', steps: ['ריבוע ABCD', 'מלבן ACBD'], expect: 'refused' },
+  { id: 'crossed-ring-1991-04', family: 'polygons', steps: ['מלבן ABCD', 'מקבילית ACBD'], expect: 'refused' },
+  { id: 'crossed-ring-1991-05', family: 'polygons', steps: ['מקבילית ACBD'], expect: 'builds', note: 'nothing placed it yet: the ring is simply drawn — the control' },
   // end #1927
   // #1953 (ADR-618 / ADR-3D-324 / ADR-AG-259): a ring restated in another reading — rotated or reversed — is the same
   // polygon, so it is accepted and adds no row in every builder (2-D «זה כבר קיים באיור», analytic «כבר ידוע», 3-D the #613

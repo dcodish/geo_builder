@@ -198,6 +198,33 @@ export const quadImpliesInEveryReading = (have: QuadBase, want: QuadBase): boole
   quadImplies(have, want) && want !== 'trapezoid' && (want !== 'kite' || QUAD_IMPLIES[have].includes('rhombus'));
 
 /**
+ * IS A SIMPLE RING OF THIS BASE NECESSARILY CONVEX (#1991,
+ * [ADR-3D-327](../../docs/06b-decisions-3d.md#adr-3d-327))? 2-D's ADR-613 states the same fact in words:
+ * *"a square, rectangle, rhombus, parallelogram or trapezoid is convex whenever simple"*.
+ *
+ * Read off {@link quadShapeConstraints}'s own relation set, so a base added to the family is classified by
+ * what it asserts. Three sufficient reasons, each an elementary fact about quadrilaterals:
+ *  - a pair of OPPOSITE SIDES PARALLEL (parallelogram, trapezoid) — a simple quadrilateral with one is convex;
+ *  - a RIGHT ANGLE (rectangle, square) — three right angles make it a rectangle;
+ *  - ALL FOUR SIDES EQUAL (rhombus, square) — a simple equilateral quadrilateral is a rhombus.
+ * The KITE may be a DART and the general quadrilateral may be concave, so both answer false — which is what
+ * keeps "search first, refuse last" (ADR-W-121's 2026-10-09 amendment) intact: the ring that another order
+ * could save is never refused on this ground.
+ *
+ * WHY IT MATTERS: four points in convex position admit exactly ONE simple cyclic order. So a declared ring
+ * whose base is convex-when-simple PROVES that every other cyclic order of its letters crosses — without
+ * sampling anything.
+ */
+export const convexWhenSimple = (base: QuadBase): boolean => {
+  const rel = quadShapeRelations(base, ['A', 'B', 'C', 'D']);
+  return (
+    rel.some((r) => r.type === 'mutual-rel' && r.rel === 'parallel') ||
+    rel.some((r) => r.type === 'cos-angle' && Math.abs(r.cos) < 1e-9) ||
+    rel.filter((r) => r.type === 'length-rel').length >= 3
+  );
+};
+
+/**
  * #1918 (ADR-3D-313): can ONE quadrilateral be both an `x` and a `y`? Read off {@link QUAD_IMPLIES}: yes when
  * some shape implies both (a kite and a rectangle meet in the square). Under the exclusive trapezoid reading
  * the trapezoid meets no member of the parallelogram family — and no kite, since a kite with a parallel pair

@@ -33,7 +33,7 @@ import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, flatHeightReading3, freeDims, ringKeyIds3 } from '../engine/apply';
-import { declaredQuads3, spaceDiagonals, diagonalClaimVerdict, quadImplies, quadImpliesInEveryReading, QUAD_PYRAMIDS, trapezoidRingInForce3, type QuadBase } from '../engine/baseShapes';
+import { convexWhenSimple, declaredQuads3, spaceDiagonals, diagonalClaimVerdict, quadImplies, quadImpliesInEveryReading, QUAD_PYRAMIDS, trapezoidRingInForce3, type QuadBase } from '../engine/baseShapes';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { checkInSpan, componentValue, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
@@ -685,6 +685,57 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
     const latest = retryError(f);
     if (latest !== null) status[f.id] = latest;
   }
+  /**
+   * #1991 ([ADR-3D-327](../../docs/06b-decisions-3d.md#adr-3d-327)) — TWO DECLARED RINGS OVER THE SAME LETTERS IN
+   * DIFFERENT CYCLIC ORDERS, ONE OF THEM CONVEX WHENEVER SIMPLE: the other crosses in every configuration.
+   *
+   * «ריבוע ABCD» · «מקבילית ACBD» was refused «הטענה לא מתקיימת בציור — בדקו את החישוב» (`claim-refuted`), and
+   * «מלבן ACBD» with `givens-contradict` — both telling the student their arithmetic is wrong when the mistake is
+   * the order of four letters. The operator's ruling of 2026-10-10 (#1991, option A): 2-D's crossed-shape message
+   * everywhere.
+   *
+   * WHY #1927's PASS COULD NOT SAY IT. ADR-3D-322 proves the crossing over the CLAIM SAMPLES, and a specific noun's
+   * own relations are claims that cannot hold, so the pivot finds no placement: measured at 06fc51dd, every one of
+   * these sequences has `pivot.solutions === 0` and ZERO placed samples, where that pass rightly fails open — there
+   * is no figure of the givens to read a crossing in. The evidence here is STRUCTURAL instead and needs no figure at
+   * all: four points in convex position admit exactly one simple cyclic order, so a ring declared with a noun that
+   * is convex whenever simple (`convexWhenSimple` — everything but the kite and the bare quadrilateral) PROVES that
+   * every other cyclic order of its letters crosses. Run BEFORE the claim pass, so the structural reason speaks and
+   * the claim verdict never has to be overridden; "search first, refuse last" is kept by the predicate itself — a
+   * kite partner may be a DART, on which the other order is simple, and is never refused here.
+   *
+   * Blamed on the LATEST of the two declarations — the line that completed the contradiction — exactly as
+   * ADR-3D-322 blames the ring-first order's shape line.
+   */
+  {
+    const ringsByLetters = new Map<string, { ids: Id[]; convex: boolean }[]>();
+    const letterKey = (ids: readonly Id[]) => [...ids].sort().join('');
+    const addRing = (ids: readonly Id[], convex: boolean) => {
+      if (ids.length !== 4 || new Set(ids).size !== 4) return;
+      const k = letterKey(ids);
+      const list = ringsByLetters.get(k) ?? [];
+      if (!list.some((r) => ringKeyIds3(r.ids) === ringKeyIds3(ids))) list.push({ ids: [...ids], convex });
+      else if (convex) list.find((r) => ringKeyIds3(r.ids) === ringKeyIds3(ids))!.convex = true;
+      ringsByLetters.set(k, list);
+    };
+    for (const q of declaredQuads3(c)) addRing(q.ids, convexWhenSimple(q.base));
+    for (const sld of c.solids) if (sld.kind === 'polygon4') addRing(sld.ids, false); // a bare «מרובע» promises nothing
+    /** Does fact `f` declare exactly this ring, in this cyclic order? (ADR-3D-322's own reader.) */
+    const declaresRingOrdered = (f: Fact3, ring: readonly Id[]) =>
+      f.cmds.some((k) => (k.type === 'solid' || k.type === 'quad-shape' || k.type === 'rect-complete') && k.ids.length === ring.length && ringKeyIds3(k.ids) === ringKeyIds3(ring));
+    for (const list of ringsByLetters.values()) {
+      if (list.length < 2) continue;
+      for (const crossed of list) {
+        if (!list.some((other) => other !== crossed && other.convex)) continue;
+        const involved = facts.filter((f) => f.enabled && list.some((r) => declaresRingOrdered(f, r.ids)));
+        const blamed = involved[involved.length - 1];
+        if (!blamed || status[blamed.id] !== 'ok') continue;
+        status[blamed.id] = { code: 'ring-crossed', stated: blamed.utterance };
+        break;
+      }
+    }
+  }
+
   // #978 (ADR-3D-246): the VERIFIER arm of the «אלכסון» claim (#859 / ADR-3D-203). The apply moment
   // judges the claim only when ONE solid holds both letters; with two solids on the canvas, or a pair the
   // figure could not yet place, the claim was accepted and never revisited — «אלכסון AB» on a cube's edge
@@ -996,6 +1047,9 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
    * cross — not a trapezoid, not any quadrilateral — and it recorded green. When EVERY vertex is coordinate-fixed
    * (`coordinateFixers3`) the ring cannot move, so the drawn ring is the only one. The line that COMPLETED it is
    * refused. Run after the claim pass, so a truer message (a rectangle's own claim refuted) wins, as in analytic.
+ * #1991 (ADR-3D-327) narrows that: where the crossing is STRUCTURAL — a convex-when-simple ring reordered — the pass
+ * above speaks BEFORE the claim pass, because the operator ruled the order message wins there (2026-10-10). This one
+ * keeps its place, for the rings whose figure the pivot can still place.
    *
    * #1927 (ADR-3D-322, ADR-W-121 and its 2026-10-09 amendment — "search first, refuse last") — and a ring over points
    * a SHAPE placed («ריבוע ABCD · מרובע ACBD», a cube's «מרובע ACBD», the midpoint ring «מרובע ABED») is refused too,

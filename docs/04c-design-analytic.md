@@ -807,7 +807,19 @@ the constraints' tangent space, tolerance relative to the read's own scale — a
 freedom). An affine map keeps every proper crossing, so 0 proves it. The arm adds those `crossed` faults; `decideSubmit`
 re-attributes a fault that appeared to the submitted line, so the ring-first order refuses the shape line.
 
-*Identifiers:* `seed … seed + DRAWABLE_TRIES` · `shape` · `declared` · `degenerate` · `crossed` · `ring-contradicts-noun` · `InputError`
+**…or STRUCTURALLY, with no figure at all** ([ADR-AG-261](06c-decisions-analytic.md#adr-ag-261), #1991). The walk's evidence
+needs a candidate whose GIVENS hold, and a second ring's own noun can be exactly what cannot hold — «ריבוע ABCD» ·
+«מקבילית ACBD» leaves `forcedCrossed` empty and the crossed ring's `ringDof` at 4, so both arms above are silent and
+«לא נמצאה תצורה» spoke for an order mistake. `derive`'s `ringOrderFault`, computed before the drop-one probe's arms,
+groups the DECLARED polygons by their letter SET — the polygon id is canonical over rotations and reversals
+(ADR-AG-259), so two ids over the same letters are two cyclic orders — and when any of them carries a noun that is
+convex whenever simple (`convexWhenSimple`, read off the row's givens: a parallel pair, a right angle, or
+`equalSides`; false for «מרובע» and «דלתון») the others cross in every configuration, because four points in convex
+position admit exactly one simple cyclic order. The LATEST declaring line is faulted `ring-contradicts-noun`, and the
+given-attribution arms stay silent on ADR-AG-240's rule, so the earlier shape line is not blamed for the other ring's
+order. Search first is kept by the predicate, not by a budget: a dart-capable partner is never refused here.
+
+*Identifiers:* `seed … seed + DRAWABLE_TRIES` · `shape` · `declared` · `degenerate` · `crossed` · `ring-contradicts-noun` · `convexWhenSimple` · `ringOrderFault` · `InputError`
 
 ### A forced coincidence is refused; a configuration-dependent one is not ([ADR-AG-125](06c-decisions-analytic.md#adr-ag-125))
 
