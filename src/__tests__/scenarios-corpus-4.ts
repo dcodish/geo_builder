@@ -3937,6 +3937,33 @@ export const SCENARIOS_4: Scenario[] = [
       expect(gateVerdict(factsOf(['טרפז ABCD']), 'מרובע ACBD')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
     },
   },
+  {
+    id: 'untick-leaves-an-independent-row-building-1952',
+    title: '#1952 (ADR-625): «ריבוע ABCD» · «משולש ABC», untick the SQUARE — the triangle keeps building (it declares A, B, C itself), exactly as DELETING the square leaves it; re-ticking brings the figure back; a NEW «מרובע ADCB» over the unticked row is still refused naming it',
+    guards:
+      "Operator, 2026-10-09, playing round #1940 T11: \"after the 2nd line is there, i remove the first line (the square) and get an error. there is no error. this is a bug.\" Measured on 06fc51dd through runSubmit + runSetGroupEnabled: untick the square -> «can't build: A, B, C belong to the unticked row «ריבוע ABCD» — tick it again or delete it» and an EMPTY canvas, while deleting the square left the triangle building. Root cause: a disabled fact claimed every point it introduced (ADR-010/015), and ADR-578 read that reservation back out of the fact list (mutedOwnerOf), so the fold's broken cascade fired on a row that needs no earlier definition at all. Fix: the fold reserves nothing — an unticked row drops only its own objects; the reservation is a commit-seam rule (mutedRowHolding, read by dryRunOutcome) for the one case it is for, a NEW differently-spelled row. The store-path matrix (the untick-vs-delete parity table, the re-tick position identity, ADR-578's refusals) is in src/app/__tests__/issue-1952-untick-independent-row.test.ts.",
+    steps: ['ריבוע ABCD', 'משולש ABC'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['ריבוע ABCD', 'משולש ABC']);
+      const square = facts[0].group ?? facts[0].id;
+      const muted = facts.map((f) => ((f.group ?? f.id) === square ? { ...f, enabled: false } : f));
+      // The operator's interaction: the square off, the triangle still green — and the same figure that
+      // DELETING the square gives, measured right here so the 2-D reference cannot go stale.
+      const off = replay(muted, 0);
+      expect(off.status[facts[1].id], JSON.stringify(off.status)).toBe('ok');
+      expect(off.violations, 'the triangle satisfies its givens on its own').toEqual([]);
+      const deleted = replay(facts.filter((f) => (f.group ?? f.id) !== square), 0);
+      expect([...off.positions.keys()].sort(), 'untick draws what delete draws').toEqual([...deleted.positions.keys()].sort());
+      // ADR-010: ticking the square again restores the ORIGINAL figure exactly. Pinned at seed 0 on BOTH
+      // sides (not against `fig`), so the seed sweep re-runs this check without comparing two seeds.
+      const at = (d: ReturnType<typeof replay>) => [...d.positions].map(([k, p]) => `${k}:${p.x.toFixed(6)},${p.y.toFixed(6)}`).sort().join(' ');
+      expect(at(replay(muted.map((f) => ({ ...f, enabled: true })), 0))).toBe(at(replay(facts, 0)));
+      // ADR-578 kept: a NEW differently spelled row over the unticked square's letters is refused, naming it.
+      const other = gateVerdict(muted, 'מרובע ADCB');
+      expect(other.kind === 'refused' && other.detail, 'the commit seam still names the unticked row').toMatch(/belong to the unticked row «ריבוע ABCD»/);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */
