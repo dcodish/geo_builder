@@ -3937,6 +3937,35 @@ export const SCENARIOS_4: Scenario[] = [
       expect(gateVerdict(factsOf(['טרפז ABCD']), 'מרובע ACBD')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
     },
   },
+  {
+    id: 'concave-quad-second-ring-1987',
+    title:
+      '#1987 (ADR-622): «מרובע ABCD · מרובע ABDC» — four FREE points read in a second order commit and draw a CONCAVE quadrilateral, both rings simple; the convex-whenever-simple shapes keep ADR-608’s refusal',
+    guards:
+      "Operator ruling of 2026-10-09 on #1927, applied to #1987 on 2026-10-10 (P2, 2-D and 3-D together): *\"Search first, refuse last … Refuse only when nothing the student wrote can save it.\"* Four points NOT in convex position have three simple ring orders, so «מרובע ABDC» over «מרובע ABCD» has a drawing — analytic draws it. Measured on 06fc51dd through the submit door: refused with the ring message in 14 ms, because ADR-613 taught `polygonsConvex` to YIELD the convexity default but left every vertex on the convex SEAT and registered no axis naming the choice (`findValidConfig` → null in 2 ms; 2 of 200 raw seeds are concave and the sweep covers 40). Root cause (ADR-622): the missing configuration DIMENSION, not the predicate — `reflexAxes` registers the reflex-vertex choice in the #1600 axis registry and `quadrilateral.reflex` seats it. The class matrix is src/app/__tests__/issue-1987-concave-quad.test.ts.",
+    steps: ['מרובע ABCD', 'מרובע ABDC'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(gateVerdict(factsOf(['מרובע ABCD']), 'מרובע ABDC').kind, '«מרובע ABDC» after the free quadrilateral commits').toBe('commit');
+      const facts = factsOf(['מרובע ABCD', 'מרובע ABDC']);
+      const found = findValidConfig(facts, 0);
+      expect(found, 'a configuration meeting every requirement exists (the concave quadrilateral)').not.toBeNull();
+      const shown = replay(found!.facts, found!.seed).positions;
+      const ringOf = (ids: string[]) => ids.map((id) => shown.get(id as Id) as Vec);
+      expect(ringSimple(ringOf(['A', 'B', 'C', 'D'])), 'the ring ABCD is simple').toBe(true);
+      expect(ringSimple(ringOf(['A', 'B', 'D', 'C'])), 'the declared ring ABDC is simple').toBe(true);
+      const turnsAllOneWay = (pts: Vec[]) => {
+        const signs = pts.map((_, i) => {
+          const [o, a, b] = [pts[i], pts[(i + 1) % pts.length], pts[(i + 2) % pts.length]];
+          return Math.sign((a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x));
+        });
+        return signs.every((s) => s === signs[0]);
+      };
+      expect(turnsAllOneWay(ringOf(['A', 'B', 'C', 'D'])), 'and the four points are NOT in convex position').toBe(false);
+      // ADR-613's honest refusals are untouched: a rhombus is convex whenever it is simple.
+      expect(gateVerdict(factsOf(['מעוין ABCD']), 'מרובע ABDC')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

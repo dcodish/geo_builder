@@ -2874,13 +2874,15 @@ export function cyclableSeat(facts: Fact[]): Fact | undefined {
  * - `side` — a shape composed on an existing edge whose side was a genuine choice (the construction's
  *   `sideChoices`, recorded by LADDER stage 2c), stored as `edgeSide: 'toward'` on the composing fact;
  * - `variant` — every cyclable variant fact ({@link variantAxes}, ADR-573);
- * - `seat` — the unpinned right-angle seat ({@link cyclableSeat}, ADR-481).
+ * - `seat` — the unpinned right-angle seat ({@link cyclableSeat}, ADR-481);
+ * - `reflex` — WHICH vertex of a ring whose convexity default yields (ADR-613) is the reflex one
+ *   ({@link reflexAxes}, #1987 [ADR-622](docs/06-decisions.md#adr-622)).
  *
  * `c` is the construction the facts fold to (any seed — a discrete choice is seed-invariant). An axis whose
  * rewrite cannot reach its fact (no fact carries the choice) is not registered: a press that changes nothing
  * is not another configuration.
  */
-export type ChoiceKind = 'branch' | 'side' | 'variant' | 'seat';
+export type ChoiceKind = 'branch' | 'side' | 'variant' | 'seat' | 'reflex';
 export interface ChoiceAxis {
   kind: ChoiceKind;
   /** The fact index the choice is stored on. */
@@ -2890,6 +2892,50 @@ export interface ChoiceAxis {
   /** The command with this axis set to `digit`. */
   set: (cmd: AnyCommand, digit: number) => AnyCommand;
 }
+/**
+ * THE REFLEX-VERTEX AXES (#1987, [ADR-622](docs/06-decisions.md#adr-622)) — the registry's `reflex` kind.
+ *
+ * A ring whose convexity default YIELDS to a second declared ring over its points (ADR-613,
+ * {@link convexityYields}) is held only to simplicity, so the point set it names is non-convex: one vertex
+ * sits inside the triangle of the other three, and WHICH one is an unstated discrete choice
+ * ([ADR-052](docs/06-decisions.md#adr-052)). ADR-613 taught the PREDICATE to yield but left the SEAT convex,
+ * and no axis named the choice — so «מרובע ABCD · מרובע ABDC» was refused although 2 of 200 raw seeds happen
+ * to draw it (measured, #1987). Registering it here is what makes it reachable, by the configuration search
+ * ({@link choiceRescue}) and by «הציגו תצורה אחרת» ({@link searchAnotherView}) alike.
+ *
+ * Digit 0 is the CONVEX default seat — so the axis can always put the figure back, which is what a student
+ * who deletes the second ring needs — and digit k+1 seats `ids[k]` inside the others
+ * (`quadrilateral.reflex`, applied in `applyCommand`). A fact that still CARRIES a reflex keeps its axis even
+ * once the yield is gone, for exactly that reason. Only the general quadrilateral carries the field: a
+ * square, rectangle, rhombus, parallelogram or trapezoid is convex whenever it is simple (ADR-613), so a
+ * reflex seat could not satisfy both rings there, and a regular polygon's vertices are derived.
+ */
+function reflexAxes(facts: Fact[], c: Construction): ChoiceAxis[] {
+  if (!facts.some((f) => f.enabled && f.cmd.type === 'quadrilateral')) return []; // zero cost on every other figure
+  const seatable = new Set(c.objects.filter((o) => o.kind === 'free-point' && !o.pinned).map((o) => o.id));
+  const yields = convexityYields(facts);
+  const out: ChoiceAxis[] = [];
+  facts.forEach((f, i) => {
+    if (!f.enabled || f.cmd.type !== 'quadrilateral') return;
+    const cmd = f.cmd as Extract<AnyCommand, { type: 'quadrilateral' }>;
+    if (!yields.has(ringKey(cmd.ids)) && cmd.reflex === undefined) return;
+    if (!cmd.ids.some((id) => seatable.has(id))) return; // no vertex is ours to seat — the ring has no reflex choice
+    const k = cmd.ids.length; // 4 reflex choices + the convex default
+    const cur = cmd.reflex === undefined ? 0 : (((cmd.reflex % k) + k) % k) + 1;
+    out.push({
+      kind: 'reflex',
+      i,
+      n: k + 1,
+      cur,
+      set: (target, d) => {
+        const { reflex: _prev, ...rest } = target as Extract<AnyCommand, { type: 'quadrilateral' }>;
+        return (d === 0 ? rest : { ...rest, reflex: d - 1 }) as AnyCommand;
+      },
+    });
+  });
+  return out;
+}
+
 const sameIdSet = (a: readonly Id[], b: readonly Id[]) => a.length === b.length && [...a].sort().join(',') === [...b].sort().join(',');
 const withEdgeSide = (cmd: AnyCommand, toward: boolean): AnyCommand => {
   const { edgeSide: _drop, ...rest } = cmd as AnyCommand & { edgeSide?: 'toward' };
@@ -2920,6 +2966,7 @@ export function configurationAxes(facts: Fact[], c: Construction): ChoiceAxis[] 
     axes.push({ kind: 'side', i, n: 2, cur: edgeSideToward(facts[i].cmd) ? 1 : 0, set: (cmd, d) => withEdgeSide(cmd, d === 1) });
   }
   for (const a of variantAxes(facts)) axes.push({ kind: 'variant', i: a.i, n: a.n, cur: a.cur, set: (cmd, d) => withVariant(cmd, d) });
+  axes.push(...reflexAxes(facts, c)); // #1987 (ADR-622)
   const seatFact = cyclableSeat(facts);
   if (seatFact) {
     const i = facts.indexOf(seatFact);
@@ -3088,7 +3135,10 @@ function advanceAssignment(axes: readonly { n: number; cur: number }[], steps: n
 export function choiceRescue(facts: Fact[], deadline: number): { facts: Fact[]; seed: number } | null {
   const mayHaveSide = facts.some((f) => f.enabled && 'ids' in f.cmd);
   if (!mayHaveSide && variantAxes(facts).length === 0) return null;
-  const axes = configurationAxes(facts, replay(facts).construction).filter((a) => a.kind === 'variant' || a.kind === 'side');
+  // #1987 (ADR-622): the `reflex` axis joins this tier — a convexity default that YIELDED (ADR-613) is an
+  // unstated choice exactly as a variant is, so a figure the convex seat cannot draw belongs here, not in a
+  // refusal. Zero cost on a figure with no yielding ring ({@link reflexAxes} registers no axis).
+  const axes = configurationAxes(facts, replay(facts).construction).filter((a) => a.kind === 'variant' || a.kind === 'side' || a.kind === 'reflex');
   if (axes.length === 0) return null;
   const total = axes.reduce((p, a) => p * a.n, 1);
   const changed = (a: number[]): number => a.reduce((c, d, k) => c + (d === axes[k].cur ? 0 : 1), 0);

@@ -634,6 +634,18 @@ asks `findValidConfig` of the trial facts before refusing; a configuration found
 search draws it («דלתון ABCD · מרובע ABDC» → the dart). A square, rectangle, rhombus, parallelogram or trapezoid is
 convex whenever simple, so the search finds nothing for them in a few milliseconds and the refusal stands.
 
+A yielded default also needs a yielded SEAT ([ADR-622](06-decisions.md#adr-622), #1987). The quadrilateral macro
+seats its four free vertices convex and the seed jitter almost never leaves convex position (2 of 200 raw seeds), so
+for a FREE quadrilateral the search above had nothing new to try and the refusal stood — the kite row was carried by
+the reflection tier, which only exists because a kite apex is tied to anchors by equalities. Which vertex is the
+REFLEX one is therefore registered as a configuration axis of its own: `reflexAxes` (the `reflex` kind of the #1600
+`configurationAxes` registry) offers, for every `quadrilateral` fact whose ring `convexityYields` names, the convex
+seat plus one digit per vertex; `quadrilateral.reflex` carries the digit (the `right-triangle.rot` shape — internal,
+never a step row) and `seatReflexVertex` (`engine/apply.ts`) seats that vertex at the centroid of the others, the
+canonical point strictly inside their hull. Four points not in convex position have THREE simple rings, not one, so
+one interior vertex makes every declared order simple at once. `choiceRescue` steps the axis alongside `variant` and
+`side`, so the post-commit search and «הציגו תצורה אחרת» reach the same drawings; a fact that still carries a
+`reflex` keeps its axis after the second ring is deleted, so the search can put the figure back.
 ### What counts as "produced": a display-only command declares itself (#1011, [ADR-519](06-decisions.md#adr-519))
 
 `dryRunOutcome` asks whether a line did anything — the construction grew, a DOF went, the scale was fixed, a point

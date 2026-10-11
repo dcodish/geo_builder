@@ -1046,7 +1046,13 @@ export type VariantShape = 'kite' | 'isosceles' | 'midsegment' | 'midsegment-fre
 
 export type Command =
   | { type: 'square'; ids: [Id, Id, Id, Id]; side?: number }
-  | { type: 'quadrilateral'; ids: [Id, Id, Id, Id]; declaredAs?: string } // declaredAs: the variant noun a shape-variant lowering carries through its base command ('kite', #770)
+  // declaredAs: the variant noun a shape-variant lowering carries through its base command ('kite', #770).
+  // reflex (#1987, ADR-622): WHICH vertex is the REFLEX one — the unstated discrete choice of a ring whose
+  // convexity default yields (ADR-613). `undefined` is the convex default seat; `k` seats `ids[k]` inside the
+  // triangle of the other three, so every simple order of the four points is simple. An internal
+  // configuration field like `branch` and `right-triangle`'s `rot`: the config search writes it, the student
+  // never states it, and it is invisible in the step list.
+  | { type: 'quadrilateral'; ids: [Id, Id, Id, Id]; declaredAs?: string; reflex?: number }
   | { type: 'parallelogram'; ids: [Id, Id, Id, Id] }
   | { type: 'rectangle'; ids: [Id, Id, Id, Id] }
   | { type: 'rhombus'; ids: [Id, Id, Id, Id] }
