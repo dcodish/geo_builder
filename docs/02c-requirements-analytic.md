@@ -747,7 +747,12 @@ a sentence the tool parsed.
 - «נקודה Q» · «A(0,0)» · «B(4,0)» · «D(0,4)» · «E(0,2)» · «F(4,2)» · «P נקודת החיתוך של הישר AD עם הישר EF» → refused, naming E, exactly as without «נקודה Q»
 - the line that FORCES the coincidence is refused too, with the figure still free: «A(0,0)» · «D(0,4)» · «F(4,2)» · «נקודה E» · «P נקודת החיתוך של הישר AD עם הישר EF» (drawn) · «E על ציר ה-y» → refused
 - a crossing genuinely free to move off the point it sits on still records (a free circle's «AC חותך את המעגל בנקודה E» on A — its own refusal is #1893's, a different sentence)
-- Sources: ADR-AG-125, ADR-W-066, #1175, #1255, ADR-AG-140, #1273, ADR-AG-254, #1938.
+- **a crossing whose pair ALREADY PASSES THROUGH a named point is the OTHER crossing** ([ADR-AG-263](06c-decisions-analytic.md#adr-ag-263), #1917): the line is drawn and the point takes the root no earlier point holds. It is refused only when no other admissible root EXISTS — a tangency, a bounded piece that holds only the named point, or a pair whose every root is already named.
+  - «x^2+y^2=25» · «A(3,4)» · «P(0,0)» · «AP חותך את המעגל בנקודה E» → records, E = (−3,−4), at every configuration
+  - «y^2=4x» · «A(1,2)» · «P(10,0)» · «AP חותך את הפרבולה בנקודה E» → records, E = (100,−20); with P(7,0), E = (49,−14)
+  - every spelling of that sentence reads the same: «הישר AP», «PA», «AO», «E נקודת החיתוך (האחרת) של הישר AP עם המעגל», «E על הישר AP» · «E על המעגל», and a line given by its equation («נתון הישר l1: y=x+1» → E = (−4,−3))
+  - still refused: «הקטע AP חותך את המעגל בנקודה E» and «E על AP» · «E על המעגל» (a bare pair is the segment, R60's own reading / ADR-AG-248) — that piece reaches the circle only at A
+- Sources: ADR-AG-125, ADR-W-066, #1175, #1255, ADR-AG-140, #1273, ADR-AG-254, #1938, ADR-AG-263, #1917.
 
 **R60 — two positions the solver cannot tell apart are ONE position, and a determined point's locus is that point**. *(Operator: "a cluster inside solver resolution is not an option set".)* The tolerance derives from the solve's own stopping rule.
 - «המקום הגיאומטרי של M» on a determined M → «נקודה · (4, 0)»

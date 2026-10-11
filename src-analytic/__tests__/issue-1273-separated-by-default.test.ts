@@ -10,21 +10,39 @@
  *
  * The figure: the line through A(3,4) and B(0,4) meets x² + y² = 25 at A itself and at (−3, 4). Measured
  * before, the crossing P landed ON A at seeds 2, 3, 4, 6, 7 and was shown there — two labels at one place.
+ *
+ * ⚠ **Amended by [ADR-AG-263](../../docs/06c-decisions-analytic.md#adr-ag-263) (#1917).** That figure no
+ * longer stacks even RAW: a crossing now STARTS on the root no earlier point holds, so the descent never
+ * lands on A and P is determined at (−3,4). The display preference this file locks is unchanged and is
+ * still exercised — by a crossing of two STRAIGHTS, which has no root order to start on (`orderedCrossings`
+ * answers nothing for a pair of straights), so #1917's block proposes nothing there. The baseline and the
+ * not-a-filter property move to that figure; the circle figure keeps its "never shown stacked" promise and
+ * gains #1917's determined answer.
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
-import { drawableAt, evaluate, knownOptions, stackedPairs } from '../engine/evaluate';
+import { drawableAt, evaluate, knownOptions, knownValues, stackedPairs } from '../engine/evaluate';
 
 const LINES = ['A(3,4)', 'B(0,4)', 'משוואת המעגל x^2+y^2=25', 'P נקודת החיתוך של הישר AB עם המעגל x^2+y^2=25'];
+/** Two STRAIGHTS crossing inside a free triangle — the pair #1917's start rule has no order for. */
+const STRAIGHTS = ['נתון משולש ABC', 'נקודה D', 'P נקודת החיתוך של הישר AB עם הישר CD'];
 const at = (d: ReturnType<typeof derive>, id: string) => d.figure.points.find((p) => p.id === id)!;
 // CALLS the display's own decision (#1526 moved its ruler off `crossings.apart()`, the identity tolerance).
 const stacked = (f: Parameters<typeof stackedPairs>[0]) => stackedPairs(f).length > 0;
 
 describe('#1273 — the figure opens on a configuration that separates its named points', () => {
-  it('the raw configuration at seed 2 stacks P on A — the measured baseline this lock protects against', () => {
-    const c = derive(LINES, 0).construction;
-    const raw = evaluate(c, 2);
-    expect(stacked(raw), 'seed 2 alone puts P on A').toBe(true);
+  it('a raw configuration stacks P on a vertex — the measured baseline this lock protects against', () => {
+    const c = derive(STRAIGHTS, 0).construction;
+    const stacks = [...Array(16).keys()].filter((s) => stacked(evaluate(c, s)));
+    expect(stacks, 'some raw seeds alone put P on a vertex').toEqual([1, 3, 12, 14]);
+  });
+
+  it('what is SHOWN at every seed 0–7 keeps P off the vertex, for the straights too', () => {
+    for (let seed = 0; seed < 8; seed++) {
+      const d = derive(STRAIGHTS, seed);
+      expect(d.faults, `seed ${seed}`).toEqual([]);
+      expect(stacked(d.figure), `seed ${seed}: shown separated`).toBe(false);
+    }
   });
 
   it('what is SHOWN at every seed 0–7 keeps P apart from A, without the student pressing anything', () => {
@@ -37,11 +55,29 @@ describe('#1273 — the figure opens on a configuration that separates its named
     }
   });
 
-  it('a preference, not a filter: the knowledge pool still holds both roots — the stacked one is admissible, it is just not what opens', () => {
+  it('a preference, not a filter: the pool still holds the stacked configuration — it is just not what opens', () => {
+    // `drawableAt` WITHOUT the spread preference is what the honesty gates read; with it is what the canvas
+    // shows. The stacked configuration must stay in the first and never be the second.
+    const c = derive(STRAIGHTS, 0).construction;
+    const pool = [...Array(16).keys()].filter((s) => stacked(drawableAt(c, s)));
+    const shown = [...Array(16).keys()].filter((s) => stacked(drawableAt(c, s, true)));
+    expect(pool, 'the honesty gates see every admissible configuration').toEqual([1, 3, 12, 14]);
+    expect(shown, 'the display opens on none of them').toEqual([]);
+  });
+
+  /**
+   * #1917 (ADR-AG-263) — on the circle figure the start itself now avoids A, so P has ONE configuration
+   * and the panel says so. Before, `knownOptions` offered «(3,4) או (−3,4)» — the first of them P sitting on
+   * A, which this very file's ruling says the tool must never show.
+   */
+  it('a crossing whose other root is taken is DETERMINED, and the panel no longer offers the stacked root', () => {
     const c = derive(LINES, 0).construction;
-    const opts = knownOptions(c, (f) => { const p = f.points.find((q) => q.id === 'P'); return p ? [p.x, p.y] : null; });
-    expect(opts, 'the honesty gates see every admissible configuration').not.toBeNull();
-    expect(opts!.map((o) => Math.round(o[0])).sort()).toEqual([-3, 3]);
+    const readPt = (f: Parameters<typeof stackedPairs>[0]) => {
+      const p = f.points.find((q) => q.id === 'P');
+      return p ? [p.x, p.y] : null;
+    };
+    expect(knownValues(c, readPt, 2, { fillPool: true })).toEqual({ known: true, value: [-3, 4] });
+    expect(knownOptions(c, readPt), 'one value is not an option set').toBeNull();
   });
 
   it('a figure where NO configuration separates two named points still draws — refusing the statement is #1254’s half', () => {

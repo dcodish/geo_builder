@@ -21,6 +21,7 @@ import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
 import { angleAt, dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
+import { withinSegment } from './extent';
 import { carryingLines } from './carryingLines';
 import { segmentIdOf } from './cevian';
 import { offInkExtensions } from '../../shell/offInk';
@@ -2315,6 +2316,97 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
       const o = orderedCrossings(sel.pair, atSeed, curveAtOf(c, env, atSeed));
       const root = o && !o.touching ? o.roots[sel.nth] : undefined;
       if (root) seeded.set(sel.id, { x: root.x, y: root.y });
+    }
+  }
+
+  /**
+   * …AND A CROSSING STARTS ON THE ROOT NO EARLIER POINT HOLDS (#1917, ADR-AG-263) — 2-D's `otherCrossing`,
+   * ported as a START.
+   *
+   * «x^2+y^2=25 · A(3,4) · P(0,0) · AP חותך את המעגל בנקודה E»: the line through the centre meets the circle
+   * twice, A holds one root and E should take the other — and it was refused «הישרים האלה נפגשים ב-A,
+   * ולנקודה הזאת כבר יש שם…». The cause is where the solve STARTS. A crossing of a pair one of whose roots is
+   * a point the figure already has is started wherever its letter hashes to, so the descent usually lands on
+   * that point; on a fixed figure the #1254 arm (`derive.ts`) then reports the coincidence as forced, which is
+   * false — the other root exists. Measured at `5edeeca1` and again at pickup: raw `evaluate` put E on A at 13
+   * of seeds 0–13 on the circle and at 14 of 14 on the parabola, and the only thing that ever reached the
+   * other root was the #1273 display walk, by luck (seeds 3–5 of the circle, nothing on the parabola).
+   *
+   * 2-D has had this rule since [ADR-045](../../docs/06-decisions.md#adr-045) R8: `otherCrossing`
+   * (`src/engine/evaluate.ts`) drops every root that coincides with an already-placed point and keeps the
+   * fresh one. This is that rule, in this tree's idiom:
+   *
+   *  - the points it applies to are those with exactly TWO incidences (`on-line-2pt`, `on-line`, `on-curve`)
+   *    — the very set the #1254 arm calls crossed, so every spelling counts, «E על הישר AP · E על המעגל» included;
+   *    one carrying a `crossing-nth` ordinal is left to the block above, which owns the root it names;
+   *  - the roots are `orderedCrossings` on those two incidences, read at the seeded positions exactly as the
+   *    ordinal block reads them; a pair that cannot be read here, or that only touches, proposes nothing;
+   *  - a root is TAKEN when a point DECLARED BEFORE this one sits on it, within `apartOf` — the #1254 arm's
+   *    own "only a point that was already there", read off the object order, which is the order the lines
+   *    were folded in;
+   *  - a root the point's OWN statement excludes is not admissible: outside the drawn piece of a bounded
+   *    crossing («הקטע AP», the ruler `solve.ts`'s bound rows use), or failing its `between` / `beyond`
+   *    selector — judged by `failingSelectors` itself, so the start cannot disagree with the verdict.
+   *
+   * It moves the start only when a root was DROPPED as taken and exactly one admissible root is left. Two
+   * fresh roots: the seed still chooses and «הציגו תצורה אחרת» cycles. None: a tangency, a segment that
+   * reaches the curve once, or a chord whose both roots are named — today's verdict stands, and #1893's and
+   * #1909's refusals are untouched. A START, never a verdict: the solve may move it, and the judge and the
+   * #1254 arm keep the last word. Costs one `place` per evaluation, and only when some point qualifies.
+   */
+  {
+    const incidencesOf = (id: Id): Constraint[] =>
+      c.constraints.filter(
+        (k) => (k.t === 'on-line-2pt' || k.t === 'on-line' || k.t === 'on-curve') && (k as { id?: Id }).id === id,
+      );
+    const ordinalOwns = new Set(c.selectors.filter((s) => s.kind === 'crossing-nth').map((s) => s.id));
+    const pairs = new Map<Id, [Constraint, Constraint]>();
+    for (const id of seeded.keys()) {
+      if (ordinalOwns.has(id)) continue;
+      const ks = incidencesOf(id);
+      if (ks.length === 2) pairs.set(id, [ks[0], ks[1]]);
+    }
+    if (pairs.size > 0) {
+      // Declaration order: `place` walks `c.objects` in it, and it is the order the student's lines minted
+      // the names in — the #1254 arm's "already there", asked of the construction rather than of the facts.
+      const declaredAt = new Map<Id, number>();
+      c.objects.forEach((o, i) => declaredAt.set(o.id, i));
+      const pos = place(c, env, seeded);
+      const atSeed = (id: Id) => pos.get(id) ?? null;
+      const curveAt = curveAtOf(c, env, atSeed);
+      const apart = apartOf(pos);
+      for (const [id, pair] of pairs) {
+        const o = orderedCrossings(pair, atSeed, curveAt);
+        if (!o || o.touching || o.roots.length < 2) continue;
+        const mine = declaredAt.get(id) ?? Number.POSITIVE_INFINITY;
+        const fresh = o.roots.filter(
+          (r) =>
+            ![...pos].some(
+              ([qid, q]) =>
+                qid !== id &&
+                (declaredAt.get(qid) ?? Number.POSITIVE_INFINITY) < mine &&
+                Math.hypot(q.x - r.x, q.y - r.y) < apart,
+            ),
+        );
+        if (fresh.length === o.roots.length) continue; // nothing taken — the seed still chooses
+        // The point's OWN statement about which part of the carrier it is on, judged by the judge itself.
+        const own = c.selectors.filter((s) => (s.kind === 'between' || s.kind === 'beyond') && s.id === id);
+        const bounds = pair.filter(
+          (k): k is Extract<Constraint, { t: 'on-line-2pt' }> => k.t === 'on-line-2pt' && k.bounded === true && k.crossing === true,
+        );
+        const admissible = fresh.filter((r) => {
+          for (const k of bounds) {
+            const pa = atSeed(k.a);
+            const pb = atSeed(k.b);
+            if (pa && pb && !withinSegment(pa, pb, r)) return false;
+          }
+          if (own.length === 0) return true;
+          const trial = new Map(pos);
+          trial.set(id, r);
+          return failingSelectors({ ...c, selectors: own }, trial, env).length === 0;
+        });
+        if (admissible.length === 1) seeded.set(id, { x: admissible[0].x, y: admissible[0].y });
+      }
     }
   }
 
