@@ -603,6 +603,7 @@ a sentence the tool parsed.
 **R45 — a statement that adds nothing is SAID, not silently swallowed or silently duplicated**. Informational, never an error; a restatement that NARROWS is recorded.
 - a repeated given → «זה כבר ידוע…», no second row
 - a polygon restated with its letters rotated or reversed («ריבוע ABCD» · «מרובע ADCB») → «זה כבר ידוע…», no second row ([ADR-AG-259](06c-decisions-analytic.md#adr-ag-259))
+- …and with its OWN noun, in every reading that noun says the same thing in («ריבוע ABCD» · «ריבוע BCDA»; «מעוין», «מלבן», «מקבילית», «משולש», a bare polygon) → the same answer. A reading that says something ELSE records: «טרפז ABCD» · «טרפז BCDA» names the other pair of parallel sides, and a kite's axis, an isosceles triangle's apex and a right triangle's seat move with the letters ([ADR-AG-262](06c-decisions-analytic.md#adr-ag-262))
 - «a הוא פרמטר» then «a<13» → recorded
 - Sources: ADR-AG-020.
 

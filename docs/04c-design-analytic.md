@@ -240,6 +240,16 @@ A restatement is `known` when every fact of the line is absorbed in `applyFact`;
 `selectorIdentity`, which reads a `distinct` selector as the SET it is, so a ring restated in another order is
 absorbed like its polygon (whose id is already canonical over rotations and reversals) ([ADR-AG-259](06c-decisions-analytic.md#adr-ag-259)).
 
+**A ring already declared is read in its declared spelling** ([ADR-AG-262](06c-decisions-analytic.md#adr-ag-262), #1989;
+2-D's [ADR-618](06-decisions.md#adr-618) over this tree's model). A noun's `givens` seat its right angle and its equal
+pair by ring ORDER, so «ריבוע BCDA» stated constraints the figure held but had never been given, and the line recorded.
+`declaredRingSpelling(facts, group)` at the head of `fold` re-spells a `polygon` fact over a ring an earlier fact
+declares, and regenerates that line's `definition` constraints from the row over the declared ring — positionally, so
+every index `fold` reports still names the student's own fact. Whether the noun says the same thing in the new reading is
+`sameStatementUnder` (`engine/shapes.ts`), read off the registry: generic (`isGenericNoun`), `regular`, or
+`assertsBothParallelPairs` ⇒ every reading; `promisesOneParallelPair` ⇒ only the readings that keep sides 0 and 2
+opposite (2-D's parity test on `(r, dir)`); any other noun's vertex order is semantic and is never re-spelled.
+
 ### A line that loses a part ([ADR-AG-251](06c-decisions-analytic.md#adr-ag-251), #1888, #1889; [ADR-W-120](06w-decisions-workspace.md#adr-w-120))
 
 `app/lostPart.ts`, asked by `decideOnce` (`app/submit.ts`) and by `decideEdit` through `lostPartOf`: one question for both typed seams.

@@ -22,7 +22,7 @@ import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr } from '
 import { curveParentsOf, parentsOf, type DerivedRule, type FootLine } from './derived';
 import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, sineAngle, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
-import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounsExclude, promisesOneParallelPair, rightAngleAt, ringsNamed, shapeRow } from './shapes';
+import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounsExclude, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { RESERVED_SYMBOLS, radiusSymbol, toolSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
@@ -4001,6 +4001,57 @@ function identicalCurve(a: Curve, b: Curve): boolean {
   });
 }
 
+/**
+ * #1989 ([ADR-AG-262](../../docs/06c-decisions-analytic.md#adr-ag-262)) — A RING ALREADY DECLARED IS READ IN ITS
+ * DECLARED SPELLING.
+ *
+ * «ריבוע ABCD» · «ריבוע BCDA» names the same square read from the next vertex. The POLYGON was already absorbed
+ * (its id is canonical over the ring's rotations and reversals, the parser's `polygonId`), but the noun's own
+ * defining constraints were not: the row seats «ריבוע»'s right angle at the FIRST vertex and its equal pair on the
+ * first two sides, so the second reading stated `⊥ at B` and `|BC| = |CD|` where the first stated `⊥ at A` and
+ * `|AB| = |BC|`. Structurally different, so nothing was `known`; and the entailment gate (#1063) then read the
+ * redundant constraints as independent and saw the freedom drop 4 → 3, so the line RECORDED — the student's figure
+ * grew a second «ריבוע ABCD» row for a sentence that added nothing. The generic word in any reading was already
+ * absorbed by #1953 (ADR-AG-259), which compares the ring; this is the same class one noun over.
+ *
+ * Fixed where the facts become a figure, for every noun at once: a ring the list already declares in another
+ * spelling is RE-SPELLED to the declared one — the fact's vertices, and its line's definition constraints
+ * regenerated from the row over the declared ring — whenever `sameStatementUnder` says the noun says the same
+ * thing in that reading. From there the line takes exactly the verdict its declared spelling takes: an identical
+ * restatement is `known` («זה כבר קיים באיור»), a different specific noun stays ADR-AG-260's refusal, and a
+ * crossing order («ACBD») is a different ring and is untouched. 2-D reached the same rule from the same report
+ * (ADR-618) over its command model; the rulings are shared, the code is not.
+ *
+ * Pure over the fact list, and positional: the result has the same length and order, so every index `fold`
+ * reports — errors, effects, `constraintFact` — still names the student's own fact.
+ */
+function declaredRingSpelling(facts: readonly Fact[], group: readonly number[]): readonly Fact[] {
+  const declared = new Map<Id, Id[]>();
+  let out: Fact[] | null = null;
+  facts.forEach((f, i) => {
+    if (f.t !== 'polygon' || f.vertices.length < 3) return;
+    const key = ringId(f.vertices);
+    const spelling = declared.get(key);
+    if (!spelling) {
+      declared.set(key, [...f.vertices]);
+      return;
+    }
+    if (spelling.every((v, j) => v === f.vertices[j])) return; // already the declared spelling
+    if (!sameStatementUnder(f.noun, spelling, f.vertices)) return;
+    const row = shapeRow(f.noun!)!;
+    const was = row.givens([...f.vertices]);
+    const now = row.givens([...spelling]);
+    out ??= [...facts];
+    out[i] = { ...f, vertices: [...spelling] };
+    facts.forEach((g, j) => {
+      if (group[j] !== group[i] || g.t !== 'constraint' || !g.definition) return;
+      const at = was.findIndex((k) => sameConstraint(k, g.k));
+      if (at >= 0) out![j] = { ...g, k: now[at] };
+    });
+  });
+  return out ?? facts;
+}
+
 export interface FoldResult {
   construction: Construction;
   /** Per-fact outcome, positionally — the fact list renders refusals in place. */
@@ -4053,6 +4104,7 @@ export interface FoldResult {
  */
 export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldResult {
   const group = groupOf ?? facts.map((_, i) => i);
+  facts = declaredRingSpelling(facts, group);
   const excluded = new Map<number, ApplyError>(); // line → the error that faulted it
   for (;;) {
     const r = foldPass(facts, (i) => !excluded.has(group[i]), group);
