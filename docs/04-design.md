@@ -659,8 +659,14 @@ resizes in place, anything else appends. The commit (`foldFact`) and the dry run
 the dry run judges `trialChanges` (by object identity), never `all.slice(facts.length)`; a second copy of the rule
 is the ADR-320 class. The load refresh
 and audit compare `committedStepCommands(prefix, …)` on both sides and write refreshed steps as those rows
-([ADR-579](06-decisions.md#adr-579), #1604); `fixtures.test.ts` asks the same. A differently spelled statement over
-an unticked row's letters is refused naming that row (`errors.mutedRowOwns`, ADR-010).
+([ADR-579](06-decisions.md#adr-579), #1604); `fixtures.test.ts` asks the same. A **new** differently spelled
+statement over an unticked row's letters is refused naming that row (`errors.mutedRowOwns`, ADR-010) — and that
+reservation is a commit-seam rule only: `mutedRowHolding` answers it for `dryRunOutcome`, over the trial list
+(an identical re-type sees its own twin enabled) and only for rows unticked above the step's own facts, with
+letters already on the figure free. The fold reserves nothing ([ADR-625](06-decisions.md#adr-625), #1952): an
+unticked row drops only its own objects, so a row below it that defines the letters itself keeps building,
+exactly as deleting the row leaves it building. The cascade muting must produce (ADR-015) arrives through the
+row's own red riders, which claim what they define (`introducedDefinedPointIds`).
 
 ### Re-reading a role-assigned letter run ([ADR-521](06-decisions.md#adr-521))
 

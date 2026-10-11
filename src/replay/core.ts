@@ -536,6 +536,60 @@ export function trialFacts(facts: Fact[], commands: AnyCommand[]): Fact[] {
   return commands.reduce((all, c) => foldCommand(all, c, mint), facts.slice());
 }
 
+/** The POINT letters an `AnyCommand` would introduce (created or auto-created) OUTSIDE the fold — the
+ *  gate's reading of the fold's `introducedPointIds ∘ lowerFact`. The pre-scan reseats the fold applies
+ *  only move a rider onto another side; they never change WHICH letters appear, so plain `lowerOne` plus
+ *  the two variant expansions gives the same set. */
+function introducedPointsOf(cmd: AnyCommand, symtab: ReturnType<typeof buildSymTab>): Id[] {
+  const lowered: AnyCommand[] =
+    cmd.type === 'shape-variant' ? expandShapeVariant(cmd, [])
+    : cmd.type === 'inscribe' ? expandInscribe(cmd)
+    : lowerOne(cmd, symtab);
+  return lowered.flatMap((c) => introducedPointIds(c as Command));
+}
+
+/**
+ * #1952 ([ADR-625](docs/06-decisions.md#adr-625)) — ADR-578's unticked-row reservation, now a
+ * **COMMIT-SEAM** rule and nothing else.
+ *
+ * ADR-010 makes muting reversible, so an unticked row keeps its letters for when it returns. #1748 read
+ * that as a reservation enforced by the FOLD, which also broke rows already in the list that define those
+ * letters themselves (#1952) — rows that were committed while the row was enabled, so re-ticking restores
+ * them exactly. The fold no longer asks the question; this does, for the ONE case where it matters: a
+ * **new** row that takes letters an unticked row introduced would make re-ticking that row conflict.
+ *
+ * Answered over the TRIAL list, so an identical re-type (which {@link foldCommand} re-enables in place,
+ * #1748) sees its own twin enabled and is never refused; only rows unticked ABOVE the step's own facts
+ * count, so re-enabling one of two unticked twins is not refused by the other. Letters already on the
+ * FIGURE belong to an enabled row and are free — «משולש ABC» · «ריבוע ABCD» with the triangle unticked
+ * still accepts «משולש ACB», because the square defines A, B, C.
+ *
+ * A row with no utterance (a direct command) has nothing to name, so it reserves nothing here.
+ */
+export function mutedRowHolding(facts: Fact[], all: Fact[], figure: Construction): { ids: Id[]; utterance: string } | null {
+  const changed = trialChanges(facts, all);
+  if (changed.length === 0) return null;
+  const firstChanged = Math.min(...changed.map((f) => all.indexOf(f)));
+  if (firstChanged <= 0) return null;
+  // Nothing unticked above the step — the common case on every submit, and it pays no lowering.
+  const mutedRows = all.slice(0, firstChanged).filter((g) => !g.enabled && g.utterance);
+  if (mutedRows.length === 0) return null;
+  const symtab = buildSymTab(all.filter((f) => f.enabled).map((f) => f.cmd));
+  const onFigure = new Set(figure.objects.map((o) => o.id));
+  const intro: Id[] = [];
+  for (const f of changed) {
+    if (!f.enabled) continue;
+    for (const id of introducedPointsOf(f.cmd, symtab)) if (!onFigure.has(id) && !intro.includes(id)) intro.push(id);
+  }
+  if (intro.length === 0) return null;
+  for (const g of mutedRows) {
+    const reserved = new Set(introducedPointsOf(g.cmd, symtab));
+    const held = intro.filter((id) => reserved.has(id));
+    if (held.length) return { ids: held, utterance: g.utterance! };
+  }
+  return null;
+}
+
 function computeReplay(raw: Fact[], seed = 0): Derived {
   // #1697 (ADR-588): a naming by use is a FACT of the line that made it — applied here, to the facts before it
   const facts = resolveBinds(raw);
@@ -1205,20 +1259,6 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       const s = claimedBy.get(id);
       if (s) s.add(by); else claimedBy.set(id, new Set([by]));
     };
-    /** #1748 (ADR-578): the first UNTICKED row above fact `fi` that reserves any of `ids` (a disabled fact
-     *  claims everything it introduces, ADR-010/015), with the reserved subset — or null. Read off the
-     *  fact list, not `claimedBy`, so a prefix resumed from the memo answers the same. A row with no
-     *  utterance (a direct command) has nothing to name, so it keeps the generic cascade message. */
-    const mutedOwnerOf = (ids: Id[], fi: number): { ids: Id[]; utterance: string } | null => {
-      for (let i = 0; i < fi; i++) {
-        const g = facts[i];
-        if (g.enabled || !g.utterance) continue;
-        const intro = new Set(engineCmdsOf(g).flatMap(introducedPointIds));
-        const held = ids.filter((id) => intro.has(id));
-        if (held.length) return { ids: held, utterance: g.utterance };
-      }
-      return null;
-    };
     let retriedCreating = false;
     const applied: Command[] = start ? [...start.node.applied] : [];
     // #360 (ADR-398): ownership maps for per-seed failure attribution — filled after each successful
@@ -1304,9 +1344,20 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
         claim();
         continue;
       }
+      // #1952 ([ADR-625](docs/06-decisions.md#adr-625)): an UNTICKED row reserves NOTHING for the rows
+      // BELOW it. It claimed everything it introduced (ADR-010/015 — muting is reversible, so the row
+      // "kept" its letters), and that reservation made a later row which DEFINES those letters itself
+      // read broken: «ריבוע ABCD» · «משולש ABC», untick the square, and the triangle — a figure that
+      // stands perfectly well on its own — went red naming the unticked row. Deleting the square left it
+      // building, so untick and delete disagreed about the same figure (#1952; 3-D and analytic build it).
+      // Nothing is lost by dropping the reservation HERE: every row below was committed while this row was
+      // enabled, so re-ticking replays this row first and defines the letters again — the figure comes back
+      // exactly (ADR-010), and the cascade that muting MUST produce still arrives through the row's own red
+      // riders («נקודה P על מעגל O» goes red for a missing circle, and `claimDefined` then cascades «קטע PQ»).
+      // The reservation is a COMMIT-SEAM rule only ({@link mutedRowHolding}, read by `dryRunOutcome`):
+      // a NEW differently-spelled row taking an unticked row's letters is still refused naming it (#1748).
       if (!f.enabled) {
         status[f.id] = 'disabled';
-        claim();
         continue;
       }
       // A SOFT default equal-pair the student's explicit equality overrides (ADR-114) — step aside (no-op).
@@ -1341,14 +1392,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       // isn't in the figure now ⇒ its definition is gone, so this fact can't build either.
       const broken = intro.filter((id) => owned.has(id) && !cur.objects.some((o) => o.id === id));
       if (broken.length) {
-        // #1748 (ADR-578): letters an UNTICKED row reserves (ADR-010 — muting is reversible, so the row
-        // keeps its points for when it returns) are not "removed or failed": say which row holds them and
-        // the two ways out. Reached by a DIFFERENTLY spelled re-statement — an identical one re-enables the
-        // twin through the shared fold rule (`foldCommand`) and never gets here.
-        const muted = mutedOwnerOf(broken, fi);
-        status[f.id] = muted
-          ? `can't build: ${muted.ids.join(', ')} belong to the unticked row «${muted.utterance}» — tick it again or delete it`
-          : `can't build: ${broken.join(', ')} is no longer available (an earlier step it relies on was removed or failed)`;
+        status[f.id] = `can't build: ${broken.join(', ')} is no longer available (an earlier step it relies on was removed or failed)`;
         claimDefined();
         continue;
       }
@@ -3432,6 +3476,14 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
   const before = replay(facts, seed);
   const all = trialFacts(facts, commands);
   const trial = trialChanges(facts, all); // #1748: a re-enabled twin is the step's fact too, not only an append
+  // #1952 (ADR-625): ADR-578's unticked-row reservation lives HERE now, and only here. The fold stopped
+  // reserving an unticked row's letters for the rows below it (a row already in the list that defines them
+  // itself must build, exactly as deleting the row leaves it building) — so the one case the reservation is
+  // FOR is asked at the seam it is about: a NEW differently-spelled row taking those letters, which would
+  // make re-ticking the row conflict (#1748). The message is unchanged, and still names the row.
+  const holding = mutedRowHolding(facts, all, before.construction);
+  if (holding)
+    return { produced: false, reason: 'error', detail: `can't build: ${holding.ids.join(', ')} belong to the unticked row «${holding.utterance}» — tick it again or delete it` };
   const after = replay(all, seed);
   // #926: a `set-var` whose letter nothing binds YET is marked in the fold (a pending row with its reason,
   // never a silent ✓) but is still data the student may state first — it commits as data-only below.
@@ -4200,8 +4252,10 @@ function introducedPointIds(cmd: Command): Id[] {
  * statement that re-creates one of them would be building on a definition that is gone — the
  * «M is no longer available» cascade). A free point it would merely have auto-created carries no
  * definition, so a later statement that introduces that letter contradicts nothing and must be free to.
- * Disabled and atomic-poisoned statements still claim everything ({@link introducedPointIds}) — muting
- * a statement cascades its dependents (ADR-015). One named decision, called by the fold and its lock.
+ * An atomic-poisoned statement still claims everything ({@link introducedPointIds}). A DISABLED one claims
+ * NOTHING since #1952 (ADR-625) — unticking a row leaves its letters exactly as deleting it does, and the
+ * cascade muting must produce (ADR-015) arrives through the row's own red riders, which claim what they
+ * define. One named decision, called by the fold and its lock.
  */
 export function introducedDefinedPointIds(cmd: Command): Id[] {
   return applyCommand(emptyConstruction(), cmd).objects.filter((o) => isGeoPoint(o) && o.kind !== 'free-point').map((o) => o.id);
