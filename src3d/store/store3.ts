@@ -28,6 +28,7 @@ import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { ingestTypedText } from '../../shell/bidi';
 import { findProofTarget } from '../../shell/proofTarget';
+import { unreadScript } from '../../shell/inputScript';
 import { lostPart3, unreadParts3, type LostPart3 } from './unreadParts3';
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
@@ -85,6 +86,12 @@ export type StoreError3 =
   /** #1666 (ADR-3D-295, ADR-W-107): a PROOF TARGET («הוכיחו כי …», "prove that …") — what the student must
    *  show, never a given. `sentence` is the proof sentence as typed. Typed, so it never escalates. */
   | { code: 'proof-target'; sentence: string }
+  /** #1919 (ADR-3D-328, ADR-626): a letter this tool cannot read — «משולש ДЖФ» RECORDED A, B, C, because a
+   *  letter outside the label alphabet is invisible to `declLeftover`, so the shape read as unlabelled and
+   *  `planarPolygon` drew its default names. `detail` is the student's own run(s); `name` is a run that
+   *  could be a point name («ДЖФ»), `word` a word in another language («треугольник»). Typed, so it never
+   *  escalates: the model is not asked about a script the tool does not read. */
+  | { code: 'unread-name' | 'unread-word'; detail: string }
   /** #1547 (ADR-3D-299): «x_B = 2t» — one coordinate given a SYMBOLIC value, recognised and not yet
    *  supported. Typed, so it never escalates; `component` is the student's own component («x_B»). */
   | { code: 'component-symbolic'; component: string }
@@ -1595,6 +1602,11 @@ function readStatement3(
   // what the student was asked to prove. The rule is shared with 2-D and analytic (`shell/proofTarget`).
   const proof = findProofTarget(utterance);
   if (proof) return { ok: false, error: { code: 'proof-target', sentence: proof.sentence } };
+  // #1919 (ADR-3D-328): a letter the tool cannot read, refused at the one statement reader both seams
+  // share — the shared rule every builder calls (`shell/inputScript`), run after the glyph fold's
+  // look-alike row, so «משולש КМО» still records KMO and «משולש ДЖФ» is refused naming Д, Ж, Ф.
+  const unread = unreadScript(utterance);
+  if (unread) return { ok: false, error: { code: `unread-${unread.kind}`, detail: unread.detail } };
   let parsed = parse3(utterance);
   // #866 (ADR-3D-239) — a vertex carrying exactly ONE angle is not ambiguous, and asking there
   // would make the clarification's own sentence false ("more than one angle meets at A" when one

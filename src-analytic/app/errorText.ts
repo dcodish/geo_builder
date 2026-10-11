@@ -153,6 +153,9 @@ export function errorText(error: InputError, t: Translate): string {
     'bad-equation': 'errBadEquation',
     'out-of-scope': 'errOutOfScope',
     'proof-target': 'errProofTarget',
+    // #1919 — the operator chose THIS sentence for a name the tool cannot read, in every builder.
+    'unread-name': 'errRenameBadName',
+    'unread-word': 'errUnreadWord',
     // #1888 / #1889 (ADR-AG-251) — a line that loses a part: its parts listed, or the right angle's two lines taught
     'split-statements': error.key === 'split-statements' && error.teach ? 'errRightAngleVertex' : 'errSplitStatements',
     'reserved-coordinate': 'errReservedCoordinate',

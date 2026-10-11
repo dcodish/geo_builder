@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-11T14:33:36.970Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AC ⟂ AB",
+      "cmds": [
+        {
+          "type": "cos-angle",
+          "u": {
+            "kind": "pair",
+            "from": "A",
+            "to": "C"
+          },
+          "v": {
+            "kind": "pair",
+            "from": "A",
+            "to": "B"
+          },
+          "cos": 0
+        }
+      ]
+    },
+    {
+      "utterance": "∡ABC = 40°",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "B",
+          "b": "A"
+        },
+        {
+          "type": "segment3",
+          "a": "B",
+          "b": "C"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "vertex-angle-eq",
+            "vertex": "B",
+            "p": "A",
+            "q": "C",
+            "deg": 40
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "אורך AB הוא שורש 2",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "B",
+            "value": 1.4142135623730951
+          }
+        }
+      ]
+    }
+  ]
+}

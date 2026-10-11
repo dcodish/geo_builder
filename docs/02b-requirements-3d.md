@@ -143,6 +143,21 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   elsewhere — a SOLID noun included — it is **taught**, never sent to the paid fallback.
   - Sources: ADR-3D-039, ADR-3D-092, ADR-3D-223, ADR-3D-226, ADR-3D-287; #181, #353, #498, #924, #1523,
     #1861.
+- **FR-SP-20 (Must)** — **A symbol typed as any of its look-alike glyphs reads as the symbol**
+  ([FR-SU-17](02w-requirements-workspace.md)). «AC ⟂ AB» reads as «AC ⊥ AB» (and «SA ⟂ ABC» on a plane),
+  «∡ABC» and «∢ABC» as «∠ABC», a keyboard `<` before a run of letters as «∠», «40⁰» / «40º» / «40˚» as
+  40°, and «שורש 2» as √2 — in a statement and in a data-panel question alike, since a measure the student
+  can state they can ask (FR-CL-4). A comparison is never turned into an angle. The fact row keeps exactly
+  the glyph that was typed.
+  - Sources: [ADR-3D-329](06b-decisions-3d.md#adr-3d-329), #1912; the prime fold ADR-3D-300 is the same
+    seam one symbol over.
+- **FR-SP-21 (Must)** — **A letter the tool cannot read is refused by name, never replaced**
+  ([FR-SU-18](02w-requirements-workspace.md)). «משולש ДЖФ» recorded a triangle named A, B, C; it is now
+  refused quoting Д, Ж, Ф, at the one statement reader submit and the ✎ edit share, before the grammar and
+  before the model. A look-alike letter folds to its Latin twin instead («משולש КМО» records K, M, O), and a
+  GREEK vertex name («משולש ΓΔΘ», «משולש αβγ») goes to the model as it does in 2-D, where it used to record
+  A, B, C. Greek as notation — a measure name, «ΔABC» — is unchanged.
+  - Sources: [ADR-3D-328](06b-decisions-3d.md#adr-3d-328), [ADR-626](06-decisions.md#adr-626), #1919.
 - **FR-SP-9 (Must)** — **An UNDER-SPECIFIED statement is told what is missing; only an UNSUPPORTED one is
   told the tool cannot do it.** The two are different failures and must not share a voice: a student who
   wrote a sentence the tool understands but cannot pin down needs to know *which detail* to add, while

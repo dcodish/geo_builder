@@ -209,6 +209,8 @@ const he = {
   errAliasTaken: 'השם {{holder}} כבר תפוס בציור — שם אחד מסמן דבר אחד, נקודה או זווית. בחרו שם אחר, למשל אות עם ספרה אחרת.',
   // #1154 — the rename's refusals, each naming what the student wrote
   errRenameBadName: '"{{detail}}" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
+  // #1919 — a WORD in another script: the operator's Hebrew-and-English sentence, the same in every builder.
+  errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — "{{detail}}" אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
   errRenameSame: 'האות {{detail}} כבר נקראת {{detail}} — אין מה לשנות.',
   errRenameUnknown: 'אין בשרטוט נקודה בשם {{detail}}, ולכן אין מה לשנות.',
   errRenameTaken: 'האות {{detail}} כבר תפוסה: "{{holder}}". בחרו אות פנויה.',
@@ -657,6 +659,7 @@ const en: typeof he = {
   errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
   errAliasTaken: 'The name {{holder}} is already taken on this figure — one name marks one thing, a point or an angle. Pick another name, e.g. a letter with a different digit.',
   errRenameBadName: '"{{detail}}" is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
+  errUnreadWord: 'This tool reads Hebrew and English only — "{{detail}}" is in neither. Try writing the line in Hebrew or English.',
   errRenameSame: '{{detail}} is already called {{detail}} — nothing to change.',
   errRenameUnknown: 'The figure has no point named {{detail}}, so there is nothing to rename.',
   errRenameTaken: 'The letter {{detail}} is already taken: "{{holder}}". Pick a free letter.',

@@ -171,6 +171,13 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   never read as either. Angles are read the way `cis` reads them: degrees (radians such as `π/4` are
   read by neither).
   - Sources: [ADR-CX-059](06d-decisions-complex.md#adr-cx-059), #1534 (operator ruling)
+- **FR-CN-12 (Must)** — **A letter this tool cannot read is named, not met with «I did not understand».**
+  A letter or a word in a script the tool does not read — «ДЖФ = 2 + i», a Russian or Arabic word — was
+  already refused here, but with the generic unreadable-line sentence. It now gets the two sentences every
+  builder uses, quoting the letters as typed ([FR-SU-18](02w-requirements-workspace.md)). This tool's own
+  notation is untouched: a superscript or subscript letter is an exponent or an index («zⁿ», «Xₖ»), and the
+  look-alike GLYPH fold stays excluded here on purpose — only the look-alike LETTERS fold, for this check.
+  - Sources: [ADR-626](06-decisions.md#adr-626), #1919
 
 ## Knowledge and claims
 

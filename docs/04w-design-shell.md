@@ -177,6 +177,41 @@ A `SymbolSpec` whose face (`label`) is one character inserts exactly that charac
 
 `shell/conjunction.ts` `foldConjunctionSpacing` turns «AB ו- BC», «AB ו -BC» and «AB ו - BC» into «AB ו-BC». It is a PARSER-boundary fold, not a store one: 2-D `normalizeUtterance`, 3-D `normalize3` and analytic `orthography` call it, and the stored line stays as typed. A glued «ו-» always folds; a hyphen with a space before it folds only before a name-shaped token, so a minus sign («2 ו -3», «ו -y = x», «a ו -a») is never absorbed into the conjunction. The cross-builder lock is the parity rows `conj-space-*-1691-*`.
 
+### Look-alike glyphs ([ADR-3D-329](06b-decisions-3d.md#adr-3d-329))
+
+`shell/glyphFold.ts` `foldGlyphs` folds every look-alike Unicode glyph onto the symbol it renders as: ⟂ → ⊥, ∡/∢ → ∠, the guarded keyboard `<` → ∠, ⁰ → ° and º/˚ after a digit → °, and «שורש» before a value or «(» → √. `GLYPH_FOLDS` is the table, one row per fold with its `why`, applied in order; the order is part of the contract, so a later row can never mint an operand an earlier row's guard would have read. It is a PARSER-boundary fold, not a store one: 2-D `normalizeUtterance`, 3-D `normalize3` **and its ask lane** `parseQuery`, and analytic `orthography` call it, and the stored line stays as typed. The `<` row carries 2-D's ADR-381 guard verbatim — a label run after it, no operand before it — so «AB < CD», «α<β», «k < 0» and «0 < t < 1» stay comparisons; º and ˚ fold only directly after a digit, since both are letter-like. **The complex Builder is not a caller**: there a superscript digit is an exponent (`src-complex/parser/normalize.ts`), so folding ⁰ would turn «z⁰» into a degree. The uppercase Cyrillic homoglyphs are the table's LAST row since #1919 answered the question ([ADR-626](06-decisions.md#adr-626)): a letter with a Latin twin folds to it silently (2-D's `CYRILLIC_TO_LATIN` moved here, where every builder reads it), and a letter with no twin is refused by name — the next section. `foldLookalikeLetters` exports that one row on its own, for the script check and for complex, which still calls no glyph fold. The cross-builder lock is the parity rows `glyph-*-1912` plus `shell/__tests__/glyph-fold.test.ts`.
+
+### The input-script rule ([ADR-626](06-decisions.md#adr-626), [ADR-3D-328](06b-decisions-3d.md#adr-3d-328))
+
+`shell/inputScript.ts` answers one question for all four builders: **is there a letter in this line the tool
+cannot read?** `unreadScriptRuns` folds the look-alike letters (the glyph table's last row, so «КМО» is
+already KMO), then returns the maximal letter/digit runs carrying a letter outside what the tool reads —
+Latin `A–Z a–z`, Hebrew, Greek (notation, by the ruling), the letterlike and mathematical-alphanumeric
+blocks (ℓ, ℝ), and every MODIFIER letter plus the ordinal indicators ª º, which are notation and are never
+judged (so «zⁿ», «Xₖ», «A'B'C'» and «40º» pass untouched — complex depends on exactly this, since it folds
+no glyphs). `unreadScript` adds the one decision a seam needs: which of the operator's two sentences. A
+point name in this grammar is ONE run of capitals, so a single run with no lowercase letter and at most six
+letters is a `name` («ДЖФ», «ابج», «Д1Ж1Ф1»), and a lowercase word, a longer run or several runs is a
+`word` («треугольник», «مثلث متساوي الساقين»).
+
+It is called at every builder's STATEMENT seam, right where `findProofTarget` is called — 2-D
+`decidePreParse` and `editPipeline`, 3-D `readStatement3` (submit and the ✎ edit), analytic `parseLine`,
+complex `submitLine` — and, in 2-D, one layer down at `parseEntry` too, so no caller of `parse` can draw
+such a letter (the LLM lowering included). Each builder words its own refusal from its own i18n; the rule
+carries no strings. The refusal is pre-grammar and pre-model, so it never costs a call, and the stored line
+is untouched: a saved session that recorded «משולש ДЖФ» as A, B, C before the rule still loads.
+
+3-D needed one more gate: `declLeftover` tokenizes Latin and Hebrew only, so a GREEK vertex name was
+invisible to it and «משולש ΓΔΘ» recorded A, B, C. A Greek letter left in a declaration now makes the gate
+decline, which hands the line to the model — 2-D's verdict for it. Only that gate changed: the measure rules
+read Greek as they always did, so «α < β» keeps its own typed refusal.
+
+The cross-builder lock is `shell/__tests__/fixtures/unread-letter-rows.ts` with the four thin locks
+(`src/app/__tests__/unread-letters-1919.test.ts`, `src3d/__tests__/unread-letters-1919.test.ts`,
+`src-analytic/__tests__/unread-letters-1919.test.ts`,
+`src-complex/app/__tests__/unread-letters-1919.test.ts`), the meta-lock
+`shell/__tests__/input-script-1919.test.ts`, and the parity rows `unread-*-1919`.
+
 ### Indexed names ([ADR-600](06-decisions.md#adr-600))
 
 `shell/indexedName.ts` is the student's name alphabet, once: `NAME_LETTER` (Latin, and Greek in both cases), `INDEX` (glued digits, `_1` / `_{1}`, subscript digits), `INDEXED_NAME` («S1», «α1», «Α1» — one letter with an index, standing alone) and `UNGLUED`, the zero-width guard that a number never begins glued to a name letter, after an `_`, or inside another number. It is pure regex source with no product knowledge. 2-D re-exports it from `src/parser/lexicon.ts` (the angle value reader, the subscript fold and the number gate compose it); analytic's tokenizer test `INDEXED_TOKEN` (`src-analytic/engine/carriers.ts`, #1785) is `INDEXED_NAME_RE`. The cross-builder lock is the parity rows `indexed-*-1785` and `*-1814`.

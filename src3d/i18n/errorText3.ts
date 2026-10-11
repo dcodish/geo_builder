@@ -83,6 +83,12 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #1666: the tool draws the givens; a claim to prove is named and left out.
     case 'proof-target':
       return t('err.proofTarget', { sentence: err.sentence });
+    // #1919 (ADR-3D-328): a letter the tool cannot read — the operator's two sentences, 2-D's wording
+    // verbatim (ADR-W-118 B1), with the student's own letters.
+    case 'unread-name':
+      return t('err.unreadName', { detail: err.detail });
+    case 'unread-word':
+      return t('err.unreadWord', { detail: err.detail });
     // #1547: a single coordinate with a symbolic value — named by the student's own component.
     case 'component-symbolic':
       return t('err.componentSymbolic', { component: err.component });

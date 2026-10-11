@@ -458,6 +458,17 @@ phrase }`. Because it is `parse`, every seam inherits it: the submit lane (`deci
 edit seam, the scenario harness (`refusedSteps`) and log-triage. The pre-parse guard and the post-failure register
 read the same `RULES` entries.
 
+**A letter the tool cannot read** (#1919, [ADR-626](06-decisions.md#adr-626)) takes the same two positions.
+`unreadScript` (`shell/inputScript.ts`, the shared rule all four builders call) is asked in
+`decidePreParse` — refusing with `input.scope.unread-name` or `input.scope.unread-word`, the student's own
+letters quoted, logged `scope:unread-*` — in `runEditCommit`, and at the top of `parseEntry`, which returns
+`{ ok: false, reason: 'unread-script', kind, detail }` so no caller of `parse` can draw them. It runs on the
+NORMALIZED text, so the look-alike letters (the glyph table's last row,
+[04w](04w-design-shell.md#the-input-script-rule-adr-626-adr-3d-328)) are already Latin: «משולש КМО» builds
+KMO, «משולש ДЖФ» is refused. Before it, a letter outside `[A-Z]` was invisible to `namesVertices`,
+`shapeLeftover`, `statedLabelTokens` and the span accountant at once, so the shape read as unlabelled and
+`autoVertexLabels` drew A, B, C.
+
 ### A trig function of an angle is decided whole, before any rule ([ADR-566](06-decisions.md#adr-566))
 
 `trigGiven` (`parser/parse.ts`) runs at the top of `parse()`, after the angle-alias rewrite, beside the proof-target

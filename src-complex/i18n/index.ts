@@ -28,6 +28,9 @@ const he = {
   language: 'English',
   emptyHint: 'אין עדיין נתונים. נסו את הדוגמה, או הקלידו: z1 = 3+4i',
   errNotHandled: 'לא הצלחתי להבין את המשפט: "{{detail}}"',
+  // #1919 — a script this tool does not read: the operator's two sentences, identical in every builder
+  errUnreadName: '"{{detail}}" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
+  errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — "{{detail}}" אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
   errParse: 'שגיאת ניסוח בביטוי: "{{detail}}"',
   errDuplicate: 'השם כבר הוגדר במשפט: "{{detail}}"',
   errUnknownRef: 'המשפט מפנה לשם שלא הוגדר: {{detail}}',
@@ -266,6 +269,8 @@ const en: typeof he = {
   language: 'עברית',
   emptyHint: 'No givens yet. Try the example, or type: z1 = 3+4i',
   errNotHandled: 'I could not understand the statement: "{{detail}}"',
+  errUnreadName: '"{{detail}}" is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
+  errUnreadWord: 'This tool reads Hebrew and English only — "{{detail}}" is in neither. Try writing the line in Hebrew or English.',
   errParse: 'Could not parse the expression: "{{detail}}"',
   errDuplicate: 'This name is already defined by: "{{detail}}"',
   errUnknownRef: 'The statement refers to an undefined name: {{detail}}',

@@ -200,6 +200,11 @@ deeper (`MAX_FRAME_DEPTH = 2`). Structural readings run before `parseClause`, pa
 `bad-operand`), keeping separators (`Segment.sep`) and rejecting a bare-name group (`isBareName`); shape nouns come
 from `SHAPES` / `EN_SHAPE`; `unwrap`, `shapeClauses` and `originClauses` (`(0,0)`, named by `resolveMints`) fill the
 rest; `viaCanonical` calls `parseClause` directly; a proof target is `proof-target`.
+A letter the tool cannot read is
+`unread-name` / `unread-word` (#1919, [ADR-626](06-decisions.md#adr-626)): `unreadScript`
+(`shell/inputScript.ts`) is asked right after the proof target, so the line never reaches a rule and never
+reaches the model, and the two refusals are worded from `errRenameBadName` and `errUnreadWord`. The
+look-alike letters fold first, in `orthography`'s `foldGlyphs`, so «משולש КМО» now reads as KMO and records.
 
 **Entailment is judged over configurations** ([ADR-AG-188](06c-decisions-analytic.md#adr-ag-188)): the line's
 constraints (`Derivation.constraintLine`) must hold across the pool (`evaluate.holdsInEveryConfiguration`, with
@@ -268,8 +273,10 @@ after a sentence's facts (`TangentTargets.pieces`, `sideClauses`). The extent is
 construction: the crossing's bounded promotion (`drawnPieceOver`). A bare pair in a point-on sentence is decided in
 the parser, not at M1: it carries the `between` selector «הקטע AB» carries, except when the subject is one of its ends
 ([ADR-AG-248](06c-decisions-analytic.md#adr-ag-248), #1892; `lineObject` and `pairText` lower the converse to that
-bare «P על CD»). `orthography` folds format controls (`stripFormatControls`), bullets and the spaced
-conjunction (`shell/conjunction`, [ADR-AG-239](06c-decisions-analytic.md#adr-ag-239)). A tangency with no circle
+bare «P על CD»). `orthography` folds format controls (`stripFormatControls`), bullets, the spaced
+conjunction (`shell/conjunction`, [ADR-AG-239](06c-decisions-analytic.md#adr-ag-239)) and the look-alike
+glyphs (`shell/glyphFold`, [ADR-3D-329](06b-decisions-3d.md#adr-3d-329)): its own ∢/∡ and ⁰ rows moved into
+that shared table, which also brings ⟂ → ⊥, the guarded `<` → ∠, º/˚ → ° and «שורש N» → √. A tangency with no circle
 applies `touchedCircleFacts` (tool symbols, `toolSymbol`), and `theCircle` binds `{ inscribed: ring }`; created
 shapes start fitted ([ADR-AG-202](06c-decisions-analytic.md#adr-ag-202): `fitCreatedShapes`, `shapedObjectOf`). A
 non-cyclic noun refuses `inscribed-contradicts-noun { shape, forced }` (`ShapeRow.notCyclic`, `cyclicFacts`,

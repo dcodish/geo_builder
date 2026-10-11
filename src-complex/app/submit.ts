@@ -39,6 +39,7 @@
  */
 
 import { readEnvelope, type LoadAudit } from '../../shell/save';
+import { unreadScript } from '../../shell/inputScript';
 import { parseLineV2 } from '../parser/rules';
 import { trigAngleMismatch } from '../parser/normalize';
 import { complexScopeOf, parseAsk } from './deriveLines';
@@ -359,6 +360,16 @@ export function submitQuery(raw: string): boolean {
 export function submitLine(raw: string): boolean {
   const st = () => useComplexStore.getState();
   const line = raw.trim();
+
+  // #1919 (ADR-626): a letter this tool cannot read, refused before the ask routing and before the
+  // grammar — the shared rule all four builders call (`shell/inputScript`). Complex folds no glyphs (a
+  // superscript digit is an exponent here, #1912), and it does not need to: the rule folds the look-alike
+  // LETTERS itself, so «КМО» reads as KMO and only a letter with no Latin twin is named.
+  const unread = unreadScript(line);
+  if (unread) {
+    st().setError({ key: `unread-${unread.kind}`, detail: unread.detail });
+    return false;
+  }
 
   /**
    * #789 — a QUESTION typed in the givens box is routed to the ask lane, never recorded as a fact.

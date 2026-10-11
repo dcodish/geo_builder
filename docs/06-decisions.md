@@ -16035,3 +16035,52 @@ to the DELETE of the square, the re-tick identity, and the kept refusal). A `.ge
 untick, so the store-path matrix is hand-authored, as ADR-578's was.
 
 **Behaviour change for a student:** after unticking a row, a row below it that declares its own letters keeps building, instead of going red and emptying the figure — exactly as deleting the row already behaved. «ריבוע ABCD» · «משולש ABC», untick the square: the triangle stays drawn. Ticking the square again brings the whole figure back as it was. Typing a NEW, differently spelled line over an unticked row's letters is still refused, naming the row, unchanged.
+
+## ADR-626 — The tool reads Hebrew and English: a letter it cannot read is refused by name, never replaced by A, B, C (#1919)
+
+**Status:** accepted · 2026-10-11 · bug (P2, 2-D, 3-D, analytic, complex) · branch `fix/1919-non-latin-letters-not-dropped` off `fix/1912-3d-perp-symbol-u27c2` @ ad8df1d3 · fix round #1992 · twin [ADR-3D-328](06b-decisions-3d.md#adr-3d-328) · builds on #1912's shared fold table ([ADR-3D-329](06b-decisions-3d.md#adr-3d-329)), whose Cyrillic row was left to this issue · follows the `shell/proofTarget` precedent ([ADR-W-107](06w-decisions-workspace.md#adr-w-107))
+
+**Requirements:** [02](02-requirements.md) FR-IN-15 (new) · [02w](02w-requirements-workspace.md) FR-SU-18 (new) · [02c](02c-requirements-analytic.md) §3a *Out of the language* · [02d](02d-requirements-complex.md) FR-CN-12 (new) · **Design:** [04w](04w-design-shell.md) *The input-script rule* (new) and its *Look-alike glyphs* section (the Cyrillic row moved in) · [04](04-design.md) the pre-parse/`parseEntry` guards · [04c](04c-design-analytic.md) the sentence frame · [04d](04d-design-complex.md) *Boundaries* · **LADDER stage:** none (an input-boundary refusal; no engine, solver or ladder change)
+
+**The report.** Found by the #1912 plan pass, not by the operator: «משולש ДЖФ» (Cyrillic letters with no Latin look-alike) was **drawn as triangle A, B, C** in 2-D and 3-D — the student's three letters silently replaced by three he never typed, with a green ✓. That is the honesty invariant head-on: a stated name parses, escalates or errors, but never vanishes.
+
+**The ruling** (2026-10-08, three parts, all quoted in #1919):
+1. *"we only support english or hebrew so any letter or mention of anything that is not in these languages is rejected. in all tools"* — so the scope is every builder and every position in the line, not only a shape's vertex list.
+2. *"Keep Greek as math"* — α, β, γ, π, θ stay notation; only a point NAME must be Latin.
+3. *"Fold them silently"* — a Cyrillic letter identical to a Latin one is read as that letter (#1912's table), never refused.
+4. The words: analytic's own sentence for a bad point name, reused everywhere — «"ДЖФ" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.» — and, for a word in another script, «הכלי קורא עברית ואנגלית בלבד — "{{word}}" אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.»
+
+**Measured before** (re-measured at pickup, `ad8df1d3` = #1912's tip, every real door with the model mocked: `decideDeterministic2D` + `commitVerdict`, `decideSubmit3`, analytic `decideSubmit`, complex `submitLine`):
+
+| line (empty canvas) | 2-D | 3-D | analytic | complex |
+| --- | --- | --- | --- | --- |
+| «משולש ДЖФ» | **commits A B C, seg-AB, seg-BC, seg-AC, poly-ABC** | **records `polygon3 ["A","B","C"]`** | not-handled (to the model) | refused `not-handled` |
+| «ריבוע ДЖФИ» · «מחומש ДЖФИЛ» · «מקבילית ДЖФИ» · «משולש ישר זווית ДЖФ» · «משולש ДЖФ שווה שוקיים» · «triangle ДЖФ» · «משולש ابج» · «משולש ÉÜÇ» | **commits A, B, C …** | **records A, B, C …** | not-handled | refused |
+| «משולש ДЖФ חסום במעגל» | **commits A, B, C** | not-understood | not-handled | refused |
+| «משולש ДBC» · «משולש ÀBC» · «משולש Д1Ж1Ф1» · «נקודה Д» · «נקודה Ж על AB» · «מעגל Д» · «M אמצע Д» | escalates to the model | not-understood | not-handled | refused |
+| «Д(1,2)» | refused `input.scope.unrelated` | not-understood | not-handled | refused |
+| «משולש ΓΔΘ» · «משולש ΑΒΓ» · «משולש αβγ» | escalates (`weak:dropped`) | **records A, B, C** | not-handled | refused |
+| «משולש КМО» (look-alikes) | builds K, M, O | **records A, B, C** | not-handled | refused |
+| «משולש אבג» | refused `input.scope.hebrew-labels` | not-understood | not-handled | refused |
+
+Two corrections to the plan's table, both already recorded on the issue and re-confirmed here: «Д(1,2)» is a 2-D REFUSAL (`input.scope.unrelated`), not an escalation, and 3-D's «משולש ДЖФ חסום במעגל» is not-understood. One addition: **complex never silently dropped such a letter** — it refused every line above, but with the generic «לא הצלחתי להבין את המשפט», so its share of the ruling is the wording alone (the submit-door key is `not-handled`, not `line-unrecognized`, which is the derive-side code).
+
+**Root cause / class** (docs/17 §1). *A letter the label grammar does not read is invisible to every gate that counts labels. So a shape noun followed by such letters reads as UNLABELLED, and the noun's default names (A, B, C …) are drawn with a green ✓.* In 2-D four gates miss it at once — `namesVertices` (`[A-Z]` only, so the shape takes `autoVertexLabels`), the fail-closed leftover gate `shapeLeftover`, `statedLabelTokens`/`droppedNewLabels`, and the span accountant (which reads Greek as a symbol, which is why 2-D's Greek rows escalate and its Cyrillic rows did not). In 3-D it is `declLeftover`, after which `planarPolygon` and `rightTriangle` default to `['A','B','C']`. Teaching eight tokenizers one script each leaves the ninth to reintroduce the class.
+
+**Decision.**
+1. **One shared rule**, `shell/inputScript.ts` — `unreadScriptRuns` (the maximal runs carrying a letter the tool cannot read) and `unreadScript` (which of the two ruled sentences, plus the letters as typed). Readable: Latin `A–Z a–z`, Hebrew, Greek, the letterlike and mathematical-alphanumeric blocks, and — never judged — every modifier letter and the ordinal indicators ª º, which are notation (so «zⁿ», «Xₖ», «A'B'C'» and «40º» pass untouched). A `name` is ONE run of capitals with at most six letters, a hexagon's vertex list; anything else is a `word`. The rule carries no strings; each builder words its own refusal. That split is the mechanism half of CLAUDE.md rule 7 — both sentences are the operator's.
+2. **The look-alike letters join the shared fold table** (`shell/glyphFold.ts`, its last row, where 2-D has always applied them): 2-D's private `CYRILLIC_TO_LATIN` moved there, so 3-D and analytic fold them too, and `foldLookalikeLetters` is exported on its own for the script check and for complex, which calls no glyph fold. The ruling's "fold them silently" is therefore one table, not four.
+3. **Called at every statement seam, where `findProofTarget` is called** — 2-D `decidePreParse` and `runEditCommit`; 3-D `readStatement3` (submit and the ✎ edit); analytic `parseLine`; complex `submitLine`. The refusal is pre-grammar and pre-model, so it never costs a call.
+4. **And one layer down in 2-D**: `parseEntry` returns `{ ok: false, reason: 'unread-script', kind, detail }`, so no caller of `parse` can draw such a letter — the LLM lowering, the scenario harness and log-triage included. This is the proof-target posture exactly.
+5. **The words**, in all four builders: `input.scope.unread-name`/`unread-word` (2-D), `err.unreadName`/`err.unreadWord` (3-D), `errRenameBadName` (reused) + `errUnreadWord` (analytic), `errUnreadName`/`errUnreadWord` (complex), he + en.
+6. **Not touched:** the stored row (a saved session that recorded «משולש ДЖФ» as A, B, C still loads — only the statement seams judge), 2-D's Hebrew-label note, Greek as notation, and the ask lanes.
+
+**Measured after** (the same doors). Every row above is refused naming the letters in all four builders, nothing is committed and the model is never called; «משולש КМО» builds K, M, O in 2-D, 3-D and analytic; «משולש ΓΔΘ» goes to the model in all three; «משולש אבג», «משולש ABC», «α = 30», «60 < α < 90», «זווית ABC = 40º» and complex's «zⁿ = 8» are unchanged. A census of every catalog, corpus, fixture and locale string through the real detector flags nothing (the only hits in the tree are internal formula comments — û, ẑ, ēₚ — and one Armenian homoglyph inside a Hebrew word in a `src/engine/circleRef.ts` comment, reported, not fixed here).
+
+**Locks.** `shell/__tests__/fixtures/unread-letter-rows.ts` (the shared rows + `unreadLetterFaults`) with four thin locks driving the REAL seams — `src/app/__tests__/unread-letters-1919.test.ts`, `src3d/__tests__/unread-letters-1919.test.ts`, `src-analytic/__tests__/unread-letters-1919.test.ts`, `src-complex/app/__tests__/unread-letters-1919.test.ts` — plus the meta-lock `shell/__tests__/input-script-1919.test.ts` (it proves the rows catch a seam that draws the line, one that refuses vaguely, and one that overreaches onto the look-alikes or Greek). Parity rows `unread-*-1919`. Scenario `unread-letters-refused-by-name-1919` (corpus 4) carries the reported line with its refusal asserted.
+
+**Behaviour change for a student:**
+- 2-D and 3-D: «משולש ДЖФ» is refused, naming Д, Ж, Ф — instead of drawing a triangle A, B, C. The same for every shape noun and every letter the tool cannot read, and for «נקודה Д», «מעגל Д», «נקודה Ж על AB», «M אמצע Д», «משולש ДBC», which used to go to the model.
+- Analytic and complex: the same two sentences, where they answered with the model or with «לא הצלחתי להבין».
+- 3-D and analytic: «משולש КМО» draws K, M, O, as 2-D always did (it recorded A, B, C / read nothing).
+- 3-D: «משולש ΓΔΘ», «משולש ΑΒΓ» and «משולש αβγ» go to the model, as in 2-D, instead of recording A, B, C.

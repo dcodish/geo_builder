@@ -247,7 +247,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1689': 'open',
   '#1726': 'icebox',
   '#1737': 'open',
-  '#1777': 'icebox',
   '#1784': 'open',
   '#1796': 'open',
   '#1799': 'open',
@@ -674,7 +673,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-an-055', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון במשולש ABC'], expect: 'builds' },
   { id: 'cat-an-056', family: 'cevians-centres', steps: ['משולש ABC', 'AD גובה לצלע BC'], expect: 'builds' },
   { id: 'cat-an-057', family: 'cevians-centres', steps: ['טרפז ABCD', 'M מפגש האלכסונים'], expect: 'builds' },
-  { id: 'cat-an-058', family: 'angles', steps: ['משולש ABC', '∢C = 90°'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'cat-an-058', family: 'angles', steps: ['משולש ABC', '∢C = 90°'], expect: 'builds', note: '3-D’s park closed with #1912’s glyph fold (ADR-3D-329)' },
   { id: 'cat-an-059', family: 'angles', steps: ['המרובע ABCO הוא טרפז ישר זווית'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1676' }] },
   { id: 'cat-an-060', family: 'polygons', steps: ['במלבן ABCD, הנקודה E נמצאת על הצלע DC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   // #1620 S2 (ADR-AG-207): the perpendicular from a point, its foot, the line through a point cutting a side.
@@ -714,9 +713,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'trig-sine-choice-1711', family: 'angles', steps: ['משולש ABC', 'סינוס הזווית ACB = 3/4'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1726', parked: true }], note: 'a sine fits θ and 180° − θ — a configuration choice «הציגו תצורה אחרת» cycles (#1711, operator ruling 2026-10-03)' },
   { id: 'trig-sine-out-of-range-1711', family: 'angles', steps: ['משולש ABC', 'סינוס הזווית ACB = 5/4'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1726', parked: true }], note: 'no angle has a sine above 1 (#1711)' },
   // #1712 (ADR-587) — an angle measures between 0° and 180°, a length is never negative: refused by name
-  { id: 'angle-negative-1712', family: 'angles', steps: ['משולש ABC', '∢ABC = -2'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1777', parked: true }] },
+  { id: 'angle-negative-1712', family: 'angles', steps: ['משולש ABC', '∢ABC = -2'], expect: 'refused', note: '3-D’s park closed with #1912’s glyph fold (ADR-3D-329): ∢ reads as ∠, and ∠ABC = -2 was already refused' },
   { id: 'angle-negative-he-1712', family: 'angles', steps: ['משולש ABC', 'זווית ABC = -30'], expect: 'refused' },
-  { id: 'angle-reflex-1712', family: 'angles', steps: ['משולש ABC', '∢ABC = 200'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1777', parked: true }] },
+  { id: 'angle-reflex-1712', family: 'angles', steps: ['משולש ABC', '∢ABC = 200'], expect: 'refused', note: '3-D’s park closed with #1912’s glyph fold (ADR-3D-329)' },
   { id: 'angle-bound-out-of-range-1712', family: 'angles', steps: ['משולש ABC', 'זווית ABC גדולה מ-200'], expect: 'refused' },
   { id: 'length-negative-1712', family: 'lengths', steps: ['משולש ABC', 'AB = -3'], expect: 'refused' },
   { id: 'cat-3d-011', family: 'angles', steps: ['משולש ABC ישר זווית'], expect: 'builds' },
@@ -860,7 +859,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'alias-order-bound-1622', family: 'angles', steps: ['α < 30'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: "2-D's measure-bound on the alias, before any angle names it" },
   { id: 'alias-order-window-1622', family: 'angles', steps: ['20 < α < 60'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'alias-order-closed-1622', family: 'angles', steps: ['α ≤ β'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
-  { id: 'alias-order-binds-1622', family: 'angles', steps: ['α < β', 'משולש ABC', '∢ABC = α', '∢BAC = β'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the order binds when the aliases name angles' },
+  { id: 'alias-order-binds-1622', family: 'angles', steps: ['α < β', 'משולש ABC', '∢ABC = α', '∢BAC = β'], expect: 'builds', note: 'the order binds when the aliases name angles; 3-D’s #1679 park closed with #1912’s ∢ fold (ADR-3D-329)' },
   { id: 'angle-label-1622', family: 'angles', steps: ['משולש ABC', 'נקודה M על BC', 'נסמן זוית BAM כ-A1'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'angle-label-digit-1622', family: 'angles', steps: ['משולש ABC', 'נסמן זוית CAB כ 1'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the bare digit is the vertex letter plus the digit: A1' },
   { id: 'angle-label-equals-1622', family: 'angles', steps: ['משולש ABC', 'נסמן ∠CAB=A1'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
@@ -959,14 +958,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #1621 D2 (ADR-AG-215): an angle named by a Greek letter, the «נסמן» lead-in, the pin, and tan/cos of an angle ──
   { id: 'alias-nasmen-1621', family: 'angles', steps: ['מרובע ABCD', 'נסמן ∢DCB = 2α'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'corpus 471 1/4' },
   { id: 'alias-nasmen-colon-1621', family: 'angles', steps: ['משולש ABD', 'נסמן: זווית ADB = α'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'corpus 471 3/4' },
-  { id: 'alias-bare-1621', family: 'angles', steps: ['משולש ABC', '∢ABC = α'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
-  { id: 'alias-two-angles-1621', family: 'angles', steps: ['משולש ABC', '∢ABC = β', '∢ACB = β'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
-  { id: 'alias-pin-1621', family: 'angles', steps: ['משולש ABC', '∢ABC = α', 'α = 30'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'alias-bare-1621', family: 'angles', steps: ['משולש ABC', '∢ABC = α'], expect: 'builds', note: '3-D’s #1679 park closed with #1912’s ∢ fold (ADR-3D-329)' },
+  { id: 'alias-two-angles-1621', family: 'angles', steps: ['משולש ABC', '∢ABC = β', '∢ACB = β'], expect: 'builds', note: '3-D’s #1679 park closed with #1912’s ∢ fold (ADR-3D-329)' },
+  { id: 'alias-pin-1621', family: 'angles', steps: ['משולש ABC', '∢ABC = α', 'α = 30'], expect: 'builds', note: '3-D’s #1679 park closed with #1912’s ∢ fold (ADR-3D-329)' },
   { id: 'trig-tan-1621', family: 'angles', steps: ['משולש ABC', 'tan∢ABC = 2'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'corpus 471 9/4; 2-D builds it as a 2° angle — a wrong figure the verdict cannot see (#1698)' },
   { id: 'trig-tan-paren-1621', family: 'angles', steps: ['משולש ABC', 'tan(∢ABC) = 2'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D: 2° (#1698)' },
   { id: 'trig-tg-1621', family: 'angles', steps: ['משולש ABC', 'tg∢ABC = 2'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D: 2° (#1698)' },
   { id: 'trig-tan-he-1621', family: 'angles', steps: ['משולש ABC', 'טנגנס הזווית ABC הוא 2'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D: 2° (#1698)' },
-  { id: 'trig-cos-1621', family: 'angles', steps: ['משולש ABC', 'cos∢ACB = 3/4'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D: 3° (#1698)' },
+  { id: 'trig-cos-1621', family: 'angles', steps: ['משולש ABC', 'cos∢ACB = 3/4'], expect: 'builds', note: '2-D: 3° (#1698); 3-D’s #1679 park closed with #1912’s ∢ fold (ADR-3D-329)' },
   // ── #1719 (ADR-AG-227): sin of an angle — a choice between its two angles; |sin| > 1 is refused ──
   { id: 'trig-sin-1719', family: 'angles', steps: ['משולש ABC', 'sin∢ABC = 0.5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D builds it too since #1711 (ADR-573, a two-angle choice); 3-D does not read sin (#1726/#1679)' },
   { id: 'trig-sin-he-1719', family: 'angles', steps: ['משולש ABC', 'סינוס הזווית ABC הוא 0.5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D builds it too since #1711 (ADR-573, a two-angle choice); 3-D does not read sin (#1726/#1679)' },
@@ -979,8 +978,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'order-length-bare-1621', family: 'lengths', steps: ['AB < BC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'a bare order mints its letters, as its equality twin does (ADR-AG-210)' },
   { id: 'order-length-bound-1621', family: 'lengths', steps: ['משולש ABC', 'AB ≤ 10'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'order-length-at-least-1621', family: 'lengths', steps: ['משולש ABC', 'AB לפחות 3'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
-  { id: 'order-angle-bound-1621', family: 'angles', steps: ['משולש ABC', '∢ABC ≤ 40°'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
-  { id: 'order-angle-window-1621', family: 'angles', steps: ['משולש ABC', '20 < ∢ABC < 60'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'order-angle-bound-1621', family: 'angles', steps: ['משולש ABC', '∢ABC ≤ 40°'], expect: 'builds', note: '3-D’s #1679 park closed with #1912’s ∢ fold (ADR-3D-329)' },
+  { id: 'order-angle-window-1621', family: 'angles', steps: ['משולש ABC', '20 < ∢ABC < 60'], expect: 'builds', note: '3-D’s #1679 park closed with #1912’s ∢ fold (ADR-3D-329)' },
   { id: 'order-angle-acute-1621', family: 'angles', steps: ['משולש ABC', 'זווית ABC חדה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'order-angle-angle-1621', family: 'angles', steps: ['משולש ABC', '∢ABC < ∢BAC'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1677', parked: true }, { product: '3d', issue: '#1679', parked: true }], note: "2-D reads an order between two named VARIABLES (α < β) and between two segments, not between two angles; its equality twin «∢ABC = ∢BAC» builds there" },
   { id: 'order-length-conflict-1621', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 7', 'AB > BC'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'a strict order never moves a determined figure: the one it contradicts is refused on the sentence' },
@@ -1284,6 +1283,29 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-inscribed-bare-run-1941', family: 'inscribed', steps: ['משולש ABC', 'מעגל חסום ב-ABC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1969' }] },
   { id: 'cat-2d-inscribed-ngon-plain-1891', family: 'inscribed', steps: ['מחומש ABCDE חסום במעגל'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1969' }] },
   { id: 'cat-2d-inscribed-ngon-regular-1891', family: 'inscribed', steps: ['מחומש משוכלל ABCDE חסום במעגל'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1969' }, { product: '3d', issue: '#1679', parked: true }], note: '3-D has no regular n-gon at all; analytic reads no inscription sentence (#1969)' },
+  // #1912 (ADR-3D-329) — A LOOK-ALIKE GLYPH IS THE SYMBOL IT RENDERS AS, in every builder. Which glyph a
+  // student gets is decided by their keyboard, the palette or the PDF they pasted from, so the same
+  // sentence must give the same verdict whichever twin carries it. Each row pairs a twin with the
+  // canonical glyph's own row elsewhere in this list (`cat-3d-005` for ∠, the perpendicular rows for ⊥).
+  { id: 'glyph-perp-u27c2-1912', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AC ⟂ AB'], expect: 'builds', note: '⟂ U+27C2 beside ⊥ U+22A5 — the operator’s own sequences use ⟂ (#1888)' },
+  { id: 'glyph-perp-u27c2-glued-1912', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AC⟂AB'], expect: 'builds' },
+  { id: 'glyph-angle-measured-1912', family: 'angles', steps: ['משולש ABC', '∡ABC = 40°'], expect: 'builds', note: '∡ U+2221' },
+  { id: 'glyph-angle-keyboard-1912', family: 'angles', steps: ['משולש ABC', '<ABC = 40°'], expect: 'builds', note: 'the keyboard `<` as ∠ (ADR-381); the comparison rows below keep it a comparison' },
+  { id: 'glyph-degree-superscript-1912', family: 'angles', steps: ['משולש ABC', '∠ABC = 40⁰'], expect: 'builds', note: '⁰ U+2070' },
+  { id: 'glyph-degree-ordinal-1912', family: 'angles', steps: ['משולש ABC', '∠ABC = 40º'], expect: 'builds', note: 'º U+00BA' },
+  { id: 'glyph-degree-ring-1912', family: 'angles', steps: ['משולש ABC', '∠ABC = 40˚'], expect: 'builds', note: '˚ U+02DA' },
+  { id: 'glyph-root-word-1912', family: 'lengths', steps: ['משולש ABC', 'אורך AB הוא שורש 2'], expect: 'builds', note: 'the word «שורש» before a value is √ (#105)' },
+  // #1919 (ADR-626 / ADR-3D-328) — A LETTER THE TOOL CANNOT READ IS REFUSED BY NAME, in every builder
+  // (operator ruling 2026-10-08: *"we only support english or hebrew … rejected. in all tools"*). 2-D and
+  // 3-D DREW these as A, B, C …; analytic handed them to the model. Greek stays math, and the Cyrillic
+  // look-alikes fold, so those two rows are the controls that keep the rule from overreaching.
+  { id: 'unread-name-1919', family: 'polygons', steps: ['משולש ДЖФ'], expect: 'refused', note: 'Cyrillic with no Latin twin: 2-D committed A, B, C, 3-D recorded A, B, C' },
+  { id: 'unread-name-square-1919', family: 'polygons', steps: ['ריבוע ДЖФИ'], expect: 'refused' },
+  { id: 'unread-name-arabic-1919', family: 'polygons', steps: ['משולש ابج'], expect: 'refused', note: 'any script the label grammar cannot read, not only Cyrillic' },
+  { id: 'unread-name-point-1919', family: 'points-incidence', steps: ['משולש ABC', 'נקודה Ж על AB'], expect: 'refused', note: 'anywhere in the line, not only a shape’s vertex list' },
+  { id: 'unread-word-1919', family: 'frame', steps: ['треугольник ABC'], expect: 'refused', note: 'a WORD in another language takes the other ruled sentence' },
+  { id: 'unread-greek-vertex-1919', family: 'polygons', steps: ['משולש ΓΔΘ'], expect: 'not-handled', note: 'Greek is math (the ruling), so a Greek vertex name goes to the model as in 2-D — 3-D recorded A, B, C before #1919' },
+  { id: 'unread-lookalike-1919', family: 'polygons', steps: ['משולש КМО'], expect: 'builds', note: 'the Cyrillic look-alikes fold to K, M, O (the ruling: «fold them silently») — 2-D always did; 3-D recorded A, B, C and analytic read nothing' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

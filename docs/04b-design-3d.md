@@ -35,7 +35,12 @@ and *resolution happens at apply*, where the figure is known — the opposite of
 duality possible. **Reach for M1 duality before adding a construct.**
 
 **The normalisation seam and case (ADR-3D-039, ADR-3D-223).** `normalize3` is the one boundary every rule
-reads: format controls stripped, primes and minus unified, script transitions split. **The prime fold is
+reads: format controls stripped, primes and minus unified, look-alike glyphs folded, script transitions
+split. **The look-alike glyph fold is the SHARED table** ([ADR-3D-329](06b-decisions-3d.md#adr-3d-329)):
+`shell/glyphFold.ts` `foldGlyphs` (⟂ → ⊥, ∡/∢ → ∠, the guarded `<` → ∠, ⁰/º/˚ → °, «שורש N» → √), called by
+`normalize3` right after `foldPrimes3` and by the ask lane's `parseQuery` — 3-D folded none of them, which is
+why «AC ⟂ AB» was not-understood while «AC ⊥ AB» built (#1912); 2-D's and analytic's boundaries call the same
+table (docs/04w, *Look-alike glyphs*). **The prime fold is
 one set** (ADR-3D-300): `PRIME_GLYPHS3` / `foldPrimes3` in `lexicon/marks3.ts` (′ ’ ‘ \` ´ and the Hebrew geresh ׳, ʹ, ʼ → `'`),
 called by `normalize3`, the ask lane's `parseQuery`, the LLM sequence gate and the rename dialog, and read by
 the bidi run alphabet — no reader spells its own prime class. Lowercase labels are uplifted by
@@ -43,6 +48,16 @@ the bidi run alphabet — no reader spells its own prime class. Lowercase labels
 a point/vertex noun, a `label(…)` coordinate at the head of a definition, the single-letter subject of a midpoint statement — ADR-3D-287); a solid noun is not an anchor (#353/#498).
 `midpoint-auto`, the one rule in `parse3` that INVENTS a point's name, matches a full anchored frame
 (`MID_HE`/`MID_EN`, shared with the anchor), so a word it does not own declines the line.
+
+**A letter the tool cannot read is refused by name** (#1919, [ADR-3D-328](06b-decisions-3d.md#adr-3d-328)).
+`readStatement3` — the one reader submit and the ✎ edit share — asks `unreadScript` (`shell/inputScript.ts`,
+the shared rule all four builders call) right after `findProofTarget`, and answers
+`{ code: 'unread-name' | 'unread-word', detail }` with the student's own letters quoted, typed so it never
+escalates. The look-alike LETTERS are folded by the rule itself, so «משולש КМО» records K, M, O while
+«משולש ДЖФ» is refused. One gate was also made total: `declLeftover` tokenizes Latin and Hebrew only, so a
+GREEK vertex name was invisible to it and «משולש ΓΔΘ» recorded A, B, C — a Greek letter left in a
+declaration now makes the gate decline, which hands the line to the model, 2-D's verdict for it. The
+measure rules read Greek as they did, so «α < β» keeps its own typed refusal.
 
 **Case is taught, never silently accepted** (ADR-3D-226). What no anchor proves goes to the #353 nudge in
 `scope3.ts` (`upperCasedLabelCandidate3`, consulted by `App3` before the LLM seam). It lifts a label-shaped

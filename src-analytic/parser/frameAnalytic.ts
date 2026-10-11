@@ -25,6 +25,7 @@ import { ANGLE_STEM_HE, EN_SHAPE, SHAPES, normalizeShapeNoun } from '../engine/s
 import { isNumeralName } from '../engine/names';
 import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
+import { foldGlyphs } from '../../shell/glyphFold';
 import { areaNotation } from '../engine/lengths';
 
 /**
@@ -56,8 +57,12 @@ export function orthography(raw: string): string {
     .replace(/־/g, '-')
     .replace(/ /g, ' ')
     .replace(/(?<![א-ת])ה-\s+([xy])(?![A-Za-z0-9])/g, 'ה-$1')
-    .replace(/[∡∢]/g, '∠')
-    .replace(/⁰/g, '°')
+    // LOOK-ALIKE GLYPHS → the symbol they render as — the SHARED table every builder's parser boundary
+    // calls (#1912, [ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329); `shell/glyphFold`). It holds
+    // the ∢/∡ and ⁰ folds that were spelled here, in the same order, and adds the rows analytic never
+    // had: the guarded keyboard `<` ≡ ∠, º/˚ ≡ ° after a digit, «שורש N» ≡ √, and ⟂ ≡ ⊥ (which
+    // `REL_PERP_SYM` reads per-rule here, so folding it changes nothing).
+    .replace(/^[\s\S]*$/, (t) => foldGlyphs(t))
     .replace(/(\d)\s*½/g, '$1.5')
     .replace(/(\d)\s*¼/g, '$1.25')
     .replace(/(\d)\s*¾/g, '$1.75')

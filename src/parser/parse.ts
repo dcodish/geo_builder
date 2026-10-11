@@ -25,7 +25,9 @@ import { restoreStatedSequences as restoreStatedSequencesShared } from '../../sh
 import { roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
+import { foldGlyphs } from '../../shell/glyphFold';
 import { findProofTarget } from '../../shell/proofTarget';
+import { unreadScript } from '../../shell/inputScript';
 import { foreignGiven } from './scope';
 import { NOTATION_WORDS, UNIT_WORDS, unaccountedLabels } from './labelAccounting';
 import { readShapePhrase, lowerShape, SHAPE_ADJ_ANY, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
@@ -80,6 +82,15 @@ export type ParseResult =
   // `sentence` is the proof sentence as typed. The submit gate refuses it before the parser
   // (`decidePreParse`); this is the same shared rule at the one boundary every other seam reads.
   | { ok: false; reason: 'proof-target'; sentence: string }
+  // #1919 (ADR-626): a letter this tool CANNOT READ — «משולש ДЖФ». A letter outside the label alphabet is
+  // invisible to every gate that counts labels (`namesVertices`, `shapeLeftover`, `statedLabelTokens`, the
+  // span accountant), so the shape read as UNLABELLED and `autoVertexLabels` lowered it to A, B, C: the
+  // student's letters silently replaced. Refused here, at the one boundary every rule reads, so no caller of
+  // `parse` can draw them — the LLM lowering included. The submit and ✎ edit gates refuse it earlier with the
+  // ruled sentence (`decidePreParse`); this is the same shared rule (`shell/inputScript`) one layer down.
+  // `detail` is the student's own run(s); `name` is a run that could be a point name, `word` a word in
+  // another language.
+  | { ok: false; reason: 'unread-script'; kind: 'name' | 'word'; detail: string }
   // #1698 (ADR-566): a trigonometric function of an angle («sin∢ACB = 3/4», «cos∢B = 2», «tan∢B > 1»)
   // that `trigGiven` cannot lower to exactly one angle. Refused naming the function, never handed to an
   // angle rule (which read it as degrees) and never escalated. `fn` is the student's own spelling.
@@ -11575,10 +11586,6 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
  * He/Latin text — both silently break `\s*`/optional-`-` adjacency, so e.g. "נקודה E על AC ב־40%" dropped
  * the ratio. Fixing it here, at the boundary, kills the whole class in one place instead of per-rule.
  */
-/** Uppercase Cyrillic letters that are visual twins of Latin uppercase (#45 / ADR-299) — mapped to Latin so
- *  a label pasted with a homoglyph is read as the letter it looks like. Only the unambiguous look-alikes. */
-const CYRILLIC_TO_LATIN: Record<string, string> = { 'А': 'A', 'В': 'B', 'С': 'C', 'Е': 'E', 'Н': 'H', 'К': 'K', 'М': 'M', 'О': 'O', 'Р': 'P', 'Т': 'T', 'Х': 'X' };
-
 /**
  * Cardinal NUMBER WORDS before a degree word — «שלושים מעלות», «ארבעים וחמש מעלות», "thirty degrees",
  * "forty-five degrees" — rewritten to digits at the one boundary every rule reads (#185 row 5, the
@@ -12011,7 +12018,7 @@ export function normalizeUtterance(raw: string): string {
   // to the canonical circle word HERE — at the one boundary every rule reads — means the whole circle
   // vocabulary (creation, sizing, chord, tangent, inscribe…) accepts it without touching each rule.
   // #751 (ADR-W-029): the control set is the SHARED one (shell/bidi) — it had three copies.
-  const orth = stripFormatControls(raw)
+  const spelling = stripFormatControls(raw)
     .replace(/־/g, '-')
     // #531 (ADR-3D-144's 2-D half): NBSP → space — the isolates above were already stripped here
     // (the 3-D seam was the gap), but an NBSP from the same paste paths still broke literal-space
@@ -12034,30 +12041,14 @@ export function normalizeUtterance(raw: string): string {
     // deterministically; unobserved variants (זויית, זות…) are NOT enumerated — they hit the
     // fail-closed leftover gate and escalate to the LLM, which reads typos. Guarded like the שוה fold
     // so it never fires inside another word.
-    .replace(/(?<![א-ת])זוות(?![א-ת])/g, 'זווית')
-    // Angle/degree GLYPH variants (#45 / ADR-299): the ∡ MEASURED-ANGLE (U+2221) and ∢ SPHERICAL-ANGLE
-    // (U+2222) glyphs are the same student intent as ∠ (U+2220); the SUPERSCRIPT ZERO ⁰ (U+2070), typed for
-    // degrees ("90⁰"), is the ° sign. Normalising here means every angle rule reads the canonical glyphs.
-    .replace(/[∡∢]/g, '∠')
-    // Keyboard-natural PREFIX `<` ≡ ∠ (issue #237, ADR-381): students approximate the book's angle glyph
-    // with `<` («<ACB = 40», «<ACB=<BED») because ∠ isn't on a keyboard. Disambiguated from the INFIX
-    // less-than by both sides: it must be FOLLOWED by an uppercase label run (1–3 labels, not part of a
-    // longer letter run) and NOT PRECEDED (ignoring whitespace) by an operand — a label/measure letter,
-    // digit, or closing bracket. So `AB < CD` (lengthOrder, ADR-158), `α<β` (measureOrder), `R<r`
-    // (radius order, #54) and `k < 0` stay comparisons, locked in angle-bracket.test.ts.
-    .replace(/</g, (m, off: number, str: string) => {
-      if (!/^\s*(?:[A-Z]\d*){1,3}(?![A-Za-z])/.test(str.slice(off + 1))) return m;
-      const before = str.slice(0, off).replace(/\s+$/, '');
-      return /[A-Za-z0-9α-ωΑ-Ω)\]}|]$/.test(before) ? m : '∠';
-    })
-    .replace(/⁰/g, '°')
-    // Uppercase CYRILLIC homoglyphs → Latin (#45): a label pasted with a Cyrillic look-alike (А/В/С/… are
-    // NOT [A-Za-z]) silently fails every label rule. Map the visual twins to their Latin letter at the one
-    // boundary every rule reads, so "מעגל עם קוטר АВ" reads AB.
-    .replace(/[АВСЕНКМОРТХ]/g, (ch) => CYRILLIC_TO_LATIN[ch])
-    // The Hebrew word "שורש N" (square root) ≡ the √ glyph (issue #105) — normalise it HERE so every
-    // length/ratio/radius value path inherits it. Only before a number or "(" (so "שורש של" etc. is untouched).
-    .replace(/שורש\s*(?=[\d(])/g, '√')
+    .replace(/(?<![א-ת])זוות(?![א-ת])/g, 'זווית');
+  // LOOK-ALIKE GLYPHS → the symbol they render as — the SHARED table every builder's parser boundary
+  // calls (#1912, [ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329); `shell/glyphFold`). It holds
+  // what used to be spelled HERE inline: the ∡/∢ angle twins and the ⁰ degree sign (#45 / ADR-299), the
+  // guarded keyboard `<` ≡ ∠ (#237, ADR-381) and «שורש N» ≡ √ (#105) — in the same order, so 2-D's
+  // reading is unchanged — and adds the two rows 2-D never folded: ⟂ ≡ ⊥ (read per-rule here, folded
+  // nowhere) and º/˚ ≡ ° after a digit. 3-D folded NONE of them, which is the class the table closes.
+  const orth = foldGlyphs(spelling)
     // «ן-» → «ו-» (#506): the final-nun key sits beside vav, and the slip recurs across the 2026-08-10
     // triage INSIDE otherwise-real constructions — «O - חיתוך של AC ן- DB», «הנקודות F ו- G הן אמצעי
     // הקטעים BC ן- DO». Each occurrence turns a mostly-parseable compound into a partial parse the
@@ -12197,6 +12188,10 @@ function parseEntry(raw: string, ctx: ParseContext): ParseResult {
   // #1666: a claim to prove never reaches a rule (`shell/proofTarget`, shared by all three builders).
   const proof = findProofTarget(raw);
   if (proof) return { ok: false, reason: 'proof-target', sentence: proof.sentence };
+  // #1919 (ADR-626): a letter the tool cannot read never reaches a rule either — the shared rule
+  // (`shell/inputScript`), on the NORMALIZED text, so the look-alike twins are already Latin letters.
+  const unread = unreadScript(s);
+  if (unread) return { ok: false, reason: 'unread-script', kind: unread.kind, detail: unread.detail };
   // #1654–#1657 (ADR-562): a foreign given is refused before ANY rule may read part of the sentence — the
   // LaTeX/negation placement, for their reason: the partial reading is a different, wrong given.
   const foreign = foreignGiven(s);

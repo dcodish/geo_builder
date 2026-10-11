@@ -12,6 +12,9 @@ import type { InputError } from '../store/useComplexStore';
 
 const ERROR_KEY: Record<InputError['key'], string> = {
   'not-handled': 'errNotHandled',
+  // #1919 — the two ruled sentences for a script this tool does not read, 2-D's wording verbatim
+  'unread-name': 'errUnreadName',
+  'unread-word': 'errUnreadWord',
   'parse-error': 'errParse',
   'duplicate-name': 'errDuplicate',
   'wrong-app': 'errWrongApp',
