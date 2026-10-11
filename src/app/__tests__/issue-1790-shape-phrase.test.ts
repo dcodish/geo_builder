@@ -203,12 +203,34 @@ describe('#1790 Arm C — restating an already-declared ring with the generic wo
 });
 
 describe('#1790 — a conflict inside ONE sentence names the sentence, never "edit the earlier step"', () => {
-  it('«ריבוע ABCD, מלבן ABCD» on an empty canvas: refused quoting the sentence and the student’s letter', async () => {
-    const v = await decide([], 'ריבוע ABCD, מלבן ABCD');
+  // RE-SEATED by #1988/#1985 (ADR-619), round #1992. This block's guarantee is unchanged — a sentence that
+  // conflicts with ITSELF is named as the sentence, never as "edit the earlier step" — but «ריבוע, מלבן» is no
+  // longer such a sentence: an IMPLIED noun over a named shape adds nothing (every square is a rectangle), so the
+  // pair that still self-conflicts is one that is neither implied nor excluded. «מלבן, מעוין» is exactly that: a
+  // square is both, so neither narrows the other and neither excludes it.
+  it('«מלבן ABCD, מעוין ABCD» on an empty canvas: refused quoting the sentence and the student’s letter', async () => {
+    const v = await decide([], 'מלבן ABCD, מעוין ABCD');
     expect(v.kind).toBe('refuse');
     if (v.kind !== 'refuse') return;
-    expect(v.note).toMatchObject({ key: 'input.sentenceSelfConflict', params: { sentence: 'ריבוע ABCD, מלבן ABCD' } });
+    expect(v.note).toMatchObject({ key: 'input.sentenceSelfConflict', params: { sentence: 'מלבן ABCD, מעוין ABCD' } });
     expect((v.note as unknown as { params: { id: string } }).params.id).toMatch(/^[A-Z]+$/);
+  });
+
+  // The two halves of ADR-619 inside ONE sentence, so the comma spelling can never drift from the two-line one.
+  it('an IMPLIED noun in the same sentence adds nothing: «ריבוע ABCD, מלבן ABCD» draws the square', async () => {
+    const v = await decide([], 'ריבוע ABCD, מלבן ABCD');
+    expect(v.kind).toBe('commit');
+    if (v.kind !== 'commit') return;
+    const f = replay(commit('ריבוע ABCD, מלבן ABCD', v.commands), 0);
+    const poly = f.construction.objects.find((o) => o.id === 'poly-ABCD') as { declaredAs?: string } | undefined;
+    expect(poly?.declaredAs).toBe('square');
+  });
+
+  it('an EXCLUDING noun in the same sentence gets ADR-619’s ruled sentence, not the engine’s letter', async () => {
+    const v = await decide([], 'מקבילית ABCD, טרפז ABCD');
+    expect(v.kind).toBe('refuse');
+    expect(JSON.stringify(v)).toMatch(/shape-excluded/);
+    expect(JSON.stringify(v)).not.toMatch(/already defined|כבר מוגדר/);
   });
 
   it('a redefinition of something an EARLIER step made keeps the engine’s "earlier step" message', async () => {

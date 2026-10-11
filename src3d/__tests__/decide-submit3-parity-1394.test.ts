@@ -90,10 +90,19 @@ describe('#1394 — the dispatched submit reproduces the recorded one, sequence 
   it('every sequence matches its recorded behaviour', () => {
     const golden = JSON.parse(readFileSync(GOLDEN, 'utf8')) as Record<string, string>;
     const drift = Object.keys(golden).filter((k) => golden[k] !== actual[k]);
-    if (drift.length) {
+    // A key the corpus no longer harvests (an edited literal array RENAMES its key) has no `detail`, and
+    // `JSON.parse(undefined)` used to throw here — the crash replaced the report the batch needs to attribute
+    // the drift. Report the three sets instead (#1992).
+    const gone = Object.keys(golden).filter((k) => !(k in actual));
+    const added = Object.keys(actual).filter((k) => !(k in golden));
+    if (drift.length || added.length) {
       const dir = path.resolve(__dirname, '../../reports');
       mkdirSync(dir, { recursive: true });
-      writeFileSync(path.join(dir, 'decide-submit3-parity-drift.json'), JSON.stringify(Object.fromEntries(drift.map((k) => [k, JSON.parse(detail[k])])), null, 1));
+      writeFileSync(path.join(dir, 'decide-submit3-parity-drift.json'), JSON.stringify({
+        drifted: Object.fromEntries(drift.filter((k) => k in actual).map((k) => [k, JSON.parse(detail[k])])),
+        goneFromCorpus: gone,
+        newInCorpus: added,
+      }, null, 1));
     }
     expect(drift).toEqual([]);
     expect(Object.keys(actual).sort()).toEqual(Object.keys(golden).sort());

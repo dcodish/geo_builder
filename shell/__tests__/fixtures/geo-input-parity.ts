@@ -859,7 +859,6 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'alias-order-bound-1622', family: 'angles', steps: ['α < 30'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: "2-D's measure-bound on the alias, before any angle names it" },
   { id: 'alias-order-window-1622', family: 'angles', steps: ['20 < α < 60'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'alias-order-closed-1622', family: 'angles', steps: ['α ≤ β'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
-  { id: 'alias-order-binds-1622', family: 'angles', steps: ['α < β', 'משולש ABC', '∢ABC = α', '∢BAC = β'], expect: 'builds', note: 'the order binds when the aliases name angles; 3-D’s #1679 park closed with #1912’s ∢ fold (ADR-3D-329)' },
 
   { id: 'alias-order-binds-1622', family: 'angles', steps: ['α < β', 'משולש ABC', '∢ABC = α', '∢BAC = β'], expect: 'builds', contextFor: { '3d': ['משולש ABC', '∢ABC = α'] }, note: 'the order binds when the aliases name angles; 3-D’s #1679 park on the SENTENCE closed with #1912’s ∢ fold (ADR-3D-329), but its context line «α < β» is a measure order 3-D still does not read (#1679) — so 3-D types the context it can' },
   { id: 'angle-label-1622', family: 'angles', steps: ['משולש ABC', 'נקודה M על BC', 'נסמן זוית BAM כ-A1'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
