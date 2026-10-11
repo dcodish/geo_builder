@@ -83,15 +83,30 @@ describe('shapes compose on existing points (ADR-013)', () => {
     for (const id of ['P', 'Q', 'R']) expect(r.positions.get(id)).toBeTruthy();
   });
 
-  it('a DECLARED cycle stays immutable — re-declaring the square as a parallelogram still refuses (ADR-157; the ADR-375 lowering covers only UNDECLARED point sets)', () => {
+  it('a DECLARED cycle stays immutable — re-declaring the square as a RHOMBUS still refuses (ADR-157; the ADR-375 lowering covers only UNDECLARED point sets)', () => {
     // ABCD is a DECLARED shape (its polygon object exists), so ADR-157's immutability owns it:
     // a different shape word over the same cycle is a contradiction → refuse with the clear
     // message (never a silent morph). The ADR-375 M1 lowering applies only to a vertex set with
     // NO shape declared over it (riders, free points — see shape-over-existing.test.ts).
-    const base = build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }]);
-    const r = applyStep(base.construction, { type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] });
+    //
+    // #1988 (ADR-619) narrowed WHICH second word this is: a noun the declared one IMPLIES (a square is a
+    // parallelogram, a rectangle, a kite) is a restatement and no longer reaches here. A RHOMBUS over a
+    // declared RECTANGLE is neither implied nor excluded, so it is still ADR-157's refusal.
+    const base = build([{ type: 'rectangle', ids: ['A', 'B', 'C', 'D'] }]);
+    const r = applyStep(base.construction, { type: 'rhombus', ids: ['A', 'B', 'C', 'D'] });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/already defined/i);
+  });
+
+  it('a noun the declared shape IMPLIES changes nothing (#1988, ADR-619) — the square stays a square', () => {
+    const base = build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }]);
+    const r = applyStep(base.construction, { type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    for (const id of ['A', 'B', 'C', 'D']) expect(r.positions.get(id)).toEqual(base.positions.get(id));
+    expect(r.construction.objects.filter((o) => o.kind === 'polygon')).toHaveLength(1);
+    const poly = r.construction.objects.find((o) => o.kind === 'polygon');
+    expect(poly && 'declaredAs' in poly && poly.declaredAs).toBe('square');
   });
 });
 

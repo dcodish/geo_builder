@@ -216,8 +216,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «מרובע ADCB», «משולש ABC» · «משולש ACB»), or the generic word over a named shape («מרובע ABCD» over a square) —
   adds no row and shows the restatement note, exactly as the same line in the same spelling does (#613). A
   reading that changes what a shape says (a trapezoid read so its OTHER pair is named) is a new statement, and a
-  crossing order is a different ring (#1927 refuses it). The twin of 2-D FR-EN-9 and analytic R45.
-  - Sources: ADR-3D-324; #1953.
+  crossing order is a different ring (#1927 refuses it). The generic word is only the extreme case: **any** noun the
+  declared one IMPLIES — «ריבוע ABCD» · «מלבן ABCD» / «מעוין» / «מקבילית» / «דלתון», «מלבן ABCD» · «מקבילית ABCD» —
+  is the same restatement, in any reading, and is never refused as a mis-naming ([ADR-3D-326](06b-decisions-3d.md#adr-3d-326),
+  operator ruling 2026-10-10; it was «הצורה כבר ידועה כ־ריבוע — ולכן אינה נקראת מלבן», which a square contradicts).
+  A noun that ADDS information still drives (FR-SP-2), and one that EXCLUDES the declared shape is still refused
+  naming both (FR-SP-18). The twin of 2-D FR-EN-9 and analytic R45.
+  - Sources: ADR-3D-324, ADR-3D-326; #1953, #1988.
 
 ## Vectors — the geometric lane
 

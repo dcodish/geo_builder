@@ -3854,6 +3854,11 @@ the legacy command still applying for old saves. Catalog + shadow-matrix snapsho
 
 ## ADR-3D-158 — a shape is what it says, and ONLY what it says (#612, #615)
 
+**⚠ Partly superseded by [ADR-3D-326](#adr-3d-326) (2026-10-11):** the "naming error" half is gone. A noun the
+declared shape IMPLIES is a restatement, not a mis-naming — every square IS a rectangle (operator ruling on
+#1988, 2026-10-10). The rest of this entry stands: the statement is never absorbed as an inert drive, a noun
+that ADDS information drives, and the drawing obeys ADR-052.
+
 Two halves of one rule, found together while the operator played PR #604.
 
 **#612 — the student's side.** On «פירמידה ABCDS שבסיסה ריבוע» every following quad noun committed
@@ -12420,3 +12425,44 @@ A crossing order has another ring key and is never a twin (#1927's refusal); a l
 - «ריבוע ABCD · מרובע ACBD» (and the rectangle, cube, parallelogram, rhombus, trapezoid and midpoint rows, and the ring first) is refused on the line that made the ring cross, with the ring message, instead of drawn crossed and green.
 - «ריבוע ABCD · מקבילית ACBD» says its claim does not hold, not "a square is already a parallelogram"; «ריבוע ABCD · ריבוע ACBD» is refused, not accepted as redundant.
 - The ring message ends «…או לשנות את מקומות הנקודות…».
+
+## ADR-3D-326 — A noun the declared shape already implies is a restatement, not a naming error: `shape-less-specific` is retired (#1988)
+
+**Status:** accepted · 2026-10-11 · bug (P3, 3-D) · branch `fix/1988-shape-noun-implied-or-excluded` off `main` @ 06fc51dd · fix round #1992 · twin [ADR-619](06-decisions.md#adr-619) · **⚠ supersedes the "naming error" half of [ADR-3D-158](#adr-3d-158)** · extends [ADR-3D-324](#adr-3d-324) · keeps [ADR-3D-313](#adr-3d-313) · realises [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B1/B13
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-19 — any noun the declared one implies restates the ring and adds no row, in any reading; FR-SP-18's exclusion refusal is unchanged · **Design:** [04b](04b-design-3d.md) § "A quad noun over a ring the figure already knows" — one `quadImplies` read by apply's arm and by the store's restatement rule
+
+**The ruling (2026-10-10, decisions page, #1988).** *Option A — "already there" in every builder.* A true, less specific shape word over a named shape is a restatement; 2-D and 3-D answer their already-there note, and no new row is added. Rejected: refusing in all three builders with a corrected sentence; leaving 3-D stating that a square is not a rectangle.
+
+**Measured before** (`main` @ 06fc51dd, through `decideSubmit3`):
+
+| after | line | 3-D at 06fc51dd |
+| --- | --- | --- |
+| «ריבוע ABCD» | «מלבן ABCD» / «מעוין ABCD» / «מקבילית ABCD» / «דלתון ABCD» | refused `shape-less-specific` — «הצורה כבר ידועה כ־ריבוע — ולכן אינה נקראת מלבן. מחקו את הנתון הקודם אם התכוונתם מלבן.» |
+| «מלבן ABCD» / «מעוין ABCD» | «מקבילית ABCD» | the same refusal |
+| «ריבוע ABCD» | «מרובע ABCD» | `already-stated`, no row (ADR-3D-324) |
+
+**Class (docs/17 §1).** *A statement that is TRUE of the figure is refused as an error because it is less specific than what the figure is already known to be.* ADR-3D-158 read the operator's 2026-08-15 ruling as splitting the implication arm in two — the same noun redundant, a less specific noun a "naming error". The sentence that implements the second half asserts something false of the geometry: every square IS a rectangle, a rhombus, a parallelogram and a kite. There is one situation here, not two.
+
+**Decision.** The implication arm has ONE outcome. `applyCommand3`'s all-known quad arm records the statement in `redundantShapes` whenever `quadImplies(known, cmd.base)` — no longer only when the nouns are equal — and returns the figure untouched, so `buildNotices3` tells the student it added nothing. The `shape-less-specific` error code is removed from `EngineError3` and from `errorText3`; the `err.shapeLessSpecific` sentence stays, because ADR-3D-313's `shape-disjoint` was ruled to use those same words.
+
+**No new row,** in both lanes:
+- the **store's** restatement rule (`ringRestatementTwin3`, ADR-3D-324) is the second reader of the same `quadImplies`. Its generic arm was a KIND test (`cmd.type === 'solid'`); «מרובע» is only the extreme case of implication (`QUAD_IMPLIES`'s `quad` row), so the arm is now the predicate itself and «ריבוע ABCD» · «מלבן ABCD» is as much a twin as «ריבוע ABCD» · «מרובע ABCD». The ENABLED rule carries over unchanged: an implied noun never re-enables a muted declaration, which would state a square the student never said.
+- the **model's** lane (`decideSteps3`, no twin rule) commits the line green with the already-known notice instead of refusing it — the engine's answer, so the two lanes cannot disagree about what the sentence means.
+
+**Any reading of the ring.** A restatement must not change what the line SAYS, so a reading other than the declared spelling passes only `quadImpliesInEveryReading`: a **trapezoid** names one pair of opposite sides as the parallel one (ADR-3D-313's `seat`), so «טרפז ABCD» · «טרפז BCDA» is still new information and still records; a **kite** names one diagonal as its axis, but the only bases that imply `kite` without being one are the rhombus and the square, whose four equal sides make either diagonal the axis — so «ריבוע ABCD» · «דלתון CDAB» is a restatement. Both facts are read off the table and asserted by the guard test, not assumed.
+
+**Measured after** (the same path): every row above answers `already-stated` with no row and the restatement note naming the line that declared the ring. «מלבן ABCD» · «ריבוע ABCD» still drives (ADR-052 — specialising is new information). «מקבילית ABCD» · «טרפז ABCD» is still `shape-disjoint` in the ruled words. «טרפז ABCD» · «טרפז BCDA» still records.
+
+**Not changed, deliberately: the WORDING.** The ruling quotes 2-D's «זה כבר קיים באיור — אין מה להוסיף.», but measured at HEAD each builder has its own already-there note (3-D: «הנתון הזה כבר נאמר («…») — הציור לא השתנה ולא נוספה שורה»; analytic: «זה כבר ידוע מהנתונים שכתבתם…»), and whether 3-D's note — for **every** restated fact, not only polygons — becomes 2-D's is the open question **#1990**, which this item's own plan points at for it. Changing it here for polygons alone would split 3-D's own voice and pre-empt that ruling. So this ADR routes the verdict and leaves the sentence to #1990.
+
+**Sibling audit.** 2-D had the mirror defect — no hierarchy at all, so both directions leaked the engine's redefinition throw: [ADR-619](06-decisions.md#adr-619), this item's other arm. Analytic already answers «כבר ידוע» here (ADR-AG-259); its one measured gap, «ריבוע ABCD» · «דלתון ABCD» recording because its table does not derive square ⇒ kite, is reported, not built (the ruling leaves analytic unchanged).
+
+**Locks.** `src3d/__tests__/issue-1988-implied-shape-noun.test.ts` (the issue's lines, every reading, the model lane's own derive, the muted-declaration rule, and the kite/trapezoid guards on `quadImpliesInEveryReading`); `issue-612-615-shape-naming.test.ts` re-based — the implied nouns are restatements, `shape-disjoint` keeps the refusal, and what #612 actually fixed (no inert pins, no absorbed drive, specialising still drives) is asserted unchanged; `issue-1953-restated-ring3.test.ts` re-based; parity rows `implied-noun-1988-01…07`.
+
+**Expected golden drift.** `decide-submit3-parity-1394` records a verdict per sequence; every sequence whose `suite` states a noun an earlier one implies moves from `refused` to `already-stated`. That re-record belongs to the batch.
+
+**Behaviour change for a student:**
+- «ריבוע ABCD» · «מלבן ABCD» / «מעוין ABCD» / «מקבילית ABCD» / «דלתון ABCD», «מלבן ABCD» · «מקבילית ABCD», «מעוין ABCD» · «מקבילית ABCD» / «דלתון ABCD», and any reading of each, are accepted as restatements — the restatement note, no row — instead of refused «הצורה כבר ידועה כ־ריבוע — ולכן אינה נקראת מלבן…».
+- The same lines on a solid's base («פירמידה ABCDS שבסיסה ריבוע» · «מלבן ABCD») are likewise no longer refused; as for the identical noun today, the row is kept and carries the «הצורה כבר ידועה מנתון קודם» notice.
+- Nothing else changes: an excluding noun is still refused naming both, a narrowing noun still drives, and a trapezoid read so the other pair is named is still a new statement.

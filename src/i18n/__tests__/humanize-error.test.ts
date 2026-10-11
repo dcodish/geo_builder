@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import i18n from '@/i18n';
 import { humanizeError, PATTERNS, sanitizeIds, translateConstraintWords, translateParams, type Translate } from '@/i18n/humanizeError';
 import { describeConstraint } from '@/engine/solve';
-import { applyCommand } from '@/engine/apply';
+import { applyCommand, shapeExclusionError } from '@/engine/apply';
 import { collapsedPolygonError, diagonalClaimRefusal } from '@/engine/step';
 import { notCyclicImpossibilityError } from '@/engine/cyclicFeasibility';
 import type { Constraint } from '@/engine/types';
@@ -28,6 +28,11 @@ const CASES: { raw: string; contains: string[] }[] = [
   // cyclicFeasibility.ts (#1918, ADR-607) — a circle through a ring declared a right trapezoid; the reason clause is a
   // nested translation built from the shape-noun keys. Built by the engine's own function, never re-spelled here.
   { raw: `${notCyclicImpossibilityError({ ring: ['A', 'B', 'C', 'D'], shape: 'right-trapezoid', forced: 'rectangle' })} [vs #0]`, contains: ['טרפז ישר זווית', 'למלבן'] },
+  // apply.ts shapeExclusionError (#1985, ADR-619) — two nouns no quadrilateral carries at once. Both shape words
+  // are `paramKeys` (translation keys), so the gate also proves no English noun survives into the sentence.
+  // Built by the engine's own function, never re-spelled here.
+  { raw: shapeExclusionError({ actual: 'parallelogram', stated: 'trapezoid' }), contains: ['מקבילית', 'טרפז'] },
+  { raw: shapeExclusionError({ actual: 'square', stated: 'right-trapezoid' }), contains: ['ריבוע', 'טרפז ישר זווית'] },
   // metricFeasibility.ts (#420, ADR-417) — BOTH wordings: `keyOf` picks the triangle sentence for a
   // single intermediate point and the general path sentence for a longer cycle, so both are exercised.
   // Added by #983's coverage gate, which found this pattern carried no evidence row at all.

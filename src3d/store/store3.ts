@@ -33,7 +33,7 @@ import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, flatHeightReading3, freeDims, ringKeyIds3 } from '../engine/apply';
-import { declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
+import { declaredQuads3, spaceDiagonals, diagonalClaimVerdict, quadImplies, quadImpliesInEveryReading, QUAD_PYRAMIDS, trapezoidRingInForce3, type QuadBase } from '../engine/baseShapes';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { checkInSpan, componentValue, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
@@ -1437,6 +1437,9 @@ const ringKey3 = (ids: readonly Id[]): string => {
 /** The ring a command DECLARES — a flat polygon, a stated quad shape, a completed rectangle — or null. */
 const declaredRingOf3 = (k: Command3): readonly Id[] | null =>
   k.type === 'quad-shape' || k.type === 'rect-complete' || (k.type === 'solid' && (k.kind === 'polygon3' || k.kind === 'polygon4' || k.kind === 'polygon5')) ? k.ids : null;
+/** The quad NOUN a declaring command states — `'quad'` for a bare polygon, which every quad implies (#1988). */
+const declaredBaseOf3 = (k: Command3): QuadBase | null =>
+  k.type === 'quad-shape' ? k.base : k.type === 'rect-complete' ? 'rectangle' : k.type === 'solid' && k.kind === 'polygon4' ? 'quad' : null;
 /** Quad bases whose statement is the same under every rotation and reversal of the ring (2-D's `RING_SYMMETRIC`). */
 const RING_SYMMETRIC_BASES: ReadonlySet<string> = new Set(['square', 'rectangle', 'rhombus', 'parallelogram', 'quad']);
 /** Does reading the declared ring `ring` as `cmd.ids` say the same thing? (The trapezoid: only the readings that
@@ -1463,6 +1466,12 @@ const sameReading3 = (cmd: Command3, ring: readonly Id[]): boolean => {
  *  - the same shape in a reading the shape is symmetric under, re-spelled to the declared spelling, is the twin
  *    exactly when the declared spelling is.
  * A crossing order has another ring key and is never a twin (that is #1927's refusal).
+ *
+ * #1988 ([ADR-3D-326](../../docs/06b-decisions-3d.md#adr-3d-326), operator ruling 2026-10-10) — AND a noun the
+ * declared one already IMPLIES. «מרובע» is only the extreme case of that (`QUAD_IMPLIES`'s `quad` row), so the
+ * generic arm is no longer a kind test: «ריבוע ABCD» · «מלבן ABCD» is as much a restatement as «ריבוע ABCD» ·
+ * «מרובע ABCD», and the engine says so too (`applyCommand3` records it redundant). One predicate for both,
+ * so the two cannot drift apart; the ENABLED rule carries over for the same reason.
  */
 function ringRestatementTwin3(facts: readonly Fact3[], commands: readonly Command3[]): Fact3 | undefined {
   if (commands.length !== 1) return undefined;
@@ -1470,11 +1479,27 @@ function ringRestatementTwin3(facts: readonly Fact3[], commands: readonly Comman
   const ring = declaredRingOf3(cmd);
   if (!ring || new Set(ring).size !== ring.length) return undefined;
   const key = ringKey3(ring);
-  const generic = cmd.type === 'solid';
+  const stated = declaredBaseOf3(cmd);
+  const sameKey = (k: Command3) => {
+    const r = declaredRingOf3(k);
+    return r !== null && r.length === ring.length && ringKey3(r) === key;
+  };
   for (const f of facts) {
-    const declared = f.cmds.map(declaredRingOf3).find((r) => r !== null && r.length === ring.length && ringKey3(r) === key);
-    if (!declared) continue;
-    if (generic) {
+    const declaring = f.cmds.find(sameKey);
+    if (!declaring) continue;
+    const declared = declaredRingOf3(declaring)!;
+    const base = declaredBaseOf3(declaring);
+    // The declared noun already implies the stated one ⇒ the line restates the ring and adds nothing — but only
+    // in a reading that says the same thing: «טרפז ABCD» · «טרפז BCDA» names the OTHER pair as the parallel one
+    // (ADR-3D-313's seat), which is new information, not a restatement.
+    const sameSpelling = declared.length === ring.length && declared.every((v, i) => v === ring[i]);
+    const readingSame = sameSpelling || sameReading3(cmd, declared);
+    if (stated !== null && base !== null && (readingSame ? quadImplies(base, stated) : quadImpliesInEveryReading(base, stated))) {
+      if (f.enabled) return f;
+      continue;
+    }
+    // a GENERIC polygon of any arity («משולש», «מחומש»): its own ring is all it says, in every reading
+    if (cmd.type === 'solid') {
       if (f.enabled) return f;
       continue;
     }

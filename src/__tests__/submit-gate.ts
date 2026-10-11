@@ -75,6 +75,13 @@ export function gateVerdict(facts: Fact[], utterance: string, seed = 0): GateVer
   if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands, seed, { seatsExhausted: outcome.seatsExhausted }))) {
     return { kind: 'commit', commands: r.commands };
   }
+  /**
+   * #999 (ADR-542) — A RESTATEMENT IN ANOTHER SPELLING is the same friendly no-op, and the app says so on its own
+   * arm (`decideDeterministic.ts`, `implied-restatement`). This mirror had no branch for it and reported `refused`,
+   * so a lock written through the gate read a no-op as a refusal. Surfaced by #1988, whose «דלתון ABCD» over a
+   * declared square lowers to equalities the square already entails.
+   */
+  if (outcome.reason === 'implied') return { kind: 'noop' };
   if (outcome.reason === 'empty') {
     // ADR-156: re-typing something already drawn is a friendly no-op, never an LLM escalation. The
     // signal is "produced nothing, not an error, and every label it names already exists".

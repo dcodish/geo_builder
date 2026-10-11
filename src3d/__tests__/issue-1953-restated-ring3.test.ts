@@ -53,8 +53,15 @@ describe('#1953 — a restated ring adds no row in 3-D', () => {
     expect(play(['ריבוע ABCD', 'מרובע ACBD']).last.kind).not.toBe('already-stated');
   });
 
-  it('a less specific SHAPE word keeps its refusal in every reading', () => {
-    for (const b of ['מלבן ABCD', 'מלבן BCDA']) expect(play(['ריבוע ABCD', b]).last.kind, b).toBe('refused');
+  // #1988 (ADR-3D-326, operator ruling 2026-10-10): a noun the declared one IMPLIES is a restatement in every
+  // reading too — a square IS a rectangle. It used to be refused `shape-less-specific`.
+  it('a less specific SHAPE word restates the ring in every reading', () => {
+    for (const b of ['מלבן ABCD', 'מלבן BCDA', 'מקבילית ADCB', 'דלתון CDAB'])
+      expect(play(['ריבוע ABCD', b]).last.kind, b).toBe('already-stated');
+  });
+
+  it('a noun no quadrilateral carries alongside the declared one is still refused (#1918)', () => {
+    expect(play(['ריבוע ABCD', 'טרפז ABCD']).last.kind).toBe('refused');
   });
 
   it('a generic word never re-enables a MUTED declaration — that would state a square the student never said', () => {

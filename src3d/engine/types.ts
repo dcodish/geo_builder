@@ -1724,13 +1724,13 @@ export type Requirement3 =
 
 export type EngineError3 =
   | { code: 'already-defined'; id: Id }
-  // #612 (ADR-3D-158): the ring is already known to be a MORE SPECIFIC shape than the noun stated —
-  // «ABCD מלבן» on a base the figure knows is a square. Operator ruling: a naming error, not a
-  // redundancy. Carries both shapes so the message can name them.
-  | { code: 'shape-less-specific'; stated: QuadBase; actual: QuadBase }
   // #1918 (ADR-3D-313): the ring is already known to be a shape that NO quadrilateral is at the same time as
   // the noun stated — a trapezoid (exactly one parallel pair) told it is a parallelogram, or the reverse.
-  // Derived from `QUAD_IMPLIES` (no row implies both), never a listed pair. Worded as `shape-less-specific`.
+  // Derived from `QUAD_IMPLIES` (no row implies both), never a listed pair.
+  //
+  // #1988 (ADR-3D-326): this is the ONLY refusal of a second noun left. `shape-less-specific` — the ring is
+  // already a MORE SPECIFIC shape than the noun stated («ריבוע ABCD» · «מלבן ABCD») — was retired by the
+  // operator's 2026-10-10 ruling: a square IS a rectangle, so the line is a restatement, not a naming error.
   | { code: 'shape-disjoint'; stated: QuadBase; actual: QuadBase }
   // #1792 / #1918 (ADR-3D-313): a shape no circle can pass around without turning it into `forced` (a right
   // trapezoid in a circle is a rectangle). Raised by the parser for the one-line form and by apply for a ring

@@ -91,7 +91,7 @@ describe('#1927 one ring is one cyclic order — the false reasons are gone', ()
   it('«ריבוע ABCD · מקבילית ACBD» is no longer "a square is already a parallelogram" — its claim is refuted', () => {
     const r = play(['ריבוע ABCD', 'מקבילית ACBD']);
     expect(r.kinds).toEqual(['record', 'refused']);
-    expect(r.error).not.toMatchObject({ code: 'shape-less-specific' });
+    expect(r.error).not.toMatchObject({ code: 'shape-disjoint' });
     expect(r.error).toMatchObject({ code: 'claim-refuted' });
   });
 

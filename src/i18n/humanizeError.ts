@@ -157,6 +157,13 @@ interface Pattern {
    * clause, instead of a second copy of the frame.
    */
   nested?: (m: RegExpMatchArray) => Record<string, { key: string; params: Record<string, string> }>;
+  /**
+   * #1985 ([ADR-619](../../docs/06-decisions.md#adr-619)) — a param that is a WORD the engine names in English
+   * and the student must read in Hebrew (a shape noun). Each value is a translation KEY, resolved with `t`, so
+   * the noun comes from the one place the app already names shapes (`shapes.name.*`) instead of a second list.
+   * Unlike {@link nested} it interpolates a word into this template, not a whole sentence.
+   */
+  paramKeys?: (m: RegExpMatchArray) => Record<string, string>;
 }
 
 // Order matters only where one pattern's text is a prefix of another's; each regex below is
@@ -264,6 +271,17 @@ export const PATTERNS: Pattern[] = [
     saysSubject: true,
     namesOther: true,
   },
+  // apply.ts shapeExclusionError (#1985, ADR-619) — `shape-excluded: the figure is already known to be a
+  // parallelogram, so it is not a trapezoid`. The operator's 2026-10-10 ruling: the sentence he chose for
+  // analytic on 2026-10-08 (ADR-AG-260) and 3-D uses for `shape-disjoint` (ADR-3D-313). The subject is the
+  // FIGURE's own noun and the noun the line stated — both things the student can see — so it identifies
+  // itself and takes neither `saysSubject` nor `namesOther`.
+  {
+    re: /^shape-excluded: the figure is already known to be a (\S+), so it is not a (\S+)$/,
+    key: 'errors.shapeExcluded',
+    paramKeys: (m) => ({ actual: `input.shapeNoun.${m[1]}`, stated: `input.shapeNoun.${m[2]}` }),
+  },
+
   // evaluate.ts:891 — `over-constrained: |AC| = 9 cannot hold`; #943 half B: the fold may append the
   // structured tail ` [vs #<fact index>]` naming the conflicting earlier statement — matched here so
   // `what` stays the bare reason, and resolved to words by the display layer (`otherUtteranceForError`).
@@ -374,12 +392,15 @@ export function humanizeError(raw: string | null | undefined, t: Translate, said
     // stop them matching. Every param goes through the pass — it only touches known fragment words, so a
     // non-fragment param (a circle letter, an id) is untouched.
     const nested = p.nested?.(m);
+    const paramKeys = p.paramKeys?.(m);
     const translated =
-      params || nested
+      params || nested || paramKeys
         ? {
             ...(params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t)])) : {}),
             // #1918: a sentence param — its own key, each inner param a translation key
             ...(nested ? Object.fromEntries(Object.entries(nested).map(([k, n]) => [k, t(n.key, Object.fromEntries(Object.entries(n.params).map(([pk, pv]) => [pk, t(pv)])))])) : {}),
+            // #1985: a WORD param — the value is a translation key (a shape noun)
+            ...(paramKeys ? Object.fromEntries(Object.entries(paramKeys).map(([k, v]) => [k, t(v)])) : {}),
           }
         : undefined;
     const key = p.keyOf ? p.keyOf(m) : p.key;

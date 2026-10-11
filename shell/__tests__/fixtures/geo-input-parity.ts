@@ -1210,6 +1210,22 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'trapezoid-1918-redeclare', family: 'polygons', steps: ['מקבילית ABCD', 'טרפז ABCD'], expect: 'refused', note: 'no quadrilateral is both' },
   { id: 'trapezoid-1918-redeclare-rev', family: 'polygons', steps: ['טרפז ABCD', 'מקבילית ABCD'], expect: 'refused' },
   // end #1918
+  // ── #1988 + #1985 (ADR-619, ADR-3D-326; operator rulings 2026-10-10): a SECOND shape noun over the same ring is
+  // judged by the quadrilateral hierarchy, in both directions. A noun the declared one IMPLIES is a true restatement
+  // and adds nothing («זה כבר קיים באיור», analytic's «כבר ידוע», 3-D's restatement note); a noun that EXCLUDES it is refused
+  // with the ruled sentence («הצורה כבר ידועה כ־… — ולכן אינה נקראת …»), which the two #1918 rows above already carry for
+  // «מקבילית»/«טרפז». Both directions are one table, so both are locked here.
+  { id: 'implied-noun-1988-01', family: 'polygons', steps: ['ריבוע ABCD', 'מלבן ABCD'], expect: 'builds', note: 'every square IS a rectangle — a restatement, no row' },
+  { id: 'implied-noun-1988-02', family: 'polygons', steps: ['ריבוע ABCD', 'מעוין ABCD'], expect: 'builds' },
+  { id: 'implied-noun-1988-03', family: 'polygons', steps: ['ריבוע ABCD', 'מקבילית ABCD'], expect: 'builds' },
+  { id: 'implied-noun-1988-04', family: 'polygons', steps: ['ריבוע ABCD', 'דלתון ABCD'], expect: 'builds', note: 'a square is a kite too' },
+  { id: 'implied-noun-1988-05', family: 'polygons', steps: ['מלבן ABCD', 'מקבילית ABCD'], expect: 'builds' },
+  { id: 'implied-noun-1988-06', family: 'polygons', steps: ['מעוין ABCD', 'מקבילית ABCD'], expect: 'builds' },
+  { id: 'implied-noun-1988-07', family: 'polygons', steps: ['ריבוע ABCD', 'מלבן BCDA'], expect: 'builds', note: 'any reading of the same ring (ADR-618)' },
+  { id: 'excluded-noun-1985-01', family: 'polygons', steps: ['ריבוע ABCD', 'טרפז ABCD'], expect: 'refused', note: 'no quadrilateral is both' },
+  { id: 'excluded-noun-1985-02', family: 'polygons', steps: ['מקבילית ABCD', 'טרפז שווה שוקיים ABCD'], expect: 'refused' },
+  { id: 'excluded-noun-1985-03', family: 'polygons', steps: ['טרפז ABCD', 'ריבוע ABCD'], expect: 'refused' },
+  // end #1988 + #1985
   // ── #1892 (ADR-AG-248): a point on a BARE pair («D על AB») is the segment, as 2-D reads it; the order of the givens never changes the verdict ──
   { id: 'bare-on-pair-length-1892', family: 'points-incidence', steps: ['נקודה A', 'נקודה B', 'D על AB', 'AB = 4', 'AD = 5'], expect: 'refused', exception: 'X9', note: 'analytic rode the line and drew D beyond B before #1892' },
   { id: 'bare-on-pair-length-holds-1892', family: 'points-incidence', steps: ['נקודה A', 'נקודה B', 'D על AB', 'AB = 4', 'AD = 3'], expect: 'builds', exception: 'X9' },

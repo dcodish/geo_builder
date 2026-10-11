@@ -484,6 +484,26 @@ re-spells a ring command over a ring the figure already declares to the declared
 symmetric under that reading (`RING_SYMMETRIC`; the trapezoid only under the readings that keep its named pair,
 `sameStatementUnder`), so a rotated or reversed restatement takes its declared spelling's verdict ([ADR-618](06-decisions.md#adr-618)).
 
+### A second shape noun over a declared ring ([ADR-619](06-decisions.md#adr-619))
+
+`engine/shapeKinds.ts` holds the quadrilateral hierarchy as ONE table, `QUAD_IMPLIES` — 2-D's twin of 3-D's
+(ADR-3D-158) and of analytic's `SHAPES`-derived `nounsExclude` (ADR-AG-260) — keyed by the kinds 2-D stamps on
+`polygon.declaredAs` plus the two refined trapezoid phrases a `trapezoid` command carries in `kind`. The trapezoid
+rows are the curriculum's EXCLUSIVE reading (exactly one parallel pair), which `shapeConstraints` already assumes.
+Three derived readers, three directions, no list of pairs:
+
+- `quadImplies(declared, stated)` → `impliedShapeRestatement` (apply.ts) re-spells the line to the GENERIC ring
+  command over the declared spelling, so it takes ADR-595's path and the submit pipeline answers «כבר קיים» with no
+  row. A rewrite, not a new `commandConflict` carve-out.
+- `quadsExclude(declared, stated)` → `shapeExclusion` / `shapeExclusionError`, a stage-0 prover beside ADR-607's,
+  rendered by `humanizeError`'s `errors.shapeExcluded` with both nouns read from `shapes.name.*` (`paramKeys`: a
+  param whose value is a translation key).
+- neither → ADR-157's refusal, unchanged.
+
+`declaredQuadKind` reads what the ring is already known to be (by `ringKey`, so any reading), `statedQuadKind` reads
+what the line says (one reader for every spelling the parser emits). A reading other than the declared spelling
+passes only `quadImpliesInEveryReading`, which excludes a noun naming one particular pair of sides.
+
 ### A point placement keeps its tail ([ADR-570](06-decisions.md#adr-570))
 
 The point-on-carrier rules (`pointOnExtension`, `pointOnSegment`) match a prefix, so three seams carry the tail:

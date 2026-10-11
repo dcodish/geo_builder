@@ -2276,6 +2276,12 @@ Today the kite macro emits **two HARD equalities** pinned to axis AC (`parse.ts`
 
 ## ADR-157 — A named shape is immutable once drawn: no morphing into a different shape
 
+*Narrowed by [ADR-619](#adr-619) (2026-10-11, #1988/#1985):* "different and incompatible" is now read off the
+quadrilateral hierarchy. A noun the declared shape IMPLIES is a restatement, not a re-declaration; a noun that
+EXCLUDES it is this refusal, in the ruled sentence rather than the engine's «כבר מוגדרת» text; a noun that is
+neither (a rhombus over a rectangle) keeps this entry's refusal as written. The principle is untouched — nothing
+morphs, and the student edits or deletes the earlier step.
+
 **Context.** Operator: "if someone created a trapezoid, two sides are parallel and the other two are not — you cannot turn a trapezoid into a square or a rectangle, even if the user asks. That would be a mistake; we don't need that capability. Give them the error message." (Documenting the intended rule for future cases.)
 
 **Decision (principle).** A named shape (trapezoid / parallelogram / rectangle / rhombus / square / quadrilateral / triangle …) carries **defining constraints that ARE its identity**. Once its vertices are drawn, re-declaring the SAME vertices as a **different, incompatible** shape is a CONTRADICTION and is **refused with a clear error** — it is NOT silently morphed, and we deliberately do **not** offer a "turn shape X into shape Y" capability. To change a shape, the student **edits or deletes the earlier step** (the message says so). This is the correct, intended outcome — a *missing* "morph" feature is not a gap.
@@ -15792,3 +15798,50 @@ The pentagram line itself is already refused at both commit seams by ADR-608 (re
 **Behaviour change for a student:**
 - «דלתון ABCD · מרובע ABDC» is drawn — the kite as a dart, ABDC a simple ring — instead of refused.
 - The ring refusal now ends «…או לשנות את מקומות הנקודות — …» ("…or move the points — …") instead of «או לשנות את השיעורים».
+
+## ADR-619 — A second shape noun over a declared ring is judged by the quadrilateral hierarchy: an implied noun restates, an excluding noun is refused in the ruled words (#1988, #1985)
+
+**Status:** accepted · 2026-10-11 · bug (P3, 2-D) · branch `fix/1988-shape-noun-implied-or-excluded` off `main` @ 06fc51dd · fix round #1992 · twin [ADR-3D-326](06b-decisions-3d.md#adr-3d-326) · amends [ADR-157](#adr-157) and generalises [ADR-595](#adr-595) · ports [ADR-AG-260](06c-decisions-analytic.md#adr-ag-260) and [ADR-3D-313](06b-decisions-3d.md#adr-3d-313) · realises [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B13 for this refusal kind
+
+**Requirements:** [02](02-requirements.md) FR-EN-9 — a second shape noun over the same ring: an implied noun is the «כבר קיים» no-op in any reading, an excluding noun is refused with the ruled sentence, a noun that is neither keeps ADR-157's refusal · **Design:** [04](04-design.md) § "A second shape noun over a declared ring" — the `QUAD_IMPLIES` table in `engine/shapeKinds.ts`, read in both directions · **LADDER stage:** the exclusion is a stage-0 prover (beside ADR-607's), the restatement is the stage-0 spelling fold (`normalizeShapeComposition`)
+
+**The rulings.** Both 2026-10-10, on the decisions page.
+- **#1988** — *option A, "already there" in every builder.* A true, less specific shape word over a named shape is a restatement; 2-D and 3-D answer with their already-there note, as 2-D's own «מרובע» already does. No new row. (Rejected: refusing in all three; leaving 2-D's engine text.)
+- **#1985** — *option A, 2-D uses the sentence he chose for analytic on 2026-10-08.* It applies in both orders and to the trapezoid variants. (Rejected: leaving 2-D's engine text.)
+
+**Measured before** (`main` @ 06fc51dd, through `decideDeterministic2D` → `commitVerdict`, the AI mocked):
+
+| after | line | 2-D at 06fc51dd |
+| --- | --- | --- |
+| «ריבוע ABCD» | «מלבן ABCD» | refused, «'C' is already defined …» |
+| «ריבוע ABCD» | «מעוין ABCD» / «מקבילית ABCD» | refused, «'D' is already defined …» |
+| «ריבוע ABCD» | «דלתון ABCD» | refused, «'poly-ABCD' is already defined …» |
+| «מלבן ABCD» | «מקבילית ABCD» | refused, «'poly-ABCD' …» |
+| «מקבילית ABCD» | «טרפז ABCD» (and «טרפז שווה שוקיים», «טרפז ישר זווית») | refused, «'C' is already defined …» |
+| «טרפז ABCD» | «מקבילית ABCD» / «ריבוע ABCD» | refused, «'D' / 'C' is already defined …» |
+| «ריבוע ABCD» | «מרובע ABCD» | «זה כבר קיים באיור» (ADR-595) |
+
+**Class (docs/17 §1).** *A second shape noun over a ring the figure already declares is judged by WHICH DERIVED CORNER the engine would rebuild, instead of by what the two nouns MEAN together — so every answer is the redefinition throw, naming a vertex or an internal id the engine chose.* 2-D had no reading of the quadrilateral hierarchy at all: ADR-595 covered exactly the one noun («מרובע», «משולש») that implies nothing, as a per-kind test (`isSupertypeRestatement`), and everything else fell through to ADR-157. The two reported directions — an IMPLIED noun (#1988) and an EXCLUDING noun (#1985) — are the two halves of the same missing predicate, which is why they are one fix.
+
+**Decision.** One table, `QUAD_IMPLIES` in `engine/shapeKinds.ts` — 2-D's twin of 3-D's `QUAD_IMPLIES` (ADR-3D-158) and of analytic's `SHAPES`-derived `nounsExclude` (ADR-AG-260) — keyed by the kinds 2-D stamps on `polygon.declaredAs` plus the two refined trapezoid phrases a `trapezoid` command carries in `kind`. The trapezoid rows follow the curriculum's EXCLUSIVE reading, which `shapeConstraints` and ADR-157 already assume. Read in three directions, all derived from the one table, never a list of pairs:
+
+1. **`quadImplies(declared, stated)` — the stated noun adds nothing.** `impliedShapeRestatement` re-spells the line to the GENERIC ring command over the declared spelling, which is the path ADR-595's «מרובע» already takes: apply's `addObj` keeps the existing polygon and its `declaredAs`, the step produces nothing, and the submit pipeline answers «זה כבר קיים באיור — אין מה להוסיף.» with no row. Expressed as a rewrite rather than as another `commandConflict` carve-out, so the chokepoint list did not grow and the two nouns cannot take different paths. `isSupertypeRestatement` stays as the arm the rewrite lands on.
+2. **`quadsExclude(declared, stated)` — no quadrilateral carries both.** A stage-0 prover (`shapeExclusion`, beside ADR-607's `notCyclicImpossibility`) refuses before the restatement and redefinition arms, with the ruled sentence (`errors.shapeExcluded`), both nouns read from `shapes.name.*` — the one place the app already names shapes. Structural: read off the two declarations, never off the drawing, so the verdict is the same at every seed.
+3. **Neither** — a rhombus over a declared rectangle, say: a square implies both, so nothing excludes, and neither narrows the other. Unchanged: ADR-157's refusal.
+
+- **Any reading of the ring** (ADR-618): the declared ring is matched by `ringKey`, so «מלבן BCDA» over a square answers exactly as «מלבן ABCD» does. A restatement must not change what the line SAYS, so a reading other than the declared spelling passes only `quadImpliesInEveryReading` — a noun that names one particular pair of sides (the trapezoid family) is excluded, and the kite is not, because the only kinds that imply `kite` without being one are the rhombus and the square, whose four equal sides make either diagonal the axis (asserted, not assumed, by the guard test).
+- A **crossing order** has another `ringKey` and is neither restated nor excluded — that stays #1927/#1991's refusal.
+- `humanizeError` gained `paramKeys`: a param whose value is a translation KEY, for a word the engine names in English and the student must read in Hebrew. The #983 coverage gate exercises the new pattern through the engine's own `shapeExclusionError`, so no English noun can survive into the sentence.
+
+**Measured after** (the same path): every row of the table above answers «זה כבר קיים באיור — אין מה להוסיף.» with no row, or — for the trapezoid pairs — «הצורה כבר ידועה כ־{actual} — ולכן אינה נקראת {stated}. מחקו את הנתון הקודם אם התכוונתם {stated}.» with no engine id in it. «מלבן ABCD» · «מעוין ABCD» is unchanged. The refusal holds at seeds 0–7.
+
+**The class, beyond the two reports.** The predicate closed siblings nobody reported: «ריבוע ABCD» · «טרפז ABCD», «מעוין»/«דלתון» against the trapezoid family, and «טרפז ABCD» · «ריבוע ABCD» — each was the engine's redefinition text and is now the ruled exclusion sentence (#1914's 2026-10-08 ruling: *"A noun that excludes the declared shape is refused with «הצורה כבר ידועה כ־… — ולכן אינה נקראת …»"*). The implication direction likewise covers «מעוין ABCD» · «דלתון ABCD», «מלבן ABCD» · «מקבילית ABCD» and every reading of each.
+
+**Sibling audit.** 3-D had the opposite defect in the same place — it KNEW the hierarchy and refused the implied noun as a mis-naming (`shape-less-specific`): retired by [ADR-3D-326](06b-decisions-3d.md#adr-3d-326), this item's other arm. Analytic already answers «כבר ידוע» for an implied noun and `shape-excluded` for an excluding one (ADR-AG-259, ADR-AG-260) and is untouched; the one analytic gap measured here — «ריבוע ABCD» · «דלתון ABCD» records instead of answering «כבר ידוע», because its own table does not derive square ⇒ kite — is reported, not built (#1988's ruling says analytic is unchanged). Complex declares no polygons.
+
+**Locks.** `src/app/__tests__/issue-1988-1985-second-shape-noun.test.ts` (the issues' own lines, every reading, both orders, the trapezoid variants, seeds 0–7, the English wording, the table's own algebra — reflexivity, transitivity, symmetry of exclusion, the kite guard — and the three controls); scenario `second-shape-noun-over-a-ring-1988-1985` (corpus 4); parity rows `implied-noun-1988-01…07` and `excluded-noun-1985-01…03`; `humanize-error.test.ts` CASES rows. ADR-157's lock is re-based onto a rhombus over a rectangle (the pair the ruling leaves refused) and gains the implied-noun control.
+
+**Behaviour change for a student:**
+- «ריבוע ABCD» · «מלבן ABCD» (and «מעוין», «מקבילית», «דלתון»; «מלבן ABCD» · «מקבילית ABCD»; «מעוין ABCD» · «מקבילית ABCD» / «דלתון ABCD»; any reading of each) shows «זה כבר קיים באיור — אין מה להוסיף.» and adds no row, instead of «C כבר מוגדרת ולא ניתן להגדיר אותה מחדש כמשהו אחר…».
+- «מקבילית ABCD» · «טרפז ABCD», its reverse, the isosceles and right-trapezoid variants, and the same pairing with «מלבן» / «ריבוע» / «מעוין» / «דלתון», are refused with «הצורה כבר ידועה כ־{actual} — ולכן אינה נקראת {stated}. מחקו את הנתון הקודם אם התכוונתם {stated}.» instead of the engine's «כבר מוגדרת» text.
+- Nothing else changes: a noun that is neither implied nor excluded keeps its refusal, and a shape over four points no noun declared still lowers to its constraints (ADR-375).

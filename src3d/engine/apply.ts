@@ -3087,18 +3087,23 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // demonstrably has, and a ring that is a square by coincidence is left alone.
         const known = knownQuadShape(c, cmd.ids);
         if (known) {
-          // the ring already IMPLIES what was said. Two different situations, and the difference is
-          // the whole ruling: the same name adds nothing, a LESS SPECIFIC name is a mis-naming.
+          /**
+           * The ring already IMPLIES what was said, so the line is TRUE and adds nothing — whether it
+           * repeats the noun («ריבוע ABCD» twice) or names one the shape already answers to («ריבוע ABCD»
+           * then «מלבן ABCD»: every square IS a rectangle).
+           *
+           * #1988 ([ADR-3D-326](../../docs/06b-decisions-3d.md#adr-3d-326), operator ruling 2026-10-10): the
+           * less specific noun used to be refused `shape-less-specific` — «הצורה כבר ידועה כ־ריבוע — ולכן
+           * אינה נקראת מלבן», which is simply false of a square. There is ONE situation here, not two: the
+           * statement is redundant. Recorded so `buildNotices3` can say so; the figure is returned untouched
+           * rather than accumulating inert pins, and the store's restatement rule (`ringRestatementTwin3`,
+           * the same `quadImplies`) adds no row.
+           */
           if (quadImplies(known, cmd.base)) {
-            if (known === cmd.base) {
-              // redundant — true, already known, changes nothing. Recorded so `buildNotices3` can say
-              // so; the figure is returned untouched rather than accumulating inert pins.
-              const next = clone(c);
-              if (!next.redundantShapes.some((r) => r.base === cmd.base && sameRing(r.ids, cmd.ids)))
-                next.redundantShapes.push({ base: cmd.base, ids: [...cmd.ids] });
-              return { ok: true, next };
-            }
-            return { ok: false, error: { code: 'shape-less-specific', stated: cmd.base, actual: known } };
+            const next = clone(c);
+            if (!next.redundantShapes.some((r) => r.base === cmd.base && sameRing(r.ids, cmd.ids)))
+              next.redundantShapes.push({ base: cmd.base, ids: [...cmd.ids] });
+            return { ok: true, next };
           }
           // #1918 (ADR-3D-313): NO quadrilateral is both — a trapezoid (exactly one parallel pair) and any
           // parallelogram-family shape or kite. Driving would draw the earlier noun's shape green under a name
