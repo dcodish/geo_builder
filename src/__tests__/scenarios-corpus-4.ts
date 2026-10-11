@@ -3997,6 +3997,53 @@ export const SCENARIOS_4: Scenario[] = [
       expect(turnsAllOneWay(ringOf(['A', 'B', 'C', 'D'])), 'and the four points are NOT in convex position').toBe(false);
       // ADR-613's honest refusals are untouched: a rhombus is convex whenever it is simple.
       expect(gateVerdict(factsOf(['מעוין ABCD']), 'מרובע ABDC')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
+
+  {
+    id: 'restated-right-angle-trapezoid-stays-put-1943',
+    title:
+      '#1943 (ADR-623): «טרפז ישר זווית ABCD · זווית ADC = 90» — a right angle the right trapezoid ALREADY shows is recorded, drawn and verified, and moves no point of the figure (0 at every seed; was up to 10.75)',
+    guards:
+      "Found by fix round #1940 (stream B, #1922) and re-measured at pickup through the real submit gate on 06fc51dd: stating «זווית ADC = 90» (or «AD מאונך ל-DC») on «טרפז ישר זווית ABCD» re-seated D and C — max move 0.22 / 7.88 / 1.04 / 0.65 / 5.17 / 10.75 at seeds 0-5 — although the trapezoid already draws that right angle. CLAUDE.md: *adding a constraint never makes the existing figure jump*. Root cause (ADR-623): `driveOrCheck`'s EAGER pick claimed a solve carrier for the re-stated row before anything was solved, so the driven re-solve landed in another valid configuration AND the carrier left `freeDofs`, freezing a freedom the figure never lost. Fix: `releaseImpliedOwnership` (engine/step.ts) gives the claim back when the row already HOLDS on the prior figure and is FORCED by it (`impliedByFigure`, ADR-536's rank machinery), try-and-verify. The class matrix, the false-freeze net and the per-seed displacements are src/__tests__/issue-1943-restated-given-stability.test.ts.",
+    steps: ['טרפז ישר זווית ABCD', 'זווית ADC = 90'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'A'), at(fig, 'D'), at(fig, 'C')), 'the stated right angle holds').toBeCloseTo(90, 3);
+      // THE STABILITY ASSERTION: the figure the second line produces IS the figure the first line produced.
+      const before = factsOf(['טרפז ישר זווית ABCD']);
+      const after = factsOf(['טרפז ישר זווית ABCD', 'זווית ADC = 90']);
+      for (const seed of [0, 1]) {
+        const a = replay(before, seed).positions;
+        const b = replay(after, seed).positions;
+        for (const [id, p] of a) {
+          const q = b.get(id)!;
+          expect(Math.hypot(p.x - q.x, p.y - q.y), `${id} at seed ${seed} must not move`).toBeLessThan(1e-6);
+        }
+      }
+      // the freedom is still SAMPLED — the re-stated row claimed no DOF (ADR-052 / ADR-536)
+      expect(freeDofCount(replay(after, 1).construction)).toBe(freeDofCount(replay(before, 1).construction));
+    },
+  },
+  {
+    id: 'restated-perpendicular-as-angle-stays-put-1819',
+    title:
+      '#1819 (ADR-623): «משולש ABC · AB מאונך ל-BC · זווית ABC = 90» — the third line restates the second, commits, shows its 90°, and moves neither B nor C (0 at every seed; was B 2.27-3.05, C 1.72-3.60)',
+    guards:
+      "Filed from #1264 half (1) as 2-D's half; the #1182 planning pass measured it on 2026-10-06 and this round reproduced it exactly on 06fc51dd through the real submit gate: B moved 2.27 / 3.05 / 2.58 / 1.83 / 2.60 / 1.98 and C 1.72 / 2.46 / 3.50 / 2.45 / 3.60 / 2.76 at seeds 0-5. The operator ruled on #1346 (2026-09-22) that the line keeps committing, because its 90° is new ON THE FIGURE, and on #1182 (2026-09-20) that the figure must stay where it is. Same cause and same fix as #1943 (ADR-623): the eager carrier pick for a row the figure is already FORCED to satisfy. The class matrix, the alternative spelling «זווית B = 90» and the false-freeze net are src/__tests__/issue-1943-restated-given-stability.test.ts.",
+    steps: ['משולש ABC', 'AB מאונך ל-BC', 'זווית ABC = 90'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), 'the stated right angle holds').toBeCloseTo(90, 3);
+      const before = factsOf(['משולש ABC', 'AB מאונך ל-BC']);
+      const after = factsOf(['משולש ABC', 'AB מאונך ל-BC', 'זווית ABC = 90']);
+      for (const seed of [0, 1]) {
+        const a = replay(before, seed).positions;
+        const b = replay(after, seed).positions;
+        for (const [id, p] of a) {
+          const q = b.get(id)!;
+          expect(Math.hypot(p.x - q.x, p.y - q.y), `${id} at seed ${seed} must not move`).toBeLessThan(1e-6);
+        }
+      }
+      expect(freeDofCount(replay(after, 1).construction)).toBe(freeDofCount(replay(before, 1).construction));
     },
   },
 ];

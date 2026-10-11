@@ -34,8 +34,9 @@ import { sideImpossibility, sideImpossibilityError } from './sideFeasibility';
 import { notCyclicImpossibility, notCyclicImpossibilityError } from './cyclicFeasibility';
 import { recordRequirement, requirementsField } from './requirements';
 import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
-import { applySeed, freeDofs } from './sample';
-import { constraintKey, constraintRefs, describeConstraint, solvedOnSegmentCandidates } from './solve';
+import { allConstraints, applySeed, freeDofs, movableIds } from './sample';
+import { impliedByFigure } from './dofRank';
+import { constraintKey, constraintRefs, describeConstraint, isSatisfied, solvedOnSegmentCandidates } from './solve';
 
 export interface StepOk {
   ok: true;
@@ -936,9 +937,101 @@ function commitDrawnFreeVertices(r: StepResult): StepResult {
   return { ...r, construction: committed, positions: e.positions };
 }
 
+/**
+ * THE RE-STATED GIVEN YIELDS (#1943/#1819, [ADR-623](../../docs/06-decisions.md#adr-623)) — the mirror of
+ * {@link ensureOwnership}, at the same seam.
+ *
+ * `driveOrCheck`'s EAGER pick gives every new consuming constraint a carrier before anything is solved.
+ * For a constraint the figure does not yet satisfy that is right, and is the whole mechanism. For one the
+ * figure ALREADY satisfies *and is forced to* — «∠ABC = 90» after «AB ⟂ BC», «∠ADC = 90» on a right
+ * trapezoid whose AD ⟂ AB and whose DC rides AB — it is wrong twice over: the driven re-solve of the
+ * freshly claimed carrier lands in a different (equally valid) configuration, so the figure JUMPS by up to
+ * 10 units on a statement that added nothing (#1943: D and C; #1819: B and C); and the carrier leaves
+ * `freeDofs`, so a freedom the figure never lost stops being sampled and «הציגו תצורה אחרת» varies less
+ * than it did one line earlier — the ADR-052 smell, a default silently asserted as a given.
+ *
+ * {@link ensureOwnership} already states the governing rule, for the branch where the eager pick did NOT
+ * claim: *"A structurally-implied (redundant) statement survives every probe and honestly stays a check: it
+ * consumes no freedom, and claiming a DOF for it would freeze sampling variety."* The defect was that the
+ * rule was reachable only from that branch — an eagerly-claimed implied row kept its carrier. This pass
+ * applies the same rule to the eager pick, so ONE rule decides ownership whichever branch reaches it.
+ *
+ * The forcing test is {@link impliedByFigure} — ADR-536's own rank machinery, the engine's single notion of
+ * "this row adds nothing", so the DOF count and the ownership decision cannot disagree about one statement.
+ * "Already true here" alone is never enough: default placements are deliberately regular, so coincidental
+ * satisfaction is common (#150), and releasing on a coincidence would freeze the figure to that one draw.
+ *
+ * Try-and-verify, failing OPEN at every rung: a release is kept only if the figure still evaluates (which
+ * CHECKS the re-stated row), is still a figure, sits EXACTLY where it sat, and survives re-sampling.
+ * Nothing is dropped — the constraint stays a listed check, so the verifier, the givens list, the DOF count
+ * and the drawn mark all still read it. The only thing that changes is that the figure stays put.
+ */
+function releaseImpliedOwnership(prev: Construction, r: StepResult): StepResult {
+  if (!r.ok) return r;
+  const next = r.construction;
+  const dirOf = (o: GeoObject | undefined): SolveDirective | undefined => (o as { solve?: SolveDirective } | undefined)?.solve;
+  const withoutSolve = (o: GeoObject): unknown => {
+    const { solve: _s, ...rest } = o as GeoObject & { solve?: SolveDirective };
+    return rest;
+  };
+  const prevById = new Map(prev.objects.map((o) => [o.id, o] as const));
+  // (1) WHICH CARRIERS DID THIS STEP CLAIM? Only an object the prior figure already had, unchanged apart
+  // from its directive — the eager pick's exact signature. A step that claimed nothing (the overwhelming
+  // majority) pays one scan of the object list and returns untouched.
+  const claimed = next.objects.filter((o) => {
+    const p = prevById.get(o.id);
+    if (!p || p.kind !== o.kind || !dirOf(o)) return false;
+    if (deepEqual(dirOf(o), dirOf(p))) return false;
+    return deepEqual(withoutSolve(o), withoutSolve(p));
+  });
+  if (!claimed.length) return r;
+  // Past the solve budget (a view search, ADR-515) the proof below is not affordable: the rank Jacobian
+  // and the sampled probes are real work, and an aborted evaluate would only read as "do not release".
+  // Bow out explicitly, so the cost is one object scan and the answer is today's.
+  if (budgetExceeded()) return r;
+  const prevEval = evaluate(prev); // memoised by construction identity — the ladder already evaluated prev
+  if (!prevEval.ok) return r;
+  const prevPositions = prevEval.positions;
+  const prevCons = [...allConstraints(prev)];
+  const get = (id: Id) => prevPositions.get(id)!;
+  const driven = new Set<Constraint>();
+  for (const o of claimed) {
+    const sv = dirOf(o)!;
+    driven.add(sv.constraint);
+    for (const k of sv.also ?? []) driven.add(k);
+  }
+  // (2) EVERY row this step's claims drive must already HOLD on the prior figure and be FORCED by it.
+  // All-or-nothing: a step that also brought a genuinely new row must solve, so nothing is released.
+  // Ordered by cost — the residual test is free, the rank test is 2·(movable parameters) evaluateCore
+  // calls, so it is paid only for a row that already holds.
+  for (const con of driven) {
+    if (prevCons.includes(con)) continue; // the figure's own row, not this step's
+    if (constraintRefs(con).some((id) => !prevPositions.has(id))) return r;
+    if (!isSatisfied(con, get)) return r; // the figure does NOT satisfy it — it must move
+    if (!impliedByFigure(prev, movableIds(prev), prevCons, con)) return r; // only coincidentally true here
+  }
+  // (3) RELEASE — the claimed carriers go back to exactly what the prior figure had.
+  const releasedIds = new Set(claimed.map((o) => o.id));
+  const released: Construction = { ...next, objects: next.objects.map((o) => (releasedIds.has(o.id) ? prevById.get(o.id)! : o)) };
+  const e = evaluate(released);
+  if (!e.ok) return r; // `evaluate` CHECKS every constraint, the re-stated one included
+  if (!stepAccepted(released, e.positions, next.constraints.slice(prev.constraints.length))) return r;
+  let span = 1;
+  for (const p of prevPositions.values()) span = Math.max(span, Math.abs(p.x), Math.abs(p.y));
+  // (4) The stability assertion itself: a statement that adds nothing moves nothing. A release that moves
+  // the figure at all is not what this pass is for, so it is discarded and today's answer stands.
+  if (maxDelta(prevPositions, e.positions, [...prevPositions.keys()]) > 1e-9 * span) return r;
+  // (5) The #150 net with its sign flipped: a FORCED row holds in every configuration the sampler draws,
+  // so the released figure must stay green under re-sampling. Without it, a row coincidentally true AND
+  // coincidentally dependent at one symmetric default draw would be released and then violated at every
+  // other seed — a figure that reads green here and red on «הציגו תצורה אחרת».
+  for (const s of [1, 2, 3]) if (!evaluate(applySeed(released, s)).ok) return r;
+  return { ...r, construction: released, positions: e.positions, ladder: [...(r.ladder ?? []), 'implied:release'] };
+}
+
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
-  return withSideChoices(withRequirements(commitDrawnFreeVertices(applyStepLadder(prev, cmd)), prev, [cmd]), prev);
+  return withSideChoices(withRequirements(commitDrawnFreeVertices(releaseImpliedOwnership(prev, applyStepLadder(prev, cmd))), prev, [cmd]), prev);
 }
 
 function applyStepLadder(prev: Construction, cmd: Command): StepResult {
@@ -1161,7 +1254,7 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
  * composition to mirror. A run of ONE is just `applyStep`, so nothing outside a multi-constraint macro moves.
  */
 export function applyCoupledStep(prev: Construction, cmds: Command[]): StepResult {
-  return withSideChoices(withRequirements(commitDrawnFreeVertices(applyCoupledStepLadder(prev, cmds)), prev, cmds), prev);
+  return withSideChoices(withRequirements(commitDrawnFreeVertices(releaseImpliedOwnership(prev, applyCoupledStepLadder(prev, cmds))), prev, cmds), prev);
 }
 
 function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult {

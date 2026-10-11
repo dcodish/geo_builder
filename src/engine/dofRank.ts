@@ -208,3 +208,61 @@ export function constraintRank(c: Construction, movable: Id[], cons: Constraint[
   // hidden freedom the figure draws one member of, which is why this can be NEGATIVE.
   return { consumed: basis.length - jac.embedded, unranked: [...unranked] };
 }
+
+/**
+ * IS `con` ALREADY FORCED by the figure's own constraints — at the figure's own configuration?
+ * (#1943/#1819, [ADR-623](../../docs/06-decisions.md#adr-623).)
+ *
+ * The question a RE-STATED given asks: «∠ABC = 90» after «AB ⟂ BC», «∠ADC = 90» on a right trapezoid
+ * whose AD ⟂ AB and whose DC is a scaled offset along AB. The row adds no information, so it must take
+ * no freedom and move nothing — and that is decidable with exactly the machinery
+ * {@link constraintRank} already uses for the DOF count ([ADR-536](../../docs/06-decisions.md#adr-536)):
+ * at the drawn configuration a row the others imply is a linear combination of them, and a row that is
+ * identically satisfied has a zero gradient. One notion of "this row adds nothing", read by the count
+ * and by the ownership decision, so the two can never disagree about the same statement.
+ *
+ * `cons` is the figure's EXISTING rows (`allConstraints` minus `con`) and `movable` the same column
+ * universe the count uses (`movableIds`). Every residual row of `con` must be dependent: a two-row
+ * `coincide` that is only half-implied is not implied.
+ *
+ * Fails CLOSED, in the honest direction: a configuration that will not evaluate, a gradient that cannot
+ * be established, an order constraint (a region, never a row — ADR-039) all answer `false`, so the
+ * caller keeps today's behaviour. Saying "not forced" costs a figure that moves when it needn't; saying
+ * "forced" of a row that is merely coincidentally true here would freeze a figure that should move.
+ */
+export function impliedByFigure(c: Construction, movable: Id[], cons: readonly Constraint[], con: Constraint): boolean {
+  if (isOrderConstraint(con)) return false;
+  // No movable parameter means no column, and over an empty column space EVERY gradient is the zero
+  // vector — which would read as "identically satisfied" for any row at all. Nothing is movable, so
+  // nothing can be released either: answer the honest `false` rather than a vacuous `true`.
+  if (!movable.length) return false;
+  const key = JSON.stringify(con);
+  const others = cons.filter((k) => k !== con && JSON.stringify(k) !== key);
+  const jac = constraintJacobian(c, movable, [...others, con]);
+  if (!jac) return false;
+  const mine = jac.rows.filter((r) => r.con === con);
+  if (!mine.length) return false;
+  // The basis is built from every OTHER row first (the embedded rows of solved points included — they are
+  // structural), so `con` is the row judged against the figure, never the other way round.
+  const basis: number[][] = [];
+  for (const { con: k, grad } of jac.rows) {
+    if (k === con) continue;
+    if (grad.some((x) => !Number.isFinite(x))) continue;
+    const n0 = norm(grad);
+    if (n0 < ZERO_ROW_TOL) continue;
+    let v = grad.map((x) => x / n0);
+    for (let pass = 0; pass < 2; pass++) for (const b of basis) { const p = dot(v, b); v = v.map((x, i) => x - p * b[i]); }
+    const n = norm(v);
+    if (n < RANK_TOL) continue;
+    basis.push(v.map((x) => x / n));
+  }
+  for (const { grad } of mine) {
+    if (!grad.length || grad.some((x) => !Number.isFinite(x))) return false; // unrankable → not proven forced
+    const n0 = norm(grad);
+    if (n0 < ZERO_ROW_TOL) continue; // identically satisfied — adds nothing
+    let v = grad.map((x) => x / n0);
+    for (let pass = 0; pass < 2; pass++) for (const b of basis) { const p = dot(v, b); v = v.map((x, i) => x - p * b[i]); }
+    if (norm(v) >= RANK_TOL) return false; // independent — a genuinely new row
+  }
+  return true;
+}

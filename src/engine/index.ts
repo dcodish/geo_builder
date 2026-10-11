@@ -23,7 +23,7 @@ export {
   emptyConstruction,
 } from './step';
 export type { StepResult, StepOk, StepErr } from './step';
-export { applySeed, freeDofs, freeDofCount, scalePinned, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, baseSeedOf, withReflectMask, REFLECT_MAX, REFLECT_STRIDE } from './sample';
+export { allConstraints, applySeed, freeDofs, freeDofCount, movableIds, scalePinned, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, baseSeedOf, withReflectMask, REFLECT_MAX, REFLECT_STRIDE } from './sample';
 export { checkGivens, checkLabels, forcedOffArcs, type ForcedOffArc, type PrintedLabels } from './verify';
 export { solveBudget, budgetExceeded, withSolveBudget } from './solveBudget';
 export type { GivenViolation } from './verify';
@@ -61,3 +61,4 @@ export type { ValueRow, AreaClassRow, ValuesPanelResult } from './valuesPanel';
 export { degeneratePolygons, polygonFlatness, DEGENERATE_EXTENT_RATIO, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
 export type { DegeneratePolygon } from './degeneracy';
 export { NOT_CYCLIC } from './shapeKinds';
+export { impliedByFigure, constraintRank, constraintJacobian, RANK_TOL, ZERO_ROW_TOL } from './dofRank';

@@ -871,6 +871,13 @@ function rawMovableDof(o: Construction['objects'][number]): number {
   return carrier.dof; // parametric / on-line / shape scalar = 1
 }
 
+/** The ids whose parameters are the rank Jacobian's COLUMN universe — exactly the objects
+ *  {@link rawMovableDof} counts. One definition, read by `freeDofCount` and by `impliedByFigure`'s
+ *  caller, so the forcing test and the count can never be taken over different columns. */
+export function movableIds(c: Construction): Id[] {
+  return c.objects.filter((o) => rawMovableDof(o) > 0).map((o) => o.id);
+}
+
 /** DOF a constraint removes: an equality removes 1; a `coincide` pins both coords (2); an ORDER/inequality removes 0 (it's a region, ADR-039).
  *  `byId` (optional) lets a coincide inspect its operands: the two-circles TANGENCY device is a coincide of
  *  two `radial-toward` witnesses that sit on the shared centre AXIS by construction, so its cross-axis
@@ -946,8 +953,10 @@ export function scalePinned(c: Construction, cons: Set<Constraint> = allConstrai
 
 /** Every constraint the figure enforces: the checked list PLUS the driven ones living on `solve` — the
  *  primary directive AND its co-driven `also` obligations (ADR-229), which the solvers fold into their cost
- *  exactly like the primary and which the count therefore owes as well. */
-function allConstraints(c: Construction): Set<Constraint> {
+ *  exactly like the primary and which the count therefore owes as well. Exported since
+ *  [ADR-623](../../docs/06-decisions.md#adr-623), so `step.ts`'s ownership decision asks about the same
+ *  set the count does. */
+export function allConstraints(c: Construction): Set<Constraint> {
   const cons = new Set<Constraint>(c.constraints);
   for (const o of c.objects) {
     const sv = (o as { solve?: SolveDirective }).solve;
@@ -990,8 +999,7 @@ function freeDofCountUncached(c: Construction): number {
   const raw = c.objects.reduce((n, o) => n + rawMovableDof(o), 0);
   const cons = allConstraints(c);
   const byId = new Map(c.objects.map((o) => [o.id, o] as const));
-  const movable = c.objects.filter((o) => rawMovableDof(o) > 0).map((o) => o.id);
-  const ranked = constraintRank(c, movable, [...cons]);
+  const ranked = constraintRank(c, movableIds(c), [...cons]);
   let removed = 0;
   if (ranked) {
     removed = ranked.consumed;
