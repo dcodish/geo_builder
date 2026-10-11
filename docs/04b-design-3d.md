@@ -35,7 +35,12 @@ and *resolution happens at apply*, where the figure is known — the opposite of
 duality possible. **Reach for M1 duality before adding a construct.**
 
 **The normalisation seam and case (ADR-3D-039, ADR-3D-223).** `normalize3` is the one boundary every rule
-reads: format controls stripped, primes and minus unified, script transitions split. **The prime fold is
+reads: format controls stripped, primes and minus unified, look-alike glyphs folded, script transitions
+split. **The look-alike glyph fold is the SHARED table** ([ADR-3D-329](06b-decisions-3d.md#adr-3d-329)):
+`shell/glyphFold.ts` `foldGlyphs` (⟂ → ⊥, ∡/∢ → ∠, the guarded `<` → ∠, ⁰/º/˚ → °, «שורש N» → √), called by
+`normalize3` right after `foldPrimes3` and by the ask lane's `parseQuery` — 3-D folded none of them, which is
+why «AC ⟂ AB» was not-understood while «AC ⊥ AB» built (#1912); 2-D's and analytic's boundaries call the same
+table (docs/04w, *Look-alike glyphs*). **The prime fold is
 one set** (ADR-3D-300): `PRIME_GLYPHS3` / `foldPrimes3` in `lexicon/marks3.ts` (′ ’ ‘ \` ´ and the Hebrew geresh ׳, ʹ, ʼ → `'`),
 called by `normalize3`, the ask lane's `parseQuery`, the LLM sequence gate and the rename dialog, and read by
 the bidi run alphabet — no reader spells its own prime class. Lowercase labels are uplifted by

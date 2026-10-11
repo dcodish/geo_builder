@@ -258,8 +258,10 @@ after a sentence's facts (`TangentTargets.pieces`, `sideClauses`). The extent is
 construction: the crossing's bounded promotion (`drawnPieceOver`). A bare pair in a point-on sentence is decided in
 the parser, not at M1: it carries the `between` selector «הקטע AB» carries, except when the subject is one of its ends
 ([ADR-AG-248](06c-decisions-analytic.md#adr-ag-248), #1892; `lineObject` and `pairText` lower the converse to that
-bare «P על CD»). `orthography` folds format controls (`stripFormatControls`), bullets and the spaced
-conjunction (`shell/conjunction`, [ADR-AG-239](06c-decisions-analytic.md#adr-ag-239)). A tangency with no circle
+bare «P על CD»). `orthography` folds format controls (`stripFormatControls`), bullets, the spaced
+conjunction (`shell/conjunction`, [ADR-AG-239](06c-decisions-analytic.md#adr-ag-239)) and the look-alike
+glyphs (`shell/glyphFold`, [ADR-3D-329](06b-decisions-3d.md#adr-3d-329)): its own ∢/∡ and ⁰ rows moved into
+that shared table, which also brings ⟂ → ⊥, the guarded `<` → ∠, º/˚ → ° and «שורש N» → √. A tangency with no circle
 applies `touchedCircleFacts` (tool symbols, `toolSymbol`), and `theCircle` binds `{ inscribed: ring }`; created
 shapes start fitted ([ADR-AG-202](06c-decisions-analytic.md#adr-ag-202): `fitCreatedShapes`, `shapedObjectOf`). A
 non-cyclic noun refuses `inscribed-contradicts-noun { shape, forced }` (`ShapeRow.notCyclic`, `cyclicFacts`,
