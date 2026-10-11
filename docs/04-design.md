@@ -608,6 +608,20 @@ together is a co-reference. At submit, when only the read-extent members fired (
 `lostRoleNote` teaches `input.scope.split-roles` — one line per role, the side from the lowering, every line proved to
 parse in turn — else the parts cut before the later role word. Where an older gate fired too, the line keeps its
 weak path (W21). The ⟂ verb row reads «אנך»; the existing-segment ⊥-bisector declares `VERB_PERPENDICULAR`.
+
+#### An unread item is named ONCE, on every seam ([ADR-627](06-decisions.md#adr-627))
+
+The battery is a SUPERSET of overlapping gates by design — the label gate and the span accountant both account a
+label, and the accountant reports one span per OCCURRENCE — so the gate outputs concatenate to a list that repeats a
+name. `unreadItems(...lists)` (`src/app/honestyGates.ts`) is the one merge that list is assembled through: each item
+stringified, blanks dropped, the first occurrence kept, the order of distinct items untouched. `honestyGateReport`
+builds `items` with it (so the ✎ seam's `steps.editDropped` is merged), and the **AI second attempt** in
+`submitPipeline.ts` — which runs its own deliberate superset (`droppedRadiusSymbol`, `droppedRegionSubject`,
+`droppedMidsegment`) and so cannot take `items` — builds `stillDropped` with the same function, for both
+`input.labelsDropped` and the `dropped-labels:` debug line. A gate added to either seam is merged the day it is
+written. The other name lists are Set-built and were never members: `introducedNewLabels` (`input.labelsInvented`)
+and `missingOperandLetters` (`input.missingOperands`).
+
 ### A ring over placed points that crosses everywhere is refused before the dry run ([ADR-608](06-decisions.md#adr-608))
 
 `forcedCrossedRing` (`replay/core.ts`, beside `impliedByPrior`) is called from `decideFromParse` (after the

@@ -15792,3 +15792,39 @@ The pentagram line itself is already refused at both commit seams by ADR-608 (re
 **Behaviour change for a student:**
 - «דלתון ABCD · מרובע ABDC» is drawn — the kite as a dart, ABDC a simple ring — instead of refused.
 - The ring refusal now ends «…או לשנות את מקומות הנקודות — …» ("…or move the points — …") instead of «או לשנות את השיעורים».
+
+## ADR-627 — An unread item is named ONCE: the dropped-item list has one merge, where it is assembled (#1898)
+
+**Status:** accepted · 2026-10-11 · bug (P3, 2-D) · branch `fix/1898-partial-reading-duplicate-names` off `main` @ 06fc51dd · fix round #1992 · amends [ADR-240](#adr-240) / [ADR-461](#adr-461)
+
+**Requirements:** [02](02-requirements.md) FR-IN-2 — a reading that loses a stated item is refused naming each lost item once, in the student's own words · **Design:** [04](04-design.md) § "An unread item is named ONCE, on every seam" — `unreadItems` as the assembly of both seams' lists.
+
+**The report.** Found by the `/decisions` pass's plan writers (2026-10-07/08) while planning #1869, filed `needs-operator` under ruling A2 and approved at P3 on 2026-10-08 (*"Approve all as proposed"*): «ABC הוא משולש ו-D היא נקודה שסימנו מחוץ לו», with the model answering only «משולש ABC», showed «הבנתי רק חלקית — לא הצלחתי למקם את **D, D**. …». D is stated once and listed twice.
+
+**Measured before** (re-measured at pickup, `main` @ 06fc51dd, the real `runSubmit` with `llmParse` mocked to answer «משולש ABC» — no model was called):
+
+| utterance | note shown |
+| --- | --- |
+| «ABC הוא משולש ו-D היא נקודה שסימנו מחוץ לו» (the reported case) | «…לא הצלחתי למקם את **D, D**. …» |
+| «ABC הוא משולש ו-D ו-E הן נקודות מחוץ לו» | «…את **D, E, D, E**. …» |
+| «ABC הוא משולש שאורך הצלע שלו AB הוא 7 ס"מ שסימנו» | «…את **7, 7**. …» |
+| «ABC הוא משולש ו-D היא נקודה שסימנו מחוץ לו כך ש-D רחוקה» | «…את **D, D, D**. …» |
+
+**Class (docs/17 §1).** *An item a reading left unread is named once for each check that caught it, and once for each place it occurs, because the list is CONCATENATED from the checks instead of merged.* The battery is a deliberate SUPERSET of overlapping gates — `droppedNewLabels` returns `["D"]` and `unaccountedSpans` returns a span per OCCURRENCE, so the same D arrives twice, and three times when the student typed it twice. The deterministic battery (`honestyGateReport`, ADR-461) had merged its gate outputs into `items` since it became a function, so the ✎ edit seam (`steps.editDropped`) was already clean. The **AI second attempt** (`submitPipeline.ts`, ADR-240) runs its own superset — `droppedRadiusSymbol`, `droppedRegionSubject`, `droppedMidsegment` are only reachable when a model produced the commands — and so keeps its own list; it concatenated and merged nothing.
+
+**Decision.** The de-duplication belongs where the list is **assembled**, not where it is rendered, so it is a function and both seams build through it.
+
+1. **`unreadItems(...lists)`** (`src/app/honestyGates.ts`) — each item stringified (the number gates return numbers), blanks dropped, the first occurrence kept, the order of distinct items untouched: a student reads the lost items in the order they stated them. It is exactly the merge `honestyGateReport` had inline, so the deterministic and ✎ seams are behaviour-identical.
+2. **`honestyGateReport`** builds `items` through it.
+3. **The AI seam** builds `stillDropped` through it, passing its gate outputs in today's order; both `input.labelsDropped` and the `dropped-labels:` debug line use the merged list. The superset of gates and the order of distinct items do not change — only repeats go.
+4. **Not done, deliberately:** replacing the AI seam's gate list with a `honestyGateReport` call. Its context differs (it passes no `angleAliases`), so that swap could change which lines are refused — a behaviour change no ruling covers, and out of scope.
+
+**Measured after** (the same path): the four rows above read «D», «D, E», «7» and «D». Nothing is committed and the text is kept, as before.
+
+**Sibling audit.** The other student-facing name lists are Set-built and were never members of this class: `introducedNewLabels` → `input.labelsInvented` (a `Set<Id>`) and `missingOperandLetters` → `input.missingOperands` (two `Set`s, sorted) — both verified by reading, neither changed. 3-D's `lostGivens3` (`src3d/store/store3.ts`) concatenates six gates with no merge, so it was read gate by gate: `droppedNewLabels3` dedupes through a `Set`; `droppedShapeNoun3` and `droppedShapeAdjective3` match each noun/adjective family ONCE (`s.match(re)`, no `/g`), one family per entry; `droppedConstructNoun3` returns at most one phrase; the number and relation gates name other kinds of token. There is no span accountant in 3-D — the per-occurrence reporter that doubles 2-D's list — and `honestyRefusal3`'s own read-extent items are already merged. So no two of its gates can produce the SAME string, which is what the plan pass measured on six model-lane lines («D», «D, E», «D, 5», «M, ריבוע», «D, תיכון»): each item once. Analytic has no such notice — its reader never half-accepts a line. Complex has no AI-seam drop list. So the class has one member, in 2-D, and it is closed at the assembly point.
+
+**Locks.** `src/app/__tests__/submitPipeline.test.ts` — the operator-reported utterance and the three class rows above, each through the real `runSubmit` with one mocked model call, asserting the exact `labels` the note interpolates, nothing committed and the text kept. `src/app/__tests__/issue-1898-unread-items.test.ts` — `unreadItems` itself (first occurrence kept, number and string spellings one item, blanks never shown, order of distinct items untouched), and that `honestyGateReport(...).items` IS that merge over its own gate fields with no repeats, over three unread-leaving utterances: one merge, both seams.
+
+**Behaviour change for a student:**
+- A partial-reading notice names each lost point once: «הבנתי רק חלקית — לא הצלחתי למקם את D. …» (was «…את D, D. …»).
+- The same for two lost points («D, E», was «D, E, D, E»), a lost number («7», was «7, 7») and a point typed twice in the line («D», was «D, D, D»).
