@@ -14,6 +14,10 @@
 import { describe, it, expect } from 'vitest';
 import type { Id, Vec } from '../types';
 import { build, applyStep } from '../step';
+import { expandInscribe, shapeConstraints } from '../inscribe';
+import { ringOnOneCircle } from '../structure';
+import { notCyclicImpossibility } from '../cyclicFeasibility';
+import type { Command, Construction } from '../types';
 
 const d = (a: Vec, b: Vec) => Math.hypot(a.x - b.x, a.y - b.y);
 const ang = (a: Vec, b: Vec, c: Vec) => {
@@ -142,5 +146,110 @@ describe('#223 — a shape named over existing points is a CONSTRAINT statement 
     if (!r.ok) return;
     expect(r.construction.constraints.length).toBe(base.construction.constraints.length);
     expect(r.construction.objects.some((o) => o.kind === 'perp-offset' || o.kind === 'parallelogram-vertex')).toBe(true);
+  });
+});
+
+/**
+ * #1913 ([ADR-628](../../../docs/06-decisions.md#adr-628)) — A PARALLELOGRAM-FAMILY NOUN OVER A RING ALREADY ON ONE
+ * CIRCLE LOWERS TO ITS CYCLIC MEMBER. `shapeConstraints` is the ONE authority (ADR-375), so the gate is its third
+ * argument, and the apply boundary answers it from `ringOnOneCircle` — a STRUCTURAL reading (riders, a lowered
+ * membership, a stated concyclicity), never a reading of where the seed drew the points.
+ */
+describe('#1913 — the cyclic-member lowering (ADR-628)', () => {
+  const ids: Id[] = ['A', 'B', 'C', 'D'];
+  const kinds = (cs: Command[]) => cs.map((c) => c.type);
+  const rightAngles = (cs: Command[]) => cs.filter((c) => c.type === 'set-perpendicular').map((c) => (c as { b: Id }).b);
+
+  it('the authority: on one circle the parallelogram is the rectangle and the rhombus/square the square; off it, byte-identical', () => {
+    // on a circle
+    expect(kinds(shapeConstraints('parallelogram', ids, true))).toEqual(['set-perpendicular', 'set-perpendicular', 'set-perpendicular']);
+    expect(shapeConstraints('parallelogram', ids, true), 'the rectangle’s own lowering, verbatim').toEqual(shapeConstraints('rectangle', ids));
+    for (const sq of ['rhombus', 'square'] as const) {
+      const cs = shapeConstraints(sq, ids, true);
+      expect(kinds(cs)).toEqual(['set-perpendicular', 'set-perpendicular', 'set-perpendicular', 'set-equal']);
+      expect(rightAngles(cs), 'three CONSECUTIVE right angles').toEqual(['A', 'B', 'C']);
+      expect(cs[3], 'one adjacent pair: |AB| = |BC|').toEqual({ type: 'set-equal', a: 'A', b: 'B', c: 'B', d: 'C' });
+    }
+    expect(shapeConstraints('rectangle', ids, true)).toEqual(shapeConstraints('rectangle', ids));
+    expect(shapeConstraints('trapezoid', ids, true)).toEqual(shapeConstraints('trapezoid', ids));
+    // off a circle: the family’s own relations, as before
+    expect(kinds(shapeConstraints('parallelogram', ids))).toEqual(['set-equal', 'set-equal']);
+    expect(kinds(shapeConstraints('rhombus', ids))).toEqual(['set-equal', 'set-equal', 'set-equal']);
+    expect(kinds(shapeConstraints('square', ids))).toEqual(['set-equal', 'set-equal', 'set-equal', 'set-perpendicular']);
+    expect(shapeConstraints('parallelogram', ids, false)).toEqual(shapeConstraints('parallelogram', ids));
+  });
+
+  it('expandInscribe never takes the cyclic member (its riders sit on a polygon, not a circle)', () => {
+    const cmds = expandInscribe({ shape: 'parallelogram', ids: ['P', 'Q', 'R', 'S'], container: ['A', 'B', 'C'], variant: 0 } as Parameters<typeof expandInscribe>[0]);
+    expect(cmds.filter((c) => c.type === 'set-equal')).toHaveLength(2);
+    expect(cmds.some((c) => c.type === 'set-perpendicular')).toBe(false);
+  });
+
+  const circleFour = (): Construction =>
+    build([
+      { type: 'free-point', id: 'O', x: 0, y: 0 },
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
+      { type: 'point-on-circle', id: 'A', circle: 'circle-O' },
+      { type: 'point-on-circle', id: 'B', circle: 'circle-O' },
+      { type: 'point-on-circle', id: 'C', circle: 'circle-O' },
+      { type: 'point-on-circle', id: 'D', circle: 'circle-O' },
+    ] as Command[]).construction;
+
+  it('ringOnOneCircle reads riders, a stated concyclicity, and nothing from coordinates', () => {
+    const c = circleFour();
+    expect(ringOnOneCircle(c, ['A', 'B', 'C', 'D'])).toBe(true);
+    expect(ringOnOneCircle(c, ['D', 'C', 'B', 'A']), 'any reading of the ring').toBe(true);
+    // one vertex off the circle (a free point that happens to be drawn wherever) — not on one circle
+    const withE = build([
+      { type: 'free-point', id: 'O', x: 0, y: 0 },
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
+      { type: 'point-on-circle', id: 'A', circle: 'circle-O' },
+      { type: 'point-on-circle', id: 'B', circle: 'circle-O' },
+      { type: 'point-on-circle', id: 'C', circle: 'circle-O' },
+      { type: 'free-point', id: 'E', x: 5, y: 0 }, // ON the circle by coordinates, not by statement
+    ] as Command[]).construction;
+    expect(ringOnOneCircle(withE, ['A', 'B', 'C', 'E']), 'coordinates never decide').toBe(false);
+    // four free points with a stated concyclicity
+    const stated: Construction = {
+      ...build([
+        { type: 'free-point', id: 'A', x: 0, y: 0 },
+        { type: 'free-point', id: 'B', x: 4, y: 0 },
+        { type: 'free-point', id: 'C', x: 4, y: 3 },
+        { type: 'free-point', id: 'D', x: 0, y: 3 },
+      ] as Command[]).construction,
+    };
+    const withCon = { ...stated, constraints: [...stated.constraints, { type: 'concyclic', points: ['A', 'B', 'C', 'D'] } as Construction['constraints'][number]] };
+    expect(ringOnOneCircle(withCon, ['A', 'B', 'C', 'D'])).toBe(true);
+    expect(ringOnOneCircle(stated, ['A', 'B', 'C', 'D']), 'no statement, no circle — a rectangle by coordinates is not one').toBe(false);
+    expect(ringOnOneCircle(c, ['A', 'B']), 'fewer than three points is never a ring on a circle').toBe(false);
+  });
+
+  it('the apply boundary: «parallelogram ABCD» over four riders of one circle is DRIVEN into a rectangle (no crossed root, no flat root)', () => {
+    const r = applyStep(circleFour(), { type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] } as Command);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const p = (id: Id) => r.positions.get(id)!;
+    expect(ang(p('D'), p('A'), p('B'))).toBeCloseTo(90, 4);
+    expect(ang(p('A'), p('B'), p('C'))).toBeCloseTo(90, 4);
+    expect(ang(p('B'), p('C'), p('D'))).toBeCloseTo(90, 4);
+    expect(d(p('A'), p('B')), 'the sides are not collapsed').toBeGreaterThan(0.5);
+    expect(d(p('B'), p('C'))).toBeGreaterThan(0.5);
+    for (const id of ['A', 'B', 'C', 'D']) expect(d(p(id), p('O')), `${id} stayed on the circle`).toBeCloseTo(5, 6);
+    const rh = applyStep(circleFour(), { type: 'rhombus', ids: ['A', 'B', 'C', 'D'] } as Command);
+    expect(rh.ok, 'a rhombus on a circle is a square, not an over-constrained refusal').toBe(true);
+    if (!rh.ok) return;
+    const q = (id: Id) => rh.positions.get(id)!;
+    expect(d(q('A'), q('B'))).toBeCloseTo(d(q('B'), q('C')), 6);
+    expect(ang(q('D'), q('A'), q('B'))).toBeCloseTo(90, 4);
+  });
+
+  it('the not-cyclic prover (ADR-607) and the lowering read ONE predicate', () => {
+    // a right trapezoid declared over the four riders: the prover fires exactly when ringOnOneCircle holds
+    const c = circleFour();
+    const declared = applyStep(c, { type: 'trapezoid', ids: ['A', 'B', 'C', 'D'], kind: 'right-trapezoid' } as Command);
+    expect(ringOnOneCircle(c, ['A', 'B', 'C', 'D'])).toBe(true);
+    expect(declared.ok, 'a right trapezoid on four concyclic points is refused by the prover').toBe(false);
+    const probed = { ...c, requirements: [{ kind: 'declared-shape', shape: 'right-trapezoid', ring: ['A', 'B', 'C', 'D'] }] } as unknown as Construction;
+    expect(notCyclicImpossibility(probed)?.forced).toBe('rectangle');
   });
 });

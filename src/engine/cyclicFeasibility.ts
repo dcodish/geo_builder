@@ -19,9 +19,9 @@
  * The ring is a vertex SET: «מעגל חוסם את BCDA» is the same circle through the same four points. The incoming
  * command's own claim rides the probe (its record and its asserted objects), so both orders are one case.
  */
-import { drivenConstraintsOf } from './evaluate';
 import { NOT_CYCLIC } from './shapeKinds';
-import { onCircleReader } from './sideFeasibility';
+import { assertedObjects } from './sideFeasibility';
+import { ringOnOneCircle } from './structure';
 import type { Command, Construction, Id } from './types';
 
 export interface NotCyclicImpossibility {
@@ -37,13 +37,10 @@ export interface NotCyclicImpossibility {
 export function notCyclicImpossibility(probed: Construction, cmd?: Command): NotCyclicImpossibility | null {
   const declared = (probed.requirements ?? []).flatMap((r) => (r.kind === 'declared-shape' && NOT_CYCLIC[r.shape] ? [r] : []));
   if (!declared.length) return null;
-  const concyclicSets = [...probed.constraints, ...drivenConstraintsOf(probed)].flatMap((c) => (c.type === 'concyclic' ? [new Set(c.points)] : []));
-  const circles = probed.objects.flatMap((o) => (o.kind === 'circle' ? [o.id] : []));
-  const on = onCircleReader(probed, cmd);
+  // the ONE structural reading of "this ring is on a circle" (ADR-628): shared with the apply boundary's cyclic-member lowering
+  const asserted = assertedObjects(cmd);
   for (const r of declared) {
-    const ring = new Set(r.ring);
-    const stated = concyclicSets.some((s) => [...ring].every((v) => s.has(v))) || circles.some((c) => r.ring.every((v) => on(v, c)));
-    if (stated) return { ring: [...r.ring], shape: r.shape, forced: NOT_CYCLIC[r.shape] };
+    if (ringOnOneCircle(probed, r.ring, asserted)) return { ring: [...r.ring], shape: r.shape, forced: NOT_CYCLIC[r.shape] };
   }
   return null;
 }

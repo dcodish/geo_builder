@@ -4129,6 +4129,45 @@ export const SCENARIOS_4: Scenario[] = [
       );
     },
   },
+  {
+    id: 'parallelogram-on-circle-is-its-rectangle-1913',
+    title:
+      '#1913 (ADR-628): «מעגל O · A, B, C ו-D על המעגל · AB = 3 · BC = 4 · מקבילית ABCD» — a parallelogram stated over four points already on one circle is drawn as the rectangle the circle forces (here 3 × 4), never crossed, at every seed; «… · מקבילית ACBD», which cannot hold, is refused naming the statement',
+    guards:
+      'Found by the /decisions plan pass for #1899 (2026-10-08) and ruled by the operator ("never a crossed shape; a real parallelogram, or a refusal"; 2026-10-10: a 3 × 4 rectangle, and no parallelogram row may get slower). Measured on 06fc51dd through the real submit door: the five lines COMMITTED a crossed antiparallelogram (|A+C−B−D| = 2.40, ∠A = 6.1°) under «לא נמצאה תצורה…» after the 2.5 s search gave up — 0 of 24 seeds valid; the body’s three lines reached a rectangle only through the post-commit search (8 of 24 seeds). Root cause (one class): shapeConstraints lowered a parallelogram-family noun over EXISTING points to the family’s general relations ("opposite sides equal" / "adjacent sides equal"), which on a circle admit the crossed antiparallelogram and miss the forced cyclic member whenever it needs the radius to move. Fix (LADDER stage 2a): when ringOnOneCircle reads the ring structurally on one circle — riders, a lowered membership, a stated concyclicity — the lowering is the cyclic member’s own: the rectangle’s three right angles (parallelogram), plus one adjacent equal pair (rhombus, square). The real-door matrix (spellings, locales, the #1921 rhombus/square rows, the ACBD refusal, the off-circle controls) is src/app/__tests__/issue-1913-cyclic-member-lowering.test.ts; the fixture is issue-1913-parallelogram-on-circle-sides.geo.json.',
+    steps: ['מעגל O', 'A, B, C ו-D על המעגל', 'AB = 3', 'BC = 4', 'מקבילית ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const ring: [Id, Id, Id, Id] = ['A', 'B', 'C', 'D'];
+      const rectangle = (f: typeof fig, label: string) => {
+        const [A, B, C, D] = ring.map((id) => at(f, id));
+        expect(ringSimple([A, B, C, D]), `${label}: never crossed`).toBe(true);
+        for (const [p, v, q, n] of [[D, A, B, 'A'], [A, B, C, 'B'], [B, C, D, 'C'], [C, D, A, 'D']] as const) expect(angle(p, v, q), `${label}: right angle at ${n}`).toBeCloseTo(90, 3);
+        expect(dist(A, B), `${label}: |AB| = 3`).toBeCloseTo(3, 4);
+        expect(dist(B, C), `${label}: |BC| = 4`).toBeCloseTo(4, 4);
+        for (const id of ring) expect(dist(at(f, id), at(f, 'O')), `${label}: ${id} on the circle`).toBeCloseTo(2.5, 4);
+      };
+      rectangle(fig, 'shown');
+      // the ruled row over 24 seeds: every raw seed meets the givens and is the 3 × 4 rectangle — the search is never needed
+      const facts = factsOf(['מעגל O', 'A, B, C ו-D על המעגל', 'AB = 3', 'BC = 4', 'מקבילית ABCD']);
+      for (let seed = 0; seed < 24; seed++) {
+        expect(meetsRequirements(facts, seed), `seed ${seed} meets the givens`).toBe(true);
+        rectangle(replay(facts, seed), `seed ${seed}`);
+      }
+      // the body’s three lines: a rectangle at seed 0 itself (was: only after the post-commit search)
+      const body = factsOf(['מעגל O', 'A, B, C ו-D על המעגל', 'מקבילית ABCD']);
+      expect(meetsRequirements(body, 0)).toBe(true);
+      const b = replay(body, 0);
+      expect(angle(at(b, 'D'), at(b, 'A'), at(b, 'B'))).toBeCloseTo(90, 3);
+      expect(ringSimple(ring.map((id) => at(b, id)))).toBe(true);
+      // «מקבילית ACBD» over the same four lines cannot hold (a right angle at C makes AB the hypotenuse, but AB < BC): refused at the gate, never committed under the amber note
+      const prefix = factsOf(['מעגל O', 'A, B, C ו-D על המעגל', 'AB = 3', 'BC = 4']);
+      const v = gateVerdict(prefix, 'מקבילית ACBD');
+      expect(v.kind, 'refused, not committed').toBe('refused');
+      // …and it is the SAME refusal 2-D gives «מלבן ACBD» (the cyclic member is the rectangle)
+      expect(v).toEqual(gateVerdict(prefix, 'מלבן ACBD'));
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

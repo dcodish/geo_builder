@@ -25,7 +25,10 @@ resolves references against the current model (its nearest relatives are a param
 enumeration). Four corrections to the plain compiler reading hold:
 1. **Re-mention is assertion, never redefinition.** A second mention of an id is a given about the existing
    object; it lowers to constraints on it in one place at the apply boundary (M1, [docs/17](17-design-rules.md)
-   §4), and `commandConflict` refuses only what cannot be lowered.
+   §4), and `commandConflict` refuses only what cannot be lowered. The lowering reads the ring's STRUCTURE: a
+   parallelogram-family noun over four points already on one circle (`ringOnOneCircle`, `src/engine/structure.ts`)
+   asserts its cyclic member — the rectangle, or the square — because that is what the sentence says on a circle
+   ([ADR-628](06-decisions.md#adr-628)).
 2. **The parser may read the drawing, but only to resolve a pointing reference** («המעגל הגדול», «הימני»,
    «נקודת ההשקה»), through `ParseContext`'s deictic fields, each read emitting a locking assertion
    ([docs/17](17-design-rules.md) §3b).

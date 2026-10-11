@@ -11,6 +11,7 @@
 import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, Vec } from './types';
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
+import { ringOnOneCircle } from './structure';
 import { add, circleCircleIntersect, circumcenter, dist, footOnLine, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringKey, ringSimple, scale, sub } from './geometry';
 import { QUAD_IMPLIES, quadImplies, quadImpliesInEveryReading, quadsExclude, type QuadKind } from './shapeKinds';
 import { constraintKey, constraintRefs, residual, residualTolerance } from './solve';
@@ -1362,7 +1363,10 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 6, y: 4 }, { id: d, x: 0, y: 4 }], pos);
     quadEdges(objects, a, b, c, d, cmd.type);
     let acc: Construction = { ...prev, objects, constraints };
-    for (const sub of shapeConstraints(cmd.type as Parameters<typeof shapeConstraints>[0], ids)) acc = applyCommand(acc, sub, pos);
+    // ADR-628 (#1913): a ring ALREADY on one circle takes the member the circle forces (parallelogram → rectangle,
+    // rhombus/square → square) — read structurally from `prev`, never from where the seed draws the points.
+    const onOneCircle = ringOnOneCircle(prev, ids);
+    for (const sub of shapeConstraints(cmd.type as Parameters<typeof shapeConstraints>[0], ids, onOneCircle)) acc = applyCommand(acc, sub, pos);
     // the shape command's OWN record (#1918, ADR-607: a declared right trapezoid) — the sub-commands state none
     return { ...acc, ...requirementsField(recordRequirement(acc.requirements, cmd)) };
   }

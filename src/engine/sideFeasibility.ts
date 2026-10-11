@@ -34,6 +34,7 @@
  * one case.
  */
 import { applyCommand } from './apply';
+import { circleName, pairKey, Structure } from './structure';
 import { isSideRecord, type SideRecord } from './requirements';
 import { ringKey } from './geometry';
 import type { Command, Construction, GeoObject, Id, SideRequirement } from './types';
@@ -47,156 +48,7 @@ export interface SideImpossibility {
   sideIsNew: boolean;
 }
 
-const circleName = (id: Id): string => (id.startsWith('circle-') ? id.slice('circle-'.length) : id);
 const polyNoun = (poly: Id[]): string => (poly.length === 3 ? 'triangle' : 'polygon');
-const pairKey = (a: Id, b: Id): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
-
-/** Union-find over `coincide` statements — a point stated to coincide with another shares its incidences. */
-function coincideClasses(c: Construction): (id: Id) => Set<Id> {
-  const parent = new Map<Id, Id>();
-  const find = (x: Id): Id => {
-    let r = x;
-    while (parent.has(r) && parent.get(r) !== r) r = parent.get(r)!;
-    return r;
-  };
-  for (const con of c.constraints) {
-    if (con.type !== 'coincide') continue;
-    const [ra, rb] = [find(con.p), find(con.q)];
-    if (ra !== rb) parent.set(ra, rb);
-  }
-  const ids = new Set<Id>();
-  for (const con of c.constraints) if (con.type === 'coincide') ids.add(con.p).add(con.q);
-  return (id: Id) => {
-    const root = find(id);
-    const out = new Set<Id>([id]);
-    for (const x of ids) if (find(x) === root) out.add(x);
-    return out;
-  };
-}
-
-type Circle = Extract<GeoObject, { kind: 'circle' }>;
-
-/**
- * Everything the prover asks of a construction, over its objects PLUS the incoming command's asserted
- * objects. A point may appear in both lists (the command re-states an existing point); each list is
- * consulted on its own, so the asserted object never shadows the figure's.
- */
-class Structure {
-  private readonly lists: GeoObject[][];
-  private readonly cls: (id: Id) => Set<Id>;
-  constructor(private readonly c: Construction, asserted: GeoObject[]) {
-    this.lists = [c.objects, asserted];
-    this.cls = coincideClasses(c);
-  }
-  private defs(id: Id): GeoObject[] {
-    const out: GeoObject[] = [];
-    for (const x of this.cls(id)) for (const list of this.lists) for (const o of list) if (o.id === x) out.push(o);
-    return out;
-  }
-  private circle(id: Id): Circle | undefined {
-    for (const list of this.lists) {
-      const o = list.find((x): x is Circle => x.kind === 'circle' && x.id === id);
-      if (o) return o;
-    }
-    return undefined;
-  }
-  /** Structurally ON circle `circ` — a statement of that, or null. */
-  onCircle(p: Id, circ: Id): string | null {
-    const said = `${p} on circle ${circleName(circ)}`;
-    const C = this.circle(circ);
-    const mine = this.cls(p);
-    for (const o of this.defs(p)) {
-      if ((o.kind === 'on-circle' || o.kind === 'antipode' || o.kind === 'arc-midpoint' || o.kind === 'line-circle' || o.kind === 'radial-toward') && o.circle === circ) return said;
-      if (o.kind === 'circle-circle' && (o.circle1 === circ || o.circle2 === circ)) return said;
-    }
-    if (C) {
-      if (C.radius.via === 'through' && mine.has(C.radius.point)) return said;
-      // a circumcircle passes through the three points its centre is the circumcentre of
-      for (const list of this.lists) {
-        const cc = list.find((o) => o.kind === 'circumcenter' && o.id === C.center);
-        if (cc && cc.kind === 'circumcenter' && [cc.a, cc.b, cc.c].some((v) => mine.has(v))) return said;
-      }
-    }
-    // A membership M1 lowered to a CONSTRAINT (apply's point-on-circle (c), (c4), (d)): still a statement
-    // that the point is on this circle, recorded in the constraint's own operands.
-    if (C) {
-      const isCentre = (x: Id) => this.cls(C.center).has(x);
-      const onByObject = (x: Id) =>
-        this.defs(x).some((o) => (o.kind === 'on-circle' || o.kind === 'antipode' || o.kind === 'arc-midpoint' || o.kind === 'line-circle' || o.kind === 'radial-toward') && o.circle === circ) ||
-        (C.radius.via === 'through' && this.cls(C.radius.point).has(x));
-      for (const con of this.c.constraints) {
-        if (con.type === 'length-radius' && con.circle === circ && con.k === 1 && !con.add && isCentre(con.a) && mine.has(con.b)) return said;
-        if (con.type === 'distance' && C.radius.via === 'length' && Math.abs(con.value - C.radius.value) <= 1e-9 * Math.max(1, C.radius.value)) {
-          if ((isCentre(con.a) && mine.has(con.b)) || (isCentre(con.b) && mine.has(con.a))) return said;
-        }
-        if (con.type === 'equal') {
-          const pairs: [Id, Id][] = [[con.a, con.b], [con.c, con.d]];
-          const radial = (q: [Id, Id]): Id | null => (isCentre(q[0]) ? q[1] : isCentre(q[1]) ? q[0] : null);
-          const [r1, r2] = pairs.map(radial);
-          if (r1 && r2 && ((mine.has(r1) && onByObject(r2)) || (mine.has(r2) && onByObject(r1)))) return said;
-        }
-      }
-    }
-    return null;
-  }
-  isCentre(p: Id, circ: Id): string | null {
-    const C = this.circle(circ);
-    return C && this.cls(p).has(C.center) ? `${p} is the centre of circle ${circleName(circ)}` : null;
-  }
-  /** Structurally on the BOUNDARY of polygon `poly` — a vertex, or within one of its edges. */
-  onBoundary(p: Id, poly: Id[]): string | null {
-    const mine = this.cls(p);
-    const vertex = poly.find((v) => mine.has(v));
-    if (vertex !== undefined) return `${p} is a vertex of ${poly.join('')}`;
-    const edges = new Map<string, [Id, Id]>();
-    poly.forEach((v, i) => edges.set(pairKey(v, poly[(i + 1) % poly.length]), [v, poly[(i + 1) % poly.length]]));
-    const edge = (a: Id, b: Id) => edges.get(pairKey(a, b));
-    const within = (t: number | undefined) => t === undefined || (t >= 0 && t <= 1);
-    for (const o of this.defs(p)) {
-      if (o.kind === 'on-segment' && !o.extension && within(o.t) && edge(o.a, o.b)) return `${p} on segment ${o.a}${o.b}`;
-      if (o.kind === 'on-segment-solved' && within(o.t0) && edge(o.a, o.b)) return `${p} on segment ${o.a}${o.b}`;
-      if (o.kind === 'midpoint' && edge(o.a, o.b)) return `${p} is the midpoint of ${o.a}${o.b}`;
-      if (o.kind === 'line-circle' && o.onSegment && edge(o.onSegment[0], o.onSegment[1])) return `${p} on segment ${o.onSegment[0]}${o.onSegment[1]}`;
-      if (o.kind === 'line-line-intersection') {
-        if ((o.onSeg || o.onSeg1) && edge(o.a, o.b)) return `${p} on segment ${o.a}${o.b}`;
-        if ((o.onSeg || o.onSeg2) && edge(o.c, o.d)) return `${p} on segment ${o.c}${o.d}`;
-      }
-    }
-    // «E בין A ל-B» / an M1-lowered «E על AB» on a pinned point: an in-order statement with E between an edge's ends
-    for (const con of this.c.constraints) {
-      if (con.type !== 'collinear-order') continue;
-      const ix = con.points.findIndex((x) => mine.has(x));
-      if (ix < 0) continue;
-      for (let i = 0; i < ix; i++) for (let j = ix + 1; j < con.points.length; j++) {
-        const e = edge(con.points[i], con.points[j]);
-        if (e) return `${p} on segment ${e[0]}${e[1]}`;
-      }
-    }
-    return null;
-  }
-  /** Structurally on the (infinite) LINE a–b. */
-  onLine(p: Id, a: Id, b: Id): string | null {
-    const mine = this.cls(p);
-    const ab = pairKey(a, b);
-    const seg = `${a}${b}`;
-    if (mine.has(a) || mine.has(b)) return `${p} on line ${seg}`;
-    const lineIsAB = (lineId: Id): boolean =>
-      this.lists.some((list) => list.some((o) => o.kind === 'line' && o.id === lineId && o.spec.via === 'through' && pairKey(o.spec.a, o.spec.b) === ab));
-    for (const o of this.defs(p)) {
-      if ((o.kind === 'on-segment' || o.kind === 'on-segment-solved') && pairKey(o.a, o.b) === ab) return o.kind === 'on-segment' && (o.extension || !(o.t >= 0 && o.t <= 1)) ? `${p} on line ${seg}` : `${p} on segment ${seg}`;
-      if (o.kind === 'midpoint' && pairKey(o.a, o.b) === ab) return `${p} is the midpoint of ${seg}`;
-      if (o.kind === 'foot' && pairKey(o.a, o.b) === ab) return `${p} on line ${seg}`;
-      if (o.kind === 'line-line-intersection' && (pairKey(o.a, o.b) === ab || pairKey(o.c, o.d) === ab)) return `${p} on line ${seg}`;
-      if ((o.kind === 'on-line' || o.kind === 'line-circle') && lineIsAB(o.line)) return `${p} on line ${seg}`;
-      if (o.kind === 'line-intersection' && (lineIsAB(o.line1) || lineIsAB(o.line2))) return `${p} on line ${seg}`;
-    }
-    for (const con of this.c.constraints) {
-      const pts = con.type === 'collinear' ? [con.a, con.b, con.c] : con.type === 'collinear-order' ? con.points : null;
-      if (pts && pts.includes(a) && pts.includes(b) && pts.some((x) => mine.has(x))) return `${p} on line ${seg}`;
-    }
-    return null;
-  }
-}
 
 const sideText = (r: SideRecord): string =>
   r.kind === 'circle-side'
@@ -206,22 +58,13 @@ const sideText = (r: SideRecord): string =>
       : `${r.subjects.join(', ')} ${r.rel === 'different' ? 'on different sides of' : 'on the same side of'} ${r.a}${r.b}`;
 
 /** The objects a command ASSERTS on its own — its structural probe on an empty construction. */
-function assertedObjects(cmd: Command | undefined): GeoObject[] {
+export function assertedObjects(cmd: Command | undefined): GeoObject[] {
   if (!cmd) return [];
   try {
     return applyCommand({ objects: [], constraints: [] }, cmd).objects;
   } catch {
     return [];
   }
-}
-
-/**
- * #1918 ([ADR-607](../../docs/06-decisions.md#adr-607)): the same STRUCTURAL "is this point on that circle" reader,
- * for the not-cyclic prover (`cyclicFeasibility.ts`) — one notion of on-a-circle for both stage-0 members.
- */
-export function onCircleReader(probed: Construction, cmd?: Command): (p: Id, circ: Id) => boolean {
-  const s = new Structure(probed, assertedObjects(cmd));
-  return (p, circ) => s.onCircle(p, circ) !== null;
 }
 
 /**

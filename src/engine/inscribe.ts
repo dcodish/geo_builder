@@ -147,8 +147,18 @@ export function inscribeVariantCount(cmd: InscribeCmd): number {
  *  EXPORTED as the one authority for "what does this shape word assert" (M1, #223/ADR-375): the inscribe
  *  expansion and the apply-boundary lowering of a shape command over EXISTING points both read it, so the
  *  two can never drift. `trapezoid` exists for the M1 lowering only (not an inscribe shape — inscribing a
- *  trapezoid is under-determined); its single assertion is the one parallel pair (ADR-052: no more). */
-export function shapeConstraints(shape: InscribeShape | 'trapezoid', ids: Id[]): Command[] {
+ *  trapezoid is under-determined); its single assertion is the one parallel pair (ADR-052: no more).
+ *
+ *  `onOneCircle` ([ADR-628](../../docs/06-decisions.md#adr-628), #1913): the ring is ALREADY structurally on one
+ *  circle (`ringOnOneCircle`), so a parallelogram-family noun lowers to the member the circle FORCES — a cyclic
+ *  parallelogram is exactly the rectangle, a cyclic rhombus (and square) exactly the square. The family's
+ *  general relations are weaker than the cyclic member's definition: on a circle their solution set admits the
+ *  crossed antiparallelogram (`oppositeEqual`), and misses the forced member whenever it needs the radius to move
+ *  (`equalAdjacent` on four riders, which the joint optimizer neither finds nor refutes). Three consecutive right
+ *  angles have neither a crossed root (they force both parallel pairs) nor a collapsed one (a perpendicularity is
+ *  NaN on a zero side), and each has a closed-form 1-D root for its on-circle carrier. The rectangle and the
+ *  trapezoid are untouched; off a circle every shape lowers exactly as before. */
+export function shapeConstraints(shape: InscribeShape | 'trapezoid', ids: Id[], onOneCircle = false): Command[] {
   const n = ids.length;
   const side = (i: number): [Id, Id] => [ids[i % n], ids[(i + 1) % n]];
   const equalAdjacent: Command[] = Array.from({ length: n - 1 }, (_, i) => {
@@ -165,15 +175,16 @@ export function shapeConstraints(shape: InscribeShape | 'trapezoid', ids: Id[]):
     const [, q] = side(i); // outgoing side sᵢ→…
     return { type: 'set-perpendicular', a: p, b: v, c: v, d: q } as Command; // right angle at sᵢ
   };
+  const rectangle: Command[] = [rightAt(0), rightAt(1), rightAt(2)]; // three right angles ⇒ the fourth too
   switch (shape) {
     case 'rhombus':
-      return equalAdjacent; // all four sides equal
+      return onOneCircle ? [...rectangle, equalAdjacent[0]] : equalAdjacent; // all four sides equal; on a circle: the square
     case 'square':
-      return [...equalAdjacent, rightAt(0)]; // rhombus + one right angle
+      return onOneCircle ? [...rectangle, equalAdjacent[0]] : [...equalAdjacent, rightAt(0)]; // rhombus + one right angle
     case 'rectangle':
-      return [rightAt(0), rightAt(1), rightAt(2)]; // three right angles ⇒ the fourth too
+      return rectangle;
     case 'parallelogram':
-      return oppositeEqual;
+      return onOneCircle ? rectangle : oppositeEqual; // on a circle: the rectangle
     case 'trapezoid':
       // AB ∥ DC (side 0 ∥ side 2) — the ONE relation the word asserts (ADR-052: leg lengths, the other
       // pair's non-parallelism, and all sizes stay unstated).

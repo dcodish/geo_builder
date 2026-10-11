@@ -1,0 +1,129 @@
+{
+  "name": "fix-1913",
+  "title": "#1913 — a parallelogram over four points on a circle is its rectangle (ADR-628), on main",
+  "cases": [
+    {
+      "id": "T1",
+      "title": "Four points on a circle, two sides given, then «מקבילית» — a 3 × 4 rectangle, no note",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": ["מעגל O", "A, B, C ו-D על המעגל", "AB = 3", "BC = 4", "מקבילית ABCD"],
+      "lookFor": "A true rectangle ABCD inscribed in the circle, with AB = 3 and BC = 4 labelled, all four corners on the circle, and NO amber «לא נמצאה תצורה…» note. It appears within about a second.",
+      "before": "A crossed (bow-tie) quadrilateral drawn under the amber «לא נמצאה תצורה שמקיימת את כל הדרישות יחד…» note, after a search of several seconds."
+    },
+    {
+      "id": "T2",
+      "title": "The same without sides, then «הציגו תצורה אחרת» three times — rectangles only",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": ["מעגל O", "A, B, C ו-D על המעגל", "מקבילית ABCD"],
+      "cycles": 3,
+      "lookFor": "A rectangle at once, and every press of «הציגו תצורה אחרת» shows another rectangle (different proportions), never a crossed or slanted shape.",
+      "before": "A rectangle too, but only after a short search; unchanged for the student apart from speed."
+    },
+    {
+      "id": "T3",
+      "title": "«מעוין ABCD» over four points on a circle draws a square at once",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": ["מעגל O", "A, B, C ו-D על המעגל", "מעוין ABCD"],
+      "lookFor": "A square ABCD inscribed in the circle (four equal sides, right corners), drawn immediately, green.",
+      "before": "Refused after 8–11 seconds with «לא ניתן: «מעוין ABCD» סותר נתון קודם… הסיבה: |AB| = |BC|.» — a false refusal; a square fits."
+    },
+    {
+      "id": "T4",
+      "title": "«ריבוע ABCD» over four points on a circle draws a square at once",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": ["מעגל O", "A, B, C ו-D על המעגל", "ריבוע ABCD"],
+      "lookFor": "A square inscribed in the circle, drawn immediately, green.",
+      "before": "Refused after about 11 seconds as over-constrained («|AB| = |BC|»)."
+    },
+    {
+      "id": "T5",
+      "title": "A side given, then «מעוין» — a square of side 3",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": ["מעגל O", "A, B, C ו-D על המעגל", "AB = 3", "מעוין ABCD"],
+      "lookFor": "A square inscribed in the circle with AB = 3 labelled; the circle has shrunk to fit it (radius ≈ 2.1).",
+      "before": "Refused after about 11 seconds as over-constrained."
+    },
+    {
+      "id": "T6",
+      "title": "REFUSAL — «מקבילית ACBD» with AB = 3, BC = 4 cannot hold and is refused naming the right angle",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": ["מעגל O", "A, B, C ו-D על המעגל", "AB = 3", "BC = 4", "מקבילית ACBD"],
+      "expectRefusal": "לא ייתכן",
+      "lookFor": "The last line is refused at once with «לא ייתכן: מול הזווית הישרה ב-C נמצא היתר AB, הצלע הארוכה ביותר במשולש — אבל |AB| = 3 בעוד |BC| = 4. בדקו את הנתונים.» The four points and the two segments stay as they were; nothing crossed is drawn. (This is the same message «מלבן ACBD» already gives.)",
+      "before": "Committed: a crossed, impossible figure drawn under the amber «לא נמצאה תצורה…» note after about 10 seconds."
+    },
+    {
+      "id": "T7",
+      "title": "Control — off a circle a parallelogram stays a general parallelogram",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": ["משולש ABC", "נקודה D", "AB = 3", "BC = 4", "מקבילית ABCD"],
+      "lookFor": "A slanted parallelogram ABCD with AB = 3 and BC = 4 — NOT a rectangle (no right-angle marks), not crossed.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T8",
+      "title": "Control — «מלבן ABCD» over four points on a circle, as before",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": ["מעגל O", "A, B, C ו-D על המעגל", "מלבן ABCD"],
+      "lookFor": "A rectangle inscribed in the circle, drawn at once, green.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T9",
+      "title": "Control — «טרפז ABCD» over four points on a circle is still a trapezoid, not forced into a rectangle",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": ["מעגל O", "A, B, C ו-D על המעגל", "טרפז ABCD"],
+      "lookFor": "An (isosceles) trapezoid inscribed in the circle — one pair of parallel sides, slanted legs, no right angles — not crossed.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T10",
+      "title": "The English spelling draws the same 3 × 4 rectangle",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": ["circle O", "A, B, C and D on the circle", "AB = 3", "BC = 4", "parallelogram ABCD"],
+      "lookFor": "The same 3 × 4 rectangle inscribed in the circle as T1, no note.",
+      "before": "Crossed under the amber note, as T1."
+    },
+    {
+      "id": "T11",
+      "title": "Control — the parallelogram first, the circle after: the rectangle 2-D already drew",
+      "class": "verified",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": ["מקבילית ABCD", "מעגל O", "A, B, C ו-D על המעגל"],
+      "lookFor": "The parallelogram becomes a rectangle with the circle through its corners (unchanged behaviour).",
+      "before": "unchanged"
+    }
+  ]
+}
