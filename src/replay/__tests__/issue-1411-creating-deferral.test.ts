@@ -67,12 +67,22 @@ describe('#1411 — the deferral retries a creating fact whose operands a LATER 
     expect(replay(facts, 0).construction.objects.some((o) => o.kind === 'segment')).toBe(false);
   });
 
-  it('a DISABLED statement still claims its free points — a later statement re-introducing them cascades (ADR-015)', () => {
+  /**
+   * #1952 ([ADR-625](../../../docs/06-decisions.md#adr-625)) overturns this control, which used to read
+   * *"a DISABLED statement still claims its free points — a later statement re-introducing them cascades
+   * (ADR-015)"* and expected `/no longer available/`. A disabled statement claims NOTHING: unticking a row
+   * drops only its own objects, so a later statement that introduces the letters itself builds — which is
+   * exactly what DELETING the row has always done (asserted here, so the reference cannot go stale).
+   * ADR-015's cascade is unaffected: it arrives through the muted row's own red riders, which is the
+   * control immediately above.
+   */
+  it('a DISABLED statement claims nothing: a later statement that introduces the letters builds, as on delete (ADR-625)', () => {
     const facts = [
       fact({ type: 'triangle', ids: ['A', 'B', 'C'] }, undefined, false),
       fact({ type: 'segment', a: 'A', b: 'B' }),
     ];
-    expect(statuses(facts)[1]).toMatch(/no longer available/);
+    expect(statuses(facts)[1]).toBe('ok');
+    expect(statuses(facts.slice(1)), 'the same as deleting the triangle').toEqual(['ok']);
   });
 
   it('a midpoint of letters NOTHING introduces stays red, names them, and is never retried (#403 futility)', () => {

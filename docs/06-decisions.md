@@ -15983,3 +15983,55 @@ The issue's harness note is re-based: `gateVerdict`/`driveThroughGate` **do** mo
 - After «מחומש משוכלל ABCDE», the line «מחומש ABCDE חסום במעגל» now **draws the circle** instead of answering «זה כבר קיים באיור» with nothing visible — and the same for «משושה»/«מתומן», the English spellings, and a triangle or quadrilateral first stated «בר חסימה».
 - «משולש ABC בר חסימה» · «מרובע ABCD חסום במעגל» now draws its circle instead of committing green without one.
 - **Undo (or deleting the row) after any reveal now re-hides what it revealed** — the circle of «המעגל החוסם…», the centre of «מרכז המעגל הוא O». It used to stay drawn in the step before it, within a session.
+
+## ADR-625 — An unticked row drops only its own objects: the ADR-578 reservation becomes a commit-seam rule (#1952)
+
+**Status:** accepted · 2026-10-11 · bug (P2, 2-D) · branch `fix/1952-untick-independent-row` · fix round #1992 · amends [ADR-578](#adr-578) clause 3
+
+**Requirements:** none (internal) — [FR-ED-*](02-requirements.md)'s promise is unchanged (ADR-010: a row's tick is reversible), and this makes the untick path keep it · **Design:** [04-design.md](04-design.md) § "One fold rule: the dry run judges the list the commit saves" (the reservation paragraph) · **LADDER stage:** none — the fold's `broken` cascade and the submit gate, neither of which is a ladder stage
+
+**Cites** [ADR-578](#adr-578) (the reservation this amends), [ADR-010](#adr-010) / [ADR-015](#adr-015) (muting is reversible and cascades), [ADR-577](#adr-577) (`introducedDefinedPointIds` — what a FAILED row claims), [ADR-612](#adr-612) (#1953, which re-scoped half of the report).
+
+**Reported (operator, 2026-10-09, playing round #1940 T11).** *"on same test, after the 2nd line is there, i remove the first line (the square) and get an error. there is no error. this is a bug."*
+
+**Re-measured at pickup** (`06fc51dd`, through `runSubmit` with the LLM mocked → `runSetGroupEnabled` / `removeGroup` → `replay`), untick against delete on the same sequence:
+
+| sequence | untick the first row | delete it |
+| --- | --- | --- |
+| «ריבוע ABCD» · «משולש ABC» | «can't build: A, B, C belong to the unticked row «ריבוע ABCD»…»; **nothing drawn** | the triangle ✓, A B C drawn |
+| «משולש ABC» · «ריבוע ABCD» | the same refusal, on the square | the square ✓, A B C D drawn |
+| «משולש ABC» · «AB = 5» | the same refusal, plus «references an unknown point» | both rows ✓, A B drawn |
+| «משולש ABC» · «AM תיכון» | «undefined point: B, C» + «**A** belong to the unticked row…» | «undefined point: B, C» + «**M** is no longer available» |
+| «משולש ABC» · «D אמצע BC» | «undefined point: B, C» | identical |
+| «מעגל O» · «נקודה P על מעגל O» · «קטע PQ» | «circle 'O' is not defined» + «P is no longer available» | identical |
+
+**Divergence from the issue's record, corrected here.** (1) The issue's «ריבוע ABCD» · «מרובע ADCB» half no longer reproduces: since [ADR-612](#adr-612) (#1953, round #1983) a rotated or reversed re-reading of a declared ring is a RESTATEMENT — «מרובע ADCB» commits no row at all, so there is no later row to break. The «משולש ABC» variant reproduces exactly and is this entry's case. (2) The issue called «משולש ABC» · «AB = 5» consistent ("undefined on untick **and on delete too**"); it is not — delete builds it green, so it is a member of this class, not a control.
+
+**Class (docs/17 §1).** *The fold made an unticked row reserve letters for the rows BELOW it, so untick and delete disagreed about the same figure.* A disabled fact claimed every point it introduced (`claim()`, ADR-010/015 — "muting is reversible, so the row keeps its letters"), and ADR-578 clause 3 read that reservation back out of the fact list (`mutedOwnerOf`) to name the row. The fold's `broken` cascade — *a point an earlier fact owns that is not in the figure now* — therefore fired on a row that needs no earlier definition at all: «משולש ABC» declares A, B, C itself. The reservation was answering a question about a row that does not exist yet while standing in front of rows that do.
+
+**Why dropping it at replay loses nothing.** Every row BELOW the unticked one was committed while it was enabled (or refused at the gate), so re-ticking replays the row first and defines the letters again — the figure comes back exactly, which the lock asserts position by position. And the cascade muting MUST produce (ADR-015) never came from the reservation: it comes from the muted row's own **red riders**, which claim what they define (ADR-577, `introducedDefinedPointIds`). «נקודה P על מעגל O» goes red for a missing circle and claims P, and «קטע PQ» then cascades — before and after, identically, which is why the phase3 "reversible" lock is untouched.
+
+**Decision.**
+1. **The fold reserves nothing.** `runBuild`'s disabled branch marks the row `disabled` and claims no points (`src/replay/core.ts`). `mutedOwnerOf` and the muted arm of the `broken` message are gone; a genuinely lost definition keeps the generic «… is no longer available» — which is exactly what delete says, so the two paths now say one thing. Measured after: every row of every sequence above matches its delete column.
+2. **The reservation moves to the commit seam, where its one case lives.** `mutedRowHolding(facts, all, figure)` — the letters the step's own facts (`trialChanges`) would introduce, minus those already on the figure, held by the first row unticked ABOVE them — is read by `dryRunOutcome`, which refuses with ADR-578's unchanged message (`errors.mutedRowOwns`). Answered over the TRIAL list, so an identical re-type sees its own twin re-enabled (#1748) and is never refused; only rows above the step's facts count, so re-enabling one of two unticked twins is not refused by the other; letters an ENABLED row defines are free.
+3. **No wording changed.** `errors.mutedRowOwns` (he + en) and its `humanizeError` row are untouched — the same sentence, now produced only when a student is told something true about a line they are typing.
+
+**Consequences.**
+- `src/replay/core.ts`: the disabled branch of `runBuild`; the `broken` message; `mutedOwnerOf` deleted; `mutedRowHolding` + `introducedPointsOf` added beside `trialFacts`; `dryRunOutcome` asks it before judging the trial's statuses. `introducedDefinedPointIds`'s contract comment corrected (a disabled statement no longer claims everything).
+- `src/replay/__tests__/issue-1411-creating-deferral.test.ts`: ADR-577's disabled-claim control re-based (below).
+- Nothing else moved: no parser, engine, render, store or i18n change.
+- Side effect of clause 1, in the student's favour: «משולש ABC» · «ריבוע ABCD» with the triangle unticked now ACCEPTS «משולש ACB» — the square defines A, B, C, and the old reservation had painted the square itself red.
+
+**Re-based control, not relaxed.** [ADR-577](#adr-577)'s `issue-1411-creating-deferral.test.ts` asserted the
+old rule by name (*"a DISABLED statement still claims its free points"*: `[triangle ABC (off), segment AB]` →
+«no longer available»). It now asserts ADR-625's — the segment builds — **beside the same list with the triangle
+DELETED**, so the reference is measured in the run rather than transcribed. ADR-577's other control in that file,
+the muted CIRCLE whose riders cascade the segment, passes untouched: it is the proof that clause 1 does not cost
+ADR-015 its cascade.
+
+**Locks.** `src/app/__tests__/issue-1952-untick-independent-row.test.ts` (14): the operator's exact interaction (build, untick, the triangle green with an empty `violations` and A B C drawn); re-tick restores the positions to six decimals; an **untick ≡ delete** parity table over six sequences, measuring delete in the same run so the reference cannot go stale; ADR-578's two differently-spelled refusals raw and humanised in Hebrew, the identical re-type still re-enabling, and the enabled-row-defines-them control; `mutedRowHolding` units. **Fails before: 8 of 14 on 06fc51dd.** `issue-1748-untick-retype.test.ts` (11) passes unchanged. Scenario `untick-leaves-an-independent-row-building-1952` at the end of `scenarios-corpus-4.ts` (the operator's
+two lines, the square muted the way ADR-578's scenario mutes its triangle: the triangle green, the points identical
+to the DELETE of the square, the re-tick identity, and the kept refusal). A `.geo.json` fixture cannot carry an
+untick, so the store-path matrix is hand-authored, as ADR-578's was.
+
+**Behaviour change for a student:** after unticking a row, a row below it that declares its own letters keeps building, instead of going red and emptying the figure — exactly as deleting the row already behaved. «ריבוע ABCD» · «משולש ABC», untick the square: the triangle stays drawn. Ticking the square again brings the whole figure back as it was. Typing a NEW, differently spelled line over an unticked row's letters is still refused, naming the row, unchanged.
