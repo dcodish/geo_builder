@@ -1,0 +1,716 @@
+{
+  "name": "round-1992",
+  "title": "fix-round #1992 — 16 items landed on main at f7ce0cdb",
+  "cases": [
+    {
+      "id": "T1",
+      "title": "A rectangle word over a square is already there, not an error about a letter",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "ריבוע ABCD",
+        "מלבן ABCD"
+      ],
+      "lookFor": "The second line answers «זה כבר קיים באיור — אין מה להוסיף.» and adds NO second row; the square on the canvas does not move.",
+      "before": "Refused with «C כבר מוגדרת ולא ניתן להגדיר אותה מחדש כמשהו אחר. כדי לשנות, ערכו או מחקו את הצעד הקודם.» — a letter the engine chose, not the sentence.",
+      "expectRefusal": "כבר קיים באיור"
+    },
+    {
+      "id": "T2",
+      "title": "REFUSAL — a trapezoid word over a parallelogram names both shapes",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מקבילית ABCD",
+        "טרפז ABCD"
+      ],
+      "expectRefusal": "הצורה כבר ידועה כ",
+      "lookFor": "Refused with «הצורה כבר ידועה כ־מקבילית — ולכן אינה נקראת טרפז. מחקו את הנתון הקודם אם התכוונתם טרפז.» — no letter and no poly- id anywhere in it. The parallelogram stays on the canvas.",
+      "before": "«C כבר מוגדרת ולא ניתן להגדיר אותה מחדש כמשהו אחר…»"
+    },
+    {
+      "id": "T3",
+      "title": "The pair that is NEITHER implied nor excluded still shows engine text (a known gap, needs your ruling)",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מלבן ABCD",
+        "מעוין ABCD"
+      ],
+      "expectRefusal": "מוגדר",
+      "lookFor": "Still refused, and the message still names a letter («D כבר מוגדרת…»). A square is both a rectangle and a rhombus, so neither narrows the other and neither excludes it — this pair fell outside the 2026-10-10 ruling. Deliberately unchanged; the question is in the Heads-up.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T4",
+      "title": "Four free points read in a second order draw a concave quadrilateral",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מרובע ABCD",
+        "מרובע ABDC"
+      ],
+      "lookFor": "The second line is ACCEPTED — no red note — and the figure redraws as a concave arrowhead: A sits INSIDE triangle BCD, and no two sides cross in either reading. Both quadrilaterals' sides are drawn.",
+      "before": "Refused with «הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: \"מרובע ABDC\"…» and nothing is added."
+    },
+    {
+      "id": "T5",
+      "title": "REFUSAL — a rhombus read in a second order is still refused",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מעוין ABCD",
+        "מרובע ABDC"
+      ],
+      "expectRefusal": "בסדר הזה",
+      "lookFor": "Still refused with the ring message naming «מרובע ABDC» — a rhombus is convex whenever it is simple, so nothing can save that order. This is the guard that the new concave branch did not become a blanket yes.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T6",
+      "title": "A right angle the trapezoid already shows does not move the figure",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "טרפז ישר זווית ABCD",
+        "זווית ADC = 90"
+      ],
+      "lookFor": "The second line is accepted, the 90° knee appears at D, and NOTHING on the canvas moves — the trapezoid you were looking at is the trapezoid you keep.",
+      "before": "D and C jump to a different trapezoid — about 0.2 at the first configuration and up to ~10 units at others."
+    },
+    {
+      "id": "T7",
+      "title": "A right angle restated as an angle does not move the figure",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "משולש ABC",
+        "AB מאונך ל-BC",
+        "זווית ABC = 90"
+      ],
+      "lookFor": "The third line is accepted and shows its 90°, and A, B and C stay exactly where they were.",
+      "before": "B and C jump by up to 3.6 units."
+    },
+    {
+      "id": "T8",
+      "title": "A right angle the figure does NOT have still re-seats it (the false-freeze guard)",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "משולש ABC",
+        "זווית ABC = 90"
+      ],
+      "lookFor": "The figure DOES re-seat into a right triangle, exactly as today. The fix must not turn a real given into a no-op.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T9",
+      "title": "A pentagon's circumcircle finally appears",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מחומש משוכלל ABCDE",
+        "מחומש ABCDE חסום במעגל"
+      ],
+      "lookFor": "After the second line a CIRCLE appears around the pentagon, through all five vertices, and the figure stays green.",
+      "before": "«זה כבר קיים באיור — אין מה להוסיף.» and nothing is drawn — the tool claiming a circle is in a figure that has none."
+    },
+    {
+      "id": "T10",
+      "title": "The same for a triangle first called «בר חסימה»",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "משולש ABC בר חסימה",
+        "משולש ABC חסום במעגל"
+      ],
+      "lookFor": "The circle through A, B, C appears on the second line.",
+      "before": "«זה כבר קיים באיור» and no circle."
+    },
+    {
+      "id": "T11",
+      "title": "«בר חסימה» still asks for NO circle",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מחומש משוכלל ABCDE",
+        "מחומש ABCDE בר חסימה"
+      ],
+      "lookFor": "«זה כבר קיים באיור» and STILL no circle — that line states concyclicity, it does not ask for a drawing. The honest «already there» is untouched.",
+      "before": "unchanged",
+      "expectRefusal": "כבר קיים באיור"
+    },
+    {
+      "id": "T12",
+      "title": "A semicircle stays a semicircle",
+      "class": "look",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "חצי מעגל",
+        "משולש CDE חסום במעגל"
+      ],
+      "lookFor": "The triangle lands on the DRAWN half; the full circle is NOT completed. A circle the figure draws part of is already seen.",
+      "before": "unchanged — this guard is why the first version of the fix was rejected by the parity goldens."
+    },
+    {
+      "id": "T13",
+      "title": "After unticking the square, the triangle stays drawn",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "ריבוע ABCD",
+        "משולש ABC"
+      ],
+      "after": [
+        {
+          "toggle": 1
+        }
+      ],
+      "lookFor": "On untick the triangle A B C STAYS drawn and its row stays green — no red banner, canvas not empty.",
+      "before": "The triangle goes red with «לא ניתן לבנות: A, B, C שייכות לשורה המבוטלת «ריבוע ABCD»…» and the canvas empties. Deleting the square instead already worked — that is the reference this now matches."
+    },
+    {
+      "id": "T14",
+      "title": "A side length under an unticked shape keeps its figure",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "משולש ABC",
+        "AB = 5"
+      ],
+      "after": [
+        {
+          "toggle": 1
+        }
+      ],
+      "lookFor": "The segment AB stays drawn with its 5 label, both rows green.",
+      "before": "«…שייכות לשורה המבוטלת…» plus «|AB| = 5 מתייחס לנקודה לא מוגדרת», canvas empty."
+    },
+    {
+      "id": "T15",
+      "title": "REFUSAL — a new line over an unticked row is still refused",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "משולש ABC"
+      ],
+      "after": [
+        {
+          "toggle": 1
+        },
+        {
+          "type": "משולש ACB"
+        }
+      ],
+      "expectRefusal": "המבוטלת",
+      "lookFor": "Refused with «לא ניתן לבנות: A, C, B שייכות לשורה המבוטלת «משולש ABC» — סמנו אותה שוב או מחקו אותה.», no new row, the triangle row stays unticked.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T16",
+      "title": "REFUSAL — Cyrillic letters are refused BY NAME, never silently replaced",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "משולש ДЖФ"
+      ],
+      "expectRefusal": "ДЖФ",
+      "lookFor": "Refused, nothing drawn, and the message quotes the letters the student typed: «\"ДЖФ\" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.»",
+      "before": "A triangle labelled A, B, C is drawn with a green ✓ — letters the student never typed."
+    },
+    {
+      "id": "T17",
+      "title": "REFUSAL — a Russian word says the tool reads Hebrew and English",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "треугольник ABC"
+      ],
+      "expectRefusal": "עברית ואנגלית",
+      "lookFor": "«הכלי קורא עברית ואנגלית בלבד — \"треугольник\" אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.» — and it arrives instantly, with no AI wait.",
+      "before": "Sent to the AI."
+    },
+    {
+      "id": "T18",
+      "title": "A look-alike letter still folds silently to its Latin twin",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "משולש КМО"
+      ],
+      "lookFor": "A triangle labelled K, M, O is drawn. These Cyrillic letters ARE visual twins of Latin ones, so they fold — only a letter with no twin is refused.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T19",
+      "title": "BEYOND WHAT YOU ASKED — an angle bound with the look-alike degree sign now reads",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "משולש ABC",
+        "זווית ABC גדולה מ-40º"
+      ],
+      "lookFor": "The bound is ACCEPTED as a row (no AI escalation). This is the one line the round shipped that you did not ask for: 2-D's equality lane already read «40º» as degrees, so its bound lane disagreeing with itself was the inconsistency. It is locked by name and comes out of 2-D alone if you would rather it did not.",
+      "before": "«לא הצלחתי להבין את הנתון» — it went to the model."
+    },
+    {
+      "id": "T20",
+      "title": "BEHAVIOUR CHANGE — a square and a rectangle on ONE line now draws the square",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "ריבוע ABCD, מלבן ABCD"
+      ],
+      "lookFor": "The line COMMITS and draws a square. The rectangle half adds nothing, so the sentence no longer conflicts with itself. This follows from the 2026-10-10 ruling applied to the comma spelling; it was not separately ruled.",
+      "before": "Refused with «המשפט הזה מתנגש עם עצמו…» naming the sentence."
+    },
+    {
+      "id": "T21",
+      "title": "REFUSAL — a sentence that still conflicts with itself is named as the sentence",
+      "class": "play",
+      "product": "2d",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "lines": [
+        "מלבן ABCD, מעוין ABCD"
+      ],
+      "expectRefusal": "פעמיים",
+      "lookFor": "Refused quoting the whole sentence: «\"מלבן ABCD, מעוין ABCD\": המשפט הזה מגדיר את D פעמיים, כשני דברים שונים, ולכן לא נוסף.» It names the SENTENCE and the letter inside it, never «edit the earlier step» — there is no earlier step. This is the guarantee #1790 protects, now proved on a pair that still self-conflicts.",
+      "before": "unchanged (the guarantee is the same; only its example moved)"
+    },
+    {
+      "id": "T22",
+      "title": "An implied noun over a square is accepted in 3-D too, with no second row",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "ריבוע ABCD",
+        "מלבן ABCD"
+      ],
+      "lookFor": "Accepted, NO second row, and a note saying it is already stated. The wording is still 3-D's own («הנתון הזה כבר נאמר…») — 2-D's exact sentence is #1990's deliverable, next round.",
+      "before": "Refused with «הצורה כבר ידועה כ־ריבוע — ולכן אינה נקראת מלבן…», which is false of a square."
+    },
+    {
+      "id": "T23",
+      "title": "A crossing letter order is refused for its ORDER, not for your arithmetic (3-D)",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "ריבוע ABCD",
+        "מקבילית ACBD"
+      ],
+      "expectRefusal": "בסדר הזה",
+      "lookFor": "«הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: \"מקבילית ACBD\"…» — the same sentence 2-D gives. The square stays, nothing is added.",
+      "before": "«הטענה לא מתקיימת בציור — בדקו את החישוב» — the tool telling the student their arithmetic is wrong when the mistake is the order of four letters."
+    },
+    {
+      "id": "T24",
+      "title": "3-D reads the look-alike glyphs it used to refuse",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "משולש ABC",
+        "AC ⟂ AB",
+        "∡ABC = 40°",
+        "אורך AB הוא שורש 2"
+      ],
+      "lookFor": "All four rows accepted and green: a right angle drawn at A, 40° at B, AB ≈ 1.41. Each row still shows exactly the glyph typed (⟂, ∡, «שורש»).",
+      "before": "Lines 2, 3 and 4 each answer «לא הצלחתי להבין את הנתון…»."
+    },
+    {
+      "id": "T25",
+      "title": "REFUSAL — an impossible angle in the new glyph is refused as impossible, not as unreadable",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "משולש ABC",
+        "∢ABC = 200"
+      ],
+      "expectRefusal": "בדקו את החישוב",
+      "lookFor": "The triangle stays and its row stays green, and the second line is refused with «הטענה לא מתקיימת בציור — בדקו את החישוב» — NOT «לא הצלחתי להבין את הנתון». That is the proof: the ∢ glyph was read, and only then was the geometry judged. (The wording itself is 3-D generic claim text; a 200° angle arguably deserves its own sentence, which is noted as found work, not built here.)",
+      "before": "«לא הצלחתי להבין את הנתון» — refused for the glyph, so the value was never judged."
+    },
+    {
+      "id": "T26",
+      "title": "A point with two coordinates sends the student to the analytic tool",
+      "class": "look",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "A(0,0)"
+      ],
+      "lookFor": "«מיקום נקודה לפי שיעורים נעשה בכלי «גאומטריה אנליטית» — לחצו עליו בראש המסך…» — shown IMMEDIATELY, no «חושב», nothing added to the figure.",
+      "before": "«לא הצלחתי להבין את הנתון (בגרסה זו: גופים, נקודות על קטעים…)» — after a paid AI call."
+    },
+    {
+      "id": "T27",
+      "title": "A point with THREE coordinates still builds (the guard)",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "A(0,0,0)"
+      ],
+      "lookFor": "The point is drawn. The new pointer must not steal 3-D's own sentence.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T28",
+      "title": "The one-fact-per-line teaching reads one list from (1)",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "משולש ABC ישר זווית ב-B"
+      ],
+      "expectRefusal": "(1)",
+      "lookFor": "«בכל שורה נתון אחד … כתבו בשורות נפרדות: (1) משולש ABC  (2) ∠ABC = 90°» — ONE numbered list starting at (1), with no «כתבו קודם» and no «ואחר כך».",
+      "before": "«… כתבו קודם «משולש ABC», ואחר כך בשורה נפרדת «∠ABC = 90°».» — prose, not 2-D's numbered list."
+    },
+    {
+      "id": "T29",
+      "title": "The free third side of a triangle is sampled, and cycling changes it",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "משולש ABC",
+        "AC = 8",
+        "BC = 3"
+      ],
+      "cycles": 4,
+      "lookFor": "An ORDINARY triangle — ∠C roughly 32°–48° — and «הציגו תצורה אחרת» visibly changes how wide it is each time. AC and BC stay 8 and 3.",
+      "before": "The same near-flat SLIVER at every configuration (AB ≈ 5.05–5.09, ∠C ≈ 9°, essentially a line with a kink), and cycling never reaches an ordinary triangle."
+    },
+    {
+      "id": "T30",
+      "title": "A stated third side still wins over the sample",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "משולש ABC",
+        "AC = 8",
+        "BC = 3",
+        "AB = 7"
+      ],
+      "lookFor": "AB is exactly 7 — the sample does not fight a stated magnitude.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T31",
+      "title": "REFUSAL — the impossible flat triangle is still refused",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "משולש ABC",
+        "AC = 8",
+        "BC = 3",
+        "AB = 5"
+      ],
+      "expectRefusal": "שטוח",
+      "lookFor": "The last line is REFUSED with the flat-polygon message naming the statements that force it; the figure keeps its prior open triangle. 8 = 3 + 5 is a straight line, not a triangle.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T32",
+      "title": "REFUSAL — Cyrillic in 3-D is refused by name, and a look-alike still folds",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "משולש ДЖФ"
+      ],
+      "expectRefusal": "ДЖФ",
+      "lookFor": "Refused naming ДЖФ (3-D quotes with «…»). Then type «משולש КМО» — that one RECORDS the triangle K, M, O.",
+      "before": "Both recorded a triangle A, B, C."
+    },
+    {
+      "id": "T33",
+      "title": "A crossing letter order in analytic gets the same sentence, and only that line goes red",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "ריבוע ABCD",
+        "מקבילית ACBD"
+      ],
+      "expectRefusal": "בסדר הזה",
+      "lookFor": "The same sentence as 2-D and 3-D — AND only the SECOND line is red; «ריבוע ABCD» stays green.",
+      "before": "«לא נמצאה תצורה שבה מתקיים: \"מקבילית ACBD\"» with BOTH lines red — the student's correct first line blamed too."
+    },
+    {
+      "id": "T34",
+      "title": "A square restated from another vertex adds no row",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "ריבוע ABCD",
+        "ריבוע BCDA"
+      ],
+      "lookFor": "The givens list still holds ONE row, and a note says it is already known. The square does not move.",
+      "before": "A second row «ריבוע BCDA» is added with no note at all, and the counter says two givens."
+    },
+    {
+      "id": "T35",
+      "title": "A trapezoid read the other way round is NOT a restatement",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "טרפז ABCD",
+        "טרפז BCDA"
+      ],
+      "lookFor": "The second line RECORDS a row — «טרפז BCDA» names the other pair of parallel sides, so it says something new. This is the guard that the re-spelling is not a blanket rule.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T36",
+      "title": "A line through the centre finds the circle's far side",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "x^2+y^2=25",
+        "A(3,4)",
+        "P(0,0)",
+        "AP חותך את המעגל בנקודה E"
+      ],
+      "lookFor": "All four lines record; E is drawn at (−3,−4), diametrically opposite A. No red refusal.",
+      "before": "The last line is refused «הישרים האלה נפגשים ב-A, ולנקודה הזאת כבר יש שם…» at three of six configurations — though the other crossing plainly exists."
+    },
+    {
+      "id": "T37",
+      "title": "REFUSAL — the SEGMENT really does reach the circle only once",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "x^2+y^2=25",
+        "A(3,4)",
+        "P(0,0)",
+        "הקטע AP חותך את המעגל בנקודה E"
+      ],
+      "expectRefusal": "כבר יש שם",
+      "lookFor": "The last line is REFUSED, naming A — the far crossing is past P, off the segment the student named. This is the row the plan wanted to build and measurement withdrew.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T38",
+      "title": "A point on a named pair now has a segment under it",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "A(0,0)",
+        "B(4,0)",
+        "D על AB"
+      ],
+      "lookFor": "The segment from A to B is DRAWN, with D sitting on it — not a lone dot between two lone dots. A plain line: no tick marks, no extra label.",
+      "before": "Three loose points; nothing is drawn between A and B."
+    },
+    {
+      "id": "T39",
+      "title": "The diagonal a rider names is drawn",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "ריבוע ABCD",
+        "E על AC"
+      ],
+      "lookFor": "The square PLUS the diagonal AC, with E on it.",
+      "before": "The four sides only; E floats inside the square with nothing under it."
+    },
+    {
+      "id": "T40",
+      "title": "The side is not drawn twice (the absorption guard)",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ABC",
+        "D על AB"
+      ],
+      "lookFor": "Exactly THREE sides — AB not re-stroked darker or doubled — with D on AB.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T41",
+      "title": "The LINE noun is deliberately unchanged",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "A(0,0)",
+        "B(4,0)",
+        "D על הישר AB"
+      ],
+      "lookFor": "D is placed and NOTHING is drawn between A and B. Unchanged on purpose: whether «הישר AB» should draw the segment, the infinite line, or nothing is #1910's open question, not this round's.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T42",
+      "title": "REFUSAL — Cyrillic in analytic is refused instantly, with no AI wait",
+      "class": "play",
+      "product": "analytic",
+      "base": "http://localhost:5173",
+      "path": "/analytic.html",
+      "lines": [
+        "משולש ДЖФ"
+      ],
+      "expectRefusal": "ДЖФ",
+      "lookFor": "Refused naming the letters, immediately — no «חושב».",
+      "before": "Handed to the AI, which costs a call and then fails anyway."
+    },
+    {
+      "id": "T43",
+      "title": "The complex tool says what i IS, instead of pleading incomprehension",
+      "class": "play",
+      "product": "complex",
+      "base": "http://localhost:5173",
+      "path": "/complex.html",
+      "lines": [
+        "i ממשי"
+      ],
+      "expectRefusal": "מדומה",
+      "lookFor": "The banner reads «i הוא מספר מדומה». No point i on the plane, and the line is not added to the list.",
+      "before": "«לא הצלחתי להבין את המשפט: \"i ממשי\"» — the message the pedagogy forbids for something the tool can decide."
+    },
+    {
+      "id": "T44",
+      "title": "The origin's own sentence names the origin",
+      "class": "play",
+      "product": "complex",
+      "base": "http://localhost:5173",
+      "path": "/complex.html",
+      "lines": [
+        "o ממשי"
+      ],
+      "expectRefusal": "ראשית",
+      "lookFor": "«o מסמן את ראשית הצירים — אפשר לבחור שם אחר».",
+      "before": "The same generic not-understood message."
+    },
+    {
+      "id": "T45",
+      "title": "REFUSAL — a word that is no name at all keeps the generic message",
+      "class": "play",
+      "product": "complex",
+      "base": "http://localhost:5173",
+      "path": "/complex.html",
+      "lines": [
+        "foo ממשי"
+      ],
+      "expectRefusal": "להבין",
+      "lookFor": "Still «לא הצלחתי להבין את המשפט: \"foo ממשי\"», nothing drawn. The new sentence is only for the two reserved constants — it must not become the answer to everything.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T46",
+      "title": "A real name is still accepted (the false-refusal net)",
+      "class": "play",
+      "product": "complex",
+      "base": "http://localhost:5173",
+      "path": "/complex.html",
+      "lines": [
+        "z1 ממשי"
+      ],
+      "lookFor": "Accepted: the point z₁ sits on the real axis with a ✓ row.",
+      "before": "unchanged"
+    },
+    {
+      "id": "T47",
+      "title": "REFUSAL — Cyrillic in the complex tool is refused by name",
+      "class": "play",
+      "product": "complex",
+      "base": "http://localhost:5173",
+      "path": "/complex.html",
+      "lines": [
+        "ДЖФ = 2 + i"
+      ],
+      "expectRefusal": "ДЖФ",
+      "lookFor": "Refused naming ДЖФ, instead of the generic «לא הצלחתי להבין את המשפט». Complex never silently dropped these letters — its share of the fix was the wording.",
+      "before": "The generic did-not-understand message."
+    },
+    {
+      "id": "T48",
+      "title": "A cube still builds (the glyph fold did not disturb complex or the solids)",
+      "class": "play",
+      "product": "3d",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "AB = 4"
+      ],
+      "lookFor": "The cube builds with edge 4. The primes (A'B'C'D') are modifier letters and must never be judged as an unreadable script.",
+      "before": "unchanged"
+    }
+  ]
+}
