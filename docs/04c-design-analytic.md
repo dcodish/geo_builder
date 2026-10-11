@@ -721,6 +721,13 @@ promotion; it binds crossings only (`crossing`, `parseIntersection`).
 by `nth` (`crossingsOf`), the `crossing-nth` selector and the seeding. A straight is a `Walk` (`walkThrough(from, to)`,
 `walkOfCoefficients`).
 `conicMeet` substitutes the walk into the canonical conic and returns EVERY root, `t` ascending, plus whether it is a touch. The order is taken before the extent: `crossingsOf` numbers the unfiltered roots and only then applies `within` and the occupancy test, so a side's single ring carries its line's number and a taken ring never renumbers its sibling.
+**A SECOND READER of the seeding** ([ADR-AG-263](06c-decisions-analytic.md#adr-ag-263), #1917): the block after the
+ordinal's reads the same `orderedCrossings` for every point with exactly TWO incidences and no ordinal, and starts it
+on the root no EARLIER point holds — 2-D's `otherCrossing` ([ADR-045](06-decisions.md#adr-045) R8), ported as a start.
+A root is taken when a point declared before it sits there within `apartOf`; a root the point's own statement excludes
+is dropped by `withinSegment` (a bounded crossing) or by `failingSelectors` over its own `between` / `beyond`. It moves
+the start only when a root was dropped and exactly one admissible root is left — otherwise the seed still chooses and
+«הציגו תצורה אחרת» cycles.
 An ordinal lowers to `crossing-nth {id, nth, pair}`, otherwise `crossing-distinct`. Two conics are ordered by the
 reading direction ([ADR-AG-236](06c-decisions-analytic.md#adr-ag-236): `orderedCrossings`, `conicsMeet`), and the
 duplicate fault names its operands (`incidenceWords`, `errCrossingAlreadyNamedOperands`). **Both crossings in one
@@ -824,6 +831,13 @@ separation `b − a` — lazy, memoised per unordered pair, non-enumerable, like
 only of a pair it has already found within `near`, so a figure with no coincidence ranks nothing. `0` is "forced
 together"; `> 0` and `undefined` (unplaceable) both keep the silence, because a false refusal is the worse defect.
 On a determined figure it is 0 for every pair, so every figure this already refused is refused identically.
+
+**The arm had a FALSE member, and the START is what removed it** ([ADR-AG-263](06c-decisions-analytic.md#adr-ag-263), #1917).
+A crossing whose pair also passes through an existing point was seeded wherever its letter hashed, the descent landed on
+that point, and the arm then called a coincidence forced that the other root disproved. The arm is unchanged; the
+seeding above now starts such a crossing on the root no earlier point holds, so the arm sees the coincidence only when
+no other admissible root exists (a tangency, a bounded piece holding only the named point, a chord whose both roots are
+named) — and there its refusal is true.
 
 *Identifiers:* `SOLVE_TOL` · `separationDof` · `freedomOf`
 
