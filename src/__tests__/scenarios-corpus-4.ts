@@ -4044,6 +4044,32 @@ export const SCENARIOS_4: Scenario[] = [
         }
       }
       expect(freeDofCount(replay(after, 1).construction)).toBe(freeDofCount(replay(before, 1).construction));
+
+  {
+    id: 'inscribe-reveals-hidden-circle-1972',
+    title:
+      '#1972 (ADR-624): «מחומש משוכלל ABCDE» · «מחומש ABCDE חסום במעגל» — the second line DRAWS the circumcircle the macro was hiding, instead of answering «זה כבר קיים באיור» with no circle anywhere; the honest «כבר קיים» (the circle already on the canvas, or «בר חסימה», which asks for it undrawn) is untouched',
+    guards:
+      "Operator, playing round #1959's sheet: *\"once i have a pentagon (but this might be true for other shapes too), writing מחומש ABCDE חסום במעגל gives an error saying this already exists.\"* Measured on 06fc51dd through decideDeterministic2D → commitVerdict: the second line answered «זה כבר קיים באיור — אין מה להוסיף.» with NO circle on screen, and so did the hexagon, the octagon, the English spelling, the regular-inscribed spelling and the 3-/4-gon «בר חסימה» → «חסום במעגל» pair; «משולש ABC בר חסימה» · «מרובע ABCD חסום במעגל» committed green with its circle still hidden. Root cause (ADR-624): the two existing-circle readers of the inscribe lowering (reusedInscribeCircle, boundInscribeCircle, ADR-156/ADR-610) correctly refuse to mint a second circle on a centre the figure already has, and reused a HIDDEN one SILENTLY — so the lowering dropped the one thing the sentence added, and the submit gate's «produced nothing» reading was right. Fix: ONE predicate (revealReusedCircle) emits ADR-291's existing show-circle when the sentence says the circle is drawn and the circle it reuses is one the figure hides; the ruling is the operator's 2026-10-09 *\"Show the circle.\"* on #1891. The class matrix (every n-gon, both languages, the 3-/4-gon path, the bound branch, the preserved no-ops, the stability check, the lowering's one-reveal-no-second-circle shape) is src/app/__tests__/issue-1972-reveal-hidden-circle.test.ts; the fixtures are issue-1972-pentagon-reveals-its-circle.geo.json and issue-1972-cyclic-triangle-reveals-its-circle.geo.json.",
+    steps: ['מחומש משוכלל ABCDE', 'מחומש ABCDE חסום במעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const ids = ['A', 'B', 'C', 'D', 'E'];
+      // ONE circle (the scaffold revealed, never a second one minted) and it is DRAWN
+      expect(fig.circles.size, 'one circle').toBe(1);
+      const circle = fig.construction.objects.find((o) => o.kind === 'circle') as undefined | { hidden?: boolean };
+      expect(circle!.hidden, 'the circle the student asked for is VISIBLE').toBeFalsy();
+      const { center, r } = [...fig.circles.values()][0];
+      for (const id of ids) expect(dist(at(fig, id), center), id + ' rides it').toBeCloseTo(r, 4);
+      // the line is ACCEPTED, where it used to be a no-op
+      const regular = factsOf(['מחומש משוכלל ABCDE']);
+      expect(gateVerdict(regular, 'מחומש ABCDE חסום במעגל').kind, 'the reported second line commits').toBe('commit');
+      // and the two honest no-ops stay no-ops: «בר חסימה» asks for the circle NOT to be drawn,
+      // and a pentagon already on a VISIBLE circle really is already drawn
+      expect(gateVerdict(regular, 'מחומש ABCDE בר חסימה').kind, '«בר חסימה» adds nothing').toBe('noop');
+      expect(gateVerdict(factsOf(['מחומש משוכלל ABCDE חסום במעגל']), 'מחומש ABCDE חסום במעגל').kind, 'a VISIBLE circle really is already drawn').toBe('noop');
+      // (the reveal moves nothing: asserted at a fixed seed in the unit lock — this check runs under the
+      // cross-seed sweep, where `fig` is at seed s and a seed-0 comparison is not the same configuration)
     },
   },
 ];

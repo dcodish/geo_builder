@@ -219,6 +219,14 @@ export interface ParseContext {
   /** Centre letters that were AUTO-assigned to an unnamed circle (hidden until named) — «מרכז המעגל
    *  הוא P» renames one of these to P and reveals it, instead of creating a second circle (issue #112). */
   autoCenters?: string[];
+  /** #1972 ([ADR-624](docs/06-decisions.md#adr-624)): circle **ids** the figure carries but draws NOTHING of —
+   *  a macro's scaffold circumcircle (a regular n-gon's, a «בר חסימה» ring's). A statement that says the circle
+   *  is DRAWN («חסום במעגל») must REVEAL the one it reuses rather than reuse it silently: the student sees
+   *  nothing and the gate, correctly reading "nothing was produced", answered «זה כבר קיים באיור» about a
+   *  circle that was nowhere on the canvas. Ids, not centre letters, so a concentric pair's two circles never
+   *  answer for each other. A circle carrying an ARC is NOT here — a semicircle or sector draws part of its
+   *  circle, so it is seen, and ADR-423's references land on the drawn half (`buildParseCtx` says why). */
+  hiddenCircles?: string[];
   /** #1673 (ADR-565): points nothing places — a bare free point, no shape's vertex («BO = 5» drew O). A sentence that
    *  names one of them the centre of an unnamed circle PLACES it there (the naming absorbs it). */
   freePoints?: string[];
@@ -5578,6 +5586,33 @@ function reusedInscribeCircle(ctx: ParseContext, ids: Id[], named: string | null
   return ringAllExist(ctx, ids) && onCircle && (!named || up(named) === up(onCircle)) ? up(onCircle) : null;
 }
 
+/**
+ * THE REVEAL AN INSCRIPTION OWES THE CIRCLE IT REUSES (#1972,
+ * [ADR-624](../../docs/06-decisions.md#adr-624)).
+ *
+ * «חסום במעגל» / "inscribed in a circle" states that the circle IS DRAWN. Both existing-circle readers
+ * above ({@link reusedInscribeCircle}, {@link boundInscribeCircle}) correctly refuse to mint a second
+ * circle on a centre the figure already has — but reusing a circle the figure keeps HIDDEN (a regular
+ * n-gon's scaffold circumcircle, a «בר חסימה» ring's, ADR-610's one scaffold emitter) dropped the one
+ * thing the sentence added: the student saw no circle, and the submit gate — correctly reading "this
+ * produced nothing" — answered «זה כבר קיים באיור» about a circle that was nowhere on the canvas, or
+ * committed the line green with no circle. The ruling (2026-10-09, #1891) is *"show the circle"*, and
+ * the scaffold IS the circumcircle being asked for — one circle, one id, one drawing.
+ *
+ * `show-circle` is ADR-291's existing reveal (#83 — a circumscription stated about points already riding
+ * a hidden circle RESOLVES it), and it is `DISPLAY_ONLY`, so the gate already counts it as something
+ * produced. One predicate for every inscription, so the reveal cannot exist for one spelling and be
+ * missing in another — which is exactly how the one-line and two-line forms came apart.
+ *
+ * Silent in the three cases where silence is honest: «בר חסימה» / "cyclic" / "inscribable" asks for the
+ * circle NOT to be drawn (`hidden`); a circle already on the canvas has nothing to reveal — there the
+ * «כבר קיים» answer is the true one; and a circle the figure draws PART of (a semicircle's, a sector's) is
+ * not in `hiddenCircles` at all, so «חצי מעגל» · «משולש CDE חסום במעגל» keeps binding to the drawn half
+ * instead of completing the circle (ADR-422/ADR-423 — that completion is the operator's to rule on).
+ */
+const revealReusedCircle = (ctx: ParseContext, circ: Id, hidden: boolean): AnyCommand[] =>
+  !hidden && (ctx.hiddenCircles ?? []).includes(circ) ? [{ type: 'show-circle', id: circ }] : [];
+
 /** The ring sizes whose INCIRCLE 2-D draws (a triangle, a tangential quadrilateral — Pitot). */
 const INCIRCLE_ARITIES = new Set([3, 4]);
 
@@ -5644,13 +5679,24 @@ function inscribedNgon(s: string, ctx: ParseContext, hidden: boolean): AnyComman
   const reused = reusedInscribeCircle(ctx, ids, named);
   if (reused) {
     // ADR-156 / #462: a clean RE-ENTRY — the ring plus idempotent membership, minting nothing.
-    return [{ type: 'polygon', ids }, ...ids.map((id): AnyCommand => ({ type: 'point-on-circle', id, circle: circleId(reused) }))];
+    // #1972 (ADR-624): …except the REVEAL, when the circle it reuses is one the figure hides.
+    return [
+      ...revealReusedCircle(ctx, circleId(reused), hidden),
+      { type: 'polygon', ids },
+      ...ids.map((id): AnyCommand => ({ type: 'point-on-circle', id, circle: circleId(reused) })),
+    ];
   }
   const existing = boundInscribeCircle(s, ctx, ids, named, r) ?? undefined;
   const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
   // «בר-חסימה» / "cyclic" / "inscribable" keeps the circle HIDDEN — the vertices are concyclic and the circle
   // is not drawn — exactly as it does for a triangle or a quad at HEAD. «חסום» / "inscribed" draws it.
-  return ringOnCircle({ ids, center, r, named: named != null, regular, hidden, existing });
+  return [
+    // #1972 (ADR-624): a BOUND existing circle is reused the same way, and owes the same reveal — the
+    // «חסום במעגל» line committed green with its circle still hidden («משולש ABC בר חסימה» · «מרובע ABCD
+    // חסום במעגל»), which is the very outcome ADR-610's ruling forbids.
+    ...(existing ? revealReusedCircle(ctx, circleId(existing), hidden) : []),
+    ...ringOnCircle({ ids, center, r, named: named != null, regular, hidden, existing }),
+  ];
 }
 
 /** "triangle ABC inscribed in circle O" / "טרפז ABCD חסום במעגל" — circle + on-circle vertices + edges. */
@@ -5807,6 +5853,9 @@ const inscribedPolygon: Rule = (s, ctx) => {
   if (bound != null) {
     const boundCirc = circleId(bound);
     return [
+      // #1972 (ADR-624): the circle the line BINDS to may be one the figure hides — reveal it, as the
+      // sentence says it is drawn. Silent for «בר חסימה» and for a circle already on the canvas.
+      ...revealReusedCircle(ctx, boundCirc, hidden),
       ...ids.map((id): AnyCommand => ({ type: 'point-on-circle', id, circle: boundCirc })),
       ...basePlusShape(ids),
     ];
@@ -5833,7 +5882,13 @@ const inscribedPolygon: Rule = (s, ctx) => {
     // exactly case (a) of apply's `point-on-circle` — "already on this circle ⇒ idempotent" — so this
     // mints nothing, constrains nothing, and changes no figure. It only makes the commands say what the
     // sentence said, which is what 3-D's M1 has always done.
-    return [...basePlusShape(ids), ...ids.map((id) => ({ type: 'point-on-circle', id, circle: circleId(up(onCircle)) }) as AnyCommand)];
+    // #1972 (ADR-624): the reuse also owes the REVEAL when the circle it reused is HIDDEN — «משולש ABC בר
+    // חסימה» · «משולש ABC חסום במעגל» answered «זה כבר קיים באיור» with no circle anywhere.
+    return [
+      ...revealReusedCircle(ctx, circleId(up(onCircle)), hidden),
+      ...basePlusShape(ids),
+      ...ids.map((id) => ({ type: 'point-on-circle', id, circle: circleId(up(onCircle)) }) as AnyCommand),
+    ];
   }
   if (isTri && allExist) {
     return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2] }, ...shapeCmds(ids)];

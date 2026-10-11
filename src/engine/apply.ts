@@ -354,6 +354,33 @@ function upsertCircle(objects: GeoObject[], o: GeoObject): void {
 }
 
 /**
+ * A DISPLAY REVEAL — drop `hidden` (ADR-291's `show-circle`) or `autoCenter` (FR-RN-8's `name-center`) from
+ * every circle the predicate picks — by REPLACING the object, never mutating it.
+ *
+ * #1972 ([ADR-624](../../docs/06-decisions.md#adr-624)): both reveals were written as `delete o.hidden` /
+ * `delete o.autoCenter` over `objects`, which `applyCommand` copies as an ARRAY and not element by element.
+ * The mutation therefore reached the construction this step was derived FROM — including the one the
+ * replay/fold memo ([ADR-280](../../docs/06-decisions.md#adr-280)) holds for an earlier PREFIX of the same
+ * facts. Measured at HEAD on ADR-291's own path («משולש ABC בר חסימה» · «המעגל החוסם את ABC»): replaying the
+ * one-line prefix WARM showed the circle revealed where a COLD replay showed it hidden — so undoing or
+ * deleting the revealing step left the circle drawn, a figure disagreeing with its own fact list, and the
+ * same warm/cold split made the reveal unprovable in the scenario corpus. `applyCommand` is pure over its
+ * input by contract; a reveal is the one place that was not.
+ */
+function revealCircles(
+  objects: GeoObject[],
+  pick: (o: Extract<GeoObject, { kind: 'circle' }>) => boolean,
+  flag: 'hidden' | 'autoCenter',
+): void {
+  objects.forEach((o, i) => {
+    if (o.kind !== 'circle' || !pick(o)) return;
+    const next = { ...o };
+    delete next[flag];
+    objects[i] = next;
+  });
+}
+
+/**
  * Add a line, or reuse an existing one of the same id (its id is its spec, so it's
  * the same line). Visibility is OR-merged: re-referencing a drawn line for a
  * crossing keeps it drawn; re-stating a scaffolding line as a *drawn* one upgrades
@@ -1675,7 +1702,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // #83 (ADR-291): the student RE-STATED an existing circumscription — draw the (auto-hidden)
       // circle. Membership/constraints already exist (that's how the parser resolved it); only the
       // visibility flips. Idempotent; no-op when the circle is already visible.
-      for (const o of objects) if (o.kind === 'circle' && o.id === cmd.id && o.hidden) delete o.hidden;
+      revealCircles(objects, (o) => o.id === cmd.id && !!o.hidden, 'hidden');
       break;
     }
 
@@ -1684,7 +1711,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // reveal it (FR-RN-8: a named centre always shows). Flip `autoCenter` off on the circle(s) centred at
       // that label, leaving the radius spec untouched (re-emitting a `circle` would clobber it). No-op if no
       // such circle (the parser only emits this when the centre exists).
-      for (const o of objects) if (o.kind === 'circle' && o.center === cmd.center && o.autoCenter) delete o.autoCenter;
+      revealCircles(objects, (o) => o.center === cmd.center && !!o.autoCenter, 'autoCenter');
       break;
     }
 

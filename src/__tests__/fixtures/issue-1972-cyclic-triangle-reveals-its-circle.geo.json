@@ -1,0 +1,120 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-11T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "KcT-1ZskaAAx6FDH7SRgu",
+      "utterance": "משולש ABC בר חסימה",
+      "group": "r-C3PvY-KyxlJuO3RNRRQ",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "freeRadius": true,
+        "hidden": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "Rl2nE6LLFZXbFBOa0mlAF",
+      "utterance": "משולש ABC בר חסימה",
+      "group": "r-C3PvY-KyxlJuO3RNRRQ",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O",
+        "theta": 1.2217304763960306,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "kSCi1DfH9PP1ewH2ohJ0r",
+      "utterance": "משולש ABC בר חסימה",
+      "group": "r-C3PvY-KyxlJuO3RNRRQ",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O",
+        "theta": 3.0543261909900763,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "HeFqBHBVGPqblkEGbkdSl",
+      "utterance": "משולש ABC בר חסימה",
+      "group": "r-C3PvY-KyxlJuO3RNRRQ",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O",
+        "theta": 5.235987755982989,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "eRtkm_3sw8itlnrUYfWnq",
+      "utterance": "משולש ABC בר חסימה",
+      "group": "r-C3PvY-KyxlJuO3RNRRQ",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "0_9xLCKO2tV3JpaES24bU",
+      "utterance": "משולש ABC חסום במעגל",
+      "group": "lQCNOG6OaeZkptY9-ClGE",
+      "cmd": {
+        "type": "show-circle",
+        "id": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "aW7mpl19eAA6shHCtOd2N",
+      "utterance": "משולש ABC חסום במעגל",
+      "group": "lQCNOG6OaeZkptY9-ClGE",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "oTSYAHnMhn3kJL2bb-WIK",
+      "utterance": "משולש ABC חסום במעגל",
+      "group": "lQCNOG6OaeZkptY9-ClGE",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "1EYiv8hAeWmNcbFMyQGD2",
+      "utterance": "משולש ABC חסום במעגל",
+      "group": "lQCNOG6OaeZkptY9-ClGE",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-11T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "Ou8UGdt7YX8J9qocaWJD-",
+      "utterance": "מחומש משוכלל ABCDE",
+      "group": "UnFvNjunTmePYhlZBaR8U",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "freeRadius": true,
+        "hidden": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "jdj_VtQfd9pvAAENVnwLF",
+      "utterance": "מחומש משוכלל ABCDE",
+      "group": "UnFvNjunTmePYhlZBaR8U",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O",
+        "theta": 1.5707963267948966
+      },
+      "enabled": true
+    },
+    {
+      "id": "vULacE_4SY0EDH3xED_jC",
+      "utterance": "מחומש משוכלל ABCDE",
+      "group": "UnFvNjunTmePYhlZBaR8U",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O",
+        "theta": 2.827433388230814
+      },
+      "enabled": true
+    },
+    {
+      "id": "0VSE2rw5827mar0B7yiW7",
+      "utterance": "מחומש משוכלל ABCDE",
+      "group": "UnFvNjunTmePYhlZBaR8U",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O",
+        "theta": 4.084070449666731
+      },
+      "enabled": true
+    },
+    {
+      "id": "sM-7TZc1TW7hfKyl4XLzJ",
+      "utterance": "מחומש משוכלל ABCDE",
+      "group": "UnFvNjunTmePYhlZBaR8U",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-O",
+        "theta": 5.340707511102648
+      },
+      "enabled": true
+    },
+    {
+      "id": "BaNzuvo-WD7TqlTAyJurX",
+      "utterance": "מחומש משוכלל ABCDE",
+      "group": "UnFvNjunTmePYhlZBaR8U",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "E",
+        "circle": "circle-O",
+        "theta": 6.5973445725385655
+      },
+      "enabled": true
+    },
+    {
+      "id": "_nHRnAtG3jDwt_68xQMNw",
+      "utterance": "מחומש משוכלל ABCDE",
+      "group": "UnFvNjunTmePYhlZBaR8U",
+      "cmd": {
+        "type": "polygon",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "UbiwmZvDBhJTmiPVwvcfL",
+      "utterance": "מחומש ABCDE חסום במעגל",
+      "group": "dcnUNX5plYn_aXJEe2c3s",
+      "cmd": {
+        "type": "show-circle",
+        "id": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "gk04GHj7jAbwwtnG2v60x",
+      "utterance": "מחומש ABCDE חסום במעגל",
+      "group": "dcnUNX5plYn_aXJEe2c3s",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "105VJqnl9GEGDtdofYVPK",
+      "utterance": "מחומש ABCDE חסום במעגל",
+      "group": "dcnUNX5plYn_aXJEe2c3s",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "L5c0w4pPMQqKx7stwSEub",
+      "utterance": "מחומש ABCDE חסום במעגל",
+      "group": "dcnUNX5plYn_aXJEe2c3s",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "a1vxuSJL6LmWJ4LLKNXmF",
+      "utterance": "מחומש ABCDE חסום במעגל",
+      "group": "dcnUNX5plYn_aXJEe2c3s",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "F9Bnh1vAX6N5HWNw7Aswf",
+      "utterance": "מחומש ABCDE חסום במעגל",
+      "group": "dcnUNX5plYn_aXJEe2c3s",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "E",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    }
+  ]
+}
