@@ -55,6 +55,7 @@ import {
   type ComplexScope,
   NO_SCOPE,
   canonName,
+  declarabilityOf,
   foldConstants,
   isComplexName,
   isDeclarableName,
@@ -116,6 +117,7 @@ import {
   WHERE_KW,
   rx,
 } from './lexicon';
+import type { ReservedConstant } from '../model/naming';
 import { normalize } from './normalize';
 import { type Claim, type Unaccounted, claimAll, unaccountedSpans } from './span';
 
@@ -146,11 +148,43 @@ const isRealLetter = (name: string, scope: ComplexScope): boolean =>
 const readSubjects = (
   scope: ComplexScope,
   ...raw: readonly (string | undefined)[]
-): string[] | null => {
+): string[] | Reserved | null => {
   const names = raw.filter((n): n is string => n !== undefined).map(canonName);
   if (!names.length) return null;
-  return names.every((n) => isDeclarableName(n) || isComplexName(n, scope)) ? names : null;
+  const unread = names.filter((n) => !isDeclarableName(n) && !isComplexName(n, scope));
+  if (!unread.length) return names;
+  /**
+   * #1974 (ADR-CX-063) — the floor's REASON for declining, not a bare boolean. When every name it
+   * could not read is a constant this tool KNOWS, the refusal can say what the name is rather than
+   * plead incomprehension. A word that is no name at all («foo») leaves the line genuinely unread,
+   * and keeps #1948's message — for it, "I did not understand" is the honest answer.
+   */
+  const constants = unread.map(constantOf);
+  const first = constants[0];
+  return first && constants.every((c) => c !== null) ? { reserved: first } : null;
 };
+
+/** The constant a name IS (`i`, `o`), or null — every other name, readable or not. */
+const constantOf = (name: string): ReservedConstant | null => {
+  const floor = declarabilityOf(name);
+  return !floor.ok && floor.why === 'reserved-constant' ? floor.constant : null;
+};
+
+/**
+ * #1974 (ADR-CX-063) — a rule's decline that CARRIES its reason: the subject is a reserved constant.
+ *
+ * A rule declines by returning `null`, which says nothing, and `parseLineV2` then reports
+ * `not-handled` — the message the charter forbids for a sentence the tool can decide. This marker
+ * rides out of the rule beside `null`, is remembered by `parseLineV2`, and reaches the student as the
+ * sentence that names the constant. It never short-circuits the rule list: a later rule that reads
+ * the line still wins, so nothing that parses today stops parsing.
+ */
+interface Reserved {
+  readonly reserved: ReservedConstant;
+}
+
+/** The subject reader said yes — these are the names. (A `Reserved` is the decline that travels.) */
+const gotNames = (s: string[] | Reserved | null): s is string[] => Array.isArray(s);
 
 /** A claim over `text` found at offset `at` of the normalized line. */
 const claimAt = (at: number, index: number, text: string): Claim => ({ start: at + index, end: at + index + text.length });
@@ -287,6 +321,16 @@ export type ParseOutcome =
       readonly items: string[];
       /** #1890 (W20) — the unread word is a NEGATION: the refusal says so, in 2-D's sentence */
       readonly negation?: string;
+    }
+  /**
+   * #1974 (ADR-CX-063) — no rule read the line, and the reason a subject-reading rule declined is
+   * KNOWN: the subject is a constant this tool can name (`i`, `o`). The refusal says what it is.
+   */
+  | {
+      readonly ok: false;
+      readonly reason: 'reserved-constant';
+      readonly normalized: string;
+      readonly constant: ReservedConstant;
     };
 
 const empty = (): ParsedLine => ({
@@ -313,7 +357,7 @@ const empty = (): ParsedLine => ({
  * A rule reads one normalized line. `scope` is the set of letter families the figure declared complex
  * (#1405), supplied by the layer that sees every line; a rule that never reads a name ignores it.
  */
-type Rule = (s: string, scope: ComplexScope) => ParsedLine | null;
+type Rule = (s: string, scope: ComplexScope) => ParsedLine | Reserved | null;
 
 /**
  * F1 — a name declares a number: `z1` on its own line, or «z1 מספר מרוכב» / «z1 is a complex number».
@@ -378,7 +422,7 @@ const solutionSelection: Rule = (s, scope) => {
   // name the figure reads as a number: «foo הוא הפתרון ברביע הרביעי» was accepted and then bound
   // nothing, which drops a stated given silently.
   const subjects = readSubjects(scope, placement.raw);
-  if (!subjects) return null;
+  if (!gotNames(subjects)) return subjects; // #1974: the reserved-constant decline travels
   const [name] = subjects;
   // #1890 (ADR-CX-060): claim ONLY what was read — the name, the solution noun, the quadrant noun and
   // its ordinal, as `quadrantGiven` does. Claiming the whole line read «z0 הוא הפתרון שאינו ברביע
@@ -419,7 +463,7 @@ const quadrantGiven: Rule = (s, scope) => {
   const kw = rest.match(rx(QUADRANT_KW));
   if (!kw) return null;
   const subjects = readSubjects(scope, placement.raw); // #1948 (ADR-CX-062)
-  if (!subjects) return null;
+  if (!gotNames(subjects)) return subjects; // #1974: the reserved-constant decline travels
   const [name] = subjects;
   // #1894 (ADR-CX-061) — a quadrant is where a complex number lies; a real-parameter letter is not read
   if (isRealLetter(name, scope)) return null;
@@ -470,7 +514,8 @@ const argumentRelation: Rule = (s, scope) => {
   const two = s.match(rx(`^${ARG_KW}\\s*(${NAME})\\s*([+-])\\s*${ARG_KW}\\s*(${NAME})\\s*=\\s*(-?\\d+)$`));
   if (two) {
     const [, a, sign, b, deg] = two;
-    if (!readSubjects(scope, a, b)) return null; // #1948 (ADR-CX-062)
+    const pair = readSubjects(scope, a, b); // #1948 (ADR-CX-062)
+    if (!gotNames(pair)) return pair; // #1974: the reserved-constant decline travels
     // #1894 (ADR-CX-061) — an argument belongs to a complex number; a real-parameter letter is not read
     if (isRealLetter(canonName(a), scope) || isRealLetter(canonName(b), scope)) return null;
     if (sign === '-') {
@@ -502,7 +547,7 @@ const argumentRelation: Rule = (s, scope) => {
   const one = s.match(rx(`^${ARG_KW}\\s*(${NAME})\\s*=\\s*(-?\\d+)$`));
   if (!one) return null;
   const subjects = readSubjects(scope, one[1]); // #1948 (ADR-CX-062)
-  if (!subjects) return null;
+  if (!gotNames(subjects)) return subjects; // #1974: the reserved-constant decline travels
   const [name] = subjects;
   if (isRealLetter(name, scope)) return null;
   return {
@@ -592,7 +637,8 @@ const argumentInequality: Rule = (s, scope) => {
   const both = s.match(rx(`^(-?\\d+)\\s*(${CMP})\\s*${ARG_KW}\\s*(${NAME})\\s*(${CMP})\\s*(-?\\d+)$`));
   if (both) {
     const [, lo, opLo, name, opHi, hi] = both;
-    if (!readSubjects(scope, name)) return null; // #1948 (ADR-CX-062)
+    const bounded = readSubjects(scope, name); // #1948 (ADR-CX-062)
+    if (!gotNames(bounded)) return bounded; // #1974: the reserved-constant decline travels
     if (isRealLetter(canonName(name), scope)) return null; // #1894 — an argument is a complex number's
     // the left comparator points INTO the window, so «90 < arg z» is a lower bound and «90 > arg z» an upper one
     const low = isBelow(opLo) ? Number(lo) : Number(hi);
@@ -609,7 +655,7 @@ const argumentInequality: Rule = (s, scope) => {
   if (!one) return null;
   const [, raw, op, deg] = one;
   const subjects = readSubjects(scope, raw); // #1948 (ADR-CX-062)
-  if (!subjects) return null;
+  if (!gotNames(subjects)) return subjects; // #1974: the reserved-constant decline travels
   const [name] = subjects;
   if (isRealLetter(name, scope)) return null;
   return {
@@ -768,7 +814,7 @@ const conjugatesClaim: Rule = (s, scope) => {
   const conj = m[4].match(rx(CONJUGATE_KW));
   if (!conj) return null;
   const pair = readSubjects(scope, m[2], m[3]); // #1948 (ADR-CX-062)
-  if (!pair) return null;
+  if (!gotNames(pair)) return pair; // #1974: the reserved-constant decline travels
   const [a, b] = pair;
   // #1894 (ADR-CX-061) — conjugates are complex numbers; a real-parameter letter is not read
   if (isRealLetter(a, scope) || isRealLetter(b, scope)) return null;
@@ -799,7 +845,7 @@ const typeClaim: Rule = (s, scope) => {
   const read = readProperty(s, s.length - m[4].length);
   if (!read) return null;
   const names = readSubjects(scope, m[2], m[3]); // #1948 (ADR-CX-062)
-  if (!names) return null;
+  if (!gotNames(names)) return names; // #1974: the reserved-constant decline travels
   /**
    * #1894 (ADR-CX-061) — the subject's TYPE decides what the line is. A real-parameter letter with
    * «ממשי» is the 02d F1 declaration of a real parameter: no point (`realTyped`, never `declares`), and
@@ -1357,9 +1403,19 @@ export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = 
 export function parseLineV2(raw: string, scope: ComplexScope = NO_SCOPE): ParseOutcome {
   const normalized = normalize(raw);
   if (!normalized) return { ok: false, reason: 'not-handled', normalized };
+  /**
+   * #1974 — the first reserved-constant decline, remembered rather than thrown away. It does NOT
+   * stop the rule list: a later rule that really reads the line still wins, so the set of lines
+   * this grammar accepts is untouched and only the REFUSAL's wording changes.
+   */
+  let constant: ReservedConstant | null = null;
   for (const { rule } of RULES) {
     const line = rule(normalized, scope);
     if (!line) continue;
+    if ('reserved' in line) {
+      constant ??= line.reserved;
+      continue;
+    }
     const unread = unaccountedSpans(normalized, line.claims);
     if (unread.length) {
       const items = unread.map((u) => u.span.text);
@@ -1370,5 +1426,7 @@ export function parseLineV2(raw: string, scope: ComplexScope = NO_SCOPE): ParseO
     }
     return { ok: true, line, normalized };
   }
-  return { ok: false, reason: 'not-handled', normalized };
+  return constant
+    ? { ok: false, reason: 'reserved-constant', normalized, constant }
+    : { ok: false, reason: 'not-handled', normalized };
 }

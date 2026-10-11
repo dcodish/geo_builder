@@ -144,8 +144,14 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   one-letter (optionally indexed) parameter that is not `i` or `o` — the same floor the declaration
   itself applies. Length is not the question: «A1 ממשי», «z12 ממשי» and «a12 ממשי» read, and so does
   «u2 ממשי» once the u family is declared, while a word that is not a name («foo ממשי» / «foo is
-  real»), a glued pair («AB ממשי») and the reserved constants («i ממשי», «o ממשי») are refused with the
-  same message instead of drawing a point named after the word.
+  real»), a glued pair («AB ממשי») and the reserved constants («i ממשי», «o ממשי») are refused
+  instead of drawing a point named after the word. **A RESERVED CONSTANT is refused by NAME**
+  ([ADR-CX-063](06d-decisions-complex.md#adr-cx-063), #1974): the tool knows what `i` and `o` are, so
+  «i ממשי» answers «i הוא מספר מדומה» and «o ממשי» answers «o מסמן את ראשית הצירים — אפשר לבחור שם
+  אחר», in every sentence that takes a subject («i ברביע הראשון», «arg i = 45», …) and never
+  «לא הצלחתי להבין את המשפט» — that message is reserved for a line the tool genuinely cannot read,
+  which is what a word that is no name («foo ממשי», and the indexed `i2`/`o3`, which mean nothing
+  here) still is.
   - Sources: [ADR-CX-047](06d-decisions-complex.md#adr-cx-047), #1405 (operator proposal)
 - **FR-CN-9 (Must)** — **A true given is never refused as a contradiction, and «could not decide» is
   never «wrong».** Typed numbers relate to each other exactly: «z1 = 2+3i · z2 = -2+3i · z1·z2 = -13» is

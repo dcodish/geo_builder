@@ -20,6 +20,7 @@ import { fromNumber, rat, type Rat } from '../value/rational';
 import { evaluate, exact, fromCartesian } from '../value/value';
 import { radicalLiteral, radicalOfModulus, radicalPartsOf } from '../value/cartesian';
 import { fromDegrees, isExactRational } from '../value/angle';
+import type { ReservedConstant } from '../model/naming';
 import { one as modOne, fromRational as modFromRational, pow as modPow } from '../value/modulus';
 
 /**
@@ -59,13 +60,41 @@ export const familyOf = (name: string): string | null => /^([a-z])\d*$/.exec(nam
 export const isComplexName = (name: string, scope: ComplexScope = NO_SCOPE): boolean =>
   /^[zw]\d*$/i.test(name) || isPointLabel(name) || (scope.size > 0 && scope.has(familyOf(name) ?? ''));
 
+/** The two names that ARE constants (`model/naming`): `i` the imaginary unit, `o` the origin. */
+const isReservedConstant = (name: string): name is ReservedConstant => name === 'i' || name === 'o';
+
 /**
- * May this (canonical) name be DECLARED complex? A z/w name or a point label already is, and declaring
- * it again changes nothing. Any other name must pass the parameter floor below (one letter, optionally
- * indexed) and must not be `i` (the imaginary unit) or `o` (the origin), which are constants.
+ * WHY a name may not be declared — the floor's verdict, with its reason (#1974, ADR-CX-063).
+ *
+ * The floor used to return one boolean for two very different refusals, and the caller could only
+ * plead incomprehension for both. `i` is a number this tool knows exactly; «i ממשי» is a sentence it
+ * understands perfectly and refuses on purpose, and «לא הצלחתי להבין את המשפט» is the message the
+ * charter (docs/10) forbids for something the tool CAN decide. The reason travels now.
  */
-export const isDeclarableName = (name: string): boolean =>
-  isComplexName(name) || (/^[a-z]\d*$/.test(name) && !/^[io]\d*$/.test(name));
+export type Declarability =
+  | { readonly ok: true }
+  /** not parameter-shaped at all («foo», «AB», `i2`) — the #1948 class, where "I did not understand" is honest */
+  | { readonly ok: false; readonly why: 'not-a-name' }
+  /** parameter-shaped, but the name IS a constant — the figure can say what it is */
+  | { readonly ok: false; readonly why: 'reserved-constant'; readonly constant: ReservedConstant };
+
+const DECLARABLE: Declarability = { ok: true };
+
+/**
+ * May this (canonical) name be DECLARED complex — and if not, WHY? A z/w name or a point label
+ * already is, and declaring it again changes nothing. Any other name must pass the parameter floor
+ * below (one letter, optionally indexed) and must not be `i` (the imaginary unit) or `o` (the
+ * origin), which are constants — and *that* refusal names the constant, because it is a refusal the
+ * figure can explain.
+ */
+export const declarabilityOf = (name: string): Declarability => {
+  if (isComplexName(name)) return DECLARABLE;
+  if (isReservedConstant(name)) return { ok: false, why: 'reserved-constant', constant: name };
+  return /^[a-z]\d*$/.test(name) && !/^[io]\d*$/.test(name) ? DECLARABLE : { ok: false, why: 'not-a-name' };
+};
+
+/** The floor as a yes/no, for every caller that only needs to know whether the name reads. */
+export const isDeclarableName = (name: string): boolean => declarabilityOf(name).ok;
 
 /**
  * Two glued point labels are a DISTANCE (#791, operator ruling): «AB» is |A−B|, never a product —

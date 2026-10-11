@@ -9,6 +9,21 @@
  */
 
 /**
+ * The names this tool holds as CONSTANTS: `i` is the imaginary unit and `o` is the origin
+ * ([ADR-CX-063](../../docs/06d-decisions-complex.md#adr-cx-063), #1974).
+ *
+ * Neither may be a sentence's subject — «i ממשי» is not a given, it is a claim about a number the
+ * tool already knows — and because the tool knows exactly what each one IS, that refusal names it
+ * rather than pleading incomprehension. The type lives here, below every layer, because the floor
+ * (`parser`), the refusal it becomes (`store`) and the sentence it is worded as (`app`) must all
+ * mean the same two names.
+ *
+ * Their indexed relatives (`i2`, `o3`) are NOT constants: they carry no meaning this tool knows and
+ * are merely outside the parameter register, like any other word it cannot read.
+ */
+export type ReservedConstant = 'i' | 'o';
+
+/**
  * What the n solutions of `X^n = …` are CALLED, when the equation enumerates
  * ([ADR-CX-005](../../docs/06d-decisions-complex.md#adr-cx-005) mode 1): **always `X₁..Xₙ`**, in
  * argument order from the principal solution.

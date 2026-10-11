@@ -26,6 +26,7 @@ import { temporal } from 'zundo';
 import type { LoadAudit } from '../../shell/save';
 import type { Cx } from '../value/value';
 import type { Why } from '../model/why';
+import type { ReservedConstant } from '../model/naming';
 import { ingestTypedText } from '../../shell/bidi';
 
 export type InputError =
@@ -76,7 +77,13 @@ export type InputError =
   /** v2 read part of the line and could not account for the rest — it names the student's own words */
   | { key: 'unaccounted'; detail: string }
   /** #1890 (W20) — the unread word is a negation: 2-D's sentence, naming the word */
-  | { key: 'negation'; detail: string; word: string };
+  | { key: 'negation'; detail: string; word: string }
+  /**
+   * #1974 (ADR-CX-063) — the sentence READS, and names a constant this tool knows: «i ממשי» is
+   * understood and refused because `i` is the imaginary unit. The refusal says what the constant is,
+   * never «לא הצלחתי להבין» — the message the charter forbids for something the tool can decide.
+   */
+  | { key: 'reserved-constant'; detail: string; constant: ReservedConstant };
 
 /** Save format (suffix `-complex.json`, the per-product convention): the SOURCE LINES in
  * order — loading replays them through the real parse path, so a saved session doubles as

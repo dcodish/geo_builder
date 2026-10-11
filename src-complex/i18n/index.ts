@@ -45,6 +45,11 @@ const he = {
   errWordRoot: 'כתבו את השורש עם הסמל √ — יש כפתור √ בלוח «סמלים». למשל "{{suggestion}}" במקום "{{detail}}".',
   // #1365 — «zi» glues a complex number to i: z·i, or a name? Asked, with the product spelled out
   errGluedI: 'לא ברור אם הכוונה לכפל — אם כן, כתבו את הכפל במפורש: "{{suggestion}}" במקום "{{detail}}".',
+  // #1974 (ADR-CX-063) — a RESERVED CONSTANT as the subject: the tool knows what the name is, so it
+  // says so instead of «לא הצלחתי להבין». The operator's two sentences (2026-10-10); their shapes
+  // differ on purpose — `i` IS a number, `o` MARKS a position and the student may pick another name.
+  errReservedI: '{{constant}} הוא מספר מדומה',
+  errReservedO: '{{constant}} מסמן את ראשית הצירים — אפשר לבחור שם אחר',
   // #1534 — r(cosθ + i·sinθ) with two different angles is not a cis of anything: both are named
   errTrigMismatch: 'בשורה "{{detail}}" הזווית של cos ({{cos}}) שונה מהזווית של sin ({{sin}}) — בצורה r(cosθ + i·sinθ) זו אותה זווית בשני המקומות.',
   errWrongApp: 'הקובץ שייך לכלי אחר ({{detail}}) — כאן נטענים קבצים של בונה המרוכבים בלבד',
@@ -278,6 +283,9 @@ const en: typeof he = {
   errRefused: 'Statement "{{detail}}" not added — {{reason}}',
   errWordRoot: 'Write the root with the √ symbol — there is a √ button under «Symbols». E.g. "{{suggestion}}" instead of "{{detail}}".',
   errGluedI: 'Is this a product? If so, write it explicitly: "{{suggestion}}" instead of "{{detail}}".',
+  // #1974 — the Hebrew sentences are the operator's; these are their English readings
+  errReservedI: '{{constant}} is an imaginary number',
+  errReservedO: '{{constant}} marks the origin — you may choose another name',
   errTrigMismatch: 'In "{{detail}}" the cos angle ({{cos}}) differs from the sin angle ({{sin}}) — in the form r(cosθ + i·sinθ) both angles are the same.',
   errWrongApp: 'This file belongs to another tool ({{detail}}) — only Complex Builder files load here',
   errNewerVersion: 'This file was saved by a newer version of the tool — refresh the page and try again',

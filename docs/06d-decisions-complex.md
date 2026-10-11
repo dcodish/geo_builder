@@ -3861,3 +3861,99 @@ no claim; the roots untouched after «z^6 = 1»; the glued pair and the reserved
 readable with an empty `declares`; the false-refusal net above; ADR-CX-061's cases unchanged; and two
 class guards — the catalog census with every z/w name swapped for «foo» (nothing declared), and every
 subject-reading sentence crossed with `foo` / `bar2` / `AB` / `i` / `o`.
+
+## ADR-CX-063 — A constant the tool knows is refused BY NAME, not with «לא הצלחתי להבין» (#1974)
+
+**Status:** accepted, 2026-10-11 · amends [ADR-CX-062](#adr-cx-062) (the refusal's wording, not its floor) ·
+**Issue:** [#1974](https://github.com/dcodish/geo_builder/issues/1974) (bug, P3, `complex`) · round #1992
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-8 (the declaration row: the reserved-constant refusal) ·
+**Design:** none (internal) ·
+**Ladder:** stage 0b ([LADDER-CX](LADDER-CX.md)) — the same stage ADR-CX-062 inserts at
+
+**The defect.** ADR-CX-062 made «i ממשי» honest — before it, the line drew a free point «i» at ≈2.24 and
+reported ✓ *"i is real"*, which is false. But it refused with the generic key, and measured at `06fc51dd`
+through the real `submitLine` the student read:
+
+> לא הצלחתי להבין את המשפט: "i ממשי"
+
+The tool understood the sentence perfectly. It refused because `i` is the imaginary unit — and docs/10
+forbids exactly this: «לא הצלחתי להבין» is the message the charter reserves for a line the tool *cannot*
+decide, never for one it can. The same measurement held for «i is real», «i מספר ממשי», «i מדומה טהור»,
+«i ברביע הראשון», «arg i = 45», «arg i < 45», «90 < arg i < 180», «arg i - arg o = 90», «i ו-o צמודים זה
+לזה», «i הוא הפתרון ברביע הרביעי» and every `o` spelling of the same.
+
+**Root cause — the reason was known at the point of refusal and thrown away.** `isDeclarableName`
+(`parser/exprParse.ts`) was `isComplexName(name) || (/^[a-z]\d*$/.test(name) && !/^[io]\d*$/.test(name))`:
+**one boolean for two different refusals.** Either the name is not parameter-shaped at all («foo», «AB»)
+— the #1948 class, where *"I did not understand"* is honest — or it is shaped like a parameter but **is a
+constant**, `i` or `o`. ADR-CX-062's `readSubjects` declines on either, so the second case inherited the
+first case's message.
+
+**The class.** Not «i ממשי». *A refusal whose reason the code knew and discarded.* So the fix is not a
+special case for `i` anywhere: the **floor** carries its reason, and every one of the seven
+subject-reading rules ADR-CX-062 lists gets the better message for free — «i ברביע הראשון» and
+«arg i = 45» are the same student mistake as «i ממשי» and now give the same answer.
+
+**Decision.**
+
+1. **The floor returns a reason, not a boolean.** `declarabilityOf(name)` yields
+   `{ ok: true }` · `{ ok: false, why: 'not-a-name' }` · `{ ok: false, why: 'reserved-constant', constant }`.
+   `isDeclarableName` stays, derived from it (`declarabilityOf(name).ok`), so every caller that only
+   needs the yes/no is untouched and the accepted-language set is **provably unchanged**.
+2. **A reserved constant is `i` or `o` exactly** — not their indexed relatives. `i2`, `o3` carry no
+   meaning this tool knows; they merely share a reserved letter, so they stay `not-a-name` and keep the
+   not-understood message. This is what keeps the new sentence TRUE: the tool never tells a student
+   that «i2 הוא מספר מדומה».
+3. **The decline travels out of the rule.** `readSubjects` returns `{ reserved }` instead of `null` when
+   a subject is a constant; `parseLineV2` remembers the first such decline and reports
+   `reason: 'reserved-constant'` only **after every rule has had its turn** — the marker never
+   short-circuits the rule list, so a line that any later rule reads today still reads.
+4. **The refusal is worded once**, at the submit path's `unreadRefusal` chokepoint (`InputError`
+   `reserved-constant`, carrying the constant), ahead of the two taught *suggestions* (`word-root`,
+   `glued-i`) because those answer a different question: they offer another SPELLING of the line, and
+   no spelling makes `i` a number the figure can hold.
+
+**The two sentences** (the operator's own, 2026-10-10 — the `i` half in chat, the `o` half chosen on the
+rendered decisions page):
+
+| name | message |
+|---|---|
+| `i` | i הוא מספר מדומה |
+| `o` | o מסמן את ראשית הצירים — אפשר לבחור שם אחר |
+
+Their shapes differ on purpose: `i` **is** a number, so the sentence says what it is; `o` is a
+**position**, so it says what it marks and tells the student they may pick another name. One error key
+(`reserved-constant`), one code path, and `{{constant}}` is interpolated from what the student wrote —
+the two locale values are selected by a single two-entry table in `app/errorText.ts`, which the floor's
+type makes exhaustive (there can be no third constant). English reads *"i is an imaginary number"* /
+*"o marks the origin — you may choose another name"*.
+
+**Unchanged.** Everything the figure does: no line is accepted that was refused before, and no line is
+refused that was accepted before — this ADR changes **wording only**. «foo ממשי» and the whole #1948
+class keep «לא הצלחתי להבין את המשפט»; so do `i2`/`o3`. The false-refusal net holds («z1 ממשי», «A1
+ממשי», «a12 ממשי», «arg z1 = 45», «u מספר מרוכב» · «u2 ממשי»). `i` as the **imaginary unit** is
+untouched — `z1 = 3+4i` reads as it always did; it is only `i` as a sentence's SUBJECT that is refused.
+`o` as the **origin** is untouched — `|z1-o| = 5` reads.
+
+**Deliberately out of scope.** `declaration` («i מספר מרוכב») is the floor's other caller and keeps the
+generic message: that sentence is not false — `i` *is* a complex number — so the ruled refusal does not
+fit it, and what it should say is the operator's to rule. Noted on #1974 rather than guessed at
+(CLAUDE.md rule 7).
+
+**Siblings.** The reserved constants are this product's register (ADR-CX-004); no sibling has a subject
+reader of this kind. Not plane geometry, so no docs/22 §10 row.
+
+**Cost.** None: the same predicate, returning a small object instead of a boolean, in the parser.
+
+**Consequences.** `parser/exprParse.ts`, `parser/rules.ts`, `app/submit.ts`, `app/errorText.ts`,
+`store/useComplexStore.ts` (the error arm) and `i18n/` (two values). The fold's own `why` for a line it
+cannot read keeps `line-unrecognized`: a refused line is never recorded, so that door is reachable only
+by a hand-edited share link. The proxy bundles `parseLineV2`, so it needs a redeploy at deploy.
+
+**Locks.** `src-complex/__tests__/reserved-constant-1974.test.ts` — the operator's exact line «i ממשי»
+reading «i הוא מספר מדומה» with no line kept, no point at three seeds, no parameter and no claim; both
+constants crossed with sixteen subject-reading spellings (all seven rules, both languages); both
+languages' sentences; the mixed sentence «arg i - arg o = 90»; the floor's three verdicts and the
+unchanged yes/no for every name; `i2`/`o3` staying in the #1948 class; the #1948 class and the
+false-refusal net unchanged; and `i` as the imaginary unit and `o` as the origin still reading.
+`phantom-word-1948.test.ts` carries the corrected record for the four constant lines it already held.
