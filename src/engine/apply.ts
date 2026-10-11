@@ -1239,6 +1239,41 @@ function quadEdges(objects: GeoObject[], a: Id, b: Id, c: Id, d: Id, declaredAs?
   addObj(objects, { kind: 'polygon', id: `poly-${a}${b}${c}${d}`, vertices: [a, b, c, d], ...(declaredAs ? { declaredAs } : {}) });
 }
 
+/**
+ * SEAT ONE VERTEX OF A RING AS ITS REFLEX CORNER (#1987, [ADR-622](docs/06-decisions.md#adr-622)).
+ *
+ * `ids[i]` is moved to the centroid of the ring's other vertices — the canonical point STRICTLY inside their
+ * hull — which makes the ring concave at `ids[i]` and, for four points, makes EVERY simple order of them
+ * simple at once (four points not in convex position have three simple rings, not one). That is the whole
+ * content of the choice: a ring whose convexity default yielded to a second declared ring (ADR-613) needs
+ * the point set to be non-convex, and WHICH vertex is the interior one is the unstated discrete DOF
+ * ([ADR-052](docs/06-decisions.md#adr-052)) the configuration search explores.
+ *
+ * It is a SEED, not a constraint: `applySeed` jitters it and `evaluate` re-solves every constraint from it,
+ * exactly as #441's dart seat does for a STATED concavity. Only a non-pinned free vertex may be moved — a
+ * derived or pinned one is not ours to seat — and the seat lives on the free-point OBJECT (a `pos` write is
+ * discarded: `applySeed`/`evaluate` re-derive positions from the objects).
+ */
+function seatReflexVertex(objects: GeoObject[], ids: readonly Id[], i: number, pos: Map<Id, Vec>): void {
+  const n = ids.length;
+  if (n < 4 || !Number.isInteger(i) || i < 0 || i >= n) return;
+  const j = objects.findIndex((o) => o.id === ids[i]);
+  const target = j >= 0 ? objects[j] : undefined;
+  if (!target || target.kind !== 'free-point' || target.pinned) return;
+  const others: Vec[] = [];
+  for (let k = 0; k < n; k++) {
+    if (k === i) continue;
+    const o = objects.find((x) => x.id === ids[k]);
+    const seat = o && o.kind === 'free-point' ? { x: o.x, y: o.y } : pos.get(ids[k]);
+    if (!seat) return; // a vertex with no seat yet — nothing to be concave about
+    others.push(seat);
+  }
+  const cx = others.reduce((s, p) => s + p.x, 0) / others.length;
+  const cy = others.reduce((s, p) => s + p.y, 0) / others.length;
+  if (!Number.isFinite(cx) || !Number.isFinite(cy)) return;
+  objects[j] = { ...target, x: cx, y: cy };
+}
+
 /** The 3 boundary segments + the polygon for a triangle a→b→c. */
 function triEdges(objects: GeoObject[], a: Id, b: Id, c: Id, declaredAs?: string): void {
   for (const [x, y] of [[a, b], [b, c], [c, a]] as const) addObj(objects, segment(x, y));
@@ -1372,6 +1407,12 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         pos,
       );
       quadEdges(objects, a, b, c, d, cmd.declaredAs ?? 'quadrilateral');
+      // #1987 (ADR-622): the REFLEX-VERTEX seat — the unstated discrete choice of a ring whose convexity
+      // default yields (ADR-613). Convexity is only the DEFAULT, and the default is a SEAT as much as a
+      // predicate: ADR-613 taught `polygonsConvex` to yield but left every vertex on the convex seat, so the
+      // dart was reachable only by seed luck (measured: 2 of 200 seeds). `reflex` names which vertex the
+      // configuration search seated inside, exactly as `rot` names a right triangle's seat.
+      if (cmd.reflex !== undefined) seatReflexVertex(objects, cmd.ids, cmd.reflex, pos);
       break;
     }
 

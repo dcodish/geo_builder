@@ -1253,6 +1253,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'crossed-ring-1991-03', family: 'polygons', steps: ['ריבוע ABCD', 'מלבן ACBD'], expect: 'refused' },
   { id: 'crossed-ring-1991-04', family: 'polygons', steps: ['מלבן ABCD', 'מקבילית ACBD'], expect: 'refused' },
   { id: 'crossed-ring-1991-05', family: 'polygons', steps: ['מקבילית ACBD'], expect: 'builds', note: 'nothing placed it yet: the ring is simply drawn — the control' },
+
+  // #1987 (ADR-622) / #1986: four FREE points read in a second order. 2-D draws the CONCAVE quadrilateral — which
+  // vertex is reflex is a configuration axis, not a fixed default — and analytic draws it too. 3-D records the row
+  // as well, but draws the second ring CROSSED: that is a DRAWING gap, not a verdict one, and it is #1986.
+  { id: 'crossed-ring-1927-11', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ABDC'], expect: 'builds', note: 'a concave quadrilateral saves both rings: search first, never refused (3-D still draws it crossed — #1986)' },
+  { id: 'crossed-ring-1927-12', family: 'polygons', steps: ['מרובע ABCD', 'מרובע ACBD'], expect: 'builds', note: 'the class, not the letters: any other order of the same four free points' },
   // end #1927
   // #1953 (ADR-618 / ADR-3D-324 / ADR-AG-259): a ring restated in another reading — rotated or reversed — is the same
   // polygon, so it is accepted and adds no row in every builder (2-D «זה כבר קיים באיור», analytic «כבר ידוע», 3-D the #613
