@@ -12420,3 +12420,40 @@ A crossing order has another ring key and is never a twin (#1927's refusal); a l
 - «ריבוע ABCD · מרובע ACBD» (and the rectangle, cube, parallelogram, rhombus, trapezoid and midpoint rows, and the ring first) is refused on the line that made the ring cross, with the ring message, instead of drawn crossed and green.
 - «ריבוע ABCD · מקבילית ACBD» says its claim does not hold, not "a square is already a parallelogram"; «ריבוע ABCD · ריבוע ACBD» is refused, not accepted as redundant.
 - The ring message ends «…או לשנות את מקומות הנקודות…».
+
+## ADR-3D-332 — A free shape dim is SLID to the seed's sample after the solve; it no longer parks at the edge of the admissible set (#1854)
+
+**Status:** accepted · 2026-10-11 · bug (P2) · branch `fix/1854-3d-free-third-side-sampled` off `main` @ 06fc51dd · fix round #1992 · implements the #1854 `/decisions` fix plan of 2026-10-07 (with one deviation, recorded below) · amends [ADR-3D-310](#adr-3d-310): its open-figure retry stays a failure-path fallback, and is no longer what rescues this figure · the 3-D form of [ADR-052](06-decisions.md#adr-052)
+
+**Requirements:** [docs/02b](02b-requirements-3d.md) FR-SP-2 — none new; this is the promise already made ("an unstated dimension stays a free degree of freedom that resamples on «another configuration»") finally kept on the gauge-solving path · **Design:** [docs/04b](04b-design-3d.md) § "A never-positioned point is a pivot unknown", new paragraph *A free shape dim is slid to the seed's sample* · **LADDER stage:** solve (`solvePivot`, post-acceptance; no new family, no new lane)
+
+**Measured before** (`06fc51dd`, «משולש ABC · AC = 8 · BC = 3», no LLM — any AB in (5, 11) satisfies both lengths):
+
+| path | what came back |
+|---|---|
+| `derive3(facts, seed)`, seeds 0–23 | **AB = 5.0000 at 18 of 24 seeds** — the degenerate \|AC − BC\| — and 5.0003–5.0859 at the other six. ∠C = 0.07°–1.6°, except 10.9° at seed 3 |
+| `decideSubmit3`, seeds 0–23 | `seedForRequirements` sees the collapsed face and walks forward: it committed **seed 3** from seeds 0–3 and **seed 194** from seeds 4–23 (190 seeds walked, ~340 ms). So every seed drew ONE figure — AB = 5.05–5.09, ∠C ≈ 8.7°–10.9° — and «הציגו תצורה אחרת» stepped on from 194, never reaching an ordinary triangle |
+| 2-D, `replay` through the real submit gate, seeds 0–23 | AB = 5.3484–7.1848, ∠C = 22.4°–63.6°, **24 distinct values**: the third side is sampled |
+
+**Root cause / class.** *A shape dim the givens leave FREE had no anchor at all on the ordinary gauge-solving path, so LM parked it wherever its null-space walk ended — and that end is reliably the EDGE of the admissible set, not a point near the seed's sample.* The dims pull toward `dims0` rode only `planeDrive` (ADR-3D-030's degenerate-attractor guard) and the `invariantOnly` lane (its own REG pull); the general `anchored` predicate (`planeDrive || nPinSym > 0 || nRider > 0`) never covers a plain figure. A triangle is a `polygon3` whose dims are `[x2, y2]` with AB the similarity gauge, so AC/BC = 8/3 confines `(x2, y2)` to an Apollonius circle and AB = 8/|v₂| ranges over (5, 11) along it; LM converged to that circle's y = 0 point — AB = 5 — from every seed's start. This is ADR-052 inverted: an unstated magnitude parked at an extreme and **identical at every seed**, which is exactly the convention's named smell (a value the DOF count calls free that nothing samples). ADR-3D-310's open-figure retry then hid it: it hopped seeds until a face was not collapsed, which buys an *open* figure, never a *sampled* one.
+
+**Decision.** `settleFreeDims` (`solve3.ts`, beside `parkScale`): an accepted solution is SLID along its own null space toward the seed's sampled dims, then RELEASED on the givens' rows alone — pull with `REG_DIM = 1e-2`, re-solve on `fPrimary` from where that lands, and keep the result only when it is exact (`primaryErr < ACCEPT`), not degenerate, and genuinely nearer `dims0` than the start. Three consequences are structural, not conventions: a **determined** dim cannot move and stay exact, so it is unreachable; the anchor **never decides whether the givens hold**, because the unslid solution is the fallback (the ADR-3D-260 / #518 / #797 pin-then-release pattern, a fourth user of it); and the base solve is **untouched** — machine-exact, every basin and every cold start as before.
+
+Two scopes are deliberate. It does not run when `planeDrive` already anchors the dims inline (that figure is bit-identical), and it does not run on the **pooled** path (`collectAll`: a sign given, an open pin symbol, a rider), where the solve is enumerating DISCRETE branches and sliding each one moves a branch inside the pool that the sign/root filters then read — measured: «פירמידה ABCDS שבסיסה ריבוע · AS גובה · נתון: A(0,0,0), B(0,12,0) · S נמצא על החלק החיובי של ציר ה-z» lost its +z solution to `sign-unsatisfiable`. A free dim in a pooled figure is the same class and is still unsampled; it belongs with #1859, the next item on this chokepoint, not to a slide that breaks a figure that builds.
+
+**Deviation from the fix plan, with the measurement.** The plan named the mechanism *"anchor the free dims to the seed's sample on the main path … (the REG pull toward `dims0`)"*, i.e. REG rows inside `fFor`. Built and measured: it is the #518 (ADR-3D-133) trap this file already records twice. The 1e-4 pull's gradient sits below LM's improvement floor, so the free dim **crawled instead of travelling** — AB reached only 5.0200–5.0560, ∠C ≈ 5.2°–8.8°, still a sliver, so the defect was not fixed — while the stalled iterations cost **2.9 s per figure against 11 ms**, a 260× regression on a P2. Raising the weight inline would have to buy the travel with acceptance tolerance, which is what ADR-3D-260 forbids. The post-hoc slide is the same anchor, staged the way this file already stages its other seed-sample parks, and it delivers the plan's stated outcome.
+
+**Measured after** (same door, same seeds):
+
+| path | what comes back |
+|---|---|
+| `derive3`, seeds 0–23 | AB = 5.6905–6.4111, ∠C = 32.2°–48.4°, **24 distinct values**; AC = 8 and BC = 3 exact to 1e-6 |
+| `decideSubmit3`, seeds 0–23 | **the committed seed is the student's own at all 24** (no seed walk is needed any more), 46–58 ms per three-line sequence — against 11–20 ms at seeds 0–3 and 296–358 ms at seeds 4–23 before |
+| «הציגו תצורה אחרת» ×12 | 11 different triangles |
+| controls | «AB = 7» after the two lengths still pins AB = 7 exactly at seeds 0/5/13/23; #1849's 5·3·8 is still refused on its last line at all 24 seeds, and 5·3·7.99 still builds open |
+
+**Locks.** `src3d/__tests__/issue-1854-free-side-sampled.test.ts` — the operator's exact sequence through `derive3` and through `decideSubmit3` at 24 seeds, asserting what a fixed default would fail: no configuration within 0.01 of either edge (5 or 11), AB inside the open interval, **≥ 12 distinct values to 2 dp**, the thinnest configuration above AB = 5.3, the committed seed equal to the student's, the stated magnitudes exact, «הציגו תצורה אחרת» giving ≥ 10 different triangles over 12 presses, the determining-given override, and #1849's refusal intact. Fixtures-first: not applicable — the essence is *"the free side VARIES"*, which needs the bespoke assertion (a fixture pins one seed and would pass with the sliver).
+
+**Sibling audit.** 2-D samples the side already (measured above, 24 distinct values) — it is the specification here, not a change. Analytic and complex: n/a (no shape-dims pivot; a plane figure there is placed in coordinates).
+
+**Behaviour change for a student:** «משולש ABC · AC = 8 · BC = 3» draws an ordinary triangle (∠C ≈ 32°–48°) whose third side changes with the seed and with «הציגו תצורה אחרת», instead of the same near-flat sliver (∠C ≈ 9°) at every seed. Nothing else changes: a figure with a plane drive, a sign given, a pin symbol or a rider is untouched, and every stated magnitude still holds exactly.

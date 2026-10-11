@@ -1857,6 +1857,56 @@ export function solvePivot(
       if (degenerate(r.x)) return null;
       return primaryErr(r.x) < ACCEPT ? r.x : null;
     };
+    /**
+     * #1854 (ADR-3D-332) — SETTLE THE FREE SHAPE DIMS AT THE SEED'S SAMPLE, POST-HOC.
+     *
+     * The dims anchor rode only a plane drive (ADR-3D-030's degenerate-attractor guard) and the
+     * `invariantOnly` lane (its own REG pull). On the ordinary gauge-solving path a dim the givens leave
+     * FREE had no anchor at all, so LM parked it wherever its null-space walk ended — and that is reliably
+     * the EDGE of the admissible set, not a point near the seed's sample: «משולש ABC · AC = 8 · BC = 3»
+     * (a `polygon3`, dims `[x2, y2]`, with AB the similarity gauge) came back AB = 5.000 — the degenerate
+     * |AC − BC| — at 18 of 24 seeds, 5.001–5.086 at the rest. The same thin sliver at every seed: ADR-052
+     * inverted, an unstated magnitude parked at an extreme that «הציגו תצורה אחרת» could never move.
+     * 2-D (measured at this tip, seeds 0–23) draws AB = 5.35–7.18, 24 distinct values. That is the
+     * specification (CLAUDE.md rule 7, `[2-D]`), and the honest reading of "the seed samples the free
+     * magnitude" is: of the solutions the givens admit, show the one NEAREST the seed's sampled dims.
+     *
+     * Why post-hoc and not REG rows in `fFor` (the mechanism #1854's plan named): measured both. Adding
+     * the 1e-4 pull to the main residuals is exactly the #518 (ADR-3D-133) trap recorded above — the pull's
+     * gradient is below LM's improvement floor, so the free dim crawls instead of travelling (AB reached
+     * only 5.02–5.06, ∠C ≈ 6°, still a sliver) while the stalled iterations cost **2.9 s per figure against
+     * 11 ms** (a 260× perf regression on a P2 cosmetic defect). So the base solve stays EXACTLY as it was —
+     * machine-exact, every basin untouched, the fast path unchanged — and an accepted solution is then
+     * SLID along its own null space toward the sample: pull with a weight LM can feel (1e-2), then RELEASE
+     * on the primary residuals alone (the parkScale / #797 / #1311 pin-then-release pattern).
+     *
+     * The slide is kept only when the release is EXACT on the givens' rows and the solid is not degenerate,
+     * so the anchor can never decide whether the givens hold, and a DETERMINED dim is structurally
+     * unreachable (it cannot move and stay exact). The `dimOffset` comparison is the last guard: a slide
+     * that did not end nearer the seed's sample than it started is not a sample, and is discarded.
+     *
+     * Not run when `planeDrive` already anchors the dims inline, so every plane-drive figure is bit-identical.
+     *
+     * NOR on the POOLED path (`collectAll`: a sign given, an open pin symbol, a rider). There the solve is
+     * enumerating DISCRETE branches, and sliding each one along its free dims moves a branch inside the pool
+     * the sign/root filters downstream then read: measured, «פירמידה ABCDS שבסיסה ריבוע · AS גובה ·
+     * נתון: A(0,0,0), B(0,12,0) · S נמצא על החלק החיובי של ציר ה-z» lost its +z solution to
+     * `sign-unsatisfiable`. A free dim in a pooled figure is the same class and is still unsampled — it
+     * belongs with #1859, the next item on this chokepoint, not to a slide that breaks a figure that builds.
+     */
+    const REG_DIM = 1e-2;
+    const dimOffset = (x: number[]): number =>
+      x.slice(7, 7 + nDims).reduce((s, v, i) => s + (v - dims0[i]) * (v - dims0[i]), 0);
+    const settleFreeDims = (x: number[]): number[] => {
+      if (nDims === 0 || planeDrive || collectAll) return x;
+      const off0 = dimOffset(x);
+      if (off0 < 1e-18) return x; // the dims never left the sample: nothing drifted
+      const fPull = (y: number[]) => [...fPrimary(y), ...y.slice(7, 7 + nDims).map((v, i) => REG_DIM * (v - dims0[i]))];
+      const pulled = leastSquares(fPull, x);
+      const rel = leastSquares(fPrimary, pulled.x);
+      if (degenerate(rel.x) || primaryErr(rel.x) >= ACCEPT) return x; // the slide left the admissible set
+      return dimOffset(rel.x) < off0 ? rel.x : x;
+    };
     let best: { x: number[]; err: number } | null = null;
     const seen = new Set<string>();
     /** #1735: exact candidates of this mirror discarded ONLY because a rider left its host. */
@@ -1894,7 +1944,7 @@ export function solvePivot(
       const rAccept = anchored ? primaryErr(cand.x) : cand.err;
       if (!collectAll || rAccept >= ACCEPT) return;
       const parked = parkScale(cand.x); // #518: an undriven scale parks at the seed target, exactly
-      const cx = parked ?? cand.x;
+      const cx = parked ?? cand.x; // #1854: the free-dim settle does NOT ride the pooled path — see `settleFreeDims`
       const g = { ...unpack(cx), mirror };
       // dedupe by the transform's ACTION (probe frame), not its parameters (axis-angle wraps).
       // Am. 3: two pin-symbol ROOTS can share one gauge (t = 4 vs −1.6 moves only B) — the
@@ -2079,8 +2129,8 @@ export function solvePivot(
     // Jacobian floor rises with mixed scalar residuals; 1e-16 was V4-era point-pins-only)
     const bestAccept = best ? (anchored ? primaryErr(best.x) : best.err) : Infinity;
     if (!collectAll && best && bestAccept < ACCEPT) {
-      // #518: an undriven scale parks at the seed target, exactly
-      const bx = parkScale(best.x) ?? best.x;
+      // #518: an undriven scale parks at the seed target, exactly; #1854: and a free dim at the seed's dims
+      const bx = settleFreeDims(parkScale(best.x) ?? best.x);
       const g = { ...unpack(bx), mirror };
       const dims = bx.slice(7, 7 + nDims);
       const symbols = coupled ? bx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
