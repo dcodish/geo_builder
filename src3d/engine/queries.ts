@@ -22,6 +22,7 @@ import { revolutionMeasure } from './claims';
 import { angleAskOperands, componentAskOf, foldPrimes3, revolutionAskOf } from '../parser/parse3';
 import { readOperand } from '../parser/operandToken';
 import { figureSymbolsOf } from './types';
+import { foldGlyphs } from '../../shell/glyphFold';
 import type { Construction3, Id, Operand3, Positions3, Requirement3 } from './types';
 
 /** An operand: a declared vector name, or an ordered point pair. */
@@ -169,7 +170,10 @@ function atomVec(c: Construction3, a: Atom, pos: Positions3): Vec3 | null {
 
 /** Parse a query string into a typed request (no coordinates yet), or null if unrecognised. */
 export function parseQuery(c: Construction3, raw: string): Query | null {
-  const s = foldPrimes3(raw).replace(/\s+/g, ' ').trim(); // #1545: the parser's own prime fold
+  // #1545: the parser's own prime fold. #1912 (ADR-3D-329): and its own LOOK-ALIKE GLYPH fold — the ask
+  // lane is a reader of the same vocabulary, so «∡SAB» and «<SAB» must be answered as «∠SAB» is (2-D's
+  // `parseValueQuery` gets this for free by running the whole of `normalizeUtterance`).
+  const s = foldGlyphs(foldPrimes3(raw)).replace(/\s+/g, ' ').trim();
   if (!s) return null;
 
   // #319 — LINE↔PLANE angle: «הזווית בין SB למישור ABC» / «angle between SB and plane ABC»

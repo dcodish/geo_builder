@@ -25,6 +25,7 @@ import { restoreStatedSequences as restoreStatedSequencesShared } from '../../sh
 import { roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
+import { foldGlyphs } from '../../shell/glyphFold';
 import { findProofTarget } from '../../shell/proofTarget';
 import { foreignGiven } from './scope';
 import { NOTATION_WORDS, UNIT_WORDS, unaccountedLabels } from './labelAccounting';
@@ -11956,7 +11957,7 @@ export function normalizeUtterance(raw: string): string {
   // to the canonical circle word HERE — at the one boundary every rule reads — means the whole circle
   // vocabulary (creation, sizing, chord, tangent, inscribe…) accepts it without touching each rule.
   // #751 (ADR-W-029): the control set is the SHARED one (shell/bidi) — it had three copies.
-  const orth = stripFormatControls(raw)
+  const spelling = stripFormatControls(raw)
     .replace(/־/g, '-')
     // #531 (ADR-3D-144's 2-D half): NBSP → space — the isolates above were already stripped here
     // (the 3-D seam was the gap), but an NBSP from the same paste paths still broke literal-space
@@ -11979,30 +11980,19 @@ export function normalizeUtterance(raw: string): string {
     // deterministically; unobserved variants (זויית, זות…) are NOT enumerated — they hit the
     // fail-closed leftover gate and escalate to the LLM, which reads typos. Guarded like the שוה fold
     // so it never fires inside another word.
-    .replace(/(?<![א-ת])זוות(?![א-ת])/g, 'זווית')
-    // Angle/degree GLYPH variants (#45 / ADR-299): the ∡ MEASURED-ANGLE (U+2221) and ∢ SPHERICAL-ANGLE
-    // (U+2222) glyphs are the same student intent as ∠ (U+2220); the SUPERSCRIPT ZERO ⁰ (U+2070), typed for
-    // degrees ("90⁰"), is the ° sign. Normalising here means every angle rule reads the canonical glyphs.
-    .replace(/[∡∢]/g, '∠')
-    // Keyboard-natural PREFIX `<` ≡ ∠ (issue #237, ADR-381): students approximate the book's angle glyph
-    // with `<` («<ACB = 40», «<ACB=<BED») because ∠ isn't on a keyboard. Disambiguated from the INFIX
-    // less-than by both sides: it must be FOLLOWED by an uppercase label run (1–3 labels, not part of a
-    // longer letter run) and NOT PRECEDED (ignoring whitespace) by an operand — a label/measure letter,
-    // digit, or closing bracket. So `AB < CD` (lengthOrder, ADR-158), `α<β` (measureOrder), `R<r`
-    // (radius order, #54) and `k < 0` stay comparisons, locked in angle-bracket.test.ts.
-    .replace(/</g, (m, off: number, str: string) => {
-      if (!/^\s*(?:[A-Z]\d*){1,3}(?![A-Za-z])/.test(str.slice(off + 1))) return m;
-      const before = str.slice(0, off).replace(/\s+$/, '');
-      return /[A-Za-z0-9α-ωΑ-Ω)\]}|]$/.test(before) ? m : '∠';
-    })
-    .replace(/⁰/g, '°')
+    .replace(/(?<![א-ת])זוות(?![א-ת])/g, 'זווית');
+  // LOOK-ALIKE GLYPHS → the symbol they render as — the SHARED table every builder's parser boundary
+  // calls (#1912, [ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329); `shell/glyphFold`). It holds
+  // what used to be spelled HERE inline: the ∡/∢ angle twins and the ⁰ degree sign (#45 / ADR-299), the
+  // guarded keyboard `<` ≡ ∠ (#237, ADR-381) and «שורש N» ≡ √ (#105) — in the same order, so 2-D's
+  // reading is unchanged — and adds the two rows 2-D never folded: ⟂ ≡ ⊥ (read per-rule here, folded
+  // nowhere) and º/˚ ≡ ° after a digit. 3-D folded NONE of them, which is the class the table closes.
+  const orth = foldGlyphs(spelling)
     // Uppercase CYRILLIC homoglyphs → Latin (#45): a label pasted with a Cyrillic look-alike (А/В/С/… are
     // NOT [A-Za-z]) silently fails every label rule. Map the visual twins to their Latin letter at the one
-    // boundary every rule reads, so "מעגל עם קוטר АВ" reads AB.
+    // boundary every rule reads, so "מעגל עם קוטר АВ" reads AB. NOT in the shared glyph table: whether a
+    // non-Latin letter folds to its twin or the line is refused by name is #1919's question.
     .replace(/[АВСЕНКМОРТХ]/g, (ch) => CYRILLIC_TO_LATIN[ch])
-    // The Hebrew word "שורש N" (square root) ≡ the √ glyph (issue #105) — normalise it HERE so every
-    // length/ratio/radius value path inherits it. Only before a number or "(" (so "שורש של" etc. is untouched).
-    .replace(/שורש\s*(?=[\d(])/g, '√')
     // «ן-» → «ו-» (#506): the final-nun key sits beside vav, and the slip recurs across the 2026-08-10
     // triage INSIDE otherwise-real constructions — «O - חיתוך של AC ן- DB», «הנקודות F ו- G הן אמצעי
     // הקטעים BC ן- DO». Each occurrence turns a mostly-parseable compound into a partial parse the

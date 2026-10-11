@@ -20,6 +20,7 @@
 import { readOperand, readRelationSides } from './operandToken';
 import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
+import { foldGlyphs } from '../../shell/glyphFold';
 import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
@@ -163,7 +164,12 @@ export function normalize3(s: string): string {
     // #1545 (ADR-3D-300): every prime glyph → `'` through the ONE fold (lexicon/marks3), which the ask
     // lane and the LLM sequence gate also call — it used to be spelled here and twice more, narrower.
     // #1691 (ADR-AG-239): «AB ו- CD», «ו -CD», «ו - CD» are «ו-CD» — the shared fold every builder's boundary calls.
-    foldConjunctionSpacing(foldPrimes3(stripFormatControls(s)))
+    // #1912 ([ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329)): a LOOK-ALIKE GLYPH is the symbol it
+    // renders as — ⟂ ≡ ⊥, ∡/∢ ≡ ∠, the guarded `<` ≡ ∠, ⁰/º/˚ ≡ °, «שורש N» ≡ √. 3-D folded none of them,
+    // so «AC ⟂ AB» was "not understood" while «AC ⊥ AB» built; the table is the shared `shell/glyphFold`,
+    // which 2-D's boundary calls too. It runs BEFORE `upliftLowercaseLabels` (whose anchor set reads
+    // `[∠∡∢]`) and before every rule, and the stored fact row keeps the glyph the student typed.
+    foldConjunctionSpacing(foldGlyphs(foldPrimes3(stripFormatControls(s))))
       // #531 ([ADR-3D-144](../../docs/06b-decisions-3d.md)): INVISIBLE bidi/format controls are not
       // something the student typed — the APP injects them (`isolateLtrRuns3` isolates LTR runs for
       // display, ADR-3D-116/121), and the rendered fact list is text the student SELECTS AND COPIES

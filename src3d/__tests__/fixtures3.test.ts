@@ -318,6 +318,13 @@ const SEEDED: SeededCorpus = {
   // two are the build + drift net, with the stated length the degenerate figure could not carry.
   'triangle-perp-to-base-1944.geo3.json': ['משולש ABC', 'מ-A מורידים אנך לבסיס', 'אורך AE = 3'],
   'trapezoid-perp-to-base-1944.geo3.json': ['טרפז ABCD', 'מ-A מורידים אנך לבסיס', 'אורך AE = 3'],
+
+  // #1912 (ADR-3D-329) — the reported sequence: the perpendicular written with ⟂ (U+27C2) instead of ⊥
+  // (U+22A5). Before: «לא הצלחתי להבין את הנתון» on the second line while the ⊥ twin built. The essence is
+  // "this figure now builds green and verifies", so a fixture is the lock — and it nets the drift of the
+  // whole glyph table, since the stored utterance must keep lowering to the same commands. The other
+  // twins (∡/∢/`<`/⁰/º/˚/«שורש») and the ask lane are asserted in issue-1912-glyph-fold.test.ts.
+  'perp-glyph-u27c2-1912.geo3.json': ['משולש ABC', 'AC ⟂ AB', '∡ABC = 40°', 'אורך AB הוא שורש 2'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

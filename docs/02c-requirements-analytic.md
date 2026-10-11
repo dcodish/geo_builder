@@ -94,6 +94,12 @@ expected by heart. No hyperbola appears in twenty sampled exams.
 - «נתון מעגל I שמשוואתו (x−3)²+(y−4)²=9, ומרכזו בנקודה K» → that sentence is the input
 - Sources: ADR-AG-005.
 
+**Look-alike glyphs are the symbol they render as** ([FR-SU-17](02w-requirements-workspace.md),
+[ADR-3D-329](06b-decisions-3d.md#adr-3d-329), #1912). Which Unicode glyph a student gets is decided by their
+keyboard, the palette or the PDF they pasted from: «AC ⟂ AB» reads as «AC ⊥ AB», «∡ABC»/«∢ABC» as «∠ABC», a
+keyboard `<` before a run of letters as «∠», «40⁰»/«40º»/«40˚» as 40°, and «שורש 2» as √2. A comparison
+(«AB < CD», «0<k<6» of F11) is never turned into an angle, and the recorded line keeps what was typed.
+
 **The catalog is the coverage map.** [`src-analytic/parser/catalogAnalytic.ts`](../src-analytic/parser/catalogAnalytic.ts)
 is the in-app guide, the coverage map (a guard re-parses and builds every entry in both languages) and the only
 vocabulary the LLM fallback may emit. The families say what the language is built from; a phrasing parses when the
