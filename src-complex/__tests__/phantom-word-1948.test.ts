@@ -11,7 +11,9 @@
  *
  * The fix is ONE subject reader (`readSubjects`), so length stopped mattering and the one-letter and
  * multi-letter forms cannot drift apart again. Refusal reuses #1894's existing key, `not-handled` —
- * one message for one class.
+ * one message for one class. (#1974, ADR-CX-063 then split the reasons apart: a WORD stays
+ * `not-handled`, while the reserved constants `i` and `o` are named — see
+ * `reserved-constant-1974.test.ts`. The figures below are unchanged either way.)
  *
  * Everything runs through the real `submitLine` + `deriveLines`.
  */
@@ -83,7 +85,10 @@ describe('#1948 — a multi-letter subject never becomes a point', () => {
     'the reserved constants fell through the same hole: «%s» draws no point and claims nothing',
     (line) => {
       expect(play(line)).toBe(false);
-      expect(store().lastError?.key).toBe('not-handled');
+      // #1974 (ADR-CX-063): still refused, and now with the reason NAMED — the tool knows what `i`
+      // and `o` are, so it says so («i הוא מספר מדומה») instead of pleading incomprehension. The
+      // figure is unchanged, which is what this test is about.
+      expect(store().lastError?.key).toBe('reserved-constant');
       expect(pointNames()).toEqual([]);
       expect(derived().claims).toEqual([]);
     },

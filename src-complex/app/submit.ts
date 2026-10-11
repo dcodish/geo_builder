@@ -172,6 +172,10 @@ function unreadRefusal(parsed: Extract<ReturnType<typeof parseLineV2>, { ok: fal
       ? { key: 'negation', detail: parsed.items.join(', '), word: parsed.negation }
       : { key: 'unaccounted', detail: parsed.items.join(', ') };
   }
+  // #1974 (ADR-CX-063) — the line READS and names a constant the tool knows (`i`, `o`): it says what
+  // the constant is. Before the two taught suggestions, which answer a different question — those
+  // offer a different SPELLING of the same line, and no spelling makes `i` a number the figure holds.
+  if (parsed.reason === 'reserved-constant') return { key: 'reserved-constant', detail: line, constant: parsed.constant };
   const suggestion = wordRootSuggestion(line, lines);
   if (suggestion) return { key: 'word-root', detail: line, suggestion };
   const product = gluedISuggestion(line, lines);
