@@ -42,6 +42,7 @@ import { dryRunOutcome, nameByUseCommands, primeFoldFor, replay, trialFacts, use
 import { geoWork, isCancelled } from '@/store/geoWork';
 import { unaccountedSpans } from '@/parser/spanAccounting';
 import { type DecideLog, type DecideNote, type Verdict2D, decideFromParse, decidePreParse } from './decideDeterministic';
+import { unreadItems } from './honestyGates';
 import { logDebug } from '@/debug/sessionLog';
 import { otherUtteranceForError } from './errorSubject';
 
@@ -326,8 +327,13 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   // return the identical partial lowering ("A ו C נמצאות על המעגל" committed as A alone — the
   // operator's saved-figure C floating off its circle). Name the lost label and keep the text to edit.
   const llmFig = replay(curFacts).construction;
-  const stillDropped: (string | number)[] = [
-    ...droppedNewLabels(
+  // #1898 (ADR-627): the gates OVERLAP by design and the accountant reports one span per OCCURRENCE, so
+  // the concatenation named a lost label once per gate and once per occurrence («D, D»). The list is
+  // assembled through the battery's one merge (`unreadItems`) — the same merge `honestyGateReport.items`
+  // uses, so a gate added to either seam is de-duplicated the day it is written. The superset of gates
+  // and the order of distinct items are unchanged; only repeats go.
+  const stillDropped: string[] = unreadItems(
+    droppedNewLabels(
       utterance,
       llmCmds,
       llmFig.objects.filter(isGeoPoint).map((o) => o.id),
@@ -335,49 +341,49 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     ),
     // the numeric honesty gate holds on the second attempt too (ADR-250): a decomposition that loses a
     // stated magnitude must name it, never commit the partial figure
-    ...droppedGivenNumbers(utterance, llmCmds),
+    droppedGivenNumbers(utterance, llmCmds),
     // and the RELATION gate (ADR-264): a decomposition that loses a stated `AB=CD`/`⊥`/`∥` between
     // existing points must name it — its labels all appear on the shape, so the older gates never fire
-    ...droppedGivenRelations(utterance, llmCmds),
+    droppedGivenRelations(utterance, llmCmds),
     // and the VERB gate (ADR-292, the #82 P1): a decomposition that loses a stated tangency/
     // bisection/… verb must name it — never a silent drop on the second attempt either
-    ...droppedGivenVerbs(utterance, llmCmds),
+    droppedGivenVerbs(utterance, llmCmds),
     // and the WORD gate (ADR-360, #210): a decomposition that loses a word-stated circle relation
     // (זרים/מוכל) must name it — the exact prod class where two unrelated circles committed green
-    ...droppedWordRelations(utterance, llmCmds),
+    droppedWordRelations(utterance, llmCmds),
     // and the STRUCTURAL gate (#153/#145): the LLM must not re-introduce a truncated lowering of a
     // compound measure relation — the whole term list lands in one structured constraint, or refuse
-    ...droppedCompoundRelation(utterance, llmCmds),
+    droppedCompoundRelation(utterance, llmCmds),
     // and the COMPARISON gate (ADR-390, #277): a decomposition that turns a stated bound into the
     // equality at the bound must refuse — the same silent misparse, arriving by the LLM seam
-    ...(droppedComparison(utterance, llmCmds) ? ['<>'] : []),
+    droppedComparison(utterance, llmCmds) ? ['<>'] : [],
     // and the MEASURE-SYMBOL gate (issue #53): a decomposition that loses a stated radius symbol
     // ("שרדיוסו r") must name it — a lowercase measure letter trips none of the older gates
-    ...droppedRadiusSymbol(utterance, llmCmds),
+    droppedRadiusSymbol(utterance, llmCmds),
     // and the REGION-SUBJECT gate (ADR-303; wired here by #266/ADR-387): a decomposition of a
     // region-clause utterance («M בתוך המשולש ABC») that references the subject label nowhere
     // dropped the student's statement about it — the grammar path already held this line
-    ...(droppedRegionSubject(utterance, llmCmds) ? ['בתוך/מחוץ'] : []),
+    droppedRegionSubject(utterance, llmCmds) ? ['בתוך/מחוץ'] : [],
     // and the MIDSEGMENT gate (#405/ADR-411): a decomposition of a midsegment-flavoured utterance
     // that carries no midpoint semantics dropped the given — the grammar chokepoint holds this line,
     // so the LLM seam must too (the ADR-240 pattern: the second attempt never commits the same drop)
-    ...(droppedMidsegment(utterance, llmCmds) ? ['קטע אמצעים'] : []),
+    droppedMidsegment(utterance, llmCmds) ? ['קטע אמצעים'] : [],
     // and the OBJECT gate (ADR-430, #456): a decomposition that states a shape and a construct on it but
     // emits only the bare shape must name what it lost. Bound to the commit EVENT on both paths, not to a
     // code path — the reported 3-D twins were GRAMMAR drops, where the LLM-seam gates never run at all.
-    ...droppedConstructNoun(utterance, llmCmds),
+    droppedConstructNoun(utterance, llmCmds),
     // and SPAN ACCOUNTING (ADR-453): the enforcing verdict the grammar path takes must hold on the
     // second attempt too — the two seams ask the identical question, or the LLM path becomes the
     // weaker one by drift (the ADR-240 pattern this whole battery exists to keep).
     // #1795 (ADR-597): an existing label is context only when the decomposition refers to it — the figure's
     // circles and polygons say what a reference reaches, exactly as on the grammar seam.
-    ...unaccountedSpans(utterance, llmCmds, {
+    unaccountedSpans(utterance, llmCmds, {
       existingPoints: llmFig.objects.filter(isGeoPoint).map((o) => o.id),
       radiusSymbols: llmFig.objects.flatMap((o) => (o.kind === 'circle' && o.radiusSymbol ? [o.radiusSymbol] : [])),
       circleMembers: circleMembers(llmFig),
       polygons: llmFig.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])),
     }).map((x) => x.text),
-  ];
+  );
   if (stillDropped.length > 0) {
     logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `dropped-labels:${stillDropped.join(',')}`, commands: llmCmds });
     ui.setInputNote(t('input.labelsDropped', { labels: stillDropped.join(', ') }));

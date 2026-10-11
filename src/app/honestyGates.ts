@@ -22,7 +22,9 @@
  * WHAT IT DOES NOT COVER. The LLM second attempt in `submitPipeline` runs a deliberate SUPERSET —
  * `droppedRadiusSymbol`, `droppedRegionSubject`, `droppedMidsegment`, `introducedNewLabels` — because
  * those classes are only reachable when a model, not the grammar, produced the commands. That path
- * keeps its own list; this is the battery a DETERMINISTIC parse must clear.
+ * keeps its own list; this is the battery a DETERMINISTIC parse must clear. What it does NOT keep its
+ * own copy of any more is the MERGE: both seams assemble what they name through {@link unreadItems}
+ * (#1898, ADR-627), so an unread item is named once wherever it is reported.
  */
 import {
   droppedComparison,
@@ -106,6 +108,34 @@ export interface GateReport {
 }
 
 /**
+ * #1898 ([ADR-627](../../docs/06-decisions.md#adr-627)) — THE ONE MERGE for everything a seam reports as
+ * unread.
+ *
+ * The battery is a deliberate SUPERSET of overlapping gates, and the span accountant reports one span
+ * per OCCURRENCE — so a label stated once and left unread arrives from the label gate AND the
+ * accountant, and a label typed twice arrives three times. Concatenating the gate outputs therefore
+ * produces a list that repeats a name, and the student read «לא הצלחתי למקם את D, D».
+ *
+ * De-duplication belongs where the list is ASSEMBLED, not where it is rendered: this function is the
+ * assembly, and every seam that names unread items builds its list through it (`items` below, and the
+ * AI second attempt's `stillDropped` in `submitPipeline.ts`, which runs its own superset and so cannot
+ * take `items`). Each item is stringified (the number gates return numbers, the rest strings), blanks
+ * are dropped, the first occurrence is kept, and the order of distinct items is untouched — a student
+ * reads the lost items in the order they stated them.
+ */
+export function unreadItems(...lists: readonly (readonly (string | number)[])[]): string[] {
+  const out: string[] = [];
+  for (const list of lists) {
+    for (const item of list) {
+      const s = String(item);
+      if (s.trim().length === 0 || out.includes(s)) continue;
+      out.push(s);
+    }
+  }
+  return out;
+}
+
+/**
  * Run the battery a deterministic parse must clear before it may be committed.
  *
  * Every gate runs — the report is a full account, not a first-failure short-circuit — because both the
@@ -185,18 +215,18 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     !droppedCmp &&
     droppedConstruct.length === 0;
 
-  const items = [
-    ...dropped.map(String),
-    ...droppedNums.map(String),
-    ...droppedRels,
-    ...droppedVerbs,
-    ...droppedCompound,
-    ...droppedWordRels,
-    ...droppedConstruct,
-    ...unaccounted.map((x) => x.text),
-    ...(unread?.items ?? []),
-    ...(unreadRole?.items ?? []),
-  ].filter((s, i, a) => s.trim().length > 0 && a.indexOf(s) === i);
+  const items = unreadItems(
+    dropped,
+    droppedNums,
+    droppedRels,
+    droppedVerbs,
+    droppedCompound,
+    droppedWordRels,
+    droppedConstruct,
+    unaccounted.map((x) => x.text),
+    unread?.items ?? [],
+    unreadRole?.items ?? [],
+  );
 
   return {
     clean,

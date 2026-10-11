@@ -441,3 +441,48 @@ describe('#943 — a pre-commit refusal quotes the sentence that was refused', (
     expect(said, 'and the student’s own sentence as the subject').toBe('D = חיתוך AB ו-EF');
   });
 });
+
+/**
+ * #1898 (ADR-627) — AN UNREAD ITEM IS NAMED ONCE.
+ *
+ * The partial-reading notice listed «D, D»: the model's answer left D unread, and both the label gate
+ * and the span accountant named it — the accountant once per OCCURRENCE besides. The list is assembled
+ * here, on the LLM seam, which kept its own concatenation while the deterministic battery
+ * (`honestyGateReport`) had merged its gates all along. One merge now serves both seams
+ * (`unreadItems`), so the student reads each lost item once, in the order it was first stated.
+ */
+describe('#1898 — the partial-reading notice names each unread item once', () => {
+  const triangleABC = {
+    built: [{ step: 'משולש ABC', commands: [{ type: 'triangle', ids: ['A', 'B', 'C'] }] }],
+    dropped: [],
+  };
+
+  const droppedLabelsOf = async (utterance: string): Promise<string> => {
+    llmParseMock.mockResolvedValue(triangleABC);
+    const { deps, calls, notes } = makeDeps();
+    await runSubmit(utterance, deps);
+    expect(llmParseMock, 'exactly one model call — the second attempt, mocked').toHaveBeenCalledTimes(1);
+    expect(useGeoStore.getState().facts.length, 'nothing is committed').toBe(0);
+    expect(calls.cleared, 'the text stays so the student can edit it').toBe(0);
+    expect(notes().length, `one note for «${utterance}»`).toBe(1);
+    const m = /^input\.labelsDropped:(.*)$/.exec(notes()[0]);
+    expect(m, `a partial-reading note for «${utterance}», got: ${notes()[0]}`).not.toBeNull();
+    return JSON.parse(m![1]).labels as string;
+  };
+
+  it('the reported case names D once, not twice', async () => {
+    expect(await droppedLabelsOf('ABC הוא משולש ו-D היא נקודה שסימנו מחוץ לו')).toBe('D');
+  });
+
+  it('two lost points are named once each, in the order stated', async () => {
+    expect(await droppedLabelsOf('ABC הוא משולש ו-D ו-E הן נקודות מחוץ לו')).toBe('D, E');
+  });
+
+  it('a lost NUMBER is named once', async () => {
+    expect(await droppedLabelsOf('ABC הוא משולש שאורך הצלע שלו AB הוא 7 ס"מ שסימנו')).toBe('7');
+  });
+
+  it('a point the student typed twice is still named once', async () => {
+    expect(await droppedLabelsOf('ABC הוא משולש ו-D היא נקודה שסימנו מחוץ לו כך ש-D רחוקה')).toBe('D');
+  });
+});
