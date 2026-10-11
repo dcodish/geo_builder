@@ -3969,7 +3969,8 @@ export const SCENARIOS_4: Scenario[] = [
       const rect = factsOf(['מלבן ABCD']);
       expect(gateVerdict(rect, 'מעוין ABCD')).toMatchObject({ kind: 'refused', reason: 'error' });
       expect((gateVerdict(rect, 'מעוין ABCD') as { detail?: string }).detail).toMatch(/already defined/);
-
+    },
+  },
   {
     id: 'concave-quad-second-ring-1987',
     title:
@@ -3997,7 +3998,8 @@ export const SCENARIOS_4: Scenario[] = [
       expect(turnsAllOneWay(ringOf(['A', 'B', 'C', 'D'])), 'and the four points are NOT in convex position').toBe(false);
       // ADR-613's honest refusals are untouched: a rhombus is convex whenever it is simple.
       expect(gateVerdict(factsOf(['מעוין ABCD']), 'מרובע ABDC')).toMatchObject({ kind: 'refused', reason: 'crossed-ring' });
-
+    },
+  },
   {
     id: 'restated-right-angle-trapezoid-stays-put-1943',
     title:
@@ -4044,7 +4046,8 @@ export const SCENARIOS_4: Scenario[] = [
         }
       }
       expect(freeDofCount(replay(after, 1).construction)).toBe(freeDofCount(replay(before, 1).construction));
-
+    },
+  },
   {
     id: 'inscribe-reveals-hidden-circle-1972',
     title:
@@ -4070,7 +4073,8 @@ export const SCENARIOS_4: Scenario[] = [
       expect(gateVerdict(factsOf(['מחומש משוכלל ABCDE חסום במעגל']), 'מחומש ABCDE חסום במעגל').kind, 'a VISIBLE circle really is already drawn').toBe('noop');
       // (the reveal moves nothing: asserted at a fixed seed in the unit lock — this check runs under the
       // cross-seed sweep, where `fig` is at seed s and a seed-0 comparison is not the same configuration)
-
+    },
+  },
   {
     id: 'untick-leaves-an-independent-row-building-1952',
     title: '#1952 (ADR-625): «ריבוע ABCD» · «משולש ABC», untick the SQUARE — the triangle keeps building (it declares A, B, C itself), exactly as DELETING the square leaves it; re-ticking brings the figure back; a NEW «מרובע ADCB» over the unticked row is still refused naming it',
@@ -4096,7 +4100,8 @@ export const SCENARIOS_4: Scenario[] = [
       // ADR-578 kept: a NEW differently spelled row over the unticked square's letters is refused, naming it.
       const other = gateVerdict(muted, 'מרובע ADCB');
       expect(other.kind === 'refused' && other.detail, 'the commit seam still names the unticked row').toMatch(/belong to the unticked row «ריבוע ABCD»/);
-
+    },
+  },
   {
     id: 'unread-letters-refused-by-name-1919',
     title:
