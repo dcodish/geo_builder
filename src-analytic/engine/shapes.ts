@@ -311,6 +311,45 @@ export const assertsBothParallelPairs = (noun: string | undefined): boolean => {
 };
 
 /**
+ * DOES READING THE RING THE OTHER WAY ROUND SAY THE SAME THING? (#1989, [ADR-AG-262](../../docs/06c-decisions-analytic.md#adr-ag-262))
+ *
+ * A ring is a cycle: `ABCD`, `BCDA` and `ADCB` name ONE quadrilateral, while `ACBD` is a different ring
+ * ([ADR-W-121](../../docs/06w-decisions-workspace.md#adr-w-121)). Whether the NOUN over it says the same thing in
+ * another reading is a question about the noun, and it is answered here — the analytic twin of 2-D's
+ * `sameStatementUnder` ([ADR-618](../../docs/06-decisions.md#adr-618)), whose verdict this reproduces noun for noun.
+ *
+ * Read off the registry, never from a list of nouns:
+ *  - a GENERIC noun («משולש», «מרובע», «מחומש») asserts nothing but the ring, and a REGULAR one is rigid up to
+ *    similarity — every reading says the same thing;
+ *  - a noun whose row asserts BOTH pairs of opposite sides parallel (`assertsBothParallelPairs`: «מקבילית»,
+ *    «מלבן», «ריבוע», «מעוין») is likewise invariant — its row seats ONE right angle and ONE equal pair only
+ *    because, over both parallel pairs, one of each is all of each;
+ *  - a noun that promises exactly ONE pair of parallel sides (`promisesOneParallelPair`: the trapezoid family)
+ *    names its pair BY the ring order, so only the readings that keep sides 0 and 2 a pair of opposite sides say
+ *    it — the even rotations and the reversals through them. «טרפז ABCD» · «טרפז CDAB» is the same statement;
+ *    «טרפז BCDA» promises the OTHER pair and is a different one.
+ *
+ * Every other noun's vertex order is SEMANTIC — a kite's axis is `AC`, an isosceles triangle's apex is `A`, a
+ * right triangle's seats are a `choice` the sentence may collapse — so reading it elsewhere changes what it says
+ * and it is never re-spelled. 2-D excludes exactly these ([ADR-223](../../docs/06-decisions.md#adr-223) and its
+ * `shape-variant` shapes), which is why this predicate is not a looser one.
+ */
+export function sameStatementUnder(noun: string | undefined, declared: readonly Id[], reading: readonly Id[]): boolean {
+  const row = noun === undefined ? null : shapeRow(noun);
+  const n = declared.length;
+  if (!row || noun === undefined || reading.length !== n || n < 3) return false;
+  if (row.regular || isGenericNoun(noun) || assertsBothParallelPairs(noun)) return true;
+  if (!promisesOneParallelPair(noun) || n !== 4) return false;
+  const r = declared.indexOf(reading[0]);
+  if (r < 0) return false;
+  // Same ring ⇒ the reading runs one way round or the other from `r`.
+  const dir: 1 | -1 = reading[1] === declared[(r + 1) % n] ? 1 : -1;
+  // Side i of the reading is side (r + i) of the declared ring (dir +1) or side (r − i − 1) (dir −1): the named
+  // pair (sides 0 and 2) stays a pair of OPPOSITE sides exactly when that offset is even.
+  return (dir === 1 ? r : r - 1) % 2 === 0;
+}
+
+/**
  * TWO NOUNS NO QUADRILATERAL CAN CARRY AT ONCE (#1926, ADR-AG-260): one promises exactly one pair of parallel
  * sides (`promisesOneParallelPair`), the other's row asserts both pairs. Symmetric. Derived from the table —
  * the analytic twin of 3-D's "no member in common" (#1918, ADR-3D-313) and 2-D's ADR-157 refusal.
