@@ -205,9 +205,12 @@ describe('#1922 — stability and the ✎ edit seam', () => {
     ['טרפז ישר זווית ABCD', 'AB ∥ DC'],
     ['משולש ישר זווית ABC', 'AC ⊥ BC'],
     ['טרפז ABCD', '∠A + ∠D = 180'],
-    // NOT «טרפז ישר זווית ABCD» · «AD ⊥ DC»: recording it re-seats D and C (0.26 at seed 0), exactly as its other
-    // spelling «∠ADC = 90» already does at main (5edeeca1) — a solver re-seat of a constraint that holds at the drawn
-    // figure, reported as found work on #1922, not this fix's mechanism.
+    // #1943 ([ADR-623](../../../docs/06-decisions.md#adr-623)): these two were EXCLUDED here, because
+    // recording them re-seated D and C (0.26 at seed 0, up to 7.8 at seed 1) — the found work this issue
+    // filed. The eager carrier pick for a row the figure is already FORCED to satisfy is now released, so
+    // they belong in this table like every other restatement.
+    ['טרפז ישר זווית ABCD', 'AD ⊥ DC'],
+    ['טרפז ישר זווית ABCD', '∠ADC = 90'],
   ])('recording «%s» · «%s» moves no point', async (first, line) => {
     await play([first]);
     const before = replay(st().facts, st().seed);

@@ -15792,3 +15792,63 @@ The pentagram line itself is already refused at both commit seams by ADR-608 (re
 **Behaviour change for a student:**
 - «דלתון ABCD · מרובע ABDC» is drawn — the kite as a dart, ABDC a simple ring — instead of refused.
 - The ring refusal now ends «…או לשנות את מקומות הנקודות — …» ("…or move the points — …") instead of «או לשנות את השיעורים».
+
+## ADR-623 — A given the figure already satisfies, and is FORCED to satisfy, claims no carrier: the re-stated given yields, so the figure does not move (#1943, #1819)
+
+**Status:** accepted · 2026-10-11 · bug (P2, 2-D) · branch `fix/1943-restated-given-stability` off `main` @ 06fc51dd · fix round #1992 · completes [ADR-536](#adr-536) (the rank, for the COUNT) and [ADR-399](#adr-399) (the same rule, for the branch the eager pick did not claim) · LADDER stage: apply/accept (stage 4), before the solve
+
+**Requirements:** none (internal) — the promise is unchanged: [02](02-requirements.md) FR-EN-7 and [03](03-nfr.md)'s stability NFR already say a statement that adds nothing moves nothing, and CLAUDE.md states it as a standing rule. · **Design:** [04](04-design.md) § "The re-stated given yields" (new, under the solve/stability material) and [LADDER.md](LADDER.md) stage 4, the `implied:release` token.
+
+**The reports.** Two, filed separately, measured to one cause.
+
+- **#1943** (found by fix round #1940, stream B): on «טרפז ישר זווית ABCD», «זווית ADC = 90» — a right angle the right trapezoid already draws — re-seats D and C. Same for «AD מאונך ל-DC».
+- **#1819** (#1264 half ①, 2-D's half): «משולש ABC» · «AB מאונך ל-BC» · «זווית ABC = 90» moves B and C, although the third line restates the second. The operator ruled on [#1346](https://github.com/dcodish/geo_builder/issues/1346#issuecomment-5772193288) (2026-09-22) that the line keeps committing — its 90° is new *on the figure* — and on [#1182](https://github.com/dcodish/geo_builder/issues/1182#issuecomment-5752101141) (2026-09-20) that the figure must stay where it is.
+
+**Measured before** (`main` @ 06fc51dd, through the real submit gate, the AI mocked — max point displacement when the line is added, at seeds 0–5):
+
+| figure | line | seed 0 | 1 | 2 | 3 | 4 | 5 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| «טרפז ישר זווית ABCD» | «זווית ADC = 90» | 0.22 | **7.88** | 1.04 | 0.65 | 5.17 | **10.75** |
+| «טרפז ישר זווית ABCD» | «AD מאונך ל-DC» | 0.26 | 7.84 | 1.00 | 0.65 | 5.19 | 10.67 |
+| «משולש ABC» · «AB מאונך ל-BC» | «זווית ABC = 90» | 2.27 | 3.05 | 3.50 | 2.45 | 3.60 | 2.76 |
+| «טרפז ישר זווית ABCD» | «זווית DAB = 90» (unreported sibling) | 0.90 | 1.75 | 0.99 | 0.96 | — | — |
+| «משולש ABC» · «AB מאונך ל-BC» | «זווית B = 90» (another spelling) | 2.27 | 3.05 | 3.50 | 2.45 | — | — |
+
+#1819's numbers reproduce the #1182 planning pass's measurement to the digit, so the bundle is one defect, not two.
+
+**Class (docs/17 §1).** *A statement the figure is already FORCED to satisfy is given a solve carrier, so it re-opens the configuration choice and consumes a degree of freedom the figure never lost.* Not "a right angle": the reported right angle, the same right angle in another spelling, and a right angle of the same trapezoid the report never mentioned are all one member, and so is any re-stated equality or parallelism that reaches the apply boundary (several reach the `already drawn` door first — ADR-542 — and never get here).
+
+**Root cause, located.** `applyCommand`'s `driveOrCheck` makes the carrier choice EAGERLY, before anything is solved: every new consuming constraint is handed a free carrier. For a row the figure does not yet satisfy that is the whole mechanism and is right. For a row it already satisfies and is forced to, it is wrong twice:
+
+1. the freshly claimed carrier is re-solved from its sampled start with one more residual row, and Nelder–Mead stops somewhere else — a different, equally valid drawing of the same givens (the jump); and
+2. the carrier leaves `freeDofs`, so a freedom the figure still has stops being sampled — «הציגו תצורה אחרת» varies less than it did one line earlier, which is exactly the [ADR-052](#adr-052) smell CLAUDE.md names (*"a value counted by `rawMovableDof` but absent from `freeDofs`"*).
+
+[ADR-399](#adr-399)'s `ensureOwnership` already states the governing rule, in its own words: *"A structurally-implied (redundant) statement survives every probe and honestly stays a check: it consumes no freedom, and claiming a DOF for it would freeze sampling variety."* The defect was that the rule was reachable only from the branch where the eager pick had NOT claimed. An eagerly-claimed implied row kept its carrier, and nothing asked.
+
+**Decision.** `releaseImpliedOwnership` (`engine/step.ts`) is the mirror of `ensureOwnership` at the same seam — one call, wrapped around every ladder exit of `applyStep` and `applyCoupledStep`, so no branch can bypass it and no per-case list grows. It releases a carrier this step claimed when, on the PRIOR figure:
+
+- the row **already holds** (`isSatisfied` — free, so it is the first gate); and
+- the row is **forced**: `impliedByFigure` (`engine/dofRank.ts`), which is [ADR-536](#adr-536)'s own Jacobian — at the drawn configuration a row the others imply is a linear combination of them (`RANK_TOL`), and an identically-satisfied row has a zero gradient (`ZERO_ROW_TOL`). **One** notion of "this row adds nothing", read by the DOF count and by the ownership decision, so the two can never disagree about one statement.
+
+"Already true here" alone is never the test. Default placements are deliberately regular, so coincidental satisfaction is common ([#150](#adr-399)); releasing on a coincidence would freeze the figure to that one draw — the ADR-399 disaster with its sign flipped. Hence the rank proof, and hence rung (5) below.
+
+Every rung fails OPEN — a release is kept only if it (3) evaluates (which CHECKS the re-stated row), (4) is still a figure and sits **exactly** where it sat (`maxDelta ≤ 1e-9 · extent`), and (5) survives re-sampling at seeds 1–3. Otherwise today's answer stands: an unfixed jump is honest, a silently frozen figure is not.
+
+**Why not inside `driveOrCheck`, beside ADR-557's rung.** `driveOrCheck` already declines a carrier for a relation the CONSTRUCTION guarantees (`holdsByConstruction`, [ADR-557](#adr-557), #1602) — it lays the figure out at seeds 0–2 with `skipConstraints: true` and no driven solve, so it reads structural implication only. Both reported rows are implied by the figure's other GIVENS, not by its construction: with the constraints skipped, «∠ADC» is free of «AD ⟂ AB» and the probe correctly says no. Answering the constraint question there is not possible at that point — `applyCommand` is pure recording, and the rank Jacobian needs the SOLVED configuration (`resolveDrivenMemo`), which would make `applyCommand` call `evaluate` on the figure it is building. So the two rungs sit where each can be answered: ADR-557's structural one before the solve, this one at the step boundary, where the prior figure is solved and the result can be verified against it. Same rule, one step apart — and no list grew in either.
+
+**Nothing is dropped.** The constraint stays in `construction.constraints` as a listed check, so the evaluator enforces it, the givens verifier checks it, the givens list shows it, `freeDofCount` ranks it and the drawn 90° mark and label are unchanged. The only thing that changes is that the figure stays put.
+
+**Measured after** (same path): every row of the table above is **0.0000** at every seed, and the trapezoid's `freeDofs` is `[A, B, D, C]` after the line as it was before it (it was `[A, B, D]`). The false-freeze net is byte-identical to `main`: «משולש ABC» · «זווית ABC = 90» still moves 4.46 / 4.99 / 5.85 / 3.53, «AB = 5» 0.38 / 1.87 / 1.30 / 0.66, «AB = AC» 1.26 / 1.86 / 2.24 / 1.21, «מלבן ABCD» · «AB = 5» 1.02 / 0.95 / 2.13 / 0.18 and «מלבן ABCD» · «זווית ABD = 30» 0.93 / 0.91 / 3.95 / 3.34.
+
+**Relation to #1182 (analytic).** #1819's plan sequenced itself after #1182's `nearestSolution` projection. That projection has **not** landed (`nearestSolution` exists nowhere in the tree at 06fc51dd), and this fix does not need it: the projection answers *"a NEW given moved the figure further than it had to"*, while this answers *"a given that adds NOTHING moved it at all"*. The second is the stability invariant and is decidable structurally; the first remains #1182's and its parked successor's. So 2-D's half of #1264 ① is closed here without waiting, and #1182 is untouched.
+
+**Sibling audit (docs/17 §1, ADR-W-004).** The eager-pick/implied-row pair is engine-layer and copied by design. 3-D places by pivot (`pivot.scalarConsumed`, ADR-3D-248) and already measures what a pin consumes, so it has the measurement this fix needed; analytic and complex solve from a seeded start with their own carrier recording. Whether a re-stated given moves THEIR figures is not measured by this round and is not assumed either way — reported as found work, not built here, because it is a different mechanism in each tree and needs its own measurement first.
+
+**Cost.** The pass is a scan of the object list for a step that claimed no carrier (the overwhelming majority) and returns untouched. The rank Jacobian — 2·(movable parameters) `evaluateCore` calls, ADR-536's price — is paid only for a row that a step claimed AND that already holds on the prior figure; the three sampled probes only for one that is also proven forced.
+
+**Locks.** `src/__tests__/issue-1943-restated-given-stability.test.ts` (both reported sequences at seeds 0–5 asserted to ZERO displacement; the given recorded, green, verified and marked; `freeDofs` unchanged; the unreported sibling and the other spelling; the five-case false-freeze net with its `main` numbers as a ceiling; `impliedByFigure`'s own verdicts, its fail-closed empty-column and order-constraint guards). Scenarios `restated-right-angle-trapezoid-stays-put-1943` and `restated-perpendicular-as-angle-stays-put-1819` (corpus 4).
+
+**Behaviour change for a student:**
+- On «טרפז ישר זווית ABCD», typing «זווית ADC = 90» (or «AD מאונך ל-DC», or «זווית DAB = 90») leaves the figure exactly where it was; the 90° is recorded, listed and drawn as before (was: D and C moved, by up to 10.75).
+- On «משולש ABC» · «AB מאונך ל-BC», typing «זווית ABC = 90» (or «זווית B = 90») leaves A, B and C where they were, and still shows its 90° (was: B and C moved by up to 3.6).
+- After such a line, «הציגו תצורה אחרת» varies the same configurations it varied before it — the re-stated given no longer freezes one of them.
