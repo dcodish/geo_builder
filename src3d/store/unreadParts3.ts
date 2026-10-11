@@ -97,10 +97,23 @@ export function unreadParts3(utterance: string, commands: readonly Command3[], f
 
 const numbered = (parts: readonly string[], from = 1): string => parts.map((p, i) => `(${i + from}) ${p}`).join('  ');
 
+/**
+ * The lines the right-angle message TEACHES. The locale string carries them as items (1) and (2) of the
+ * list, because their nouns («משולש», «triangle», «∠… = 90°») are localized vocabulary and not the
+ * student's words; everything the student typed past them continues the SAME list from here.
+ *
+ * #1962 ([ADR-3D-331](../../docs/06b-decisions-3d.md#adr-3d-331)), the operator's ruling of 2026-10-10:
+ * ONE numbered list from (1), in 3-D as in 2-D — never a second list, never a list starting where the
+ * student can see no (1). This is 2-D's `TAUGHT_LINES` (ADR-611, `src/app/unreadParts.ts`) ported, and it
+ * replaces a hard-coded offset of `3` that encoded the numbering of the PROSE text it has now replaced.
+ */
+const TAUGHT_LINES = 2;
+
 /** The refusal of a lost part, as a 3-D store error (2-D's `lostPartNote`, ported: the same decision, the same text). */
 export type LostPart3 =
   | { code: 'split-statements'; all: string }
-  | { code: 'right-angle-vertex'; triangle: string; angle: string; rest: string };
+  /** `more` is the list's CONTINUATION from (3), already numbered and spaced — 2-D's parameter, not `rest` (ADR-611). */
+  | { code: 'right-angle-vertex'; triangle: string; angle: string; more: string };
 
 /**
  * The shared one-input-per-line message listing the parts — except where the lost tail names a VERTEX of the
@@ -120,10 +133,21 @@ export function lostPart3(cut: PartsCut<string>): LostPart3 {
     const tri = cmds.find((x) => x.type === 'solid' && x.kind === 'polygon3' && x.ids.length === 3 && x.ids.includes(v));
     const right = cmds.length === 2 && cmds.some((x) => x.type === 'cos-angle' && x.cos === 0 && x.origin === 'shape');
     if (!tri || tri.type !== 'solid' || !right) continue;
+    // The taught pair REPLACES `parts[c.part]` (the read prefix) and `parts[c.part + 1]` (its tail), and the
+    // message puts it at (1) and (2) — true only when nothing the student typed comes before it. 2-D's own
+    // guard (ADR-611); measured here too: a right-triangle lowering always opens the line. Anything else
+    // falls to the plain list, which numbers every part in the order it was typed, so no stated part can be
+    // mis-ordered or lost.
+    if (c.part !== 0) continue;
     const ids = tri.ids;
     const i = ids.indexOf(v);
-    const rest = cut.parts.filter((_, k) => k !== c.part && k !== c.part + 1);
-    return { code: 'right-angle-vertex', triangle: ids.join(''), angle: `${ids[(i + 2) % 3]}${v}${ids[(i + 1) % 3]}`, rest: rest.length ? numbered(rest, 3) : '' };
+    const rest = cut.parts.slice(TAUGHT_LINES);
+    return {
+      code: 'right-angle-vertex',
+      triangle: ids.join(''),
+      angle: `${ids[(i + 2) % 3]}${v}${ids[(i + 1) % 3]}`,
+      more: rest.length ? `  ${numbered(rest, TAUGHT_LINES + 1)}` : '',
+    };
   }
   return { code: 'split-statements', all: numbered(cut.parts) };
 }

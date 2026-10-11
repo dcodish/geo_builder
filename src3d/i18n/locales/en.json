@@ -173,8 +173,7 @@
     "unreadWord": "This tool reads Hebrew and English only — «{{detail}}» is in neither. Try writing the line in Hebrew or English.",
     "droppedGiven": "The statement was not added to the figure, because we could not draw: {{items}}. Try splitting it into shorter givens or rephrasing",
     "splitStatements": "One given per line — that way the tool can build and verify each one separately. We spotted two givens here; try entering them as two steps: {{all}}",
-    "rightAngleVertex": "One given per line — that way the tool can build and verify each one separately. Write «triangle {{triangle}}» first, and then, on a separate line, «∠{{angle}} = 90°».",
-    "rightAngleVertexMore": "One given per line — that way the tool can build and verify each one separately. Write «triangle {{triangle}}» first, and then, on a separate line, «∠{{angle}} = 90°». After that: {{rest}}",
+    "rightAngleVertex": "One given per line — that way the tool can build and verify each one separately. Write them on separate lines: (1) triangle {{triangle}}  (2) ∠{{angle}} = 90°{{more}}",
     "splitRoles": "One given per line — that way the tool can build and verify each one separately. Write each role on its own line: «{{first}}», and then «{{second}}».",
     "noPrismToMakeRight": "there is no prism in the figure to make right — build a prism or a parallelepiped first",
     "ambiguousPrism": "there is more than one prism in the figure — it's unclear which one you mean",
@@ -241,6 +240,7 @@
   "scope": {
     "unrelated": "No geometric construction detected here. Describe a solid or a given — e.g. \"box ABCDA'B'C'D'\" or \"point M midpoint of AB\".",
     "valueless-query": "This tool draws and verifies givens — it does not solve. To act on an angle, state a value: e.g. \"the angle between line AC' and plane ABCD is 30\", and it will be enforced or verified.",
+    "coordinate-point": "Placing a point by its coordinates is done in the \"$t(switcherAnalytic)\" tool — click \"$t(switcherAnalytic)\" at the top of the screen. There you write E(-1,7). Here, describe the figure itself — e.g. \"triangle ABC\" or \"point D on AB\".",
     "cross-app": "Plane geometry (circle, rectangle, rhombus, inscribed-in-circle…) is built in the 2-D tool: themathbible.com/geo-builder. A circle IN SPACE is supported here in the form \"circle centered at O tangent to line AB at B\".",
     "bare-solid": "A pyramid or prism needs its base: e.g. \"pyramid SABCD with a square base\" or \"right triangular prism ABC\". A cube, box or tetrahedron builds without details.",
     "ui-command": "Marks appear automatically from the givens — instead of asking for a mark, state the given itself: e.g. \"angle D = 90\".",

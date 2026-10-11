@@ -76,10 +76,12 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #1904 (ADR-3D-317, ruling W22): a lost role — one line per role, the taught lines proved to record first.
     case 'split-roles':
       return t('err.splitRoles', { first: err.first, second: err.second });
+    // #1962 (ADR-3D-331, the operator's ruling of 2026-10-10): ONE key, ONE numbered list from (1), as 2-D
+    // reads since ADR-611. The taught pair are items (1) and (2) INSIDE the locale string (their nouns are
+    // localized vocabulary, not the student's words) and `more` continues the same list from (3) — so the
+    // two-key branch, and with it the «ואחר כך:» connective and the hard-coded offset, are gone.
     case 'right-angle-vertex':
-      return err.rest
-        ? t('err.rightAngleVertexMore', { triangle: err.triangle, angle: err.angle, rest: err.rest })
-        : t('err.rightAngleVertex', { triangle: err.triangle, angle: err.angle });
+      return t('err.rightAngleVertex', { triangle: err.triangle, angle: err.angle, more: err.more });
     // #1666: the tool draws the givens; a claim to prove is named and left out.
     case 'proof-target':
       return t('err.proofTarget', { sentence: err.sentence });

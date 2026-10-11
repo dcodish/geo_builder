@@ -143,7 +143,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   elsewhere — a SOLID noun included — it is **taught**, never sent to the paid fallback.
   - Sources: ADR-3D-039, ADR-3D-092, ADR-3D-223, ADR-3D-226, ADR-3D-287; #181, #353, #498, #924, #1523,
     #1861.
-- **FR-SP-20 (Must)** — **A symbol typed as any of its look-alike glyphs reads as the symbol**
+- **FR-SP-22 (Must)** — **A symbol typed as any of its look-alike glyphs reads as the symbol**
   ([FR-SU-17](02w-requirements-workspace.md)). «AC ⟂ AB» reads as «AC ⊥ AB» (and «SA ⟂ ABC» on a plane),
   «∡ABC» and «∢ABC» as «∠ABC», a keyboard `<` before a run of letters as «∠», «40⁰» / «40º» / «40˚» as
   40°, and «שורש 2» as √2 — in a statement and in a data-panel question alike, since a measure the student
@@ -158,6 +158,16 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   GREEK vertex name («משולש ΓΔΘ», «משולש αβγ») goes to the model as it does in 2-D, where it used to record
   A, B, C. Greek as notation — a measure name, «ΔABC» — is unchanged.
   - Sources: [ADR-3D-328](06b-decisions-3d.md#adr-3d-328), [ADR-626](06-decisions.md#adr-626), #1919.
+
+- **FR-SP-23 (Must)** — **A point given with TWO coordinates sends the student to the analytic Builder, in
+  2-D's words.** «A(0,0)», «A = (1, 2)», «נקודה A(1,2)», «הנקודה E נמצאת ב-(-1,7)», «A(2;10)» and «A = 3,4»
+  are a point in the PLANE, which is the analytic Builder's construct — so the answer is the pointer, not
+  «לא הצלחתי להבין את הנתון», and it is given before any model call: «מיקום נקודה לפי שיעורים נעשה בכלי
+  «גאומטריה אנליטית» …», the same sentence 2-D gives ([FR-SU-5](02w-requirements-workspace.md),
+  ADR-W-118 B1). A point with THREE coordinates is this tool's own sentence and is untouched, as are plane
+  and line equations. Nothing is added to the figure.
+  - Sources: [ADR-3D-330](06b-decisions-3d.md#adr-3d-330), #1954 (operator report 2026-10-09); the 2-D
+    rule is ADR-553, #1245.
 - **FR-SP-9 (Must)** — **An UNDER-SPECIFIED statement is told what is missing; only an UNSUPPORTED one is
   told the tool cannot do it.** The two are different failures and must not share a voice: a student who
   wrote a sentence the tool understands but cannot pin down needs to know *which detail* to add, while
@@ -184,10 +194,15 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   the reading did not read — a vertex locative («משולש ABC שווה שוקיים ב-B», «טרפז ABCD ישר זווית ב-B», «…ב-A» on
   a prism) — refuses the line with 2-D's one-input-per-line message, listing the parts in the student's words
   cut where the reading stops («(1) משולש ABC שווה שוקיים  (2) ב-B»), **even where the drawing happens to agree**.
-  «משולש ABC ישר זווית ב-<V>» is taught instead: «כתבו קודם «משולש ABC», ואחר כך בשורה נפרדת «∠ABC = 90°».», the
-  angle named at the student's vertex. The ✎ editor refuses the same edits. A scene the statement lives in
+  «משולש ABC ישר זווית ב-<V>» is taught instead, as the first two items of that SAME one list:
+  «כתבו בשורות נפרדות: (1) משולש ABC  (2) ∠ABC = 90°», the angle named at the student's vertex, and anything
+  else the line said continuing the list from (3). One numbered list from (1), whatever the line holds —
+  never a second list and never a list starting where the student can see no (1); it is the same list and
+  the same words 2-D shows. The ✎ editor refuses the same edits. A scene the statement lives in
   («…במשולש SBC» on a pyramid, «פירמידה SABC שבסיסה משולש ABC») is context, not a part. The 2-D twin is FR-IN-4g.
-  - Sources: ADR-3D-316, ADR-W-120; #1888 (operator rulings 2026-10-08).
+  - Sources: ADR-3D-316, ADR-W-120; #1888 (operator rulings 2026-10-08); the numbered single list is
+    [ADR-3D-331](06b-decisions-3d.md#adr-3d-331) / #1962 (operator ruling 2026-10-10), porting
+    [ADR-611](06-decisions.md#adr-611).
 - **FR-SP-17 (Must)** — **A role the reading drops refuses the line.** A cevian or ⟂ word the reading did not read
   («AD תיכון לצלע BC שהוא גם גובה», «…שמאונך לה», "…that is also a median") refuses the line whole, never recording AD
   with one role only. The refusal teaches one line per role («כתבו כל תפקיד בשורה נפרדת: «AD is the altitude to BC», ואחר
