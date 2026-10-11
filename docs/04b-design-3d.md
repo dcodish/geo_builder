@@ -391,6 +391,18 @@ fork drives a scalar statement when `freeDims(c) > 0` or it names a `free3` poin
 above `ACCEPT` is polished on the primary residuals alone and kept only if that closes it without collapsing
 a solid (a free coordinate's anchor equilibrium sits higher than a rider's, which moves within `[0, 1]`).
 
+**A free shape dim is SLID to the seed's sample** (#1854, [ADR-3D-332](06b-decisions-3d.md#adr-3d-332)).
+The dims pull toward `dims0` rides only a plane drive (ADR-3D-030) and the `invariantOnly` lane, so on the
+ordinary gauge-solving path a dim the givens leave free used to park wherever LM's null-space walk ended —
+reliably the EDGE of the admissible set (`משולש ABC · AC = 8 · BC = 3` came back AB = 5, the degenerate
+|AC − BC|, at 18 of 24 seeds). `settleFreeDims` therefore runs AFTER acceptance, beside `parkScale`: pull the
+dims toward `dims0` at 1e-2, RELEASE on the primary residuals, and keep the result only if it is exact, not
+degenerate and nearer the sample than the start — so a determined dim is structurally unreachable and the
+anchor never decides whether the givens hold. Not on a plane drive (already anchored) and **not on the pooled
+path** (`collectAll`), where a slide would move a discrete branch the sign/root filters read. In-solve REG
+rows were measured and rejected: the 1e-4 gradient sits under LM's improvement floor (#518's lesson), so the
+dim crawls and the stalled iterations cost 2.9 s against 11 ms.
+
 **The not-determined rule** (`sampledCarrierVerdict`, `store3.ts`): a failing claim that reads a sampled
 carrier (a free plane, a free line, the frame placement, a free point) is refused naming it, never
 `claim-refuted`. Two rows read only a `given: true` arbiter and answer `given-not-drivable`, the tool's limit
