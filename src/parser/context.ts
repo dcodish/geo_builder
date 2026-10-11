@@ -111,6 +111,22 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     // Centre letters that were AUTO-assigned (unnamed circle → hidden centre): «מרכז המעגל הוא P» renames
     // one of these to the student's letter instead of minting a second circle (issue #112).
     autoCenters: construction.objects.flatMap((o) => (o.kind === 'circle' && o.autoCenter && !o.center.startsWith('~') ? [ctrToken(o.center)] : [])),
+    // #1972 (ADR-624): the circles the figure draws NOTHING of — a macro's scaffold circumcircle. A
+    // statement that says the circle IS drawn reveals the one it reuses (`show-circle`) instead of reusing
+    // it silently, which left the student with no circle and a «זה כבר קיים באיור» about it. Ids, not centre
+    // letters: a concentric pair's two circles share a centre and must never answer for each other.
+    //
+    // A circle carrying an ARC is EXCLUDED: a semicircle, a quarter circle and a sector hide the full circle
+    // and draw part of it, so the student DOES see it and «חסום במעגל» binds to the half that is drawn
+    // ([ADR-422](docs/06-decisions.md#adr-422)/[ADR-423](docs/06-decisions.md#adr-423), #429/#430 — "all
+    // references to the circle need to be to the drawn half and not the part that isn't shown"). Completing
+    // such a figure to a full circle would ADD ink the student never asked for, and is his to rule on, not
+    // this fix's (CLAUDE.md rule 7). Measured: without this, «חצי מעגל» · «משולש CDE חסום במעגל» drew the
+    // whole circle — caught by the #1395 parity goldens, whose scenarios assert the drawn extent.
+    hiddenCircles: (() => {
+      const inked = new Set(construction.objects.flatMap((o) => (o.kind === 'arc' ? [o.center] : [])));
+      return construction.objects.flatMap((o) => (o.kind === 'circle' && o.hidden && !inked.has(o.center) ? [o.id] : []));
+    })(),
     // #1673 (ADR-565): points nothing places (a bare free point, no polygon's vertex) — a naming may absorb one
     freePoints: (() => {
       const vertices = new Set(construction.objects.flatMap((o) => (o.kind === 'polygon' ? o.vertices : [])));
