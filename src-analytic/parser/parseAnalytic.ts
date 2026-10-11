@@ -2172,8 +2172,10 @@ const segmentId = (a: string, b: string) => `seg-${[a, b].sort().join('')}`;
 /**
  * THE PIECE A SENTENCE NAMES, DRAWN (#1639, ADR-AG-198) — one declaration for every sentence whose subject is a
  * named pair, whichever relation it states (a tangent, a diameter, «AB ⊥ CD», a side on an axis, «CD עובר דרך
- * …»). The class: the tangent and diameter rules lowered to constraints on the ENDPOINTS and never declared the
- * piece, so «BC משיק למעגל בנקודה B» held and drew nothing, while the chord rule — which declares it — drew.
+ * …»), and for the CARRIER a point-on sentence names («D על AB», #1900, ADR-AG-264). The class: the tangent and
+ * diameter rules lowered to constraints on the ENDPOINTS and never declared the piece, so «BC משיק למעגל בנקודה
+ * B» held and drew nothing, while the chord rule — which declares it — drew; the point-on operand was the last
+ * member of that list left out, so «D על AB» drew a dot with nothing under it.
  *
  * The NOUN decides the extent, as everywhere (#1234): «הישר BC» draws the line (`line-2pt`, resolved at M1),
  * «הצלע/הקטע/הבסיס BC» and the bare «BC» draw the segment — the very fact the bare line «BC» declares, so the
@@ -6861,7 +6863,23 @@ function parseConstraint(raw: string): RuleOutcome {
         if (bounded && !(barePair && (id === rest.a || id === rest.b))) {
           facts.push({ t: 'selector', sel: { kind: 'between', id, a: rest.a, b: rest.b }, src: line });
         }
-        return made([...facts, ...claims.out]);
+        /**
+         * THE CARRIER THE SENTENCE NAMES IS DRAWN (#1900, ADR-AG-264, amending ADR-AG-198 decision 1).
+         *
+         * A rider has to materialise the piece it rides, not only its own point: «D על AB» drew D floating with
+         * nothing under it while 2-D — the reference for how a plane figure is drawn (ADR-W-118 B1) — commits
+         * `segment` + `point-on-segment` and draws seg-AB. ADR-AG-198's list of sentences that draw the pair they
+         * name left the point-on OPERAND out; `pieceFacts` is that one list, so the operand joins it here rather
+         * than growing a second rule. Emitted AFTER the sentence's own facts, like every other `pieceFacts` call,
+         * so a reference never invents a point (#1028) and M1 absorbs a piece the figure already draws (a polygon
+         * side is that side, #1407).
+         *
+         * Only the SEGMENT reading, and only when the subject is not an end of its own pair: «D על הישר AB» keeps
+         * the line noun's extent (#1910 open), and «A על AB» / «A על הקטע AB» keep today's answer — a sentence
+         * that states nothing new draws nothing new.
+         */
+        const carrier = bounded && id !== rest.a && id !== rest.b ? pieceFacts('segment', rest.a, rest.b, line) : [];
+        return made([...facts, ...claims.out, ...carrier]);
       }
       return made([
         { t: 'declare', id, src: line },

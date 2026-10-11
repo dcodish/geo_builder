@@ -269,7 +269,9 @@ opposite (2-D's parity test on `(r, dir)`); any other noun's vertex order is sem
 ### What a sentence draws, and whose extent it is ([ADR-AG-198](06c-decisions-analytic.md#adr-ag-198), #1639, #1640, #1636, #1641, #1643)
 
 `pieceFacts(noun, a, b)` is the one piece declaration (`line-2pt { a, b }` or `segment { …, ref: true }`), emitted
-after a sentence's facts (`TangentTargets.pieces`, `sideClauses`). The extent is decided at M1 against the prior
+after a sentence's facts (`TangentTargets.pieces`, `sideClauses`, and `ON_OBJECT`'s `on-line-2pt` arm — the carrier a
+point-on sentence names, [ADR-AG-264](06c-decisions-analytic.md#adr-ag-264), #1900: the segment reading only, and not
+when the subject is an end of its own pair). The extent is decided at M1 against the prior
 construction: the crossing's bounded promotion (`drawnPieceOver`). A bare pair in a point-on sentence is decided in
 the parser, not at M1: it carries the `between` selector «הקטע AB» carries, except when the subject is one of its ends
 ([ADR-AG-248](06c-decisions-analytic.md#adr-ag-248), #1892; `lineObject` and `pairText` lower the converse to that

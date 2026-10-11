@@ -229,7 +229,7 @@ From the «lines and points» corpus (§8), numbered onward.
 - «קדקוד A(1,2)», «מרחק של C מ-AB» → read
 - Sources: #1127, #1134, ADR-AG-130, #1235, ADR-AG-021, ADR-052.
 
-**R135 — a sentence draws what it names, the extent belongs to the statement, every list and paste is read, and a tangency states its circle**. A pair named in a sentence is drawn («הישר BC» the line, «BC» the segment); «על BC» is the segment, as «על הקטע BC» is, whatever the figure draws, as in 2-D; «על הישר BC» is the line and «על המשך BC» the extension (#1892, ADR-AG-248, operator 2026-10-08: analytic *"refuses «AD = 5», as 2-D does"*); text pasted from the screen reads as typed.
+**R135 — a sentence draws what it names, the extent belongs to the statement, every list and paste is read, and a tangency states its circle**. A pair named in a sentence is drawn («הישר BC» the line, «BC» the segment); a point-on sentence draws the carrier it names, so «D על AB» draws segment AB as well as D, as 2-D draws it (#1900, ADR-AG-264) — a side of a declared shape is that side, and the piece typed afterwards is «כבר ידוע»; «על BC» is the segment, as «על הקטע BC» is, whatever the figure draws, as in 2-D; «על הישר BC» is the line and «על המשך BC» the extension (#1892, ADR-AG-248, operator 2026-10-08: analytic *"refuses «AD = 5», as 2-D does"*); text pasted from the screen reads as typed.
 - «BC משיק למעגל בנקודה B» → BC drawn
 - «A, B, C על המעגל» → three points on the circle
 - «טרפז ישר זווית ABCD חסום במעגל» → refused, offering «מלבן ABCD חסום במעגל»
