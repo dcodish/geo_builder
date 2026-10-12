@@ -239,6 +239,15 @@ And for the builders whose exam prints no figure:
   - Re-enabling it is his decision (B4).
   - The design history is in [archive/18](archive/18-theorem-relevance-plan.md), [archive/16](archive/16-theorems-plan.md) and the first version of this document ([archive/10-pedagogy-2026-06](archive/10-pedagogy-2026-06.md)).
 
+### P16 — A narrower shape than the one asked for is said, never drawn silently
+- **His words:** *"in such cases we have to have a note indicating the the only shape possible is a rectangle which is also a kind of a parallelogram. silently drawing a rectangle might be considered a mistake by the user. this comment is relevant for all cases where we end up drawing sometihng else than what user asked for (meaning a special kind of what he asked for that has a name). This should go in pedagogy so its a rule."* (2026-10-12, #1996, on a parallelogram over four points of a circle drawn as a rectangle)
+- **Why:** *"silently drawing a rectangle might be considered a mistake by the user."*
+- **For a feature:**
+  - When the figure is forced into a special kind of the shape the student named, and that kind has a name (a rectangle for a parallelogram, a square for a rhombus), a note says so, and says that it is still a kind of what was asked for.
+  - The note is for a kind forced in every configuration. A kind that only some configurations show is a configuration (P3), not this note.
+  - Every builder (P12). The circle case already has 3-D's sentence (#1899).
+  - Still open, on #1996: whether the note also fires when the student's own given makes the narrower kind («מקבילית ABCD · AB = BC»), and whether it covers triangles («משולש ABC · זווית C = 90»). Until he answers, those are `[proposed]`.
+
 ---
 
 ## 3. Where the tools differ
