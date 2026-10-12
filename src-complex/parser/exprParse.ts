@@ -20,6 +20,7 @@ import { fromNumber, rat, type Rat } from '../value/rational';
 import { evaluate, exact, fromCartesian } from '../value/value';
 import { radicalLiteral, radicalOfModulus, radicalPartsOf } from '../value/cartesian';
 import { fromDegrees, isExactRational } from '../value/angle';
+import { angleDegrees } from './angleText';
 import type { ReservedConstant } from '../model/naming';
 import { one as modOne, fromRational as modFromRational, pow as modPow } from '../value/modulus';
 
@@ -149,6 +150,8 @@ type Tok =
   | { t: 'name'; v: string; at: number; len: number }
   | { t: 'i'; at: number; len: number }
   | { t: 'cis'; at: number; len: number }
+  /** #1754 — π (or the word `pi`): an ANGLE unit read by `readCisAngle` only, never a value */
+  | { t: 'pi'; at: number; len: number }
   | { t: 'conj'; at: number; len: number }
   | { t: 'proj'; v: 're' | 'im'; at: number; len: number }
   /** `d_{z1z2}` / `d_{AB}` — the textbook's distance form (#791): exactly two point atoms */
@@ -162,7 +165,7 @@ type Tok =
 // with an invented parameter, and printed as `2cis150`.
 // `d_{…}` sits BEFORE the general name alternative, or the lexer would read the bare `d` as a
 // parameter and refuse the line at the `_`.
-const TOKEN = /\s+|conj(?![A-Za-z])|cis(?![A-Za-z])|re(?=\s*\()|im(?=\s*\()|sqrt(?=\s*\()|[⁰¹²³⁴⁵⁶⁷⁸⁹]*[√∛∜]|d_\{[^{}]*\}|[A-Za-z][A-Za-z]*\d*|\d+(?:\.\d+)?|[()|^*/+\-]/giu;
+const TOKEN = /\s+|conj(?![A-Za-z])|cis(?![A-Za-z])|re(?=\s*\()|im(?=\s*\()|sqrt(?=\s*\()|[⁰¹²³⁴⁵⁶⁷⁸⁹]*[√∛∜]|d_\{[^{}]*\}|π|[A-Za-z][A-Za-z]*\d*|\d+(?:\.\d+)?|[()|^*/+\-]/giu;
 
 /**
  * The two point atoms inside `d_{…}`, or null when the braces hold anything else. Atoms are the run
@@ -212,7 +215,7 @@ function rootIndexOf(text: string): bigint | null {
  * - the run does not END a term — `ib z1`, `in Q2`, `is real`: another operand glued after the run
  *   means it may be a word, not a coefficient, and juxtaposition cannot tell.
  *
- * A KNOWN WORD is never split and never offered: `pi` (this grammar has no π, and `p·i` would be the
+ * A KNOWN WORD is never split and never offered: `pi` (π — an angle unit only, #1754 — and `p·i` would be the
  * ADR-CX-040 invented-coefficient class run backwards) and `im` (the projection keyword — `im` without
  * its parenthesis must not become `i·m`). Lowercase `i` only: a capital `I` is a point label's
  * register.
@@ -293,6 +296,10 @@ function lex(src: string, from: number, to: number, scope: ComplexScope = NO_SCO
       if (n === null) return null; // ⁰√ / ¹√ — no such root
       out.push({ t: 'root', n, at, len });
     } else if (low === 'i') out.push({ t: 'i', at, len });
+    // #1754 — π, and its Latin spelling as a whole LOWERCASE word (`Pi` stays the label run it was)
+    else if (text === 'π' || text === 'pi') out.push({ t: 'pi', at, len });
+    else if (text === 'Π') return null; // the `i` flag folds Π into π's alternative; it is no angle
+
     else if (/^d_\{/i.test(text)) {
       const atoms = distAtoms(text.slice(3, -1));
       if (!atoms) return null; // braces holding anything but two distinct points refuse the span
@@ -404,12 +411,59 @@ export function parseExpr(
    * polar literal, as the number-only branch always read them). The angle is read through
    * `parseUnary` so its sign is part of it: `2cis-30` ≡ `2cis(-30)`.
    */
+  /**
+   * #1754 (ADR-CX-064) — the angle after `cis`, in exact degrees, or null (the line refuses).
+   *
+   * A RADIAN angle — any span holding π — is handed as TEXT to `angleDegrees`, the one reader every
+   * cis spelling shares, so `cis(π/4)` is `cis45` by construction: parenthesised (`(π/4)`, `(-3π/4)`,
+   * `-(π/3)`) or bare without a slash (`π`, `2π`). A bare slash (`cis π/4`) is refused rather than
+   * read as `(cis π)/4` — the textbook means the angle, and neither reading may be guessed. Any other
+   * angle is the degree reading it always was: `parseUnary` then `signedDegrees`.
+   */
+  const readCisAngle = (): Rat | null => {
+    const start = i;
+    let neg = false;
+    if (isOp('-')) {
+      neg = true;
+      i++;
+    }
+    const sign = (d: Rat | null): Rat | null => (d && neg ? negate(d) : d);
+    const t = peek();
+    if (t?.t === 'op' && t.v === '(') {
+      let depth = 0;
+      let close = -1;
+      let hasPi = false;
+      for (let k = i; k < toks.length; k++) {
+        const u = toks[k];
+        if (u.t === 'pi') hasPi = true;
+        if (u.t === 'op' && u.v === '(') depth++;
+        else if (u.t === 'op' && u.v === ')' && --depth === 0) {
+          close = k;
+          break;
+        }
+      }
+      if (hasPi && close > i + 1) {
+        const deg = angleDegrees(src.slice(toks[i + 1].at, toks[close].at));
+        i = close + 1;
+        return sign(deg);
+      }
+    } else if (t?.t === 'pi' || (t?.t === 'num' && toks[i + 1]?.t === 'pi')) {
+      const last = t.t === 'pi' ? i : i + 1;
+      const after = toks[last + 1];
+      if (after?.t === 'op' && after.v === '/') return null;
+      const deg = angleDegrees(src.slice(toks[i].at, toks[last].at + toks[last].len));
+      i = last + 1;
+      return sign(deg);
+    }
+    i = start;
+    const a = parseUnary();
+    return a ? signedDegrees(a) : null;
+  };
+
   const withCis = (base: Expr): Expr | null => {
     if (peek()?.t !== 'cis') return base;
     i++;
-    const a = parseUnary();
-    if (!a) return null;
-    const deg = signedDegrees(a);
+    const deg = readCisAngle();
     if (!deg) return null;
     // an exact magnitude (a root of a rational) keeps ONE literal value, as `√2cis45` always did
     if (base.t === 'val' && base.v.kind === 'exact' && isExactRational(base.v.arg) && base.v.arg.turns.n === 0n) {
@@ -505,8 +559,8 @@ export function parseExpr(
     }
     if (t.t === 'cis') {
       i++;
-      const a = parseUnary();
-      return a ? cisOf(a) : null;
+      const deg = readCisAngle();
+      return deg ? cisOf(deg) : null;
     }
     if (t.t === 'name') {
       i++;
@@ -830,14 +884,11 @@ export function foldConstants(e: Expr, atoms: Map<string, number>): Expr {
  * `cis θ` is `cos θ + i sin θ` — a unit number at a stated angle.
  *
  * Represented as a literal-valued rotation rather than as a trigonometric expression, because the
- * angle is a rational number of degrees and the value layer carries that exactly. Only a NUMERIC angle
- * is accepted here; a symbolic one (`cis α`) is a free direction and belongs to the relation rules,
- * not to a literal.
+ * angle is a rational number of degrees and the value layer carries that exactly — a radian angle
+ * included, converted by `readCisAngle` (#1754). Only a NUMERIC angle reaches here; a symbolic one
+ * (`cis α`) is a free direction and belongs to the relation rules, not to a literal.
  */
-function cisOf(angle: Expr): Expr | null {
-  const deg = signedDegrees(angle);
-  return deg ? { t: 'val', v: unitAt(deg) } : null;
-}
+const cisOf = (deg: Rat): Expr => ({ t: 'val', v: unitAt(deg) });
 
 /**
  * The signed degrees a `cis` argument states, or null when it is not a numeric angle.

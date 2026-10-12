@@ -34,6 +34,7 @@ import {
   RE_OF_KW,
   RECIPROCAL_OF_KW,
 } from './lexicon';
+import { RADIAN, RADIAN_BARE, angleDegrees } from './angleText';
 
 /** Superscript digits become an explicit power: `Z₂³` → `z2^3`. */
 const SUPERSCRIPTS: Record<string, string> = {
@@ -205,7 +206,9 @@ const TRANSFORMS: readonly { readonly why: string; readonly apply: (s: string) =
  *   so the line refuses, and the submit path names the two angles (`trigAngleMismatch`);
  * - the `i` on either side of `sin`: `i sin`, `i*sin` (the dot is `*` by now), `isin`, `sinθ i`, `sinθ*i`;
  * - the angle is whatever `cis` reads — a number of degrees (the `°` is already gone), signed, optionally
- *   parenthesised, or a symbolic letter (`θ` is `theta` by now) — so the two spellings never diverge;
+ *   parenthesised, a rational multiple of π (`cos(π/4)`, `cos π` — #1754, ADR-CX-064; the slash only
+ *   inside parentheses), or a symbolic letter (`θ` is `theta` by now) — so the two spellings never
+ *   diverge. "The same angle" is decided by `angleDegrees`, the reader `cis` itself uses;
  * - **a parenthesised group** `(cos θ + i sin θ)` becomes `cis(θ)`, so a modulus in front of it
  *   (`2(…)`, `√2(…)`, `r(…)`, `|z1|(…)`) attaches exactly as it does to `cis`. A group RAISED to a power
  *   keeps its parentheses — `2(cos45 + i sin45)^2` is 2·(cis45)², never `2cis45^2`, which the grammar
@@ -214,8 +217,11 @@ const TRANSFORMS: readonly { readonly why: string; readonly apply: (s: string) =
  *   after the start, `=`, `(` or `+`, and before the end, `=`, `)`, `+` or `-`. `2cos45 + i sin45` or
  *   `-cos45 + i sin45` is a different number and is left alone.
  */
-const TRIG_ANGLE = String.raw`(?:-\s*)?(?:\d+(?:\.\d+)?|[A-Za-z]+\d*)`;
-const TRIG_ARG = String.raw`(${TRIG_ANGLE}|\(\s*${TRIG_ANGLE}\s*\))`;
+// #1754 — a radian angle is an angle too (`cos(π/4)`, `cos π`); its slash only inside parentheses,
+// exactly as `cis` reads it (angleText.ts)
+const TRIG_ANGLE = String.raw`(?:-\s*)?(?:${RADIAN_BARE}|\d+(?:\.\d+)?|[A-Za-z]+\d*)`;
+const TRIG_ANGLE_IN_PARENS = String.raw`(?:-\s*)?(?:${RADIAN}|\d+(?:\.\d+)?|[A-Za-z]+\d*)`;
+const TRIG_ARG = String.raw`(${TRIG_ANGLE}|\(\s*${TRIG_ANGLE_IN_PARENS}\s*\))`;
 const TRIG_CORE = String.raw`(?<![A-Za-z])cos\s*${TRIG_ARG}\s*\+\s*(?:i\s*\*?\s*sin\s*${TRIG_ARG}|sin\s*${TRIG_ARG}\s*\*?\s*i)(?![A-Za-z\d])`;
 const TRIG_GROUP = new RegExp(String.raw`\(\s*${TRIG_CORE}\s*\)(\s*\^)?`, 'g');
 const TRIG_BARE = new RegExp(String.raw`(?<=(?:^|[=(+])\s*)${TRIG_CORE}(?=\s*(?:$|[)=+\-]))`, 'g');
@@ -223,10 +229,15 @@ const TRIG_ANY = new RegExp(TRIG_CORE, 'g');
 
 /** An angle as typed, without its parentheses and spaces: `( -30 )` → `-30`. */
 const bareAngle = (a: string): string => a.replace(/[\s()]/g, '');
-/** One angle, one key: `45` ≡ `45.0` ≡ `(45)`; a letter compares by name. */
+/**
+ * One angle, one key: `45` ≡ `45.0` ≡ `(45)` ≡ `π/4` (#1754 — read by the same `angleDegrees` the
+ * `cis` literal uses, so the two slots agree exactly when the number they name agrees); a letter
+ * compares by name.
+ */
 const angleKey = (a: string): string => {
   const b = bareAngle(a);
-  return /^-?\d/.test(b) ? String(Number(b)) : b.toLowerCase();
+  const deg = angleDegrees(b);
+  return deg ? `${deg.n}/${deg.d}` : b.toLowerCase();
 };
 
 function trigToCis(s: string): string {
@@ -249,8 +260,9 @@ export function trigAngleMismatch(raw: string): { readonly cos: string; readonly
   for (const m of normalize(raw).matchAll(TRIG_ANY)) {
     const cos = m[1];
     const sin = (m[2] ?? m[3])!;
-    // shown as the angle the student typed, in degrees (the `°` normalization removed comes back)
-    const shown = (a: string): string => (/^-?\d/.test(bareAngle(a)) ? `${bareAngle(a)}°` : bareAngle(a));
+    // shown as the angle the student typed: a number of degrees gets back the `°` normalization
+    // removed; a radian angle (`π/4`, `3π/4`) is shown as typed (#1754)
+    const shown = (a: string): string => (/^-?\d+(?:\.\d+)?$/.test(bareAngle(a)) ? `${bareAngle(a)}°` : bareAngle(a));
     if (angleKey(cos) !== angleKey(sin)) return { cos: shown(cos), sin: shown(sin) };
   }
   return null;

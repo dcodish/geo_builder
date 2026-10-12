@@ -119,6 +119,7 @@ import {
 } from './lexicon';
 import type { ReservedConstant } from '../model/naming';
 import { normalize } from './normalize';
+import { RADIAN, angleDegrees, isRadianText } from './angleText';
 import { type Claim, type Unaccounted, claimAll, unaccountedSpans } from './span';
 
 /**
@@ -576,15 +577,27 @@ const genericPolar: Rule = (s, scope) => {
   // as a product of two invented parameters. The modulus group backtracks over `rcis`, which is what
   // lets the unspaced and spaced spellings be one rule rather than two (#691).
   const HALF = `(?:${NUM}|${NAME})`;
-  const m = s.match(rx(`^(${NAME})\\s*=\\s*(${HALF})?\\s*cis\\s*\\(?\\s*(${HALF})\\s*\\)?$`));
+  // #1754 (ADR-CX-064) — the angle may be stated in radians (`r cis(π/4)`, `r cis π`): read by the
+  // one angle reader every cis spelling shares, never as a free direction named `pi`
+  const ANGLE = `(?:-?\\s*${RADIAN}|${HALF})`;
+  const m = s.match(rx(`^(${NAME})\\s*=\\s*(${HALF})?\\s*cis\\s*\\(?\\s*(${ANGLE})\\s*\\)?$`));
   if (!m) return null;
   const name = canonName(m[1]);
   if (!isComplexName(name, scope)) return null;
-  const angle = canonName(m[3]);
-  if (isComplexName(angle, scope)) return null; // `z1 = 2cis z2` is not an angle, it is a product
+  const radian = isRadianText(m[3]) ? angleDegrees(m[3]) : null;
+  // `rx` is case-insensitive, so `Π` or `Pi/4` can reach here through `RADIAN`: an angle that is not
+  // radians is only ever what this rule read before (a number or a name), so the rest refuse as before
+  if (!isRadianText(m[3]) && !rx(`^${HALF}$`).test(m[3])) return null;
+  if (isRadianText(m[3])) {
+    if (!radian) return null;
+    // a slash belongs to the angle only inside parentheses, as the expression grammar reads it
+    if (m[3].includes('/') && !rx(`cis\\s*\\(`).test(m[0])) return null;
+  }
+  const angle = radian ? m[3] : canonName(m[3]);
+  if (!radian && isComplexName(angle, scope)) return null; // `z1 = 2cis z2` is not an angle, it is a product
   const isNumeric = (t: string): boolean => rx(`^${NUM}$`).test(t);
   const modIsNum = m[2] !== undefined && isNumeric(m[2]);
-  const angIsNum = isNumeric(angle);
+  const angIsNum = radian !== null || isNumeric(angle);
   // both numeric is a LITERAL and belongs to the expression grammar, which reads it exactly
   if (modIsNum && angIsNum) return null;
   // a magnitude is not negative; `-2 cis θ` is not this sentence, so it goes to the equation rule
@@ -608,7 +621,7 @@ const genericPolar: Rule = (s, scope) => {
       kind: 'arg',
       lhs: ref(name),
       rhs: { t: 'num', v: rat(1) },
-      deltaTurns: rat(Math.round(Number(angle)), 360),
+      deltaTurns: radian ? rat(radian.n, radian.d * 360n) : rat(Math.round(Number(angle)), 360),
       src: s,
     });
   }
