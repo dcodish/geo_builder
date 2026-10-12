@@ -84,6 +84,9 @@ const he = {
   resetView: 'איפוס תצוגה',
   copyImage: 'העתיקו תמונה',
   saveImage: 'הורידו תמונה',
+  // #1872 — «הורידו שאלה», the suite's one wording (2-D canvas.saveQuestion / questionDoc.given)
+  saveQuestion: 'הורידו שאלה',
+  questionGiven: 'נתון:',
   copied: 'הועתק',
   symRe: 'החלק הממשי',
   symIm: 'החלק המדומה',
@@ -323,6 +326,8 @@ const en: typeof he = {
   resetView: 'Reset view',
   copyImage: 'Copy image',
   saveImage: 'Save image',
+  saveQuestion: 'Download question',
+  questionGiven: 'Given:',
   copied: 'Copied',
   symRe: 'real part',
   symIm: 'imaginary part',

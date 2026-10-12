@@ -977,7 +977,8 @@ Teachers are a named secondary audience ([01 §Audience](01-vision.md)). A quest
 teacher nothing to project either. Ruled by the operator.
 
 **R33 — Worksheet authoring is in scope, on the mechanism that already ships.** The clean image (FR-HS-5) and the `.docx` question page (FR-HS-11, [ADR-251](06-decisions.md#adr-251)), from `shell/`, good enough for a class — played, not assumed.
-- Sources: FR-HS-5, FR-HS-11, ADR-251.
+  «הורידו שאלה» ships here ([ADR-AG-269](06c-decisions-analytic.md#adr-ag-269), #1872): the «נתון:» list follows 2-D (ruling W5) — scaffolding omitted, one line per statement, in the student's own words.
+- Sources: FR-HS-5, FR-HS-11, ADR-251, ADR-AG-269.
 
 **R34 — Live demonstration is a design condition, not a feature.** «הציגו תצורה אחרת» and R22's signal are designed **for projection**: the cycle visible as a *change*.
 

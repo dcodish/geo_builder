@@ -55,11 +55,12 @@ import { Banner } from '../shell/frame/Banner';
 import { shapeWarningsOf, shapeWarningText } from './app/shapeWarnings';
 import { FigureName } from '../shell/frame/FigureName';
 import { ManualScreen } from '../shell/frame/ManualScreen';
-import { svgToPng } from '../shell/export/svgToPng';
+import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { MAX_FIGURE_STATEMENTS, figureNameFromFileName, readEnvelope, savedFileName } from '../shell/save';
 import { ANALYTIC_ENVELOPE } from './store/useAnalyticStore';
 import { COMMAND_CATALOG_ANALYTIC } from './parser/catalogAnalytic';
 import { analyticBidi } from './i18n';
+import { questionLines } from './app/questionLines';
 import { Figure } from './render/Figure';
 import { buildScene } from './render/scene';
 import { AskLane } from '../shell/frame/AskLane';
@@ -404,6 +405,39 @@ export function App() {
   };
 
   /**
+   * «הורידו שאלה» (#1872, ADR-AG-269) — the figure beside the givens, as a real .docx. The composer is SHARED
+   * (`shell/export/questionDoc`, ADR-W-027) and knows nothing about geometry: this tree hands it the heading,
+   * its givens (`app/questionLines`, 2-D's rules over analytic's facts — operator ruling W5), the figure PNG
+   * and THIS product's bidi segmenter, so the paper splits technical runs where the screen does. The docx
+   * library is dynamically imported so it stays out of the main chunk, as in 2-D and 3-D.
+   */
+  const saveQuestion = async () => {
+    const svg = viewportRef.current?.querySelector('svg');
+    if (!svg) return;
+    try {
+      const { pngDimensions, questionDocxBlob, questionFileName } = await import('../shell/export/questionDoc');
+      const png = await svgToPng(svg as SVGSVGElement, 2, QUESTION_IMAGE_WIDTH_PX);
+      const data = new Uint8Array(await png.arrayBuffer());
+      const blob = await questionDocxBlob({
+        title: name.trim() || undefined,
+        heading: t('questionGiven'),
+        lines: questionGivens,
+        png: { data, ...pngDimensions(data) },
+        rtl: i18n.language !== 'en',
+        segments: analyticBidi.segments,
+      });
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = u;
+      a.download = questionFileName(new Date());
+      a.click();
+      URL.revokeObjectURL(u);
+    } catch {
+      flashExport('err');
+    }
+  };
+
+  /**
    * WHAT THE CANVAS IS LOOKING AT (#1094) — zoom AND centre, because the operator had neither move
    * nor a zoom they could aim: *"the canvas has no zoom and move features"*.
    *
@@ -551,6 +585,11 @@ export function App() {
     configurationPool(out.construction).defer();
     return out;
   }, [active, seed, seedNames]);
+  /** The «נתון:» list «הורידו שאלה» prints (#1872) — read here so the button is disabled when it is empty. */
+  const questionGivens = useMemo(
+    () => questionLines(lines, disabled, spokenFor, new Set(d.construction.objects.map((o) => o.id))),
+    [lines, disabled, spokenFor, d],
+  );
 
   /**
    * #1864 (ADR-AG-267, docs/10 P4): every choice the tool made for an unstated given, worded — SAID under the row
@@ -1038,6 +1077,15 @@ export function App() {
           node: (
             <ToolButton key="saveImage" onClick={() => void saveImage()} disabled={lines.length === 0}>
               ⤓ {t('saveImage')}
+            </ToolButton>
+          ),
+        },
+        {
+          /* #1872: gated on there being a GIVEN to print, not on the line count (3-D's #511 reason) */
+          id: 'saveQuestion',
+          node: (
+            <ToolButton key="saveQuestion" onClick={() => void saveQuestion()} disabled={questionGivens.length === 0}>
+              ⤓ {t('saveQuestion')}
             </ToolButton>
           ),
         },

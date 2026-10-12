@@ -243,6 +243,11 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   in the view's own form (D1), including one fixed by its own stated modulus and argument («|z| = 2» ·
   «arg z = 30°» reads «z = 2·cis30°» / «z = √3+i», W7). An accepted given never leaves nothing on screen.
   - Sources: [ADR-CX-043](06d-decisions-complex.md#adr-cx-043), #1389, #1390, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W7, #1862)
+- **FR-KN-6 (Should)** — **The exported question prints the givens, never the claims.** «הורידו שאלה»
+  (02w FR-EX-2) lists every active line as typed, in entry order, and leaves out a line that only states a
+  claim (✓/✗) — a claim is the student's answer, and a question sheet does not print its answers. A line
+  that states a given and a claim is printed. Nothing to print disables the button.
+  - Sources: [ADR-CX-067](06d-decisions-complex.md#adr-cx-067), ruling W6 (2026-10-08), #1872
 
 ## Input honesty
 

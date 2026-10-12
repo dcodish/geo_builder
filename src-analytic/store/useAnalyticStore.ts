@@ -360,6 +360,14 @@ interface AnalyticState {
   setNotice: (n: string | null) => void;
 }
 
+/**
+ * THE PART MARKER of a fallback sentence (#1297) — written HERE, by `recordLlmLines`, and read back by the one
+ * consumer that needs the sentence itself: the question export prints a fallback-built statement ONCE, as the
+ * student said it (#1872, ADR-AG-269). Writer and reader share these two functions so the format cannot drift.
+ */
+export const spokenPart = (spoken: string, k: number, n: number): string => (n > 1 ? `${spoken} (${k + 1}/${n})` : spoken);
+export const spokenSentence = (label: string): string => label.replace(/ \(\d+\/\d+\)$/, '');
+
 /** One letter change, as one set — lines, ask rows, display sentences, seed names (#1154, #1631). */
 const letterCommit = ({ lines, queries, spokenFor, seedNames, segStyle }: LetterCommit) => ({
   lines: lines.map(ingestTypedText),
@@ -417,7 +425,7 @@ export const useAnalyticStore = create<AnalyticState>()(
     set((s) => {
       const spokenFor = { ...s.spokenFor };
       ls.forEach((_, k) => {
-        spokenFor[s.lines.length + k] = ls.length > 1 ? `${spoken} (${k + 1}/${ls.length})` : spoken;
+        spokenFor[s.lines.length + k] = spokenPart(spoken, k, ls.length);
       });
       return { lines: [...s.lines, ...ls.map(ingestTypedText)], spokenFor, error: null, notice };
     }),

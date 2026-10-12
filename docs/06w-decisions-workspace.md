@@ -1073,7 +1073,7 @@ where two plausible rounders disagree; `shell/__tests__/display-format.test.ts` 
 
 ## ADR-W-027 — The question document is ONE composer, parameterized by the caller's bidi (#745)
 
-**Status:** accepted, 2026-08-18 · **Amended 2026-08-19** (scope: 3-D only, see *Scope amendment*)
+**Status:** accepted, 2026-08-18 · **Amended 2026-08-19** (scope: 3-D only, see *Scope amendment*) · **⚠ Scope amendment superseded by [ADR-W-126](#adr-w-126) (2026-10-12, B16 · #1872):** every builder offers the question document
 · **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745) · operator: *"for the 3d and for
 complex tool we need the option to download question in the same way we do for the 2d tool"*
 
@@ -1126,7 +1126,7 @@ segmenter. The same was true one layer down: the clean-export rasteriser was a p
    `docx` out of the static import graph — every app imports the composer dynamically so the library
    stays out of its main chunk, and a static import of a constant declared beside it would defeat that.
 
-**Scope amendment (operator ruling, 2026-08-19): the question document is 2-D and 3-D only.**
+**Scope amendment (operator ruling, 2026-08-19): the question document is 2-D and 3-D only.** **⚠ Superseded by [ADR-W-126](#adr-w-126) (2026-10-12):** history below.
 *"הורידו שאלה should be in 3d but not in complex"*, given during play-and-approve. The complex leg —
 its givens module, handler, button and locale strings — is removed, not flagged off. Everything above
 stands unchanged: the composer is shared because 2-D and 3-D both print through it, and the argument
@@ -5768,3 +5768,23 @@ He is right, and the failure is instructive: **isolation fixes a Hebrew run agai
 **Not done here.** The plan's info note («פיצלנו את מה שהדבקתם לשורות — נתון אחד בכל שורה.») is not shipped: the operator chose "split into rows" over "build as one row with advice", and new student-facing wording needs his ruling (CLAUDE.md rule 7). The reported paste still stops at its first sentence: «דרך הנקודה P מעבירים אנך לישר AB» is not read in analytic even alone — that is #1775 (open). Its second sentence builds once the first does (locked with the first sentence in a spelling analytic reads). No row in `geo-input-parity.ts`: that fixture measures the per-line decision, and the split lives above it, at the submit seam.
 
 **Locks.** `shell/__tests__/sentences-1778.test.ts` (the splitter grid, the chain, `submitTyped`); the cross-product rows `shell/__tests__/fixtures/paste-paragraph-rows.ts` with its meta-lock `paste-paragraph-meta-1778.test.ts` and one thin lock per builder (`src/app/__tests__/`, `src-analytic/__tests__/`, `src3d/__tests__/`, `src-complex/__tests__/` — `paste-paragraph-1778.test.ts`).
+
+## ADR-W-126 — «הורידו שאלה» is offered in every builder: each product supplies its own «נתון:» list to the one composer (#1872; supersedes ADR-W-027's scope amendment)
+
+**Status:** accepted · 2026-10-12 · fix round #1998 (feature, PR) · **supersedes** the *Scope amendment* of [ADR-W-027](#adr-w-027) · **Product ADRs:** [ADR-AG-269](06c-decisions-analytic.md#adr-ag-269) (analytic), [ADR-CX-067](06d-decisions-complex.md#adr-cx-067) (complex) · rulings B16 of [ADR-W-118](#adr-w-118) and W5/W6 (2026-10-08, on #1872)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-EX-2 (every builder) · **Design:** [04w](04w-design-shell.md) "Export" row (four consumers)
+
+**The rule (operator, 2026-10-07, B16):** *"add it to complex too. this is a basic capability of the tool"* — the question document is in every builder (pedagogy P14: whatever a teacher needs is in every builder). It reverses the 2026-08-19 ruling that kept complex out and brings analytic in.
+
+**What is shared and what is not (the copy count, docs/22 §9).** The composer (`shell/export/questionDoc`), the rasteriser (`shell/export/svgToPng`) and the row slot (`shell/frame/toolRow`) were already shared and take no product knowledge. What each product adds is (a) its **givens source**, which reads its own engine's model — 2-D's commands, 3-D's facts, analytic's facts, complex's parsed lines — and is therefore engine knowledge, copied never shared (`BOUNDARIES.json`); and (b) a ~20-line handler around the one shared call, which ADR-W-027 left per product. Nothing new is hoisted.
+
+**What each list prints, per ruling.**
+
+| Builder | List | Source |
+| --- | --- | --- |
+| 2-D | scaffolding omitted, canonical echo where the renderer covers the line | ADR-252, #465 |
+| 3-D | every enabled utterance, verbatim | operator 2026-08-18 |
+| analytic | 2-D's rules over analytic's facts; the student's sentence (no renderer, #1468) | W5, ADR-AG-269 |
+| complex | every active line as typed, claim-only lines left out | W6, ADR-CX-067 |
+
+**Held by.** `shell/__tests__/question-export.test.ts` — every App in the suite (cross-checked against `utility-row-parity.test.ts`'s list) reaches the composer by dynamic import, names a givens source, hands in a segmenter, mounts the button and carries both strings in both languages; the n/a half that scanned complex for the capability's absence is retired with the ruling it held. `shell/__tests__/suite-vocabulary.test.ts` — the button label and the heading are one role each, ruled wording «הורידו שאלה» / "Download question" and «נתון:» / "Given:".

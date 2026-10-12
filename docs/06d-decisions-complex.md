@@ -1782,7 +1782,7 @@ design; a stopgap panel built here would be work that programme would delete.
 ## ADR-CX-028 — «הורידו שאלה» is NOT built here: the question document is 2-D and 3-D only (#745)
 
 **Status:** accepted, 2026-08-19 · **Issue:** [#745](https://github.com/dcodish/geo_builder/issues/745)
-· operator ruling, 2026-08-19: *"הורידו שאלה should be in 3d but not in complex"* · **⚠ Ruled to change 2026-10-07 (ADR-W-118 B16 · #1872):** «הורידו שאלה» is built in every builder, complex included
+· operator ruling, 2026-08-19: *"הורידו שאלה should be in 3d but not in complex"* · **⚠ Superseded by [ADR-CX-067](#adr-cx-067) (2026-10-12, ruling B16 · #1872):** «הורידו שאלה» is built in every builder, complex included
 
 **Context.** #745 moved the question-document composer and the clean-export rasteriser into `shell/`
 ([ADR-W-027](06w-decisions-workspace.md#adr-w-027)) so a capability that had been trapped in `src/`
@@ -4066,3 +4066,24 @@ supersedes the canvas half of [ADR-CX-015](#adr-cx-015) and the 2026-08-18 rulin
 **Locks.** `src-complex/__tests__/issue-1867-two-values.test.ts` (opposites, a non-opposite pair over three configurations, English «or», three values withheld, a floor withheld, one value unchanged, the ± bracket and ≈ spelling). Amended: `knowledge-invariance-1427` locks 1–3 and the conj case (now «±3», «±1», «±1.41»), `all-roots-1434` (Re(z) of z³ = 1 lists «-0.5 או 1»; Im(z) keeps «differs between the 3 solutions»), `solve/__tests__/knowledge.test.ts` (the predicate carries the pair; a three-valued distance is withheld, a two-valued one lists).
 
 **Behaviour change for a student:** «z1^2-4z1+13=0 · z2 = 2z1 · Im(z1)» answers «= ±3» (was: «הערך משתנה בין 2 התצורות…»); «z^3 = 8» as a number z1 answers «Re(z1) = -1 או Re(z1) = 2»; «z^2-4z+13=0 · Im(z)» answers «±3» (was: differs between the 2 solutions). A value with three or more possibilities, or one a census cannot prove complete, is withheld as before.
+
+## ADR-CX-067 — «הורידו שאלה» is offered here: the givens as typed, the claims left out (#1872; supersedes ADR-CX-028)
+
+**Status:** accepted, 2026-10-12 · **supersedes** [ADR-CX-028](#adr-cx-028) · **Issue:** [#1872](https://github.com/dcodish/geo_builder/issues/1872) (feature, P2, `complex`, `analytic`) · fix round #1998 · operator rulings B16 (2026-10-07, *"add it to complex too. this is a basic capability of the tool"*, [ADR-W-118](06w-decisions-workspace.md#adr-w-118)) and W6 (2026-10-08, on #1872: **"Givens only"**) · workspace record [ADR-W-126](06w-decisions-workspace.md#adr-w-126)
+**Requirements:** [02d](02d-requirements-complex.md) FR-KN-6 · [02w](02w-requirements-workspace.md) FR-EX-2 ·
+**Design:** [04d](04d-design-complex.md) § "The question export" ·
+**Ladder:** none (an export reads the fact list; it inserts no solve stage)
+
+**Measured at pickup** (`main` @ `403efe66`). The tool row had no «הורידו שאלה»; ADR-CX-028 had removed it on the 2026-08-19 ruling, which B16 reverses. Through the real parser, `parseLineV2` reads «z1 ממשי», «w מדומה טהור», «z1 ו-z2 צמודים זה לזה» and «לכל n טבעי, w^(4n) ממשי» as `assertions` + `declares` and nothing else; «a ממשי» as `assertions` + `realTyped`; givens («z1 = 3+4i», «|z1| = 5», «z^3 = 8») carry no assertion.
+
+**Decision.** The tool row carries «הורידו שאלה» between the image download and the guide, as in every builder. It calls the shared composer (`shell/export/questionDoc`, dynamically imported) with `complexBidi.segments`, the figure name as title and the shared rasteriser at the print width. The givens are `app/questionLines.ts`:
+- every **active** line, **as typed**, in entry order (no canonical echo exists here, and the fact list shows the typed line too);
+- **minus a claim-only line** (W6): one whose parse states a claim and no given. Read off `ParsedLine`'s channels, classified in an exhaustive `Record<keyof ParsedLine, …>`, so a channel added to the parser does not typecheck until it is classified;
+- a line that states a given AND a claim **stays** — the given cannot be printed without its sentence, and dropping a stated given is the one error this list must not make;
+- a claim that DRIVES a free number (#688) is still the student's answer and is left out; a real-parameter **type** («a ממשי», [ADR-CX-061](#adr-cx-061)) is a given and is printed.
+
+The button is disabled while the list is empty, so a session of claims alone offers no document.
+
+**Locks.** `src-complex/__tests__/question-export-1872.test.ts` (10): entry order, the empty list, the muted line, each claim family left out (with the precondition that the fold really checks each as a claim), a driving claim, claims alone → empty, the type kept, the App's gate and list read from one memo, and the saved fixture `fixtures/question-export-1872.complex.json` through `hydrateSession` (which the fixtures net also replays green). `shell/__tests__/question-export.test.ts` no longer scans complex for the absence of the capability (ADR-W-126).
+
+**Consequences.** `src-complex/app/questionLines.ts` (new), `App.tsx` (handler, memo, button; the ADR-CX-028 comment rewritten), `i18n/index.ts` (`saveQuestion`, `questionGiven`).

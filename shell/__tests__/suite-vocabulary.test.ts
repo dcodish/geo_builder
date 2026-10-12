@@ -65,6 +65,9 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   stateEqualPair: { '2d': ['steps.stateEqualPair'], '3d': null, complex: null, analytic: ['stateEqualPair'] },
   stateParallel: { '2d': ['steps.stateParallel'], '3d': null, complex: null, analytic: ['stateParallel'] },
   drawnParallel: { '2d': ['steps.drawnParallel'], '3d': null, complex: null, analytic: ['drawnParallel'] },
+  // #1872 (ADR-W-126): «הורידו שאלה» is in every builder (B16), so its label and the document's heading are one role each
+  saveQuestion: { '2d': ['canvas.saveQuestion'], '3d': ['actions.saveQuestion'], complex: ['saveQuestion'], analytic: ['saveQuestion'] },
+  questionHeading: { '2d': ['questionDoc.given'], '3d': ['questionDoc.given'], complex: ['questionGiven'], analytic: ['questionGiven'] },
 };
 
 /** The ruled wording (the "Explicit set", 2026-09-27) — the lock's anchor, not just "all equal". */
@@ -81,6 +84,8 @@ const RULED: Record<string, Record<Lang, string>> = {
   dofCount: { he: 'דרגות חופש: {{N}}', en: 'Degrees of freedom: {{N}}' },
   busy: { he: 'חושב…', en: 'Working…' },
   askSubmit: { he: 'שאלו', en: 'Ask' },
+  saveQuestion: { he: 'הורידו שאלה', en: 'Download question' },
+  questionHeading: { he: 'נתון:', en: 'Given:' },
 };
 
 /** Interpolation names differ per product ({{count}} / {{n}}) — the WORDING is what must match. */

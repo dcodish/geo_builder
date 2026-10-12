@@ -310,7 +310,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | AI fallback for unread input | yes | yes | yes | none | **Ruled change** — build it (B14, #1869) |
 | Save, load, share link | shared | same | same | same | **Same** |
 | Image export | yes | yes | yes | yes | **Same** |
-| Question export «הורידו שאלה» | yes | yes | no | no | **Ruled change** — every builder (B16, #1872) |
+| Question export «הורידו שאלה» | yes | yes | yes | yes | **Same** (B16, #1872: ADR-W-126) — each list per its ruling: analytic follows 2-D (W5), complex leaves the claims out (W6) |
 | Empty state | «מה בונים היום?» | same | its own title and hint | same as 2-D | **Ruled change** — shared title, analytic keeps its hint (B15, #1871) |
 | Hide a segment | menu, not undoable | no menu | menu, undoable | n/a | **Ruled change** — 2-D becomes undoable (B15, #1871); 3-D **Ruled** n/a |
 | Header, suite bar, About | shared frame | same | same | same | **Same** |
@@ -456,10 +456,12 @@ engine. Owned by the site-root files in `deploy/homepage/` and by each builder's
 - **FR-EX-1 (Should)** — **A clean, print-ready image** of the current figure, from every builder, on a
   white background at export resolution rather than screen resolution.
   - Sources: generalises [02](02-requirements.md) FR-HS-5.
-- **FR-EX-2 (Should)** — **⚠ Ruled to change (2026-10-07, ADR-W-118 B16 · #1872):** «הורידו שאלה» is offered in every builder, the analytic and complex builders included; today only 2-D and 3-D offer it. The text below describes the code until that ships. **The built question as a document**, laying out the figure beside the student's
+- **FR-EX-2 (Should)** — **«הורידו שאלה» is offered in every builder.** **The built question as a document**, laying out the figure beside the student's
   own numbered givens, Hebrew RTL correct in Word. **Deterministic — never LLM-generated**: the givens are
-  the student's own words in entry order.
-  - Sources: generalises [02](02-requirements.md) FR-HS-11.
+  the student's statements in entry order, each builder's list per its ruling — 2-D omits scaffolding and
+  echoes its canonical form, 3-D is verbatim, analytic follows 2-D, complex leaves the claims out. The button is
+  disabled while there is no given to print.
+  - Sources: generalises [02](02-requirements.md) FR-HS-11; [ADR-W-126](06w-decisions-workspace.md#adr-w-126) (B16, #1872).
 - **FR-EX-3 (Must)** — **A downloaded image never contains on-screen chrome, in every builder.** What is
   painted only to be interacted with — hover marks, crossing offers, hit rings, hidden-item ghosts,
   selection accents, edit affordances — is not part of the figure and never reaches a worksheet. The

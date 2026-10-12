@@ -1,0 +1,13 @@
+{
+  "app": "complex-builder",
+  "version": 1,
+  "lines": [
+    "z1 = 3+4i",
+    "w מדומה טהור",
+    "|z2| = 5",
+    "z1 ו-z2 צמודים זה לזה"
+  ],
+  "freePos": {},
+  "seed": 0,
+  "view": "cart"
+}

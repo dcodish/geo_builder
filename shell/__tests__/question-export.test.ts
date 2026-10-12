@@ -8,7 +8,7 @@
  *     nothing but its inputs, with the caller's own segmenter deciding where technical runs begin.
  *     Asserted with a STUB segmenter that no product would ever produce, so a hard-coded run rule
  *     sneaking back in — the fork wearing a shared file's name (ADR-W-003) — fails here.
- *  2. **Parity.** All three builders reach the shared composer, name a givens source, and carry the
+ *  2. **Parity.** All four builders (#1872) reach the shared composer, name a givens source, and carry the
  *     heading and the button label in both locales. Source-scan locks in the row-parity/isolation
  *     pattern: the capability is what #745 is about, and a silently dropped wire-up is the regression.
  */
@@ -147,20 +147,27 @@ describe('#745 — the source size is resolved as a PAIR, for the way each build
 });
 
 /**
- * Which builders print a question document is a DECLARED matrix row, not a headcount.
+ * EVERY builder prints a question document (#1872, [ADR-W-126](../../docs/06w-decisions-workspace.md#adr-w-126)).
  *
- * Operator ruling, 2026-08-19: «הורידו שאלה» belongs in 2-D and 3-D and **not** in the complex builder.
- * So this file locks two things that are easy to confuse: every builder in `APPS` wires the capability
- * completely, and the builder in `NO_QUESTION_EXPORT` does not wire it at all. The second assertion is
- * the one that matters — a deliberate n/a and a forgotten cell look identical in a passing suite, and
- * the only difference is whether something fails when the gap quietly closes.
+ * Operator ruling B16 (2026-10-07): *"add it to complex too. this is a basic capability of the tool"* —
+ * superseding the 2026-08-19 ruling that kept complex out, and bringing analytic in (pedagogy P14: whatever a
+ * teacher needs is in every builder). So the matrix has no n/a row any more: every App in the suite wires the
+ * capability completely, and a builder that stops doing so fails here rather than in front of a teacher.
  */
-describe('#745 — the builders that offer the question download, and the one that does not', () => {
+describe('#745 / #1872 — every builder offers the question download', () => {
   const APPS = [
     { name: '2-D', file: 'src/App.tsx', lines: 'src/export/questionLines.ts' },
     { name: '3-D', file: 'src3d/App3.tsx', lines: 'src3d/export/questionLines3.ts' },
+    { name: 'analytic', file: 'src-analytic/App.tsx', lines: 'src-analytic/app/questionLines.ts' },
+    { name: 'complex', file: 'src-complex/App.tsx', lines: 'src-complex/app/questionLines.ts' },
   ];
-  const NO_QUESTION_EXPORT = [{ name: 'complex', file: 'src-complex/App.tsx' }];
+
+  it('the matrix is the whole suite — every App the utility row knows is listed here', () => {
+    // utility-row-parity.test.ts enumerates the suite's Apps; a fifth builder joins both lists or fails
+    const parity = read('shell/__tests__/utility-row-parity.test.ts');
+    for (const { file } of APPS) expect(parity).toContain(`'${file}'`);
+    expect((parity.match(/const APPS = \[([^\]]*)\]/)?.[1].match(/'/g) ?? []).length / 2).toBe(APPS.length);
+  });
 
   it.each(APPS)('$name reaches the SHARED composer, dynamically imported', ({ file }) => {
     const src = read(file);
@@ -178,44 +185,41 @@ describe('#745 — the builders that offer the question download, and the one th
     expect(read(file)).toMatch(/segments:\s*\w/);
   });
 
-  it('the button carries ONE wording in the builders that have it, he and en', () => {
-    for (const rel of ['src/i18n/locales/he.json', 'src3d/i18n/locales/he.json'])
-      expect(read(rel), `${rel} must carry the button label`).toContain('הורידו שאלה');
-    for (const rel of ['src/i18n/locales/en.json', 'src3d/i18n/locales/en.json'])
-      expect(read(rel), `${rel} must carry the en mirror`).toContain('Download question');
+  it.each(APPS)('$name mounts the button in the tool row', ({ file }) => {
+    expect(read(file)).toMatch(/id: 'saveQuestion'/);
   });
 
-  it('the document heading is defined in those builders, he and en', () => {
-    for (const rel of ['src/i18n/locales/he.json', 'src3d/i18n/locales/he.json'])
-      expect(read(rel), `${rel} must carry the «נתון:» heading`).toContain('נתון:');
-    for (const rel of ['src/i18n/locales/en.json', 'src3d/i18n/locales/en.json'])
-      expect(read(rel), `${rel} must carry the en heading`).toContain('Given:');
+  const HE = ['src/i18n/locales/he.json', 'src3d/i18n/locales/he.json'];
+  const EN = ['src/i18n/locales/en.json', 'src3d/i18n/locales/en.json'];
+  /** The TS-object locales hold both languages in one file: `const he = {…}` then `const en: typeof he = {…}`. */
+  const tsBlock = (rel: string, lang: 'he' | 'en') => {
+    const src = read(rel);
+    const enAt = src.indexOf('const en: typeof he = {');
+    return lang === 'he' ? src.slice(src.indexOf('const he = {'), enAt) : src.slice(enAt);
+  };
+  const TS = ['src-analytic/i18n/index.ts', 'src-complex/i18n/index.ts'];
+
+  it('the button carries ONE wording in every builder, he and en', () => {
+    for (const rel of HE) expect(read(rel), `${rel} must carry the button label`).toContain('הורידו שאלה');
+    for (const rel of EN) expect(read(rel), `${rel} must carry the en mirror`).toContain('Download question');
+    for (const rel of TS) {
+      expect(tsBlock(rel, 'he'), `${rel} (he) must carry the button label`).toContain("'הורידו שאלה'");
+      expect(tsBlock(rel, 'en'), `${rel} (en) must carry the en mirror`).toContain("'Download question'");
+    }
   });
 
-  /**
-   * The n/a half. If a later session mounts the button in complex — by porting a surface wholesale, or
-   * by "completing the matrix" without reading the ruling — these fail and name the ruling, which is
-   * the only way a DECISION not to build something survives contact with a unification programme.
-   */
-  it.each(NO_QUESTION_EXPORT)('$name does NOT wire the question export (operator ruling, 2026-08-19)', ({ file }) => {
-    const src = read(file);
-    expect(src, `${file} must not reach the question composer`).not.toContain('shell/export/questionDoc');
-    expect(src, `${file} must not offer the button`).not.toContain('questionDownload');
+  it('the document heading is defined in every builder, he and en', () => {
+    for (const rel of HE) expect(read(rel), `${rel} must carry the «נתון:» heading`).toContain('נתון:');
+    for (const rel of EN) expect(read(rel), `${rel} must carry the en heading`).toContain('Given:');
+    for (const rel of TS) {
+      expect(tsBlock(rel, 'he'), `${rel} (he) must carry the «נתון:» heading`).toContain("'נתון:'");
+      expect(tsBlock(rel, 'en'), `${rel} (en) must carry the en heading`).toContain("'Given:'");
+    }
   });
 
-  it('complex carries no question-export strings and no givens module', () => {
-    expect(read('src-complex/i18n/index.ts')).not.toContain('הורידו שאלה');
-    expect(read('src-complex/i18n/index.ts')).not.toContain('Download question');
-    expect(fs.existsSync(path.join(ROOT, 'src-complex/export/questionLines.ts'))).toBe(false);
-  });
-
-  /**
-   * What complex DOES share is the rasteriser — the third product-local svg→png copy, which #742
-   * flagged as a shell candidate and this issue's shared module retires. Sharing the pixels while
-   * declining the document is the point: the n/a is about the QUESTION, not about the export layer.
-   */
-  it('complex still rasterises through the SHARED path — the n/a is the document, not the pixels', () => {
-    expect(read('src-complex/App.tsx')).toContain('shell/export/svgToPng');
-    expect(read('src-complex/App.tsx')).not.toContain('new XMLSerializer()');
+  /** Every builder rasterises through the ONE shared path — the image export and the document alike. */
+  it.each(APPS)('$name rasterises through the SHARED path', ({ file }) => {
+    expect(read(file)).toContain('shell/export/svgToPng');
+    expect(read(file)).not.toContain('new XMLSerializer()');
   });
 });
