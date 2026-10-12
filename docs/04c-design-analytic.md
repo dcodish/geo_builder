@@ -498,6 +498,12 @@ The line is COMPOSED, never rewritten (2-D's ADR-574/575 shape). `parseRoleLengt
 
 *Identifiers:* `ROLE_LENGTH_HE/EN` · `ROLE_PHRASE_HE/EN` · `ROLE_COPULA` · `measureTemplate` · `composeRoleLength` · `HEIGHT_SHAPE_HE/EN` · `parseShapeHeight` · `height-of` · `applyHeightOf` · `CEVIAN_MEASURE_SENTINELS` · `measureFacts` · `ambiguous-height` · `shape-not-found` · `diagonal-is-side` · `diagonal-none-here`
 
+### A side named by its role alone ([ADR-AG-266](06c-decisions-analytic.md#adr-ag-266), #1807)
+
+`parseClause`'s last resort before `not-handled`: `parseRoleSide` writes a bare «הבסיס» / «השוק» / «היתר» (En "the base / leg / hypotenuse") as «<noun> Z₄Z₅» (`ROLE_SIDE_SENTINELS`) and reads the line through the real grammar, so the reading is the lettered twin's. It keeps the reading only when it puts that side on a stated LINE (a `curve` over the sentinels: the equation and incidence forms) and lowers it to `role-side { role, facts }`. M1's `applyRoleSide` finds the one polygon where the role has a content (an isosceles noun's apex choice, a triangle's right-angle seat, a trapezoid's parallel pair; none or several → `noHost`). A SETTLED role (a stated equal pair or right angle, `seatOver`'s `fixed`) applies the facts with the side's letters written in. An OPEN one replaces the noun's choice IN PLACE with `choice(all(option, the statement's constraints on that option's side))`: the line is drawn once, anonymous (`curve-<role>-<hash>`), and the declarations, sides and role claims (a trapezoid's pair excepted, stated once) are left to the ring. A statement naming PART of exactly one joint option («AB=AC» later) collapses the choice to that whole option, at the same seat the plain collapse uses.
+
+*Identifiers:* `BARE_ROLE_HE/EN` · `parseRoleSide` · `role-side` · `ROLE_SIDE_SENTINELS` · `applyRoleSide` · `seatOver` · `readingOf` · `anonOf` · the joint-option collapse in `applyFact`'s constraint arm
+
 ### The perpendicular from a point, and the line through a point that cuts a side ([ADR-AG-207](06c-decisions-analytic.md#adr-ag-207), #1620)
 
 The foot is `DerivedRule { t: 'foot'; from; onto: FootLine }` (`engine/derived.ts`, `footOn`, `curveParentsOf`).

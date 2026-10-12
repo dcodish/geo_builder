@@ -58,7 +58,7 @@ function unreadable(src: string): RuleOutcome {
 }
 import { angleLabelSymbol, constantLengthExpr, namedLengthPairs, planeLetterLength, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
-import { CENTRE_SENTINEL, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
+import { CENTRE_SENTINEL, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow, BARE_POLYGON_NOT_BUILT } from '../engine/shapes';
 import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
@@ -7844,7 +7844,50 @@ function parseShapesAndPoints(line: string): RuleOutcome {
 
 function parseClause(raw: string): ParseResult {
   const r = parseClauseRules(raw);
+  // #1807 (ADR-AG-266): a sentence the grammar reads with a side's letters, written with its ROLE alone instead.
+  if (!r.ok && r.code === 'not-handled') {
+    const side = parseRoleSide(trim(raw));
+    if (side) return side;
+  }
   return r.ok ? made(withRoleIntroductions(r.facts)) : r;
+}
+
+/*
+ * A SIDE NAMED BY ITS ROLE ALONE (#1807, ADR-AG-266) — «משוואת הבסיס היא x-2y+6=0», «הבסיס מונח על הישר y=2x»,
+ * «משוואת היתר היא …», "the equation of the base is …".
+ *
+ * Operator, 2026-10-06: *"משוואת הבסיס should be understood. if the user defined the equal sides, this is easy to know
+ * what the base is but if he didn't the sentence can be used with dof"*. The parser cannot see which side the role is
+ * — that is the figure's (the apex the student stated, or the noun's open choice) — so the role becomes a REFERENCE:
+ * the sentence is read by the real grammar exactly as its lettered twin («משוואת הבסיס BC היא …»), with two sentinel
+ * letters in the side's place, and M1 resolves them (`applyRoleSide`). One resolver for every sentence, never a rule
+ * per spelling (#1236's lesson).
+ *
+ * The resolver serves what it can lower per option: a sentence that puts the role's SIDE ON A STATED LINE (the
+ * equation and the incidence forms) — constraints on the side's two ends. A sentence whose reading has no such line
+ * («D על הבסיס», «אורך הבסיס הוא 6», «תיכון לבסיס», which 2-D does not read the same way or which mint a point per
+ * option, #2018) is left exactly as it was.
+ */
+const BARE_ROLE_HE = /(^|[\s(])ה(בסיס|שוק|יתר)(?=$|[\s,.:)])(?!\s+[A-Z])/g;
+const BARE_ROLE_EN = /\b([Tt]he\s+(base|leg|hypotenuse))\b(?!\s+[A-Z])/g;
+const ROLE_SIDE_WORD: Readonly<Record<string, 'base' | 'leg' | 'hypotenuse'>> = {
+  בסיס: 'base', שוק: 'leg', יתר: 'hypotenuse', base: 'base', leg: 'leg', hypotenuse: 'hypotenuse',
+};
+function parseRoleSide(line: string): RuleOutcome {
+  const he = [...line.matchAll(BARE_ROLE_HE)];
+  const en = he.length ? [] : [...line.matchAll(BARE_ROLE_EN)];
+  const hits = he.length ? he : en;
+  if (hits.length !== 1) return null;
+  const [s1, s2] = ROLE_SIDE_SENTINELS;
+  const m = hits[0];
+  const at = m.index ?? 0;
+  const role = ROLE_SIDE_WORD[m[2]];
+  const lettered = `${line.slice(0, at)}${m[0]} ${s1}${s2}${line.slice(at + m[0].length)}`;
+  const r = parseClause(lettered);
+  if (!r.ok) return null;
+  const onLine = r.facts.some((f) => f.t === 'curve' && f.id.includes(s1) && f.id.includes(s2));
+  if (!onLine) return null;
+  return made([{ t: 'role-side', role, facts: r.facts.map((f) => ({ ...f, src: line })), src: line }]);
 }
 
 /** The facts that MAKE a point of their id — a point the clause defines (or already declares) is left as the clause has it. */
