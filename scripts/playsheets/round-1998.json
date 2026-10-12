@@ -1,0 +1,659 @@
+{
+ "name": "round-1998",
+ "title": "fix-round #1998 — a feature round: 12 PRs, each on its own port",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "2-D: two altitudes paired with their sides «בהתאמה»",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "משולש OBC",
+    "OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה"
+   ],
+   "lookFor": "The altitude from O lands on BC at D and the one from B lands on OC at E; both rows green.",
+   "before": "The second line goes to the AI fallback."
+  },
+  {
+   "id": "T2",
+   "title": "2-D: two medians paired with their sides «בהתאמה»",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AD ו-BE הם תיכונים לצלעות BC ו-AC בהתאמה"
+   ],
+   "lookFor": "D is the midpoint of BC and E the midpoint of AC, with AD and BE drawn; green.",
+   "before": "The second line goes to the AI fallback."
+  },
+  {
+   "id": "T3",
+   "title": "2-D: the exam framing «המרובע ABCD הוא טרפז (AB ∥ CD)»",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "path": "/",
+   "lines": [
+    "המרובע ABCD הוא טרפז (AB ∥ CD)"
+   ],
+   "lookFor": "A trapezoid with AB ∥ CD, one row, green.",
+   "before": "Refused, asking to split the line."
+  },
+  {
+   "id": "T4",
+   "title": "2-D: the exam's figure intro and «O – מרכז המעגל»",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "path": "/",
+   "lines": [
+    "בסרטוט שלפניך מתואר משולש ABC",
+    "משולש ABC חסום במעגל",
+    "O – מרכז המעגל"
+   ],
+   "lookFor": "Triangle ABC, its circumcircle, and the centre labelled O; every row green.",
+   "before": "Lines 1 and 3 go to the AI fallback."
+  },
+  {
+   "id": "T5",
+   "title": "2-D: «המרובע ABCO הוא טרפז ישר זווית»",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5175",
+   "path": "/",
+   "lines": [
+    "המרובע ABCO הוא טרפז ישר זווית"
+   ],
+   "lookFor": "A right trapezoid ABCO with its right-angle marks.",
+   "before": "The AI fallback."
+  },
+  {
+   "id": "T6",
+   "title": "2-D: a list of the sides a circle touches draws the incircle",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5176",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה"
+   ],
+   "lookFor": "The inscribed circle of ABC touching AB at D, BC at E and CA at F; green.",
+   "before": "Refused with «נראה שיש כאן כמה הוראות בשורה אחת…»."
+  },
+  {
+   "id": "T7",
+   "title": "2-D: the touch list typed first, then the centre named",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5176",
+   "path": "/",
+   "lines": [
+    "הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה",
+    "O מרכז המעגל"
+   ],
+   "lookFor": "The same figure as T6, with the centre labelled O.",
+   "before": "Refused, as T6."
+  },
+  {
+   "id": "T8",
+   "title": "2-D: a square's touch list draws its incircle",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5176",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "הצלעות AB, BC, CD ו-DA משיקות למעגל בנקודות P, Q, R ו-S בהתאמה"
+   ],
+   "lookFor": "The square's inscribed circle touching at P, Q, R, S.",
+   "before": "Refused, as T6."
+  },
+  {
+   "id": "T9",
+   "title": "REFUSAL — 2-D: a pentagon's touch list says the tool cannot draw it yet",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5176",
+   "path": "/",
+   "lines": [
+    "מחומש ABCDE",
+    "הצלעות AB, BC, CD, DE ו-EA משיקות למעגל"
+   ],
+   "expectRefusal": "מחומש",
+   "lookFor": "The second line is refused with «הכלי עדיין לא יודע לשרטט מעגל חסום במחומש».",
+   "before": "Refused with the «כמה הוראות» note instead."
+  },
+  {
+   "id": "T10",
+   "title": "2-D: a sector's area as a given",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5177",
+   "path": "/",
+   "lines": [
+    "גזרה AOB",
+    "שטח הגזרה AOB הוא 12π"
+   ],
+   "lookFor": "The sector resizes with its angle kept, and «12π» sits inside the wedge; green.",
+   "before": "Line 2 is not understood."
+  },
+  {
+   "id": "T11",
+   "title": "2-D: an arc length added to the sector area",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5177",
+   "path": "/",
+   "lines": [
+    "גזרה AOB",
+    "שטח הגזרה AOB הוא 12π",
+    "אורך הקשת AB הוא 4π"
+   ],
+   "lookFor": "The angle becomes 120° and «4π» labels the arc; green.",
+   "before": "Lines 2 and 3 are not understood."
+  },
+  {
+   "id": "T12",
+   "title": "2-D: a sector's area as a quarter of the circle",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5177",
+   "path": "/",
+   "lines": [
+    "גזרה AOB",
+    "שטח הגזרה AOB = ¼ משטח המעגל"
+   ],
+   "cycles": 2,
+   "lookFor": "A 90° wedge, and «הציגו תצורה אחרת» keeps it at 90°.",
+   "before": "Line 2 is not understood."
+  },
+  {
+   "id": "T13",
+   "title": "2-D: the sector's area named S",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5177",
+   "path": "/",
+   "lines": [
+    "גזרה AOB",
+    "נסמן את שטח הגזרה ב-S"
+   ],
+   "lookFor": "S inside the sector; the figure does not change.",
+   "before": "Line 2 is not understood."
+  },
+  {
+   "id": "T14",
+   "title": "REFUSAL — 2-D: the English arc length on a bare circle is no longer a chord",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5177",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "A על המעגל",
+    "B על המעגל",
+    "arc length AB = 4π"
+   ],
+   "lookFor": "The last line is refused as unreadable («לא הצלחתי לקרוא את זה עדיין…» — this port has no AI model); no chord AB is drawn and no 4π appears.",
+   "before": "Commits the CHORD AB = 4π — a straight segment, not the arc.",
+   "expectRefusal": "לא הצלחתי לקרוא"
+  },
+  {
+   "id": "T15",
+   "title": "Analytic: «האלכסון AC = 8» on a parallelogram",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5178",
+   "path": "/analytic.html",
+   "lines": [
+    "מקבילית ABCD",
+    "האלכסון AC = 8"
+   ],
+   "lookFor": "The diagonal AC drawn and labelled 8.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T16",
+   "title": "Analytic: «התיכון AM = 5»",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5178",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "התיכון AM = 5"
+   ],
+   "lookFor": "M is the midpoint of BC and AM is labelled 5.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T17",
+   "title": "Analytic: «גובה הטרפז 4»",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5178",
+   "path": "/analytic.html",
+   "lines": [
+    "טרפז ABCD",
+    "גובה הטרפז 4"
+   ],
+   "lookFor": "A height from D to a new point H on AB, labelled 4.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T18",
+   "title": "Analytic: «גובה המשולש 4» asks which height",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5178",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "גובה המשולש 4"
+   ],
+   "lookFor": "«גובה המשולש 4» asks: «ל\"גובה\" כאן יש כמה אפשרויות (הגובה לצלע BC 4, …)», naming the three heights. Then typing the taught «הגובה לצלע BC 4» commits the height to BC, labelled 4.",
+   "before": "Not understood.",
+   "expectRefusal": "כמה אפשרויות",
+   "after": [
+    {
+     "type": "הגובה לצלע BC 4"
+    }
+   ]
+  },
+  {
+   "id": "T19",
+   "title": "REFUSAL — Analytic: «האלכסון AB = 8» on a parallelogram (AB is a side)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5178",
+   "path": "/analytic.html",
+   "lines": [
+    "מקבילית ABCD",
+    "האלכסון AB = 8"
+   ],
+   "expectRefusal": "AB",
+   "lookFor": "Refused, saying AB is a side, not a diagonal. Nothing is drawn as 8.",
+   "before": "Not understood. (A bare «האלכסון AB» used to draw the side silently — that now refuses too.)"
+  },
+  {
+   "id": "T20",
+   "title": "Analytic: «משוואת הבסיס» on an isosceles triangle",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5185",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש שווה שוקיים ABC",
+    "AB=AC",
+    "משוואת הבסיס היא x-2y+6=0"
+   ],
+   "lookFor": "B and C on the line x − 2y + 6 = 0.",
+   "before": "The last line is not understood."
+  },
+  {
+   "id": "T21",
+   "title": "Analytic: the base equation with the equal pair unstated",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5185",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש שווה שוקיים ABC",
+    "משוואת הבסיס היא x-2y+6=0"
+   ],
+   "cycles": 2,
+   "lookFor": "One side lies on the line; «הציגו תצורה אחרת» cycles which side is the base, together with the apex.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T22",
+   "title": "REFUSAL — Analytic: a parallelogram has no base",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5185",
+   "path": "/analytic.html",
+   "lines": [
+    "מקבילית ABCD",
+    "משוואת הבסיס היא x-2y+6=0"
+   ],
+   "expectRefusal": "משוואת הבסיס",
+   "lookFor": "Refused, quoting the sentence.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T23",
+   "title": "Analytic: an isosceles triangle says which pair the tool drew",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5179",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC שווה שוקיים"
+   ],
+   "cycles": 1,
+   "after": [
+    {
+     "type": "AC=AB"
+    }
+   ],
+   "lookFor": "A note under the row naming the pair drawn («…כרגע מצוירות AB = AC…») and the amber cue beside «הציגו תצורה אחרת»; pressing it changes the drawing and the named pair together; typing «AC=AB» makes the note and the cue go.",
+   "before": "No note at all."
+  },
+  {
+   "id": "T24",
+   "title": "Analytic: an isosceles trapezoid says which pair is parallel",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5179",
+   "path": "/analytic.html",
+   "lines": [
+    "טרפז שווה שוקיים ABCD"
+   ],
+   "after": [
+    {
+     "type": "BC מקביל ל-AD"
+    }
+   ],
+   "lookFor": "«הכלי הניח ש-AB ∥ DC (השוקיים AD, BC)…» until «BC מקביל ל-AD» is typed; then the note goes.",
+   "before": "No note."
+  },
+  {
+   "id": "T25",
+   "title": "Analytic: an obtuse triangle, then «זווית A קהה» is read",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5179",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש קהה זווית ABC"
+   ],
+   "after": [
+    {
+     "type": "זווית A קהה"
+    }
+   ],
+   "lookFor": "«הכלי לא יודע איזו זווית קהה — כרגע מצוירת ∠…», then «זווית A קהה» records, A is drawn obtuse and the note goes.",
+   "before": "No note, and «זווית A קהה» is refused."
+  },
+  {
+   "id": "T26",
+   "title": "Analytic: the triangle's vertices on the axes",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5179",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "קודקודי המשולש מונחים על הצירים"
+   ],
+   "lookFor": "A note saying which vertex the tool put on which axis.",
+   "before": "No note."
+  },
+  {
+   "id": "T27",
+   "title": "Complex: an angle in radians, «2cis(π/4)»",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5180",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = 2cis(π/4)"
+   ],
+   "lookFor": "z₁ at 45° on radius 2, reading «z₁ = 2·cis45°».",
+   "before": "«לא הצלחתי להבין»."
+  },
+  {
+   "id": "T28",
+   "title": "Complex: the trig form in radians",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5180",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = 2(cos(π/4) + i sin(π/4))"
+   ],
+   "lookFor": "The same point and reading as T27; the row stays as typed.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T29",
+   "title": "Complex: «2cis(pi)» is 180°, not a free direction",
+   "class": "play",
+   "product": "complex",
+   "base": "http://localhost:5180",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = 2cis(pi)"
+   ],
+   "lookFor": "z₁ at −2, reading «2·cis180°».",
+   "before": "Accepted, but «pi» was read as a free direction (a letter), so no angle was stated."
+  },
+  {
+   "id": "T30",
+   "title": "REFUSAL — Complex: «z1 = π» as a value is still refused",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5180",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = π"
+   ],
+   "expectRefusal": "להבין",
+   "lookFor": "«לא הצלחתי להבין», unchanged.",
+   "before": "unchanged"
+  },
+  {
+   "id": "T31",
+   "title": "Complex: a computed number shows only its letter on the canvas",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5181",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = 3+4i",
+    "w = z1*i"
+   ],
+   "lookFor": "The canvas shows «w» alone (both views); the panel still has −4+3i.",
+   "before": "«w = -4+3i» printed on the canvas."
+  },
+  {
+   "id": "T32",
+   "title": "Complex: «z₂ = 18r» stays as typed",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5181",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = 3+4i",
+    "z2 = 18r",
+    "|z2| = 2|z1|"
+   ],
+   "lookFor": "The canvas reads «z₂ = 18r» in both views; the panel shows r = ±5/9.",
+   "before": "«z₂ = 10» on the canvas."
+  },
+  {
+   "id": "T33",
+   "title": "Complex: a letter's value can be shown or hidden on the canvas",
+   "class": "play",
+   "product": "complex",
+   "base": "http://localhost:5181",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = a+bi",
+    "a = 3"
+   ],
+   "lookFor": "The canvas reads «z₁ = 3+bi» and the «a = 3» row has an «a» chip; clicking it turns the canvas to «z₁ = a+bi», and the choice survives «הציגו תצורה אחרת».",
+   "before": "No chip; the polar view shows a bare «z₁»."
+  },
+  {
+   "id": "T34",
+   "title": "Complex: the roots of «z^2 = 2i» show their letters only",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5181",
+   "path": "/complex.html",
+   "lines": [
+    "z^2 = 2i"
+   ],
+   "lookFor": "The canvas shows «z₁» and «z₂» alone; their values are in the panel.",
+   "before": "«z₁ = 1+i» and «z₂ = -1-i» on the canvas."
+  },
+  {
+   "id": "T35",
+   "title": "2-D: a pasted two-sentence paragraph becomes two rows",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5182",
+   "path": "/",
+   "lines": [
+    "משולש ABC. M אמצע BC."
+   ],
+   "lookFor": "Two rows («משולש ABC», «M אמצע BC»), the input box empty.",
+   "before": "The whole line goes to the AI fallback."
+  },
+  {
+   "id": "T36",
+   "title": "Analytic: a paste stops at the first sentence that needs a second look",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5182",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,2)",
+    "P(1,3)",
+    "מעבירים אנך מהנקודה P לישר AB. האנך חותך את הישר y = 7 בנקודה C."
+   ],
+   "lookFor": "No row is added yet; the box holds «אנך מהנקודה P לישר AB. האנך חותך…» for a second Enter, which then adds two rows with C on y = 7.",
+   "before": "The whole paste is not understood."
+  },
+  {
+   "id": "T37",
+   "title": "3-D: a paste stops at a sentence the tool cannot read and keeps the rest",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5182",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC. שלום לכולם. M אמצע BC."
+   ],
+   "lookFor": "One row («משולש ABC»); the box keeps «שלום לכולם. M אמצע BC.» with the refusal for «שלום לכולם».",
+   "before": "The whole line is not understood."
+  },
+  {
+   "id": "T38",
+   "title": "Complex: a paste with decimals splits only at sentence ends",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5182",
+   "path": "/complex.html",
+   "lines": [
+    "z = 2.5 + i. w = 1 - i."
+   ],
+   "lookFor": "Two rows, z = 2.5 + i and w = 1 − i (the decimal point is not a sentence end).",
+   "before": "Not handled."
+  },
+  {
+   "id": "T39",
+   "title": "2-D: two possible lengths shown with «או»",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5183",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB = 5",
+    "BC = 4",
+    "זווית BAC = 40"
+   ],
+   "asks": [
+    "AC"
+   ],
+   "lookFor": "«AC = 1.45 או AC = 6.21»; and «∠ABC = 13.46 או ∠ABC = 86.54» in degrees.",
+   "before": "Only the three stated values, and «undetermined» for AC."
+  },
+  {
+   "id": "T40",
+   "title": "Complex: a solution-set question lists both values",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5183",
+   "path": "/complex.html",
+   "lines": [
+    "z1^2-4z1+13=0",
+    "z2 = 2z1",
+    "Im(z1)"
+   ],
+   "lookFor": "«Im(z1) = ±3».",
+   "before": "«הערך משתנה בין 2 התצורות…»."
+  },
+  {
+   "id": "T41",
+   "title": "3-D: two parameter values joined by «או»",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5183",
+   "path": "/3d.html",
+   "lines": [
+    "המישור π1: z = 1",
+    "המישור π2: z - m = 0",
+    "המרחק בין המישורים π1 ו-π2 הוא 3"
+   ],
+   "asks": [
+    "m"
+   ],
+   "lookFor": "«m = -2 או m = 4».",
+   "before": "«m = -2, m = 4»."
+  },
+  {
+   "id": "T42",
+   "title": "Analytic: «הורידו שאלה» exports the givens as a .docx",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5184",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "D על BC",
+    "זווית BAD = 30",
+    "AD",
+    "E על AB"
+   ],
+   "lookFor": "A «הורידו שאלה» button between «הורידו תמונה» and «מדריך». The .docx lists exactly «משולש ABC», «D על BC», «זווית BAD = 30», each as typed (no tidier form yet); the bare «AD» and «E על AB» are left out.",
+   "before": "No button."
+  },
+  {
+   "id": "T43",
+   "title": "Complex: «הורידו שאלה» leaves out checked claims",
+   "class": "play",
+   "product": "complex",
+   "base": "http://localhost:5184",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = 3+4i",
+    "w מדומה טהור",
+    "|z2| = 5"
+   ],
+   "lookFor": "The .docx lists «z1 = 3+4i» and «|z2| = 5», without «w מדומה טהור».",
+   "before": "No button."
+  },
+  {
+   "id": "T44",
+   "title": "Complex: «הורידו שאלה» is greyed out when only a claim is on the canvas",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5184",
+   "path": "/complex.html",
+   "lines": [
+    "w מדומה טהור"
+   ],
+   "lookFor": "«הורידו שאלה» is disabled.",
+   "before": "No button."
+  }
+ ]
+}
