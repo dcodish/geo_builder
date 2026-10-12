@@ -29,6 +29,7 @@ import { drawnPieceOver, isPolygonSide } from './extent';
 import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
 import {
   CENTRE_SENTINEL,
+  ROLE_SIDE_SENTINELS,
   CIRCLE_SENTINEL,
   CIRCLE_SLOT_SENTINELS,
   UNBOUNDED,
@@ -1594,6 +1595,137 @@ function applyHeightOf(c: Construction, f: Extract<Fact, { t: 'height-of' }>): A
   return applyFact(c, { t: 'cevian-of', role: 'altitude', apex, side: [ring[i], ring[(i + 1) % 4]], foot: f.foot, toolFoot: true, measure: f.measure, src: f.src });
 }
 
+/**
+ * A SIDE NAMED BY ITS ROLE ALONE, RESOLVED AGAINST THE FIGURE (#1807, ADR-AG-266).
+ *
+ * Which polygon: the ones where the role has a content — an isosceles triangle's base or leg (its noun's apex
+ * choice), a right triangle's hypotenuse (its seat choice, or any triangle's stated right angle), a trapezoid's base
+ * or leg (its one parallel pair). None or several → the contextual refusal (`noHost`), which names the sentence:
+ * a parallelogram and a plain triangle have no base (operator ruling 2026-10-06, #1807).
+ *
+ * Which side, read off the polygon's EXISTING structure, never a new pick:
+ * - SETTLED (the student stated the equal pair or the right angle) → the one side, and the sentence is applied
+ *   exactly as its lettered twin («משוואת הבסיס BC …»), its role claim included;
+ * - OPEN (the noun's choice still stands) → the statement is attached to EVERY option of that choice, in place
+ *   (`all(option, the statement on that option's side)`): one cycle, and the side on the line can never disagree
+ *   with the drawn apex (ADR-052 — an unstated choice is a degree of freedom, never refused, never a fixed pick);
+ * - a trapezoid's two bases (or legs), or an isosceles triangle's two legs once its apex is settled → a new choice
+ *   between them, the trapezoid's pair stated by the role's own claim (#1159).
+ * The sentence's line is drawn once, anonymous: in an open figure no pair of letters names it.
+ */
+function applyRoleSide(c: Construction, f: Extract<Fact, { t: 'role-side' }>): ApplyOutcome {
+  const [s1, s2] = ROLE_SIDE_SENTINELS;
+  type Option = { side: [Id, Id]; with?: Constraint };
+  type Reading = { poly: PolygonObject; options: Option[]; seat?: number; trapezoid?: true };
+  const sideOf = (ring: readonly Id[], i: number): [Id, Id] => {
+    const rest = ring.filter((_, k) => k !== i);
+    return [rest[0], rest[1]];
+  };
+  /** The noun's choice (or what is left of it) over `keys` — the seat holding it, else the keys stated outright. */
+  const seatOver = (keys: readonly Constraint[]): { seat: number; opts: Array<{ with: Constraint; i: number }> } | { fixed: number[] } => {
+    const idxOf = (o: Constraint): number => keys.findIndex((k) => sameConstraint(o, k) || (o.t === 'all' && o.of.some((x) => sameConstraint(x, k))));
+    const seat = c.constraints.findIndex((k) => k.t === 'choice' && k.options.length > 0 && k.options.every((o) => idxOf(o) >= 0));
+    const held = seat >= 0 ? c.constraints[seat] : undefined;
+    if (held && held.t === 'choice') return { seat, opts: held.options.map((o) => ({ with: o, i: idxOf(o) })) };
+    return { fixed: keys.flatMap((k, i) => (c.constraints.some((x) => x.t !== 'choice' && sameConstraint(x, k)) ? [i] : [])) };
+  };
+  const readingOf = (o: PolygonObject): Reading | null => {
+    const ring = o.vertices;
+    const noun = o.noun ? normalizeShapeNoun(o.noun) : '';
+    if (ring.length === 3) {
+      let keys: Constraint[];
+      if (f.role === 'hypotenuse') keys = [rightAngleAt(ring[0], ring[1], ring[2]), rightAngleAt(ring[1], ring[0], ring[2]), rightAngleAt(ring[2], ring[0], ring[1])];
+      else if (noun === 'משולש שווה שוקיים') {
+        const given = shapeRow(noun)!.givens([...ring])[0];
+        if (given.t !== 'choice') return null;
+        keys = given.options;
+      } else return null;
+      const sidesAt = (i: number): Array<[Id, Id]> =>
+        f.role === 'leg' ? sideOf(ring, i).map((x): [Id, Id] => [ring[i], x]) : [sideOf(ring, i)];
+      const s = seatOver(keys);
+      if ('seat' in s) return { poly: o, seat: s.seat, options: s.opts.flatMap(({ with: w, i }) => sidesAt(i).map((side) => ({ side, with: w }))) };
+      if (s.fixed.length === 0) return null;
+      return { poly: o, options: s.fixed.flatMap((i) => sidesAt(i).map((side) => ({ side }))) };
+    }
+    if (ring.length !== 4 || f.role === 'hypotenuse' || ringsNamed([o], 'טרפז').length !== 1) return null;
+    const edges = ring.map((x, i): [Id, Id] => [x, ring[(i + 1) % 4]]);
+    const pairs = c.constraints.flatMap((k): Array<[[Id, Id], [Id, Id]]> => {
+      if (k.t !== 'relation' || k.rel !== 'parallel' || k.u.k !== 'points' || k.v.k !== 'points') return [];
+      const u: [Id, Id] = [k.u.a, k.u.b];
+      const v: [Id, Id] = [k.v.a, k.v.b];
+      const e1 = edges.find((e) => sameEdge(e, u));
+      const e2 = edges.find((e) => sameEdge(e, v));
+      return e1 && e2 && !sameEdge(e1, e2) ? [[e1, e2]] : [];
+    });
+    const distinct = pairs.filter((p, i) => pairs.findIndex((q) => sameEdge(q[0], p[0]) || sameEdge(q[1], p[0])) === i);
+    if (distinct.length !== 1) return null;
+    const [e1, e2] = distinct[0];
+    const sides = f.role === 'base' ? [e1, e2] : edges.filter((e) => !sameEdge(e, e1) && !sameEdge(e, e2));
+    return { poly: o, trapezoid: true, options: sides.map((side) => ({ side })) };
+  };
+  const readings = c.objects.flatMap((o) => (o.kind === 'polygon' ? [readingOf(o)] : [])).filter((r): r is Reading => r !== null);
+  if (readings.length !== 1) return { ok: false, error: noHost(f.src, 'polygon', readings.map((r) => r.poly)) };
+  const { options, seat, trapezoid } = readings[0];
+  const onSide = <T>(x: T, [u, v]: readonly [Id, Id]): T => JSON.parse(JSON.stringify(x).split(s1).join(u).split(s2).join(v)) as T;
+  // SETTLED: the sentence as its lettered twin, claim and all.
+  if (options.length === 1 && seat === undefined) return applyAll(c, onSide(f.facts, options[0].side));
+  // OPEN: the statement's line once, anonymous; its conditions on the side, per option.
+  const mentions = (x: unknown) => JSON.stringify(x).includes(s1) || JSON.stringify(x).includes(s2);
+  const once: Fact[] = [];
+  const per: Constraint[] = [];
+  const renamed = new Map<string, string>();
+  for (const g of f.facts) {
+    if (!mentions(g)) {
+      once.push(g);
+      continue;
+    }
+    if (g.t === 'curve') {
+      const id = `curve-${f.role}-${anonOf(g.curve)}`;
+      renamed.set(g.id, id);
+      once.push({ ...g, id, label: { name: '', ...(g.label.kind ? { kind: g.label.kind } : {}) } });
+      continue;
+    }
+    // The ring's own vertices and sides are already drawn; the role's claim is each option's, except a trapezoid's
+    // pair, which every option shares and the claim states once (#1159).
+    if (g.t === 'declare' || g.t === 'segment') continue;
+    if (g.t === 'role-of') {
+      if (trapezoid) once.push(onSide(g, options[0].side));
+      continue;
+    }
+    if (g.t !== 'constraint') return { ok: false, error: { code: 'not-handled', detail: f.src } };
+    per.push(g.k);
+  }
+  const rename = <T>(x: T): T => {
+    let text = JSON.stringify(x);
+    for (const [from, to] of renamed) text = text.split(JSON.stringify(from)).join(JSON.stringify(to));
+    return JSON.parse(text) as T;
+  };
+  const choice: Constraint = {
+    t: 'choice',
+    options: options.map(({ side, with: w }) => {
+      const of = [...(w ? (w.t === 'all' ? w.of : [w]) : []), ...per.map((k) => onSide(rename(k), side))];
+      return of.length === 1 ? of[0] : { t: 'all', of };
+    }),
+  };
+  const drawn = applyAll(c, once);
+  if (!drawn.ok) return drawn;
+  if (seat === undefined) {
+    const out = applyFact(drawn.next, { t: 'constraint', k: choice, src: f.src });
+    return out.ok ? { ...out, effect: 'created' } : out;
+  }
+  const constraints = [...drawn.next.constraints];
+  constraints[seat] = choice;
+  return { ok: true, effect: 'created', next: { ...drawn.next, constraints } };
+}
+
+/** A stable, content-derived suffix for the anonymous line a role sentence draws — the same line, the same id. */
+function anonOf(curve: unknown): string {
+  const s = JSON.stringify(curve);
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h).toString(36);
+}
+
 function applyAll(c: Construction, facts: readonly Fact[]): ApplyOutcome {
   let next = c;
   let effect: LineEffect = 'known';
@@ -2190,6 +2322,24 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const collapsed = [...c.constraints];
         collapsed[seat] = f.k;
         return { ok: true, effect: 'narrowed', next: { ...c, constraints: collapsed } };
+      }
+      /*
+       * …OR PART OF EXACTLY ONE JOINT OPTION (#1807, ADR-AG-266): «משוואת הבסיס היא …» on an open isosceles attaches
+       * its line to every apex option (`all(AB = AC, B and C on the line)`), so a later «AB = AC» names the first
+       * option's apex — the choice collapses to that WHOLE option, never to the equality alone, which would drop the
+       * line. A statement several options share (a vertex on an axis, #1620) collapses nothing, as before.
+       */
+      const joint = c.constraints.findIndex(
+        (k) => k.t === 'choice' && k.options.filter((o) => o.t === 'all' && o.of.some((x) => namesOption(x, f.k))).length === 1,
+      );
+      if (joint >= 0) {
+        const held = c.constraints[joint];
+        const option = held.t === 'choice' ? held.options.find((o) => o.t === 'all' && o.of.some((x) => namesOption(x, f.k))) : undefined;
+        if (option) {
+          const collapsed = [...c.constraints];
+          collapsed[joint] = option;
+          return { ok: true, effect: 'narrowed', next: { ...c, constraints: collapsed } };
+        }
       }
       return { ok: true, effect: 'created', next: { ...c, constraints: [...c.constraints, f.k] } };
     }
@@ -3577,6 +3727,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      */
     case 'height-of':
       return applyHeightOf(c, f);
+
+    /** A side named by its role alone (#1807, ADR-AG-266) — resolved against the polygon's existing structure. */
+    case 'role-side':
+      return applyRoleSide(c, f);
 
     /**
      * «AD חוצה את הזווית BAC» (#1284, ADR-AG-209) — 2-D's verdict: a `p` the figure does not have yet is the

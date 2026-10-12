@@ -584,6 +584,16 @@ export type Fact =
    */
   | (FactBase & { t: 'role-of'; role: PolygonOrRadiusRole; a: Id; b: Id })
   /**
+   * A SIDE NAMED BY ITS ROLE ALONE (#1807, ADR-AG-266) — «משוואת הבסיס היא x-2y+6=0», «הבסיס מונח על הישר …»,
+   * «משוואת היתר היא …». The sentence is the one its lettered twin («משוואת הבסיס BC היא …») lowers to, written
+   * over {@link ROLE_SIDE_SENTINELS} in the side's place; which side the role IS only the figure knows. M1 resolves
+   * it against the polygon's EXISTING structure (`applyRoleSide`): a settled role → the side, as if its letters
+   * were typed; an open one (the isosceles apex, the right-angle seat, which of a trapezoid's two bases) → the
+   * statement attached to every option of that choice, so one cycle draws a different side on the line and the
+   * side can never disagree with the drawn apex.
+   */
+  | (FactBase & { t: 'role-side'; role: 'base' | 'leg' | 'hypotenuse'; facts: Fact[] })
+  /**
    * «שכל קודקודיו מונחים על הצירים» · «כל קודקודי הטרפז נמצאים על הצירים» — EVERY VERTEX ON SOME AXIS (#1620 item 3,
    * ADR-AG-208). Not a frame: each vertex is on the x-axis OR the y-axis, and the sentence does not say which, so
    * it is a DISCRETE choice over the assignments (02c R14, «discrete ones cycle») — M1 builds it over the one ring
@@ -620,6 +630,9 @@ export type PolygonOrRadiusRole = 'radius' | 'leg' | 'base' | 'hypotenuse' | 'di
  * writes, as {@link CENTRE_SENTINEL}. M1 writes the resolved apex and foot in (`engine/cevian.ts` `measureFacts`).
  */
 export const CEVIAN_MEASURE_SENTINELS = ['Z₂', 'Z₃'] as const;
+
+/** The stand-ins a `role-side` sentence carries for its side's two ends (#1807, ADR-AG-266) — names no student writes. */
+export const ROLE_SIDE_SENTINELS = ['Z₄', 'Z₅'] as const;
 
 /** The stand-in a `via-centre` sentence carries for «מרכז המעגל» — a name no student writes (#1619 B1). */
 export const CENTRE_SENTINEL = 'Z₁';

@@ -498,6 +498,11 @@ From the «lines and points» corpus (§8), numbered onward.
 - «גובה המשולש 4» / «גובה המקבילית הוא 4» → asks · «מקבילית ABCD» · «האלכסון AB» → refused (a side) · «משולש ABC» · «גובה הטרפז 4» → «באיור אין טרפז»
 - Sources: ADR-AG-265, #1737, ADR-574, ADR-575, ADR-569.
 
+**R178 — a side named by its ROLE alone is the side the figure says; an open role is a degree of freedom**. *(Operator, 2026-10-06: "משוואת הבסיס should be understood. if the user defined the equal sides, this is easy to know what the base is but if he didn't the sentence can be used with dof"; "there is no base in parallelogram".)* «משוואת הבסיס היא …», «הבסיס מונח על הישר …», «משוואת השוק …», «משוואת היתר …», "the base lies on the line …": a stated equal pair or right angle settles the side, read as if its letters were typed; an open apex, right-angle seat or trapezoid base is cycled by «הציגו תצורה אחרת», one cycle, the side always matching the drawn apex. A shape with no such role (a parallelogram, a plain triangle) is refused, naming the sentence. A cevian to a role-named side («תיכון לבסיס») is #2018.
+- «משולש שווה שוקיים» · «AB=AC» · «משוואת הבסיס היא x-2y+6=0» · «A(3,2)» · «d_{BC}=6√5»
+- «משולש שווה שוקיים ABC» · «משוואת הבסיס היא x-2y+6=0» → the base cycles · «מקבילית ABCD» · «משוואת הבסיס …» → refused
+- Sources: ADR-AG-266, #1807, ADR-AG-200, ADR-596.
+
 **R141 — the perpendicular from a point and its foot, the line through a point that cuts a side, and «האנך» as a reference**. *(Operator ruling: the analytic tool behaves as 2-D for plane geometry.)* An unnamed foot is named by the tool.
 - «האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D»
 - «המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D»

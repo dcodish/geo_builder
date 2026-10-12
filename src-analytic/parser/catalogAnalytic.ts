@@ -99,6 +99,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { featured: true, category: 'lines', family: 'F3', he: 'נתון הישר l1: 4y-3x-20=0', en: 'line l1: 4y-3x-20=0' },
   { featured: true, category: 'lines', family: 'F3', he: 'משוואת הישר AC היא y=-2x+8', en: 'the line AC is y=-2x+8' },
   { featured: true, category: 'lines', family: 'F3', he: 'הישר x=-4', en: 'the line x=-4' },
+  // A side named by its ROLE alone (#1807, ADR-AG-266): the base the figure says — stated, or cycled while the apex is open.
+  { category: 'lines', family: 'F3', he: 'משוואת הבסיס היא x-2y+6=0', en: 'the base lies on the line x-2y+6=0', needs: ['משולש שווה שוקיים ABC'] },
   // The LINE through two named points, drawn (#1639, ADR-AG-198) — «הישר AB» the line, where «הקטע AB» is the segment.
   { category: 'lines', family: 'F3', he: 'הישר AB', en: 'the line AB', needs: ['A(0,0)', 'B(4,3)'] },
   { category: 'lines', family: 'F3', he: 'הישר y=x', en: 'the line y=x' },
