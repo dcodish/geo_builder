@@ -1,0 +1,39 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-12T12:00:00.000Z",
+  "name": "issue-1676-framed-right-trapezoid",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "kdEaVPyB78MVYahjYQ3Zi",
+      "utterance": "המרובע ABCO הוא טרפז ישר זווית",
+      "group": "g0",
+      "cmd": {
+        "type": "trapezoid",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "O"
+        ],
+        "kind": "right-trapezoid"
+      },
+      "enabled": true
+    },
+    {
+      "id": "Hx-L0_XPsnSjmB9Gw_9b-",
+      "utterance": "המרובע ABCO הוא טרפז ישר זווית",
+      "group": "g0",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "A",
+        "b": "O",
+        "c": "A",
+        "d": "B"
+      },
+      "enabled": true
+    }
+  ]
+}

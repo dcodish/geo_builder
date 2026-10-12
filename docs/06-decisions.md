@@ -16224,3 +16224,45 @@ Two corrections to the plan's table, both already recorded on the issue and re-c
 **Behaviour change for a student:**
 - «OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה» on triangle OBC draws the altitude from O to BC and the one from B to OC, as the two singular sentences would (was: sent to the AI fallback).
 - «AD ו-BE הם תיכונים לצלעות BC ו-AC בהתאמה» draws the two medians the same way; the English "… respectively" too.
+
+## ADR-630 — The exam's sentence frame is read at 2-D's normalize boundary: the wrapper off, the shape predicate in its noun-first spelling (#1676)
+
+**Status:** accepted · 2026-10-12 · feature (P2, 2-D) · branch `feat/1676-exam-shape-frame` off `feat/1685-respectively-cevians` @ 57e6ed50 · fix round #1998 · copies analytic's frame chokepoint ([ADR-AG-187](06c-decisions-analytic.md), `frameAnalytic.ts`) for the families its parity rows print
+
+**Requirements:** [02](02-requirements.md) FR-IN-16 — the exam's own sentence frame is read, not refused · **Design:** [04](04-design.md) § "The exam's sentence frame, read at the normalize boundary".
+
+**The report.** Found by the #1649 parity lock (ADR-W-108, 2026-10-02): five `frame` rows were 2-D known gaps naming this issue. Armed 2026-10-05, approved for round #1998 on 2026-10-12 (*"approved"*). Standing ruling quoted on the issue: for plane geometry 2-D and analytic give the same experience. The plan: port analytic's frame chokepoint, and measure whether the pure part belongs in `shell/`.
+
+**Measured before** (re-measured at pickup on 57e6ed50, `decideDeterministic2D`, model mocked):
+
+| line | verdict |
+| --- | --- |
+| «המרובע ABCD הוא טרפז (AB ∥ CD)» | refused `split-statements`, listing «המרובע ABCD הוא טרפז (» and «AB ∥ CD)» |
+| «מעגל O» · «O – מרכז המעגל» (and «O - מרכז המעגל») | `escalate` `not-handled` |
+| «המרובע ABCD מלבן» (and «… הוא מלבן», «… הוא טרפז») | `escalate` `not-handled` |
+| «בסרטוט שלפניך מתואר משולש ABC» | `escalate` `not-handled` |
+| «המרובע ABCO הוא טרפז ישר זווית» | `escalate` `not-handled` |
+| "the quadrilateral ABCD is a trapezoid" | `escalate` `not-handled` |
+
+Each canonical spelling — «טרפז ABCD (AB ∥ CD)», «O מרכז המעגל», «מלבן ABCD», «משולש ABC», «טרפז ישר זווית ABCO» — commits.
+
+**Class (docs/17 §1).** *A sentence 2-D understands is missed whole for a textbook wrapper around it*: each rule reads its canonical spelling, and no boundary took the frame off, so a wrapper a rule was not taught missed every rule at once — analytic's #1618 class, which it closed at one boundary.
+
+**Decision.**
+1. **One boundary, `src/parser/frame.ts` → `readFrame`**, called last in `normalizeUtterance`. That function is what every rule reads and what the honesty gates re-run on the student's line, so the framed line is the canonical sentence for the gates too: the removed wrapper is never a "dropped" word, and no gate needed a change. The line stored is the one the student typed.
+2. **The wrapper** (`UNWRAP`, copied from analytic's): the figure that introduces the sentence («בסרטוט/בציור/באיור שלפניך|שלפניכם מתואר|מתוארת …») and the dash between a name and its description («O – …», «O - …»).
+3. **The shape as a predicate** (`shapePredicate`, analytic's `shapeClauses` predicate arm): «(ה)<noun>? LETTERS הוא|היא <phrase>», and without the copula when the subject noun is there, plus "the <noun> LETTERS is a <phrase>" → «<phrase> LETTERS», a trailing parenthetical kept as typed (2-D already reads «טרפז ABCD (AB ∥ CD)»). The phrase is read by the one shape-phrase reader (ADR-595) and must be lowered whole, with no unconsumed adjective and nothing left over; a bare adjective takes the subject noun («המשולש ABC הוא ישר זווית»); the arity must match the letters; the subject noun must be the phrase's own or the generic «מרובע». Otherwise the line is left as typed: «המרובע ABC הוא משולש», «המשולש ABCD הוא טרפז», «משולש ABC ישר זווית ב-B» (ADR-611's teaching) are unchanged.
+4. **Not ported, deliberately:** the rest of `frameAnalytic.ts` (given-prefixes, units, the origin, point/side/centre/condition/chain readings, the comma partitions). Those change what 2-D reads for sentences this issue does not name; each would need its own ruling (CLAUDE.md rule 7).
+5. **Where it lives.** Measured: the frame exists only in analytic (`frameAnalytic.ts`); 3-D has no copy, and its rows are parked (#1679) or refused (#1888). So this is the second copy and stays in the tree; a third copy moves the pure part to `shell/`.
+
+**Measured after** (the same path): all eleven framed lines above commit exactly the commands of their canonical spelling, with no model call. The twenty controls in the pickup probe — «ABCD הוא טרפז», «משולש ABC ישר זווית», «טרפז ABCD (AD ∥ BC)», «ריבוע ABCD שצלעו 5», «משולש ABC ישר זווית ב-B», «O - חיתוך של AC ו-BD» and the rest — give byte-identical decisions before and after.
+
+**Cross-builder (docs/22 §10).** `frame-paren`, `frame-dash`, `frame-noun-after`, `frame-figure` and `cat-an-059` drop their 2-D known gaps (`#1676` leaves `GAP_ISSUES`); three twins join — `frame-predicate-copula`, `frame-dash-hyphen`, `frame-figure-feminine` (analytic builds all three; 3-D builds the first, excepts the second as X8, and the third carries 3-D's parked #1679 gap, like `frame-figure`).
+
+**Locks.** Fixtures `issue-1676-framed-trapezoid.geo.json`, `issue-1676-framed-right-trapezoid.geo.json`, `issue-1676-framed-figure-and-centre.geo.json` (the rows as typed; the fixture net re-parses them, so a frame regression is parser drift). `src/app/__tests__/issue-1676-sentence-frame.test.ts` — `readFrame` row by row and the lines it must leave as typed; it runs inside `normalizeUtterance`; through `decideDeterministic2D` each framed line commits exactly its canonical spelling's commands, the parenthetical is a stated parallel, and a predicate the frame does not read still does not commit.
+
+**Behaviour change for a student:**
+- «המרובע ABCD הוא טרפז (AB ∥ CD)» draws the trapezoid with AB ∥ CD (was: refused, asking to split the line at the parenthesis).
+- «O – מרכז המעגל» names the circle's centre O, as «O מרכז המעגל» does (was: sent to the AI fallback); the same with «-».
+- «המרובע ABCD מלבן» / «המרובע ABCD הוא מלבן» draw the rectangle; «המרובע ABCO הוא טרפז ישר זווית» the right trapezoid; "the quadrilateral ABCD is a trapezoid" the trapezoid (was: sent to the AI fallback).
+- «בסרטוט שלפניך מתואר משולש ABC» draws the triangle (was: sent to the AI fallback).

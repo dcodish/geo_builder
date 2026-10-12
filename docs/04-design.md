@@ -499,6 +499,16 @@ re-spells a ring command over a ring the figure already declares to the declared
 symmetric under that reading (`RING_SYMMETRIC`; the trapezoid only under the readings that keep its named pair,
 `sameStatementUnder`), so a rotated or reversed restatement takes its declared spelling's verdict ([ADR-618](06-decisions.md#adr-618)).
 
+### The exam's sentence frame, read at the normalize boundary ([ADR-630](06-decisions.md#adr-630))
+
+`src/parser/frame.ts`: `readFrame(s)` — pure text → text, called LAST in `normalizeUtterance`, so every rule and every
+honesty gate (which normalize the student's line themselves) read the canonical sentence. Two families: the
+wrapper that states nothing (`UNWRAP`: «בסרטוט שלפניך מתואר …», the name–dash «O – …») and the shape as a
+predicate (`shapePredicate`: «(ה)<noun>? LETTERS (הוא)? <phrase>[ (…)]» → «<phrase> LETTERS[ (…)]»), where the phrase
+must be one `readShapePhrase` lowers whole, its arity must match the letters and the subject noun must be the
+phrase's own or the generic «מרובע». Anything else is returned unchanged. It is the second copy of analytic's
+`frameAnalytic.ts` (copied, BOUNDARIES.json); a third copy (3-D, #1679/#1888) moves the pure part to `shell/`.
+
 ### A second shape noun over a declared ring ([ADR-619](06-decisions.md#adr-619))
 
 `engine/shapeKinds.ts` holds the quadrilateral hierarchy as ONE table, `QUAD_IMPLIES` — 2-D's twin of 3-D's

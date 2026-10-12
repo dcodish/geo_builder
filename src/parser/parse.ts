@@ -29,6 +29,7 @@ import { foldGlyphs } from '../../shell/glyphFold';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { foreignGiven } from './scope';
+import { readFrame } from './frame';
 import { NOTATION_WORDS, UNIT_WORDS, unaccountedLabels } from './labelAccounting';
 import { readShapePhrase, lowerShape, SHAPE_ADJ_ANY, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
 
@@ -12089,7 +12090,10 @@ export function normalizeUtterance(raw: string): string {
   // #1691 (ADR-AG-239): «F ו- G», «F ו -G», «F ו - G» are «F ו-G» — the shared fold every builder's boundary calls.
   const lengths = normalizeVerboseLength(stripValueUnits(foldConjunctionSpacing(orth)));
   const words = normalizeWordEquality(normalizeWordDegrees(lengths));
-  return normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(words.trim().replace(/\s+/g, ' ')))));
+  const folded = normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(words.trim().replace(/\s+/g, ' ')))));
+  // #1676 (ADR-630): the exam's sentence frame — «בסרטוט שלפניך מתואר …», «O – …», «המרובע ABCD הוא טרפז (…)» — read
+  // off LAST, on the fully folded text, so every rule and every honesty gate sees the canonical sentence.
+  return readFrame(folded);
 }
 
 /**

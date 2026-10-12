@@ -1,0 +1,60 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-12T12:00:00.000Z",
+  "name": "issue-1676-framed-trapezoid",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "tSXaNuk6Wg4ZPpWTP2twT",
+      "utterance": "המרובע ABCD הוא טרפז (AB ∥ CD)",
+      "group": "g0",
+      "cmd": {
+        "type": "trapezoid",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "01alTdfe6DpVlj3vpfokO",
+      "utterance": "המרובע ABCD הוא טרפז (AB ∥ CD)",
+      "group": "g0",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "IA4QPQKPVRkSvFPM7szA1",
+      "utterance": "המרובע ABCD הוא טרפז (AB ∥ CD)",
+      "group": "g0",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "8QbE73JQLB5uL1ieXyGUv",
+      "utterance": "המרובע ABCD הוא טרפז (AB ∥ CD)",
+      "group": "g0",
+      "cmd": {
+        "type": "set-parallel",
+        "a": "A",
+        "b": "B",
+        "c": "C",
+        "d": "D"
+      },
+      "enabled": true
+    }
+  ]
+}
