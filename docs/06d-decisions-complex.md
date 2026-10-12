@@ -807,7 +807,7 @@ quantities remain open on #623.**
 ## ADR-CX-015 — A plotted number carries a READING, composed once (2026-08-16)
 
 **Status:** Accepted · **Slice:** S5 (#622), before the visualization layer · **Ladder:** stage 5d
-· **Fixes:** [#675](https://github.com/dcodish/geo_builder/issues/675) · **⚠ Ruled to change 2026-10-07 (ADR-W-118 B6/D1 · #1862):** the canvas shows what the student typed; computed readings go to the panel
+· **Fixes:** [#675](https://github.com/dcodish/geo_builder/issues/675) · **⚠ Partly superseded by [ADR-CX-065](#adr-cx-065) (2026-10-12):** the canvas half — the reading is the panel's; the canvas prints what the student typed, and a computed number's name alone
 
 ### The report
 
@@ -2582,7 +2582,7 @@ under names that are not the solutions' own; the `2b-capstone` fixture ends at p
 [#1390](https://github.com/dcodish/geo_builder/issues/1390) (bug, `P1`) +
 [#1389](https://github.com/dcodish/geo_builder/issues/1389) (feature, `P2`), built as ONE item per the
 ruling · round [#1397](https://github.com/dcodish/geo_builder/issues/1397) · **amends**
-[ADR-CX-041](#adr-cx-041) ("What this does NOT do") · **⚠ Ruled to change 2026-10-07 (ADR-W-118 B6/D1 · #1862):** a letter the student did not value is never replaced on the canvas
+[ADR-CX-041](#adr-cx-041) ("What this does NOT do") · **⚠ Partly superseded by [ADR-CX-065](#adr-cx-065) (2026-10-12):** "substituted" holds for the panel only; a letter the student did not value is never replaced on the canvas
 **Requirements:** [02d](02d-requirements-complex.md) FR-KN-5 (new): a real parameter is shown and askable
 · **Design:** [04d](04d-design-complex.md) — "A solved parameter has ONE exact value" · **Ladder:** stage 5d
 ([LADDER-CX](LADDER-CX.md))
@@ -3490,7 +3490,7 @@ The pre-played sheet (PR #1515, 20 cases, 6 red) found five classes. Each is fix
 
 ## ADR-CX-058 — «z1 = a+bi»: a glued `i` is a coefficient times i, and a number defined by parameters reads as its definition (#1365)
 
-**Status:** accepted, 2026-10-04 (operator ruling 2026-09-24, option (c) of the round-#1382 escalation) · · **⚠ Ruled to change 2026-10-07 (ADR-W-118 B6/D1 · #1862):** a letter the student did not value is never replaced on the canvas
+**Status:** accepted, 2026-10-04 (operator ruling 2026-09-24, option (c) of the round-#1382 escalation) · **⚠ Partly superseded by [ADR-CX-065](#adr-cx-065) (2026-10-12):** on the canvas only a letter the student valued is substituted, and only while its chip shows the value; the panel's reading is unchanged
 **Issue:** [#1365](https://github.com/dcodish/geo_builder/issues/1365) (feature, `complex`, PR) · round #1736
 **Requirements:** [02d](02d-requirements-complex.md) FR-CN-10 (new): the symbolic cartesian form reads as the textbook writes it ·
 **Design:** [04d](04d-design-complex.md), "A glued `i` is a coefficient times i" and "A number DEFINED by real parameters reads as its definition" ·
@@ -3957,3 +3957,35 @@ languages' sentences; the mixed sentence «arg i - arg o = 90»; the floor's thr
 unchanged yes/no for every name; `i2`/`o3` staying in the #1948 class; the #1948 class and the
 false-refusal net unchanged; and `i` as the imaginary unit and `o` as the origin still reading.
 `phantom-word-1948.test.ts` carries the corrected record for the four constant lines it already held.
+
+## ADR-CX-065 — The canvas shows what the student typed; computed values go to the panel (#1862)
+
+**Status:** accepted, 2026-10-12 · **Issue:** [#1862](https://github.com/dcodish/geo_builder/issues/1862) (feature, P2, `complex`, PR) · round #1998 ·
+supersedes the canvas half of [ADR-CX-015](#adr-cx-015) and the 2026-08-18 ruling that the reading returns to the canvas; partly supersedes [ADR-CX-043](#adr-cx-043) ("substituted", canvas clause) and [ADR-CX-058](#adr-cx-058) (canvas substitution)
+**Requirements:** [02d](02d-requirements-complex.md) FR-KN-5 and FR-CN-10 (rewritten); [02w](02w-requirements-workspace.md) rows "A computed value on the canvas" and "Letter ↔ value chip" ·
+**Design:** [04d](04d-design-complex.md), "A number DEFINED by real parameters reads as its definition" and "A solved parameter has ONE exact value" ·
+**Ladder:** stage 5d ([LADDER-CX](LADDER-CX.md))
+
+**The rulings.** B6 (operator, 2026-10-07, #1861): complex follows [ADR-W-047](06w-decisions-workspace.md#adr-w-047) fully — *"Inputs go on the canvas and computed values go in the panel"*. D1: a number the student typed is written as typed in the cartesian view and in its polar form in the polar view. W7 (2026-10-08): a number fixed by its own stated modulus and argument counts as typed. W8 (2026-10-08): a typed number whose polar form the givens leave open shows its typed form in the polar view too. ADR-W-047 clause 3: a letter the student did not value stays a letter on the canvas; clause 2: the line that valued it carries the letter/value chip.
+
+**Measured at pickup** (`403efe66`, through `deriveLines`, the fold behind `submitLine`): the canvas printed `reading`/`readingCart` beside every plotted number — «w = -4+3i» for `w = z1·i`, «z₁ = 1+i» for a root of `z^2 = 2i`, «w = 5i» for `|w| = |z1|` · `arg(w) = 90°`, and «z₂ = 10» for `z2 = 18r` · `|z2| = 2|z1|`, where r is solved by the tool (the panel reads r = ±5/9, so «10» was also one sign of two).
+
+**Root cause — one composed string served two surfaces with different contracts.** `readingOf` / `readingCartOf` (stage 5d) compose a number's value for the PANEL; `PolarPlane` printed the same string on the canvas, and the 5d substitution of every solved rational parameter (`rationalParams`, ADR-CX-043/058) reached the canvas with it.
+
+**Decision.**
+
+1. **The canvas gets its own label, composed at stage 5d beside the panel's** (`DerivedPoint.canvas` / `canvasCart`). `reading`/`readingCart` are unchanged, so the panel's «נקודות» still prints every value.
+2. **How a number was stated is read off the constraint shapes** (`statedAs`, `model/cartesianForm.ts`), never off line text, over the constraints the lines state themselves (`FoldInput.stated` — an enumeration's member placements `z1 = <root>` are the tool's values, not a typed definition):
+   - **typed** — `name = E` with E naming no other number;
+   - **polar** — `|name| = E` and `arg name = θ`, both naming no other number (W7);
+   - **computed** — anything else. A bound label («A (z₁)») is typed when its label is.
+3. **The label.** Computed → the display name alone. Polar, or typed with no parameter → the reading, in the view's own form (D1). Typed in parameters (`z2 = 18r`, `z1 = a+bi`) → the student's form with **only the letters the student valued** substituted (`valuedParamOf`: `a = 3`, a bare parameter equal to a number), and only while their chip shows the value. Closed → the number in each view's own form; still holding a letter → the typed form in **both** views (W8). A letter the tool solved stays a letter.
+4. **The chip** is the shared `FactList` chip (`shell/displayMode.ts`). The fold reports `Derived2.paramChips`: a valued letter that appears in a typed number's form, with the line that valued it. The default is the value. The store keeps the choice by line index (`display`, shifted on removal like `disabled`), in the undo slice, through «הציגו תצורה אחרת», and in the save file (optional `display`, remapped onto the lines that come back on load). `deriveLines` takes the letter-mode lines as a display input; the gate never passes it.
+
+**Unchanged.** The panel, the ask lane, the gate, the opt-in canvas layers (argument arcs, rotation and series labels — measurements the student asked to see, docs/10 P5). Typed numbers read as before: «z₁ = 3+4i» / «z₁ ≈ 5·cis53.13°», «z₁ = 6·cis30°» / «z₁ = 3√3+3i», «z = 2·cis30°» / «z = √3+i».
+
+**Not in this ADR (found, filed as [#2002](https://github.com/dcodish/geo_builder/issues/2002), not built).** A typed number in a parameter form that is not affine (`z = r·cis(30°)`) or a W7 pair holding a letter (`|z| = 9r` · `arg z = 30°`) still prints the carriers' reading: with `|z| = 4` the first reads «z = 4·cis30°» on the canvas although r = ±4 was solved by the tool, and the second's cartesian view prints a sampled decimal. Composing a symbolic polar form is a new composer, and what it should print is the operator's call.
+
+**Siblings.** 2-D and 3-D already follow ADR-W-047; this brings complex into line. Not a plane-geometry input change, so no docs/22 §10 row.
+
+**Locks.** `src-complex/__tests__/canvas-typed-1862.test.tsx` — the plan's table in both views (computed names, typed forms, W7, W8, the solved letter kept), the chip (competing only, letter mode, mixed), the renderer printing the canvas label, the store/save round trip, and a class net over every fixture (a computed number shows its name; a letter the student did not value is never missing from a typed number's label). Fixture `canvas-letter-kept-1862.complex.json` (the issue's case).

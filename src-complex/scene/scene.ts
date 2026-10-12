@@ -54,6 +54,12 @@ export interface ScenePoint {
   readonly reading: string;
   /** #703 — the a+bi form of the same reading, for the cartesian view. */
   readonly readingCart: string;
+  /**
+   * #1862 (ADR-CX-065) — what the CANVAS prints, per view: the student's stated form, or the bare name
+   * for a number the tool computed. The readings above are the panel's.
+   */
+  readonly canvas: string;
+  readonly canvasCart: string;
   readonly modulusKnown: boolean;
   readonly argumentKnown: boolean;
 }
@@ -230,6 +236,8 @@ export function buildScene(figure: SceneInput, display: SceneDisplay = {}): Scen
     z: p.z,
     reading: p.reading,
     readingCart: p.readingCart,
+    canvas: p.canvas,
+    canvasCart: p.canvasCart,
     modulusKnown: p.modulusKnown,
     argumentKnown: p.argumentKnown,
   }));

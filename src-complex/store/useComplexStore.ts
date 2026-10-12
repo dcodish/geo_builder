@@ -28,6 +28,7 @@ import type { Cx } from '../value/value';
 import type { Why } from '../model/why';
 import type { ReservedConstant } from '../model/naming';
 import { ingestTypedText } from '../../shell/bidi';
+import { type DisplayMode, type DisplayModeMap, toggleDisplayMode } from '../../shell/displayMode';
 
 export type InputError =
   | { key: 'not-handled' | 'parse-error'; detail: string }
@@ -112,6 +113,10 @@ export interface SavedSession {
    *  questions about the figure, never facts. Additive and optional, so every pre-existing file
    *  loads unchanged and an OLD app ignores the field rather than refusing the file. */
   queries?: string[];
+  /** #1862 (ADR-CX-065, ADR-W-047) — the letter/value chip choices, keyed by LINE INDEX (the file's
+   *  stable handle, shell/displayMode); only non-default entries. Additive and optional: an older
+   *  file shows values, the default. */
+  display?: Record<string, DisplayMode>;
 }
 
 interface ComplexState {
@@ -133,6 +138,14 @@ interface ComplexState {
    *  (re-enabling faces the gate); the store only records. */
   disabled: number[];
   setDisabledIdx: (disabled: number[]) => void;
+  /**
+   * #1862 (ADR-CX-065, ADR-W-047) — the letter/value chip's choice per VALUING line («a = 3»), keyed by
+   * the line's index (this store's handle for a row, as `disabled` is). A DISPLAY preference, never a
+   * fact: it survives «הציגו תצורה אחרת» (the seed is not its key) and save/reload (`serialize`).
+   */
+  display: DisplayModeMap;
+  toggleDisplay: (index: number) => void;
+  setDisplay: (display: DisplayModeMap) => void;
   /** Replace line `index` in place (an accepted EDIT — position keeps its meaning, D6). */
   replaceLine: (index: number, line: string, seed: number) => void;
   /** Append a line WITHOUT gating, already marked disabled (hydration of a muted saved line). */
@@ -202,6 +215,9 @@ export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
   setName: (name) => set({ name }),
   disabled: [],
   setDisabledIdx: (disabled) => set({ disabled }),
+  display: {},
+  toggleDisplay: (index) => set(({ display }) => ({ display: toggleDisplayMode(display, String(index)) })),
+  setDisplay: (display) => set({ display }),
   replaceLine: (index, line, seed) =>
     set(({ lines }) => ({ lines: lines.map((l, i) => (i === index ? cleanLine(line) : l)), seed, lastError: null })),
   recordDisabledLine: (line) =>
@@ -212,11 +228,16 @@ export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
   lastError: null,
   loadAudit: null,
 
-  // a removal SHIFTS the disabled indexes above it — they name positions, not texts
+  // a removal SHIFTS the disabled indexes (and the chip choices) above it — they name positions, not texts
   removeLine: (index) =>
-    set(({ lines, disabled }) => ({
+    set(({ lines, disabled, display }) => ({
       lines: lines.filter((_, i) => i !== index),
       disabled: disabled.filter((d) => d !== index).map((d) => (d > index ? d - 1 : d)),
+      display: Object.fromEntries(
+        Object.entries(display)
+          .filter(([k]) => Number(k) !== index)
+          .map(([k, v]) => [String(Number(k) > index ? Number(k) - 1 : Number(k)), v]),
+      ),
     })),
   setFree: (name, z) => set(({ freePos }) => ({ freePos: { ...freePos, [name]: z } })),
   setView: (view) => set({ view }),
@@ -224,11 +245,12 @@ export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
   // OLD configuration and are released (the sibling "show another configuration" semantics)
   nextConfig: () => set(({ seed }) => ({ seed: seed + 1, freePos: {} })),
   clearAll: () =>
-    set({ lines: [], queries: [], name: '', disabled: [], freePos: {}, seed: 0, lastError: null, loadAudit: null }),
+    set({ lines: [], queries: [], name: '', disabled: [], display: {}, freePos: {}, seed: 0, lastError: null, loadAudit: null }),
   clearError: () => set({ lastError: null }),
 
   serialize: () => {
-    const { lines, queries, freePos, seed, view, name, disabled } = get();
+    const { lines, queries, freePos, seed, view, name, disabled, display } = get();
+    const shown = Object.fromEntries(Object.entries(display).filter(([, m]) => m !== 'value'));
     return {
       app: 'complex-builder',
       version: 1,
@@ -239,6 +261,7 @@ export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
       ...(name.trim() ? { name: name.trim() } : {}),
       ...(disabled.length ? { disabled: [...disabled].sort((a, b) => a - b) } : {}),
       ...(queries.length ? { queries: [...queries] } : {}),
+      ...(Object.keys(shown).length ? { display: shown } : {}),
     };
   },
 
@@ -247,7 +270,7 @@ export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
   setError: (lastError) => set({ lastError }),
   setLoadAudit: (loadAudit) => set({ loadAudit }),
   resetSession: () =>
-    set({ lines: [], queries: [], name: '', disabled: [], freePos: {}, seed: 0, lastError: null, loadAudit: null }),
+    set({ lines: [], queries: [], name: '', disabled: [], display: {}, freePos: {}, seed: 0, lastError: null, loadAudit: null }),
   restoreView: ({ freePos, seed, view, name }) => set({ freePos, seed, view, ...(name !== undefined ? { name } : {}) }),
 
   /**
@@ -276,6 +299,7 @@ export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
     lines: s.lines,
     queries: s.queries,
     disabled: s.disabled,
+    display: s.display,
     name: s.name,
     seed: s.seed,
     freePos: s.freePos,
@@ -285,6 +309,7 @@ export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
     a.lines === b.lines &&
     a.queries === b.queries &&
     a.disabled === b.disabled &&
+    a.display === b.display &&
     a.name === b.name &&
     a.seed === b.seed &&
     a.freePos === b.freePos,

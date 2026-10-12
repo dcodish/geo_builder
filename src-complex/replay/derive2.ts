@@ -27,7 +27,7 @@
 import { fmtNum } from '../../shell/format';
 import type { Cx } from '../value/value';
 import { cArgDeg, cPolar, evaluate, exact, formatPolar, fromCartesian } from '../value/value';
-import { closedParts, definitionOf, substituteKnown, symbolicParts } from '../model/cartesianForm';
+import { closedParts, definitionOf, statedAs, substituteKnown, symbolicParts, valuedParamOf } from '../model/cartesianForm';
 import { type Rat, rat, toNumber, add as ratAdd, sub as ratSub, mul as ratMul, div as ratDiv, neg as ratNeg, isZero as ratIsZero, sqrtExact } from '../value/rational';
 import { composeCartesian, gaussianRationalParts, numericPart, ratPart, readableCartesianParts } from '../value/cartesian';
 import { type ExpVec, evaluate as evalMod, format as fmtMod, fromRational as modFromRational, pow as modPow, isOne as modIsOne, isParametric } from '../value/modulus';
@@ -122,6 +122,18 @@ export interface DerivedPoint {
   readonly reading: string;
   /** #703 — the same point in the a+bi lens, same chokepoint, same no-guess rule. */
   readonly readingCart: string;
+  /**
+   * #1862 ([ADR-CX-065](../../docs/06d-decisions-complex.md#adr-cx-065)) — the text the CANVAS prints
+   * beside this number, in the polar view (`canvas`) and the cartesian view (`canvasCart`).
+   *
+   * Not `reading`: that is the PANEL's composition («נקודות»), which prints every value the givens
+   * determine. The canvas carries what the student STATED (docs/10 P5, ADR-W-047, B6): a number the
+   * student typed shows as typed, in the view's own form (D1), and a letter in it is replaced only by a
+   * value the student gave it; a number the tool computed shows its name alone. One string serving both
+   * surfaces is what put «w = -4+3i» and «z₂ = 10» (a solved, never-valued r) on the canvas.
+   */
+  readonly canvas: string;
+  readonly canvasCart: string;
   /** the exact polar text, when the whole value is carried exactly — a VALUE question, not a display one */
   readonly exactLabel: string | null;
   /**
@@ -282,6 +294,8 @@ export interface Derived2 {
    * never printed from the sample.
    */
   readonly params: readonly ParamRow[];
+  /** #1862 (ADR-CX-065) — the rows that get the letter/value chip, and what it switches */
+  readonly paramChips: readonly ParamChip[];
   /**
    * Is there ANOTHER drawing to show? — the one definition the button reads.
    *
@@ -424,6 +438,31 @@ export interface FoldInput {
    * claim never drives.
    */
   readonly realTyped?: readonly string[];
+  /**
+   * #1862 (ADR-CX-065) — the line (its index in the folded lines) that gave each parameter its value in
+   * the student's own words («a = 3»), first one wins. What the letter/value chip rides (ADR-W-047).
+   */
+  readonly valuedBy?: ReadonlyMap<string, number>;
+  /**
+   * #1862 — the constraints the student's lines state themselves (the parser's own lowering), WITHOUT
+   * what an enumeration wrote: `z^2 - 4z + 13 = 0` places its members as `z1 = 2+3i`, the shape of a
+   * typed definition, but those values are the tool's. Absent: every constraint, set members computed.
+   */
+  readonly stated?: readonly Constraint[];
+  /** #1862 — the valued parameters the student switched to their LETTER with the chip (default: value) */
+  readonly letterParams?: ReadonlySet<string>;
+}
+
+/**
+ * #1862 (ADR-CX-065) — a parameter the student valued whose two forms COMPETE on the canvas: a typed
+ * number's label reads differently with the letter and with the value. The chip goes on `line`.
+ */
+export interface ParamChip {
+  readonly param: string;
+  /** the folded line that valued it */
+  readonly line: number;
+  /** the value as the parameters section prints it («3», «5/9») */
+  readonly value: string;
 }
 
 /**
@@ -476,6 +515,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
     selections = [],
     solutionSets = new Map<string, readonly string[]>(),
     realTyped = [],
+    valuedBy,
+    stated,
+    letterParams = new Set<string>(),
   } = input;
   const realLetters = new Set(realTyped);
   /**
@@ -1249,6 +1291,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
           // layer answers only for a registered literal pair, never for a free or sampled atom.
           exactParts: m.exact && a.exact ? readableCartesianParts(m.exact, a.exact) : null,
         }),
+        // #1862 — composed at the canvas stage below; until then, the computed number's bare name
+        canvas: display,
+        canvasCart: display,
         exactLabel,
         cyclePeriod: cycle === null ? null : Number(cycle),
         modulusKnown: m.exact !== null,
@@ -1796,6 +1841,23 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * `2|b|·cis90°`) keep that polar form, but their cartesian reading was the SAMPLE printed as a
    * decimal («z₂ ≈ 0.4i», a guess under the no-guess rule); a definition now says «z₂ = 2bi».
    */
+  /** Both readings of a CLOSED cartesian form — one composition for the panel's and the canvas's stages. */
+  const closedReadings = (display: string, closed: { re: Rat; im: Rat }): { reading: string; readingCart: string } => {
+    const lit = fromCartesian(closed.re, closed.im).value;
+    const z = { re: toNumber(closed.re), im: toNumber(closed.im) };
+    if (lit.kind !== 'exact') return { reading: `${display} = 0`, readingCart: `${display} = 0` };
+    return {
+      reading: readingOf({
+        display,
+        exactLabel: exactLabelOf(lit.mod, lit.arg),
+        modulus: fmtMod(lit.mod),
+        modulusKnown: true,
+        argumentDeg: cArgDeg(z),
+        argumentKnown: true,
+      }),
+      readingCart: readingCartOf({ display, z, known: true, exactParts: readableCartesianParts(lit.mod, lit.arg) }),
+    };
+  };
   const shownPoints: DerivedPoint[] = points.map((p) => {
     const parametric = parametricNames.has(p.name);
     if (p.modulusKnown && p.argumentKnown && !parametric) return p;
@@ -1807,24 +1869,53 @@ export function foldConstraints(input: FoldInput): Derived2 {
       const parts = symbolicParts(form, p.z);
       return { ...p, readingCart: `${p.display} = ${composeCartesian(parts.re, parts.im)}`, defined: 'symbolic' };
     }
-    const lit = fromCartesian(closed.re, closed.im).value;
-    const z = { re: toNumber(closed.re), im: toNumber(closed.im) };
-    if (lit.kind !== 'exact') return { ...p, reading: `${p.display} = 0`, readingCart: `${p.display} = 0`, defined: 'closed' };
-    const argumentDeg = cArgDeg(z);
-    return {
-      ...p,
-      reading: readingOf({
-        display: p.display,
-        exactLabel: exactLabelOf(lit.mod, lit.arg),
-        modulus: fmtMod(lit.mod),
-        modulusKnown: true,
-        argumentDeg,
-        argumentKnown: true,
-      }),
-      readingCart: readingCartOf({ display: p.display, z, known: true, exactParts: readableCartesianParts(lit.mod, lit.arg) }),
-      defined: 'closed',
-    };
+    return { ...p, ...closedReadings(p.display, closed), defined: 'closed' };
   });
+
+  /**
+   * #1862 ([ADR-CX-065](../../docs/06d-decisions-complex.md#adr-cx-065)) — STAGE 5d, the CANVAS label.
+   *
+   * The canvas shows what the student stated; computed values go in the panel (docs/10 P5, ADR-W-047,
+   * the operator's B6 ruling of 2026-10-07, which superseded the 2026-08-18 "the reading returns to
+   * the canvas"). The panel keeps `reading`/`readingCart` unchanged. Per number, from HOW it was
+   * stated (`statedAs`, read off the constraint shapes, never the line text):
+   *
+   * - computed → the bare name («w», «z₁»);
+   * - its own modulus and argument stated (W7) → the reading, as before;
+   * - typed with no parameter («z1 = 3+4i», «z1 = 6cis30°») → the reading, in the view's own form (D1);
+   * - typed in parameters («z2 = 18r», «z1 = a+bi») → the student's form with ONLY the letters the
+   *   student valued («a = 3») replaced, and only while the chip shows values. Closed → the number in
+   *   the view's own form; still holding a letter → the typed form in BOTH views (W8: its polar form
+   *   depends on the letter's sign, which nothing states). A letter the TOOL solved stays a letter.
+   */
+  const studentValued = new Set(valuedBy ? valuedBy.keys() : constraints.map(valuedParamOf).filter((p): p is string => p !== null));
+  const shownValues = new Map([...rationalParams].filter(([p]) => studentValued.has(p) && !letterParams.has(p)));
+  const setMembers = stated ? new Set<string>() : new Set([...solutionSets.values()].flat());
+  const statedList = stated ?? constraints;
+  const aliasOf = new Map<string, string>([...aliases, ...selectionAliases]);
+  const competing = new Set<string>();
+  const canvasPoints: DerivedPoint[] = shownPoints.map((p) => {
+    const names = [p.name, ...(aliasOf.has(p.name) ? [aliasOf.get(p.name)!] : [])];
+    const how = names.map((n) => statedAs(n, statedList, setMembers));
+    if (how.every((h) => h === 'computed')) return { ...p, canvas: p.display, canvasCart: p.display };
+    const def = how.includes('typed') ? names.map((n) => definitionOf(n, statedList)).find((d) => d !== null) ?? null : null;
+    if (!def) return { ...p, canvas: p.reading, canvasCart: p.readingCart };
+    for (const part of [def.re, def.im]) for (const k of part.terms.keys()) if (studentValued.has(k) && rationalParams.has(k)) competing.add(k);
+    const form = substituteKnown(def, shownValues);
+    const closed = closedParts(form);
+    if (closed) {
+      const r = closedReadings(p.display, closed);
+      return { ...p, canvas: r.reading, canvasCart: r.readingCart };
+    }
+    const parts = symbolicParts(form, p.z);
+    const typed = `${p.display} = ${composeCartesian(parts.re, parts.im)}`;
+    return { ...p, canvas: typed, canvasCart: typed };
+  });
+  const paramChips: ParamChip[] = [];
+  for (const row of params) {
+    const line = valuedBy?.get(row.name);
+    if (line !== undefined && row.value !== null && competing.has(row.name)) paramChips.push({ param: row.name, line, value: row.value });
+  }
 
   const knowledge: KnowledgeRow[] = queries.map((q) => {
     const value = measureAt(finalEnv, q);
@@ -1873,7 +1964,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
 
   return {
     contradiction: t1.inconsistent,
-    points: shownPoints,
+    points: canvasPoints,
     objects: t1.inconsistent ? [] : resolveObjects(objects, points, sample, solutionSets),
     sequences: t1.inconsistent ? [] : resolveSequences(sequences, points),
     rotations: t1.inconsistent ? [] : resolveRotations(constraints, points),
@@ -1892,6 +1983,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     undecided: [...new Set([...t1.undecided, ...undecided])],
     knowledge: [...knowledge, ...ratioRows, ...exprRows, ...argRows],
     params: t1.inconsistent ? [] : params,
+    paramChips: t1.inconsistent ? [] : paramChips,
     configCount,
     configCompleteness: completeness,
     canCycle: configCount > 1 || closure.remainingDof > 0,

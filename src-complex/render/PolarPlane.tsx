@@ -437,15 +437,13 @@ export function PolarPlane({
               textAnchor={anchor}
               style={{ userSelect: 'none' }}
             >
-              {/* B6 follow-up (operator, 2026-08-18): the reading RETURNS to the canvas — with the
-                  panel hidden it is the only check that z₁ landed right. The no-guess ruling makes
-                  it safe: `readingOf` now composes a value only when the givens determine it, so an
-                  undetermined point's reading IS the bare name — nothing sampled is ever printed.
-                  (#653/#675: one source, two surfaces — both print stage 5d's composition.)
-                  #703: the reading FOLLOWS THE VIEW — a+bi in the cartesian lens. */}
+              {/* #1862 (ADR-CX-065; B6, operator 2026-10-07): the canvas carries what the student
+                  STATED — a typed number as typed, in the view's own form (D1); a computed number by
+                  its name alone. Its value is the panel's («נקודות»). Stage 5d composes both strings;
+                  the renderer only picks the view's (#703). */}
               {/* #727: the radical INDEX is drawn as a real digit, raised — the Unicode superscript
                   was hairline at this size and read as the retired ~ mark. */}
-              <RadicalTspans text={cart ? p.readingCart : p.reading} />
+              <RadicalTspans text={cart ? p.canvasCart : p.canvas} />
             </text>
           </g>
           );
