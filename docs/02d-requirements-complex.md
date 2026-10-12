@@ -162,13 +162,18 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   1+√2i), a given is accepted and listed as undecided, and a claim reads «unknown» — never a refusal,
   never ✗.
   - Sources: [ADR-CX-057](06d-decisions-complex.md#adr-cx-057), #1481 (operator ruling)
-- **FR-CN-10 (Must)** — **The symbolic cartesian form reads as the textbook writes it.** **⚠ Ruled to change (2026-10-07, ADR-W-118 B6/D1 · #1862):** the canvas shows the number as the student typed it (its polar form in the polar view) and the computed values go to the data panel — a letter the student did not value is never replaced, so «z₁ = a+bi» does not become «z₁ = 3+bi» on the canvas. The text below describes the code until that ships. «z1 = a+bi»,
+- **FR-CN-10 (Must)** — **The symbolic cartesian form reads as the textbook writes it.** «z1 = a+bi»,
   «z = x+yi», «z1 = a-bi», «z1 = a+ib», «w = c+di» define a number from two real parameters, with no
-  `*`. The number reads «z₁ = a+bi» in the cartesian view while a and b are free (the polar view prints
-  no value), «z₁ = 3+bi» once a = 3 is forced, and exactly as the literal 3+4i once both are. A glued
+  `*`. On the canvas the number reads as the student typed it, «z₁ = a+bi», in both views while a letter
+  is left (its polar form would depend on the letter's sign). A letter is replaced on the canvas only by
+  a value the student gave it: after «a = 3» the canvas reads «z₁ = 3+bi», and the «a = 3» row carries
+  the letter/value chip, which switches the canvas back to «z₁ = a+bi»; the choice survives «הציגו תצורה
+  אחרת» and save/reload. A letter the tool solved from other givens stays a letter on the canvas. With
+  every letter valued the number reads exactly as the literal 3+4i, each view in its own form. The data
+  panel's «נקודות» substitutes every letter whose value the givens force. A glued
   `i` whose other letter is a complex number («zi») is ambiguous and is refused with the explicit
   product offered («z*i»); `pi` is never read as p·i.
-  - Sources: [ADR-CX-058](06d-decisions-complex.md#adr-cx-058), #1365 (operator ruling), #1410
+  - Sources: [ADR-CX-058](06d-decisions-complex.md#adr-cx-058), #1365 (operator ruling), #1410, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W8, #1862)
 - **FR-CN-11 (Must)** — **The trigonometric form is the same number as cis.** «z1 = 2(cos45 + i sin45)»,
   «z1 = √2(cos45 + i·sin45)», «z1 = cos45 + i sin45» (r omitted is 1), with `i·sin`, `i*sin`,
   `sin45·i`, the `°` or without it, a signed or parenthesised angle, and a symbolic one
@@ -228,12 +233,16 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   a structured reason code, not a sentence, so the same fact reads correctly in Hebrew and English and
   the wording can improve without touching the engine.
   - Sources: #716
-- **FR-KN-5 (Must)** — **⚠ Ruled to change (2026-10-07, ADR-W-118 B6/D1 · #1862):** a letter the student did not value is never replaced on the canvas — `|z₂| = 18r` stays «18r» there, and its value (10) is in the data panel. The text below describes the code until that ships. **A real parameter is visible.** Every parameter the figure mentions is listed
+- **FR-KN-5 (Must)** — **A real parameter is visible.** Every parameter the figure mentions is listed
   in the data panel: its exact value when the givens force it (`u^5 = 32` → `u = 2`), «חופשי» when they
-  do not. It can be asked (`r`, `9r`), and wherever a solved parameter would print inside another value,
-  its value is printed instead (`|z₂| = 18r` with r = 5/9 reads 10). An accepted given never leaves
-  nothing on screen.
-  - Sources: [ADR-CX-043](06d-decisions-complex.md#adr-cx-043), #1389, #1390
+  do not. It can be asked (`r`, `9r`), and wherever a solved parameter would print inside another value
+  in the data panel, its value is printed instead (`z2 = 18r` · `|z₂| = 10` reads 10 there). **The canvas
+  shows what the student stated** (docs/10 P5): a letter the student did not value is never replaced there
+  — the same figure reads «z₂ = 18r» on the canvas — and a number the tool computed («w = z1·i», the roots
+  of «z^2 = 2i») shows its name alone, its value in the panel. A number the student typed shows as typed,
+  in the view's own form (D1), including one fixed by its own stated modulus and argument («|z| = 2» ·
+  «arg z = 30°» reads «z = 2·cis30°» / «z = √3+i», W7). An accepted given never leaves nothing on screen.
+  - Sources: [ADR-CX-043](06d-decisions-complex.md#adr-cx-043), #1389, #1390, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W7, #1862)
 
 ## Input honesty
 

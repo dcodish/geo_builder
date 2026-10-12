@@ -163,6 +163,8 @@ const he = {
   secParams: 'פרמטרים',
   paramFree: 'חופשי',
   // #1405 — the teaching note under a line whose letter was read as a real number
+  // #1862 (ADR-W-047) — the letter/value chip on the line that valued a parameter; 2-D's wording
+  paramDisplayTitle: 'הצגת {{sym}}: אות או ערך',
   noteRealParam: '{{name}} נקרא כמספר ממשי ({{name}} = {{value}}). אם {{name}} מרוכב, כתבו: {{name}} מספר מרוכב',
   secAsk: 'חישוב',
   // S5 — the visualization layer (#622)
@@ -396,6 +398,7 @@ const en: typeof he = {
   secRelations: 'Relations',
   secParams: 'Parameters',
   paramFree: 'free',
+  paramDisplayTitle: 'Show {{sym}}: letter or value',
   noteRealParam: '{{name}} is read as a real number ({{name}} = {{value}}). If {{name}} is complex, write: {{name}} is a complex number',
   secAsk: 'Calculate',
   // S5 — the visualization layer (#622)

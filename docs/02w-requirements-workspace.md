@@ -278,8 +278,8 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | The opt-in relations layer | yes (hover) | none | none | none | **Ruled** — 2-D only; not ported (operator, 2026-10-07: "no need to port this capability"). Elsewhere relations live in the givens list |
 | Parallel marks | none | none | none | n/a | **Same** |
 | The area label | «13» | — | «S=13» | — | **Ruled change** — «S=13» everywhere (B9, #1865) |
-| A computed value on the canvas | opt-in layer only | coordinates while the panel is open | a circle centre's coordinates when known | every plotted reading | **Ruled** — canvas = inputs (ADR-W-047); exceptions per docs/10 P5. **Ruled change**: complex (B6, D1, #1862); analytic foci and directrix (B7, #1863) |
-| Letter ↔ value chip | yes | yes | no | no | **Gap** — analytic #1725 (icebox); complex follows from B6 (#1862) |
+| A computed value on the canvas | opt-in layer only | coordinates while the panel is open | a circle centre's coordinates when known | a typed number's value only (as typed, D1; ADR-CX-065) | **Ruled** — canvas = inputs (ADR-W-047); exceptions per docs/10 P5. **Ruled change**: analytic foci and directrix (B7, #1863) |
+| Letter ↔ value chip | yes | yes | no | yes (ADR-CX-065) | **Gap** — analytic #1725 (icebox) |
 | «✓ הציור נקבע במלואו» | only when one figure fits | whenever nothing is free | whenever nothing is free | whenever nothing is free | **Ruled change** — 2-D's rule everywhere (B8, #1596) |
 | Note for a choice the tool made | yes | n/a | yes (equal pair, parallel pair, obtuse vertex, axes) | n/a | **Ruled** — ported to analytic (B10, #1864, ADR-AG-267); the analytic kite's pair is #2006 |
 | «הציגו תצורה אחרת» wording | locked | same | same | same | **Same** (ADR-W-098) |

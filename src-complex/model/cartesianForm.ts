@@ -18,7 +18,7 @@
  */
 
 import type { Expr } from './expr';
-import { refsOf } from './expr';
+import { paramsOf, refsOf } from './expr';
 import { type Rat, rat, add, sub, mul, div, neg, isZero, cmp, ZERO } from '../value/rational';
 import { gaussianRationalParts, type CartPart, ratPart } from '../value/cartesian';
 import type { Constraint } from './constraint';
@@ -170,4 +170,58 @@ function partOf(p: AffinePart, value: number): CartPart {
 /** The pair of parts for `composeCartesian`; `at` is the drawn value, for the parts' numeric field. */
 export function symbolicParts(f: CartesianForm, at: { re: number; im: number }): { re: CartPart; im: CartPart } {
   return { re: partOf(f.re, at.re), im: partOf(f.im, at.im) };
+}
+
+/**
+ * #1862 ([ADR-CX-065](../../docs/06d-decisions-complex.md#adr-cx-065)) — the PARAMETER a constraint
+ * gives a value to, in the student's own words: «a = 3», «r = 5/9» — a full equation whose one side is
+ * a bare parameter and whose other side names no complex number and no parameter. Null otherwise.
+ *
+ * This is the "the student valued the letter" half of ADR-W-047: a parameter the TOOL solved from other
+ * givens («|z₂| = 10» forcing r) is not valued by the student, and the canvas keeps its letter.
+ */
+export function valuedParamOf(c: Constraint): string | null {
+  if ((c.kind ?? 'eq') !== 'eq') return null;
+  const [p, other] = c.lhs.t === 'param' ? [c.lhs, c.rhs] : c.rhs.t === 'param' ? [c.rhs, c.lhs] : [null, null];
+  if (!p || p.t !== 'param' || !other) return null;
+  return refsOf(other).length === 0 && paramsOf(other).length === 0 ? p.name : null;
+}
+
+/**
+ * #1862 (ADR-CX-065) — HOW THE STUDENT STATED a number, read from the constraint shapes alone (never
+ * from line text). What the canvas may print beside it follows from this (docs/10 P5 and its D1
+ * exception):
+ *
+ * - `'typed'` — a value definition `name = E` with E naming no other number («z1 = 3+4i»,
+ *   «z1 = 6cis30°», «z2 = 18r», «z1 = a+bi»);
+ * - `'polar'` — the number's own modulus AND argument, each stated against no other number
+ *   («|z| = 2» · «arg z = 30°»): the operator's W7 ruling (2026-10-08) counts this as typed;
+ * - `'computed'` — anything else: a product of other numbers, a root of an equation, a number fixed
+ *   by a relation to another one. Only its name goes on the canvas; its value is the panel's.
+ *
+ * Pass only the constraints the student's lines state themselves: an enumeration places its members
+ * as `z1 = <root>` (`z^2 - 4z + 13 = 0`), the shape of a typed definition, though the TOOL solved
+ * those values. `setMembers` is the fallback for a caller that has only the merged list: a member is
+ * then computed whatever its constraint looks like.
+ */
+export type StatedAs = 'typed' | 'polar' | 'computed';
+
+export function statedAs(
+  name: string,
+  constraints: readonly Constraint[],
+  setMembers: ReadonlySet<string>,
+): StatedAs {
+  if (setMembers.has(name)) return 'computed';
+  const isName = (e: Expr): boolean => e.t === 'ref' && e.name === name;
+  const isAbsName = (e: Expr): boolean => e.t === 'abs' && isName(e.e);
+  const free = (e: Expr): boolean => refsOf(e).length === 0;
+  let mod = false;
+  let arg = false;
+  for (const c of constraints) {
+    const kind = c.kind ?? 'eq';
+    if (kind === 'eq' && ((isName(c.lhs) && free(c.rhs)) || (isName(c.rhs) && free(c.lhs)))) return 'typed';
+    if (kind === 'mod' && ((isAbsName(c.lhs) && free(c.rhs)) || (isAbsName(c.rhs) && free(c.lhs)))) mod = true;
+    if (kind === 'arg' && isName(c.lhs) && free(c.rhs)) arg = true;
+  }
+  return mod && arg ? 'polar' : 'computed';
 }

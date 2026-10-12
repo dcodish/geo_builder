@@ -133,16 +133,26 @@ never as a contradiction or a refutation.
   `angleDegrees` (parenthesised, or bare without a slash); `genericPolar`'s angle half and the trig
   rewrite's same-angle key ask the same function. π is never a value — the atom refuses anywhere else.
 - **A number DEFINED by real parameters reads as its definition** (`model/cartesianForm.ts`;
-  [ADR-CX-058](06d-decisions-complex.md#adr-cx-058)). **⚠ Ruled to change (2026-10-07, ADR-W-118 B6/D1 ·
-  #1862):** the canvas shows what the student typed and never substitutes a letter they did not value;
-  computed values go to the panel. The text below describes the code until that ships. `z1 = a+bi` is carried as a free unknown plus a
+  [ADR-CX-058](06d-decisions-complex.md#adr-cx-058)). `z1 = a+bi` is carried as a free unknown plus a
   numeric relation (making it a function of a and b in the solver is #1410, closed and parked in the icebox), so its exact carriers
   know nothing. Stage 5d reads the student's own definition instead — any `name = E` with E free of
   complex names and affine in its parameters over the Gaussian rationals — substitutes every parameter
   whose value is a known exact rational, and prints «z₁ = a+bi» / «z₁ = 3+bi» in the cartesian view
   (the polar view stays bare, FR-KN-1). With no parameter left the number is closed and reads exactly as
   the literal would, in both views. `DerivedPoint.defined` tells the panel rows the reading has
-  something to say.
+  something to say. That is the PANEL's reading.
+- **The canvas prints its own label** (`DerivedPoint.canvas` / `canvasCart`, stage 5d;
+  [ADR-CX-065](06d-decisions-complex.md#adr-cx-065)). `statedAs` (`model/cartesianForm.ts`) reads how
+  the student stated each number off the constraint shapes the lines themselves wrote (`FoldInput.stated`,
+  without an enumeration's member placements): typed (`name = E`, E naming no other number), polar
+  (its own `|name| = E` and `arg name = θ`, W7) or computed. Computed → the display name; polar or a
+  parameter-free typed number → the reading; a typed number in parameters → its definition with only the
+  letters the student VALUED substituted (`valuedParamOf`: `a = 3`), and only while the chip shows the
+  value — closed, in each view's own form; open, the typed form in both views (W8). `lowerLines`
+  records the valuing line per letter (`valuedBy`); the fold reports `paramChips` for a valued letter
+  that appears in a typed form; `deriveLines` takes the letter-mode lines (`letterLines`), mapped by
+  the App from the store's `display` map (keyed by store line index, shifted on removal, in the undo
+  slice and the save file).
 - **A radical is a token, and a radical LITERAL is a value** ([ADR-CX-056](06d-decisions-complex.md#adr-cx-056)).
   «√» / «∛» / «∜» / «ⁿ√» / «sqrt(» lex as one root token; a root of a rational literal becomes an exact
   value on the modulus exponent vector (so «√2cis45» stays a tier-1 literal), and any other radicand is
@@ -165,10 +175,9 @@ never as a contradiction or a refutation.
   A solved parameter is drawn at its value and leaves the free basis. The argument half holds the other
   end: a turn-unknown pinned to a non-whole constant is always a contradiction.
 - **A solved parameter has ONE exact value** ([ADR-CX-043](06d-decisions-complex.md#adr-cx-043)).
-  **⚠ Ruled to change (2026-10-07, ADR-W-118 B6/D1 · #1862):** the canvas keeps the student's `18r`; the
-  substituted value is the panel's. The text below describes the code until that ships. Tier 1
+  The canvas keeps the student's `18r`; the substituted value is the panel's (ADR-CX-065). Tier 1
   publishes `paramValues` (each determined parameter as an exact `ExpVec`), and `substituteSolvedParams` is the
-  only way a solved atom leaves a modulus: `knownModulus`, the drawn reading, the «פרמטרים» panel section
+  only way a solved atom leaves a modulus: `knownModulus`, the panel's reading, the «פרמטרים» panel section
   (`Derived2.params`) and the ask lane all read it, so none can print `18r` for a number the givens made
   10. The class net `accepted-line-visible-1390.test.ts` fails any accepted given whose numbers and
   parameters appear on no surface.

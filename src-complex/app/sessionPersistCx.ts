@@ -40,7 +40,7 @@ export function persistSessionCx(now: Date = new Date()): void {
 /** Start mirroring the session to storage. Returns the unsubscribe, for the caller's effect. */
 export function startSessionPersistCx(): () => void {
   return useComplexStore.subscribe((s, p) => {
-    if (s.lines !== p.lines || s.queries !== p.queries || s.seed !== p.seed || s.freePos !== p.freePos || s.name !== p.name)
+    if (s.lines !== p.lines || s.queries !== p.queries || s.seed !== p.seed || s.freePos !== p.freePos || s.name !== p.name || s.display !== p.display)
       persistSessionCx();
   });
 }

@@ -39,6 +39,7 @@
  */
 
 import { readEnvelope, type LoadAudit } from '../../shell/save';
+import { readDisplayMode } from '../../shell/displayMode';
 import { unreadScript } from '../../shell/inputScript';
 import { parseLineV2 } from '../parser/rules';
 import { trigAngleMismatch } from '../parser/normalize';
@@ -437,7 +438,23 @@ export function hydrateSession(data: unknown): boolean {
   });
   const savedDisabled = new Set(Array.isArray(d.disabled) ? d.disabled : []);
   const failed: LoadAudit<InputError>['failed'] = [];
+  /** #1862 — saved line index → its index in the replayed list (a dropped line or a migrated question shifts it) */
+  const placedAt = new Map<number, number>();
+  const before = () => st().lines.length;
   d.lines.forEach((raw, i) => {
+    const n = before();
+    replayOne(raw, i);
+    if (st().lines.length > n) placedAt.set(i, n);
+  });
+  // #1862 (ADR-CX-065) — the letter/value chip choices ride the file by LINE INDEX (shell/displayMode),
+  // remapped onto the lines that actually came back; lenient like every other optional field
+  const savedDisplay = readDisplayMode(d.display);
+  st().setDisplay(
+    Object.fromEntries(
+      Object.entries(savedDisplay).flatMap(([k, m]) => (placedAt.has(Number(k)) ? [[String(placedAt.get(Number(k))), m]] : [])),
+    ),
+  );
+  function replayOne(raw: unknown, i: number): void {
     const line = String(raw);
     // a MUTED saved line re-enters muted, ungated — it gates when re-enabled, which is the
     // moment it would touch the figure (B5). #789: unless it is a QUESTION — a question has no
@@ -450,7 +467,7 @@ export function hydrateSession(data: unknown): boolean {
     }
     if (!submitLine(line))
       failed.push({ line, reason: st().lastError ?? { key: 'not-handled', detail: line } });
-  });
+  }
   // #789 — the lane's own saved field (files written by this version onward); lenient like 3-D:
   // keep well-formed entries, ignore anything else
   if (Array.isArray(d.queries)) {

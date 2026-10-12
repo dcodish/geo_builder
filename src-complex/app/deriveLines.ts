@@ -21,6 +21,7 @@ import type { ArgQuery, ExprQuery, MeasureQuery, MeasureRelation, RatioQuery } f
 import type { SequenceStatement } from '../model/sequence';
 import { type RootsMode, rootsMode } from '../model/naming';
 import { refsOf } from '../model/expr';
+import { valuedParamOf } from '../model/cartesianForm';
 import { paramSigns } from '../model/paramSign';
 import {
   type PolyEquation,
@@ -68,9 +69,15 @@ export function deriveLines(
   configIndex = 0,
   seed = 0,
   asks: readonly string[] = [],
+  /**
+   * #1862 (ADR-CX-065) — the lines (indices into `lines`) whose letter/value chip shows the LETTER. A
+   * DISPLAY choice: it changes only what the canvas prints, never the figure, and the gate never passes it.
+   */
+  letterLines: ReadonlySet<number> = new Set(),
 ): Derived2 {
   const declaredBy = complexScopeOf(lines);
   const lowered = lowerLines(lines, declaredBy);
+  const letterParams = new Set([...(lowered.valuedBy ?? new Map<string, number>())].filter(([, i]) => letterLines.has(i)).map(([p]) => p));
   // #1405: a question reads a declared letter the way the givens do
   const lane = lowerAsks(asks, new Set(declaredBy.keys()));
   return foldConstraints({
@@ -79,6 +86,7 @@ export function deriveLines(
     ratios: [...(lowered.ratios ?? []), ...lane.ratios],
     exprQueries: [...(lowered.exprQueries ?? []), ...lane.exprQueries],
     argQueries: [...(lowered.argQueries ?? []), ...lane.argQueries],
+    letterParams,
     configIndex,
     seed,
   });
@@ -222,6 +230,10 @@ export function lowerLines(
   const selections: ResolvedSelection[] = [];
   /** #791 — «z1 = A» / «A = z1» bindings, read off the equation shape: number name → label */
   const aliases = new Map<string, string>();
+  /** #1862 — the line that VALUED each parameter in the student's words («a = 3»): where its chip rides */
+  const valuedBy = new Map<string, number>();
+  /** #1862 — the constraints the lines state THEMSELVES, before any enumeration places its members */
+  const stated: Constraint[] = [];
 
   /**
    * Every name an EARLIER line mentioned — defined, constrained, or merely referred to.
@@ -353,7 +365,12 @@ export function lowerLines(
       const number = names.find((n) => /^[zw]\d*$/.test(n));
       if (label !== undefined && number !== undefined) aliases.set(number, label);
     }
+    for (const c of r.line.constraints) {
+      const p = valuedParamOf(c);
+      if (p !== null && !valuedBy.has(p)) valuedBy.set(p, idx);
+    }
     constraints.push(...r.line.constraints);
+    stated.push(...r.line.constraints);
     filters.push(...r.line.filters);
     declared.push(...r.line.declares);
     assertions.push(...r.line.assertions);
@@ -394,6 +411,8 @@ export function lowerLines(
     selections,
     solutionSets,
     realTyped,
+    valuedBy,
+    stated,
   };
 }
 

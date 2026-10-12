@@ -9,6 +9,7 @@ import { Banner } from '../shell/frame/Banner';
 import { AskLane } from '../shell/frame/AskLane';
 import { DataPanel } from '../shell/frame/DataPanel';
 import { FactList } from '../shell/frame/FactList';
+import { displayModeOf } from '../shell/displayMode';
 import { ManualScreen } from '../shell/frame/ManualScreen';
 import { Workbench } from '../shell/frame/Workbench';
 import { manualSections } from './ui/manual';
@@ -69,6 +70,8 @@ export function App() {
     lastError,
     loadAudit,
     removeLine,
+    display,
+    toggleDisplay,
     setView,
     nextConfig,
     clearAll,
@@ -321,7 +324,21 @@ export function App() {
   // out of the figure — "what if I hadn't said this?" made literal
   const active = useMemo(() => lines.filter((_, i) => !disabled.includes(i)), [lines, disabled]);
   // #789: the ask lane rides the fold as QUESTIONS — its entries can never constrain the figure
-  const derived2 = useMemo(() => deriveLines(active, seed, seed, queries), [active, seed, queries]);
+  /**
+   * #1862 (ADR-CX-065, ADR-W-047) — the letter/value chip. The store keys a choice by the STORE line
+   * index; the fold numbers the ACTIVE lines, so the two are mapped here, the one place both are known.
+   */
+  const activeIndex = useMemo(() => lines.map((_, i) => i).filter((i) => !disabled.includes(i)), [lines, disabled]);
+  const letterLines = useMemo(
+    () => new Set(activeIndex.flatMap((storeIdx, k) => (displayModeOf(display, String(storeIdx)) === 'letter' ? [k] : []))),
+    [activeIndex, display],
+  );
+  const derived2 = useMemo(() => deriveLines(active, seed, seed, queries, letterLines), [active, seed, queries, letterLines]);
+  /** store line index → the chip its row carries (only rows whose two forms compete on the canvas) */
+  const chipByLine = useMemo(
+    () => new Map(derived2.paramChips.map((c) => [activeIndex[c.line], c] as const)),
+    [derived2, activeIndex],
+  );
   // …and each saved question resolves to its answer (or its reason) against the current figure
   const askRows = useMemo(
     () => askRowsOf(queries, derived2.knowledge, new Set(complexScopeOf(active).keys())),
@@ -720,6 +737,19 @@ export function App() {
                     })()
                   : undefined,
                 disabled: disabled.includes(i),
+                // #1862 (ADR-W-047): the row that VALUED a letter carries the shared chip when the
+                // letter and its value compete on the canvas; which rows get one is the fold's answer
+                ...(chipByLine.has(i)
+                  ? {
+                      chip: {
+                        letter: chipByLine.get(i)!.param,
+                        value: chipByLine.get(i)!.value,
+                        mode: displayModeOf(display, String(i)),
+                        onToggle: () => toggleDisplay(i),
+                        title: t('paramDisplayTitle', { sym: chipByLine.get(i)!.param }),
+                      },
+                    }
+                  : {}),
                 // #1405 — a NOTE, never an error: the line is accepted and the real reading stands
                 notes: paramNotes.has(i) ? (
                   <>
