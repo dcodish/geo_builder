@@ -293,6 +293,18 @@ it teaches scores zero, so the gate can never brush off a sentence the tool acce
 
 **The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/proof-target-rows.ts`. Each builder's thin lock hands over a `ProofGate`: its REAL submit decision on a figure with A, B and C, answering `{ proof, recorded, text }`. The rows check that every spelling is refused as a proof target, recorded by none and quoted by the refusal, and that the negatives are never refused as one. The meta-lock proves each check can fail.
 
+### Sentence boundaries ([ADR-W-125](06w-decisions-workspace.md#adr-w-125))
+
+`shell/sentences.ts` turns a pasted paragraph into the sentences a builder submits one by one. It is pure, knows no product and returns no strings.
+
+- `splitSentences(text) → Sentence[] | null` — `{ text, rest }` per sentence: `text` is what the builder reads (format controls stripped, a final «.» dropped, «?»/«!» kept); `rest` is the paste from that sentence on, as typed, which is what the box holds if the chain stops there. A boundary is a run of «.?!» (bidi marks inside it skipped) at bracket depth 0 followed by whitespace or the end. Not a boundary: a decimal, a dot in a bracket, «i.e.»/«e.g.»/«etc.»/«vs.»/«cf.»/«fig.». `null` for one sentence, and for a paste carrying a proof target (`shell/proofTarget`, ADR-W-107), which the builder refuses whole.
+- `submitSentences(sentences, submitOne) → Promise<box>` — awaits each sentence's `SentenceOutcome` in order: `'consumed'` goes on; `'kept'` stops with `rest`; `{ prefill }` stops with the canonical, its sentence end restored, then the next sentence's `rest`.
+- `submitTyped(raw, submitOne, setBox)` — the box's submit for a builder whose one-sentence submit answers an outcome: one sentence is the one-element case.
+
+**Each builder's seam.** 2-D: `runSubmit` splits, then runs each sentence through the one-sentence pipeline with a box-tracking UI wrapper; later sentences read their parse context from the store, and the post-commit search (`resolveAfterCommit`) is awaited between sentences. Analytic (`App.tsx` `submitSentence`), 3-D (`App3.tsx` `submitSentence3`), complex (`App.tsx` over `submitLine`): `submitTyped`, with the one-sentence submit reading the live store.
+
+**The cross-product lock** is `shell/__tests__/fixtures/paste-paragraph-rows.ts` (docs/04w "How a cross-product wiring guard is written"): each builder's thin lock hands a `PasteRunner` over its real one-sentence submit, answering the rows a paste added and the box; the meta-lock proves a seam that never splits, a chain that skips a refusal, one that drops the rest, and one that splits a single dotted sentence are each caught.
+
 ### Read extent ([ADR-W-120](06w-decisions-workspace.md#adr-w-120))
 
 `shell/readExtent.ts` measures which parts of a line a builder's reading READ. It is pure and knows no product; the caller passes a `Reader` (`read(text) → lowering | null`, `same`) in its own context.

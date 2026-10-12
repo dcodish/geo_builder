@@ -32,7 +32,8 @@ import { curveDetailsKey, curveParts, namedRow } from './app/curveText';
 import { color, fs } from '../shell/theme';
 import { reportedDof } from './engine/carriers';
 import { derive } from './engine/derive';
-import { commitRecord, decideEdit, decideSubmit, decideToggle, noticeText, reachesFallback } from './app/submit';
+import { commitRecord, decideEdit, decideSubmit, decideToggle, noticeText, reachesFallback, sentenceOutcome } from './app/submit';
+import { submitTyped, type SentenceOutcome } from '../shell/sentences';
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
@@ -769,8 +770,25 @@ export function App() {
    * should have caught it REPRODUCED this function instead of calling it, so it modelled a submit
    * path that no longer existed.
    */
+  /**
+   * #1778 (ADR-W-125) — the box's text may be a pasted PARAGRAPH: `submitTyped` hands each sentence to
+   * {@link submitSentence} in order, one row each, and sets the box to what is left when it stops.
+   */
   const submit = (raw: string) => {
-    const verdict = decideSubmit(raw, active, seed, d);
+    void submitTyped(raw, submitSentence, setDraft);
+  };
+
+  /**
+   * One sentence. It reads the LIVE store rather than this render's `active`/`d`: a paragraph's second
+   * sentence must see the row its first just recorded («האנך חותך…» after the perpendicular). On a single
+   * sentence the two are the same state, and the render's memoized derivation is reused.
+   */
+  const submitSentence = async (raw: string): Promise<SentenceOutcome> => {
+    const live = useAnalyticStore.getState();
+    const same = live.lines === lines && live.disabled === disabled && live.seed === seed && live.seedNames === seedNames;
+    const act = same ? active : activeOf(live.lines, live.disabled);
+    const cur = same ? d : derive(act, live.seed, live.seedNames);
+    const verdict = decideSubmit(raw, act, live.seed, cur);
     /**
      * THE TRACE (#1300) — one line per submitted utterance, including the ones that fail.
      *
@@ -795,7 +813,7 @@ export function App() {
     }
     switch (verdict.kind) {
       case 'ignored':
-        return;
+        return 'kept';
       case 'refused':
         /**
          * THE LLM SEAM (#1251). `not-handled` means no rule matched — the one code that means "I do
@@ -804,26 +822,20 @@ export function App() {
          * tool understood the student and disagreed, and handing that to a model would replace a
          * correct explanation with a guess.
          */
-        if (reachesFallback(verdict)) {
-          void tryFallback(raw, verdict.error);
-          return;
-        }
+        if (reachesFallback(verdict)) return (await tryFallback(raw, verdict.error, act, live.seed)) ? 'consumed' : 'kept';
         setError(verdict.error);
-        return;
+        return sentenceOutcome(verdict);
       case 'already-known':
         setNotice(t('noticeAlreadyKnown', { detail: verdict.line }));
-        setDraft('');
-        return;
+        return sentenceOutcome(verdict);
       case 'already-follows':
         setNotice(t('noticeAlreadyFollows', { detail: verdict.line }));
-        setDraft('');
-        return;
+        return sentenceOutcome(verdict);
       case 'record':
         // #1350 — the notice rides IN the commit that records the line: `recordLine` clears the
         // transient surfaces, so a notice set before it would be erased by the very line that earned it.
         commitRecord(verdict, recordLine, t);
-        setDraft('');
-        return;
+        return sentenceOutcome(verdict);
       /**
        * THE TEACHING CASE (#1353, ADR-W-030) — the one branch that deliberately does NOT clear the box.
        *
@@ -835,24 +847,21 @@ export function App() {
        * intention as a mistake is the #1045 lesson.
        */
       case 'teach':
-        setDraft(verdict.canonical);
         setNotice(t('noticeTeachCanonical', { verb: verdict.verb, canonical: verdict.canonical }));
-        return;
+        return sentenceOutcome(verdict); // the canonical goes INTO the box (ADR-W-030)
       /**
        * #1154 — A RENAME rewrites the session (every line, every ask row) in ONE store commit, or names
        * why not. Decided in `app/rename.ts` over the WHOLE session — muted lines too — which is why it
        * is dispatched here rather than decided by `decideSubmit`, which sees only the active lines.
        */
       case 'rename': {
-        const r = dispatchRename(verdict.from, verdict.to, { lines, disabled, queries, spokenFor, seed, seedNames, segStyle }, { applyRename, setError }, d);
-        if (r.kind === 'apply') setDraft('');
-        return;
+        const r = dispatchRename(verdict.from, verdict.to, sessionOf(live), { applyRename, setError }, cur);
+        return r.kind === 'apply' ? 'consumed' : 'kept';
       }
       // #1303 / #1631 — a SWAP («החלף בין A ל-B»): the rename's contract, two letters at once.
       case 'swap': {
-        const r = dispatchSwap(verdict.a, verdict.b, { lines, disabled, queries, spokenFor, seed, seedNames, segStyle }, { applySwap, setError }, d);
-        if (r.kind === 'apply') setDraft('');
-        return;
+        const r = dispatchSwap(verdict.a, verdict.b, sessionOf(live), { applySwap, setError }, cur);
+        return r.kind === 'apply' ? 'consumed' : 'kept';
       }
     }
   };
@@ -865,12 +874,24 @@ export function App() {
    * On any outcome but a clean set of lines the student keeps the original refusal, because that
    * refusal is about words they actually wrote.
    */
-  const tryFallback = async (raw: string, original: InputError) => {
+  /** The whole session a rename or swap rewrites, read from the live store (#1778: mid-paragraph, the render's copy is stale). */
+  const sessionOf = (live: ReturnType<typeof useAnalyticStore.getState>) => ({
+    lines: live.lines,
+    disabled: live.disabled,
+    queries: live.queries,
+    spokenFor: live.spokenFor,
+    seed: live.seed,
+    seedNames: live.seedNames,
+    segStyle: live.segStyle,
+  });
+
+  /** Answers whether the model's lines were recorded — the sentence was taken (#1778: the paragraph chain goes on). */
+  const tryFallback = async (raw: string, original: InputError, act: readonly string[], atSeed: number): Promise<boolean> => {
     setThinking(true);
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), LLM_TIMEOUT_MS_ANALYTIC);
     try {
-      const out = await runFallback(raw, active, seed, (utterance, context) =>
+      const out = await runFallback(raw, act, atSeed, (utterance, context) =>
         llmParseAnalytic(utterance, context, { signal: ctl.signal, locale: i18n.language === 'en' ? 'en' : 'he' }),
       );
       /**
@@ -898,8 +919,7 @@ export function App() {
         // #1297 (operator ruling 2026-09-27, 'student's words now'): the rows DISPLAY the sentence
         // the student typed; the machine lines stay the stored truth so replay is unchanged.
         recordLlmLines(raw, out.lines, noticeText(out.notice, t));
-        setDraft('');
-        return;
+        return true;
       }
       /**
        * Anything else leaves the figure as it was and says why, decided by `fallbackRefusal`: a throttle
@@ -908,6 +928,7 @@ export function App() {
        * student's ORIGINAL refusal, since nothing was understood and the tool may well support the move.
        */
       setError(fallbackRefusal(out, raw, original));
+      return false;
     } finally {
       clearTimeout(timer);
       setThinking(false);

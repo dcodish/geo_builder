@@ -31,6 +31,7 @@ import { complexScopeOf, deriveLines } from './app/deriveLines';
 import { realParamNotes } from './app/paramNote';
 import { askRowsOf } from './app/askLane';
 import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, submitQuery, toggleLine } from './app/submit';
+import { submitTyped } from '../shell/sentences';
 import { logComplex } from './debug/sessionLogComplex';
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
 // This tree is why the rule exists: #919 removed a seam here that re-submitted stored lines on every load.
@@ -466,9 +467,10 @@ export function App() {
     return ok;
   };
 
+  /** #1778 (ADR-W-125): a pasted PARAGRAPH is submitted one sentence at a time, one row each. */
   const submit = () => {
     if (input.trim() === '') return;
-    if (submitCounted(input)) setInput('');
+    void submitTyped(input, (sentence) => (submitCounted(sentence) ? 'consumed' : 'kept'), setInput);
   };
 
   /**

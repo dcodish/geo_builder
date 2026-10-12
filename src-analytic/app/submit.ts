@@ -30,6 +30,7 @@ import { factsWithin, type Fact } from '../engine/types';
 import { activeOf, rowOf } from './active';
 import { namesOfKind, nearMissOf, withName } from './nearMiss';
 import { declinedPart, unreadPart, type LostPart } from './lostPart';
+import type { SentenceOutcome } from '../../shell/sentences';
 
 /** What a recorded line tells the student (#1350) — the engine's notice, without the line index. */
 export type RecordNotice = ApplyNotice;
@@ -627,6 +628,25 @@ export const reachesFallback = (verdict: SubmitVerdict): boolean =>
   // answers, so it keeps the deterministic refusal and never costs a call. `not-handled` carries the
   // student's own line as its detail (the #1272 lock), so the predicate needs nothing more.
   hasConstructionSignal(verdict.error.detail ?? '', VOCABULARY_ANALYTIC);
+
+/**
+ * #1778 (ADR-W-125) — WHAT A VERDICT LEAVES IN THE INPUT BOX, the answer the paragraph chain (`shell/sentences`)
+ * reads to go on or stop: a recorded line, or one that adds nothing, takes the sentence; a taught imperative
+ * puts its canonical in the box (ADR-W-030); every refusal keeps the sentence. A refusal that reaches the model
+ * and a rename or swap are decided by the caller's dispatch, which knows how they ended.
+ */
+export function sentenceOutcome(verdict: SubmitVerdict): SentenceOutcome {
+  switch (verdict.kind) {
+    case 'record':
+    case 'already-known':
+    case 'already-follows':
+      return 'consumed';
+    case 'teach':
+      return { prefill: verdict.canonical };
+    default:
+      return 'kept';
+  }
+}
 
 /**
  * THE LINES A STUDENT ENDS UP WITH when they type `typed` one at a time and confirm every lesson

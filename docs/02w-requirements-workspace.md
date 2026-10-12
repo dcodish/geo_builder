@@ -134,6 +134,16 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   english or hebrew so any letter or mention of anything that is not in these languages is rejected. in all
   tools».
   - Sources: [ADR-626](06-decisions.md#adr-626), [ADR-3D-328](06b-decisions-3d.md#adr-3d-328), #1919.
+- **FR-SU-19 (Must)** — **A pasted paragraph is read sentence by sentence, one row per sentence.** In all four
+  builders, text holding two or more sentences (each ending in «.», «?» or «!» before a space or the end) is
+  submitted one sentence at a time, in order, each as its own row, so a later sentence reads the figure the
+  earlier ones built. A decimal point, a dot inside a coordinate or parentheses and a dotted abbreviation are
+  not sentence ends, and one sentence with a final dot is submitted as typed. Each sentence gets exactly what it
+  gets typed alone. At the first sentence the builder does not take, the paste stops: the rows before it stay,
+  and the input box holds that sentence and the rest — or, for a sentence the builder teaches, its canonical
+  sentence followed by the rest. A paste that carries a claim to prove is not split; it is refused whole
+  (FR-SU-15). The operator's ruling: «split into rows».
+  - Sources: [ADR-W-125](06w-decisions-workspace.md#adr-w-125), #1778.
 - **FR-SU-15 (Must)** — **A claim to prove is never drawn as a given.** **⚠ Ruled to change (2026-10-07, ADR-W-118 B14/D3 · #1870):** the complex builder refuses a proof-verb line like the others, while keeping its claim check for a bare statement. The text below describes the code until that ships. In every builder, a line that asks the student to PROVE something — «הוכיחו כי …», «הוכח ש …», «הראו כי …», «יש להוכיח …», "prove that …", "show that …", with or without an item marker («א.», «(1)») and also when it follows a given on the same line («נתון AB = AC. הוכיחו כי AB ⊥ AC») — is refused, and nothing of the line is recorded. The refusal says that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and quotes the claim so the student knows which part to leave out. «כי» and «ש» in their other senses («נתון כי …», «כך ש-…») and «הראו» as "show me" are never refused for this. Sources: [ADR-W-107](06w-decisions-workspace.md#adr-w-107), #1666, #1649, #1618.
 - **FR-SU-16 (Must)** — **A plane-geometry sentence gets the same answer in every builder that reads plane geometry.** When a student types a plane-geometry sentence, the 2-D builder and the analytic builder give the same verdict: both build it, both refuse it, or both ask the same kind of question. The 2-D builder's verdict is the reference. The 3-D builder is to give the same verdict for the core plane families: polygons, lengths, angles, midpoints and ratios, cevians, parallel and perpendicular, and area — that parity is **parked, not realised**: most of 3-D's known-gap rows are owned by #1679, which is in the icebox (as are 2-D's own phrasing gaps, #1677). The exceptions are topic families that one builder reads by design: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, and free points in 3-D. A builder that does not read such a family answers it honestly, with a refusal, a question or the model, and never draws it as something else. A known difference is listed with the issue that will remove it. The operator's ruling: «analytics and 2d should have same user experience».
   - Sources: [ADR-W-108](06w-decisions-workspace.md#adr-w-108), #1649, [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B15, #1861.
@@ -266,6 +276,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 
 | Behaviour | 2-D | 3-D | Analytic | Complex | Status |
 | --- | --- | --- | --- | --- | --- |
+| A pasted paragraph | one row per sentence | same | same | same | **Same** (ADR-W-125, FR-SU-19) |
 | Plane-geometry sentence verdicts | reference | core families; most gaps parked | locked to 2-D | n/a (not plane geometry) | **Ruled** — ADR-W-108; 3-D parity parked (#1679, icebox; B15) |
 | Givens list: mute, edit, delete | shared list | same | same | same | **Same** |
 | Undo / redo | yes | yes | yes | yes | **Same** |
