@@ -3035,7 +3035,12 @@ export const SCENARIOS_4: Scenario[] = [
       expect(verdict.configurations, 'both triangles are in the pool').toBeGreaterThan(1);
       expect(figureStatus(facts.length, freeDofCount(fig.construction), verdict)?.key, 'never «נקבע במלואו»').toBe('actions.dofConfigsMany');
       const rows = computeValues(facts).rows;
-      expect(rows.some((r) => r.kind === 'length' && r.label === 'BC'), 'BC is 6.212 in one shape and 1.449 in the other — withheld').toBe(false);
+      {
+      // #1867 (ADR-634, ruling W1, round #1998): a value with exactly two possibilities is shown as BOTH — never one as definite
+      const r = (rows).find((x) => x.kind === 'length' && x.label === 'BC') as { value?: number; or?: { value: number } } | undefined;
+      expect(r?.or, 'BC is 6.212 in one shape and 1.449 in the other — both shown').toBeDefined();
+      expect([r!.value!, r!.or!.value].sort((p, q) => p - q).map((x) => +x.toFixed(3)), 'BC: both values').toEqual([1.449, 6.212]);
+    }
       expect(rows.find((r) => r.kind === 'length' && r.label === 'AB')?.value, 'the givens still print').toBeCloseTo(5, 6);
     },
   },
@@ -3467,8 +3472,12 @@ export const SCENARIOS_4: Scenario[] = [
       allStepsOk(fig);
       const facts = factsOf(['משולש ABC', 'AB=4, BC=5, AC=6', 'מעגל A ברדיוס 4.5', 'הישר BC פוגש את מעגל A בנקודה E']);
       expect(configsShown(facts)).toBe(2);
-      const rows = computeValues(facts).rows.filter((r) => r.kind === 'length').map((r) => r.label);
-      expect(rows.includes('BE') || rows.includes('CE'), 'no definite BE/CE while two figures exist').toBe(false);
+      {
+      // #1867 (ADR-634, ruling W1, round #1998): while two figures exist, each of these lengths shows BOTH values — never one as definite
+      const rs = (computeValues(facts).rows).filter((x) => x.kind === 'length' && ["BE","CE"].includes(x.label as string)) as { or?: unknown }[];
+      expect(rs.length, 'no single definite BE/CE while two figures exist: the rows are shown').toBeGreaterThan(0);
+      expect(rs.every((x) => x.or !== undefined), 'no single definite BE/CE while two figures exist').toBe(true);
+    }
       const be = pressAll(facts, 3).map((f) => dist(f.positions.get('B')!, f.positions.get('E')!));
       expect(be.some((x) => Math.abs(x - 2.621) < 1e-3), `the other crossing is reached: ${be}`).toBe(true);
       expect(shapesReached(facts, 4)).toBe(2);
@@ -3483,7 +3492,12 @@ export const SCENARIOS_4: Scenario[] = [
       allStepsOk(fig);
       const facts = factsOf(['משולש ABC', 'AB=4, BC=5, AC=6', 'מעגל A ברדיוס 3.98', 'BC חותך את מעגל A בנקודה E']);
       expect(configsShown(facts)).toBe(2);
-      expect(computeValues(facts).rows.some((r) => r.kind === 'length' && r.label === 'BE'), 'BE withheld').toBe(false);
+      {
+      // #1867 (ADR-634, ruling W1, round #1998): while two figures exist, each of these lengths shows BOTH values — never one as definite
+      const rs = (computeValues(facts).rows).filter((x) => x.kind === 'length' && ["BE"].includes(x.label as string)) as { or?: unknown }[];
+      expect(rs.length, 'BE shows both values: the rows are shown').toBeGreaterThan(0);
+      expect(rs.every((x) => x.or !== undefined), 'BE shows both values').toBe(true);
+    }
       expect(shapesReached(facts, 4)).toBe(2);
     },
   },

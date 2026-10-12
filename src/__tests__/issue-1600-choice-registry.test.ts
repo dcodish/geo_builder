@@ -85,7 +85,12 @@ describe('#1600 arm A — a crossing whose `avoid` is not a crossing is a choice
     expect(branchCount(replay(facts).construction, 'E'), 'B is off the circle, so `avoid: B` decides nothing').toBe(2);
     expect(statusOf(facts)).toEqual({ key: 'actions.dofConfigs', n: 2 });
     const v = lengths(facts);
-    expect(v.has('BE') || v.has('CE'), `no definite BE/CE while two figures exist: ${[...v.keys()]}`).toBe(false);
+    {
+      // #1867 (ADR-634, ruling W1, round #1998): while two figures exist, each of these lengths shows BOTH values — never one as definite
+      const rs = (computeValues(facts).rows).filter((x) => x.kind === 'length' && ["BE","CE"].includes(x.label as string)) as { or?: unknown }[];
+      expect(rs.length, 'BE/CE show both values while two figures exist: the rows are shown').toBeGreaterThan(0);
+      expect(rs.every((x) => x.or !== undefined), 'BE/CE show both values while two figures exist').toBe(true);
+    }
     expect(v.get('BC'), 'the givens still print').toBeCloseTo(5, 6);
     const { shapes, views } = reached(facts, 3);
     expect(shapes.size).toBe(2);
@@ -96,7 +101,12 @@ describe('#1600 arm A — a crossing whose `avoid` is not a crossing is a choice
   it('m1 (segment form, both roots inside BC): two configurations, BE withheld, both reached', () => {
     const facts = factsOf(M1);
     expect(statusOf(facts)).toEqual({ key: 'actions.dofConfigs', n: 2 });
-    expect(lengths(facts).has('BE')).toBe(false);
+    {
+      // #1867 (ADR-634, ruling W1, round #1998): while two figures exist, each of these lengths shows BOTH values — never one as definite
+      const rs = (computeValues(facts).rows).filter((x) => x.kind === 'length' && ["BE"].includes(x.label as string)) as { or?: unknown }[];
+      expect(rs.length, 'BE shows both values while two figures exist: the rows are shown').toBeGreaterThan(0);
+      expect(rs.every((x) => x.or !== undefined), 'BE shows both values while two figures exist').toBe(true);
+    }
     expect(reached(facts, 3).shapes.size).toBe(2);
   }, 120_000);
 });

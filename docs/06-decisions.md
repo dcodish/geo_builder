@@ -16231,7 +16231,7 @@ Two corrections to the plan's table, both already recorded on the issue and re-c
 
 **Status:** accepted · 2026-10-12 · feature (P2, 2-D) · branch `feat/1676-exam-shape-frame` off `feat/1685-respectively-cevians` @ 57e6ed50 · fix round #1998 · copies analytic's frame chokepoint ([ADR-AG-187](06c-decisions-analytic.md), `frameAnalytic.ts`) for the families its parity rows print
 
-**Requirements:** [02](02-requirements.md) FR-IN-16 — the exam's own sentence frame is read, not refused · **Design:** [04](04-design.md) § "The exam's sentence frame, read at the normalize boundary".
+**Requirements:** [02](02-requirements.md) FR-IN-17 — the exam's own sentence frame is read, not refused · **Design:** [04](04-design.md) § "The exam's sentence frame, read at the normalize boundary".
 
 **The report.** Found by the #1649 parity lock (ADR-W-108, 2026-10-02): five `frame` rows were 2-D known gaps naming this issue. Armed 2026-10-05, approved for round #1998 on 2026-10-12 (*"approved"*). Standing ruling quoted on the issue: for plane geometry 2-D and analytic give the same experience. The plan: port analytic's frame chokepoint, and measure whether the pure part belongs in `shell/`.
 

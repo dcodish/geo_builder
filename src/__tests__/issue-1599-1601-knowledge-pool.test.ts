@@ -41,7 +41,12 @@ describe('#1599 — a determined figure is sampled over the configuration button
   it('the SSA triangle: BC is NOT printed as a definite value (it is 6.212 in one shape, 1.449 in the other)', () => {
     const v = computeValues(factsOf(SSA));
     expect(v.complete).toBe(true);
-    expect(v.rows.some((r) => r.kind === 'length' && r.label === 'BC'), 'BC withheld').toBe(false);
+    {
+      // #1867 (ADR-634, ruling W1, round #1998): a value with exactly two possibilities is shown as BOTH — never one as definite
+      const r = (v.rows).find((x) => x.kind === 'length' && x.label === 'BC') as { value?: number; or?: { value: number } } | undefined;
+      expect(r?.or, 'BC shows both values, never one as definite').toBeDefined();
+      expect([r!.value!, r!.or!.value].sort((p, q) => p - q).map((x) => +x.toFixed(3)), 'BC: both values').toEqual([1.449, 6.212]);
+    }
     expect(v.rows.find((r) => r.kind === 'length' && r.label === 'AB')?.value, 'the givens still print').toBeCloseTo(5, 6);
   });
 

@@ -74,7 +74,11 @@ describe('#434 — the SEAT axis: a right angle the student never placed is an a
     const facts = factsOf(quarter);
     expect(freeDofCount(replay(facts, 0).construction)).toBe(0);
     expect(canvasLength(facts, 'A', 'B'), '18.03 is one seat’s number').toBeUndefined();
-    expect(panelRows(facts, 'length').map((r) => r.ids?.join('')).sort(), 'the two givens remain').toEqual(['AC', 'BC']);
+    // #1867 (ADR-634, ruling W1, round #1998): with two admissible seats, every unstated length shows BOTH values
+    // (an `or` row), never one seat's number as definite; the two givens still print as givens.
+    const lens = panelRows(facts, 'length') as { ids?: string[]; stated?: boolean; or?: unknown }[];
+    expect(lens.filter((r) => r.stated).map((r) => r.ids?.join('')).sort(), 'the two givens remain').toEqual(['AC', 'BC']);
+    expect(lens.filter((r) => !r.stated).every((r) => r.or !== undefined), 'no unstated length is printed as one definite value').toBe(true);
     // the seat at B is a genuine alternative: it meets every requirement and joins the pool
     const pool = sharedSamples(facts);
     expect(pool.determined).toBe(true);
