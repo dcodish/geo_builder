@@ -104,9 +104,21 @@ describe('ADR-AG-119 — what #1246 could only refuse, this answers (#1128)', ()
    * hypotenuse — so reading it as |BC| = 10 would drop the student's claim silently. The noun list
    * admits only nouns that add NOTHING to the pair they precede.
    */
-  it.each(['התיכון BC = 10', 'הגובה BC = 10'])('«%s» is still NOT silently reduced to a length', (line) => {
+  /**
+   * ⚠ MOVED (#1737, ADR-AG-265): «התיכון BC = 10» and «הגובה BC = 10» were rows of the refusal above, for the same
+   * reason «השוק» was: the claim could not be stated. It now can — the role half is the sentence «BC תיכון» / «BC
+   * גובה» (`cevian-of`, which M1 lowers against the figure), as 2-D's ADR-574 composes it — so they are accepted
+   * only WITH it. The boundary's intent holds: never a bare length.
+   */
+  it.each([
+    ['התיכון BC = 10', 'median'],
+    ['הגובה BC = 10', 'altitude'],
+  ])('«%s» is a length that STATES its cevian claim (%s), never a bare length', (line, role) => {
     const r = parseLine(line);
-    expect(r.ok).toBe(false);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.facts.some((f) => f.t === 'constraint' && f.k.t === 'length-eq')).toBe(true);
+    expect(r.facts.filter((f) => f.t === 'cevian-of').map((f) => (f.t === 'cevian-of' ? [f.role, f.apex, f.foot] : []))).toEqual([[role, 'B', 'C']]);
   });
 
   /**

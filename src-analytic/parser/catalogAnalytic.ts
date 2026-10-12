@@ -699,6 +699,24 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'AB = 10',
     needs: ['משולש ABC'],
   },
+  /*
+   * A LENGTH WITH THE SEGMENT'S ROLE IN FRONT (#1737, ADR-AG-265; 2-D's catalog rows, ADR-574 and ADR-575): the role
+   * is drawn as on its own — the diagonal, the median's midpoint, the altitude's foot — and the length fixed; a
+   * height given as a number on a trapezoid is drawn between its bases, and on a triangle or a parallelogram asked.
+   */
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'האלכסון AC = 8',
+    en: 'the diagonal AC is 8',
+    needs: ['מקבילית ABCD'],
+  },
+  {
+    category: 'relations',
+    family: 'F20',
+    he: 'גובה הטרפז ABCD הוא 4',
+    en: 'the height of the trapezoid ABCD is 4',
+  },
   {
     category: 'relations',
     family: 'F20',

@@ -136,8 +136,13 @@ const collapseFields = (f: Derivation['faults'][number]) =>
       ? { shape: f.shape, forced: f.forced, declared: f.declared }
       : // #1926 (ADR-AG-260) — a ring re-declared as a shape its noun excludes: both nouns.
         f.code === 'shape-excluded'
-        ? { actual: f.actual, stated: f.stated }
-        : {};
+          ? { actual: f.actual, stated: f.stated }
+          : // #1737 (ADR-AG-265) — a height's shape noun; a diagonal claim's pair and ring.
+            f.code === 'shape-not-found'
+            ? { shape: f.shape }
+            : f.code === 'diagonal-is-side' || f.code === 'diagonal-none-here'
+              ? { polygon: f.polygon, pair: f.pair }
+              : {};
 
 /** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
 const definingLineOf = (lines: readonly string[], id: string): string | null => {

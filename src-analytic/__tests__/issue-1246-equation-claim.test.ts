@@ -34,12 +34,11 @@ describe('ADR-AG-114 — a length is not a broken equation (#1246)', () => {
    * wrote no equation, so the honest answer is that the sentence was not understood.
    */
   it.each([
-    ['התיכון BC = 10'],
-    ['הגובה BC = 10'],
+    // ⚠ «התיכון BC = 10» and «הגובה BC = 10» MOVED to issue-1128-distance-spellings.test.ts too (#1737, ADR-AG-265): the
+    // median/altitude claim is now stated (`cevian-of`, 2-D's ADR-574 composition), so they are accepted WITH it.
     // ⚠ «השוק BC = 10», «הבסיס BC = 10» and «היתר BC = 10» MOVED to issue-1128-distance-spellings.test.ts (#1651 /
     // #1620 item 2, ADR-AG-200): the role claim can now be STATED, so they are accepted WITH it — a length plus the
     // leg/base/hypotenuse claim — and the lock there asserts the claim is present, which was always this row's point.
-    // «תיכון» and «גובה» stay: their claim is not lowered, so they are still not-handled.
     // ⚠ «הקטע BC = 10», «הצלע BC = 10» and «אורך הקטע BC = 10» were rows of THIS table and have
     // MOVED to issue-1128-distance-spellings.test.ts, with the opposite expectation.
     //

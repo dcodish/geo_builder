@@ -171,6 +171,12 @@ export type InputError =
   | { key: 'undistinguished-diagonal'; detail: string }
   /** «האלכסונים AB ו-CD» where the quadrilateral makes them sides (#1620, ADR-AG-208). */
   | { key: 'not-a-diagonal'; detail: string }
+  /** #1737 (ADR-AG-265) — «האלכסון AB …» where AB is a side of the ring holding it, or of a triangle: 2-D's ADR-569 wording. */
+  | { key: 'diagonal-is-side' | 'diagonal-none-here'; detail: string; polygon?: string; pair?: string }
+  /** #1737 (ADR-AG-265) — a height stated as a number on a shape with several: the sentences that each build. */
+  | { key: 'ambiguous-height'; detail: string; options?: string[] }
+  /** #1737 (ADR-AG-265) — «גובה הטרפז 4» with no trapezoid in the figure: the noun (registry key). */
+  | { key: 'shape-not-found'; detail: string; shape?: string }
   /** «מלבן ABCD שצלעו 4» — «its side» on a shape whose sides are not all equal: which side? (#1622, ADR-AG-217). */
   | { key: 'ambiguous-side'; detail: string }
   /** «משובע ABCDEFG» — a polygon noun built only when regular (#1622, ADR-AG-217; 2-D's #835). */

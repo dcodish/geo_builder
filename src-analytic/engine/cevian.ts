@@ -17,7 +17,7 @@
  */
 import type { AngleRef, Constraint } from './solve';
 import type { DerivedRule } from './derived';
-import type { Fact, Id } from './types';
+import { CEVIAN_MEASURE_SENTINELS, type Fact, type Id } from './types';
 
 export type CevianRole = 'median' | 'altitude' | 'bisector';
 
@@ -82,4 +82,16 @@ export function onBisectorFacts(at: AngleRef, p: Id, src: string): Fact[] {
     { t: 'constraint', k: { t: 'angle-ratio', left: angle(at.v, at.a, p), right: angle(at.v, p, at.b), k: ONE }, src },
     { t: 'selector', sel: { kind: 'angle-side', id: p, v: at.v, a: at.a, b: at.b }, src },
   ];
+}
+
+/**
+ * A STATED CEVIAN LENGTH, WRITTEN ONTO THE SEGMENT THE CEVIAN DREW (#1737, ADR-AG-265; 2-D's ADR-574/575).
+ *
+ * «התיכון AM = 5», «הגובה לצלע BC הוא 4», «גובה הטרפז 4»: the length half is parsed by the length lane over the two
+ * sentinels (`CEVIAN_MEASURE_SENTINELS`), so the bound or equality is exactly what «AM = 5» / «AM גדול מ-5» lowers
+ * to; this writes the resolved apex and foot in — the `via-centre` substitution (ADR-AG-196), one segment over.
+ */
+export function measureFacts(template: readonly Fact[], apex: Id, foot: Id): Fact[] {
+  const [s1, s2] = CEVIAN_MEASURE_SENTINELS;
+  return JSON.parse(JSON.stringify(template).split(s1).join(apex).split(s2).join(foot)) as Fact[];
 }

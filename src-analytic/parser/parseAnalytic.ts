@@ -18,8 +18,8 @@
  * Unmatched input returns `not-handled`, which is the seam where the LLM fallback escalates.
  */
 import type { DerivedRule, FootLine } from '../engine/derived';
-import { cevianFacts, toolFootFacts, type CevianRole } from '../engine/cevian';
-import { toolPoint, type ToolPointRole } from '../engine/toolLetters';
+import { cevianFacts, measureFacts, toolFootFacts, type CevianRole } from '../engine/cevian';
+import { TOOL_PREFIX, toolPoint, type ToolPointRole } from '../engine/toolLetters';
 import { isAngleRef, sineAngle, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { evalExpr, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { INDEXED_TOKEN, POINT_TOKEN, RESERVED_SYMBOLS, directionSymbol, mentionsPlane, mentionsPointName, radiusSymbol, toolSymbol } from '../engine/carriers';
@@ -58,7 +58,7 @@ function unreadable(src: string): RuleOutcome {
 }
 import { angleLabelSymbol, constantLengthExpr, namedLengthPairs, planeLetterLength, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
-import { CENTRE_SENTINEL, CIRCLE_SENTINEL, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
+import { CENTRE_SENTINEL, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow, BARE_POLYGON_NOT_BUILT } from '../engine/shapes';
 import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
@@ -4583,7 +4583,8 @@ function parseDiagonalDecl(line: string): RuleOutcome {
   const [, a, b, noun, run] = m;
   if (a === b) return refuse('repeated-vertex', line);
   const segment: Fact = { t: 'segment', id: segmentId(a, b), a, b, src: line };
-  if (!run) return made([segment]);
+  // «האלכסון AC» CLAIMS AC is a diagonal — checked against the figure at M1 (#1737, ADR-AG-265; 2-D's ADR-569).
+  if (!run) return made([segment, { t: 'role-of', role: 'diagonal', a, b, src: line }]);
   const ring = splitNames(run);
   if (hasRepeat(ring)) return refuse('repeated-vertex', line);
   // The ring, as its own declaration sentence lowers it (one lowering of «מרובע ABCD», selectors included).
@@ -5094,6 +5095,149 @@ function viaSentences(line: string, sentences: readonly string[], lead: Fact[] =
     facts.push(...r.facts);
   }
   return made(facts.map((f) => ({ ...f, src: line })));
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * A ROLE NOUN BEFORE A LENGTH KEEPS BOTH (#1737, ADR-AG-265 — 2-D's ADR-574 and ADR-575, measured at `403efe66`)
+ * ---------------------------------------------------------------------------
+ *
+ * «האלכסון AC = 8», «התיכון AM = 5», «הגובה AH הוא 5», «התיכון AM גדול מ-5», «הגובה לצלע BC הוא 4», «גובה הטרפז 4»:
+ * a textbook sentence that says two things — what the segment IS (a diagonal, a median, an altitude, the shape's
+ * height) and how LONG it is. Each half already had a reading here — «האלכסון AC», «AM תיכון», «הגובה לצלע BC»,
+ * «AM = 5», «AM גדול מ-5» — and nothing composed them, so the line was `not-handled`.
+ *
+ * So the line is COMPOSED, never rewritten: the role half is parsed by its own rule (its foot, its claim and its
+ * refusals included) and the length half by the length lane, over the segment the role draws. The length half is
+ * parsed over two sentinels (`CEVIAN_MEASURE_SENTINELS`) and the apex and foot written in — at once when the role
+ * half names them, at M1 (`cevian-of`'s `measure`) when only the figure knows the apex («הגובה לצלע BC»). No third
+ * copy of either rule exists: the copula is the length lane's own allowlist (#1260), a relation is the bound rule's
+ * own (#1462 / ADR-AG-216), and anything the length lane does not read as a length over that segment («פי 2 מ-AB»)
+ * leaves the line exactly as before. The connective may be empty («התיכון AM 5», «גובה הטרפז 4»), as in 2-D: a role
+ * noun in front of the segment is what makes the number its length.
+ */
+const ROLE_CONN = '([^A-Za-z]*?)(?=[√\\d(])';
+const ROLE_LENGTH_HE = new RegExp(`^${HE_GIVEN}(?:אורך\\s+)?ה?(אלכסון|תיכון|גובה)\\s+(${NAME})\\s*(${NAME})(?![0-9₀-₉])${ROLE_CONN}(.+)$`);
+const ROLE_LENGTH_EN = new RegExp(
+  `^(?:[Tt]he\\s+)?(?:length\\s+of\\s+(?:the\\s+)?)?(diagonal|median|altitude|height)\\s+(${NAME})\\s*(${NAME})(?![0-9₀-₉])\\s*(?:=|is(?:\\s+equal\\s+to)?|equals)?\\s*(?=[√\\d(])(.+)$`,
+);
+/** «הגובה לצלע BC הוא 4» · «התיכון מ-A הוא 5» · «הגובה ליתר הוא 4» — the cevian named by a phrase, not by its pair. */
+const ROLE_PHRASE_HE = new RegExp(`^${HE_GIVEN}(?:אורך\\s+)?(ה?(?:תיכון|גובה)\\s+\\S.*?(?:${NAME}|יתר))(?![0-9₀-₉])${ROLE_CONN}(.+)$`);
+const ROLE_PHRASE_EN = new RegExp(
+  `^(?:[Tt]he\\s+)?(?:length\\s+of\\s+(?:the\\s+)?)?((?:median|altitude|height)\\s+\\S.*?(?:${NAME}|hypotenuse))(?![0-9₀-₉])\\s*(?:=|is(?:\\s+equal\\s+to)?|equals)?\\s*(?=[√\\d(])(.+)$`,
+);
+/** A connective that says "is" — the length lane's copulas (#1260), or nothing at all. */
+const ROLE_COPULA = new RegExp(`^[\\s.,:]*(?:=|${COPULA_WORDS})?[\\s.,:-]*$`);
+
+/**
+ * The length half, over the sentinel pair: the facts «Z₂Z₃ <connective> <value>» lowers to, minus the segment the
+ * role half draws. `null` when the length lane does not read it as a length of that segment — the line then stays
+ * as it was; a refusal of the value («= 3x», #1622) is the student's answer.
+ */
+function measureTemplate(conn: string, value: string, line: string): Fact[] | ParseResult | null {
+  const [s1, s2] = CEVIAN_MEASURE_SENTINELS;
+  const r = parseClause(ROLE_COPULA.test(conn) ? `${s1}${s2} = ${value}` : `${s1}${s2}${conn}${value}`);
+  if (!r.ok) return r.code === 'not-handled' ? null : { ...r, detail: line };
+  const sentinelSegment = (f: Fact) => f.t === 'segment' && [f.a, f.b].sort().join() === [s1, s2].sort().join();
+  const facts = r.facts.filter((f) => !sentinelSegment(f)).map((f) => ({ ...f, src: line }));
+  const isLength = (f: Fact) =>
+    f.t === 'segment' || (f.t === 'constraint' && f.k.t === 'length-eq') || (f.t === 'selector' && f.sel.kind === 'sign');
+  if (facts.length === 0 || !facts.every(isLength) || !JSON.stringify(facts).includes(s1)) return null;
+  return facts;
+}
+
+/** The role half's reading plus the length on the segment it draws (a `cevian-of` with no apex carries it to M1). */
+function composeRoleLength(roleSentence: string, pair: [Id, Id] | null, conn: string, value: string, line: string): RuleOutcome {
+  const role = parseClause(roleSentence);
+  if (!role.ok) return role.code === 'not-handled' ? null : { ...role, detail: line };
+  const measure = measureTemplate(conn, value, line);
+  if (!measure || !Array.isArray(measure)) return measure;
+  const facts: Fact[] = role.facts.map((f) => ({ ...f, src: line }));
+  const open = facts.findIndex((f) => f.t === 'cevian-of' && f.apex === undefined);
+  if (open >= 0) {
+    facts[open] = { ...(facts[open] as Extract<Fact, { t: 'cevian-of' }>), measure };
+    return made(facts);
+  }
+  let ends = pair;
+  if (!ends) {
+    const cevian = facts.find((f): f is Extract<Fact, { t: 'cevian-of' }> => f.t === 'cevian-of');
+    if (cevian?.apex) ends = [cevian.apex, cevian.foot];
+  }
+  if (!ends) {
+    // The role drew its segment from the apex to a point it derived (a foot or a midpoint the tool names).
+    const minted = facts.find((f) => f.t === 'derived' && f.id.startsWith(TOOL_PREFIX));
+    const seg = minted && facts.find((f): f is Extract<Fact, { t: 'segment' }> => f.t === 'segment' && (f.a === (minted as { id: Id }).id || f.b === (minted as { id: Id }).id));
+    if (minted && seg) ends = seg.a === (minted as { id: Id }).id ? [seg.b, seg.a] : [seg.a, seg.b];
+  }
+  if (!ends) return null;
+  return made([...facts, ...measureFacts(measure, ends[0], ends[1])]);
+}
+
+function parseRoleLength(line: string): RuleOutcome {
+  const he = ROLE_LENGTH_HE.exec(line);
+  const en = he ? null : ROLE_LENGTH_EN.exec(line);
+  if (he || en) {
+    const [, noun, a, b] = (he ?? en)!;
+    if (a === b) return refuse('repeated-vertex', line);
+    const role = /אלכסון|diagonal/.test(noun) ? 'diagonal' : /תיכון|median/.test(noun) ? 'median' : 'altitude';
+    const sentence =
+      role === 'diagonal' ? (he ? `האלכסון ${a}${b}` : `diagonal ${a}${b}`) : he ? `${a}${b} ${role === 'median' ? 'תיכון' : 'גובה'}` : `${a}${b} is the ${role}`;
+    return composeRoleLength(sentence, [a, b], he ? he[4] : ' = ', he ? he[5] : en![4], line);
+  }
+  const ph = ROLE_PHRASE_HE.exec(line);
+  const pe = ph ? null : ROLE_PHRASE_EN.exec(line);
+  if (ph) return composeRoleLength(ph[1], null, ph[2], ph[3], line);
+  if (pe) return composeRoleLength(pe[1], null, ' = ', pe[2], line);
+  return null;
+}
+
+/**
+ * A HEIGHT STATED AS A MAGNITUDE, WITH NO SEGMENT NAMED (#1737, ADR-AG-265; 2-D's ADR-575) — «גובה הטרפז 4», «גובה
+ * הטרפז ABCD הוא 4», «הגובה הוא 4», "the height of the trapezoid is 4". Which height is the shape's to answer, so the
+ * sentence lowers to `height-of` and M1 reads the figure (`applyHeightOf`): a trapezoid's is drawn, a parallelogram's
+ * or a triangle's is asked. Only these three nouns, as in 2-D; a rectangle's height stays not understood.
+ */
+const HEIGHT_SHAPE_HE = new RegExp(
+  `^${HE_GIVEN}(?:אורך\\s+)?ה?גובה(?:\\s+(?:של\\s+)?ב?ה?(טרפז|מקבילית|משולש)(?:\\s+((?:${NAME}){3,4}))?)?${ROLE_CONN}(.+)$`,
+);
+const HEIGHT_SHAPE_EN = new RegExp(
+  `^(?:[Tt]he\\s+)?[Hh]eight(?:\\s+(?:of|in)\\s+(?:the\\s+)?(trapezoid|parallelogram|triangle)(?:\\s+((?:${NAME}){3,4}))?)?\\s*(?:=|is(?:\\s+equal\\s+to)?|equals)?\\s*(?=[√\\d(])(.+)$`,
+);
+const HEIGHT_NOUN: Readonly<Record<string, string>> = { trapezoid: 'טרפז', parallelogram: 'מקבילית', triangle: 'משולש' };
+
+function parseShapeHeight(line: string): RuleOutcome {
+  const he = HEIGHT_SHAPE_HE.exec(line);
+  const en = he ? null : HEIGHT_SHAPE_EN.exec(line);
+  if (!he && !en) return null;
+  const m = (he ?? en)!;
+  const noun = m[1] ? (HEIGHT_NOUN[m[1]] ?? m[1]) : undefined;
+  const ring = m[2] ? splitNames(m[2]) : undefined;
+  if (ring && hasRepeat(ring)) return refuse('repeated-vertex', line);
+  if (ring && noun && ring.length !== (noun === 'משולש' ? 3 : 4)) return refuse('bad-arity', line);
+  const conn = he ? he[3] : ' = ';
+  const value = he ? he[4] : en![3];
+  const measure = measureTemplate(conn, value, line);
+  if (!measure || !Array.isArray(measure)) return measure;
+  // A trapezoid named by its letters: its own declaration, which M1 applies only when the figure has none of them.
+  let declare: Fact[] | undefined;
+  if (noun === 'טרפז' && ring) {
+    const d = parseClause(`טרפז ${ring.join('')}`);
+    if (!d.ok) return { ...d, detail: line };
+    declare = d.facts.map((f) => ({ ...f, src: line }));
+  }
+  return made([
+    {
+      t: 'height-of',
+      ...(noun ? { noun } : {}),
+      ...(ring ? { ring } : {}),
+      ...(declare ? { declare } : {}),
+      foot: toolPoint('foot', `height:${ring?.join('') ?? noun ?? ''}`),
+      measure,
+      said: he ? `${conn}${value}` : value,
+      ...(en ? { en: true as const } : {}),
+      src: line,
+    },
+  ]);
 }
 
 function parseCevianFamily(line: string): RuleOutcome {
@@ -8320,7 +8464,7 @@ function parseClauseRules(raw: string): ParseResult {
     // `meetFrame` BEFORE `parsePerpendicular` (#1715): «האנך מ-A ל-BC וחוצה זוית C נפגשים בנקודה E» starts like a
     // perpendicular, whose rule would take everything after «ל-» as its line and refuse it. The frame answers `null`
     // for a subject it cannot split into two operands, so a sentence that is a perpendicular is untouched.
-    parseCongruence(line) ?? parseSegmentCross(line) ?? parseAngleBetween(line) ?? parseVertexValue(line) ?? parseThroughLine(line) ?? meetFrame(line) ?? parsePerpendicular(line) ?? parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
+    parseCongruence(line) ?? parseSegmentCross(line) ?? parseAngleBetween(line) ?? parseVertexValue(line) ?? parseThroughLine(line) ?? meetFrame(line) ?? parsePerpendicular(line) ?? parseRoleLength(line) ?? parseShapeHeight(line) ?? parseConstraint(line) ?? parseDerived(line) ?? parseShape(line) ?? parsePoints(line);
   if (matched) return matched;
 
   // NO constrained-shape refusal here any more (#1049). It existed because those nouns carried
