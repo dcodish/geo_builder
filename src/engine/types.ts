@@ -724,21 +724,42 @@ export interface LengthRadiusConstraint {
   add?: number;
 }
 
+/**
+ * A ROUND operand of an area / boundary-length measure ([ADR-632](docs/06-decisions.md#adr-632), #172). Absent ⇒
+ * the operand is a POLYGON ring (`ids` in boundary order, ADR-118/228). Present ⇒ `ids` name a round figure:
+ *  - a SECTOR / its ARC: `ids` = [centre, from, to] in the drawn arc's own order, and the arc's IDENTITY
+ *    (`spanDeg` / `minor`, copied from the drawn `arc`) decides which of the two arcs between the ends is
+ *    meant — the same {@link orientArc} definition the renderer draws with, so the measured sector is the
+ *    drawn one. Area = ½·θ·r², boundary length = the arc length θ·r.
+ *  - the WHOLE circle (`whole`): `ids` = [centre, a point on it]. Area = π·r², boundary length = 2π·r.
+ * Pure data (no ids inside), so rename/swap/merge rewrite the flat `ids` and never need to look in here.
+ */
+export interface RoundOperand {
+  whole?: boolean;
+  spanDeg?: number;
+  minor?: boolean;
+}
+
 /** area(polygon `ids`) = value — the shoelace area of the named polygon ([ADR-118](docs/06-decisions.md#adr-118)).
  *  A LONE absolute area drives the figure's free SCALE DOF (invisible after the viewport fit, ADR-052/ADR-101);
- *  paired with another given it drives a SHAPE DOF. `ids` are the vertices in boundary order (n ≥ 3). */
+ *  paired with another given it drives a SHAPE DOF. `ids` are the vertices in boundary order (n ≥ 3).
+ *  With `round` the operand is a sector or a whole disc instead ({@link RoundOperand}, ADR-632). */
 export interface AreaConstraint {
   type: 'area';
   ids: Id[];
   value: number;
+  round?: RoundOperand;
 }
 
-/** area(`ids1`) = k·area(`ids2`) — a DIMENSIONLESS ratio between two polygon areas (always a shape relation). */
+/** area(`ids1`) = k·area(`ids2`) — a DIMENSIONLESS ratio between two areas (always a shape relation). Each
+ *  side is a polygon, or a round operand when its `round1`/`round2` is present (ADR-632). */
 export interface AreaRatioConstraint {
   type: 'area-ratio';
   ids1: Id[];
   ids2: Id[];
   k: number;
+  round1?: RoundOperand;
+  round2?: RoundOperand;
 }
 
 /** perimeter(polygon `ids`) = value — the Σ of edge lengths (ADR-228). A circle's circumference is NOT
@@ -749,14 +770,19 @@ export interface PerimeterConstraint {
   type: 'perimeter';
   ids: Id[];
   value: number;
+  /** ADR-632: the operand is an ARC (its length θ·r) or a whole circle (its circumference) — {@link RoundOperand}. */
+  round?: RoundOperand;
 }
 
-/** perimeter(`ids1`) = k·perimeter(`ids2`) — a DIMENSIONLESS ratio between two polygon perimeters. */
+/** perimeter(`ids1`) = k·perimeter(`ids2`) — a DIMENSIONLESS ratio between two boundary lengths (polygon
+ *  perimeters, or an arc / a circumference when `round1`/`round2` is present — ADR-632). */
 export interface PerimeterRatioConstraint {
   type: 'perimeter-ratio';
   ids1: Id[];
   ids2: Id[];
   k: number;
+  round1?: RoundOperand;
+  round2?: RoundOperand;
 }
 
 /**
@@ -1103,10 +1129,11 @@ export type Command =
   | { type: 'set-radius-ratio'; c1: Id; c2: Id; k: number }
   | { type: 'show-circle'; id: Id } // #83 (ADR-291): reveal an EXISTING hidden circle — a circumscription stated about points already riding a circle RESOLVES it (never a coincident duplicate)
   | { type: 'name-center'; center: Id } // reveal/name an EXISTING circle's auto-hidden centre (FR-RN-8): the student said "O is the centre of the circle" — flips the circle's autoCenter off so its centre shows, WITHOUT touching the radius
-  | { type: 'set-area'; ids: Id[]; value: number } // area of polygon `ids` = value (ADR-118)
-  | { type: 'set-area-ratio'; ids1: Id[]; ids2: Id[]; k: number } // area(ids1) = k·area(ids2)
-  | { type: 'set-perimeter'; ids: Id[]; value: number } // perimeter of polygon `ids` = value (ADR-228)
-  | { type: 'set-perimeter-ratio'; ids1: Id[]; ids2: Id[]; k: number } // perimeter(ids1) = k·perimeter(ids2)
+  // `round`/`round1`/`round2` (ADR-632): that operand is a sector / an arc / a whole circle, not a polygon ring
+  | { type: 'set-area'; ids: Id[]; value: number; round?: RoundOperand } // area of polygon `ids` = value (ADR-118)
+  | { type: 'set-area-ratio'; ids1: Id[]; ids2: Id[]; k: number; round1?: RoundOperand; round2?: RoundOperand } // area(ids1) = k·area(ids2)
+  | { type: 'set-perimeter'; ids: Id[]; value: number; round?: RoundOperand } // perimeter of polygon `ids` = value (ADR-228)
+  | { type: 'set-perimeter-ratio'; ids1: Id[]; ids2: Id[]; k: number; round1?: RoundOperand; round2?: RoundOperand } // perimeter(ids1) = k·perimeter(ids2)
   // Σ coefs[i]·m_i = target over same-unit measures (#153/#154): stride-2 length pairs or stride-3
   // angles (vertex in the middle) in the FLAT `points`; RHS terms arrive negated; arcs are lowered by
   // the parser to central angles first. See {@link MeasureSumConstraint}.
@@ -1268,7 +1295,12 @@ export type SymbolicCommand =
   | { type: 'mark-angle'; vertex: Id; ray1: Id; ray2: Id }
   // The (possibly symbolic) AREA of a named polygon ([ADR-118](docs/06-decisions.md#adr-118)). Lowered like
   // `measure-length`: a value → `set-area`; a shared variable → `set-area-ratio` against the representative.
-  | { type: 'measure-area'; ids: Id[]; expr: MeasureExpr }
+  // ADR-632: with `round` the area is a SECTOR's (ids = [centre, from, to]) — the same lowering, a round operand.
+  | { type: 'measure-area'; ids: Id[]; expr: MeasureExpr; round?: RoundOperand }
+  // The (possibly symbolic) BOUNDARY LENGTH of a round operand — an ARC's length ([ADR-632](docs/06-decisions.md#adr-632),
+  // #172): the `measure-area` twin in length units. A value → `set-perimeter`; a shared variable →
+  // `set-perimeter-ratio` against the representative; the representative / a lone «L» label stays free.
+  | { type: 'measure-perimeter'; ids: Id[]; expr: MeasureExpr; round?: RoundOperand }
   | { type: 'set-var'; name: string; value: number }
   // A NAMING BY USE ([ADR-588](docs/06-decisions.md#adr-588), #1697): the line «נקודה C על מעגל P» named an unnamed
   // circle P (`centre`, #186), a fresh label named an auto-named point (`point`, #539), or a typed letter moved a

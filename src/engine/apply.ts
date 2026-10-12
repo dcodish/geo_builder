@@ -59,6 +59,50 @@ function isTautologicalMeasure(con: Extract<Constraint, { type: 'measure-sum' | 
   tally(con.rhs, -1);
   return [...count.values()].every((v) => v === 0);
 }
+/**
+ * [ADR-632](../../docs/06-decisions.md#adr-632) (#172) — a ROUND measure is carried by the round figure's OWN DOFs,
+ * chosen by what the statement IS (docs/17 §2.2), never by which carrier the generic ladder meets first:
+ *  - an ABSOLUTE size (`area` / `perimeter` over a sector or an arc) is the figure's SCALE, so it drives the
+ *    circle's free RADIUS. ADR-118's scale-vs-shape law: a lone «שטח הגזרה AOB הוא 12π» RESIZES the sector and
+ *    never reshapes it — the generic ladder would have reached for an on-circle end and swung the angle;
+ *  - a RATIO (to its own circle, or to another figure), or an absolute size whose radius is already pinned or
+ *    owned (a stated radius, an earlier size given), drives the arc's FREE end — the central-angle DOF the sector
+ *    designates (ADR-357) — never a gauge end.
+ * Returns false when neither is available, and the generic ladder takes the constraint as before. The radius is
+ * the ADR-071 `length-radius` precedent: a free radius is an ordinary carrier of the joint solve.
+ */
+function driveRoundMeasure(objects: GeoObject[], constraints: Constraint[], con: Constraint): boolean {
+  const sides: { ids: Id[]; whole: boolean }[] =
+    con.type === 'area' || con.type === 'perimeter'
+      ? con.round ? [{ ids: con.ids, whole: !!con.round.whole }] : []
+      : con.type === 'area-ratio' || con.type === 'perimeter-ratio'
+        ? [con.round1 ? { ids: con.ids1, whole: !!con.round1.whole } : null, con.round2 ? { ids: con.ids2, whole: !!con.round2.whole } : null].filter((x): x is { ids: Id[]; whole: boolean } => x !== null)
+        : [];
+  const arcs = sides.filter((s) => !s.whole);
+  if (arcs.length === 0) return false;
+  const idx = (id: Id) => objects.findIndex((o) => o.id === id);
+  const claim = (i: number): true => {
+    objects[i] = { ...objects[i], solve: { constraint: con, branch: 0 } } as GeoObject;
+    constraints.push(con); // verified after the driven solve (and the recruit fallback when it cannot hold)
+    return true;
+  };
+  if (con.type === 'area' || con.type === 'perimeter') {
+    const [c, p] = arcs[0].ids;
+    const end = objects[idx(p)];
+    const ci = end?.kind === 'on-circle' ? idx(end.circle) : -1;
+    const circ = ci >= 0 ? objects[ci] : undefined;
+    if (circ?.kind === 'circle' && circ.center === c && circ.radius.via === 'free' && (circ as { solve?: unknown }).solve === undefined) return claim(ci);
+  }
+  for (const s of arcs) {
+    for (const id of s.ids.slice(1)) {
+      const i = idx(id);
+      const o = i >= 0 ? objects[i] : undefined;
+      if (o?.kind === 'on-circle' && o.free === true && o.solve === undefined) return claim(i);
+    }
+  }
+  return false;
+}
+
 function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Constraint): void {
   // A trivially-true equal/ratio — the SAME segment on both sides ("DF = DF") —
   // constrains nothing, so it must NOT drive a carrier (which would slide it to a
@@ -110,6 +154,7 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
     constraints.push(con); // verified after the driven solve (and the recruit-DOFs fallback if it can't hold)
     return;
   }
+  if (driveRoundMeasure(objects, constraints, con)) return;
   const idxs = constraintRefs(con).map((id) => objects.findIndex((o) => o.id === id));
   // A point already pinned by another constraint (e.g. F fixed by a coincidence
   // from a second definition) must not be re-driven — that would fight its pin and
@@ -2644,20 +2689,22 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       driveOrCheck(objects, constraints, { type: 'ratio', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d, k: cmd.k, ...(cmd.add ? { add: cmd.add } : {}) });
       break;
 
+    // ADR-632: a round operand (sector / arc / whole circle) rides along — the residual measures it, and
+    // driveOrCheck's round branch carries it on the round figure's own DOFs.
     case 'set-area':
-      driveOrCheck(objects, constraints, { type: 'area', ids: cmd.ids, value: cmd.value });
+      driveOrCheck(objects, constraints, { type: 'area', ids: cmd.ids, value: cmd.value, ...(cmd.round ? { round: cmd.round } : {}) });
       break;
 
     case 'set-area-ratio':
-      driveOrCheck(objects, constraints, { type: 'area-ratio', ids1: cmd.ids1, ids2: cmd.ids2, k: cmd.k });
+      driveOrCheck(objects, constraints, { type: 'area-ratio', ids1: cmd.ids1, ids2: cmd.ids2, k: cmd.k, ...(cmd.round1 ? { round1: cmd.round1 } : {}), ...(cmd.round2 ? { round2: cmd.round2 } : {}) });
       break;
 
     case 'set-perimeter':
-      driveOrCheck(objects, constraints, { type: 'perimeter', ids: cmd.ids, value: cmd.value });
+      driveOrCheck(objects, constraints, { type: 'perimeter', ids: cmd.ids, value: cmd.value, ...(cmd.round ? { round: cmd.round } : {}) });
       break;
 
     case 'set-perimeter-ratio':
-      driveOrCheck(objects, constraints, { type: 'perimeter-ratio', ids1: cmd.ids1, ids2: cmd.ids2, k: cmd.k });
+      driveOrCheck(objects, constraints, { type: 'perimeter-ratio', ids1: cmd.ids1, ids2: cmd.ids2, k: cmd.k, ...(cmd.round1 ? { round1: cmd.round1 } : {}), ...(cmd.round2 ? { round2: cmd.round2 } : {}) });
       break;
 
     case 'set-measure-sum':

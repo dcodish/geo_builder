@@ -40,6 +40,15 @@ export const ULABEL = String.raw`[A-Z]\d*`;
  *  consumer — the `(?<![A-Za-z])` guard some rules add blocks a LATIN label, not a Hebrew particle. */
 export const NUM = String.raw`(?<![א-ת])-?\d+(?:\.\d+)?`;
 
+/**
+ * [ADR-632](../../docs/06-decisions.md#adr-632) (#172) — a Unicode VULGAR-FRACTION glyph («¼», «½», «¾») spelled as
+ * the `a/b` the number readers understand. «שטח הגזרה = ¼ משטח המעגל» is the issue's own spelling; without this
+ * the glyph carries no digit, so a ratio reader finds no coefficient and falls back to «equal». Applied by the
+ * round-measure reader only — the polygon area/perimeter ratio has the same gap and is filed as its own issue.
+ */
+const VULGAR: Record<string, string> = { '½': '1/2', '⅓': '1/3', '⅔': '2/3', '¼': '1/4', '¾': '3/4', '⅕': '1/5', '⅙': '1/6', '⅛': '1/8' };
+export const spellVulgarFractions = (s: string): string => s.replace(/[½⅓⅔¼¾⅕⅙⅛]/g, (g) => ` ${VULGAR[g]} `);
+
 // ── Name glyphs (#1814, ADR-600) ──────────────────────────────────────────────────────────────────
 /** The student's name alphabet (Latin + Greek), an index on a name, and `UNGLUED` — where a number may
  *  begin. Shared with analytic through `shell/indexedName` (the third-copy rule): a guard that keeps a value

@@ -187,6 +187,10 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     tangentLines: construction.objects.flatMap((o) => (o.kind === 'line' && o.spec.via === 'tangent' ? [{ id: o.id, circle: o.spec.circle, at: o.spec.at }] : [])),
     tangentAuxes: construction.objects.flatMap((o) => (o.kind === 'circle' && o.id.startsWith('tanaux-') ? [o.id] : [])), // existing Thales tangent-aux circles — a 2nd single tangent from the SAME apex takes the OTHER branch (issue #142)
     polygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])), // definite "the quad" binds to the existing one
+    // ADR-632 (#172): the drawn arcs + their identity — «שטח הגזרה AOB» / «אורך הקשת AB» measure the arc the student sees
+    arcs: construction.objects.flatMap((o) =>
+      o.kind === 'arc' ? [{ center: o.center, from: o.from, to: o.to, ...(o.spanDeg !== undefined ? { spanDeg: o.spanDeg } : {}), ...(o.minor ? { minor: true } : {}) }] : [],
+    ),
     // #770: the DECLARED kind travels with each ring, so a definite shape noun («אלכסוני הריבוע»)
     // resolves on what the student named, never on "whichever quad exists".
     declaredPolygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [{ vertices: o.vertices, kind: o.declaredAs }] : [])),

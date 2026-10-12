@@ -12,9 +12,10 @@
  * tangency point. Expandable to constraint residuals (distance/angle/parallel/⟂) and collinearity.
  */
 
-import type { Command, Constraint, Construction, Id, Polygon, Vec } from './types';
+import type { Command, Constraint, Construction, Id, Polygon, RoundOperand, Vec } from './types';
 import type { ResolvedCircle } from './evaluate';
-import { angleDeg, dist, isRingDiagonal, polygonArea } from './geometry';
+import { angleDeg, dist, isRingDiagonal } from './geometry';
+import { operandArea, operandBoundary, operandText } from './roundMeasure';
 import { angleOffSpans, angleOnSpans, drawnArcSpans, type ArcSpan } from './arcs';
 import { constraintRefs, describeConstraint, isSatisfied, residual, residualTolerance } from './solve';
 import { formatMeasure } from '../format';
@@ -58,10 +59,11 @@ function assertedRelations(commands: Command[]): Constraint[] {
       case 'set-perpendicular': out.push({ type: 'perpendicular', a: c.a, b: c.b, c: c.c, d: c.d }); break;
       case 'set-concyclic': out.push({ type: 'concyclic', points: c.points }); break;
       case 'set-collinear': out.push({ type: 'collinear', a: c.a, b: c.b, c: c.c }); break;
-      case 'set-area': out.push({ type: 'area', ids: c.ids, value: c.value }); break;
-      case 'set-area-ratio': out.push({ type: 'area-ratio', ids1: c.ids1, ids2: c.ids2, k: c.k }); break;
-      case 'set-perimeter': out.push({ type: 'perimeter', ids: c.ids, value: c.value }); break;
-      case 'set-perimeter-ratio': out.push({ type: 'perimeter-ratio', ids1: c.ids1, ids2: c.ids2, k: c.k }); break;
+      // ADR-632: a round operand (sector / arc / whole circle) travels with its side — it IS the operand
+      case 'set-area': out.push({ type: 'area', ids: c.ids, value: c.value, ...(c.round ? { round: c.round } : {}) }); break;
+      case 'set-area-ratio': out.push({ type: 'area-ratio', ids1: c.ids1, ids2: c.ids2, k: c.k, ...(c.round1 ? { round1: c.round1 } : {}), ...(c.round2 ? { round2: c.round2 } : {}) }); break;
+      case 'set-perimeter': out.push({ type: 'perimeter', ids: c.ids, value: c.value, ...(c.round ? { round: c.round } : {}) }); break;
+      case 'set-perimeter-ratio': out.push({ type: 'perimeter-ratio', ids1: c.ids1, ids2: c.ids2, k: c.k, ...(c.round1 ? { round1: c.round1 } : {}), ...(c.round2 ? { round2: c.round2 } : {}) }); break;
       case 'set-measure-sum': out.push({ type: 'measure-sum', unit: c.unit, coefs: c.coefs, points: c.points, target: c.target }); break;
       case 'set-length-product': out.push({ type: 'length-product', k: c.k, lhs: c.lhs, rhs: c.rhs }); break;
     }
@@ -789,7 +791,8 @@ export function forcedOffArcs(
 export interface PrintedLabels {
   lengths: { a: Id; b: Id; text: string }[];
   angles: { vertex: Id; ray1: Id; ray2: Id; text: string }[];
-  areas: { ids: Id[]; text: string }[];
+  /** ADR-632: `round` — the label annotates a sector (or, with `of: 'length'`, its arc's length), not a polygon */
+  areas: { ids: Id[]; text: string; round?: RoundOperand; of?: 'length' }[];
 }
 
 /**
@@ -848,8 +851,10 @@ export function checkLabels(labels: PrintedLabels, positions: Map<Id, Vec>, prio
   for (const l of labels.areas) {
     const pts = l.ids.map(get);
     if (pts.some((p) => !p)) continue;
-    const a = polygonArea(pts as Vec[]);
-    check(l.ids, l.ids.join(''), l.text, '', a, residualTolerance({ type: 'area', ids: l.ids, value: a }, a));
+    // the operand's OWN measure (ADR-632): a sector label is held to ½θr², an arc label to θr — never the shoelace of its ends
+    const a = l.of === 'length' ? operandBoundary(pts as Vec[], l.round) : operandArea(pts as Vec[], l.round);
+    const tol = l.of === 'length' ? residualTolerance({ type: 'perimeter', ids: l.ids, value: a }, a) : residualTolerance({ type: 'area', ids: l.ids, value: a }, a);
+    check(l.ids, operandText(l.ids, l.round), l.text, '', a, tol);
   }
   return out;
 }

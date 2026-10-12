@@ -401,8 +401,9 @@ export function computeValuesPanel(
   for (const con of c.constraints) {
     if (con.type === 'distance') statedLen.add(segKey(con.a, con.b));
     if (con.type === 'angle' && !con.arcOf) statedAng.add(`${con.vertex}|${con.ray1}|${con.ray2}`);
-    if (con.type === 'area') statedArea.add([...con.ids].sort().join(''));
-    if (con.type === 'perimeter') statedPerim.add([...con.ids].sort().join(''));
+    // a POLYGON's stated area/perimeter — a sector or arc over the same letters (ADR-632) states nothing about it
+    if (con.type === 'area' && !con.round) statedArea.add([...con.ids].sort().join(''));
+    if (con.type === 'perimeter' && !con.round) statedPerim.add([...con.ids].sort().join(''));
   }
 
   // ---- lengths over the figure's edge universe (the detection layers' own, scaffold-filtered) ---
