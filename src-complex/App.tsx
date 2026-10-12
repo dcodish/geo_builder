@@ -20,7 +20,7 @@ import { ToolButton } from '../shell/frame/ToolButton';
 import { orderToolActions } from '../shell/frame/toolRow';
 // #742 / ADR-W-024: the shared canvas corner cluster — one look in every builder.
 // #745: and the shared RASTERISER — one svg→png in the workspace, not one per product.
-import { svgToPng } from '../shell/export/svgToPng';
+import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
 import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../shell/frame/canvasControls';
 // #743: the under-canvas row's ONE look — the shell contract, replacing this tree's bare buttons.
 import { figureRowStyle, rowAccentStyle, rowAccentOffStyle, rowSpacerStyle, rowSubtleStyle, rowSubtleOffStyle, rowDangerInk } from '../shell/frame/figureRow';
@@ -28,6 +28,7 @@ import { MAX_FIGURE_STATEMENTS, figureNameFromFileName, readEnvelope, savedFileN
 import { applySwitcherConfig, configOf, readToolConfig, type ToolConfig } from '../shell/switcherConfig';
 import { complexScopeOf, deriveLines } from './app/deriveLines';
 import { realParamNotes } from './app/paramNote';
+import { questionLines } from './app/questionLines';
 import { askRowsOf } from './app/askLane';
 import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, submitQuery, toggleLine } from './app/submit';
 import { logComplex } from './debug/sessionLogComplex';
@@ -97,9 +98,8 @@ export function App() {
   // #745: the product-local svg→png copy that #742 flagged as "a shell candidate" is GONE — this now
   // calls the shared rasteriser. It is behaviour-neutral here (this renderer tags nothing, so the
   // clean-export contract is a no-op, and `sourceSize` reads the Gauss plane's viewBox exactly as the
-  // inline copy read its client box) and it retires the third of three copies. No «הורידו שאלה»
-  // button follows it into this tool — operator ruling, 2026-08-19: the question document is 2-D and
-  // 3-D only.
+  // inline copy read its client box) and it retires the third of three copies. The 2026-08-19 ruling
+  // that kept «הורידו שאלה» out of this tool is SUPERSEDED (B16, 2026-10-07): see `saveQuestion` below.
   const rasterCanvas = (): Promise<Blob> => {
     const svg = canvasCard.current?.querySelector('svg');
     if (!svg) return Promise.reject(new Error('no canvas'));
@@ -125,6 +125,39 @@ export function App() {
       const a = document.createElement('a');
       a.href = u;
       a.download = 'figure.png';
+      a.click();
+      URL.revokeObjectURL(u);
+    } catch {
+      flashExport('err');
+    }
+  };
+
+  /**
+   * «הורידו שאלה» (#1872, ADR-CX-067) — the Gauss plane beside the givens, as a real .docx. Operator, B16
+   * (2026-10-07): *"add it to complex too. this is a basic capability of the tool"*. The composer is SHARED
+   * (`shell/export/questionDoc`, ADR-W-027): this tree hands it the heading, its givens (`app/questionLines` —
+   * the active lines as typed, the claims left out, ruling W6), the figure PNG and THIS product's bidi
+   * segmenter. The docx library is dynamically imported so it stays out of the main chunk.
+   */
+  const saveQuestion = async () => {
+    const svg = canvasCard.current?.querySelector('svg');
+    if (!svg) return;
+    try {
+      const { pngDimensions, questionDocxBlob, questionFileName } = await import('../shell/export/questionDoc');
+      const png = await svgToPng(svg, 2, QUESTION_IMAGE_WIDTH_PX);
+      const data = new Uint8Array(await png.arrayBuffer());
+      const blob = await questionDocxBlob({
+        title: name.trim() || undefined,
+        heading: t('questionGiven'),
+        lines: questionGivens,
+        png: { data, ...pngDimensions(data) },
+        rtl: i18n.language !== 'en',
+        segments: complexBidi.segments,
+      });
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = u;
+      a.download = questionFileName(new Date());
       a.click();
       URL.revokeObjectURL(u);
     } catch {
@@ -320,6 +353,8 @@ export function App() {
   // the figure folds from the ACTIVE lines only (B5/D6): a muted statement stays in the list,
   // out of the figure — "what if I hadn't said this?" made literal
   const active = useMemo(() => lines.filter((_, i) => !disabled.includes(i)), [lines, disabled]);
+  /** The «נתון:» list «הורידו שאלה» prints (#1872) — read here so the button is disabled when it is empty. */
+  const questionGivens = useMemo(() => questionLines(lines, disabled), [lines, disabled]);
   // #789: the ask lane rides the fold as QUESTIONS — its entries can never constrain the figure
   const derived2 = useMemo(() => deriveLines(active, seed, seed, queries), [active, seed, queries]);
   // …and each saved question resolves to its answer (or its reason) against the current figure
@@ -562,6 +597,15 @@ export function App() {
           node: (
             <ToolButton key="saveImage" onClick={() => void saveImage()} disabled={lines.length === 0}>
               ⤓ {t('saveImage')}
+            </ToolButton>
+          ),
+        },
+        {
+          /* #1872: gated on there being a GIVEN to print — a list of claims alone prints nothing (ruling W6) */
+          id: 'saveQuestion',
+          node: (
+            <ToolButton key="saveQuestion" onClick={() => void saveQuestion()} disabled={questionGivens.length === 0}>
+              ⤓ {t('saveQuestion')}
             </ToolButton>
           ),
         },

@@ -52,7 +52,7 @@ reading, with one implementation and two consumers.
 |---|---|---|
 | **Primitives** | `theme.ts` · `bidi.ts` · `i18n.ts` · `format.ts` · `math.tsx` · `symbols.ts` · `save.ts` · `switcherConfig.ts` | Pure, no React, no product knowledge. Design tokens, bidi isolation, the i18n bootstrap, number/math display, the save envelope, the config overlay merge |
 | **Frame** | `AppFrame` · `Workbench` · `Switcher` · `InputArea` · `FactList` · `DataPanel` · `AskLane` · `SymbolRow` · `QuickChips` · `Banner` · `ManualScreen` · `Modal` · `ToolButton` · `FigureName` | React components implementing the D1–D10 rulings ([02w, *Suite rulings*](02w-requirements-workspace.md), moved from docs/28 §4a), each taking its product-shaped content as a slot |
-| **Export** | `export/svgToPng.ts` · `export/questionDoc.ts` | The shared output paths behind "save image" and "download question" |
+| **Export** | `export/svgToPng.ts` · `export/questionDoc.ts` | The shared output paths behind "save image" and "download question" — four consumers: every builder hands `questionDoc` its own givens list and bidi segmenter ([ADR-W-126](06w-decisions-workspace.md#adr-w-126)) |
 | **Also in the tree** | `ticks.ts` · `proofTarget.ts` · `studentText.ts` · `conjunction.ts` · `indexedName.ts` · `marks.ts` · `displayMode.ts` · `mathExpr.ts` · `usageLog.ts` · `session/` · `llm/` · `seo/` · frame: `LetterPopover` · `SegmentMenu` · `ResumeOffer` · `ShareSheet` | Not yet described in a section of their own: the primitives above plus the session, LLM-harness and site-metadata folders, and the frame pieces named |
 
 The primitives layer is the one a product can adopt without changing its layout.

@@ -1,0 +1,18 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "משולש ABC",
+    "D על BC",
+    "זווית BAD = 30",
+    "AD",
+    "AB = 5",
+    "M אמצע AC",
+    "BM",
+    "E על AB"
+  ],
+  "seed": 0,
+  "name": "שאלה לדוגמה",
+  "spokenFor": { "5": "התיכון מ-B לצלע AC (1/2)", "6": "התיכון מ-B לצלע AC (2/2)" },
+  "disabled": [4]
+}

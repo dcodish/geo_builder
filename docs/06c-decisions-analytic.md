@@ -11975,3 +11975,25 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Locks.** New `src-analytic/__tests__/issue-1900-point-on-draws-pair.test.ts` (44 tests through the real `decideSubmit` + `derive`; **fails before: 29 of 44**, measured by reverting the source change from a patch file): the reported sequence at seeds 0–3 on coordinates and on free points; sixteen class spellings with the exact segment list; five ring/side absorptions; the four already-known follow-ups; and every control above. No parity row moves — the runner reads verdicts, and `already-known` counts as `builds`; a display change has no parity lock (docs/22 §10).
 
 **Consequences.** `src-analytic/parser/parseAnalytic.ts` (the `on-line-2pt` arm and `pieceFacts`' header); the new lock; docs 02c R135, 04c, ADR-AG-198 stamped.
+
+## ADR-AG-269 — «הורידו שאלה» is offered here: the figure beside 2-D's «נתון:» list, read over analytic's facts (#1872)
+
+**Status:** accepted · 2026-10-12 · fix round #1998 (feature, PR) · operator rulings B16 (2026-10-07, *"add it to complex too. this is a basic capability of the tool"*, [ADR-W-118](06w-decisions-workspace.md#adr-w-118)) and W5 (2026-10-08, on #1872: the list is **"Like 2-D"**) · workspace record [ADR-W-126](06w-decisions-workspace.md#adr-w-126)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R33 (the `.docx` question page ships here) · [02w](02w-requirements-workspace.md) FR-EX-2 · **Design:** [04c](04c-design-analytic.md) § "The question export"
+
+**Measured at pickup** (`main` @ `403efe66`). Analytic never imported the shared composer; R33 promised the `.docx` question page "on the mechanism that already ships" and nothing offered it. 2-D's `questionLines` through 2-D's real parser: «משולש ABC · AD» → `["משולש ABC"]`; «משולש ABC · D על BC · AD» → `["משולש ABC"]`; «משולש ABC · D על BC · זווית BAD = 30» → `["משולש ABC","D על BC","∠BAD = 30"]`; «משולש ABC · הנקודה E» and «משולש ABC · הישר BC» → `["משולש ABC"]`; «משולש ABC · AD · זווית BAD = 30» → `["משולש ABC","AD","∠BAD = 30"]`.
+
+**Decision.** The tool row carries «הורידו שאלה» between the image download and the guide, as in 2-D and 3-D. It calls the shared composer (`shell/export/questionDoc`, dynamically imported) with `analyticBidi.segments`, the figure name as title and the shared rasteriser at the print width. The givens are `app/questionLines.ts`, 2-D's ADR-252 rules over this tree's facts:
+- **One line per submission**; consecutive rows one AI-fallback sentence produced are one submission (its part marker is written and read by one pair of store functions, `spokenPart` / `spokenSentence`).
+- **A muted row is not a given.** The button is disabled while the list is empty.
+- **Scaffolding is omitted**: a submission whose every fact is ink (`segment`, `line-2pt`), a bare `declare`, or a value-less membership of a NEW point (`on-line-2pt` / `on-curve`, with its `between` selector) — kept when a later kept given refers to what it introduced, cascading in reverse. A membership of an EXISTING point is a given (M1).
+- **Safe in the direction that matters.** The scaffold kinds are a closed list (an unknown kind is a given), and a submission's references are every string its facts carry intersected with the active figure's object ids, so an over-read reference can only keep a line, never drop a given.
+
+**The canonical echo, and why it prints the student's sentence.** 2-D prints `canonicalText(...) ?? utterance`. This tree has no fact → sentence renderer: that is #1468, which the operator held (2026-09-27, *"student's words now, form later"*). The recorded line is the student's own sentence for a typed row (a taught imperative is recorded in its taught form, #1353), and model output for a fallback-built row, which [ADR-AG-172](#adr-ag-172) rules is never shown. So every printed line is the student's sentence, the `?? utterance` arm, and the paper agrees with the fact list. When #1468 lands, the echo joins here.
+
+**Rejected.** Printing every row as it shows it (3-D's verbatim posture) — ruled against in W5. Printing a fallback row's machine line as "the canonical form" — it is model output, against ADR-AG-172. Placing the module in a new `export/` directory as the plan sketched — `app/` is the layer that already composes the parser with the figure, so no new layer is introduced.
+
+**Locks.** `src-analytic/__tests__/question-export-1872.test.ts` (17): every 2-D measurement above through the real parser and `derive`, the muted row, the empty list, the M1 keep, values always kept, the fallback sentence printed once, the part-marker round trip, the App's gate and list read from one memo, and the saved fixture `fixtures/question-export-1872.analytic.json` loaded through `loadAnalyticSession`. `shell/__tests__/question-export.test.ts` and `suite-vocabulary.test.ts` (ADR-W-126).
+
+**Consequences.** `src-analytic/app/questionLines.ts` (new), `App.tsx` (handler, memo, button), `i18n/index.ts` (`saveQuestion`, `questionGiven`), `store/useAnalyticStore.ts` (`spokenPart`, `spokenSentence`).

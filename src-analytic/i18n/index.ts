@@ -453,6 +453,9 @@ const he = {
   namePlaceholder: 'שם השרטוט (לא חובה)',
   copyImage: 'העתיקו תמונה',
   saveImage: 'הורידו תמונה',
+  // #1872 — «הורידו שאלה», the suite's one wording (2-D canvas.saveQuestion / questionDoc.given)
+  saveQuestion: 'הורידו שאלה',
+  questionGiven: 'נתון:',
   copied: 'הועתק',
   manualButton: 'מדריך',
   manualTitle: 'המדריך — גאומטריה אנליטית',
@@ -860,6 +863,8 @@ const en: typeof he = {
   namePlaceholder: 'Figure name (optional)',
   copyImage: 'Copy image',
   saveImage: 'Download image',
+  saveQuestion: 'Download question',
+  questionGiven: 'Given:',
   copied: 'Copied',
   manualButton: 'Guide',
   manualTitle: 'The guide — analytic geometry',

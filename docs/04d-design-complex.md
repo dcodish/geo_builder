@@ -269,6 +269,14 @@ incompleteness. The 3-D builder refuses a claim its givens do not determine
 ([02b FR-CL-1](02b-requirements-3d.md), [ADR-3D-260](06b-decisions-3d.md#adr-3d-260)); the operator deferred
 a three-valued verdict for 3-D ([#909](https://github.com/dcodish/geo_builder/issues/909)).
 
+## The question export ([ADR-CX-067](06d-decisions-complex.md#adr-cx-067), #1872)
+
+`app/questionLines.ts` is the «נתון:» list «הורידו שאלה» hands the shared composer (`shell/export/questionDoc`): the
+active lines as typed, minus a line whose `parseLineV2` reading states a claim and no given. The channels of
+`ParsedLine` are classified in one exhaustive `Record<keyof ParsedLine, 'given' | 'claim' | 'meta'>`, so a new channel
+cannot reach the export unclassified. The App computes it once (`questionGivens`) for the button's gate and the
+document alike.
+
 ## Boundaries
 
 **A letter this tool cannot read** (#1919, [ADR-626](06-decisions.md#adr-626)) is refused in `submitLine`,

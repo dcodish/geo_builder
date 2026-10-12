@@ -1040,6 +1040,15 @@ value in one `placeSceneLabels` call, each value bounded to its mark (ADR-AG-228
 `render/Figure.tsx`'s click-only affordances sit inside `data-noexport` (FR-EX-3), locked by
 `render/__tests__/clean-export.test.tsx`.
 
+### The question export ([ADR-AG-269](06c-decisions-analytic.md#adr-ag-269), #1872)
+
+`app/questionLines.ts` is the «נתון:» list «הורידו שאלה» hands the shared composer (`shell/export/questionDoc`): 2-D's
+ADR-252 rules over this tree's facts — one line per submission (a fallback sentence's rows are one, read back through
+the store's `spokenPart`/`spokenSentence` pair), muted rows out, scaffolding (`segment`, `line-2pt`, `declare`, a NEW
+point's `on-line-2pt`/`on-curve` + `between`) omitted unless a later kept given refers to what it introduced. References
+are every string a fact carries ∩ the active figure's object ids, so an over-read keeps a line and never drops one.
+The App computes it once (`questionGivens`) for the button's gate and the document alike.
+
 ### One decision for the view after any change ([ADR-AG-190](06c-decisions-analytic.md#adr-ag-190), #1624)
 
 The App's box effect (keyed on the drawn box and the seed) makes one call, `viewAfterChange(from, view, to,
