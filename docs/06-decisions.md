@@ -7853,6 +7853,8 @@ session's own rows with the workaround replaced by the statement the student fir
 
 ## ADR-460 — an utterance packing INDEPENDENT constructs is taught, never decomposed (#763)
 
+**⚠ Amended by [ADR-W-125](06w-decisions-workspace.md#adr-w-125) (2026-10-12, #1778):** a sentence boundary is no longer one utterance. «משולש ABC. ריבוע WERT» is two sentences, and the operator's 2026-10-05 ruling on pasted paragraphs (*"split into rows"*) submits them as two rows before this check sees either. The check stands for independent constructs packed into ONE sentence.
+
 **Operator ruling (2026-08-19):** *"what we should do in such cases is ask user to input one fact at a
 time and refuse to draw this shape. it will be similar in other cases like «משולש ABC וריבוע WERT»."*
 

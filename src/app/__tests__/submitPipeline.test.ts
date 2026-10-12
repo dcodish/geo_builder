@@ -290,7 +290,6 @@ describe('submit pipeline — independent constructs are taught, never decompose
     ['משולש ABC וריבוע WERT'],               // the ruling's second example
     ['two circles tangent externally with a chord AB'],
     ['ריבוע ABCD ומשולש WER'],
-    ['משולש ABC. ריבוע WERT'],
   ])('«%s» is split back to the student, commits nothing, and never reaches the LLM', async (utterance) => {
     const { deps, calls, notes } = makeDeps();
     await runSubmit(utterance, deps);
@@ -300,6 +299,18 @@ describe('submit pipeline — independent constructs are taught, never decompose
     // The whole point of the ruling: the figure that shipped was the LLM's decomposition.
     expect(llmParseMock, 'the paid LLM is never called').not.toHaveBeenCalled();
     expect(calls.busy.at(-1), 'the spinner is cleared').toBe(false);
+  });
+
+  // #1778 (ADR-W-125, operator ruling 2026-10-05 "split into rows"): a SENTENCE BOUNDARY is no longer one
+  // utterance — «משולש ABC. ריבוע WERT» is two sentences, submitted as two rows before this check sees either.
+  // The check stands for compounds INSIDE one sentence (the rows above, and #553's comma-compound).
+  it('«משולש ABC. ריבוע WERT» is two sentences: two rows, and still never the LLM (#1778)', async () => {
+    const { deps } = makeDeps();
+    await runSubmit('משולש ABC. ריבוע WERT', deps);
+    const groups = [...new Set(useGeoStore.getState().facts.map((f) => f.group ?? f.id))];
+    expect(groups).toHaveLength(2);
+    expect(useGeoStore.getState().facts.map((f) => f.utterance)).toContain('ריבוע WERT');
+    expect(llmParseMock, 'the paid LLM is never called').not.toHaveBeenCalled();
   });
 
   it('the reported utterance no longer draws a segment belonging to nothing', async () => {

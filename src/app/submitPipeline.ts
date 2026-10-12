@@ -45,6 +45,7 @@ import { type DecideLog, type DecideNote, type Verdict2D, decideFromParse, decid
 import { unreadItems } from './honestyGates';
 import { logDebug } from '@/debug/sessionLog';
 import { otherUtteranceForError } from './errorSubject';
+import { splitSentences, submitSentences, type SentenceOutcome } from '../../shell/sentences';
 
 export interface SubmitUi {
   setInputNote(msg: string): void;
@@ -71,7 +72,8 @@ export interface SubmitDeps {
   isBusy(): boolean;
   /** Two animation frames so the spinner paints before a heavy synchronous solve. */
   nextPaint(): Promise<void>;
-  /** The post-commit auto-resolve (worker config search + view rewrite, one undo entry). */
+  /** The post-commit auto-resolve (worker config search + view rewrite, one undo entry). A paragraph's chain
+   *  awaits it before its next sentence (#1778), so the next sentence reads the figure the search settled. */
   resolveAfterCommit(): void;
   /** Shared abort slot so the UI's cancel button reaches the in-flight LLM call. */
   llmAbortRef: { current: AbortController | null };
@@ -96,7 +98,59 @@ export function commitVerdict(verdict: Verdict2D, utterance: string): void {
   else if (verdict.kind === 'noop' && verdict.binds.some((b) => b.op !== 'step-aside')) st.executeMany(nameByUseCommands(verdict.binds), utterance);
 }
 
+/**
+ * #1778 ([ADR-W-125](../../docs/06w-decisions-workspace.md#adr-w-125)) — THE BOX'S TEXT, which may be a pasted
+ * PARAGRAPH. One sentence goes through the one-sentence pipeline exactly as before. Two or more («M אמצע BC. N
+ * אמצע AC.») are submitted one at a time through that same pipeline (`shell/sentences`), each its own row,
+ * and the chain stops at the first sentence the pipeline leaves in the box; the box then holds that sentence —
+ * or its taught canonical — followed by the rest.
+ */
 export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<void> {
+  const sentences = splitSentences(utterance);
+  if (!sentences) return runSentence(utterance, deps);
+  if (deps.isBusy()) return; // a submit is already in flight (E3)
+  const box = await submitSentences(sentences, (text, i) => chainSentence(text, i, deps));
+  if (box) deps.ui.setText?.(box);
+  else deps.ui.clearText();
+}
+
+/**
+ * One sentence of a paragraph through {@link runSentence}, its outcome read from what the pipeline did to the
+ * box: cleared it (a row, or an answered store-op) → consumed; pre-filled a taught canonical → that; neither →
+ * kept. The REAL box is set once, by the chain, at the end. A later sentence reads the figure from the store —
+ * the caller's display view is the one painted before the paste — and the post-commit search is awaited, so
+ * it never sees a figure mid-rewrite.
+ */
+async function chainSentence(text: string, i: number, deps: SubmitDeps): Promise<SentenceOutcome> {
+  let outcome: SentenceOutcome = 'kept';
+  let settling: void | Promise<void> = undefined;
+  const storeView = () => {
+    const st = useGeoStore.getState();
+    const d = replay(st.facts, st.seed);
+    return { construction: d.construction, positions: d.positions };
+  };
+  await runSentence(text, {
+    ...deps,
+    ui: {
+      ...deps.ui,
+      clearText: () => {
+        outcome = 'consumed';
+      },
+      setText: (prefill: string) => {
+        outcome = { prefill };
+      },
+    },
+    isBusy: () => false,
+    view: i === 0 ? deps.view : storeView,
+    resolveAfterCommit: () => {
+      settling = deps.resolveAfterCommit();
+    },
+  });
+  await settling;
+  return outcome;
+}
+
+async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
   const { t, locale, ui } = deps;
   if (deps.isBusy()) return; // a submit is already in flight (E3) — chips/enter can't race a second one
   ui.setInputNote('');

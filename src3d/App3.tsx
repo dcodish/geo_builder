@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import { useTranslation } from 'react-i18next';
 // The shared frame (Track B, B3 #668): the deliberate src3d -> shell adoption ADR-W-019 reserved.
 import { AppFrame } from '../shell/frame/AppFrame';
+import { submitTyped, type SentenceOutcome } from '../shell/sentences';
 import { privacyDeclaration } from './ui/privacy';
 import { aboutContent } from './ui/about';
 import { AskLane } from '../shell/frame/AskLane';
@@ -555,6 +556,13 @@ export default function App3() {
   // short-circuits, LLM escalation, logging.
   const submitText = async (raw = text) => {
     if (!raw.trim() || busy) return;
+    // #1778 (ADR-W-125): a pasted PARAGRAPH is submitted one sentence at a time, one row each; the box keeps
+    // what is left when a sentence is not taken.
+    await submitTyped(raw, submitSentence3, setText);
+  };
+
+  /** One sentence through the 3-D submit. Reads the LIVE store, so a paragraph's next sentence sees this one's row. */
+  const submitSentence3 = async (raw: string): Promise<SentenceOutcome> => {
     setGuidanceNote(null); // a fresh submit clears the previous guidance
     setLoadNote(null); // …and the load note, which described the file as opened
     // #1692 (ADR-3D-305): the whole pre-LLM decision — the store's `decideSubmit3`, then the #353
@@ -569,7 +577,7 @@ export default function App3() {
       logDebug3({ kind: 'input', utterance: raw, locale: i18n.language, source: 'scope', result: v.tag });
       setGuidanceNote(v.register === 'lowercase-labels' ? t('scope.lowercase-labels', { corrected: v.corrected }) : t(v.match.messageKey));
       useGeo3.setState({ lastError: null });
-      return;
+      return 'kept';
     }
     dispatchVerdict(v);
     let err = useGeo3.getState().lastError;
@@ -578,7 +586,8 @@ export default function App3() {
     if (err?.code === 'not-understood') {
       setBusy(true);
       try {
-        const ctx = `Existing points: ${[...derived.construction.points.keys()].join(', ') || '(none)'}.`;
+        const live = useGeo3.getState();
+        const ctx = `Existing points: ${[...derive3(live.facts, live.seed).construction.points.keys()].join(', ') || '(none)'}.`;
         const rawSteps = await escalate3(raw, ctx);
         // #555 (ADR-3D-173) — the SEQUENCE gate, applied to the canonical lines BEFORE the re-parse:
         // a stated point-run the model respelled is restored to the student's own spelling, so the
@@ -595,10 +604,9 @@ export default function App3() {
         setBusy(false);
       }
     }
-    if (!err) {
-      setText('');
-      setGuidanceNote(null);
-    }
+    if (err) return 'kept';
+    setGuidanceNote(null);
+    return 'consumed';
   };
 
   const statusDot = (st: FactStatus3 | undefined) => {
