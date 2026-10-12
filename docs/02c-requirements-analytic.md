@@ -492,6 +492,12 @@ From the «lines and points» corpus (§8), numbered onward.
 - «OC = 15, BC = 3» → both drawn; «d_{OC} = 15» → nothing drawn
 - Sources: ADR-AG-200, #1651, #1652, #1620, #1637.
 
+**R177 — a length stated with its segment's ROLE in front keeps the role and the length; a height stated as a number is the shape's**. *(ADR-W-118 B1: 2-D's verdict and drawing, measured at `403efe66`.)* The role is drawn as on its own — the diagonal, the median's midpoint, the altitude's foot, the foot the tool names for a phrase («הגובה לצלע BC») — and the length lands on that segment; a relation stays a bound. A trapezoid's height given as a number is drawn between its bases (its foot gets a letter, H); a triangle's or a parallelogram's is ASKED, offering sentences that each build. «האלכסון» claims a diagonal: a side of the polygon holding both letters, or any pair of a triangle, is refused in 2-D's words.
+- «מקבילית ABCD» · «האלכסון AC = 8» · «משולש ABC» · «התיכון AM = 5» / «הגובה AH הוא 5» / «התיכון AM גדול מ-5» (a bound)
+- «הגובה לצלע BC הוא 4» · «התיכון מ-A הוא 5» · «טרפז ABCD» · «גובה הטרפז 4» · «גובה הטרפז ABCD הוא 4» on an empty canvas introduces the trapezoid
+- «גובה המשולש 4» / «גובה המקבילית הוא 4» → asks · «מקבילית ABCD» · «האלכסון AB» → refused (a side) · «משולש ABC» · «גובה הטרפז 4» → «באיור אין טרפז»
+- Sources: ADR-AG-265, #1737, ADR-574, ADR-575, ADR-569.
+
 **R141 — the perpendicular from a point and its foot, the line through a point that cuts a side, and «האנך» as a reference**. *(Operator ruling: the analytic tool behaves as 2-D for plane geometry.)* An unnamed foot is named by the tool.
 - «האנך מהקודקוד C לציר ה-x חותך אותו בנקודה D»
 - «המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D»

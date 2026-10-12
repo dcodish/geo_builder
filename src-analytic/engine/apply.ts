@@ -26,7 +26,7 @@ import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, no
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { RESERVED_SYMBOLS, radiusSymbol, toolSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
-import { cevianFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
+import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
 import {
   CENTRE_SENTINEL,
   CIRCLE_SENTINEL,
@@ -102,6 +102,20 @@ export type ApplyErrorCode =
    * wrote, never about a search that ran out.
    */
   | 'ring-contradicts-noun'
+  /**
+   * A HEIGHT STATED AS A MAGNITUDE ON A SHAPE WITH SEVERAL HEIGHTS (#1737, ADR-AG-265; 2-D's ADR-575) — «גובה המשולש
+   * 4», «גובה המקבילית הוא 4»: which one is the student's to say (ADR-052), so it is ASKED, `options` the sentences
+   * that each build, carrying the student's own connective and value.
+   */
+  | 'ambiguous-height'
+  /** «גובה הטרפז 4» in a figure with no trapezoid (#1737, ADR-AG-265; 2-D's `shape-not-found`) — `shape` the noun. */
+  | 'shape-not-found'
+  /**
+   * «האלכסון AB …» where AB is a SIDE of the polygon holding both letters (#1737, ADR-AG-265; 2-D's ADR-569 check),
+   * or of a triangle, which has no diagonals — `polygon` the ring, `pair` the letters.
+   */
+  | 'diagonal-is-side'
+  | 'diagonal-none-here'
   /**
    * THE GIVENS FORCE A DECLARED POLYGON FLAT (#1849, ADR-AG-247; workspace ruling ADR-W-115). «משולש ABC» ·
    * «AB = 5» · «BC = 3» · «AC = 8»: the three lengths hold only with B on AC, and a flat figure is not a
@@ -306,6 +320,9 @@ export interface ApplyError {
   /** For `shape-excluded` (#1926): the noun the ring is known as, and the noun the refused line stated (registry keys). */
   actual?: string;
   stated?: string;
+  /** For `diagonal-is-side` / `diagonal-none-here` (#1737): the ring holding the pair, and the pair, as written. */
+  polygon?: string;
+  pair?: string;
 }
 
 /** How a found curve can be called in a sentence — its name, or (unnamed) its equation. */
@@ -1363,6 +1380,25 @@ function applyRoleOf(c: Construction, f: Extract<Fact, { t: 'role-of' }>): Apply
     if (!p || !isPositional(p)) return { ok: false, error: unknownRef(c, id) };
   }
   if (f.a === f.b) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
+  /*
+   * «האלכסון AC» CLAIMS AC IS A DIAGONAL (#1737, ADR-AG-265; 2-D's ADR-569 check, measured at `403efe66`). Against the
+   * polygons holding both letters: a diagonal of any of them holds; a SIDE of a quadrilateral, or any pair of a
+   * triangle (which has no diagonals), is refused naming the pair and the ring. No such polygon claims nothing yet.
+   */
+  if (f.role === 'diagonal') {
+    const holders = c.objects.filter((o): o is PolygonObject => o.kind === 'polygon' && o.vertices.includes(f.a) && o.vertices.includes(f.b));
+    const isDiagonal = (r: readonly Id[]): boolean => {
+      const n = r.length;
+      const d = (r.indexOf(f.a) - r.indexOf(f.b) + n) % n;
+      return n >= 4 && d !== 1 && d !== n - 1;
+    };
+    if (holders.length === 0 || holders.some((o) => isDiagonal(o.vertices))) return { ok: true, effect: 'known', next: c };
+    const ring = holders[0].vertices;
+    return {
+      ok: false,
+      error: { code: ring.length < 4 ? 'diagonal-none-here' : 'diagonal-is-side', detail: f.src, polygon: ring.join(''), pair: `${f.a}${f.b}` },
+    };
+  }
   const say = (k: Constraint): Fact => ({ t: 'constraint', k, src: f.src });
   if (f.role === 'radius') {
     const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
@@ -1494,6 +1530,68 @@ function footOnPair(c: Construction, id: Id, u: Id, v: Id): boolean {
   if (o.rule.t === 'midpoint') return pair(o.rule.a, o.rule.b);
   if (o.rule.t === 'foot' && o.rule.onto.k === 'points') return pair(o.rule.onto.a, o.rule.onto.b);
   return false;
+}
+
+/**
+ * A HEIGHT STATED AS A MAGNITUDE, RESOLVED AGAINST THE FIGURE (#1737, ADR-AG-265) — 2-D's `shapeHeight` (ADR-575),
+ * measured at `403efe66`, read here at M1 because this parser is context-free.
+ *
+ * - The candidates: the polygons the noun names (a triangle noun: any three-vertex ring), narrowed by the letters;
+ *   with no noun, every polygon. None → `shape-not-found` (a sentence with no noun → `not-handled`), except that a
+ *   trapezoid named by letters NONE of which the figure has is introduced first (2-D's #1720). Several → `not-handled`.
+ * - A triangle → ASK which height: the sides opposite each vertex, in ring order.
+ * - A parallelogram, or a trapezoid whose figure holds two parallel pairs → ASK: the heights from the first vertex to
+ *   the two sides opposite it.
+ * - A trapezoid with ONE parallel pair (its assumed pair, or the pair the student stated, #1159) → the height from the
+ *   ring vertex before the pair's first edge in ring order, onto that edge (2-D's seat): the cevian «הגובה מ-D לצלע
+ *   AB» («הגובה מ-A לצלע BC» once BC ∥ AD is stated) with its tool-named foot and the stated measure. Every such segment has the same length, so the
+ *   vertex is gauge, never an unstated given.
+ * - Any other quadrilateral → `not-handled` (2-D leaves it to the old path).
+ */
+function applyHeightOf(c: Construction, f: Extract<Fact, { t: 'height-of' }>): ApplyOutcome {
+  const unread: ApplyOutcome = { ok: false, error: { code: 'not-handled', detail: f.src } };
+  const polys = c.objects.filter((o): o is PolygonObject => o.kind === 'polygon');
+  let cands = f.noun === 'משולש' ? polys.filter((o) => o.vertices.length === 3) : f.noun ? (ringsNamed(polys, f.noun) as PolygonObject[]) : polys;
+  const ring0 = f.ring;
+  if (ring0) cands = cands.filter((o) => o.vertices.length === ring0.length && ring0.every((v) => o.vertices.includes(v)));
+  if (cands.length === 0) {
+    if (f.declare && ring0 && !ring0.some((id) => objectById(c, id))) {
+      const introduced = applyAll(c, f.declare);
+      if (!introduced.ok) return introduced;
+      const rest = applyHeightOf(introduced.next, { ...f, declare: undefined });
+      return rest.ok ? { ...rest, effect: 'created' } : rest;
+    }
+    return f.noun ? { ok: false, error: { code: 'shape-not-found', detail: f.src, shape: f.noun } } : unread;
+  }
+  if (cands.length > 1) return unread;
+  const host = cands[0];
+  const ring = host.vertices;
+  const phrase = (apex: Id | null, side: readonly Id[]): string =>
+    f.en ? `the height ${apex ? `from ${apex} ` : ''}to side ${side[0]}${side[1]}` : `הגובה ${apex ? `מ-${apex} ` : ''}לצלע ${side[0]}${side[1]}`;
+  const option = (apex: Id | null, side: readonly Id[]): string => (f.en ? `${phrase(apex, side)} is ${f.said}` : `${phrase(apex, side)}${f.said}`);
+  const ask = (options: string[]): ApplyOutcome => ({ ok: false, error: { code: 'ambiguous-height', detail: f.src, options } });
+  if (ring.length === 3) return ask([[ring[1], ring[2]], [ring[0], ring[2]], [ring[0], ring[1]]].map((sd) => option(null, sd)));
+  if (ring.length !== 4) return unread;
+  const ringEdge = (e: readonly [Id, Id]): boolean => ring.some((x, i) => sameEdge([x, ring[(i + 1) % ring.length]], e));
+  const bases: Array<[[Id, Id], [Id, Id]]> = [];
+  for (const k of c.constraints) {
+    if (k.t !== 'relation' || k.rel !== 'parallel' || k.u.k !== 'points' || k.v.k !== 'points') continue;
+    const e1: [Id, Id] = [k.u.a, k.u.b];
+    const e2: [Id, Id] = [k.v.a, k.v.b];
+    if (!ringEdge(e1) || !ringEdge(e2) || sameEdge(e1, e2)) continue;
+    if (bases.some(([p, q]) => (sameEdge(p, e1) && sameEdge(q, e2)) || (sameEdge(p, e2) && sameEdge(q, e1)))) continue;
+    bases.push([e1, e2]);
+  }
+  const trapezoid = ringsNamed([host], 'טרפז').length === 1;
+  const parallelogram = host.noun !== undefined && normalizeShapeNoun(host.noun) === 'מקבילית';
+  if (parallelogram || (trapezoid && bases.length === 2)) return ask([option(ring[0], [ring[2], ring[3]]), option(ring[0], [ring[1], ring[2]])]);
+  if (!trapezoid || bases.length !== 1) return unread;
+  // The base is the FIRST ring edge in the pair, the apex the vertex before it — 2-D's seat (measured at `403efe66`:
+  // AB ∥ DC → from D onto AB; a stated BC ∥ AD → from A onto BC).
+  const i = ring.findIndex((x, k) => bases[0].some((e) => sameEdge(e, [x, ring[(k + 1) % 4]])));
+  if (i < 0) return unread;
+  const apex = ring[(i + 3) % 4];
+  return applyFact(c, { t: 'cevian-of', role: 'altitude', apex, side: [ring[i], ring[(i + 1) % 4]], foot: f.foot, toolFoot: true, measure: f.measure, src: f.src });
 }
 
 function applyAll(c: Construction, facts: readonly Fact[]): ApplyOutcome {
@@ -3460,15 +3558,25 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (targets.size > 1) return { ok: false, error: { code: 'ambiguous-cevian', detail: f.src } };
       const [{ apex, u, v }] = [...targets.values()];
       if (f.foot === apex || f.foot === u || f.foot === v) return { ok: false, error: { code: 'degenerate-role', detail: f.src } };
+      /** The length the sentence stated for this cevian (#1737, ADR-AG-265), on the segment it draws. */
+      const measured = (foot: Id): Fact[] => (f.measure ? measureFacts(f.measure, apex, foot) : []);
       if (f.toolFoot && !objectById(c, f.foot)) {
         // The same point derived the same way already has a name (#1153): the cevian runs to IT.
         const rule = toolFootRule(f.role, apex, u, v);
         const same = c.objects.find((o) => o.kind === 'derived' && sameDerivation(o.rule, rule));
-        if (same) return applyAll(c, [{ t: 'segment', id: `seg-${[apex, same.id].sort().join('')}`, a: apex, b: same.id, src: f.src }]);
-        return applyAll(c, toolFootFacts(f.role, apex, f.foot, u, v, f.src));
+        if (same) return applyAll(c, [{ t: 'segment', id: `seg-${[apex, same.id].sort().join('')}`, a: apex, b: same.id, src: f.src }, ...measured(same.id)]);
+        return applyAll(c, [...toolFootFacts(f.role, apex, f.foot, u, v, f.src), ...measured(f.foot)]);
       }
-      return applyAll(c, cevianFacts(f.role, apex, f.foot, u, v, f.src));
+      return applyAll(c, [...cevianFacts(f.role, apex, f.foot, u, v, f.src), ...measured(f.foot)]);
     }
+
+    /**
+     * A HEIGHT STATED AS A MAGNITUDE (#1737, ADR-AG-265) — 2-D's `shapeHeight` (ADR-575), measured at `403efe66`, with
+     * the figure read here at M1 because this parser is context-free. Which polygon: the noun's, narrowed by the
+     * letters, else the one polygon. A trapezoid's height is drawn; a parallelogram's or a triangle's is asked.
+     */
+    case 'height-of':
+      return applyHeightOf(c, f);
 
     /**
      * «AD חוצה את הזווית BAC» (#1284, ADR-AG-209) — 2-D's verdict: a `p` the figure does not have yet is the

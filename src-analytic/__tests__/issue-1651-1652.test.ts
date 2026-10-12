@@ -230,8 +230,17 @@ describe('#1620 item 2 — שוק / בסיס / יתר state their claims', () =>
     }
   });
 
-  it('«תיכון» and «גובה» stay refused in a length — their claim is not lowered, so it is never dropped', () => {
-    for (const line of ['התיכון BC = 10', 'הגובה BC = 10', 'אורך התיכון BC הוא 10']) expect(parseLine(line).ok).toBe(false);
+  /*
+   * ⚠ CHANGED (#1737, ADR-AG-265): «תיכון» and «גובה» were refused in a length because their claim was not lowered. It
+   * is now — the length sentence composes «BC תיכון» / «BC גובה» (`cevian-of`) with the length, as 2-D's ADR-574 does —
+   * so the intent of this lock (the claim is never dropped) is asserted directly: accepted, WITH the cevian claim.
+   */
+  it('«תיכון» and «גובה» in a length state their cevian claim — never dropped', () => {
+    for (const line of ['התיכון BC = 10', 'הגובה BC = 10', 'אורך התיכון BC הוא 10']) {
+      const r = parseLine(line);
+      expect(r.ok, line).toBe(true);
+      if (r.ok) expect(r.facts.some((f) => f.t === 'cevian-of' && f.apex === 'B' && f.foot === 'C'), line).toBe(true);
+    }
   });
 
   /** The two corpus questions ADR-AG-187 left one role noun short — each line typed in turn, figure as printed. */

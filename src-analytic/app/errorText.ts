@@ -202,6 +202,11 @@ export function errorText(error: InputError, t: Translate): string {
     'numeral-notation': 'errNumeralNotation',
     'undistinguished-diagonal': 'errNoPrincipalDiagonal',
     'not-a-diagonal': 'errNotADiagonal',
+    // #1737 (ADR-AG-265) — 2-D's sentences: the diagonal claim refuted, the height asked, the shape missing.
+    'diagonal-is-side': 'errDiagonalIsSide',
+    'diagonal-none-here': 'errDiagonalNoneHere',
+    'ambiguous-height': 'errAmbiguousHeight',
+    'shape-not-found': 'errShapeNotFound',
     'ambiguous-side': 'errAmbiguousSide',
     'polygon-not-supported': 'errPolygonNotSupported',
     'already-named': 'errAlreadyNamed',
@@ -240,10 +245,19 @@ export function errorText(error: InputError, t: Translate): string {
       ? ambiguousCurveExample(error.detail, theNoun, candidates[0])
       : 'example' in error ? (error.example ?? '') : '',
     found: host ? host.found : 0,
-    options: error.key === 'ambiguous-angle' && error.options ? error.options.map((o) => `∠${o}`).join(', ') : '',
+    options: error.key === 'ambiguous-angle' && error.options
+      ? error.options.map((o) => `∠${o}`).join(', ')
+      : error.key === 'ambiguous-height' && error.options
+        ? error.options.join(', ')
+        : '',
+    pair: 'pair' in error ? (error.pair ?? '') : '',
     range: error.key === 'out-of-domain' && error.domain ? rangeText(error.domain, t) : '',
     holder: 'holder' in error ? (error.holder ?? '') : '',
-    first: error.key === 'crossing-already-named' && error.operands ? error.operands[0] : '',
+    first: error.key === 'crossing-already-named' && error.operands
+      ? error.operands[0]
+      : error.key === 'ambiguous-height' && error.options
+        ? (error.options[0] ?? '')
+        : '',
     second: error.key === 'crossing-already-named' && error.operands ? error.operands[1] : '',
     other: 'other' in error ? error.other : '',
     reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '',

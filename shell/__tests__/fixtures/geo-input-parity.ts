@@ -244,7 +244,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1685': 'open',
   '#1689': 'open',
   '#1726': 'icebox',
-  '#1737': 'open',
   '#1784': 'open',
   '#1796': 'open',
   '#1799': 'open',
@@ -1075,16 +1074,16 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'meet-same-line-twice-1715', family: 'intersections', steps: ['משולש ABC', 'חוצה זוית B וחוצה הזווית B נפגשים בנקודה E'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'one line twice names no point; 2-D refuses it since round #1940' },
   { id: 'meet-parallel-1715', family: 'intersections', steps: ['מלבן ABCD', 'הישר AB והישר CD נפגשים בנקודה E'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   // ── #1607 (ADR-574): a role noun before a length keeps the role AND the length ──
-  { id: 'role-length-diagonal-1607', family: 'lengths', steps: ['מקבילית ABCD', 'האלכסון AC = 8'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1679', parked: true }] },
-  { id: 'role-length-median-1607', family: 'lengths', steps: ['משולש ABC', 'התיכון AM = 5'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1679', parked: true }] },
-  { id: 'role-length-altitude-1607', family: 'lengths', steps: ['משולש ABC', 'הגובה AH הוא 5'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1679', parked: true }] },
-  { id: 'role-length-bound-1607', family: 'lengths', steps: ['משולש ABC', 'התיכון AM גדול מ-5'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1679', parked: true }], note: 'a bound, never |AM| = 5 (#1248)' },
+  { id: 'role-length-diagonal-1607', family: 'lengths', steps: ['מקבילית ABCD', 'האלכסון AC = 8'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'role-length-median-1607', family: 'lengths', steps: ['משולש ABC', 'התיכון AM = 5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'role-length-altitude-1607', family: 'lengths', steps: ['משולש ABC', 'הגובה AH הוא 5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'role-length-bound-1607', family: 'lengths', steps: ['משולש ABC', 'התיכון AM גדול מ-5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'a bound, never |AM| = 5 (#1248)' },
   // ── #1443 (ADR-575): a height stated as a magnitude with no segment named — the trapezoid builds, the others ask ──
-  { id: 'height-trapezoid-1443', family: 'lengths', steps: ['טרפז ABCD', 'גובה הטרפז 4'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448', parked: true }], note: 'the reported sentence; the height is minted and drawn between the bases' },
-  { id: 'height-trapezoid-copula-1443', family: 'lengths', steps: ['טרפז ABCD', 'גובה הטרפז הוא 4'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448', parked: true }] },
-  { id: 'height-trapezoid-introduced-1443', family: 'lengths', steps: ['גובה הטרפז ABCD הוא 4'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448', parked: true }], note: 'the trapezoid named by its letters on an empty canvas is introduced (the #1720 precedent)' },
-  { id: 'height-triangle-asks-1443', family: 'lengths', steps: ['משולש ABC', 'גובה המשולש 4'], expect: 'asks', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448', parked: true }], note: 'three heights — which one is the student’s to say (ADR-052)' },
-  { id: 'height-parallelogram-asks-1443', family: 'lengths', steps: ['מקבילית ABCD', 'גובה המקבילית הוא 4'], expect: 'asks', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448', parked: true }] },
+  { id: 'height-trapezoid-1443', family: 'lengths', steps: ['טרפז ABCD', 'גובה הטרפז 4'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1448', parked: true }], note: 'the reported sentence; the height is minted and drawn between the bases' },
+  { id: 'height-trapezoid-copula-1443', family: 'lengths', steps: ['טרפז ABCD', 'גובה הטרפז הוא 4'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1448', parked: true }] },
+  { id: 'height-trapezoid-introduced-1443', family: 'lengths', steps: ['גובה הטרפז ABCD הוא 4'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1448', parked: true }], note: 'the trapezoid named by its letters on an empty canvas is introduced (the #1720 precedent)' },
+  { id: 'height-triangle-asks-1443', family: 'lengths', steps: ['משולש ABC', 'גובה המשולש 4'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1448', parked: true }], note: 'three heights — which one is the student’s to say (ADR-052)' },
+  { id: 'height-parallelogram-asks-1443', family: 'lengths', steps: ['מקבילית ABCD', 'גובה המקבילית הוא 4'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1448', parked: true }] },
   // ── #1749 (ADR-AG-235): the meet VERB reads the distributive plural through the crossing's reader ──
   { id: 'meet-verb-lines-plural-1749', family: 'intersections', steps: ['מרובע ABCD', 'הישרים AC ו-BD נפגשים בנקודה M'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'control — analytic built it before through a second plural reader (`withLineNoun`); now through `distributedLines`' },
   // ── #1751 (ADR-592 · ADR-AG-241): the grammatical SUBJECT decides what a crossing draws — the verb its lines, the noun the point only ──
@@ -1098,7 +1097,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'meet-noun-letters-hi-1751', family: 'intersections', steps: ['מרובע ABCD', 'M היא נקודת החיתוך של AC ו-BD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'noun: M only' },
   { id: 'meet-noun-diagonals-1751', family: 'intersections', steps: ['מרובע ABCD', 'M מפגש האלכסונים'], expect: 'builds', note: 'noun, role: M only' },
   { id: 'meet-noun-diagonals-chitukh-1751', family: 'intersections', steps: ['מרובע ABCD', 'M נקודת החיתוך של האלכסונים'], expect: 'builds', note: 'noun, role: M only' },
-  { id: 'height-to-side-1443', family: 'lengths', steps: ['משולש ABC', 'הגובה לצלע BC הוא 4'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1737' }, { product: '3d', issue: '#1448', parked: true }] },
+  { id: 'height-to-side-1443', family: 'lengths', steps: ['משולש ABC', 'הגובה לצלע BC הוא 4'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1448', parked: true }] },
+  // ── #1737 (ADR-AG-265): analytic composes the role and the length too; the diagonal claim and the shape's height, 2-D's verdicts ──
+  { id: 'role-length-phrase-median-1737', family: 'lengths', steps: ['משולש ABC', 'התיכון מ-A הוא 5'], knownGap: [{ product: '3d', issue: '#1679', parked: true }], expect: 'builds' },
+  { id: 'role-diagonal-side-1737', family: 'lengths', steps: ['מקבילית ABCD', 'האלכסון AB = 8'], knownGap: [{ product: '3d', issue: '#1679', parked: true }], expect: 'refused', note: 'AB is a side of ABCD, not a diagonal (2-D ADR-569)' },
+  { id: 'role-diagonal-bare-side-1737', family: 'polygons', steps: ['מקבילית ABCD', 'האלכסון AB'], expect: 'refused', note: 'the same claim with no length' },
+  { id: 'height-trapezoid-bound-1737', family: 'lengths', steps: ['טרפז ABCD', 'גובה הטרפז גדול מ-4'], knownGap: [{ product: '3d', issue: '#1448', parked: true }], expect: 'builds', note: 'the height drawn and a bound, never 4' },
+  { id: 'height-no-trapezoid-1737', family: 'lengths', steps: ['משולש ABC', 'גובה הטרפז 4'], knownGap: [{ product: '3d', issue: '#1448', parked: true }], expect: 'refused', note: 'there is no trapezoid in the figure' },
 
   // ── #1430 (ADR-AG-233): tangents FROM a point with a movement verb / unnamed touches, and a polygon side as the subject — 2-D builds each ──
   { id: 'tan-from-1430-01', family: 'tangents', steps: ['מעגל O', 'מנקודה P יוצאים שני משיקים למעגל'], expect: 'builds', exception: 'X8' },

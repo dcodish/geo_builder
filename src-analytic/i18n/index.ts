@@ -253,6 +253,13 @@ const he = {
   'locus.circle.2': 'שני מעגלים',
   'locus.parabola.2': 'שתי פרבולות',
   'locus.ellipse.2': 'שתי אליפסות',
+  // #1737 (ADR-AG-265) — 2-D's sentences (`src/i18n/locales/he.json`, diagonalIsSide / diagonalNoneHere /
+  // ambiguousConstruct / shapeNotFound), so one plane sentence reads the same in both builders (ADR-W-118 B1).
+  errDiagonalIsSide: '{{pair}} אינו אלכסון של {{polygon}} — הוא צלע שלו. אלכסון מחבר שני קדקודים שאינם סמוכים.',
+  errDiagonalNoneHere: '{{pair}} אינו אלכסון — ל-{{polygon}} אין אלכסונים כלל (כל זוג קדקודים שלו הוא צלע).',
+  errAmbiguousHeight:
+    'ל"גובה" כאן יש כמה אפשרויות ({{options}}), והבחירה ביניהן היא שלכם — היא לא נובעת מהנתונים. כתבו איזו מהן, למשל "{{first}}".',
+  errShapeNotFound: 'באיור אין {{shapeHe}} — בדקו את שם הצורה, או הגדירו אותה קודם (למשל "{{shapeHe}} ABCD").',
   errNotADiagonal:
     'האותיות האלה הן צלעות של המרובע, לא אלכסונים שלו: "{{detail}}". אלכסון מחבר שני קודקודים שאינם סמוכים, למשל «האלכסונים AC ו-BD נפגשים בנקודה E» במרובע ABCD.',
   errNoPrincipalDiagonal:
@@ -692,6 +699,13 @@ const en: typeof he = {
   'locus.circle.2': 'two circles',
   'locus.parabola.2': 'two parabolas',
   'locus.ellipse.2': 'two ellipses',
+  // #1737 (ADR-AG-265) — 2-D's sentences (`src/i18n/locales/en.json`, diagonalIsSide / diagonalNoneHere /
+  // ambiguousConstruct / shapeNotFound), so one plane sentence reads the same in both builders (ADR-W-118 B1).
+  errDiagonalIsSide: '{{pair}} is not a diagonal of {{polygon}} — it is a side of it. A diagonal joins two corners that are not next to each other.',
+  errDiagonalNoneHere: '{{pair}} is not a diagonal — {{polygon}} has no diagonals at all (every pair of its corners is a side).',
+  errAmbiguousHeight:
+    'There is more than one "height" here ({{options}}), and the givens do not choose between them — you do. Say which, e.g. "{{first}}".',
+  errShapeNotFound: 'There is no {{shapeEn}} in this figure — check the shape name, or declare it first (e.g. "{{shapeEn}} ABCD").',
   errNotADiagonal:
     'Those letters name sides of the quadrilateral, not its diagonals: "{{detail}}". A diagonal joins two ' +
     'vertices that are not adjacent, for example "the diagonals AC and BD meet at E" in quadrilateral ABCD.',

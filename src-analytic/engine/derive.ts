@@ -58,6 +58,8 @@ export interface LineFault {
   /** For a ring re-declared as a shape its noun excludes (#1926, ADR-AG-260): the ring's noun and the refused one (registry keys). */
   actual?: string;
   stated?: string;
+  /** For a diagonal claim the figure refutes (#1737, ADR-AG-265): the pair as written (the ring is `polygon`). */
+  pair?: string;
 }
 
 /**
@@ -170,13 +172,20 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     const other = rings.find(({ f, j }) => owner[j] !== at && (refusedIsInscription ? !!f.noun && !!shapeRow(f.noun)?.notCyclic : !!f.cyclic));
     return { shape: e.shape, forced: e.forced, ...(other ? { declared: lines[owner[other.j]] } : {}) };
   };
+  /** #1737 (ADR-AG-265): the shape a height named, or the pair and ring a diagonal claim named — what the refusal says. */
+  const roleClaimFields = (e: ApplyError): Partial<LineFault> =>
+    e.code === 'shape-not-found'
+      ? { shape: e.shape }
+      : e.code === 'diagonal-is-side' || e.code === 'diagonal-none-here'
+        ? { polygon: e.polygon, pair: e.pair }
+        : {};
   const reported = new Set<string>();
   errors.forEach((e, i) => {
     if (!e) return;
     const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null, e.options ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]) });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e) });
   });
 
   /**

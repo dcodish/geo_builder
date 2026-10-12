@@ -278,6 +278,32 @@ export type Fact =
       hypotenuse?: true;
       /** The TOOL named the foot (ADR-AG-211): it is lowered as a derived point (`toolFootFacts`), never a free one. */
       toolFoot?: true;
+      /**
+       * THE LENGTH THE SENTENCE STATES FOR THE DRAWN CEVIAN (#1737, ADR-AG-265) — «הגובה לצלע BC הוא 4»: the length
+       * half, parsed by the length lane over {@link CEVIAN_MEASURE_SENTINELS} (apex, foot), because only M1 knows
+       * which vertex the apex is. Applied after the cevian with the resolved apex and foot written in.
+       */
+      measure?: Fact[];
+    })
+  /**
+   * A HEIGHT STATED AS A MAGNITUDE, WITH NO SEGMENT NAMED (#1737, ADR-AG-265; 2-D's ADR-575) — «גובה הטרפז 4»,
+   * «גובה המקבילית הוא 4», «הגובה הוא 4». Which height is the SHAPE's to answer, so M1 resolves it against the
+   * figure's polygons (by noun, by letters, or the one polygon): a trapezoid's one height is drawn from a vertex of
+   * one base onto the other (every such segment has the same length — gauge, not a choice); a parallelogram's two
+   * and a triangle's three are ASKED (`ambiguous-height`), quoting sentences that each build. `declare` is the
+   * trapezoid the sentence names by its letters, introduced when the figure holds none of them (2-D's #1720).
+   * `said` is the student's connective and value as typed, carried into the offered sentences; `en` picks their
+   * language. `measure` is the length half over {@link CEVIAN_MEASURE_SENTINELS}.
+   */
+  | (FactBase & {
+      t: 'height-of';
+      noun?: string;
+      ring?: Id[];
+      declare?: Fact[];
+      foot: Id;
+      measure: Fact[];
+      said: string;
+      en?: true;
     })
   /**
    * «AD חוצה את הזווית BAC» · «האלכסון DB חוצה את הזווית ADC» · «AM הוא חוצה זווית CMD» — a segment from the
@@ -587,7 +613,13 @@ export type CircleSlot = { k: 'new'; r?: Expr } | { k: 'named'; name: string } |
 export const CIRCLE_SLOT_SENTINELS = ['⟨circle-1⟩', '⟨circle-2⟩'] as const;
 
 /** The role claims that need the FIGURE to lower (#1651, ADR-AG-200) — the rest lower in the parser. */
-export type PolygonOrRadiusRole = 'radius' | 'leg' | 'base' | 'hypotenuse';
+export type PolygonOrRadiusRole = 'radius' | 'leg' | 'base' | 'hypotenuse' | 'diagonal';
+
+/**
+ * The stand-ins a stated cevian length is parsed over — its APEX and its FOOT (#1737, ADR-AG-265) — names no student
+ * writes, as {@link CENTRE_SENTINEL}. M1 writes the resolved apex and foot in (`engine/cevian.ts` `measureFacts`).
+ */
+export const CEVIAN_MEASURE_SENTINELS = ['Z₂', 'Z₃'] as const;
 
 /** The stand-in a `via-centre` sentence carries for «מרכז המעגל» — a name no student writes (#1619 B1). */
 export const CENTRE_SENTINEL = 'Z₁';
@@ -601,7 +633,14 @@ export const CIRCLE_SENTINEL = '⟨the-circle⟩';
  * sentence may make, whichever branch M1 takes.
  */
 export const factsWithin = (f: Fact): Fact[] =>
-  f.t === 'the-circle' ? [f, ...f.create.flatMap(factsWithin)] : f.t === 'circles-about' ? [f, ...f.about.flatMap(factsWithin)] : [f];
+  f.t === 'the-circle'
+    ? [f, ...f.create.flatMap(factsWithin)]
+    : f.t === 'circles-about'
+      ? [f, ...f.about.flatMap(factsWithin)]
+      : // #1737 (ADR-AG-265): the trapezoid a height sentence introduces by its letters.
+        f.t === 'height-of' && f.declare
+        ? [f, ...f.declare.flatMap(factsWithin)]
+        : [f];
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list
