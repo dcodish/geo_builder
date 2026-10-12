@@ -3957,3 +3957,66 @@ languages' sentences; the mixed sentence «arg i - arg o = 90»; the floor's thr
 unchanged yes/no for every name; `i2`/`o3` staying in the #1948 class; the #1948 class and the
 false-refusal net unchanged; and `i` as the imaginary unit and `o` as the origin still reading.
 `phantom-word-1948.test.ts` carries the corrected record for the four constant lines it already held.
+
+## ADR-CX-064 — An angle in radians is read exactly, by the one reader every cis spelling shares (#1754)
+
+**Status:** accepted, 2026-10-12 · extends [ADR-CX-059](#adr-cx-059) (the trig form's angle) ·
+**Issue:** [#1754](https://github.com/dcodish/geo_builder/issues/1754) (feature, P3, `complex`) · round #1998
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-11 (radians now read), F2 row of the grammar families ·
+**Design:** [04d](04d-design-complex.md) — the trigonometric-form bullet (the angle reader) ·
+**Ladder:** stages 0a and 0b ([LADDER-CX](LADDER-CX.md)) — the trig rewrite's same-angle test and the
+expression lexer / polar rule's angle slot
+
+**The gap.** Measured at `403efe66` through the real `submitLine`: «z1 = 2cis(π/4)», «z1 = 2cis(pi/4)» and
+the #1534 trig form «z1 = 2(cos(π/4) + i sin(π/4))» were `not-handled` — the complex lexer had no π, so a
+textbook argument in radians could not be typed at all. Worse, the WORD `pi` alone was read: «z1 = 2cis(pi)»,
+«z1 = r cis pi», «z1 = cis pi» were accepted by the symbolic polar rule (`genericPolar`) as a **free
+direction named `pi`** — a stated angle silently became no angle.
+
+**Root cause.** Three readers each decided what a `cis` angle is, and none knew π: the expression grammar's
+polar literal (`parseUnary` → `signedDegrees`, numbers only), `genericPolar`'s regex (`NUM | NAME`, where
+`pi` is a NAME), and the trig rewrite's same-angle key (`String(Number(…))`). Adding π to one would have
+left the other two to disagree with it.
+
+**Decision.**
+
+1. **One angle reader** — `parser/angleText.ts` `angleDegrees(text)`: a signed decimal is degrees (as
+   always); a signed RATIONAL multiple of π (`π`, `2π`, `π/4`, `3π/4`, `3/4π`, `-π/3`, `-(π/3)`, `1.5π`,
+   with `pi` as π's Latin spelling and an optional `*`) is `180k°` as an exact rational. `π/4` and `45`
+   are the same `Rat`, so the lines lower to **byte-identical facts** — not two paths that happen to agree.
+2. **Every cis reader asks it.** The expression lexer gains a `pi` token (`π`, or the whole lowercase word
+   `pi`); `readCisAngle` hands any angle span holding π to `angleDegrees` as text (parenthesised, or bare
+   without a slash: `2cisπ`); every other angle is read exactly as before. `genericPolar`'s angle half
+   accepts the same radian text («r cis(π/4)» states the direction 45°, «r cis pi» 180°). The trig
+   rewrite's `TRIG_ARG` accepts it and its same-angle key IS `angleDegrees`, so «cos(π/4) + i sin45» names
+   one angle and is that angle; «cos(π/4) + i sin(π/3)» is refused naming both as typed (ADR-CX-059's ruling).
+3. **π is an angle unit, never a value.** The `pi` token is read only in a cis angle slot; anywhere else
+   the atom refuses, so «z1 = pi», «z1 = π», «z1 = 2pi», «|z1| = π» keep today's `not-handled` (the
+   issue's lock). A capital `Π` refuses; `Pi` stays the label run it was (`gluedI` already never splits `pi`).
+4. **A bare slash is not guessed.** «2cis π/4» could be the angle π/4 or (cis π)/4 — the degree grammar
+   reads «2cis90/2» as the latter — so a slash belongs to a radian angle only inside parentheses; the bare
+   form keeps today's refusal, and so does «2(cos π/4 + i sin π/4)».
+
+**Unchanged.** A bare number in a cis angle is degrees («2cis(1)» is 1°). The canonical reading prints
+degrees («z₁ = 2·cis45°»); the line list keeps the student's text.
+
+**Deliberately out of scope** (filed as [#2000](https://github.com/dcodish/geo_builder/issues/2000),
+`needs-operator`): `genericPolar` still rounds a non-integer degree angle («r cis 22.5» → 23°), drops `pi`
+as a MODULUS («pi cis 30»), and reads a capitalised `Pi` angle as a free direction; and an argument stated
+in radians («arg z1 = π/4») is still not read — the issue named the cis and trig forms only.
+
+**Siblings.** `cis` and the radian argument are this product's register; not plane geometry, so no
+docs/22 §10 row.
+
+**Cost.** None measurable: one regex alternative and a text read per cis angle.
+
+**Consequences.** `parser/angleText.ts` (new), `parser/exprParse.ts`, `parser/normalize.ts`,
+`parser/rules.ts`. The proxy bundles `parseLineV2`, so it needs a redeploy at deploy.
+
+**Locks.** `src-complex/__tests__/radians-1754.test.ts` — the reader's table (degrees and radians, exact)
+and its refusals; the issue's three lines and fourteen more spellings each lowering to exactly the facts and
+readings of the degree spelling (signs, `π`, `2cisπ`, `√2cis(3π/4)`, a power equation, a symbolic modulus,
+both trig spellings); `2cis(pi)` as 180°; the mixed-unit trig form; the real gate keeping the student's
+text and treating a radian second mention as the degree given; and the refusal net (π as a value, the bare
+slash, non-rational and `Π` angles). Fixture `fixtures/radians-1754.complex.json` (the three spellings, one
+figure) joins the saved-session net.

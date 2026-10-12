@@ -126,6 +126,12 @@ never as a contradiction or a refutation.
   raised to a power keeps its parentheses (`2(cis45)^2`, never `(2cis45)^2`); an unparenthesised sum
   only as a whole additive term. A form with two different angles is left as typed, refuses, and the
   submit path names both angles (`trigAngleMismatch`, `trig-mismatch`).
+- **One angle reader for every cis spelling** (`angleDegrees` in `parser/angleText.ts`;
+  [ADR-CX-064](06d-decisions-complex.md#adr-cx-064)). A cis angle's TEXT becomes an exact rational number
+  of degrees: a signed decimal as before, or a rational multiple of π (`π/4` → 45, `pi` the same as `π`).
+  The expression lexer's `pi` token is read only by `readCisAngle`, which hands a span holding π to
+  `angleDegrees` (parenthesised, or bare without a slash); `genericPolar`'s angle half and the trig
+  rewrite's same-angle key ask the same function. π is never a value — the atom refuses anywhere else.
 - **A number DEFINED by real parameters reads as its definition** (`model/cartesianForm.ts`;
   [ADR-CX-058](06d-decisions-complex.md#adr-cx-058)). **⚠ Ruled to change (2026-10-07, ADR-W-118 B6/D1 ·
   #1862):** the canvas shows what the student typed and never substitutes a letter they did not value;

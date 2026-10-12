@@ -174,9 +174,14 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   `sin45·i`, the `°` or without it, a signed or parenthesised angle, and a symbolic one
   («r(cosθ + i sinθ)»), read exactly as «2cis45» / «r cis θ» does — the same facts, and the student's
   line stays as typed. A form whose two angles differ («cos45 + i sin30») is refused naming both angles,
-  never read as either. Angles are read the way `cis` reads them: degrees (radians such as `π/4` are
-  read by neither).
-  - Sources: [ADR-CX-059](06d-decisions-complex.md#adr-cx-059), #1534 (operator ruling)
+  never read as either. Angles are read the way `cis` reads them, by one reader: a number is degrees,
+  and a rational multiple of π is radians, converted exactly — «z1 = 2cis(π/4)», «z1 = 2cis(pi/4)» and
+  «z1 = 2(cos(π/4) + i sin(π/4))» are the same facts as «z1 = 2cis45» (also `2π/3`, `-π/3`, `π`, `π/7`,
+  and after a symbolic modulus, «r cis(π/4)»). A slash belongs to a radian angle only inside
+  parentheses («2cis π/4» is refused). π is an angle unit only: «z1 = π», «z1 = pi», «|z1| = π» are
+  refused as not understood.
+  - Sources: [ADR-CX-059](06d-decisions-complex.md#adr-cx-059), #1534 (operator ruling);
+    [ADR-CX-064](06d-decisions-complex.md#adr-cx-064), #1754 (radians)
 - **FR-CN-12 (Must)** — **A letter this tool cannot read is named, not met with «I did not understand».**
   A letter or a word in a script the tool does not read — «ДЖФ = 2 + i», a Russian or Arabic word — was
   already refused here, but with the generic unreadable-line sentence. It now gets the two sentences every
@@ -300,7 +305,7 @@ Two principles cover most of the surface:
 | # | Family (generic form) | Canonical Hebrew (one witness) | Corpus witnesses |
 |---|---|---|---|
 | F1 | **Declarations**: k names as complex numbers; real parameters with a domain (`≠ 0`, `> 0`, `טבעי`, an interval). **Implicit typing ([ADR-CX-004](06d-decisions-complex.md#adr-cx-004))**: z- and w-family names (`z`, `z2`, `z10`, `w1`…) are complex WITHOUT a declaration, and the first reference creates a visible free number; other letters (a, d, m, n, r, t…) are real parameters by the same exam convention. **A declaration types a letter family for the whole figure (FR-CN-8, [ADR-CX-047](06d-decisions-complex.md#adr-cx-047))**: «u מספר מרוכב» makes u, u₁, u₂… complex in every line, before or after it; a size or an angle cannot be declared complex | `Z1 ו-Z2 מספרים מרוכבים` (optional for z/w) · `r ≠ 0` · `π/2 < α < π` | §2b, 2020, 2022, 2023 |
-| F2 | **Value definitions**: `name = expr`. A literal is cartesian (`3+4i`, or from two real parameters with a glued `i`: `a+bi`, `a+ib`, `x+yi`, FR-CN-10, [ADR-CX-058](06d-decisions-complex.md#adr-cx-058)), polar (`r cis θ`) or trigonometric (`r(cosθ + i sinθ)`, read as the same number as cis, FR-CN-11, [ADR-CX-059](06d-decisions-complex.md#adr-cx-059)). Radicals are input, carried exactly (`√3 + i`, `³√8`, `√2cis45`, FR-LN-4, [ADR-CX-056](06d-decisions-complex.md#adr-cx-056)). Components and angles may be expressions in real parameters; six operations, the conjugate, integer and symbolic `kn+c` powers | `w = (z1/2)^(4n)` · `z1 = (2a²+5a+4) + (2a²+3a+2)i` · `z1 = a+bi` · `z1 = 2(cos45 + i sin45)` · `z1 = √3 + i` | §2b, 2018, 2020, 2022 |
+| F2 | **Value definitions**: `name = expr`. A literal is cartesian (`3+4i`, or from two real parameters with a glued `i`: `a+bi`, `a+ib`, `x+yi`, FR-CN-10, [ADR-CX-058](06d-decisions-complex.md#adr-cx-058)), polar (`r cis θ`) or trigonometric (`r(cosθ + i sinθ)`, read as the same number as cis, FR-CN-11, [ADR-CX-059](06d-decisions-complex.md#adr-cx-059)); an angle in degrees or in radians as a rational multiple of π (`2cis(π/4)` ≡ `2cis45`, [ADR-CX-064](06d-decisions-complex.md#adr-cx-064)). Radicals are input, carried exactly (`√3 + i`, `³√8`, `√2cis45`, FR-LN-4, [ADR-CX-056](06d-decisions-complex.md#adr-cx-056)). Components and angles may be expressions in real parameters; six operations, the conjugate, integer and symbolic `kn+c` powers | `w = (z1/2)^(4n)` · `z1 = (2a²+5a+4) + (2a²+3a+2)i` · `z1 = a+bi` · `z1 = 2(cos45 + i sin45)` · `z1 = √3 + i` | §2b, 2018, 2020, 2022 |
 | F3 | **Modulus relations**: `\|A\| ⟨cmp⟩ rhs`, where rhs is a number, a parameter expression or `k·\|B\|`; chained equalities; cmp ∈ {=, <, >, ≤, ≥, ≠} | `\|Z1\| = 9r` · `\|z1\| = \|z2\| = r` · `2\|z_A\| = \|z_M\|` | §2b, 2018, 2024 |
 | F4 | **Argument relations**: signed sums and integer multiples of `arg` terms against an angle or each other, any comparator. An inequality is a BRANCH SELECTOR | `arg Z1 − arg Z2 = 90` · `arg Z2 < 45` · `לשניהם אותו ארגומנט` | §2b, 2018, 2024 |
 | F5 | **Location givens**: a quadrant; on an axis or half-axis; on a stated line or ray; on a circle; inside, on or outside a region | `Z2 ברביע הראשון` · `C על הישר y=x` · `על ישר העובר דרך ראשית הצירים` | §2b, 2011, 2018, 2023 |
