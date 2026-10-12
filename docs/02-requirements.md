@@ -84,6 +84,9 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 - **FR-IN-4d (Must) — a point placement keeps its tail.** A sentence that places a point («הנקודה E נמצאת על המשך הצלע BC», «D על BC») and then says more keeps all of it: a condition clause — «כך ש», «ונתון כי / ונתון ש / וידוע כי», "and it is given that" — is a given held on the figure, and «מעבר לנקודה B» / "beyond B" picks the end of the segment the extension passes. A tail the tool cannot read is escalated or refused, never dropped from a green figure. A shape with a given glued on («משולש ABC ונתון כי AB = AC») stays the two-step teaching.
   - Sources: ADR-570, #1682, #108.
 
+- **FR-IN-16 (Should) — a sector's area and an arc's length are givens.** On a drawn sector (or quarter circle), «שטח הגזרה AOB הוא 12π» and «אורך הקשת AB הוא 4π» (also «= …», the definite «שטח הגזרה …», "sector area AOB = 12π", "arc length AB = 4π") are accepted and printed on the figure — the area inside the sector, the length on the arc. One such size alone **resizes** the sector and keeps its angle; a second size given (the other measure, or a radius) fixes the angle. A ratio to the sector's own circle — «שטח הגזרה AOB = ¼ משטח המעגל», «אורך הקשת AB הוא רבע מהיקף המעגל» — fixes the angle. A letter — «נסמן את שטח הגזרה ב-S», «אורך הקשת AB = L» — is printed and relates measures like any measure letter. The measured sector is the one drawn, a reflex one included. «אורך הקשת AB» is never read as the segment AB: with no drawn arc it is not understood. Not yet: a ratio to a polygon in one sentence, and the analytic Builder (#2013).
+  - Sources: ADR-632, #172.
+
 ### What is asked or taught
 
 - **FR-IN-4 (Must)** — When input cannot be understood, show a helpful clarification message (bilingual) and leave the figure unchanged. A sentence the tool understood but which misses a given **asks** for it, keeping the text in place («מלבן ABCD שהצלע שלו 6» names no particular side).

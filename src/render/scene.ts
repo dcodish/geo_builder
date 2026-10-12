@@ -9,7 +9,7 @@
  * rather than rendered at a bogus position.
  */
 
-import type { Construction, Id, Circle, Vec } from '@/engine/types';
+import type { Construction, Id, Circle, RoundOperand, Vec } from '@/engine/types';
 import { isGeoPoint } from '@/engine/types';
 import { len, rot90, sub, unit } from '@/engine/geometry';
 import { formatMeasure, formatAngle } from '@/format';
@@ -108,7 +108,7 @@ export interface SceneMeasure {
 export interface MeasureLabels {
   lengths: { a: Id; b: Id; text: string }[];
   angles: { vertex: Id; ray1: Id; ray2: Id; text: string }[];
-  areas?: { ids: Id[]; text: string }[]; // a polygon's area label at its centroid (ADR-118); optional for back-compat
+  areas?: { ids: Id[]; text: string; round?: RoundOperand; of?: 'length' }[]; // a polygon's area label at its centroid (ADR-118); a sector/arc's with `round` (ADR-632); optional for back-compat
   /** An ARC measure («קשת AB = 40», ADR-335): the value prints ON the arc — at the minor-arc midpoint of
    *  a–b on `circle`, nudged toward the centre — never a wedge at the (often hidden) centre. */
   arcs?: { circle: Id; a: Id; b: Id; text: string }[];
@@ -191,6 +191,31 @@ export interface Scene {
 export interface SceneExtension {
   a: Vec;
   b: Vec;
+}
+
+/**
+ * Where a ROUND measure's value prints ([ADR-632](../../docs/06-decisions.md#adr-632)): the traversal is the drawn
+ * arc's own (`orientArc`, the same `mirrored` frame the arc is drawn in), so the text sits on the sector the
+ * student sees. A sector's AREA goes at the wedge's centroid — 4r·sin(θ/2)/(3θ) from the centre along the
+ * mid-ray — and an arc's LENGTH on the arc at the mid-ray, nudged inward like an ADR-335 arc measure.
+ */
+function roundLabelPlacement(
+  pts: (Vec | undefined)[],
+  round: RoundOperand,
+  onArc: boolean,
+  mirrored?: boolean,
+): Omit<SceneMeasure, 'text'> | null {
+  const [c, p, q] = pts;
+  if (!c || !p || round.whole) return null;
+  if (!q) return null;
+  const or = orientArc(c, p, q, { spanDeg: round.spanDeg, minor: round.minor, mirrored });
+  if (!or) return null;
+  const mid = or.startAng + or.sweepAng / 2;
+  const u = { x: Math.cos(mid), y: Math.sin(mid) };
+  if (onArc) return { kind: 'arc', pos: { x: c.x + u.x * or.r, y: c.y + u.y * or.r }, dir: { x: -u.x, y: -u.y } };
+  const theta = Math.abs(or.sweepAng);
+  const d = theta > 1e-6 ? (4 * or.r * Math.sin(theta / 2)) / (3 * theta) : (2 * or.r) / 3;
+  return { kind: 'area', pos: { x: c.x + u.x * d, y: c.y + u.y * d }, dir: { x: 0, y: 0 } };
 }
 
 /**
@@ -507,6 +532,13 @@ export function buildScene(
     }
     // An area label sits at the polygon's centroid (ADR-118) — no offset direction.
     for (const Ar of labels.areas ?? []) {
+      // ADR-632: a ROUND operand — a sector's area sits at the drawn wedge's centroid, an arc's length ON the drawn
+      // arc (the ADR-335 placement, at the DRAWN arc's midpoint so a reflex sector's label is on its own ink).
+      if (Ar.round) {
+        const m = roundLabelPlacement(Ar.ids.map((id) => positions.get(id)), Ar.round, Ar.of === 'length', opts?.mirrored);
+        if (m) measures.push({ ...m, text: Ar.text });
+        continue;
+      }
       const verts = Ar.ids.map((id) => positions.get(id)).filter((p): p is Vec => !!p);
       if (verts.length < 3) continue;
       const c = { x: verts.reduce((s, p) => s + p.x, 0) / verts.length, y: verts.reduce((s, p) => s + p.y, 0) / verts.length };

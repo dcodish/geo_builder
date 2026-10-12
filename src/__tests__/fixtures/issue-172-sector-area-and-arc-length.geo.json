@@ -1,0 +1,132 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-12T12:00:00.000Z",
+  "name": "issue-172-sector-area-and-arc-length",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "9eZlJgps-UAMZ4wrR2_SO",
+      "utterance": "גזרה AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true,
+        "hidden": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "VEPVEQ3CPnhnrDM4demA_",
+      "utterance": "גזרה AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O",
+        "theta": 0
+      },
+      "enabled": true
+    },
+    {
+      "id": "6bgTMpZ6xYsXuNN7bp7IC",
+      "utterance": "גזרה AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O",
+        "theta": 1.2217304763960306,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "aNmSB2FSrpT5A8GjeVJuj",
+      "utterance": "גזרה AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "arc",
+        "id": "arc-AB",
+        "center": "O",
+        "from": "A",
+        "to": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "vxqKKz2c2hTlNKfHmWX9A",
+      "utterance": "גזרה AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "segment",
+        "a": "O",
+        "b": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "_UzakDONm66ZEaq30aQSv",
+      "utterance": "גזרה AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "segment",
+        "a": "O",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "36hAD4tqa3LgQ-oLVi27V",
+      "utterance": "שטח הגזרה AOB הוא 12π",
+      "group": "g6",
+      "cmd": {
+        "type": "measure-area",
+        "ids": [
+          "O",
+          "A",
+          "B"
+        ],
+        "expr": {
+          "value": 37.69911184307752,
+          "text": "12π"
+        },
+        "round": {},
+        "consumed": {
+          "symbols": [
+            "π"
+          ]
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "XHD_ZO9qhbiHXfNK9Hkm6",
+      "utterance": "אורך הקשת AB הוא 4π",
+      "group": "g7",
+      "cmd": {
+        "type": "measure-perimeter",
+        "ids": [
+          "O",
+          "A",
+          "B"
+        ],
+        "expr": {
+          "value": 12.566370614359172,
+          "text": "4π"
+        },
+        "round": {},
+        "consumed": {
+          "symbols": [
+            "π"
+          ]
+        }
+      },
+      "enabled": true
+    }
+  ]
+}

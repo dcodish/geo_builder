@@ -25,7 +25,8 @@ import {
   boundAim,
   isOrderConstraint,
 } from './types';
-import { add, angleDeg, circumcenter, dist, polygonArea, polygonPerimeter, scale, solveParam, sub, unit } from './geometry';
+import { add, angleDeg, circumcenter, dist, scale, solveParam, sub, unit } from './geometry';
+import { operandArea, operandBoundary, operandText } from './roundMeasure';
 
 /** A length bound's aim/accept margins in LENGTH units: the order fractions taken against the stated
  *  bound, then window-clamped (`boundAim`) so a narrow range keeps a reachable target (ADR-390). */
@@ -253,14 +254,15 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
     }
     case 'area':
       // signed: area − value (area is length²). Passes through the target with a sign change as a DOF varies.
-      return polygonArea(con.ids.map(get)) - con.value;
+      // The operand is a polygon or a round figure (ADR-632) — `operandArea` is the one formula seam.
+      return operandArea(con.ids.map(get), con.round) - con.value;
     case 'area-ratio':
-      return polygonArea(con.ids1.map(get)) - con.k * polygonArea(con.ids2.map(get));
+      return operandArea(con.ids1.map(get), con.round1) - con.k * operandArea(con.ids2.map(get), con.round2);
     case 'perimeter':
       // signed: perimeter − value (length units). Sign-changes through the target as a DOF varies.
-      return polygonPerimeter(con.ids.map(get)) - con.value;
+      return operandBoundary(con.ids.map(get), con.round) - con.value;
     case 'perimeter-ratio':
-      return polygonPerimeter(con.ids1.map(get)) - con.k * polygonPerimeter(con.ids2.map(get));
+      return operandBoundary(con.ids1.map(get), con.round1) - con.k * operandBoundary(con.ids2.map(get), con.round2);
     case 'measure-sum': {
       // signed: Σ coefᵢ·mᵢ − target (length units or degrees). Sign-changes through the target as a
       // DOF varies. An angle term propagates angleDeg's NaN on a collapsed ray (solver skips — the
@@ -359,11 +361,11 @@ export function constraintScale(con: Constraint, get: (id: Id) => Vec): number {
     case 'area':
       return Math.max(Math.abs(con.value), 1e-9); // area² units — relative to the target area
     case 'area-ratio':
-      return Math.max(con.k * polygonArea(con.ids2.map(get)), 1e-9); // relative to the (scaled) reference area
+      return Math.max(con.k * operandArea(con.ids2.map(get), con.round2), 1e-9); // relative to the (scaled) reference area
     case 'perimeter':
       return Math.max(Math.abs(con.value), 1e-9); // length units — relative to the target perimeter
     case 'perimeter-ratio':
-      return Math.max(con.k * polygonPerimeter(con.ids2.map(get)), 1e-9); // relative to the (scaled) reference perimeter
+      return Math.max(con.k * operandBoundary(con.ids2.map(get), con.round2), 1e-9); // relative to the (scaled) reference perimeter
     case 'measure-sum': {
       if (con.unit === 'angle') return 1; // degrees are scale-free (the angle/angle-ratio convention)
       // Length units: an ABSOLUTE sum scales to its target (the perimeter precedent); a RELATIVE
@@ -606,13 +608,13 @@ export function describeConstraint(con: Constraint): string {
     case 'length-bound':
       return `${boundText(`|${con.a}${con.b}|`, con.min, con.max, con.minStrict, con.maxStrict)}`;
     case 'area':
-      return `area(${con.ids.join('')}) = ${con.value}`;
+      return `area(${operandText(con.ids, con.round)}) = ${con.value}`;
     case 'area-ratio':
-      return `area(${con.ids1.join('')}) = ${con.k}·area(${con.ids2.join('')})`;
+      return `area(${operandText(con.ids1, con.round1)}) = ${con.k}·area(${operandText(con.ids2, con.round2)})`;
     case 'perimeter':
-      return `perimeter(${con.ids.join('')}) = ${con.value}`;
+      return `${con.round ? 'length' : 'perimeter'}(${operandText(con.ids, con.round)}) = ${con.value}`;
     case 'perimeter-ratio':
-      return `perimeter(${con.ids1.join('')}) = ${con.k}·perimeter(${con.ids2.join('')})`;
+      return `${con.round1 ? 'length' : 'perimeter'}(${operandText(con.ids1, con.round1)}) = ${con.k}·${con.round2 ? 'length' : 'perimeter'}(${operandText(con.ids2, con.round2)})`;
     case 'measure-sum': {
       // Reassemble the student's equation: positive-coef terms on the left, negated (RHS) terms back
       // on the right, the numeric target joining whichever side keeps everything positive.

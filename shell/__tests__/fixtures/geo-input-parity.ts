@@ -257,6 +257,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1903': 'open',
   '#1961': 'open',
   '#1969': 'open',
+  '#2013': 'open',
 };
 
 export interface ParityRow {
@@ -1005,6 +1006,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'e4-central-value', family: 'chords-arcs', steps: ['מעגל O', 'זוית מרכזית COD = 80'], expect: 'builds', exception: 'X8' },
   { id: 'e4-sector-free', family: 'chords-arcs', steps: ['גזרה AOB'], expect: 'builds', exception: 'X8' },
   { id: 'e4-sector-reflex', family: 'chords-arcs', steps: ['גזרה AOB בזווית 200'], expect: 'builds', exception: 'X8' },
+  // #172 (ADR-632): a sector's area and an arc's length as measures — size, ratio to the circle, letter
+  { id: 'sector-area-172', family: 'chords-arcs', steps: ['גזרה AOB', 'שטח הגזרה AOB הוא 12π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2013' }] },
+  { id: 'arc-length-172', family: 'chords-arcs', steps: ['גזרה AOB', 'אורך הקשת AB הוא 4π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2013' }] },
+  { id: 'sector-area-ratio-172', family: 'chords-arcs', steps: ['גזרה AOB', 'שטח הגזרה AOB = ¼ משטח המעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2013' }] },
+  { id: 'arc-length-ratio-172', family: 'chords-arcs', steps: ['גזרה AOB', 'אורך הקשת AB הוא רבע מהיקף המעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2013' }] },
+  { id: 'sector-area-letter-172', family: 'chords-arcs', steps: ['גזרה AOB', 'נסמן את שטח הגזרה ב-S'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2013' }] },
   { id: 'e4-quarter-named', family: 'chords-arcs', steps: ['רבע מעגל OAB'], expect: 'builds', exception: 'X8' },
   { id: 'e4-arc-mid-contextual', family: 'chords-arcs', steps: ['מעגל O', 'B על מעגל O', 'C על מעגל O', 'M אמצע הקשת BC'], expect: 'builds', exception: 'X8' },
   { id: 'e4-arc-mid-major', family: 'chords-arcs', steps: ['מעגל O', 'B על מעגל O', 'C על מעגל O', 'M אמצע הקשת הגדולה BC'], expect: 'builds', exception: 'X8' },

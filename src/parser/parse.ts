@@ -19,8 +19,8 @@
  * no digits). Keywords are bilingual; the same rule matches either language.
  */
 
-import { MIDSEGMENT_SHAPES, RADIUS_VAR, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED } from './lexicon';
+import { MIDSEGMENT_SHAPES, RADIUS_VAR, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand } from '@/engine';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -225,6 +225,12 @@ export interface ParseContext {
    *  ("במרובע חסום מעגל" typed after מרובע ABCD exists) bind to THE existing polygon instead of minting
    *  a fresh auto-named one (the ADR-029 implicit-reference pattern, polygon edition). */
   polygons?: string[][];
+  /** [ADR-632](docs/06-decisions.md#adr-632) (#172): the DRAWN arcs — a sector's, a quarter's, a semicircle's — with
+   *  their identity (`spanDeg`/`minor`, ADR-356/357). «שטח הגזרה AOB» / «אורך הקשת AB» / the definite «הגזרה»
+   *  bind to one of these, and the measure carries its identity so it measures the arc the student SEES.
+   *  SEMANTIC field: read off the `arc` objects, never off coordinates. `center` is the real point id (an
+   *  unnamed sector's is anonymous, '@ctr-O', ADR-342). */
+  arcs?: { center: string; from: string; to: string; spanDeg?: number; minor?: boolean }[];
   /** #770: each ring with the shape KIND the student DECLARED it as — a definite shape noun
    *  («אלכסוני הריבוע») resolves on this, never on "whichever quad exists". */
   declaredPolygons?: { vertices: string[]; kind?: string }[];
@@ -4152,6 +4158,135 @@ const perimeter: Rule = (s) => {
   const expr = parseAreaExpr(rhs[1]); // number / radical (a variable-label perimeter is out of scope → null → escalate)
   if (!expr || !('value' in expr)) return null;
   return [{ type: 'set-perimeter', ids: refs[0].ids, value: expr.value }];
+};
+
+// ── ROUND measures: a sector's AREA, an arc's LENGTH ([ADR-632](docs/06-decisions.md#adr-632), #172) ───────────
+// The ADR-118 area seam and the ADR-228 perimeter seam, over a ROUND operand: «שטח הגזרה AOB» is the sector's
+// area (½·θ·r²), «אורך הקשת AB» the arc's length (θ·r), «שטח המעגל» / «היקף המעגל» that circle's whole area /
+// circumference — each read OFF THE NOUN it names (ADR-228's discipline: «שטח» and «היקף» are one word per
+// measure, the noun decides the operand). A one-letter particle may lead a reference («משטח המעגל», «מהיקף»).
+const RM_PRE = String.raw`(?<![א-ת])[מלבו]?`;
+const ROUND_REF: Record<'sector' | 'arc' | 'disc' | 'rim', string> = {
+  sector: String.raw`${RM_PRE}שטח\s+(?:של\s+)?ה?גי?זרה|\b(?:the\s+)?(?:area\s+of\s+(?:the\s+)?sector|sector(?:'s)?\s+area)\b`,
+  arc: String.raw`${RM_PRE}אורך\s+(?:של\s+)?ה?קשת|\b(?:the\s+)?(?:length\s+of\s+(?:the\s+)?arc|arc(?:'s)?\s+length)\b`,
+  disc: String.raw`${RM_PRE}שטח\s+(?:של\s+)?ה?מעגל|\b(?:the\s+)?(?:area\s+of\s+(?:the\s+)?circle|circle(?:'s)?\s+area)\b`,
+  rim: String.raw`${RM_PRE}היקף\s+(?:של\s+)?ה?מעגל|\b(?:the\s+)?(?:circumference(?:\s+of\s+(?:the\s+)?circle)?|perimeter\s+of\s+(?:the\s+)?circle|circle(?:'s)?\s+circumference)\b`,
+};
+type RoundRef = { kind: keyof typeof ROUND_REF; at: number; end: number; letters: string[] };
+
+/** Every round-measure reference in `s`, in order, each with the label run that names it (0–3 labels). */
+function roundReferences(s: string): RoundRef[] {
+  const out: RoundRef[] = [];
+  for (const kind of Object.keys(ROUND_REF) as (keyof typeof ROUND_REF)[]) {
+    const re = new RegExp(ROUND_REF[kind], 'gi');
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(s)) !== null) {
+      // the label run is read CASE-SENSITIVELY (a vertex is a capital): the noun's own match is case-blind, and a
+      // case-blind run would read the English copula «is» as the labels I, S
+      const run = s.slice(m.index + m[0].length).match(new RegExp(String.raw`^\s*(?:${ULABEL}\s*){0,3}(?![A-Za-z])`))?.[0] ?? '';
+      const letters = run.match(new RegExp(ULABEL, 'g')) ?? [];
+      out.push({ kind, at: m.index, end: m.index + m[0].length + run.length, letters });
+    }
+  }
+  return out.sort((a, b) => a.at - b.at);
+}
+
+/** The DRAWN arc a sector/arc reference names: its letters as a set (the centre's token for an unnamed centre),
+ *  or — with no letters — THE one arc in the figure. Null when none or more than one answers. */
+function namedArc(ctx: ParseContext, letters: string[]): NonNullable<ParseContext['arcs']>[number] | null {
+  const tok = (id: string) => up(id.replace(/^@ctr-/, ''));
+  const arcs = ctx.arcs ?? [];
+  const want = [...new Set(letters)].sort().join('|');
+  const hits =
+    letters.length === 0 ? arcs
+    : letters.length === 2 ? arcs.filter((a) => [up(a.from), up(a.to)].sort().join('|') === want)
+    : letters.length === 3 ? arcs.filter((a) => [tok(a.center), up(a.from), up(a.to)].sort().join('|') === want)
+    : [];
+  return hits.length === 1 ? hits[0] : null;
+}
+
+/** A round measure's stated value: a π multiple («12π», «4pi», «π») or anything an area value reads (ADR-118). */
+function roundValue(rhs: string): { expr: MeasureExpr; pi: boolean } | null {
+  const t = rhs.trim();
+  const pi = t.match(new RegExp(String.raw`^(${COEF})?\s*[*·]?\s*(?:π|pi)$`, 'i'));
+  if (pi) return { expr: { value: (pi[1] ? parseFloat(pi[1]) : 1) * Math.PI, text: `${pi[1] ?? ''}π` }, pi: true };
+  const e = parseAreaExpr(t);
+  return e ? { expr: e, pi: false } : null;
+}
+
+/** The words a round-measure statement may carry besides its references and its value — the copula, the
+ *  ratio connectives, the marker verb («נסמן את … ב-S»). Anything else left over is meaning this rule cannot
+ *  express, and the statement escalates rather than half-parse (ADR-024). */
+const ROUND_CONNECTIVES = new RegExp(
+  String.raw`=|\/|π|(?<![א-ת])(?:הוא|היא|שווה|שווים|ל-?|נסמן|את|ב-?|פי|גדול|קטן|רבע|שליש|חצי|מחצית|מ-?)(?![א-ת])|\b(?:is|equals?|times|of|the|a|quarter|third|half|denote|by|let|be|pi)\b|${COEF}`,
+  'gi',
+);
+
+/**
+ * A sector's AREA and an arc's LENGTH as first-class measures ([ADR-632](docs/06-decisions.md#adr-632), #172) — the
+ * ADR-118 forms over a round operand:
+ *  - a size: «שטח הגזרה AOB הוא 12π», «אורך הקשת AB = 4π», "sector area AOB = 12π", "arc length AB is 4π";
+ *  - a ratio to its own circle (or to another drawn sector/arc): «שטח הגזרה AOB = ¼ משטח המעגל», «אורך הקשת AB הוא רבע מהיקף המעגל»;
+ *  - a letter: «נסמן את שטח הגזרה ב-S», «אורך הקשת AB = L» (shared like any measure letter).
+ * The sector/arc is one the figure DRAWS (`ctx.arcs`), named by its letters or, definite, the only one — and the
+ * measure carries the arc's identity, so it measures the arc on the canvas. A sector/arc reference that names no
+ * drawn arc returns 'stop': «אורך הקשת AB» is never read as the segment AB (the operator's 2026-08-16 ruling).
+ */
+const roundMeasure: Rule = (s0, ctx) => {
+  const s = spellVulgarFractions(s0);
+  const refs = roundReferences(s);
+  const lead = refs.find((r) => r.kind === 'sector' || r.kind === 'arc');
+  if (!lead) return null;
+  const isArea = lead.kind === 'sector';
+  if (refs.some((r) => (isArea ? r.kind === 'arc' || r.kind === 'rim' : r.kind === 'sector' || r.kind === 'disc'))) return 'stop'; // an area against a length
+  const leadArc = namedArc(ctx, lead.letters);
+  if (!leadArc) return 'stop';
+  type Operand = { ids: Id[]; round: RoundOperand };
+  const operands: Operand[] = [];
+  for (const r of refs) {
+    if (r.kind === 'sector' || r.kind === 'arc') {
+      const a = r === lead ? leadArc : namedArc(ctx, r.letters);
+      if (!a) return 'stop';
+      const round: RoundOperand = { ...(a.spanDeg !== undefined ? { spanDeg: a.spanDeg } : {}), ...(a.minor ? { minor: true } : {}) };
+      operands.push({ ids: [a.center, a.from, a.to], round });
+    } else {
+      // the WHOLE circle — the sector's own; a stated centre letter must be that circle's
+      const tok = up(leadArc.center.replace(/^@ctr-/, ''));
+      if (r.letters.length > 1 || (r.letters.length === 1 && r.letters[0] !== tok)) return 'stop';
+      operands.push({ ids: [leadArc.center, leadArc.from], round: { whole: true } });
+    }
+  }
+  // a POLYGON partner («שטח הגזרה = 2 שטח המשולש ABC») is not this statement's: the issue asks the ratio to the
+  // sector's own circle. Escalate it rather than drop it (the ADR-118/228 readers, minus the words inside ours).
+  const inRound = (at: number) => refs.some((r) => at >= r.at && at < r.end);
+  if ((isArea ? areaReferences(s) : perimeterReferences(s)).some((p) => !inRound(p.at))) return 'stop';
+  if (operands.length > 2) return 'stop';
+  // what is left once the references are read must be the statement's own connectives and value
+  const unread = (text: string, ids: Id[]): boolean => shapeLeftover(removeClaimed(text.replace(ROUND_CONNECTIVES, ' '), ids));
+  let rest = s;
+  for (const r of [...refs].reverse()) rest = rest.slice(0, r.at) + ' ' + rest.slice(r.end);
+  if (operands.length === 2) {
+    const [o1, o2] = operands;
+    if (unread(rest, [...o1.ids, ...o2.ids])) return 'stop';
+    const k = measureRatioK(s, isArea ? String.raw`S[A-Z]|שטח|area` : String.raw`היקף|אורך|perimeter|length|circumference`);
+    if (!(k > 0)) return 'stop';
+    const sides = { ids1: o1.ids, ids2: o2.ids, k, round1: o1.round, round2: o2.round };
+    return [isArea ? { type: 'set-area-ratio', ...sides } : { type: 'set-perimeter-ratio', ...sides }];
+  }
+  // ONE operand: a value or a letter. The copula form «… הוא 12π» / «… = L», or the marker «נסמן את … ב-S».
+  const after = s.slice(lead.end);
+  const before = s.slice(0, lead.at);
+  const cop = after.match(/^\s*(?:=|הוא|היא|שווה(?:\s*ל-?)?|\bis\b|\bequals?\b)\s*(.+)$/i);
+  const mark = /^\s*(?:נסמן(?:\s+את)?|denote|let)\s*$/i.test(before) ? after.match(new RegExp(String.raw`^\s*(?:ב-?|\bby\b|\bbe\b)\s*(${LABEL})\s*$`, 'i')) : null;
+  if (!mark && before.trim() !== '') return 'stop';
+  const v = mark ? roundValue(mark[1]) : cop ? roundValue(cop[1]) : null;
+  if (!v) return 'stop';
+  if ('value' in v.expr && !(v.expr.value > 0)) return 'stop';
+  const op = operands[0];
+  const cmd: AnyCommand = isArea
+    ? { type: 'measure-area', ids: op.ids, expr: v.expr, round: op.round }
+    : { type: 'measure-perimeter', ids: op.ids, expr: v.expr, round: op.round };
+  return [v.pi ? { ...cmd, consumed: PI_CONSUMED } : cmd];
 };
 
 const measureLength: Rule = (s) => {
@@ -10763,6 +10898,7 @@ export const RULES: Rule[] = [
   radiusRelation, // "R > r" / "R = 1.5r" / "R/r = 2√7/5" between BOUND radius symbols (#54); before measureOrder (unbound-pair no-op) and the value rules
   congruence, // "ABC ≅ DEF" — before the shape rules ("triangle ABC ≅ …" contains "triangle")
   similarity, // "ABC ~ DEF"
+  roundMeasure, // «שטח הגזרה AOB הוא 12π» / «אורך הקשת AB = 4π» / «… = ¼ משטח המעגל» (ADR-632) — BEFORE `area`/`perimeter`/`sector` and the length rules, which would read the arc as a SEGMENT
   area, // "שטח המשולש ABC = 13" / "SABC/SDEF = 3/4" (ADR-118) — BEFORE the shape rules, which would otherwise build the named shape and drop the area
   perimeter, // "היקף ABC = 20" / "perimeter of ABCD is 20" (ADR-228) — BEFORE the shape rules, same reason (a circle's circumference → the `circle` rule)
   semicirclesOnEverySide, // "על כל צלע … יש חצי מעגל" — a semicircle on EVERY side; before `semicircle` (#29)

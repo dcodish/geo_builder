@@ -15,12 +15,14 @@
  * finer-grained pieces so it can attach a status/label to each originating fact.
  */
 
-import type { AnyCommand, Command, Id, MeasureExpr, SymbolicCommand } from './types';
+import type { AnyCommand, Command, Id, MeasureExpr, RoundOperand, SymbolicCommand } from './types';
 import { formatMeasure } from '@/format';
 import { expandShapeVariant } from './shapeVariants';
 import { expandInscribe } from './inscribe';
 
-type Binding = { kind: 'len' | 'ang' | 'area'; refs: Id[]; coef: number; pow?: number; affine?: boolean };
+/** `perim` (ADR-632): an arc's length — a length, but of a ROUND operand, so it couples only with its own kind
+ *  (a ratio of two boundary lengths), never with a segment's `len`. `round` rides with the refs it qualifies. */
+type Binding = { kind: 'len' | 'ang' | 'area' | 'perim'; refs: Id[]; coef: number; pow?: number; affine?: boolean; round?: RoundOperand };
 export interface SymTab {
   vars: Map<string, { value?: number; bindings: Binding[] }>;
   /** The FREE-radius circle the symbol R denotes, plus a point on it that witnesses the radius
@@ -62,7 +64,8 @@ export function buildSymTab(cmds: AnyCommand[]): SymTab {
     if (c.type === 'set-var') slot(c.name).value = c.value;
     else if (c.type === 'measure-length' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'len', refs: [c.a, c.b], coef: c.expr.coef, pow: c.expr.pow, affine: (c.expr.const ?? 0) !== 0 });
     else if (c.type === 'measure-angle' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'ang', refs: [c.vertex, c.ray1, c.ray2], coef: c.expr.coef });
-    else if (c.type === 'measure-area' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'area', refs: c.ids, coef: c.expr.coef, pow: c.expr.pow, affine: (c.expr.const ?? 0) !== 0 });
+    else if (c.type === 'measure-area' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'area', refs: c.ids, coef: c.expr.coef, pow: c.expr.pow, affine: (c.expr.const ?? 0) !== 0, ...(c.round ? { round: c.round } : {}) });
+    else if (c.type === 'measure-perimeter' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'perim', refs: c.ids, coef: c.expr.coef, pow: c.expr.pow, affine: (c.expr.const ?? 0) !== 0, ...(c.round ? { round: c.round } : {}) });
   }
   // The reserved radius symbol R always denotes the circle's radius (ADR-034): if a measure uses it
   // but no explicit value was given, bind R to the (first FIXED-radius) circle's radius — so
@@ -170,6 +173,7 @@ export function symbolsConsumedBy(cmd: AnyCommand): string[] {
     case 'measure-length':
     case 'measure-angle':
     case 'measure-area':
+    case 'measure-perimeter':
       return 'var' in cmd.expr ? [cmd.expr.var] : [];
     case 'measure-order':
       return [cmd.left, cmd.right];
@@ -231,21 +235,29 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
         },
       ];
     }
-    case 'measure-area': {
-      // Mirrors `measure-length` but for a polygon's area (ADR-118): a value → `set-area`; a SHARED variable
-      // → `set-area-ratio` against the representative area binding; the representative / a lone label stays free.
+    case 'measure-area':
+    case 'measure-perimeter': {
+      // Mirrors `measure-length` but for an area (ADR-118) — or a round operand's boundary length (ADR-632): a value
+      // → `set-area`/`set-perimeter`; a SHARED variable → the ratio against the representative binding of the SAME
+      // kind; the representative / a lone label stays free. A round operand (a sector, an arc) travels with its side.
+      const perim = cmd.type === 'measure-perimeter';
+      const own = cmd.round ? { round: cmd.round } : {};
+      const absolute = (value: number): Command[] =>
+        perim ? [{ type: 'set-perimeter', ids: cmd.ids, value, ...own }] : [{ type: 'set-area', ids: cmd.ids, value, ...own }];
       const e = cmd.expr;
-      if ('value' in e) return [{ type: 'set-area', ids: cmd.ids, value: e.value }];
+      if ('value' in e) return absolute(e.value);
       const konst = e.const ?? 0;
       const info = tab.vars.get(e.var);
-      if (info?.value !== undefined) {
-        return [{ type: 'set-area', ids: cmd.ids, value: e.coef * Math.pow(info.value, e.pow ?? 1) + konst }];
-      }
-      const reps = info?.bindings.filter((b) => b.kind === 'area' && !b.affine) ?? [];
+      if (info?.value !== undefined) return absolute(e.coef * Math.pow(info.value, e.pow ?? 1) + konst);
+      const reps = info?.bindings.filter((b) => b.kind === (perim ? 'perim' : 'area') && !b.affine) ?? [];
       const rep = reps[0];
-      if (!rep || sameRefs(rep.refs, cmd.ids)) return []; // the representative (or a lone "SABC = S" label) stays free
+      // the representative (or a lone "SABC = S" label) stays free. The SAME operand is the same letters AND the same
+      // kind of operand: sector OAB and triangle OAB share letters and are two areas (ADR-632) — reading them as one
+      // would drop the relation «S = area(OAB)» without a trace
+      if (!rep || (sameRefs(rep.refs, cmd.ids) && JSON.stringify(rep.round ?? null) === JSON.stringify(cmd.round ?? null))) return [];
       if ((rep.pow ?? 1) !== (e.pow ?? 1) || konst !== 0) return []; // mixed exponent / affine → not a clean ratio
-      return [{ type: 'set-area-ratio', ids1: cmd.ids, ids2: rep.refs, k: e.coef / rep.coef }];
+      const sides = { ids1: cmd.ids, ids2: rep.refs, k: e.coef / rep.coef, ...(cmd.round ? { round1: cmd.round } : {}), ...(rep.round ? { round2: rep.round } : {}) };
+      return [perim ? { type: 'set-perimeter-ratio', ...sides } : { type: 'set-area-ratio', ...sides }];
     }
     case 'measure-angle': {
       const e = cmd.expr;
@@ -329,8 +341,8 @@ const powVar = (v: string, pow?: number): string => {
 };
 
 /** Is this a symbolic measure fact (carries a display label)? */
-export function isMeasure(cmd: AnyCommand): cmd is Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' | 'measure-area' }> {
-  return cmd.type === 'measure-length' || cmd.type === 'measure-angle' || cmd.type === 'measure-area';
+export function isMeasure(cmd: AnyCommand): cmd is Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' | 'measure-area' | 'measure-perimeter' }> {
+  return cmd.type === 'measure-length' || cmd.type === 'measure-angle' || cmd.type === 'measure-area' || cmd.type === 'measure-perimeter';
 }
 
 /**
@@ -358,7 +370,7 @@ export interface MeasureLabelForms {
  * stays the one authority for it, so the printed string cannot drift from the switchable one.
  */
 export function measureLabelForms(
-  cmd: Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' | 'measure-area' }>,
+  cmd: Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' | 'measure-area' | 'measure-perimeter' }>,
   tab: SymTab,
 ): MeasureLabelForms {
   const e: MeasureExpr = cmd.expr;
@@ -389,6 +401,6 @@ export function measureLabelForms(
  * its variable has a value (the user's choice — "3x" → "12"), else the expression
  * ("3x", "2α"). Angles get a trailing degree sign only when numeric/resolved.
  */
-export function measureLabelText(cmd: Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' | 'measure-area' }>, tab: SymTab): string {
+export function measureLabelText(cmd: Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' | 'measure-area' | 'measure-perimeter' }>, tab: SymTab): string {
   return measureLabelForms(cmd, tab).text;
 }

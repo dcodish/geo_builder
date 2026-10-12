@@ -552,8 +552,9 @@ function lengthRows(constraints: readonly Constraint[]): { coefs: Map<string, nu
       case 'distance': row([[c.a, c.b, 1]], c.value); break;
       case 'equal': row([[c.a, c.b, 1], [c.c, c.d, -1]], 0); break;
       case 'ratio': row([[c.a, c.b, 1], [c.c, c.d, -c.k]], c.add ?? 0); break;
-      case 'perimeter': if (c.ids.length >= 3) row(ring(c.ids, 1), c.value); break;
-      case 'perimeter-ratio': if (c.ids1.length >= 3 && c.ids2.length >= 3) row([...ring(c.ids1, 1), ...ring(c.ids2, -c.k)], 0); break;
+      // a ROUND operand (an arc, a circumference — ADR-632) is no sum of segment lengths: it has no row here
+      case 'perimeter': if (c.ids.length >= 3 && !c.round) row(ring(c.ids, 1), c.value); break;
+      case 'perimeter-ratio': if (c.ids1.length >= 3 && c.ids2.length >= 3 && !c.round1 && !c.round2) row([...ring(c.ids1, 1), ...ring(c.ids2, -c.k)], 0); break;
       case 'measure-sum':
         if (c.unit === 'length' && c.points.length === 2 * c.coefs.length) row(c.coefs.map((k, i) => [c.points[2 * i]!, c.points[2 * i + 1]!, k]), c.target);
         break;

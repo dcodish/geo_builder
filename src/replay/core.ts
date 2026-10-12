@@ -13,7 +13,7 @@
  * The store re-exports this module's surface, so existing consumers are untouched.
  */
 
-import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
+import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
 import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { NOT_CYCLIC_VS, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
@@ -67,7 +67,9 @@ export interface MeasureLabelForm {
 export interface MeasureLabels {
   lengths: ({ a: Id; b: Id } & MeasureLabelForm)[];
   angles: ({ vertex: Id; ray1: Id; ray2: Id } & MeasureLabelForm)[];
-  areas: ({ ids: Id[] } & MeasureLabelForm)[]; // a polygon's area label, printed at its centroid (ADR-118)
+  /** a polygon's area label, printed at its centroid (ADR-118). ADR-632: with `round` it annotates a SECTOR (printed
+   *  inside the drawn wedge) or, with `of: 'length'`, that sector's ARC length (printed on the drawn arc). */
+  areas: ({ ids: Id[]; round?: RoundOperand; of?: 'length' } & MeasureLabelForm)[];
   arcs: ({ circle: Id; a: Id; b: Id } & MeasureLabelForm)[]; // an ARC measure's value, printed ON the arc (ADR-335)
 }
 
@@ -1985,7 +1987,9 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
       if (con.arcOf) arcByKey.set(`${con.arcOf}:${[con.ray1, con.ray2].sort().join('')}`, { circle: con.arcOf, a: con.ray1, b: con.ray2, text: `${fmtMeasure(con.value)}°` });
       else addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: con.vertex, ray1: con.ray1, ray2: con.ray2 }, `${fmtMeasure(con.value)}°`, true);
     }
-    else if (con.type === 'area') addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-area', ids: con.ids }, fmtMeasure(con.value), true);
+    else if (con.type === 'area') addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-area', ids: con.ids, ...(con.round ? { round: con.round } : {}) }, fmtMeasure(con.value), true);
+    // an ARC's stated length (ADR-632) — a polygon perimeter still prints no label (ADR-228's recorded scope)
+    else if (con.type === 'perimeter' && con.round) addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-perimeter', ids: con.ids, round: con.round }, fmtMeasure(con.value), true);
   }
   const labels: MeasureLabels = { lengths: [...lenByKey.values()], angles: [...angByKey.values()], areas: [...areaByKey.values()], arcs: [...arcByKey.values()] };
   // Angle marks the student ASSERTED (only from facts that applied, and whose points all exist) —
@@ -3682,17 +3686,21 @@ function addMeasureLabel(
   m:
     | { type: 'measure-length'; a: Id; b: Id }
     | { type: 'measure-angle'; vertex: Id; ray1: Id; ray2: Id }
-    | { type: 'measure-area'; ids: Id[] },
+    | { type: 'measure-area'; ids: Id[]; round?: RoundOperand }
+    | { type: 'measure-perimeter'; ids: Id[]; round?: RoundOperand },
   text: string,
   fillOnly = false,
   /** #948: the SWITCHABLE half — supplied only by the symbolic-measure seam, absent for a plain number. */
   alt: { letter?: string; sym?: string } = {},
 ): void {
   const { letter, sym } = alt;
-  if (m.type === 'measure-area') {
-    const key = m.ids.join(''); // the polygon, in boundary order (ABC ≠ ACB — different shape)
+  if (m.type === 'measure-area' || m.type === 'measure-perimeter') {
+    // the polygon, in boundary order (ABC ≠ ACB — different shape); a round operand keys apart from the polygon
+    // over the same letters, and an arc's length apart from its sector's area (ADR-632)
+    const of = m.type === 'measure-perimeter' ? 'length' : undefined;
+    const key = `${m.ids.join('')}${m.round ? (m.round.whole ? '◯' : '◔') : ''}${of ? '‿' : ''}`;
     if (fillOnly && areaByKey.has(key)) return;
-    areaByKey.set(key, { ids: m.ids, text, letter, sym });
+    areaByKey.set(key, { ids: m.ids, ...(m.round ? { round: m.round } : {}), ...(of ? { of } : {}), text, letter, sym });
   } else if (m.type === 'measure-angle') {
     const key = `${m.vertex}:${[m.ray1, m.ray2].sort().join('')}`;
     if (fillOnly && angByKey.has(key)) return;
@@ -4263,7 +4271,8 @@ export function computeValues(facts: Fact[], queries: QueryInput[] = []): Values
   const circles = shared.samples.map((pos) => circlesOfSample.get(pos) ?? new Map<Id, ResolvedCircle>());
   let areaLetter: string | null = null;
   for (const f of facts) {
-    if (f.enabled && f.cmd.type === 'measure-area' && 'var' in f.cmd.expr) areaLetter = f.cmd.expr.var;
+    // a POLYGON's area letter only — a sector's «S» (ADR-632) is not a unit the panel's polygon areas are counted in
+    if (f.enabled && f.cmd.type === 'measure-area' && !f.cmd.round && 'var' in f.cmd.expr) areaLetter = f.cmd.expr.var;
   }
   // #427: the student's declared length unit («AB = a») — read off the ENABLED facts, so deselecting the
   // statement that named it returns the panel to plain magnitudes.
@@ -4281,7 +4290,7 @@ export function introducedIds(cmd: AnyCommand): Id[] {
   // A symbolic measure introduces no objects; highlight the points it annotates instead.
   if (cmd.type === 'measure-length') return [cmd.a, cmd.b];
   if (cmd.type === 'measure-angle' || cmd.type === 'mark-angle') return [cmd.vertex, cmd.ray1, cmd.ray2];
-  if (cmd.type === 'measure-area') return cmd.ids; // highlight the polygon the area annotates
+  if (cmd.type === 'measure-area' || cmd.type === 'measure-perimeter') return cmd.ids; // highlight the polygon / sector the measure annotates
   if (cmd.type === 'set-var' || cmd.type === 'measure-order' || cmd.type === 'measure-bound' || cmd.type === 'name-by-use') return []; // a relation over variables — no object to highlight
   if (cmd.type === 'shape-variant') return cmd.ids; // the named shape's vertices (ADR-138)
   if (cmd.type === 'inscribe') return variantVertices(cmd); // container + inscribed vertices (ADR-262)
