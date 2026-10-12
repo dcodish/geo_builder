@@ -9,6 +9,7 @@ import { type Construction, type ParamDecl, positionalOf } from '../engine/types
 import { exprText, symbolsOf, type Expr } from '../engine/expr';
 import { curveEquationText, type DetailLabelKey, type DetailLine } from './curveText';
 import { isolateRtlName } from '../../shell/bidi';
+import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
 
 /**
  * WHICH CURVES THE DATA PANEL LISTS (#1250) — one decision, in one place, so a lock can CALL it.
@@ -234,15 +235,20 @@ export function openCurveText(c: Pick<Construction, 'objects'>, id: string): str
 
 /**
  * WHAT A VALUE ROW PRINTS (#1716, ADR-AG-226) — the one formatter for the one gate's verdict: the value; or its
- * two options, in the option set's stable ascending order and joined as the point rows join theirs («-2 או 2», #1433's «3.16 או 5.83»); or `null`, which the row words
+ * two options, in the option set's stable ascending order (#1433's «3.16 או 5.83»); or `null`, which the row words
  * as «—» (open) or «בודק…» (pending). Two options that print the same at the display precision are not two
  * answers the student can tell apart, so they print nothing rather than one "option" the gate withheld.
+ *
+ * #1867 ([ADR-AG-270](../../docs/06c-decisions-analytic.md#adr-ag-270), operator ruling W1 2026-10-08 — one spelling
+ * in every builder, through the shared `shell/valueOptions`): a pair of OPPOSITES reads «±2» (was «-2 או 2»), and a
+ * row with a «name =» shape passes its `label` so the second value repeats it, «∢BAO = 30° או ∢BAO = 150°». A row
+ * without that shape (the ask lane's «question = …», the compound slope row) passes none and reads «30° או 150°».
  */
-export function valueText(k: PanelKnown, fmt: (v: number) => string): string | null {
+export function valueText(k: PanelKnown, fmt: (v: number) => string, label?: string): string | null {
   if (k.known) return fmt(k.value);
   if (!k.options) return null;
-  const texts = [...new Set([...k.options].sort((a, b) => a - b).map(fmt))];
-  return texts.length > 1 ? texts.join(' או ') : null;
+  const o = realValueOptions(k.options, 1e-6);
+  return o ? valueOptionsText(o, fmt, { or: 'או', ...(label ? { label } : {}) }) : null;
 }
 
 /** Does the panel print at least one quantity as UNKNOWN? (the #1289 invariant's right-hand side) */

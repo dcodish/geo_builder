@@ -31,6 +31,15 @@
  *      never read as invariant: the value is withheld as «may have more than one possibility».
  *   4. **Otherwise it is not knowledge**, and the panel says so instead of printing a number.
  *
+ * #1867 ([ADR-CX-066](../../docs/06d-decisions-complex.md#adr-cx-066), operator ruling B12, 2026-10-07: *"complex
+ * should also show both values - so it should follow all of the tools"*) amends rule 2's withholding: a COMPLETE
+ * set whose values number exactly TWO is not a value the student lacks — it is the exam's «שתי אפשרויות» answer.
+ * The verdict stays `known: false` (no single value is knowledge) and carries the pair; stage 5d classifies it by
+ * the one cross-builder rule (`shell/valueOptions`, W1: «±a» when opposites, else «a או b», through
+ * {@link CX_ORDER}) and the row prints both. Three
+ * or more keep `multi-config` (#1861: *"if there are 3 and more, dont show options"*), and a FLOOR never lists
+ * (rule 3 — a census cannot prove there is no third).
+ *
  * The comparison in rule 2 is NOT the sampling-variance shape ADR-421 forbids: the configurations are
  * enumerated (branches exactly, roots by a complete polynomial census), not sampled, so one agreeing
  * configuration means there IS only one — never that only one was looked at.
@@ -58,7 +67,15 @@ export interface KnowledgeRow {
    * fraction, or an exact radical form.
    */
   readonly approx?: boolean;
+  /**
+   * #1867 (ADR-CX-066) — the quantity has exactly TWO values over a complete configuration set: `pm` says they
+   * are opposites, so `value` (the positive one) prints «±value»; otherwise `or` is the second value, listed
+   * after «או». Both absent ⇒ `value` is the one value.
+   */
+  readonly pm?: true;
+  readonly or?: { readonly value: string; readonly approx?: boolean };
 }
+
 
 import type { Why } from './why';
 import type { Cx } from '../value/value';
@@ -105,7 +122,7 @@ export function knowledgeOf(
   carriedExactly: boolean,
   c: FigureClosure,
   acrossConfigs: readonly (Cx | null)[],
-): { readonly known: true } | { readonly known: false; readonly why: Why } {
+): { readonly known: true } | { readonly known: false; readonly why: Why; readonly two?: readonly [Cx, Cx] } {
   if (carriedExactly) return { known: true };
   if (c.remainingDof > 0) return { known: false, why: { code: 'free-dof-remain' } };
   if (acrossConfigs.length === 0 || acrossConfigs.some((v) => v === null)) {
@@ -115,11 +132,25 @@ export function knowledgeOf(
   const invariant = values.every((v) => agree(v, values[0]));
   // a census that differs is proof of two possibilities; one that agrees proves nothing if it is a floor
   if (!invariant && c.completeness === 'complete') {
-    return { known: false, why: { code: 'multi-config', configs: c.configCount } };
+    // #1867: exactly two values over the complete set are listed (B12); three or more are not (#1861)
+    const distinct: Cx[] = [];
+    for (const v of values) if (!distinct.some((d) => agree(d, v))) distinct.push(v);
+    const two = distinct.length === 2 ? ([distinct[0], distinct[1]] as const) : null;
+    return { known: false, why: { code: 'multi-config', configs: c.configCount }, ...(two ? { two } : {}) };
   }
   if (c.completeness === 'floor') return { known: false, why: { code: 'maybe-multi' } };
   return { known: true };
 }
+
+/**
+ * How complex values compare for the shared two-value rule (`shell/valueOptions`'s `OptionAlgebra`, which this
+ * layer may not import — stage 5d passes it): the same at {@link AGREE}, listed by real part then imaginary part.
+ */
+export const CX_ORDER = {
+  same: agree,
+  opposite: (a: Cx, b: Cx) => agree(a, { re: -b.re, im: -b.im }),
+  compare: (a: Cx, b: Cx) => (agree({ re: a.re, im: 0 }, { re: b.re, im: 0 }) ? a.im - b.im : a.re - b.re),
+};
 
 /** A real scalar as the predicate's value type. */
 export const realValue = (x: number | null): Cx | null => (x === null ? null : { re: x, im: 0 });

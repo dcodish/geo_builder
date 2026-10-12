@@ -100,8 +100,19 @@
   "canvas |BC| = 10.00",
   "canvas ∠AOD = 90.00",
   "canvas ∠COD = 90.00",
+  "panel angle ABC = 56.31 או 90.00",
+  "panel angle BCA = 48.19 או 90.00",
+  "panel angle CAB = 33.69 או 41.81",
+  "panel area ABC = 55.90 או 75.00",
+  "panel length AB = 11.18 או 18.03",
   "panel length AC = 15.00",
-  "panel length BC = 10.00"
+  "panel length AD = 10.62 או 10.82",
+  "panel length AO = 7.92 או 9.00",
+  "panel length BC = 10.00",
+  "panel length BD = 0.56 או 7.21",
+  "panel length CO = 6.00 או 7.08",
+  "panel length DO = 6.00 או 7.08",
+  "panel perimeter ABC = 36.18 או 43.03"
  ],
  "sc:semicircle-diameter-phrasing-on-existing-side": [
   "canvas ∠ABC = 90.00",

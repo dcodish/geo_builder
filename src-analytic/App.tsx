@@ -1554,7 +1554,7 @@ export function App() {
                   // configuration, and one sample of it is not knowledge — it printed «m = -3.46» once.
                   // #1473: a value not yet read over the whole pool is «בודק…», never its domain as if open.
                   // #1716 (ADR-AG-226): one value, or two («α = 30 או 150»), through the panel's one gate.
-                  const shown = valueText(k, fmtAnalytic);
+                  const shown = valueText(k, fmtAnalytic, label);
                   const text = shown !== null
                     ? `${label} = ${shown}`
                     : !k.known && k.pending
@@ -1704,7 +1704,7 @@ export function App() {
                  */
                 rows: knows.angles.map(({ at, k }) => {
                   const name = `∢${at.a}${at.v}${at.b}`;
-                  const shown = valueText(k, angleText);
+                  const shown = valueText(k, angleText, name);
                   return <span key={name}><ValueRow text={`${name} = ${shown ?? (!k.known && k.pending ? checking : '—')}`} /></span>;
                 }),
               },
@@ -1761,7 +1761,7 @@ export function App() {
                   const [a, b] = s.ends;
                   const k = s.length;
                   return (
-                    <span key={s.id}><ValueRow text={`${a}${b} = ${valueText(k, fmt) ?? (!k.known && k.pending ? checking : '—')}`} /></span>
+                    <span key={s.id}><ValueRow text={`${a}${b} = ${valueText(k, fmt, `${a}${b}`) ?? (!k.known && k.pending ? checking : '—')}`} /></span>
                   );
                 }),
               },

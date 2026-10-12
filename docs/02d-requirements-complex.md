@@ -195,7 +195,7 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   before, «?» / «= ?» after — for every ask kind alike, and a statement in a frame is never recorded as a
   given.
   - Sources: [ADR-CX-055](06d-decisions-complex.md#adr-cx-055) Amendment 1, #1437
-- **FR-KN-1 (Must)** — **⚠ Ruled to change (2026-10-07, ADR-W-118 B12 · #1867):** a quantity with two possible values shows both, joined by «או», as in every other tool — here too for a question about a solution-set letter (FR-CN-6). The text below describes the code until that ships. **A number printed on screen is knowledge**: invariant across every valid
+- **FR-KN-1 (Must)** — **A quantity with exactly two possible values shows both**, as in every other tool — here too for a question about a solution-set letter (FR-CN-6): «Im(z1) = ±3» when they are opposites, otherwise «Re(z1) = -1 או Re(z1) = 2» (ADR-W-118 B12, W1, [ADR-CX-066](06d-decisions-complex.md#adr-cx-066), #1867). Three or more values, or a set the tool cannot prove complete, show none. **A number printed on screen is knowledge**: invariant across every valid
   configuration, with its gauge pinned. **The figure shows everything; the panel prints only what was
   asked for, and only what is known.** A value true of the current drawing but not forced by the givens
   is not printed. *(The product's statement of the suite rule [FR-DP-3](02w-requirements-workspace.md).)*

@@ -196,11 +196,14 @@ describe('#1434 arm 2 — G1: a polynomial of degree ≤ 4 in a fresh letter enu
 });
 
 describe('#1434 — a question about the SET letter is asked of every solution', () => {
-  it('z³ = 1: |z| = 1 prints (every root agrees); Re(z) says it differs between the 3 solutions', () => {
-    feed(['z^3 = 1'], ['|z|', 'Re(z)']);
+  it('z³ = 1: |z| = 1 prints (every root agrees); Im(z) says it differs between the 3 solutions; Re(z) lists its two values (#1867)', () => {
+    feed(['z^3 = 1'], ['|z|', 'Im(z)', 'Re(z)']);
     for (const s of SEEDS) {
       expect(row(s, '|z|').value).toBe('1');
-      expect(row(s, 'Re(z)').why).toEqual({ code: 'multi-solution', solutions: 3, first: 'z1' });
+      // Im takes three values (0, ±0.87) — no value is listed (#1861)
+      expect(row(s, 'Im(z)').why).toEqual({ code: 'multi-solution', solutions: 3, first: 'z1' });
+      // Re takes two (1, and −0.5 twice) — both print (#1867, 02d FR-KN-1)
+      expect(row(s, 'Re(z)')).toMatchObject({ value: '-0.5', or: { value: '1' }, why: null });
     }
   });
 

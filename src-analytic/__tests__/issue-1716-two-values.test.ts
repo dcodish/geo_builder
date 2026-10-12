@@ -5,6 +5,8 @@
  * the exam's own lines fix |slope AB| = 2 and leave its sign to the printed figure, so the slope is 2 in some
  * configurations and −2 in others, and the panel printed «—». Operator ruling, 2026-10-03: *"if there are 2
  * options, we always show up to 2 options"* — one value as today, two as «-2 או 2», more keeps «—».
+ * #1867 (ADR-AG-270, operator ruling W1 2026-10-08): a pair of opposites now reads «±2», and a «name =» row repeats
+ * its name before the second value («AB = 2 או AB = 4») — one spelling in every builder (`shell/valueOptions`).
  *
  * Every row kind is asked through the panel's own functions (`panelKnowledge`, `segmentKnowledge`, `pointText`,
  * `valueText`), so this lock CALLS the decision rather than reproducing it (ADR-W-053).
@@ -48,7 +50,7 @@ describe('#1716 — 9/4: the exam lines give «-2 או 2», the figure note give
   it('the exam as printed: slope AB lists both signs, at every seed', () => {
     for (const seed of SEEDS) {
       const d = clean(PRINTED, seed);
-      expect(valueText(seg(d, 'AB').slope, fmtAnalytic), `seed ${seed}`).toBe('-2 או 2');
+      expect(valueText(seg(d, 'AB').slope, fmtAnalytic), `seed ${seed}`).toBe('±2'); // #1867 (ADR-AG-270, W1): opposites read «±»
       // …and its angle with the x-axis lists the two angles those slopes make
       const angle = seg(d, 'AB').angle;
       expect(angle.known).toBe(false);
@@ -74,14 +76,17 @@ describe('#1716 — 9/4: the exam lines give «-2 או 2», the figure note give
 describe('#1716 — every row kind goes through the one gate', () => {
   const lines = ['O(0,0)', 'A(1,0)', 'B(k,0)', 'OB = 3', 'AB'];
 
-  it('a parameter: «k = -3 או 3»', () => {
+  it('a parameter: «k = ±3» (#1867, W1: opposites read «±»)', () => {
     const d = clean(lines);
     const k = panelKnowledge(d).params.find((p) => p.sym === 'k')!;
-    expect(valueText(k.k, fmtAnalytic)).toBe('-3 או 3');
+    expect(valueText(k.k, fmtAnalytic)).toBe('±3');
+    expect(`k = ${valueText(k.k, fmtAnalytic, 'k')}`).toBe('k = ±3');
   });
 
   it('a length: AB = «2 או 4»', () => {
     expect(valueText(seg(clean(lines), 'AB').length, fmtAnalytic)).toBe('2 או 4');
+    // #1867 (ADR-AG-270, W1): a «name =» row repeats its name before the second value
+    expect(`AB = ${valueText(seg(clean(lines), 'AB').length, fmtAnalytic, 'AB')}`).toBe('AB = 2 או AB = 4');
   });
 
   it('an equation: the line AB is one of two whole equations, never a mix of their coefficients', () => {

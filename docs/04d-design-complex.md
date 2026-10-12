@@ -64,7 +64,10 @@ never as a contradiction or a refutation.
   configuration set, not a sampling heuristic — so [`FR-KN-1`](02d-requirements-complex.md) ("a number
   printed on screen is knowledge") has an exact test behind it: `knowledgeOf` evaluates the value in
   every configuration and prints iff the set is complete and they agree
-  ([ADR-CX-049](06d-decisions-complex.md#adr-cx-049)).
+  ([ADR-CX-049](06d-decisions-complex.md#adr-cx-049)). Over a complete set whose values number exactly TWO the
+  verdict carries the pair (`two`, classified by `shell/valueOptions`); each stage-5d row prints it as
+  `KnowledgeRow.pm` («±3») or `KnowledgeRow.or` («-1 או Re(z1) = 2»), an argument pair as two directions, and the
+  ask lane reads `knowledgeAnswerText` ([ADR-CX-066](06d-decisions-complex.md#adr-cx-066), #1867).
 - **The configuration set** is tier 1's kept branches × each branch's numeric solutions
   ([ADR-CX-049](06d-decisions-complex.md#adr-cx-049)). `foldConstraints` solves every kept branch
   (`systemFor`); stage 3b's census (`solve/census.ts`) reports each system's distinct solutions and
@@ -220,11 +223,11 @@ never as a contradiction or a refutation.
   holds is a numeric definition, which stage 3a **places** rather than searches (a name a closed number
   defines is not a free coordinate). A stated member claims its root by set membership. An indexed
   letter never enumerates (no z₁₁). Anything else keeps the ordinary equation, and ADR-CX-049's census.
-- **A question about a set's letter is asked of every member** ([ADR-CX-050](06d-decisions-complex.md#adr-cx-050)). **⚠ Ruled to change (2026-10-07, ADR-W-118 B12 · #1867):** up to two differing values are shown, joined by «או», as in every builder. The text below describes the code until that ships.
+- **A question about a set's letter is asked of every member** ([ADR-CX-050](06d-decisions-complex.md#adr-cx-050)).
   `lowerLines` publishes each enumerated set (`FoldInput.solutionSets`, letter → members), and stage 5d
   substitutes each member into the asked expression and hands every value, in every configuration, to
-  the one predicate `knowledgeOf`. Values that differ inside one drawing are the set's own spread and
-  read `multi-solution`, naming the first member.
+  the one predicate `knowledgeOf`. Exactly two values print both (ADR-CX-066); more that differ inside one
+  drawing are the set's own spread and read `multi-solution`, naming the first member.
 - **A line is read as a QUESTION by ONE reader** ([ADR-CX-055](06d-decisions-complex.md#adr-cx-055) A1).
   `parseAsk` in `app/deriveLines.ts` is called by `readAsk`, the lane lowering and the panel row model;
   it removes the question frame (`questionBody`, `parser/normalize.ts`) once, before any ask rule runs,

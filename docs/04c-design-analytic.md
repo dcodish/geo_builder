@@ -897,7 +897,9 @@ the smallest span, so one flung free point cannot widen it.
 ### One value gate; up to two values ([ADR-AG-226](06c-decisions-analytic.md#adr-ag-226), #1716)
 
 `knownValues(c, read, size, { fillPool? })` answers known, pending, `options` (at most `MAX_LISTED_VALUES = 2`) or
-open; `valueText` (`app/panelRows.ts`) prints a value or two joined by «או».
+open; `valueText` (`app/panelRows.ts`) prints a value or two through `shell/valueOptions` — «±2» for opposites,
+else ascending, the row's name repeated before the second value when the caller passes it («AB = 2 או AB = 4»;
+[ADR-AG-270](06c-decisions-analytic.md#adr-ag-270), #1867).
 
 *Identifiers:* `Knowledge` · `knownCurveOptions` · `panelKnowledge` · `segmentKnowledge` · `fillPool: true`
 

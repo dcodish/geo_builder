@@ -535,11 +535,12 @@ branch coverage never rides seed offsets (`chooseParam` picks `pool[seed % n]`),
 `every` sample, never `[0]/[1]/[2]`. `paramIsKnowledge` answers only for m's own value. `openCrossings3`
 asks per crossing at `Resolved3.seed`, with `openParamProbes3` for an unpinned m.
 
-**Two configurations print as two rows ([ADR-3D-289](06b-decisions-3d.md#adr-3d-289), #1506).**
+**Two configurations print as one «או» row ([ADR-3D-289](06b-decisions-3d.md#adr-3d-289), #1506; [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867).**
 `twoConfigurations3` (`dataView.ts`) asks whether a not-fully-determined point has EXACTLY two members
 (`sameConfig`) — the same two at every sample, the drawn one among them, judged beside #827's
-`pivot.pointRoots` check. If so `points` carries `S₁(…)` / `S₂(…)`, each printed whole by `coordStr`,
-instead of `S(?, 7/2, ?)`; `pointCoords` keeps the partial form; anything else returns `null`.
+`pivot.pointRoots` check. If so `points` carries one row `S(…) או (…)`, each configuration printed whole by
+`coordStr`, instead of `S(?, 7/2, ?)`, and `pointOptions[id]` carries the same text for the ask lane's point
+answer; `pointCoords` keeps the partial form; anything else returns `null`.
 
 ## The submit decision and refusals
 
@@ -707,9 +708,9 @@ composer sits in the engine (`render → engine`); a row's arrow comes from `lex
 asserts the section count and `dir: 'app'` on each (never a section-level `dir: 'ltr'`, #559). Every
 measurement field of `DataPanel` keeps only what agrees across the samples.
 
-**A parameter's roots: one join, two surfaces (#1591, [ADR-3D-303](06b-decisions-3d.md#adr-3d-303)).**
-`formatBranches` returns the ascending per-root strings (`['±√2']` for a symmetric pair) and
-`branchAnswer(sym, branches)` joins them with `, ${sym} = `. The panel's `params` row prints
+**A parameter's roots: one join, two surfaces (#1591, [ADR-3D-303](06b-decisions-3d.md#adr-3d-303); [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867).**
+`branchAnswer(sym, branches)` classifies the roots through `shell/valueOptions`: «±√2» for a symmetric pair,
+«-2 או m = 4» for any other pair, `null` for none or three and more (the open «m = ?» row). The panel's `params` row prints
 `${sym} = ${answer}` and App3's ask row `${question} = ${answer}`, both through `branchAnswer` (#480, #1746).
 
 ### The input preview composes, and who may import whom (#1195, [ADR-3D-255](06b-decisions-3d.md#adr-3d-255))

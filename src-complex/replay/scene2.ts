@@ -16,6 +16,8 @@ import { FORMULA_TABLE } from '../formulas/table';
 import type { Prop, Translate, Why } from '../model/why';
 import { prettyName } from '../model/naming';
 import type { Derived2 } from './derive2';
+import type { KnowledgeRow } from '../model/knowledge';
+import { valueOptionsText, type ValueOptions } from '../../shell/valueOptions';
 
 /**
  * THE WHY TRANSLATOR (#716) — the one place an engine-published reason code becomes words.
@@ -184,3 +186,22 @@ export const v2Claims = (d: Derived2, t: Translate): string[] =>
     const mark = verdict.status === 'holds' ? '✓' : verdict.status === 'refuted' ? '✗' : '?';
     return `${mark} ${claim.src} — ${whyText(verdict.why, t)}`;
   });
+
+/**
+ * The answer a row prints after «label =», under the W1 spelling: «3», «±3», «±(2+3i)», «1 או Re(w) = 2».
+ * `or` is the joiner in the UI's language; the App and the locks read this one function.
+ */
+export function knowledgeAnswerText(row: KnowledgeRow, or: string): string | null {
+  if (row.value === null) return null;
+  type Spelled = { readonly value: string; readonly approx?: boolean };
+  const first: Spelled = { value: row.value, ...(row.approx ? { approx: true } : {}) };
+  const o: ValueOptions<Spelled> = row.pm ? { kind: 'opposites', value: first } : row.or ? { kind: 'two', values: [first, row.or] } : { kind: 'one', value: first };
+  return valueOptionsText(o, (v) => v.value, {
+    or,
+    label: row.label,
+    // a compound value under ± is one operand: «±(2+3i)»; «±3», «±3i», «±√2» need no brackets
+    pmOperand: (t) => (/^-?[^+-]+$/.test(t) ? t : `(${t})`),
+    // the ≈ honesty floor (#1436) holds for the second value too
+    rel: (v) => (v.approx ? '≈' : '='),
+  }) ?? row.value;
+}

@@ -351,11 +351,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   screen. Only two (operator: *"many exams ask questions that have 2 options. but not more than 2"*).
   - Sources: ADR-3D-289, #1506.
 - **FR-EQ-4b (Should)** — **A parameter's roots are written as the student writes the answer.** When the
-  givens leave a figure parameter more than one value, the data panel and the ask lane both list every
-  root: a pair that are negatives of each other reads **«m = ±√2»**; every other set repeats the symbol
-  before each root, ascending — **«m = -2, m = 4»**, **«m = -2, m = 0, m = 4»** — never a set
-  «{-2, 4}».
-  - Sources: ADR-3D-303, #1591.
+  givens leave a figure parameter two values, the data panel and the ask lane both list them: a pair that
+  are negatives of each other reads **«m = ±√2»**; any other pair repeats the symbol after «או», ascending —
+  **«m = -2 או m = 4»** — never a set «{-2, 4}». Three or more roots list nothing: the panel reads the open
+  **«m = ?»** and the ask lane says the value is not determined (#1861). A point with exactly two
+  configurations reads one row, **«S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»**, and asking for it answers the same.
+  - Sources: ADR-3D-303, #1591, [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867.
 
 ## Claims — the student's answer, never a driver
 

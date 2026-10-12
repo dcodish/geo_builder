@@ -54,6 +54,7 @@ import { complexBidi } from './i18n';
 import registry from '../products.json';
 import { EXAMPLE_LINES } from './app/example';
 import { errorText } from './app/errorText';
+import { knowledgeAnswerText } from './replay/scene2';
 
 export function App() {
   const { t, i18n } = useTranslation();
@@ -984,7 +985,7 @@ export function App() {
                           <span style={{ color: '#94a3b8' }}> — {t(r.note === 'statement' ? 'askIsStatement' : 'askUnreadable')}</span>
                         ) : r.row!.value !== null ? (
                           /* #1436 — a rounded decimal answers with ≈; = is reserved for the exact value */
-                          <span style={{ fontWeight: 600 }}> {r.row!.approx ? '≈' : '='} {r.row!.value}</span>
+                          <span style={{ fontWeight: 600 }}> {r.row!.approx ? '≈' : '='} {/* #1867 (ADR-CX-066): two values read «a או label = b» as ONE left-to-right run, the Hebrew joiner inside it */}{r.row!.or ? <bdi dir="ltr">{knowledgeAnswerText(r.row!, t('askOr'))}</bdi> : knowledgeAnswerText(r.row!, t('askOr'))}</span>
                         ) : (
                           <span style={{ color: '#94a3b8' }}> — {r.row!.why ? whyText(r.row!.why, t) : ''}</span>
                         )}

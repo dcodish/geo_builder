@@ -3080,7 +3080,7 @@ both orders with the exact Hebrew sentence, `z^2=4 · z^2=-4`, `w^2=4 · w^2=9`,
 
 ## ADR-CX-049 — Knowledge compares values across a COMPLETE configuration set; numeric roots are configurations (#1427)
 
-**Status:** accepted, 2026-09-27 (operator-approved plan, `auto-ok` 2026-09-27, with the wording ruling in
+**Status:** accepted, 2026-09-27 (operator-approved plan, `auto-ok` 2026-09-27, with the wording ruling in · **⚠ Partly superseded by [ADR-CX-066](#adr-cx-066) (2026-10-12):** a value that takes exactly TWO values over a complete set prints both («Im(z1) = ±3», operator ruling B12) instead of «differs between N configurations»; three or more, and a floor, still withhold
 the issue comment) · **Issue:** [#1427](https://github.com/dcodish/geo_builder/issues/1427) (bug, `P1`,
 `complex`) · round [#1469](https://github.com/dcodish/geo_builder/issues/1469) · **amends**
 [ADR-CX-014](#adr-cx-014) (the knowledge predicate) and [ADR-CX-006](#adr-cx-006)'s "branches are what
@@ -3206,7 +3206,7 @@ API; the driving-measure lock moved to the ruled doctrine). There are four fixtu
 
 ## ADR-CX-050 — An equation about one letter reads as a solution set in every spelling, and a polynomial names all its roots (#1434)
 
-**Status:** accepted, 2026-09-27 (operator-approved plan, `auto-ok` 2026-09-27 for arm 1; arm 2 approved by the
+**Status:** accepted, 2026-09-27 (operator-approved plan, `auto-ok` 2026-09-27 for arm 1; arm 2 approved by the · *amended by [ADR-CX-066](#adr-cx-066) (2026-10-12): a set letter whose members give exactly two values prints both («Im(z) = ±3»)*
 operator during the round #1469 play session, «i approve part2») · **Issue:**
 [#1434](https://github.com/dcodish/geo_builder/issues/1434) (feature, `P2`, `complex`) · round
 [#1478](https://github.com/dcodish/geo_builder/issues/1478) · **amends** [ADR-CX-005](#adr-cx-005) (mode 1 in
@@ -3957,3 +3957,17 @@ languages' sentences; the mixed sentence «arg i - arg o = 90»; the floor's thr
 unchanged yes/no for every name; `i2`/`o3` staying in the #1948 class; the #1948 class and the
 false-refusal net unchanged; and `i` as the imaginary unit and `o` as the origin still reading.
 `phantom-word-1948.test.ts` carries the corrected record for the four constant lines it already held.
+
+## ADR-CX-066 — Two possible values print both: «Im(z1) = ±3», «Re(z1) = -1 או Re(z1) = 2» (#1867)
+
+**Status:** accepted · 2026-10-12 · feature (P2) · fix-round #1998, stream K · branch `feat/1867-two-values-or` · operator rulings B12 (2026-10-07, *"complex should also show both values - so it should follow all of the tools"*), #1861 (the cap of two) and W1 (2026-10-08, «±» when opposite, else «או») · **Partly supersedes** [ADR-CX-049](#adr-cx-049) (its withholding of a value that differs over a complete set, for exactly two values) and amends [ADR-CX-050](#adr-cx-050) (a solution-set letter whose members give two values) · LADDER stage **5d** ([LADDER-CX](LADDER-CX.md)) · the cross-builder record is [ADR-634](06-decisions.md#adr-634)
+
+**Requirements:** [02d](02d-requirements-complex.md) FR-KN-1 (the ⚠ Ruled-to-change stamp is discharged) · **Design:** [04d](04d-design-complex.md) the knowledge predicate · [04w](04w-design-shell.md) *Two possible values*
+
+**Measured before** (`main` @ 403efe66, the real submit path at 24 seeds). «z1^2-4z1+13=0 · z2 = 2z1»: Im(z1) read «הערך משתנה בין 2 התצורות — הוסיפו נתון שיבחר אחת מהן», Re(z1) = 2. «z1 = 2 · |z2| = 1 · z2^2 = -1»: Im(z2) withheld as «differs». «z^2-4z+13=0»: Im(z) withheld as «differs between the 2 solutions».
+
+**Decision.** `knowledgeOf` (rule 2) keeps its verdict — a value that differs over a COMPLETE set is not ONE value — and now carries the pair when the distinct values number exactly two, classified by the shared rule (`shell/valueOptions`, complex values compared at `AGREE`, listed by real part then imaginary part, a ± pair keeping the member with the positive real part). Each stage-5d row that judges through the predicate — an expression ask, a parameter-only expression, a measure, a ratio, a solution-set letter (02d FR-KN-1: *"here too for a question about a solution-set letter"*) and an argument — prints the pair through its own spelling (`numAnswer`, `cxAnswer`) as `KnowledgeRow.pm` (opposites, «±3», a compound value «±(2+3i)») or `KnowledgeRow.or` (the larger value, «-1 או Re(z1) = 2», its own ≈). An argument pair lists its two DIRECTIONS in degrees, ascending, never «±» (45° and 225° are opposite vectors, not opposite angles). The ask lane prints `knowledgeAnswerText(row, t('askOr'))`. Three or more values keep `multi-config` / `multi-solution`; a `floor` census never lists (rule 3 — nothing proves there is no third). Two values that print alike keep the withholding.
+
+**Locks.** `src-complex/__tests__/issue-1867-two-values.test.ts` (opposites, a non-opposite pair over three configurations, English «or», three values withheld, a floor withheld, one value unchanged, the ± bracket and ≈ spelling). Amended: `knowledge-invariance-1427` locks 1–3 and the conj case (now «±3», «±1», «±1.41»), `all-roots-1434` (Re(z) of z³ = 1 lists «-0.5 או 1»; Im(z) keeps «differs between the 3 solutions»), `solve/__tests__/knowledge.test.ts` (the predicate carries the pair; a three-valued distance is withheld, a two-valued one lists).
+
+**Behaviour change for a student:** «z1^2-4z1+13=0 · z2 = 2z1 · Im(z1)» answers «= ±3» (was: «הערך משתנה בין 2 התצורות…»); «z^3 = 8» as a number z1 answers «Re(z1) = -1 או Re(z1) = 2»; «z^2-4z+13=0 · Im(z)» answers «±3» (was: differs between the 2 solutions). A value with three or more possibilities, or one a census cannot prove complete, is withheld as before.

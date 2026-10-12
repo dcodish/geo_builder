@@ -16,6 +16,7 @@
  */
 
 import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
+import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
 import { knowledgeSamples3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { angleMarkText, figureSymbolsOf, symbolOwnersOf } from './types';
@@ -85,6 +86,9 @@ export interface DataPanel {
    *  `+?`/`−?` — so the ask lane answers ONE coordinate from the panel's own judgement (the #481 rule:
    *  one decision, two surfaces) instead of re-deciding it. Present exactly when `pointCoords` is. */
   pointComps: Record<string, readonly [string, string, string]>;
+  /** #1867 (ADR-3D-336): a point with EXACTLY TWO admissible configurations — its two coordinate triples joined by
+   *  «או», the text its panel row and its ask row both print after the point's name. */
+  pointOptions: Record<string, string>;
   /** #325 (ADR-3D-079 Am. 2): the pins' OPEN symbols (`B(2t,t,k)` → t, k) — a determined
    *  symbol (identical across every sampled configuration) prints its value (`k = -3`); a
    *  still-free one prints open (`t = ?`), so the stated given visibly took effect. */
@@ -168,40 +172,22 @@ const cleanCoef = (x: number): string => cleanNum(x, 2e-3);
  * The presentation is the SOLUTION SET, not the branch this drawing happens to show ([ADR-052](docs/06-decisions.md#adr-052),
  * and [ADR-3D-118](docs/06b-decisions-3d.md) for the canvas edition of the same rule): with two roots the
  * honest answer to «what is m?» is `±√2` — the student's own answer to that exam question — and printing
- * `-1.41` instead would state one of them as if the givens had forced it. Language-neutral by
- * construction (`±`, `,`), because it renders inside both locales.
+ * `-1.41` instead would state one of them as if the givens had forced it.
  *
- * #1591 ([ADR-3D-303](docs/06b-decisions-3d.md#adr-3d-303), operator ruling 2026-09-30): the roots are
- * written the way the student writes the answer — a symmetric pair keeps `±√2`; every other set repeats
- * the symbol before each root, `m = -2, m = 4` (`m = -2, m = 0, m = 4`), never the set `{-2, 4}`.
- * This returns the per-root VALUE strings, ascending (`['±√2']` for a symmetric pair); {@link branchAnswer}
- * joins them, and is what both callers print.
+ * #1867 ([ADR-3D-336](docs/06b-decisions-3d.md#adr-3d-336), operator ruling W1 2026-10-08, superseding ADR-3D-303's
+ * comma): the ANSWER half of «sym = …», through the one cross-builder rule (`shell/valueOptions`) — a symmetric
+ * pair keeps «±√2»; any other pair repeats the symbol after «או», «m = -2 או m = 4»; THREE or more roots answer
+ * `null` (#1861: *"if there are 3 and more, dont show options"*), so the panel reads the open «m = ?» and the ask
+ * lane «undetermined». The panel prints `${sym} = ${branchAnswer}` and the ask lane's row prints
+ * `${question} = ${answer}` (App3), so the symbol is never printed twice (#1746's class). `null` also when there
+ * is no root at all — the caller decides whether that reads as an open `?` row or an «undetermined» note.
  *
- * `null` means the figure does not determine the symbol at all — the caller decides whether that reads
- * as an open `?` row or an «undetermined» note.
- */
-export function formatBranches(branches: number[]): string[] | null {
-  if (branches.length === 0) return null;
-  if (branches.length === 1) return [cleanMag(branches[0])];
-  const sorted = [...branches].sort((a, b) => a - b);
-  // a symmetric pair is the common bagrut shape (±√2, ±2√15) and reads best in ± form
-  if (sorted.length === 2 && Math.abs(sorted[0] + sorted[1]) <= 1e-6 * Math.max(1, Math.abs(sorted[1]))) {
-    return [`±${cleanMag(Math.abs(sorted[1]))}`];
-  }
-  // #1440 (ADR-3D-262): never point-free — `Array.map` passes the INDEX as `cleanMag`'s optional
-  // `decimals`, which rounded root 0 to 0 dp and root 1 to 1 dp («t = {0, 2.6}» for −0.23 and 2.63).
-  return sorted.map((x) => cleanMag(x));
-}
-
-/**
- * #1591 (ADR-3D-303) — the ANSWER half of «sym = …» for a parameter's root set: everything after the
- * first `sym = `. The panel prints `${sym} = ${branchAnswer}` and the ask lane's row prints
- * `${question} = ${answer}` (App3), so both read `m = -2, m = 4` from this one join and the symbol is
- * never printed twice (#1746's class). `null` exactly when {@link formatBranches} is.
+ * #1440 (ADR-3D-262): every root is spelled by the same `cleanMag` call, never point-free (`Array.map` would pass
+ * the INDEX as its optional `decimals`).
  */
 export function branchAnswer(sym: string, branches: number[]): string | null {
-  const parts = formatBranches(branches);
-  return parts ? parts.join(`, ${sym} = `) : null;
+  const o = realValueOptions(branches, 1e-6);
+  return o ? valueOptionsText(o, (x) => cleanMag(x), { or: 'או', label: sym }) : null;
 }
 
 export const coordStr = (v: Vec3): string => `(${cleanMag(v.x)}, ${cleanMag(v.y)}, ${cleanMag(v.z)})`;
@@ -624,8 +610,6 @@ export function twoConfigurations3(samples: readonly PointConfigSample3[]): [Vec
   return [a, b]; // unreachable: two distinct configurations differ on some axis
 }
 
-/** The row label of configuration k (1-based): `S₁`, `S₂`. */
-const configLabel = (id: Id, k: number): string => `${id}${String(k).replace(/\d/g, (d) => '₀₁₂₃₄₅₆₇₈₉'[+d])}`;
 
 /**
  * Stated magnitudes: |pair| = value, from driving pins and recorded claims.
@@ -1159,6 +1143,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   const points: string[] = [];
   const pointCoords: Record<string, { text: string; kind: 'fact' | 'partial' }> = {};
   const pointComps: Record<string, readonly [string, string, string]> = {};
+  const pointOptions: Record<string, string> = {};
   {
     // #315: a point coordinate is gauge until a real point injection anchors translation.
     // #1547 (ADR-3D-299): with ONE exception — a component the student STATED on a new point («x_B = 3»,
@@ -1196,13 +1181,19 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       const stableAx = axes.map((ax) => stated(ax) && ps.every((p) => near(ps[0]![ax], p![ax])) && branchAgrees(ax));
       const nStable = stableAx.filter(Boolean).length;
       /**
-       * #1506 (ADR-3D-289) — EXACTLY TWO admissible configurations print both, one row each:
-       * «S₁(1.33, 7/2, 3.33)» / «S₂(−4.33, 7/2, −2.33)», in place of the «S(?, 7/2, ?)» row. The
+       * #1506 (ADR-3D-289) — EXACTLY TWO admissible configurations print both, in place of the «S(?, 7/2, ?)»
+       * row (one row since #1867, below — it was «S₁(…)» / «S₂(…)»). The
        * canvas label (`pointCoords`) keeps the #827 partial form: the node shows ONE configuration,
        * and a component that is a branch choice is still not knowledge about the point on screen.
        */
       const two = nStable < 3 && !statedOnly ? twoConfigurations3(resolved.map((r, k) => ({ roots: r.pivot?.pointRoots?.[id], drawn: ps[k]! }))) : null;
-      if (two) two.forEach((q, k) => points.push(`${configLabel(id, k + 1)}${coordStr(q)}`));
+      // #1867 (ADR-3D-336): ONE row, the two configurations joined by «או» — «S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»
+      // (the issue: "align both on «או»"; analytic's point rows read the same way). The ask lane answers the same text.
+      if (two) {
+        const text = `${coordStr(two[0])} או ${coordStr(two[1])}`;
+        pointOptions[id] = text;
+        points.push(`${id}${text}`);
+      }
       if (nStable === 3) {
         const cs = coordStr(ps[0]!);
         pointCoords[id] = { text: cs, kind: 'fact' };
@@ -1331,7 +1322,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
 
   // #1196: the STATED vector rows need no sampling — they are givens, not measurements — so they are
   // composed from the construction rather than from the three resolved configurations above.
-  return { stated: statedVectorRows(c), relations, mutual, vectors: entries, points, pointCoords, pointComps, planes, params };
+  return { stated: statedVectorRows(c), relations, mutual, vectors: entries, points, pointCoords, pointComps, pointOptions, planes, params };
 }
 
 /**

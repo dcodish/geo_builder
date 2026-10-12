@@ -26,7 +26,8 @@ const clean = (lines: string[], seed = 0) => {
 };
 /** The panel's angle rows, as the row prints them. */
 const angleRows = (d: ReturnType<typeof derive>) =>
-  panelKnowledge(d).angles.map(({ at, k }) => `∢${at.a}${at.v}${at.b} = ${valueText(k, angleText) ?? '—'}`);
+  // the App's row (#1867, ADR-AG-270: the name is repeated before a second value)
+  panelKnowledge(d).angles.map(({ at, k }) => `∢${at.a}${at.v}${at.b} = ${valueText(k, angleText, `∢${at.a}${at.v}${at.b}`) ?? '—'}`);
 const canvasAngles = (d: ReturnType<typeof derive>) =>
   buildScene(d.figure, d.box, 600, 400, { stated: d.stated }).stated.labels.filter((l) => l.kind === 'angle').map((l) => strip(l.text));
 const drawnDeg = (d: ReturnType<typeof derive>, v: string, a: string, b: string) => {
@@ -66,7 +67,7 @@ describe('#1719 — the trig given indicates a slope (9/4): «-2 או 2» from t
   it('the exam as printed: ∢BAO = 63.43°, slope AB lists both signs', () => {
     const d = clean(confirmTaught(q.lines.slice(0, q.printed), 0));
     expect(angleRows(d)).toEqual(['∢BAO = 63.43°']);
-    expect(slopeAB(d)).toBe('-2 או 2');
+    expect(slopeAB(d)).toBe('±2'); // #1867 (ADR-AG-270, W1): opposites read «±»
   });
 
   it('with the figure note: slope AB = 2', () => {
@@ -98,7 +99,7 @@ describe('#1719 — sin is a two-option choice, cycled by «הציגו תצור�
   });
 
   it('the panel lists both angles until a given settles it; «∢ABC > 90» leaves 150°', () => {
-    expect(angleRows(clean(['משולש ABC', 'sin∢ABC = 0.5']))).toEqual(['∢ABC = 30° או 150°']);
+    expect(angleRows(clean(['משולש ABC', 'sin∢ABC = 0.5']))).toEqual(['∢ABC = 30° או ∢ABC = 150°']);
     for (const seed of SEEDS) {
       const d = clean(['משולש ABC', 'sin∢ABC = 0.5', '∢ABC > 90'], seed);
       expect(Math.round(drawnDeg(d, 'B', 'A', 'C'))).toBe(150);
@@ -108,7 +109,7 @@ describe('#1719 — sin is a two-option choice, cycled by «הציגו תצור�
 
   it('the angle named by its vertex alone, in Hebrew: «סינוס הזווית B הוא 0.6» → 36.87° or 143.13°', () => {
     const d = clean(['משולש ABC', 'סינוס הזווית B הוא 0.6']);
-    expect(angleRows(d)).toEqual(['∢ABC = 36.87° או 143.13°']);
+    expect(angleRows(d)).toEqual(['∢ABC = 36.87° או ∢ABC = 143.13°']);
   });
 
   it('a sine of 1 has ONE angle: the right angle, a knee, no choice', () => {
