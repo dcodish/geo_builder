@@ -4168,6 +4168,27 @@ export const SCENARIOS_4: Scenario[] = [
       expect(v).toEqual(gateVerdict(prefix, 'מלבן ACBD'));
     },
   },
+  {
+    id: 'touch-list-builds-the-incircle-1660',
+    title: '#1660 (ADR-631): «הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה» after «משולש ABC» builds the incircle tangent at D, E, F (centre unnamed); «O מרכז המעגל» names it',
+    guards:
+      "The #1649 parity audit (family «touch lists») and the #1650 stream measured it: 2-D REFUSED the touch list, after «משולש ABC» and typed first. The two-sides tangency rule read only «BC ו-CA» and the multi-instruction gate refused the line, while analytic builds the incircle (ADR-AG-198 Am. 1). Ruling on #1619 (2026-10-01), ported by ADR-560: a touch sentence with no circle creates the circle, its centre unnamed. Sides that close one ring touch only its incircle, so the sentence builds the `incircle` rule's own construction with D, E, F as its feet. Asserts every step builds, D, E and F lie within their sides with OD/OE/OF ⟂ the side and equal, and O is the named centre. The submit-door locks (typed first, the English twin, the square, the pentagon refusal, the subset, two circles → ask) are in src/app/__tests__/issue-1660-touch-list-incircle.test.ts.",
+    steps: ['משולש ABC', 'הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה', 'O מרכז המעגל'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const o = at(fig, 'O');
+      const radii: number[] = [];
+      for (const [a, b, t] of [['A', 'B', 'D'], ['B', 'C', 'E'], ['C', 'A', 'F']] as const) {
+        const A = at(fig, a), B = at(fig, b), T = at(fig, t);
+        expect(dist(A, T) + dist(T, B), `${t} within ${a}${b}`).toBeCloseTo(dist(A, B), 6);
+        expect(Math.abs((T.x - o.x) * (B.x - A.x) + (T.y - o.y) * (B.y - A.y)) / (dist(o, T) * dist(A, B)), `O${t} ⟂ ${a}${b}`).toBeLessThan(1e-6);
+        radii.push(dist(o, T));
+      }
+      for (const r of radii) expect(r, 'D, E, F on one circle').toBeCloseTo(radii[0], 6);
+      expect(fig.positions.has('@ctr-O'), 'the centre is the named O, not a hidden one').toBe(false);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

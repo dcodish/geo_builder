@@ -16266,3 +16266,62 @@ Each canonical spelling — «טרפז ABCD (AB ∥ CD)», «O מרכז המעג
 - «O – מרכז המעגל» names the circle's centre O, as «O מרכז המעגל» does (was: sent to the AI fallback); the same with «-».
 - «המרובע ABCD מלבן» / «המרובע ABCD הוא מלבן» draw the rectangle; «המרובע ABCO הוא טרפז ישר זווית» the right trapezoid; "the quadrilateral ABCD is a trapezoid" the trapezoid (was: sent to the AI fallback).
 - «בסרטוט שלפניך מתואר משולש ABC» draws the triangle (was: sent to the AI fallback).
+
+## ADR-631 — a touch list over every side of a ring is that ring's incircle; any other touch list asks the shared seam (#1660)
+
+**Status:** accepted · 2026-10-12 · feature (P2, 2-D) · fix-round #1998 (operator approval 2026-10-12) · ports [ADR-AG-198 Am. 1](06c-decisions-analytic.md#adr-ag-198) · LADDER stage: parse only (no engine or solver change)
+
+**Requirements:** [FR-IN-12](02-requirements.md) extended — a touch list over three or more sides binds as the two-sides tangency does. With no circle drawn, a list that closes one ring creates that ring's inscribed circle · **Design:** [04-design.md](04-design.md) § "A touch list is one sentence: the ring's incircle, else the shared seam"
+
+**Cites** the operator ruling on #1619 (2026-10-01: a touch sentence about «המעגל» with no circle creates the circle, its centre unnamed), [ADR-560](#adr-560) (its 2-D port, and the "not built" record this closes), [ADR-AG-198 Am. 1](06c-decisions-analytic.md#adr-ag-198) (the analytic sibling: a touch list over every side of one ring is that ring's incircle), [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B1 and [ADR-W-108](06w-decisions-workspace.md#adr-w-108) (one sentence, one drawing; the parity row), [ADR-606](#adr-606) (the five-sides refusal), [ADR-297](#adr-297) (anonymous touch dots), [ADR-342](#adr-342) (the hidden centre), #203 / #226 (`tangentLine`: a side tangent to a drawn circle is the foot from the centre, lying on the circle), [ADR-228](#adr-228) Am. 5 (a given touch point: on the circle, radius ⟂ side).
+
+**Context.** Re-measured at pickup on `main` 403efe66 through `runSubmit`, with the model mocked. «הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה» was refused with the multi-instruction note, both after «משולש ABC» and typed first. So were these variants:
+- no touch points;
+- the bare «AB, BC ו-CA …»;
+- the English twin;
+- a square's four sides.
+
+The two-sides rule (`cornerTangentCircle`) matched only «BC ו-CA», and the honesty gate refused the rest. 2-D had no rule that reads a list of three or more sides. Analytic builds the incircle; the parity row `touch-list` recorded this as a 2-D known gap.
+
+**Decision.** A new rule, `touchListCircle` (`src/parser/parse.ts`), runs just before `cornerTangentCircle`. It reads the whole sentence at once: three or more sides, the tangency verb, the circle with an optional centre letter, and an optional touch list that pairs with the sides in order. It reads Hebrew and English, with or without «הצלעות».
+
+**Which circle.** The shared seam decides, as in ADR-560:
+- `existingCircleRef` binds a named, drawn circle, or the one circle in the figure;
+- an unnamed reference beside several circles declines, and `ambiguousCircleAsk` asks which one;
+- otherwise the sentence creates the circle.
+
+**Create, when the sides close one ring.** Geometry decides, as in analytic. The only circle tangent to every side of a ring at points on the sides is its incircle; an excircle touches the extensions. So the rule calls the `incircle` rule's own construction, now the shared helper `incircleConstruction`:
+- **The feet** are the named letters. With none named, they are the anonymous dots «מעגל חסום במשולש» draws.
+- **The circle** is the same one: at the same seed, the centre and radius equal those of «מעגל חסום במשולש ABC».
+- **The centre** is hidden (`autoCenter`) until named. A centre named in the sentence («למעגל O») is visible.
+- **A side not yet drawn** is created by its `segment`, as in ADR-560.
+- **A quadrilateral** flexes to admit the circle, as it does for the incircle sentence.
+
+A ring of five sides or more returns ADR-606's `incircle-not-drawn`, the same refusal «מעגל חסום במחומש» gets.
+
+**Bind, or create for a subset of the sides.** Each side is stated exactly as the single sentence «AB משיק למעגל בנקודה D» states it (`tangentLine`, #203/#226): the touch point is the foot from the centre, it lies on the circle, and it lies within the side. A touch point that is already placed is stated as the two-sides rule states it (ADR-228 Am. 5). A full ring with a placed touch point and no circle declines, so its behaviour is unchanged: pinning a placed point to the incircle's foot would need a joint solve.
+
+**Measured.** `src/app/__tests__/issue-1660-touch-list-incircle.test.ts` runs through the real `runSubmit`. It has 14 tests, and 12 of them fail on the pre-change parser. They cover:
+- the triangle after «משולש ABC» and typed first: D, E and F lie within their sides, the radii are ⟂ to the sides and equal, the centre is hidden, and the model is never called;
+- the same circle as «מעגל חסום במשולש ABC»;
+- «O מרכז המעגל» naming the centre, and «למעגל O»;
+- the bare, English and reordered spellings, and the list with no touch points (anonymous dots);
+- the square;
+- the pentagon refusal, with nothing committed;
+- three sides of a quadrilateral, which create a circle;
+- two circles, which get the which-circle question;
+- the two-sides corner, unchanged.
+
+Scenario `touch-list-builds-the-incircle-1660` is in corpus 4. The parity rows `touch-list` (2-D known gap removed) and `touch-list-first` (new) build in both 2-D and analytic.
+
+**Not built: the limit of binding to a drawn circle.** With a circle already drawn, the list gives the same verdict as typing each side's sentence. On `main`, those single sentences already fail in two cases:
+- a third side tangent to a free drawn circle: «over-constrained», after about 6.5 s;
+- a named touch point on a drawn incircle: «over-constrained», after about 1.5 s.
+
+The touch list inherits both. They are filed as #2001 (`needs-operator`). The incircle path above does not depend on them.
+
+**Consequences.** Code: `touchListCircle` and `closedRing` are new in `src/parser/parse.ts`, and `incircleConstruction` is lifted out of `incircle`; the incircle sentence's output is byte-identical. `shell/__tests__/fixtures/geo-input-parity.ts` closes the #1660 gap.
+
+**Behaviour change for a student:**
+- the touch list builds where it was refused: the incircle, or a circle tangent to the listed sides;
+- a five-sided list gets the pentagon-incircle refusal instead of the multi-instruction note.

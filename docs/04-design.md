@@ -423,6 +423,16 @@ free (a missing corner minted by its side's `segment`), else `resolveOrIntroduce
 named centre carries `autoCenter` (ADR-342's anonymiser hides it until `name-center`), and its auto letter avoids
 the sentence's labels.
 
+### A touch list is one sentence: the ring's incircle, else the shared seam ([ADR-631](06-decisions.md#adr-631))
+
+`touchListCircle` (`src/parser/parse.ts`) runs before `cornerTangentCircle`. It reads three or more sides, the tangency verb, the circle and the optional in-order touch list as ONE sentence.
+
+**No circle to bind, sides closing one ring** (`closedRing`): the rule emits the `incircle` rule's own construction (`incircleConstruction`, shared), with the named letters as the feet. A ring that `INCIRCLE_ARITIES` does not hold returns ADR-606's `incircle-not-drawn`.
+
+**Every other case** asks the ADR-560 seam: `existingCircleRef`, then `resolveOrIntroduceCircle`, or a decline to `ambiguousCircleAsk`. Each side is then stated one of two ways:
+- as `tangentLine` states a single side: the foot from the centre, on the circle, `set-line` within the side;
+- for a placed touch point, as `cornerTangentCircle` does: on the circle, radius ⟂ side.
+
 ### The hidden centre letter steps aside ([ADR-565](06-decisions.md#adr-565))
 
 An unnamed circle still carries an internal reference token (`O`, then `P`, `Q`, `K` — ADR-342): its id is

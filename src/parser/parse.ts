@@ -6709,27 +6709,40 @@ const incircle: Rule = (s, ctx) => {
   // that stops special-casing one of them would false-refuse the other.
   if (lines.has(bis0) && lines.has(bis1))
     return [...shapeCmds, { type: 'point-on-circle', id: anonId('f', `${v[0]}${v[1]}`), circle: circleId(I) }];
-  const cmds: AnyCommand[] = [
-    ...shapeCmds,
+  return [...shapeCmds, ...incircleConstruction(v, I, !namedInc, (e) => anonId('f', `${v[e]}${v[(e + 1) % n]}`))];
+};
+
+/**
+ * The INCIRCLE of the ring `v` (a triangle, or a quadrilateral the construction flexes to be tangential —
+ * Pitot), centred at `I`: the commands the `incircle` rule always emitted, lifted out (#1660,
+ * [ADR-631](../../docs/06-decisions.md#adr-631)) so the touch list «הצלעות AB, BC ו-CA משיקות למעגל …»
+ * builds the SAME circle instead of a second copy of the construction. `foot(e)` names the touch point on
+ * edge e (v[e]–v[e+1]): the incircle sentence's anonymous scaffold dot, or the touch list's named letter.
+ * `extra` rides every command (the touch list's tangency-verb encoding, #785).
+ */
+const incircleConstruction = (v: Id[], I: Id, autoCenter: boolean, foot: (e: number) => Id, extra: { consumed?: AnyCommand['consumed'] } = {}): AnyCommand[] => {
+  const n = v.length;
+  const nb = (i: number): [Id, Id] => [v[(i - 1 + n) % n], v[(i + 1) % n]];
+  const [a0p, a0q] = nb(0);
+  const [b1p, b1q] = nb(1);
+  const bis0 = `bis-${a0p}${v[0]}${a0q}`;
+  const bis1 = `bis-${b1p}${v[1]}${b1q}`;
+  const cmds = [
     { type: 'bisector', id: bis0, vertex: v[0], p: a0p, q: a0q },
     { type: 'bisector', id: bis1, vertex: v[1], p: b1p, q: b1q },
     { type: 'line-intersection', id: I, line1: bis0, line2: bis1 }, // the incentre
-  ];
-  const feet: Id[] = [];
+  ] as AnyCommand[];
   for (let e = 0; e < n; e++) {
-    // The tangency foot on edge e is SCAFFOLDING the student didn't name (#32): an anonymous promotable
-    // point (`@f-AB`), deterministic per side, so it never occupies a student letter and shows as a
-    // clickable dot instead of hijacking F/G/H. The student promotes it to a letter if the book labels it.
-    const f = anonId('f', `${v[e]}${v[(e + 1) % n]}`);
-    feet.push(f);
+    // The tangency foot on edge e — see the `incircle` rule for why it is anonymous there (#32).
+    const f = foot(e);
     cmds.push({ type: 'foot', id: f, from: I, a: v[e], b: v[(e + 1) % n] }); // touch point on edge e
     if (e === 0) {
-      cmds.push({ type: 'circle-through', id: circleId(I), center: I, through: f, ...(namedInc ? {} : { autoCenter: true }) }); // edge v0–v1 sets the inradius
+      cmds.push({ type: 'circle-through', id: circleId(I), center: I, through: f, ...(autoCenter ? { autoCenter: true } : {}) }); // edge v0–v1 sets the inradius
     } else if (e !== 1 && e !== n - 1) {
       cmds.push({ type: 'point-on-circle', id: f, circle: circleId(I) }); // a non-auto edge → force tangency (flex to tangential)
     }
   }
-  return cmds;
+  return cmds.map((c) => ({ ...c, ...extra }) as AnyCommand);
 };
 
 /**
@@ -6847,6 +6860,116 @@ const cornerTangentCircle: Rule = (s, ctx) => {
     // later «O מרכז המעגל» names it (ADR-342; the #1619 ruling: no tool-chosen letter is offered).
     { type: 'circle-through', id: circleId(center), center, through: E, ...(named ? {} : { autoCenter: true }), ...enc },
   ];
+};
+
+/**
+ * #1660 ([ADR-631](../../docs/06-decisions.md#adr-631)) — the TOUCH LIST: three or more sides tangent to one
+ * circle, each (optionally) at its own named point, in order — «הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E
+ * ו-F בהתאמה», "the sides AB, BC and CA are tangent to the circle at D, E and F respectively". The whole
+ * sentence is read at once, so a later clause is never dropped: the two-sides rule ({@link cornerTangentCircle})
+ * used to read only «BC ו-CA», and the multi-instruction gate refused the line.
+ *
+ * Which circle is the shared seam's question (ADR-560, the #1619 ruling): a named or the one drawn circle BINDS,
+ * an unnamed «המעגל» beside several circles declines to `ambiguousCircleAsk`, and with none the sentence CREATES
+ * the circle. The created circle is decided by geometry, as analytic decides it (ADR-AG-198 Am. 1): sides that
+ * close EXACTLY one ring touch only that ring's INCIRCLE (an excircle touches the extensions), so the incircle
+ * is built by the `incircle` rule's own construction ({@link incircleConstruction}) with the named letters as
+ * its feet. A ring 2-D does not inscribe (five sides or more) is refused as «מעגל חסום במחומש» is (ADR-606).
+ * Every other case — a bound circle, a subset of a ring's sides, or touch points that are already placed and so
+ * cannot be redefined as feet — states each touch on the circle as the two-sides rule does: the point on the
+ * circle, the radius ⟂ the side, the point on the side.
+ */
+const TL_PAIR = String.raw`[A-Z]\d*[A-Z]\d*`;
+const TL_LBL = String.raw`[A-Z]\d*`;
+const TL_SEP = String.raw`(?:\s*,\s*(?:and\s+|ו[-־]?\s*)?|\s+and\s+|\s+ו[-־]?\s*)`;
+const tlList = (item: string, min: number): string => String.raw`(${item}(?:${TL_SEP}${item}){${min - 1},})`;
+const TOUCH_LIST_HE = new RegExp(
+  String.raw`^\s*(?:נתון\s*:?\s*)?(?:ה?צלעות|ה?קטעים)?\s*${tlList(TL_PAIR, 3)}\s+(?:הם\s+|הן\s+)?משיק(?:ות|ים|ה)?\s+ל(?:ה)?מעגל(?:\s+(${TL_LBL}))?(?:\s+ב(?:ה)?נקודות(?:\s+ה?השקה|\s+ה?מגע)?\s+${tlList(TL_LBL, 2)}(?:\s+בהתאמה)?)?\s*\.?\s*$`,
+);
+const TOUCH_LIST_EN = new RegExp(
+  String.raw`^\s*(?:[Gg]iven\s*:?\s*)?(?:[Tt]he\s+)?(?:sides\s+|segments\s+)?${tlList(TL_PAIR, 3)}\s+(?:are\s+)?(?:all\s+)?tangent\s+to\s+(?:the\s+|a\s+)?circle(?:\s+(${TL_LBL}))?(?:\s+at\s+(?:the\s+)?(?:points\s+)?${tlList(TL_LBL, 2)}(?:,?\s+respectively)?)?\s*\.?\s*$`,
+);
+
+/** The ring a list of sides closes — every vertex on exactly two sides, one cycle — in cycle order, or null
+ *  (the analytic `touchedRing`, ADR-AG-198 Am. 1, over 2-D's labels). */
+const closedRing = (sides: Array<[Id, Id]>): Id[] | null => {
+  const ring: Id[] = [sides[0][0], sides[0][1]];
+  const used = new Set([0]);
+  while (used.size < sides.length) {
+    const last = ring[ring.length - 1];
+    const i = sides.findIndex((e, k) => !used.has(k) && (e[0] === last || e[1] === last));
+    if (i < 0) return null;
+    used.add(i);
+    ring.push(sides[i][0] === last ? sides[i][1] : sides[i][0]);
+  }
+  if (ring[ring.length - 1] !== ring[0]) return null;
+  ring.pop();
+  return new Set(ring).size === ring.length && ring.length === sides.length ? ring : null;
+};
+
+const touchListCircle: Rule = (s, ctx) => {
+  if (!/tangent|משיק/.test(s)) return null;
+  const m = s.match(TOUCH_LIST_HE) ?? s.match(TOUCH_LIST_EN);
+  if (!m) return null;
+  const sides = (m[1].match(new RegExp(TL_PAIR, 'g')) ?? []).map((p) => p.match(new RegExp(TL_LBL, 'g'))! as [Id, Id]);
+  const tips = m[3] ? (m[3].match(new RegExp(TL_LBL, 'g')) ?? []) : null;
+  // A side twice, a degenerate side, or touch points that do not pair one-to-one with the sides: not a touch list.
+  const keyOf = (a: Id, b: Id): string => [a, b].sort().join('|');
+  if (sides.some(([a, b]) => a === b) || new Set(sides.map(([a, b]) => keyOf(a, b))).size !== sides.length) return null;
+  if (tips && (tips.length !== sides.length || new Set(tips).size !== tips.length)) return null;
+  const named = m[2] ?? null;
+  const known = new Set((ctx.points ?? []).map(up));
+  const vertices = new Set(sides.flat());
+  const circles = (ctx.circles ?? []).filter((c) => !c.startsWith('~'));
+  const existing = existingCircleRef(s, ctx);
+  // An unnamed «המעגל» the figure cannot bind (several circles, no tie-break) is AMBIGUOUS — never a pick and
+  // never a fresh circle; declining hands it to `ambiguousCircleAsk`, which asks which one (ADR-443/560).
+  if (!existing && !named && circles.length > 0) return null;
+  // A named centre that is already a POINT (not a circle) cannot be re-defined as the circle's centre here.
+  if (!existing && named && known.has(named)) return null;
+  const enc = { consumed: { verbs: [VERB_TANGENT] } };
+  const tipOf = (a: Id, b: Id): Id | null => (tips ? tips[sides.findIndex(([x, y]) => keyOf(x, y) === keyOf(a, b))] : null);
+  const drawSides: AnyCommand[] = sides.map(([a, b]) => ({ type: 'segment', a, b, ...enc }));
+  const ring = closedRing(sides);
+  // A touch point is GIVEN when it is already placed or is a side's own end; a fresh letter (or none) is free.
+  const given = (T: Id | null): boolean => T !== null && (known.has(T) || vertices.has(T));
+  if (!existing && ring) {
+    // CREATE, by geometry: the sides close one ring → that ring's INCIRCLE, its feet the named letters (or the
+    // `incircle` rule's anonymous dots). A given touch point cannot be redefined as a foot, and pinning it to the
+    // incircle's foot is a joint solve 2-D does not run — the sentence declines, unchanged (ADR-631).
+    if (tips?.some(given)) return null;
+    if (!INCIRCLE_ARITIES.has(ring.length)) return { clarify: 'incircle-not-drawn', sides: ring.length };
+    const I = named ?? freeLabel([...(ctx.points ?? []), ...circles, ...vertices, ...(tips ?? [])], ['O', 'P', 'Q', 'I']);
+    const n = ring.length;
+    const foot = (e: number): Id => tipOf(ring[e], ring[(e + 1) % n]) ?? anonId('f', `${ring[e]}${ring[(e + 1) % n]}`);
+    return [...drawSides, ...incircleConstruction(ring, I, !named, foot, enc)];
+  }
+  // BIND the drawn circle, or CREATE a free one for a subset of a ring's sides (the shared seam): each side is
+  // stated tangent exactly as the single sentence «AB משיק למעגל בנקודה D» states it (`tangentLine`, #203/#226)
+  // — the touch is the FOOT from the centre and lies on the circle (dist = r), within the side. A GIVEN touch
+  // point is stated as the two-sides rule states it (ADR-228 Am. 5): on the circle, the radius ⟂ the side.
+  const intro = existing ? null : resolveOrIntroduceCircle(s, ctx);
+  if (!existing && !intro) return null;
+  const O = existing ?? intro!.center;
+  const C = centrePt(ctx, O);
+  const members = membersOfCenter(ctx, O);
+  const cmds: AnyCommand[] = [...(intro?.prepend ?? []), ...drawSides];
+  for (const [a, b] of sides) {
+    const T = tipOf(a, b);
+    if (T !== null && given(T)) {
+      if (!members.has(T)) cmds.push({ type: 'point-on-circle', id: T, circle: circleId(O), ...enc });
+      cmds.push({ type: 'set-perpendicular', a: C, b: T, c: a, d: b, implicit: true, ...enc }); // radius ⟂ side at T
+      if (T !== a && T !== b) cmds.push({ type: 'set-collinear', a: T, b: a, c: b, ...enc }); // T on the side's line
+      continue;
+    }
+    const F = T ?? anonId('tang', up(O), a, b);
+    cmds.push(
+      { type: 'foot', id: F, from: C, a, b, ...enc }, // the touch = the ⟂ foot from the centre
+      { type: 'point-on-circle', id: F, circle: circleId(O), ...enc }, // on the circle ⟺ dist(centre, side) = r
+      { type: 'set-line', points: [a, F, b], ...enc }, // within the side (a bare pair is the segment, ADR-077)
+    );
+  }
+  return cmds;
 };
 
 /** "chord AB in circle O" / "מיתר AB במעגל O" — both endpoints on the circle + the segment. */
@@ -10677,6 +10800,7 @@ export const RULES: Rule[] = [
   triangle,
   bisectorIntersection, // two bisectors meet — before the one-bisector and generic intersections
   bisectorSegmentIntersection, // one bisector ∩ a segment
+  touchListCircle, // #1660: «הצלעות AB, BC ו-CA משיקות למעגל [בנקודות D, E ו-F]» — three or more sides at once; before cornerTangentCircle (which would read two of them)
   cornerTangentCircle, // "AB and AD tangent to circle O" — a circle tangent to two sides of a corner; before the tangent/line rules (the משיק keyword makes lineLineIntersection 'stop')
   twoTangentsMeet, // TWO tangents (at two on-circle points) meeting at a point — before tangent∩segment
   tangentsAtPointsMeet, // #554: «המשיקים נחתכים בנקודה E» — the INCREMENTAL twin of the line above (the drawn tangents, unnamed)
