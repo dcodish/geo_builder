@@ -16186,3 +16186,41 @@ Two corrections to the plan's table, both already recorded on the issue and re-c
 - «מעגל O · A, B, C ו-D על המעגל · מקבילית ABCD» is a rectangle at once; «הציגו תצורה אחרת» shows only rectangles (was: a rectangle after a short search).
 - «מעוין ABCD» or «ריבוע ABCD» over four points on a circle draws a square promptly (was: a false over-constrained refusal after 8–11 s); with «AB = 3» stated, a square of side 3.
 - «… · AB = 3 · BC = 4 · מקבילית ACBD», which cannot hold, is refused at once with the message «מלבן ACBD» already gets (was: an impossible crossed figure under the amber note).
+
+## ADR-629 — Plural heights and medians paired with their sides by «בהתאמה»: the plural rule distributes the side list too (#1685)
+
+**Status:** accepted · 2026-10-12 · feature (P2, 2-D) · branch `feat/1685-respectively-cevians` off `main` @ 403efe66 · fix round #1998 · extends the #71 plural special-line rule (`pluralSpecialLines`, the ADR-076 list convention) · LADDER: parser only, no solver stage changes
+
+**Requirements:** [02](02-requirements.md) FR-EN-5 — heights and medians stated together, with one side per segment under «בהתאמה», are each drawn as their own sentence would draw them · **Design:** none (internal) — the existing distribute-and-reparse step of `pluralSpecialLines` gains the side operand; no new mechanism.
+
+**The report.** Found while building #1620 stream S4 (analytic cevians, ADR-AG-209) and filed as the 2-D half of two parity rows (`cevian-plural-respectively`, `bisector-copula`, ADR-W-108). Armed 2026-10-05 in the decisions pass and approved for round #1998 on 2026-10-12 (*"approved"*). Standing ruling: for plane geometry 2-D and analytic give the same experience (ADR-W-108, ADR-W-118 B1).
+
+**Measured before** (re-measured at pickup, `main` @ 403efe66, `decideDeterministic2D` with `llmParse` mocked):
+
+| prefix · line | verdict |
+| --- | --- |
+| «משולש OBC» · «OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה» (471 corpus 7/4) | `escalate`, `not-handled` (to the paid model) |
+| «משולש ABC» · «AD ו-BE הם תיכונים לצלעות BC ו-AC בהתאמה» | `escalate`, `not-handled` |
+| «משולש ABC» · «BE ו-CF הם גבהים במשולש ABC» | commits the two altitudes |
+| «משולש ABC» · «AD הוא גובה לצלע BC» / «AD תיכון לצלע BC» | commit (the singulars) |
+| «משולש CMD» · «AM הוא חוצה זווית CMD» (471 corpus 22/5) | `escalate`, `weak:dropped` |
+| «משולש CMD» · «AM חוצה זווית CMD» | `refuse` `conflict` — «∠CMA = 1·∠AMD references an unknown point» |
+
+**Class (docs/17 §1).** *A plural cevian sentence whose targets are paired with its segments by «בהתאמה» is not distributed*: `pluralSpecialLines` (#71) read the segment list and an optional «במשולש ABC», and nothing after the role noun otherwise, so the side list made the whole line unmatched, for either role and either language. The singular sentences it distributes into already read a stated side — through `statedSide`, with every gate a side carries (`cevianFault`'s apex-on-side, the degenerate foot, #1267's wrong side).
+
+**Decision.**
+1. **The plural rule reads a side list** — «לצלעות BC ו-OC בהתאמה», «ל-BC ו-OC בהתאמה», "to sides BC and AC respectively" — and distributes it with the segments: segment *i* becomes the singular «<seg> גובה|תיכון לצלע <side i>», read by the owning rule exactly as before. All or nothing is unchanged: one singular that does not commit commits no part of the line.
+2. **«בהתאמה» licenses the pairing, and the counts must agree.** A side list without it, or with a different number of sides than segments, pairs nothing — the rule bows out and the line goes where it went before (analytic's `parseCevianFamily` plural arm, ADR-AG-209: `targets.length !== segs.length || !respectively` → not handled). The pattern is copied, never imported (BOUNDARIES.json).
+3. **Spellings of the same sentence**, read with it: the definite role noun («הם הגבהים», "are the medians") and «הן».
+
+**Not built here — escalated.** The issue's second half, the copula «AM הוא חוצה זווית CMD», rests on the claim that «AM חוצה זווית CMD» builds in 2-D. It does not: written vertex-last with A new, `bisectorPlacesPoint`'s `vertex === D` branch emits a constraint on the undefined A and the line is refused with an internal-state message (filed as #1999). Reading the copula alone would move the reported sentence from the model to that refusal, so the copula half waits for the operator with #1999 (escalation on #1685); the `bisector-copula` parity row keeps its 2-D known gap.
+
+**Measured after** (the same path): the two plural rows commit exactly the commands of their singulars, in order (the altitude from O to BC, the one from B to OC; the medians to BC and AC); the bisector rows are unchanged.
+
+**Cross-builder (docs/22 §10).** `cevian-plural-respectively` drops its 2-D known gap; a medians twin `cevian-plural-respectively-medians` joins it (analytic builds both; 3-D keeps its parked #1679 gap).
+
+**Locks.** Fixtures `src/__tests__/fixtures/issue-1685-altitudes-respectively.geo.json` and `issue-1685-medians-respectively.geo.json` (the operator's corpus lines, rule 4). `src/app/__tests__/issue-1685-respectively-cevians.test.ts` — through `decideDeterministic2D`: each plural form (Hebrew altitudes and medians, the definite noun, three segments, English medians and altitudes) commits exactly what its singular sentences commit; each segment to its own side; no «בהתאמה» and both count mismatches commit nothing; a side the singular refuses commits no part of the line; the triangle form unchanged.
+
+**Behaviour change for a student:**
+- «OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה» on triangle OBC draws the altitude from O to BC and the one from B to OC, as the two singular sentences would (was: sent to the AI fallback).
+- «AD ו-BE הם תיכונים לצלעות BC ו-AC בהתאמה» draws the two medians the same way; the English "… respectively" too.

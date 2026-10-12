@@ -1,0 +1,72 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-12T12:00:00.000Z",
+  "name": "issue-1685-altitudes-respectively",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "q1KJUK79DLAnK6rp7sGaQ",
+      "utterance": "משולש OBC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "O",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "Lh-fZvApGYP9lW1kd8uwL",
+      "utterance": "OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה",
+      "group": "g1",
+      "cmd": {
+        "type": "foot",
+        "id": "D",
+        "from": "O",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "dZ4Z3GRM8FLM0xmJoTOWm",
+      "utterance": "OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "O",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "1A9_2DacnxnVcvwlzn4ss",
+      "utterance": "OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה",
+      "group": "g1",
+      "cmd": {
+        "type": "foot",
+        "id": "E",
+        "from": "B",
+        "a": "O",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "TaEGKivT2OHEUV56BIQ2m",
+      "utterance": "OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "E"
+      },
+      "enabled": true
+    }
+  ]
+}

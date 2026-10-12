@@ -1,0 +1,70 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-12T12:00:00.000Z",
+  "name": "issue-1685-medians-respectively",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "X_YS4yAFE5g2YmffPbqS8",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "f0sPX3b_zNavxPI51ySln",
+      "utterance": "AD ו-BE הם תיכונים לצלעות BC ו-AC בהתאמה",
+      "group": "g1",
+      "cmd": {
+        "type": "midpoint",
+        "id": "D",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "7ZWLs7byLF1tupOh6k3Ai",
+      "utterance": "AD ו-BE הם תיכונים לצלעות BC ו-AC בהתאמה",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "DjotgELMtjVWxTOGEnlNr",
+      "utterance": "AD ו-BE הם תיכונים לצלעות BC ו-AC בהתאמה",
+      "group": "g1",
+      "cmd": {
+        "type": "midpoint",
+        "id": "E",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "jLJHk7LQNvSIQMG7nHR9m",
+      "utterance": "AD ו-BE הם תיכונים לצלעות BC ו-AC בהתאמה",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "E"
+      },
+      "enabled": true
+    }
+  ]
+}

@@ -9841,21 +9841,39 @@ const altitude: Rule = (s, ctx) => {
  * "AD BE and CF are heights/medians in triangle ABC" distributes into the singular statements
  * (the ADR-076 list convention) and parses each through the OWNING rule — all-or-nothing (the
  * ADR-264 honesty bar: a partial distribution never commits).
+ *
+ * #1685 ([ADR-629](../../docs/06-decisions.md#adr-629)) — THE RESPECTIVELY-PAIRED TARGETS. «OD ו-BE הם גבהים
+ * לצלעות BC ו-OC בהתאמה» / "AD and BE are the medians to sides BC and AC respectively" names one side per
+ * segment, in order, and «בהתאמה» is what licenses the pairing. The distribution is the same one: each
+ * segment becomes its singular «OD גובה לצלע BC», read by the owning rule (which owns every gate a stated
+ * side carries — the apex, the degenerate foot, the wrong side). A count mismatch, or a side list without
+ * «בהתאמה», pairs nothing: the rule bows out rather than guess a pairing (analytic's `parseCevianFamily`
+ * plural arm, ADR-AG-209, copied — never imported).
  */
+const PAIR = String.raw`(?:[A-Z]\d*){2}`;
+const PAIR_SEP = String.raw`(?:\s*,\s*|\s+ו-?\s*|\s+[aA]nd\s+|\s+)`;
+const PLURAL_SPECIAL_RX = new RegExp(
+  String.raw`^(${PAIR}(?:${PAIR_SEP}${PAIR})+)\s+(?:(?:הם|הן)\s+|[aA]re\s+(?:the\s+)?)?ה?(גבהים|[hH]eights|[aA]ltitudes|תיכונים|[mM]edians)` +
+    String.raw`(?:\s+(?:במשולש|[iI]n\s+(?:the\s+)?triangle)(\s+(?:[A-Z]\d*){3})?` +
+    // #1685: «לצלעות BC ו-OC בהתאמה» · "to sides BC and AC respectively"
+    String.raw`|\s+(?:(?:ל|אל\s+ה?)-?\s*(?:ה?צלעות\s+)?|[tT]o\s+(?:the\s+)?(?:sides\s+)?)(${PAIR}(?:${PAIR_SEP}${PAIR})+)\s*,?\s+(?:בהתאמה|[rR]espectively))?\s*\.?\s*$`,
+);
 const pluralSpecialLines: Rule = (s, ctx) => {
   // NO /i — under it the pair atom [A-Z] would also swallow lowercase connectives ("and" reads
   // as the pairs "an"+"d"); En keywords carry explicit case alternatives instead.
-  const m = s.match(
-    /^((?:[A-Z]\d*){2}(?:(?:\s*,\s*|\s+ו-?\s*|\s+[aA]nd\s+|\s+)(?:[A-Z]\d*){2})+)\s+(?:הם\s+|[aA]re\s+)?(גבהים|[hH]eights|[aA]ltitudes|תיכונים|[mM]edians)(?:\s+(?:במשולש|[iI]n\s+(?:the\s+)?triangle)(\s+(?:[A-Z]\d*){3})?)?\s*\.?\s*$/,
-  );
+  const m = s.match(PLURAL_SPECIAL_RX);
   if (!m) return null;
   const labels = m[1].match(/[A-Z]\d*/g) ?? [];
   if (labels.length < 4 || labels.length % 2 !== 0) return null;
   const kind = /גבהים|heights|altitudes/i.test(m[2]) ? 'גובה' : 'תיכון';
   const tail = m[3] ? ` במשולש${m[3]}` : '';
+  // #1685: one stated side per segment, in order — or no pairing at all.
+  const sides = m[4] ? (m[4].match(/[A-Z]\d*/g) ?? []) : null;
+  if (sides && sides.length !== labels.length) return null;
   const out: AnyCommand[] = [];
   for (let i = 0; i < labels.length; i += 2) {
-    const single = `${up(labels[i])}${up(labels[i + 1])} ${kind}${tail}`;
+    const target = sides ? ` לצלע ${up(sides[i])}${up(sides[i + 1])}` : tail;
+    const single = `${up(labels[i])}${up(labels[i + 1])} ${kind}${target}`;
     const r = kind === 'גובה' ? altitude(single, ctx) : median(single, ctx);
     if (!r || !Array.isArray(r)) return null; // all-or-nothing — never a partial figure
     out.push(...r);
