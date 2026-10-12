@@ -362,6 +362,32 @@ outside it), replacing a `JSON.stringify` compare.
 
 *Identifiers:* `shapes.ts` · `AB ∥ DC`
 
+### The tool's choices are SAID ([ADR-AG-267](06c-decisions-analytic.md#adr-ag-267), #1864)
+
+`engine/unstatedChoices.ts` reads a `Derivation` and returns one entry per choice the tool still holds, on the line
+that opened it (`constraintLine`, and its selector twin `selectorLine`). It classifies a choice by WHAT ITS OPTIONS
+ARE, never by the sentence: equalities between two segments → `equal-pair`; each vertex on an axis → `axes`; one angle
+over 90° (a region `choice`) → `obtuse-vertex`; an `assumed` parallel on a one-parallel-pair ring → `parallel-pair`
+(legs when an equality between the other two sides holds). Every other choice — a right-angle seat, a tangency, a
+sine's two roots, an inscribed square — is not said. Which option is drawn is read off the drawn figure (`holdsOn`,
+`selectorsHold`), as `statedMeasures` reads it.
+
+#### "Until stated" is the apply step's structure
+
+- A statement naming a whole option replaces the choice (#1049); one naming PART of an `all` option NARROWS the
+  choice to the options containing it, in place — the fold keeps the slot's attribution to the opener.
+- A selector naming an option of a region `choice` replaces it (`selectorIdentity` sorts an order's angle rays).
+- `canonicalConstraint` sorts a `length-eq`'s segment points and its two sides, so «AC=AB» pins «AB = AC».
+- «זווית A קהה» is a `vertex-angle` fact whose `order` right side M1 resolves to the three-letter selector.
+
+#### Wording
+
+`app/unstatedChoice.ts` mirrors 2-D's `src/ui/unstatedChoice.ts`; the templates are 2-D's `steps.*` verbatim,
+held equal by `shell/__tests__/suite-vocabulary.test.ts`. `App.tsx` shows each note in its row's `notes` slot and
+the `unstatedTitle` cue beside «הציגו תצורה אחרת».
+
+*Identifiers:* `unstatedChoices.ts` · `unstatedChoice.ts` · `selectorLine`
+
 ### The shape registry ([ADR-AG-035](06c-decisions-analytic.md#adr-ag-035))
 
 `engine/shapes.ts` maps a noun to its constraints with three helpers — `parallel`, `equal`, `rightAngleAt` — and lowers

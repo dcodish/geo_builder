@@ -281,7 +281,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | A computed value on the canvas | opt-in layer only | coordinates while the panel is open | a circle centre's coordinates when known | every plotted reading | **Ruled** — canvas = inputs (ADR-W-047); exceptions per docs/10 P5. **Ruled change**: complex (B6, D1, #1862); analytic foci and directrix (B7, #1863) |
 | Letter ↔ value chip | yes | yes | no | no | **Gap** — analytic #1725 (icebox); complex follows from B6 (#1862) |
 | «✓ הציור נקבע במלואו» | only when one figure fits | whenever nothing is free | whenever nothing is free | whenever nothing is free | **Ruled change** — 2-D's rule everywhere (B8, #1596) |
-| Note for a choice the tool made | yes | n/a | no | n/a | **Ruled change** — port to analytic (B10, #1864) |
+| Note for a choice the tool made | yes | n/a | yes (equal pair, parallel pair, obtuse vertex, axes) | n/a | **Ruled** — ported to analytic (B10, #1864, ADR-AG-267); the analytic kite's pair is #2006 |
 | «הציגו תצורה אחרת» wording | locked | same | same | same | **Same** (ADR-W-098) |
 | Two possible values | not shown | both, as S₁/S₂ | both, with «או» | withheld | **Ruled change** — both, with «או», everywhere (B12, #1867). Three or more: no value shown; the student cycles configurations (operator, 2026-10-07) |
 | "Not understood" refusal | «לא הצלחתי לקרוא את זה עדיין — נסו…» | «לא הצלחתי להבין את הנתון…» | «לא הצלחתי להבין את המשפט» | as analytic | **Ruled change** — 2-D's wording everywhere (B13, #1868) |

@@ -5560,8 +5560,13 @@ const ORDER_WORD_HE = new RegExp(`^(.+?)\\s+(?:(?:הוא|היא)\\s+)?(גדול|
 const ORDER_BOUND_HE = new RegExp(`^(.+?)\\s+(?:(?:הוא|היא)\\s+)?(לפחות|לכל\\s+היותר)\\s+(.+)$`);
 const ORDER_WORD_EN = /^(?:the\s+)?(.+?)\s+is\s+(greater|larger|longer|bigger|more|less|smaller|shorter)\s+than\s+(.+)$/i;
 const ORDER_BOUND_EN = /^(?:the\s+)?(.+?)\s+is\s+(at\s+least|at\s+most|no\s+less\s+than|no\s+more\s+than)\s+(.+)$/i;
-const ACUTENESS_HE = new RegExp(`^${HE_GIVEN}${ANGLE_NOUN_HE}(${NAME})(${NAME})(${NAME})${HE_IS}\\s*(קהה|חדה)$`);
-const ACUTENESS_EN = new RegExp(`^${ANGLE_NOUN_EN}(${NAME})(${NAME})(${NAME})\\s+is\\s+(?:an?\\s+)?(obtuse|acute)(?:\\s+angle)?$`, 'i');
+/*
+ * ONE LETTER OR THREE (#1864, ADR-AG-267) — «זווית A קהה» names the angle at its vertex, as «זווית B ישרה» and «זוית C=200»
+ * do (ADR-AG-158): 2-D reads «∠C קהה/חדה» (its catalog's single-vertex form), and the unstated-choice note of
+ * «משולש קהה זווית ABC» teaches exactly this line, so the tool must read it.
+ */
+const ACUTENESS_HE = new RegExp(`^${HE_GIVEN}${ANGLE_NOUN_HE}${ANGLE_LETTERS}${HE_IS}\\s*(קהה|חדה)$`);
+const ACUTENESS_EN = new RegExp(`^${ANGLE_NOUN_EN}${ANGLE_LETTERS}\\s+is\\s+(?:an?\\s+)?(obtuse|acute)(?:\\s+angle)?$`, 'i');
 
 /** One side of an order, as the measure its equality twin reads — `null` when it is no side this rule takes. */
 function orderSide(src: string, claims: ClaimSink): { side: OrderSide; text: string } | null {
@@ -5635,7 +5640,9 @@ function parseOrder(line: string): RuleOutcome {
   const acute = ACUTENESS_HE.exec(line) ?? ACUTENESS_EN.exec(line);
   if (acute) {
     const at = angleNameOf(acute[1], acute[2], acute[3]);
-    if (!at || !isAngleRef(at)) return refuse('repeated-vertex', line);
+    if (!at) return refuse('repeated-vertex', line);
+    // A lone vertex is resolved against the figure, by M1 (the `vertex-angle` seam every one-letter angle uses).
+    if (!isAngleRef(at)) return made([{ t: 'vertex-angle', left: at, rhs: { t: 'order', positive: /קהה|obtuse/i.test(acute[4]) }, src: line }]);
     const sel: Selector = {
       kind: 'sign',
       q: { k: 'order', left: { t: 'angle', at }, right: { t: 'value', value: { kind: 'num', value: 90 } } },

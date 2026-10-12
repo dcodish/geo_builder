@@ -93,7 +93,7 @@ And for the builders whose exam prints no figure:
 - **For a feature:**
   - Say that a choice is the tool's, never which one as if it were the student's.
   - An assumption is never reported as "already known".
-  - Every builder (B10; analytic is ported in #1864).
+  - Every builder (B10; analytic: [ADR-AG-267](06c-decisions-analytic.md#adr-ag-267), the kite's pair #2006).
 
 ### P5 — The canvas shows what the student stated; computed values go in the data panel
 - **His words:**

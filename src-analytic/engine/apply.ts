@@ -1401,7 +1401,7 @@ function applyRoleOf(c: Construction, f: Extract<Fact, { t: 'role-of' }>): Apply
     if (n === 3) {
       const third = at(2);
       if (f.role === 'hypotenuse') return { says: rightAngleAt(third, f.a, f.b) };
-      if (f.role === 'leg') return { says: { t: 'choice', options: [equal(f.a, f.b, f.a, third), equal(f.b, f.a, f.b, third)] } };
+      if (f.role === 'leg') return { says: { t: 'choice', options: [equal(f.a, f.b, f.a, third), equal(f.a, f.b, f.b, third)] } };
       return o.noun !== undefined && normalizeShapeNoun(o.noun) === 'משולש שווה שוקיים' ? { says: equal(third, f.a, third, f.b) } : null;
     }
     if (n !== 4 || !promisesOneParallelPair(o.noun) || f.role === 'hypotenuse') return null;
@@ -2092,6 +2092,28 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const collapsed = [...c.constraints];
         collapsed[seat] = f.k;
         return { ok: true, effect: 'narrowed', next: { ...c, constraints: collapsed } };
+      }
+      /**
+       * …and a statement that is ONE PART of some options NARROWS the choice to them (#1864, ADR-AG-267).
+       *
+       * An option may be several statements at once (`all`): «שכל קודקודיו מונחים על הצירים» chooses an axis for
+       * every vertex in one option. «A על ציר ה-x» names no whole option, so it never collapsed anything — the choice
+       * stayed open beside it, and the figure reached A's axis only because the other options happened to fail.
+       * The statement is the student consuming PART of the discrete freedom, so the options that do not contain it
+       * are dropped, exactly as a whole option replaces the choice above. The narrowed choice keeps its slot (the
+       * fold keeps its attribution to the sentence that opened it), so what is still open is still that sentence's.
+       */
+      const partOf = (o: Constraint): boolean => o.t === 'all' && o.of.some((m) => sameConstraint(m, f.k));
+      const narrows = c.constraints.findIndex((k) => {
+        if (k.t !== 'choice') return false;
+        const kept = k.options.filter(partOf).length;
+        return kept > 0 && kept < k.options.length;
+      });
+      if (narrows >= 0) {
+        const open = c.constraints[narrows] as Extract<Constraint, { t: 'choice' }>;
+        const narrowed = [...c.constraints];
+        narrowed[narrows] = { t: 'choice', options: open.options.filter(partOf) };
+        return { ok: true, effect: 'narrowed', next: { ...c, constraints: narrowed } };
       }
       return { ok: true, effect: 'created', next: { ...c, constraints: [...c.constraints, f.k] } };
     }
@@ -3347,6 +3369,15 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       const left = resolveAngleName(c, f.left, f.src);
       if (!left.ok) return left;
+      // «זווית A קהה» (#1864, ADR-AG-267): the lone vertex resolved, the same selector its three-letter twin lowers to.
+      if (f.rhs.t === 'order') {
+        const sel: Selector = {
+          kind: 'sign',
+          q: { k: 'order', left: { t: 'angle', at: left.ref }, right: { t: 'value', value: { kind: 'num', value: 90 } } },
+          positive: f.rhs.positive,
+        };
+        return withReadAs(applyFact(c, { t: 'selector', sel, src: f.src }), left);
+      }
       if (f.rhs.t === 'value') {
         // sin (#1719, ADR-AG-227): the lone vertex resolved, the same choice its three-letter twin carries.
         if (f.rhs.measure === 'sin') return withReadAs(applyFact(c, { t: 'constraint', k: sineAngle(left.ref, f.rhs.value), src: f.src }), left);
@@ -3638,6 +3669,21 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // (`selectorIdentity`), so a «distinct» set restated in another order is the same selector (#1953).
       const dup = c.selectors.some((s) => selectorIdentity(s) === selectorIdentity(f.sel));
       if (dup) return { ok: true, effect: 'known', next: c };
+      /**
+       * THE STUDENT CONSUMING A REGION CHOICE (#1864, ADR-AG-267) — the constraint `choice`'s collapse (#1049), for its
+       * selector twin. «משולש קהה זווית ABC» opens a choice over the three vertices; «זווית BAC קהה» names one of
+       * them. Added beside the choice it left the choice open, so «הציגו תצורה אחרת» still offered the other
+       * vertices (each then failing the stated region) and the tool still called the obtuse vertex its own pick. The
+       * statement REPLACES the choice it names, as a named seat replaces a right triangle's.
+       */
+      const named = c.selectors.findIndex(
+        (s) => s.kind === 'choice' && s.options.some((o) => selectorIdentity(o) === selectorIdentity(f.sel)),
+      );
+      if (named >= 0) {
+        const collapsed = [...c.selectors];
+        collapsed[named] = f.sel;
+        return { ok: true, effect: 'narrowed', next: { ...c, selectors: collapsed } };
+      }
       return {
         ok: true,
         effect: 'created',
@@ -3872,7 +3918,17 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
  * canonical over the ring's rotations and reversals) was absorbed.
  */
 function selectorIdentity(sel: Selector): string {
-  return JSON.stringify(sel.kind === 'distinct' ? { ...sel, ids: [...sel.ids].sort() } : sel);
+  if (sel.kind === 'distinct') return JSON.stringify({ ...sel, ids: [...sel.ids].sort() });
+  /*
+   * An ORDER BETWEEN MEASURES names an angle by its vertex and two rays, and the rays are UNORDERED (#1864, ADR-AG-267):
+   * «זווית BAC קהה» is «זווית CAB קהה» — canonicalConstraint's `ray` rule, for the region twin. Without it the
+   * obtuse-vertex option «משולש קהה זווית ABC» builds at A (rays C, B) was not the statement «זווית BAC קהה» names.
+   */
+  if (sel.kind === 'sign' && sel.q.k === 'order') {
+    const side = (o: typeof sel.q.left) => (o.t === 'angle' && o.at.a > o.at.b ? { ...o, at: { ...o.at, a: o.at.b, b: o.at.a } } : o);
+    return JSON.stringify({ ...sel, q: { ...sel.q, left: side(sel.q.left), right: side(sel.q.right) } });
+  }
+  return JSON.stringify(sel);
 }
 
 /**
@@ -4160,8 +4216,12 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
     c = next;
     // Appended AND replaced: #1049’s choice collapse swaps a constraint in place, and the
     // replacement belongs to the line that named the seat, not to the line that opened it.
+    // A choice NARROWED in place (#1864, ADR-AG-267) — what remains open is still the opener's: every option it keeps
+    // is one of the old choice's own options, by identity.
+    const narrowedFrom = (old: Constraint | undefined, k: Constraint): boolean =>
+      old !== undefined && old.t === 'choice' && k.t === 'choice' && k.options.every((o) => old.options.includes(o));
     c.constraints.forEach((k, at) => {
-      if (before[at] === k && constraintFact[at] !== undefined) return;
+      if ((before[at] === k || narrowedFrom(before[at], k)) && constraintFact[at] !== undefined) return;
       constraintFact[at] = i;
     });
     c.selectors.forEach((s, at) => {

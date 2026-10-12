@@ -501,6 +501,27 @@ export function canonicalConstraint(k: Constraint): string {
   // rays sorted by letter, so the same seat must not read as a different option because a letter changed.
   if (k.t === 'choice') return `choice|${k.options.map(canonicalConstraint).join('||')}`;
   if (k.t === 'all') return `all|${k.of.map(canonicalConstraint).sort().join('&&')}`;
+  /*
+   * A length equation is SYMMETRIC and a length term is UNDIRECTED (#1864, ADR-AG-267): «AC=AB» is «AB=AC» and «BA=BC»
+   * is «AB=BC». Without this a stated equality pinned a noun's equal-pair choice in one spelling only — «משולש שווה
+   * שוקיים ABC» · «AC=AB» kept the choice open beside it, and a configuration on another option drew an equilateral
+   * triangle. Only the spelling is normalised: each segment term's two points, then the two sides; the expression
+   * over the terms is untouched, so «AB = 2AC» and «AC = 2AB» stay two statements.
+   */
+  if (k.t === 'length-eq') {
+    const side = (le: { expr: unknown; terms: readonly unknown[] }): string =>
+      JSON.stringify({
+        ...le,
+        terms: le.terms.map((term) => {
+          const m = term as { kind?: string; a?: Id; b?: Id };
+          return (m.kind === undefined || m.kind === 'length') && m.a !== undefined && m.b !== undefined
+            ? { ...m, ...(m.a > m.b ? { a: m.b, b: m.a } : {}) }
+            : m;
+        }),
+      });
+    const [l, r] = [side(k.left), side(k.right)].sort();
+    return `length-eq|${l}|${r}`;
+  }
   if (k.t === 'angle') return JSON.stringify({ ...k, at: ray(k.at) });
   if (k.t === 'angle-ratio') return JSON.stringify({ ...k, left: ray(k.left), right: ray(k.right) });
   return JSON.stringify(k);
