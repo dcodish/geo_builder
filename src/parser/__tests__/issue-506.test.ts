@@ -19,7 +19,8 @@ describe('#506 — the connective slip', () => {
   it('the prod rows normalise to the ו-connective', () => {
     // #1691 (ADR-AG-239): the boundary then folds the spaced «ו- X» to «ו-X» (shell/conjunction), so the
     // slip lands on the canonical connective — «ן-» → «ו-» is still what this asserts.
-    expect(normalizeUtterance('O - חיתוך של AC ן- DB')).toBe('O - חיתוך של AC ו-DB');
+    // #1676 (ADR-630): the frame then reads the name–dash «O - …» as «O …» (the decision is unchanged, measured).
+    expect(normalizeUtterance('O - חיתוך של AC ן- DB')).toBe('O חיתוך של AC ו-DB');
     expect(normalizeUtterance('הנקודות F ו- G הן אמצעי הקטעים BC ן- DO')).toBe('הנקודות F ו-G הן אמצעי הקטעים BC ו-DO');
   });
 

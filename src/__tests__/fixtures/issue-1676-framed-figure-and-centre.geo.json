@@ -1,0 +1,48 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-12T12:00:00.000Z",
+  "name": "issue-1676-framed-figure-and-centre",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "7iud_bmYaSo1yPTDTSSIg",
+      "utterance": "בסרטוט שלפניך מתואר משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "-9AXAQlG2CJUjV_POLoo7",
+      "utterance": "משולש ABC חסום במעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "circumcircle",
+        "id": "circle-O",
+        "center": "O",
+        "a": "A",
+        "b": "B",
+        "c": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "w10ncSNGeoNSQkHo9Psrn",
+      "utterance": "O – מרכז המעגל",
+      "group": "g2",
+      "cmd": {
+        "type": "name-center",
+        "center": "O"
+      },
+      "enabled": true
+    }
+  ]
+}
