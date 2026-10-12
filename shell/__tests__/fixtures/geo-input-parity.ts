@@ -1324,6 +1324,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'unread-greek-vertex-1919', family: 'polygons', steps: ['משולש ΓΔΘ'], expect: 'not-handled', note: 'Greek is math (the ruling), so a Greek vertex name goes to the model as in 2-D — 3-D recorded A, B, C before #1919' },
   { id: 'unread-lookalike-1919', family: 'polygons', steps: ['משולש КМО'], expect: 'builds', note: 'the Cyrillic look-alikes fold to K, M, O (the ruling: «fold them silently») — 2-D always did; 3-D recorded A, B, C and analytic read nothing' },
 
+  // ── #1864 (ADR-AG-267): an angle's acuteness named by its VERTEX alone — 2-D's «∠C קהה/חדה» ──
+  { id: 'vertex-obtuse-1864', family: 'angles', steps: ['משולש ABC', 'זווית A קהה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the line the obtuse-triangle note teaches' },
+  { id: 'vertex-acute-1864', family: 'angles', steps: ['משולש ABC', 'זווית A חדה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

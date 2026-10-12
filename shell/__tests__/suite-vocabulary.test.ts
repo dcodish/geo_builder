@@ -56,6 +56,15 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   clearAll: { '2d': ['actions.clear'], '3d': ['actions.clear'], complex: ['clearAll'], analytic: ['clearAll'] },
   showAnother: { '2d': ['actions.another'], '3d': ['actions.another'], complex: ['anotherConfig'], analytic: ['another'] },
   about: { '2d': ['header.about'], '3d': ['aboutLabel'], complex: ['menuAbout'], analytic: ['about'] },
+  // #1864 (ADR-AG-267, B10): a choice the tool made for an unstated given — 2-D's notes, ported to analytic word for
+  // word. 3-D and complex hold no such choice (n/a in 02w's row).
+  unstatedEqualPair: { '2d': ['steps.unstatedEqualPair'], '3d': null, complex: null, analytic: ['unstatedEqualPair'] },
+  unstatedParallelPairPlain: { '2d': ['steps.unstatedParallelPairPlain'], '3d': null, complex: null, analytic: ['unstatedParallelPairPlain'] },
+  unstatedParallelPair: { '2d': ['steps.unstatedParallelPair'], '3d': null, complex: null, analytic: ['unstatedParallelPair'] },
+  unstatedTitle: { '2d': ['steps.unstatedTitle'], '3d': null, complex: null, analytic: ['unstatedTitle'] },
+  stateEqualPair: { '2d': ['steps.stateEqualPair'], '3d': null, complex: null, analytic: ['stateEqualPair'] },
+  stateParallel: { '2d': ['steps.stateParallel'], '3d': null, complex: null, analytic: ['stateParallel'] },
+  drawnParallel: { '2d': ['steps.drawnParallel'], '3d': null, complex: null, analytic: ['drawnParallel'] },
 };
 
 /** The ruled wording (the "Explicit set", 2026-09-27) — the lock's anchor, not just "all equal". */

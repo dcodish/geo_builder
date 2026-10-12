@@ -87,6 +87,8 @@ import { ShareSheet } from '../shell/frame/ShareSheet';
 import { loadAnalyticSession } from './app/loadSession';
 import type { StoredSession } from '../shell/session/persist';
 import { ResumeOffer } from '../shell/frame/ResumeOffer';
+import { unstatedChoices } from './engine/unstatedChoices';
+import { unstatedChoiceText } from './app/unstatedChoice';
 
 
 declare const __BUILD__: string;
@@ -548,6 +550,15 @@ export function App() {
     configurationPool(out.construction).defer();
     return out;
   }, [active, seed, seedNames]);
+
+  /**
+   * #1864 (ADR-AG-267, docs/10 P4): every choice the tool made for an unstated given, worded — SAID under the row
+   * that opened it and gathered beside «הציגו תצורה אחרת», for as long as it is unstated. 2-D's two surfaces.
+   */
+  const unstatedNotes = useMemo(
+    () => unstatedChoices(d).map((c) => ({ line: c.line, text: unstatedChoiceText(c, (k, o) => t(k, o)) })),
+    [d, t],
+  );
 
   /**
    * THE POOL COMPLETES AFTER THE RENDER (#1473). One seed per slice, yielding to the browser between seeds; a re-render when it completes,
@@ -1251,6 +1262,18 @@ export function App() {
                  * bidi neutral) resolved to the paragraph direction and landed at the far end.
                  */
                 text: line,
+                // #1864 (ADR-AG-267): the tool's choice for this row's unstated given, said under it (2-D's `role="note"`).
+                ...(unstatedNotes.some((n) => rows[n.line] === i)
+                  ? {
+                      notes: unstatedNotes
+                        .filter((n) => rows[n.line] === i)
+                        .map((n, k) => (
+                          <span key={k} data-testid="unstated-choice" role="note" dir={analyticBidi.textDir(n.text)} style={{ color: color.warn, fontSize: fs.small }}>
+                            {n.text}
+                          </span>
+                        )),
+                    }
+                  : {}),
                 // #1548: a derivation indexes the ACTIVE lines; a muted row is not in it and carries no fault
                 error: d.faults.find((f) => rows[f.index] === i)?.detail,
                 disabled: disabled.includes(i),
@@ -1476,6 +1499,14 @@ export function App() {
             >
               {t('another')}
             </button>
+
+            {/* #1864 (ADR-AG-267): while the tool holds a choice the student has not stated, say so beside the button
+                that cycles it, with the notes themselves as the tooltip — 2-D's cue. */}
+            {unstatedNotes.length > 0 && (
+              <span data-testid="unstated-choice-cue" style={{ fontSize: fs.small, color: color.warn, alignSelf: 'center' }} title={unstatedNotes.map((n) => n.text).join('\n')}>
+                {t('unstatedTitle')}
+              </span>
+            )}
 
             {/* A product EXTRA, which the contract allows between the accent and the spacer. Offered
                 only when there IS a construction to show, so the control never promises something

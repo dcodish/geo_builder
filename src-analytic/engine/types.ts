@@ -253,7 +253,11 @@ export type Fact =
       t: 'vertex-angle';
       left: AngleName;
       /** `measure` (#1621, ADR-AG-215): «tan∢A = 2» — the `angle` constraint's measure, carried to it unchanged. */
-      rhs: { t: 'value'; value: Expr; measure?: 'tan' | 'cos' | 'sin' } | { t: 'angle'; of: AngleName; k: Expr };
+      rhs:
+        | { t: 'value'; value: Expr; measure?: 'tan' | 'cos' | 'sin' }
+        | { t: 'angle'; of: AngleName; k: Expr }
+        /** «זווית A קהה» / «זווית A חדה» (#1864, ADR-AG-267): the ORDER against 90° — `positive` is obtuse. A region, so a selector. */
+        | { t: 'order'; positive: boolean };
       /** «A = 40» — no angle noun (#1622, ADR-AG-218): a letter that is no point of the figure is not understood, not refused. */
       bare?: true;
     })

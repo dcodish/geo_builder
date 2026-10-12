@@ -138,8 +138,9 @@ export const SHAPES: Record<string, ShapeRow> = {
   },
   'משולש שווה שוקיים': {
     arity: 3,
-    // WHICH pair is equal is unstated, in exactly the same way.
-    givens: ([a, b, c]) => [choice([equal(a, b, a, c), equal(b, a, b, c), equal(c, a, c, b)])],
+    // WHICH pair is equal is unstated, in exactly the same way. Spelled as 2-D's `variantPairs` spells its three
+    // apexes (AB = AC, AB = BC, AC = BC) — the unstated-choice note names the drawn option in these letters (#1864).
+    givens: ([a, b, c]) => [choice([equal(a, b, a, c), equal(a, b, b, c), equal(a, c, b, c)])],
   },
   'משולש שווה צלעות': {
     arity: 3,

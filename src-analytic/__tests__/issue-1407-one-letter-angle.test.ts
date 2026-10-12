@@ -215,7 +215,10 @@ describe('#1407 — what did NOT change', () => {
   });
 
   it('a word on the right is still left to its owner', () => {
-    expect(parseLine('זווית B חדה').ok).toBe(false);
+    // #1864 (ADR-AG-267): the owner — the acuteness rule — now reads a lone vertex too, as 2-D does; the VALUE rule
+    // still never takes «חדה» for a value.
+    const r = parseLine('זווית B חדה');
+    expect(r.ok && r.facts.map((f) => (f.t === 'vertex-angle' ? f.rhs.t : f.t))).toEqual(['order']);
   });
 });
 

@@ -109,6 +109,8 @@ export interface Derivation {
    * line's constraints from it to ask whether they hold in every configuration of the current figure.
    */
   constraintLine: number[];
+  /** WHICH LINE STATED EACH SELECTOR (#1864, ADR-AG-267) — `constraintLine`'s twin over `construction.selectors`. */
+  selectorLine: number[];
   /**
    * WHAT THE STUDENT STATED ABOUT A MEASURE (#1714, ADR-AG-225) — lengths, angles, right angles, areas, arcs and
    * equalities, read off the constraints a SENTENCE added (a noun's definition only through its resolved choice),
@@ -686,7 +688,8 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       return resolveChoices([held ?? k], figure.choiceSeed ?? seed);
     },
   );
-  return { construction, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices, constraintLine, stated };
+  const selectorLine = construction.selectors.map((_, at) => (selectorFact[at] === undefined ? -1 : owner[selectorFact[at]]));
+  return { construction, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices, constraintLine, selectorLine, stated };
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */
@@ -877,5 +880,6 @@ export const EMPTY_DERIVATION: Derivation = {
   minted: [],
   notices: [],
   constraintLine: [],
+  selectorLine: [],
   stated: NO_STATED_MEASURES,
 };
