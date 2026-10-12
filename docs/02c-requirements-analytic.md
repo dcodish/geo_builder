@@ -706,9 +706,10 @@ a sentence the tool parsed.
 - «המעגל משיק לציר ה-x» then «…חותך את ציר ה-x בנקודות B ו-C» → refused
 - Sources: ADR-AG-197, #1642, #1638, #1635, #1634, #1539.
 
-**R169 — a value the givens fix up to two choices shows both**. *(Operator ruling: "if there are 2 options, we always show up to 2 options".)* More than two, or a moving value, shows «—».
-- 9/4 as printed → «שיפוע AB: -2 או 2»
-- Sources: ADR-AG-226, #1716.
+**R169 — a value the givens fix up to two choices shows both**. *(Operator ruling: "if there are 2 options, we always show up to 2 options".)* More than two, or a moving value, shows «—». The spelling is every builder's (W1, #1867): a pair of opposites reads «±2»; any other pair is ascending, and a «name =» row repeats its name before the second value.
+- 9/4 as printed → «שיפוע AB: ±2»
+- a length with two values → «AB = 2 או AB = 4»
+- Sources: ADR-AG-226, #1716, [ADR-AG-270](06c-decisions-analytic.md#adr-ag-270), #1867.
 
 **R72 — a value with two roots is listed as BOTH**. Never one alone, never a dash, the drawn one marked.
 - «C נמצאת על הישר 4x-y-9=0» with «שטח המשולש ABC הוא 7» → `(1, -5) או [(3, 3)]`

@@ -224,6 +224,10 @@ The cross-builder lock is `shell/__tests__/fixtures/unread-letter-rows.ts` with 
 
 `shell/ticks.ts` holds the one "nice step" rule (1, 2 or 5 × 10ⁿ) and the tick values across a range. Analytic re-exports `tickStep` from it, so its grid is byte-identical by construction. The complex Builder grids its VISIBLE window with it (`render/visibleGrid`). A §5c lock (`shell/__tests__/ticks-1465.test.ts`) fails if any product tree defines its own `tickStep`/`niceStep`.
 
+### Two possible values ([ADR-634](06-decisions.md#adr-634))
+
+`shell/valueOptions.ts` holds the one rule for a quantity's values over a configuration set the CALLER vouches is complete (operator rulings B12, #1861, W1; #1867). `valueOptionsOf(values, algebra)` returns `one`, `opposites` (the positive member kept) or `two` (ascending), or `null` for none and for three or more; `realValueOptions` is the real-number case at a caller's tolerance. `valueOptionsText(o, fmt, { or, label?, pmOperand?, rel? })` writes «±a», «a או label = b», or «a או b» for a row with no «name =» shape; the joiner comes from the caller's locale. Each builder enumerates its own configurations (engine layer, copied): 2-D's `computeValuesPanel` gate, complex's `knowledgeOf`, 3-D's `branchAnswer`, analytic's `valueText`. No product strings and no product knowledge enter the module.
+
 ### Student-facing text ([ADR-W-096](06w-decisions-workspace.md#adr-w-096))
 
 `shell/studentText.ts` `studentFacingViolations(values, { typed, names })` judges the VALUES a message interpolates, never its template, since a template may quote a worked example. A value may name what the student typed (case-insensitive) or what the figure shows; an id-shaped token (`~x`, `@x`, `#x`, `kind-Id`), an untyped English word, or an unknown capital label is a violation. Each product runs it over its own refusal corpus through its own humanizer. 3-D's is `src3d/i18n/errorText3.ts`; the other three are #1522.

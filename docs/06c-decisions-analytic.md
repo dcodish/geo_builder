@@ -10821,7 +10821,7 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 
 ## ADR-AG-226 — A data-panel row shows up to two values, through one value gate (#1716)
 
-**Status:** accepted · 2026-10-03 · fix-round #1721, stream R5 item 2 (PR stacked on #1714's). Operator report, playing T6 (471 9/4): *"the row of tan should have created a slope of 2 and it did not. not in the canvas and not in the data panel"*. **Operator ruling, 2026-10-03:** *"if there are 2 options, we always show up to 2 options. in this case, i think there would be only one"* — transcribed on #1716 as: one value as today; two values listed («2 או −2»); more than two keeps «—».
+**Status:** accepted · 2026-10-03 · fix-round #1721, stream R5 item 2 (PR stacked on #1714's). Operator report, playing T6 (471 9/4): *"the row of tan should have created a slope of 2 and it did not. not in the canvas and not in the data panel"*. **Operator ruling, 2026-10-03:** *"if there are 2 options, we always show up to 2 options. in this case, i think there would be only one"* — transcribed on #1716 as: one value as today; two values listed («2 או −2»); more than two keeps «—». · *amended by [ADR-AG-270](#adr-ag-270) (2026-10-12): the formatter follows the one cross-builder spelling — «±2» for opposites, a named row repeats its name before the second value*
 
 **Requirements:** [02c](02c-requirements-analytic.md) R169. · **Design:** [04c](04c-design-analytic.md), "One value gate; up to two values".
 
@@ -12062,3 +12062,17 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 
 
 **Integration note (round #1998, 2026-10-12).** ADR-AG-266 (#1807) built the same lowering in its narrower form — a statement that is part of EXACTLY ONE joint option collapses the choice to that whole option. At integration the two converged into this ADR's general narrowing, which collapses to the whole option when exactly one survives (so #1807's base line is never dropped) and otherwise keeps the narrowed choice. One lowering, `src-analytic/engine/apply.ts`; both PRs' locks hold.
+
+## ADR-AG-270 — Two values follow the one cross-builder spelling: «±2» for opposites, «AB = 2 או AB = 4» otherwise (#1867)
+
+**Status:** accepted · 2026-10-12 · feature (P2) · fix-round #1998, stream K · branch `feat/1867-two-values-or` · operator ruling W1 (2026-10-08, *"± when opposite, else «או»"* — one rule in every tool) · amends [ADR-AG-226](#adr-ag-226)'s formatter (the gate is unchanged) · LADDER stage: none (display) · the cross-builder record is [ADR-634](06-decisions.md#adr-634)
+
+**Requirements:** [02c](02c-requirements-analytic.md) the data panel's two-value rule · **Design:** [04c](04c-design-analytic.md) the panel's one value gate · [04w](04w-design-shell.md) *Two possible values*
+
+**Measured before** (`main` @ 403efe66, `issue-1716-two-values` green): «-2 או 2» for the 471 9/4 slope, «k = -3 או 3», «AB = 2 או 4», «∢BAO = 30° או 150°».
+
+**Decision.** `valueText` (`src-analytic/app/panelRows.ts`) classifies the gate's options through the shared rule (`shell/valueOptions`): a pair of opposites prints «±2»; any other pair prints both, ascending, and a row with a «name =» shape passes its name so the second value repeats it — «AB = 2 או AB = 4», «∢BAO = 30° או ∢BAO = 150°», «m = -2 או m = 4». A row without that shape (the compound slope row, the ask lane's «question = …», whose «=» in a value switches the row to «question: value») passes none and reads «30° או 150°». `knownValues`, the gate, and the point rows («A = [(…)] או (…)») are unchanged.
+
+**Locks.** `issue-1716-two-values` amended: the slope «±2», the parameter «±3» and «k = ±3», the length «AB = 2 או AB = 4».
+
+**Behaviour change for a student:** a value with two opposite possibilities reads «±2» (was «-2 או 2»); a named row with two values repeats its name, «AB = 2 או AB = 4» (was «AB = 2 או 4»).

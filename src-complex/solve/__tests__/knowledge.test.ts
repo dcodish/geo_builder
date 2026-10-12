@@ -38,11 +38,19 @@ describe('the predicate itself', () => {
     expect(knowledgeOf(false, closed(3), [re(2), re(2), re(2 + 1e-12)]).known).toBe(true);
   });
 
-  it('a value that differs across a COMPLETE set is withheld as «differs between N configurations»', () => {
+  it('a value that differs across a COMPLETE set is not ONE value — and with exactly two it carries both (#1867)', () => {
     expect(knowledgeOf(false, closed(2), [re(3), re(-3)])).toEqual({
       known: false,
       why: { code: 'multi-config', configs: 2 },
+      two: [re(3), re(-3)],
     });
+    expect(knowledgeOf(false, closed(2), [re(4), re(1)])).toEqual({
+      known: false,
+      why: { code: 'multi-config', configs: 2 },
+      two: [re(4), re(1)],
+    });
+    // three or more carry nothing (#1861: "if there are 3 and more, dont show options")
+    expect(knowledgeOf(false, closed(3), [re(1), re(2), re(4)])).toEqual({ known: false, why: { code: 'multi-config', configs: 3 } });
   });
 
   it('a FLOOR is never read as invariant — agreeing or not, it withholds as «may have more than one possibility»', () => {
@@ -112,13 +120,17 @@ describe('answers are given only when the figure forces them', () => {
   });
 
   /** Invariance is across EVERY valid configuration, not the one on screen. */
-  it('WITHHOLDS a value that differs between configurations', () => {
+  it('WITHHOLDS a value that takes three values between configurations (#1861), and lists exactly two (#1867)', () => {
     // `z` is declared first so the equation CONSTRAINS it — three configurations, and the distance to
     // w differs between them. (Without the declaration «z^3 = 8» enumerates and `z1` would be one of
     // its own solutions, so `z1 = 4` would contradict it — ADR-CX-021.)
-    const d = deriveLines(['z', 'z^3 = 8', 'w = 4', 'אורך wz']);
+    const d = deriveLines(['z', 'z^3 = 8', 'w = 4i', 'אורך wz']);
     expect(d.knowledge[0].value).toBeNull();
     expect(d.knowledge[0].why?.code).toBe('multi-config');
+    // w = 4 on the real axis: |w − z| is 2 at z = 2 and √28 at both other roots — two values, both printed
+    const two = deriveLines(['z', 'z^3 = 8', 'w = 4', 'אורך wz']).knowledge[0];
+    expect(two.value).toBe('2');
+    expect(two.or).toEqual({ value: '5.29', approx: true });
   });
 
   /**

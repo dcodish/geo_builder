@@ -909,6 +909,12 @@ The relations layer's definite values, the values panel and the forced crossing 
   number). It rides `detectAll` into the store's `determinacy` slot (facts-keyed, like `crossings`), and
   `figureStatus` (`app/figureStatus.ts`) maps it to the status line (FR-ALT-6). The values panel reads the same
   `complete` flag.
+- **The values panel's one value gate** ([ADR-634](06-decisions.md#adr-634), #1867): every row and every question in
+  `computeValuesPanel` asks `optionsOf` — one value when the pool agrees; the quantity's TWO values (classified by
+  `shell/valueOptions`, at `REL_TOL`) when the pool is `determined` and `complete` and each value is seen at two
+  or more seeds (`computeValues` passes `seedOfSample` per sample); nothing otherwise. Not `stable`: that stays the
+  condition for a configuration COUNT. A row carries the second value in `or`, or `pm` for opposites; `MathValues`
+  (`render/MathValue.tsx`) typesets «±v» or «a או label = b», and `valueText(row, words)` is the text twin.
 
 ## The configuration registry and searches
 

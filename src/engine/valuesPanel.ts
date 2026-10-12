@@ -18,8 +18,26 @@ import { figureEdges } from './relations';
 import { freeDofCount, scalePinned } from './sample';
 import { polygonArea } from './geometry';
 import type { AnyCommand, Construction, Id, Vec } from './types';
+import { realValueOptions, valueOptionsText, type ValueOptions, type ValueOptionsWords } from '../../shell/valueOptions';
 
-export interface ValueRow {
+/** One printed value: the number, its exact form, and the student's unit when the row speaks in one. */
+export interface ValueAnswer {
+  value: number;
+  exact: ExactForm | null;
+  unit?: UnitValue;
+}
+
+/**
+ * #1867 ([ADR-634](../../docs/06-decisions.md#adr-634)) — the SECOND value of a quantity the givens fix to exactly
+ * two (operator rulings B12 and W1): `or` is the larger value (the row's own `value` is then the smaller), and `pm`
+ * says the two are opposites, so the row's `value` (the positive one) prints as «±value». Absent ⇒ one value.
+ */
+export interface TwoValues {
+  or?: ValueAnswer;
+  pm?: true;
+}
+
+export interface ValueRow extends TwoValues {
   kind: 'length' | 'angle' | 'radius' | 'area' | 'perimeter' | 'symbol';
   /** ids to highlight on the canvas when the row is clicked (endpoints / wedge / polygon / centre). */
   ids: Id[];
@@ -214,7 +232,7 @@ export function waitingNote(computing: boolean): QueryNote {
 }
 
 /** One answered (or honestly refused) query. */
-export interface QueryRow {
+export interface QueryRow extends TwoValues {
   /** exactly what the student typed — echoed back so the list reads as their own questions. */
   text: string;
   kind: ValueQuery['kind'] | null;
@@ -304,6 +322,13 @@ export function computeValuesPanel(
    *  sample core — replaces the `freeDofCount === 0` shortcut in the knowledge gate when given (the count is
    *  arithmetic and can lie, ADR-424; the enumerated set cannot). */
   determined?: boolean,
+  /**
+   * #1867 (ADR-634): the pool finished inside the work cap (ADR-558) — with `determined`, the condition for
+   * listing a quantity's TWO values: only a complete admissible set proves there is no third.
+   */
+  complete?: boolean,
+  /** #1867: the seed each sample came from (index-aligned with `samples`); a listed value must be seen at ≥ 2. */
+  seedOf?: readonly number[],
 ): ValuesPanelResult {
   const c = constructions[0];
   const rows: ValueRow[] = [];
@@ -334,9 +359,45 @@ export function computeValuesPanel(
     }
     return vals;
   };
-  const per = (f: Measure): number | null => {
+  /**
+   * #1867 (ADR-634) — THE ONE VALUE GATE of every row and every question: one value when the quantity is
+   * identical across the pool (the knowledge rule, unchanged); its TWO values when the pool is the figure's
+   * COMPLETE admissible set (`determined` — count 0 and enumerated, ADR-509 — and not cut short, ADR-558) and
+   * the quantity takes exactly two values over it (operator ruling B12: *"complex should also show both values -
+   * so it should follow all of the tools"*); otherwise nothing — three or more values, a continuum, or a pool
+   * that cannot prove there is no third (#1861: *"if there are 3 and more, dont show options"*).
+   *
+   * Not the configuration COUNT's `stable` condition (FR-ALT-6): the SSA triangle is `stable: false` (some seeds
+   * find one triangle only) while its pool's AC values are exactly {6.21, 1.45}. The safeguard that replaces it
+   * is per value: each of the two must be seen at two or more seeds, so a lone stray sample never prints.
+   */
+  const optionsOf = (vals: number[]): ValueOptions | null => {
+    if (vals.length === 0 || vals.some((v) => !Number.isFinite(v))) return null;
+    const inv = invariant(vals);
+    if (inv !== null) return { kind: 'one', value: inv };
+    if (determined !== true || complete === false) return null;
+    const o = realValueOptions(vals, REL_TOL);
+    if (!o || o.kind === 'one') return null;
+    // two values the panel prints alike are not two answers the student can tell apart (ADR-AG-226's rule)
+    if (o.kind === 'two' && formatMeasure(o.values[0]) === formatMeasure(o.values[1])) return null;
+    const members = o.kind === 'two' ? o.values : [-o.value, o.value];
+    for (const m of members) {
+      const seen = new Set<number>();
+      vals.forEach((v, i) => {
+        if (Math.abs(v - m) <= REL_TOL * Math.max(1, Math.abs(m))) seen.add(seedOf?.[i] ?? i);
+      });
+      if (seen.size < 2) return null;
+    }
+    return o;
+  };
+  /** A classification as the row's fields: one value, a ± pair, or the smaller value with the larger in `or`. */
+  const answersOf = (o: ValueOptions, toAnswer: (v: number) => ValueAnswer): ValueAnswer & TwoValues =>
+    o.kind === 'one' ? toAnswer(o.value)
+    : o.kind === 'opposites' ? { ...toAnswer(o.value), pm: true }
+    : { ...toAnswer(o.values[0]), or: toAnswer(o.values[1]) };
+  const perOpt = (f: Measure): ValueOptions | null => {
     const vals = samplesOf(f);
-    return vals === null ? null : invariant(vals);
+    return vals === null ? null : optionsOf(vals);
   };
 
   // ---- the declared-unit lane (#427) -----------------------------------------------------------
@@ -355,7 +416,8 @@ export function computeValuesPanel(
   // printing on the very same figure — that asymmetry is the whole point.
   const sized = scalePinned(c);
   const useUnit = !!unit && !sized;
-  const unitCoefOf = (f: Measure, pow: 1 | 2): UnitValue | null => {
+  /** The measure's coefficient of the declared unit, through the one value gate (#1867: one or two values). */
+  const unitOptionsOf = (f: Measure, pow: 1 | 2): ValueOptions | null => {
     if (!unit || !useUnit) return null;
     const vals: number[] = [];
     for (const [i, pos] of samples.entries()) {
@@ -367,8 +429,24 @@ export function computeValuesPanel(
       if (!(u > 1e-9)) return null;
       vals.push(v / Math.pow(u, pow));
     }
-    const k = invariant(vals);
-    return k === null ? null : { sym: unit.sym, pow, coef: k, exact: exactFormOf(k) };
+    return optionsOf(vals);
+  };
+  const unitValue = (k: number, pow: 1 | 2): UnitValue => ({ sym: unit!.sym, pow, coef: k, exact: exactFormOf(k) });
+
+  /** A magnitude's answer through the scale discipline: the absolute when the scale is pinned, else the declared unit. */
+  const magnitudeAnswer = (f: Measure, pow: 1 | 2): (ValueAnswer & TwoValues) | null => {
+    if (!sized && !useUnit) return null;
+    const vals = samplesOf(f);
+    if (vals === null) return null;
+    if (sized) {
+      const o = optionsOf(vals);
+      return o && answersOf(o, (v) => ({ value: v, exact: exactOrNull(v) }));
+    }
+    const o = unitOptionsOf(f, pow);
+    if (!o) return null;
+    // the unit lane's value is only this drawing's measurement, for reference — the unit is the knowledge
+    const mean = vals.reduce((x, y) => x + y, 0) / vals.length;
+    return answersOf(o, (k) => ({ value: mean, exact: null, unit: unitValue(k, pow) }));
   };
 
   // The segments the student themself annotated with the symbol are נתון, not נגזר.
@@ -383,14 +461,9 @@ export function computeValuesPanel(
   const magnitude = (
     kind: ValueRow['kind'], ids: Id[], label: string, stated: boolean, pow: 1 | 2, f: Measure, circle?: CircleRef,
   ): void => {
-    if (!sized && !useUnit) return;
-    const vals = samplesOf(f);
-    if (vals === null) return;
-    const abs = sized ? invariant(vals) : null;
-    const u = unitCoefOf(f, pow);
-    if (abs === null && u === null) return;
-    const value = abs ?? vals.reduce((x, y) => x + y, 0) / vals.length;
-    rows.push({ kind, ids, label, value, exact: abs === null ? null : exactOrNull(value), stated, ...(u ? { unit: u } : {}), ...(circle ? { circle } : {}) });
+    const a = magnitudeAnswer(f, pow);
+    if (!a) return;
+    rows.push({ kind, ids, label, ...a, stated, ...(circle ? { circle } : {}) });
   };
 
   // ---- stated markers (נתון) from the construction's own constraints/objects --------------------
@@ -453,9 +526,9 @@ export function computeValuesPanel(
     if (b.via === 'length' && !sized) continue;
     const f = symbolMeasure(b);
     if (!f) continue;
-    const val = per(f);
-    if (val === null) continue;
-    rows.push({ kind: 'symbol', ids: symbolIds(b), label: b.sym, value: val, exact: exactOrNull(val), stated: b.stated });
+    const o = perOpt(f);
+    if (o === null) continue;
+    rows.push({ kind: 'symbol', ids: symbolIds(b), label: b.sym, ...answersOf(o, (v) => ({ value: v, exact: exactOrNull(v) })), stated: b.stated });
   }
 
   // ---- angles at polygon corners + stated wedges ------------------------------------------------
@@ -479,15 +552,15 @@ export function computeValuesPanel(
     const canonical = `${v}|${[p, q].sort().join('|')}`;
     if (seenWedge.has(canonical)) continue;
     seenWedge.add(canonical);
-    const val = per((pos) => {
+    const o = perOpt((pos) => {
       const V = pos.get(v);
       const P = pos.get(p);
       const Q = pos.get(q);
       return V && P && Q ? angleAt(V, P, Q) : null;
     });
-    if (val === null) continue;
+    if (o === null) continue;
     rows.push({
-      kind: 'angle', ids: [p, v, q], label: `∠${p}${v}${q}`, value: val, exact: null,
+      kind: 'angle', ids: [p, v, q], label: `∠${p}${v}${q}`, ...answersOf(o, (val) => ({ value: val, exact: null })),
       stated: statedAng.has(`${v}|${p}|${q}`) || statedAng.has(`${v}|${q}|${p}`),
     });
   }
@@ -588,7 +661,7 @@ export function computeValuesPanel(
 
   // ---- the QUERY lane (#477) --------------------------------------------------------------------
   // The student names a quantity and gets it back WHEN IT IS KNOWLEDGE. Answered from the very helpers
-  // the rows above use — `samplesOf`/`invariant` for seed-invariance, `sized`/`unitCoefOf` for the
+  // the rows above use — `samplesOf`/`invariant` for seed-invariance, `sized`/`magnitudeAnswer` for the
   // scale discipline — because a query resolved by any other path could contradict the rows printed
   // directly above it, which is worse than not answering. That is the M3 "never a second sampler" rule
   // applied to a second CONSUMER, not just a second sampler.
@@ -619,10 +692,10 @@ export function computeValuesPanel(
       if (bIds.some((id) => !known.has(id))) return { ...base, ids: bIds, note: 'unavailable' as const };
       if (b.via === 'length' && !sized) return { ...base, ids: bIds, note: 'scale' as const };
       const f = symbolMeasure(b);
-      const val = f ? per(f) : null;
-      return val === null
+      const o = f ? perOpt(f) : null;
+      return o === null
         ? { ...base, ids: bIds, note: 'undetermined' as const }
-        : { ...base, ids: bIds, value: val, exact: exactOrNull(val) };
+        : { ...base, ids: bIds, ...answersOf(o, (v) => ({ value: v, exact: exactOrNull(v) })) };
     }
 
     const measure: Measure =
@@ -635,21 +708,16 @@ export function computeValuesPanel(
         : (pos) => { const pts = q.ids.map((id) => pos.get(id)); return pts.every(Boolean) ? Math.abs(polygonArea(pts as Vec[])) : null; };
 
     if (q.kind === 'angle') {
-      const val = per(measure);
-      return val === null
+      const o = perOpt(measure);
+      return o === null
         ? { ...base, ids, note: 'undetermined' as const }
-        : { ...base, ids, value: val, exact: exactOrNull(val) };
+        // an angle is a decimal of degrees, as its panel row prints it — never a recognised radical (86.54° is not 387√5/10)
+        : { ...base, ids, ...answersOf(o, (v) => ({ value: v, exact: null })) };
     }
     // a magnitude: the scale discipline decides which lane may speak
     if (!sized && !useUnit) return { ...base, ids, note: 'scale' as const };
-    const vals = samplesOf(measure);
-    if (vals === null) return { ...base, ids, note: 'undetermined' as const };
-    const pow = q.kind === 'area' ? 2 : 1;
-    const abs = sized ? invariant(vals) : null;
-    const u = unitCoefOf(measure, pow);
-    if (abs === null && u === null) return { ...base, ids, note: 'undetermined' as const };
-    const value = abs ?? vals.reduce((x, y) => x + y, 0) / vals.length;
-    return { ...base, ids, value, exact: abs === null ? null : exactOrNull(value), ...(u ? { unit: u } : {}) };
+    const a = magnitudeAnswer(measure, q.kind === 'area' ? 2 : 1);
+    return a === null ? { ...base, ids, note: 'undetermined' as const } : { ...base, ids, ...a };
   });
 
   return { rows, areaClasses, sampleCount: samples.length, queryRows };
@@ -660,5 +728,22 @@ export function computeValuesPanel(
  * Display text for a row's value — the student's own unit when the row carries one (#427: `a√2` beats
  * `5√2`, whose 5 is only the drawing's scale), else exact when recognized, else the 2-decimal fallback.
  */
-export const valueText = (row: ValueRow): string =>
-  row.unit ? formatUnitText(row.unit) : row.exact ? formatExactText(row.exact) : formatMeasure(row.value);
+const answerText = (a: ValueAnswer): string =>
+  a.unit ? formatUnitText(a.unit) : a.exact ? formatExactText(a.exact) : formatMeasure(a.value);
+
+/**
+ * #1867 (ADR-634) — a row's (or an answered question's) values as the shared classification
+ * ({@link ValueOptions}, `shell/valueOptions`): one value, a ± pair, or two ascending.
+ */
+export function rowOptions(row: ValueAnswer & TwoValues): ValueOptions<ValueAnswer> {
+  if (row.pm) return { kind: 'opposites', value: row };
+  if (row.or) return { kind: 'two', values: [row, row.or] };
+  return { kind: 'one', value: row };
+}
+
+/**
+ * The answer half of «label = …» as plain text, under the W1 spelling (#1867): «6.21», «±3», «1.45 או AC = 6.21».
+ * `words` carries the caller's joiner and the row's own label (the App typesets the same three shapes as MathML).
+ */
+export const valueText = (row: ValueAnswer & TwoValues, words: ValueOptionsWords = { or: 'או' }): string =>
+  valueOptionsText(rowOptions(row), answerText, words) ?? `${answerText(row)} ${words.or} ${answerText(row.or ?? row)}`;

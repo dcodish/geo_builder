@@ -6,6 +6,7 @@
  */
 import React from 'react';
 import { formatMeasure, type ExactForm, type UnitValue } from '@/format';
+import { rowOptions, type TwoValues, type ValueAnswer } from '@/engine/valuesPanel';
 
 const m = (tag: string, props: Record<string, unknown> | null, ...children: React.ReactNode[]) =>
   React.createElement(tag, props, ...children);
@@ -65,4 +66,38 @@ function unitMath(u: UnitValue): React.ReactElement {
     { style: { fontSize: '1.05em' }, dir: 'ltr' },
     f && f.q > 1 ? m('mfrac', null, numerator, m('mn', null, String(f.q))) : numerator,
   ) as React.ReactElement;
+}
+
+/**
+ * #1867 ([ADR-634](../../docs/06-decisions.md#adr-634)) — the VALUES of a row or an answered question, after its
+ * label and «=»: one value; «±value» for a pair of opposites; or «a או label = b» for two values (operator ruling
+ * W1, 2026-10-08: *"± when opposite, else «או»"* — one spelling in every builder; the shared classification is
+ * `shell/valueOptions`, read here through the engine's `rowOptions`).
+ */
+export function MathValues({
+  row,
+  degrees,
+  label,
+  or,
+}: {
+  row: ValueAnswer & TwoValues;
+  degrees?: boolean;
+  /** the row's own name, repeated before the second value */
+  label: string;
+  /** the joiner word in the UI's locale */
+  or: string;
+}): React.ReactElement {
+  const o = rowOptions(row);
+  const one = (a: ValueAnswer) => <MathValue value={a.value} exact={a.exact} degrees={degrees} unit={a.unit} />;
+  if (o.kind === 'one') return one(o.value);
+  if (o.kind === 'opposites') return <span style={{ direction: 'ltr', unicodeBidi: 'isolate' }}>±{one(o.value)}</span>;
+  return (
+    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'baseline', flexWrap: 'wrap' }}>
+      {one(o.values[0])}
+      <span>{or}</span>
+      <bdi style={{ direction: 'ltr' }}>{label}</bdi>
+      <span>=</span>
+      {one(o.values[1])}
+    </span>
+  );
 }

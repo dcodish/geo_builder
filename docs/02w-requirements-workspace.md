@@ -294,7 +294,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | «✓ הציור נקבע במלואו» | only when one figure fits | whenever nothing is free | whenever nothing is free | whenever nothing is free | **Ruled change** — 2-D's rule everywhere (B8, #1596) |
 | Note for a choice the tool made | yes | n/a | yes (equal pair, parallel pair, obtuse vertex, axes) | n/a | **Ruled** — ported to analytic (B10, #1864, ADR-AG-267); the analytic kite's pair is #2006 |
 | «הציגו תצורה אחרת» wording | locked | same | same | same | **Same** (ADR-W-098) |
-| Two possible values | not shown | both, as S₁/S₂ | both, with «או» | withheld | **Ruled change** — both, with «או», everywhere (B12, #1867). Three or more: no value shown; the student cycles configurations (operator, 2026-10-07) |
+| Two possible values | «x = ±a» / «x = a או x = b» | same | same | same | **Same** — one spelling, `shell/valueOptions` (B12, W1, #1867, [ADR-634](06-decisions.md#adr-634)). Three or more: no value shown; the student cycles configurations (operator, 2026-10-07) |
 | "Not understood" refusal | «לא הצלחתי לקרוא את זה עדיין — נסו…» | «לא הצלחתי להבין את הנתון…» | «לא הצלחתי להבין את המשפט» | as analytic | **Ruled change** — 2-D's wording everywhere (B13, #1868) |
 | "The tool's limit, not your mistake" | no | yes | no | no | **Ruled change** — everywhere (B13, #1868) |
 | Student-text check (ADR-W-096) | no | yes | no | no | **Gap** — #1522 (icebox) |
@@ -332,7 +332,10 @@ The pedagogy boundary of each product still governs *what* may be answered; thes
   - Sources: ADR-W-038.
 - **FR-DP-3 (Must)** — **The panel reports what the FIGURE knows, never what one drawing happens to
   show.** A value is displayed only when it is invariant across the figure's residual freedom; a number
-  true only of the current sample is not knowledge and must not be printed. This is the shared statement
+  true only of the current sample is not knowledge and must not be printed. A value the givens fix to exactly
+  TWO possibilities is knowledge as a pair and shows both, in one spelling in every product: «x = ±a» when they
+  are opposites, otherwise «x = a או x = b» (`shell/valueOptions`); three or more show no value, and the student
+  switches configurations ([ADR-634](06-decisions.md#adr-634), #1867). This is the shared statement
   of the honesty rule each product enforces in its own engine. What the CANVAS carries is a separate
   rule — the student's inputs, with recorded exceptions.
   - Sources: [ADR-W-047](06w-decisions-workspace.md#adr-w-047), [ADR-W-118](06w-decisions-workspace.md#adr-w-118)

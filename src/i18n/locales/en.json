@@ -581,6 +581,7 @@
     "areaSole": "area of the circle",
     "perimeterSole": "circumference of the circle",
     "rowHint": "Click to highlight on the canvas",
+    "or": "or",
     "queryTitle": "Ask for a value",
     "queryPlaceholder": "e.g. ∠GBC, AB, area ABC",
     "queryAdd": "Ask",

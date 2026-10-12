@@ -4282,7 +4282,7 @@ export function computeValues(facts: Fact[], queries: QueryInput[] = []): Values
   // enabled facts only, so deselecting the statement that named it removes its row with it.
   const symbols = symbolBindings(enabledCmds);
   // #1601 (ADR-558): the panel SAYS when its pool was cut short, rather than reading as "nothing to derive".
-  return { ...computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter, unit, queries, symbols, shared.determined), complete: shared.complete };
+  return { ...computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter, unit, queries, symbols, shared.determined, shared.complete, shared.samples.map((pos, i) => seedOfSample.get(pos) ?? i)), complete: shared.complete };
 }
 
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */

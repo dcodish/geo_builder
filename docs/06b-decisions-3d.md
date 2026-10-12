@@ -11349,7 +11349,7 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 
 ## ADR-3D-289 — A point with exactly two admissible configurations lists both in the data panel, one row per configuration (#1506)
 
-**Status:** accepted · 2026-09-30 · fix round #1571 · feature (PR) · plan: the #1506 issue body, narrowed by the "Operator ruling — 2026-09-29" comment (exactly 2; display form (b), one row per configuration). **Extends** [ADR-3D-194](#adr-3d-194) (#827's singleton rule) — unchanged for everything that is not exactly two.
+**Status:** accepted · 2026-09-30 · fix round #1571 · feature (PR) · plan: the #1506 issue body, narrowed by the "Operator ruling — 2026-09-29" comment (exactly 2; display form (b), one row per configuration). **Extends** [ADR-3D-194](#adr-3d-194) (#827's singleton rule) — unchanged for everything that is not exactly two. · *amended by [ADR-3D-336](#adr-3d-336) (2026-10-12): the two configurations print as ONE row joined by «או», «S(…) או (…)», and the ask lane answers it*
 
 **Requirements:** docs/02b FR-EQ-4a (a point with exactly two configurations lists both) · **Design:** docs/04b — "Two configurations print as two rows" (`twoConfigurations3`)
 
@@ -11876,7 +11876,7 @@ Both build with every row ok and 8 points, and in both the point that was A now 
 
 ## ADR-3D-303 — A parameter's roots read «m = -2, m = 4», never «m = {-2, 4}» (#1591)
 
-**Status:** accepted · 2026-10-04 · feature (P3) · round #1753 · operator ruling 2026-09-30 on #1591 (*"the m = ±√2 is correct if the 2 solutions are plus minus of each other. in any other case, separate them"*) · branch `feat/1591-param-solutions` off `main` @ c098af9b
+**Status:** accepted · 2026-10-04 · feature (P3) · round #1753 · operator ruling 2026-09-30 on #1591 (*"the m = ±√2 is correct if the 2 solutions are plus minus of each other. in any other case, separate them"*) · branch `feat/1591-param-solutions` off `main` @ c098af9b · **⚠ Superseded by [ADR-3D-336](#adr-3d-336) (2026-10-12):** a non-symmetric pair reads «m = -2 או m = 4» (operator ruling W1), and three or more roots list nothing — the open «m = ?» row (#1861); «m = ±√2» is unchanged
 
 **Requirements:** docs/02b FR-EQ-4b (new) · **Design:** docs/04b — "A parameter's roots: one join, two surfaces"
 
@@ -12659,3 +12659,19 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 **Sibling audit.** 2-D samples the side already (measured above, 24 distinct values) — it is the specification here, not a change. Analytic and complex: n/a (no shape-dims pivot; a plane figure there is placed in coordinates).
 
 **Behaviour change for a student:** «משולש ABC · AC = 8 · BC = 3» draws an ordinary triangle (∠C ≈ 32°–48°) whose third side changes with the seed and with «הציגו תצורה אחרת», instead of the same near-flat sliver (∠C ≈ 9°) at every seed. Nothing else changes: a figure with a plane drive, a sign given, a pin symbol or a rider is untouched, and every stated magnitude still holds exactly.
+
+## ADR-3D-336 — Two values read «m = -2 או m = 4» and a two-configuration point reads «S(…) או (…)»; three roots list nothing (#1867)
+
+**Status:** accepted · 2026-10-12 · feature (P2) · fix-round #1998, stream K · branch `feat/1867-two-values-or` · operator rulings B12 (2026-10-07), #1861 (2026-10-07, *"if there are 3 and more, dont show options"*) and W1 (2026-10-08, *"± when opposite, else «או»"*, which **replaces** [ADR-3D-303](#adr-3d-303)'s comma form) · **Supersedes** [ADR-3D-303](#adr-3d-303)'s spelling of a non-symmetric root set and its three-root listing · amends [ADR-3D-289](#adr-3d-289)'s display form (one row, not one per configuration) · LADDER stage: none (display of the panel's existing verdicts) · the cross-builder record is [ADR-634](06-decisions.md#adr-634)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-EQ-4b (rewritten) · **Design:** [04b](04b-design-3d.md) the data panel's parameter and point rows · [04w](04w-design-shell.md) *Two possible values*
+
+**Measured before** (`main` @ 403efe66, the locks `issue-1506-two-configurations` and `issue-1591-param-solutions` green): a point with two configurations printed two rows «S₁(1.33, 7/2, 3.33)» / «S₂(-4.33, 7/2, -2.33)», and its ask row the partial «S(?, 7/2, ?)»; a parameter with two roots «m = -2, m = 4», a ± pair «m = ±√2», three roots «m = -2, m = 0, m = 4».
+
+**Decision.**
+1. **`branchAnswer`** (`src3d/engine/dataView.ts`) writes the answer half through the shared rule (`shell/valueOptions`): «±√2» for opposites (unchanged), «-2 או m = 4» otherwise; three or more roots answer `null`, so the panel prints the open «m = ?» row and the ask lane «undetermined». `formatBranches`, its private copy of the ± rule, is folded in (the #1440 rounding lock now calls `branchAnswer`).
+2. **The two-configuration point** keeps ADR-3D-289's gate (`twoConfigurations3`) and prints ONE row, «S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)» — the issue's "align both on «או»", the way analytic's point rows read. `DataPanel.pointOptions` carries it, and the ask lane's point answer reads it, so «S» answers what the row prints. The canvas label keeps the #827 partial form.
+
+**Locks.** `issue-1591-param-solutions` («m = -2 או m = 4» in the panel and the ask row, «m = ±√2» unchanged, three roots: «m = ?» and no ask value), `issue-1440-format-branches` (rounding through `branchAnswer`), `issue-1474-branch-coverage` (figure B's three roots read open), `issue-1506-two-configurations` (the one «או» row at seeds 0, 1, 17, and the ask row the same).
+
+**Behaviour change for a student:** «המישור π1: z = 1 · המישור π2: z - m = 0 · המרחק בין המישורים π1 ו-π2 הוא 3» reads «m = -2 או m = 4» (was «m = -2, m = 4»); a parameter with three roots reads «m = ?» (was «m = -2, m = 0, m = 4»); a point with two configurations reads one row «S(…) או (…)» (was two rows S₁/S₂) and asking «S» answers the same (was «S(?, 7/2, ?)»).

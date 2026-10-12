@@ -1,4 +1,7 @@
 /**
+ * #1867 (ADR-3D-336) amends this lock: the two configurations print as ONE row joined by «או»,
+ * «S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)» (the issue: "align both on «או»"), and the ask lane answers the same.
+ *
  * #1506 (ADR-3D-289) — "there are 2 possible configs to this shape now so shouldnt we be showing both
  * in the data panel?" (operator, 2026-09-28, playing the #1499 sheet, T7 — «SM⊥ABC» then «|SM| = 4»).
  *
@@ -14,6 +17,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
 import { dataView, twoConfigurations3 } from '../engine/dataView';
+import { answerQuery } from '../engine/queries';
 import type { Vec3 } from '../engine/vec3';
 
 const st = () => useGeo3.getState();
@@ -50,12 +54,14 @@ const T7 = [
   '|SM| = 4',
 ] as const;
 
-describe('#1506 — exactly two configurations print both, one row each', () => {
-  it('T7 prints S₁ / S₂ with each row a WHOLE configuration, at every seed', () => {
+describe('#1506 — exactly two configurations print both, in one row joined by «או» (#1867)', () => {
+  it('T7 prints S(…) או (…) with each half a WHOLE configuration, at every seed', () => {
     build(T7);
     for (const seed of [0, 1, 17]) {
       const { panel } = panelAt(seed);
-      expect(rowsOf(panel.points, 'S'), `seed ${seed}`).toEqual(['S₁(1.33, 7/2, 3.33)', 'S₂(-4.33, 7/2, -2.33)']);
+      expect(rowsOf(panel.points, 'S'), `seed ${seed}`).toEqual(['S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)']);
+      // #1867: the ask lane answers the panel's own row
+      expect(answerQuery(derive3(st().facts, seed).construction, 'S', seed).answer, `ask, seed ${seed}`).toBe('S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)');
       // the determined points are untouched
       expect(panel.points, `seed ${seed}`).toContain('M(-3/2, 7/2, 1/2)');
     }

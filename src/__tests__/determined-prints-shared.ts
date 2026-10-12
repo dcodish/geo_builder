@@ -39,10 +39,12 @@ export function printsOf(facts: Fact[]): string[] {
   const { relations } = detectAll(facts);
   for (const a of relations.definiteAngles) out.push(`canvas ∠${a.a}${a.vertex}${a.b} = ${a.valueDeg.toFixed(2)}`);
   for (const l of relations.definiteLengths) out.push(`canvas |${l.a}${l.b}| = ${l.value.toFixed(2)}`);
-  const rows = computeValues(facts).rows as { kind: string; ids?: string[]; value?: number; note?: string }[];
+  const rows = computeValues(facts).rows as { kind: string; ids?: string[]; value?: number; note?: string; or?: { value: number }; pm?: true }[];
   for (const r of rows) {
     if (r.note === 'undetermined' || r.value === undefined) continue;
-    out.push(`panel ${r.kind} ${(r.ids ?? []).join('')} = ${Number(r.value).toFixed(2)}`);
+    // #1867 (ADR-634): a two-value row is recorded as BOTH values — never as one value presented as knowledge
+    const v = Number(r.value).toFixed(2);
+    out.push(`panel ${r.kind} ${(r.ids ?? []).join('')} = ${r.pm ? `±${v}` : r.or ? `${v} או ${Number(r.or.value).toFixed(2)}` : v}`);
   }
   return out.sort();
 }

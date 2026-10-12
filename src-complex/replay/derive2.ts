@@ -25,6 +25,7 @@
  */
 
 import { fmtNum } from '../../shell/format';
+import { valueOptionsOf, type ValueOptions } from '../../shell/valueOptions';
 import type { Cx } from '../value/value';
 import { cArgDeg, cPolar, evaluate, exact, formatPolar, fromCartesian } from '../value/value';
 import { closedParts, definitionOf, statedAs, substituteKnown, symbolicParts, valuedParamOf } from '../model/cartesianForm';
@@ -56,7 +57,7 @@ import {
   type ExprQuery,
   measureOf,
 } from '../model/measure';
-import { type Completeness, type KnowledgeRow, knowledgeOf, realValue, whyNotKnowledge } from '../model/knowledge';
+import { type Completeness, CX_ORDER, type KnowledgeRow, knowledgeOf, realValue, whyNotKnowledge } from '../model/knowledge';
 import { prettyName } from '../model/naming';
 import { substitute } from '../model/solutionSet';
 import type { SequenceKind, SequenceStatement } from '../model/sequence';
@@ -1409,6 +1410,26 @@ export function foldConstraints(input: FoldInput): Derived2 {
   const judgeAll = (valuesIn: (env: Env) => (Cx | null)[]) =>
     knowledgeOf(false, closure, configEnvs.flatMap(valuesIn));
   /**
+   * #1867 (ADR-CX-066) — a verdict's TWO values (B12) as a row's answer fields: `pm` for a pair of opposites
+   * («±3»), else the smaller value with the larger in `or` («1 או … = 2»), each spelled by the row's own `fmt`.
+   * `null` when the two print alike — two answers the student cannot tell apart are not two answers.
+   */
+  const twoParts = (
+    pair: readonly [Cx, Cx],
+    fmt: (z: Cx) => { value: string; approx?: true },
+  ): Pick<KnowledgeRow, 'value' | 'approx' | 'pm' | 'or'> | null => {
+    const two: ValueOptions<Cx> | null = valueOptionsOf(pair, CX_ORDER);
+    if (!two) return null;
+    if (two.kind === 'one') return fmt(two.value);
+    if (two.kind === 'opposites') return { ...fmt(two.value), pm: true };
+    const a = fmt(two.values[0]);
+    const b = fmt(two.values[1]);
+    return a.value === b.value ? null : { ...a, or: b };
+  };
+  /** a value spelled as the ask lane spells it: a real number plainly, a complex one as a+bi */
+  const cxFmt = (z: Cx) => cxAnswer(z, Math.abs(z.im) <= 1e-9 * Math.max(1, Math.hypot(z.re, z.im)));
+  const reFmt = (z: Cx) => numAnswer(z.re);
+  /**
    * The closure a quantity over SOLVED parameters is judged against: it cannot move with a free
    * direction or a numeric root (neither tier moves a solved parameter), so only the configurations'
    * own values — a branch's sign — decide it.
@@ -1546,7 +1567,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * complex number (the ordinary path answers it), `null` when a parameter it names is still free,
    * else the formatted exact value. It is exact through `linearize`, so `9r` with r = 5/9 prints 5.
    */
-  const paramOnlyValue = (e: Expr): { value: string; approx?: true } | null | undefined => {
+  const paramOnlyValue = (e: Expr): Pick<KnowledgeRow, 'value' | 'approx' | 'pm' | 'or'> | null | undefined => {
     if (refsOf(e).length > 0) return undefined;
     const names = paramsOf(e);
     if (names.length === 0) return undefined;
@@ -1572,7 +1593,10 @@ export function foldConstraints(input: FoldInput): Derived2 {
     // #1427 — the one predicate, over every configuration. A SOLVED parameter is exact and the numeric
     // tier never moves it (it is not in the free basis), so neither the free directions nor the numeric
     // census can change it: only a branch's sign can, and that is what the comparison sees.
-    return knowledgeOf(false, exactClosure, configEnvs.map((env) => evalComplex(e, env))).known ? numAnswer(here.re) : null;
+    const verdict = knowledgeOf(false, exactClosure, configEnvs.map((env) => evalComplex(e, env)));
+    if (verdict.known) return numAnswer(here.re);
+    // #1867 — a branch's sign makes two values («2u» with u² = 4 is ±4): both are the answer (B12)
+    return verdict.two ? twoParts(verdict.two, reFmt) : null;
   };
 
   /**
@@ -1598,6 +1622,10 @@ export function foldConstraints(input: FoldInput): Derived2 {
       if (ex !== null) return { label: q.src, value: ex, why: null };
       return { label: q.src, ...cxAnswer(here, real), why: null };
     }
+    // #1867 (ADR-CX-066; 02d FR-KN-1, B12 "here too for a question about a solution-set letter"): the set's
+    // members and configurations giving exactly TWO values print both — Im(z) of z² − 4z + 13 = 0 is ±3
+    const listed = verdict.two ? twoParts(verdict.two, cxFmt) : null;
+    if (listed) return { label: q.src, ...listed, why: null };
     // the members differ within ONE drawing: that is the set's own spread, not a choice of configuration
     const inOne = each.map((e) => evalComplex(e, finalEnv));
     const spread = inOne.some((v) => !v || Math.hypot(v.re - here.re, v.im - here.im) > 1e-6 * Math.max(1, Math.hypot(here.re, here.im)));
@@ -1735,6 +1763,9 @@ export function foldConstraints(input: FoldInput): Derived2 {
       if (ex !== null) return { label: q.src, value: ex, why: null };
       return { label: q.src, ...cxAnswer(here, real), why: null };
     }
+    // #1867 (ADR-CX-066): exactly two values over the complete set — both print (B12), «±» when opposites (W1)
+    const listed = verdict.two ? twoParts(verdict.two, cxFmt) : null;
+    if (listed) return { label: q.src, ...listed, why: null };
     if (!shapeFixed || !gaugeName || !real) {
       return { label: q.src, value: null, why: verdict.why };
     }
@@ -1799,7 +1830,16 @@ export function foldConstraints(input: FoldInput): Derived2 {
         return m < 1e-12 ? null : { re: v.re / m, im: v.im / m };
       }),
     );
-    if (!verdict.known) return { label: q.src, value: null, why: verdict.why };
+    if (!verdict.known) {
+      // #1867 — two DIRECTIONS print as their two angles, ascending in [0°, 360°); a direction is never «±»
+      // (45° and 225° are opposite vectors, not opposite angles), so the pair is re-listed as degrees
+      if (verdict.two) {
+        const degs = verdict.two.map((z) => ((((Math.atan2(z.im, z.re) * 180) / Math.PI) % 360) + 360) % 360).sort((x, y) => x - y);
+        const [a, b] = degs.map((d) => `${fmtNum(d)}°`);
+        if (a !== b) return { label: q.src, value: a, or: { value: b }, why: null };
+      }
+      return { label: q.src, value: null, why: verdict.why };
+    }
     // a DIRECTION, folded into one turn — the plotted point's rule, not the winding carrier's
     const deg = ((a.deg % 360) + 360) % 360;
     return { label: q.src, value: `${fmtNum(deg)}°`, why: null };
@@ -1922,6 +1962,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
     if (value === null) return { label: q.src, value: null, why: whyNotKnowledge(closure) };
     const verdict = judge(false, (env) => realValue(measureAt(env, q)));
     if (verdict.known) return { label: q.src, ...numAnswer(value), why: null };
+    const listed = verdict.two ? twoParts(verdict.two, reFmt) : null; // #1867
+    if (listed) return { label: q.src, ...listed, why: null };
     const expressed = expressMeasure(q.kind, q.points, value);
     if (expressed) return { label: q.src, ...expressed, why: null };
     return { label: q.src, value: null, why: verdict.why };
@@ -1949,6 +1991,8 @@ export function foldConstraints(input: FoldInput): Derived2 {
       return a === null || b === null || Math.abs(b) < 1e-12 ? null : realValue(a / b);
     });
     if (verdict.known) return { label: r.src, ...numAnswer(value), why: null };
+    const listed = verdict.two ? twoParts(verdict.two, reFmt) : null; // #1867
+    if (listed) return { label: r.src, ...listed, why: null };
     const invariant =
       shapeFixed &&
       symmetries.every((s) => {

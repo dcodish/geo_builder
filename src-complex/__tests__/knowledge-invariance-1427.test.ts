@@ -22,6 +22,7 @@ import { deriveLines } from '../app/deriveLines';
 import { submitLine } from '../app/submit';
 import { complexI18n } from '../i18n';
 import { whyText } from '../replay/scene2';
+import { knowledgeAnswerText } from '../replay/scene2';
 import { useComplexStore } from '../store/useComplexStore';
 
 const store = () => useComplexStore.getState();
@@ -38,11 +39,20 @@ const row = (seed: number, label: string) => at(seed).knowledge.find((k) => k.la
 /** the ask's row at every one of the 24 seeds */
 const rows = (label: string) => SEEDS.map((s) => row(s, label));
 
-describe('#1427 lock 1 — z1²−4z1+13=0 · z2 = 2z1: Im(z1) is ±3, never printed; Re(z1) is 2', () => {
+/**
+ * #1867 (ADR-CX-066) amends locks 1 and 3 per the operator's rulings B12 (2026-10-07, *"complex should also show
+ * both values - so it should follow all of the tools"*) and W1 (2026-10-08, «±» when opposite, else «או»): a value
+ * with exactly two possibilities over the COMPLETE configuration set prints both — Im(z1) reads «±3», never one
+ * configuration's «3». A floor (lock 4) still never prints, and three or more values keep «differs».
+ */
+describe('#1427 lock 1 — z1²−4z1+13=0 · z2 = 2z1: Im(z1) is ±3, never ONE of them; Re(z1) is 2', () => {
   beforeEach(() => feed(['z1^2-4z1+13=0', 'z2 = 2z1'], ['Im(z1)', 'Re(z1)']));
 
-  it('Im(z1) never prints a number, at any of 24 seeds — it differs between the two configurations', () => {
-    for (const r of rows('Im(z1)')) expect(r).toEqual({ label: 'Im(z1)', value: null, why: { code: 'multi-config', configs: 2 } });
+  it('Im(z1) prints «±3» at all 24 seeds — both configurations\' values, never one as fact (#1867)', () => {
+    for (const r of rows('Im(z1)')) {
+      expect(r).toEqual({ label: 'Im(z1)', value: '3', pm: true, why: null });
+      expect(knowledgeAnswerText(r, 'או')).toBe('±3');
+    }
   });
 
   it('Re(z1) prints 2 at every seed — both roots share it', () => {
@@ -53,7 +63,7 @@ describe('#1427 lock 1 — z1²−4z1+13=0 · z2 = 2z1: Im(z1) is ±3, never pri
     store().resetSession();
     feed(['z2 = 2z1', 'z1^2-4z1+13=0'], ['Im(z1)', 'Re(z1)']);
     expect(row(0, 'Re(z1)').value).toBe('2');
-    expect(row(0, 'Im(z1)').value).toBeNull();
+    expect(knowledgeAnswerText(row(0, 'Im(z1)'), 'או')).toBe('±3');
   });
 });
 
@@ -74,8 +84,8 @@ describe('#1427 lock 2 — z²−4z+13=0: Re and |z| print, Im is withheld, both
     for (const r of rows('|z|')) expect(r.value).toBe('√13');
   });
 
-  it('Im(z) is withheld as «differs between the 2 solutions», naming z₁ to ask about', () => {
-    for (const r of rows('Im(z)')) expect(r.why).toEqual({ code: 'multi-solution', solutions: 2, first: 'z1' });
+  it('Im(z) prints «±3» — the two solutions\' values (#1867; it was withheld as «differs between the 2 solutions»)', () => {
+    for (const r of rows('Im(z)')) expect(knowledgeAnswerText(r, 'או')).toBe('±3');
   });
 
   it('both roots are drawn at once, named z₁ = 2+3i and z₂ = 2−3i, at every seed', () => {
@@ -97,8 +107,8 @@ describe('#1427 lock 3 — z1 = 2 · |z2| = 1 · z2² = −1: invariants print a
     for (const r of rows('Re(z2)')) expect(r.value).toBe('0');
   });
 
-  it('Im(z2) is withheld as «differs» (it is ±1)', () => {
-    for (const r of rows('Im(z2)')) expect(r.why).toEqual({ code: 'multi-config', configs: 2 });
+  it('Im(z2) prints «±1» — both branches\' values (#1867; it was withheld as «differs»)', () => {
+    for (const r of rows('Im(z2)')) expect(knowledgeAnswerText(r, 'או')).toBe('±1');
   });
 });
 
@@ -118,9 +128,12 @@ describe('#1427 lock 4 — z1 = 1+i · Im(z2) = 0 · |z2 − z1| = 2: a census F
 });
 
 describe('#1427 — the class, beyond the four reported sequences', () => {
-  it('a polynomial read through the OTHER orientation (z2 = conj(z1)) is complete too: Im(z1) = ±√2 is withheld as «differs»', () => {
+  it('a polynomial read through the OTHER orientation (z2 = conj(z1)) is complete too: Im(z1) ≈ ±1.41 (±√2) prints both (#1867)', () => {
     feed(['z1^2-4z1+6=0', 'z2 = conj(z1)'], ['Im(z1)', 'Re(z1)']);
-    for (const r of rows('Im(z1)')) expect(r.why).toEqual({ code: 'multi-config', configs: 2 });
+    for (const r of rows('Im(z1)')) {
+      expect(knowledgeAnswerText(r, 'או')).toBe('±1.41');
+      expect(r.approx).toBe(true);
+    }
     for (const r of rows('Re(z1)')) expect(r.value).toBe('2');
   });
 
@@ -129,12 +142,13 @@ describe('#1427 — the class, beyond the four reported sequences', () => {
     for (const r of rows('Re(z2)')) expect(r.why).toEqual({ code: 'maybe-multi' });
   });
 
-  it('z³ − 1 = 0 (#1434: now the three named roots of z³ = 1): |z| = 1 prints, Re(z) differs between them', () => {
-    feed(['z^3-1=0'], ['|z|', 'Re(z)']);
+  it('z³ − 1 = 0 (#1434: now the three named roots of z³ = 1): |z| = 1 prints, Im(z) differs between them (three values; #1867: Re lists its two)', () => {
+    feed(['z^3-1=0'], ['|z|', 'Im(z)', 'Re(z)']);
     expect(at(0).configCount).toBe(1);
     expect(at(0).points.filter((p) => p.name !== 'o').map((p) => p.name)).toEqual(['z1', 'z2', 'z3']);
     for (const r of rows('|z|')) expect(r.value).toBe('1');
-    for (const r of rows('Re(z)')) expect(r.why).toEqual({ code: 'multi-solution', solutions: 3, first: 'z1' });
+    for (const r of rows('Im(z)')) expect(r.why).toEqual({ code: 'multi-solution', solutions: 3, first: 'z1' });
+    for (const r of rows('Re(z)')) expect(knowledgeAnswerText(r, 'או')).toBe('-0.5 או Re(z) = 1');
   });
 
   it('a degree-1 polynomial is a complete set of ONE: z1 + z2 = 5+2i prints Re(z2) = 2', () => {

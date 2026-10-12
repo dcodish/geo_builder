@@ -41,7 +41,7 @@ import { independentConstructs } from '@/app/independence';
 import type { Crossing } from '@/engine';
 import { MathText, hasMath } from '../shell/math';
 import { inputPreviewNode } from '@/render/inputPreviewNode';
-import { MathValue } from '@/render/MathValue';
+import { MathValues } from '@/render/MathValue';
 import { formatMeasure } from '@/format';
 import { readoutForGroup } from '@/render/computedValue';
 import type { DetectedShape, Id, SimilarClass } from '@/engine';
@@ -1888,7 +1888,8 @@ export default function App() {
                           {valueRowText(r, (k, p) => t(k, p) as string)}
                         </bdi>
                         <span>=</span>
-                        <MathValue value={r.value} exact={r.exact} degrees={r.kind === 'angle'} unit={r.unit} />
+                        {/* #1867 (ADR-634): one value, «±v», or «a או label = b» — the W1 spelling */}
+                        <MathValues row={r} degrees={r.kind === 'angle'} label={valueRowText(r, (k, p) => t(k, p) as string)} or={t('values.or')} />
                       </button>
                     ))}
                   </div>
@@ -1981,7 +1982,7 @@ export default function App() {
                     {qr.value !== null && qr.value !== undefined ? (
                       <>
                         <span style={{ color: '#334155' }}>=</span>
-                        <MathValue value={qr.value} exact={qr.exact} degrees={qr.kind === 'angle'} unit={qr.unit} />
+                        <MathValues row={{ ...qr, value: qr.value }} degrees={qr.kind === 'angle'} label={qr.label ?? qr.text} or={t('values.or')} />
                       </>
                     ) : (
                       <span style={{ fontSize: 11, color: '#94a3b8' }}>{t(`values.q.${qr.note ?? 'undetermined'}`)}</span>

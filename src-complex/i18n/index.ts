@@ -239,6 +239,8 @@ const he = {
   askPlaceholder: 'למשל: שטח Oz1z2 או |z1-z2|',
   askAdd: 'שאלו',
   askRemove: 'הסרת השאלה',
+  /** #1867 (ADR-CX-066): the joiner between a quantity's two values (W1) */
+  askOr: 'או',
   askUnreadable: 'הכלי לא הבין את השאלה — נסו ניסוח אחר',
   askIsStatement: 'זהו נתון, לא שאלה — הקלידו אותו בתיבת הנתונים',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
@@ -469,6 +471,7 @@ const en: typeof he = {
   askPlaceholder: 'e.g. area Oz1z2 or |z1-z2|',
   askAdd: 'Ask',
   askRemove: 'Remove question',
+  askOr: 'or',
   askUnreadable: 'the tool could not read this question — try another phrasing',
   askIsStatement: 'this is a given, not a question — enter it in the givens box',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.

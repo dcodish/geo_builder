@@ -614,7 +614,7 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
   // undetermined and says so.
   if (q.kind === 'symbol' && q.sym === c.param) {
     const branches = resolve3(c, seed).param?.branches ?? [];
-    const shown = branchAnswer(q.sym, branches); // #1591: «m = -2, m = 4» once joined by the ask row
+    const shown = branchAnswer(q.sym, branches); // #1867: «m = -2 או m = 4» once joined by the ask row; 3+ roots → null
     return shown ? { text, answer: shown } : { text, answer: null, note: 'undetermined' };
   }
   /**
@@ -668,7 +668,11 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
   // would be free to disagree with the ארגון נתונים panel about the same point (the #481 lesson), and
   // the #315 translation anchor would have to be remembered twice.
   if (q.kind === 'point') {
-    const entry = dataView(c, seed).pointCoords[q.id];
+    const panel = dataView(c, seed);
+    // #1867 (ADR-3D-336): a point with exactly two configurations answers both, as its panel row prints them
+    const two = panel.pointOptions[q.id];
+    if (two) return { text, answer: `${q.id}${two}` };
+    const entry = panel.pointCoords[q.id];
     return entry ? { text, answer: `${q.id}${entry.text}` } : { text, answer: null, note: 'undetermined' };
   }
 
