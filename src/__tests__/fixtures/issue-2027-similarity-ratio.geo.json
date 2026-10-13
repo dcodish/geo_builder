@@ -1,0 +1,84 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-13T00:00:00.000Z",
+  "name": "issue-2027-similarity-ratio",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "ei9Radfc16t0C5RjK0paM",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "JAvKaYDCBS8osW1w_6tos",
+      "utterance": "משולש DEF",
+      "group": "g1",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "D",
+          "E",
+          "F"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "R_knRKSXhggnEOMYZzefR",
+      "utterance": "משולש ABC דומה למשולש DEF ביחס 1/2",
+      "group": "g2",
+      "cmd": {
+        "type": "set-ratio",
+        "a": "A",
+        "b": "B",
+        "c": "D",
+        "d": "E",
+        "k": 0.5
+      },
+      "enabled": true
+    },
+    {
+      "id": "mbpPyd4-W-qYyBcteTm49",
+      "utterance": "משולש ABC דומה למשולש DEF ביחס 1/2",
+      "group": "g2",
+      "cmd": {
+        "type": "set-angle-ratio",
+        "v1": "D",
+        "a1": "E",
+        "b1": "F",
+        "v2": "A",
+        "a2": "B",
+        "b2": "C",
+        "k": 1
+      },
+      "enabled": true
+    },
+    {
+      "id": "jsZrESSzLWY88QVv9za-h",
+      "utterance": "משולש ABC דומה למשולש DEF ביחס 1/2",
+      "group": "g2",
+      "cmd": {
+        "type": "set-angle-ratio",
+        "v1": "E",
+        "a1": "D",
+        "b1": "F",
+        "v2": "B",
+        "a2": "A",
+        "b2": "C",
+        "k": 1
+      },
+      "enabled": true
+    }
+  ]
+}
