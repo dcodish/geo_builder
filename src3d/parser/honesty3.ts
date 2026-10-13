@@ -30,7 +30,7 @@ import type { Command3, Id } from '../engine/types';
 import { readShapePhrase3, SHAPE_ADJ_WORDS3 } from '../lexicon/shapePhrase3';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { QUAD_PYRAMIDS, type QuadBase } from '../engine/baseShapes';
-import { CONSTRUCT_NOUNS, foldPrimes3, labelTokens, normalize3 } from './parse3';
+import { CONSTRUCT_NOUNS, RADICAND, evalRadical, foldPrimes3, labelTokens, normalize3 } from './parse3';
 
 /**
  * Uppercase point labels (and conventional vector names) the utterance STATES but the committed
@@ -411,8 +411,10 @@ export function droppedGivenNumbers3(utterance: string, commands: Command3[]): s
   // (the 2-D discipline: each letter → space, so `x`, `t(...)`, `k/6` leave their digits behind)
   s = s.replace(/[A-Za-z]\d*/g, ' ');
   // after blanking, parentheses wrap only numeric content — `(√6/4)`, coordinate triples `(2,-2,6)` —
-  // so drop them, letting the fraction/radical spans read whole
-  s = s.replace(/[()]/g, ' ');
+  // so drop them, letting the fraction/radical spans read whole. #1827 (ADR-3D-337): except a RADICAND's
+  // own parentheses — `√(3/4)` is √0.75, and stripping them read it as √3/4, a value the parser never
+  // lowered, so a line the grammar read was refused `dropped-given`. The radicand is the parser's atom.
+  s = s.replace(new RegExp(String.raw`√\s*${RADICAND}|[()]`, 'g'), (m) => (m.startsWith('√') ? m : ' '));
 
   const dropped: string[] = [];
   const seen = new Set<string>();
@@ -438,12 +440,13 @@ export function droppedGivenNumbers3(utterance: string, commands: Command3[]): s
 
   // 2) RADICAL / FRACTION value expressions `[coef]√n [/ term]` or `a/b` — evaluated and consumed
   //    WHOLE (the value the parser lowers to is what must be accounted, not the raw digits).
-  const RAD = String.raw`√\s*\d+(?:\.\d+)?`;
+  // #1827: the radical term is the PARSER'S atom and is read by the parser's own reader, so the gate can
+  // never value a radicand («√(3/4)») differently from the rule that lowered it
+  const RAD = String.raw`√\s*${RADICAND}`;
   const TERM = String.raw`(?:\d+(?:\.\d+)?\s*[*·]?\s*)?${RAD}|\d+(?:\.\d+)?`;
   const evalTerm = (t: string): number => {
-    const r = t.trim().match(/^(?:(\d+(?:\.\d+)?)\s*[*·]?\s*)?√\s*(\d+(?:\.\d+)?)$/);
-    if (!r) return parseFloat(t);
-    return (r[1] ? parseFloat(r[1]) : 1) * Math.sqrt(parseFloat(r[2]));
+    if (!t.includes('√')) return parseFloat(t);
+    return evalRadical(t.replace(/\s*[*·]\s*/g, '')) ?? NaN;
   };
   for (const m of s.matchAll(new RegExp(`(${TERM})(?:\\s*/\\s*(${TERM}))?`, 'g'))) {
     if (!/√|\//.test(m[0])) continue; // a bare number → the single-number pass below (with its own lowering candidates)

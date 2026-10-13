@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-13T15:41:29.458Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "פירמידה SABCD",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramid4gr",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "S"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "SO גובה הפירמידה = √7",
+      "cmds": [
+        {
+          "type": "seg-plane-rel",
+          "rel": "perp",
+          "a": "S",
+          "b": "O",
+          "plane": []
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "S",
+            "b": "O",
+            "value": 2.6457513110645907
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "AB = sqrt(2)",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "B",
+            "value": 1.4142135623730951
+          }
+        }
+      ]
+    }
+  ]
+}

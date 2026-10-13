@@ -325,6 +325,14 @@ const SEEDED: SeededCorpus = {
   // whole glyph table, since the stored utterance must keep lowering to the same commands. The other
   // twins (∡/∢/`<`/⁰/º/˚/«שורש») and the ask lane are asserted in issue-1912-glyph-fold.test.ts.
   'perp-glyph-u27c2-1912.geo3.json': ['משולש ABC', 'AC ⟂ AB', '∡ABC = 40°', 'אורך AB הוא שורש 2'],
+
+  // #1827 (ADR-3D-337) — the operator's exact sequence: a bare side given as a RADICAL. Before: «לא הצלחתי להבין
+  // את הנתון» on «AD=√7» while «|AD|=√7» built. The two sibling slots that read the same magnitude atom (a height's
+  // stated length, a triangle's area) and the `sqrt` spelling ride along; every rule × spelling is swept in
+  // src3d/parser/__tests__/issue-1827-magnitude-atom.test.ts.
+  'rect-surd-side-1827.geo3.json': ['מלבן ABCD', 'AB=1', 'AD=√7'],
+  'pyramid-surd-height-1827.geo3.json': ['פירמידה SABCD', 'SO גובה הפירמידה = √7', 'AB = sqrt(2)'],
+  'triangle-surd-area-1827.geo3.json': ['משולש ABC', 'שטח המשולש ABC = √3'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

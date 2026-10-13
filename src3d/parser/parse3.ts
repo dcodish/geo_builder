@@ -243,6 +243,12 @@ export function normalize3(s: string): string {
       // the equal-sides word. The declaration gate admitted it (`שוו?ה`) but no reader did, so «משולש שוה
       // צלעות ABC» drew a scalene triangle, green. Guarded on both sides, so «שוהה» is untouched.
       .replace(/(?<![א-ת])(ו?)שוה(?![א-ת])/g, '$1שווה')
+      // #1827 ([ADR-3D-337](../../docs/06b-decisions-3d.md#adr-3d-337)): the keyboard spellings of the
+      // root sign ARE √ — «AD = sqrt(7)», «sqrt7», «\sqrt{7}» (a braced radicand is the parenthesised one).
+      // 2-D reads all three as √7; 3-D read none, «|AB| = sqrt(2)» included. Folded at the one boundary
+      // every rule AND the honesty gate read, so no √-reading slot can miss a spelling another one takes.
+      .replace(/\\?sqrt\s*\{([^{}]*)\}/g, '√($1)')
+      .replace(/\\?sqrt/g, '√')
       .replace(/½/g, '1/2')
       .replace(/¼/g, '1/4')
       .replace(/¾/g, '3/4')
@@ -1781,7 +1787,7 @@ const spanPoint: Rule = (s) => {
  * private branch here.
  */
 
-const RADICAND = String.raw`(?:\(\s*${UNUM}(?:\s*\/\s*${UNUM})?\s*\)|${UNUM})`;
+export const RADICAND = String.raw`(?:\(\s*${UNUM}(?:\s*\/\s*${UNUM})?\s*\)|${UNUM})`;
 
 /**
  * A term whose coefficient may carry ONE scalar symbol (V7): `(k/2)DB`, `kDC`,
@@ -1864,7 +1870,29 @@ function radicandValue(raw: string): number | null {
 /** Evaluate a small numeric expression with radicals: 3, 3/4, √6/4, 2√3, (√6/4), and — #513 — a
  *  parenthesised radicand: √(48), 2√(3), √(12/4), √(48)/4. */
 const RADICAL_RE = new RegExp(String.raw`^(${UNUM})?\s*(?:√\s*(${RADICAND}))?\s*(?:\/\s*(${UNUM}))?$`);
-function evalRadical(raw: string): number | null {
+/**
+ * #1827 ([ADR-3D-337](../../docs/06b-decisions-3d.md#adr-3d-337)) — THE MAGNITUDE ATOM: the lexical
+ * half of {@link evalRadical}, and the ONE source every stated-magnitude slot composes from. `7`, `2.5`,
+ * `7/2`, `√7`, `√(7)`, `2√7`, `√7/2`, `√(3/4)` — and `sqrt(7)` / `\sqrt{7}`, which {@link normalize3}
+ * folds to `√` before any rule reads the line.
+ *
+ * Only `|AB| = …` (`lengthRel`) read its value through `evalRadical`; the bare `AB = …`, the area and the
+ * height slots matched the decimal-only `NUM`/`UNUM` and read the capture with `+m[n]`, so «AD = √7»
+ * was "not understood" while «|AD| = √7» built — one value, two verdicts, decided by which rule's
+ * private atom the sentence reached. A slot that states a magnitude matches `MAG` and reads it with
+ * {@link magValue}; the pair is defined together so a capture the atom admits is one the reader reads
+ * (the `magnitude-atom` sweep in `issue-1827-magnitude-atom.test.ts` holds that, rule by rule).
+ * An ANGLE stays decimal (`ANGLE_VAL`): its unit is the degree.
+ */
+const MAG = String.raw`(?:(?:${UNUM})?\s*√\s*${RADICAND}|${UNUM})(?:\s*\/\s*${UNUM})?`;
+/** The reader paired with {@link MAG}: a signed magnitude literal's value, null when it is not one. */
+function magValue(raw: string): number | null {
+  const t = raw.trim();
+  if (!t.startsWith('-')) return evalRadical(t);
+  const v = evalRadical(t.slice(1));
+  return v === null ? null : -v;
+}
+export function evalRadical(raw: string): number | null {
   const s0 = raw.trim().replace(/^\((.*)\)$/, '$1').trim();
   if (s0 === '') return null;
   const m = s0.match(RADICAL_RE);
@@ -2075,22 +2103,25 @@ interface HeightStatement3 {
 }
 
 function readHeight3(s: string): HeightStatement3 | null {
-  // The value slots compose from the UNUM atom (the docs/24 S2.1 lexical ratchet), so these three
-  // are built RegExps rather than literals. Named groups: positional indices shift as a pattern grows.
+  // The value slots compose from the MAG atom (the docs/24 S2.1 lexical ratchet; #1827: a height's
+  // length may be a radical), so these three are built RegExps rather than literals. Named groups:
+  // positional indices shift as a pattern grows.
   const L = String.raw`[A-Z]\d*'?`;
   const m =
-    s.match(new RegExp(String.raw`^(?:המקצוע\s+|הצלע\s+)?(?<a>${L})(?<b>${L})\s+(?:הוא\s+)?(?<noun>גובה|אנך)(?<solid>\s+(?:בפירמידה|במנסרה|הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?(?:\s*,?\s*(?:\k<a>\k<b>\s*)?(?:ואורכו|אורכו|הוא|=)\s*(?<value>${UNUM}))?\s*$`)) ??
-    s.match(new RegExp(String.raw`^(?<a>${L})(?<b>${L})\s+is\s+the\s+(?<noun>height|altitude)(?<solid>\s+of\s+the\s+(?:pyramid|prism))?(?:\s*,?\s*(?:and\s+its\s+length\s+is|=)\s*(?<value>${UNUM}))?\s*$`, 'i')) ??
+    s.match(new RegExp(String.raw`^(?:המקצוע\s+|הצלע\s+)?(?<a>${L})(?<b>${L})\s+(?:הוא\s+)?(?<noun>גובה|אנך)(?<solid>\s+(?:בפירמידה|במנסרה|הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?(?:\s*,?\s*(?:\k<a>\k<b>\s*)?(?:ואורכו|אורכו|הוא|=)\s*(?<value>${MAG}))?\s*$`)) ??
+    s.match(new RegExp(String.raw`^(?<a>${L})(?<b>${L})\s+is\s+the\s+(?<noun>height|altitude)(?<solid>\s+of\s+the\s+(?:pyramid|prism))?(?:\s*,?\s*(?:and\s+its\s+length\s+is|=)\s*(?<value>${MAG}))?\s*$`, 'i')) ??
     // #1448: the noun-first named spelling — «גובה הפירמידה SO = 4».
-    s.match(new RegExp(String.raw`^ה?(?<noun>גובה)(?<solid>\s+(?:הפירמידה|המנסרה))\s+(?<a>${L})(?<b>${L})\s*(?:,?\s*(?:הוא|=)\s*(?<value>${UNUM}))?\s*$`));
+    s.match(new RegExp(String.raw`^ה?(?<noun>גובה)(?<solid>\s+(?:הפירמידה|המנסרה))\s+(?<a>${L})(?<b>${L})\s*(?:,?\s*(?:הוא|=)\s*(?<value>${MAG}))?\s*$`));
   const g = m?.groups;
   if (!g) return null;
+  const value = g.value !== undefined ? magValue(g.value) : undefined;
+  if (value === null) return null;
   return {
     a: g.a,
     b: g.b,
     altitude: g.noun !== 'אנך',
     ofSolid: g.solid !== undefined,
-    ...(g.value !== undefined ? { value: Number(g.value) } : {}),
+    ...(value !== undefined ? { value } : {}),
   };
 }
 
@@ -2159,7 +2190,7 @@ const heightFromApex: Rule = (s) => {
   const FROM = String.raw`(?:ש?יוצא\s+)?מ-?\s*(?:נקודה\s+|ה?קודקוד\s+)?`;
   // #1448: the phrase may carry its VALUE — «גובה הפירמידה 4», «הוא 4», «= 4» — the two-line
   // spelling («SO גובה הפירמידה» then «SO = 4») compressed into the sentence the review typed.
-  const VAL = String.raw`(?:\s*,?\s*(?:הוא\s+|שווה\s+ל-?\s*|=\s*|is\s+)?(?<len>${UNUM}))?`;
+  const VAL = String.raw`(?:\s*,?\s*(?:הוא\s+|שווה\s+ל-?\s*|=\s*|is\s+)?(?<len>${MAG}))?`;
   const m =
     s.match(
       new RegExp(
@@ -2178,6 +2209,8 @@ const heightFromApex: Rule = (s) => {
     );
   if (!m?.groups) return null;
   const { solid, from, b1, b2, b3, len } = m.groups;
+  const lenValue = len !== undefined ? magValue(len) : undefined;
+  if (lenValue === null) return null;
   const face = b1 && b2 && b3 ? [b1, b2, b3] : undefined;
   // the base clause is present iff the utterance said בסיס/base at all — a named face implies it
   const saidBase = /ל-?\s*ה?בסיס|to\s+(?:the\s+)?base/i.test(s);
@@ -2195,7 +2228,7 @@ const heightFromApex: Rule = (s) => {
       type: 'perp-to-base',
       ...(from ? { from } : {}),
       ...(face ? { face } : {}),
-      ...(len !== undefined ? { len: Number(len) } : {}),
+      ...(lenValue !== undefined ? { len: lenValue } : {}),
     },
   ];
 };
@@ -4284,26 +4317,29 @@ const coordsClaim: Rule = (s) => {
  * two orders of one sentence disagreed.
  */
 const lengthClaim: Rule = (s) => {
-  const m = s.match(new RegExp(`^([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(${NUM})$`));
-  if (!m) return null;
+  // #1827: the value is a MAGNITUDE (`AD = √7`), read by its paired reader — never `+m[3]`
+  const m = s.match(new RegExp(`^([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(-?\\s*${MAG})$`));
+  const value = m ? magValue(m[3]) : null;
+  if (!m || value === null) return null;
   return [
     VEC_MARKED ? { type: 'draw-arrow', from: m[1], to: m[2] } : { type: 'segment3', a: m[1], b: m[2] },
-    { type: 'claim', claim: { type: 'length-eq', a: m[1], b: m[2], value: +m[3] } },
+    { type: 'claim', claim: { type: 'length-eq', a: m[1], b: m[2], value } },
   ];
 };
 
 /** `שטח המשולש ABC = 4.5` / `the area of triangle ABC = 4.5` — an area CLAIM (draws the triangle). */
 const areaClaim: Rule = (s) => {
   const m = s.match(
-    new RegExp(`^(?:שטח\\s+(?:ה?משולש\\s+)?|the area of (?:the )?triangle\\s+|area of\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(${NUM})$`),
+    new RegExp(`^(?:שטח\\s+(?:ה?משולש\\s+)?|the area of (?:the )?triangle\\s+|area of\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(-?\\s*${MAG})$`),
   );
-  if (!m) return null;
-  const [, a, b, c, value] = m;
+  const value = m ? magValue(m[4]) : null; // #1827: «שטח המשולש ABC = √3» is a magnitude too
+  if (!m || value === null) return null;
+  const [, a, b, c] = m;
   return [
     { type: 'segment3', a, b },
     { type: 'segment3', a: b, b: c },
     { type: 'segment3', a: c, b: a },
-    { type: 'claim', claim: { type: 'area-eq', ids: [a, b, c], value: +value } },
+    { type: 'claim', claim: { type: 'area-eq', ids: [a, b, c], value } },
   ];
 };
 

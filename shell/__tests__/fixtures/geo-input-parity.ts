@@ -1327,6 +1327,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #1864 (ADR-AG-267): an angle's acuteness named by its VERTEX alone — 2-D's «∠C קהה/חדה» ──
   { id: 'vertex-obtuse-1864', family: 'angles', steps: ['משולש ABC', 'זווית A קהה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the line the obtuse-triangle note teaches' },
   { id: 'vertex-acute-1864', family: 'angles', steps: ['משולש ABC', 'זווית A חדה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+
+  // ── #1827 (ADR-3D-337): a stated magnitude may be a RADICAL in every slot, not only «|AD| = …» ──
+  // 3-D read «|AD| = √7» and refused the bare «AD = √7» (the operator's line), the area and the `sqrt` spelling.
+  { id: 'surd-length-1827', family: 'lengths', steps: ['מלבן ABCD', 'AB=1', 'AD=√7'], expect: 'builds', note: 'the operator’s exact sequence (prod 3-D, 2026-10-06)' },
+  { id: 'surd-length-paren-1827', family: 'lengths', steps: ['משולש ABC', 'AB = √(7)'], expect: 'builds' },
+  { id: 'surd-length-sqrt-1827', family: 'lengths', steps: ['משולש ABC', 'AB = sqrt(2)'], expect: 'builds', note: 'the keyboard spelling of √ (#1920)' },
+  { id: 'surd-area-1827', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC = √3'], expect: 'builds' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

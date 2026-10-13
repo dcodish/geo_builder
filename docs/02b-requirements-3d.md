@@ -146,11 +146,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
 - **FR-SP-22 (Must)** — **A symbol typed as any of its look-alike glyphs reads as the symbol**
   ([FR-SU-17](02w-requirements-workspace.md)). «AC ⟂ AB» reads as «AC ⊥ AB» (and «SA ⟂ ABC» on a plane),
   «∡ABC» and «∢ABC» as «∠ABC», a keyboard `<` before a run of letters as «∠», «40⁰» / «40º» / «40˚» as
-  40°, and «שורש 2» as √2 — in a statement and in a data-panel question alike, since a measure the student
+  40°, and «שורש 2», «sqrt(2)», «sqrt2» and «\sqrt{2}» as √2 — in a statement and in a data-panel question alike, since a measure the student
   can state they can ask (FR-CL-4). A comparison is never turned into an angle. The fact row keeps exactly
-  the glyph that was typed.
+  the glyph that was typed. A stated length, area or height takes a RADICAL value («AD = √7», «2√7»,
+  «√7/2», «√(3/4)») wherever it takes a decimal, as 2-D does: «AD = √7» and «|AD| = √7» are one given.
   - Sources: [ADR-3D-329](06b-decisions-3d.md#adr-3d-329), #1912; the prime fold ADR-3D-300 is the same
-    seam one symbol over.
+    seam one symbol over; [ADR-3D-337](06b-decisions-3d.md#adr-3d-337), #1827 (the `sqrt` spelling and the
+    radical value in every stated-magnitude slot).
 - **FR-SP-21 (Must)** — **A letter the tool cannot read is refused by name, never replaced**
   ([FR-SU-18](02w-requirements-workspace.md)). «משולש ДЖФ» recorded a triangle named A, B, C; it is now
   refused quoting Д, Ж, Ф, at the one statement reader submit and the ✎ edit share, before the grammar and
