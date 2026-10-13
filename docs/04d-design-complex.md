@@ -98,6 +98,14 @@ never as a contradiction or a refutation.
   reader, `readProperty`, which claims one property word plus the meaning-free structure around it
   (number noun, «על הציר», «הינו»). Which sentence a refusal is worded with is decided after the
   accounting, from the unread spans (`negationAmong` → `errNegation`); it never makes a rule read more.
+- **A stated object is drawn or refused, never dropped** ([ADR-CX-069](06d-decisions-complex.md#adr-cx-069)).
+  `resolveObjects` runs at stage 3e beside the backstop and returns `{ drawn, undrawn }`; every undrawn
+  object's `src` joins `unsatisfied`, the channel stage 0e's gate already reads — so the gate tries the
+  other configurations, then names the blocking line or quotes the object's own. **One evaluator:** a
+  radius is read by `evalReal` over the final environment, never by a private copy and never by its
+  modulus; null or ≤ 0 is undrawable. **One name map:** an object's names (centre, vertices, the names
+  inside the radius) are read label → number through `allAliases` (the #791 bindings and #694
+  selections) before any lookup. The circle rule declares `refNames(radius)` with its centre.
 - **A second mention of a name is a GIVEN, and that decision lives at ONE seam.** Rules ask
   `existingRef()` rather than each deciding for itself
   ([ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md)) — the difference

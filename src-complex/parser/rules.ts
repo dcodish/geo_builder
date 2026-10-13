@@ -1049,7 +1049,11 @@ const circleByCenterRadius: Rule = (s, scope) => {
   // #1405 — a radius is a LENGTH: a complex number outside `|…|` is not one (the same type question
   // the equation rule asks of `|z1| = 9w`)
   if (hasBareComplexRef(radius)) return null;
-  return objectLine({ kind: 'circle', center: canonName(m[1]), radius, src: s }, s);
+  const line = objectLine({ kind: 'circle', center: canonName(m[1]), radius, src: s }, s);
+  // #1895 (ADR-CX-069) — the radius's names are DECLARED, as the equation rule declares both sides:
+  // «ורדיוסו |z1|» typed before z₁ is mentioned brings a free z₁, never a circle with no radius
+  // (ADR-CX-004 D1: a name referenced before definition auto-creates a free complex number)
+  return { ...line, declares: [...new Set([...line.declares, ...refNames(radius)])] };
 };
 
 // --- F7: measures -----------------------------------------------------------

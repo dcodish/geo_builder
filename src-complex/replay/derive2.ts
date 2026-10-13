@@ -1230,14 +1230,19 @@ export function foldConstraints(input: FoldInput): Derived2 {
     );
   }
 
+  /**
+   * #694: a resolved selection is an alias like any other — «z₀ (z₆)» through the #791 display tie.
+   * Number name → label. #1895 (ADR-CX-069): the SAME map, read label → number, is how a stated object
+   * finds a bound or selected letter («המעגל שמרכזו A», «|B|»): one name map, never a second lookup.
+   */
+  const allAliases = new Map<string, string>([...aliases, ...selectionAliases]);
+  const numberOfLabel = new Map<string, string>([...allAliases].map(([number, label]) => [label, number]));
   const points: DerivedPoint[] = [];
   /** #1365 — names whose exact modulus still holds a parameter: KNOWN only as a function of it */
   const parametricNames = new Set<string>();
   if (!t1.inconsistent) {
     // the union: names the constraints mention PLUS bare declarations, so a number the student merely
     // named is still on the canvas (always-visualise) rather than waiting for a constraint to earn it
-    // #694: a resolved selection is an alias like any other — «z₀ (z₆)» through the #791 display tie.
-    const allAliases = new Map<string, string>([...aliases, ...selectionAliases]);
     const boundLabels = new Set(allAliases.values());
     for (const name of drawnNames) {
       // #791: a bound label is the SAME point as its number — one dot, one dual-named reading
@@ -1385,7 +1390,29 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * with no reference to any other statement, so naming it before the relational verdicts tells the
    * student the true reason rather than pointing at a conflict that is not the problem.
    */
-  const unsatisfied = [...t1.impossible, ...unsatisfiedRelations, ...violatedMeasures, ...violatedFilters, ...unresolvedSelections];
+  /**
+   * #1895 (ADR-CX-069) — STAGE 3e FOR OBJECTS: a stated object is DRAWN or REFUSED, never dropped.
+   *
+   * `resolveObjects` used to run at the very end and `return` in silence on three paths: a radius its
+   * private evaluator could not read («|z1|», «r+1»), a centre or vertex that is a bound or selected
+   * letter, and a circumscribed circle through collinear numbers. The line was accepted and nothing
+   * was drawn. It now runs here, over the final values, and an object it cannot draw joins the same
+   * channel as every other given that does not hold — so the acceptance gate first tries the other
+   * configurations (a free radius may be positive in another drawing), then names the line that blocks
+   * it, or quotes the object's own line. No new message and no new channel.
+   */
+  const resolvedObjects: { drawn: DerivedObject[]; undrawn: string[] } = t1.inconsistent
+    ? { drawn: [], undrawn: [] }
+    : resolveObjects(objects, points, finalEnv, numberOfLabel, solutionSets);
+
+  const unsatisfied = [
+    ...t1.impossible,
+    ...unsatisfiedRelations,
+    ...violatedMeasures,
+    ...violatedFilters,
+    ...unresolvedSelections,
+    ...resolvedObjects.undrawn,
+  ];
 
   /**
    * STAGE 5d — the only place a number the engine computed reaches a string.
@@ -2009,7 +2036,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
   return {
     contradiction: t1.inconsistent,
     points: canvasPoints,
-    objects: t1.inconsistent ? [] : resolveObjects(objects, points, sample, solutionSets),
+    objects: resolvedObjects.drawn,
     sequences: t1.inconsistent ? [] : resolveSequences(sequences, points),
     rotations: t1.inconsistent ? [] : resolveRotations(constraints, points),
     enumeratedConfigCount,
@@ -2081,19 +2108,28 @@ function consumedDimensions(f: (x: readonly number[]) => number[], x: readonly n
 }
 
 /**
- * Resolve the stated objects against the configuration that was just solved.
+ * Resolve the stated objects against the configuration that was just solved — stage 3e (#1895,
+ * [ADR-CX-069](../../docs/06d-decisions-complex.md#adr-cx-069)).
  *
- * An object whose vertices are not all on the canvas is DROPPED rather than drawn partially — a
- * triangle missing a corner is not a triangle, and inventing the missing one would be the ADR-052 sin
- * with a straight edge on it. The name is still declared by the parser, so the missing point shows up
- * as a free degree of freedom rather than as silence.
+ * Every object comes back DRAWN or, by its `src`, UNDRAWN; never neither. An undrawn object is
+ * refused by the caller through `unsatisfied`, never drawn partially: a triangle missing a corner is
+ * not a triangle, and inventing the missing one would be the ADR-052 sin with a straight edge on it.
+ *
+ * - **One name map.** A name is read through `numberOf` (label → number: the #791 bindings and the
+ *   #694 selections) before any lookup, so «A» is drawn wherever its number is and «|A|» reads the
+ *   selected root, never a free sample of the letter.
+ * - **One evaluator.** A radius is read by `evalReal` over the final environment — the evaluator the
+ *   measure lane and the backstop already use. A radius that is not a real number («2i») or not
+ *   positive («-2», «0») cannot be drawn; it is never read by its modulus.
+ * - **Collinear numbers** have no circumscribed circle; the object is undrawn and so refused.
  */
 function resolveObjects(
   objects: readonly FigureObject[],
   points: readonly DerivedPoint[],
-  sample: ReadonlyMap<string, number>,
+  env: Env,
+  numberOf: ReadonlyMap<string, string>,
   solutionSets: ReadonlyMap<string, readonly string[]> = new Map(),
-): DerivedObject[] {
+): { drawn: DerivedObject[]; undrawn: string[] } {
   const solutionMembers = new Set([...solutionSets.values()].flat());
   const at = new Map<string, Cx>([[ORIGIN, { re: 0, im: 0 }]]);
   const forced = new Map<string, boolean>([[ORIGIN, true]]);
@@ -2101,36 +2137,56 @@ function resolveObjects(
     at.set(p.name, p.z);
     forced.set(p.name, p.modulusKnown && p.argumentKnown);
   }
+  const numberName = (n: string): string => numberOf.get(n) ?? n;
+  const named: Env = { ...env, at: (n) => env.at(numberName(n)) };
 
-  const out: DerivedObject[] = [];
+  const drawn: DerivedObject[] = [];
+  const undrawn: string[] = [];
   objects.forEach((o, i) => {
     const names = objectPoints(o);
-    const spots = names.map((n) => at.get(n));
-    if (spots.some((z) => z === undefined)) return;
+    const resolved = names.map(numberName);
+    const spots = resolved.map((n) => at.get(n));
+    if (spots.some((z) => z === undefined)) {
+      undrawn.push(o.src);
+      return;
+    }
     const vertices = spots as Cx[];
-    const known = names.every((n) => forced.get(n) === true);
+    const known = resolved.every((n) => forced.get(n) === true);
     const label = names.map((n) => (n === ORIGIN ? 'O' : n)).join('');
     const key = `${o.kind}-${label}-${i}`;
 
     if (o.kind === 'segment') {
-      out.push({ kind: o.kind, key, label, vertices, known });
+      drawn.push({ kind: o.kind, key, label, vertices, known });
       return;
     }
     if (o.kind === 'polygon') {
-      out.push({ kind: o.kind, key, label, vertices, known, cornerNames: names.filter((n) => !solutionMembers.has(n)) });
+      drawn.push({
+        kind: o.kind,
+        key,
+        label,
+        vertices,
+        known,
+        cornerNames: resolved.filter((n) => !solutionMembers.has(n)),
+      });
       return;
     }
     if (o.kind === 'circle') {
-      const r = radiusValue(o.radius, sample);
-      if (r === null || !(r > 0)) return;
-      out.push({ kind: 'circle', key, label, vertices: [], center: vertices[0], radius: r, known });
+      const r = evalReal(o.radius, named);
+      if (r === null || !(r > 1e-9)) {
+        undrawn.push(o.src);
+        return;
+      }
+      drawn.push({ kind: 'circle', key, label, vertices: [], center: vertices[0], radius: r, known });
       return;
     }
     const c = circumcircle(vertices[0], vertices[1], vertices[2]);
-    if (!c) return; // three collinear points have no circumscribed circle — say nothing, draw nothing
-    out.push({ kind: 'circle', key, label, vertices: [], center: c.center, radius: c.r, known });
+    if (!c) {
+      undrawn.push(o.src);
+      return;
+    }
+    drawn.push({ kind: 'circle', key, label, vertices: [], center: c.center, radius: c.r, known });
   });
-  return out;
+  return { drawn, undrawn };
 }
 
 /**
@@ -2257,27 +2313,6 @@ function refNamesOf(e: Expr): string[] {
       return refNamesOf(e.e);
     default:
       return [];
-  }
-}
-
-/** A stated radius is a number or a real parameter; anything else is not a length. */
-function radiusValue(e: Expr, sample: ReadonlyMap<string, number>): number | null {
-  switch (e.t) {
-    case 'num':
-      return toNumber(e.v);
-    case 'param':
-      return sample.get(e.name) ?? null;
-    case 'mul': {
-      const l = radiusValue(e.l, sample);
-      const r = radiusValue(e.r, sample);
-      return l !== null && r !== null ? l * r : null;
-    }
-    case 'val': {
-      const v = evaluate(e.v);
-      return v ? Math.hypot(v.re, v.im) : null;
-    }
-    default:
-      return null;
   }
 }
 
