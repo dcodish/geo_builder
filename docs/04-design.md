@@ -367,7 +367,8 @@ with the pair(s) the words attach it to. `withRoleClaims` (`src/parser/parse.ts`
 - **radius** — the other end on the circle whose centre is an end (else the sentence's circle); no circle →
   `no-circle`, no centre end → `no-centre-end`.
 - **diagonal** (ADR-569) — `segment {diagonal: true}`, judged at apply (`diagonalClaimRefusal`) and by the
-  verifier; «אלכסוני» stays the `diagonals` rule's.
+  verifier; «אלכסוני» stays the `diagonals` rule's. That rule reads the PLURAL only, in both languages
+  («אלכסונים»/«אלכסוני», "diagonals"): a singular noun names one diagonal and is `segment`'s (ADR-638).
 - **tangent** — `'unread'` when the winner touched no circle, so `runRules` tries the next rule.
 - **hypotenuse / leg / base** — over the polygons holding the pair as a side: hypotenuse → `set-angle` 90 at the
   third vertex; isosceles base → `set-equal` of the other two sides; trapezoid base or leg → `set-parallel`; a
