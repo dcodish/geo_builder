@@ -1,0 +1,187 @@
+{
+ "name": "p1-2026-10-13",
+ "title": "P1 session after round #2053 — #2078 and #2079",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "Complex: «z = r(cos30° + i sin30°)» stays on the 30° ray at every press",
+   "class": "play",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "path": "/complex.html",
+   "lines": [
+    "z = r(cos30° + i sin30°)"
+   ],
+   "lookFor": "z stays in quadrant I on the 30° ray at every press of «הציגו תצורה אחרת»; it never jumps to 210°. The parameters row reads «r — חופשי». (The canvas label shows the sampled decimal, e.g. «z ≈ 0.65+0.37i», as before; that is the open #1738.)",
+   "before": "Every other press flipped z to 210°, with «z ≈ |r|·cis210°».",
+   "cycles": 4
+  },
+  {
+   "id": "T2",
+   "title": "Complex: a stated modulus gives r = 5",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "path": "/complex.html",
+   "lines": [
+    "z = r cis 30",
+    "|z| = 5"
+   ],
+   "lookFor": "z = 5√3/2+(5/2)i (that is 5·cis30°) and the parameters read «r = 5», not ±5. «הציגו תצורה אחרת» is greyed out: there is only one configuration.",
+   "before": "z alternated between 5·cis30° and 5·cis210°."
+  },
+  {
+   "id": "T3",
+   "title": "Complex refusal: «r = -3» after «z = r cis 30»",
+   "class": "play",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "path": "/complex.html",
+   "lines": [
+    "z = r cis 30",
+    "r = -3"
+   ],
+   "lookFor": "The second line is not added; the strip reads «המשפט לא נוסף — אינו מתיישב עם: \"z = r cis 30\"».",
+   "before": "Accepted, with z drawn green at 3·cis210°.",
+   "expectRefusal": "אינו מתיישב עם"
+  },
+  {
+   "id": "T4",
+   "title": "Complex refusal: «z ברביע השלישי» after «z = r cis 30»",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "path": "/complex.html",
+   "lines": [
+    "z = r cis 30",
+    "z ברביע השלישי"
+   ],
+   "lookFor": "The second line is refused with the same message.",
+   "before": "Accepted and drawn green at 210°.",
+   "expectRefusal": "אינו מתיישב עם"
+  },
+  {
+   "id": "T5",
+   "title": "Complex: «z = r cis 90» stays on the positive imaginary axis",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "path": "/complex.html",
+   "lines": [
+    "z = r cis 90"
+   ],
+   "lookFor": "z is on the positive imaginary axis at every press.",
+   "before": "It alternated between the positive and negative imaginary axis.",
+   "cycles": 3
+  },
+  {
+   "id": "T6",
+   "title": "Complex guard: «z = r·i» is unchanged",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "path": "/complex.html",
+   "lines": [
+    "z = r·i"
+   ],
+   "lookFor": "Still alternates between the positive and negative imaginary axis, as before (your ruling: both forms build, r·i as today).",
+   "before": "Unchanged.",
+   "cycles": 3
+  },
+  {
+   "id": "T7",
+   "title": "Complex: «z^3 = r cis 60» draws only the r > 0 roots",
+   "class": "look",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "path": "/complex.html",
+   "lines": [
+    "z^3 = r cis 60"
+   ],
+   "lookFor": "Three roots at 20°, 140° and 260°, unchanged on «הציגו תצורה אחרת» (the same as «z^3 = 8 cis 60»).",
+   "before": "6 configurations, alternating with the 80°/200°/320° set.",
+   "cycles": 2
+  },
+  {
+   "id": "T8",
+   "title": "3-D refusal: a sphere of radius 1/2 is refused, not drawn as 1",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "כדור שרדיוסו 1/2"
+   ],
+   "lookFor": "No sphere is added; the message reads «הכלי עדיין לא יודע לקבוע את גודל הכדור לפי נתון כזה, ולכן הוא לא נוסף — זו מגבלה של הכלי».",
+   "before": "A sphere of radius 1, green.",
+   "expectRefusal": "עדיין לא יודע"
+  },
+  {
+   "id": "T9",
+   "title": "3-D refusal: a cone of height 7/2",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "חרוט שרדיוסו 2 וגובהו 7/2"
+   ],
+   "lookFor": "No cone is added; the same message, naming «החרוט».",
+   "before": "A cone of height 7, green.",
+   "expectRefusal": "עדיין לא יודע"
+  },
+  {
+   "id": "T10",
+   "title": "3-D refusal: a cone of radius √2 gets the not-yet message",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "חרוט שרדיוסו √2 וגובהו 3"
+   ],
+   "lookFor": "«הכלי עדיין לא יודע לקבוע את גודל החרוט לפי נתון כזה…».",
+   "before": "«המשפט לא נוסף לציור, כי לא הצלחנו לצייר: √2. נסו לפצל…» (round #2053 T44).",
+   "expectRefusal": "עדיין לא יודע"
+  },
+  {
+   "id": "T11",
+   "title": "3-D guard: a whole-number cone still builds",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "חרוט שרדיוסו 2 וגובהו 3"
+   ],
+   "lookFor": "A cone appears, green, with radius 2 and height 3.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T12",
+   "title": "3-D guard: a decimal radius still builds",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "חרוט שרדיוסו 2.5 וגובהו 3"
+   ],
+   "lookFor": "A cone appears, green, with radius 2.5.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T13",
+   "title": "3-D guard: a sphere with a whole radius still builds",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "כדור שרדיוסו 2"
+   ],
+   "lookFor": "A sphere appears, green.",
+   "before": "Unchanged."
+  }
+ ]
+}
