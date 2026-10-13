@@ -726,7 +726,7 @@ function centreRuleOf(o: GeoObject): DerivedRule | null {
 }
 
 /** The POINT the figure already holds at this circle's centre, by its id — null when the centre is unnamed. */
-function centreIdOf(c: Construction, o: GeoObject): Id | null {
+export function centreIdOf(c: Construction, o: GeoObject): Id | null {
   if (o.kind === 'circle-at') return o.centre;
   const rule = centreRuleOf(o);
   if (!rule) return null;

@@ -146,7 +146,10 @@ const collapseFields = (f: Derivation['faults'][number]) =>
               : // #1893 (ADR-AG-271) — a third crossing: the line as written and the two points it already crosses at.
                 f.code === 'third-crossing'
                 ? { line: f.line, a: f.a, b: f.b }
-                : {};
+                : // #1924 (ADR-AG-272) — a tangent's missing second crossing: the point that cannot be placed.
+                  f.code === 'tangent-no-second-crossing'
+                  ? { id: f.point }
+                  : {};
 
 /** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
 const definingLineOf = (lines: readonly string[], id: string): string | null => {

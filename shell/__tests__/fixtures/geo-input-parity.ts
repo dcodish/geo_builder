@@ -1330,6 +1330,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #1893 (ADR-AG-271): a third crossing asked of a chord whose two ends are on the circle — #1834's ruling ──
   { id: 'chord-third-crossing-1893', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'C על מעגל O', 'AC חותך את המעגל בנקודה E'], expect: 'refused', exception: 'X8', note: 'analytic drew E on A, green; 2-D refuses (its sentence is #1834’s to reword) — the verdict, not the text, is the row' },
+  // ── #1924 (ADR-AG-272): a crossing asked of a tangent at a named point — 2-D's errors.tangentNoSecondCrossing ──
+  { id: 'tangent-no-second-crossing-1924', family: 'tangents', steps: ['מעגל O', 'A על מעגל O', 'מנקודה P משיק נוגע במעגל O בנקודה A', 'PA חותך את המעגל בנקודה E'], expect: 'refused', exception: 'X8' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

@@ -918,7 +918,16 @@ at the drawn figure (`holdsOn`). No freedom gate: the predicate is a proof, not 
 can move, so `separationDof` is 1–2), yet no configuration separates the pair. Blamed on the latest of the four statements it
 is made of; the line carrying it gets no `unsatisfiable` or `crossing-already-named` beside it, and the positional arm skips P.
 
-*Identifiers:* `SOLVE_TOL` · `separationDof` · `freedomOf` · `onCurveByConstruction` · `noFreedomReaches` · `third-crossing`
+**…and the tangent member** ([ADR-AG-272](06c-decisions-analytic.md#adr-ag-272), #1924). A point P carrying a straight
+incidence ℓ (`on-line-2pt`, `on-line`, or `on-curve` on a line-kind curve) and `on-curve(P, K)`, K a circle, is refused
+`tangent-no-second-crossing { point }` (2-D's `errors.tangentNoSecondCrossing`) when ℓ touches K only at a point Q declared
+before P. Two ways, mirroring the chord member: **nothing can move** (`noFreedomReaches` for ℓ's objects, K and Q) and
+`touchPointOf` (`crossing-order.ts`; the chord ℓ would cut is within `meetsTwice`'s `SOLVE_RESOLUTION` floor) puts the touch
+within that floor of Q; or **by construction** — Q on K for good, Q on ℓ, and a stated `relation perpendicular` between ℓ
+and K's radius at Q (`{radius, K, Q}` or K's centre and Q, via `centreIdOf`), or ℓ is K's tangent object at Q, or runs
+through Q and a point on it. Same blame, one-fault-per-line filter and positional skip as the chord member.
+
+*Identifiers:* `SOLVE_TOL` · `separationDof` · `freedomOf` · `onCurveByConstruction` · `noFreedomReaches` · `third-crossing` · `touchPointOf` · `tangent-no-second-crossing`
 
 ## Knowledge gates
 

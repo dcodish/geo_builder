@@ -317,6 +317,35 @@ function conicSize(cu: NumCurve): number {
 }
 
 /**
+ * WHERE A STRAIGHT ONLY TOUCHES A CIRCLE (#1924, [ADR-AG-272](../../docs/06c-decisions-analytic.md#adr-ag-272)) — the
+ * touch point when the incidence `k` is a straight whose two crossings with `circle` are ONE point to the solver's
+ * resolution, else `null` (it crosses twice, it misses, or it is not a straight readable here).
+ *
+ * The floor is {@link meetsTwice}'s: two roots closer than `SOLVE_RESOLUTION` relative to the circle's size are one
+ * point. Read symmetrically — the chord the straight would cut, `2·√|r² − d²|` — so a tangent computed from exact
+ * coordinates that misses by rounding (`d` a hair above `r`) is the same touch as one that crosses by a hair.
+ */
+export function touchPointOf(
+  k: Constraint,
+  circle: NumCurve,
+  at: (id: Id) => Pt | null,
+  curveAt: (id: Id) => NumCurve | null,
+): Pt | null {
+  if (circle.kind !== 'circle') return null;
+  const s = sideOf(k, at, curveAt);
+  if (!s || s.k !== 'straight') return null;
+  const { p0, d } = s.w;
+  const n2 = d.x * d.x + d.y * d.y;
+  if (!(n2 > 0)) return null;
+  const t = ((circle.cx - p0.x) * d.x + (circle.cy - p0.y) * d.y) / n2;
+  const foot = { x: p0.x + t * d.x, y: p0.y + t * d.y };
+  const dist = Math.hypot(foot.x - circle.cx, foot.y - circle.cy);
+  const r = Math.abs(circle.r);
+  if (!(r > 0)) return null;
+  return 2 * Math.sqrt(Math.abs(r * r - dist * dist)) <= SOLVE_RESOLUTION * r ? foot : null;
+}
+
+/**
  * DOES THE PAIR MEET IN TWO POINTS? — what «…בנקודות A ו-B» states beyond its two ordinals (#1512,
  * [ADR-AG-185](../../docs/06c-decisions-analytic.md#adr-ag-185)).
  *
