@@ -94,7 +94,7 @@
       "several-polygons": "\"{{noun}} {{pair}}\": {{pair}} is a side of several shapes ({{options}}), so it is unclear which one is meant. State the given directly — e.g. a right angle or parallel sides.",
       "leg-apex": "\"{{noun}} {{pair}}\": in a triangle a leg starts at the apex — {{a}} or {{b}} — and the sentence does not say which. Write the equality: \"{{a}}{{b}} = {{a}}{{other}}\" or \"{{b}}{{a}} = {{b}}{{other}}\"."
     },
-    "ambiguousAngle": "There's more than one angle at {{vertex}}, so I can't tell which one you mean. Name all three letters of the angle — e.g. \"∠A{{vertex}}C = 90\" — or give it a name: \"denote angle A{{vertex}}C as {{vertex}}1\".",
+    "noAngleYet": "There is no angle at vertex {{vertex}} yet — first draw two sides that leave {{vertex}}, or write the angle with three letters.",
     "ambiguousAngleOptions": "There are several angles at {{vertex}}: {{options}}. Which one do you mean? Write it with three letters — e.g. \"∠{{example}} = 90\" — or give it a name: \"denote angle {{example}} as {{vertex}}1\".",
     "tangentsAmbiguous": "More than two tangents are drawn here ({{points}}), so it is unclear which two meet. Name them — e.g. «the tangent at {{a}} and the tangent at {{b}} meet at E».",
     "aliasTaken": "The name {{name}} is already taken on this figure, so it can't name an angle. Pick another name — e.g. a letter with a different digit.",

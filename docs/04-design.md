@@ -278,7 +278,9 @@ by name as a value does.
 site — `angleArms`, the bare `B = 30`, the equality sides, the measure-sum terms, the bisector's forms — in place
 of their `nb.length !== 2` tests. Exactly two edges → that angle; else exactly one declared polygon
 (`ctx.polygons`) holding the vertex → its interior angle; else `ambiguous-angle` with `options` (every edge pair,
-less a straight pair stated via `onSegment`/`midpointOf`). A polygon-default reading goes to a reading sink owned
+less a straight pair stated via `onSegment`/`midpointOf`), kept even when only ONE remains (ADR-641). The submit door
+(`decideDeterministic.ts`) answers any listed candidate with `input.ambiguousAngleOptions`, and an empty list — fewer than two
+edges, no angle at the vertex — with `input.noAngleYet` («בקודקוד A עדיין אין זווית…»). A polygon-default reading goes to a reading sink owned
 by the outermost `parse`, which reports the winning commands' `angleReadings`; the submit path shows
 `input.vertexAngleReadAs` («הובן כ-∠ABC»). The parser stays a pure function of `(utterance, ctx)`.
 

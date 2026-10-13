@@ -16404,3 +16404,31 @@ The touch list inherits both. They are filed as #2001 (`needs-operator`). The in
 - «משולש ABC · AB = 5 · BC = 4 · זווית BAC = 40» → «חשב ערכים» lists AC = 1.45 או AC = 6.21, ∠ABC = 13.46 או ∠ABC = 86.54, ∠BCA = 53.46 או ∠BCA = 126.54 and the two areas and perimeters; asking «AC» answers the same (was: only the three stated values, and «undetermined»).
 - With three or more possible values nothing is shown, as before; the student switches configurations with «הציגו תצורה אחרת».
 - An angle question never answers as a radical.
+
+## ADR-641 — A lone-vertex angle where the vertex has fewer than two edges says there is no angle there yet; a single candidate angle is named, never dropped (#1722)
+
+**Status:** accepted · 2026-10-13 · bug (P3, 2-D) · fix-round #2053, stream P2 · branch `fix/1722-no-angle-yet` off `main` @ 6096b643 · operator ruling 2026-10-13 on #1722 (the fifth /decisions ballot, card `d5-1722`) · LADDER stage: none (a parser clarification and its submit-door wording; no solve) · amends [ADR-590](#adr-590)
+
+**Requirements:** [02](02-requirements.md) FR-IN-7d (the lone-vertex angle: the no-angle sentence, a single candidate named) · **Design:** [04](04-design.md) *A lone vertex* (the options kept at one; the door's two notes)
+
+**The ruling.** «בקודקוד A עדיין אין זווית — שרטטו קודם שתי צלעות שיוצאות מ-A, או כתבו את הזווית בשלוש אותיות.», approved verbatim, the vertex letter following what the student typed; plus the one-option pass-through: where exactly one angle exists at the vertex, the existing options note names it instead of throwing it away. The English locale mirrors the sentence as literally as possible: "There is no angle at vertex A yet — first draw two sides that leave A, or write the angle with three letters." (the ruling approved only the Hebrew; flagged to the operator).
+
+**Measured before** (`main` @ 6096b643, the real `decideDeterministic2D`). Since #1445 every lone-vertex angle goes through `resolveVertexAngle`, so a vertex with two or more candidate angles already got `input.ambiguousAngleOptions` listing real angles — including the reported «משולש ABC · משולש ABD · AE חוצה זווית» («∠BAC, ∠BAD, ∠CAD»). The old note `input.ambiguousAngle` was reached only with an EMPTY candidate list: «נקודה A» · «זווית A = 30» and «קטע AB» · «AE חוצה זווית» showed «יש יותר מזווית אחת בקודקוד A … ∠AAC», «קטע AB» · «קטע AC» · «זווית C = זווית B» showed «∠ACC», and «קטע AB» · «זווית B = 30» showed «∠ABC» with no C in the figure.
+
+**Class (docs/17 §1).** *A clarification whose premise is false in every case that reaches it.* `resolveVertexAngle` keeps `options` only when there were two or more, so the door could not tell "one candidate" from "none", and the one note left for both said "more than one". With exactly two edges the resolver answers the angle itself, and a stated straight pair removes at most one pair of three or more edges, so an empty list means exactly fewer than two edges at the vertex (after `exclude`, for the bisector's far-end read): no angle there.
+
+**Decision.**
+1. `resolveVertexAngle` (parse.ts) returns `options` whenever there is at least one candidate.
+2. The submit door (`decideDeterministic.ts`) sends any non-empty list to `input.ambiguousAngleOptions` (unchanged text) and an empty one to the new `input.noAngleYet`, the ruled sentence. `input.ambiguousAngle` and its `A{{vertex}}C` interpolation are deleted (no other reader). The log tag stays `ambiguous-angle:<vertex>`, so the dashboard's register is unchanged.
+
+**Reachability of the one-option case.** A point is either an `on-segment` rider or a `midpoint`, never both, so no real figure today leaves exactly one candidate; the pass-through is pinned on a hand-built context and holds for any future straight-pair source.
+
+**Worst-case multiplier (docs/17 M3):** zero — no new parse, solve or sample.
+
+**Sibling audit.** Every single-letter site already calls the one resolver (ADR-590), so this is the whole 2-D class. **3-D:** `err.ambiguousAngle` already says the vertex needs exactly two sides; untouched. **Analytic (found, not fixed):** `errorText.ts` keeps the same `> 1` options test, so a single candidate would fall to its general `errAmbiguousAngle`, and its wording for a vertex with no angle differs from this sentence — reported to the round for the operator (rule 7 cross-tool question).
+
+**Locks.** `src/__tests__/issue-1722-no-angle-yet.test.ts` — the four measured sequences through `decideDeterministic2D` with the exact sentence, the English twin, the old key and interpolation gone, the reported multi-option sequence unchanged, and the one-candidate resolver. Scenario `no-angle-yet-at-a-bare-vertex-1722` (corpus 4) asserts the four lines are bare `ambiguous-angle` refusals in one sequence and the figure stands.
+
+**Behaviour change for a student:**
+- «נקודה A» · «זווית A = 30» (and a one-letter angle or bisector at any vertex with fewer than two sides) → «בקודקוד A עדיין אין זווית — שרטטו קודם שתי צלעות שיוצאות מ-A, או כתבו את הזווית בשלוש אותיות.» (was: «יש יותר מזווית אחת בקודקוד A … למשל "∠AAC = 90"»).
+- Two or more angles at the vertex: unchanged, the real angles listed.

@@ -4203,6 +4203,24 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.positions.has('@ctr-O'), 'the centre is the named O, not a hidden one').toBe(false);
     },
   },
+  {
+    id: 'no-angle-yet-at-a-bare-vertex-1722',
+    title: '#1722 (ADR-641): a one-letter angle at a vertex with fewer than two edges is refused as «no angle there yet», carrying no candidate; the figure built so far stands',
+    guards:
+      "Escalation measurement on #1722 (6096b643, decideDeterministic2D): «נקודה A» · «זווית A = 30», «קטע AB» · «AE חוצה זווית», «קטע AB» · «זווית B = 30» and «קטע AB» · «קטע AC» · «זווית C = זווית B» each answered «יש יותר מזווית אחת בקודקוד X» with the example ∠AAC / ∠ABC / ∠ACC — a false premise (there is no angle at that vertex) and a nonsense example. Operator ruling 2026-10-13: say there is no angle yet, in the approved sentence. Each line is refused as a bare ambiguous-angle (no options), which the submit door renders as input.noAngleYet; the sentence, the English twin, the unchanged multi-option sequence and the one-option pass-through are locked in src/__tests__/issue-1722-no-angle-yet.test.ts.",
+    steps: ['נקודה A', 'זווית A = 30', 'קטע AB', 'AE חוצה זווית', 'זווית B = 30', 'קטע AC', 'זווית C = זווית B'],
+    refusedSteps: [
+      { step: 2, reason: 'ambiguous-angle', with: { vertex: 'A', options: undefined }, why: 'ADR-641 (#1722): A has no edges — no angle at A yet' },
+      { step: 4, reason: 'ambiguous-angle', with: { vertex: 'A', options: undefined }, why: 'ADR-641 (#1722): A has one edge — no angle at A yet' },
+      { step: 5, reason: 'ambiguous-angle', with: { vertex: 'B', options: undefined }, why: 'ADR-641 (#1722): B has one edge — no angle at B yet' },
+      { step: 7, reason: 'ambiguous-angle', with: { vertex: 'C', options: undefined }, why: 'ADR-641 (#1722): C has one edge — no angle at C yet' },
+    ],
+    check: (fig) => {
+      expect(fig.violations).toEqual([]);
+      for (const id of ['A', 'B', 'C']) expect(fig.positions.has(id), `${id} is drawn`).toBe(true);
+      expect(fig.positions.has('E'), 'the refused bisector minted no E').toBe(false);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

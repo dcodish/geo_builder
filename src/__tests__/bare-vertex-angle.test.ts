@@ -104,7 +104,7 @@ describe('#447 — it TEACHES the canonical form (ADR-428 obligation 2)', () => 
     if (!r.ok) throw new Error('parse');
     const hint = teachCanonical('A=40', r.commands, 'he');
     // The GLYPH, not the word (#460, operator ruling 2026-08-09): every other teaching surface in the
-    // app — err.latex, err.ambiguousAngle, the toolbar button — already says ∠.
+    // app — err.latex, the angle-options note, the toolbar button — already says ∠.
     expect(hint).toMatch(/^∠[A-Z]{3} = 40$/);
   });
 

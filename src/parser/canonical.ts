@@ -26,7 +26,7 @@ const NAMES_ANGLE = /זוו?ית|\bangle\b|∠/i;
  *
  *  **The GLYPH, not the word** (operator ruling 2026-08-09, #460 — [ADR-428](../../docs/06-decisions.md#adr-428)
  *  Am. 1). Every other teaching surface in the app already says `∠`: `err.latex` points at the toolbar
- *  ("△ ∥ ∠ ⊥ √"), `err.ambiguousAngle` spells its example as `∠A{v}C = 90`, and there is a `∠` button
+ *  ("△ ∥ ∠ ⊥ √"), the angle-options note spells its example as `∠{example} = 90`, and there is a `∠` button
  *  sitting beside the input box. This hint was the one surface teaching a different canonical spelling
  *  from the rest of the tool. The glyph is locale-independent — only the surrounding copy is not.
  *
