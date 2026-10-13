@@ -50,7 +50,7 @@ export { expandShapeVariant, eqMatchesPair, MIDSEGMENT_SHAPES, pinsSoftVariant, 
 export type { ChoiceFact, StatedShapeEquality, UnstatedChoice, UnstatedChoiceKind, VariantShape } from './shapeVariants';
 export { expandInscribe, inscribePlacements, inscribeVariantCount } from './inscribe';
 export type { InscribeShape, InscribeCmd } from './inscribe';
-export { roleSidesOf, bindRoleSide, resolveRoleSide, type RoleSide } from './roleSides';
+export { roleSidesOf, openRightTriangles, bindRoleSide, resolveRoleSide, type RoleSide } from './roleSides';
 export { variantCountOf, cyclableVariant, withVariant, variantVertices } from './variants';
 export { computeValuesPanel, queryLabel, rowOptions, valueText } from './valuesPanel';
 export { circleRefs, isDrawnCircle } from './circleRef';

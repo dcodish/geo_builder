@@ -147,6 +147,9 @@ export type ParseResult =
   /** #775: a side named by its ROLE («ליתר», «לבסיס») with no unique referent in the figure —
    *  clarify rather than guess a side or burn an escalation on a form the LLM must not invent for. */
   | { ok: false; reason: 'role-side-unresolved'; role: string }
+  /** #1689 ([ADR-639](../../docs/06-decisions.md#adr-639)): «היתר» on a triangle declared right whose right angle
+   *  no statement has seated — WHICH side is the hypotenuse is the student's to say (operator ruling 2026-10-02). */
+  | { ok: false; reason: 'ambiguous-hypotenuse' }
   /** #1661 ([ADR-563](../../docs/06-decisions.md#adr-563)): a ROLE NOUN on a pair («המיתר OB», «הרדיוס BC»,
    *  «השוק AB», «היתר AB») whose claim cannot be stated on this figure — the sentence is refused naming the
    *  noun and the pair, never built as a bare segment with the claim dropped. */
@@ -293,6 +296,10 @@ export interface ParseContext {
   /** #1810: `ring`/`at` — the triangle and its distinguished vertex (right-angle vertex / apex), so a role-named
    *  command can carry its binding and follow «show another configuration» (ADR-596). */
   roleSides?: { role: 'hypotenuse' | 'base' | 'leg'; edge: [string, string]; ring?: string[]; at?: string }[];
+  /** #1689 ([ADR-639](../../docs/06-decisions.md#adr-639)): the triangles declared right («משולש ישר-זווית ABC»)
+   *  whose right angle no statement has seated. Their hypotenuse is OPEN: «תיכון ליתר» asks which side is meant,
+   *  and «תיכון ליתר AB» names it (the role claim states the right angle opposite). */
+  openRightTriangles?: string[][];
   /** #805 play (ADR-465 Am. 2): existing altitude FEET — lets a repeated auto-named altitude REUSE
    *  its foot (identical re-lowering → the #613 restate-dedupe reads the repeat as the same
    *  statement) and lets the leg-role pick rotate to the leg not yet carrying one. */
@@ -359,7 +366,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -9556,13 +9563,23 @@ const roleSideLine: Rule = (s, ctx) => {
   const isHeightHead = /גובה|\bheight\b|\baltitude\b/i.test(s);
   const occupied = (e: [Id, Id]): boolean =>
     isHeightHead ? existingFootOf(ctx, null, e[0], e[1]) !== null : existingMidpointOf(ctx, e[0], e[1]) !== null;
+  // #1689 (ADR-639): a triangle declared right whose right angle no statement has seated has an OPEN hypotenuse —
+  // the noun says a right angle exists, not where (operator ruling 2026-10-02, #1620: "build when a stated right
+  // angle fixes the vertex; otherwise ASK which side is the hypotenuse; never assume C"). Letters after the noun
+  // naming one of ITS sides answer the question: the student's side is used, and the role claim («היתר AB»)
+  // states the right angle opposite it. With no such letters, ask — never the side the default seat draws.
+  const named = afterNoun ? ([up(afterNoun[1]), up(afterNoun[2])] as [Id, Id]) : null;
+  const open = role === 'hypotenuse' && !selected ? (ctx.openRightTriangles ?? []) : [];
+  const namedOpenSide = named && named[0] !== named[1] && open.some((ring) => named.every((v) => ring.includes(v))) ? named : null;
+  if (open.length > 0 && !namedOpenSide) return { clarify: 'ambiguous-hypotenuse' };
   const pick =
-    selected ??
+    namedOpenSide ? null
+    : selected ??
     (cands.length === 1 ? cands[0]
     : role === 'leg' && cands.length === 2 ? (cands.find((r) => !occupied(r.edge)) ?? cands[0])
     : null);
-  if (!pick) return { clarify: 'role-side-unresolved', role: noun };
-  const [p, q] = pick.edge;
+  if (!pick && !namedOpenSide) return { clarify: 'role-side-unresolved', role: noun };
+  const [p, q] = namedOpenSide ?? pick!.edge;
   const heb = /[א-ת]/.test(s);
   // a run restating the side right after the role noun («תיכון ליתר AB») folds into the rewrite;
   // any other letters stay untouched for the letter-form rules to read
@@ -9577,8 +9594,8 @@ const roleSideLine: Rule = (s, ctx) => {
   // (`bindRoleSide`) so the median to «the base» stays on the base. Only when every triangle letter the
   // commands carry came from the RESOLVER: a vertex the student typed («AD גובה לבסיס», «גובה לשוק AC»,
   // «תיכון ליתר AB») is the student's own choice and stays literal (the #1810 ruling).
-  const ring = pick.ring;
-  const at = pick.at;
+  const ring = pick?.ring;
+  const at = pick?.at;
   const typedTriVertex = ring !== undefined && statedLabelTokens(s).some((l) => ring.includes(l));
   if (!ring || !at || typedTriVertex) return r.commands;
   const binding: RoleSideBinding = { role, ring: [...ring], at };
@@ -13118,6 +13135,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };
   if (res.clarify === 'alias-taken') return { ok: false, reason: 'alias-taken', name: res.name };
   if (res.clarify === 'role-side-unresolved') return { ok: false, reason: 'role-side-unresolved', role: res.role };
+  if (res.clarify === 'ambiguous-hypotenuse') return { ok: false, reason: 'ambiguous-hypotenuse' };
   if (res.clarify === 'role-claim')
     return { ok: false, reason: 'role-claim', why: res.why, noun: res.noun, a: res.a, b: res.b, ...(res.other ? { other: res.other } : {}), ...(res.options ? { options: res.options } : {}) };
   if (res.clarify === 'side-unspecified') return { ok: false, reason: 'side-unspecified', noun: res.noun, value: res.value };

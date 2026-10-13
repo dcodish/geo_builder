@@ -1601,7 +1601,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         // genuine CONSTRAINT: seg c→a ⟂ seg c→b (∠(a c b)=90). A shape declared over existing points is
         // a constraint, not a rebuild (the ADR-099/ADR-115 family).
         placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 3, y: 3 }], pos);
-        const con: Constraint = { type: 'perpendicular', a: c, b: a, c: c, d: b };
+        const con: Constraint = { type: 'perpendicular', a: c, b: a, c: c, d: b, seat: true }; // the noun's default seat, not a statement (#1689)
         // Drive the NEW right-angle vertex c onto the Thales circle over the fixed hypotenuse — NOT a
         // pre-existing leg's shape DOF (adding this triangle must not reshape the OTHER one built on AB;
         // generic driveOrCheck would grab B's perp-offset `dist` first — a stability violation). Only

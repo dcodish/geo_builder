@@ -12,7 +12,7 @@
  */
 
 import type { Construction, Id, Vec } from '@/engine';
-import { isGeoPoint, circleMembers, pointNeighbors, parallelEdgePairs, roleSidesOf } from '@/engine';
+import { isGeoPoint, circleMembers, pointNeighbors, parallelEdgePairs, roleSidesOf, openRightTriangles } from '@/engine';
 import type { ParseContext } from './parse';
 
 /** A circle centre's reference TOKEN ([ADR-342](../../docs/06-decisions.md#adr-342)): an anonymous auto
@@ -202,6 +202,8 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     // #1810 (ADR-596): the derivation lives in the engine (`roleSidesOf`) because the replay fold re-resolves a
     // role-bound command against the configuration in force with the SAME reading — one definition of «the base».
     roleSides: roleSidesOf(construction),
+    // #1689 (ADR-639): the right triangles whose right angle no statement has seated — their hypotenuse is asked.
+    openRightTriangles: openRightTriangles(construction),
     // Every circle pair's MUTUAL POSITION (from the drawn seed, tangency tol-based) — the two-touch
     // common-tangent CAPACITY depends on it (#197 Am. 4): disjoint 4, externally tangent / intersecting
     // 2 (the remaining tangents pass through the touch / don't exist), internally tangent or contained 0.

@@ -837,6 +837,11 @@ export interface PerpendicularConstraint {
   b: Id;
   c: Id;
   d: Id;
+  /** #1689 ([ADR-639](../../docs/06-decisions.md#adr-639)): the right-triangle NOUN's own right angle at its DEFAULT
+   *  seat (the shared-hypotenuse build, where no vertex is free to be the perp-offset). «משולש ישר-זווית ABD»
+   *  says the triangle has a right angle, not which vertex has it, so this constraint is NOT a statement of the
+   *  seat: `roleSidesOf` never reads a hypotenuse off it. A stated ⟂ / 90° lowers to its own constraint. */
+  seat?: true;
 }
 
 /** ∠(a1·v1·b1) = k·∠(a2·v2·b2) — a proportion between two angles (equal is k = 1). */
