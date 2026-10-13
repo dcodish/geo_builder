@@ -16404,3 +16404,27 @@ The touch list inherits both. They are filed as #2001 (`needs-operator`). The in
 - «משולש ABC · AB = 5 · BC = 4 · זווית BAC = 40» → «חשב ערכים» lists AC = 1.45 או AC = 6.21, ∠ABC = 13.46 או ∠ABC = 86.54, ∠BCA = 53.46 או ∠BCA = 126.54 and the two areas and perimeters; asking «AC» answers the same (was: only the three stated values, and «undetermined»).
 - With three or more possible values nothing is shown, as before; the student switches configurations with «הציגו תצורה אחרת».
 - An angle question never answers as a radical.
+
+## ADR-638 — A singular diagonal noun names one diagonal in both languages: the plural rule reads the plural only (#1742, half 2)
+
+**Status:** accepted · 2026-10-13 · bug (P2) · found by [ADR-574](#adr-574)'s sibling audit (#1607, round #1736) · fix-round #2053, stream D · branch `fix/1742-role-noun-length` off `main` @ 6096b643 · half 1 of #1742 escalated to the operator (below)
+
+**Requirements:** none (internal) — restores the existing [FR-IN-4c](02-requirements.md) promise (a role noun names what it names; named lines are never replaced by other lines) for English · **Design:** [04-design.md](04-design.md) § the role-noun registry, the **diagonal** row (the `diagonals` rule reads the plural only) · **LADDER stage:** none — a parser rule guard. No solver, replay or render change.
+
+**Cites** [ADR-499](#adr-499) («אלכסון» is a claim), [ADR-569](#adr-569) (the claim is checked against the figure), [ADR-574](#adr-574) (the role-length composer, whose role half is the bare noun sentence), [ADR-604](#adr-604) (a cevian role the reading never read).
+
+**Context — measured at pickup on 6096b643** (`decideDeterministic2D` + the store + `replay`).
+- **Half 2 reproduces.** «parallelogram ABCD» · "diagonal AC" (and "the diagonal AC", "diagonal BD", on a rectangle, square or quadrilateral too) committed `segment A–C {diagonal}` **and** `segment B–D`. «מקבילית ABCD» · «האלכסון AC» / «אלכסון AC» committed A–C alone. The leak reached ADR-574's composition ("diagonal AC = 8" drew BD too) and the side refusal ("diagonal AB" carried AC and BD in its refused parse), and "the diagonal of ABCD" drew both where «האלכסון של ABCD» is `not-handled`.
+- **Half 1 has moved.** «משולש ABC» · «התיכון AB = 5» no longer commits `|AB| = 5`: since ADR-604 (#1904) the unread-role gate catches the dropped noun and the line escalates to the model (`weak:dropped:unread-role:התיכון`). The plan's route does not hold: the median rule never reads «התיכון AB» (B is a vertex; the bare line is `not-handled`), so `roleLength`'s role half cannot validate it and the composer bows out. The refusal 2-D already gives the same claim, «AB תיכון לצלע BC» → `input.cevianMedianFootAtEnd`, is a different message family from the ADR-574 diagonal one the plan names, and the diagonal message cannot carry "median" by parameter. Escalated on #1742; not built here.
+
+**Root cause (half 2).** The PLURAL `diagonals` rule (registered before `segment`, which owns the singular) guarded English with `\bdiagonals?\b`. On a figure with one polygon the singular therefore took the rule's form (B), "every diagonal of the polygon", and the named pair was then flagged by the role-noun registry, so both diagonals were drawn. The Hebrew guard (`אלכסונים|אלכסוני`) never admitted the singular.
+
+**Class (docs/17 §1).** *A singular role noun is read by the rule for its plural, so a sentence naming one object draws all of them.* **Sibling audit.** Grepped every English plural guard in `parse.ts` (`diagonals?`, `medians?`, `altitudes?|heights?`, `bisectors?`, `perpendicular bisectors?`): the only other `s?` guards on a family rule are the `specialPointMeet` table (`/medians?/`, `/altitudes?|heights?/`, `/diagonals?/`), which needs a meet frame ("X is the intersection of the …") and draws the centre point only, never the family, so it cannot over-draw. **Analytic:** "diagonal AC" records the one line it was given (its plural reader needs two pairs); **3-D:** records `segment3 A–C` only. Neither has the class.
+
+**Decision.** The `diagonals` guard reads the plural only: `\bdiagonals\b`. The singular falls to `segment`, which draws the named pair with its ADR-499 claim, exactly as «האלכסון AC» does. The plural forms ("the diagonals", "diagonals of ABCD", "diagonals AC and BD") are unchanged.
+
+**Why not a patch (docs/17 §2).** No chokepoint list grows and no input is special-cased: one guard stops claiming a grammatical number it does not read. Every singular English spelling on every quadrilateral (and the composed and refused forms) is fixed by it.
+
+**Locks.** `src/app/__tests__/issue-1742-singular-diagonal.test.ts` (27, through `decideDeterministic2D` and the store): four shapes × three English and two Hebrew singular spellings (one segment, the other diagonal not drawn); "diagonal AC = 8"; the side refusal in both languages; the plural controls; "the diagonal of ABCD" gets «האלכסון של ABCD»'s verdict. **Fails before: 14 of 27** (the English rows, the composition and the no-pair row). Scenario `singular-diagonal-draws-one-1742` (corpus 4) is the operator's exact two lines.
+
+**Behaviour change for a student:** in English, "diagonal AC" (and "diagonal AC = 8") on a drawn quadrilateral now draws only AC, as the Hebrew «האלכסון AC» always has; "the diagonal of ABCD", which names no diagonal, no longer draws both and goes where the Hebrew goes.

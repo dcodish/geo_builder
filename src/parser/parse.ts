@@ -1810,9 +1810,14 @@ const specialPointMeet: Rule = (s, ctx) => {
  * Two forms: (A) two explicitly named diagonals joined by ו/and — `AC ו-BD אלכסוני הריבוע` → the
  * two segments; (B) bare/quad — `אלכסונים` or `אלכסוני ABCD` → every non-adjacent vertex pair of the
  * named quad (or the figure's single polygon). Singular `אלכסון AC` is a lone segment — left to `segment`.
+ *
+ * #1742 ([ADR-638](../../docs/06-decisions.md#adr-638)): the rule reads the PLURAL in both languages. Its English
+ * guard was `diagonals?`, so on a drawn quad the singular "diagonal AC" took form (B) and drew BOTH diagonals,
+ * while «האלכסון AC» (the singular never matches `אלכסונים|אלכסוני`) drew one. A singular noun is one diagonal,
+ * whatever the language — `segment` owns it, claim included.
  */
 const diagonals: Rule = (s, ctx) => {
-  if (!/אלכסונים|אלכסוני|\bdiagonals?\b/i.test(s)) return null;
+  if (!/אלכסונים|אלכסוני|\bdiagonals\b/i.test(s)) return null;
   // (A) named diagonals: two label-pairs joined by ו/and/comma
   const named = s.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:ו-?|,|and)\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (named && named.slice(1, 5).every(isUpperLabel)) {

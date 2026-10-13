@@ -4203,6 +4203,20 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.positions.has('@ctr-O'), 'the centre is the named O, not a hidden one').toBe(false);
     },
   },
+  {
+    id: 'singular-diagonal-draws-one-1742',
+    title: '#1742 (ADR-638): English «diagonal AC» after «parallelogram ABCD» draws the diagonal AC only, as «האלכסון AC» does',
+    guards:
+      "Found by ADR-574's sibling audit (#1607, round #1736) and re-measured at 6096b643 through decideDeterministic2D: on a drawn parallelogram, \"diagonal AC\" committed segment AC (diagonal claim) PLUS segment BD; «האלכסון AC» committed AC alone. Root cause: the PLURAL `diagonals` rule (registered before `segment`) guarded English with `diagonals?`, so the singular took its form (B) and drew every diagonal of the figure's polygon; its Hebrew guard (`אלכסונים|אלכסוני`) never matched the singular. The guard now reads the plural only. Asserts the step builds, AC is drawn and BD is not. The unit matrix (the composed \"diagonal AC = 8\", other shapes, the plural controls, the side refusal) is src/app/__tests__/issue-1742-singular-diagonal.test.ts.",
+    steps: ['parallelogram ABCD', 'diagonal AC'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const segs = fig.construction.objects.filter((o) => o.kind === 'segment').map((o) => [(o as { a: Id }).a, (o as { b: Id }).b].sort().join(''));
+      expect(segs, 'the named diagonal is drawn').toContain('AC');
+      expect(segs, 'the other diagonal was never asked for').not.toContain('BD');
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */
