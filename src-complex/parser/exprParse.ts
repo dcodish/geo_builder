@@ -165,7 +165,13 @@ type Tok =
 // with an invented parameter, and printed as `2cis150`.
 // `d_{…}` sits BEFORE the general name alternative, or the lexer would read the bare `d` as a
 // parameter and refuse the line at the `_`.
-const TOKEN = /\s+|conj(?![A-Za-z])|cis(?![A-Za-z])|re(?=\s*\()|im(?=\s*\()|sqrt(?=\s*\()|[⁰¹²³⁴⁵⁶⁷⁸⁹]*[√∛∜]|d_\{[^{}]*\}|π|[A-Za-z][A-Za-z]*\d*|\d+(?:\.\d+)?|[()|^*/+\-]/giu;
+// #2029 (ADR-CX-068) — a letter run also STOPS before a `cis` token. `rcis30` lexed as the one name
+// `rcis30`, so the glued polar form with a letter modulus — «z = rcis30°», «z = (rcis30)» — could not
+// be read by this grammar at all, and «z = r cis 30» had to be read by a separate rule that dropped the
+// letter. No legal name contains `cis` (a z/w name, a point label, or a one-letter parameter —
+// `isDeclarableName`), so cutting there splits nothing a student can name; `cis` followed by a letter
+// («cisb», «precise») is not the token and does not cut.
+const TOKEN = /\s+|conj(?![A-Za-z])|cis(?![A-Za-z])|re(?=\s*\()|im(?=\s*\()|sqrt(?=\s*\()|[⁰¹²³⁴⁵⁶⁷⁸⁹]*[√∛∜]|d_\{[^{}]*\}|π|[A-Za-z](?:(?!cis(?![A-Za-z]))[A-Za-z])*\d*|\d+(?:\.\d+)?|[()|^*/+\-]/giu;
 
 /**
  * The two point atoms inside `d_{…}`, or null when the braces hold anything else. Atoms are the run
