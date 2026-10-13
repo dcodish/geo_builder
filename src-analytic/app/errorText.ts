@@ -175,6 +175,8 @@ export function errorText(error: InputError, t: Translate): string {
     'self-crossing': 'errSelfCrossing',
     // #1893 (ADR-AG-271) — #1834's ruled sentence, with the student's letters
     'third-crossing': 'errThirdCrossing',
+    // #1924 (ADR-AG-272) — 2-D's errors.tangentNoSecondCrossing, verbatim
+    'tangent-no-second-crossing': 'errTangentNoSecondCrossing',
     'llm-busy': 'errLlmBusy',
     'llm-understood-unsupported': 'errLlmUnderstood',
     'bad-operand': 'errBadOperand',
@@ -265,6 +267,7 @@ export function errorText(error: InputError, t: Translate): string {
     line: error.key === 'third-crossing' ? (error.line ?? '') : '',
     a: error.key === 'third-crossing' ? (error.a ?? '') : '',
     b: error.key === 'third-crossing' ? (error.b ?? '') : '',
+    id: error.key === 'tangent-no-second-crossing' ? (error.id ?? '') : '',
     reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '',
     definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '',
     all: error.key === 'split-statements' ? error.parts.map((p, i) => `(${i + 1}) ${p}`).join('  ') : '',

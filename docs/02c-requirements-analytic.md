@@ -765,12 +765,16 @@ a sentence the tool parsed.
   - «מעגל O» · «A על מעגל O» · «C על מעגל O» · «AC חותך את המעגל בנקודה E» → refused, at every configuration
   - every spelling: «הישר / המיתר / המשך AC», «בנקודות A ו-E», «AB קוטר», an inscribed triangle, the circle through A, B and C, an existing D, «P על AC» · «P על מעגל O» in either order; in the other order the line refused is the one that completes it («C על מעגל O»)
   - with coordinates: «x^2+y^2=25 · A(3,4) · C(-3,4)» or «… · C על המעגל», then «AC חותך את המעגל בנקודה E» → refused
+- **a crossing asked of a line TANGENT to the circle at a point the figure already has is refused, in 2-D's sentence** ([ADR-AG-272](06c-decisions-analytic.md#adr-ag-272), #1924): «לא ניתן למקם את E: הישר משיק למעגל בנקודה אחת בלבד — אין נקודת חיתוך נוספת להמשיך אליה.», with the student's letter. The line is tangent there because nothing can move and it only touches the circle at that point, or because the tangency is stated (⊥ the radius at the point, «הישר AP משיק למעגל בנקודה A», «מנקודה P משיק נוגע…», «המשיק למעגל בנקודה A», a point on that tangent). Circles only: a parabola's or an ellipse's tangent keeps today's verdict (wording unruled).
+  - «x^2+y^2=25» · «A(3,4)» · «P(7,1)» · «AP חותך את המעגל בנקודה E» → refused, at every configuration
+  - every crossing spelling: «הישר / הקטע / המשך AP», «PA», «E נקודת החיתוך (הראשונה / השנייה) של הישר AP עם המעגל», «בנקודות A ו-E», «E על AP» · «E על המעגל», a tangent given by its equation; in the other order the line that completes the tangency is refused
+  - a line that crosses again keeps its crossing: «… P(10,0) · AP חותך את המעגל בנקודה E» → E = (25/13, 60/13)
 - **a crossing whose pair ALREADY PASSES THROUGH a named point is the OTHER crossing** ([ADR-AG-263](06c-decisions-analytic.md#adr-ag-263), #1917): the line is drawn and the point takes the root no earlier point holds. It is refused only when no other admissible root EXISTS — a tangency, a bounded piece that holds only the named point, or a pair whose every root is already named.
   - «x^2+y^2=25» · «A(3,4)» · «P(0,0)» · «AP חותך את המעגל בנקודה E» → records, E = (−3,−4), at every configuration
   - «y^2=4x» · «A(1,2)» · «P(10,0)» · «AP חותך את הפרבולה בנקודה E» → records, E = (100,−20); with P(7,0), E = (49,−14)
   - every spelling of that sentence reads the same: «הישר AP», «PA», «AO», «E נקודת החיתוך (האחרת) של הישר AP עם המעגל», «E על הישר AP» · «E על המעגל», and a line given by its equation («נתון הישר l1: y=x+1» → E = (−4,−3))
   - still refused: «הקטע AP חותך את המעגל בנקודה E» and «E על AP» · «E על המעגל» (a bare pair is the segment, R60's own reading / ADR-AG-248) — that piece reaches the circle only at A
-- Sources: ADR-AG-125, ADR-W-066, #1175, #1255, ADR-AG-140, #1273, ADR-AG-254, #1938, ADR-AG-263, #1917, ADR-AG-271, #1893.
+- Sources: ADR-AG-125, ADR-W-066, #1175, #1255, ADR-AG-140, #1273, ADR-AG-254, #1938, ADR-AG-263, #1917, ADR-AG-271, #1893, ADR-AG-272, #1924.
 
 **R60 — two positions the solver cannot tell apart are ONE position, and a determined point's locus is that point**. *(Operator: "a cluster inside solver resolution is not an option set".)* The tolerance derives from the solve's own stopping rule.
 - «המקום הגיאומטרי של M» on a determined M → «נקודה · (4, 0)»

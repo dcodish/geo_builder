@@ -121,6 +121,8 @@ export type InputError =
    * sentence): the line's two letters as written, and the two points it already crosses the circle at.
    */
   | { key: 'third-crossing'; detail: string; line?: string; a?: string; b?: string }
+  /** A crossing asked of a line tangent to the circle at a point the figure has (#1924, ADR-AG-272; 2-D's sentence): the point. */
+  | { key: 'tangent-no-second-crossing'; detail: string; id?: string }
   /** A crossing of a line with itself — «הישר AB עם הישר BA» names no point (#1255). */
   | { key: 'self-crossing'; detail: string }
   /**

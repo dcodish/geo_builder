@@ -407,6 +407,8 @@ const he = {
   // #1893 (ADR-AG-271) — #1834's ruled sentence (2-D gets it as errors.thirdCrossing under #1834): a line through two points already on the
   // circle has no third crossing with it. The letters are the student's, never an object id.
   errThirdCrossing: '{{line}} כבר חותך את המעגל ב-{{a}} וב-{{b}} — לישר אין נקודת חיתוך שלישית עם המעגל.',
+  // #1924 (ADR-AG-272) — 2-D's errors.tangentNoSecondCrossing, verbatim: a tangent at a named point has no other crossing.
+  errTangentNoSecondCrossing: 'לא ניתן למקם את {{id}}: הישר משיק למעגל בנקודה אחת בלבד — אין נקודת חיתוך נוספת להמשיך אליה.',
   // #1255 — one line written twice has no crossing with itself. Says what the sentence failed to
   // define and shows the sentence that says what they may have meant, per the operator's ruling.
   errSelfCrossing:
@@ -851,6 +853,7 @@ const en: typeof he = {
   errCrossingAlreadyNamed:
     'Those lines meet at {{holder}}, and that point already has a name. "{{detail}}" would give it a second one. If you meant a different point, check which two lines cross there.',
   errThirdCrossing: '{{line}} already crosses the circle at {{a}} and {{b}} — a line has no third crossing with a circle.',
+  errTangentNoSecondCrossing: "Can't place {{id}}: the line is tangent to the circle (touches at one point) — there's no second crossing to extend onto.",
   errCrossingAlreadyNamedOperands:
     'The two things "{{detail}}" crosses meet at {{holder}}, and that point already has a name. The sentence would give it a second one. If you meant a different point, check which of their intersections has no name yet.',
   errSelfCrossing:

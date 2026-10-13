@@ -6,9 +6,10 @@
  * that fails is reported with its own index and its own words — never dropped, and never blamed on
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
-import { curveKindOf, fold, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
+import { centreIdOf, curveKindOf, fold, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { noFreedomReaches, reportedDof } from './carriers';
-import { collapsedByGivens, completingStatement, drawableAt, hardRingFaults, holdsOn, viewBox, type Figure } from './evaluate';
+import { collapsedByGivens, completingStatement, curveAtOf, drawableAt, hardRingFaults, holdsOn, viewBox, type Figure } from './evaluate';
+import { touchPointOf } from './crossing-order';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
 import { resolveToolLetters } from './toolLetters';
@@ -16,7 +17,7 @@ import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
 import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
-import { SOLVE_TOL, resolveChoices } from './solve';
+import { SOLVE_RESOLUTION, SOLVE_TOL, resolveChoices } from './solve';
 import { NO_STATED_MEASURES, statedMeasures, type StatedMeasures } from './statedMeasures';
 import { incidenceWords } from './crossings';
 import { convexWhenSimple, shapeRow } from './shapes';
@@ -29,7 +30,7 @@ function incidenceIds(k: { t: string; id?: string }): string[] {
 
 export interface LineFault {
   index: number;
-  code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch' | 'third-crossing';
+  code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch' | 'third-crossing' | 'tangent-no-second-crossing';
   detail: string;
   /** For a name clash: what the name already holds, as a token the locale renders (#1046). */
   existing?: ApplyError['existing'];
@@ -67,6 +68,8 @@ export interface LineFault {
   line?: string;
   a?: string;
   b?: string;
+  /** For a crossing asked of a line tangent to the circle at a point the figure has (#1924, ADR-AG-272): the point placed. */
+  point?: string;
 }
 
 /**
@@ -480,6 +483,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
    * carrying it gets no `unsatisfiable` or `crossing-already-named` beside it (filtered below), and the #1254 arm skips P.
    */
   const thirdCrossed = new Set<string>();
+  const tangentCrossed = new Set<string>();
   {
     const constraintOn = construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]]));
     const objectLine = (id: string) => pinnedBy.get(id) ?? lineOf.get(id) ?? -1;
@@ -508,6 +512,126 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
         if (index < 0) return;
         thirdCrossed.add(P);
         faults.push({ index, code: 'third-crossing', detail: lines[index], line: `${line.a}${line.b}`, a: line.a, b: line.b });
+      });
+    });
+
+    /**
+     * …AND A CROSSING ASKED OF A LINE TANGENT TO THE CIRCLE AT A POINT THE FIGURE ALREADY HAS (#1924, ADR-AG-272 — this
+     * issue's ruling: *"refused, as a tangent with no second crossing. 2-D's `errors.tangentNoSecondCrossing` sentence is
+     * the template"*).
+     *
+     * «x^2+y^2=25 · A(3,4) · P(7,1) · AP חותך את המעגל בנקודה E»: AP is the tangent at A, so it meets the circle only
+     * there, and the descent stopped within √SOLVE_TOL of the double root — E drawn 5·10⁻⁴ from A, green. The positional
+     * arm's identity ruler never sees a pair that far apart, and `crossing-distinct` / `nthHolds` accept a tangency. 2-D
+     * asks the question this did not (`crossingChoice`): is there a crossing that is not a point already placed?
+     *
+     * The straight ℓ (P's `on-line-2pt`, `on-line` or line-kind `on-curve`) touches circle K only at Q, in every
+     * configuration, in one of two ways:
+     *  - **nothing can move** (`noFreedomReaches` for ℓ's objects, K and Q) and at the drawn figure ℓ only touches K
+     *    (`touchPointOf`, `meetsTwice`'s resolution) within that resolution of Q — the coordinate rows, a tangent given
+     *    by its equation, a centre-and-radius circle;
+     *  - **by construction**: Q on K for good (the third-crossing arm's `onForGood`), Q on ℓ by construction, and ℓ stated
+     *    perpendicular to K's radius at Q — the radius written as `{radius, K, Q}` («הישר AP משיק למעגל בנקודה A»,
+     *    «מנקודה P משיק נוגע במעגל O בנקודה A») or as K's centre and Q («AP ⊥ OA») — or ℓ IS K's tangent object at Q
+     *    («המשיק למעגל O בנקודה A»), or runs through Q and a point stated on it («B על המשיק · AB …»).
+     * These are the constraint forms a tangency lowers to, measured; spellings are never listed. Q must have been declared
+     * BEFORE P (a plural's own sibling letter is not "already there"), and P is neither Q nor a point of ℓ.
+     *
+     * Circles only — 2-D's sentence names «המעגל»; a conic tangent is unruled (#1924's found work). Blame, one fault per
+     * line and the positional arm's skip follow the third-crossing arm above.
+     */
+    const declaredAt = new Map<string, number>();
+    construction.objects.forEach((o, i) => declaredAt.set(o.id, i));
+    const posOf = new Map(figure.points.map((q) => [q.id, { x: q.x, y: q.y }]));
+    const atFig = (id: string) => posOf.get(id) ?? null;
+    const curveAt = curveAtOf(construction, figure.env, atFig);
+    type Straight = { k: (typeof construction.constraints)[number]; at: number; pts: string[]; curve?: string };
+    /** P's straight incidence, as the objects it is drawn from. */
+    const straightOf = (k: (typeof construction.constraints)[number], at: number): Straight | null => {
+      if (k.t === 'on-line-2pt') return { k, at, pts: [k.a, k.b] };
+      if (k.t === 'on-line') return { k, at, pts: [] };
+      if (k.t !== 'on-curve') return null;
+      const L = objectById(construction, k.curve);
+      if (!L || curveKindOf(L) !== 'line') return null;
+      if (L.kind === 'line-at' && L.dir.k === 'points' && !L.perp && (L.through === L.dir.a || L.through === L.dir.b)) {
+        return { k, at, pts: [L.dir.a, L.dir.b], curve: L.id };
+      }
+      return { k, at, pts: [], curve: L.id };
+    };
+    const sameSet = (u: readonly string[], v: readonly string[]) => u.length === 2 && v.length === 2 && ((u[0] === v[0] && u[1] === v[1]) || (u[0] === v[1] && u[1] === v[0]));
+    /** Is `q` a point of the straight by construction? */
+    const onStraight = (s: Straight, q: string): number | null => {
+      if (s.pts.includes(q)) return -1;
+      if (!s.curve) return null;
+      const L = objectById(construction, s.curve);
+      if (L && L.kind === 'line-at' && L.through === q) return objectLine(L.id);
+      const at = construction.constraints.findIndex((k) => k.t === 'on-curve' && k.id === q && k.curve === s.curve);
+      return at >= 0 ? constraintOn[at] : null;
+    };
+    /** Is the straight tangent to K at Q BY CONSTRUCTION? The line that made it so, or null. */
+    const tangentByConstruction = (s: Straight, K: (typeof construction.objects)[number], Q: string): number | null => {
+      const centre = centreIdOf(construction, K);
+      const isRadius = (d: { k: string; circle?: string; at?: string; a?: string; b?: string }) =>
+        (d.k === 'radius' && d.circle === K.id && d.at === Q) || (d.k === 'points' && centre !== null && sameSet([d.a!, d.b!], [centre, Q]));
+      const isStraight = (d: { k: string; id?: string; a?: string; b?: string }) =>
+        (d.k === 'points' && sameSet([d.a!, d.b!], s.pts)) || (d.k === 'curve' && s.curve !== undefined && d.id === s.curve);
+      const rel = construction.constraints.findIndex(
+        (k) => k.t === 'relation' && k.rel === 'perpendicular' && ((isRadius(k.u) && isStraight(k.v)) || (isRadius(k.v) && isStraight(k.u))),
+      );
+      if (rel >= 0) return constraintOn[rel];
+      const isTangentObject = (id: string) => {
+        const T = objectById(construction, id);
+        return !!T && T.kind === 'line-at' && T.perp && T.through === Q && T.dir.k === 'radius' && T.dir.circle === K.id && T.dir.at === Q;
+      };
+      if (s.curve && isTangentObject(s.curve)) return objectLine(s.curve);
+      // Through Q and a point stated on K's tangent object at Q.
+      const other = s.pts.length === 2 && s.pts.includes(Q) ? s.pts.find((x) => x !== Q) : undefined;
+      if (other !== undefined) {
+        const on = construction.constraints.findIndex((k) => k.t === 'on-curve' && k.id === other && isTangentObject(k.curve));
+        if (on >= 0) return Math.max(constraintOn[on], objectLine((construction.constraints[on] as { curve: string }).curve));
+      }
+      return null;
+    };
+    const fixedStraight = (s: Straight) =>
+      s.pts.every((x) => noFreedomReaches(construction, x)) && (s.curve === undefined || noFreedomReaches(construction, s.curve));
+    construction.constraints.forEach((onK, ki) => {
+      if (onK.t !== 'on-curve') return;
+      const P = onK.id;
+      if (thirdCrossed.has(P) || tangentCrossed.has(P)) return;
+      const K = objectById(construction, onK.curve);
+      if (!K || curveKindOf(K) !== 'circle') return;
+      const mine = declaredAt.get(P) ?? Number.POSITIVE_INFINITY;
+      construction.constraints.forEach((k, li) => {
+        if (tangentCrossed.has(P) || li === ki || (k as { id?: string }).id !== P) return;
+        const s = straightOf(k, li);
+        if (!s || s.pts.includes(P)) return;
+        const earlier = construction.objects.filter((q) => q.id !== P && (declaredAt.get(q.id) ?? Infinity) < mine && posOf.has(q.id));
+        for (const q of earlier) {
+          const Q = q.id;
+          let evidence: number | null = null;
+          // By construction: Q on K, Q on ℓ, ℓ ⊥ the radius at Q (or ℓ is the tangent at Q).
+          const onKAt = onForGood(K, Q);
+          const onLAt = onStraight(s, Q);
+          if (onKAt !== null && onLAt !== null) {
+            const tan = tangentByConstruction(s, K, Q);
+            if (tan !== null) evidence = Math.max(onKAt, onLAt, tan);
+          }
+          // Nothing can move: ℓ only touches K, at Q.
+          if (evidence === null && fixedStraight(s) && noFreedomReaches(construction, K.id) && noFreedomReaches(construction, Q)) {
+            const cu = curveAt(K.id);
+            const foot = cu ? touchPointOf(k, cu, atFig, curveAt) : null;
+            const qp = posOf.get(Q)!;
+            if (foot && cu && cu.kind === 'circle' && Math.hypot(foot.x - qp.x, foot.y - qp.y) <= SOLVE_RESOLUTION * Math.abs(cu.r)) {
+              evidence = Math.max(objectLine(Q), objectLine(K.id), ...s.pts.map((x) => objectLine(x)), s.curve ? objectLine(s.curve) : -1);
+            }
+          }
+          if (evidence === null) continue;
+          const index = Math.max(constraintOn[ki], constraintOn[li], evidence);
+          if (index < 0) continue;
+          tangentCrossed.add(P);
+          faults.push({ index, code: 'tangent-no-second-crossing', detail: lines[index], point: P });
+          return;
+        }
       });
     });
   }
@@ -571,7 +695,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     });
     const ownerLine = (id: string) => declaredOn.get(id) ?? lineOf.get(id);
     for (const pt of figure.points) {
-      if (!crossed.has(pt.id) || thirdCrossed.has(pt.id)) continue; // #1893: already refused, in its own words
+      if (!crossed.has(pt.id) || thirdCrossed.has(pt.id) || tangentCrossed.has(pt.id)) continue; // #1893/#1924: already refused, in its own words
       const index = ownerLine(pt.id);
       if (index === undefined) continue;
       const holder = figure.points.find((q) => {
@@ -709,10 +833,11 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       faults.push({ index: declared, code: 'ring-contradicts-noun', detail: lines[declared] });
     }
   }
-  // #1893 (ADR-AG-271) — ONE fault per line (#1287): a line refused as a third crossing is not also refused as a failed
-  // search or a second name for the point it would coincide with; those are the same contradiction read twice.
+  // #1893 / #1924 (ADR-AG-271, ADR-AG-272) — ONE fault per line (#1287): a line refused as a third crossing, or as a
+  // tangent's missing second crossing, is not also refused as a failed search or a second name for the point it would
+  // coincide with; those are the same contradiction read twice.
   {
-    const third = new Set(faults.filter((f) => f.code === 'third-crossing').map((f) => f.index));
+    const third = new Set(faults.filter((f) => f.code === 'third-crossing' || f.code === 'tangent-no-second-crossing').map((f) => f.index));
     const kept = faults.filter((f) => !(third.has(f.index) && (f.code === 'unsatisfiable' || f.code === 'crossing-already-named')));
     faults.splice(0, faults.length, ...kept);
   }
