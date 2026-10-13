@@ -634,6 +634,7 @@ be the one that invents it. Two consequences were found by building it:
 
 An object whose vertex has no position is **dropped whole**, never drawn partially: a triangle missing
 a corner is not a triangle, and inventing the corner would be ADR-052 with a straight edge on it.
+*(Amended by [ADR-CX-069](#adr-cx-069): such an object is now **refused**, still never drawn partially.)*
 `known` travels on the object exactly as it does on a point, so an object resting on any sampled
 vertex is dashed.
 
@@ -4087,3 +4088,64 @@ The button is disabled while the list is empty, so a session of claims alone off
 **Locks.** `src-complex/__tests__/question-export-1872.test.ts` (10): entry order, the empty list, the muted line, each claim family left out (with the precondition that the fold really checks each as a claim), a driving claim, claims alone → empty, the type kept, the App's gate and list read from one memo, and the saved fixture `fixtures/question-export-1872.complex.json` through `hydrateSession` (which the fixtures net also replays green). `shell/__tests__/question-export.test.ts` no longer scans complex for the absence of the capability (ADR-W-126).
 
 **Consequences.** `src-complex/app/questionLines.ts` (new), `App.tsx` (handler, memo, button; the ADR-CX-028 comment rewritten), `i18n/index.ts` (`saveQuestion`, `questionGiven`).
+
+## ADR-CX-069 — A stated object is drawn or refused, never dropped (#1895)
+
+**Status:** accepted, 2026-10-13 (operator ruling 2026-10-08 on #1895: *"the circle is drawn, or the line is refused naming it"*; approved as found work, P2) · **amends** [ADR-CX-012](#adr-cx-012) ("dropped whole" → refused) ·
+**Issue:** [#1895](https://github.com/dcodish/geo_builder/issues/1895) (bug, P2, `complex`) · fix round #2053
+**Requirements:** [02d](02d-requirements-complex.md) FR-LN-1 (an accepted object is drawn; an undrawable one is refused naming the statement), the appendix F6 row (a radius is any real expression) ·
+**Design:** [04d](04d-design-complex.md), "Design rules with teeth", the "A stated object is drawn or refused" bullet ·
+**Ladder:** stages 3e (objects resolved beside the backstop), 0e (the gate reads them through `unsatisfied`), 5c (the scene draws only `drawn`) ([LADDER-CX](LADDER-CX.md))
+
+**The defect.** «z1 = 2i · המעגל שמרכזו O ורדיוסו |z1|» was accepted and drew no circle, with no refusal and
+no notice. So did the English spelling, the 2021 חורף ב lines ending «המעגל שמרכזו O ורדיוסו |B|», and the
+radii |z1 − z2|, 2|z1|, r+1, r/2, r² and 0. «ורדיוסו |z1|» with z₁ never mentioned drew no circle and no z₁.
+«ורדיוסו -2» and «ורדיוסו 2i» drew a circle of radius 2. A circle or polygon on a bound letter («A = z1»)
+or a selected root («A הוא הפתרון ברביע הרביעי») drew nothing, and so did a circumscribed circle through
+collinear numbers. Measured at pickup (`main` @ `6096b643`) through `submitLine` + `deriveLines`.
+
+**The class.** *The fold could drop an object line the parser accepted, and nothing said so.*
+`resolveObjects` had three silent `return`s and ran after every check:
+1. a private radius evaluator, `radiusValue`, a narrower copy of `evalReal` that knew only a number, a
+   parameter and a product, and read a value by its modulus (so −2 and 2i became 2);
+2. a name with no plotted spot: a bound or selected letter is drawn as its number's alias («A (z₁)»), so
+   a lookup by the letter found nothing;
+3. a circumcircle over collinear points ("say nothing, draw nothing").
+Plus a declaration gap: `circleByCenterRadius` declared only the centre, against ADR-CX-004 D1.
+
+**Decision.**
+1. **One evaluator.** A radius is read by `evalReal` over the final environment. `radiusValue` is deleted.
+   A radius that is null (not a real number) or ≤ 0 cannot be drawn.
+2. **One name map.** Every name an object reads — centre, vertices, the names inside the radius — goes
+   through `allAliases` read label → number (the #791 bindings and the #694 selections) before any
+   lookup. «A» is drawn where its number is; «|A|» reads the selected root. The map is hoisted out of
+   the points block so stage 3e can read it.
+3. **Drawn or refused.** `resolveObjects` moves to stage 3e and returns `{ drawn, undrawn }`. Each undrawn
+   object's `src` joins `unsatisfied`, the ADR-CX-031/035 channel the acceptance gate reads. The gate
+   then treats the line like every other given: other configurations first, then the earlier line that
+   blocks it (`incompatible`), else the line itself (`impossible`). No new message, no new channel.
+4. **The radius's names exist.** `circleByCenterRadius` declares `refNames(radius)` with its centre.
+5. **Not touched:** the object's `known` flag (still the centre only), the scene, the renderer.
+
+**Unchanged.** Radius 2, √2, r and 2r; a centre z1; a free centre B (creates a free B). The class guard
+in the lock replays every catalog object line and every fixture: the drawn objects equal the stated ones.
+
+**Siblings.** Complex's own fold; no other builder's code is involved. Not plane geometry, so no
+docs/22 §10 row.
+
+**Cost.** One `evalReal` per circle and one map lookup per name, per fold. No solve change.
+
+**Consequences.** `replay/derive2.ts`, `parser/rules.ts`. A saved file, share link or resumed session
+holding a newly refused line loads without it, listed under the existing «הקובץ נטען חלקית…» notice
+(FR-SL-3). The proxy bundles `parseLineV2`, so it needs a redeploy at deploy. A radius that is positive
+for only some values of a free parameter («ורדיוסו r-1») is accepted in a configuration where it is
+positive; positivity is not a driven constraint, so «הציגו תצורה אחרת» can reach a drawing where the
+circle is undrawn and the strip names it with the existing ✗ row (found work, for the operator).
+
+**Locks.** `src-complex/__tests__/circle-drawn-1895.test.ts`: the issue's line and its English mirror,
+the 2021 חורף ב lines, every radius form at 24 seeds (√10, 4, 3, 1), r² moving with r, «ורדיוסו |z1|»
+alone bringing a free z₁, the declaration, bound and selected centres and polygon vertices, «|A|» on a
+selected root, the refusals (−2, 0, 2i → `impossible`; collinear circumcircle), the partial load, the
+controls, and the class guard over the catalog and the fixtures. The fixture
+`fixtures/exam-2021wB-circle-1895.complex.json` holds the 2021 חורף ב lines; the fixtures net's
+`unsatisfied: []` assertion is now itself the "drawn" check for every fixture that states an object.
