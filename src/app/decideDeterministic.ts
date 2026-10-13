@@ -344,9 +344,8 @@ export async function decideFromParse(
   if (!r.ok && r.reason === 'polygon-not-supported') {
     return refuse('guided', { source: 'parser', result: `polygon-not-supported:${r.noun}` }, { key: 'input.polygonNotSupported', params: { noun: r.noun, offer: r.offer.join(', ') } });
   }
-  // A single-vertex angle ("∠B = 90") the parser flagged as ambiguous (the vertex has ≠2 edges, so WHICH
-  // angle is meant is unclear) — ask the student to name all three letters instead of escalating to the LLM
-  // (which would only guess). Keep the text so they can edit it into the three-letter form.
+  // A single-vertex angle ("∠B = 90") the parser could not resolve to one angle — ask the student instead of
+  // escalating to the LLM (which would only guess). Keep the text so they can edit it into the three-letter form.
   // #554: «המשיקים נחתכים בנקודה E» with more than two tangents drawn — ask WHICH two (name them, as the
   // one-utterance form does) instead of guessing or paying the LLM to guess.
   if (!r.ok && r.reason === 'tangents-ambiguous') {
@@ -354,14 +353,16 @@ export async function decideFromParse(
   }
   if (!r.ok && r.reason === 'ambiguous-angle') {
     // #1445 (ADR-590): with several angles at the vertex the question LISTS them, each in three letters.
+    // #1722 (ADR-641, operator ruling 2026-10-13): ONE candidate is listed too (never thrown away), and with
+    // none — fewer than two edges at the vertex — the note says there is no angle there yet.
     const options = r.options ?? [];
-    if (options.length > 1) {
+    if (options.length > 0) {
       return refuse('clarify', { source: 'parser', result: `ambiguous-angle:${r.vertex}` }, {
         key: 'input.ambiguousAngleOptions',
         params: { vertex: r.vertex, options: options.map((o) => `∠${o}`).join(', '), example: options[0] },
       });
     }
-    return refuse('clarify', { source: 'parser', result: `ambiguous-angle:${r.vertex}` }, { key: 'input.ambiguousAngle', params: { vertex: r.vertex } });
+    return refuse('clarify', { source: 'parser', result: `ambiguous-angle:${r.vertex}` }, { key: 'input.noAngleYet', params: { vertex: r.vertex } });
   }
   // An angle-alias name that is already taken (an existing point, or an alias bound to a different
   // angle) — the student picks another name (#235, ADR-386); never a silent rebind or an LLM guess.

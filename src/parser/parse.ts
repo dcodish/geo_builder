@@ -2581,7 +2581,8 @@ function resolveVertexAngle(v: Id, ctx: ParseContext, exclude: readonly Id[] = [
       if (straight.some(([a, b]) => (a === nb[i] && b === nb[j]) || (a === nb[j] && b === nb[i]))) continue;
       options.push(`${nb[i]}${v}${nb[j]}`);
     }
-  return options.length > 1 ? { clarify: 'ambiguous-angle', vertex: v, options } : { clarify: 'ambiguous-angle', vertex: v };
+  // #1722 (ADR-641): even ONE candidate is listed — a real angle is never thrown away; none means no angle yet.
+  return options.length > 0 ? { clarify: 'ambiguous-angle', vertex: v, options } : { clarify: 'ambiguous-angle', vertex: v };
 }
 
 /**
