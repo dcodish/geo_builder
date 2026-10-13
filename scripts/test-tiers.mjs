@@ -97,14 +97,27 @@ function treeState() {
  * `report` is null when the runner produced no JSON (a crash, or `--reporter=json` failing): `green` then
  * comes from the exit status alone and the detail fields are explicitly `null`. A crashed run must read as
  * `green: false`, never as an absent file that a consumer could mistake for "no news".
+ *
+ * #1557 (ADR-W-128) — a FILE fails, not only a test. Vitest marks a file `status: "failed"` when it errors
+ * outside any test: at COLLECTION (an import or transform failure, `assertionResults: []`, so none of its
+ * tests ever ran) or in a file-level hook. Keying "failing" on failed assertions alone dropped those files
+ * from `failingFiles` and counted a collection-failed file as SKIPPED (an empty list passes `every`), so a
+ * run with 13 failed files named one, and its test counts read as a smaller suite instead of a broken one.
+ * Now: `failingFiles` is every failed file; `collectErrors` counts the ones that ran no test;
+ * `fileErrors` gives each file-level failure's first message line; and `files.total` is held against
+ * `files.expected` — the number of files the run was asked to run (`planned`, from the file-time
+ * reporter's `onPathsCollected`) — with any planned file that produced no result named in `missingFiles`.
+ * A missing file, like a failed one, makes the verdict red whatever the exit status said.
  * Exported for `server/__tests__/test-tiers.test.ts`.
  */
-export function buildVerdict({ mode, status, report, at, sha, dirty }) {
-  const green = status === 0;
+export const fileFailed = (t) => t.status === 'failed' || t.assertionResults.some((a) => a.status === 'failed');
+const firstLine = (m) => String(m ?? '').split('\n')[0].trim() || '(no message)';
+
+export function buildVerdict({ mode, status, report, at, sha, dirty, planned = null }) {
   if (!report?.testResults) {
     return {
-      green, mode, at, sha, dirty,
-      files: null, tests: null, failingFiles: null,
+      green: status === 0, mode, at, sha, dirty,
+      files: null, tests: null, failingFiles: null, collectErrors: null, fileErrors: null, missingFiles: null,
       note: 'no JSON report produced — green derived from the runner exit status alone',
     };
   }
@@ -113,13 +126,22 @@ export function buildVerdict({ mode, status, report, at, sha, dirty }) {
   // `num*TestSuites`, which counts `describe` BLOCKS: on this suite that reads 2085 against 520 files.
   // A verdict whose numbers do not match the summary a human reads is a verdict nobody will trust.
   const SKIPPED = new Set(['pending', 'skipped', 'todo', 'disabled']);
-  const failingFiles = results
-    .filter((t) => t.assertionResults.some((a) => a.status === 'failed'))
-    .map((t) => rel(t.name))
-    .sort();
+  const failed = results.filter(fileFailed);
+  const failingFiles = failed.map((t) => rel(t.name)).sort();
+  const collectErrors = failed.filter((t) => t.assertionResults.length === 0).length;
+  const fileErrors = Object.fromEntries(
+    failed
+      .filter((t) => !t.assertionResults.some((a) => a.status === 'failed'))
+      .map((t) => [rel(t.name), firstLine(t.message)])
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  );
   const skippedFiles = results.filter(
-    (t) => !t.assertionResults.some((a) => a.status === 'failed') && t.assertionResults.every((a) => SKIPPED.has(a.status)),
+    (t) => !fileFailed(t) && t.assertionResults.every((a) => SKIPPED.has(a.status)),
   ).length;
+  const seen = new Set(results.map((t) => rel(t.name)));
+  const expected = Array.isArray(planned) ? new Set(planned.map(rel)).size : null;
+  const missingFiles = Array.isArray(planned) ? [...new Set(planned.map(rel))].filter((p) => !seen.has(p)).sort() : null;
+  const green = status === 0 && failingFiles.length === 0 && !missingFiles?.length;
   const tally = { passed: 0, failed: 0, skipped: 0 };
   for (const t of results) {
     for (const a of t.assertionResults) {
@@ -132,9 +154,18 @@ export function buildVerdict({ mode, status, report, at, sha, dirty }) {
     green,
     mode,
     at,
-    files: { passed: results.length - failingFiles.length - skippedFiles, failed: failingFiles.length, skipped: skippedFiles },
+    files: {
+      total: results.length,
+      expected,
+      passed: results.length - failingFiles.length - skippedFiles,
+      failed: failingFiles.length,
+      skipped: skippedFiles,
+    },
     tests: tally,
     failingFiles,
+    collectErrors,
+    fileErrors,
+    missingFiles,
     sha,
     dirty,
   };
@@ -153,6 +184,9 @@ export function writeVerdict(verdict, dest = VERDICT) {
       `\nsuite verdict: ${verdict.green ? 'GREEN' : 'RED'} (mode=${verdict.mode}, sha=${verdict.sha}` +
         `${verdict.dirty ? ', DIRTY tree' : ''}) → ${rel(dest)}`,
     );
+    // #1557: the files that never ran are the ones a reader most needs and least expects — say so here.
+    if (verdict.failingFiles?.length) console.log(`  ${verdict.failingFiles.length} failing file(s)${verdict.collectErrors ? `, ${verdict.collectErrors} at COLLECTION (no test ran)` : ''}`);
+    if (verdict.missingFiles?.length) console.log(`  ${verdict.missingFiles.length} planned file(s) produced no result`);
   } catch (e) {
     console.error(`suite verdict could not be written (${e.message}) — read the summary lines by hand.`);
   }
@@ -182,7 +216,11 @@ export function timedFiles(report, trueTimes) {
   return report.testResults.map((t) => ({
     file: rel(t.name),
     ms: byRel.get(rel(t.name)) ?? t.endTime - t.startTime,
-    failures: t.assertionResults.filter((a) => a.status === 'failed').map((a) => a.fullName),
+    // #1557: a file that failed OUTSIDE any test (collection, a file-level hook) is a failure too, or the
+    // catch tracker would miss exactly the red runs whose only failures never reached a test.
+    failures: fileFailed(t) && !t.assertionResults.some((a) => a.status === 'failed')
+      ? [`(file-level error) ${firstLine(t.message)}`]
+      : t.assertionResults.filter((a) => a.status === 'failed').map((a) => a.fullName),
   }));
 }
 
@@ -238,20 +276,23 @@ function runAndRecord(mode, extraArgs) {
   const at = new Date().toISOString();
   const out = join(tmpdir(), `geo-suite-${process.pid}.json`);
   const timesOut = join(tmpdir(), `geo-file-times-${process.pid}.json`);
+  const plannedOut = join(tmpdir(), `geo-planned-files-${process.pid}.json`);
   const status = runVitest(
     ['--reporter=default', '--reporter=json', `--outputFile.json=${out}`, `--reporter=${FILE_TIME_REPORTER}`, ...extraArgs],
-    { GEO_FILE_TIMES_OUT: timesOut },
+    { GEO_FILE_TIMES_OUT: timesOut, GEO_PLANNED_FILES_OUT: plannedOut },
   );
   release();
   const report = readJson(out, null);
   const trueTimes = readJson(timesOut, null);
+  const planned = readJson(plannedOut, null);
   try {
     rmSync(out, { force: true });
     rmSync(timesOut, { force: true });
+    rmSync(plannedOut, { force: true });
   } catch {
     /* best effort */
   }
-  writeVerdict(buildVerdict({ mode, status, report, at, sha, dirty }));
+  writeVerdict(buildVerdict({ mode, status, report, at, sha, dirty, planned }));
   return { status, report, trueTimes };
 }
 
@@ -444,7 +485,12 @@ function printVerdict() {
   }
   const { sha, dirty } = treeState();
   console.log(`\nNewest suite verdict: ${v.green ? 'GREEN' : 'RED'}  (mode=${v.mode}, sha=${v.sha}, at ${v.at})`);
+  if (v.files?.total != null) {
+    console.log(`  files: ${v.files.total} with a result` + (v.files.expected != null ? ` of ${v.files.expected} expected` : ''));
+  }
   if (v.failingFiles?.length) console.log(`  failing: ${v.failingFiles.join(', ')}`);
+  if (v.collectErrors) console.log(`  ${v.collectErrors} file(s) failed at COLLECTION — none of their tests ran, so the test counts are short`);
+  if (v.missingFiles?.length) console.log(`  missing (planned, no result): ${v.missingFiles.join(', ')}`);
   if (v.note) console.log(`  ${v.note}`);
   const why = [];
   if (!v.green) why.push('the run was RED');

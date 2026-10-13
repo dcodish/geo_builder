@@ -1461,7 +1461,7 @@ drift locks (complex gains the `symDist` template), and the three product lanes 
 
 ## ADR-W-033 — The suite writes a VERDICT; "green" is read, never inferred from an exit code (#750)
 
-**Status:** Accepted (2026-08-26) · **Products:** workspace (all lanes)
+**Status:** Accepted (2026-08-26) · **Products:** workspace (all lanes) · **Amended by** [ADR-W-128](#adr-w-128): a file that fails at collection is a failing file, and the record carries `collectErrors`, `fileErrors`, `missingFiles` and `files.total`/`files.expected`.
 
 `npm run test:full` is the bar before every commit and every deploy, and until now "was it green?"
 could only be answered by a human reading two summary lines. The obvious mechanical answer — the
@@ -5788,3 +5788,21 @@ He is right, and the failure is instructive: **isolation fixes a Hebrew run agai
 | complex | every active line as typed, claim-only lines left out | W6, ADR-CX-067 |
 
 **Held by.** `shell/__tests__/question-export.test.ts` — every App in the suite (cross-checked against `utility-row-parity.test.ts`'s list) reaches the composer by dynamic import, names a givens source, hands in a segmenter, mounts the button and carries both strings in both languages; the n/a half that scanned complex for the capability's absence is retired with the ruling it held. `shell/__tests__/suite-vocabulary.test.ts` — the button label and the heading are one role each, ruled wording «הורידו שאלה» / "Download question" and «נתון:» / "Given:".
+
+## ADR-W-128 — The suite verdict counts a file that failed at COLLECTION, and holds its file total against the expected count (#1557; amends ADR-W-033)
+
+**Status:** accepted · 2026-10-13 · **Issue:** #1557 (bug, P2, workspace) · round #2053 · **Amends:** [ADR-W-033](#adr-w-033), whose record keyed "failing" on failed tests.
+**Operator ruling:** none owed. A student sees nothing here — `scripts/test-tiers.mjs` is session tooling, so this is mechanism, which a session decides alone ([ADR-W-117](#adr-w-117) / CLAUDE.md rule 7). The plan was armed `auto-ok` under [ADR-W-014](#adr-w-014).
+
+**Requirements:** none (internal) · **Design:** [08](08-testing-strategy.md) "How to CLAIM green": the verdict's fields, and what a non-zero `collectErrors` or a non-empty `missingFiles` means.
+
+**Context.** In the 2026-09-29 merge train vitest printed `Test Files 13 failed | 987 passed | 2 skipped (1002)`, and `reports/suite-verdict.json` said `failingFiles: ["server/__tests__/deploy-preflight.test.ts"]`. The other twelve files failed at FILE level: the transform server timed out (`[vitest-worker]: Timeout calling "fetch" …`) before any of their tests was collected. `buildVerdict` decided "failing" from failed ASSERTIONS, and a collection-failed file has none — vitest's JSON reporter writes it as `status: "failed"`, a `message`, and `assertionResults: []`. Worse, an empty list passes `every(skipped)`, so each such file was counted as a SKIPPED file, and its ~800 tests simply vanished from `tests`. `green` was still `false`, but the record named the wrong culprit and described a smaller suite instead of a broken one: a session reading it would re-run the one flaky file, see it pass, and call the red noise. The same blind spot sat in `timedFiles`, so the unique-catch tracker never saw a red run whose only failures were file-level.
+
+**Decision.**
+1. **A file fails when vitest says it failed** — `status === "failed"` OR any failed assertion (`fileFailed`, one predicate shared by the verdict and the catch tracker). `failingFiles` is every such file; a failed file is never a skipped one.
+2. **`collectErrors`** counts the failed files that ran NO test (empty `assertionResults`): a non-zero value says the test counts are short by those files' tests. **`fileErrors`** maps each file that failed outside any test (collection, or a file-level hook with every test passing) to its message's first line, so the reader sees *why* without re-running.
+3. **The file total is held against the expected count.** The file-time reporter (`scripts/lib/file-time-reporter.mjs`) also records `onPathsCollected` — the files the run was ASKED to run, after the tier's `--exclude` and before any collection — to `GEO_PLANNED_FILES_OUT`. The verdict carries `files.total` (files with a result) and `files.expected` (that planned count), and names any planned file without a result in `missingFiles`. The denominator comes from the run itself, not from the committed tier artifact: a file count in `reports/test-tiers.json` would change with every added test and bring back the merge churn [ADR-W-037](#adr-w-037) removed.
+4. **A missing file reds the verdict** whatever the exit status said: `green` is `status === 0`, no failing file, and nothing missing. A shrunken suite must not read as a pass. (Without a planned list — an older reporter, or a write failure — `expected` and `missingFiles` are `null` and the rule reduces to the old one.)
+5. The run's closing line and `npm run test:tiers` print the failing-file count, the collection count, and `total of expected`.
+
+**Consequences.** A verdict now names every file the `Test Files` line counts as failed, and a red run caused by collection timeouts says so in two fields instead of hiding inside the test counts. The crash path (no JSON) is unchanged, with the new fields explicitly `null`. Locks in `server/__tests__/test-tiers.test.ts` (#1557 block): a fake vitest JSON report with one collection-failed file yields a verdict that names it, counts it in `collectErrors`, and does not call it skipped; a hook-failed file is failing but not a collection error; a planned file with no result is named and reds a status-0 run; a complete run stays green with `expected === total`; the catch tracker sees the file-level failure; and the reporter writes the planned list.
