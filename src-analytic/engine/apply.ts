@@ -694,7 +694,7 @@ const PROBE_ENVS: Env[] = [
  * Lifted out of `on-kind` when «BD קוטר במעגל» needed the same question (#1324): a second copy that read
  * the declaration only missed «(x-3)^2+(y-4)^2=9» — measured — and treated the figure as circle-less.
  */
-function curveKindOf(o: GeoObject): string | null {
+export function curveKindOf(o: GeoObject): string | null {
   if (o.kind === 'circle-at' || o.kind === 'circle-thru') return 'circle';
   // A line CONSTRUCTED through a point is a line, however it was stated (#1501; the `on-curve`
   // M1 arm carried this as a local special case before it lived here).
@@ -752,6 +752,20 @@ function circleByName(c: Construction, name: string): GeoObject | undefined {
 }
 
 /**
+ * IS `p` ON THIS CURVE BY CONSTRUCTION — in every configuration, whatever moves (#1893, ADR-AG-271)? A defining point
+ * of a computed circle (never an incircle's: its points are the ring it touches, not points on it), or a point the
+ * figure STATES on it by an incidence. The one answer for "the figure says this point is on that curve"; the
+ * circumcircle a ring describes (#1663) and the third-crossing arm (`derive.ts`) both read it. Deliberately not
+ * `onCircleAlready` below, which counts an incircle's ring vertices for its own purpose (skipping a restatement).
+ */
+export function onCurveByConstruction(c: Construction, curve: GeoObject, p: Id): boolean {
+  return (
+    (curve.kind === 'circle-thru' && curve.def.t !== 'incircle' && circleDefPoints(curve.def).includes(p)) ||
+    c.constraints.some((k) => k.t === 'on-curve' && k.id === p && k.curve === curve.id)
+  );
+}
+
+/**
  * THE CIRCLE A RING DESCRIBES (#1663, ADR-AG-203) — «המעגל החוסם את המשולש ABC» is the circle the figure states
  * EVERY vertex on (a defining point of a computed circle, or an incidence — so a triangle inscribed in an equation
  * circle names that circle); «המעגל החסום במשולש ABC» is the computed incircle of that ring, or the circle the
@@ -761,12 +775,7 @@ function circleByName(c: Construction, name: string): GeoObject | undefined {
  */
 function describedCircle(c: Construction, d: DescribedCircle): GeoObject | undefined {
   const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
-  if (d.role === 'circum') {
-    const onIt = (o: GeoObject, p: Id) =>
-      (o.kind === 'circle-thru' && o.def.t !== 'incircle' && circleDefPoints(o.def).includes(p)) ||
-      c.constraints.some((k) => k.t === 'on-curve' && k.id === p && k.curve === o.id);
-    return circles.find((o) => d.pts.every((p) => onIt(o, p)));
-  }
+  if (d.role === 'circum') return circles.find((o) => d.pts.every((p) => onCurveByConstruction(c, o, p)));
   const ring = ringId(d.pts);
   const sides = d.pts.map((p, i) => [p, d.pts[(i + 1) % d.pts.length]] as const);
   return circles.find(

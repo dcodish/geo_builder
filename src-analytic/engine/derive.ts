@@ -6,8 +6,8 @@
  * that fails is reported with its own index and its own words — never dropped, and never blamed on
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
-import { fold, existingKindOf, type ApplyError, type ApplyNotice } from './apply';
-import { reportedDof } from './carriers';
+import { curveKindOf, fold, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
+import { noFreedomReaches, reportedDof } from './carriers';
 import { collapsedByGivens, completingStatement, drawableAt, hardRingFaults, holdsOn, viewBox, type Figure } from './evaluate';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
@@ -29,7 +29,7 @@ function incidenceIds(k: { t: string; id?: string }): string[] {
 
 export interface LineFault {
   index: number;
-  code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch';
+  code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch' | 'third-crossing';
   detail: string;
   /** For a name clash: what the name already holds, as a token the locale renders (#1046). */
   existing?: ApplyError['existing'];
@@ -60,6 +60,13 @@ export interface LineFault {
   stated?: string;
   /** For a diagonal claim the figure refutes (#1737, ADR-AG-265): the pair as written (the ring is `polygon`). */
   pair?: string;
+  /**
+   * For a third crossing asked of a line through two points already on the circle (#1893, ADR-AG-271): the line as
+   * written (its two letters) and the two points it already crosses the circle at.
+   */
+  line?: string;
+  a?: string;
+  b?: string;
 }
 
 /**
@@ -449,6 +456,63 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   const freedom = reportedDof(construction, figure.carrierDof);
 
   /**
+   * A THIRD CROSSING OF A LINE WITH A CIRCLE IT ALREADY CROSSES AT TWO NAMED POINTS (#1893, ADR-AG-271 — #1834's ruling:
+   * *"any third crossing asked of a line that already has two named points on the circle gets this sentence, with the
+   * letters filled in"*).
+   *
+   * «מעגל O · A על מעגל O · C על מעגל O · AC חותך את המעגל בנקודה E» lowers to `on-line-2pt(E; A, C)`, `on-curve(E, K)`
+   * and `crossing-distinct E`. A line meets a circle at most twice, and A and C already are those two, so E = A (or C)
+   * is the only solution — a coincidence the givens FORCE. Analytic knew two shapes of a forced coincidence: two lines
+   * sharing a written letter (#1175, the parser) and a pair with no separation freedom (#1254 / #1938, below). This is
+   * the third, STRUCTURAL member: the pair's separation is not forced in the rank's sense (the circle can still move,
+   * `separationDof` reads 1–2), yet no configuration can separate them. So the figure drew E on A, green — or, at the
+   * seeds where the rank read 0, refused it in the two-straights wording.
+   *
+   * A point of the line is ON the circle in every configuration when (a) the figure says so by construction
+   * (`onCurveByConstruction`: a defining point of a computed circle, never an incircle's, or a stated incidence), or
+   * (b) nothing can move either one (`noFreedomReaches`) and it lies on the circle as drawn — «x^2+y^2=25 · A(3,4) ·
+   * C(-3,4)». Every spelling that lowers to these constraints is one case: «הישר / המיתר / המשך / הקטע AC», «בנקודות A
+   * ו-E», a point stated on the line and on the circle in two sentences, in either order, a circle through three points.
+   *
+   * Circles only (`curveKindOf`): the ruled sentence names «המעגל», and a conic's wording is unruled (#1909, #1932).
+   * Blamed on the LATEST of the statements it is made of — P's two incidences and the two on-the-circle facts — ADR-492's
+   * shortest infeasible prefix, so «C על מעגל O» typed last is the refused line. ONE fault per line (#1287): the line
+   * carrying it gets no `unsatisfiable` or `crossing-already-named` beside it (filtered below), and the #1254 arm skips P.
+   */
+  const thirdCrossed = new Set<string>();
+  {
+    const constraintOn = construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]]));
+    const objectLine = (id: string) => pinnedBy.get(id) ?? lineOf.get(id) ?? -1;
+    /** The line that put `p` on circle `K` for good — or null when it is not, in every configuration. */
+    const onForGood = (K: (typeof construction.objects)[number], p: string): number | null => {
+      if (onCurveByConstruction(construction, K, p)) {
+        const at = construction.constraints.findIndex((k) => k.t === 'on-curve' && k.id === p && k.curve === K.id);
+        return at >= 0 ? constraintOn[at] : objectLine(K.id);
+      }
+      if (!noFreedomReaches(construction, p) || !noFreedomReaches(construction, K.id)) return null;
+      if (!holdsOn(construction, { t: 'on-curve', id: p, curve: K.id }, figure)) return null;
+      return Math.max(objectLine(p), objectLine(K.id));
+    };
+    construction.constraints.forEach((line, li) => {
+      if (line.t !== 'on-line-2pt' || line.a === line.b || line.id === line.a || line.id === line.b) return;
+      const P = line.id;
+      if (thirdCrossed.has(P)) return;
+      construction.constraints.forEach((onK, ki) => {
+        if (thirdCrossed.has(P) || onK.t !== 'on-curve' || onK.id !== P) return;
+        const K = objectById(construction, onK.curve);
+        if (!K || curveKindOf(K) !== 'circle') return;
+        const atA = onForGood(K, line.a);
+        const atB = atA === null ? null : onForGood(K, line.b);
+        if (atA === null || atB === null) return;
+        const index = Math.max(constraintOn[li], constraintOn[ki], atA, atB);
+        if (index < 0) return;
+        thirdCrossed.add(P);
+        faults.push({ index, code: 'third-crossing', detail: lines[index], line: `${line.a}${line.b}`, a: line.a, b: line.b });
+      });
+    });
+  }
+
+  /**
    * A NAMED CROSSING THAT IS A POINT THE FIGURE ALREADY HAS (#1254, the operator’s T18 ruling).
    *
    * *"if P and B must be on the same location … it should be refused. The only case where P and B can
@@ -507,7 +571,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     });
     const ownerLine = (id: string) => declaredOn.get(id) ?? lineOf.get(id);
     for (const pt of figure.points) {
-      if (!crossed.has(pt.id)) continue;
+      if (!crossed.has(pt.id) || thirdCrossed.has(pt.id)) continue; // #1893: already refused, in its own words
       const index = ownerLine(pt.id);
       if (index === undefined) continue;
       const holder = figure.points.find((q) => {
@@ -644,6 +708,13 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       alreadyFaulted.add(declared);
       faults.push({ index: declared, code: 'ring-contradicts-noun', detail: lines[declared] });
     }
+  }
+  // #1893 (ADR-AG-271) — ONE fault per line (#1287): a line refused as a third crossing is not also refused as a failed
+  // search or a second name for the point it would coincide with; those are the same contradiction read twice.
+  {
+    const third = new Set(faults.filter((f) => f.code === 'third-crossing').map((f) => f.index));
+    const kept = faults.filter((f) => !(third.has(f.index) && (f.code === 'unsatisfiable' || f.code === 'crossing-already-named')));
+    faults.splice(0, faults.length, ...kept);
   }
   /**
    * Roll the per-FACT effects up to per-LINE outcomes (#1045).

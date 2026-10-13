@@ -136,18 +136,20 @@ describe('#1938 — the false-refusal net', () => {
   /**
    * The rows that MEASURE the net rather than assume it: a free circle (#1893) and a free parabola (#1909)
    * whose crossing lands exactly on a point the student named, with the separation still free (`separationDof`
-   * 2 — the carriers can move it off). They record today, they must keep recording here, and their own
-   * refusal is a different, better sentence («AC כבר חותך את המעגל ב-A וב-C …», #1834) that belongs to those
-   * issues. This arm must not pre-empt it.
+   * 2 — the carriers can move it off). This arm must not accuse them, and their own refusal is a different,
+   * better sentence («AC כבר חותך את המעגל ב-A וב-C …», #1834) that belongs to those issues.
+   *
+   * RE-BASED by #1893 (ADR-AG-271): the circle's chord now carries that sentence — `third-crossing`, the structural
+   * arm — and still never this arm's `crossing-already-named`. The parabola row below is #1909's and is unchanged.
    */
-  it('#1893 — a free circle’s chord: E lands on A, the pair is still free, and the line records', () => {
+  it('#1893 — a free circle’s chord: E lands on A, the pair is still free, and this arm stays silent (the third-crossing arm refuses it)', () => {
     const lines = ['מעגל O', 'A על מעגל O', 'C על מעגל O', 'AC חותך את המעגל בנקודה E'];
     const d = derive(lines);
     const a = d.figure.points.find((p) => p.id === 'A')!;
     const e = d.figure.points.find((p) => p.id === 'E')!;
     expect(Math.hypot(a.x - e.x, a.y - e.y)).toBeLessThan(1e-3); // the coincidence is really there
     expect(d.figure.separationDof?.('E', 'A')).toBeGreaterThan(0); // …and really not forced
-    expect(d.faults).toEqual([]);
+    expect(d.faults).toMatchObject([{ index: 3, code: 'third-crossing', line: 'AC', a: 'A', b: 'C' }]);
   });
 
   it('#1909 — a free parabola’s chord does the same', () => {

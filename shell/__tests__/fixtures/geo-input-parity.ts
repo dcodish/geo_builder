@@ -1327,6 +1327,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #1864 (ADR-AG-267): an angle's acuteness named by its VERTEX alone — 2-D's «∠C קהה/חדה» ──
   { id: 'vertex-obtuse-1864', family: 'angles', steps: ['משולש ABC', 'זווית A קהה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the line the obtuse-triangle note teaches' },
   { id: 'vertex-acute-1864', family: 'angles', steps: ['משולש ABC', 'זווית A חדה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+
+  // ── #1893 (ADR-AG-271): a third crossing asked of a chord whose two ends are on the circle — #1834's ruling ──
+  { id: 'chord-third-crossing-1893', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'C על מעגל O', 'AC חותך את המעגל בנקודה E'], expect: 'refused', exception: 'X8', note: 'analytic drew E on A, green; 2-D refuses (its sentence is #1834’s to reword) — the verdict, not the text, is the row' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

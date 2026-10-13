@@ -908,7 +908,17 @@ seeding above now starts such a crossing on the root no earlier point holds, so 
 no other admissible root exists (a tangency, a bounded piece holding only the named point, a chord whose both roots are
 named) — and there its refusal is true.
 
-*Identifiers:* `SOLVE_TOL` · `separationDof` · `freedomOf`
+**The STRUCTURAL member: a third crossing of a chord** ([ADR-AG-271](06c-decisions-analytic.md#adr-ag-271), #1893).
+A point P carrying `on-line-2pt(P; a, b)` (any extent) and `on-curve(P, K)` with `curveKindOf(K) === 'circle'`, P neither a
+nor b, where a and b are each on K **in every configuration**, is refused `third-crossing { line, a, b }` — #1834's ruled
+sentence. "On K in every configuration" is one of two ways: `onCurveByConstruction` (`apply.ts`; a defining point of a
+`circle-thru` that is not an incircle, or a stated `on-curve` incidence — the one predicate `describedCircle` also reads), or
+`noFreedomReaches` (`carriers.ts`; no carrier, no symbol, no movable parent) for both the point and K **and** the point on K
+at the drawn figure (`holdsOn`). No freedom gate: the predicate is a proof, not a sample — the rank cannot see it (the circle
+can move, so `separationDof` is 1–2), yet no configuration separates the pair. Blamed on the latest of the four statements it
+is made of; the line carrying it gets no `unsatisfiable` or `crossing-already-named` beside it, and the positional arm skips P.
+
+*Identifiers:* `SOLVE_TOL` · `separationDof` · `freedomOf` · `onCurveByConstruction` · `noFreedomReaches` · `third-crossing`
 
 ## Knowledge gates
 

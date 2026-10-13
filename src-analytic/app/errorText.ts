@@ -173,6 +173,8 @@ export function errorText(error: InputError, t: Translate): string {
     // #1416 — the operands named when the figure can say them; the straights' wording is for two straights only
     'crossing-already-named': error.key === 'crossing-already-named' && error.operands ? 'errCrossingAlreadyNamedOperands' : 'errCrossingAlreadyNamed',
     'self-crossing': 'errSelfCrossing',
+    // #1893 (ADR-AG-271) — #1834's ruled sentence, with the student's letters
+    'third-crossing': 'errThirdCrossing',
     'llm-busy': 'errLlmBusy',
     'llm-understood-unsupported': 'errLlmUnderstood',
     'bad-operand': 'errBadOperand',
@@ -260,6 +262,9 @@ export function errorText(error: InputError, t: Translate): string {
         : '',
     second: error.key === 'crossing-already-named' && error.operands ? error.operands[1] : '',
     other: 'other' in error ? error.other : '',
+    line: error.key === 'third-crossing' ? (error.line ?? '') : '',
+    a: error.key === 'third-crossing' ? (error.a ?? '') : '',
+    b: error.key === 'third-crossing' ? (error.b ?? '') : '',
     reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '',
     definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '',
     all: error.key === 'split-statements' ? error.parts.map((p, i) => `(${i + 1}) ${p}`).join('  ') : '',
