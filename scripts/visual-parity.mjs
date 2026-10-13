@@ -3,7 +3,7 @@
 // computed styles of the title, body background. Prints PASS or a named DELTA per probe.
 // B3-2d: the 2-D app joined the frame, so the check now compares ALL THREE pairwise against the
 // complex baseline. Formal wiring into the readiness gate is #704's.
-import { chromium } from 'playwright';
+import { launchBrowser } from './lib/browser-harness.mjs';
 
 const TOOLS = [
   { id: '2d', url: 'http://localhost:5173/' },
@@ -11,7 +11,7 @@ const TOOLS = [
   { id: 'complex', url: 'http://localhost:5173/complex.html' },
 ];
 
-const browser = await chromium.launch();
+const browser = await launchBrowser();
 const results = {};
 for (const tool of TOOLS) {
   const p = await browser.newPage({ viewport: { width: 1600, height: 900 } });

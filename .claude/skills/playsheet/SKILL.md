@@ -81,8 +81,13 @@ A case is a claim about the product, so it is measured before it goes on the she
 ## 3. Pre-play it
 
 - **Write the spec** `scripts/playsheets/<name>.json` (tracked):
-  `{ "name", "title", "cases": [{ "id": "T1", "title", "class": "play|look|verified", "product": "2d|3d|complex|analytic", "base": "http://localhost:5173", "path"?, "lines": [...], "lookFor", "before", "expect"?: [...], "expectAbsent"?: [...], "expectRefusal"?, "asks"?: [...], "cycles"?: N, "after"?: [{ "toggle": row } | { "type": "…" }] }] }`.
+  `{ "name", "title", "cases": [{ "id": "T1", "title", "class": "play|look|verified", "product": "2d|3d|complex|analytic", "base": "http://localhost:5173", "path"?, "lines": [...], "lookFor", "before", "expect"?: [...], "expectAbsent"?: [...], "expectRefusal"?, "asks"?: [...], "cycles"?: N, "after"?: [{ "toggle": row } | { "type": "…" }], "llm"?: { "<utterance>": ["canonical line", …] } }] }`.
   `expectRefusal` flips the case: it passes only when a refusal containing that text appears.
+- **The model lane is never live** (CLAUDE.md rule 2, ADR-W-127). The driver's browser answers every `/api/parse`
+  itself: keyless by default (the deterministic refusal stands). For a case that exercises the AI lane, be the
+  oracle and put the canonical lines the model should return in `llm`, keyed by the utterance the client
+  sends. A declared answer no request used fails the case, and so does any request that reaches the network.
+  The run ends with a `model lane:` line, which is the rule-2 record to quote.
 - **Run** `npm run playsheet -- --sheet scripts/playsheets/<name>.json` (`--out <dir>` optional). It types the
   lines, asks the asks, presses «הציגו תצורה אחרת», audits the captures and writes
   `reports/playsheets/<name>/report.html` beside the screenshots. It exits non-zero on any red case.
@@ -91,7 +96,10 @@ A case is a claim about the product, so it is measured before it goes on the she
 - **UI-touching work also passes** `npm run smoke:visual -- --app <2d|3d|complex|analytic> --base http://localhost:PORT`
   (docs/22 §4).
 - **A bespoke probe** the spec cannot express is a Playwright script inside the repo, because a scratchpad
-  `.mjs` cannot resolve `playwright`: copy it to the repo root, run it, delete it. Reuse `visual-smoke.mjs`'s
+  `.mjs` cannot resolve `playwright`: copy it to the repo root, run it, delete it. It launches with
+  `launchBrowser()` from `scripts/lib/browser-harness.mjs` and never imports `playwright` itself: that is the
+  stub on `/api/parse` (pass `modelAnswers` to `newPage` for an oracle answer), and a guard test fails on any
+  other import. Reuse `visual-smoke.mjs`'s
   `dismissModal` (the first-visit About modal intercepts every click), and in 2-D `fill()` the input
   without clicking it.
 

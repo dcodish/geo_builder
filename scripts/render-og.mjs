@@ -17,7 +17,7 @@
  * read from the served page's `<h1>`, so the card cannot disagree with the page it previews. It refuses
  * to write a card if any line was refused or the figure is empty.
  */
-import { chromium } from 'playwright';
+import { launchBrowser } from './lib/browser-harness.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -57,7 +57,7 @@ const apps = args.includes('--app') ? [opt('--app')].filter((a) => a !== 'home')
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-const browser = await chromium.launch();
+const browser = await launchBrowser();
 let failed = false;
 for (const app of apps) {
   const spec = APPS[app];
