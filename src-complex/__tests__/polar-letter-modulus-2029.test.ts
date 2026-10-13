@@ -52,11 +52,13 @@ describe('#2029 — every spelling of a letter-modulus polar form lowers to the 
     expect(readingsOf([line])).toEqual(readingsOf([dotted]));
   });
 
-  it('r is a parameter with the chip, and its sign is the second configuration', () => {
+  // #2078 (ADR-CX-070) amends this lock: r is the MODULUS of a polar form, so it is a size (r > 0) and
+  // there is no second configuration for its sign — «z ≈ r·cis30°» at every seed
+  it('r is a parameter with the chip, and it is positive: one configuration', () => {
     const d = deriveLines(['z = r cis 30'], 0, 0);
     expect(d.params.map((p) => p.name)).toEqual(['r']);
     expect(d.freeDof).toEqual(['r']);
-    expect(d.configCount).toBe(2);
+    expect(d.configCount).toBe(1);
   });
 });
 

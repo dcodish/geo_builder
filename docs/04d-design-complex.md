@@ -200,7 +200,9 @@ never as a contradiction or a refutation.
   parameters appear on no surface.
 - **A parameter's sign follows its use** ([ADR-CX-045](06d-decisions-complex.md#adr-cx-045)). ONE reading,
   `paramSigns` (`model/paramSign.ts`), splits the parameters into SIZES (under `|…|`, a `mod` row, a
-  radius, a measure, or one product with a complex name) and SIGN-FREE (everything else; any size use
+  radius, a measure, or one product with a complex name or a written `cis θ` — the polar mark the parser
+  puts on that unit literal, since `r cis 90` and `r·i` lower to the same value,
+  [ADR-CX-070](06d-decisions-complex.md#adr-cx-070)) and SIGN-FREE (everything else; any size use
   wins). Both tiers read it. Tier 1 keeps a sign-free parameter's magnitude in the modulus constant,
   exactly as a size's, and adds its sign as an argument unknown `#s:p` pinned by `2·s − k = 0`, so the
   enumeration decides it: `u^5 = -32` has one integral sign (½), `u^4 = -16` has none and refuses

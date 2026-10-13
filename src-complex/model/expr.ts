@@ -25,7 +25,17 @@ export type Expr =
    * `3 + 4i` it contains an addition and would be pushed to the numeric tier, but the number itself is
    * a perfectly good exact value (modulus 5, argument an atom) and nothing about it is additive.
    */
-  | { readonly t: 'val'; readonly v: Value }
+  | {
+      readonly t: 'val';
+      readonly v: Value;
+      /**
+       * Set only on the unit literal the student wrote as `cis θ` (or `cos θ + i sin θ`) with a numeric
+       * angle: the POLAR notation, whose factor in front is a modulus. The VALUE cannot carry this —
+       * `r cis 90` and `r·i` lower to the same unit literal — so the parser marks where the notation
+       * was read (`model/paramSign.ts`, ADR-CX-070).
+       */
+      readonly polar?: true;
+    }
   /** the imaginary unit */
   | { readonly t: 'i' }
   /** a named complex number — an unknown of the system */

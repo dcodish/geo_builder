@@ -6,8 +6,10 @@
  * u^5=-32"*. So a real parameter is one of two things, and which one is read off how the student USES it:
  *
  *   - a **SIZE** — a positive real, as every parameter was before: a modulus (`|z1| = 9r`), anything
- *     inside `|…|`, a circle's radius, a measure's value (`אורך z1z2 = 15r`, `שטח … = 54r²`), or a
- *     scale factor multiplying a complex number in one product (`z2 = r·z1`);
+ *     inside `|…|`, a circle's radius, a measure's value (`אורך z1z2 = 15r`, `שטח … = 54r²`), a
+ *     scale factor multiplying a complex number in one product (`z2 = r·z1`), or the modulus slot of a
+ *     written polar form (`z = r cis 30`, `z = r(cos30° + i sin30°)`; #2078, ADR-CX-070). The polar form
+ *     is told by the parser's `polar` mark, never by the value: `r cis 90` and `r·i` are the same number;
  *   - **SIGN-FREE** — any real — in every other use: an additive term (`z1 = a + b·i`, `2 + r·i`), a
  *     power equated to a number (`u^5 = -32`), a number equal to it (`z1 = u`).
  *
@@ -86,7 +88,8 @@ function walk(e: Expr, inSize: boolean, size: Set<string>, all: Set<string>): vo
     case 'neg': {
       const factors: Expr[] = [];
       factorsOf(e, factors);
-      const scalesANumber = factors.some((f) => f.t === 'ref');
+      // a complex NAME, or a written `cis θ` — the modulus slot of the polar form (ADR-CX-070)
+      const scalesANumber = factors.some((f) => f.t === 'ref' || (f.t === 'val' && f.polar === true));
       for (const f of factors) walk(f, inSize || (scalesANumber && f.t === 'param'), size, all);
       return;
     }
