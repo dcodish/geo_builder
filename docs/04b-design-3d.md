@@ -57,6 +57,12 @@ refused while «|AD| = √7» built. `normalize3` folds `sqrt` / `\sqrt{…}` to
 the glyph. The honesty gate (`droppedGivenNumbers3`) values a radical with the same exported `RADICAND` and
 `evalRadical`, and keeps a radicand's own parentheses. The distance, `A = (…)`, ratio and solid-size slots still
 take decimals until the operator rules on them. Angles are degrees and stay `ANGLE_VAL`.
+The revolution solid's size slots (`RADIUS_SLOT` / `HEIGHT_SLOT`, #2079,
+[ADR-3D-340](06b-decisions-3d.md#adr-3d-340)) match the whole `MAG` value, anchored (`SIZE_VALUE`), so no
+prefix of a number is ever taken, and `readSizeSlot` reads only a plain decimal. A fraction or root there is
+UNREAD: the rule declines and flags it, and after every rule has declined `parse3` returns
+`solid-size-unread`, which the store words as apply's own `given-not-drivable` size refusal. The gate values a
+fraction by its value, or by numerator AND denominator together (the ratio's `p`/`q`), never by one part alone.
 
 **A letter the tool cannot read is refused by name** (#1919, [ADR-3D-328](06b-decisions-3d.md#adr-3d-328)).
 `readStatement3` — the one reader submit and the ✎ edit share — asks `unreadScript` (`shell/inputScript.ts`,

@@ -393,6 +393,18 @@ export function droppedGivenNumbers3(utterance: string, commands: Command3[]): s
     }
     return false;
   };
+  /** #2079: account a fraction by BOTH its parts, spending one of each — or neither, when either is spent. */
+  const hasPair = (a: number, b: number): boolean => {
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+    const qa = q(a);
+    const qb = q(b);
+    const la = acc.get(qa) ?? 0;
+    const lb = acc.get(qb) ?? 0;
+    if (qa === qb ? la < 2 : la < 1 || lb < 1) return false;
+    acc.set(qa, la - 1);
+    acc.set(qb, (acc.get(qb) ?? 0) - 1);
+    return true;
+  };
 
   // ---- utterance side (conservative): blank every token whose digits are NOT magnitudes ----
   let s = normalize3(utterance);
@@ -456,7 +468,12 @@ export function droppedGivenNumbers3(utterance: string, commands: Command3[]): s
     const num = evalTerm(m[1]);
     const den = m[2] !== undefined ? evalTerm(m[2]) : 1;
     const val = den !== 0 ? num / den : num;
-    if (!has([val, -val, num, den])) flag(m[0]);
+    // #2079 (ADR-3D-340): a fraction is accounted by its VALUE, or by its numerator AND its denominator
+    // together (a rule that keeps the pair, as the ratio `p/q` does). Never by one of them alone: «1/2»
+    // read as `radius: 1` left the 1 paying for the whole fraction, and the half-read line drew green.
+    // A lone radical term (no slash) has no parts, and keeps its accounting unchanged.
+    const fraction = m[2] !== undefined;
+    if (fraction ? !has([val, -val]) && !hasPair(num, den) : !has([val, -val, num, den])) flag(m[0]);
   }
 
   // 3) bare numbers — accounted directly or via a standard lowering: a signed coordinate (−n), a
