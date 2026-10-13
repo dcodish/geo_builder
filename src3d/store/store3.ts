@@ -1649,7 +1649,10 @@ function readStatement3(
                   ? { code: 'inscribed-contradicts-noun', shape: parsed.shape, forced: parsed.forced, sentence: utterance.trim() }
                   : parsed.reason === 'incircle-not-drawn'
                     ? incircleRefusal3(parsed.sides) // #1891: apply's own refusal, so both seams word it alike
-                    : { code: 'not-understood' },
+                    : parsed.reason === 'solid-size-unread'
+                      ? // #2079 (ADR-3D-340): apply's own «not yet» size refusal (ADR-3D-291), reused — no new sentence
+                        { code: 'given-not-drivable', object: { kind: 'size', solid: parsed.solid } }
+                      : { code: 'not-understood' },
   };
 }
 

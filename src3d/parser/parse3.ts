@@ -22,7 +22,7 @@ import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
 import { isPlanar, sameOperand } from '../engine/operands';
-import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
+import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, RevolutionKind, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX, SOLID_QUALIFIER_HE } from '../lexicon/nouns3';
 import { foldPrimes3, VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
@@ -79,7 +79,10 @@ export type ParseResult3 =
   | { ok: false; reason: 'inscribed-contradicts-noun'; shape: string; forced: string }
   // #1891 (ADR-3D-311): a circle inscribed in a polygon of `sides` whose incircle the engine does not draw.
   // Refused before any rule (the store words it per `incircleRefusal3`); never escalated.
-  | { ok: false; reason: 'incircle-not-drawn'; sides: number };
+  | { ok: false; reason: 'incircle-not-drawn'; sides: number }
+  // #2079 (ADR-3D-340): a cone/cylinder/sphere size stated in a form its slot does not read (a fraction, a
+  // root) — refused whole, worded by the store as apply's own «not yet» size refusal (ADR-3D-291).
+  | { ok: false; reason: 'solid-size-unread'; solid: RevolutionKind };
 
 const NOT_HANDLED: ParseResult3 = { ok: false, reason: 'not-handled' };
 
@@ -3702,28 +3705,49 @@ const lengthRatioClaim: Rule = (s) => {
   ];
 };
 
+/**
+ * #2079 ([ADR-3D-340](../../docs/06b-decisions-3d.md#adr-3d-340)) — a revolution solid's SIZE SLOT: its noun,
+ * then the whole stated value. The value is the shared magnitude atom {@link MAG}, anchored so that no PREFIX
+ * of a number can be taken («1/2» is never «1», «2√2» never «2», «2.5» never «2»).
+ *
+ * The slot READS only a plain decimal. Any other value the atom admits (a fraction, a root) is UNREAD: ADR-3D-337
+ * §4 held these slots, and reading them waits for the operator (#1569 parks cone treatment), so the line is
+ * refused with the existing «not yet» size message rather than drawn from part of its number.
+ */
+const SIZE_VALUE = String.raw`(-?${MAG})(?!\.?\d|\s*[/√])`;
+const PLAIN_SIZE = new RegExp(String.raw`^${NUM}$`);
+const RADIUS_SLOT = new RegExp(String.raw`(?:שרדיוסו|רדיוסו?|רדיוס\s+ה?בסיסו?|radius(?:\s+is)?)\s*(?:הוא\s*)?${SIZE_VALUE}`);
+const HEIGHT_SLOT = new RegExp(String.raw`(?:שגובהו|גובהו?|height(?:\s+is)?)\s*(?:הוא\s*)?${SIZE_VALUE}`);
+type SizeSlot = { value: number } | 'unread' | undefined;
+function readSizeSlot(s: string, slot: RegExp): SizeSlot {
+  const raw = s.match(slot)?.[1];
+  if (raw === undefined) return undefined;
+  const t = raw.replace(/\s+/g, '');
+  return PLAIN_SIZE.test(t) ? { value: +t } : 'unread';
+}
+/** #2079: the solid whose size slot held a value the slot does not read — refused after every rule declined. */
+let SOLID_SIZE_UNREAD: RevolutionKind | null = null;
+
 /** `חרוט שקודקודו S ומרכז בסיסו O, רדיוס הבסיס 5 וגובהו 12` — a solid of revolution; unstated sizes stay FREE. */
 const revolutionSolid: Rule = (s) => {
   const kind = /חרוט|\bcone\b/i.test(s) ? 'cone' : /גליל|\bcylinder\b/i.test(s) ? 'cylinder' : /כדור|\bsphere\b/i.test(s) ? 'sphere' : null;
   if (!kind) return null;
   const apex = s.match(/(?:שקודקודו|קודקודו|apex(?:\s+is)?(?:\s+at)?)\s+([A-Z]\d*'?)/)?.[1];
   const center = s.match(/(?:שמרכזו|מרכזו|מרכז\s+ה?בסיסו?|(?:base\s+)?cent(?:er|re)(?:\s+is)?(?:\s+at)?)\s+([A-Z]\d*'?)/)?.[1];
-  const radius = s.match(new RegExp(`(?:שרדיוסו|רדיוסו?|רדיוס\\s+ה?בסיסו?|radius(?:\\s+is)?)\\s*(?:הוא\\s*)?(${NUM})`))?.[1];
-  const height = s.match(new RegExp(`(?:שגובהו|גובהו?|height(?:\\s+is)?)\\s*(?:הוא\\s*)?(${NUM})`))?.[1];
+  const radiusSlot = readSizeSlot(s, RADIUS_SLOT);
+  const heightSlot = readSizeSlot(s, HEIGHT_SLOT);
+  if (kind !== 'cone' && apex) return null; // only a cone has an apex
+  // #2079: a size stated in a form the slot does not read is refused whole — never drawn from part of it
+  if (radiusSlot === 'unread' || heightSlot === 'unread') {
+    SOLID_SIZE_UNREAD = kind;
+    return null;
+  }
+  const radius = radiusSlot?.value;
+  const height = heightSlot?.value;
   // a BARE solid noun (no name/size bound) is a free-size solid (ADR-052 — unstated radius/
   // height are free DOFs), UNLESS it carries a number we failed to bind (a half-read → refuse).
   if (!apex && !center && radius === undefined && height === undefined && /\d/.test(s)) return null;
-  if (kind !== 'cone' && apex) return null; // only a cone has an apex
-  return [
-    {
-      type: 'revolution',
-      kind,
-      center,
-      apex,
-      radius: radius !== undefined ? +radius : undefined,
-      height: height !== undefined ? +height : undefined,
-    },
-  ];
+  return [{ type: 'revolution', kind, center, apex, radius, height }];
 };
 
 const REV_KIND: Record<string, 'cylinder' | 'cone' | 'sphere'> = {
@@ -5147,6 +5171,7 @@ export function parse3(utterance: string): ParseResult3 {
   PARAM_CONFLATED = null;
   MAIN_DIAGONAL_AMBIGUOUS = false;
   COMPONENT_SYMBOLIC = null;
+  SOLID_SIZE_UNREAD = null;
   const s = normalize3(utterance);
   if (!s) return NOT_HANDLED;
   if (!VEC_MARKED && /^([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*$/.test(s))
@@ -5170,6 +5195,8 @@ export function parse3(utterance: string): ParseResult3 {
   if (MAIN_DIAGONAL_AMBIGUOUS) return { ok: false, reason: 'ambiguous-main-diagonal' };
   // #1547: a single component with a SYMBOLIC value — recognised, not yet supported (see componentGiven)
   if (COMPONENT_SYMBOLIC) return { ok: false, reason: 'component-symbolic', component: COMPONENT_SYMBOLIC };
+  // #2079: a revolution size the slot does not read — refused, never drawn from part of its number
+  if (SOLID_SIZE_UNREAD) return { ok: false, reason: 'solid-size-unread', solid: SOLID_SIZE_UNREAD };
   // #866: «AD חוצה את זווית A» — the bisected angle named by its VERTEX alone. Checked AFTER every rule,
   // so the three-letter form «AD חוצה זווית BAC» (which builds) can never reach it, and the frame is
   // reported as under-specified rather than escalated to the lane whose job is to guess.

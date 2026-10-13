@@ -1044,6 +1044,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'ex-cube', family: 'topic', steps: ["קובייה ABCDA'B'C'D'"], expect: 'builds', exception: 'X7' },
   { id: 'ex-plane-1656', family: 'topic', steps: ['משולש ACD', 'נקודה S', 'דרך AC העבירו מישור המקביל ל-SD'], contextFor: { '3d': ['פירמידה SABCD שבסיסה ריבוע'] }, expect: 'builds', exception: 'X7', note: '#1656: 2-D used to commit AC ∥ SD' },
   { id: 'ex-sphere-1657', family: 'topic', steps: ['כדור שמרכזו O ורדיוסו 3'], expect: 'builds', exception: 'X7', note: '#1657: 2-D used to draw a circle' },
+  { id: 'ex-sphere-fraction-2079', family: 'topic', steps: ['כדור שרדיוסו 1/2'], expect: 'refused', exception: 'X7', note: '#2079 (ADR-3D-340): a fraction size is refused, never drawn as its numerator' },
   { id: 'ex-vector', family: 'topic', steps: ['משולש ABC', 'וקטור AB'], expect: 'builds', exception: 'X7' },
   // ── #1616 rulings of 2026-10-03 (ADR-AG-222) ──
   { id: 'ex-position-above-1706', family: 'topic', steps: ['נקודה A', 'נקודה D', 'D מעל A'], expect: 'builds', exception: 'X1', only: ['analytic'], note: "#1706: y_D > y_A on analytic's fixed axes; 2-D does not read screen orientation" },

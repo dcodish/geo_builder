@@ -108,8 +108,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   - **A refusal never tells a student who may be right that they miscalculated:** a given the tool cannot
     yet make hold («|SO| = 4» on a cone of unstated height) is refused as the tool's limit («… זו מגבלה של
     הכלי»); «בדקו את החישוב» is kept for a given the student's own data contradicts.
+  - **A cone, cylinder or sphere size is read whole or refused, never cut:** inside the declaration the
+    radius and height take a whole number or a decimal («חרוט שרדיוסו 2.5 וגובהו 3»). A size written as a
+    fraction or a root («כדור שרדיוסו 1/2», «חרוט שרדיוסו √2 וגובהו 3») is refused with the same «not yet»
+    message («הכלי עדיין לא יודע לקבוע את גודל הכדור לפי נתון כזה …»), never drawn as part of its number.
   - Sources: ADR-3D-217, ADR-3D-281, ADR-3D-282, ADR-3D-284, ADR-3D-285, ADR-3D-290, ADR-3D-291,
-    ADR-3D-292, ADR-3D-293; #909, #1546, #1550, #1560, #1561, #1567, #1569, #1573, #1590, #1615.
+    ADR-3D-292, ADR-3D-293, [ADR-3D-340](06b-decisions-3d.md#adr-3d-340); #909, #1546, #1550, #1560, #1561,
+    #1567, #1569, #1573, #1590, #1615, #2079.
 - **FR-SP-6 (Must)** — **A stated new label must land on the figure.** A decomposition that loses a point
   the student named is **refused, naming the label** — never committed with the point missing. A label
   that already exists is context, not a drop.
