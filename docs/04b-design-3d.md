@@ -540,7 +540,9 @@ asks per crossing at `Resolved3.seed`, with `openParamProbes3` for an unpinned m
 (`sameConfig`) — the same two at every sample, the drawn one among them, judged beside #827's
 `pivot.pointRoots` check. If so `points` carries one row `S(…) או (…)`, each configuration printed whole by
 `coordStr`, instead of `S(?, 7/2, ?)`, and `pointOptions[id]` carries the same text for the ask lane's point
-answer; `pointCoords` keeps the partial form; anything else returns `null`.
+answer; `pointCoords` keeps the partial form; anything else returns `null`. The ask lane answers either text
+WITHOUT the label: App3's row prints «<question> = <answer>», so every `QueryResult.answer` is the bare value,
+and a `params` row carries `value` beside `text` for the same reason ([ADR-3D-339](06b-decisions-3d.md#adr-3d-339), #1746).
 
 ## The submit decision and refusals
 

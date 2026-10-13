@@ -60,10 +60,16 @@ type Query =
   // The exam's «מצאו את משוואת המישור» asked as a QUESTION instead of entered as a figure-changing fact.
   | { kind: 'plane'; name: string | null; ids: Id[] | null };
 
+/** #1746 (ADR-3D-339) — every query kind, so the ask-row sweep can be TOTAL over them (a new kind cannot
+ *  ship without a row case). */
+export type QueryKind3 = Query['kind'];
+
 export interface QueryResult {
   /** The student's query text, verbatim. */
   text: string;
-  /** The value (`0`, `6`, `90°`), or null when it can't be answered. For a multi-row answer this is
+  /** The value (`0`, `6`, `90°`), or null when it can't be answered. #1746 (ADR-3D-339): ONLY the value —
+   *  the ask row prints «<question> = <answer>», so an answer that names its own subject prints it twice
+   *  («B = B(1, ?, 2)», «k = k = 2»); `issue-1746-ask-row.test.ts` holds every query kind to this. For a multi-row answer this is
    *  the FIRST row — a complete answer on its own, so a non-UI consumer needs no special case. */
   answer: string | null;
   /**
@@ -626,7 +632,7 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
    */
   if (q.kind === 'symbol') {
     const row = dataView(c, seed).params.find((p) => p.sym === q.sym);
-    if (row && !row.open) return { text, answer: row.text };
+    if (row && !row.open) return { text, answer: row.value }; // #1746: the value — the row's echo already names the symbol
     // No panel row, or an open one — fall THROUGH: the ratio lane («AE = t·AS») measures t on
     // the generic path, and #1450's fix there is only the NOTE (a symbol is never 'points').
   }
@@ -671,9 +677,10 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
     const panel = dataView(c, seed);
     // #1867 (ADR-3D-336): a point with exactly two configurations answers both, as its panel row prints them
     const two = panel.pointOptions[q.id];
-    if (two) return { text, answer: `${q.id}${two}` };
+    // #1746 (ADR-3D-339): the COORDINATES only — the ask row's echo already names the point, so «B = (1, ?, 2)»
+    if (two) return { text, answer: two };
     const entry = panel.pointCoords[q.id];
-    return entry ? { text, answer: `${q.id}${entry.text}` } : { text, answer: null, note: 'undetermined' };
+    return entry ? { text, answer: entry.text } : { text, answer: null, note: 'undetermined' };
   }
 
   // #1547 — ONE coordinate, from the SAME per-axis decision the panel and the whole-point answer use: the

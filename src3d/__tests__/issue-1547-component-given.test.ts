@@ -153,7 +153,7 @@ describe('#1547 — ASKABLE (ADR-3D-279): the question is the statement with its
     const st = build(['x_B = 3']);
     expect(ask(st, 'x_B').answer).toBe('3');
     expect(ask(st, 'y_B')).toMatchObject({ answer: null, note: 'undetermined' });
-    expect(ask(st, 'B').answer).toBe('B(3, ?, ?)');
+    expect(ask(st, 'B').answer).toBe('(3, ?, ?)'); // #1746: the row reads «B = (3, ?, ?)»
   });
 
   it('a stated sign is answered as a sign', () => {

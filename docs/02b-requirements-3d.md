@@ -355,8 +355,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   are negatives of each other reads **«m = ±√2»**; any other pair repeats the symbol after «או», ascending —
   **«m = -2 או m = 4»** — never a set «{-2, 4}». Three or more roots list nothing: the panel reads the open
   **«m = ?»** and the ask lane says the value is not determined (#1861). A point with exactly two
-  configurations reads one row, **«S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»**, and asking for it answers the same.
-  - Sources: ADR-3D-303, #1591, [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867.
+  configurations reads one row, **«S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»**, and asking «S» answers the same coordinates,
+  naming the point once: **«S = (1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»**. Every ask answer is the bare value after the
+  question («B = (1, ?, 2)», «k = 2»), never the label again.
+  - Sources: ADR-3D-303, #1591, [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867, [ADR-3D-339](06b-decisions-3d.md#adr-3d-339), #1746.
 
 ## Claims — the student's answer, never a driver
 

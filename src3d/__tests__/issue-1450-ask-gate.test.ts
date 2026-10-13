@@ -34,11 +34,11 @@ describe('#1450 — the five measured rows answer their values', () => {
     submit('AB = (k-1,k,3)');
     submit('k = 2');
     const a = ask('k');
-    expect(a.answer).toBe('k = 2');
+    expect(a.answer).toBe('2'); // #1746: the row reads «k = 2», never «k = k = 2»
     // The lock CALLS the panel's decision (the #481 rule): query and panel cannot disagree.
     const st = useGeo3.getState();
     const row = dataView(derive3(st.facts, st.seed).construction, st.seed).params.find((p) => p.sym === 'k')!;
-    expect(a.answer).toBe(row.text);
+    expect(a.answer).toBe(row.value);
   });
 
   it('a free injected vector answers its components and its length', () => {

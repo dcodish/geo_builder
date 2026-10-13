@@ -12675,3 +12675,24 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 **Locks.** `issue-1591-param-solutions` («m = -2 או m = 4» in the panel and the ask row, «m = ±√2» unchanged, three roots: «m = ?» and no ask value), `issue-1440-format-branches` (rounding through `branchAnswer`), `issue-1474-branch-coverage` (figure B's three roots read open), `issue-1506-two-configurations` (the one «או» row at seeds 0, 1, 17, and the ask row the same).
 
 **Behaviour change for a student:** «המישור π1: z = 1 · המישור π2: z - m = 0 · המרחק בין המישורים π1 ו-π2 הוא 3» reads «m = -2 או m = 4» (was «m = -2, m = 4»); a parameter with three roots reads «m = ?» (was «m = -2, m = 0, m = 4»); a point with two configurations reads one row «S(…) או (…)» (was two rows S₁/S₂) and asking «S» answers the same (was «S(?, 7/2, ?)»).
+
+## ADR-3D-339 — An ask answer is the bare value: asking «B» reads «B = (1, ?, 2)», the label once (#1746)
+
+**Status:** accepted · 2026-10-13 · bug (P3) · fix-round #2053, stream O · branch `fix/1746-3d-ask-point-label` · follows [ADR-3D-299](#adr-3d-299)'s row format (#1547, PR #1744) · LADDER stage: none (display of the ask lane's existing verdicts)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-EQ-4b (the two-configuration ask reading) · **Design:** [04b](04b-design-3d.md) the data panel's point rows (`pointOptions` / `pointCoords`) and `params.value`
+
+**Measured before** (`main` @ 6096b643, through `decideSubmit3` + `answerQuery`): «B(1, t, 2)» then asking «B» → «B = B(1, ?, 2)»; «שיעורי B» → «שיעורי B = B(1, ?, 2)»; #1499's T7 figure, asking «S» → «S = S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»; «פירמידה משולשת ABCD · AB = (k-1,k,3) · k = 2», asking «k» → «k = k = 2».
+
+**Root cause / class.** *App3's ask row prints «<question> = <answer>», so an answerer that returns a subject-labelled string prints its subject twice.* #1547 fixed the component kind («x_B = x_B = 1») by returning only the value; the whole-point kind (#496) and two others still returned the PANEL's labelled row text: the point answer prefixed `q.id` to `pointCoords` / `pointOptions`, and a priced symbol returned the params row's whole `text` («k = 2»).
+
+**Decision.**
+1. `QueryResult.answer` is documented as ONLY the value. The point kind answers `pointOptions[id]` / `pointCoords[id].text` as is (the coordinates after the name, which is what `pointOptions` was already documented to carry).
+2. `DataPanel.params` rows carry `value` beside `text`, built by ONE `paramRow` helper, so the panel prints `text` («k = 2») and the ask lane answers `value` («2») from the same decision (the #481 rule).
+3. The sweep is total: `issue-1746-ask-row.test.ts` asserts the JOINED row text for every query kind through a `Record<QueryKind3, …>` (`QueryKind3` is newly exported), so a new kind cannot compile without a row case.
+
+**Not taken: a declared basis vector asked by its own name.** «w» answers its trivial decomposition «w», so the row reads «w = w = (0, 0, 12)» with a frame and «u = u» without one. Dropping the self-decomposition leaves a frameless figure nothing to answer, and what to show then is a product decision, so it is reported as a finding, not decided here.
+
+**Locks.** `src3d/__tests__/issue-1746-ask-row.test.ts`: the operator's exact lines («B(1, t, 2)», then «B»), the joined row of every kind, and the panel's rows unchanged. Updated to the bare value: `query-point-plane`, `frame-gates`, `issue-803`, `issue-1547-component-given`, `issue-1506-two-configurations`, `issue-1450-ask-gate`. The params-row locks that compare whole rows (`issue-794`, `-797`, `-801`, `-815`, `-902`, `-939-symbol-display`, `book-coordinate-givens`) gain the `value` key; their `text` is byte-unchanged. Fixtures-first: not applicable. The ask lane is not part of a saved session, so a fixture cannot hold the row text.
+
+**Behaviour change for a student:** asking for a point names it once: «B = (1, ?, 2)» (was «B = B(1, ?, 2)»), and «S = (1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)» for a point with two configurations. Asking a priced symbol reads «k = 2» (was «k = k = 2»). The data panel and the canvas are unchanged.
