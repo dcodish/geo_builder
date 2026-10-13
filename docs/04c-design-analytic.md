@@ -1073,6 +1073,13 @@ ADR-AG-237), an `area`, an arc — and never a noun's definition (`Fact.definiti
 `angleArcPoints`, `markFitScale`) is the shared mark geometry ([04w](04w-design-shell.md)); `statedScene` places every
 value in one `placeSceneLabels` call, each value bounded to its mark (ADR-AG-228).
 
+**An area has two representations, one reader** ([ADR-AG-273](06c-decisions-analytic.md#adr-ag-273), #2031): the copula's
+`area` and the measure equation's `length-eq` with one area term («שטח ABC = 12», and «נסמן את שטח ABC ב-S» restated as
+«שטח ABC = S»). `plainMeasure` reads a side's single coefficient-1 length **or** area term; an area against a value side is
+an `areas` entry, an area against an area or a length is a relation and writes nothing. Areas are keyed by the ring
+(`ringKey`, rotation- and direction-free) through the same `keep` as lengths and angles; an entry whose value is one
+free letter is marked `bare`, and the renderer writes it alone («S»), every other value as «S=…».
+
 *Identifiers:* `render/scene.ts` · `alt` · `origin` · `{ num }` · `{ text }` · `statedText` · `App` · `ticks` · `labels` · `SceneSegment.label` · `FigureSegment.pinnedLength` · `pinnedLengths` · `wedgeBisector` · `equalTickSegments` · `unitOf` · `shell/__tests__/fixtures/mark-geometry-rows.ts` · `LabelRequest`
 
 ### The image carries no chrome ([ADR-AG-151](06c-decisions-analytic.md#adr-ag-151))
