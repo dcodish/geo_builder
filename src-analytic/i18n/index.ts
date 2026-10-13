@@ -404,6 +404,9 @@ const he = {
   // sentence's own construct («נקודת החיתוך של … עם …»), which needs no gender or number agreement.
   errCrossingAlreadyNamedOperands:
     'נקודת החיתוך של {{first}} עם {{second}} היא {{holder}}, ולנקודה הזאת כבר יש שם. המשפט "{{detail}}" היה נותן לה שם שני. אם התכוונתם לנקודה אחרת, בדקו לאיזו נקודת חיתוך שלהם עדיין אין שם.',
+  // #1893 (ADR-AG-271) — #1834's ruled sentence (2-D gets it as errors.thirdCrossing under #1834): a line through two points already on the
+  // circle has no third crossing with it. The letters are the student's, never an object id.
+  errThirdCrossing: '{{line}} כבר חותך את המעגל ב-{{a}} וב-{{b}} — לישר אין נקודת חיתוך שלישית עם המעגל.',
   // #1255 — one line written twice has no crossing with itself. Says what the sentence failed to
   // define and shows the sentence that says what they may have meant, per the operator's ruling.
   errSelfCrossing:
@@ -847,6 +850,7 @@ const en: typeof he = {
     'Define the triangle first, or name the side outright — for example "AD is the altitude to side BC".',
   errCrossingAlreadyNamed:
     'Those lines meet at {{holder}}, and that point already has a name. "{{detail}}" would give it a second one. If you meant a different point, check which two lines cross there.',
+  errThirdCrossing: '{{line}} already crosses the circle at {{a}} and {{b}} — a line has no third crossing with a circle.',
   errCrossingAlreadyNamedOperands:
     'The two things "{{detail}}" crosses meet at {{holder}}, and that point already has a name. The sentence would give it a second one. If you meant a different point, check which of their intersections has no name yet.',
   errSelfCrossing:

@@ -31,7 +31,7 @@
  * find anything out of place. If a future kind can forward-reference, that is the moment a real sort
  * is earned — and this function is what will fail first and say so.
  */
-import { curveParentOf, parentsOf } from './derived';
+import { curveParentOf, curveParentsOf, parentsOf } from './derived';
 import { evalExpr, exprText, symbolsOf, type Env, type Expr } from './expr';
 import { constraintRefs, dirRefs, freeDirectionSymbol } from './solve';
 import { UNBOUNDED, circleDefPoints, type Construction, type Domain, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
@@ -247,6 +247,23 @@ export function objectDeps(o: GeoObject): Id[] {
       throw new Error(`object kind declares no dependencies: ${JSON.stringify(undeclared)}`);
     }
   }
+}
+
+/**
+ * NO FREEDOM REACHES THIS OBJECT (#1893, ADR-AG-271) — it is the same in every configuration, by its statement alone: no
+ * carrier of its own ({@link carrierOf}), no parameter symbol ({@link symbolDeps}), and every object it is defined from
+ * ({@link objectDeps}, a derived point's curve parents included) the same. «A(3,4)» and «x^2+y^2=25» are; a free
+ * point, a circle with a free radius, a coordinate written with a parameter are not. Conservative by construction —
+ * a free point the constraints happen to pin, or a parameter a later line fixes, answers `false`: the callers use it
+ * to PROVE a coincidence, and a missed proof leaves today's verdict, never a false refusal.
+ */
+export function noFreedomReaches(c: Construction, id: Id, seen: Set<Id> = new Set()): boolean {
+  if (seen.has(id)) return true;
+  seen.add(id);
+  const o = c.objects.find((q) => q.id === id);
+  if (!o || carrierOf(o) !== null || symbolDeps(o).length > 0) return false;
+  const deps = o.kind === 'derived' ? [...objectDeps(o), ...curveParentsOf(o.rule)] : objectDeps(o);
+  return deps.every((d) => noFreedomReaches(c, d, seen));
 }
 
 /**
