@@ -1,0 +1,59 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-13T12:00:00.000Z",
+  "name": "issue-2040-three-quarters-area",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "_YBMQYLbPX8yEjnlTudob",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "MlhdPf90u0fcfc4yjYtQu",
+      "utterance": "משולש DEF",
+      "group": "g1",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "D",
+          "E",
+          "F"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "-Kn2RF1yHaj4F0HguZAfL",
+      "utterance": "שטח DEF הוא שלושה רבעים משטח ABC",
+      "group": "g2",
+      "cmd": {
+        "type": "set-area-ratio",
+        "ids1": [
+          "D",
+          "E",
+          "F"
+        ],
+        "ids2": [
+          "A",
+          "B",
+          "C"
+        ],
+        "k": 0.75
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

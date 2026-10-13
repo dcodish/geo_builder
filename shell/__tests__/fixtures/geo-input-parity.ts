@@ -256,6 +256,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2018': 'open',
   '#1969': 'open',
   '#2013': 'open',
+  '#2047': 'open',
 };
 
 export interface ParityRow {
@@ -1338,6 +1339,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'surd-length-paren-1827', family: 'lengths', steps: ['משולש ABC', 'AB = √(7)'], expect: 'builds' },
   { id: 'surd-length-sqrt-1827', family: 'lengths', steps: ['משולש ABC', 'AB = sqrt(2)'], expect: 'builds', note: 'the keyboard spelling of √ (#1920)' },
   { id: 'surd-area-1827', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC = √3'], expect: 'builds' },
+
+  // ── #2008 (ADR-635): a vulgar-fraction glyph is its value — 2-D spells the whole Unicode block at its boundary ──
+  { id: 'glyph-fraction-ratio-2008', family: 'lengths', steps: ['משולש ABC', 'AB = ¼ BC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2047' }, { product: '3d', issue: '#2047' }], note: 'analytic and 3-D each fold their own subset of the glyphs; one shared table is #2047 (needs-operator)' },
+
+  // ── #2040 (ADR-636): «קטן פי N» is the inverse factor — 2-D drew it as «גדול פי N»; analytic always read it as half ──
+  { id: 'comparative-smaller-2040', family: 'lengths', steps: ['משולש ABC', 'AB קטן פי 2 מ-AC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the reported line; 3-D reads no «פי» comparative (not-understood)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

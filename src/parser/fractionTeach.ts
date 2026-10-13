@@ -22,42 +22,18 @@
  * A fraction with no comparand («BE = רבע») proposes nothing: there is nothing the canonical form could say.
  */
 import type { ParseContext } from './parse';
+import { HE_FRACTION_DENOM, HE_FRACTION_NUM, EN_FRACTION_DENOM, EN_FRACTION_NUM } from './lexicon';
 
 type Id = string;
 
 const SEG = '[A-Z]\\d*[A-Z]\\d*';
 const SEG_RE = new RegExp(`^${SEG}$`);
 
-/** Hebrew denominators: singular (numerator 1) and plural (numerator ≥ 2). חצי has no plural in use. */
-const HE_DENOM: readonly { sing: string; plur?: string; q: number }[] = [
-  { sing: 'חצי', q: 2 },
-  { sing: 'שליש', plur: 'שלישים', q: 3 },
-  { sing: 'רבע', plur: 'רבעים', q: 4 },
-  { sing: 'חמישית', plur: 'חמישיות', q: 5 },
-  { sing: 'שישית', plur: 'שישיות', q: 6 },
-  { sing: 'שביעית', plur: 'שביעיות', q: 7 },
-  { sing: 'שמינית', plur: 'שמיניות', q: 8 },
-  { sing: 'תשיעית', plur: 'תשיעיות', q: 9 },
-  { sing: 'עשירית', plur: 'עשיריות', q: 10 },
-];
-/** Hebrew numerators, both genders (שלושה רבעים / שלוש חמישיות). */
-const HE_NUM: Record<string, number> = {
-  'שני': 2, 'שתי': 2, 'שלושה': 3, 'שלוש': 3, 'ארבעה': 4, 'ארבע': 4, 'חמישה': 5, 'חמש': 5,
-  'שישה': 6, 'שש': 6, 'שבעה': 7, 'שבע': 7, 'שמונה': 8, 'תשעה': 9, 'תשע': 9,
-};
-const EN_DENOM: readonly { sing: string; plur: string; q: number }[] = [
-  { sing: 'half', plur: 'halves', q: 2 },
-  { sing: 'third', plur: 'thirds', q: 3 },
-  { sing: 'quarter', plur: 'quarters', q: 4 },
-  { sing: 'fourth', plur: 'fourths', q: 4 },
-  { sing: 'fifth', plur: 'fifths', q: 5 },
-  { sing: 'sixth', plur: 'sixths', q: 6 },
-  { sing: 'seventh', plur: 'sevenths', q: 7 },
-  { sing: 'eighth', plur: 'eighths', q: 8 },
-  { sing: 'ninth', plur: 'ninths', q: 9 },
-  { sing: 'tenth', plur: 'tenths', q: 10 },
-];
-const EN_NUM: Record<string, number> = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
+// The word tables live once in the lexicon (#2040, ADR-636): the ratio reader reads the same words.
+const HE_DENOM = HE_FRACTION_DENOM;
+const HE_NUM = HE_FRACTION_NUM;
+const EN_DENOM = EN_FRACTION_DENOM;
+const EN_NUM = EN_FRACTION_NUM;
 
 /** Shape nouns a side reference may name, with the declared kind they resolve on (`null` = any triangle). */
 const SHAPE_NOUN: readonly [RegExp, string | 'triangle'][] = [

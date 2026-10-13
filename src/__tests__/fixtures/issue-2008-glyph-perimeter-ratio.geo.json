@@ -1,0 +1,59 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-13T12:00:00.000Z",
+  "name": "issue-2008-glyph-perimeter-ratio",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "5WkazFCccs_CcrmTZrJwa",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "a8FHBnvzpgWHeqgilbSuC",
+      "utterance": "משולש DEF",
+      "group": "g1",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "D",
+          "E",
+          "F"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "YuCxeeyki7pb31Clw_cZM",
+      "utterance": "היקף DEF = ½ מהיקף ABC",
+      "group": "g2",
+      "cmd": {
+        "type": "set-perimeter-ratio",
+        "ids1": [
+          "D",
+          "E",
+          "F"
+        ],
+        "ids2": [
+          "A",
+          "B",
+          "C"
+        ],
+        "k": 0.5
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}
