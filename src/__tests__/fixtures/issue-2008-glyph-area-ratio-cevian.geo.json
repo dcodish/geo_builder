@@ -1,0 +1,91 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-13T12:00:00.000Z",
+  "name": "issue-2008-glyph-area-ratio-cevian",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "wfk70d9diH_BrV4LpMG8l",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "TMvwyvSk9vceZ_GaUKDQF",
+      "utterance": "D על AB",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "-aWmwPUXw65kWgPvfApq_",
+      "utterance": "D על AB",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "D",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "5n0Fp5MYpIZxqKSnxTwXX",
+      "utterance": "E על AC",
+      "group": "g3",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "HTAWFvv8Hgu3KoSBYvUBY",
+      "utterance": "E על AC",
+      "group": "g3",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "E",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "8qnEfzre4m_ajb5Om72XJ",
+      "utterance": "שטח ADE = ¼ משטח ABC",
+      "group": "g5",
+      "cmd": {
+        "type": "set-area-ratio",
+        "ids1": [
+          "A",
+          "D",
+          "E"
+        ],
+        "ids2": [
+          "A",
+          "B",
+          "C"
+        ],
+        "k": 0.25
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

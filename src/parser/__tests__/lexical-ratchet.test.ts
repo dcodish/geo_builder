@@ -33,6 +33,11 @@ const CEILINGS = {
   // radicand: 24 → 14. The ratchet worked exactly as designed — it caught the fix inlining fresh
   // copies, and the fix composed from an atom instead.
   parse3Num: 13, //    '\d+(?:\.\d+)?' in parse3.ts
+  // #2008 (ADR-635): the LEGACY decimal coefficient atom `COEF` stops at a slash — «1/2∠B» read 2, «בקוטר 3/2» read 3.
+  // Every slot that reads a stated coefficient composes the shared NUMEXPR atom (ADR-298) instead; the sweep took
+  // the uses 33 → 22 (the NUMTERM atom itself is five of them). The sites left REQUIRE the next token right after
+  // the number (a π, a letter, a √, `$`), so a quotient fails to match and escalates — it is never truncated.
+  parse2Coef: 22, // '${COEF}' in parse.ts
 };
 
 describe('lexical ratchet — inline fragment counts must not grow (docs/24 S2.1)', () => {
@@ -47,6 +52,10 @@ describe('lexical ratchet — inline fragment counts must not grow (docs/24 S2.1
   });
   it('parse3.ts number-fragment inlines ≤ ceiling', () => {
     expect(count(parse3, String.raw`\d+(?:\.\d+)?`)).toBeLessThanOrEqual(CEILINGS.parse3Num);
+  });
+  it('parse.ts legacy-decimal COEF uses ≤ ceiling (#2008 — a coefficient slot reads NUMEXPR)', () => {
+    expect(count(parse2, '${COEF}')).toBeLessThanOrEqual(CEILINGS.parse2Coef);
+    expect(count(parse2, '${COEF}')).toBeGreaterThan(0);
   });
   it('non-vacuity: the counters actually see the fragments', () => {
     expect(count(parse2, String.raw`[A-Za-z]\d*`)).toBeGreaterThan(100);

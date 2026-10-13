@@ -257,6 +257,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2018': 'open',
   '#1969': 'open',
   '#2013': 'open',
+  '#2047': 'open',
 };
 
 export interface ParityRow {
@@ -1327,6 +1328,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #1864 (ADR-AG-267): an angle's acuteness named by its VERTEX alone — 2-D's «∠C קהה/חדה» ──
   { id: 'vertex-obtuse-1864', family: 'angles', steps: ['משולש ABC', 'זווית A קהה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the line the obtuse-triangle note teaches' },
   { id: 'vertex-acute-1864', family: 'angles', steps: ['משולש ABC', 'זווית A חדה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+
+  // ── #2008 (ADR-635): a vulgar-fraction glyph is its value — 2-D spells the whole Unicode block at its boundary ──
+  { id: 'glyph-fraction-ratio-2008', family: 'lengths', steps: ['משולש ABC', 'AB = ¼ BC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2047' }, { product: '3d', issue: '#2047' }], note: 'analytic and 3-D each fold their own subset of the glyphs; one shared table is #2047 (needs-operator)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

@@ -1,0 +1,63 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-13T12:00:00.000Z",
+  "name": "issue-2008-glyph-area-ratio",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "S8t5R6D-3x-HuxwRgJL9a",
+      "utterance": "ריבוע ABCD",
+      "group": "g0",
+      "cmd": {
+        "type": "square",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "ueZbJmol8_w547N9HpOrB",
+      "utterance": "ריבוע EFGH",
+      "group": "g1",
+      "cmd": {
+        "type": "square",
+        "ids": [
+          "E",
+          "F",
+          "G",
+          "H"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "rfqdUN50yKVaX3kF9v781",
+      "utterance": "שטח EFGH = ¼ משטח ABCD",
+      "group": "g2",
+      "cmd": {
+        "type": "set-area-ratio",
+        "ids1": [
+          "E",
+          "F",
+          "G",
+          "H"
+        ],
+        "ids2": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "k": 0.25
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

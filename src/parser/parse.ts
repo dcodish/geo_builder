@@ -2716,8 +2716,15 @@ function angleValueBlocked(s: string): boolean {
 function angleValueOf(stripped: string): AngleValue | null {
   // SYMBOLIC first: «2α» would otherwise be read by the numeric branch as the bare number 2 — #969's
   // defect exactly. An optional ° is consumed with it («= 2α°» parses today and must keep parsing).
-  const sym = stripped.match(new RegExp(String.raw`(?<![A-Za-z])(${COEF})?\s*[*·]?\s*(${VAR})\s*°?\s*[.,;]?\s*$`));
-  if (sym) return { kind: 'sym', coef: sym[1] ? parseFloat(sym[1]) : 1, sym: sym[2], rest: stripped.replace(sym[0], ' ') };
+  // #2008 (ADR-635): the coefficient is the shared NUMEXPR atom, so «½α» (spelled «1/2α» at the boundary) is ONE
+  // coefficient — the legacy decimal atom stopped at the slash and read «2α».
+  const sym = stripped.match(new RegExp(String.raw`(?<![A-Za-z])(?:${NUMEXPR('sy')})?\s*[*·]?\s*(?<symVar>${VAR})\s*°?\s*[.,;]?\s*$`));
+  if (sym) {
+    const g = sym.groups!;
+    const coef = g.syall !== undefined ? numexprVal(g, 'sy') : { value: 1 };
+    if (!coef) return null;
+    return { kind: 'sym', coef: coef.value, sym: g.symVar!, rest: stripped.replace(sym[0], ' ') };
+  }
   // A degree value must be a standalone number, NEVER a label's subscript digit: «∠CAD=A1» (an angle
   // ALIAS, #267) used to read the "1" of "A1" as value 1° and silently set ∠CAD=1°. The lookbehind keeps
   // this from grabbing a digit glued to a preceding letter (a subscripted label), so such input falls
@@ -3023,8 +3030,8 @@ const angleEquality: Rule = (s, ctx) => {
   if (!left || !right) return null;
   if (!Array.isArray(left)) return left;
   if (!Array.isArray(right)) return right;
-  const coefM = parts[1].match(new RegExp(String.raw`(${COEF})\s*[*·]?\s*(?:angle|∠|∢|זוו?ית)`, 'i')); // "= 2∠DEF"
-  const k = coefM ? parseFloat(coefM[1]) : 1;
+  const k = coefBefore(parts[1], String.raw`angle|∠|∢|זוו?ית`); // "= 2∠DEF", «= ½∠DEF» (#2008)
+  if (Number.isNaN(k)) return null;
   const [a1, v1, b1] = left;
   const [a2, v2, b2] = right;
   return [
@@ -3144,8 +3151,8 @@ const arcEquality: Rule = (s, ctx) => {
   const left = labelRun(strip(parts[0]), 2);
   const right = labelRun(strip(parts[1]), 2);
   if (!left || !right) return null;
-  const coefM = parts[1].match(new RegExp(String.raw`(${COEF})\s*[*·]?\s*(?:arcs?|קשת|⌢)`, 'i')); // "= 2 arc CE"
-  const k = coefM ? parseFloat(coefM[1]) : 1;
+  const k = coefBefore(parts[1], String.raw`arcs?|קשת|⌢`); // "= 2 arc CE", «= ½ קשת CD» (#2008)
+  if (Number.isNaN(k)) return null;
   return [{ type: 'set-angle-ratio', v1: O, a1: left[0], b1: left[1], v2: O, a2: right[0], b2: right[1], k }];
 };
 
@@ -3466,6 +3473,19 @@ const numexprVal = (g: Record<string, string | undefined>, p: string): { value: 
   const denom = hasDivisor(g, p) ? numTermVal(g, `${p}B`) : 1;
   if (denom === null || denom === 0) return null;
   return { value: numer / denom, text: (g[`${p}all`] ?? '').replace(/\s+/g, '') };
+};
+
+/**
+ * #2008 ([ADR-635](../../docs/06-decisions.md#adr-635)) — the COEFFICIENT written right before a measure keyword
+ * («= 2∠DEF», «= 1/2 קשת CD», «= ½∠B» once the boundary has spelled the glyph), read through the shared NUMEXPR
+ * atom so a quotient is ONE value. The legacy decimal atom stopped at the slash («1/2∠B» read 2), and a glyph
+ * carried no digit at all and defaulted to 1. No coefficient → 1 (the bare «∠A = ∠B» equality); an unreadable
+ * one (a zero denominator) → NaN, and the caller declines rather than guess.
+ */
+const coefBefore = (t: string, kw: string): number => {
+  const m = t.match(new RegExp(String.raw`${UNGLUED}${NUMEXPR('cb')}\s*[*·]?\s*(?:${kw})`, 'i'));
+  if (!m) return 1;
+  return numexprVal(m.groups!, 'cb')?.value ?? NaN;
 };
 
 // ── Compound measure relations (#153/#145/#154/#144) ─────────────────────────────────────────────
@@ -4040,11 +4060,11 @@ function areaReferences(s: string): { ids: Id[]; at: number }[] {
 
 /**
  * The ratio coefficient k for "measure(P1) = k·measure(P2)" from the connective between two refs — shared by
- * area (ADR-118) and perimeter (ADR-228). `kwAlt` is the measure keyword alternation (e.g. `S[A-Z]|שטח|area`)
- * used only by the "= 2 <kw>DEF" coefficient form; every other connective (fraction word, "פי N", "= r") is
- * keyword-agnostic.
+ * area (ADR-118), perimeter (ADR-228) and the round measures (ADR-632). Every connective (fraction word, "פי N",
+ * "= r", "= 2 SDEF") is keyword-agnostic; #2008 retired the keyword-anchored legacy-decimal "= 2 <kw>DEF" form,
+ * which could only re-read the number the `eq` form had already read.
  */
-function measureRatioK(s: string, kwAlt: string): number {
+function measureRatioK(s: string): number {
   // Hebrew fraction words get no `\b` — JS word boundaries don't fire around non-ASCII letters.
   if (/רבע/.test(s) || /\bquarter\b/i.test(s)) return 1 / 4;
   if (/שליש/.test(s) || /\bthird\b/i.test(s)) return 1 / 3;
@@ -4055,11 +4075,9 @@ function measureRatioK(s: string, kwAlt: string): number {
   if (pi) { const v = numexprVal(pi.groups!, 'pi'); if (v) return v.value; }
   const eq = s.match(new RegExp(String.raw`(?:=|הוא|\bis\b)\s*${NUMEXPR('eq')}`, 'i'));
   if (eq) { const v = numexprVal(eq.groups!, 'eq'); if (v) return v.value; }
-  const coef = s.match(new RegExp(String.raw`=\s*(${COEF})\s*(?:${kwAlt})`, 'i')); // "= 2 SDEF" / "= 2 area DEF"
-  if (coef) return parseFloat(coef[1]);
   return 1; // equal measures
 }
-const areaRatioK = (s: string): number => measureRatioK(s, String.raw`S[A-Z]|שטח|area`);
+const areaRatioK = (s: string): number => measureRatioK(s);
 
 /** The value/label on the RHS of a single-area measure: a number, radical, variable, or power. */
 function parseAreaExpr(rhs: string): MeasureExpr | null {
@@ -4151,7 +4169,7 @@ const perimeter: Rule = (s) => {
   }
   if (refs.length === 0) return null;
   if (refs.length >= 2) {
-    return [{ type: 'set-perimeter-ratio', ids1: refs[0].ids, ids2: refs[1].ids, k: measureRatioK(s, String.raw`היקף|perimeter`) }];
+    return [{ type: 'set-perimeter-ratio', ids1: refs[0].ids, ids2: refs[1].ids, k: measureRatioK(s) }];
   }
   const rhs = s.match(/(?:=|הוא|שווה|\bis\b|\bequals?\b)\s*(.+)$/i);
   if (!rhs) return null;
@@ -4232,8 +4250,7 @@ const ROUND_CONNECTIVES = new RegExp(
  * measure carries the arc's identity, so it measures the arc on the canvas. A sector/arc reference that names no
  * drawn arc returns 'stop': «אורך הקשת AB» is never read as the segment AB (the operator's 2026-08-16 ruling).
  */
-const roundMeasure: Rule = (s0, ctx) => {
-  const s = spellVulgarFractions(s0);
+const roundMeasure: Rule = (s, ctx) => {
   const refs = roundReferences(s);
   const lead = refs.find((r) => r.kind === 'sector' || r.kind === 'arc');
   if (!lead) return null;
@@ -4268,7 +4285,7 @@ const roundMeasure: Rule = (s0, ctx) => {
   if (operands.length === 2) {
     const [o1, o2] = operands;
     if (unread(rest, [...o1.ids, ...o2.ids])) return 'stop';
-    const k = measureRatioK(s, isArea ? String.raw`S[A-Z]|שטח|area` : String.raw`היקף|אורך|perimeter|length|circumference`);
+    const k = measureRatioK(s);
     if (!(k > 0)) return 'stop';
     const sides = { ids1: o1.ids, ids2: o2.ids, k, round1: o1.round, round2: o2.round };
     return [isArea ? { type: 'set-area-ratio', ...sides } : { type: 'set-perimeter-ratio', ...sides }];
@@ -4843,7 +4860,7 @@ const RADIUS_WORD = String.raw`(?:radius|רדיוס\S*)`;
  * radius symbol — ADR-034). A symbol pins the variable R to the concrete default radius via
  * a `set-var`, so a later "AC = 1.6R" resolves to |AC| = 1.6·radius while still labelling "1.6R".
  */
-const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: boolean; sym?: string; varCmd?: SymbolicCommand; statedSize?: number; consumed?: Consumed } => {
+const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: boolean; sym?: string; varCmd?: SymbolicCommand; consumed?: Consumed } => {
   // A QUOTIENT radius — "רדיוס 35/√32", "שרדיוסו √32/5" (#77, the shared NUMEXPR atom). Checked BEFORE the
   // bare-number form, which would otherwise read "רדיוס 35" and silently drop the "/√32".
   const rFrac = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*(?:=|:|הוא|שווה|\bis\b)?\s*${NUMEXPR('r')}`, 'i'));
@@ -4862,7 +4879,10 @@ const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: b
   const rVar = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*(?:is\s+|הוא\s+)?(?:=\s*)?([A-Za-z])(?![A-Za-z\d])`));
   if (rVar) return { radius: RADIUS_DEFAULT, numeric: false, symbolic: true, sym: rVar[1], varCmd: { type: 'set-var', name: RADIUS_VAR, value: RADIUS_DEFAULT } };
   const sized = circleSizeRadius(s);
-  if (sized !== null) return { radius: sized.r, numeric: true, symbolic: false, statedSize: sized.stated, ...(sized.pi ? { consumed: PI_CONSUMED } : {}) };
+  // #2008 (ADR-635): the STATED size is declared consumed (the ADR-462 route `circleSizeExisting` already takes) —
+  // a transformed size leaves no trace of itself in the radius, so «בקוטר 3/2» (r = 0.75) would read as a
+  // dropped 3/2. The field used to be returned as `statedSize`, which no caller read.
+  if (sized !== null) return { radius: sized.r, numeric: true, symbolic: false, consumed: { numbers: [sized.stated], ...(sized.pi ? PI_CONSUMED : {}) } };
   return { radius: RADIUS_DEFAULT, numeric: false, symbolic: false };
 };
 
@@ -4897,54 +4917,47 @@ const circleSizeRadius = (s: string): { r: number; stated: number; pi: boolean }
    * of «6π» and of a bare «6». `readVal` returns the evaluated magnitude (6π ≈ 18.85), which is not what
    * appears in their sentence, and the gate accounts what appears in their sentence.
    */
-  const statedCoef = (after: string): number | null => {
-    const m =
-      after.match(new RegExp(String.raw`(?:=|הוא|שווה|\bis\b|\bequals?\b|:)\s*(${COEF})`, 'i')) ??
-      after.match(new RegExp(String.raw`^\s*(${COEF})`, 'i')) ??
-      after.match(new RegExp(String.raw`^\s*(?:circle|מעגל)?\s*[A-Z]\d*\s+(${COEF})`, 'i'));
-    return m ? parseFloat(m[1]) : null;
-  };
-  let pi = false; // #1814: whether the value read carried the constant π (declared by the caller)
-  const readVal = (after: string): number | null => {
-    // copula-anchored first — skips a digit-bearing circle label ("circle O2 is 6π") the glued form would
-    // misread; else the number glued right after the possessive suffix ("שהיקפו 6π").
-    // The π factor is written as the glyph π OR the word "pi" (the toolbar inserts π; a student types "6pi").
-    // GREEK_WORDS deliberately omits "pi" (it collides with a segment "PI"), but right after a circumference/
-    // area keyword + number the context is unambiguous, so accept it here (ADR-228 Am.).
-    const cop = after.match(new RegExp(String.raw`(?:=|הוא|שווה|\bis\b|\bequals?\b|:)\s*(${COEF})\s*[*·]?\s*(π|pi)?`, 'i'));
-    const glued = after.match(new RegExp(String.raw`^\s*(${COEF})\s*[*·]?\s*(π|pi)?`, 'i'));
-    // COPULA-LESS with the circle named between keyword and value — "היקף מעגל O1 6π" (the operator typed it
-    // twice; it fell to the LLM). The keyword is behind us, so "circle-word? + ONE label + number" is safe.
-    const named = after.match(new RegExp(String.raw`^\s*(?:circle|מעגל)?\s*[A-Z]\d*\s+(${COEF})\s*[*·]?\s*(π|pi)?`, 'i'));
-    const m = cop ?? glued ?? named;
+  //
+  // #2008 (ADR-635) — the coefficient is the shared NUMEXPR atom (ADR-298), never the legacy decimal atom, which
+  // stopped at a slash: «מעגל O בקוטר 3/2» read d = 3 and drew r = 1.5, green (the honesty gate let it through
+  // because 3/2 happens to equal the radius it drew). A quotient is ONE value, and `stated` carries that value.
+  // The π factor is written as the glyph π OR the word "pi" (the toolbar inserts π; a student types "6pi").
+  // GREEK_WORDS deliberately omits "pi" (it collides with a segment "PI"), but right after a circumference/
+  // area keyword + number the context is unambiguous, so accept it here (ADR-228 Am.).
+  const SIZE_VAL = String.raw`${NUMEXPR('sz')}\s*[*·]?\s*(?<szPi>π|pi)?`;
+  type SizeVal = { coef: number; pi: boolean };
+  const sizeOf = (m: RegExpMatchArray | null): SizeVal | null => {
     if (!m) return null;
-    pi = !!m[2];
-    return parseFloat(m[1]) * (m[2] ? Math.PI : 1);
+    const v = numexprVal(m.groups!, 'sz');
+    return v ? { coef: v.value, pi: m.groups!.szPi !== undefined } : null;
+  };
+  const readVal = (after: string): SizeVal | null =>
+    // copula-anchored first — skips a digit-bearing circle label ("circle O2 is 6π") the glued form would
+    // misread; else the number glued right after the possessive suffix ("שהיקפו 6π"); else COPULA-LESS with
+    // the circle named between keyword and value — "היקף מעגל O1 6π" (the operator typed it twice; it fell to
+    // the LLM). The keyword is behind us, so "circle-word? + ONE label + number" is safe.
+    sizeOf(after.match(new RegExp(String.raw`(?:=|הוא|שווה|\bis\b|\bequals?\b|:)\s*${SIZE_VAL}`, 'i'))) ??
+    sizeOf(after.match(new RegExp(String.raw`^\s*${SIZE_VAL}`, 'i'))) ??
+    sizeOf(after.match(new RegExp(String.raw`^\s*(?:circle|מעגל)?\s*[A-Z]\d*\s+${SIZE_VAL}`, 'i')));
+  const sized = (v: SizeVal | null, toRadius: (magnitude: number) => number): { r: number; stated: number; pi: boolean } | null => {
+    if (!v) return null;
+    const magnitude = v.coef * (v.pi ? Math.PI : 1);
+    return magnitude > 0 ? { r: toRadius(magnitude), stated: v.coef, pi: v.pi } : null;
   };
   // A circle SIZED by its DIAMETER — "diameter 10" / "מעגל קוטר 10" / "מעגל בקוטר 10" (r = d/2). The value
   // must follow the diameter word directly (optionally via a copula), with NO endpoint label between them —
   // that keeps this DISTINCT from the diameter-CHORD "קוטר AB" (labelled, no size), which the diameter rule
   // owns. A circle's size IS its radius, so this reduces to the same numeric-radius path as circumference/area.
-  const dm = s.match(
-    new RegExp(String.raw`(?:diameter|בקוטר|שקוטרו|קוטרו|קוטר)\s*(?:של|=|:|הוא|שווה|\bis\b|equals?)?\s*(${COEF})\s*[*·]?\s*(π|pi)?`, 'i'),
+  const dm = sized(
+    sizeOf(s.match(new RegExp(String.raw`(?:diameter|בקוטר|שקוטרו|קוטרו|קוטר)\s*(?:של|=|:|הוא|שווה|\bis\b|equals?)?\s*${SIZE_VAL}`, 'i'))),
+    (d) => d / 2,
   );
-  if (dm) {
-    const v = parseFloat(dm[1]) * (dm[2] ? Math.PI : 1);
-    if (v > 0) return { r: v / 2, stated: parseFloat(dm[1]), pi: !!dm[2] };
-  }
+  if (dm) return dm;
   const cm = s.match(new RegExp(CIRCUMFERENCE_WORD, 'i'));
-  if (cm) {
-    const after = s.slice(cm.index! + cm[0].length);
-    const v = readVal(after);
-    if (v !== null && v > 0) return { r: v / (2 * Math.PI), stated: statedCoef(after) ?? v, pi };
-  }
+  const byCircumference = cm ? sized(readVal(s.slice(cm.index! + cm[0].length)), (c) => c / (2 * Math.PI)) : null;
+  if (byCircumference) return byCircumference;
   const am = s.match(new RegExp(AREA_WORD, 'i'));
-  if (am) {
-    const after = s.slice(am.index! + am[0].length);
-    const v = readVal(after);
-    if (v !== null && v > 0) return { r: Math.sqrt(v / Math.PI), stated: statedCoef(after) ?? v, pi };
-  }
-  return null;
+  return am ? sized(readVal(s.slice(am.index! + am[0].length)), (a) => Math.sqrt(a / Math.PI)) : null;
 };
 
 /**
@@ -5300,8 +5313,15 @@ const sizeStatementLeftover = (s: string): boolean =>
 const setRadius: Rule = (s, ctx) => {
   if (!/radius|רדיוס/i.test(s)) return null;
   if (sizeStatementLeftover(s)) return null; // a construction carrying a size clause — not a size statement
-  const valM = s.replace(/[A-Z]\d*/g, ' ').match(new RegExp(num)); // value with circle labels (e.g. P1) stripped first
-  if (!valM) return null; // a magnitude must be given
+  // The value, with circle labels (e.g. P1) stripped first. #2008 (ADR-635): the COPULA's value, read through the
+  // shared NUMEXPR atom — «רדיוס המעגל O הוא 1/2» used to take the first bare number of the sentence (1) and drop
+  // the «/2» with every gate quiet; a quotient is one value. No copula → the first value, as before.
+  const bare = s.replace(/[A-Z]\d*/g, ' ');
+  const valM =
+    bare.match(new RegExp(String.raw`(?:=|:|הוא|היא|שווה(?:\s+ל-?)?|\bis\b|\bequals?\b)\s*${NUMEXPR('rv')}`, 'i')) ??
+    bare.match(new RegExp(UNGLUED + NUMEXPR('rv')));
+  const value = valM ? numexprVal(valM.groups!, 'rv')?.value : undefined;
+  if (value === undefined) return null; // a magnitude must be given
   const center =
     circleCenter(s) ??
     (() => {
@@ -5315,7 +5335,7 @@ const setRadius: Rule = (s, ctx) => {
     const noun = s.search(/circle|מעגל/i);
     if (noun >= 0 && noun < s.search(/radius|רדיוס/i)) return null;
   }
-  return [{ type: 'set-radius', circle: circleId(center), value: parseFloat(valM[1]) }];
+  return [{ type: 'set-radius', circle: circleId(center), value }];
 };
 
 /**
@@ -12327,7 +12347,10 @@ export function normalizeUtterance(raw: string): string {
   // guarded keyboard `<` ≡ ∠ (#237, ADR-381) and «שורש N» ≡ √ (#105) — in the same order, so 2-D's
   // reading is unchanged — and adds the two rows 2-D never folded: ⟂ ≡ ⊥ (read per-rule here, folded
   // nowhere) and º/˚ ≡ ° after a digit. 3-D folded NONE of them, which is the class the table closes.
-  const orth = foldGlyphs(spelling)
+  // #2008 ([ADR-635](../../docs/06-decisions.md#adr-635)): a vulgar-fraction glyph («¼», «2½») is spelled as its
+  // digits HERE, after the glyph fold, so every rule and every honesty gate reads the number (it used to be
+  // spelled by the round-measure reader alone, and every other slot read «¼» as 1).
+  const orth = spellVulgarFractions(foldGlyphs(spelling))
     // «ן-» → «ו-» (#506): the final-nun key sits beside vav, and the slip recurs across the 2026-08-10
     // triage INSIDE otherwise-real constructions — «O - חיתוך של AC ן- DB», «הנקודות F ו- G הן אמצעי
     // הקטעים BC ן- DO». Each occurrence turns a mostly-parseable compound into a partial parse the

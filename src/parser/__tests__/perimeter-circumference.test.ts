@@ -19,7 +19,7 @@ const cmds = (u: string) => {
 
 describe('point-label subscript O_1 → O1 (ADR-228 A)', () => {
   it('circle O_1 keeps its subscript AND reads the circumference', () => {
-    expect(cmds('מעגל O_1 שהיקפו 6π')).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 3, consumed: { symbols: ['π'] } }]);
+    expect(cmds('מעגל O_1 שהיקפו 6π')).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 3, consumed: { numbers: [6], symbols: ['π'] } }]);
   });
   it('O_{1} braces form normalises too', () => {
     expect(cmds('circle O_{1} radius 5')).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 5 }]);
@@ -34,18 +34,20 @@ describe('point-label subscript O_1 → O1 (ADR-228 A)', () => {
 
 describe('circle sized by circumference / area (ADR-228 B)', () => {
   // #1814 (ADR-600): a size read through π DECLARES the π it consumed (`consumed.symbols`) — the span accountant's only payer for it
-  const r3 = [{ type: 'circle', id: 'circle-O', center: 'O', radius: 3, consumed: { symbols: ['π'] } }];
+  // #2008 (ADR-635): it declares the STATED size it consumed too (`consumed.numbers`, the ADR-462 route) — the radius
+  // keeps no trace of a transformed size, so «בקוטר 3/2» (r = 0.75) read as a dropped 3/2
+  const r3 = (stated: number) => [{ type: 'circle', id: 'circle-O', center: 'O', radius: 3, consumed: { numbers: [stated], symbols: ['π'] } }];
   it('circumference 6π (He, possessive שהיקפו) ⇒ radius 3', () => {
-    expect(cmds('מעגל O שהיקפו 6π')).toEqual(r3);
+    expect(cmds('מעגל O שהיקפו 6π')).toEqual(r3(6));
   });
   it('circumference 6π (En, with copula)', () => {
-    expect(cmds('circle O with circumference 6π')).toEqual(r3);
+    expect(cmds('circle O with circumference 6π')).toEqual(r3(6));
   });
   it('area 9π (He, possessive ששטחו) ⇒ radius 3', () => {
-    expect(cmds('מעגל O ששטחו 9π')).toEqual(r3);
+    expect(cmds('מעגל O ששטחו 9π')).toEqual(r3(9));
   });
   it('area 9π (En)', () => {
-    expect(cmds('circle O area 9π')).toEqual(r3);
+    expect(cmds('circle O area 9π')).toEqual(r3(9));
   });
   it('a plain-number circumference 12 ⇒ radius 12/2π', () => {
     const c = cmds('circle O circumference 12');
@@ -55,7 +57,7 @@ describe('circle sized by circumference / area (ADR-228 B)', () => {
 });
 
 describe('circle sized by its DIAMETER + the עיגול synonym (ADR-259)', () => {
-  const r5 = [{ type: 'circle', id: 'circle-O', center: '@ctr-O', radius: 5, autoCenter: true }]; // an unnamed circle's centre is anonymous (ADR-342)
+  const r5 = [{ type: 'circle', id: 'circle-O', center: '@ctr-O', radius: 5, consumed: { numbers: [10] }, autoCenter: true }]; // an unnamed circle's centre is anonymous (ADR-342)
   it('מעגל קוטר 10 ⇒ radius 5 (diameter/2)', () => expect(cmds('מעגל קוטר 10')).toEqual(r5));
   it('מעגל בקוטר 10 (the ב prefix) ⇒ radius 5', () => expect(cmds('מעגל בקוטר 10')).toEqual(r5));
   it('English "circle diameter 10" ⇒ radius 5', () => expect(cmds('circle diameter 10')).toEqual(r5));
@@ -127,7 +129,7 @@ describe('tangent circles: stated names + circumference on an existing circle (A
   });
   it('circumference on a NON-existing circle still CREATES it (via the circle rule)', () => {
     const r = parse('מעגל O1 שהיקפו 6pi', { circles: [] });
-    expect(r.ok && r.commands).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 3, consumed: { symbols: ['π'] } }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 3, consumed: { numbers: [6], symbols: ['π'] } }]);
   });
   it('AREA on an existing circle → set-radius (√(A/π)): "שטח מעגל O2 הוא 81π" ⇒ r=9', () => {
     const r = parse('שטח מעגל O2 הוא 81π', { circles: ['O2'] });
@@ -156,6 +158,6 @@ describe('tangent circles: stated names + circumference on an existing circle (A
   });
   it('copula-less creation "מעגל O1 שהיקפו 6π" unaffected (still a radius-3 circle)', () => {
     const r = parse('מעגל O1 שהיקפו 6π', { circles: [] });
-    expect(r.ok && r.commands).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 3, consumed: { symbols: ['π'] } }]);
+    expect(r.ok && r.commands).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 3, consumed: { numbers: [6], symbols: ['π'] } }]);
   });
 });
