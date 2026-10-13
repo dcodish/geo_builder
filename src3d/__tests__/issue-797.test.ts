@@ -29,7 +29,7 @@ describe('#797 — discrete pin-symbol roots read OPEN, and the pool carries the
       expect(err(), u).toBeNull();
     }
     const params = dataView(derive3(state().facts, state().seed).construction, state().seed).params;
-    expect(params).toEqual([{ sym: 'k', text: 'k = ?', open: true }]);
+    expect(params).toEqual([{ sym: 'k', text: 'k = ?', value: '?', open: true }]);
   });
 
   it('both roots are REACHABLE: configurations across seeds visit k ≈ 1 and k ≈ 2, nothing else', () => {
@@ -52,6 +52,6 @@ describe('#797 — discrete pin-symbol roots read OPEN, and the pool carries the
   it('the third vector determines: the panel returns to «k = 2» (the joint root)', () => {
     for (const u of [...TWO_VECTORS, 'AC = (k+1, 0, k-3)']) submit(u);
     const params = dataView(derive3(state().facts, state().seed).construction, state().seed).params;
-    expect(params).toEqual([{ sym: 'k', text: 'k = 2', open: false }]);
+    expect(params).toEqual([{ sym: 'k', text: 'k = 2', value: '2', open: false }]);
   });
 });

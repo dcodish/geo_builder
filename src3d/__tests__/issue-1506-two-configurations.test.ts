@@ -61,7 +61,7 @@ describe('#1506 — exactly two configurations print both, in one row joined by 
       const { panel } = panelAt(seed);
       expect(rowsOf(panel.points, 'S'), `seed ${seed}`).toEqual(['S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)']);
       // #1867: the ask lane answers the panel's own row
-      expect(answerQuery(derive3(st().facts, seed).construction, 'S', seed).answer, `ask, seed ${seed}`).toBe('S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)');
+      expect(answerQuery(derive3(st().facts, seed).construction, 'S', seed).answer, `ask, seed ${seed}`).toBe('(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)'); // #1746: the row reads «S = (…) או (…)»
       // the determined points are untouched
       expect(panel.points, `seed ${seed}`).toContain('M(-3/2, 7/2, 1/2)');
     }

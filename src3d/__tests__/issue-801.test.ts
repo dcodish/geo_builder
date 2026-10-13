@@ -76,7 +76,7 @@ describe('#801 — the equation and the injections share ONE letter', () => {
     const ln = d.resolved.lines.get('ℓ')!;
     expect(ln.dir.x).toBeCloseTo(3, 4);
     expect(ln.dir.z).toBeCloseTo(-1, 4);
-    expect(dataView(d.construction, state().seed).params).toEqual([{ sym: 'k', text: 'k = 2', open: false }]);
+    expect(dataView(d.construction, state().seed).params).toEqual([{ sym: 'k', text: 'k = 2', value: '2', open: false }]);
   });
 
   it('M2 re-homing — the equation FIRST still reaches the same figure (the fact SET, e.g. a loaded file)', () => {

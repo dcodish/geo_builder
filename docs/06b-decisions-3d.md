@@ -12695,3 +12695,24 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 **Locks.** `src3d/parser/__tests__/issue-1827-magnitude-atom.test.ts`: a totality sweep over 8 rule frames × 11 spellings, with a guard on how many rules were exercised; the gate sweep (no line the parser reads is flagged, and a radical the commands do not carry still is); and the operator's exact sequence through `decideDeterministic3` with |AD| = √7 at seed 0. Fixtures `rect-surd-side-1827`, `pyramid-surd-height-1827` and `triangle-surd-area-1827`. Parity rows `surd-length-1827`, `surd-length-paren-1827`, `surd-length-sqrt-1827` and `surd-area-1827` (docs/22 §10), which build in 2-D, analytic and 3-D.
 
 **Behaviour change for a student:** «AD=√7» (and √(7), 2√7, √7/2, 7/2, √(3/4), sqrt(7), sqrt7, \sqrt{7}) builds a stated length. «שטח המשולש ABC = √3» builds. A height stated with a radical length builds. «|AB| = sqrt(2)» builds. «|AD| = √(3/4)» is no longer refused as a lost given. The panel shows «|AD| = √7», as «|AD|=√7» already did. «√(7)» still displays as «√7», which is #1497's open "keep the format of entry".
+
+## ADR-3D-339 — An ask answer is the bare value: asking «B» reads «B = (1, ?, 2)», the label once (#1746)
+
+**Status:** accepted · 2026-10-13 · bug (P3) · fix-round #2053, stream O · branch `fix/1746-3d-ask-point-label` · follows [ADR-3D-299](#adr-3d-299)'s row format (#1547, PR #1744) · LADDER stage: none (display of the ask lane's existing verdicts)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-EQ-4b (the two-configuration ask reading) · **Design:** [04b](04b-design-3d.md) the data panel's point rows (`pointOptions` / `pointCoords`) and `params.value`
+
+**Measured before** (`main` @ 6096b643, through `decideSubmit3` + `answerQuery`): «B(1, t, 2)» then asking «B» → «B = B(1, ?, 2)»; «שיעורי B» → «שיעורי B = B(1, ?, 2)»; #1499's T7 figure, asking «S» → «S = S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»; «פירמידה משולשת ABCD · AB = (k-1,k,3) · k = 2», asking «k» → «k = k = 2».
+
+**Root cause / class.** *App3's ask row prints «<question> = <answer>», so an answerer that returns a subject-labelled string prints its subject twice.* #1547 fixed the component kind («x_B = x_B = 1») by returning only the value; the whole-point kind (#496) and two others still returned the PANEL's labelled row text: the point answer prefixed `q.id` to `pointCoords` / `pointOptions`, and a priced symbol returned the params row's whole `text` («k = 2»).
+
+**Decision.**
+1. `QueryResult.answer` is documented as ONLY the value. The point kind answers `pointOptions[id]` / `pointCoords[id].text` as is (the coordinates after the name, which is what `pointOptions` was already documented to carry).
+2. `DataPanel.params` rows carry `value` beside `text`, built by ONE `paramRow` helper, so the panel prints `text` («k = 2») and the ask lane answers `value` («2») from the same decision (the #481 rule).
+3. The sweep is total: `issue-1746-ask-row.test.ts` asserts the JOINED row text for every query kind through a `Record<QueryKind3, …>` (`QueryKind3` is newly exported), so a new kind cannot compile without a row case.
+
+**Not taken: a declared basis vector asked by its own name.** «w» answers its trivial decomposition «w», so the row reads «w = w = (0, 0, 12)» with a frame and «u = u» without one. Dropping the self-decomposition leaves a frameless figure nothing to answer, and what to show then is a product decision, so it is reported as a finding, not decided here.
+
+**Locks.** `src3d/__tests__/issue-1746-ask-row.test.ts`: the operator's exact lines («B(1, t, 2)», then «B»), the joined row of every kind, and the panel's rows unchanged. Updated to the bare value: `query-point-plane`, `frame-gates`, `issue-803`, `issue-1547-component-given`, `issue-1506-two-configurations`, `issue-1450-ask-gate`. The params-row locks that compare whole rows (`issue-794`, `-797`, `-801`, `-815`, `-902`, `-939-symbol-display`, `book-coordinate-givens`) gain the `value` key; their `text` is byte-unchanged. Fixtures-first: not applicable. The ask lane is not part of a saved session, so a fixture cannot hold the row text.
+
+**Behaviour change for a student:** asking for a point names it once: «B = (1, ?, 2)» (was «B = B(1, ?, 2)»), and «S = (1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)» for a point with two configurations. Asking a priced symbol reads «k = 2» (was «k = k = 2»). The data panel and the canvas are unchanged.

@@ -126,7 +126,7 @@ describe('#902 — the class: every lane that can own a letter takes the value',
     const d = derived();
     expect(d.resolved.param).toEqual({ name: 'm', value: 2, roots: [2], branches: [2] });
     expect(freeDofCount3(d.construction, d.resolved)).toBe(0);
-    expect(dataView(d.construction, 0).params).toEqual([{ sym: 'm', text: 'm = 2', open: false }]);
+    expect(dataView(d.construction, 0).params).toEqual([{ sym: 'm', text: 'm = 2', value: '2', open: false }]);
   });
 
   it('the figure parameter of a coord-sym POINT: «M(k,1,3)» then «k = 3» → M = (3, 1, 3)', () => {
@@ -168,11 +168,11 @@ describe('#902 — honesty: the value is knowledge, and it is seed-stable', () =
   it('the data panel prints «p = 3» (open before, determined after) and the DOF cue drops by exactly one', () => {
     [BOX, 'C(p²,1,0)'].forEach(submit);
     const before = derived();
-    expect(dataView(before.construction, 0).params).toEqual([{ sym: 'p', text: 'p = ?', open: true }]);
+    expect(dataView(before.construction, 0).params).toEqual([{ sym: 'p', text: 'p = ?', value: '?', open: true }]);
     const dofBefore = freeDofCount3(before.construction, before.resolved);
     submit('p=3');
     const after = derived();
-    expect(dataView(after.construction, 0).params).toEqual([{ sym: 'p', text: 'p = 3', open: false }]);
+    expect(dataView(after.construction, 0).params).toEqual([{ sym: 'p', text: 'p = 3', value: '3', open: false }]);
     expect(freeDofCount3(after.construction, after.resolved)).toBe(dofBefore - 1);
   });
 

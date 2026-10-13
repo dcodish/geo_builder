@@ -91,8 +91,9 @@ export interface DataPanel {
   pointOptions: Record<string, string>;
   /** #325 (ADR-3D-079 Am. 2): the pins' OPEN symbols (`B(2t,t,k)` → t, k) — a determined
    *  symbol (identical across every sampled configuration) prints its value (`k = -3`); a
-   *  still-free one prints open (`t = ?`), so the stated given visibly took effect. */
-  params: { sym: string; text: string; open: boolean }[];
+   *  still-free one prints open (`t = ?`), so the stated given visibly took effect. #1746 (ADR-3D-339):
+   *  `value` is the text after «<sym> = » (`-3`, `?`) — what the ask row prints after its own echo. */
+  params: { sym: string; text: string; value: string; open: boolean }[];
 }
 
 /**
@@ -1246,6 +1247,9 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // #325 (ADR-3D-079 Am. 2): the pins' open symbols — determined values print, free ones read
   // open, so `B(2t, t, k)` visibly registers even while the coordinates still read `?`.
   const params: DataPanel['params'] = [];
+  // #1746 (ADR-3D-339): ONE builder for a params row — the panel prints `text`, the ask row prints `value`.
+  const paramRow = (sym: string, value: string | null): DataPanel['params'][number] =>
+    value ? { sym, text: `${sym} = ${value}`, value, open: false } : { sym, text: `${sym} = ?`, value: '?', open: true };
   for (const sym of figureSymbolsOf(c)) {
     // #480: the ALGEBRAIC lane's parameter is not a pivot pin symbol — its value lives in
     // `resolved.param`, and its branch set is the answer whenever the givens leave more than one.
@@ -1255,7 +1259,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       // does not, the symbol is not knowledge and reads open rather than picking a seed's version
       const agree = perSeed.every((b) => b.length === perSeed[0].length && b.every((v, i) => Math.abs(v - perSeed[0][i]) <= 1e-6 * Math.max(1, Math.abs(v))));
       const text = agree ? branchAnswer(sym, perSeed[0]) : null;
-      params.push(text ? { sym, text: `${sym} = ${text}`, open: false } : { sym, text: `${sym} = ?`, open: true });
+      params.push(paramRow(sym, text));
       continue;
     }
     /**
@@ -1317,7 +1321,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     const stable =
       singleRoot &&
       nums.length === resolved.length && nums.every((v) => Math.abs(v - nums[0]) <= 1e-4 * Math.max(1, Math.abs(nums[0])));
-    params.push(stable ? { sym, text: `${sym} = ${cleanNum(nums[0], 1e-4)}`, open: false } : { sym, text: `${sym} = ?`, open: true });
+    params.push(paramRow(sym, stable ? cleanNum(nums[0], 1e-4) : null));
   }
 
   // #1196: the STATED vector rows need no sampling — they are givens, not measurements — so they are

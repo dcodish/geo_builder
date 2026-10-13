@@ -43,7 +43,7 @@ describe('#496 — a bare POINT label answers its coordinates', () => {
   it('«A» answers the coordinates the panel would print for A', () => {
     const { c, seed } = build(TRIANGLE);
     const r = answerQuery(c, 'A', seed);
-    expect(r.answer).toBe(`A${dataView(c, seed).pointCoords['A'].text}`);
+    expect(r.answer).toBe(dataView(c, seed).pointCoords['A'].text); // #1746: the row's echo names A
     expect(r.note).toBeUndefined();
   });
 
@@ -60,7 +60,7 @@ describe('#496 — a bare POINT label answers its coordinates', () => {
     const { c, seed } = build(TRIANGLE);
     const panel = dataView(c, seed).pointCoords;
     for (const id of Object.keys(panel)) {
-      expect(answerQuery(c, id, seed).answer, id).toBe(`${id}${panel[id].text}`);
+      expect(answerQuery(c, id, seed).answer, id).toBe(panel[id].text); // #1746: the coordinates after the name
     }
   });
 

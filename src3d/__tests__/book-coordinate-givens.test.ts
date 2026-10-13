@@ -174,8 +174,8 @@ describe('the book snippet end-to-end (box figure)', () => {
     const d = derive3(state().facts, state().seed);
     const params = dataView(d.construction, state().seed).params;
     expect(params).toEqual([
-      { sym: 't', text: 't = ?', open: true },
-      { sym: 'k', text: 'k = -3', open: false },
+      { sym: 't', text: 't = ?', value: '?', open: true },
+      { sym: 'k', text: 'k = -3', value: '-3', open: false },
     ]);
   });
 

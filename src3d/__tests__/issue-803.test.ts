@@ -83,7 +83,7 @@ describe('#803 — the operator’s prism: a pin-driven placement answers', () =
     expect(top.rows![1]).toMatch(/^π\d* = /);
     expect(answerQuery(c, 'מישור ABC', state().seed).answer).not.toBeNull();
     const a = answerQuery(c, 'A', state().seed);
-    expect(a.answer).toBe('A(2, -1, 1)');
+    expect(a.answer).toBe('(2, -1, 1)'); // #1746: the row reads «A = (2, -1, 1)»
   });
 
   it('the panel and the canvas labels open with the same gate — the coordinates block is populated', () => {

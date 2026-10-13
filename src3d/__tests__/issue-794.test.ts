@@ -57,7 +57,7 @@ describe('#794 — the bagrut Q2 prism: symbolic pair pins determine k', () => {
     for (const u of Q2) submit(u);
     const d = derive3(state().facts, state().seed);
     const params = dataView(d.construction, state().seed).params;
-    expect(params).toEqual([{ sym: 'k', text: 'k = 2', open: false }]);
+    expect(params).toEqual([{ sym: 'k', text: 'k = 2', value: '2', open: false }]);
   });
 
   it('a sign given reaches a PAIR symbol: «k חיובי» passes (k = 2), «k < 0» refuses', () => {

@@ -95,7 +95,7 @@ describe('#639 — the algebraic lane is an absolute frame', () => {
     const d = derive3(build(EXAM), 0);
     for (const [id, st] of Object.entries(d.status)) expect(st, id).toBe('ok');
     expect(dataView(d.construction, 0).points).toEqual(['A(2, 0, -10)']);
-    expect(answerQuery(d.construction, 'A', 0).answer).toBe('A(2, 0, -10)');
+    expect(answerQuery(d.construction, 'A', 0).answer).toBe('(2, 0, -10)'); // #1746: the row reads «A = (2, 0, -10)»
     expect(answerQuery(d.construction, 'A', 0).note).toBeUndefined();
     for (const seed of [1, 2, 7, 99]) expect(dataView(d.construction, seed).points).toEqual(['A(2, 0, -10)']);
   });
@@ -122,7 +122,7 @@ describe('#639 — the algebraic lane is an absolute frame', () => {
     const d = derive3(build(mixed), 0);
     const panel = dataView(d.construction, 0);
     expect(panel.points).toEqual(['A1(2, 0, -10)']); // and NOT one of A…D'
-    expect(answerQuery(d.construction, 'A1', 0).answer).toBe('A1(2, 0, -10)');
+    expect(answerQuery(d.construction, 'A1', 0).answer).toBe('(2, 0, -10)');
     expect(answerQuery(d.construction, 'A', 0)).toMatchObject({ answer: null, note: 'undetermined' });
     // the mechanism: the cube genuinely roams while the crossing does not
     const posOf = (seed: number) => resolve3(d.construction, seed).positions;

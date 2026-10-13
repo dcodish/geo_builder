@@ -68,7 +68,7 @@ describe('#815 — the equation typed FIRST: its memberships DRIVE the figure', 
       expect(ln.dir.z, `seed ${seed}`).toBeCloseTo(-1, 4);
       for (const id of ['A', 'C']) expect(offLine(d.positions.get(id)!, ln), `seed ${seed}: ${id} on AC`).toBeLessThan(1e-5);
     }
-    expect(dataView(derive3(state().facts, 0).construction, 0).params).toEqual([{ sym: 'k', text: 'k = 2', open: false }]);
+    expect(dataView(derive3(state().facts, 0).construction, 0).params).toEqual([{ sym: 'k', text: 'k = 2', value: '2', open: false }]);
   });
 
   it('at the equation’s OWN step the figure is already driven onto the line, k an OPEN pivot symbol', () => {
@@ -90,7 +90,7 @@ describe('#815 — the equation typed FIRST: its memberships DRIVE the figure', 
     }
     // nothing pins k yet — it is a free DOF and must VARY with the seed (ADR-052), never a frozen default
     expect(new Set(ks.map((k) => k.toFixed(2))).size, `k by seed: ${ks.join(', ')}`).toBeGreaterThan(1);
-    expect(dataView(derive3(state().facts, 0).construction, 0).params).toEqual([{ sym: 'k', text: 'k = ?', open: true }]);
+    expect(dataView(derive3(state().facts, 0).construction, 0).params).toEqual([{ sym: 'k', text: 'k = ?', value: '?', open: true }]);
   });
 
   it('the apply gate: the membership door re-homes the letter; the equation object carries it', () => {

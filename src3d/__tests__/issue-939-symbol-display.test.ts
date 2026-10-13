@@ -51,24 +51,24 @@ beforeEach(() => {
 describe('#939 — the reported lane: a valued rider ratio', () => {
   it('«t = 1/2» is a CLOSED row, the way «p = 3» is', () => {
     const { params } = panelOf([PYRAMID, RIDER, 't = 1/2']);
-    expect(row(params, 't')).toEqual({ sym: 't', text: 't = 1/2', open: false });
+    expect(row(params, 't')).toEqual({ sym: 't', text: 't = 1/2', value: '1/2', open: false });
   });
 
   it('and an UNVALUED «t» still reads open — this is not "always print something"', () => {
     const { params } = panelOf([PYRAMID, RIDER]);
-    expect(row(params, 't')).toEqual({ sym: 't', text: 't = ?', open: true });
+    expect(row(params, 't')).toEqual({ sym: 't', text: 't = ?', value: '?', open: true });
   });
 });
 
 describe('#939 — the class: every producer that binds a symbol', () => {
   it('a named COMPONENT (#814): «D(3,p,0)» then «p = 2»', () => {
     expect(row(panelOf(['תיבה ABCD', 'D(3,p,0)']).params, 'p')?.open).toBe(true);
-    expect(row(panelOf(['תיבה ABCD', 'D(3,p,0)', 'p = 2']).params, 'p')).toEqual({ sym: 'p', text: 'p = 2', open: false });
+    expect(row(panelOf(['תיבה ABCD', 'D(3,p,0)', 'p = 2']).params, 'p')).toEqual({ sym: 'p', text: 'p = 2', value: '2', open: false });
   });
 
   it('an ANGLE letter: «∠SAB = α» then «α = 70»', () => {
     expect(row(panelOf([PYRAMID, '∠SAB = α']).params, 'α')?.open).toBe(true);
-    expect(row(panelOf([PYRAMID, '∠SAB = α', 'α = 70']).params, 'α')).toEqual({ sym: 'α', text: 'α = 70', open: false });
+    expect(row(panelOf([PYRAMID, '∠SAB = α', 'α = 70']).params, 'α')).toEqual({ sym: 'α', text: 'α = 70', value: '70', open: false });
   });
 
   it('THE INVARIANT, stated over the registry itself: no owner kind is displayable-by-accident', () => {
@@ -88,11 +88,11 @@ describe('#939 — the class: every producer that binds a symbol', () => {
 
 describe('#939 — the lanes that already worked are BYTE-UNCHANGED', () => {
   it('the coordinate lane: «c(p²,1,0)» · «p=3»', () => {
-    expect(row(panelOf(['תיבה ABCD', 'c(p²,1,0)']).params, 'p')).toEqual({ sym: 'p', text: 'p = ?', open: true });
-    expect(row(panelOf(['תיבה ABCD', 'c(p²,1,0)', 'p=3']).params, 'p')).toEqual({ sym: 'p', text: 'p = 3', open: false });
+    expect(row(panelOf(['תיבה ABCD', 'c(p²,1,0)']).params, 'p')).toEqual({ sym: 'p', text: 'p = ?', value: '?', open: true });
+    expect(row(panelOf(['תיבה ABCD', 'c(p²,1,0)', 'p=3']).params, 'p')).toEqual({ sym: 'p', text: 'p = 3', value: '3', open: false });
   });
 
   it('the vec-def ratio lane: «SN = k·SC»', () => {
-    expect(row(panelOf([PYRAMID, 'SN = k·SC']).params, 'k')).toEqual({ sym: 'k', text: 'k = ?', open: true });
+    expect(row(panelOf([PYRAMID, 'SN = k·SC']).params, 'k')).toEqual({ sym: 'k', text: 'k = ?', value: '?', open: true });
   });
 });
