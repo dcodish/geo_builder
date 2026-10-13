@@ -10465,16 +10465,51 @@ const congruence: Rule = (s, ctx) => {
  * similar triangles. Reshapes the SECOND to have the same angles as the first (AA), free
  * to scale. Two angle equalities suffice.
  */
-const similarity: Rule = (s, ctx) => {
-  if (!/[~∼∽]|similar|דומ/i.test(s)) return null;
+const similarity: Rule = (s0, ctx) => {
+  const s = spellVulgarFractions(s0);
+  // «יחס הדמיון בין המשולשים ABC ו-DEF הוא 1:2» names the similarity by its RATIO noun (#2027) — claimed only
+  // when two triangles are named; a bare «יחס הדמיון הוא 1/2» keeps whatever path it had.
+  const byRatioNoun = !/[~∼∽]|similar|דומ/i.test(s);
+  if (byRatioNoun && !SIM_RATIO_NOUN.test(s)) return null;
   const tt = twoTriangles(s);
-  if (!tt) return 'stop';
+  if (!tt) return byRatioNoun ? null : 'stop';
   const [[A, B, C], [D, E, F]] = tt;
+  const k = statedSimilarityRatio(s);
+  if (k === 'unreadable') return 'stop'; // a ratio is stated but not readable: escalate, never draw without it
   return [
     ...ensureTriangles([A, B, C], [D, E, F], ctx),
+    // #2027 (ADR-637): the stated ratio is the scale between the two — |AB| = k·|DE|. With the two angle
+    // equalities it fixes every pair of corresponding sides. No ratio stated → no constraint: the scale stays
+    // a free quantity the sampler varies (ADR-052). Emitted BEFORE the angle equalities: it is the line's one
+    // SIZE statement, so it claims its carrier first, exactly as the two-line spelling «AB/DE = k» then
+    // «ABC ~ DEF» does (a size given claimed after the shape equalities found only the first triangle's
+    // vertices free and flattened it when AB was already given).
+    ...(k === null ? [] : [{ type: 'set-ratio' as const, a: A, b: B, c: D, d: E, k }]),
     { type: 'set-angle-ratio', v1: D, a1: E, b1: F, v2: A, a2: B, b2: C, k: 1 }, // ∠D = ∠A
     { type: 'set-angle-ratio', v1: E, a1: D, b1: F, v2: B, a2: A, b2: C, k: 1 }, // ∠E = ∠B
   ];
+};
+
+/** The similarity-ratio noun — «יחס (ה)דמיון», "similarity ratio" (#2027). */
+const SIM_RATIO_NOUN = /יחס\s+ה?דמיון|similarity\s+ratio|ratio\s+of\s+similarity/i;
+/** A ratio keyword in a similarity sentence: «ביחס», «יחס (ה)דמיון», "ratio", "scale factor". */
+const SIM_RATIO_KW = /ב?יחס|ratio|scale\s+factor/i;
+/**
+ * #2027 ([ADR-637](docs/06-decisions.md#adr-637)) — the RATIO a similarity sentence states, as |first|/|second|.
+ * `null` when the sentence states none; `'unreadable'` when it names a ratio whose value this grammar cannot read
+ * (or anything unread follows it), so the caller escalates instead of drawing the similarity without it. The value
+ * is a colon ratio `p:q` (→ p/q) or the shared NUMEXPR value atom (`2`, `0.5`, `1/2`, `√2`, `√2/2`; a vulgar glyph
+ * is spelled out by the caller). The labels are blanked first, so the triangles may sit between the keyword and
+ * the value («יחס הדמיון בין המשולשים ABC ו-DEF הוא 1:2»).
+ */
+const statedSimilarityRatio = (s: string): number | null | 'unreadable' => {
+  const kw = SIM_RATIO_KW.exec(s);
+  if (!kw) return null;
+  const tail = s.slice(kw.index + kw[0].length).replace(new RegExp(LABEL, 'g'), (m) => ' '.repeat(m.length));
+  const m = tail.match(new RegExp(String.raw`^[^\d√]*?(?:${RATPQ}|${NUMEXPR('k')})\s*[.,]?\s*$`));
+  if (!m) return 'unreadable';
+  const k = m[1] !== undefined ? parseFloat(m[1]) / parseFloat(m[2]) : numexprVal(m.groups ?? {}, 'k')?.value;
+  return k !== undefined && Number.isFinite(k) && k > 0 ? k : 'unreadable';
 };
 
 /**

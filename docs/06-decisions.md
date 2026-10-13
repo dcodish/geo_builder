@@ -16463,3 +16463,30 @@ The touch list inherits both. They are filed as #2001 (`needs-operator`). The in
 - «משולש ישר-זווית ABC שבו זווית A ישרה»: refused at the door with the one-given-per-line note, which teaches the two lines.
 
 **Not done:** 2-D does not read the English example «angle C is right»; it escalates.
+
+## ADR-637 — A similarity's stated ratio is a verified constraint; an unstated one stays free (#2027)
+
+**Status:** accepted · 2026-10-13 · bug (P1, 2-D) · fix-round #2053, stream B · branch `fix/2027-similarity-ratio` off `main` @ 6096b643 · rulings: the honesty invariant (CLAUDE.md, "no stated magnitude is ever silently dropped") for the stated ratio; operator ruling 2026-10-13 (#2027, the `/decisions` ballot card 1, option A) for the unstated one · LADDER stage: none (a parser lowering onto the existing `set-ratio` constraint; no solve, sample or stage changes)
+
+**Requirements:** [02](02-requirements.md) FR-EN-12 (the stated ratio, and the free scale without one) · **Design:** none (internal — the similarity rule lowers onto the existing `set-ratio` constraint and the existing verifier; no new mechanism)
+
+**Measured before** (at pickup, `main` @ 6096b643, `decideDeterministic2D` + `replay`). «משולש ABC · משולש DEF · משולש ABC דומה למשולש DEF ביחס 1/2» committed and drew AB/DE = BC/EF = 1.000, every row green; «ביחס ½» the same. «ביחס 1:2», «ביחס 2», «ביחס 0.5» and "in ratio 1:2" escalated (the dropped-number gate caught the digit). Over an EXISTING similarity, «ביחס √2» and "with a similarity ratio of 1/2" were a «כבר קיים» no-op — the ratio dropped again. «יחס הדמיון בין המשולשים ABC ו-DEF הוא 1:2» was `not-handled`. «1/2» and «√2» slipped the gate because a fraction or radical is accounted by its parts, and the two angle equalities carry `k: 1`. **The unstated half was already true:** with no ratio, «הציגו תצורה אחרת» reached AB/DE = 1, 2.76, 1.53, 1.29, … (the shape fingerprint is every pairwise distance over their mean, so the scale between the two triangles is part of it). The issue's "always 1" was the seed-0 drawing only. Polygon similarity («ABCD ~ EFGH», «מלבן ABCD דומה למלבן EFGH ביחס 2») is not read at all (`not-handled`), so it drops nothing.
+
+**Class (docs/17 §1).** *A similarity sentence that states its ratio lowers to the angle equalities only, so the ratio — in any spelling, on the similarity line or a later one — never reaches the figure.* Root cause: the `similarity` rule in `src/parser/parse.ts` matched the sentence and never read «ביחס k».
+
+**Decision.**
+1. **The similarity rule reads its ratio** (`statedSimilarityRatio`). After a ratio keyword («ביחס», «יחס (ה)דמיון», "ratio", "scale factor") the line must end in ONE value: a colon ratio `p:q` (→ p/q) or the shared NUMEXPR value atom (`2`, `0.5`, `1/2`, `√2`, `√2/2`); a vulgar glyph is spelled out first. Labels are blanked, so the triangles may sit between keyword and value («יחס הדמיון בין המשולשים ABC ו-DEF הוא 1:2» — the ratio noun now names a similarity too, but only when two triangles are named; a bare «יחס הדמיון הוא 1/2» keeps its path).
+2. **It lowers to `set-ratio` |AB| = k·|DE|** — the same command «AB/DE = k» already lowers to, so the givens and the readout show it exactly as 2-D shows that spelling — beside the two angle equalities. The verifier checks it, so a figure that does not hold the ratio is never green. It is emitted FIRST in the line: the one size statement claims its carrier before the shape equalities, as the two-line spelling «AB/DE = k» · «ABC ~ DEF» does. Emitted last, with AB already given, it found only ABC's vertices free and the step refused as "collapsed".
+3. **A ratio stated but unreadable** («ביחס חצי», «ביחס 1:2:3», or anything after the value) returns `stop`: the line escalates and is never drawn without its ratio. Contradicting sides («AB = 4 · DE = 4 · … ביחס 1/2») are refused by the existing over-constrained conflict.
+4. **No ratio stated → no ratio constraint.** The scale stays a free quantity the button varies (ADR-052, the 2026-10-13 ruling), as it already did; now locked.
+
+**Worst-case multiplier (docs/17 M3):** none — one constraint the step already knows how to drive.
+
+**Sibling audit.** The congruence rule states no ratio. The honesty gate's part-wise accounting of a fraction or radical (a payload of `1` vouches for «1/2» and «√2») is how this escaped as green; it is a wider gate question and is reported, not changed here. «ABC ∽ DEF, k = 2» reads `k = 2` as a letter assignment, not as the ratio (reported). 3-D: `not-handled` for a ratio sentence (honest). Analytic: `CONG_HE` / `CONG_EN` are anchored at the end of the line, so a ratio tail is `not-handled` (honest). Complex: no similarity. Polygon similarity in 2-D: a missing capability, not a drop (reported).
+
+**Locks.** Fixture `src/__tests__/fixtures/issue-2027-similarity-ratio.geo.json` — the operator's three lines, verified green, with the parser-drift check holding the `set-ratio` lowering. `src/app/__tests__/issue-2027-similarity-ratio.test.ts` — every spelling above through `decideDeterministic2D` and the gate, with AB/DE = BC/EF = CA/FD = k and the angles equal; a ratio on a later line; the ratio beside a stated side in either entry order; the contradiction refused; the unreadable ratio escalated; and, with no ratio, the scale changing across presses of «הציגו תצורה אחרת» (`searchAnotherView`).
+
+**Behaviour change for a student:**
+- «משולש ABC דומה למשולש DEF ביחס 1/2» draws ABC at half the size of DEF, with the ratio among the givens (was: two congruent triangles, green). The same for «½», «1:2», «0.5», «2», «√2», «ביחס דמיון 2», «ויחס הדמיון הוא 2», the plural «המשולשים ABC ו-DEF דומים ביחס 1:2», and the English "in ratio" / "with ratio" / "with a similarity ratio of".
+- The ratio may come on a later line: «משולש ABC דומה למשולש DEF ביחס 1/2» or «יחס הדמיון בין המשולשים ABC ו-DEF הוא 1:2» after a bare similarity (was: «כבר קיים» or not understood).
+- With no ratio, nothing changes: «הציגו תצורה אחרת» already varied the scale.
