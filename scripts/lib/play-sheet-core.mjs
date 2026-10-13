@@ -16,6 +16,7 @@
  * matcher, the per-case verdict, and the HTML report — so the locks can hold it without driving
  * one (the `judgeCapture` split in `visual-smoke.mjs`, followed).
  */
+import { validateModelAnswers } from './model-stub.mjs';
 
 /** The classes, in the order the report presents them: the operator's work first. */
 export const CASE_CLASSES = ['play', 'look', 'verified'];
@@ -69,6 +70,8 @@ export function validateSheet(sheet, products) {
     if (!c.lookFor) problems.push(`${at}: missing lookFor — the operator's at-a-glance pass`);
     if (c.asks && products[c.product] && !products[c.product].askHint)
       problems.push(`${at}: asks are not supported for ${c.product} (no ask-box descriptor)`);
+    // #1955: a case that exercises the AI lane names the oracle's canonical lines; nothing is live.
+    problems.push(...validateModelAnswers(c.llm, at));
     if (c.expectRefusal && c.expect) problems.push(`${at}: expectRefusal and expect are one or the other`);
     if (c.after !== undefined) {
       if (!Array.isArray(c.after)) problems.push(`${at}: \`after\` must be a list of steps`);
@@ -112,6 +115,8 @@ export function caseVerdict(spec, drive) {
   }
   if (drive.pageErrors?.length) problems.push(`${drive.pageErrors.length} uncaught page error(s) — first: ${drive.pageErrors[0]}`);
   for (const p of drive.captureProblems ?? []) problems.push(p);
+  // #1955 (ADR-W-127): a live model call or an unused oracle answer fails the case.
+  for (const p of drive.modelProblems ?? []) problems.push(p);
   return problems;
 }
 

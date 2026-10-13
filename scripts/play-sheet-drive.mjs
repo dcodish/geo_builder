@@ -15,7 +15,8 @@
  * `reports/playsheets/<name>/` (gitignored, per-machine evidence like `reports/screens/`); the
  * SPECS are tracked in `scripts/playsheets/`. Not CI (ADR-W-005): a local gate, like its sibling.
  */
-import { chromium } from 'playwright';
+import { launchBrowser } from './lib/browser-harness.mjs';
+import { ledgerProblems } from './lib/model-stub.mjs';
 import { mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -62,7 +63,9 @@ function parseArgs(argv) {
 /** Drive ONE case; returns everything `caseVerdict` measures plus the shots taken. */
 async function driveCase(browser, spec, outDir, prefix) {
   const product = PRODUCTS[spec.product];
-  const page = await browser.newPage({ viewport: { width: 1600, height: 950 } });
+  // #1955 (ADR-W-127): the harness answers every /api/parse — keyless by default, or with the
+  // canonical lines this case declared as the oracle (`llm`). Nothing reaches the live model.
+  const page = await browser.newPage({ viewport: { width: 1600, height: 950 }, modelAnswers: spec.llm });
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
 
@@ -165,8 +168,10 @@ async function driveCase(browser, spec, outDir, prefix) {
   }
 
   const bodyText = await page.evaluate(() => document.body.innerText).catch(() => '');
+  const model = { calls: [...page.modelLedger.calls], leaks: [...page.modelLedger.leaks] };
   await page.close();
-  return { steps, askSteps, bodyText, pageErrors, shots };
+  const modelProblems = ledgerProblems(model, spec.llm);
+  return { steps, askSteps, bodyText, pageErrors, shots, model, modelProblems };
 }
 
 async function run() {
@@ -191,18 +196,29 @@ async function run() {
   if (existsSync(outDir)) await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
 
-  const browser = await chromium.launch();
+  const browser = await launchBrowser();
   const results = [];
+  const modelTotals = { calls: 0, mocked: 0, leaks: 0 };
   for (const spec of sheet.cases) {
     const drive = await driveCase(browser, spec, outDir, spec.id);
     // Read the captures back before anything is claimed — evidence produced is not evidence read.
     const audit = await auditImages(browser, drive.shots.map((s) => path.join(outDir, s.file)));
     drive.captureProblems = audit.map((v) => judgeCapture(path.basename(v.file), v)).filter(Boolean);
     const problems = caseVerdict(spec, drive);
+    modelTotals.calls += drive.model.calls.length;
+    modelTotals.mocked += drive.model.calls.filter((c) => c.mocked).length;
+    modelTotals.leaks += drive.model.leaks.length;
     results.push({ id: spec.id, problems, shots: drive.shots, steps: drive.steps, askSteps: drive.askSteps });
     console.log(`${problems.length === 0 ? '✓' : '✗'} ${spec.id} · ${spec.title}${problems.length ? `\n    ${problems.join('\n    ')}` : ''}`);
   }
   await browser.close();
+  // The rule-2 record (#1955): every model request this run made, and where it was answered.
+  console.log(
+    `
+model lane: ${modelTotals.calls} /api/parse request(s), all answered by the harness stub ` +
+      `(${modelTotals.mocked} with a declared oracle answer, ${modelTotals.calls - modelTotals.mocked} keyless); ` +
+      `${modelTotals.leaks} reached the network.`,
+  );
 
   const generatedAt = new Date().toISOString().replace('T', ' ').slice(0, 16);
   await writeFile(path.join(outDir, 'report.html'), renderReport({ sheet, results, generatedAt }));

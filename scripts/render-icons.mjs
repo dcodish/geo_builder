@@ -16,7 +16,7 @@
  * browser draws. The .ico container holds PNG frames, which every browser since IE 11 reads; writing
  * that container is 22 bytes of header per frame, so no image library is pulled in for it.
  */
-import { chromium } from 'playwright';
+import { launchBrowser } from './lib/browser-harness.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -27,7 +27,7 @@ if (!svgPath || !outDir) {
 }
 const svg = readFileSync(svgPath, 'utf8');
 
-const browser = await chromium.launch();
+const browser = await launchBrowser();
 const page = await browser.newPage();
 /** One square PNG of `size` px, transparent outside the icon's own shape. */
 async function png(size) {

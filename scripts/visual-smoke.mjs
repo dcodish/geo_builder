@@ -27,7 +27,8 @@
  * worth quoting in a PR body.
  */
 
-import { chromium } from 'playwright';
+import { launchBrowser } from './lib/browser-harness.mjs';
+import { ledgerProblems } from './lib/model-stub.mjs';
 import { mkdir, writeFile, rm, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -301,7 +302,7 @@ async function run() {
     fail(`no dev server at ${base} (${e.message}). Start one first:  npm run dev`);
   }
 
-  const browser = await chromium.launch();
+  const browser = await launchBrowser();
   const manifest = { base, capturedAt: new Date().toISOString(), apps: {} };
   const problems = [];
   const allFiles = [];
@@ -377,6 +378,9 @@ async function run() {
     }
 
     if (pageErrors.length) problems.push(`${app}: ${pageErrors.length} uncaught page error(s) — first: ${pageErrors[0]}`);
+    // #1955 (ADR-W-127): the harness stub answered every /api/parse; a leak is a live call.
+    record.modelCalls = page.modelLedger.calls.length;
+    for (const p of ledgerProblems(page.modelLedger, {})) problems.push(`${app}: ${p}`);
     await page.close();
 
     // #1458 (ADR-W-097): on a PHONE the switcher strip scrolls inside itself, and the current tool's tab

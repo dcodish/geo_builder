@@ -51,6 +51,13 @@ are two *hosts* of `parseHandler.ts`, not two implementations — so a behaviour
 is the behaviour that ships. `configProxy.ts` exists for exactly this reason: without it the dev server
 would degrade differently from prod when no config file is present.
 
+**The one deliberate dev-only difference** ([ADR-W-127](06w-decisions-workspace.md#adr-w-127), #1955): the dev host
+answers a **headless** browser (`HeadlessChrome` in the User-Agent or `sec-ch-ua`) as a keyless server, 503
+`no-api-key`, before `handleParse` can dispatch. A headless browser is a script (a pre-play, the visual smoke, a
+session's probe) with no operator at it, and CLAUDE.md rule 2 lets only the operator authorise a live call. The
+scripts' own guard is the stub in `scripts/lib/browser-harness.mjs`; this is its backstop. `standalone.ts` is
+unchanged.
+
 ## The key boundary
 
 `ANTHROPIC_API_KEY` lives **only** in this process's environment, from a root-only systemd

@@ -167,7 +167,10 @@ pressed), the screenshots are audited and READ by the session, and a mechanicall
 its fix — the operator never receives a red sheet. Each case is classed **🎮 play** (operator judgment) ·
 **👁 look** (judge from the embedded screenshot) · **✅ verified** (record only); the driver's
 `report.html` with the screenshots IS the published artifact's play-sheet half, and the operator's
-sitting covers 🎮 fully, 👁 by eye, ✅ not at all. How to build, serve and pre-play a sheet: the
+sitting covers 🎮 fully, 👁 by eye, ✅ not at all. **No pre-play reaches the live model**
+([ADR-W-127](06w-decisions-workspace.md#adr-w-127)): every browser opens through `scripts/lib/browser-harness.mjs`,
+which answers `/api/parse` itself. A case that exercises the AI lane declares the oracle's canonical lines
+(`llm`), and a leak fails the run. How to build, serve and pre-play a sheet: the
 `/playsheet` skill.
 `/status-update`'s "Waiting on you" section surfaces the whole loop: plans awaiting `auto-ok`, PRs
 awaiting play, rounds in flight, rounds awaiting validation.
