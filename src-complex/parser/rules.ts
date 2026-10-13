@@ -603,6 +603,13 @@ const genericPolar: Rule = (s, scope) => {
   // a magnitude is not negative; `-2 cis θ` is not this sentence, so it goes to the equation rule
   if (modIsNum && Number(m[2]) < 0) return null;
   if (m[2] !== undefined && !modIsNum && isComplexName(canonName(m[2]), scope)) return null;
+  // #2029 (ADR-CX-068, operator ruling 2026-10-13: "both spellings read r as a letter") — a REAL-LETTER
+  // modulus at a CLOSED angle is a number the expression grammar reads exactly: «z = r cis 30» is
+  // «z = r·cis(30°)», r a parameter. This rule used to claim the undotted spellings and emit only
+  // `arg z = 30°`, so the letter was discarded and |z| freed instead — and a later «r = 3» reached
+  // nothing. One sentence, one reading: it goes to the `equation` rule (ADR-CX-026 D2 row
+  // "symbolic | numeric" is superseded; a symbolic ANGLE stays here, the grammar cannot read it).
+  if (m[2] !== undefined && !modIsNum && angIsNum && isRealLetter(canonName(m[2]), scope)) return null;
 
   /**
    * What the sentence actually STATES — never more (ADR-052: an unstated magnitude is a free DOF).

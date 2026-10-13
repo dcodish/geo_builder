@@ -172,10 +172,15 @@ describe('the spelled-out declaration and the symbolic polar form', () => {
    * Each half of `<mod> cis <ang>` may be symbolic, and the SHAPE decides what is stated — never more
    * than was stated ([ADR-052](../../../docs/06-decisions.md#adr-052)).
    */
-  it('«w = r cis 45» states the DIRECTION and leaves the magnitude free — the mirror case', () => {
+  // #2029 (ADR-CX-068, operator ruling 2026-10-13: "both spellings read r as a letter") — this lock
+  // used to assert that r was dropped and |w| left free (ADR-CX-026 D2 row "symbolic | numeric", now
+  // superseded). A letter modulus at a closed angle is the real PARAMETER r, as «w = r·cis(45°)» reads
+  // it; the magnitude is still not fixed — r is the free DOF (ADR-052), and its sign is a configuration.
+  it('«w = r cis 45» reads r as a PARAMETER, exactly as «w = r·cis(45°)» does', () => {
     const d = deriveLines(['w = r cis 45']);
+    expect(d.params.map((p) => p.name)).toEqual(['r']);
+    expect(d.freeDof).toEqual(['r']);
     expect(d.points[0].argumentDeg).toBeCloseTo(45, 6);
-    expect(d.freeDof).toContain('|w|');
     expect(d.freeDof.some((f) => f.includes('arg'))).toBe(false);
   });
 

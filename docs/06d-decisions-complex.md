@@ -1629,7 +1629,7 @@ for a filter built in code, and is in the student's register because a violated 
 ## ADR-CX-026 — Three parity gaps the cutover measurement found: word order, the polar shape, and a type error (2026-08-17)
 
 **Status:** accepted · **Slice:** S7 ([#624](https://github.com/dcodish/geo_builder/issues/624)),
-fixes [#691](https://github.com/dcodish/geo_builder/issues/691) ·
+fixes [#691](https://github.com/dcodish/geo_builder/issues/691) · **⚠ Partly superseded by [ADR-CX-068](#adr-cx-068) (2026-10-13):** Decision 2's row "symbolic | numeric" — a letter modulus at a closed angle is a parameter in every spelling ·
 **Ladder stage:** **0b** (rules) and **0c** (span accounting). No new rung.
 
 The remainder of the #624 step-3 measurement — driving every input line the prototype suite exercises
@@ -1664,7 +1664,7 @@ applied literally:
 | modulus | angle | stated |
 | --- | --- | --- |
 | numeric | symbolic | `\|z\| = m` — direction free |
-| symbolic | numeric | `arg z = a` — magnitude free |
+| symbolic | numeric | `arg z = a` — magnitude free · **⚠ Superseded by [ADR-CX-068](#adr-cx-068) (2026-10-13, operator ruling on #2029):** a real-letter modulus at a closed angle is a parameter, read by the expression grammar as «z = r·cis(30°)» is |
 | symbolic | symbolic | nothing but the name |
 | absent | symbolic | `\|z\| = 1` — `cis θ` is the unit circle |
 | numeric | numeric | a literal; the expression grammar reads it exactly |
@@ -4087,3 +4087,26 @@ The button is disabled while the list is empty, so a session of claims alone off
 **Locks.** `src-complex/__tests__/question-export-1872.test.ts` (10): entry order, the empty list, the muted line, each claim family left out (with the precondition that the fold really checks each as a claim), a driving claim, claims alone → empty, the type kept, the App's gate and list read from one memo, and the saved fixture `fixtures/question-export-1872.complex.json` through `hydrateSession` (which the fixtures net also replays green). `shell/__tests__/question-export.test.ts` no longer scans complex for the absence of the capability (ADR-W-126).
 
 **Consequences.** `src-complex/app/questionLines.ts` (new), `App.tsx` (handler, memo, button; the ADR-CX-028 comment rewritten), `i18n/index.ts` (`saveQuestion`, `questionGiven`).
+
+## ADR-CX-068 — A letter modulus in a polar form is a parameter in every spelling: «z = r cis 30» reads as «z = r·cis(30°)» (#2029)
+
+**Status:** accepted, 2026-10-13 · **Issue:** [#2029](https://github.com/dcodish/geo_builder/issues/2029) (bug, `complex`) · fix round #2053 · operator ruling 2026-10-13 (follow-up /decisions ballot, card 24, option A: *"both spellings read r as a letter"*) · **supersedes** [ADR-CX-026](#adr-cx-026) Decision 2, row "symbolic | numeric" (the other rows stand)
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-11 and the grammar appendix row F2 ·
+**Design:** [04d](04d-design-complex.md), "Which rule owns which polar shape" ·
+**Ladder:** stage 0b ([LADDER-CX](LADDER-CX.md)), no new stage
+
+**Measured at pickup** (`6096b643`, through `deriveLines`, the fold behind `submitLine`). «z = r·cis(30°)», «z = r·cis30°», «z = 2r cis 30» and «z = (r cis 30)» read r as a parameter (`params` [r], `freeDof` [r], two configurations, canvas «z ≈ |r|·cis30°»). «z = r cis 30», «z = rcis30°», «z = r cis(30°)», «z = r cis30», «z = rcis(30)», «z = r(cos30° + i sin30°)», «z = r (cos 30 + i sin 30)», «w = r cis 45», «z = a cis 30» and «z = r cis(π/6)» declared no parameter and freed |z| instead (canvas: the bare name). «z = r cis 30» · «r = 3» accepted both lines and left |z| free — the stated value reached nothing. «z = (rcis30)» was refused as not understood.
+
+**Root cause.** `genericPolar` (`parser/rules.ts`) claimed `NAME = HALF cis ANGLE` with no `·`, ahead of the `equation` rule. For a letter modulus at a numeric angle it emitted only `arg z = a` and declared only z: the letter was discarded and z's own modulus left as a free DOF (ADR-CX-026 D2 row "symbolic | numeric"). The dotted spelling never reached it and was read by the expression grammar. The trig rewrite (ADR-CX-059) and the radian reader (ADR-CX-064) feed the same branch. The glued form failed differently: the expression lexer's letter run swallowed `rcis30` as one name, which is why ADR-CX-026 had routed glued spellings through `genericPolar` at all. Class: one polar sentence read two ways by spelling.
+
+**Decision.**
+1. **One reading for the shape.** `genericPolar` declines a real-letter modulus (`isRealLetter`) at a closed angle (degrees or radians); the line falls to the `equation` rule, which reads it exactly as «z = r·cis(30°)». `genericPolar` keeps a symbolic angle, an absent modulus, and a numeric modulus with a symbolic angle.
+2. **The lexer's letter run stops before a `cis` token** (`TOKEN` in `parser/exprParse.ts`), so `rcis30`, `rcis(30)` and `(rcis30)` lex as `r`, `cis`, `30`. No declarable name contains `cis`; `cis` followed by a letter is not the token and does not cut.
+
+**Unchanged.** A symbolic angle («z1 = r cis θ», «z = r cis t», «z1 = 2cis(θ)», «z = 4cis(t)»), a numeric pair («z = 2 cis 30»), an uppercase modulus («z = R cis 30», a complex name by convention), and every other lexer word (`conj`, `re(`, `im(`, `sqrt(`, a glued `i`).
+
+**Behaviour change for a student** (all `[asked]` by the ruling): every spelling above shows r's chip, the canvas form «z ≈ |r|·cis30°» and two configurations (the sign of r), as «z = r·cis(30°)» does; after it, «r = 3» fixes |z| = 3; «z = (rcis30)» is read instead of refused.
+
+**Siblings.** Complex only: no other builder has a polar form, and it is not a plane-geometry sentence, so no docs/22 §10 row.
+
+**Locks.** `src-complex/__tests__/polar-letter-modulus-2029.test.ts` — each spelling lowers to exactly the dotted facts and reads back the same; the parameter, its free DOF and two configurations; «r = 3» fixes |z| = 3 at two seeds for the spaced, glued and trig spellings; the store accepts the operator's lines; the symbolic-angle and numeric rows unchanged; the lexer words still parse. Fixtures `polar-letter-modulus-2029.complex.json` («z = r cis 30» · «r = 3») and `polar-letter-modulus-trig-2029.complex.json` (the trig spelling) join the saved-session net. **Rewritten** because the ruling reverses it: `parser/__tests__/cutover-parity.test.ts` «w = r cis 45» now asserts the parameter r.

@@ -135,6 +135,12 @@ never as a contradiction or a refutation.
   The expression lexer's `pi` token is read only by `readCisAngle`, which hands a span holding π to
   `angleDegrees` (parenthesised, or bare without a slash); `genericPolar`'s angle half and the trig
   rewrite's same-angle key ask the same function. π is never a value — the atom refuses anywhere else.
+- **Which rule owns which polar shape** ([ADR-CX-068](06d-decisions-complex.md#adr-cx-068), #2029). A polar
+  form the expression grammar can read is read by it alone: a numeric pair, and a real-letter modulus at a
+  closed angle (`r cis 30`, `rcis30`, `(rcis30)`, the trig form, radians), where the letter is a parameter
+  exactly as in `r·cis(30°)`. `genericPolar` keeps only what that grammar cannot read: a symbolic ANGLE
+  (`2cis(θ)`, `r cis θ`) and an absent modulus with one. The expression lexer's letter run stops before a
+  `cis` token, so a glued `rcis30` lexes as `r`, `cis`, `30`; no declarable name contains `cis`.
 - **A number DEFINED by real parameters reads as its definition** (`model/cartesianForm.ts`;
   [ADR-CX-058](06d-decisions-complex.md#adr-cx-058)). `z1 = a+bi` is carried as a free unknown plus a
   numeric relation (making it a function of a and b in the solver is #1410, closed and parked in the icebox), so its exact carriers
