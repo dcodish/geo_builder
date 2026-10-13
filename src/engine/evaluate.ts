@@ -64,6 +64,10 @@ export interface EvalErr {
   /** #360 (ADR-398): the OBJECT ids the failure names — a point/line/circle whose resolution failed or
    *  never completed. The attribution twin of `violated` for the non-constraint failure paths. */
   stuckIds?: Id[];
+  /** #1931 ([ADR-640](docs/06-decisions.md#adr-640)): set when the failure is a crossing asked of a line that is
+   *  TANGENT at a placed point ({@link tangentTouch}) — the one reason the step ladder carries past its rescue
+   *  stages (`runFailureLadder`). Never set by the chord branch, which shares the sentence today (#1834). */
+  tangent?: true;
 }
 export type EvalResult = EvalOk | EvalErr;
 
@@ -1382,7 +1386,7 @@ function evaluateUncached(c: Construction, resolve: (c: Construction) => Constru
   // #1931 (ADR-640): an on-circle point driven onto a line that is tangent to its circle has nowhere to go but
   // the touch point — the crossing's refusal, in its carrier spelling.
   const tangent = tangentDrivenRefusal(c, res.positions, res.circles);
-  if (tangent) return { ok: false, error: tangent };
+  if (tangent) return { ok: false, error: tangent, tangent: true };
   // Report the whole CONFLICT SET, not one arbitrary member. When a joint solve can't satisfy an
   // impossible constraint it drags its co-drivers off too (here the impossible ⟂ pulls F off the
   // ratio), so several read violated at the best-effort placement. Naming just one is misleading —
@@ -1464,6 +1468,7 @@ export function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean
       const r = tryEval(p, pos, lines, circles, spansOf, opts?.skipConstraints === true);
       if (r === 'pending') continue;
       if (typeof r === 'string') return { ok: false, error: r, stuckIds: [p.id] };
+      if ('tangentRefusal' in r) return { ok: false, error: r.tangentRefusal, stuckIds: [p.id], tangent: true };
       pos.set(p.id, r);
       remaining.delete(p.id);
       progressed = true;
@@ -1704,21 +1709,68 @@ function tangentNoSecondCrossing(pointId: Id, lineName: string, circleId: Id, to
  */
 function tangentDrivenRefusal(c: Construction, pos: Map<Id, Vec>, circles: Map<Id, ResolvedCircle>): string | null {
   for (const o of c.objects) {
-    if (o.kind !== 'on-circle') continue;
-    const k = (o as { solve?: { constraint: Constraint } }).solve?.constraint;
-    if (!k || k.type !== 'collinear') continue;
-    const ends = [k.a, k.b, k.c].filter((id) => id !== o.id);
-    if (ends.length !== 2) continue;
-    const circle = circles.get(o.circle);
-    const x = pos.get(ends[0]);
-    const y = pos.get(ends[1]);
-    if (!circle || !x || !y || len(sub(y, x)) < LEN_EPS) continue;
-    const line: ResolvedLine = { anchor: x, dir: unit(sub(y, x)) };
-    for (const id of ends) {
-      if (tangentAt(line, circle, pos.get(id)!)) return tangentNoSecondCrossing(o.id, `${ends[0]}${ends[1]}`, o.circle, id);
-    }
+    const err = drivenCarrierTangency(o, pos, circles);
+    if (err) return err;
   }
   return null;
+}
+
+/** #1931 (ADR-640): {@link tangentDrivenRefusal}'s question for ONE object — an on-circle carrier driven by
+ *  `collinear(E, X, Y)` whose line XY is tangent to E's circle at X or Y, read on `pos`. */
+function drivenCarrierTangency(o: GeoObject, pos: Map<Id, Vec>, circles: Map<Id, ResolvedCircle>): string | null {
+  if (o.kind !== 'on-circle') return null;
+  const k = (o as { solve?: { constraint: Constraint } }).solve?.constraint;
+  if (!k || k.type !== 'collinear') return null;
+  const ends = [k.a, k.b, k.c].filter((id) => id !== o.id);
+  if (ends.length !== 2) return null;
+  const circle = circles.get(o.circle);
+  const x = pos.get(ends[0]);
+  const y = pos.get(ends[1]);
+  if (!circle || !x || !y || len(sub(y, x)) < LEN_EPS) return null;
+  const line: ResolvedLine = { anchor: x, dir: unit(sub(y, x)) };
+  for (const id of ends) {
+    if (tangentAt(line, circle, pos.get(id)!)) return tangentNoSecondCrossing(o.id, `${ends[0]}${ends[1]}`, o.circle, id);
+  }
+  return null;
+}
+
+/**
+ * #1931 ([ADR-640](docs/06-decisions.md#adr-640)) — the step ladder's PRE-STAGE question (docs/LADDER.md stage 0j):
+ * does `next` ask a NEW crossing of a line that is tangent to its circle at a point the figure before it
+ * already placed? `e` is an evaluation of the PRIOR figure (or of a sampled configuration of it), where every
+ * earlier given holds, so a tangency the givens hold is exact there — no solve has yet leaned the line to
+ * make the crossing exist. A crossing is a `line-circle` point, or an on-circle carrier driven onto a line
+ * by `collinear` (`E על הישר AP` · `E על מעגל O`), that `next` adds or rewrites relative to `prev`. Its
+ * line is resolved on the prior positions; a line that needs a point the prior figure does not have is not
+ * judged (fails open). Returns the engine's one tangent sentence, or null.
+ */
+export function newCrossingTangency(prev: Construction, next: Construction, e: EvalOk): string | null {
+  const before = new Map(prev.objects.map((o) => [o.id, o] as const));
+  const linesById = new Map(next.objects.filter((o): o is Line => o.kind === 'line').map((l) => [l.id, l] as const));
+  for (const o of next.objects) {
+    if (o.kind !== 'line-circle' && o.kind !== 'on-circle') continue;
+    const was = before.get(o.id);
+    if (was && (was === o || JSON.stringify(was) === JSON.stringify(o))) continue; // not new, not rewritten
+    if (o.kind === 'on-circle') {
+      const err = drivenCarrierTangency(o, e.positions, e.circles);
+      if (err) return err;
+      continue;
+    }
+    const lineObj = linesById.get(o.line);
+    const circle = e.circles.get(o.circle);
+    if (!lineObj || !circle) continue;
+    const line = resolveLine(lineObj, e.positions, e.circles);
+    if (typeof line === 'string') continue; // 'pending' or a resolver error — not this question
+    const placed = new Map([...e.positions].filter(([id]) => id !== o.id));
+    const touch = tangentTouch(line, circle, placed);
+    if (touch) return tangentNoSecondCrossing(o.id, o.line, o.circle, touch);
+  }
+  return null;
+}
+
+/** #1931 (ADR-640): `tryEval`'s tagged refusal for a crossing asked of a tangent (`EvalErr.tangent`). */
+interface TangentRefusal {
+  tangentRefusal: string;
 }
 
 /**
@@ -1832,7 +1884,7 @@ function tryEval(
   spansOf?: (circleId: Id) => ArcSpan[] | null,
   /** #1931 (ADR-640): a driven solve's TRIAL layout (`evaluateCore`'s `skipConstraints`), not the drawn figure. */
   trial = false,
-): Vec | 'pending' | string {
+): Vec | 'pending' | string | TangentRefusal {
   switch (p.kind) {
     case 'free-point':
       return { x: p.x, y: p.y };
@@ -2040,7 +2092,7 @@ function tryEval(
       // the solve to lean the line off the tangent by more than its stated relation allows (breaking the
       // relation, or flinging a point that holds it by collinearity far away), only to make E exist. The
       // drawn figure, evaluated once the solve is done, is refused.
-      if (touch) return trial ? pos.get(touch)! : tangentNoSecondCrossing(p.id, p.line, p.circle, touch);
+      if (touch) return trial ? pos.get(touch)! : { tangentRefusal: tangentNoSecondCrossing(p.id, p.line, p.circle, touch) };
       // The selection (in-segment root, "the OTHER crossing", or a stable side by `branch`) is ONE shared
       // function with the branch count (#1600, ADR-593) — see {@link crossingChoice}.
       const choice = crossingChoice(p, sols, pos, l);

@@ -4203,6 +4203,56 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.positions.has('@ctr-O'), 'the centre is the named O, not a hidden one').toBe(false);
     },
   },
+  {
+    id: 'relation-tangent-has-no-second-crossing-1931',
+    title: 'A line stated tangent at A: «הישר AP חותך את המעגל בנקודה E» is refused with the tangent sentence, in every spelling and order (#1931, ADR-640)',
+    guards: "#1931 (ADR-640), operator ruling 2026-10-13 (option A: every spelling gets the tangent sentence). Measured on 6096b643 through decideDeterministic2D: after «הישר AP משיק למעגל O בנקודה A» the crossing line COMMITTED with E 1·10⁻⁶ from A and the amber «לא נמצאה תצורה…» note — the relation may lean by its own 1e-6 tolerance, and the solve tuned the lean until a \"second root\" cleared the coordinate ruler LEN_EPS. Root cause: \"is there another crossing?\" was answered with a ruler finer than the tolerance the tangency is held to, and three spellings («E על הישר AP · E על מעגל O», «AP חותך…», the other order) were answered by whichever ladder stage failed first. Fix: tangentAt (an angle test held to 10× the ⟂ tolerance) in evaluate, a ladder pre-stage 0j judging a NEW crossing on the prior figure, and the tangent reason carried past the rescue stages (ADR-602's collapsedSeen shape). The class matrix is src/app/__tests__/issue-1931-relation-tangent.test.ts.",
+    steps: ["מעגל O","A על מעגל O","נקודה P","הישר AP משיק למעגל O בנקודה A"],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const said = (v: unknown) => humanizeError((v as { detail?: string }).detail, he as never).replace(/[⁦-⁩]/g, '');
+      const TANGENT = 'לא ניתן למקם את E: הישר משיק למעגל בנקודה אחת בלבד — אין נקודת חיתוך נוספת להמשיך אליה.';
+      const pre = factsOf(["מעגל O","A על מעגל O","נקודה P","הישר AP משיק למעגל O בנקודה A"]);
+      // the operator's line: refused before it is added, with the tangent sentence
+      const v = gateVerdict(pre, 'הישר AP חותך את המעגל בנקודה E');
+      expect(v.kind, 'the crossing of a tangent is refused').toBe('refused');
+      expect(said(v)).toBe(TANGENT);
+      // the spellings a solve used to answer with another reason: the carrier pair, and the order spelling
+      expect(said(gateVerdict(factsOf([...["מעגל O","A על מעגל O","נקודה P","הישר AP משיק למעגל O בנקודה A"], 'E על הישר AP']), 'E על מעגל O')), 'E על הישר AP · E על מעגל O').toBe(TANGENT);
+      expect(said(gateVerdict(pre, 'AP חותך את המעגל בנקודה E')), 'AP חותך…').toBe(TANGENT);
+      // the other order: the crossing first, then the tangency — the tangency line is refused
+      const crossingFirst = factsOf([...["מעגל O","A על מעגל O","נקודה P"], 'הישר AP חותך את המעגל בנקודה E']);
+      const w = gateVerdict(crossingFirst, "הישר AP משיק למעגל O בנקודה A");
+      expect(w.kind, 'the tangency after the crossing is refused, never parked').toBe('refused');
+      expect(said(w)).toBe(TANGENT);
+    },
+  },
+  {
+    id: 'perpendicular-tangent-has-no-second-crossing-1931',
+    title: '«AP ⊥ OA» with A on the circle: the crossing of AP with the circle is refused with the tangent sentence (#1931, ADR-640)',
+    guards: "#1931 (ADR-640), operator ruling 2026-10-13 (option A: every spelling gets the tangent sentence). Measured on 6096b643 through decideDeterministic2D: after «AP ⊥ OA» the crossing line COMMITTED with E 1·10⁻⁶ from A and the amber «לא נמצאה תצורה…» note — the relation may lean by its own 1e-6 tolerance, and the solve tuned the lean until a \"second root\" cleared the coordinate ruler LEN_EPS. Root cause: \"is there another crossing?\" was answered with a ruler finer than the tolerance the tangency is held to, and three spellings («E על הישר AP · E על מעגל O», «AP חותך…», the other order) were answered by whichever ladder stage failed first. Fix: tangentAt (an angle test held to 10× the ⟂ tolerance) in evaluate, a ladder pre-stage 0j judging a NEW crossing on the prior figure, and the tangent reason carried past the rescue stages (ADR-602's collapsedSeen shape). The class matrix is src/app/__tests__/issue-1931-relation-tangent.test.ts.",
+    steps: ["מעגל O","A על מעגל O","נקודה P","AP ⊥ OA"],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const said = (v: unknown) => humanizeError((v as { detail?: string }).detail, he as never).replace(/[⁦-⁩]/g, '');
+      const TANGENT = 'לא ניתן למקם את E: הישר משיק למעגל בנקודה אחת בלבד — אין נקודת חיתוך נוספת להמשיך אליה.';
+      const pre = factsOf(["מעגל O","A על מעגל O","נקודה P","AP ⊥ OA"]);
+      // the operator's line: refused before it is added, with the tangent sentence
+      const v = gateVerdict(pre, 'הישר AP חותך את המעגל בנקודה E');
+      expect(v.kind, 'the crossing of a tangent is refused').toBe('refused');
+      expect(said(v)).toBe(TANGENT);
+      // the spellings a solve used to answer with another reason: the carrier pair, and the order spelling
+      expect(said(gateVerdict(factsOf([...["מעגל O","A על מעגל O","נקודה P","AP ⊥ OA"], 'E על הישר AP']), 'E על מעגל O')), 'E על הישר AP · E על מעגל O').toBe(TANGENT);
+      expect(said(gateVerdict(pre, 'AP חותך את המעגל בנקודה E')), 'AP חותך…').toBe(TANGENT);
+      // the other order: the crossing first, then the tangency — the tangency line is refused
+      const crossingFirst = factsOf([...["מעגל O","A על מעגל O","נקודה P"], 'הישר AP חותך את המעגל בנקודה E']);
+      const w = gateVerdict(crossingFirst, "AP ⊥ OA");
+      expect(w.kind, 'the tangency after the crossing is refused, never parked').toBe('refused');
+      expect(said(w)).toBe(TANGENT);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

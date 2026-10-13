@@ -1814,3 +1814,11 @@ over all four (ADR-041).
 ### `touch-list-builds-the-incircle-1660` — «הצלעות AB, BC ו-CA משיקות למעגל בנקודות D, E ו-F בהתאמה» after «משולש ABC» builds the incircle tangent at D, E, F; «O מרכז המעגל» names its centre (#1660, ADR-631)
 
 **Guards against:** a touch list over every side of a triangle being refused in 2-D while analytic builds it. The two-sides tangency rule read only «BC ו-CA» and the multi-instruction gate refused the line (the #1649 parity audit, family «touch lists»). Ruling on #1619 (2026-10-01), ported by ADR-560: a touch sentence with no circle creates the circle, its centre unnamed. Sides that close one ring touch only its incircle, so the sentence builds the `incircle` rule's own construction, with the named letters as its feet. **Asserts** every step builds, D, E and F each lie within their side, OD/OE/OF are ⟂ to their sides and of one length, and the centre is the named O. The submit-door matrix (typed first, the bare and English spellings, another side order, no touch points, the square, the pentagon refusal, three sides of a quadrilateral, two circles → the which-circle question) is in `src/app/__tests__/issue-1660-touch-list-incircle.test.ts`; the parity rows are `touch-list` and `touch-list-first`.
+
+### `relation-tangent-has-no-second-crossing-1931` — «מעגל O · A על מעגל O · נקודה P · הישר AP משיק למעגל O בנקודה A · הישר AP חותך את המעגל בנקודה E»: refused with the tangent sentence, in every spelling and order (#1931, ADR-640)
+
+**Guards against:** a crossing asked of a tangent STATED AS A RELATION committing with E 1·10⁻⁶ from A (the solve leaned the line within the relation's own tolerance until a "second root" cleared `LEN_EPS`), and the ladder answering «E על הישר AP · E על מעגל O», «AP חותך…» and the other order with another stage's reason. Also checks the carrier pair, the order spelling, and the tangency typed after the crossing.
+
+### `perpendicular-tangent-has-no-second-crossing-1931` — «… AP ⊥ OA · הישר AP חותך את המעגל בנקודה E»: the ⟂ twin (#1931, ADR-640)
+
+**Guards against:** the same class with the tangency stated as «AP ⊥ OA» (A on the circle): every spelling is refused with «לא ניתן למקם את E: הישר משיק למעגל בנקודה אחת בלבד…», and «AP ⊥ OA» typed after the crossing is refused, never parked.

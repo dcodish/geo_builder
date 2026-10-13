@@ -257,6 +257,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2018': 'open',
   '#1969': 'open',
   '#2013': 'open',
+  '#1924': 'open',
 };
 
 export interface ParityRow {
@@ -1327,6 +1328,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #1864 (ADR-AG-267): an angle's acuteness named by its VERTEX alone — 2-D's «∠C קהה/חדה» ──
   { id: 'vertex-obtuse-1864', family: 'angles', steps: ['משולש ABC', 'זווית A קהה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the line the obtuse-triangle note teaches' },
   { id: 'vertex-acute-1864', family: 'angles', steps: ['משולש ABC', 'זווית A חדה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+
+  // ── #1931 (ADR-640): a crossing asked of a line the givens make TANGENT has no second point — refused with the tangent sentence ──
+  { id: 'relation-tangent-crossing-1931', family: 'tangents', steps: ['מעגל O', 'A על מעגל O', 'נקודה P', 'הישר AP משיק למעגל O בנקודה A', 'הישר AP חותך את המעגל בנקודה E'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1924' }], note: '2-D committed E 1e-6 from A before ADR-640' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

@@ -11,7 +11,7 @@ import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObjec
 import { LEN_EPS, edgeSideToward, isGeoPoint, isOrderConstraint } from './types';
 import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeExclusion, shapeExclusionError, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
 import { lower } from './lower';
-import { carrierParams, crossingBranchCount, evaluate, evaluateTightened, resolveDriven, resolveDrivenMemo, drivenConstraintsOf, setCarrierVals } from './evaluate';
+import { carrierParams, crossingBranchCount, evaluate, evaluateTightened, newCrossingTangency, resolveDriven, resolveDrivenMemo, drivenConstraintsOf, setCarrierVals } from './evaluate';
 import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist, isRingDiagonal, sub } from './geometry';
 import { budgetExceeded } from './solveBudget';
@@ -492,6 +492,8 @@ function settleOnFrozenPrior(
   prev: Construction,
   next: Construction,
   newCons: Constraint[],
+  /** #1931 (ADR-640): sees the frozen trial's evaluation, so the ladder can carry a tangent reason. */
+  observe?: (r: EvalResult) => void,
 ): { construction: Construction; positions: Map<Id, Vec> } | null {
   const prevRes = evaluate(prev);
   if (!prevRes.ok) return null; // no valid prior solution to freeze
@@ -515,6 +517,7 @@ function settleOnFrozenPrior(
   if (!anyFrozen) return null; // nothing was jointly driven before — the primary attempt already was minimal
   const trial: Construction = { ...next, objects: trialObjects };
   const r = evaluate(trial);
+  observe?.(r);
   if (!r.ok || !stepAccepted(trial, r.positions, newCons)) return null;
   // Re-attach the standing directives on top of the SOLVED params (ownership restore).
   const solvedTrial = resolveDriven(trial);
@@ -651,6 +654,14 @@ function runFailureLadder(
   // #1849 (ADR-602): the first declared polygon a rescue stage's solution FLATTENED — a solution that holds every
   // given and is a line, which is the refusal's reason whichever stage found it.
   let collapsedSeen: Id[] | undefined;
+  // #1931 ([ADR-640](../../docs/06-decisions.md#adr-640)): the first rescue stage whose figure asked a crossing of a
+  // line the solve made TANGENT at a placed point (`EvalErr.tangent`) — the crossing has no point of its own, and
+  // that is the refusal's reason whichever stage found it, never the primary's over-constraint (the other order:
+  // «הישר AP חותך את המעגל בנקודה E» · «AP ⊥ OA»). The same shape as `collapsedSeen`.
+  let tangentSeen: string | undefined;
+  const sawTangent = (r: EvalResult): void => {
+    if (!r.ok && r.tangent) tangentSeen ??= r.error;
+  };
   const gate = (c: Construction, pos: Map<Id, Vec>): boolean => {
     const ok = stepAccepted(c, pos, newCons);
     if (!ok) {
@@ -690,7 +701,7 @@ function runFailureLadder(
   // FROZEN prior solution — a satisfiable-by-its-own-carrier statement must not re-open (and land in a
   // compromise basin of) the whole already-valid coupled system.
   if (!orphans.length) {
-    const settled = settleOnFrozenPrior(prev, next, newCons);
+    const settled = settleOnFrozenPrior(prev, next, newCons, sawTangent);
     if (settled) {
       const a = accept(settled.construction, settled.positions, `${prefix}:settle`);
       if (a) return a;
@@ -699,6 +710,7 @@ function runFailureLadder(
   const recruited = recruitFreeDofs(next, [...newCons, ...orphans], trace);
   if (recruited) {
     const r2 = evaluate(recruited);
+    sawTangent(r2);
     if (r2.ok && gate(recruited, r2.positions)) {
       const a = accept(recruited, r2.positions, `${prefix}:recruit`);
       if (a) return a;
@@ -715,6 +727,7 @@ function runFailureLadder(
   const joint = jointFirst(next, newCons, trace);
   if (joint) {
     const rj = evaluate(joint);
+    sawTangent(rj);
     if (rj.ok && gate(joint, rj.positions)) {
       const a = accept(joint, rj.positions, `${prefix}:component`);
       if (a) return a;
@@ -728,6 +741,7 @@ function runFailureLadder(
   const scaled = scaleRescue(next, newCons, prevPositions);
   if (scaled) {
     const rs = evaluate(scaled);
+    sawTangent(rs);
     if (rs.ok && gate(scaled, rs.positions)) {
       const a = accept(scaled, rs.positions, `${prefix}:scale`);
       if (a) return a;
@@ -750,7 +764,7 @@ function runFailureLadder(
   // satisfaction (#7), a collapsed polygon (#408), a tolerance artefact (#1328) — a solution EXISTS and is
   // not a figure. That is a rigid contradiction, never "waiting for more givens": the fold's classifier
   // must not file it as pending on the strength of the figure still having freedom.
-  return { ok: false, error: flatErr ?? (primary.ok ? vacuousErr : blameNewStatement(primary.error, blameCons, primary.violated)), construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:refuse`], ...(refusedAsNotAFigure ? { degenerate: true as const } : {}) };
+  return { ok: false, error: flatErr ?? tangentSeen ?? (primary.ok ? vacuousErr : blameNewStatement(primary.error, blameCons, primary.violated)), construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:refuse`], ...(refusedAsNotAFigure || (!flatErr && tangentSeen) ? { degenerate: true as const } : {}) };
 }
 
 /**
@@ -1029,6 +1043,24 @@ function releaseImpliedOwnership(prev: Construction, r: StepResult): StepResult 
   return { ...r, construction: released, positions: e.positions, ladder: [...(r.ladder ?? []), 'implied:release'] };
 }
 
+/**
+ * #1931 ([ADR-640](../../docs/06-decisions.md#adr-640)) — docs/LADDER.md stage 0j. `next`'s new crossing
+ * (`newCrossingTangency`) asked of a line that is tangent at a placed point in the PRIOR figure, and in every
+ * sampled configuration of it that evaluates (`applySeed` 1..3, the ADR-399 probe set): a tangency the givens
+ * HOLD, never one a default layout happens to draw (a free P whose default seat is accidentally tangent is
+ * sampled off it, and the ordinary ladder decides). Sound one way, like every stage-0 prover.
+ */
+function tangentCrossingOnPrior(prev: Construction, next: Construction, prevEval: EvalResult): string | null {
+  if (!prevEval.ok) return null;
+  const err = newCrossingTangency(prev, next, prevEval);
+  if (!err) return null;
+  for (const seed of [1, 2, 3]) {
+    const e = evaluate(applySeed(prev, seed));
+    if (e.ok && !newCrossingTangency(prev, next, e)) return null;
+  }
+  return err;
+}
+
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
   return withSideChoices(withRequirements(commitDrawnFreeVertices(releaseImpliedOwnership(prev, applyStepLadder(prev, cmd))), prev, [cmd]), prev);
@@ -1145,6 +1177,14 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   // forced by measurement: «אלכסון AC» typed BEFORE «מלבן ABCD» is a legitimate order that ends up
   // perfectly true, and an apply-time refusal of every unsupported pair would reject it (ADR-104's
   // deferral principle — a claim that is not yet checkable is not yet false).
+  // #1931 (ADR-640), stage 0j: a NEW crossing asked of a line that is tangent at a placed point, judged on the
+  // figure BEFORE this step, where every earlier given holds — «AP ⊥ OA» (or «הישר AP משיק למעגל O בנקודה A»)
+  // then «AP חותך את המעגל בנקודה E» / «E על הישר AP» · «E על מעגל O». Asked before any solve, because a solve
+  // weighs the stated tangency against the new crossing's own obligations (an A–E–P order, the carrier's
+  // collinearity) and the refusal then named whichever gave way. Only a tangency the givens HOLD refuses here.
+  const tangentCrossing = tangentCrossingOnPrior(prev, probed, prevEval);
+  if (tangentCrossing) return { ok: false, error: tangentCrossing, construction: prev, positions: prevPositions, ladder: ['pre:tangent-crossing'], degenerate: true };
+
   const roleRefusal = diagonalClaimRefusal(prev, cmd);
   if (roleRefusal) return { ok: false, error: roleRefusal, construction: prev, positions: prevPositions, ladder: ['role:diagonal-refuse'] };
 

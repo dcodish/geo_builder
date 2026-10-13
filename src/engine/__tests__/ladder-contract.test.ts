@@ -55,6 +55,44 @@ describe('ladder contract (docs/LADDER.md)', () => {
     expect(r.ladder).toEqual(['pre:degenerate']);
   });
 
+  // #1931 (ADR-640), stage 0j: a NEW crossing of a line the givens hold tangent («AP ⊥ OA», A on the circle) is
+  // refused on the prior figure, before any solve — in both spellings of the crossing.
+  const tangentAtA: Command[] = [
+    { type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true },
+    { type: 'point-on-circle', id: 'A', circle: 'circle-O' },
+    { type: 'free-point', id: 'P', x: 3, y: 2, free: true, ifAbsent: true },
+    { type: 'set-perpendicular', a: 'A', b: 'P', c: 'O', d: 'A' },
+  ] as Command[];
+  it('#1931 (ADR-640): a crossing asked of a tangent refuses at pre:tangent-crossing (0j)', () => {
+    const r = run([
+      ...tangentAtA,
+      { type: 'line-through', id: 'chord-AP', a: 'A', b: 'P' },
+      { type: 'line-circle-intersection', id: 'E', line: 'chord-AP', circle: 'circle-O', avoid: 'A', order: ['A', 'E', 'P'] },
+    ] as Command[]);
+    expect(r.ok).toBe(false);
+    expect(r.ladder).toEqual(['pre:tangent-crossing']);
+    if (!r.ok) expect(r.error).toMatch(/^cannot place E: line chord-AP is tangent to circle circle-O at A/);
+    // the carrier spelling: E on the line first, then on the circle
+    const c = run([...tangentAtA, { type: 'free-point', id: 'E', x: 3, y: 2, free: true, ifAbsent: true } as Command, { type: 'set-collinear', a: 'E', b: 'A', c: 'P' } as Command, { type: 'point-on-circle', id: 'E', circle: 'circle-O' } as Command]);
+    expect(c.ok).toBe(false);
+    expect(c.ladder).toEqual(['pre:tangent-crossing']);
+  });
+
+  it('#1931 (ADR-640): the tangency stated AFTER the crossing refuses at main:refuse with the tangent reason (2i)', () => {
+    const r = run([
+      ...tangentAtA.slice(0, 3),
+      { type: 'line-through', id: 'chord-AP', a: 'A', b: 'P' },
+      { type: 'line-circle-intersection', id: 'E', line: 'chord-AP', circle: 'circle-O', avoid: 'A' },
+      tangentAtA[3],
+    ] as Command[]);
+    expect(r.ok).toBe(false);
+    expect(r.ladder?.[r.ladder.length - 1]).toBe('main:refuse');
+    if (!r.ok) {
+      expect(r.error).toMatch(/is tangent to circle circle-O at A/);
+      expect(r.degenerate, 'a contradiction, never a pending row').toBe(true);
+    }
+  });
+
   it('an M1 restatement of an existing on-segment point accepts on the m1 branch', () => {
     const r = run([
       { type: 'triangle', ids: ['A', 'B', 'C'] },
