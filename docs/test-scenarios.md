@@ -1834,3 +1834,11 @@ over all four (ADR-041).
 ### `perpendicular-tangent-has-no-second-crossing-1931` — «… AP ⊥ OA · הישר AP חותך את המעגל בנקודה E»: the ⟂ twin (#1931, ADR-640)
 
 **Guards against:** the same class with the tangency stated as «AP ⊥ OA» (A on the circle): every spelling is refused with «לא ניתן למקם את E: הישר משיק למעגל בנקודה אחת בלבד…», and «AP ⊥ OA» typed after the crossing is refused, never parked.
+
+### `median-on-a-side-refused-1742` — «התיכון AB = 5» after «משולש ABC» is refused with the long form's median refusal (#1742, ADR-642)
+
+**Guards against:** a median named by a pair whose far end is a vertex of the triangle (AB is a side) going unread, so the line escalated to the paid model (and, before ADR-604, committed |AB| = 5 with «התיכון» dropped). Operator ruling 2026-10-13: the refusal «AB תיכון לצלע BC» already gets (`input.cevianMedianFootAtEnd`). **Asserts** the step is refused as `cevian-degenerate` / `median-foot-at-end` on side BC, and nothing from it is committed. The spelling matrix is `src/app/__tests__/issue-1742-median-on-side.test.ts`.
+
+### `altitude-on-a-side-is-a-right-angle-1742` — «הגובה AB = 5» after «משולש ABC» builds a right angle at B with |AB| = 5 (#1742, ADR-642)
+
+**Guards against:** the altitude twin of the row above going unread. Operator ruling 2026-10-13: build it as «AB גובה לצלע BC» does (ADR-527). **Asserts** the step builds green, AB ⟂ BC, |AB| = 5, and no foot point is minted.

@@ -10041,6 +10041,17 @@ const cevianShapeEdges = (
     const hit = all.filter((e) => key(e) === key(on.map(up)));
     if (hit.length === 1) return { edges: hit };
   }
+  // #1742 ([ADR-642](../../docs/06-decisions.md#adr-642)) — A NAMED FOOT THAT IS A VERTEX OF THE ONE OPPOSITE
+  // SIDE NAMES THAT SIDE. Excluding the foot as a base vertex is right while another side remains; when it
+  // leaves NOTHING, the sentence named a segment from the apex to an endpoint of its shape's only opposite
+  // side («משולש ABC» · «התיכון AB»: AB is a side). That side is the one the sentence is about, so it is
+  // returned and the caller's `cevianFault` judges it exactly as it judges the long form «AB תיכון לצלע BC»:
+  // a median refuses (`median-foot-at-end`), an altitude is the ADR-527 right angle (`altitudeAtVertex`).
+  // Several opposite sides (a quadrilateral) stay unresolved — the foot does not pick between them.
+  if (foot && all.length === 0) {
+    const full = oppositePolygonEdges(apex, ctx.polygons, null);
+    if (full.length === 1 && full[0].includes(foot)) return { edges: full };
+  }
   const shapes = new Map<string, { ring: string; sides: string; first: string }>();
   for (const poly of ctx.polygons ?? []) {
     const verts = poly.map(up);

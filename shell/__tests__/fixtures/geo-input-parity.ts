@@ -1079,6 +1079,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'role-length-median-1607', family: 'lengths', steps: ['משולש ABC', 'התיכון AM = 5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'role-length-altitude-1607', family: 'lengths', steps: ['משולש ABC', 'הגובה AH הוא 5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'role-length-bound-1607', family: 'lengths', steps: ['משולש ABC', 'התיכון AM גדול מ-5'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'a bound, never |AM| = 5 (#1248)' },
+  // ── #1742 (ADR-642): a median named by a side is refused as its long form «AB תיכון לצלע BC» is ──
+  { id: 'median-on-a-side-1742', family: 'lengths', steps: ['משולש ABC', 'התיכון AB = 5'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D: the long form’s `input.cevianMedianFootAtEnd`; analytic: its own `degenerate-role`' },
   // ── #1443 (ADR-575): a height stated as a magnitude with no segment named — the trapezoid builds, the others ask ──
   { id: 'height-trapezoid-1443', family: 'lengths', steps: ['טרפז ABCD', 'גובה הטרפז 4'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1448', parked: true }], note: 'the reported sentence; the height is minted and drawn between the bases' },
   { id: 'height-trapezoid-copula-1443', family: 'lengths', steps: ['טרפז ABCD', 'גובה הטרפז הוא 4'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1448', parked: true }] },

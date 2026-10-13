@@ -104,7 +104,7 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 
 ### What is refused
 
-- **FR-IN-4c (Must)** — **A ROLE NOUN is a claim about the figure, and the tool stands behind it.** Words that assign a role — «אלכסון»/"diagonal" today, and the family it belongs to — do not merely point at an object, they assert something about it, and the tool never accepts one it can show to be false. «אלכסון AB» where AB is a side, or on a triangle, is refused by name, never drawn or answered "already drawn"; a claim the figure cannot yet judge is checked against the finished figure. Named lines are never replaced by other lines.
+- **FR-IN-4c (Must)** — **A ROLE NOUN is a claim about the figure, and the tool stands behind it.** Words that assign a role — «אלכסון»/"diagonal" today, and the family it belongs to — do not merely point at an object, they assert something about it, and the tool never accepts one it can show to be false. «אלכסון AB» where AB is a side, or on a triangle, is refused by name, never drawn or answered "already drawn"; a claim the figure cannot yet judge is checked against the finished figure. Named lines are never replaced by other lines. A median or altitude named by a pair that is a SIDE («משולש ABC» · «התיכון AB = 5», «הגובה AB = 5») is judged exactly as its long form «AB תיכון לצלע BC» / «AB גובה לצלע BC»: the median is refused with that form's message, the altitude is the right angle at B with its length ([ADR-642](06-decisions.md#adr-642), ruling 2026-10-13 on #1742).
   - e.g. «מרובע ABCD» · «האלכסונים AB ו-CD נפגשים» → refused, naming the side
   - e.g. «התיכונים AD ו-BE נפגשים בנקודה G» → AD and BE are medians
   - Sources: ADR-499, #966, #859, ADR-569, #1683.

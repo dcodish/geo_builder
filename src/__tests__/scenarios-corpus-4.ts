@@ -4307,6 +4307,43 @@ export const SCENARIOS_4: Scenario[] = [
       expect(said(w)).toBe(TANGENT);
     },
   },
+  {
+    id: 'median-on-a-side-refused-1742',
+    title: '#1742 (ADR-642): «התיכון AB = 5» after «משולש ABC» (AB is a side) is REFUSED with the long form\'s median refusal — nothing is committed',
+    guards:
+      "Reported in round #1736 (#1607): the line committed |AB| = 5 with the noun «התיכון» dropped; since ADR-604 it escalated to the paid model instead. Re-measured at d6601678: the median rule never read «התיכון AB» when B is a vertex — `cevianShapeEdges` excluded the named foot B from the candidate sides, which left the triangle's one opposite side BC out, so the rule bowed out and the line was never judged. Operator ruling 2026-10-13 on #1742: reuse the long form's refusal («AB תיכון לצלע BC» → `input.cevianMedianFootAtEnd`). The foot that is an endpoint of the one opposite side now names that side, and `cevianFault` refuses it. Asserts the step is refused as `cevian-degenerate` / `median-foot-at-end` on side BC and the triangle carries nothing from it. The spelling matrix is src/app/__tests__/issue-1742-median-on-side.test.ts.",
+    steps: ['משולש ABC', 'התיכון AB = 5'],
+    refusedSteps: [
+      {
+        step: 2,
+        reason: 'cevian-degenerate',
+        with: { role: 'median', why: 'median-foot-at-end', apex: 'A', foot: 'B', side: ['B', 'C'] },
+        why: 'operator ruling 2026-10-13 on #1742 (question 1, A): reuse the long form «AB תיכון לצלע BC» refusal, no new wording',
+      },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.construction.constraints, 'no length and no median were committed').toEqual([]);
+      for (const id of ['A', 'B', 'C']) expect(fig.positions.has(id), `the triangle keeps ${id}`).toBe(true);
+    },
+  },
+  {
+    id: 'altitude-on-a-side-is-a-right-angle-1742',
+    title: '#1742 (ADR-642): «הגובה AB = 5» after «משולש ABC» (AB is a side) builds a right angle at B with |AB| = 5, as «AB גובה לצלע BC» does',
+    guards:
+      "The altitude twin of median-on-a-side-refused-1742: the same excluded-foot seam left «הגובה AB = 5» unread (escalated to the paid model, `unread-role`). Operator ruling 2026-10-13 on #1742 (question 2, A): build it as the long form does — ADR-527's altitude whose foot is a vertex, AB ⟂ BC — with the stated length. Asserts the step builds, ∠ABC = 90° and |AB| = 5 in the replayed figure, and no foot point was minted.",
+    steps: ['משולש ABC', 'הגובה AB = 5'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const a = at(fig, 'A'), b = at(fig, 'B'), c = at(fig, 'C');
+      const dot = (a.x - b.x) * (c.x - b.x) + (a.y - b.y) * (c.y - b.y);
+      expect(Math.abs(dot) / (dist(a, b) * dist(c, b)), 'AB ⟂ BC').toBeLessThan(1e-6);
+      expect(dist(a, b), '|AB| = 5').toBeCloseTo(5, 6);
+      expect([...fig.positions.keys()].filter((id) => /^[A-Z]\d*$/.test(id)).sort(), 'no foot point minted').toEqual(['A', 'B', 'C']);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */
