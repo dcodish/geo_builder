@@ -978,7 +978,8 @@ function statedScene(
         if (inRing(c, ps)) inside.push(c);
       }
     }
-    ask('area', { mid: { x: cx, y: cy }, n: { x: 0, y: -1 }, text: lbl(`S=${valueText(ar.value)}`), candidates: inside.length ? inside : [{ x: cx, y: cy }], priority: 2 });
+    // A lone letter is written alone («S», as 2-D does); every other value as «S=…» (ADR-W-118 B9, #2031 ADR-AG-273).
+    ask('area', { mid: { x: cx, y: cy }, n: { x: 0, y: -1 }, text: lbl(ar.bare ? valueText(ar.value) : `S=${valueText(ar.value)}`), candidates: inside.length ? inside : [{ x: cx, y: cy }], priority: 2 });
   }
   /**
    * An ARC's value sits ON the arc (2-D's ADR-335: never a wedge at the often-hidden centre) — at the minor arc's

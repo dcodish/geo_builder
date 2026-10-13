@@ -12,7 +12,8 @@
  * never a value the solve produced:
  *
  * - a **length** against a value («AB = 5», «AB = 3a»), an **angle** against a value («∢ABC = 30», «∢ABC = α»,
- *   «tan∢BAO = 2»), an **area** («שטח המשולש ABC הוא 13»), an **arc** («⌢AC = 60°»);
+ *   «tan∢BAO = 2»), an **area** («שטח המשולש ABC הוא 13», «שטח ABC = 12», «נסמן את שטח ABC ב-S» — #2031), an
+ *   **arc** («⌢AC = 60°»);
  * - a **right angle** stated at a vertex («זווית ABC ישרה», «AB ⊥ BC», «∢ABC = 90») — a knee, never «90°»;
  * - an **altitude** or a **perpendicular** («AD גובה לצלע BC», «הגובה מ-A לצלע BC», «D רגל האנך מ-A ל-BC») — a knee
  *   at its FOOT (#1241, ADR-AG-237), on the side or on its extension;
@@ -49,8 +50,12 @@ export interface StatedMeasures {
    * farther from `v`, so a foot that lands on an endpoint still has a ray to draw along (#1241).
    */
   rights: Array<{ v: Id; a: Id; b: Id; alt?: Id }>;
-  /** «שטח המשולש ABC הוא 13» — written at the ring's centroid. */
-  areas: Array<{ ids: Id[]; value: StatedValue }>;
+  /**
+   * «שטח המשולש ABC הוא 13», «שטח ABC = 12», «נסמן את שטח ABC ב-S» — written at the ring's centroid. `bare` marks a
+   * value that is ONE letter the student wrote («S»), which is written alone, as 2-D writes it; every other value
+   * keeps the ruled «S=…» form (ADR-W-118 B9). Read off the value's `Expr`, never off its printed text (#2031, ADR-AG-273).
+   */
+  areas: Array<{ ids: Id[]; value: StatedValue; bare?: true }>;
   /** «⌢AC = 60°» — written ON the arc of `circle` between `a` and `b` (2-D's ADR-335: never a wedge at the centre). */
   arcs: Array<{ circle: Id; a: Id; b: Id; value: StatedValue }>;
   /** «AB = AC» — `count` ticks per member, one count per equality class (1, 2, …). */
@@ -102,11 +107,20 @@ function valuedSymbols(ks: readonly Constraint[]): Env {
   return env;
 }
 
-/** A plain single length term with coefficient 1 — «AB» — or null. */
-function plainLength(e: LengthExpr): { a: Id; b: Id } | null {
+/**
+ * A side that is ONE plain measure with coefficient 1 — the length «AB» or the area «שטח ABC» — or null.
+ *
+ * #2031 (ADR-AG-273): the measure equation is the second representation of a stated area. «שטח ABC = 12» and the
+ * label form «נסמן את שטח ABC ב-S» (restated as «שטח ABC = S») reach the fold as `length-eq` with one area term, not
+ * as the copula's `area` constraint; reading only lengths here dropped every one of them from the canvas.
+ */
+type PlainMeasure = { kind: 'length'; a: Id; b: Id } | { kind: 'area'; ids: Id[] };
+function plainMeasure(e: LengthExpr): PlainMeasure | null {
   if (e.terms.length !== 1 || e.expr.kind !== 'sym' || !isTermPlaceholder(e.expr.name)) return null;
   const t = e.terms[0];
-  return t.kind === undefined || t.kind === 'length' ? { a: t.a, b: t.b } : null;
+  if (t.kind === undefined || t.kind === 'length') return { kind: 'length', a: t.a, b: t.b };
+  if (t.kind === 'area') return { kind: 'area', ids: t.ids };
+  return null;
 }
 
 /** A side with NO length term — the value side of «AB = 5». */
@@ -123,6 +137,19 @@ function kneeOf(u: Direction, v: Direction): { v: Id; a: Id; b: Id } | null {
 
 const segKey = (a: Id, b: Id): string => [a, b].sort().join('|');
 const angKey = (v: Id, a: Id, b: Id): string => `${v}:${[a, b].sort().join('|')}`;
+/**
+ * One key per POLYGON: the ring read from any vertex, in either direction, is the same region (ABC ≡ BCA ≡ CBA), while
+ * a different boundary order over the same letters (ABCD vs ABDC) is a different polygon, as 2-D keys it.
+ */
+const ringKey = (ids: readonly Id[]): string => {
+  const n = ids.length;
+  const reads: string[] = [];
+  for (let i = 0; i < n; i += 1) {
+    reads.push(Array.from({ length: n }, (_, j) => ids[(i + j) % n]).join('|'));
+    reads.push(Array.from({ length: n }, (_, j) => ids[(i - j + n) % n]).join('|'));
+  }
+  return reads.sort()[0];
+};
 
 /**
  * Read the stated measures off a construction. `origin(at)` is the source of constraint `at`; `resolve` answers which
@@ -153,6 +180,13 @@ export function statedMeasures(
    */
   const lenAt = new Map<string, StatedMeasures['lengths'][number]>();
   const angAt = new Map<string, StatedMeasures['angles'][number]>();
+  /** Areas too (#2031): «שטח ABC הוא S» · «שטח ABC הוא 12» is ONE label, «S=12» — 2-D's `areaByKey.set`. */
+  const areaAt = new Map<string, StatedMeasures['areas'][number]>();
+  /** A stated area's value: the bare letter when the value is ONE free letter, else the «S=…» value. */
+  const area = (ids: Id[], e: Expr): void => {
+    const value = valueOf(e);
+    keep(areaAt, ringKey(ids), { ids, value, ...('text' in value && e.kind === 'sym' ? { bare: true as const } : {}) });
+  };
   const keep = <T extends { value: StatedValue }>(at: Map<string, T>, key: string, next: T): void => {
     const prev = at.get(key);
     if (prev && 'num' in prev.value && !('num' in next.value)) return;
@@ -163,15 +197,18 @@ export function statedMeasures(
   const read = (k: Constraint): void => {
     switch (k.t) {
       case 'length-eq': {
-        const l = plainLength(k.left);
-        const r = plainLength(k.right);
-        if (l && r) lengthPairs.push([l, r]);
-        else {
-          const seg = l ?? r;
-          const value = l ? k.right : k.left;
-          if (!seg || !isValueSide(value)) return;
-          keep(lenAt, segKey(seg.a, seg.b), { ...seg, value: valueOf(value.expr) });
+        const l = plainMeasure(k.left);
+        const r = plainMeasure(k.right);
+        if (l && r) {
+          // Two lengths are an equality (ticks); an area against an area, or against a length, is a relation — no value.
+          if (l.kind === 'length' && r.kind === 'length') lengthPairs.push([{ a: l.a, b: l.b }, { a: r.a, b: r.b }]);
+          return;
         }
+        const m = l ?? r;
+        const value = l ? k.right : k.left;
+        if (!m || !isValueSide(value)) return;
+        if (m.kind === 'area') area(m.ids, value.expr);
+        else keep(lenAt, segKey(m.a, m.b), { a: m.a, b: m.b, value: valueOf(value.expr) });
         return;
       }
       case 'angle': {
@@ -232,7 +269,7 @@ export function statedMeasures(
         return;
       }
       case 'area': {
-        out.areas.push({ ids: k.ids, value: valueOf(k.value) });
+        area(k.ids, k.value);
         return;
       }
       case 'arc-sum': {
@@ -290,6 +327,7 @@ export function statedMeasures(
 
   out.lengths = [...lenAt.values()];
   out.angles = [...angAt.values()];
+  out.areas = [...areaAt.values()];
   out.equalLengths = equalityClasses(lengthPairs, (s) => segKey(s.a, s.b)).flatMap((cls, i) =>
     cls.map((s) => ({ ...s, count: i + 1 })),
   );

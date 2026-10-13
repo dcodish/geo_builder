@@ -866,7 +866,7 @@ a sentence the tool parsed.
 - «AO = 3» → «3» beside AO
 - Sources: ADR-AG-223, #1717.
 
-**R168 — what the student stated about a length, an angle, an area or an arc is written on the figure, as in the 2-D tool**. *(Operator ruling: the canvas shows the inputs, the panel the computed values — ADR-W-047.)* A stated right angle is a knee, never «90°»; an area writes «S=13» inside (ADR-W-118 B9); each value sits at its mark (ADR-AG-228); a computed value is never written. Known gap: #1806.
+**R168 — what the student stated about a length, an angle, an area or an arc is written on the figure, as in the 2-D tool**. *(Operator ruling: the canvas shows the inputs, the panel the computed values — ADR-W-047.)* A stated right angle is a knee, never «90°»; an area writes «S=13» inside (ADR-W-118 B9) however it was stated — «שטח ABC = 12» writes «S=12» — and a value that is one letter writes the letter alone: «נסמן את שטח ABC ב-S» writes «S» (ADR-AG-273); an area stated twice is one label; each value sits at its mark (ADR-AG-228); a computed value is never written. Known gap: #1806.
 - «∢ABC = 30» → «30°»; «tan∢BAO = 2» → «63.43°»
 - «AB = 3a» → «3a»
 - **⚠ Ruled to change (2026-10-07, ADR-W-118 B2 · #1805):** a stated equality draws no mark at rest; it stays in the givens list, and is drawn only in an opt-in relations layer. The text below describes the code until that ships. A stated equality marks both members: «AB = AC» one tick on each, «∢ABC = ∢ACB» one arc on each; a second equality class draws two.
