@@ -92,6 +92,72 @@ export const spellVulgarFractions = (s: string): string =>
       return `${before}${n}/${d}${after}`;
     });
 
+// ── Word fractions (#1611 ADR-591's tables; one reader since #2040, ADR-636) ─────────────────────
+/** Hebrew denominators: singular (numerator 1) and plural (numerator ≥ 2). חצי has no plural in use. */
+export const HE_FRACTION_DENOM: readonly { sing: string; plur?: string; q: number }[] = [
+  { sing: 'חצי', q: 2 },
+  { sing: 'שליש', plur: 'שלישים', q: 3 },
+  { sing: 'רבע', plur: 'רבעים', q: 4 },
+  { sing: 'חמישית', plur: 'חמישיות', q: 5 },
+  { sing: 'שישית', plur: 'שישיות', q: 6 },
+  { sing: 'שביעית', plur: 'שביעיות', q: 7 },
+  { sing: 'שמינית', plur: 'שמיניות', q: 8 },
+  { sing: 'תשיעית', plur: 'תשיעיות', q: 9 },
+  { sing: 'עשירית', plur: 'עשיריות', q: 10 },
+];
+/** Hebrew numerators, both genders (שלושה רבעים / שלוש חמישיות). */
+export const HE_FRACTION_NUM: Readonly<Record<string, number>> = {
+  'שני': 2, 'שתי': 2, 'שלושה': 3, 'שלוש': 3, 'ארבעה': 4, 'ארבע': 4, 'חמישה': 5, 'חמש': 5,
+  'שישה': 6, 'שש': 6, 'שבעה': 7, 'שבע': 7, 'שמונה': 8, 'תשעה': 9, 'תשע': 9,
+};
+export const EN_FRACTION_DENOM: readonly { sing: string; plur: string; q: number }[] = [
+  { sing: 'half', plur: 'halves', q: 2 },
+  { sing: 'third', plur: 'thirds', q: 3 },
+  { sing: 'quarter', plur: 'quarters', q: 4 },
+  { sing: 'fourth', plur: 'fourths', q: 4 },
+  { sing: 'fifth', plur: 'fifths', q: 5 },
+  { sing: 'sixth', plur: 'sixths', q: 6 },
+  { sing: 'seventh', plur: 'sevenths', q: 7 },
+  { sing: 'eighth', plur: 'eighths', q: 8 },
+  { sing: 'ninth', plur: 'ninths', q: 9 },
+  { sing: 'tenth', plur: 'tenths', q: 10 },
+];
+export const EN_FRACTION_NUM: Readonly<Record<string, number>> = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
+
+const altOf = (ws: readonly string[]): string => [...ws].sort((a, b) => b.length - a.length).join('|');
+/** «מחצית» (a half) is read as a ratio word (ADR-118) but is not one the fraction teacher proposes. */
+const HE_READ_ONLY_DENOM: readonly { sing: string; q: number }[] = [{ sing: 'מחצית', q: 2 }];
+const HE_READ_DENOM: readonly { sing: string; plur?: string; q: number }[] = [...HE_FRACTION_DENOM, ...HE_READ_ONLY_DENOM];
+const EN_ONE: Readonly<Record<string, number>> = { a: 1, an: 1, one: 1 };
+const HE_DENOM_WORDS = altOf(HE_READ_DENOM.flatMap((d) => (d.plur ? [d.sing, d.plur] : [d.sing])));
+const EN_DENOM_WORDS = altOf(EN_FRACTION_DENOM.flatMap((d) => [d.sing, d.plur]));
+const HE_WORD_FRACTION = new RegExp(
+  String.raw`(?<![א-ת])[ולבמכה]{0,2}-?(?:(?<n>${altOf(Object.keys(HE_FRACTION_NUM))})\s+)?(?<d>${HE_DENOM_WORDS})(?![א-ת])`,
+);
+const EN_WORD_FRACTION = new RegExp(String.raw`\b(?:(?<n>${altOf([...Object.keys(EN_ONE), ...Object.keys(EN_FRACTION_NUM)])})\s+)?(?<d>${EN_DENOM_WORDS})\b`, 'i');
+
+/**
+ * #2040 ([ADR-636](../../docs/06-decisions.md#adr-636)) — the first WORD fraction in `s` («רבע», «שלושה רבעים»,
+ * «שתי חמישיות», "a third", "three quarters"), read WHOLE: `{ p, q, at, text }`. A numerator word goes with a
+ * PLURAL denominator and only with one, so «רבעים» alone or «שלושה רבע» is `'unread'` — a fraction the student
+ * wrote that this reader cannot spell exactly, which a caller must decline, never read as a different number.
+ * `null` when `s` names no fraction word. The tables are ADR-591's (the fraction teacher reads them too).
+ */
+export function readWordFraction(s: string): { p: number; q: number; at: number; text: string } | 'unread' | null {
+  const he = HE_WORD_FRACTION.exec(s);
+  const en = EN_WORD_FRACTION.exec(s);
+  const m = he && en ? (he.index <= en.index ? he : en) : (he ?? en);
+  if (!m) return null;
+  const g = m.groups!;
+  const isHe = m === he;
+  const d = g.d!.toLowerCase();
+  const denom = isHe ? HE_READ_DENOM.find((x) => x.sing === d || x.plur === d)! : EN_FRACTION_DENOM.find((x) => x.sing === d || x.plur === d)!;
+  const plural = denom.plur === d;
+  const n = g.n === undefined ? undefined : isHe ? HE_FRACTION_NUM[g.n] : (EN_ONE[g.n.toLowerCase()] ?? EN_FRACTION_NUM[g.n.toLowerCase()]);
+  if (plural ? n === undefined || n < 2 : n !== undefined && n !== 1) return 'unread';
+  return { p: n ?? 1, q: denom.q, at: m.index, text: m[0] };
+}
+
 // ── Name glyphs (#1814, ADR-600) ──────────────────────────────────────────────────────────────────
 /** The student's name alphabet (Latin + Greek), an index on a name, and `UNGLUED` — where a number may
  *  begin. Shared with analytic through `shell/indexedName` (the third-copy rule): a guard that keeps a value

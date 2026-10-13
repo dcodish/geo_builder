@@ -1331,6 +1331,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2008 (ADR-635): a vulgar-fraction glyph is its value — 2-D spells the whole Unicode block at its boundary ──
   { id: 'glyph-fraction-ratio-2008', family: 'lengths', steps: ['משולש ABC', 'AB = ¼ BC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2047' }, { product: '3d', issue: '#2047' }], note: 'analytic and 3-D each fold their own subset of the glyphs; one shared table is #2047 (needs-operator)' },
+
+  // ── #2040 (ADR-636): «קטן פי N» is the inverse factor — 2-D drew it as «גדול פי N»; analytic always read it as half ──
+  { id: 'comparative-smaller-2040', family: 'lengths', steps: ['משולש ABC', 'AB קטן פי 2 מ-AC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the reported line; 3-D reads no «פי» comparative (not-understood)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, RADIUS_VAR, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -3362,13 +3362,20 @@ const ratioConstraint: Rule = (s) => {
   // skip an optional noun after מ; the LHS noun prefix ("אורך AC" / "הצלע BC") is absorbed by the `[^=]*?`.
   const he = s.match(
     new RegExp(
-      String.raw`(?<ha>[A-Za-z]\d*)\s*(?<hb>[A-Za-z]\d*)\b[^=]*?פי\s*${NUMEXPR('k')}\s*מ-?\s*(?:(?:ה?קטע|ה?צלע|אורך|ה?ישר)\s+)?(?<hc>[A-Za-z]\d*)\s*(?<hd>[A-Za-z]\d*)\b`,
+      String.raw`(?<ha>[A-Za-z]\d*)\s*(?<hb>[A-Za-z]\d*)\b(?<hmid>[^=]*?)פי\s*${NUMEXPR('k')}\s*מ-?\s*(?:(?:ה?קטע|ה?צלע|אורך|ה?ישר)\s+)?(?<hc>[A-Za-z]\d*)\s*(?<hd>[A-Za-z]\d*)\b`,
     ),
   );
   if (he) {
     const hg = he.groups ?? {};
     const k = numexprVal(hg, 'k');
-    if (k !== null) return [{ type: 'set-ratio', a: up(hg.ha!), b: up(hg.hb!), c: up(hg.hc!), d: up(hg.hd!), k: k.value }];
+    // #2040 (ADR-636): the comparative before «פי» is part of the factor — «AB קטן פי 2 מ-AC» is |AB| = ½·|AC|. The
+    // words between the segment and «פי» used to be skipped unread, so «קטן» was read as «גדול». An inverted factor
+    // declares the number it consumed (ADR-462): k = ½ keeps no trace of the stated «2».
+    const smaller = new RegExp(String.raw`(?<![א-ת])(?:${RATIO_SMALLER})(?![א-ת])`, 'i').test(hg.hmid ?? '');
+    if (k !== null && k.value > 0) {
+      const ids = { a: up(hg.ha!), b: up(hg.hb!), c: up(hg.hc!), d: up(hg.hd!) };
+      return [smaller ? { type: 'set-ratio', ...ids, k: 1 / k.value, consumed: { numbers: [k.value] } } : { type: 'set-ratio', ...ids, k: k.value }];
+    }
   }
   return null;
 };
@@ -4059,25 +4066,88 @@ function areaReferences(s: string): { ids: Id[]; at: number }[] {
 }
 
 /**
- * The ratio coefficient k for "measure(P1) = k·measure(P2)" from the connective between two refs — shared by
- * area (ADR-118), perimeter (ADR-228) and the round measures (ADR-632). Every connective (fraction word, "פי N",
- * "= r", "= 2 SDEF") is keyword-agnostic; #2008 retired the keyword-anchored legacy-decimal "= 2 <kw>DEF" form,
- * which could only re-read the number the `eq` form had already read.
+ * #2040 ([ADR-636](../../docs/06-decisions.md#adr-636)) — the comparative words a multiplicative factor may carry.
+ * «קטן פי 2» / «פחות פי 2» / «קצר פי 2» / "2 times smaller" state the INVERSE factor (half), «גדול / ארוך פי 2»
+ * and "2 times larger" the factor itself.
  */
-function measureRatioK(s: string): number {
-  // Hebrew fraction words get no `\b` — JS word boundaries don't fire around non-ASCII letters.
-  if (/רבע/.test(s) || /\bquarter\b/i.test(s)) return 1 / 4;
-  if (/שליש/.test(s) || /\bthird\b/i.test(s)) return 1 / 3;
-  if (/חצי|מחצית/.test(s) || /\bhalf\b/i.test(s)) return 1 / 2;
-  // "גדול פי 2 מ" / "2 times" / "פי √(3)" and "= 3/4" / "הוא 1.8" — the shared NUMEXPR atom (ADR-298) so a
-  // radical factor / the √() toolbar form parses here too (issue #114, the segment-ratio sibling).
-  const pi = s.match(new RegExp(String.raw`(?:פי|times)\s*${NUMEXPR('pi')}`, 'i'));
-  if (pi) { const v = numexprVal(pi.groups!, 'pi'); if (v) return v.value; }
-  const eq = s.match(new RegExp(String.raw`(?:=|הוא|\bis\b)\s*${NUMEXPR('eq')}`, 'i'));
-  if (eq) { const v = numexprVal(eq.groups!, 'eq'); if (v) return v.value; }
-  return 1; // equal measures
+const RATIO_SMALLER = String.raw`קט[ןנ][א-ת]*|פחות|קצר[א-ת]*|smaller|less|shorter`;
+const RATIO_BIGGER = String.raw`גדול[א-ת]*|ארו[ךכ][א-ת]*|larger|bigger|greater|longer`;
+const RATIO_CMP = String.raw`(?:(?<![א-ת])(?:${RATIO_SMALLER}|${RATIO_BIGGER})(?![א-ת]))`;
+const isSmaller = (w: string | undefined): boolean => !!w && new RegExp(String.raw`^(?:${RATIO_SMALLER})$`, 'i').test(w);
+
+/** The words a two-measure RATIO sentence may carry besides the value it states: the measure nouns and shape
+ *  nouns its references are written with, the copula, «היחס בין … ובין», «של», «את». Hebrew words are checked
+ *  with up to three particle letters peeled off («משטח», «לשטח», «ובין», «המשולש»). */
+const RATIO_WORDS_HE = new Set([
+  '', 'שטח', 'שטחו', 'שטחה', 'היקף', 'היקפו', 'היקפה', 'אורך', 'גזרה', 'קשת', 'מעגל',
+  'משולש', 'מרובע', 'דלתון', 'מלבן', 'מקבילית', 'טרפז', 'מעוין', 'ריבוע',
+  'שווה', 'שווים', 'שוות', 'זהה', 'זהים', 'הוא', 'היא', 'של', 'את', 'יחס', 'בין',
+]);
+const RATIO_WORDS_EN = new Set([
+  'area', 'perimeter', 'length', 'circumference', 'sector', 'arc', 'circle', 's', 'of', 'the', 'is', 'are', 'equals', 'equal', 'to',
+  'as', 'same', 'than', 'ratio', 'between', 'and', 'triangle', 'quadrilateral', 'rectangle', 'parallelogram', 'trapezoid',
+  'trapezium', 'rhombus', 'kite', 'square', 'polygon',
+]);
+const ratioWord = (t: string): boolean => {
+  if (/^[A-Z][A-Z\d]*$/.test(t)) return true; // a label run, or the compact S-marker («SABC»)
+  if (/^[a-z]+$/i.test(t)) return RATIO_WORDS_EN.has(t.toLowerCase());
+  for (let i = 0; i <= 3 && i <= t.length; i++) {
+    if (i > 0 && !/[ולבמכהש]/.test(t[i - 1])) return false;
+    if (RATIO_WORDS_HE.has(t.slice(i))) return true;
+  }
+  return false;
+};
+/** Does `rest` — the sentence with its stated value taken out — say nothing more than "this measure, that measure"? */
+const onlyRatioWords = (rest: string): boolean => rest.split(/[\s=·*/,.:;()\-–—]+/).filter(Boolean).every(ratioWord);
+
+/**
+ * The ratio coefficient k for "measure(P1) = k·measure(P2)" — shared by area (ADR-118), perimeter (ADR-228) and the
+ * round measures (ADR-632). Keyword-agnostic; #2008 retired the keyword-anchored legacy-decimal "= 2 <kw>DEF" form.
+ *
+ * #2040 ([ADR-636](../../docs/06-decisions.md#adr-636)) — the coefficient is read by MEANING, and the reader says
+ * `null` when the sentence states anything it did not read. It used to recognise a ratio by the presence of a word:
+ * «קטן פי 2» was read as «גדול פי 2» (k = 2, never inverted), «שלושה רבעים» matched «רבע» and dropped «שלושה»
+ * (k = ¼), «שלוש חמישיות» and «פי שניים» matched nothing and fell to «equal» (k = 1), all drawn green. Now:
+ *  1. a FACTOR — «פי N», «N פעמים», "N times" — carries its comparative: a smaller-word inverts it;
+ *  2. a WORD fraction is read whole through the lexicon's one reader («שלושה רבעים» = ¾); a fraction word it
+ *     cannot spell exactly is unread;
+ *  3. a NUMBER after the copula («= 3/4», «הוא 1.8», «= 2 SDEF»);
+ *  4. nothing at all is EQUALITY (k = 1).
+ * In every branch, what is left of the sentence must be ratio words only ({@link onlyRatioWords}); anything else —
+ * «שניים», «בערך», "twice", a comparative with no factor («גדול משטח») — is a statement this reader cannot
+ * express, so it returns `null` and the caller declines (the line escalates; it is never drawn as another ratio).
+ * An inverted factor DECLARES the number it consumed (`consumed.numbers`, the ADR-462 route): k = ½ leaves no
+ * trace of the «2» the student wrote, and the honesty gates would otherwise read it as dropped.
+ */
+type MeasureRatio = { k: number; consumed?: Consumed };
+function measureRatioK(s: string): MeasureRatio | null {
+  const kept = (rest: string, k: number, consumed?: Consumed): MeasureRatio | null =>
+    onlyRatioWords(rest) ? { k, ...(consumed ? { consumed } : {}) } : null;
+  const cut = (m: RegExpMatchArray): string => s.slice(0, m.index!) + ' ' + s.slice(m.index! + m[0].length);
+  // (1) a factor — «גדול פי 2 מ», «קטנה פי √(3)», «פי 2 קטן», «2 פעמים», "3 times smaller than"; the shared NUMEXPR
+  // atom (ADR-298), so a radical factor or the √() toolbar form parses too (issue #114).
+  const fac =
+    s.match(new RegExp(String.raw`(?:(?<pre>${RATIO_CMP})\s+)?(?<![א-ת])פי\s*${NUMEXPR('pi')}(?:\s+(?<post>${RATIO_CMP}))?`, 'i')) ??
+    s.match(new RegExp(String.raw`(?:(?<pre>${RATIO_CMP})\s+)?${NUMEXPR('pi')}\s*(?:(?<![א-ת])פעמים(?![א-ת])|\btimes\b)(?:\s+(?<post>${RATIO_CMP}))?`, 'i'));
+  if (fac) {
+    const v = numexprVal(fac.groups!, 'pi');
+    if (!v || !(v.value > 0)) return null;
+    const inverse = isSmaller(fac.groups!.pre) || isSmaller(fac.groups!.post);
+    return inverse ? kept(cut(fac), 1 / v.value, { numbers: [v.value] }) : kept(cut(fac), v.value);
+  }
+  // (2) a word fraction — «רבע משטח», «הוא שלושה רבעים מ», "three quarters of"
+  const wf = readWordFraction(s);
+  if (wf === 'unread') return null;
+  if (wf) return kept(s.slice(0, wf.at) + ' ' + s.slice(wf.at + wf.text.length), wf.p / wf.q);
+  // (3) a number after the copula — «= 3/4», «הוא 1.8», «= 2 SDEF», «SDEF = 1/2SABC»
+  const eq = s.match(new RegExp(String.raw`(?:=|הוא|היא|\bis\b)\s*${NUMEXPR('eq')}`, 'i'));
+  if (eq) {
+    const v = numexprVal(eq.groups!, 'eq');
+    return v && v.value > 0 ? kept(cut(eq), v.value) : null;
+  }
+  // (4) equal measures
+  return kept(s, 1);
 }
-const areaRatioK = (s: string): number => measureRatioK(s);
 
 /** The value/label on the RHS of a single-area measure: a number, radical, variable, or power. */
 function parseAreaExpr(rhs: string): MeasureExpr | null {
@@ -4115,7 +4185,10 @@ const area: Rule = (s) => {
   if (refs.length === 0) return null;
   if (refs.length >= 2) {
     // area(first) = k·area(second). For an explicit "SABC/SDEF = r" the ratio is area1/area2 = r ⇒ k = r.
-    return [{ type: 'set-area-ratio', ids1: refs[0].ids, ids2: refs[1].ids, k: areaRatioK(s) }];
+    // #2040 (ADR-636): a ratio the reader cannot express escalates — never drawn as some other ratio.
+    const r = measureRatioK(s);
+    if (r === null) return 'stop';
+    return [{ type: 'set-area-ratio', ids1: refs[0].ids, ids2: refs[1].ids, ...r }];
   }
   // A single area + a value/label. The RHS follows '=', 'הוא'/'is', 'ב-'/'by' (the נסמן/denote label form).
   // Hebrew connectives get no `\b` — JS word boundaries don't fire around non-ASCII letters.
@@ -4169,7 +4242,9 @@ const perimeter: Rule = (s) => {
   }
   if (refs.length === 0) return null;
   if (refs.length >= 2) {
-    return [{ type: 'set-perimeter-ratio', ids1: refs[0].ids, ids2: refs[1].ids, k: measureRatioK(s) }];
+    const r = measureRatioK(s); // #2040 (ADR-636): unread → escalate
+    if (r === null) return 'stop';
+    return [{ type: 'set-perimeter-ratio', ids1: refs[0].ids, ids2: refs[1].ids, ...r }];
   }
   const rhs = s.match(/(?:=|הוא|שווה|\bis\b|\bequals?\b)\s*(.+)$/i);
   if (!rhs) return null;
@@ -4285,9 +4360,9 @@ const roundMeasure: Rule = (s, ctx) => {
   if (operands.length === 2) {
     const [o1, o2] = operands;
     if (unread(rest, [...o1.ids, ...o2.ids])) return 'stop';
-    const k = measureRatioK(s);
-    if (!(k > 0)) return 'stop';
-    const sides = { ids1: o1.ids, ids2: o2.ids, k, round1: o1.round, round2: o2.round };
+    const r = measureRatioK(s);
+    if (r === null || !(r.k > 0)) return 'stop';
+    const sides = { ids1: o1.ids, ids2: o2.ids, k: r.k, round1: o1.round, round2: o2.round, ...(r.consumed ? { consumed: r.consumed } : {}) };
     return [isArea ? { type: 'set-area-ratio', ...sides } : { type: 'set-perimeter-ratio', ...sides }];
   }
   // ONE operand: a value or a letter. The copula form «… הוא 12π» / «… = L», or the marker «נסמן את … ב-S».

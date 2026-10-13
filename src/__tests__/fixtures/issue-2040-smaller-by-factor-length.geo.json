@@ -1,0 +1,44 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-13T12:00:00.000Z",
+  "name": "issue-2040-smaller-by-factor-length",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "elDc4N8ICbZllfyqc5vFQ",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "eNdoFnH5qH2ZanSNJIXOM",
+      "utterance": "AB קטן פי 2 מ-AC",
+      "group": "g1",
+      "cmd": {
+        "type": "set-ratio",
+        "a": "A",
+        "b": "B",
+        "c": "A",
+        "d": "C",
+        "k": 0.5,
+        "consumed": {
+          "numbers": [
+            2
+          ]
+        }
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

@@ -1,0 +1,64 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-13T12:00:00.000Z",
+  "name": "issue-2040-smaller-by-factor-area",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "kvXkvYc-BX2mRcBNPsd8o",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "4c03L_UIU0LcpzVyWzLJm",
+      "utterance": "משולש DEF",
+      "group": "g1",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "D",
+          "E",
+          "F"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "fUqU45j2Y6V2zGy8MBMV8",
+      "utterance": "שטח ABC קטן פי 2 משטח DEF",
+      "group": "g2",
+      "cmd": {
+        "type": "set-area-ratio",
+        "ids1": [
+          "A",
+          "B",
+          "C"
+        ],
+        "ids2": [
+          "D",
+          "E",
+          "F"
+        ],
+        "k": 0.5,
+        "consumed": {
+          "numbers": [
+            2
+          ]
+        }
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}
