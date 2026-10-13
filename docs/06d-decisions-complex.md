@@ -2699,7 +2699,8 @@ FLIPPED with a comment naming this ruling, and fixture `roots-set-membership-139
 **Status:** accepted, 2026-09-24 (operator ruling 2026-09-24) · **Issues:**
 [#1387](https://github.com/dcodish/geo_builder/issues/1387) + [#1406](https://github.com/dcodish/geo_builder/issues/1406)
 (bug, `P2`, `complex`), built as one item · round [#1408](https://github.com/dcodish/geo_builder/issues/1408) ·
-**amends** [ADR-CX-041](#adr-cx-041) and [ADR-CX-043](#adr-cx-043) ("parameters remain positive reals")
+**amends** [ADR-CX-041](#adr-cx-041) and [ADR-CX-043](#adr-cx-043) ("parameters remain positive reals") ·
+**⚠ Amended by [ADR-CX-070](#adr-cx-070) (2026-10-13, operator ruling on #2078):** the size list gains the modulus slot of a polar form — a parameter in one product with a written `cis θ` (`z = r cis 30`, `z = r(cos30° + i sin30°)`) is a size, as with a complex name; `z = r·i` stays sign-free
 **Requirements:** [02d](02d-requirements-complex.md) FR-CN-7 (new): a real parameter's sign follows its
 use; FR-CN-4 (amended): a sign-free parameter's sign is part of its freedom · **Design:**
 [04d](04d-design-complex.md), "A parameter's sign follows its use" · **Ladder:** stages 1c/1d and 3c
@@ -4106,7 +4107,7 @@ The button is disabled while the list is empty, so a session of claims alone off
 
 **Unchanged.** A symbolic angle («z1 = r cis θ», «z = r cis t», «z1 = 2cis(θ)», «z = 4cis(t)»), a numeric pair («z = 2 cis 30»), an uppercase modulus («z = R cis 30», a complex name by convention), and every other lexer word (`conj`, `re(`, `im(`, `sqrt(`, a glued `i`).
 
-**Behaviour change for a student** (all `[asked]` by the ruling): every spelling above shows r's chip, the canvas form «z ≈ |r|·cis30°» and two configurations (the sign of r), as «z = r·cis(30°)» does; after it, «r = 3» fixes |z| = 3; «z = (rcis30)» is read instead of refused.
+**Behaviour change for a student** (all `[asked]` by the ruling): every spelling above shows r's chip, the canvas form «z ≈ |r|·cis30°» and two configurations (the sign of r), as «z = r·cis(30°)» does **⚠ Amended by [ADR-CX-070](#adr-cx-070) (2026-10-13, operator ruling on #2078: *"r is always positive"*): r is a size, so every spelling has one configuration and reads «z ≈ r·cis30°»**; after it, «r = 3» fixes |z| = 3; «z = (rcis30)» is read instead of refused.
 
 **Siblings.** Complex only: no other builder has a polar form, and it is not a plane-geometry sentence, so no docs/22 §10 row.
 
@@ -4172,3 +4173,34 @@ selected root, the refusals (−2, 0, 2i → `impossible`; collinear circumcircl
 controls, and the class guard over the catalog and the fixtures. The fixture
 `fixtures/exam-2021wB-circle-1895.complex.json` holds the 2021 חורף ב lines; the fixtures net's
 `unsatisfied: []` assertion is now itself the "drawn" check for every fixture that states an object.
+
+## ADR-CX-070 — The letter in a polar form's modulus slot is positive: «z = r cis 30» stays on the 30° ray (#2078)
+
+**Status:** accepted, 2026-10-13 · **Issue:** [#2078](https://github.com/dcodish/geo_builder/issues/2078) (bug, `P1`, `complex`) · P1 session after round #2053 · operator report 2026-10-13 (*"in complex numbers, r is always positive so rcis30 shoudl not be as image shows"*) and ruling 2026-10-13 on the two open lines · **amends** [ADR-CX-045](#adr-cx-045) (the size list) and [ADR-CX-068](#adr-cx-068) ("two configurations (the sign of r)")
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-7 (amended: the modulus slot of a polar form is a size) ·
+**Design:** [04d](04d-design-complex.md), "A parameter's sign follows its use" ·
+**Ladder:** stages 1c/1d and 3c read the same `paramSigns` ([LADDER-CX](LADDER-CX.md)); no new stage
+
+**Measured at pickup** (`main` @ `03643aff`, `submitLine` + `deriveLines`, seeds 0–9). «z = r(cos30° + i sin30°)», «z = r cis 30», «z = rcis30°», «z = r·cis(30°)» and «z = 2r cis 30» alternated between the 30° and the 210° ray, two configurations, canvas «z ≈ |r|·cis210°» on every odd seed. «z = r cis 30» · «|z| = 5» drew ±5·cis30°. «z^3 = r cis 60» had 6 configurations (the r > 0 and r < 0 root sets, each relabelled). «z = r cis 30» · «z ברביע השלישי» and «z = r cis 30» · «r = -3» were accepted and drawn green at 210°. The no-dot and trig spellings regressed with ADR-CX-068 (on `main`, not deployed); the dotted spelling has done this since ADR-CX-045.
+
+**Root cause.** `paramSigns.walk` (`model/paramSign.ts`) made a product's parameter a size only when a factor was a complex NAME (`ref`). The parser lowers `cis θ` to a unit literal `val`, so the modulus of a polar form read as sign-free, like the `r` of `2 + r·i`. **The plan's predicate does not work as written:** it proposed recognising the cis factor by its value (an exact unit of modulus 1), but «z = r cis 90» and «z = r·i» lower to the SAME unit literal (`i` is folded to `exact(1, ¼ turn)`), and the ruling keeps «z = r·i» sign-free. No predicate over the lowered value can tell them apart.
+
+**Decision.**
+1. **The parser marks the notation.** A unit literal the student wrote as `cis θ` with a numeric angle — every spelling, since the trigonometric form is rewritten to `cis` (ADR-CX-059) and the radian reader feeds the same reader (ADR-CX-064) — carries `polar: true` on its `val` node (`cisOf` in `parser/exprParse.ts`). `foldConstants` keeps the mark through its re-read of the value. Nothing else reads it; the value is unchanged.
+2. **A parameter in one product with a written `cis θ` is a size** (`paramSigns.walk`), exactly as one in a product with a complex name. Tier 1 carries no sign unknown for it and tier 2 bounds it `> 0` — no solver change.
+3. **Unchanged:** «z = r·i», «z = 2 + r·i», «z = -r» (sign-free, ADR-CX-045); a symbolic angle (ADR-CX-026); a numeric modulus. An EXPRESSION modulus («(r+1)cis30») needs a constraint-level positivity mechanism and belongs to #2071.
+
+**Behaviour change for a student** (every line `[asked]` by the report and the 2026-10-13 ruling):
+- every spelling of «z = r cis 30» is on the 30° ray at every press of «הציגו תצורה אחרת», one configuration, canvas «z ≈ r·cis30°»;
+- «|z| = 5» after it gives r = 5; «z ברביע השלישי» after it is refused; «r = -3» after it is refused with the acceptance gate's existing message «המשפט לא נוסף — אינו מתיישב עם: "z = r cis 30"», the same refusal «|z1| = 9r» · «r = -3» already gives;
+- «z = r cis 90» builds with r > 0 (the positive imaginary axis only); «z = r·i» builds as before.
+
+**Deviation from the plan (measured).** The plan expected «z^3 = r cis 60» to have 3 configurations. It has **1**, the same figure as «z^3 = 8 cis 60»: the three roots at 20°, 140°, 260°, labels fixed. The 6 before were the two sign root sets times their relabelling; with r > 0 the parametric equation behaves exactly as the numeric one already does.
+
+**What moved (the ADR-CX-045 method).** A 24-seed sweep, before vs after, over every catalog row in both languages (alone and after «z1 = 3+4i · z2 = 2cis150 · w = z1*z2»), every complex fixture, and the issue's cases: 163 sequences, 3,912 seed×sequence verdicts (acceptance, configuration count, contradiction, unsatisfied, every position). 144 verdicts changed, all in the six intended sequences: «z = r(cos30° + i sin30°)», «z = r cis 90», «z^3 = r cis 60», «z = r cis 30 · r = -3», «z = r cis 30 · z ברביע השלישי», «z = r cis 30 · |z| = 5». **No catalog row and no fixture moved**, «z = r·i» included.
+
+**Siblings.** Complex only: no other builder has a polar form; not a plane-geometry sentence, so no docs/22 §10 row.
+
+**Cost.** One optional field on one AST node; one predicate term. No solve change.
+
+**Locks.** `src-complex/__tests__/polar-modulus-positive-2078.test.ts`: the operator's line «z = r(cos30° + i sin30°)» at seeds 0–9 (arg z = 30°, one configuration, «z ≈ r·cis30°»); the class over nine spellings and angles; the size classification; «|z| = 5» ⇒ r = 5; «z^3 = r cis 60» equals «z^3 = 8 cis 60»; the quadrant-III refusal; the «r = -3» refusal (both spellings, the existing `incompatible` message, «r = 3» still accepted); «z = r cis 90» positive and «z = r·i» sign-free with two configurations, and that the two differ only by the mark. **Rewritten:** `polar-letter-modulus-2029.test.ts` (two configurations → one). Fixtures `polar-cis90-2078` and `cartesian-ri-2078` join the saved-session net (the operator's line alone is locked by the test file, not a fixture: the fixtures' canvas class net fails it on the pre-existing cartesian-view sample «z ≈ 0.74+0.42i», #1738's class, which this item does not change); the `polar-letter-modulus-2029*` fixtures («… · r = 3») are unchanged and still green, since they never asserted the sign.

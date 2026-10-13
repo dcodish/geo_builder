@@ -120,12 +120,13 @@ behind it; their history is in [06d](06d-decisions-complex.md).
     #1367, #1428 and #1466 (operator rulings), #1434
 - **FR-CN-7 (Must)** — **A real parameter's sign follows its use.** A parameter that stands as a
   SIZE — a modulus (`|z1| = 9r`), anything inside `|…|`, a circle's radius, a measure's value, a scale
-  factor multiplying a complex number (`z2 = r·z1`) — is **positive**. A parameter in any other use — an
+  factor multiplying a complex number (`z2 = r·z1`), the modulus slot of a polar form (`z = r cis 30`,
+  `z = r(cos30° + i sin30°)`: z stays on the 30° ray, and «r = -3» after it is refused) — is **positive**. A parameter in any other use — an
   additive term (`z1 = a + b·i`), a power equated to a number (`u^5 = -32`), a number equal to it
-  (`z1 = u`) — is **any real**: `u^5 = -32` gives u = −2, and «z1 = a + b·i · z1 ברביע השני» holds with
+  (`z1 = u`), a coefficient of `i` (`z = r·i`) — is **any real**: `u^5 = -32` gives u = −2, and «z1 = a + b·i · z1 ברביע השני» holds with
   a < 0. An even power of a negative (`u^4 = -16`) has no real solution and is refused. Mixed use is a
   size. The value shown carries the sign (`u = -2`, and `u = ±2` when the configurations disagree).
-  - Sources: [ADR-CX-045](06d-decisions-complex.md#adr-cx-045) (operator ruling)
+  - Sources: [ADR-CX-045](06d-decisions-complex.md#adr-cx-045) (operator ruling), [ADR-CX-070](06d-decisions-complex.md#adr-cx-070) (#2078, operator ruling 2026-10-13)
 - **FR-CN-8 (Must)** — **A letter declared complex is complex in every line.** «u מספר מרוכב» /
   «u is a complex number» makes u, u₁, u₂… complex exactly as z and w are, in every line before or
   after it: `u^5 = 32` then draws the five roots u₁..u₅ in either order. The declaration is a TYPE, not

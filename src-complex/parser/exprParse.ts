@@ -475,7 +475,7 @@ export function parseExpr(
     if (base.t === 'val' && base.v.kind === 'exact' && isExactRational(base.v.arg) && base.v.arg.turns.n === 0n) {
       return val(exact(base.v.mod, fromDegrees(deg)));
     }
-    return mul(base, { t: 'val', v: unitAt(deg) });
+    return mul(base, cisOf(deg));
   };
 
   const parsePower = (): Expr | null => {
@@ -830,6 +830,12 @@ function hasRadical(e: Expr): boolean {
  * what caught that it did not.)
  */
 export function foldConstants(e: Expr, atoms: Map<string, number>): Expr {
+  const folded = foldConstantsOnce(e, atoms);
+  // a written `cis θ` keeps its polar mark through the re-read of its value (ADR-CX-070)
+  return e.t === 'val' && e.polar && folded.t === 'val' && !folded.polar ? { ...folded, polar: true } : folded;
+}
+
+function foldConstantsOnce(e: Expr, atoms: Map<string, number>): Expr {
   const k = constValue(e);
   if (k) {
     /**
@@ -894,7 +900,7 @@ export function foldConstants(e: Expr, atoms: Map<string, number>): Expr {
  * included, converted by `readCisAngle` (#1754). Only a NUMERIC angle reaches here; a symbolic one
  * (`cis α`) is a free direction and belongs to the relation rules, not to a literal.
  */
-const cisOf = (deg: Rat): Expr => ({ t: 'val', v: unitAt(deg) });
+const cisOf = (deg: Rat): Expr => ({ t: 'val', v: unitAt(deg), polar: true });
 
 /**
  * The signed degrees a `cis` argument states, or null when it is not a numeric angle.
