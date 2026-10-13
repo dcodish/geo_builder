@@ -40,6 +40,16 @@ const ANGLE_ADJECTIVE_EN = `(?:acute|obtuse)(?:[\\s-]+angled)?`;
 // ---------------------------------------------------------------------------
 
 /**
+ * THE AXIS LETTER OF A SUBSCRIPTED COORDINATE TOKEN HAS ONE CASE (#1773, ADR-AG-274). The token is `x_B`, `x_{B}` or
+ * the reversed `B_x`, and every reader of it (the comparison atom, `x_A = 5`) matches a lowercase `x`/`y`. So `X_B<X_D`
+ * was `not-handled` while `x_B<x_D` read. Folding the case here, where every rule reads, means no reader can miss it.
+ * It is unambiguous because a point label's subscript is DIGITS (`X_1`, `carriers.POINT_TOKEN`). A letter after the `_`
+ * (or the axis letter after a label's `_`) can only be a coordinate component, so `X_1` is never touched.
+ */
+const SUB_AXIS_FIRST = /(?<![A-Za-z0-9_])([XY])(\s*_\s*\{?\s*[A-Z][0-9₀-₉]?\s*\}?)(?![A-Za-z0-9_])/g;
+const SUB_AXIS_LAST = /(?<![A-Za-z0-9_])([A-Z][0-9₀-₉]?\s*_\s*\{?\s*)([XY])(?![A-Za-z0-9_])/g;
+
+/**
  * One spelling per symbol. ∢ (U+2222) and ∡ (U+2221) are the exam's angle glyphs and mean ∠ (#1555);
  * ⁰ is typed for °; the Israeli coordinate pair «A(2;10)» separates with a semicolon; «10½» is 10.5;
  * «קודקוד» is the plene spelling of «קדקוד»; the maqaf and the NBSP are a hyphen and a space.
@@ -57,6 +67,8 @@ export function orthography(raw: string): string {
     .replace(/־/g, '-')
     .replace(/ /g, ' ')
     .replace(/(?<![א-ת])ה-\s+([xy])(?![A-Za-z0-9])/g, 'ה-$1')
+    .replace(SUB_AXIS_FIRST, (_m, ax: string, rest: string) => `${ax.toLowerCase()}${rest}`)
+    .replace(SUB_AXIS_LAST, (_m, head: string, ax: string) => `${head}${ax.toLowerCase()}`)
     // LOOK-ALIKE GLYPHS → the symbol they render as — the SHARED table every builder's parser boundary
     // calls (#1912, [ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329); `shell/glyphFold`). It holds
     // the ∢/∡ and ⁰ folds that were spelled here, in the same order, and adds the rows analytic never

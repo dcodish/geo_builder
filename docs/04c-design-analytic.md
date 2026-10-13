@@ -275,7 +275,9 @@ when the subject is an end of its own pair). The extent is decided at M1 against
 construction: the crossing's bounded promotion (`drawnPieceOver`). A bare pair in a point-on sentence is decided in
 the parser, not at M1: it carries the `between` selector «הקטע AB» carries, except when the subject is one of its ends
 ([ADR-AG-248](06c-decisions-analytic.md#adr-ag-248), #1892; `lineObject` and `pairText` lower the converse to that
-bare «P על CD»). `orthography` folds format controls (`stripFormatControls`), bullets, the spaced
+bare «P על CD»). `orthography` folds format controls (`stripFormatControls`), bullets, the case of a subscripted
+coordinate's axis letter (`X_B`, `B_{X}` → `x_B`, `B_{x}`; a letter subscript only, so the label `X_1` is untouched,
+[ADR-AG-274](06c-decisions-analytic.md#adr-ag-274)), the spaced
 conjunction (`shell/conjunction`, [ADR-AG-239](06c-decisions-analytic.md#adr-ag-239)) and the look-alike
 glyphs (`shell/glyphFold`, [ADR-3D-329](06b-decisions-3d.md#adr-3d-329)): its own ∢/∡ and ⁰ rows moved into
 that shared table, which also brings ⟂ → ⊥, the guarded `<` → ∠, º/˚ → ° and «שורש N» → √. A tangency with no circle
