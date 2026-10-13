@@ -117,7 +117,8 @@ describe('#750 — the suite verdict is the machine-readable answer', () => {
     const v = buildVerdict({ mode: 'full', status: 1, report: REPORT_RED, at, sha: '13edd1d', dirty: false });
     expect(v.green).toBe(false);
     expect(v.failingFiles).toEqual(['src/render/__tests__/shadow-matrix3.test.ts']);
-    expect(v.files).toEqual({ passed: 1, failed: 1, skipped: 1 });
+    // `expected` is null: no planned file list was handed in (#1557 adds it).
+    expect(v.files).toEqual({ total: 3, expected: null, passed: 1, failed: 1, skipped: 1 });
     expect(v.tests).toEqual({ passed: 1, failed: 1, skipped: 1 });
   });
 
@@ -359,5 +360,111 @@ describe('#1813 — tier timing counts the work a file does in its hooks', () =>
   it('paths match whichever separator each reporter used (Windows backslashes vs vitest forward slashes)', () => {
     const backslashed = { [heavy.name.replace(/\//g, '\\')]: 271_860 };
     expect(timedFiles(report, backslashed)[0].ms).toBe(271_860);
+  });
+});
+
+/**
+ * #1557 (ADR-W-128) — a file that fails at COLLECTION is a failing file.
+ *
+ * Measured in the 2026-09-29 merge train: vitest printed `Test Files 13 failed | 987 passed`, and the
+ * verdict said `failingFiles: ["server/__tests__/deploy-preflight.test.ts"]`. The other twelve failed at
+ * FILE level — the transform server timed out before a single test was collected — so they carried no
+ * failed assertion, and the verdict keyed "failing" on failed assertions. Worse, an empty assertion list
+ * passes `every(skipped)`, so each one was counted as a SKIPPED file, and ~800 tests vanished from the
+ * counts: a broken suite read as a smaller one. A session reading only `failingFiles` re-runs the one
+ * flaky file, sees it pass, and concludes the red was noise.
+ *
+ * The lock is a fake vitest JSON report with one collection-failed file, shaped exactly as vitest 2's
+ * JSON reporter writes it (`status: "failed"`, `message`, `assertionResults: []`).
+ */
+// @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
+import { buildVerdict as verdictOf, timedFiles as timed } from '../../scripts/test-tiers.mjs';
+// @ts-expect-error — plain-JS tooling module, deliberately not part of any product's type graph
+import FileTimeReporter from '../../scripts/lib/file-time-reporter.mjs';
+
+describe('#1557 — the verdict names a file that failed at collection', () => {
+  const abs = (p: string) => join(ROOT, p).replace(/\\/g, '/');
+  const COLLECT_MSG = '[vitest-worker]: Timeout calling "fetch" with "["/src-analytic/engine/expr.ts","ssr"]"';
+  const ok = { name: abs('src/engine/__tests__/ok.test.ts'), status: 'passed', message: '', startTime: 0, endTime: 1,
+    assertionResults: [{ status: 'passed', fullName: 'a' }, { status: 'passed', fullName: 'b' }] };
+  const flaky = { name: abs('server/__tests__/deploy-preflight.test.ts'), status: 'failed', message: '', startTime: 0, endTime: 1,
+    assertionResults: [{ status: 'failed', fullName: 'times out' }] };
+  const neverRan = { name: abs('src-analytic/__tests__/expr.test.ts'), status: 'failed', message: `${COLLECT_MSG}\n    at stack`,
+    startTime: 0, endTime: 0, assertionResults: [] };
+  const hookFailed = { name: abs('src/__tests__/hooked.test.ts'), status: 'failed', message: 'afterAll blew up', startTime: 0, endTime: 1,
+    assertionResults: [{ status: 'passed', fullName: 'c' }] };
+  const REPORT = { testResults: [ok, flaky, neverRan] };
+  const base = { mode: 'full', status: 1, at, sha: 'abc1234', dirty: false };
+
+  it('THE LOCK: a collection-failed file is NAMED in failingFiles and counted in collectErrors', () => {
+    const v = verdictOf({ ...base, report: REPORT });
+    expect(v.green).toBe(false);
+    expect(v.failingFiles).toEqual(['server/__tests__/deploy-preflight.test.ts', 'src-analytic/__tests__/expr.test.ts']);
+    expect(v.collectErrors).toBe(1);
+    expect(v.fileErrors).toEqual({ 'src-analytic/__tests__/expr.test.ts': COLLECT_MSG });
+  });
+
+  it('it is a FAILED file, never a skipped one — the file counts add up to the files vitest ran', () => {
+    const v = verdictOf({ ...base, report: REPORT });
+    expect(v.files).toMatchObject({ total: 3, passed: 1, failed: 2, skipped: 0 });
+  });
+
+  it('the defect, stated: keyed on failed assertions alone, the same report names ONE file and calls the other skipped', () => {
+    const failedByAssertion = (t: { assertionResults: { status: string }[] }) => t.assertionResults.some((a) => a.status === 'failed');
+    expect(REPORT.testResults.filter(failedByAssertion)).toHaveLength(1);
+    // The old "skipped file" test: an EMPTY assertion list passes `every`, vacuously.
+    const oldSkipped = (t: { assertionResults: { status: string }[] }) => !failedByAssertion(t) && t.assertionResults.every((a) => a.status === 'pending');
+    expect(oldSkipped(neverRan)).toBe(true);
+  });
+
+  it('a file that fails in a file-level HOOK with every test passing is failing too (the same class)', () => {
+    const v = verdictOf({ ...base, report: { testResults: [ok, hookFailed] } });
+    expect(v.failingFiles).toEqual(['src/__tests__/hooked.test.ts']);
+    expect(v.collectErrors).toBe(0); // its tests ran — it is not a collection error
+    expect(v.fileErrors).toEqual({ 'src/__tests__/hooked.test.ts': 'afterAll blew up' });
+  });
+
+  it('the file total is held against the EXPECTED count, and a planned file with no result is named', () => {
+    const planned = [ok.name, flaky.name, neverRan.name, abs('src3d/__tests__/vanished.test.ts')];
+    const v = verdictOf({ ...base, report: REPORT, planned });
+    expect(v.files.total).toBe(3);
+    expect(v.files.expected).toBe(4);
+    expect(v.missingFiles).toEqual(['src3d/__tests__/vanished.test.ts']);
+  });
+
+  it('a shrunken suite cannot read green — a missing file reds the verdict even on exit status 0', () => {
+    const v = verdictOf({ ...base, status: 0, report: { testResults: [ok] }, planned: [ok.name, flaky.name] });
+    expect(v.missingFiles).toEqual(['server/__tests__/deploy-preflight.test.ts']);
+    expect(v.green).toBe(false);
+  });
+
+  it('a complete green run stays green, with expected === total and nothing missing', () => {
+    const v = verdictOf({ ...base, status: 0, report: { testResults: [ok] }, planned: [ok.name.replace(/\//g, '\\')] });
+    expect(v.green).toBe(true);
+    expect(v.files).toMatchObject({ total: 1, expected: 1 });
+    expect(v.missingFiles).toEqual([]);
+    expect(v.collectErrors).toBe(0);
+  });
+
+  it('the catch tracker sees a collection failure as a failure too', () => {
+    const files = timed(REPORT, null);
+    const f = files.find((x: { file: string }) => x.file === 'src-analytic/__tests__/expr.test.ts');
+    expect(f.failures).toEqual([`(file-level error) ${COLLECT_MSG}`]);
+    expect(files.find((x: { file: string }) => x.file === 'src/engine/__tests__/ok.test.ts').failures).toEqual([]);
+  });
+
+  it('the reporter records the PLANNED file list — the denominator — before any file is collected', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'geo-planned-'));
+    const dest = join(dir, 'planned.json');
+    const prev = process.env.GEO_PLANNED_FILES_OUT;
+    process.env.GEO_PLANNED_FILES_OUT = dest;
+    try {
+      new FileTimeReporter().onPathsCollected([ok.name, neverRan.name]);
+      expect(JSON.parse(readFileSync(dest, 'utf8'))).toEqual([ok.name, neverRan.name]);
+    } finally {
+      if (prev === undefined) delete process.env.GEO_PLANNED_FILES_OUT;
+      else process.env.GEO_PLANNED_FILES_OUT = prev;
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

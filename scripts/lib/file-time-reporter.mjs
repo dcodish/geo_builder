@@ -12,6 +12,11 @@
  *
  * Wired by `scripts/test-tiers.mjs` via `--reporter=<this file>`; the output path comes from
  * `GEO_FILE_TIMES_OUT`. Best-effort: a failure here must never fail a suite run.
+ *
+ * #1557 (ADR-W-128) — it also records the files the run was ASKED to run (`onPathsCollected`, the
+ * tier's file list after `--exclude`, before any file is collected) to `GEO_PLANNED_FILES_OUT`. That is
+ * the denominator the suite verdict holds its file total against: a file that never produced a result
+ * is then named as missing instead of silently shrinking the suite.
  */
 import { writeFileSync } from 'node:fs';
 
@@ -26,6 +31,16 @@ export function fileDurationMs(file) {
 }
 
 export default class FileTimeReporter {
+  onPathsCollected(paths) {
+    const dest = process.env.GEO_PLANNED_FILES_OUT;
+    if (!dest) return;
+    try {
+      writeFileSync(dest, JSON.stringify(paths ?? []));
+    } catch (e) {
+      console.error(`file-time reporter: could not write ${dest} (${e.message}) — the verdict will carry no expected file count.`);
+    }
+  }
+
   onFinished(files) {
     const dest = process.env.GEO_FILE_TIMES_OUT;
     if (!dest) return;
