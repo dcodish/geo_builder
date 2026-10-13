@@ -49,6 +49,15 @@ a point/vertex noun, a `label(…)` coordinate at the head of a definition, the 
 `midpoint-auto`, the one rule in `parse3` that INVENTS a point's name, matches a full anchored frame
 (`MID_HE`/`MID_EN`, shared with the anchor), so a word it does not own declines the line.
 
+**One magnitude atom** (#1827, [ADR-3D-337](06b-decisions-3d.md#adr-3d-337)). A slot that states a
+magnitude (a length, an area, a height's length) matches `MAG` and reads the capture with `magValue`. These
+are the lexical half and the reader of `evalRadical`, defined side by side, so a spelling the atom admits is
+one the reader values. Never `+m[n]`: the decimal-only `NUM`/`UNUM` in a magnitude slot is how «AD = √7»
+refused while «|AD| = √7» built. `normalize3` folds `sqrt` / `\sqrt{…}` to `√`, so the atom only ever sees
+the glyph. The honesty gate (`droppedGivenNumbers3`) values a radical with the same exported `RADICAND` and
+`evalRadical`, and keeps a radicand's own parentheses. The distance, `A = (…)`, ratio and solid-size slots still
+take decimals until the operator rules on them. Angles are degrees and stay `ANGLE_VAL`.
+
 **A letter the tool cannot read is refused by name** (#1919, [ADR-3D-328](06b-decisions-3d.md#adr-3d-328)).
 `readStatement3` — the one reader submit and the ✎ edit share — asks `unreadScript` (`shell/inputScript.ts`,
 the shared rule all four builders call) right after `findProofTarget`, and answers

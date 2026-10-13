@@ -1331,6 +1331,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'chord-third-crossing-1893', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'C על מעגל O', 'AC חותך את המעגל בנקודה E'], expect: 'refused', exception: 'X8', note: 'analytic drew E on A, green; 2-D refuses (its sentence is #1834’s to reword) — the verdict, not the text, is the row' },
   // ── #1924 (ADR-AG-272): a crossing asked of a tangent at a named point — 2-D's errors.tangentNoSecondCrossing ──
   { id: 'tangent-no-second-crossing-1924', family: 'tangents', steps: ['מעגל O', 'A על מעגל O', 'מנקודה P משיק נוגע במעגל O בנקודה A', 'PA חותך את המעגל בנקודה E'], expect: 'refused', exception: 'X8' },
+
+  // ── #1827 (ADR-3D-337): a stated magnitude may be a RADICAL in every slot, not only «|AD| = …» ──
+  // 3-D read «|AD| = √7» and refused the bare «AD = √7» (the operator's line), the area and the `sqrt` spelling.
+  { id: 'surd-length-1827', family: 'lengths', steps: ['מלבן ABCD', 'AB=1', 'AD=√7'], expect: 'builds', note: 'the operator’s exact sequence (prod 3-D, 2026-10-06)' },
+  { id: 'surd-length-paren-1827', family: 'lengths', steps: ['משולש ABC', 'AB = √(7)'], expect: 'builds' },
+  { id: 'surd-length-sqrt-1827', family: 'lengths', steps: ['משולש ABC', 'AB = sqrt(2)'], expect: 'builds', note: 'the keyboard spelling of √ (#1920)' },
+  { id: 'surd-area-1827', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC = √3'], expect: 'builds' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

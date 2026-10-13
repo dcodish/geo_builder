@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-13T15:41:29.340Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מלבן ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "rectangle",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AB=1",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "B",
+            "value": 1
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "AD=√7",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "D"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "D",
+            "value": 2.6457513110645907
+          }
+        }
+      ]
+    }
+  ]
+}
