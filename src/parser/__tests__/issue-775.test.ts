@@ -29,9 +29,16 @@ function ctxAfter(utterances: string[]) {
 }
 
 describe('#775 — the prod session: a right triangle, then the median to the hypotenuse', () => {
-  const rt = ctxAfter(['משולש ישר זווית ABC']); // right angle at C (the engine convention) ⇒ hypotenuse AB
+  // #1689 (ADR-639): the noun alone does not say WHICH angle is right, so these locks state it («זווית C ישרה»);
+  // the noun alone asks — locked below and in src/app/__tests__/issue-1689-hypotenuse-vertex.test.ts.
+  const rt = ctxAfter(['משולש ישר זווית ABC', 'זווית C ישרה']); // the stated right angle at C ⇒ hypotenuse AB
 
-  it('«תיכון ליתר» builds the median from C to the midpoint of AB (the ks1up71f replay)', () => {
+  it('#1689: on the right-triangle noun ALONE «תיכון ליתר» asks which side is the hypotenuse — never the default seat C', () => {
+    const open = ctxAfter(['משולש ישר זווית ABC']);
+    for (const u of ['תיכון ליתר', 'גובה ליתר', 'median to the hypotenuse']) expect(parse(u, open), u).toEqual({ ok: false, reason: 'ambiguous-hypotenuse' });
+  });
+
+  it('«תיכון ליתר» builds the median from C to the midpoint of AB (the ks1up71f replay, with the right angle stated)', () => {
     for (const u of ['תיכון ליתר', 'התיכון ליתר', 'median to the hypotenuse']) {
       const r = parse(u, rt);
       expect(r.ok, u).toBe(true);
@@ -258,8 +265,10 @@ describe('#1810 — a role-named side follows the configuration', () => {
     expect(sideOf(targets(fig, 'midpoint')[0])).toBe('AC');
   });
 
-  it('the hypotenuse follows a re-seated right angle: «משולש ישר זווית ABC · תיכון ליתר · זווית BAC = 90» → the median goes to BC', () => {
-    const fig = view(factsFor(['משולש ישר זווית ABC', 'תיכון ליתר', 'זווית BAC = 90']));
+  it('the hypotenuse is the one the STATED right angle makes: «משולש ישר זווית ABC · זווית BAC = 90 · תיכון ליתר» → the median goes to BC', () => {
+    // #1689 (ADR-639): «תיכון ליתר» before the right angle is stated now asks (it used to draw from the default seat
+    // C and move on the re-seat), so the hypotenuse never hangs off an unstated choice.
+    const fig = view(factsFor(['משולש ישר זווית ABC', 'זווית BAC = 90', 'תיכון ליתר']));
     expect(sideOf(targets(fig, 'midpoint')[0])).toBe('BC');
   });
 

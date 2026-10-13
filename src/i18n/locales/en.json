@@ -86,6 +86,7 @@
     "alreadyDrawn": "That's already on the figure — nothing to add.",
     "sideUnspecified": "A {{noun}} does not have all sides equal, so \"its side\" does not name a particular one — say WHICH side, for example \"{{a}} = {{value}}\".",
     "roleSideUnresolved": "The figure has no single side matching \"{{role}}\" — declare the matching triangle first (e.g. \"right triangle ABC\" for the hypotenuse, \"isosceles triangle ABC\" for the base), or name the side by its letters (e.g. \"median to side AB\").",
+    "ambiguousHypotenuse": "Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: \"{{detail}}\". Name the hypotenuse — for example \"the median to the hypotenuse AB\" — or the right angle, for example \"angle C is right\".",
     "roleClaim": {
       "centre-end": "\"{{noun}} {{pair}}\": {{other}} is the centre of the circle, not a point on it — a chord or a diameter joins two points on the circle.",
       "no-centre-end": "\"{{noun}} {{pair}}\": a radius starts at the centre of the circle, {{other}}, but neither {{a}} nor {{b}} is the centre.",

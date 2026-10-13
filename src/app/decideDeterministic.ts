@@ -381,6 +381,12 @@ export async function decideFromParse(
   if (!r.ok && r.reason === 'role-side-unresolved') {
     return refuse('clarify', { source: 'parser', result: `role-side-unresolved:${r.role}` }, { key: 'input.roleSideUnresolved', params: { role: r.role } });
   }
+  // #1689 ([ADR-639](../../docs/06-decisions.md#adr-639)): «היתר» on a triangle declared right whose right angle no
+  // statement has seated. Ruled 2026-10-02 (#1620): ask which side is the hypotenuse, never assume C. The
+  // question is analytic's `ambiguous-hypotenuse` (ADR-AG-211), one sentence for one verdict in both builders.
+  if (!r.ok && r.reason === 'ambiguous-hypotenuse') {
+    return refuse('clarify', { source: 'parser', result: 'ambiguous-hypotenuse' }, { key: 'input.ambiguousHypotenuse', params: { detail: utterance.trim() } });
+  }
   // #1661 ([ADR-563](../../docs/06-decisions.md#adr-563)): a role noun («המיתר OB», «הרדיוס BC», «השוק AB»)
   // whose claim cannot be stated on this figure. Refused naming the noun and the pair the student typed —
   // never built as a bare segment with the claim dropped, never a paid guess at what the role meant.

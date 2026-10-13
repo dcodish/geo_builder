@@ -4,9 +4,10 @@
  *
  * A triangle's declarations induce roles on its sides: a right angle makes the opposite side the
  * hypotenuse; an equal pair of sides meeting at a vertex makes them the legs and the third side the base.
- * The roles are read off the CONSTRUCTION's declared structure (the right-triangle macro's perp-offset, a
- * ⟂ / 90° constraint at a triangle vertex, an equal-sides constraint) — never off drawn coordinates, so a
- * side that merely MEASURES equal at this seed never becomes «the base» (ADR-052).
+ * The roles are read off the CONSTRUCTION's declared structure (a STATED ⟂ / 90° constraint at a triangle
+ * vertex, an equal-sides constraint) — never off drawn coordinates, so a side that merely MEASURES equal at
+ * this seed never becomes «the base» (ADR-052). #1689 (ADR-639): the right-triangle noun alone states no
+ * vertex, so its default seat makes no hypotenuse ({@link openRightTriangles}).
  *
  * Every role family hangs off ONE distinguished vertex of the triangle — the right-angle vertex for the
  * hypotenuse, the apex for the base and the legs. When that vertex is an UNSTATED choice (the isosceles
@@ -37,6 +38,32 @@ export interface RoleSide {
 /** Which family a role belongs to — the family decides which distinguished vertex it hangs off. */
 const familyOf = (role: SideRole): 'right' | 'isosceles' => (role === 'hypotenuse' ? 'right' : 'isosceles');
 
+/** The vertex both segments share, when segments (a,b) and (c,d) meet at one point. */
+const sharedVertex = (a: Id, b: Id, c: Id, d: Id): Id | null => {
+  const shared = [a, b].filter((x) => x === c || x === d);
+  return shared.length === 1 ? shared[0] : null;
+};
+
+/**
+ * The vertices of triangle `vs` where a right angle is STATED. #1689 (ADR-639): only a stated right angle makes
+ * a side «the hypotenuse». The right-triangle noun's own right angle (its perp-offset, or its `seat` constraint)
+ * sits at a DEFAULT vertex the student never named, so it is not read here — see {@link openRightTriangles}. A
+ * stated «זווית C ישרה» / «∠ACB = 90» / «AC ⟂ BC» lowers to its own constraint (the ADR-163 reseat moves the
+ * noun's seat onto it, and the constraint stays).
+ */
+function statedRightAngles(construction: Construction, vs: Id[]): Set<Id> {
+  const inTri = (id: Id): boolean => vs.includes(id);
+  const rightAt = new Set<Id>();
+  for (const con of construction.constraints) {
+    if (con.type === 'perpendicular' && !con.seat) {
+      const v = sharedVertex(con.a, con.b, con.c, con.d);
+      if (v && inTri(v) && [con.a, con.b, con.c, con.d].every(inTri)) rightAt.add(v);
+    }
+    if (con.type === 'angle' && con.value === 90 && inTri(con.vertex) && inTri(con.ray1) && inTri(con.ray2)) rightAt.add(con.vertex);
+  }
+  return rightAt;
+}
+
 /** Every side role the construction's declarations induce (semantic — never read off coordinates). */
 export function roleSidesOf(construction: Construction): RoleSide[] {
   const out: RoleSide[] = [];
@@ -44,26 +71,10 @@ export function roleSidesOf(construction: Construction): RoleSide[] {
     if (!out.some((r) => r.role === role && ((r.edge[0] === edge[0] && r.edge[1] === edge[1]) || (r.edge[0] === edge[1] && r.edge[1] === edge[0])))) out.push({ role, edge, ring, at });
   };
   const tris = construction.objects.filter((o): o is Extract<GeoObject, { kind: 'polygon' }> => o.kind === 'polygon' && o.vertices.length === 3);
-  /** The vertex both segments share, when segments (a,b) and (c,d) meet at one point. */
-  const sharedVertex = (a: Id, b: Id, c: Id, d: Id): Id | null => {
-    const shared = [a, b].filter((x) => x === c || x === d);
-    return shared.length === 1 ? shared[0] : null;
-  };
   for (const t of tris) {
     const vs = t.vertices;
     const inTri = (id: Id): boolean => vs.includes(id);
-    const rightAt = new Set<Id>();
-    for (const o of construction.objects) {
-      // the right-triangle macro's structural build: the perp-offset anchored at the right-angle vertex
-      if (o.kind === 'perp-offset' && inTri(o.anchor) && inTri(o.to) && inTri(o.id) && o.anchor === o.from) rightAt.add(o.anchor);
-    }
-    for (const con of construction.constraints) {
-      if (con.type === 'perpendicular') {
-        const v = sharedVertex(con.a, con.b, con.c, con.d);
-        if (v && inTri(v) && [con.a, con.b, con.c, con.d].every(inTri)) rightAt.add(v);
-      }
-      if (con.type === 'angle' && con.value === 90 && inTri(con.vertex) && inTri(con.ray1) && inTri(con.ray2)) rightAt.add(con.vertex);
-    }
+    const rightAt = statedRightAngles(construction, vs);
     if (rightAt.size === 1) {
       const [v] = rightAt;
       push('hypotenuse', vs.filter((x) => x !== v) as [Id, Id], [...vs], v);
@@ -79,6 +90,28 @@ export function roleSidesOf(construction: Construction): RoleSide[] {
       push('leg', [c4.c, c4.d].sort() as [Id, Id], [...vs], apex);
       push('base', vs.filter((x) => x !== apex) as [Id, Id], [...vs], apex);
     }
+  }
+  return out;
+}
+
+/**
+ * #1689 ([ADR-639](../../docs/06-decisions.md#adr-639)) — the triangles declared RIGHT whose right angle is
+ * not yet STATED at any vertex: «משולש ישר-זווית ABC» alone. The noun says the triangle has a right angle,
+ * not which vertex has it, so its hypotenuse is OPEN — a role noun («תיכון ליתר») asks which side is meant
+ * rather than reading the default seat the drawing happens to use (operator ruling 2026-10-02, #1620).
+ * Read off the noun's structural build (the perp-offset anchored at its own `from`, which only the
+ * right-triangle macro builds, or its `seat` constraint); a triangle with a stated right angle is not open.
+ */
+export function openRightTriangles(construction: Construction): Id[][] {
+  const out: Id[][] = [];
+  for (const t of construction.objects) {
+    if (t.kind !== 'polygon' || t.vertices.length !== 3) continue;
+    const vs = t.vertices;
+    const inTri = (id: Id): boolean => vs.includes(id);
+    const seated =
+      construction.objects.some((o) => o.kind === 'perp-offset' && o.anchor === o.from && inTri(o.anchor) && inTri(o.to) && inTri(o.id)) ||
+      construction.constraints.some((c) => c.type === 'perpendicular' && c.seat === true && [c.a, c.b, c.c, c.d].every(inTri));
+    if (seated && statedRightAngles(construction, vs).size === 0) out.push([...vs]);
   }
   return out;
 }

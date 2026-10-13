@@ -826,6 +826,15 @@ triangle, `at` its apex or right-angle vertex — unless the sentence names a ve
 command through `resolveRoleSide` against the construction at that fact's apply: same vertex → unchanged; one other →
 the letters rotate along the ring; several, none the bound one → unchanged; none → the fact waits. The theorem context and the rename core follow the binding.
 
+**Only a stated right angle makes a hypotenuse ([ADR-639](06-decisions.md#adr-639)).** `roleSidesOf` reads the
+hypotenuse off a ⟂ / 90° constraint at a triangle vertex that a STATEMENT lowered; the right-triangle macro's own
+right angle — its perp-offset (`anchor === from`, which no other build makes) and, in the shared-hypotenuse build,
+its ⟂ marked `seat: true` — is the noun's default seat and is skipped. `openRightTriangles(construction)` lists the
+triangles that carry such a seat and no stated right angle; `buildParseCtx` carries it as
+`ParseContext.openRightTriangles`. `roleSideLine` answers «היתר» beside one with `ambiguous-hypotenuse` (the
+message is analytic's `errAmbiguousHypotenuse`, ADR-AG-211), unless the letters after the noun name one of its
+sides: then that side is the rewrite's, and the role claim (ADR-563) states the right angle opposite it.
+
 ### A stated side is a requirement record, checked at stage 0g′ and read wherever a point is placed ([ADR-549](06-decisions.md#adr-549), [ADR-594](06-decisions.md#adr-594))
 
 - **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`): `circle-side`, `polygon-side`,

@@ -16404,3 +16404,34 @@ The touch list inherits both. They are filed as #2001 (`needs-operator`). The in
 - «משולש ABC · AB = 5 · BC = 4 · זווית BAC = 40» → «חשב ערכים» lists AC = 1.45 או AC = 6.21, ∠ABC = 13.46 או ∠ABC = 86.54, ∠BCA = 53.46 או ∠BCA = 126.54 and the two areas and perimeters; asking «AC» answers the same (was: only the three stated values, and «undetermined»).
 - With three or more possible values nothing is shown, as before; the student switches configurations with «הציגו תצורה אחרת».
 - An angle question never answers as a radical.
+
+## ADR-639 — «היתר» is the side opposite a STATED right angle; the right-triangle noun alone asks which side it is (#1689)
+
+**Status:** accepted · 2026-10-13 · bug (P2, 2-D) · fix-round #2053, stream E · branch `fix/1689-hypotenuse-vertex` off `main` @ 6096b643 · operator ruling 2026-10-02 on #1620 · LADDER stage: none (a parse-context read; no solve, sample or stage changes) · the 2-D side of [ADR-AG-211](06c-decisions-analytic.md#adr-ag-211)'s hypotenuse decision
+
+**Requirements:** [02](02-requirements.md) FR-IN-9 (a hypotenuse is built from a stated right angle, else asked) · **Design:** [04](04-design.md) *A side named by its role follows the configuration* — new paragraph *Only a stated right angle makes a hypotenuse*
+
+**The ruling** (2026-10-02, on #1620): build when a stated right angle fixes the vertex; otherwise ASK which side is the hypotenuse; never assume C.
+
+**Measured before** (re-measured at pickup, `main` @ 6096b643, through `decideDeterministic2D` + `replay`). After «משולש ישר-זווית ABC»: «תיכון ליתר» committed `midpoint M of AB` + CM; «גובה ליתר» `foot F from C to AB`; "the median to the hypotenuse" and «CM תיכון ליתר» the same. «גובה ליתר BC» committed «∠BAC = 90» **and** the altitude from C to AB — the student's side dropped for C's — and «תיכון ליתר BC» escalated to the paid model. With the right angle stated («זווית A ישרה», «∠BAC = 90», «AC ⟂ BC», «(∠C = 90°)») the line was right; «משולש ABC» · «תיכון ליתר» asked (`roleSideUnresolved`).
+
+**The class (docs/17 §1).** *A side named by its role resolved against a vertex the student never stated.* `roleSidesOf` — the one definition of the side roles (ADR-596) — read the right-triangle macro's structural perp-offset as a declared right angle. That perp-offset is the noun's DEFAULT seat (the noun names no vertex; the ADR-163 reseat and the ADR-445 `rot` move it), so every reader of «היתר» inherited C: both cevian heads, both languages, a named hypotenuse that is not AB (the candidate list held only AB, so `cands[0]` replaced the student's side), and the Thales starting reading. The shared-hypotenuse build (two right triangles on one side) hid the same seat in a plain ⟂ constraint.
+
+**Decision.**
+1. **`roleSidesOf` reads only a stated right angle** (`statedRightAngles`): a ⟂ or 90° constraint at a triangle vertex. The macro's perp-offset is skipped, and the shared-hypotenuse build's ⟂ is marked `seat: true` (`PerpendicularConstraint.seat`) and skipped. A statement keeps its own constraint after the reseat (measured: «זווית A ישרה» leaves `angle A 90`; «AC ⟂ BC» a ⟂), so stated seats still resolve, at C or re-seated.
+2. **`openRightTriangles(construction)`** lists the triangles carrying the macro's seat and no stated right angle; `buildParseCtx` carries it as `ParseContext.openRightTriangles`.
+3. **`roleSideLine` asks** with `ambiguous-hypotenuse` when «היתר» meets an open right triangle, unless the two letters after the noun name one of its sides. Then that side is the rewrite's, and the role claim (ADR-563) states the right angle opposite: «תיכון ליתר BC» is the median from A with ∠BAC = 90. A pair that is no side of it still asks. A plain triangle keeps `roleSideUnresolved`; a stated right angle builds as before.
+4. **The question is analytic's** `errAmbiguousHypotenuse` (ADR-AG-211), copied word for word as `input.ambiguousHypotenuse` (He/En), with the student's sentence as `{{detail}}`: one sentence for one verdict (ADR-W-118 B1). Its Hebrew examples, «תיכון ליתר AB» and «זווית C ישרה», both build in 2-D.
+
+**Worst-case multiplier (docs/17 M3):** none — one more pass over the triangles and constraints at parse-context build, no solve.
+
+**Sibling audit.** Analytic already asks (ADR-AG-211). 3-D's row is parked (#1679). Complex has no plane hypotenuse. Parity row `cat-2d-051` (`asks`) loses its 2-D known gap, and `#1689` leaves `GAP_ISSUES`.
+
+**Locks.** `src/app/__tests__/issue-1689-hypotenuse-vertex.test.ts` — through `decideDeterministic2D`: the open noun asks for seven spellings (He/En, median/altitude, «CM תיכון ליתר») with no model call and analytic's exact text; the suggested answers build; a named side («תיכון ליתר BC», «גובה ליתר BC», «CB») runs from A with ∠A = 90 stated; a pair outside the triangle and two open triangles ask; five stated forms build from the stated vertex; the one-line «(∠C = 90°)» and a plain triangle with «זווית B ישרה» build; the plain-triangle refusal is unchanged; the engine units (no hypotenuse role and one open triangle on the noun alone; a stated angle closes it at C and at A; the shared-hypotenuse ⟂ carries `seat`). Scenario `open-right-triangle-asks-the-hypotenuse-1689` (corpus 4) — the operator's three lines asked, then «תיכון ליתר AB» builds. **Locks changed to this ruling:** `src/parser/__tests__/issue-775.test.ts` — the #775 prod-session block states «זווית C ישרה» before its builds, and gains the open-noun ask; #1810's hypotenuse case states the right angle first («… · זווית BAC = 90 · תיכון ליתר» → BC), since the line before the statement now asks.
+
+**Behaviour change for a student:**
+- «משולש ישר-זווית ABC» · «תיכון ליתר» (also «גובה ליתר», "the median to the hypotenuse", «CM תיכון ליתר») → the question «לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר …», nothing drawn (was: the line from C).
+- «תיכון ליתר BC» / «גובה ליתר BC» on that triangle → the line from A to BC, ∠A marked right (was: escalated / the altitude from C to AB).
+- A figure saved before this fix with «תיכון ליתר» on an unstated right angle loads with that row waiting, «can't build yet: no hypotenuse is declared in triangle ABC» (the ADR-596 message), until a right angle is stated.
+
+**Not done (found, filed separately):** «משולש ישר-זווית ABC שבו זווית A ישרה» drops the «שבו» clause and draws the right angle at C; «משולש ישר-זווית ABC» · «AB ⟂ AC» commits with ∠A = 51° and no error; 2-D does not read the English example «angle C is right» (it escalates).
