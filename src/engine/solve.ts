@@ -17,6 +17,7 @@
 import type { Constraint, Construction, Id, LengthBoundConstraint, SolveDirective, SolvedOnSegmentPoint, Vec } from './types';
 import {
   ANGLE_EPS,
+  DIRECTION_EPS,
   LEN_EPS,
   ORDER_ANGLE_MARGIN_DEG,
   ORDER_ANGLE_MIN_GAP_DEG,
@@ -448,7 +449,7 @@ function baseResidualTolerance(con: Constraint, scale = 1): number {
     case 'parallel':
     case 'perpendicular':
     case 'collinear':
-      return 1e-6;
+      return DIRECTION_EPS;
     case 'angle-ratio':
       return ANGLE_EPS;
     case 'coincide':

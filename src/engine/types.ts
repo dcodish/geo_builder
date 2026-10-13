@@ -1433,6 +1433,15 @@ export const DISPLAY_ONLY: ReadonlySet<AnyCommand['type']> = new Set<AnyCommand[
 /** Tolerances. */
 export const LEN_EPS = 1e-6; // coordinate closeness (units)
 export const ANGLE_EPS = 0.5; // degrees
+/** The ∥ / ⟂ / collinear residual tolerance: the sine or cosine of the angle a direction relation may be off by. */
+export const DIRECTION_EPS = 1e-6;
+/**
+ * #1931 ([ADR-640](docs/06-decisions.md#adr-640)) — how far from tangent a line may lean at a placed on-circle point
+ * and still BE the tangent there: |cos∠(line, radius)| at or below this. Ten times {@link DIRECTION_EPS}, so a
+ * tangency held by a ⟂ / collinear relation (which may lean by up to DIRECTION_EPS) can never pass for a secant
+ * unless that relation fails its own status. An angle, so it is scale-free; a real secant measures far above it.
+ */
+export const TANGENT_COS = 10 * DIRECTION_EPS;
 
 /**
  * Inequality (order) constraint tuning (ADR-039). An ordering like "α < β" is satisfied by a

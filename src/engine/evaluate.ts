@@ -6,7 +6,7 @@
  */
 
 import type { Circle, Constraint, Construction, GeoObject, GeoPoint, Id, Line, Vec } from './types';
-import { LEN_EPS, isGeoPoint, isOrderConstraint, objectParents } from './types';
+import { LEN_EPS, TANGENT_COS, isGeoPoint, isOrderConstraint, objectParents } from './types';
 import { isShapeCarrier } from './carriers';
 import { angleIntoSpans, drawnArcSpans, drawnSign, type ArcSpan } from './arcs';
 import {
@@ -1379,6 +1379,10 @@ function evaluateUncached(c: Construction, resolve: (c: Construction) => Constru
   }
   const res = evaluateCore(resolve(c));
   if (!res.ok || driven.length === 0) return res;
+  // #1931 (ADR-640): an on-circle point driven onto a line that is tangent to its circle has nowhere to go but
+  // the touch point — the crossing's refusal, in its carrier spelling.
+  const tangent = tangentDrivenRefusal(c, res.positions, res.circles);
+  if (tangent) return { ok: false, error: tangent };
   // Report the whole CONFLICT SET, not one arbitrary member. When a joint solve can't satisfy an
   // impossible constraint it drags its co-drivers off too (here the impossible ⟂ pulls F off the
   // ratio), so several read violated at the best-effort placement. Naming just one is misleading —
@@ -1457,7 +1461,7 @@ export function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean
     }
     for (const p of points) {
       if (!remaining.has(p.id)) continue;
-      const r = tryEval(p, pos, lines, circles, spansOf);
+      const r = tryEval(p, pos, lines, circles, spansOf, opts?.skipConstraints === true);
       if (r === 'pending') continue;
       if (typeof r === 'string') return { ok: false, error: r, stuckIds: [p.id] };
       pos.set(p.id, r);
@@ -1657,6 +1661,67 @@ export function avoidIsCrossing(sols: Vec[], avoid: Vec | undefined): boolean {
 }
 
 /**
+ * #1931 ([ADR-640](docs/06-decisions.md#adr-640)) — IS `line` THE TANGENT to `circle` AT `q`? True when `q` lies
+ * on the circle and on the line, and the line leans from the circle's tangent at `q` by no more than
+ * {@link TANGENT_COS} (|cos∠(line, radius to q)|). An angle, so it is scale-free, and held to the ⟂ / collinear
+ * tolerance (times a margin), never to the coordinate ruler `LEN_EPS`: a tangency STATED as a relation («AP ⊥ OA»,
+ * «הישר AP משיק למעגל O בנקודה A») may lean by up to DIRECTION_EPS, which buys a "second crossing" up to 2r·10⁻⁶
+ * from `q`, and a solve could tune that chord past any absolute ruler while the relation still read ✓.
+ */
+export function tangentAt(line: ResolvedLine, circle: ResolvedCircle, q: Vec): boolean {
+  const rq = sub(q, circle.center);
+  const d = len(rq);
+  const tol = LEN_EPS * Math.max(1, circle.r);
+  if (d < tol || Math.abs(d - circle.r) > tol) return false; // not on the circle (or the circle is a point)
+  const off = (q.x - line.anchor.x) * line.dir.y - (q.y - line.anchor.y) * line.dir.x;
+  if (Math.abs(off) > tol) return false; // not on the line
+  return Math.abs((line.dir.x * rq.x + line.dir.y * rq.y) / (d * len(line.dir))) <= TANGENT_COS;
+}
+
+/**
+ * #1931 (ADR-640): the placed point at which `line` is tangent to `circle`, or null. When there is one, the line
+ * meets the circle there ONLY: both of `lineCircleIntersect`'s roots sit within 2r·TANGENT_COS of it, so neither
+ * is a point of its own. The ONE question both crossing spellings ask — the line∩circle point ({@link tryEval})
+ * and the on-circle point driven onto a line ({@link tangentDrivenRefusal}).
+ */
+export function tangentTouch(line: ResolvedLine, circle: ResolvedCircle, pos: Map<Id, Vec>): Id | null {
+  for (const [id, q] of pos) if (tangentAt(line, circle, q)) return id;
+  return null;
+}
+
+/** The engine's one sentence for "a crossing asked of a tangent" (`humanizeError` → `errors.tangentNoSecondCrossing`). */
+function tangentNoSecondCrossing(pointId: Id, lineName: string, circleId: Id, touch: Id): string {
+  return `cannot place ${pointId}: line ${lineName} is tangent to circle ${circleId} at ${touch} — it has no second crossing to extend onto`;
+}
+
+/**
+ * #1931 (ADR-640) — the second caller of {@link tangentTouch}: an ON-CIRCLE point driven onto a line by
+ * `collinear(E, X, Y)` (the lowering of «E על הישר AP · E על מעגל O», ADR-050) IS that line's crossing with
+ * the circle, spelled as a carrier. When the line XY is tangent to E's circle at X or Y, the only root the
+ * solve can take is the touch point itself, so there is no E to place: the same refusal as the line∩circle
+ * spelling. Judged on the SOLVED positions `pos` against the directives of the unsolved construction `c`
+ * (the solve clears them), so it holds whichever solver placed the carriers.
+ */
+function tangentDrivenRefusal(c: Construction, pos: Map<Id, Vec>, circles: Map<Id, ResolvedCircle>): string | null {
+  for (const o of c.objects) {
+    if (o.kind !== 'on-circle') continue;
+    const k = (o as { solve?: { constraint: Constraint } }).solve?.constraint;
+    if (!k || k.type !== 'collinear') continue;
+    const ends = [k.a, k.b, k.c].filter((id) => id !== o.id);
+    if (ends.length !== 2) continue;
+    const circle = circles.get(o.circle);
+    const x = pos.get(ends[0]);
+    const y = pos.get(ends[1]);
+    if (!circle || !x || !y || len(sub(y, x)) < LEN_EPS) continue;
+    const line: ResolvedLine = { anchor: x, dir: unit(sub(y, x)) };
+    for (const id of ends) {
+      if (tangentAt(line, circle, pos.get(id)!)) return tangentNoSecondCrossing(o.id, `${ends[0]}${ends[1]}`, o.circle, id);
+    }
+  }
+  return null;
+}
+
+/**
  * #1600 ([ADR-593](docs/06-decisions.md#adr-593)) — THE CHOICE a line∩circle / circle∩circle point makes: the
  * roots it chooses among (`among`) and the one it picks (`pick`). `among.length` is how many configurations
  * stepping `branch` can reach — 1 when the choice is DETERMINED (an `avoid` that is one of the crossings, a
@@ -1752,6 +1817,8 @@ export function crossingBranchCount(c: Construction, e: EvalOk, id: Id): number 
     sols = lineCircleIntersect(l.anchor, l.dir, circ.center, circ.r);
   }
   if (!sols.length) return 0;
+  // #1931 (ADR-640): a tangent's crossing has no configuration to step to — the same question `tryEval` asks.
+  if (line && p.kind === 'line-circle' && tangentTouch(line, e.circles.get(p.circle)!, pos)) return 0;
   return crossingChoice(p, sols, pos, line)?.among.length ?? 0;
 }
 
@@ -1763,6 +1830,8 @@ function tryEval(
   circles: Map<Id, ResolvedCircle>,
   /** #429: the drawn ink of a circle, or null/absent when the whole circle is drawn. */
   spansOf?: (circleId: Id) => ArcSpan[] | null,
+  /** #1931 (ADR-640): a driven solve's TRIAL layout (`evaluateCore`'s `skipConstraints`), not the drawn figure. */
+  trial = false,
 ): Vec | 'pending' | string {
   switch (p.kind) {
     case 'free-point':
@@ -1964,6 +2033,14 @@ function tryEval(
       if (!l || !c) return 'pending';
       const sols = lineCircleIntersect(l.anchor, l.dir, c.center, c.r);
       if (sols.length === 0) return `cannot construct ${p.id}: line ${p.line} does not meet circle ${p.circle}`;
+      // #1931 (ADR-640): a line tangent at a placed point meets the circle there only — however the tangency
+      // was stated. Asked before the choice, whose `LEN_EPS` ruler a relation-held tangency can game.
+      const touch = tangentTouch(l, c, pos);
+      // In a solve's TRIAL the crossing sits on its touch point instead: a trial that errored here would steer
+      // the solve to lean the line off the tangent by more than its stated relation allows (breaking the
+      // relation, or flinging a point that holds it by collinearity far away), only to make E exist. The
+      // drawn figure, evaluated once the solve is done, is refused.
+      if (touch) return trial ? pos.get(touch)! : tangentNoSecondCrossing(p.id, p.line, p.circle, touch);
       // The selection (in-segment root, "the OTHER crossing", or a stable side by `branch`) is ONE shared
       // function with the branch count (#1600, ADR-593) — see {@link crossingChoice}.
       const choice = crossingChoice(p, sols, pos, l);
@@ -1971,7 +2048,7 @@ function tryEval(
       // No NEW crossing: the line meets the circle ONLY at points already placed — it is tangent at
       // `avoid` (touches just there), or both its named ends are on the circle (a chord). Report it
       // clearly instead of collapsing the new point onto `avoid` (the tangent-extension crash).
-      return `cannot place ${p.id}: line ${p.line} is tangent to circle ${p.circle} at ${p.avoid} — it has no second crossing to extend onto`;
+      return tangentNoSecondCrossing(p.id, p.line, p.circle, String(p.avoid));
     }
 
     case 'circle-circle': {
