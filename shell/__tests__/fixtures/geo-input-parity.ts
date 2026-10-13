@@ -257,6 +257,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1969': 'open',
   '#2013': 'open',
   '#2047': 'open',
+
+  '#1924': 'open',
 };
 
 export interface ParityRow {
@@ -1345,6 +1347,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2040 (ADR-636): «קטן פי N» is the inverse factor — 2-D drew it as «גדול פי N»; analytic always read it as half ──
   { id: 'comparative-smaller-2040', family: 'lengths', steps: ['משולש ABC', 'AB קטן פי 2 מ-AC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the reported line; 3-D reads no «פי» comparative (not-understood)' },
+
+  // ── #1931 (ADR-640): a crossing asked of a line the givens make TANGENT has no second point — refused with the tangent sentence ──
+  { id: 'relation-tangent-crossing-1931', family: 'tangents', steps: ['מעגל O', 'A על מעגל O', 'נקודה P', 'הישר AP משיק למעגל O בנקודה A', 'הישר AP חותך את המעגל בנקודה E'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1924' }], note: '2-D committed E 1e-6 from A before ADR-640' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

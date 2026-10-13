@@ -1826,3 +1826,11 @@ over all four (ADR-041).
 ### `no-angle-yet-at-a-bare-vertex-1722` — «זווית A = 30» on a lone point, «AE חוצה זווית» / «זווית B = 30» on one segment, «זווית C = זווית B» on two: refused as «no angle there yet», never «more than one angle … ∠AAC» (#1722, ADR-641)
 
 **Guards against:** the old ambiguous-angle note firing where the vertex has FEWER than two edges, claiming «יש יותר מזווית אחת בקודקוד A» (there are none) and teaching the nonsense example «∠AAC» from its `A{{vertex}}C` interpolation. The operator ruled on 2026-10-13: say there is no angle yet, in the approved sentence «בקודקוד A עדיין אין זווית — שרטטו קודם שתי צלעות שיוצאות מ-A, או כתבו את הזווית בשלוש אותיות.». **Asserts** that each of the four lines is refused as a bare `ambiguous-angle` with no candidate list (which the submit door renders as `input.noAngleYet`), that the points drawn so far stand, and that the refused bisector minted no E. The sentence through the real `decideDeterministic2D` for all four measured sequences, the English twin, the unchanged multi-option sequence «משולש ABC · משולש ABD · AE חוצה זווית» (ADR-590) and the one-candidate pass-through are in `src/__tests__/issue-1722-no-angle-yet.test.ts`.
+
+### `relation-tangent-has-no-second-crossing-1931` — «מעגל O · A על מעגל O · נקודה P · הישר AP משיק למעגל O בנקודה A · הישר AP חותך את המעגל בנקודה E»: refused with the tangent sentence, in every spelling and order (#1931, ADR-640)
+
+**Guards against:** a crossing asked of a tangent STATED AS A RELATION committing with E 1·10⁻⁶ from A (the solve leaned the line within the relation's own tolerance until a "second root" cleared `LEN_EPS`), and the ladder answering «E על הישר AP · E על מעגל O», «AP חותך…» and the other order with another stage's reason. Also checks the carrier pair, the order spelling, and the tangency typed after the crossing.
+
+### `perpendicular-tangent-has-no-second-crossing-1931` — «… AP ⊥ OA · הישר AP חותך את המעגל בנקודה E»: the ⟂ twin (#1931, ADR-640)
+
+**Guards against:** the same class with the tangency stated as «AP ⊥ OA» (A on the circle): every spelling is refused with «לא ניתן למקם את E: הישר משיק למעגל בנקודה אחת בלבד…», and «AP ⊥ OA» typed after the crossing is refused, never parked.

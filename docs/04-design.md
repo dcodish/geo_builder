@@ -577,6 +577,14 @@ diagonals of «האלכסונים נפגשים בנקודה M» as plain segment
 `cross(…, 'point')`, a role meet with a noun head — inks nothing and ensures the endpoints as `ifAbsent` free
 points. Analytic reads the same rule (ADR-AG-241).
 
+**A tangent has no second crossing** ([ADR-640](06-decisions.md#adr-640), #1931). `tangentAt(line, circle, Q)` (`evaluate.ts`) is
+the one test: Q on both, and |cos∠(line, radius)| ≤ `TANGENT_COS` = 10 × `DIRECTION_EPS` — an angle held to the ⟂
+tolerance, never to `LEN_EPS`, which a relation-held tangency can game. `tangentTouch` asks it of every placed point.
+Callers: the line∩circle point in `tryEval` (a solve's trial seats it on the touch point; the drawn figure refuses,
+tagged `EvalErr.tangent`), the on-circle carrier driven by `collinear` (post-solve), `crossingBranchCount`, and the
+step ladder twice — `newCrossingTangency` judges a NEW crossing on the prior figure (stage 0j), and
+`runFailureLadder` carries a rescue stage's tangent refusal as the refusal's reason (`tangentSeen`, stage 2i).
+
 ### A fixed-run rule consumes the whole label body ([ADR-601](06-decisions.md#adr-601))
 
 `labelRun(body, n)` returns the first run of exactly n labels and nothing about the rest of the body, so a rule
