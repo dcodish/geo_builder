@@ -12163,3 +12163,23 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Locks.** `src-analytic/__tests__/issue-2031-area-label.test.ts` (9), every row through `decideSubmit` → `derive` → `buildScene` at seeds 0–3: the operator's two lines → one «S» inside ABC; the class rows (`המשולש`, English, square, copula letter, «= T», «= 12», «= 2a», twice-stated in both representations); unchanged rows («הוא 6» → «S=6», the two area ratios and the mixed form → no area label, a length equation still labels and ticks). `issue-1714-stated-measures` unchanged and green. Analytic has no saved-figure fixture harness (ADR-AG-266), so the operator's exact lines are the first row of the test file.
 
 **Behaviour change for a student:** «נסמן את שטח ABC ב-S» now prints «S» inside the triangle, and «שטח ABC = 12» prints «S=12» (both drew nothing); «שטח המשולש ABC הוא S» prints «S» (was «S=S»); an area stated as a letter and then a number prints one label, «S=12» (was two).
+
+## ADR-AG-274 — The axis letter of a subscripted coordinate is read in either case: «X_B<X_D» is «x_B<x_D» (#1773)
+
+**Status:** accepted · 2026-10-13 · bug (P3) · fix round #2053, stream N · branch `fix/1773-uppercase-axis-letter` · LADDER stage: none (parser boundary)
+
+**Requirements:** [02c](02c-requirements-analytic.md) R89 (a new example line: the axis letter in either case) · **Design:** [04c](04c-design-analytic.md) the `orthography` fold list
+
+**Measured at pickup** (`6096b643`, `decideSubmit`). After the operator's kite lines («דלתון ABCD» … «שיעור ה- x של B גדול משיעור ה- x של D»), `x_B<x_D` → `refused unsatisfiable` and `X_B<X_D` → `refused not-handled`. With `A(1,7)`, `B(3,3)`, `D(5,1)`, `x_B<x_D` records and `X_B<X_D` is `not-handled`. The same split holds for `X_{B}`, `B_X`, `Y_B`, the mixed `X_B<x_D`, and the value forms `X_B=3`, `X_A=4`, `Y_A=2`, `X_{A}=4`, `Y_A>0`, `X_A<5`.
+
+**Class** (docs/17 §1). *A coordinate token whose axis letter is uppercase is not read anywhere.* The plan expected one token reader. Measured, there are two: the comparison atom (`COORD_ATOM`: `x_B`, `x_{B}`, `B_x`, `xB`) and the value rule (`COMPONENT_SUB`: `x_A = 5`, `x_{A} = 5`). Both spell the axis `[xy]`. A fold in either one alone would leave the other spelling refused.
+
+**Decision.** The case is folded once, in `parser/frameAnalytic.ts` `orthography`, the character-level boundary every rule reads (it already folds `S_{ABC}`, the glyph look-alikes and the spaced «ה- x»). `X_B`/`X_{B}` → `x_B`/`x_{B}`, and `B_X`/`B_{X}` → `B_x`/`B_{x}`. The fold is unambiguous because a point label's subscript is digits (`carriers.POINT_TOKEN`). It needs a LETTER after the `_` (or the axis letter after a label's `_`), so `X_1` and `X_{12}` stay labels. The bare run `XB` is a segment name and is not touched. The stored line, and the source a refusal quotes, stay the line as typed (`parseLine`'s `line !== typed` arm).
+
+**Behaviour change for a student** (`[ruled]`, the plan as armed on #1773): an uppercase axis letter in a subscripted coordinate gets exactly the verdict of its lowercase spelling, whether that is a record, a refusal or "already known". No new message.
+
+**Not changed (findings, filed separately):** `A_x = 4` and the bare `xA = 4` are `not-handled` in lowercase too (R32 says `xA` is understood). The word form «שיעור ה-X של B» is not folded. 3-D (`src3d/parser/parse3.ts` `COMPONENT_FRAMES`, all `[xyz]`) has the same class: `X_B=3`, `X_{B}=3`, `B_X=3`, `Z_B=3`, `X_B>0` → `not-understood` while lowercase reads.
+
+**Locks.** `src-analytic/__tests__/issue-1773-uppercase-axis-letter.test.ts`: the operator's exact sequence (`X_B<X_D` → `refused unsatisfiable`, as `x_B<x_D`); a 13 × 3 grid (each uppercase spelling equals its lowercase verdict on the kite, on three stated points and on an empty canvas); the fold's unit cases (`X_1`, `X_{12}`, `A_1B_2`, `XB`, `XY` untouched); the recorded line is the typed one.
+
+**Consequences.** `src-analytic/parser/frameAnalytic.ts` (`SUB_AXIS_FIRST`, `SUB_AXIS_LAST`); docs 02c R89, 04c.
