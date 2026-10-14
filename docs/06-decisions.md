@@ -16663,3 +16663,59 @@ Several opposite sides (a quadrilateral) are untouched: the foot does not choose
 **Locks.** `src/app/__tests__/issue-2099-collinear-circle.test.ts` (25): 11 spellings refused with the ruled Hebrew sentence word for word and the named other statement, the 3 circle-first incidences, the length member, the English line in the English locale, 5 controls that build, the structural reader with its witnesses, the "already degenerate" guard, the scale-free backstop at three scales, the evaluator message's humanised form. `humanize-error.test.ts` CASES gain both raw shapes. Scenario `collinear-circle-refused-2099` (corpus 4). Parity rows above.
 
 **Behaviour change for a student:** «מעגל שעובר דרך A, D ו-B» (or «מעגל חוסם את המשולש ADB») after «D על הישר AB» is now refused with «לא ניתן: «מעגל שעובר דרך A, D ו-B» סותר את «D על הישר AB» — אי אפשר לקיים את שניהם יחד. הסיבה: A, D ו-B על ישר אחד, ואין מעגל שעובר דרך שלוש נקודות על ישר אחד.» instead of committing green with no circle; the rows that were refused in half-English now read the same Hebrew sentence; typing the circle first and then the incidence refuses the incidence, naming the circle.
+
+## ADR-648 — A circle's radius letter takes its value: «r = 3» sizes the circle the letter names (#2101)
+
+**Status:** accepted · 2026-10-14 · bug (P1) · operator ruling 2026-10-14 on #2101 (option A) · P1 session #2107, stream S2 · branch `fix/2101-radius-letter-value`
+
+**Requirements:** [FR-EN-22a](02-requirements.md) · **Design:** [04-design.md](04-design.md) § "A letter's value lowers at its binding" · **LADDER stage:** none — a lowering at the symbolic middle-end ([ADR-031](#adr-031)), before stage 0; no solve stage changes.
+
+**Cites** [ADR-031](#adr-031) (symbolic lowering), [ADR-034](#adr-034) (the radius symbol), [ADR-087](#adr-087) (`set-radius`), [ADR-483](#adr-483) (a value whose subject is gone), [ADR-492](#adr-492) (blame on the value row), issue #54 (per-circle radius letters).
+
+**Context — measured at pickup on `939b160a`** (`decideDeterministic2D` + the gate + `replay`, `fetch` stubbed). «מעגל O ברדיוס r» · «A על מעגל O» · «r = 3»: every row green, the circle at its free default radius 5, A at distance 5. «שרדיוסו r», «רדיוס המעגל O הוא r», a diameter (|AB| = 10), and the value typed first: the same. «מעגל O ברדיוס R» · «R = 3»: `not-handled` (the paid model). The control «משולש ABC» · «AB = x» · «x = 4» drew |AB| = 4 in both orders.
+
+**Root cause.** A letter's value is consumed in `lowerOne` at the row that BINDS the letter: `measure-length` reads `tab.vars` and lowers to `set-distance`. A radius letter's binding is the `radius-symbol` command, which `lowerOne` passed through untouched, so nothing ever read the table for it; the `set-var` lowered to nothing and the row stayed green. Separately, `setVar` reads only the lowercase/Greek `VAR` atom, so «R = 3» never reached the table.
+
+**Class (docs/17 §1).** *A value given to a letter that a statement binds to an object's magnitude is applied only when the binding is a measure.* `radius-symbol` is the one non-measure binding of a magnitude a `set-var` reaches; its members are every spelling that emits it («ברדיוס r», «שרדיוסו r», «רדיוס המעגל O הוא r», the #54 post-pass), lower and upper case, the value before or after the binding.
+
+**Decision.**
+1. `lowerOne('radius-symbol')`: with a value in the table, lower to the naming **plus** `set-radius {circle, value}` — the stated-radius path, the numeric twin of «רדיוס המעגל O הוא 3» (`applyRadiusGiven`). The table is whole-list, so both entry orders hold. It does not re-emit a sizeless `circle` (after #2083 A that is a pure reference).
+2. `symbolsConsumedBy('radius-symbol')` = `[name]`: the binding reads the table, so ADR-492 blames a conflict the value causes on the value row when the value row is the later one.
+3. `setVar` reads an uppercase letter only when the semantic `ParseContext.radiusSymbols` lists it (the construction's own binding); an unbound capital stays a point name and is not read as a value.
+
+**Why not a patch (docs/17 §2).** No input is special-cased and no chokepoint list grows: the binding row resolves its letter exactly as the measure rows already do. The uppercase gate is a statement about the figure (the letter is bound), not a word test.
+
+**Sibling audit.** Measures (`measure-length/-angle/-area/-perimeter`) already resolve their values. Found, not this path, reported: an angle alias's value («נסמן זווית BAC כ-A1» · «A1 = 30») escalates; a bound on a radius letter («r > 7») is refused honestly as "cannot be enforced"; the UNBOUND reserved r («מעגל O» · «AB = r» · «r = 3») sizes AB to 3 but not the circle (the ADR-034/071 fallback, a different code path); an independent earlier size the value contradicts («OA = 4» then «r = 3» after «מעגל O ברדיוס r») is attributed to the earlier row, exactly as the length twin «AB = x» · «AB = 4» · «x = 3» is (ADR-492 moves blame only from the binding). Analytic: «מעגל O ברדיוס r» · «r = 3» is `not-handled` (its own radius parameters) — the parity row with a known gap needs an open analytic issue, owed by the session. 3-D: X8 (no plane circle). Complex: n/a.
+
+**Locks.** `src/engine/__tests__/radius-letter-value-2101.test.ts` (the lowering, both orders, the latest value, another letter, `symbolsConsumedBy`); `src/app/__tests__/issue-2101-radius-letter-value.test.ts` (through `decideDeterministic2D` and the gate: every spelling and order, the uppercase without the model, an unbound capital not read, a diameter following the circle, no size without a value, the contradiction refused with its numeric twin's message); scenario `radius-letter-value-sizes-circle-2101`.
+
+**Behaviour change for a student:** after «מעגל O ברדיוס r» (or «שרדיוסו r», «רדיוס המעגל O הוא r»), «r = 3» now draws the circle with radius 3 and moves its points (was: the circle kept radius 5, green). «R = 3» after «מעגל O ברדיוס R» does the same (was: sent to the AI).
+
+## ADR-649 — A ratio between two radii is a relation, never a size: «רדיוס מעגל O גדול פי 2 מרדיוס מעגל P» holds r_O = 2·r_P (#2100)
+
+**Status:** accepted · 2026-10-14 · bug (P1) · operator ruling 2026-10-14 on #2100 (option A) · P1 session #2107, stream S2 · branch `fix/2100-radius-ratio`, stacked on `fix/2101-radius-letter-value` ([ADR-648](#adr-648))
+
+**Requirements:** [FR-EN-22b](02-requirements.md) · **Design:** [04-design.md](04-design.md) § "A ratio between two radii" · **LADDER stage:** none — a parser reading; the lowering is the existing `set-radius-ratio` (an ordinary `ratio` over centre/witness pairs, with ADR-103 free-radius recruitment). No solve stage changes.
+
+**Cites** [ADR-087](#adr-087) (`set-radius`), [ADR-103](#adr-103), [ADR-298](#adr-298) (NUMEXPR), [ADR-462](#adr-462) (consumed numbers), [ADR-636](#adr-636) («קטן פי» inverts; `onlyRatioWords`), issue #54 («R = 2r» → `set-radius-ratio`), #2068 item 4 (word factors).
+
+**Context — measured at pickup on `939b160a`** (`decideDeterministic2D` + the gate + `replay`). After «מעגל O» · «מעגל P»: «רדיוס מעגל O גדול פי 2 מרדיוס מעגל P», the order «…גדול מרדיוס מעגל P פי 2», «קטן פי 2», «פי 3», the definite «רדיוס המעגל O…» and English "the radius of circle O is 2 times the radius of circle P" all committed `set-radius circle-O = k`: O drawn at radius k, P free at 3.6, green. After «מעגל O ברדיוס 4» the line was the «כבר קיים» no-op.
+
+**Root cause.** No rule read a ratio between two radii. `setRadius` claims a line with «רדיוס» and a number: it took the first unglued number — the factor after «פי» — as the value and the first circle label as the target, dropping the comparand and the comparative. Over a stated O that wrong `set-radius O = 2` was judged against the figure, and the submit gate called it «כבר קיים».
+
+**Class (docs/17 §1).** *A ratio between two circles' radii is lowered to an absolute radius equal to the factor.* Members: both orders of factor and comparand, «גדול/קטן», any factor, «רדיוס מעגל X» / «רדיוס המעגל X» / «רדיוס של המעגל X», English "radius of (the) circle X … N times …", and the word factors of #2068 item 4 once they land.
+
+**Decision.**
+1. `radiusReferences` reads a radius reference (the circle noun is part of it; a bare «רדיוס O» is not read here — it escalates, as before).
+2. `radiusRatio`, registered before `setRadius`: two references + a factor in the «פי k» / "k times" slot (NUMEXPR) → `set-radius-ratio {c1, c2, k}`, the relation «R = 2r» between bound radius letters already lowers to — no parallel mechanism. The comparative is read wherever it sits in the sentence, so both orders hold; a smaller-word inverts k and declares the number it consumed. What is left once the references, the factor and the comparative are read must be ratio connectives (`onlyRatioWords`, ADR-636), else the line escalates. Both circles must be drawn, else it escalates (unchanged). No factor («שווה לרדיוס…») is not read here (unchanged: escalates).
+3. `setRadius` does not read a sentence that names two radii — a statement about what the sentence says, not a keyword bow-out.
+
+**Why it is the base #2068 item 4 builds on.** The factor is this rule's own «פי» slot; #2068's plan replaces `NUMEXPR` with its `FACTOR` atom in every «פי» reader, so «רדיוס מעגל O גדול פי שניים מרדיוס מעגל P» will lower to this relation, not to `set-radius`.
+
+**Why not a patch (docs/17 §2).** No chokepoint list grows; the reading composes the shared atoms (`LABEL`, `NUMEXPR`, `RATIO_CMP`, `isSmaller`, `onlyRatioWords`) and the existing relation command. Measured: both radii free → «הציגו תצורה אחרת» varies them with the ratio held (ADR-052); O stated 4 → P = 2; P stated 3 → O = 6; the ratio typed before the size → the same.
+
+**Sibling audit.** The segment ratio (`ratioConstraint`) and the area/perimeter ratio (`measureRatioK`) already lower to relations; the area ratio with the factor after the comparand («שטח ABC גדול משטח ABD פי 2») still escalates — #2085 item 7, `[proposed]`, deliberately not changed here (`measureRatioK` is untouched). Found, not fixed: the refusal of a contradicted radius ratio reads «הסיבה: |O⟨…⟩| = 2·|P⟨…⟩|» — the witness-segment description of `set-radius-ratio`, shared with «R = 2r»; it should name the radii. Analytic: both orders are `not-handled` (a parity row with a known gap needs an open analytic issue, owed by the session). 3-D: X8. Complex: n/a.
+
+**Locks.** `src/app/__tests__/issue-2100-radius-ratio.test.ts` (through `decideDeterministic2D` and the gate): eight spellings (both orders, «קטן», «פי 3», «פי 1.5», definite noun, English) with r_O / r_P on the drawn figure; resampling keeps the ratio and varies the size; O = 4 → P = 2; P = 3 → O = 6; ratio before size; contradiction refused with «R = 2r»'s message; a missing circle and «שווה» unchanged; a plain size still a size. Scenario `radius-ratio-is-a-relation-2100`.
+
+**Behaviour change for a student:** «רדיוס מעגל O גדול פי 2 מרדיוס מעגל P» (either order, «קטן» for half) now draws O with twice P's radius, both still free (was: O drawn at radius 2, green). After «מעגל O ברדיוס 4» it sizes P to 2 (was: «כבר קיים»). Two stated radii that disagree with the ratio are refused.

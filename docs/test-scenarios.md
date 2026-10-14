@@ -1846,3 +1846,11 @@ over all four (ADR-041).
 ### `collinear-circle-refused-2099` — «מעגל שעובר דרך A, D ו-B» after «D על הישר AB» is refused, naming «D על הישר AB» (#2099, ADR-651)
 
 **Guards against:** a circle through three points the stated incidences put on one line committing green with its centre at ~10⁷ and no circle drawn (a solved rider passed the old absolute collinearity test), and the exact-rider spellings being refused in half-English. Operator ruling 2026-10-14: the over-constrained frame naming the conflicting statement, its reason «A, D ו-B על ישר אחד, ואין מעגל שעובר דרך שלוש נקודות על ישר אחד». **Asserts** the circle line is refused before it becomes a fact as a circle through A, D, B on one line, the other side is «D על הישר AB», the rendered sentence carries the ruled reason, and the control (D on AC) builds. The class matrix is `src/app/__tests__/issue-2099-collinear-circle.test.ts`.
+
+### `radius-letter-value-sizes-circle-2101` — «מעגל O ברדיוס r · A על מעגל O · r = 3»: the circle is drawn with radius 3 (#2101, ADR-648)
+
+**Guards against:** the value of a circle's radius letter being dropped green — the `radius-symbol` binding lowered to the naming alone, so the circle kept its free default radius 5. Operator ruling 2026-10-14. **Asserts** every step is green, the drawn radius is 3 and |OA| = 3. The spelling and order matrix (also «שרדיוסו r», «רדיוס המעגל O הוא r», the uppercase «R = 3», the value typed first) and the contradiction refusal are `src/app/__tests__/issue-2101-radius-letter-value.test.ts`.
+
+### `radius-ratio-is-a-relation-2100` — «מעגל O ברדיוס 4 · מעגל P · רדיוס מעגל O גדול פי 2 מרדיוס מעגל P»: P is sized to 2 (#2100, ADR-649)
+
+**Guards against:** a ratio between two radii being read as an absolute radius — the factor after «פי» became O's size (`set-radius O = 2`, green, the comparand dropped), and over a stated O the line was the false «כבר קיים». Operator ruling 2026-10-14. **Asserts** every step is green, r_O = 4 and r_P = 2. The spelling and order matrix («גדול/קטן», the factor before or after the comparand, the definite noun, English), the free-size resampling and the contradiction refusal are `src/app/__tests__/issue-2100-radius-ratio.test.ts`.
