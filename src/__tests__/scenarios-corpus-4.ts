@@ -4355,6 +4355,18 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.circles.get('circle-O')?.r, 'the stated radius').toBeCloseTo(3, 9);
       expect(dist(at(fig, 'O'), at(fig, 'A')), '|OA| = r = 3').toBeCloseTo(3, 9);
     },
+  },  {
+    id: 'radius-ratio-is-a-relation-2100',
+    title: '#2100 (ADR-649): «מעגל O ברדיוס 4 · מעגל P · רדיוס מעגל O גדול פי 2 מרדיוס מעגל P» sizes P to 2 (a relation, never a size)',
+    guards:
+      'A ratio between two radii was read as an absolute radius: setRadius took the factor after «פי» as the size of O (set-radius O = 2, green, the comparand dropped), and over a stated O it answered the false «כבר קיים». Operator ruling 2026-10-14: the line holds r_O = 2·r_P. Asserts every step is green, r_O = 4 and r_P = 2. The spelling/order matrix, the free-size resampling and the contradiction refusal are src/app/__tests__/issue-2100-radius-ratio.test.ts.',
+    steps: ['מעגל O ברדיוס 4', 'מעגל P', 'רדיוס מעגל O גדול פי 2 מרדיוס מעגל P'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.circles.get('circle-O')?.r, 'the stated radius of O').toBeCloseTo(4, 5);
+      expect(fig.circles.get('circle-P')?.r, 'r_P = r_O / 2').toBeCloseTo(2, 5);
+    },
   },
 ];
 

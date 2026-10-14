@@ -5391,6 +5391,56 @@ const sizeStatementLeftover = (s: string): boolean =>
   );
 
 /**
+ * #2100 ([ADR-649](../../docs/06-decisions.md#adr-649)) — a RADIUS reference: «רדיוס (ה)מעגל O» (also «רדיוס של המעגל O»,
+ * a particle-glued «מרדיוס מעגל P») or "the radius of (the) circle O". The circle noun is part of the reference: a
+ * bare «רדיוס O» is not read here.
+ */
+const RADIUS_REF = new RegExp(String.raw`(?:רדיוס(?:\s+של)?\s+ה?מעגל\s+|\bradius\s+of\s+(?:the\s+)?circle\s+)(${LABEL})(?![A-Za-z\d])`, 'gi');
+const radiusReferences = (s: string): { label: string; at: number; end: number }[] =>
+  [...s.matchAll(RADIUS_REF)].map((m) => ({ label: up(m[1]), at: m.index!, end: m.index! + m[0].length }));
+
+/**
+ * #2100 ([ADR-649](../../docs/06-decisions.md#adr-649)) — A RATIO BETWEEN TWO RADII is a relation, never a size.
+ *
+ * «רדיוס מעגל O גדול פי 2 מרדיוס מעגל P» (either order of the factor and the comparand, «גדול» or «קטן», "the radius
+ * of circle O is 2 times the radius of circle P") states r_O = k·r_P. `setRadius` used to read the factor as O's
+ * radius — `set-radius O = 2`, green, the comparand dropped — and, over a stated O, called it «כבר קיים». It lowers
+ * to `set-radius-ratio`, the relation «R = 2r» between bound radius letters already emits (#54): the ratio machinery
+ * drives one free radius and leaves the other a free DOF (ADR-052), and a ratio that two stated radii contradict is
+ * refused like any over-constrained given.
+ *
+ * The factor is this rule's «פי» slot (the NUMEXPR atom, ADR-298; #2068 item 4's word factors compose here). The
+ * comparative may sit anywhere in the sentence, so «גדול מרדיוס מעגל P פי 2» reads as «גדול פי 2 מרדיוס מעגל P»;
+ * a smaller-word inverts it and declares the number it consumed (ADR-636 / ADR-462). What is left once the two
+ * references, the factor and the comparative are read must be ratio connectives only ({@link onlyRatioWords}), else
+ * the line escalates — never a half-read. Both circles must already be drawn: a reference to no circle escalates.
+ */
+const radiusRatio: Rule = (s, ctx) => {
+  const refs = radiusReferences(s);
+  if (refs.length < 2) return null;
+  const fac =
+    s.match(new RegExp(String.raw`(?<![א-ת])פי\s*${NUMEXPR('k')}`, 'i')) ??
+    s.match(new RegExp(String.raw`${UNGLUED}${NUMEXPR('k')}\s*(?:(?<![א-ת])פעמים(?![א-ת])|\btimes\b)`, 'i'));
+  if (!fac) return null; // no factor: not a ratio sentence this rule reads
+  const k = numexprVal(fac.groups!, 'k');
+  const known = new Set((ctx.circles ?? []).map(up));
+  if (refs.length !== 2 || !k || !(k.value > 0)) return 'stop';
+  const [a, b] = refs;
+  if (a.label === b.label || !known.has(a.label) || !known.has(b.label)) return 'stop';
+  // blank the two references and the factor, then read the comparative from what remains
+  const spans = [...refs, { at: fac.index!, end: fac.index! + fac[0].length }].sort((x, y) => y.at - x.at);
+  let rest = s;
+  for (const sp of spans) rest = rest.slice(0, sp.at) + ' ' + rest.slice(sp.end);
+  const cmps = [...rest.matchAll(new RegExp(RATIO_CMP, 'gi'))];
+  if (cmps.length > 1) return 'stop';
+  const smaller = cmps.length === 1 && isSmaller(cmps[0][0]);
+  if (cmps.length === 1) rest = rest.slice(0, cmps[0].index!) + ' ' + rest.slice(cmps[0].index! + cmps[0][0].length);
+  if (!onlyRatioWords(rest)) return 'stop';
+  const ratio = { type: 'set-radius-ratio', c1: circleId(a.label), c2: circleId(b.label) } as const;
+  return [smaller ? { ...ratio, k: 1 / k.value, consumed: { numbers: [k.value] } } : { ...ratio, k: k.value }];
+};
+
+/**
  * "the radius of circle P is 4" / "רדיוס מעגל P הוא 4" / "radius of P = 4" — set a circle's radius
  * to a value, with NO segment drawn and NO point invented (ADR-087). Distinct from circle CREATION
  * ("circle O radius 5" / «מעגל O שרדיוסו 4»): a creation puts the circle NOUN first and the size after
@@ -5405,6 +5455,7 @@ const sizeStatementLeftover = (s: string): boolean =>
 const setRadius: Rule = (s, ctx) => {
   if (!/radius|רדיוס/i.test(s)) return null;
   if (sizeStatementLeftover(s)) return null; // a construction carrying a size clause — not a size statement
+  if (radiusReferences(s).length >= 2) return null; // two radii named: a RELATION between them (`radiusRatio`, #2100), never a size
   // The value, with circle labels (e.g. P1) stripped first. #2008 (ADR-635): the COPULA's value, read through the
   // shared NUMEXPR atom — «רדיוס המעגל O הוא 1/2» used to take the first bare number of the sentence (1) and drop
   // the «/2» with every gate quiet; a quotient is one value. No copula → the first value, as before.
@@ -11061,6 +11112,7 @@ export const RULES: Rule[] = [
   roleLength, // #1607: «האלכסון AC = 8» / «התיכון AM הוא 5» — the role's own reading + the length, composed
   roleSideLine, // #775: «תיכון ליתר» — role noun → the declared side, rewritten and re-parsed
   multiStatement, // "AB = 4, BC = 6" — split comma/and-joined GIVENS, parse each all-or-nothing (PAR-2)
+  radiusRatio, // «רדיוס מעגל O גדול פי 2 מרדיוס מעגל P» — a ratio between two radii (#2100, ADR-649); before setRadius, which read the factor as a size
   setRadius, // "radius of circle P is 4" — set an EXISTING circle's radius; before `circle` (creation) and the shape rules (which 'stop' on רדיוס)
   radiusSymbolStatement, // "רדיוס מעגל O הוא R" — NAME an existing circle's radius with a letter (#54); after setRadius (numeric wins), before the shape rules
   radiusRelation, // "R > r" / "R = 1.5r" / "R/r = 2√7/5" between BOUND radius symbols (#54); before measureOrder (unbound-pair no-op) and the value rules

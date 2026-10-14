@@ -1846,3 +1846,7 @@ over all four (ADR-041).
 ### `radius-letter-value-sizes-circle-2101` — «מעגל O ברדיוס r · A על מעגל O · r = 3»: the circle is drawn with radius 3 (#2101, ADR-648)
 
 **Guards against:** the value of a circle's radius letter being dropped green — the `radius-symbol` binding lowered to the naming alone, so the circle kept its free default radius 5. Operator ruling 2026-10-14. **Asserts** every step is green, the drawn radius is 3 and |OA| = 3. The spelling and order matrix (also «שרדיוסו r», «רדיוס המעגל O הוא r», the uppercase «R = 3», the value typed first) and the contradiction refusal are `src/app/__tests__/issue-2101-radius-letter-value.test.ts`.
+
+### `radius-ratio-is-a-relation-2100` — «מעגל O ברדיוס 4 · מעגל P · רדיוס מעגל O גדול פי 2 מרדיוס מעגל P»: P is sized to 2 (#2100, ADR-649)
+
+**Guards against:** a ratio between two radii being read as an absolute radius — the factor after «פי» became O's size (`set-radius O = 2`, green, the comparand dropped), and over a stated O the line was the false «כבר קיים». Operator ruling 2026-10-14. **Asserts** every step is green, r_O = 4 and r_P = 2. The spelling and order matrix («גדול/קטן», the factor before or after the comparand, the definite noun, English), the free-size resampling and the contradiction refusal are `src/app/__tests__/issue-2100-radius-ratio.test.ts`.
