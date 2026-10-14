@@ -1842,3 +1842,7 @@ over all four (ADR-041).
 ### `altitude-on-a-side-is-a-right-angle-1742` — «הגובה AB = 5» after «משולש ABC» builds a right angle at B with |AB| = 5 (#1742, ADR-642)
 
 **Guards against:** the altitude twin of the row above going unread. Operator ruling 2026-10-13: build it as «AB גובה לצלע BC» does (ADR-527). **Asserts** the step builds green, AB ⟂ BC, |AB| = 5, and no foot point is minted.
+
+### `collinear-circle-refused-2099` — «מעגל שעובר דרך A, D ו-B» after «D על הישר AB» is refused, naming «D על הישר AB» (#2099, ADR-651)
+
+**Guards against:** a circle through three points the stated incidences put on one line committing green with its centre at ~10⁷ and no circle drawn (a solved rider passed the old absolute collinearity test), and the exact-rider spellings being refused in half-English. Operator ruling 2026-10-14: the over-constrained frame naming the conflicting statement, its reason «A, D ו-B על ישר אחד, ואין מעגל שעובר דרך שלוש נקודות על ישר אחד». **Asserts** the circle line is refused before it becomes a fact as a circle through A, D, B on one line, the other side is «D על הישר AB», the rendered sentence carries the ruled reason, and the control (D on AC) builds. The class matrix is `src/app/__tests__/issue-2099-collinear-circle.test.ts`.

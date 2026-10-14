@@ -257,6 +257,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1969': 'open',
   '#2013': 'open',
   '#2047': 'open',
+  '#1963': 'open',
 
 };
 
@@ -1352,6 +1353,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #1931 (ADR-640): a crossing asked of a line the givens make TANGENT has no second point — refused with the tangent sentence ──
   { id: 'relation-tangent-crossing-1931', family: 'tangents', steps: ['מעגל O', 'A על מעגל O', 'נקודה P', 'הישר AP משיק למעגל O בנקודה A', 'הישר AP חותך את המעגל בנקודה E'], expect: 'refused', exception: 'X8', note: '2-D committed E 1e-6 from A before ADR-640; analytic refuses since ADR-AG-272 (#1924, same round)' },
+
+  // ── #2099 (ADR-651, operator ruling 2026-10-14): a circle through three points the incidences put on ONE line is refused,
+  // naming the statement that put them there — 2-D committed the solved-rider rows green with a centre at ~10⁷ ──
+  { id: 'collinear-circle-2099-line', family: 'circles', steps: ['משולש ABC', 'D על הישר AB', 'מעגל שעובר דרך A, D ו-B'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1963' }], note: 'the reported row; analytic draws the circle, its port is #1963 (the proved-collinear arm)' },
+  { id: 'collinear-circle-2099-segment', family: 'circles', steps: ['משולש ABC', 'D על AB', 'מעגל שעובר דרך A, D ו-B'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1963' }] },
+  { id: 'collinear-circle-2099-midpoint', family: 'circles', steps: ['משולש ABC', 'M אמצע AB', 'מעגל שעובר דרך A, M ו-B'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1963' }] },
+  { id: 'collinear-circle-2099-circumscribed', family: 'circles', steps: ['משולש ABC', 'D על הישר AB', 'מעגל חוסם את המשולש ADB'], expect: 'refused', exception: 'X8' },
+  { id: 'collinear-circle-2099-control', family: 'circles', steps: ['משולש ABC', 'D על AC', 'מעגל שעובר דרך A, D ו-B'], expect: 'builds', exception: 'X8', note: 'D off line AB — a real circle' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

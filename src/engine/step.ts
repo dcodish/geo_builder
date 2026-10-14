@@ -31,7 +31,7 @@ import {
   forcedFlatPolygon,
 } from './metricFeasibility';
 import { sideImpossibility, sideImpossibilityError } from './sideFeasibility';
-import { notCyclicImpossibility, notCyclicImpossibilityError } from './cyclicFeasibility';
+import { collinearCircleError, collinearCircleImpossibility, notCyclicImpossibility, notCyclicImpossibilityError } from './cyclicFeasibility';
 import { recordRequirement, requirementsField } from './requirements';
 import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
 import { allConstraints, applySeed, freeDofs, movableIds } from './sample';
@@ -1153,6 +1153,13 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   if (cyclicErr) {
     return { ok: false, error: notCyclicImpossibilityError(cyclicErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
+  // #2099 (ADR-651): a circle through three points the stated incidences put on ONE line — «D על הישר AB» ·
+  // «מעגל שעובר דרך A, D ו-B», in either order. Structural (what the construction says, never where a solved
+  // rider stopped), so a near-collinear numeric centre at ~10⁷ can no longer commit green. Operator ruling 2026-10-14.
+  const lineCircle = collinearCircleImpossibility(prev, probed, cmd);
+  if (lineCircle) {
+    return { ok: false, error: collinearCircleError(lineCircle), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  }
 
   // #1985 (ADR-619): a noun that EXCLUDES the one the ring is already declared as — «מקבילית ABCD» ·
   // «טרפז ABCD», in either order and in any reading of the ring. Structural (the two declarations, never
@@ -1321,6 +1328,9 @@ function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult
   // #1918 (ADR-607): a coupled run can state the circle through a declared right trapezoid as well as one statement can.
   const cyclicErr = notCyclicImpossibility(next);
   if (cyclicErr) return { ok: false, error: notCyclicImpossibilityError(cyclicErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  // #2099 (ADR-651): a coupled run can complete a circle through three points on one line as well as one statement can.
+  const lineCircle = collinearCircleImpossibility(prev, next);
+  if (lineCircle) return { ok: false, error: collinearCircleError(lineCircle), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   const res = evaluate(next);
   if (res.ok && stepAccepted(next, res.positions, newCons)) {
     const owned = ensureOwnership(next, newCons, res.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF

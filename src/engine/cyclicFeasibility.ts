@@ -19,10 +19,12 @@
  * The ring is a vertex SET: «מעגל חוסם את BCDA» is the same circle through the same four points. The incoming
  * command's own claim rides the probe (its record and its asserted objects), so both orders are one case.
  */
+import { drivenConstraintsOf } from './evaluate';
+import { forcedFlatPolygon } from './metricFeasibility';
 import { NOT_CYCLIC } from './shapeKinds';
 import { assertedObjects } from './sideFeasibility';
-import { ringOnOneCircle } from './structure';
-import type { Command, Construction, Id } from './types';
+import { ringOnOneCircle, threeOnOneLine } from './structure';
+import type { Command, Constraint, Construction, GeoObject, Id } from './types';
 
 export interface NotCyclicImpossibility {
   /** the declared ring, as declared */
@@ -63,3 +65,58 @@ export function spellsRing(ids: readonly Id[], ring: string): boolean {
   for (const r of [ids, [...ids].reverse()]) for (let k = 0; k < n; k++) if ([...r.slice(k), ...r.slice(0, k)].join('') === ring) return true;
   return false;
 }
+
+/**
+ * #2099 ([ADR-651](../../docs/06-decisions.md#adr-651)) — A CIRCLE THROUGH THREE POINTS THE GIVENS PUT ON ONE LINE.
+ * The same stage-0 family and the same one-way soundness: a hit PROVES no circle exists, passing proves nothing.
+ *
+ * Class: a circle through three points («מעגל שעובר דרך A, D ו-B», «מעגל חוסם את המשולש ADB», the English
+ * spellings — every reading lowers to one `circumcircle`, whose centre is a `circumcenter` object) whose three
+ * points the stated incidences put on one line. On a solved rider («D על הישר AB») the numeric collinearity test
+ * missed it and the figure committed green with a centre at ~10⁷ and no circle; on an exact rider («D על AB») it
+ * reached the evaluator and was refused in an untranslated engine sentence. Judged here by the CONSTRUCTION
+ * (`threeOnOneLine`), in either order: the circle after the incidence, or the incidence after the circle (the
+ * incoming command's asserted objects and its M1-lowered constraint ride the probe), or by the LENGTH givens
+ * (ADR-602's `forcedFlatPolygon`, asked about the three points as a ring). A centre already degenerate
+ * in the prior figure is never blamed on an unrelated later line (ADR-602's doctrine).
+ */
+export interface CollinearCircle {
+  /** the circle's three stated points, in the order the circle names them */
+  points: [Id, Id, Id];
+  /** the centre (a `circumcenter`) */
+  centre: Id;
+}
+
+function collinearCircles(c: Construction, asserted: GeoObject[]): CollinearCircle[] {
+  const out: CollinearCircle[] = [];
+  let enforced: Constraint[] | null = null;
+  for (const list of [c.objects, asserted])
+    for (const o of list) {
+      if (o.kind !== 'circumcenter') continue;
+      const pts: [Id, Id, Id] = [o.a, o.b, o.c];
+      if (threeOnOneLine(c, pts, asserted)) {
+        out.push({ points: pts, centre: o.id });
+        continue;
+      }
+      // the LENGTH givens can put them on one line too («AB = 5» · «AD = 2» · «DB = 3»): ADR-602's theorem prover,
+      // asked about the circle's three points as a ring — |AB| = |AD| + |DB| is a straight angle at D
+      enforced ??= [...c.constraints, ...drivenConstraintsOf(c)];
+      if (forcedFlatPolygon([{ kind: 'polygon', id: `~through-${o.id}`, vertices: pts }], enforced)) out.push({ points: pts, centre: o.id });
+    }
+  return out;
+}
+
+/** The first circle through three points the probed figure structurally puts on one line, new with this step, or null. */
+export function collinearCircleImpossibility(prev: Construction, probed: Construction, cmd?: Command): CollinearCircle | null {
+  if (![...probed.objects, ...assertedObjects(cmd)].some((o) => o.kind === 'circumcenter')) return null; // an ordinary figure pays nothing
+  const before = new Set(collinearCircles(prev, []).map((x) => x.centre));
+  return collinearCircles(probed, assertedObjects(cmd)).find((x) => !before.has(x.centre)) ?? null;
+}
+
+/** The wire message — the over-constrained family's shape, so the fold names the OTHER statement (`[vs #i]`). */
+export function collinearCircleError(m: CollinearCircle): string {
+  return `over-constrained: a circle through ${m.points.join(', ')} on one line cannot hold`;
+}
+
+/** The wire shape above, with the fold's optional `[vs #<fact index>]` tail: 1–3 the points, 4 the index. */
+export const COLLINEAR_CIRCLE_VS = /^over-constrained: a circle through ([^,\s]+), ([^,\s]+), ([^,\s]+) on one line cannot hold(?: \[vs #(\d+)\])?$/;
