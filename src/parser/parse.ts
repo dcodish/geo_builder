@@ -19,7 +19,7 @@
  * no digits). Keywords are bilingual; the same rule matches either language.
  */
 
-import { MIDSEGMENT_SHAPES, RADIUS_VAR, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand } from '@/engine';
+import { MIDSEGMENT_SHAPES, RADIUS_VAR, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand } from '@/engine';
 import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
@@ -62,7 +62,14 @@ export type ParseResult =
   // the geometry, so `not-handled` was a lie: it said "I do not know this sentence" about one the tool
   // understands, escalated it to a paid model that cannot build it either, and told the student their
   // words were unreadable. `why` picks which impossibility to name; the rest is the student's own letters.
-  | { ok: false; reason: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: string; foot: string; side: [string, string] }
+  // #2066 / #2085 (ADR-643): the BISECTOR joins — a side of a declared polygon at the angle's vertex is not a
+  // bisector (`bisector-is-side`); `host` is the polygon's kind or its vertex count, for the noun the note names.
+  | { ok: false; reason: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: string; foot: string; side: [string, string]; host?: string }
+  // #2064 (ADR-643): a height named by two existing polygon vertices whose reading would REDEFINE the second one
+  // as a foot («מרובע ABCD» · «AC גובה» — C moved onto BD). The operator's ruling: an existing vertex is never
+  // redefined as a foot. `foot` is that vertex; the app seam first asks whether a right angle the pair names
+  // already holds (`cevianPairReadings`).
+  | { ok: false; reason: 'cevian-redefines-vertex'; apex: string; foot: string; side: [string, string] }
   // #1267: «BD חוצה זווית לצלע BC» — the bisector from B meets AC, and the side the student NAMED is not
   // the one it can meet. Refused with both sides quoted, never silently redirected to the real one.
   | { ok: false; reason: 'cevian-wrong-side'; apex: string; stated: [string, string]; actual: [string, string] }
@@ -366,7 +373,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -9910,14 +9917,9 @@ const cevianFault = (
  * `foot` command for it was what produced the hidden `~B` and the over-constrained error. The
  * lowering is exactly what the student's own «AB ⟂ BC» produces, which is what the lock asserts.
  */
-const altitudeAtVertex = (apex: Id, foot: Id, side: readonly [Id, Id]): Command[] => {
-  const other = side[0] === foot ? side[1] : side[0];
-  return [
-    { type: 'segment', a: apex, b: foot },
-    { type: 'segment', a: foot, b: other },
-    { type: 'set-perpendicular', a: apex, b: foot, c: foot, d: other },
-  ];
-};
+// #2064 Stage 2 (ADR-644): the lowering lives in the engine (`rightAngleAtFoot`), shared with the cyclable
+// `altitude-choice`, so the long form and the free choice can never drift.
+const altitudeAtVertex = (apex: Id, foot: Id, side: readonly [Id, Id]): Command[] => rightAngleAtFoot(apex, foot, side);
 
 /**
  * "median from A in ABC" / "תיכון מ-A במשולש ABC" — the median from a vertex to the
@@ -10120,6 +10122,112 @@ const cevianShapeEdges = (
   return { edges: all };
 };
 
+/** #2064 (ADR-643): every vertex of a polygon the student DECLARED — a semantic field, never coordinates. */
+const declaredVertices = (ctx: ParseContext): Set<Id> => new Set((ctx.declaredPolygons ?? []).flatMap((p) => p.vertices.map(up)));
+/** #2064 (ADR-643): both letters are vertices of declared polygons — a segment between two corners the figure has. */
+const isVertexPair = (a: Id, b: Id, ctx: ParseContext): boolean => {
+  const v = declaredVertices(ctx);
+  return a !== b && v.has(a) && v.has(b);
+};
+
+/** The named-altitude head, name-first: «AB גובה», «AB הוא גובה», "AB is the altitude" (the `altitude` rule's reader). */
+const NAMED_ALT_FIRST = rx(String.raw`^\s*\b(${LABEL})\s*(${LABEL})\b\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:height|altitude|גובה)`, 'i');
+/** The named-altitude head, keyword-first: «הגובה AB», "the altitude AB". */
+const NAMED_ALT_KW = rx(String.raw`(?:height|altitude|גובה)\s+\b(${LABEL})\s*(${LABEL})\b`, 'i');
+
+/**
+ * #2064 ([ADR-643](../../docs/06-decisions.md#adr-643)) — THE RIGHT ANGLES A HEIGHT NAMED BY TWO EXISTING VERTICES CAN
+ * MEAN, as the long-form sentences that state each one.
+ *
+ * «AB גובה» with A and B corners of a declared shape says that AB is a height — and a segment whose ends are both
+ * vertices is a height exactly when it is perpendicular to a side at one of its ends (ADR-527's reading: a foot at
+ * a vertex is a right angle there). The operator's ruling of 2026-10-13: *"with no side named, the candidates are
+ * the sides at either endpoint"*. So for each endpoint E and each side of a declared polygon at E other than the
+ * pair itself, the long form «X E גובה לצלע E Z» / "XE is the altitude to side EZ" — the spelling the altitude
+ * rule already lowers to that right angle (`altitudeAtVertex`). The sides at the SECOND letter come first, in
+ * ring order, then the first letter's (the operator's own example: «AC גובה» → AC ⟂ BC first).
+ *
+ * Each segment carries `readings` (with whatever followed the head — «= 5» — kept) and `bare` (the role alone).
+ * The app seam (`src/app/vertexPairCevian.ts`) dry-runs the bare readings: one already true answers «כבר קיים».
+ * The plural «AB ו-CD הם גבהים» is one entry per segment. `null`: not a two-vertex named height with no side.
+ */
+/**
+ * #2064 (ADR-643/644) — THE RIGHT ANGLES the pair X Y can name, as `{ apex, foot, side }`: for each endpoint E and
+ * each side of a declared polygon at E other than the pair itself, the right angle at E between the other letter
+ * and that side. The sides at the SECOND letter first, in ring order, then the first letter's — one list, read by
+ * the long-form readings (`cevianPairReadings`) and by the cyclable `altitude-choice` (ADR-644), so the option
+ * the student sees first is the reading tried first.
+ */
+function vertexPairOptions(x: Id, y: Id, ctx: ParseContext): { apex: Id; foot: Id; side: [Id, Id] }[] {
+  const out: { apex: Id; foot: Id; side: [Id, Id] }[] = [];
+  for (const [apex, e] of [[x, y], [y, x]] as const) {
+    const seen = new Set<Id>();
+    for (const poly of ctx.declaredPolygons ?? []) {
+      const ring = poly.vertices.map(up);
+      const i = ring.indexOf(e);
+      if (i < 0) continue;
+      for (const z of [ring[(i + ring.length - 1) % ring.length], ring[(i + 1) % ring.length]]) {
+        if (z === apex || z === e || seen.has(z)) continue;
+        seen.add(z);
+        out.push({ apex, foot: e, side: [e, z] });
+      }
+    }
+  }
+  return out;
+}
+export interface CevianPairSegment {
+  apex: Id;
+  foot: Id;
+  readings: string[];
+  bare: string[];
+}
+export function cevianPairReadings(raw: string, ctx: ParseContext): { segments: CevianPairSegment[]; tail: boolean } | null {
+  const s = normalizeUtterance(raw);
+  if (!s || /\bfoot\b|רגל/i.test(s)) return null;
+  if (!/\bheights?\b|\baltitudes?\b|גובה|גבהים/i.test(s)) return null;
+  if (statedSide(s) || statedTriangle(s) || /\bin\b|במשולש/i.test(s)) return null;
+  if (new RegExp(APEX_FROM, 'i').test(s) || new RegExp(LOCATIVE_APEX.replace('%KW%', 'height|altitude|גובה'), 'i').test(s)) return null;
+  const heb = /[א-ת]/.test(s);
+  /** The long forms for the pair X Y, `head` the matched text naming it, `rest` what followed. */
+  const segment = (x: Id, y: Id, head: string, rest: string): CevianPairSegment | null => {
+    if (!isVertexPair(x, y, ctx)) return null;
+    const swapped = head.replace(new RegExp(String.raw`${x}(\s*)${y}(?![A-Za-z\d])`), `${y}$1${x}`);
+    const readings: string[] = [];
+    const bare: string[] = [];
+    for (const o of vertexPairOptions(x, y, ctx)) {
+      const h = o.apex === x ? head : swapped;
+      const side = heb ? ` לצלע ${o.side[0]}${o.side[1]}` : ` to side ${o.side[0]}${o.side[1]}`;
+      bare.push(`${h}${side}`.replace(/\s+/g, ' ').trim());
+      readings.push(`${h}${side}${rest}`.replace(/\s+/g, ' ').trim());
+    }
+    return readings.length ? { apex: x, foot: y, readings, bare } : null;
+  };
+  const plural = s.match(PLURAL_SPECIAL_RX);
+  if (plural) {
+    if (!/גבהים|heights|altitudes/i.test(plural[2]) || plural[3] || plural[4]) return null;
+    const labels = plural[1].match(/[A-Z]\d*/g) ?? [];
+    if (labels.length < 4 || labels.length % 2 !== 0) return null;
+    const segments: CevianPairSegment[] = [];
+    for (let i = 0; i < labels.length; i += 2) {
+      const head = heb ? `${labels[i]}${labels[i + 1]} גובה` : `${labels[i]}${labels[i + 1]} is the altitude`;
+      const seg = segment(labels[i], labels[i + 1], head, '');
+      if (!seg) return null;
+      segments.push(seg);
+    }
+    return { segments, tail: false };
+  }
+  const first = s.match(NAMED_ALT_FIRST);
+  const m = first ?? s.match(NAMED_ALT_KW);
+  if (!m || !isUpperLabel(m[1]) || !isUpperLabel(m[2])) return null;
+  const end = (m.index ?? 0) + m[0].length;
+  // The name-first head is rewritten keyword-first («AB גובה» → «הגובה AB»): that is the long form measured to carry
+  // a tail («הגובה AB לצלע BC = 5» builds the length; «AB גובה לצלע BC = 5» drops it). The keyword-first head is kept.
+  const head = first ? (heb ? `הגובה ${up(m[1])}${up(m[2])}` : `the altitude ${up(m[1])}${up(m[2])}`) : s.slice(0, end);
+  const seg = segment(up(m[1]), up(m[2]), head, s.slice(end));
+  if (!seg) return null;
+  return { segments: [seg], tail: s.slice(end).replace(/[\s.]/g, '') !== '' };
+}
+
 /**
  * "height from A in ABC" / "altitude from A in ABC" / "גובה מ-A במשולש ABC", and
  * the bare-foot phrasing "perpendicular from A to BC" — the altitude from a vertex:
@@ -10211,6 +10319,17 @@ const altitude: Rule = (s, ctx) => {
   if (sideM) {
     p = sideM.side[0];
     q = sideM.side[1];
+    // #2064 ([ADR-643](../../docs/06-decisions.md#adr-643)) — A HEIGHT NAMED BY TWO EXISTING POLYGON VERTICES, WITH A
+    // STATED SIDE THROUGH ONE OF THEM, IS THE RIGHT ANGLE AT THAT SHARED VERTEX (the operator's ruling of
+    // 2026-10-13: "the apex is the endpoint NOT on the named side, and the foot is the shared vertex"). The
+    // segment's letter order does not decide which end is the apex — the side does: «BC גובה ל-AB» after «ריבוע
+    // ABCD» is CB ⟂ AB at B, exactly «CB גובה לצלע AB». Only for a pair of existing polygon vertices: a NEW
+    // letter («משולש ABC» · «BD גובה לצלע AB», D new) is a foot to be minted, and its apex on the side stays
+    // ADR-525's refusal.
+    if (namedFoot && namedFoot !== apex && isVertexPair(apex, namedFoot, ctx)) {
+      const shared = [p, q].filter((x) => x === apex || x === namedFoot);
+      if (shared.length === 1 && shared[0] === apex) return altitudeAtVertex(namedFoot, apex, [p, q]);
+    }
   } else {
     // A trapezoid height: the apex sits on one parallel base and drops perpendicular to the OPPOSITE base
     // (ADR-169). The triangle inference below can't reach it — the apex's two neighbours are a diagonal, not
@@ -10274,6 +10393,23 @@ const altitude: Rule = (s, ctx) => {
   // #1247 — the foot may BE an endpoint of the side, and then the sentence is a right angle at that
   // vertex rather than a new point. Deciding it here, at the one emit, keeps both readings in one place.
   if (f === p || f === q) return [...cmds, ...altitudeAtVertex(apex, f, [p, q])];
+  // #2064 ([ADR-643](../../docs/06-decisions.md#adr-643)) — AN EXISTING POLYGON VERTEX IS NEVER REDEFINED AS A FOOT
+  // (the operator's ruling of 2026-10-13: "an existing vertex is never redefined as a foot"). «ריבוע ABCD» ·
+  // «AB גובה» used to emit `foot{B from A onto CD}`: M1 lowered it to "B coincides with its constructed
+  // target", and the solve met that by squashing the square to one point, green. The named second letter is a
+  // vertex the student already declared, so the sentence is about the right angle the pair names
+  // (`cevianPairReadings`, judged at the app seam), never about moving B. The one exception is a figure that
+  // already has B as exactly this foot — a restatement, lowered to the identical commands as before.
+  if (namedFoot && f === namedFoot && declaredVertices(ctx).has(namedFoot) && existingFootOf(ctx, apex, p, q) !== namedFoot) {
+    // #2064 Stage 2 ([ADR-644](../../docs/06-decisions.md#adr-644)) — with NO side stated, which side the pair is a
+    // height to is an unstated choice (the operator's ruling of 2026-10-14, option D: *"we just draw AC
+    // perpendicular to BC"*), so the sentence builds the first right angle the pair names and «הציגו תצורה אחרת»
+    // cycles the rest. A STATED side through neither letter («AB גובה לצלע CD») has no choice to make: building it
+    // would redefine B, so it keeps the refusal (ruling 3 of 2026-10-13).
+    const options = !sideM && isVertexPair(apex, namedFoot, ctx) ? vertexPairOptions(apex, namedFoot, ctx) : [];
+    if (options.length > 0) return [{ type: 'altitude-choice', options, variant: 0 }];
+    return { clarify: 'cevian-redefines-vertex', apex, foot: namedFoot, side: [p, q] };
+  }
   cmds.push({ type: 'foot', id: f, from: apex, a: p, b: q });
   cmds.push({ type: 'segment', a: apex, b: f });
   return cmds;
@@ -10318,6 +10454,8 @@ const pluralSpecialLines: Rule = (s, ctx) => {
     const target = sides ? ` לצלע ${up(sides[i])}${up(sides[i + 1])}` : tail;
     const single = `${up(labels[i])}${up(labels[i + 1])} ${kind}${target}`;
     const r = kind === 'גובה' ? altitude(single, ctx) : median(single, ctx);
+    // #2064 (ADR-643): a segment that would redefine an existing vertex refuses the whole line, as it does alone
+    if (r && typeof r === 'object' && !Array.isArray(r) && r.clarify === 'cevian-redefines-vertex') return r;
     if (!r || !Array.isArray(r)) return null; // all-or-nothing — never a partial figure
     out.push(...r);
   }
@@ -10400,6 +10538,44 @@ const perpBisector: Rule = (s, ctx) => {
 };
 
 /**
+ * #2066 / #2085 ([ADR-643](../../docs/06-decisions.md#adr-643)) — the declared polygon in which A B is a SIDE (ring
+ * neighbours), preferring one that also holds `third` (the angle's other arm). Its kind as declared, or — for a
+ * shape declared by its noun alone («מרובע», «מחומש») — the vertex count (`n4`, `n5`, …), from which the note names
+ * the host («המרובע», «המחומש»). Structure only (`ctx.declaredPolygons`), never coordinates. `null`: not a side.
+ */
+const NAMED_QUAD_HOSTS: ReadonlySet<string> = new Set(['square', 'rectangle', 'rhombus', 'parallelogram', 'kite', 'trapezoid', 'isosceles-trapezoid', 'right-trapezoid']);
+const polygonSideHost = (a: Id, b: Id, ctx: ParseContext, third: Id | null): string | null => {
+  let best: string | null = null;
+  for (const poly of ctx.declaredPolygons ?? []) {
+    const ring = poly.vertices.map(up);
+    const i = ring.indexOf(a);
+    if (i < 0 || (ring[(i + 1) % ring.length] !== b && ring[(i + ring.length - 1) % ring.length] !== b)) continue;
+    const host = ring.length === 3 ? 'triangle' : ring.length === 4 && poly.kind && NAMED_QUAD_HOSTS.has(poly.kind) ? poly.kind : `n${ring.length}`;
+    if (third === null || ring.includes(third)) return host;
+    best ??= host;
+  }
+  return best;
+};
+
+/**
+ * #2066 ([ADR-643](../../docs/06-decisions.md#adr-643)) — the ROLE-NOUN spellings of a bisector named by a pair:
+ * «AB הוא חוצה זווית», «חוצה הזווית AB [= 5]», "AB is an angle bisector", "the bisector AB". No rule reads them (a
+ * bisector named this way with a NEW far end still escalates, unruled); when the pair is a side of a declared
+ * polygon the sentence is refused exactly as «AB חוצה זווית» is — the operator's ruling: one sentence, one verdict,
+ * in every spelling. The vertex is the first letter, the apex, as for the other cevians.
+ */
+const bisectorRoleNounOnSide = (s: string, ctx: ParseContext): Extract<Clarify, { clarify: 'cevian-degenerate' }> | null => {
+  const m =
+    s.match(/^\s*([A-Z]\d*)\s*([A-Z]\d*)\s+(?:הוא|היא)\s+ה?חוצה[\s-]+ה?זוו?ית(?![א-ת])/) ??
+    s.match(/(?<![א-ת])ה?חוצה[\s-]+ה?זוו?ית\s+([A-Z]\d*)\s*([A-Z]\d*)(?![A-Za-z\d])/) ??
+    s.match(/^\s*([A-Z]\d*)\s*([A-Z]\d*)\s+is\s+(?:an?|the)\s+(?:angle\s+)?bisector\b/i) ??
+    s.match(/\b(?:the\s+)?(?:angle\s+)?bisector\s+([A-Z]\d*)\s*([A-Z]\d*)(?![A-Za-z\d])/i);
+  if (!m || !isUpperLabel(m[1]) || !isUpperLabel(m[2]) || m[1] === m[2]) return null;
+  const host = polygonSideHost(m[1], m[2], ctx, null);
+  return host ? { clarify: 'cevian-degenerate', role: 'bisector', why: 'bisector-is-side', apex: m[1], foot: m[2], side: [m[1], m[2]], host } : null;
+};
+
+/**
  * "AD bisects angle BAC" / "AD חוצה את הזווית BAC" — the angle bisector from the
  * vertex, with the named point D *placed* where it meets the opposite side. The
  * bisector and opposite-side lines are scaffolding; only D and the segment show.
@@ -10408,9 +10584,14 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
   if (!/bisects?|חוצ/i.test(s)) return null;
   if (INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s)) return null; // intersection rules own that phrasing
   const seg = s.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:bisects?|חוצ\w*)/i);
-  if (!seg) return null;
+  if (!seg) return bisectorRoleNounOnSide(s, ctx);
   const apex = up(seg[1]);
   const D = up(seg[2]);
+  /** #2066 / #2085 (ADR-643): the refusal for a pair that is a side of a declared polygon, at the angle's vertex `at`. */
+  const onSide = (at: Id, other: Id | null): Extract<Clarify, { clarify: 'cevian-degenerate' }> | null => {
+    const host = polygonSideHost(apex, D, ctx, other);
+    return host ? { clarify: 'cevian-degenerate', role: 'bisector', why: 'bisector-is-side', apex: at, foot: at === apex ? D : apex, side: [up(seg[1]), up(seg[2])], host } : null;
+  };
   /**
    * THE SIDE THE STUDENT NAMED (#1267).
    *
@@ -10465,6 +10646,10 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
       if (i < 0) return { clarify: 'bisector-wrong-apex', apex, stated: v ?? triangle.ring.join('') };
       tri = [triangle.ring[(i + 2) % 3], at, triangle.ring[(i + 1) % 3]];
     } else if (at === D) {
+      // #2066 (ADR-643): «AB חוצה זווית B» — AB is a side AT B, so it cannot bisect the angle there. Asked before the
+      // angle is resolved: the resolver excludes A, and «בקודקוד B עדיין אין זווית» was false of a vertex with an angle.
+      const side = onSide(D, null);
+      if (side) return side;
       // The angle at the segment's far end: D must already be a figure point with exactly one angle there.
       if (!(ctx.points ?? []).includes(D)) return { clarify: 'bisector-wrong-apex', apex, stated: D };
       const atD = resolveVertexAngle(D, ctx, [apex]); // #1445: the one lone-vertex resolver (less the bisector itself)
@@ -10493,6 +10678,18 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
     const [o1, o2] = tri.filter((t) => t !== vertex);
     if (o2 === undefined) return null;
     /**
+     * #2066 / #2085 ([ADR-643](../../docs/06-decisions.md#adr-643)) — A SIDE IS NOT A BISECTOR. «משולש ABC» · «AB חוצה
+     * זווית»: the far end B is an ARM of the angle at A, so «the bisector from A places B» lowered to ∠BAB = ∠BAC — a
+     * zero angle only a flattened polygon meets. The median and the altitude got this question in `cevianFault`
+     * (ADR-528, ADR-642); the bisector never did. Asked here, at the one emit, for every way the angle was resolved,
+     * and before the stated side («AB חוצה זווית לצלע BC» is the same side). The operator's rulings of 2026-10-14
+     * (#2066: the triangle sentence; #2085 item 3: «…צלע של המרובע…» for every other declared polygon).
+     */
+    if (D === o1 || D === o2) {
+      const side = onSide(apex, D === o1 ? o2 : o1);
+      if (side) return side;
+    }
+    /**
      * #1267: the bisector from a vertex meets the side OPPOSITE it, and only that one. A student who
      * names a different side has written something false of the figure — «BD חוצה זווית לצלע BC»,
      * where the bisector from B meets AC. Refused with BOTH sides quoted, never silently redirected:
@@ -10520,6 +10717,11 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
       { type: 'line-intersection', id: D, line1: bisId, line2: lineId },
       { type: 'segment', a: apex, b: D },
     ];
+  }
+  if (vertex === D && (tri[0] === apex || tri[2] === apex)) {
+    // #2066 (ADR-643): «AB חוצה את זווית ABC» — the segment is an arm of the angle at its own far end B
+    const side = onSide(D, tri[0] === apex ? tri[2] : tri[0]);
+    if (side) return side;
   }
   if (vertex === D) {
     // "AC bisects ∠ECD": the angle's vertex (C) is the segment's SECOND letter, and the bisecting
@@ -13343,7 +13545,8 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'incomplete-comparative') return { ok: false, reason: 'incomplete-comparative', subject: res.subject, factor: res.factor };
   if (res.clarify === 'angle-sides-disjoint') return { ok: false, reason: 'angle-sides-disjoint', s1: res.s1, s2: res.s2 };
   if (res.clarify === 'cevian-degenerate')
-    return { ok: false, reason: 'cevian-degenerate', role: res.role, why: res.why, apex: res.apex, foot: res.foot, side: res.side };
+    return { ok: false, reason: 'cevian-degenerate', role: res.role, why: res.why, apex: res.apex, foot: res.foot, side: res.side, ...(res.host ? { host: res.host } : {}) };
+  if (res.clarify === 'cevian-redefines-vertex') return { ok: false, reason: 'cevian-redefines-vertex', apex: res.apex, foot: res.foot, side: res.side };
   if (res.clarify === 'cevian-wrong-side')
     return { ok: false, reason: 'cevian-wrong-side', apex: res.apex, stated: res.stated, actual: res.actual };
   if (res.clarify === 'bisector-wrong-apex') return { ok: false, reason: 'bisector-wrong-apex', apex: res.apex, stated: res.stated };

@@ -25,7 +25,7 @@ import { DISPLAY_ONLY } from '@/engine';
 import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents } from '@/engine/types';
-import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption } from '@/engine';
 import { resolveBinds } from './naming';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -546,7 +546,7 @@ function introducedPointsOf(cmd: AnyCommand, symtab: ReturnType<typeof buildSymT
   const lowered: AnyCommand[] =
     cmd.type === 'shape-variant' ? expandShapeVariant(cmd, [])
     : cmd.type === 'inscribe' ? expandInscribe(cmd)
-    : lowerOne(cmd, symtab);
+    : lowerOne(cmd, symtab); // an `altitude-choice` lowers through `lowerOne` too: every option names existing vertices only
   return lowered.flatMap((c) => introducedPointIds(c as Command));
 }
 
@@ -1029,6 +1029,12 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     .flatMap((f) => lowerOne(f.cmd, symtab))
     .filter((c): c is Extract<Command, { type: 'point-on-segment' }> => c.type === 'point-on-segment')
     .map((c) => ({ id: c.id, a: c.a, b: c.b }));
+  // #2064 Stage 2 ([ADR-644](docs/06-decisions.md#adr-644)): the right angles the student STATED (NOT an
+  // altitude-choice's own default) — they PIN the matching option of an `altitude-choice` (M4, the ADR-412 shape).
+  // Read only when the list has such a command, so an ordinary figure pays nothing.
+  const explicitRightAngles = facts.some((f) => f.enabled && f.cmd.type === 'altitude-choice')
+    ? statedRightAngles(facts.filter((f) => f.enabled && f.cmd.type !== 'altitude-choice').flatMap((f) => lowerOne(f.cmd, symtab)) as Command[])
+    : [];
   // A base-less midsegment's ANCHOR SIDE is an unstated default that yields to an explicit membership
   // ([ADR-412](docs/06-decisions.md#adr-412), issue #407 — the ADR-163 pre-scan shape, M4). The named-
   // triangle (#71) and implicit-triangle (#405) forms seat the pair's first letter on a DEFAULT side and
@@ -1090,6 +1096,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       pair: [...pairSwapByGroup].filter(([g]) => prefixGroups.has(g)).map(([g, m]) => [groupPartition.get(g), [...m].sort()]),
       eqs: explicitEqs,
       ons: explicitOnSegs,
+      rt90: explicitRightAngles,
     });
   };
   // #403 (ADR-407): FUTILITY — a failed fact referencing a POINT label that NO fact in the list
@@ -1104,6 +1111,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
   const factCmds = (g: Fact): Command[] =>
     (g.cmd.type === 'shape-variant' ? expandShapeVariant(g.cmd, explicitEqs, explicitOnSegs)
     : g.cmd.type === 'inscribe' ? expandInscribe(g.cmd, explicitOnSegs)
+    : g.cmd.type === 'altitude-choice' ? expandAltitudeChoice(g.cmd, explicitRightAngles)
     : lowerOne(g.cmd, symtab)) as Command[];
   let introduciblePts: Set<Id> | null = null;
   const futileCache = new Map<string, boolean>();
@@ -1193,6 +1201,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       f.cmd.type === 'shape-variant' ?
         expandShapeVariant(msSvMove.has(f.id) ? { ...f.cmd, ids: msSvMove.get(f.id)! } : f.cmd, explicitEqs, explicitOnSegs)
       : f.cmd.type === 'inscribe' ? expandInscribe(f.cmd, explicitOnSegs)
+      : f.cmd.type === 'altitude-choice' ? expandAltitudeChoice(f.cmd, explicitRightAngles)
       : lowerOne(f.cmd, symtab);
     // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see
     // pre-scan), or — #566 (ADR-445) — onto the SOLVE-CHOSEN `rot` seat; the explicit pin always wins.
@@ -3657,6 +3666,20 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
    * figure jumps and the DOF count over-counts — is **#1007**, deliberately still open. This covers the
    * typed seam and the ✎ edit seam; a loaded file has no door and is knowingly not covered.
    */
+  // #2064 Stage 2 ([ADR-644](docs/06-decisions.md#adr-644)): a right angle naming an option of a two-vertex height whose
+  // side is still a SOFT choice is the student choosing the side — it PINS the option, so «הציגו תצורה אחרת» can no
+  // longer cycle away from a stated given (M4). Asked BEFORE the implied test: naming the DRAWN option («AC גובה» ·
+  // «AC ⟂ BC») moves nothing, and answering it «כבר קיים» would leave the choice cyclable.
+  {
+    const altitudeChoices = facts.filter((f) => f.enabled && f.cmd.type === 'altitude-choice').map((f) => f.cmd as Extract<AnyCommand, { type: 'altitude-choice' }>);
+    if (altitudeChoices.length > 0) {
+      const symtab = buildSymTab([...facts.filter((f) => f.enabled).map((f) => f.cmd), ...commands]);
+      const rightAnglesOf = (cmds: AnyCommand[]) => statedRightAngles(cmds.flatMap((c) => lowerOne(c, symtab)) as Command[]);
+      const stated = rightAnglesOf(facts.filter((f) => f.enabled && f.cmd.type !== 'altitude-choice').map((f) => f.cmd));
+      const added = rightAnglesOf(commands);
+      if (altitudeChoices.some((ac) => pinnedAltitudeOption(ac.options, stated) === null && pinnedAltitudeOption(ac.options, added) !== null)) return { produced: true };
+    }
+  }
   if (impliedByPrior(facts, commands, seed)) return { produced: false, reason: 'implied' };
   if (grew || dofReduced || scaleFixed || dataOnly || reveals) return { produced: true };
   // No geometric change — but a `set-equal` NAMING an enabled shape-variant's (kite/isosceles) equal-pair
@@ -4296,6 +4319,7 @@ export function introducedIds(cmd: AnyCommand): Id[] {
   if (cmd.type === 'set-var' || cmd.type === 'measure-order' || cmd.type === 'measure-bound' || cmd.type === 'name-by-use') return []; // a relation over variables — no object to highlight
   if (cmd.type === 'shape-variant') return cmd.ids; // the named shape's vertices (ADR-138)
   if (cmd.type === 'inscribe') return variantVertices(cmd); // container + inscribed vertices (ADR-262)
+  if (cmd.type === 'altitude-choice') return variantVertices(cmd); // the pair and the sides it may be a height to (ADR-644)
   return applyCommand(emptyConstruction(), cmd).objects.map((o) => o.id);
 }
 

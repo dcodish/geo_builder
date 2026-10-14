@@ -259,6 +259,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2047': 'open',
   '#1963': 'open',
 
+  '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
+
 };
 
 export interface ParityRow {
@@ -1361,6 +1363,17 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'collinear-circle-2099-midpoint', family: 'circles', steps: ['משולש ABC', 'M אמצע AB', 'מעגל שעובר דרך A, M ו-B'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1963' }] },
   { id: 'collinear-circle-2099-circumscribed', family: 'circles', steps: ['משולש ABC', 'D על הישר AB', 'מעגל חוסם את המשולש ADB'], expect: 'refused', exception: 'X8' },
   { id: 'collinear-circle-2099-control', family: 'circles', steps: ['משולש ABC', 'D על AC', 'מעגל שעובר דרך A, D ו-B'], expect: 'builds', exception: 'X8', note: 'D off line AB — a real circle' },
+
+  // ── #2064 (ADR-643): a height named by two existing vertices that is ALREADY a height answers «כבר קיים» in every spelling ──
+  { id: 'altitude-already-height-2064', family: 'cevians-centres', steps: ['ריבוע ABCD', 'AB גובה'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2072' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D: «זה כבר קיים באיור» (it used to squash the square to a point); analytic refuses `degenerate-role` — the cross-tool question #2072' },
+  { id: 'altitude-reversed-side-already-drawn-2064', family: 'cevians-centres', steps: ['ריבוע ABCD', 'BC גובה ל-AB'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2072' }, { product: '3d', issue: '#1679', parked: true }], note: 'the operator’s screenshot line: the apex is the letter off the side' },
+  { id: 'altitude-long-form-already-drawn-2064', family: 'cevians-centres', steps: ['ריבוע ABCD', 'AB גובה לצלע BC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2072' }, { product: '3d', issue: '#1679', parked: true }], note: 'the control: unchanged in 2-D' },
+  // ── #2064 / #2085 (ADR-643): a declared polygon is never squashed to a point or given a straight corner — every builder refuses ──
+  { id: 'square-midpoint-collapse-2064', family: 'polygons', steps: ['ריבוע ABCD', 'B אמצע CD'], expect: 'refused', note: '2-D: «B כבר מוגדרת…» (it drew one point, green)' },
+  { id: 'quad-straight-corner-2064', family: 'polygons', steps: ['מרובע ABCD', 'זווית BCD = 180'], expect: 'refused', note: '2-D: the flat sentence naming B, C, D' },
+  { id: 'quad-corner-incidence-2064', family: 'polygons', steps: ['מרובע ABCD', 'C על BD'], expect: 'refused' },
+  { id: 'pentagon-straight-corner-2085', family: 'polygons', steps: ['מחומש ABCDE', 'זווית BCD = 180'], expect: 'refused', note: '2-D: «…והמחומש ABCDE היה נעשה מרובע»' },
+  { id: 'altitude-two-vertex-not-true-2064', family: 'cevians-centres', steps: ['מרובע ABCD', 'AC גובה'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2072' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D: AC ⟂ BC, the side a free choice «הציגו תצורה אחרת» cycles (ADR-644); analytic refuses `degenerate-role` — the cross-tool question #2072' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

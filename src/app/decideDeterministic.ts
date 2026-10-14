@@ -72,6 +72,7 @@ import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { honestyGateReport } from './honestyGates';
 import { honoursConstruct, roleReadings, thalesReadings } from './roleReadings';
+import { vertexPairVerdict } from './vertexPairCevian';
 import { solveBudget, work, withWorkBudget, withWorkEpoch } from '@/engine/solveBudget';
 
 /**
@@ -331,6 +332,28 @@ export async function decideFromParse(
    * model could only re-absorb the operand into a plane given, which is the defect itself. Logged under
    * the family's existing `scope:<category>` tag, so the dashboard's register is unchanged.
    */
+  /**
+   * #2064 ([ADR-643](../../docs/06-decisions.md#adr-643)) — A HEIGHT NAMED BY TWO EXISTING VERTICES. A right angle the
+   * pair names that already holds answers «כבר קיים» (the operator's ruling: in every spelling); with a tail
+   * («הגובה AB = 5») the long form carrying it is decided instead, exactly as if the student had typed it.
+   * Otherwise the line's own parse stands below (ADR-642's right angle, or the `cevian-redefines-vertex` refusal).
+   */
+  {
+    const vp = vertexPairVerdict(utterance, pctx, facts, seed, roleReadingConfig.cap);
+    if (vp?.kind === 'implied') {
+      return { kind: 'noop', binds, logs: [...logs, { source: 'parser', result: 'implied-restatement', detail: 'vertex-pair' }], note: { key: 'input.alreadyDrawn' } };
+    }
+    if (vp?.kind === 'adopt') {
+      const v = await decideFromParse(state, vp.reading, locale, hooks, opts);
+      return v.kind === 'store-op' ? v : { ...v, logs: [{ source: 'parser', result: 'vertex-pair:adopted', detail: vp.reading, intermediate: true }, ...v.logs] };
+    }
+  }
+  // #2064 (ADR-643): the only reading would redefine an existing vertex as a foot — «מרובע ABCD» · «AC גובה» would
+  // move C onto BD. Ruled: never. The existing «C כבר מוגדרת…» sentence (true in every member) until the side
+  // becomes a free choice (ADR-644).
+  if (!r.ok && r.reason === 'cevian-redefines-vertex') {
+    return refuse('guided', { source: 'parser', result: `cevian-redefines-vertex:${r.foot}` }, { key: 'errors.alreadyDefined', params: { id: r.foot } });
+  }
   if (!r.ok && r.reason === 'foreign-given') {
     return refuse('guided', { source: 'scope', result: `scope:${r.category}`, phrase: r.phrase }, { key: 'input.scope.foreign-given', params: { phrase: r.phrase, guide: { t: `input.scope.${r.category}` } } });
   }
@@ -416,6 +439,19 @@ export async function decideFromParse(
    * perfectly to the paid model and told the student their words were unreadable. The rule owes an
    * answer about what it matched, and `why` decides which impossibility to name.
    */
+  /**
+   * #2066 / #2085 item 3 ([ADR-643](../../docs/06-decisions.md#adr-643)): a bisector named by a side of a declared
+   * polygon at the angle's vertex. The operator's rulings of 2026-10-14: a triangle gets its own sentence (with the
+   * cevian clause), any other polygon «…היא צלע של המרובע/המלבן/… ולכן אינה יכולה לחצות את זווית A.». `side` is the
+   * pair as typed, `vertex` the letter it shares with the angle — both what the student wrote (ADR-W-096).
+   */
+  if (!r.ok && r.reason === 'cevian-degenerate' && r.why === 'bisector-is-side') {
+    const host = r.host ?? 'triangle';
+    const params = { side: r.side.join(''), vertex: r.apex };
+    return refuse('guided', { source: 'parser', result: `cevian-degenerate:bisector-is-side:${r.apex}${r.foot}` }, host === 'triangle'
+      ? { key: 'input.cevianBisectorIsSide', params }
+      : { key: 'input.cevianBisectorIsPolygonSide', params: { ...params, noun: { t: `input.shapeNounDefinite.${host}` } } });
+  }
   if (!r.ok && r.reason === 'cevian-degenerate') {
     const kind = r.role === 'median' ? 'input.cevianRoleMedian' : 'input.cevianRoleAltitude';
     const key =

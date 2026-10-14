@@ -121,7 +121,6 @@ describe('#1849 — the forced family is REFUSED at the door, naming the line an
     for (const [prefix, line, noun] of [
       [['משולש ABC', 'D אמצע AB'], 'D על AC', 'משולש'],
       [['משולש ABC'], 'הנקודות A, B, C על ישר אחד', 'משולש'],
-      [['מרובע ABCD', 'C על הישר AB'], 'D על הישר AB', 'מרובע'],
       [['מרובע ABCD'], 'ישר ABCD', 'מרובע'],
     ] as [string[], string, string][]) {
       const { v, raw, he } = await decide(prefix, line);
@@ -130,6 +129,15 @@ describe('#1849 — the forced family is REFUSED at the door, naming the line an
       expect(he, line).toContain(`«${line}» סותר את «${prefix[0]}»`);
       expect(he, line).toContain(`וקו ישר אינו ${noun}`);
     }
+  });
+
+  it('#2064 B2 (ADR-643): the quadrilateral row\'s FIRST incidence is now the refused line — «C על הישר AB» gives the ring a straight corner', async () => {
+    // Re-based (docs/17 §9): the row «מרובע ABCD» · «C על הישר AB» · «D על הישר AB» flattened the quadrilateral only at
+    // its third line, because a straight corner (A, B, C on one line) passed the gate. The operator's ruling of
+    // 2026-10-14 on #2064 (item 4, A) refuses that corner with the existing flat message, naming the three points.
+    const { v, he } = await decide(['מרובע ABCD'], 'C על הישר AB');
+    expect(v.kind).toBe('refuse');
+    expect(he).toBe('לא ניתן: עם «C על הישר AB» המרובע ABCD היה נעשה קו ישר — הנקודות A, B, C היו על ישר אחד, וקו ישר אינו מרובע. בדקו את הנתונים.');
   });
 
   it('the polygon declared LAST over lengths that already put its vertices on a line is the refused line itself', async () => {

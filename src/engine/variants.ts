@@ -25,6 +25,8 @@ const angleRoots = (cmd: AnyCommand): number[] | null =>
 /** The number of distinct configurations a command cycles (1 for a non-variant command). */
 export function variantCountOf(cmd: AnyCommand): number {
   if (cmd.type === 'shape-variant') return VARIANT_COUNT[cmd.shape];
+  // #2064 (ADR-644): the side of a two-vertex height the sentence did not state — one per right angle the pair can name.
+  if (cmd.type === 'altitude-choice') return cmd.options.length;
   if (cmd.type === 'inscribe') return inscribeVariantCount(cmd);
   // The UNSTATED two-circle mutual position (#196 Am.): intersecting / disjoint / contained.
   if (cmd.type === 'set-circle-position') return cmd.relation === 'any' ? 3 : 1;
@@ -39,14 +41,14 @@ export function variantCountOf(cmd: AnyCommand): number {
 /** Is this a variant command with more than one configuration (so "show another" can step it)? */
 export function cyclableVariant(cmd: AnyCommand): boolean {
   return (
-    (cmd.type === 'shape-variant' || cmd.type === 'inscribe' || cmd.type === 'set-circle-position' || cmd.type === 'common-tangent' || angleRoots(cmd) !== null) &&
+    (cmd.type === 'shape-variant' || cmd.type === 'inscribe' || cmd.type === 'set-circle-position' || cmd.type === 'common-tangent' || cmd.type === 'altitude-choice' || angleRoots(cmd) !== null) &&
     variantCountOf(cmd) > 1
   );
 }
 
 /** A copy of `cmd` with its `variant` set to `v` (unchanged if not a variant command). */
 export function withVariant<T extends AnyCommand>(cmd: T, v: number): T {
-  if (cmd.type === 'shape-variant' || cmd.type === 'inscribe' || cmd.type === 'set-circle-position' || cmd.type === 'common-tangent')
+  if (cmd.type === 'shape-variant' || cmd.type === 'inscribe' || cmd.type === 'set-circle-position' || cmd.type === 'common-tangent' || cmd.type === 'altitude-choice')
     return { ...cmd, variant: v };
   const roots = angleRoots(cmd);
   if (roots && cmd.type === 'measure-angle') {
@@ -61,6 +63,7 @@ export function variantVertices(cmd: AnyCommand): Id[] {
   if (cmd.type === 'shape-variant') return cmd.ids;
   if (cmd.type === 'inscribe') return [...cmd.container, ...cmd.ids];
   if (cmd.type === 'common-tangent') return [cmd.a, cmd.b];
+  if (cmd.type === 'altitude-choice') return [...new Set(cmd.options.flatMap((o) => [o.apex, o.foot, ...o.side]))];
   if (angleRoots(cmd) && cmd.type === 'measure-angle') return [cmd.ray1, cmd.vertex, cmd.ray2];
   return [];
 }

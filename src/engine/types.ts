@@ -1339,7 +1339,11 @@ export type SymbolicCommand =
   // configuration" cycles, and an explicit `point-on-segment` given on a shape vertex PINS the matching
   // variant. `containerKind` tells the expansion whether to CREATE the container (labels not yet drawn) or
   // reuse the existing one (M1).
-  | { type: 'inscribe'; shape: 'rhombus' | 'rectangle' | 'square' | 'parallelogram'; ids: Id[]; container: Id[]; containerKind: 'triangle' | 'quad'; variant: number };
+  | { type: 'inscribe'; shape: 'rhombus' | 'rectangle' | 'square' | 'parallelogram'; ids: Id[]; container: Id[]; containerKind: 'triangle' | 'quad'; variant: number }
+  // #2064 Stage 2 ([ADR-644](docs/06-decisions.md#adr-644)): a height named by two existing vertices whose SIDE the
+  // sentence did not state («מרובע ABCD» · «AC גובה») — each option is the right angle at `foot` between `apex` and
+  // `side`; `variant` is the persisted, cyclable choice, and a stated right angle matching an option pins it.
+  | { type: 'altitude-choice'; options: { apex: Id; foot: Id; side: [Id, Id] }[]; variant: number };
 
 /**
  * #784/#785 (ADR-462) — WHAT THIS LOWERING CONSUMED from the student's sentence.

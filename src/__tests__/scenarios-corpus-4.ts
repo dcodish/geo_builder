@@ -4391,6 +4391,144 @@ export const SCENARIOS_4: Scenario[] = [
       expect(gateVerdict(factsOf(['משולש ABC', 'D על AC']), 'מעגל שעובר דרך A, D ו-B').kind, 'D on AC builds the circle').toBe('commit');
     },
   },
+  {
+    id: 'altitude-on-existing-side-already-drawn-2064',
+    title: '#2064 (ADR-643): «AB גובה» after «ריבוע ABCD» answers «כבר קיים» — the square is never squashed to a point',
+    guards:
+      "The operator's exact line (P1, ruling 3 of 2026-10-13: *\"typing just AB גובה collapses all\"*). Measured at 939b160a: the altitude rule read A as the apex and B as a foot to be minted onto CD, emitted `foot{B}`, M1 lowered it to \"B coincides with its constructed target\", and the solve squashed the square to A = B = C = D with every row green. Ruled (2 of 2026-10-13): a segment that is already a height answers «זה כבר קיים באיור — אין מה להוסיף.» in every spelling. Asserts the line is the submit gate's no-op (through the app's own `vertexPairVerdict`), the parser never emits a foot over B, and the square keeps its shape. The spelling matrix is src/app/__tests__/issue-2064-vertex-pair-cevian.test.ts.",
+    steps: ['ריבוע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const sq = factsOf(['ריבוע ABCD']);
+      expect(gateVerdict(sq, 'AB גובה').kind, '«AB גובה» is already true').toBe('noop');
+      const r = parse('AB גובה', ctxOf(sq));
+      expect(r.ok && r.commands.some((c) => c.type === 'foot'), 'the parser never redefines B as a foot').toBe(false);
+      expect(dist(at(fig, 'A'), at(fig, 'B')), 'the square keeps its size').toBeGreaterThan(1);
+      expect(dist(at(fig, 'A'), at(fig, 'B'))).toBeCloseTo(dist(at(fig, 'B'), at(fig, 'C')), 6);
+    },
+  },
+  {
+    id: 'altitude-reversed-side-already-drawn-2064',
+    title: '#2064 (ADR-643): «BC גובה ל- AB» after «ריבוע ABCD» (the operator\'s screenshot, the space included) answers «כבר קיים»',
+    guards:
+      "The operator's screenshot of 2026-10-13: «ריבוע ABCD» · «BC גובה ל- AB» was refused «B נמצאת על הצלע AB, ולכן הגובה מ-B אל AB הוא באורך אפס…» — the rule took B, the letter the pair shares with the side, as the apex. Ruled (2 of 2026-10-13): the apex is the endpoint NOT on the named side, the foot the shared vertex, so this is CB ⟂ AB at B — already true. Asserts both spellings are the gate's no-op and the parse is the right angle at B (no foot minted).",
+    steps: ['ריבוע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const sq = factsOf(['ריבוע ABCD']);
+      for (const line of ['BC גובה ל- AB', 'BC גובה ל-AB']) {
+        expect(gateVerdict(sq, line).kind, line).toBe('noop');
+        const r = parse(line, ctxOf(sq));
+        expect(r.ok && r.commands, line).toContainEqual({ type: 'set-perpendicular', a: 'C', b: 'B', c: 'B', d: 'A' });
+      }
+    },
+  },
+  {
+    id: 'altitude-long-form-already-drawn-2064',
+    title: '#2064 (ADR-643, control): «AB גובה לצלע BC» after «ריבוע ABCD» still answers «כבר קיים»',
+    guards:
+      "The control the operator called correct (ballot card d7-2064, 2026-10-13: *\"it says this is already existing\"*). Unchanged by the fix: the long form lowers to AB ⟂ BC, which the square already holds. Asserts the gate's no-op.",
+    steps: ['ריבוע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(gateVerdict(factsOf(['ריבוע ABCD']), 'AB גובה לצלע BC').kind).toBe('noop');
+    },
+  },
+  {
+    id: 'altitude-two-vertex-not-true-2064',
+    title: '#2064 (ADR-644): «AC גובה» after «מרובע ABCD» draws AC ⟂ BC — C is never moved onto BD — and «הציגו תצורה אחרת» cycles the side',
+    guards:
+      "Measured at 939b160a: «מרובע ABCD» · «AC גובה» committed `foot{C from A onto BD}` — C moved onto the diagonal, green, no note. Ruled (3 of 2026-10-13): an existing vertex is never redefined as a foot; ruled 2026-10-14 (option D): *\"we just draw AC perpendicular to BC\"*, the side a free choice «הציגו תצורה אחרת» cycles. ADR-643 shipped the interim «C כבר מוגדרת…» refusal; ADR-644 builds it as the cyclable `altitude-choice`. Asserts AC ⟂ BC at every configuration the app would display with the default choice, C off the diagonal BD, and that every option is a drawable figure.",
+    steps: ['מרובע ABCD', 'AC גובה'],
+    check(fig) {
+      allStepsOk(fig);
+      const a = at(fig, 'A'), b = at(fig, 'B'), c = at(fig, 'C'), d = at(fig, 'D');
+      const dot = (a.x - c.x) * (b.x - c.x) + (a.y - c.y) * (b.y - c.y);
+      expect(Math.abs(dot) / (dist(a, c) * dist(b, c)), 'AC ⟂ BC').toBeLessThan(1e-6);
+      const off = Math.abs((d.x - b.x) * (c.y - b.y) - (d.y - b.y) * (c.x - b.x)) / dist(b, d) ** 2;
+      expect(off, 'C is not on BD').toBeGreaterThan(1e-3);
+      const facts = factsOf(['מרובע ABCD', 'AC גובה']);
+      const i = facts.findIndex((f) => f.cmd.type === 'altitude-choice');
+      for (let v = 0; v < 4; v++) {
+        const fc = facts.map((f, k) => (k === i ? { ...f, cmd: { ...f.cmd, variant: v } as AnyCommand } : f));
+        expect([0, 1, 2, 3, 4, 5, 6, 7].some((s) => meetsRequirements(fc, s)), `option ${v} is drawable`).toBe(true);
+      }
+    },
+  },
+  {
+    id: 'square-midpoint-collapse-refused-2064',
+    title: '#2064 (ADR-643, B1): «B אמצע CD» or «AB תיכון» after «ריבוע ABCD» is refused «B כבר מוגדרת…» — never one point, green',
+    guards:
+      "Measured at 939b160a: «ריבוע ABCD» · «B אמצע CD» (and «AB תיכון») drew the square as ONE POINT with every row green — the scale-free flatness ruler read a ring 1e-8 across as healthy (0.5), so neither the ADR-602 gate nor the ADR-513 notice fired. Ruled (2026-10-14, items 2 and 3): the existing «B כבר מוגדרת ולא ניתן להגדיר אותה מחדש כמשהו אחר…». Asserts both lines are refused before they become facts with that sentence.",
+    steps: ['ריבוע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const sq = factsOf(['ריבוע ABCD']);
+      for (const line of ['B אמצע CD', 'AB תיכון']) {
+        const v = gateVerdict(sq, line);
+        expect(v.kind, line).toBe('refused');
+        expect(humanizeError((v as { detail?: string }).detail, he as never).replace(/[⁦-⁩]/g, ''), line).toBe('B כבר מוגדרת ולא ניתן להגדיר אותה מחדש כמשהו אחר. כדי לשנות, ערכו או מחקו את הצעד הקודם.');
+      }
+    },
+  },
+  {
+    id: 'quad-straight-corner-refused-2064',
+    title: '#2064 (ADR-643, B2): a quadrilateral given a straight corner — «זווית BCD = 180», «C על BD», and C on BD before the quadrilateral — is refused with the flat sentence',
+    guards:
+      "Measured at 939b160a: «מרובע ABCD» · «זווית BCD = 180» and «מרובע ABCD» · «C על BD» drew a quadrilateral with B, C, D on one line, green — nothing in the accept path asked about a straight corner. Ruled (2026-10-14, item 4, A): the existing «…המרובע ABCD היה נעשה קו ישר…» message, naming the three points. Asserts all three orders are refused with that sentence, and that a corner only a DEFAULT layout made straight (two loose segments, then the quadrilateral) still commits — the search moves it (#1927's doctrine).",
+    steps: ['מרובע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const say = (v: unknown, said: string) => humanizeError((v as { detail?: string }).detail, he as never, said).replace(/[⁦-⁩]/g, '');
+      const flat = (said: string) => `לא ניתן: עם «${said}» המרובע ABCD היה נעשה קו ישר — הנקודות B, C, D היו על ישר אחד, וקו ישר אינו מרובע. בדקו את הנתונים.`;
+      const quad = factsOf(['מרובע ABCD']);
+      for (const line of ['זווית BCD = 180', 'C על BD']) expect(say(gateVerdict(quad, line), line), line).toBe(flat(line));
+      expect(say(gateVerdict(factsOf(['קטע BD', 'C על BD', 'נקודה A']), 'מרובע ABCD'), 'מרובע ABCD')).toBe(flat('מרובע ABCD'));
+      expect(gateVerdict(factsOf(['קטע AC', 'קטע BD']), 'מרובע ABCD').kind, 'a default layout is a choice, not a refusal').toBe('commit');
+    },
+  },
+  {
+    id: 'pentagon-straight-corner-refused-2085',
+    title: '#2085 item 2 (ADR-643): «זווית BCD = 180» after «מחומש ABCDE» is refused — «…והמחומש ABCDE היה נעשה מרובע»',
+    guards:
+      "The ballot line (2026-10-14, #2085 item 2, A): «מחומש ABCDE» · «זווית BCD = 180» committed green with B, C, D on one line. Ruled: «לא ניתן: עם «זווית BCD = 180» הנקודות B, C, D היו על ישר אחד, והמחומש ABCDE היה נעשה מרובע. בדקו את הנתונים.» — the n-gon would become an (n−1)-gon. Asserts the sentence word for word, and the hexagon's «…והמשושה ABCDEF היה נעשה מחומש.».",
+    steps: ['מחומש ABCDE'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const say = (v: unknown, said: string) => humanizeError((v as { detail?: string }).detail, he as never, said).replace(/[⁦-⁩]/g, '');
+      expect(say(gateVerdict(factsOf(['מחומש ABCDE']), 'זווית BCD = 180'), 'זווית BCD = 180')).toBe('לא ניתן: עם «זווית BCD = 180» הנקודות B, C, D היו על ישר אחד, והמחומש ABCDE היה נעשה מרובע. בדקו את הנתונים.');
+      expect(say(gateVerdict(factsOf(['משושה ABCDEF']), 'זווית BCD = 180'), 'זווית BCD = 180')).toBe('לא ניתן: עם «זווית BCD = 180» הנקודות B, C, D היו על ישר אחד, והמשושה ABCDEF היה נעשה מחומש. בדקו את הנתונים.');
+    },
+  },
+  {
+    id: 'bisector-on-a-side-refused-2066',
+    title: '#2066 (ADR-643): «AB חוצה זווית» after «משולש ABC» (AB is a side) is refused as a side, never a flat triangle',
+    guards:
+      "The ballot line (2026-10-14, #2066, A). Measured at 939b160a: the bisector rule read «AB חוצה זווית» as the bisector from A placing B, and with B already a vertex emitted ∠BAB = ∠BAC — a zero angle only a flattened triangle meets — refused with the flat-triangle message. Ruled: «AB היא צלע של המשולש ולכן אינה יכולה לחצות את זווית A — חוצה זווית יוצא מקודקוד אל הצלע שמולו.». Asserts the parser's `cevian-degenerate` / `bisector-is-side` refusal with A as the vertex. The spelling matrix is src/app/__tests__/issue-2066-bisector-on-side.test.ts.",
+    steps: ['משולש ABC'],
+    check(fig) {
+      allStepsOk(fig);
+      const r = parse('AB חוצה זווית', ctxOf(factsOf(['משולש ABC'])));
+      expect(r.ok ? null : r).toMatchObject({ reason: 'cevian-degenerate', role: 'bisector', why: 'bisector-is-side', apex: 'A', host: 'triangle' });
+    },
+  },
+  {
+    id: 'polygon-side-bisector-refused-2085',
+    title: '#2085 item 3 (ADR-643): «AB חוצה זווית» after «מרובע ABCD» is refused «AB היא צלע של המרובע…» — D is never pulled onto AB',
+    guards:
+      "The ballot line (2026-10-14, #2085 item 3, A). Measured at 939b160a: «מרובע ABCD» · «AB חוצה זווית» committed ∠BAB = ∠BAD and D landed on AB, green. Ruled: «AB היא צלע של המרובע ולכן אינה יכולה לחצות את זווית A.», with «המלבן» / «המקבילית» etc. as fits. Asserts the refusal names the quadrilateral and the rectangle.",
+    steps: ['מרובע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      for (const [shape, host] of [['מרובע ABCD', 'n4'], ['מלבן ABCD', 'rectangle']]) {
+        const r = parse('AB חוצה זווית', ctxOf(factsOf([shape])));
+        expect(r.ok ? null : r, shape).toMatchObject({ reason: 'cevian-degenerate', why: 'bisector-is-side', apex: 'A', host });
+      }
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */
