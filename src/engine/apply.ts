@@ -8,10 +8,11 @@
  * existing points is fitted to them, instead of keeping absolute defaults.
  */
 
-import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, Vec } from './types';
+import type { Command, Constraint, Construction, GeoObject, Id, SideRequirement, SolveDirective, Vec } from './types';
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
 import { ringOnOneCircle } from './structure';
+import { referencesCircle } from './lower';
 import { add, circleCircleIntersect, circumcenter, dist, footOnLine, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringKey, ringSimple, scale, sub } from './geometry';
 import { QUAD_IMPLIES, quadImplies, quadImpliesInEveryReading, quadsExclude, type QuadKind } from './shapeKinds';
 import { constraintKey, constraintRefs, residual, residualTolerance } from './solve';
@@ -1231,6 +1232,27 @@ function pointOnCircle(objects: GeoObject[], id: Id, circleId: Id): boolean {
   return false;
 }
 
+/**
+ * #2084 ([ADR-647](../../docs/06-decisions.md#adr-647)) — the definition point `id` takes when it is stated on circle
+ * `circleId` while it already rides a circle the construction states TANGENT to it: a copy of the stated touch
+ * point's own object (`circles-tangent`'s `at`: its kind and parameters, under `id`). Null when no such tangency
+ * holds, when the touch point is not an object yet, or when the copy would make `id` depend on itself.
+ */
+function tangentTouchCopy(objects: GeoObject[], requirements: readonly SideRequirement[] | undefined, id: Id, circleId: Id): GeoObject | null {
+  for (const r of requirements ?? []) {
+    if (r.kind !== 'circle-position' || r.relation !== 'tangent') continue;
+    const other = r.a === circleId ? r.b : r.b === circleId ? r.a : null;
+    if (!other || !pointOnCircle(objects, id, other) || r.at === id) continue;
+    const at = objects.find((o) => o.id === r.at);
+    if (!at || !isGeoPoint(at)) continue;
+    const copy = { ...at, id } as GeoObject;
+    if ('solve' in copy) delete (copy as { solve?: unknown }).solve;
+    if (wouldInvertDependency(objects, id, objectParents(copy))) continue;
+    return copy;
+  }
+  return null;
+}
+
 /** The golden angle — spreads N points around a circle so none coincide and they look even. */
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
@@ -1714,7 +1736,10 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // "circle O" without creating it). Skip it when that circle already exists, so it never CLOBBERS a
       // real one with the default free radius (e.g. when a later "chord … in circle O" is parsed without
       // the circle in context). When truly absent, fall through and create it.
-      if (cmd.ifAbsent && objects.some((o) => o.kind === 'circle' && o.id === cmd.id)) break;
+      // #2083 (ADR-646): the same holds for EVERY sizeless circle — a `freeRadius` circle over an existing
+      // circle states no size, so it is a reference (the crossing rule's «המעגלים O ו-P נחתכים…», the LLM
+      // route, a saved file) and must never overwrite a stated radius, a through-point or an incircle.
+      if (objects.some((o) => o.kind === 'circle' && referencesCircle(cmd, o))) break;
       // `apart` (#196): a STANDALONE bare circle seeds its NEW centre CLEAR of every existing circle —
       // the default 0-anchor placement (a fixed +4 gap) lands a second «מעגל O2» overlapping the first,
       // visually asserting two intersection points the student never stated (the ADR-052/253 smell,
@@ -2064,6 +2089,18 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       if (existing) {
         // (a) Already on this circle ⇒ idempotent (re-stating the same fact).
         if (pointOnCircle(objects, cmd.id, cmd.circle)) break;
+        // (a2) #2084 (ADR-647): the point already rides a circle the construction states TANGENT to this one
+        // (`circles-tangent`'s record, every spelling). Two tangent circles have ONE common point, so a point on
+        // both IS the touch point: X takes the touch point's own definition (same kind and parameters, its own
+        // id), evaluates on the same formula, and the forced coincidence X = M is recorded (ADR-123's notice).
+        // Before, a busy free radius skipped every structural branch and the membership was dropped as
+        // «כבר קיים» (X off the circle); a stated radius drove X only to within the solve's tolerance of M.
+        const touchCopy = tangentTouchCopy(objects, prev.requirements, cmd.id, cmd.circle);
+        if (touchCopy) {
+          const i = objects.findIndex((o) => o.id === cmd.id);
+          objects[i] = touchCopy;
+          break;
+        }
         // (b) E sits on a segment/line one of whose ends is ALSO on C ⇒ this is the SECOND
         // crossing of that line with C: become a line∩circle avoiding the shared end (the same
         // reinterpretation as `addCollinear`). E.g. "E on extension AC" + "E on circle P", A on P
@@ -2166,9 +2203,18 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         // amber-only was a report, not an enforcement). Witness = any point already riding the circle;
         // reaching here with NO member and a free radius cannot happen ((c3) owns that), so the bare
         // `break` below is the genuine can't-say residue, still verifier-reported.
+        // #2084 (ADR-647): the witness is ANY point the construction puts on the circle — every kind
+        // `pointOnCircle` reads (a rider, an antipode, an arc midpoint, a line∩circle or circle∩circle crossing,
+        // the through-point, a circumcircle's vertex), a `radial-toward` on it (a tangency's touch / witness), and
+        // the touch point of a tangency STATED with it (on both circles by that statement — the only point an inner
+        // `tangent-inner` circle carries).
+        const statedTouch = (prev.requirements ?? []).find(
+          (r): r is Extract<SideRequirement, { relation: 'tangent' }> => r.kind === 'circle-position' && r.relation === 'tangent' && (r.a === cmd.circle || r.b === cmd.circle) && r.at !== cmd.id,
+        )?.at;
         const witness =
-          objects.find((o) => o.kind === 'on-circle' && (o as Extract<GeoObject, { kind: 'on-circle' }>).circle === cmd.circle && o.id !== cmd.id)?.id ??
-          (circ && circ.radius.via === 'through' && circ.radius.point !== cmd.id ? circ.radius.point : undefined);
+          objects.find((o) => o.id !== cmd.id && o.id !== circ?.center && isGeoPoint(o) && (pointOnCircle(objects, o.id, cmd.circle) || (o.kind === 'radial-toward' && o.circle === cmd.circle)))?.id ??
+          (circ && circ.radius.via === 'through' && circ.radius.point !== cmd.id ? circ.radius.point : undefined) ??
+          (statedTouch && objects.some((o) => o.id === statedTouch) ? statedTouch : undefined);
         if (circ && witness) {
           driveOrCheck(objects, constraints, { type: 'length-radius', a: circ.center, b: cmd.id, circle: cmd.circle, center: circ.center, witness, k: 1 });
           break;

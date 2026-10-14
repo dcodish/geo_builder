@@ -11,6 +11,8 @@ import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObjec
 import { LEN_EPS, edgeSideToward, isGeoPoint, isOrderConstraint } from './types';
 import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeExclusion, shapeExclusionError, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
 import { lower } from './lower';
+import { circlesTouch, oneCommonPointError } from './evaluate';
+import { circlesStatedTangent } from './structure';
 import { carrierParams, crossingBranchCount, evaluate, evaluateTightened, newCrossingTangency, resolveDriven, resolveDrivenMemo, drivenConstraintsOf, setCarrierVals } from './evaluate';
 import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist, isRingDiagonal, sub } from './geometry';
@@ -1100,6 +1102,45 @@ function tangentCrossingOnPrior(prev: Construction, next: Construction, prevEval
   return err;
 }
 
+/**
+ * #2080 / #2083 ([ADR-645](../../docs/06-decisions.md#adr-645)) — docs/LADDER.md stage 0j, the circle–circle member.
+ * Two circles have ONE common point when the construction states them tangent (`circlesStatedTangent`, every
+ * tangency spelling) or when their lengths make them tangent on the PRIOR figure at every sampled configuration
+ * that evaluates (`applySeed` 1..3 — sound one way, like ADR-640's line member: a tangency a default layout merely
+ * draws is sampled off and left to the ladder). So:
+ *  - a SECOND crossing of such a pair (`avoid` naming the first crossing of the same pair) is refused;
+ *  - a tangency stated over a pair that already has two named crossings is refused.
+ * The refusal is the over-constrained coincide shape, `degenerate` (a concluded contradiction); the fold's
+ * attribution names the other statement.
+ */
+function circlesCrossingTangentError(prev: Construction, cmd: Command, prevEval: EvalResult): string | null {
+  const samePair = (o: GeoObject | undefined, a: Id, b: Id): o is Extract<GeoObject, { kind: 'circle-circle' }> =>
+    !!o && o.kind === 'circle-circle' && ((o.circle1 === a && o.circle2 === b) || (o.circle1 === b && o.circle2 === a));
+  if (cmd.type === 'circles-tangent') {
+    for (const o of prev.objects) {
+      if (!samePair(o, cmd.circle1, cmd.circle2) || !o.avoid) continue;
+      if (samePair(prev.objects.find((f) => f.id === o.avoid), cmd.circle1, cmd.circle2)) return oneCommonPointError(o.avoid, o.id);
+    }
+    return null;
+  }
+  if (cmd.type !== 'circle-circle-intersection' || !cmd.avoid) return null;
+  if (!samePair(prev.objects.find((o) => o.id === cmd.avoid), cmd.circle1, cmd.circle2)) return null;
+  const err = oneCommonPointError(cmd.avoid, cmd.id);
+  if (circlesStatedTangent(prev, cmd.circle1, cmd.circle2)) return err;
+  const touches = (e: EvalResult): boolean => {
+    if (!e.ok) return false;
+    const a = e.circles.get(cmd.circle1);
+    const b = e.circles.get(cmd.circle2);
+    return !!a && !!b && circlesTouch(a, b);
+  };
+  if (!touches(prevEval)) return null;
+  for (const seed of [1, 2, 3]) {
+    const e = evaluate(applySeed(prev, seed));
+    if (e.ok && !touches(e)) return null;
+  }
+  return err;
+}
+
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
   return withSideChoices(withRequirements(commitDrawnFreeVertices(releaseImpliedOwnership(prev, applyStepLadder(prev, cmd))), prev, [cmd]), prev);
@@ -1228,7 +1269,7 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   // then «AP חותך את המעגל בנקודה E» / «E על הישר AP» · «E על מעגל O». Asked before any solve, because a solve
   // weighs the stated tangency against the new crossing's own obligations (an A–E–P order, the carrier's
   // collinearity) and the refusal then named whichever gave way. Only a tangency the givens HOLD refuses here.
-  const tangentCrossing = tangentCrossingOnPrior(prev, probed, prevEval);
+  const tangentCrossing = tangentCrossingOnPrior(prev, probed, prevEval) ?? circlesCrossingTangentError(prev, cmd, prevEval);
   if (tangentCrossing) return { ok: false, error: tangentCrossing, construction: prev, positions: prevPositions, ladder: ['pre:tangent-crossing'], degenerate: true };
 
   const roleRefusal = diagonalClaimRefusal(prev, cmd);

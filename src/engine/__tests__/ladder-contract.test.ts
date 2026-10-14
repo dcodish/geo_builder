@@ -93,6 +93,50 @@ describe('ladder contract (docs/LADDER.md)', () => {
     }
   });
 
+  // #2080 / #2083 (ADR-645), stage 0j's circle–circle member: two circles with ONE common point (stated tangent, or
+  // tangent by their stated lengths) have no second crossing — refused on the prior figure, before any solve.
+  const pair: Command[] = [
+    { type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true },
+    { type: 'circle', id: 'circle-P', center: 'P', radius: 3.6, freeRadius: true, apart: true },
+  ] as Command[];
+  const crossings: Command[] = [
+    { type: 'circle-circle-intersection', id: 'X', circle1: 'circle-O', circle2: 'circle-P', branch: 0 },
+    { type: 'circle-circle-intersection', id: 'Y', circle1: 'circle-O', circle2: 'circle-P', branch: 1, avoid: 'X' },
+  ] as Command[];
+  const tangency = { type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'M', external: true } as Command;
+  it('#2080 (ADR-645): a second crossing of two circles stated tangent refuses at pre:tangent-crossing (0j), both orders', () => {
+    const r = run([...pair, tangency, ...crossings]);
+    expect(r.ok).toBe(false);
+    expect(r.ladder).toEqual(['pre:tangent-crossing']);
+    if (!r.ok) {
+      expect(r.error).toBe('over-constrained: X coincides with Y cannot hold');
+      expect(r.degenerate).toBe(true);
+    }
+    const other = run([...pair, ...crossings, tangency]);
+    expect(other.ok).toBe(false);
+    expect(other.ladder).toEqual(['pre:tangent-crossing']);
+  });
+
+  it('#2083 (ADR-645): tangent by stated lengths — the crossing after «OP = 5» refuses at 0j; «OP = 5» after it at main:refuse', () => {
+    const sized: Command[] = [
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 3 },
+      { type: 'circle', id: 'circle-P', center: 'P', radius: 2, apart: true },
+    ] as Command[];
+    const op = { type: 'set-distance', a: 'O', b: 'P', value: 5 } as Command;
+    const r = run([...sized, op, ...crossings]);
+    expect(r.ok).toBe(false);
+    expect(r.ladder).toEqual(['pre:tangent-crossing']);
+    const other = run([...sized, ...crossings, op]);
+    expect(other.ok).toBe(false);
+    expect(other.ladder?.[other.ladder.length - 1]).toBe('main:refuse');
+    if (!other.ok) {
+      expect(other.error).toBe('over-constrained: X coincides with Y cannot hold');
+      expect(other.degenerate, 'a contradiction, never a pending row').toBe(true);
+    }
+    // control: «OP = 4» crosses at two points
+    expect(run([...sized, { ...op, value: 4 } as Command, ...crossings]).ok).toBe(true);
+  });
+
   it('an M1 restatement of an existing on-segment point accepts on the m1 branch', () => {
     const r = run([
       { type: 'triangle', ids: ['A', 'B', 'C'] },

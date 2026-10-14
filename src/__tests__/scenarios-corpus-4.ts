@@ -4529,6 +4529,74 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'tangent-circles-have-no-two-crossings-2080',
+    title: 'Two circles stated tangent: «המעגלים O ו-P נחתכים בנקודות X ו-Y» is refused with the contradiction sentence, both orders (#2080, ADR-645)',
+    guards:
+      "#2080 (ADR-645), operator ruling 2026-10-14 on #2073 (option A: the existing «…סותר את «המעגלים O ו-P משיקים»…» sentence). Measured on 939b160a through decideDeterministic2D: the crossing line committed with X = Y on the touch point (two roots ~10⁻³ apart — the tangency is held by a witness coincide to its residual tolerance, and the circle∩circle evaluation asked only whether the roots differ by LEN_EPS); the other order committed the same way. Root cause: nothing in the construction recorded that the pair was stated tangent, so a second crossing was judged by coordinates. Fix: the circles-tangent statement leaves a circle-position 'tangent' record (circlesStatedTangent), stage 0j refuses a second crossing of a stated-tangent pair and a tangency over a pair with two named crossings, the evaluation refuses it as a backstop, and the fold names the crossing's statement for the other order. The spelling matrix is src/app/__tests__/issue-2080-tangent-circles-cross.test.ts.",
+    steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const said = (facts: ReturnType<typeof factsOf>, line: string, v: unknown) => {
+        const d = (v as { detail?: string }).detail;
+        return humanizeError(d, he as never, line, otherUtteranceForError(facts, d)).replace(/[⁦-⁩]/g, '');
+      };
+      const CROSS = 'המעגלים O ו-P נחתכים בנקודות X ו-Y';
+      const TAN = 'המעגלים O ו-P משיקים';
+      const pre = factsOf(['מעגל O', 'מעגל P', TAN]);
+      const v = gateVerdict(pre, CROSS);
+      expect(v.kind, 'the two-point crossing of tangent circles is refused').toBe('refused');
+      expect(said(pre, CROSS, v)).toBe(`לא ניתן: «${CROSS}» סותר את «${TAN}» — אי אפשר לקיים את שניהם יחד. הסיבה: X מתלכדת עם Y.`);
+      // the other order: the crossing first, then the tangency — the tangency is refused, naming the crossing
+      const crossingFirst = factsOf(['מעגל O', 'מעגל P', CROSS]);
+      const w = gateVerdict(crossingFirst, TAN);
+      expect(w.kind).toBe('refused');
+      expect(said(crossingFirst, TAN, w)).toBe(`לא ניתן: «${TAN}» סותר את «${CROSS}» — אי אפשר לקיים את שניהם יחד. הסיבה: X מתלכדת עם Y.`);
+    },
+  },
+  {
+    id: 'point-on-two-tangent-circles-is-the-touch-2084',
+    title: 'Two tangent circles: «X על מעגל O» · «X על מעגל P» puts X on the touch point M, with the converge notice (#2084, ADR-647)',
+    guards:
+      "#2084 (ADR-647), operator ruling 2026-10-14 (card d14b-2084-priority, A: X moves to the touch point, with the \"moved to coincide\" notice). Measured on 939b160a through decideDeterministic2D: «X על מעגל P» answered «זה כבר קיים באיור — אין מה להוסיף.» with X at (0, 5), off circle P; with stated radii X was drawn ~10⁻³ beside M with no notice. Root cause: apply's point-on-circle existing-point branches never asked what a membership of both tangent circles means — the busy free radius skipped (c3), the witness search read only on-circle riders, and the command reached the bare break; (c4) drove X only to within the solve tolerance. Fix: a point on one circle of a stated tangency, stated on the other, takes the touch point's own definition (tangentTouchCopy), and the witness reads every point on the circle. Matrix: src/app/__tests__/issue-2084-point-on-tangent-circles.test.ts.",
+    steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'X על מעגל O', 'X על מעגל P'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(dist(at(fig, 'X'), at(fig, 'M')), 'X is the touch point').toBeLessThan(1e-6);
+      expect(fig.coincidences.map((p) => [...p].sort().join('')), 'the converge notice').toContain('MX');
+    },
+  },
+  {
+    id: 'tangent-by-lengths-cross-refused-2083',
+    title: 'Radii 3 and 2 with «OP = 5»: the two-point crossing is refused, both orders; the stated radii are kept (#2083, ADR-646 + ADR-645)',
+    guards:
+      "#2083 (ADR-646 part A, ADR-645 part B), operator ruling 2026-10-14 (card d14b-2083-priority, A: the stated radii are kept; the tangency-by-lengths case is refused under #2080's ruling). Measured on 939b160a: the named crossing replaced both radius facts with free defaults (r 5 and 3.6), and with the radii kept («המעגלים נחתכים…») «OP = 5» then the crossing drew X(3.00, 0.10), Y(3.00, 0.09) green — three stated lengths leaned inside their tolerances until two roots 0.01 apart existed. Fix: a sizeless circle statement is a reference (the fold rule + apply), and circlesTouch (the lengths held to the stated-length ruler) refuses a second crossing at stage 0j on the prior figure and in the evaluation; the fold names the crossing for the other order. Matrix: src/app/__tests__/issue-2083-circle-reference.test.ts.",
+    steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'המעגלים O ו-P נחתכים בנקודות X ו-Y'],
+    check(fig) {
+      allStepsOk(fig);
+      // part A: the stated radii are kept by the crossing line
+      for (const X of ['X', 'Y']) {
+        expect(dist(at(fig, 'O'), at(fig, X)), `|O${X}| = 3`).toBeCloseTo(3, 6);
+        expect(dist(at(fig, 'P'), at(fig, X)), `|P${X}| = 2`).toBeCloseTo(2, 6);
+      }
+      const he = i18n.getFixedT('he');
+      const said = (facts: ReturnType<typeof factsOf>, line: string, v: unknown) => {
+        const d = (v as { detail?: string }).detail;
+        return humanizeError(d, he as never, line, otherUtteranceForError(facts, d)).replace(/[⁦-⁩]/g, '');
+      };
+      const CROSS = 'המעגלים O ו-P נחתכים בנקודות X ו-Y';
+      const lengthsFirst = factsOf(['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'OP = 5']);
+      const v = gateVerdict(lengthsFirst, CROSS);
+      expect(v.kind).toBe('refused');
+      expect(said(lengthsFirst, CROSS, v)).toBe(`לא ניתן: «${CROSS}» סותר את «OP = 5» — אי אפשר לקיים את שניהם יחד. הסיבה: X מתלכדת עם Y.`);
+      const crossingFirst = factsOf(['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', CROSS]);
+      const w = gateVerdict(crossingFirst, 'OP = 5');
+      expect(w.kind).toBe('refused');
+      expect(said(crossingFirst, 'OP = 5', w)).toBe(`לא ניתן: «OP = 5» סותר את «${CROSS}» — אי אפשר לקיים את שניהם יחד. הסיבה: X מתלכדת עם Y.`);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

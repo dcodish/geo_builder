@@ -78,7 +78,7 @@ describe('store — "show another configuration" varies the radii (and can flip 
   it('resampling produces differently-sized circles, every view clean (no collapsed points)', () => {
     const st = useGeoStore.getState();
     st.clear();
-    for (const u of ['two circles intersect at A and B', 'C על מעגל O', 'D על מעגל P']) {
+    for (const u of ['circles O and P intersect at A and B', 'C על מעגל O', 'D על מעגל P']) {
       const r = parse(u);
       expect(r.ok, u).toBe(true);
       if (!r.ok) return;
@@ -107,7 +107,7 @@ describe('store — "show another configuration" varies the radii (and can flip 
     // radius, so `circles` is the only place the true value is published.
     const st = useGeoStore.getState();
     st.clear();
-    for (const u of ['two circles intersect at A and B', 'C על מעגל O', 'OC = 9']) {
+    for (const u of ['circles O and P intersect at A and B', 'C על מעגל O', 'OC = 9']) {
       const r = parse(u);
       expect(r.ok, u).toBe(true);
       if (!r.ok) return;

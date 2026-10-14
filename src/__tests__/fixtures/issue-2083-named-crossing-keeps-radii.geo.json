@@ -1,0 +1,61 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-14T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מעגל O ברדיוס 3",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 3
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "מעגל P ברדיוס 2",
+      "group": "g1",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 2,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.2",
+      "utterance": "המעגלים O ו-P נחתכים בנקודות X ו-Y",
+      "group": "g2",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "X",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "branch": 0
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.3",
+      "utterance": "המעגלים O ו-P נחתכים בנקודות X ו-Y",
+      "group": "g2",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "Y",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "branch": 1,
+        "avoid": "X"
+      },
+      "enabled": true
+    }
+  ]
+}

@@ -51,6 +51,38 @@ function pointOnCircle(cmds: AnyCommand[], circleId: Id): Id | null {
   return null;
 }
 
+/**
+ * #2083 ([ADR-646](docs/06-decisions.md#adr-646)) — the circle a command DEFINES, or null. A circle object is
+ * made by exactly three command kinds: `circle` (a centre and a radius), `circle-through` (a centre and a
+ * point on it — an incircle, a through-circle) and `circumcircle`.
+ */
+export function circleDefinedBy(cmd: AnyCommand): { id: Id; center: Id } | null {
+  return cmd.type === 'circle' || cmd.type === 'circle-through' || cmd.type === 'circumcircle' ? { id: cmd.id, center: cmd.center } : null;
+}
+
+/**
+ * #2083 ([ADR-646](docs/06-decisions.md#adr-646)) — a `circle` command that STATES NO SIZE: `freeRadius` (the
+ * radius is a DOF seeded at a default, ADR-051) or `ifAbsent` (a parser-injected ensure-exists). When its
+ * circle already exists such a command is a REFERENCE to that circle, never a resize: it says nothing the
+ * circle's own definition (a stated radius, a through-point, an incircle, an inscribed polygon's circle)
+ * does not already say. Only a stated radius re-states a circle's size (ADR-011's in-place resize).
+ */
+export function isSizelessCircle(cmd: AnyCommand): cmd is Extract<Command, { type: 'circle' }> {
+  return cmd.type === 'circle' && (!!cmd.freeRadius || !!cmd.ifAbsent);
+}
+
+/**
+ * #2083 ([ADR-646](docs/06-decisions.md#adr-646)) — is `cmd` a REFERENCE to the existing circle `existing`
+ * (its id and centre)? A sizeless circle over that id, either an ensure-exists (`ifAbsent`: it never states
+ * anything) or one naming the SAME centre. A sizeless circle naming ANOTHER centre still states something —
+ * where the centre is (a context-free «C על מעגל O» naming an unnamed circle's anonymous centre) — and keeps
+ * the old re-statement path. The one predicate behind the fold rule (`foldCommand` in `src/replay/core.ts`)
+ * and `applyCommand`'s `circle` case.
+ */
+export function referencesCircle(cmd: AnyCommand, existing: { id: Id; center: Id }): boolean {
+  return isSizelessCircle(cmd) && cmd.id === existing.id && (!!cmd.ifAbsent || cmd.center === existing.center);
+}
+
 const sameRefs = (a: Id[], b: Id[]): boolean => a.length === b.length && a.every((x, i) => x === b[i]);
 
 /** Build the symbol table from a command list: each variable's value (if given) and its bindings, in order. */

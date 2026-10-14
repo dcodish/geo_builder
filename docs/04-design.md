@@ -28,7 +28,11 @@ enumeration). Four corrections to the plain compiler reading hold:
    §4), and `commandConflict` refuses only what cannot be lowered. The lowering reads the ring's STRUCTURE: a
    parallelogram-family noun over four points already on one circle (`ringOnOneCircle`, `src/engine/structure.ts`)
    asserts its cyclic member — the rectangle, or the square — because that is what the sentence says on a circle
-   ([ADR-628](06-decisions.md#adr-628)).
+   ([ADR-628](06-decisions.md#adr-628)). A membership of an existing point on a second circle reads the same
+   structure: a point already on one circle of a STATED tangency (`circles-tangent`'s record) is the touch point,
+   and takes the touch point's own definition (`tangentTouchCopy`, so ADR-123's coincidence records X = M); a
+   residual membership is held through a witness that is any point the construction puts on the circle — a
+   `radial-toward` and a stated touch point included ([ADR-647](06-decisions.md#adr-647), #2084).
 2. **The parser may read the drawing, but only to resolve a pointing reference** («המעגל הגדול», «הימני»,
    «נקודת ההשקה»), through `ParseContext`'s deictic fields, each read emitting a locking assertion
    ([docs/17](17-design-rules.md) §3b).
@@ -614,6 +618,19 @@ tagged `EvalErr.tangent`), the on-circle carrier driven by `collinear` (post-sol
 step ladder twice — `newCrossingTangency` judges a NEW crossing on the prior figure (stage 0j), and
 `runFailureLadder` carries a rescue stage's tangent refusal as the refusal's reason (`tangentSeen`, stage 2i).
 
+**Two circles with one common point have no second crossing** ([ADR-645](06-decisions.md#adr-645), #2080, #2083). A
+`circles-tangent` statement leaves a `circle-position` record with `relation: 'tangent'` (and its touch point `at`) in
+`requirements`, whichever way apply realised the tangency; `circlesStatedTangent` (`structure.ts`) reads it, never
+coordinates. `circlesTouch` (`evaluate.ts`) is the lengths twin: |d − (r₁ + r₂)| or |d − |r₁ − r₂|| within
+`CIRCLES_TOUCH_REL` = 2·10⁻⁴ of the pair's scale, the ruler a stated length is held to. A second crossing — a
+`circle-circle` point whose `avoid` is the first crossing of the same pair — of a pair with one common point is
+refused with `oneCommonPointError` («X coincides with Y», the over-constrained coincide shape): at stage 0j on the
+prior figure (`circlesCrossingTangentError`: stated tangent, or touching at every sampled configuration of the prior
+figure), a tangency stated over a pair with two named crossings likewise, and in `tryEval` as the backstop (a trial
+seats the second crossing on the first; the drawn figure refuses, tagged `EvalErr.tangent`, so the ladder carries
+it). The fold names the other side: the drop-one search finds the tangency or the length; for the other order the
+crossing's own statement is read from `ownerByObjId`.
+
 ### A fixed-run rule consumes the whole label body ([ADR-601](06-decisions.md#adr-601))
 
 `labelRun(body, n)` returns the first run of exactly n labels and nothing about the rest of the body, so a rule
@@ -776,8 +793,11 @@ registry cap, past the clock or on a throw it fails open.
 ### One fold rule: the dry run judges the list the commit saves ([ADR-578](06-decisions.md#adr-578))
 
 `foldCommand` (`replay/core.ts`) decides how one command enters the fact list: an exact duplicate of an enabled fact
-is a no-op, of an unticked fact re-enables it, a re-stated free point moves in place, a re-stated standalone circle
-resizes in place, anything else appends. The commit (`foldFact`) and the dry run (`trialFacts`) fold through it, and
+is a no-op, of an unticked fact re-enables it, a re-stated free point moves in place, a circle statement that states
+no size (`freeRadius` / `ifAbsent`) over a circle an enabled fact defines is a **reference** and changes nothing
+(`referencesCircle` in `engine/lower.ts`, read over the named list; apply's `circle` case reads the same predicate —
+[ADR-646](06-decisions.md#adr-646), #2083), a re-stated standalone circle with a stated radius resizes in place,
+anything else appends. The commit (`foldFact`) and the dry run (`trialFacts`) fold through it, and
 the dry run judges `trialChanges` (by object identity), never `all.slice(facts.length)`; a second copy of the rule
 is the ADR-320 class. The load refresh
 and audit compare `committedStepCommands(prefix, …)` on both sides and write refreshed steps as those rows
