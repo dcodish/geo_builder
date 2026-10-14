@@ -16884,7 +16884,7 @@ The student reads `errors.overConstrained_said_vs` with `errors.desc.coincidesWi
 
 ## ADR-647 — A point stated on two tangent circles is their touch point; a membership's witness is any point the construction puts on the circle (#2084)
 
-**Status:** accepted · 2026-10-14 · bug (P1, 2-D) · P1 session #2107, stream S1 · branch `fix/2084-point-on-tangent-circles` (stacked on ADR-645) · operator ruling 2026-10-14 (card `d14b-2084-priority`, A: *"X moves to the touch point, with the "moved to coincide" notice … He accepted it as shown"*; the #1595 ruling *"accept but always give a message"*; ADR-W-115 am.) · LADDER stage: **none** (an apply-time lowering, M1)
+**Status:** accepted · 2026-10-14 · bug (P1, 2-D) · P1 session #2107, stream S1 · branch `fix/2084-point-on-tangent-circles` (stacked on ADR-645) · operator ruling 2026-10-14 (card `d14b-2084-priority`, A: *"X moves to the touch point, with the "moved to coincide" notice … He accepted it as shown"*; the #1595 ruling *"accept but always give a message"*; ADR-W-115 am.) · LADDER stage: **none** (an apply-time lowering, M1) · **⚠ Ruled to change 2026-10-14 (#2122):** when the touch point carries the tool's own letter (M, never typed by the student), the student's X replaces it — only X is drawn and no «…נפלו על אותה נקודה» notice shows; the notice stays for two letters the student chose (T and X)
 
 **Requirements:** [02](02-requirements.md) FR-EN-20 (a point stated on two tangent circles is their touch point; a membership is never answered «כבר קיים» while the point is off the circle) · **Design:** [04](04-design.md) §1 correction 1 (M1's point-on-circle lowering: the tangent pair and the witness rule)
 
