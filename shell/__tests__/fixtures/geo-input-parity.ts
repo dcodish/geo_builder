@@ -1352,6 +1352,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #1931 (ADR-640): a crossing asked of a line the givens make TANGENT has no second point — refused with the tangent sentence ──
   { id: 'relation-tangent-crossing-1931', family: 'tangents', steps: ['מעגל O', 'A על מעגל O', 'נקודה P', 'הישר AP משיק למעגל O בנקודה A', 'הישר AP חותך את המעגל בנקודה E'], expect: 'refused', exception: 'X8', note: '2-D committed E 1e-6 from A before ADR-640; analytic refuses since ADR-AG-272 (#1924, same round)' },
+
+  // ── #2098 (ADR-650): a bare run as the SUBJECT of «חוסם» encloses the circle — the incircle in every builder ──
+  { id: 'bare-run-circumscribes-2098', family: 'inscribed', steps: ['משולש ABC', 'ABC חוסם מעגל'], expect: 'builds', note: 'all three built it before the fix; 2-D drew the circle THROUGH the vertices — its geometry is held by issue-2098-bare-run-circumscribes.test.ts' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

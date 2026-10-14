@@ -31,7 +31,7 @@ import { unreadScript } from '../../shell/inputScript';
 import { foreignGiven } from './scope';
 import { readFrame } from './frame';
 import { NOTATION_WORDS, UNIT_WORDS, unaccountedLabels } from './labelAccounting';
-import { readShapePhrase, lowerShape, SHAPE_ADJ_ANY, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
+import { readShapePhrase, lowerShape, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
 
 export type ParseResult =
   | { ok: true; commands: AnyCommand[]; angleReadings?: string[] }
@@ -5678,6 +5678,57 @@ const markerOnBareRun = (s: string, min = 3): boolean =>
   new RegExp(String.raw`(?:ב|בתוך\s+ה?)-?\s*[A-Z]{${min},}\b|\bin(?:side)?\s+(?:an?\s+|the\s+)?[A-Z]{${min},}\b`).test(s);
 
 /**
+ * #2098 ([ADR-650](../../docs/06-decisions.md#adr-650)) — WHICH NOUN IS THE CONTAINER of a «חוסם» /
+ * "circumscribe" sentence, read from its SUBJECT and its VOICE, never from the letters. ONE reader, consulted
+ * by every rule that takes the verb as a cue: the circle-through rules (`circumcircle`,
+ * `circumcircleMeetsSegment`) read it as the circumcircle only when the CIRCLE encloses, and the `incircle`
+ * rule reads the shape-as-subject sentence — a polygon noun and its run, or a BARE run — as the incircle.
+ *
+ * «חוסם» / "circumscribes" is ACTIVE: its subject is the OUTER figure.
+ *  - the circle is the subject → `circle` (the circumcircle): «מעגל חוסם את ABC», «המעגל O חוסם את המשולש
+ *    ABC», «מעגל שחוסם את ABC», "a circle circumscribes ABC", "the circle circumscribing triangle ABC";
+ *  - the shape is the subject → `shape` (the incircle): «ABC חוסם מעגל», «משולש ABC חוסם את המעגל»,
+ *    «ABCD חוסם את המעגל», "ABC circumscribes a circle", and the relative clause whose subject is the shape,
+ *    «מעגל ש-ABC חוסם» / «מעגל שהמשולש ABC חוסם» (the circle is the OBJECT: a run or noun sits between it and
+ *    the verb).
+ * The participle "circumscribed" names the outer figure too: "the circumscribed circle", "a circle
+ * circumscribed about ABC", "ABC is circumscribed BY a circle" → `circle`; "ABC is circumscribed about a
+ * circle" → `shape`.
+ *
+ * The defect this closes was #1941's in the active voice: the circle-through rule keyed on the verb and the
+ * run and never asked which noun was the subject, so «ABC חוסם מעגל» drew the circle THROUGH A, B, C, green.
+ * `run` is the ring the outer/inner shape is named by (a bare run or the run after its noun), or null.
+ * The «חוסם ב-» slip is normalised to the passive before any rule runs (ADR-283), so it never reaches here.
+ */
+type InscriptionVoice = { container: 'circle' | 'shape'; run: Id[] | null };
+const CIRCUM_VERB = /(?<![א-ת])[הש]?חוסם(?![א-ת])|\bcircumscrib(?:es|e|ing|ed)\b/i;
+const CIRCLE_NOUN_G = /(?<![A-Za-z])circles?\b|מעגל(?![א-ת])/gi;
+const RING_RUN = rx(String.raw`(?<![A-Za-z])(?:${ULABEL}){3,}(?![A-Za-z])`);
+const inscriptionVoice = (s: string): InscriptionVoice | null => {
+  const verb = s.match(CIRCUM_VERB);
+  if (!verb || verb.index === undefined) return null;
+  const before = s.slice(0, verb.index);
+  const after = s.slice(verb.index + verb[0].length);
+  const circlesBefore = [...before.matchAll(CIRCLE_NOUN_G)];
+  const circleAfter = new RegExp(CIRCLE_NOUN_G.source, 'i').test(after);
+  const lastCircle = circlesBefore.at(-1);
+  // what sits between the circle noun and the verb: a ring (a run of ≥3 labels, or a polygon noun) there is
+  // the SUBJECT of a relative clause — «מעגל ש-ABC חוסם» — so the circle is its object
+  const between = lastCircle ? before.slice(lastCircle.index! + lastCircle[0].length) : '';
+  const ringBetween = !!lastCircle && (RING_RUN.test(between) || new RegExp(`${POLY_WORDS_EN}|${POLY_WORDS_HE}`, 'i').test(between));
+  const runIn = (t: string): Id[] | null => t.match(RING_RUN)?.[0].match(rx(ULABEL, 'g'))?.map(up) ?? null;
+  const circleOuter = (): InscriptionVoice => ({ container: 'circle', run: runIn(after) ?? runIn(before) });
+  const shapeOuter = (): InscriptionVoice => ({ container: 'shape', run: ringBetween ? runIn(between) : runIn(before) });
+  if (/ed$/i.test(verb[0])) {
+    // the participle: attributive "circumscribed circle", or the agent "… circumscribed by a circle"
+    if (/^\s*(?:circle|by\b)/i.test(after)) return circleOuter();
+  }
+  if (lastCircle && !ringBetween) return circleOuter(); // the circle is the subject
+  if (lastCircle || circleAfter) return shapeOuter(); // the shape is the subject (the circle its object)
+  return null;
+};
+
+/**
  * Is this a *circle* inscribed in a *polygon* (the incircle), rather than a
  * polygon inscribed in a circle? The CONTAINER is the noun carrying the "in"
  * preposition — Hebrew's ב prefix ("מעגל חסום במשולש", "במרובע ABCD חסום מעגל")
@@ -6819,7 +6870,9 @@ const INCIRCLE_FILLER = String.raw`incircle|inscrib\w*|חסום|circumscrib\w*|�
  * Five letters or more never reach here: {@link uninscribableIncircle} refuses them first (ADR-606).
  */
 const bareRingPhrase = (s: string): ShapePhrase | null => {
-  if (!markerOnBareRun(s)) return null;
+  // the ring carries the "in" marker («מעגל חסום ב-ABC»), or it is the SUBJECT of the active verb
+  // («ABC חוסם מעגל», #2098 / ADR-650 — the same ring in the other voice)
+  if (!markerOnBareRun(s) && inscriptionVoice(s)?.container !== 'shape') return null;
   const bare = dropCircleRef(s).replace(new RegExp(INCIRCLE_FILLER, 'gi'), ' ');
   const implied = labelRun(bare, 4) ? 'מרובע' : labelRun(bare, 3) ? 'משולש' : null;
   return implied ? readShapePhrase(implied) : null;
@@ -6842,14 +6895,11 @@ const incircle: Rule = (s, ctx) => {
   // one ("מעוין חסום במשולש") it is a polygon-in-polygon inscription (ADR-262, owned by `inscribedInPolygon`),
   // not an incircle — this is a semantic guard (what the statement is), not a keyword bow-out.
   const inscribed = /incircle|inscrib\w*|חסום/i.test(s) && /incircle|circle|מעגל/i.test(s) && isCircleInPolygon(s);
-  // … OR "<polygon> ABCD circumscribes the circle" — the polygon encloses the circle (same figure). Ordered
-  // (polygon-labels … circumscribes … circle) so a CIRCLE-first "מעגל חוסם משולש" (a circumcircle) does NOT
-  // match here — only the polygon-as-subject reading does.
-  // A shape-property adjective may sit between the noun and its labels («טרפז ישר זווית ABCD חוסם מעגל», #1790).
-  const circumscribes = new RegExp(
-    String.raw`(?:${POLY_WORDS_EN}|${POLY_WORDS_HE})(?:\s+(?:${SHAPE_ADJ_ANY}))?\s+${LABEL}.*?(?:circumscrib\w*|חוסם).*?(?:circle|מעגל)`,
-    'i',
-  ).test(s);
+  // … OR "<polygon> ABCD circumscribes the circle" — the polygon encloses the circle (same figure). The ONE
+  // voice reader decides it (#2098, ADR-650): the shape is the SUBJECT of the active verb — a polygon noun and
+  // its run («טרפז ישר זווית ABCD חוסם מעגל», #1790), or a BARE run («ABC חוסם מעגל», «מעגל ש-ABC חוסם») —
+  // so a CIRCLE-subject «מעגל חוסם את המשולש ABC» (a circumcircle) never reads here.
+  const circumscribes = inscriptionVoice(s)?.container === 'shape';
   if (!inscribed && !circumscribes) return null;
   // The polygon → vertex count, read by the ONE shape-phrase reader (#1790, ADR-595): the noun decides the
   // arity and its stated adjective refines the container («במשולש ישר זווית ABC» is a RIGHT triangle). This
@@ -9503,6 +9553,9 @@ const parallelLine: Rule = (s, ctx) => {
 const circumcircleMeetsSegment: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
   const cue = s.match(/circumscrib\w*|חוסם|\bthrough\b|דרך/i); // circumcircle cue (חוסם ≠ inscribed חסום)
+  // #2098 (ADR-650): «חוסם» names the circumcircle only when the CIRCLE is the outer figure — «מעגל ש-ABC
+  // חוסם» puts the circle INSIDE the shape, which is no circle through its vertices
+  if (cue && /circumscrib|חוסם/i.test(cue[0]) && inscriptionVoice(s)?.container === 'shape') return null;
   const cut = s.match(/חות[כך]|נחתכ?\w*|נפגש\w*|פוגש\w*|cuts?|crosses?|intersects?|meets?/i);
   const at = s.match(/(?:\bat\b|בנקודה|ב-)\s*([A-Za-z]\d*)\b/i);
   if (!cue || !cut || !at || cut.index! < cue.index!) return null;
@@ -9558,7 +9611,11 @@ const circumcircleMeetsSegment: Rule = (s, ctx) => {
 
 const circumcircle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
-  if (!/through|circumscrib|חוסם|דרך/i.test(s)) return null; // the 3-point cue (חוסם circumscribes ≠ חסום inscribed)
+  // the 3-point cue: a through-clause, or a circumscription whose OUTER figure is the circle (חוסם circumscribes
+  // ≠ חסום inscribed). #2098 (ADR-650): «ABC חוסם מעגל» — the shape as the subject — is the INCIRCLE, the
+  // `incircle` rule's sentence; read as a cue here it drew the circle through the vertices, green.
+  const circumscribes = /circumscrib|חוסם/i.test(s) && inscriptionVoice(s)?.container !== 'shape';
+  if (!circumscribes && !/through|דרך/i.test(s)) return null;
   if (circleCenter(s)) return null; // a named centre ⇒ it's a centre-based circle, not a circumcircle
   const rest = s
     .replace(/circles?|מעגל|circumscrib\w*|through|דרך|חוסם|את|of|the|around|triangle|משולש|מרובע/gi, ' ')
