@@ -154,9 +154,10 @@ interface Pattern {
   /**
    * #1918 (ADR-607) — a param that is itself a TRANSLATED sentence: `key` rendered with each of `params` resolved as
    * a translation key. Lets a refusal reuse a ruled frame (`errors.overConstrained_said_vs`) with a ruled reason
-   * clause, instead of a second copy of the frame.
+   * clause, instead of a second copy of the frame. `letters` (#2099, ADR-651) are params interpolated AS-IS — the
+   * student's own point letters, which are not translation keys.
    */
-  nested?: (m: RegExpMatchArray) => Record<string, { key: string; params: Record<string, string> }>;
+  nested?: (m: RegExpMatchArray) => Record<string, { key: string; params: Record<string, string>; letters?: Record<string, string> }>;
   /**
    * #1985 ([ADR-619](../../docs/06-decisions.md#adr-619)) — a param that is a WORD the engine names in English
    * and the student must read in Hebrew (a shape noun). Each value is a translation KEY, resolved with `t`, so
@@ -270,6 +271,25 @@ export const PATTERNS: Pattern[] = [
     nested: (m) => ({ what: { key: 'errors.notCyclicReason', params: { shape: `input.shapeNoun.${m[1]}`, forced: `input.shapeNoun.${m[2]}` } } }),
     saysSubject: true,
     namesOther: true,
+  },
+  // cyclicFeasibility.ts (#2099, ADR-651) — `over-constrained: a circle through A, D, B on one line cannot hold`: the
+  // operator's 2026-10-14 ruling — the over-constrained frame naming the statement that put the points on the line
+  // (the fold's `[vs #i]`), its reason «A, D ו-B על ישר אחד, ואין מעגל שעובר דרך שלוש נקודות על ישר אחד».
+  {
+    re: /^over-constrained: a circle through ([^,\s]+), ([^,\s]+), ([^,\s]+) on one line cannot hold(?: \[vs #\d+\])?$/,
+    key: 'errors.overConstrained',
+    nested: (m) => ({ what: { key: 'errors.collinearCircleReason', params: {}, letters: { a: m[1], b: m[2], c: m[3] } } }),
+    saysSubject: true,
+    namesOther: true,
+  },
+  // evaluate.ts circumcenter (#2099, ADR-651) — `cannot construct O: A, D, B are collinear (no circumscribed circle)`:
+  // the NUMERIC backstop behind the structural prover above (three points no stated incidence puts on one line but
+  // the solve lands there). The same ruled reason in the same frame; the fold names no other side for it.
+  {
+    re: /^cannot construct \S+: ([^,\s]+), ([^,\s]+), ([^,\s]+) are collinear \(no circumscribed circle\)$/,
+    key: 'errors.overConstrained',
+    nested: (m) => ({ what: { key: 'errors.collinearCircleReason', params: {}, letters: { a: m[1], b: m[2], c: m[3] } } }),
+    saysSubject: true,
   },
   // apply.ts shapeExclusionError (#1985, ADR-619) — `shape-excluded: the figure is already known to be a
   // parallelogram, so it is not a trapezoid`. The operator's 2026-10-10 ruling: the sentence he chose for
@@ -398,7 +418,7 @@ export function humanizeError(raw: string | null | undefined, t: Translate, said
         ? {
             ...(params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t)])) : {}),
             // #1918: a sentence param — its own key, each inner param a translation key
-            ...(nested ? Object.fromEntries(Object.entries(nested).map(([k, n]) => [k, t(n.key, Object.fromEntries(Object.entries(n.params).map(([pk, pv]) => [pk, t(pv)])))])) : {}),
+            ...(nested ? Object.fromEntries(Object.entries(nested).map(([k, n]) => [k, t(n.key, { ...Object.fromEntries(Object.entries(n.params).map(([pk, pv]) => [pk, t(pv)])), ...n.letters })])) : {}),
             // #1985: a WORD param — the value is a translation key (a shape noun)
             ...(paramKeys ? Object.fromEntries(Object.entries(paramKeys).map(([k, v]) => [k, t(v)])) : {}),
           }

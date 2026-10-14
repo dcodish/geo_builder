@@ -890,6 +890,22 @@ amends ADR-W-048).
   reads the declaring statement from `ownerByObjId` and appends `[vs #i]`, resolved by `otherUtteranceForError`.
 - **Defaults yield**: a collapse only an unstated default forces is cured by the variant rescue (ADR-573).
 
+### A circle through three points the givens put on one line is refused (#2099, [ADR-651](06-decisions.md#adr-651))
+
+- **The proof** — stage 0g‴, `collinearCircleImpossibility` (`engine/cyclicFeasibility.ts`): for every `circumcenter`
+  centre in the probed figure (plus the incoming command's asserted objects), `threeOnOneLine` (`engine/structure.ts`)
+  asks whether one named line carries all three points by what the construction says — an endpoint, a rider, a
+  midpoint, a crossing, a lowered collinearity (`Structure.onLineBy`, which also returns the witness) — over the
+  candidate lines `carryingLines` and the stated collinearities name; failing that, ADR-602's `forcedFlatPolygon` is
+  asked about the three points as a ring (the length givens). Only a circle that is NEW-degenerate with this step is
+  refused. Run by `applyStep`, `applyCoupledStep` and `constraintIsPending`.
+- **One message**, `over-constrained: a circle through A, D, B on one line cannot hold`: the over-constrained wire
+  family, so the fold's drop-one search (ADR-508/554) appends `[vs #i]`; humanised as `errors.overConstrained` with the
+  nested reason `errors.collinearCircleReason` (letters interpolated as-is, the `letters` field of `nested`).
+- **The backstop** — `circumcenter` (`engine/geometry.ts`) answers null below a scale-free flatness
+  (`CIRCUMCIRCLE_FLATNESS_FLOOR` = 1e-6), replacing the absolute `|d| < 1e-12`; its evaluator message
+  (`cannot construct O: A, D, B are collinear …`) renders the same reason in the `_said` frame.
+
 ### A declared polygon the givens force FLAT is said out loud (#945, [ADR-513](06-decisions.md#adr-513))
 
 The net below ADR-602, for a polygon not forced flat but drawn below the floor at a sampled configuration.

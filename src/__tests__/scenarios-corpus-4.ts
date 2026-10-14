@@ -52,6 +52,8 @@ import i18n from '@/i18n';
 import { humanizeError } from '@/i18n/humanizeError';
 import { otherUtteranceForError } from '@/app/errorSubject';
 import { parse } from '@/parser';
+import { COLLINEAR_CIRCLE_VS } from '@/engine/cyclicFeasibility';
+import { stripFormatControls } from '../../shell/bidi';
 import { COLLAPSED_VS, computeValues, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
 import { drivenSolveStats } from '@/engine/evaluate';
@@ -4342,6 +4344,27 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs(dot) / (dist(a, b) * dist(c, b)), 'AB ⟂ BC').toBeLessThan(1e-6);
       expect(dist(a, b), '|AB| = 5').toBeCloseTo(5, 6);
       expect([...fig.positions.keys()].filter((id) => /^[A-Z]\d*$/.test(id)).sort(), 'no foot point minted').toEqual(['A', 'B', 'C']);
+    },
+  },
+  {
+    id: 'collinear-circle-refused-2099',
+    title: '#2099 (ADR-651): «משולש ABC · D על הישר AB · מעגל שעובר דרך A, D ו-B» — the circle is REFUSED naming «D על הישר AB» (A, D and B are on one line); D on AC still builds the circle',
+    guards:
+      "Found by the /decisions plan pass for #1963 (the analytic twin), filed P1 under rule 7's exception (a figure drawn green for a given that cannot hold). Measured on 939b160a through decideDeterministic2D + the real gate: the circle line committed green with its centre at (23570838, 26189817) and no circle drawn; «D על AB» and the midpoint/extension/two-rider spellings were refused in half-English («cannot construct O: A, D, B are על ישר אחד …»). Root cause: the only test of «three points on one line» was numeric — `circumcenter`'s absolute |d| < 1e-12 — so a SOLVED rider on the line (flatness ~1e-8) passed it and the centre went to ~10^7, while an exact rider reached an engine sentence nothing humanised. Fix (ADR-651): a stage-0 prover over the CONSTRUCTION (`collinearCircleImpossibility`: the stated incidences, or the length givens via ADR-602's prover), the over-constrained wire family so the fold's drop-one search names the other statement, the ruled sentence (operator, 2026-10-14) and a scale-free backstop in `circumcenter`. The class matrix (every spelling, both orders, the lengths, English, the controls) is src/app/__tests__/issue-2099-collinear-circle.test.ts.",
+    // The refused line never becomes a fact, so it is driven through the submit gate in `check`, not listed as a step.
+    steps: ['משולש ABC', 'D על הישר AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC', 'D על הישר AB']);
+      const v = gateVerdict(facts, 'מעגל שעובר דרך A, D ו-B');
+      expect(v.kind === 'refused' && v.reason, 'the circle is refused before it becomes a fact').toBe('error');
+      const detail = v.kind === 'refused' ? v.detail ?? '' : '';
+      const m = COLLINEAR_CIRCLE_VS.exec(detail);
+      expect(m?.slice(1, 4), 'a circle through A, D, B on one line').toEqual(['A', 'D', 'B']);
+      expect(facts[Number(m?.[4])]?.utterance, 'the other side is the statement that put D on the line').toBe('D על הישר AB');
+      expect(stripFormatControls(humanizeError(detail, (k, o) => i18n.t(k, o) as string, 'מעגל שעובר דרך A, D ו-B', otherUtteranceForError(facts, detail)))).toContain('הסיבה: A, D ו-B על ישר אחד, ואין מעגל שעובר דרך שלוש נקודות על ישר אחד');
+      // the control: D off line AB — a real circle
+      expect(gateVerdict(factsOf(['משולש ABC', 'D על AC']), 'מעגל שעובר דרך A, D ו-B').kind, 'D on AC builds the circle').toBe('commit');
     },
   },
 ];

@@ -7,7 +7,8 @@
  * ADR-628 cyclic-member lowering, and the #1899 narrowing notice.
  */
 import { drivenConstraintsOf } from './evaluate';
-import type { Construction, GeoObject, Id } from './types';
+import { carryingLines } from './carryingLines';
+import type { Constraint, Construction, GeoObject, Id } from './types';
 
 export const circleName = (id: Id): string => (id.startsWith('circle-') ? id.slice('circle-'.length) : id);
 export const pairKey = (a: Id, b: Id): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
@@ -137,23 +138,31 @@ export class Structure {
   }
   /** Structurally on the (infinite) LINE a–b. */
   onLine(p: Id, a: Id, b: Id): string | null {
+    return this.onLineBy(p, a, b)?.said ?? null;
+  }
+  /**
+   * #2099 ([ADR-651](../../docs/06-decisions.md#adr-651)) — {@link onLine} with its WITNESS: the object (a rider, a
+   * midpoint, a crossing …) or the constraint (a lowered collinearity) whose statement puts `p` on line a–b, so a
+   * refusal can name the statement that made it so. No witness when `p` is `a` or `b` itself.
+   */
+  onLineBy(p: Id, a: Id, b: Id): { said: string; obj?: Id; con?: Constraint } | null {
     const mine = this.cls(p);
     const ab = pairKey(a, b);
     const seg = `${a}${b}`;
-    if (mine.has(a) || mine.has(b)) return `${p} on line ${seg}`;
+    if (mine.has(a) || mine.has(b)) return { said: `${p} on line ${seg}` };
     const lineIsAB = (lineId: Id): boolean =>
       this.lists.some((list) => list.some((o) => o.kind === 'line' && o.id === lineId && o.spec.via === 'through' && pairKey(o.spec.a, o.spec.b) === ab));
     for (const o of this.defs(p)) {
-      if ((o.kind === 'on-segment' || o.kind === 'on-segment-solved') && pairKey(o.a, o.b) === ab) return o.kind === 'on-segment' && (o.extension || !(o.t >= 0 && o.t <= 1)) ? `${p} on line ${seg}` : `${p} on segment ${seg}`;
-      if (o.kind === 'midpoint' && pairKey(o.a, o.b) === ab) return `${p} is the midpoint of ${seg}`;
-      if (o.kind === 'foot' && pairKey(o.a, o.b) === ab) return `${p} on line ${seg}`;
-      if (o.kind === 'line-line-intersection' && (pairKey(o.a, o.b) === ab || pairKey(o.c, o.d) === ab)) return `${p} on line ${seg}`;
-      if ((o.kind === 'on-line' || o.kind === 'line-circle') && lineIsAB(o.line)) return `${p} on line ${seg}`;
-      if (o.kind === 'line-intersection' && (lineIsAB(o.line1) || lineIsAB(o.line2))) return `${p} on line ${seg}`;
+      if ((o.kind === 'on-segment' || o.kind === 'on-segment-solved') && pairKey(o.a, o.b) === ab) return { said: o.kind === 'on-segment' && (o.extension || !(o.t >= 0 && o.t <= 1)) ? `${p} on line ${seg}` : `${p} on segment ${seg}`, obj: o.id };
+      if (o.kind === 'midpoint' && pairKey(o.a, o.b) === ab) return { said: `${p} is the midpoint of ${seg}`, obj: o.id };
+      if (o.kind === 'foot' && pairKey(o.a, o.b) === ab) return { said: `${p} on line ${seg}`, obj: o.id };
+      if (o.kind === 'line-line-intersection' && (pairKey(o.a, o.b) === ab || pairKey(o.c, o.d) === ab)) return { said: `${p} on line ${seg}`, obj: o.id };
+      if ((o.kind === 'on-line' || o.kind === 'line-circle') && lineIsAB(o.line)) return { said: `${p} on line ${seg}`, obj: o.id };
+      if (o.kind === 'line-intersection' && (lineIsAB(o.line1) || lineIsAB(o.line2))) return { said: `${p} on line ${seg}`, obj: o.id };
     }
     for (const con of this.c.constraints) {
       const pts = con.type === 'collinear' ? [con.a, con.b, con.c] : con.type === 'collinear-order' ? con.points : null;
-      if (pts && pts.includes(a) && pts.includes(b) && pts.some((x) => mine.has(x))) return `${p} on line ${seg}`;
+      if (pts && pts.includes(a) && pts.includes(b) && pts.some((x) => mine.has(x))) return { said: `${p} on line ${seg}`, con };
     }
     return null;
   }
@@ -175,4 +184,33 @@ export function ringOnOneCircle(c: Construction, ring: readonly Id[], asserted: 
   const s = new Structure(c, asserted);
   const circles = [c.objects, asserted].flatMap((list) => list.flatMap((o) => (o.kind === 'circle' ? [o.id] : [])));
   return circles.some((circ) => ring.every((v) => s.onCircle(v, circ) !== null));
+}
+
+/**
+ * #2099 ([ADR-651](../../docs/06-decisions.md#adr-651)) — ARE THESE THREE POINTS STRUCTURALLY ON ONE LINE? The line
+ * is named by two points, and every point is on it by what the construction SAYS — an endpoint of it, a rider on
+ * it, its midpoint, a crossing on it, a collinearity lowered to a constraint (`Structure.onLineBy`), read through
+ * the coincide classes. The candidate lines are the ones the figure names: the pairs among the three points, every
+ * carrying line a point is defined on (`carryingLines`, ADR-612) and every stated collinearity. A reading of the
+ * construction, never of coordinates — three points that merely LOOK collinear at one seed are not on a line.
+ * Returns the line and the witnesses (objects / constraints whose statements put the points there), or null.
+ */
+export function threeOnOneLine(c: Construction, pts: readonly [Id, Id, Id], asserted: GeoObject[] = []): { line: [Id, Id]; objs: Id[]; cons: Constraint[] } | null {
+  const s = new Structure(c, asserted);
+  const cand = new Map<string, [Id, Id]>();
+  const add = (a: Id, b: Id) => { if (a !== b) cand.set(pairKey(a, b), [a, b]); };
+  for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) add(pts[i], pts[j]);
+  for (const cl of carryingLines({ ...c, objects: [...c.objects, ...asserted] })) add(cl.a, cl.b);
+  for (const con of c.constraints) {
+    const ps = con.type === 'collinear' ? [con.a, con.b, con.c] : con.type === 'collinear-order' ? con.points : null;
+    if (ps) for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) add(ps[i], ps[j]);
+  }
+  for (const [a, b] of cand.values()) {
+    const by = pts.map((p) => s.onLineBy(p, a, b));
+    if (by.every((w) => w !== null)) {
+      const ws = by as { obj?: Id; con?: Constraint }[];
+      return { line: [a, b], objs: ws.flatMap((w) => (w.obj ? [w.obj] : [])), cons: ws.flatMap((w) => (w.con ? [w.con] : [])) };
+    }
+  }
+  return null;
 }

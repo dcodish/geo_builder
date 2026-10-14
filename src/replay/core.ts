@@ -16,7 +16,7 @@
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
 import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
-import { NOT_CYCLIC_VS, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
+import { NOT_CYCLIC_VS, collinearCircleImpossibility, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
 import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
@@ -2160,6 +2160,8 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   if (cmds.some((cmd) => sideImpossibility(probe, cmd))) return false;
   // #1918 (ADR-607): a circle through a ring declared a right trapezoid — no later given makes it cyclic.
   if (cmds.some((cmd) => notCyclicImpossibility(probe, cmd))) return false;
+  // #2099 (ADR-651): a circle through three points the incidences put on one line — no later given bends the line.
+  if (cmds.some((cmd) => collinearCircleImpossibility(cur, probe, cmd))) return false;
   return newCons.some((con) => {
     const vals: number[] = [];
     for (const s of [0, 1, 2, 3, 4]) {

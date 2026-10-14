@@ -113,10 +113,23 @@ export function reflectAcross(p: Vec, a: Vec, b: Vec): Vec {
   return { x: 2 * foot.x - p.x, y: 2 * foot.y - p.y };
 }
 
-/** Circumcentre of triangle a,b,c — equidistant from all three. null if they are collinear. */
+/**
+ * #2099 ([ADR-651](../../docs/06-decisions.md#adr-651)) — three points whose FLATNESS (the third point's distance from
+ * the line through the other two, over the widest of the three spans) is below this are a line, not a triangle: their
+ * circumcentre would sit more than ~10⁵ of their own extent away. Scale-free, so a figure drawn ten times bigger is
+ * not ten times less degenerate. The old absolute `|d| < 1e-12` let a SOLVED rider on the line through two points
+ * (flatness ~10⁻⁸) through with a centre at ~10⁷. Far below any drawable triangle (a polygon is refused as collapsed
+ * at 5e-4, `DEGENERATE_EXTENT_RATIO`) and far above solver round-off; the structural prover
+ * (`collinearCircleImpossibility`) is the rule, this is its backstop.
+ */
+export const CIRCUMCIRCLE_FLATNESS_FLOOR = 1e-6;
+
+/** Circumcentre of triangle a,b,c — equidistant from all three. null if they are collinear (scale-free, above). */
 export function circumcenter(a: Vec, b: Vec, c: Vec): Vec | null {
   const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
-  if (Math.abs(d) < 1e-12) return null; // collinear — no circumscribed circle
+  const span2 = Math.max((a.x - b.x) ** 2 + (a.y - b.y) ** 2, (b.x - c.x) ** 2 + (b.y - c.y) ** 2, (c.x - a.x) ** 2 + (c.y - a.y) ** 2);
+  // |d| / 2 is twice the triangle's area = the widest span × the third point's offset from it
+  if (!(span2 > 0) || Math.abs(d) / 2 <= CIRCUMCIRCLE_FLATNESS_FLOOR * span2) return null; // collinear — no circumscribed circle
   const a2 = a.x * a.x + a.y * a.y;
   const b2 = b.x * b.x + b.y * b.y;
   const c2 = c.x * c.x + c.y * c.y;
