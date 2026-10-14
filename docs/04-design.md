@@ -275,6 +275,20 @@ or more labels) with the circle inside → the `incircle-not-drawn` clarify, ref
 gate must not overrule. In `droppedConstructNoun`, `BARE_SHAPE_KEYS` holds `place`: #835's bare n-gon flag is the
 shape's identity, not payload, so a model answer of a bare n-gon accounts for no stated construct.
 
+### The voice of «חוסם»: one reader decides which noun encloses (#2098, [ADR-650](06-decisions.md#adr-650))
+
+The passive «חסום ב-» is read by `isCircleInPolygon` (the ב / "in" marker names the container). The active
+«חוסם» / "circumscribe" has no marker: its **subject** is the outer figure, and `inscriptionVoice(s)` reads it —
+`{ container: 'circle' | 'shape', run }`. A circle noun before the verb with no ring between them is the subject
+(«מעגל חוסם את ABC», «המעגל O החוסם…», «מעגל שחוסם את ABC») → `circle`; a ring before the verb, or a ring between
+the circle noun and the verb (the relative clause «מעגל ש-ABC חוסם») → `shape`. The participle "circumscribed"
+names the outer figure: "the circumscribed circle", "… circumscribed by a circle" → `circle`. Every rule that takes
+the verb as a cue consults it: `circumcircle` and `circumcircleMeetsSegment` read «חוסם» as the circumcircle only
+when the reader does not say `shape`; the `incircle` rule reads the `shape` verdict — a polygon noun and its run,
+or a bare run, whose arity `bareRingPhrase` infers from its length exactly as for «מעגל חסום ב-ABC». The
+ADR-291 reference spelling `CIRCUM_REF_SRC` puts the verb directly after the circle noun, so it is circle-subject
+by construction. The «חוסם ב-» slip is normalised to the passive before any rule runs (ADR-283).
+
 ### Addressing an angle: one reader, many value kinds (#967, [ADR-496](06-decisions.md#adr-496))
 
 An angle statement has two halves: **which angle** is named and **what is said about it**. **`angleArms` is the

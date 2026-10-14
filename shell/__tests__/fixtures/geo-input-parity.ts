@@ -1381,6 +1381,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'radius-ratio-after-2100', family: 'circles', steps: ['מעגל O', 'מעגל P', 'רדיוס מעגל O גדול מרדיוס מעגל P פי 2'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }] },
   // ── #2066 (ADR-643): a side of the triangle is never its bisector — 2-D refuses with a sentence ──
   { id: 'bisector-on-a-side-2066', family: 'cevians-centres', steps: ['משולש ABC', 'AB חוצה זווית'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2115' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D: «AB היא צלע של המשולש ולכן אינה יכולה לחצות את זווית A…»' },
+
+  // ── #2098 (ADR-650): a bare run as the SUBJECT of «חוסם» encloses the circle — the incircle in every builder ──
+  { id: 'bare-run-circumscribes-2098', family: 'inscribed', steps: ['משולש ABC', 'ABC חוסם מעגל'], expect: 'builds', note: 'all three built it before the fix; 2-D drew the circle THROUGH the vertices — its geometry is held by issue-2098-bare-run-circumscribes.test.ts' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

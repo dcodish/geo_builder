@@ -227,22 +227,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
-      "circumcircle",
-    ],
-    "text": "triangle DEF circumscribes the circle",
-    "winner": "incircle",
-  },
-  {
-    "lang": "he",
-    "shadowedBy": [
-      "circumcircle",
-    ],
-    "text": "משולש DEF חוסם את המעגל",
-    "winner": "incircle",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
       "tangentLine",
     ],
     "text": "the tangent at A and the tangent at C to circle O meet at D",
