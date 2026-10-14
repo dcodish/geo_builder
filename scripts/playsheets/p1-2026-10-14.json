@@ -1,0 +1,948 @@
+{
+ "name": "p1-2026-10-14",
+ "title": "P1 session 2026-10-14 (#2107) — all eight 2-D P1s, #2066, #2085 (1–3), and PR #1975",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "Two circles with stated radii keep them when they are said to cross",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "מעגל P ברדיוס 2",
+    "המעגלים O ו-P נחתכים בנקודות X ו-Y"
+   ],
+   "lookFor": "The circles stay radius 3 and 2 (labels 3 and 2), X and Y sit on both, and the two radius rows keep their own lines.",
+   "before": "The circles were redrawn with radius 5 and 3.6, green."
+  },
+  {
+   "id": "T2",
+   "title": "An incircle stays the incircle when a second circle crosses it",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "מעגל O חסום במשולש ABC",
+    "מעגל P",
+    "המעגלים O ו-P נחתכים בנקודות X ו-Y"
+   ],
+   "lookFor": "O still touches all three sides of ABC; X and Y are on O and P.",
+   "before": "O became a free circle of radius 5, no longer touching the sides."
+  },
+  {
+   "id": "T3",
+   "title": "Refusal: two tangent circles cannot cross at two points",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "המעגלים O ו-P משיקים",
+    "המעגלים O ו-P נחתכים בנקודות X ו-Y"
+   ],
+   "lookFor": "The last line is refused: «לא ניתן: «המעגלים O ו-P נחתכים בנקודות X ו-Y» סותר את «המעגלים O ו-P משיקים» — אי אפשר לקיים את שניהם יחד. הסיבה: X מתלכדת עם Y.»",
+   "before": "Accepted, X and Y drawn on the single touch point, green.",
+   "expectRefusal": "סותר את «המעגלים O ו-P משיקים»"
+  },
+  {
+   "id": "T4",
+   "title": "Refusal, other order: tangency after the two crossings",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "המעגלים O ו-P נחתכים בנקודות X ו-Y",
+    "המעגלים O ו-P משיקים"
+   ],
+   "lookFor": "The last line is refused: «לא ניתן: «המעגלים O ו-P משיקים» סותר את «המעגלים O ו-P נחתכים בנקודות X ו-Y» — … הסיבה: X מתלכדת עם Y.»",
+   "before": "Accepted, X and Y collapsed onto one point.",
+   "expectRefusal": "סותר את «המעגלים O ו-P נחתכים בנקודות X ו-Y»"
+  },
+  {
+   "id": "T5",
+   "title": "Refusal: radii 3 and 2 with OP = 5 touch at one point only",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "מעגל P ברדיוס 2",
+    "OP = 5",
+    "המעגלים O ו-P נחתכים בנקודות X ו-Y"
+   ],
+   "lookFor": "The last line is refused «…סותר את «OP = 5» — אי אפשר לקיים את שניהם יחד. הסיבה: X מתלכדת עם Y.»",
+   "before": "Radii silently replaced by 5 and 3.6, two crossings drawn, green.",
+   "expectRefusal": "סותר את «OP = 5»"
+  },
+  {
+   "id": "T6",
+   "title": "Refusal, other order: OP = 5 after the crossing",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "מעגל P ברדיוס 2",
+    "המעגלים O ו-P נחתכים בנקודות X ו-Y",
+    "OP = 5"
+   ],
+   "lookFor": "«OP = 5» is refused: «לא ניתן: «OP = 5» סותר את «המעגלים O ו-P נחתכים בנקודות X ו-Y» — …»",
+   "before": "The radii were already replaced, so «OP = 5» was accepted.",
+   "expectRefusal": "אי אפשר לקיים את שניהם יחד"
+  },
+  {
+   "id": "T7",
+   "title": "A real crossing still builds (control)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "מעגל P ברדיוס 2",
+    "OP = 4",
+    "המעגלים O ו-P נחתכים בנקודות X ו-Y"
+   ],
+   "lookFor": "Two separate points X and Y on circles of radius 3 and 2.",
+   "before": "Built, but on the replaced radii 5 and 3.6."
+  },
+  {
+   "id": "T8",
+   "title": "A point on two tangent circles goes to the touch point, with a notice",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "המעגלים O ו-P משיקים",
+    "X על מעגל O",
+    "X על מעגל P"
+   ],
+   "lookFor": "X moves onto the touch point M and the ⓘ notice reads «… נפלו על אותה נקודה.» naming M and X.",
+   "before": "«זה כבר קיים באיור — אין מה להוסיף.» with X off circle P.",
+   "expect": [
+    "נפלו על אותה נקודה"
+   ]
+  },
+  {
+   "id": "T9",
+   "title": "The same with stated radii: exactly on the touch point",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "מעגל P ברדיוס 2",
+    "המעגלים O ו-P משיקים",
+    "X על מעגל O",
+    "X על מעגל P"
+   ],
+   "lookFor": "X sits exactly on M, with the same notice.",
+   "before": "X drawn about 0.001 beside M, two labels on one dot, no notice.",
+   "expect": [
+    "נפלו על אותה נקודה"
+   ]
+  },
+  {
+   "id": "T10",
+   "title": "A named touch point T, the circles in the other order",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "המעגלים O ו-P משיקים בנקודה T",
+    "X על מעגל P",
+    "X על מעגל O"
+   ],
+   "lookFor": "X lands on T; the notice names T and X.",
+   "before": "«כבר קיים», X off circle O.",
+   "expect": [
+    "נפלו על אותה נקודה"
+   ]
+  },
+  {
+   "id": "T11",
+   "title": "A radius letter's value sizes the circle",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס r",
+    "A על מעגל O",
+    "r = 3"
+   ],
+   "lookFor": "The circle shrinks to radius 3, A stays on it, every row green. (The ⚠ line under «מעגל O ברדיוס r» is the existing notice that a lowercase letter is a measure; the row stays green.)",
+   "before": "Radius stayed 5, green.",
+   "expectRefusal": "נקראה כסמל מידה"
+  },
+  {
+   "id": "T12",
+   "title": "The value typed before the circle",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "r = 3",
+    "מעגל O ברדיוס r"
+   ],
+   "lookFor": "The circle is drawn with radius 3 (the ⚠ lowercase-letter notice is existing; the row stays green).",
+   "before": "Radius 5.",
+   "expectRefusal": "נקראה כסמל מידה"
+  },
+  {
+   "id": "T13",
+   "title": "Uppercase R",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס R",
+    "R = 3"
+   ],
+   "lookFor": "Accepted without the AI; radius 3.",
+   "before": "«R = 3» went to the AI."
+  },
+  {
+   "id": "T14",
+   "title": "Refusal: a radius value that contradicts a stated length",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "A על מעגל O",
+    "OA = 4",
+    "רדיוס המעגל O הוא r",
+    "r = 3"
+   ],
+   "lookFor": "The last line is refused «לא ניתן: «r = 3» סותר את «OA = 4» — אי אפשר לקיים את שניהם יחד. הסיבה: |OA| = 4.»",
+   "before": "«r = 3» was green and changed nothing.",
+   "expectRefusal": "סותר את «OA = 4»"
+  },
+  {
+   "id": "T15",
+   "title": "A radius ratio holds 2:1 and survives «הציגו תצורה אחרת»",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "רדיוס מעגל O גדול פי 2 מרדיוס מעגל P"
+   ],
+   "lookFor": "O's radius is twice P's; pressing «הציגו תצורה אחרת» changes the sizes and keeps the 2:1.",
+   "before": "O drawn with radius 2, P with 3.6.",
+   "cycles": 2
+  },
+  {
+   "id": "T16",
+   "title": "The factor after the comparand",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "רדיוס מעגל O גדול מרדיוס מעגל P פי 2"
+   ],
+   "lookFor": "The same 2:1.",
+   "before": "O drawn with radius 2."
+  },
+  {
+   "id": "T17",
+   "title": "«קטן פי 2» gives half",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "רדיוס מעגל O קטן פי 2 מרדיוס מעגל P"
+   ],
+   "lookFor": "O is half of P.",
+   "before": "O drawn with radius 2."
+  },
+  {
+   "id": "T18",
+   "title": "A ratio over a stated radius sizes the other circle",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 4",
+    "מעגל P",
+    "רדיוס מעגל O גדול פי 2 מרדיוס מעגל P"
+   ],
+   "lookFor": "P becomes radius 2.",
+   "before": "«זה כבר קיים באיור»."
+  },
+  {
+   "id": "T20",
+   "title": "A side of a square named as a height is already drawn",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "AB גובה"
+   ],
+   "lookFor": "«זה כבר קיים באיור — אין מה להוסיף.» and the square stays a square.",
+   "before": "The square collapsed to one point, every row green.",
+   "expectRefusal": "כבר קיים"
+  },
+  {
+   "id": "T21",
+   "title": "Two sides named as heights at once",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "AB ו-CD הם גבהים"
+   ],
+   "lookFor": "«כבר קיים»; the square stays.",
+   "before": "Collapsed to a point, green.",
+   "expectRefusal": "כבר קיים"
+  },
+  {
+   "id": "T22",
+   "title": "Your screenshot line: «BC גובה ל- AB» on a square",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "BC גובה ל- AB"
+   ],
+   "lookFor": "«כבר קיים».",
+   "before": "«B נמצאת על הצלע AB, ולכן הגובה…».",
+   "expectRefusal": "כבר קיים"
+  },
+  {
+   "id": "T23",
+   "title": "Rectangle: «AB גובה»",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מלבן ABCD",
+    "AB גובה"
+   ],
+   "lookFor": "«כבר קיים».",
+   "before": "Internal text «B מתלכדת עם הנקודה שנבנתה לה».",
+   "expectRefusal": "כבר קיים"
+  },
+  {
+   "id": "T24",
+   "title": "Right angle at A already given, then «AB גובה»",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "זווית BAC = 90",
+    "AB גובה"
+   ],
+   "lookFor": "«כבר קיים».",
+   "before": "Refused «AB ⟂ BC cannot hold».",
+   "expectRefusal": "כבר קיים"
+  },
+  {
+   "id": "T25",
+   "title": "A height with a length on a square",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "הגובה AB = 5"
+   ],
+   "lookFor": "AB = 5 is drawn and the square keeps its shape.",
+   "before": "Refused «…הסיבה: |AB| = 5.»"
+  },
+  {
+   "id": "T26",
+   "title": "A height to a named side makes the right angle",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "BC גובה ל-AB"
+   ],
+   "lookFor": "The angle at B becomes 90°.",
+   "before": "Refused «B נמצאת על הצלע AB…»."
+  },
+  {
+   "id": "T27",
+   "title": "Refusal: a height to a side through neither letter",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "AB גובה לצלע CD"
+   ],
+   "lookFor": "«B כבר מוגדרת ולא ניתן להגדיר אותה מחדש כמשהו אחר. כדי לשנות, ערכו או מחקו את הצעד הקודם.»",
+   "before": "The square collapsed, green.",
+   "expectRefusal": "B כבר מוגדרת"
+  },
+  {
+   "id": "T28",
+   "title": "Refusal: a square's vertex as the midpoint of a side",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "B אמצע CD"
+   ],
+   "lookFor": "«B כבר מוגדרת…».",
+   "before": "One point, green.",
+   "expectRefusal": "B כבר מוגדרת"
+  },
+  {
+   "id": "T29",
+   "title": "Refusal: a square has no median AB",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "AB תיכון"
+   ],
+   "lookFor": "«B כבר מוגדרת…».",
+   "before": "One point, green.",
+   "expectRefusal": "B כבר מוגדרת"
+  },
+  {
+   "id": "T31",
+   "title": "Refusal: a straight corner on a quadrilateral",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "זווית BCD = 180"
+   ],
+   "lookFor": "«לא ניתן: עם «זווית BCD = 180» המרובע ABCD היה נעשה קו ישר — הנקודות B, C, D היו על ישר אחד, וקו ישר אינו מרובע. בדקו את הנתונים.»",
+   "before": "Green, three corners on one line.",
+   "expectRefusal": "היה נעשה קו ישר"
+  },
+  {
+   "id": "T32",
+   "title": "Refusal: C on diagonal BD",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "C על BD"
+   ],
+   "lookFor": "The same \"קו ישר\" sentence with «C על BD».",
+   "before": "Green.",
+   "expectRefusal": "היה נעשה קו ישר"
+  },
+  {
+   "id": "T33",
+   "title": "Refusal: the quadrilateral declared over a straight corner",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "קטע BD",
+    "C על BD",
+    "נקודה A",
+    "מרובע ABCD"
+   ],
+   "lookFor": "The last line is refused «…עם «מרובע ABCD» המרובע ABCD היה נעשה קו ישר…».",
+   "before": "Green.",
+   "expectRefusal": "היה נעשה קו ישר"
+  },
+  {
+   "id": "T34",
+   "title": "Refusal: a pentagon with a straight corner",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מחומש ABCDE",
+    "זווית BCD = 180"
+   ],
+   "lookFor": "«לא ניתן: עם «זווית BCD = 180» הנקודות B, C, D היו על ישר אחד, והמחומש ABCDE היה נעשה מרובע. בדקו את הנתונים.»",
+   "before": "Green.",
+   "expectRefusal": "היה נעשה מרובע"
+  },
+  {
+   "id": "T35",
+   "title": "Refusal: a triangle side is not a bisector",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB חוצה זווית"
+   ],
+   "lookFor": "«AB היא צלע של המשולש ולכן אינה יכולה לחצות את זווית A — …».",
+   "before": "The flat-triangle message.",
+   "expectRefusal": "AB היא צלע של המשולש"
+  },
+  {
+   "id": "T36",
+   "title": "Refusal: a quadrilateral side is not a bisector",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "AB חוצה זווית"
+   ],
+   "lookFor": "«AB היא צלע של המרובע ולכן אינה יכולה לחצות את זווית A.»",
+   "before": "D drawn on AB, green.",
+   "expectRefusal": "AB היא צלע של המרובע"
+  },
+  {
+   "id": "T37",
+   "title": "Unchanged: a triangle's «AB גובה» keeps its right angle at B",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB גובה"
+   ],
+   "lookFor": "AB ⟂ BC; «הציגו תצורה אחרת» never moves the right angle off B.",
+   "before": "unchanged",
+   "cycles": 3
+  },
+  {
+   "id": "T38",
+   "title": "Unchanged: a quadrilateral over two crossing segments builds",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "קטע AC",
+    "קטע BD",
+    "מרובע ABCD"
+   ],
+   "lookFor": "Builds a quadrilateral.",
+   "before": "unchanged"
+  },
+  {
+   "id": "T39",
+   "title": "A diagonal named as a height: AC ⟂ BC, the side cycles",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "AC גובה"
+   ],
+   "lookFor": "AC is drawn perpendicular to BC and C stays off BD. Pressing «הציגו תצורה אחרת» shows AC ⟂ CD, CA ⟂ AD, CA ⟂ AB.",
+   "before": "C was moved onto BD, green.",
+   "cycles": 3
+  },
+  {
+   "id": "T40",
+   "title": "A later «AC ⟂ CD» moves the right angle to CD",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "AC גובה",
+    "AC ⟂ CD"
+   ],
+   "lookFor": "The right angle is at CD; nothing refused or flattened.",
+   "before": "C on BD, green."
+  },
+  {
+   "id": "T41",
+   "title": "A parallelogram with a side as a height becomes a rectangle",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מקבילית ABCD",
+    "AB גובה"
+   ],
+   "lookFor": "A rectangle is drawn. No note yet: the \"הוגבל ממקבילית למלבן\" note is #1996, not built.",
+   "before": "Refused with the \"would go flat\" message."
+  },
+  {
+   "id": "T42",
+   "title": "Two triangles: «AB גובה» cycles its side",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "משולש ACD",
+    "AB גובה"
+   ],
+   "lookFor": "AB ⟂ BC, cycling to AB ⟂ AC and AB ⟂ AD.",
+   "before": "B was redefined as a foot onto CD.",
+   "cycles": 2
+  },
+  {
+   "id": "T43",
+   "title": "«ABC חוסם מעגל» draws the circle inside",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "ABC חוסם מעגל"
+   ],
+   "lookFor": "The circle is inside the triangle, touching all three sides.",
+   "before": "The circle through A, B, C, green."
+  },
+  {
+   "id": "T44",
+   "title": "«ABCD חוסם את המעגל» on a square",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "ABCD חוסם את המעגל"
+   ],
+   "lookFor": "The inscribed circle.",
+   "before": "The circle through the corners."
+  },
+  {
+   "id": "T45",
+   "title": "«מעגל ש-ABC חוסם»",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "מעגל ש-ABC חוסם"
+   ],
+   "lookFor": "The incircle.",
+   "before": "The circumcircle."
+  },
+  {
+   "id": "T46",
+   "title": "Unchanged: «מעגל חוסם את ABC» is still the circle through the vertices",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "מעגל חוסם את ABC"
+   ],
+   "lookFor": "The circle through A, B, C.",
+   "before": "unchanged"
+  },
+  {
+   "id": "T47",
+   "title": "Refusal: a circle through three points on one line",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "D על הישר AB",
+    "מעגל שעובר דרך A, D ו-B"
+   ],
+   "lookFor": "«לא ניתן: «מעגל שעובר דרך A, D ו-B» סותר את «D על הישר AB» — אי אפשר לקיים את שניהם יחד. הסיבה: A, D ו-B על ישר אחד, ואין מעגל שעובר דרך שלוש נקודות על ישר אחד.»",
+   "before": "Accepted green with no circle drawn and nothing said.",
+   "expectRefusal": "ואין מעגל שעובר דרך שלוש נקודות על ישר אחד"
+  },
+  {
+   "id": "T48",
+   "title": "Refusal: the circumscribed spelling",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "D על הישר AB",
+    "מעגל חוסם את המשולש ADB"
+   ],
+   "lookFor": "The same sentence quoting «מעגל חוסם את המשולש ADB».",
+   "before": "Green, no circle.",
+   "expectRefusal": "ואין מעגל שעובר דרך שלוש נקודות על ישר אחד"
+  },
+  {
+   "id": "T49",
+   "title": "Refusal in Hebrew where it was half-English",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "D על AB",
+    "מעגל שעובר דרך A, D ו-B"
+   ],
+   "lookFor": "The same sentence, the other side «D על AB».",
+   "before": "«cannot construct O: A, D, B are על ישר אחד …».",
+   "expectRefusal": "ואין מעגל שעובר דרך שלוש נקודות על ישר אחד"
+  },
+  {
+   "id": "T50",
+   "title": "Refusal: a midpoint",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "M אמצע AB",
+    "מעגל שעובר דרך A, M ו-B"
+   ],
+   "lookFor": "The same frame, letters A, M ו-B.",
+   "before": "Half-English.",
+   "expectRefusal": "ואין מעגל שעובר דרך שלוש נקודות על ישר אחד"
+  },
+  {
+   "id": "T51",
+   "title": "Refusal, circle first: the incidence is refused",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "נקודה D",
+    "מעגל שעובר דרך A, D ו-B",
+    "D על הישר AB"
+   ],
+   "lookFor": "«לא ניתן: «D על הישר AB» סותר את «מעגל שעובר דרך A, D ו-B» — …».",
+   "before": "Green, circle centre thrown far off-screen.",
+   "expectRefusal": "ואין מעגל שעובר דרך שלוש נקודות על ישר אחד"
+  },
+  {
+   "id": "T52",
+   "title": "Refusal: lengths force D onto AB",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB = 5",
+    "נקודה D",
+    "מעגל שעובר דרך A, D ו-B",
+    "AD = 2",
+    "DB = 3"
+   ],
+   "lookFor": "«DB = 3» is refused in the same frame (naming «AD = 2»).",
+   "before": "Green, absurd circle.",
+   "expectRefusal": "ואין מעגל שעובר דרך שלוש נקודות על ישר אחד"
+  },
+  {
+   "id": "T53",
+   "title": "Control: a real circle through A, D and B",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "D על AC",
+    "מעגל שעובר דרך A, D ו-B"
+   ],
+   "lookFor": "Builds, a real circle through A, D, B.",
+   "before": "unchanged"
+  },
+  {
+   "id": "T54",
+   "title": "PR: «מעגל חוסם את המחומש ABCDE»",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "מחומש ABCDE",
+    "מעגל חוסם את המחומש ABCDE"
+   ],
+   "lookFor": "A circle through all five vertices.",
+   "before": "Went to the AI."
+  },
+  {
+   "id": "T55",
+   "title": "PR: a named circle encloses a square",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "ריבוע ABCD",
+    "מעגל O חוסם את הריבוע ABCD"
+   ],
+   "lookFor": "Circle centred O through A, B, C, D.",
+   "before": "Went to the AI."
+  },
+  {
+   "id": "T56",
+   "title": "PR: the feminine «חסומה»",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "מקבילית ABCD",
+    "מקבילית ABCD חסומה במעגל"
+   ],
+   "lookFor": "Builds as «חסום» does.",
+   "before": "Went to the AI."
+  },
+  {
+   "id": "T57",
+   "title": "PR refusal: a pentagon around a circle",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "מחומש ABCDE",
+    "ABCDE חוסם מעגל"
+   ],
+   "lookFor": "«הכלי עדיין לא יודע לשרטט מעגל חסום במחומש — זו מגבלה של הכלי.»",
+   "before": "Went to the AI.",
+   "expectRefusal": "מגבלה של הכלי"
+  },
+  {
+   "id": "T58",
+   "title": "PR refusal: a right trapezoid in a circle, active voice",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "טרפז ישר זווית ABCD",
+    "מעגל חוסם את הטרפז ישר זווית ABCD"
+   ],
+   "lookFor": "The same refusal «טרפז ישר זווית ABCD חסום במעגל» gives: «טרפז ישר זווית לא יכול להיות חסום במעגל…».",
+   "before": "Went to the AI.",
+   "expectRefusal": "לא יכול להיות חסום במעגל"
+  },
+  {
+   "id": "T59",
+   "title": "PR: «ABCDE חסום במעגל» (a bare five-letter run) builds",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "ABCDE חסום במעגל"
+   ],
+   "lookFor": "A pentagon inscribed in a circle — the same as «מחומש ABCDE חסום במעגל». Not a line you asked for by itself.",
+   "before": "Not read."
+  },
+  {
+   "id": "T60",
+   "title": "PR 3-D: «מעגל ש-ABC חוסם»",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "מעגל ש-ABC חוסם"
+   ],
+   "lookFor": "The incircle.",
+   "before": "The circle through the vertices."
+  },
+  {
+   "id": "T61",
+   "title": "PR 3-D: a named circle encloses a triangle",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "מעגל O חוסם את המשולש ABC"
+   ],
+   "lookFor": "Circle O through the vertices.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T62",
+   "title": "PR analytic: «מעגל שחוסם את המשולש ABC»",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "מעגל שחוסם את המשולש ABC"
+   ],
+   "lookFor": "The circle through the vertices.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T63",
+   "title": "PR analytic: English «circumscribes the circle O»",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "triangle ABC circumscribes the circle O"
+   ],
+   "lookFor": "The incircle centred O.",
+   "before": "Not understood."
+  }
+ ]
+}

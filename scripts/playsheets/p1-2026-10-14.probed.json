@@ -1,0 +1,33 @@
+[
+ {
+  "id": "T19",
+  "title": "Refusal: two stated radii that disagree with the ratio",
+  "class": "look",
+  "product": "2d",
+  "base": "http://localhost:5173",
+  "path": "/",
+  "lines": [
+   "מעגל O ברדיוס 4",
+   "מעגל P ברדיוס 3",
+   "רדיוס מעגל O גדול פי 2 מרדיוס מעגל P"
+  ],
+  "lookFor": "Refused «…סותר נתון קודם…». The reason after «הסיבה» shows internal helper text — that is #2112, not this fix.",
+  "before": "O changed to radius 2, green.",
+  "probe": "refused after 2.1 s with «לא ניתן: «רדיוס מעגל O גדול פי 2 מרדיוס מעגל P» סותר נתון קודם — …»"
+ },
+ {
+  "id": "T30",
+  "title": "Refusal wording change: rectangle vertex as a midpoint",
+  "class": "play",
+  "product": "2d",
+  "base": "http://localhost:5173",
+  "path": "/",
+  "lines": [
+   "מלבן ABCD",
+   "B אמצע CD"
+  ],
+  "lookFor": "«B כבר מוגדרת…» (the rectangle would collapse to one point, so ruling 3's message).",
+  "before": "Refused with the \"would go flat\" message.",
+  "probe": "refused after 1.6 s with «B כבר מוגדרת ולא ניתן להגדיר אותה מחדש כמשהו אחר. …»"
+ }
+]
