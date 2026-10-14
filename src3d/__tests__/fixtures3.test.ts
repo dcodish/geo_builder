@@ -333,6 +333,9 @@ const SEEDED: SeededCorpus = {
   'rect-surd-side-1827.geo3.json': ['מלבן ABCD', 'AB=1', 'AD=√7'],
   'pyramid-surd-height-1827.geo3.json': ['פירמידה SABCD', 'SO גובה הפירמידה = √7', 'AB = sqrt(2)'],
   'triangle-surd-area-1827.geo3.json': ['משולש ABC', 'שטח המשולש ABC = √3'],
+  // #1975 (ADR-3D-341): a circle named first, in the circle-as-subject voice
+  'named-circle-circumscribes-1975.geo3.json': ['משולש ABC', 'מעגל O חוסם את המשולש ABC'],
+  'relative-clause-incircle-1975.geo3.json': ['משולש ABC', 'מעגל ש-ABC חוסם'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

@@ -238,7 +238,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   A word in an inscription sentence the tool does not read refuses the line, naming it («…לא הצלחנו לצייר: שווה צלעת…»);
   nothing is drawn and the model is not asked. «שוה» reads as «שווה». A shape declaration with a qualifier word no
   reader lowers («משולש שווה ABC», «טרפז ישר ABCD») is not drawn without it: the line goes to the model.
-  - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311, ADR-3D-312, ADR-3D-313; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891, #1902, #1918.
+  Both voices of both relations are one sentence (#1975, operator 2026-10-14): a circle named FIRST — «מעגל O חוסם
+  את המשולש ABC», «מעגל O חסום במשולש ABC», "the circle O circumscribes triangle ABC" — builds what «משולש ABC חסום
+  במעגל O» / «משולש ABC חוסם את המעגל O» build, and the relative clause whose subject is the ring, «מעגל ש-ABC
+  חוסם», is the circle INSIDE (as «ABC חוסם מעגל»), never the circle through the vertices. «מעגל שמרכזו O …» names a
+  centre point the inscribed circle does not carry, and is refused in both voices.
+  - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311, ADR-3D-312, ADR-3D-313, ADR-3D-341; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891, #1902, #1918, #1975.
 - **FR-SP-18 (Must)** — **A trapezoid keeps exactly one pair of parallel sides, or the page says it no longer
   does.** When the givens force a declared trapezoid (flat, or a pyramid's base) to be drawn with both pairs of
   opposite sides parallel, the figure is drawn and an amber warning names the trapezoid while that holds — 2-D's

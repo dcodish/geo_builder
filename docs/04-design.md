@@ -293,6 +293,16 @@ or a bare run, whose arity `bareRingPhrase` infers from its length exactly as fo
 ADR-291 reference spelling `CIRCUM_REF_SRC` puts the verb directly after the circle noun, so it is circle-subject
 by construction. The «חוסם ב-» slip is normalised to the passive before any rule runs (ADR-283).
 
+**The circle as the subject is the passive sentence said the other way (#1975, [ADR-652](06-decisions.md#adr-652)).**
+`activeCircumscription` runs right after `incircle`: when the reader says `circle` and the WHOLE line is «circle
+phrase · verb · (את) shape phrase» (`ACTIVE_CIRCUM_HE` / `_EN`; the circle phrase may carry a name or «שמרכזו O»),
+it restates the line as «<shape phrase> חסום במעגל <circle phrase>» and returns what `parse` makes of that — so the two
+voices share every lowering and every refusal (the ruled `inscribed-contradicts-noun` is passed through), with no
+second lowering. Precedence: a bare run or the triangle with no named circle stays the 3-point `circumcircle`
+rule's sentence. `inscribedNgon` takes a bare run of five or more as its arity when no polygon noun is said, and
+`uninscribableIncircle` reads the shape-as-subject verdict from the reader. The inscription predicates' gender is
+folded at the utterance boundary (`normalizeInscriptionSlip`: «חסומה» → «חסום», «חוסמת» → «חוסם»).
+
 ### Addressing an angle: one reader, many value kinds (#967, [ADR-496](06-decisions.md#adr-496))
 
 An angle statement has two halves: **which angle** is named and **what is said about it**. **`angleArms` is the

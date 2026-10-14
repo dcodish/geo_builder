@@ -292,6 +292,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'BD is a diameter of the circle',
     needs: ['B(7,7)', 'D(1,1)'],
   },
+  // #1975 (ADR-AG-275): the circle as the subject in a relative clause, and the English active voice
+  { category: 'circles', family: 'F5', he: 'מעגל שחוסם את המשולש ABC', en: 'a circle circumscribes triangle ABC' },
   // The circle named by its ring or by its centre inside another sentence (#1663, ADR-AG-203).
   {
     category: 'circles',

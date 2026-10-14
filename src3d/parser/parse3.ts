@@ -246,7 +246,7 @@ export function normalize3(s: string): string {
       // the equal-sides word. The declaration gate admitted it (`שוו?ה`) but no reader did, so «משולש שוה
       // צלעות ABC» drew a scalene triangle, green. Guarded on both sides, so «שוהה» is untouched.
       .replace(/(?<![א-ת])(ו?)שוה(?![א-ת])/g, '$1שווה')
-      // #1827 ([ADR-3D-337](../../docs/06b-decisions-3d.md#adr-3d-337)): the keyboard spellings of the
+      // #1827 ([ADR-3D-341](../../docs/06b-decisions-3d.md#adr-3d-337)): the keyboard spellings of the
       // root sign ARE √ — «AD = sqrt(7)», «sqrt7», «\sqrt{7}» (a braced radicand is the parenthesised one).
       // 2-D reads all three as √7; 3-D read none, «|AB| = sqrt(2)» included. Folded at the one boundary
       // every rule AND the honesty gate read, so no √-reading slot can miss a spelling another one takes.
@@ -1874,7 +1874,7 @@ function radicandValue(raw: string): number | null {
  *  parenthesised radicand: √(48), 2√(3), √(12/4), √(48)/4. */
 const RADICAL_RE = new RegExp(String.raw`^(${UNUM})?\s*(?:√\s*(${RADICAND}))?\s*(?:\/\s*(${UNUM}))?$`);
 /**
- * #1827 ([ADR-3D-337](../../docs/06b-decisions-3d.md#adr-3d-337)) — THE MAGNITUDE ATOM: the lexical
+ * #1827 ([ADR-3D-341](../../docs/06b-decisions-3d.md#adr-3d-337)) — THE MAGNITUDE ATOM: the lexical
  * half of {@link evalRadical}, and the ONE source every stated-magnitude slot composes from. `7`, `2.5`,
  * `7/2`, `√7`, `√(7)`, `2√7`, `√7/2`, `√(3/4)` — and `sqrt(7)` / `\sqrt{7}`, which {@link normalize3}
  * folds to `√` before any rule reads the line.
@@ -3710,7 +3710,7 @@ const lengthRatioClaim: Rule = (s) => {
  * then the whole stated value. The value is the shared magnitude atom {@link MAG}, anchored so that no PREFIX
  * of a number can be taken («1/2» is never «1», «2√2» never «2», «2.5» never «2»).
  *
- * The slot READS only a plain decimal. Any other value the atom admits (a fraction, a root) is UNREAD: ADR-3D-337
+ * The slot READS only a plain decimal. Any other value the atom admits (a fraction, a root) is UNREAD: ADR-3D-341
  * §4 held these slots, and reading them waits for the operator (#1569 parks cone treatment), so the line is
  * refused with the existing «not yet» size message rather than drawn from part of its number.
  */
@@ -4464,6 +4464,46 @@ function isInscription3(s: string): boolean {
 }
 
 /**
+ * #1975 (ADR-3D-341) — the 3-D copy of 2-D's voice reader (ADR-650; copied, never imported: BOUNDARIES.json).
+ * Which noun ENCLOSES in a «חוסם» / "circumscribe" sentence, read from the SUBJECT of the active verb: a circle
+ * noun before the verb with no ring between them is the subject («מעגל O חוסם את המשולש ABC», «מעגל שחוסם את
+ * ABC») → the circle encloses (`true`); a ring before the verb, or between the circle noun and the verb (the
+ * relative clause «מעגל ש-ABC חוסם», whose subject is the ring) → the ring encloses (`false`). The participle
+ * "circumscribed" names its own noun as the outer one ("a circle circumscribed about ABC"; "… by a circle").
+ * `null` when the sentence has no such verb. Word order alone read «מעגל ש-ABC חוסם» as the circumcircle.
+ */
+function circleEnclosesByVoice3(s: string): boolean | null {
+  const verb = s.match(/(?<![א-ת])[הש]?(?:חוסם|חוסמת)(?![א-ת])|\bcircumscrib(?:es|e|ing|ed)\b/i);
+  if (!verb || verb.index === undefined) return null;
+  const before = s.slice(0, verb.index);
+  const after = s.slice(verb.index + verb[0].length);
+  if (/ed$/i.test(verb[0]) && /^\s*(?:circle|by\b)/i.test(after)) return true;
+  const CIRCLE = /(?<![A-Za-z])circles?\b|מעגל(?![א-ת])/gi;
+  const last = [...before.matchAll(CIRCLE)].at(-1);
+  const between = last ? before.slice(last.index! + last[0].length) : '';
+  const ringBetween =
+    !!last &&
+    ((between.match(RUN) ?? []).some((r) => (r.match(TOKEN) ?? []).length >= 3) || new RegExp(`${POLY_WORDS_HE3}|${POLY_WORDS_EN3}`, 'i').test(between));
+  if (last && !ringBetween) return true;
+  if (last || new RegExp(CIRCLE.source, 'i').test(after)) return false;
+  return null;
+}
+
+/** The circle's own NAME in an inscription sentence: «מעגל O», "circle O". «שמרכזו O» states a CENTRE point, which
+ *  3-D's inscribed circle does not carry (its centre is derived): it stays an unread word and refuses (#1902). */
+const CIRCLE_NAME3 = new RegExp(String.raw`(?:מעגל|\bcircle)\s+(${TOKEN.source})(?![A-Za-z\d])`, 'g');
+/**
+ * #1975 — the inscription's RING: the first label run once the circle's own name is set aside. «מעגל O חוסם את
+ * המשולש ABC», «מעגל O חסום במשולש ABC» name the circle FIRST, and the first run was its
+ * letter, so every named-circle-first sentence was `not-understood` while «משולש ABC חסום במעגל O» built.
+ */
+function inscriptionRing3(s: string): Id[] {
+  // the centre clause «שמרכזו O» is set aside for the RING only: it stays an unread word, so the sentence is
+  // refused exactly as its passive twin «… חסום במעגל שמרכזו O» is (#1902), never sent to the model
+  return firstLabelRun(s.replace(CIRCLE_NAME3, ' ').replace(new RegExp(String.raw`שמרכזו\s+${TOKEN.source}`, 'g'), ' '));
+}
+
+/**
  * Does the CIRCLE contain the polygon (`true`: the polygon is inscribed in it), the polygon contain the
  * circle (`false`), or is the sentence undecidable (`null`)? `ring` is the polygon's named run — empty for
  * an unlettered sentence, which names its polygon by the noun alone.
@@ -4501,10 +4541,10 @@ function circleContains3(s: string, ring: readonly Id[]): boolean | null {
   const circIdx = s.search(/מעגל|\bcircle\b/i);
   const polyIdx = nounIdx >= 0 ? nounIdx : runIdx;
   if (circIdx < 0 || polyIdx < 0) return null;
-  // #1792: "X circumscribed about Y" names its CONTAINER as its subject, as «X חוסם את Y» does — so word
-  // order decides it. The old rule forced the POLYGON to contain whenever the verb read "circumscribed
-  // about", and «circle circumscribed about triangle ABC» drew an INcircle.
-  return /חוסמ?\s*(?:את\s*)?(?:ה?מעגל)/i.test(s) ? false : circIdx < polyIdx;
+  // #1792: "X circumscribed about Y" names its CONTAINER as its subject, as «X חוסם את Y» does. #1975: the
+  // SUBJECT is read by the voice reader, not by which noun comes first — «מעגל ש-ABC חוסם» puts the circle
+  // first and the ring is still the subject. Word order stays the answer only where no such verb is said.
+  return circleEnclosesByVoice3(s) ?? circIdx < polyIdx;
 }
 
 /**
@@ -4518,7 +4558,7 @@ function inscribedContradiction3(s: string): { shape: string; forced: string } |
   if (!isInscription3(s)) return null;
   const phrase = readShapePhrase3(s);
   if (!phrase || phrase.cyclic === 'yes') return null;
-  return circleContains3(s, firstLabelRun(s)) === true ? phrase.cyclic : null;
+  return circleContains3(s, inscriptionRing3(s)) === true ? phrase.cyclic : null;
 }
 
 /**
@@ -4533,7 +4573,7 @@ function inscribedContradiction3(s: string): { shape: string; forced: string } |
  */
 function uninscribableIncircle3(s: string): number | null {
   if (!isInscription3(s)) return null;
-  const ring = firstLabelRun(s);
+  const ring = inscriptionRing3(s);
   const noun = statedPolygonArity3(s);
   if (noun === null && SOLID_WORD3.test(s)) return null;
   const sides = typeof noun === 'number' ? noun : ring.length >= 3 ? ring.length : null;
@@ -4605,13 +4645,14 @@ let UNREAD3: string[] = [];
 
 const polygonCircle3: Rule = (s) => {
   if (!isInscription3(s)) return null;
-  const ring = firstLabelRun(s);
+  const ring = inscriptionRing3(s);
   if (ring.length < 3 || ring.length > 5) return null; // the polygon must be NAMED — an unnamed one has no ring to fit
   const circleIsContainer = circleContains3(s, ring);
   if (circleIsContainer === null) return null;
   // an explicitly named circle keeps its letter; otherwise the id is derived from the ring, so the
   // implicit-reference lane (`c.circles3.length === 1`) still resolves «המעגל»
-  const named = s.match(/(?:מעגל|circle)\s+([A-Z]\d*)/);
+  // #1975 (ADR-3D-341): the one reading of the circle's name (CIRCLE_NAME3), which the ring reader also sets aside
+  const named = [...s.matchAll(CIRCLE_NAME3)][0] ?? null;
   const id = named ? `circle-${named[1]}` : `circle-${ring.join('')}`;
   const def: Circle3Def = circleIsContainer ? { kind: 'circum', ring } : { kind: 'incircle', ring };
   // #1792: an adjective this noun cannot carry — or a bare adjective on a ring that is not a triangle's —

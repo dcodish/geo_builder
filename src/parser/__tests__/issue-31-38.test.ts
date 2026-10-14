@@ -33,7 +33,9 @@ describe('issues #31/#38 — normalizeInscriptionSlip: the ב container marker w
     expect(normalizeUtterance('משולש ABC חוסם במעגל')).toBe('משולש ABC חסום במעגל');
     expect(normalizeUtterance('מעגל חוסם במשולש ABC')).toBe('מעגל חסום במשולש ABC');
     // Feminine/plural forms map to their passive counterparts.
-    expect(normalizeUtterance('מקבילית ABCD חוסמת במעגל')).toBe('מקבילית ABCD חסומה במעגל');
+    // #1975 / #2035 (ADR-652): …and the feminine passive then folds to the masculine at the same boundary — the
+    // gender states nothing about the figure, so every reader sees one spelling.
+    expect(normalizeUtterance('מקבילית ABCD חוסמת במעגל')).toBe('מקבילית ABCD חסום במעגל');
     expect(normalizeUtterance('משולשים חוסמים במעגל')).toBe('משולשים חסומים במעגל');
     // The English twin: "circumscribed in" carries the container marker — inscribed.
     expect(normalizeUtterance('triangle ABC circumscribed in a circle')).toBe('triangle ABC inscribed in a circle');
