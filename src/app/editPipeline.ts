@@ -19,7 +19,8 @@
  */
 import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabelFold, parse, typedLabels } from '@/parser';
 import { autoNamedLabels, groupKey, nameByUseCommands, nameCentreFacts, renameFacts, replay, resolveBinds, stepAsideFacts, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
-import type { DecideBind } from './decideDeterministic';
+import { roleReadingConfig, type DecideBind } from './decideDeterministic';
+import { vertexPairVerdict } from './vertexPairCevian';
 import { honestyGateReport } from './honestyGates';
 import { forcedCrossedRing, impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
@@ -124,6 +125,19 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     }
     ectx = prefixCtx();
     r = parse(editText, ectx);
+  }
+  // #2064 (ADR-643): a height named by two existing vertices — the submit seam's one predicate (ADR-W-006), against the
+  // PREFIX the edited row is replayed after. Already true → «כבר קיים»; with a tail, the long form that carries it.
+  const vp = vertexPairVerdict(editText, ectx, prefixRaw, store().seed, roleReadingConfig.cap);
+  if (vp?.kind === 'implied') {
+    logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-implied-restatement', detail: 'vertex-pair' });
+    setInputNote(t('input.alreadyDrawn'));
+    return false;
+  }
+  if (vp?.kind === 'adopt') r = parse(vp.reading, ectx);
+  if (!r.ok && r.reason === 'cevian-redefines-vertex') {
+    setInputNote(t('errors.alreadyDefined', { id: r.foot }));
+    return false;
   }
   if (!r.ok || r.commands.length === 0) {
     setInputNote(t('steps.editRefused'));

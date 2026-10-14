@@ -30,6 +30,8 @@ import { useGeoStore, dryRunOutcome, deferralWorthwhile, forcedCrossedRing, repl
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
 import { ctxOf } from './scenario-pipeline';
+import { vertexPairVerdict } from '@/app/vertexPairCevian';
+import { ROLE_READING_WORK_CAP } from '@/app/decideDeterministic';
 
 /** Why the deterministic path did not commit — the app's own branch, named. */
 export type GateRefusal =
@@ -61,6 +63,10 @@ export type GateVerdict =
  */
 export function gateVerdict(facts: Fact[], utterance: string, seed = 0): GateVerdict {
   const ctx = ctxOf(facts);
+  // #2064 (ADR-643): a height named by two existing vertices — the app's own predicate, called, never mirrored
+  const vp = vertexPairVerdict(utterance, ctx, facts, seed, ROLE_READING_WORK_CAP);
+  if (vp?.kind === 'implied') return { kind: 'noop' };
+  if (vp?.kind === 'adopt') return gateVerdict(facts, vp.reading, seed);
   const r = parse(utterance, ctx);
   if (!r.ok) return { kind: 'refused', reason: 'parse', detail: r.reason };
   if (droppedNewLabels(utterance, r.commands, ctx.points ?? []).length > 0 || droppedGivenNumbers(utterance, r.commands).length > 0) {

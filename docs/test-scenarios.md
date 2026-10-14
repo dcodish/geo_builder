@@ -1842,3 +1842,39 @@ over all four (ADR-041).
 ### `altitude-on-a-side-is-a-right-angle-1742` — «הגובה AB = 5» after «משולש ABC» builds a right angle at B with |AB| = 5 (#1742, ADR-642)
 
 **Guards against:** the altitude twin of the row above going unread. Operator ruling 2026-10-13: build it as «AB גובה לצלע BC» does (ADR-527). **Asserts** the step builds green, AB ⟂ BC, |AB| = 5, and no foot point is minted.
+
+### `altitude-on-existing-side-already-drawn-2064` — «AB גובה» after «ריבוע ABCD» answers «כבר קיים»; the square is never squashed to a point (#2064, ADR-643)
+
+**Guards against:** the altitude rule reading the second letter of a two-vertex height as a foot to be minted — `foot{B}` over the square's own vertex, which M1 lowered to "B coincides with its constructed target" and the solve met by collapsing the square to one point, green (the operator's P1). **Asserts** the line is the submit gate's no-op (the app's own `vertexPairVerdict`), the parser never emits the foot, and the square keeps its shape. The spelling matrix is `src/app/__tests__/issue-2064-vertex-pair-cevian.test.ts`.
+
+### `altitude-reversed-side-already-drawn-2064` — «BC גובה ל- AB» after «ריבוע ABCD» answers «כבר קיים» (#2064, ADR-643)
+
+**Guards against:** the operator's screenshot line refused «B נמצאת על הצלע AB…» because the rule took the shared letter as the apex. Ruled: the apex is the letter off the side, the foot the shared one. **Asserts** both spellings (with and without the space) are the gate's no-op and parse to CB ⟂ AB.
+
+### `altitude-long-form-already-drawn-2064` — «AB גובה לצלע BC» after «ריבוע ABCD» still answers «כבר קיים» (#2064, ADR-643, control)
+
+**Guards against:** the fix disturbing the long form the operator called correct. **Asserts** the gate's no-op.
+
+### `altitude-two-vertex-not-true-2064` — «AC גובה» after «מרובע ABCD» is refused «C כבר מוגדרת…» (#2064, ADR-643, interim)
+
+**Guards against:** C moved onto the diagonal BD, green. **Asserts** the parser's `cevian-redefines-vertex` refusal. Re-pointed by ADR-644 when the side becomes a free choice.
+
+### `square-midpoint-collapse-refused-2064` — «B אמצע CD» / «AB תיכון» after «ריבוע ABCD» is refused «B כבר מוגדרת…» (#2064, ADR-643, B1)
+
+**Guards against:** a square drawn as one point with every row green (the scale-free flatness ruler read a ring 1e-8 across as healthy). **Asserts** both lines are refused before they become facts, with the ruled sentence.
+
+### `quad-straight-corner-refused-2064` — a quadrilateral given a straight corner is refused with the flat sentence (#2064, ADR-643, B2)
+
+**Guards against:** «זווית BCD = 180», «C על BD» and C-on-BD-then-the-quadrilateral drawing three corners on one line, green. **Asserts** each is refused with «…המרובע ABCD היה נעשה קו ישר — הנקודות B, C, D…», and that a corner only a default layout made straight («קטע AC» · «קטע BD» · «מרובע ABCD») still commits.
+
+### `pentagon-straight-corner-refused-2085` — «זווית BCD = 180» after «מחומש ABCDE» says the pentagon would become a quadrilateral (#2085 item 2, ADR-643)
+
+**Guards against:** a pentagon with a straight corner drawn green. **Asserts** the ruled sentence word for word, and the hexagon's.
+
+### `bisector-on-a-side-refused-2066` — «AB חוצה זווית» after «משולש ABC» is refused as a side (#2066, ADR-643)
+
+**Guards against:** ∠BAB = ∠BAC (a zero angle) refused as a flat triangle, the false «בקודקוד B עדיין אין זווית», and the role-noun spellings going to the model. **Asserts** the parser's `cevian-degenerate` / `bisector-is-side` refusal at A. The spelling matrix is `src/app/__tests__/issue-2066-bisector-on-side.test.ts`.
+
+### `polygon-side-bisector-refused-2085` — «AB חוצה זווית» after «מרובע ABCD» is refused «AB היא צלע של המרובע…» (#2085 item 3, ADR-643)
+
+**Guards against:** D pulled onto AB, green. **Asserts** the refusal names the quadrilateral and the rectangle.

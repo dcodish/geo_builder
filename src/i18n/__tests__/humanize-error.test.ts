@@ -25,6 +25,11 @@ const CASES: { raw: string; contains: string[] }[] = [
   { raw: collapsedPolygonError(['A', 'B', 'C'], '|AC| = 8'), contains: ['ABC', 'A, B, C', 'משולש'] },
   { raw: `${collapsedPolygonError(['A', 'B', 'C', 'D'], '|AD| = 3')} [vs #0]`, contains: ['ABCD', 'מרובע'] },
   { raw: collapsedPolygonError(['A', 'B', 'C', 'D', 'E'], null), contains: ['ABCDE', 'מצולע'] },
+  // #2064 B2 / #2085 item 2 (ADR-643): a straight corner names its triple; a quadrilateral keeps the flat sentence,
+  // a pentagon and up says it would become the (n−1)-gon
+  { raw: collapsedPolygonError(['A', 'B', 'C', 'D'], '∠BCD = 180°', ['B', 'C', 'D']), contains: ['ABCD', 'B, C, D', 'מרובע'] },
+  { raw: collapsedPolygonError(['A', 'B', 'C', 'D', 'E'], '∠BCD = 180°', ['B', 'C', 'D']), contains: ['ABCDE', 'B, C, D', 'המחומש', 'מרובע'] },
+  { raw: collapsedPolygonError(['A', 'B', 'C', 'D', 'E', 'F'], null, ['B', 'C', 'D']), contains: ['ABCDEF', 'המשושה', 'מחומש'] },
   // cyclicFeasibility.ts (#1918, ADR-607) — a circle through a ring declared a right trapezoid; the reason clause is a
   // nested translation built from the shape-noun keys. Built by the engine's own function, never re-spelled here.
   { raw: `${notCyclicImpossibilityError({ ring: ['A', 'B', 'C', 'D'], shape: 'right-trapezoid', forced: 'rectangle' })} [vs #0]`, contains: ['טרפז ישר זווית', 'למלבן'] },

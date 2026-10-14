@@ -250,14 +250,29 @@ export const PATTERNS: Pattern[] = [
   // with the fold's optional `[vs #i]` naming the statement that DECLARED the polygon. The operator's ruling
   // (2026-10-07) is the sentence: the line contradicts «משולש ABC», because a flat line is not a triangle — so the
   // noun is the polygon's own (a triangle, a quadrilateral, a polygon), counted from the vertex list.
+  // #2085 item 2 (ADR-643): a STRAIGHT CORNER on a polygon of five or more vertices — `collapsed: polygon A, B, C, D, E
+  // would be flat at B, C, D — …`. The operator's ruling of 2026-10-14: «…הנקודות B, C, D היו על ישר אחד, והמחומש
+  // ABCDE היה נעשה מרובע.» — the n-gon would become an (n−1)-gon, the two nouns from one table in the locale.
   {
-    re: /^collapsed: polygon (.+?) would be flat(?: — (.+) cannot hold)?(?: \[vs #\d+\])?$/,
+    re: /^collapsed: polygon ((?:[^,]+, ){4,11}[^,]+) would be flat at (.+?)(?: — (.+) cannot hold)?(?: \[vs #\d+\])?$/,
+    key: 'errors.polygonCornerStraight',
+    params: (m) => ({ poly: m[1].split(', ').join(''), points: m[2], what: m[3] ?? '' }),
+    paramKeys: (m) => {
+      const n = m[1].split(', ').length;
+      return { polyNoun: `errors.ngonDefinite.${n}`, lessNoun: `errors.ngonIndefinite.${n - 1}` };
+    },
+    saysSubject: true,
+  },
+  {
+    // #2064 B2 (ADR-643): `… would be flat at B, C, D` on a quadrilateral — the ruled existing flat message, with the
+    // three vertices on one line as its points
+    re: /^collapsed: polygon (.+?) would be flat(?: at (.+?))?(?: — (.+) cannot hold)?(?: \[vs #\d+\])?$/,
     key: 'errors.polygonFlatTriangle',
     keyOf: (m) => {
       const n = m[1].split(', ').length;
       return n === 3 ? 'errors.polygonFlatTriangle' : n === 4 ? 'errors.polygonFlatQuad' : 'errors.polygonFlatPolygon';
     },
-    params: (m) => ({ poly: m[1].split(', ').join(''), points: m[1], what: m[2] ?? '' }),
+    params: (m) => ({ poly: m[1].split(', ').join(''), points: m[2] ?? m[1], what: m[3] ?? '' }),
     saysSubject: true,
     namesOther: true,
   },

@@ -94,6 +94,18 @@ The figure is a set of **objects**, each with a *definition* referencing earlier
 - **A fact whose subject is gone (ADR-483, #926):** the fold asks `isSymbolBound` (`engine/lower.ts`) before applying a `set-var`; a value for an unbound letter is stamped into the "no longer available" register, and a definition re-added anywhere binds it again. The ✎ edit seam (`app/editPipeline.ts`) names the rows an edit orphaned while committing it.
 - **Where the solve budget is consulted (ADR-515, #259).** The cooperative wall-clock budget (`engine/solveBudget.ts`) is armed only around view searches (the configuration searches, the submit gate's «כבר קיים» test), never the primary submit fold (ADR-281). It is consulted between recruit experiments (`step.ts`) and inside `nelderMead`'s descent (`evaluate.ts`); unarmed it is a null check. The knowledge pool is bounded by work, never seconds (`POOL_WORK_CAP`, ADR-558; see the knowledge pool).
 - **A refusal names what the rule matched (ADR-528, #1266/#1267).** A rule that recognised a construct and rejected it answers through `Clarify` (mapped by `refusalOf`, armed by `runSubmit`), never `not-handled`. A cevian's stated side has one reader, `statedSide`, shared by median, altitude and bisector (the bisector also checks it); its stated triangle has one, `statedTriangle` (ADR-540, #1285), so the triangle form answers where the bare form asks `ambiguous-angle`, and a wrong lone vertex is `bisector-wrong-apex`. `cevianTriangle` wraps every cevian rule and prepends `triangle` when the sentence names one the figure lacks (ADR-571, #1720). The bisector's vertex has one reader for both forms (ADR-568, #1684). A cevian with no stated side or triangle resolves through `cevianShapeEdges`: one shape answers; shapes giving the apex different opposite sides ask (`ambiguous-cevian`). A NAMED foot is excluded as a base vertex while another opposite side remains; when that exclusion leaves none and the shape has exactly one opposite side holding the foot («משולש ABC» · «התיכון AB»), the foot names that side and `cevianFault` judges it as the long form ([ADR-642](06-decisions.md#adr-642), #1742).
+A height named by TWO EXISTING polygon vertices ([ADR-643](06-decisions.md#adr-643), #2064) is the right angle the
+pair names: with a stated side through one letter, that letter is the foot and the other the apex
+(`altitudeAtVertex`); the altitude rule never emits `foot{id: Y}` over a declared vertex Y (it answers
+`cevian-redefines-vertex` unless Y already is exactly that foot). With no side, `cevianPairReadings` lists the long
+forms «X E גובה לצלע E Z» for each endpoint E and each declared side at E (second letter first, ring order), and the
+app seam `vertexPairVerdict` (`src/app/vertexPairCevian.ts`, called by the submit decision and the ✎ edit seam)
+dry-runs the bare ones under the #1012 cap: one already true → «כבר קיים»; with a tail («= 5») → the long form
+that carries it is decided instead. The bisector joins `cevianFault`'s family: a pair that is a side of a declared
+polygon at the angle's vertex is `bisector-is-side` (with `host`, the polygon's kind or vertex count), asked at
+`bisectorPlacesPoint`'s one emit for every way the angle resolved, and for the role-noun spellings
+(`bisectorRoleNounOnSide`); the door words it `input.cevianBisectorIsSide` (a triangle) or
+`input.cevianBisectorIsPolygonSide` with `input.shapeNounDefinite.<host>`.
 - **A bound’s aim is not its test (ADR-529, #1265).** ADR-390's visible gap is the residual the optimizer follows; acceptance is `isSatisfied`'s direct test of the stated inequality, with ≥ vs > carried from the parser (absent ⇒ strict). The edge never enters the aim. **The aim yields (ADR-547, #1351):** when the ladder with the aim accepts nothing and a bound is present, it runs again with `jointCostTerm(…, aim = false)`, where a bound costs only `boundShortfall` (the region `boundHolds` reads) — retry-only, below every given (ADR-097/ADR-238).
 - **A crossing is refused when its own letters make it an existing point (ADR-531, #1274).** The check sits inside `cross`, the single emit point of the two-named-lines family, so no spelling reaches `line-line-intersection` around it; it travels the `Clarify` road. ADR-123's boundary holds, and ADR-489's within-margin exemption stays for `rename` and `merge`.
 - **The letter-holder question (ADR-520, #238).** `letterHolder` (`store/geoStore.ts`) answers who holds a letter and whether it can be taken back, returned with every `target-taken` refusal from `renameFacts` and `nameCentreFacts`. Reclaimable means dropping the holder removes that letter and nothing else; `reclaim` re-asks before acting.
@@ -889,6 +901,18 @@ amends ADR-W-048).
 - **One message**, `collapsed: polygon A, B, C would be flat — <statement> cannot hold`, from both seams; the fold
   reads the declaring statement from `ownerByObjId` and appends `[vs #i]`, resolved by `otherUtteranceForError`.
 - **Defaults yield**: a collapse only an unstated default forces is cured by the variant rescue (ADR-573).
+- **Two more members, one gate** ([ADR-643](06-decisions.md#adr-643), #2064 / #2085). The accept gate asks
+  `polygonDefects` (`engine/degeneracy.ts`) instead of the flatness ruler alone, in the order a figure degenerates:
+  `collapsedToPoint` (B1 — every vertex within `LEN_EPS`, the ADR-123 coincidence floor; the scale-free ruler reads
+  a ring 1e-8 across as healthy), then flat, then `straightCorner` (B2 — a 4+-gon corner whose |sin| is below
+  `DEGENERATE_EXTENT_RATIO`, 180° and 0° alike). A rejecting accept routes into the failure ladder, which hunts a
+  real configuration first. Wording: a point collapse whose step M1-lowered a derived point over one of the ring's
+  vertices (`coincide` with a `~` helper) is `commandConflict`'s own `'B' is already defined…` («B כבר מוגדרת…»);
+  a stage that found the ring genuinely flat keeps ADR-602's text; a straight corner is `… would be flat at B, C, D
+  …` — the quadrilateral's existing flat sentence with the triple as its points, and for n ≥ 5
+  `errors.polygonCornerStraight` (the n-gon would become an (n−1)-gon, nouns from `errors.ngonDefinite` /
+  `errors.ngonIndefinite`). The corner wire form carries no `[vs #i]` (`COLLAPSED_VS` does not read it), so the
+  student reads the ruled «עם «…»» sentence.
 
 ### A declared polygon the givens force FLAT is said out loud (#945, [ADR-513](06-decisions.md#adr-513))
 

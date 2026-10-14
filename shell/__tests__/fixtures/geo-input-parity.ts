@@ -257,6 +257,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1969': 'open',
   '#2013': 'open',
   '#2047': 'open',
+  '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
 
 };
 
@@ -1352,6 +1353,17 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #1931 (ADR-640): a crossing asked of a line the givens make TANGENT has no second point — refused with the tangent sentence ──
   { id: 'relation-tangent-crossing-1931', family: 'tangents', steps: ['מעגל O', 'A על מעגל O', 'נקודה P', 'הישר AP משיק למעגל O בנקודה A', 'הישר AP חותך את המעגל בנקודה E'], expect: 'refused', exception: 'X8', note: '2-D committed E 1e-6 from A before ADR-640; analytic refuses since ADR-AG-272 (#1924, same round)' },
+
+  // ── #2064 (ADR-643): a height named by two existing vertices that is ALREADY a height answers «כבר קיים» in every spelling ──
+  { id: 'altitude-already-height-2064', family: 'cevians-centres', steps: ['ריבוע ABCD', 'AB גובה'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2072' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D: «זה כבר קיים באיור» (it used to squash the square to a point); analytic refuses `degenerate-role` — the cross-tool question #2072' },
+  { id: 'altitude-reversed-side-already-drawn-2064', family: 'cevians-centres', steps: ['ריבוע ABCD', 'BC גובה ל-AB'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2072' }, { product: '3d', issue: '#1679', parked: true }], note: 'the operator’s screenshot line: the apex is the letter off the side' },
+  { id: 'altitude-long-form-already-drawn-2064', family: 'cevians-centres', steps: ['ריבוע ABCD', 'AB גובה לצלע BC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2072' }, { product: '3d', issue: '#1679', parked: true }], note: 'the control: unchanged in 2-D' },
+  // ── #2064 / #2085 (ADR-643): a declared polygon is never squashed to a point or given a straight corner — every builder refuses ──
+  { id: 'square-midpoint-collapse-2064', family: 'polygons', steps: ['ריבוע ABCD', 'B אמצע CD'], expect: 'refused', note: '2-D: «B כבר מוגדרת…» (it drew one point, green)' },
+  { id: 'quad-straight-corner-2064', family: 'polygons', steps: ['מרובע ABCD', 'זווית BCD = 180'], expect: 'refused', note: '2-D: the flat sentence naming B, C, D' },
+  { id: 'quad-corner-incidence-2064', family: 'polygons', steps: ['מרובע ABCD', 'C על BD'], expect: 'refused' },
+  { id: 'pentagon-straight-corner-2085', family: 'polygons', steps: ['מחומש ABCDE', 'זווית BCD = 180'], expect: 'refused', note: '2-D: «…והמחומש ABCDE היה נעשה מרובע»' },
+  { id: 'altitude-two-vertex-not-true-2064', family: 'cevians-centres', steps: ['מרובע ABCD', 'AC גובה'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D: the interim «C כבר מוגדרת…» until ADR-644 makes the side a free choice; analytic: `degenerate-role`' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

@@ -58,7 +58,7 @@ export type { CircleRef } from './circleRef';
 export type { QueryInput, QueryNote, QueryRow, ValueQuery } from './valuesPanel';
 export type { ValueRow, AreaClassRow, ValuesPanelResult } from './valuesPanel';
 
-export { degeneratePolygons, polygonFlatness, DEGENERATE_EXTENT_RATIO, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
-export type { DegeneratePolygon } from './degeneracy';
+export { degeneratePolygons, polygonFlatness, polygonDefects, collapsedToPoint, straightCorner, DEGENERATE_EXTENT_RATIO, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
+export type { DegeneratePolygon, PolygonDefect } from './degeneracy';
 export { NOT_CYCLIC } from './shapeKinds';
 export { impliedByFigure, constraintRank, constraintJacobian, RANK_TOL, ZERO_ROW_TOL } from './dofRank';

@@ -20,6 +20,7 @@
  * thin triangle in the same band (89° + 90° at 1.7e-2) survives and a needle does not. See the tail.
  */
 import type { Construction, Id, Vec } from './types';
+import { LEN_EPS } from './types';
 
 /** A declared polygon's vertices are collinear to within this fraction of the polygon's own extent. */
 export const DEGENERATE_EXTENT_RATIO = 5e-4;
@@ -71,6 +72,75 @@ export function degeneratePolygons(c: Construction, positions: Map<Id, Vec>, tol
   for (const { id, vertices, pts } of placedPolygons(c, positions)) {
     const ratio = polygonFlatness(pts);
     if (ratio !== null && ratio < tol) out.push({ id, vertices, ratio });
+  }
+  return out;
+}
+
+/**
+ * #2064 B1 ([ADR-643](../../docs/06-decisions.md#adr-643)) — A RING SQUASHED TO ONE POINT. `polygonFlatness` is
+ * scale-free, so a square 1e-8 across reads its own rounding noise as a healthy shape (0.5 measured), and its
+ * `null` for "every vertex on one spot" is never reached because the span is 1e-8, not 0. Every vertex within
+ * the ADR-123 coincidence floor (`LEN_EPS`, the ruler that already declares two points one) is the limit of a
+ * line: not a polygon. Reached with no role noun at all — «ריבוע ABCD» · «B אמצע CD».
+ */
+export function collapsedToPoint(pts: Vec[]): boolean {
+  for (let i = 0; i < pts.length; i++)
+    for (let j = i + 1; j < pts.length; j++) if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) >= LEN_EPS) return false;
+  return pts.length > 0;
+}
+
+/**
+ * #2064 B2 / #2085 item 2 ([ADR-643](../../docs/06-decisions.md#adr-643)) — A STRAIGHT CORNER. The index of the first
+ * vertex whose two sides lie on one line (|sin| of the corner below `tol`, the ADR-513 ruler — one number for
+ * "flat"), for a polygon of four or more vertices; `null` when every corner turns. A triangle with a straight
+ * corner is a flat triangle, which `polygonFlatness` already judges. A corner whose side has no length is the
+ * coincidence channel's (ADR-123), not this one's.
+ */
+export function straightCorner(pts: Vec[], tol = DEGENERATE_EXTENT_RATIO): number | null {
+  const n = pts.length;
+  if (n < 4) return null;
+  for (let i = 0; i < n; i++) {
+    const a = pts[(i + n - 1) % n], b = pts[i], c = pts[(i + 1) % n];
+    const ux = a.x - b.x, uy = a.y - b.y, vx = c.x - b.x, vy = c.y - b.y;
+    const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
+    if (lu < LEN_EPS || lv < LEN_EPS) continue;
+    if (Math.abs(ux * vy - uy * vx) / (lu * lv) < tol) return i;
+  }
+  return null;
+}
+
+/** #2064 (ADR-643): what makes a declared polygon not a polygon — the accept gate's one question, three answers. */
+export interface PolygonDefect {
+  id: Id;
+  vertices: Id[];
+  /** `point`: squashed to one spot (B1) · `flat`: onto a line (ADR-413/602) · `corner`: a straight corner (B2) */
+  kind: 'point' | 'flat' | 'corner';
+  /** for `corner`: the three consecutive vertices on one line, the straight one in the middle */
+  corner?: [Id, Id, Id];
+}
+
+/**
+ * #2064 ([ADR-643](../../docs/06-decisions.md#adr-643)) — EVERY declared polygon that is not a polygon at these
+ * positions, judged in the order a figure degenerates: one point, then one line, then one straight corner.
+ * `flatTol` is the caller's flatness floor (the accept gate's `COLLAPSED_POLYGON_RATIO`).
+ */
+export function polygonDefects(c: Construction, positions: Map<Id, Vec>, flatTol = DEGENERATE_EXTENT_RATIO): PolygonDefect[] {
+  const out: PolygonDefect[] = [];
+  for (const { id, vertices, pts } of placedPolygons(c, positions)) {
+    if (collapsedToPoint(pts)) {
+      out.push({ id, vertices, kind: 'point' });
+      continue;
+    }
+    const ratio = polygonFlatness(pts);
+    if (ratio !== null && ratio < flatTol) {
+      out.push({ id, vertices, kind: 'flat' });
+      continue;
+    }
+    const i = straightCorner(pts);
+    if (i !== null) {
+      const n = vertices.length;
+      out.push({ id, vertices, kind: 'corner', corner: [vertices[(i + n - 1) % n], vertices[i], vertices[(i + 1) % n]] });
+    }
   }
   return out;
 }

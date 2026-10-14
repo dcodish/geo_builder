@@ -33,7 +33,7 @@ import {
 import { sideImpossibility, sideImpossibilityError } from './sideFeasibility';
 import { notCyclicImpossibility, notCyclicImpossibilityError } from './cyclicFeasibility';
 import { recordRequirement, requirementsField } from './requirements';
-import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
+import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, polygonDefects, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, type PolygonDefect } from './degeneracy';
 import { allConstraints, applySeed, freeDofs, movableIds } from './sample';
 import { impliedByFigure } from './dofRank';
 import { constraintKey, constraintRefs, describeConstraint, isSatisfied, solvedOnSegmentCandidates } from './solve';
@@ -336,8 +336,24 @@ function newConstraintsNonVacuous(c: Construction, positions: Map<Id, Vec>, newC
  * statement as `describeConstraint` names it, absent when the step added no constraint (a shape declared over
  * points the givens already put on one line). Exported for the humaniser's coverage lock.
  */
-export function collapsedPolygonError(vertices: readonly Id[], what: string | null): string {
-  return `collapsed: polygon ${vertices.join(', ')} would be flat${what ? ` — ${what} cannot hold` : ''}`;
+export function collapsedPolygonError(vertices: readonly Id[], what: string | null, corner?: readonly Id[]): string {
+  // #2064 B2 (ADR-643): a straight corner names its three vertices (`would be flat at B, C, D`), which the humaniser
+  // reads as the points on one line — the n-gon would lose a corner, not become a line
+  return `collapsed: polygon ${vertices.join(', ')} would be flat${corner ? ` at ${corner.join(', ')}` : ''}${what ? ` — ${what} cannot hold` : ''}`;
+}
+/**
+ * #2064 ([ADR-643](../../docs/06-decisions.md#adr-643)) — the refusal for a declared polygon the step's figure
+ * degenerates. A ring squashed to ONE POINT by a step that M1-lowered a derived point over one of its vertices
+ * («ריבוע ABCD» · «B אמצע CD»: B coincides with its constructed target) is the student redefining that vertex —
+ * the operator's ruling of 2026-10-14 (item 3) is the existing «B כבר מוגדרת…» sentence, `commandConflict`'s own
+ * wire text. Any other degeneracy is ADR-602's flat refusal; a straight corner names its triple (B2).
+ */
+function polygonDefectError(d: PolygonDefect, added: Constraint[]): string {
+  if (d.kind === 'point') {
+    const redefined = added.flatMap((k) => (k.type !== 'coincide' ? [] : k.q.startsWith('~') ? [k.p] : k.p.startsWith('~') ? [k.q] : [])).find((v) => d.vertices.includes(v));
+    if (redefined) return `'${redefined}' is already defined — it can't be redefined as something different`;
+  }
+  return collapsedPolygonError(d.vertices, added.length ? describeConstraint(describeNewStatement(added)) : null, d.kind === 'corner' ? d.corner : undefined);
 }
 /**
  * #1849 (ADR-602): the stage-0h refusal — the step's figure has a declared polygon its LENGTH givens prove flat
@@ -353,10 +369,28 @@ export function forcedFlatError(prev: Construction, next: Construction): string 
   const added = addedConstraints(prev, next);
   return collapsedPolygonError(proof.polygon, added.length ? describeConstraint(describeNewStatement(added)) : null);
 }
+/**
+ * #2064 ([ADR-643](../../docs/06-decisions.md#adr-643)) — the defects the accept gate refuses. A straight corner whose
+ * three vertices are all UNSTATED free points (no constraint, no directive — their positions are pure defaults,
+ * ADR-052) is a configuration choice, not a given the step forced: «קטע AC» · «קטע BD» · «מרובע ABCD» lays B out on
+ * line AC by default, and the post-commit search draws it elsewhere (#1927's doctrine, ADR-608: a ring with a free
+ * vertex is a configuration choice, never a refusal). A corner a statement made straight — an angle, an incidence,
+ * a derived point — is refused.
+ */
+function gateDefects(c: Construction, positions: Map<Id, Vec>): PolygonDefect[] {
+  const all = polygonDefects(c, positions, COLLAPSED_POLYGON_RATIO);
+  if (!all.some((d) => d.kind === 'corner')) return all;
+  const stated = new Set([...c.constraints, ...drivenConstraintsOf(c)].flatMap(constraintRefs));
+  const unstated = (id: Id) => {
+    const o = c.objects.find((x) => x.id === id);
+    return o?.kind === 'free-point' && !(o as { solve?: unknown }).solve && !stated.has(id);
+  };
+  return all.filter((d) => d.kind !== 'corner' || !d.corner!.every(unstated));
+}
 function collapsedPolygon(c: Construction, positions: Map<Id, Vec>): boolean {
-  // The one flatness ruler (`polygonFlatness`) — an all-coincident ring answers null, which is the
-  // coincidence machinery's concern, not this gate's.
-  return degeneratePolygons(c, positions, COLLAPSED_POLYGON_RATIO).length > 0;
+  // The one flatness ruler (`polygonFlatness`), plus #2064's two members (ADR-643): a ring squashed to one point
+  // (B1 — the scale-free ruler reads its noise as a healthy shape) and a straight corner on a 4+-gon (B2).
+  return gateDefects(c, positions).length > 0;
 }
 /**
  * ADR-413's floor, RAISED to the notice band's ceiling by #1849 ([ADR-602](../../docs/06-decisions.md#adr-602),
@@ -653,7 +687,7 @@ function runFailureLadder(
   let refusedAsNotAFigure = primary.ok;
   // #1849 (ADR-602): the first declared polygon a rescue stage's solution FLATTENED — a solution that holds every
   // given and is a line, which is the refusal's reason whichever stage found it.
-  let collapsedSeen: Id[] | undefined;
+  let collapsedSeen: PolygonDefect | undefined; // #2064 (ADR-643): the defect, not only the ring — a point and a corner word differently
   // #1931 ([ADR-640](../../docs/06-decisions.md#adr-640)): the first rescue stage whose figure asked a crossing of a
   // line the solve made TANGENT at a placed point (`EvalErr.tangent`) — the crossing has no point of its own, and
   // that is the refusal's reason whichever stage found it, never the primary's over-constraint (the other order:
@@ -666,7 +700,8 @@ function runFailureLadder(
     const ok = stepAccepted(c, pos, newCons);
     if (!ok) {
       refusedAsNotAFigure = true;
-      collapsedSeen ??= degeneratePolygons(c, pos, COLLAPSED_POLYGON_RATIO)[0]?.vertices;
+      const d = gateDefects(c, pos)[0];
+      if (!collapsedSeen || (collapsedSeen.kind === 'point' && d && d.kind !== 'point')) collapsedSeen = d ?? collapsedSeen;
     }
     return ok;
   };
@@ -758,8 +793,12 @@ function runFailureLadder(
   // operator's ruling, 2026-10-07). One shape for every collapse the gate refuses: forced by lengths
   // («AB = 5 · BC = 3 · AC = 8»), by a sum, a ratio, or invented by an incidence («D אמצע AB · D על AC»,
   // ADR-413). The fold names the polygon's declaring statement as the other side (`[vs #i]`).
-  const flatPoly = (primary.ok ? degeneratePolygons(next, primary.positions, COLLAPSED_POLYGON_RATIO)[0]?.vertices : undefined) ?? collapsedSeen;
-  const flatErr = flatPoly ? collapsedPolygonError(flatPoly, blameCons.length ? describeConstraint(describeNewStatement(blameCons)) : null) : null;
+  // #2064 (ADR-643): a stage that found the polygon FLAT (not merely squashed to a point) shows the statement flattens the
+  // declared shape, and ADR-602's refusal names it; the «כבר מוגדרת» wording is for a step whose degenerate solution is
+  // only ever the one point («ריבוע ABCD» · «B אמצע CD»). «מלבן ABCD» · «B אמצע CD» keeps its flat refusal.
+  const primaryDefect = primary.ok ? gateDefects(next, primary.positions)[0] : undefined;
+  const flatPoly = [primaryDefect, collapsedSeen].find((d) => d && d.kind !== 'point') ?? primaryDefect ?? collapsedSeen;
+  const flatErr = flatPoly ? polygonDefectError(flatPoly, blameCons) : null;
   // #1328 (ADR-537): when the PRIMARY solve succeeded and the step-accept gate refused it — a vacuous
   // satisfaction (#7), a collapsed polygon (#408), a tolerance artefact (#1328) — a solution EXISTS and is
   // not a figure. That is a rigid contradiction, never "waiting for more givens": the fold's classifier
