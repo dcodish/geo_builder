@@ -258,9 +258,9 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2013': 'open',
   '#2047': 'open',
   '#1963': 'open',
-
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
-
+  '#2110': 'open', // #2101/#2100 (ADR-648/649): analytic does not read a radius letter's value or a radius ratio
+  '#2115': 'open', // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
 };
 
 export interface ParityRow {
@@ -1374,6 +1374,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'quad-corner-incidence-2064', family: 'polygons', steps: ['מרובע ABCD', 'C על BD'], expect: 'refused' },
   { id: 'pentagon-straight-corner-2085', family: 'polygons', steps: ['מחומש ABCDE', 'זווית BCD = 180'], expect: 'refused', note: '2-D: «…והמחומש ABCDE היה נעשה מרובע»' },
   { id: 'altitude-two-vertex-not-true-2064', family: 'cevians-centres', steps: ['מרובע ABCD', 'AC גובה'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2072' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D: AC ⟂ BC, the side a free choice «הציגו תצורה אחרת» cycles (ADR-644); analytic refuses `degenerate-role` — the cross-tool question #2072' },
+  // ── #2101 / #2100 (ADR-648 / ADR-649, operator rulings 2026-10-14): a radius letter's value sizes its circle; a radius ratio is a relation ──
+  { id: 'radius-letter-value-2101', family: 'circles', steps: ['מעגל O ברדיוס r', 'r = 3'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }] },
+  { id: 'radius-letter-value-upper-2101', family: 'circles', steps: ['מעגל O ברדיוס R', 'R = 3'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }] },
+  { id: 'radius-ratio-2100', family: 'circles', steps: ['מעגל O', 'מעגל P', 'רדיוס מעגל O גדול פי 2 מרדיוס מעגל P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }] },
+  { id: 'radius-ratio-after-2100', family: 'circles', steps: ['מעגל O', 'מעגל P', 'רדיוס מעגל O גדול מרדיוס מעגל P פי 2'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }] },
+  // ── #2066 (ADR-643): a side of the triangle is never its bisector — 2-D refuses with a sentence ──
+  { id: 'bisector-on-a-side-2066', family: 'cevians-centres', steps: ['משולש ABC', 'AB חוצה זווית'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2115' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D: «AB היא צלע של המשולש ולכן אינה יכולה לחצות את זווית A…»' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
