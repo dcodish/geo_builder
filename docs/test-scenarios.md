@@ -1855,9 +1855,9 @@ over all four (ADR-041).
 
 **Guards against:** the fix disturbing the long form the operator called correct. **Asserts** the gate's no-op.
 
-### `altitude-two-vertex-not-true-2064` — «AC גובה» after «מרובע ABCD» is refused «C כבר מוגדרת…» (#2064, ADR-643, interim)
+### `altitude-two-vertex-not-true-2064` — «AC גובה» after «מרובע ABCD» draws AC ⟂ BC and the side cycles (#2064, ADR-644)
 
-**Guards against:** C moved onto the diagonal BD, green. **Asserts** the parser's `cevian-redefines-vertex` refusal. Re-pointed by ADR-644 when the side becomes a free choice.
+**Guards against:** C moved onto the diagonal BD, green (and, between ADR-643 and ADR-644, the interim «C כבר מוגדרת…» refusal). **Asserts** AC ⟂ BC at every displayed configuration, C off BD, and that each of the four options is a drawable figure.
 
 ### `square-midpoint-collapse-refused-2064` — «B אמצע CD» / «AB תיכון» after «ריבוע ABCD» is refused «B כבר מוגדרת…» (#2064, ADR-643, B1)
 

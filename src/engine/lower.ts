@@ -19,6 +19,7 @@ import type { AnyCommand, Command, Id, MeasureExpr, RoundOperand, SymbolicComman
 import { formatMeasure } from '@/format';
 import { expandShapeVariant } from './shapeVariants';
 import { expandInscribe } from './inscribe';
+import { expandAltitudeChoice } from './altitudeChoice';
 
 /** `perim` (ADR-632): an arc's length — a length, but of a ROUND operand, so it couples only with its own kind
  *  (a ratio of two boundary lengths), never with a segment's `len`. `round` rides with the refs it qualifies. */
@@ -318,6 +319,10 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       // (no explicit on-segment pin); `replay` calls `expandInscribe` with the figure's `point-on-segment`
       // givens so an explicit placement PINS the variant.
       return expandInscribe(cmd, []);
+    case 'altitude-choice':
+      // #2064 (ADR-644): the persisted option. This fallback (no stated right angles) is the whole-list path; `replay`
+      // calls `expandAltitudeChoice` with the figure's stated right angles so a statement PINS the option.
+      return expandAltitudeChoice(cmd, []);
     default:
       return [cmd as Command];
   }

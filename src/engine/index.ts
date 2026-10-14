@@ -52,6 +52,8 @@ export { expandInscribe, inscribePlacements, inscribeVariantCount } from './insc
 export type { InscribeShape, InscribeCmd } from './inscribe';
 export { roleSidesOf, openRightTriangles, bindRoleSide, resolveRoleSide, type RoleSide } from './roleSides';
 export { variantCountOf, cyclableVariant, withVariant, variantVertices } from './variants';
+export { expandAltitudeChoice, pinnedAltitudeOption, rightAngleAtFoot, statedRightAngles } from './altitudeChoice';
+export type { AltitudeOption, StatedRightAngle } from './altitudeChoice';
 export { computeValuesPanel, queryLabel, rowOptions, valueText } from './valuesPanel';
 export { circleRefs, isDrawnCircle } from './circleRef';
 export type { CircleRef } from './circleRef';

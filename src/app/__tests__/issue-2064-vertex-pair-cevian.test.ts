@@ -142,16 +142,36 @@ describe('#2064 — a stated side through one letter: the apex is the letter off
   });
 });
 
-describe('#2064 — never a vertex redefined as a foot: the interim refusal (ruling 3; Stage 2 replaces the no-side rows)', () => {
+describe('#2064 Stage 2 (ADR-644) — a height that is not yet true BUILDS, its side a free choice; no vertex is redefined', () => {
   it.each([
-    [['מרובע ABCD'], 'AC גובה', 'C'],
-    [['מרובע ABCD'], 'AB גובה', 'B'],
-    [['מקבילית ABCD'], 'AB גובה', 'B'],
-    [['משולש ABC', 'משולש ACD'], 'AB גובה', 'B'],
-    [['משולש ABC', 'משולש ACD'], 'AC גובה', 'C'],
+    [['מרובע ABCD'], 'AC גובה', ['A', 'C', 'B']],
+    [['מרובע ABCD'], 'AB גובה', ['A', 'B', 'C']],
+    [['מקבילית ABCD'], 'AB גובה', ['A', 'B', 'C']],
+    [['משולש ABC', 'משולש ACD'], 'AB גובה', ['A', 'B', 'C']],
+    [['משולש ABC', 'משולש ACD'], 'AC גובה', ['A', 'C', 'B']],
+  ] as [string[], string, [string, string, string]][])('%j · «%s» builds the first right angle the pair names (%j), green, no foot minted', async (prefix, line, [a, b, c]) => {
+    await drive(prefix);
+    const v = await decideHere(line);
+    expect(v.kind).toBe('commit');
+    if (v.kind !== 'commit') return;
+    expect(v.commands.map((x) => x.type)).toEqual(['altitude-choice']);
+    commitVerdict(v, line);
+    expect(Object.values(replay(st().facts, st().seed).status).every((x) => x === 'ok')).toBe(true);
+    expect(cosAt(a, b, c)).toBeLessThan(1e-6);
+    expect(llmParseMock).not.toHaveBeenCalled();
+  });
+
+  it('the plural on a quadrilateral, «AB and CD are altitudes», builds one choice per segment', async () => {
+    await drive(['מרובע ABCD']);
+    const v = await decideHere('AB and CD are altitudes');
+    expect(v.kind === 'commit' && v.commands.map((x) => x.type)).toEqual(['altitude-choice', 'altitude-choice']);
+  });
+});
+
+describe('#2064 — a stated side through neither letter still never redefines a vertex (ruling 3)', () => {
+  it.each([
     [['ריבוע ABCD'], 'AB גובה לצלע CD', 'B'],
     [['מרובע ABCD'], 'AB גובה לצלע CD', 'B'],
-    [['מרובע ABCD'], 'AB and CD are altitudes', 'B'],
   ] as [string[], string, string][])('%j · «%s» → «%s כבר מוגדרת…», nothing committed, nothing moves', async (prefix, line, id) => {
     await drive(prefix);
     const before = snapshot();
@@ -270,12 +290,19 @@ describe('#2064 — the ✎ edit seam asks the same question (ADR-W-006)', () =>
     expect(runEditCommit(key, 'AB גובה', deps)).toBe(false);
     expect(notes.at(-1)).toBe('input.alreadyDrawn');
   });
-  it('editing a row into «AC גובה» on a quadrilateral is refused with the vertex', async () => {
+  it('editing a row into «AC גובה» on a quadrilateral builds the right angle (ADR-644)', async () => {
     st().clear();
     await submit('מרובע ABCD');
     const key = await submit('AB = 5');
-    expect(runEditCommit(key, 'AC גובה', deps)).toBe(false);
-    expect(notes.at(-1)).toBe(`errors.alreadyDefined:${JSON.stringify({ id: 'C' })}`);
+    expect(runEditCommit(key, 'AC גובה', deps)).toBe(true);
+    expect(st().facts.some((f) => f.cmd.type === 'altitude-choice')).toBe(true);
+  });
+  it('editing a row into «AB גובה לצלע CD» on a quadrilateral is refused with the vertex', async () => {
+    st().clear();
+    await submit('מרובע ABCD');
+    const key = await submit('AB = 5');
+    expect(runEditCommit(key, 'AB גובה לצלע CD', deps)).toBe(false);
+    expect(notes.at(-1)).toBe(`errors.alreadyDefined:${JSON.stringify({ id: 'B' })}`);
   });
 });
 

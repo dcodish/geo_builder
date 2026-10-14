@@ -4355,7 +4355,7 @@ export const SCENARIOS_4: Scenario[] = [
       const sq = factsOf(['ריבוע ABCD']);
       expect(gateVerdict(sq, 'AB גובה').kind, '«AB גובה» is already true').toBe('noop');
       const r = parse('AB גובה', ctxOf(sq));
-      expect(r.ok, 'the parser never redefines B as a foot').toBe(false);
+      expect(r.ok && r.commands.some((c) => c.type === 'foot'), 'the parser never redefines B as a foot').toBe(false);
       expect(dist(at(fig, 'A'), at(fig, 'B')), 'the square keeps its size').toBeGreaterThan(1);
       expect(dist(at(fig, 'A'), at(fig, 'B'))).toBeCloseTo(dist(at(fig, 'B'), at(fig, 'C')), 6);
     },
@@ -4389,14 +4389,23 @@ export const SCENARIOS_4: Scenario[] = [
   },
   {
     id: 'altitude-two-vertex-not-true-2064',
-    title: '#2064 (ADR-643, interim): «AC גובה» after «מרובע ABCD» is refused «C כבר מוגדרת…» — C is never moved onto BD',
+    title: '#2064 (ADR-644): «AC גובה» after «מרובע ABCD» draws AC ⟂ BC — C is never moved onto BD — and «הציגו תצורה אחרת» cycles the side',
     guards:
-      "Measured at 939b160a: «מרובע ABCD» · «AC גובה» committed `foot{C from A onto BD}` — C moved onto the diagonal, green, no note. Ruled (3 of 2026-10-13): an existing vertex is never redefined as a foot; a P1 commit ships the honest «כבר מוגדרת» refusal until the side becomes a free choice (the 2026-10-14 ruling, option D — ADR-644, which re-points this scenario). Asserts the parser refuses `cevian-redefines-vertex` with C as the vertex and nothing is committed.",
-    steps: ['מרובע ABCD'],
+      "Measured at 939b160a: «מרובע ABCD» · «AC גובה» committed `foot{C from A onto BD}` — C moved onto the diagonal, green, no note. Ruled (3 of 2026-10-13): an existing vertex is never redefined as a foot; ruled 2026-10-14 (option D): *\"we just draw AC perpendicular to BC\"*, the side a free choice «הציגו תצורה אחרת» cycles. ADR-643 shipped the interim «C כבר מוגדרת…» refusal; ADR-644 builds it as the cyclable `altitude-choice`. Asserts AC ⟂ BC at every configuration the app would display with the default choice, C off the diagonal BD, and that every option is a drawable figure.",
+    steps: ['מרובע ABCD', 'AC גובה'],
     check(fig) {
       allStepsOk(fig);
-      const v = gateVerdict(factsOf(['מרובע ABCD']), 'AC גובה');
-      expect(v.kind === 'refused' && v.detail).toBe('cevian-redefines-vertex');
+      const a = at(fig, 'A'), b = at(fig, 'B'), c = at(fig, 'C'), d = at(fig, 'D');
+      const dot = (a.x - c.x) * (b.x - c.x) + (a.y - c.y) * (b.y - c.y);
+      expect(Math.abs(dot) / (dist(a, c) * dist(b, c)), 'AC ⟂ BC').toBeLessThan(1e-6);
+      const off = Math.abs((d.x - b.x) * (c.y - b.y) - (d.y - b.y) * (c.x - b.x)) / dist(b, d) ** 2;
+      expect(off, 'C is not on BD').toBeGreaterThan(1e-3);
+      const facts = factsOf(['מרובע ABCD', 'AC גובה']);
+      const i = facts.findIndex((f) => f.cmd.type === 'altitude-choice');
+      for (let v = 0; v < 4; v++) {
+        const fc = facts.map((f, k) => (k === i ? { ...f, cmd: { ...f.cmd, variant: v } as AnyCommand } : f));
+        expect([0, 1, 2, 3, 4, 5, 6, 7].some((s) => meetsRequirements(fc, s)), `option ${v} is drawable`).toBe(true);
+      }
     },
   },
   {

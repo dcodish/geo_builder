@@ -98,7 +98,8 @@ A height named by TWO EXISTING polygon vertices ([ADR-643](06-decisions.md#adr-6
 pair names: with a stated side through one letter, that letter is the foot and the other the apex
 (`altitudeAtVertex`); the altitude rule never emits `foot{id: Y}` over a declared vertex Y (it answers
 `cevian-redefines-vertex` unless Y already is exactly that foot). With no side, `cevianPairReadings` lists the long
-forms «X E גובה לצלע E Z» for each endpoint E and each declared side at E (second letter first, ring order), and the
+forms «X E גובה לצלע E Z» for each endpoint E and each declared side at E (second letter first, ring order; with no
+side stated and none already true, the rule builds them as the cyclable `altitude-choice`, ADR-644), and the
 app seam `vertexPairVerdict` (`src/app/vertexPairCevian.ts`, called by the submit decision and the ✎ edit seam)
 dry-runs the bare ones under the #1012 cap: one already true → «כבר קיים»; with a tail («= 5») → the long form
 that carries it is decided instead. The bisector joins `cevianFault`'s family: a pair that is a side of a declared
@@ -988,6 +989,18 @@ crossing, a single in-segment root or a tangent is 1, an `avoid` that is not a c
 `edgeSide: 'toward'`, and records `SideChoice { type, ids, toward }`, carried by `withSideChoices` (the
 `withRequirements` discipline); `expandShapeVariant` carries `edgeSide`. A stated side wins through
 `meetsRequirements` and `choiceRescue`.
+
+### The side of a two-vertex height is a variant command ([ADR-644](06-decisions.md#adr-644))
+
+«מרובע ABCD» · «AC גובה» names a height whose side the sentence did not state. The altitude rule emits
+`altitude-choice { options: {apex, foot, side}[], variant }` (`engine/altitudeChoice.ts`), the options from the parser's
+`vertexPairOptions` — the same list `cevianPairReadings` reads, the second letter's sides first. It is one more member
+of the variant family (`variants.ts`: count = options, cyclable, `withVariant`, `variantVertices`), so the store, the
+registry's `variant` axis, `choiceRescue`, `settleVariantDefaults` and the save file need no new branch. It lowers to
+`rightAngleAtFoot` (the long form's lowering, shared with the parser's `altitudeAtVertex`). M4: `replay`'s pre-scan
+reads the right angles the student stated elsewhere (`statedRightAngles`: a ⟂ between two segments sharing an end, a
+90° angle) into `explicitRightAngles` (in the prefix signature), and `expandAltitudeChoice` pins the matching option
+and drops its own ⟂; `dryRunOutcome` commits a right angle that pins a still-soft option, ahead of the implied test.
 
 ### A sine is a two-root angle choice; the configuration searches walk every variant ([ADR-573](06-decisions.md#adr-573))
 

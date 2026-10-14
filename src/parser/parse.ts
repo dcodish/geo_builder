@@ -19,7 +19,7 @@
  * no digits). Keywords are bilingual; the same rule matches either language.
  */
 
-import { MIDSEGMENT_SHAPES, RADIUS_VAR, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand } from '@/engine';
+import { MIDSEGMENT_SHAPES, RADIUS_VAR, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand } from '@/engine';
 import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
@@ -9862,14 +9862,9 @@ const cevianFault = (
  * `foot` command for it was what produced the hidden `~B` and the over-constrained error. The
  * lowering is exactly what the student's own «AB ⟂ BC» produces, which is what the lock asserts.
  */
-const altitudeAtVertex = (apex: Id, foot: Id, side: readonly [Id, Id]): Command[] => {
-  const other = side[0] === foot ? side[1] : side[0];
-  return [
-    { type: 'segment', a: apex, b: foot },
-    { type: 'segment', a: foot, b: other },
-    { type: 'set-perpendicular', a: apex, b: foot, c: foot, d: other },
-  ];
-};
+// #2064 Stage 2 (ADR-644): the lowering lives in the engine (`rightAngleAtFoot`), shared with the cyclable
+// `altitude-choice`, so the long form and the free choice can never drift.
+const altitudeAtVertex = (apex: Id, foot: Id, side: readonly [Id, Id]): Command[] => rightAngleAtFoot(apex, foot, side);
 
 /**
  * "median from A in ABC" / "תיכון מ-A במשולש ABC" — the median from a vertex to the
@@ -10101,6 +10096,30 @@ const NAMED_ALT_KW = rx(String.raw`(?:height|altitude|גובה)\s+\b(${LABEL})\s
  * The app seam (`src/app/vertexPairCevian.ts`) dry-runs the bare readings: one already true answers «כבר קיים».
  * The plural «AB ו-CD הם גבהים» is one entry per segment. `null`: not a two-vertex named height with no side.
  */
+/**
+ * #2064 (ADR-643/644) — THE RIGHT ANGLES the pair X Y can name, as `{ apex, foot, side }`: for each endpoint E and
+ * each side of a declared polygon at E other than the pair itself, the right angle at E between the other letter
+ * and that side. The sides at the SECOND letter first, in ring order, then the first letter's — one list, read by
+ * the long-form readings (`cevianPairReadings`) and by the cyclable `altitude-choice` (ADR-644), so the option
+ * the student sees first is the reading tried first.
+ */
+function vertexPairOptions(x: Id, y: Id, ctx: ParseContext): { apex: Id; foot: Id; side: [Id, Id] }[] {
+  const out: { apex: Id; foot: Id; side: [Id, Id] }[] = [];
+  for (const [apex, e] of [[x, y], [y, x]] as const) {
+    const seen = new Set<Id>();
+    for (const poly of ctx.declaredPolygons ?? []) {
+      const ring = poly.vertices.map(up);
+      const i = ring.indexOf(e);
+      if (i < 0) continue;
+      for (const z of [ring[(i + ring.length - 1) % ring.length], ring[(i + 1) % ring.length]]) {
+        if (z === apex || z === e || seen.has(z)) continue;
+        seen.add(z);
+        out.push({ apex, foot: e, side: [e, z] });
+      }
+    }
+  }
+  return out;
+}
 export interface CevianPairSegment {
   apex: Id;
   foot: Id;
@@ -10114,28 +10133,17 @@ export function cevianPairReadings(raw: string, ctx: ParseContext): { segments: 
   if (statedSide(s) || statedTriangle(s) || /\bin\b|במשולש/i.test(s)) return null;
   if (new RegExp(APEX_FROM, 'i').test(s) || new RegExp(LOCATIVE_APEX.replace('%KW%', 'height|altitude|גובה'), 'i').test(s)) return null;
   const heb = /[א-ת]/.test(s);
-  const sidesAt = (e: Id, other: Id): Id[] => {
-    const out: Id[] = [];
-    for (const poly of ctx.declaredPolygons ?? []) {
-      const ring = poly.vertices.map(up);
-      const i = ring.indexOf(e);
-      if (i < 0) continue;
-      for (const z of [ring[(i + ring.length - 1) % ring.length], ring[(i + 1) % ring.length]]) if (z !== other && z !== e && !out.includes(z)) out.push(z);
-    }
-    return out;
-  };
   /** The long forms for the pair X Y, `head` the matched text naming it, `rest` what followed. */
   const segment = (x: Id, y: Id, head: string, rest: string): CevianPairSegment | null => {
     if (!isVertexPair(x, y, ctx)) return null;
     const swapped = head.replace(new RegExp(String.raw`${x}(\s*)${y}(?![A-Za-z\d])`), `${y}$1${x}`);
     const readings: string[] = [];
     const bare: string[] = [];
-    for (const [h, e, other] of [[head, y, x], [swapped, x, y]] as const) {
-      for (const z of sidesAt(e, other)) {
-        const side = heb ? ` לצלע ${e}${z}` : ` to side ${e}${z}`;
-        bare.push(`${h}${side}`.replace(/\s+/g, ' ').trim());
-        readings.push(`${h}${side}${rest}`.replace(/\s+/g, ' ').trim());
-      }
+    for (const o of vertexPairOptions(x, y, ctx)) {
+      const h = o.apex === x ? head : swapped;
+      const side = heb ? ` לצלע ${o.side[0]}${o.side[1]}` : ` to side ${o.side[0]}${o.side[1]}`;
+      bare.push(`${h}${side}`.replace(/\s+/g, ' ').trim());
+      readings.push(`${h}${side}${rest}`.replace(/\s+/g, ' ').trim());
     }
     return readings.length ? { apex: x, foot: y, readings, bare } : null;
   };
@@ -10338,6 +10346,13 @@ const altitude: Rule = (s, ctx) => {
   // (`cevianPairReadings`, judged at the app seam), never about moving B. The one exception is a figure that
   // already has B as exactly this foot — a restatement, lowered to the identical commands as before.
   if (namedFoot && f === namedFoot && declaredVertices(ctx).has(namedFoot) && existingFootOf(ctx, apex, p, q) !== namedFoot) {
+    // #2064 Stage 2 ([ADR-644](../../docs/06-decisions.md#adr-644)) — with NO side stated, which side the pair is a
+    // height to is an unstated choice (the operator's ruling of 2026-10-14, option D: *"we just draw AC
+    // perpendicular to BC"*), so the sentence builds the first right angle the pair names and «הציגו תצורה אחרת»
+    // cycles the rest. A STATED side through neither letter («AB גובה לצלע CD») has no choice to make: building it
+    // would redefine B, so it keeps the refusal (ruling 3 of 2026-10-13).
+    const options = !sideM && isVertexPair(apex, namedFoot, ctx) ? vertexPairOptions(apex, namedFoot, ctx) : [];
+    if (options.length > 0) return [{ type: 'altitude-choice', options, variant: 0 }];
     return { clarify: 'cevian-redefines-vertex', apex, foot: namedFoot, side: [p, q] };
   }
   cmds.push({ type: 'foot', id: f, from: apex, a: p, b: q });
