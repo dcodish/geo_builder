@@ -28,7 +28,11 @@ enumeration). Four corrections to the plain compiler reading hold:
    §4), and `commandConflict` refuses only what cannot be lowered. The lowering reads the ring's STRUCTURE: a
    parallelogram-family noun over four points already on one circle (`ringOnOneCircle`, `src/engine/structure.ts`)
    asserts its cyclic member — the rectangle, or the square — because that is what the sentence says on a circle
-   ([ADR-628](06-decisions.md#adr-628)).
+   ([ADR-628](06-decisions.md#adr-628)). A membership of an existing point on a second circle reads the same
+   structure: a point already on one circle of a STATED tangency (`circles-tangent`'s record) is the touch point,
+   and takes the touch point's own definition (`tangentTouchCopy`, so ADR-123's coincidence records X = M); a
+   residual membership is held through a witness that is any point the construction puts on the circle — a
+   `radial-toward` and a stated touch point included ([ADR-647](06-decisions.md#adr-647), #2084).
 2. **The parser may read the drawing, but only to resolve a pointing reference** («המעגל הגדול», «הימני»,
    «נקודת ההשקה»), through `ParseContext`'s deictic fields, each read emitting a locking assertion
    ([docs/17](17-design-rules.md) §3b).

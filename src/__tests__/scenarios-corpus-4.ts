@@ -4371,6 +4371,19 @@ export const SCENARIOS_4: Scenario[] = [
     },
   },
   {
+    id: 'point-on-two-tangent-circles-is-the-touch-2084',
+    title: 'Two tangent circles: «X על מעגל O» · «X על מעגל P» puts X on the touch point M, with the converge notice (#2084, ADR-647)',
+    guards:
+      "#2084 (ADR-647), operator ruling 2026-10-14 (card d14b-2084-priority, A: X moves to the touch point, with the \"moved to coincide\" notice). Measured on 939b160a through decideDeterministic2D: «X על מעגל P» answered «זה כבר קיים באיור — אין מה להוסיף.» with X at (0, 5), off circle P; with stated radii X was drawn ~10⁻³ beside M with no notice. Root cause: apply's point-on-circle existing-point branches never asked what a membership of both tangent circles means — the busy free radius skipped (c3), the witness search read only on-circle riders, and the command reached the bare break; (c4) drove X only to within the solve tolerance. Fix: a point on one circle of a stated tangency, stated on the other, takes the touch point's own definition (tangentTouchCopy), and the witness reads every point on the circle. Matrix: src/app/__tests__/issue-2084-point-on-tangent-circles.test.ts.",
+    steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'X על מעגל O', 'X על מעגל P'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(dist(at(fig, 'X'), at(fig, 'M')), 'X is the touch point').toBeLessThan(1e-6);
+      expect(fig.coincidences.map((p) => [...p].sort().join('')), 'the converge notice').toContain('MX');
+    },
+  },
+  {
     id: 'tangent-by-lengths-cross-refused-2083',
     title: 'Radii 3 and 2 with «OP = 5»: the two-point crossing is refused, both orders; the stated radii are kept (#2083, ADR-646 + ADR-645)',
     guards:
