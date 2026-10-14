@@ -4571,10 +4571,14 @@ const chainedEquality: Rule = (s, ctx) => {
   return out;
 };
 
-/** "x = 4" / "α = 30" — bind a variable to a number; resolves every measure that uses it. */
-const setVar: Rule = (s) => {
-  const m = s.match(new RegExp(String.raw`^\s*(${VAR})\s*=\s*${num}\s*$`));
-  return m ? [{ type: 'set-var', name: m[1], value: parseFloat(m[2]) }] : null;
+/** "x = 4" / "α = 30" — bind a variable to a number; resolves every measure that uses it. An UPPERCASE letter
+ *  is a variable only when the figure BINDS it as a circle's radius (`ctx.radiusSymbols`, a semantic field —
+ *  «מעגל O ברדיוס R» · «R = 3», #2101 / ADR-648); otherwise an uppercase letter is a point name and stays out. */
+const setVar: Rule = (s, ctx) => {
+  const m = s.match(new RegExp(String.raw`^\s*(${VAR}|[A-Z])\s*=\s*${num}\s*$`));
+  if (!m) return null;
+  if (/^[A-Z]$/.test(m[1]) && !(ctx.radiusSymbols ?? []).some((r) => r.name === m[1])) return null;
+  return [{ type: 'set-var', name: m[1], value: parseFloat(m[2]) }];
 };
 
 /**

@@ -4343,6 +4343,18 @@ export const SCENARIOS_4: Scenario[] = [
       expect(dist(a, b), '|AB| = 5').toBeCloseTo(5, 6);
       expect([...fig.positions.keys()].filter((id) => /^[A-Z]\d*$/.test(id)).sort(), 'no foot point minted').toEqual(['A', 'B', 'C']);
     },
+  },  {
+    id: 'radius-letter-value-sizes-circle-2101',
+    title: '#2101 (ADR-648): «מעגל O ברדיוס r · A על מעגל O · r = 3» draws the circle with radius 3, A on it',
+    guards:
+      'A value given to a circle radius LETTER was dropped green: the `radius-symbol` binding lowered to the naming alone, so «r = 3» lowered to nothing and the circle kept its free default radius 5 (A at distance 5). Operator ruling 2026-10-14: «r = 3» sizes the circle. Asserts every step is green, the drawn radius is 3 and |OA| = 3. The spelling/order matrix and the refusal are src/app/__tests__/issue-2101-radius-letter-value.test.ts.',
+    steps: ['מעגל O ברדיוס r', 'A על מעגל O', 'r = 3'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.circles.get('circle-O')?.r, 'the stated radius').toBeCloseTo(3, 9);
+      expect(dist(at(fig, 'O'), at(fig, 'A')), '|OA| = r = 3').toBeCloseTo(3, 9);
+    },
   },
 ];
 

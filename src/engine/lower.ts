@@ -179,6 +179,8 @@ export function symbolsConsumedBy(cmd: AnyCommand): string[] {
       return [cmd.left, cmd.right];
     case 'measure-bound':
       return [cmd.name];
+    case 'radius-symbol':
+      return [cmd.name]; // #2101 (ADR-648): the binding row lowers the letter's value into its circle's size
     default:
       return [];
   }
@@ -193,6 +195,15 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       return []; // #1697: a naming, applied by `resolveBinds` before the fold — nothing for the engine
     case 'mark-angle':
       return []; // pure display (issue #106) — a valueless angle mark; the arms are their own `segment`s
+    case 'radius-symbol': {
+      // #2101 (ADR-648) — a letter BOUND as a circle's radius («מעגל O ברדיוס r», «שרדיוסו r», «רדיוס המעגל O
+      // הוא r») is resolved by its binding exactly as «AB = x» is by its measure: once a `set-var` gives the
+      // letter a value (on any row, before or after), the binding lowers to that circle's size — `set-radius`,
+      // the stated-radius path (ADR-087/011) — beside the naming itself. Without a value it stays a name and
+      // the radius stays a free DOF (ADR-052). A value whose letter names nothing is #926's register, not this.
+      const value = tab.vars.get(cmd.name)?.value;
+      return value !== undefined ? [cmd, { type: 'set-radius', circle: cmd.circle, value }] : [cmd];
+    }
     case 'measure-length': {
       const e = cmd.expr;
       if ('value' in e) return [{ type: 'set-distance', a: cmd.a, b: cmd.b, value: e.value }];

@@ -16640,3 +16640,30 @@ Several opposite sides (a quadrilateral) are untouched: the foot does not choose
 **Locks.** `src/app/__tests__/issue-1742-median-on-side.test.ts` (24, through `decideDeterministic2D` and the store): the median refusal over 11 spellings, its Hebrew text word for word (the same as the long form's), every side and direction; the altitude over 7 spellings (∠ABC = 90° and |AB| = 5 in the replayed figure, no foot minted, identical to the long form); controls (a new foot still mints, the quadrilateral is unchanged). **Fails before: 22 of 24** (the two controls pass). Scenarios `median-on-a-side-refused-1742` and `altitude-on-a-side-is-a-right-angle-1742` (corpus 4) are the operator's exact lines.
 
 **Behaviour change for a student:** after «משולש ABC», «התיכון AB = 5» (AB is a side) is now refused at once with the message «AB תיכון לצלע BC» already gives, instead of going to the paid model. «הגובה AB = 5» now builds a right angle at B with AB = 5, as «AB גובה לצלע BC» does.
+
+## ADR-648 — A circle's radius letter takes its value: «r = 3» sizes the circle the letter names (#2101)
+
+**Status:** accepted · 2026-10-14 · bug (P1) · operator ruling 2026-10-14 on #2101 (option A) · P1 session #2107, stream S2 · branch `fix/2101-radius-letter-value`
+
+**Requirements:** [FR-EN-22a](02-requirements.md) · **Design:** [04-design.md](04-design.md) § "A letter's value lowers at its binding" · **LADDER stage:** none — a lowering at the symbolic middle-end ([ADR-031](#adr-031)), before stage 0; no solve stage changes.
+
+**Cites** [ADR-031](#adr-031) (symbolic lowering), [ADR-034](#adr-034) (the radius symbol), [ADR-087](#adr-087) (`set-radius`), [ADR-483](#adr-483) (a value whose subject is gone), [ADR-492](#adr-492) (blame on the value row), issue #54 (per-circle radius letters).
+
+**Context — measured at pickup on `939b160a`** (`decideDeterministic2D` + the gate + `replay`, `fetch` stubbed). «מעגל O ברדיוס r» · «A על מעגל O» · «r = 3»: every row green, the circle at its free default radius 5, A at distance 5. «שרדיוסו r», «רדיוס המעגל O הוא r», a diameter (|AB| = 10), and the value typed first: the same. «מעגל O ברדיוס R» · «R = 3»: `not-handled` (the paid model). The control «משולש ABC» · «AB = x» · «x = 4» drew |AB| = 4 in both orders.
+
+**Root cause.** A letter's value is consumed in `lowerOne` at the row that BINDS the letter: `measure-length` reads `tab.vars` and lowers to `set-distance`. A radius letter's binding is the `radius-symbol` command, which `lowerOne` passed through untouched, so nothing ever read the table for it; the `set-var` lowered to nothing and the row stayed green. Separately, `setVar` reads only the lowercase/Greek `VAR` atom, so «R = 3» never reached the table.
+
+**Class (docs/17 §1).** *A value given to a letter that a statement binds to an object's magnitude is applied only when the binding is a measure.* `radius-symbol` is the one non-measure binding of a magnitude a `set-var` reaches; its members are every spelling that emits it («ברדיוס r», «שרדיוסו r», «רדיוס המעגל O הוא r», the #54 post-pass), lower and upper case, the value before or after the binding.
+
+**Decision.**
+1. `lowerOne('radius-symbol')`: with a value in the table, lower to the naming **plus** `set-radius {circle, value}` — the stated-radius path, the numeric twin of «רדיוס המעגל O הוא 3» (`applyRadiusGiven`). The table is whole-list, so both entry orders hold. It does not re-emit a sizeless `circle` (after #2083 A that is a pure reference).
+2. `symbolsConsumedBy('radius-symbol')` = `[name]`: the binding reads the table, so ADR-492 blames a conflict the value causes on the value row when the value row is the later one.
+3. `setVar` reads an uppercase letter only when the semantic `ParseContext.radiusSymbols` lists it (the construction's own binding); an unbound capital stays a point name and is not read as a value.
+
+**Why not a patch (docs/17 §2).** No input is special-cased and no chokepoint list grows: the binding row resolves its letter exactly as the measure rows already do. The uppercase gate is a statement about the figure (the letter is bound), not a word test.
+
+**Sibling audit.** Measures (`measure-length/-angle/-area/-perimeter`) already resolve their values. Found, not this path, reported: an angle alias's value («נסמן זווית BAC כ-A1» · «A1 = 30») escalates; a bound on a radius letter («r > 7») is refused honestly as "cannot be enforced"; the UNBOUND reserved r («מעגל O» · «AB = r» · «r = 3») sizes AB to 3 but not the circle (the ADR-034/071 fallback, a different code path); an independent earlier size the value contradicts («OA = 4» then «r = 3» after «מעגל O ברדיוס r») is attributed to the earlier row, exactly as the length twin «AB = x» · «AB = 4» · «x = 3» is (ADR-492 moves blame only from the binding). Analytic: «מעגל O ברדיוס r» · «r = 3» is `not-handled` (its own radius parameters) — the parity row with a known gap needs an open analytic issue, owed by the session. 3-D: X8 (no plane circle). Complex: n/a.
+
+**Locks.** `src/engine/__tests__/radius-letter-value-2101.test.ts` (the lowering, both orders, the latest value, another letter, `symbolsConsumedBy`); `src/app/__tests__/issue-2101-radius-letter-value.test.ts` (through `decideDeterministic2D` and the gate: every spelling and order, the uppercase without the model, an unbound capital not read, a diameter following the circle, no size without a value, the contradiction refused with its numeric twin's message); scenario `radius-letter-value-sizes-circle-2101`.
+
+**Behaviour change for a student:** after «מעגל O ברדיוס r» (or «שרדיוסו r», «רדיוס המעגל O הוא r»), «r = 3» now draws the circle with radius 3 and moves its points (was: the circle kept radius 5, green). «R = 3» after «מעגל O ברדיוס R» does the same (was: sent to the AI).

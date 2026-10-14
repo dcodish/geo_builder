@@ -1842,3 +1842,7 @@ over all four (ADR-041).
 ### `altitude-on-a-side-is-a-right-angle-1742` — «הגובה AB = 5» after «משולש ABC» builds a right angle at B with |AB| = 5 (#1742, ADR-642)
 
 **Guards against:** the altitude twin of the row above going unread. Operator ruling 2026-10-13: build it as «AB גובה לצלע BC» does (ADR-527). **Asserts** the step builds green, AB ⟂ BC, |AB| = 5, and no foot point is minted.
+
+### `radius-letter-value-sizes-circle-2101` — «מעגל O ברדיוס r · A על מעגל O · r = 3»: the circle is drawn with radius 3 (#2101, ADR-648)
+
+**Guards against:** the value of a circle's radius letter being dropped green — the `radius-symbol` binding lowered to the naming alone, so the circle kept its free default radius 5. Operator ruling 2026-10-14. **Asserts** every step is green, the drawn radius is 3 and |OA| = 3. The spelling and order matrix (also «שרדיוסו r», «רדיוס המעגל O הוא r», the uppercase «R = 3», the value typed first) and the contradiction refusal are `src/app/__tests__/issue-2101-radius-letter-value.test.ts`.
