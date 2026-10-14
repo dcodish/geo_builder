@@ -5703,7 +5703,7 @@ const markerOnBareRun = (s: string, min = 3): boolean =>
 type InscriptionVoice = { container: 'circle' | 'shape'; run: Id[] | null };
 const CIRCUM_VERB = /(?<![א-ת])[הש]?חוסם(?![א-ת])|\bcircumscrib(?:es|e|ing|ed)\b/i;
 const CIRCLE_NOUN_G = /(?<![A-Za-z])circles?\b|מעגל(?![א-ת])/gi;
-const RING_RUN = rx(String.raw`(?<![A-Za-z])(?:${ULABEL}){3,}(?![A-Za-z])`);
+const RING_RUN = rx(String.raw`(?<![A-Za-z])(?:${ULABEL}){3,}(?![A-Za-z])`, ''); // case-SENSITIVE: a lowercase word is never a ring
 const inscriptionVoice = (s: string): InscriptionVoice | null => {
   const verb = s.match(CIRCUM_VERB);
   if (!verb || verb.index === undefined) return null;
