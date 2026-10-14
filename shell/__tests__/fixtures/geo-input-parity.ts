@@ -1386,6 +1386,21 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'bisector-on-a-side-2066', family: 'cevians-centres', steps: ['משולש ABC', 'AB חוצה זווית'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2115' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D: «AB היא צלע של המשולש ולכן אינה יכולה לחצות את זווית A…»' },
 
   // ── #2098 (ADR-650): a bare run as the SUBJECT of «חוסם» encloses the circle — the incircle in every builder ──
+  // ── #1975 (ADR-652, ADR-3D-341, ADR-AG-275): both voices of both inscription relations, every shape, all tools ──
+  // operator 2026-10-14: "we need to have both forms supported … for all shapes … in all tools". Each row's other
+  // voice is a row above or below with the same verdict.
+  { id: 'voices-circum-pentagon-1975', family: 'inscribed', steps: ['מחומש ABCDE', 'מעגל חוסם את המחומש ABCDE'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1969' }], note: 'the request (2026-10-10)' },
+  { id: 'voices-circum-pentagon-empty-1975', family: 'inscribed', steps: ['מעגל חוסם את המחומש ABCDE'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1969' }] },
+  { id: 'voices-circum-bare-pentagon-1975', family: 'inscribed', steps: ['מחומש ABCDE', 'מעגל חוסם את ABCDE'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#1969' }] },
+  { id: 'voices-circum-square-1975', family: 'inscribed', steps: ['ריבוע ABCD', 'מעגל חוסם את הריבוע ABCD'], expect: 'builds', note: '#1841' },
+  { id: 'voices-circum-square-en-1975', family: 'inscribed', steps: ['ריבוע ABCD', 'a circle circumscribes the square ABCD'], expect: 'builds' },
+  { id: 'voices-circum-named-1975', family: 'inscribed', steps: ['משולש ABC', 'מעגל O חוסם את המשולש ABC'], expect: 'builds', note: '#1531 (the inscription half)' },
+  { id: 'voices-circum-relative-1975', family: 'inscribed', steps: ['משולש ABC', 'מעגל שחוסם את המשולש ABC'], expect: 'builds', note: 'analytic read no relative clause before ADR-AG-275' },
+  { id: 'voices-in-named-1975', family: 'inscribed', steps: ['משולש ABC', 'מעגל O חסום במשולש ABC'], expect: 'builds' },
+  { id: 'voices-in-relative-1975', family: 'inscribed', steps: ['משולש ABC', 'מעגל ש-ABC חוסם'], expect: 'builds', note: '3-D drew the circle THROUGH A, B, C before ADR-3D-341 (the #2098 trap)' },
+  { id: 'voices-in-pentagon-refused-1975', family: 'inscribed', steps: ['מחומש ABCDE', 'ABCDE חוסם מעגל'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1903' }], note: 'the other voice of pentagon-incircle-1891 (the same gap); #1908 lifts both' },
+  { id: 'voices-feminine-inscribed-1975', family: 'inscribed', steps: ['מקבילית ABCD', 'מקבילית ABCD חסומה במעגל'], expect: 'builds', note: '#2035-01' },
+  { id: 'voices-feminine-circumscribes-1975', family: 'inscribed', steps: ['משולש ABC', 'משולש ABC חוסמת מעגל'], expect: 'builds', note: '#2035-02' },
   { id: 'bare-run-circumscribes-2098', family: 'inscribed', steps: ['משולש ABC', 'ABC חוסם מעגל'], expect: 'builds', note: 'all three built it before the fix; 2-D drew the circle THROUGH the vertices — its geometry is held by issue-2098-bare-run-circumscribes.test.ts' },
 
   // ── #2083 (ADR-646): a sentence that only NAMES an existing circle is a reference — the stated radii are kept ──

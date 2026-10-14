@@ -404,6 +404,14 @@ From the «lines and points» corpus (§8), numbered onward.
 - «במרובע ABCD חסום מעגל O», «מעגל M משיק לצלעות AB, BC, CD ו-DA»
 - Sources: ADR-AG-242, #1554, ADR-W-108.
 
+**R131 amendment — both voices of both relations (#1975, operator 2026-10-14)**. The English active voice and the
+Hebrew relative clause read as their other voice: "a circle circumscribes the square ABCD" and "the circle O
+circumscribes triangle ABC" as «… חסום במעגל (O)»; "triangle ABC circumscribes the circle O" and "ABC circumscribes a
+circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשולש ABC» (the circle the subject) as «מעגל חוסם את המשולש ABC»;
+«מעגל ש-ABC חוסם» / «מעגל שהמשולש ABC חוסם» (the ring the subject) as the incircle. n ≥ 5 waits for #1969.
+- «מעגל שחוסם את המשולש ABC», «מעגל ש-ABC חוסם», "the circle O circumscribes triangle ABC"
+- Sources: ADR-AG-275, #1975, ADR-W-108.
+
 **R132 — a tangent at a named point, the tangent as an object, tangency to any circle, and chords**. *(Operator, #1616 ruling 4: "Chord: yes.")* The touch is perpendicular to the radius at every configuration; «המשיק» refers to the drawn tangent.
 - «הישר BC משיק למעגל בנקודה B», «המשיק למעגל בנקודה A»
 - «הישר y=kx+10 משיק למעגל x²+y²=25» → the values of k, cycled

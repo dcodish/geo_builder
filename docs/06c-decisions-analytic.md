@@ -12183,3 +12183,16 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Locks.** `src-analytic/__tests__/issue-1773-uppercase-axis-letter.test.ts`: the operator's exact sequence (`X_B<X_D` → `refused unsatisfiable`, as `x_B<x_D`); a 13 × 3 grid (each uppercase spelling equals its lowercase verdict on the kite, on three stated points and on an empty canvas); the fold's unit cases (`X_1`, `X_{12}`, `A_1B_2`, `XB`, `XY` untouched); the recorded line is the typed one.
 
 **Consequences.** `src-analytic/parser/frameAnalytic.ts` (`SUB_AXIS_FIRST`, `SUB_AXIS_LAST`); docs 02c R89, 04c.
+
+## ADR-AG-275 — The English active voice and the Hebrew relative clauses read as their other voice (#1975)
+
+**Status:** accepted · 2026-10-14 · feature (P3) · P1 session #2107, stream S4 · branch `feat/1975-inscription-voices` · the analytic arm of [ADR-652](06-decisions.md#adr-652)
+**Requirements:** [02c](02c-requirements-analytic.md) R131 amendment (both voices of both relations) · **Design:** [04c](04c-design-analytic.md) § "Inscribed and circumscribed" · **LADDER stage:** none (parser)
+
+**Measured before** (`939b160a`, `decideSubmit`). "a circle circumscribes the square ABCD", "a circle circumscribes triangle ABC", "the circle O circumscribes triangle ABC", "triangle ABC circumscribes the circle O", "ABC circumscribes a circle", «מעגל שחוסם את המשולש ABC» and «מעגל ש-ABC חוסם» were `not-handled`, each while its other voice built.
+
+**Decision.** Two English patterns into the existing lowerings: `CYCLIC_ACTIVE_EN` → `cyclicFacts` (the circle's letter is the tail, exactly as «מעגל O חוסם את …» passes it) and `INCIRCLE_ACTIVE_EN` → `incircleFacts` (a bare run takes its arity from its length, as `INCIRCLE_POLYGON_HE` does). `CIRCUMSCRIBING_VERB_HE` admits the relative «ש». `INCIRCLE_RELATIVE_HE` reads «מעגל ש(ה)X חוסם», whose subject is the RING, as the incircle (2-D's ADR-650 trap, side by side in the lock). Each lowers to the **same facts** as its other voice. n ≥ 5 stays #1969's.
+
+**Locks.** `src-analytic/__tests__/issue-1975-inscription-voices.test.ts` (fact equality with the other voice, the drawing at four seeds); parity rows `voices-*-1975`; catalog row «מעגל שחוסם את המשולש ABC» / "a circle circumscribes triangle ABC".
+
+**Behaviour change for a student:** the English "a circle circumscribes …", "the circle O circumscribes …", "… circumscribes the circle (O)" and the Hebrew «מעגל שחוסם את …», «מעגל ש-ABC חוסם» now draw the figure their other voice draws; before, not understood.

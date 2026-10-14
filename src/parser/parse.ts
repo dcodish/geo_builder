@@ -6003,10 +6003,11 @@ function uninscribableIncircle(s: string): number | null {
   const sides = named ?? (generic && longest >= 5 ? longest : null);
   if (sides === null || INCIRCLE_ARITIES.has(sides)) return null;
   // the circle is INSIDE: an inscribe verb (never the «circum-» of "circumscribed") with the polygon as the
-  // container, the polygon-subject «<polygon> ABCDE חוסם מעגל», or the marker riding a bare run
+  // container, the shape as the subject of «חוסם» — noun or bare run, «ABCDE חוסם מעגל» (#1975, ADR-652: the
+  // one voice reader, so the active voice gets the passive voice's refusal) — or the marker riding a bare run
   const circleInside =
     (/incircle|(?<!circum)inscrib\w*|חסום/i.test(s) && isCircleInPolygon(s)) ||
-    new RegExp(String.raw`(?:${POLY_WORDS_EN}|${POLY_WORDS_HE})(?:\s+\S+)?\s+${LABEL}.*?(?:circumscrib\w*|חוסם).*?(?:circle|מעגל)`, 'i').test(s) ||
+    inscriptionVoice(s)?.container === 'shape' ||
     (named === undefined && markerOnBareRun(s, 5));
   return circleInside ? sides : null;
 }
@@ -6024,7 +6025,16 @@ function uninscribableIncircle(s: string): number | null {
  * refusal for the plain one).
  */
 function inscribedNgon(s: string, ctx: ParseContext, hidden: boolean): AnyCommand[] | 'stop' | null {
-  const n = ngonArity(s);
+  // #1975 (ADR-652): a ring of five or more named by its LETTERS alone («ABCDE חסום במעגל», and so the active
+  // «מעגל חוסם את ABCDE» handed here) states its arity in the run, as a bare 3-/4-run does below and as
+  // `uninscribableIncircle` already reads it for the converse — never with a polygon noun beside it.
+  const bareRun = (): number | null => {
+    if (new RegExp(`${POLY_WORDS_EN}|${POLY_WORDS_HE}|\\bgon\\b`, 'i').test(s)) return null;
+    const runs = (dropCircleRef(s).match(LABEL_RUN_G) ?? []).map((r) => r.match(rx(ULABEL, 'g'))?.length ?? 0);
+    const longest = Math.max(0, ...runs);
+    return longest >= 5 ? longest : null;
+  };
+  const n = ngonArity(s) ?? bareRun();
   if (n === null || n < 5) return null; // not an n-gon subject — the 3-/4-gon readings own the line
   const regular = /\bregular\b|משוכלל/i.test(s) || /\b\d+\s*-?\s*gon\b/i.test(s);
   const r = parseRadius(s);
@@ -6066,6 +6076,57 @@ function inscribedNgon(s: string, ctx: ParseContext, hidden: boolean): AnyComman
     ...ringOnCircle({ ids, center, r, named: named != null, regular, hidden, existing }),
   ];
 }
+
+/**
+ * #1975 ([ADR-652](../../docs/06-decisions.md#adr-652)) — THE CIRCLE AS THE SUBJECT OF «חוסם» IS THE SENTENCE
+ * «X חסום במעגל» SAID IN THE OTHER VOICE, and it lowers through that sentence's own rule.
+ *
+ * Operator, 2026-10-14: *"we need to have both forms supported … This is for all shapes"*. «מעגל חוסם את
+ * הריבוע ABCD», «מעגל O חוסם את המחומש ABCDE», «מעגל שמרכזו O חוסם את ABCD», "a circle circumscribes the
+ * square ABCD", "the circle O circumscribes triangle ABC": the 3-point circle-through rule read only three
+ * letters and no named centre, so every quadrilateral, n-gon and named circle in this voice escalated while
+ * its passive twin built. When the voice reader ({@link inscriptionVoice}) says the circle encloses and the
+ * WHOLE sentence is «circle phrase · verb · (את) shape phrase», the sentence is restated in the passive —
+ * «<shape phrase> חסום במעגל <circle phrase>» — and handed to `inscribedPolygon`, so the two voices give the
+ * same commands and the same refusals by construction («טרפז ישר זווית», ADR-595), with no second lowering.
+ * Anything more on the line (a cut, a second clause) does not match, and the older rules read it as before.
+ */
+const ACTIVE_CIRCUM_HE = rx(
+  String.raw`^ה?מעגל(?:\s+(${ULABEL})|\s+שמרכזו\s+(${ULABEL}))?\s+[הש]?חוסם\s+(?:את\s+)?((?:[א-ת][א-ת'-]*\s+){0,4}(?:${ULABEL}){3,})$`,
+  '', // case-sensitive: the labels are UPPERCASE
+);
+const ACTIVE_CIRCUM_EN = rx(
+  String.raw`^(?:[Aa]\s+|[Tt]he\s+)?[Cc]ircle(?:\s+(${ULABEL}))?\s+(?:circumscribes|circumscribing|is\s+circumscribed\s+(?:about|around)|circumscribed\s+(?:about|around))\s+(?:the\s+|a\s+)?((?:[a-z][a-z-]*\s+){0,4}(?:${ULABEL}){3,})$`,
+  '',
+);
+const activeCircumscription: Rule = (s, ctx) => {
+  if (inscriptionVoice(s)?.container !== 'circle') return null;
+  const he = s.match(ACTIVE_CIRCUM_HE);
+  const en = he ? null : s.match(ACTIVE_CIRCUM_EN);
+  if (!he && !en) return null;
+  // Precedence (ADR-024): the 3-point circle-through rule keeps every sentence it reads today — a bare run or the
+  // triangle, with no named circle («מעגל חוסם את ABC», «מעגל חוסם את המשולש ABC», "a circle circumscribes
+  // triangle ABC": the circle through the points, unchanged). What it cannot read — a quadrilateral or n-gon
+  // noun, a named circle — is read here.
+  const named = he ? (he[1] ?? he[2]) : en![1];
+  const shapeNoun = (he ? he[3] : en![2])
+    .replace(rx(String.raw`(?:${ULABEL})+`, 'g'), ' ')
+    .replace(/(?<![א-ת])ה(?=[א-ת])/g, '')
+    .trim();
+  const circumcircleOwns = !shapeNoun || /^(?:triangle|משולש)$/i.test(shapeNoun);
+  if (!named && circumcircleOwns && Array.isArray(circumcircle(s, ctx))) return null;
+  const passive = he
+    ? `${he[3]} חסום במעגל${he[1] ? ` ${he[1]}` : he[2] ? ` שמרכזו ${he[2]}` : ''}`
+    : `${en![2]} inscribed in ${en![1] ? `circle ${en![1]}` : 'a circle'}`;
+  // The passive sentence through the WHOLE grammar (the `roleSideLine` precedent), not one rule: «מקבילית ABCD
+  // חסום במעגל» is read as a declaration plus a trailing inscription, and its active twin must reach that too.
+  const r = parse(passive, ctx);
+  if (r.ok) return r.commands;
+  // the passive sentence's ruled refusal is this one's («טרפז ישר זווית ABCD», ADR-595); anything else the
+  // passive cannot read leaves the line to the rules below, as before
+  if (r.reason === 'inscribed-contradicts-noun') return { clarify: 'inscribed-contradicts-noun', shape: r.shape, forced: r.forced };
+  return null;
+};
 
 /** "triangle ABC inscribed in circle O" / "טרפז ABCD חסום במעגל" — circle + on-circle vertices + edges. */
 const inscribedPolygon: Rule = (s, ctx) => {
@@ -11393,6 +11454,7 @@ export const RULES: Rule[] = [
   concentricCircles, // "שני מעגלים בעלי מרכז משותף O" — the CONCENTRIC PAIR (ADR-244); before `circle` (which would half-parse it to ONE circle) and the two-circle rules
   inscribedInPolygon, // "מעוין BDEF חסום במשולש ABC" — a polygon inscribed in a polygon (ADR-262); before incircle/inscribedPolygon (all match "inscribed") AND the base shape rules
   incircle, // "circle inscribed in triangle ABC" — before inscribedPolygon (both match "inscribed")
+  activeCircumscription, // #1975 (ADR-652): «מעגל חוסם את X» — the passive «X חסום במעגל» in the other voice; a sentence the circle-through rule reads whole stays its own
   circumcircleMeetsSegment, // "the circle circumscribing ABC cuts CE at D" — before the shape rules (its "משולש ABC" would stop `triangle`)
   inscribedPolygon, // before the shape rules ("triangle ABC inscribed …" contains "triangle")
   // Special-line constructs whose Hebrew names a triangle ("…במשולש ABC") must
@@ -12864,7 +12926,12 @@ const normalizeInscriptionSlip = (s: string): string =>
       new RegExp(String.raw`(חוסם|חוסמת|חוסמים|חוסמות)(?=\s+ב-?ה?(?:${CONTAINER_NOUNS_HE}))`, 'g'),
       (m) => HOSEM_TO_PASSIVE[m] ?? m,
     )
-    .replace(/circumscrib\w+(?=\s+in\s+(?:a\s+|the\s+|another\s+)?(?:circle|triangle|square|rectangle|rhombus|kite|trapezoid|parallelogram|quadrilateral))/gi, 'inscribed');
+    .replace(/circumscrib\w+(?=\s+in\s+(?:a\s+|the\s+|another\s+)?(?:circle|triangle|square|rectangle|rhombus|kite|trapezoid|parallelogram|quadrilateral))/gi, 'inscribed')
+    // #1975 / #2035 (ADR-652): the inscription predicates agree with their noun's GENDER — «מקבילית ABCD חסומה
+    // במעגל», «מקבילית ABCD חוסמת מעגל» — and the
+    // gender states nothing about the figure. Folded to the masculine HERE, at the one boundary every rule reads,
+    // so no reader re-spells the inflection (the final-mem trap: «חסום» never matches «חסומה»).
+    .replace(/(?<![א-ת])([הש]?)(חסומה|חוסמת)(?![א-ת])/g, (_m, pre: string, w: string) => `${pre}${w === 'חסומה' ? 'חסום' : 'חוסם'}`);
 
 /** The bare POINT labels a command list DEFINES/REFERENCES as nodes — the geometry-POSITION fields only, so
  *  a circle id ("circle-O") contributes nothing and a bound radius symbol used purely in a radius RELATION

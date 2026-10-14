@@ -2195,6 +2195,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "the circle O circumscribes triangle ABC",
+    "winner": "polygonCircle3",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל O חוסם את המשולש ABC",
+    "winner": "polygonCircle3",
+  },
+  {
+    "lang": "en",
     "text": "right trapezoid ABCD",
     "winner": "planarPolygon",
   },

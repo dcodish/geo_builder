@@ -605,6 +605,10 @@ resolved through `circleByName`, `centreRuleOf` / `centreIdOf`, with regions as 
 
 `parseInscribed` reads both directions; the lowering composes `parseShape` and `parseClause(«מעגל <tail>»)`. The
 incircle is a `CircleDef` (`incircle`, `incircleCentre`); side touches are `touch-at` / `side-touch`.
+Both voices (#1975, [ADR-AG-275](06c-decisions-analytic.md#adr-ag-275)): `CYCLIC_ACTIVE_EN` and `INCIRCLE_ACTIVE_EN` read
+the English active voice into `cyclicFacts` / `incircleFacts` (the circle's letter is the tail, as in «מעגל O»);
+`CIRCUMSCRIBING_VERB_HE` takes the relative «שחוסם»; `INCIRCLE_RELATIVE_HE` reads «מעגל ש-ABC חוסם», whose subject
+is the ring, into `incircleFacts`.
 
 *Identifiers:* `parseShape(«<noun> RUN»)` · `acute` · `src` · `circleDefPoints` · `tangent-line` · `diameterClauses` · `parenClauses`
 

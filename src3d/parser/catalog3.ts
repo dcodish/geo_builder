@@ -336,6 +336,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // #442 — the circle of a polygon (ring may be a flat polygon OR a solid's face)
   { category: 'solids', he: 'משולש ABC חסום במעגל', en: 'triangle ABC inscribed in a circle' },
   { category: 'solids', he: 'מעגל חסום במשולש ABC', en: 'circle inscribed in triangle ABC' },
+  // #1975 (ADR-3D-341): a circle named first, in either voice
+  { category: 'solids', he: 'מעגל O חוסם את המשולש ABC', en: 'the circle O circumscribes triangle ABC' },
   // #1792 (ADR-3D-307): a quad's adjective, and a quad inscribed in a circle (drawn as its cyclic member)
   { category: 'solids', he: 'טרפז ישר-זווית ABCD', en: 'right trapezoid ABCD' },
   { category: 'solids', he: 'טרפז שווה שוקיים ABCD', en: 'isosceles trapezoid ABCD' },

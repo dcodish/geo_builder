@@ -3870,7 +3870,8 @@ const INSCRIBED_RUN = `((?:${NAME}){3,4})`;
 /** A noun phrase — the noun and its adjectives; `inscribedShape` decides whether the registry knows it. */
 const NOUN_PHRASE = '([א-ת]+(?:[- ][א-ת]+){0,3})';
 const INSCRIBED_VERB_HE = '(?:(?:הוא|היא)\\s+)?(?:ה)?(?:חסום|חסומה)';
-const CIRCUMSCRIBING_VERB_HE = '(?:(?:הוא|היא)\\s+)?(?:ה)?(?:חוסם|חוסמת)';
+/** «חוסם», «החוסם», and the relative «שחוסם» (#1975, ADR-AG-275: «מעגל שחוסם את המשולש ABC» — the circle is the subject). */
+const CIRCUMSCRIBING_VERB_HE = '(?:(?:הוא|היא)\\s+)?(?:ה|ש)?(?:חוסם|חוסמת)';
 /** The circle's own words after «מעגל» — a numeral name, «שמרכזו M», «שמשוואתו …», «שקוטרו AC». */
 const CIRCLE_TAIL = '(?:\\s+(.+?))?';
 
@@ -3922,6 +3923,29 @@ const INCIRCLE_EN: readonly RegExp[] = [
   new RegExp(`^(?:the\\s+|a\\s+)?${EN_NOUN}\\s+${INSCRIBED_RUN}\\s+circumscribes\\s+(?:a|the)\\s+circle$`, 'i'),
   new RegExp(`^(?:a\\s+|the\\s+)?tangential\\s+(quadrilateral)\\s+${INSCRIBED_RUN}$`, 'i'),
 ];
+/**
+ * #1975 (ADR-AG-275) — the ACTIVE voice in English and the relative clause in Hebrew, each read as the sentence
+ * its other voice already is (operator 2026-10-14: *"we need to have both forms supported … for all shapes …
+ * in all tools"*). The subject of "circumscribes" is the OUTER figure:
+ * - "(a|the) circle (O) circumscribes (the) (<noun>) ABCD" → the circle around the ring — `cyclicFacts`, the
+ *   letter its centre exactly as in «מעגל O חוסם את …» (`CYCLIC_CIRCLE_HE`);
+ * - "(the) (<noun>) ABCD circumscribes (a|the) circle (O)" → the circle inside — `incircleFacts`, a bare run
+ *   taking its arity from its length as «ABCD חוסם מעגל» does (`INCIRCLE_POLYGON_HE`);
+ * - «מעגל ש-ABC חוסם» / «מעגל שהמשולש ABC חוסם» — the RING is the relative clause's subject, so the circle is
+ *   inside it (2-D ADR-650's direction trap: the circle comes first and is still the object).
+ */
+const CYCLIC_ACTIVE_EN = new RegExp(
+  `^(?:the\\s+|a\\s+)?circle(?:\\s+(${NAME}))?\\s+(?:circumscribes|is\\s+circumscribed\\s+(?:about|around))\\s+(?:the\\s+|a\\s+)?(?:${EN_NOUN}\\s+)?${INSCRIBED_RUN}$`,
+  'i',
+);
+const INCIRCLE_ACTIVE_EN = new RegExp(
+  `^(?:the\\s+|a\\s+)?(?:${EN_NOUN}\\s+)?${INSCRIBED_RUN}\\s+circumscribes\\s+(?:a|the)\\s+circle(?:\\s+(${NAME}))?$`,
+  'i',
+);
+const INCIRCLE_RELATIVE_HE = new RegExp(
+  `^${HE_GIVEN}ה?מעגל\\s+ש-?(?:ה?${NOUN_PHRASE}\\s+)?${INSCRIBED_RUN}\\s+(?:חוסם|חוסמת)$`,
+);
+
 /** "circle O is inscribed in quadrilateral ABCD" — the letter is the centre, as «מעגל O» is (#1554, ADR-AG-242). */
 const INCIRCLE_CENTRED_EN = new RegExp(
   `^(?:the\\s+|a\\s+)?circle\\s+(${NAME})\\s+(?:is\\s+)?inscribed\\s+in\\s+(?:the\\s+|a\\s+)?${EN_NOUN}\\s+${INSCRIBED_RUN}$`,
@@ -4035,7 +4059,7 @@ function cyclicFacts(noun: string | undefined, run: string, tail: string | undef
  * quadrilateral the Pitot condition that makes the incircle exist. A tail this rule cannot honour (a radius,
  * an equation, a centre letter for a quadrilateral) is refused BY NAME — a stated given never vanishes.
  */
-function incircleFacts(noun: string, run: string, tail: string | undefined, line: string, en = false): RuleOutcome {
+function incircleFacts(noun: string | undefined, run: string, tail: string | undefined, line: string, en = false): RuleOutcome {
   const shape = inscribedShape(noun, run, en);
   if (!shape || !('vertices' in shape)) return shape;
   const t = tail?.trim();
@@ -4146,6 +4170,13 @@ function parseInscribedLettered(line: string): RuleOutcome {
   }
   const centred = INCIRCLE_CENTRED_EN.exec(line);
   if (centred) return incircleFacts(centred[2], centred[3], centred[1], line, true);
+  // #1975: the active voice in English and the Hebrew relative clause — each the sentence its other voice is
+  const activeCirc = CYCLIC_ACTIVE_EN.exec(line);
+  if (activeCirc) return cyclicFacts(activeCirc[2], activeCirc[3], activeCirc[1], line, true);
+  const activeIn = INCIRCLE_ACTIVE_EN.exec(line);
+  if (activeIn) return incircleFacts(activeIn[1], activeIn[2], activeIn[3], line, true);
+  const relIn = INCIRCLE_RELATIVE_HE.exec(line);
+  if (relIn) return incircleFacts(relIn[1], relIn[2], undefined, line);
   return null;
 }
 
@@ -6672,7 +6703,7 @@ function asEquation(line: string): string | null {
 
 /**
  * THE CONNECTIVE OF A LENGTH GIVEN IS AN **ALLOWLIST OF COPULAS**, NEVER "anything that is not `=`"
- * (#1260 · ADR-AG-NNN, porting 2-D’s ADR-524 Am. 1 mechanism).
+ * (#1260 · ADR-AG-275, porting 2-D’s ADR-524 Am. 1 mechanism).
  *
  * A length given used to admit a literal `=` and nothing else, so «אורך הקטע AB הוא 10» — an ordinary
  * Hebrew sentence — was refused while its symbolic twin was understood.

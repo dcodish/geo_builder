@@ -1,0 +1,69 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-14T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "ריבוע ABCD",
+      "group": "g0",
+      "cmd": {
+        "type": "square",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "מעגל O חוסם את הריבוע ABCD",
+      "group": "g1",
+      "cmd": {
+        "type": "circumcircle",
+        "id": "circle-O",
+        "center": "O",
+        "a": "A",
+        "b": "B",
+        "c": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "utterance": "מעגל O חוסם את הריבוע ABCD",
+      "group": "g1",
+      "cmd": {
+        "type": "set-concyclic",
+        "points": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.3",
+      "utterance": "מעגל O חוסם את הריבוע ABCD",
+      "group": "g1",
+      "cmd": {
+        "type": "quadrilateral",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "declaredAs": "square"
+      },
+      "enabled": true
+    }
+  ]
+}

@@ -297,6 +297,12 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   `shapeWarnings`; `App3` renders it as an amber `Banner kind="notice"` (`role="status"`) with 2-D's
   `figure.mismatch` / `figure.v.trapezoidMorph` words copied into 3-D's `warn.*` keys. `buildNotices3` drops a
   warned ring's `inscribed-constrained` / `base-constrained` notice.
+**Both voices: the subject decides, and the ring is read past the circle's name (#1975, [ADR-3D-341](06b-decisions-3d.md#adr-3d-341)).**
+`circleContains3`'s fallback (no container marker) asks `circleEnclosesByVoice3` — the copy of 2-D's voice reader:
+the subject of «חוסם» / "circumscribe" is the outer figure, and a ring between the circle noun and the verb («מעגל
+ש-ABC חוסם») is that subject. `inscriptionRing3` is the first label run once `CIRCLE_NAME3` («מעגל O», "circle O")
+and the centre clause are set aside, so a circle named first no longer reads its own letter as the ring.
+
 **The inscription accounts for every word (#1902, [ADR-3D-312](06b-decisions-3d.md#adr-3d-312)).** `polygonCircle3`
 removes its own spans, each marked: the ring, a named circle's letter, the verb, the circle noun, the container
 marker and `phrase.strip` (the noun and the adjectives it consumed, 2-D's `ShapePhrase.strip`). What is left goes

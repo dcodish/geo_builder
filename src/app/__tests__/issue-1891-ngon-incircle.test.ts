@@ -129,7 +129,20 @@ describe('#1891 — what still works', () => {
       expect(r.added).toBeGreaterThan(0);
     },
   );
-  it.each(['מעגל חוסם את מחומש ABCDE', 'circle circumscribed about pentagon ABCDE', 'ריבוע DEFG חסום במחומש ABCDE'])(
+  // #1975 (ADR-652) — RE-BASED, not relaxed: «מעגל חוסם את מחומש ABCDE» and "circle circumscribed about pentagon
+  // ABCDE" (the circle AROUND the pentagon) were locked here as "still goes to the model" only because no rule read
+  // them. The operator asked for that voice (2026-10-14: "both forms supported … for all shapes"), so they now
+  // build the figure «מחומש ABCDE חסום במעגל» builds — and still never the refusal this file is about.
+  it.each(['מעגל חוסם את מחומש ABCDE', 'circle circumscribed about pentagon ABCDE'])(
+    '«%s» (the circle AROUND a pentagon) builds without the model, never the incircle refusal',
+    async (line) => {
+      const r = await play([line], []);
+      expect(r.modelCalls).toBe(0);
+      expect(r.added).toBeGreaterThan(0);
+      expect(r.notes.join(' ')).not.toContain('מגבלה של הכלי');
+    },
+  );
+  it.each(['ריבוע DEFG חסום במחומש ABCDE'])(
     '«%s» (no circle inside a pentagon) still goes to the model',
     async (line) => {
       const r = await play([line], []);

@@ -1606,6 +1606,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "a circle circumscribes the pentagon ABCDE",
+    "winner": "activeCircumscription",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל חוסם את המחומש ABCDE",
+    "winner": "activeCircumscription",
+  },
+  {
+    "lang": "en",
     "text": "the circle through A B C cuts CE at D",
     "winner": "circumcircleMeetsSegment",
   },
