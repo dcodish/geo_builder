@@ -21,7 +21,7 @@ import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
-import { DISPLAY_ONLY } from '@/engine';
+import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle } from '@/engine';
 import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents } from '@/engine/types';
@@ -493,6 +493,9 @@ export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
  * - an exact duplicate of an existing fact is idempotent: an ENABLED twin leaves the list unchanged, a
  *   DISABLED twin (an unticked row) is re-enabled in place — re-typing never stacks a second copy;
  * - a free point re-stated by id is moved in place (ADR-011);
+ * - a circle statement that states NO size (`freeRadius` / `ifAbsent`) over a circle an enabled fact
+ *   already defines (same centre, or any for an ensure-exists) is a reference and leaves the list unchanged
+ *   (#2083, ADR-646);
  * - a re-stated STANDALONE circle is resized in place (a circle inside a bigger step falls through to an
  *   append, keeping that step's label intact);
  * - anything else is appended as `mint(cmd)`.
@@ -507,6 +510,14 @@ export function foldCommand(facts: Fact[], cmd: AnyCommand, mint: (cmd: AnyComma
     const prev = facts.find((f) => f.cmd.type === 'free-point' && f.cmd.id === cmd.id);
     if (prev) return facts.map((f) => (f === prev ? { ...f, cmd, utterance, enabled: true } : f));
   }
+  // #2083 (ADR-646): a circle statement that states NO size over a circle an enabled fact already defines
+  // is a REFERENCE — the list is unchanged. Only a stated size re-states a circle (the resize below). Read over
+  // the list with its namings applied (`resolveBinds`): a #1673 step-aside moves an unnamed circle off the
+  // letter, and the student's «מעגל O» after it is then a NEW circle, never a reference to the old one.
+  if (isSizelessCircle(cmd) && resolveBinds(facts).some((f) => {
+    const def = f.enabled ? circleDefinedBy(f.cmd) : null;
+    return !!def && referencesCircle(cmd, def);
+  })) return facts;
   if (cmd.type === 'circle' || cmd.type === 'circle-through') {
     const prev = facts.find((f) => (f.cmd.type === 'circle' || f.cmd.type === 'circle-through') && f.cmd.id === cmd.id);
     if (prev && !facts.some((f) => f.id !== prev.id && groupKey(f) === groupKey(prev)))

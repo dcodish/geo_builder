@@ -8228,11 +8228,17 @@ const twoCirclesMeet: Rule = (s, ctx) => {
   // A centre the student didn't name (defaulted O/P) is auto → hidden unless used; a named one shows.
   const auto1 = !named.includes(c1);
   const auto2 = !named.includes(c2);
+  // #2083 (ADR-646): a circle that already exists is REFERENCED, not re-created — the sibling rules' guard
+  // (twoCirclesPosition, circlesTangent). The fold and apply treat a sizeless circle over an existing one as
+  // a reference anyway; this is the better decomposition (M1's dual), not the correctness fix. Only a circle the
+  // student NAMED is referenced: an indefinite «שני מעגלים נחתכים» is a fresh pair whose default tokens are
+  // re-picked clear of the figure's circles by `withAnonymousAutoCentres` (#1688), never the existing ones.
+  const haveCircles = new Set((ctx.circles ?? []).map(up).filter((c) => named.includes(c)));
   return [
     // No radius is stated, so each circle's size is a free DOF (ADR-051) seeded at a distinct value (so it
     // doesn't render as a symmetric lens) — the solver sizes them to the problem's givens, the sampler varies them.
-    { type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, freeRadius: true, ...(auto1 ? { autoCenter: true } : {}) },
-    { type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ...(auto2 ? { autoCenter: true } : {}) },
+    ...(haveCircles.has(c1) ? [] : [{ type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, freeRadius: true, ...(auto1 ? { autoCenter: true } : {}) } as AnyCommand]),
+    ...(haveCircles.has(c2) ? [] : [{ type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ...(auto2 ? { autoCenter: true } : {}) } as AnyCommand]),
     { type: 'circle-circle-intersection', id: A, circle1: id1, circle2: id2, branch: 0 },
     // B is "the OTHER crossing" — geometric (avoid A), so it doesn't swap with A as the circles flex (R8).
     { type: 'circle-circle-intersection', id: B, circle1: id1, circle2: id2, branch: 1, avoid: A },

@@ -747,8 +747,11 @@ registry cap, past the clock or on a throw it fails open.
 ### One fold rule: the dry run judges the list the commit saves ([ADR-578](06-decisions.md#adr-578))
 
 `foldCommand` (`replay/core.ts`) decides how one command enters the fact list: an exact duplicate of an enabled fact
-is a no-op, of an unticked fact re-enables it, a re-stated free point moves in place, a re-stated standalone circle
-resizes in place, anything else appends. The commit (`foldFact`) and the dry run (`trialFacts`) fold through it, and
+is a no-op, of an unticked fact re-enables it, a re-stated free point moves in place, a circle statement that states
+no size (`freeRadius` / `ifAbsent`) over a circle an enabled fact defines is a **reference** and changes nothing
+(`referencesCircle` in `engine/lower.ts`, read over the named list; apply's `circle` case reads the same predicate —
+[ADR-646](06-decisions.md#adr-646), #2083), a re-stated standalone circle with a stated radius resizes in place,
+anything else appends. The commit (`foldFact`) and the dry run (`trialFacts`) fold through it, and
 the dry run judges `trialChanges` (by object identity), never `all.slice(facts.length)`; a second copy of the rule
 is the ADR-320 class. The load refresh
 and audit compare `committedStepCommands(prefix, …)` on both sides and write refreshed steps as those rows

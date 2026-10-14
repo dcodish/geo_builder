@@ -257,6 +257,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1969': 'open',
   '#2013': 'open',
   '#2047': 'open',
+  '#2108': 'open',
 
 };
 
@@ -1352,6 +1353,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #1931 (ADR-640): a crossing asked of a line the givens make TANGENT has no second point — refused with the tangent sentence ──
   { id: 'relation-tangent-crossing-1931', family: 'tangents', steps: ['מעגל O', 'A על מעגל O', 'נקודה P', 'הישר AP משיק למעגל O בנקודה A', 'הישר AP חותך את המעגל בנקודה E'], expect: 'refused', exception: 'X8', note: '2-D committed E 1e-6 from A before ADR-640; analytic refuses since ADR-AG-272 (#1924, same round)' },
+
+  // ── #2083 (ADR-646): a sentence that only NAMES an existing circle is a reference — the stated radii are kept ──
+  { id: 'named-crossing-keeps-radii-2083', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'המעגלים O ו-P נחתכים בנקודות X ו-Y'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2108' }], note: 'analytic refuses the crossing line bad-operand (#2108, needs-operator). 2-D replaced both radii with free defaults (r 5 and 3.6) before ADR-646; the verdict was builds then too — the radii are locked in src/app/__tests__/issue-2083-circle-reference.test.ts' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

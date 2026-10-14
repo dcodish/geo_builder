@@ -12,6 +12,7 @@ import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, 
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
 import { ringOnOneCircle } from './structure';
+import { referencesCircle } from './lower';
 import { add, circleCircleIntersect, circumcenter, dist, footOnLine, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringKey, ringSimple, scale, sub } from './geometry';
 import { QUAD_IMPLIES, quadImplies, quadImpliesInEveryReading, quadsExclude, type QuadKind } from './shapeKinds';
 import { constraintKey, constraintRefs, residual, residualTolerance } from './solve';
@@ -1714,7 +1715,10 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // "circle O" without creating it). Skip it when that circle already exists, so it never CLOBBERS a
       // real one with the default free radius (e.g. when a later "chord … in circle O" is parsed without
       // the circle in context). When truly absent, fall through and create it.
-      if (cmd.ifAbsent && objects.some((o) => o.kind === 'circle' && o.id === cmd.id)) break;
+      // #2083 (ADR-646): the same holds for EVERY sizeless circle — a `freeRadius` circle over an existing
+      // circle states no size, so it is a reference (the crossing rule's «המעגלים O ו-P נחתכים…», the LLM
+      // route, a saved file) and must never overwrite a stated radius, a through-point or an incircle.
+      if (objects.some((o) => o.kind === 'circle' && referencesCircle(cmd, o))) break;
       // `apart` (#196): a STANDALONE bare circle seeds its NEW centre CLEAR of every existing circle —
       // the default 0-anchor placement (a fixed +4 gap) lands a second «מעגל O2» overlapping the first,
       // visually asserting two intersection points the student never stated (the ADR-052/253 smell,
