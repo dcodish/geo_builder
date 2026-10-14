@@ -66,8 +66,9 @@ function autosInterchangeable(construction: Construction): boolean {
       // circle is listed first, and its `branch` only picks a side of the line of centres — swapping the circles
       // reflects the figure across that line, which no given can tell apart. So the pair is unordered and the
       // branch is seed, not statement. (`avoid` — "the OTHER crossing" — stays: it is a relation between points.)
-      if (o.kind === 'circle-position' && o.relation === 'disjoint') {
-        return { kind: o.kind, relation: o.relation, circles: [norm(o.a, swap), norm(o.b, swap)].map((x) => JSON.stringify(x)).sort() };
+      if (o.kind === 'circle-position' && (o.relation === 'disjoint' || o.relation === 'tangent')) {
+        // #2080 (ADR-645): a stated tangency is unordered too (its touch point is the pair's one common point)
+        return { kind: o.kind, relation: o.relation, circles: [norm(o.a, swap), norm(o.b, swap)].map((x) => JSON.stringify(x)).sort(), ...(o.at !== undefined ? { at: norm(o.at, swap) } : {}) };
       }
       if (o.kind === 'circle-circle') {
         out.circles = [norm(o.circle1, swap), norm(o.circle2, swap)].map((x) => JSON.stringify(x)).sort();

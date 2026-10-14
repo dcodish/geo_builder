@@ -696,6 +696,8 @@ function foldForSearch(facts: Fact[]): FoldNode {
 }
 /** #943: the structured tail an over-constrained status carries once the other side is known — `[vs #<fact index>]`. */
 export const OVER_CONSTRAINED_VS = /^over-constrained: (.+) cannot hold(?: \[vs #(\d+)\])?$/;
+/** #2080 (ADR-645): `oneCommonPointError` — a second crossing of two circles with one common point, untagged. */
+const ONE_COMMON_POINT = /^over-constrained: (\S+) coincides with (\S+) cannot hold$/;
 /**
  * #1849 ([ADR-602](docs/06-decisions.md#adr-602)) — a DECLARED polygon the step would flatten
  * (`collapsedPolygonError`, step.ts), with the same optional `[vs #<fact index>]` tail. Group 1 is the
@@ -1769,6 +1771,30 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       const declared = facts.findIndex((g) => g.enabled && g.cmd.type === 'trapezoid' && g.cmd.kind === m[1] && spellsRing(g.cmd.ids, m[2]));
       if (declared < 0 || groupKey(facts[declared]) === groupKey(f)) continue;
       const tagged = `${st} [vs #${declared}]`;
+      for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
+    }
+  }
+  /**
+   * #2080 / #2083 ([ADR-645](docs/06-decisions.md#adr-645)) — the same provenance for a second crossing of two
+   * circles that have one common point (`oneCommonPointError`: «X coincides with Y», Y the crossing that avoids X on
+   * the same pair). When the refused line is NOT the one that placed the crossings — a tangency, or a length, typed
+   * after them — the other side is the statement that placed Y, read from `ownerByObjId`. The drop-one search below
+   * cannot find it: the crossing owns no constraint and the refused line reads neither crossing. When the refused
+   * line placed the crossings itself, nothing is tagged here and the search names the tangency or the length.
+   */
+  if (attribute && hoistDepth === 0) {
+    for (const f of failedFacts) {
+      const st = status[f.id];
+      if (typeof st !== 'string') continue;
+      const m = ONE_COMMON_POINT.exec(st);
+      if (!m) continue;
+      const y = cur.objects.find((o) => o.id === m[2]);
+      const x = cur.objects.find((o) => o.id === m[1]);
+      if (!y || !x || y.kind !== 'circle-circle' || x.kind !== 'circle-circle' || y.avoid !== x.id) continue;
+      const declared = ownerByObjId.get(y.id);
+      if (declared === undefined || !facts[declared]?.enabled || groupKey(facts[declared]) === groupKey(f)) continue;
+      const first = facts.findIndex((g) => groupKey(g) === groupKey(facts[declared]));
+      const tagged = `${st} [vs #${first}]`;
       for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
     }
   }

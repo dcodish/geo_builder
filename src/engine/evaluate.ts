@@ -25,7 +25,7 @@ import {
   unit,
 } from './geometry';
 import { carriesBoundAim, constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates, withToleranceFactor } from './solve';
-import { sideRecordsOf, sideShortfall, type SideRecord } from './requirements';
+import { sideRecordsOf, sideShortfall, statedTangency, type SideRecord } from './requirements';
 import { budgetExceeded, chargeHit, computeWithCell, countWork, solveBudget, type WorkCell } from './solveBudget';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
@@ -1428,6 +1428,16 @@ export function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean
   // positions — an arc's endpoints are ordinary points and may not be placed yet, in which case the
   // circle reads as fully drawn (unknown, never "empty"), exactly as it did before this existed. A
   // figure with no `arc` objects gets null everywhere ⇒ byte-identical behaviour.
+  // #2080 / #2083 (ADR-645): a SECOND crossing (`avoid` = the first crossing of the same pair) of two circles that
+  // have one common point — stated tangent (the construction's record), or tangent by their lengths (`circlesTouch`).
+  const pointById = new Map(points.map((p) => [p.id, p] as const));
+  const oneCommonPoint = (p: Extract<GeoPoint, { kind: 'circle-circle' }>, c1: ResolvedCircle, c2: ResolvedCircle): boolean => {
+    if (!p.avoid) return false;
+    const first = pointById.get(p.avoid);
+    if (!first || first.kind !== 'circle-circle') return false;
+    const same = (first.circle1 === p.circle1 && first.circle2 === p.circle2) || (first.circle1 === p.circle2 && first.circle2 === p.circle1);
+    return same && (statedTangency(c.requirements, p.circle1, p.circle2) !== null || circlesTouch(c1, c2));
+  };
   const arcObjs = c.objects.filter((o) => o.kind === 'arc');
   const hasArcs = arcObjs.length > 0;
   const spansOf = hasArcs
@@ -1465,7 +1475,7 @@ export function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean
     }
     for (const p of points) {
       if (!remaining.has(p.id)) continue;
-      const r = tryEval(p, pos, lines, circles, spansOf, opts?.skipConstraints === true);
+      const r = tryEval(p, pos, lines, circles, spansOf, opts?.skipConstraints === true, oneCommonPoint);
       if (r === 'pending') continue;
       if (typeof r === 'string') return { ok: false, error: r, stuckIds: [p.id] };
       if ('tangentRefusal' in r) return { ok: false, error: r.tangentRefusal, stuckIds: [p.id], tangent: true };
@@ -1768,6 +1778,27 @@ export function newCrossingTangency(prev: Construction, next: Construction, e: E
   return null;
 }
 
+/**
+ * #2080 / #2083 ([ADR-645](../../docs/06-decisions.md#adr-645)) — DO THESE TWO CIRCLES TOUCH? Externally
+ * |d − (r₁ + r₂)|, or internally |d − |r₁ − r₂||, within the ruler a STATED length is held to (2·10⁻⁴ of the pair's
+ * scale, the length-residual discipline of `solve.ts`). Three stated lengths that make the pair tangent may each lean
+ * by that much, which opens a chord far above the coordinate ruler `LEN_EPS` — so the question "is there a second
+ * common point?" is asked of the lengths, never of whether two roots happen to differ.
+ */
+export const CIRCLES_TOUCH_REL = 2e-4;
+export function circlesTouch(c1: ResolvedCircle, c2: ResolvedCircle): boolean {
+  const d = dist(c1.center, c2.center);
+  const tol = CIRCLES_TOUCH_REL * Math.max(d, c1.r + c2.r);
+  return Math.abs(d - (c1.r + c2.r)) <= tol || Math.abs(d - Math.abs(c1.r - c2.r)) <= tol;
+}
+
+/** #2080 (ADR-645): the engine's sentence for a second crossing of two circles that have ONE common point — the
+ *  over-constrained coincide shape (`describeConstraint`'s own `coincide` wording), so the student reads
+ *  «הסיבה: X מתלכדת עם Y» and the fold's attribution names the other statement. */
+export function oneCommonPointError(first: Id, second: Id): string {
+  return `over-constrained: ${first} coincides with ${second} cannot hold`;
+}
+
 /** #1931 (ADR-640): `tryEval`'s tagged refusal for a crossing asked of a tangent (`EvalErr.tangent`). */
 interface TangentRefusal {
   tangentRefusal: string;
@@ -1884,6 +1915,8 @@ function tryEval(
   spansOf?: (circleId: Id) => ArcSpan[] | null,
   /** #1931 (ADR-640): a driven solve's TRIAL layout (`evaluateCore`'s `skipConstraints`), not the drawn figure. */
   trial = false,
+  /** #2080 (ADR-645): is this circle∩circle point a second crossing of a pair with one common point? */
+  oneCommonPoint?: (p: Extract<GeoPoint, { kind: 'circle-circle' }>, c1: ResolvedCircle, c2: ResolvedCircle) => boolean,
 ): Vec | 'pending' | string | TangentRefusal {
   switch (p.kind) {
     case 'free-point':
@@ -2107,6 +2140,16 @@ function tryEval(
       const c1 = circles.get(p.circle1);
       const c2 = circles.get(p.circle2);
       if (!c1 || !c2) return 'pending';
+      // #2080 / #2083 (ADR-645): two circles stated tangent, or tangent by their stated lengths, have ONE common
+      // point — a second crossing coincides with the first. Asked before the roots, whose `LEN_EPS` ruler a
+      // tangency held to a residual tolerance can game (two roots 10⁻³ apart). In a solve's TRIAL the crossing
+      // sits on the first one (the ADR-640 shape: a trial error would steer the solve to break the tangency only
+      // to make the point exist); the drawn figure is refused, tagged so the ladder carries the reason.
+      if (oneCommonPoint?.(p, c1, c2)) {
+        const at = pos.get(p.avoid!);
+        if (!at) return 'pending';
+        return trial ? at : { tangentRefusal: oneCommonPointError(p.avoid!, p.id) };
+      }
       const sols = circleCircleIntersect(c1.center, c1.r, c2.center, c2.r);
       if (sols.length === 0) return `cannot construct ${p.id}: circles ${p.circle1} and ${p.circle2} do not meet`;
       // "The second intersection" (`avoid` set, the other crossing already placed): keep the root that

@@ -7,6 +7,7 @@
  * ADR-628 cyclic-member lowering, and the #1899 narrowing notice.
  */
 import { drivenConstraintsOf } from './evaluate';
+import { statedTangency } from './requirements';
 import type { Construction, GeoObject, Id } from './types';
 
 export const circleName = (id: Id): string => (id.startsWith('circle-') ? id.slice('circle-'.length) : id);
@@ -157,6 +158,16 @@ export class Structure {
     }
     return null;
   }
+}
+
+/**
+ * #2080 ([ADR-645](../../docs/06-decisions.md#adr-645)) — DOES THE CONSTRUCTION STATE THESE TWO CIRCLES TANGENT? True
+ * when a `circles-tangent` statement (every tangency spelling lowers to it: «משיקים», «מבחוץ», «מבפנים», «בנקודה T»,
+ * "are tangent") recorded the pair, in either argument order. Structural: two circles that merely LOOK tangent at
+ * one seed are not stated tangent, and a stated pair is tangent whatever its solve leaned.
+ */
+export function circlesStatedTangent(c: Construction, c1: Id, c2: Id): boolean {
+  return statedTangency(c.requirements, c1, c2) !== null;
 }
 
 /**

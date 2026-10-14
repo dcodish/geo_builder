@@ -1842,3 +1842,11 @@ over all four (ADR-041).
 ### `altitude-on-a-side-is-a-right-angle-1742` — «הגובה AB = 5» after «משולש ABC» builds a right angle at B with |AB| = 5 (#1742, ADR-642)
 
 **Guards against:** the altitude twin of the row above going unread. Operator ruling 2026-10-13: build it as «AB גובה לצלע BC» does (ADR-527). **Asserts** the step builds green, AB ⟂ BC, |AB| = 5, and no foot point is minted.
+
+### `tangent-circles-have-no-two-crossings-2080` — «מעגל O · מעגל P · המעגלים O ו-P משיקים · המעגלים O ו-P נחתכים בנקודות X ו-Y»: refused with the contradiction sentence, both orders (#2080, ADR-645)
+
+**Guards against:** two circles stated tangent being "crossed" at two named points drawn on the touch point (two roots ~10⁻³ apart, green), and the tangency typed after the crossing committing the same way. Operator ruling 2026-10-14 on #2073 (option A). **Asserts** the crossing line is refused «לא ניתן: «המעגלים O ו-P נחתכים בנקודות X ו-Y» סותר את «המעגלים O ו-P משיקים» — אי אפשר לקיים את שניהם יחד. הסיבה: X מתלכדת עם Y.», and in the other order the tangency is refused naming the crossing. The spelling matrix (מבחוץ / מבפנים / בנקודה T / English / the definition form) is `src/app/__tests__/issue-2080-tangent-circles-cross.test.ts`.
+
+### `tangent-by-lengths-cross-refused-2083` — «מעגל O ברדיוס 3 · מעגל P ברדיוס 2 · OP = 5 · המעגלים O ו-P נחתכים בנקודות X ו-Y»: radii kept, the crossing refused, both orders (#2083, ADR-646 + ADR-645)
+
+**Guards against:** the named crossing overwriting the stated radii with free defaults (r 5 and 3.6, green), and — with the radii kept — «OP = 5» (circles 3 and 2 tangent by their lengths) letting the solve lean three lengths until two roots 0.01 apart existed. Operator ruling 2026-10-14 (card d14b-2083-priority). **Asserts** that the three lines build with |OX| = |OY| = 3 and |PX| = |PY| = 2, that the crossing after «OP = 5» is refused naming «OP = 5», and that «OP = 5» after the crossing is refused naming the crossing. The class matrix («OP = 1», the controls «OP = 4» / «OP = 6», every definition the reference keeps) is `src/app/__tests__/issue-2083-circle-reference.test.ts`.

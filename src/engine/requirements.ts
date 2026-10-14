@@ -19,6 +19,8 @@ export function sideRequirementOf(cmd: Command): SideRequirement | null {
   if (cmd.type === 'points-line-side') return { kind: 'line-side', a: cmd.a, b: cmd.b, subjects: [...cmd.subjects], rel: cmd.rel };
   // #1709 (ADR-567): a STATED mutual position of two circles; the unstated bare-pair variant states nothing
   if (cmd.type === 'set-circle-position' && cmd.relation !== 'any') return { kind: 'circle-position', relation: cmd.relation, a: cmd.a, b: cmd.b };
+  // #2080 (ADR-645): two circles STATED tangent — the pair has one common point
+  if (cmd.type === 'circles-tangent') return { kind: 'circle-position', relation: 'tangent', a: cmd.circle1, b: cmd.circle2, at: cmd.at };
   // #1918 (ADR-607): a ring declared as a phrase no circle can pass around («טרפז ישר זווית ABCD»)
   if (cmd.type === 'trapezoid' && cmd.kind && NOT_CYCLIC[cmd.kind]) return { kind: 'declared-shape', ring: [...cmd.ids], shape: cmd.kind };
   return null;
@@ -34,6 +36,16 @@ export function recordRequirement(prior: readonly SideRequirement[] | undefined,
     if (r && !out.some((x) => same(x, r))) out.push(r);
   }
   return out;
+}
+
+/**
+ * #2080 ([ADR-645](../../docs/06-decisions.md#adr-645)) — the stated tangency record of the circle pair (a, b), in
+ * either order, or null. A reading of what the construction SAYS (the `circles-tangent` statement's record), never of
+ * where the circles are drawn.
+ */
+export function statedTangency(reqs: readonly SideRequirement[] | undefined, a: Id, b: Id): Extract<SideRequirement, { relation: 'tangent' }> | null {
+  for (const r of reqs ?? []) if (r.kind === 'circle-position' && r.relation === 'tangent' && ((r.a === a && r.b === b) || (r.a === b && r.b === a))) return r;
+  return null;
 }
 
 /** The `requirements` field to spread into a construction — omitted when empty, so a figure without a stated side is byte-identical to before. */

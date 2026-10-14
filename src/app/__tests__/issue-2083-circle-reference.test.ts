@@ -19,6 +19,9 @@ vi.mock('@/parser/llm', () => ({ llmParse: (...a: unknown[]) => llmParseMock(...
 import { decideDeterministic2D } from '@/app/decideDeterministic';
 import { commitVerdict } from '@/app/submitPipeline';
 import { replay, useGeoStore } from '@/store/geoStore';
+import { otherUtteranceForError } from '@/app/errorSubject';
+import { humanizeError } from '@/i18n/humanizeError';
+import i18n from '@/i18n';
 
 const st = () => useGeoStore.getState();
 type V = { kind: string; note?: { key?: string } };
@@ -124,5 +127,57 @@ describe('#2083 — unchanged (measured at 939b160a)', () => {
     expect(g.radius('O')!.radius.via).toBe('free');
     expect(g.radius('P')!.radius.via).toBe('free');
     expect(g.dist('X', 'Y')).toBeGreaterThan(0.1);
+  });
+});
+
+/**
+ * #2083 part B ([ADR-645](../../../docs/06-decisions.md#adr-645)) — with the radii kept, «OP = 5» makes circles of
+ * radius 3 and 2 tangent BY THEIR LENGTHS. Measured with the definite spelling at 939b160a: X(3.00, 0.10),
+ * Y(3.00, 0.09), green — three stated lengths leaned inside their tolerances until two roots 0.01 apart existed.
+ * Operator ruling 2026-10-14: refused under #2080's ruling, with the existing contradiction message, both orders.
+ */
+describe('#2083 B — a crossing of circles the lengths make tangent is refused, both orders', () => {
+  const sentenceFor = async (lines: string[]) => {
+    const g = await play(lines);
+    const ex = (g.last as { note?: { explain?: string } }).note?.explain ?? '';
+    return { g, said: humanizeError(ex, i18n.getFixedT('he') as never, lines.at(-1), otherUtteranceForError(g.facts, ex)).replace(/[\u2066-\u2069]/g, '') };
+  };
+  const RADII = ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2'];
+  const CROSS = 'המעגלים O ו-P נחתכים בנקודות X ו-Y';
+  const S = (said: string, other: string) => `לא ניתן: «${said}» סותר את «${other}» — אי אפשר לקיים את שניהם יחד. הסיבה: X מתלכדת עם Y.`;
+
+  it.each([['OP = 5'], ['OP = 1']])('«%s» then the crossing → refused, naming the length', async (op) => {
+    const { g, said } = await sentenceFor([...RADII, op, CROSS]);
+    expect(g.last.kind).toBe('refuse');
+    expect(said).toBe(S(CROSS, op));
+    expect(g.facts.some((f) => f.utterance === CROSS), 'nothing committed').toBe(false);
+  });
+
+  it.each([['OP = 5'], ['OP = 1']])('the crossing then «%s» → refused, naming the crossing', async (op) => {
+    const { g, said } = await sentenceFor([...RADII, CROSS, op]);
+    expect(g.last.kind).toBe('refuse');
+    expect(said).toBe(S(op, CROSS));
+    expect(g.dist('X', 'Y'), 'the crossing stays as it was').toBeGreaterThan(0.5);
+  });
+
+  it('the definite unnamed spelling with «OP = 5» first is refused too', async () => {
+    const { g } = await sentenceFor([...RADII, 'OP = 5', 'המעגלים נחתכים בנקודות X ו-Y']);
+    expect(g.last.kind).toBe('refuse');
+  });
+
+  it('control: «OP = 4» crosses at two points on circles 3 and 2', async () => {
+    const g = await play([...RADII, 'OP = 4', CROSS]);
+    expect(g.last.kind).toBe('commit');
+    expect(g.dist('X', 'Y')).toBeGreaterThan(0.5);
+    for (const X of ['X', 'Y']) {
+      expect(g.dist('O', X)).toBeCloseTo(3, 6);
+      expect(g.dist('P', X)).toBeCloseTo(2, 6);
+    }
+  });
+
+  it('control: «OP = 6» keeps its refusal «הסיבה: |OP| = 6»', async () => {
+    const { g, said } = await sentenceFor([...RADII, 'OP = 6', CROSS]);
+    expect(g.last.kind).toBe('refuse');
+    expect(said).toBe(`לא ניתן: «${CROSS}» סותר את «OP = 6» — אי אפשר לקיים את שניהם יחד. הסיבה: |OP| = 6.`);
   });
 });

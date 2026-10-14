@@ -1032,6 +1032,11 @@ export type SideRequirement =
    *  statement lived only in its fact command, and the interchangeable-pair test (`autosInterchangeable`)
    *  read a nested pair as two identical circles. The unstated bare-pair variant (`relation: 'any'`) records nothing. */
   | { kind: 'circle-position'; relation: 'contained' | 'disjoint'; a: Id; b: Id }
+  /** #2080 ([ADR-645](../../docs/06-decisions.md#adr-645)): two circles STATED tangent («המעגלים O ו-P משיקים», every
+   *  spelling — they all lower to `circles-tangent`), touching at `at`. Recorded so the construction itself says the
+   *  pair has ONE common point, whichever way apply realised the tangency (a witness coincide over free radii, a pinned
+   *  centre distance over stated ones, a `tangent-inner` radius) — read by `circlesStatedTangent`, never by coordinates. */
+  | { kind: 'circle-position'; relation: 'tangent'; a: Id; b: Id; at: Id }
   /** #1918 ([ADR-607](../../docs/06-decisions.md#adr-607)): a ring DECLARED as a shape phrase no circle can pass
    *  around (`NOT_CYCLIC`) — «טרפז ישר זווית ABCD». Recorded so the stage-0 prover sees the declaration whichever
    *  order the circle and the noun arrive in; not a side, so no side reader consumes it. */

@@ -585,6 +585,19 @@ tagged `EvalErr.tangent`), the on-circle carrier driven by `collinear` (post-sol
 step ladder twice — `newCrossingTangency` judges a NEW crossing on the prior figure (stage 0j), and
 `runFailureLadder` carries a rescue stage's tangent refusal as the refusal's reason (`tangentSeen`, stage 2i).
 
+**Two circles with one common point have no second crossing** ([ADR-645](06-decisions.md#adr-645), #2080, #2083). A
+`circles-tangent` statement leaves a `circle-position` record with `relation: 'tangent'` (and its touch point `at`) in
+`requirements`, whichever way apply realised the tangency; `circlesStatedTangent` (`structure.ts`) reads it, never
+coordinates. `circlesTouch` (`evaluate.ts`) is the lengths twin: |d − (r₁ + r₂)| or |d − |r₁ − r₂|| within
+`CIRCLES_TOUCH_REL` = 2·10⁻⁴ of the pair's scale, the ruler a stated length is held to. A second crossing — a
+`circle-circle` point whose `avoid` is the first crossing of the same pair — of a pair with one common point is
+refused with `oneCommonPointError` («X coincides with Y», the over-constrained coincide shape): at stage 0j on the
+prior figure (`circlesCrossingTangentError`: stated tangent, or touching at every sampled configuration of the prior
+figure), a tangency stated over a pair with two named crossings likewise, and in `tryEval` as the backstop (a trial
+seats the second crossing on the first; the drawn figure refuses, tagged `EvalErr.tangent`, so the ladder carries
+it). The fold names the other side: the drop-one search finds the tangency or the length; for the other order the
+crossing's own statement is read from `ownerByObjId`.
+
 ### A fixed-run rule consumes the whole label body ([ADR-601](06-decisions.md#adr-601))
 
 `labelRun(body, n)` returns the first run of exactly n labels and nothing about the rest of the body, so a rule
