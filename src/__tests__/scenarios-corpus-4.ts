@@ -4759,6 +4759,8 @@ export const SCENARIOS_4: Scenario[] = [
       expect(humanizeError(d, he as never, 'AC ⊥ BC', otherUtteranceForError(facts, d)).replace(/[⁦-⁩]/g, '')).toBe(
         'לא ניתן: «AC ⊥ BC» סותר את «AB ⊥ BC» — אי אפשר לקיים את שניהם יחד. הסיבה: AC ⟂ BC.',
       );
+    },
+  },
   // ── #1996 (ADR-655): the givens forced a narrower named kind — said in one cause-naming sentence ──
   {
     id: 'narrowing-note-circle-points-parallelogram-1996',
