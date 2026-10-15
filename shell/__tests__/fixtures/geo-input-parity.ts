@@ -265,7 +265,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2131': 'open', // #2090 (ADR-665): analytic does not read the incremental trapezoid mid-segment or «… מקביל לבסיסים»
 
-  '#2115': 'open',
   '#2074': 'open', // #2074 (ADR-659): analytic's half of «תיכון ליתר» on an open right triangle waits for #2018 // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
 
   '#2108': 'open',
