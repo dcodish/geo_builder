@@ -76,6 +76,7 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   const afterIds = new Set(afterRaw.map((f) => f.id));
   let work: Fact[] = [...resolveBinds(prefixRaw), ...afterRaw];
   const binds: DecideBind[] = [];
+  let identityBound = false; // #2122 (ADR-653): a naming by the identity criterion — the statement holds by it
   const prefixCtx = () => {
     const before = replay(work.filter((f) => !afterIds.has(f.id)));
     return buildParseCtx(before.construction, before.positions);
@@ -120,6 +121,7 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
       const lineBind = impliedPointBinding(r.commands, ectx, autoNamedLabels(work));
       const pbind = lineBind ? { ...lineBind, merge: false } : impliedIdentityBinding(work.filter((f) => !afterIds.has(f.id)), r.commands, store().seed, autoNamedLabels(work));
       if (!pbind) break;
+      if (!lineBind) identityBound = true;
       const res = pbind.merge ? mergeFacts(work, pbind.from, pbind.to) : renameFacts(work, pbind.from, pbind.to);
       if (!res.ok) break;
       work = res.facts;
@@ -190,7 +192,7 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     return false;
   }
   // #2122 (ADR-653): a MERGE naming made the statement true by construction — the submit seam's rule: a success, kept
-  if (!binds.some((b) => b.op === 'merge') && impliedByPrior(prefixFacts, r.commands, store().seed)) {
+  if (!identityBound && impliedByPrior(prefixFacts, r.commands, store().seed)) {
     logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-implied-restatement', commands: r.commands });
     setInputNote(t('input.alreadyDrawn'));
     return false;

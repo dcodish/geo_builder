@@ -178,6 +178,21 @@ describe('#2122 — unchanged (measured at b0ef3240)', () => {
   });
 });
 
+describe('#2122 — every route (operator ruling 2026-10-15, option A)', () => {
+  it('«גובה מ B» · «BE גובה»: one foot E for the two B heights, no tool letter beside it, no notice', async () => {
+    const g = await play(['מקבילית ABCD', 'BD', 'גובה מ A', 'גובה מ B', 'BE גובה']);
+    expect(g.last.kind).toBe('commit');
+    expect(g.last.binds).toEqual([{ op: 'rename', from: 'G', to: 'E' }]);
+    const r = replay(st().facts, st().seed);
+    const feet = r.construction.objects.filter((o) => o.kind === 'foot') as { id: string; from: string; a: string; b: string }[];
+    expect(feet.filter((f) => f.from === 'B').map((f) => f.id)).toEqual(['E']);
+    expect(feet.map((f) => f.id).sort()).toEqual(['E', 'F']);
+    expect(r.coincidences).toEqual([]);
+    expect(r.violations).toHaveLength(0);
+    for (const f of feet) expect([f.a, f.b].sort().join(''), 'never the diagonal BD').not.toBe('BD');
+  });
+});
+
 describe('#2122 — the criterion is structural', () => {
   it('a free sampled DOF is never an identity: two riders on one circle are not one point', async () => {
     await play(['משולש', 'D על BC']);

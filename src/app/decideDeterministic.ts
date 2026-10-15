@@ -291,6 +291,7 @@ export async function decideFromParse(
   // resolvable unnamed circle (the #112 `nameCentre` machinery) and re-parse; genuinely ambiguous →
   // ask which circle is meant (never a silent pick, never an LLM guess).
   let boundName = false; // a #186 auto-bind happened — the submission already changed the figure (a naming)
+  let identityBound = false; // #2122 (ADR-653): the naming came from the identity criterion — the line's statement holds by it
   for (let guard = 0; r.ok && guard < 3; guard++) {
     const bind = impliedCircleBinding(r.commands, pctx);
     if (bind && 'clarify' in bind) {
@@ -314,6 +315,7 @@ export async function decideFromParse(
       const lineBind = impliedPointBinding(r.commands, pctx, autoNamedLabels(facts));
       const pbind = lineBind ? { ...lineBind, merge: false } : impliedIdentityBinding(facts, r.commands, seed);
       if (!pbind) break;
+      if (!lineBind) identityBound = true;
       const res = pbind.merge ? mergeFacts(facts, pbind.from, pbind.to) : renameFacts(facts, pbind.from, pbind.to);
       if (!res.ok) break; // can't bind — the fresh-rider reading stands, as before
       facts = res.facts;
@@ -873,10 +875,10 @@ export async function decideFromParse(
        * escalates: reaching the LLM would spend a call on a sentence the parser read correctly, and the
        * model could only answer "couldn't build". Its own log result, so the class is countable.
        */
-      // #2122 (ADR-653): the line's naming MERGED the student's point with the engine's (the touch point M took X), so
-      // its statement now holds by construction. It is a plain success, never «כבר קיים», and the statement is kept
+      // #2122 (ADR-653): the line's naming identified the student's point with the engine's (the touch point M took X,
+      // a foot G took E — a merge or a fresh rename), so its statement now holds by construction. It is a plain success, never «כבר קיים», and the statement is kept
       // as the line's own fact: it still holds X on that circle if the earlier line about X is deleted.
-      if ((outcome.reason === 'implied' || outcome.reason === 'empty') && binds.some((b) => b.op === 'merge')) {
+      if ((outcome.reason === 'implied' || outcome.reason === 'empty') && identityBound) {
         return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: [...logs, { source: 'parser', result: 'bound-point-name', commands: r.commands }], note: null };
       }
       if (outcome.reason === 'implied') {

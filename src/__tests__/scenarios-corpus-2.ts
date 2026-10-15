@@ -228,9 +228,15 @@ export const SCENARIOS_2: Scenario[] = [
         return ['AB', 'BC', 'CD', 'AD'].includes(key);
       };
       const feet = fig.construction.objects.filter((o) => o.kind === 'foot') as { id: Id; from: Id; a: Id; b: Id }[];
-      expect(feet.length, 'three heights → three feet').toBe(3);
+      // RE-BASED by #2122 (ADR-653, operator ruling 2026-10-15, option A: the "only the student's letter" rule covers
+      // every route): «BE גובה» is the height from B that «גובה מ B» already drew, so the tool's foot letter yields to
+      // E — two feet (F from A, E from B), no tool letter on E's dot and no coincidence pair. Was three feet with G
+      // and E on one dot and «G ו-E נפלו על אותה נקודה.».
+      expect(feet.length, 'two B heights are one foot E, plus the foot from A').toBe(2);
+      expect(feet.filter((f) => f.from === 'B').map((f) => f.id), 'the B height carries the student\'s letter').toEqual(['E']);
+      expect(fig.coincidences, 'no tool letter on the same dot, so no converge notice').toEqual([]);
       const footIds = new Set(feet.map((f) => f.id));
-      expect(footIds.size, 'the feet have DISTINCT labels (no F/F collision)').toBe(3);
+      expect(footIds.size, 'the feet have DISTINCT labels (no F/F collision)').toBe(2);
       for (const f of feet) {
         // The base is a genuine side of the quad — never the diagonal BD (the reported bug).
         expect(isSide(f.a, f.b), `height from ${f.from} drops onto real side ${f.a}${f.b}, not a diagonal`).toBe(true);
