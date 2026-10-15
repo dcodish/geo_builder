@@ -1,0 +1,47 @@
+[
+ {
+  "id": "T8",
+  "title": "A failure no message describes reads one honest sentence",
+  "class": "look",
+  "product": "2d",
+  "base": "http://localhost:5173",
+  "path": "/",
+  "lines": [
+   "משולש ABC",
+   "מעגל חסום במשולש ABC",
+   "AB משיק למעגל בנקודה D"
+  ],
+  "lookFor": "Refused with exactly «משהו השתבש בבניית השורה הזאת. נסו לנסח אותה אחרת, או לפרק אותה לשני צעדים.», with no «@f-AB» and no hint after it. (The refusal itself is #2001, still open.)",
+  "before": "«…הסיבה: |OD| = |O@f-AB|.» plus the hint.",
+  "probe": "refused after 2.3 s with the floor sentence"
+ },
+ {
+  "id": "T66",
+  "title": "PR: rectangle + rhombus = square, ONE note",
+  "class": "play",
+  "product": "2d",
+  "base": "http://localhost:5174",
+  "path": "/",
+  "lines": [
+   "מלבן ABCD",
+   "מעוין ABCD"
+  ],
+  "lookFor": "A square and exactly one note: «ABCD הוא כעת ריבוע, שהוא גם מלבן וגם מעוין.»",
+  "before": "Refused «D כבר מוגדרת…».",
+  "probe": "the single note appears after the check finishes, 1.6 s"
+ },
+ {
+  "id": "T67",
+  "title": "PR: the same on one line",
+  "class": "look",
+  "product": "2d",
+  "base": "http://localhost:5174",
+  "path": "/",
+  "lines": [
+   "מלבן ABCD, מעוין ABCD"
+  ],
+  "lookFor": "The same square and note.",
+  "before": "«…המשפט הזה מגדיר את D פעמיים…».",
+  "probe": "the single note appears after the check finishes, 1.4 s"
+ }
+]

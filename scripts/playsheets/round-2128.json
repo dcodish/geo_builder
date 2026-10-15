@@ -1,0 +1,1037 @@
+{
+ "name": "round-2128",
+ "title": "Fix round #2128 (2026-10-15) — batch on main + PR #2168",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "3-D: the circle inside the triangle beside the circle through its vertices",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "מעגל חוסם את ABC",
+    "מעגל חסום במשולש ABC"
+   ],
+   "lookFor": "Two circles: one through A, B, C and one inside touching the sides; every row green.",
+   "before": "The last line was refused «\"ABC\" כבר מוגדר בציור»."
+  },
+  {
+   "id": "T2",
+   "title": "3-D: the other order",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "מעגל חסום במשולש ABC",
+    "מעגל חוסם את ABC"
+   ],
+   "lookFor": "Both circles, no error.",
+   "before": "Refused «\"ABC\" כבר מוגדר בציור»."
+  },
+  {
+   "id": "T3",
+   "title": "3-D: the passive voice",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "משולש ABC חסום במעגל",
+    "מעגל חסום במשולש ABC"
+   ],
+   "lookFor": "Both circles.",
+   "before": "Refused."
+  },
+  {
+   "id": "T4",
+   "title": "A length named with its own endpoint's letter",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB=b"
+   ],
+   "lookFor": "AB labelled b, green.",
+   "before": "Refused, suggesting «AB=B»."
+  },
+  {
+   "id": "T5",
+   "title": "An angle named with its own vertex's letter",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "זוית B=b"
+   ],
+   "lookFor": "The angle at B labelled b, green.",
+   "before": "Refused, suggesting «זוית B=B»."
+  },
+  {
+   "id": "T6",
+   "title": "The letter's value reaches the figure",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB=b",
+    "b=4"
+   ],
+   "lookFor": "AB drawn with length 4, green.",
+   "before": "The second line was refused."
+  },
+  {
+   "id": "T7",
+   "title": "A radius letter equal to the centre's letter (same class, not in the report)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל B ברדיוס b",
+    "b = 3"
+   ],
+   "lookFor": "Circle B with radius 3. The ⚠ line under the first row is the existing lowercase-letter notice; the row stays green.",
+   "before": "The first line was refused, suggesting «מעגל B ברדיוס B».",
+   "expectRefusal": "נקראה כסמל מידה"
+  },
+  {
+   "id": "T9",
+   "title": "Unticked row: the refusal names the row",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC"
+   ],
+   "lookFor": "After unticking the row and typing «משולש ACB»: «השורה «משולש ABC» מסומנת כרגע כלא מוצגת, ולכן אי אפשר לבנות עליה. סמנו אותה שוב ברשימת הנתונים — אין צורך להוסיף שורה חדשה.» Nothing is added.",
+   "before": "«לא ניתן לבנות: A, C, B שייכות לשורה המבוטלת «משולש ABC» — …».",
+   "expectRefusal": "מסומנת כרגע כלא מוצגת",
+   "after": [
+    {
+     "toggle": 1
+    },
+    {
+     "type": "משולש ACB"
+    }
+   ]
+  },
+  {
+   "id": "T10",
+   "title": "An arc on an empty canvas",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "קשת AB = 40 במעגל O"
+   ],
+   "lookFor": "Circle O with A and B on it, 40° apart, green.",
+   "before": "Refused «…מתייחס לנקודה שעדיין לא הוגדרה (∠AOB = 40°)»."
+  },
+  {
+   "id": "T11",
+   "title": "Existing points move onto the arc's circle",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "AB = 7",
+    "קשת AB = 40 במעגל O"
+   ],
+   "lookFor": "A and B now on the circle, green.",
+   "before": "Green with A and B off the circle."
+  },
+  {
+   "id": "T12",
+   "title": "An arc sum on an empty canvas",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "קשת AC + קשת BE = קשת AD + קשת BC במעגל O"
+   ],
+   "lookFor": "Five points on circle O, green.",
+   "before": "Refused with internal notation."
+  },
+  {
+   "id": "T13",
+   "title": "Refusal: a chord too long for the circle",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס 3",
+    "AB = 7",
+    "קשת AB = 40 במעגל O"
+   ],
+   "lookFor": "The existing contradiction refusal naming «AB = 7».",
+   "before": "Built with A, B off the circle.",
+   "expectRefusal": "AB = 7"
+  },
+  {
+   "id": "T14",
+   "title": "A diameter's from-point lies on its circle",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "מעגל O",
+    "נקודה F",
+    "קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E"
+   ],
+   "lookFor": "F on circle O, E on AC.",
+   "before": "F off the circle."
+  },
+  {
+   "id": "T15",
+   "title": "An arc value with π is the arc's length",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "גזרה AOB",
+    "קשת AB = 4π"
+   ],
+   "lookFor": "«4π» written on the arc; the chord AB is not labelled.",
+   "before": "The chord AB = 4π."
+  },
+  {
+   "id": "T16",
+   "title": "The copula spelling",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "גזרה AOB",
+    "הקשת AB היא 4π"
+   ],
+   "lookFor": "Same as the previous case.",
+   "before": "Not understood."
+  },
+  {
+   "id": "T17",
+   "title": "Refusal: a letter on an arc asks degrees or length",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "גזרה AOB",
+    "קשת AB = x"
+   ],
+   "lookFor": "«לא ברור אם x היא מידת הקשת במעלות או אורך הקשת. למעלות כתבו «∠AOB = x», ולאורך כתבו «אורך הקשת AB הוא x».»",
+   "before": "The chord AB = x.",
+   "expectRefusal": "לא ברור אם x"
+  },
+  {
+   "id": "T18",
+   "title": "Unchanged: a degree value",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "גזרה AOB",
+    "קשת AB = 40"
+   ],
+   "lookFor": "A 40° arc, with the existing teaching notice «נקלט. בפעם הבאה אפשר לכתוב כך: ∠AOB = 40 …».",
+   "before": "unchanged",
+   "expectRefusal": "נקלט"
+  },
+  {
+   "id": "T19",
+   "title": "A height lands on the triangle's own side",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB מקביל ל-DE",
+    "AF גובה"
+   ],
+   "lookFor": "F on BC, the right angle at F.",
+   "before": "F drawn on DE."
+  },
+  {
+   "id": "T20",
+   "title": "A trapezoid height ignores a foreign parallel",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "טרפז ABCD",
+    "AD מקביל ל-EF",
+    "AG גובה"
+   ],
+   "lookFor": "G on base DC.",
+   "before": "G on BC."
+  },
+  {
+   "id": "T21",
+   "title": "A placed foot stays where the student put it",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "טרפז ABCD",
+    "E על BC",
+    "AE גובה"
+   ],
+   "lookFor": "E stays inside BC, the height to BC.",
+   "before": "E on top of C, green."
+  },
+  {
+   "id": "T22",
+   "title": "A placed foot on AD",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "טרפז ABCD",
+    "E על AD",
+    "BE גובה"
+   ],
+   "lookFor": "E stays inside AD.",
+   "before": "E on D."
+  },
+  {
+   "id": "T23",
+   "title": "The midsegment with a foreign parallel",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "טרפז ABCD",
+    "AC מקביל ל-KL",
+    "EF קטע אמצעים"
+   ],
+   "lookFor": "EF joins the midpoints of AD and BC.",
+   "before": "Sent to the AI."
+  },
+  {
+   "id": "T24",
+   "title": "«מקביל לבסיסים» with a foreign parallel",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "טרפז ABCD",
+    "AC מקביל ל-KL",
+    "EL מקביל לבסיסים"
+   ],
+   "lookFor": "EL drawn parallel to AB.",
+   "before": "Sent to the AI."
+  },
+  {
+   "id": "T25",
+   "title": "Unchanged: a trapezoid height",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "טרפז ABCD",
+    "AE גובה"
+   ],
+   "lookFor": "E on DC.",
+   "before": "unchanged"
+  },
+  {
+   "id": "T26",
+   "title": "A bisector written vertex-last",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש CMD",
+    "AM חוצה זווית CMD"
+   ],
+   "lookFor": "A on CD, MA bisects ∠CMD.",
+   "before": "Refused «references an unknown point»."
+  },
+  {
+   "id": "T27",
+   "title": "A median written vertex-last",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש CMD",
+    "AM תיכון לצלע CD"
+   ],
+   "lookFor": "A is the midpoint of CD.",
+   "before": "Refused as a collapsed triangle."
+  },
+  {
+   "id": "T28",
+   "title": "A height written vertex-last, with «היא»",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש CMD",
+    "AM היא גובה לצלע CD"
+   ],
+   "lookFor": "AM ⟂ CD, A on CD.",
+   "before": "Sent to the AI."
+  },
+  {
+   "id": "T29",
+   "title": "A bisector with «הוא»",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש CMD",
+    "AM הוא חוצה זווית CMD"
+   ],
+   "lookFor": "Same figure as the bisector case.",
+   "before": "Sent to the AI."
+  },
+  {
+   "id": "T30",
+   "title": "English: \"AM is the bisector of angle CMD\"",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "triangle CMD",
+    "AM is the bisector of angle CMD"
+   ],
+   "lookFor": "Same figure as the bisector case.",
+   "before": "Sent to the AI."
+  },
+  {
+   "id": "T31",
+   "title": "Analytic: a bisector written vertex-last",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש CMD",
+    "AM חוצה זווית CMD"
+   ],
+   "lookFor": "A on CD, MA bisects ∠CMD.",
+   "before": "Refused."
+  },
+  {
+   "id": "T32",
+   "title": "Refusal: a second name for an angle",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "זוית B=α",
+    "זוית ABC=β"
+   ],
+   "lookFor": "«לזווית ABC כבר יש שם: α (בשורה «זוית B=α»). לכל זווית שם אחד — המשיכו עם α.»",
+   "before": "«זה כבר קיים באיור».",
+   "expectRefusal": "כבר יש שם"
+  },
+  {
+   "id": "T33",
+   "title": "Refusal: a second name for a segment",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB=a",
+    "AB=c"
+   ],
+   "lookFor": "«לקטע AB כבר יש שם: a (בשורה «AB=a»). לכל קטע שם אחד — המשיכו עם a.»",
+   "before": "«כבר קיים».",
+   "expectRefusal": "כבר יש שם"
+  },
+  {
+   "id": "T34",
+   "title": "Refusal: the same letter with another coefficient",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "∠ABC=2α",
+    "∠ABC=3α"
+   ],
+   "lookFor": "«לא ניתן: «∠ABC=3α» סותר את «∠ABC=2α» — … הסיבה: ∠ABC = 3α.»; the label stays «2α».",
+   "before": "«כבר קיים».",
+   "expectRefusal": "סותר את «∠ABC=2α»"
+  },
+  {
+   "id": "T35",
+   "title": "Refusal: a length with another coefficient",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB = 2a",
+    "AB = 3a"
+   ],
+   "lookFor": "«… סותר את «AB = 2a» … הסיבה: |AB| = 3a.»",
+   "before": "«כבר קיים».",
+   "expectRefusal": "סותר את «AB = 2a»"
+  },
+  {
+   "id": "T36",
+   "title": "Unchanged: the same name twice",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "זוית B=α",
+    "זוית ABC=α"
+   ],
+   "lookFor": "«זה כבר קיים באיור».",
+   "before": "unchanged",
+   "expectRefusal": "כבר קיים"
+  },
+  {
+   "id": "T37",
+   "title": "Analytic: a second name for an angle",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "זוית B=α",
+    "זוית ABC=β"
+   ],
+   "lookFor": "The same angle sentence as in 2-D.",
+   "before": "Recorded both names.",
+   "expectRefusal": "כבר יש שם"
+  },
+  {
+   "id": "T38",
+   "title": "Analytic: another coefficient",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "משולש ABC",
+    "∠ABC=2α",
+    "∠ABC=3α"
+   ],
+   "lookFor": "2-D's contradiction sentence naming «∠ABC=2α».",
+   "before": "The flat-triangle sentence.",
+   "expectRefusal": "סותר"
+  },
+  {
+   "id": "T39",
+   "title": "3-D: a second name for an angle",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "זווית ABC=α",
+    "זווית ABC=β"
+   ],
+   "lookFor": "«לזווית ABC כבר יש שם: α (בשורה «זווית ABC=α»). …»",
+   "before": "The arc silently relabelled to β.",
+   "expectRefusal": "כבר יש שם"
+  },
+  {
+   "id": "T40",
+   "title": "3-D: another coefficient",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "משולש ABC",
+    "∠ABC=2α",
+    "∠ABC=3α"
+   ],
+   "lookFor": "«הנתונים סותרים זה את זה — … «∠ABC=3α» … «∠ABC=2α»».",
+   "before": "Recorded with 3α dropped.",
+   "expectRefusal": "סותרים"
+  },
+  {
+   "id": "T41",
+   "title": "«∠ABC = α + 40» is accepted",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "∠ABC = α + 40"
+   ],
+   "lookFor": "Accepted; the arc reads «α + 40».",
+   "before": "Sent to the AI."
+  },
+  {
+   "id": "T42",
+   "title": "An angle 40° larger than another",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "∠ACB = α",
+    "∠ABC = α + 40"
+   ],
+   "lookFor": "∠B is 40° larger than ∠C.",
+   "before": "Sent to the AI."
+  },
+  {
+   "id": "T43",
+   "title": "The value then reaches the figure",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "∠ABC = α + 40",
+    "α = 30"
+   ],
+   "lookFor": "The arc reads 70°.",
+   "before": "Sent to the AI."
+  },
+  {
+   "id": "T44",
+   "title": "Refusal: the same letter with another constant",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "∠ABC = α",
+    "∠ABC = α + 40"
+   ],
+   "lookFor": "«לא ניתן: «∠ABC = α + 40» סותר את «∠ABC = α» — …»",
+   "before": "Sent to the AI.",
+   "expectRefusal": "סותר את «∠ABC = α»"
+  },
+  {
+   "id": "T45",
+   "title": "A right triangle, then ⟂ at B",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ישר-זווית ABC",
+    "AB ⟂ BC"
+   ],
+   "lookFor": "Green, the right-angle knee at B.",
+   "before": "Green only after the configuration search; a red row first."
+  },
+  {
+   "id": "T46",
+   "title": "The ⟂ typed before the right triangle",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "AB ⟂ BC",
+    "משולש ישר-זווית ABC"
+   ],
+   "lookFor": "Builds, the right angle at B.",
+   "before": "Refused «…סותר נתון קודם…»."
+  },
+  {
+   "id": "T47",
+   "title": "Refusal: a second right angle",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ישר זווית ABC",
+    "AB ⊥ BC",
+    "AC ⊥ BC"
+   ],
+   "lookFor": "The last line refused at once: «לא ניתן: «AC ⊥ BC» סותר את «AB ⊥ BC» — …»",
+   "before": "A red row and «no valid configuration» after ~8 s.",
+   "expectRefusal": "סותר את «AB ⊥ BC»"
+  },
+  {
+   "id": "T48",
+   "title": "Refusal: a right angle stated as an angle, then ⟂",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "זווית B ישרה",
+    "AC ⊥ BC"
+   ],
+   "lookFor": "Refused at once, naming «זווית B ישרה».",
+   "before": "A red deferred row.",
+   "expectRefusal": "זווית B ישרה"
+  },
+  {
+   "id": "T49",
+   "title": "«תיכון ליתר» on an open right triangle; the right angle cycles",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ישר-זווית ABC",
+    "תיכון ליתר"
+   ],
+   "lookFor": "The median CM is drawn; pressing «הציגו תצורה אחרת» moves the right angle C → A → B → C and the median follows.",
+   "before": "Asked «לא נאמר איזו זווית…».",
+   "cycles": 3
+  },
+  {
+   "id": "T50",
+   "title": "Typing the vertex fixes it",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ישר-זווית ABC",
+    "CM תיכון ליתר"
+   ],
+   "lookFor": "The right angle at C, and presses never move it.",
+   "before": "Asked."
+  },
+  {
+   "id": "T51",
+   "title": "Two right triangles: the question names no single side",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ישר-זווית ABC",
+    "משולש ישר-זווית DEF",
+    "תיכון ליתר"
+   ],
+   "lookFor": "«אין בסרטוט צלע יחידה…».",
+   "before": "The hypotenuse question.",
+   "expectRefusal": "אין בסרטוט צלע יחידה"
+  },
+  {
+   "id": "T52",
+   "title": "Three bare points make a triangle",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "נקודה A",
+    "נקודה B",
+    "נקודה C",
+    "משולש ABC"
+   ],
+   "lookFor": "A triangle on three spread dots.",
+   "before": "Refused «…היה נעשה קו ישר…»."
+  },
+  {
+   "id": "T53",
+   "title": "Four bare points make a quadrilateral",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "נקודה A",
+    "נקודה B",
+    "נקודה C",
+    "נקודה D",
+    "מרובע ABCD"
+   ],
+   "lookFor": "A simple quadrilateral, no notice.",
+   "before": "Refused flat."
+  },
+  {
+   "id": "T54",
+   "title": "Two crossing segments, then a triangle (same class; issue #2116)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "קטע AC",
+    "קטע BD",
+    "משולש ABC"
+   ],
+   "lookFor": "Builds.",
+   "before": "Refused flat."
+  },
+  {
+   "id": "T55",
+   "title": "Unchanged: a truly flat triangle is refused",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB = 5",
+    "BC = 3",
+    "AC = 8"
+   ],
+   "lookFor": "The flat refusal naming «AC = 8».",
+   "before": "unchanged",
+   "expectRefusal": "AC = 8"
+  },
+  {
+   "id": "T56",
+   "title": "PR: your T56 — a parallelogram inscribed in a circle",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "מקבילית ABCD",
+    "מקבילית ABCD חסומה במעגל"
+   ],
+   "lookFor": "A rectangle and the note «כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.»",
+   "before": "A rectangle, silent.",
+   "expect": [
+    "הוגבל ממקבילית למלבן"
+   ]
+  },
+  {
+   "id": "T57",
+   "title": "PR: your T41 — a parallelogram with a side as a height",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "מקבילית ABCD",
+    "AB גובה"
+   ],
+   "lookFor": "«בגלל הנתון AB גובה, ABCD הוגבל ממקבילית למלבן — …»",
+   "before": "Silent.",
+   "expect": [
+    "הוגבל ממקבילית למלבן"
+   ]
+  },
+  {
+   "id": "T58",
+   "title": "PR: AB = BC makes a rhombus",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "מקבילית ABCD",
+    "AB = BC"
+   ],
+   "lookFor": "«בגלל הנתון AB = BC, ABCD הוגבל ממקבילית למעוין — …»",
+   "before": "Silent.",
+   "expect": [
+    "הוגבל ממקבילית למעוין"
+   ]
+  },
+  {
+   "id": "T59",
+   "title": "PR: a right triangle stays silent",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "זווית C = 90"
+   ],
+   "lookFor": "No note.",
+   "before": "unchanged",
+   "expectAbsent": [
+    "הוגבל"
+   ]
+  },
+  {
+   "id": "T60",
+   "title": "PR: the angle is named, not the circle",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "מקבילית ABCD",
+    "זווית DAB = 90",
+    "ABCD חסום במעגל"
+   ],
+   "lookFor": "«בגלל הנתון זווית DAB = 90, ABCD הוגבל ממקבילית למלבן — …»",
+   "before": "Silent.",
+   "expect": [
+    "בגלל הנתון זווית DAB = 90"
+   ]
+  },
+  {
+   "id": "T61",
+   "title": "PR 3-D: the same sentence",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "path": "/3d.html",
+   "lines": [
+    "מקבילית ABCD",
+    "ABCD חסום במעגל"
+   ],
+   "lookFor": "The same sentence as the 2-D T56 case.",
+   "before": "«…הוגבל מ־מקבילית ל־מלבן.»",
+   "expect": [
+    "הוגבל ממקבילית למלבן"
+   ]
+  },
+  {
+   "id": "T62",
+   "title": "PR analytic: your #1913 T1",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "lines": [
+    "מעגל O",
+    "A, B, C ו-D על המעגל",
+    "AB = 3",
+    "BC = 4",
+    "מקבילית ABCD"
+   ],
+   "lookFor": "A 3 × 4 rectangle, then the circle note a beat later.",
+   "before": "Silent."
+  },
+  {
+   "id": "T63",
+   "title": "PR 3-D: an isosceles trapezoid in a circle says nothing",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "path": "/3d.html",
+   "lines": [
+    "טרפז שווה שוקיים ABCD",
+    "ABCD חסום במעגל"
+   ],
+   "lookFor": "No notice.",
+   "before": "«…מ־טרפז ל־טרפז שווה שוקיים.»",
+   "expectAbsent": [
+    "הוגבל"
+   ]
+  },
+  {
+   "id": "T64",
+   "title": "PR 3-D: a right pyramid over a parallelogram",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5174",
+   "path": "/3d.html",
+   "lines": [
+    "פירמידה ישרה SABCD שבסיסה מקבילית ABCD"
+   ],
+   "lookFor": "«כדי שהפירמידה תהיה ישרה, ABCD הוגבל ממקבילית למלבן — …»",
+   "before": "«…הבסיס (ABCDS) הוגבל מ־מקבילית ל־מלבן.»",
+   "expect": [
+    "הוגבל ממקבילית למלבן"
+   ]
+  },
+  {
+   "id": "T65",
+   "title": "PR: an inscribed ring takes a later «מקבילית»",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "ABCD חסום במעגל",
+    "מקבילית ABCD"
+   ],
+   "lookFor": "A rectangle with the circle note.",
+   "before": "Refused «D כבר מוגדרת…»."
+  },
+  {
+   "id": "T68",
+   "title": "PR: parallelogram then rectangle",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "מקבילית ABCD",
+    "מלבן ABCD"
+   ],
+   "lookFor": "A rectangle, no note.",
+   "before": "Refused «C כבר מוגדרת…»."
+  },
+  {
+   "id": "T69",
+   "title": "PR refusal, unchanged: a trapezoid is never a square",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "טרפז ABCD",
+    "ריבוע ABCD"
+   ],
+   "lookFor": "«הצורה כבר ידועה כ־טרפז — ולכן אינה נקראת ריבוע…»",
+   "before": "unchanged",
+   "expectRefusal": "כבר ידועה"
+  },
+  {
+   "id": "T70",
+   "title": "PR: a kite on a circle draws (#1921)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "A, B, C ו-D על המעגל",
+    "AB = 3",
+    "BC = 4",
+    "דלתון ABCD"
+   ],
+   "lookFor": "A right kite 3/4/4/3 in about a second, with the circle note.",
+   "before": "Refused as over-constrained after ~21 s."
+  }
+ ]
+}
