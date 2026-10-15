@@ -1425,16 +1425,16 @@ function trapezoidMidsegment(s: string, ctx: ParseContext): AnyCommand[] | null 
   } else {
     // (2) INCREMENTAL — the trapezoid is already drawn; resolve its bases from the figure's unique
     //     vertex-disjoint parallel edge-pair, and its legs from the adjacency (ADR-169's `ctx.parallels`).
-    const pairs = ctx.parallels ?? [];
-    if (pairs.length !== 1) return null; // 0 = triangle, 2 = parallelogram (which base?) — defer, don't guess
-    const base1 = pairs[0][0].map(up) as [Id, Id];
-    const base2 = pairs[0][1].map(up) as [Id, Id];
-    const nb = ctx.neighbors ?? {};
-    // Legs: pair each base-1 endpoint with the base-2 endpoint it is joined to in the figure (an edge, not
-    // the diagonal). A clean quadrilateral gives exactly one partner per endpoint; anything else ⇒ defer.
+    // #2090 (ADR-665): the bases are the drawn trapezoid RING'S OWN pair, never a parallel stated elsewhere.
+    const pair = trapezoidBasePair(ctx);
+    if (!pair) return null; // no quadrilateral with one own pair (a triangle), or a parallelogram (which base?) — defer, don't guess
+    const { bases: [base1, base2], ring } = pair;
+    // Legs: pair each base-1 endpoint with the base-2 endpoint it is joined to by a SIDE OF THE RING (never a
+    // drawn diagonal — «AC מקביל ל-KL» draws AC, which the figure's adjacency would otherwise offer as a leg).
+    const ringSide = (a: Id, b: Id) => ring.some((v, i) => sameSide(v, ring[(i + 1) % ring.length], a, b));
     legs = [];
     for (const a of base1) {
-      const partner = base2.find((b) => (nb[a] ?? []).includes(b));
+      const partner = base2.find((b) => ringSide(a, b));
       if (!partner) return null;
       legs.push([a, partner]);
     }
@@ -4662,10 +4662,10 @@ const parallelConstraint: Rule = (s, ctx) => {
     // defer; zero → not a trapezoid figure → defer.
     if (/בסיסים|בסיסי\b|the\s+bases/i.test(s)) {
       const one = t.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
-      const pairs = ctx.parallels ?? [];
-      if (one && pairs.length === 1) {
+      const pair = trapezoidBasePair(ctx); // #2090 (ADR-665): the trapezoid ring's own pair, not every stated ∥
+      if (one && pair) {
         const [a, b] = [up(one[1]), up(one[2])];
-        const [base] = pairs[0];
+        const [base] = pair.bases;
         return [
           { type: 'segment', a, b },
           { type: 'set-parallel', a, b, c: up(base[0]), d: up(base[1]) },
@@ -10155,20 +10155,68 @@ const median: Rule = (s, ctx) => {
   ];
 };
 
-/** The unique base OPPOSITE `apex` that a trapezoid height drops onto: among the figure's vertex-disjoint
- *  parallel edge-pairs (`ctx.parallels`), the partner edge of a pair whose OTHER edge carries the apex.
- *  Exactly one such base ⇒ return it (the trapezoid height); zero (a leg-only apex / a triangle, whose
- *  parallels are empty) or several (a parallelogram's two parallel pairs) ⇒ null, so the caller defers
- *  rather than guess a side (ADR-052 / ADR-169). */
-const oppositeParallelBase = (apex: Id, parallels?: [[string, string], [string, string]][]): [Id, Id] | null => {
+/**
+ * THE RING'S OWN PARALLEL PAIRS (#1965/#2090, [ADR-665](../../docs/06-decisions.md#adr-665); analytic's
+ * `ringParallelBase`, ADR-AG-253, ported). Among the figure's vertex-disjoint parallel edge-pairs
+ * (`ctx.parallels`, ADR-169), only those whose BOTH edges are sides of `ring`. A parallel stated anywhere else
+ * («AB מקביל ל-DE», «AC מקביל ל-KL») is not a base of this ring, so it can neither capture a triangle's height
+ * nor cancel a trapezoid's real base. The ONE reading of "a ring's parallel bases" — the cevian, the
+ * midsegment, «… מקביל לבסיסים» and the valueless «גובה הטרפז» all read it.
+ */
+const ringParallelPairs = (ring: readonly Id[], ctx: ParseContext): [[Id, Id], [Id, Id]][] => {
+  const r = ring.map(up);
+  const isEdge = (e: readonly string[]) => r.some((v, i) => sameSide(v, r[(i + 1) % r.length], up(e[0]), up(e[1])));
+  return (ctx.parallels ?? [])
+    .filter(([e1, e2]) => isEdge(e1) && isEdge(e2))
+    .map(([e1, e2]) => [e1.map(up) as [Id, Id], e2.map(up) as [Id, Id]]);
+};
+
+/** The drawn trapezoid's base pair for a sentence that names no ring («EF קטע אמצעים», «EL מקביל לבסיסים»;
+ *  #2090, [ADR-665](../../docs/06-decisions.md#adr-665)): the figure's quadrilaterals that hold at least one
+ *  parallel pair OF THEIR OWN — exactly one such ring, holding exactly one pair, names the bases. Several rings, or
+ *  a parallelogram's two pairs, are ambiguous ⇒ null (defer, never guess — ADR-052). */
+const trapezoidBasePair = (ctx: ParseContext): { bases: [[Id, Id], [Id, Id]]; ring: Id[] } | null => {
+  const owned = (ctx.polygons ?? [])
+    .filter((p) => p.length === 4)
+    .map((p) => ({ ring: p.map(up), pairs: ringParallelPairs(p, ctx) }))
+    .filter((o) => o.pairs.length > 0);
+  return owned.length === 1 && owned[0].pairs.length === 1 ? { bases: owned[0].pairs[0], ring: owned[0].ring } : null;
+};
+
+/** The unique base OPPOSITE `apex` that a trapezoid height drops onto: over every polygon holding the apex, among
+ *  that RING'S OWN parallel pairs (`ringParallelPairs`), the partner edge of a pair whose OTHER edge carries the
+ *  apex. Exactly one such base ⇒ return it (the trapezoid height); zero (a leg-only apex / a triangle) or several
+ *  (a parallelogram's two parallel pairs) ⇒ null, so the caller falls through rather than guess a side
+ *  (ADR-052 / ADR-169). Bounded to the ring by #1965 ([ADR-665](../../docs/06-decisions.md#adr-665)). */
+const ringParallelBase = (apex: Id, ctx: ParseContext): [Id, Id] | null => {
   const cands: [Id, Id][] = [];
-  for (const [e1, e2] of parallels ?? []) {
-    const in1 = e1.map(up).includes(apex), in2 = e2.map(up).includes(apex);
-    if (in1 === in2) continue; // apex on both (degenerate) or neither (a leg apex) — not this pair's base
-    const other = (in1 ? e2 : e1).map(up) as [Id, Id];
-    if (!cands.some((c) => (c[0] === other[0] && c[1] === other[1]) || (c[0] === other[1] && c[1] === other[0]))) cands.push(other);
+  for (const poly of ctx.polygons ?? []) {
+    const ring = poly.map(up);
+    if (!ring.includes(apex)) continue;
+    const opposite = oppositePolygonEdges(apex, [ring], null);
+    for (const [e1, e2] of ringParallelPairs(ring, ctx)) {
+      const in1 = e1.includes(apex), in2 = e2.includes(apex);
+      if (in1 === in2) continue; // apex on both (degenerate) or neither (a leg apex) — not this pair's base
+      const other = in1 ? e2 : e1;
+      if (!opposite.some((e) => sameSide(e[0], e[1], other[0], other[1]))) continue;
+      if (!cands.some((c) => sameSide(c[0], c[1], other[0], other[1]))) cands.push(other);
+    }
   }
   return cands.length === 1 ? cands[0] : null;
+};
+
+/**
+ * THE SIDE THE STUDENT ALREADY PUT THE FOOT ON (#1966, [ADR-665](../../docs/06-decisions.md#adr-665); analytic's
+ * ADR-AG-222 reading). Among the opposite sides of the polygons holding the apex, the single one that the figure
+ * already places `foot` on («E על BC»). A point the student placed outranks a base the tool assumed (the operator's
+ * ruling of 2026-10-10), so the altitude asks this BEFORE the ring's parallel base. `null`: no foot, no incidence,
+ * or the incidence is not on exactly one candidate side.
+ */
+const footNarrowedSide = (apex: Id, ctx: ParseContext, foot: Id | null): [Id, Id] | null => {
+  const on = foot ? ctx.onSegment?.[foot] : undefined;
+  if (!on) return null;
+  const hit = oppositePolygonEdges(apex, ctx.polygons, foot).filter((e) => sameSide(e[0], e[1], up(on[0]), up(on[1])));
+  return hit.length === 1 ? hit[0] : null;
 };
 
 /** Real EDGES of a polygon the apex belongs to that do NOT touch the apex — the legitimate bases a height
@@ -10217,11 +10265,8 @@ const cevianShapeEdges = (
 ): { edges: [Id, Id][] } | { shapes: string[]; side: string } => {
   const all = oppositePolygonEdges(apex, ctx.polygons, foot);
   const key = (e: readonly Id[]) => [...e].sort().join('|');
-  const on = foot ? ctx.onSegment?.[foot] : undefined;
-  if (on) {
-    const hit = all.filter((e) => key(e) === key(on.map(up)));
-    if (hit.length === 1) return { edges: hit };
-  }
+  const placed = footNarrowedSide(apex, ctx, foot); // #1966 (ADR-665): the one reading of "the placed foot"
+  if (placed) return { edges: [placed] };
   // #1742 ([ADR-642](../../docs/06-decisions.md#adr-642)) — A NAMED FOOT THAT IS A VERTEX OF THE ONE OPPOSITE
   // SIDE NAMES THAT SIDE. Excluding the foot as a base vertex is right while another side remains; when it
   // leaves NOTHING, the sentence named a segment from the apex to an endpoint of its shape's only opposite
@@ -10455,10 +10500,17 @@ const altitude: Rule = (s, ctx) => {
       if (shared.length === 1 && shared[0] === apex) return altitudeAtVertex(namedFoot, apex, [p, q]);
     }
   } else {
-    // A trapezoid height: the apex sits on one parallel base and drops perpendicular to the OPPOSITE base
-    // (ADR-169). The triangle inference below can't reach it — the apex's two neighbours are a diagonal, not
-    // an edge — so try the unique opposite parallel base first (empty for a triangle, so it never interferes).
-    const base = oppositeParallelBase(apex, ctx.parallels);
+    // #1965/#1966 ([ADR-665](../../docs/06-decisions.md#adr-665)) — WHICH SIDE, in analytic's order of authority
+    // (ADR-AG-222 / ADR-AG-253): (a) the side the student already placed the foot on («E על BC» — a placed point
+    // outranks a base the tool assumed, the operator's ruling of 2026-10-10); (b) a trapezoid height: the apex
+    // sits on one of ITS RING'S parallel bases and drops perpendicular to the OPPOSITE base (ADR-169) — read off
+    // the apex's own ring, so a parallel stated elsewhere neither captures nor cancels it; (c) below, the stated
+    // triangle, then the first opposite side. The triangle inference can't reach (b) — the apex's two neighbours
+    // are a diagonal, not an edge.
+    // A triangle the sentence itself names is a stated given: the placed-foot narrowing reads the figure's rings
+    // and must not overrule it (the ring base keeps its old precedence over the named triangle).
+    const namesTriangle = (labelRun((s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s).replace(/triangle|the/gi, ' '), 3) ?? []).filter((x) => x !== apex).length === 2;
+    const base = (namesTriangle ? null : footNarrowedSide(apex, ctx, namedFoot)) ?? ringParallelBase(apex, ctx);
     if (base) {
       [p, q] = base; // tri stays null — the trapezoid already exists; don't re-emit a shape
     } else {
@@ -12800,8 +12852,7 @@ function shapeHeight(s: string, ctx: ParseContext): AnyCommand[] | Clarify | nul
   const ask = (options: string[]): Clarify => ({ clarify: 'ambiguous-construct', noun: he ? 'גובה' : 'height', options });
   if (ring.length === 3) return ask([[ring[1], ring[2]], [ring[0], ring[2]], [ring[0], ring[1]]].map((sd) => option(null, sd)));
   if (ring.length !== 4) return null;
-  const isEdge = (e: readonly string[]) => ring.some((v, i) => sameSide(v, ring[(i + 1) % 4], up(e[0]), up(e[1])));
-  const bases = (ctx.parallels ?? []).filter(([e1, e2]) => isEdge(e1) && isEdge(e2));
+  const bases = ringParallelPairs(ring, ctx); // #1965 (ADR-665): the one reading of a ring's parallel bases
   // a parallelogram's two heights differ — the two sides opposite the first vertex name them
   if (k === 'parallelogram' || (k === 'trapezoid' && bases.length === 2)) return ask([option(ring[0], [ring[2], ring[3]]), option(ring[0], [ring[1], ring[2]])]);
   if (k !== 'trapezoid' || bases.length !== 1) return null;

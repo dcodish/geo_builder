@@ -261,6 +261,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
   '#2110': 'open', // #2101/#2100 (ADR-648/649): analytic does not read a radius letter's value or a radius ratio
   '#2115': 'open', // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
+  '#2131': 'open', // #2090 (ADR-665): analytic does not read the incremental trapezoid mid-segment or «… מקביל לבסיסים»
 
   '#2108': 'open',
 
@@ -781,6 +782,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
    */
   { id: 'cevian-height-trapezoid', family: 'cevians-centres', steps: ['טרפז ABCD', 'AE גובה'], expect: 'builds' },
   { id: 'cevian-height-parallelogram', family: 'cevians-centres', steps: ['מקבילית ABCD', 'AE גובה'], expect: 'builds' },
+  // #1966/#2090 (ADR-665): a placed foot outranks the assumed base; a trapezoid's bases are its own pair (the #1965 verdict never changed — builds — so it has no row; where the foot lands is its scenario)
+  { id: 'cevian-height-placed-foot-1966', family: 'cevians-centres', steps: ['טרפז ABCD', 'E על BC', 'AE גובה'], expect: 'builds', note: 'E stays on BC, never on C' },
+  { id: 'trapezoid-midsegment-foreign-parallel-2090', family: 'cevians-centres', steps: ['טרפז ABCD', 'AC מקביל ל-KL', 'EF קטע אמצעים'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2131' }, { product: '3d', issue: '#1679', parked: true }] },
+  { id: 'trapezoid-bases-foreign-parallel-2090', family: 'cevians-centres', steps: ['טרפז ABCD', 'AC מקביל ל-KL', 'EL מקביל לבסיסים'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2131' }, { product: '3d', issue: '#1679', parked: true }] },
   { id: 'cevian-to-side', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון לצלע BC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cevian-plural-respectively', family: 'cevians-centres', steps: ['משולש OBC', 'OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '471 corpus 7/4, as S1 teaches its imperative' },
   { id: 'cevian-plural-respectively-medians', family: 'cevians-centres', steps: ['משולש ABC', 'AD ו-BE הם תיכונים לצלעות BC ו-AC בהתאמה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the medians twin (#1685, ADR-629)' },

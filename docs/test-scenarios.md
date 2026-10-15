@@ -1902,3 +1902,15 @@ over all four (ADR-041).
 ### `tangent-by-lengths-cross-refused-2083` — «מעגל O ברדיוס 3 · מעגל P ברדיוס 2 · OP = 5 · המעגלים O ו-P נחתכים בנקודות X ו-Y»: radii kept, the crossing refused, both orders (#2083, ADR-646 + ADR-645)
 
 **Guards against:** the named crossing overwriting the stated radii with free defaults (r 5 and 3.6, green), and — with the radii kept — «OP = 5» (circles 3 and 2 tangent by their lengths) letting the solve lean three lengths until two roots 0.01 apart existed. Operator ruling 2026-10-14 (card d14b-2083-priority). **Asserts** that the three lines build with |OX| = |OY| = 3 and |PX| = |PY| = 2, that the crossing after «OP = 5» is refused naming «OP = 5», and that «OP = 5» after the crossing is refused naming the crossing. The class matrix («OP = 1», the controls «OP = 4» / «OP = 6», every definition the reference keeps) is `src/app/__tests__/issue-2083-circle-reference.test.ts`.
+
+### `height-ignores-foreign-parallel-1965` — «משולש ABC · AB מקביל ל-DE · AF גובה»: the height lands on BC, never on DE (#1965, ADR-665)
+
+**Guards against:** a parallel stated elsewhere in the figure capturing a triangle's height (F drawn on DE, a segment that is no side of the triangle, green). Operator ruling 2026-10-10. **Asserts** the three lines build green, F lies on line BC with AF ⟂ BC, and at seeds 0–5 the figure equals «AF גובה לצלע BC». The matrix (apex-only spelling, the trapezoid whose base an unrelated parallel used to cancel, every ADR-169 apex, the parallelogram) is `src/parser/__tests__/issue-1965-ring-parallel-base.test.ts`.
+
+### `height-keeps-placed-foot-1966` — «טרפז ABCD · E על BC · AE גובה»: E stays on BC and AE ⟂ BC (#1966, ADR-665)
+
+**Guards against:** the trapezoid's assumed base DC beating the student's «E על BC», which collapsed E onto C, green. Operator ruling 2026-10-10 (confirmed): a placed point outranks an assumed base. **Asserts** the three lines build green, E ≠ C, E on segment BC, AE ⟂ BC, and at seeds 0–5 the figure equals «AE גובה לצלע BC». The matrix (apex B, isosceles and right trapezoids, the controls) is `src/parser/__tests__/issue-1966-placed-foot-order.test.ts`.
+
+### `trapezoid-bases-ignore-foreign-parallel-2090` — «טרפז ABCD · AC מקביל ל-KL · EF קטע אמצעים»: the mid-segment of the legs, as without the unrelated parallel (#2090, ADR-665)
+
+**Guards against:** «EF קטע אמצעים» and «EL מקביל לבסיסים» on a drawn trapezoid going to the AI once any other parallel is stated. **Asserts** E and F are the midpoints of AD and BC, and «EL מקביל לבסיסים» after the same prefix commits `segment EL` + `EL ∥ AB`, exactly as without «AC מקביל ל-KL».

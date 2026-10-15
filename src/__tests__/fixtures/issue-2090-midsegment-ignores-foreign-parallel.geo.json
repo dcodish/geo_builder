@@ -1,0 +1,95 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T08:00:00.000Z",
+  "name": "issue-2090-midsegment-ignores-foreign-parallel",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "mox5zKuh4gnDyORmS-JfR",
+      "utterance": "טרפז ABCD",
+      "group": "g0",
+      "cmd": {
+        "type": "trapezoid",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "cn-uNI93niUj2QyHlbkkf",
+      "utterance": "AC מקביל ל-KL",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "uBJQAGr17QZAEctxbySOx",
+      "utterance": "AC מקביל ל-KL",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "K",
+        "b": "L"
+      },
+      "enabled": true
+    },
+    {
+      "id": "25AmuNpvxUMN7RLv6DUlM",
+      "utterance": "AC מקביל ל-KL",
+      "group": "g1",
+      "cmd": {
+        "type": "set-parallel",
+        "a": "A",
+        "b": "C",
+        "c": "K",
+        "d": "L"
+      },
+      "enabled": true
+    },
+    {
+      "id": "iDEJBnEbxXrCvO0PREDdZ",
+      "utterance": "EF קטע אמצעים",
+      "group": "g4",
+      "cmd": {
+        "type": "midpoint",
+        "id": "E",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "Kv335mgl4QR_7zPvF4yFW",
+      "utterance": "EF קטע אמצעים",
+      "group": "g4",
+      "cmd": {
+        "type": "midpoint",
+        "id": "F",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "t3cXFTRmJ10X9VIWyb7my",
+      "utterance": "EF קטע אמצעים",
+      "group": "g4",
+      "cmd": {
+        "type": "segment",
+        "a": "E",
+        "b": "F"
+      },
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T08:00:00.000Z",
+  "name": "issue-1965-height-ignores-foreign-parallel",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "rzWBMivKf29mGapdKzMMH",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "oU1AJL9aztcD5tPEa86-Z",
+      "utterance": "AB מקביל ל-DE",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "wyB02eRr_3lni7uNKhz03",
+      "utterance": "AB מקביל ל-DE",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "D",
+        "b": "E"
+      },
+      "enabled": true
+    },
+    {
+      "id": "t2UsFohSGNemiNXvNg8Sx",
+      "utterance": "AB מקביל ל-DE",
+      "group": "g1",
+      "cmd": {
+        "type": "set-parallel",
+        "a": "A",
+        "b": "B",
+        "c": "D",
+        "d": "E"
+      },
+      "enabled": true
+    },
+    {
+      "id": "wBFjDXU8lVuRvlL-qm1TI",
+      "utterance": "AF גובה",
+      "group": "g4",
+      "cmd": {
+        "type": "foot",
+        "id": "F",
+        "from": "A",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "qYHGPApPa60dJL7Z12t5w",
+      "utterance": "AF גובה",
+      "group": "g4",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "F"
+      },
+      "enabled": true
+    }
+  ]
+}
