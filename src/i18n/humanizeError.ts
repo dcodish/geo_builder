@@ -152,6 +152,16 @@ interface Pattern {
    */
   namesOther?: true;
   /**
+   * #2023 ([ADR-661](../../docs/06-decisions.md#adr-661)) — this refusal names the EARLIER LINE but not the refused
+   * sentence: its own subject (the angle or segment, in the student's letters) already identifies itself, as
+   * `shapeExcluded`'s does, so it is not the «X» סותר את «Y» frame `namesOther` stands for. With an `other`, the `_vs`
+   * variant renders (`{{other}}` only); without one, the base key. Kept apart from `namesOther` so the #943 ratchet —
+   * every `_said_vs` quotes BOTH statements — stays exact, and its own ratchet (`OTHER_LINE_KEYS`) holds `{{other}}`.
+   */
+  namesOtherLine?: true;
+  /** Every key `keyOf` can pick, when it picks among several (read by the ratchets). */
+  keys?: readonly string[];
+  /**
    * #1918 (ADR-607) — a param that is itself a TRANSLATED sentence: `key` rendered with each of `params` resolved as
    * a translation key. Lets a refusal reuse a ruled frame (`errors.overConstrained_said_vs`) with a ruled reason
    * clause, instead of a second copy of the frame. `letters` (#2099, ADR-651) are params interpolated AS-IS — the
@@ -326,8 +336,9 @@ export const PATTERNS: Pattern[] = [
     re: /^name-taken: (angle|segment) (\S+) is already named (.+?)(?: \[vs #\d+\])?$/,
     key: 'errors.angleNameTaken',
     keyOf: (m) => (m[1] === 'angle' ? 'errors.angleNameTaken' : 'errors.lengthNameTaken'),
+    keys: ['errors.angleNameTaken', 'errors.lengthNameTaken'],
     params: (m) => ({ name: m[2], symbol: m[3] }),
-    namesOther: true,
+    namesOtherLine: true,
   },
   // evaluate.ts:891 — `over-constrained: |AC| = 9 cannot hold`; #943 half B: the fold may append the
   // structured tail ` [vs #<fact index>]` naming the conflicting earlier statement — matched here so
@@ -418,6 +429,8 @@ export const PATTERNS: Pattern[] = [
 export const SAID_SUBJECT_KEYS: readonly string[] = [...new Set(PATTERNS.filter((p) => p.saysSubject).map((p) => p.key))];
 /** #943 half B: the keys that can name the OTHER side — each must have a `_said_vs` variant in both locales (the same ratchet). */
 export const OTHER_SUBJECT_KEYS: readonly string[] = [...new Set(PATTERNS.filter((p) => p.namesOther).map((p) => p.key))];
+/** #2023 (ADR-661): the keys that name the earlier LINE only — each must have a `_vs` variant carrying `{{other}}` (every key `keyOf` can pick). */
+export const OTHER_LINE_KEYS: readonly string[] = [...new Set(PATTERNS.filter((p) => p.namesOtherLine).flatMap((p) => p.keys ?? [p.key]))];
 
 /**
  * Translate a raw engine error to a student-facing message. Returns the raw string
@@ -459,6 +472,7 @@ export function humanizeError(raw: string | null | undefined, t: Translate, said
     const oth = other?.trim();
     // #943 half B: both sides known ⇒ the sentence AND the earlier given it contradicts are the subject.
     if (p.namesOther && sub && oth) return t(`${key}_said_vs`, { ...translated, said: sub, other: oth });
+    if (p.namesOtherLine && oth) return t(`${key}_vs`, { ...translated, other: oth });
     if (p.saysSubject && sub) return t(`${key}_said`, { ...translated, said: sub });
     return t(key, translated);
   }

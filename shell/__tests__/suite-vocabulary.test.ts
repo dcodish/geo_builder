@@ -71,9 +71,9 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   // #2023 / #2054 (ADR-661, ADR-3D-344, ADR-AG-277; operator rulings 2026-10-13 — «all three builders, the same
   // sentences»): a second letter for an angle or a segment. 3-D has no symbolic LENGTH (a 3-D «AB=a» is a vector, X7);
   // the complex builder has no angles or segments.
-  angleNameTaken: { '2d': ['errors.angleNameTaken_said_vs'], '3d': ['err.angleNameTaken'], complex: null, analytic: ['errAngleNameTaken_vs'] },
+  angleNameTaken: { '2d': ['errors.angleNameTaken_vs'], '3d': ['err.angleNameTaken'], complex: null, analytic: ['errAngleNameTaken_vs'] },
   angleNameTakenAlone: { '2d': ['errors.angleNameTaken'], '3d': ['err.angleNameTakenAlone'], complex: null, analytic: ['errAngleNameTaken'] },
-  lengthNameTaken: { '2d': ['errors.lengthNameTaken_said_vs'], '3d': null, complex: null, analytic: ['errLengthNameTaken_vs'] },
+  lengthNameTaken: { '2d': ['errors.lengthNameTaken_vs'], '3d': null, complex: null, analytic: ['errLengthNameTaken_vs'] },
   lengthNameTakenAlone: { '2d': ['errors.lengthNameTaken'], '3d': null, complex: null, analytic: ['errLengthNameTaken'] },
   // #2061 (ADR-AG-277; ruling 2026-10-14, card d14b-2061-crosstool A): analytic speaks 2-D's over-constrained frame for
   // the same letter with another coefficient. 3-D keeps its own conflict sentence (card d14b-2061-wording A).

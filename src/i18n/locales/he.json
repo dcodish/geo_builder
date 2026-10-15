@@ -350,9 +350,9 @@
       "11": "מצולע בן 11 צלעות"
     },
     "angleNameTaken": "לזווית {{name}} כבר יש שם: {{symbol}}. לכל זווית שם אחד — המשיכו עם {{symbol}}.",
-    "angleNameTaken_said_vs": "לזווית {{name}} כבר יש שם: {{symbol}} (בשורה «{{other}}»). לכל זווית שם אחד — המשיכו עם {{symbol}}.",
+    "angleNameTaken_vs": "לזווית {{name}} כבר יש שם: {{symbol}} (בשורה «{{other}}»). לכל זווית שם אחד — המשיכו עם {{symbol}}.",
     "lengthNameTaken": "לקטע {{name}} כבר יש שם: {{symbol}}. לכל קטע שם אחד — המשיכו עם {{symbol}}.",
-    "lengthNameTaken_said_vs": "לקטע {{name}} כבר יש שם: {{symbol}} (בשורה «{{other}}»). לכל קטע שם אחד — המשיכו עם {{symbol}}.",
+    "lengthNameTaken_vs": "לקטע {{name}} כבר יש שם: {{symbol}} (בשורה «{{other}}»). לכל קטע שם אחד — המשיכו עם {{symbol}}.",
     "overConstrained": "לא ניתן: הנתון {{what}} סותר נתון קודם — אי אפשר לקיים את שניהם יחד.",
     "shapeExcluded": "הצורה כבר ידועה כ־{{actual}} — ולכן אינה נקראת {{stated}}. מחקו את הנתון הקודם אם התכוונתם {{stated}}.",
     "overConstrained_said": "לא ניתן: «{{said}}» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.",

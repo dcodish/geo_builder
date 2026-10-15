@@ -25,7 +25,7 @@ import { describe, expect, it } from 'vitest';
 import i18n from '@/i18n';
 import he from '@/i18n/locales/he.json';
 import en from '@/i18n/locales/en.json';
-import { humanizeError, OTHER_SUBJECT_KEYS, type Translate } from '@/i18n/humanizeError';
+import { humanizeError, OTHER_LINE_KEYS, OTHER_SUBJECT_KEYS, type Translate } from '@/i18n/humanizeError';
 import { otherUtteranceForError, utteranceForError } from '@/app/errorSubject';
 import { conflictSearchStats, OVER_CONSTRAINED_VS, replay } from '@/replay/core';
 import { factsOf, replayFacts } from '@/__tests__/scenario-pipeline';
@@ -133,6 +133,21 @@ describe('#943 half B — the guards', () => {
         expect(typeof s, `${name}: ${key}_said_vs`).toBe('string');
         expect(s as string).toContain('{{said}}');
         expect(s as string).toContain('{{other}}');
+      }
+    }
+  });
+
+  // #2023 (ADR-661): a refusal whose subject is the angle or segment itself names only the earlier LINE (the operator's
+  // verbatim sentence has no «X» סותר את «Y»), so it is a family of its own: a `_vs` variant carrying `{{other}}`.
+  it('RATCHET: every key that names only the earlier line has a `_vs` variant with `{{other}}` in BOTH locales', () => {
+    expect(OTHER_LINE_KEYS).toEqual(expect.arrayContaining(['errors.angleNameTaken', 'errors.lengthNameTaken']));
+    const get = (obj: unknown, key: string) => key.split('.').reduce<unknown>((o, k) => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined), obj);
+    for (const key of OTHER_LINE_KEYS) {
+      for (const [name, loc] of [['he', he], ['en', en]] as const) {
+        const s = get(loc, `${key}_vs`);
+        expect(typeof s, `${name}: ${key}_vs`).toBe('string');
+        expect(s as string).toContain('{{other}}');
+        expect(typeof get(loc, key), `${name}: ${key} (no earlier line found)`).toBe('string');
       }
     }
   });
