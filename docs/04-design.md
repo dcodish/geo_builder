@@ -28,7 +28,9 @@ enumeration). Four corrections to the plain compiler reading hold:
    §4), and `commandConflict` refuses only what cannot be lowered. The lowering reads the ring's STRUCTURE: a
    parallelogram-family noun over four points already on one circle (`ringOnOneCircle`, `src/engine/structure.ts`)
    asserts its cyclic member — the rectangle, or the square — because that is what the sentence says on a circle
-   ([ADR-628](06-decisions.md#adr-628)). A second shape NOUN over a declared ring is judged by one four-valued relation
+   ([ADR-628](06-decisions.md#adr-628)); a kite there is bound in the fold to the right kite's definition (`cyclicKiteCommands`:
+   a right angle at an off-axis vertex and the axis ⟂ the other diagonal, in place of the two equal pairs —
+   [ADR-657](06-decisions.md#adr-657)). A second shape NOUN over a declared ring is judged by one four-valued relation
    (`quadRelation`, `engine/shapeKinds.ts`): an implied noun restates, an excluding one is refused, and a noun that
    narrows the ring or meets it in a third kind is lowered onto it through `refinesDeclaredRing` — the predicate
    `shapeLowersToConstraints` and `commandConflict`'s polygon arm both read — and the ring's polygon takes the

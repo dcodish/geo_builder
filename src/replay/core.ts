@@ -29,6 +29,8 @@ import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed,
 import { resolveBinds } from './naming';
 import { narrowingNotes2D, type RowNouns } from './narrowing';
 import type { RingNote } from '../../shell/narrowing';
+import { ringOnOneCircle } from '@/engine/structure';
+import { cyclicKiteCommands } from '@/engine/inscribe';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -1316,7 +1318,9 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
    * after the per-fact lowering cache, because the same fact resolves differently against different figures.
    */
   const boundCmdsOf = (f: Fact, cur: Construction): Command[] | null => {
-    const cmds = engineCmdsOf(f);
+    // #1921 (ADR-657): a kite whose ring is already on one circle lowers to the right kite it is forced to be
+    const lowered = engineCmdsOf(f);
+    const cmds = f.cmd.type === 'shape-variant' && f.cmd.shape === 'kite' && ringOnOneCircle(cur, f.cmd.ids) ? cyclicKiteCommands(lowered) : lowered;
     const binding = f.cmd.roleSide;
     if (!binding) return cmds;
     const out: Command[] = [];
