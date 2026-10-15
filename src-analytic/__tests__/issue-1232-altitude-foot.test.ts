@@ -102,13 +102,14 @@ describe('#1232 — the altitude foot lies ON the side, at every configuration',
    * mean: both conditions, from the one rule that owns the word.
    */
   it('the rule lowers the altitude to BOTH conditions', () => {
-    const r = parseLine('AD גובה לצלע BC');
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    const ks = r.facts
-      .filter((f) => f.t === 'constraint')
-      .map((f) => (f as Extract<typeof f, { t: 'constraint' }>).k);
-    expect(ks.map((k) => k.t).sort()).toEqual(['on-line-2pt', 'perpendicular']);
+    expect(parseLine('AD גובה לצלע BC').ok).toBe(true);
+    // #1999 (ADR-AG-278): the named cevian is a `cevian-of` the figure orients at M1 — the conjunction is read where it
+    // is applied, in the construction after «משולש ABC» (the triangle's own constraints set aside).
+    const before = derive(['משולש ABC'], 0).construction.constraints.length;
+    const d = derive(['משולש ABC', 'AD גובה לצלע BC'], 0);
+    expect(d.faults).toEqual([]);
+    const ks = d.construction.constraints.slice(before) as unknown[];
+    expect((ks as { t: string }[]).map((k) => k.t).sort()).toEqual(['on-line-2pt', 'perpendicular']);
     expect(ks).toContainEqual({ t: 'on-line-2pt', id: 'D', a: 'B', b: 'C' });
     expect(ks).toContainEqual({ t: 'perpendicular', a: 'A', b: 'D', c: 'B', d: 'C' });
   });

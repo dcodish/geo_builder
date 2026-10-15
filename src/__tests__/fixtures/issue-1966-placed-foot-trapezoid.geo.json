@@ -1,0 +1,72 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T08:00:00.000Z",
+  "name": "issue-1966-placed-foot-trapezoid",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "Sj2kQPsk8Si8X_5OsTAYg",
+      "utterance": "טרפז ABCD",
+      "group": "g0",
+      "cmd": {
+        "type": "trapezoid",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "iddV9tulGY5UmSgsSKU1M",
+      "utterance": "E על BC",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "33AVMMHpg2YTDB25QYwlX",
+      "utterance": "E על BC",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "E",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "ovG8qk0Qv23ICt_BQyeEi",
+      "utterance": "AE גובה",
+      "group": "g3",
+      "cmd": {
+        "type": "foot",
+        "id": "E",
+        "from": "A",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "ChGR_QM01t6Rs2HnNKe_4",
+      "utterance": "AE גובה",
+      "group": "g3",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "E"
+      },
+      "enabled": true
+    }
+  ]
+}

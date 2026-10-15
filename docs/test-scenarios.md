@@ -1914,3 +1914,15 @@ over all four (ADR-041).
 ### `diameter-cut-end-on-circle-2056` — «משולש ABC · מעגל O · G על המעגל · קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E»: F is on circle O (#2056, ADR-663)
 
 **Guards against:** the diameter sentence committing green with F, a stated end of the diameter, off the circle (|OF| = 2.11 against r = 5 for a new F; 0.42 for an existing free F), because `diameterCutsSegment` lowered to a line-line crossing and dropped the membership. Operator ruling 2026-10-13 (card d6-2056). **Asserts** every row is green and the verifier clean, |OF| = r, E on segment AC, and E, F, O collinear — for the reported sequence, for an existing F («נקודה F» first), and for the English sentence. The seed sweep re-runs the check. The lowering unit is `src/parser/__tests__/diameter-cuts-segment.test.ts`.
+
+### `height-ignores-foreign-parallel-1965` — «משולש ABC · AB מקביל ל-DE · AF גובה»: the height lands on BC, never on DE (#1965, ADR-665)
+
+**Guards against:** a parallel stated elsewhere in the figure capturing a triangle's height (F drawn on DE, a segment that is no side of the triangle, green). Operator ruling 2026-10-10. **Asserts** the three lines build green, F lies on line BC with AF ⟂ BC, and at seeds 0–5 the figure equals «AF גובה לצלע BC». The matrix (apex-only spelling, the trapezoid whose base an unrelated parallel used to cancel, every ADR-169 apex, the parallelogram) is `src/parser/__tests__/issue-1965-ring-parallel-base.test.ts`.
+
+### `height-keeps-placed-foot-1966` — «טרפז ABCD · E על BC · AE גובה»: E stays on BC and AE ⟂ BC (#1966, ADR-665)
+
+**Guards against:** the trapezoid's assumed base DC beating the student's «E על BC», which collapsed E onto C, green. Operator ruling 2026-10-10 (confirmed): a placed point outranks an assumed base. **Asserts** the three lines build green, E ≠ C, E on segment BC, AE ⟂ BC, and at seeds 0–5 the figure equals «AE גובה לצלע BC». The matrix (apex B, isosceles and right trapezoids, the controls) is `src/parser/__tests__/issue-1966-placed-foot-order.test.ts`.
+
+### `trapezoid-bases-ignore-foreign-parallel-2090` — «טרפז ABCD · AC מקביל ל-KL · EF קטע אמצעים»: the mid-segment of the legs, as without the unrelated parallel (#2090, ADR-665)
+
+**Guards against:** «EF קטע אמצעים» and «EL מקביל לבסיסים» on a drawn trapezoid going to the AI once any other parallel is stated. **Asserts** E and F are the midpoints of AD and BC, and «EL מקביל לבסיסים» after the same prefix commits `segment EL` + `EL ∥ AB`, exactly as without «AC מקביל ל-KL».

@@ -241,7 +241,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1677': 'icebox',
   '#1679': 'icebox',
   '#1680': 'open',
-  '#1685': 'open',
   '#1726': 'icebox',
   '#1784': 'open',
   '#1796': 'open',
@@ -263,6 +262,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2115': 'open', // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
   '#2129': 'open',
   '#2041': 'open', // #2041 (ADR-664): analytic reads a symbol on an arc as degrees — its half of the ruling waits for #2013 // #2037 (ADR-663): analytic does not put a fresh arc's endpoints on its circle — the cross-tool question
+
+  '#2131': 'open', // #2090 (ADR-665): analytic does not read the incremental trapezoid mid-segment or «… מקביל לבסיסים»
 
   '#2108': 'open',
   '#2130': 'open', // #2125 (ADR-3D-342): analytic refuses an unnamed circumcircle stated after the incircle
@@ -789,10 +790,26 @@ export const PARITY_ROWS: readonly ParityRow[] = [
    */
   { id: 'cevian-height-trapezoid', family: 'cevians-centres', steps: ['טרפז ABCD', 'AE גובה'], expect: 'builds' },
   { id: 'cevian-height-parallelogram', family: 'cevians-centres', steps: ['מקבילית ABCD', 'AE גובה'], expect: 'builds' },
+  // #1966/#2090 (ADR-665): a placed foot outranks the assumed base; a trapezoid's bases are its own pair (the #1965 verdict never changed — builds — so it has no row; where the foot lands is its scenario)
+  { id: 'cevian-height-placed-foot-1966', family: 'cevians-centres', steps: ['טרפז ABCD', 'E על BC', 'AE גובה'], expect: 'builds', note: 'E stays on BC, never on C' },
+  { id: 'trapezoid-midsegment-foreign-parallel-2090', family: 'cevians-centres', steps: ['טרפז ABCD', 'AC מקביל ל-KL', 'EF קטע אמצעים'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2131' }, { product: '3d', issue: '#1679', parked: true }] },
+  { id: 'trapezoid-bases-foreign-parallel-2090', family: 'cevians-centres', steps: ['טרפז ABCD', 'AC מקביל ל-KL', 'EL מקביל לבסיסים'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2131' }, { product: '3d', issue: '#1679', parked: true }] },
   { id: 'cevian-to-side', family: 'cevians-centres', steps: ['משולש ABC', 'תיכון לצלע BC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cevian-plural-respectively', family: 'cevians-centres', steps: ['משולש OBC', 'OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '471 corpus 7/4, as S1 teaches its imperative' },
   { id: 'cevian-plural-respectively-medians', family: 'cevians-centres', steps: ['משולש ABC', 'AD ו-BE הם תיכונים לצלעות BC ו-AC בהתאמה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the medians twin (#1685, ADR-629)' },
-  { id: 'bisector-copula', family: 'cevians-centres', steps: ['משולש CMD', 'AM הוא חוצה זווית CMD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#1685' }, { product: '3d', issue: '#1679', parked: true }], note: '471 corpus 22/5' },
+  { id: 'bisector-copula', family: 'cevians-centres', steps: ['משולש CMD', 'AM הוא חוצה זווית CMD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '471 corpus 22/5; 2-D reads it since #1685/#1999 (ADR-666)' },
+  // #1999/#1685 (ADR-666, ADR-AG-278): a named cevian, either letter first, with or without the copula, Hebrew and English
+  { id: 'cevian-vertex-last-median', family: 'cevians-centres', steps: ['משולש CMD', 'AM תיכון לצלע CD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'cevian-vertex-last-height', family: 'cevians-centres', steps: ['משולש CMD', 'AM גובה לצלע CD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'cevian-vertex-last-bisector', family: 'cevians-centres', steps: ['משולש CMD', 'AM חוצה זווית CMD'], expect: 'builds' },
+  { id: 'cevian-copula-median', family: 'cevians-centres', steps: ['משולש CMD', 'AM הוא תיכון לצלע CD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'cevian-copula-height', family: 'cevians-centres', steps: ['משולש CMD', 'AM היא גובה לצלע CD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'cevian-vertex-last-triangle-median', family: 'cevians-centres', steps: ['משולש CMD', 'AM תיכון במשולש CMD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'cevian-vertex-last-triangle-bisector', family: 'cevians-centres', steps: ['משולש CMD', 'AM חוצה זווית CMD במשולש CMD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'cevian-vertex-last-existing', family: 'cevians-centres', steps: ['משולש CMD', 'A על CD', 'AM תיכון לצלע CD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'cevian-english-bisector', family: 'cevians-centres', steps: ['משולש CMD', 'AM is the bisector of angle CMD'], expect: 'builds' },
+  { id: 'cevian-english-median', family: 'cevians-centres', steps: ['משולש CMD', 'AM is the median to side CD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'cevian-english-height', family: 'cevians-centres', steps: ['משולש CMD', 'AM is the height to side CD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'bisector-wrong-vertex', family: 'cevians-centres', steps: ['משולש ABC', 'AD חוצה זווית C'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the honesty invariant: a segment from A cannot bisect ∠C (2-D refuses since #1684, ADR-568)' },
   { id: 'bisector-wrong-vertex-en', family: 'cevians-centres', steps: ['משולש ABC', 'AD bisects angle C'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the English twin (#1684)' },
   { id: 'cevian-apex-two-triangles', family: 'cevians-centres', steps: ['משולש ABC', 'משולש ABD', 'AE גובה'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'ADR-052: A is in two triangles with different opposite sides (2-D asks since #1684, ADR-568)' },

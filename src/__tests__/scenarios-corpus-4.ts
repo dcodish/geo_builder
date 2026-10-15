@@ -4632,6 +4632,27 @@ export const SCENARIOS_4: Scenario[] = [
         const a = at(fig, ring[i]), b = at(fig, ring[(i + 1) % 3]);
         const h = Math.abs((b.x - a.x) * (a.y - k.center.y) - (a.x - k.center.x) * (b.y - a.y)) / dist(a, b);
         expect(Math.abs(h - k.r), `side ${ring[i]}${ring[(i + 1) % 3]} tangent to circle O`).toBeLessThan(1e-6);
+    },
+  },
+  {
+    id: 'height-ignores-foreign-parallel-1965',
+    title: '«משולש ABC · AB מקביל ל-DE · AF גובה»: the height drops onto BC, the triangle\'s own side, never onto DE (#1965, ADR-665)',
+    guards:
+      "#1965 (ADR-665), operator ruling 2026-10-10: \"a height of ABC must land on a side of ABC … analytic is the reference implementation (ADR-AG-253) … Port that bound\". Measured on b0ef3240 through decideDeterministic2D: F = (3.79, 5.59), on DE, green. Root cause: `oppositeParallelBase` scanned EVERY parallel pair in the parse context, so a stated parallel through the apex captured the height. Fix: `ringParallelBase` reads only the apex's own ring's parallel pairs. Matrix: src/parser/__tests__/issue-1965-ring-parallel-base.test.ts.",
+    steps: ['משולש ABC', 'AB מקביל ל-DE', 'AF גובה'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const [A, B, C, F] = ['A', 'B', 'C', 'F'].map((id) => at(fig, id));
+      const cross = (B.x - C.x) * (F.y - C.y) - (B.y - C.y) * (F.x - C.x);
+      expect(Math.abs(cross) / dist(B, C), 'F on line BC').toBeLessThan(1e-6);
+      expect(Math.abs((A.x - F.x) * (B.x - C.x) + (A.y - F.y) * (B.y - C.y)) / (dist(A, F) * dist(B, C)), 'AF ⟂ BC').toBeLessThan(1e-6);
+      const facts = factsOf(['משולש ABC', 'AB מקביל ל-DE', 'AF גובה']);
+      const stated = factsOf(['משולש ABC', 'AB מקביל ל-DE', 'AF גובה לצלע BC']);
+      for (let s = 0; s <= 5; s++) {
+        const a = replay(facts, s), b = replay(stated, s);
+        expect(a.lastError, `seed ${s}`).toBe(b.lastError);
+        if (a.lastError === null) expect(dist(at(a, 'F'), at(b, 'F')), `seed ${s}: the same F as «AF גובה לצלע BC»`).toBeLessThan(1e-9);
       }
     },
   },
@@ -4659,6 +4680,44 @@ export const SCENARIOS_4: Scenario[] = [
       const english = replay(factsOf(['משולש ABC', 'מעגל O', 'the diameter of circle O from F cuts AC at E']));
       allStepsOk(english);
       onDiameter(english, 'English');
+    },
+  },
+  {
+    id: 'height-keeps-placed-foot-1966',
+    title: '«טרפז ABCD · E על BC · AE גובה»: E stays on BC where it was placed and AE ⟂ BC — never E on top of C (#1966, ADR-665)',
+    guards:
+      "#1966 (ADR-665), operator ruling 2026-10-10, confirmed: \"E stays on BC where they put it, and the height is drawn to BC. A point the student placed outranks a base the tool assumed\" / \"2d should follow analytics behavior\". Measured on b0ef3240: the committed figure had E = C = (2.25, 4.41) with `coincidences [[C, E]]`. Root cause: the altitude asked the trapezoid's parallel base BEFORE the foot narrowing, so the foot went onto DC while E's own rider kept it on BC, and the only point on both is C. Fix: `footNarrowedSide` first, then the ring's parallel base, then the first opposite side (analytic's ADR-AG-222/253 order). Matrix: src/parser/__tests__/issue-1966-placed-foot-order.test.ts.",
+    steps: ['טרפז ABCD', 'E על BC', 'AE גובה'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const [A, B, C, E] = ['A', 'B', 'C', 'E'].map((id) => at(fig, id));
+      expect(dist(E, C), 'E is not C').toBeGreaterThan(1e-3);
+      expect(Math.abs(dist(B, E) + dist(E, C) - dist(B, C)), 'E on segment BC').toBeLessThan(1e-6);
+      expect(Math.abs((A.x - E.x) * (B.x - C.x) + (A.y - E.y) * (B.y - C.y)) / (dist(A, E) * dist(B, C)), 'AE ⟂ BC').toBeLessThan(1e-6);
+      const facts = factsOf(['טרפז ABCD', 'E על BC', 'AE גובה']);
+      const stated = factsOf(['טרפז ABCD', 'E על BC', 'AE גובה לצלע BC']);
+      for (let s = 0; s <= 5; s++) {
+        const a = replay(facts, s), b = replay(stated, s);
+        expect(a.lastError, `seed ${s}`).toBe(b.lastError);
+        if (a.lastError === null) for (const id of ['A', 'B', 'C', 'D', 'E']) expect(dist(at(a, id), at(b, id)), `seed ${s}: ${id} as in «AE גובה לצלע BC»`).toBeLessThan(1e-9);
+      }
+    },
+  },
+  {
+    id: 'trapezoid-bases-ignore-foreign-parallel-2090',
+    title: '«טרפז ABCD · AC מקביל ל-KL · EF קטע אמצעים»: the mid-segment joins the midpoints of the legs AD and BC, as without the unrelated parallel (#2090, ADR-665)',
+    guards:
+      "#2090 (ADR-665), folded into #1965 by the operator ruling of 2026-10-14 (card d14b-found-accept, A). Measured on b0ef3240: «EF קטע אמצעים» and «EL מקביל לבסיסים» went to the AI (not-handled) once any other parallel was stated, because both readers counted every pair in `ctx.parallels`. Fix: they read the drawn trapezoid ring's OWN pair (`trapezoidBasePair` over `ringParallelPairs`) and take the legs from the ring's sides (never the drawn diagonal AC). Matrix: src/parser/__tests__/issue-1965-ring-parallel-base.test.ts.",
+    steps: ['טרפז ABCD', 'AC מקביל ל-KL', 'EF קטע אמצעים'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const mid = (p: string, q: string) => ({ x: (at(fig, p).x + at(fig, q).x) / 2, y: (at(fig, p).y + at(fig, q).y) / 2 });
+      expect(dist(at(fig, 'E'), mid('A', 'D')), 'E is the midpoint of AD').toBeLessThan(1e-9);
+      expect(dist(at(fig, 'F'), mid('B', 'C')), 'F is the midpoint of BC').toBeLessThan(1e-9);
+      const v = gateVerdict(factsOf(['טרפז ABCD', 'AC מקביל ל-KL']), 'EL מקביל לבסיסים');
+      expect(v.kind === 'commit' && v.commands).toEqual([{ type: 'segment', a: 'E', b: 'L' }, { type: 'set-parallel', a: 'E', b: 'L', c: 'A', d: 'B' }]);
     },
   },
 ];

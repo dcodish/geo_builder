@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, RADIUS_VAR, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -1452,16 +1452,16 @@ function trapezoidMidsegment(s: string, ctx: ParseContext): AnyCommand[] | null 
   } else {
     // (2) INCREMENTAL — the trapezoid is already drawn; resolve its bases from the figure's unique
     //     vertex-disjoint parallel edge-pair, and its legs from the adjacency (ADR-169's `ctx.parallels`).
-    const pairs = ctx.parallels ?? [];
-    if (pairs.length !== 1) return null; // 0 = triangle, 2 = parallelogram (which base?) — defer, don't guess
-    const base1 = pairs[0][0].map(up) as [Id, Id];
-    const base2 = pairs[0][1].map(up) as [Id, Id];
-    const nb = ctx.neighbors ?? {};
-    // Legs: pair each base-1 endpoint with the base-2 endpoint it is joined to in the figure (an edge, not
-    // the diagonal). A clean quadrilateral gives exactly one partner per endpoint; anything else ⇒ defer.
+    // #2090 (ADR-665): the bases are the drawn trapezoid RING'S OWN pair, never a parallel stated elsewhere.
+    const pair = trapezoidBasePair(ctx);
+    if (!pair) return null; // no quadrilateral with one own pair (a triangle), or a parallelogram (which base?) — defer, don't guess
+    const { bases: [base1, base2], ring } = pair;
+    // Legs: pair each base-1 endpoint with the base-2 endpoint it is joined to by a SIDE OF THE RING (never a
+    // drawn diagonal — «AC מקביל ל-KL» draws AC, which the figure's adjacency would otherwise offer as a leg).
+    const ringSide = (a: Id, b: Id) => ring.some((v, i) => sameSide(v, ring[(i + 1) % ring.length], a, b));
     legs = [];
     for (const a of base1) {
-      const partner = base2.find((b) => (nb[a] ?? []).includes(b));
+      const partner = base2.find((b) => ringSide(a, b));
       if (!partner) return null;
       legs.push([a, partner]);
     }
@@ -4753,10 +4753,10 @@ const parallelConstraint: Rule = (s, ctx) => {
     // defer; zero → not a trapezoid figure → defer.
     if (/בסיסים|בסיסי\b|the\s+bases/i.test(s)) {
       const one = t.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
-      const pairs = ctx.parallels ?? [];
-      if (one && pairs.length === 1) {
+      const pair = trapezoidBasePair(ctx); // #2090 (ADR-665): the trapezoid ring's own pair, not every stated ∥
+      if (one && pair) {
         const [a, b] = [up(one[1]), up(one[2])];
-        const [base] = pairs[0];
+        const [base] = pair.bases;
         return [
           { type: 'segment', a, b },
           { type: 'set-parallel', a, b, c: up(base[0]), d: up(base[1]) },
@@ -9612,11 +9612,20 @@ const tangentLine: Rule = (s, ctx) => {
   return cmds;
 };
 
+/**
+ * #1685/#1999 ([ADR-666](../../docs/06-decisions.md#adr-666)) — THE BISECTOR'S SUBJECT, read by `bisectorPlacesPoint` and
+ * by `bisectorLine`'s deferral guard from ONE constant so they cannot drift: the shared cevian subject (two labels,
+ * an optional copula «הוא/היא/הינו» or "is", an optional article) then the role — "bisects", «חוצ…», or the English
+ * role noun "(the|an) (angle) bisector of (the angle)". Before, both required the letters directly before the verb,
+ * so «AM הוא חוצה זווית CMD» fell to `bisectorLine`, which drew a bare bisector and left «AM» unread.
+ */
+const BISECTOR_SUBJECT = rx(CEVIAN_SUBJECT + String.raw`(?:bisects?\b|(?:angle\s+)?bisector\s+of\b(?:\s+(?:the\s+)?angle\b)?|חוצ)`, 'i');
+
 /** "bisector of angle ABC" / "חוצה זווית ABC" — a *drawn* angle bisector (not "AD bisects …", which places a point). */
 const bisectorLine: Rule = (s) => {
   if (!/bisector|חוצ/i.test(s)) return null;
   if (INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s)) return null;
-  if (/\b[A-Za-z]\d*\s*[A-Za-z]\d*\b\s*(?:bisects?|חוצ)/i.test(s)) return null; // "AD bisects ∠.." = placing a point (deferred)
+  if (BISECTOR_SUBJECT.test(s)) return null; // "AD bisects ∠.." / «AD הוא חוצה …» = placing a point (deferred) — #1999: the shared subject
   const ids = labelRun(s.replace(/bisector|angle|זוו?ית|הזוו?ית|חוצה|חוצי|חוצ|את/gi, ' '), 3);
   if (!ids) return null;
   return [{ type: 'bisector', id: `bis-${ids.join('')}`, vertex: ids[1], p: ids[0], q: ids[2], visible: true }];
@@ -10058,7 +10067,7 @@ const statedSide = (s: string): { side: [Id, Id]; match: string } | null => {
  */
 const statedTriangle = (s: string): { ring: [Id, Id, Id]; match: string } | null => {
   const m =
-    s.match(/(?:\bin\s+(?:the\s+)?triangle\s+|ב?ה?משולש\s+)([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i) ??
+    s.match(/(?:\b(?:in|of)\s+(?:the\s+)?triangle\s+|ב?ה?משולש\s+)([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i) ?? // #1999: "of triangle"
     // #1720: the English forms the median and altitude rules always read — "median from A in ABC", "triangle
     // ABC with a height from A". UPPERCASE labels only (no /i), so "a triangle and …" is never A, N, D.
     s.match(new RegExp(String.raw`(?:\b[Ii]n\s+(?:the\s+)?|\b[Tt]riangle\s+)(${ULABEL})\s*(${ULABEL})\s*(${ULABEL})(?![A-Za-z\d])`));
@@ -10126,6 +10135,30 @@ const cevianFault = (
 };
 
 /**
+ * #1999 ([ADR-666](../../docs/06-decisions.md#adr-666)) — WHICH END OF A NAMED CEVIAN IS THE VERTEX: the figure says, never
+ * the letter order. `[x, y]` when `x` is the vertex, `[y, x]` when only `y` is, and `[x, y]` when neither is — so every
+ * vertex-first sentence, and every sentence whose letters name no vertex (the degenerate refusals), reads exactly as
+ * before. Each rule passes its own semantic predicate: the bisector the resolved angle's vertex; the median and the
+ * altitude the third vertex of a triangle on the stated side, a letter of the stated triangle, or a vertex of a
+ * figure polygon. «AM תיכון לצלע CD» after «משולש CMD» is therefore «MA תיכון לצלע CD».
+ */
+const cevianEnds = (x: Id, y: Id, isVertex: (v: Id) => boolean): [Id, Id] => (!isVertex(x) && isVertex(y) ? [y, x] : [x, y]);
+
+/** #1999 (ADR-666): the vertex predicate the median and the altitude share — a letter that can be the apex of a cevian
+ *  to `side` (the third vertex of a figure or stated triangle on it), to the stated triangle (one of its letters), or,
+ *  with neither stated, to a figure polygon holding it. Structure only (`ctx.polygons`, the sentence), never coordinates. */
+const cevianVertexOf = (s: string, ctx: ParseContext, side: readonly [Id, Id] | null): ((v: Id) => boolean) => {
+  const tri = statedTriangle(s)?.ring ?? null;
+  const rings = [...(ctx.polygons ?? []).map((p) => p.map(up)), ...(tri ? [tri as Id[]] : [])];
+  if (side) {
+    const [p, q] = side;
+    return (v) => v !== p && v !== q && rings.some((r) => r.length === 3 && r.includes(p) && r.includes(q) && r.includes(v));
+  }
+  if (tri) return (v) => tri.includes(v);
+  return (v) => rings.some((r) => r.includes(v));
+};
+
+/**
  * The altitude whose foot IS an endpoint of the side: «AB גובה לצלע BC» ⇒ AB ⟂ BC (#1247).
  *
  * It mints NO point — the foot the student named is a vertex the figure already has, and emitting a
@@ -10155,8 +10188,8 @@ const median: Rule = (s, ctx) => {
   if (sideM) body = body.replace(sideM.match, ' ');
   const seg = labelRun(body, 2);
   if (seg && seg[0] !== seg[1]) {
-    const apex = seg[0];
-    const foot = seg[1];
+    // #1999 (ADR-666): the figure says which end is the vertex — «AM תיכון לצלע CD» is «MA תיכון לצלע CD»
+    const [apex, foot] = cevianEnds(seg[0], seg[1], cevianVertexOf(s, ctx, side));
     let opp = side;
     if (!opp) {
       // No side stated: derive the opposite side from a triangle named in the
@@ -10246,20 +10279,68 @@ const median: Rule = (s, ctx) => {
   ];
 };
 
-/** The unique base OPPOSITE `apex` that a trapezoid height drops onto: among the figure's vertex-disjoint
- *  parallel edge-pairs (`ctx.parallels`), the partner edge of a pair whose OTHER edge carries the apex.
- *  Exactly one such base ⇒ return it (the trapezoid height); zero (a leg-only apex / a triangle, whose
- *  parallels are empty) or several (a parallelogram's two parallel pairs) ⇒ null, so the caller defers
- *  rather than guess a side (ADR-052 / ADR-169). */
-const oppositeParallelBase = (apex: Id, parallels?: [[string, string], [string, string]][]): [Id, Id] | null => {
+/**
+ * THE RING'S OWN PARALLEL PAIRS (#1965/#2090, [ADR-665](../../docs/06-decisions.md#adr-665); analytic's
+ * `ringParallelBase`, ADR-AG-253, ported). Among the figure's vertex-disjoint parallel edge-pairs
+ * (`ctx.parallels`, ADR-169), only those whose BOTH edges are sides of `ring`. A parallel stated anywhere else
+ * («AB מקביל ל-DE», «AC מקביל ל-KL») is not a base of this ring, so it can neither capture a triangle's height
+ * nor cancel a trapezoid's real base. The ONE reading of "a ring's parallel bases" — the cevian, the
+ * midsegment, «… מקביל לבסיסים» and the valueless «גובה הטרפז» all read it.
+ */
+const ringParallelPairs = (ring: readonly Id[], ctx: ParseContext): [[Id, Id], [Id, Id]][] => {
+  const r = ring.map(up);
+  const isEdge = (e: readonly string[]) => r.some((v, i) => sameSide(v, r[(i + 1) % r.length], up(e[0]), up(e[1])));
+  return (ctx.parallels ?? [])
+    .filter(([e1, e2]) => isEdge(e1) && isEdge(e2))
+    .map(([e1, e2]) => [e1.map(up) as [Id, Id], e2.map(up) as [Id, Id]]);
+};
+
+/** The drawn trapezoid's base pair for a sentence that names no ring («EF קטע אמצעים», «EL מקביל לבסיסים»;
+ *  #2090, [ADR-665](../../docs/06-decisions.md#adr-665)): the figure's quadrilaterals that hold at least one
+ *  parallel pair OF THEIR OWN — exactly one such ring, holding exactly one pair, names the bases. Several rings, or
+ *  a parallelogram's two pairs, are ambiguous ⇒ null (defer, never guess — ADR-052). */
+const trapezoidBasePair = (ctx: ParseContext): { bases: [[Id, Id], [Id, Id]]; ring: Id[] } | null => {
+  const owned = (ctx.polygons ?? [])
+    .filter((p) => p.length === 4)
+    .map((p) => ({ ring: p.map(up), pairs: ringParallelPairs(p, ctx) }))
+    .filter((o) => o.pairs.length > 0);
+  return owned.length === 1 && owned[0].pairs.length === 1 ? { bases: owned[0].pairs[0], ring: owned[0].ring } : null;
+};
+
+/** The unique base OPPOSITE `apex` that a trapezoid height drops onto: over every polygon holding the apex, among
+ *  that RING'S OWN parallel pairs (`ringParallelPairs`), the partner edge of a pair whose OTHER edge carries the
+ *  apex. Exactly one such base ⇒ return it (the trapezoid height); zero (a leg-only apex / a triangle) or several
+ *  (a parallelogram's two parallel pairs) ⇒ null, so the caller falls through rather than guess a side
+ *  (ADR-052 / ADR-169). Bounded to the ring by #1965 ([ADR-665](../../docs/06-decisions.md#adr-665)). */
+const ringParallelBase = (apex: Id, ctx: ParseContext): [Id, Id] | null => {
   const cands: [Id, Id][] = [];
-  for (const [e1, e2] of parallels ?? []) {
-    const in1 = e1.map(up).includes(apex), in2 = e2.map(up).includes(apex);
-    if (in1 === in2) continue; // apex on both (degenerate) or neither (a leg apex) — not this pair's base
-    const other = (in1 ? e2 : e1).map(up) as [Id, Id];
-    if (!cands.some((c) => (c[0] === other[0] && c[1] === other[1]) || (c[0] === other[1] && c[1] === other[0]))) cands.push(other);
+  for (const poly of ctx.polygons ?? []) {
+    const ring = poly.map(up);
+    if (!ring.includes(apex)) continue;
+    const opposite = oppositePolygonEdges(apex, [ring], null);
+    for (const [e1, e2] of ringParallelPairs(ring, ctx)) {
+      const in1 = e1.includes(apex), in2 = e2.includes(apex);
+      if (in1 === in2) continue; // apex on both (degenerate) or neither (a leg apex) — not this pair's base
+      const other = in1 ? e2 : e1;
+      if (!opposite.some((e) => sameSide(e[0], e[1], other[0], other[1]))) continue;
+      if (!cands.some((c) => sameSide(c[0], c[1], other[0], other[1]))) cands.push(other);
+    }
   }
   return cands.length === 1 ? cands[0] : null;
+};
+
+/**
+ * THE SIDE THE STUDENT ALREADY PUT THE FOOT ON (#1966, [ADR-665](../../docs/06-decisions.md#adr-665); analytic's
+ * ADR-AG-222 reading). Among the opposite sides of the polygons holding the apex, the single one that the figure
+ * already places `foot` on («E על BC»). A point the student placed outranks a base the tool assumed (the operator's
+ * ruling of 2026-10-10), so the altitude asks this BEFORE the ring's parallel base. `null`: no foot, no incidence,
+ * or the incidence is not on exactly one candidate side.
+ */
+const footNarrowedSide = (apex: Id, ctx: ParseContext, foot: Id | null): [Id, Id] | null => {
+  const on = foot ? ctx.onSegment?.[foot] : undefined;
+  if (!on) return null;
+  const hit = oppositePolygonEdges(apex, ctx.polygons, foot).filter((e) => sameSide(e[0], e[1], up(on[0]), up(on[1])));
+  return hit.length === 1 ? hit[0] : null;
 };
 
 /** Real EDGES of a polygon the apex belongs to that do NOT touch the apex — the legitimate bases a height
@@ -10308,11 +10389,8 @@ const cevianShapeEdges = (
 ): { edges: [Id, Id][] } | { shapes: string[]; side: string } => {
   const all = oppositePolygonEdges(apex, ctx.polygons, foot);
   const key = (e: readonly Id[]) => [...e].sort().join('|');
-  const on = foot ? ctx.onSegment?.[foot] : undefined;
-  if (on) {
-    const hit = all.filter((e) => key(e) === key(on.map(up)));
-    if (hit.length === 1) return { edges: hit };
-  }
+  const placed = footNarrowedSide(apex, ctx, foot); // #1966 (ADR-665): the one reading of "the placed foot"
+  if (placed) return { edges: [placed] };
   // #1742 ([ADR-642](../../docs/06-decisions.md#adr-642)) — A NAMED FOOT THAT IS A VERTEX OF THE ONE OPPOSITE
   // SIDE NAMES THAT SIDE. Excluding the foot as a base vertex is right while another side remains; when it
   // leaves NOTHING, the sentence named a segment from the apex to an endpoint of its shape's only opposite
@@ -10346,7 +10424,7 @@ const isVertexPair = (a: Id, b: Id, ctx: ParseContext): boolean => {
 };
 
 /** The named-altitude head, name-first: «AB גובה», «AB הוא גובה», "AB is the altitude" (the `altitude` rule's reader). */
-const NAMED_ALT_FIRST = rx(String.raw`^\s*\b(${LABEL})\s*(${LABEL})\b\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:height|altitude|גובה)`, 'i');
+const NAMED_ALT_FIRST = rx(String.raw`^\s*${CEVIAN_SUBJECT}(?:height|altitude|גובה)`, 'i'); // #1999 (ADR-666): the shared subject
 /** The named-altitude head, keyword-first: «הגובה AB», "the altitude AB". */
 const NAMED_ALT_KW = rx(String.raw`(?:height|altitude|גובה)\s+\b(${LABEL})\s*(${LABEL})\b`, 'i');
 
@@ -10484,13 +10562,13 @@ const altitude: Rule = (s, ctx) => {
   // like "to"/"in" sitting after the keyword is misread as two single-letter labels (T,O / I,N).
   const nm =
     isHeight && !apexM
-      ? (s.match(/^\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:height|altitude|גובה)/i) ?? // name-first "CD גובה …"
-        s.match(/(?:height|altitude|גובה)\s+\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i)) // keyword-first "הגובה CD …"
+      ? (s.match(NAMED_ALT_FIRST) ?? // name-first "CD גובה …" — #1999: the shared subject (the copula, "is an")
+        s.match(NAMED_ALT_KW)) // keyword-first "הגובה CD …"
       : null;
   const named = nm && isUpperLabel(nm[1]) && isUpperLabel(nm[2]) ? nm : null;
   if (named) {
-    apex = up(named[1]);
-    namedFoot = up(named[2]);
+    // #1999 (ADR-666): the figure says which end is the vertex — «AM גובה לצלע CD» is «MA גובה לצלע CD»
+    [apex, namedFoot] = cevianEnds(up(named[1]), up(named[2]), cevianVertexOf(s, ctx, statedSide(s)?.side ?? null));
   } else if (apexM) {
     apex = up(apexM[1]);
   } else {
@@ -10546,10 +10624,17 @@ const altitude: Rule = (s, ctx) => {
       if (shared.length === 1 && shared[0] === apex) return altitudeAtVertex(namedFoot, apex, [p, q]);
     }
   } else {
-    // A trapezoid height: the apex sits on one parallel base and drops perpendicular to the OPPOSITE base
-    // (ADR-169). The triangle inference below can't reach it — the apex's two neighbours are a diagonal, not
-    // an edge — so try the unique opposite parallel base first (empty for a triangle, so it never interferes).
-    const base = oppositeParallelBase(apex, ctx.parallels);
+    // #1965/#1966 ([ADR-665](../../docs/06-decisions.md#adr-665)) — WHICH SIDE, in analytic's order of authority
+    // (ADR-AG-222 / ADR-AG-253): (a) the side the student already placed the foot on («E על BC» — a placed point
+    // outranks a base the tool assumed, the operator's ruling of 2026-10-10); (b) a trapezoid height: the apex
+    // sits on one of ITS RING'S parallel bases and drops perpendicular to the OPPOSITE base (ADR-169) — read off
+    // the apex's own ring, so a parallel stated elsewhere neither captures nor cancels it; (c) below, the stated
+    // triangle, then the first opposite side. The triangle inference can't reach (b) — the apex's two neighbours
+    // are a diagonal, not an edge.
+    // A triangle the sentence itself names is a stated given: the placed-foot narrowing reads the figure's rings
+    // and must not overrule it (the ring base keeps its old precedence over the named triangle).
+    const namesTriangle = (labelRun((s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s).replace(/triangle|the/gi, ' '), 3) ?? []).filter((x) => x !== apex).length === 2;
+    const base = (namesTriangle ? null : footNarrowedSide(apex, ctx, namedFoot)) ?? ringParallelBase(apex, ctx);
     if (base) {
       [p, q] = base; // tri stays null — the trapezoid already exists; don't re-emit a shape
     } else {
@@ -10798,7 +10883,7 @@ const bisectorRoleNounOnSide = (s: string, ctx: ParseContext): Extract<Clarify, 
 const bisectorPlacesPoint: Rule = (s, ctx) => {
   if (!/bisects?|חוצ/i.test(s)) return null;
   if (INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s)) return null; // intersection rules own that phrasing
-  const seg = s.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:bisects?|חוצ\w*)/i);
+  const seg = s.match(BISECTOR_SUBJECT); // #1999 (ADR-666): the copula and the English role noun are read here too
   if (!seg) return bisectorRoleNounOnSide(s, ctx);
   const apex = up(seg[1]);
   const D = up(seg[2]);
@@ -10822,7 +10907,10 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
   // #1285: the triangle is read BEFORE the keyword strip — «angle» is a substring of «triangle», and the
   // strip would leave "in tri ABC": the English form of the very defect this fixes.
   const triangle = statedTriangle(tail);
-  let after = (triangle ? tail.replace(triangle.match, ' ') : tail).replace(/bisects?|חוצ\w*|angles?|the|את|הזוו?ית|זוו?ית|של/gi, ' ');
+  // #1999 (ADR-666): the English role noun («bisector of») and its lowercase fillers are stripped too — never read as labels
+  let after = (triangle ? tail.replace(triangle.match, ' ') : tail)
+    .replace(/bisectors?|bisects?|חוצ\w*|angles?|the|את|הזוו?ית|זוו?ית|של/gi, ' ')
+    .replace(/\b(?:of|is|an?)\b/g, ' ');
   const statedInAfter = statedSide(after);
   if (statedInAfter) after = after.replace(statedInAfter.match, ' ');
   /**
@@ -10888,8 +10976,18 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
     else return null;
   }
   const vertex = tri[1];
-  if (vertex === apex) {
-    // "AD bisects ∠BAC": the segment's FIRST letter is the angle vertex.
+  /**
+   * #1999 ([ADR-666](../../docs/06-decisions.md#adr-666)) — ONE LOWERING, WHICHEVER LETTER OF THE SEGMENT IS THE VERTEX.
+   * The resolved angle's vertex says which end the bisecting ray runs from (`cevianEnds`, the figure's answer, never
+   * the letter order): «MA חוצה זווית CMD» and «AM חוצה זווית CMD» are one sentence. The vertex-last order used to
+   * have its own branch that emitted only `set-angle-ratio` — a new far point referenced before it was defined
+   * («… references an unknown point»), the stated side never read, the segment never drawn. Now both orders run the
+   * body below over (near = the vertex, far = the other letter).
+   */
+  const [near, far] = cevianEnds(apex, D, (v) => v === vertex);
+  if (near !== vertex) return null;
+  {
+    // "AD bisects ∠BAC": the segment's vertex letter is the angle vertex.
     const [o1, o2] = tri.filter((t) => t !== vertex);
     if (o2 === undefined) return null;
     /**
@@ -10900,8 +10998,8 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
      * and before the stated side («AB חוצה זווית לצלע BC» is the same side). The operator's rulings of 2026-10-14
      * (#2066: the triangle sentence; #2085 item 3: «…צלע של המרובע…» for every other declared polygon).
      */
-    if (D === o1 || D === o2) {
-      const side = onSide(apex, D === o1 ? o2 : o1);
+    if (far === o1 || far === o2) {
+      const side = onSide(near, far === o1 ? o2 : o1);
       if (side) return side;
     }
     /**
@@ -10911,16 +11009,16 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
      * drawing D on AC while the sentence says BC is the given-vanishing this issue is about.
      */
     if (stated && !(stated.side.includes(o1) && stated.side.includes(o2))) {
-      return { clarify: 'cevian-wrong-side', apex, stated: stated.side, actual: [o1, o2] };
+      return { clarify: 'cevian-wrong-side', apex: near, stated: stated.side, actual: [o1, o2] };
     }
     // If the bisector-foot point D ALREADY EXISTS (e.g. "G on DF" was placed first, then "EG bisects ∠DEF"),
     // DON'T re-create it — that's a redefinition conflict ("'G' is already defined"). It's a CONSTRAINT:
     // EG bisects ∠DEF ⇔ ∠(o1, vertex, D) = ∠(D, vertex, o2), which drives the existing point (on its
     // segment DOF) onto the bisector. (ADR-107.)
-    if ((ctx.points ?? []).includes(D)) {
+    if ((ctx.points ?? []).includes(far)) {
       return [
-        { type: 'set-angle-ratio', v1: vertex, a1: o1, b1: D, v2: vertex, a2: D, b2: o2, k: 1 },
-        { type: 'segment', a: apex, b: D },
+        { type: 'set-angle-ratio', v1: vertex, a1: o1, b1: far, v2: vertex, a2: far, b2: o2, k: 1 },
+        { type: 'segment', a: near, b: far },
       ];
     }
     // …else place D where the bisector meets the opposite side (a new point).
@@ -10929,22 +11027,10 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
     return [
       { type: 'bisector', id: bisId, vertex, p: tri[0], q: tri[2] },
       { type: 'line-through', id: lineId, a: o1, b: o2 },
-      { type: 'line-intersection', id: D, line1: bisId, line2: lineId },
-      { type: 'segment', a: apex, b: D },
+      { type: 'line-intersection', id: far, line1: bisId, line2: lineId },
+      { type: 'segment', a: near, b: far },
     ];
   }
-  if (vertex === D && (tri[0] === apex || tri[2] === apex)) {
-    // #2066 (ADR-643): «AB חוצה את זווית ABC» — the segment is an arm of the angle at its own far end B
-    const side = onSide(D, tri[0] === apex ? tri[2] : tri[0]);
-    if (side) return side;
-  }
-  if (vertex === D) {
-    // "AC bisects ∠ECD": the angle's vertex (C) is the segment's SECOND letter, and the bisecting
-    // ray runs from the vertex through the EXISTING point `apex` (A). All points exist ⇒ this is a
-    // CONSTRAINT: the two half-angles are equal, ∠(ray1,vertex,apex) = ∠(apex,vertex,ray2).
-    return [{ type: 'set-angle-ratio', v1: vertex, a1: tri[0], b1: apex, v2: vertex, a2: apex, b2: tri[2], k: 1 }];
-  }
-  return null;
 };
 
 /**
@@ -12663,7 +12749,8 @@ const normalizeWordEquality = (s: string): string =>
     .replace(/\b(?:equals|is\s+equal\s+to)\s+(?=(?:the\s+)?(?:angle|∠|arcs?|⌢))/gi, '= ')
     .replace(/\b(?:equals|is\s+equal\s+to)\s+(?=-?\d+(?:\.\d+)?\s*(?:°|degrees?))/gi, '= ')
     .replace(new RegExp(String.raw`(?<![א-ת])(?:היא|הוא|שוו(?:ה|ות))(?![א-ת])\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:ה?זוו?ית|∠|∢)\s*${LABEL}|${NUM}\s*[*·]?\s*(?:ה?קשת|⌢)\s*${LABEL})`, 'g'), '= ')
-    .replace(new RegExp(String.raw`\b(?:is|are)\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:the\s+)?(?:angle|∠|∢)\s*${LABEL}|${NUM}\s*[*·]?\s*(?:the\s+)?(?:arcs?|⌢)\s*${LABEL})`, 'gi'), '= ');
+    // #1999 (ADR-666): "is the angle bisector of …" names a cevian, not an angle — «angle» there is the role noun's first word
+    .replace(new RegExp(String.raw`\b(?:is|are)\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:the\s+)?(?:angle(?!\s+bisector)|∠|∢)\s*${LABEL}|${NUM}\s*[*·]?\s*(?:the\s+)?(?:arcs?|⌢)\s*${LABEL})`, 'gi'), '= ');
 
 /**
  * A trailing UNIT word is not part of the value (#1157).
@@ -12922,8 +13009,7 @@ function shapeHeight(s: string, ctx: ParseContext): AnyCommand[] | Clarify | nul
   const ask = (options: string[]): Clarify => ({ clarify: 'ambiguous-construct', noun: he ? 'גובה' : 'height', options });
   if (ring.length === 3) return ask([[ring[1], ring[2]], [ring[0], ring[2]], [ring[0], ring[1]]].map((sd) => option(null, sd)));
   if (ring.length !== 4) return null;
-  const isEdge = (e: readonly string[]) => ring.some((v, i) => sameSide(v, ring[(i + 1) % 4], up(e[0]), up(e[1])));
-  const bases = (ctx.parallels ?? []).filter(([e1, e2]) => isEdge(e1) && isEdge(e2));
+  const bases = ringParallelPairs(ring, ctx); // #1965 (ADR-665): the one reading of a ring's parallel bases
   // a parallelogram's two heights differ — the two sides opposite the first vertex name them
   if (k === 'parallelogram' || (k === 'trapezoid' && bases.length === 2)) return ask([option(ring[0], [ring[2], ring[3]]), option(ring[0], [ring[1], ring[2]])]);
   if (k !== 'trapezoid' || bases.length !== 1) return null;

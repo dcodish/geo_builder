@@ -18,6 +18,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { parseLine } from '../parser/parseAnalytic';
+import { derive } from '../engine/derive';
 
 const outcome = (line: string): string => {
   const r = parseLine(line);
@@ -88,14 +89,15 @@ describe('ADR-AG-110 — the role’s own incidence is checked (#1231)', () => {
    * teaches «AD תיכון לצלע BC»; it is asserted here, driven, not read.
    */
   it('the spelling the refusal message teaches builds', () => {
-    const r = parseLine('AD תיכון לצלע BC');
-    expect(r.ok).toBe(true);
-    if (r.ok) {
-      // and it lowers to the full conjunction ADR-AG-109 established — incidence AND the role
-      const kinds = r.facts.flatMap((f) => ('k' in f && f.k ? [(f.k as { t: string }).t] : []));
-      expect(kinds).toContain('on-line-2pt');
-      expect(kinds).toContain('midpoint');
-    }
+    expect(parseLine('AD תיכון לצלע BC').ok).toBe(true);
+    // and it lowers to the full conjunction ADR-AG-109 established — incidence AND the role
+    // #1999 (ADR-AG-278): the named cevian is a `cevian-of` the figure orients at M1, so the conjunction is read where it
+    // is applied — in the construction, after «משולש ABC» — not in the parse.
+    const d = derive(['משולש ABC', 'AD תיכון לצלע BC'], 0);
+    expect(d.faults).toEqual([]);
+    const kinds = d.construction.constraints.map((k) => k.t as string);
+    expect(kinds).toContain('on-line-2pt');
+    expect(kinds).toContain('midpoint');
   });
 
   /**
@@ -104,12 +106,13 @@ describe('ADR-AG-110 — the role’s own incidence is checked (#1231)', () => {
    * would quietly drop a leg.
    */
   it('the altitude still lowers to both halves of its definition', () => {
-    const r = parseLine('AD גובה לצלע BC');
-    expect(r.ok).toBe(true);
-    if (r.ok) {
-      const kinds = r.facts.flatMap((f) => ('k' in f && f.k ? [(f.k as { t: string }).t] : []));
-      expect(kinds).toContain('on-line-2pt');
-      expect(kinds).toContain('perpendicular');
-    }
+    expect(parseLine('AD גובה לצלע BC').ok).toBe(true);
+    // #1999 (ADR-AG-278): the named cevian is a `cevian-of` the figure orients at M1, so the conjunction is read where it
+    // is applied — in the construction, after «משולש ABC» — not in the parse.
+    const d = derive(['משולש ABC', 'AD גובה לצלע BC'], 0);
+    expect(d.faults).toEqual([]);
+    const kinds = d.construction.constraints.map((k) => k.t as string);
+    expect(kinds).toContain('on-line-2pt');
+    expect(kinds).toContain('perpendicular');
   });
 });

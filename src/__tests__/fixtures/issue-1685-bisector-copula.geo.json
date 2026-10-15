@@ -1,0 +1,72 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T08:00:00.000Z",
+  "name": "issue-1685-bisector-copula",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "bGPAi8f-AHYHsY2EY6D0c",
+      "utterance": "משולש CMD",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "C",
+          "M",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "PDicq9AoY3rNKzOeT_Htt",
+      "utterance": "AM הוא חוצה זווית CMD",
+      "group": "g1",
+      "cmd": {
+        "type": "bisector",
+        "id": "bis-CMD",
+        "vertex": "M",
+        "p": "C",
+        "q": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "ZdreD_X_1JInzx72nOtnh",
+      "utterance": "AM הוא חוצה זווית CMD",
+      "group": "g1",
+      "cmd": {
+        "type": "line-through",
+        "id": "line-CD",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "MYvayhWJrd_3XeuMmyO17",
+      "utterance": "AM הוא חוצה זווית CMD",
+      "group": "g1",
+      "cmd": {
+        "type": "line-intersection",
+        "id": "A",
+        "line1": "bis-CMD",
+        "line2": "line-CD"
+      },
+      "enabled": true
+    },
+    {
+      "id": "ebmJfawqV6TD_CwqfA2gN",
+      "utterance": "AM הוא חוצה זווית CMD",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "M",
+        "b": "A"
+      },
+      "enabled": true
+    }
+  ]
+}
