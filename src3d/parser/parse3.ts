@@ -23,7 +23,7 @@ import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
 import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, RevolutionKind, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
-import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, soleSymOf, symsOfAffine } from '../engine/types';
+import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, ringCircleId3, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX, SOLID_QUALIFIER_HE } from '../lexicon/nouns3';
 import { foldPrimes3, VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
 import { POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_WORDS3, statedPolygonArity3, type ShapeAdj3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
@@ -4653,8 +4653,10 @@ const polygonCircle3: Rule = (s) => {
   // implicit-reference lane (`c.circles3.length === 1`) still resolves «המעגל»
   // #1975 (ADR-3D-341): the one reading of the circle's name (CIRCLE_NAME3), which the ring reader also sets aside
   const named = [...s.matchAll(CIRCLE_NAME3)][0] ?? null;
-  const id = named ? `circle-${named[1]}` : `circle-${ring.join('')}`;
+  // #2125 (ADR-3D-342): an unnamed circle is keyed by (kind, ring) — the circumcircle and the incircle of one ring
+  // are two circles, and keyed by the ring alone the second was refused «כבר מוגדר»
   const def: Circle3Def = circleIsContainer ? { kind: 'circum', ring } : { kind: 'incircle', ring };
+  const id = named ? `circle-${named[1]}` : ringCircleId3(def.kind, ring);
   // #1792: an adjective this noun cannot carry — or a bare adjective on a ring that is not a triangle's —
   // declines the rule. Escalating is honest; committing the polygon without it is the silent drop.
   const phrase = readShapePhrase3(s);

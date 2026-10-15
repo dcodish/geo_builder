@@ -5,9 +5,10 @@
 import { MAX_FIGURE_STATEMENTS } from '../../shell/save';
 import type { StoreError3 } from '../store/store3';
 
-/** ADR-3D-318: an engine id's student-facing letters — `circle-ABCD` → `ABCD`; a bare label is itself. */
+/** ADR-3D-318: an engine id's student-facing letters — `circle-ABCD` → `ABCD`; a bare label is itself.
+ *  #2125 (ADR-3D-342): the incircle's `circle-in-ABC` is the ring's letters too. */
 export function studentLetters3(id: string): string {
-  const m = /^[a-z]+-(.+)$/.exec(id);
+  const m = /^[a-z]+-(?:in-)?(.+)$/.exec(id);
   return m ? m[1] : id;
 }
 

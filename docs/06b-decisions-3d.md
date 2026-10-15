@@ -12757,3 +12757,22 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 **Locks.** `src3d/__tests__/inscription-voices-1975.test.ts`; fixtures `fixtures3/named-circle-circumscribes-1975.geo3.json` and `relative-clause-incircle-1975.geo3.json`; parity rows `voices-*-1975`; catalog row «מעגל O חוסם את המשולש ABC».
 
 **Behaviour change for a student:** «מעגל O חוסם את המשולש ABC» and «מעגל O חסום במשולש ABC» (the square, and English, too) now draw the circle named O, as the other voice does; before, not understood. «מעגל ש-ABC חוסם» now draws the circle inside the triangle; before, the circle through its vertices.
+
+## ADR-3D-342 — An unnamed circle of a ring is keyed by (kind, ring): the circumcircle and the incircle of one triangle are two circles (#2125)
+
+**Status:** accepted · 2026-10-15 · bug (P2) · fix round #2128, stream B · branch `fix/2125-3d-incircle-id`
+**Requirements:** [02b](02b-requirements-3d.md) the inscription requirement (a triangle carries both of its circles) · **Design:** [04b](04b-design-3d.md) § "An unnamed circle of a ring is keyed by (kind, ring)" · **LADDER stage:** none (naming)
+
+**Measured before** (`b0ef3240`, `decideSubmit3`, as the issue measured at e4d52c83). After «משולש ABC», «מעגל חוסם את ABC» · «מעגל חסום במשולש ABC» refused the second line `already-defined` (`circle-ABC`, «"ABC" כבר מוגדר בציור»); so did «משולש ABC חסום במעגל» first, the other order, and «ABC חוסם מעגל» · «משולש ABC חסום במעגל». Named circles («…חסום במעגל O» · «מעגל P חסום במשולש ABC») already built both. 2-D builds both in every row.
+
+**Class.** *Two unnamed circles of different kinds on the same ring collide on one id, so the second is refused as «already defined».* **Root cause.** `polygonCircle3` minted an unnamed circle's id from the ring alone (`circle-${ring}`), whatever the circle was, so the circumcircle and the incircle of ABC were the same id to apply's duplicate check.
+
+**Decision.** `ringCircleId3(kind, ring)` in engine/types is the one minting point: the circumcircle keeps `circle-ABC` (every saved file and lock stays valid), the incircle becomes `circle-in-ABC`, analytic's spelling (`incircleId`), so the two tools share one convention. The duplicate-id check is untouched: a same-kind restatement in another spelling records identical commands and is answered `already-stated` as before. Saved files replay their stored commands, so an old file whose incircle holds `circle-ABC` loads unchanged. `studentLetters3` strips the `in-` too, so a refusal naming the incircle names «ABC» (ADR-3D-318). The quadrilateral pair joins the class when #1838 lands (today its incircle refuses `incircle-needs-triangle`).
+
+**Sibling audit.** Grepped every `circle-` id minted in `src3d/`: the tangent circle (`circle-<centre>`) and a named circle are keyed by a letter the student typed, so only the ring rule had the class. **2-D** keys circles by centre and gives each unnamed circle its own derived centre: builds both. **Analytic** already keys the incircle `circle-in-<ring>`; it builds both when the circumcircle comes first, but refuses an UNNAMED circumcircle stated after the incircle `unsatisfiable` in every spelling. That is a different cause (no id collision), filed as #2130 (`needs-operator`, proposed P2) and recorded as a known gap on the parity row `incircle-then-circum-2125`. **Complex** has no inscription circles.
+
+**Locks.** `src3d/__tests__/issue-2125-incircle-id.test.ts` (both orders × three circumcircle spellings × three incircle spellings, a pyramid's face, named circles, same-kind restatements in another spelling, the refusal's letters, an old-file load); fixture `fixtures3/circum-and-incircle-2125.geo3.json` (the operator's sequence); `relative-clause-incircle-1975.geo3.json` re-recorded to the incircle's new id (the drift is this decision); parity rows `circum-then-incircle-2125`, `incircle-then-circum-2125`, `circum-passive-then-incircle-2125`.
+
+**Not changed.** A circle's carrier plane is still registered under the circle's id, so the incircle's plane reads «circle-in-ABC» where it read «circle-ABC»: the internal-id plane label is #2126 (`needs-operator`), untouched here.
+
+**Behaviour change for a student:** after «משולש ABC» · «מעגל חוסם את ABC», «מעגל חסום במשולש ABC» draws the incircle beside the circle through the vertices, in either order and voice; before, refused «"ABC" כבר מוגדר בציור». Stating the same circle twice is still answered as already in the figure.

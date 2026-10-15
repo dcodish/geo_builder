@@ -32,7 +32,7 @@
         },
         {
           "type": "circle3",
-          "id": "circle-ABC",
+          "id": "circle-in-ABC",
           "def": {
             "kind": "incircle",
             "ring": [
