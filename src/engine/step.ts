@@ -1179,9 +1179,20 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   // (n − 2)·180° is impossible in the plane. Without this the solver found nothing, the step failed on
   // its own, and the classifier's flex probe filed the contradiction as a PENDING "add the remaining
   // givens". Same one-way soundness as the metric gate above.
+  // #1936 (ADR-658): the prover reads every spelling of a stated angle (a value, «זווית X ישרה», a ⟂ of the two
+  // sides at the vertex), and stated angles that leave an unstated one no room (two right angles of a triangle)
+  // are as impossible as an excess. That verdict is the NEW statement's over-constraint, so the fold's drop-one
+  // search names the statement it contradicts («לא ניתן: «AC ⊥ BC» סותר את «AB ⊥ BC»…»); an excess keeps the
+  // curriculum sentence.
   const angleErr = angleSumImpossibility(probed.objects, probed.constraints);
   if (angleErr) {
-    return { ok: false, error: angleSumImpossibilityError(angleErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+    // A line that adds no constraint of its own (the polygon declared over corners already stated) names the angles.
+    const newCons = probed.constraints.slice(prev.constraints.length);
+    const what = newCons.length
+      ? describeConstraint(describeNewStatement(newCons))
+      : angleErr.angles.map((a) => `∠${a.ray1}${a.vertex}${a.ray2} = ${Number(a.value.toFixed(2))}°`).join(' and ');
+    const error = angleErr.kind === 'no-room' ? `over-constrained: ${what} cannot hold` : angleSumImpossibilityError(angleErr);
+    return { ok: false, error, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
   // #1849 (ADR-602), stage 0h: the EQUALITY the metric prover lets through — a declared polygon its length givens
   // force flat («משולש ABC» · «AB = 5» · «BC = 3» · «AC = 8»). Proven, so the refusal does not depend on where the

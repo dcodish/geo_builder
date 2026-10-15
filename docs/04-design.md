@@ -1044,6 +1044,8 @@ press); `admissibleRewrites` enumerates every axis but `variant` (sampled by `va
 test) tries the `variant` and `side` axes, fewest changes first; `App.tsx` enables the button when any axis or free
 DOF exists.
 
+The seat is **pinned** by the student's own right angle, read from one set, `explicitRightAngleVerts` (ADR-445), that the ADR-163 reseat pre-scan, `cyclableSeat` and `unpinnedSeats` all consult: a 90° `set-angle`, and since [ADR-658](06-decisions.md#adr-658) (#2082) a `set-perpendicular` whose two segments meet at one vertex V of an enabled right triangle with their other ends its other two vertices (every ⟂ spelling and every height that lowers to one; structure only, never positions). The set is in fact order, so of two right angles stated on one right triangle the earlier keeps the seat, and the later line meets the angle-sum prover's `no-room` verdict (LADDER stage 0f) and is refused at the door, naming the earlier statement through the fold's drop-one search ([ADR-508](06-decisions.md#adr-508)). A noun's default seat (`seat: true` ⟂ or perp-offset knee) is never read as a stated angle by that prover.
+
 **The crossing count is evaluate's own selection:** `crossingChoice` (`engine/evaluate.ts`) returns the roots and
 the pick, `tryEval` draws it, and `crossingBranchCount` (behind `branchCount`) counts; an `avoid` that is a
 crossing, a single in-segment root or a tangent is 1, an `avoid` that is not a crossing is an ordinary pick

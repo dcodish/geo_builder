@@ -49,7 +49,7 @@ const sharedVertex = (a: Id, b: Id, c: Id, d: Id): Id | null => {
  * a side «the hypotenuse». The right-triangle noun's own right angle (its perp-offset, or its `seat` constraint)
  * sits at a DEFAULT vertex the student never named, so it is not read here — see {@link openRightTriangles}. A
  * stated «זווית C ישרה» / «∠ACB = 90» / «AC ⟂ BC» lowers to its own constraint (the ADR-163 reseat moves the
- * noun's seat onto it, and the constraint stays).
+ * noun's seat onto it at whichever vertex it names — the ⟂ spelling too since #2082, ADR-658 — and the constraint stays).
  */
 function statedRightAngles(construction: Construction, vs: Id[]): Set<Id> {
   const inTri = (id: Id): boolean => vs.includes(id);

@@ -5616,6 +5616,10 @@ This entry is the citable source for each ruling until the pedagogy charter (doc
 
 So: §1's thesis and P6's reason are his; the trace (ADR-AG-062) stays; the relations layer stays 2-D only; and with three or more values no value is shown and the student cycles configurations.
 
+**ADR-W-118 Amendment 2 (2026-10-15): B1 means ONE VERDICT, not "2-D always wins" (#1936).** The operator's rulings of 2026-10-09 and 2026-10-10 on #1936, the first parity case where 2-D was the LENIENT tool: «משולש ישר זווית ABC» · «AB ⊥ BC» · «AC ⊥ BC» parked a red deferred row in 2-D while 3-D and analytic refused it. Verbatim: *"All three tools refuse immediately, naming both statements. A pending row that can never clear is not really pending."*, and (2026-10-10) *"yes — 2-D follows the other two"*, at P2.
+
+The precedent, for every later parity case: **B1 asks for one verdict per plane-geometry sentence. Where 2-D is the lenient tool and its leniency shows the student something that can never resolve (a pending row no later given can clear), parity resolves toward the honest refusal, and 2-D changes.** Where 2-D's leniency is a real deferral (a row a later given can clear), 2-D stays the reference. Realised for the second right angle by [ADR-658](06-decisions.md#adr-658) (2-D refuses at once, naming both statements; 3-D and analytic unchanged). **Requirements:** [02w](02w-requirements-workspace.md) FR-SU-16 · **Design:** none (a precedent; the mechanism is ADR-658's).
+
 ## ADR-W-119 — The C4 documentation guards: a superseded ADR says so, requirement ids are unique, a cited ladder lists its ADR, instruction files point at live docs, a parity gap names open work or is parked, MEMORY.md has a ceiling (#1861)
 
 **Status:** accepted · 2026-10-07 · process (#1861 step 5) · implements ruling C4 of [ADR-W-118](#adr-w-118), and B15 for the parity rows.

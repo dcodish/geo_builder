@@ -56,6 +56,7 @@
     "src/app/__tests__/issue-1790-shape-phrase.test.ts",
     "src/app/__tests__/issue-1888-unread-corpus-net.test.ts",
     "src/app/__tests__/issue-1913-cyclic-member-lowering.test.ts",
+    "src/app/__tests__/issue-1936-false-refusal-net.test.ts",
     "src/app/__tests__/resolve-view.test.ts",
     "src/engine/__tests__/dof-vacuous.test.ts",
     "src/engine/__tests__/issue-1328-tolerance-artefact.test.ts",

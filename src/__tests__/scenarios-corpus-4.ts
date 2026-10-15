@@ -4597,6 +4597,26 @@ export const SCENARIOS_4: Scenario[] = [
       expect(said(crossingFirst, 'OP = 5', w)).toBe(`לא ניתן: «OP = 5» סותר את «${CROSS}» — אי אפשר לקיים את שניהם יחד. הסיבה: X מתלכדת עם Y.`);
     },
   },
+  {
+    id: 'second-right-angle-refused-1936',
+    title: '«משולש ישר זווית ABC · AB ⊥ BC · AC ⊥ BC»: the ⟂ moves the right angle to B, and the second right angle is refused at once naming both statements (#1936 + #2082, ADR-658)',
+    guards:
+      "Operator rulings 2026-10-09 / 2026-10-10 on #1936: *\"All three tools refuse immediately, naming both statements. A pending row that can never clear is not really pending.\"* Measured on b0ef3240 through the browser path (decideDeterministic2D → commitVerdict → autoResolve): line 2 reseated only through the post-commit config search, and line 3 committed as a red deferred row «over-constrained: AC ⟂ BC cannot hold» with the search exhausted. Root cause: the angle-sum prover read only `angle` constraints and only a sum strictly past 180°, so two right angles (exactly 180° with a third angle owed), and any ⟂ spelling of an angle, reached the flex probe and parked. Fix (ADR-658): the prover reads every spelling of a stated angle and refuses stated angles that leave an unstated one no room; the ⟂ also pins the right-triangle seat (#2082), so line 2 reseats in the fold. Class matrix: src/app/__tests__/issue-1936-second-right-angle.test.ts; false-refusal net: issue-1936-false-refusal-net.test.ts.",
+    // The refused line never becomes a fact, so it is driven through the submit gate in `check`, not listed as a step.
+    steps: ['משולש ישר זווית ABC', 'AB ⊥ BC'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), 'line 2 moved the right angle to B').toBeCloseTo(90, 6);
+      const facts = factsOf(['משולש ישר זווית ABC', 'AB ⊥ BC']);
+      const v = gateVerdict(facts, 'AC ⊥ BC');
+      expect(v.kind === 'refused' && v.reason, '«AC ⊥ BC» is refused at once, never parked').toBe('error');
+      const d = (v as { detail?: string }).detail;
+      const he = i18n.getFixedT('he');
+      expect(humanizeError(d, he as never, 'AC ⊥ BC', otherUtteranceForError(facts, d)).replace(/[⁦-⁩]/g, '')).toBe(
+        'לא ניתן: «AC ⊥ BC» סותר את «AB ⊥ BC» — אי אפשר לקיים את שניהם יחד. הסיבה: AC ⟂ BC.',
+      );
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */
