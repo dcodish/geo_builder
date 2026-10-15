@@ -181,7 +181,14 @@ export type ParseResult =
    * does accept: «קשת CD שווה לקשת DE». `a`/`b` are the student's own arc labels, so the offer is
    * their line with one word changed.
    */
-  | { ok: false; reason: 'arc-copula'; a: string; b: string };
+  | { ok: false; reason: 'arc-copula'; a: string; b: string }
+  /**
+   * #2041 (ADR-664, operator ruling 2026-10-13, cards `d4-2041` C and `d5-2041-wording` A): an arc given a value that
+   * is neither a plain number (degrees) nor a π expression (its length, #2032) — a letter, a Greek letter, a root, a
+   * multiple of a letter — does not say whether degrees or length is meant. The tool asks, teaching both sentences
+   * with the student's own letters, centre and value: «∠AOB = x» and «אורך הקשת AB הוא x».
+   */
+  | { ok: false; reason: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string };
 
 /**
  * Figure context the parser may consult to resolve implicit references — chiefly
@@ -381,7 +388,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -3186,6 +3193,51 @@ const arcEquality: Rule = (s, ctx) => {
   return [{ type: 'set-angle-ratio', v1: O, a1: left[0], b1: left[1], v2: O, a2: right[0], b2: right[1], k, arcOf: circleId(center) }];
 };
 
+/** «קשת AB = v» where v is not a degree number: the arc noun, its two letters, a copula, and the value. The copula
+ *  set is `roundMeasure`'s («= / הוא / היא / שווה ל-», "is"); a trailing circle reference is tolerated as after a degree. */
+const ARC_SIZE_RX = new RegExp(
+  String.raw`^(.*?)(?:=|(?<![א-ת])(?:הוא|היא)(?![א-ת])|(?<![א-ת])שווה\s*ל-?|\bis\b)\s*(.+?)\s*(?:(?:ב-?)?(?:ה?מעגל|in\s+circle|circle)\s+${LABEL}\s*)?$`,
+  'is',
+);
+/** A symbolic value carries a letter (Latin or Greek) or a root — neither degrees nor a π length. Which symbolic
+ *  values are ASKED about is decided by the readers of the two taught sentences (`arcSize`), not by this test. */
+const ARC_SYMBOL_MARK = /[a-zα-ω√]/;
+
+/**
+ * ONE VERDICT FOR AN ARC'S VALUE ([ADR-664](docs/06-decisions.md#adr-664), #2032, #2041). A degree number is
+ * `arcValue`'s. Any other value used to fall through to the LENGTH readers (`measurePi`, `measureLength`,
+ * `measureSqrt`), which read «AB = v» out of the sentence and dropped the arc noun — the chord AB = v, green
+ * (ADR-335's family, for the non-degree values). Now:
+ *  - a π value («4π», «π») is the arc's LENGTH (operator ruling 2026-10-13, #2032) — exactly the command
+ *    «אורך הקשת AB הוא 4π» commits, through `roundSize`; no single drawn arc → 'stop' (escalate), never the chord;
+ *  - a symbol (a letter, a Greek letter, a root, a multiple of a letter) is ASKED about (ruling 2026-10-13, #2041):
+ *    degrees or length? The question teaches «∠AOB = x» and «אורך הקשת AB הוא x», which build on the drawn arc. With
+ *    no single drawn arc the length sentence would not build, so the line escalates instead — never the chord;
+ *  - anything else («2π/3») is left as it was (null).
+ */
+function arcSize(s: string, ctx: ParseContext): ReturnType<Rule> {
+  const m = s.match(ARC_SIZE_RX);
+  if (!m || /אורך|length|[+−]/i.test(m[1]) || !/arc|קשת|⌢|⏜/i.test(m[1])) return null; // «אורך הקשת …» is roundMeasure's; sums are measureSum's
+  const stripped = dropCircleRef(m[1]).replace(/arcs?|הקשת|קשת|⌢|⏜|[{}]|\bin\b|\bof\b|של|ב-?/gi, ' ');
+  const pair = labelRun(stripped, 2);
+  if (!pair || (stripped.match(/[A-Z]\d*/g) ?? []).length !== 2) return null;
+  const value = m[2].trim();
+  if (roundValue(value)?.pi) return roundSize(ctx, 'arc', pair, value);
+  if (!ARC_SYMBOL_MARK.test(value)) return null;
+  const arc = namedArc(ctx, pair);
+  if (!arc) return 'stop';
+  const center = up(arc.center.replace(/^@ctr-/, ''));
+  // The question TEACHES two sentences, so it is asked only when the tool reads both (docs/17 §9: a taught remedy is
+  // a grammar claim, read from the readers themselves). Today a Greek letter has no arc-length reading and a root no
+  // angle reading: those lines escalate — never the chord — until the reader they lack exists (ADR-664).
+  const reads = (taught: string) => {
+    const r = runRules(taught, ctx);
+    return r.ok && droppedGivenNumbers(taught, r.commands).length === 0; // read whole: no stated number dropped
+  };
+  if (!reads(`∠${pair[0]}${center}${pair[1]} = ${value}`) || !reads(`אורך הקשת ${pair[0]}${pair[1]} הוא ${value}`)) return 'stop';
+  return { clarify: 'arc-value-ambiguous', value, a: pair[0], b: pair[1], center };
+}
+
 /**
  * "קשת AB = 40" / "arc AB = 40°" / "⌢{AB} = 40" — an ABSOLUTE arc-measure given (operator request at the
  * ADR-335 play-gate). An arc's measure IS its central angle (ADR-116), so this lowers to `set-angle` at
@@ -3202,7 +3254,7 @@ const arcValue: Rule = (s, ctx) => {
   if (/midpoint|אמצע/i.test(s)) return null; // "midpoint of arc …" → arcMidpoint
   // the circle reference may trail the VALUE («arc AB = 40 in circle O») — tolerate it after the number
   const m = s.match(/^(.*?)=\s*(-?\d+(?:\.\d+)?)\s*°?\s*(?:(?:ב-?)?(?:ה?מעגל|in\s+circle|circle)\s+[A-Za-z]\d*\s*)?$/is);
-  if (!m) return null; // no numeric RHS — the ratio/equality forms belong to arcEquality/measureSum
+  if (!m) return arcSize(s, ctx); // not a degree number: a π value is the arc's LENGTH, a symbol is asked about (ADR-664)
   const stripped = dropCircleRef(m[1]).replace(/arcs?|הקשת|קשת|⌢|⏜|[{}]|\bin\b|\bof\b|של|ב-?/gi, ' ');
   const pair = labelRun(stripped, 2);
   if (!pair || (stripped.match(/[A-Z]\d*/g) ?? []).length !== 2) return null; // not a single-arc value shape
@@ -4404,15 +4456,29 @@ const roundMeasure: Rule = (s, ctx) => {
   const cop = after.match(/^\s*(?:=|הוא|היא|שווה(?:\s*ל-?)?|\bis\b|\bequals?\b)\s*(.+)$/i);
   const mark = /^\s*(?:נסמן(?:\s+את)?|denote|let)\s*$/i.test(before) ? after.match(new RegExp(String.raw`^\s*(?:ב-?|\bby\b|\bbe\b)\s*(${LABEL})\s*$`, 'i')) : null;
   if (!mark && before.trim() !== '') return 'stop';
-  const v = mark ? roundValue(mark[1]) : cop ? roundValue(cop[1]) : null;
+  const text = mark ? mark[1] : cop ? cop[1] : null;
+  return text === null ? 'stop' : roundSize(ctx, isArea ? 'sector' : 'arc', lead.letters, text);
+};
+
+/**
+ * ONE round operand given ONE size: the drawn sector/arc the letters name (`namedArc`) and the value text
+ * (`roundValue`). Shared by `roundMeasure`'s single-operand form and the bare arc noun with a π value
+ * («קשת AB = 4π», `arcSize`, ADR-664), so the two spellings commit the identical command. No single drawn arc, or a
+ * value it cannot read → 'stop' (escalate; never the segment).
+ */
+function roundSize(ctx: ParseContext, kind: 'sector' | 'arc', letters: string[], valueText: string): AnyCommand[] | 'stop' {
+  const a = namedArc(ctx, letters);
+  if (!a) return 'stop';
+  const v = roundValue(valueText);
   if (!v) return 'stop';
   if ('value' in v.expr && !(v.expr.value > 0)) return 'stop';
-  const op = operands[0];
-  const cmd: AnyCommand = isArea
-    ? { type: 'measure-area', ids: op.ids, expr: v.expr, round: op.round }
-    : { type: 'measure-perimeter', ids: op.ids, expr: v.expr, round: op.round };
+  const ids: Id[] = [a.center, a.from, a.to];
+  const round: RoundOperand = { ...(a.spanDeg !== undefined ? { spanDeg: a.spanDeg } : {}), ...(a.minor ? { minor: true } : {}) };
+  const cmd: AnyCommand = kind === 'sector'
+    ? { type: 'measure-area', ids, expr: v.expr, round }
+    : { type: 'measure-perimeter', ids, expr: v.expr, round };
   return [v.pi ? { ...cmd, consumed: PI_CONSUMED } : cmd];
-};
+}
 
 const measureLength: Rule = (s) => {
   if (SEG_RATIO_LHS.test(s)) return null;
@@ -13728,6 +13794,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'crossing-already-named')
     return { ok: false, reason: 'crossing-already-named', holder: res.holder, id: res.id, s1: res.s1, s2: res.s2 };
   if (res.clarify === 'arc-copula') return { ok: false, reason: 'arc-copula', a: res.a, b: res.b };
+  if (res.clarify === 'arc-value-ambiguous') return { ok: false, reason: 'arc-value-ambiguous', value: res.value, a: res.a, b: res.b, center: res.center };
   if (res.clarify === 'inscribed-contradicts-noun') return { ok: false, reason: 'inscribed-contradicts-noun', shape: res.shape, forced: res.forced };
   if (res.clarify === 'incircle-not-drawn') return { ok: false, reason: 'incircle-not-drawn', sides: res.sides };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };

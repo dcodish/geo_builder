@@ -477,6 +477,11 @@ export async function decideFromParse(
   if (!r.ok && r.reason === 'arc-copula') {
     return refuse('guided', { source: 'parser', result: `arc-copula:${r.a}/${r.b}` }, { key: 'input.arcCopula', params: { a: r.a, b: r.b } });
   }
+  // #2041 (ADR-664): an arc given a symbol — degrees or length? Ask, teaching both sentences with the student's own
+  // letters, centre and value (the ruled sentence, 2026-10-13). Never escalated: the tool read the line exactly.
+  if (!r.ok && r.reason === 'arc-value-ambiguous') {
+    return refuse('guided', { source: 'parser', result: `arc-value-ambiguous:${r.a}${r.b}=${r.value}` }, { key: 'input.arcValueAmbiguous', params: { value: r.value, a: r.a, b: r.b, center: r.center } });
+  }
   if (!r.ok && r.reason === 'cevian-wrong-side') {
     return refuse('guided', { source: 'parser', result: `cevian-wrong-side:${r.apex}:${r.stated.join('')}/${r.actual.join('')}` }, { key: 'input.cevianWrongSide', params: { apex: r.apex, stated: r.stated.join(''), actual: r.actual.join('') } });
   }

@@ -261,7 +261,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
   '#2110': 'open', // #2101/#2100 (ADR-648/649): analytic does not read a radius letter's value or a radius ratio
   '#2115': 'open', // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
-  '#2129': 'open', // #2037 (ADR-663): analytic does not put a fresh arc's endpoints on its circle — the cross-tool question
+  '#2129': 'open',
+  '#2041': 'open', // #2041 (ADR-664): analytic reads a symbol on an arc as degrees — its half of the ruling waits for #2013 // #2037 (ADR-663): analytic does not put a fresh arc's endpoints on its circle — the cross-tool question
 
   '#2108': 'open',
 
@@ -599,6 +600,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-127', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'קוטר AB במעגל O'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-128', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O', 'F על מעגל O', 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E'], expect: 'builds', exception: 'X8' },
   { id: 'diameter-cut-end-2056', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O', 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E'], expect: 'builds', exception: 'X8', note: 'ADR-663 (#2056): F, a stated end of the diameter, is put on circle O — cat-2d-128 without «F על מעגל O»' },
+  { id: 'arc-bare-pi-2032', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = 4π'], expect: 'builds', exception: 'X8', note: 'ADR-664 (#2032): 2-D reads the arc\x27s LENGTH (the twin of «אורך הקשת AB הוא 4π»); analytic builds it as 4π degrees until #2013 — the verdict row cannot see degrees against length, the class test does' },
+  { id: 'arc-bare-pi-no-arc-2032', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'קשת AB = 4π'], expect: 'not-handled', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2013' }], note: 'ADR-664 (#2032): no drawn arc — 2-D does not understand it (never the chord); analytic draws a 12.57° arc until #2013' },
+  { id: 'arc-symbol-value-2041', family: 'chords-arcs', steps: ['גזרה AOB', 'קשת AB = x'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2041' }], note: 'ADR-664 (#2041): 2-D asks degrees or length with the ruled sentence; analytic\x27s half of the ruling is open' },
   { id: 'arc-fresh-2037-01', family: 'chords-arcs', steps: ['קשת AB = 40 במעגל O'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2129' }], note: 'ADR-663 (#2037): 2-D creates circle O and puts A and B on it; analytic refuses the unknown letters — whether it should place them on the circle is #2129' },
   { id: 'cat-2d-129', family: 'chords-arcs', steps: ['קוטר מנקודה F במעגל O'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-130', family: 'chords-arcs', steps: ['קוטר העובר בנקודה A במעגל O'], expect: 'builds', exception: 'X8' },
