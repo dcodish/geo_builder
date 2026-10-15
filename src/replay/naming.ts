@@ -127,6 +127,23 @@ export function renameFacts(facts0: Fact[], from: Id, to: Id): { ok: true; facts
 }
 
 /**
+ * #2122 ([ADR-653](../../docs/06-decisions.md#adr-653)) — the MERGE core of a naming by use: the auto-named point
+ * `from` takes the student's letter `to`, which ALREADY names a point that a later line made the same point by
+ * construction (`impliedIdentityBinding`). Every `from` becomes `to`; the facts that introduced `to` then state
+ * things about the named point (M1 lowering). Supported only while `from` is defined before `to` first appears, so
+ * the renamed list defines `to` where `from` was; otherwise (an earlier line edited or deleted) nothing is applied.
+ */
+export function mergeFacts(facts: Fact[], from: Id, to: Id): { ok: true; facts: Fact[] } | { ok: false } {
+  const F = from.toUpperCase();
+  const T = to.toUpperCase();
+  if (F === T) return { ok: false };
+  const firstAt = (id: Id) => facts.findIndex((f) => f.enabled && commandPointIds(f.cmd).includes(id));
+  const iF = firstAt(F), iT = firstAt(T);
+  if (iF < 0 || iT < 0 || iF >= iT) return { ok: false };
+  return { ok: true, facts: facts.map((f) => ({ ...f, cmd: renameInCommand(f.cmd, F, T), utterance: relabelUtterance(f.utterance, F, T) })) };
+}
+
+/**
  * #1673 / #1688 ([ADR-565](docs/06-decisions.md#adr-565), operator ruling 2026-10-02) — THE HIDDEN CENTRE LETTER
  * STEPS ASIDE. An unnamed circle keeps an internal reference token the tool picked (`O`, then `P`, `Q`, `K`):
  * its centre is `@ctr-O`, its id `circle-O`. The student never saw that letter, so it may never take part in
@@ -314,6 +331,10 @@ export function applyNameByUse(prefix: Fact[], b: NameByUse): Fact[] {
       const r = renameFacts(prefix, b.from, b.to);
       return r.ok ? r.facts : prefix;
     }
+    case 'merge': {
+      const r = mergeFacts(prefix, b.from, b.to);
+      return r.ok ? r.facts : prefix;
+    }
     case 'step-aside': {
       // only a token that is still HIDDEN steps aside — once it is gone (already moved, or named) there is nothing
       // to move, and `circle-<letter>` may by then be a circle the student named that letter
@@ -361,10 +382,10 @@ export function resolveBinds(facts: Fact[]): Fact[] {
 }
 
 /** The `name-by-use` facts a line's naming produced — prepended to the line's own commands, one group. */
-export function nameByUseCommands(binds: readonly { op: 'name-centre' | 'rename' | 'step-aside'; from: Id; to: Id }[]): NameByUse[] {
+export function nameByUseCommands(binds: readonly { op: 'name-centre' | 'rename' | 'merge' | 'step-aside'; from: Id; to: Id }[]): NameByUse[] {
   return binds.map((b) =>
     b.op === 'step-aside'
       ? { type: 'name-by-use', op: 'step-aside', from: `@ctr-${hiddenLetter(b.from)}`, to: `@ctr-${hiddenLetter(b.to)}` }
-      : { type: 'name-by-use', op: b.op === 'name-centre' ? 'centre' : 'point', from: b.from, to: b.to },
+      : { type: 'name-by-use', op: b.op === 'name-centre' ? 'centre' : b.op === 'merge' ? 'merge' : 'point', from: b.from, to: b.to },
   );
 }

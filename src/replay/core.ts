@@ -4538,6 +4538,65 @@ export function autoNamedLabels(raw: Fact[]): Set<Id> {
   return out;
 }
 
+/** A point's DEFINITION with its own name taken out: kind, parents and parameters. Two points with equal keys are
+ *  the same point by construction. A point that carries a free DOF (`free: true`, a bare free point) has no such
+ *  key: equal parameter values there are a sampled coincidence, never an identity. */
+function definitionKey(o: { kind: string; id?: string }): string | null {
+  if (o.kind === 'free-point' || (o as { free?: boolean }).free) return null;
+  const { id: _id, solve: _solve, ...rest } = o as Record<string, unknown>;
+  return JSON.stringify(Object.keys(rest).sort().map((k) => [k, rest[k]]));
+}
+
+/**
+ * #2122 ([ADR-653](../../docs/06-decisions.md#adr-653)) — NAMING BY USE, THE GENERAL CRITERION (ADR-440's point
+ * edition widened). A line that leaves a STUDENT-named point L structurally identical to exactly ONE auto-named point M
+ * (the same definition after the line applies: the tangency's touch point M copied by «X על מעגל P», ADR-647's
+ * `tangentTouchCopy`) names M by use: the auto letter is the engine's, so it yields to the student's, and the figure
+ * has one point L instead of a pair the coincidence notice reports. Read from the construction, never coordinates.
+ *
+ * Returns the naming, or null. `merge` is true when L already exists (its earlier facts become statements about the
+ * named point, ADR-588's `merge` naming); then M must be defined BEFORE L first appears, so the renamed list defines
+ * L where M was defined and every earlier fact about L lowers onto it (M1). A point L older than M is not named here:
+ * renaming would redefine L at a later fact. Shared by every caller of `impliedPointBinding` (one implementation).
+ * `autos` defaults to the facts' own auto-named labels; the edit seam passes the whole list's (a letter a LATER line
+ * types is the student's, never the engine's).
+ */
+export function impliedIdentityBinding(
+  facts: Fact[],
+  commands: AnyCommand[],
+  seed = 0,
+  autos: ReadonlySet<Id> = autoNamedLabels(facts),
+): { from: Id; to: Id; merge: boolean } | null {
+  if (!autos.size || !commands.length) return null;
+  const autoSet = new Set(autos);
+  const lineLabels = [...new Set(commands.flatMap(commandPointIds))];
+  const students = lineLabels.filter((l) => !autoSet.has(l));
+  if (!students.length) return null;
+  const before = replay(facts, seed).construction.objects;
+  const after = replay(trialFacts(facts, commands), seed).construction.objects;
+  const byId = (objs: typeof after) => new Map(objs.filter(isGeoPoint).map((o) => [o.id, o]));
+  const pre = byId(before), post = byId(after);
+  const resolved = resolveBinds(facts).filter((f) => f.enabled);
+  const firstAt = (id: Id) => resolved.findIndex((f) => commandPointIds(f.cmd).includes(id));
+  const found: { from: Id; to: Id; merge: boolean }[] = [];
+  for (const L of students) {
+    const o = post.get(L);
+    const key = o && definitionKey(o);
+    if (!key) continue;
+    for (const M of autos) {
+      if (M === L || lineLabels.includes(M)) continue; // named in the same statement — two roles, not one
+      const m = post.get(M);
+      if (!m || definitionKey(m) !== key) continue;
+      const was = pre.get(L), wasM = pre.get(M);
+      if (was && wasM && definitionKey(was) === definitionKey(wasM)) continue; // already one point before this line
+      const merge = pre.has(L);
+      if (merge && !(firstAt(M) >= 0 && firstAt(M) < firstAt(L))) continue;
+      found.push({ from: M, to: L, merge });
+    }
+  }
+  return found.length === 1 ? found[0] : null;
+}
+
 /** Every OBJECT id a command mentions — points (`A`, `O1`) plus prefixed object ids (`circle-O`,
  *  `line-…`, `seg-…`, …) — the dependency set the HOIST pass needs to place a relation fact at the
  *  earliest position where everything it references exists, and the reference set the question

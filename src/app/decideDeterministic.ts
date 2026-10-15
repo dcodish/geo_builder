@@ -57,6 +57,8 @@ import {
   type Fact,
   autoNamedLabels,
   deferralWorthwhile,
+  impliedIdentityBinding,
+  mergeFacts,
   dryRunOutcome,
   forcedCrossedRing,
   nameCentreFacts,
@@ -113,7 +115,7 @@ export type DecideLog = Readonly<Record<string, unknown>>;
  *  as a `name-by-use` fact in the line's own group (`nameByUseCommands`) — never as a store rename no line owns. */
 export interface DecideBind {
   /** `step-aside` (#1673, ADR-565): a hidden circle token re-lettered out of the student's way — still unnamed */
-  readonly op: 'name-centre' | 'rename' | 'step-aside';
+  readonly op: 'name-centre' | 'rename' | 'merge' | 'step-aside';
   readonly from: Id;
   readonly to: Id;
 }
@@ -307,12 +309,15 @@ export async function decideFromParse(
       // #539 — the POINT edition: a fresh set-line label whose stated slot an AUTO-NAMED drawn point
       // structurally occupies is that point under the student's name (the touch «M» typed as «E») —
       // rename it instead of minting a duplicate node beside it.
-      const pbind = impliedPointBinding(r.commands, pctx, autoNamedLabels(facts));
+      // #2122 (ADR-653): or, generally, the line leaves a student point structurally identical to exactly one
+      // auto-named point (the tangency's touch M copied by «X על מעגל P») — the auto letter yields to the student's.
+      const lineBind = impliedPointBinding(r.commands, pctx, autoNamedLabels(facts));
+      const pbind = lineBind ? { ...lineBind, merge: false } : impliedIdentityBinding(facts, r.commands, seed);
       if (!pbind) break;
-      const res = renameFacts(facts, pbind.from, pbind.to);
+      const res = pbind.merge ? mergeFacts(facts, pbind.from, pbind.to) : renameFacts(facts, pbind.from, pbind.to);
       if (!res.ok) break; // can't bind — the fresh-rider reading stands, as before
       facts = res.facts;
-      binds.push({ op: 'rename', from: pbind.from, to: pbind.to });
+      binds.push({ op: pbind.merge ? 'merge' : 'rename', from: pbind.from, to: pbind.to });
       boundName = true;
       logs.push({ source: 'rename', rename: pbind, result: 'auto-bind-point', intermediate: true });
     }
@@ -868,6 +873,12 @@ export async function decideFromParse(
        * escalates: reaching the LLM would spend a call on a sentence the parser read correctly, and the
        * model could only answer "couldn't build". Its own log result, so the class is countable.
        */
+      // #2122 (ADR-653): the line's naming MERGED the student's point with the engine's (the touch point M took X), so
+      // its statement now holds by construction. It is a plain success, never «כבר קיים», and the statement is kept
+      // as the line's own fact: it still holds X on that circle if the earlier line about X is deleted.
+      if ((outcome.reason === 'implied' || outcome.reason === 'empty') && binds.some((b) => b.op === 'merge')) {
+        return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: [...logs, { source: 'parser', result: 'bound-point-name', commands: r.commands }], note: null };
+      }
       if (outcome.reason === 'implied') {
         return { kind: 'noop', binds, logs: [...logs, { source: 'parser', result: 'implied-restatement', commands: r.commands }], note: { key: 'input.alreadyDrawn' } };
       }

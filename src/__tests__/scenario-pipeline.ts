@@ -9,7 +9,7 @@
  * is a LAYERING split, not a second implementation (the ADR-346 no-mirrors rule).
  */
 import { parse, buildParseCtx, impliedCircleBinding, impliedPointBinding, parseNameCenter, typedLabels } from '@/parser';
-import { autoNamedLabels, replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, renameFacts, stepAsideFacts } from '@/store/geoStore';
+import { autoNamedLabels, impliedIdentityBinding, mergeFacts, replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, renameFacts, stepAsideFacts } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
 import type { ParseResult } from '@/parser';
@@ -123,9 +123,11 @@ export function factsOf(steps: Step[], refused: readonly RefusedStep[] = []): Fa
           facts = nc.facts;
         } else {
           // #539 mirror (the App's point auto-bind): a fresh set-line label binds an auto-named point.
-          const pbind = impliedPointBinding(er.commands, ctxOf(facts.slice(0, start)), autoNamedLabels(facts));
+          // #2122 mirror (ADR-653): or the general criterion — the line makes a student point one auto-named point
+          const lineBind = impliedPointBinding(er.commands, ctxOf(facts.slice(0, start)), autoNamedLabels(facts));
+          const pbind = lineBind ? { ...lineBind, merge: false } : impliedIdentityBinding(facts.slice(0, start), er.commands, 0, autoNamedLabels(facts));
           if (!pbind) break;
-          const rn = renameFacts(facts, pbind.from, pbind.to);
+          const rn = pbind.merge ? mergeFacts(facts, pbind.from, pbind.to) : renameFacts(facts, pbind.from, pbind.to);
           if (!rn.ok) break;
           facts = rn.facts;
         }
@@ -173,9 +175,11 @@ export function factsOf(steps: Step[], refused: readonly RefusedStep[] = []): Fa
         } else {
           // #539 mirror (App.submit's point auto-bind): a fresh set-line label whose slot an auto-named
           // drawn point structurally occupies renames that point instead of minting a duplicate.
-          const pbind = impliedPointBinding(r.commands, ctxOf(facts), autoNamedLabels(facts));
+          // #2122 mirror (ADR-653): or the general criterion — the line makes a student point one auto-named point
+          const lineBind = impliedPointBinding(r.commands, ctxOf(facts), autoNamedLabels(facts));
+          const pbind = lineBind ? { ...lineBind, merge: false } : impliedIdentityBinding(facts, r.commands, 0);
           if (!pbind) break;
-          const rn = renameFacts(facts, pbind.from, pbind.to);
+          const rn = pbind.merge ? mergeFacts(facts, pbind.from, pbind.to) : renameFacts(facts, pbind.from, pbind.to);
           if (!rn.ok) break;
           facts = rn.facts;
         }
