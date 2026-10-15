@@ -4632,6 +4632,7 @@ export const SCENARIOS_4: Scenario[] = [
         const a = at(fig, ring[i]), b = at(fig, ring[(i + 1) % 3]);
         const h = Math.abs((b.x - a.x) * (a.y - k.center.y) - (a.x - k.center.x) * (b.y - a.y)) / dist(a, b);
         expect(Math.abs(h - k.r), `side ${ring[i]}${ring[(i + 1) % 3]} tangent to circle O`).toBeLessThan(1e-6);
+      }
     },
   },
   {
