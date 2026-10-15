@@ -124,8 +124,11 @@ describe('P5 — a chords-MEET utterance keeps its circle membership', () => {
   it('control: "the diameter from F cuts AC at E" (centre-anchored line) does NOT get double membership', () => {
     const r = parse('קוטר המעגל היוצא מנקודה F חותך את AC בנקודה E', { circles: ['O'], points: ['A', 'C', 'F'] });
     expect(r.ok).toBe(true);
-    // the winner anchors its line to the centre O — the post-pass must bail, adding NO point-on-circle
-    expect(onCircle(r)).toEqual([]);
+    // the winner anchors its line to the centre O — the chord post-pass must bail. F is a stated END of the
+    // diameter, so the rule itself puts it on the circle ONCE (ADR-663, #2056); nothing else adds a membership.
+    expect(onCircle(r)).toEqual(['F']);
+    const member = parse('קוטר המעגל היוצא מנקודה F חותך את AC בנקודה E', { circles: ['O'], points: ['A', 'C', 'F'], circleMembers: [{ center: 'O', points: ['F'] }] });
+    expect(onCircle(member)).toEqual([]);
   });
 });
 

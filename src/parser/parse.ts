@@ -334,6 +334,14 @@ const membersOfCenter = (ctx: ParseContext, center: string): Set<string> => {
       for (const p of e.points) out.add(p.toUpperCase());
   return out;
 };
+/**
+ * A point the sentence states is ON the circle centred at `center` (an arc's endpoint, a diameter's end —
+ * [ADR-663](docs/06-decisions.md#adr-663)): `point-on-circle` unless the figure already knows it there. A new point
+ * is created on the circle; an existing one off it is lowered to the membership (M1). The centre is never on it.
+ * THE predicate for "already a member" — the arc post-pass and both diameter rules call it, never re-spell it.
+ */
+const circleMembership = (ctx: ParseContext, center: string, id: Id): AnyCommand[] =>
+  up(id) === up(center) || membersOfCenter(ctx, center).has(up(id)) ? [] : [{ type: 'point-on-circle', id: up(id), circle: circleId(center) }];
 const NO_CONTEXT: ParseContext = {};
 
 /** The label of a "דרך [ה]נקודה X" / "through [the] point X" / bare "דרך X" carrier clause, or null.
@@ -2187,6 +2195,8 @@ const diameterCutsSegment: Rule = (s, ctx) => {
   const isExtension = /המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(after);
   const isLine = /\bline\b|הישר|הקו/i.test(after);
   const out: AnyCommand[] = [
+    // ADR-663: F is a stated END of the diameter, so it is on the circle — new F created there, an existing F lowered (M1)
+    ...circleMembership(ctx, center, F),
     { type: 'line-line-intersection', id: E, a: F, b: centrePt(ctx, up(center)), c: X, d: Y, dir1: true, ...(isExtension ? { dir2: true } : {}) },
   ];
   if (!isExtension && !isLine) out.push({ type: 'set-line', points: [X, E, Y] }); // default: E between X and Y (on the segment)
@@ -3119,7 +3129,7 @@ const angleAliasRule: Rule = (s, ctx) => {
  * on-circle DOF until the arcs hold; on a determined one the givens verifier checks it. The circle is
  * resolved implicitly (ADR-029): the named circle, or THE one circle in the figure. No radii are drawn — the
  * arc lives on the circle boundary, not as central radii (matches the textbook figure). The arc endpoints are
- * assumed on that circle (true in the corpus). Runs before `angleEquality` (its own `arc`/`קשת` keyword).
+ * PUT on that circle by `withArcEndpoints` (ADR-663) — `arcOf` names it. Runs before `angleEquality` (its own `arc`/`קשת` keyword).
  */
 /**
  * A BARE COPULA JOINING TWO LABELLED ARCS — the spelling #1000 narrowed out of the equality seam.
@@ -3173,7 +3183,7 @@ const arcEquality: Rule = (s, ctx) => {
   if (!left || !right) return null;
   const k = coefBefore(parts[1], String.raw`arcs?|קשת|⌢`); // "= 2 arc CE", «= ½ קשת CD» (#2008)
   if (Number.isNaN(k)) return null;
-  return [{ type: 'set-angle-ratio', v1: O, a1: left[0], b1: left[1], v2: O, a2: right[0], b2: right[1], k }];
+  return [{ type: 'set-angle-ratio', v1: O, a1: left[0], b1: left[1], v2: O, a2: right[0], b2: right[1], k, arcOf: circleId(center) }];
 };
 
 /**
@@ -3526,7 +3536,7 @@ const coefBefore = (t: string, kw: string): number => {
 // OTHER rule's lowering of an utterance with this shape, on both commit paths.
 
 /** One parsed additive term: a coefficient times a measure (a segment length or an angle). */
-type MeasureTerm = { coef: number; kind: 'length' | 'angle'; ids: Id[] }; // ids: [a,b] | [a,vertex,b]
+type MeasureTerm = { coef: number; kind: 'length' | 'angle'; ids: Id[]; arc?: true }; // ids: [a,b] | [a,vertex,b]; arc: an ARC term (its central angle)
 type MeasureSide = { terms: MeasureTerm[]; constant: number };
 
 const ARC_KW = /arcs?|הקשת|קשת|⌢|⏜/i;
@@ -3704,7 +3714,7 @@ function parseMeasureSide(raw: string, ctx: ParseContext, center: string | null)
       const stripped = dropCircleRef(chunk).replace(new RegExp(ARC_KW.source, 'gi'), ' ').replace(/\bin\b|\bof\b|של|ב-?/gi, ' ');
       const pair = labelRun(stripped, 2);
       if (!pair || !center || (stripped.match(/[A-Z]\d*/g) ?? []).length !== 2) return null;
-      side.terms.push({ coef: sign * coef, kind: 'angle', ids: [pair[0], centrePt(ctx, up(center)), pair[1]] });
+      side.terms.push({ coef: sign * coef, kind: 'angle', ids: [pair[0], centrePt(ctx, up(center)), pair[1]], arc: true });
       sign = 1;
       continue;
     }
@@ -3787,6 +3797,8 @@ const measureSum: Rule = (s, ctx) => {
       draw(t.ids[1], t.ids[2]);
     }
   }
+  // ADR-663: the arc terms name their circle and their endpoints, so `withArcEndpoints` puts them on it.
+  const arcTerms = terms.flatMap((t, i) => (t.arc ? [i] : []));
   return [
     ...draws,
     {
@@ -3795,6 +3807,7 @@ const measureSum: Rule = (s, ctx) => {
       coefs: terms.map((t) => t.coef),
       points: terms.flatMap((t) => t.ids),
       target,
+      ...(center && arcTerms.length ? { arcOf: circleId(center), arcTerms } : {}),
     },
   ];
 };
@@ -7699,10 +7712,10 @@ const diameterFromPoint: Rule = (s, ctx) => {
   const labels = [...rest.matchAll(/\b[A-Za-z]\d*\b/g)].map((mm) => up(mm[0]));
   if (labels.some((l) => l !== F)) return null;
   const far = freeLabel([F, up(center), ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['D', 'E', 'G', 'H', 'K', 'L']);
-  const members = membersOfCenter(ctx, center);
   const exists = (ctx.points ?? []).some((q) => up(q) === F);
   return [
-    ...(exists && !members.has(F) ? [{ type: 'point-on-circle' as const, id: F, circle: circleId(center) }] : []),
+    // a NEW F is created on the circle by the `diameter` command itself; an existing one is lowered (ADR-663's helper)
+    ...(exists ? circleMembership(ctx, center, F) : []),
     { type: 'diameter' as const, id1: F, id2: far, circle: circleId(center) },
   ];
 };
@@ -11657,7 +11670,10 @@ const consumedCircleId = (cmd: AnyCommand): Id | null =>
   cmd.type === 'set-radius' ||
   cmd.type === 'radius-symbol'
     ? cmd.circle
-    : null;
+    : // ADR-663: an ARC measure names its circle («קשת AB = 40 במעגל O») — a reference like any membership
+      (cmd.type === 'set-angle' || cmd.type === 'set-angle-ratio' || cmd.type === 'set-measure-sum') && cmd.arcOf
+      ? cmd.arcOf
+      : null;
 
 /** The circle a command DEFINES (creates), or null. */
 const definedCircleId = (cmd: AnyCommand): Id | null =>
@@ -12140,6 +12156,34 @@ function withOnCircleMembership(commands: AnyCommand[], s: string, ctx: ParseCon
     if (id === up(center) || already.has(id)) continue; // the centre isn't ON its circle; don't double-add
     add.push({ type: 'point-on-circle', id, circle: circ });
     already.add(id);
+  }
+  return add.length ? [...add, ...commands] : commands;
+}
+
+/**
+ * ARC-ENDPOINT post-pass ([ADR-663](docs/06-decisions.md#adr-663), #2037/#2049): an arc statement — a measure
+ * («קשת AB = 40 במעגל O»), a ratio («קשת DE = 2 קשת CE»), a sum's arc terms — names a circle and two endpoints ON
+ * it. The readers lower to a central angle (`arcOf` marks it) and create nothing; this pass asserts the
+ * membership for every endpoint the figure does not already know on that circle: a new endpoint is created on
+ * it (the `arc-midpoint` discipline, apply.ts, moved to the parse seam so every arc reader is covered at once),
+ * an existing one off it is put on it (M1 lowering of `point-on-circle`). PREPENDED, once per point.
+ */
+function withArcEndpoints(commands: AnyCommand[], ctx: ParseContext): AnyCommand[] {
+  const done = new Set(commands.flatMap((c) => (c.type === 'point-on-circle' ? [`${c.circle}|${up(c.id)}`] : [])));
+  const add: AnyCommand[] = [];
+  const put = (circ: Id, ends: Id[]) => {
+    const center = circ.slice('circle-'.length);
+    for (const e of ends) {
+      if (done.has(`${circ}|${up(e)}`)) continue;
+      done.add(`${circ}|${up(e)}`);
+      add.push(...circleMembership(ctx, center, e));
+    }
+  };
+  for (const c of commands) {
+    if (c.type === 'set-angle' && c.arcOf) put(c.arcOf, [c.ray1, c.ray2]);
+    else if (c.type === 'set-angle-ratio' && c.arcOf) put(c.arcOf, [c.a1, c.b1, c.a2, c.b2]);
+    else if (c.type === 'set-measure-sum' && c.arcOf && c.arcTerms)
+      put(c.arcOf, c.arcTerms.flatMap((i) => [c.points[3 * i], c.points[3 * i + 2]]));
   }
   return add.length ? [...add, ...commands] : commands;
 }
@@ -13635,7 +13679,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
       const claimed = withRoleClaims(withCarrierSegments(res), s, ctx);
       if (claimed === 'unread') continue; // a role noun this winner read bare — let a later rule try, never commit the drop
       if (!Array.isArray(claimed)) return refusalOf(claimed);
-      const resolved = withConcentricResolution(withImplicitCircles(withOnCircleMembership(claimed, s, ctx), ctx), s, ctx);
+      const resolved = withConcentricResolution(withImplicitCircles(withArcEndpoints(withOnCircleMembership(claimed, s, ctx), ctx), ctx), s, ctx);
       if (Array.isArray(resolved)) return { ok: true, commands: withStatedConvexity(withAnonymousAutoCentres(withRadiusSymbolBinding(resolved, s, ctx), ctx), s) };
       return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
     }

@@ -856,25 +856,51 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "arc AB = 40 in circle O": {
     "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
       "set-angle",
     ],
     "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
       "set-angle",
     ],
   },
   "arc AC + arc BE = arc AD + arc BC in circle O": {
     "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
       "set-measure-sum",
     ],
     "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
       "set-measure-sum",
     ],
   },
   "arc DE = 2 arc CE in circle O": {
     "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
       "set-angle-ratio",
     ],
     "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
       "set-angle-ratio",
     ],
   },
@@ -1896,11 +1922,15 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "the diameter of circle O from F cuts side AC at E": {
     "en": [
+      "circle",
+      "point-on-circle",
       "line-line-intersection",
       "set-line",
       "segment",
     ],
     "he": [
+      "circle",
+      "point-on-circle",
       "line-line-intersection",
       "set-line",
       "segment",

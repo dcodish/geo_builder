@@ -261,6 +261,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
   '#2110': 'open', // #2101/#2100 (ADR-648/649): analytic does not read a radius letter's value or a radius ratio
   '#2115': 'open', // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
+  '#2129': 'open', // #2037 (ADR-663): analytic does not put a fresh arc's endpoints on its circle — the cross-tool question
 
   '#2108': 'open',
 
@@ -533,9 +534,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-062', family: 'angles', steps: ['זווית ABC שווה לשלושים מעלות'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-063', family: 'angles', steps: ['זוית AEB שווה לזווית BEC שווה 60 מעלות'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-064', family: 'angles', steps: ['משולש ABC', 'משולש DEF', 'זווית ABC היא זווית DEF'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
-  { id: 'cat-2d-065', family: 'chords-arcs', steps: ['נקודה D', 'נקודה E', 'נקודה C', 'נקודה O', 'קשת DE = 2 קשת CE במעגל O'], expect: 'builds', exception: 'X8' },
-  { id: 'cat-2d-066', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O', 'קשת AB = 40 במעגל O'], expect: 'builds', exception: 'X8' },
-  { id: 'cat-2d-067', family: 'chords-arcs', steps: ['נקודה A', 'נקודה C', 'נקודה B', 'נקודה E', 'נקודה D', 'נקודה O', 'קשת AC + קשת BE = קשת AD + קשת BC במעגל O'], expect: 'builds', exception: 'X8' },
+  { id: 'cat-2d-065', family: 'chords-arcs', steps: ['נקודה D', 'נקודה E', 'נקודה C', 'נקודה O', 'קשת DE = 2 קשת CE במעגל O'], expect: 'builds', exception: 'X8', note: 'ADR-663 (#2049): the arc puts its existing endpoints ON circle O — before, the row built with them left off it' },
+  { id: 'cat-2d-066', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O', 'קשת AB = 40 במעגל O'], expect: 'builds', exception: 'X8', note: 'ADR-663 (#2049): the arc puts its existing endpoints ON circle O — before, the row built with them left off it' },
+  { id: 'cat-2d-067', family: 'chords-arcs', steps: ['נקודה A', 'נקודה C', 'נקודה B', 'נקודה E', 'נקודה D', 'נקודה O', 'קשת AC + קשת BE = קשת AD + קשת BC במעגל O'], expect: 'builds', exception: 'X8', note: 'ADR-663 (#2049): the arc puts its existing endpoints ON circle O — before, the row built with them left off it' },
   { id: 'cat-2d-068', family: 'lengths', steps: ['נקודה D', 'נקודה M', 'נקודה E', 'נקודה B', 'נקודה R', 'DM*ME = BM*DR'], expect: 'builds', exception: 'X9' },
   { id: 'cat-2d-069', family: 'chords-arcs', steps: ['זוית מרכזית COD'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-070', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC הוא 13'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
@@ -597,6 +598,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-126', family: 'tangents', steps: ['מנקודה E משיק נוגע במעגל O בנקודה D'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-127', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'קוטר AB במעגל O'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-128', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O', 'F על מעגל O', 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E'], expect: 'builds', exception: 'X8' },
+  { id: 'diameter-cut-end-2056', family: 'chords-arcs', steps: ['משולש ABC', 'מעגל O', 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E'], expect: 'builds', exception: 'X8', note: 'ADR-663 (#2056): F, a stated end of the diameter, is put on circle O — cat-2d-128 without «F על מעגל O»' },
+  { id: 'arc-fresh-2037-01', family: 'chords-arcs', steps: ['קשת AB = 40 במעגל O'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2129' }], note: 'ADR-663 (#2037): 2-D creates circle O and puts A and B on it; analytic refuses the unknown letters — whether it should place them on the circle is #2129' },
   { id: 'cat-2d-129', family: 'chords-arcs', steps: ['קוטר מנקודה F במעגל O'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-130', family: 'chords-arcs', steps: ['קוטר העובר בנקודה A במעגל O'], expect: 'builds', exception: 'X8' },
   { id: 'cat-2d-131', family: 'chords-arcs', steps: ['M אמצע הקשת BC במעגל O'], expect: 'builds', exception: 'X8' },
@@ -1008,7 +1011,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'e4-arc-reflex', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'קשת AB = 200'], expect: 'builds', exception: 'X8' },
   { id: 'e4-arc-equal-words', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'B על מעגל O', 'C על מעגל O', 'קשת AB שווה לקשת BC'], expect: 'builds', exception: 'X8' },
   { id: 'e4-arc-sum-value', family: 'chords-arcs', steps: ['נתון מעגל O', 'A על מעגל O', 'B על מעגל O', 'C על מעגל O', 'D על מעגל O', 'קשת AB + קשת CD = 180'], expect: 'builds', exception: 'X8' },
-  { id: 'e4-arc-unknown-end', family: 'chords-arcs', steps: ['מעגל O', 'קשת AB = 40 במעגל O'], expect: 'refused', exception: 'X8', note: 'an arc whose ends the figure does not have is refused in both (2-D: «references an unknown point»)' },
+  { id: 'e4-arc-unknown-end', family: 'chords-arcs', steps: ['מעגל O', 'קשת AB = 40 במעגל O'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2129' }], note: 'ADR-663 (#2037 ruling 2026-10-13): 2-D puts the new ends A and B on circle O and builds — it used to refuse «references an unknown point»; analytic still refuses (#2129)' },
   { id: 'e4-central-value', family: 'chords-arcs', steps: ['מעגל O', 'זוית מרכזית COD = 80'], expect: 'builds', exception: 'X8' },
   { id: 'e4-sector-free', family: 'chords-arcs', steps: ['גזרה AOB'], expect: 'builds', exception: 'X8' },
   { id: 'e4-sector-reflex', family: 'chords-arcs', steps: ['גזרה AOB בזווית 200'], expect: 'builds', exception: 'X8' },
