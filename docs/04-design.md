@@ -944,6 +944,15 @@ carriers — `onSeg`, `segments-cross`, or a `set-collinear` whose rider is name
 asks it before its switch and calls `reseatLooseMeetEndpoint` (ADR-255); a new member is a row in the predicate.
 The endpoint moved is a non-pinned, unreferenced, undriven free point, fewest dependents first, aimed through the
 other carrier's midpoint in general position and on the same side of every circle (ADR-253/254).
+
+**Bare points and a flattened ring ([ADR-660](06-decisions.md#adr-660), #1934).** Every bare «נקודה X» hands the canned
+spot (3, 2). When that spot sits on an existing point, the `free-point` arm probes around the existing points'
+CENTROID at their span (a centre that is no point, so the general-position line test is defined), preferring a
+candidate that keeps the points in convex position in the order placed (`convexInOrder`), else any general-position
+one; the first two points keep their places. A declared polygon that a step's solution still flattens, with UNSTATED
+free vertices (no constraint, no directive, not pinned), tries the sampler's positions for those vertices before the
+refusal (`freeVertexRestart`, LADDER 2h″); forced flatness is refused earlier (0h) and incidence-forced flatness
+finds no start.
 `reinterpretAsCollinear` (step.ts) passes previous positions into `applyCommand`.
 
 ### A declared polygon the givens force flat is refused (#1849, [ADR-602](06-decisions.md#adr-602))
