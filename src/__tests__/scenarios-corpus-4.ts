@@ -4635,6 +4635,32 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'diameter-cut-end-on-circle-2056',
+    title: '«קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E» puts F on circle O — new F, existing F, English (#2056, ADR-663)',
+    guards:
+      "#2056 (ADR-663), operator ruling 2026-10-13 (card d6-2056: F, a stated end of the diameter, goes on circle O, as ruled for the arc in #2049). Measured on b0ef3240 through decideDeterministic2D: the sequence committed green with |OF| = 2.11 against r = 5 (new F) and |OF| = 0.42 (an existing free F); the verifier passed because nothing stated the membership. Root cause: diameterCutsSegment lowered the diameter to a line-line crossing through F and O and never said F is on the circle. Fix: the rule asserts F's membership through circleMembership, the one predicate the arc post-pass and diameterFromPoint share. Unit: src/parser/__tests__/diameter-cuts-segment.test.ts.",
+    steps: ['משולש ABC', 'מעגל O', 'G על המעגל', 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const onDiameter = (g: ReturnType<typeof replay>, label: string) => {
+        const O = at(g, 'O'), F = at(g, 'F'), E = at(g, 'E'), A = at(g, 'A'), C = at(g, 'C');
+        const r = g.circles.get('circle-O')!.r;
+        expect(Math.abs(dist(O, F) - r) / r, `${label}: |OF| = r`).toBeLessThan(1e-6);
+        expect(Math.abs(dist(A, E) + dist(E, C) - dist(A, C)), `${label}: E on segment AC`).toBeLessThan(1e-6);
+        const cross = (F.x - O.x) * (E.y - O.y) - (F.y - O.y) * (E.x - O.x);
+        expect(Math.abs(cross) / (dist(O, F) * Math.max(dist(O, E), 1e-9)), `${label}: E, F, O collinear`).toBeLessThan(1e-6);
+      };
+      onDiameter(fig, 'new F');
+      const existing = replay(factsOf(['משולש ABC', 'מעגל O', 'נקודה F', 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E']));
+      allStepsOk(existing);
+      onDiameter(existing, 'existing F');
+      const english = replay(factsOf(['משולש ABC', 'מעגל O', 'the diameter of circle O from F cuts AC at E']));
+      allStepsOk(english);
+      onDiameter(english, 'English');
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

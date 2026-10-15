@@ -84,7 +84,7 @@
     {
       "id": "ia19wuL-fREneUdYU_u7w",
       "utterance": "קשת AB = קשת BC",
-      "cmd": { "type": "set-angle-ratio", "v1": "O", "a1": "A", "b1": "B", "v2": "O", "a2": "B", "b2": "C", "k": 1 },
+      "cmd": { "type": "set-angle-ratio", "v1": "O", "a1": "A", "b1": "B", "v2": "O", "a2": "B", "b2": "C", "k": 1, "arcOf": "circle-O" },
       "enabled": true
     }
   ],

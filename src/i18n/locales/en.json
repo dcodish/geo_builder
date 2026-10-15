@@ -192,6 +192,7 @@
     },
     "sentenceSelfConflict": "\"{{sentence}}\": this sentence defines {{id}} twice, as two different things, so it was not added.",
     "ambiguousCevian": "\"{{sentence}}\": vertex {{apex}} belongs to several shapes ({{shapes}}), each with a different side opposite it — so it is unclear which side {{kind}} drops to. Name the side (e.g. \"to side {{side}}\") or the triangle (e.g. \"in triangle {{shape}}\").",
+    "arcValueAmbiguous": "It is not clear whether {{value}} is the arc's measure in degrees or the arc's length. For degrees write «∠{{a}}{{center}}{{b}} = {{value}}», and for the length write «arc length {{a}}{{b}} is {{value}}».",
     "arcCopula": "\"arc {{a}} is arc {{b}}\" says they are the same arc. To say their measures are equal: \"arc {{a}} equals arc {{b}}\".",
     "crossingAlreadyNamed": "The point you asked for is «{{holder}}» — a point already in the figure. {{s1}} and {{s2}} do meet there, but there is no new point here to call «{{id}}»; if you meant another point, check which two lines cross there."
   },

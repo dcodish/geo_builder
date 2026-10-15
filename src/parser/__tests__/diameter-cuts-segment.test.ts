@@ -9,8 +9,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
+import type { AnyCommand } from '@/engine';
 
-const ctx = { circles: ['O'], points: ['A', 'B', 'C', 'F', 'O'] };
+// F is ON circle O here (the rule's precondition); a new or off-circle F is the #2056 block below
+const ctx = { circles: ['O'], points: ['A', 'B', 'C', 'F', 'O'], circleMembers: [{ id: 'circle-O', center: 'O', points: ['F'] }] };
 const CUT = [
   { type: 'line-line-intersection', id: 'E', a: 'F', b: 'O', c: 'A', d: 'C', dir1: true },
   { type: 'set-line', points: ['A', 'E', 'C'] }, // E between A and C ⇒ on the side
@@ -80,5 +82,55 @@ describe('parse — diameter from a point cuts a side at a new point', () => {
       { type: 'point-on-circle', id: 'B', circle: 'circle-O' },
       { type: 'set-collinear', a: 'A', b: 'O', c: 'B' },
     ]);
+  });
+});
+
+/**
+ * #2056 ([ADR-663](../../../docs/06-decisions.md#adr-663)) — «קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E»
+ * names F as an END of a diameter of circle O, so F is on circle O. `diameterCutsSegment` lowered only the crossing
+ * (line F–O with AC) and dropped the membership. It now asserts it through `circleMembership`, the predicate the arc
+ * post-pass and `diameterFromPoint` share: a new F is created on the circle, an existing F off it is lowered onto it,
+ * and a member F gets nothing.
+ */
+const LINE = 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E';
+const triangle = ['A', 'B', 'C', 'O'];
+const cmds = (u: string, at: Parameters<typeof parse>[1]): AnyCommand[] => {
+  const r = parse(u, at);
+  expect(r.ok, u).toBe(true);
+  return r.ok ? (r.commands as AnyCommand[]) : [];
+};
+const membershipsOf = (cs: AnyCommand[]) => cs.filter((c) => c.type === 'point-on-circle');
+
+describe('#2056 — the diameter-cut sentence puts its from-point on the circle', () => {
+  it('a NEW F is created on circle O, before the crossing that uses it', () => {
+    const cs = cmds(LINE, { points: triangle, circles: ['O'], circleMembers: [{ id: 'circle-O', center: 'O', points: [] }] });
+    expect(membershipsOf(cs)).toEqual([{ type: 'point-on-circle', id: 'F', circle: 'circle-O' }]);
+    expect(cs[0].type).toBe('point-on-circle');
+    expect(cs.map((c) => c.type)).toEqual(['point-on-circle', 'line-line-intersection', 'set-line', 'segment']);
+  });
+
+  it('an EXISTING F off the circle is put on it (M1 lowering of the membership)', () => {
+    const cs = cmds(LINE, { points: [...triangle, 'F'], circles: ['O'], circleMembers: [{ id: 'circle-O', center: 'O', points: [] }] });
+    expect(membershipsOf(cs)).toEqual([{ type: 'point-on-circle', id: 'F', circle: 'circle-O' }]);
+  });
+
+  it('an F already on the circle gets nothing new (the «F על המעגל» control)', () => {
+    const cs = cmds(LINE, { points: [...triangle, 'F'], circles: ['O'], circleMembers: [{ id: 'circle-O', center: 'O', points: ['F'] }] });
+    expect(membershipsOf(cs)).toEqual([]);
+  });
+
+  it('the English sentence lowers the same way', () => {
+    const he = cmds(LINE, { points: triangle, circles: ['O'], circleMembers: [{ id: 'circle-O', center: 'O', points: [] }] });
+    const en = cmds('the diameter of circle O from F cuts AC at E', { points: triangle, circles: ['O'], circleMembers: [{ id: 'circle-O', center: 'O', points: [] }] });
+    expect(membershipsOf(en)).toEqual(membershipsOf(he));
+  });
+
+  it('the cut-less sibling keeps its behaviour: a new F is created by `diameter`, an existing one is lowered', () => {
+    const fresh = cmds('קוטר מנקודה F', { points: [], circles: ['O'], circleMembers: [{ id: 'circle-O', center: 'O', points: [] }] });
+    expect(fresh.map((c) => c.type)).toEqual(['diameter']);
+    const existing = cmds('קוטר מנקודה F', { points: ['F'], circles: ['O'], circleMembers: [{ id: 'circle-O', center: 'O', points: [] }] });
+    expect(existing.map((c) => c.type)).toEqual(['point-on-circle', 'diameter']);
+    const member = cmds('קוטר מנקודה F', { points: ['F'], circles: ['O'], circleMembers: [{ id: 'circle-O', center: 'O', points: ['F'] }] });
+    expect(member.map((c) => c.type)).toEqual(['diameter']);
   });
 });

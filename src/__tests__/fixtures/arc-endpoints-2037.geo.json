@@ -1,0 +1,62 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T12:00:00.000Z",
+  "name": "arc-endpoints-2037",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "קשת AB = 40 במעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true,
+        "ifAbsent": true,
+        "implied": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "קשת AB = 40 במעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "קשת AB = 40 במעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.3",
+      "utterance": "קשת AB = 40 במעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "set-angle",
+        "vertex": "O",
+        "ray1": "A",
+        "ray2": "B",
+        "value": 40,
+        "arcOf": "circle-O"
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

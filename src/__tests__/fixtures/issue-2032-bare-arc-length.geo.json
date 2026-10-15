@@ -1,0 +1,109 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T12:00:00.000Z",
+  "name": "issue-2032-bare-arc-length",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "f0",
+      "utterance": "גזרה AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true,
+        "hidden": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "f1",
+      "utterance": "גזרה AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O",
+        "theta": 0
+      },
+      "enabled": true
+    },
+    {
+      "id": "f2",
+      "utterance": "גזרה AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O",
+        "theta": 1.2217304763960306,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "f3",
+      "utterance": "גזרה AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "arc",
+        "id": "arc-AB",
+        "center": "O",
+        "from": "A",
+        "to": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "f4",
+      "utterance": "גזרה AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "segment",
+        "a": "O",
+        "b": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "f5",
+      "utterance": "גזרה AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "segment",
+        "a": "O",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "f6",
+      "utterance": "קשת AB = 4π",
+      "group": "g6",
+      "cmd": {
+        "type": "measure-perimeter",
+        "ids": [
+          "O",
+          "A",
+          "B"
+        ],
+        "expr": {
+          "value": 12.566370614359172,
+          "text": "4π"
+        },
+        "round": {},
+        "consumed": {
+          "symbols": [
+            "π"
+          ]
+        }
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

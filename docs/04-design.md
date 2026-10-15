@@ -398,6 +398,18 @@ falls out of the same predicate). Both quote the statement.
 The derived plural («אלכסונים», «אלכסוני ABCD») computes its pairs from the ring and is right by construction; the
 named pair form («AC ו-BD אלכסוני הריבוע») carries the claim.
 
+### An arc names its circle and its endpoints ([ADR-663](06-decisions.md#adr-663))
+
+The three arc-measure readers (`arcValue`, `arcEquality`, `measureSum`'s arc terms) lower an arc to its central angle
+and create nothing. Each marks the arc: `set-angle` and `set-angle-ratio` carry `arcOf` (the circle), `set-measure-sum`
+carries `arcOf` plus `arcTerms` (the indices of its arc terms, since a sum may mix «∠» and «קשת»). The engine ignores
+the markers. Two parse seams read them: `consumedCircleId` (so `withImplicitCircles` creates a named circle the arc
+names and the figure lacks), and the post-pass `withArcEndpoints`, run in `runRules` after `withOnCircleMembership`
+and before `withImplicitCircles`, which prepends `point-on-circle` for every endpoint the figure does not already know
+on that circle — a new point is created on it, an existing one is lowered onto it (M1). The membership predicate is
+one helper, `circleMembership(ctx, centre, id)`, which `diameterCutsSegment` and `diameterFromPoint` call for a
+diameter's from-point too.
+
 ### A role noun is a claim, lowered once ([ADR-563](06-decisions.md#adr-563))
 
 `src/parser/roleNouns.ts` is the one vocabulary of role nouns (chord, diameter, radius, tangent, leg, base,
