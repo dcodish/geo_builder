@@ -263,6 +263,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2115': 'open', // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
 
   '#2108': 'open',
+  '#2054': 'open',
+  '#2061': 'open',
 
 };
 
@@ -1411,6 +1413,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2084 (ADR-647): a point stated on two tangent circles is their touch point (builds, with the converge notice) ──
   { id: 'point-on-two-tangent-circles-2084', family: 'circles', steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'X על מעגל O', 'X על מעגל P'], expect: 'builds', exception: 'X8', note: '2-D answered «כבר קיים» with X off circle P before ADR-647 (a builds verdict then too — the position is locked in src/app/__tests__/issue-2084-point-on-tangent-circles.test.ts)' },
   { id: 'tangent-by-lengths-cross-2083', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'OP = 5', 'המעגלים O ו-P נחתכים בנקודות X ו-Y'], expect: 'refused', exception: 'X8', note: '2-D drew X and Y 0.01 apart, green, before ADR-645' },
+
+  // ── #2023 / #2061 (ADR-661): a second letter for a measured angle or segment, or the same letter with another
+  // coefficient, is refused naming the earlier line (operator rulings 2026-10-13 and 2026-10-14: all three builders) ──
+  { id: 'angle-second-name-2023', family: 'angles', steps: ['משולש ABC', 'זווית ABC=α', 'זווית ABC=β'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2054' }, { product: '3d', issue: '#2054' }], note: 'analytic records both names, 3-D relabels the arc to β (#2054, the analytic and 3-D arms)' },
+  { id: 'angle-coef-restated-2061', family: 'angles', steps: ['משולש ABC', '∠ABC=2α', '∠ABC=3α'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2061' }], note: '3-D records both and keeps 2α (#2061, its 3-D arm); analytic refuses already (the flat-triangle reason — its sentence changes in the analytic arm of #2061)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

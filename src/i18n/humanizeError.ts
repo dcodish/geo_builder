@@ -317,6 +317,18 @@ export const PATTERNS: Pattern[] = [
     paramKeys: (m) => ({ actual: `input.shapeNoun.${m[1]}`, stated: `input.shapeNoun.${m[2]}` }),
   },
 
+  // replay/core.ts (#2023, ADR-661) — `name-taken: angle ABC is already named α [vs #i]`: a second letter for an angle
+  // or a segment that already has one. The operator's verbatim sentences (2026-10-13): «לזווית ABC כבר יש שם: α
+  // (בשורה «זוית B=α»). לכל זווית שם אחד — המשיכו עם α.» and «לקטע AB כבר יש שם: a (בשורה «AB=a»). לכל קטע שם אחד —
+  // המשיכו עם a.» The subject is the angle or segment itself, so it takes no `saysSubject`; the earlier line is the
+  // `[vs #i]` tail resolved by the display layer.
+  {
+    re: /^name-taken: (angle|segment) (\S+) is already named (.+?)(?: \[vs #\d+\])?$/,
+    key: 'errors.angleNameTaken',
+    keyOf: (m) => (m[1] === 'angle' ? 'errors.angleNameTaken' : 'errors.lengthNameTaken'),
+    params: (m) => ({ name: m[2], symbol: m[3] }),
+    namesOther: true,
+  },
   // evaluate.ts:891 — `over-constrained: |AC| = 9 cannot hold`; #943 half B: the fold may append the
   // structured tail ` [vs #<fact index>]` naming the conflicting earlier statement — matched here so
   // `what` stays the bare reason, and resolved to words by the display layer (`otherUtteranceForError`).

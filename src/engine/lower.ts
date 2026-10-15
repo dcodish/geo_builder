@@ -84,6 +84,87 @@ export function referencesCircle(cmd: AnyCommand, existing: { id: Id; center: Id
 }
 
 const sameRefs = (a: Id[], b: Id[]): boolean => a.length === b.length && a.every((x, i) => x === b[i]);
+/** #2061 (ADR-661): the same SEGMENT (an unordered pair) or the same ANGLE (its vertex and an unordered ray pair) —
+ *  «BA» is «AB», «∠CBA» is «∠ABC». A measure on its letter's own representative target lowers to nothing; read in
+ *  one order only, «∠CBA = 3α» after «∠ABC = 2α» lowered to ∠CBA = 1.5·∠ABC, one angle a multiple of itself. */
+const sameSegment = (a: Id[], b: Id[]): boolean => a.length === 2 && b.length === 2 && ((a[0] === b[0] && a[1] === b[1]) || (a[0] === b[1] && a[1] === b[0]));
+const sameAngle = (a: Id[], b: Id[]): boolean => a.length === 3 && b.length === 3 && a[0] === b[0] && sameSegment([a[1], a[2]], [b[1], b[2]]);
+
+/**
+ * #2023 + #2061 ([ADR-661](../../docs/06-decisions.md#adr-661)) — what a SYMBOLIC measure says about an angle or a
+ * segment that an EARLIER statement already measured with a letter.
+ *
+ * The lowering keys a symbolic measure by its letter: «∠ABC = α» binds α, and a measure whose letter's
+ * representative is its own target lowers to nothing (the representative stays free). So a second letter on the
+ * same target («זוית B=α» · «זוית ABC=β») and the same letter with another coefficient («∠ABC=2α» · «∠ABC=3α»)
+ * both lowered to NOTHING, and the submit door read the empty step as «כבר קיים» while the stated value vanished
+ * (with the rays reversed the second became ∠CBA = 1.5·∠ABC, one angle set to a multiple of itself, which only a
+ * flat triangle satisfies). This is the one question both cases ask, read off the statements alone:
+ *
+ * - `same` — the same letter, coefficient, power and constant: a true restatement (the honest «כבר קיים»);
+ * - `coef-conflict` — the same letter and form with another coefficient: k₁·α = k₂·α forces α = 0, which no figure
+ *   has — a contradiction of the earlier line (operator ruling 2026-10-14, #2061);
+ * - `name-taken` — a FRESH letter (bound to nothing else before, no value) on a target whose earlier letters are all
+ *   different: a second name for one angle or segment (operator rulings 2026-10-13, #2023).
+ *
+ * The target is the angle as its vertex plus an UNORDERED ray pair, the segment as an unordered pair, so either
+ * spelling order is one case. Left alone (null — today's lowering judges them): a letter or an earlier letter that
+ * has a VALUE (a number is a pin or a residual), a radius letter (it names the circle's radius, so «AB = R» is a
+ * relation), a new letter already bound to ANOTHER quantity (then «AB = c» is the relation AB = CD), the same
+ * letter in another form (a constant or a power: an equation the solver judges, «AB = 2a» · «AB = a + 3»), and
+ * areas and arc lengths (outside both rulings).
+ *
+ * `prior` is the statements BEFORE this one, in order; `at` is the index in `prior` of the earlier statement the
+ * verdict is about (its first measure of that target, or for `coef-conflict` the first with that letter).
+ */
+export type MeasureRestatement = { kind: 'same' | 'coef-conflict' | 'name-taken'; at: number; earlier: Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' }> };
+export function measureRestatement(cmd: AnyCommand, prior: readonly AnyCommand[], tab: SymTab): MeasureRestatement | null {
+  if (cmd.type !== 'measure-length' && cmd.type !== 'measure-angle') return null;
+  const e = cmd.expr;
+  if (!('var' in e)) return null;
+  const valued = (name: string) => tab.vars.get(name)?.value !== undefined;
+  const radiusLetter = (name: string) => tab.radiusOf.has(name) || /^[Rr]$/.test(name);
+  if (valued(e.var) || radiusLetter(e.var)) return null;
+  const pair = (a: Id, b: Id) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const targetOf = (c: AnyCommand): string | null =>
+    c.type === 'measure-length' ? `len:${pair(c.a, c.b)}` : c.type === 'measure-angle' ? `ang:${c.vertex}:${pair(c.ray1, c.ray2)}` : null;
+  const target = targetOf(cmd);
+  type M = MeasureRestatement['earlier'];
+  const onTarget: { i: number; c: M }[] = [];
+  let boundElsewhere = false;
+  prior.forEach((c, i) => {
+    if ((c.type !== 'measure-length' && c.type !== 'measure-angle') || !('var' in c.expr)) return;
+    if (targetOf(c) === target) onTarget.push({ i, c });
+    else if (c.expr.var === e.var) boundElsewhere = true;
+  });
+  if (onTarget.length === 0) return null;
+  const form = (x: MeasureExpr) => ('var' in x ? `${x.pow ?? 1}|${x.const ?? 0}` : '');
+  const sameLetter = onTarget.filter(({ c }) => 'var' in c.expr && c.expr.var === e.var);
+  if (sameLetter.length > 0) {
+    const exact = sameLetter.find(({ c }) => 'var' in c.expr && form(c.expr) === form(e) && c.expr.coef === e.coef);
+    if (exact) return { kind: 'same', at: exact.i, earlier: exact.c };
+    const conflict = sameLetter.find(({ c }) => 'var' in c.expr && form(c.expr) === form(e) && c.expr.coef !== e.coef);
+    return conflict ? { kind: 'coef-conflict', at: conflict.i, earlier: conflict.c } : null;
+  }
+  if (boundElsewhere) return null;
+  const first = onTarget[0];
+  if (!('var' in first.c.expr) || valued(first.c.expr.var) || radiusLetter(first.c.expr.var)) return null;
+  return { kind: 'name-taken', at: first.i, earlier: first.c };
+}
+
+/**
+ * The fold status a refused restatement carries (#2023 + #2061, ADR-661), without the `[vs #i]` tail the fold adds.
+ * `coef-conflict` is the over-constrained frame («∠ABC = 3α cannot hold», «|AB| = 3a cannot hold» — the refused
+ * measure, in the refused line's own letter order); `name-taken` names the target as the refused line spells it and
+ * the earlier letter as the student wrote it. `same` refuses nothing (null).
+ */
+export function measureRestatementStatus(cmd: Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' }>, r: MeasureRestatement, tab: SymTab): string | null {
+  const angle = cmd.type === 'measure-angle';
+  const name = cmd.type === 'measure-angle' ? `${cmd.ray1}${cmd.vertex}${cmd.ray2}` : `${cmd.a}${cmd.b}`;
+  if (r.kind === 'coef-conflict') return `over-constrained: ${angle ? `∠${name}` : `|${name}|`} = ${measureLabelText(cmd, tab)} cannot hold`;
+  if (r.kind === 'name-taken') return `name-taken: ${angle ? 'angle' : 'segment'} ${name} is already named ${measureLabelText(r.earlier, tab)}`;
+  return null;
+}
 
 /** Build the symbol table from a command list: each variable's value (if given) and its bindings, in order. */
 export function buildSymTab(cmds: AnyCommand[]): SymTab {
@@ -260,7 +341,7 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       // The representative must itself be pure (an affine binding can't anchor a ratio).
       const reps = info?.bindings.filter((b) => b.kind === 'len' && !b.affine) ?? [];
       const rep = reps[0];
-      if (!rep || sameRefs(rep.refs, [cmd.a, cmd.b])) return []; // the representative (or sole binding) stays free
+      if (!rep || sameSegment(rep.refs, [cmd.a, cmd.b])) return []; // the representative (or sole binding) stays free
       // A ratio is linear only when both share the same exponent: the varⁿ cancels (12√x : 3√x = 4:1;
       // 4x² : x² = 4:1). Mixed exponents (12√x vs 3x) are nonlinear — leave a free label, not a wrong ratio.
       if ((rep.pow ?? 1) !== (e.pow ?? 1)) return [];
@@ -311,7 +392,7 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       if (info?.value !== undefined) return [angle(e.coef * info.value)];
       const reps = info?.bindings.filter((b) => b.kind === 'ang') ?? [];
       const rep = reps[0];
-      if (!rep || sameRefs(rep.refs, [cmd.vertex, cmd.ray1, cmd.ray2])) return [];
+      if (!rep || sameAngle(rep.refs, [cmd.vertex, cmd.ray1, cmd.ray2])) return [];
       // ∠this = (coef/repCoef)·∠rep
       return [
         { type: 'set-angle-ratio', v1: cmd.vertex, a1: cmd.ray1, b1: cmd.ray2, v2: rep.refs[0], a2: rep.refs[1], b2: rep.refs[2], k: e.coef / rep.coef },
