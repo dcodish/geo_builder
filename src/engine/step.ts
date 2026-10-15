@@ -1248,7 +1248,10 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
       ? describeConstraint(describeNewStatement(newCons))
       : angleErr.angles.map((a) => `∠${a.ray1}${a.vertex}${a.ray2} = ${Number(a.value.toFixed(2))}°`).join(' and ');
     const error = angleErr.kind === 'no-room' ? `over-constrained: ${what} cannot hold` : angleSumImpossibilityError(angleErr);
-    return { ok: false, error, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+    // A no-room proof answers before the ladder, which used to reach the same verdict by finding the degenerate needle
+    // and refusing it as not a figure (#1328, ADR-537). It must carry that standing: `degenerate` is what files the
+    // fact in the fold's RIGID set (a contradiction no later given clears), as stage 0h's flat proof does.
+    return { ok: false, error, construction: prev, positions: prevPositions, ladder: ['pre:impossible'], ...(angleErr.kind === 'no-room' ? { degenerate: true as const } : {}) };
   }
   // #1849 (ADR-602), stage 0h: the EQUALITY the metric prover lets through — a declared polygon its length givens
   // force flat («משולש ABC» · «AB = 5» · «BC = 3» · «AC = 8»). Proven, so the refusal does not depend on where the
