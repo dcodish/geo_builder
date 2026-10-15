@@ -129,6 +129,8 @@
     "symbolicNewPoint": "A new point «{{id}}» needs numeric coordinates — letters are only allowed for a point already in the figure",
     "powerNeedsSolid": "A power in a coordinate of «{{id}}» is possible only in a figure that has a solid — without one there is nothing to anchor it to, and the tool will not drop it silently. Add a solid first (say «box ABCDA'B'C'D'») and «C(p²,p,0)» will build.",
     "injectionUnsatisfiable": "No placement of the solid matches the given coordinates — check the givens",
+    "angleNameTaken": "Angle {{angle}} already has a name: {{symbol}} (in the line «{{line}}»). An angle has one name — keep using {{symbol}}.",
+    "angleNameTakenAlone": "Angle {{angle}} already has a name: {{symbol}}. An angle has one name — keep using {{symbol}}.",
     "givensContradict": "The givens contradict each other — no figure satisfies «{{stated}}» together with {{others}}",
     "givensContradictAlone": "The givens contradict each other — no figure satisfies «{{stated}}» together with the rest of the givens",
     "ringNotFlat": "A {{kind}} is a flat shape, and the vertices {{vertices}} do not lie in one plane — so «{{stated}}» cannot hold together with {{others}}.",

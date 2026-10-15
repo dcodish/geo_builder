@@ -196,6 +196,13 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
             others: quoteList(err.others),
           })
         : t('err.givensContradictAlone', { stated: err.stated });
+    // #2054 (ADR-3D-344): 2-D's sentence (ADR-661, operator ruling 2026-10-13 — «all three builders, the same sentences»)
+    case 'angle-name-taken':
+      return err.line
+        ? t('err.angleNameTaken', { angle: err.angle, symbol: err.symbol, line: err.line })
+        : t('err.angleNameTakenAlone', { angle: err.angle, symbol: err.symbol });
+    case 'angle-coef-conflict': // reported as `givens-contradict` by derive3; never reaches the student raw
+      return t('err.givensContradictAlone', { stated: `∠${err.was.p}${err.was.vertex}${err.was.q}` });
     case 'givens-contradict':
       return err.others.length > 0
         ? t('err.givensContradict', { stated: err.stated, others: quoteList(err.others) })

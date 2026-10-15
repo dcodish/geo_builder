@@ -333,6 +333,12 @@ const he = {
     'ו{{forcedHe}} אינו {{shapeHe}}. אם הצורה היא {{forcedHe}}, כתבו «{{forcedHe}} ABCD חסום במעגל».',
   // #1918 (ADR-AG-252; operator ruling 2026-10-08) — the noun and the inscription in TWO sentences, either order. 2-D's
   // over-constrained frame (#1868) naming both statements, with #1554's reason clause (B1: copied, never imported).
+  errAngleNameTaken: 'לזווית {{nameOf}} כבר יש שם: {{holder}}. לכל זווית שם אחד — המשיכו עם {{holder}}.',
+  errAngleNameTaken_vs: 'לזווית {{nameOf}} כבר יש שם: {{holder}} (בשורה «{{declared}}»). לכל זווית שם אחד — המשיכו עם {{holder}}.',
+  errLengthNameTaken: 'לקטע {{nameOf}} כבר יש שם: {{holder}}. לכל קטע שם אחד — המשיכו עם {{holder}}.',
+  errLengthNameTaken_vs: 'לקטע {{nameOf}} כבר יש שם: {{holder}} (בשורה «{{declared}}»). לכל קטע שם אחד — המשיכו עם {{holder}}.',
+  errMeasureContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
+  errMeasureContradictsAlone: 'לא ניתן: «{{detail}}» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errInscribedContradictsDeclared:
     'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. ' +
     'הסיבה: מעגל שעובר דרך ארבעת הקודקודים הופך {{shapeHe}} ל{{forcedHe}}, ו{{forcedHe}} אינו {{shapeHe}}.',
@@ -796,6 +802,12 @@ const en: typeof he = {
   errInscribedContradictsNoun:
     'A {{shapeEn}} cannot be inscribed in a circle: "{{detail}}". A circle around it would make it a {{forcedEn}}, ' +
     'and a {{forcedEn}} is not a {{shapeEn}}. If the shape is a {{forcedEn}}, write "{{forcedEn}} ABCD is inscribed in a circle".',
+  errAngleNameTaken: 'Angle {{nameOf}} already has a name: {{holder}}. An angle has one name — keep using {{holder}}.',
+  errAngleNameTaken_vs: 'Angle {{nameOf}} already has a name: {{holder}} (in the line «{{declared}}»). An angle has one name — keep using {{holder}}.',
+  errLengthNameTaken: 'Segment {{nameOf}} already has a name: {{holder}}. A segment has one name — keep using {{holder}}.',
+  errLengthNameTaken_vs: 'Segment {{nameOf}} already has a name: {{holder}} (in the line «{{declared}}»). A segment has one name — keep using {{holder}}.',
+  errMeasureContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold. The reason: {{what}}.',
+  errMeasureContradictsAlone: 'Can\'t do that: «{{detail}}» contradicts an earlier given — they can\'t both hold. The reason: {{what}}.',
   errInscribedContradictsDeclared:
     "Can't do that: «{{detail}}» contradicts «{{declared}}» — they can't both hold. " +
     'The reason: a circle through the four vertices would make a {{shapeEn}} a {{forcedEn}}, and a {{forcedEn}} is not a {{shapeEn}}.',

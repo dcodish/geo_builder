@@ -215,6 +215,11 @@ export function errorText(error: InputError, t: Translate): string {
     'polygon-not-supported': 'errPolygonNotSupported',
     'already-named': 'errAlreadyNamed',
     'alias-taken': 'errAliasTaken',
+    // #2054 / #2061 (ADR-AG-277) — 2-D's sentences (ADR-661): the second name, and the same letter's other coefficient
+    'name-taken': error.key === 'name-taken' && error.nameKind === 'length'
+      ? (error.declared ? 'errLengthNameTaken_vs' : 'errLengthNameTaken')
+      : error.key === 'name-taken' && error.declared ? 'errAngleNameTaken_vs' : 'errAngleNameTaken',
+    'measure-contradicts': error.key === 'measure-contradicts' && error.declared ? 'errMeasureContradicts' : 'errMeasureContradictsAlone',
     // #1154 — a rename understood and declined, each naming what the student wrote
     'rename-bad-name': 'errRenameBadName',
     'rename-same': 'errRenameSame',
@@ -284,5 +289,7 @@ export function errorText(error: InputError, t: Translate): string {
     statedHe: error.key === 'shape-excluded' ? (error.stated ?? '') : '',
     actualEn: error.key === 'shape-excluded' ? enNoun(error.actual) : '',
     statedEn: error.key === 'shape-excluded' ? enNoun(error.stated) : '',
+    nameOf: error.key === 'name-taken' ? (error.nameOf ?? '') : '',
+    what: error.key === 'measure-contradicts' ? (error.what ?? '') : '',
   }) + near;
 }

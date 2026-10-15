@@ -140,6 +140,11 @@ constants, so `angle ABC`, `the angle ABC` and «שווה» read alike in every 
 the angle mark keeps `label` (the binding letter `symbolOwnersOf` matches) apart from `coef`; display text
 is composed once (`angleMarkText`), and carriers keep the split — `Wedge.label` is shown, `Wedge.sym` is
 matched — so the panel never prints `α = 60°` beside an `α = 30°`.
+**An angle carries one name** (#2054/#2061, ADR-3D-344): `apply`'s `angle-mark` arm refuses a different letter on an
+angle that already wears one (`angle-name-taken`, unless the letter already names another angle — the ADR-3D-052
+equality) and the same letter with another coefficient (`angle-coef-conflict`), instead of relabelling or absorbing.
+`derive3` names the line that put the letter there (the first enabled green fact marking that angle with that letter
+and coefficient) — in the fold and in both retry passes — and reports the coefficient conflict as `givens-contradict`.
 
 #### Adding a relation: the registration surfaces and the non-negotiables (moved from docs/26 §5 and §7, #1861)
 

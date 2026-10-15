@@ -12757,3 +12757,25 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 **Locks.** `src3d/__tests__/inscription-voices-1975.test.ts`; fixtures `fixtures3/named-circle-circumscribes-1975.geo3.json` and `relative-clause-incircle-1975.geo3.json`; parity rows `voices-*-1975`; catalog row «מעגל O חוסם את המשולש ABC».
 
 **Behaviour change for a student:** «מעגל O חוסם את המשולש ABC» and «מעגל O חסום במשולש ABC» (the square, and English, too) now draw the circle named O, as the other voice does; before, not understood. «מעגל ש-ABC חוסם» now draws the circle inside the triangle; before, the circle through its vertices.
+
+## ADR-3D-344 — An angle carries one name: a second letter, or its letter with another coefficient, is refused naming the earlier line (#2054, #2061)
+
+**Status:** accepted · 2026-10-15 · bug (P2, 3-D) · fix round #2128, stream E · branch `fix/2054-second-symbol-3d-analytic` (stacked on 2-D's `fix/2023-second-symbol`)
+**Requirements:** [02b](02b-requirements-3d.md) FR-VC-2e · **Design:** [04b](04b-design-3d.md) § "Vocabulary is not a rule's private property" (the one-name paragraph) · **LADDER stage:** none (3-D apply)
+**Siblings:** [ADR-661](06-decisions.md#adr-661) (2-D, the reference), [ADR-AG-277](06c-decisions-analytic.md#adr-ag-277) (analytic) · **amends** [ADR-3D-052](#adr-3d-052)'s relabel comment (its equality rule stands)
+
+**The rulings.** 2026-10-13 (#2023, cards `d4-2023`, `d5-2023-tools`): *"All three builders refuse, with the same sentences"* — «לזווית ABC כבר יש שם: α (בשורה «זוית B=α»). לכל זווית שם אחד — המשיכו עם α.». 2026-10-14 (#2061, card `d14b-2061-crosstool` A; `d14b-2061-wording` A): «∠ABC=3α» after «∠ABC=2α» is refused as a contradiction, in 3-D's own sentence «הנתונים סותרים זה את זה — אין גוף שמקיים את «∠ABC=3α» יחד עם «∠ABC=2α»».
+
+**Measured before** (`8d3cadfb`, the store's `submit` → `derive3`). «משולש ABC» · «זווית ABC=α» · «זווית ABC=β» (also «∠ABC=α», «זווית CBA=β», «זווית ABC=2α», «∠SAB» on a square pyramid) recorded, and `apply` relabelled the arc to β: α left the figure without a word. «∠ABC=2α» · «∠ABC=3α» (the box, «∠CBA», «∠ABC=α» · «∠ABC=2α», the English) recorded, and the arc kept «2α»: 3α vanished.
+
+**The class.** *A labelled angle restated with another letter, or with its letter at another coefficient, is absorbed into the existing mark (relabelled or ignored) instead of being judged against the label it wears.* Root cause: `case 'angle-mark'` updated an existing mark only `if (cmd.label && existing.label !== cmd.label)` — a relabel — and did nothing when the letter matched with another coefficient.
+
+**Decision.** In the existing-mark branch, before any update: the same letter with another coefficient → `angle-coef-conflict`; a different letter that names no other angle → `angle-name-taken` (`angle` as the refused line spells it, `symbol` = `angleMarkText` of the mark). A letter that already names another angle keeps the ADR-3D-052 equality path, as 2-D reads it as a relation. An unlabelled mark («∠ABC» · «∠ABC=β») still takes its first name. `derive3` attaches the earlier line (`restatedAgainst`: the first enabled, green fact before it whose commands mark that angle with that letter and coefficient) in the fold and both retry passes, so the engine stays free of utterances, and reports the coefficient conflict as the existing `givens-contradict` (`stated` the refused line, `others` that line). New strings: `err.angleNameTaken` / `err.angleNameTakenAlone`, 2-D's sentence (held by `suite-vocabulary.test.ts`). No new string for the coefficient conflict.
+
+**Not here.** The ruled LENGTH sentence has no 3-D target: a 3-D «AB=a» is the vector AB⃗ = a⃗ (X7, operator 2026-09-18, #1184), unchanged. 3-D does not read a lone-vertex symbolic angle («זוית B=α», `not-understood`) — #2054's found work, so the operator's own card sequence is not a 3-D row. A letter that was VALUED («α = 20») before the second name is still refused here, where 2-D reads it as a pin (3-D's angle owner keeps no value record to ask); reported.
+
+**Sibling audit.** 2-D: ADR-661. Analytic: ADR-AG-277. Complex: no angle marks — class not present.
+
+**Locks.** `src3d/__tests__/angle-name-taken-2054.test.ts` (the ruled and spelling rows, the pyramid and the box, English, the unchanged rows — already-stated, a number, an unlabelled mark, one letter on two angles, a ratio, the X7 vector, the numeric twin — and a saved list through `derive3`) — **fails before: 36 of the 55 tests across this file and the analytic one** (the rest are the unchanged rows). Parity rows `angle-second-name-2023` and `angle-coef-restated-2061` lose their 3-D gaps. Vocabulary roles `angleNameTaken`, `angleNameTakenAlone`.
+
+**Behaviour change for a student:** «זווית ABC=β» after «זווית ABC=α» is refused «לזווית ABC כבר יש שם: α (בשורה «זווית ABC=α»). לכל זווית שם אחד — המשיכו עם α.» — before, the arc silently became β. «∠ABC=3α» after «∠ABC=2α» is refused «הנתונים סותרים זה את זה — אין גוף שמקיים את «∠ABC=3α» יחד עם «∠ABC=2α»» — before, recorded with 3α dropped. A saved list holding both lines opens with the second line red.

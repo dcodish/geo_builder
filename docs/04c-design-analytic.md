@@ -730,6 +730,8 @@ sentences; unlettered shapes take `toolPoint('vertex', …)`; regular polygons a
 
 - `alias-taken` refuses a taken label; `areaLabelRing` mints an area label's ring.
 
+- **Its dual: one angle or segment, two letters ([ADR-AG-277](06c-decisions-analytic.md#adr-ag-277), #2054/#2061).** `measureRestatement` (`engine/statedMeasures.ts`, reading the stated value through `plainMeasure` / `isValueSide`, the canvas's own definition) compares a new `angle` / plain-segment `length-eq` value with the earlier stated values of the same target (vertex + unordered rays; unordered pair). It runs in `applyFact`'s `constraint` arm before the duplicate absorb: a fresh letter on a target whose letters all differ → `name-taken`; the same single letter with another coefficient → `measure-contradicts`. The error carries the earlier constraint (`against`); `derive` maps it to its line (`constraintFact` → `owner`) as `declared`, and `errorText` renders 2-D's sentences (`errAngleNameTaken[_vs]`, `errLengthNameTaken[_vs]`, `errMeasureContradicts`, held equal to 2-D's by `suite-vocabulary.test.ts`).
+
 *Identifiers:* `GREEK_ALIAS` · `evalExpr` · `foldSignSelectors` · `narrowedDomain(declared, impliedRange)` · `poly-<ring>`
 
 ### The equation of a cevian keeps its claim; position words are coordinate comparisons; an obtuse triangle is a region choice ([ADR-AG-222](06c-decisions-analytic.md#adr-ag-222), #1662 #1706 #1708)

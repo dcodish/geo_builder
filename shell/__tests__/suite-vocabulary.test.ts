@@ -29,7 +29,7 @@ function tsValue(product: 'complex' | 'analytic', lang: Lang, key: string): stri
   const enAt = src.indexOf('const en: typeof he = {');
   const block = lang === 'he' ? src.slice(heAt, enAt) : src.slice(enAt);
   const m = block.match(new RegExp(String.raw`\n\s*${key}:\s*'((?:[^'\\]|\\.)*)'`));
-  return m?.[1];
+  return m?.[1].replace(/\\(.)/g, '$1'); // a JS escape («can\'t») reads as the character it escapes
 }
 
 const valueOf = (p: Product, lang: Lang, key: string) =>
@@ -68,6 +68,17 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   // #1872 (ADR-W-126): «הורידו שאלה» is in every builder (B16), so its label and the document's heading are one role each
   saveQuestion: { '2d': ['canvas.saveQuestion'], '3d': ['actions.saveQuestion'], complex: ['saveQuestion'], analytic: ['saveQuestion'] },
   questionHeading: { '2d': ['questionDoc.given'], '3d': ['questionDoc.given'], complex: ['questionGiven'], analytic: ['questionGiven'] },
+  // #2023 / #2054 (ADR-661, ADR-3D-344, ADR-AG-277; operator rulings 2026-10-13 — «all three builders, the same
+  // sentences»): a second letter for an angle or a segment. 3-D has no symbolic LENGTH (a 3-D «AB=a» is a vector, X7);
+  // the complex builder has no angles or segments.
+  angleNameTaken: { '2d': ['errors.angleNameTaken_said_vs'], '3d': ['err.angleNameTaken'], complex: null, analytic: ['errAngleNameTaken_vs'] },
+  angleNameTakenAlone: { '2d': ['errors.angleNameTaken'], '3d': ['err.angleNameTakenAlone'], complex: null, analytic: ['errAngleNameTaken'] },
+  lengthNameTaken: { '2d': ['errors.lengthNameTaken_said_vs'], '3d': null, complex: null, analytic: ['errLengthNameTaken_vs'] },
+  lengthNameTakenAlone: { '2d': ['errors.lengthNameTaken'], '3d': null, complex: null, analytic: ['errLengthNameTaken'] },
+  // #2061 (ADR-AG-277; ruling 2026-10-14, card d14b-2061-crosstool A): analytic speaks 2-D's over-constrained frame for
+  // the same letter with another coefficient. 3-D keeps its own conflict sentence (card d14b-2061-wording A).
+  measureContradicts: { '2d': ['errors.overConstrained_said_vs'], '3d': null, complex: null, analytic: ['errMeasureContradicts'] },
+  measureContradictsAlone: { '2d': ['errors.overConstrained_said'], '3d': null, complex: null, analytic: ['errMeasureContradictsAlone'] },
 };
 
 /** The ruled wording (the "Explicit set", 2026-09-27) — the lock's anchor, not just "all equal". */
@@ -86,6 +97,19 @@ const RULED: Record<string, Record<Lang, string>> = {
   askSubmit: { he: 'שאלו', en: 'Ask' },
   saveQuestion: { he: 'הורידו שאלה', en: 'Download question' },
   questionHeading: { he: 'נתון:', en: 'Given:' },
+  // the operator's verbatim sentences (2026-10-13, cards d4-2023 and d5-2023-length), placeholders normalised
+  angleNameTaken: {
+    he: 'לזווית {{N}} כבר יש שם: {{N}} (בשורה «{{N}}»). לכל זווית שם אחד — המשיכו עם {{N}}.',
+    en: 'Angle {{N}} already has a name: {{N}} (in the line «{{N}}»). An angle has one name — keep using {{N}}.',
+  },
+  lengthNameTaken: {
+    he: 'לקטע {{N}} כבר יש שם: {{N}} (בשורה «{{N}}»). לכל קטע שם אחד — המשיכו עם {{N}}.',
+    en: 'Segment {{N}} already has a name: {{N}} (in the line «{{N}}»). A segment has one name — keep using {{N}}.',
+  },
+  measureContradicts: {
+    he: 'לא ניתן: «{{N}}» סותר את «{{N}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{N}}.',
+    en: "Can't do that: «{{N}}» contradicts «{{N}}» — they can't both hold. The reason: {{N}}.",
+  },
 };
 
 /** Interpolation names differ per product ({{count}} / {{n}}) — the WORDING is what must match. */

@@ -656,6 +656,13 @@ a sentence the tool parsed.
 - «P מרכז המעגל I» then «O מרכז המעגל I» → refused, naming P
 - Sources: #1153, ADR-052.
 
+**R98a — an angle or a segment carries at most one letter; a second, different one is REFUSED naming the first line; the same one again is a no-op** (2-D's verdict and sentences, ADR-661). The same letter with another coefficient contradicts the first line and is refused in 2-D's over-constrained frame, whatever else the figure holds.
+- «זוית B=α» · «זוית ABC=β» → «לזווית ABC כבר יש שם: α (בשורה «זוית B=α»). לכל זווית שם אחד — המשיכו עם α.»
+- «AB=a» · «AB=c» → «לקטע AB כבר יש שם: a (בשורה «AB=a»). לכל קטע שם אחד — המשיכו עם a.»
+- «∠ABC=2α» · «∠ABC=3α» → «לא ניתן: «∠ABC=3α» סותר את «∠ABC=2α» — אי אפשר לקיים את שניהם יחד. הסיבה: ∠ABC = 3α.»
+- Not a second name: a letter naming another quantity («AB=a» · «BC=a», «CB=c» · «AB=a» · «AB=c»), a number, a shared-letter equation («AB=2a» · «AB=a+3»), a trig measure, an angle label.
+- Sources: #2054, #2061, ADR-AG-277.
+
 **R55 — an object that cannot exist is REPORTED once the figure has no freedom left**. Silent while another configuration may yet have it (ADR-AG-008).
 - the circumcentre of three fixed collinear points → named as not existing
 - Sources: ADR-AG-031, ADR-AG-008.

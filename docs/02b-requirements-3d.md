@@ -327,6 +327,16 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   value later given to the letter drives it accordingly — the form a question uses when two angles stand
   in a stated ratio. One letter with different coefficients states a ratio, never an equality.
   - Sources: ADR-3D-052, ADR-3D-241; #977.
+- **FR-VC-2e (Must)** — **An angle carries one name; a second name is refused, not relabelled.** A different
+  letter for an angle that already wears one («זווית ABC=α» · «זווית ABC=β», either ray order, any host) is
+  refused with 2-D's sentence «לזווית ABC כבר יש שם: α (בשורה «זווית ABC=α»). לכל זווית שם אחד — המשיכו עם α.»;
+  the same letter with another coefficient («∠ABC=2α» · «∠ABC=3α») is refused in 3-D's conflict sentence
+  «הנתונים סותרים זה את זה — אין גוף שמקיים את «∠ABC=3α» יחד עם «∠ABC=2α»». The same letter and coefficient
+  again stays already-stated; an unlabelled mark still takes its first name; a letter already naming another
+  angle is the FR-VC-2d equality. A saved list holding both lines opens with the second refused. This amends
+  FR-VC-2d's relabel (ADR-3D-052's equality rule stands). A 3-D «AB=a» is a vector (X7), so the length half of
+  the ruling has no 3-D sentence.
+  - Sources: ADR-3D-344; #2054, #2061, #2023 (operator rulings 2026-10-13, 2026-10-14).
 - **FR-VC-3 (Must)** — **NO CAS.** Every "symbolic" feature is a numeric root-find, a closed form, or a
   linear solve. Anything beyond that is refused and escalated to the operator, not approximated.
   - Sources: operator authority, D3 above; [docs/20 §10](archive/20-space-vectors-tool.md).
