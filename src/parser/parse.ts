@@ -31,10 +31,12 @@ import { unreadScript } from '../../shell/inputScript';
 import { foreignGiven } from './scope';
 import { readFrame } from './frame';
 import { NOTATION_WORDS, UNIT_WORDS, unaccountedLabels } from './labelAccounting';
-import { readShapePhrase, lowerShape, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
+import { readShapePhrase, lowerShape, shapeNounIsDefinite, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
 
 export type ParseResult =
-  | { ok: true; commands: AnyCommand[]; angleReadings?: string[] }
+  // `indefiniteShape` (#2127, ADR-654): the vertices of the existing polygon an INDEFINITE unnamed shape noun
+  // («משולש …») was bound to — the caller decides whether the sentence restates that shape or draws a new one
+  | { ok: true; commands: AnyCommand[]; angleReadings?: string[]; indefiniteShape?: string[] }
   | { ok: false; reason: 'not-handled' }
   // #1654–#1657 (ADR-562): a FOREIGN GIVEN — a slope, a quadrant, axes/coordinates (the analytic Builder's), a
   // plane, a sphere or another solid (the Space Builder's). Decided BEFORE every rule (`foreignGiven`), because
@@ -850,6 +852,16 @@ function autoVertexLabels(n: number, used: string[] = []): Id[] {
 const existingPolygon = (ctx: ParseContext, n: number): Id[] | null => {
   const matches = (ctx.polygons ?? []).filter((v) => v.length === n);
   return matches.length === 1 ? matches[0].map(up) : null;
+};
+
+/** #2127 ([ADR-654](../../docs/06-decisions.md#adr-654)): the outermost `parse` call collects the existing polygons an
+ *  INDEFINITE shape noun was bound to; only one the winning commands name is reported (`indefiniteShape`). */
+let indefiniteBindSink: Id[][] | null = null;
+/** {@link existingPolygon} for an unnamed shape noun in `s`: the binding is recorded when the noun is indefinite. */
+const referencedPolygon = (ctx: ParseContext, n: number, s: string): Id[] | null => {
+  const ids = existingPolygon(ctx, n);
+  if (ids && !shapeNounIsDefinite(s)) indefiniteBindSink?.push(ids);
+  return ids;
 };
 
 /** Did the student write an explicit vertex label? Vertex labels are UPPERCASE Latin (the parser's
@@ -6209,7 +6221,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
     labelRun(rest, n) ??
     (namesVertices(rest)
       ? null
-      : (existingPolygon(ctx, n) ?? autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])])));
+      : (referencedPolygon(ctx, n, s) ?? autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])])));
   if (!ids) return null;
   // After the circle, the shape, and the vertices are consumed, nothing
   // geometry-significant should remain — a constraint/extra construct means a
@@ -7049,7 +7061,7 @@ const incircle: Rule = (s, ctx) => {
     labelRun(rest, n) ??
     (namesVertices(rest)
       ? null
-      : (existingPolygon(ctx, n) ??
+      : (referencedPolygon(ctx, n, s) ??
         autoVertexLabels(n, [...taken, ...(namedC ? [namedC] : []), ...(incLabel ? [incLabel] : [])])));
   if (!ids) return null;
   // #1790: the leftover guard this rule never had — after the circle, the phrase, the centre and the vertices
@@ -13009,13 +13021,19 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
   // write into it, and only readings the winning commands name are reported (said aloud on commit).
   if (angleReadingSink) return parseEntry(raw, ctx);
   angleReadingSink = [];
+  indefiniteBindSink = []; // #2127 (ADR-654): the same outermost-call ownership
   try {
-    const r = parseEntry(raw, ctx);
-    if (!r.ok || angleReadingSink.length === 0) return r;
+    let r = parseEntry(raw, ctx);
+    if (!r.ok) return r;
+    const named = new Set(r.commands.flatMap(commandLetters));
+    const indefiniteShape = indefiniteBindSink.find((ids) => ids.every((v) => named.has(v)));
+    if (indefiniteShape) r = { ...r, indefiniteShape };
+    if (angleReadingSink.length === 0) return r;
     const angleReadings = angleReadingsOf(r.commands, angleReadingSink);
     return angleReadings.length ? { ...r, angleReadings } : r;
   } finally {
     angleReadingSink = null;
+    indefiniteBindSink = null;
   }
 }
 
