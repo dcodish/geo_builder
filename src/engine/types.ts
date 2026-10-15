@@ -854,6 +854,8 @@ export interface AngleRatioConstraint {
   a2: Id;
   b2: Id;
   k: number;
+  /** #1851 (ADR-662): an affine offset in degrees — ∠1 = k·∠2 + add («∠ABC = α + 40» against «∠ACB = α»). */
+  add?: number;
 }
 
 /**
@@ -1154,7 +1156,7 @@ export type Command =
   | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id; soft?: boolean; trapezoidLegs?: boolean } // trapezoidLegs: the isosceles-trapezoid macro's leg equality, stated on the legs of the ASSUMED base pair — replay re-seats it onto the legs of the ring in force when a stated ∥ pins the other pair (#989, ADR-506). soft: a DEFAULT equal-pair a named-shape macro picks when the student didn't say which sides are equal (e.g. isosceles |AB|=|AC|); the store drops it if an explicit equality on the same triangle is stated (ADR-114). The engine treats it as an ordinary equality.
   | { type: 'set-ratio'; a: Id; b: Id; c: Id; d: Id; k: number; add?: number } // |ab| = k·|cd| + add
   | { type: 'set-length-radius'; a: Id; b: Id; circle: Id; center: Id; witness: Id; k: number; add?: number } // |ab| = k·R (ADR-071)
-  | { type: 'set-angle-ratio'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id; k: number } // ∠1 = k·∠2
+  | { type: 'set-angle-ratio'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id; k: number; add?: number } // ∠1 = k·∠2 + add (degrees; #1851)
   | { type: 'set-angle-order'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id } // ∠1 < ∠2 (∠1 is the smaller)
   | { type: 'set-length-order'; a: Id; b: Id; c: Id; d: Id } // |ab| < |cd| (ab is the shorter)
   | { type: 'set-angle-acuteness'; vertex: Id; ray1: Id; ray2: Id; obtuse: boolean } // ∠ obtuse (>90°) / acute (<90°) — "זווית קהה/חדה"; lowers to `angle-bound` at 90 (kept: saved figures carry this command)

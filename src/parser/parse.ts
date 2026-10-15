@@ -2703,7 +2703,8 @@ function angleArms(text: string, ctx: ParseContext): AngleArms | Clarify | null 
  */
 type AngleValue =
   | { kind: 'num'; value: number; rest: string }
-  | { kind: 'sym'; coef: number; sym: string; rest: string };
+  /** #1851 (ADR-662): `konst` / `text` — a symbol plus a constant («α + 40»), read by the shared {@link AFFINE_TAIL}. */
+  | { kind: 'sym'; coef: number; sym: string; rest: string; konst?: number; text?: string };
 
 /**
  * The guards every value-bearing angle rule shares. Kept HERE rather than in one rule, because a guard
@@ -2738,12 +2739,18 @@ function angleValueOf(stripped: string): AngleValue | null {
   // defect exactly. An optional ° is consumed with it («= 2α°» parses today and must keep parsing).
   // #2008 (ADR-635): the coefficient is the shared NUMEXPR atom, so «½α» (spelled «1/2α» at the boundary) is ONE
   // coefficient — the legacy decimal atom stopped at the slash and read «2α».
-  const sym = stripped.match(new RegExp(String.raw`(?<![A-Za-z])(?:${NUMEXPR('sy')})?\s*[*·]?\s*(?<symVar>${VAR})\s*°?\s*[.,;]?\s*$`));
+  // #1851 (ADR-662): «α + 40», «2α − 10» — the letter may carry the shared affine tail, as a length's letter does.
+  const sym = stripped.match(new RegExp(String.raw`(?<![A-Za-z])(?:${NUMEXPR('sy')})?\s*[*·]?\s*(?<symVar>${VAR})\s*°?\s*${AFFINE_TAIL('at')}\s*°?\s*[.,;]?\s*$`));
   if (sym) {
     const g = sym.groups!;
     const coef = g.syall !== undefined ? numexprVal(g, 'sy') : { value: 1 };
     if (!coef) return null;
-    return { kind: 'sym', coef: coef.value, sym: g.symVar!, rest: stripped.replace(sym[0], ' ') };
+    const tail = affineTailOf(g, 'at');
+    if (g.atsg !== undefined && !tail) return null; // a zero denominator: unreadable, never guessed
+    return {
+      kind: 'sym', coef: coef.value, sym: g.symVar!, rest: stripped.replace(sym[0], ' '),
+      ...(tail ? { konst: tail.konst, text: `${g.syall !== undefined ? g.syall.replace(/\s+/g, '') : ''}${g.symVar} ${tail.text}` } : {}),
+    };
   }
   // A degree value must be a standalone number, NEVER a label's subscript digit: «∠CAD=A1» (an angle
   // ALIAS, #267) used to read the "1" of "A1" as value 1° and silently set ∠CAD=1°. The lookbehind keeps
@@ -3363,6 +3370,21 @@ const pointByDistances: Rule = (s) => {
  * "AB = √2R" (the reserved radius symbol) stays with `measureSqrt` and "AB = √2" stays a concrete length.
  */
 const COEF = String.raw`\d+(?:\.\d+)?`;
+/**
+ * #1851 ([ADR-662](../../docs/06-decisions.md#adr-662)) — THE AFFINE TAIL of a symbolic value: «± c» or «± c/d» after
+ * the letter («a + 3», «2a − 5/2», «α + 40»). ONE reader for the length rule and the angle reader. It lived inline in
+ * `measureLength` only, so «AB = a + 3» was read while «∠ABC = α + 40» escalated: two readers of one grammar.
+ * Groups (prefix `p`): `<p>sg` the sign, `<p>c` the constant, `<p>cd` its denominator.
+ */
+const AFFINE_TAIL = (p: string) => String.raw`(?:(?<${p}sg>[+\-−])\s*(?<${p}c>${COEF})(?:\s*\/\s*(?<${p}cd>${COEF}))?)?`;
+/** The constant an {@link AFFINE_TAIL} read, and its faithful text («+ 3», «− 5/2») — or null when there is none. */
+function affineTailOf(g: Record<string, string | undefined>, p: string): { konst: number; text: string } | null {
+  if (g[`${p}sg`] === undefined) return null;
+  const sign = g[`${p}sg`] === '+' ? 1 : -1; // '-' or '−' (the minus sign)
+  const den = g[`${p}cd`] !== undefined ? parseFloat(g[`${p}cd`]!) : 1;
+  if (den === 0) return null;
+  return { konst: (sign * parseFloat(g[`${p}c`]!)) / den, text: `${sign > 0 ? '+' : '−'} ${g[`${p}c`]}${g[`${p}cd`] !== undefined ? `/${g[`${p}cd`]}` : ''}` };
+}
 const ratioConstraint: Rule = (s) => {
   const en = s.match(
     new RegExp(
@@ -4412,19 +4434,18 @@ const measureLength: Rule = (s) => {
   // "AB = 3x²" must NOT half-parse to "3x" (measurePower runs first and owns it); a leftover suffix
   // falls through to escalation instead of a wrong partial parse (the ADR-024/026 class). (R6a.)
   const m = s.match(
-    new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*(${LVAR})(?![a-zA-Z])\s*(?:\/\s*(${COEF}))?\s*(?:([+\-−])\s*(${COEF})(?:\s*\/\s*(${COEF}))?)?\s*$`),
+    new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*(${LVAR})(?![a-zA-Z])\s*(?:\/\s*(${COEF}))?\s*${AFFINE_TAIL('lt')}\s*$`),
   );
   if (!m) return null;
   const num = m[3] ? parseFloat(m[3]) : 1;
   const den = m[5] ? parseFloat(m[5]) : 1;
-  const sign = m[6] === '+' ? 1 : -1; // '-' or '−' (minus sign)
-  const cNum = m[7] ? parseFloat(m[7]) : 0;
-  const cDen = m[8] ? parseFloat(m[8]) : 1;
-  const konst = m[6] ? (sign * cNum) / cDen : 0;
+  // #1851 (ADR-662): the affine tail is the shared reader's, so the angle reader reads «α + 40» exactly as this reads «a + 3»
+  const tail = affineTailOf(m.groups ?? {}, 'lt');
+  const konst = tail?.konst ?? 0;
   // Faithful label: "7k/5", "k+2", "k-5/2", etc. — built from the parts the student typed.
   let text: string | undefined;
-  if (m[5] || m[6]) {
-    text = `${m[3] ?? ''}${m[4]}${m[5] ? `/${m[5]}` : ''}${m[6] ? ` ${m[6] === '+' ? '+' : '−'} ${m[7]}${m[8] ? `/${m[8]}` : ''}` : ''}`;
+  if (m[5] || tail) {
+    text = `${m[3] ?? ''}${m[4]}${m[5] ? `/${m[5]}` : ''}${tail ? ` ${tail.text}` : ''}`;
   }
   return [
     {
@@ -4534,7 +4555,7 @@ const measureAngle: Rule = (s, ctx) => {
   // symbol spelled with a Latin letter would be counted as a second label.
   const arms = angleArms(v.rest, ctx);
   if (!arms || 'clarify' in arms) return arms;
-  return [{ type: 'measure-angle', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2, expr: { coef: v.coef, var: v.sym } }];
+  return [{ type: 'measure-angle', vertex: arms.vertex, ray1: arms.ray1, ray2: arms.ray2, expr: { coef: v.coef, var: v.sym, ...(v.konst ? { const: v.konst, text: v.text } : {}) } }];
 };
 
 /**

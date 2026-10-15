@@ -143,7 +143,10 @@ export function measureRestatement(cmd: AnyCommand, prior: readonly AnyCommand[]
   if (sameLetter.length > 0) {
     const exact = sameLetter.find(({ c }) => 'var' in c.expr && form(c.expr) === form(e) && c.expr.coef === e.coef);
     if (exact) return { kind: 'same', at: exact.i, earlier: exact.c };
-    const conflict = sameLetter.find(({ c }) => 'var' in c.expr && form(c.expr) === form(e) && c.expr.coef !== e.coef);
+    // #1851 (ADR-662): the same letter and coefficient with ANOTHER CONSTANT («∠ABC = α» · «∠ABC = α + 40») is the same
+    // contradiction in another spelling — no α satisfies both
+    const sameShape = (x: MeasureExpr) => 'var' in x && (x.pow ?? 1) === (e.pow ?? 1);
+    const conflict = sameLetter.find(({ c }) => 'var' in c.expr && ((form(c.expr) === form(e) && c.expr.coef !== e.coef) || (sameShape(c.expr) && c.expr.coef === e.coef && (c.expr.const ?? 0) !== (e.const ?? 0))));
     return conflict ? { kind: 'coef-conflict', at: conflict.i, earlier: conflict.c } : null;
   }
   if (boundElsewhere) return null;
@@ -177,7 +180,7 @@ export function buildSymTab(cmds: AnyCommand[]): SymTab {
   for (const c of cmds) {
     if (c.type === 'set-var') slot(c.name).value = c.value;
     else if (c.type === 'measure-length' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'len', refs: [c.a, c.b], coef: c.expr.coef, pow: c.expr.pow, affine: (c.expr.const ?? 0) !== 0 });
-    else if (c.type === 'measure-angle' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'ang', refs: [c.vertex, c.ray1, c.ray2], coef: c.expr.coef });
+    else if (c.type === 'measure-angle' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'ang', refs: [c.vertex, c.ray1, c.ray2], coef: c.expr.coef, affine: (c.expr.const ?? 0) !== 0 });
     else if (c.type === 'measure-area' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'area', refs: c.ids, coef: c.expr.coef, pow: c.expr.pow, affine: (c.expr.const ?? 0) !== 0, ...(c.round ? { round: c.round } : {}) });
     else if (c.type === 'measure-perimeter' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'perim', refs: c.ids, coef: c.expr.coef, pow: c.expr.pow, affine: (c.expr.const ?? 0) !== 0, ...(c.round ? { round: c.round } : {}) });
   }
@@ -388,14 +391,22 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       const e = cmd.expr;
       const angle = (value: number): Command => ({ type: 'set-angle', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, value });
       if ('value' in e) return [angle(e.value)];
+      // #1851 (ADR-662): a symbol plus a constant («α + 40») lowers as the length lane's affine measure does — the
+      // constant joins the value once the letter has one, and rides an AFFINE ratio while it does not.
+      const konst = e.const ?? 0;
       const info = tab.vars.get(e.var);
-      if (info?.value !== undefined) return [angle(e.coef * info.value)];
-      const reps = info?.bindings.filter((b) => b.kind === 'ang') ?? [];
+      if (info?.value !== undefined) return [angle(e.coef * info.value + konst)];
+      // the representative must itself be pure (an affine binding cannot anchor a ratio — the length rule)
+      const reps = info?.bindings.filter((b) => b.kind === 'ang' && !b.affine) ?? [];
       const rep = reps[0];
-      if (!rep || sameAngle(rep.refs, [cmd.vertex, cmd.ray1, cmd.ray2])) return [];
-      // ∠this = (coef/repCoef)·∠rep
+      if (!rep) return [];
+      // ∠this = (coef/repCoef)·∠rep + const. On the representative's OWN angle the identical measure is the letter's
+      // binding (nothing to add); another form there is the equation it states («∠ABC = 2α» · «∠ABC = α + 40» is
+      // ∠ABC = ½∠ABC + 40, so α = 40). The same letter and coefficient with another constant never reaches here — it is
+      // a contradiction, refused in the fold (`measureRestatement`, ADR-661).
+      if (sameAngle(rep.refs, [cmd.vertex, cmd.ray1, cmd.ray2]) && e.coef === rep.coef && konst === 0) return [];
       return [
-        { type: 'set-angle-ratio', v1: cmd.vertex, a1: cmd.ray1, b1: cmd.ray2, v2: rep.refs[0], a2: rep.refs[1], b2: rep.refs[2], k: e.coef / rep.coef },
+        { type: 'set-angle-ratio', v1: cmd.vertex, a1: cmd.ray1, b1: cmd.ray2, v2: rep.refs[0], a2: rep.refs[1], b2: rep.refs[2], k: e.coef / rep.coef, ...(konst ? { add: konst } : {}) },
       ];
     }
     case 'measure-order': {
