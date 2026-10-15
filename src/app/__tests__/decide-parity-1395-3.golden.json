@@ -29,7 +29,7 @@
  "scenario:tangent-from-external-D-then-pinned-by-extension": "9910ef36e9395d8f",
  "scenario:unnamed-circle-secant-full-q4": "4ca69b95f593bd50",
  "scenario:segment-tangent-no-explicit-touch-point": "785e48169705d53a",
- "scenario:collinear-flexes-redundant-carrier-kite-tangents": "642d263f9b96b5a3",
+ "scenario:collinear-flexes-redundant-carrier-kite-tangents": "1cef321fee4543c3",
  "scenario:inscribed-trapezoid-stays-a-trapezoid-when-flexed": "b5be34923374af60",
  "scenario:tangent-meets-extension-lands-on-named-side": "2c4bdbb76bea5408",
  "scenario:relations-layer-tangent-chord-angle": "613fbee0e485d2f2",
