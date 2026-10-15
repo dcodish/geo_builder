@@ -1,0 +1,47 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T00:00:00.000Z",
+  "name": "issue-2024-symbol-endpoint-length",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "HsZe3_UgCKmVfIYkB4Y6j",
+      "utterance": "משולש ABC",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "yWStPs2NYspyZWAD_1amS",
+      "utterance": "AB=b",
+      "cmd": {
+        "type": "measure-length",
+        "a": "A",
+        "b": "B",
+        "expr": {
+          "coef": 1,
+          "var": "b"
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "9-0VP2_VLaK-aFlMv7Tph",
+      "utterance": "b=4",
+      "cmd": {
+        "type": "set-var",
+        "name": "b",
+        "value": 4
+      },
+      "enabled": true
+    }
+  ]
+}

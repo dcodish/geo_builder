@@ -17130,3 +17130,29 @@ No chokepoint grows: a per-order special case is removed and the copula is an at
 **Sibling audit.** 3-D, analytic and complex have no refusal of this shape: a muted row there is simply out of effect (`src3d/store/paramChips.ts`, `src-analytic/app/submit.ts`), and no message reports a muted row's reservation. Nothing to port.
 
 **Consequences.** Locks: `src/app/__tests__/issue-1994-muted-row-names-row.test.ts` (T15 exactly, through `runSubmit` and `explainError`, both locales; no point list; and the class — any re-use of an unticked row's letters, a segment over an unticked triangle, a triangle over an unticked square). Re-based: `humanize-error.test.ts`'s mutedRowOwns row, `issue-1748-untick-retype.test.ts`, `issue-1952-untick-independent-row.test.ts` (their wording assertions; their behaviour assertions are unchanged).
+
+## ADR-668 — A symbol that shares a letter with a point it measures is a value, never a lowercase label: «AB=b» builds as «AB=c» does (#2024)
+
+**Status:** accepted · 2026-10-15 · bug (P2) · operator ruling 2026-10-13 on #2024 (option A, card d4-2024: *build it like «AB=c»; the same holds for «זוית B=b»; the false correction is withdrawn*) · fix round #2128, stream I · branch `fix/2024-symbol-equal-endpoint-letter`
+
+**Requirements:** [FR-IN-4b](02-requirements.md) · **Design:** [04-design.md](04-design.md) § "Telling a LABEL from a WORD in Hebrew" (the symbol exemption paragraph) · **LADDER stage:** none — a commit-seam convention check before any solve; no solve stage changes.
+
+**Cites** [ADR-497](#adr-497) (the convention nudge, #779), [ADR-492](#adr-492) (`symbolsConsumedBy`), [ADR-648](#adr-648) (a radius letter's value, #2101).
+
+**Context — measured at pickup on `b0ef3240`** through `decideDeterministic2D`. After «משולש ABC»: «AB=b», «זוית B=b», «זווית ABC=b», «זוית A=a», «AB=b+1» and the Hebrew-framed «האורך AB=a» were refused `scope:lowercase-labels` with the corrected sentence «AB=B» (and «זוית B=B», …) — a sentence that is not geometry. «AB=c», «AC=b», «AB=2b» committed; the Latin-only «AB=a» committed only because the article `a` is filler. «מעגל B ברדיוס b» was refused the same way («מעגל B ברדיוס B»). The parse itself was right every time (`measure-length {A, B, var:'b'}`). 3-D and analytic already build «AB=b».
+
+**Root cause.** `lowercaseLabelFold` (`src/parser/parse.ts`) proves a lowercase run was folded into a label when the run's upper-cased letters are all labels the commands reference. It never asked whether the commands consumed that run as a SYMBOL, so a symbol letter that coincided with one of the measured element's own point letters (b on AB, b at vertex B, b naming circle B's radius) read as a folded label.
+
+**Class (docs/17 §1).** *A lowercase symbol a command carries is read as a lowercase label whenever its letter coincides with a label the same line references* — every symbol slot (a measure's `expr.var` for length, angle, area, perimeter; a radius letter; an order or bound operand), every coincidence (an endpoint, a vertex, a circle's centre), both languages.
+
+**Decision.** The fold collects the symbol names the commands carry — the engine's own `symbolsConsumedBy` (the one list of symbol slots, which ADR-492's blame rule already reads) plus a `set-var`'s name — and a run equal to one of them never proves a fold. The evidence then proves a lowercase LABEL, never a lowercase SYMBOL. A genuine lowercase label («ab = 5», «זוית abc = 40») is still taught, because there the run is a label slot and no command carries it as a symbol.
+
+**Composition with ADR-648.** #2101 lets `setVar` read an UPPERCASE letter when a circle's radius binds it; the fold only examines runs that contain a lowercase letter, so that reading is untouched («מעגל O ברדיוס R» · «R = 3» still commits). A lowercase radius letter that equals the circle's own centre letter («מעגל B ברדיוס b») is now a member of this class and builds; «b = 3» then sizes the circle, and a length sharing the letter («AB=b» with «מעגל O ברדיוס b») takes the same value.
+
+**Why not a patch (docs/17 §2).** No input is special-cased and no chokepoint list grows: the exemption reads the existing engine list of symbol slots, so a future symbolic command joins it the day `symbolsConsumedBy` learns it.
+
+**Sibling audit.** 2-D: all three commit seams call this one function (`decideDeterministic.ts`, `editPipeline.ts`, `submitPipeline.ts` for the model's commands), so all three are fixed. The failed-parse half (`upperCasedLabelCandidate`) proof-parses its candidate, so a symbol that already parsed never reaches it. 3-D (`src3d`, measured through `decideDeterministic3`): «AB=b» records exactly as «AB=c» does — the class is not present; «זוית B=b» is not understood there, as «זוית B=c» and «זוית B=α» are — a separate gap, #2060 (3-D reads no symbol on a one-letter angle), now a known-gap row. Analytic (measured through `decideSubmit`): «AB=b» and «זוית B=b» record; no fold exists. Complex: no fold exists, n/a.
+
+**Locks.** `src/app/__tests__/issue-2024-symbol-endpoint-letter.test.ts` (through `decideDeterministic2D` + `commitVerdict`: every spelling above commits its measure without the model, the English locale, builds green and verified, «AB=b · b=4» draws |AB| = 4 as «AB=c · c=4» does, the #2101 compositions, and the controls «ab = 5» / «זוית abc = 40» still taught); fixtures `issue-2024-symbol-endpoint-length.geo.json` and `issue-2024-symbol-endpoint-angle.geo.json`; parity rows `symbol-endpoint-length-2024`, `symbol-endpoint-angle-2024` (known gap 3-D #2060), `symbol-endpoint-angle-full-2024`.
+
+**Behaviour change for a student:** after «משולש ABC», «AB=b» and «זוית B=b» now draw the length / angle labelled b, as «AB=c» already did (was: refused with the suggestion «AB=B»). «מעגל B ברדיוס b» now builds (was: refused with «מעגל B ברדיוס B»). A lowercase point name («ab = 5») is still taught.

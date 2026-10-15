@@ -1,0 +1,38 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T00:00:00.000Z",
+  "name": "issue-2024-symbol-endpoint-angle",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "3q-gumVFklifuvfF7SYKp",
+      "utterance": "משולש ABC",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "cdamoGBx0ZD1zr7gKCRc5",
+      "utterance": "זוית B=b",
+      "cmd": {
+        "type": "measure-angle",
+        "vertex": "B",
+        "ray1": "A",
+        "ray2": "C",
+        "expr": {
+          "coef": 1,
+          "var": "b"
+        }
+      },
+      "enabled": true
+    }
+  ]
+}

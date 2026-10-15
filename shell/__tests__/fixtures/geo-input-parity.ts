@@ -268,6 +268,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2108': 'open',
   '#2130': 'open', // #2125 (ADR-3D-342): analytic refuses an unnamed circumcircle stated after the incircle
 
+  '#2060': 'open', // #2024 (ADR-668): 3-D does not read a single-letter angle given a symbol («זוית B=b», «זוית B=α»)
+
 };
 
 export interface ParityRow {
@@ -1427,6 +1429,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'voices-feminine-inscribed-1975', family: 'inscribed', steps: ['מקבילית ABCD', 'מקבילית ABCD חסומה במעגל'], expect: 'builds', note: '#2035-01' },
   { id: 'voices-feminine-circumscribes-1975', family: 'inscribed', steps: ['משולש ABC', 'משולש ABC חוסמת מעגל'], expect: 'builds', note: '#2035-02' },
   { id: 'bare-run-circumscribes-2098', family: 'inscribed', steps: ['משולש ABC', 'ABC חוסם מעגל'], expect: 'builds', note: 'all three built it before the fix; 2-D drew the circle THROUGH the vertices — its geometry is held by issue-2098-bare-run-circumscribes.test.ts' },
+  // ── #2024 (ADR-668): a symbol letter equal to one of the measured element's own endpoints is a value, never a lowercase label ──
+  { id: 'symbol-endpoint-length-2024', family: 'lengths', steps: ['משולש ABC', 'AB=b'], expect: 'builds', note: '2-D refused it as a lowercase label and taught «AB=B»; «AB=c» built' },
+  { id: 'symbol-endpoint-angle-2024', family: 'angles', steps: ['משולש ABC', 'זוית B=b'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2060' }], note: '2-D taught «זוית B=B»; 3-D reads no symbol on a one-letter angle, Greek included' },
+  { id: 'symbol-endpoint-angle-full-2024', family: 'angles', steps: ['משולש ABC', 'זווית ABC=b'], expect: 'builds' },
 
   // ── #2125 (ADR-3D-342): the circle through the vertices and the circle inside are two circles — both build, in either order ──
   { id: 'circum-then-incircle-2125', family: 'inscribed', steps: ['משולש ABC', 'מעגל חוסם את ABC', 'מעגל חסום במשולש ABC'], expect: 'builds', note: "the operator's sequence: 3-D refused the incircle «ABC כבר מוגדר» before ADR-3D-342 (both unnamed circles were circle-ABC)" },

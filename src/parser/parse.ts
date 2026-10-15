@@ -19,7 +19,7 @@
  * no digits). Keywords are bilingual; the same rule matches either language.
  */
 
-import { MIDSEGMENT_SHAPES, RADIUS_VAR, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand } from '@/engine';
+import { MIDSEGMENT_SHAPES, RADIUS_VAR, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
 import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
@@ -14188,6 +14188,13 @@ const EN_FILLER_WORDS = new Set(['a', 'an', 'to', 'the', 'and', 'of', 'is', 'are
  * `radius-symbol name:"r"`) is never flagged, and an English function word never coincides with the
  * whole folded run (FILLER-excluded besides). Returns the folded labels plus the corrected sentence to
  * suggest, or null when the parse read no lowercase label.
+ *
+ * #2024 ([ADR-668](../../docs/06-decisions.md#adr-668)) — the evidence must prove a LABEL, never a SYMBOL. A run
+ * the commands consumed as a symbol name (`expr.var`, a radius letter, an order/bound operand — the engine's own
+ * {@link symbolsConsumedBy}, plus a `set-var` name) is a magnitude the command carries case-preserved, so it is
+ * exempt even when its upper-cased letter coincides with a label the same command references: «AB=b» measures AB
+ * as b exactly as «AB=c» does, and «זוית B=b» names the angle at B as b. Before, the coincidence alone (b on AB,
+ * b at vertex B) read as a folded label and the tool "corrected" the line to the non-sentence «AB=B».
  */
 export function lowercaseLabelFold(utterance: string, commands: AnyCommand[]): { folded: Id[]; corrected: string } | null {
   const s = normalizeUtterance(utterance);
@@ -14201,9 +14208,11 @@ export function lowercaseLabelFold(utterance: string, commands: AnyCommand[]): {
     else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => k !== 'type' && walk(x));
   };
   commands.forEach(walk);
+  const symbols = new Set(commands.flatMap((c) => (c.type === 'set-var' ? [c.name] : symbolsConsumedBy(c))));
   const heb = hasHebrewScript(s);
   const RUN = /(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g;
   const foldToks = (run: string): Id[] | null => {
+    if (symbols.has(run)) return null; // #2024: a symbol the commands carry is not a folded label
     const toks = run.toUpperCase().match(/[A-Z]\d*/g) ?? [];
     return toks.length > 0 && toks.every((tok) => referenced.has(tok)) ? toks : null;
   };
