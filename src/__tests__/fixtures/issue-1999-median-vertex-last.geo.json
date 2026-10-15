@@ -1,0 +1,47 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T08:00:00.000Z",
+  "name": "issue-1999-median-vertex-last",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "-igFUB8eIfNg4w3XjETXd",
+      "utterance": "משולש CMD",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "C",
+          "M",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "iNi7ASH-4IqXkW4-04NwA",
+      "utterance": "AM תיכון לצלע CD",
+      "group": "g1",
+      "cmd": {
+        "type": "midpoint",
+        "id": "A",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "cIT-RW00YtszKYSnXZ3R6",
+      "utterance": "AM תיכון לצלע CD",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "M",
+        "b": "A"
+      },
+      "enabled": true
+    }
+  ]
+}

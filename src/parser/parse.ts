@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, RADIUS_VAR, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -9521,11 +9521,20 @@ const tangentLine: Rule = (s, ctx) => {
   return cmds;
 };
 
+/**
+ * #1685/#1999 ([ADR-666](../../docs/06-decisions.md#adr-666)) — THE BISECTOR'S SUBJECT, read by `bisectorPlacesPoint` and
+ * by `bisectorLine`'s deferral guard from ONE constant so they cannot drift: the shared cevian subject (two labels,
+ * an optional copula «הוא/היא/הינו» or "is", an optional article) then the role — "bisects", «חוצ…», or the English
+ * role noun "(the|an) (angle) bisector of (the angle)". Before, both required the letters directly before the verb,
+ * so «AM הוא חוצה זווית CMD» fell to `bisectorLine`, which drew a bare bisector and left «AM» unread.
+ */
+const BISECTOR_SUBJECT = rx(CEVIAN_SUBJECT + String.raw`(?:bisects?\b|(?:angle\s+)?bisector\s+of\b(?:\s+(?:the\s+)?angle\b)?|חוצ)`, 'i');
+
 /** "bisector of angle ABC" / "חוצה זווית ABC" — a *drawn* angle bisector (not "AD bisects …", which places a point). */
 const bisectorLine: Rule = (s) => {
   if (!/bisector|חוצ/i.test(s)) return null;
   if (INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s)) return null;
-  if (/\b[A-Za-z]\d*\s*[A-Za-z]\d*\b\s*(?:bisects?|חוצ)/i.test(s)) return null; // "AD bisects ∠.." = placing a point (deferred)
+  if (BISECTOR_SUBJECT.test(s)) return null; // "AD bisects ∠.." / «AD הוא חוצה …» = placing a point (deferred) — #1999: the shared subject
   const ids = labelRun(s.replace(/bisector|angle|זוו?ית|הזוו?ית|חוצה|חוצי|חוצ|את/gi, ' '), 3);
   if (!ids) return null;
   return [{ type: 'bisector', id: `bis-${ids.join('')}`, vertex: ids[1], p: ids[0], q: ids[2], visible: true }];
@@ -9967,7 +9976,7 @@ const statedSide = (s: string): { side: [Id, Id]; match: string } | null => {
  */
 const statedTriangle = (s: string): { ring: [Id, Id, Id]; match: string } | null => {
   const m =
-    s.match(/(?:\bin\s+(?:the\s+)?triangle\s+|ב?ה?משולש\s+)([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i) ??
+    s.match(/(?:\b(?:in|of)\s+(?:the\s+)?triangle\s+|ב?ה?משולש\s+)([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i) ?? // #1999: "of triangle"
     // #1720: the English forms the median and altitude rules always read — "median from A in ABC", "triangle
     // ABC with a height from A". UPPERCASE labels only (no /i), so "a triangle and …" is never A, N, D.
     s.match(new RegExp(String.raw`(?:\b[Ii]n\s+(?:the\s+)?|\b[Tt]riangle\s+)(${ULABEL})\s*(${ULABEL})\s*(${ULABEL})(?![A-Za-z\d])`));
@@ -10035,6 +10044,30 @@ const cevianFault = (
 };
 
 /**
+ * #1999 ([ADR-666](../../docs/06-decisions.md#adr-666)) — WHICH END OF A NAMED CEVIAN IS THE VERTEX: the figure says, never
+ * the letter order. `[x, y]` when `x` is the vertex, `[y, x]` when only `y` is, and `[x, y]` when neither is — so every
+ * vertex-first sentence, and every sentence whose letters name no vertex (the degenerate refusals), reads exactly as
+ * before. Each rule passes its own semantic predicate: the bisector the resolved angle's vertex; the median and the
+ * altitude the third vertex of a triangle on the stated side, a letter of the stated triangle, or a vertex of a
+ * figure polygon. «AM תיכון לצלע CD» after «משולש CMD» is therefore «MA תיכון לצלע CD».
+ */
+const cevianEnds = (x: Id, y: Id, isVertex: (v: Id) => boolean): [Id, Id] => (!isVertex(x) && isVertex(y) ? [y, x] : [x, y]);
+
+/** #1999 (ADR-666): the vertex predicate the median and the altitude share — a letter that can be the apex of a cevian
+ *  to `side` (the third vertex of a figure or stated triangle on it), to the stated triangle (one of its letters), or,
+ *  with neither stated, to a figure polygon holding it. Structure only (`ctx.polygons`, the sentence), never coordinates. */
+const cevianVertexOf = (s: string, ctx: ParseContext, side: readonly [Id, Id] | null): ((v: Id) => boolean) => {
+  const tri = statedTriangle(s)?.ring ?? null;
+  const rings = [...(ctx.polygons ?? []).map((p) => p.map(up)), ...(tri ? [tri as Id[]] : [])];
+  if (side) {
+    const [p, q] = side;
+    return (v) => v !== p && v !== q && rings.some((r) => r.length === 3 && r.includes(p) && r.includes(q) && r.includes(v));
+  }
+  if (tri) return (v) => tri.includes(v);
+  return (v) => rings.some((r) => r.includes(v));
+};
+
+/**
  * The altitude whose foot IS an endpoint of the side: «AB גובה לצלע BC» ⇒ AB ⟂ BC (#1247).
  *
  * It mints NO point — the foot the student named is a vertex the figure already has, and emitting a
@@ -10064,8 +10097,8 @@ const median: Rule = (s, ctx) => {
   if (sideM) body = body.replace(sideM.match, ' ');
   const seg = labelRun(body, 2);
   if (seg && seg[0] !== seg[1]) {
-    const apex = seg[0];
-    const foot = seg[1];
+    // #1999 (ADR-666): the figure says which end is the vertex — «AM תיכון לצלע CD» is «MA תיכון לצלע CD»
+    const [apex, foot] = cevianEnds(seg[0], seg[1], cevianVertexOf(s, ctx, side));
     let opp = side;
     if (!opp) {
       // No side stated: derive the opposite side from a triangle named in the
@@ -10300,7 +10333,7 @@ const isVertexPair = (a: Id, b: Id, ctx: ParseContext): boolean => {
 };
 
 /** The named-altitude head, name-first: «AB גובה», «AB הוא גובה», "AB is the altitude" (the `altitude` rule's reader). */
-const NAMED_ALT_FIRST = rx(String.raw`^\s*\b(${LABEL})\s*(${LABEL})\b\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:height|altitude|גובה)`, 'i');
+const NAMED_ALT_FIRST = rx(String.raw`^\s*${CEVIAN_SUBJECT}(?:height|altitude|גובה)`, 'i'); // #1999 (ADR-666): the shared subject
 /** The named-altitude head, keyword-first: «הגובה AB», "the altitude AB". */
 const NAMED_ALT_KW = rx(String.raw`(?:height|altitude|גובה)\s+\b(${LABEL})\s*(${LABEL})\b`, 'i');
 
@@ -10438,13 +10471,13 @@ const altitude: Rule = (s, ctx) => {
   // like "to"/"in" sitting after the keyword is misread as two single-letter labels (T,O / I,N).
   const nm =
     isHeight && !apexM
-      ? (s.match(/^\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:height|altitude|גובה)/i) ?? // name-first "CD גובה …"
-        s.match(/(?:height|altitude|גובה)\s+\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i)) // keyword-first "הגובה CD …"
+      ? (s.match(NAMED_ALT_FIRST) ?? // name-first "CD גובה …" — #1999: the shared subject (the copula, "is an")
+        s.match(NAMED_ALT_KW)) // keyword-first "הגובה CD …"
       : null;
   const named = nm && isUpperLabel(nm[1]) && isUpperLabel(nm[2]) ? nm : null;
   if (named) {
-    apex = up(named[1]);
-    namedFoot = up(named[2]);
+    // #1999 (ADR-666): the figure says which end is the vertex — «AM גובה לצלע CD» is «MA גובה לצלע CD»
+    [apex, namedFoot] = cevianEnds(up(named[1]), up(named[2]), cevianVertexOf(s, ctx, statedSide(s)?.side ?? null));
   } else if (apexM) {
     apex = up(apexM[1]);
   } else {
@@ -10759,7 +10792,7 @@ const bisectorRoleNounOnSide = (s: string, ctx: ParseContext): Extract<Clarify, 
 const bisectorPlacesPoint: Rule = (s, ctx) => {
   if (!/bisects?|חוצ/i.test(s)) return null;
   if (INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s)) return null; // intersection rules own that phrasing
-  const seg = s.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:bisects?|חוצ\w*)/i);
+  const seg = s.match(BISECTOR_SUBJECT); // #1999 (ADR-666): the copula and the English role noun are read here too
   if (!seg) return bisectorRoleNounOnSide(s, ctx);
   const apex = up(seg[1]);
   const D = up(seg[2]);
@@ -10783,7 +10816,10 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
   // #1285: the triangle is read BEFORE the keyword strip — «angle» is a substring of «triangle», and the
   // strip would leave "in tri ABC": the English form of the very defect this fixes.
   const triangle = statedTriangle(tail);
-  let after = (triangle ? tail.replace(triangle.match, ' ') : tail).replace(/bisects?|חוצ\w*|angles?|the|את|הזוו?ית|זוו?ית|של/gi, ' ');
+  // #1999 (ADR-666): the English role noun («bisector of») and its lowercase fillers are stripped too — never read as labels
+  let after = (triangle ? tail.replace(triangle.match, ' ') : tail)
+    .replace(/bisectors?|bisects?|חוצ\w*|angles?|the|את|הזוו?ית|זוו?ית|של/gi, ' ')
+    .replace(/\b(?:of|is|an?)\b/g, ' ');
   const statedInAfter = statedSide(after);
   if (statedInAfter) after = after.replace(statedInAfter.match, ' ');
   /**
@@ -10849,8 +10885,18 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
     else return null;
   }
   const vertex = tri[1];
-  if (vertex === apex) {
-    // "AD bisects ∠BAC": the segment's FIRST letter is the angle vertex.
+  /**
+   * #1999 ([ADR-666](../../docs/06-decisions.md#adr-666)) — ONE LOWERING, WHICHEVER LETTER OF THE SEGMENT IS THE VERTEX.
+   * The resolved angle's vertex says which end the bisecting ray runs from (`cevianEnds`, the figure's answer, never
+   * the letter order): «MA חוצה זווית CMD» and «AM חוצה זווית CMD» are one sentence. The vertex-last order used to
+   * have its own branch that emitted only `set-angle-ratio` — a new far point referenced before it was defined
+   * («… references an unknown point»), the stated side never read, the segment never drawn. Now both orders run the
+   * body below over (near = the vertex, far = the other letter).
+   */
+  const [near, far] = cevianEnds(apex, D, (v) => v === vertex);
+  if (near !== vertex) return null;
+  {
+    // "AD bisects ∠BAC": the segment's vertex letter is the angle vertex.
     const [o1, o2] = tri.filter((t) => t !== vertex);
     if (o2 === undefined) return null;
     /**
@@ -10861,8 +10907,8 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
      * and before the stated side («AB חוצה זווית לצלע BC» is the same side). The operator's rulings of 2026-10-14
      * (#2066: the triangle sentence; #2085 item 3: «…צלע של המרובע…» for every other declared polygon).
      */
-    if (D === o1 || D === o2) {
-      const side = onSide(apex, D === o1 ? o2 : o1);
+    if (far === o1 || far === o2) {
+      const side = onSide(near, far === o1 ? o2 : o1);
       if (side) return side;
     }
     /**
@@ -10872,16 +10918,16 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
      * drawing D on AC while the sentence says BC is the given-vanishing this issue is about.
      */
     if (stated && !(stated.side.includes(o1) && stated.side.includes(o2))) {
-      return { clarify: 'cevian-wrong-side', apex, stated: stated.side, actual: [o1, o2] };
+      return { clarify: 'cevian-wrong-side', apex: near, stated: stated.side, actual: [o1, o2] };
     }
     // If the bisector-foot point D ALREADY EXISTS (e.g. "G on DF" was placed first, then "EG bisects ∠DEF"),
     // DON'T re-create it — that's a redefinition conflict ("'G' is already defined"). It's a CONSTRAINT:
     // EG bisects ∠DEF ⇔ ∠(o1, vertex, D) = ∠(D, vertex, o2), which drives the existing point (on its
     // segment DOF) onto the bisector. (ADR-107.)
-    if ((ctx.points ?? []).includes(D)) {
+    if ((ctx.points ?? []).includes(far)) {
       return [
-        { type: 'set-angle-ratio', v1: vertex, a1: o1, b1: D, v2: vertex, a2: D, b2: o2, k: 1 },
-        { type: 'segment', a: apex, b: D },
+        { type: 'set-angle-ratio', v1: vertex, a1: o1, b1: far, v2: vertex, a2: far, b2: o2, k: 1 },
+        { type: 'segment', a: near, b: far },
       ];
     }
     // …else place D where the bisector meets the opposite side (a new point).
@@ -10890,22 +10936,10 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
     return [
       { type: 'bisector', id: bisId, vertex, p: tri[0], q: tri[2] },
       { type: 'line-through', id: lineId, a: o1, b: o2 },
-      { type: 'line-intersection', id: D, line1: bisId, line2: lineId },
-      { type: 'segment', a: apex, b: D },
+      { type: 'line-intersection', id: far, line1: bisId, line2: lineId },
+      { type: 'segment', a: near, b: far },
     ];
   }
-  if (vertex === D && (tri[0] === apex || tri[2] === apex)) {
-    // #2066 (ADR-643): «AB חוצה את זווית ABC» — the segment is an arm of the angle at its own far end B
-    const side = onSide(D, tri[0] === apex ? tri[2] : tri[0]);
-    if (side) return side;
-  }
-  if (vertex === D) {
-    // "AC bisects ∠ECD": the angle's vertex (C) is the segment's SECOND letter, and the bisecting
-    // ray runs from the vertex through the EXISTING point `apex` (A). All points exist ⇒ this is a
-    // CONSTRAINT: the two half-angles are equal, ∠(ray1,vertex,apex) = ∠(apex,vertex,ray2).
-    return [{ type: 'set-angle-ratio', v1: vertex, a1: tri[0], b1: apex, v2: vertex, a2: apex, b2: tri[2], k: 1 }];
-  }
-  return null;
 };
 
 /**
@@ -12593,7 +12627,8 @@ const normalizeWordEquality = (s: string): string =>
     .replace(/\b(?:equals|is\s+equal\s+to)\s+(?=(?:the\s+)?(?:angle|∠|arcs?|⌢))/gi, '= ')
     .replace(/\b(?:equals|is\s+equal\s+to)\s+(?=-?\d+(?:\.\d+)?\s*(?:°|degrees?))/gi, '= ')
     .replace(new RegExp(String.raw`(?<![א-ת])(?:היא|הוא|שוו(?:ה|ות))(?![א-ת])\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:ה?זוו?ית|∠|∢)\s*${LABEL}|${NUM}\s*[*·]?\s*(?:ה?קשת|⌢)\s*${LABEL})`, 'g'), '= ')
-    .replace(new RegExp(String.raw`\b(?:is|are)\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:the\s+)?(?:angle|∠|∢)\s*${LABEL}|${NUM}\s*[*·]?\s*(?:the\s+)?(?:arcs?|⌢)\s*${LABEL})`, 'gi'), '= ');
+    // #1999 (ADR-666): "is the angle bisector of …" names a cevian, not an angle — «angle» there is the role noun's first word
+    .replace(new RegExp(String.raw`\b(?:is|are)\s+(?=(?:${NUM}\s*[*·]?\s*)?(?:the\s+)?(?:angle(?!\s+bisector)|∠|∢)\s*${LABEL}|${NUM}\s*[*·]?\s*(?:the\s+)?(?:arcs?|⌢)\s*${LABEL})`, 'gi'), '= ');
 
 /**
  * A trailing UNIT word is not part of the value (#1157).

@@ -3653,6 +3653,25 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * `8e0debff` through `parse` + `buildParseCtx`), so «AE תיכון» on a quadrilateral keeps its refusal.
      */
     case 'cevian-of': {
+      /*
+       * #1999 (ADR-AG-278) — WHICH END IS THE VERTEX, decided by the figure (2-D's `cevianEnds`, ADR-666): the end that is
+       * the third vertex of a figure triangle on the stated side — or, with no side, a vertex of a figure polygon — is
+       * the apex. Only when the written first letter does not qualify and the second does are they swapped, so every
+       * vertex-first sentence, and every sentence whose letters name no vertex, resolves exactly as before.
+       */
+      if (f.either && f.apex) {
+        const isVertex = (id: Id): boolean =>
+          c.objects.some(
+            (o) =>
+              o.kind === 'polygon' &&
+              o.vertices.includes(id) &&
+              (f.side ? o.vertices.length === 3 && !f.side.includes(id) && f.side.every((s) => o.vertices.includes(s)) : true),
+          );
+        if (!isVertex(f.apex) && isVertex(f.foot)) {
+          const { either: _either, ...asWritten } = f;
+          return applyFact(c, { ...asWritten, apex: f.foot, foot: f.apex });
+        }
+      }
       const targets = new Map<string, { apex: Id; u: Id; v: Id }>();
       let openRight = false;
       // Both named («גובה מ-A לצלע BC בנקודה D»): nothing to resolve.

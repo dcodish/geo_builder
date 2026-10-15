@@ -15,6 +15,7 @@
  * typed. The line STORED is always the one the student typed.
  */
 import { SHAPE_NOUN_WORDS, readShapePhrase, type ShapeNoun } from './shapePhrase';
+import { COPULA_HE } from './lexicon'; // #1999 (ADR-666): the one copula atom
 
 /** The figure, as the exam refers to it — «הסרטוט», «בציור שלפניכם», «האיור». */
 const FIGURE = String.raw`(?:ה)?(?:ציור|סרטוט|שרטוט|איור)(?:\s+ש?לפני(?:ך|כם|כן))?`;
@@ -31,7 +32,6 @@ const UNWRAP: ReadonlyArray<[RegExp, string]> = [
 
 /** One letter-run subject: three or four vertex labels. */
 const LETTERS = String.raw`((?:[A-Z]\d*){3,4})`;
-const COPULA_HE = String.raw`(?:הוא|היא|הנו|הינו|הינה)`;
 const NOUN_HE = String.raw`(?:משולש|ריבוע|מלבן|מעוין|דלתון|טרפז|מקבילית|מרובע)`;
 const NOUN_EN = String.raw`(?:triangle|square|rectangle|rhombus|kite|trapezoid|trapezium|parallelogram|quadrilateral)`;
 

@@ -1,0 +1,72 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T08:00:00.000Z",
+  "name": "issue-1999-bisector-vertex-last",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "u3nzLtKxCAuKVgurQRDl4",
+      "utterance": "משולש CMD",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "C",
+          "M",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "4FwZXNNxEWCm5JB4LVlMx",
+      "utterance": "AM חוצה זווית CMD",
+      "group": "g1",
+      "cmd": {
+        "type": "bisector",
+        "id": "bis-CMD",
+        "vertex": "M",
+        "p": "C",
+        "q": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "VFGrEXxTVshUDJhH8Pevp",
+      "utterance": "AM חוצה זווית CMD",
+      "group": "g1",
+      "cmd": {
+        "type": "line-through",
+        "id": "line-CD",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "cDWjTeBuGhRHedC5VZZCL",
+      "utterance": "AM חוצה זווית CMD",
+      "group": "g1",
+      "cmd": {
+        "type": "line-intersection",
+        "id": "A",
+        "line1": "bis-CMD",
+        "line2": "line-CD"
+      },
+      "enabled": true
+    },
+    {
+      "id": "TaLssNY-jRltrMnWzuRxq",
+      "utterance": "AM חוצה זווית CMD",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "M",
+        "b": "A"
+      },
+      "enabled": true
+    }
+  ]
+}

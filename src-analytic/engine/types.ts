@@ -283,6 +283,13 @@ export type Fact =
       /** The TOOL named the foot (ADR-AG-211): it is lowered as a derived point (`toolFootFacts`), never a free one. */
       toolFoot?: true;
       /**
+       * EITHER END MAY BE THE VERTEX (#1999, ADR-AG-278): the sentence wrote the segment's two letters and the role, and
+       * only the figure says which end is the vertex — «AM תיכון לצלע CD» after «משולש CMD» is «MA תיכון לצלע CD». M1
+       * orients `apex`/`foot` first: the end that is the third vertex of a figure triangle on `side` (or, with no side, a
+       * vertex of a figure polygon) is the apex; when only the second letter qualifies they swap; otherwise as written.
+       */
+      either?: true;
+      /**
        * THE LENGTH THE SENTENCE STATES FOR THE DRAWN CEVIAN (#1737, ADR-AG-265) — «הגובה לצלע BC הוא 4»: the length
        * half, parsed by the length lane over {@link CEVIAN_MEASURE_SENTINELS} (apex, foot), because only M1 knows
        * which vertex the apex is. Applied after the cevian with the resolved apex and foot written in.

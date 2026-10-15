@@ -486,7 +486,8 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «CE חוצה זווית C במשולש ABC», «AD חוצה את הזווית BAC»
 - «תיכון מ-A במשולש ABC» → foot named M, «הכלי קרא לנקודה M»
 - «OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה»
-- Sources: ADR-AG-209, #1284, #1222, #1240, #1263.
+- Either end of a named cevian may be written first, for all three roles, with or without «הוא/היא/הינו», in Hebrew and English: «AM תיכון לצלע CD», «AM חוצה את זווית M במשולש CMD», "AM is the height to side CD" on «משולש CMD» draw what «MA …» draws; and every spelling 2-D reads vertex-first is read here ("MA median to CD", "MA is the median of triangle CMD", «הקטע MA הוא תיכון לצלע CD», «MA חוצה זווית CMD לצלע CD», «MA גובה לצלע CD במשולש CMD») ([ADR-AG-278](06c-decisions-analytic.md#adr-ag-278)).
+- Sources: ADR-AG-209, #1284, #1222, #1240, #1263, #1999.
 
 **R103d — a HEIGHT is drawn on any ring that has a side opposite the apex, and which side is 2-D's choice**. *(ADR-W-118 B1: 2-D is the reference for the verdict and for the drawing.)* The trapezoid's parallel base ([ADR-169](06-decisions.md#adr-169)), else the ring's first opposite side (the draw-one steer, [ADR-263](06-decisions.md#adr-263)); a diagonal is never a target. Two shapes giving the apex different sides ASK. `cevian-no-triangle` is kept for a figure with no such side, and the **median** keeps the triangle-only host, because 2-D defers it on a ring.
 - «טרפז ABCD» · «AE גובה» → the foot on DC · «מקבילית ABCD» · «AE גובה» → the foot on BC

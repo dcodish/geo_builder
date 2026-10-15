@@ -251,6 +251,18 @@ export const BISECT_KW = String.raw`bisector|חוצ`;
 export const CEVIAN_NOUNS_HE = String.raw`גובה|גבהי|תיכו[ןנ]|חוצ[הת]?[-\s]?זו?וית`;
 export const CEVIAN_NOUNS_EN = String.raw`altitude|height|median|bisect\w*`;
 
+/** The Hebrew copula between a subject and its predicate noun — «AM הוא חוצה זווית», «ABC היא …» (#1685/#1999,
+ *  [ADR-666](../../docs/06-decisions.md#adr-666)). One atom: `frame.ts` and the cevian subject read it. Bare alternation. */
+export const COPULA_HE = String.raw`(?:הוא|היא|הנו|הינו|הינה)`;
+
+/**
+ * THE SUBJECT OF A NAMED CEVIAN (#1685/#1999, [ADR-666](../../docs/06-decisions.md#adr-666)): two labels (captured), then
+ * an optional copula — «הוא/היא/הינו», English "is" — then an optional article («ה», "the", "a", "an"). One atom for
+ * every reader that names its segment before the role word (the bisector's subject and `bisectorLine`'s deferral
+ * guard, the altitude's name-first head), so the copula is read in all of them or none. A caller appends the role.
+ */
+export const CEVIAN_SUBJECT = String.raw`\b(${LABEL})\s*(${LABEL})\b\s*(?:${COPULA_HE}\s+|is\s+)?(?:(?:the|an?)\s+|ה)?`;
+
 // ── Gate-neutral vocabulary (#497 — the fail-closed leftover gate) ───────────────────────────────
 /** Hebrew tokens a shape rule may legitimately leave unconsumed: bare connectives/copulas a construct
  *  sentence wraps around its nouns, plus the convexity adjectives a POST-PASS (`withStatedConvexity`),

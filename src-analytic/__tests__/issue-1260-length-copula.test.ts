@@ -120,7 +120,8 @@ describe('#1260 — a BOUND is never an equality', () => {
  */
 describe('#1260 — the copula does not let the length rule swallow its neighbours', () => {
   it.each([
-    ['AD הוא תיכון לצלע BC', 'constraint:midpoint'],
+    // #1999 (ADR-AG-278): a named cevian is one `cevian-of` the figure orients at M1 — still the cevian rule's, never a length
+    ['AD הוא תיכון לצלע BC', 'cevian-of'],
     ['M הוא אמצע AB', 'derived'],
     ['שיפוע AB הוא 2', 'constraint:slope'],
     ['הישר l1 הוא y=2x+1', 'curve'],

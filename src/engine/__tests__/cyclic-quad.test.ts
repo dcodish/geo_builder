@@ -180,7 +180,8 @@ describe('a diameter stated on a cyclic quad reshapes the whole quad (stays conv
 describe('a segment that BISECTS an angle (all points exist) is a coupled constraint', () => {
   it('"AC bisects ∠ECD" parses to the angle-equality ∠ECA = ∠ACD', () => {
     for (const u of ['AC bisects angle ECD', 'AC חוצה את הזווית ECD']) {
-      const r = parse(u);
+      // #1999 (ADR-666): «all points exist» is the figure's to say — a far point the figure lacks is placed on the bisector
+      const r = parse(u, { points: ['A', 'B', 'C', 'D', 'E'] });
       expect(r.ok).toBe(true);
       if (!r.ok) return;
       const c = r.commands[0] as { type: string; v1: string; a1: string; b1: string; a2: string; b2: string; k: number };

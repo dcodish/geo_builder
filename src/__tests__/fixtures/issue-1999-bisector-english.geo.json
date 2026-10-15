@@ -1,0 +1,72 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T08:00:00.000Z",
+  "name": "issue-1999-bisector-english",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "WJhBzOLFRLMxSIVu-GTwe",
+      "utterance": "triangle CMD",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "C",
+          "M",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "on7fOzrN9__Q-JYBnQzDO",
+      "utterance": "AM is the bisector of angle CMD",
+      "group": "g1",
+      "cmd": {
+        "type": "bisector",
+        "id": "bis-CMD",
+        "vertex": "M",
+        "p": "C",
+        "q": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "6tMYizY9NuaSqKpaHZCum",
+      "utterance": "AM is the bisector of angle CMD",
+      "group": "g1",
+      "cmd": {
+        "type": "line-through",
+        "id": "line-CD",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "78p0T186kb5cSP2oBEE9l",
+      "utterance": "AM is the bisector of angle CMD",
+      "group": "g1",
+      "cmd": {
+        "type": "line-intersection",
+        "id": "A",
+        "line1": "bis-CMD",
+        "line2": "line-CD"
+      },
+      "enabled": true
+    },
+    {
+      "id": "MoeD8R63F6OGpaHewmrJq",
+      "utterance": "AM is the bisector of angle CMD",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "M",
+        "b": "A"
+      },
+      "enabled": true
+    }
+  ]
+}
