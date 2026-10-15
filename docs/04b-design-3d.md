@@ -249,7 +249,7 @@ right angle is stated at any corner of that ring (M4; the #116 default, ring-sco
 **A circle through a ring is a claim about the ring.** `circle3 {circum}` fits its centre to the ring, and:
 - **the lowering** — `polygonCircle3` emits the noun's `CYCLIC_MEMBER` fix (the #305 registry): rhombus →
   square, parallelogram → rectangle, kite → right kite, trapezoid → equal diagonals (equal legs also hold on
-  a parallelogram), generic quad → `concyclic`; `notices.ts` derives `inscribed-constrained`;
+  a parallelogram), generic quad → `concyclic`; the note that the shape was narrowed is #1996's `narrowed` notice (below);
 - **the backstop** — `apply` records one `concyclic` claim per vertex past the third, so a ring nothing
   made cyclic is refuted rather than drawn.
 
@@ -301,7 +301,18 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   has both pairs parallel at |sin| < sin 1° (`quadShapeDrawn('parallelogram')`). `derive3` returns it as
   `shapeWarnings`; `App3` renders it as an amber `Banner kind="notice"` (`role="status"`) with 2-D's
   `figure.mismatch` / `figure.v.trapezoidMorph` words copied into 3-D's `warn.*` keys. `buildNotices3` drops a
-  warned ring's `inscribed-constrained` / `base-constrained` notice.
+  warned ring's `narrowed` notice.
+
+**A declared ring the givens force narrower is said ([ADR-3D-343](06b-decisions-3d.md#adr-3d-343), #1996).** `store/narrowing3.ts`
+`narrowingNotes3` runs at the end of `derive3`'s fold (`deriveCore3(…, narrow = true)`; its subset trials fold through
+the same function with `narrow = false`, so no recursion and no `deriveStats3` count). Declared kind: a `quad-shape`'s
+base + `adj` (`declaredKind3`), `rect-complete`, a `QUAD_PYRAMIDS` solid's base (its ring `ids[0..3]`), a flat
+triangle's `readShapePhrase3` adjectives. Forced kinds: `ringKinds` over `knowledgeSamples3(c, claimSeeds(seed))`
+(placed samples only), widened by one more claim-bar group when the declared kind shows in only one or two samples.
+The cause search is capped at `NARROW_TRIALS_3D` subset trials (a COUNT — past it «בגלל הנתונים, …»). `buildNotices3`
+turns the result into `{ kind: 'narrowed', ids, note }`, rendered by `i18n/narrowingText3.ts` (`notice.narrowed.*`).
+`CYCLIC_MEMBER` is the solver's fix table only; the one pair the lattice cannot name — a right pyramid over a plain
+«מרובע» — keeps ADR-3D-090's `base-constrained` sentence.
 **Both voices: the subject decides, and the ring is read past the circle's name (#1975, [ADR-3D-341](06b-decisions-3d.md#adr-3d-341)).**
 `circleContains3`'s fallback (no container marker) asks `circleEnclosesByVoice3` — the copy of 2-D's voice reader:
 the subject of «חוסם» / "circumscribe" is the outer figure, and a ring between the circle noun and the verb («מעגל

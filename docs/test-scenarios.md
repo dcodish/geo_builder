@@ -1781,7 +1781,7 @@ over all four (ADR-041).
 
 ### `second-shape-noun-over-a-ring-1988-1985` — «מקבילית ABCD · טרפז ABCD» is refused naming both nouns, and «ריבוע ABCD · מלבן ABCD» answers «כבר קיים» (#1988, #1985, ADR-619)
 
-**Guards against:** a second shape noun over a declared ring being judged by whose derived corner the engine would rebuild, so both directions of the quadrilateral hierarchy leaked the engine's own «'C' is already defined …» / «'poly-ABCD' is already defined …» — a letter or an internal id the engine chose, never the statement in conflict. **Asserts** that «טרפז ABCD» (and the isosceles and right variants, and any reading of the ring) over a declared parallelogram is refused with the ruled sentence «הצורה כבר ידועה כ־מקבילית — ולכן אינה נקראת טרפז. מחקו את הנתון הקודם אם התכוונתם טרפז.» with no engine id in it, that the reverse order is the same refusal, that every noun a square implies («מלבן», «מעוין», «מקבילית», «דלתון», and «מלבן BCDA») is an `empty` no-op at the submit gate leaving the ring declared a square, and that a pair which is neither implied nor excluded («מלבן ABCD · מעוין ABCD» — a square is both) keeps ADR-157's refusal. The class matrix is `src/app/__tests__/issue-1988-1985-second-shape-noun.test.ts`; 3-D's is `src3d/__tests__/issue-1988-implied-shape-noun.test.ts`.
+**Guards against:** a second shape noun over a declared ring being judged by whose derived corner the engine would rebuild, so both directions of the quadrilateral hierarchy leaked the engine's own «'C' is already defined …» / «'poly-ABCD' is already defined …» — a letter or an internal id the engine chose, never the statement in conflict. **Asserts** that «טרפז ABCD» (and the isosceles and right variants, and any reading of the ring) over a declared parallelogram is refused with the ruled sentence «הצורה כבר ידועה כ־מקבילית — ולכן אינה נקראת טרפז. מחקו את הנתון הקודם אם התכוונתם טרפז.» with no engine id in it, that the reverse order is the same refusal, that every noun a square implies («מלבן», «מעוין», «מקבילית», «דלתון», and «מלבן BCDA») is an `empty` no-op at the submit gate leaving the ring declared a square, and that a pair which is neither implied nor excluded («מלבן ABCD · מעוין ABCD» — a square is both) is no longer refused: since ADR-656 (#1993) it refines the ring to the square. The class matrix is `src/app/__tests__/issue-1988-1985-second-shape-noun.test.ts`; 3-D's is `src3d/__tests__/issue-1988-implied-shape-noun.test.ts`.
 
 ### `concave-quad-second-ring-1987` — «מרובע ABCD · מרובע ABDC»: four free points read in a second order draw a CONCAVE quadrilateral, both rings simple (#1987, ADR-622)
 
@@ -1932,3 +1932,27 @@ over all four (ADR-041).
 ### `second-right-angle-refused-1936` — «משולש ישר זווית ABC · AB ⊥ BC · AC ⊥ BC»: the ⟂ moves the right angle to B, the second right angle is refused at once naming both statements (#1936 + #2082, ADR-658)
 
 **Guards against:** the third line committed as a red deferred row («over-constrained: AC ⟂ BC cannot hold») that no later given could clear, and the ⟂ on line 2 not pinning the right triangle's seat in the fold. Operator rulings 2026-10-09/10 on #1936 (*"All three tools refuse immediately, naming both statements"*) and 2026-10-14 on #2082. Asserts line 2 builds with ∠ABC = 90° and that «AC ⊥ BC» is refused at the gate with «לא ניתן: «AC ⊥ BC» סותר את «AB ⊥ BC» — …». The class matrices are `src/app/__tests__/issue-1936-second-right-angle.test.ts` and `issue-2082-perp-reseat.test.ts`.
+
+### `narrowing-note-circle-points-parallelogram-1996` — «מעגל O · A, B, C ו-D על המעגל · AB = 3 · BC = 4 · מקבילית ABCD»: the 3 × 4 rectangle with the circle note (#1996, ADR-655)
+
+**Guards against:** the rectangle drawn silently under the noun «מקבילית» (the operator's #1913 T1: *"we have to have a note indicating the only shape possible is a rectangle which is also a kind of a parallelogram"*). **Asserts** ∠A = 90° and «כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.». The cross-builder rows are `shell/__tests__/fixtures/narrowing-note-rows.ts`; 2-D's thin lock and lifecycle are `src/app/__tests__/narrowing-note-1996.test.ts`.
+
+### `narrowing-note-parallelogram-inscribed-t56-1996` — «מקבילית ABCD · מקבילית ABCD חסומה במעגל»: the rectangle with the circle note (operator T56, 2026-10-14; #1996, ADR-655)
+
+**Guards against:** the operator's 2026-10-14 report on the #2107 sheet, *"shape was reduced to a rectangle but no notice is given to user"*. **Asserts** ∠A = 90° and the circle note.
+
+### `narrowing-note-parallelogram-height-t41-1996` — «מקבילית ABCD · AB גובה»: the rectangle with «בגלל הנתון AB גובה, …» (operator T41, 2026-10-14; #1996, ADR-655)
+
+**Guards against:** the same play session's T41 (#2064 Stage 2), approved but not delivered. **Asserts** «בגלל הנתון AB גובה, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.».
+
+### `narrowing-note-given-rhombus-1996` — «מקבילית ABCD · AB = BC»: «בגלל הנתון AB = BC, ABCD הוגבל ממקבילית למעוין — מעוין הוא סוג של מקבילית.» (#1996, ADR-655)
+
+**Guards against:** a narrowing the student's own given caused drawn silently (ruling 2026-10-13, cards 1 and 2). **Asserts** the sentence verbatim.
+
+### `narrowing-note-isosceles-sixty-1996` — «משולש שווה שוקיים ABC · זווית BAC = 60»: the equilateral note (#1996 card 3, ADR-655)
+
+**Guards against:** the triangle narrowing drawn silently (card 3) and the numeric silence reaching a declared named kind (third ballot A). **Asserts** «בגלל הנתון זווית BAC = 60, ABC הוגבל ממשולש שווה שוקיים למשולש שווה צלעות — משולש שווה צלעות הוא סוג של משולש שווה שוקיים.».
+
+### `narrowing-note-typed-right-angle-silent-1996` — «משולש ABC · זווית C = 90»: NO note — the typed right angle is the carve-out (#1996 card 3, ADR-655)
+
+**Guards against:** a note on the right angle the student typed (card 3: *"«משולש ABC» then «זווית C = 90» stays silent"*). **Asserts** no note, and none for «AC ⊥ BC».

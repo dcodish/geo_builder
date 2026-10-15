@@ -83,19 +83,17 @@ describe('shapes compose on existing points (ADR-013)', () => {
     for (const id of ['P', 'Q', 'R']) expect(r.positions.get(id)).toBeTruthy();
   });
 
-  it('a DECLARED cycle stays immutable — re-declaring the square as a RHOMBUS still refuses (ADR-157; the ADR-375 lowering covers only UNDECLARED point sets)', () => {
-    // ABCD is a DECLARED shape (its polygon object exists), so ADR-157's immutability owns it:
-    // a different shape word over the same cycle is a contradiction → refuse with the clear
-    // message (never a silent morph). The ADR-375 M1 lowering applies only to a vertex set with
-    // NO shape declared over it (riders, free points — see shape-over-existing.test.ts).
-    //
-    // #1988 (ADR-619) narrowed WHICH second word this is: a noun the declared one IMPLIES (a square is a
-    // parallelogram, a rectangle, a kite) is a restatement and no longer reaches here. A RHOMBUS over a
-    // declared RECTANGLE is neither implied nor excluded, so it is still ADR-157's refusal.
+  it('a SIBLING noun over a declared cycle makes it the kind both name — a rhombus over a rectangle is the square (ADR-656, superseding ADR-157 here)', () => {
+    // #1993 (operator, 2026-10-11): *"if a shape can be both … the shape is now X which is also Y"*. A RHOMBUS over a
+    // declared RECTANGLE is neither implied nor excluded (a square is both): it lowers to the rhombus's constraints on
+    // the ring and the ring becomes the square. An EXCLUDING noun stays refused (ADR-619, issue-1988-1985 tests).
     const base = build([{ type: 'rectangle', ids: ['A', 'B', 'C', 'D'] }]);
     const r = applyStep(base.construction, { type: 'rhombus', ids: ['A', 'B', 'C', 'D'] });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/already defined/i);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const p = (id: string) => r.positions.get(id)!;
+    expect(Math.hypot(p('A').x - p('B').x, p('A').y - p('B').y)).toBeCloseTo(Math.hypot(p('B').x - p('C').x, p('B').y - p('C').y), 6);
+    expect((r.construction.objects.find((o) => o.kind === 'polygon') as { declaredAs?: string }).declaredAs).toBe('square');
   });
 
   it('a noun the declared shape IMPLIES changes nothing (#1988, ADR-619) — the square stays a square', () => {

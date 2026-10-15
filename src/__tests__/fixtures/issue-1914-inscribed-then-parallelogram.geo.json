@@ -1,0 +1,106 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T12:00:00.000Z",
+  "name": "issue-1914-inscribed-then-parallelogram",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "ABCD חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "freeRadius": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "ABCD חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O",
+        "theta": 0.5235987755982988,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "ABCD חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O",
+        "theta": 1.8325957145940461,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.3",
+      "utterance": "ABCD חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O",
+        "theta": 3.4033920413889422,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.4",
+      "utterance": "ABCD חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-O",
+        "theta": 5.1487212933832724,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.5",
+      "utterance": "ABCD חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "quadrilateral",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.6",
+      "utterance": "מקבילית ABCD",
+      "cmd": {
+        "type": "parallelogram",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true,
+      "group": "g1"
+    }
+  ]
+}

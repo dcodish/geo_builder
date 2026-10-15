@@ -27,6 +27,10 @@ import { allDrivableAncestors } from '@/engine/step';
 import { objectParents } from '@/engine/types';
 import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption } from '@/engine';
 import { resolveBinds } from './naming';
+import { narrowingNotes2D, type RowNouns } from './narrowing';
+import type { RingNote } from '../../shell/narrowing';
+import { ringOnOneCircle } from '@/engine/structure';
+import { cyclicKiteCommands } from '@/engine/inscribe';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -1314,7 +1318,9 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
    * after the per-fact lowering cache, because the same fact resolves differently against different figures.
    */
   const boundCmdsOf = (f: Fact, cur: Construction): Command[] | null => {
-    const cmds = engineCmdsOf(f);
+    // #1921 (ADR-657): a kite whose ring is already on one circle lowers to the right kite it is forced to be
+    const lowered = engineCmdsOf(f);
+    const cmds = f.cmd.type === 'shape-variant' && f.cmd.shape === 'kite' && ringOnOneCircle(cur, f.cmd.ids) ? cyclicKiteCommands(lowered) : lowered;
     const binding = f.cmd.roleSide;
     if (!binding) return cmds;
     const out: Command[] = [];
@@ -3899,7 +3905,15 @@ export function variantConfigs(facts: Fact[]): Fact[][] {
  * `complete` (#1601/#1599, ADR-558): every sampling job ran to the end within the deterministic work budget.
  * An incomplete pool is evidence of nothing beyond the samples in hand, and its consumers SAY so.
  */
-export interface SharedSamples { constructions: Construction[]; samples: Map<Id, Vec>[]; determined: boolean; complete: boolean }
+export interface SharedSamples {
+  constructions: Construction[];
+  samples: Map<Id, Vec>[];
+  determined: boolean;
+  complete: boolean;
+  /** #1996: every sample passed every filter (no "never below 2" fallback kept an unfiltered one) — the bar a
+   *  partial pool must meet before one of its samples may count as a counterexample ({@link sampleSubset}). */
+  strict?: boolean;
+}
 let sampleMemo: ({ facts: Fact[]; key: string } & SharedSamples) | null = null;
 /**
  * The sample sweep counter — the perf canary for the M3 "one sampler" law (the twin of
@@ -4117,7 +4131,7 @@ export function samplingJobs(facts: Fact[], opts: { wide?: boolean } = {}) {
     const within = sideSamples(c0, requirementSamples(c0, distinctSamples(c0, preciseSamples(c0, converged))).filter((pos) => segmentsCrossWithin(facts, pos)));
     const strict = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived));
     const key = foldKey(facts);
-    if (strict.length >= 2) return (sampleMemo = { facts, key, constructions, samples: strict, determined: complete_, complete: complete && !overCap });
+    if (strict.length >= 2) return (sampleMemo = { facts, key, constructions, samples: strict, determined: complete_, complete: complete && !overCap, strict: true });
     // The ADR-267 preference ladder: when the letter-order side is unachievable (no strict samples), the
     // RELAXED shared-endpoint bar (ADR-142) is the figure's real validity — filter by it before giving up
     // to the unfiltered converged pool (which would count wrong-side samples as configurations).
@@ -4284,6 +4298,35 @@ function preciseSamples(c0: Construction, samples: Map<Id, Vec>[]): Map<Id, Vec>
   return precise.length >= 2 ? precise : samples;
 }
 
+/**
+ * #1996 (ADR-655): the pool of a figure with some rows MUTED — the forced-narrowing note's cause search asks "is the
+ * narrower kind still forced without these rows". Its own work epoch and budget like the shared pool, and it never
+ * replaces the memo: the student's own pool stays the one every knowledge layer reads.
+ */
+export function sampleSubset(facts: Fact[], counterexample?: (pos: Map<Id, Vec>) => boolean): SharedSamples {
+  const before = sampleMemo;
+  try {
+    // A "not forced" verdict needs ONE genuine counterexample, not a whole pool: the first few jobs, finished
+    // through the same filter ladder, answer it when every one of their samples passed every filter (`strict`).
+    // Their evaluations are the full pool's first jobs, so a "forced" verdict pays only the finishing pass extra.
+    if (counterexample) {
+      const early = withWorkEpoch(() => {
+        const { jobs, finish } = samplingJobs(facts, { wide: true });
+        if (jobs.length <= SUBSET_PROBE_JOBS) return null;
+        for (let i = 0; i < SUBSET_PROBE_JOBS; i++) jobs[i]();
+        const part = finish(false);
+        return part.strict && part.samples.some(counterexample) ? part : null;
+      });
+      if (early) return { ...early, complete: false };
+    }
+    return withWorkEpoch(() => samplePool(facts, {}));
+  } finally {
+    sampleMemo = before;
+  }
+}
+/** #1996: how many sampling jobs the counterexample probe of {@link sampleSubset} runs before the full pool. */
+const SUBSET_PROBE_JOBS = 4;
+
 export function sharedSamples(facts: Fact[], opts: { deadlineMs?: number } = {}): SharedSamples {
   // #1605 (ADR-582): the work-bounded pool is now a function of the input alone (every memo hit inside it is
   // charged — engine/solveBudget.ts), so a pool the cap cut is served from the memo like a complete one: the
@@ -4356,6 +4399,9 @@ export interface DetectAllResult {
   crossings: Set<string>;
   /** #1444 (ADR-556): how determined the figure is, read off the SAME pool — see {@link figureDeterminacy}. */
   determinacy: Determinacy;
+  /** #1996 (ADR-655): every declared ring the givens forced into a narrower named kind, with its cause — read off
+   *  the SAME pool (complete only), the cause from per-subset pools ({@link sampleSubset}). */
+  narrowed: RingNote[];
 }
 
 /**
@@ -4369,7 +4415,7 @@ export interface DetectAllResult {
  * than the pool keeps the boundary narrow: the `circlesOfSample` side table (a `WeakMap` keyed by a
  * positions map) never has to cross a thread, and the heavy classification runs where the samples are.
  */
-export function detectAll(facts: Fact[]): DetectAllResult {
+export function detectAll(facts: Fact[], nouns: RowNouns = {}): DetectAllResult {
   const shared = sharedSamples(facts);
   // #444: the DRAWN variant's declared equal pairs — a SEPARATE channel from the discovered relations
   // (which pool across variants and therefore, correctly, never report a variant-specific pair). The
@@ -4388,6 +4434,8 @@ export function detectAll(facts: Fact[]): DetectAllResult {
     shapes: classifyShapesFromSamples(shared.constructions[0], shared.samples),
     crossings: forcedCrossingKeys(shared),
     determinacy: figureDeterminacy(shared),
+    // #1996 (ADR-655): `nouns` is the store's reading of each row's shape phrase (replay may not import the parser)
+    narrowed: narrowingNotes2D(facts, shared, nouns, { subsetSamples: (fs, cx) => sampleSubset(fs as Fact[], cx) }, (fs) => foldKey(fs as Fact[])),
   };
 }
 

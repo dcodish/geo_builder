@@ -28,7 +28,13 @@ enumeration). Four corrections to the plain compiler reading hold:
    §4), and `commandConflict` refuses only what cannot be lowered. The lowering reads the ring's STRUCTURE: a
    parallelogram-family noun over four points already on one circle (`ringOnOneCircle`, `src/engine/structure.ts`)
    asserts its cyclic member — the rectangle, or the square — because that is what the sentence says on a circle
-   ([ADR-628](06-decisions.md#adr-628)). A membership of an existing point on a second circle reads the same
+   ([ADR-628](06-decisions.md#adr-628)); a kite there is bound in the fold to the right kite's definition (`cyclicKiteCommands`:
+   a right angle at an off-axis vertex and the axis ⟂ the other diagonal, in place of the two equal pairs —
+   [ADR-657](06-decisions.md#adr-657)). A second shape NOUN over a declared ring is judged by one four-valued relation
+   (`quadRelation`, `engine/shapeKinds.ts`): an implied noun restates, an excluding one is refused, and a noun that
+   narrows the ring or meets it in a third kind is lowered onto it through `refinesDeclaredRing` — the predicate
+   `shapeLowersToConstraints` and `commandConflict`'s polygon arm both read — and the ring's polygon takes the
+   narrower kind (`refineRingKind`) ([ADR-656](06-decisions.md#adr-656)). A membership of an existing point on a second circle reads the same
    structure: a point already on one circle of a STATED tangency (`circles-tangent`'s record) is the touch point,
    and takes the touch point's own definition (`tangentTouchCopy`, so ADR-123's coincidence records X = M); a
    residual membership is held through a witness that is any point the construction puts on the circle — a
@@ -1026,6 +1032,17 @@ shown as an ⓘ notice. `degeneratePolygons` (`engine/degeneracy.ts`) measures e
 offset from the line through its two most-separated vertices, over that separation (the ADR-413 accept gate's
 measure), against `DEGENERATE_EXTENT_RATIO`. `nameDegeneracies` walks the statement prefixes (the ADR-492 rule) for the declaring and
 responsible statements; the wording is `figure.degenerate`.
+
+### A declared ring the givens force NARROWER is said (#1996, [ADR-655](06-decisions.md#adr-655), [ADR-W-129](06w-decisions-workspace.md#adr-w-129))
+
+A derived layer of the always-on detect sweep, not of replay: `detectAll(facts, nouns)` returns `narrowed`
+(`replay/narrowing.ts` over `shell/narrowing.ts`). `nouns` is each row's noun as typed, read in the STORE layer
+(`store/rowNouns.ts`, the parser's `readShapePhrase` on the row's utterance) because replay may not import the parser;
+`geoWork.detect` carries it to the worker. Per declared ring: `ringKinds` on every sample of the shared pool (a complete
+pool only), `forcedUnder` the declared kind, `narrowingOf`; then the cause, over per-subset pools (`sampleSubset` —
+the shared memo saved and restored; a "not forced" subset settled by its first strict counterexample). Memoized on the
+fold key. The store keeps `narrowed: { list, facts }` beside `determinacy`; App.tsx renders it in the ⓘ strip through
+`app/narrowingText.ts` and the `figure.narrowed.*` keys.
 
 ## The knowledge pool
 

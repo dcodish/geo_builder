@@ -101,7 +101,7 @@ describe('#1918 the three reported sequences, verbatim, along 24 configurations'
     for (const d of ds) {
       expect(allOk(d)).toBe(true);
       expect(d.shapeWarnings).toEqual([{ kind: 'trapezoid-morph', ids: ['A', 'B', 'C', 'D'] }]);
-      expect(d.notices.filter((n) => n.kind === 'inscribed-constrained' || n.kind === 'base-constrained')).toEqual([]);
+      expect(d.notices.filter((n) => n.kind === 'narrowed')).toEqual([]); // #1996: the one narrowing notice
     }
     expect(he('warn.mismatch')).toBe('ייתכן שהאיור אינו תואם למה שתיארתם:');
     expect(he('warn.trapezoidMorph', { quad: 'ABCD' })).toBe(HE_MORPH);
@@ -198,7 +198,7 @@ describe('#1918 (B) the warning — every route that DRAWS a declared trapezoid 
     for (const d of walk(st, 8)) {
       expect(allOk(d)).toBe(true);
       expect(d.shapeWarnings.map((w) => w.ids.join(''))).toEqual(['ABCD']);
-      expect(d.notices.filter((n) => n.kind === 'inscribed-constrained' || n.kind === 'base-constrained')).toEqual([]);
+      expect(d.notices.filter((n) => n.kind === 'narrowed')).toEqual([]); // #1996: the one narrowing notice
     }
   });
 
@@ -331,7 +331,10 @@ describe('#1918 the controls — unchanged', () => {
 
   it('«טרפז ABCD חסום במעגל» keeps its notice', () => {
     const { st } = play(['טרפז ABCD חסום במעגל']);
-    expect(derive3(st.facts, st.seed).notices).toContainEqual(expect.objectContaining({ kind: 'inscribed-constrained', from: 'trapezoid', to: 'isoTrapezoid' }));
+    // #1996 (ADR-3D-343): the one narrowing notice, in the cross-builder family (follow-up card 8)
+    expect(derive3(st.facts, st.seed).notices).toContainEqual(
+      expect.objectContaining({ kind: 'narrowed', note: expect.objectContaining({ ring: 'ABCD', from: 'trapezoid', to: 'isosceles-trapezoid', cause: { kind: 'circum' } }) }),
+    );
   });
 
   it('notCyclic3 is the one lookup the parser and the engine share', () => {

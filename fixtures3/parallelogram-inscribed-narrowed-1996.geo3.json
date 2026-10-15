@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-15T06:30:45.824Z",
+  "seed": 1,
+  "facts": [
+    {
+      "utterance": "מקבילית ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "parallelogram",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "ABCD חסום במעגל",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon4",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "type": "concyclic",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ],
+          "origin": "shape"
+        },
+        {
+          "type": "circle3",
+          "id": "circle-ABCD",
+          "def": {
+            "kind": "circum",
+            "ring": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

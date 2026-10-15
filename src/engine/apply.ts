@@ -14,7 +14,7 @@ import { shapeConstraints } from './inscribe';
 import { ringOnOneCircle } from './structure';
 import { referencesCircle } from './lower';
 import { add, circleCircleIntersect, circumcenter, dist, footOnLine, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringKey, ringSimple, scale, sub } from './geometry';
-import { QUAD_IMPLIES, quadImplies, quadImpliesInEveryReading, quadsExclude, type QuadKind } from './shapeKinds';
+import { QUAD_IMPLIES, quadAfter, quadImplies, quadImpliesInEveryReading, quadRelation, quadsExclude, type QuadKind } from './shapeKinds';
 import { constraintKey, constraintRefs, residual, residualTolerance } from './solve';
 import { evaluateCore } from './evaluate';
 import { applySeed } from './sample';
@@ -522,7 +522,9 @@ export function shapeLowersToConstraints(prev: Construction, cmd: Command): bool
   const declared = prev.objects.some(
     (o) => o.kind === 'polygon' && o.vertices.length === ids.length && o.vertices.every((v) => set.has(v)),
   );
-  if (declared) return false; // ADR-157 — the declared cycle stays immutable
+  // ADR-157 — a declared cycle is not REDEFINED; ADR-656 — but a noun that narrows it, or a sibling noun the
+  // ring can also carry, is a statement ABOUT it and lowers to its constraints (one predicate: `refinesDeclaredRing`)
+  if (declared && !refinesDeclaredRing(prev, cmd)) return false;
   if (!slots.some((sIdx) => prev.objects.some((x) => x.id === ids[sIdx]))) return false;
   // A derived-slot id counts as a CLASH only when it exists as a point that is NOT this command's own
   // identical corner. Both objects come off the same construction path, so serialized equality is exact.
@@ -597,6 +599,33 @@ function declaredRingSpelling(prev: Construction, cmd: Command): Command | null 
  * does this line say the ring is" is answered in one place, exactly as `declaredQuadKind` answers "what is
  * the ring already known to be".
  */
+/**
+ * #1914 / #1993 ([ADR-656](../../docs/06-decisions.md#adr-656)) — does this noun REFINE the ring already declared over
+ * the same cycle: narrow it («ABCD חסום במעגל» · «מקבילית ABCD», «מקבילית» · «מלבן») or meet it in a third kind
+ * («מלבן» · «מעוין» = «ריבוע»)? The ONE predicate the conflict check (`commandConflict`'s polygon arm and its
+ * shape-corner arm, through `shapeLowersToConstraints`) and the lowering read. Same CYCLE only (`ringKey`): a
+ * crossing order is a different ring (ADR-613), and a noun that excludes the declared one stays ADR-619's refusal.
+ */
+export function refinesDeclaredRing(prev: Construction, cmd: Command): boolean {
+  const stated = statedQuadKind(cmd);
+  if (!stated || !('ids' in cmd)) return false;
+  const declared = declaredQuadKind(prev, cmd.ids as Id[]);
+  if (!declared) return false;
+  const rel = quadRelation(declared, stated);
+  return rel === 'narrows' || rel === 'siblings';
+}
+
+/** ADR-656: the ring takes the narrower kind — the stated noun, or the kind both nouns name — on its polygon. */
+function refineRingKind(objects: GeoObject[], prev: Construction, cmd: Command): void {
+  if (!refinesDeclaredRing(prev, cmd) || !('ids' in cmd)) return;
+  const key = ringKey(cmd.ids as Id[]);
+  const i = objects.findIndex((o) => o.kind === 'polygon' && o.vertices.length === 4 && ringKey(o.vertices) === key);
+  const ring = objects[i];
+  if (i < 0 || ring.kind !== 'polygon') return;
+  const after = quadAfter(declaredQuadKind(prev, cmd.ids as Id[])!, statedQuadKind(cmd)!);
+  if (after) objects[i] = { ...ring, declaredAs: after };
+}
+
 export function statedQuadKind(cmd: Command): QuadKind | null {
   if (!('ids' in cmd) || (cmd.ids as Id[]).length !== 4) return null;
   switch (cmd.type) {
@@ -1456,6 +1485,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     // the template is a generic quad seed — the shape's own constraints drive the final form
     placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 6, y: 4 }, { id: d, x: 0, y: 4 }], pos);
     quadEdges(objects, a, b, c, d, cmd.type);
+    refineRingKind(objects, prev, cmd); // ADR-656: a declared ring takes the narrower kind it now is
     let acc: Construction = { ...prev, objects, constraints };
     // ADR-628 (#1913): a ring ALREADY on one circle takes the member the circle forces (parallelogram → rectangle,
     // rhombus/square → square) — read structurally from `prev`, never from where the seed draws the points.
@@ -1549,6 +1579,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         pos,
       );
       quadEdges(objects, a, b, c, d, cmd.declaredAs ?? 'quadrilateral');
+      refineRingKind(objects, prev, cmd); // ADR-656: a kite over a declared ring narrows it (a rhombus, a square)
       // #1987 (ADR-622): the REFLEX-VERTEX seat — the unstated discrete choice of a ring whose convexity
       // default yields (ADR-613). Convexity is only the DEFAULT, and the default is a SEAT as much as a
       // predicate: ADR-613 taught `polygonsConvex` to yield but left every vertex on the convex seat, so the

@@ -836,6 +836,17 @@ and `applyFact`'s polygon arm refuses the later declaration `shape-excluded { ac
 
 *Identifiers:* `current` · `freeCoord` · `{A: G}` · `{A: B, B: A}` · `rewriteLineMap` · `*-not-typed` · `letter → seed name` · `derive(lines, seed, seedNames)` · `dispatchRename` · `dispatchSwap`
 
+### A declared shape the givens force narrower is said ([ADR-AG-276](06c-decisions-analytic.md#adr-ag-276), #1996)
+
+`app/narrowing.ts` `narrowingNotesOf(lines, d)` is the analytic adapter of `shell/narrowing.ts` (ADR-W-129). The declared
+kind is `SHAPES[…].kind` of a polygon whose noun the line's OWN text names (`normalizeShapeNoun` / `EN_SHAPE`) — so
+«ABCD חסום במעגל», which lowers its ring under the default «מרובע», declares nothing. Forced kinds are read over the
+admitted figures of `drawableAt(c, 0..POOL_SIZE-1)`, only once `configurationPool(c).complete()`; a deferred pool
+reports pending and returns nothing, so `poolScheduler`'s re-render brings the note. Subset trials re-derive the
+anchors plus the chosen lines, settled "not forced" at the first counterexample. `App.tsx` computes it in a passive
+effect after paint (never in render) and shows one `Banner kind="notice"` per note under the shape warnings; the
+given text is the line as the page shows it (`spokenFor`).
+
 ### Only valid configurations are evidence ([ADR-AG-197](06c-decisions-analytic.md#adr-ag-197), #1642, #1638, #1635, #1634, #1539)
 
 A configuration the givens contradict is never knowledge. `evaluateTryingChoices` tries a seed's `choice` options

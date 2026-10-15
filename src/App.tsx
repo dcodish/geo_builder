@@ -86,6 +86,7 @@ import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { runSubmit } from '@/app/submitPipeline';
 import { runViewResolve } from '@/app/resolveView';
+import { narrowingText } from '@/app/narrowingText';
 import { figureStatus, figureStatusParams } from '@/app/figureStatus';
 import { runEditCommit, runSetGroupEnabled } from '@/app/editPipeline';
 import { subscribeFigureNotes } from '@/app/figureNotes';
@@ -159,6 +160,7 @@ export default function App() {
   const shapes = useGeoStore((s) => s.shapes);
   const crossings = useGeoStore((s) => s.crossings);
   const determinacy = useGeoStore((s) => s.determinacy);
+  const narrowed = useGeoStore((s) => s.narrowed);
   const detectShapes = useGeoStore((s) => s.detectShapes);
   const clearShapes = useGeoStore((s) => s.clearShapes);
   const clear = useGeoStore((s) => s.clear);
@@ -1557,6 +1559,14 @@ export default function App() {
                   out loud in the student's own words — the statements responsible, never a bare number — and
                   never refused: the figure is right, and the student may have meant to discover exactly this. */}
               ⓘ {degeneracies.map((d) => t('figure.degenerate', { object: d.object, statements: d.statements.map((id) => facts.find((f) => f.id === id)?.utterance?.trim()).filter((s): s is string => !!s).map((s) => `«${s}»`).join(', ') })).join(' ')}
+            </div>
+          )}
+
+          {narrowed?.facts === facts && narrowed.list.length > 0 && (
+            <div style={infoBanner} data-testid="narrowed-note">
+              {/* #1996 (ADR-655, ADR-W-129): the givens forced a declared ring into a narrower named kind — said
+                  in one cause-naming sentence, derived from the always-on sweep (stale-guarded like the dots). */}
+              ⓘ {narrowingText(narrowed.list, (k, o) => t(k, o) as string).join(' ')}
             </div>
           )}
 

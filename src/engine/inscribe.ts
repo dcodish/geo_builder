@@ -232,3 +232,36 @@ export function expandInscribe(
   const draw: Command = { type: 'polygon', ids: [...cmd.ids] };
   return [...riders, draw, ...shapeConstraints(cmd.shape, cmd.ids)];
 }
+
+/**
+ * #1921 ([ADR-657](../../docs/06-decisions.md#adr-657)) — A KITE WHOSE FOUR VERTICES ARE ALREADY ON ONE CIRCLE IS THE
+ * RIGHT KITE, lowered as its definition: ADR-628's rule for the parallelogram family (`shapeConstraints`'s
+ * `onOneCircle`), for the kite.
+ *
+ * A cyclic kite has a right angle at each off-axis vertex (its axis is a diameter) and its axis is the
+ * perpendicular bisector of the other diagonal. Its two equal adjacent pairs are weaker on a circle: they need the
+ * radius to move to the one value the stated sides allow, which the joint optimizer neither found nor refuted —
+ * «מעגל O · A, B, C ו-D על המעגל · AB = 3 · BC = 4 · דלתון ABCD» was refused as over-constrained after ≈17 s although
+ * the right kite fits. So the two pairs are replaced by the right kite's definition: the right angle at one off-axis
+ * vertex (the axis on a diameter — each root closed-form on a circle rider, as ADR-628's right angles) and the axis
+ * perpendicular to the other diagonal (the figure symmetric about it, so both pairs hold). The plan's "right angle +
+ * the first pair" was measured first and refused: the pair's circle root includes the coincident one (D on B).
+ *
+ * `cmds` is the kite's expansion (`expandShapeVariant`): the base `quadrilateral` declared «דלתון» and the pairs it
+ * emits — a pair the student stated EXPLICITLY is not among them, and then the expansion is returned unchanged
+ * (the stated pair is a given of its own; replacing around it would state the right kite twice).
+ */
+export function cyclicKiteCommands(cmds: readonly Command[]): Command[] {
+  const base = cmds.find((c): c is Extract<Command, { type: 'quadrilateral' }> => c.type === 'quadrilateral' && c.declaredAs === 'kite');
+  const eqs = cmds.filter((c): c is Extract<Command, { type: 'set-equal' }> => c.type === 'set-equal');
+  if (!base || eqs.length !== 2) return [...cmds];
+  const ring = base.ids;
+  const apex = [eqs[0].a, eqs[0].b].find((p) => p === eqs[0].c || p === eqs[0].d);
+  const i = apex === undefined ? -1 : ring.indexOf(apex);
+  if (i < 0) return [...cmds];
+  const [p, q] = [ring[i], ring[(i + 2) % 4]]; // the axis
+  const k = (i + 1) % 4; // an off-axis vertex
+  const right: Command = { type: 'set-perpendicular', a: ring[(k + 3) % 4], b: ring[k], c: ring[k], d: ring[(k + 1) % 4] };
+  const axisPerp: Command = { type: 'set-perpendicular', a: p, b: q, c: ring[k], d: ring[(k + 2) % 4] };
+  return [...cmds.filter((c) => c.type !== 'set-equal'), right, axisPerp];
+}

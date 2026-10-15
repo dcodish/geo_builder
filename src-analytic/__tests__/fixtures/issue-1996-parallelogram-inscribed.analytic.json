@@ -1,0 +1,10 @@
+{
+  "app": "analytic-builder",
+  "version": 1,
+  "lines": [
+    "מקבילית ABCD",
+    "ABCD חסום במעגל"
+  ],
+  "seed": 0,
+  "name": "#1996 — מקבילית חסומה במעגל"
+}

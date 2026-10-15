@@ -69,6 +69,8 @@ import { displayModeOf } from '../shell/displayMode';
 import { askEchoNode3, FactRowText3, factRowText3, inputPreviewNode3 } from './render/FactRow3';
 import { VecMath } from './render/VecMath';
 import { errorText3 } from './i18n/errorText3';
+import { narrowingText3 } from './i18n/narrowingText3';
+import type { NarrowTranslate } from '../shell/narrowing';
 import { emptyStateChips3 } from './emptyChips3';
 
 /**
@@ -824,10 +826,10 @@ export default function App3() {
               amber error strip: nothing failed, so it reads as information, not a warning. */}
           {!busy && notices.map((n, i) => (
             <div key={`notice-${i}`} role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-              {n.kind === 'base-constrained'
-                ? t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
-                : n.kind === 'inscribed-constrained' // #1792
-                  ? t('notice.inscribedConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
+              {n.kind === 'narrowed' // #1996 (ADR-3D-343): the givens forced a narrower kind — the cross-builder family
+                ? narrowingText3(n.note, t as NarrowTranslate)
+                : n.kind === 'base-constrained' // ADR-3D-090, kept for the plain «מרובע» base only (#1996)
+                  ? t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
                 : n.kind === 'line-rel-noun'
                   ? t('notice.lineRelNoun', { line: n.line })
                   : n.kind === 'line-auto-named'

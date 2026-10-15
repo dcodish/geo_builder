@@ -28,6 +28,7 @@
 import { parseLengthExpr } from './lengths';
 import { sameConstraint, type Constraint } from './solve';
 import type { Id } from './types';
+import type { NarrowKind } from '../../shell/narrowing';
 
 /** `ab ∥ cd` / `ab ⊥ cd`, over the point pairs the ring gives. */
 const rel = (kind: 'parallel' | 'perpendicular', a: Id, b: Id, c: Id, d: Id): Constraint => ({
@@ -119,6 +120,13 @@ export interface ShapeRow {
    * declaration's lowering (`parseAnalytic`'s `shapeDeclaration`) reads this flag; `givens` is empty.
    */
   regular?: number;
+  /**
+   * THE NAMED KIND THIS NOUN DECLARES (#1996, ADR-AG-276) — the noun as typed, adjective included («טרפז שווה שוקיים» is
+   * an isosceles trapezoid, never a bare trapezoid), in the shared lattice (`shell/narrowing.ts`). The forced-narrowing
+   * note compares it with the kind the configuration pool forces. Absent for a noun the lattice has no kind for (the
+   * polygons of five sides and more).
+   */
+  kind?: NarrowKind;
 }
 
 /** A regular n-gon's row — see {@link ShapeRow.regular}. */
@@ -130,37 +138,43 @@ const regular = (n: number): ShapeRow => ({ arity: n, equalSides: true, regular:
  */
 export const SHAPES: Record<string, ShapeRow> = {
   // --- triangles ---
-  משולש: { arity: 3, givens: () => [] },
+  משולש: { arity: 3, kind: 'triangle', givens: () => [] },
   'משולש ישר זווית': {
     arity: 3,
+    kind: 'right-triangle',
     // WHICH angle is right is unstated — three seats, cycled.
     givens: ([a, b, c]) => [choice([rightAngleAt(a, b, c), rightAngleAt(b, a, c), rightAngleAt(c, a, b)])],
   },
   'משולש שווה שוקיים': {
     arity: 3,
+    kind: 'isosceles-triangle',
     // WHICH pair is equal is unstated, in exactly the same way. Spelled as 2-D's `variantPairs` spells its three
     // apexes (AB = AC, AB = BC, AC = BC) — the unstated-choice note names the drawn option in these letters (#1864).
     givens: ([a, b, c]) => [choice([equal(a, b, a, c), equal(a, b, b, c), equal(a, c, b, c)])],
   },
   'משולש שווה צלעות': {
     arity: 3,
+    kind: 'equilateral-triangle',
     equalSides: true,
     givens: ([a, b, c]) => [equal(a, b, b, c), equal(b, c, c, a)],
   },
   // --- quadrilaterals ---
-  מרובע: { arity: 4, givens: () => [] },
+  מרובע: { arity: 4, kind: 'quadrilateral', givens: () => [] },
   מקבילית: {
     arity: 4,
+    kind: 'parallelogram',
     givens: ([a, b, c, d]) => [parallel(a, b, d, c), parallel(a, d, b, c)],
   },
   מלבן: {
     // A parallelogram with one right angle has four; naming the seat asserts nothing extra, so this
     // row has no choice in it.
     arity: 4,
+    kind: 'rectangle',
     givens: ([a, b, c, d]) => [parallel(a, b, d, c), parallel(a, d, b, c), rightAngleAt(a, b, d)],
   },
   ריבוע: {
     arity: 4,
+    kind: 'square',
     equalSides: true,
     givens: ([a, b, c, d]) => [
       parallel(a, b, d, c),
@@ -171,6 +185,7 @@ export const SHAPES: Record<string, ShapeRow> = {
   },
   מעוין: {
     arity: 4,
+    kind: 'rhombus',
     equalSides: true,
     givens: ([a, b, c, d]) => [parallel(a, b, d, c), parallel(a, d, b, c), equal(a, b, b, c)],
     // A rhombus's diagonals are not interchangeable in a figure, but neither is distinguished by the
@@ -178,12 +193,14 @@ export const SHAPES: Record<string, ShapeRow> = {
   },
   טרפז: {
     arity: 4,
+    kind: 'trapezoid',
     // Which pair is parallel is the TOOL'S ASSUMPTION, defaulted by ring order and then pinned or
     // displaced the moment the student names a pair (#1159) — see `assumedParallel`.
     givens: ([a, b, c, d]) => [assumedParallel(a, b, d, c)],
   },
   'טרפז שווה שוקיים': {
     arity: 4,
+    kind: 'isosceles-trapezoid',
     givens: ([a, b, c, d]) => [assumedParallel(a, b, d, c), equal(a, d, b, c)],
   },
   'טרפז ישר זווית': {
@@ -195,6 +212,7 @@ export const SHAPES: Record<string, ShapeRow> = {
     // parallel pair, makes a right trapezoid, so all four seats are offered; a stated «∢C = 90°» is
     // then exactly one of them and collapses the choice by structure (`rightAngleAt` is shared).
     arity: 4,
+    kind: 'right-trapezoid',
     givens: ([a, b, c, d]) => [
       assumedParallel(a, b, d, c),
       choice([rightAngleAt(a, b, d), rightAngleAt(b, a, c), rightAngleAt(c, b, d), rightAngleAt(d, a, c)]),
@@ -204,6 +222,7 @@ export const SHAPES: Record<string, ShapeRow> = {
     // A kite: two pairs of ADJACENT equal sides, meeting at `A` and at `C`. That makes `AC` the axis
     // of symmetry, which is why this row — and only some others — can name a principal diagonal.
     arity: 4,
+    kind: 'kite',
     givens: ([a, b, c, d]) => [equal(a, b, a, d), equal(c, b, c, d)],
     principalDiagonal: ([a, , c]) => [a, c],
   },

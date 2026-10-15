@@ -54,10 +54,12 @@ import { otherUtteranceForError } from '@/app/errorSubject';
 import { parse } from '@/parser';
 import { COLLINEAR_CIRCLE_VS } from '@/engine/cyclicFeasibility';
 import { stripFormatControls } from '../../shell/bidi';
-import { COLLAPSED_VS, computeValues, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
+import { COLLAPSED_VS, computeValues, detectAll, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
 import { drivenSolveStats } from '@/engine/evaluate';
 import { buildScene } from '@/render/scene';
+import { rowNouns } from '@/store/rowNouns';
+import { narrowingText } from '@/app/narrowingText';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -3958,7 +3960,7 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'second-shape-noun-over-a-ring-1988-1985',
     title: 'A second shape noun over a declared ring: implied restates, excluding refuses',
     guards:
-      "#1988 + #1985 (ADR-619), operator rulings 2026-10-10. Measured on 06fc51dd through decideDeterministic2D: «ריבוע ABCD» · «מלבן ABCD» and «מקבילית ABCD» · «טרפז ABCD» were both refused with the engine's own «'C' is already defined …» — a letter the engine chose, not the statement in conflict (the honesty invariant). Root cause: 2-D judged a second shape noun by whose derived corner it would rebuild, and had no reading of the quadrilateral hierarchy at all — ADR-595 covered only the one noun («מרובע») that implies nothing. Fix: ONE table (QUAD_IMPLIES, shapeKinds.ts) read in both directions — an IMPLIED noun is re-spelled to the generic ring command (ADR-595's own path, so «כבר קיים» with no row), an EXCLUDING one is refused by a stage-0 prover with the ruled sentence. A pair that is neither (a rhombus over a rectangle) stays ADR-157's refusal. The class matrix is src/app/__tests__/issue-1988-1985-second-shape-noun.test.ts.",
+      "#1988 + #1985 (ADR-619), operator rulings 2026-10-10. Measured on 06fc51dd through decideDeterministic2D: «ריבוע ABCD» · «מלבן ABCD» and «מקבילית ABCD» · «טרפז ABCD» were both refused with the engine's own «'C' is already defined …» — a letter the engine chose, not the statement in conflict (the honesty invariant). Root cause: 2-D judged a second shape noun by whose derived corner it would rebuild, and had no reading of the quadrilateral hierarchy at all — ADR-595 covered only the one noun («מרובע») that implies nothing. Fix: ONE table (QUAD_IMPLIES, shapeKinds.ts) read in both directions — an IMPLIED noun is re-spelled to the generic ring command (ADR-595's own path, so «כבר קיים» with no row), an EXCLUDING one is refused by a stage-0 prover with the ruled sentence. A pair that is neither (a rhombus over a rectangle) stayed ADR-157's refusal until ADR-656 (#1993: it now refines the ring to the square). The class matrix is src/app/__tests__/issue-1988-1985-second-shape-noun.test.ts.",
     steps: ['מקבילית ABCD'],
     check(fig) {
       allStepsOk(fig);
@@ -3981,10 +3983,10 @@ export const SCENARIOS_4: Scenario[] = [
       // and the declared square is still a square afterwards
       const poly = replay(sq).construction.objects.find((o) => o.kind === 'polygon');
       expect(poly && 'declaredAs' in poly && poly.declaredAs).toBe('square');
-      // the control: neither implied nor excluded keeps ADR-157's refusal
+      // the pair that is neither (a rhombus over a rectangle — a square is both) no longer keeps ADR-157's refusal: it
+      // refines the ring (ADR-656, #1993 ruling 2026-10-11); its notice and figure: issue-1914-1993-noun-refines-ring.test.ts
       const rect = factsOf(['מלבן ABCD']);
-      expect(gateVerdict(rect, 'מעוין ABCD')).toMatchObject({ kind: 'refused', reason: 'error' });
-      expect((gateVerdict(rect, 'מעוין ABCD') as { detail?: string }).detail).toMatch(/already defined/);
+      expect(gateVerdict(rect, 'מעוין ABCD').kind).not.toBe('refused');
     },
   },
   {
@@ -4759,7 +4761,90 @@ export const SCENARIOS_4: Scenario[] = [
       );
     },
   },
+  // ── #1996 (ADR-655): the givens forced a narrower named kind — said in one cause-naming sentence ──
+  {
+    id: 'narrowing-note-circle-points-parallelogram-1996',
+    title: '«מעגל O · A, B, C ו-D על המעגל · AB = 3 · BC = 4 · מקבילית ABCD»: the 3 × 4 rectangle with the circle note (#1996, ADR-655)',
+    guards:
+      "#1996 (ADR-W-129 / ADR-655), operator rulings 2026-10-13 (every forced narrowing, whatever caused it; one cause-naming family). The operator's own #1913 T1: *\"we have to have a note indicating the only shape possible is a rectangle which is also a kind of a parallelogram\"*. Measured on b0ef3240: the rectangle drawn silently. Asserts the circle note and ∠A = 90°.",
+    steps: ['מעגל O', 'A, B, C ו-D על המעגל', 'AB = 3', 'BC = 4', 'מקבילית ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'D'), at(fig, 'A'), at(fig, 'B')), '∠DAB = 90°').toBeCloseTo(90, 3);
+      expect(narrowNotes(['מעגל O', 'A, B, C ו-D על המעגל', 'AB = 3', 'BC = 4', 'מקבילית ABCD'])).toEqual([
+        'כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.',
+      ]);
+    },
+  },
+  {
+    id: 'narrowing-note-parallelogram-inscribed-t56-1996',
+    title: '«מקבילית ABCD · מקבילית ABCD חסומה במעגל»: the rectangle with the circle note (operator T56, 2026-10-14; #1996, ADR-655)',
+    guards:
+      "#1996 (ADR-655). The operator playing the #2107 sheet, T56 (PR #2121), 2026-10-14: *\"shape was reduced to a rectangle but no notice is given to user. we have a rule that we highlight such cases\"*. Measured on b0ef3240: the rectangle drawn silently. Asserts the circle note and ∠A = 90°.",
+    steps: ['מקבילית ABCD', 'מקבילית ABCD חסומה במעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'D'), at(fig, 'A'), at(fig, 'B')), '∠DAB = 90°').toBeCloseTo(90, 3);
+      expect(narrowNotes(['מקבילית ABCD', 'מקבילית ABCD חסומה במעגל'])).toEqual([
+        'כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.',
+      ]);
+    },
+  },
+  {
+    id: 'narrowing-note-parallelogram-height-t41-1996',
+    title: '«מקבילית ABCD · AB גובה»: the rectangle with «בגלל הנתון AB גובה, …» (operator T41, 2026-10-14; #1996, ADR-655)',
+    guards:
+      '#1996 (ADR-655). The same play session, T41 (#2064 Stage 2), which its Heads-up flagged as approved but not delivered: the parallelogram whose side is its own height is a rectangle, drawn silently on b0ef3240. Asserts the note naming the given as typed.',
+    steps: ['מקבילית ABCD', 'AB גובה'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(narrowNotes(['מקבילית ABCD', 'AB גובה'])).toEqual(['בגלל הנתון AB גובה, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.']);
+    },
+  },
+  {
+    id: 'narrowing-note-given-rhombus-1996',
+    title: '«מקבילית ABCD · AB = BC»: «בגלל הנתון AB = BC, ABCD הוגבל ממקבילית למעוין — מעוין הוא סוג של מקבילית.» (#1996, ADR-655)',
+    guards:
+      '#1996 (ADR-655), operator ruling 2026-10-13, cards 1 and 2 (the student\'s own given causes a note; the sentence verbatim). Measured on b0ef3240: the rhombus drawn silently. Asserts the exact sentence.',
+    steps: ['מקבילית ABCD', 'AB = BC'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(narrowNotes(['מקבילית ABCD', 'AB = BC'])).toEqual(['בגלל הנתון AB = BC, ABCD הוגבל ממקבילית למעוין — מעוין הוא סוג של מקבילית.']);
+    },
+  },
+  {
+    id: 'narrowing-note-isosceles-sixty-1996',
+    title: '«משולש שווה שוקיים ABC · זווית BAC = 60»: the equilateral note (#1996 card 3, ADR-655)',
+    guards:
+      '#1996 (ADR-655), operator ruling 2026-10-13, card 3: *"«משולש שווה שוקיים ABC» then «זווית BAC = 60» gets a note"*; third ballot A: the declared kind takes part in forcing it, so the numeric silence does not apply. Measured on b0ef3240: silent. Asserts the sentence.',
+    steps: ['משולש שווה שוקיים ABC', 'זווית BAC = 60'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(narrowNotes(['משולש שווה שוקיים ABC', 'זווית BAC = 60'])).toEqual([
+        'בגלל הנתון זווית BAC = 60, ABC הוגבל ממשולש שווה שוקיים למשולש שווה צלעות — משולש שווה צלעות הוא סוג של משולש שווה שוקיים.',
+      ]);
+    },
+  },
+  {
+    id: 'narrowing-note-typed-right-angle-silent-1996',
+    title: '«משולש ABC · זווית C = 90»: NO note — the typed right angle is the carve-out (#1996 card 3, ADR-655)',
+    guards:
+      '#1996 (ADR-655), operator ruling 2026-10-13, card 3: *"«משולש ABC» then «זווית C = 90» stays silent"*. Asserts no note, and none for the same right angle spelled «AC ⊥ BC».',
+    steps: ['משולש ABC', 'זווית C = 90'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(narrowNotes(['משולש ABC', 'זווית C = 90'])).toEqual([]);
+      expect(narrowNotes(['משולש ABC', 'AC ⊥ BC'])).toEqual([]);
+    },
+  },
 ];
+
+/** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */
+function narrowNotes(steps: string[]): string[] {
+  const facts = factsOf(steps);
+  const he = i18n.getFixedT('he');
+  return narrowingText(detectAll(facts, rowNouns(facts)).narrowed, (k, o) => he(k, o) as string).map(stripFormatControls);
+}
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */
 function guards1600(): string {

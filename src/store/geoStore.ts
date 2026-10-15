@@ -33,6 +33,7 @@ export * from '@/replay/naming';
 import { nameCentreFacts, reletterHiddenFacts, relabelUtterance, renameFacts, renameInCommand, resolveBinds, type RenameResult } from '@/replay/naming';
 import { replay, groupKey, foldCommand, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, commandPointIds, BRANCH_CYCLE_KINDS } from '@/replay/core';
 import type { DetectAllResult, Determinacy, Fact } from '@/replay/core';
+import type { RingNote } from '../../shell/narrowing';
 import { viewDelta } from '@/replay/viewDelta';
 import type { ViewDelta } from '@/replay/viewDelta';
 import { geoWork, geoValues, isCancelled } from './geoWork';
@@ -183,6 +184,9 @@ export interface GeoState {
    *  off the SAME shared pool as the crossings and the values panel, and computed by the same always-on
    *  post-fact sweep. Same staleness contract: meaningful only while `facts` is the store's facts. */
   determinacy: (Determinacy & { facts: Fact[] }) | null;
+  /** #1996 (ADR-655): the forced-narrowing notes — a declared ring the givens forced into a narrower named kind,
+   *  with the statements that forced it — read off the SAME always-on sweep. Same staleness contract. */
+  narrowed: { list: RingNote[]; facts: Fact[] } | null;
 
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
   execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;
@@ -407,6 +411,7 @@ export const useGeoStore = create<GeoState>()(
       shapes: null,
       crossings: null,
       determinacy: null,
+      narrowed: null,
 
       execute: (cmd, utterance, group) => {
         commitCommands(get, set, [cmd], utterance, group);
@@ -601,7 +606,7 @@ export const useGeoStore = create<GeoState>()(
         if (get().crossings?.facts === facts) return;
         const r = await detectFor(facts, get);
         if (!r) return;
-        set({ crossings: { forced: r.crossings, facts }, determinacy: { ...r.determinacy, facts } });
+        set({ crossings: { forced: r.crossings, facts }, determinacy: { ...r.determinacy, facts }, narrowed: { list: r.narrowed, facts } });
       },
 
       cycleAlt: (pointId) => {

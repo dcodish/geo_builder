@@ -53,6 +53,7 @@ import { MathText } from '../shell/math';
 import { inputPreviewNodeAnalytic } from './render/inputPreviewNodeAnalytic';
 import { Banner } from '../shell/frame/Banner';
 import { shapeWarningsOf, shapeWarningText } from './app/shapeWarnings';
+import { narrowingNotesOf, narrowingText, type AnalyticNarrowing } from './app/narrowing';
 import { FigureName } from '../shell/frame/FigureName';
 import { ManualScreen } from '../shell/frame/ManualScreen';
 import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
@@ -618,6 +619,21 @@ export function App() {
   const shapeWarnings = useMemo(() => shapeWarningsOf(active, d), [active, d]);
   const [poolTick, setPoolTick] = useState(0);
   useLayoutEffect(() => completePoolAfterRender(configurationPool(d.construction), () => setPoolTick((n) => n + 1)), [d]);
+  /**
+   * THE GIVENS FORCED A NARROWER KIND (#1996, ADR-AG-276 — operator rulings 2026-10-13): one ⓘ line per declared ring the
+   * givens force into a narrower named kind, naming the cause. Read off the COMPLETE configuration pool only, and computed
+   * AFTER paint (a passive effect, never in the render): the pool completes after the render (ADR-AG-180, operator
+   * 2026-09-29: *"we cannot afford 0.5 s addition"*), so the note arrives with the pool's re-render and never delays the
+   * figure. An incomplete pool reports pending, which makes `poolScheduler` re-render on completion. Kept with the
+   * derivation it was read from, so a changed figure never shows the old figure's note.
+   */
+  const [narrowed, setNarrowed] = useState<{ d: typeof d; notes: AnalyticNarrowing[] } | null>(null);
+  useEffect(() => {
+    const notes = narrowingNotesOf(active, d);
+    setNarrowed((prev) => (prev?.d === d && prev.notes === notes ? prev : { d, notes }));
+    // poolTick: the pool completed, read it again
+  }, [active, d, poolTick]);
+  const narrowings = narrowed?.d === d ? narrowed.notes : [];
 
   /**
    * THE FIGURE SNAPSHOT (#1300) — the sibling effect, over this product's own source of truth.
@@ -1283,6 +1299,23 @@ export function App() {
                     t,
                     analyticBidi.isolateLtrRuns(spokenFor[rows[w.forcedBy]] ?? w.line),
                     analyticBidi.isolateLtrRuns(w.shape),
+                  )}
+                </Banner>
+              </div>
+            ))}
+            {/*
+              #1996 — the forced-narrowing note (ⓘ, the notice family): the ring the givens narrowed, from which kind to
+              which, and the statement(s) that did it, as the student typed them.
+            */}
+            {narrowings.map((n) => (
+              <div key={`${n.ring}-${n.to}`} style={{ marginTop: 8 }} data-testid="analytic-narrowing-note">
+                <Banner kind="notice">
+                  <span aria-hidden="true">ⓘ </span>
+                  {narrowingText(
+                    n,
+                    (k, o) => t(k, o) as string,
+                    (i) => analyticBidi.isolateLtrRuns(spokenFor[rows[i]] ?? active[i] ?? ''),
+                    (ring) => analyticBidi.isolateLtrRuns(ring),
                   )}
                 </Banner>
               </div>

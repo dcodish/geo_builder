@@ -228,7 +228,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   vertex.** An adjective stated on a polygon noun («טרפז ישר זווית», «טרפז שווה שוקיים», «משולש ישר זווית», "isosceles
   trapezoid", "right triangle") is drawn, standalone and inside an inscription in either direction; one the noun
   cannot carry («מרובע ישר זווית») is never dropped — the line goes to the model. A quadrilateral in a circle is
-  drawn as its family's cyclic member, with a notice; a right trapezoid in a circle is refused — in one sentence,
+  drawn as its family's cyclic member, with a notice when the shape is narrowed, naming the cause in the shared
+  family (2-D's FR-HS-14, ADR-W-129: «כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.»;
+  a right pyramid over a base it narrows: «כדי שהפירמידה תהיה ישרה, ABCD הוגבל …»; a given typed first is named instead;
+  nothing when the declared noun is already the cyclic one, «טרפז שווה שוקיים»); every other forced narrowing the
+  givens make is said in the same family, as in 2-D; a right trapezoid in a circle is refused — in one sentence,
   and also when «טרפז ישר זווית ABCD» and the circle («ABCD חסום במעגל», «מעגל חוסם את ABCD», a pyramid's
   right-trapezoid base) are stated on two lines, in either order: the second line is refused, naming both. A
   shape's own condition draws no segment the student did not name. The 2-D twin is FR-EN-14. A circle inscribed in a pentagon

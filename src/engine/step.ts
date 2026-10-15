@@ -9,7 +9,7 @@
 
 import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Polygon, SideChoice, SolveDirective, Vec } from './types';
 import { LEN_EPS, edgeSideToward, isGeoPoint, isOrderConstraint } from './types';
-import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeExclusion, shapeExclusionError, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
+import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, refinesDeclaredRing, shapeExclusion, shapeExclusionError, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
 import { lower } from './lower';
 import { circlesTouch, oneCommonPointError } from './evaluate';
 import { circlesStatedTangent } from './structure';
@@ -186,7 +186,10 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     // changes nothing structurally, and whatever else the sentence adds (a circle through the four vertices)
     // is judged on its own. Semantic, not per-kind: only the supertype word of the same arity passes — a
     // specific → different-specific re-declaration (a trapezoid's cycle as a square) stays ADR-157's refusal.
-    if (o.kind === 'polygon' && existing.kind === 'polygon' && isSupertypeRestatement(cmd, existing)) continue;
+    // #1914 / #1993 (ADR-656): the same arm, read off the one predicate — a noun that NARROWS the declared ring
+    // («מרובע»/an inscribed ring → «דלתון») or meets it in a third kind is a statement about the ring, never a
+    // redefinition of it; apply's `refineRingKind` gives the polygon the narrower kind.
+    if (o.kind === 'polygon' && existing.kind === 'polygon' && (isSupertypeRestatement(cmd, existing) || refinesDeclaredRing(prev, cmd))) continue;
     return `'${o.id}' is already defined — it can't be redefined as something different`;
   }
   return null;

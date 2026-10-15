@@ -23,6 +23,7 @@
 import { create } from 'zustand';
 import type { PlaneDisplayMode3Map } from './figureFile3';
 import { buildNotices3, shapeWarnings3, type BuildNotice3, type ShapeWarning3 } from '../engine/notices';
+import { narrowingNotes3 } from './narrowing3';
 import { normalizeLabel3, renameFacts3, renamePlaneDisplay3, renameQueries3, swapSession3, type RenameResult3, type SwapResult3 } from './rename3';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
@@ -497,6 +498,15 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
 export const deriveStats3 = { uncached: 0 };
 function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
   deriveStats3.uncached++;
+  return deriveCore3(facts, seed, true);
+}
+
+/**
+ * The fold + verification of one fact list. `narrow` runs the #1996 forced-narrowing pass (ADR-3D-343); its cause
+ * search folds SUBSETS of the list through this same function with `narrow: false` — the same fold, never a
+ * second reader, and no recursion. A subset fold is not a "press", so it never counts in {@link deriveStats3}.
+ */
+function deriveCore3(facts: Fact3[], seed: number, narrow: boolean): Derived3 {
   let c: Construction3 = emptyConstruction3();
   const status: Record<string, FactStatus3> = {};
   const claimOwners: { factId: string; from: number; to: number }[] = [];
@@ -1411,7 +1421,10 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
   // #850: the notice lane's numeric gate needs sampled configurations. `resolved` is the one this
   // derive already computed — no extra solve on the hot path; the branch guard inside reads the
   // admissible pool this sample already carries (`pivot.pointRoots`, built for #827).
-  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved]), shapeWarnings: shapeWarnings3(c, positions) };
+  // #1996 (ADR-3D-343): a declared ring the givens forced into a narrower named kind, with the statements that did
+  // it — needs the facts and their utterances, so it is computed here and handed to the notice builder.
+  const narrowed = narrow ? narrowingNotes3(facts, seed, c, (id) => status[id] === 'ok', { construct: (sub) => deriveCore3(sub as Fact3[], seed, false).construction }) : [];
+  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions) };
 }
 
 export interface Geo3State {

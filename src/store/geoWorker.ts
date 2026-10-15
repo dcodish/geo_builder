@@ -15,12 +15,13 @@
  */
 import { searchAnotherView, findValidConfig, meetsRequirements, replay, getFoldFor, detectAll, computeValues, WORKER_SEARCH_BUDGET_MS, type DetectAllResult, type Fact, type FoldNode } from '@/replay/core';
 import type { QueryInput, ValuesPanelResult } from '@/engine/valuesPanel';
+import type { RowNouns } from '@/replay/narrowing';
 
 export type GeoWorkRequest =
   | { id: number; op: 'resample'; facts: Fact[]; seed: number }
   | { id: number; op: 'autoResolve'; facts: Fact[]; seed: number }
   | { id: number; op: 'prefold'; facts: Fact[]; seed: number }
-  | { id: number; op: 'detect'; facts: Fact[]; seed: number }
+  | { id: number; op: 'detect'; facts: Fact[]; seed: number; nouns?: RowNouns }
   | { id: number; op: 'values'; facts: Fact[]; seed: number; queries?: QueryInput[] };
 
 export type GeoWorkResponse =
@@ -72,7 +73,7 @@ self.onmessage = (e: MessageEvent<GeoWorkRequest>) => {
     } else if (req.op === 'detect') {
       // #157: the sample sweep — the dominant per-step cost on a coupled figure — with the three
       // layers' classification done HERE, so only the small verdicts cross back (ADR-401).
-      post({ id: req.id, done: { op: 'detect', result: detectAll(req.facts) } });
+      post({ id: req.id, done: { op: 'detect', result: detectAll(req.facts, req.nouns ?? {}) } });
     } else if (req.op === 'values') {
       post({ id: req.id, done: { op: 'values', result: computeValues(req.facts, req.queries ?? []) } });
     }

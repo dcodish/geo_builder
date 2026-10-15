@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { deserializeFigure3 } from '../store/figureFile3';
 import { derive3 } from '../store/store3';
+import { narrowingStats3 } from '../store/narrowing3';
 import { sampleStats } from '../engine/rng';
 
 const DIR = join(__dirname, '..', '..', 'fixtures3');
@@ -29,6 +30,8 @@ const load = (file: string) => {
 /** Far above the measured post-fix counts (4–12 per derive, one-shot callers included) and three orders of
  *  magnitude below the pre-fix ones (72 k – 2.04 M). */
 const CEILING = 64;
+/** #1996: the forced-narrowing pass's own draws per derive (measured ≤ 96 per derive over fixtures3; trials are count-capped). */
+const NARROWING_CEILING = 192;
 
 describe('#863 — the pivot residual loop samples nothing', () => {
   it("the operator's figure: one derive3 costs O(distinct keys) sample calls, not O(iterations)", () => {
@@ -54,8 +57,14 @@ describe('#863 — the pivot residual loop samples nothing', () => {
       const r = load(f);
       for (const seed of [r.seed, r.seed + 1]) {
         sampleStats.solidCalls = 0;
+        narrowingStats3.solidCalls = 0;
         derive3(r.facts, seed);
-        if (sampleStats.solidCalls > CEILING) over.push(`${f}@${seed}=${sampleStats.solidCalls}`);
+        // #1996 (ADR-3D-343): the forced-narrowing pass draws its OWN knowledge pool (claimSeeds × branches, the plan's
+        // bar) and its subset folds — a separate, bounded consumer held to its own ceiling; the derive's pivot loop
+        // (this lock's class) is held to CEILING without it
+        const own = sampleStats.solidCalls - narrowingStats3.solidCalls;
+        if (own > CEILING) over.push(`${f}@${seed}=${own}`);
+        if (narrowingStats3.solidCalls > NARROWING_CEILING) over.push(`${f}@${seed} narrowing=${narrowingStats3.solidCalls}`);
       }
     }
     expect(over, 'pre-fix: 12 fixtures between 72 k and 205 k').toEqual([]);

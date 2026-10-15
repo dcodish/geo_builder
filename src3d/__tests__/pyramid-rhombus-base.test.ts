@@ -79,7 +79,8 @@ describe('#304 — rhombus-base pyramid builds correctly (parser)', () => {
     const apex = d.positions.get('S')!;
     const lat = ['A', 'B', 'C', 'D'].map((p) => dist3(apex, d.positions.get(p)!));
     for (const l of lat) expect(l).toBeCloseTo(lat[0], 4);
-    expect(d.notices.some((n) => n.kind === 'base-constrained' && n.from === 'rhombus')).toBe(true);
+    // #1996 (ADR-3D-343): the one narrowing notice — the right pyramid narrowed the BASE ring from a rhombus to a square
+    expect(d.notices.some((n) => n.kind === 'narrowed' && n.ids.join('') === 'ABCD' && n.note.from === 'rhombus' && n.note.to === 'square' && n.note.cause.kind === 'rightPyramid')).toBe(true);
   });
 });
 
