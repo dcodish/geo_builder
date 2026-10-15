@@ -1,0 +1,82 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T12:00:00.000Z",
+  "name": "issue-1934-four-bare-points-quad",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "נקודה A",
+      "group": "g0",
+      "cmd": {
+        "type": "free-point",
+        "id": "A",
+        "x": 3,
+        "y": 2,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "נקודה B",
+      "group": "g1",
+      "cmd": {
+        "type": "free-point",
+        "id": "B",
+        "x": 3,
+        "y": 2,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.2",
+      "utterance": "נקודה C",
+      "group": "g2",
+      "cmd": {
+        "type": "free-point",
+        "id": "C",
+        "x": 3,
+        "y": 2,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3.3",
+      "utterance": "נקודה D",
+      "group": "g3",
+      "cmd": {
+        "type": "free-point",
+        "id": "D",
+        "x": 3,
+        "y": 2,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g4.4",
+      "utterance": "מרובע ABCD",
+      "group": "g4",
+      "cmd": {
+        "type": "quadrilateral",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

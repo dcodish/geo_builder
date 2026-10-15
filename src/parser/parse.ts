@@ -311,7 +311,7 @@ export interface ParseContext {
    *  naming the statement — it never falls back to an arbitrary side (ADR-052). */
   /** #1810: `ring`/`at` — the triangle and its distinguished vertex (right-angle vertex / apex), so a role-named
    *  command can carry its binding and follow «show another configuration» (ADR-596). */
-  roleSides?: { role: 'hypotenuse' | 'base' | 'leg'; edge: [string, string]; ring?: string[]; at?: string }[];
+  roleSides?: { role: 'hypotenuse' | 'base' | 'leg'; edge: [string, string]; ring?: string[]; at?: string; unstated?: true }[];
   /** #1689 ([ADR-639](../../docs/06-decisions.md#adr-639)): the triangles declared right («משולש ישר-זווית ABC»)
    *  whose right angle no statement has seated. Their hypotenuse is OPEN: «תיכון ליתר» asks which side is meant,
    *  and «תיכון ליתר AB» names it (the role claim states the right angle opposite). */
@@ -6815,7 +6815,8 @@ const semicircle: Rule = (s, ctx) => {
     let dia2: Id[] | null;
     let on: Id;
     if (onVertices) {
-      const hyp = (ctx.roleSides ?? []).find((rs) => rs.role === 'hypotenuse' && rs.edge.every((e) => onVertices.includes(up(e))));
+      // #2074 (ADR-659): a STATED hypotenuse only; the noun's unstated seat is not the figure's call
+      const hyp = (ctx.roleSides ?? []).find((rs) => rs.role === 'hypotenuse' && !rs.unstated && rs.edge.every((e) => onVertices.includes(up(e))));
       on = hyp ? onVertices.find((v) => !hyp.edge.map(up).includes(v))! : onVertices[2];
       dia2 = onVertices.filter((v) => v !== on);
     } else {
@@ -9949,7 +9950,11 @@ const roleSideLine: Rule = (s, ctx) => {
   if (!m) return null;
   const noun = m[1] ?? m[2] ?? '';
   const role = /יתר|hypotenuse/i.test(noun) ? 'hypotenuse' : /בסיס|base/i.test(noun) ? 'base' : 'leg';
-  const cands = (ctx.roleSides ?? []).filter((r) => r.role === role);
+  // #2074 (ADR-659): the noun's UNSTATED seat yields a hypotenuse of its own (`unstated`) that a statement may
+  // bind to, never one a typed letter selects — a named side or apex is the student's claim (below).
+  const roleAll = (ctx.roleSides ?? []).filter((r) => r.role === role);
+  const cands = roleAll.filter((r) => !r.unstated);
+  const unstatedHosts = roleAll.filter((r) => r.unstated);
   // #805 play, second pass (ADR-465 Am. 2): letters right after the role noun SELECT among the
   // candidates — «גובה לשוק AC» is the student naming WHICH leg, and it must win outright.
   const afterNoun = s.slice((m.index ?? 0) + m[0].length).match(/^\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)(?![A-Za-z\d])/);
@@ -9970,19 +9975,40 @@ const roleSideLine: Rule = (s, ctx) => {
   // the noun says a right angle exists, not where (operator ruling 2026-10-02, #1620: "build when a stated right
   // angle fixes the vertex; otherwise ASK which side is the hypotenuse; never assume C"). Letters after the noun
   // naming one of ITS sides answer the question: the student's side is used, and the role claim («היתר AB»)
-  // states the right angle opposite it. With no such letters, ask — never the side the default seat draws.
+  // states the right angle opposite it. With no such letters, see #2074 below.
   const named = afterNoun ? ([up(afterNoun[1]), up(afterNoun[2])] as [Id, Id]) : null;
   const open = role === 'hypotenuse' && !selected ? (ctx.openRightTriangles ?? []) : [];
   const namedOpenSide = named && named[0] !== named[1] && open.some((ring) => named.every((v) => ring.includes(v))) ? named : null;
-  if (open.length > 0 && !namedOpenSide) return { clarify: 'ambiguous-hypotenuse' };
+  // #2074 (ADR-659, reversing ADR-639's question; operator 2026-10-13: *"תיכון ליתר should be drawn using whats
+  // currently showing but we need to have dof and show other option will create a different triangle"*). An open
+  // hypotenuse is an unstated choice, not a missing operand:
+  //  - no triangle letter typed (the noun alone, or a foot outside the ring): BIND to the seat as shown — the
+  //    fold rotates the line with `rot`, so «הציגו תצורה אחרת» moves the right angle and the line follows it;
+  //  - ONE ring vertex typed («CM תיכון ליתר», «גובה ליתר מ-C»): the student named the right angle's vertex,
+  //    which forces the seat (ruling 2026-10-14) — read as the cevian to the opposite side plus that right angle,
+  //    the same claim «תיכון ליתר AB» states;
+  //  - several hosts (another right triangle, open or stated): no single host — the existing question.
+  let apexClaim: { v: Id; side: [Id, Id] } | null = null;
+  let bindOpen: (typeof roleAll)[number] | null = null;
+  if (open.length > 0 && !namedOpenSide) {
+    if (cands.length + unstatedHosts.length !== 1 || !unstatedHosts[0]?.ring) return { clarify: 'role-side-unresolved', role: noun };
+    const host = unstatedHosts[0];
+    const ring = host.ring!.map(up);
+    const typed = [...new Set(statedLabelTokens(s).filter((l) => ring.includes(l)))];
+    // a pair typed after the noun that is no side of the triangle («תיכון ליתר AD») names no apex: still asked
+    if (named) return { clarify: 'ambiguous-hypotenuse' };
+    if (typed.length === 1) apexClaim = { v: typed[0], side: ring.filter((x) => x !== typed[0]) as [Id, Id] };
+    else if (typed.length === 0) bindOpen = host;
+    else return { clarify: 'ambiguous-hypotenuse' };
+  }
   const pick =
-    namedOpenSide ? null
-    : selected ??
+    namedOpenSide || apexClaim ? null
+    : bindOpen ?? selected ??
     (cands.length === 1 ? cands[0]
     : role === 'leg' && cands.length === 2 ? (cands.find((r) => !occupied(r.edge)) ?? cands[0])
     : null);
-  if (!pick && !namedOpenSide) return { clarify: 'role-side-unresolved', role: noun };
-  const [p, q] = namedOpenSide ?? pick!.edge;
+  if (!pick && !namedOpenSide && !apexClaim) return { clarify: 'role-side-unresolved', role: noun };
+  const [p, q] = namedOpenSide ?? apexClaim?.side ?? pick!.edge;
   const heb = /[א-ת]/.test(s);
   // a run restating the side right after the role noun («תיכון ליתר AB») folds into the rewrite;
   // any other letters stay untouched for the letter-form rules to read
@@ -9991,6 +10017,8 @@ const roleSideLine: Rule = (s, ctx) => {
   const rewritten = (restated.test(s) ? s.replace(restated, target) : s.replace(ROLE_NOUN_RX, target)).replace(/\s+/g, ' ').trim();
   const r = parse(rewritten, ctx);
   if (!r.ok) return null;
+  // #2074 (ADR-659): the typed apex's claim, prepended as the role-claim post-pass prepends «היתר AB»'s
+  if (apexClaim) return [{ type: 'set-angle', vertex: apexClaim.v, ray1: p, ray2: q, value: 90 }, ...r.commands];
   // #1810 (ADR-596): the fact keeps the ROLE, not only the letters. The letters above are the resolution at
   // the configuration showing NOW; when the role hangs off an unstated choice (the isosceles apex, a re-seated
   // right angle), «show another configuration» moves it, and the replay fold re-resolves the binding

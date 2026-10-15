@@ -51,32 +51,45 @@ beforeEach(() => {
   llmParseMock.mockResolvedValue({ built: [], dropped: [] });
 });
 
-describe('#1689 — the right-triangle noun alone: the hypotenuse is ASKED', () => {
+/**
+ * #2074 ([ADR-659](../../../docs/06-decisions.md#adr-659)) — RE-BASED to the operator's 2026-10-13 request and the
+ * 2026-10-14 ruling, reversing ADR-639's question: the noun alone is not a missing operand. «תיכון ליתר» draws on the
+ * triangle as SHOWN, bound to the seat (the fold rotates it with «הציגו תצורה אחרת»); a typed apex forces the seat.
+ * Only a pair that is no side of the triangle is still asked, and two hosts get the existing no-single-side question.
+ */
+describe('#1689 → #2074 — the right-triangle noun alone: the hypotenuse is the one SHOWN, bound to the seat', () => {
   it.each([
     ['תיכון ליתר', 'he'],
     ['גובה ליתר', 'he'],
     ['התיכון ליתר', 'he'],
-    ['CM תיכון ליתר', 'he'],
     ['the median to the hypotenuse', 'he'],
     ['median to the hypotenuse', 'en'],
     ['the altitude to the hypotenuse', 'en'],
-  ] as const)('«%s» asks which side is the hypotenuse, commits nothing and never reaches the model', async (line, lng) => {
+  ] as const)('«%s» commits the cevian from the shown seat C to AB, bound to the seat, and never reaches the model', async (line, lng) => {
     const r = await decide([RT], line, lng);
-    expect(r.v.kind).toBe('refuse');
-    expect(r.v.kind === 'refuse' && r.v.category).toBe('clarify');
-    expect(r.key).toBe('input.ambiguousHypotenuse');
-    expect(r.text).toContain(line);
+    expect(r.v.kind).toBe('commit');
+    expect(cevian(r.v)).toEqual({ apex: 'C', side: 'AB' });
+    expect(cmds(r.v).every((c) => (c as { roleSide?: { role: string; at: string } }).roleSide?.role === 'hypotenuse' && (c as { roleSide?: { at: string } }).roleSide?.at === 'C')).toBe(true);
+    expect(cmds(r.v).some((c) => c.type === 'set-angle'), 'no right angle is stated for the student').toBe(false);
     expect(llmParseMock).not.toHaveBeenCalled();
   });
 
-  it('the question is analytic’s (ADR-AG-211), word for word, in both languages', async () => {
-    const he = await decide([RT], 'תיכון ליתר');
-    expect(he.text).toBe('לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: "תיכון ליתר". כתבו איזו צלע היא היתר, למשל "תיכון ליתר AB", או איזו זווית ישרה, למשל "זווית C ישרה".');
-    const en = await decide([RT], 'median to the hypotenuse', 'en');
-    expect(en.text).toMatch(/^Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: "median to the hypotenuse"\./);
+  it('a typed apex forces the seat: «CM תיכון ליתר» / «AM תיכון ליתר» / «גובה ליתר מ-C» state the right angle there, unbound', async () => {
+    for (const [line, apex, side] of [['CM תיכון ליתר', 'C', 'AB'], ['AM תיכון ליתר', 'A', 'BC'], ['גובה ליתר מ-C', 'C', 'AB']] as const) {
+      const r = await decide([RT], line);
+      expect(cevian(r.v), line).toEqual({ apex, side });
+      expect(cmds(r.v), line).toContainEqual(expect.objectContaining({ type: 'set-angle', vertex: apex, value: 90 }));
+      expect(cmds(r.v).some((c) => (c as { roleSide?: unknown }).roleSide), line).toBe(false);
+    }
   });
 
-  it('the answers the question suggests build: «תיכון ליתר AB» (the right angle at C, stated by the claim) and «זווית C ישרה»', async () => {
+  it('a named pair that is no side of the open triangle still asks, with analytic’s question (ADR-AG-211)', async () => {
+    const r = await decide([RT, 'נקודה D'], 'תיכון ליתר AD');
+    expect(r.key).toBe('input.ambiguousHypotenuse');
+    expect(r.text).toBe('לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: "תיכון ליתר AD". כתבו איזו צלע היא היתר, למשל "תיכון ליתר AB", או איזו זווית ישרה, למשל "זווית C ישרה".');
+  });
+
+  it('the named answers still build: «תיכון ליתר AB» (the right angle at C, stated by the claim) and «זווית C ישרה»', async () => {
     const named = await decide([RT], 'תיכון ליתר AB');
     expect(cevian(named.v)).toEqual({ apex: 'C', side: 'AB' });
     expect(cmds(named.v)).toContainEqual(expect.objectContaining({ type: 'set-angle', vertex: 'C', value: 90 }));
@@ -92,12 +105,8 @@ describe('#1689 — the right-triangle noun alone: the hypotenuse is ASKED', () 
     }
   });
 
-  it('a named pair that is no side of the open triangle still asks', async () => {
-    expect((await decide([RT, 'נקודה D'], 'תיכון ליתר AD')).key).toBe('input.ambiguousHypotenuse');
-  });
-
-  it('two right triangles on one side, neither seated, ask too', async () => {
-    expect((await decide([RT, 'משולש ישר-זווית ABD'], 'תיכון ליתר')).key).toBe('input.ambiguousHypotenuse');
+  it('two right triangles on one side, neither seated: no single host — the no-single-side question', async () => {
+    expect((await decide([RT, 'משולש ישר-זווית ABD'], 'תיכון ליתר')).key).toBe('input.roleSideUnresolved');
   });
 });
 
@@ -123,7 +132,7 @@ describe('#1689 — a STATED right angle fixes the vertex, and builds', () => {
   });
 });
 
-describe('#1689 — the engine reads only a STATED right angle as the hypotenuse’s vertex', () => {
+describe('#1689 — the engine reads a STATED right angle as the hypotenuse’s vertex, and the noun’s seat as an UNSTATED one (#2074)', () => {
   const figure = (lines: string[]) => {
     useGeoStore.getState().clear();
     expect(driveThroughGate(lines).refused).toEqual([]);
@@ -131,9 +140,9 @@ describe('#1689 — the engine reads only a STATED right angle as the hypotenuse
     return replay(st.facts, st.seed).construction;
   };
 
-  it('the noun alone: no hypotenuse role, one open right triangle', () => {
+  it('the noun alone: one UNSTATED hypotenuse at the shown seat, one open right triangle', () => {
     const c = figure([RT]);
-    expect(roleSidesOf(c).filter((r) => r.role === 'hypotenuse')).toEqual([]);
+    expect(roleSidesOf(c).filter((r) => r.role === 'hypotenuse').map((r) => [r.at, [...r.edge].sort().join(''), r.unstated])).toEqual([['C', 'AB', true]]);
     expect(openRightTriangles(c)).toEqual([['A', 'B', 'C']]);
   });
 
@@ -142,6 +151,7 @@ describe('#1689 — the engine reads only a STATED right angle as the hypotenuse
       const c = figure([RT, stated]);
       expect(openRightTriangles(c), stated).toEqual([]);
       const hyp = roleSidesOf(c).filter((r) => r.role === 'hypotenuse');
+      expect(hyp.some((r) => r.unstated), stated).toBe(false);
       expect(hyp.map((r) => [r.at, [...r.edge].sort().join('')]), stated).toEqual([[at, edge]]);
     }
   });
@@ -149,7 +159,7 @@ describe('#1689 — the engine reads only a STATED right angle as the hypotenuse
   it('the shared-hypotenuse build’s own ⟂ (no free vertex for the perp-offset) is the noun’s seat, not a statement', () => {
     const c = figure([RT, 'משולש ישר-זווית ABD']);
     expect(c.constraints).toContainEqual(expect.objectContaining({ type: 'perpendicular', seat: true }));
-    expect(roleSidesOf(c).filter((r) => r.role === 'hypotenuse')).toEqual([]);
+    expect(roleSidesOf(c).filter((r) => r.role === 'hypotenuse').every((r) => r.unstated)).toBe(true);
     expect(openRightTriangles(c).map((r) => [...r].sort().join(''))).toEqual(['ABC', 'ABD']);
   });
 });

@@ -42,6 +42,8 @@ export interface MetricImpossibility {
 
 /** Relative slack, so floating-point equality (the flat/collinear case) is never called impossible. */
 const TOL = 1e-9;
+/** #1936: the angle-sum prover's no-room tolerance, in degrees (angle values are typed numbers, or exactly 90). */
+const NO_ROOM_TOL = 1e-6;
 
 /**
  * The pinned-distance graph's first metric contradiction, or null when there is none.
@@ -135,6 +137,22 @@ export function metricImpossibilityError(m: MetricImpossibility): string {
  * Not a triangle rule: any declared ring is bounded by its own (n − 2)·180°, so a quadrilateral with
  * four stated angles past 360° is covered by the same code. A single reflex angle in a quadrilateral
  * («∠ABC = 200» on ABCD) is NOT refused — a non-convex quadrilateral is a real figure.
+ *
+ * #1936 ([ADR-658](../../docs/06-decisions.md#adr-658)) — EVERY SPELLING OF A STATED ANGLE, AND NO ROOM LEFT.
+ * Two widenings, both still one-way sound:
+ *  - the pinned interior angles are read in every spelling ({@link pinnedAngleWedges}): a stated `angle`, and a
+ *    stated `perpendicular` whose two segments are the ring's two edges at a vertex (90° there). The
+ *    right-triangle noun's own right angle (its perp-offset knee, or its `seat` constraint) is NOT read: it
+ *    sits at a DEFAULT vertex that yields (ADR-163/445, ADR-551 Am. 1), and a pinned seat always carries the
+ *    student's own statement at that vertex, which is read;
+ *  - the bound is sound for PARTIAL coverage. While some interior angle is still unstated it is strictly
+ *    positive in any real ring, so the stated ones must sum to strictly LESS than (n − 2)·180°: two right
+ *    angles of a triangle (exactly 180° with a third angle owed) leave no room, and no later given can make
+ *    room. A measured angle at a reflex vertex reads as its unsigned value (< 180°), which only lowers the
+ *    sum, so a concave ring is never refused by this. With every angle stated the old rule stands (a strict
+ *    excess); equality there is the flat-polygon gates' concern.
+ * `kind` tells the two verdicts apart: an `excess` keeps the curriculum sentence; `no-room` is refused as the
+ * new statement's over-constraint, and the fold's drop-one search names the statement it contradicts.
  */
 export interface AngleSumImpossibility {
   /** the polygon, as its vertex run */
@@ -145,12 +163,45 @@ export interface AngleSumImpossibility {
   sum: number;
   /** (n − 2)·180 */
   bound: number;
+  /** #1936: `excess`, the stated angles sum past the bound; `no-room`, they reach it with an angle still owed */
+  kind: 'excess' | 'no-room';
+}
+
+/**
+ * #1936 ([ADR-658](../../docs/06-decisions.md#adr-658)) — the STATED angle wedges of a construction, in every
+ * spelling a student has for an angle: a stated `angle` (its value; an ARC measure excluded, it sits at a
+ * centre), and a stated `perpendicular` whose two segments share exactly one endpoint (90° at that corner,
+ * between the two arm ends: the ADR-223 shape). A noun's DEFAULT right angle (`seat: true`) is not a
+ * statement and is not read. Shared by the angle-sum and obtuse-side provers, so the two read one list.
+ */
+export function pinnedAngleWedges(constraints: readonly Constraint[]): { v: Id; p: Id; q: Id; deg: number }[] {
+  const out: { v: Id; p: Id; q: Id; deg: number }[] = [];
+  for (const con of constraints) {
+    if (con.type === 'angle' && !con.arcOf && Number.isFinite(con.value)) out.push({ v: con.vertex, p: con.ray1, q: con.ray2, deg: con.value });
+    else if (con.type === 'perpendicular' && !con.seat) {
+      const corner = perpendicularCorner(con);
+      if (corner) out.push({ ...corner, deg: 90 });
+    }
+  }
+  return out;
+}
+
+/** Segments (a,b) ⟂ (c,d) meeting at exactly one shared endpoint: the corner and its two arm ends (three
+ *  distinct points), or null when they share no endpoint, both, or an arm is degenerate. */
+function perpendicularCorner(con: { a: Id; b: Id; c: Id; d: Id }): { v: Id; p: Id; q: Id } | null {
+  const shared = [con.a, con.b].filter((x) => x === con.c || x === con.d);
+  if (shared.length !== 1) return null;
+  const v = shared[0]!;
+  const p = con.a === v ? con.b : con.a;
+  const q = con.c === v ? con.d : con.c;
+  return p !== v && q !== v && p !== q ? { v, p, q } : null;
 }
 
 export function angleSumImpossibility(
   objects: readonly GeoObject[],
   constraints: readonly Constraint[],
 ): AngleSumImpossibility | null {
+  const wedges = pinnedAngleWedges(constraints);
   for (const o of objects) {
     if (o.kind !== 'polygon' || o.vertices.length < 3) continue;
     const n = o.vertices.length;
@@ -161,17 +212,19 @@ export function angleSumImpossibility(
       const prev = o.vertices[(i + n - 1) % n]!;
       const next = o.vertices[(i + 1) % n]!;
       let stated: AngleSumImpossibility['angles'][number] | null = null;
-      for (const c of constraints) {
-        if (c.type !== 'angle' || c.arcOf || c.vertex !== v || !Number.isFinite(c.value)) continue;
-        const interior = (c.ray1 === prev && c.ray2 === next) || (c.ray1 === next && c.ray2 === prev);
+      for (const w of wedges) {
+        if (w.v !== v) continue;
+        const interior = (w.p === prev && w.q === next) || (w.p === next && w.q === prev);
         if (!interior) continue;
-        if (!stated || c.value < stated.value) stated = { vertex: v, ray1: c.ray1, ray2: c.ray2, value: c.value };
+        if (!stated || w.deg < stated.value) stated = { vertex: v, ray1: w.p, ray2: w.q, value: w.deg };
       }
       if (stated) angles.push(stated);
     }
     if (!angles.length) continue;
     const sum = angles.reduce((s, a) => s + a.value, 0);
-    if (sum > bound * (1 + TOL) + TOL) return { polygon: [...o.vertices], angles, sum, bound };
+    if (sum > bound * (1 + TOL) + TOL) return { polygon: [...o.vertices], angles, sum, bound, kind: 'excess' };
+    // #1936: an angle still unstated is strictly positive, so stated angles that reach the bound leave it no room
+    if (angles.length < n && sum >= bound - NO_ROOM_TOL) return { polygon: [...o.vertices], angles, sum, bound, kind: 'no-room' };
   }
   return null;
 }
@@ -356,21 +409,12 @@ export function obtuseSideImpossibility(
   }
   if (len.size < 2) return null; // a leg and its opposite side need two pinned lengths
 
-  const wedges: { v: Id; p: Id; q: Id; deg: number }[] = [];
+  // #1936: the stated wedges come from the one shared reader (an `angle` in [90°, 270°], a ⟂ corner). A noun's
+  // `seat` ⟂ is the same structural right angle as its perp-offset knee, and is read with the knees here.
+  const wedges = pinnedAngleWedges(constraints).filter((w) => w.deg >= 90 - TOL && w.deg <= 270 + TOL);
   for (const con of constraints) {
-    if (con.type === 'angle' && !con.arcOf && Number.isFinite(con.value) && con.value >= 90 - TOL && con.value <= 270 + TOL) {
-      wedges.push({ v: con.vertex, p: con.ray1, q: con.ray2, deg: con.value });
-    } else if (con.type === 'perpendicular') {
-      // a→b ⊥ c→d sharing an endpoint: the right angle sits at the shared point, between the others.
-      for (const [v, p, v2, q] of [
-        [con.a, con.b, con.c, con.d],
-        [con.a, con.b, con.d, con.c],
-        [con.b, con.a, con.c, con.d],
-        [con.b, con.a, con.d, con.c],
-      ] as [Id, Id, Id, Id][]) {
-        if (v === v2) wedges.push({ v, p, q, deg: 90 });
-      }
-    }
+    const corner = con.type === 'perpendicular' && con.seat ? perpendicularCorner(con) : null;
+    if (corner) wedges.push({ ...corner, deg: 90 });
   }
   for (const o of objects) {
     if (o.kind === 'perp-offset' && o.from === o.anchor) wedges.push({ v: o.anchor, p: o.to, q: o.id, deg: 90 });

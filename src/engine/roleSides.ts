@@ -7,7 +7,8 @@
  * The roles are read off the CONSTRUCTION's declared structure (a STATED ⟂ / 90° constraint at a triangle
  * vertex, an equal-sides constraint) — never off drawn coordinates, so a side that merely MEASURES equal at
  * this seed never becomes «the base» (ADR-052). #1689 (ADR-639): the right-triangle noun alone states no
- * vertex, so its default seat makes no hypotenuse ({@link openRightTriangles}).
+ * vertex, so its default seat makes no STATED hypotenuse ({@link openRightTriangles}); #2074 (ADR-659): it makes an
+ * UNSTATED one, which a role statement binds to and the fold rotates with the seat.
  *
  * Every role family hangs off ONE distinguished vertex of the triangle — the right-angle vertex for the
  * hypotenuse, the apex for the base and the legs. When that vertex is an UNSTATED choice (the isosceles
@@ -33,6 +34,10 @@ export interface RoleSide {
   ring: Id[];
   /** the distinguished vertex the role hangs off: the right-angle vertex (hypotenuse) or the apex (base, leg) */
   at: Id;
+  /** #2074 (ADR-659): the role hangs off an UNSTATED choice, the right-triangle noun's own seat, which
+   *  «הציגו תצורה אחרת» cycles. A statement may BIND to it (the fold rotates it with the seat); letters the
+   *  student typed are never read off it (a named side or apex is a claim, not a lookup). */
+  unstated?: true;
 }
 
 /** Which family a role belongs to — the family decides which distinguished vertex it hangs off. */
@@ -49,7 +54,7 @@ const sharedVertex = (a: Id, b: Id, c: Id, d: Id): Id | null => {
  * a side «the hypotenuse». The right-triangle noun's own right angle (its perp-offset, or its `seat` constraint)
  * sits at a DEFAULT vertex the student never named, so it is not read here — see {@link openRightTriangles}. A
  * stated «זווית C ישרה» / «∠ACB = 90» / «AC ⟂ BC» lowers to its own constraint (the ADR-163 reseat moves the
- * noun's seat onto it, and the constraint stays).
+ * noun's seat onto it at whichever vertex it names — the ⟂ spelling too since #2082, ADR-658 — and the constraint stays).
  */
 function statedRightAngles(construction: Construction, vs: Id[]): Set<Id> {
   const inTri = (id: Id): boolean => vs.includes(id);
@@ -78,6 +83,12 @@ export function roleSidesOf(construction: Construction): RoleSide[] {
     if (rightAt.size === 1) {
       const [v] = rightAt;
       push('hypotenuse', vs.filter((x) => x !== v) as [Id, Id], [...vs], v);
+    } else if (rightAt.size === 0) {
+      // #2074 (ADR-659): the noun's own right angle at its EFFECTIVE seat (the seat `rot` chose in this
+      // configuration) is an unstated choice, yielded as such: a role statement binds to the triangle as SHOWN
+      // and the fold rotates it with the seat, as the isosceles base follows its apex (ADR-596).
+      const seat = nounSeat(construction, vs);
+      if (seat) out.push({ role: 'hypotenuse', edge: vs.filter((x) => x !== seat) as [Id, Id], ring: [...vs], at: seat, unstated: true });
     }
     for (const con of construction.constraints) {
       const isEq = con.type === 'equal' || (con.type === 'ratio' && con.k === 1 && !con.add);
@@ -107,13 +118,24 @@ export function openRightTriangles(construction: Construction): Id[][] {
   for (const t of construction.objects) {
     if (t.kind !== 'polygon' || t.vertices.length !== 3) continue;
     const vs = t.vertices;
-    const inTri = (id: Id): boolean => vs.includes(id);
-    const seated =
-      construction.objects.some((o) => o.kind === 'perp-offset' && o.anchor === o.from && inTri(o.anchor) && inTri(o.to) && inTri(o.id)) ||
-      construction.constraints.some((c) => c.type === 'perpendicular' && c.seat === true && [c.a, c.b, c.c, c.d].every(inTri));
-    if (seated && statedRightAngles(construction, vs).size === 0) out.push([...vs]);
+    if (nounSeat(construction, vs) && statedRightAngles(construction, vs).size === 0) out.push([...vs]);
   }
   return out;
+}
+
+/** The right-triangle noun's own right-angle vertex on triangle `vs` in this construction (its EFFECTIVE seat,
+ *  after any reseat or `rot`): the perp-offset anchored at its own `from`, or the corner of its `seat` ⟂. */
+function nounSeat(construction: Construction, vs: Id[]): Id | null {
+  const inTri = (id: Id): boolean => vs.includes(id);
+  for (const o of construction.objects) {
+    if (o.kind === 'perp-offset' && o.anchor === o.from && inTri(o.anchor) && inTri(o.to) && inTri(o.id)) return o.anchor;
+  }
+  for (const c of construction.constraints) {
+    if (c.type !== 'perpendicular' || c.seat !== true || ![c.a, c.b, c.c, c.d].every(inTri)) continue;
+    const v = sharedVertex(c.a, c.b, c.c, c.d);
+    if (v) return v;
+  }
+  return null;
 }
 
 /** Map every whole point label inside a string (a bare id or one embedded in a structured id). */

@@ -97,12 +97,24 @@ describe('ADR-527 — an altitude whose foot is an endpoint IS a right angle the
   });
 
   /**
-   * On a triangle whose right angle is ALREADY placed elsewhere, the statement asserts a second right
-   * angle and is honestly refused — the row says so and names the given it conflicts with. Locked
-   * because the fix must not turn an impossible figure into a silent one.
+   * #2082 (ADR-658), operator ruling 2026-10-14: on a right triangle whose right angle no statement has
+   * seated, the height IS the student's right angle at B, and the noun's unstated seat yields to it (it was
+   * refused here as a second right angle while «זווית B ישרה» moved the seat — one statement, two verdicts).
+   * Re-based to the ruling: it builds with the right angle at B.
+   */
+  it('on an unseated right triangle the height moves the right angle to its foot (#2082)', () => {
+    const fig = replayFacts(factsOf(['ABC משולש ישר זווית', 'AB גובה לצלע BC']));
+    expect(Object.values(fig.status).every((s) => s === 'ok')).toBe(true);
+    expect(fig.angleMarks.some((m) => m.right && m.vertex === 'B')).toBe(true);
+  });
+
+  /**
+   * On a triangle whose right angle the student has ALREADY stated elsewhere, the statement asserts a second
+   * right angle and is honestly refused, naming the conflict. Locked because the fix must not turn an
+   * impossible figure into a silent one.
    */
   it('a second right angle is refused, naming the conflict', () => {
-    const fig = replayFacts(factsOf(['ABC משולש ישר זווית', 'AB גובה לצלע BC']));
+    const fig = replayFacts(factsOf(['ABC משולש ישר זווית', 'זווית C ישרה', 'AB גובה לצלע BC']));
     const statuses = Object.values(fig.status);
     expect(statuses.some((s) => typeof s === 'string' && s.includes('over-constrained'))).toBe(true);
   });

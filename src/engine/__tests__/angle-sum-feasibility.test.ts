@@ -37,9 +37,38 @@ describe('angleSumImpossibility — the pure prover', () => {
     expect(angleSumImpossibility(TRI, [ang('A', 'B', 'C', 200)])?.sum).toBe(200);
   });
 
-  it('passing proves nothing: 90° + 89° builds, and EQUALITY (90° + 90°) is the flat-polygon gates’ business, not a proof', () => {
+  it('passing proves nothing: 90° + 89° builds; with EVERY angle stated, equality (60·3) is the flat-polygon gates’ business', () => {
     expect(angleSumImpossibility(TRI, [ang('A', 'B', 'C', 90), ang('A', 'C', 'B', 89)])).toBeNull();
-    expect(angleSumImpossibility(TRI, [ang('A', 'B', 'C', 90), ang('A', 'C', 'B', 90)])).toBeNull();
+    expect(angleSumImpossibility(TRI, [ang('B', 'A', 'C', 60), ang('A', 'B', 'C', 60), ang('A', 'C', 'B', 60)])).toBeNull();
+  });
+
+  // #1936 (ADR-658): an unstated angle is strictly positive, so stated angles that REACH the bound leave it no room —
+  // re-based from ADR-538's "equality is not a proof", which held only with every angle stated.
+  it('#1936: two right angles of a triangle (90° + 90°, a third angle owed) leave no room — kind no-room', () => {
+    const m = angleSumImpossibility(TRI, [ang('A', 'B', 'C', 90), ang('A', 'C', 'B', 90)]);
+    expect(m?.kind).toBe('no-room');
+    expect(m?.sum).toBe(180);
+    expect(angleSumImpossibility(TRI, [ang('A', 'B', 'C', 100), ang('A', 'C', 'B', 80)])?.kind).toBe('no-room');
+    expect(angleSumImpossibility(TRI, [ang('A', 'B', 'C', 100), ang('A', 'C', 'B', 100)])?.kind, 'a strict excess keeps its own verdict').toBe('excess');
+  });
+
+  it('#1936: a stated ⟂ of the ring’s two edges at a vertex is a 90° interior angle, in any letter order', () => {
+    const perp = (a: string, b: string, c: string, d: string, seat?: true): Constraint => ({ type: 'perpendicular', a, b, c, d, ...(seat ? { seat } : {}) }) as Constraint;
+    expect(angleSumImpossibility(TRI, [perp('A', 'B', 'B', 'C'), perp('A', 'C', 'B', 'C')])?.kind).toBe('no-room');
+    expect(angleSumImpossibility(TRI, [perp('B', 'A', 'C', 'B'), ang('A', 'C', 'B', 90)])?.kind).toBe('no-room');
+    expect(angleSumImpossibility(TRI, [perp('A', 'B', 'B', 'C'), ang('A', 'C', 'B', 89)])).toBeNull();
+    // the noun's DEFAULT seat is not a statement: it yields (ADR-551 Am. 1) and is never counted
+    expect(angleSumImpossibility(TRI, [perp('C', 'A', 'C', 'B', true), ang('A', 'B', 'C', 90)])).toBeNull();
+    // a ⟂ to a segment outside the ring is no interior angle
+    expect(angleSumImpossibility(TRI, [perp('A', 'B', 'B', 'D'), ang('A', 'C', 'B', 90)])).toBeNull();
+  });
+
+  it('#1936: a quadrilateral keeps room for its unstated angle — three right angles build, a concave ring is never refused', () => {
+    const perp = (a: string, b: string, c: string, d: string): Constraint => ({ type: 'perpendicular', a, b, c, d }) as Constraint;
+    expect(angleSumImpossibility(QUAD, [perp('A', 'B', 'B', 'C'), perp('B', 'C', 'C', 'D'), perp('C', 'D', 'D', 'A')])).toBeNull();
+    expect(angleSumImpossibility(QUAD, [perp('A', 'B', 'B', 'C'), perp('B', 'C', 'C', 'D'), perp('C', 'D', 'D', 'A'), perp('D', 'A', 'A', 'B')])).toBeNull();
+    expect(angleSumImpossibility(QUAD, [ang('A', 'B', 'C', 200), ang('B', 'C', 'D', 100)])).toBeNull();
+    expect(angleSumImpossibility(QUAD, [ang('D', 'A', 'B', 120), ang('A', 'B', 'C', 120), ang('B', 'C', 'D', 120)])?.kind).toBe('no-room');
   });
 
   it('only INTERIOR angles are summed — a diagonal’s angle and an arc measure say nothing about the ring', () => {
@@ -95,7 +124,7 @@ describe('end to end — the reported sequence through the real parse → replay
     expect(fig.pending).toBe(false);
   });
 
-  it('«∠ABC = 90» · «∠ACB = 90» is still ADR-537’s refusal — equality passes the prover and the accept gate refuses the needle', () => {
+  it('«∠ABC = 90» · «∠ACB = 90» is refused as the new statement’s over-constraint — #1936: the prover now proves it (no room)', () => {
     const fig = replay(factsOf(['משולש ABC', '∠ABC = 90', '∠ACB = 90'] as never));
     expect(fig.lastError).toMatch(/^over-constrained: ∠ACB = 90° cannot hold/);
     expect(fig.pending).toBe(false);

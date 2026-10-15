@@ -1397,13 +1397,40 @@ function seedRadiusOf(circ: Extract<GeoObject, { kind: 'circle' }>, pos: Map<Id,
  *  off lines through the centre and an existing point (the ADR-253/ADR-254 seeding discipline), with an
  *  extra per-candidate acceptance test. Returns the first passing spot, or the θ=0 fallback. */
 function seedSpotAround(centre: Vec, rad: number, others: Vec[], accept: (p: Vec) => boolean = () => true): Vec {
+  return probeSpotAround(centre, rad, others, accept) ?? { x: centre.x + rad, y: centre.y };
+}
+/** {@link seedSpotAround}'s golden-angle probe, with no fallback: null when no candidate is accepted. */
+function probeSpotAround(centre: Vec, rad: number, others: Vec[], accept: (p: Vec) => boolean = () => true): Vec | null {
   const span = spanAround(centre, others.length ? others : [{ x: centre.x + rad, y: centre.y }]);
   for (let k = 0; k <= 24; k++) {
     const th = k * GOLDEN_ANGLE;
     const p = { x: centre.x + rad * Math.cos(th), y: centre.y + rad * Math.sin(th) };
     if (accept(p) && !degeneratePlacement(centre, [p], others, span)) return p;
   }
-  return { x: centre.x + rad, y: centre.y };
+  return null;
+}
+/** #1934: are these points, in this order, the vertices of a strictly convex polygon (every turn the same way)? */
+function convexInOrder(pts: Vec[]): boolean {
+  if (pts.length < 3) return true;
+  let sign = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length], c = pts[(i + 2) % pts.length];
+    const t = Math.sign((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x));
+    if (t === 0) return false;
+    if (sign === 0) sign = t;
+    else if (t !== sign) return false;
+  }
+  // every turn one way is convex only if the ring winds once: the turning angles sum to ±360°
+  let wind = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length], c = pts[(i + 2) % pts.length];
+    const u = Math.atan2(b.y - a.y, b.x - a.x), v = Math.atan2(c.y - b.y, c.x - b.x);
+    let d = v - u;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    wind += d;
+  }
+  return Math.abs(Math.abs(wind) - 2 * Math.PI) < 1e-6;
 }
 
 export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec> = new Map()): Construction {
@@ -1464,7 +1491,24 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
           .filter((p): p is Vec => !!p);
         if (others.length) {
           const span = spanAround(spot, others);
-          if (degeneratePlacement(spot, [spot], others, span)) spot = seedSpotAround(spot, Math.max(1.5, 0.25 * span), others);
+          if (degeneratePlacement(spot, [spot], others, span)) {
+            // #1934 (ADR-660): the probe needs a centre that is not itself an existing point — the line through the
+            // centre and a point AT the centre is undefined, so every candidate failed the general-position test and
+            // the fallback stacked the third bare point on the second (B = C at the base layout, every seed). When
+            // the canned spot sits on an existing point, probe around the existing points' centroid at their span.
+            const tol = 0.015 * span;
+            const onPoint = others.some((q) => Math.hypot(q.x - spot.x, q.y - spot.y) < tol);
+            const centroid = { x: others.reduce((s, q) => s + q.x, 0) / others.length, y: others.reduce((s, q) => s + q.y, 0) / others.length };
+            const centroidFree = !others.some((q) => Math.hypot(q.x - centroid.x, q.y - centroid.y) < tol);
+            // Among the general-position candidates, prefer one that keeps the points in convex position in the
+            // order they were placed, so a ring later declared over them in that order («מרובע ABCD») is drawn
+            // simple at the default; any general-position spot otherwise. A default only: the points stay free.
+            const rad = Math.max(1.5, spanAround(centroid, others));
+            spot = onPoint && centroidFree
+              ? probeSpotAround(centroid, rad, others, (p) => convexInOrder([...others, p])) ??
+                seedSpotAround(centroid, rad, others)
+              : seedSpotAround(spot, Math.max(1.5, 0.25 * span), others);
+          }
         }
       }
       // A free point may be (re)placed: if it already exists as a free point,

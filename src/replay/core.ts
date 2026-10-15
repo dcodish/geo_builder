@@ -643,16 +643,46 @@ function tailChoice(fold: FoldNode, facts: Fact[], seed: number): Derived {
 
 /** #566 (ADR-445): the vertices an enabled EXPLICIT 90° statement names — the right-triangle seat's
  *  PIN set. The ADR-163 reseat pre-scan and the ADR-445 config-search dimension consult this SAME set,
- *  so the yield channel and the search can never disagree about which seats are the student's. */
+ *  so the yield channel and the search can never disagree about which seats are the student's.
+ *
+ *  #2082 ([ADR-658](docs/06-decisions.md#adr-658)): a right angle is one statement in two spellings — an
+ *  ANGLE («זווית B ישרה», «∠ABC = 90») or a PERPENDICULAR between two sides of a declared right triangle
+ *  («AB ⟂ BC», every ⟂ spelling, and every height that lowers to one: «AB גובה», «CB גובה לצלע AB»). Both
+ *  pin the seat. The ⟂ member is read from structure only (ids): its two segments share exactly one
+ *  endpoint V, and V with the two other endpoints are the three vertices of an enabled `right-triangle`
+ *  fact — so a ⟂ to a segment outside the triangle («AB ⟂ BD») pins nothing.
+ *
+ *  The set is in FACT ORDER (a Set keeps insertion order), so when one right triangle carries two stated
+ *  right angles the reseat keeps the EARLIER statement's seat and the later one is the line refused — the
+ *  angle twin's verdict («זווית B ישרה» · «זווית C ישרה»), whichever spelling each line uses. */
 export function explicitRightAngleVerts(facts: Fact[], symtab?: ReturnType<typeof buildSymTab>): Set<Id> {
   const st = symtab ?? buildSymTab(facts.filter((f) => f.enabled).map((f) => f.cmd));
-  return new Set<Id>(
-    facts
-      .filter((f) => f.enabled)
-      .flatMap((f) => lowerOne(f.cmd, st))
-      .filter((c): c is Extract<Command, { type: 'set-angle' }> => c.type === 'set-angle' && Math.abs(c.value - 90) < 1e-6)
-      .map((c) => c.vertex),
-  );
+  const rightTriangles = facts
+    .filter((f) => f.enabled && f.cmd.type === 'right-triangle')
+    .map((f) => (f.cmd as Extract<AnyCommand, { type: 'right-triangle' }>).ids);
+  const out = new Set<Id>();
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    for (const c of lowerOne(f.cmd, st)) {
+      if (c.type === 'set-angle' && Math.abs(c.value - 90) < 1e-6) out.add(c.vertex);
+      else if (c.type === 'set-perpendicular' && rightTriangles.length) {
+        const v = perpendicularCorner(c.a, c.b, c.c, c.d);
+        if (v && rightTriangles.some((ids) => ids.length === 3 && [v.at, v.p, v.q].every((id) => ids.includes(id)))) out.add(v.at);
+      }
+    }
+  }
+  return out;
+}
+
+/** #2082: segments (a,b) ⟂ (c,d) meeting at exactly one shared endpoint — the corner they make, with its two
+ *  arm ends (three distinct points); null when they share no endpoint, both, or an arm is degenerate. */
+function perpendicularCorner(a: Id, b: Id, c: Id, d: Id): { at: Id; p: Id; q: Id } | null {
+  const shared = [a, b].filter((x) => x === c || x === d);
+  if (shared.length !== 1) return null;
+  const at = shared[0];
+  const p = a === at ? b : a;
+  const q = c === at ? d : c;
+  return p !== at && q !== at && p !== q ? { at, p, q } : null;
 }
 
 /** #566 (ADR-445): a right-triangle's EFFECTIVE ids — the explicit-90° reseat (ADR-163) always wins;
@@ -946,7 +976,10 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
   for (const f of facts) {
     if (!f.enabled || f.cmd.type !== 'right-triangle') continue;
     const ids = f.cmd.ids;
-    const v = ids.find((id) => rightAngleVerts.has(id) && id !== ids[2]);
+    // #2082 (ADR-658): the EARLIEST stated right angle on this triangle wins (the pin set is in fact order), so
+    // a second one is the later line and is refused, never a reseat that turns the earlier statement red.
+    const first = [...rightAngleVerts].find((id) => ids.includes(id));
+    const v = first !== undefined && first !== ids[2] ? first : undefined;
     if (v) {
       const [a, b] = ids.filter((id) => id !== v);
       rtReorder.set(f.id, [a, b, v]); // the right-angle vertex LAST (the structural ∠ position)

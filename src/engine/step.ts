@@ -382,12 +382,56 @@ export function forcedFlatError(prev: Construction, next: Construction): string 
 function gateDefects(c: Construction, positions: Map<Id, Vec>): PolygonDefect[] {
   const all = polygonDefects(c, positions, COLLAPSED_POLYGON_RATIO);
   if (!all.some((d) => d.kind === 'corner')) return all;
+  const unstated = unstatedFreeVertex(c);
+  return all.filter((d) => d.kind !== 'corner' || !d.corner!.every(unstated));
+}
+/** A free point no constraint and no directive touches: its position is a pure default (ADR-052), never a given.
+ *  Shared by the corner gate (ADR-643) and the restart (ADR-660), which also leaves a pinned (typed) point alone. */
+function unstatedFreeVertex(c: Construction): (id: Id) => boolean {
   const stated = new Set([...c.constraints, ...drivenConstraintsOf(c)].flatMap(constraintRefs));
-  const unstated = (id: Id) => {
+  return (id: Id) => {
     const o = c.objects.find((x) => x.id === id);
     return o?.kind === 'free-point' && !(o as { solve?: unknown }).solve && !stated.has(id);
   };
-  return all.filter((d) => d.kind !== 'corner' || !d.corner!.every(unstated));
+}
+/** #1934 (ADR-660): how many sampled starts the free-vertex restart tries (the ADR-399 probe sampler, `applySeed`). */
+const FREE_RESTART_SEEDS = 8;
+/**
+ * #1934 ([ADR-660](../../docs/06-decisions.md#adr-660)) — LADDER stage 2h″: a declared polygon the step's figure
+ * flattened, with vertices that are UNSTATED free points (no constraint, no directive, not pinned — their places are
+ * the tool's defaults), tries other starts for those vertices: the positions the shared sampler (`applySeed`, the
+ * same family replay draws and ADR-399 probes) gives them at seeds 1..{@link FREE_RESTART_SEEDS}, one vertex at a
+ * time (latest-declared first, least movement) and then all of them. The first start whose figure the full accept
+ * gate passes is taken; the step's other points stay where the evaluation puts them. A ring the givens force flat
+ * never reaches this (stage 0h refuses it); a flatness that stated incidences force finds no start and is refused as
+ * before. A fixed WORK bound — at most seeds × (vertices + 1) evaluations, deterministic — never a clock (M3).
+ */
+function freeVertexRestart(
+  next: Construction,
+  defect: PolygonDefect,
+  gate: (c: Construction, pos: Map<Id, Vec>) => boolean,
+): { construction: Construction; positions: Map<Id, Vec> } | null {
+  const unstated = unstatedFreeVertex(next);
+  const pinned = (id: Id) => next.objects.some((o) => o.id === id && o.kind === 'free-point' && (o as FreePoint).pinned);
+  const movable = [...defect.vertices].reverse().filter((v) => unstated(v) && !pinned(v));
+  if (!movable.length) return null;
+  const subsets = movable.length > 1 ? [...movable.map((v) => [v]), movable] : [movable];
+  for (let s = 1; s <= FREE_RESTART_SEEDS; s++) {
+    const sampled = evaluate(applySeed(next, s));
+    if (!sampled.ok) continue;
+    for (const ids of subsets) {
+      const moved: Construction = {
+        ...next,
+        objects: next.objects.map((o) => {
+          const p = ids.includes(o.id) && o.kind === 'free-point' ? sampled.positions.get(o.id) : undefined;
+          return p ? { ...o, x: p.x, y: p.y } : o;
+        }),
+      };
+      const r = evaluate(moved);
+      if (r.ok && gate(moved, r.positions)) return { construction: moved, positions: r.positions };
+    }
+  }
+  return null;
 }
 function collapsedPolygon(c: Construction, positions: Map<Id, Vec>): boolean {
   // The one flatness ruler (`polygonFlatness`), plus #2064's two members (ADR-643): a ring squashed to one point
@@ -781,6 +825,18 @@ function runFailureLadder(
     sawTangent(rs);
     if (rs.ok && gate(scaled, rs.positions)) {
       const a = accept(scaled, rs.positions, `${prefix}:scale`);
+      if (a) return a;
+    }
+  }
+  // #1934 (ADR-660), LADDER stage 2h″ — SEARCH BEFORE REFUSING A FLAT SHAPE. A declared polygon collapsed by the
+  // tool's own DEFAULT placement (a ring over free vertices no given touches) is a configuration choice, not a
+  // contradiction: forced flatness was already refused at stage 0h, so try other starts for those vertices before
+  // the refusal below (operator ruling 2026-10-10: "make the tool search other configurations before refusing").
+  {
+    const defect = primary.ok ? gateDefects(next, primary.positions)[0] : collapsedSeen;
+    const restart = defect && defect.kind !== 'point' ? freeVertexRestart(next, defect, gate) : null;
+    if (restart) {
+      const a = accept(restart.construction, restart.positions, `${prefix}:free-restart`);
       if (a) return a;
     }
   }
@@ -1179,9 +1235,20 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   // (n − 2)·180° is impossible in the plane. Without this the solver found nothing, the step failed on
   // its own, and the classifier's flex probe filed the contradiction as a PENDING "add the remaining
   // givens". Same one-way soundness as the metric gate above.
+  // #1936 (ADR-658): the prover reads every spelling of a stated angle (a value, «זווית X ישרה», a ⟂ of the two
+  // sides at the vertex), and stated angles that leave an unstated one no room (two right angles of a triangle)
+  // are as impossible as an excess. That verdict is the NEW statement's over-constraint, so the fold's drop-one
+  // search names the statement it contradicts («לא ניתן: «AC ⊥ BC» סותר את «AB ⊥ BC»…»); an excess keeps the
+  // curriculum sentence.
   const angleErr = angleSumImpossibility(probed.objects, probed.constraints);
   if (angleErr) {
-    return { ok: false, error: angleSumImpossibilityError(angleErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+    // A line that adds no constraint of its own (the polygon declared over corners already stated) names the angles.
+    const newCons = probed.constraints.slice(prev.constraints.length);
+    const what = newCons.length
+      ? describeConstraint(describeNewStatement(newCons))
+      : angleErr.angles.map((a) => `∠${a.ray1}${a.vertex}${a.ray2} = ${Number(a.value.toFixed(2))}°`).join(' and ');
+    const error = angleErr.kind === 'no-room' ? `over-constrained: ${what} cannot hold` : angleSumImpossibilityError(angleErr);
+    return { ok: false, error, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   }
   // #1849 (ADR-602), stage 0h: the EQUALITY the metric prover lets through — a declared polygon its length givens
   // force flat («משולש ABC» · «AB = 5» · «BC = 3» · «AC = 8»). Proven, so the refusal does not depend on where the

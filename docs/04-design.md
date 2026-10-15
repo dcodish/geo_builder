@@ -941,9 +941,19 @@ hypotenuse off a ⟂ / 90° constraint at a triangle vertex that a STATEMENT low
 right angle — its perp-offset (`anchor === from`, which no other build makes) and, in the shared-hypotenuse build,
 its ⟂ marked `seat: true` — is the noun's default seat and is skipped. `openRightTriangles(construction)` lists the
 triangles that carry such a seat and no stated right angle; `buildParseCtx` carries it as
-`ParseContext.openRightTriangles`. `roleSideLine` answers «היתר» beside one with `ambiguous-hypotenuse` (the
-message is analytic's `errAmbiguousHypotenuse`, ADR-AG-211), unless the letters after the noun name one of its
-sides: then that side is the rewrite's, and the role claim (ADR-563) states the right angle opposite it.
+`ParseContext.openRightTriangles`. Letters after the noun naming one of its sides are the rewrite's, and the role claim (ADR-563) states the right
+angle opposite them.
+
+**The noun's seat is an unstated hypotenuse a statement may bind to ([ADR-659](06-decisions.md#adr-659), #2074; reverses
+ADR-639's question).** For an open triangle `roleSidesOf` also yields the hypotenuse at the noun's EFFECTIVE seat (the
+perp-offset's anchor or the `seat` ⟂'s corner, after any reseat or `rot`), marked `unstated: true`. `roleSideLine`
+never lets typed letters SELECT it (a stated `cands` list excludes it) and reads an open triangle three ways: no ring
+letter typed (the noun alone, or a foot outside the ring) → the commands BIND to the unstated entry, and the fold's
+`resolveRoleSide` rotates them with `rot` as it rotates the isosceles base with its apex; exactly one ring vertex
+typed («CM תיכון ליתר», «גובה ליתר מ-C») → the cevian to the opposite side plus `set-angle` 90° at that vertex,
+unbound (the claim «תיכון ליתר AB» states); more than one host (another right triangle, open or stated) →
+`role-side-unresolved`. `ambiguous-hypotenuse` is left only for a pair after the noun that is no side of the
+triangle («תיכון ליתר AD»). The Thales reader keeps reading only a STATED hypotenuse.
 
 ### A stated side is a requirement record, checked at stage 0g′ and read wherever a point is placed ([ADR-549](06-decisions.md#adr-549), [ADR-594](06-decisions.md#adr-594))
 
@@ -974,6 +984,15 @@ carriers — `onSeg`, `segments-cross`, or a `set-collinear` whose rider is name
 asks it before its switch and calls `reseatLooseMeetEndpoint` (ADR-255); a new member is a row in the predicate.
 The endpoint moved is a non-pinned, unreferenced, undriven free point, fewest dependents first, aimed through the
 other carrier's midpoint in general position and on the same side of every circle (ADR-253/254).
+
+**Bare points and a flattened ring ([ADR-660](06-decisions.md#adr-660), #1934).** Every bare «נקודה X» hands the canned
+spot (3, 2). When that spot sits on an existing point, the `free-point` arm probes around the existing points'
+CENTROID at their span (a centre that is no point, so the general-position line test is defined), preferring a
+candidate that keeps the points in convex position in the order placed (`convexInOrder`), else any general-position
+one; the first two points keep their places. A declared polygon that a step's solution still flattens, with UNSTATED
+free vertices (no constraint, no directive, not pinned), tries the sampler's positions for those vertices before the
+refusal (`freeVertexRestart`, LADDER 2h″); forced flatness is refused earlier (0h) and incidence-forced flatness
+finds no start.
 `reinterpretAsCollinear` (step.ts) passes previous positions into `applyCommand`.
 
 ### A declared polygon the givens force flat is refused (#1849, [ADR-602](06-decisions.md#adr-602))
@@ -1083,6 +1102,8 @@ press); `admissibleRewrites` enumerates every axis but `variant` (sampled by `va
 `ADMISSIBLE_REWRITE_CAP`; `choiceRescue` (`findValidConfig`'s tier after the seat, and `dryRunOutcome`'s curable
 test) tries the `variant` and `side` axes, fewest changes first; `App.tsx` enables the button when any axis or free
 DOF exists.
+
+The seat is **pinned** by the student's own right angle, read from one set, `explicitRightAngleVerts` (ADR-445), that the ADR-163 reseat pre-scan, `cyclableSeat` and `unpinnedSeats` all consult: a 90° `set-angle`, and since [ADR-658](06-decisions.md#adr-658) (#2082) a `set-perpendicular` whose two segments meet at one vertex V of an enabled right triangle with their other ends its other two vertices (every ⟂ spelling and every height that lowers to one; structure only, never positions). The set is in fact order, so of two right angles stated on one right triangle the earlier keeps the seat, and the later line meets the angle-sum prover's `no-room` verdict (LADDER stage 0f) and is refused at the door, naming the earlier statement through the fold's drop-one search ([ADR-508](06-decisions.md#adr-508)). A noun's default seat (`seat: true` ⟂ or perp-offset knee) is never read as a stated angle by that prover.
 
 **The crossing count is evaluate's own selection:** `crossingChoice` (`engine/evaluate.ts`) returns the roots and
 the pick, `tryEval` draws it, and `crossingBranchCount` (behind `branchCount`) counts; an `avoid` that is a

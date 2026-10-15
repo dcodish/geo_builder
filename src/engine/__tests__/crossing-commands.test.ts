@@ -7,10 +7,10 @@
 
 import { describe, it, expect } from 'vitest';
 import type { Command, Vec } from '@/engine/types';
-import { applySeed, build, evaluate } from '@/engine';
+import { build } from '@/engine';
 import { parse } from '@/parser';
 import { factsOf } from '@/__tests__/scenarios-corpus';
-import { firstSatisfyingSeed, meetsRequirements, replay } from '@/store/geoStore';
+import { meetsRequirements, replay } from '@/store/geoStore';
 import { crossingCommands, findInkCrossings } from '../inkCrossings';
 
 describe('findSegmentCrossings', () => {
@@ -101,7 +101,6 @@ describe('crossingCommands — the dot lowers to the within-the-ink meaning (#23
     // lowering 7 of the 15 displayable seeds put O outside both cevians; under the stated one, none do.
     const steps = ['קטע BC', 'M ו N על BC', 'נקודה A', 'נקודה D', 'AM', 'AN', 'DM', 'DN'];
     const facts = factsOf([...steps, { llm: crossingCommands({ pos: { x: 0, y: 0 }, a: 'A', b: 'N', c: 'D', d: 'M' }, 'O') }]);
-    const fig = replay(facts, firstSatisfyingSeed(facts));
 
     const param = (p: Vec, a: Vec, b: Vec) =>
       ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / ((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
@@ -109,8 +108,9 @@ describe('crossingCommands — the dot lowers to the within-the-ink meaning (#23
     let displayable = 0;
     for (let s = 0; s < 16; s++) {
       if (!meetsRequirements(facts, s)) continue; // the app never shows this config
-      const r = evaluate(applySeed(fig.construction, s));
-      if (!r.ok) continue;
+      // #1934 (ADR-660): what the app DRAWS at seed s is replay(facts, s) — re-seeding the seeded construction of
+      // another seed measured a figure no view shows (it passed only at the old stacked base layout)
+      const r = replay(facts, s);
       displayable++;
       const p = r.positions;
       const t1 = param(p.get('O')!, p.get('A')!, p.get('N')!);
