@@ -106,8 +106,8 @@ describe('#1748 — a differently spelled re-type over an unticked row is refuse
       expect(notes).toHaveLength(1);
       expect(notes[0]).toMatch(/belong to the unticked row «משולש ABC» — tick it again or delete it$/);
       const shown = humanizeError(notes[0], he).replace(/[\u2066-\u2069]/g, ''); // the bidi isolates are display
-      expect(shown).toContain('שייכות לשורה המבוטלת «משולש ABC»');
-      expect(shown).toContain('סמנו אותה שוב או מחקו אותה');
+      expect(shown).toContain('השורה «משולש ABC» מסומנת כרגע כלא מוצגת');
+      expect(shown).toContain('סמנו אותה שוב ברשימת הנתונים — אין צורך להוסיף שורה חדשה');
       expect(shown).not.toMatch(/כבר אינה זמינה/);
     });
   }

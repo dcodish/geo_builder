@@ -155,8 +155,8 @@ describe('#1952 — the reservation survives where it belongs: the commit seam (
       expect(notes).toHaveLength(1);
       expect(notes[0]).toMatch(/belong to the unticked row «משולש ABC» — tick it again or delete it$/);
       const text = humanizeError(notes[0], he).replace(/[⁦-⁩]/g, ''); // the bidi isolates are display
-      expect(text).toContain('שייכות לשורה המבוטלת «משולש ABC»');
-      expect(text).toContain('סמנו אותה שוב או מחקו אותה');
+      expect(text).toContain('השורה «משולש ABC» מסומנת כרגע כלא מוצגת');
+      expect(text).toContain('סמנו אותה שוב ברשימת הנתונים — אין צורך להוסיף שורה חדשה');
     });
   }
 

@@ -381,7 +381,9 @@ export const PATTERNS: Pattern[] = [
   { re: /^can't build: (.+) is no longer available/, key: 'errors.noLongerAvailable', params: (m) => ({ ids: m[1] }) },
 
   // core.ts (#1748, ADR-578) — `can't build: A, B, C belong to the unticked row «משולש ABC» — tick it again or delete it`
-  { re: /^can't build: (.+) belong to the unticked row «(.+)» — tick it again or delete it$/, key: 'errors.mutedRowOwns', params: (m) => ({ ids: m[1], row: m[2] }) },
+  // #1994 (ADR-667, ruled 2026-10-11): the refusal names the ROW and the action, never the points the engine reserved —
+  // so the point list is matched and dropped.
+  { re: /^can't build: (.+) belong to the unticked row «(.+)» — tick it again or delete it$/, key: 'errors.mutedRowOwns', params: (m) => ({ row: m[2] }) },
 
   // core.ts (#926) — `variable α is not defined by any statement (the step that defined it was removed, muted or failed)`
   { re: /^variable (\S+) is not defined by any statement/, key: 'errors.unboundVariable', params: (m) => ({ name: m[1] }) },

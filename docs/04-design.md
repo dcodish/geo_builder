@@ -812,7 +812,8 @@ the dry run judges `trialChanges` (by object identity), never `all.slice(facts.l
 is the ADR-320 class. The load refresh
 and audit compare `committedStepCommands(prefix, …)` on both sides and write refreshed steps as those rows
 ([ADR-579](06-decisions.md#adr-579), #1604); `fixtures.test.ts` asks the same. A **new** differently spelled
-statement over an unticked row's letters is refused naming that row (`errors.mutedRowOwns`, ADR-010) — and that
+statement over an unticked row's letters is refused naming that row (`errors.mutedRowOwns`, ADR-010) — the row and the
+action only, never the points the row holds: the humaniser matches the engine's point list and drops it ([ADR-667](06-decisions.md#adr-667)) — and that
 reservation is a commit-seam rule only: `mutedRowHolding` answers it for `dryRunOutcome`, over the trial list
 (an identical re-type sees its own twin enabled) and only for rows unticked above the step's own facts, with
 letters already on the figure free. The fold reserves nothing ([ADR-625](06-decisions.md#adr-625), #1952): an
