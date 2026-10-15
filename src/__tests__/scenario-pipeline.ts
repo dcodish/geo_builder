@@ -9,9 +9,8 @@
  * is a LAYERING split, not a second implementation (the ADR-346 no-mirrors rule).
  */
 import { parse, buildParseCtx, impliedCircleBinding, impliedPointBinding, parseNameCenter, typedLabels } from '@/parser';
-import { autoNamedLabels, impliedIdentityBinding, mergeFacts, replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, renameFacts, stepAsideFacts } from '@/store/geoStore';
+import { autoNamedLabels, replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, renameFacts, stepAsideFacts } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
-import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import type { AnyCommand } from '@/engine';
 import type { ParseResult } from '@/parser';
 
@@ -124,18 +123,15 @@ export function factsOf(steps: Step[], refused: readonly RefusedStep[] = []): Fa
           facts = nc.facts;
         } else {
           // #539 mirror (the App's point auto-bind): a fresh set-line label binds an auto-named point.
-          // #2122 mirror (ADR-653): or the general criterion — the line makes a student point one auto-named point
-          const lineBind = impliedPointBinding(er.commands, ctxOf(facts.slice(0, start)), autoNamedLabels(facts));
-          const pbind = lineBind ? { ...lineBind, merge: false } : impliedIdentityBinding(facts.slice(0, start), er.commands, 0, autoNamedLabels(facts));
+          const pbind = impliedPointBinding(er.commands, ctxOf(facts.slice(0, start)), autoNamedLabels(facts));
           if (!pbind) break;
-          const rn = pbind.merge ? mergeFacts(facts, pbind.from, pbind.to) : renameFacts(facts, pbind.from, pbind.to);
+          const rn = renameFacts(facts, pbind.from, pbind.to);
           if (!rn.ok) break;
           facts = rn.facts;
         }
         er = parse(step.edit.to, ctxOf(facts.slice(0, start)));
       }
-      // #2127 mirror (ADR-654): an indefinite shape noun is a new shape unless it restates the existing one
-      const r = indefiniteShapeReading(er, step.edit.to, ctxOf(facts.slice(0, start)), facts.slice(0, start), 0);
+      const r = er;
       if (!r.ok) throw new Error(`edited step did not parse: ${JSON.stringify(step.edit.to)}`);
       const replacement: Fact[] = r.commands.map((cmd, i) => ({
         id: `${key}e.${i}`,
@@ -177,18 +173,14 @@ export function factsOf(steps: Step[], refused: readonly RefusedStep[] = []): Fa
         } else {
           // #539 mirror (App.submit's point auto-bind): a fresh set-line label whose slot an auto-named
           // drawn point structurally occupies renames that point instead of minting a duplicate.
-          // #2122 mirror (ADR-653): or the general criterion — the line makes a student point one auto-named point
-          const lineBind = impliedPointBinding(r.commands, ctxOf(facts), autoNamedLabels(facts));
-          const pbind = lineBind ? { ...lineBind, merge: false } : impliedIdentityBinding(facts, r.commands, 0);
+          const pbind = impliedPointBinding(r.commands, ctxOf(facts), autoNamedLabels(facts));
           if (!pbind) break;
-          const rn = pbind.merge ? mergeFacts(facts, pbind.from, pbind.to) : renameFacts(facts, pbind.from, pbind.to);
+          const rn = renameFacts(facts, pbind.from, pbind.to);
           if (!rn.ok) break;
           facts = rn.facts;
         }
         r = parse(step, ctxOf(facts));
       }
-      // #2127 mirror (ADR-654): an indefinite shape noun is a new shape unless it restates the existing one
-      r = indefiniteShapeReading(r, step, ctxOf(facts), facts, 0);
       const row = refusedAt.get(index);
       if (row) {
         // #1288: a DECLARED refusal — asserted, then skipped: a refused sentence never becomes a fact.

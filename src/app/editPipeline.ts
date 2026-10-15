@@ -17,9 +17,8 @@
  * student refining a step, not freeform input — and this is the third refusal of the same shape the
  * editor already shipped, not a new behaviour.
  */
-import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabelFold, parse, typedLabels } from '@/parser';
-import { autoNamedLabels, groupKey, impliedIdentityBinding, mergeFacts, nameByUseCommands, nameCentreFacts, renameFacts, replay, resolveBinds, stepAsideFacts, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
+import { autoNamedLabels, groupKey, nameByUseCommands, nameCentreFacts, renameFacts, replay, resolveBinds, stepAsideFacts, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
 import { roleReadingConfig, type DecideBind } from './decideDeterministic';
 import { vertexPairVerdict } from './vertexPairCevian';
 import { honestyGateReport } from './honestyGates';
@@ -117,20 +116,16 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
       // #539: the POINT edition, mirroring submit — a fresh set-line label whose slot an auto-named
       // drawn point structurally occupies renames that point (auto-named judged over ALL facts, so a
       // label the student typed anywhere is never grabbed).
-      // #2122 (ADR-653): or the general criterion — the same decision as submit, against the edited row's PREFIX
-      const lineBind = impliedPointBinding(r.commands, ectx, autoNamedLabels(work));
-      const pbind = lineBind ? { ...lineBind, merge: false } : impliedIdentityBinding(work.filter((f) => !afterIds.has(f.id)), r.commands, store().seed, autoNamedLabels(work));
+      const pbind = impliedPointBinding(r.commands, ectx, autoNamedLabels(work));
       if (!pbind) break;
-      const res = pbind.merge ? mergeFacts(work, pbind.from, pbind.to) : renameFacts(work, pbind.from, pbind.to);
+      const res = renameFacts(work, pbind.from, pbind.to);
       if (!res.ok) break;
       work = res.facts;
-      binds.push({ op: pbind.merge ? 'merge' : 'rename', from: pbind.from, to: pbind.to });
+      binds.push({ op: 'rename', from: pbind.from, to: pbind.to });
     }
     ectx = prefixCtx();
     r = parse(editText, ectx);
   }
-  // #2127 (ADR-654): the submit seam's reading of an indefinite shape noun, against the PREFIX
-  r = indefiniteShapeReading(r, editText, ectx, work.filter((f) => !afterIds.has(f.id)), store().seed);
   // #2064 (ADR-643): a height named by two existing vertices — the submit seam's one predicate (ADR-W-006), against the
   // PREFIX the edited row is replayed after. Already true → «כבר קיים»; with a tail, the long form that carries it.
   const vp = vertexPairVerdict(editText, ectx, prefixRaw, store().seed, roleReadingConfig.cap);
@@ -192,8 +187,7 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     setInputNote(t('input.ringContradictsNoun', { detail: editText.trim() }));
     return false;
   }
-  // #2122 (ADR-653): a MERGE naming made the statement true by construction — the submit seam's rule: a success, kept
-  if (!binds.some((b) => b.op === 'merge') && impliedByPrior(prefixFacts, r.commands, store().seed)) {
+  if (impliedByPrior(prefixFacts, r.commands, store().seed)) {
     logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-implied-restatement', commands: r.commands });
     setInputNote(t('input.alreadyDrawn'));
     return false;

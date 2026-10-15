@@ -466,16 +466,6 @@ Final forms fold first (ך→כ, ם→מ, ן→נ, ף→פ, ץ→צ — the lexi
 makes a misread harmless: a candidate that does not parse produces no suggestion. The alphabet itself is not
 supported (operator ruling): it would reach labels, RTL direction, export and every element id (`seg-AB`).
 
-### An indefinite shape is a new shape ([ADR-654](06-decisions.md#adr-654))
-
-The inscription rules (`inscribedPolygon`, `incircle`) resolve an unnamed shape noun through `referencedPolygon`:
-ADR-029's `existingPolygon` (the figure's one polygon of that size), recorded in a parse-wide sink when
-`shapeNounIsDefinite` (`parser/shapePhrase.ts`) says the noun is indefinite — no glued ה, no preposition prefix,
-no English "the". The outermost `parse` returns the binding as `indefiniteShape` when the winning commands name it.
-`indefiniteShapeReading` (`store/indefiniteShape.ts`), called by submit, the ✎ edit seam, the load refresh and audit (`loadAudit.ts`) and the scenario harness,
-keeps the bound reading only when it restates the shape (dry run empty or implied, and no new violation from the
-givens verifier); otherwise it re-parses with that polygon left out of `ctx.polygons`, so the rule mints fresh letters.
-
 ### A through-statement about a drawn circle is a reference ([ADR-548](06-decisions.md#adr-548))
 
 The circle definition rules (`circle`, `circumcircle` in `src/parser/parse.ts`) ask ADR-029's introduce-vs-resolve
@@ -537,14 +527,6 @@ committed as `name-by-use` facts at the head of the line's group (`commitVerdict
 (`replay/naming.ts`) applies each enabled one to the facts before it, so deleting, muting, editing or undoing the
 line removes the name. The naming core never collides: `nameCentreFacts` and `renameFacts` step a hidden token
 aside, `withAnonymousAutoCentres` re-picks a held token; `withMetricCentreBinding` is gone.
-
-**The point naming has a general criterion** ([ADR-653](06-decisions.md#adr-653), #2122): beside ADR-440's line-slot
-arm, `impliedIdentityBinding` (`replay/core.ts`) trial-applies the line and names by use an auto-named point M that the
-line leaves with the same definition (`definitionKey`: kind, parents, parameters; never a free DOF) as exactly one
-student point L — the touch point M that `tangentTouchCopy` copies into X. A fresh L is the `point` rename; an existing
-L is a `merge` naming (`mergeFacts`): M takes L's letter in the facts before the line, valid only while M is defined
-before L first appears. A merge makes the line's statement true by construction, so both commit seams commit it as a
-plain success (no «כבר קיים»). Submit, the ✎ edit seam and the scenario harness call the same two arms.
 
 ### A foreign given is refused by the grammar, before any rule ([ADR-562](06-decisions.md#adr-562))
 
