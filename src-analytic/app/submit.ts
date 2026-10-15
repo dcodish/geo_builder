@@ -149,7 +149,12 @@ const collapseFields = (f: Derivation['faults'][number]) =>
                 : // #1924 (ADR-AG-272) — a tangent's missing second crossing: the point that cannot be placed.
                   f.code === 'tangent-no-second-crossing'
                   ? { id: f.point }
-                  : {};
+                  : // #2054 / #2061 (ADR-AG-277) — a second name, or another coefficient: the target, the earlier line.
+                    f.code === 'name-taken'
+                    ? { nameOf: f.nameOf, nameKind: f.nameKind, declared: f.declared }
+                    : f.code === 'measure-contradicts'
+                      ? { what: f.what, declared: f.declared }
+                      : {};
 
 /** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
 const definingLineOf = (lines: readonly string[], id: string): string | null => {

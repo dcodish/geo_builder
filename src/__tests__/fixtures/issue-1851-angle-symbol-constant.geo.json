@@ -1,0 +1,57 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-15T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "Z1eLKHXrTTZ7VcjPiXIra",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "z8Ig1wU2rUv_5z-qljnrn",
+      "utterance": "∠ACB = α",
+      "group": "g1",
+      "cmd": {
+        "type": "measure-angle",
+        "vertex": "C",
+        "ray1": "A",
+        "ray2": "B",
+        "expr": {
+          "coef": 1,
+          "var": "α"
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "1-ZN4ukhm2kgcZl2r9MmZ",
+      "utterance": "∠ABC = α + 40",
+      "group": "g2",
+      "cmd": {
+        "type": "measure-angle",
+        "vertex": "B",
+        "ray1": "A",
+        "ray2": "C",
+        "expr": {
+          "coef": 1,
+          "var": "α",
+          "const": 40,
+          "text": "α + 40"
+        }
+      },
+      "enabled": true
+    }
+  ]
+}

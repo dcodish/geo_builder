@@ -25,7 +25,7 @@ import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle } fro
 import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents } from '@/engine/types';
-import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption } from '@/engine';
 import { resolveBinds } from './naming';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -905,6 +905,34 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     const V = f.enabled ? softEqVerts(f.cmd) : null;
     if (V && facts.some((g) => g !== f && g.enabled && explicitEqWithin(lowerOne(g.cmd, symtab), V))) supersededSoft.add(f.id);
   }
+  /**
+   * #2023 + #2061 ([ADR-661](docs/06-decisions.md#adr-661)) — A SECOND LETTER FOR A MEASURED ANGLE OR SEGMENT, OR
+   * THE SAME LETTER WITH ANOTHER COEFFICIENT, IS REFUSED NAMING THE EARLIER LINE. Both lowered to nothing (the
+   * letter's representative is its own target), so the submit door answered «כבר קיים» and the stated value
+   * vanished. Judged here, in list order over the earlier enabled statements (`measureRestatement`, one predicate),
+   * so the typed door and a loaded list holding both lines reach the same verdict: a `coef-conflict` is the
+   * over-constrained frame (operator ruling 2026-10-14), a `name-taken` the ruled «כבר יש שם» sentence (2026-10-13).
+   * The tail names the earlier statement's first row, as every other attribution does. A refused restatement
+   * binds nothing for the rows after it (it is skipped as `prior`), is never retried and never waits.
+   */
+  const restated = new Map<string, string>();
+  {
+    const prior: AnyCommand[] = [];
+    const priorAt: number[] = [];
+    for (const [fi, f] of facts.entries()) {
+      if (!f.enabled) continue;
+      const r = measureRestatement(f.cmd, prior, symtab);
+      const st = r && (f.cmd.type === 'measure-angle' || f.cmd.type === 'measure-length') ? measureRestatementStatus(f.cmd, r, symtab) : null;
+      if (r && st) {
+        const j = priorAt[r.at];
+        const first = facts.findIndex((g) => groupKey(g) === groupKey(facts[j]));
+        restated.set(f.id, groupKey(facts[j]) === groupKey(f) ? st : `${st} [vs #${first}]`);
+        continue;
+      }
+      prior.push(f.cmd);
+      priorAt.push(fi);
+    }
+  }
   // "right triangle ABC" pins the right angle at the LAST vertex (C) structurally (B is built ⟂ at C). But
   // WHICH vertex is the right one is UNSTATED, so that default must YIELD to an explicit "∠ABC = 90" the
   // student gives on a different vertex — otherwise the structural ∠C=90 and the stated ∠B=90 collide and the
@@ -1390,6 +1418,12 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
         status[f.id] = 'ok';
         continue;
       }
+      // #2023 + #2061 (ADR-661): a second letter, or another coefficient, for a measured angle or segment
+      const restatedAs = restated.get(f.id);
+      if (restatedAs) {
+        status[f.id] = restatedAs;
+        continue;
+      }
       // #926 (ADR-483, ADR-W-044): a VALUE for a letter no statement binds — «α = 70» after «∠ABC = α»
       // was deleted or muted — is a fact whose SUBJECT is gone, the same class as a point whose defining
       // step is gone (the cascade message below), not a no-op. `set-var` lowers to nothing, so nothing
@@ -1477,6 +1511,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       cmds.flatMap(introducedPointIds).some((id) => !cur.objects.some((o) => o.id === id) && [...(claimedBy.get(id) ?? [])].some((c) => c !== fi));
     const deferrable = (f: Fact): boolean => {
       if (forced.has(f.id) || !f.enabled || status[f.id] === 'ok' || status[f.id] === 'disabled') return false;
+      if (restated.has(f.id)) return false; // #2023 + #2061 (ADR-661): a refused restatement is a verdict on the statements, never a solve to retry
       if (futileFact(f)) return false; // #403: a dangling reference can never resolve by retrying
       return engineCmdsOf(f).length > 0;
     };
@@ -1530,6 +1565,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       if (isVariableStatement(f.cmd) && unboundSubjectOf(f.cmd, symtab, enabledCmds)) return true; // #1658: the whole family waits
       if (f.cmd.type === 'set-var') return false;
       if (unenforceableRelation(f.cmd, symtab, enabledCmds)) return false; // #1658: cannot hold, not waiting
+      if (restated.has(f.id)) return false; // #2023 + #2061 (ADR-661): refused on the statements alone, not waiting
       // #1328 (ADR-537): a solution was found and refused as not a figure — a rigid contradiction, not a
       // constraint waiting for givens, however much the figure still flexes.
       if (rigid.has(f.id)) return false;

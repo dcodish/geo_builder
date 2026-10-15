@@ -13,7 +13,7 @@ import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
 import { CYCLIC_MEMBER, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadImplies, quadPyramidDimCount, quadsDisjoint, quadShapeConstraints, type QuadBase } from './baseShapes';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
-import { claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
+import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import { firstFreeLetter } from './freeLetter';
 import { carrierParams3, readCoordGiven } from './carriers';
 import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, ScalarPin, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
@@ -1634,6 +1634,23 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const same = (m: { vertex: Id; p: Id; q: Id }) =>
         m.vertex === cmd.vertex && ((m.p === cmd.p && m.q === cmd.q) || (m.p === cmd.q && m.q === cmd.p));
       const existing = next.angleMarks.find(same);
+      /*
+       * #2054 + #2061 (ADR-3D-344 — 2-D's ADR-661). An angle that already wears a letter gets ONE name: a DIFFERENT letter
+       * («∠ABC = α» · «∠ABC = β») is a second name for it and is refused (operator rulings 2026-10-13, #2023 —
+       * «לזווית ABC כבר יש שם: α (בשורה …)»), never a relabel that drops α; the SAME letter with another coefficient
+       * («∠ABC = 2α» · «∠ABC = 3α») forces α = 0 and is refused as contradicting the earlier line (2026-10-14, #2061),
+       * never absorbed with 3α dropped. A letter that already names ANOTHER angle is the ADR-3D-052 equality below,
+       * not a second name — 2-D's rule. An unlabelled mark («∠ABC» · «∠ABC = β») still takes its first name. The
+       * engine names the angle and the earlier letter; `derive3` finds the line that put that letter there.
+       */
+      if (existing?.label && cmd.label) {
+        const was = { vertex: existing.vertex, p: existing.p, q: existing.q, label: existing.label, coef: existing.coef ?? 1 };
+        if (existing.label === cmd.label && (existing.coef ?? 1) !== (cmd.coef ?? 1)) return { ok: false, error: { code: 'angle-coef-conflict', was } };
+        const boundElsewhere = c.angleMarks.some((m) => m.label === cmd.label && !same(m));
+        if (existing.label !== cmd.label && !boundElsewhere) {
+          return { ok: false, error: { code: 'angle-name-taken', angle: `${cmd.p}${cmd.vertex}${cmd.q}`, symbol: angleMarkText(existing), was } };
+        }
+      }
       if (!existing) {
         next.angleMarks.push({ vertex: cmd.vertex, p: cmd.p, q: cmd.q, ...(cmd.label ? { label: cmd.label } : {}), ...(cmd.coef !== undefined ? { coef: cmd.coef } : {}) });
       } else if (cmd.label && existing.label !== cmd.label) {

@@ -54,7 +54,7 @@ function assertedRelations(commands: Command[]): Constraint[] {
       case 'set-equal': out.push({ type: 'equal', a: c.a, b: c.b, c: c.c, d: c.d }); break;
       case 'set-ratio': out.push({ type: 'ratio', a: c.a, b: c.b, c: c.c, d: c.d, k: c.k, add: c.add }); break;
       case 'set-length-radius': out.push({ type: 'length-radius', a: c.a, b: c.b, circle: c.circle, center: c.center, witness: c.witness, k: c.k, add: c.add }); break;
-      case 'set-angle-ratio': out.push({ type: 'angle-ratio', v1: c.v1, a1: c.a1, b1: c.b1, v2: c.v2, a2: c.a2, b2: c.b2, k: c.k }); break;
+      case 'set-angle-ratio': out.push({ type: 'angle-ratio', v1: c.v1, a1: c.a1, b1: c.b1, v2: c.v2, a2: c.a2, b2: c.b2, k: c.k, ...(c.add ? { add: c.add } : {}) }); break;
       case 'set-parallel': out.push({ type: 'parallel', a: c.a, b: c.b, c: c.c, d: c.d }); break;
       case 'set-perpendicular': out.push({ type: 'perpendicular', a: c.a, b: c.b, c: c.c, d: c.d }); break;
       case 'set-concyclic': out.push({ type: 'concyclic', points: c.points }); break;

@@ -66,14 +66,28 @@ describe('#1814 — a symbol in an angle value slot is never read as its digits'
     'נסמן ∠ABC = α1',
     '∠ABC = π/3',
     '∠ABC = π/2',
-    '∠ABC = α + 40',
-    '∠ABC = x + 10',
     '∠ABC = X + 10',
     '∠ABC = α1 / 2',
   ])('after «משולש ABC», «%s» is not committed and no angle value is set', async (line) => {
     const v = await decide(TRI, line);
     expect(['escalate', 'refuse'], JSON.stringify(v).slice(0, 300)).toContain(v.kind);
     expect(cmds(v).some((c) => c.type === 'set-angle')).toBe(false);
+  });
+
+  /**
+   * #1851 (ADR-662, operator 2026-10-07: *"∠ABC = α + 40 should be accepted and drawn"*) RE-BASES two rows of this
+   * file: ADR-600 made «α + 40» and «x + 10» decline because no reader could represent a symbol plus a constant. The
+   * shared affine-tail reader now does, so they commit the WHOLE expression. What this file guards still holds: the
+   * digits are never the angle's value (no `set-angle`).
+   */
+  it.each([
+    ['∠ABC = α + 40', { coef: 1, var: 'α', const: 40, text: 'α + 40' }],
+    ['∠ABC = x + 10', { coef: 1, var: 'x', const: 10, text: 'x + 10' }],
+  ])('after «משולש ABC», «%s» commits the whole expression, never its digits', async (line, expr) => {
+    const v = await decide(TRI, line);
+    expect(v.kind).toBe('commit');
+    expect(cmds(v).some((c) => c.type === 'set-angle')).toBe(false);
+    expect(cmds(v)).toContainEqual(expect.objectContaining({ type: 'measure-angle', expr }));
   });
 
   it('«∠ABC = a12» escalates, and the reader no longer restarts inside the index (no `set-angle value: 2`)', async () => {

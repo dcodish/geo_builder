@@ -2771,7 +2771,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     case 'set-angle-ratio':
       driveOrCheck(objects, constraints, {
         type: 'angle-ratio',
-        v1: cmd.v1, a1: cmd.a1, b1: cmd.b1, v2: cmd.v2, a2: cmd.a2, b2: cmd.b2, k: cmd.k,
+        v1: cmd.v1, a1: cmd.a1, b1: cmd.b1, v2: cmd.v2, a2: cmd.a2, b2: cmd.b2, k: cmd.k, ...(cmd.add ? { add: cmd.add } : {}),
       });
       break;
 

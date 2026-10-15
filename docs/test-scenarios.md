@@ -1926,3 +1926,11 @@ over all four (ADR-041).
 ### `trapezoid-bases-ignore-foreign-parallel-2090` — «טרפז ABCD · AC מקביל ל-KL · EF קטע אמצעים»: the mid-segment of the legs, as without the unrelated parallel (#2090, ADR-665)
 
 **Guards against:** «EF קטע אמצעים» and «EL מקביל לבסיסים» on a drawn trapezoid going to the AI once any other parallel is stated. **Asserts** E and F are the midpoints of AD and BC, and «EL מקביל לבסיסים» after the same prefix commits `segment EL` + `EL ∥ AB`, exactly as without «AC מקביל ל-KL».
+
+### `second-symbol-refused-2023` — «משולש ABC · זוית B=α · טרפז ABCD חסום במעגל · זוית ABC=β» (and «AB=a · AB=c»): the second name is refused naming the earlier line (#2023, ADR-661)
+
+**Guards against:** a second letter for an angle or a segment that already has one answering «זה כבר קיים באיור — אין מה להוסיף.» while the new letter vanished (prod session 8mv4jow7). Operator rulings 2026-10-13 (cards d4-2023, d5-2023-length). **Asserts** the prefix builds with α on the corner, «זוית ABC=β» is refused at the door with «לזווית ABC כבר יש שם: α (בשורה «זוית B=α»). לכל זווית שם אחד — המשיכו עם α.», «AB=c» after «AB=a» with «לקטע AB כבר יש שם: a (בשורה «AB=a»). לכל קטע שם אחד — המשיכו עם a.», and a loaded list holding both lines keeps the first green and the second refused in the same sentence. The matrix is `src/app/__tests__/issue-2023-second-symbol.test.ts`.
+
+### `angle-coef-restated-refused-2061` — «משולש ABC · ∠ABC=2α · ∠ABC=3α»: refused as contradicting the earlier line, both ray orders; the label stays «2α» (#2061, ADR-661)
+
+**Guards against:** «∠ABC=3α» answering «כבר קיים» and dropping 3α, and «∠CBA=3α» being refused as a flat triangle (one angle set to 1.5 times itself). Operator ruling 2026-10-14 (card d14b-2061-crosstool A). **Asserts** the prefix builds with the label «2α», both lines are refused «לא ניתן: «∠ABC=3α» סותר את «∠ABC=2α» — אי אפשר לקיים את שניהם יחד. הסיבה: ∠ABC = 3α.» (and the ∠CBA twin), and a loaded list holding both lines leaves A, B, C where they were. The spelling matrix (זווית, English, coefficient 1 vs 2, the length twin «AB = 3a») is `src/app/__tests__/issue-2023-second-symbol.test.ts`.

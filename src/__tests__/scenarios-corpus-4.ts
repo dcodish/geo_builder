@@ -4721,6 +4721,53 @@ export const SCENARIOS_4: Scenario[] = [
       expect(v.kind === 'commit' && v.commands).toEqual([{ type: 'segment', a: 'E', b: 'L' }, { type: 'set-parallel', a: 'E', b: 'L', c: 'A', d: 'B' }]);
     },
   },
+  {
+    id: 'second-symbol-refused-2023',
+    title: '#2023 (ADR-661): «זוית ABC=β» after «זוית B=α» (and «AB=c» after «AB=a») is refused naming the earlier line, never «כבר קיים»',
+    guards:
+      "Prod log triage, session 8mv4jow7 (2026-10-09): «משולש ABC · זוית B=α · זוית C · טרפז ABCD חסום במעגל · זוית ABC=β» answered «זה כבר קיים באיור» and dropped β (re-measured on b0ef3240 through decideDeterministic2D; «זוית C» went to the AI and is not modelled). Root cause: a symbolic measure lowers by its letter and a letter whose representative is its own target lowers to nothing, so a second letter on a measured angle or segment was an empty step the door read as already drawn. Operator rulings 2026-10-13 (cards d4-2023, d5-2023-length): refuse with «לזווית ABC כבר יש שם: α (בשורה «זוית B=α»). לכל זווית שם אחד — המשיכו עם α.» and its segment twin. Asserts the prefix builds with α on the corner, the β line is refused at the door in the ruled sentence, the AB=c twin likewise, and a loaded list holding both lines keeps the first green and the second red. The matrix (every spelling, coefficients, the unchanged rows, the predicate) is src/app/__tests__/issue-2023-second-symbol.test.ts.",
+    steps: ['משולש ABC', 'זוית B=α', 'טרפז ABCD חסום במעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.labels.angles.map((a) => a.text), 'α is on the corner').toContain('α');
+      const he = i18n.getFixedT('he');
+      const said = (facts: Fact[], line: string, raw: string | undefined) => stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)));
+      const prefix = factsOf(['משולש ABC', 'זוית B=α', 'טרפז ABCD חסום במעגל']);
+      const v = gateVerdict(prefix, 'זוית ABC=β');
+      expect(v.kind, 'refused before it becomes a fact').toBe('refused');
+      expect(said(prefix, 'זוית ABC=β', (v as { detail?: string }).detail)).toBe('לזווית ABC כבר יש שם: α (בשורה «זוית B=α»). לכל זווית שם אחד — המשיכו עם α.');
+      const seg = factsOf(['משולש ABC', 'AB=a']);
+      const w = gateVerdict(seg, 'AB=c');
+      expect(w.kind).toBe('refused');
+      expect(said(seg, 'AB=c', (w as { detail?: string }).detail)).toBe('לקטע AB כבר יש שם: a (בשורה «AB=a»). לכל קטע שם אחד — המשיכו עם a.');
+      const loaded = factsOf(['משולש ABC', 'זוית B=α', 'זוית ABC=β']);
+      const d = replay(loaded);
+      expect(d.status[loaded[1].id], 'the first name stays green').toBe('ok');
+      expect(said(loaded, 'זוית ABC=β', d.status[loaded[2].id] as string)).toBe('לזווית ABC כבר יש שם: α (בשורה «זוית B=α»). לכל זווית שם אחד — המשיכו עם α.');
+    },
+  },
+  {
+    id: 'angle-coef-restated-refused-2061',
+    title: '#2061 (ADR-661): «∠ABC=3α» after «∠ABC=2α» is refused as contradicting it; the label stays «2α» and nothing moves',
+    guards:
+      "Found by the /decisions plan writer for #2054; the 2-D arm measured on 939b160a and re-measured on b0ef3240 through decideDeterministic2D: the second line answered «זה כבר קיים באיור» and the label stayed «2α» (3α vanished); with the rays reversed («∠CBA=3α») it was refused as a flat triangle (∠CBA = 1.5·∠ABC). Root cause: the measure lowering keyed the angle in one ray order and lowered a letter's measure on its own representative target to nothing whatever the coefficient. Operator ruling 2026-10-14 (card d14b-2061-crosstool A): refuse it as a contradiction, «לא ניתן: «∠ABC=3α» סותר את «∠ABC=2α» — אי אפשר לקיים את שניהם יחד. הסיבה: ∠ABC = 3α.» Asserts the prefix builds with «2α», both ray orders are refused at the door naming the first line, and the figure is unchanged by the refusal. The matrix is src/app/__tests__/issue-2023-second-symbol.test.ts.",
+    steps: ['משולש ABC', '∠ABC=2α'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.labels.angles.map((a) => a.text), 'the label stays 2α').toEqual(['2α']);
+      const he = i18n.getFixedT('he');
+      const prefix = factsOf(['משולש ABC', '∠ABC=2α']);
+      for (const [line, what] of [['∠ABC=3α', '∠ABC = 3α'], ['∠CBA=3α', '∠CBA = 3α']]) {
+        const v = gateVerdict(prefix, line);
+        expect(v.kind, line).toBe('refused');
+        const raw = (v as { detail?: string }).detail;
+        expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(prefix, raw)))).toBe(`לא ניתן: «${line}» סותר את «∠ABC=2α» — אי אפשר לקיים את שניהם יחד. הסיבה: ${what}.`);
+      }
+      const before = replay(prefix).positions;
+      const loaded = replay(factsOf(['משולש ABC', '∠ABC=2α', '∠ABC=3α']));
+      for (const id of ['A', 'B', 'C']) expect(dist(loaded.positions.get(id)!, before.get(id)!), `${id} did not move`).toBeLessThan(1e-9);
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

@@ -17,7 +17,7 @@ import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
 import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
-import { SOLVE_RESOLUTION, SOLVE_TOL, resolveChoices } from './solve';
+import { SOLVE_RESOLUTION, SOLVE_TOL, resolveChoices, sameConstraint } from './solve';
 import { NO_STATED_MEASURES, statedMeasures, type StatedMeasures } from './statedMeasures';
 import { incidenceWords } from './crossings';
 import { convexWhenSimple, shapeRow } from './shapes';
@@ -61,6 +61,10 @@ export interface LineFault {
   stated?: string;
   /** For a diagonal claim the figure refutes (#1737, ADR-AG-265): the pair as written (the ring is `polygon`). */
   pair?: string;
+  /** For a second name or another coefficient (#2054, #2061): the target as the line spells it, its kind, and 2-D's reason clause. */
+  nameOf?: string;
+  nameKind?: 'angle' | 'length';
+  what?: string;
   /**
    * For a third crossing asked of a line through two points already on the circle (#1893, ADR-AG-271): the line as
    * written (its two letters) and the two points it already crosses the circle at.
@@ -191,13 +195,21 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       : e.code === 'diagonal-is-side' || e.code === 'diagonal-none-here'
         ? { polygon: e.polygon, pair: e.pair }
         : {};
+  /** #2054 / #2061 (ADR-AG-277): the line that stated the earlier value a restatement is refused against — by provenance. */
+  const restatedAgainst = (e: ApplyError): Partial<LineFault> => {
+    if (e.code !== 'name-taken' && e.code !== 'measure-contradicts') return {};
+    const at = e.against ? folded.constraints.findIndex((k) => k === e.against || sameConstraint(k, e.against!)) : -1;
+    const fact = at >= 0 ? constraintFact[at] : undefined;
+    const declared = fact !== undefined ? lines[owner[fact]] : undefined;
+    return { ...(e.nameOf ? { nameOf: e.nameOf, nameKind: e.nameKind } : {}), ...(e.what ? { what: e.what } : {}), ...(declared !== undefined ? { declared } : {}) };
+  };
   const reported = new Set<string>();
   errors.forEach((e, i) => {
     if (!e) return;
     const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null, e.options ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e) });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e) });
   });
 
   /**

@@ -270,6 +270,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2060': 'open', // #2024 (ADR-668): 3-D does not read a single-letter angle given a symbol («זוית B=b», «זוית B=α»)
 
+  '#2140': 'open',
+
 };
 
 export interface ParityRow {
@@ -1449,6 +1451,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'indefinite-second-triangle-2127', family: 'inscribed', steps: ['מעגל O', 'משולש חוסם את מעגל O', 'משולש חסום במעגל O'], expect: 'builds', exception: 'X8', note: '2-D refused the second, indefinite triangle as contradicting the first before ADR-654; analytic already drew two' },
   { id: 'indefinite-second-triangle-other-order-2127', family: 'inscribed', steps: ['מעגל O', 'משולש חסום במעגל O', 'משולש חוסם את מעגל O'], expect: 'builds', exception: 'X8' },
   { id: 'tangent-by-lengths-cross-2083', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'OP = 5', 'המעגלים O ו-P נחתכים בנקודות X ו-Y'], expect: 'refused', exception: 'X8', note: '2-D drew X and Y 0.01 apart, green, before ADR-645' },
+
+  // ── #2023 / #2061 (ADR-661): a second letter for a measured angle or segment, or the same letter with another
+  // coefficient, is refused naming the earlier line (operator rulings 2026-10-13 and 2026-10-14: all three builders) ──
+  { id: 'angle-second-name-2023', family: 'angles', steps: ['משולש ABC', 'זווית ABC=α', 'זווית ABC=β'], expect: 'refused', note: 'before ADR-AG-277 / ADR-3D-344 analytic recorded both names and 3-D relabelled the arc to β (#2054)' },
+  { id: 'angle-coef-restated-2061', family: 'angles', steps: ['משולש ABC', '∠ABC=2α', '∠ABC=3α'], expect: 'refused', note: 'before ADR-3D-344 3-D recorded both and kept 2α; analytic refused it as a flat triangle (ADR-AG-277 gives it 2-D sentence)' },
+  // ── #1851 (ADR-662): a symbol plus a constant is read by one affine-tail reader, as a length's «a + 3» is ──
+  { id: 'angle-symbol-constant-1851', family: 'angles', steps: ['משולש ABC', '∠ABC = α + 40'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2140' }], note: 'the operator (2026-10-07): «should be accepted and drawn»; analytic already recorded it; 3-D does not read a constant (#2140, needs-operator)' },
+  { id: 'angle-same-letter-other-constant-1851', family: 'angles', steps: ['משולש ABC', '∠ABC = α', '∠ABC = α + 40'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2140' }], note: '2-D refuses it in the #2061 contradiction frame; analytic refuses it «לא נמצאה תצורה» (the wording is #2105)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

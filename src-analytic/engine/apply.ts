@@ -24,6 +24,7 @@ import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, sineAngle, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounsExclude, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
+import { measureRestatement } from './statedMeasures';
 import { RESERVED_SYMBOLS, radiusSymbol, toolSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
 import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
@@ -235,7 +236,11 @@ export type ApplyErrorCode =
    * the restriction doing nothing. Refused here, at the one boundary every producer of a `param` fact passes, never
    * silently absorbed. Drawing only the part of a curve where x > 0 is a capability of its own (#1846).
    */
-  | 'coordinate-restriction';
+  | 'coordinate-restriction'
+  /** #2054 (ADR-AG-277): a second letter for an angle or a segment that already has one — `holder` is the first letter, `nameOf` the target as the line spells it. */
+  | 'name-taken'
+  /** #2061 (ADR-AG-277): the same letter with another coefficient for an angle or segment — `what` is 2-D's reason clause. */
+  | 'measure-contradicts';
 
 /**
  * WHICH OBJECT a contextual reference needed, and how many the figure holds (#1432 amendment 1).
@@ -324,6 +329,13 @@ export interface ApplyError {
   /** For `diagonal-is-side` / `diagonal-none-here` (#1737): the ring holding the pair, and the pair, as written. */
   polygon?: string;
   pair?: string;
+  /** For `name-taken` (#2054): the target as the refused line spells it (`ABC`, `AB`), and whether it is an angle or a segment. */
+  nameOf?: string;
+  nameKind?: 'angle' | 'length';
+  /** For `measure-contradicts` (#2061): the refused measure, as 2-D's reason clause renders it («∠ABC = 3α»). */
+  what?: string;
+  /** For `name-taken` / `measure-contradicts`: the EARLIER constraint the line restates — `derive` maps it to its line. */
+  against?: Constraint;
 }
 
 /** How a found curve can be called in a sentence — its name, or (unnamed) its equation. */
@@ -2269,6 +2281,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // may repeat a given without it counting twice against the figure's freedom. Compared by what
       // the constraint SAYS (#1159): «AB ∥ CD» and «AB ∥ DC» are one statement, and used to get two
       // different answers depending on which letter the student wrote first.
+      /*
+       * A SECOND NAME, OR ANOTHER COEFFICIENT, FOR A STATED ANGLE OR SEGMENT (#2054, #2061; ADR-AG-277 — 2-D's ADR-661).
+       * «זוית B=α» · «זוית ABC=β» and «AB=a» · «AB=c» were recorded with both letters (the solve equated two free
+       * parameters and the canvas showed the later one); «∠ABC=2α» · «∠ABC=3α» met α = 0 and was refused for whatever
+       * the figure happened to hold (a flat triangle, a failed search, or nothing). One predicate (`measureRestatement`,
+       * statedMeasures.ts), judged before the absorb so the same statement twice is still `known`; `against` is the
+       * earlier constraint, which `derive` turns into its line.
+       */
+      const restated = measureRestatement(c, f.k);
+      if (restated)
+        return {
+          ok: false,
+          error: restated.kind === 'name-taken'
+            ? { code: 'name-taken', detail: f.src, holder: restated.holder, nameOf: restated.name, nameKind: f.k.t === 'angle' ? 'angle' : 'length', against: restated.earlier }
+            : { code: 'measure-contradicts', detail: f.src, what: restated.what, against: restated.earlier },
+        };
       const dup = c.constraints.some((k) => sameConstraint(k, f.k));
       if (dup) return { ok: true, effect: 'known', next: c };
 

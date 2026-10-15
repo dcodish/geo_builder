@@ -31,7 +31,7 @@
  * Formatting stays a DISPLAY concern: this hands the renderer a number or a text, never a rounded string.
  */
 import { exprText, evalExpr, symbolsOf, type Env, type Expr } from './expr';
-import { isTermPlaceholder, type LengthExpr } from './lengths';
+import { angleLabelName, isTermPlaceholder, type LengthExpr } from './lengths';
 import type { Constraint, Direction } from './solve';
 import type { Construction, Id } from './types';
 import type { FootLine } from './derived';
@@ -177,6 +177,8 @@ export function statedMeasures(
   /**
    * ONE value per measure. A length or angle stated twice («AB = 3a» · «AB = 6») is written once: a NUMBER beats a
    * letter (the later number is what the letter now is), otherwise the later statement wins — 2-D's `lenByKey.set`.
+   * Since #2054 (ADR-AG-277) a second, disjoint letter is refused at apply (`measureRestatement`), so «letter against
+   * letter» reaches here only as a shared-letter equation («AB = 2a» · «AB = a + 3»).
    */
   const lenAt = new Map<string, StatedMeasures['lengths'][number]>();
   const angAt = new Map<string, StatedMeasures['angles'][number]>();
@@ -368,4 +370,75 @@ function equalityClasses<T>(pairs: ReadonlyArray<[T, T]>, key: (t: T) => string)
     classes.get(root)!.push(item.get(k)!);
   }
   return [...classes.values()].filter((cls) => cls.length >= 2);
+}
+
+/**
+ * #2054 + #2061 ([ADR-AG-277](../../docs/06c-decisions-analytic.md#adr-ag-277)) — what a statement about an angle's or a
+ * segment's VALUE says against an EARLIER stated value of the same angle or segment: 2-D's `measureRestatement`
+ * ([ADR-661](../../docs/06-decisions.md#adr-661)), the same rules over analytic's constraints.
+ *
+ * The target is the angle as its vertex plus an unordered ray pair (`angle`, no trig `measure`), or one plain segment
+ * against a value side (`length-eq`, read by {@link plainMeasure} / {@link isValueSide} — the canvas's own definition
+ * of a stated value). Over the student's letters (not a term placeholder, a tool symbol or an angle label):
+ *
+ * - `coef-conflict` — the same single letter with another coefficient (k₁·α against k₂·α forces α = 0): refused as
+ *   contradicting the earlier line (operator ruling 2026-10-14, #2061);
+ * - `name-taken` — a fresh letter set (no letter in it appears anywhere else in the figure — another quantity's
+ *   letter, a radius, a valued letter) on a target whose earlier value's letters are all different and not valued:
+ *   a second name (operator rulings 2026-10-13, #2023/#2054).
+ *
+ * Anything else — the same statement (the duplicate absorb), a number on either side, a shared letter in another
+ * form (an equation the solve judges) — is null. `earlier` is the constraint the verdict is about (an object
+ * reference, so the fold's attribution finds its line whatever was removed since).
+ */
+export type MeasureRestatement = { kind: 'coef-conflict' | 'name-taken'; earlier: Constraint; holder: string; name: string; what: string };
+type MeasureTarget = { key: string; name: string; value: Expr; angle: boolean };
+function measureTargetOf(k: Constraint): MeasureTarget | null {
+  if (k.t === 'angle' && !k.measure) return { key: `ang:${k.at.v}:${[k.at.a, k.at.b].sort().join('|')}`, name: `${k.at.a}${k.at.v}${k.at.b}`, value: k.value, angle: true };
+  if (k.t !== 'length-eq') return null;
+  const l = plainMeasure(k.left);
+  const r = plainMeasure(k.right);
+  const m = l && !r && isValueSide(k.right) ? { m: l, v: k.right } : r && !l && isValueSide(k.left) ? { m: r, v: k.left } : null;
+  if (!m || m.m.kind !== 'length') return null;
+  return { key: `len:${segKey(m.m.a, m.m.b)}`, name: `${m.m.a}${m.m.b}`, value: m.v.expr, angle: false };
+}
+const studentLetters = (e: Expr): string[] => [...new Set(symbolsOf(e))].filter((s) => !isTermPlaceholder(s) && !s.startsWith('θ_') && angleLabelName(s) === null);
+/** Every expression symbol anywhere inside a constraint or an object (a circle's radius letter, a parameter's value). */
+const symbolNamesIn = (x: unknown): string[] => [...JSON.stringify(x).matchAll(/"kind":"sym","name":"([^"]*)"/g)].map((m) => m[1]);
+/** `k·s` for one letter s, else null. */
+function linearIn(e: Expr): { s: string; k: number } | null {
+  if (e.kind === 'sym') return { s: e.name, k: 1 };
+  if (e.kind === 'neg') { const x = linearIn(e.a); return x ? { s: x.s, k: -x.k } : null; }
+  if (e.kind === 'mul' && e.a.kind === 'num' && e.b.kind === 'sym') return { s: e.b.name, k: e.a.value };
+  if (e.kind === 'mul' && e.b.kind === 'num' && e.a.kind === 'sym') return { s: e.a.name, k: e.b.value };
+  return null;
+}
+export function measureRestatement(c: Construction, k: Constraint): MeasureRestatement | null {
+  const t = measureTargetOf(k);
+  if (!t) return null;
+  const letters = studentLetters(t.value);
+  if (letters.length === 0) return null;
+  const onTarget: { k: Constraint; t: MeasureTarget }[] = [];
+  const elsewhere = new Set<string>();
+  for (const e of c.constraints) {
+    const et = measureTargetOf(e);
+    if (et && et.key === t.key) onTarget.push({ k: e, t: et });
+    else for (const s of symbolNamesIn(e)) elsewhere.add(s);
+  }
+  if (onTarget.length === 0) return null;
+  const valued = new Set(c.constraints.flatMap((e) => (e.t === 'param-eq' ? [e.sym.name] : [])));
+  const lin = linearIn(t.value);
+  const what = `${t.angle ? `∠${t.name}` : `|${t.name}|`} = ${statedText(t.value)}`;
+  for (const o of onTarget) {
+    const ol = linearIn(o.t.value);
+    if (lin && ol && lin.s === ol.s && lin.k !== ol.k && !valued.has(lin.s)) return { kind: 'coef-conflict', earlier: o.k, holder: statedText(o.t.value), name: t.name, what };
+  }
+  if (onTarget.some((o) => studentLetters(o.t.value).some((s) => letters.includes(s)))) return null; // a shared letter: an equation
+  const first = onTarget[0];
+  const firstLetters = studentLetters(first.t.value);
+  if (firstLetters.length === 0) return null; // a number: a pin, the residual judges it
+  const objectLetters = new Set(symbolNamesIn(c.objects));
+  const used = (s: string) => elsewhere.has(s) || objectLetters.has(s) || s === 'x' || s === 'y';
+  if (letters.some(used) || firstLetters.some((s) => valued.has(s))) return null;
+  return { kind: 'name-taken', earlier: first.k, holder: statedText(first.t.value), name: t.name, what };
 }

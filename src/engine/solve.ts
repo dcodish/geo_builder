@@ -161,7 +161,7 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
       // |center→witness| is the radius (witness is ON the circle), so this is the ratio form |ab| = k·R.
       return dist(get(con.a), get(con.b)) - (con.k * dist(get(con.center), get(con.witness)) + (con.add ?? 0));
     case 'angle-ratio':
-      return angleDeg(get(con.v1), get(con.a1), get(con.b1)) - con.k * angleDeg(get(con.v2), get(con.a2), get(con.b2));
+      return angleDeg(get(con.v1), get(con.a1), get(con.b1)) - (con.k * angleDeg(get(con.v2), get(con.a2), get(con.b2)) + (con.add ?? 0));
     case 'coincide':
       return dist(get(con.p), get(con.q)); // 0 ⇔ the two points meet
     case 'parallel': {
@@ -580,7 +580,7 @@ export function describeConstraint(con: Constraint): string {
     case 'length-radius':
       return `|${con.a}${con.b}| = ${con.k}·R${con.add ? ` ${con.add > 0 ? '+' : '−'} ${Math.abs(con.add)}` : ''}`;
     case 'angle-ratio':
-      return `∠${con.a1}${con.v1}${con.b1} = ${con.k}·∠${con.a2}${con.v2}${con.b2}`;
+      return `∠${con.a1}${con.v1}${con.b1} = ${con.k}·∠${con.a2}${con.v2}${con.b2}${con.add ? ` ${con.add > 0 ? '+' : '−'} ${Math.abs(con.add)}` : ''}`;
     case 'parallel':
       return `${con.a}${con.b} ∥ ${con.c}${con.d}`;
     case 'perpendicular':

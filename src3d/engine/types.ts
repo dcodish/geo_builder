@@ -1732,8 +1732,17 @@ export type Requirement3 =
   // so a right corner is not a special case the drawing must avoid.
   | { kind: 'quad-general'; base: QuadBase; ids: [Id, Id, Id, Id]; right?: true };
 
+/** The angle mark a restatement is refused against (#2054/#2061): which angle, and the letter and coefficient it wears. */
+export interface AngleMarkRef3 { vertex: Id; p: Id; q: Id; label: string; coef: number }
+
 export type EngineError3 =
   | { code: 'already-defined'; id: Id }
+  /** #2054 (ADR-3D-344): a second letter for an angle that already wears one — `angle` as the refused line spells it,
+   *  `symbol` the letter it wears (with its coefficient), `line` the statement that put it there (filled by `derive3`). */
+  | { code: 'angle-name-taken'; angle: string; symbol: string; line?: string; was: AngleMarkRef3 }
+  /** #2061 (ADR-3D-344): the same letter with another coefficient — engine-internal; `derive3` reports it as
+   *  `givens-contradict` naming the line that put `was` on the angle. */
+  | { code: 'angle-coef-conflict'; was: AngleMarkRef3 }
   // #1918 (ADR-3D-313): the ring is already known to be a shape that NO quadrilateral is at the same time as
   // the noun stated — a trapezoid (exactly one parallel pair) told it is a parallelogram, or the reverse.
   // Derived from `QUAD_IMPLIES` (no row implies both), never a listed pair.

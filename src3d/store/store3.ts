@@ -622,12 +622,26 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
     if (paramPinKey(c) !== paramPinsBefore) paramPinOwners.push(f.id);
     return 'ok';
   };
+  /**
+   * #2054 + #2061 (ADR-3D-344): a restatement refused against an angle's letter names the LINE that put that letter
+   * there — the first enabled fact before it whose commands mark that angle with that letter and coefficient. The
+   * engine stays free of utterances; the coefficient conflict is reported in 3-D's existing conflict sentence.
+   */
+  const restatedAgainst = (f: Fact3, st: FactStatus3): FactStatus3 => {
+    if (st === 'ok' || typeof st !== 'object' || (st.code !== 'angle-name-taken' && st.code !== 'angle-coef-conflict')) return st;
+    const w = st.was;
+    const marks = (g: Fact3) =>
+      g.cmds.some((x) => x.type === 'angle-mark' && x.vertex === w.vertex && ((x.p === w.p && x.q === w.q) || (x.p === w.q && x.q === w.p)) && x.label === w.label && (x.coef ?? 1) === w.coef);
+    const by = facts.slice(0, facts.indexOf(f)).find((g) => g.enabled && status[g.id] === 'ok' && marks(g));
+    if (st.code === 'angle-coef-conflict') return { code: 'givens-contradict', stated: f.utterance, others: by ? [by.utterance] : [] };
+    return by ? { ...st, line: by.utterance } : st;
+  };
   for (const f of facts) {
     if (!f.enabled) {
       status[f.id] = 'disabled';
       continue;
     }
-    status[f.id] = applyFact(f);
+    status[f.id] = restatedAgainst(f, applyFact(f));
   }
   // #926 (ADR-3D-220, ADR-W-044): a statement addressed to a LETTER — «α = 70», «p חיובי» — whose
   // definition sits LATER in the list is retried once the fold is complete. The list reaches that shape
@@ -673,7 +687,7 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
     for (const f of facts) {
       if (typeof status[f.id] === 'string') continue; // ok, or disabled — never touched
       if (retryError(f) !== null) continue; // still unsatisfiable against the completed figure — stays red
-      status[f.id] = applyFact(f);
+      status[f.id] = restatedAgainst(f, applyFact(f));
       progressed = true;
     }
     if (!progressed) break;
@@ -690,7 +704,7 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
   for (const f of facts) {
     if (typeof status[f.id] === 'string') continue; // ok, or disabled
     const latest = retryError(f);
-    if (latest !== null) status[f.id] = latest;
+    if (latest !== null) status[f.id] = restatedAgainst(f, latest);
   }
   /**
    * #1991 ([ADR-3D-327](../../docs/06b-decisions-3d.md#adr-3d-327)) — TWO DECLARED RINGS OVER THE SAME LETTERS IN
