@@ -303,6 +303,13 @@ the subject of «חוסם» / "circumscribe" is the outer figure, and a ring bet
 ש-ABC חוסם») is that subject. `inscriptionRing3` is the first label run once `CIRCLE_NAME3` («מעגל O», "circle O")
 and the centre clause are set aside, so a circle named first no longer reads its own letter as the ring.
 
+**An unnamed circle of a ring is keyed by (kind, ring) (#2125, [ADR-3D-342](06b-decisions-3d.md#adr-3d-342)).**
+`ringCircleId3` (engine/types) is the one place an unnamed inscription circle gets its id: the circle through the
+vertices is `circle-<ring>`, the circle inside is `circle-in-<ring>` (analytic's `incircleId` spelling). A named
+circle keeps `circle-<letter>`. apply's `circle3` duplicate-id check is unchanged, so a same-kind restatement still
+collides on its id, and saved files replay their stored commands, so an old incircle holding `circle-<ring>` loads
+as it was. `studentLetters3` reads `circle-in-ABC` as «ABC», so a refusal naming the incircle names the ring.
+
 **The inscription accounts for every word (#1902, [ADR-3D-312](06b-decisions-3d.md#adr-3d-312)).** `polygonCircle3`
 removes its own spans, each marked: the ring, a named circle's letter, the verb, the circle noun, the container
 marker and `phrase.strip` (the noun and the adjectives it consumed, 2-D's `ShapePhrase.strip`). What is left goes

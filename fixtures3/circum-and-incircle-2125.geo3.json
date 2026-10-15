@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-15T05:17:05.898Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מעגל חוסם את ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        {
+          "type": "circle3",
+          "id": "circle-ABC",
+          "def": {
+            "kind": "circum",
+            "ring": [
+              "A",
+              "B",
+              "C"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "מעגל חסום במשולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        {
+          "type": "circle3",
+          "id": "circle-in-ABC",
+          "def": {
+            "kind": "incircle",
+            "ring": [
+              "A",
+              "B",
+              "C"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

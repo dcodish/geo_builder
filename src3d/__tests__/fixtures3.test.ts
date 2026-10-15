@@ -336,6 +336,10 @@ const SEEDED: SeededCorpus = {
   // #1975 (ADR-3D-341): a circle named first, in the circle-as-subject voice
   'named-circle-circumscribes-1975.geo3.json': ['משולש ABC', 'מעגל O חוסם את המשולש ABC'],
   'relative-clause-incircle-1975.geo3.json': ['משולש ABC', 'מעגל ש-ABC חוסם'],
+  // #2125 (ADR-3D-342) — the operator's exact sequence: the incircle after the circle through the vertices. Before:
+  // refused «"ABC" כבר מוגדר בציור» (both unnamed circles were `circle-ABC`). Both orders, voices and the
+  // same-kind restatement are asserted in issue-2125-incircle-id.test.ts; this is the build + drift net.
+  'circum-and-incircle-2125.geo3.json': ['משולש ABC', 'מעגל חוסם את ABC', 'מעגל חסום במשולש ABC'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

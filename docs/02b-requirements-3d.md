@@ -243,7 +243,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   במעגל O» / «משולש ABC חוסם את המעגל O» build, and the relative clause whose subject is the ring, «מעגל ש-ABC
   חוסם», is the circle INSIDE (as «ABC חוסם מעגל»), never the circle through the vertices. «מעגל שמרכזו O …» names a
   centre point the inscribed circle does not carry, and is refused in both voices.
-  - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311, ADR-3D-312, ADR-3D-313, ADR-3D-341; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891, #1902, #1918, #1975.
+  A triangle carries both of its circles at once (#2125, as in 2-D): «מעגל חוסם את ABC» and «מעגל חסום במשולש ABC»
+  build together, in either order and in every voice, unnamed or named. Stating the same circle again, in any
+  spelling, is still answered as already in the figure.
+  - Sources: ADR-3D-307, ADR-3D-308, ADR-3D-311, ADR-3D-312, ADR-3D-313, ADR-3D-341, ADR-3D-342; #1554, #1792, #1838 (a quadrilateral's incircle), #1844, #1891, #1902, #1918, #1975, #2125.
 - **FR-SP-18 (Must)** — **A trapezoid keeps exactly one pair of parallel sides, or the page says it no longer
   does.** When the givens force a declared trapezoid (flat, or a pyramid's base) to be drawn with both pairs of
   opposite sides parallel, the figure is drawn and an amber warning names the trapezoid while that holds — 2-D's

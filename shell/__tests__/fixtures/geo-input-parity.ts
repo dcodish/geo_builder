@@ -263,6 +263,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2115': 'open', // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
 
   '#2108': 'open',
+  '#2130': 'open', // #2125 (ADR-3D-342): analytic refuses an unnamed circumcircle stated after the incircle
 
 };
 
@@ -1402,6 +1403,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'voices-feminine-inscribed-1975', family: 'inscribed', steps: ['מקבילית ABCD', 'מקבילית ABCD חסומה במעגל'], expect: 'builds', note: '#2035-01' },
   { id: 'voices-feminine-circumscribes-1975', family: 'inscribed', steps: ['משולש ABC', 'משולש ABC חוסמת מעגל'], expect: 'builds', note: '#2035-02' },
   { id: 'bare-run-circumscribes-2098', family: 'inscribed', steps: ['משולש ABC', 'ABC חוסם מעגל'], expect: 'builds', note: 'all three built it before the fix; 2-D drew the circle THROUGH the vertices — its geometry is held by issue-2098-bare-run-circumscribes.test.ts' },
+
+  // ── #2125 (ADR-3D-342): the circle through the vertices and the circle inside are two circles — both build, in either order ──
+  { id: 'circum-then-incircle-2125', family: 'inscribed', steps: ['משולש ABC', 'מעגל חוסם את ABC', 'מעגל חסום במשולש ABC'], expect: 'builds', note: "the operator's sequence: 3-D refused the incircle «ABC כבר מוגדר» before ADR-3D-342 (both unnamed circles were circle-ABC)" },
+  { id: 'incircle-then-circum-2125', family: 'inscribed', steps: ['משולש ABC', 'מעגל חסום במשולש ABC', 'מעגל חוסם את ABC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2130' }], note: 'analytic refuses the circumcircle unsatisfiable in this order (found by round #2128)' },
+  { id: 'circum-passive-then-incircle-2125', family: 'inscribed', steps: ['משולש ABC', 'משולש ABC חסום במעגל', 'מעגל חסום במשולש ABC'], expect: 'builds' },
 
   // ── #2083 (ADR-646): a sentence that only NAMES an existing circle is a reference — the stated radii are kept ──
   { id: 'named-crossing-keeps-radii-2083', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'המעגלים O ו-P נחתכים בנקודות X ו-Y'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2108' }], note: 'analytic refuses the crossing line bad-operand (#2108, needs-operator). 2-D replaced both radii with free defaults (r 5 and 3.6) before ADR-646; the verdict was builds then too — the radii are locked in src/app/__tests__/issue-2083-circle-reference.test.ts' },

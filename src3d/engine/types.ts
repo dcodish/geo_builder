@@ -798,6 +798,16 @@ export type Circle3Def =
   | { kind: 'circum'; ring: Id[] }
   | { kind: 'incircle'; ring: Id[] };
 
+/**
+ * #2125 (ADR-3D-342) — the id of an UNNAMED circle of a ring, keyed by (kind, ring). The circle through the
+ * vertices keeps `circle-<ring>` (every saved file and lock stays valid); the circle inside the polygon is
+ * `circle-in-<ring>`, analytic's spelling (`incircleId`). Keyed by the ring alone, the two circles of one
+ * triangle shared an id and the second was refused «כבר מוגדר». A named circle keeps its letter (`circle-O`).
+ * Saved files are replayed from their stored commands, so an old incircle holding `circle-<ring>` still loads.
+ */
+export const ringCircleId3 = (kind: 'circum' | 'incircle', ring: readonly Id[]): Id =>
+  kind === 'incircle' ? `circle-in-${ring.join('')}` : `circle-${ring.join('')}`;
+
 /** `מעגל O במישור π משיק לישר ℓ בנקודה B` — a circle in R³ (id `circle-<centre>` unless named). */
 export interface Circle3Command {
   type: 'circle3';
