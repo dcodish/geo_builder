@@ -91,7 +91,7 @@ import { runEditCommit, runSetGroupEnabled } from '@/app/editPipeline';
 import { subscribeFigureNotes } from '@/app/figureNotes';
 import { anonPointDescriptor, visibleCoincidences } from '@/render/pointDescriptions';
 import { valueRowText } from '@/render/valueRowText';
-import { humanizeError, translateParams } from '@/i18n/humanizeError';
+import { explainError as explainRefusal, translateParams } from '@/i18n/humanizeError';
 import { otherUtteranceForError, utteranceForError } from '@/app/errorSubject';
 /**
  * Resolve AFTER the browser has had a chance to paint. A just-set React state (e.g. a "thinking"
@@ -121,10 +121,9 @@ export default function App() {
   // fragment cannot say which statement was rejected. Passed in by the display sites (which have the
   // fact list) rather than looked up here, so `humanizeError` stays a pure mapping (ADR-228 Am.6) and
   // the submit path, which has no fact yet, keeps calling with one argument.
-  const explainError = (raw: string | null | undefined, said?: string, other?: string): string => {
-    const m = humanizeError(raw, t, said, other);
-    return m ? `${m} ${t('errors.retryHint')}` : m;
-  };
+  // #2028 (ADR-W-130): the hint is decided in `explainError` (humanizeError.ts), which leaves it off the floor
+  // sentence — one function the banner, the row tooltip and the submit pipeline all render through.
+  const explainError = (raw: string | null | undefined, said?: string, other?: string): string => explainRefusal(raw, t, said, other);
   const facts = useGeoStore((s) => s.facts);
   const selectedId = useGeoStore((s) => s.selectedId);
   const removeGroup = useGeoStore((s) => s.removeGroup);

@@ -77,7 +77,12 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
 - **FR-SU-5 (Must)** — **One voice for refusals and notices.** A refusal, a warning and a notice look and
   read the same in every builder; error text names the conflicting *statement*, never internal state.
   A message may interpolate only what the student typed or the figure shows — never an engine id or noun.
-  - Sources: [ADR-W-096](06w-decisions-workspace.md#adr-w-096), #1522.
+  **No engine text reaches the student.** A failure none of the tool's messages describes reads
+  «משהו השתבש בבניית השורה הזאת. נסו לנסח אותה אחרת, או לפרק אותה לשני צעדים.» ("Something went wrong building
+  this line. Try wording it differently, or split it into two steps."), alone, without the retry hint; so does a
+  message whose explanation would name something the tool made up. Engine text is never shown raw in English and
+  never spliced into a mixed-language line (operator ruling 2026-10-13).
+  - Sources: [ADR-W-096](06w-decisions-workspace.md#adr-w-096), #1522, [ADR-W-130](06w-decisions-workspace.md#adr-w-130), #2028.
 - **FR-SU-7 (Should)** — **A manual screen per builder, in one chrome.** Each builder documents its own
   language; the frame around that documentation is identical. **A section shows a SAMPLE, and the sample is
   chosen rather than sliced:** the guide caps each section so it teaches rather than inventories, the entries

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import i18n from '@/i18n';
-import { humanizeError, PATTERNS, sanitizeIds, translateConstraintWords, translateParams, type Translate } from '@/i18n/humanizeError';
+import { humanizeError, humanizeErrorOutcome, PATTERNS, sanitizeIds, translateConstraintWords, translateParams, type Translate } from '@/i18n/humanizeError';
 import { describeConstraint } from '@/engine/solve';
 import { applyCommand, shapeExclusionError } from '@/engine/apply';
 import { collapsedPolygonError, diagonalClaimRefusal } from '@/engine/step';
@@ -69,7 +69,7 @@ const CASES: { raw: string; contains: string[] }[] = [
   { raw: "circle 'O2' is not defined", contains: ['O2'] },
   { raw: 'unresolved dependencies for: A, B, circle-O', contains: ['A, B, O'] },
   // core.ts (#1748, ADR-578) — a differently spelled re-statement over an unticked row's letters names the row
-  { raw: "can't build: A, B, C belong to the unticked row «משולש ABC» — tick it again or delete it", contains: ['A, B, C', '«משולש', 'ABC', 'המבוטלת'] },
+  { raw: "can't build: A, B, C belong to the unticked row «משולש ABC» — tick it again or delete it", contains: ['«משולש', 'ABC', 'מסומנת כרגע כלא מוצגת'] },
   { raw: 'undefined point: A, B', contains: ['A, B'] }, // #1411 (ADR-577): evaluate names the ABSENT operands
   { raw: 'non-finite position computed', contains: [] },
   { raw: '|AB| = |AD| references an unknown point', contains: ['|AB| = |AD|'] },
@@ -112,15 +112,18 @@ describe('humanizeError', () => {
     it(`humanises: ${raw.slice(0, 50)}…`, () => {
       const out = humanizeError(raw, t);
       expect(out).not.toBe(raw); // it was actually translated, not passed through
+      expect(humanizeErrorOutcome(raw, t).floor, 'a known message must render its own key, not the #2028 floor').toBe(false);
       expect(hasHebrew(out)).toBe(true); // …into Hebrew
       expect(out).not.toContain('errors.'); // the i18n key resolved (no missing-key leak)
       for (const frag of contains) expect(out).toContain(frag); // dynamic data preserved
     });
   }
 
-  it('returns an unrecognised string UNCHANGED (never worse than the raw text)', () => {
+  // #2028 (ADR-W-130, the operator's ruling of 2026-10-13) supersedes "returned UNCHANGED": unmatched engine text
+  // renders the floor sentence, never the raw English. The full lock is humanize-floor.test.ts.
+  it('an unrecognised string renders the floor sentence, never the raw text', () => {
     const novel = 'some brand-new engine diagnostic we have not mapped yet';
-    expect(humanizeError(novel, t)).toBe(novel);
+    expect(humanizeError(novel, t)).toBe(i18n.t('errors.floor'));
   });
 
   it('handles null / empty input', () => {
@@ -195,6 +198,8 @@ describe('#413 — no English word survives in a student-facing message', () => 
     it(`${kind}: its description is fully translated inside a refusal`, () => {
       const desc = describeConstraint(con);
       const msg = humanizeError(`over-constrained: ${desc} cannot hold`, t);
+      // #2028: the floor is Hebrew with no English word too, so this row must prove it reached the ruled frame
+      expect(humanizeErrorOutcome(`over-constrained: ${desc} cannot hold`, t).floor, `«${desc}» fell to the floor`).toBe(false);
       expect(hasHebrew(msg), `«${msg}» is Hebrew`).toBe(true);
       const leak = msg.match(LOWERCASE_RUN);
       expect(leak, `«${msg}» still contains the English word "${leak?.[0]}" (from «${desc}»)`).toBeNull();
