@@ -16,6 +16,8 @@ type Code3 = NonNullable<StoreError3>['code'];
 const others = ['∠ABC = 40°'];
 const ERRORS3: Record<Code3, Payload[]> = {
   'already-defined': [{ id: 'circle-ABCD' }, { id: 'P' }],
+  'angle-name-taken': [{ angle: 'ABC', symbol: 'k', line: '∠ABC = 40°', was: { vertex: 'B', p: 'A', q: 'C', label: 'k', coef: 1 } }, { angle: 'ABC', symbol: 'k', was: { vertex: 'B', p: 'A', q: 'C', label: 'k', coef: 1 } }],
+  'angle-coef-conflict': [{ was: { vertex: 'B', p: 'A', q: 'C', label: 'k', coef: 2 } }],
   'shape-disjoint': [{ stated: 'trapezoid', actual: 'parallelogram' }],
   'inscribed-contradicts-noun': [
     { shape: 'rightTrapezoid', forced: 'rectangle', sentence: 'AB = 3', other: 'משולש ABC' },
