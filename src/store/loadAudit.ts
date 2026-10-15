@@ -21,6 +21,7 @@
 import type { Fact } from './geoStore';
 import { foldCommand, groupKey, replay } from './geoStore';
 import { buildParseCtx, droppedNewLabels, parse } from '@/parser';
+import { indefiniteShapeReading } from './indefiniteShape';
 import type { AnyCommand } from '@/engine';
 
 export interface LoadAuditFinding {
@@ -127,7 +128,9 @@ export function refreshLoadedFigure(facts: Fact[], budgetMs = 4000): { facts: Fa
     const base = namingFacts.length ? [...out, ...namingFacts] : out;
     // Re-parse against the prefix built from the ALREADY-refreshed earlier steps (`out`).
     const { construction, positions } = replay(base);
-    const p = parse(step.utterance, buildParseCtx(construction, positions));
+    const bctx = buildParseCtx(construction, positions);
+    // #2127 (ADR-654): the submit seam's reading of an indefinite shape noun — a second «משולש …» stays a new triangle
+    const p = indefiniteShapeReading(parse(step.utterance, bctx), step.utterance, bctx, base, 0);
     // #1604 (ADR-579): compare and write what a COMMIT would store — the fresh parse folded against the
     // refreshed prefix, the same rule the save's own commit applied — never the raw parse. A fresh reading
     // that folds to nothing (a pure restatement today) keeps the saved row rather than deleting it.
@@ -173,7 +176,7 @@ export function auditLoadedFigure(facts: Fact[], budgetMs = 3000): { findings: L
       findings.push({ step: i + 1, utterance: step.utterance, kind: 'dropped', labels: dropped, group, cmds: step.cmds });
       continue; // `dropped` subsumes `drift` for the step — one finding per row
     }
-    const p = parse(step.utterance, ctx);
+    const p = indefiniteShapeReading(parse(step.utterance, ctx), step.utterance, ctx, prefix, 0); // #2127 (ADR-654)
     if (p.ok && !lowersAsSaved(prefix, p.commands, stated)) // #1604: through the commit's fold, both sides
       findings.push({ step: i + 1, utterance: step.utterance, kind: 'drift', labels: [], group, cmds: step.cmds });
   }

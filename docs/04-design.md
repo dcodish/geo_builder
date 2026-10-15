@@ -472,6 +472,16 @@ Final forms fold first (ך→כ, ם→מ, ן→נ, ף→פ, ץ→צ — the lexi
 makes a misread harmless: a candidate that does not parse produces no suggestion. The alphabet itself is not
 supported (operator ruling): it would reach labels, RTL direction, export and every element id (`seg-AB`).
 
+### An indefinite shape is a new shape ([ADR-654](06-decisions.md#adr-654))
+
+The inscription rules (`inscribedPolygon`, `incircle`) resolve an unnamed shape noun through `referencedPolygon`:
+ADR-029's `existingPolygon` (the figure's one polygon of that size), recorded in a parse-wide sink when
+`shapeNounIsDefinite` (`parser/shapePhrase.ts`) says the noun is indefinite — no glued ה, no preposition prefix,
+no English "the". The outermost `parse` returns the binding as `indefiniteShape` when the winning commands name it.
+`indefiniteShapeReading` (`store/indefiniteShape.ts`), called by submit, the ✎ edit seam, the load refresh and audit (`loadAudit.ts`) and the scenario harness,
+keeps the bound reading only when it restates the shape (dry run empty or implied, and no new violation from the
+givens verifier); otherwise it re-parses with that polygon left out of `ctx.polygons`, so the rule mints fresh letters.
+
 ### A through-statement about a drawn circle is a reference ([ADR-548](06-decisions.md#adr-548))
 
 The circle definition rules (`circle`, `circumcircle` in `src/parser/parse.ts`) ask ADR-029's introduce-vs-resolve

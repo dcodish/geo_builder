@@ -1461,6 +1461,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'circles-tangent-then-cross-2080', family: 'circles', steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'המעגלים O ו-P נחתכים בנקודות X ו-Y'], expect: 'refused', exception: 'X8', note: '2-D committed X = Y on the touch point before ADR-645' },
   // ── #2084 (ADR-647): a point stated on two tangent circles is their touch point (builds, with the converge notice) ──
   { id: 'point-on-two-tangent-circles-2084', family: 'circles', steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'X על מעגל O', 'X על מעגל P'], expect: 'builds', exception: 'X8', note: '2-D answered «כבר קיים» with X off circle P before ADR-647 (a builds verdict then too — the position is locked in src/app/__tests__/issue-2084-point-on-tangent-circles.test.ts)' },
+  { id: 'indefinite-second-triangle-2127', family: 'inscribed', steps: ['מעגל O', 'משולש חוסם את מעגל O', 'משולש חסום במעגל O'], expect: 'builds', exception: 'X8', note: '2-D refused the second, indefinite triangle as contradicting the first before ADR-654; analytic already drew two' },
+  { id: 'indefinite-second-triangle-other-order-2127', family: 'inscribed', steps: ['מעגל O', 'משולש חסום במעגל O', 'משולש חוסם את מעגל O'], expect: 'builds', exception: 'X8' },
   { id: 'tangent-by-lengths-cross-2083', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'OP = 5', 'המעגלים O ו-P נחתכים בנקודות X ו-Y'], expect: 'refused', exception: 'X8', note: '2-D drew X and Y 0.01 apart, green, before ADR-645' },
 
   // ── #2023 / #2061 (ADR-661): a second letter for a measured angle or segment, or the same letter with another

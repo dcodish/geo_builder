@@ -22,6 +22,7 @@ import { runSubmit, type SubmitDeps } from '@/app/submitPipeline';
 import { deserializeFigure, serializeFigure } from '@/store/figureFile';
 import { loadFigureText } from '@/store/figureLoad';
 import { auditLoadedFigure, committedStepCommands, refreshLoadedFigure } from '@/store/loadAudit';
+import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { buildParseCtx, parse } from '@/parser';
 import type { AnyCommand } from '@/engine';
 
@@ -146,7 +147,9 @@ describe('#1604 — save → load round-trip over the fixtures', () => {
         let cmds = s.cmds;
         if (s.utterance) {
           const { construction, positions } = replay(st().facts);
-          const p = parse(s.utterance, buildParseCtx(construction, positions));
+          const ctx = buildParseCtx(construction, positions);
+          // #2127 (ADR-654): the commit seam's reading of an indefinite shape noun
+          const p = indefiniteShapeReading(parse(s.utterance, ctx), s.utterance, ctx, st().facts, 0);
           if (p.ok) cmds = p.commands;
         }
         st().executeMany(cmds, s.utterance);

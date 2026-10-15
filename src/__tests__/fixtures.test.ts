@@ -31,6 +31,7 @@ import { findValidConfig, meetsRequirements } from '@/replay/core';
 import type { Fact } from '@/store/geoStore';
 import { parse, buildParseCtx } from '@/parser';
 import type { AnyCommand } from '@/engine';
+import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { committedStepCommands } from '@/store/loadAudit';
 
 const files = import.meta.glob('./fixtures/*.geo.json', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>;
@@ -126,7 +127,9 @@ describe('figure-file fixtures net', () => {
           const stated = step.cmds.filter((c) => c.type !== 'name-by-use');
           const prefix = [...facts.slice(0, step.start), ...naming];
           const { construction, positions } = replay(prefix);
-          const p = parse(step.utterance, buildParseCtx(construction, positions));
+          const ctx = buildParseCtx(construction, positions);
+          // #2127 (ADR-654): the load refresh's reading of an indefinite shape noun
+          const p = indefiniteShapeReading(parse(step.utterance, ctx), step.utterance, ctx, prefix, 0);
           if (!p.ok) return; // out-of-grammar — an LLM-escalated step, stored as canonical commands
           // #1604 (ADR-579): both sides through the commit's fold — the load refresh's own comparison, so a
           // duplicate the commit dropped (a re-mentioned segment) is not drift here either.
