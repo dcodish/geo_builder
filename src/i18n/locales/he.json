@@ -287,6 +287,70 @@
       "tangentExternal": "המשיק המשותף {{a}}{{b}} צריך להיות חיצוני — שני המרכזים באותו צד שלו",
       "tangentInternal": "המשיק המשותף {{a}}{{b}} צריך להיות פנימי — המרכזים בצדדים מנוגדים שלו",
       "tangentDistinct": "המשיק המשותף החוזר {{a}}{{b}} מתלכד עם המשיק שכבר סורטט ({{prior}})"
+    },
+    "narrowed": {
+      "sentence": "{{cause}}, {{ring}} הוגבל מ{{from}} ל{{to}} — {{kindOf}}.",
+      "cause": {
+        "circum": "כדי שהמעגל יעבור דרך כל הקודקודים",
+        "incircle": "כדי שהמעגל יהיה משיק לכל הצלעות",
+        "rightPyramid": "כדי שהפירמידה תהיה ישרה",
+        "given": "בגלל הנתון {{given}}",
+        "givens": "בגלל הנתונים {{given}}",
+        "unknown": "בגלל הנתונים"
+      },
+      "listSep": ", ",
+      "listLast": " ו-",
+      "shape": {
+        "quadrilateral": "מרובע",
+        "trapezoid": "טרפז",
+        "isosceles-trapezoid": "טרפז שווה שוקיים",
+        "right-trapezoid": "טרפז ישר זווית",
+        "parallelogram": "מקבילית",
+        "rectangle": "מלבן",
+        "rhombus": "מעוין",
+        "kite": "דלתון",
+        "right-kite": "דלתון ישר־זווית",
+        "square": "ריבוע",
+        "triangle": "משולש",
+        "isosceles-triangle": "משולש שווה שוקיים",
+        "equilateral-triangle": "משולש שווה צלעות",
+        "right-triangle": "משולש ישר זווית",
+        "right-isosceles-triangle": "משולש ישר זווית שווה שוקיים"
+      },
+      "shapeA": {
+        "quadrilateral": "מרובע",
+        "trapezoid": "טרפז",
+        "isosceles-trapezoid": "טרפז שווה שוקיים",
+        "right-trapezoid": "טרפז ישר זווית",
+        "parallelogram": "מקבילית",
+        "rectangle": "מלבן",
+        "rhombus": "מעוין",
+        "kite": "דלתון",
+        "right-kite": "דלתון ישר־זווית",
+        "square": "ריבוע",
+        "triangle": "משולש",
+        "isosceles-triangle": "משולש שווה שוקיים",
+        "equilateral-triangle": "משולש שווה צלעות",
+        "right-triangle": "משולש ישר זווית",
+        "right-isosceles-triangle": "משולש ישר זווית שווה שוקיים"
+      },
+      "kindOf": {
+        "quadrilateral": "מרובע הוא סוג של {{from}}",
+        "trapezoid": "טרפז הוא סוג של {{from}}",
+        "isosceles-trapezoid": "טרפז שווה שוקיים הוא סוג של {{from}}",
+        "right-trapezoid": "טרפז ישר זווית הוא סוג של {{from}}",
+        "parallelogram": "מקבילית היא סוג של {{from}}",
+        "rectangle": "מלבן הוא סוג של {{from}}",
+        "rhombus": "מעוין הוא סוג של {{from}}",
+        "kite": "דלתון הוא סוג של {{from}}",
+        "right-kite": "דלתון ישר־זווית הוא סוג של {{from}}",
+        "square": "ריבוע הוא סוג של {{from}}",
+        "triangle": "משולש הוא סוג של {{from}}",
+        "isosceles-triangle": "משולש שווה שוקיים הוא סוג של {{from}}",
+        "equilateral-triangle": "משולש שווה צלעות הוא סוג של {{from}}",
+        "right-triangle": "משולש ישר זווית הוא סוג של {{from}}",
+        "right-isosceles-triangle": "משולש ישר זווית שווה שוקיים הוא סוג של {{from}}"
+      }
     }
   },
   "errors": {

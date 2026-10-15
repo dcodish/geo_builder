@@ -1027,6 +1027,17 @@ offset from the line through its two most-separated vertices, over that separati
 measure), against `DEGENERATE_EXTENT_RATIO`. `nameDegeneracies` walks the statement prefixes (the ADR-492 rule) for the declaring and
 responsible statements; the wording is `figure.degenerate`.
 
+### A declared ring the givens force NARROWER is said (#1996, [ADR-655](06-decisions.md#adr-655), [ADR-W-129](06w-decisions-workspace.md#adr-w-129))
+
+A derived layer of the always-on detect sweep, not of replay: `detectAll(facts, nouns)` returns `narrowed`
+(`replay/narrowing.ts` over `shell/narrowing.ts`). `nouns` is each row's noun as typed, read in the STORE layer
+(`store/rowNouns.ts`, the parser's `readShapePhrase` on the row's utterance) because replay may not import the parser;
+`geoWork.detect` carries it to the worker. Per declared ring: `ringKinds` on every sample of the shared pool (a complete
+pool only), `forcedUnder` the declared kind, `narrowingOf`; then the cause, over per-subset pools (`sampleSubset` —
+the shared memo saved and restored; a "not forced" subset settled by its first strict counterexample). Memoized on the
+fold key. The store keeps `narrowed: { list, facts }` beside `determinacy`; App.tsx renders it in the ⓘ strip through
+`app/narrowingText.ts` and the `figure.narrowed.*` keys.
+
 ## The knowledge pool
 
 ### The knowledge pool of a DETERMINED figure is its admissible set (#434, [ADR-509](06-decisions.md#adr-509))

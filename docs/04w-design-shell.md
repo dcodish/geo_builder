@@ -234,6 +234,22 @@ The cross-builder lock is `shell/__tests__/fixtures/unread-letter-rows.ts` with 
 
 **The message floor ([ADR-W-130](06w-decisions-workspace.md#adr-w-130), #2028).** `hasEngineToken(s)` is the same id shape as a yes/no, for a seam that must refuse to render a value rather than report it. 2-D's errors cross the engine → UI boundary as English strings, so its humaniser (`src/i18n/humanizeError.ts`) has a fall-through: `humanizeErrorOutcome` returns the floor sentence (`errors.floor`) when no pattern matches, and when a matched pattern's engine-derived value (its params and nested letters, never the student's `said`/`other`) still carries an engine token after `sanitizeIds`. `explainError` there is the display wording (banner, row tooltip, submit note): the message plus `errors.retryHint`, except after the floor. 3-D, analytic and complex carry typed codes rendered by exhaustive tables (`errorText3`, analytic and complex `errorText`, complex `whyText`), so they have no fall-through; `message-floor-2028.test.ts` in each of `src3d/__tests__/`, `src-analytic/__tests__/` and `src-complex/__tests__/` (the shared assertions in `shell/__tests__/fixtures/message-floor.ts`) drives every member of each typed union through its renderer and keeps it that way.
 
+### Forced narrowing ([ADR-W-129](06w-decisions-workspace.md#adr-w-129))
+
+`shell/narrowing.ts` decides whether the givens forced a declared ring into a narrower named kind, and what to say. It
+knows no product and holds no student string; each builder supplies the parts only it has:
+
+| The builder supplies | The shell answers |
+| --- | --- |
+| its sample pool, as each sample's ring vertex coordinates (2-D `[x, y]`, 3-D `[x, y, z]`) — complete pools only | `ringKinds` per sample; `forcedUnder(declared, …)` (only samples that ARE the declared kind count); `narrowingOf` |
+| the nouns each row stated over the ring, adjective included, and whether a row types a triangle's right angle | `declaredKindOf` (their meet, plus the card-3 carve-out) |
+| `isForced(rows)` — "with the ring's noun rows and these candidate rows on, is the narrower kind forced" on its own pool | `attributeCause` (k*, the statement typed first; its co-causes; ≤ 8 trials) |
+| each row's class (`circum` · `incircle` · `rightPyramid` · `value` · `relation` · `definition`) and text as typed | `silentByValues`, `causeSlot`, `narrowingSentence(note, t, prefix)` over its own locale keys |
+
+The locale family is the same in every builder (`<prefix>.sentence`, `.cause.*`, `.shape.*`, `.shapeA.*`, `.kindOf.*`,
+`.listSep`, `.listLast`). The cross-builder rows are `shell/__tests__/fixtures/narrowing-note-rows.ts`, with a meta-lock
+and one thin lock per tree (the wiring-guard pattern above).
+
 ## The gates a typed line passes
 
 ### The sequence gate (docs/28 §5d, moved in #1861; [ADR-W-076](06w-decisions-workspace.md#adr-w-076))

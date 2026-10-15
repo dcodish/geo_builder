@@ -112,20 +112,29 @@ describe('ADR-3D-090 — a RIGHT pyramid over every quad base', () => {
 describe('ADR-3D-090 — the build NOTICE names what the shape became', () => {
   beforeEach(reset);
 
+  // #1996 (ADR-3D-343): the one narrowing notice, in the cross-builder family (follow-up card 8) — about the BASE
+  // ring ABCD, never the solid (ABCDS); its cause is the right pyramid.
   for (const [u, from, to] of [
     ['פירמידה ישרה SABCD שבסיסה מעוין', 'rhombus', 'square'],
     ['פירמידה ישרה SABCD שבסיסה מקבילית', 'parallelogram', 'rectangle'],
-    ['פירמידה ישרה SABCD שבסיסה דלתון', 'kite', 'rightKite'],
-    ['פירמידה ישרה SABCD שבסיסה טרפז', 'trapezoid', 'isoTrapezoid'],
-    ['פירמידה ישרה SABCD שבסיסה מרובע', 'quad', 'cyclicQuad'],
+    ['פירמידה ישרה SABCD שבסיסה דלתון', 'kite', 'right-kite'],
+    ['פירמידה ישרה SABCD שבסיסה טרפז', 'trapezoid', 'isosceles-trapezoid'],
   ] as [string, string, string][]) {
     it(`${from} → ${to} raises a notice`, () => {
       submit(u);
       const notices = derive3(state().facts, 0).notices;
       expect(notices).toHaveLength(1);
-      expect(notices[0]).toMatchObject({ kind: 'base-constrained', from, to });
+      expect(notices[0]).toMatchObject({ kind: 'narrowed', ids: ['A', 'B', 'C', 'D'], note: { ring: 'ABCD', from, to, cause: { kind: 'rightPyramid' } } });
     });
   }
+
+  // #1996: a cyclic quadrilateral is not a NAMED kind of the shared lattice, so the family cannot say it; the
+  // ADR-3D-090 sentence is kept unchanged for this one pair (withdrawing it is unruled — asked on #1996).
+  it('quad → a cyclic quad keeps its ADR-3D-090 notice, and no narrowing notice', () => {
+    submit('פירמידה ישרה SABCD שבסיסה מרובע');
+    const notices = derive3(state().facts, 0).notices;
+    expect(notices).toEqual([{ kind: 'base-constrained', ids: ['A', 'B', 'C', 'D', 'S'], from: 'quad', to: 'cyclicQuad' }]);
+  });
 
   it('a base that is ALREADY cyclic raises NO notice (nothing changed)', () => {
     for (const u of ['פירמידה ישרה SABCD שבסיסה ריבוע', 'פירמידה ישרה SABCD שבסיסה מלבן']) {

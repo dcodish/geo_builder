@@ -297,6 +297,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | A computed value on the canvas | opt-in layer only | coordinates while the panel is open | a circle centre's coordinates when known | a typed number's value only (as typed, D1; ADR-CX-065) | **Ruled** — canvas = inputs (ADR-W-047); exceptions per docs/10 P5. **Ruled change**: analytic foci and directrix (B7, #1863) |
 | Letter ↔ value chip | yes | yes | no | yes (ADR-CX-065) | **Gap** — analytic #1725 (icebox) |
 | «✓ הציור נקבע במלואו» | only when one figure fits | whenever nothing is free | whenever nothing is free | whenever nothing is free | **Ruled change** — 2-D's rule everywhere (B8, #1596) |
+| A declared shape forced into a narrower named kind | one ⓘ sentence, the cause first («…, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.») | same (replaces its two base-derived sentences) | same (when the pool completes) | n/a | **Same** — ruled 2026-10-13 (#1996, ADR-W-129); one decision, `shell/narrowing.ts` |
 | Note for a choice the tool made | yes | n/a | yes (equal pair, parallel pair, obtuse vertex, axes) | n/a | **Ruled** — ported to analytic (B10, #1864, ADR-AG-267); the analytic kite's pair is #2006 |
 | «הציגו תצורה אחרת» wording | locked | same | same | same | **Same** (ADR-W-098) |
 | Two possible values | «x = ±a» / «x = a או x = b» | same | same | same | **Same** — one spelling, `shell/valueOptions` (B12, W1, #1867, [ADR-634](06-decisions.md#adr-634)). Three or more: no value shown; the student cycles configurations (operator, 2026-10-07) |

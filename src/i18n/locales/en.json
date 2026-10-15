@@ -287,6 +287,70 @@
       "tangentExternal": "the common tangent {{a}}{{b}} should be external — both centres on the same side of it",
       "tangentInternal": "the common tangent {{a}}{{b}} should be internal — the centres on opposite sides of it",
       "tangentDistinct": "the repeated common tangent {{a}}{{b}} coincides with the tangent already drawn ({{prior}})"
+    },
+    "narrowed": {
+      "sentence": "{{cause}}, {{ring}} was constrained from {{fromA}} to {{toA}} — {{kindOf}}.",
+      "cause": {
+        "circum": "For the circle to pass through every vertex",
+        "incircle": "For the circle to be tangent to every side",
+        "rightPyramid": "For the pyramid to be right",
+        "given": "Because of the given {{given}}",
+        "givens": "Because of the givens {{given}}",
+        "unknown": "Because of the givens"
+      },
+      "listSep": ", ",
+      "listLast": " and ",
+      "shape": {
+        "quadrilateral": "quadrilateral",
+        "trapezoid": "trapezoid",
+        "isosceles-trapezoid": "isosceles trapezoid",
+        "right-trapezoid": "right trapezoid",
+        "parallelogram": "parallelogram",
+        "rectangle": "rectangle",
+        "rhombus": "rhombus",
+        "kite": "kite",
+        "right-kite": "right kite",
+        "square": "square",
+        "triangle": "triangle",
+        "isosceles-triangle": "isosceles triangle",
+        "equilateral-triangle": "equilateral triangle",
+        "right-triangle": "right triangle",
+        "right-isosceles-triangle": "right isosceles triangle"
+      },
+      "shapeA": {
+        "quadrilateral": "a quadrilateral",
+        "trapezoid": "a trapezoid",
+        "isosceles-trapezoid": "an isosceles trapezoid",
+        "right-trapezoid": "a right trapezoid",
+        "parallelogram": "a parallelogram",
+        "rectangle": "a rectangle",
+        "rhombus": "a rhombus",
+        "kite": "a kite",
+        "right-kite": "a right kite",
+        "square": "a square",
+        "triangle": "a triangle",
+        "isosceles-triangle": "an isosceles triangle",
+        "equilateral-triangle": "an equilateral triangle",
+        "right-triangle": "a right triangle",
+        "right-isosceles-triangle": "a right isosceles triangle"
+      },
+      "kindOf": {
+        "quadrilateral": "a quadrilateral is a kind of {{from}}",
+        "trapezoid": "a trapezoid is a kind of {{from}}",
+        "isosceles-trapezoid": "an isosceles trapezoid is a kind of {{from}}",
+        "right-trapezoid": "a right trapezoid is a kind of {{from}}",
+        "parallelogram": "a parallelogram is a kind of {{from}}",
+        "rectangle": "a rectangle is a kind of {{from}}",
+        "rhombus": "a rhombus is a kind of {{from}}",
+        "kite": "a kite is a kind of {{from}}",
+        "right-kite": "a right kite is a kind of {{from}}",
+        "square": "a square is a kind of {{from}}",
+        "triangle": "a triangle is a kind of {{from}}",
+        "isosceles-triangle": "an isosceles triangle is a kind of {{from}}",
+        "equilateral-triangle": "an equilateral triangle is a kind of {{from}}",
+        "right-triangle": "a right triangle is a kind of {{from}}",
+        "right-isosceles-triangle": "a right isosceles triangle is a kind of {{from}}"
+      }
     }
   },
   "errors": {

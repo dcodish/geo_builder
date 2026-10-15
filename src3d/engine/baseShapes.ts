@@ -27,6 +27,7 @@ import { sample } from './rng';
 import { dist3, dot3, norm3, ringCircumcentre2, sub3, type Vec3 } from './vec3';
 import type { Command3, Construction3, Id, PointDef, SolidKind } from './types';
 import type { ShapeAdj3 } from '../lexicon/shapePhrase3';
+import type { NarrowKind } from '../../shell/narrowing';
 
 /** The quadrilateral base shapes a solid can stand on. */
 export type QuadBase = 'square' | 'rectangle' | 'rhombus' | 'parallelogram' | 'kite' | 'trapezoid' | 'quad';
@@ -563,6 +564,23 @@ export function declaredQuads3(c: Pick<Construction3, 'quadShapes' | 'solids'>):
     out.push({ base: spec.base, ids: sld.ids.slice(0, 4), ...(sld.baseAdj ? { adj: sld.baseAdj } : {}), solid: i });
   });
   return out;
+}
+
+/**
+ * #1996 (ADR-3D-343, #1915's root) — the kind a quad ring was DECLARED, its noun WITH the adjective the phrase
+ * consumed: «טרפז שווה שוקיים» is an isosceles trapezoid, «טרפז ישר זווית» a right trapezoid — never the bare
+ * `trapezoid` the base keeps. THE one reader the forced-narrowing note compares with what the givens force; a
+ * base-only reading called a declared isosceles trapezoid "narrowed to an isosceles trapezoid" (#1915).
+ */
+export function declaredKind3(q: { readonly base: QuadBase; readonly adj?: ShapeAdj3 }): NarrowKind {
+  switch (q.base) {
+    case 'trapezoid':
+      return q.adj === 'isosceles' ? 'isosceles-trapezoid' : q.adj === 'right' ? 'right-trapezoid' : 'trapezoid';
+    case 'quad':
+      return 'quadrilateral';
+    default:
+      return q.base;
+  }
 }
 
 /** Is this kind a 4-base pyramid (any base × right/free apex)? The one predicate every

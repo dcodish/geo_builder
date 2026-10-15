@@ -246,7 +246,7 @@ And for the builders whose exam prints no figure:
   - When the figure is forced into a special kind of the shape the student named, and that kind has a name (a rectangle for a parallelogram, a square for a rhombus), a note says so, and says that it is still a kind of what was asked for.
   - The note is for a kind forced in every configuration. A kind that only some configurations show is a configuration (P3), not this note.
   - Every builder (P12). The circle case already has 3-D's sentence (#1899).
-  - Still open, on #1996: whether the note also fires when the student's own given makes the narrower kind («מקבילית ABCD · AB = BC»), and whether it covers triangles («משולש ABC · זווית C = 90»). Until he answers, those are `[proposed]`.
+  - **Ruled (2026-10-13, three ballots, #1996):** every forced narrowing, whatever caused it, the student's own given included («מקבילית ABCD · AB = BC» → «בגלל הנתון AB = BC, ABCD הוגבל ממקבילית למעוין — מעוין הוא סוג של מקבילית.»); one sentence family, the cause first; triangles too, except when the typed given IS the right angle («משולש ABC · זווית C = 90» stays silent); several givens listed as typed; the statement typed first named; silent when only numbers force a kind on a plain «משולש» / «מרובע»; 30-60-90 is not a named kind. Built in every builder (ADR-W-129).
 
 ---
 

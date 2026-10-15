@@ -1932,3 +1932,27 @@ over all four (ADR-041).
 ### `second-right-angle-refused-1936` — «משולש ישר זווית ABC · AB ⊥ BC · AC ⊥ BC»: the ⟂ moves the right angle to B, the second right angle is refused at once naming both statements (#1936 + #2082, ADR-658)
 
 **Guards against:** the third line committed as a red deferred row («over-constrained: AC ⟂ BC cannot hold») that no later given could clear, and the ⟂ on line 2 not pinning the right triangle's seat in the fold. Operator rulings 2026-10-09/10 on #1936 (*"All three tools refuse immediately, naming both statements"*) and 2026-10-14 on #2082. Asserts line 2 builds with ∠ABC = 90° and that «AC ⊥ BC» is refused at the gate with «לא ניתן: «AC ⊥ BC» סותר את «AB ⊥ BC» — …». The class matrices are `src/app/__tests__/issue-1936-second-right-angle.test.ts` and `issue-2082-perp-reseat.test.ts`.
+
+### `narrowing-note-circle-points-parallelogram-1996` — «מעגל O · A, B, C ו-D על המעגל · AB = 3 · BC = 4 · מקבילית ABCD»: the 3 × 4 rectangle with the circle note (#1996, ADR-655)
+
+**Guards against:** the rectangle drawn silently under the noun «מקבילית» (the operator's #1913 T1: *"we have to have a note indicating the only shape possible is a rectangle which is also a kind of a parallelogram"*). **Asserts** ∠A = 90° and «כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.». The cross-builder rows are `shell/__tests__/fixtures/narrowing-note-rows.ts`; 2-D's thin lock and lifecycle are `src/app/__tests__/narrowing-note-1996.test.ts`.
+
+### `narrowing-note-parallelogram-inscribed-t56-1996` — «מקבילית ABCD · מקבילית ABCD חסומה במעגל»: the rectangle with the circle note (operator T56, 2026-10-14; #1996, ADR-655)
+
+**Guards against:** the operator's 2026-10-14 report on the #2107 sheet, *"shape was reduced to a rectangle but no notice is given to user"*. **Asserts** ∠A = 90° and the circle note.
+
+### `narrowing-note-parallelogram-height-t41-1996` — «מקבילית ABCD · AB גובה»: the rectangle with «בגלל הנתון AB גובה, …» (operator T41, 2026-10-14; #1996, ADR-655)
+
+**Guards against:** the same play session's T41 (#2064 Stage 2), approved but not delivered. **Asserts** «בגלל הנתון AB גובה, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.».
+
+### `narrowing-note-given-rhombus-1996` — «מקבילית ABCD · AB = BC»: «בגלל הנתון AB = BC, ABCD הוגבל ממקבילית למעוין — מעוין הוא סוג של מקבילית.» (#1996, ADR-655)
+
+**Guards against:** a narrowing the student's own given caused drawn silently (ruling 2026-10-13, cards 1 and 2). **Asserts** the sentence verbatim.
+
+### `narrowing-note-isosceles-sixty-1996` — «משולש שווה שוקיים ABC · זווית BAC = 60»: the equilateral note (#1996 card 3, ADR-655)
+
+**Guards against:** the triangle narrowing drawn silently (card 3) and the numeric silence reaching a declared named kind (third ballot A). **Asserts** «בגלל הנתון זווית BAC = 60, ABC הוגבל ממשולש שווה שוקיים למשולש שווה צלעות — משולש שווה צלעות הוא סוג של משולש שווה שוקיים.».
+
+### `narrowing-note-typed-right-angle-silent-1996` — «משולש ABC · זווית C = 90»: NO note — the typed right angle is the carve-out (#1996 card 3, ADR-655)
+
+**Guards against:** a note on the right angle the student typed (card 3: *"«משולש ABC» then «זווית C = 90» stays silent"*). **Asserts** no note, and none for «AC ⊥ BC».

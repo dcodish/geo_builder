@@ -15,9 +15,10 @@
  * it needs no plumbing through the submit path.
  */
 
-import { CYCLIC_MEMBER, CYCLIC_MEMBER_NAME, declaredQuads3, QUAD_PYRAMIDS, quadShapeDrawn } from './baseShapes';
-import { claimPinsParam, isSelfDetermined, lineDirCarriesParam, operandLabel, planeNormalCarriesParam } from './operands';
+import { declaredQuads3, QUAD_PYRAMIDS, quadShapeDrawn } from './baseShapes';
 import type { QuadBase } from './baseShapes';
+import type { NarrowingNote } from '../../shell/narrowing';
+import { claimPinsParam, isSelfDetermined, lineDirCarriesParam, operandLabel, planeNormalCarriesParam } from './operands';
 import { cross3, dot3, norm3, sub3 } from './vec3';
 import type { Vec3 } from './vec3';
 import type { Resolved3 } from './evaluate';
@@ -121,6 +122,12 @@ export const DEGENERATE_FLAT_RATIO = 1e-2;
  */
 const FLAT_BY_DESIGN: ReadonlySet<SolidKind> = new Set<SolidKind>(['polygon3', 'polygon4', 'polygon5']);
 
+/** #1996: a forced-narrowing note and the ring it is about (`store/narrowing3.ts` computes it). */
+export interface NarrowedRing3 {
+  readonly ids: readonly Id[];
+  readonly note: NarrowingNote;
+}
+
 /** A non-error message attached to a successfully built figure. */
 export type BuildNotice3 =
   | {
@@ -137,23 +144,30 @@ export type BuildNotice3 =
       because: DegenerateCause[];
     }
   | {
-      /** A stated base was constrained into the cyclic member of its family so «ישרה» could hold. */
+      /**
+       * ADR-3D-090: a right pyramid over a plain «מרובע» base made it a quadrilateral inscribed in a circle. Kept,
+       * word for word, for this ONE pair (#1996, ADR-3D-343): a cyclic quadrilateral is not a named kind of the
+       * shared lattice, so the narrowing family cannot say it, and withdrawing it is a change nobody ruled
+       * (asked of the operator on #1996). Every other pair moved to `narrowed`.
+       */
       kind: 'base-constrained';
-      /** The solid's vertex ids (so the UI can name the solid the way the student did). */
       ids: Id[];
-      /** The base the student stated, and the shape it became — both i18n keys. */
-      from: QuadBase;
-      to: string;
+      from: 'quad';
+      to: 'cyclicQuad';
     }
   | {
-      /** #1792: a stated quad was constrained into the cyclic member of its family so the circle stated
-       *  THROUGH its vertices could hold («טרפז ABCD חסום במעגל» — a cyclic trapezoid is isosceles). */
-      kind: 'inscribed-constrained';
-      /** The ring, as the student lettered it. */
+      /**
+       * #1996 (ADR-3D-343, ADR-W-129): the givens forced a declared ring into a strictly NARROWER named kind
+       * («מקבילית ABCD · ABCD חסום במעגל» → a rectangle; «מקבילית ABCD · |AB| = |BC|» → a rhombus; a right pyramid
+       * over a parallelogram → a rectangle) — said in the one cause-naming sentence family of every builder. ONE
+       * notice in place of the two `CYCLIC_MEMBER`-keyed ones (`base-constrained`, `inscribed-constrained`), which
+       * read the noun's base and so fired when nothing was narrowed (#1915). The note (forced kind and cause) is
+       * computed where facts and utterances are known (`store/narrowing3.ts`, from `derive3`).
+       */
+      kind: 'narrowed';
+      /** The ring, as the student lettered its declaration (a pyramid's BASE ring, never the apex). */
       ids: Id[];
-      /** The shape the student stated, and the shape it became — both `notice.shape.*` keys. */
-      from: QuadBase;
-      to: string;
+      note: NarrowingNote;
     }
   | {
       /** #375: the student called a LINE a plane («ACD אנך למישור ℓ1»). The kinds are known, so the
@@ -505,11 +519,11 @@ function degenerateSolids(c: Construction3, samples: readonly Resolved3[]): Buil
  * Every notice the figure currently warrants. Recomputed on each derive — a notice is a property of
  * the built figure, never a one-shot event, so undo/redo and load all show the right thing.
  */
-export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = []): BuildNotice3[] {
+export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = [], narrowed: readonly NarrowedRing3[] = []): BuildNotice3[] {
   const out: BuildNotice3[] = [];
   // #1918 (ADR-3D-313; #1915 step 2, "out of family, no pair"): a ring the drawing shows as a parallelogram
-  // carries the trapezoid warning, and «…הוגבל מ־טרפז ל־טרפז שווה שוקיים» beside it would contradict it — so a
-  // warned ring gets no cyclic-member notice. Judged on the drawn configuration, as the warning is.
+  // carries the trapezoid warning, and a narrowing note beside it would contradict it — so a warned ring gets
+  // no narrowing note (#1996). Judged on the drawn configuration, as the warning is.
   const warned = samples[0] ? shapeWarnings3(c, samples[0].positions).map((w) => [...w.ids].sort().join(',')) : [];
   const isWarned = (ids: readonly Id[]) => warned.includes([...ids].sort().join(','));
   // #375: derived from the pin's own flag, so it survives save/load and undo exactly like every notice
@@ -525,25 +539,18 @@ export function buildNotices3(c: Construction3, samples: readonly Resolved3[] = 
     if (def.kind === 'plane-plane' && def.requested && def.requested !== name) {
       out.push({ kind: 'line-auto-named', requested: def.requested, assigned: name });
     }
-  }  for (const s of c.solids) {
-    const spec = (QUAD_PYRAMIDS as Partial<Record<SolidKind, { base: QuadBase; right: boolean }>>)[s.kind];
-    if (!spec?.right) continue;
-    const entry = CYCLIC_MEMBER[spec.base];
-    if (entry.fix.kind === 'none') continue; // square / rectangle are cyclic already — nothing changed
-    if (isWarned(s.ids.slice(0, 4))) continue; // #1918
-    out.push({ kind: 'base-constrained', ids: [...s.ids], from: spec.base, to: CYCLIC_MEMBER_NAME[spec.base] });
   }
-  // #1792: the same registry, reached by a circle through a stated quad's vertices. Derived from the
-  // construction (the circle and the stated shape), so it survives undo/load like every notice.
-  for (const k of c.circles3) {
-    if (k.def.kind !== 'circum' || k.def.ring.length !== 4) continue;
-    const ring = k.def.ring;
-    // #1918: through the one declared-ring reader — the FLAT declarations, as before (a pyramid's base under a
-    // circle is not this notice's case, and widening it would be a message nobody asked for)
-    const stated = declaredQuads3(c).find((q) => q.solid === undefined && q.ids.length === 4 && q.ids.every((id) => ring.includes(id)));
-    if (!stated || CYCLIC_MEMBER[stated.base].fix.kind === 'none') continue;
-    if (isWarned(ring)) continue; // #1918
-    out.push({ kind: 'inscribed-constrained', ids: [...ring], from: stated.base, to: CYCLIC_MEMBER_NAME[stated.base] });
+  // #1996 (ADR-3D-343): the forced-narrowing notes `derive3` computed (the cause needs the facts). A ring the
+  // drawing shows as a parallelogram carries the trapezoid warning (#1918), and a narrowing note beside it would
+  // contradict it — so a warned ring gets none, judged on the drawn configuration as the warning is.
+  for (const n of narrowed) {
+    if (isWarned(n.ids)) continue;
+    out.push({ kind: 'narrowed', ids: [...n.ids], note: n.note });
+  }
+  // ADR-3D-090's sentence for the one pair the family cannot name (see the `base-constrained` variant)
+  for (const s of c.solids) {
+    const spec = (QUAD_PYRAMIDS as Partial<Record<SolidKind, { base: QuadBase; right: boolean }>>)[s.kind];
+    if (spec?.right && spec.base === 'quad') out.push({ kind: 'base-constrained', ids: [...s.ids], from: 'quad', to: 'cyclicQuad' });
   }
   // #853 (ADR-3D-209): everything that says «true, and already known» — one predicate, one channel.
   // The four cases that used to live here inline (a redundant shape, a relation between two

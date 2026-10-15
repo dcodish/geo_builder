@@ -340,6 +340,10 @@ const SEEDED: SeededCorpus = {
   // refused «"ABC" כבר מוגדר בציור» (both unnamed circles were `circle-ABC`). Both orders, voices and the
   // same-kind restatement are asserted in issue-2125-incircle-id.test.ts; this is the build + drift net.
   'circum-and-incircle-2125.geo3.json': ['משולש ABC', 'מעגל חוסם את ABC', 'מעגל חסום במשולש ABC'],
+  // #1996 (ADR-3D-343) — the rule-4 lock of the forced-narrowing note's reference row: a declared parallelogram a
+  // circle through its vertices makes a rectangle. The essence here is "builds green and verifies" (the drift net);
+  // the note's exact sentence, the cause attribution and the lifecycle live in narrowing-note-1996.test.ts.
+  'parallelogram-inscribed-narrowed-1996.geo3.json': ['מקבילית ABCD', 'ABCD חסום במעגל'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

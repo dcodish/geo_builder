@@ -474,6 +474,10 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «טרפז ישר זווית ABCO» · «∠C = 90» · «∠O = 90» → «הטרפז ABCO כבר אינו טרפז…»
 - Sources: ADR-AG-189, #1627, ADR-157, ADR-165, ADR-AG-252.
 
+**R179 — a declared shape the givens force into a narrower named kind is said, naming what forced it**. 2-D's FR-HS-14, word for word (ADR-W-129): «מקבילית ABCD» · «ABCD חסום במעגל» → «כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.». The note appears when the configuration pool completes, a beat after the figure, like the panel values (ADR-AG-180); never a provisional one.
+- «מקבילית ABCD» · «AB = BC» → «בגלל הנתון AB = BC, ABCD הוגבל ממקבילית למעוין — מעוין הוא סוג של מקבילית.»
+- Sources: ADR-AG-276, ADR-W-129, #1996, #1899.
+
 **R103 — a named cevian ACTUALLY REACHES its side, and may reach the side's extension**. D on BC and the role's property, in every configuration; the foot is on the LINE, beyond the side for an obtuse triangle.
 - «AD גובה לצלע BC»
 - Sources: #1232.

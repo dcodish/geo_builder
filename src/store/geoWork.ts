@@ -22,6 +22,8 @@ import {
   type Fact,
   type FoldNode,
 } from '@/replay/core';
+import type { RowNouns } from '@/replay/narrowing';
+import { rowNouns } from './rowNouns';
 import type { GeoWorkResponse, ResampleDone, AutoResolveDone, PrefoldDone, DetectDone, ValuesDone } from './geoWorker';
 
 type Done = ResampleDone | AutoResolveDone | PrefoldDone | DetectDone | ValuesDone;
@@ -115,6 +117,8 @@ function call(
   onProgress?: (k: number, n: number) => void,
   /** #477: the student's value queries — carried on the `values` op only. */
   queries: QueryInput[] = [],
+  /** #1996 (ADR-655): each row's stated nouns — carried on the `detect` op only (read here: the worker's replay may not parse). */
+  nouns: RowNouns = {},
 ): Promise<Done> {
   if (!hasWorker) {
     // synchronous fallback — the same functions, same semantics, main thread (tests / no-Worker envs)
@@ -125,7 +129,7 @@ function call(
         const found = findValidConfig(facts, seed); // #364 (ADR-510): from the current seed
         return Promise.resolve({ op, found: found ? { ...found, fold: null } : null } as AutoResolveDone);
       }
-      if (op === 'detect') return Promise.resolve({ op, result: detectAll(facts) });
+      if (op === 'detect') return Promise.resolve({ op, result: detectAll(facts, nouns) });
       if (op === 'values') return Promise.resolve({ op, result: computeValues(facts, queries) });
       replay(facts, seed);
       return Promise.resolve({ op: 'prefold', fold: getFoldFor(facts) } as PrefoldDone);
@@ -137,7 +141,7 @@ function call(
   const lane = LANE_OF[op];
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject, onProgress, lane });
-    ensureWorker(lane).postMessage({ id, op, facts, seed, ...(queries.length ? { queries } : {}) });
+    ensureWorker(lane).postMessage({ id, op, facts, seed, ...(queries.length ? { queries } : {}), ...(op === 'detect' ? { nouns } : {}) });
   });
 }
 
@@ -174,7 +178,7 @@ export const geoWork = {
   detect(facts: Fact[]): Promise<DetectAllResult> {
     if (detectInFlight?.facts === facts) return detectInFlight.promise;
     if (detectInFlight) cancelLane('detect'); // superseded — its figure is no longer on screen
-    const promise = call('detect', facts, 0)
+    const promise = call('detect', facts, 0, undefined, [], rowNouns(facts))
       .then((done) => (done as DetectDone).result)
       .finally(() => {
         if (detectInFlight?.promise === promise) detectInFlight = null;
