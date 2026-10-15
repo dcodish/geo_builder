@@ -3960,7 +3960,7 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'second-shape-noun-over-a-ring-1988-1985',
     title: 'A second shape noun over a declared ring: implied restates, excluding refuses',
     guards:
-      "#1988 + #1985 (ADR-619), operator rulings 2026-10-10. Measured on 06fc51dd through decideDeterministic2D: «ריבוע ABCD» · «מלבן ABCD» and «מקבילית ABCD» · «טרפז ABCD» were both refused with the engine's own «'C' is already defined …» — a letter the engine chose, not the statement in conflict (the honesty invariant). Root cause: 2-D judged a second shape noun by whose derived corner it would rebuild, and had no reading of the quadrilateral hierarchy at all — ADR-595 covered only the one noun («מרובע») that implies nothing. Fix: ONE table (QUAD_IMPLIES, shapeKinds.ts) read in both directions — an IMPLIED noun is re-spelled to the generic ring command (ADR-595's own path, so «כבר קיים» with no row), an EXCLUDING one is refused by a stage-0 prover with the ruled sentence. A pair that is neither (a rhombus over a rectangle) stays ADR-157's refusal. The class matrix is src/app/__tests__/issue-1988-1985-second-shape-noun.test.ts.",
+      "#1988 + #1985 (ADR-619), operator rulings 2026-10-10. Measured on 06fc51dd through decideDeterministic2D: «ריבוע ABCD» · «מלבן ABCD» and «מקבילית ABCD» · «טרפז ABCD» were both refused with the engine's own «'C' is already defined …» — a letter the engine chose, not the statement in conflict (the honesty invariant). Root cause: 2-D judged a second shape noun by whose derived corner it would rebuild, and had no reading of the quadrilateral hierarchy at all — ADR-595 covered only the one noun («מרובע») that implies nothing. Fix: ONE table (QUAD_IMPLIES, shapeKinds.ts) read in both directions — an IMPLIED noun is re-spelled to the generic ring command (ADR-595's own path, so «כבר קיים» with no row), an EXCLUDING one is refused by a stage-0 prover with the ruled sentence. A pair that is neither (a rhombus over a rectangle) stayed ADR-157's refusal until ADR-656 (#1993: it now refines the ring to the square). The class matrix is src/app/__tests__/issue-1988-1985-second-shape-noun.test.ts.",
     steps: ['מקבילית ABCD'],
     check(fig) {
       allStepsOk(fig);
@@ -3983,10 +3983,10 @@ export const SCENARIOS_4: Scenario[] = [
       // and the declared square is still a square afterwards
       const poly = replay(sq).construction.objects.find((o) => o.kind === 'polygon');
       expect(poly && 'declaredAs' in poly && poly.declaredAs).toBe('square');
-      // the control: neither implied nor excluded keeps ADR-157's refusal
+      // the pair that is neither (a rhombus over a rectangle — a square is both) no longer keeps ADR-157's refusal: it
+      // refines the ring (ADR-656, #1993 ruling 2026-10-11); its notice and figure: issue-1914-1993-noun-refines-ring.test.ts
       const rect = factsOf(['מלבן ABCD']);
-      expect(gateVerdict(rect, 'מעוין ABCD')).toMatchObject({ kind: 'refused', reason: 'error' });
-      expect((gateVerdict(rect, 'מעוין ABCD') as { detail?: string }).detail).toMatch(/already defined/);
+      expect(gateVerdict(rect, 'מעוין ABCD').kind).not.toBe('refused');
     },
   },
   {

@@ -33,7 +33,8 @@ import {
   ringKinds,
   type CauseClass,
   type NarrowKind,
-  type NarrowingNote,
+  mergeOf,
+  type RingNote,
 } from '../../shell/narrowing';
 
 /** The minimal fact shape this module reads (the replay `Fact`, without importing core — no cycle). */
@@ -133,22 +134,21 @@ export function rowClass2D(cmds: readonly AnyCommand[], ownRings: readonly (read
   return 'definition';
 }
 
-let memo: { key: string; notes: NarrowingNote[] } | null = null;
+let memo: { key: string; notes: RingNote[] } | null = null;
 
 /**
  * Every forced-narrowing note the figure warrants. `keyOf` is the fold key of the facts (content-keyed memo:
  * the detect op is asked once per layer, and attribution is paid once per figure).
  */
-export function narrowingNotes2D(facts: NFact[], pool: NPool, nouns: RowNouns, deps: NarrowingDeps, keyOf: (facts: NFact[]) => string): NarrowingNote[] {
-  if (!pool.complete || pool.samples.length === 0) return [];
-  const key = keyOf(facts) + '|' + JSON.stringify(nouns);
+export function narrowingNotes2D(facts: NFact[], pool: NPool, nouns: RowNouns, deps: NarrowingDeps, keyOf: (facts: NFact[]) => string): RingNote[] {
+  const key = keyOf(facts) + '|' + JSON.stringify(nouns) + '|' + (pool.complete && pool.samples.length > 0);
   if (memo?.key === key) return memo.notes;
   const notes = compute(facts, pool, nouns, deps);
   memo = { key, notes };
   return notes;
 }
 
-function compute(facts: NFact[], pool: NPool, nouns: RowNouns, deps: NarrowingDeps): NarrowingNote[] {
+function compute(facts: NFact[], pool: NPool, nouns: RowNouns, deps: NarrowingDeps): RingNote[] {
   // the enabled rows, in typed order
   const rows: string[] = [];
   const cmdsOf = new Map<string, AnyCommand[]>();
@@ -176,7 +176,14 @@ function compute(facts: NFact[], pool: NPool, nouns: RowNouns, deps: NarrowingDe
   }
   const ownRingsOf = (k: string) => (nouns[k] ?? []).map((n) => n.ring);
   const classOf = new Map(rows.map((k) => [k, rowClass2D(cmdsOf.get(k)!, ownRingsOf(k))]));
-  const out: NarrowingNote[] = [];
+  const out: RingNote[] = [];
+  // #1993 (ADR-656): two nouns the ring carries together — the kind both name, said once; read off the nouns alone,
+  // so it needs no pool
+  for (const ring of rings.values()) {
+    const m = mergeOf(ring.kinds);
+    if (m) out.push({ ring: ring.ids.join(''), ...m });
+  }
+  if (!pool.complete || pool.samples.length === 0) return out; // a cut pool over-claims forcing (ADR-558)
   for (const ring of rings.values()) {
     const carve = rows.filter((k) => {
       const cmds = cmdsOf.get(k)!;

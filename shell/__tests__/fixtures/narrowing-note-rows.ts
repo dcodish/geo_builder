@@ -56,7 +56,7 @@ export const NARROW_ROWS: readonly NarrowRow[] = [
     note: P_RECT(CIRCUM),
     exception: { '3d': X8_CIRCLE_POINTS },
   },
-  { steps: ['ABCD חסום במעגל', 'מקבילית ABCD'], note: P_RECT(CIRCUM), gap: { '2d': 1914 } },
+  { steps: ['ABCD חסום במעגל', 'מקבילית ABCD'], note: P_RECT(CIRCUM) }, // 2-D since ADR-656 (#1914)
   // ── a circle tangent to every side ──
   { steps: ['מלבן ABCD', 'מעגל חסום במלבן ABCD'], note: note(INCIRCLE, 'ABCD', 'מלבן', 'ריבוע', 'ריבוע הוא סוג של מלבן'), exception: { '3d': X8_INCIRCLE } },
   { steps: ['מקבילית ABCD', 'מעגל חסום במקבילית ABCD'], note: note(INCIRCLE, 'ABCD', 'מקבילית', 'מעוין', 'מעוין הוא סוג של מקבילית'), exception: { '3d': X8_INCIRCLE } },
@@ -138,9 +138,9 @@ export function rowFor(row: NarrowRow, b: Builder): { steps: readonly string[]; 
  * Every fault of `gate` (builder `b`) against the rows. A gap row must still FAIL (a passing gap row says "move
  * it": the known gap closed and the row should become a plain one).
  */
-export async function narrowingFaults(gate: NarrowGate, b: Builder): Promise<string[]> {
+export async function narrowingFaults(gate: NarrowGate, b: Builder, rows: readonly NarrowRow[] = NARROW_ROWS): Promise<string[]> {
   const faults: string[] = [];
-  for (const row of NARROW_ROWS) {
+  for (const row of rows) {
     const r = rowFor(row, b);
     if (!r) continue;
     const v = await gate(r.steps);

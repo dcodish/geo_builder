@@ -384,3 +384,45 @@ export function declaredKindOf(nouns: readonly NarrowKind[], typedRightAngle: bo
 
 /** Order-free key of a ring (the same four letters in any rotation or direction). */
 export const narrowRingKey = (ids: readonly string[]): string => [...ids].sort().join(',');
+
+/**
+ * #1993 ([ADR-656](../docs/06-decisions.md#adr-656)) — TWO NOUNS THE RING CARRIES TOGETHER, neither a kind of the
+ * other («מלבן ABCD» · «מעוין ABCD»): the ring is now the kind both name (a square), and the student is told so —
+ * the operator's 2026-10-11 ruling, *"if a shape can be both, we should say in the message that the shape is now X
+ * which is also Y"*, with the wording he approved: «ABCD הוא כעת ריבוע, שהוא גם מלבן וגם מעוין.».
+ */
+export interface MergeNote {
+  ring: string;
+  /** the kind the ring now is (every noun's meet) */
+  now: NarrowKind;
+  /** the first two nouns, in typed order, of which neither implies the other */
+  a: NarrowKind;
+  b: NarrowKind;
+}
+
+/**
+ * The sibling pair among a ring's nouns, typed order, and what the ring now is — or null. Quadrilaterals only: the
+ * ruling's pairs (rectangle ↔ rhombus, rectangle ↔ kite, parallelogram ↔ kite); a triangle's two nouns are not in it.
+ */
+export function mergeOf(kinds: readonly NarrowKind[]): Omit<MergeNote, 'ring'> | null {
+  const now = declaredKindOf(kinds, false);
+  if (!now || familyRoot(now) !== 'quadrilateral') return null;
+  for (let i = 0; i < kinds.length; i++) {
+    for (let j = i + 1; j < kinds.length; j++) {
+      const [a, b] = [kinds[i], kinds[j]];
+      if (!narrowImplies(a, b) && !narrowImplies(b, a) && meetKinds(a, b)) return { now, a, b };
+    }
+  }
+  return null;
+}
+
+/** The merge note as one sentence: `<prefix>.merged` {ring, now, a, b, nowA, aA, bA}. */
+export function mergeSentence(note: MergeNote, t: NarrowTranslate, prefix: string): string {
+  const shape = (k: NarrowKind) => t(`${prefix}.shape.${k}`);
+  const shapeA = (k: NarrowKind) => t(`${prefix}.shapeA.${k}`);
+  return t(`${prefix}.merged`, { ring: note.ring, now: shape(note.now), a: shape(note.a), b: shape(note.b), nowA: shapeA(note.now), aA: shapeA(note.a), bA: shapeA(note.b) });
+}
+
+/** Either note a ring can carry. */
+export type RingNote = NarrowingNote | MergeNote;
+export const isMergeNote = (n: RingNote): n is MergeNote => 'now' in n;

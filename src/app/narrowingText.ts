@@ -7,7 +7,8 @@
  * `shell/__tests__/fixtures/narrowing-note-rows.ts` lock it). Pure, and imported by its lock (the seam registry:
  * a decision a test reproduces instead of calling is the #1102 root).
  */
-import { narrowingSentence, type NarrowTranslate, type NarrowingNote } from '../../shell/narrowing';
+import { isMergeNote, mergeSentence, narrowingSentence, type NarrowTranslate, type RingNote } from '../../shell/narrowing';
 
-export const narrowingText = (notes: readonly NarrowingNote[], t: NarrowTranslate): string[] =>
-  notes.map((n) => narrowingSentence(n, t, 'figure.narrowed'));
+/** #1993 (ADR-656): a ring two sibling nouns made the kind both name says «ABCD הוא כעת ריבוע, שהוא גם מלבן וגם מעוין.». */
+export const narrowingText = (notes: readonly RingNote[], t: NarrowTranslate): string[] =>
+  notes.map((n) => (isMergeNote(n) ? mergeSentence(n, t, 'figure.narrowed') : narrowingSentence(n, t, 'figure.narrowed')));

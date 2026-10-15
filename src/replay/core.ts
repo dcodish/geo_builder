@@ -28,7 +28,7 @@ import { objectParents } from '@/engine/types';
 import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption } from '@/engine';
 import { resolveBinds } from './naming';
 import { narrowingNotes2D, type RowNouns } from './narrowing';
-import type { NarrowingNote } from '../../shell/narrowing';
+import type { RingNote } from '../../shell/narrowing';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -4397,7 +4397,7 @@ export interface DetectAllResult {
   determinacy: Determinacy;
   /** #1996 (ADR-655): every declared ring the givens forced into a narrower named kind, with its cause — read off
    *  the SAME pool (complete only), the cause from per-subset pools ({@link sampleSubset}). */
-  narrowed: NarrowingNote[];
+  narrowed: RingNote[];
 }
 
 /**

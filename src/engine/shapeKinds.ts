@@ -73,3 +73,36 @@ export const quadImpliesInEveryReading = (have: QuadKind, want: QuadKind): boole
  */
 export const quadsExclude = (x: QuadKind, y: QuadKind): boolean =>
   !(Object.keys(QUAD_IMPLIES) as QuadKind[]).some((k) => quadImplies(k, x) && quadImplies(k, y));
+
+/**
+ * #1993 / #1914 ([ADR-656](../../docs/06-decisions.md#adr-656)) — THE MOST GENERAL KIND THAT IS BOTH, derived from
+ * the table: «מלבן» and «מעוין» meet in «ריבוע», «מקבילית» and «דלתון» in «מעוין». Null when no quadrilateral
+ * carries both (`quadsExclude`) or the answer is not unique.
+ */
+export function quadMeet(x: QuadKind, y: QuadKind): QuadKind | null {
+  const both = (Object.keys(QUAD_IMPLIES) as QuadKind[]).filter((k) => quadImplies(k, x) && quadImplies(k, y));
+  const top = both.filter((k) => both.every((o) => quadImplies(o, k)));
+  return top.length === 1 ? top[0] : null;
+}
+
+/**
+ * #1993 / #1914 ([ADR-656](../../docs/06-decisions.md#adr-656)) — WHAT A SECOND NOUN DOES TO A RING ALREADY DECLARED,
+ * three-valued over the one table (ADR-619 read it two-valued, so a pair that is neither fell to the engine's
+ * «כבר מוגדרת»):
+ * - `implies` — the declared noun already says it (a square is a rectangle): a restatement, «כבר קיים»;
+ * - `narrows` — the stated noun is a special kind of the declared one («מקבילית» → «מלבן», «מרובע» → anything):
+ *   the ring takes it (the operator's 2026-10-08 ruling on #1914, *"Yes, any narrowing refines"*);
+ * - `siblings` — neither implies the other but one kind is both (rectangle and rhombus — a square): the ring
+ *   becomes that kind (the 2026-10-11 ruling on #1993);
+ * - `excludes` — no quadrilateral is both (the trapezoid family against the parallelogram family or the kite):
+ *   ADR-619's refusal.
+ */
+export type QuadRelation = 'implies' | 'narrows' | 'siblings' | 'excludes';
+export function quadRelation(declared: QuadKind, stated: QuadKind): QuadRelation {
+  if (quadImplies(declared, stated)) return 'implies';
+  if (quadImplies(stated, declared)) return 'narrows';
+  return quadMeet(declared, stated) ? 'siblings' : 'excludes';
+}
+
+/** The kind a ring declared `declared` becomes when `stated` is said of it too (null when they exclude). */
+export const quadAfter = (declared: QuadKind, stated: QuadKind): QuadKind | null => quadMeet(declared, stated);

@@ -350,7 +350,8 @@
         "equilateral-triangle": "an equilateral triangle is a kind of {{from}}",
         "right-triangle": "a right triangle is a kind of {{from}}",
         "right-isosceles-triangle": "a right isosceles triangle is a kind of {{from}}"
-      }
+      },
+      "merged": "{{ring}} is now {{nowA}}, which is both {{aA}} and {{bA}}."
     }
   },
   "errors": {

@@ -160,15 +160,15 @@ describe('#1985 — a noun that EXCLUDES the declared one is refused with the ru
 });
 
 describe('#1988 + #1985 — what did NOT change', () => {
-  it('a noun that neither implies nor excludes the declared one stays ADR-157’s refusal', async () => {
-    // a square is both a rectangle and a rhombus, so the two exclude nothing — and neither narrows the other
+  it('a noun that neither implies nor excludes the declared one now builds the kind both name (ADR-656, #1993)', async () => {
+    // a square is both a rectangle and a rhombus — the 2026-10-11 ruling: the ring narrows and the student is told
+    // (the notice and the 24-seed figure: issue-1914-1993-noun-refines-ring.test.ts)
     for (const [a, b] of [
       ['מלבן ABCD', 'מעוין ABCD'],
       ['מעוין ABCD', 'מלבן ABCD'],
     ]) {
       const r = await play([a, b]);
-      expect(r.kind, `${a} · ${b}`).toBe('refuse');
-      expect(r.explain, `${a} · ${b}`).toMatch(/already defined/);
+      expect(r.kind, `${a} · ${b}`).toBe('commit');
     }
   });
 

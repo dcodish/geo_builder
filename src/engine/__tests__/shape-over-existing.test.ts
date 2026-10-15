@@ -101,12 +101,12 @@ describe('#223 — a shape named over existing points is a CONSTRAINT statement 
       expect(r.ok, `${shape} over four existing free points`).toBe(true);
       if (r.ok) check((id: Id) => r.positions.get(id)!);
     }
-    // the DECLARED-cycle counterpart refuses (ADR-157): a generic quadrilateral's cycle is a named
-    // shape — re-declaring it as a square is owned by the immutability rule, never a silent morph
+    // a cycle declared only as a generic «מרובע» takes the specific noun too (ADR-656, #1914 ruling 2026-10-08:
+    // *"Yes, it refines"* — superseding ADR-375's refusal here): it lowers, and the ring becomes the square
     const declared = build([{ type: 'quadrilateral', ids: ['P', 'Q', 'R', 'S'] }]);
     const rd = applyStep(declared.construction, { type: 'square', ids: ['P', 'Q', 'R', 'S'] });
-    expect(rd.ok).toBe(false);
-    if (!rd.ok) expect(rd.error).toMatch(/already defined/i);
+    expect(rd.ok).toBe(true);
+    if (rd.ok) expect((rd.construction.objects.find((o) => o.kind === 'polygon') as { declaredAs?: string }).declaredAs).toBe('square');
   });
 
   it('an exact re-issue of the same shape stays the idempotent no-op (FR-EN-9)', () => {

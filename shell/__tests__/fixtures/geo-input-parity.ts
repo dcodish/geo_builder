@@ -835,6 +835,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'circle3d-circum', family: 'inscribed', steps: ['משולש ABC חסום במעגל'], expect: 'builds' },
   // #1792 (ADR-3D-307): a quad inscribed in a circle — 3-D draws its cyclic member (a trapezoid is made isosceles)
   { id: 'circle3d-circum-trapezoid-1792', family: 'inscribed', steps: ['טרפז ABCD חסום במעגל'], expect: 'builds' },
+  // #1914 / #1993 (ADR-656): a second noun the ring can carry refines it — 2-D built neither before
+  { id: 'inscribed-then-noun-1914', family: 'inscribed', steps: ['ABCD חסום במעגל', 'מקבילית ABCD'], expect: 'builds' },
+  { id: 'sibling-nouns-1993', family: 'polygons', steps: ['מלבן ABCD', 'מעוין ABCD'], expect: 'builds' },
   { id: 'circle3d-centre-circum', family: 'inscribed', steps: ['משולש ABC חסום במעגל', 'K מרכז המעגל החוסם את המשולש ABC'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#1531' }] },
   { id: 'circle-centre-incircle', family: 'inscribed', steps: ['במשולש ABC חסום מעגל', 'K מרכז המעגל החסום במשולש ABC'], expect: 'builds', exception: 'X8' },
   { id: 'circle-numeral-on', family: 'circles', steps: ['נתון מעגל I', 'P על המעגל I'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1257' }] },

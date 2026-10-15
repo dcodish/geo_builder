@@ -28,7 +28,11 @@ enumeration). Four corrections to the plain compiler reading hold:
    §4), and `commandConflict` refuses only what cannot be lowered. The lowering reads the ring's STRUCTURE: a
    parallelogram-family noun over four points already on one circle (`ringOnOneCircle`, `src/engine/structure.ts`)
    asserts its cyclic member — the rectangle, or the square — because that is what the sentence says on a circle
-   ([ADR-628](06-decisions.md#adr-628)). A membership of an existing point on a second circle reads the same
+   ([ADR-628](06-decisions.md#adr-628)). A second shape NOUN over a declared ring is judged by one four-valued relation
+   (`quadRelation`, `engine/shapeKinds.ts`): an implied noun restates, an excluding one is refused, and a noun that
+   narrows the ring or meets it in a third kind is lowered onto it through `refinesDeclaredRing` — the predicate
+   `shapeLowersToConstraints` and `commandConflict`'s polygon arm both read — and the ring's polygon takes the
+   narrower kind (`refineRingKind`) ([ADR-656](06-decisions.md#adr-656)). A membership of an existing point on a second circle reads the same
    structure: a point already on one circle of a STATED tangency (`circles-tangent`'s record) is the touch point,
    and takes the touch point's own definition (`tangentTouchCopy`, so ADR-123's coincidence records X = M); a
    residual membership is held through a witness that is any point the construction puts on the circle — a

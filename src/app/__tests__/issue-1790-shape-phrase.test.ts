@@ -208,12 +208,13 @@ describe('#1790 — a conflict inside ONE sentence names the sentence, never "ed
   // longer such a sentence: an IMPLIED noun over a named shape adds nothing (every square is a rectangle), so the
   // pair that still self-conflicts is one that is neither implied nor excluded. «מלבן, מעוין» is exactly that: a
   // square is both, so neither narrows the other and neither excludes it.
-  it('«מלבן ABCD, מעוין ABCD» on an empty canvas: refused quoting the sentence and the student’s letter', async () => {
+  it('«מלבן ABCD, מעוין ABCD» on an empty canvas: the square (ADR-656, #1993 case T21 — the comma spelling reads as the two lines)', async () => {
     const v = await decide([], 'מלבן ABCD, מעוין ABCD');
-    expect(v.kind).toBe('refuse');
-    if (v.kind !== 'refuse') return;
-    expect(v.note).toMatchObject({ key: 'input.sentenceSelfConflict', params: { sentence: 'מלבן ABCD, מעוין ABCD' } });
-    expect((v.note as unknown as { params: { id: string } }).params.id).toMatch(/^[A-Z]+$/);
+    expect(v.kind).toBe('commit');
+    if (v.kind !== 'commit') return;
+    const f = replay(commit('מלבן ABCD, מעוין ABCD', v.commands), 0);
+    const poly = f.construction.objects.find((o) => o.id === 'poly-ABCD') as { declaredAs?: string } | undefined;
+    expect(poly?.declaredAs).toBe('square');
   });
 
   // The two halves of ADR-619 inside ONE sentence, so the comma spelling can never drift from the two-line one.

@@ -68,22 +68,31 @@ function spellings(ring: readonly Id[]): string[] {
 }
 
 /**
- * The noun the utterance states for `ring`, or null. `own`: the row itself made the ring a polygon, so a
- * sentence that never spells the letters («טרפז ישר זוות», auto-lettered) still reads as its own noun.
+ * Every noun the utterance states for `ring`, once per time it names the ring («מלבן ABCD, מעוין ABCD» states two).
+ * `own`: the row itself made the ring a polygon, so a sentence that never spells the letters («טרפז ישר זוות»,
+ * auto-lettered) still reads as its own noun.
  */
-export function nounForRing(utterance: string, ring: readonly Id[], own = true): NarrowKind | null {
-  const bounded = (s: string) => new RegExp(String.raw`(?<![A-Z\d])${s}(?![A-Z\d])`);
-  const run = spellings(ring).find((s) => bounded(s).test(utterance)) ?? ring.join('');
-  const at = utterance.search(bounded(run));
+export function nounsForRing(utterance: string, ring: readonly Id[], own = true): NarrowKind[] {
   const fits = (s: string): NarrowKind | null => {
     const p = readShapePhrase(s);
     return p && p.arity === ring.length && (p.noun || p.consumed) ? KIND[p.kind] : null;
   };
-  if (at < 0) return own ? fits(utterance) : null;
-  // the text between the previous label run (or the start) and this ring's letters, then after them
-  const before = utterance.slice(0, at).split(/\b[A-Z]\d*(?:[A-Z]\d*){2,}\b/).pop() ?? '';
-  const after = utterance.slice(at + run.length).split(/\b[A-Z]\d*(?:[A-Z]\d*){2,}\b/)[0] ?? '';
-  return fits(before) ?? fits(after);
+  const RUN = /\b[A-Z]\d*(?:[A-Z]\d*){2,}\b/;
+  const hits = [...utterance.matchAll(new RegExp(String.raw`(?<![A-Z\d])(?:${spellings(ring).join('|')})(?![A-Z\d])`, 'g'))];
+  if (!hits.length) {
+    const k = own ? fits(utterance) : null;
+    return k ? [k] : [];
+  }
+  const out: NarrowKind[] = [];
+  for (const m of hits) {
+    const at = m.index!;
+    // the text between the previous label run (or the start) and this naming of the ring, then after it
+    const before = utterance.slice(0, at).split(RUN).pop() ?? '';
+    const after = utterance.slice(at + m[0].length).split(RUN)[0] ?? '';
+    const k = fits(before) ?? fits(after);
+    if (k) out.push(k);
+  }
+  return out;
 }
 
 /**
@@ -125,12 +134,12 @@ export function rowNouns(facts: readonly Fact[]): RowNouns {
     seen.add(key);
     for (const [rk, ring] of rings) {
       const own = made.get(key)?.has(rk) ?? false;
-      const read = nounForRing(f.utterance, ring, own);
-      if (!read) continue;
-      const stamped = stamps.get(key + '|' + rk);
-      const kind = stamped && narrowImplies(stamped, read) ? stamped : read;
-      const n: RowNoun = { ring, kind };
-      (out[key] ??= []).push(n);
+      for (const read of nounsForRing(f.utterance, ring, own)) {
+        const stamped = stamps.get(key + '|' + rk);
+        const kind = stamped && narrowImplies(stamped, read) ? stamped : read;
+        const n: RowNoun = { ring, kind };
+        (out[key] ??= []).push(n);
+      }
     }
   }
   return out;

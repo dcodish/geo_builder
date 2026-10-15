@@ -4,7 +4,7 @@
  * all three thin locks go green while the rule is held by nothing.
  */
 import { describe, expect, it } from 'vitest';
-import { NARROW_ROWS, narrowingFaults, rowFor, type Builder, type NarrowGate } from './fixtures/narrowing-note-rows';
+import { NARROW_ROWS, narrowingFaults, rowFor, type Builder, type NarrowGate, type NarrowRow } from './fixtures/narrowing-note-rows';
 
 /** A conforming gate for builder `b`: every row records and shows exactly its note (a gap row fails, as it does today). */
 const conforming = (b: Builder, mutate: (note: string | null, steps: readonly string[]) => string | null = (n) => n): NarrowGate => (steps) => {
@@ -54,13 +54,12 @@ describe('#1996 — the shared narrowing rows catch a broken gate', () => {
     expect((await narrowingFaults(refusing, '2d')).join('\n')).toMatch(/did not record in 2d/);
   });
 
-  it('a known gap that starts passing says "move it"', async () => {
-    const healed: NarrowGate = (steps) => {
-      const row = NARROW_ROWS.find((r) => r.steps.join('|') === steps.join('|'))!;
-      return { recorded: true, notes: row.note === null ? [] : [row.note] };
-    };
-    const faults = await narrowingFaults(healed, '2d');
-    for (const row of NARROW_ROWS.filter((r) => r.gap?.['2d'])) expect(faults.join('\n')).toContain(`the known gap #${row.gap!['2d']} closed`);
+  it('a known gap that starts passing says "move it" (and a gap still failing says nothing)', async () => {
+    // a synthetic gap row — the live rows hold none since ADR-656 closed 2-D's #1914 row
+    const gapRow: NarrowRow = { steps: ['ABCD חסום במעגל', 'מקבילית ABCD'], note: NARROW_ROWS[0].note, gap: { '2d': 1914 } };
+    const healed: NarrowGate = () => ({ recorded: true, notes: [gapRow.note!] });
+    expect(await narrowingFaults(healed, '2d', [gapRow])).toEqual(['«ABCD חסום במעגל · מקבילית ABCD» passes in 2d — the known gap #1914 closed: move it to a plain row']);
+    expect(await narrowingFaults(() => ({ recorded: false, notes: [] }), '2d', [gapRow])).toEqual([]);
   });
 
   it('the rows are not trivial', () => {

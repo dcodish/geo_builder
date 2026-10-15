@@ -33,7 +33,7 @@ export * from '@/replay/naming';
 import { nameCentreFacts, reletterHiddenFacts, relabelUtterance, renameFacts, renameInCommand, resolveBinds, type RenameResult } from '@/replay/naming';
 import { replay, groupKey, foldCommand, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, commandPointIds, BRANCH_CYCLE_KINDS } from '@/replay/core';
 import type { DetectAllResult, Determinacy, Fact } from '@/replay/core';
-import type { NarrowingNote } from '../../shell/narrowing';
+import type { RingNote } from '../../shell/narrowing';
 import { viewDelta } from '@/replay/viewDelta';
 import type { ViewDelta } from '@/replay/viewDelta';
 import { geoWork, geoValues, isCancelled } from './geoWork';
@@ -186,7 +186,7 @@ export interface GeoState {
   determinacy: (Determinacy & { facts: Fact[] }) | null;
   /** #1996 (ADR-655): the forced-narrowing notes — a declared ring the givens forced into a narrower named kind,
    *  with the statements that forced it — read off the SAME always-on sweep. Same staleness contract. */
-  narrowed: { list: NarrowingNote[]; facts: Fact[] } | null;
+  narrowed: { list: RingNote[]; facts: Fact[] } | null;
 
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
   execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;

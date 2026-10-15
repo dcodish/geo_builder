@@ -10,26 +10,22 @@ import { replaySession } from '../replaySession';
 import { eventsToSessions, hasFailure } from '../sessionsFromLog';
 
 describe('replaySession — production session z0t3i7m1', () => {
-  it('classifies "square ABCD after parallelogram ABCD" as an empty/collision, not a parser failure', () => {
+  it('classifies "square ABCD after parallelogram ABCD": the first refines the ring (ADR-656), the repeat is an empty collision, not a parser failure', () => {
     const r = replaySession([
       'מקבילית ABCD', // parallelogram → A,B,C,D now exist
       'שני מעגלים נחתכים', // two intersecting circles
-      'ריבוע ABCD', // square ABCD — builds NOTHING because A,B,C,D already exist
-      'ריבוע ABCD', // again
+      'ריבוע ABCD', // square ABCD — a noun that NARROWS the parallelogram refines the ring (#1914 ruling, ADR-656)
+      'ריבוע ABCD', // again — now a restatement: builds nothing
     ]);
 
-    // The parallelogram and the two circles build.
-    expect(r.steps[0].category).toBe('ok');
-    expect(r.steps[1].category).toBe('ok');
+    // The parallelogram, the two circles and the narrowing square build.
+    for (const i of [0, 1, 2]) expect(r.steps[i].category, `step ${i}`).toBe('ok');
+    expect(r.steps[2].committed).toBe(true);
 
-    // The two squares are NOT a parser failure — they parse fine but collide with the existing ABCD.
-    for (const i of [2, 3]) {
-      expect(r.steps[i].category, `step ${i}`).toBe('empty');
-      expect(r.steps[i].committed).toBe(false);
-      expect(r.steps[i].alreadyDefined, `collision ids for step ${i}`).toEqual(
-        expect.arrayContaining(['A', 'B', 'C', 'D']),
-      );
-    }
+    // The repeat is NOT a parser failure — it parses fine and collides with the existing ABCD.
+    expect(r.steps[3].category).toBe('empty');
+    expect(r.steps[3].committed).toBe(false);
+    expect(r.steps[3].alreadyDefined).toEqual(expect.arrayContaining(['A', 'B', 'C', 'D']));
   });
 });
 

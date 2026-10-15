@@ -350,7 +350,8 @@
         "equilateral-triangle": "משולש שווה צלעות הוא סוג של {{from}}",
         "right-triangle": "משולש ישר זווית הוא סוג של {{from}}",
         "right-isosceles-triangle": "משולש ישר זווית שווה שוקיים הוא סוג של {{from}}"
-      }
+      },
+      "merged": "{{ring}} הוא כעת {{now}}, שהוא גם {{a}} וגם {{b}}."
     }
   },
   "errors": {
