@@ -17,6 +17,7 @@
  * student refining a step, not freeform input — and this is the third refusal of the same shape the
  * editor already shipped, not a new behaviour.
  */
+import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabelFold, parse, typedLabels } from '@/parser';
 import { autoNamedLabels, groupKey, impliedIdentityBinding, mergeFacts, nameByUseCommands, nameCentreFacts, renameFacts, replay, resolveBinds, stepAsideFacts, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
 import { roleReadingConfig, type DecideBind } from './decideDeterministic';
@@ -128,6 +129,8 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     ectx = prefixCtx();
     r = parse(editText, ectx);
   }
+  // #2127 (ADR-654): the submit seam's reading of an indefinite shape noun, against the PREFIX
+  r = indefiniteShapeReading(r, editText, ectx, work.filter((f) => !afterIds.has(f.id)), store().seed);
   // #2064 (ADR-643): a height named by two existing vertices — the submit seam's one predicate (ADR-W-006), against the
   // PREFIX the edited row is replayed after. Already true → «כבר קיים»; with a tail, the long form that carries it.
   const vp = vertexPairVerdict(editText, ectx, prefixRaw, store().seed, roleReadingConfig.cap);

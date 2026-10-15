@@ -4616,6 +4616,25 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.coincidences, 'no pair, so no converge notice').toEqual([]);
     },
   },
+  {
+    id: 'indefinite-second-triangle-other-order-2127',
+    title: 'Inside, then «משולש חוסם את מעגל O»: the indefinite noun draws a second triangle D, E, F around the circle (#2127, ADR-654)',
+    guards:
+      "#2127 (ADR-654), operator report 2026-10-14 (2-D, playing the #2107 sheet). Measured on b0ef3240 + ADR-653 through decideDeterministic2D: «מעגל O» · «משולש חוסם את מעגל O» · «משולש חסום במעגל O» refused the last line (the second line's commands put the first triangle's A, B, C on the circle), and this order refused «A coincides with its constructed target». Root cause: the inscription rules bound an unnamed shape noun to the figure's one polygon of that size (ADR-029's existingPolygon) whatever its article, so the indefinite «משולש …» was a statement about the existing triangle. Fix: the parser reports an indefinite binding and the seam keeps it only for a restatement; otherwise the line is re-read as a new shape with fresh letters. The reported order is the fixture indefinite-second-triangle-2127.geo.json; the matrix is src/app/__tests__/issue-2127-indefinite-shape-fresh-letters.test.ts.",
+    steps: ['מעגל O', 'משולש חסום במעגל O', 'משולש חוסם את מעגל O'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const k = fig.circles.get('circle-O')!;
+      for (const v of ['A', 'B', 'C']) expect(Math.abs(dist(at(fig, v), k.center) - k.r), `${v} on circle O`).toBeLessThan(1e-6);
+      const ring = ['D', 'E', 'F'];
+      for (let i = 0; i < 3; i++) {
+        const a = at(fig, ring[i]), b = at(fig, ring[(i + 1) % 3]);
+        const h = Math.abs((b.x - a.x) * (a.y - k.center.y) - (a.x - k.center.x) * (b.y - a.y)) / dist(a, b);
+        expect(Math.abs(h - k.r), `side ${ring[i]}${ring[(i + 1) % 3]} tangent to circle O`).toBeLessThan(1e-6);
+      }
+    },
+  },
 ];
 
 /** #1600: the shared record of what these five scenarios guard (a hoisted function — the array above reads it at load). */

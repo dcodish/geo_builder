@@ -11,6 +11,7 @@
 import { parse, buildParseCtx, impliedCircleBinding, impliedPointBinding, parseNameCenter, typedLabels } from '@/parser';
 import { autoNamedLabels, impliedIdentityBinding, mergeFacts, replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, renameFacts, stepAsideFacts } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
+import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import type { AnyCommand } from '@/engine';
 import type { ParseResult } from '@/parser';
 
@@ -133,7 +134,8 @@ export function factsOf(steps: Step[], refused: readonly RefusedStep[] = []): Fa
         }
         er = parse(step.edit.to, ctxOf(facts.slice(0, start)));
       }
-      const r = er;
+      // #2127 mirror (ADR-654): an indefinite shape noun is a new shape unless it restates the existing one
+      const r = indefiniteShapeReading(er, step.edit.to, ctxOf(facts.slice(0, start)), facts.slice(0, start), 0);
       if (!r.ok) throw new Error(`edited step did not parse: ${JSON.stringify(step.edit.to)}`);
       const replacement: Fact[] = r.commands.map((cmd, i) => ({
         id: `${key}e.${i}`,
@@ -185,6 +187,8 @@ export function factsOf(steps: Step[], refused: readonly RefusedStep[] = []): Fa
         }
         r = parse(step, ctxOf(facts));
       }
+      // #2127 mirror (ADR-654): an indefinite shape noun is a new shape unless it restates the existing one
+      r = indefiniteShapeReading(r, step, ctxOf(facts), facts, 0);
       const row = refusedAt.get(index);
       if (row) {
         // #1288: a DECLARED refusal — asserted, then skipped: a refused sentence never becomes a fact.

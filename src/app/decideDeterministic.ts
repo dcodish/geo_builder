@@ -49,6 +49,7 @@ import {
   typedLabels,
 } from '@/parser';
 import { independentConstructs } from './independence';
+import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { compoundNotHonoured, droppedClause } from './clauseCoverage';
 import { lostPartNote } from './unreadParts';
 import { lostRoleNote } from './unreadRoles';
@@ -326,6 +327,8 @@ export async function decideFromParse(
     pctx = buildParseCtx(d.construction, d.positions);
     r = parse(utterance, pctx);
   }
+  // #2127 (ADR-654): an indefinite «משולש …» bound to the figure's triangle is a new triangle unless it restates it
+  r = indefiniteShapeReading(r, utterance, pctx, facts, seed);
   // #770 — a definite SHAPE reference whose named kind is not in the figure («אלכסוני הריבוע» on a
   // trapezoid-only figure): refuse naming the statement, keep the text. Deterministic — the LLM could
   // only bind something the student did not say (ADR-052).

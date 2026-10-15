@@ -1906,3 +1906,7 @@ over all four (ADR-041).
 ### `touch-letter-yields-stated-radii-2122` — «מעגל O ברדיוס 3 · מעגל P ברדיוס 2 · המעגלים O ו-P משיקים · X על מעגל O · X על מעגל P»: only X is drawn at the touch point, no M, no notice (#2122, ADR-653)
 
 **Guards against:** the tool's own touch letter M drawn on the same dot as the student's X, with «M ו-X נפלו על אותה נקודה.» (the operator's T8/T9 report, 2026-10-14). **Asserts** the five lines build green, no M is drawn, |OX| = 3 and |PX| = 2, and `coincidences` is empty. The matrix (both orders, «מבחוץ»/«מבפנים», English, delete/undo, the edit seam, the «בנקודה T» and second-point controls) is `src/app/__tests__/issue-2122-touch-letter-yields.test.ts`.
+
+### `indefinite-second-triangle-other-order-2127` — «מעגל O · משולש חסום במעגל O · משולש חוסם את מעגל O»: a second triangle D, E, F around the circle; the first stays (#2127, ADR-654)
+
+**Guards against:** the indefinite «משולש חוסם את מעגל O» lowered as a statement about the triangle already inside the circle and refused «…סותר את «משולש חסום במעגל O»…» (the operator's report, 2026-10-14; the reported order is the fixture `indefinite-second-triangle-2127.geo.json`). **Asserts** the three lines build green, two triangles ABC and DEF, every vertex of ABC on circle O, and every side of DEF tangent to it. The matrix (both orders, the square, English, the edit seam, the definite refusal and the «כבר קיים» restatements) is `src/app/__tests__/issue-2127-indefinite-shape-fresh-letters.test.ts`.

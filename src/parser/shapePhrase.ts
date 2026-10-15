@@ -141,6 +141,34 @@ export interface ShapePhrase {
 
 const re = (src: string, flags = 'i') => new RegExp(src, flags);
 
+const HEBREW = /[א-ת]/;
+/** "the", then any shape adjectives, right before the English noun. */
+const EN_DEFINITE = /\bthe\s+(?:(?:right(?:[\s-]?angled?)?|isosceles|equilateral|regular)\s+)*$/i;
+
+/**
+ * #2127 ([ADR-654](../../docs/06-decisions.md#adr-654)) — IS THE SHAPE NOUN DEFINITE? An indefinite noun («משולש …»,
+ * "a triangle …") introduces a NEW shape; only a definite one («המשולש», "the triangle") refers to a shape the figure
+ * already has. A Hebrew preposition prefix (ב/ל/כ/מ) hides the article in unpointed text («במשולש» is both "in a
+ * triangle" and "in the triangle"), so it reads as a possible reference, as it always did; the conjunction ו and the
+ * relative ש carry no article of their own («ומשולש», «שמשולש» stay indefinite). Reads the first noun occurrence.
+ */
+export function shapeNounIsDefinite(s: string): boolean {
+  let best: { at: number; definite: boolean } | null = null;
+  for (const n of NOUN_ORDER) {
+    const parts = SHAPE_NOUN_WORDS[n].split('|');
+    const heWords = parts.filter((w) => HEBREW.test(w)).join('|');
+    const enWords = parts.filter((w) => !HEBREW.test(w)).join('|');
+    const he = heWords ? re(`(?:^|[^\\u05D0-\\u05EA])([\\u05D0-\\u05EA]*?)(?:${heWords})`).exec(s) : null;
+    if (he && (!best || he.index < best.at)) {
+      // the letters glued before the noun, less a leading conjunction ו / relative ש: anything left is ה or a preposition
+      best = { at: he.index, definite: he[1].replace(/^[וש]+/, '').length > 0 };
+    }
+    const en = enWords ? re(`\\b(?:${enWords})`).exec(s) : null;
+    if (en && (!best || en.index < best.at)) best = { at: en.index, definite: EN_DEFINITE.test(s.slice(0, en.index)) };
+  }
+  return best?.definite ?? false;
+}
+
 /**
  * Read the shape phrase of `s`. `s` should hold ONE phrase (a caller with two polygons — a polygon
  * inscribed in a polygon — splits the sentence first). Returns null when `s` names no polygon noun
