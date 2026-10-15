@@ -901,9 +901,19 @@ hypotenuse off a ⟂ / 90° constraint at a triangle vertex that a STATEMENT low
 right angle — its perp-offset (`anchor === from`, which no other build makes) and, in the shared-hypotenuse build,
 its ⟂ marked `seat: true` — is the noun's default seat and is skipped. `openRightTriangles(construction)` lists the
 triangles that carry such a seat and no stated right angle; `buildParseCtx` carries it as
-`ParseContext.openRightTriangles`. `roleSideLine` answers «היתר» beside one with `ambiguous-hypotenuse` (the
-message is analytic's `errAmbiguousHypotenuse`, ADR-AG-211), unless the letters after the noun name one of its
-sides: then that side is the rewrite's, and the role claim (ADR-563) states the right angle opposite it.
+`ParseContext.openRightTriangles`. Letters after the noun naming one of its sides are the rewrite's, and the role claim (ADR-563) states the right
+angle opposite them.
+
+**The noun's seat is an unstated hypotenuse a statement may bind to ([ADR-659](06-decisions.md#adr-659), #2074; reverses
+ADR-639's question).** For an open triangle `roleSidesOf` also yields the hypotenuse at the noun's EFFECTIVE seat (the
+perp-offset's anchor or the `seat` ⟂'s corner, after any reseat or `rot`), marked `unstated: true`. `roleSideLine`
+never lets typed letters SELECT it (a stated `cands` list excludes it) and reads an open triangle three ways: no ring
+letter typed (the noun alone, or a foot outside the ring) → the commands BIND to the unstated entry, and the fold's
+`resolveRoleSide` rotates them with `rot` as it rotates the isosceles base with its apex; exactly one ring vertex
+typed («CM תיכון ליתר», «גובה ליתר מ-C») → the cevian to the opposite side plus `set-angle` 90° at that vertex,
+unbound (the claim «תיכון ליתר AB» states); more than one host (another right triangle, open or stated) →
+`role-side-unresolved`. `ambiguous-hypotenuse` is left only for a pair after the noun that is no side of the
+triangle («תיכון ליתר AD»). The Thales reader keeps reading only a STATED hypotenuse.
 
 ### A stated side is a requirement record, checked at stage 0g′ and read wherever a point is placed ([ADR-549](06-decisions.md#adr-549), [ADR-594](06-decisions.md#adr-594))
 

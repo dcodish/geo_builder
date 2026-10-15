@@ -4185,25 +4185,34 @@ export const SCENARIOS_4: Scenario[] = [
     },
   },
   {
-    id: 'open-right-triangle-asks-the-hypotenuse-1689',
-    title: '#1689 (ADR-639): «משולש ישר-זווית ABC» · «תיכון ליתר» / «גובה ליתר» / "the median to the hypotenuse" ask which side is the hypotenuse; «תיכון ליתר AB» answers and builds the median from C',
+    id: 'open-right-triangle-median-follows-the-seat-2074',
+    title: '#2074 (ADR-659, re-basing #1689\'s ADR-639 scenario): «משולש ישר-זווית ABC» · «תיכון ליתר» draws the median on the triangle as shown (the right angle at C), and «הציגו תצורה אחרת» moves the right angle C → A → B → C with the median following it',
     guards:
-      "Found while building #1620 S6 and measured on main 6096b643 through decideDeterministic2D: on the right-triangle noun alone, «תיכון ליתר» committed the median from C to AB, «גובה ליתר» the altitude from C, and \"the median to the hypotenuse\" the same — the right angle at C, which the student never stated, read off the noun's DEFAULT seat (roleSidesOf took the macro's perp-offset as a stated right angle). Operator ruling 2026-10-02 (#1620): build when a stated right angle fixes the vertex; otherwise ASK which side is the hypotenuse; never assume C. Steps 2-4 are declared refusals (`ambiguous-hypotenuse`, analytic's ADR-AG-211 question); step 5 is the answer the question suggests, and builds: the median from C to the midpoint of AB, with ∠ACB = 90 stated by the role claim. The submit-door matrix (both languages, the named-side class «גובה ליתר BC», the stated-angle forms, the engine units) is src/app/__tests__/issue-1689-hypotenuse-vertex.test.ts; the parity row is cat-2d-051.",
-    steps: ['משולש ישר-זווית ABC', 'תיכון ליתר', 'גובה ליתר', 'the median to the hypotenuse', 'תיכון ליתר AB'],
-    refusedSteps: [
-      { step: 2, reason: 'ambiguous-hypotenuse', why: 'ruling 2026-10-02 (#1620): the right angle is not stated, so the hypotenuse is asked — ADR-639' },
-      { step: 3, reason: 'ambiguous-hypotenuse', why: 'ruling 2026-10-02 (#1620): the right angle is not stated, so the hypotenuse is asked — ADR-639' },
-      { step: 4, reason: 'ambiguous-hypotenuse', why: 'ruling 2026-10-02 (#1620): the right angle is not stated, so the hypotenuse is asked — ADR-639' },
-    ],
+      "Operator report 2026-10-13 on round #2053's T16: *\"תיכון ליתר should be drawn using whats currently showing but we need to have dof and show other option will create a different triangle with the constraints in place\"*. Measured on c00a9d28 through decideDeterministic2D: the line was asked with ADR-639's hypotenuse question (`input.ambiguousHypotenuse`). Root cause: ADR-639 read the noun's open seat as 'no hypotenuse' (`statedRightAngles` / `openRightTriangles` and the `open → clarify` branch of `roleSideLine`), so the ADR-596 binding that already moves «תיכון לבסיס» with its apex was never offered the hypotenuse. Fix (ADR-659): `roleSidesOf` yields the open triangle's hypotenuse at its EFFECTIVE seat, marked `unstated`, and the noun alone binds to it; the fold rotates the median with `rot`. Asserts A, B, C do not move when the line is added, every view is green, and at each of four views the right angle and the median's foot (the midpoint of the side opposite it) move together. This scenario replaces `open-right-triangle-asks-the-hypotenuse-1689` (ADR-639's asked outcome, reversed by the ruling). The class matrix is src/app/__tests__/issue-2074-hypotenuse-open.test.ts.",
+    steps: ['משולש ישר-זווית ABC', 'תיכון ליתר'],
     check: (fig) => {
       allStepsOk(fig);
-      const [A, B, C, M] = (['A', 'B', 'C', 'M'] as const).map((id) => at(fig, id));
-      expect(angle(A, C, B), '∠ACB = 90, stated by «ליתר AB»').toBeCloseTo(90, 6);
-      expect(dist(A, M), 'M is the midpoint of AB').toBeCloseTo(dist(M, B), 6);
-      expect(dist(A, M) + dist(M, B)).toBeCloseTo(dist(A, B), 6);
-      const segs = fig.construction.objects.filter((o) => o.kind === 'segment') as unknown as { a: string; b: string }[];
-      expect(segs.some((s) => [s.a, s.b].sort().join('') === 'CM'), 'the median CM is drawn').toBe(true);
-      expect(fig.construction.objects.some((o) => o.kind === 'foot'), 'the refused altitude drew nothing').toBe(false);
+      const facts = factsOf(['משולש ישר-זווית ABC', 'תיכון ליתר']);
+      const before = replay(factsOf(['משולש ישר-זווית ABC']), 0);
+      const after = replay(facts, 0);
+      for (const id of ['A', 'B', 'C']) {
+        expect(dist(at(after, id), at(before, id)), `${id} does not move when the line is added`).toBeLessThan(1e-9);
+      }
+      const seats: string[] = [];
+      for (const view of pressAll(facts, 3)) {
+        expect(Object.values(view.status).every((st) => st === 'ok'), 'every view is green').toBe(true);
+        const seat = (['A', 'B', 'C'] as const).find((v) => {
+          const [p, q] = (['A', 'B', 'C'] as const).filter((x) => x !== v);
+          return Math.abs(angle(at(view, p), at(view, v), at(view, q)) - 90) < 1e-4;
+        });
+        expect(seat, 'one right angle').toBeDefined();
+        const [p, q] = (['A', 'B', 'C'] as const).filter((x) => x !== seat);
+        const M = at(view, 'M');
+        expect(dist(at(view, p), M), `M is the midpoint of the side opposite ${seat}`).toBeCloseTo(dist(M, at(view, q)), 6);
+        expect(dist(at(view, p), M) + dist(M, at(view, q))).toBeCloseTo(dist(at(view, p), at(view, q)), 6);
+        seats.push(seat!);
+      }
+      expect(seats, 'the presses walk the seat, the median following').toEqual(['C', 'A', 'B', 'C']);
     },
   },
   {

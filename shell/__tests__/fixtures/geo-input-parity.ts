@@ -260,7 +260,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1963': 'open',
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
   '#2110': 'open', // #2101/#2100 (ADR-648/649): analytic does not read a radius letter's value or a radius ratio
-  '#2115': 'open', // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
+  '#2115': 'open',
+  '#2074': 'open', // #2074 (ADR-659): analytic's half of «תיכון ליתר» on an open right triangle waits for #2018 // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
 
   '#2108': 'open',
 
@@ -511,7 +512,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-048', family: 'points-incidence', steps: ['משולש ABC', 'ישר ABE'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-049', family: 'cevians-centres', steps: ['תיכון מ-A במשולש ABC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-050', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון לצלע BC'], expect: 'builds' },
-  { id: 'cat-2d-051', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'תיכון ליתר'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the ruling (2026-10-02, #1620): the right angle is not stated, so the hypotenuse is asked — 2-D since #1689 (ADR-639)' },
+  { id: 'cat-2d-051', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'תיכון ליתר'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2074' }, { product: '3d', issue: '#1679', parked: true }], note: '#2074 (ADR-659, reversing ADR-639): drawn on the shown triangle, the right-angle vertex a free choice «הציגו תצורה אחרת» cycles; analytic still asks until its half lands (waits on #2018)' },
+  { id: 'hypotenuse-altitude-open-2074', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'גובה ליתר'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2074' }, { product: '3d', issue: '#1679', parked: true }], note: '#2074 (ADR-659): the altitude spelling' },
+  { id: 'hypotenuse-apex-pins-2074', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'CM תיכון ליתר'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2074' }, { product: '3d', issue: '#1679', parked: true }], note: '#2074 (ADR-659), ruling 2026-10-14: a typed apex forces the seat' },
+  { id: 'hypotenuse-two-open-2074', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'משולש ישר-זווית DEF', 'תיכון ליתר'], expect: 'asks', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '#2074 (ADR-659): two right triangles, no single host' },
   { id: 'hypotenuse-median-stated', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'זווית C ישרה', 'תיכון ליתר'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'hypotenuse-median-named', family: 'cevians-centres', steps: ['משולש ישר-זווית ABC', 'תיכון ליתר AB'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'right-triangle-perp-reseats-2082', family: 'angles', steps: ['משולש ישר-זווית ABC', 'AB ⟂ BC'], expect: 'builds', note: '#2082 (ADR-658): a right angle stated as ⟂ pins the seat as «זווית B ישרה» does' },

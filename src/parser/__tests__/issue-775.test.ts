@@ -30,12 +30,20 @@ function ctxAfter(utterances: string[]) {
 
 describe('#775 — the prod session: a right triangle, then the median to the hypotenuse', () => {
   // #1689 (ADR-639): the noun alone does not say WHICH angle is right, so these locks state it («זווית C ישרה»);
-  // the noun alone asks — locked below and in src/app/__tests__/issue-1689-hypotenuse-vertex.test.ts.
+  // the noun alone binds to the shown seat (#2074) — locked below and in src/app/__tests__/issue-1689-hypotenuse-vertex.test.ts.
   const rt = ctxAfter(['משולש ישר זווית ABC', 'זווית C ישרה']); // the stated right angle at C ⇒ hypotenuse AB
 
-  it('#1689: on the right-triangle noun ALONE «תיכון ליתר» asks which side is the hypotenuse — never the default seat C', () => {
+  // #2074 (ADR-659) re-based ADR-639's question: on the noun ALONE the line draws on the triangle as shown, BOUND to
+  // the seat (an unstated choice the fold rotates), never a right angle stated for the student.
+  it('#2074: on the right-triangle noun ALONE «תיכון ליתר» binds to the shown seat C — no right angle is stated', () => {
     const open = ctxAfter(['משולש ישר זווית ABC']);
-    for (const u of ['תיכון ליתר', 'גובה ליתר', 'median to the hypotenuse']) expect(parse(u, open), u).toEqual({ ok: false, reason: 'ambiguous-hypotenuse' });
+    for (const u of ['תיכון ליתר', 'גובה ליתר', 'median to the hypotenuse']) {
+      const r = parse(u, open);
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) continue;
+      expect(r.commands.some((c) => c.type === 'set-angle'), u).toBe(false);
+      expect(r.commands.every((c) => (c as { roleSide?: { at: string } }).roleSide?.at === 'C'), u).toBe(true);
+    }
   });
 
   it('«תיכון ליתר» builds the median from C to the midpoint of AB (the ks1up71f replay, with the right angle stated)', () => {
