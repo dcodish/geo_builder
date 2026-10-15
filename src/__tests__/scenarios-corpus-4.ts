@@ -4557,15 +4557,19 @@ export const SCENARIOS_4: Scenario[] = [
   },
   {
     id: 'point-on-two-tangent-circles-is-the-touch-2084',
-    title: 'Two tangent circles: «X על מעגל O» · «X על מעגל P» puts X on the touch point M, with the converge notice (#2084, ADR-647)',
+    title: 'Two tangent circles: «X על מעגל O» · «X על מעגל P» makes X the touch point, and the touch letter M yields to X (#2084 ADR-647, re-based by #2122 ADR-653)',
     guards:
-      "#2084 (ADR-647), operator ruling 2026-10-14 (card d14b-2084-priority, A: X moves to the touch point, with the \"moved to coincide\" notice). Measured on 939b160a through decideDeterministic2D: «X על מעגל P» answered «זה כבר קיים באיור — אין מה להוסיף.» with X at (0, 5), off circle P; with stated radii X was drawn ~10⁻³ beside M with no notice. Root cause: apply's point-on-circle existing-point branches never asked what a membership of both tangent circles means — the busy free radius skipped (c3), the witness search read only on-circle riders, and the command reached the bare break; (c4) drove X only to within the solve tolerance. Fix: a point on one circle of a stated tangency, stated on the other, takes the touch point's own definition (tangentTouchCopy), and the witness reads every point on the circle. Matrix: src/app/__tests__/issue-2084-point-on-tangent-circles.test.ts.",
+      "#2084 (ADR-647), operator ruling 2026-10-14 (card d14b-2084-priority, A: X moves to the touch point, with the \"moved to coincide\" notice). Measured on 939b160a through decideDeterministic2D: «X על מעגל P» answered «זה כבר קיים באיור — אין מה להוסיף.» with X at (0, 5), off circle P; with stated radii X was drawn ~10⁻³ beside M with no notice. Root cause: apply's point-on-circle existing-point branches never asked what a membership of both tangent circles means — the busy free radius skipped (c3), the witness search read only on-circle riders, and the command reached the bare break; (c4) drove X only to within the solve tolerance. Fix: a point on one circle of a stated tangency, stated on the other, takes the touch point's own definition (tangentTouchCopy), and the witness reads every point on the circle. Matrix: src/app/__tests__/issue-2084-point-on-tangent-circles.test.ts. RE-BASED by #2122 (ADR-653), the operator's T8 report 2026-10-14 (\"we should not say X=M we should remove the letter M which was never defined and use only X\"): these are his exact five lines; the engine's touch letter M is named X by use (a merge naming owned by the last line), so the figure has one point X, no coincidence pair and no notice. Matrix: src/app/__tests__/issue-2122-touch-letter-yields.test.ts.",
     steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'X על מעגל O', 'X על מעגל P'],
     check(fig) {
       allStepsOk(fig);
       expect(fig.violations).toEqual([]);
-      expect(dist(at(fig, 'X'), at(fig, 'M')), 'X is the touch point').toBeLessThan(1e-6);
-      expect(fig.coincidences.map((p) => [...p].sort().join('')), 'the converge notice').toContain('MX');
+      expect(fig.positions.has('M'), 'the touch letter M yielded to X (#2122)').toBe(false);
+      for (const c of ['circle-O', 'circle-P']) {
+        const k = fig.circles.get(c)!;
+        expect(Math.abs(dist(at(fig, 'X'), k.center) - k.r), `X on ${c} — the touch point`).toBeLessThan(1e-6);
+      }
+      expect(fig.coincidences, 'no pair, so no converge notice').toEqual([]);
     },
   },
   {
@@ -4595,6 +4599,21 @@ export const SCENARIOS_4: Scenario[] = [
       const w = gateVerdict(crossingFirst, 'OP = 5');
       expect(w.kind).toBe('refused');
       expect(said(crossingFirst, 'OP = 5', w)).toBe(`לא ניתן: «OP = 5» סותר את «${CROSS}» — אי אפשר לקיים את שניהם יחד. הסיבה: X מתלכדת עם Y.`);
+    },
+  },
+  {
+    id: 'touch-letter-yields-stated-radii-2122',
+    title: 'Radii 3 and 2, tangent, X on both circles: only X is drawn at the touch point — no M, no notice (#2122, ADR-653)',
+    guards:
+      "#2122 (ADR-653), operator report 2026-10-14 playing the #2107 sheet (T8: \"we should not say X=M we should remove the letter M which was never defined and use only X\"; T9, these stated-radii lines, confirmed \"the same\"). Measured on b0ef3240 through decideDeterministic2D: labels M, O, P, X, coincidences [[M, X]], banner «M ו-X נפלו על אותה נקודה.». Root cause: ADR-440's naming by use (impliedPointBinding) read only a fresh label in a line's between slot, so ADR-647's tangentTouchCopy — which makes X the touch point M by construction — fell through to the coincidence notice naming the engine's letter. Fix: the general criterion impliedIdentityBinding (a line leaving a student point structurally identical to exactly one auto-named point names it by use, a merge naming owned by the line). The free-radii lines are point-on-two-tangent-circles-is-the-touch-2084; the matrix is src/app/__tests__/issue-2122-touch-letter-yields.test.ts.",
+    steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'המעגלים O ו-P משיקים', 'X על מעגל O', 'X על מעגל P'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.positions.has('M'), 'the touch letter M yielded to X').toBe(false);
+      expect(dist(at(fig, 'O'), at(fig, 'X')), '|OX| = 3').toBeCloseTo(3, 6);
+      expect(dist(at(fig, 'P'), at(fig, 'X')), '|PX| = 2').toBeCloseTo(2, 6);
+      expect(fig.coincidences, 'no pair, so no converge notice').toEqual([]);
     },
   },
 ];

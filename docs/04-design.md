@@ -507,6 +507,14 @@ committed as `name-by-use` facts at the head of the line's group (`commitVerdict
 line removes the name. The naming core never collides: `nameCentreFacts` and `renameFacts` step a hidden token
 aside, `withAnonymousAutoCentres` re-picks a held token; `withMetricCentreBinding` is gone.
 
+**The point naming has a general criterion** ([ADR-653](06-decisions.md#adr-653), #2122): beside ADR-440's line-slot
+arm, `impliedIdentityBinding` (`replay/core.ts`) trial-applies the line and names by use an auto-named point M that the
+line leaves with the same definition (`definitionKey`: kind, parents, parameters; never a free DOF) as exactly one
+student point L — the touch point M that `tangentTouchCopy` copies into X. A fresh L is the `point` rename; an existing
+L is a `merge` naming (`mergeFacts`): M takes L's letter in the facts before the line, valid only while M is defined
+before L first appears. A merge makes the line's statement true by construction, so both commit seams commit it as a
+plain success (no «כבר קיים»). Submit, the ✎ edit seam and the scenario harness call the same two arms.
+
 ### A foreign given is refused by the grammar, before any rule ([ADR-562](06-decisions.md#adr-562))
 
 `classifyOutOfScope` (`parser/scope.ts`) holds the vocabulary of the families another tool owns — `analytic` (axes,

@@ -6,6 +6,11 @@
  * — off circle P; with stated radii X was drawn ~10⁻³ beside the touch point M with no notice. Operator ruling
  * 2026-10-14 (card d14b-2084-priority, A): X moves to the touch point, with the "moved to coincide" notice.
  *
+ * RE-BASED by #2122 ([ADR-653](../../../docs/06-decisions.md#adr-653), operator 2026-10-14: *"we should not say X=M we
+ * should remove the letter M which was never defined and use only X"*): when the touch point is the ENGINE's letter M,
+ * it is named X by use — one point X, no pair, no notice. A touch point the student named (T) keeps the pair and the
+ * notice. X is still exactly the touch point, on both circles, at every seed.
+ *
  * Root cause: apply's `point-on-circle` existing-point branches never asked what a membership of BOTH tangent circles
  * means: the busy free radius skipped (c3), the witness search read only `on-circle` riders, and the command reached
  * the bare `break` (dropped, so the dry run saw no change); with stated radii (c4) drove X only to within the solve's
@@ -46,14 +51,20 @@ async function play(lines: string[], lang: 'he' | 'en' = 'he') {
 const d = (p: Vec, q: Vec) => Math.hypot(p.x - q.x, p.y - q.y);
 const banner = (pairs: [string, string][]) => visibleCoincidences(pairs).map(([a, b]) => i18n.getFixedT('he')('figure.converge', { a, b }).replace(/[⁦-⁩]/g, ''));
 
-/** X is the touch point at every seed 0–3: on both circles, exactly on `touch`, the pair recorded, no red row. */
-function isTouch(touch: string, X = 'X') {
+/** X is the touch point at every seed 0–3: on both circles, exactly on `touch` (the pair recorded) — or, when `touch`
+ *  is null, the engine's touch letter yielded to X (#2122): no M drawn and no pair. No red row either way. */
+function isTouch(touch: string | null, X = 'X') {
   for (let seed = 0; seed < 4; seed++) {
     const r = replay(st().facts, seed);
     if (r.lastError) continue; // a sampled seed that does not build is not this question
-    const x = r.positions.get(X)!, m = r.positions.get(touch)!;
-    expect(d(x, m), `seed ${seed}: |${X}${touch}|`).toBeLessThan(1e-6);
-    expect(r.coincidences.map((p) => [...p].sort().join('')), `seed ${seed}`).toContain([X, touch].sort().join(''));
+    const x = r.positions.get(X)!;
+    if (touch) {
+      expect(d(x, r.positions.get(touch)!), `seed ${seed}: |${X}${touch}|`).toBeLessThan(1e-6);
+      expect(r.coincidences.map((p) => [...p].sort().join('')), `seed ${seed}`).toContain([X, touch].sort().join(''));
+    } else {
+      expect(r.positions.has('M'), `seed ${seed}: the engine's M yielded to ${X}`).toBe(false);
+      expect(r.coincidences, `seed ${seed}`).toEqual([]);
+    }
     expect(r.violations, `seed ${seed}`).toHaveLength(0);
     for (const c of ['circle-O', 'circle-P']) {
       const k = r.circles.get(c)!;
@@ -68,30 +79,31 @@ beforeEach(() => llmParseMock.mockReset());
 
 const PAIR = ['מעגל O', 'מעגל P'];
 
-describe('#2084 — the operator-ballot lines: «X על מעגל P» moves X to the touch point, with the notice', () => {
+describe('#2084 — the operator-ballot lines: «X על מעגל P» moves X to the touch point (re-based by #2122: the touch letter M yields to X, no notice)', () => {
   it('free radii: «משיקים» · «X על מעגל O» · «X על מעגל P»', async () => {
     const g = await play([...PAIR, 'המעגלים O ו-P משיקים', 'X על מעגל O', 'X על מעגל P']);
     expect(g.last.kind).toBe('commit');
-    expect(isTouch('M')).toEqual(['M ו-X נפלו על אותה נקודה.']);
-    // stability: O, P and M do not move
+    expect(isTouch(null)).toEqual([]);
+    // stability: O and P do not move, and X is drawn exactly where M was
     const r = replay(st().facts, st().seed);
-    for (const id of ['O', 'P', 'M']) expect(d(r.positions.get(id)!, g.before.get(id)!), id).toBeLessThan(1e-9);
+    for (const id of ['O', 'P']) expect(d(r.positions.get(id)!, g.before.get(id)!), id).toBeLessThan(1e-9);
+    expect(d(r.positions.get('X')!, g.before.get('M')!)).toBeLessThan(1e-9);
     expect(llmParseMock).not.toHaveBeenCalled();
   });
 
-  it('stated radii 3 and 2: X lands EXACTLY on M (was ~10⁻³ beside it, no notice)', async () => {
+  it('stated radii 3 and 2: X is EXACTLY the touch point (was ~10⁻³ beside M, no notice)', async () => {
     const g = await play(['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'המעגלים O ו-P משיקים', 'X על מעגל O', 'X על מעגל P']);
     expect(g.last.kind).toBe('commit');
-    expect(isTouch('M')).toEqual(['M ו-X נפלו על אותה נקודה.']);
+    expect(isTouch(null)).toEqual([]);
   });
 });
 
 describe('#2084 — every spelling of the same statement', () => {
   it.each([
     [['המעגלים O ו-P משיקים בנקודה T', 'X על מעגל O', 'X על מעגל P'], 'T'],
-    [['המעגלים O ו-P משיקים מבפנים', 'X על מעגל O', 'X על מעגל P'], 'M'],
-    [['המעגלים O ו-P משיקים מבחוץ', 'X על מעגל P', 'X על מעגל O'], 'M'], // the other order
-  ])('%j → X is %s', async (tail, touch) => {
+    [['המעגלים O ו-P משיקים מבפנים', 'X על מעגל O', 'X על מעגל P'], null],
+    [['המעגלים O ו-P משיקים מבחוץ', 'X על מעגל P', 'X על מעגל O'], null], // the other order
+  ] as [string[], string | null][])('%j → X is the touch point (%s)', async (tail, touch) => {
     const g = await play([...PAIR, ...tail]);
     expect(g.last.kind).toBe('commit');
     isTouch(touch);
@@ -100,13 +112,13 @@ describe('#2084 — every spelling of the same statement', () => {
   it('English: "circles O and P are tangent" · "X on circle O" · "X on circle P"', async () => {
     const g = await play([...PAIR, 'circles O and P are tangent', 'X on circle O', 'X on circle P'], 'en');
     expect(g.last.kind).toBe('commit');
-    isTouch('M');
+    isTouch(null);
   });
 
-  it('a second point Y on both is the touch point too', async () => {
+  it("a second point Y on both is the touch point too — X's pair, with the notice (two student letters)", async () => {
     const g = await play([...PAIR, 'המעגלים O ו-P משיקים', 'X על מעגל O', 'X על מעגל P', 'Y על מעגל O', 'Y על מעגל P']);
     expect(g.last.kind).toBe('commit');
-    isTouch('M', 'Y');
+    isTouch('X', 'Y');
   });
 });
 
