@@ -379,6 +379,7 @@
     "degenerateSegment": "{{rel}} needs two distinct points on each side — \"{{seg}}\" is a single point, not a segment.",
     "degenerateAngle": "An angle needs three distinct points — \"{{angle}}\" repeats its vertex.",
     "degenerateCollinear": "Collinear points must be distinct — \"{{id}}\" appears twice.",
+    "floor": "Something went wrong building this line. Try wording it differently, or split it into two steps.",
     "retryHint": "You can try a different order (enter the givens first), reword it, or build it in a few smaller steps.",
     "unboundVariable": "The letter {{name}} is not defined by any statement — it was never defined, or the step that defined it was removed, muted or failed. The statement stays in the list and takes effect once a statement defines it — e.g. AB = {{name}}.",
     "unenforceableRelation": "The relation on {{names}} can't be enforced: a letter is used in a form this relation can't follow (a power, a constant, an area), or it compares an angle with a length.",

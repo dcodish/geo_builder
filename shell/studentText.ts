@@ -23,6 +23,17 @@ export interface StudentVocabulary {
 }
 
 const ID_SHAPED = /[~@#][\p{L}\p{N}_-]+|\b[a-z]+-[\p{L}\p{N}_]+/gu;
+
+/**
+ * #2028 (ADR-W-130) — does `s` carry an engine token (`~x`, `@x`, `#x`, `kind-Id`)? The same id shape
+ * {@link studentFacingViolations} reports, as a yes/no for a seam that must REFUSE to render a value rather
+ * than report it (2-D's humaniser renders its floor sentence instead). One shape, so the next anonymous-id
+ * kind is caught without a new prefix list.
+ */
+export function hasEngineToken(s: string): boolean {
+  return new RegExp(ID_SHAPED.source, 'u').test(s);
+}
+
 const LATIN_WORD = /\b[a-z]{2,}\b/g;
 const LABEL_RUN = /\b[A-Z](?:[A-Z0-9'′])*/g;
 const LABEL = /[A-Z]\d*['′]*/g;

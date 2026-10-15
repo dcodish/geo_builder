@@ -11,8 +11,12 @@
  * Design (deliberately zero-risk to the engine):
  *  - It is a PURE UI-layer consumer — the engine keeps emitting exactly what it does
  *    today. No engine error model is restructured.
- *  - Anything that does NOT match a known shape falls through UNCHANGED, so a new or
- *    unrecognised engine message is never *worse* than the current raw text.
+ *  - Anything that does NOT match a known shape renders the FLOOR sentence (`errors.floor`, #2028,
+ *    ADR-W-130): «משהו השתבש בבניית השורה הזאת…». Engine text is never shown raw in English and never
+ *    spliced into a mixed-language line (the operator's ruling of 2026-10-13). So does a matched shape
+ *    whose engine-derived value still carries an engine token after {@link sanitizeIds}
+ *    (`shell/studentText` `hasEngineToken`). The raw string stays where it is recorded (the debug log,
+ *    the usage events), so a floor case is still diagnosable.
  *  - The symbolic constraint fragment (`|AC| = 9`, `∠DOE = 2·∠COE`, `E, D, O collinear`)
  *    is kept as-is inside the translated wrapper — it is locale-neutral and readable to
  *    an Israeli student, exactly as the verifier messages (`figure.v.constraint`) already
@@ -23,6 +27,7 @@
  */
 
 import { formatMeasure } from '@/format';
+import { hasEngineToken } from '../../shell/studentText';
 
 /** The subset of i18next's `t` we need — a key plus interpolation params → string. */
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -33,7 +38,7 @@ const EMDASH = '—'; // — , used literally in two engine messages
  * Turn INTERNAL object ids + raw floats into student-facing text (#200, ADR-393). Engine errors embed
  * implementation ids the student never saw — `circle-O`, `sec-KE`, `chord-CA`, the anonymous scaffold
  * `~A`/`~radw-circle-P`/`@ctr-O`, and 16-digit floats. Run FIRST, so both the matched-pattern params and
- * the fall-through string are clean:
+ * the match itself are clean (an unmatched message renders the floor sentence, #2028):
  *   - a long float → display precision (the #164 shared formatter);
  *   - a named-object id → the student's LETTERS (`circle-O` → `O`, `sec-KE` → `KE`, `@ctr-O` → `O`);
  *   - an anonymous `~`-scaffold (a helper point the student never named) → a generic ⟨…⟩ placeholder — its
@@ -407,21 +412,49 @@ export const SAID_SUBJECT_KEYS: readonly string[] = [...new Set(PATTERNS.filter(
 /** #943 half B: the keys that can name the OTHER side — each must have a `_said_vs` variant in both locales (the same ratchet). */
 export const OTHER_SUBJECT_KEYS: readonly string[] = [...new Set(PATTERNS.filter((p) => p.namesOther).map((p) => p.key))];
 
+/** #2028 (ADR-W-130): what {@link humanizeErrorOutcome} produced — the text, and whether it is the floor sentence. */
+export interface Humanized {
+  text: string;
+  /** True when no ruled message could say this honestly: no pattern matched, or a matched value carried an engine token. */
+  floor: boolean;
+}
+
 /**
- * Translate a raw engine error to a student-facing message. Returns the raw string
- * unchanged when no known shape matches (so it is never worse than the current text).
- * `said` is the student's refused sentence; `other` (#943 half B) the earlier statement it conflicts
- * with, when the fold could name one — both are arguments, never looked up here (ADR-228 Am.6).
+ * Translate a raw engine error to a student-facing message. `said` is the student's refused sentence;
+ * `other` (#943 half B) the earlier statement it conflicts with, when the fold could name one — both are
+ * arguments, never looked up here (ADR-228 Am.6). Returns the text only; {@link humanizeErrorOutcome} says
+ * whether it is the floor.
  */
 export function humanizeError(raw: string | null | undefined, t: Translate, said?: string, other?: string): string {
-  if (!raw) return '';
+  return humanizeErrorOutcome(raw, t, said, other).text;
+}
+
+/**
+ * The display seam's one wording of a refusal (#2028, ADR-W-130): the humanised message, then the
+ * «אפשר לנסות סדר אחר…» hint (ADR-228 Am.6) — except after the floor sentence, which already gives its own
+ * next step and is ruled as the whole message. Both the banner and the submit pipeline render through this.
+ */
+export function explainError(raw: string | null | undefined, t: Translate, said?: string, other?: string): string {
+  const { text, floor } = humanizeErrorOutcome(raw, t, said, other);
+  return text && !floor ? `${text} ${t('errors.retryHint')}` : text;
+}
+
+/** {@link humanizeError}, reporting whether the result is the floor sentence (#2028). */
+export function humanizeErrorOutcome(raw: string | null | undefined, t: Translate, said?: string, other?: string): Humanized {
+  if (!raw) return { text: '', floor: false };
+  const floor: Humanized = { text: t('errors.floor'), floor: true };
   // Sanitize FIRST (#200): the patterns then match a clean string and every extracted param (`circle: m[1]`)
-  // is already the student's letter — no internal id can reach the message, matched or fall-through.
+  // is already the student's letter — no internal id can reach the message, and a token sanitizeIds does not know sends the message to the floor (#2028).
   const s = sanitizeIds(raw.trim());
   for (const p of PATTERNS) {
     const m = s.match(p.re);
     if (!m) continue;
     const params = p.params?.(m);
+    // #2028 (ADR-W-130): a value the ENGINE handed over (never `said`/`other`, the student's own sentences)
+    // that still carries an engine token — an anonymous touch point `@f-AB`, a `kind-Id` sanitizeIds does not
+    // know — cannot be shown, so the ruled frame around it cannot be either.
+    const engineValues = [...Object.values(params ?? {}), ...Object.values(p.nested?.(m) ?? {}).flatMap((n) => Object.values(n.letters ?? {}))];
+    if (engineValues.some(hasEngineToken)) return floor;
     // Translate the constraint vocabulary AFTER matching, never before: several wrapper patterns key on
     // the very same English words («collinear points must be distinct …»), so translating first would
     // stop them matching. Every param goes through the pass — it only touches known fragment words, so a
@@ -446,11 +479,11 @@ export function humanizeError(raw: string | null | undefined, t: Translate, said
     const sub = said?.trim();
     const oth = other?.trim();
     // #943 half B: both sides known ⇒ the sentence AND the earlier given it contradicts are the subject.
-    if (p.namesOther && sub && oth) return t(`${key}_said_vs`, { ...translated, said: sub, other: oth });
-    if (p.saysSubject && sub) return t(`${key}_said`, { ...translated, said: sub });
-    return t(key, translated);
+    if (p.namesOther && sub && oth) return { text: t(`${key}_said_vs`, { ...translated, said: sub, other: oth }), floor: false };
+    if (p.saysSubject && sub) return { text: t(`${key}_said`, { ...translated, said: sub }), floor: false };
+    return { text: t(key, translated), floor: false };
   }
-  // No known shape — still translate the vocabulary, so an unmatched message is never worse and never
-  // leaks an English word we already know how to say.
-  return translateConstraintWords(s, t);
+  // #2028 (ADR-W-130): no known shape. The floor sentence, never the engine's English — and never a partial
+  // translation of it, which spliced Hebrew vocabulary into an English sentence («cannot place point על הקטע»).
+  return floor;
 }
