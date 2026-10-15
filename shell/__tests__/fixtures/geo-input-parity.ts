@@ -263,6 +263,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2115': 'open', // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
 
   '#2108': 'open',
+  '#2060': 'open', // #2024 (ADR-668): 3-D does not read a single-letter angle given a symbol («זוית B=b», «זוית B=α»)
 
 };
 
@@ -1402,6 +1403,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'voices-feminine-inscribed-1975', family: 'inscribed', steps: ['מקבילית ABCD', 'מקבילית ABCD חסומה במעגל'], expect: 'builds', note: '#2035-01' },
   { id: 'voices-feminine-circumscribes-1975', family: 'inscribed', steps: ['משולש ABC', 'משולש ABC חוסמת מעגל'], expect: 'builds', note: '#2035-02' },
   { id: 'bare-run-circumscribes-2098', family: 'inscribed', steps: ['משולש ABC', 'ABC חוסם מעגל'], expect: 'builds', note: 'all three built it before the fix; 2-D drew the circle THROUGH the vertices — its geometry is held by issue-2098-bare-run-circumscribes.test.ts' },
+  // ── #2024 (ADR-668): a symbol letter equal to one of the measured element's own endpoints is a value, never a lowercase label ──
+  { id: 'symbol-endpoint-length-2024', family: 'lengths', steps: ['משולש ABC', 'AB=b'], expect: 'builds', note: '2-D refused it as a lowercase label and taught «AB=B»; «AB=c» built' },
+  { id: 'symbol-endpoint-angle-2024', family: 'angles', steps: ['משולש ABC', 'זוית B=b'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2060' }], note: '2-D taught «זוית B=B»; 3-D reads no symbol on a one-letter angle, Greek included' },
+  { id: 'symbol-endpoint-angle-full-2024', family: 'angles', steps: ['משולש ABC', 'זווית ABC=b'], expect: 'builds' },
 
   // ── #2083 (ADR-646): a sentence that only NAMES an existing circle is a reference — the stated radii are kept ──
   { id: 'named-crossing-keeps-radii-2083', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'המעגלים O ו-P נחתכים בנקודות X ו-Y'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2108' }], note: 'analytic refuses the crossing line bad-operand (#2108, needs-operator). 2-D replaced both radii with free defaults (r 5 and 3.6) before ADR-646; the verdict was builds then too — the radii are locked in src/app/__tests__/issue-2083-circle-reference.test.ts' },

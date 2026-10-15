@@ -429,7 +429,14 @@ through their own rule, all or nothing.
 ### Telling a LABEL from a WORD in Hebrew (#968, [ADR-497](06-decisions.md#adr-497))
 
 The convention nudge (#779) lifts `abcd` to `ABCD`, checks the corrected sentence parses, and shows it without
-committing. Hebrew-alphabet labels are told from words by the alphabet **range** — labels come from its start
+committing.
+
+The commit-seam half (`lowercaseLabelFold`) proves a fold from the COMMANDS: a lowercase run whose upper-cased letters
+are all labels the commands reference. A run the commands carry as a **symbol** is exempt — the engine's own
+`symbolsConsumedBy` (a measure's `expr.var`, a radius letter, an order or bound operand) plus a `set-var` name — so
+«AB=b» (b coinciding with the endpoint B) is a measure, never the folded label B ([ADR-668](06-decisions.md#adr-668), #2024).
+
+Hebrew-alphabet labels are told from words by the alphabet **range** — labels come from its start
 (א-ט ⇒ A-I), and geometry words carry a later letter:
 
 | token | letters | verdict |
