@@ -9048,6 +9048,30 @@ const circlesTangent: Rule = (s, ctx) => {
  * configuration" explores; a side-of-line bias is a filed follow-up, not a dropped magnitude.
  * Runs BEFORE `tangentChord`/`tangentMeetsOtherCircle`/`circlesTangent` (none checks "משותף").
  */
+/**
+ * #2208 ([ADR-669](../../docs/06-decisions.md#adr-669)) — the circle that is the SUBJECT of «משיק» / "tangent".
+ *
+ * «מעגל P משיק למעגל O מבפנים» predicates a tangency OF THE CIRCLE P: «משיק» is the verb (the masculine singular
+ * participle agreeing with «מעגל»), and a kind word on it is the kind of the circles' tangency — it is never the
+ * noun "a (common) tangent line". The subject is a circle noun with its label that no preposition governs: no
+ * attached «ל/ב/מ/ש/ו» (`(?<![א-ת])` — «למעגל», «במעגל», «ומעגל» are governed), no free-standing «של/את/עם/אל/על/
+ * בתוך/מחוץ/בין/ליד», and in English no preceding to/of/with/in/from/on/and/at/by/inside/than. It either stands
+ * BEFORE the tangent word («מעגל P משיק…», "circle P is … tangent…") or directly after it, the Hebrew inversion
+ * («למעגל O משיק מעגל P»). A statement about what the sentence says — whose tangency it predicates — in the
+ * discipline of `circleIsOnlyLocative` (ADR-601), never a keyword bow-out. Returns the subject's letter, or null.
+ */
+const CIRCLE_REF_HE = String.raw`(?<![א-ת])(?<!(?:של|את|עם|אל|על|בתוך|מחוץ|בין|ליד)\s+)ה?מעגל\s+(${ULABEL})(?![A-Za-z])`;
+const CIRCLE_REF_EN = String.raw`(?<!\b(?:to|of|with|in|from|on|and|at|by|inside|than)\s+(?:(?:the|a)\s+)?)(?<![A-Za-z])(?:(?:the|a)\s+)?circle\s+(${ULABEL})(?![A-Za-z])`;
+const CIRCLE_SUBJECT_BEFORE = rx(String.raw`(?:${CIRCLE_REF_HE}|${CIRCLE_REF_EN})(?=.*?(?:(?<![א-ת])ה?משיק|\btangent\b))`, 'i');
+const CIRCLE_SUBJECT_AFTER = rx(String.raw`(?<![א-ת])ה?משיק(?:ה)?\s+(?:${CIRCLE_REF_HE}|${CIRCLE_REF_EN})`, 'i');
+const circleSubjectOfTangent = (s: string): string | null => {
+  // «משיק משותף» / "a common tangent" is a NOUN phrase — a line — whatever stands before it («מעגל O ומעגל P
+  // יש להם משיק משותף»): no circle is the subject of a tangency there.
+  if (/\bcommon\b|משותפ/i.test(s)) return null;
+  const m = s.match(CIRCLE_SUBJECT_BEFORE) ?? s.match(CIRCLE_SUBJECT_AFTER);
+  return m ? up(m[1] ?? m[2]) : null;
+};
+
 const commonTangent: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   // The stated KIND (hoisted — it doubles as a TRIGGER, #212): a kind adjective on a SINGULAR tangent
@@ -9078,6 +9102,11 @@ const commonTangent: Rule = (s, ctx) => {
   // (inventing the circles and dropping the stated AB — the #215 class). An unbindable reference
   // beside existing circles defers — never an invented pairing next to drawn circles.
   const resolved = resolveCirclePair(s, ctx, { presupposes: true });
+  // #2208 (ADR-669): a circle of the pair as the SUBJECT of «משיק» — «מעגל P משיק למעגל O מבפנים» — states the
+  // circles' OWN tangency (the verb), never a common tangent line: decline, so `circlesTangent` reads it with its
+  // kind and touch point. A circle subject outside the resolved pair (three circles) keeps today's reading (#2211).
+  const subject = circleSubjectOfTangent(s);
+  if (subject && resolved !== null && resolved !== 'introduce' && resolved.kind === 'named' && resolved.centres.includes(subject)) return null;
   const noCircles = (ctx.circles ?? []).filter((c) => !c.startsWith('~')).length === 0;
   const introduce = noCircles && (resolved === 'introduce' || (resolved === null && /מעגלים|\bcircles\b/i.test(s)));
   if (!introduce && (resolved === null || resolved === 'introduce')) return null; // no two distinct circles to be common to → LLM
