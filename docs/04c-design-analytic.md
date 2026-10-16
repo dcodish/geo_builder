@@ -201,10 +201,12 @@ or numeral name the model writes must be stated or existing. Names are read with
 (`POINT_NAME_ATOM`, `LETTER_LINE_NAME_ATOM`, `NUMERAL_ALT`, `HE_NUM_UNITS`); exponents, subscripts, numeral names and
 counts are blanked before numbers are read. A trip is `{ kind: 'unfaithful', dropped, invented, answer }`, which
 `fallbackRefusal` words as `llm-dropped` (the student's tokens) or `llm-invented` (no interpolation); the App logs
-`result: 'unfaithful'` and every refusal's whole answer. The algebra is `shell/llm/honestyCore.ts`
+`result: 'unfaithful'` and every refusal's whole answer. A name the model writes that the figure holds but the
+sentence never wrote is `inventedExisting` ([ADR-AG-281](06c-decisions-analytic.md#adr-ag-281)), refused as
+`llm-invented-existing`, which names it (the figure shows it). The algebra is `shell/llm/honestyCore.ts`
 ([ADR-AG-280](06c-decisions-analytic.md#adr-ag-280)).
 
-*Identifiers:* `faithfulnessAnalytic` · `existingNamesAnalytic` · `unfaithful` · `llm-dropped` · `llm-invented` · `errLlmDropped` · `errLlmInvented`
+*Identifiers:* `faithfulnessAnalytic` · `existingNamesAnalytic` · `unfaithful` · `llm-dropped` · `llm-invented` · `errLlmDropped` · `errLlmInvented` · `inventedExisting` · `llm-invented-existing` · `errLlmInventedExisting`
 
 ## The sentence frame
 

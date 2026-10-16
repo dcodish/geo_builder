@@ -45,7 +45,7 @@ describe('#1355 (a) — the logged answers that lose or invent a name are refuse
     ['prod 2026-10-13 f3yiwxyu (the leg 5 lost behind a green figure)', LEG5, [], ['A(10,1)', 'B(10,-11)', 'משולש ישר זווית ABC'], ['2', '3', '4', '12', '5', '1'], false],
   ])('%s', async (_row, utterance, ctx, answer, dropped, invented) => {
     const out = await run(utterance, ctx, answer);
-    expect(out).toEqual({ kind: 'unfaithful', dropped, invented, answer });
+    expect(out).toMatchObject({ kind: 'unfaithful', dropped, invented, answer });
   });
 
   /** Rows whose answer is refused EARLIER (an unknown reference), so the gate never runs: locked on the gate itself. */
@@ -54,7 +54,7 @@ describe('#1355 (a) — the logged answers that lose or invent a name are refuse
     ['prod 10-?? wnyd1luh (the triangle and both legs dropped)', 'משולש ישר זוית ABC  על מערכת צירים ברביע 1 2 3 4 הנקודה (10,1)A כך שאורכי הניצבים 12 5  ', [], ['A(10,1)'], ['B', 'C', '2', '3', '4', '1', '12', '5'], []],
     ['prod (the origin named O by the model)', 'המשך DA ו CB נפגשים בראשית הצירים', ['טרפז ABCD'], ['המשכי הצלעות AD ו-BC נפגשים בנקודה O'], [], ['O']],
   ])('%s', (_row, utterance, ctx, answer, dropped, invented) => {
-    expect(gates(utterance, answer, ctx)).toEqual({ dropped, invented });
+    expect(gates(utterance, answer, ctx)).toMatchObject({ dropped, invented });
   });
 });
 
@@ -76,7 +76,7 @@ describe('#1355 (b) — the logged FAITHFUL answers still commit (must-not-chang
     ['AB = 3 ו-BC = 4', ['משולש ABC'], ['AB = 3', 'BC = 4']],
     ['AB = 3, בלה בלה', ['משולש ABC'], ['AB = 3']],
     ['נתון מעגל I - x^2+y^2=16', [], ['נתון מעגל I שמשוואתו x^2+y^2=16']],
-    ['משוואת הבסיס היא x-2y+6=0', ['טרפז ABCD'], ['משוואת הצלע BC היא x-2y+6=0']],
+    // «משוואת הבסיס היא x-2y+6=0» → «… הצלע BC …» moved to issue-2225: since #2225 an existing name the sentence never wrote refuses.
     ['דרך הנקודה ‎P‎ מעבירים אנך לישר ‎AB‎', ['A(0,0)', 'B(4,0)', 'P(1,3)'], ['ישר דרך P מאונך ל-AB']],
   ])('«%s» still records', async (utterance, ctx, answer) => {
     const out = await run(utterance, ctx, answer);
@@ -110,7 +110,7 @@ describe('#1355 (c) — ORACLE rows (authored by the session as the model, not e
     ['plural numeral names («הישרים 1 ו-2»)', 'A נקודת החיתוך של הישרים 1 ו-2', ['A היא נקודת החיתוך של ישר 1 וישר 2']],
     ['a count is not a magnitude', 'מנקודה A יוצאים 2 משיקים למעגל O', ['המשיקים מ-A למעגל O']],
   ])('%s commits', (_name, utterance, answer) => {
-    expect(gates(utterance, answer, ['A(0,0)', 'B(4,0)', 'מעגל O'])).toEqual({ dropped: [], invented: [] });
+    expect(gates(utterance, answer, ['A(0,0)', 'B(4,0)', 'מעגל O'])).toEqual({ dropped: [], invented: [], inventedExisting: [] });
   });
 });
 
@@ -120,7 +120,7 @@ describe('#1355 (c) — ORACLE rows (authored by the session as the model, not e
  */
 describe('#1355 (d) — every catalogue example is faithful to itself', () => {
   it.each(COMMAND_CATALOG_ANALYTIC.flatMap((e) => [[e.he], [e.en]]))('«%s»', (line) => {
-    expect(faithfulnessAnalytic(line, [line], new Set())).toEqual({ dropped: [], invented: [] });
+    expect(faithfulnessAnalytic(line, [line], new Set())).toEqual({ dropped: [], invented: [], inventedExisting: [] });
   });
 });
 

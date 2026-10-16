@@ -12301,3 +12301,24 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Deviation from the plan, recorded.** The plan's step 4 (move 2-D's and 3-D's copies onto the core, behaviour-identical) is split out to #2251: it would touch 2-D's submit pipeline and its parity goldens inside a P1 analytic PR, and the round reserved no ADR-W id. Analytic is the core's first consumer; neither sibling changes.
 
 **Locks.** `shell/__tests__/honesty-core-1355.test.ts` — each row pins a property a broken core would lose: a set instead of a multiset (#437), a case-sensitive stated side (#779), a mirror gate that ignores `existing`, the article «a», a signed or exponent-blind scan, one statement paying twice.
+
+## ADR-AG-281 — The invented-name gate covers names already in the figure: an answer that ties the sentence to an existing point or line it never named refuses, naming it (#2225)
+
+**Status:** accepted · 2026-10-16 · bug (P1, analytic) · fix round #2245, stream E · branch `fix/2225-invented-existing-label`, stacked on `feat/1355-analytic-llm-honesty-gates` and pushed to the same PR (#2254)
+**Requirements:** [02c](02c-requirements-analytic.md) R104a (amended) · **Design:** [04c](04c-design-analytic.md) "The LLM lane's faithfulness gates" · **LADDER stage:** none (the LLM seam)
+**Amends:** [ADR-AG-279](#adr-ag-279) gate 3 · **Siblings:** 2-D's `introducedNewLabels` (#255) exempts existing labels too — the 2-D widening is its own issue (#2228); 3-D has no mirror gate (#1821)
+
+**The ruling.** Operator, 2026-10-16: "1 - yes" — refuse a fallback reading that names any point the student did not write, *including one already in the figure*.
+
+**Measured** (at #1355's tip `6cd5d6f0`, stub transport, no network). The operator's prod sequence (session `e6eulylq`): «ישר l» is `not-handled`; the stub answer «דרך P עובר ישר l» records, because P (the centroid) exists and ADR-AG-279's gate 3 exempts existing names. The row shows «ישר l»; nothing on screen reveals the «through P». Sweep of every logged answer with the widened gate: besides rows already refused, it newly refuses two committed answers — «AD גובה ו-AD תיכון» → «AD גובה לצלע BC», «AD תיכון לצלע BC» and «משוואת הבסיס היא x-2y+6=0» → «משוואת הצלע BC היא …»: the model resolved "the side" / "the base" to letters the student did not write. Both fall under the ruling as worded.
+
+**Decision.**
+1. `faithfulnessAnalytic` also reports `inventedExisting`: names the model WROTE (point, letter line, numeral curve) that the student did not, though the figure holds them — the same `nameAccounting` with `exemptExistingFromInvented: false`, less the genuinely new names. Case-blind on the student's side (#779).
+2. `runFallback` refuses on it (`unfaithful`, `inventedExisting`). `fallbackRefusal`: dropped first; then a NEW invented name keeps `llm-invented` (it names nothing — the model's letter is not the student's); otherwise `llm-invented-existing` names the existing labels, which ADR-W-096 allows because the figure shows them: «כדי לבנות את זה הייתי צריך לקשר את המשפט ל-P, שלא מופיע בו — לא רשמתי כלום. אם התכוונתם ל-P, כתבו זאת במשפט ונסו שוב.» (session-authored wording in 2-D's register — the ruling asked for "a note", not a sentence).
+3. Prompt: "Reuse an existing label from the context only where the student's sentence names it — never attach the sentence to a point or line it does not mention" (replaces "Reuse existing labels from the context"; proxy deploy, with ADR-AG-279's clause).
+
+**Not in scope** (split by the same rulings): the bare free line «ישר l» as a 2-DOF line (#2226), «ישר l מקביל לצלע BC» in one step (#2227), the 2-D widening (#2228). Until #2226 lands, «ישר l» is refused on the AI path instead of recorded through an invented P.
+
+**Behaviour change for a student.** An AI reading that ties the sentence to a point or line already in the figure that the sentence never named is refused with the note above, where it used to record silently — «ישר l» → «דרך P עובר ישר l», and also «AD גובה ו-AD תיכון» (the model chose side BC) and «משוואת הבסיס היא …» (the model chose BC).
+
+**Locks.** `src-analytic/__tests__/issue-2225-invented-existing-label.test.ts` (the operator's sequence from the fixture `src-analytic/__tests__/fixtures/issue-2225-before-free-line.analytic.json`, the model mocked, refused naming P; an existing line; the «הבסיס» row; the student's own and lowercase spellings pass; a new name keeps its unnamed message). `issue-1355-llm-honesty.test.ts`: the «הבסיס» row moved out of the must-not-change list.

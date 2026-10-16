@@ -629,7 +629,8 @@ a sentence the tool parsed.
 **R104a — the fallback's answer must say what the student said: a dropped name or number, or an invented name, refuses it**. *(Operator: «1355 is p1», 2026-10-15, on a student who lost the stated leg 5.)* An answer that loses a name or a number the sentence stated, or names something the student did not name and the figure does not hold, records nothing; the text stays in the input. A loss names what was lost, in the student's own tokens; an invention names nothing (the model's letter is not the student's).
 - «משולש ישר זוית ABC … אורכי הניצבים 12 5 … B(10,-11) A(10,1)» answered without the legs → «הבנתי רק חלקית — לא הצלחתי למקם את 2, 3, 4, 12, 5, 1. …», nothing recorded
 - «גובה מנקודה M לצלע OG» answered «MH גובה לצלע OG» → «כדי לבנות את זה צריך לתת שם למשהו שלא נתתם לו שם — תנו לו שם משלכם ונסו שוב.»
-- Sources: ADR-AG-279, ADR-AG-280, #1355.
+- A name already in the figure that the sentence never wrote counts too *(operator, 2026-10-16: "1 - yes")*: «ישר l» answered «דרך P עובר ישר l» → «כדי לבנות את זה הייתי צריך לקשר את המשפט ל-P, שלא מופיע בו — לא רשמתי כלום. …», nothing recorded
+- Sources: ADR-AG-279, ADR-AG-280, ADR-AG-281, #1355, #2225.
 
 **R111 — a word the tool does not know is REFUSED in a value slot, never absorbed as parameters**. **A stated magnitude is never silently reinterpreted**; juxtaposed parameters (`2a`, `25k²`) are kept.
 - «שיפוע הישר l1 הוא tan(30)» → refused, never `t·a·n·30`

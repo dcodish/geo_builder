@@ -182,6 +182,7 @@ export function errorText(error: InputError, t: Translate): string {
     // #1355 (ADR-AG-279) — the model's answer lost what the student stated, or named what they did not
     'llm-dropped': 'errLlmDropped',
     'llm-invented': 'errLlmInvented',
+    'llm-invented-existing': 'errLlmInventedExisting',
     'bad-operand': 'errBadOperand',
     'conflicting-restatement': 'errConflict',
     'name-kind-clash': 'errNameClash',
@@ -294,6 +295,6 @@ export function errorText(error: InputError, t: Translate): string {
     statedEn: error.key === 'shape-excluded' ? enNoun(error.stated) : '',
     nameOf: error.key === 'name-taken' ? (error.nameOf ?? '') : '',
     what: error.key === 'measure-contradicts' ? (error.what ?? '') : '',
-    labels: error.key === 'llm-dropped' ? error.labels : '',
+    labels: error.key === 'llm-dropped' || error.key === 'llm-invented-existing' ? error.labels : '',
   }) + near;
 }

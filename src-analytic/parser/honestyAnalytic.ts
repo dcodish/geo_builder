@@ -235,6 +235,12 @@ export interface Faithfulness {
   dropped: string[];
   /** Names the answer wrote that the student did not, and the figure does not hold. */
   invented: string[];
+  /**
+   * Names the answer wrote that the student did not, though the figure HOLDS them (#2225, ADR-AG-281): an
+   * unstated relation pulled onto an existing point or line («ישר l» → «דרך P עובר ישר l»). As typed by the model,
+   * which may be shown: the figure shows the name (ADR-W-096).
+   */
+  inventedExisting: string[];
 }
 
 /**
@@ -249,6 +255,9 @@ export interface Faithfulness {
  *    that states a right angle.
  * 3. **Invented name**: every point, line or numeral name the model WROTE must be stated or in the figure. Read
  *    off the text, so a name the grammar mints while lowering (P₁, a canonical centre) is never counted.
+ * 4. **Invented existing name** (#2225, ADR-AG-281, operator ruling 2026-10-16): a name the model wrote that the
+ *    student did not, though the figure holds it, is refused too — the model attached a relation to it that the
+ *    sentence never stated (an existing P made «ישר l» pass through P, and pinned it).
  */
 export function faithfulnessAnalytic(utterance: string, modelLines: readonly string[], existing: ReadonlySet<string>): Faithfulness {
   const stated = namesOf(utterance);
@@ -264,6 +273,11 @@ export function faithfulnessAnalytic(utterance: string, modelLines: readonly str
     existing,
   });
 
+  // #2225: the same difference with the figure's names NOT exempt; what it adds is an existing name pulled in.
+  const widened = nameAccounting({ stated: stated.map((n) => n.key), written: written.map((n) => n.key), existing, exemptExistingFromInvented: false });
+  const newly = new Set(names.invented);
+  const inventedExisting = widened.invented.filter((k) => !newly.has(k));
+
   const accounts: number[] = [];
   modelLines.forEach((line, i) => {
     accounts.push(...unionByMax(numbersOf(line).map((o) => o.value), facts[i].numbers));
@@ -274,5 +288,6 @@ export function faithfulnessAnalytic(utterance: string, modelLines: readonly str
   return {
     dropped: [...names.dropped.map((k) => shownOf.get(k) ?? k), ...droppedNumbers.map((o) => o.raw)],
     invented: names.invented.map((k) => shownOf.get(k) ?? k),
+    inventedExisting: inventedExisting.map((k) => shownOf.get(k) ?? k),
   };
 }

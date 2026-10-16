@@ -430,6 +430,8 @@ const he = {
   errLlmDropped: 'הבנתי רק חלקית — לא הצלחתי למקם את {{labels}}. נסחו את הצעד מחדש (למשל פרקו אותו לשני צעדים).',
   // #1355 — 2-D's input.labelsInvented without the model's letter (ADR-W-096: the student never typed it).
   errLlmInvented: 'כדי לבנות את זה צריך לתת שם למשהו שלא נתתם לו שם — תנו לו שם משלכם ונסו שוב.',
+  // #2225 (ADR-AG-281) — the answer tied the sentence to {{labels}}, which the figure shows and the sentence never named.
+  errLlmInventedExisting: 'כדי לבנות את זה הייתי צריך לקשר את המשפט ל-{{labels}}, שלא מופיע בו — לא רשמתי כלום. אם התכוונתם ל-{{labels}}, כתבו זאת במשפט ונסו שוב.',
   thinking: 'חושב…',
   errBadOperand:
     'הבנתי את היחס במשפט "{{detail}}", אבל לא זיהיתי את אחד האגפים. אפשר לציין שני קודקודים (AB), ' +
@@ -946,6 +948,7 @@ const en: typeof he = {
     'I understood "{{detail}}", but the tool does not support this move yet. Try another phrasing, or the commands panel.',
   errLlmDropped: "I only partly understood — I couldn't place {{labels}}. Rephrase the step (e.g. split it in two).",
   errLlmInvented: 'Building this needs a name for something you did not name — give it a name of your own and try again.',
+  errLlmInventedExisting: 'Building this would tie your sentence to {{labels}}, which it does not mention — nothing was recorded. If you meant {{labels}}, say so in the sentence and try again.',
   thinking: 'Working…',
   errBadOperand:
     'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +

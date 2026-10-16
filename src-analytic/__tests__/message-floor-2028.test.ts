@@ -40,6 +40,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'llm-understood-unsupported': [{}],
   'llm-dropped': [{ labels: 'B, C' }],
   'llm-invented': [{}],
+  'llm-invented-existing': [{ labels: 'P' }],
   'bad-operand': [{}],
   'conflicting-restatement': [{}],
   'name-kind-clash': [{ existing: 'curve:circle' }, { existing: 'derived:centroid' }, {}],

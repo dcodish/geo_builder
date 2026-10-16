@@ -78,7 +78,17 @@ export type FallbackOutcome =
    * student wrote them. `invented` is only a flag: the model's letter is neither typed by the student nor
    * shown by the figure, so it is never put in front of them (ADR-W-096).
    */
-  | { kind: 'unfaithful'; dropped: string[]; invented: boolean; answer: string[] };
+  | {
+      kind: 'unfaithful';
+      dropped: string[];
+      invented: boolean;
+      answer: string[];
+      /**
+       * #2225 (ADR-AG-281): names the FIGURE holds that the answer pulled in though the sentence never named them
+       * («ישר l» → «דרך P עובר ישר l»). Shown, because the figure shows them (ADR-W-096).
+       */
+      inventedExisting?: string[];
+    };
 
 /** What the model is told the figure already holds. Kept short — the proxy caps it at 1000 chars. */
 export function fallbackContext(lines: readonly string[]): string {
@@ -145,8 +155,14 @@ export async function runFallback(
    */
   if (accepted.length) {
     const f = faithfulnessAnalytic(utterance, gated.lines, existingNamesAnalytic(derive(lines, seed).construction));
-    if (f.dropped.length || f.invented.length) {
-      return { kind: 'unfaithful', dropped: f.dropped, invented: f.invented.length > 0, answer: gated.lines };
+    if (f.dropped.length || f.invented.length || f.inventedExisting.length) {
+      return {
+        kind: 'unfaithful',
+        dropped: f.dropped,
+        invented: f.invented.length > 0,
+        answer: gated.lines,
+        ...(f.inventedExisting.length ? { inventedExisting: f.inventedExisting } : {}),
+      };
     }
   }
 
@@ -179,7 +195,10 @@ export function fallbackRefusal(
   if (out.kind === 'busy') return { key: 'llm-busy', detail: raw };
   // #1355 — dropped first, then invented (2-D's precedence). The dropped tokens are the student's own.
   if (out.kind === 'unfaithful') {
-    return out.dropped.length ? { key: 'llm-dropped', detail: raw, labels: out.dropped.join(', ') } : { key: 'llm-invented', detail: raw };
+    if (out.dropped.length) return { key: 'llm-dropped', detail: raw, labels: out.dropped.join(', ') };
+    if (out.invented || !out.inventedExisting?.length) return { key: 'llm-invented', detail: raw };
+    // #2225 (ADR-AG-281): only names the figure already shows were pulled in — they may be named.
+    return { key: 'llm-invented-existing', detail: raw, labels: out.inventedExisting.join(', ') };
   }
   if (out.kind === 'rejected' && out.code !== 'not-handled') return { key: 'llm-understood-unsupported', detail: raw };
   return original;
