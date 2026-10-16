@@ -619,3 +619,68 @@ describe('#757 — a two-circle tangency declines rather than swallowing a modif
     }
   });
 });
+
+describe('#2186 (ADR-679) — the equal size rides EVERY pair-resolving rule, and the word gate watches the words', () => {
+  const k1 = (cmds: AnyCommand[]) => cmds.some((c) => c.type === 'set-radius-ratio' && (c as { k: number }).k === 1);
+  const ctxAfter = (steps: string[]) => {
+    const { construction, positions } = replay(buildFacts(steps));
+    return buildParseCtx(construction, positions);
+  };
+
+  it('twoCirclesMeet — fresh, completed and named pairs, the definite drawn pair, the four-point line', () => {
+    for (const [pre, u] of [
+      [[], 'שני מעגלים נחתכים ברדיוסים שווים'],
+      [[], 'שני מעגלים נחתכים בנקודות A ו-B ורדיוסיהם שווים'],
+      [[], 'two intersecting circles with equal radii'],
+      [['מעגל O'], 'שני מעגלים נחתכים ברדיוסים שווים'],
+      [['מעגל O', 'מעגל P'], 'המעגלים O ו-P נחתכים ברדיוסים שווים'],
+      [['מעגל O', 'מעגל P'], 'המעגלים נחתכים בנקודות A ו-B ורדיוסיהם שווים'],
+      [[], 'ישר חותך את שני מעגלים ברדיוסים שווים בנקודות C, D, E ו-F'],
+    ] as [string[], string][]) {
+      const r = parse(u, ctxAfter(pre));
+      expect(r.ok, u).toBe(true);
+      if (r.ok) expect(k1(r.commands), u).toBe(true);
+    }
+  });
+
+  it('circleCircleIntersection and commonTangent read it on the pair they resolved', () => {
+    const cci = parse('מעגל O חותך את מעגל P בנקודה A ברדיוסים שווים', ctxAfter(['מעגל O', 'מעגל P']));
+    expect(cci.ok && k1(cci.commands)).toBe(true);
+    for (const [pre, u] of [
+      [[], 'AB משיק משותף חיצוני לשני מעגלים ברדיוסים שווים'],
+      [['מעגל O', 'מעגל P'], 'AB משיק משותף למעגלים O ו-P ברדיוסים שווים'],
+    ] as [string[], string][]) {
+      const r = parse(u, ctxAfter(pre));
+      expect(r.ok, u).toBe(true);
+      if (r.ok) expect(k1(r.commands), u).toBe(true);
+    }
+  });
+
+  it('every meet form the rule reads without the equality still builds and carries no ratio', () => {
+    for (const u of ['שני מעגלים נחתכים', 'שני מעגלים נחתכים בנקודות A ו-B', 'שני מעגלים נפגשים בנקודות A ו-B', 'two circles intersect at A and B']) {
+      const r = parse(u);
+      expect(r.ok, u).toBe(true);
+      if (r.ok) expect(k1(r.commands), u).toBe(false);
+    }
+  });
+
+  it('the gate fires on an equal-size word or the equal-circle noun with no equality, and is silent with one', () => {
+    const free: AnyCommand[] = [
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true },
+      { type: 'circle', id: 'circle-P', center: 'P', radius: 3.6, freeRadius: true },
+    ];
+    const ratio: AnyCommand = { type: 'set-radius-ratio', c1: 'circle-O', c2: 'circle-P', k: 1 } as AnyCommand;
+    for (const u of ['שני מעגלים בעלי מרכז משותף O ברדיוסים שווים', 'שני מעגלים שווים נחתכים', 'two equal circles intersect', 'מעגל מוכל ברדיוסים שווים', 'מעגל מוכל במעגל O ששטחם שווה']) {
+      expect(droppedWordRelations(u, free), u).toContain('שווים');
+      expect(droppedWordRelations(u, [...free, ratio]), u).not.toContain('שווים');
+    }
+    // two radii pinned at one value are the equality too (generous, per the gate discipline)
+    const pinned: AnyCommand[] = [
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
+      { type: 'circle', id: 'circle-P', center: 'P', radius: 5 },
+    ];
+    expect(droppedWordRelations('שני מעגלים משיקים ברדיוסים שווים ל-5', pinned)).not.toContain('שווים');
+    // one circle's own radius equal to a value is not a pair statement
+    expect(droppedWordRelations('הרדיוס שווה ל-5 במעגל O', free.slice(0, 1))).not.toContain('שווים');
+  });
+});

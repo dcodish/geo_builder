@@ -698,6 +698,15 @@ only; its #757 leftover guard strips the phrase only then) and `commonTangent` (
 that cannot be equal (contained, internally tangent, concentric) does not read it, so its number stays unread and the
 line escalates (ADR-678).
 
+`withEqualRadii`'s consumers ([ADR-679](06-decisions.md#adr-679), #2186): `circlesTangent`, `twoCirclesPosition`,
+`twoCirclesBare` (ADR-455), and `twoCirclesMeet` (all three branches), `circleCircleIntersection`, `commonTangent` (every
+construction it returns). `concentricCircles` and `containedNewInExisting` do not read it — equal circles cannot share
+a centre or nest. The net under every rule (and the LLM lane): `droppedWordRelations`' **equal-size member** — in a
+two-circle context, or one circle noun with a plural size noun («מעגל מוכל ברדיוסים שווים»), an EQUAL_SIZE word or
+the equal-circle noun phrase («מעגלים שווים», "equal circles") must land in a lowering that makes two radii equal
+(`set-radius-ratio` k = 1, or two radii pinned at one value — `radiiMadeEqual`), or the gate reports «שווים» and the
+line escalates.
+
 ### A fixed-run rule consumes the whole label body ([ADR-601](06-decisions.md#adr-601))
 
 `labelRun(body, n)` returns the first run of exactly n labels and nothing about the rest of the body, so a rule

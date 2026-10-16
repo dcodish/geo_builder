@@ -1475,6 +1475,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'angle-same-letter-other-constant-1851', family: 'angles', steps: ['משולש ABC', '∠ABC = α', '∠ABC = α + 40'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2140' }], note: '2-D refuses it in the #2061 contradiction frame; analytic refuses it «לא נמצאה תצורה» (the wording is #2105)' },
   // ── #2198 / #2216 (ADR-677): one «ברדיוס N» on a two-circle sentence sizes BOTH circles (operator ruling 2026-10-16) ──
   { id: 'two-circles-radius-both-2216', family: 'circles', steps: ['שני מעגלים נחתכים ברדיוס 5'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D drew 5 / 3.6 green before ADR-677 (the 5 paid by the default radius); analytic does not read the sentence (not-handled)' },
+  // ── #2186 (ADR-679): a stated equal size on intersecting circles is drawn ──
+  { id: 'equal-radii-intersecting-2186', family: 'circles', steps: ['שני מעגלים נחתכים ברדיוסים שווים'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D drew 5 / 3.6 green before ADR-679 (the equality dropped); analytic does not read the sentence (not-handled)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

@@ -8246,9 +8246,15 @@ const parallelCircleIntersection: Rule = (s, ctx) => {
  *
  * Equal diameters ⇔ equal radii ⇔ the ratio k = 1, which `set-radius-ratio` already expresses, so this
  * is a PARSER READING and nothing else — no engine work, no new command. It rides the whole two-circle
- * family (tangency, disjoint, contained, meeting, bare) rather than one rule, because every member
- * resolves its pair at the same `resolveCirclePair` chokepoint and the class would otherwise re-open
- * one rule at a time — the #215 lesson.
+ * family rather than one rule, because every member resolves its pair at the same `resolveCirclePair`
+ * chokepoint and the class would otherwise re-open one rule at a time — the #215 lesson.
+ *
+ * #2186 ([ADR-679](docs/06-decisions.md#adr-679)) — the consumers, as they ARE (ADR-455 wired three and the comment
+ * claimed the family): `circlesTangent`, `twoCirclesPosition`, `twoCirclesBare` (#761), and `twoCirclesMeet` (all
+ * three branches), `circleCircleIntersection`, `commonTangent` (#2186). `concentricCircles` and
+ * `containedNewInExisting` deliberately do NOT read it: two equal circles cannot share a centre or nest, so the
+ * words contradict themselves there and the word-relation gate (`droppedWordRelations`, its equal-size member)
+ * keeps the line from being drawn. A rule that forgets the helper is caught by that gate, not by luck.
  *
  * ADR-052 note: an unstated size is a free DOF, seeded APART so a pair reads as two circles. A STATED
  * equality removes that DOF — which is exactly the difference between a default and a given.
@@ -8507,7 +8513,7 @@ const twoCirclesMeet: Rule = (s, ctx) => {
             { type: 'circle', id: sid2, center: cc2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ifAbsent: true, ...(namedCentres[1] ? {} : { autoCenter: true }) },
           ];
       const [P1, P2, P3, P4] = labels;
-      return withStatedRadius(s, [
+      return withEqualRadii(s, withStatedRadius(s, [
         ...creates,
         { type: 'point-on-circle', id: P1, circle: sid1, free: true },
         { type: 'point-on-circle', id: P2, circle: sid1, free: true },
@@ -8515,7 +8521,7 @@ const twoCirclesMeet: Rule = (s, ctx) => {
         { type: 'point-on-circle', id: P4, circle: sid2, free: true },
         { type: 'set-line', points: [P1, P2, P3, P4] },
         { type: 'segment', a: P1, b: P4 },
-      ], sid1, sid2); // #2198 / #2216
+      ], sid1, sid2), sid1, sid2); // #2198 / #2216; #2186: the equality
     }
   }
   // A definite reference to the TWO circles ALREADY in the figure — «A חיתוך בין המעגלים» / «A נקודת
@@ -8528,7 +8534,7 @@ const twoCirclesMeet: Rule = (s, ctx) => {
     if (labels.length === 0) return null; // no crossing named — leave to another rule / escalate
     const out: AnyCommand[] = [{ type: 'circle-circle-intersection', id: labels[0], circle1: id1, circle2: id2, branch: 0 }];
     if (labels[1]) out.push({ type: 'circle-circle-intersection', id: labels[1], circle1: id1, circle2: id2, branch: 1, avoid: labels[0] });
-    return withStatedRadius(s, out, id1, id2); // #2198 / #2216
+    return withEqualRadii(s, withStatedRadius(s, out, id1, id2), id1, id2); // #2198 / #2216; #2186: the equality
   }
   // Pair resolution at the shared #215 chokepoint: a half-named / ambiguous-many reference defers —
   // never invents default names; exactly one existing circle COMPLETES the pair (bound regardless of
@@ -8563,8 +8569,9 @@ const twoCirclesMeet: Rule = (s, ctx) => {
   // student NAMED is referenced: an indefinite «שני מעגלים נחתכים» is a fresh pair whose default tokens are
   // re-picked clear of the figure's circles by `withAnonymousAutoCentres` (#1688), never the existing ones.
   const haveCircles = new Set((ctx.circles ?? []).map(up).filter((c) => named.includes(c)));
-  // #2198 / #2216: one radius stated for the pair sizes both (the ruling's "same figure as the three-line form")
-  return withStatedRadius(s, [
+  // #2198 / #2216: one radius stated for the pair sizes both (the ruling's "same figure as the three-line form");
+  // #2186: a stated equal size makes them equal (the tangent lane's reading, ADR-455)
+  return withEqualRadii(s, withStatedRadius(s, [
     // No radius is stated, so each circle's size is a free DOF (ADR-051) seeded at a distinct value (so it
     // doesn't render as a symmetric lens) — the solver sizes them to the problem's givens, the sampler varies them.
     ...(haveCircles.has(c1) ? [] : [{ type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, freeRadius: true, ...(auto1 ? { autoCenter: true } : {}) } as AnyCommand]),
@@ -8572,8 +8579,9 @@ const twoCirclesMeet: Rule = (s, ctx) => {
     { type: 'circle-circle-intersection', id: A, circle1: id1, circle2: id2, branch: 0 },
     // B is "the OTHER crossing" — geometric (avoid A), so it doesn't swap with A as the circles flex (R8).
     { type: 'circle-circle-intersection', id: B, circle1: id1, circle2: id2, branch: 1, avoid: A },
-  ], id1, id2);
+  ], id1, id2), id1, id2);
 };
+
 
 const circleCircleIntersection: Rule = (s) => {
   if (!/circle|מעגל/i.test(s)) return null;
@@ -8588,7 +8596,8 @@ const circleCircleIntersection: Rule = (s) => {
   if (centers.length < 2) return null;
   const resM = dropCircleRef(s).match(/\b([A-Za-z]\d*)\b/);
   if (!resM) return null;
-  return [{ type: 'circle-circle-intersection', id: up(resM[1]), circle1: circleId(centers[0]), circle2: circleId(centers[1]), branch: 0 }];
+  // #2186 (ADR-679): «מעגל O חותך את מעגל P בנקודה A ברדיוסים שווים» — the equality lands on the named pair
+  return withEqualRadii(s, [{ type: 'circle-circle-intersection', id: up(resM[1]), circle1: circleId(centers[0]), circle2: circleId(centers[1]), branch: 0 }], circleId(centers[0]), circleId(centers[1]));
 };
 
 /**
@@ -9157,6 +9166,8 @@ const commonTangent: Rule = (s, ctx) => {
   );
   const [c1, c2] = centres;
   const id1 = circleId(c1), id2 = circleId(c2);
+  /** #2186 (ADR-679): a stated equal size lands on the pair, whichever construction this returns. */
+  const equal = (cmds: AnyCommand[]): AnyCommand[] => withEqualRadii(s, cmds, id1, id2);
   // NAMED circles that don't yet exist are created (free radius per ADR-052, `ifAbsent` keeps a stated
   // one); a centre the student never stated (an INTRODUCED pair / a COMPLETED pair's fresh partner)
   // gets an auto (hidden-until-used) centre, per the family convention.
@@ -9179,7 +9190,7 @@ const commonTangent: Rule = (s, ctx) => {
     // nothing new, so the lowering is ONLY the drawn tangent line at the touch. Re-asserting the
     // memberships/collinearity (the at-variant's creation path) coupled into the existing tangency's
     // joint solve and ground it for ~55 s.
-    return [...mk, { type: 'tangent', id: `tan-${up(touch)}`, circle: id1, at: up(touch), visible: true }];
+    return equal([...mk, { type: 'tangent', id: `tan-${up(touch)}`, circle: id1, at: up(touch), visible: true }]);
   }
   if (atResolved) {
     if (apex) return 'stop'; // an apex + a named touch is a compound this rule can't couple yet — escalate, never drop A
@@ -9203,7 +9214,7 @@ const commonTangent: Rule = (s, ctx) => {
     cmds.push({ type: 'tangent', id: `tan-${at}`, circle: id1, at, visible: true });
     const fresh = (naming ?? []).filter((p) => !have.has(p));
     if (fresh.length) cmds.push(...lineMarkers(`tan-${at}`, fresh));
-    return cmds;
+    return equal(cmds);
   }
   // (`kind` is hoisted to the trigger above, #212: «חיצוני»/«מבחוץ» external ⇔ centres on the same
   // side of the tangent; «פנימי»/«מבפנים»/«אלכסוני» internal ⇔ opposite sides — a REQUIREMENT
@@ -9252,7 +9263,7 @@ const commonTangent: Rule = (s, ctx) => {
     // the touch kind BUILDS it directly.
     const touchKind = position === 'ext-tangent' ? 'internal' : 'external';
     if (touchFree && wantPairs === 1 && (kind === undefined || kind === touchKind)) {
-      return [...mk, { type: 'tangent', id: `tan-${up(touch)}`, circle: id1, at: up(touch), visible: true }];
+      return equal([...mk, { type: 'tangent', id: `tan-${up(touch)}`, circle: id1, at: up(touch), visible: true }]);
     }
     return { clarify: 'tangents-exhausted', kind: kind ?? 'any', ...(touchy && touchFree ? { hint: 'at-touch' as const } : {}), ...(position ? { position } : {}) };
   }
@@ -9305,7 +9316,7 @@ const commonTangent: Rule = (s, ctx) => {
   if (apex && newApex && wantPairs === 2)
     out.push({ type: 'line-intersection', id: apex, line1: `tanline-${names[0]}${names[1]}`, line2: `tanline-${names[2]}${names[3]}` });
   out.push(...apexInk);
-  return withStatedRadius(s, out, id1, id2); // #2198 / #2216: one radius stated for the pair sizes both
+  return equal(withStatedRadius(s, out, id1, id2)); // #2198 / #2216: one radius stated for the pair sizes both
 };
 
 /**
@@ -14594,6 +14605,20 @@ export const VERB_GATES: VerbGate[] = [
   // lowering lost is a dropped given, exactly as its twin «…שהוא גם מאונך» already was
   gate({ verb: VERB_PERPENDICULAR, he: [`מאונ${KAF}`, `אנ${KAF}`], en: [['perpendicular']], satisfied: family('perpendicular', 'foot', 'right-triangle', 'altitude') }),
 ];
+/** The equal-circle noun phrase (#2186): «(שני) מעגלים שווים / זהים», "equal / congruent circles". */
+const EQUAL_CIRCLES = /(?<![א-ת])ה?מעגלים\s+(?:ה?שווים|ה?זהים)(?![א-ת])|\b(?:equal|congruent|identical)\s+circles\b/i;
+/** Does the lowering make two circles' radii equal? A k = 1 ratio, or two radii pinned at one value (#2186). */
+function radiiMadeEqual(commands: AnyCommand[]): boolean {
+  if (commands.some((c) => c.type === 'set-radius-ratio' && Math.abs(c.k - 1) < 1e-9)) return true;
+  const pinned = new Map<string, number>();
+  for (const c of commands) {
+    if (c.type === 'circle' && !c.freeRadius) pinned.set(c.id, c.radius);
+    if (c.type === 'set-radius') pinned.set(c.circle, c.value);
+  }
+  const vals = [...pinned.values()];
+  return vals.some((v, i) => vals.some((w, j) => j !== i && Math.abs(v - w) < 1e-9));
+}
+
 /**
  * WORD-form RELATION givens (#210, ADR-360) — the fourth dropped-given sibling: a relation stated as a
  * WORD between CIRCLE nouns that the parsed commands do not encode. The symbol gate (ADR-264) sees
@@ -14622,7 +14647,22 @@ export function droppedWordRelations(utterance: string, commands: AnyCommand[]):
   // Two-circle context for the mutual-position members: >=2 circle nouns or the plural — a point-side
   // «M בתוך המעגל» never trips.
   const circleNouns = (s.match(/circle|מעגל/gi) ?? []).length;
-  if (!(circleNouns >= 2 || /מעגלים|\bcircles\b/i.test(s))) return out;
+  const twoCircles = circleNouns >= 2 || /מעגלים|\bcircles\b/i.test(s);
+  // The EQUAL-SIZE member (#2186, ADR-679) — a size equality stated on circles: the EQUAL_SIZE words («ברדיוסים
+  // שווים», «ששטחם שווה», "with equal radii") or the equal-circle noun phrase («שני מעגלים שווים», "equal circles").
+  // ADR-455 wired the reading into three of the family's rules, and nothing watched the words, so every rule that
+  // forgot `withEqualRadii` — and any LLM decomposition — committed two unequal circles green. Its context: the
+  // two-circle one, or ONE circle noun with a PLURAL size noun («מעגל מוכל ברדיוסים שווים» states two sizes); a lone
+  // «הרדיוס שווה ל-5» about one circle never trips. Satisfied, generously, by any lowering that makes two radii
+  // equal: `set-radius-ratio` k = 1, or two radii pinned at one value (the circles' own or `set-radius`).
+  const pluralSize = /רדיוסים|רדיוסיהם|רדיוסיהן|קטרים|קוטרים|קטריהם|\bradii\b|\bdiameters\b/i.test(s);
+  if (
+    (twoCircles || (circleNouns >= 1 && pluralSize)) &&
+    (EQUAL_SIZE.test(s) || EQUAL_CIRCLES.test(s)) &&
+    !radiiMadeEqual(commands)
+  )
+    out.push('שווים');
+  if (!twoCircles) return out;
   if (/זרים|\bdisjoint\b/i.test(s) && !commands.some((c) => c.type === 'set-circle-position' && c.relation === 'disjoint')) out.push('זרים');
   if (/מוכל(?:ים|ת)?(?![א-ת])|\bcontained\b/i.test(s) && !commands.some((c) => c.type === 'set-circle-position' && c.relation === 'contained')) out.push('מוכל');
   // The tangent-KIND member (#212): a kind adjective on a SINGULAR tangent noun in a two-circle
