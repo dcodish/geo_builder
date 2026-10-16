@@ -2316,10 +2316,22 @@ function refNamesOf(e: Expr): string[] {
   }
 }
 
-/** The circle through three points, or null when they are collinear. */
+/**
+ * #2109 (ADR-CX-071) — the scale-free collinearity floor: three points are on one line when twice
+ * their triangle's area, |d|/2, is at most this fraction of the widest span squared. A SHAPE verdict,
+ * so it gives one answer at every size; the absolute `|d| < 1e-12` it replaces scaled with |z|² and
+ * drew a circle of radius 7·10¹⁸ through «300w» and «1000w». The constant is the operator's ruling
+ * (2026-10-15, #2109 card 8 A: "a genuinely thin typed triangle is DRAWN — about 1e-9, analytic's"),
+ * pinned equal to analytic's `isDegenerate` by a text lock (`literal-exact-2134.test.ts`).
+ */
+export const CIRCUMCIRCLE_FLATNESS_FLOOR = 1e-9;
+
+/** The circle through three points, or null when they are collinear (to the scale-free floor above). */
 function circumcircle(a: Cx, b: Cx, c: Cx): { center: Cx; r: number } | null {
   const d = 2 * (a.re * (b.im - c.im) + b.re * (c.im - a.im) + c.re * (a.im - b.im));
-  if (Math.abs(d) < 1e-12) return null;
+  const sq = (p: Cx, q: Cx) => (p.re - q.re) ** 2 + (p.im - q.im) ** 2;
+  const span2 = Math.max(sq(a, b), sq(b, c), sq(c, a));
+  if (!(span2 > 0) || Math.abs(d) / 2 <= CIRCUMCIRCLE_FLATNESS_FLOOR * span2) return null;
   const sa = a.re * a.re + a.im * a.im;
   const sb = b.re * b.re + b.im * b.im;
   const sc = c.re * c.re + c.im * c.im;

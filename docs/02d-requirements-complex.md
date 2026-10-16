@@ -74,8 +74,10 @@ behind it; their history is in [06d](06d-decisions-complex.md).
 - **FR-CN-1 (Must)** — **The multiplicative core is answered EXACTLY, not numerically.** Products,
   quotients, powers and roots are decided by exact linear algebra over ℚ rather than by iteration, so a
   modulus or argument the givens force is reported without drift. Sums, areas, distances and series are
-  the numeric residue.
-  - Sources: [ADR-CX-006](06d-decisions-complex.md)
+  the numeric residue. **A stated polar literal «r cis θ» is the number it states, at every modulus**
+  («15cis(π/7)» reads «= 15·cis180/7°», |z| = 15); a closed literal is read exactly or left as written,
+  and never replaced by a nearby fraction.
+  - Sources: [ADR-CX-006](06d-decisions-complex.md) · [ADR-CX-071](06d-decisions-complex.md#adr-cx-071) ([#2134](https://github.com/dcodish/geo_builder/issues/2134))
 - **FR-CN-2 (Must)** — **NO CAS.** The exact core is bounded linear algebra over two vector spaces.
   Anything wanting general symbolic algebra is refused and escalated to the operator, never approximated.
   *(Operator authority.)*
@@ -265,8 +267,9 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   או "arg(z1) = 30°".» — any other unread word keeps «הבנתי חלק מהשורה, אבל לא את: …». **An accepted
   object is drawn**: a circle whose radius is not a positive real number («ורדיוסו -2», «0», «2i»), or a
   circumscribed circle through collinear numbers, is refused with the existing sentence, naming the
-  statement that blocks it or else the line itself.
-  - Sources: [ADR-CX-009](06d-decisions-complex.md) §2 · [ADR-CX-060](06d-decisions-complex.md#adr-cx-060) ([#1890](https://github.com/dcodish/geo_builder/issues/1890)) · [ADR-CX-069](06d-decisions-complex.md#adr-cx-069) ([#1895](https://github.com/dcodish/geo_builder/issues/1895))
+  statement that blocks it or else the line itself. Three numbers on one line, to a scale-free
+  tolerance, have no circumscribed circle at any size; a genuinely thin typed triangle is drawn.
+  - Sources: [ADR-CX-009](06d-decisions-complex.md) §2 · [ADR-CX-060](06d-decisions-complex.md#adr-cx-060) ([#1890](https://github.com/dcodish/geo_builder/issues/1890)) · [ADR-CX-069](06d-decisions-complex.md#adr-cx-069) ([#1895](https://github.com/dcodish/geo_builder/issues/1895)) · [ADR-CX-072](06d-decisions-complex.md#adr-cx-072) ([#2109](https://github.com/dcodish/geo_builder/issues/2109))
 - **FR-LN-2 (Must)** — **A refusal names the student's statement**, never internal state
   ([FR-SU-5](02w-requirements-workspace.md)), and reads correctly in an RTL sentence with LTR
   mathematics inside it ([FR-WI-2](02w-requirements-workspace.md)).
