@@ -257,6 +257,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2013': 'open',
   '#2047': 'open',
   '#1963': 'open',
+  '#2185': 'open', // #2199 (ADR-AG-282): 2-D drops the second carrier of an English per-point line and of a line list (#2185 removes these)
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
   '#2110': 'open', // #2101/#2100 (ADR-648/649): analytic does not read a radius letter's value or a radius ratio
   '#2115': 'open', // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
@@ -1483,6 +1484,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'two-circles-radius-both-2216', family: 'circles', steps: ['שני מעגלים נחתכים ברדיוס 5'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D drew 5 / 3.6 green before ADR-677 (the 5 paid by the default radius); analytic does not read the sentence (not-handled)' },
   // ── #2186 (ADR-679): a stated equal size on intersecting circles is drawn ──
   { id: 'equal-radii-intersecting-2186', family: 'circles', steps: ['שני מעגלים נחתכים ברדיוסים שווים'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D drew 5 / 3.6 green before ADR-679 (the equality dropped); analytic does not read the sentence (not-handled)' },
+  // ── #2199 (ADR-AG-282) / #2185: a point stated on a LIST of carriers is on each ──
+  { id: 'point-on-two-circles-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A על מעגל O ועל מעגל P'], expect: 'builds', exception: 'X8' },
+  { id: 'points-on-two-circles-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A ו-B על מעגל O ועל מעגל P'], expect: 'builds', exception: 'X8' },
+  { id: 'point-on-two-circles-en-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A on circle O and on circle P'], expect: 'builds', exception: 'X8' },
+  { id: 'point-on-three-circles-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל Q', 'A על מעגל O, על מעגל P ועל מעגל Q'], expect: 'builds', exception: 'X8' },
+  { id: 'points-respectively-en-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A and B on circle O and on circle P respectively'], expect: 'builds', exception: 'X8' },
+  { id: 'point-per-circle-en-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A on circle O and B on circle P'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2185' }], note: '2-D refuses it split-statements today; #2185 reads it' },
+  { id: 'point-on-two-lines-2185', family: 'points-incidence', steps: ['ריבוע ABCD', 'P על הישר AC ועל הישר BD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#2185' }], note: '2-D escalates it today; #2185 reads it' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

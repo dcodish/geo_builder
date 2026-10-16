@@ -774,6 +774,33 @@ const namesOf = (list: string): string[] => list.match(new RegExp(NAME, 'g')) ??
 const objectsOf = (s: string): string[] => s.split(/\s+ו-?(?=\s*(?:על|ב[א-ת]|[A-Za-z0-9(−-]))/).map((x) => x.trim()).filter(Boolean);
 
 /**
+ * A LIST OF CARRIERS (#2199, ADR-AG-282) — «על מעגל O ועל מעגל P», «על K₁ וגם על K₂», «על K₁, על K₂ ועל K₃»: the
+ * strict counterpart of {@link objectsOf}. EVERY member must open with «על»; a member that opens with anything
+ * else (a point's name, «… ו-B על מעגל P») means this is not a carrier list, and the per-point form keeps its own
+ * reading (ADR-AG-222's cut). Null unless there are at least two carriers — a single carrier is read where it
+ * always was.
+ */
+export function carriersOf(rest: string): string[] | null {
+  if (!/^על\s/.test(rest)) return null;
+  // A conjunction is REQUIRED between members (a comma, «ו», «וגם»): plain whitespace before «על» is not a joint.
+  const parts = rest.split(/\s*,\s*(?:ו-?\s*)?(?:גם\s+)?(?=על\s)|\s+ו-?\s*(?:גם\s+)?(?=על\s)/).map((x) => x.trim()).filter(Boolean);
+  if (parts.length < 2 || !parts.every((p) => /^על\s+\S/.test(p))) return null;
+  return parts;
+}
+
+/** The English twin: "on K₁ and on K₂", "on K₁ and also on K₂", "on K₁, on K₂ and on K₃". */
+export function carriersOfEn(rest: string): string[] | null {
+  if (!/^on\s/i.test(rest)) return null;
+  const parts = rest.split(/\s*,\s*(?:and\s+)?(?:also\s+)?(?=on\s)|\s+and\s+(?:also\s+)?(?=on\s)/i).map((x) => x.trim()).filter(Boolean);
+  if (parts.length < 2 || !parts.every((p) => /^on\s+\S/i.test(p))) return null;
+  return parts;
+}
+
+/** Each subject on each carrier — the two-line meaning («A על מעגל O» · «A על מעגל P»), and 2-D's after #2185. */
+const eachOnEach = (names: readonly string[], carriers: readonly string[], verb = ''): string[] =>
+  names.flatMap((n) => carriers.map((c) => `${n} ${verb}${c}`));
+
+/**
  * A plural subject and one predicate, or two lists paired by «בהתאמה» — each subject gets its own
  * clause. Only the LOCATION predicate (נמצא/מונח … על/ב…) and the plural EQUATION form distribute: they
  * are the corpus's two shapes, and a predicate that relates the subjects to EACH OTHER («A ו-B
@@ -794,22 +821,52 @@ export function distributeClauses(line: string): string[] | null {
     let rest = (loc[2] ?? loc[3]).trim();
     const respectively = /\s+בהתאמה$/.test(rest);
     if (respectively) rest = rest.replace(/\s+בהתאמה$/, '');
-    if (!respectively) return names.map((n) => `${n} ${rest}`);
+    if (!respectively) {
+      // #2199 (ADR-AG-282): a list of carriers puts EVERY subject on EVERY carrier, as the two lines would.
+      const carriers = carriersOf(rest);
+      return carriers ? eachOnEach(names, carriers) : names.map((n) => `${n} ${rest}`);
+    }
     const objs = objectsOf(rest);
     if (objs.length !== names.length) return null;
     return names.map((n, i) => `${n} ${objs[i]}`);
   }
+  /*
+   * #2199 (ADR-AG-282) — ONE subject on a list of carriers: «A על מעגל O ועל מעגל P», «הנקודה A נמצאת על …»,
+   * «A נקודה על …». It distributes only when the list has two carriers or more; a single carrier never enters here.
+   */
+  const one = new RegExp(`^(?:ה?נקודה\\s+)?(${NAME})(?:\\s+נקודה)?(?:\\s+(?:נמצא(?:ת)?|מונח(?:ת)?))?\\s+(על\\s.+)$`).exec(line);
+  if (one) {
+    const carriers = carriersOf(one[2].trim());
+    if (carriers) return eachOnEach([one[1]], carriers);
+  }
+  /*
+   * The English location sentence. The verb is optional (#2199), exactly as the Hebrew branch made it optional
+   * before «על» (#1641): "A and B on circle O" is "A and B lie on circle O" with its verb dropped. One subject
+   * distributes only over a list of carriers.
+   */
   const locEn = new RegExp(
-    `^(?:(?:the\\s+)?(?:points|vertices)\\s+)?((?:${NAME})(?:\\s*,\\s*${NAME})*,?\\s+and\\s+${NAME})\\s+(?:are|lie)\\s+(on\\s+.+?)(\\s+respectively)?$`,
+    `^(?:(?:the\\s+)?(?:points?|vertices)\\s+)?((?:${NAME})(?:(?:\\s*,\\s*${NAME})*,?\\s+and\\s+${NAME})?)\\s+(?:(?:are|lie|is|lies)\\s+)?(on\\s+.+?)(\\s+respectively)?$`,
     'i',
   ).exec(line);
   if (locEn) {
     const names = namesOf(locEn[1]);
-    if (!locEn[3]) return names.map((n) => `${n} is ${locEn[2]}`);
-    const objs = locEn[2].split(/\s+and\s+(?=on\s|the\s)/i).map((o) => (/^on\s/i.test(o) ? o : `on ${o}`).trim());
-    if (objs.length !== names.length) return null;
-    return names.map((n, i) => `${n} is ${objs[i]}`);
+    const carriers = carriersOfEn(locEn[2]);
+    if (!locEn[3]) {
+      if (carriers) return eachOnEach(names, carriers, 'is ');
+      if (names.length > 1) return names.map((n) => `${n} is ${locEn[2]}`);
+    } else if (names.length > 1) {
+      const objs = locEn[2].split(/\s+and\s+(?=on\s|the\s)/i).map((o) => (/^on\s/i.test(o) ? o : `on ${o}`).trim());
+      if (objs.length !== names.length) return null;
+      return names.map((n, i) => `${n} is ${objs[i]}`);
+    }
   }
+  /*
+   * #2199 — the English PER-POINT incidence: "A on circle O and B on circle P" (each with an optional "is"/"lies").
+   * The twin of ADR-AG-222's Hebrew cut before a point's name, scoped to the incidence sentence: no general
+   * English "and" cut is introduced.
+   */
+  const perPointEn = new RegExp(`^(${NAME})\\s+(?:(?:is|lies)\\s+)?(on\\s+.+?)\\s+and\\s+(${NAME})\\s+(?:(?:is|lies)\\s+)?(on\\s+.+)$`, 'i').exec(line);
+  if (perPointEn) return [`${perPointEn[1]} is ${perPointEn[2]}`, `${perPointEn[3]} is ${perPointEn[4]}`];
   const eqs = new RegExp(
     `^משוואות\\s+(?:ה)?(ישרים|צלעות|אלכסונים)\\s+((?:(?:${NAME}){2})(?:\\s*,\\s*(?:${NAME}){2})*\\s+ו-?\\s*(?:${NAME}){2})\\s+(?:הן|הם)\\s*:?\\s*(.+?)\\s+בהתאמה$`,
   ).exec(line);

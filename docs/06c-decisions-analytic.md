@@ -12260,3 +12260,31 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Open for the operator (reported, not decided by default).** A coordinate pin is classed a VALUE (analytic's «נתון:» list already counts a coordinate as a given, #1872), so «מקבילית ABCD · A(0,0) · B(4,0) · C(4,3) · D(0,3)» would name the coordinates that forced it as typed; on a plain «מרובע»/«משולש» it stays silent either way.
 
 **Locks.** `src-analytic/__tests__/narrowing-note-1996.test.ts` (the shared rows through `decideSubmit` and `analyticI18n`; every 3- and 4-sided `SHAPES` row has a kind in the lattice; removing the cause removes the note; a deferred, incomplete pool says nothing and then the note arrives; the given text from the page's own line text); fixture `src-analytic/__tests__/fixtures/issue-1996-parallelogram-inscribed.analytic.json` (the circle note, he and en).
+
+## ADR-AG-282 — A point on a list of carriers is on each: the frame distributes carriers as it distributes subjects (#2199)
+
+**Status:** accepted · 2026-10-16 · bug (P1, analytic) · fix round #2245, stream E · branch `fix/2199-analytic-carrier-list`
+**Requirements:** [02c](02c-requirements-analytic.md) R124 (the carrier-list bullet) · **Design:** [04c](04c-design-analytic.md) "Carriers distribute as subjects do" · **LADDER stage:** parse only (the sentence frame)
+**Siblings:** 2-D #2185 (the same shape, stream A of the same round) · 3-D: circle geometry is exception X8 · complex: no point-on-named-circle grammar and no fallback
+
+**The ruling.** Operator, 2026-10-16 (ballot round 5, card 19): analytic follows 2-D after #2185, P1 — *"Currently in prod this is still not supported and A is only on O and not on P but line is green"*.
+
+**Measured before** (`ef78f15c`, `decideSubmit` → `derive`, membership measured on the figure). After «מעגל O» · «מעגל P»: «A על מעגל O ועל מעגל P» and its spellings («A נקודה …», «הנקודה A נמצאת …», «… וגם על …», «F על המעגל O ועל המעגל P», "A on circle O and on circle P"), the three-circle comma list, «A ו-B על מעגל O ועל מעגל P» and its English twin, "… respectively", "A on circle O and B on circle P", the line and mixed lists («P על הישר AC ועל הישר BD», «C על מעגל O ועל הישר AB»), and the empty figure — all `not-handled`, so each went to the model; with the stub answer «A על מעגל O», `runFallback` recorded A on O only, green (the operator's report). Rows 7 and 10–16 (Hebrew) already recorded correctly.
+
+**The class.** *A statement placing one or more points on a LIST of carriers had no reader in analytic; it went to the model, whose answer was committed after only a well-formedness check, so a partial decomposition drew green with a stated carrier gone.* Two layers: (1) `distributeClauses` distributed a subject list, never a carrier list (a single subject never matched `NAME_LIST`; the English branch required a verb and a list; no English per-point cut); (2) the LLM seam does no accounting — #1355 (ADR-AG-279), whose name gate refuses `["A על מעגל O"]` for this line (P dropped). This ADR does not re-implement that gate.
+
+**Decision (frame only).**
+1. `carriersOf(rest)` — the strict counterpart of `objectsOf`: «על K₁» then one or more members joined by a comma, «ו» or «וגם», each opening with «על»; null under two members or when any member opens with anything else (a point's name keeps ADR-AG-222's per-point cut). A conjunction is required: plain whitespace before «על» is no joint. `carriersOfEn` is the English twin.
+2. Hebrew: subject list + carrier list without «בהתאמה» → subjects × carriers (`eachOnEach`), each clause the canonical «N על K»; «בהתאמה» still pairs; one subject (optional «הנקודה», «נקודה», «נמצא(ת)» / «מונח(ת)») distributes only over two carriers or more.
+3. English: the verb is optional ("are/lie/is/lies"), one subject or a list; carriers × subjects; "respectively" pairs; a list with one carrier distributes as before ("A and B on circle O", as 2-D builds it). The per-point incidence "N₁ (is/lies)? on K₁ and N₂ (is/lies)? on K₂" → two clauses — no general English "and" cut.
+4. Not touched: the plural «על המעגלים O ו-P» / «שני המעגלים» (#2187 / #2149), the LLM seam (#1355), `segmentsOf`.
+
+**Measured after.** Every row above records with each point on each named carrier; rows 7 and 10–16 unchanged; a «בהתאמה» count mismatch stays `not-handled` and «A על מעגל O ועל המשיק» is refused (`ambiguous-shape`), never committed with a carrier missing. «A ו-B על מעגל O ועל מעגל P» puts A and B on different crossings in at least 20 of 24 seeds. The frame, catalogue and parity batteries pass unchanged.
+
+**Parity.** Rows `point-on-two-circles-2185`, `points-on-two-circles-2185`, `point-on-two-circles-en-2185`, `point-on-three-circles-2185`, `points-respectively-en-2185`, `point-per-circle-en-2185` (circles, X8) and `point-on-two-lines-2185`; this lands before #2185, so the two rows 2-D does not read today carry `knownGap: [{ product: '2d', issue: '#2185' }]` (#2185 removes them). If #2185 lands first with its own copies of these rows, keep one row per id and drop its analytic gaps on `#2199`.
+
+**Catalog.** «A על מעגל O ועל מעגל P» / "A on circle O and on circle P" (F5, needs «מעגל O», «מעגל P»). The catalogue is also the LLM prompt's vocabulary — a proxy-deploy item.
+
+**Behaviour change for a student.** In the analytic builder «A על מעגל O ועל מעגל P» (and the spellings above) puts A on both circles, read by the tool itself; before, the AI answered and drew A on O only with the row green. "A on circle O and B on circle P" and "A and B on circle O" now build instead of going to the AI.
+
+**Locks.** `src-analytic/__tests__/issue-2199-point-on-carrier-list.test.ts` (every row on the figure, the non-lists, the refusals, the 24-seed sweep, the operator's line no longer reaching the fallback); fixtures `src-analytic/__tests__/fixtures/point-on-two-circles-2199.analytic.json`, `two-points-on-two-circles-2199.analytic.json` (built and verified by that test); the parity rows above.
