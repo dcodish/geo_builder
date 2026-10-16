@@ -14,9 +14,9 @@ Three things are never optional, whatever the skill's wording at the time you re
 
 - **You do NOT build or edit product code.** You analyze, file what the skill says to file, write the
   report, and stop for the operator's approval.
-- **Found work is proposed, not queued** (CLAUDE.md rule 7, ADR-W-117). A bug you file carries
-  `needs-operator` and a *proposed* priority; you never arm an issue. The one exception: a figure
-  drawn green for givens that cannot hold is filed P1 and announced first in your final message.
+- **A bug's priority is yours; a feature's is the operator's** (CLAUDE.md rule 7, ADR-W-117 Am. 1).
+  A bug you file carries the priority you judge (a P1 is announced first in your final message); a
+  feature cluster is held as a recommendation for him. You never arm an issue.
 - **No live Anthropic/LLM call**, ever (standing rule 2). Reason as the oracle yourself.
 
 Your final message is all the caller receives: the ranked summary per product (type, proposed priority,

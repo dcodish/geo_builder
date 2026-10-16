@@ -65,7 +65,9 @@ An issue that merely *lacks* a plan is **not** automatically blocking. If the pl
 code and the rulings already on record, **write it** — and arm it only if every line of its
 `## What the student will see` is `[asked]`, `[ruled]` or `[2-D]` (CLAUDE.md rule 7). Do not spend an
 operator question on mechanism the session can work out. Bring them only what is genuinely theirs: product behaviour, pedagogy, UX,
-scope, priority, and anything that reverses a shipped promise.
+scope, a **feature's** priority, and anything that reverses a shipped promise. A bug's priority is never a card: the session sets it
+and says so in the report (ADR-W-117 Am. 1). Likewise a 2-D plane-geometry change's analytic port is never a card; 3-D and complex
+ports still are.
 
 ---
 

@@ -147,10 +147,10 @@ and needs his dated ruling.
   or of another builder, stop and escalate (docs/17 §8). Never ship "because the plan lists it".
 - **No defaults.** An open question waits for him, in P1 sessions too. The one exception: a P1 session may
   ship an honest refusal that reuses an existing message, flagged in the Heads-up.
-- **Found work is proposed, not queued.** File it `needs-operator` with a proposed priority; never arm it or
-  make it P1 yourself, except a figure drawn green for givens that cannot hold (P1, announced at once).
+- **Found work: a bug's priority is yours** (announce a P1); a found feature is `needs-operator` with a
+  proposed priority. A `[proposed]` outcome still waits for him (ADR-W-117 Am. 1).
 - **Cross-tool warnings.** When he asks a non-2-D tool for behaviour that differs from 2-D, say so before
-  building. When a 2-D change would change what the other tools should do, ask whether it applies to them.
+  building. A 2-D change reaches analytic automatically; ask whether it applies to 3-D and complex.
 
 ## Workflow — the standard operating route
 

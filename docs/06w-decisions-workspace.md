@@ -5523,8 +5523,8 @@ The same audit sampled the issues opened from 2026-10-05 to 10-07 (#1786–#1860
 4. **"The whole class"** (rule 1) means the same wrong outcome in more places: other spellings, rules, seeds or builders. An outcome the report did not describe is never class-widening. It is `[proposed]`.
 5. **Measured beats written** (amends ADR-W-064). The pickup measurement may contradict what the plan says about the request, about 2-D, or about another builder. When it does, the item escalates (docs/17 §8). It never ships "because the plan lists it".
 6. **No defaults** (A3). An unanswered question waits for the operator. A recommendation does not become a ruling by going unopposed. The one P1 exception is an honest refusal that reuses an existing message, flagged in the Heads-up.
-7. **Found work is proposed, not queued** (A2). It is filed `needs-operator` with a proposed priority. It is not armed, and not made P1, until he looks. The one exception: a figure drawn green for givens that cannot hold is filed P1 and announced at once.
-8. **Cross-tool warnings** (B1). The operator may ask a non-2-D tool for a behaviour that differs from 2-D's. If so, the session says so before building and names 2-D's behaviour. A 2-D change may change what the other tools should do under the reference rule (ADR-W-118). If so, the session asks whether the change applies to them.
+7. **Found work is proposed, not queued** (A2). *(⚠ Amended by Amendment 1 below: for a **bug**, the priority is the session's; this clause now governs found **features** only.)* It is filed `needs-operator` with a proposed priority. It is not armed, and not made P1, until he looks. The one exception: a figure drawn green for givens that cannot hold is filed P1 and announced at once.
+8. **Cross-tool warnings** (B1). *(⚠ Amended by Amendment 1 below: analytic follows a 2-D plane-geometry change without the ask; 3-D and complex are still asked.)* The operator may ask a non-2-D tool for a behaviour that differs from 2-D's. If so, the session says so before building and names 2-D's behaviour. A 2-D change may change what the other tools should do under the reference rule (ADR-W-118). If so, the session asks whether the change applies to them.
 9. **Reporting.**
    - Each round-ledger item carries the line `beyond the request:`, which should read "none".
    - The Heads-up names anything shipped that the operator did not ask for.
@@ -5534,6 +5534,20 @@ The same audit sampled the issues opened from 2026-10-05 to 10-07 (#1786–#1860
 - Fewer items arm themselves, and rounds escalate more. Questions that used to be answered by default now reach the operator as `needs-operator`.
 - The `/decisions` pass changes its aim. It used to aim at "enough armed work to run rounds without him"; it now aims at "no product question left unasked".
 - The memory notes "plan mechanism beats plan locks", "ship the mechanism, file the judgement" and "parked arms need successor issues" are read under this rule. When the memory was reorganised (#1861, C2) they went to: "plan mechanism beats plan locks" → [docs/17 §9](17-design-rules.md); "ship the mechanism, file the judgement" → deleted, covered by CLAUDE.md rule 7; "parked arms need successor issues" → [docs/22 §1](22-workflow.md).
+
+### ADR-W-117 Amendment 1 (2026-10-16) — a bug's priority is the session's; analytic follows 2-D without a per-case ask (#2282)
+
+**Requirements:** none (internal) · **Design:** none (internal). This is process: CLAUDE.md rule 7, docs/17 §1, docs/22 §1, and the fix-round and decisions skills plus the log-triage agent are edited in the same commit.
+
+**The rulings, verbatim:**
+- **§7 (priority).** In the /decisions session chat, 2026-10-16: *"from now on, i dont want to need to decide what priority bugs are. Only new features would need my classification"*.
+- **§8 (analytic ports).** From the /decisions ballot, 2026-10-16, card `d-parity-analytic-default`, choice A: *"Standing yes for analytic. A 2-D plane-geometry verdict or drawing change applies to analytic automatically. 3-D and complex are still asked each time."* It is recorded on #2204, #2218, #2207, #2214, #2190 and #1802. The pass found nine analytic ports in a row answered "follow 2-D".
+
+**Decision.**
+1. **§7 is replaced for bugs.** A bug a session finds, or files from a report or from the prod logs, carries the priority the session judges by docs/22 §1's taxonomy. It is not `needs-operator` for its priority or for its acceptance. A P1 is announced at once; the old exception (a figure drawn green for givens that cannot hold) is now one case of the general rule, not the only route to P1. Once its plan's `## What the student will see` lines are all `[asked]`/`[ruled]`/`[2-D]`, it is armed by the ordinary §3 test. A found **feature** keeps §7 as written: `needs-operator` with a proposed priority, because only the operator classifies features. **Unchanged:** a `[proposed]` outcome line still makes any issue `needs-operator`. Only the priority question moves to the session.
+2. **§8 is narrowed.** The second sentence (a 2-D change that would change what the other tools should do → ask) no longer applies to **analytic**: a 2-D plane-geometry verdict or drawing change lands in analytic as a `[ruled]` parity row, with no card. **3-D and complex are still asked each time.** The first sentence (the operator asks a non-2-D tool for different behaviour → say so first) is unchanged in every tool.
+
+**Consequences.** Decisions ballots stop carrying priority rows for bugs and port cards for analytic. The report still names each priority the session set, so the operator can overrule one. A bug the session sets at P1 joins the P1 queue only through its plan's ordinary arming test.
 
 ## ADR-W-118 — The rulings of 2026-10-07: 2-D is the reference for display too, the honesty invariant names values not relations, and the docs are reorganised (#1861)
 

@@ -380,9 +380,9 @@ reply). Keep it to one short list; `/status-update` stays the full surface.
 Pick anything without `auto-ok` · write a fix plan for an unplanned issue · merge a feature PR
 · deploy · take a P1 silently · run over a dirty/behind tree · stall every stream on a blocking
 question (ask in text; Step 2) · overlap two test runs (the suite lock queues them) · keep a symptom patch to avoid
-an escalation · exceed the announced composition mid-round (found new work → file an issue `needs-operator` with a
-proposed priority — never armed, never made P1 by the round, except a figure drawn green for givens
-that cannot hold) · take a default on an open question · ship a `[proposed]` outcome ·
+an escalation · exceed the announced composition mid-round (found new work → file an issue, never armed by the round:
+a bug with the priority the round judges, a P1 announced at once; a feature `needs-operator` with a proposed
+priority — ADR-W-117 Am. 1) · take a default on an open question · ship a `[proposed]` outcome ·
 land over unreconciled external `origin/main` movement · leave outcomes, deviations, or skips
 out of the ledger (chat is not a record) · finish with the `in-round` label still on · report a
 play sheet whose servers are not running, whose cases are not numbered, or whose heads-up items

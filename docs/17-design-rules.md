@@ -45,8 +45,8 @@ routine asked. Your class sentence names categories, not files — so it is alre
 the question "do the other builders have this same class?" is one grep away. **State the answer in
 the ADR either way.** If a sibling has it: a plane-geometry input or display change lands in every
 builder that should have it, or adds a known-gap row naming its issue (docs/22 §10, ADR-W-108,
-ADR-W-118); anything else is filed against that product as `needs-operator` with a proposed priority
-(CLAUDE.md rule 7). Note that no amount of code
+ADR-W-118); anything else is filed against that product: a bug with the priority the session judges,
+a feature as `needs-operator` with a proposed priority (CLAUDE.md rule 7, ADR-W-117 Am. 1). Note that no amount of code
 sharing would prevent this: these classes live in the `engine` layer, which is copied on purpose
 (`BOUNDARIES.json`). The check *is* the mechanism.
 
