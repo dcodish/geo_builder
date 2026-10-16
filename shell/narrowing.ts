@@ -54,9 +54,10 @@ export type NarrowKind =
 
 /**
  * `NARROW_IMPLIES[x]` is every kind a genuine `x` also is (reflexive and transitive — written out in full so a
- * reader never has to close it by hand). The quadrilateral rows agree with 2-D's and 3-D's `QUAD_IMPLIES` and
- * analytic's `nounsExclude` on every kind they share (asserted by `shell/__tests__/narrowing-1996.test.ts`);
- * the right kite is the one kind they lack (a kite with two right angles — the cyclic kite).
+ * reader never has to close it by hand). Since #2169 / #2171 ([ADR-W-131](../docs/06w-decisions-workspace.md#adr-w-131))
+ * this is the ONLY copy of the quadrilateral hierarchy: 2-D's and 3-D's `QUAD_IMPLIES` are views derived from it
+ * and analytic's `nounsExclude` reads {@link kindRelation}. The right kite (a kite with two right angles — the
+ * cyclic kite) has no noun, so it is never a stated kind.
  */
 export const NARROW_IMPLIES: Readonly<Record<NarrowKind, readonly NarrowKind[]>> = {
   quadrilateral: ['quadrilateral'],
@@ -93,6 +94,45 @@ export function meetKinds(a: NarrowKind, b: NarrowKind): NarrowKind | null {
   const top = both.filter((k) => both.every((o) => narrowImplies(o, k)));
   return top.length === 1 ? top[0] : null;
 }
+
+/**
+ * #2169 / #2171 / #2180 ([ADR-W-131](../docs/06w-decisions-workspace.md#adr-w-131)) — WHAT A SECOND NOUN DOES TO A
+ * RING ALREADY DECLARED, the one relation every builder reads (2-D's `quadRelation`, moved here so 3-D's ARM 3 and
+ * store twin and analytic's polygon arm stop judging it from their own copies of the hierarchy, which disagreed):
+ * - `implies` — the declared kind already says it (a square is a rectangle; an isosceles trapezoid is a trapezoid):
+ *   a restatement, «כבר קיים»;
+ * - `narrows` — the stated kind is a special kind of the declared one («מקבילית» → «מלבן», «טרפז» → «טרפז שווה
+ *   שוקיים»): the ring takes it (the 2026-10-08 ruling on #1914);
+ * - `siblings` — neither implies the other but one kind is both (a rectangle and a rhombus — a square): the ring
+ *   becomes that kind (the 2026-10-11 ruling on #1993);
+ * - `excludes` — no kind of the lattice is both (the trapezoid family against the parallelogram family or the kite,
+ *   and an isosceles against a right trapezoid — its legs equal and one of them perpendicular to the bases makes
+ *   both perpendicular, a rectangle): ADR-619's refusal, in every builder (the 2026-10-16 rulings on #2169).
+ * Derived from {@link NARROW_IMPLIES}, never a list of pairs.
+ */
+export type KindRelation = 'implies' | 'narrows' | 'siblings' | 'excludes';
+export function kindRelation(declared: NarrowKind, stated: NarrowKind): KindRelation {
+  if (narrowImplies(declared, stated)) return 'implies';
+  if (narrowImplies(stated, declared)) return 'narrows';
+  return NARROW_KINDS.some((k) => narrowImplies(k, declared) && narrowImplies(k, stated)) ? 'siblings' : 'excludes';
+}
+
+/**
+ * Does a genuine `have` stay a `want` when the ring is read FROM ANY VERTEX IN EITHER DIRECTION (#1988; 2-D's
+ * ADR-619, 3-D's ADR-3D-326)? {@link kindRelation} is about CLASSES; a restatement is about a sentence, and two
+ * nouns name a particular pair of sides: a trapezoid (of any adjective) names its parallel pair by the ring order, so
+ * it never survives an arbitrary reading; the only kinds that imply a kite without being one (the rhombus and the
+ * square) are kites about either diagonal. Every other noun is symmetric under the ring's whole dihedral group.
+ * One copy since #2169 (ADR-W-131): 2-D's, 3-D's and analytic's restatement checks all read it.
+ */
+export const kindImpliesInEveryReading = (have: NarrowKind, want: NarrowKind): boolean =>
+  narrowImplies(have, want) && !narrowImplies(want, 'trapezoid') && (want !== 'kite' || narrowImplies(have, 'rhombus'));
+
+/** Can no ring be both an `x` and a `y`? Symmetric; {@link kindRelation}'s `excludes`. */
+export const kindsExclude = (x: NarrowKind, y: NarrowKind): boolean => kindRelation(x, y) === 'excludes';
+
+/** The kind of a ring declared `declared` once `stated` is said of it too — their meet — or null when they exclude. */
+export const kindAfter = (declared: NarrowKind, stated: NarrowKind): NarrowKind | null => meetKinds(declared, stated);
 
 /** The kind in `set` that implies every other kind in it (its least element), or null. */
 export function leastKind(set: ReadonlySet<NarrowKind>): NarrowKind | null {

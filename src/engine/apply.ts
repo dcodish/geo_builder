@@ -14,7 +14,7 @@ import { shapeConstraints } from './inscribe';
 import { ringOnOneCircle } from './structure';
 import { referencesCircle } from './lower';
 import { add, circleCircleIntersect, circumcenter, dist, footOnLine, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringKey, ringSimple, scale, sub } from './geometry';
-import { QUAD_IMPLIES, quadAfter, quadImplies, quadImpliesInEveryReading, quadRelation, quadsExclude, type QuadKind } from './shapeKinds';
+import { isQuadKind, QUAD_IMPLIES, quadAfter, quadImplies, quadImpliesInEveryReading, quadRelation, quadsExclude, type QuadKind } from './shapeKinds';
 import { constraintKey, constraintRefs, residual, residualTolerance } from './solve';
 import { evaluateCore } from './evaluate';
 import { applySeed } from './sample';
@@ -635,7 +635,7 @@ export function statedQuadKind(cmd: Command): QuadKind | null {
     case 'parallelogram':
       return cmd.type;
     case 'trapezoid':
-      return (cmd.kind as QuadKind | undefined) ?? 'trapezoid';
+      return isQuadKind(cmd.kind) ? cmd.kind : 'trapezoid';
     case 'quadrilateral':
       return (cmd.declaredAs as QuadKind | undefined) ?? 'quadrilateral';
     default:
@@ -1634,7 +1634,13 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       const template = [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 4.6, y: 4 }, { id: d, x: 1, y: 4 }];
       placeBase(objects, template.filter((_, i) => i !== missing), pos);
       addObj(objects, trapezoidOffset(cmd.ids, missing, 0.6));
-      quadEdges(objects, a, b, c, d, 'trapezoid');
+      // #2169 (ADR-W-131): the ring is declared as the phrase the command carries — «טרפז שווה שוקיים» is an isosceles
+      // trapezoid, not a bare one — so a second noun is judged against the adjective too (an isosceles and a right
+      // trapezoid exclude each other) and the exclusion refusal names it.
+      quadEdges(objects, a, b, c, d, isQuadKind(cmd.kind) ? cmd.kind : 'trapezoid');
+      // ...and an adjective stated over a ring already declared a trapezoid narrows it («טרפז ABCD» · «טרפז שווה שוקיים
+      // ABCD»): the corner is the same derived one, so the line takes this arm, not the lowering, and the kind is kept here
+      refineRingKind(objects, prev, cmd);
       break;
     }
 

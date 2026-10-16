@@ -275,6 +275,7 @@
   },
   "notice": {
     "narrowed": {
+      "merged": "{{ring}} הוא כעת {{now}}, שהוא גם {{a}} וגם {{b}}.",
       "sentence": "{{cause}}, {{ring}} הוגבל מ{{from}} ל{{to}} — {{kindOf}}.",
       "cause": {
         "circum": "כדי שהמעגל יעבור דרך כל הקודקודים",

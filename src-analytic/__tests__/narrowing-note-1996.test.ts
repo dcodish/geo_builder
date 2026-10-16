@@ -94,7 +94,7 @@ describe('#1996 — lifecycle: the note is derived, never state', () => {
   it('the given is the line as the page shows it (a fallback-built row reads its spoken sentence)', () => {
     const d = derive(lines, 0);
     const [n] = narrowingNotesOf(lines, d);
-    expect(n.causeLines).toEqual([1]);
+    expect('causeLines' in n && n.causeLines).toEqual([1]);
     expect(plain(narrowingText(n, he, () => 'AB שווה ל-BC'))).toBe('בגלל הנתון AB שווה ל-BC, ABCD הוגבל ממקבילית למעוין — מעוין הוא סוג של מקבילית.');
   });
 });
@@ -124,28 +124,5 @@ describe('#1996 — the fixture «מקבילית ABCD · ABCD חסום במעג�
   });
 });
 
-import { nounsExclude } from '../engine/shapes';
-import { NARROW_IMPLIES, type NarrowKind } from '../../shell/narrowing';
-
-describe('#1996 — the shared lattice and analytic’s nounsExclude (ADR-AG-260)', () => {
-  // FOUND (#1996, reported, not changed here): analytic's `nounsExclude` keys on "one parallel pair" against "both
-  // parallel pairs", so it reads the trapezoid family as compatible with a kite, and an isosceles with a right
-  // trapezoid — pairs 2-D (`quadsExclude`) and the lattice exclude (no quadrilateral is both). The lock holds the
-  // direction this note relies on: every pair analytic refuses, the lattice has no kind for either.
-  it('every pair analytic excludes has no kind of the lattice that is both', () => {
-    const quads = Object.entries(SHAPES)
-      .map(([noun, r]) => ({ noun, kind: r.kind }))
-      .filter((r) => r.kind && NARROW_IMPLIES[r.kind as NarrowKind].includes('quadrilateral'));
-    expect(quads.length).toBeGreaterThan(6);
-    let excluded = 0;
-    for (const a of quads) {
-      for (const b of quads) {
-        if (!nounsExclude(a.noun, b.noun)) continue;
-        excluded++;
-        const both = (Object.keys(NARROW_IMPLIES) as NarrowKind[]).some((k) => NARROW_IMPLIES[k].includes(a.kind!) && NARROW_IMPLIES[k].includes(b.kind!));
-        expect(both, `${a.noun} / ${b.noun}`).toBe(false);
-      }
-    }
-    expect(excluded).toBeGreaterThan(0);
-  });
-});
+// #2169 (ADR-W-131): the one-way "FOUND" agreement check is retired — `nounsExclude` now READS the shared relation
+// (`kindRelation`), locked both ways in quad-noun-pairs-2169.test.ts.

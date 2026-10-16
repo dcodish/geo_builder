@@ -23,6 +23,7 @@ import type { Vec3 } from './vec3';
 // names the same seven families the solid lane's bases do. Type-only, so the cycle is erased at compile.
 import type { QuadBase } from './baseShapes';
 import type { ShapeAdj3 } from '../lexicon/shapePhrase3';
+import type { NarrowKind } from '../../shell/narrowing';
 
 export type Id = string;
 
@@ -1317,8 +1318,10 @@ export interface Construction3 {
   /** Stated inequalities the DISPLAYED configuration must satisfy (ADR-3D-053) — see {@link Requirement3}. */
   requirements: Requirement3[];
   /** #612 (ADR-3D-158): the quad shapes the figure is KNOWN to have, as stated — the structural
-   *  record the naming-error check reads. Never a measurement of one drawing. */
-  quadShapes: { base: QuadBase; ids: Id[]; adj?: ShapeAdj3 }[];
+   *  record the naming-error check reads. Never a measurement of one drawing. `kind` (#2171, ADR-3D-345): what
+   *  every noun stated over the ring makes it together — their meet («מלבן» · «מעוין» = «ריבוע») — set once a
+   *  later noun narrowed the ring; absent, the ring is what its own noun says (`declaredKind3`). */
+  quadShapes: { base: QuadBase; ids: Id[]; adj?: ShapeAdj3; kind?: NarrowKind }[];
   /** #612: shape statements that were TRUE and already known, so they changed nothing. Recorded so
    *  the notice is DERIVED from the construction like every other one, surviving reload and undo. */
   redundantShapes: { base: QuadBase; ids: Id[] }[];
@@ -1750,7 +1753,8 @@ export type EngineError3 =
   // #1988 (ADR-3D-326): this is the ONLY refusal of a second noun left. `shape-less-specific` — the ring is
   // already a MORE SPECIFIC shape than the noun stated («ריבוע ABCD» · «מלבן ABCD») — was retired by the
   // operator's 2026-10-10 ruling: a square IS a rectangle, so the line is a restatement, not a naming error.
-  | { code: 'shape-disjoint'; stated: QuadBase; actual: QuadBase }
+  // #2171 (ADR-3D-345): both are lattice KINDS, adjective included — «טרפז שווה שוקיים» is named as typed.
+  | { code: 'shape-disjoint'; stated: NarrowKind; actual: NarrowKind }
   // #1792 / #1918 (ADR-3D-313): a shape no circle can pass around without turning it into `forced` (a right
   // trapezoid in a circle is a rectangle). Raised by the parser for the one-line form and by apply for a ring
   // DECLARED with the phrase on one line and inscribed on another, in either order. `shape`/`forced` are

@@ -28,7 +28,7 @@
 import { parseLengthExpr } from './lengths';
 import { sameConstraint, type Constraint } from './solve';
 import type { Id } from './types';
-import type { NarrowKind } from '../../shell/narrowing';
+import { kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 
 /** `ab ∥ cd` / `ab ⊥ cd`, over the point pairs the ring gives. */
 const rel = (kind: 'parallel' | 'perpendicular', a: Id, b: Id, c: Id, d: Id): Constraint => ({
@@ -394,13 +394,27 @@ export function sameStatementUnder(noun: string | undefined, declared: readonly 
   return (dir === 1 ? r : r - 1) % 2 === 0;
 }
 
+/** The lattice kind of a quadrilateral noun (any spelling the table folds), or null for any other noun. */
+export const quadKindOf = (noun: string | undefined): NarrowKind | null => {
+  const k = noun === undefined ? undefined : shapeRow(noun)?.kind;
+  return k && narrowImplies(k, 'quadrilateral') ? k : null;
+};
+
+/** The registry noun that names a lattice kind («ריבוע» for `square`), or undefined (the right kite has none). */
+export const nounOfKind = (kind: NarrowKind): string | undefined => Object.keys(SHAPES).find((n) => SHAPES[n].kind === kind);
+
 /**
- * TWO NOUNS NO QUADRILATERAL CAN CARRY AT ONCE (#1926, ADR-AG-260): one promises exactly one pair of parallel
- * sides (`promisesOneParallelPair`), the other's row asserts both pairs. Symmetric. Derived from the table —
- * the analytic twin of 3-D's "no member in common" (#1918, ADR-3D-313) and 2-D's ADR-157 refusal.
+ * TWO NOUNS NO QUADRILATERAL CAN CARRY AT ONCE (#1926, ADR-AG-260). Symmetric.
+ *
+ * #2169 ([ADR-W-131](../../docs/06w-decisions-workspace.md#adr-w-131)): read off the ONE lattice every builder reads
+ * (`kindRelation`, `shell/narrowing.ts`) over each row's `kind`. It was "one parallel pair against both pairs",
+ * which cannot see a kite against the trapezoid family (a kite with a parallel pair is a rhombus) nor an isosceles
+ * against a right trapezoid — so «דלתון ABCD» · «טרפז ABCD» drew a rhombus GREEN, where 2-D and 3-D refuse it.
  */
-export const nounsExclude = (a: string | undefined, b: string | undefined): boolean =>
-  (promisesOneParallelPair(a) && assertsBothParallelPairs(b)) || (promisesOneParallelPair(b) && assertsBothParallelPairs(a));
+export const nounsExclude = (a: string | undefined, b: string | undefined): boolean => {
+  const [x, y] = [quadKindOf(a), quadKindOf(b)];
+  return !!x && !!y && kindRelation(x, y) === 'excludes';
+};
 
 /**
  * Is this noun the GENERIC one for its arity — «משולש», «מרובע» — asserting nothing but the ring?

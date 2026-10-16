@@ -105,14 +105,16 @@ export function lowerShape(kind: ShapeKind, v: readonly Id[]): AnyCommand[] {
       return [{ type: 'shape-variant', shape: 'kite', ids: q4, variant: 0 }];
     case 'right-trapezoid':
       return [
-        // `kind` records the declared phrase for the engine's not-cyclic prover (#1918, ADR-607): «ABCD חסום במעגל»
-        // on a later line is refused like the one-line sentence. Stamped only where the table says it matters.
-        { type: 'trapezoid', ids: q4, ...(notCyclic(kind) ? { kind } : {}) },
+        // `kind` records the declared phrase: the engine's not-cyclic prover reads it (#1918, ADR-607: «ABCD חסום במעגל»
+        // on a later line is refused like the one-line sentence), and the ring is declared as it (#2169, ADR-W-131).
+        { type: 'trapezoid', ids: q4, kind },
         { type: 'set-perpendicular', a: v[0], b: v[3], c: v[0], d: v[1] }, // AD ⟂ AB ⇒ right angles at A and D
       ];
     case 'isosceles-trapezoid':
       return [
-        { type: 'trapezoid', ids: q4 },
+        // #2169 (ADR-W-131): the ring is DECLARED an isosceles trapezoid — a later «טרפז ישר זווית» over it excludes,
+        // and a refusal names the adjective
+        { type: 'trapezoid', ids: q4, kind },
         { type: 'set-equal', a: v[0], b: v[3], c: v[1], d: v[2], trapezoidLegs: true }, // |AD| = |BC| (the legs; AB ∥ DC assumed)
       ];
   }

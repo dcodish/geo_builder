@@ -479,6 +479,8 @@ const he = {
   // #1996 (ADR-AG-276, ADR-W-129): the forced-narrowing note — one sentence family, word for word in every builder
   // (`shell/narrowing.ts` narrowingSentence; rows in shell/__tests__/fixtures/narrowing-note-rows.ts).
   narrowed: {
+    // #2171 (ADR-W-131): two sibling nouns the ring carries together — 2-D's `figure.narrowed.merged`, word for word
+    merged: '{{ring}} הוא כעת {{now}}, שהוא גם {{a}} וגם {{b}}.',
     sentence: '{{cause}}, {{ring}} הוגבל מ{{from}} ל{{to}} — {{kindOf}}.',
     cause: {
       circum: 'כדי שהמעגל יעבור דרך כל הקודקודים',
@@ -990,6 +992,7 @@ const en: typeof he = {
   // #1996 (ADR-AG-276, ADR-W-129): the forced-narrowing note — one sentence family, word for word in every builder
   // (`shell/narrowing.ts` narrowingSentence; rows in shell/__tests__/fixtures/narrowing-note-rows.ts).
   narrowed: {
+    merged: '{{ring}} is now {{nowA}}, which is both {{aA}} and {{bA}}.',
     sentence: '{{cause}}, {{ring}} was constrained from {{fromA}} to {{toA}} — {{kindOf}}.',
     cause: {
       circum: 'For the circle to pass through every vertex',

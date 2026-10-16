@@ -19,7 +19,7 @@
  * no digits). Keywords are bilingual; the same rule matches either language.
  */
 
-import { MIDSEGMENT_SHAPES, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
+import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
 import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
@@ -6405,7 +6405,9 @@ const inscribedPolygon: Rule = (s, ctx) => {
             : // #770: the cyclic route lowers a named quad to the GENERIC quadrilateral base (its shape
               // relations ride as constraints — the trapezoid's AB∥CD above), so the DECLARED noun must
               // travel via declaredAs or «אלכסוני הטרפז» cannot resolve an inscribed trapezoid.
-              { type: 'quadrilateral', ids: [v[0], v[1], v[2], v[3]], ...(kind && kind !== 'quad' ? { declaredAs: kind } : {}) },
+              // #2169 (ADR-W-131): an isosceles trapezoid is DECLARED as one (its adjective kept), so a later noun is judged
+              // against it and a refusal names it; the cyclic lowering itself is the trapezoid's.
+              { type: 'quadrilateral', ids: [v[0], v[1], v[2], v[3]], ...(kind && kind !== 'quad' ? { declaredAs: kind === 'trapezoid' && phrase?.kind === 'isosceles-trapezoid' ? phrase.kind : kind } : {}) },
           ...shapeCmds(v),
         ];
   // No centre named ⇒ create one: a fresh label that doesn't clash with the vertices OR with any
@@ -13796,7 +13798,7 @@ export function droppedShapeAdjective(s: string, commands: AnyCommand[], ctx: Pa
       commands.some((c) => c.type === 'set-angle' && Math.abs(c.value - 90) < 1e-9),
     isosceles: () =>
       has('set-equal') || has('shape-variant') ||
-      (commands.some((c) => c.type === 'trapezoid' || (c.type === 'quadrilateral' && c.declaredAs === 'trapezoid')) &&
+      (commands.some((c) => c.type === 'trapezoid' || (c.type === 'quadrilateral' && nounOfKind(c.declaredAs) === 'trapezoid')) &&
         (has('point-on-circle') || has('set-concyclic'))),
     equilateral: () => count('set-equal') >= 2 || has('square') || has('rhombus'),
   };
@@ -14248,7 +14250,8 @@ export function augmentParseCtx(ctx: ParseContext, cmds: AnyCommand[]): ParseCon
       polygons.push(ids as string[]);
       // #770: the clause-fallback context carries the declared KIND too, so «טרפז ABCD, אלכסוני
       // הריבוע נפגשים ב-M» refuses inside a compound exactly as it does across two lines.
-      const kind = typeof c.declaredAs === 'string' ? c.declaredAs
+      // #2169: the noun the ring answers to (`nounOfKind`), as `buildParseCtx` reads a drawn ring
+      const kind = typeof c.declaredAs === 'string' ? nounOfKind(c.declaredAs)
         : c.type === 'shape-variant' && c.shape === 'kite' ? 'kite'
         : c.type === 'right-triangle' ? 'triangle'
         : SHAPE_TYPES.has(String(c.type)) ? String(c.type) : undefined;

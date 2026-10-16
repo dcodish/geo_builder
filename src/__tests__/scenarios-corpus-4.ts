@@ -4891,6 +4891,31 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.positions.has('G'), 'the refused line minted no third triangle').toBe(false);
     },
   },
+  {
+    id: 'trapezoid-iso-right-2169',
+    title: 'An isosceles and a right trapezoid on one ring are refused in either order, naming the adjective (#2169, ADR-W-132)',
+    guards:
+      "#2169 Q1 (ADR-W-131 / ADR-W-132), operator ruling 2026-10-16 (ballot round 5, card 1, A: refuse it in all three builders, 2-D included). Measured on ef78f15c through decideDeterministic2D: «טרפז שווה שוקיים ABCD» · «טרפז ישר זווית ABCD» committed a RECTANGLE with two amber trapezoidMorph warnings, and «טרפז שווה שוקיים ABCD» · «מלבן ABCD» was refused «כ־טרפז». Root cause: the trapezoid arm stamped declaredAs 'trapezoid' whatever the phrase (and the parser stamped `kind` only on the right trapezoid), so the hierarchy — which excludes the pair — was never asked. Fix: the ring is declared as the phrase and narrowed by a later adjective; the relation is the shared lattice's kindRelation. The 81-pair matrix is shell/__tests__/fixtures/quad-noun-pairs.ts through src/app/__tests__/quad-noun-pairs-2169.test.ts.",
+    steps: ['טרפז שווה שוקיים ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const said = (v: unknown) => humanizeError((v as { detail?: string }).detail, he as never).replace(/[⁦-⁩]/g, '');
+      const iso = factsOf(['טרפז שווה שוקיים ABCD']);
+      const v = gateVerdict(iso, 'טרפז ישר זווית ABCD');
+      expect(v, 'the right trapezoid over a declared isosceles one is refused').toMatchObject({ kind: 'refused', reason: 'error' });
+      expect(said(v)).toBe('הצורה כבר ידועה כ־טרפז שווה שוקיים — ולכן אינה נקראת טרפז ישר זווית. מחקו את הנתון הקודם אם התכוונתם טרפז ישר זווית.');
+      const back = gateVerdict(factsOf(['טרפז ישר זווית ABCD']), 'טרפז שווה שוקיים ABCD');
+      expect(back, 'and the reverse order').toMatchObject({ kind: 'refused', reason: 'error' });
+      expect(said(back)).toBe('הצורה כבר ידועה כ־טרפז ישר זווית — ולכן אינה נקראת טרפז שווה שוקיים. מחקו את הנתון הקודם אם התכוונתם טרפז שווה שוקיים.');
+      // a declared isosceles trapezoid is named with its adjective in every exclusion refusal
+      expect(said(gateVerdict(iso, 'מלבן ABCD'))).toBe('הצורה כבר ידועה כ־טרפז שווה שוקיים — ולכן אינה נקראת מלבן. מחקו את הנתון הקודם אם התכוונתם מלבן.');
+      // the ring keeps the adjective, and «טרפז» after it still restates
+      const poly = fig.construction.objects.find((o) => o.kind === 'polygon');
+      expect(poly && 'declaredAs' in poly && poly.declaredAs).toBe('isosceles-trapezoid');
+      expect(gateVerdict(iso, 'טרפז ABCD')).toEqual({ kind: 'noop' });
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

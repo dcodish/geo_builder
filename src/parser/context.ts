@@ -12,7 +12,7 @@
  */
 
 import type { Construction, Id, Vec } from '@/engine';
-import { isGeoPoint, circleMembers, pointNeighbors, parallelEdgePairs, roleSidesOf, openRightTriangles } from '@/engine';
+import { isGeoPoint, nounOfKind, circleMembers, pointNeighbors, parallelEdgePairs, roleSidesOf, openRightTriangles } from '@/engine';
 import type { ParseContext } from './parse';
 
 /** A circle centre's reference TOKEN ([ADR-342](../../docs/06-decisions.md#adr-342)): an anonymous auto
@@ -194,7 +194,9 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     ),
     // #770: the DECLARED kind travels with each ring, so a definite shape noun («אלכסוני הריבוע»)
     // resolves on what the student named, never on "whichever quad exists".
-    declaredPolygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [{ vertices: o.vertices, kind: o.declaredAs }] : [])),
+    // #2169 (ADR-W-131): read as the NOUN the ring answers to — a declared isosceles or right trapezoid is «הטרפז»
+    // (`nounOfKind`); the selectors match a noun word, while the engine keeps the adjective for the hierarchy.
+    declaredPolygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [{ vertices: o.vertices, kind: nounOfKind(o.declaredAs) }] : [])),
     // #775: side ROLES the figure's declarations induce — «תיכון ליתר» resolves the hypotenuse of the
     // right triangle, «לבסיס» the isosceles base. SEMANTIC on purpose: read off the declared structure
     // (the perp-offset the right-triangle macro builds, a ⟂/90° constraint at a triangle vertex, the
