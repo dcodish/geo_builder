@@ -31,6 +31,8 @@ import {
   declaredKindOf,
   forcedUnder,
   isRingRightAngle,
+  mergeOf,
+  mergeSentence,
   narrowingOf,
   narrowingSentence,
   narrowRingKey,
@@ -39,11 +41,24 @@ import {
   type CauseClass,
   type NarrowKind,
   type NarrowTranslate,
+  type MergeNote,
   type NarrowingNote,
 } from '../../shell/narrowing';
 
+/**
+ * One note on a declared ring: a forced narrowing, or (#2171, ADR-W-131 — 2-D's ADR-656 #4) two sibling nouns the ring
+ * carries together («מלבן ABCD» · «מעוין ABCD»: «ABCD הוא כעת ריבוע, שהוא גם מלבן וגם מעוין.»).
+ */
+export type AnalyticNarrowing = AnalyticForced | MergeNote;
+
+/** Is this note the merge note? */
+export const isMergeNoteAg = (n: AnalyticNarrowing): n is MergeNote => 'now' in n;
+
+/** A stable key for a note (the page's list key). */
+export const narrowingKey = (n: AnalyticNarrowing): string => (isMergeNoteAg(n) ? `${n.ring}-merged-${n.now}` : `${n.ring}-${n.to}`);
+
 /** One forced-narrowing note, with the ACTIVE indices of the lines its cause names (in typed order). */
-export interface AnalyticNarrowing {
+export interface AnalyticForced {
   ring: string;
   from: NarrowKind;
   to: NarrowKind;
@@ -217,7 +232,8 @@ export function narrowingNotesOf(lines: readonly string[], d: Derivation): Analy
   if (!pool.complete()) {
     if (pool.deferred) {
       reportPending(c);
-      return [];
+      // the merge note is read off the nouns alone, so an incomplete pool still says it (2-D's sweep does the same)
+      return mergesOf(rings(lines.map(lineInfo)));
     }
     pool.fill();
   }
@@ -235,25 +251,42 @@ function walkPool(c: Derivation['construction'], visit: (f: Figure) => boolean):
   }
 }
 
+type DeclaredRing = { ids: Id[]; kinds: NarrowKind[]; rows: Set<number> };
+
+/** The declared rings: every typed noun over the same ring (any rotation), with the lines that typed them. */
+function rings(infos: readonly LineInfo[]): Map<string, DeclaredRing> {
+  const out = new Map<string, DeclaredRing>();
+  infos.forEach((info, i) => {
+    for (const n of info.nouns) {
+      const rk = narrowRingKey(n.ring);
+      const r = out.get(rk) ?? { ids: n.ring, kinds: [], rows: new Set<number>() };
+      r.kinds.push(n.kind);
+      r.rows.add(i);
+      out.set(rk, r);
+    }
+  });
+  return out;
+}
+
+/**
+ * #2171 (ADR-W-131, 2-D's ADR-656 #4): two nouns the ring carries together — the kind both name, said once. Read off
+ * the nouns alone (no pool); the narrowing below then starts from that kind, so it is the only note on the ring.
+ */
+const mergesOf = (declared: Map<string, DeclaredRing>): AnalyticNarrowing[] =>
+  [...declared.values()].flatMap((ring) => {
+    const m = mergeOf(ring.kinds);
+    return m ? [{ ring: ring.ids.join(''), ...m }] : [];
+  });
+
 function compute(lines: readonly string[], d: Derivation): AnalyticNarrowing[] {
   const infos = lines.map(lineInfo);
   const isCircle = (curve: string): boolean =>
     curve === CIRCLE_SENTINEL || curve.startsWith('circle') || d.figure.curves.some((k) => k.id === curve && k.curve.kind === 'circle');
   const classes = lines.map((l, i) => lineClass(l, infos[i].facts, isCircle));
-  // the declared rings: every typed noun over the same ring (any rotation), with the lines that typed them
-  const rings = new Map<string, { ids: Id[]; kinds: NarrowKind[]; rows: Set<number> }>();
-  infos.forEach((info, i) => {
-    for (const n of info.nouns) {
-      const rk = narrowRingKey(n.ring);
-      const r = rings.get(rk) ?? { ids: n.ring, kinds: [], rows: new Set<number>() };
-      r.kinds.push(n.kind);
-      r.rows.add(i);
-      rings.set(rk, r);
-    }
-  });
+  const declaredRings = rings(infos);
   const seedNames = d.construction.seedNames ?? {};
-  const out: AnalyticNarrowing[] = [];
-  for (const ring of rings.values()) {
+  const out: AnalyticNarrowing[] = mergesOf(declaredRings);
+  for (const ring of declaredRings.values()) {
     const carve = lines
       .map((_, i) => i)
       .filter((i) => {
@@ -322,5 +355,6 @@ export function narrowingText(
   given: (activeIndex: number) => string,
   ring: (label: string) => string = (s) => s,
 ): string {
+  if (isMergeNoteAg(n)) return mergeSentence({ ...n, ring: ring(n.ring) }, t, 'narrowed');
   return narrowingSentence({ ring: ring(n.ring), from: n.from, to: n.to, cause: n.cause, givens: n.causeLines.map(given) }, t, 'narrowed');
 }

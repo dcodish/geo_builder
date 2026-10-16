@@ -730,8 +730,12 @@ export type GeoObject =
    * statements and never from a drawing: `cyclic` — an inscription sentence put it on a circle; `circleless` — a
    * sentence declared it a noun no circle can pass around (the registry key whose row carries `notCyclic`). M1
    * refuses the statement that would make both true.
+   *
+   * `also` (#2169, ADR-W-131) — every further noun a later sentence stated over the ring that NARROWED it («מלבן ABCD»
+   * · «מעוין ABCD»: the rhombus), registry keys in typed order. The ring is what `noun` and `also` make it together
+   * (their meet in the shared lattice), and a later noun is judged against that.
    */
-  | { kind: 'polygon'; id: Id; vertices: Id[]; noun?: string; cyclic?: true; circleless?: string }
+  | { kind: 'polygon'; id: Id; vertices: Id[]; noun?: string; cyclic?: true; circleless?: string; also?: string[] }
   /**
    * A circle given by its CENTRE POINT and a radius — «נתון מעגל O» (#1060).
    *

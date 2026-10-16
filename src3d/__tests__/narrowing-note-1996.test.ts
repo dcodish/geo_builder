@@ -131,14 +131,5 @@ describe('#1996 — the declared-kind read and the row classes', () => {
   }, 120_000);
 });
 
-import { QUAD_IMPLIES, type QuadBase } from '../engine/baseShapes';
-import { NARROW_IMPLIES, type NarrowKind } from '../../shell/narrowing';
-
-describe('#1996 — the shared lattice agrees with 3-D’s QUAD_IMPLIES (ADR-3D-158) on every kind both know', () => {
-  it('implication, pair by pair', () => {
-    const map: Record<QuadBase, NarrowKind> = { square: 'square', rectangle: 'rectangle', rhombus: 'rhombus', parallelogram: 'parallelogram', kite: 'kite', trapezoid: 'trapezoid', quad: 'quadrilateral' };
-    for (const a of Object.keys(QUAD_IMPLIES) as QuadBase[]) {
-      for (const b of Object.keys(QUAD_IMPLIES) as QuadBase[]) expect(NARROW_IMPLIES[map[a]].includes(map[b]), `${a} ⇒ ${b}`).toBe(QUAD_IMPLIES[a].includes(b));
-    }
-  });
-});
+// #2171 (ADR-3D-345): 3-D's QUAD_IMPLIES is now a VIEW of the shared lattice, so the old agreement check is retired;
+// that 3-D READS the shared relation is locked in quad-noun-pairs-2169.test.ts.

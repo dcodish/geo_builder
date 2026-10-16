@@ -613,9 +613,12 @@ phrase's own or the generic «מרובע». Anything else is returned unchanged.
 
 ### A second shape noun over a declared ring ([ADR-619](06-decisions.md#adr-619))
 
-`engine/shapeKinds.ts` holds the quadrilateral hierarchy as ONE table, `QUAD_IMPLIES` — 2-D's twin of 3-D's
-(ADR-3D-158) and of analytic's `SHAPES`-derived `nounsExclude` (ADR-AG-260) — keyed by the kinds 2-D stamps on
-`polygon.declaredAs` plus the two refined trapezoid phrases a `trapezoid` command carries in `kind`. The trapezoid
+`engine/shapeKinds.ts` reads the quadrilateral hierarchy from the ONE shared lattice (`shell/narrowing.ts`
+`NARROW_IMPLIES`; [ADR-W-131](06w-decisions-workspace.md#adr-w-131)): `QUAD_IMPLIES` is a derived view and `quadRelation` is
+`kindRelation` — the function 3-D and analytic read too — keyed by the kinds 2-D stamps on `polygon.declaredAs`. The
+trapezoid arm stamps the phrase its command carries in `kind` (`isosceles-trapezoid` / `right-trapezoid`, both stamped
+by `lowerShape` since #2169) and a later adjective narrows the ring (`refineRingKind`); the parser's noun selectors read
+the ring's kind through `nounOfKind` (an adjective trapezoid is «הטרפז»). The trapezoid
 rows are the curriculum's EXCLUSIVE reading (exactly one parallel pair), which `shapeConstraints` already assumes.
 Three derived readers, three directions, no list of pairs:
 

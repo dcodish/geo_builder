@@ -17,7 +17,7 @@
 
 import { declaredQuads3, QUAD_PYRAMIDS, quadShapeDrawn } from './baseShapes';
 import type { QuadBase } from './baseShapes';
-import type { NarrowingNote } from '../../shell/narrowing';
+import type { RingNote } from '../../shell/narrowing';
 import { claimPinsParam, isSelfDetermined, lineDirCarriesParam, operandLabel, planeNormalCarriesParam } from './operands';
 import { cross3, dot3, norm3, sub3 } from './vec3';
 import type { Vec3 } from './vec3';
@@ -125,7 +125,8 @@ const FLAT_BY_DESIGN: ReadonlySet<SolidKind> = new Set<SolidKind>(['polygon3', '
 /** #1996: a forced-narrowing note and the ring it is about (`store/narrowing3.ts` computes it). */
 export interface NarrowedRing3 {
   readonly ids: readonly Id[];
-  readonly note: NarrowingNote;
+  /** a forced narrowing, or (#2171, ADR-3D-345) two sibling nouns the ring carries together — 2-D's merge note */
+  readonly note: RingNote;
 }
 
 /** A non-error message attached to a successfully built figure. */
@@ -167,7 +168,8 @@ export type BuildNotice3 =
       kind: 'narrowed';
       /** The ring, as the student lettered its declaration (a pyramid's BASE ring, never the apex). */
       ids: Id[];
-      note: NarrowingNote;
+      /** #2171 (ADR-3D-345): or the merge note («ABCD הוא כעת ריבוע, שהוא גם מלבן וגם מעוין.»), 2-D's ADR-656 #4 */
+      note: RingNote;
     }
   | {
       /** #375: the student called a LINE a plane («ACD אנך למישור ℓ1»). The kinds are known, so the

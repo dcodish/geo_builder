@@ -830,7 +830,9 @@ Ring promises — simple, open, and not-a-parallelogram for the trapezoid family
 records them and `drawableAt`'s `whole()` rejects them, but the exclusion is never refused (Amendment 1, 2-D ADR-165):
 `app/shapeWarnings.ts` `shapeWarningsOf(lines, d)` reads `d.figure.ringFaults` and `App.tsx` shows a shared
 `Banner kind="notice"`. A second NOUN is not a given (ADR-AG-260, #1926): `engine/shapes.ts` `nounsExclude(a, b)` —
-one noun `promisesOneParallelPair`, the other's row `assertsBothParallelPairs` (read off its givens, never listed) —
+`kindRelation` over each row's `kind`, the shared lattice ([ADR-W-131](06w-decisions-workspace.md#adr-w-131)); the ring is
+the meet of its `noun` and every later narrowing noun (`also`); an implied noun returns `restates` and the fold takes that
+line's `definition` constraints as held (ADR-W-133) —
 and `applyFact`'s polygon arm refuses the later declaration `shape-excluded { actual, stated }` before M1 absorbs it
 (`errShapeExcluded`).
 

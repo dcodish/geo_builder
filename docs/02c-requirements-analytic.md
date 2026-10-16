@@ -470,11 +470,11 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «טרפז ABCD» · «BC מקביל ל-AD» → the figure rotates
 - Sources: #1159.
 
-**R126 — a trapezoid keeps exactly one pair of parallel sides, or the page says it no longer does**. *(Operator: "when i wrote c=90 it accepted but then i got a rectangle.")* When the givens force a parallelogram, an amber warning names the trapezoid and the forcing line. A circle through a declared right trapezoid is not this warning: it is refused (R131). Nor is a second noun: a trapezoid noun stated on a ring declared as a parallelogram-family shape (parallelogram, rectangle, square, rhombus), or the reverse, is refused naming both («הצורה כבר ידועה כ־מקבילית — ולכן אינה נקראת טרפז…», ADR-AG-260, #1926).
+**R126 — a trapezoid keeps exactly one pair of parallel sides, or the page says it no longer does**. *(Operator: "when i wrote c=90 it accepted but then i got a rectangle.")* When the givens force a parallelogram, an amber warning names the trapezoid and the forcing line. A circle through a declared right trapezoid is not this warning: it is refused (R131). Nor is a second noun: a trapezoid noun stated on a ring declared as a parallelogram-family shape (parallelogram, rectangle, square, rhombus) **or a kite**, an isosceles trapezoid on a right one, or the reverse, is refused naming both («הצורה כבר ידועה כ־מקבילית — ולכן אינה נקראת טרפז…», ADR-AG-260, #1926) — the one relation 2-D and 3-D read (`kindRelation`, [ADR-W-131](06w-decisions-workspace.md#adr-w-131), operator rulings 2026-10-16, #2169). «דלתון ABCD» · «טרפז ABCD» drew a green rhombus before.
 - «טרפז ישר זווית ABCO» · «∠C = 90» · «∠O = 90» → «הטרפז ABCO כבר אינו טרפז…»
 - Sources: ADR-AG-189, #1627, ADR-157, ADR-165, ADR-AG-252.
 
-**R179 — a declared shape the givens force into a narrower named kind is said, naming what forced it**. 2-D's FR-HS-14, word for word (ADR-W-129): «מקבילית ABCD» · «ABCD חסום במעגל» → «כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.». The note appears when the configuration pool completes, a beat after the figure, like the panel values (ADR-AG-180); never a provisional one.
+**R179 — a declared shape the givens force into a narrower named kind is said, naming what forced it**. 2-D's FR-HS-14, word for word (ADR-W-129): «מקבילית ABCD» · «ABCD חסום במעגל» → «כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.». The note appears when the configuration pool completes, a beat after the figure, like the panel values (ADR-AG-180); never a provisional one. Two sibling nouns on one ring («מלבן ABCD» · «מעוין ABCD») get 2-D's one note instead, «ABCD הוא כעת ריבוע, שהוא גם מלבן וגם מעוין.» — read off the nouns, so it needs no pool ([ADR-W-133](06w-decisions-workspace.md#adr-w-133), #2171).
 - «מקבילית ABCD» · «AB = BC» → «בגלל הנתון AB = BC, ABCD הוגבל ממקבילית למעוין — מעוין הוא סוג של מקבילית.»
 - Sources: ADR-AG-276, ADR-W-129, #1996, #1899.
 
@@ -635,7 +635,7 @@ a sentence the tool parsed.
 - «y = ax + 1, a > 0» → a domain
 - Sources: ADR-AG-246, #1832, #1846.
 
-**R45 — a statement that adds nothing is SAID, not silently swallowed or silently duplicated**. Informational, never an error; a restatement that NARROWS is recorded.
+**R45 — a statement that adds nothing is SAID, not silently swallowed or silently duplicated**. Informational, never an error; a restatement that NARROWS is recorded. A shape noun the ring's nouns already IMPLY («ריבוע ABCD» · «דלתון ABCD», «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD») is «already known», no row, in any reading it holds in — 2-D's answer ([ADR-W-133](06w-decisions-workspace.md#adr-w-133), #2169).
 - a repeated given → «זה כבר ידוע…», no second row
 - a polygon restated with its letters rotated or reversed («ריבוע ABCD» · «מרובע ADCB») → «זה כבר ידוע…», no second row ([ADR-AG-259](06c-decisions-analytic.md#adr-ag-259))
 - …and with its OWN noun, in every reading that noun says the same thing in («ריבוע ABCD» · «ריבוע BCDA»; «מעוין», «מלבן», «מקבילית», «משולש», a bare polygon) → the same answer. A reading that says something ELSE records: «טרפז ABCD» · «טרפז BCDA» names the other pair of parallel sides, and a kite's axis, an isosceles triangle's apex and a right triangle's seat move with the letters ([ADR-AG-262](06c-decisions-analytic.md#adr-ag-262))

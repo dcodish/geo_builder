@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-16T15:18:41.104Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מלבן ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "rectangle",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מעוין ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "rhombus",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    }
+  ]
+}

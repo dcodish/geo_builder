@@ -138,7 +138,8 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // is known to be, and the name it does not take. The key keeps the `shapeLessSpecific` name it was written
     // under; #1988 (ADR-3D-326) retired the other caller, not the sentence.
     case 'shape-disjoint':
-      return t('err.shapeLessSpecific', { stated: t(`notice.shape.${err.stated}`), actual: t(`notice.shape.${err.actual}`) });
+      // #2171 (ADR-3D-345): both are lattice kinds, so a declared «טרפז שווה שוקיים» is named with its adjective
+      return t('err.shapeLessSpecific', { stated: t(`notice.narrowed.shape.${err.stated}`), actual: t(`notice.narrowed.shape.${err.actual}`) });
     case 'unknown-point':
       return t('err.unknownPoint', { id: err.id });
     case 'unknown-symbol':

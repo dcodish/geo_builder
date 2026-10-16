@@ -126,6 +126,16 @@ export const NARROW_ROWS: readonly NarrowRow[] = [
   { steps: ['משולש ישר זווית ABC'], note: null },
   { steps: ['משולש שווה שוקיים ABC'], note: null },
   { steps: ['דלתון ABCD'], note: null },
+  // ── #2171 (ADR-W-131, 2-D's ADR-656 #4): two sibling nouns the ring carries together — ONE note, in every builder ──
+  { steps: ['מלבן ABCD', 'מעוין ABCD'], note: 'ABCD הוא כעת ריבוע, שהוא גם מלבן וגם מעוין.' },
+  { steps: ['מעוין ABCD', 'מלבן ABCD'], note: 'ABCD הוא כעת ריבוע, שהוא גם מעוין וגם מלבן.' },
+  { steps: ['מלבן ABCD', 'דלתון ABCD'], note: 'ABCD הוא כעת ריבוע, שהוא גם מלבן וגם דלתון.' },
+  { steps: ['דלתון ABCD', 'מלבן ABCD'], note: 'ABCD הוא כעת ריבוע, שהוא גם דלתון וגם מלבן.' },
+  { steps: ['מקבילית ABCD', 'דלתון ABCD'], note: 'ABCD הוא כעת מעוין, שהוא גם מקבילית וגם דלתון.' },
+  { steps: ['דלתון ABCD', 'מקבילית ABCD'], note: 'ABCD הוא כעת מעוין, שהוא גם דלתון וגם מקבילית.' },
+  // ── #2171: a trapezoid adjective stated after «טרפז» narrows the ring — silent, never «adds nothing» (3-D said it did) ──
+  { steps: ['טרפז ABCD', 'טרפז שווה שוקיים ABCD'], note: null },
+  { steps: ['טרפז ABCD', 'טרפז ישר זווית ABCD'], note: null },
 ];
 
 /** The row as this builder runs it: its own spelling, or null when the row is an exception there. */

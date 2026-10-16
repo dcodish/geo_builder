@@ -344,6 +344,9 @@ const SEEDED: SeededCorpus = {
   // circle through its vertices makes a rectangle. The essence here is "builds green and verifies" (the drift net);
   // the note's exact sentence, the cause attribution and the lifecycle live in narrowing-note-1996.test.ts.
   'parallelogram-inscribed-narrowed-1996.geo3.json': ['מקבילית ABCD', 'ABCD חסום במעגל'],
+  // #2171 (ADR-3D-345) — the rule-4 lock of the sibling merge: «מלבן» · «מעוין» builds green (a square). Before: built
+  // silently; the merge note's sentence, both orders and the three-noun restatement live in quad-noun-pairs-2169.test.ts.
+  'rectangle-rhombus-merged-2171.geo3.json': ['מלבן ABCD', 'מעוין ABCD'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

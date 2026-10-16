@@ -12818,3 +12818,34 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 **Sibling audit.** The class is ADR-W-129's; 2-D and analytic are fixed in the same PR. A triangular solid's base is not read (no ruled row needs it).
 
 **Locks.** `src3d/__tests__/narrowing-note-1996.test.ts` (the shared rows through `decideDeterministic3` + `derive3` and the real i18n, with 3-D's `|AB| = |BC|` spellings; #1915's rows — the isosceles trapezoid pyramid and one-line and English silent, the right pyramid over a parallelogram and a trapezoid, a given typed before the circle named; mute → gone → back; reload says the same; seed + 1 says the same; `declaredKind3`, `rowClass3`; the lattice agrees with `QUAD_IMPLIES`); fixture `fixtures3/parallelogram-inscribed-narrowed-1996.geo3.json`.
+
+
+## ADR-3D-345 — A second shape noun is judged by the shared relation over the declared KIND: the adjective counts, the refusal names it, and two sibling nouns say «הוא כעת …» (#2171)
+
+**Status:** accepted · 2026-10-16 · **Issue:** #2171 (3-D twin of #2169), built with #2169 / #2180 as one item · fix round #2245 · the 3-D half of [ADR-W-131](06w-decisions-workspace.md#adr-w-131) / [ADR-W-132](06w-decisions-workspace.md#adr-w-132). Amends ADR-3D-158, ADR-3D-313, ADR-3D-326, ADR-3D-343.
+**Operator rulings (verbatim):** 2026-10-16, ballot round 4, card 1, **A** — *"Analytic and 3-D give 2-D's answers"*; ballot round 5, card 1, **A** — *"Refuse it in all three builders, 2-D included"* (the isosceles + right trapezoid pair, the adjective named).
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-18, FR-SP-19 · **Design:** [04b](04b-design-3d.md) "The disjoint re-declaration" · [04w](04w-design-shell.md) § Forced narrowing.
+
+**Context — measured at ef78f15c** through `decideSubmit3` → `derive3`: «טרפז ABCD» · «טרפז שווה שוקיים ABCD» (and the right twin) drew the right shape but showed `already-known` («… אינו מוסיף מידע חדש» — false, the noun narrowed the ring); «טרפז שווה שוקיים ABCD» · «טרפז ישר זווית ABCD» drew a rectangle with `trapezoid-morph` and the same false note; the six sibling pairs built silently; every `shape-disjoint` refusal named a declared or stated adjective trapezoid «טרפז». Cause: ARM 3 read `quadImplies(known, cmd.base)` over BASES, from 3-D's own `QUAD_IMPLIES`, which has no adjectives.
+
+**Decision.**
+1. **Known as a kind.** `knownQuadKind(c, ids)` (was `knownQuadShape`) is the meet of `declaredKind3` of every declared ring entry on the same cyclic ring — the adjective included — and of a later narrowing, recorded by `recordShape` on the entry's new `kind` field (the entry's base and adjective stay the first noun's: they are what is drawn).
+2. **ARM 3 reads `kindRelation(known, declaredKind3(cmd))`** (shared): `implies` → redundant, as before (the only `already-known` path); `excludes` → `shape-disjoint { stated, actual }`, now lattice KINDS, worded by `err.shapeLessSpecific` over `notice.narrowed.shape.*`, which names «טרפז שווה שוקיים» / «טרפז ישר זווית»; a narrowing of the ADJECTIVE only (the base's relations already hold) records the kind and leaves the figure untouched — the adjective's own lowering rides as its own command, exactly as it did; anything else lowers, as before.
+3. **`QUAD_IMPLIES` is a view** of the shared lattice over 3-D's bases (`QUAD_BASES`, `baseKind3`), kept for the drawing-side helpers; `quadImpliesInEveryReading` delegates to the shared `kindImpliesInEveryReading`.
+4. **The merge note.** `narrowingNotes3` pushes `mergeOf(ring.kinds)` per declared ring before the pool (2-D's ADR-656 #4); `NarrowedRing3.note` and the `narrowed` notice widen to `RingNote`; `narrowingText3` words it with `notice.narrowed.merged` — 2-D's sentence, he and en.
+
+**Risk checked.** The adjective's constraint still lowers: «טרפז ABCD» · «טרפז ישר זווית ABCD» is a right trapezoid at 24/24 seeds; «טרפז ABCD» · «טרפז שווה שוקיים ABCD» is an isosceles trapezoid at 23/24, and at seed 16 a rectangle with the amber `trapezoid-morph` warning — measured IDENTICALLY with this change reverted (the line used to take the redundant path, which lowered no more), so it is not this fix's; filed as found work #2259 (needs-operator).
+
+**Locks.** `src3d/__tests__/quad-noun-pairs-2169.test.ts` (the shared rows, `already-known` counted as a note; the 24-seed shape locks; the adjective refusals in another reading, English, the kite/trapezoid in another reading, the three-noun «מלבן · מעוין · טרפז» → «כ־ריבוע»); fixture `fixtures3/rectangle-rhombus-merged-2171.geo3.json`; `narrowing-note-rows` sibling and D4 rows through `narrowing-note-1996.test.ts`; the retired "agrees with QUAD_IMPLIES" check.
+
+## ADR-3D-346 — A restated ring is judged against what every enabled noun makes it: a third noun after a sibling merge adds no row (#2180)
+
+**Status:** accepted · 2026-10-16 · **Issue:** #2180 (its 2026-10-16 scope note) with #2169 / #2171 · fix round #2245 · amends [ADR-3D-324](#adr-3d-324), [ADR-3D-326](#adr-3d-326).
+**Operator ruling:** 2026-10-16, ballot round 4, card 1, **A** — *"Analytic and 3-D give 2-D's answers"*; the scope note on #2180 records the third noun as covered by it.
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-19 · **Design:** [04b](04b-design-3d.md) "The disjoint re-declaration" (the store twin).
+
+**Context.** Measured at ef78f15c: «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD» recorded the square as a new row; analytic answers «already known» (and 2-D will, after #2193). `ringRestatementTwin3` asked each declaring fact alone whether its noun implies the stated one, and neither «מלבן» nor «מעוין» implies «ריבוע» by itself.
+
+**Decision.** Before the per-fact loop, `ringRestatementTwin3` collects every ENABLED fact that declares the same ring, with its `declaredKindOf3` kind (adjective included); if the meet of those read in the stated reading implies the stated kind, or the meet of all of them implies it in every reading (`kindImpliesInEveryReading`), the twin is the first such fact. A muted noun does not count — re-typing «ריבוע» over a muted «מעוין» records the square. The per-fact arms (the generic word, the same statement in a symmetric reading) are unchanged, now over kinds.
+
+**Locks.** `src3d/__tests__/quad-noun-pairs-2169.test.ts` (#2180 block: both three-noun sequences, another reading, «מלבן · דלתון · ריבוע»; the muted-sibling negative); the shared rows' three-noun entries.

@@ -166,7 +166,9 @@ describe('#1918 — the prover, structurally', () => {
   it('the parser and the engine read ONE not-cyclic table', () => {
     expect(readShapePhrase('טרפז ישר זווית')?.cyclic).toEqual({ forces: NOT_CYCLIC['right-trapezoid'] });
     expect(lowerShape('right-trapezoid', ['A', 'B', 'C', 'D'])[0]).toEqual(RIGHT);
-    expect(lowerShape('isosceles-trapezoid', ['A', 'B', 'C', 'D'])[0]).toEqual({ type: 'trapezoid', ids: ['A', 'B', 'C', 'D'] }); // cyclic: no stamp
+    // #2169 (ADR-W-131): stamped too — the ring is declared as the phrase — but the not-cyclic table has no row for it
+    expect(lowerShape('isosceles-trapezoid', ['A', 'B', 'C', 'D'])[0]).toEqual({ type: 'trapezoid', ids: ['A', 'B', 'C', 'D'], kind: 'isosceles-trapezoid' });
+    expect(NOT_CYCLIC['isosceles-trapezoid']).toBeUndefined();
   });
 
   it('a stated concyclicity over the ring (any vertex order) is a hit', () => {

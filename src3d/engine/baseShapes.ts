@@ -27,7 +27,7 @@ import { sample } from './rng';
 import { dist3, dot3, norm3, ringCircumcentre2, sub3, type Vec3 } from './vec3';
 import type { Command3, Construction3, Id, PointDef, SolidKind } from './types';
 import type { ShapeAdj3 } from '../lexicon/shapePhrase3';
-import type { NarrowKind } from '../../shell/narrowing';
+import { kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 
 /** The quadrilateral base shapes a solid can stand on. */
 export type QuadBase = 'square' | 'rectangle' | 'rhombus' | 'parallelogram' | 'kite' | 'trapezoid' | 'quad';
@@ -170,16 +170,21 @@ export function quadCornerDef(base: QuadBase, ring: readonly Id[], i: number): P
  * shape the ring already IMPLIES adds nothing and is a mis-naming; a statement naming something the
  * ring does not yet imply is new information and drives. Keeping it as one table, rather than as tests
  * scattered through the apply arms, is what stops the two questions drifting apart.
+ *
+ * #2171 ([ADR-3D-345](../../docs/06b-decisions-3d.md#adr-3d-345), ADR-W-131): a VIEW of the shared lattice
+ * (`shell/narrowing.ts`'s `NARROW_IMPLIES`) restricted to the bases 3-D draws — no longer a copy. The copy had no
+ * trapezoid adjectives, so «טרפז» · «טרפז שווה שוקיים» read as "implied" (a false «adds nothing») and an isosceles
+ * and a right trapezoid as one kind. The noun-on-noun judgement reads `kindRelation` over the declared KIND
+ * (`declaredKind3`, adjective included); this view stays for the drawing-side helpers, which speak of bases.
  */
-export const QUAD_IMPLIES: Record<QuadBase, QuadBase[]> = {
-  square: ['square', 'rectangle', 'rhombus', 'parallelogram', 'kite', 'quad'],
-  rectangle: ['rectangle', 'parallelogram', 'quad'],
-  rhombus: ['rhombus', 'parallelogram', 'kite', 'quad'],
-  parallelogram: ['parallelogram', 'quad'],
-  kite: ['kite', 'quad'],
-  trapezoid: ['trapezoid', 'quad'],
-  quad: ['quad'],
-};
+export const QUAD_BASES: readonly QuadBase[] = ['square', 'rectangle', 'rhombus', 'parallelogram', 'kite', 'trapezoid', 'quad'];
+
+/** The lattice kind a bare base names (`quad` is «מרובע»). */
+export const baseKind3 = (b: QuadBase): NarrowKind => (b === 'quad' ? 'quadrilateral' : b);
+
+export const QUAD_IMPLIES: Readonly<Record<QuadBase, readonly QuadBase[]>> = Object.fromEntries(
+  QUAD_BASES.map((b) => [b, QUAD_BASES.filter((w) => narrowImplies(baseKind3(b), baseKind3(w)))]),
+) as unknown as Record<QuadBase, readonly QuadBase[]>;
 
 /** Does a genuine `have` also count as a `want`? (`quad` is implied by everything.) */
 export const quadImplies = (have: QuadBase, want: QuadBase): boolean => QUAD_IMPLIES[have].includes(want);
@@ -195,8 +200,8 @@ export const quadImplies = (have: QuadBase, want: QuadBase): boolean => QUAD_IMP
  * so they are kites about either diagonal. Every other base is symmetric under the whole dihedral group
  * (`RING_SYMMETRIC_BASES`, store3.ts). Derived from the table, asserted by the #1988 guard test.
  */
-export const quadImpliesInEveryReading = (have: QuadBase, want: QuadBase): boolean =>
-  quadImplies(have, want) && want !== 'trapezoid' && (want !== 'kite' || QUAD_IMPLIES[have].includes('rhombus'));
+export const quadImpliesInEveryReading = (have: QuadBase, want: QuadBase): boolean => kindImpliesInEveryReading(baseKind3(have), baseKind3(want));
+
 
 /**
  * IS A SIMPLE RING OF THIS BASE NECESSARILY CONVEX (#1991,
@@ -555,9 +560,11 @@ export interface DeclaredQuad3 {
   readonly adj?: ShapeAdj3;
   /** the index in `c.solids` when the ring is a pyramid's base; absent for a flat statement */
   readonly solid?: number;
+  /** #2171: the kind a later noun narrowed the ring to (the meet of every noun stated over it), when one did */
+  readonly kind?: NarrowKind;
 }
 export function declaredQuads3(c: Pick<Construction3, 'quadShapes' | 'solids'>): DeclaredQuad3[] {
-  const out: DeclaredQuad3[] = c.quadShapes.map((q) => ({ base: q.base, ids: q.ids, ...(q.adj ? { adj: q.adj } : {}) }));
+  const out: DeclaredQuad3[] = c.quadShapes.map((q) => ({ base: q.base, ids: q.ids, ...(q.adj ? { adj: q.adj } : {}), ...(q.kind ? { kind: q.kind } : {}) }));
   c.solids.forEach((sld, i) => {
     const spec = QUAD_PYRAMIDS[sld.kind];
     if (!spec || sld.ids.length < 4) return;

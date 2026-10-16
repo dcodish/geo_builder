@@ -7,6 +7,8 @@
  * `shell/__tests__/fixtures/narrowing-note-rows.ts` lock it). Pure, and imported by its lock (the seam registry:
  * a decision a test reproduces instead of calling is the #1102 root).
  */
-import { narrowingSentence, type NarrowTranslate, type NarrowingNote } from '../../shell/narrowing';
+import { isMergeNote, mergeSentence, narrowingSentence, type NarrowTranslate, type RingNote } from '../../shell/narrowing';
 
-export const narrowingText3 = (note: NarrowingNote, t: NarrowTranslate): string => narrowingSentence(note, t, 'notice.narrowed');
+/** #2171 (ADR-3D-345): a merge note («ABCD הוא כעת ריבוע, שהוא גם מלבן וגם מעוין.») words through `notice.narrowed.merged`. */
+export const narrowingText3 = (note: RingNote, t: NarrowTranslate): string =>
+  isMergeNote(note) ? mergeSentence(note, t, 'notice.narrowed') : narrowingSentence(note, t, 'notice.narrowed');

@@ -31,6 +31,7 @@ import {
   declaredKindOf,
   forcedUnder,
   isRingRightAngle,
+  mergeOf,
   narrowingOf,
   narrowRingKey,
   ringKinds,
@@ -256,8 +257,14 @@ function compute(facts: readonly NFact3[], seed: number, c: Construction3, ok: (
   if (!rings.size) return [];
   const classOf = new Map(rows.map((f) => [f.id, rowClass3(f.cmds)]));
   const enabledIds = new Set(facts.filter((f) => f.enabled).map((f) => f.id));
-  const full = samplePool(c, seed); // the student's own figure's samples, drawn once for every ring
   const out: NarrowedRing3[] = [];
+  // #2171 (ADR-3D-345, 2-D's ADR-656 #4): two nouns the ring carries together — the kind both name, said once; read off
+  // the nouns alone, so it needs no pool. The narrowing below then starts from that kind, so it is the only note.
+  for (const ring of rings.values()) {
+    const m = mergeOf(ring.kinds);
+    if (m) out.push({ ids: ring.ids, note: { ring: ring.ids.join(''), ...m } });
+  }
+  const full = samplePool(c, seed); // the student's own figure's samples, drawn once for every ring
   for (const ring of rings.values()) {
     const carve = rows.filter(
       (f) => f.cmds.some((k) => isTypedRightAngle3(k, ring.ids)) && f.cmds.every((k) => isTypedRightAngle3(k, ring.ids) || rowClass3([k]) === 'definition'),

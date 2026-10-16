@@ -277,8 +277,12 @@ worded by `incircleRefusal3` (a quad: `incircle-needs-triangle`; five or more: `
   (`against: 'circle'`). `derive3` fills `sentence` (the refused line) and `other` (the first enabled fact that
   declared the ring, or stated its circle), so `err.inscribedContradictsNounVs` — 2-D's over-constrained frame —
   names both statements. The one-line form keeps `err.inscribedContradictsNoun`.
-- **The disjoint re-declaration.** ARM 3's `known` split refuses `shape-disjoint` when no row of `QUAD_IMPLIES`
-  implies both the known shape and the stated noun (`quadsDisjoint`); worded by `err.shapeLessSpecific`.
+- **The disjoint re-declaration.** ARM 3 reads `kindRelation(known, declaredKind3(cmd))` (the shared lattice,
+  [ADR-3D-345](06b-decisions-3d.md#adr-3d-345)): `known` is the meet of every noun on the ring (`knownQuadKind`, a
+  narrowing recorded on the `quadShapes` entry's `kind`); `implies` → redundant, `excludes` → `shape-disjoint` with both
+  KINDS (worded by `err.shapeLessSpecific` over `notice.narrowed.shape.*`, so the adjective is named), an adjective-only
+  narrowing records the kind and leaves the figure, anything else lowers. The store twin (`ringRestatementTwin3`)
+  judges a restatement against the meet of every ENABLED noun (ADR-3D-346).
 - **A CROSSING ORDER of the same letters** (#1991, [ADR-3D-327](06b-decisions-3d.md#adr-3d-327)). `convexWhenSimple(base)`
   — read off `quadShapeConstraints`' relation set: a parallel pair, a right angle, or four equal sides; false for the
   kite and the bare quadrilateral — makes the crossing STRUCTURAL. `derive3` groups the declared rings by letter SET

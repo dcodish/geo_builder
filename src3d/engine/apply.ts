@@ -11,7 +11,8 @@ import { FREE_LINE_TOKEN } from './freeLine';
 import { riderPairsT, riderWholeSide, riderWholeT } from './onSegmentRatio';
 import { isScaleGivenClaim, scaleGivenSafe } from './scaleGiven';
 import { resolveSolidSubject } from './solidSubject';
-import { CYCLIC_MEMBER, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadImplies, quadPyramidDimCount, quadsDisjoint, quadShapeConstraints, type QuadBase } from './baseShapes';
+import { baseKind3, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimVerdict, isQuadPyramid, QUAD_BASE_DIMS, quadCornerDef, quadPyramidDimCount, quadShapeConstraints, type QuadBase } from './baseShapes';
+import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import { firstFreeLetter } from './freeLetter';
@@ -147,7 +148,7 @@ function clone(c: Construction3): Construction3 {
     arrows: c.arrows.map(([f, t]) => [f, t] as [Id, Id]),
     segments: [...c.segments],
     requirements: [...c.requirements],
-    quadShapes: c.quadShapes.map((q) => ({ base: q.base, ids: [...q.ids], ...(q.adj ? { adj: q.adj } : {}) })),
+    quadShapes: c.quadShapes.map((q) => ({ base: q.base, ids: [...q.ids], ...(q.adj ? { adj: q.adj } : {}), ...(q.kind ? { kind: q.kind } : {}) })),
     redundantShapes: c.redundantShapes.map((q) => ({ base: q.base, ids: [...q.ids] })),
     angleMarks: [...c.angleMarks],
     planes: new Map(c.planes),
@@ -241,7 +242,7 @@ const sameRing = (x: Id[], y: Id[]): boolean => x.length === y.length && [...x].
  * that merely happens to be a square at the current seed is deliberately NOT known — refusing a student
  * on the strength of one sampled configuration is the class of dishonesty this tree exists to avoid.
  */
-function knownQuadShape(c: Construction3, ids: Id[]): QuadBase | null {
+function knownQuadKind(c: Construction3, ids: Id[]): NarrowKind | null {
   // #1918: through the one declared-ring reader — a flat statement first, then a pyramid's base (the order
   // the two sources were always read in)
   //
@@ -249,7 +250,13 @@ function knownQuadShape(c: Construction3, ids: Id[]): QuadBase | null {
   // and «ACBD» over a square's letters is another ring (crossed, two of its sides the square's diagonals): matched by
   // letters, «ריבוע ABCD · מקבילית ACBD» was refused as "a square is already a parallelogram" — a false reason — and
   // «ריבוע ABCD · ריבוע ACBD» passed as redundant. The same ring read from another vertex or reversed still matches.
-  return declaredQuads3(c).find((q) => q.ids.length === ids.length && ringKeyIds3([...q.ids]) === ringKeyIds3(ids))?.base ?? null;
+  //
+  // #2171 (ADR-3D-345, ADR-W-131): KNOWN AS A KIND — the noun WITH its adjective (`declaredKind3`), and every noun
+  // stated over the ring together (a flat statement and a pyramid's base, a later noun's narrowing): their meet. Read
+  // as the base alone, a declared «טרפז שווה שוקיים» and a «טרפז ישר זווית» were one kind, and «מלבן» · «מעוין» left
+  // the ring a rectangle, so a third «ריבוע» was new information.
+  const on = declaredQuads3(c).filter((q) => q.ids.length === ids.length && ringKeyIds3([...q.ids]) === ringKeyIds3(ids));
+  return on.length ? declaredKindOf(on.map((q) => q.kind ?? declaredKind3(q)), false) : null;
 }
 
 /**
@@ -323,7 +330,16 @@ function noteStatedRightAngle(next: Construction3, u: VecAtom, v: VecAtom): void
 function recordShape(c: Construction3, base: QuadBase, ids: [Id, Id, Id, Id], adj?: ShapeAdj3): Construction3 {
   const next = clone(c);
   const sameOrder = (x: readonly Id[]) => x.length === ids.length && ringKeyIds3(x) === ringKeyIds3(ids);
-  if (!next.quadShapes.some((s) => sameOrder(s.ids))) next.quadShapes.push({ base, ids: [...ids], ...(adj ? { adj } : {}) });
+  const at = next.quadShapes.findIndex((s) => sameOrder(s.ids));
+  if (at < 0) next.quadShapes.push({ base, ids: [...ids], ...(adj ? { adj } : {}) });
+  else {
+    // #2171 (ADR-3D-345): a later noun over the ring NARROWED it — keep what the nouns make it together, so the next
+    // noun is judged against that (a third «ריבוע» after «מלבן» · «מעוין» restates; a «טרפז ישר זווית» after «טרפז» ·
+    // «טרפז שווה שוקיים» excludes). The record's base and adjective stay the first noun's: they are what is drawn.
+    const prior = next.quadShapes[at];
+    const kind = declaredKindOf([prior.kind ?? declaredKind3(prior), declaredKind3({ base, adj })], false);
+    if (kind && kind !== declaredKind3(prior)) next.quadShapes[at] = { ...prior, kind };
+  }
   // #615: only a shape with room to be drawn wrongly needs the gate — a square has no freedom left,
   // and a general `quad` has no more-specific sibling it is obliged to avoid looking like.
   if (QUAD_BASE_DIMS[base] > 0 &&
@@ -3102,7 +3118,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // ask what the ring is ALREADY KNOWN to be. Structural knowledge only (a solid's base kind, or
         // a shape stated earlier) — never a measurement, so this can only fire on a shape the figure
         // demonstrably has, and a ring that is a square by coincidence is left alone.
-        const known = knownQuadShape(c, cmd.ids);
+        const known = knownQuadKind(c, cmd.ids);
+        // #2171 (ADR-3D-345, ADR-W-131): what this line says the ring is, adjective included, judged against what it is
+        // known to be by the ONE relation every builder reads (`kindRelation`, the shared lattice)
+        const stated = declaredKind3(cmd);
+        const rel = known ? kindRelation(known, stated) : null;
         if (known) {
           /**
            * The ring already IMPLIES what was said, so the line is TRUE and adds nothing — whether it
@@ -3114,9 +3134,9 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
            * אינה נקראת מלבן», which is simply false of a square. There is ONE situation here, not two: the
            * statement is redundant. Recorded so `buildNotices3` can say so; the figure is returned untouched
            * rather than accumulating inert pins, and the store's restatement rule (`ringRestatementTwin3`,
-           * the same `quadImplies`) adds no row.
+           * the same `kindRelation`) adds no row.
            */
-          if (quadImplies(known, cmd.base)) {
+          if (rel === 'implies') {
             const next = clone(c);
             if (!next.redundantShapes.some((r) => r.base === cmd.base && sameRing(r.ids, cmd.ids)))
               next.redundantShapes.push({ base: cmd.base, ids: [...cmd.ids] });
@@ -3125,7 +3145,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           // #1918 (ADR-3D-313): NO quadrilateral is both — a trapezoid (exactly one parallel pair) and any
           // parallelogram-family shape or kite. Driving would draw the earlier noun's shape green under a name
           // it can never carry, so the statement contradicts the earlier one and is refused, naming both.
-          if (quadsDisjoint(known, cmd.base)) return { ok: false, error: { code: 'shape-disjoint', stated: cmd.base, actual: known } };
+          // #2171: and an isosceles trapezoid is no right one (the 2026-10-16 ruling on #2169) — read off the lattice.
+          if (rel === 'excludes') return { ok: false, error: { code: 'shape-disjoint', stated, actual: known } };
+          // #2171: the line narrows only the ADJECTIVE («טרפז» · «טרפז שווה שוקיים»): the base's relations already hold
+          // and the adjective's own lowering rides as its own command, so the figure is untouched — the ring is only
+          // known as the narrower kind from here on. It used to be recorded redundant, which told the student the
+          // line «adds no new information» when it had narrowed the ring.
+          if (narrowImplies(known, baseKind3(cmd.base))) return { ok: true, next: recordShape(c, cmd.base, cmd.ids, cmd.adj) };
           // NOT implied, and compatible ⇒ the statement is new information (a rectangle told it is a square).
           // It drives, exactly as before — refusing here would mean a student could never SPECIALISE a
           // shape they had already drawn, which is ADR-052 upside down.
