@@ -19,7 +19,7 @@
  * no digits). Keywords are bilingual; the same rule matches either language.
  */
 
-import { MIDSEGMENT_SHAPES, RADIUS_VAR, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
+import { MIDSEGMENT_SHAPES, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
 import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
@@ -8246,9 +8246,15 @@ const parallelCircleIntersection: Rule = (s, ctx) => {
  *
  * Equal diameters ⇔ equal radii ⇔ the ratio k = 1, which `set-radius-ratio` already expresses, so this
  * is a PARSER READING and nothing else — no engine work, no new command. It rides the whole two-circle
- * family (tangency, disjoint, contained, meeting, bare) rather than one rule, because every member
- * resolves its pair at the same `resolveCirclePair` chokepoint and the class would otherwise re-open
- * one rule at a time — the #215 lesson.
+ * family rather than one rule, because every member resolves its pair at the same `resolveCirclePair`
+ * chokepoint and the class would otherwise re-open one rule at a time — the #215 lesson.
+ *
+ * #2186 ([ADR-679](docs/06-decisions.md#adr-679)) — the consumers, as they ARE (ADR-455 wired three and the comment
+ * claimed the family): `circlesTangent`, `twoCirclesPosition`, `twoCirclesBare` (#761), and `twoCirclesMeet` (all
+ * three branches), `circleCircleIntersection`, `commonTangent` (#2186). `concentricCircles` and
+ * `containedNewInExisting` deliberately do NOT read it: two equal circles cannot share a centre or nest, so the
+ * words contradict themselves there and the word-relation gate (`droppedWordRelations`, its equal-size member)
+ * keeps the line from being drawn. A rule that forgets the helper is caught by that gate, not by luck.
  *
  * ADR-052 note: an unstated size is a free DOF, seeded APART so a pair reads as two circles. A STATED
  * equality removes that DOF — which is exactly the difference between a default and a given.
@@ -8267,6 +8273,47 @@ const EQUAL_SIZE_G = rx(EQUAL_SIZE.source, 'gi');
  *  so the constraint always lands on the circles the sentence is actually about. */
 const withEqualRadii = (s: string, cmds: AnyCommand[], id1: Id, id2: Id): AnyCommand[] =>
   EQUAL_SIZE.test(s) ? [...cmds, { type: 'set-radius-ratio', c1: id1, c2: id2, k: 1 } as AnyCommand] : cmds;
+
+/**
+ * #2198 / #2216 ([ADR-677](docs/06-decisions.md#adr-677)) — ONE radius stated for the PAIR: «שני מעגלים נחתכים
+ * ברדיוס 5», «…, רדיוס כל אחד 5», «…שרדיוס כל אחד מהם 5», "two intersecting circles with radius 5". Operator ruling
+ * 2026-10-16 (#2216 card 4, transcribed on #2198): *"Both circles get radius 5: two equal circles that intersect,
+ * the same figure as the three-line form. «משיקים ברדיוס 5» and «זרים ברדיוס 5» read the same way."*
+ *
+ * The SINGULAR radius word only: the plural «ברדיוסים 3 ו-5» (respective radii) and «ברדיוסים שווים ל-5» are other
+ * statements, never this one. Read only when it governs the pair — exactly one such phrase, and not the own size of
+ * a NAMED single circle («מעגל O ברדיוס 5 …», the circle rule's). Before this reading the phrase was swallowed
+ * unread and the number gate let the default radius 5 pay for it (ADR-677).
+ */
+const STATED_PAIR_RADIUS = new RegExp(
+  String.raw`(?:(?<![א-ת])(?:[ובש]-?)?ה?רדיוס(?![א-ת])(?:\s+(?:של\s+)?כל\s+(?:אחד|אחת|מעגל)(?:\s+(?:מהם|מהן|מהמעגלים))?)?|\b(?:each\s+)?(?:with|of|having|has)\s+(?:a\s+)?radius\b)\s*(?:=|:|הוא|שווה(?:\s+ל-?)?|\bof\b|\bis\b)?\s*${num}`,
+  'gi',
+);
+const NAMED_CIRCLE_BEFORE = new RegExp(String.raw`(?:circle|מעגל)\s+${LABEL}\s*,?\s*$`, 'i');
+/** The one radius the sentence states for its circle pair, or null (none, several, or a named circle's own). */
+const statedPairRadius = (s: string): number | null => {
+  const ms = [...s.matchAll(STATED_PAIR_RADIUS)];
+  if (ms.length !== 1) return null;
+  const m = ms[0];
+  if (NAMED_CIRCLE_BEFORE.test(s.slice(0, m.index!))) return null; // «מעגל O ברדיוס 5» — that circle's own size
+  const v = parseFloat(m[1]);
+  return v > 0 ? v : null;
+};
+/** Size BOTH circles of the pair the rule resolved to the stated radius: a circle the rule creates is created
+ *  PINNED at it (never a free seed that merely starts there); a circle already drawn gets `set-radius`. */
+const withStatedRadius = (s: string, cmds: AnyCommand[], id1: Id, id2: Id): AnyCommand[] => {
+  const r = statedPairRadius(s);
+  if (r === null) return cmds;
+  const made = new Set<Id>();
+  const out = cmds.map((c): AnyCommand => {
+    if (c.type !== 'circle' || (c.id !== id1 && c.id !== id2)) return c;
+    made.add(c.id);
+    const { freeRadius: _free, ...pinned } = c;
+    return { ...pinned, radius: r };
+  });
+  for (const id of [id1, id2]) if (!made.has(id)) out.push({ type: 'set-radius', circle: id, value: r });
+  return out;
+};
 
 const resolveCirclePair = (
   s: string,
@@ -8414,7 +8461,9 @@ const twoCirclesPosition: Rule = (s, ctx) => {
       ? { type: 'set-circle-position', relation, a: id1, b: id2 }
       : { type: 'set-circle-position', relation, a: isNamed ? id2 : id1, b: isNamed ? id1 : id2 },
   );
-  return withEqualRadii(s, cmds, id1, id2); // #761
+  // #2198 / #2216: «שני מעגלים זרים ברדיוס 5» sizes both. A CONTAINED pair is never read so: two equal circles
+  // cannot nest (#2200's refusal, not landed), so its number stays unread and the line escalates.
+  return withEqualRadii(s, relation === 'disjoint' ? withStatedRadius(s, cmds, id1, id2) : cmds, id1, id2); // #761
 };
 
 /**
@@ -8464,7 +8513,7 @@ const twoCirclesMeet: Rule = (s, ctx) => {
             { type: 'circle', id: sid2, center: cc2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ifAbsent: true, ...(namedCentres[1] ? {} : { autoCenter: true }) },
           ];
       const [P1, P2, P3, P4] = labels;
-      return [
+      return withEqualRadii(s, withStatedRadius(s, [
         ...creates,
         { type: 'point-on-circle', id: P1, circle: sid1, free: true },
         { type: 'point-on-circle', id: P2, circle: sid1, free: true },
@@ -8472,7 +8521,7 @@ const twoCirclesMeet: Rule = (s, ctx) => {
         { type: 'point-on-circle', id: P4, circle: sid2, free: true },
         { type: 'set-line', points: [P1, P2, P3, P4] },
         { type: 'segment', a: P1, b: P4 },
-      ];
+      ], sid1, sid2), sid1, sid2); // #2198 / #2216; #2186: the equality
     }
   }
   // A definite reference to the TWO circles ALREADY in the figure — «A חיתוך בין המעגלים» / «A נקודת
@@ -8485,7 +8534,7 @@ const twoCirclesMeet: Rule = (s, ctx) => {
     if (labels.length === 0) return null; // no crossing named — leave to another rule / escalate
     const out: AnyCommand[] = [{ type: 'circle-circle-intersection', id: labels[0], circle1: id1, circle2: id2, branch: 0 }];
     if (labels[1]) out.push({ type: 'circle-circle-intersection', id: labels[1], circle1: id1, circle2: id2, branch: 1, avoid: labels[0] });
-    return out;
+    return withEqualRadii(s, withStatedRadius(s, out, id1, id2), id1, id2); // #2198 / #2216; #2186: the equality
   }
   // Pair resolution at the shared #215 chokepoint: a half-named / ambiguous-many reference defers —
   // never invents default names; exactly one existing circle COMPLETES the pair (bound regardless of
@@ -8520,7 +8569,9 @@ const twoCirclesMeet: Rule = (s, ctx) => {
   // student NAMED is referenced: an indefinite «שני מעגלים נחתכים» is a fresh pair whose default tokens are
   // re-picked clear of the figure's circles by `withAnonymousAutoCentres` (#1688), never the existing ones.
   const haveCircles = new Set((ctx.circles ?? []).map(up).filter((c) => named.includes(c)));
-  return [
+  // #2198 / #2216: one radius stated for the pair sizes both (the ruling's "same figure as the three-line form");
+  // #2186: a stated equal size makes them equal (the tangent lane's reading, ADR-455)
+  return withEqualRadii(s, withStatedRadius(s, [
     // No radius is stated, so each circle's size is a free DOF (ADR-051) seeded at a distinct value (so it
     // doesn't render as a symmetric lens) — the solver sizes them to the problem's givens, the sampler varies them.
     ...(haveCircles.has(c1) ? [] : [{ type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, freeRadius: true, ...(auto1 ? { autoCenter: true } : {}) } as AnyCommand]),
@@ -8528,8 +8579,9 @@ const twoCirclesMeet: Rule = (s, ctx) => {
     { type: 'circle-circle-intersection', id: A, circle1: id1, circle2: id2, branch: 0 },
     // B is "the OTHER crossing" — geometric (avoid A), so it doesn't swap with A as the circles flex (R8).
     { type: 'circle-circle-intersection', id: B, circle1: id1, circle2: id2, branch: 1, avoid: A },
-  ];
+  ], id1, id2), id1, id2);
 };
+
 
 const circleCircleIntersection: Rule = (s) => {
   if (!/circle|מעגל/i.test(s)) return null;
@@ -8544,7 +8596,8 @@ const circleCircleIntersection: Rule = (s) => {
   if (centers.length < 2) return null;
   const resM = dropCircleRef(s).match(/\b([A-Za-z]\d*)\b/);
   if (!resM) return null;
-  return [{ type: 'circle-circle-intersection', id: up(resM[1]), circle1: circleId(centers[0]), circle2: circleId(centers[1]), branch: 0 }];
+  // #2186 (ADR-679): «מעגל O חותך את מעגל P בנקודה A ברדיוסים שווים» — the equality lands on the named pair
+  return withEqualRadii(s, [{ type: 'circle-circle-intersection', id: up(resM[1]), circle1: circleId(centers[0]), circle2: circleId(centers[1]), branch: 0 }], circleId(centers[0]), circleId(centers[1]));
 };
 
 /**
@@ -8962,7 +9015,12 @@ const circlesTangent: Rule = (s, ctx) => {
   // geometry-significant remains. That closes every unread modifier on a two-circle statement, not
   // just the reported one — a stated radius, an area, a perpendicular, a further relation. Declining
   // is honest: the statement escalates instead of committing a figure that contradicts it.
+  // #2198 / #2216: one radius stated for the pair is READ on external tangency, so it is vocabulary there only.
+  // Internal tangency of two equal circles is one circle (ADR-455 D2): never read, so it stays a leftover.
+  const internalWords = /\binternal\w*\b|\bfrom\s+inside\b|\binside\b|פנימ|מבפנים/i;
+  const readsRadius = !internalWords.test(s) && statedPairRadius(s) !== null;
   const tangentLeftover = s
+    .replace(readsRadius ? STATED_PAIR_RADIUS : /,^/, ' ')
     .replace(EQUAL_SIZE_G, ' ') // #761: the rule READS this now, so it is its own vocabulary
     .replace(/tangents?|משיק\w*/gi, ' ')
     .replace(/circles?|מעגל\w*/gi, ' ')
@@ -8992,7 +9050,7 @@ const circlesTangent: Rule = (s, ctx) => {
   const [c1, c2] =
     pair === 'introduce' ? ['O', freeLabel(['O', ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])] : pair.centres;
   if (c1 === c2) return null;
-  const internal = /\binternal\w*\b|\bfrom\s+inside\b|\binside\b|פנימ|מבפנים/i.test(s);
+  const internal = internalWords.test(s);
   // #761, operator ruling 2026-08-19 («we should not support 2 equal circles tangents from inside —
   // this is an easy refusal as it doesn't make sense»): INTERNAL tangency + equal radii is a
   // CONTRADICTION IN THE WORDS — two internally tangent circles of equal radius are the same circle.
@@ -9025,7 +9083,7 @@ const circlesTangent: Rule = (s, ctx) => {
   // anyway, deliberately — the engine then refuses it as an unsatisfiable given set, naming the
   // conflicting statement, which is the honest answer. Refusing it HERE would make the parser judge
   // satisfiability, which is the solver's job (and a parser-side special case besides).
-  return withEqualRadii(s, cmds, id1, id2);
+  return withEqualRadii(s, readsRadius ? withStatedRadius(s, cmds, id1, id2) : cmds, id1, id2);
 };
 
 /**
@@ -9137,6 +9195,8 @@ const commonTangent: Rule = (s, ctx) => {
   );
   const [c1, c2] = centres;
   const id1 = circleId(c1), id2 = circleId(c2);
+  /** #2186 (ADR-679): a stated equal size lands on the pair, whichever construction this returns. */
+  const equal = (cmds: AnyCommand[]): AnyCommand[] => withEqualRadii(s, cmds, id1, id2);
   // NAMED circles that don't yet exist are created (free radius per ADR-052, `ifAbsent` keeps a stated
   // one); a centre the student never stated (an INTRODUCED pair / a COMPLETED pair's fresh partner)
   // gets an auto (hidden-until-used) centre, per the family convention.
@@ -9159,7 +9219,7 @@ const commonTangent: Rule = (s, ctx) => {
     // nothing new, so the lowering is ONLY the drawn tangent line at the touch. Re-asserting the
     // memberships/collinearity (the at-variant's creation path) coupled into the existing tangency's
     // joint solve and ground it for ~55 s.
-    return [...mk, { type: 'tangent', id: `tan-${up(touch)}`, circle: id1, at: up(touch), visible: true }];
+    return equal([...mk, { type: 'tangent', id: `tan-${up(touch)}`, circle: id1, at: up(touch), visible: true }]);
   }
   if (atResolved) {
     if (apex) return 'stop'; // an apex + a named touch is a compound this rule can't couple yet — escalate, never drop A
@@ -9183,7 +9243,7 @@ const commonTangent: Rule = (s, ctx) => {
     cmds.push({ type: 'tangent', id: `tan-${at}`, circle: id1, at, visible: true });
     const fresh = (naming ?? []).filter((p) => !have.has(p));
     if (fresh.length) cmds.push(...lineMarkers(`tan-${at}`, fresh));
-    return cmds;
+    return equal(cmds);
   }
   // (`kind` is hoisted to the trigger above, #212: «חיצוני»/«מבחוץ» external ⇔ centres on the same
   // side of the tangent; «פנימי»/«מבפנים»/«אלכסוני» internal ⇔ opposite sides — a REQUIREMENT
@@ -9232,7 +9292,7 @@ const commonTangent: Rule = (s, ctx) => {
     // the touch kind BUILDS it directly.
     const touchKind = position === 'ext-tangent' ? 'internal' : 'external';
     if (touchFree && wantPairs === 1 && (kind === undefined || kind === touchKind)) {
-      return [...mk, { type: 'tangent', id: `tan-${up(touch)}`, circle: id1, at: up(touch), visible: true }];
+      return equal([...mk, { type: 'tangent', id: `tan-${up(touch)}`, circle: id1, at: up(touch), visible: true }]);
     }
     return { clarify: 'tangents-exhausted', kind: kind ?? 'any', ...(touchy && touchFree ? { hint: 'at-touch' as const } : {}), ...(position ? { position } : {}) };
   }
@@ -9285,7 +9345,7 @@ const commonTangent: Rule = (s, ctx) => {
   if (apex && newApex && wantPairs === 2)
     out.push({ type: 'line-intersection', id: apex, line1: `tanline-${names[0]}${names[1]}`, line2: `tanline-${names[2]}${names[3]}` });
   out.push(...apexInk);
-  return out;
+  return equal(withStatedRadius(s, out, id1, id2)); // #2198 / #2216: one radius stated for the pair sizes both
 };
 
 /**
@@ -12466,6 +12526,53 @@ function withCarrierSegments(commands: AnyCommand[]): AnyCommand[] {
 }
 
 /**
+ * The text the number gate scans (ADR-250), shared with the read-extent number probe (#2198, ADR-678) so the two
+ * can never disagree about what a STATED number is. `raw` is the normalized line; `counted` blanks the digits in
+ * count slots; `s` also blanks name indices. Both blanking passes are length-preserving, so an index into `s` is
+ * an index into `raw`.
+ */
+function statedNumberText(utterance: string): { raw: string; counted: string; s: string } {
+  const raw = normalizeUtterance(utterance);
+  // A COUNT is not a MAGNITUDE (issue #160): a bare integer QUANTIFYING a plural countable noun
+  // ("2 משיקים", "3 circles") is consumed by the rule's STRUCTURE (it emits that many objects), never
+  // by a numeric payload — the digit twin of the count words (שני/שתי/two) this gate is already blind
+  // to, so the same statement passed or failed on SPELLING alone (the correct Thales construction for
+  // "מנקודה A יוצאים 2 משיקים למעגל" was thrown away and lost to a failed LLM round-trip). Blank the
+  // digit in count slots before extraction (the label-subscript blanking precedent below): a count
+  // slot is a bare integer immediately followed by a Hebrew plural (…ים/…ות) or an English plural
+  // (…s, lowercase tail — a label pair "AS" is not a plural). Real magnitudes never sit in that slot
+  // ("רדיוס 5", "AB = 6", "פי 2" — and a ratio's "פי"-prefixed digit is excluded outright); the
+  // regular-N-gon `ids.length` account is the same count-by-structure idea, un-generalized.
+  // Deliberately generous per this gate's doctrine — a false account only suppresses a warning, while
+  // the false DROP broke a working input.
+  // "פעמים"/"times" end in a plural suffix but head a RATIO ("גדול 2 פעמים", "2 times CD") — excluded,
+  // that digit is a magnitude.
+  // Both blanking passes are LENGTH-PRESERVING (#1161): the sign lookbehind below reads the
+  // letter-bearing text at the SAME index as the digit match in `s`, so a blank must occupy exactly
+  // the span it replaced. Every consumer downstream separates on optional whitespace, so the widened
+  // runs are invisible to it.
+  const blank = (m: string): string => ' '.repeat(m.length);
+  const counted = raw.replace(/(?<![\d.,])(?<!פי\s)\d+\s+(?=(?!פעמים)[א-ת]+(?:ים|ות)(?![א-ת])|(?!times\b)[A-Za-z][a-z]+s(?![A-Za-z]))/g, blank);
+  // #1814 (ADR-600): a NAME's index is never a magnitude, whatever alphabet the name is in. Latin-only, the
+  // «1» of «α1» counted as a stated number and the bogus value 1° paid for it.
+  const s = counted.replace(new RegExp(String.raw`${NAME_LETTER}\d*`, 'g'), blank);
+  return { raw, counted, s };
+}
+
+/** The bare digit runs of the scan (a stated number, or one term of a fraction / ratio / radical). */
+const STATED_DIGITS = /\d+(?:\.\d+)?/g;
+
+/**
+ * #2198 ([ADR-678](docs/06-decisions.md#adr-678)) — every number the student STATED, located in the normalized
+ * line: the number gate's own scanner (counts and name indices blanked — «2 משיקים», «O1», «α1» are never stated
+ * magnitudes). The read-extent probe substitutes each one and re-reads the line.
+ */
+export function statedNumberOccurrences(utterance: string): { text: string; occurrences: { text: string; at: number; end: number }[] } {
+  const { raw, s } = statedNumberText(utterance);
+  return { text: raw, occurrences: [...s.matchAll(STATED_DIGITS)].map((m) => ({ text: m[0], at: m.index!, end: m.index! + m[0].length })) };
+}
+
+/**
  * Numeric values the utterance STATES but the parsed commands don't account for — the NUMERIC sibling of
  * {@link droppedNewLabels} (ADR-089 → ADR-250). A first-match rule can claim an utterance and consume only
  * part of it, silently dropping a stated magnitude: session m68n76e7's
@@ -12520,8 +12627,15 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
       for (const x of Object.values(v)) walk(x);
     }
   };
-  // the declaration above is already accounted; walking it again would let one statement pay twice
-  for (const c of commands) walk({ ...c, consumed: undefined });
+  // the declaration above is already accounted; walking it again would let one statement pay twice.
+  // #2198 (ADR-677): a SEED is never an account — a DOF's starting value (an unsized circle's radius 5, an apex's
+  // x = 12, a line marker's ±5) is the rule's choice, which the engine moves; it cannot be the lowering of a number
+  // the student typed. Counted, it paid for «ברדיוס 5» while the figure drew 3.6 (and «ברדיוס 4» escalated).
+  for (const c of commands) {
+    const copy: Record<string, unknown> = { ...c, consumed: undefined };
+    for (const f of seedFields(c)) delete copy[f];
+    walk(copy);
+  }
   /** Account this occurrence against the first candidate lowering still unspent — and SPEND it. */
   const ok = (cands: number[]): boolean => {
     for (const v of cands) {
@@ -12534,31 +12648,8 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
     }
     return false;
   };
-  // stated numbers: blank labels FIRST (a subscript digit — O1, A2 — is part of a label, not a number)
-  const raw = normalizeUtterance(utterance);
-  // A COUNT is not a MAGNITUDE (issue #160): a bare integer QUANTIFYING a plural countable noun
-  // ("2 משיקים", "3 circles") is consumed by the rule's STRUCTURE (it emits that many objects), never
-  // by a numeric payload — the digit twin of the count words (שני/שתי/two) this gate is already blind
-  // to, so the same statement passed or failed on SPELLING alone (the correct Thales construction for
-  // "מנקודה A יוצאים 2 משיקים למעגל" was thrown away and lost to a failed LLM round-trip). Blank the
-  // digit in count slots before extraction (the label-subscript blanking precedent below): a count
-  // slot is a bare integer immediately followed by a Hebrew plural (…ים/…ות) or an English plural
-  // (…s, lowercase tail — a label pair "AS" is not a plural). Real magnitudes never sit in that slot
-  // ("רדיוס 5", "AB = 6", "פי 2" — and a ratio's "פי"-prefixed digit is excluded outright); the
-  // regular-N-gon `ids.length` account is the same count-by-structure idea, un-generalized.
-  // Deliberately generous per this gate's doctrine — a false account only suppresses a warning, while
-  // the false DROP broke a working input.
-  // "פעמים"/"times" end in a plural suffix but head a RATIO ("גדול 2 פעמים", "2 times CD") — excluded,
-  // that digit is a magnitude.
-  // Both blanking passes are LENGTH-PRESERVING (#1161): the sign lookbehind below reads the
-  // letter-bearing text at the SAME index as the digit match in `s`, so a blank must occupy exactly
-  // the span it replaced. Every consumer downstream separates on optional whitespace, so the widened
-  // runs are invisible to it.
-  const blank = (m: string): string => ' '.repeat(m.length);
-  const counted = raw.replace(/(?<![\d.,])(?<!פי\s)\d+\s+(?=(?!פעמים)[א-ת]+(?:ים|ות)(?![א-ת])|(?!times\b)[A-Za-z][a-z]+s(?![A-Za-z]))/g, blank);
-  // #1814 (ADR-600): a NAME's index is never a magnitude, whatever alphabet the name is in. Latin-only, the
-  // «1» of «α1» counted as a stated number and the bogus value 1° paid for it.
-  const s = counted.replace(new RegExp(String.raw`${NAME_LETTER}\d*`, 'g'), blank);
+  // stated numbers: counts and name indices blanked, by the one scanner the read-extent probe shares (#2198)
+  const { raw, counted, s } = statedNumberText(utterance);
   // #1161 (ADR-523) — the scan is SIGN-AWARE. A stated number’s leading minus belongs to the number:
   // «E=(-1,7)» states −1, and reading it unsigned hunted for an account for +1, found only −1 among
   // the payloads, and reported a dropped given against a parse that was perfectly faithful. That is a
@@ -12644,7 +12735,7 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
       dropped.push(val);
     }
   }
-  for (const m of s.matchAll(/\d+(?:\.\d+)?/g)) {
+  for (const m of s.matchAll(STATED_DIGITS)) {
     const i = m.index!;
     if (spans.some(([x, y]) => i >= x && i < y)) continue;
     const neg = negAt(i); // #1161 — the sign is part of the stated number
@@ -14543,6 +14634,20 @@ export const VERB_GATES: VerbGate[] = [
   // lowering lost is a dropped given, exactly as its twin «…שהוא גם מאונך» already was
   gate({ verb: VERB_PERPENDICULAR, he: [`מאונ${KAF}`, `אנ${KAF}`], en: [['perpendicular']], satisfied: family('perpendicular', 'foot', 'right-triangle', 'altitude') }),
 ];
+/** The equal-circle noun phrase (#2186): «(שני) מעגלים שווים / זהים», "equal / congruent circles". */
+const EQUAL_CIRCLES = /(?<![א-ת])ה?מעגלים\s+(?:ה?שווים|ה?זהים)(?![א-ת])|\b(?:equal|congruent|identical)\s+circles\b/i;
+/** Does the lowering make two circles' radii equal? A k = 1 ratio, or two radii pinned at one value (#2186). */
+function radiiMadeEqual(commands: AnyCommand[]): boolean {
+  if (commands.some((c) => c.type === 'set-radius-ratio' && Math.abs(c.k - 1) < 1e-9)) return true;
+  const pinned = new Map<string, number>();
+  for (const c of commands) {
+    if (c.type === 'circle' && !c.freeRadius) pinned.set(c.id, c.radius);
+    if (c.type === 'set-radius') pinned.set(c.circle, c.value);
+  }
+  const vals = [...pinned.values()];
+  return vals.some((v, i) => vals.some((w, j) => j !== i && Math.abs(v - w) < 1e-9));
+}
+
 /**
  * WORD-form RELATION givens (#210, ADR-360) — the fourth dropped-given sibling: a relation stated as a
  * WORD between CIRCLE nouns that the parsed commands do not encode. The symbol gate (ADR-264) sees
@@ -14571,7 +14676,22 @@ export function droppedWordRelations(utterance: string, commands: AnyCommand[]):
   // Two-circle context for the mutual-position members: >=2 circle nouns or the plural — a point-side
   // «M בתוך המעגל» never trips.
   const circleNouns = (s.match(/circle|מעגל/gi) ?? []).length;
-  if (!(circleNouns >= 2 || /מעגלים|\bcircles\b/i.test(s))) return out;
+  const twoCircles = circleNouns >= 2 || /מעגלים|\bcircles\b/i.test(s);
+  // The EQUAL-SIZE member (#2186, ADR-679) — a size equality stated on circles: the EQUAL_SIZE words («ברדיוסים
+  // שווים», «ששטחם שווה», "with equal radii") or the equal-circle noun phrase («שני מעגלים שווים», "equal circles").
+  // ADR-455 wired the reading into three of the family's rules, and nothing watched the words, so every rule that
+  // forgot `withEqualRadii` — and any LLM decomposition — committed two unequal circles green. Its context: the
+  // two-circle one, or ONE circle noun with a PLURAL size noun («מעגל מוכל ברדיוסים שווים» states two sizes); a lone
+  // «הרדיוס שווה ל-5» about one circle never trips. Satisfied, generously, by any lowering that makes two radii
+  // equal: `set-radius-ratio` k = 1, or two radii pinned at one value (the circles' own or `set-radius`).
+  const pluralSize = /רדיוסים|רדיוסיהם|רדיוסיהן|קטרים|קוטרים|קטריהם|\bradii\b|\bdiameters\b/i.test(s);
+  if (
+    (twoCircles || (circleNouns >= 1 && pluralSize)) &&
+    (EQUAL_SIZE.test(s) || EQUAL_CIRCLES.test(s)) &&
+    !radiiMadeEqual(commands)
+  )
+    out.push('שווים');
+  if (!twoCircles) return out;
   if (/זרים|\bdisjoint\b/i.test(s) && !commands.some((c) => c.type === 'set-circle-position' && c.relation === 'disjoint')) out.push('זרים');
   if (/מוכל(?:ים|ת)?(?![א-ת])|\bcontained\b/i.test(s) && !commands.some((c) => c.type === 'set-circle-position' && c.relation === 'contained')) out.push('מוכל');
   // The tangent-KIND member (#212): a kind adjective on a SINGULAR tangent noun in a two-circle
