@@ -2,9 +2,9 @@
   "version": 1,
   "_comment": "Git-tracked so the log-triage NEW-vs-carried split survives a machine switch (#502). Keys are sha256('geo-builder/log-triage/surfaced/v1' + app + utterance), truncated — NO utterance text is stored here, which is why this file may be committed while logs/triage-state-*.json may not. Values are the date the row was first put in front of the operator. Written by .claude/skills/log-triage/triage.mjs on every run.",
   "lastRun": {
-    "3d": "2026-10-13T07:54:38.432Z",
-    "2d": "2026-10-13T07:54:22.232Z",
-    "analytic": "2026-10-13T07:54:40.462Z"
+    "3d": "2026-10-15T08:34:11.133Z",
+    "2d": "2026-10-15T08:34:05.647Z",
+    "analytic": "2026-10-15T08:34:13.360Z"
   },
   "surfaced": {
     "044372aaddb95f3c": "2026-07-28",
@@ -23,6 +23,7 @@
     "2c3f32b2a722f3c2": "2026-10-13",
     "2d75f0bd3df0c283": "2026-09-30",
     "2fa160b5cd796654": "2026-10-13",
+    "31bff8fdfa032a20": "2026-10-15",
     "3320c95754041676": "2026-09-30",
     "352949240027ce96": "2026-09-30",
     "3ab8dd4f502a4333": "2026-07-17",
@@ -39,6 +40,7 @@
     "57418777ee8d8d2a": "2026-07-27",
     "5824959c60746016": "2026-09-30",
     "592b85f0d8d3f0b7": "2026-08-24",
+    "5fbcba7182811be2": "2026-10-15",
     "6184b739a6467e95": "2026-08-24",
     "63812bb3ee153abc": "2026-09-30",
     "6545d7b8b72ae176": "2026-10-13",
@@ -61,6 +63,7 @@
     "8b41e404dac7824a": "2026-07-17",
     "8f27f17f4a255c46": "2026-09-30",
     "8feca99893257412": "2026-08-24",
+    "8ffe14b7b3063b3c": "2026-10-15",
     "92302a6145fef9df": "2026-10-02",
     "95025f70850b0a75": "2026-08-08",
     "95493f05958ef898": "2026-10-05",
@@ -88,8 +91,10 @@
     "b775615b382540bf": "2026-08-08",
     "b78ea1af5de813ed": "2026-10-05",
     "bcdaba661aec61b8": "2026-08-08",
+    "bf305ad0439c41fa": "2026-10-15",
     "c0794a6df820f457": "2026-09-30",
     "c11f250bb0410f7f": "2026-07-17",
+    "c225ef22dcc71633": "2026-10-15",
     "c250ffdacefa508c": "2026-07-28",
     "c2927d9ca042282f": "2026-09-30",
     "c57c34bb882dc0c5": "2026-07-21",
