@@ -12322,3 +12322,59 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Behaviour change for a student.** An AI reading that ties the sentence to a point or line already in the figure that the sentence never named is refused with the note above, where it used to record silently — «ישר l» → «דרך P עובר ישר l», and also «AD גובה ו-AD תיכון» (the model chose side BC) and «משוואת הבסיס היא …» (the model chose BC).
 
 **Locks.** `src-analytic/__tests__/issue-2225-invented-existing-label.test.ts` (the operator's sequence from the fixture `src-analytic/__tests__/fixtures/issue-2225-before-free-line.analytic.json`, the model mocked, refused naming P; an existing line; the «הבסיס» row; the student's own and lowercase spellings pass; a new name keeps its unnamed message). `issue-1355-llm-honesty.test.ts`: the «הבסיס» row moved out of the must-not-change list.
+## ADR-AG-282 — A point on a list of carriers is on each: the frame distributes carriers as it distributes subjects (#2199)
+
+**Status:** accepted · 2026-10-16 · bug (P1, analytic) · fix round #2245, stream E · branch `fix/2199-analytic-carrier-list`
+**Requirements:** [02c](02c-requirements-analytic.md) R124 (the carrier-list bullet) · **Design:** [04c](04c-design-analytic.md) "Carriers distribute as subjects do" · **LADDER stage:** parse only (the sentence frame)
+**Siblings:** 2-D #2185 (the same shape, stream A of the same round) · 3-D: circle geometry is exception X8 · complex: no point-on-named-circle grammar and no fallback
+
+**The ruling.** Operator, 2026-10-16 (ballot round 5, card 19): analytic follows 2-D after #2185, P1 — *"Currently in prod this is still not supported and A is only on O and not on P but line is green"*.
+
+**Measured before** (`ef78f15c`, `decideSubmit` → `derive`, membership measured on the figure). After «מעגל O» · «מעגל P»: «A על מעגל O ועל מעגל P» and its spellings («A נקודה …», «הנקודה A נמצאת …», «… וגם על …», «F על המעגל O ועל המעגל P», "A on circle O and on circle P"), the three-circle comma list, «A ו-B על מעגל O ועל מעגל P» and its English twin, "… respectively", "A on circle O and B on circle P", the line and mixed lists («P על הישר AC ועל הישר BD», «C על מעגל O ועל הישר AB»), and the empty figure — all `not-handled`, so each went to the model; with the stub answer «A על מעגל O», `runFallback` recorded A on O only, green (the operator's report). Rows 7 and 10–16 (Hebrew) already recorded correctly.
+
+**The class.** *A statement placing one or more points on a LIST of carriers had no reader in analytic; it went to the model, whose answer was committed after only a well-formedness check, so a partial decomposition drew green with a stated carrier gone.* Two layers: (1) `distributeClauses` distributed a subject list, never a carrier list (a single subject never matched `NAME_LIST`; the English branch required a verb and a list; no English per-point cut); (2) the LLM seam does no accounting — #1355 (ADR-AG-279), whose name gate refuses `["A על מעגל O"]` for this line (P dropped). This ADR does not re-implement that gate.
+
+**Decision (frame only).**
+1. `carriersOf(rest)` — the strict counterpart of `objectsOf`: «על K₁» then one or more members joined by a comma, «ו» or «וגם», each opening with «על»; null under two members or when any member opens with anything else (a point's name keeps ADR-AG-222's per-point cut). A conjunction is required: plain whitespace before «על» is no joint. `carriersOfEn` is the English twin.
+2. Hebrew: subject list + carrier list without «בהתאמה» → subjects × carriers (`eachOnEach`), each clause the canonical «N על K»; «בהתאמה» still pairs; one subject (optional «הנקודה», «נקודה», «נמצא(ת)» / «מונח(ת)») distributes only over two carriers or more.
+3. English: the verb is optional ("are/lie/is/lies"), one subject or a list; carriers × subjects; "respectively" pairs; a list with one carrier distributes as before ("A and B on circle O", as 2-D builds it). The per-point incidence "N₁ (is/lies)? on K₁ and N₂ (is/lies)? on K₂" → two clauses — no general English "and" cut.
+4. Not touched: the plural «על המעגלים O ו-P» / «שני המעגלים» (#2187 / #2149), the LLM seam (#1355), `segmentsOf`.
+
+**Measured after.** Every row above records with each point on each named carrier; rows 7 and 10–16 unchanged; a «בהתאמה» count mismatch stays `not-handled` and «A על מעגל O ועל המשיק» is refused (`ambiguous-shape`), never committed with a carrier missing. «A ו-B על מעגל O ועל מעגל P» puts A and B on different crossings in at least 20 of 24 seeds. The frame, catalogue and parity batteries pass unchanged.
+
+**Parity.** Rows `point-on-two-circles-2185`, `points-on-two-circles-2185`, `point-on-two-circles-en-2185`, `point-on-three-circles-2185`, `points-respectively-en-2185`, `point-per-circle-en-2185` (circles, X8) and `point-on-two-lines-2185`; this lands before #2185, so the two rows 2-D does not read today carry `knownGap: [{ product: '2d', issue: '#2185' }]` (#2185 removes them). If #2185 lands first with its own copies of these rows, keep one row per id and drop its analytic gaps on `#2199`.
+
+**Catalog.** «A על מעגל O ועל מעגל P» / "A on circle O and on circle P" (F5, needs «מעגל O», «מעגל P»). The catalogue is also the LLM prompt's vocabulary — a proxy-deploy item.
+
+**Behaviour change for a student.** In the analytic builder «A על מעגל O ועל מעגל P» (and the spellings above) puts A on both circles, read by the tool itself; before, the AI answered and drew A on O only with the row green. "A on circle O and B on circle P" and "A and B on circle O" now build instead of going to the AI.
+
+**Locks.** `src-analytic/__tests__/issue-2199-point-on-carrier-list.test.ts` (every row on the figure, the non-lists, the refusals, the 24-seed sweep, the operator's line no longer reaching the fallback); fixtures `src-analytic/__tests__/fixtures/point-on-two-circles-2199.analytic.json`, `two-points-on-two-circles-2199.analytic.json` (built and verified by that test); the parity rows above.
+## ADR-AG-284 — An ASCII mixed number «5 1/2» is refused with a teaching sentence, never multiplied; the glyph «5½» is 5.5 (#2222)
+
+**Status:** accepted · 2026-10-16 · bug (P1, analytic) · fix round #2245, stream F · branch `fix/2222-mixed-number-refusal` from `main` @ ef78f15c
+**Requirements:** [02c](02c-requirements-analytic.md) R111 (a new example row) · **Design:** [04c](04c-design-analytic.md) § "A letter run is not automatically a product" (a new tokenizer row) · **LADDER stage:** none (parser only)
+**Siblings:** [ADR-635](06-decisions.md#adr-635) (2-D: «2½» is one number, the ASCII «2 1/2» escalates honestly) · complex measured, filed separately (below)
+
+**The ruling.** Operator, 2026-10-16: *"if the user used a symbol of 1/2 so yes - it should be 5.5. otherwise we should reject a 5 1/2 syntax and teach to either use decimal or 5+1/2 or 5*1/2. it should be P1"*.
+
+**Measured before** (`ef78f15c`, `parseLine` + `decideSubmit`, the model mocked). In every numeric slot juxtaposition read «5 1/2» as 5·1/2: «שיעור ה-y של P הוא 5 1/2» → y_P = 2.5, «שיעור ה-x של P הוא 2 1/2» → 1, «A(5 1/2, 3)» → (2.5, 3), «x = 3 1/2» → x = 1.5, «y = 2 1/2x + 1» → slope 1, «רדיוס המעגל הוא 2 1/2» → r = 1, «שטח המשולש ABC הוא 12 1/2» → area 6, «x² + y² = 6 1/4» → r² = 1.5, «A(5 1 / 2, 3)» and «A(-5 1/2, 3)» the same — each recorded, the figure drawn green for a value the student never stated. «Y_p=5 1/2», «משולש ABC ששטחו 12 1/2» and «P = (2 1/2, 1)» were `not-handled` and reached the model. The glyph already read: «5½» → 5.5, «5¼» → 5.25, «5¾» → 5.75 (`frameAnalytic.orthography`); «5⅓» is `not-handled`.
+
+**The class.** *An integer, whitespace, then an `a/b` fraction, in any value an analytic sentence reads, is read as a product.* Root cause: `expr.ts`'s juxtaposition rule reads any two atoms in a row as a product, and nothing told the ASCII mixed number apart — so the same misread reached every slot (and the fallback could reproduce it).
+
+**Decision (one detector, at the tokenizer chokepoint).**
+1. `findMixedNumber` (`engine/expr.ts`) is the ONE definition: a standalone integer (no letter, digit, `_` or `.` before it), whitespace, then `int / int` (`/` or `⁄`). The tokenizer refuses that shape, so `parseExpr` can never multiply it whatever rule or route reaches it.
+2. `parseLine` asks the same detector right after the proof-target and input-script gates — before every rule and before the model — and returns the new owned code `mixed-number` with the student's text and its three unambiguous spellings: a decimal (only when the fraction terminates — «2 1/3» offers none), the sum `5+1/2` (parenthesised after an operator, «x - (2+1/2)», so it reads the same in place) and the product `5*1/2`. Owned, so `reachesFallback` is false; a model line carrying one is rejected by the same gate.
+3. The message (`errMixedNumber` / `errMixedNumberNoDecimal`, he + en): «לא ברור אם "5 1/2" הוא מספר מעורב או מכפלה. כתבו 5.5 (מספר עשרוני) או 5+1/2 למספר המעורב, או 5*1/2 למכפלה.»
+4. Unchanged: the glyph forms (no glyph-table change; «5⅓» stays `not-handled` — the shared table is #2047), the explicit forms `5+1/2`, `5*1/2`, `5.5`, `11/2`, and number-then-symbol juxtaposition (`2x`, `1/2x`, `2 x`). A letter after the fraction («2 1/2x») does not remove the ambiguity, so it is refused as well (the issue's slope row).
+
+**Measured after.** Every row above → `mixed-number`, naming «5 1/2» / «2 1/2» / «12 1/2» / «6 1/4» / «5 1 / 2», never reaching the model; the reported question with its glyphs («שטח המשולש ABC הוא 12½», «שיעור ה-y של P הוא 5½») draws the official B, C = (7;8), (4.5;5.5) on seeds 0 and 1, with the ASCII twins refused on exactly those two lines.
+
+**Performance (docs/17 §7).** One regex test per tokenize and per line; no solve, sample or replay change.
+
+**Sibling audit.** *Spellings:* spaced slash, fraction slash, a leading sign, a glued trailing letter, Hebrew and English sentences — in the grid. *Slots:* coordinate, coordinate-of, point pair, equation (line, circle), radius, area, the LLM-only spellings. *Other builders:* 2-D escalates «AB = 2 1/2» honestly (`not-handled`, ADR-635) — the analytic sentence is a teaching refusal by the operator's ruling for this tool; whether 2-D and 3-D should teach the same is a cross-tool question, filed as #2248 (needs-operator). 3-D: `A(5 1/2, 3, 1)`, `AB = 2 1/2`, `x+y+z = 2 1/2` are not-handled (honest). **Complex multiplies:** measured at `ef78f15c`, «z = 2 1/2 + i» parses to arg 1/8 turn (z = 1 + i, so 2·1/2), and «|z| = 2 1/2» parses ok — not changed here (the plan's step 6), filed as #2247 (needs-operator).
+
+**Locks.** `src-analytic/__tests__/mixed-number-2222.test.ts` (the slot grid through `parseLine` and `decideSubmit`, `reachesFallback` false, a mocked model line rejected, the he/en sentences, the no-decimal and parenthesised forms, each taught spelling read back to its value, the tokenizer refusal, the glyph and explicit twins, `⅓` unchanged, and the bagrut question from the fixture `src-analytic/__tests__/fixtures/issue-2222-mixed-number-glyph.analytic.json`). The `mixed-number` rows in `message-floor-2028.test.ts`.
+
+**Behaviour change for a student:** «5 1/2» typed with a space, in any number the tool reads, is refused: «לא ברור אם "5 1/2" הוא מספר מעורב או מכפלה. כתבו 5.5 (מספר עשרוני) או 5+1/2 למספר המעורב, או 5*1/2 למכפלה.» — before, it was silently read as 2.5 (or handed to the model). «5½» (the symbol) still reads 5.5.
+
+> **Note (2026-10-16, #2119):** analytic's wording for a second, different radius («מעגל O ברדיוס 4» after «מעגל O ברדיוס 3») now follows 2-D's ruled sentence — recorded as [ADR-684](06-decisions.md#adr-684) in the 2-D log (fix round #2245 held 2-D ids only).

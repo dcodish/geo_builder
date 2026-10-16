@@ -156,6 +156,8 @@ export function errorText(error: InputError, t: Translate): string {
     // #1919 — the operator chose THIS sentence for a name the tool cannot read, in every builder.
     'unread-name': 'errRenameBadName',
     'unread-word': 'errUnreadWord',
+    // #2222 (ADR-AG-284) — the operator's three spellings; the decimal only when the fraction terminates
+    'mixed-number': error.key === 'mixed-number' && error.decimal ? 'errMixedNumber' : 'errMixedNumberNoDecimal',
     // #1888 / #1889 (ADR-AG-251) — a line that loses a part: its parts listed, or the right angle's two lines taught
     'split-statements': error.key === 'split-statements' && error.teach ? 'errRightAngleVertex' : 'errSplitStatements',
     'reserved-coordinate': 'errReservedCoordinate',
@@ -224,6 +226,8 @@ export function errorText(error: InputError, t: Translate): string {
       ? (error.declared ? 'errLengthNameTaken_vs' : 'errLengthNameTaken')
       : error.key === 'name-taken' && error.declared ? 'errAngleNameTaken_vs' : 'errAngleNameTaken',
     'measure-contradicts': error.key === 'measure-contradicts' && error.declared ? 'errMeasureContradicts' : 'errMeasureContradictsAlone',
+    // #2119 (ADR-684) — 2-D's errors.restatedSize, verbatim; with no line to name, the old conflict sentence
+    'radius-contradicts': error.key === 'radius-contradicts' && error.declared ? 'errRadiusContradicts' : 'errConflict',
     // #1154 — a rename understood and declined, each naming what the student wrote
     'rename-bad-name': 'errRenameBadName',
     'rename-same': 'errRenameSame',
@@ -296,5 +300,8 @@ export function errorText(error: InputError, t: Translate): string {
     nameOf: error.key === 'name-taken' ? (error.nameOf ?? '') : '',
     what: error.key === 'measure-contradicts' ? (error.what ?? '') : '',
     labels: error.key === 'llm-dropped' || error.key === 'llm-invented-existing' ? error.labels : '',
+    decimal: error.key === 'mixed-number' ? (error.decimal ?? '') : '',
+    sum: error.key === 'mixed-number' ? error.sum : '',
+    product: error.key === 'mixed-number' ? error.product : '',
   }) + near;
 }

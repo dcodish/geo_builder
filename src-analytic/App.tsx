@@ -53,7 +53,7 @@ import { MathText } from '../shell/math';
 import { inputPreviewNodeAnalytic } from './render/inputPreviewNodeAnalytic';
 import { Banner } from '../shell/frame/Banner';
 import { shapeWarningsOf, shapeWarningText } from './app/shapeWarnings';
-import { narrowingNotesOf, narrowingText, type AnalyticNarrowing } from './app/narrowing';
+import { narrowingKey, narrowingNotesOf, narrowingText, type AnalyticNarrowing } from './app/narrowing';
 import { FigureName } from '../shell/frame/FigureName';
 import { ManualScreen } from '../shell/frame/ManualScreen';
 import { QUESTION_IMAGE_WIDTH_PX, svgToPng } from '../shell/export/svgToPng';
@@ -1311,7 +1311,7 @@ export function App() {
               which, and the statement(s) that did it, as the student typed them.
             */}
             {narrowings.map((n) => (
-              <div key={`${n.ring}-${n.to}`} style={{ marginTop: 8 }} data-testid="analytic-narrowing-note">
+              <div key={narrowingKey(n)} style={{ marginTop: 8 }} data-testid="analytic-narrowing-note">
                 <Banner kind="notice">
                   <span aria-hidden="true">ⓘ </span>
                   {narrowingText(

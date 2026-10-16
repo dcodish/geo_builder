@@ -108,9 +108,14 @@ describe('#2100 — «רדיוס מעגל O גדול פי 2 מרדיוס מעג�
     expect(v.kind === 'refuse' && v.note).toEqual(twin.kind === 'refuse' && twin.note);
   });
 
-  it('unchanged: a ratio to a circle the figure does not have, and «שווה» with no factor, are not read here', async () => {
+  it('unchanged: a ratio to a circle the figure does not have is not read here', async () => {
     expect((await decide(['מעגל O'], 'רדיוס מעגל O גדול פי 2 מרדיוס מעגל P')).kind).toBe('escalate');
-    expect((await decide(TWO, 'רדיוס מעגל O שווה לרדיוס מעגל P')).kind).toBe('escalate');
+  });
+  // Re-based by #2149 (ADR-671, operator ruling 2026-10-16 card 6: «רדיוס מעגל O שווה לרדיוס מעגל P» becomes a real
+  // given): «שווה» with no factor is now the ratio's equality branch, k = 1 — it escalated before the ruling.
+  it('«שווה» with no factor is the equality, k = 1 (#2149)', async () => {
+    const v = await decide(TWO, 'רדיוס מעגל O שווה לרדיוס מעגל P');
+    expect(v.kind === 'commit' && v.commands).toEqual([{ type: 'set-radius-ratio', c1: 'circle-O', c2: 'circle-P', k: 1 }]);
   });
 
   it('a plain size statement still sizes its circle', async () => {

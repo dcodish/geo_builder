@@ -1,0 +1,46 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-16T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "9O0nGiakn5i3ZA7ZN-kAC",
+      "utterance": "מעגל O",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "0T5O0t92m4xOWgFEr03-m",
+      "utterance": "מעגל P",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "h_2Ml1rAuuvTX6VQ3p8GP",
+      "utterance": "מעגל P משיק למעגל O מבפנים",
+      "cmd": {
+        "type": "circles-tangent",
+        "circle1": "circle-P",
+        "circle2": "circle-O",
+        "at": "M",
+        "external": false
+      },
+      "enabled": true
+    }
+  ]
+}

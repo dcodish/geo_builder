@@ -12,7 +12,7 @@
  */
 
 import type { Construction, Id, Vec } from '@/engine';
-import { isGeoPoint, circleMembers, pointNeighbors, parallelEdgePairs, roleSidesOf, openRightTriangles } from '@/engine';
+import { isGeoPoint, nounOfKind, circleMembers, pointNeighbors, parallelEdgePairs, roleSidesOf, openRightTriangles } from '@/engine';
 import type { ParseContext } from './parse';
 
 /** A circle centre's reference TOKEN ([ADR-342](../../docs/06-decisions.md#adr-342)): an anonymous auto
@@ -68,7 +68,7 @@ function autosInterchangeable(construction: Construction): boolean {
       // branch is seed, not statement. (`avoid` — "the OTHER crossing" — stays: it is a relation between points.)
       if (o.kind === 'circle-position' && (o.relation === 'disjoint' || o.relation === 'tangent')) {
         // #2080 (ADR-645): a stated tangency is unordered too (its touch point is the pair's one common point)
-        return { kind: o.kind, relation: o.relation, circles: [norm(o.a, swap), norm(o.b, swap)].map((x) => JSON.stringify(x)).sort(), ...(o.at !== undefined ? { at: norm(o.at, swap) } : {}) };
+        return { kind: o.kind, relation: o.relation, circles: [norm(o.a, swap), norm(o.b, swap)].map((x) => JSON.stringify(x)).sort(), ...(o.at !== undefined ? { at: norm(o.at, swap) } : {}), ...(o.external !== undefined ? { external: o.external } : {}) };
       }
       if (o.kind === 'circle-circle') {
         out.circles = [norm(o.circle1, swap), norm(o.circle2, swap)].map((x) => JSON.stringify(x)).sort();
@@ -194,7 +194,9 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     ),
     // #770: the DECLARED kind travels with each ring, so a definite shape noun («אלכסוני הריבוע»)
     // resolves on what the student named, never on "whichever quad exists".
-    declaredPolygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [{ vertices: o.vertices, kind: o.declaredAs }] : [])),
+    // #2169 (ADR-W-131): read as the NOUN the ring answers to — a declared isosceles or right trapezoid is «הטרפז»
+    // (`nounOfKind`); the selectors match a noun word, while the engine keeps the adjective for the hierarchy.
+    declaredPolygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [{ vertices: o.vertices, kind: nounOfKind(o.declaredAs) }] : [])),
     // #775: side ROLES the figure's declarations induce — «תיכון ליתר» resolves the hypotenuse of the
     // right triangle, «לבסיס» the isosceles base. SEMANTIC on purpose: read off the declared structure
     // (the perp-offset the right-triangle macro builds, a ⟂/90° constraint at a triangle vertex, the
@@ -236,6 +238,19 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
             : d > Math.abs(r1 - r2) ? 'intersecting'
             : 'contained';
         }
+      return out;
+    })(),
+    // #2149 / #2188 (ADR-671, ADR-672) — SEMANTIC: each circle pair STATED tangent, from the construction's own
+    // records (the `circles-tangent` statement's requirement, ADR-645), never from coordinates: its touch point and the
+    // KIND the statement gave. When a pair carries several records (a restatement with the pair reversed), the FIRST
+    // in requirement order wins — the kind stated earliest. Keyed by the sorted pair of circle ids.
+    statedTangencies: (() => {
+      const out: Record<string, { at: Id; external: boolean }> = {};
+      for (const r of construction.requirements ?? []) {
+        if (r.kind !== 'circle-position' || r.relation !== 'tangent') continue;
+        const key = [r.a, r.b].sort().join('|');
+        if (!out[key]) out[key] = { at: r.at, external: r.external !== false };
+      }
       return out;
     })(),
     // The TOUCH POINT of each tangent circle pair, resolved POSITIONALLY (#197 Am. 5): the point lying

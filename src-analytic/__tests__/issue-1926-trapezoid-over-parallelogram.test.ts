@@ -106,11 +106,17 @@ describe('#1926 — what stays as it was', () => {
   });
 });
 
-describe('#1926 — `nounsExclude` is derived from the table, and the table says exactly this', () => {
-  it('over every pair of quadrilateral nouns, it is the parallelogram family × the trapezoids, symmetric', () => {
+describe('#1926 / #2169 — `nounsExclude` is derived from the shared lattice, and it says exactly this', () => {
+  // #2169 (ADR-W-131, the 2026-10-16 rulings): the kite against the trapezoid family, and an isosceles against a right
+  // trapezoid, exclude too — the pairs 2-D and 3-D always refused.
+  it('over every pair of quadrilateral nouns: the parallelogram family and the kite × the trapezoids, and iso × right', () => {
     const quads = Object.keys(SHAPES).filter((k) => SHAPES[k].arity === 4);
     const got = quads.flatMap((a) => quads.filter((b) => nounsExclude(a, b)).map((b) => `${a}|${b}`)).sort();
-    const want = PARALLELOGRAMS.flatMap((p) => TRAPEZOIDS.flatMap((t) => [`${p}|${t}`, `${t}|${p}`])).sort();
+    const want = [
+      ...[...PARALLELOGRAMS, 'דלתון'].flatMap((p) => TRAPEZOIDS.flatMap((t) => [`${p}|${t}`, `${t}|${p}`])),
+      'טרפז שווה שוקיים|טרפז ישר זווית',
+      'טרפז ישר זווית|טרפז שווה שוקיים',
+    ].sort();
     expect(got).toEqual(want);
   });
 });

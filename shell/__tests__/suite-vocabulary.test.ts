@@ -79,6 +79,8 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   // the same letter with another coefficient. 3-D keeps its own conflict sentence (card d14b-2061-wording A).
   measureContradicts: { '2d': ['errors.overConstrained_said_vs'], '3d': null, complex: null, analytic: ['errMeasureContradicts'] },
   measureContradictsAlone: { '2d': ['errors.overConstrained_said'], '3d': null, complex: null, analytic: ['errMeasureContradictsAlone'] },
+  // #2119 (ADR-684): a second, different radius — 2-D's ruled sentence, no reason clause, in analytic too
+  radiusContradicts: { '2d': ['errors.restatedSize_said_vs'], '3d': null, complex: null, analytic: ['errRadiusContradicts'] },
 };
 
 /** The ruled wording (the "Explicit set", 2026-09-27) — the lock's anchor, not just "all equal". */

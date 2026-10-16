@@ -105,11 +105,9 @@ describe('#2083 — the class: every way a circle was defined survives the refer
 });
 
 describe('#2083 — unchanged (measured at 939b160a)', () => {
-  it('«מעגל O ברדיוס 4» after «ברדיוס 3» answers exactly as at 939b160a (the plan said "resizes"; measured: «כבר קיים», r = 3)', async () => {
-    // Measured on the unchanged baseline: the door answers «כבר קיים» and the circle keeps r = 3. Not this fix's
-    // seam (the fold's stated-radius resize is unchanged: fold-circle-reference.test.ts); reported as a finding.
+  it('«מעגל O ברדיוס 4» after «ברדיוס 3» is refused and the circle keeps r = 3 (#2119, ADR-683 — was «כבר קיים»)', async () => {
     const g = await play(['מעגל O ברדיוס 3', 'מעגל O ברדיוס 4']);
-    expect(g.last.kind).toBe('noop');
+    expect(g.last.kind).toBe('refuse');
     expect(g.radius('O')!.radius).toEqual({ via: 'length', value: 3 });
     expect(g.facts).toHaveLength(1);
   });

@@ -91,6 +91,8 @@ export type InputError =
   | { key: 'proof-target'; detail: string }
   /** #1919 — a letter the tool cannot read; `detail` is the run(s) as typed (`shell/inputScript`). */
   | { key: 'unread-name' | 'unread-word'; detail: string }
+  /** #2222 (ADR-AG-284) — an ASCII mixed number «5 1/2», refused with its unambiguous spellings (`engine/expr.findMixedNumber`). */
+  | { key: 'mixed-number'; detail: string; decimal?: string; sum: string; product: string }
   /** `x` or `y` used as a point's unknown — they are the plane's own variables (#1039). */
   | { key: 'reserved-coordinate'; detail: string }
   /** A shape noun and a vertex count that disagree (#1042). */
@@ -207,6 +209,8 @@ export type InputError =
   | { key: 'name-taken'; detail: string; holder?: string; nameOf?: string; nameKind?: 'angle' | 'length'; declared?: string }
   /** #2061 (ADR-AG-277) — the same letter with another coefficient: 2-D's reason clause and the earlier line. */
   | { key: 'measure-contradicts'; detail: string; what?: string; declared?: string }
+  /** #2119 (ADR-684) — a second, different radius for a circle: the line that sized it. */
+  | { key: 'radius-contradicts'; detail: string; declared?: string }
   /**
    * A RENAME the tool understood and declined (#1154) — each names what the student wrote. `detail` is
    * the letter (or, for `rename-unsafe`, the line that could not be rewritten faithfully; empty when

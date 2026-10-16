@@ -117,14 +117,19 @@ describe('#1985 — a noun that EXCLUDES the declared one is refused with the ru
   it.each([
     ['מקבילית ABCD', 'טרפז ABCD', 'מקבילית', 'טרפז'], // the operator's pair
     ['טרפז ABCD', 'מקבילית ABCD', 'טרפז', 'מקבילית'], // and the reverse
-    ['מקבילית ABCD', 'טרפז שווה שוקיים ABCD', 'מקבילית', 'טרפז'], // the isosceles variant carries no refined `kind`: it states «טרפז»
+    // #2169 (ADR-W-131, the 2026-10-16 ruling): the isosceles variant is named with its adjective, like the right one
+    ['מקבילית ABCD', 'טרפז שווה שוקיים ABCD', 'מקבילית', 'טרפז שווה שוקיים'],
     ['מקבילית ABCD', 'טרפז ישר זווית ABCD', 'מקבילית', 'טרפז ישר זווית'],
     ['מלבן ABCD', 'טרפז ABCD', 'מלבן', 'טרפז'],
     ['ריבוע ABCD', 'טרפז ABCD', 'ריבוע', 'טרפז'],
     ['מעוין ABCD', 'טרפז ABCD', 'מעוין', 'טרפז'],
     ['דלתון ABCD', 'טרפז ABCD', 'דלתון', 'טרפז'],
     ['טרפז ABCD', 'ריבוע ABCD', 'טרפז', 'ריבוע'],
-    ['טרפז שווה שוקיים ABCD', 'מקבילית ABCD', 'טרפז', 'מקבילית'],
+    ['טרפז שווה שוקיים ABCD', 'מקבילית ABCD', 'טרפז שווה שוקיים', 'מקבילית'],
+    ['טרפז ישר זווית ABCD', 'מקבילית ABCD', 'טרפז ישר זווית', 'מקבילית'],
+    // #2169: an isosceles and a right trapezoid exclude each other, in either order (refused in every builder)
+    ['טרפז שווה שוקיים ABCD', 'טרפז ישר זווית ABCD', 'טרפז שווה שוקיים', 'טרפז ישר זווית'],
+    ['טרפז ישר זווית ABCD', 'טרפז שווה שוקיים ABCD', 'טרפז ישר זווית', 'טרפז שווה שוקיים'],
   ])('«%s» · «%s» names both nouns', async (a, b, actual, stated) => {
     const r = await play([a, b]);
     expect(r.kind).toBe('refuse');

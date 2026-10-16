@@ -35,7 +35,8 @@ import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, flatHeightReading3, freeDims, ringKeyIds3 } from '../engine/apply';
-import { convexWhenSimple, declaredQuads3, spaceDiagonals, diagonalClaimVerdict, quadImplies, quadImpliesInEveryReading, QUAD_PYRAMIDS, trapezoidRingInForce3, type QuadBase } from '../engine/baseShapes';
+import { convexWhenSimple, declaredKind3, declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
+import { declaredKindOf, kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
 import { checkInSpan, componentValue, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
@@ -1525,9 +1526,12 @@ const ringKey3 = (ids: readonly Id[]): string => {
 /** The ring a command DECLARES — a flat polygon, a stated quad shape, a completed rectangle — or null. */
 const declaredRingOf3 = (k: Command3): readonly Id[] | null =>
   k.type === 'quad-shape' || k.type === 'rect-complete' || (k.type === 'solid' && (k.kind === 'polygon3' || k.kind === 'polygon4' || k.kind === 'polygon5')) ? k.ids : null;
-/** The quad NOUN a declaring command states — `'quad'` for a bare polygon, which every quad implies (#1988). */
-const declaredBaseOf3 = (k: Command3): QuadBase | null =>
-  k.type === 'quad-shape' ? k.base : k.type === 'rect-complete' ? 'rectangle' : k.type === 'solid' && k.kind === 'polygon4' ? 'quad' : null;
+/**
+ * The quad KIND a declaring command states — `'quadrilateral'` for a bare polygon, which every quad implies (#1988) —
+ * with the adjective its phrase consumed (#2171, ADR-3D-345: «טרפז שווה שוקיים» is an isosceles trapezoid).
+ */
+const declaredKindOf3 = (k: Command3): NarrowKind | null =>
+  k.type === 'quad-shape' ? declaredKind3(k) : k.type === 'rect-complete' ? 'rectangle' : k.type === 'solid' && k.kind === 'polygon4' ? 'quadrilateral' : null;
 /** Quad bases whose statement is the same under every rotation and reversal of the ring (2-D's `RING_SYMMETRIC`). */
 const RING_SYMMETRIC_BASES: ReadonlySet<string> = new Set(['square', 'rectangle', 'rhombus', 'parallelogram', 'quad']);
 /** Does reading the declared ring `ring` as `cmd.ids` say the same thing? (The trapezoid: only the readings that
@@ -1567,22 +1571,44 @@ function ringRestatementTwin3(facts: readonly Fact3[], commands: readonly Comman
   const ring = declaredRingOf3(cmd);
   if (!ring || new Set(ring).size !== ring.length) return undefined;
   const key = ringKey3(ring);
-  const stated = declaredBaseOf3(cmd);
+  const stated = declaredKindOf3(cmd);
   const sameKey = (k: Command3) => {
     const r = declaredRingOf3(k);
     return r !== null && r.length === ring.length && ringKey3(r) === key;
   };
+  /*
+   * #2180 (ADR-3D-346, ADR-W-131) — WHAT THE NOUNS MAKE THE RING TOGETHER. Judged fact by fact, «מלבן ABCD» ·
+   * «מעוין ABCD» · «ריבוע ABCD» recorded the square as new information (neither earlier noun implies it alone), while
+   * 2-D and analytic answer «already there». The ring is the meet of every ENABLED noun stated over it — in the
+   * stated reading, or (for the restatement in another reading) of them all — and a stated kind it implies is the
+   * same statement; the twin is the first enabled fact that declared the ring.
+   */
+  if (stated !== null) {
+    const declaring = facts.filter((f) => f.enabled).flatMap((f) => {
+      const k = f.cmds.find(sameKey);
+      const kind = k ? declaredKindOf3(k) : null;
+      if (!k || kind === null) return [];
+      const declared = declaredRingOf3(k)!;
+      const sameSpelling = declared.length === ring.length && declared.every((v, i) => v === ring[i]);
+      return [{ f, kind, readingSame: sameSpelling || sameReading3(cmd, declared) }];
+    });
+    const meet = (rows: typeof declaring) => (rows.length ? declaredKindOf(rows.map((r) => r.kind), false) : null);
+    const inReading = meet(declaring.filter((r) => r.readingSame));
+    const inAll = meet(declaring);
+    if (inReading && narrowImplies(inReading, stated)) return declaring.find((r) => r.readingSame)!.f;
+    if (inAll && kindImpliesInEveryReading(inAll, stated)) return declaring[0].f;
+  }
   for (const f of facts) {
     const declaring = f.cmds.find(sameKey);
     if (!declaring) continue;
     const declared = declaredRingOf3(declaring)!;
-    const base = declaredBaseOf3(declaring);
+    const base = declaredKindOf3(declaring);
     // The declared noun already implies the stated one ⇒ the line restates the ring and adds nothing — but only
     // in a reading that says the same thing: «טרפז ABCD» · «טרפז BCDA» names the OTHER pair as the parallel one
     // (ADR-3D-313's seat), which is new information, not a restatement.
     const sameSpelling = declared.length === ring.length && declared.every((v, i) => v === ring[i]);
     const readingSame = sameSpelling || sameReading3(cmd, declared);
-    if (stated !== null && base !== null && (readingSame ? quadImplies(base, stated) : quadImpliesInEveryReading(base, stated))) {
+    if (stated !== null && base !== null && (readingSame ? narrowImplies(base, stated) : kindImpliesInEveryReading(base, stated))) {
       if (f.enabled) return f;
       continue;
     }

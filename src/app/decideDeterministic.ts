@@ -250,6 +250,20 @@ export function decidePreParse(utterance: string, view: DecideView): Verdict2D |
 export const PRE_LLM = new Set(['analytic', 'coordinate-point', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point', 'unnamed-sides', 'compound-relation', 'unrelated']);
 
 /** The parse-and-dry-run half. Assumes {@link decidePreParse} returned `null` for this utterance. */
+/**
+ * #2205 ([ADR-685](../../docs/06-decisions.md#adr-685)) — the note for a definite unnamed shape noun beside two or more
+ * shapes of its size, ONE spelling for the submit and the edit seam. The plural noun is a translated word (`{ t: key }`,
+ * the locale's `input.shapePlural` table by arity: 3 → triangles, 4 → quadrilaterals, otherwise polygons); every
+ * other value is the student's text or a figure name.
+ */
+export function ambiguousDefiniteShapeNote(
+  r: { shapes: string[]; sides: number; example: string },
+  utterance: string,
+): { key: string; params: { sentence: string; shapes: string; example: string; plural: { t: string } } } {
+  const plural = { t: `input.shapePlural.${r.sides === 3 || r.sides === 4 ? r.sides : 'n'}` };
+  return { key: 'input.ambiguousDefiniteShape', params: { sentence: utterance.trim(), shapes: r.shapes.join(', '), example: r.example, plural } };
+}
+
 export async function decideFromParse(
   state: DecideState,
   utterance: string,
@@ -574,6 +588,11 @@ export async function decideFromParse(
   // the LLM lane, whose guess parses and commits. Ask, naming the candidates.
   if (!r.ok && r.reason === 'ambiguous-shape') {
     return refuse('clarify', { source: 'parser', result: `ambiguous-shape:${r.noun}:${r.shapes.join(',')}` }, { key: 'input.ambiguousShape', params: { shapes: r.shapes.join(', '), first: r.shapes[0] ?? 'ABCD' } });
+  }
+  // #2205 (ADR-685): a DEFINITE unnamed shape noun («המשולש ישר זווית») beside two or more shapes of its size —
+  // refused naming them, with the student's own sentence naming the first as the next step (ruling 2026-10-16).
+  if (!r.ok && r.reason === 'ambiguous-definite-shape') {
+    return refuse('clarify', { source: 'parser', result: `ambiguous-definite-shape:${r.shapes.join(',')}` }, ambiguousDefiniteShapeNote(r, utterance));
   }
   // #889: the SIBLING ask, and a different question — «מרובע ABCD עם אלכסון» names its shape and
   // leaves the CONSTRUCT open. The candidates are constructs that do not exist yet, so the answer is

@@ -276,12 +276,13 @@ describe('#1918 (D) a trapezoid re-declared over a shape no quadrilateral is at 
     [['מקבילית ABCD', 'טרפז ABCD'], 'trapezoid', 'parallelogram'],
     [['מלבן ABCD', 'טרפז ABCD'], 'trapezoid', 'rectangle'],
     [['ריבוע ABCD', 'טרפז ABCD'], 'trapezoid', 'square'],
-    [['מקבילית ABCD', 'טרפז שווה שוקיים ABCD'], 'trapezoid', 'parallelogram'],
+    // #2169 (ADR-3D-345): a stated isosceles trapezoid is named with its adjective in the refusal
+    [['מקבילית ABCD', 'טרפז שווה שוקיים ABCD'], 'isosceles-trapezoid', 'parallelogram'],
     [['ABCD מקבילית', 'ABCD טרפז'], 'trapezoid', 'parallelogram'],
     [['פירמידה SABCD שבסיסה מקבילית', 'ABCD טרפז'], 'trapezoid', 'parallelogram'],
     [['טרפז ABCD', 'מקבילית ABCD'], 'parallelogram', 'trapezoid'],
     [['טרפז ABCD', 'מלבן ABCD'], 'rectangle', 'trapezoid'],
-  ] as [string[], QuadBase, QuadBase][])('%j — refused, naming both shapes', (lines, stated, actual) => {
+  ] as [string[], string, string][])('%j — refused, naming both shapes', (lines, stated, actual) => {
     const r = refusedCode(lines);
     expect(r.kinds).toEqual(['record', 'refused']);
     expect(r.error).toEqual({ code: 'shape-disjoint', stated, actual });

@@ -18,10 +18,11 @@ const verdictAfter = (prefix: string[], utterance: string) => {
 };
 
 describe('#960 — the operator’s two dead play cases, as the gate sees them', () => {
-  it('T2: «AB = x» after «AB = 3» commits NOTHING — the app answers "already drawn"', () => {
+  // #2165 (ADR-681): re-based — «AB = x» after «AB = 3» binds x to the measured AB (x = 3) and COMMITS; the old
+  // "already drawn" dropped the binding, so a later «x = …» found a letter nothing defined.
+  it('T2: «AB = x» after «AB = 3» commits — the binding gives x its value (was "already drawn")', () => {
     const v = verdictAfter(['משולש ABC', 'AB = 3'], 'AB = x');
-    expect(v.kind, 'not a commit — which is why the canvas never reached line 4').not.toBe('commit');
-    expect(v.kind).toBe('noop');
+    expect(v.kind).toBe('commit');
   });
 
   it('T6: «DE = x» before D and E exist is REFUSED pre-commit, not deferred', () => {

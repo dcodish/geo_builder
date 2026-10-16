@@ -1,0 +1,75 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-16T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "utterance": "מעגל O",
+      "group": "g0",
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "utterance": "מעגל P",
+      "group": "g1",
+      "enabled": true
+    },
+    {
+      "id": "g2.2",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "A",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "branch": 0
+      },
+      "utterance": "המעגלים O ו-P נחתכים ברדיוסים שווים",
+      "group": "g2",
+      "enabled": true
+    },
+    {
+      "id": "g2.3",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "B",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "branch": 1,
+        "avoid": "A"
+      },
+      "utterance": "המעגלים O ו-P נחתכים ברדיוסים שווים",
+      "group": "g2",
+      "enabled": true
+    },
+    {
+      "id": "g2.4",
+      "cmd": {
+        "type": "set-radius-ratio",
+        "c1": "circle-O",
+        "c2": "circle-P",
+        "k": 1
+      },
+      "utterance": "המעגלים O ו-P נחתכים ברדיוסים שווים",
+      "group": "g2",
+      "enabled": true
+    }
+  ]
+}

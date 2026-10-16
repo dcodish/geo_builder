@@ -22,8 +22,9 @@ import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr } from '
 import { curveParentsOf, parentsOf, type DerivedRule, type FootLine } from './derived';
 import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, sineAngle, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
-import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounsExclude, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
+import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
+import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
 import { measureRestatement } from './statedMeasures';
 import { RESERVED_SYMBOLS, radiusSymbol, toolSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
@@ -240,7 +241,10 @@ export type ApplyErrorCode =
   /** #2054 (ADR-AG-277): a second letter for an angle or a segment that already has one — `holder` is the first letter, `nameOf` the target as the line spells it. */
   | 'name-taken'
   /** #2061 (ADR-AG-277): the same letter with another coefficient for an angle or segment — `what` is 2-D's reason clause. */
-  | 'measure-contradicts';
+  | 'measure-contradicts'
+  /** #2119 (ADR-684): a second, different radius for a circle whose radius a line already stated — `circle` is its id;
+   *  `derive` names the line that sized it (2-D's ruled sentence, no reason clause). */
+  | 'radius-contradicts';
 
 /**
  * WHICH OBJECT a contextual reference needed, and how many the figure holds (#1432 amendment 1).
@@ -336,6 +340,8 @@ export interface ApplyError {
   what?: string;
   /** For `name-taken` / `measure-contradicts`: the EARLIER constraint the line restates — `derive` maps it to its line. */
   against?: Constraint;
+  /** For `radius-contradicts` (#2119): the circle whose stated radius the line contradicts. */
+  circle?: Id;
 }
 
 /** How a found curve can be called in a sentence — its name, or (unnamed) its equation. */
@@ -655,7 +661,11 @@ export interface ApplyNotice {
 }
 
 export type ApplyOutcome =
-  | { ok: true; next: Construction; effect: LineEffect; notice?: ApplyNotice }
+  /**
+   * `restates` (#2169, ADR-W-131): a shape noun the ring's own nouns already IMPLY («ריבוע ABCD» · «דלתון ABCD») — the
+   * fold takes the rest of that sentence's noun definition as already held, so the whole line is «already known».
+   */
+  | { ok: true; next: Construction; effect: LineEffect; notice?: ApplyNotice; restates?: true }
   | { ok: false; error: ApplyError };
 
 /**
@@ -755,7 +765,7 @@ export function centreIdOf(c: Construction, o: GeoObject): Id | null {
  * שמשוואתו …», «M מרכז המעגל»), so «A על מעגל M» found no circle beside a figure whose circle plainly has
  * centre M. Asked here once, so every reference reaches every naming.
  */
-function circleByName(c: Construction, name: string): GeoObject | undefined {
+export function circleByName(c: Construction, name: string): GeoObject | undefined {
   const described = readDescribedCircle(name);
   if (described) return describedCircle(c, described);
   const direct = objectById(c, numeralCurveId('circle', name)) ?? objectById(c, `circle-at-${name}`) ?? curveByName(c, name);
@@ -3118,10 +3128,13 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
         }
       }
-      return applyAll(c, [
+      const lowered = applyAll(c, [
         { t: 'point', id: host.centre, x: num(cx), y: num(cy), src: f.src },
         { t: 'radius-of', circleId: host.id, value: num(r), src: f.src },
       ]);
+      // #2119 (ADR-684): an EQUATION against a stated radius keeps its conflict sentence, in both orders — the ruled
+      // radius sentence is for a radius sentence (the equation-first order meets the curve arm's errConflict)
+      return !lowered.ok && lowered.error.code === 'radius-contradicts' ? { ok: false, error: { code: 'conflicting-restatement', detail: f.src } } : lowered;
     }
 
     case 'centre-of': {
@@ -3438,10 +3451,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           const params = restText.includes(`"${sym}"`) ? base.params : base.params.filter((p) => p.sym !== sym);
           return { ok: true, next: { ...base, objects, constraints, params }, effect: 'narrowed' };
         }
-        // A radius already carried by the object: a RESTATEMENT, judged at the probes.
+        // A radius already carried by the object: a RESTATEMENT, judged at the probes. A different one is refused in 2-D's
+        // ruled sentence naming the line that sized the circle (#2119, ADR-684 — operator ruling 2026-10-15, every builder).
         return sameNumbers(host.r, f.value)
           ? { ok: true, next: c, effect: 'known' }
-          : { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+          : { ok: false, error: { code: 'radius-contradicts', detail: f.src, circle: host.id } };
       }
       if (isCreatedCircle(host) && JSON.stringify(host.curve).includes(`"${toolSymbol(host.id, 'r')}"`)) {
         /*
@@ -4137,8 +4151,17 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * refused, in either order and every spelling the polygon rule reads. Forcing GIVENS keep ADR-AG-189 Am. 1's
        * warning; only a second NOUN is refused here.
        */
-      if (prior?.kind === 'polygon' && f.t === 'polygon' && prior.noun && f.noun && nounsExclude(prior.noun, f.noun)) {
-        return { ok: false, error: { code: 'shape-excluded', detail: f.src, actual: normalizeShapeNoun(prior.noun), stated: normalizeShapeNoun(f.noun) } };
+      /*
+       * #2169 (ADR-W-131, the 2026-10-16 rulings): the ring is what EVERY noun stated over it makes it together (`noun`
+       * and `also`, their meet), judged by the one relation every builder reads (`kindRelation`, the shared lattice):
+       * a kite against the trapezoid family and an isosceles against a right trapezoid exclude too, and the refusal names
+       * what the ring is known to be — «ריבוע» after «מלבן» · «מעוין», as 2-D says.
+       */
+      const ringKind = prior?.kind === 'polygon' ? ringKindOf(prior) : null;
+      const statedKind = f.t === 'polygon' ? quadKindOf(f.noun) : null;
+      const relation = ringKind && statedKind ? kindRelation(ringKind, statedKind) : null;
+      if (prior?.kind === 'polygon' && f.t === 'polygon' && prior.noun && f.noun && ringKind && nounsExclude(nounOfKind(ringKind) ?? prior.noun, f.noun)) {
+        return { ok: false, error: { code: 'shape-excluded', detail: f.src, actual: normalizeShapeNoun(nounOfKind(ringKind) ?? prior.noun), stated: normalizeShapeNoun(f.noun) } };
       }
       if (prior) {
         // M1: restating the same construction is absorbed — no duplicate row, no re-creation. This
@@ -4169,6 +4192,29 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
                 objects: c.objects.map((o) => (o.id === f.id ? { ...prior, noun: f.noun, ...circleFlags } : o)),
               },
             };
+          }
+          /*
+           * #2169 (ADR-W-131) — A NOUN THE RING'S NOUNS ALREADY IMPLY IS A RESTATEMENT, in the reading the student wrote:
+           * «ריבוע ABCD» · «דלתון ABCD» (every square is a kite). Its definition constraints are not the same OBJECTS as
+           * the square's, so the line recorded a second row where 2-D and 3-D answer «already there»; it is now absorbed
+           * whole (`restates` — the fold takes the line's noun definition as held). A trapezoid read the other way round
+           * names the other pair of sides, so only the declared spelling, or a noun no reading changes, restates.
+           */
+          if (f.t === 'polygon' && prior.kind === 'polygon' && relation === 'implies' && ringKind && statedKind) {
+            const sameSpelling = prior.vertices.length === f.vertices.length && prior.vertices.every((v, i) => v === f.vertices[i]);
+            if (sameSpelling || kindImpliesInEveryReading(ringKind, statedKind)) {
+              const flaggedNow = !!circleFlags.cyclic !== !!prior.cyclic || circleFlags.circleless !== prior.circleless;
+              const next = flaggedNow ? { ...c, objects: c.objects.map((o) => (o.id === f.id ? { ...prior, ...circleFlags } : o)) } : c;
+              return { ok: true, effect: 'known', next, restates: true };
+            }
+          }
+          /*
+           * #2169 — a noun that NARROWS the ring, or meets it in a third kind («מלבן» · «מעוין» = «ריבוע»), is kept on the
+           * ring: its constraints arrive as their own facts, and a later noun is judged against what both make it.
+           */
+          if (f.t === 'polygon' && prior.kind === 'polygon' && f.noun && (relation === 'narrows' || relation === 'siblings')) {
+            const also = [...(prior.also ?? []), normalizeShapeNoun(f.noun)];
+            return { ok: true, effect: 'known', next: { ...c, objects: c.objects.map((o) => (o.id === f.id ? { ...prior, ...circleFlags, also } : o)) } };
           }
           // Absorbed — but what it said about a circle through the ring is kept (#1918): a later sentence answers to it.
           const flagged = prior.kind === 'polygon' && (!!circleFlags.cyclic !== !!prior.cyclic || circleFlags.circleless !== prior.circleless);
@@ -4249,6 +4295,15 @@ function selectorIdentity(sel: Selector): string {
  *
  * Caller has already established that the ids match.
  */
+/**
+ * #2169 (ADR-W-131): what a declared ring IS — the meet of its noun and every later noun that narrowed it (`also`), as a
+ * kind of the shared lattice — or null for a ring no quadrilateral noun names.
+ */
+function ringKindOf(p: Extract<GeoObject, { kind: 'polygon' }>): NarrowKind | null {
+  const kinds = [p.noun, ...(p.also ?? [])].map(quadKindOf).filter((k): k is NarrowKind => k !== null);
+  return kinds.length ? declaredKindOf(kinds, false) : null;
+}
+
 function sameReference(prior: GeoObject, f: Fact): boolean {
   if (prior.kind === 'derived' && f.t === 'derived') {
     return JSON.stringify(prior.rule) === JSON.stringify(f.rule);
@@ -4535,11 +4590,24 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
     effects[i] = effect;
     notices[i] = notice ?? null;
   };
+  /*
+   * #2169 (ADR-W-131): the lines whose shape noun the ring's nouns already imply (`restates`) — the rest of that line's
+   * noun DEFINITION (its `definition` constraints, ADR-AG-225) is held by the ring already, so it is not applied again:
+   * applying it would add constraints that are new OBJECTS though not new information, and record the line.
+   */
+  const restated = new Set<number>();
+  const lineOfFact = (i: number) => (group ? group[i] : i);
   facts.forEach((f, i) => {
     if (!include(i)) return;
+    if (restated.has(lineOfFact(i)) && f.t === 'constraint' && f.definition) {
+      commit(i, c, 'known');
+      return;
+    }
     const out = applyFact(c, f);
-    if (out.ok) commit(i, out.next, out.effect, out.notice);
-    else errors[i] = out.error;
+    if (out.ok) {
+      commit(i, out.next, out.effect, out.notice);
+      if (out.restates) restated.add(lineOfFact(i));
+    } else errors[i] = out.error;
   });
   // The deferral fixpoint: retry every still-failed fact — creating or not (#1340) — against the construction the
   // later facts completed. Bounded by the fact count; a pass that lands nothing ends it. A fact is not

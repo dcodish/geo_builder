@@ -217,6 +217,7 @@ From the «lines and points» corpus (§8), numbered onward.
 - «טרפז ישר זווית ABCD (AB ∥ CD, AB ⊥ AD)» → the shape and its givens
 - «הוכיחו כי …» → refused as a claim to prove
 - **A line that loses a part is refused whole, never drawn without it and never handed to the model** *(operator, 2026-10-08: "a line that loses a part gets the existing one-input-per-line message … in every builder"; "refuse it too" when the lost part happens to hold)*. A part is lost when the reading never read it: a trailing label the line's reading does not depend on («C מחלקת את AB ביחס 3:2 ב-B»), or the rest of a declined line that adds only letters the readable part already names («AC ו-BD נפגשים בנקודה E על AB»). The message is 2-D's one-input-per-line message with the parts in the student's words; «משולש ABC ישר זווית ב-B» (any vertex) instead teaches «משולש ABC», then «∠ABC = 90°» *("teach the right form")*. A line whose every part is read keeps building («AC ו-BD נפגשים בנקודה E שהיא אמצע BD»: E is the midpoint); a rest that says something («בקודקוד B», «ש-AE = EC») is still the model's.
+- **A point stated on a list of carriers is on each** *(operator, 2026-10-16: "A is only on O and not on P but line is green")*: «A על מעגל O ועל מעגל P», «A ו-B על מעגל O ועל מעגל P» and "A on circle O and on circle P" put each named point on each named carrier (circles, lines, diagonals, mixed), as the two lines would; «בהתאמה» / "respectively" pairs them; "A on circle O and B on circle P" puts each point on its own; never a carrier dropped (ADR-AG-282, #2199).
 - Sources: ADR-AG-187, #1618, #1616, #1666, FR-SU-15, ADR-W-107; the lost part: ADR-AG-251, ADR-W-120, #1888, #1889.
 
 **R114 — the tool never accepts a sentence a textbook would not print; it teaches the one it would**. The textbook sentence is pre-filled for the student to confirm, only when it would be accepted; the exam's imperatives («העבירו», «הורידו», «בחרו») are taught the same way.
@@ -470,11 +471,11 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «טרפז ABCD» · «BC מקביל ל-AD» → the figure rotates
 - Sources: #1159.
 
-**R126 — a trapezoid keeps exactly one pair of parallel sides, or the page says it no longer does**. *(Operator: "when i wrote c=90 it accepted but then i got a rectangle.")* When the givens force a parallelogram, an amber warning names the trapezoid and the forcing line. A circle through a declared right trapezoid is not this warning: it is refused (R131). Nor is a second noun: a trapezoid noun stated on a ring declared as a parallelogram-family shape (parallelogram, rectangle, square, rhombus), or the reverse, is refused naming both («הצורה כבר ידועה כ־מקבילית — ולכן אינה נקראת טרפז…», ADR-AG-260, #1926).
+**R126 — a trapezoid keeps exactly one pair of parallel sides, or the page says it no longer does**. *(Operator: "when i wrote c=90 it accepted but then i got a rectangle.")* When the givens force a parallelogram, an amber warning names the trapezoid and the forcing line. A circle through a declared right trapezoid is not this warning: it is refused (R131). Nor is a second noun: a trapezoid noun stated on a ring declared as a parallelogram-family shape (parallelogram, rectangle, square, rhombus) **or a kite**, an isosceles trapezoid on a right one, or the reverse, is refused naming both («הצורה כבר ידועה כ־מקבילית — ולכן אינה נקראת טרפז…», ADR-AG-260, #1926) — the one relation 2-D and 3-D read (`kindRelation`, [ADR-W-131](06w-decisions-workspace.md#adr-w-131), operator rulings 2026-10-16, #2169). «דלתון ABCD» · «טרפז ABCD» drew a green rhombus before.
 - «טרפז ישר זווית ABCO» · «∠C = 90» · «∠O = 90» → «הטרפז ABCO כבר אינו טרפז…»
 - Sources: ADR-AG-189, #1627, ADR-157, ADR-165, ADR-AG-252.
 
-**R179 — a declared shape the givens force into a narrower named kind is said, naming what forced it**. 2-D's FR-HS-14, word for word (ADR-W-129): «מקבילית ABCD» · «ABCD חסום במעגל» → «כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.». The note appears when the configuration pool completes, a beat after the figure, like the panel values (ADR-AG-180); never a provisional one.
+**R179 — a declared shape the givens force into a narrower named kind is said, naming what forced it**. 2-D's FR-HS-14, word for word (ADR-W-129): «מקבילית ABCD» · «ABCD חסום במעגל» → «כדי שהמעגל יעבור דרך כל הקודקודים, ABCD הוגבל ממקבילית למלבן — מלבן הוא סוג של מקבילית.». The note appears when the configuration pool completes, a beat after the figure, like the panel values (ADR-AG-180); never a provisional one. Two sibling nouns on one ring («מלבן ABCD» · «מעוין ABCD») get 2-D's one note instead, «ABCD הוא כעת ריבוע, שהוא גם מלבן וגם מעוין.» — read off the nouns, so it needs no pool ([ADR-W-133](06w-decisions-workspace.md#adr-w-133), #2171).
 - «מקבילית ABCD» · «AB = BC» → «בגלל הנתון AB = BC, ABCD הוגבל ממקבילית למעוין — מעוין הוא סוג של מקבילית.»
 - Sources: ADR-AG-276, ADR-W-129, #1996, #1899.
 
@@ -634,14 +635,15 @@ a sentence the tool parsed.
 
 **R111 — a word the tool does not know is REFUSED in a value slot, never absorbed as parameters**. **A stated magnitude is never silently reinterpreted**; juxtaposed parameters (`2a`, `25k²`) are kept.
 - «שיפוע הישר l1 הוא tan(30)» → refused, never `t·a·n·30`
-- Sources: ADR-AG-145, #1321.
+- «5 1/2» typed with a space, in any number → refused, teaching 5.5, 5+1/2 or 5*1/2; never 5·½. The symbol «5½» reads 5.5
+- Sources: ADR-AG-145, #1321, ADR-AG-284, #2222.
 
 **R171 — a condition on x or y is never taken for a parameter; until a curve can be drawn in part, it is refused and says so**. Nothing of the line is recorded; a condition on another letter is a domain. Drawing part of a curve is #1846.
 - «y = 2x + 1, x > 0», «x הוא פרמטר» → refused, saying why
 - «y = ax + 1, a > 0» → a domain
 - Sources: ADR-AG-246, #1832, #1846.
 
-**R45 — a statement that adds nothing is SAID, not silently swallowed or silently duplicated**. Informational, never an error; a restatement that NARROWS is recorded.
+**R45 — a statement that adds nothing is SAID, not silently swallowed or silently duplicated**. Informational, never an error; a restatement that NARROWS is recorded. A shape noun the ring's nouns already IMPLY («ריבוע ABCD» · «דלתון ABCD», «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD») is «already known», no row, in any reading it holds in — 2-D's answer ([ADR-W-133](06w-decisions-workspace.md#adr-w-133), #2169).
 - a repeated given → «זה כבר ידוע…», no second row
 - a polygon restated with its letters rotated or reversed («ריבוע ABCD» · «מרובע ADCB») → «זה כבר ידוע…», no second row ([ADR-AG-259](06c-decisions-analytic.md#adr-ag-259))
 - …and with its OWN noun, in every reading that noun says the same thing in («ריבוע ABCD» · «ריבוע BCDA»; «מעוין», «מלבן», «מקבילית», «משולש», a bare polygon) → the same answer. A reading that says something ELSE records: «טרפז ABCD» · «טרפז BCDA» names the other pair of parallel sides, and a kite's axis, an isosceles triangle's apex and a right triangle's seat move with the letters ([ADR-AG-262](06c-decisions-analytic.md#adr-ag-262))
@@ -673,6 +675,7 @@ a sentence the tool parsed.
 - «∠ABC=2α» · «∠ABC=3α» → «לא ניתן: «∠ABC=3α» סותר את «∠ABC=2α» — אי אפשר לקיים את שניהם יחד. הסיבה: ∠ABC = 3α.»
 - Not a second name: a letter naming another quantity («AB=a» · «BC=a», «CB=c» · «AB=a» · «AB=c»), a number, a shared-letter equation («AB=2a» · «AB=a+3»), a trig measure, an angle label.
 - Sources: #2054, #2061, ADR-AG-277.
+- **A second, different radius for a circle is refused in 2-D's sentence** ([ADR-684](06-decisions.md#adr-684), #2119; operator ruling 2026-10-15, every builder): «מעגל O ברדיוס 4» after «מעגל O ברדיוס 3», and «רדיוס המעגל O הוא 3» after «מעגל O ברדיוס 5», say «לא ניתן: «…» סותר את «…» — אי אפשר לקיים את שניהם יחד.», naming the line that sized the circle. The same radius again is known.
 
 **R55 — an object that cannot exist is REPORTED once the figure has no freedom left**. Silent while another configuration may yet have it (ADR-AG-008).
 - the circumcentre of three fixed collinear points → named as not existing

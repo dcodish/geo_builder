@@ -1964,3 +1964,39 @@ over all four (ADR-041).
 ### `indefinite-second-triangle-other-order-2127` — «מעגל O · משולש חסום במעגל O · משולש חוסם את מעגל O»: a second triangle D, E, F around the circle; the first stays (#2127, ADR-654)
 
 **Guards against:** the indefinite «משולש חוסם את מעגל O» lowered as a statement about the triangle already inside the circle and refused «…סותר את «משולש חסום במעגל O»…» (the operator's report, 2026-10-14; the reported order is the fixture `indefinite-second-triangle-2127.geo.json`). **Asserts** the three lines build green, two triangles ABC and DEF, every vertex of ABC on circle O, and every side of DEF tangent to it. The matrix (both orders, the square, English, the edit seam, the definite refusal and the «כבר קיים» restatements) is `src/app/__tests__/issue-2127-indefinite-shape-fresh-letters.test.ts`.
+
+### `definite-triangle-two-triangles-2205` — «משולש ABC · משולש DEF · המשולש ישר זווית»: refused naming ABC and DEF, with «המשולש ABC ישר זווית» as the next step (#2205, ADR-685)
+
+**Guards against:** a definite unnamed shape noun lowered as a NEW shape — with two triangles drawn «המשולש ישר זווית» drew a third triangle G, H, I, green (the operator's ruling 2026-10-16: refuse, naming both, with the named form as the next step; the one-triangle case, where the line now makes ABC right-angled, is the fixture `definite-triangle-predicate-2205.geo.json`). **Asserts** the third line is refused `ambiguous-definite-shape` naming ABC and DEF with the example «המשולש ABC ישר זווית», and the figure keeps exactly two triangles and no G. The matrix (definite = named over every one-shape row, every two-shape row and its taught example, the definite container, the unchanged rows, the article reader, the edit seam, saved files) is `src/app/__tests__/issue-2205-definite-shape-reference.test.ts`.
+
+### `trapezoid-iso-right-2169` — «טרפז שווה שוקיים ABCD · טרפז ישר זווית ABCD» is refused in either order, naming the adjective (#2169, ADR-W-131, ADR-W-132)
+
+**Guards against:** the pair committed as a rectangle with two amber warnings, and a declared isosceles trapezoid refused «כ־טרפז» (measured at ef78f15c; the 2026-10-16 ruling refuses the pair in every builder). **Asserts** both orders are refused with the exclusion sentence naming both adjectives, «מלבן ABCD» over the isosceles trapezoid names it «כ־טרפז שווה שוקיים», the ring is declared `isosceles-trapezoid`, and «טרפז ABCD» over it still answers «כבר קיים». The 81-pair matrix in every builder is `shell/__tests__/fixtures/quad-noun-pairs.ts` (thin locks `quad-noun-pairs-2169.test.ts` per tree).
+
+### `centres-segment-named-pair-2149` — «מעגל O · מעגל P · קטע המרכזים של המעגלים O ו-P»: the segment OP, no «which circle?» (#2149, ADR-671)
+
+**Guards against:** the false «…ולא ברור לאיזה מהם הכוונה» on a sentence that names both circles (operator ruling 2026-10-16, card 6). **Asserts** green, segment OP drawn.
+
+### `equal-radii-named-pair-2149` — «מעגל O · מעגל P · רדיוסי המעגלים O ו-P שווים»: the radii are equal (#2149, ADR-671)
+
+**Guards against:** the false question on the equal-radii given (card 6). **Asserts** green, r_O = r_P.
+
+### `equal-radii-singular-2149` — «מעגל O · מעגל P · רדיוס מעגל O שווה לרדיוס מעגל P»: the radii are equal (#2149, ADR-671)
+
+**Guards against:** the singular equality sent to the AI (card 6). **Asserts** green, r_O = r_P.
+
+### `touch-point-states-tangency-2149` — «מעגל O · מעגל P · X נקודת ההשקה של המעגלים O ו-P»: tangent at X (#2149, ADR-671)
+
+**Guards against:** the false question when no tangency was stated (card 7: the sentence states the tangency). **Asserts** green, externally tangent, X on both circles.
+
+### `touch-point-named-2123` — «… · המעגלים O ו-P משיקים · X נקודת ההשקה של המעגלים O ו-P»: X alone at the touch point (#2123, ADR-671)
+
+**Guards against:** the false question, and the tool's M kept beside X (ruling 2026-10-15 on #2123, the #2122 T8 ruling). **Asserts** green, no M, no coincidence notice, X on both circles. The matrix (spellings, the inherited kind, «T ו-X», refusals, delete brings M back) is `src/app/__tests__/issue-2149-plural-circle-pair.test.ts`.
+
+### `letter-value-contradiction-2135` — a letter given a second, different value is refused naming the first (#2135 + #2133, ADR-681)
+
+**Guards against:** the last value of a letter winning while the first row stays ✓ («מעגל O ברדיוס r · r = 3 · r = 4» drew r = 4; «משולש ABC · AB = x · x = 3 · x = 4» drew |AB| = 4), and a valued reserved r no longer naming the radius («מעגל O ברדיוס 4 · A, B על מעגל O · AB = r · r = 3» drew radius 4 and |AB| = 3; «מעגל O ברדיוס 3 · r = 4» green). **Asserts** «AB = x · x = 3» draws |AB| = 3, and each of the four later lines is refused at the door in the ruled sentence naming the statement that gave the first value («…סותר את «x = 3»… הסיבה: |AB| = 4.»; the radius rows with no reason clause). The matrix (both orders, the angle and radius twins, English, a loaded list, the #2165 equation «AB=2a · AB=a+3», the controls) is `src/app/__tests__/issue-2165-letter-system.test.ts`; the equation is the fixture `issue-2165-letter-equation.geo.json`.
+
+### `radius-restated-refused-2119` — a second, different stated radius is refused naming the first (#2119, ADR-683)
+
+**Guards against:** «מעגל O ברדיוס 4» after «מעגל O ברדיוס 3», and «רדיוס המעגל O הוא 3» after «מעגל O ברדיוס 5», answering «כבר קיים» with the second size dropped — and, with a point on the circle, resizing it silently and green (the operator's ruling of 2026-10-15). **Asserts** «מעגל O ברדיוס 3» builds with r = 3, and each second line is refused at the door «לא ניתן: «…» סותר את «…» — אי אפשר לקיים את שניהם יחד.» with the first radius standing. The matrix (with and without a point, English, circumference, area, the radius letter, the #2206 spelling, saved lists, the AI's `circle` command, the controls) is `src/app/__tests__/issue-2119-radius-restated.test.ts`.

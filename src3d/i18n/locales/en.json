@@ -275,6 +275,7 @@
   },
   "notice": {
     "narrowed": {
+      "merged": "{{ring}} is now {{nowA}}, which is both {{aA}} and {{bA}}.",
       "sentence": "{{cause}}, {{ring}} was constrained from {{fromA}} to {{toA}} — {{kindOf}}.",
       "cause": {
         "circum": "For the circle to pass through every vertex",

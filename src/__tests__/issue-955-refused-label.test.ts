@@ -82,7 +82,8 @@ describe('#955 — the four lanes of the ruling’s table (angle/length × symbo
     expect(statusOf(fig, facts, 'AB = x'), 'and the symbolic length stays green').toBe('ok');
     const drawn = Math.hypot(at(fig, 'A').x - at(fig, 'B').x, at(fig, 'A').y - at(fig, 'B').y);
     expect(drawn, '|AB| is the 3 that held').toBeCloseTo(3, 3);
-    expect(lengthLabel(fig, 'A', 'B')?.text, 'the surviving given labels the segment').toBe('3');
+    // #2165 (ADR-681): «AB = x» binds x to the measured AB (x = 3), so the letter labels the segment — never the refused 8
+    expect(lengthLabel(fig, 'A', 'B')?.text, 'the letter labels the segment, never the refused 8').toBe('x');
     expect(fig.violations).toEqual([]);
   });
 

@@ -258,8 +258,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   («טרפז ABCD · AD ∥ BC») becomes the trapezoid's parallel pair, on every route. A trapezoid declared on a ring
   already known to be a shape no quadrilateral is at the same time (a parallelogram, rectangle, rhombus, square
   or kite), or the reverse, is refused naming both shapes. The twin of analytic R126 + R93 and of 2-D ADR-165 /
-  ADR-506 / ADR-157.
-  - Sources: ADR-3D-313; #1918.
+  ADR-506 / ADR-157. **The same relation as 2-D and analytic, adjective included** ([ADR-3D-345](06b-decisions-3d.md#adr-3d-345),
+  ADR-W-131, operator rulings 2026-10-16): an isosceles and a right trapezoid exclude each other («טרפז שווה שוקיים ABCD»
+  · «טרפז ישר זווית ABCD», either order, is refused), the refusal names a declared or stated isosceles or right
+  trapezoid with its adjective, and what the ring is known to be is what every noun stated over it makes it together.
+  A trapezoid adjective stated after «טרפז» narrows the ring and is never said to add nothing.
+  - Sources: ADR-3D-313, ADR-3D-345; #1918, #2171.
 - **FR-SP-19 (Must)** — **A polygon restated is the polygon already there.** A line that only declares a ring the
   figure already declares — the same letters read from another vertex or the other way round («ריבוע ABCD» ·
   «מרובע ADCB», «משולש ABC» · «משולש ACB»), or the generic word over a named shape («מרובע ABCD» over a square) —
@@ -270,8 +274,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   is the same restatement, in any reading, and is never refused as a mis-naming ([ADR-3D-326](06b-decisions-3d.md#adr-3d-326),
   operator ruling 2026-10-10; it was «הצורה כבר ידועה כ־ריבוע — ולכן אינה נקראת מלבן», which a square contradicts).
   A noun that ADDS information still drives (FR-SP-2), and one that EXCLUDES the declared shape is still refused
-  naming both (FR-SP-18). The twin of 2-D FR-EN-9 and analytic R45.
-  - Sources: ADR-3D-324, ADR-3D-326; #1953, #1988.
+  naming both (FR-SP-18). The twin of 2-D FR-EN-9 and analytic R45. **Two sibling nouns** («מלבן ABCD» · «מעוין ABCD»,
+  «מלבן» · «דלתון», «מקבילית» · «דלתון», either order) build with 2-D's one note, «ABCD הוא כעת ריבוע, שהוא גם מלבן וגם
+  מעוין.» ([ADR-3D-345](06b-decisions-3d.md#adr-3d-345)); and the restatement is judged against what EVERY enabled noun
+  makes the ring together — «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD» adds no row ([ADR-3D-346](06b-decisions-3d.md#adr-3d-346), #2180).
+  - Sources: ADR-3D-324, ADR-3D-326, ADR-3D-345, ADR-3D-346; #1953, #1988, #2171, #2180.
 - **FR-SP-20 (Must)** — **A crossing ORDER of a ring's letters is refused for its order, whatever noun it carries.**
   When two declared rings spell the same four letters in different cyclic orders and either noun is convex whenever
   simple (every quad noun but «דלתון» and the bare «מרובע»), the other order crosses in every configuration — four

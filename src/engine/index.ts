@@ -44,7 +44,7 @@ export type { ShapeType, DetectedShape, SimilarClass, ShapesResult, ShapeDetectO
 export { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 export type { Carrier, CarrierFamily } from './carriers';
 export { circleDefinedBy, isSizelessCircle, referencesCircle } from './lower';
-export { lower, lowerOne, buildSymTab, isSymbolBound, isVariableStatement, unboundSubjectOf, unenforceableRelation, measureLabelText, measureLabelForms, isMeasure, symbolsConsumedBy, measureRestatement, measureRestatementStatus } from './lower';
+export { lower, lowerOne, buildSymTab, letterSystem, statedSizeCircles, isSymbolBound, isVariableStatement, unboundSubjectOf, unenforceableRelation, measureLabelText, measureLabelForms, isMeasure, symbolsConsumedBy, measureRestatement, measureRestatementStatus } from './lower';
 export type { MeasureRestatement } from './lower';
 export type { MeasureLabelForms } from './lower';
 export type { SymTab } from './lower';
@@ -64,5 +64,5 @@ export type { ValueRow, AreaClassRow, ValuesPanelResult } from './valuesPanel';
 
 export { degeneratePolygons, polygonFlatness, polygonDefects, collapsedToPoint, straightCorner, DEGENERATE_EXTENT_RATIO, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
 export type { DegeneratePolygon, PolygonDefect } from './degeneracy';
-export { NOT_CYCLIC } from './shapeKinds';
+export { NOT_CYCLIC, nounOfKind } from './shapeKinds';
 export { impliedByFigure, constraintRank, constraintJacobian, RANK_TOL, ZERO_ROW_TOL } from './dofRank';

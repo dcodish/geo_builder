@@ -257,6 +257,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2013': 'open',
   '#2047': 'open',
   '#1963': 'open',
+  '#2185': 'open', // #2199 (ADR-AG-282): 2-D drops the second carrier of an English per-point line and of a line list (#2185 removes these)
+  '#2260': 'open', // #2199 (ADR-AG-282): 3-D does not read a point stated on a list of lines
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
   '#2110': 'open', // #2101/#2100 (ADR-648/649): analytic does not read a radius letter's value or a radius ratio
   '#2115': 'open', // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
@@ -273,6 +275,11 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2060': 'open', // #2024 (ADR-668): 3-D does not read a single-letter angle given a symbol («זוית B=b», «זוית B=α»)
 
   '#2140': 'open',
+  '#2190': 'open', // #2198 / #2216 (ADR-677) and #2149 (ADR-671): analytic does not read one «ברדיוס N» for a circle pair, nor the named two-circle sentences (centre segment, equal radii, touch point)
+  '#2235': 'open', // #2205 (ADR-685): 3-D picks the first of two triangles for a definite «המשולש …» where 2-D asks
+  '#2236': 'open', // #2205 (ADR-685): analytic does not read a definite unnamed shape noun with a predicate
+
+  '#2253': 'open', // #2165 (ADR-681): analytic and 3-D read no value line for a length letter; 3-D refuses «AB = 2a»
 
 };
 
@@ -1293,6 +1300,15 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'excluded-noun-1985-01', family: 'polygons', steps: ['ריבוע ABCD', 'טרפז ABCD'], expect: 'refused', note: 'no quadrilateral is both' },
   { id: 'excluded-noun-1985-02', family: 'polygons', steps: ['מקבילית ABCD', 'טרפז שווה שוקיים ABCD'], expect: 'refused' },
   { id: 'excluded-noun-1985-03', family: 'polygons', steps: ['טרפז ABCD', 'ריבוע ABCD'], expect: 'refused' },
+  // #2169 / #2171 (ADR-W-131): one relation, read off the shared lattice, in every builder
+  { id: 'excluded-noun-kite-trapezoid-2169-01', family: 'polygons', steps: ['דלתון ABCD', 'טרפז ABCD'], expect: 'refused', note: 'a kite with a parallel pair is a rhombus — analytic drew it green before #2169' },
+  { id: 'excluded-noun-kite-trapezoid-2169-02', family: 'polygons', steps: ['דלתון ABCD', 'טרפז שווה שוקיים ABCD'], expect: 'refused' },
+  { id: 'excluded-noun-kite-trapezoid-2169-03', family: 'polygons', steps: ['דלתון ABCD', 'טרפז ישר זווית ABCD'], expect: 'refused', note: 'analytic drew a green square before #2169' },
+  { id: 'excluded-noun-kite-trapezoid-2169-04', family: 'polygons', steps: ['טרפז ABCD', 'דלתון ABCD'], expect: 'refused' },
+  { id: 'excluded-noun-kite-trapezoid-2169-05', family: 'polygons', steps: ['טרפז שווה שוקיים ABCD', 'דלתון ABCD'], expect: 'refused' },
+  { id: 'excluded-noun-kite-trapezoid-2169-06', family: 'polygons', steps: ['טרפז ישר זווית ABCD', 'דלתון ABCD'], expect: 'refused' },
+  { id: 'excluded-noun-iso-right-2169-01', family: 'polygons', steps: ['טרפז שווה שוקיים ABCD', 'טרפז ישר זווית ABCD'], expect: 'refused', note: 'the 2026-10-16 ruling: refused in every builder, 2-D included (all three drew a rectangle before)' },
+  { id: 'excluded-noun-iso-right-2169-02', family: 'polygons', steps: ['טרפז ישר זווית ABCD', 'טרפז שווה שוקיים ABCD'], expect: 'refused' },
   // end #1988 + #1985
   // ── #1892 (ADR-AG-248): a point on a BARE pair («D על AB») is the segment, as 2-D reads it; the order of the givens never changes the verdict ──
   { id: 'bare-on-pair-length-1892', family: 'points-incidence', steps: ['נקודה A', 'נקודה B', 'D על AB', 'AB = 4', 'AD = 5'], expect: 'refused', exception: 'X9', note: 'analytic rode the line and drew D beyond B before #1892' },
@@ -1418,6 +1434,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'quad-straight-corner-2064', family: 'polygons', steps: ['מרובע ABCD', 'זווית BCD = 180'], expect: 'refused', note: '2-D: the flat sentence naming B, C, D' },
   { id: 'quad-corner-incidence-2064', family: 'polygons', steps: ['מרובע ABCD', 'C על BD'], expect: 'refused' },
   { id: 'pentagon-straight-corner-2085', family: 'polygons', steps: ['מחומש ABCDE', 'זווית BCD = 180'], expect: 'refused', note: '2-D: «…והמחומש ABCDE היה נעשה מרובע»' },
+  { id: 'definite-triangle-predicate-2205', family: 'polygons', steps: ['משולש ABC', 'המשולש ישר זווית'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2236' }], note: '#2205 (ADR-685): the definite noun is the one triangle — 2-D drew a second triangle DEF before' },
+  { id: 'definite-triangle-two-2205', family: 'polygons', steps: ['משולש ABC', 'משולש DEF', 'המשולש ישר זווית'], expect: 'asks', knownGap: [{ product: '3d', issue: '#2235' }, { product: 'analytic', issue: '#2236' }], note: '#2205 (ADR-685): two triangles — refused naming them, with the named form as the next step' },
   { id: 'altitude-two-vertex-not-true-2064', family: 'cevians-centres', steps: ['מרובע ABCD', 'AC גובה'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2072' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D: AC ⟂ BC, the side a free choice «הציגו תצורה אחרת» cycles (ADR-644); analytic refuses `degenerate-role` — the cross-tool question #2072' },
   // ── #2101 / #2100 (ADR-648 / ADR-649, operator rulings 2026-10-14): a radius letter's value sizes its circle; a radius ratio is a relation ──
   { id: 'radius-letter-value-2101', family: 'circles', steps: ['מעגל O ברדיוס r', 'r = 3'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }] },
@@ -1471,7 +1489,44 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'angle-coef-restated-2061', family: 'angles', steps: ['משולש ABC', '∠ABC=2α', '∠ABC=3α'], expect: 'refused', note: 'before ADR-3D-344 3-D recorded both and kept 2α; analytic refused it as a flat triangle (ADR-AG-277 gives it 2-D sentence)' },
   // ── #1851 (ADR-662): a symbol plus a constant is read by one affine-tail reader, as a length's «a + 3» is ──
   { id: 'angle-symbol-constant-1851', family: 'angles', steps: ['משולש ABC', '∠ABC = α + 40'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2140' }], note: 'the operator (2026-10-07): «should be accepted and drawn»; analytic already recorded it; 3-D does not read a constant (#2140, needs-operator)' },
-  { id: 'angle-same-letter-other-constant-1851', family: 'angles', steps: ['משולש ABC', '∠ABC = α', '∠ABC = α + 40'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2140' }], note: '2-D refuses it in the #2061 contradiction frame; analytic refuses it «לא נמצאה תצורה» (the wording is #2105)' },
+  // ── #2149 / #2123 (ADR-671): a sentence naming its circles is never asked «which circle?»; the named-pair readers ──
+  { id: 'centres-named-pair-2149', family: 'circles', steps: ['מעגל O', 'מעגל P', 'קטע המרכזים של המעגלים O ו-P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D asked «which circle?» before ADR-671' },
+  { id: 'equal-radii-plural-2149', family: 'circles', steps: ['מעגל O', 'מעגל P', 'רדיוסי המעגלים O ו-P שווים'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D asked «which circle?» before ADR-671' },
+  { id: 'equal-radii-singular-2149', family: 'circles', steps: ['מעגל O', 'מעגל P', 'רדיוס מעגל O שווה לרדיוס מעגל P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D sent it to the AI before ADR-671' },
+  { id: 'touch-point-unstated-2149', family: 'circles', steps: ['מעגל O', 'מעגל P', 'X נקודת ההשקה של המעגלים O ו-P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D asked «which circle?» before ADR-671 (operator ruling 2026-10-16, card 7: the sentence states the tangency)' },
+  { id: 'touch-point-named-2123', family: 'circles', steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'X נקודת ההשקה של המעגלים O ו-P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D asked «which circle?» before ADR-671' },
+  // ── #2188 (ADR-672): a restated tangency keeps the kind stated earlier ──
+  { id: 'tangent-twin-kind-2188', family: 'circles', steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים מבפנים', 'המעגלים O ו-P משיקים בנקודה X'], expect: 'builds', exception: 'X8', note: '2-D drew the twin EXTERNAL with the internal row red before ADR-672 (a builds verdict then too; the kind is locked in src/app/__tests__/issue-2188-tangent-kind-inherited.test.ts); analytic already kept it internal (src-analytic issue-1504)' },
+  // ── #2208 (ADR-669): «משיק» with a circle subject is the verb — the circles are tangent, never a common tangent line ──
+  { id: 'circle-subject-kind-2208', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל P משיק למעגל O מבפנים'], expect: 'builds', exception: 'X8', note: '2-D drew a common tangent AB with the circles not tangent before ADR-669 (a builds verdict then too — the kind is locked in src/app/__tests__/issue-2208-circle-subject-tangent.test.ts); analytic already drew them internally tangent' },
+  { id: 'angle-same-letter-other-constant-1851',family: 'angles', steps: ['משולש ABC', '∠ABC = α', '∠ABC = α + 40'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2140' }], note: '2-D refuses it in the #2061 contradiction frame; analytic refuses it «לא נמצאה תצורה» (the wording is #2105)' },
+  // ── #2198 / #2216 (ADR-677): one «ברדיוס N» on a two-circle sentence sizes BOTH circles (operator ruling 2026-10-16) ──
+  { id: 'two-circles-radius-both-2216', family: 'circles', steps: ['שני מעגלים נחתכים ברדיוס 5'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D drew 5 / 3.6 green before ADR-677 (the 5 paid by the default radius); analytic does not read the sentence (not-handled)' },
+  // ── #2186 (ADR-679): a stated equal size on intersecting circles is drawn ──
+  { id: 'equal-radii-intersecting-2186', family: 'circles', steps: ['שני מעגלים נחתכים ברדיוסים שווים'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D drew 5 / 3.6 green before ADR-679 (the equality dropped); analytic does not read the sentence (not-handled)' },
+  // ── #2199 (ADR-AG-282) / #2185: a point stated on a LIST of carriers is on each ──
+  { id: 'point-on-two-circles-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A על מעגל O ועל מעגל P'], expect: 'builds', exception: 'X8' },
+  { id: 'points-on-two-circles-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A ו-B על מעגל O ועל מעגל P'], expect: 'builds', exception: 'X8' },
+  { id: 'point-on-two-circles-en-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A on circle O and on circle P'], expect: 'builds', exception: 'X8' },
+  { id: 'point-on-three-circles-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל Q', 'A על מעגל O, על מעגל P ועל מעגל Q'], expect: 'builds', exception: 'X8' },
+  { id: 'points-respectively-en-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A and B on circle O and on circle P respectively'], expect: 'builds', exception: 'X8' },
+  { id: 'point-per-circle-en-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A on circle O and B on circle P'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2185' }], note: '2-D refuses it split-statements today; #2185 reads it' },
+  { id: 'point-on-two-lines-2185', family: 'points-incidence', steps: ['ריבוע ABCD', 'P על הישר AC ועל הישר BD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#2185' }, { product: '3d', issue: '#2260' }], note: '2-D escalates it today; #2185 reads it' },
+  // ── #2165 + #2135 + #2133 (ADR-681): a letter's values are judged in list order — a second value is an equation or a
+  // contradiction, never «כבר קיים» or last-wins ──
+  { id: 'letter-equation-2165', family: 'lengths', steps: ['משולש ABC', 'AB = 2a', 'AB = a + 3'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2253' }], note: 'the operator (2026-10-15): «commits the equation: a = 3, |AB| = 6, as analytic does»; 2-D answered «כבר קיים» before ADR-681' },
+  { id: 'letter-binding-after-number-2165', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'AB = a'], expect: 'builds', note: '2-D answered «כבר קיים» and dropped the binding before ADR-681' },
+  { id: 'letter-value-against-number-2165', family: 'lengths', steps: ['משולש ABC', 'AB = a', 'AB = 5', 'a = 6'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2253' }], note: '2-D committed it and turned «AB = 5» red before ADR-681' },
+  // the second value itself («k = 4» after «k = 3») needs a value line the siblings do not read yet (#2253), so its row is
+  // the value line; the refusal is locked in src/app/__tests__/issue-2165-letter-system.test.ts
+  { id: 'letter-value-line-2135', family: 'lengths', steps: ['משולש ABC', 'AB = k', 'k = 3'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2253' }, { product: '3d', issue: '#2253' }] },
+  { id: 'radius-letter-second-value-2135', family: 'circles', steps: ['מעגל O ברדיוס r', 'r = 3', 'r = 4'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }], note: '2-D drew r = 4 with «r = 3» still ✓ before ADR-681' },
+  { id: 'reserved-radius-value-2133', family: 'circles', steps: ['מעגל O ברדיוס 3', 'r = 4'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2253' }], note: 'ADR-034 Am. 1: r names the radius; 2-D committed it green with r = 3 before ADR-681' },
+  { id: 'reserved-radius-through-length-2133', family: 'circles', steps: ['מעגל O ברדיוס 4', 'A, B על מעגל O', 'AB = r', 'r = 3'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2253' }], note: '2-D drew radius 4 and |AB| = 3, green, before ADR-681' },
+  // ── #2119 (ADR-683, ADR-684): a second, different stated radius is refused naming the first, 2-D's sentence in both builders ──
+  { id: 'radius-restated-2119', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל O ברדיוס 4'], expect: 'refused', exception: 'X8', note: '2-D answered «כבר קיים» before ADR-683; analytic refused in its own conflict sentence before ADR-684' },
+  { id: 'radius-restated-sentence-2119', family: 'circles', steps: ['מעגל O ברדיוס 5', 'רדיוס המעגל O הוא 3'], expect: 'refused', exception: 'X8' },
+  { id: 'radius-restated-with-point-2119', family: 'circles', steps: ['מעגל O ברדיוס 3', 'A על מעגל O', 'מעגל O ברדיוס 4'], expect: 'refused', exception: 'X8', note: '2-D resized silently and committed green before ADR-683' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

@@ -105,14 +105,16 @@ export function lowerShape(kind: ShapeKind, v: readonly Id[]): AnyCommand[] {
       return [{ type: 'shape-variant', shape: 'kite', ids: q4, variant: 0 }];
     case 'right-trapezoid':
       return [
-        // `kind` records the declared phrase for the engine's not-cyclic prover (#1918, ADR-607): «ABCD חסום במעגל»
-        // on a later line is refused like the one-line sentence. Stamped only where the table says it matters.
-        { type: 'trapezoid', ids: q4, ...(notCyclic(kind) ? { kind } : {}) },
+        // `kind` records the declared phrase: the engine's not-cyclic prover reads it (#1918, ADR-607: «ABCD חסום במעגל»
+        // on a later line is refused like the one-line sentence), and the ring is declared as it (#2169, ADR-W-131).
+        { type: 'trapezoid', ids: q4, kind },
         { type: 'set-perpendicular', a: v[0], b: v[3], c: v[0], d: v[1] }, // AD ⟂ AB ⇒ right angles at A and D
       ];
     case 'isosceles-trapezoid':
       return [
-        { type: 'trapezoid', ids: q4 },
+        // #2169 (ADR-W-131): the ring is DECLARED an isosceles trapezoid — a later «טרפז ישר זווית» over it excludes,
+        // and a refusal names the adjective
+        { type: 'trapezoid', ids: q4, kind },
         { type: 'set-equal', a: v[0], b: v[3], c: v[1], d: v[2], trapezoidLegs: true }, // |AD| = |BC| (the legs; AB ∥ DC assumed)
       ];
   }
@@ -145,28 +147,67 @@ const HEBREW = /[א-ת]/;
 /** "the", then any shape adjectives, right before the English noun. */
 const EN_DEFINITE = /\bthe\s+(?:(?:right(?:[\s-]?angled?)?|isosceles|equilateral|regular)\s+)*$/i;
 
+/** How a shape noun is introduced (#2205, [ADR-685](../../docs/06-decisions.md#adr-685)): `definite` («המשולש», «שהמשולש»,
+ *  "the triangle") refers to the figure's shape; `prefixed` (a ב/ל/כ/מ prefix, «במשולש») hides the article in
+ *  unpointed text, so it is only a POSSIBLE reference; `indefinite` («משולש», «ומשולש», "a triangle") is a new shape. */
+export type ShapeArticle = 'definite' | 'prefixed' | 'indefinite';
+
+/** The first shape noun of a sentence: where it sits, its arity and its article. */
+export interface ShapeNounSpan {
+  /** the index just past the noun's word — where a vertex run naming it would go («המשולש| ישר זווית») */
+  readonly end: number;
+  readonly arity: number;
+  readonly article: ShapeArticle;
+}
+
+const NOUN_ARITY: Readonly<Record<ShapeNoun, number>> = {
+  triangle: 3, square: 4, rectangle: 4, rhombus: 4, kite: 4, trapezoid: 4, parallelogram: 4, quad: 4,
+};
+
 /**
- * #2127 ([ADR-654](../../docs/06-decisions.md#adr-654)) — IS THE SHAPE NOUN DEFINITE? An indefinite noun («משולש …»,
- * "a triangle …") introduces a NEW shape; only a definite one («המשולש», "the triangle") refers to a shape the figure
- * already has. A Hebrew preposition prefix (ב/ל/כ/מ) hides the article in unpointed text («במשולש» is both "in a
- * triangle" and "in the triangle"), so it reads as a possible reference, as it always did; the conjunction ו and the
- * relative ש carry no article of their own («ומשולש», «שמשולש» stay indefinite). Reads the first noun occurrence.
+ * #2127 ([ADR-654](../../docs/06-decisions.md#adr-654)) + #2205 ([ADR-685](../../docs/06-decisions.md#adr-685)) — THE ONE
+ * ARTICLE READER. Reads the FIRST shape noun occurrence of `s`. A Hebrew preposition prefix (ב/ל/כ/מ) hides the article
+ * («במשולש» is both "in a triangle" and "in the triangle") → `prefixed`; the conjunction ו and the relative ש carry no
+ * article of their own, so «ומשולש» / «שמשולש» stay `indefinite` while «שהמשולש» / «והמשולש» are `definite`. English
+ * "the" (shape adjectives allowed between) → `definite`. `extra` adds nouns this module does not own (the n-gon words
+ * parse.ts keeps), word → arity.
  */
-export function shapeNounIsDefinite(s: string): boolean {
-  let best: { at: number; definite: boolean } | null = null;
-  for (const n of NOUN_ORDER) {
-    const parts = SHAPE_NOUN_WORDS[n].split('|');
+export function shapeNounSpan(s: string, extra: Readonly<Record<string, number>> = {}): ShapeNounSpan | null {
+  let best: { at: number; end: number; arity: number; article: ShapeArticle } | null = null;
+  const lists: [string, number][] = [
+    ...NOUN_ORDER.map((n): [string, number] => [SHAPE_NOUN_WORDS[n], NOUN_ARITY[n]]),
+    ...Object.entries(extra).map(([w, k]): [string, number] => [w, k]),
+  ];
+  for (const [words, arity] of lists) {
+    const parts = words.split('|');
     const heWords = parts.filter((w) => HEBREW.test(w)).join('|');
     const enWords = parts.filter((w) => !HEBREW.test(w)).join('|');
-    const he = heWords ? re(`(?:^|[^\\u05D0-\\u05EA])([\\u05D0-\\u05EA]*?)(?:${heWords})`).exec(s) : null;
+    const he = heWords ? re(`(?:^|[^\\u05D0-\\u05EA])([\\u05D0-\\u05EA]*?)(?:${heWords})[\\u05D0-\\u05EA]*`).exec(s) : null;
     if (he && (!best || he.index < best.at)) {
-      // the letters glued before the noun, less a leading conjunction ו / relative ש: anything left is ה or a preposition
-      best = { at: he.index, definite: he[1].replace(/^[וש]+/, '').length > 0 };
+      // the letters glued before the noun, less a leading conjunction ו / relative ש: «ה» is the article, anything
+      // else left is a preposition (possibly with its own swallowed article)
+      const glued = he[1].replace(/^[וש]+/, '');
+      best = { at: he.index, end: he.index + he[0].length, arity, article: glued === 'ה' ? 'definite' : glued ? 'prefixed' : 'indefinite' };
     }
-    const en = enWords ? re(`\\b(?:${enWords})`).exec(s) : null;
-    if (en && (!best || en.index < best.at)) best = { at: en.index, definite: EN_DEFINITE.test(s.slice(0, en.index)) };
+    const en = enWords ? re(`\\b(?:${enWords})\\w*`).exec(s) : null;
+    if (en && (!best || en.index < best.at)) {
+      best = { at: en.index, end: en.index + en[0].length, arity, article: EN_DEFINITE.test(s.slice(0, en.index)) ? 'definite' : 'indefinite' };
+    }
   }
-  return best?.definite ?? false;
+  return best && { end: best.end, arity: best.arity, article: best.article };
+}
+
+/** The article of the first shape noun in `s` (`indefinite` when there is none). */
+export const shapeNounArticle = (s: string, extra?: Readonly<Record<string, number>>): ShapeArticle =>
+  shapeNounSpan(s, extra)?.article ?? 'indefinite';
+
+/**
+ * #2127 ([ADR-654](../../docs/06-decisions.md#adr-654)) — IS THE SHAPE NOUN A (POSSIBLE) REFERENCE? An indefinite noun
+ * («משולש …», "a triangle …") introduces a NEW shape; a definite one («המשולש», "the triangle") refers to a shape the
+ * figure already has, and a prefixed one («במשולש») may. ADR-654's reader, now {@link shapeNounArticle}'s two-way view.
+ */
+export function shapeNounIsDefinite(s: string): boolean {
+  return shapeNounArticle(s) !== 'indefinite';
 }
 
 /**

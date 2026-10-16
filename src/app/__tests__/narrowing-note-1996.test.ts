@@ -25,11 +25,9 @@ import { replay, useGeoStore, groupKey } from '@/store/geoStore';
 import { serializeFigure, deserializeFigure } from '@/store/figureFile';
 import { rowNouns } from '@/store/rowNouns';
 import { detectAll, sharedSamples, type Fact } from '@/replay/core';
-import { QUAD_IMPLIES, type QuadKind } from '@/engine/shapeKinds';
 import i18n from '@/i18n';
 import { humanizeError } from '@/i18n/humanizeError';
 import { stripFormatControls } from '../../../shell/bidi';
-import { NARROW_IMPLIES, type NarrowKind } from '../../../shell/narrowing';
 import { narrowingFaults, type NarrowGate } from '../../../shell/__tests__/fixtures/narrowing-note-rows';
 
 const he = (k: string, o?: Record<string, unknown>) => i18n.t(k, { ...o, lng: 'he' }) as string;
@@ -136,16 +134,5 @@ describe('#1996 — 2-D lifecycle: the note is derived', () => {
   }, 120_000);
 });
 
-describe('#1996 — the shared lattice agrees with 2-D’s QUAD_IMPLIES (ADR-619)', () => {
-  it('on every kind both know', () => {
-    const map: Record<QuadKind, NarrowKind> = {
-      square: 'square', rectangle: 'rectangle', rhombus: 'rhombus', parallelogram: 'parallelogram', kite: 'kite',
-      trapezoid: 'trapezoid', 'isosceles-trapezoid': 'isosceles-trapezoid', 'right-trapezoid': 'right-trapezoid', quadrilateral: 'quadrilateral',
-    };
-    for (const a of Object.keys(QUAD_IMPLIES) as QuadKind[]) {
-      for (const b of Object.keys(QUAD_IMPLIES) as QuadKind[]) {
-        expect(NARROW_IMPLIES[map[a]].includes(map[b]), `${a} ⇒ ${b}`).toBe(QUAD_IMPLIES[a].includes(b));
-      }
-    }
-  });
-});
+// #2171 (ADR-W-131): 2-D's QUAD_IMPLIES is now a VIEW of the shared lattice, so the old agreement check is retired;
+// that 2-D READS the shared relation is locked in quad-noun-pairs-2169.test.ts.

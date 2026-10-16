@@ -2443,7 +2443,8 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.lastError, 'the x line is refused').toMatch(/cannot hold/);
       expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| is the 3 that held').toBeCloseTo(3, 3);
       const AB = fig.labels.lengths.find((l) => [l.a, l.b].sort().join('') === 'AB');
-      expect(AB?.text, 'the surviving given labels the segment').toBe('3');
+      // #2165 (ADR-681): «AB = x» binds x to the measured AB (x = 3), so the letter labels it — never the refused 8
+      expect(AB?.text, 'the letter labels the segment, never the refused 8').toBe('x');
       expect(fig.violations).toEqual([]);
     },
   },
@@ -4872,6 +4873,161 @@ export const SCENARIOS_4: Scenario[] = [
         const a = at(fig, ring[i]), b = at(fig, ring[(i + 1) % 3]);
         const h = Math.abs((b.x - a.x) * (a.y - k.center.y) - (a.x - k.center.x) * (b.y - a.y)) / dist(a, b);
         expect(Math.abs(h - k.r), `side ${ring[i]}${ring[(i + 1) % 3]} tangent to circle O`).toBeLessThan(1e-6);
+      }
+    },
+  },
+  {
+    id: 'definite-triangle-two-triangles-2205',
+    title: 'Two triangles drawn: «המשולש ישר זווית» is refused naming ABC and DEF, with «המשולש ABC ישר זווית» as the next step; nothing is drawn (#2205, ADR-685)',
+    guards:
+      "#2205 (ADR-685), operator ruling 2026-10-16 (card 2: «Refuse, naming both triangles, and show the named form as the next step»). Measured on ef78f15c through decideDeterministic2D: «משולש ABC» · «משולש DEF» · «המשולש ישר זווית» drew a THIRD triangle G, H, I, green (and with one triangle the line drew a second triangle DEF instead of making ABC right-angled). Root cause: the shape rules auto-named a fresh polygon for an unnamed shape noun whatever its article; a definite noun («המשולש», \"the triangle\") is a statement about the figure's shape. Fix: one resolver (definiteShapeVertices, over ADR-029's candidate set) asked by every auto-naming shape site — one candidate is its named form, two or more is the ambiguous-definite-shape question. The one-triangle case is the fixture definite-triangle-predicate-2205.geo.json; the matrix is src/app/__tests__/issue-2205-definite-shape-reference.test.ts.",
+    steps: ['משולש ABC', 'משולש DEF', 'המשולש ישר זווית'],
+    refusedSteps: [
+      { step: 3, reason: 'ambiguous-definite-shape', with: { shapes: ['ABC', 'DEF'], sides: 3, example: 'המשולש ABC ישר זווית' }, why: 'ADR-685 (#2205): two triangles — the operator ruled a refusal naming them, with the named form as the next step' },
+    ],
+    check(fig) {
+      expect(fig.violations).toEqual([]);
+      const rings = fig.construction.objects.filter((o) => o.kind === 'polygon').map((o) => (o as { vertices: string[] }).vertices.join(''));
+      expect(rings).toEqual(['ABC', 'DEF']);
+      expect(fig.positions.has('G'), 'the refused line minted no third triangle').toBe(false);
+    },
+  },
+  {
+    id: 'trapezoid-iso-right-2169',
+    title: 'An isosceles and a right trapezoid on one ring are refused in either order, naming the adjective (#2169, ADR-W-132)',
+    guards:
+      "#2169 Q1 (ADR-W-131 / ADR-W-132), operator ruling 2026-10-16 (ballot round 5, card 1, A: refuse it in all three builders, 2-D included). Measured on ef78f15c through decideDeterministic2D: «טרפז שווה שוקיים ABCD» · «טרפז ישר זווית ABCD» committed a RECTANGLE with two amber trapezoidMorph warnings, and «טרפז שווה שוקיים ABCD» · «מלבן ABCD» was refused «כ־טרפז». Root cause: the trapezoid arm stamped declaredAs 'trapezoid' whatever the phrase (and the parser stamped `kind` only on the right trapezoid), so the hierarchy — which excludes the pair — was never asked. Fix: the ring is declared as the phrase and narrowed by a later adjective; the relation is the shared lattice's kindRelation. The 81-pair matrix is shell/__tests__/fixtures/quad-noun-pairs.ts through src/app/__tests__/quad-noun-pairs-2169.test.ts.",
+    steps: ['טרפז שווה שוקיים ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const said = (v: unknown) => humanizeError((v as { detail?: string }).detail, he as never).replace(/[⁦-⁩]/g, '');
+      const iso = factsOf(['טרפז שווה שוקיים ABCD']);
+      const v = gateVerdict(iso, 'טרפז ישר זווית ABCD');
+      expect(v, 'the right trapezoid over a declared isosceles one is refused').toMatchObject({ kind: 'refused', reason: 'error' });
+      expect(said(v)).toBe('הצורה כבר ידועה כ־טרפז שווה שוקיים — ולכן אינה נקראת טרפז ישר זווית. מחקו את הנתון הקודם אם התכוונתם טרפז ישר זווית.');
+      const back = gateVerdict(factsOf(['טרפז ישר זווית ABCD']), 'טרפז שווה שוקיים ABCD');
+      expect(back, 'and the reverse order').toMatchObject({ kind: 'refused', reason: 'error' });
+      expect(said(back)).toBe('הצורה כבר ידועה כ־טרפז ישר זווית — ולכן אינה נקראת טרפז שווה שוקיים. מחקו את הנתון הקודם אם התכוונתם טרפז שווה שוקיים.');
+      // a declared isosceles trapezoid is named with its adjective in every exclusion refusal
+      expect(said(gateVerdict(iso, 'מלבן ABCD'))).toBe('הצורה כבר ידועה כ־טרפז שווה שוקיים — ולכן אינה נקראת מלבן. מחקו את הנתון הקודם אם התכוונתם מלבן.');
+      // the ring keeps the adjective, and «טרפז» after it still restates
+      const poly = fig.construction.objects.find((o) => o.kind === 'polygon');
+      expect(poly && 'declaredAs' in poly && poly.declaredAs).toBe('isosceles-trapezoid');
+      expect(gateVerdict(iso, 'טרפז ABCD')).toEqual({ kind: 'noop' });
+    },
+  },
+  {
+    id: 'centres-segment-named-pair-2149',
+    title: '«קטע המרכזים של המעגלים O ו-P» draws the segment OP — no «which circle?» question (#2149, ADR-671)',
+    guards:
+      "#2149 (ADR-671), operator ruling 2026-10-16 (card 6 A: «קטע המרכזים של המעגלים O ו-P» is drawn as the segment OP). Measured on 062d059b: the last-resort ambiguousCircleAsk asked «…ולא ברור לאיזה מהם הכוונה» although both circles are named — its named-centre check read only the singular «מעגל X». Fix: one named-circles reader (namedCircleRefs) the ask consults, and centresSegment reads a named pair. The matrix is src/app/__tests__/issue-2149-plural-circle-pair.test.ts.",
+    steps: ['מעגל O', 'מעגל P', 'קטע המרכזים של המעגלים O ו-P'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect([...fig.construction.objects.values()].some((o) => o.kind === 'segment' && [o.a, o.b].sort().join('') === 'OP'), 'segment OP drawn').toBe(true);
+    },
+  },
+  {
+    id: 'equal-radii-named-pair-2149',
+    title: '«רדיוסי המעגלים O ו-P שווים» makes the radii equal (#2149, ADR-671)',
+    guards:
+      "#2149 (ADR-671), operator ruling 2026-10-16 (card 6 A: «רדיוסי המעגלים O ו-P שווים» becomes a real given). Measured on 062d059b: a false «which circle?» question. Fix: pairEqualSize reads the equal-size vocabulary (EQUAL_SIZE, ADR-467) said of a named pair and lowers to set-radius-ratio k = 1.",
+    steps: ['מעגל O', 'מעגל P', 'רדיוסי המעגלים O ו-P שווים'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.circles.get('circle-O')!.r).toBeCloseTo(fig.circles.get('circle-P')!.r, 5);
+    },
+  },
+  {
+    id: 'equal-radii-singular-2149',
+    title: '«רדיוס מעגל O שווה לרדיוס מעגל P» makes the radii equal (#2149, ADR-671)',
+    guards:
+      "#2149 (ADR-671), operator ruling 2026-10-16 (card 6 A: «… and so does its singular form «רדיוס מעגל O שווה לרדיוס מעגל P»»). Measured on 062d059b: sent to the AI — radiusRatio (ADR-649) read only a «פי» factor. Fix: its equality branch, k = 1, with every ADR-649 guard.",
+    steps: ['מעגל O', 'מעגל P', 'רדיוס מעגל O שווה לרדיוס מעגל P'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.circles.get('circle-O')!.r).toBeCloseTo(fig.circles.get('circle-P')!.r, 5);
+    },
+  },
+  {
+    id: 'touch-point-states-tangency-2149',
+    title: '«X נקודת ההשקה של המעגלים O ו-P» with no tangency stated makes the circles tangent at X (#2149, ADR-671)',
+    guards:
+      "#2149 (ADR-671), operator ruling 2026-10-16 (card 7 A: the sentence itself states the tangency at X). Measured on 062d059b: a false «which circle?» question. Fix: namedTouchPoint lowers to exactly what «המעגלים O ו-P משיקים בנקודה X» lowers to (circles-tangent at X).",
+    steps: ['מעגל O', 'מעגל P', 'X נקודת ההשקה של המעגלים O ו-P'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const o = fig.circles.get('circle-O')!, p = fig.circles.get('circle-P')!;
+      expect(dist(o.center, p.center), 'externally tangent').toBeCloseTo(o.r + p.r, 6);
+      expect(Math.abs(dist(at(fig, 'X'), o.center) - o.r)).toBeLessThan(1e-6);
+      expect(Math.abs(dist(at(fig, 'X'), p.center) - p.r)).toBeLessThan(1e-6);
+    },
+  },
+  {
+    id: 'touch-point-named-2123',
+    title: 'Tangent, then «X נקודת ההשקה של המעגלים O ו-P»: the touch point is X alone — no M, no notice (#2123, ADR-671)',
+    guards:
+      "#2123 (ADR-671), operator ruling 2026-10-15 (\"names the touch point X (no «which circle?» question)\", by extension of the #2122 T8 ruling \"use only X\"). Measured on 062d059b: «…ולא ברור לאיזה מהם הכוונה». Fix: the line lowers to circles-tangent at X, and ADR-653's naming by use gives the auto-named M the student's X. Deleting the line brings M back (src/app/__tests__/issue-2149-plural-circle-pair.test.ts).",
+    steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'X נקודת ההשקה של המעגלים O ו-P'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.positions.has('M'), 'the touch letter M yielded to X').toBe(false);
+      expect(fig.coincidences).toEqual([]);
+      const o = fig.circles.get('circle-O')!, p = fig.circles.get('circle-P')!;
+      expect(Math.abs(dist(at(fig, 'X'), o.center) - o.r)).toBeLessThan(1e-6);
+      expect(Math.abs(dist(at(fig, 'X'), p.center) - p.r)).toBeLessThan(1e-6);
+    },
+  },
+  // ── #2165 + #2135 + #2133 (ADR-681): a letter's values are judged in list order — a second value is refused ──
+  {
+    id: 'letter-value-contradiction-2135',
+    title: 'A letter given a second, different value is refused naming the first («x = 4» after «x = 3», «r = 4» after «r = 3», «r = 3» against «מעגל O ברדיוס 4») (#2135 + #2133, ADR-681)',
+    guards:
+      "#2135 and #2133 (P1, found 2026-10-15 by the /decisions pass), measured again on ef78f15c through decideDeterministic2D: «מעגל O ברדיוס r» · «r = 3» · «r = 4» drew r = 4 green; «משולש ABC» · «AB = x» · «x = 3» · «x = 4» drew |AB| = 4 green; «מעגל O ברדיוס 4» · «A, B על מעגל O» · «AB = r» · «r = 3» drew radius 4 and |AB| = 3 green; «מעגל O ברדיוס 3» · «r = 4» committed green at r = 3. Root cause: letters were resolved by substitution — the last set-var won and the reserved r stopped naming the radius once valued — so no two sources of a letter's value were ever judged against each other. Fix (ADR-681): the letter system in buildSymTab judges every source in list order; the fold refuses a contradicting row with the [vs #i] of the statement that gave the value. Rulings: #2119 2026-10-15 (a second radius is a contradiction, 2-D's wording, no reason clause), #2105 card 4, ADR-034 Am. 1. Asserts each later line is refused at the door in the ruled sentence and the first value still draws. The matrix is src/app/__tests__/issue-2165-letter-system.test.ts.",
+    steps: ['משולש ABC', 'AB = x', 'x = 3'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| = 3').toBeCloseTo(3, 4);
+      const he = i18n.getFixedT('he');
+      const cases: [string[], string, string][] = [
+        [['משולש ABC', 'AB = x', 'x = 3'], 'x = 4', 'לא ניתן: «x = 4» סותר את «x = 3» — אי אפשר לקיים את שניהם יחד. הסיבה: |AB| = 4.'],
+        [['מעגל O ברדיוס r', 'r = 3'], 'r = 4', 'לא ניתן: «r = 4» סותר את «r = 3» — אי אפשר לקיים את שניהם יחד.'],
+        [['מעגל O ברדיוס 4', 'A, B על מעגל O', 'AB = r'], 'r = 3', 'לא ניתן: «r = 3» סותר את «מעגל O ברדיוס 4» — אי אפשר לקיים את שניהם יחד.'],
+        [['מעגל O ברדיוס 3'], 'r = 4', 'לא ניתן: «r = 4» סותר את «מעגל O ברדיוס 3» — אי אפשר לקיים את שניהם יחד.'],
+      ];
+      for (const [prefix, line, sentence] of cases) {
+        const facts = factsOf(prefix);
+        const v = gateVerdict(facts, line);
+        expect(v.kind, `${prefix.join(' · ')} · ${line}`).toBe('refused');
+        const raw = (v as { detail?: string }).detail;
+        expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)))).toBe(sentence);
+      }
+    },
+  },
+  // ── #2119 (ADR-683): a second, different stated radius is refused naming the first ──
+  {
+    id: 'radius-restated-refused-2119',
+    title: '«מעגל O ברדיוס 4» after «מעגל O ברדיוס 3», and «רדיוס המעגל O הוא 3» after «מעגל O ברדיוס 5», are refused naming the first line; the radius is unchanged (#2119, ADR-683)',
+    guards:
+      "#2119, the operator's ruling of 2026-10-15 (card 4, A): «לא ניתן: «מעגל O ברדיוס 4» סותר את «מעגל O ברדיוס 3» — אי אפשר לקיים את שניהם יחד.» Measured on the ADR-681 tip through decideDeterministic2D: both answered «זה כבר קיים באיור» and the second size was dropped; with a point on the circle the same lines resized it silently and committed green (P1). Root cause: a stated radius is an object property, not a constraint, so nothing judged two of them; the fold resized a re-stated circle in place. Fix: the letter system's radius target judges two stated sizes, and the fold appends a differing one. Asserts each pair builds its first line with r unchanged, one fact, and the second line is refused at the door in the ruled sentence. The matrix is src/app/__tests__/issue-2119-radius-restated.test.ts.",
+    steps: ['מעגל O ברדיוס 3'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.circles.get('circle-O')!.r, 'r = 3').toBeCloseTo(3, 9);
+      const he = i18n.getFixedT('he');
+      for (const [first, line] of [['מעגל O ברדיוס 3', 'מעגל O ברדיוס 4'], ['מעגל O ברדיוס 5', 'רדיוס המעגל O הוא 3']]) {
+        const facts = factsOf([first]);
+        const v = gateVerdict(facts, line);
+        expect(v.kind, `${first} · ${line}`).toBe('refused');
+        const raw = (v as { detail?: string }).detail;
+        expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)))).toBe(`לא ניתן: «${line}» סותר את «${first}» — אי אפשר לקיים את שניהם יחד.`);
+        expect(replay(facts).circles.get('circle-O')!.r, 'the first radius stands').toBeCloseTo(Number(first.match(/\d+/)![0]), 9);
       }
     },
   },

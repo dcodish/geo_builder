@@ -154,7 +154,10 @@ const collapseFields = (f: Derivation['faults'][number]) =>
                     ? { nameOf: f.nameOf, nameKind: f.nameKind, declared: f.declared }
                     : f.code === 'measure-contradicts'
                       ? { what: f.what, declared: f.declared }
-                      : {};
+                      : // #2119 (ADR-684) — a second radius: the line that sized the circle
+                        f.code === 'radius-contradicts'
+                        ? { declared: f.declared }
+                        : {};
 
 /** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
 const definingLineOf = (lines: readonly string[], id: string): string | null => {

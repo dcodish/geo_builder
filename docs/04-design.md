@@ -105,6 +105,7 @@ The figure is a set of **objects**, each with a *definition* referencing earlier
 - **A second letter, or another coefficient, for a measured angle or segment (ADR-661, #2023/#2061).** `measureRestatement` (`engine/lower.ts`) reads a symbolic `measure-angle`/`measure-length` against the EARLIER statements: the target is the angle as its vertex plus an unordered ray pair, the segment as an unordered pair. The same letter in the same form with another coefficient is `coef-conflict`; a fresh letter (no value, not a radius letter, bound to no other quantity earlier) on a target whose earlier letters all differ is `name-taken`; the identical measure is `same`. The fold pre-scans the list in order (`computeFoldInScope`, beside the soft-equal pre-scan) and stamps a refused restatement with `measureRestatementStatus` — the over-constrained frame, or `name-taken: angle|segment <name> is already named <letter>` — plus a `[vs #i]` tail naming the earlier statement's first row by provenance (the drop-one search could never find it: a representative measure owns no constraint). The stamped fact is skipped as `prior`, never retried and never waits. `lowerOne` reads the representative's target unordered too, so «∠CBA = 3α» no longer lowers to a self-ratio. `humanizeError` renders `name-taken` with `errors.angleNameTaken`/`errors.lengthNameTaken` (`_vs` with the earlier line — the `namesOtherLine` family, not #943's `namesOther`).
 - **One affine tail for every symbolic value (ADR-662, #1851).** `AFFINE_TAIL` / `affineTailOf` (`parser/parse.ts`) read «± c» or «± c/d» after the letter, for `measureLength` and for `angleValueOf` (so `measureAngle` emits `expr.const` + its faithful `text`). `lowerOne`'s `measure-angle` lowers the constant as `measure-length` does: `coef·value + const` once the letter has a value; else an affine `set-angle-ratio` (`add`, degrees — the `angle-ratio` residual `∠1 − (k·∠2 + add)`) against the letter's first PURE binding (an affine binding is marked `affine` in the symbol table and never anchors a ratio). On the representative's own angle only the identical measure lowers to nothing; another form there is the equation it states (∠ABC = ½∠ABC + 40). `measureRestatement` treats the same letter and coefficient with another constant as `coef-conflict`.
 - **A letter's value lowers at its binding (ADR-648, #2101).** `lowerOne` resolves a `set-var` at the row that binds the letter, never at the value row itself: a measure (`measure-length`, …) lowers to its value; a radius binding (`radius-symbol`) lowers to the naming plus `set-radius` on its circle, the stated-radius path (ADR-087). `symbolsConsumedBy` lists the binding, so ADR-492 blames a value that breaks the figure on the value row. The parser's `setVar` reads an uppercase letter only when `ParseContext.radiusSymbols` binds it; an unbound capital is a point name.
+- **The letter system (ADR-681/682, #2165/#2135/#2133).** `buildSymTab` builds the table through `letterSystem(cmds, radiusOf)` (`engine/lower.ts`): the linear single-letter equations every statement states, keyed by target — a segment (unordered pair), an angle (vertex + unordered ray pair) or `radius(circle)` — judged in LIST ORDER. Sources: `set-var`; two expressions on one target, or an expression against a number (`measure-length/-angle`, `set-distance`, `set-angle`, a sized `circle`, `set-radius`); `radius-symbol`; the reserved R/r when exactly one circle has a stated size (`statedSizeCircles`). A consistent row adds nothing or determines a letter with an admissible value, stored as `derived` (`SymTab.vars[x].derived`; `value` is a STATED value only); an inconsistent row (`0 = c`, the same constant with another coefficient, a second value, an inadmissible value) lands in `SymTab.refused` keyed by its index, with `at` = the statement that supplied the earlier value, and its equations are dropped for the rows after it. Two numbers on one length or angle are left to the solve (a residual), a value for an unbound letter waits (#926), and multi-letter equations, powers and area/perimeter targets add nothing. `lowerOne` reads `value ?? derived` (a determined letter lowers to a pin); `measureLabelForms` reads `value` only, so the labels stay as typed. The fold's restatement pre-scan reads `symtab.refused` beside `measureRestatement` with the same `[vs #i]` tail; `dryRunOutcome`'s `bindsLetter` counts a symbolic measure binding a letter to a target in a new form as produced. A radius target renders `errors.restatedSize` (the #2119 frame, no reason clause). On a radius target two NUMBERS are judged too (a stated radius is a size, not a constraint, so no residual sees it — ADR-683): the latest earlier sizing statement is the `at`; and `foldCommand` resizes a re-stated standalone circle in place only when the earlier fact states no size or the same size, appending a different one so the pre-scan judges it.
 - **A ratio between two radii (ADR-649, #2100).** The parser's `radiusReferences` reads «רדיוס (של)? (ה)?מעגל X» / "radius of (the)? circle X"; `radiusRatio` (before `setRadius`) turns two references and a «פי k» / "k times" factor into `set-radius-ratio` — the relation «R = 2r» already lowers to (a `ratio` over centre/witness pairs in `apply.ts`). The comparative is read wherever it sits, a smaller-word inverts k, and the leftover must be ratio connectives (`onlyRatioWords`). `setRadius` does not read a sentence naming two radii. The factor slot is the one #2068's word-factor atom composes into.
 - **Where the solve budget is consulted (ADR-515, #259).** The cooperative wall-clock budget (`engine/solveBudget.ts`) is armed only around view searches (the configuration searches, the submit gate's «כבר קיים» test), never the primary submit fold (ADR-281). It is consulted between recruit experiments (`step.ts`) and inside `nelderMead`'s descent (`evaluate.ts`); unarmed it is a null check. The knowledge pool is bounded by work, never seconds (`POOL_WORK_CAP`, ADR-558; see the knowledge pool).
 - **A refusal names what the rule matched (ADR-528, #1266/#1267).** A rule that recognised a construct and rejected it answers through `Clarify` (mapped by `refusalOf`, armed by `runSubmit`), never `not-handled`. A cevian's stated side has one reader, `statedSide`, shared by median, altitude and bisector (the bisector also checks it); its stated triangle has one, `statedTriangle` (ADR-540, #1285), so the triangle form answers where the bare form asks `ambiguous-angle`, and a wrong lone vertex is `bisector-wrong-apex`. `cevianTriangle` wraps every cevian rule and prepends `triangle` when the sentence names one the figure lacks (ADR-571, #1720). The bisector's vertex has one reader for both forms (ADR-568, #1684). A cevian with no stated side or triangle resolves through `cevianShapeEdges`: one shape answers; shapes giving the apex different opposite sides ask (`ambiguous-cevian`). A NAMED foot is excluded as a base vertex while another opposite side remains; when that exclusion leaves none and the shape has exactly one opposite side holding the foot («משולש ABC» · «התיכון AB»), the foot names that side and `cevianFault` judges it as the long form ([ADR-642](06-decisions.md#adr-642), #1742). The altitude with no stated side picks its side in analytic's order of authority ([ADR-665](06-decisions.md#adr-665), #1965/#1966): `footNarrowedSide` (the opposite side the figure already puts the named foot on — the one reading `cevianShapeEdges` also calls), then `ringParallelBase` (the partner of the apex's base among the apex's OWN ring's parallel pairs, `ringParallelPairs`), then the stated triangle and `cevianShapeEdges`. `ringParallelPairs` is the one reader of a ring's parallel bases: the trapezoid midsegment, «… מקביל לבסיסים» (via `trapezoidBasePair`) and the valueless «גובה הטרפז» read it, never the whole `ctx.parallels`.
@@ -482,6 +483,19 @@ no English "the". The outermost `parse` returns the binding as `indefiniteShape`
 keeps the bound reading only when it restates the shape (dry run empty or implied, and no new violation from the
 givens verifier); otherwise it re-parses with that polygon left out of `ctx.polygons`, so the rule mints fresh letters.
 
+**The definite half** ([ADR-685](06-decisions.md#adr-685)). `shapeNounSpan` / `shapeNounArticle` (`parser/shapePhrase.ts`)
+read the first shape noun's article three ways — `definite` (glued ה, also behind ו/ש; English "the"), `prefixed`
+(ב/ל/כ/מ, the article unwritten), `indefinite` — plus where the noun's word ends and its arity (the n-gon words
+passed in by parse.ts); `shapeNounIsDefinite` is the ADR-654 two-way view of it. `definiteShapeVertices`
+(`parse.ts`) is asked by every rule that would auto-name a polygon for an unnamed noun — `shapeMacro`'s no-label
+branch, `inscribedNgon`, `regularPolygon`, `inscribedPolygon` and `incircle` (before `referencedPolygon`), and the
+polygon-in-polygon container (reading from the container phrase): a `definite` noun of the rule's arity over
+ADR-029's candidate set returns the one polygon's vertices (the labelled branch's lowering follows), or with two or
+more the `ambiguous-definite-shape` clarify (`shapes`, `sides`, `example` — the sentence with the first ring's
+letters after the noun). It is an ambiguity question (`isAmbiguityQuestion`), so neither the dropped-noun gate nor
+the model sees it; `ambiguousDefiniteShapeNote` (`app/decideDeterministic.ts`) renders it for the submit and ✎ edit
+seams (`input.ambiguousDefiniteShape`, the plural from `input.shapePlural` by arity).
+
 ### A through-statement about a drawn circle is a reference ([ADR-548](06-decisions.md#adr-548))
 
 The circle definition rules (`circle`, `circumcircle` in `src/parser/parse.ts`) ask ADR-029's introduce-vs-resolve
@@ -613,9 +627,12 @@ phrase's own or the generic «מרובע». Anything else is returned unchanged.
 
 ### A second shape noun over a declared ring ([ADR-619](06-decisions.md#adr-619))
 
-`engine/shapeKinds.ts` holds the quadrilateral hierarchy as ONE table, `QUAD_IMPLIES` — 2-D's twin of 3-D's
-(ADR-3D-158) and of analytic's `SHAPES`-derived `nounsExclude` (ADR-AG-260) — keyed by the kinds 2-D stamps on
-`polygon.declaredAs` plus the two refined trapezoid phrases a `trapezoid` command carries in `kind`. The trapezoid
+`engine/shapeKinds.ts` reads the quadrilateral hierarchy from the ONE shared lattice (`shell/narrowing.ts`
+`NARROW_IMPLIES`; [ADR-W-131](06w-decisions-workspace.md#adr-w-131)): `QUAD_IMPLIES` is a derived view and `quadRelation` is
+`kindRelation` — the function 3-D and analytic read too — keyed by the kinds 2-D stamps on `polygon.declaredAs`. The
+trapezoid arm stamps the phrase its command carries in `kind` (`isosceles-trapezoid` / `right-trapezoid`, both stamped
+by `lowerShape` since #2169) and a later adjective narrows the ring (`refineRingKind`); the parser's noun selectors read
+the ring's kind through `nounOfKind` (an adjective trapezoid is «הטרפז»). The trapezoid
 rows are the curriculum's EXCLUSIVE reading (exactly one parallel pair), which `shapeConstraints` already assumes.
 Three derived readers, three directions, no list of pairs:
 
@@ -685,6 +702,27 @@ figure), a tangency stated over a pair with two named crossings likewise, and in
 seats the second crossing on the first; the drawn figure refuses, tagged `EvalErr.tangent`, so the ladder carries
 it). The fold names the other side: the drop-one search finds the tangency or the length; for the other order the
 crossing's own statement is read from `ownerByObjId`.
+
+### The two-circle family's pair modifiers ([ADR-455](06-decisions.md#adr-455), [ADR-677](06-decisions.md#adr-677))
+
+A modifier stated for the PAIR lands on the pair the rule resolved (`resolveCirclePair`, the #215 chokepoint), through
+one helper per modifier in `parse.ts`: `withEqualRadii` (EQUAL_SIZE → `set-radius-ratio k = 1`) and, since ADR-677,
+`withStatedRadius` (one singular «ברדיוס N» / «רדיוס כל אחד N» / "with radius N" — `STATED_PAIR_RADIUS`, read only when
+exactly one such phrase governs the pair and it is not a named circle's own «מעגל O ברדיוס 5»): a circle the rule
+creates is created PINNED at N (`freeRadius` dropped), a drawn one gets `set-radius N`. `withStatedRadius`'s consumers
+are `twoCirclesMeet` (all three branches), `twoCirclesPosition` (the disjoint pair only), `circlesTangent` (external
+only; its #757 leftover guard strips the phrase only then) and `commonTangent` (the two-touch construction). A pair
+that cannot be equal (contained, internally tangent, concentric) does not read it, so its number stays unread and the
+line escalates (ADR-678).
+
+`withEqualRadii`'s consumers ([ADR-679](06-decisions.md#adr-679), #2186): `circlesTangent`, `twoCirclesPosition`,
+`twoCirclesBare` (ADR-455), and `twoCirclesMeet` (all three branches), `circleCircleIntersection`, `commonTangent` (every
+construction it returns). `concentricCircles` and `containedNewInExisting` do not read it — equal circles cannot share
+a centre or nest. The net under every rule (and the LLM lane): `droppedWordRelations`' **equal-size member** — in a
+two-circle context, or one circle noun with a plural size noun («מעגל מוכל ברדיוסים שווים»), an EQUAL_SIZE word or
+the equal-circle noun phrase («מעגלים שווים», "equal circles") must land in a lowering that makes two radii equal
+(`set-radius-ratio` k = 1, or two radii pinned at one value — `radiiMadeEqual`), or the gate reports «שווים» and the
+line escalates.
 
 ### A fixed-run rule consumes the whole label body ([ADR-601](06-decisions.md#adr-601))
 
@@ -776,6 +814,27 @@ together is a co-reference. At submit, when only the read-extent members fired (
 `lostRoleNote` teaches `input.scope.split-roles` — one line per role, the side from the lowering, every line proved to
 parse in turn — else the parts cut before the later role word. Where an older gate fired too, the line keeps its
 weak path (W21). The ⟂ verb row reads «אנך»; the existing-segment ⊥-bisector declares `VERB_PERPENDICULAR`.
+
+#### A number the reading never read ([ADR-677](06-decisions.md#adr-677), [ADR-678](06-decisions.md#adr-678))
+
+The number gate (`droppedGivenNumbers`, ADR-250 / ADR-437) accounts a stated number by VALUE, so any equal payload
+used to pay for it — a default radius 5 for «ברדיוס 5», a line marker's ±5 for «ואורכו 5», an apex's free x = 12, the
+k = 1 of «שווים» for «שווים ל-1». Two layers now:
+
+- **The accountant skips seeds** (ADR-677): the walk over the commands' payloads leaves out every field
+  `seedFields(cmd)` (`src/engine/types.ts`, beside the command kinds) declares — a `circle`'s `radius` when
+  `freeRadius`, a `free-point`'s `x`/`y` when `free`, a `point-on-line` marker's `offset`, a free `point-on-circle`'s
+  `theta`. A DOF's starting value is not a given. The LLM lane's second attempt uses the same accountant, so it has
+  this too. A new free-DOF command kind declares its seeds there.
+- **The number class of the read-extent probe** (ADR-678): `unreadNumbers` (`src/app/unreadNumbers.ts`, in
+  `honestyGateReport`, so both seams) runs only when the accountant found nothing. Each number the gate's own scanner
+  sees (`statedNumberOccurrences` — `statedNumberText` blanks counts and name indices, the scan `droppedGivenNumbers`
+  itself uses) is replaced by a same-kind value not in the line (`shell/readExtent.ts` `readNumbers`: the next free
+  integer, a decimal keeping its places) and the line re-read in the seam's context; an occurrence whose replacement
+  leaves the lowering identical was not read, and its value joins `droppedNums` — the verdict is the one the same line
+  with an unaccounted number gets (`escalate`, `weak: dropped`; the ✎ seam's `steps.editDropped`). It closes the
+  structural-constant member no field predicate can foresee. Cost: one parse per stated number on lines every older
+  number check passed.
 
 #### An unread item is named ONCE, on every seam ([ADR-627](06-decisions.md#adr-627))
 

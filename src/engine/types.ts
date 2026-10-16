@@ -1038,7 +1038,10 @@ export type SideRequirement =
    *  spelling — they all lower to `circles-tangent`), touching at `at`. Recorded so the construction itself says the
    *  pair has ONE common point, whichever way apply realised the tangency (a witness coincide over free radii, a pinned
    *  centre distance over stated ones, a `tangent-inner` radius) — read by `circlesStatedTangent`, never by coordinates. */
-  | { kind: 'circle-position'; relation: 'tangent'; a: Id; b: Id; at: Id }
+  | { kind: 'circle-position'; relation: 'tangent'; a: Id; b: Id; at: Id;
+      /** #2188 ([ADR-672](../../docs/06-decisions.md#adr-672)): the KIND the statement gave (`circles-tangent.external`) —
+       *  read back by the parser (`statedTangencies`) so a later restatement that names no kind keeps it. */
+      external?: boolean }
   /** #1918 ([ADR-607](../../docs/06-decisions.md#adr-607)): a ring DECLARED as a shape phrase no circle can pass
    *  around (`NOT_CYCLIC`) — «טרפז ישר זווית ABCD». Recorded so the stage-0 prover sees the declaration whichever
    *  order the circle and the noun arrive in; not a side, so no side reader consumes it. */
@@ -1449,6 +1452,38 @@ export const DISPLAY_ONLY: ReadonlySet<AnyCommand['type']> = new Set<AnyCommand[
   // their own `segment`s, so on a figure where they already exist it is the whole of what this line did.
   'mark-angle',
 ]);
+
+/**
+ * #2198 ([ADR-677](../../docs/06-decisions.md#adr-677)) — the SEED fields of a command: values the engine is free
+ * to move, written by the rule as a DOF's STARTING value, never as a given.
+ *
+ * A seed is not a statement. An unsized circle starts at radius 5 (`freeRadius`), an auto-placed apex at x = 12
+ * (`free`), a drawn line's named markers at ±5 along it, a free on-circle point at some starting angle — and the
+ * sampler, the solver and «הציגו תצורה אחרת» move every one of them. So a seed can never be the LOWERING of a
+ * number the student typed, and an accountant that lets one pay for a stated number reports «ברדיוס 5» kept
+ * while the figure draws 3.6 (the number gate, `droppedGivenNumbers`, did exactly that).
+ *
+ * Declared here, beside the command kinds, so a new free-DOF kind declares its seeds in the one place every
+ * reader of "what a value IS" consults (the DISPLAY_ONLY precedent above). A pinned value — a `circle` without
+ * `freeRadius`, a student-typed `free-point` without `free` — is a given and has no seed field.
+ */
+export function seedFields(cmd: AnyCommand): readonly string[] {
+  switch (cmd.type) {
+    case 'circle':
+      return cmd.freeRadius ? ['radius'] : [];
+    case 'free-point':
+      return cmd.free ? ['x', 'y'] : [];
+    case 'point-on-line':
+      return ['offset']; // a drawn line's marker: placement only (ADR-036), never a stated distance
+    case 'point-on-circle':
+      return cmd.free ? ['theta'] : [];
+    default:
+      return [];
+  }
+}
+
+/** Is `field` of `cmd` a seed (a DOF's starting value, not a given)? See {@link seedFields}. */
+export const isSeedValue = (cmd: AnyCommand, field: string): boolean => seedFields(cmd).includes(field);
 
 /** Tolerances. */
 export const LEN_EPS = 1e-6; // coordinate closeness (units)

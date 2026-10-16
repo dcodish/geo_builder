@@ -123,6 +123,7 @@ Its atom grammar has exactly one function, `√`, and `normalizeMath` maps `sqrt
 | 1 letter before `(` | kept | `k(x+1)` is a product, and the corpus writes it |
 | ≥3 letters NOT space-delimited | kept | `x²+y²-2abc=0` — juxtaposed parameters, ruled legal by #1068 |
 | a letter (Latin or Greek) IMMEDIATELY before a digit, `_` or a subscript digit | refused — an indexed name ([ADR-AG-244](06c-decisions-analytic.md#adr-ag-244), #1785) | «S1», «a2», «α1» are ONE name each; juxtaposition read `S·1`, so «S1» and «S2» shared one parameter and asserted a 1 : 2 ratio. Number-then-letter (`2a`) is unchanged |
+| an integer, whitespace, then `int/int` («5 1/2») | refused — an ASCII mixed number ([ADR-AG-284](06c-decisions-analytic.md#adr-ag-284), #2222) | ambiguous as written (5.5 or 5·½); `findMixedNumber` is the one detector, and `parseLine` asks it before every rule and the model (`mixed-number`, teaching the decimal, `5+1/2`, `5*1/2`). The glyph «5½» is spelled 5.5 upstream (`orthography`) |
 | the private-use range | never a run | `lengths.ts` encodes a length term (`AB`) as one character; it cannot appear in student input |
 
 The noun must be consumed by the rule that claims it: `DISTANCE` spells its English article as `NOUN` does
@@ -308,7 +309,9 @@ polygon object carries `cyclic` and `circleless` (the declared `notCyclic` noun)
 both true fails `inscribed-contradicts-declared { shape, forced, ring }`; `derive` adds the other sentence as
 `declared` (`errInscribedContradictsDeclared`).
 
-*Identifiers:* `errorText` · `θ_<object>.<part>` · `tangent-curve` · `about` · `the-circle` · `ref` · `line-AB` · `line-BA` · `line-at { through: a, dir: points a→b, name: 'AB' }` · `objects` · `NAME_LIST` · `distributeClauses` · `param θ_circle-touched.r > 0` · `circle-touched` · `θ_circle-touched.{a,b,r}` · `θ_` · `circleId` · `match` · `centre-of { circleId }` · `evaluateUncached` · `shapeHe/forcedHe` · `shapeEn/forcedEn` · `A = [(3/5, 4/5)] או (4, -2)` · `… (2- ,4) או` · `x_{B}` · `namedRow` · `pointText` · `scalarText` · `<text>` · `direction: ltr` · `<svg>`
+**Carriers distribute as subjects do** ([ADR-AG-282](06c-decisions-analytic.md#adr-ag-282), #2199). `distributeClauses` reads a CARRIER list with `carriersOf` (every member opens with «על», joined by a comma, «ו» or «וגם»; two or more) and `carriersOfEn` ("on K₁ and (also) on K₂"): with no «בהתאמה» every subject gets every carrier (`eachOnEach`) — one subject («A על מעגל O ועל מעגל P», «הנקודה A נמצאת …», «A נקודה על …») or a list; «בהתאמה» / "respectively" still pairs. The English verb is optional ("A and B on circle O"), and the English per-point incidence "A on circle O and B on circle P" is cut into its two clauses — the twin of ADR-AG-222's Hebrew cut, scoped to that shape. A member that opens with a point's name is not a carrier, so the per-point Hebrew form keeps ADR-AG-222's reading.
+
+*Identifiers:* `carriersOf` · `carriersOfEn` · `eachOnEach` · `errorText` · `θ_<object>.<part>` · `tangent-curve` · `about` · `the-circle` · `ref` · `line-AB` · `line-BA` · `line-at { through: a, dir: points a→b, name: 'AB' }` · `objects` · `NAME_LIST` · `distributeClauses` · `param θ_circle-touched.r > 0` · `circle-touched` · `θ_circle-touched.{a,b,r}` · `θ_` · `circleId` · `match` · `centre-of { circleId }` · `evaluateUncached` · `shapeHe/forcedHe` · `shapeEn/forcedEn` · `A = [(3/5, 4/5)] או (4, -2)` · `… (2- ,4) או` · `x_{B}` · `namedRow` · `pointText` · `scalarText` · `<text>` · `direction: ltr` · `<svg>`
 
 ## Fold and apply
 
@@ -749,6 +752,7 @@ sentences; unlettered shapes take `toolPoint('vertex', …)`; regular polygons a
 - `alias-taken` refuses a taken label; `areaLabelRing` mints an area label's ring.
 
 - **Its dual: one angle or segment, two letters ([ADR-AG-277](06c-decisions-analytic.md#adr-ag-277), #2054/#2061).** `measureRestatement` (`engine/statedMeasures.ts`, reading the stated value through `plainMeasure` / `isValueSide`, the canvas's own definition) compares a new `angle` / plain-segment `length-eq` value with the earlier stated values of the same target (vertex + unordered rays; unordered pair). It runs in `applyFact`'s `constraint` arm before the duplicate absorb: a fresh letter on a target whose letters all differ → `name-taken`; the same single letter with another coefficient → `measure-contradicts`. The error carries the earlier constraint (`against`); `derive` maps it to its line (`constraintFact` → `owner`) as `declared`, and `errorText` renders 2-D's sentences (`errAngleNameTaken[_vs]`, `errLengthNameTaken[_vs]`, `errMeasureContradicts`, held equal to 2-D's by `suite-vocabulary.test.ts`).
+- **A second radius ([ADR-684](06-decisions.md#adr-684), #2119).** The `radius-of` restatement on a centred circle (`applyFact`) returns `radius-contradicts { circle }` instead of `conflicting-restatement`; `derive`'s `radiusAgainst` names the latest earlier accepted line that sized that circle (a `circle-at` with a stated radius, or a `radius-of` resolving to it through `circleByName`) as `declared`, and `errorText` renders `errRadiusContradicts` — 2-D's `errors.restatedSize_said_vs`, byte for byte — or `errConflict` with no line to name.
 
 *Identifiers:* `GREEK_ALIAS` · `evalExpr` · `foldSignSelectors` · `narrowedDomain(declared, impliedRange)` · `poly-<ring>`
 
@@ -848,7 +852,9 @@ Ring promises — simple, open, and not-a-parallelogram for the trapezoid family
 records them and `drawableAt`'s `whole()` rejects them, but the exclusion is never refused (Amendment 1, 2-D ADR-165):
 `app/shapeWarnings.ts` `shapeWarningsOf(lines, d)` reads `d.figure.ringFaults` and `App.tsx` shows a shared
 `Banner kind="notice"`. A second NOUN is not a given (ADR-AG-260, #1926): `engine/shapes.ts` `nounsExclude(a, b)` —
-one noun `promisesOneParallelPair`, the other's row `assertsBothParallelPairs` (read off its givens, never listed) —
+`kindRelation` over each row's `kind`, the shared lattice ([ADR-W-131](06w-decisions-workspace.md#adr-w-131)); the ring is
+the meet of its `noun` and every later narrowing noun (`also`); an implied noun returns `restates` and the fold takes that
+line's `definition` constraints as held (ADR-W-133) —
 and `applyFact`'s polygon arm refuses the later declaration `shape-excluded { actual, stated }` before M1 absorbs it
 (`errShapeExcluded`).
 

@@ -247,8 +247,18 @@ knows no product and holds no student string; each builder supplies the parts on
 | each row's class (`circum` · `incircle` · `rightPyramid` · `value` · `relation` · `definition`) and text as typed | `silentByValues`, `causeSlot`, `narrowingSentence(note, t, prefix)` over its own locale keys |
 
 The locale family is the same in every builder (`<prefix>.sentence`, `.cause.*`, `.shape.*`, `.shapeA.*`, `.kindOf.*`,
-`.listSep`, `.listLast`). The cross-builder rows are `shell/__tests__/fixtures/narrowing-note-rows.ts`, with a meta-lock
+`.listSep`, `.listLast`, and `.merged` for the sibling note). The cross-builder rows are `shell/__tests__/fixtures/narrowing-note-rows.ts`, with a meta-lock
 and one thin lock per tree (the wiring-guard pattern above).
+
+**Two shape nouns on one ring ([ADR-W-131](06w-decisions-workspace.md#adr-w-131)).** `NARROW_IMPLIES` is the ONLY copy of
+the quadrilateral hierarchy. What a second noun does to a declared ring is `kindRelation(declared, stated)` —
+`implies` (a restatement) · `narrows` · `siblings` (the meet, `kindAfter`) · `excludes` (the refusal) — with
+`kindImpliesInEveryReading` for a restatement read from another vertex. 2-D (`engine/shapeKinds.ts`: `QUAD_IMPLIES` is a
+derived view, `quadRelation` delegates), 3-D (`applyShape` ARM 3 and the store's restatement twin, over
+`declaredKind3` — the adjective included — and the meet of every noun on the ring) and analytic (`nounsExclude`, the
+polygon arm's `restates` / `also`) all read it; the merge note is `mergeOf` + `mergeSentence` in each sweep. The
+cross-builder rows are `shell/__tests__/fixtures/quad-noun-pairs.ts` (all 81 ordered pairs, 2-D's measured answers,
+written out), with a meta-lock and one thin lock per tree.
 
 ## The gates a typed line passes
 

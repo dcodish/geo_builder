@@ -21,9 +21,12 @@ describe('#2101 — the radius-symbol binding lowers its letter value into the c
     expect(lower([CIRCLE, BIND, VALUE])).toContainEqual({ type: 'set-radius', circle: 'circle-O', value: 3 });
   });
 
-  it('the latest value wins, as for every letter', () => {
+  // #2135 (ADR-681): a second, different value is REFUSED by the letter system — the first value stands (it used to be
+  // "the latest value wins", which drew r = 4 with «r = 3» still ✓).
+  it('a second, different value is refused and the first one sizes the circle', () => {
     const tab = buildSymTab([CIRCLE, BIND, VALUE, { type: 'set-var', name: 'r', value: 4 }]);
-    expect(lowerOne(BIND, tab)).toContainEqual({ type: 'set-radius', circle: 'circle-O', value: 4 });
+    expect(lowerOne(BIND, tab)).toContainEqual({ type: 'set-radius', circle: 'circle-O', value: 3 });
+    expect(tab.refused.get(3)).toEqual({ at: 2, status: 'over-constrained: radius of circle-O = 4 cannot hold' });
   });
 
   it('a value for ANOTHER letter does not size the circle', () => {

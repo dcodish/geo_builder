@@ -6,7 +6,7 @@
  * that fails is reported with its own index and its own words — never dropped, and never blamed on
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
-import { centreIdOf, curveKindOf, fold, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
+import { centreIdOf, circleByName, curveKindOf, fold, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { noFreedomReaches, reportedDof } from './carriers';
 import { collapsedByGivens, completingStatement, curveAtOf, drawableAt, hardRingFaults, holdsOn, viewBox, type Figure } from './evaluate';
 import { touchPointOf } from './crossing-order';
@@ -203,13 +203,29 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     const declared = fact !== undefined ? lines[owner[fact]] : undefined;
     return { ...(e.nameOf ? { nameOf: e.nameOf, nameKind: e.nameKind } : {}), ...(e.what ? { what: e.what } : {}), ...(declared !== undefined ? { declared } : {}) };
   };
+  /**
+   * #2119 (ADR-684): the line that SIZED the circle a second radius contradicts — the latest earlier accepted fact that
+   * states that circle's radius (a centred circle created with a number, or a radius sentence about it), by provenance.
+   */
+  const radiusAgainst = (e: ApplyError, i: number): Partial<LineFault> => {
+    if (e.code !== 'radius-contradicts' || !e.circle) return {};
+    const sizes = (f: Fact): boolean => {
+      if (f.t === 'circle-at') return f.id === e.circle && !(typeof f.r === 'object' && f.r !== null && (f.r as { kind?: string }).kind === 'sym');
+      if (f.t !== 'radius-of') return false;
+      if (f.circleId !== undefined) return f.circleId === e.circle;
+      if (f.circle !== undefined) return circleByName(folded, f.circle)?.id === e.circle;
+      return folded.objects.filter((o) => curveKindOf(o) === 'circle').length === 1;
+    };
+    for (let j = i - 1; j >= 0; j--) if (owner[j] < owner[i] && !errors[j] && sizes(facts[j])) return { declared: lines[owner[j]] };
+    return {};
+  };
   const reported = new Set<string>();
   errors.forEach((e, i) => {
     if (!e) return;
     const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null, e.options ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e) });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e), ...radiusAgainst(e, i) });
   });
 
   /**

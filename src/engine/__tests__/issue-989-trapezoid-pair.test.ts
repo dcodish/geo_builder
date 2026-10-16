@@ -157,7 +157,7 @@ describe('#989 — the isosceles macro’s legs follow the pair in force', () =>
   it('the macro tags its leg equality', () => {
     const r = parse('טרפז שווה שוקיים ABCD', ctxOf([]));
     expect(r.ok && r.commands).toEqual([
-      { type: 'trapezoid', ids: ['A', 'B', 'C', 'D'] },
+      { type: 'trapezoid', ids: ['A', 'B', 'C', 'D'], kind: 'isosceles-trapezoid' }, // #2169: the ring is declared as the phrase
       { type: 'set-equal', a: 'A', b: 'D', c: 'B', d: 'C', trapezoidLegs: true },
     ]);
   });
