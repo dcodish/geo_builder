@@ -4251,3 +4251,31 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Siblings.** Collinearity floors: 2-D 1e-6 (ADR-651), analytic 1e-9, complex 1e-9 now, 3-D an absolute |n|² < 1e-18 (#2158, its own plan; #2134's read-back does not reach 3-D, which has none). ADR-651's "honest for curriculum magnitudes" sentence is corrected in place.
 
 **Locks.** `literal-exact-2134.test.ts`: the six family members refused at seeds 0–7; the same collinear shape at ×1, ×10, ×100 refused, and a genuine triangle at ×1, ×10, ×100 drawn with the right radius; the thin typed triangle drawn; z1, z1², z1³ drawn at √5; a text lock that complex's floor is 1e-9 and analytic's `isDegenerate` reads `<= 1e-9 * scale * scale`. 2-D's `issue-2099-collinear-circle.test.ts` is untouched.
+
+## ADR-CX-073 — A polygon over numbers on one line is refused, by the circle's own flatness test: complex adopts ADR-W-115 (#2212)
+
+**Status:** accepted, 2026-10-16 · **Issue:** [#2212](https://github.com/dcodish/geo_builder/issues/2212) (bug, `P1`, `complex`) · fix round #2245, stacked on [ADR-CX-071](#adr-cx-071) / [ADR-CX-072](#adr-cx-072) · adopts [ADR-W-115](06w-decisions-workspace.md#adr-w-115) (operator ruling 2026-10-07: *"refuse on all tools with a message since it contradicts ABC is a triangle and a flat line is not a triangle"*)
+**Requirements:** [02d](02d-requirements-complex.md) the appendix F6 «Objects» row (a polygon on one line is refused, as its circumscribed circle is) ·
+**Design:** [04d](04d-design-complex.md), "A stated object is drawn or refused" ("One flatness predicate") ·
+**Ladder:** stage 3e, objects ([LADDER-CX](LADDER-CX.md))
+
+**Measured at pickup** (the #2134 tip `f9daa4db`, `submitLine` + `deriveLines`). «z1 = 1» · «z2 = 2» · «המשולש Oz1z2» was accepted and drew a flat "triangle"; so did the bare run «Oz1z2», «z1 = 1 · z2 = 2 · z3 = 3 · המשולש z1z2z3», «z2 = 2z1 · המשולש Oz1z2», «z^2 = 4 · המשולש Oz1z2», «המשולש Oz1z1», «המרובע Oz1z2z3» over 0, 1, 2, 3, and the triangle typed first. The circumscribed circle over the same numbers was refused `{incompatible, "z1 = 1"}`, and typed after the triangle it was refused while the triangle stayed drawn: one figure, two verdicts on the same three points.
+
+**The class.** *A polygon object over numbers that lie on one line (or with corners that coincide) is drawn as if it were the polygon it names.* Complex's only collinearity verdict lived inside `circumcircle`; the `polygon` branch of `resolveObjects` pushed its vertices unconditionally and never refused into ADR-CX-069's drawn-or-refused channel. 2-D (ADR-602), 3-D (ADR-3D-310) and analytic (ADR-AG-247) already refuse a declared polygon the givens force flat; complex was the one builder that drew it.
+
+**Decision.**
+1. **One predicate, `flatPoints(vs)`** (`replay/derive2.ts`): take the widest chord AB, span² = |AB|²; the points are flat when `!(span² > 0)` or every |cross(B−A, P−A)| ≤ `FLATNESS_FLOOR` · span². For three points this is exactly ADR-CX-072's circumcircle test; for n points it is 2-D's ADR-602 `polygonFlatness` measure at complex's ruled 1e-9 floor, copied and never imported. ADR-CX-072's `CIRCUMCIRCLE_FLATNESS_FLOOR` is renamed `FLATNESS_FLOOR`: there is one constant.
+2. **`circumcircle` asks `flatPoints([a, b, c])`**: its verdicts are unchanged from ADR-CX-072.
+3. **The polygon branch** pushes `o.src` to `undrawn` when `flatPoints(vertices)` holds: the ADR-CX-069 channel, so the gate tries the other configurations, then names the blocking line (`incompatible`) or the polygon's own (`impossible`). No new channel, no new message, no parser change. Every arity and the bare run go through it. A segment is never flat-tested.
+4. **Nothing else.** The measures of a flat "triangle" (area 0, perimeter 4) are found work.
+
+**Behaviour change for a student** (every line `[ruled]`/`[asked]`/`[2-D]` in the #2212 plan):
+- «z1 = 1» · «z2 = 2» · «המשולש Oz1z2» is refused with «המשפט לא נוסף — אינו מתיישב עם: "z1 = 1"», exactly as «המעגל החוסם את המשולש Oz1z2» is; the same for every spelling, for numbers on one line at any size or angle, for numbers forced onto one line («z2 = 2z1», «z1 ממשי · z2 ממשי», the roots of «z^2 = 4»), and for repeated corners («המשולש Oz1z1» is refused `impossible`, naming itself).
+- «המרובע Oz1z2z3» / «המצולע Oz1z2z3» over 0, 1, 2, 3 is refused the same way; typed first, the line that puts the last number on the line («z2 = 2», «z3 = 3») is refused, naming the polygon.
+- Unchanged: the thin typed triangle «3+0.0000001i» and a quadrilateral with three of four corners on a line are drawn.
+
+**Fixture sweep.** No complex fixture holds a flat polygon (the 38 fixtures' 8 polygon instances, measured on #2212); the fixtures net stays green.
+
+**Siblings.** 2-D, 3-D and analytic already refuse (ADR-602, ADR-3D-310, ADR-AG-247); ADR-W-115's Adoptions line now names complex, which keeps its existing refusal sentence rather than ADR-W-115 §2's wording (found work, for the operator). Complex is not in `geo-input-parity`.
+
+**Locks.** `src-complex/__tests__/flat-polygon-2212.test.ts`: the report's exact error object; five spellings; eleven sizes, angles, coincident and polygon-arity rows; the forced-flat rows; both entry orders naming the polygon; the triangle and its circle get one verdict (six flat rows and two drawn controls); scale ×1/×10/×100; the drawn controls (the thin triangle, three-of-four quadrilateral, «1+i / 2», a bound letter, «z^3 = 8», «1 / i», free «משולש ABC» and «A = 0 · B = 4 · משולש ABC» at 24/24 seeds); a saved file holding the flat triangle (and its circle twin) loads without it and lists it in the load audit; `flatPoints` unit cases. Fixture `fixtures/triangle-not-flat-2212.complex.json` (the thin triangle and its circle, `unsatisfied: []`). The plan's segment control («הקטע z1z2» over 1 and 2) is not lockable: that line always reads as a length question (the #789 ask lane), so no segment is drawn either way; filed as found work.

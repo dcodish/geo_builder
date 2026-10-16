@@ -2160,6 +2160,12 @@ function resolveObjects(
       return;
     }
     if (o.kind === 'polygon') {
+      // #2212 (ADR-CX-073, adopting ADR-W-115) — a polygon over points on one line is no polygon: it
+      // is refused by the circumscribed circle's own test, through the ADR-CX-069 channel
+      if (flatPoints(vertices)) {
+        undrawn.push(o.src);
+        return;
+      }
       drawn.push({
         kind: o.kind,
         key,
@@ -2317,21 +2323,45 @@ function refNamesOf(e: Expr): string[] {
 }
 
 /**
- * #2109 (ADR-CX-071) — the scale-free collinearity floor: three points are on one line when twice
- * their triangle's area, |d|/2, is at most this fraction of the widest span squared. A SHAPE verdict,
- * so it gives one answer at every size; the absolute `|d| < 1e-12` it replaces scaled with |z|² and
- * drew a circle of radius 7·10¹⁸ through «300w» and «1000w». The constant is the operator's ruling
- * (2026-10-15, #2109 card 8 A: "a genuinely thin typed triangle is DRAWN — about 1e-9, analytic's"),
- * pinned equal to analytic's `isDegenerate` by a text lock (`literal-exact-2134.test.ts`).
+ * #2109 (ADR-CX-072) — the scale-free collinearity floor: points are on one line when every one of
+ * them sits within this fraction of the widest chord squared (|cross| ≤ floor · span²) of that chord.
+ * A SHAPE verdict, so it gives one answer at every size; the absolute `|d| < 1e-12` it replaced
+ * scaled with |z|² and drew a circle of radius 7·10¹⁸ through «300w» and «1000w». The constant is the
+ * operator's ruling (2026-10-15, #2109 card 8 A: "a genuinely thin typed triangle is DRAWN — about
+ * 1e-9, analytic's"), pinned equal to analytic's `isDegenerate` by a text lock
+ * (`literal-exact-2134.test.ts`).
  */
-export const CIRCUMCIRCLE_FLATNESS_FLOOR = 1e-9;
+export const FLATNESS_FLOOR = 1e-9;
 
-/** The circle through three points, or null when they are collinear (to the scale-free floor above). */
-function circumcircle(a: Cx, b: Cx, c: Cx): { center: Cx; r: number } | null {
-  const d = 2 * (a.re * (b.im - c.im) + b.re * (c.im - a.im) + c.re * (a.im - b.im));
+/**
+ * #2212 (ADR-CX-073) — THE one flatness predicate: are these points on one line (or coincident)?
+ * The widest chord AB is the base (span² = |AB|²); the points are flat when `!(span² > 0)` or every
+ * |cross(B−A, P−A)| ≤ FLATNESS_FLOOR · span². For three points this is exactly the circumscribed
+ * circle's test (the cross product is the same whichever pair is the base); for n points it is 2-D's
+ * ADR-602 `polygonFlatness` measure at complex's ruled floor — copied, never imported (ADR-W-115).
+ * `circumcircle` and the polygon object both ask it, so a triangle and its circle can never disagree.
+ */
+export function flatPoints(vs: readonly Cx[]): boolean {
   const sq = (p: Cx, q: Cx) => (p.re - q.re) ** 2 + (p.im - q.im) ** 2;
-  const span2 = Math.max(sq(a, b), sq(b, c), sq(c, a));
-  if (!(span2 > 0) || Math.abs(d) / 2 <= CIRCUMCIRCLE_FLATNESS_FLOOR * span2) return null;
+  let span2 = 0;
+  let a = vs[0];
+  let b = vs[0];
+  for (let i = 0; i < vs.length; i++) {
+    for (let j = i + 1; j < vs.length; j++) {
+      const s = sq(vs[i], vs[j]);
+      if (s > span2) [span2, a, b] = [s, vs[i], vs[j]];
+    }
+  }
+  if (!(span2 > 0)) return true;
+  const ux = b.re - a.re;
+  const uy = b.im - a.im;
+  return vs.every((p) => Math.abs(ux * (p.im - a.im) - uy * (p.re - a.re)) <= FLATNESS_FLOOR * span2);
+}
+
+/** The circle through three points, or null when they are on one line (`flatPoints`). */
+function circumcircle(a: Cx, b: Cx, c: Cx): { center: Cx; r: number } | null {
+  if (flatPoints([a, b, c])) return null;
+  const d = 2 * (a.re * (b.im - c.im) + b.re * (c.im - a.im) + c.re * (a.im - b.im));
   const sa = a.re * a.re + a.im * a.im;
   const sb = b.re * b.re + b.im * b.im;
   const sc = c.re * c.re + c.im * c.im;

@@ -19,7 +19,7 @@ import { askRowsOf } from '../app/askLane';
 import { deriveLines } from '../app/deriveLines';
 import { activeLines, submitLine } from '../app/submit';
 import { parseExpr } from '../parser/exprParse';
-import { CIRCUMCIRCLE_FLATNESS_FLOOR } from '../replay/derive2';
+import { FLATNESS_FLOOR } from '../replay/derive2';
 import { useComplexStore } from '../store/useComplexStore';
 
 const store = () => useComplexStore.getState();
@@ -177,7 +177,7 @@ describe('#2134 — controls that stay as they are', () => {
 
 describe('#2109 — the floor is the ruled constant, equal to analytic’s `isDegenerate`', () => {
   it('complex’s floor is 1e-9, and analytic’s scale-free test reads `1e-9 * scale * scale`', () => {
-    expect(CIRCUMCIRCLE_FLATNESS_FLOOR).toBe(1e-9);
+    expect(FLATNESS_FLOOR).toBe(1e-9);
     const analytic = readFileSync(new URL('../../src-analytic/engine/derived.ts', import.meta.url), 'utf8');
     const body = analytic.slice(analytic.indexOf('function isDegenerate'));
     expect(body.slice(0, body.indexOf('\n}'))).toMatch(/<=\s*1e-9\s*\*\s*scale\s*\*\s*scale/);
