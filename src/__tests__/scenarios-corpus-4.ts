@@ -4916,6 +4916,73 @@ export const SCENARIOS_4: Scenario[] = [
       expect(gateVerdict(iso, 'טרפז ABCD')).toEqual({ kind: 'noop' });
     },
   },
+  {
+    id: 'centres-segment-named-pair-2149',
+    title: '«קטע המרכזים של המעגלים O ו-P» draws the segment OP — no «which circle?» question (#2149, ADR-671)',
+    guards:
+      "#2149 (ADR-671), operator ruling 2026-10-16 (card 6 A: «קטע המרכזים של המעגלים O ו-P» is drawn as the segment OP). Measured on 062d059b: the last-resort ambiguousCircleAsk asked «…ולא ברור לאיזה מהם הכוונה» although both circles are named — its named-centre check read only the singular «מעגל X». Fix: one named-circles reader (namedCircleRefs) the ask consults, and centresSegment reads a named pair. The matrix is src/app/__tests__/issue-2149-plural-circle-pair.test.ts.",
+    steps: ['מעגל O', 'מעגל P', 'קטע המרכזים של המעגלים O ו-P'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect([...fig.construction.objects.values()].some((o) => o.kind === 'segment' && [o.a, o.b].sort().join('') === 'OP'), 'segment OP drawn').toBe(true);
+    },
+  },
+  {
+    id: 'equal-radii-named-pair-2149',
+    title: '«רדיוסי המעגלים O ו-P שווים» makes the radii equal (#2149, ADR-671)',
+    guards:
+      "#2149 (ADR-671), operator ruling 2026-10-16 (card 6 A: «רדיוסי המעגלים O ו-P שווים» becomes a real given). Measured on 062d059b: a false «which circle?» question. Fix: pairEqualSize reads the equal-size vocabulary (EQUAL_SIZE, ADR-467) said of a named pair and lowers to set-radius-ratio k = 1.",
+    steps: ['מעגל O', 'מעגל P', 'רדיוסי המעגלים O ו-P שווים'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.circles.get('circle-O')!.r).toBeCloseTo(fig.circles.get('circle-P')!.r, 5);
+    },
+  },
+  {
+    id: 'equal-radii-singular-2149',
+    title: '«רדיוס מעגל O שווה לרדיוס מעגל P» makes the radii equal (#2149, ADR-671)',
+    guards:
+      "#2149 (ADR-671), operator ruling 2026-10-16 (card 6 A: «… and so does its singular form «רדיוס מעגל O שווה לרדיוס מעגל P»»). Measured on 062d059b: sent to the AI — radiusRatio (ADR-649) read only a «פי» factor. Fix: its equality branch, k = 1, with every ADR-649 guard.",
+    steps: ['מעגל O', 'מעגל P', 'רדיוס מעגל O שווה לרדיוס מעגל P'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.circles.get('circle-O')!.r).toBeCloseTo(fig.circles.get('circle-P')!.r, 5);
+    },
+  },
+  {
+    id: 'touch-point-states-tangency-2149',
+    title: '«X נקודת ההשקה של המעגלים O ו-P» with no tangency stated makes the circles tangent at X (#2149, ADR-671)',
+    guards:
+      "#2149 (ADR-671), operator ruling 2026-10-16 (card 7 A: the sentence itself states the tangency at X). Measured on 062d059b: a false «which circle?» question. Fix: namedTouchPoint lowers to exactly what «המעגלים O ו-P משיקים בנקודה X» lowers to (circles-tangent at X).",
+    steps: ['מעגל O', 'מעגל P', 'X נקודת ההשקה של המעגלים O ו-P'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const o = fig.circles.get('circle-O')!, p = fig.circles.get('circle-P')!;
+      expect(dist(o.center, p.center), 'externally tangent').toBeCloseTo(o.r + p.r, 6);
+      expect(Math.abs(dist(at(fig, 'X'), o.center) - o.r)).toBeLessThan(1e-6);
+      expect(Math.abs(dist(at(fig, 'X'), p.center) - p.r)).toBeLessThan(1e-6);
+    },
+  },
+  {
+    id: 'touch-point-named-2123',
+    title: 'Tangent, then «X נקודת ההשקה של המעגלים O ו-P»: the touch point is X alone — no M, no notice (#2123, ADR-671)',
+    guards:
+      "#2123 (ADR-671), operator ruling 2026-10-15 (\"names the touch point X (no «which circle?» question)\", by extension of the #2122 T8 ruling \"use only X\"). Measured on 062d059b: «…ולא ברור לאיזה מהם הכוונה». Fix: the line lowers to circles-tangent at X, and ADR-653's naming by use gives the auto-named M the student's X. Deleting the line brings M back (src/app/__tests__/issue-2149-plural-circle-pair.test.ts).",
+    steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'X נקודת ההשקה של המעגלים O ו-P'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.positions.has('M'), 'the touch letter M yielded to X').toBe(false);
+      expect(fig.coincidences).toEqual([]);
+      const o = fig.circles.get('circle-O')!, p = fig.circles.get('circle-P')!;
+      expect(Math.abs(dist(at(fig, 'X'), o.center) - o.r)).toBeLessThan(1e-6);
+      expect(Math.abs(dist(at(fig, 'X'), p.center) - p.r)).toBeLessThan(1e-6);
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

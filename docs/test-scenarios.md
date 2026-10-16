@@ -1972,3 +1972,23 @@ over all four (ADR-041).
 ### `trapezoid-iso-right-2169` — «טרפז שווה שוקיים ABCD · טרפז ישר זווית ABCD» is refused in either order, naming the adjective (#2169, ADR-W-131, ADR-W-132)
 
 **Guards against:** the pair committed as a rectangle with two amber warnings, and a declared isosceles trapezoid refused «כ־טרפז» (measured at ef78f15c; the 2026-10-16 ruling refuses the pair in every builder). **Asserts** both orders are refused with the exclusion sentence naming both adjectives, «מלבן ABCD» over the isosceles trapezoid names it «כ־טרפז שווה שוקיים», the ring is declared `isosceles-trapezoid`, and «טרפז ABCD» over it still answers «כבר קיים». The 81-pair matrix in every builder is `shell/__tests__/fixtures/quad-noun-pairs.ts` (thin locks `quad-noun-pairs-2169.test.ts` per tree).
+
+### `centres-segment-named-pair-2149` — «מעגל O · מעגל P · קטע המרכזים של המעגלים O ו-P»: the segment OP, no «which circle?» (#2149, ADR-671)
+
+**Guards against:** the false «…ולא ברור לאיזה מהם הכוונה» on a sentence that names both circles (operator ruling 2026-10-16, card 6). **Asserts** green, segment OP drawn.
+
+### `equal-radii-named-pair-2149` — «מעגל O · מעגל P · רדיוסי המעגלים O ו-P שווים»: the radii are equal (#2149, ADR-671)
+
+**Guards against:** the false question on the equal-radii given (card 6). **Asserts** green, r_O = r_P.
+
+### `equal-radii-singular-2149` — «מעגל O · מעגל P · רדיוס מעגל O שווה לרדיוס מעגל P»: the radii are equal (#2149, ADR-671)
+
+**Guards against:** the singular equality sent to the AI (card 6). **Asserts** green, r_O = r_P.
+
+### `touch-point-states-tangency-2149` — «מעגל O · מעגל P · X נקודת ההשקה של המעגלים O ו-P»: tangent at X (#2149, ADR-671)
+
+**Guards against:** the false question when no tangency was stated (card 7: the sentence states the tangency). **Asserts** green, externally tangent, X on both circles.
+
+### `touch-point-named-2123` — «… · המעגלים O ו-P משיקים · X נקודת ההשקה של המעגלים O ו-P»: X alone at the touch point (#2123, ADR-671)
+
+**Guards against:** the false question, and the tool's M kept beside X (ruling 2026-10-15 on #2123, the #2122 T8 ruling). **Asserts** green, no M, no coincidence notice, X on both circles. The matrix (spellings, the inherited kind, «T ו-X», refusals, delete brings M back) is `src/app/__tests__/issue-2149-plural-circle-pair.test.ts`.
