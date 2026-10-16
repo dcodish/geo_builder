@@ -4875,6 +4875,22 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'definite-triangle-two-triangles-2205',
+    title: 'Two triangles drawn: «המשולש ישר זווית» is refused naming ABC and DEF, with «המשולש ABC ישר זווית» as the next step; nothing is drawn (#2205, ADR-685)',
+    guards:
+      "#2205 (ADR-685), operator ruling 2026-10-16 (card 2: «Refuse, naming both triangles, and show the named form as the next step»). Measured on ef78f15c through decideDeterministic2D: «משולש ABC» · «משולש DEF» · «המשולש ישר זווית» drew a THIRD triangle G, H, I, green (and with one triangle the line drew a second triangle DEF instead of making ABC right-angled). Root cause: the shape rules auto-named a fresh polygon for an unnamed shape noun whatever its article; a definite noun («המשולש», \"the triangle\") is a statement about the figure's shape. Fix: one resolver (definiteShapeVertices, over ADR-029's candidate set) asked by every auto-naming shape site — one candidate is its named form, two or more is the ambiguous-definite-shape question. The one-triangle case is the fixture definite-triangle-predicate-2205.geo.json; the matrix is src/app/__tests__/issue-2205-definite-shape-reference.test.ts.",
+    steps: ['משולש ABC', 'משולש DEF', 'המשולש ישר זווית'],
+    refusedSteps: [
+      { step: 3, reason: 'ambiguous-definite-shape', with: { shapes: ['ABC', 'DEF'], sides: 3, example: 'המשולש ABC ישר זווית' }, why: 'ADR-685 (#2205): two triangles — the operator ruled a refusal naming them, with the named form as the next step' },
+    ],
+    check(fig) {
+      expect(fig.violations).toEqual([]);
+      const rings = fig.construction.objects.filter((o) => o.kind === 'polygon').map((o) => (o as { vertices: string[] }).vertices.join(''));
+      expect(rings).toEqual(['ABC', 'DEF']);
+      expect(fig.positions.has('G'), 'the refused line minted no third triangle').toBe(false);
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

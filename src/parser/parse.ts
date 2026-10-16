@@ -31,7 +31,7 @@ import { unreadScript } from '../../shell/inputScript';
 import { foreignGiven } from './scope';
 import { readFrame } from './frame';
 import { NOTATION_WORDS, UNIT_WORDS, unaccountedLabels } from './labelAccounting';
-import { readShapePhrase, lowerShape, shapeNounIsDefinite, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
+import { readShapePhrase, lowerShape, shapeNounIsDefinite, shapeNounSpan, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
 
 export type ParseResult =
   // `indefiniteShape` (#2127, ADR-654): the vertices of the existing polygon an INDEFINITE unnamed shape noun
@@ -134,6 +134,11 @@ export type ParseResult =
   // is the student's), but declining sent the utterance to the LLM lane, which can only guess and
   // whose guess builds. Ask instead, naming the candidates. `noun` is the construct the student used.
   | { ok: false; reason: 'ambiguous-shape'; noun: string; shapes: string[] }
+  // #2205 ([ADR-685](../../docs/06-decisions.md#adr-685)): a DEFINITE unnamed shape noun («המשולש ישר זווית», "the
+  // triangle is isosceles") on a figure holding two or more shapes of its size — which one is the student's to say
+  // (operator ruling 2026-10-16: refuse, naming them, with the named form as the next step). `shapes` in figure
+  // order; `sides` the arity they share; `example` the student's own sentence with the first one's letters after the noun.
+  | { ok: false; reason: 'ambiguous-definite-shape'; shapes: string[]; sides: number; example: string }
   // #889: the OTHER ambiguity, and a different question. #461's shape-plus-construct rule knows
   // exactly which shape it is about — «מרובע ABCD עם אלכסון» — and cannot know WHICH VARIANT of the
   // construct: either diagonal, one of three altitudes. The candidates are constructs that do not
@@ -390,7 +395,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-definite-shape'; shapes: string[]; sides: number; example: string } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -869,6 +874,33 @@ const existingPolygon = (ctx: ParseContext, n: number): Id[] | null => {
   return matches.length === 1 ? matches[0].map(up) : null;
 };
 
+/**
+ * #2205 ([ADR-685](../../docs/06-decisions.md#adr-685)) — THE VERTICES OF A DEFINITE UNNAMED SHAPE NOUN.
+ *
+ * «המשולש ישר זווית», "the triangle is isosceles", «הריבוע חסום במעגל O»: the definite article makes the sentence a
+ * statement about the figure's shape, exactly as the same sentence naming it («המשולש ABC ישר זווית») is. Every rule
+ * that would otherwise auto-name a fresh polygon for an unnamed shape noun asks here first. The candidates are ADR-029's
+ * (`existingPolygon`'s): the figure's polygons of this arity.
+ *  - one → its vertices, so the rule lowers exactly what its labelled branch lowers over them;
+ *  - two or more → the `ambiguous-definite-shape` question, naming them (the 2026-10-16 ruling);
+ *  - none, or a noun that is not definite (a ב-prefixed «במשולש» is ADR-029's possible reference, an indefinite one is
+ *    ADR-654's new shape), or a first noun of another arity → null: the caller does what it did before.
+ * `from` is where the shape's phrase starts when it is not the sentence's first noun (a polygon-in-polygon's container,
+ * «ריבוע חסום בתוך המשולש»); the article is read there, and the example names the shape there.
+ */
+const definiteShapeVertices = (s: string, ctx: ParseContext, n: number, from = 0): Id[] | Clarify | null => {
+  const span = shapeNounSpan(s.slice(from), NGON_ARITY);
+  if (span?.article !== 'definite' || span.arity !== n) return null;
+  const noun = { end: from + span.end };
+  const matches = (ctx.polygons ?? []).filter((v) => v.length === n).map((v) => v.map(up));
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0];
+  const shapes = matches.map((v) => v.join(''));
+  return { clarify: 'ambiguous-definite-shape', shapes, sides: n, example: `${s.slice(0, noun.end)} ${shapes[0]}${s.slice(noun.end)}`.trim() };
+};
+/** A {@link definiteShapeVertices} result that is the question, not vertices. */
+const isClarify = (v: Id[] | Clarify | null): v is Clarify => v !== null && !Array.isArray(v);
+
 /** #2127 ([ADR-654](../../docs/06-decisions.md#adr-654)): the outermost `parse` call collects the existing polygons an
  *  INDEFINITE shape noun was bound to; only one the winning commands name is reported (`indefiniteShape`). */
 let indefiniteBindSink: Id[][] | null = null;
@@ -1156,7 +1188,10 @@ const shapeMacro =
       // No label run. Auto-name a bare named shape ("דלתון" → A,B,C,D) when the student named NO labels and
       // nothing geometry-significant remains; a partial run / leftover defers or escalates exactly as before.
       if (namesVertices(bare) || shapeLeftover(bare)) return null;
-      return withGivens(autoVertexLabels(n, ctx.points ?? []));
+      // #2205 (ADR-685): a DEFINITE noun («המשולש ישר זווית») is the figure's one shape of this size, or a question
+      const def = definiteShapeVertices(s, ctx, n);
+      if (isClarify(def)) return def;
+      return withGivens(def ?? autoVertexLabels(n, ctx.points ?? []));
     }
     // After keyword + labels are consumed, nothing geometry-significant should remain — a constraint/extra
     // construct ("kite ABCD with AB = 6") means a compound → escalate, don't half-parse (mirrors inscribedPolygon).
@@ -5831,6 +5866,11 @@ const HE_POLY_NAME_N: Record<string, number> = {
 /** The n-gon nouns (n ≥ 5) of the tables above, per language — composed, never re-spelled (#1891). */
 const NGON_WORDS_EN = Object.entries(POLY_NAME_N).filter(([, n]) => n >= 5).map(([w]) => w).join('|');
 const NGON_WORDS_HE = Object.keys(HE_POLY_NAME_N).join('|');
+/** The n-gon nouns (n ≥ 5), word → arity, for the article reader (#2205, ADR-685) — the tables above, composed. */
+const NGON_ARITY: Readonly<Record<string, number>> = {
+  ...Object.fromEntries(Object.entries(POLY_NAME_N).filter(([, n]) => n >= 5)),
+  ...HE_POLY_NAME_N,
+};
 
 /** The polygon words an inscription statement can name, one alternation per language — shared by the
  *  container-marker and order tests below so the list can't drift between them (a missing word here
@@ -6136,7 +6176,7 @@ function uninscribableIncircle(s: string): number | null {
  * במעגל» already does for four — one sentence shape must not give a circle for the regular noun and a
  * refusal for the plain one).
  */
-function inscribedNgon(s: string, ctx: ParseContext, hidden: boolean): AnyCommand[] | 'stop' | null {
+function inscribedNgon(s: string, ctx: ParseContext, hidden: boolean): AnyCommand[] | 'stop' | Clarify | null {
   // #1975 (ADR-652): a ring of five or more named by its LETTERS alone («ABCDE חסום במעגל», and so the active
   // «מעגל חוסם את ABCDE» handed here) states its arity in the run, as a bare 3-/4-run does below and as
   // `uninscribableIncircle` already reads it for the converse — never with a polygon noun beside it.
@@ -6160,9 +6200,12 @@ function inscribedNgon(s: string, ctx: ParseContext, hidden: boolean): AnyComman
   if (r.symbolic) rest = rest.replace(new RegExp(String.raw`\b[Rr]\b${r.sym && !/^[Rr]$/.test(r.sym) ? String.raw`|\b${r.sym}\b` : ''}`, 'g'), ' ');
   rest = stripConsumedNumber(rest, r.numeric);
   // The named vertices, or — «מחומש משוכלל חסום במעגל», unlabelled, n known from the noun — auto-named.
+  // #2205 (ADR-685): a definite «המחומש …» is the figure's one pentagon, or a question
+  const def = labelRun(rest, n) || namesVertices(rest) || shapeLeftover(rest) ? null : definiteShapeVertices(s, ctx, n);
+  if (isClarify(def)) return def;
   const ids =
     labelRun(rest, n) ??
-    (!namesVertices(rest) && !shapeLeftover(rest) ? autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])]) : null);
+    (!namesVertices(rest) && !shapeLeftover(rest) ? (def ?? autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])])) : null);
   if (!ids) return null;
   if (shapeLeftover(removeClaimed(rest, ids))) return 'stop'; // a second statement rides the line — escalate
   // The two existing-circle questions the 3-/4-gon path asks, asked here through the SAME readers.
@@ -6317,11 +6360,14 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // The vertices the student named, or — when the shape word is explicit but UNLABELED ("מרובע חסום
   // במעגל" / "triangle inscribed in a circle") — auto-named A,B,C(,D), avoiding existing points and the
   // named centre. A PARTIAL label run (some letters but not n) stays a defer/escalate (a typo / compound).
+  // #2205 (ADR-685): a DEFINITE noun is decided before ADR-029's binding — with two or more candidates it asks
+  const def = labelRun(rest, n) || namesVertices(rest) ? null : definiteShapeVertices(s, ctx, n);
+  if (isClarify(def)) return def;
   const ids =
     labelRun(rest, n) ??
     (namesVertices(rest)
       ? null
-      : (referencedPolygon(ctx, n, s) ?? autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])])));
+      : (def ?? referencedPolygon(ctx, n, s) ?? autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])])));
   if (!ids) return null;
   // After the circle, the shape, and the vertices are consumed, nothing
   // geometry-significant should remain — a constraint/extra construct means a
@@ -6514,7 +6560,11 @@ const inscribedInPolygon: Rule = (s, ctx) => {
   // the inverted "במשולש ABC חסום …").
   const contN = cont.arity;
   const afterCont = s.slice(cm.index + cm[0].length);
-  const contIds = labelRun(afterCont, contN) ?? existingPolygon(ctx, contN) ?? autoVertexLabels(contN, ctx.points ?? []);
+  // #2205 (ADR-685): a DEFINITE container («בתוך המשולש», "in the triangle") is the figure's one such shape, or a
+  // question; a ב-prefixed one («במשולש») keeps ADR-029's possible reference below
+  const contDef = labelRun(afterCont, contN) ? null : definiteShapeVertices(s, ctx, contN, cm.index);
+  if (isClarify(contDef)) return contDef;
+  const contIds = labelRun(afterCont, contN) ?? contDef ?? existingPolygon(ctx, contN) ?? autoVertexLabels(contN, ctx.points ?? []);
   // The inner shape: read from the utterance with the container noun, its consumed adjective and its labels
   // removed, so a same-family container (rhombus in a rhombus) doesn't confuse the inner-shape detection.
   let inner = s.replace(cm[0], ' ');
@@ -6530,6 +6580,8 @@ const inscribedInPolygon: Rule = (s, ctx) => {
   const taken = [...(ctx.points ?? []), ...contIds];
   const wm = new RegExp(SHAPE_NOUN_WORDS[innerPhrase.noun], 'i').exec(inner);
   const afterShape = wm ? inner.slice(wm.index + wm[0].length) : inner;
+  // #2205 (ADR-685): NOT resolved for a definite inner noun — its named twin («הריבוע ABCD חסום במשולש EFG») does not
+  // build on a drawn square, so neither the binding nor the question would teach a sentence that commits (#2257).
   const ids = labelRun(afterShape, 4) ?? autoVertexLabels(4, taken);
 
   const cmds: AnyCommand[] = [];
@@ -6607,10 +6659,13 @@ const regularPolygon: Rule = (s, ctx) => {
   // The named vertices, or — when the n-gon is named/numbered but UNLABELED ("regular pentagon",
   // "מחומש משוכלל") — auto-named A,B,C,… (n is known from the name, so we can). A partial run / a leftover
   // still escalates. (A generic "regular polygon" with no labels already returned null above: n is unknown.)
+  // #2205 (ADR-685): «המחומש משוכלל» is the figure's one pentagon, or a question
+  const def = labelRun(rest, n) || namesVertices(rest) || shapeLeftover(rest) ? null : definiteShapeVertices(s, ctx, n);
+  if (isClarify(def)) return def;
   const ids =
     labelRun(rest, n) ??
     (!namesVertices(rest) && !shapeLeftover(rest)
-      ? autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])])
+      ? (def ?? autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])]))
       : null);
   if (!ids) return null;
   if (shapeLeftover(removeClaimed(rest, ids))) return 'stop';
@@ -7158,11 +7213,15 @@ const incircle: Rule = (s, ctx) => {
   // (#54). A NUMERIC one is left in `rest`: the inradius is derived, so a stated value is a compound to escalate.
   const rad = parseRadius(s);
   if (rad.symbolic && rad.sym) rest = rest.replace(new RegExp(String.raw`\b${rad.sym}\b`, 'g'), ' ');
+  // #2205 (ADR-685): a DEFINITE noun («המשולש חוסם את מעגל O») is decided before ADR-029's binding
+  const def = labelRun(rest, n) || namesVertices(rest) ? null : definiteShapeVertices(s, ctx, n);
+  if (isClarify(def)) return def;
   const ids =
     labelRun(rest, n) ??
     (namesVertices(rest)
       ? null
-      : (referencedPolygon(ctx, n, s) ??
+      : (def ??
+        referencedPolygon(ctx, n, s) ??
         autoVertexLabels(n, [...taken, ...(namedC ? [namedC] : []), ...(incLabel ? [incLabel] : [])])));
   if (!ids) return null;
   // #1790: the leftover guard this rule never had — after the circle, the phrase, the centre and the vertices
@@ -13260,7 +13319,7 @@ const withReservedGuard = (r: ParseResult, ctx: ParseContext): ParseResult => {
  * about that member (docs/17 §3), which is why the list is explicit and each entry carries its reason.
  */
 const isAmbiguityQuestion = (reason: string): boolean =>
-  reason === 'ambiguous-shape' || reason === 'ambiguous-construct' || reason === 'side-unspecified';
+  reason === 'ambiguous-shape' || reason === 'ambiguous-construct' || reason === 'side-unspecified' || reason === 'ambiguous-definite-shape';
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
   // #1445: the OUTERMOST call owns the lone-vertex reading sink; nested calls (a chain's clauses, the split)
   // write into it, and only readings the winning commands name are reported (said aloud on commit).
@@ -13926,6 +13985,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'ambiguous-circle-ref') return { ok: false, reason: 'ambiguous-circle-ref', centers: res.centers };
   if (res.clarify === 'ambiguous-container') return { ok: false, reason: 'ambiguous-container', centers: res.centers };
   if (res.clarify === 'ambiguous-shape') return { ok: false, reason: 'ambiguous-shape', noun: res.noun, shapes: res.shapes };
+  if (res.clarify === 'ambiguous-definite-shape') return { ok: false, reason: 'ambiguous-definite-shape', shapes: res.shapes, sides: res.sides, example: res.example };
   if (res.clarify === 'ambiguous-construct') return { ok: false, reason: 'ambiguous-construct', noun: res.noun, options: res.options };
   if (res.clarify === 'tangents-ambiguous') return { ok: false, reason: 'tangents-ambiguous', points: res.points };
   if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };

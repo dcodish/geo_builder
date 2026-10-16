@@ -273,6 +273,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2060': 'open', // #2024 (ADR-668): 3-D does not read a single-letter angle given a symbol («זוית B=b», «זוית B=α»)
 
   '#2140': 'open',
+  '#2235': 'open', // #2205 (ADR-685): 3-D picks the first of two triangles for a definite «המשולש …» where 2-D asks
+  '#2236': 'open', // #2205 (ADR-685): analytic does not read a definite unnamed shape noun with a predicate
 
 };
 
@@ -1418,6 +1420,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'quad-straight-corner-2064', family: 'polygons', steps: ['מרובע ABCD', 'זווית BCD = 180'], expect: 'refused', note: '2-D: the flat sentence naming B, C, D' },
   { id: 'quad-corner-incidence-2064', family: 'polygons', steps: ['מרובע ABCD', 'C על BD'], expect: 'refused' },
   { id: 'pentagon-straight-corner-2085', family: 'polygons', steps: ['מחומש ABCDE', 'זווית BCD = 180'], expect: 'refused', note: '2-D: «…והמחומש ABCDE היה נעשה מרובע»' },
+  { id: 'definite-triangle-predicate-2205', family: 'polygons', steps: ['משולש ABC', 'המשולש ישר זווית'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2236' }], note: '#2205 (ADR-685): the definite noun is the one triangle — 2-D drew a second triangle DEF before' },
+  { id: 'definite-triangle-two-2205', family: 'polygons', steps: ['משולש ABC', 'משולש DEF', 'המשולש ישר זווית'], expect: 'asks', knownGap: [{ product: '3d', issue: '#2235' }, { product: 'analytic', issue: '#2236' }], note: '#2205 (ADR-685): two triangles — refused naming them, with the named form as the next step' },
   { id: 'altitude-two-vertex-not-true-2064', family: 'cevians-centres', steps: ['מרובע ABCD', 'AC גובה'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2072' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D: AC ⟂ BC, the side a free choice «הציגו תצורה אחרת» cycles (ADR-644); analytic refuses `degenerate-role` — the cross-tool question #2072' },
   // ── #2101 / #2100 (ADR-648 / ADR-649, operator rulings 2026-10-14): a radius letter's value sizes its circle; a radius ratio is a relation ──
   { id: 'radius-letter-value-2101', family: 'circles', steps: ['מעגל O ברדיוס r', 'r = 3'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }] },

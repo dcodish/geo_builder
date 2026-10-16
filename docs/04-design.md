@@ -482,6 +482,19 @@ no English "the". The outermost `parse` returns the binding as `indefiniteShape`
 keeps the bound reading only when it restates the shape (dry run empty or implied, and no new violation from the
 givens verifier); otherwise it re-parses with that polygon left out of `ctx.polygons`, so the rule mints fresh letters.
 
+**The definite half** ([ADR-685](06-decisions.md#adr-685)). `shapeNounSpan` / `shapeNounArticle` (`parser/shapePhrase.ts`)
+read the first shape noun's article three ways — `definite` (glued ה, also behind ו/ש; English "the"), `prefixed`
+(ב/ל/כ/מ, the article unwritten), `indefinite` — plus where the noun's word ends and its arity (the n-gon words
+passed in by parse.ts); `shapeNounIsDefinite` is the ADR-654 two-way view of it. `definiteShapeVertices`
+(`parse.ts`) is asked by every rule that would auto-name a polygon for an unnamed noun — `shapeMacro`'s no-label
+branch, `inscribedNgon`, `regularPolygon`, `inscribedPolygon` and `incircle` (before `referencedPolygon`), and the
+polygon-in-polygon container (reading from the container phrase): a `definite` noun of the rule's arity over
+ADR-029's candidate set returns the one polygon's vertices (the labelled branch's lowering follows), or with two or
+more the `ambiguous-definite-shape` clarify (`shapes`, `sides`, `example` — the sentence with the first ring's
+letters after the noun). It is an ambiguity question (`isAmbiguityQuestion`), so neither the dropped-noun gate nor
+the model sees it; `ambiguousDefiniteShapeNote` (`app/decideDeterministic.ts`) renders it for the submit and ✎ edit
+seams (`input.ambiguousDefiniteShape`, the plural from `input.shapePlural` by arity).
+
 ### A through-statement about a drawn circle is a reference ([ADR-548](06-decisions.md#adr-548))
 
 The circle definition rules (`circle`, `circumcircle` in `src/parser/parse.ts`) ask ADR-029's introduce-vs-resolve
