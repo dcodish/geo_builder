@@ -309,6 +309,14 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'A is on the circle with centre M',
     needs: ['נתון מעגל שמרכזו M', 'x^2+y^2=16'],
   },
+  // #2199 (ADR-AG-282): a point on a LIST of carriers is on each — the two-line meaning, in one sentence.
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'A על מעגל O ועל מעגל P',
+    en: 'A on circle O and on circle P',
+    needs: ['מעגל O', 'מעגל P'],
+  },
   {
     category: 'circles',
     family: 'F5',
