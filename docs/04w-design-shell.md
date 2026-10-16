@@ -287,6 +287,16 @@ once; each tree has a thin lock; 3-D's primed alphabet rides as an explicit opti
 does nothing, one that restores without logging, one that rewrites a reversal, one that invents an
 unstated run, one that picks a spelling the student left ambiguous) and asserts each is caught. A row the meta-lock shows cannot fail is deleted, never kept as a check of nothing.
 
+### The honesty accounting core ([ADR-AG-280](06c-decisions-analytic.md#adr-ag-280))
+
+`shell/llm/honestyCore.ts` is the algebra of the faithfulness gates, with no product vocabulary:
+`spendAccounts` (the multiset: one account pays one occurrence, 2-D #437), `nameAccounting` (stated vs written,
+case-blind on the stated side, `existing` exempting invented by default and dropped only on request),
+`scanNumbers` (unsigned occurrences after the caller's blanks; `a/b` is one), `unionByMax` (one statement read
+from two sources pays once) and `LATIN_FILLER`. What a name or a number is stays in the product. Analytic is its
+first consumer (`faithfulnessAnalytic`); 2-D's and 3-D's own copies move onto it in a follow-up, behaviour-identical.
+Lock: `shell/__tests__/honesty-core-1355.test.ts`.
+
 ### The junk gate ([ADR-W-087](06w-decisions-workspace.md#adr-w-087))
 
 `shell/llm/constructionSignal.ts` answers one question for every builder that escalates to the model:

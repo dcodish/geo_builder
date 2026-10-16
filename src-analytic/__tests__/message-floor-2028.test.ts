@@ -38,6 +38,8 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'self-crossing': [{}],
   'llm-busy': [{}],
   'llm-understood-unsupported': [{}],
+  'llm-dropped': [{ labels: 'B, C' }],
+  'llm-invented': [{}],
   'bad-operand': [{}],
   'conflicting-restatement': [{}],
   'name-kind-clash': [{ existing: 'curve:circle' }, { existing: 'derived:centroid' }, {}],

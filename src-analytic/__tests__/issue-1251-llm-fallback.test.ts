@@ -86,9 +86,11 @@ describe('#1251 — the system prompt carries the catalogue and the rules that m
 
 describe('#1251 — every returned line goes back through the real submit gate', () => {
   const ask = (steps: string[]) => vi.fn().mockResolvedValue({ steps });
+  // #1355: each utterance below states what its answer names — the faithfulness gates refuse an answer that
+  // names a point the sentence never did (those gates have their own lock, issue-1355-llm-honesty.test.ts).
 
   it('records the lines when they all parse and fold', async () => {
-    const out = await runFallback('סמן שתי נקודות', [], 0, ask(['A(0,0)', 'B(6,8)']));
+    const out = await runFallback('סמן את A(0,0) ואת B(6,8)', [], 0, ask(['A(0,0)', 'B(6,8)']));
     expect(out).toEqual({ kind: 'lines', lines: ['A(0,0)', 'B(6,8)'] });
   });
 
@@ -130,18 +132,18 @@ describe('#1251 — every returned line goes back through the real submit gate',
 
   /** A restatement of something already true is not a failure — it contributes nothing and is dropped. */
   it('drops a line that restates what the figure already holds', async () => {
-    const out = await runFallback('שוב', ['A(0,0)'], 0, ask(['A(0,0)', 'B(6,8)']));
+    const out = await runFallback('A(0,0) ו-B(6,8)', ['A(0,0)'], 0, ask(['A(0,0)', 'B(6,8)']));
     expect(out).toEqual({ kind: 'lines', lines: ['B(6,8)'] });
   });
 
   /** A later line may depend on an earlier one — each is decided against the figure as it then stands. */
   it('lets a later line build on an earlier one', async () => {
-    const out = await runFallback('משולש ותיכון', [], 0, ask(['משולש ABC', 'AD תיכון לצלע BC']));
+    const out = await runFallback('משולש ABC ותיכון AD לצלע BC', [], 0, ask(['משולש ABC', 'AD תיכון לצלע BC']));
     expect(out).toEqual({ kind: 'lines', lines: ['משולש ABC', 'AD תיכון לצלע BC'] });
   });
 
   it('the accepted lines actually build', async () => {
-    const out = await runFallback('משולש ותיכון', [], 0, ask(['משולש ABC', 'AD תיכון לצלע BC']));
+    const out = await runFallback('משולש ABC ותיכון AD לצלע BC', [], 0, ask(['משולש ABC', 'AD תיכון לצלע BC']));
     expect(out.kind).toBe('lines');
     if (out.kind === 'lines') expect(derive(out.lines, 0).faults).toEqual([]);
   });

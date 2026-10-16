@@ -33,7 +33,7 @@
 import { decideSubmit, type RecordNotice, type SubmitVerdict } from './submit';
 import { derive } from '../engine/derive';
 import type { LlmStepsOutcome } from '../parser/llmAnalytic';
-import { restoreStatedSequencesAnalytic } from '../parser/honestyAnalytic';
+import { existingNamesAnalytic, faithfulnessAnalytic, restoreStatedSequencesAnalytic } from '../parser/honestyAnalytic';
 import type { InputError } from '../store/useAnalyticStore';
 
 export type FallbackOutcome =
@@ -66,7 +66,19 @@ export type FallbackOutcome =
        * student did not write); the key names the CLASS, which is the tool's own state.
        */
       code?: string;
-    };
+      /** The model's WHOLE answer (after the sequence gate), for the log only (#1355: a rejection logged only its refused step). */
+      answer?: string[];
+    }
+  /**
+   * THE ANSWER DOES NOT SAY WHAT THE STUDENT SAID (#1355, ADR-AG-279). Every line re-parsed, but the
+   * decomposition lost a name or a number the sentence stated, or wrote a name nobody stated. Nothing is
+   * recorded, exactly as for a refused line.
+   *
+   * `dropped` is the student's OWN tokens as typed (names, then numbers): they may be shown, because the
+   * student wrote them. `invented` is only a flag: the model's letter is neither typed by the student nor
+   * shown by the figure, so it is never put in front of them (ADR-W-096).
+   */
+  | { kind: 'unfaithful'; dropped: string[]; invented: boolean; answer: string[] };
 
 /** What the model is told the figure already holds. Kept short — the proxy caps it at 1000 chars. */
 export function fallbackContext(lines: readonly string[]): string {
@@ -116,13 +128,25 @@ export async function runFallback(
     // history is theirs to ask for, never the model's.
     if (verdict.kind === 'refused' || verdict.kind === 'ignored' || verdict.kind === 'rename' || verdict.kind === 'swap') {
       const code = verdict.kind === 'refused' ? (verdict.error as { key?: string }).key : undefined;
-      return { kind: 'rejected', refusedStep: step, ...(code ? { code } : {}) };
+      return { kind: 'rejected', refusedStep: step, ...(code ? { code } : {}), answer: gated.lines };
     }
     // `already-known` / `already-follows` contribute nothing but are not failures: the model restated
     // something true. Drop the line and keep going rather than recording a duplicate.
     if (verdict.kind === 'record') {
       accepted.push(verdict.line);
       notice ??= verdict.notice;
+    }
+  }
+
+  /**
+   * THE FAITHFULNESS GATES (#1355, ADR-AG-279) — after the re-parse, so an unbuildable answer keeps its own
+   * refusal (ADR-AG-186), and before anything records. They read the WHOLE answer (`gated.lines`): a line
+   * dropped above as already-known still states its given, so it still accounts for a name or a number.
+   */
+  if (accepted.length) {
+    const f = faithfulnessAnalytic(utterance, gated.lines, existingNamesAnalytic(derive(lines, seed).construction));
+    if (f.dropped.length || f.invented.length) {
+      return { kind: 'unfaithful', dropped: f.dropped, invented: f.invented.length > 0, answer: gated.lines };
     }
   }
 
@@ -144,6 +168,8 @@ export async function runFallback(
  *   that never happened and a missing capability that exists. The student keeps the ORIGINAL refusal,
  *   which is about words they actually wrote.
  * - `none`: the model judged it inexpressible, or the transport failed — the original refusal too.
+ * - `unfaithful` (#1355, ADR-AG-279): the answer lost what the student stated (`llm-dropped`, naming the
+ *   student's own tokens) or named what they did not (`llm-invented`, naming nothing). Dropped first.
  */
 export function fallbackRefusal(
   out: Exclude<FallbackOutcome, { kind: 'lines' }>,
@@ -151,6 +177,10 @@ export function fallbackRefusal(
   original: InputError,
 ): InputError {
   if (out.kind === 'busy') return { key: 'llm-busy', detail: raw };
+  // #1355 — dropped first, then invented (2-D's precedence). The dropped tokens are the student's own.
+  if (out.kind === 'unfaithful') {
+    return out.dropped.length ? { key: 'llm-dropped', detail: raw, labels: out.dropped.join(', ') } : { key: 'llm-invented', detail: raw };
+  }
   if (out.kind === 'rejected' && out.code !== 'not-handled') return { key: 'llm-understood-unsupported', detail: raw };
   return original;
 }

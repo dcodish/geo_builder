@@ -456,6 +456,8 @@ const HE_IS = `(?:\\s*(?:${COPULA_WORDS}))?`;
 
 /** A point/vertex name: a capital letter with an optional digit subscript (`F1`, `D2`). */
 const NAME = '[A-Z][0-9₀-₉]?';
+/** #1355 — the point-name atom, exported so the LLM seam's honesty gates read a name exactly as the grammar does. */
+export const POINT_NAME_ATOM = NAME;
 /**
  * A NUMERAL naming a line — the exam's own «הישר 1» / «הישר I» (#1298, #1318; ADR-AG-144).
  *
@@ -480,13 +482,15 @@ const LINE_NUMERAL_RE = new RegExp(`^${LINE_NUMERAL}$`);
  * line through the points I and V is not a sentence the corpus writes, and it is still sayable by its
  * points («הישר העובר דרך I ו-V» is #1281's converse).
  */
-const LINE_NAME = `(?:[ℓl][0-9]?|${LINE_NUMERAL}(?=[\\s:,]|$)|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)`;
+/** #1355 — the letter line-name atom (`l`, `ℓ1`), exported for the honesty gates (the lexical-atoms rule, docs/17 §3). */
+export const LETTER_LINE_NAME_ATOM = '[ℓl][0-9]?';
+const LINE_NAME = `(?:${LETTER_LINE_NAME_ATOM}|${LINE_NUMERAL}(?=[\\s:,]|$)|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)`;
 /**
  * The name slot of the NOUN-LESS forms («משוואת AB היא …», «AB: …») keeps the pre-numeral token: with
  * the noun dropped, a Roman numeral is a CIRCLE («משוואת I היא x²+y²=9», #1072) and the circle branch
  * below owns it. A numeral names a LINE only where the student wrote the line noun.
  */
-const LINE_NAME_PLAIN = '(?:[ℓl][0-9]?|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)';
+const LINE_NAME_PLAIN = `(?:${LETTER_LINE_NAME_ATOM}|[A-Z][0-9₀-₉]?[A-Z][0-9₀-₉]?)`;
 
 // How a numeral-named line is CALLED («ישר 1» / «line 1») is `lineNameOf` in engine/names.ts (#1350), so
 // `nameReading` inverts it from the same table.
