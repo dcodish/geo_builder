@@ -1,0 +1,49 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-16T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "ifAbsent": true,
+        "autoCenter": true
+      },
+      "utterance": "שני מעגלים זרים ברדיוס 5",
+      "group": "g0",
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "@ctr-P",
+        "radius": 5,
+        "ifAbsent": true,
+        "autoCenter": true
+      },
+      "utterance": "שני מעגלים זרים ברדיוס 5",
+      "group": "g0",
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "cmd": {
+        "type": "set-circle-position",
+        "relation": "disjoint",
+        "a": "circle-O",
+        "b": "circle-P"
+      },
+      "utterance": "שני מעגלים זרים ברדיוס 5",
+      "group": "g0",
+      "enabled": true
+    }
+  ]
+}

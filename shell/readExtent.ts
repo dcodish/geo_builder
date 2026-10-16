@@ -305,3 +305,38 @@ export function readWords<L>(text: string, lowering: L, reader: Reader<L>, word:
   }
   return { read, unread, exempt };
 }
+
+/**
+ * THE NUMBER CLASS (#2198, ADR-678) — a NUMBER the reading never read.
+ *
+ * «שני מעגלים נחתכים ברדיוס 5» lowered to two FREE circles: the rule never read «ברדיוס 5», and the 5 looked kept
+ * only because the tool's own default radius happens to be 5 («ברדיוס 4» escalated). Any value a rule writes for
+ * another reason — a default, a placement constant, the k = 1 of "equal" — can collide with a stated number the
+ * same way, so the number is asked of the READING, like a label run: **an occurrence is read when replacing it with
+ * a same-kind value that is not in the line changes the lowering or fails the read.** An integer becomes the next
+ * integer not in the line, a decimal the next decimal (same places) not in the line. No exemption lives here: a
+ * builder decides which digit runs are stated numbers at all (its scanner already blanks counts and name indices)
+ * and passes them in.
+ *
+ * @param text the line the occurrences index into (the builder's normalized line)
+ * @param occurrences the stated numbers, located in `text`
+ */
+export function readNumbers<L>(text: string, lowering: L, reader: Reader<L>, occurrences: readonly { text: string; at: number; end: number }[]): RunReading {
+  const present = new Set((text.match(/\d+(?:\.\d+)?/g) ?? []).map((x) => parseFloat(x)));
+  const substitute = (n: string): string => {
+    const places = n.includes('.') ? n.length - n.indexOf('.') - 1 : 0;
+    const step = 10 ** -places;
+    let v = parseFloat(n);
+    do v = Math.round((v + step) * 10 ** places) / 10 ** places;
+    while (present.has(v));
+    return v.toFixed(places);
+  };
+  const read: Occurrence[] = [];
+  const unread: Occurrence[] = [];
+  for (const o of occurrences) {
+    const occ: Occurrence = { ...o, parts: [o.text] };
+    const r = reader.read(text.slice(0, o.at) + substitute(o.text) + text.slice(o.end));
+    (r === null || !reader.same(r, lowering) ? read : unread).push(occ);
+  }
+  return { read, unread, exempt: [] };
+}

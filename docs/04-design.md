@@ -686,6 +686,18 @@ seats the second crossing on the first; the drawn figure refuses, tagged `EvalEr
 it). The fold names the other side: the drop-one search finds the tangency or the length; for the other order the
 crossing's own statement is read from `ownerByObjId`.
 
+### The two-circle family's pair modifiers ([ADR-455](06-decisions.md#adr-455), [ADR-677](06-decisions.md#adr-677))
+
+A modifier stated for the PAIR lands on the pair the rule resolved (`resolveCirclePair`, the #215 chokepoint), through
+one helper per modifier in `parse.ts`: `withEqualRadii` (EQUAL_SIZE → `set-radius-ratio k = 1`) and, since ADR-677,
+`withStatedRadius` (one singular «ברדיוס N» / «רדיוס כל אחד N» / "with radius N" — `STATED_PAIR_RADIUS`, read only when
+exactly one such phrase governs the pair and it is not a named circle's own «מעגל O ברדיוס 5»): a circle the rule
+creates is created PINNED at N (`freeRadius` dropped), a drawn one gets `set-radius N`. `withStatedRadius`'s consumers
+are `twoCirclesMeet` (all three branches), `twoCirclesPosition` (the disjoint pair only), `circlesTangent` (external
+only; its #757 leftover guard strips the phrase only then) and `commonTangent` (the two-touch construction). A pair
+that cannot be equal (contained, internally tangent, concentric) does not read it, so its number stays unread and the
+line escalates (ADR-678).
+
 ### A fixed-run rule consumes the whole label body ([ADR-601](06-decisions.md#adr-601))
 
 `labelRun(body, n)` returns the first run of exactly n labels and nothing about the rest of the body, so a rule
@@ -776,6 +788,27 @@ together is a co-reference. At submit, when only the read-extent members fired (
 `lostRoleNote` teaches `input.scope.split-roles` — one line per role, the side from the lowering, every line proved to
 parse in turn — else the parts cut before the later role word. Where an older gate fired too, the line keeps its
 weak path (W21). The ⟂ verb row reads «אנך»; the existing-segment ⊥-bisector declares `VERB_PERPENDICULAR`.
+
+#### A number the reading never read ([ADR-677](06-decisions.md#adr-677), [ADR-678](06-decisions.md#adr-678))
+
+The number gate (`droppedGivenNumbers`, ADR-250 / ADR-437) accounts a stated number by VALUE, so any equal payload
+used to pay for it — a default radius 5 for «ברדיוס 5», a line marker's ±5 for «ואורכו 5», an apex's free x = 12, the
+k = 1 of «שווים» for «שווים ל-1». Two layers now:
+
+- **The accountant skips seeds** (ADR-677): the walk over the commands' payloads leaves out every field
+  `seedFields(cmd)` (`src/engine/types.ts`, beside the command kinds) declares — a `circle`'s `radius` when
+  `freeRadius`, a `free-point`'s `x`/`y` when `free`, a `point-on-line` marker's `offset`, a free `point-on-circle`'s
+  `theta`. A DOF's starting value is not a given. The LLM lane's second attempt uses the same accountant, so it has
+  this too. A new free-DOF command kind declares its seeds there.
+- **The number class of the read-extent probe** (ADR-678): `unreadNumbers` (`src/app/unreadNumbers.ts`, in
+  `honestyGateReport`, so both seams) runs only when the accountant found nothing. Each number the gate's own scanner
+  sees (`statedNumberOccurrences` — `statedNumberText` blanks counts and name indices, the scan `droppedGivenNumbers`
+  itself uses) is replaced by a same-kind value not in the line (`shell/readExtent.ts` `readNumbers`: the next free
+  integer, a decimal keeping its places) and the line re-read in the seam's context; an occurrence whose replacement
+  leaves the lowering identical was not read, and its value joins `droppedNums` — the verdict is the one the same line
+  with an unaccounted number gets (`escalate`, `weak: dropped`; the ✎ seam's `steps.editDropped`). It closes the
+  structural-constant member no field predicate can foresee. Cost: one parse per stated number on lines every older
+  number check passed.
 
 #### An unread item is named ONCE, on every seam ([ADR-627](06-decisions.md#adr-627))
 

@@ -42,6 +42,7 @@ import {
 import { unaccountedSpans } from '@/parser/spanAccounting';
 import type { AnyCommand, Id } from '@/engine';
 import type { ParseContext } from '@/parser';
+import { unreadNumbers } from './unreadNumbers';
 import { unreadParts, type UnreadReport } from './unreadParts';
 import { unreadRoles, type RoleReport } from './unreadRoles';
 
@@ -53,9 +54,9 @@ import { unreadRoles, type RoleReport } from './unreadRoles';
  * though only the LLM path consults them today.
  *
  * The context-carrying gates (`droppedNewLabels`, `introducedNewLabels`, `unaccountedSpans`, and #1888's
- * `unreadParts`, which re-reads the line in the seam's own parse context) are deliberately out — they need
- * the figure, which is not this map's input shape. The read-extent member is netted over the corpus by
- * `issue-1888-unread-corpus-net.test.ts`.
+ * `unreadParts` / `unreadRoles` / #2198's `unreadNumbers`, which re-read the line in the seam's own parse context)
+ * are deliberately out — they need the figure, which is not this map's input shape. The read-extent members are
+ * netted over the corpus by `issue-1888-unread-corpus-net.test.ts`.
  */
 export const CONTEXT_FREE_GATES: Record<string, (u: string, cmds: AnyCommand[]) => unknown[] | boolean> = {
   droppedComparison,
@@ -160,7 +161,12 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
   const dropped = droppedNewLabels(utterance, commands, pts, radiusSymbols);
   // The NUMERIC sibling (ADR-250): a stated magnitude the commands don't account for means the rule
   // consumed only part of the utterance (usually a typo'd keyword mid-sentence).
-  const droppedNums = droppedGivenNumbers(utterance, commands);
+  // #2198 (ADR-678): and a number no command carries is not the only drop — a number the READING never read is
+  // one too, however a value the rule wrote for another reason happens to match it (the k = 1 of «שווים» paying for
+  // «שווים ל-1»). Asked of the reading (substitute, re-read) only when the accountant found nothing: a line it
+  // already flags escalates anyway, and the probe costs one parse per stated number.
+  const accounted = droppedGivenNumbers(utterance, commands);
+  const droppedNums = accounted.length ? accounted : unreadNumbers(utterance, commands, ctx);
   // The RELATION sibling (ADR-264): a stated `AB=CD`/`AB⊥CD`/`AB∥CD` between points that all already
   // appear on the shape trips neither older gate.
   const droppedRels = droppedGivenRelations(utterance, commands);

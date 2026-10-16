@@ -1,0 +1,62 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-16T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "autoCenter": true
+      },
+      "utterance": "שני מעגלים נחתכים ברדיוס 5",
+      "group": "g0",
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "@ctr-P",
+        "radius": 5,
+        "autoCenter": true
+      },
+      "utterance": "שני מעגלים נחתכים ברדיוס 5",
+      "group": "g0",
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "A",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "branch": 0
+      },
+      "utterance": "שני מעגלים נחתכים ברדיוס 5",
+      "group": "g0",
+      "enabled": true
+    },
+    {
+      "id": "g0.3",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "B",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "branch": 1,
+        "avoid": "A"
+      },
+      "utterance": "שני מעגלים נחתכים ברדיוס 5",
+      "group": "g0",
+      "enabled": true
+    }
+  ]
+}

@@ -273,6 +273,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2060': 'open', // #2024 (ADR-668): 3-D does not read a single-letter angle given a symbol («זוית B=b», «זוית B=α»)
 
   '#2140': 'open',
+  '#2190': 'open', // #2198 / #2216 (ADR-677): analytic does not read one «ברדיוס N» for a circle pair
 
 };
 
@@ -1472,6 +1473,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #1851 (ADR-662): a symbol plus a constant is read by one affine-tail reader, as a length's «a + 3» is ──
   { id: 'angle-symbol-constant-1851', family: 'angles', steps: ['משולש ABC', '∠ABC = α + 40'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2140' }], note: 'the operator (2026-10-07): «should be accepted and drawn»; analytic already recorded it; 3-D does not read a constant (#2140, needs-operator)' },
   { id: 'angle-same-letter-other-constant-1851', family: 'angles', steps: ['משולש ABC', '∠ABC = α', '∠ABC = α + 40'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2140' }], note: '2-D refuses it in the #2061 contradiction frame; analytic refuses it «לא נמצאה תצורה» (the wording is #2105)' },
+  // ── #2198 / #2216 (ADR-677): one «ברדיוס N» on a two-circle sentence sizes BOTH circles (operator ruling 2026-10-16) ──
+  { id: 'two-circles-radius-both-2216', family: 'circles', steps: ['שני מעגלים נחתכים ברדיוס 5'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D drew 5 / 3.6 green before ADR-677 (the 5 paid by the default radius); analytic does not read the sentence (not-handled)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
