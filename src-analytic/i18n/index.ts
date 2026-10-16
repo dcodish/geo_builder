@@ -226,6 +226,9 @@ const he = {
   errRenameBadName: '"{{detail}}" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
   // #1919 — a WORD in another script: the operator's Hebrew-and-English sentence, the same in every builder.
   errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — "{{detail}}" אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
+  // #2222 (ADR-AG-284, operator ruling 2026-10-16) — an ASCII mixed number: a decimal, the sum, or the product.
+  errMixedNumber: 'לא ברור אם "{{detail}}" הוא מספר מעורב או מכפלה. כתבו {{decimal}} (מספר עשרוני) או {{sum}} למספר המעורב, או {{product}} למכפלה.',
+  errMixedNumberNoDecimal: 'לא ברור אם "{{detail}}" הוא מספר מעורב או מכפלה. כתבו {{sum}} למספר המעורב, או {{product}} למכפלה.',
   errRenameSame: 'האות {{detail}} כבר נקראת {{detail}} — אין מה לשנות.',
   errRenameUnknown: 'אין בשרטוט נקודה בשם {{detail}}, ולכן אין מה לשנות.',
   errRenameTaken: 'האות {{detail}} כבר תפוסה: "{{holder}}". בחרו אות פנויה.',
@@ -775,6 +778,8 @@ const en: typeof he = {
   errAliasTaken: 'The name {{holder}} is already taken on this figure — one name marks one thing, a point or an angle. Pick another name, e.g. a letter with a different digit.',
   errRenameBadName: '"{{detail}}" is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
   errUnreadWord: 'This tool reads Hebrew and English only — "{{detail}}" is in neither. Try writing the line in Hebrew or English.',
+  errMixedNumber: '"{{detail}}" could be a mixed number or a product. Write {{decimal}} (a decimal) or {{sum}} for the mixed number, or {{product}} for the product.',
+  errMixedNumberNoDecimal: '"{{detail}}" could be a mixed number or a product. Write {{sum}} for the mixed number, or {{product}} for the product.',
   errRenameSame: '{{detail}} is already called {{detail}} — nothing to change.',
   errRenameUnknown: 'The figure has no point named {{detail}}, so there is nothing to rename.',
   errRenameTaken: 'The letter {{detail}} is already taken: "{{holder}}". Pick a free letter.',

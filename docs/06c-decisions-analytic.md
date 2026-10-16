@@ -12288,3 +12288,31 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Behaviour change for a student.** In the analytic builder «A על מעגל O ועל מעגל P» (and the spellings above) puts A on both circles, read by the tool itself; before, the AI answered and drew A on O only with the row green. "A on circle O and B on circle P" and "A and B on circle O" now build instead of going to the AI.
 
 **Locks.** `src-analytic/__tests__/issue-2199-point-on-carrier-list.test.ts` (every row on the figure, the non-lists, the refusals, the 24-seed sweep, the operator's line no longer reaching the fallback); fixtures `src-analytic/__tests__/fixtures/point-on-two-circles-2199.analytic.json`, `two-points-on-two-circles-2199.analytic.json` (built and verified by that test); the parity rows above.
+## ADR-AG-284 — An ASCII mixed number «5 1/2» is refused with a teaching sentence, never multiplied; the glyph «5½» is 5.5 (#2222)
+
+**Status:** accepted · 2026-10-16 · bug (P1, analytic) · fix round #2245, stream F · branch `fix/2222-mixed-number-refusal` from `main` @ ef78f15c
+**Requirements:** [02c](02c-requirements-analytic.md) R111 (a new example row) · **Design:** [04c](04c-design-analytic.md) § "A letter run is not automatically a product" (a new tokenizer row) · **LADDER stage:** none (parser only)
+**Siblings:** [ADR-635](06-decisions.md#adr-635) (2-D: «2½» is one number, the ASCII «2 1/2» escalates honestly) · complex measured, filed separately (below)
+
+**The ruling.** Operator, 2026-10-16: *"if the user used a symbol of 1/2 so yes - it should be 5.5. otherwise we should reject a 5 1/2 syntax and teach to either use decimal or 5+1/2 or 5*1/2. it should be P1"*.
+
+**Measured before** (`ef78f15c`, `parseLine` + `decideSubmit`, the model mocked). In every numeric slot juxtaposition read «5 1/2» as 5·1/2: «שיעור ה-y של P הוא 5 1/2» → y_P = 2.5, «שיעור ה-x של P הוא 2 1/2» → 1, «A(5 1/2, 3)» → (2.5, 3), «x = 3 1/2» → x = 1.5, «y = 2 1/2x + 1» → slope 1, «רדיוס המעגל הוא 2 1/2» → r = 1, «שטח המשולש ABC הוא 12 1/2» → area 6, «x² + y² = 6 1/4» → r² = 1.5, «A(5 1 / 2, 3)» and «A(-5 1/2, 3)» the same — each recorded, the figure drawn green for a value the student never stated. «Y_p=5 1/2», «משולש ABC ששטחו 12 1/2» and «P = (2 1/2, 1)» were `not-handled` and reached the model. The glyph already read: «5½» → 5.5, «5¼» → 5.25, «5¾» → 5.75 (`frameAnalytic.orthography`); «5⅓» is `not-handled`.
+
+**The class.** *An integer, whitespace, then an `a/b` fraction, in any value an analytic sentence reads, is read as a product.* Root cause: `expr.ts`'s juxtaposition rule reads any two atoms in a row as a product, and nothing told the ASCII mixed number apart — so the same misread reached every slot (and the fallback could reproduce it).
+
+**Decision (one detector, at the tokenizer chokepoint).**
+1. `findMixedNumber` (`engine/expr.ts`) is the ONE definition: a standalone integer (no letter, digit, `_` or `.` before it), whitespace, then `int / int` (`/` or `⁄`). The tokenizer refuses that shape, so `parseExpr` can never multiply it whatever rule or route reaches it.
+2. `parseLine` asks the same detector right after the proof-target and input-script gates — before every rule and before the model — and returns the new owned code `mixed-number` with the student's text and its three unambiguous spellings: a decimal (only when the fraction terminates — «2 1/3» offers none), the sum `5+1/2` (parenthesised after an operator, «x - (2+1/2)», so it reads the same in place) and the product `5*1/2`. Owned, so `reachesFallback` is false; a model line carrying one is rejected by the same gate.
+3. The message (`errMixedNumber` / `errMixedNumberNoDecimal`, he + en): «לא ברור אם "5 1/2" הוא מספר מעורב או מכפלה. כתבו 5.5 (מספר עשרוני) או 5+1/2 למספר המעורב, או 5*1/2 למכפלה.»
+4. Unchanged: the glyph forms (no glyph-table change; «5⅓» stays `not-handled` — the shared table is #2047), the explicit forms `5+1/2`, `5*1/2`, `5.5`, `11/2`, and number-then-symbol juxtaposition (`2x`, `1/2x`, `2 x`). A letter after the fraction («2 1/2x») does not remove the ambiguity, so it is refused as well (the issue's slope row).
+
+**Measured after.** Every row above → `mixed-number`, naming «5 1/2» / «2 1/2» / «12 1/2» / «6 1/4» / «5 1 / 2», never reaching the model; the reported question with its glyphs («שטח המשולש ABC הוא 12½», «שיעור ה-y של P הוא 5½») draws the official B, C = (7;8), (4.5;5.5) on seeds 0 and 1, with the ASCII twins refused on exactly those two lines.
+
+**Performance (docs/17 §7).** One regex test per tokenize and per line; no solve, sample or replay change.
+
+**Sibling audit.** *Spellings:* spaced slash, fraction slash, a leading sign, a glued trailing letter, Hebrew and English sentences — in the grid. *Slots:* coordinate, coordinate-of, point pair, equation (line, circle), radius, area, the LLM-only spellings. *Other builders:* 2-D escalates «AB = 2 1/2» honestly (`not-handled`, ADR-635) — the analytic sentence is a teaching refusal by the operator's ruling for this tool; whether 2-D and 3-D should teach the same is a cross-tool question, filed as #2248 (needs-operator). 3-D: `A(5 1/2, 3, 1)`, `AB = 2 1/2`, `x+y+z = 2 1/2` are not-handled (honest). **Complex multiplies:** measured at `ef78f15c`, «z = 2 1/2 + i» parses to arg 1/8 turn (z = 1 + i, so 2·1/2), and «|z| = 2 1/2» parses ok — not changed here (the plan's step 6), filed as #2247 (needs-operator).
+
+**Locks.** `src-analytic/__tests__/mixed-number-2222.test.ts` (the slot grid through `parseLine` and `decideSubmit`, `reachesFallback` false, a mocked model line rejected, the he/en sentences, the no-decimal and parenthesised forms, each taught spelling read back to its value, the tokenizer refusal, the glyph and explicit twins, `⅓` unchanged, and the bagrut question from the fixture `src-analytic/__tests__/fixtures/issue-2222-mixed-number-glyph.analytic.json`). The `mixed-number` rows in `message-floor-2028.test.ts`.
+
+**Behaviour change for a student:** «5 1/2» typed with a space, in any number the tool reads, is refused: «לא ברור אם "5 1/2" הוא מספר מעורב או מכפלה. כתבו 5.5 (מספר עשרוני) או 5+1/2 למספר המעורב, או 5*1/2 למכפלה.» — before, it was silently read as 2.5 (or handed to the model). «5½» (the symbol) still reads 5.5.
+
