@@ -201,6 +201,8 @@ export type InputError =
   | { key: 'name-taken'; detail: string; holder?: string; nameOf?: string; nameKind?: 'angle' | 'length'; declared?: string }
   /** #2061 (ADR-AG-277) — the same letter with another coefficient: 2-D's reason clause and the earlier line. */
   | { key: 'measure-contradicts'; detail: string; what?: string; declared?: string }
+  /** #2119 (ADR-684) — a second, different radius for a circle: the line that sized it. */
+  | { key: 'radius-contradicts'; detail: string; declared?: string }
   /**
    * A RENAME the tool understood and declined (#1154) — each names what the student wrote. `detail` is
    * the letter (or, for `rename-unsafe`, the line that could not be rewritten faithfully; empty when

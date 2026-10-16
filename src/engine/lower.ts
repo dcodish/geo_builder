@@ -367,14 +367,18 @@ export function letterSystem(
       return null;
     };
     const mine = valueOfEntry(e);
-    const fixed = prior.find((x) => valueOfEntry(x) !== undefined);
+    // A radius is judged against the LATEST statement that sized the circle (#2119's `statedSizeOwner`: after a
+    // same-size restatement, that restatement is what the student last said); a length or angle against its first.
+    const knownOnes = prior.filter((x) => valueOfEntry(x) !== undefined);
+    const fixed = t.kind === 'radius' ? knownOnes[knownOnes.length - 1] : knownOnes[0];
     if (fixed) {
       const tv = valueOfEntry(fixed)!;
       if (mine !== undefined) {
         if (same(mine, tv)) return record();
-        // Two NUMBERS on a target are a residual the solve judges and the fold attributes, as before. A known LETTER
-        // against a radius is not: a stated radius is a size, not a constraint, so no residual ever sees it.
-        if (t.kind !== 'radius' || ('num' in e && 'num' in fixed)) return record();
+        // Two NUMBERS on a length or angle are a residual the solve judges and the fold attributes, as before. A radius
+        // is not: a stated radius is a SIZE, not a constraint, so no residual ever sees it — a second, different size for
+        // a circle (a restated radius, circumference or area, a radius letter's value) is refused here (#2119, ADR-683).
+        if (t.kind !== 'radius') return record();
         const other = 'lin' in e ? provenance(e) : provenance(fixed);
         return { status: overConstrained(whatOf(t, mine)), at: other === i ? provenance(fixed) : other };
       }

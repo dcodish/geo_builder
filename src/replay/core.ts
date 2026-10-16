@@ -21,7 +21,7 @@ import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
-import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle } from '@/engine';
+import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle, statedSizeCircles } from '@/engine';
 import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents, type MeasureExpr } from '@/engine/types';
@@ -501,7 +501,10 @@ export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
  *   already defines (same centre, or any for an ensure-exists) is a reference and leaves the list unchanged
  *   (#2083, ADR-646);
  * - a re-stated STANDALONE circle is resized in place (a circle inside a bigger step falls through to an
- *   append, keeping that step's label intact);
+ *   append, keeping that step's label intact) — but only when its fact states NO size or the SAME size: a
+ *   second, DIFFERENT stated size is appended, so the letter system judges it against the first and the fold
+ *   refuses it naming that statement (#2119, [ADR-683](docs/06-decisions.md#adr-683); the operator's ruling of
+ *   2026-10-15 — to change a radius the student edits or mutes the old row);
  * - anything else is appended as `mint(cmd)`.
  *
  * Returns the SAME array when nothing changed, and never mutates: a changed fact is a new object, so
@@ -524,7 +527,9 @@ export function foldCommand(facts: Fact[], cmd: AnyCommand, mint: (cmd: AnyComma
   })) return facts;
   if (cmd.type === 'circle' || cmd.type === 'circle-through') {
     const prev = facts.find((f) => (f.cmd.type === 'circle' || f.cmd.type === 'circle-through') && f.cmd.id === cmd.id);
-    if (prev && !facts.some((f) => f.id !== prev.id && groupKey(f) === groupKey(prev)))
+    // #2119 (ADR-683): two stated sizes that differ are two statements, never an overwrite
+    const restatesOtherSize = !!prev && statedSizeCircles([prev.cmd]).size > 0 && statedSizeCircles([cmd]).size > 0 && prev.cmd.type === 'circle' && cmd.type === 'circle' && prev.cmd.radius !== cmd.radius;
+    if (prev && !restatesOtherSize && !facts.some((f) => f.id !== prev.id && groupKey(f) === groupKey(prev)))
       return facts.map((f) => (f === prev ? { ...f, cmd, utterance, enabled: true } : f));
   }
   return [...facts, mint(cmd)];

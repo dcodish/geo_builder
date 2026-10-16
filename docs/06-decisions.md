@@ -14330,6 +14330,8 @@ The full suite is the batch gate (round #1736).
 
 ## ADR-578 — Re-typing an unticked row ticks it again: the dry run folds through the commit's own rule (#1748)
 
+**⚠ Amended by [ADR-683](#adr-683) (2026-10-16):** the fold rule's standalone-circle resize now applies only when the earlier fact states no size or the same size; a second, different stated size is appended and refused naming the first (#2119).
+
 **Status:** accepted · 2026-10-04 · bug (P2) · round #1753 · branch `fix/1748-untick-retype` off `main` @ c098af9b
 
 **Requirements:** [FR-EN-9](02-requirements.md) (extended — re-typing an unticked row ticks it; a different spelling over its letters is refused naming the row) · **Design:** [04-design.md](04-design.md) "One fold rule: the dry run judges the list the commit saves" · **LADDER stage:** the submit gate's dry run (`trialFacts` → `dryRunOutcome`) and the replay fold's cascade message. No parser, solver or render change.
@@ -17447,3 +17449,48 @@ No chokepoint grows: a per-order special case is removed and the copula is an at
 **Locks.** In ADR-681's files (the #2133 describe, the radius rows of the loaded-list block, `letter-system.test.ts`'s reserved-r cases); a `humanize-error.test.ts` CASES row for `radius of`.
 
 **Behaviour change for a student:** «r = 3» after «מעגל O ברדיוס 4» · «A, B על מעגל O» · «AB = r», and «r = 4» after «מעגל O ברדיוס 3», are refused «לא ניתן: «r = …» סותר את «מעגל O ברדיוס …» — אי אפשר לקיים את שניהם יחד.» (was: committed green). «r = 4» after «מעגל O ברדיוס r» · «r = 3» is refused «…סותר את «r = 3»…» (was: green, r = 4).
+
+## ADR-683 — A second, different stated size for a circle is refused naming the first, in every spelling, with or without a point on it (#2119)
+
+**Status:** accepted · 2026-10-16 · bug (P1, 2-D) · fix round #2245, stream C · branch `fix/2119-radius-restated`, stacked on `fix/2165-letter-system` ([ADR-681](#adr-681))
+**Requirements:** [02](02-requirements.md) FR-EN-9 — a second, different size for the same circle is refused naming the first · **Design:** [04](04-design.md) § "The letter system" (the radius target) and § the fold rule · **LADDER stage:** 5 (the restatement pre-scan; no stage-0 gate, no solve change)
+**Amends** [ADR-578](#adr-578) / ADR-011's fold rule (a re-stated standalone circle resized in place whatever its size) · **Cites** [ADR-087](#adr-087) (`set-radius`), [ADR-646](#adr-646) (a sizeless circle is a reference), [ADR-681](#adr-681), [ADR-682](#adr-682)
+
+**The ruling.** 2026-10-15 (decisions ballot card 4, A): *"a second, different radius for the same circle is refused as a contradiction, in 2-D's wording, in every builder"* — «לא ניתן: «מעגל O ברדיוס 4» סותר את «מעגל O ברדיוס 3» — אי אפשר לקיים את שניהם יחד.»; to change a radius the student edits or mutes the old row. Raised to P1 the same day: with a point on the circle the second size resized it silently, green.
+
+**Measured before** (on the ADR-681 tip, `decideDeterministic2D` → the store → `replay`, model mocked). «מעגל O ברדיוס 3» · «מעגל O ברדיוס 4» (also "circle O with radius 4", «מעגל שמרכזו O ורדיוסו 4», "radius of circle O is 4", «היקף המעגל O הוא 10π»): «זה כבר קיים באיור — אין מה להוסיף.», r = 3, the 4 dropped (all parse to `set-radius`). «מעגל O ברדיוס 5» · «רדיוס המעגל O הוא 3» and the #2206 spelling «רדיוס מעגל O הוא 3» (also after an inner tangency): the same. «מעגל O» · «רדיוס המעגל O הוא 3» · «… 4»: the same. With «A על מעגל O» between (every spelling, «שטח המעגל O הוא 16π» too): committed GREEN at the new radius, the first row still ✓. «מעגל O ברדיוס r» · … · «r = 3» · «מעגל O ברדיוס 4» was already refused by ADR-682 (a re-scope, not a deviation).
+
+**The class (docs/17 §1).** *A second stated size for a circle whose size is already stated is never judged against the first.* A stated radius is the one magnitude stored as an object PROPERTY, not a constraint, so no residual ever evaluates two of them: `set-radius` overwrote it (`applyRadiusGiven`) and the fold's standalone-circle rule replaced a re-stated `circle` in place; the door then read "nothing moved" as «כבר קיים», or a moved point as a silent resize.
+
+**Decision (the radius target of the letter system — the #2165 plan made #2119's detector and `statedSizeOwner` one table).**
+1. **`letterSystem`'s radius target judges two numbers** (`engine/lower.ts`): a sized `circle` and every `set-radius` on the same circle are number entries on `radius(circle)`; a different one is refused `over-constrained: radius of circle-O = 4 cannot hold`, its `at` the LATEST earlier statement that sized the circle (the plan's `statedSizeOwner`). Two numbers on a length or angle are still the solve's residual (ADR-681). The same size again is no contradiction (the honest «כבר קיים»).
+2. **The fold rule** (`foldCommand`): the standalone-circle in-place resize applies only when the earlier fact states NO size or the SAME size; a differing stated size is appended, so the pre-scan judges it. A size given to a sizeless circle still sizes it in place (FR-EN-9 idempotency, #2083's reference rule kept).
+3. **Wording:** ADR-682's `errors.restatedSize` — the ruled sentence, no reason clause — naming the statement that sized the circle by provenance (`[vs #i]`).
+
+**Measured after.** Every row above is refused at the door «לא ניתן: «<line>» סותר את «<the sizing line>» — אי אפשר לקיים את שניהם יחד.», the circle keeps its first radius, every earlier row green; a saved list holding both opens with the later row ✗ in the same sentence; a second `circle` command (the AI's, an older saved file's) is appended and refused, never an overwrite. Unchanged: the same radius twice and «היקף … 6π» after radius 3 («כבר קיים»), a size given to «מעגל O», «OA=4» on a radius-3 circle (refused naming «A על מעגל O»).
+
+**Why not a patch (docs/17 §2).** No chokepoint list grows; no stage-0 gate is added (the plan's `restatedRadiusError` became the radius row of the one table, per the #2165 plan). The fold clause is a statement about what the two facts say (two sizes), not about solver state.
+
+**Risk.** A `length` radius that is not a student statement would now refuse a later stated size. Measured: every parser emission of a numeric `circle` radius is gated on the size being stated (`freeRadius` otherwise, ADR-051/052); the AI fallback is the residual exposure. Saved files that relied on a second `circle` overriding the first now open with that row ✗ (the ruling).
+
+**Worst-case multiplier (docs/17 M3):** none beyond ADR-681's pass.
+
+**Sibling audit.** Analytic refused both spellings in its own conflict sentence — brought to 2-D's ([ADR-684](#adr-684)). 3-D: no plane circles (X8). Complex: none. Parity rows `radius-restated-2119`, `radius-restated-sentence-2119`, `radius-restated-with-point-2119`.
+
+**Locks.** `src/app/__tests__/issue-2119-radius-restated.test.ts` (every row above with and without a point, English, circumference, area, the radius letter, the #2206 spelling, saved lists, the AI's `circle` command, the controls). Scenario `radius-restated-refused-2119` (the operator's exact two pairs). Re-based: `phase3.test.ts` "circle resize" (now "circle restatement — refused"), `issue-2083-circle-reference.test.ts` («ברדיוס 4» after «ברדיוס 3» now refused), `fold-circle-reference.test.ts` (a different stated radius is appended).
+
+**Behaviour change for a student:** «מעגל O ברדיוס 4» (or «רדיוס המעגל O הוא 4», "radius of circle O is 4", «היקף המעגל O הוא 10π», «שטח המעגל O הוא 16π») after «מעגל O ברדיוס 3» is refused «לא ניתן: «מעגל O ברדיוס 4» סותר את «מעגל O ברדיוס 3» — אי אפשר לקיים את שניהם יחד.» — before: «כבר קיים», or with a point on the circle a silent green resize.
+
+## ADR-684 — Analytic says 2-D's sentence for a second, different radius (#2119, analytic arm)
+
+**Status:** accepted · 2026-10-16 · bug (P1) · fix round #2245, stream C · branch `fix/2119-radius-restated` (with [ADR-683](#adr-683))
+**Requirements:** [02c](02c-requirements-analytic.md) — a second, different radius for a circle is refused in 2-D's sentence · **Design:** [04c](04c-design-analytic.md) — `radius-contradicts` and its provenance · **LADDER stage:** none (analytic's apply boundary)
+**Cites** [ADR-682](#adr-682) (the sentence), ADR-AG-277 (the same provenance pattern for `measure-contradicts`)
+
+**Context.** Analytic already refused «מעגל O ברדיוס 4» after «מעגל O ברדיוס 3» and «רדיוס המעגל O הוא 3» after «… 5» (both parse to `radius-of`), but as `conflicting-restatement`: «המשפט לא נוסף — הוא סותר את מה שכבר נקבע: "מעגל O ברדיוס 4"» — not 2-D's frame, and naming no earlier line. The ruling asks for 2-D's wording in every builder (B1).
+
+**Decision.** The `radius-of` restatement on a centred circle returns a new code `radius-contradicts` carrying the circle id; `derive` names the LATEST earlier accepted line that sized that circle (a `circle-at` with a stated radius, or a `radius-of` about it — `circleByName` is exported for the name lookup); `errorText` renders `errRadiusContradicts`, 2-D's He/En sentence byte for byte (no reason clause), and the old `errConflict` when no line can be named. Every other `conflicting-restatement` site (a point's coordinates, a line's or an equation circle's equation) keeps `errConflict`. An EQUATION against a stated radius keeps `errConflict` in both orders (the equation lowering maps the code back); a radius sentence against a circle an equation sized gets the new code, but no radius line exists to name, so its wording is still `errConflict`. This ADR sits in 06 because the stream held 06 ids only; 06c carries a pointer note.
+
+**Locks.** `src-analytic/__tests__/issue-2119-radius-restated.test.ts` (both spellings, English, the same radius still known); `message-floor-2028.test.ts` payloads; the parity rows of ADR-683.
+
+**Behaviour change for a student (analytic):** «מעגל O ברדיוס 4» after «מעגל O ברדיוס 3» says «לא ניתן: «מעגל O ברדיוס 4» סותר את «מעגל O ברדיוס 3» — אי אפשר לקיים את שניהם יחד.» (was «המשפט לא נוסף — הוא סותר את מה שכבר נקבע: "מעגל O ברדיוס 4"»).

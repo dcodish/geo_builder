@@ -4902,6 +4902,27 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  // ── #2119 (ADR-683): a second, different stated radius is refused naming the first ──
+  {
+    id: 'radius-restated-refused-2119',
+    title: '«מעגל O ברדיוס 4» after «מעגל O ברדיוס 3», and «רדיוס המעגל O הוא 3» after «מעגל O ברדיוס 5», are refused naming the first line; the radius is unchanged (#2119, ADR-683)',
+    guards:
+      "#2119, the operator's ruling of 2026-10-15 (card 4, A): «לא ניתן: «מעגל O ברדיוס 4» סותר את «מעגל O ברדיוס 3» — אי אפשר לקיים את שניהם יחד.» Measured on the ADR-681 tip through decideDeterministic2D: both answered «זה כבר קיים באיור» and the second size was dropped; with a point on the circle the same lines resized it silently and committed green (P1). Root cause: a stated radius is an object property, not a constraint, so nothing judged two of them; the fold resized a re-stated circle in place. Fix: the letter system's radius target judges two stated sizes, and the fold appends a differing one. Asserts each pair builds its first line with r unchanged, one fact, and the second line is refused at the door in the ruled sentence. The matrix is src/app/__tests__/issue-2119-radius-restated.test.ts.",
+    steps: ['מעגל O ברדיוס 3'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.circles.get('circle-O')!.r, 'r = 3').toBeCloseTo(3, 9);
+      const he = i18n.getFixedT('he');
+      for (const [first, line] of [['מעגל O ברדיוס 3', 'מעגל O ברדיוס 4'], ['מעגל O ברדיוס 5', 'רדיוס המעגל O הוא 3']]) {
+        const facts = factsOf([first]);
+        const v = gateVerdict(facts, line);
+        expect(v.kind, `${first} · ${line}`).toBe('refused');
+        const raw = (v as { detail?: string }).detail;
+        expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)))).toBe(`לא ניתן: «${line}» סותר את «${first}» — אי אפשר לקיים את שניהם יחד.`);
+        expect(replay(facts).circles.get('circle-O')!.r, 'the first radius stands').toBeCloseTo(Number(first.match(/\d+/)![0]), 9);
+      }
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

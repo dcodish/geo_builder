@@ -339,6 +339,7 @@ const he = {
   errLengthNameTaken_vs: 'לקטע {{nameOf}} כבר יש שם: {{holder}} (בשורה «{{declared}}»). לכל קטע שם אחד — המשיכו עם {{holder}}.',
   errMeasureContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errMeasureContradictsAlone: 'לא ניתן: «{{detail}}» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
+  errRadiusContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד.',
   errInscribedContradictsDeclared:
     'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. ' +
     'הסיבה: מעגל שעובר דרך ארבעת הקודקודים הופך {{shapeHe}} ל{{forcedHe}}, ו{{forcedHe}} אינו {{shapeHe}}.',
@@ -874,6 +875,7 @@ const en: typeof he = {
   errLengthNameTaken_vs: 'Segment {{nameOf}} already has a name: {{holder}} (in the line «{{declared}}»). A segment has one name — keep using {{holder}}.',
   errMeasureContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold. The reason: {{what}}.',
   errMeasureContradictsAlone: 'Can\'t do that: «{{detail}}» contradicts an earlier given — they can\'t both hold. The reason: {{what}}.',
+  errRadiusContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold.',
   errInscribedContradictsDeclared:
     "Can't do that: «{{detail}}» contradicts «{{declared}}» — they can't both hold. " +
     'The reason: a circle through the four vertices would make a {{shapeEn}} a {{forcedEn}}, and a {{forcedEn}} is not a {{shapeEn}}.',

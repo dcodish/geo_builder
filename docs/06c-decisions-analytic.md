@@ -12260,3 +12260,5 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Open for the operator (reported, not decided by default).** A coordinate pin is classed a VALUE (analytic's «נתון:» list already counts a coordinate as a given, #1872), so «מקבילית ABCD · A(0,0) · B(4,0) · C(4,3) · D(0,3)» would name the coordinates that forced it as typed; on a plain «מרובע»/«משולש» it stays silent either way.
 
 **Locks.** `src-analytic/__tests__/narrowing-note-1996.test.ts` (the shared rows through `decideSubmit` and `analyticI18n`; every 3- and 4-sided `SHAPES` row has a kind in the lattice; removing the cause removes the note; a deferred, incomplete pool says nothing and then the note arrives; the given text from the page's own line text); fixture `src-analytic/__tests__/fixtures/issue-1996-parallelogram-inscribed.analytic.json` (the circle note, he and en).
+
+> **Note (2026-10-16, #2119):** analytic's wording for a second, different radius («מעגל O ברדיוס 4» after «מעגל O ברדיוס 3») now follows 2-D's ruled sentence — recorded as [ADR-684](06-decisions.md#adr-684) in the 2-D log (fix round #2245 held 2-D ids only).
