@@ -106,6 +106,9 @@ never as a contradiction or a refutation.
   modulus; null or ≤ 0 is undrawable. **One name map:** an object's names (centre, vertices, the names
   inside the radius) are read label → number through `allAliases` (the #791 bindings and #694
   selections) before any lookup. The circle rule declares `refNames(radius)` with its centre.
+  **Collinearity is a shape verdict** ([ADR-CX-072](06d-decisions-complex.md#adr-cx-072)): `circumcircle` has no circle when
+  |d|/2 ≤ `FLATNESS_FLOOR` (asked through `flatPoints`) · span², span² the widest chord squared and the floor 1e-9
+  (the operator's #2109 ruling, equal to analytic's `isDegenerate`), never an absolute epsilon. **One flatness predicate** ([ADR-CX-073](06d-decisions-complex.md#adr-cx-073)): `flatPoints` (the widest chord as the base, every point within the floor of it) is asked by `circumcircle` and by the polygon branch, so a polygon is undrawn when `flatPoints` holds and a triangle and its circle can never disagree; a segment is never flat-tested.
 - **A second mention of a name is a GIVEN, and that decision lives at ONE seam.** Rules ask
   `existingRef()` rather than each deciding for itself
   ([ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md)) — the difference
@@ -176,10 +179,12 @@ never as a contradiction or a refutation.
   the power the grammar already has (`pow(x, 1/n)` — no new AST kind). A constant with RADICAL parts
   («√3 + i») folds through the Gaussian-radical walk and the angle table, **verified symbolically**
   against the candidate turn before any exact value is claimed — the fold never invents exactness the
-  table cannot prove. **The exact walk decides before the float read-back** (amendment 1): a pair it
+  table cannot prove. **Only the exact walk folds** (amendment 1; [ADR-CX-071](06d-decisions-complex.md#adr-cx-071)): a pair it
   recognises is a Gaussian rational (`fromCartesian`) or a radical literal (`radicalLiteral` — the
   table's turn, else a LITERAL ATOM carrying the exact pair in the one literal-atom registry, as
-  `3+4i` is carried), and the float read-back never runs over a root. The cartesian reading of a
+  `3+4i` is carried). There is no float read-back: a closed subtree the exact walk does not read
+  (`15cis(π/7)`, `5cis(π/7) + 1`) stays as written — the exact tier carries the product, the sum is
+  the numeric residue — and a float is never taken for the fraction it lands near. The cartesian reading of a
   literal atom comes from that registry (`literalAtomTerms`), not from the polar label. `cis`
   attaches after any operand at one point (`withCis`); a closed negative radicand refuses at the root
   atom; the orthography chokepoint reads an opening superscript before √ as the index and the word

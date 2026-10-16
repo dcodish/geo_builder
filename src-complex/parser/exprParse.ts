@@ -16,7 +16,7 @@
  */
 
 import { type Expr, I, abs, add, conj, div, mul, neg, num, param, pow, ref, sub, val } from '../model/expr';
-import { fromNumber, rat, type Rat } from '../value/rational';
+import { rat, type Rat } from '../value/rational';
 import { evaluate, exact, fromCartesian } from '../value/value';
 import { radicalLiteral, radicalOfModulus, radicalPartsOf } from '../value/cartesian';
 import { fromDegrees, isExactRational } from '../value/angle';
@@ -795,32 +795,8 @@ function constValue(e: Expr, withPow = false): { re: number; im: number } | null
 /** The numeric value of a CLOSED subtree, powers included — what a radicand's sign is read from. */
 const closedValue = (e: Expr): { re: number; im: number } | null => constValue(e, true);
 
-/** Does a subtree carry an irrational ROOT magnitude (`√2`, `∛5`)? A float can never be read back as exact there. */
-function hasRadical(e: Expr): boolean {
-  switch (e.t) {
-    case 'val': {
-      if (e.v.kind !== 'exact') return false;
-      const m = radicalOfModulus(e.v.mod);
-      return m === null || m.k !== 1n;
-    }
-    case 'add':
-    case 'sub':
-    case 'mul':
-    case 'div':
-      return hasRadical(e.l) || hasRadical(e.r);
-    case 'pow':
-      return hasRadical(e.base);
-    case 'conj':
-    case 'neg':
-    case 'abs':
-      return hasRadical(e.e);
-    default:
-      return false;
-  }
-}
-
 /**
- * Replace every name-free subtree with its exact VALUE.
+ * Replace every name-free subtree the EXACT walk can read with its exact VALUE.
  *
  * `3+4i` is written as an addition, and addition is the one operation the exact core cannot carry —
  * so without this the most basic input there is would route to the numeric tier. But a constant
@@ -828,6 +804,13 @@ function hasRadical(e: Expr): boolean {
  * before classifying is what keeps the SYNTAX of a literal from deciding whether the engine can be
  * exact about it. (The S3 bridge did this; the parser has to do it too, and the conjugates claim is
  * what caught that it did not.)
+ *
+ * #2134 (ADR-CX-071) — a constant subtree is a literal when the exact walk can say WHICH number it is,
+ * and never because a float landed near a fraction. A closed subtree the walk does not read
+ * (`15cis(π/7)`, `5cis(π/7) + 1`) stays as written — the exact tier carries the product, the sum is
+ * the numeric residue — and its children still fold. The float read-back that used to stand here
+ * replaced `15cis(π/7)` with the Gaussian rational 104616/7741 + (44933/6904)i: a different number,
+ * so two numbers stated at one argument carried two arguments, and «|z1| = 15» was refused.
  */
 export function foldConstants(e: Expr, atoms: Map<string, number>): Expr {
   const folded = foldConstantsOnce(e, atoms);
@@ -863,17 +846,8 @@ function foldConstantsOnce(e: Expr, atoms: Map<string, number>): Expr {
           return val(exact(lit.mod, lit.arg));
         }
       }
-    } else if (!hasRadical(e)) {
-      // the float read-back, for closed subtrees the walk does not cover (`cis20·cis-20 + 1`). Never
-      // over a root: `√2 + √3` read back as 10949/3480 — a rational that is not the number.
-      const re = fromNumber(k.re, 10_000, 1e-9);
-      const im = fromNumber(k.im, 10_000, 1e-9);
-      if (re && im && !(re.n === 0n && im.n === 0n)) {
-        const lit = fromCartesian(re, im);
-        for (const b of lit.atomBindings) atoms.set(b.atom, b.degrees);
-        return val(lit.value);
-      }
     }
+    // no float read-back (#2134, ADR-CX-071): what the exact walk cannot read stays as written
   }
   switch (e.t) {
     case 'add':
