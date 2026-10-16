@@ -21,7 +21,7 @@ import type { DerivedRule, FootLine } from '../engine/derived';
 import { cevianFacts, measureFacts, toolFootFacts, type CevianRole } from '../engine/cevian';
 import { TOOL_PREFIX, toolPoint, type ToolPointRole } from '../engine/toolLetters';
 import { isAngleRef, sineAngle, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
-import { evalExpr, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
+import { evalExpr, findMixedNumber, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
 import { INDEXED_TOKEN, POINT_TOKEN, RESERVED_SYMBOLS, directionSymbol, mentionsPlane, mentionsPointName, radiusSymbol, toolSymbol } from '../engine/carriers';
 
 /** A student's VALUE — a number or an expression in parameters, never the plane's x/y (#1496, `mentionsPlane`). */
@@ -117,6 +117,12 @@ export type ParseFailure =
    * `shell/inputScript`, after the glyph fold's look-alike row.
    */
   | { code: 'unread-name' | 'unread-word'; detail: string }
+  /**
+   * #2222 (ADR-AG-284, operator ruling 2026-10-16) — an ASCII mixed number, «5 1/2»: ambiguous as written (5.5 or
+   * 5·½), so refused before every rule and before the model with a sentence teaching its unambiguous spellings.
+   * `detail` is the student's own text; the glyph «5½» is not this (it reads 5.5).
+   */
+  | { code: 'mixed-number'; detail: string; decimal?: string; sum: string; product: string }
   /**
    * A coordinate written in `x` or `y` — «M(3,y)» (#1039).
    *
@@ -7448,6 +7454,10 @@ export function parseLine(raw: string): ParseResult {
   // the model. The detail is the student's own run(s); `orthography` has already folded the look-alikes.
   const unread = unreadScript(line);
   if (unread) return { ok: false, code: `unread-${unread.kind}`, detail: unread.detail };
+  // #2222 (ADR-AG-284): an ASCII mixed number is refused here, before every rule and before the model, so no slot
+  // multiplies it and the fallback cannot either — one teaching sentence, whichever sentence carries it.
+  const mixed = findMixedNumber(line);
+  if (mixed) return { ok: false, code: 'mixed-number', detail: mixed.text, ...(mixed.decimal ? { decimal: mixed.decimal } : {}), sum: mixed.sum, product: mixed.product };
   // An angle the student NAMES (#1622 E5, ADR-AG-221) — read with its verb, before the lead-in is unwrapped.
   const label = parseAngleLabel(line);
   if (label) return label.ok ? made(label.facts.map((f) => ({ ...f, src: typed }))) : label;

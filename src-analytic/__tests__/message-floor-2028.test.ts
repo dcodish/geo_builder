@@ -20,6 +20,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'proof-target': [{}],
   'unread-name': [{}],
   'unread-word': [{}],
+  'mixed-number': [{ detail: '2', decimal: '45', sum: '30', product: '2' }, { detail: '2', sum: '30', product: '2' }],
   'reserved-coordinate': [{}],
   'bad-arity': [{}],
   'repeated-vertex': [{}],

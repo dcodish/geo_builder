@@ -123,6 +123,7 @@ Its atom grammar has exactly one function, `√`, and `normalizeMath` maps `sqrt
 | 1 letter before `(` | kept | `k(x+1)` is a product, and the corpus writes it |
 | ≥3 letters NOT space-delimited | kept | `x²+y²-2abc=0` — juxtaposed parameters, ruled legal by #1068 |
 | a letter (Latin or Greek) IMMEDIATELY before a digit, `_` or a subscript digit | refused — an indexed name ([ADR-AG-244](06c-decisions-analytic.md#adr-ag-244), #1785) | «S1», «a2», «α1» are ONE name each; juxtaposition read `S·1`, so «S1» and «S2» shared one parameter and asserted a 1 : 2 ratio. Number-then-letter (`2a`) is unchanged |
+| an integer, whitespace, then `int/int` («5 1/2») | refused — an ASCII mixed number ([ADR-AG-284](06c-decisions-analytic.md#adr-ag-284), #2222) | ambiguous as written (5.5 or 5·½); `findMixedNumber` is the one detector, and `parseLine` asks it before every rule and the model (`mixed-number`, teaching the decimal, `5+1/2`, `5*1/2`). The glyph «5½» is spelled 5.5 upstream (`orthography`) |
 | the private-use range | never a run | `lengths.ts` encodes a length term (`AB`) as one character; it cannot appear in student input |
 
 The noun must be consumed by the rule that claims it: `DISTANCE` spells its English article as `NOUN` does

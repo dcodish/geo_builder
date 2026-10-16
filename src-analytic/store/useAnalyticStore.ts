@@ -91,6 +91,8 @@ export type InputError =
   | { key: 'proof-target'; detail: string }
   /** #1919 — a letter the tool cannot read; `detail` is the run(s) as typed (`shell/inputScript`). */
   | { key: 'unread-name' | 'unread-word'; detail: string }
+  /** #2222 (ADR-AG-284) — an ASCII mixed number «5 1/2», refused with its unambiguous spellings (`engine/expr.findMixedNumber`). */
+  | { key: 'mixed-number'; detail: string; decimal?: string; sum: string; product: string }
   /** `x` or `y` used as a point's unknown — they are the plane's own variables (#1039). */
   | { key: 'reserved-coordinate'; detail: string }
   /** A shape noun and a vertex count that disagree (#1042). */

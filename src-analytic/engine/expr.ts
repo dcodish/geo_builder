@@ -63,6 +63,61 @@ export function normalizeMath(src: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// The ASCII mixed number — refused, never multiplied (#2222, ADR-AG-284)
+// ---------------------------------------------------------------------------
+
+/**
+ * AN INTEGER, WHITESPACE, THEN A FRACTION — «5 1/2», «12 1/2», «2 1 / 2».
+ *
+ * Juxtaposition (below) reads two atoms in a row as a product, so this shape read as `5·1/2 = 2.5` in every numeric
+ * slot, silently, and a figure for a value the student never stated was drawn green. As written it is AMBIGUOUS: the
+ * exam's mixed number (5.5) or a product (2.5). **Operator ruling, 2026-10-16:** *"if the user used a symbol of 1/2 so
+ * yes - it should be 5.5. otherwise we should reject a 5 1/2 syntax and teach to either use decimal or 5+1/2 or
+ * 5*1/2"* — so the glyph «5½» keeps its reading (`frameAnalytic.orthography` spells it 5.5), and this shape is a
+ * refusal. It is defined ONCE here: the tokenizer refuses it (so no reader of a value can multiply it, whichever rule
+ * or route reaches `parseExpr`), and `parseLine` asks {@link findMixedNumber} before every rule and before the model,
+ * so the student gets one teaching sentence instead of each rule's own verdict.
+ *
+ * The integer stands alone — a letter or digit before it (an indexed name «A1 1/2», a decimal's tail) is not a whole
+ * part — and the fraction's denominator is an integer; a letter glued after it («2 1/2x») does not rescue the
+ * ambiguity, so it is refused too. Number-then-symbol juxtaposition («2x», «1/2x», «2 x») is untouched.
+ */
+const MIXED_NUMBER_RE = /(?<![A-Za-z0-9_.])(\d+)\s+(\d+)\s*[/⁄]\s*(\d+)(?![\d.])/;
+
+/** What a refused mixed number teaches: the student's text and its three unambiguous spellings. */
+export interface MixedNumber {
+  /** the student's own text, as typed — «5 1/2» */
+  text: string;
+  /** the mixed number as a decimal — `5.5`; absent when the fraction does not terminate («2 1/3») */
+  decimal?: string;
+  /** the mixed number as a sum — `5+1/2`, parenthesised after an operator so it reads the same in place («x-(5+1/2)») */
+  sum: string;
+  /** the product reading — `5*1/2` */
+  product: string;
+}
+
+const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+
+/** The first ASCII mixed number in `src`, or null. The one detector both the tokenizer and the line gate use. */
+export function findMixedNumber(src: string): MixedNumber | null {
+  const m = MIXED_NUMBER_RE.exec(src);
+  if (!m) return null;
+  const [whole, num, den] = [m[1], m[2], m[3]];
+  let d = Number(den) / gcd(Number(num), Number(den));
+  while (d > 1 && d % 2 === 0) d /= 2;
+  while (d > 1 && d % 5 === 0) d /= 5;
+  const terminates = Number(den) > 0 && d === 1;
+  const afterOperator = /[-−*·×/⁄^]\s*$/.test(src.slice(0, m.index));
+  const sum = `${whole}+${num}/${den}`;
+  return {
+    text: m[0],
+    ...(terminates ? { decimal: String(Number(whole) + Number(num) / Number(den)) } : {}),
+    sum: afterOperator ? `(${sum})` : sum,
+    product: `${whole}*${num}/${den}`,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Tokenizer
 // ---------------------------------------------------------------------------
 
@@ -105,6 +160,8 @@ const INDEXED_LETTER_RE = /[A-Za-zα-ορ-ω]/;
 const INDEX_START_RE = /[0-9_₀-₉]/;
 
 function tokenize(src: string): Tok[] | null {
+  // An ASCII mixed number is ambiguous as written, so it is a refusal here, never a product (#2222, ADR-AG-284).
+  if (MIXED_NUMBER_RE.test(src)) return null;
   const out: Tok[] = [];
   let i = 0;
   while (i < src.length) {

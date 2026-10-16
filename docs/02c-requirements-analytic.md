@@ -628,7 +628,8 @@ a sentence the tool parsed.
 
 **R111 — a word the tool does not know is REFUSED in a value slot, never absorbed as parameters**. **A stated magnitude is never silently reinterpreted**; juxtaposed parameters (`2a`, `25k²`) are kept.
 - «שיפוע הישר l1 הוא tan(30)» → refused, never `t·a·n·30`
-- Sources: ADR-AG-145, #1321.
+- «5 1/2» typed with a space, in any number → refused, teaching 5.5, 5+1/2 or 5*1/2; never 5·½. The symbol «5½» reads 5.5
+- Sources: ADR-AG-145, #1321, ADR-AG-284, #2222.
 
 **R171 — a condition on x or y is never taken for a parameter; until a curve can be drawn in part, it is refused and says so**. Nothing of the line is recorded; a condition on another letter is a domain. Drawing part of a curve is #1846.
 - «y = 2x + 1, x > 0», «x הוא פרמטר» → refused, saying why
