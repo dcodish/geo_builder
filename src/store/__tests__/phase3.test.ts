@@ -352,18 +352,28 @@ describe('step grouping — one submission, one row (even if it expands to many 
   });
 });
 
-describe('circle resize — re-stating a circle overrides its radius (not a conflict)', () => {
+// #2119 (ADR-683) re-based: a second, DIFFERENT stated radius is a contradiction refused naming the first (operator
+// ruling 2026-10-15 — "to change a radius, the student edits or mutes the old row"); it used to override the radius.
+describe('circle restatement — a second, different stated radius is refused, never an override', () => {
   const CIRCLE = (r: number): Command => ({ type: 'circle', id: 'circle-O', center: 'O', radius: r });
 
-  it('a standalone circle re-stated with a new radius resizes in place (one step)', () => {
+  it('a standalone circle re-stated with a new radius is a second row, refused; the first radius stands', () => {
     s().execute(CIRCLE(5), 'circle O radius 5', 'g1');
     s().execute(CIRCLE(8), 'circle O radius 8', 'g2');
-    expect(s().facts).toHaveLength(1); // collapsed like a free-point move
-    const circle = replay(s().facts).construction.objects.find((o) => o.id === 'circle-O');
-    expect(circle).toMatchObject({ radius: { via: 'length', value: 8 } });
+    expect(s().facts).toHaveLength(2);
+    const d = replay(s().facts);
+    expect(d.construction.objects.find((o) => o.id === 'circle-O')).toMatchObject({ radius: { via: 'length', value: 5 } });
+    expect(d.status[s().facts[1].id]).toMatch(/^over-constrained: radius of circle-O = 8 cannot hold \[vs #0\]$/);
   });
 
-  it('resizing the circle of an inscribed shape grows its vertices (override step, no conflict)', () => {
+  it('a size for a sizeless circle still sizes it in place', () => {
+    s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true }, 'circle O', 'g1');
+    s().execute(CIRCLE(8), 'circle O radius 8', 'g2');
+    expect(s().facts).toHaveLength(1);
+    expect(replay(s().facts).construction.objects.find((o) => o.id === 'circle-O')).toMatchObject({ radius: { via: 'length', value: 8 } });
+  });
+
+  it('the circle of an inscribed shape re-stated with another radius is refused; its vertices stay on r = 5', () => {
     // inscribed-triangle group (circle-O r5 + 3 on-circle + triangle), all one step
     const inscribed: Command[] = [
       { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
@@ -375,12 +385,11 @@ describe('circle resize — re-stating a circle overrides its radius (not a conf
     inscribed.forEach((c) => s().execute(c, 'triangle inscribed', 'g1'));
     expect(replay(s().facts).positions.get('A')!.x).toBeCloseTo(5, 6); // on r=5
 
-    s().execute(CIRCLE(8), 'circle O radius 8', 'g2'); // override step — must NOT conflict
+    s().execute(CIRCLE(8), 'circle O radius 8', 'g2');
     const d = replay(s().facts);
-    expect(d.lastError).toBeNull();
-    expect(d.positions.get('A')!.x).toBeCloseTo(8, 6); // the vertex moved out to r=8
+    expect(d.positions.get('A')!.x).toBeCloseTo(5, 6); // the vertex stays on r=5
     const facts = s().facts;
-    expect(d.status[facts[facts.length - 1].id]).toBe('ok'); // the resize step applied
+    expect(d.status[facts[facts.length - 1].id]).toMatch(/^over-constrained: radius of circle-O = 8 cannot hold/);
   });
 });
 

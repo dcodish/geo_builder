@@ -64,10 +64,18 @@ describe('#2083 — foldCommand: a sizeless restatement leaves the list unchange
     }
   });
 
-  it('a stated radius still resizes in place (ADR-011, unchanged)', () => {
+  // #2119 (ADR-683): a second, DIFFERENT stated radius is two statements — appended, so the letter system refuses it
+  // naming the first (operator ruling 2026-10-15). It used to resize in place (ADR-011's "a re-stated circle resizes").
+  it('a different stated radius is appended, never an in-place resize', () => {
     const facts = [fact(stated)];
     const out = foldCommand(facts, { ...stated, radius: 4 }, mint);
-    expect(out).not.toBe(facts);
+    expect(out).toHaveLength(2);
+    expect((out[0].cmd as { radius: number }).radius).toBe((stated as { radius: number }).radius);
+  });
+
+  it('a size given to a sizeless circle still resizes it in place (ADR-011)', () => {
+    const facts = [fact(free)];
+    const out = foldCommand(facts, { ...stated, radius: 4 }, mint);
     expect(out).toHaveLength(1);
     expect((out[0].cmd as { radius: number }).radius).toBe(4);
   });

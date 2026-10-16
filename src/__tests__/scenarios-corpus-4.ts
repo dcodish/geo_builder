@@ -2443,7 +2443,8 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.lastError, 'the x line is refused').toMatch(/cannot hold/);
       expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| is the 3 that held').toBeCloseTo(3, 3);
       const AB = fig.labels.lengths.find((l) => [l.a, l.b].sort().join('') === 'AB');
-      expect(AB?.text, 'the surviving given labels the segment').toBe('3');
+      // #2165 (ADR-681): «AB = x» binds x to the measured AB (x = 3), so the letter labels it — never the refused 8
+      expect(AB?.text, 'the letter labels the segment, never the refused 8').toBe('x');
       expect(fig.violations).toEqual([]);
     },
   },
@@ -4981,6 +4982,53 @@ export const SCENARIOS_4: Scenario[] = [
       const o = fig.circles.get('circle-O')!, p = fig.circles.get('circle-P')!;
       expect(Math.abs(dist(at(fig, 'X'), o.center) - o.r)).toBeLessThan(1e-6);
       expect(Math.abs(dist(at(fig, 'X'), p.center) - p.r)).toBeLessThan(1e-6);
+    },
+  },
+  // ── #2165 + #2135 + #2133 (ADR-681): a letter's values are judged in list order — a second value is refused ──
+  {
+    id: 'letter-value-contradiction-2135',
+    title: 'A letter given a second, different value is refused naming the first («x = 4» after «x = 3», «r = 4» after «r = 3», «r = 3» against «מעגל O ברדיוס 4») (#2135 + #2133, ADR-681)',
+    guards:
+      "#2135 and #2133 (P1, found 2026-10-15 by the /decisions pass), measured again on ef78f15c through decideDeterministic2D: «מעגל O ברדיוס r» · «r = 3» · «r = 4» drew r = 4 green; «משולש ABC» · «AB = x» · «x = 3» · «x = 4» drew |AB| = 4 green; «מעגל O ברדיוס 4» · «A, B על מעגל O» · «AB = r» · «r = 3» drew radius 4 and |AB| = 3 green; «מעגל O ברדיוס 3» · «r = 4» committed green at r = 3. Root cause: letters were resolved by substitution — the last set-var won and the reserved r stopped naming the radius once valued — so no two sources of a letter's value were ever judged against each other. Fix (ADR-681): the letter system in buildSymTab judges every source in list order; the fold refuses a contradicting row with the [vs #i] of the statement that gave the value. Rulings: #2119 2026-10-15 (a second radius is a contradiction, 2-D's wording, no reason clause), #2105 card 4, ADR-034 Am. 1. Asserts each later line is refused at the door in the ruled sentence and the first value still draws. The matrix is src/app/__tests__/issue-2165-letter-system.test.ts.",
+    steps: ['משולש ABC', 'AB = x', 'x = 3'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| = 3').toBeCloseTo(3, 4);
+      const he = i18n.getFixedT('he');
+      const cases: [string[], string, string][] = [
+        [['משולש ABC', 'AB = x', 'x = 3'], 'x = 4', 'לא ניתן: «x = 4» סותר את «x = 3» — אי אפשר לקיים את שניהם יחד. הסיבה: |AB| = 4.'],
+        [['מעגל O ברדיוס r', 'r = 3'], 'r = 4', 'לא ניתן: «r = 4» סותר את «r = 3» — אי אפשר לקיים את שניהם יחד.'],
+        [['מעגל O ברדיוס 4', 'A, B על מעגל O', 'AB = r'], 'r = 3', 'לא ניתן: «r = 3» סותר את «מעגל O ברדיוס 4» — אי אפשר לקיים את שניהם יחד.'],
+        [['מעגל O ברדיוס 3'], 'r = 4', 'לא ניתן: «r = 4» סותר את «מעגל O ברדיוס 3» — אי אפשר לקיים את שניהם יחד.'],
+      ];
+      for (const [prefix, line, sentence] of cases) {
+        const facts = factsOf(prefix);
+        const v = gateVerdict(facts, line);
+        expect(v.kind, `${prefix.join(' · ')} · ${line}`).toBe('refused');
+        const raw = (v as { detail?: string }).detail;
+        expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)))).toBe(sentence);
+      }
+    },
+  },
+  // ── #2119 (ADR-683): a second, different stated radius is refused naming the first ──
+  {
+    id: 'radius-restated-refused-2119',
+    title: '«מעגל O ברדיוס 4» after «מעגל O ברדיוס 3», and «רדיוס המעגל O הוא 3» after «מעגל O ברדיוס 5», are refused naming the first line; the radius is unchanged (#2119, ADR-683)',
+    guards:
+      "#2119, the operator's ruling of 2026-10-15 (card 4, A): «לא ניתן: «מעגל O ברדיוס 4» סותר את «מעגל O ברדיוס 3» — אי אפשר לקיים את שניהם יחד.» Measured on the ADR-681 tip through decideDeterministic2D: both answered «זה כבר קיים באיור» and the second size was dropped; with a point on the circle the same lines resized it silently and committed green (P1). Root cause: a stated radius is an object property, not a constraint, so nothing judged two of them; the fold resized a re-stated circle in place. Fix: the letter system's radius target judges two stated sizes, and the fold appends a differing one. Asserts each pair builds its first line with r unchanged, one fact, and the second line is refused at the door in the ruled sentence. The matrix is src/app/__tests__/issue-2119-radius-restated.test.ts.",
+    steps: ['מעגל O ברדיוס 3'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.circles.get('circle-O')!.r, 'r = 3').toBeCloseTo(3, 9);
+      const he = i18n.getFixedT('he');
+      for (const [first, line] of [['מעגל O ברדיוס 3', 'מעגל O ברדיוס 4'], ['מעגל O ברדיוס 5', 'רדיוס המעגל O הוא 3']]) {
+        const facts = factsOf([first]);
+        const v = gateVerdict(facts, line);
+        expect(v.kind, `${first} · ${line}`).toBe('refused');
+        const raw = (v as { detail?: string }).detail;
+        expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)))).toBe(`לא ניתן: «${line}» סותר את «${first}» — אי אפשר לקיים את שניהם יחד.`);
+        expect(replay(facts).circles.get('circle-O')!.r, 'the first radius stands').toBeCloseTo(Number(first.match(/\d+/)![0]), 9);
+      }
     },
   },
 ];

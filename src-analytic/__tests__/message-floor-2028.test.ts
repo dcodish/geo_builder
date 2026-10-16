@@ -14,6 +14,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'not-handled': [{}],
   'name-taken': [{ detail: '∠ABC = 40°', nameOf: 'ABC', nameKind: 'angle' }, { detail: 'AB = 3', nameOf: 'AB', nameKind: 'length' }],
   'measure-contradicts': [{ detail: '∠ABC = 40°', what: '∠ABC = 40°' }],
+  'radius-contradicts': [{ detail: 'מעגל O ברדיוס 4', declared: 'מעגל O ברדיוס 3' }, { detail: 'מעגל O ברדיוס 4' }], // #2119 (ADR-684)
   'split-statements': [{ parts: ['משולש ABC', 'ישר זווית ב-B'] }, { parts: ['משולש ABC', 'ישר זווית ב-B'], teach: { triangle: 'משולש ABC', angle: '∠ABC = 90°' } }],
   'bad-equation': [{}],
   'out-of-scope': [{}],

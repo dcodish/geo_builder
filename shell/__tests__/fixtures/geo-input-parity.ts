@@ -278,6 +278,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2235': 'open', // #2205 (ADR-685): 3-D picks the first of two triangles for a definite «המשולש …» where 2-D asks
   '#2236': 'open', // #2205 (ADR-685): analytic does not read a definite unnamed shape noun with a predicate
 
+  '#2253': 'open', // #2165 (ADR-681): analytic and 3-D read no value line for a length letter; 3-D refuses «AB = 2a»
+
 };
 
 export interface ParityRow {
@@ -1509,6 +1511,21 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'points-respectively-en-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A and B on circle O and on circle P respectively'], expect: 'builds', exception: 'X8' },
   { id: 'point-per-circle-en-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A on circle O and B on circle P'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2185' }], note: '2-D refuses it split-statements today; #2185 reads it' },
   { id: 'point-on-two-lines-2185', family: 'points-incidence', steps: ['ריבוע ABCD', 'P על הישר AC ועל הישר BD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#2185' }], note: '2-D escalates it today; #2185 reads it' },
+  // ── #2165 + #2135 + #2133 (ADR-681): a letter's values are judged in list order — a second value is an equation or a
+  // contradiction, never «כבר קיים» or last-wins ──
+  { id: 'letter-equation-2165', family: 'lengths', steps: ['משולש ABC', 'AB = 2a', 'AB = a + 3'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2253' }], note: 'the operator (2026-10-15): «commits the equation: a = 3, |AB| = 6, as analytic does»; 2-D answered «כבר קיים» before ADR-681' },
+  { id: 'letter-binding-after-number-2165', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'AB = a'], expect: 'builds', note: '2-D answered «כבר קיים» and dropped the binding before ADR-681' },
+  { id: 'letter-value-against-number-2165', family: 'lengths', steps: ['משולש ABC', 'AB = a', 'AB = 5', 'a = 6'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2253' }], note: '2-D committed it and turned «AB = 5» red before ADR-681' },
+  // the second value itself («k = 4» after «k = 3») needs a value line the siblings do not read yet (#2253), so its row is
+  // the value line; the refusal is locked in src/app/__tests__/issue-2165-letter-system.test.ts
+  { id: 'letter-value-line-2135', family: 'lengths', steps: ['משולש ABC', 'AB = k', 'k = 3'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2253' }, { product: '3d', issue: '#2253' }] },
+  { id: 'radius-letter-second-value-2135', family: 'circles', steps: ['מעגל O ברדיוס r', 'r = 3', 'r = 4'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }], note: '2-D drew r = 4 with «r = 3» still ✓ before ADR-681' },
+  { id: 'reserved-radius-value-2133', family: 'circles', steps: ['מעגל O ברדיוס 3', 'r = 4'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2253' }], note: 'ADR-034 Am. 1: r names the radius; 2-D committed it green with r = 3 before ADR-681' },
+  { id: 'reserved-radius-through-length-2133', family: 'circles', steps: ['מעגל O ברדיוס 4', 'A, B על מעגל O', 'AB = r', 'r = 3'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2253' }], note: '2-D drew radius 4 and |AB| = 3, green, before ADR-681' },
+  // ── #2119 (ADR-683, ADR-684): a second, different stated radius is refused naming the first, 2-D's sentence in both builders ──
+  { id: 'radius-restated-2119', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל O ברדיוס 4'], expect: 'refused', exception: 'X8', note: '2-D answered «כבר קיים» before ADR-683; analytic refused in its own conflict sentence before ADR-684' },
+  { id: 'radius-restated-sentence-2119', family: 'circles', steps: ['מעגל O ברדיוס 5', 'רדיוס המעגל O הוא 3'], expect: 'refused', exception: 'X8' },
+  { id: 'radius-restated-with-point-2119', family: 'circles', steps: ['מעגל O ברדיוס 3', 'A על מעגל O', 'מעגל O ברדיוס 4'], expect: 'refused', exception: 'X8', note: '2-D resized silently and committed green before ADR-683' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

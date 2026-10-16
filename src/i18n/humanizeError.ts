@@ -345,6 +345,18 @@ export const PATTERNS: Pattern[] = [
     params: (m) => ({ name: m[2], symbol: m[3] }),
     namesOtherLine: true,
   },
+  // engine/lower.ts letterSystem (#2165 + #2119, ADR-681) — `over-constrained: radius of O = 4 cannot hold [vs #i]`: a
+  // second, different size for a circle whose size a statement already gave (a radius letter's value, a reserved r, a
+  // restated radius). The operator's 2026-10-15 ruling on #2119, verbatim: «לא ניתן: «X» סותר את «Y» — אי אפשר לקיים
+  // את שניהם יחד.» — the over-constrained frame WITHOUT a reason clause. Before the generic entry, whose `what` would
+  // carry the English «radius of».
+  {
+    re: /^over-constrained: radius of (\S+) = (.+) cannot hold(?: \[vs #\d+\])?$/,
+    key: 'errors.restatedSize',
+    params: (m) => ({ circle: m[1], value: m[2] }),
+    saysSubject: true,
+    namesOther: true,
+  },
   // evaluate.ts:891 — `over-constrained: |AC| = 9 cannot hold`; #943 half B: the fold may append the
   // structured tail ` [vs #<fact index>]` naming the conflicting earlier statement — matched here so
   // `what` stays the bare reason, and resolved to words by the display layer (`otherUtteranceForError`).

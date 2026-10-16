@@ -12316,3 +12316,4 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 
 **Behaviour change for a student:** «5 1/2» typed with a space, in any number the tool reads, is refused: «לא ברור אם "5 1/2" הוא מספר מעורב או מכפלה. כתבו 5.5 (מספר עשרוני) או 5+1/2 למספר המעורב, או 5*1/2 למכפלה.» — before, it was silently read as 2.5 (or handed to the model). «5½» (the symbol) still reads 5.5.
 
+> **Note (2026-10-16, #2119):** analytic's wording for a second, different radius («מעגל O ברדיוס 4» after «מעגל O ברדיוס 3») now follows 2-D's ruled sentence — recorded as [ADR-684](06-decisions.md#adr-684) in the 2-D log (fix round #2245 held 2-D ids only).

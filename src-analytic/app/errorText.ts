@@ -222,6 +222,8 @@ export function errorText(error: InputError, t: Translate): string {
       ? (error.declared ? 'errLengthNameTaken_vs' : 'errLengthNameTaken')
       : error.key === 'name-taken' && error.declared ? 'errAngleNameTaken_vs' : 'errAngleNameTaken',
     'measure-contradicts': error.key === 'measure-contradicts' && error.declared ? 'errMeasureContradicts' : 'errMeasureContradictsAlone',
+    // #2119 (ADR-684) — 2-D's errors.restatedSize, verbatim; with no line to name, the old conflict sentence
+    'radius-contradicts': error.key === 'radius-contradicts' && error.declared ? 'errRadiusContradicts' : 'errConflict',
     // #1154 — a rename understood and declined, each naming what the student wrote
     'rename-bad-name': 'errRenameBadName',
     'rename-same': 'errRenameSame',

@@ -164,7 +164,9 @@ describe('ADR-AG-196 — the contextual «המעגל» binds to the one circle (
     expect(codes(['(x-3)^2+(y-1)^2=10', 'משוואת המעגל היא (x-3)^2+(y-1)^2=9'])).toEqual([[1, 'conflicting-restatement']]);
     expect(codes(['נתון מעגל שמרכזו M', 'M(1,2)', 'משוואת המעגל היא (x-3)^2+(y-1)^2=10'])).toEqual([[2, 'conflicting-restatement']]);
     expect(codes(['נתון מעגל שמרכזו M שרדיוסו 4', 'משוואת המעגל היא (x-3)^2+(y-1)^2=10'])).toEqual([[1, 'conflicting-restatement']]);
-    expect(codes(['נתון מעגל שמרכזו M', 'משוואת המעגל היא (x-3)^2+(y-1)^2=10', 'רדיוס המעגל הוא 4'])).toEqual([[2, 'conflicting-restatement']]);
+    // #2119 (ADR-684): a radius SENTENCE against a sized circle is `radius-contradicts`; the circle was sized by an equation,
+    // which names no radius line, so the wording is still errConflict (see errorText)
+    expect(codes(['נתון מעגל שמרכזו M', 'משוואת המעגל היא (x-3)^2+(y-1)^2=10', 'רדיוס המעגל הוא 4'])).toEqual([[2, 'radius-contradicts']]);
   });
 
   it('two circles in the figure: «המעגל» is ambiguous and refused, never a pick', () => {

@@ -241,7 +241,10 @@ export type ApplyErrorCode =
   /** #2054 (ADR-AG-277): a second letter for an angle or a segment that already has one — `holder` is the first letter, `nameOf` the target as the line spells it. */
   | 'name-taken'
   /** #2061 (ADR-AG-277): the same letter with another coefficient for an angle or segment — `what` is 2-D's reason clause. */
-  | 'measure-contradicts';
+  | 'measure-contradicts'
+  /** #2119 (ADR-684): a second, different radius for a circle whose radius a line already stated — `circle` is its id;
+   *  `derive` names the line that sized it (2-D's ruled sentence, no reason clause). */
+  | 'radius-contradicts';
 
 /**
  * WHICH OBJECT a contextual reference needed, and how many the figure holds (#1432 amendment 1).
@@ -337,6 +340,8 @@ export interface ApplyError {
   what?: string;
   /** For `name-taken` / `measure-contradicts`: the EARLIER constraint the line restates — `derive` maps it to its line. */
   against?: Constraint;
+  /** For `radius-contradicts` (#2119): the circle whose stated radius the line contradicts. */
+  circle?: Id;
 }
 
 /** How a found curve can be called in a sentence — its name, or (unnamed) its equation. */
@@ -760,7 +765,7 @@ export function centreIdOf(c: Construction, o: GeoObject): Id | null {
  * שמשוואתו …», «M מרכז המעגל»), so «A על מעגל M» found no circle beside a figure whose circle plainly has
  * centre M. Asked here once, so every reference reaches every naming.
  */
-function circleByName(c: Construction, name: string): GeoObject | undefined {
+export function circleByName(c: Construction, name: string): GeoObject | undefined {
   const described = readDescribedCircle(name);
   if (described) return describedCircle(c, described);
   const direct = objectById(c, numeralCurveId('circle', name)) ?? objectById(c, `circle-at-${name}`) ?? curveByName(c, name);
@@ -3123,10 +3128,13 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
         }
       }
-      return applyAll(c, [
+      const lowered = applyAll(c, [
         { t: 'point', id: host.centre, x: num(cx), y: num(cy), src: f.src },
         { t: 'radius-of', circleId: host.id, value: num(r), src: f.src },
       ]);
+      // #2119 (ADR-684): an EQUATION against a stated radius keeps its conflict sentence, in both orders — the ruled
+      // radius sentence is for a radius sentence (the equation-first order meets the curve arm's errConflict)
+      return !lowered.ok && lowered.error.code === 'radius-contradicts' ? { ok: false, error: { code: 'conflicting-restatement', detail: f.src } } : lowered;
     }
 
     case 'centre-of': {
@@ -3443,10 +3451,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           const params = restText.includes(`"${sym}"`) ? base.params : base.params.filter((p) => p.sym !== sym);
           return { ok: true, next: { ...base, objects, constraints, params }, effect: 'narrowed' };
         }
-        // A radius already carried by the object: a RESTATEMENT, judged at the probes.
+        // A radius already carried by the object: a RESTATEMENT, judged at the probes. A different one is refused in 2-D's
+        // ruled sentence naming the line that sized the circle (#2119, ADR-684 — operator ruling 2026-10-15, every builder).
         return sameNumbers(host.r, f.value)
           ? { ok: true, next: c, effect: 'known' }
-          : { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+          : { ok: false, error: { code: 'radius-contradicts', detail: f.src, circle: host.id } };
       }
       if (isCreatedCircle(host) && JSON.stringify(host.curve).includes(`"${toolSymbol(host.id, 'r')}"`)) {
         /*

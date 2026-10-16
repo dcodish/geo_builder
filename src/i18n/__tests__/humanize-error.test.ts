@@ -74,6 +74,8 @@ const CASES: { raw: string; contains: string[] }[] = [
   { raw: 'non-finite position computed', contains: [] },
   { raw: '|AB| = |AD| references an unknown point', contains: ['|AB| = |AD|'] },
   { raw: 'over-constrained: |AC| = 9 cannot hold', contains: ['|AC| = 9'] },
+  // #2165 + #2119 (ADR-681): a second size for a stated circle — the ruled frame without a reason clause
+  { raw: 'over-constrained: radius of circle-O = 4 cannot hold', contains: ['רדיוס המעגל', 'O = 4'] },
   // replay/core.ts (#2023, ADR-661) — a second letter for an angle or a segment that already has one
   { raw: 'name-taken: angle ABC is already named α [vs #1]', contains: ['ABC', 'α'] },
   { raw: 'name-taken: segment AB is already named 2a', contains: ['AB', '2a'] },
