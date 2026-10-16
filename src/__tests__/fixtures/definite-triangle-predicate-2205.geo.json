@@ -1,0 +1,38 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-16T12:00:00.000Z",
+  "name": "definite-triangle-predicate-2205",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "המשולש ישר זווית",
+      "group": "g1",
+      "cmd": {
+        "type": "right-triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    }
+  ]
+}

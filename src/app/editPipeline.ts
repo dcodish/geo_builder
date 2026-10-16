@@ -20,7 +20,7 @@
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabelFold, parse, typedLabels } from '@/parser';
 import { autoNamedLabels, groupKey, impliedIdentityBinding, mergeFacts, nameByUseCommands, nameCentreFacts, renameFacts, replay, resolveBinds, stepAsideFacts, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
-import { roleReadingConfig, type DecideBind } from './decideDeterministic';
+import { ambiguousDefiniteShapeNote, roleReadingConfig, type DecideBind } from './decideDeterministic';
 import { vertexPairVerdict } from './vertexPairCevian';
 import { honestyGateReport } from './honestyGates';
 import { forcedCrossedRing, impliedByPrior } from '@/replay/core';
@@ -144,6 +144,12 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   if (vp?.kind === 'adopt') r = parse(vp.reading, ectx);
   if (!r.ok && r.reason === 'cevian-redefines-vertex') {
     setInputNote(t('errors.alreadyDefined', { id: r.foot }));
+    return false;
+  }
+  // #2205 (ADR-685): the submit seam's question, in the same words
+  if (!r.ok && r.reason === 'ambiguous-definite-shape') {
+    const note = ambiguousDefiniteShapeNote(r, editText);
+    setInputNote(t(note.key, { ...note.params, plural: t(note.params.plural.t) }));
     return false;
   }
   if (!r.ok || r.commands.length === 0) {
