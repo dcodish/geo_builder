@@ -192,8 +192,10 @@ describe('#1795 — references stay context (controls)', () => {
     // «AD קוטר במעגל ABCD»: the circle is named by its points
     const diam: AnyCommand[] = [{ type: 'point-on-circle', id: 'A', circle: 'circle-O' }, { type: 'point-on-circle', id: 'D', circle: 'circle-O' }];
     expect(unaccountedLabels('AD קוטר במעגל ABCD', diam, { existingPoints, circleMembers }).labels).toEqual([]);
-    // «… במעגל O» names the circle, and the lowering touches a circle
-    expect(unaccountedLabels('F על המעגל O', [{ type: 'point-on-circle', id: 'F', circle: 'circle-P' }], { existingPoints }).labels).toEqual([]);
+    // «… במעגל O» names the circle, and the lowering touches THAT circle (#2185, ADR-670 narrowed rule 3)
+    expect(unaccountedLabels('F על המעגל O', [{ type: 'point-on-circle', id: 'F', circle: 'circle-O' }], { existingPoints }).labels).toEqual([]);
+    // …touching ANOTHER circle no longer excuses the named one (was []: "touches a circle at all")
+    expect(unaccountedLabels('F על המעגל O', [{ type: 'point-on-circle', id: 'F', circle: 'circle-P' }], { existingPoints }).labels).toEqual(['O']);
     // «במשולש ABC» names an existing polygon whose vertex the lowering carries
     expect(
       unaccountedLabels('M אמצע AB במשולש ABC', [{ type: 'midpoint', id: 'M', a: 'A', b: 'B' }], { existingPoints, polygons: [['A', 'B', 'C']] }).labels,

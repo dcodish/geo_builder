@@ -29,6 +29,7 @@ import { foldGlyphs } from '../../shell/glyphFold';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { foreignGiven } from './scope';
+import { incidenceList } from './incidenceList';
 import { readFrame } from './frame';
 import { NOTATION_WORDS, UNIT_WORDS, unaccountedLabels } from './labelAccounting';
 import { readShapePhrase, lowerShape, shapeNounIsDefinite, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
@@ -12385,21 +12386,32 @@ function withRoleClaims(commands: AnyCommand[], s: string, ctx: ParseContext): A
  * created ON the circle before the relation drives its remaining DOF.
  */
 function withOnCircleMembership(commands: AnyCommand[], s: string, ctx: ParseContext): AnyCommand[] {
-  if (!/על\s+ה?מעגל|on\s+the\s+circle/i.test(s)) return commands;
-  const center = resolveMentionedCircle(s, ctx);
-  if (!center) return commands; // no single/named circle to anchor on
-  const circ = circleId(center);
-  const already = new Set(commands.flatMap((c) => (c.type === 'point-on-circle' && c.circle === circ ? [up(c.id)] : [])));
+  if (!/על\s+ה?מעגל|on\s+(?:the\s+)?circle/i.test(s)) return commands;
+  // #2185 (ADR-670): each «X על [ה]מעגל K» binds X to ITS OWN circle K when K is named — «A על מעגל O ו-B על מעגל P»
+  // puts B on P. One circle resolved per SENTENCE bound every subject to the first circle (B on O, green). An
+  // unnamed «X על המעגל» binds to the resolved definite circle, as before.
+  const resolved = resolveMentionedCircle(s, ctx);
+  const known = new Set([...(ctx.circles ?? []).map(up), ...commands.flatMap((c) => (c.type === 'circle' ? [up(c.center)] : []))]);
+  const already = new Set(commands.flatMap((c) => (c.type === 'point-on-circle' ? [`${c.circle}|${up(c.id)}`] : [])));
   const add: AnyCommand[] = [];
+  // A point the rule already put on ANOTHER circle gets this membership AFTER it, in the order stated — «A על מעגל O,
+  // A על מעגל P» seats A on O and grows P through it, exactly as the two lines do. A point the rule left free is
+  // created ON the circle first (prepended), as before.
+  const onAnother = new Set(commands.flatMap((c) => (c.type === 'point-on-circle' ? [up(c.id)] : [])));
+  const after: AnyCommand[] = [];
   // The label must be a STANDALONE token immediately before "on the circle" (`(?<![A-Za-z])` so the last
   // letter of a word — "are ON the circle" → not "e" — is never captured, PAR-2/ADR-240 regression).
-  for (const m of s.matchAll(/(?<![A-Za-z])([A-Za-z]\d*)\s*(?:על\s+ה?מעגל|on\s+the\s+circle)/gi)) {
+  for (const m of s.matchAll(/(?<![A-Za-z])([A-Za-z]\d*)\s*(?:על\s+ה?מעגל|on\s+(?:the\s+)?circle)(?:\s+([A-Za-z]\d*)(?![A-Za-z\d]))?/gi)) {
+    const named = m[2] && known.has(up(m[2])) ? up(m[2]) : null;
+    const center = named ?? resolved;
+    if (!center) continue; // no single/named circle to anchor on
+    const circ = circleId(center);
     const id = up(m[1]);
-    if (id === up(center) || already.has(id)) continue; // the centre isn't ON its circle; don't double-add
-    add.push({ type: 'point-on-circle', id, circle: circ });
-    already.add(id);
+    if (id === up(center) || already.has(`${circ}|${id}`)) continue; // the centre isn't ON its circle; don't double-add
+    (onAnother.has(id) ? after : add).push({ type: 'point-on-circle', id, circle: circ });
+    already.add(`${circ}|${id}`);
   }
-  return add.length ? [...add, ...commands] : commands;
+  return add.length || after.length ? [...add, ...commands, ...after] : commands;
 }
 
 /**
@@ -13443,6 +13455,12 @@ function droppedLabelSpan(s: string, commands: AnyCommand[], ctx: ParseContext):
 
 /** The parse body AFTER normalization + size-qualifier resolution (the pre-#102 `parse`). */
 function parseResolved(s: string, ctx: ParseContext): ParseResult {
+  // #2185 (ADR-670): an INCIDENCE LIST («A על מעגל O ועל מעגל P», «A ו-B על … ועל … בהתאמה») means its
+  // distribution — every subject on every carrier, or paired — read through the clause path all-or-nothing, ahead
+  // of the whole-line rules (which read the first carrier and dropped the rest green). A clause that does not read
+  // alone leaves the line unread, never the first-carrier half (parser precedence, the ADR-024 discipline).
+  const dist = incidenceList(s);
+  if (dist && dist.length >= 2) return parseClauses(dist, ctx) ?? { ok: false, reason: 'not-handled' };
   const whole = runRules(s, ctx);
   // ADR-264 Am. 1 / issue #33: a winning parse (or a rule's clarification) that silently DROPPED something
   // the student stated — a shape NOUN left unmaterialized, a circle predicate, a radius symbol, a REGION
@@ -14017,51 +14035,14 @@ function splitStatements(s0: string, ctx: ParseContext): ParseResult | null {
   // e.g. the whole-line "AB=AC חוסם במעגל" a lax rule would otherwise claim minus the inscribe.
   if (parts.length < 2 && !CIRCLE_PRED_TAIL.test(s)) return null;
   if (parts.some((p) => BARE_LABEL_PIECE.test(p))) return null; // a label-list construction — not clauses
+  return parseClauses(parts, ctx);
+}
+
+/** The ADR-264 clause path: each piece read ALL-OR-NOTHING in the context augmented by the pieces before it.
+ *  Shared by the apposition split and the #2185 incidence-list distribution (ADR-670). */
+function parseClauses(parts: readonly string[], ctx: ParseContext): ParseResult | null {
   let cur = ctx;
   const all: AnyCommand[] = [];
-  // ONE clause, all-or-nothing: a clean rule win commits; a piece a lax rule half-claims (dropped shape
-  // noun — ADR-264 Am. 1 — or a dropped trailing inscribe predicate — Am. 2) gets ONE rescue: detach the
-  // inscribe tail, parse the head as its own clause, and give the subject-less predicate its subject —
-  // THE unique polygon the clause context knows (the ADR-245 definite-reference pattern, verb edition:
-  // "AB=AC חוסם במעגל" after "משולש שווה שוקיים ABC" ⇒ pair + "ABC חוסם במעגל" ⇒ the circumcircle).
-  // Ambiguity (zero or several polygons) → null → the whole line escalates honestly, never a guess.
-  const parseClause = (p: string, c0: ParseContext): AnyCommand[] | null => {
-    const r = runRules(p, c0);
-    if (
-      r.ok &&
-      !droppedShapeNoun(p, r.commands, c0) &&
-      !droppedMidsegment(p, r.commands) &&
-      !droppedCirclePredicate(p, r.commands) &&
-      droppedRadiusSymbol(p, r.commands).length === 0 &&
-      !droppedLabelSpan(p, r.commands, c0) // #1795: a half-read clause cannot survive the split either
-    )
-      return r.commands;
-    const m = p.match(CIRCLE_PRED_TAIL);
-    if (!m) return null;
-    const head = p.slice(0, m.index).trim();
-    const out: AnyCommand[] = [];
-    let c1 = c0;
-    if (head) {
-      if (BARE_LABEL_PIECE.test(head)) return null; // a label list is no statement — nothing to inscribe
-      const rh = runRules(head, c1);
-      if (!rh.ok || droppedShapeNoun(head, rh.commands, c1) || droppedCirclePredicate(head, rh.commands)) return null;
-      out.push(...rh.commands);
-      c1 = augmentParseCtx(c1, rh.commands);
-    }
-    // Unique BY CONTENT — the head clause re-declaring the figure's own polygon (augmentParseCtx appends
-    // it again) is still ONE subject; two genuinely different polygons stay an honest refusal.
-    const polys = [...new Map((c1.polygons ?? []).map((v) => [v.join(''), v])).values()];
-    if (polys.length !== 1) return null; // no unique subject for the bare predicate — defer to the LLM
-    const rp = runRules(`${polys[0].join('')} ${m[1]}`, c1);
-    if (!rp.ok) return null;
-    // The rebuilt predicate must not drop a RADIUS SYMBOL its clause carries — the ADR-156 idempotent
-    // re-inscribe returns a bare polygon HERE too (issue #53), and the rescue must not become the leak it
-    // plugs. The bare no-op re-inscribe itself stays a legitimate lowering (ADR-156: "already drawn");
-    // a dropped NUMERIC size keeps its existing lane (droppedGivenNumbers at the commit boundary).
-    if (droppedRadiusSymbol(m[1], rp.commands).length > 0) return null;
-    out.push(...rp.commands);
-    return out;
-  };
   for (const p of parts) {
     const cmds = parseClause(p, cur);
     // ALL-OR-NOTHING — any unreadable piece → whole line escalates (never half-parse).
@@ -14070,6 +14051,50 @@ function splitStatements(s0: string, ctx: ParseContext): ParseResult | null {
     cur = augmentParseCtx(cur, cmds);
   }
   return { ok: true, commands: all };
+}
+
+// ONE clause, all-or-nothing: a clean rule win commits; a piece a lax rule half-claims (dropped shape
+// noun — ADR-264 Am. 1 — or a dropped trailing inscribe predicate — Am. 2) gets ONE rescue: detach the
+// inscribe tail, parse the head as its own clause, and give the subject-less predicate its subject —
+// THE unique polygon the clause context knows (the ADR-245 definite-reference pattern, verb edition:
+// "AB=AC חוסם במעגל" after "משולש שווה שוקיים ABC" ⇒ pair + "ABC חוסם במעגל" ⇒ the circumcircle).
+// Ambiguity (zero or several polygons) → null → the whole line escalates honestly, never a guess.
+function parseClause(p: string, c0: ParseContext): AnyCommand[] | null {
+  const r = runRules(p, c0);
+  if (
+    r.ok &&
+    !droppedShapeNoun(p, r.commands, c0) &&
+    !droppedMidsegment(p, r.commands) &&
+    !droppedCirclePredicate(p, r.commands) &&
+    droppedRadiusSymbol(p, r.commands).length === 0 &&
+    !droppedLabelSpan(p, r.commands, c0) // #1795: a half-read clause cannot survive the split either
+  )
+    return r.commands;
+  const m = p.match(CIRCLE_PRED_TAIL);
+  if (!m) return null;
+  const head = p.slice(0, m.index).trim();
+  const out: AnyCommand[] = [];
+  let c1 = c0;
+  if (head) {
+    if (BARE_LABEL_PIECE.test(head)) return null; // a label list is no statement — nothing to inscribe
+    const rh = runRules(head, c1);
+    if (!rh.ok || droppedShapeNoun(head, rh.commands, c1) || droppedCirclePredicate(head, rh.commands)) return null;
+    out.push(...rh.commands);
+    c1 = augmentParseCtx(c1, rh.commands);
+  }
+  // Unique BY CONTENT — the head clause re-declaring the figure's own polygon (augmentParseCtx appends
+  // it again) is still ONE subject; two genuinely different polygons stay an honest refusal.
+  const polys = [...new Map((c1.polygons ?? []).map((v) => [v.join(''), v])).values()];
+  if (polys.length !== 1) return null; // no unique subject for the bare predicate — defer to the LLM
+  const rp = runRules(`${polys[0].join('')} ${m[1]}`, c1);
+  if (!rp.ok) return null;
+  // The rebuilt predicate must not drop a RADIUS SYMBOL its clause carries — the ADR-156 idempotent
+  // re-inscribe returns a bare polygon HERE too (issue #53), and the rescue must not become the leak it
+  // plugs. The bare no-op re-inscribe itself stays a legitimate lowering (ADR-156: "already drawn");
+  // a dropped NUMERIC size keeps its existing lane (droppedGivenNumbers at the commit boundary).
+  if (droppedRadiusSymbol(m[1], rp.commands).length > 0) return null;
+  out.push(...rp.commands);
+  return out;
 }
 
 /** Thread what earlier clauses INTRODUCED into the next clause's context (the clause-fallback sibling of

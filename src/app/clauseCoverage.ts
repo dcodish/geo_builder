@@ -79,17 +79,20 @@ const knownIds = (ctx: ParseContext): Set<string> =>
 /**
  * Does the whole-line lowering carry a reading of this clause, syntactically? Any of the clause's significant
  * commands: (1) a whole-line command of the same type names all its labels; (2) the whole line DEFINES the same
- * object (one id, maybe in another construction — the extension head inside `extend-onto-circle`); (3) it only
+ * object (one id, maybe in another construction — the extension head inside `extend-onto-circle`) with every label
+ * the clause's command names (#2185: the same carrier, never another incidence on the same point); (3) it only
  * declares an object the figure already has.
  */
 function traced(clause: AnyCommand[], whole: readonly AnyCommand[], known: Set<string>): boolean {
   const wholeLabels = whole.map((w) => ({ type: w.type, labels: labelsOf(w) }));
-  const wholeIds = new Set(whole.flatMap((w) => (idOf(w) ? [idOf(w)!] : [])));
   return significant(clause).some((c) => {
     const need = [...labelsOf(c)];
     if (wholeLabels.some((w) => w.type === c.type && need.every((l) => w.labels.has(l)))) return true;
+    // (2) the whole line defines the same object AND that definition names every label the clause's command names
+    // (#2185, ADR-670): the extension head inside `extend-onto-circle` carries the head, the segment and the circle.
+    // A different incidence on the same point (B on circle O for «B על מעגל P») is no trace.
     const id = idOf(c);
-    if (id && wholeIds.has(id)) return true;
+    if (id && whole.some((w) => idOf(w) === id && need.every((l) => labelsOf(w).has(l)))) return true;
     if (DECLARATION.has(c.type)) {
       const ids = id ? [id] : ((c as { ids?: unknown }).ids as string[] | undefined) ?? [];
       return ids.length > 0 && ids.every((x) => known.has(x));

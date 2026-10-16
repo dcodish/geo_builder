@@ -18,7 +18,8 @@
  *  1. a command carries it (as before — the plain "accounted" case);
  *  2. it is a member or the centre of a CIRCLE the commands reference (`circle-X` / its centre id):
  *     «AD קוטר במעגל ABCD» names the circle by its points, and the lowering references the circle;
- *  3. it NAMES a circle («במעגל O», "circle O") and the lowering touches a circle;
+ *  3. it NAMES a circle («במעגל O», "circle O") and the lowering touches THAT circle (`circle-X`, `circle-X-2`,
+ *     `@ctr-X`, the centre X) — narrowed by #2185 (ADR-670) from "touches a circle at all";
  *  4. it is a vertex of an existing POLYGON the sentence names with its noun («במשולש ABC»), when the
  *     commands carry at least one of that polygon's vertices — a definite reference to the shape;
  *  5. it names the circle of a sentence-opening LOCATIVE («במעגל O, המיתר AC …») and the figure already
@@ -110,9 +111,13 @@ export function referencedContextLabels(s: string, commands: AnyCommand[], actx:
     for (const p of e.points) out.add(p.toUpperCase());
     out.add(centreLetter(e.center));
   }
-  // 3 — a circle NAME, when the lowering touches a circle at all.
-  const touchesCircle = commands.some((c) => /circle|inscribe|tangent|chord|arc|diameter/i.test(c.type)) || [...vals].some((v) => /^circle-|^@ctr-/.test(v));
-  if (touchesCircle) for (const m of s.matchAll(CIRCLE_NAME)) out.add(m[1].toUpperCase());
+  // 3 — a circle NAME, when the lowering touches THAT circle (#2185, ADR-670): its id `circle-X`, a concentric
+  // `circle-X-2…`, its anonymous centre `@ctr-X`, or the centre X itself (an `arcOf: circle-X` is a value too).
+  // "Touches a circle at all" excused every other circle the sentence named: «A על מעגל O ועל מעגל P» lowered to A
+  // on O alone and P was accounted because circle O was touched — the second carrier dropped green.
+  const touchesNamed = (x: string): boolean =>
+    vals.has(`circle-${x}`) || vals.has(`@ctr-${x}`) || vals.has(x) || [...vals].some((v) => v.startsWith(`circle-${x}-`));
+  for (const m of s.matchAll(CIRCLE_NAME)) if (touchesNamed(m[1].toUpperCase())) out.add(m[1].toUpperCase());
   // 5 — #1678 (ADR-601): a sentence-opening LOCATIVE circle («במעגל O, המיתר AC חותך את המיתר BD …» / "in
   // circle O, …") is the scene the statement lives in, and it says one thing: the points the statement is about
   // lie on that circle. The lowering refers to it exactly when that already holds — at least two existing
