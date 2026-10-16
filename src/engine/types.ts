@@ -1038,7 +1038,10 @@ export type SideRequirement =
    *  spelling — they all lower to `circles-tangent`), touching at `at`. Recorded so the construction itself says the
    *  pair has ONE common point, whichever way apply realised the tangency (a witness coincide over free radii, a pinned
    *  centre distance over stated ones, a `tangent-inner` radius) — read by `circlesStatedTangent`, never by coordinates. */
-  | { kind: 'circle-position'; relation: 'tangent'; a: Id; b: Id; at: Id }
+  | { kind: 'circle-position'; relation: 'tangent'; a: Id; b: Id; at: Id;
+      /** #2188 ([ADR-672](../../docs/06-decisions.md#adr-672)): the KIND the statement gave (`circles-tangent.external`) —
+       *  read back by the parser (`statedTangencies`) so a later restatement that names no kind keeps it. */
+      external?: boolean }
   /** #1918 ([ADR-607](../../docs/06-decisions.md#adr-607)): a ring DECLARED as a shape phrase no circle can pass
    *  around (`NOT_CYCLIC`) — «טרפז ישר זווית ABCD». Recorded so the stage-0 prover sees the declaration whichever
    *  order the circle and the noun arrive in; not a side, so no side reader consumes it. */

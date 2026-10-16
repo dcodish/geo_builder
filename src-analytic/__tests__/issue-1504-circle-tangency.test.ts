@@ -332,3 +332,18 @@ describe('#1504 amendment 1 — concentric circles are NOT tangent (operator rul
     expect(error.detail).toBe(line);
   });
 });
+
+// #2188 (ADR-672, 2-D) — the cross-builder half of «Keep the kind stated earlier» (operator ruling 2026-10-16): analytic
+// already keeps it; this pins that a restatement naming no kind stays internal here too, so a regression is caught.
+describe('#2188 — a restated tangency keeps the kind stated earlier', () => {
+  it('«…משיקים מבפנים» · «המעגלים O ו-P משיקים בנקודה X» stays INTERNAL at every seed', () => {
+    for (let seed = 0; seed < 4; seed += 1) {
+      const d = derive(['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים מבפנים', 'המעגלים O ו-P משיקים בנקודה X'], seed);
+      expect(d.faults, `seed ${seed}`).toEqual([]);
+      const pt = (id: string) => d.figure.points.find((p) => p.id === id)!;
+      const [r1, r2] = d.figure.curves.map((c) => c.curve).filter((c) => c.kind === 'circle').map((c) => (c as { r: number }).r);
+      const dd = Math.hypot(pt('O').x - pt('P').x, pt('O').y - pt('P').y);
+      expect(Math.abs(dd - Math.abs(r1 - r2)), `seed ${seed} internal`).toBeLessThan(1e-5 * Math.max(1, dd));
+    }
+  });
+});

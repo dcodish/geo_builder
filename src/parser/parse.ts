@@ -296,6 +296,11 @@ export interface ParseContext {
   circlePairPositions?: Record<string, 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained'>;
   /** A tangent circle pair's TOUCH point, resolved positionally — the referent of «בנקודת ההשקה» (#197 Am. 5). */
   circlePairTouches?: Record<string, string>;
+  /** #2149 / #2188 ([ADR-671](../../docs/06-decisions.md#adr-671), [ADR-672](../../docs/06-decisions.md#adr-672)) — SEMANTIC:
+   *  each circle pair the construction STATES tangent (its `circles-tangent` record, ADR-645), keyed by the sorted pair of
+   *  circle ids: the touch point and the stated kind (the earliest record of the pair). The only source of an inherited
+   *  tangency kind — the deictic `circlePairPositions` never decides it (docs/17 §3b law 2). */
+  statedTangencies?: Record<string, { at: string; external: boolean }>;
   /** Recorded SIZE roles between circles (`set-radius-order`, concentric or not — issue #102): lets
    *  «המעגל הגדול/הקטן» resolve consistently once assigned. */
   radiusOrder?: { outer: string; inner: string }[];
@@ -4930,6 +4935,20 @@ const pointOnTheLine: Rule = (s, ctx) => {
 const centresSegment: Rule = (s, ctx) => {
   const HE = String.raw`ה?(?:קטע|קו|ישר)\s+(?:ה?מרכזים|מרכזי?\s+ה?מעגלים)|מרכזי?\s+ה?מעגלים`;
   const EN = String.raw`(?:the\s+)?(?:segment|line)\s+of\s+(?:the\s+)?cent(?:er|re)s|(?:the\s+)?cent(?:er|re)s\s+(?:segment|line)`;
+  // #2149 (ADR-671, card 6): the NAMED pair — «קטע המרכזים של המעגלים O ו-P», «קטע מרכזי המעגלים O ו-P», «מרכזי
+  // המעגלים O ו-P», «… של מעגל O ומעגל P», "the segment of the centres of circles O and P". Exactly two named circles,
+  // both drawn; the segment joins their centres however many circles the figure holds.
+  const pairHe = String.raw`(?:(?:של|בין)\s+)?(?:(?:ה|שני\s+ה)?מעגלים\s+(${LABEL})\s*(?:ו-?|,)\s*(${LABEL})|ה?מעגל\s+(${LABEL})\s+וה?מעגל\s+(${LABEL}))`;
+  const pairEn = String.raw`(?:of\s+)?(?:(?:the\s+)?circles\s+(${LABEL})\s+and\s+(${LABEL})|(?:the\s+)?circle\s+(${LABEL})\s+and\s+(?:the\s+)?circle\s+(${LABEL}))`;
+  const namedM =
+    s.match(new RegExp(String.raw`^\s*(?:ה?(?:קטע|קו|ישר)\s+(?:ה?מרכזים|מרכזי)|מרכזי)\s+${pairHe}\s*$`, 'i')) ??
+    s.match(new RegExp(String.raw`^\s*(?:the\s+)?(?:(?:segment|line)\s+(?:of|joining)\s+(?:the\s+)?cent(?:er|re)s|cent(?:er|re)s)\s+${pairEn}\s*$`, 'i'));
+  if (namedM) {
+    const [a, b] = namedM.slice(1).filter((x): x is string => !!x).map(up);
+    const known = new Set((ctx.circles ?? []).map(up));
+    if (!a || !b || a === b || !known.has(a) || !known.has(b)) return null; // a named circle not drawn: decline
+    return [{ type: 'segment', a: centrePt(ctx, a), b: centrePt(ctx, b) }];
+  }
   if (!new RegExp(String.raw`^\s*(?:${HE}|${EN})\s*$`, 'i').test(s)) return null;
   const cs = ctx.circles ?? [];
   if (cs.length !== 2) return null;
@@ -5540,7 +5559,20 @@ const radiusRatio: Rule = (s, ctx) => {
   const fac =
     s.match(new RegExp(String.raw`(?<![א-ת])פי\s*${NUMEXPR('k')}`, 'i')) ??
     s.match(new RegExp(String.raw`${UNGLUED}${NUMEXPR('k')}\s*(?:(?<![א-ת])פעמים(?![א-ת])|\btimes\b)`, 'i'));
-  if (!fac) return null; // no factor: not a ratio sentence this rule reads
+  if (!fac) {
+    // #2149 (ADR-671, card 6): no factor — an EQUALITY of the two radii is the ratio k = 1 («רדיוס מעגל O שווה לרדיוס
+    // מעגל P», «… = …», «רדיוס מעגל O ורדיוס מעגל P שווים», "the radius of circle O equals / is equal to the radius of
+    // circle P"). The same guards: two references to two drawn circles, and nothing left but ratio connectives.
+    if (refs.length !== 2) return null;
+    let rest = s;
+    for (const sp of [...refs].sort((x, y) => y.at - x.at)) rest = rest.slice(0, sp.at) + ' ' + rest.slice(sp.end);
+    if (!/=|(?<![א-ת])ו?(?:שווה|שווים|שוות|זהה|זהים)(?![א-ת])|\bequals?\b|\bequal\b/i.test(rest)) return null;
+    const known = new Set((ctx.circles ?? []).map(up));
+    const [a, b] = refs;
+    if (a.label === b.label || !known.has(a.label) || !known.has(b.label)) return 'stop';
+    if (!onlyRatioWords(rest)) return 'stop';
+    return [{ type: 'set-radius-ratio', c1: circleId(a.label), c2: circleId(b.label), k: 1 }];
+  }
   const k = numexprVal(fac.groups!, 'k');
   const known = new Set((ctx.circles ?? []).map(up));
   if (refs.length !== 2 || !k || !(k.value > 0)) return 'stop';
@@ -8268,11 +8300,13 @@ const EQUAL_SIZE_G = rx(EQUAL_SIZE.source, 'gi');
 const withEqualRadii = (s: string, cmds: AnyCommand[], id1: Id, id2: Id): AnyCommand[] =>
   EQUAL_SIZE.test(s) ? [...cmds, { type: 'set-radius-ratio', c1: id1, c2: id2, k: 1 } as AnyCommand] : cmds;
 
-const resolveCirclePair = (
-  s: string,
-  ctx: ParseContext,
-  opts?: { presupposes?: boolean },
-): { kind: 'named' | 'existing' | 'complete'; centres: [string, string] } | 'introduce' | null => {
+/**
+ * #2149 ([ADR-671](../../docs/06-decisions.md#adr-671)) — the circles a sentence NAMES: the per-circle «מעגל X» /
+ * "circle X" names, else the plural-list form «(ה)מעגלים X ו-Y» / "circles X and Y" (ADR-228 Am.). ONE reader, shared
+ * by the pair resolver, the last-resort «which circle?» ask and the named-pair readers, so a sentence that names its
+ * circles is never treated as an anonymous reference. Readers of a PAIR test exactly two names.
+ */
+const namedCircleRefs = (s: string): string[] => {
   let named = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
   if (named.length < 2) {
     // PLURAL-list form: "circles O1 and O2" / «מעגלים O1 ו-O2» — the names follow the plural noun,
@@ -8280,6 +8314,24 @@ const resolveCirclePair = (
     const pl = s.match(/(?:circles|מעגלים|מעגלי)\s+([A-Za-z]\d*)\s*(?:ו-?|\band\b|,)\s*([A-Za-z]\d*)/i);
     if (pl) named = [up(pl[1]), up(pl[2])];
   }
+  return named;
+};
+
+/** #2188 ([ADR-672](../../docs/06-decisions.md#adr-672)) — the tangency KIND the construction already states for the
+ *  pair (its earliest `circles-tangent` record, `statedTangencies`), or undefined when none is stated. A restatement
+ *  that names no kind keeps it; an explicit kind word on the line always wins (the callers read it first). */
+const inheritedExternal = (ctx: ParseContext, id1: Id, id2: Id): boolean | undefined =>
+  ctx.statedTangencies?.[[id1, id2].sort().join('|')]?.external;
+/** The pair's stated tangency record (touch point + kind), or undefined. */
+const statedTangencyOf = (ctx: ParseContext, id1: Id, id2: Id): { at: string; external: boolean } | undefined =>
+  ctx.statedTangencies?.[[id1, id2].sort().join('|')];
+
+const resolveCirclePair = (
+  s: string,
+  ctx: ParseContext,
+  opts?: { presupposes?: boolean },
+): { kind: 'named' | 'existing' | 'complete'; centres: [string, string] } | 'introduce' | null => {
+  const named = namedCircleRefs(s);
   if (named.length >= 2) return named[0] === named[1] ? null : { kind: 'named', centres: [named[0], named[1]] };
   if (named.length === 1) return null; // a half-named pair — ambiguous which circle is the other; defer
   const plural = /\bcircles\b|מעגלים|שני\s+מעגל|שתי\s+מעגל/i.test(s);
@@ -9019,13 +9071,80 @@ const circlesTangent: Rule = (s, ctx) => {
   // stays a given); a named centre shows, an unnamed default centre is auto (hidden until used).
   if (!have.has(c1)) cmds.push({ type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, ...(!isNamed ? { autoCenter: true } : {}) });
   if (!have.has(c2)) cmds.push({ type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ifAbsent: true, ...(!isNamed ? { autoCenter: true } : {}) });
-  cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: !internal });
+  // #2188 (ADR-672, operator ruling 2026-10-16 «Keep the kind stated earlier»): an explicit kind word wins; a line
+  // naming none keeps the kind the construction already states for the pair; with none stated, external.
+  const explicitExternal = /חיצונ|מבחוץ|\bexternal\w*|\boutside\b/i.test(s);
+  const external = internal ? false : explicitExternal ? true : (inheritedExternal(ctx, id1, id2) ?? true);
+  cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external });
   // #761: «…ברדיוסים שווים». INTERNAL tangency + equal radii is a CONTRADICTION (two internally
   // tangent circles of equal radius are the same circle: |c1c2| = |r1 - r2| = 0). It is lowered
   // anyway, deliberately — the engine then refuses it as an unsatisfiable given set, naming the
   // conflicting statement, which is the honest answer. Refusing it HERE would make the parser judge
   // satisfiability, which is the solver's job (and a parser-side special case besides).
   return withEqualRadii(s, cmds, id1, id2);
+};
+
+/**
+ * #2149 ([ADR-671](../../docs/06-decisions.md#adr-671), operator ruling 2026-10-16 card 6) — EQUAL SIZE of a named pair:
+ * «רדיוסי המעגלים O ו-P שווים», «קוטרי / שטחי / היקפי המעגלים O ו-P שווים», «למעגלים O ו-P רדיוסים שווים», «המעגלים O ו-P
+ * בעלי רדיוסים שווים», "the radii of circles O and P are equal", "circles O and P have equal radii". The pair is what the
+ * sentence is about; the rest must be the equal-size vocabulary (`EQUAL_SIZE`, the #761/ADR-467 lane: radii, diameters,
+ * areas and perimeters are all r₁ = r₂) and nothing else — a leftover guard, so «…משיקים ורדיוסיהם שווים» stays with
+ * `circlesTangent`. Exactly two named circles, both drawn. Lowers to `set-radius-ratio` k = 1.
+ */
+const PAIR_REF = rx(
+  String.raw`(?:(?<![א-ת])[לב]?|של\s+)?(?:ה|שני\s+ה)?מעגלים\s+${LABEL}\s*(?:ו-?|,)\s*${LABEL}(?![A-Za-z\d])|(?<![A-Za-z])(?:the\s+)?circles\s+${LABEL}\s+and\s+${LABEL}(?![A-Za-z\d])`,
+  'i',
+);
+const EQUAL_SIZE_EN_REV = /^(?:the\s+)?(?:radii|radiuses|diameters|areas|perimeters|circumferences)\s+(?:of\s+)?(?:are\s+)?(?:equal|the\s+same)$/i;
+const pairEqualSize: Rule = (s, ctx) => {
+  const names = namedCircleRefs(s);
+  if (names.length !== 2 || names[0] === names[1]) return null;
+  const pm = s.match(PAIR_REF);
+  if (!pm) return null;
+  const rest = (s.slice(0, pm.index!) + ' ' + s.slice(pm.index! + pm[0].length))
+    .replace(/(?<![א-ת])(?:בעלי|בעלות|הם|הן)(?![א-ת])|\b(?:have|has|are|with)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const he = rest.match(EQUAL_SIZE);
+  const ok = (he && he.index === 0 && he[0].length === rest.length) || EQUAL_SIZE_EN_REV.test(rest);
+  if (!ok) return null;
+  const known = new Set((ctx.circles ?? []).map(up));
+  if (!known.has(names[0]) || !known.has(names[1])) return null; // a named circle not drawn: decline
+  return [{ type: 'set-radius-ratio', c1: circleId(names[0]), c2: circleId(names[1]), k: 1 }];
+};
+
+/**
+ * #2149 + #2123 ([ADR-671](../../docs/06-decisions.md#adr-671), operator rulings 2026-10-15 and 2026-10-16 card 7) — the
+ * TOUCH POINT of a named pair, by role: «X [היא] נקודת ה(השקה|מגע) של / בין המעגלים O ו-P», «… של מעגל O ומעגל P»,
+ * «נקודת ההשקה של … היא X», «X נקודת השקה …», "X is the point of tangency / touch point / tangency point of circles O
+ * and P", "the point of tangency of circles O and P is X". The sentence itself states the tangency at X, so it lowers
+ * to exactly what «המעגלים O ו-P משיקים בנקודה X» does — `circles-tangent … at X` — with the kind the pair is already
+ * stated with (#2188, `inheritedExternal`), else external. Already tangent at an auto-named M, ADR-653's naming by use
+ * gives the touch X alone. Exactly two named circles, both drawn; a leftover declines whole (ADR-024).
+ */
+const TOUCH_NOUN_HE = String.raw`נקודת\s+ה?(?:השקה|מגע)`;
+const TOUCH_NOUN_EN = String.raw`(?:the\s+)?(?:point\s+of\s+(?:tangency|contact)|(?:touch|tangency|contact)\s+point)`;
+const PAIR_TAIL_HE = String.raw`(?:של|בין)\s+(?:(?:ה|שני\s+ה)?מעגלים\s+${LABEL}\s*(?:ו-?|,)\s*${LABEL}|ה?מעגל\s+${LABEL}\s+ו(?:ל|ב)?ה?מעגל\s+${LABEL})`;
+const PAIR_TAIL_EN = String.raw`(?:of|between)\s+(?:(?:the\s+)?circles\s+${LABEL}\s+and\s+${LABEL}|(?:the\s+)?circle\s+${LABEL}\s+and\s+(?:the\s+)?circle\s+${LABEL})`;
+const TOUCH_FORMS = [
+  rx(String.raw`^\s*(?:ה?נקודה\s+)?(${LABEL})\s+(?:(?:היא|הוא)\s+)?${TOUCH_NOUN_HE}\s+${PAIR_TAIL_HE}\s*\.?\s*$`, ''),
+  rx(String.raw`^\s*${TOUCH_NOUN_HE}\s+${PAIR_TAIL_HE}\s+(?:היא|הוא)\s+(?:ה?נקודה\s+)?(${LABEL})\s*\.?\s*$`, ''),
+  rx(String.raw`^\s*(?:(?:the\s+)?point\s+)?(${LABEL})\s+is\s+${TOUCH_NOUN_EN}\s+${PAIR_TAIL_EN}\s*\.?\s*$`, 'i'),
+  rx(String.raw`^\s*${TOUCH_NOUN_EN}\s+${PAIR_TAIL_EN}\s+is\s+(?:(?:the\s+)?point\s+)?(${LABEL})\s*\.?\s*$`, 'i'),
+];
+const namedTouchPoint: Rule = (s, ctx) => {
+  if (!/נקודת\s+ה?(?:השקה|מגע)|tangency|touch\s+point|point\s+of\s+contact|contact\s+point/i.test(s)) return null;
+  const m = TOUCH_FORMS.map((r) => s.match(r)).find((x) => x);
+  if (!m) return null;
+  const names = namedCircleRefs(s);
+  if (names.length !== 2 || names[0] === names[1]) return null;
+  const at = up(m[1]);
+  const known = new Set((ctx.circles ?? []).map(up));
+  if (!known.has(names[0]) || !known.has(names[1])) return null; // a named circle not drawn: decline
+  if (at === names[0] || at === names[1]) return null; // a centre is never the touch point
+  const id1 = circleId(names[0]), id2 = circleId(names[1]);
+  return [{ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: inheritedExternal(ctx, id1, id2) ?? true }];
 };
 
 /**
@@ -9166,19 +9285,29 @@ const commonTangent: Rule = (s, ctx) => {
     const at = atResolved;
     // Variant 2 — the common tangent AT the shared touch point M ("tangent at the intersection").
     const cmds: AnyCommand[] = [...mk];
-    if (have.has(at)) {
+    const stated = statedTangencyOf(ctx, id1, id2);
+    if (have.has(at) && stated?.at === at) {
+      // #2188 (ADR-672): M IS the pair's stated touch point — the tangency already makes it the common point with the
+      // centres collinear, so the centre line states nothing new: re-asserting `set-line` forced an external order
+      // after an internal one. The lowering is the drawn tangent line at M plus M's two memberships, which the stated
+      // tangency already implies — kept so the line refers to BOTH circles it names (the label accountant's rule 3).
+      cmds.push({ type: 'point-on-circle', id: at, circle: id1 }, { type: 'point-on-circle', id: at, circle: id2 });
+    } else if (have.has(at)) {
       // M exists (typically the stated touch of "…משיקים בנקודה M"): assert its membership on BOTH
-      // circles + centres collinear with it (⟺ common tangency at M) — all idempotent when the pair
-      // is already tangent there, constraints that flex the figure when not.
+      // circles + centres collinear with it (⟺ common tangency at M) — constraints that flex the figure.
+      // #2188: the centre line follows the kind the pair is stated with — external (or none stated): `set-line`,
+      // the touch BETWEEN the centres; internal: the unordered collinearity (which centre is nearer is the
+      // radius order, never stated — ADR-052).
       cmds.push(
         { type: 'point-on-circle', id: at, circle: id1 },
         { type: 'point-on-circle', id: at, circle: id2 },
-        { type: 'set-line', points: [c1, at, c2] },
+        inheritedExternal(ctx, id1, id2) === false ? { type: 'set-collinear', a: c1, b: at, c: c2 } : { type: 'set-line', points: [c1, at, c2] },
       );
     } else {
       // M is new: "a common tangent at ONE point M" says the circles are TANGENT at M — the
-      // circles-tangent device owns that state (free radii, gap-driving coincide).
-      cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: true });
+      // circles-tangent device owns that state (free radii, gap-driving coincide). #2188: the circles' kind is
+      // inherited (the line's own «חיצוני/פנימי» is the tangent LINE's kind, never the circles').
+      cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: inheritedExternal(ctx, id1, id2) ?? true });
     }
     cmds.push({ type: 'tangent', id: `tan-${at}`, circle: id1, at, visible: true });
     const fresh = (naming ?? []).filter((p) => !have.has(p));
@@ -11585,6 +11714,10 @@ const ambiguousCircleAsk: Rule = (s, ctx) => {
   if (!mentionsCircle(s) && !CIRCLE_CONSTRUCT_NOUN.test(s)) return null;
   if (/גדול|קטן|ימני|שמאלי|חיצוני|פנימי|חוסם|חסום|מוכל|outer|inner|\bright\b|\bleft\b|larger|smaller|circumscrib|inscrib|contained/i.test(s)) return null;
   if (circleCenter(s)) return null;
+  // #2149 (ADR-671, operator ruling 2026-10-16 card 3): a sentence that NAMES its circles — the plural list
+  // «המעגלים O ו-P», "circles O and P" — is not an anonymous reference; with no reader it goes to the AI, as its
+  // one-by-one twin «מעגל O ומעגל P …» already does. Never a false «which circle?».
+  if (namedCircleRefs(s).length) return null;
   if (anonymousCircleTieBreak(s, ctx, circles)) return null;
   return { clarify: 'ambiguous-circle-ref', centers: circles.map((c) => (c.startsWith('@ctr-') ? c.slice(5) : c)) };
 };
@@ -11693,6 +11826,7 @@ export const RULES: Rule[] = [
   roleLength, // #1607: «האלכסון AC = 8» / «התיכון AM הוא 5» — the role's own reading + the length, composed
   roleSideLine, // #775: «תיכון ליתר» — role noun → the declared side, rewritten and re-parsed
   multiStatement, // "AB = 4, BC = 6" — split comma/and-joined GIVENS, parse each all-or-nothing (PAR-2)
+  pairEqualSize, // #2149 «רדיוסי המעגלים O ו-P שווים» — equal size of a named pair (ADR-671); before radiusRatio/setRadius
   radiusRatio, // «רדיוס מעגל O גדול פי 2 מרדיוס מעגל P» — a ratio between two radii (#2100, ADR-649); before setRadius, which read the factor as a size
   setRadius, // "radius of circle P is 4" — set an EXISTING circle's radius; before `circle` (creation) and the shape rules (which 'stop' on רדיוס)
   radiusSymbolStatement, // "רדיוס מעגל O הוא R" — NAME an existing circle's radius with a letter (#54); after setRadius (numeric wins), before the shape rules
@@ -11744,6 +11878,7 @@ export const RULES: Rule[] = [
   tangentsAtPointsMeet, // #554: «המשיקים נחתכים בנקודה E» — the INCREMENTAL twin of the line above (the drawn tangents, unnamed)
   tangentLineIntersection, // tangent ∩ a segment
   parallelCircleIntersection, // a parallel line ∩ the circle
+  namedTouchPoint, // #2149/#2123 «X נקודת ההשקה של המעגלים O ו-P» — the sentence states the tangency at X (ADR-671)
   commonTangent, // a COMMON tangent of two circles ("משיק משותף") — before circlesTangent (which would misread it as mutual tangency of new circles)
   tangentChord, // a CHORD of one circle tangent to the OTHER at its endpoint — before circlesTangent/chord (which drop the tangency or the chord)
   tangentMeetsOtherCircle, // tangent LINE to one circle meets the OTHER circle — before circlesTangent (which would misread it as mutual tangency)

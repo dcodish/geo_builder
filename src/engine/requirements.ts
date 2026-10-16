@@ -20,7 +20,8 @@ export function sideRequirementOf(cmd: Command): SideRequirement | null {
   // #1709 (ADR-567): a STATED mutual position of two circles; the unstated bare-pair variant states nothing
   if (cmd.type === 'set-circle-position' && cmd.relation !== 'any') return { kind: 'circle-position', relation: cmd.relation, a: cmd.a, b: cmd.b };
   // #2080 (ADR-645): two circles STATED tangent — the pair has one common point
-  if (cmd.type === 'circles-tangent') return { kind: 'circle-position', relation: 'tangent', a: cmd.circle1, b: cmd.circle2, at: cmd.at };
+  // #2188 (ADR-672): with the stated KIND, so a restatement that names none inherits it (`statedTangencies`)
+  if (cmd.type === 'circles-tangent') return { kind: 'circle-position', relation: 'tangent', a: cmd.circle1, b: cmd.circle2, at: cmd.at, external: cmd.external };
   // #1918 (ADR-607): a ring declared as a phrase no circle can pass around («טרפז ישר זווית ABCD»)
   if (cmd.type === 'trapezoid' && cmd.kind && NOT_CYCLIC[cmd.kind]) return { kind: 'declared-shape', ring: [...cmd.ids], shape: cmd.kind };
   return null;
