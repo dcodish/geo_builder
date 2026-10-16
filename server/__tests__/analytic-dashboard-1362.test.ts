@@ -26,6 +26,8 @@ describe('#1362 — the analytic taxonomy is the operator\'s ruling', () => {
     expect(outcomeOfAnalytic(ev('parser', 'not-handled'))).toBe('not-understood');
     expect(outcomeOfAnalytic(ev('llm', 'none'))).toBe('not-understood');
     expect(outcomeOfAnalytic(ev('llm', 'rejected'))).toBe('not-understood');
+    // #1355 (ADR-AG-279): an answer the faithfulness gates refused — the student kept a refusal.
+    expect(outcomeOfAnalytic(ev('llm', 'unfaithful'))).toBe('not-understood');
   });
 
   it('out-of-scope is CORRECTLY DECLINED', () => {

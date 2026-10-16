@@ -95,7 +95,7 @@ export function orthography(raw: string): string {
  * BOUNDARIES.json). Scoped to the DEGREE word on purpose — a counting word elsewhere («צלע אחת») is a determiner,
  * not a value — and a glued prefix on the number word is kept («לשלושים» → «ל-30»).
  */
-const HE_NUM_UNITS: Readonly<Record<string, number>> = {
+export const HE_NUM_UNITS: Readonly<Record<string, number>> = {
   'אחת': 1, 'אחד': 1, 'שתיים': 2, 'שניים': 2, 'שתי': 2, 'שני': 2, 'שלוש': 3, 'שלושה': 3, 'ארבע': 4, 'ארבעה': 4,
   'חמש': 5, 'חמישה': 5, 'שש': 6, 'שישה': 6, 'שבע': 7, 'שבעה': 7, 'שמונה': 8, 'תשע': 9, 'תשעה': 9,
 };

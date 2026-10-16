@@ -181,6 +181,10 @@ export function errorText(error: InputError, t: Translate): string {
     'tangent-no-second-crossing': 'errTangentNoSecondCrossing',
     'llm-busy': 'errLlmBusy',
     'llm-understood-unsupported': 'errLlmUnderstood',
+    // #1355 (ADR-AG-279) — the model's answer lost what the student stated, or named what they did not
+    'llm-dropped': 'errLlmDropped',
+    'llm-invented': 'errLlmInvented',
+    'llm-invented-existing': 'errLlmInventedExisting',
     'bad-operand': 'errBadOperand',
     'conflicting-restatement': 'errConflict',
     'name-kind-clash': 'errNameClash',
@@ -295,6 +299,7 @@ export function errorText(error: InputError, t: Translate): string {
     statedEn: error.key === 'shape-excluded' ? enNoun(error.stated) : '',
     nameOf: error.key === 'name-taken' ? (error.nameOf ?? '') : '',
     what: error.key === 'measure-contradicts' ? (error.what ?? '') : '',
+    labels: error.key === 'llm-dropped' || error.key === 'llm-invented-existing' ? error.labels : '',
     decimal: error.key === 'mixed-number' ? (error.decimal ?? '') : '',
     sum: error.key === 'mixed-number' ? error.sum : '',
     product: error.key === 'mixed-number' ? error.product : '',

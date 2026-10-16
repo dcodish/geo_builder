@@ -137,6 +137,12 @@ export type InputError =
   | { key: 'llm-busy'; detail: string }
   // #1336: the escape ran and the tool declined its completion — understood, not unintelligible.
   | { key: 'llm-understood-unsupported'; detail: string }
+  /** #1355 (ADR-AG-279): the model's answer lost names or numbers the student stated — `labels` is the student's own tokens, as typed. */
+  | { key: 'llm-dropped'; detail: string; labels: string }
+  /** #1355 (ADR-AG-279): the model's answer named something the student did not. The name is never shown (ADR-W-096). */
+  | { key: 'llm-invented'; detail: string }
+  /** #2225 (ADR-AG-281): the answer tied the sentence to a point or line the figure has but the sentence never named — `labels`, which the figure shows. */
+  | { key: 'llm-invented-existing'; detail: string; labels: string }
   /** A relation whose verb was understood and whose operand was not (#1052). */
   | { key: 'bad-operand'; detail: string }
   /** The statement contradicts what an earlier statement already fixed. */

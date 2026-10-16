@@ -967,7 +967,10 @@ export function App() {
         // silently fixed reads identically to one that needed no fixing — which is how the 2-D #536 P1
         // stayed invisible. Both siblings log the same field.
         ...(out.kind === 'lines' && out.restored ? { restored: out.restored } : {}),
-        ...(out.kind === 'rejected' ? { steps: [out.refusedStep] } : {}),
+        // #1355 (ADR-AG-279): a refusal logs the model's WHOLE answer, not only its refused step — the gap that
+        // made #1355's own evidence reconstruct contexts. `refused` keeps the step the tool declined.
+        ...(out.kind === 'rejected' ? { steps: out.answer ?? [out.refusedStep], refused: out.refusedStep } : {}),
+        ...(out.kind === 'unfaithful' ? { steps: out.answer, dropped: out.dropped, invented: out.invented } : {}),
         ...(out.kind === 'busy' ? { why: out.why } : {}),
       });
       if (out.kind === 'lines') {

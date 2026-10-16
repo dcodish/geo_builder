@@ -62,7 +62,8 @@ describe('#2222 — an ASCII mixed number is refused in every analytic slot, bef
 
   it('a model line carrying one is rejected by the same gate (the fallback re-decides every step)', async () => {
     const out = await runFallback('נקודה P ששיעור ה-y שלה חמש וחצי', [], 0, async () => ({ steps: ['שיעור ה-y של P הוא 5 1/2'] }));
-    expect(out).toEqual({ kind: 'rejected', refusedStep: 'שיעור ה-y של P הוא 5 1/2', code: 'mixed-number' });
+    // #1355 (ADR-AG-279): every rejected outcome carries the model's whole answer (logged with the refusal)
+    expect(out).toEqual({ kind: 'rejected', refusedStep: 'שיעור ה-y של P הוא 5 1/2', code: 'mixed-number', answer: ['שיעור ה-y של P הוא 5 1/2'] });
   });
 
   it('the teaching sentence names the student’s text and the three spellings, Hebrew and English', () => {

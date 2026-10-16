@@ -113,10 +113,15 @@ describe('#1278 — the oracle: what the model should have answered builds, and 
     expect(derive(accepted, 0).faults).toEqual([]);
   });
 
-  /** The issue's known-good call stays buildable — a parse lock, not a model call. */
-  it('the first call’s good answer (triangle + median) still records', async () => {
+  /**
+   * The issue's first-call answer stays BUILDABLE — a parse lock, not a model call. Through the fallback it is
+   * now refused (#1355, ADR-AG-279): the student named only A, and the answer names B, C and D — names nobody
+   * gave. Only the tool may name (#1263).
+   */
+  it('the first call’s answer (triangle + median) still builds, and the fallback refuses its invented names', async () => {
+    expect(walk(['משולש ABC', 'AD תיכון לצלע BC']).verdicts).toEqual(['record', 'record']);
     const out = await runFallback('תצייר לי משולש עם תיכון מ-A', [], 0, ask(['משולש ABC', 'AD תיכון לצלע BC']));
-    expect(out).toEqual({ kind: 'lines', lines: ['משולש ABC', 'AD תיכון לצלע BC'] });
+    expect(out).toMatchObject({ kind: 'unfaithful', dropped: [], invented: true });
   });
 });
 
@@ -125,7 +130,7 @@ describe('#1278 — a prose answer is harmless AND keeps the student’s origina
 
   it('the prose answer records nothing', async () => {
     const out = await runFallback(REPORTED, [], 0, ask([PROSE]));
-    expect(out).toEqual({ kind: 'rejected', refusedStep: PROSE, code: 'not-handled' });
+    expect(out).toEqual({ kind: 'rejected', refusedStep: PROSE, code: 'not-handled', answer: [PROSE] });
   });
 
   it('and the student reads the ORIGINAL refusal — not «understood, unsupported»', async () => {

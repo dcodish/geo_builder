@@ -191,6 +191,24 @@ nothing.
 be written (`הישר y-3=4(x-2)`). Steps must be catalogue commands. `fallbackRefusal` (`app/fallback.ts`) words a
 non-recording answer (ADR-AG-170).
 
+### The LLM lane's faithfulness gates ([ADR-AG-279](06c-decisions-analytic.md#adr-ag-279))
+
+`runFallback` runs `faithfulnessAnalytic` (`parser/honestyAnalytic.ts`) after the all-or-nothing re-decide and
+before recording, on the whole answer after the sequence gate (`gated.lines`), with the figure's names from
+`existingNamesAnalytic(derive(lines, seed).construction)`. A stated name (point, letter line, numeral curve,
+lowercase symbol) must appear in a model line or its parsed facts, existing names included; a stated number must be
+paid, as a multiset, by a line's numbers or facts (value, square, square root, 90 for a right angle); a point, line
+or numeral name the model writes must be stated or existing. Names are read with the grammar's atoms
+(`POINT_NAME_ATOM`, `LETTER_LINE_NAME_ATOM`, `NUMERAL_ALT`, `HE_NUM_UNITS`); exponents, subscripts, numeral names and
+counts are blanked before numbers are read. A trip is `{ kind: 'unfaithful', dropped, invented, answer }`, which
+`fallbackRefusal` words as `llm-dropped` (the student's tokens) or `llm-invented` (no interpolation); the App logs
+`result: 'unfaithful'` and every refusal's whole answer. A name the model writes that the figure holds but the
+sentence never wrote is `inventedExisting` ([ADR-AG-281](06c-decisions-analytic.md#adr-ag-281)), refused as
+`llm-invented-existing`, which names it (the figure shows it). The algebra is `shell/llm/honestyCore.ts`
+([ADR-AG-280](06c-decisions-analytic.md#adr-ag-280)).
+
+*Identifiers:* `faithfulnessAnalytic` · `existingNamesAnalytic` · `unfaithful` · `llm-dropped` · `llm-invented` · `errLlmDropped` · `errLlmInvented` · `inventedExisting` · `llm-invented-existing` · `errLlmInventedExisting`
+
 ## The sentence frame
 
 ### The sentence frame ([ADR-AG-187](06c-decisions-analytic.md#adr-ag-187), #1618)

@@ -105,7 +105,12 @@ export const PROMPT_SPEC_ANALYTIC = {
     '- Points are capital letters, optionally with a digit subscript (A, B, F1). Parameters are single',
     '  lowercase letters (a, k, t). The letters x and y name the AXES and can never be a point’s unknown.',
     '- A point at coordinates is written `A(3,5)` — NEVER `A=(3,5)`, which this tool does not accept.',
-    '- ONLY introduce points the student names. Reuse existing labels from the context.',
+    // #2225 (ADR-AG-281): an existing label the sentence does not name is an unstated relation, and is refused.
+    '- ONLY introduce points the student names. Reuse an existing label from the context only where the',
+    '  student’s sentence names it — never attach the sentence to a point or line it does not mention.',
+    // #1355 (ADR-AG-279) — the request half of the faithfulness gates; the gates refuse an answer that breaks it.
+    '- Never name what the student did not name: leave it unnamed and the tool names it. Copy every name and',
+    '  every number the student states into some line — an answer that drops one is refused.',
     // ADR-052 — the cardinal sin, stated in this tool's own terms.
     '- NEVER invent an unstated value. If the student does not give a coordinate, a radius, a slope or a',
     '  length, do not supply one: emit the form that leaves it open (`נקודה P`, a parameter, a bare',
