@@ -274,6 +274,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2140': 'open',
 
+  '#2253': 'open', // #2165 (ADR-681): analytic and 3-D read no value line for a length letter; 3-D refuses «AB = 2a»
+
 };
 
 export interface ParityRow {
@@ -1472,6 +1474,17 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #1851 (ADR-662): a symbol plus a constant is read by one affine-tail reader, as a length's «a + 3» is ──
   { id: 'angle-symbol-constant-1851', family: 'angles', steps: ['משולש ABC', '∠ABC = α + 40'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2140' }], note: 'the operator (2026-10-07): «should be accepted and drawn»; analytic already recorded it; 3-D does not read a constant (#2140, needs-operator)' },
   { id: 'angle-same-letter-other-constant-1851', family: 'angles', steps: ['משולש ABC', '∠ABC = α', '∠ABC = α + 40'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2140' }], note: '2-D refuses it in the #2061 contradiction frame; analytic refuses it «לא נמצאה תצורה» (the wording is #2105)' },
+  // ── #2165 + #2135 + #2133 (ADR-681): a letter's values are judged in list order — a second value is an equation or a
+  // contradiction, never «כבר קיים» or last-wins ──
+  { id: 'letter-equation-2165', family: 'lengths', steps: ['משולש ABC', 'AB = 2a', 'AB = a + 3'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2253' }], note: 'the operator (2026-10-15): «commits the equation: a = 3, |AB| = 6, as analytic does»; 2-D answered «כבר קיים» before ADR-681' },
+  { id: 'letter-binding-after-number-2165', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'AB = a'], expect: 'builds', note: '2-D answered «כבר קיים» and dropped the binding before ADR-681' },
+  { id: 'letter-value-against-number-2165', family: 'lengths', steps: ['משולש ABC', 'AB = a', 'AB = 5', 'a = 6'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2253' }], note: '2-D committed it and turned «AB = 5» red before ADR-681' },
+  // the second value itself («k = 4» after «k = 3») needs a value line the siblings do not read yet (#2253), so its row is
+  // the value line; the refusal is locked in src/app/__tests__/issue-2165-letter-system.test.ts
+  { id: 'letter-value-line-2135', family: 'lengths', steps: ['משולש ABC', 'AB = k', 'k = 3'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2253' }, { product: '3d', issue: '#2253' }] },
+  { id: 'radius-letter-second-value-2135', family: 'circles', steps: ['מעגל O ברדיוס r', 'r = 3', 'r = 4'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }], note: '2-D drew r = 4 with «r = 3» still ✓ before ADR-681' },
+  { id: 'reserved-radius-value-2133', family: 'circles', steps: ['מעגל O ברדיוס 3', 'r = 4'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2253' }], note: 'ADR-034 Am. 1: r names the radius; 2-D committed it green with r = 3 before ADR-681' },
+  { id: 'reserved-radius-through-length-2133', family: 'circles', steps: ['מעגל O ברדיוס 4', 'A, B על מעגל O', 'AB = r', 'r = 3'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2253' }], note: '2-D drew radius 4 and |AB| = 3, green, before ADR-681' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

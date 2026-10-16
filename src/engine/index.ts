@@ -44,7 +44,7 @@ export type { ShapeType, DetectedShape, SimilarClass, ShapesResult, ShapeDetectO
 export { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 export type { Carrier, CarrierFamily } from './carriers';
 export { circleDefinedBy, isSizelessCircle, referencesCircle } from './lower';
-export { lower, lowerOne, buildSymTab, isSymbolBound, isVariableStatement, unboundSubjectOf, unenforceableRelation, measureLabelText, measureLabelForms, isMeasure, symbolsConsumedBy, measureRestatement, measureRestatementStatus } from './lower';
+export { lower, lowerOne, buildSymTab, letterSystem, statedSizeCircles, isSymbolBound, isVariableStatement, unboundSubjectOf, unenforceableRelation, measureLabelText, measureLabelForms, isMeasure, symbolsConsumedBy, measureRestatement, measureRestatementStatus } from './lower';
 export type { MeasureRestatement } from './lower';
 export type { MeasureLabelForms } from './lower';
 export type { SymTab } from './lower';

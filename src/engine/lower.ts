@@ -25,7 +25,14 @@ import { expandAltitudeChoice } from './altitudeChoice';
  *  (a ratio of two boundary lengths), never with a segment's `len`. `round` rides with the refs it qualifies. */
 type Binding = { kind: 'len' | 'ang' | 'area' | 'perim'; refs: Id[]; coef: number; pow?: number; affine?: boolean; round?: RoundOperand };
 export interface SymTab {
-  vars: Map<string, { value?: number; bindings: Binding[] }>;
+  /** `value` is a STATED value (an accepted `set-var` — the labels read it); `derived` is a value the letter system
+   *  ({@link letterSystem}, #2165) solved from the other statements («AB = 2a» · «AB = a + 3» → a = 3). Lowering reads
+   *  `value ?? derived`; the figure's labels read `value` only, so they stay as the student typed them. */
+  vars: Map<string, { value?: number; derived?: number; bindings: Binding[] }>;
+  /** #2165 ([ADR-681](docs/06-decisions.md#adr-681)) — the statements the letter system REFUSES, keyed by their index in
+   *  the command list the table was built from: `at` is the index of the earlier statement they contradict, `status`
+   *  the fold status (without the `[vs #i]` tail the fold adds). */
+  refused: Map<number, { at: number; status: string }>;
   /** The FREE-radius circle the symbol R denotes, plus a point on it that witnesses the radius
    *  (|center→witness| = R). Set only when R has no fixed value — it lets an "AB = √2R" measure
    *  lower to a {@link LengthRadiusConstraint} that couples the length to the free radius DOF (ADR-071). */
@@ -171,14 +178,14 @@ export function measureRestatementStatus(cmd: Extract<SymbolicCommand, { type: '
 
 /** Build the symbol table from a command list: each variable's value (if given) and its bindings, in order. */
 export function buildSymTab(cmds: AnyCommand[]): SymTab {
-  const vars = new Map<string, { value?: number; bindings: Binding[] }>();
+  const vars: SymTab['vars'] = new Map();
   const slot = (name: string) => {
     let v = vars.get(name);
     if (!v) vars.set(name, (v = { bindings: [] }));
     return v;
   };
   for (const c of cmds) {
-    if (c.type === 'set-var') slot(c.name).value = c.value;
+    if (c.type === 'set-var') slot(c.name); // its value is the letter system's to accept (#2165, below) — never the last one written
     else if (c.type === 'measure-length' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'len', refs: [c.a, c.b], coef: c.expr.coef, pow: c.expr.pow, affine: (c.expr.const ?? 0) !== 0 });
     else if (c.type === 'measure-angle' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'ang', refs: [c.vertex, c.ray1, c.ray2], coef: c.expr.coef, affine: (c.expr.const ?? 0) !== 0 });
     else if (c.type === 'measure-area' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'area', refs: c.ids, coef: c.expr.coef, pow: c.expr.pow, affine: (c.expr.const ?? 0) !== 0, ...(c.round ? { round: c.round } : {}) });
@@ -203,8 +210,20 @@ export function buildSymTab(cmds: AnyCommand[]): SymTab {
       | undefined;
     if (circ) radiusOf.set(c.name, { id: circ.id, center: circ.center, witness: pointOnCircle(cmds, circ.id) ?? undefined });
   }
+  // #2165 (ADR-681): every source of a letter's value, judged in list order — the stated values, the derived ones,
+  // and the statements that contradict an earlier one.
+  const sys = letterSystem(cmds, radiusOf);
+  for (const [name, v] of vars) {
+    const s = sys.values.get(name);
+    if (!s) continue;
+    if (s.stated !== undefined) v.value = s.stated;
+    else if (s.derived !== undefined) v.derived = s.derived;
+  }
   // Legacy reserved-R fallback (ADR-034/071) — now per SPELLING (R and r are the same reserved symbol
   // only while UNBOUND; an explicit per-circle binding above removes the spelling from this fallback).
+  // #2165 (ADR-681, ADR-034 Am. 2): with EXACTLY ONE stated-size circle the reserved letter is an equation of the
+  // letter system (its value is derived from that radius, and a contradicting value is refused); the fallback
+  // below keeps today's reading for two or more stated circles (which one r names is unruled).
   let radiusCircle: SymTab['radiusCircle'];
   for (const name of ['R', 'r']) {
     const rad = vars.get(name);
@@ -225,7 +244,242 @@ export function buildSymTab(cmds: AnyCommand[]): SymTab {
       }
     }
   }
-  return { vars, radiusCircle, radiusOf };
+  return { vars, radiusCircle, radiusOf, refused: sys.refused };
+}
+
+/** A letter's value as the lowering reads it: the stated value, else the one the letter system derived (#2165). */
+const valueOf = (tab: SymTab, name: string): number | undefined => {
+  const v = tab.vars.get(name);
+  return v?.value ?? v?.derived;
+};
+
+/** The circles whose SIZE a statement states: a `circle` with a number radius (not a free or ensure-exists one), or a
+ *  `set-radius` (every typed radius / circumference / area spelling). */
+export function statedSizeCircles(cmds: readonly AnyCommand[]): Set<Id> {
+  const out = new Set<Id>();
+  for (const c of cmds) {
+    if (c.type === 'circle' && !c.freeRadius && !c.ifAbsent) out.add(c.id); // not `isSizelessCircle` (ADR-646)
+    else if (c.type === 'set-radius') out.add(c.circle);
+  }
+  return out;
+}
+
+/**
+ * #2165 + #2135 + #2133 ([ADR-681](../../docs/06-decisions.md#adr-681)) — THE LETTER SYSTEM: every statement that gives
+ * a letter a value, judged against the others in LIST ORDER.
+ *
+ * Letters used to be resolved by substitution alone: the last `set-var` won (#2135), a measure on its letter's own
+ * target lowered to nothing whatever its form («AB = 2a» · «AB = a + 3» answered «כבר קיים», #2165), and the reserved
+ * r stopped naming the radius once it had a value (#2133). This is the one place those sources meet. It collects the
+ * LINEAR SINGLE-LETTER equations each statement states, keyed by TARGET — a segment (unordered pair), an angle (its
+ * vertex and an unordered ray pair) or a circle's radius — and decides each row on arrival:
+ *
+ * - **consistent** — the row adds nothing new, or it DETERMINES a letter with an admissible value (every length and
+ *   radius above 0, every angle in (0°, 360°)); the value is recorded as `derived`;
+ * - **inconsistent** — `0 = c ≠ 0`, a second different value, or an inadmissible one: the row is REFUSED with the index
+ *   of the statement that supplied the earlier value (a `set-var`, the number on the target, or the later of two
+ *   expressions), else the earlier expression on the same target; its equations are dropped for the rows after it.
+ *
+ * Sources: `set-var x = v`; two expressions on one target, or an expression against a number (`measure-*`,
+ * `set-distance`, `set-angle`, a stated radius); a `radius-symbol` on a circle; the reserved R/r when exactly one
+ * circle has a stated size (ADR-034 Am. 1 — R/r always names the radius, now also when it has a value). Two NUMBERS
+ * on one length or angle target are left to the solve (a residual, judged and attributed by the fold as before).
+ * Multi-letter equations, powers of an unknown, and area / perimeter targets add nothing: today's ratio lowering keeps
+ * them. Pure and deterministic; O(rows × statements on the row's target).
+ */
+export function letterSystem(
+  cmds: readonly AnyCommand[],
+  radiusOf: SymTab['radiusOf'],
+): { values: Map<string, { stated?: number; derived?: number }>; refused: SymTab['refused'] } {
+  type Lin = { coef: number; var: string; pow: number; konst: number };
+  type Entry = { num: number; row: number } | { lin: Lin; row: number };
+  type Target = { key: string; kind: 'len' | 'ang' | 'radius'; name: string; circle?: Id };
+  /** `row` — the statement that supplied the value (the `[vs #i]` a later contradiction names) */
+  const values = new Map<string, { stated?: number; derived?: number; row: number }>();
+  const refused: SymTab['refused'] = new Map();
+  const entries = new Map<string, Entry[]>();
+  /** each letter's targets so far — for the admissibility test and the refusal's reason */
+  const bindings = new Map<string, { t: Target; lin: Lin }[]>();
+  const pair = (a: Id, b: Id) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const known = (name: string): number | undefined => {
+    const v = values.get(name);
+    return v?.stated ?? v?.derived;
+  };
+  const at = (l: Lin, v: number) => l.coef * Math.pow(v, l.pow) + l.konst;
+  const valueOfEntry = (x: Entry): number | undefined => {
+    if ('num' in x) return x.num;
+    const v = known(x.lin.var);
+    return v === undefined ? undefined : at(x.lin, v);
+  };
+  /** the statement that supplied an entry's value: its own row for a number, else its letter's determining row */
+  const provenance = (x: Entry): number => ('num' in x ? x.row : (values.get(x.lin.var)?.row ?? x.row));
+  const same = (a: number, b: number) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+  const admissible = (t: Target, v: number) => (t.kind === 'ang' ? v > 1e-9 && v < 360 - 1e-9 : v > 1e-9);
+  const whatOf = (t: Target, v: number) =>
+    t.kind === 'radius' ? `radius of ${t.circle} = ${formatMeasure(v)}` : t.kind === 'ang' ? `∠${t.name} = ${formatMeasure(v)}°` : `|${t.name}| = ${formatMeasure(v)}`;
+  const overConstrained = (what: string) => `over-constrained: ${what} cannot hold`;
+  /** the refused measure in its own letters — ADR-661's coef-conflict frame («|AB| = 3a cannot hold») */
+  const ownText = (t: Target, row: number): string => {
+    const c = cmds[row];
+    if ((c.type !== 'measure-length' && c.type !== 'measure-angle') || !('var' in c.expr)) return whatOf(t, 0);
+    const k = c.expr.const ?? 0;
+    const txt = c.expr.text ?? `${c.expr.coef === 1 ? '' : formatMeasure(c.expr.coef)}${powVar(c.expr.var, c.expr.pow)}${k ? ` ${k > 0 ? '+' : '−'} ${formatMeasure(Math.abs(k))}` : ''}`;
+    return c.type === 'measure-angle' ? `∠${c.ray1}${c.vertex}${c.ray2} = ${txt}` : `|${c.a}${c.b}| = ${txt}`;
+  };
+  /** a value refused for letter `name`: reported on its radius when it names one (R/r always does), else on its first
+   *  length or angle — «|AB| = 4», what the value would have made of the figure */
+  const reasonFor = (name: string, v: number): string => {
+    const bs = bindings.get(name) ?? [];
+    const b = bs.find((x) => x.t.kind === 'radius') ?? bs[0];
+    return overConstrained(b ? whatOf(b.t, at(b.lin, v)) : `${name} = ${formatMeasure(v)}`);
+  };
+  const bind = (t: Target, lin: Lin) => {
+    const bs = bindings.get(lin.var) ?? [];
+    if (!bs.some((b) => b.t.key === t.key && b.lin.coef === lin.coef && b.lin.konst === lin.konst && b.lin.pow === lin.pow)) bs.push({ t, lin });
+    bindings.set(lin.var, bs);
+  };
+  /** would `name = v` keep every target the letter measures (with the row's own) admissible? */
+  const admissibleFor = (name: string, v: number, own: { t: Target; lin: Lin }[]): boolean =>
+    [...(bindings.get(name) ?? []), ...own].every((b) => b.lin.var !== name || admissible(b.t, at(b.lin, v)));
+  const determine = (name: string, v: number, row: number) => values.set(name, { ...values.get(name), derived: v, row });
+
+  // The reserved R/r (ADR-034 Am. 1): with exactly one stated-size circle, an unbound R/r names that circle's radius —
+  // an equation on the radius target from the row where both the circle's size and the letter exist.
+  const stated = statedSizeCircles(cmds);
+  const reservedCircle = stated.size === 1 ? [...stated][0] : undefined;
+  const centreOf = (id: Id) => (cmds.find((c) => circleDefinedBy(c)?.id === id) as { center?: Id } | undefined)?.center ?? id;
+  const radiusTarget = (circle: Id): Target => ({ key: `rad:${circle}`, kind: 'radius', name: centreOf(circle), circle });
+  const lettersOf = (c: AnyCommand): string[] =>
+    c.type === 'set-var' ? [c.name] : (c.type === 'measure-length' || c.type === 'measure-angle') && 'var' in c.expr ? [c.expr.var] : [];
+  const reservedBound = new Set<string>();
+  const lin1 = (name: string): Lin => ({ coef: 1, var: name, pow: 1, konst: 0 });
+
+  /**
+   * Judge entry `e` on target `t` at row `i`: record it and return null when consistent, else return the refusal
+   * (`status`, and `at` — the earlier statement it contradicts).
+   */
+  const judge = (i: number, t: Target, e: Entry): { status: string; at: number } | null => {
+    const prior = entries.get(t.key) ?? [];
+    const record = () => {
+      prior.push(e);
+      entries.set(t.key, prior);
+      if ('lin' in e) bind(t, e.lin);
+      return null;
+    };
+    const mine = valueOfEntry(e);
+    const fixed = prior.find((x) => valueOfEntry(x) !== undefined);
+    if (fixed) {
+      const tv = valueOfEntry(fixed)!;
+      if (mine !== undefined) {
+        if (same(mine, tv)) return record();
+        // Two NUMBERS on a target are a residual the solve judges and the fold attributes, as before. A known LETTER
+        // against a radius is not: a stated radius is a size, not a constraint, so no residual ever sees it.
+        if (t.kind !== 'radius' || ('num' in e && 'num' in fixed)) return record();
+        const other = 'lin' in e ? provenance(e) : provenance(fixed);
+        return { status: overConstrained(whatOf(t, mine)), at: other === i ? provenance(fixed) : other };
+      }
+      // an unknown letter against a known target: solve it
+      const l = (e as { lin: Lin }).lin;
+      if (l.pow !== 1) return record();
+      const v = (tv - l.konst) / l.coef;
+      if (!admissibleFor(l.var, v, [{ t, lin: l }])) return { status: overConstrained(whatOf(t, tv)), at: provenance(fixed) };
+      determine(l.var, v, 'num' in fixed ? fixed.row : i);
+      return record();
+    }
+    const first = prior.find((x): x is { lin: Lin; row: number } => 'lin' in x);
+    if (!first) return record();
+    const f = first.lin;
+    if (mine !== undefined) {
+      // a number (or a known letter) against an unknown expression: solve the expression's letter
+      if (f.pow !== 1) return record();
+      const v = (mine - f.konst) / f.coef;
+      if (!admissibleFor(f.var, v, [])) return { status: overConstrained(whatOf(t, mine)), at: first.row };
+      determine(f.var, v, 'num' in e ? e.row : i);
+      return record();
+    }
+    const l = (e as { lin: Lin }).lin;
+    if (l.var !== f.var || l.pow !== 1 || f.pow !== 1) return record(); // two letters, or a power: no single-letter equation
+    // the same letter twice on one target: (c₁ − c₂)·x = k₂ − k₁
+    const dc = f.coef - l.coef;
+    const dk = l.konst - f.konst;
+    if (Math.abs(dc) <= 1e-12) return Math.abs(dk) <= 1e-12 ? record() : { status: overConstrained(ownText(t, i)), at: first.row };
+    // the same constant with another coefficient forces x = 0 — ADR-661's ruled contradiction («∠ABC=2α» · «∠ABC=3α»,
+    // operator 2026-10-14: «no α satisfies both»), the one verdict the `measureRestatement` coef-conflict arm also gives
+    if (Math.abs(dk) <= 1e-12) return { status: overConstrained(ownText(t, i)), at: first.row };
+    const v = dk / dc;
+    if (!admissibleFor(l.var, v, [{ t, lin: l }])) return { status: overConstrained(ownText(t, i)), at: first.row };
+    determine(l.var, v, i);
+    return record();
+  };
+  const targetOf = (c: AnyCommand, i: number): { t: Target; e: Entry } | null => {
+    const entry = (x: MeasureExpr): Entry => ('value' in x ? { num: x.value, row: i } : { lin: { coef: x.coef, var: x.var, pow: x.pow ?? 1, konst: x.const ?? 0 }, row: i });
+    const len = (a: Id, b: Id): Target => ({ key: `len:${pair(a, b)}`, kind: 'len', name: `${a}${b}` });
+    const ang = (v: Id, r1: Id, r2: Id): Target => ({ key: `ang:${v}:${pair(r1, r2)}`, kind: 'ang', name: `${r1}${v}${r2}` });
+    switch (c.type) {
+      case 'measure-length':
+        return { t: len(c.a, c.b), e: entry(c.expr) };
+      case 'measure-angle':
+        return { t: ang(c.vertex, c.ray1, c.ray2), e: entry(c.expr) };
+      case 'set-distance':
+        return { t: len(c.a, c.b), e: { num: c.value, row: i } };
+      case 'set-angle':
+        return { t: ang(c.vertex, c.ray1, c.ray2), e: { num: c.value, row: i } };
+      case 'circle':
+        return c.freeRadius || c.ifAbsent ? null : { t: radiusTarget(c.id), e: { num: c.radius, row: i } }; // a sizeless circle states no size (ADR-646)
+      case 'set-radius':
+        return { t: radiusTarget(c.circle), e: { num: c.value, row: i } };
+      case 'radius-symbol':
+        return { t: radiusTarget(c.circle), e: { lin: lin1(c.name), row: i } };
+      default:
+        return null;
+    }
+  };
+  /** a letter some statement binds (#926's question, asked of the whole list): a value for an unbound letter waits */
+  const letterIsBound = (name: string): boolean =>
+    radiusOf.has(name) || bindings.has(name) || cmds.some((c) => c.type !== 'set-var' && lettersOf(c).includes(name)) || (/^[Rr]$/.test(name) && reservedCircle !== undefined);
+  const refuse = (i: number, r: { status: string; at: number } | null) => {
+    if (r && !refused.has(i)) refused.set(i, r);
+  };
+  const bindReserved = (i: number, name: string) => {
+    reservedBound.add(name);
+    const r = judge(i, radiusTarget(reservedCircle!), { lin: lin1(name), row: i });
+    // the row that brought the letter and the radius together carries the contradiction, in the frame of its own value
+    if (r) refuse(i, cmds[i].type === 'set-var' ? { status: reasonFor(name, (cmds[i] as { value: number }).value), at: r.at } : r);
+  };
+
+  cmds.forEach((c, i) => {
+    if (reservedCircle !== undefined && cmds.slice(0, i).some((x) => statedSizeCircles([x]).has(reservedCircle))) {
+      for (const name of lettersOf(c)) if (/^[Rr]$/.test(name) && !radiusOf.has(name) && !reservedBound.has(name)) bindReserved(i, name);
+    }
+    if (refused.has(i)) return;
+    if (c.type === 'set-var') {
+      const k = known(c.name);
+      if (k === undefined) {
+        values.set(c.name, { ...values.get(c.name), stated: c.value, row: i }); // its admissibility is the solve's, as before
+        return;
+      }
+      if (same(k, c.value)) {
+        const v = values.get(c.name)!;
+        if (v.stated === undefined) values.set(c.name, { ...v, stated: c.value });
+        return;
+      }
+      if (letterIsBound(c.name)) refuse(i, { status: reasonFor(c.name, c.value), at: values.get(c.name)!.row });
+      return;
+    }
+    const t = targetOf(c, i);
+    if (t) refuse(i, judge(i, t.t, t.e));
+    // a size stated for the reserved circle makes the letter, already in use, an equation on it from here on
+    if (!refused.has(i) && reservedCircle !== undefined && statedSizeCircles([c]).has(reservedCircle)) {
+      for (const name of ['R', 'r']) {
+        if (radiusOf.has(name) || reservedBound.has(name) || !cmds.slice(0, i).some((x) => lettersOf(x).includes(name))) continue;
+        bindReserved(i, name);
+      }
+    }
+  });
+
+  const out = new Map<string, { stated?: number; derived?: number }>();
+  for (const [k, v] of values) out.set(k, { ...(v.stated !== undefined ? { stated: v.stated } : {}), ...(v.derived !== undefined ? { derived: v.derived } : {}) });
+  return { values: out, refused };
 }
 
 /**
@@ -318,7 +572,7 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       // letter a value (on any row, before or after), the binding lowers to that circle's size — `set-radius`,
       // the stated-radius path (ADR-087/011) — beside the naming itself. Without a value it stays a name and
       // the radius stays a free DOF (ADR-052). A value whose letter names nothing is #926's register, not this.
-      const value = tab.vars.get(cmd.name)?.value;
+      const value = valueOf(tab, cmd.name); // #2165: a value the letter system derived sizes the circle exactly as a stated one
       return value !== undefined ? [cmd, { type: 'set-radius', circle: cmd.circle, value }] : [cmd];
     }
     case 'measure-length': {
@@ -337,8 +591,9 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
         return [...mint, { type: 'set-length-radius', a: cmd.a, b: cmd.b, circle: rc.id, center: rc.center, witness, k: e.coef, ...(konst ? { add: konst } : {}) }];
       }
       const info = tab.vars.get(e.var);
-      if (info?.value !== undefined) {
-        const len = e.coef * Math.pow(info.value, e.pow ?? 1) + konst; // 12√x with x=4 → 24; k+2 with k=4 → 6
+      const known = valueOf(tab, e.var); // #2165 (ADR-681): stated, else derived by the letter system
+      if (known !== undefined) {
+        const len = e.coef * Math.pow(known, e.pow ?? 1) + konst; // 12√x with x=4 → 24; k+2 with k=4 → 6
         return [{ type: 'set-distance', a: cmd.a, b: cmd.b, value: len }];
       }
       // The representative must itself be pure (an affine binding can't anchor a ratio).
@@ -376,7 +631,8 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       if ('value' in e) return absolute(e.value);
       const konst = e.const ?? 0;
       const info = tab.vars.get(e.var);
-      if (info?.value !== undefined) return absolute(e.coef * Math.pow(info.value, e.pow ?? 1) + konst);
+      const known = valueOf(tab, e.var);
+      if (known !== undefined) return absolute(e.coef * Math.pow(known, e.pow ?? 1) + konst);
       const reps = info?.bindings.filter((b) => b.kind === (perim ? 'perim' : 'area') && !b.affine) ?? [];
       const rep = reps[0];
       // the representative (or a lone "SABC = S" label) stays free. The SAME operand is the same letters AND the same
@@ -395,7 +651,8 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       // constant joins the value once the letter has one, and rides an AFFINE ratio while it does not.
       const konst = e.const ?? 0;
       const info = tab.vars.get(e.var);
-      if (info?.value !== undefined) return [angle(e.coef * info.value + konst)];
+      const known = valueOf(tab, e.var);
+      if (known !== undefined) return [angle(e.coef * known + konst)];
       // the representative must itself be pure (an affine binding cannot anchor a ratio — the length rule)
       const reps = info?.bindings.filter((b) => b.kind === 'ang' && !b.affine) ?? [];
       const rep = reps[0];

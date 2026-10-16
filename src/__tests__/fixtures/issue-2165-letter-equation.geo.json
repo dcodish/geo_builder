@@ -1,0 +1,56 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-16T00:00:00.000Z",
+  "seed": 0,
+  "radiusOverrides": {},
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "AB=2a",
+      "group": "g1",
+      "cmd": {
+        "type": "measure-length",
+        "a": "A",
+        "b": "B",
+        "expr": {
+          "coef": 2,
+          "var": "a"
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.2",
+      "utterance": "AB=a+3",
+      "group": "g2",
+      "cmd": {
+        "type": "measure-length",
+        "a": "A",
+        "b": "B",
+        "expr": {
+          "coef": 1,
+          "var": "a",
+          "const": 3,
+          "text": "a + 3"
+        }
+      },
+      "enabled": true
+    }
+  ]
+}

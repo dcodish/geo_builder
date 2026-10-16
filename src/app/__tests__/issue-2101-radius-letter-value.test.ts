@@ -59,7 +59,7 @@ describe('#2101 — «r = 3» sizes the circle its letter names', () => {
     [['r = 3', 'מעגל O ברדיוס r']],
     [['מעגל O ברדיוס R', 'R = 3']],
     [['מעגל O שרדיוסו R', 'R = 3']],
-    [['מעגל O ברדיוס r', 'r = 7', 'r = 3']],
+    // #2135 (ADR-681): «r = 7» · «r = 3» is no longer "the latest wins" — the second value is refused (issue-2165 lock)
   ])('%j → radius 3', (lines) => {
     expect(build(lines).circles.get('circle-O')!.r).toBeCloseTo(3, 9);
   });
