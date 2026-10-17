@@ -347,6 +347,10 @@ const SEEDED: SeededCorpus = {
   // #2171 (ADR-3D-345) — the rule-4 lock of the sibling merge: «מלבן» · «מעוין» builds green (a square). Before: built
   // silently; the merge note's sentence, both orders and the three-noun restatement live in quad-noun-pairs-2169.test.ts.
   'rectangle-rhombus-merged-2171.geo3.json': ['מלבן ABCD', 'מעוין ABCD'],
+  // #2126 (ADR-3D-350) — the operator's exact figure: a triangle in its circle builds green with no plane of the
+  // circle's own (before: a full patch labelled «circle-ABC» and a «מישורים» row). Every circle kind, the named plane
+  // drawn once and the crossing offers are asserted in issue-2126-circle-plane.test.ts; this is the build + drift net.
+  'circle-no-plane-2126.geo3.json': ['משולש ABC', 'משולש ABC חסום במעגל'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
