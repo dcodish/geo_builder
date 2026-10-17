@@ -387,6 +387,12 @@ const SEEDED: SeededCorpus = {
   // and the `already-defined` controls are asserted in cevian-on-existing-point-1942.test.ts; this is the build + drift net.
   'altitude-on-existing-d-1942.geo3.json': ['משולש ABC', 'D על BC', 'AD גובה לצלע BC'],
   'median-then-altitude-1942.geo3.json': ['משולש ABC', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'],
+
+  // #1946 + #2103 (ADR-3D-366) — the rule-4 locks: a ⟂ at a NAMED foot and at a NAMED crossing draws one knee in the
+  // corner the statement names (before: none at D; the crossing's on ∠AOB). The corners are asserted in
+  // issue-1946-knee-at-named-foot.test.ts; these are the build + drift net.
+  'perp-knee-at-foot-1946.geo3.json': ['משולש ABC', 'D על BC', 'AD ⟂ BC'],
+  'knee-named-crossing-2103.geo3.json': ['ריבוע ABCD', 'O נקודת חיתוך האלכסונים', 'AC ⟂ BD'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

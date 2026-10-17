@@ -1634,6 +1634,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'median-then-altitude-1942', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'], expect: 'builds', note: '3-D refused already-defined D before ADR-3D-367' },
   { id: 'median-then-bisector-1942', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון לצלע BC', 'AD חוצה זווית A'], expect: 'builds', note: '3-D asked which angle at A before ADR-3D-367; «זווית A» is the triangle angle, said aloud' },
   { id: 'median-also-altitude-oneline-1942', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון לצלע BC שהוא גם גובה'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1905' }], note: 'guided: 2-D and 3-D teach the two lines (3-D gave the parts list before ADR-3D-367); analytic as role-clause-1904-02' },
+
+  // ── #1946 + #2103 (ADR-731, ADR-3D-366): a ⟂ at a NAMED foot / crossing draws one knee at rest, in the corner the statement names ──
+  { id: 'perp-knee-named-foot-1946', family: 'parallel-perpendicular', steps: ['משולש ABC', 'D על BC', 'AD ⟂ BC'], expect: 'builds', note: 'the knee at D (∠ADC) is locked per tool in issue-1946-knee-at-named-foot.test.ts (2-D and 3-D)' },
+  { id: 'knee-named-crossing-2103', family: 'parallel-perpendicular', steps: ['ריבוע ABCD', 'O נקודת חיתוך האלכסונים', 'AC ⟂ BD'], expect: 'builds', note: 'the knee at O (∠COD) is locked per tool in issue-1946-knee-at-named-foot.test.ts (2-D and 3-D)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

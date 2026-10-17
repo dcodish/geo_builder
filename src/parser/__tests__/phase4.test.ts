@@ -383,9 +383,9 @@ describe('parser — an explicitly NAMED foot keeps its name (not auto-renamed)'
   // "G is the foot of the perpendicular from E to AB" must name the foot G — the
   // altitude rule must not grab it and auto-name the foot (which collided with F).
   it('names the foot G, not an auto letter', () =>
-    one('G is the foot of the perpendicular from E to AB', { type: 'foot', id: 'G', from: 'E', a: 'A', b: 'B' }));
+    one('G is the foot of the perpendicular from E to AB', { type: 'foot', id: 'G', from: 'E', a: 'A', b: 'B', named: true }));
   it('the original corpus phrasing still names F', () =>
-    one('F is the foot of the perpendicular from C to AD', { type: 'foot', id: 'F', from: 'C', a: 'A', b: 'D' }));
+    one('F is the foot of the perpendicular from C to AD', { type: 'foot', id: 'F', from: 'C', a: 'A', b: 'D', named: true }));
 });
 
 describe('parser — a NAMED altitude segment honours the foot the student gave', () => {
@@ -397,7 +397,7 @@ describe('parser — a NAMED altitude segment honours the foot the student gave'
     expect(r.ok, `"${input}" should parse`).toBe(true);
     return r.ok ? r.commands : [];
   };
-  const footD = { type: 'foot', id: 'D', from: 'C', a: 'A', b: 'B' };
+  const footD = { type: 'foot', id: 'D', from: 'C', a: 'A', b: 'B', named: true }; // #1946 (ADR-731): the student named the foot
   const segCD = { type: 'segment', a: 'C', b: 'D' };
   it('"CD גובה ל AB" → foot D on AB (not an auto-named F)', () =>
     expect(cmds('CD גובה ל AB', { points: ['A', 'B', 'C'] })).toEqual([footD, segCD]));
@@ -441,7 +441,7 @@ describe('parser — a NAMED altitude segment honours the foot the student gave'
   };
   it('"CE גובה בטרפז" → foot E on the opposite parallel base AB (not the leg AD)', () =>
     expect(cmds('CE גובה בטרפז', trapCtx)).toEqual([
-      { type: 'foot', id: 'E', from: 'C', a: 'A', b: 'B' },
+      { type: 'foot', id: 'E', from: 'C', a: 'A', b: 'B', named: true },
       { type: 'segment', a: 'C', b: 'E' },
     ]));
   it('unnamed "גובה מ-A בטרפז" drops A to the opposite base DC (auto-named foot)', () =>

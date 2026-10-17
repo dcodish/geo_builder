@@ -372,6 +372,18 @@ export function buildScene(
     addIncident(o.a, unit(sub(b, a)));
     addIncident(o.b, unit(sub(a, b)));
   }
+  // #1946 (ADR-731): a right-angle knee at a point occupies a wedge its letter must not sit in — the knee's
+  // diagonal counts as one more incident direction, so the label takes the widest gap outside the mark. A named
+  // crossing («O נקודת חיתוך האלכסונים») is no segment's endpoint, and its letter's default could be the very corner
+  // «AC ⟂ BD» marks.
+  for (const m of angleMarkSpecs ?? []) {
+    if (!m.right) continue;
+    const v = positions.get(m.vertex), p1 = positions.get(m.ray1), p2 = positions.get(m.ray2);
+    if (!v || !p1 || !p2 || len(sub(p1, v)) <= 1e-9 || len(sub(p2, v)) <= 1e-9) continue;
+    const u1 = unit(sub(p1, v)), u2 = unit(sub(p2, v));
+    const diag = { x: u1.x + u2.x, y: u1.y + u2.y };
+    if (len(diag) > 1e-9) addIncident(m.vertex, unit(diag));
+  }
 
   // An AUTO-assigned circle centre (circumcentre, incentre, a defaulted "two circles" centre) is
   // drawn only when other geometry uses it — i.e. something is drawn FROM it (a radius, a central
@@ -639,6 +651,10 @@ export function relationMarks(
   positions: Map<Id, Vec>,
   /** #444 — the equal classes the DRAWN named shape declares, marked distinctly (see SceneEqualTick). */
   stated: [Id, Id][][] = [],
+  /** #1946 ([ADR-731](../../docs/06-decisions.md#adr-731)) — the right-angle knees the figure already draws AT REST.
+   *  A forced 90° between the same two lines at the same vertex is that right angle again (∠ADB beside the at-rest
+   *  ∠ADC), so the layer does not draw a second knee for it: "the right angle is stated once, so it is marked once". */
+  restKnees: { vertex: Id; ray1: Id; ray2: Id }[] = [],
 ): RelationMarks {
   const ticks: SceneEqualTick[] = [];
   relations.equalSegments.forEach((cls, i) => {
@@ -688,6 +704,21 @@ export function relationMarks(
   const shownWedges: { v: Id; d1: number; d2: number }[] = []; // wedges whose definite value/right-angle is displayed
   const isShown = (w: { v: Id; d1: number; d2: number }): boolean =>
     shownWedges.some((s) => s.v === w.v && ((angNear(s.d1, w.d1) && angNear(s.d2, w.d2)) || (angNear(s.d1, w.d2) && angNear(s.d2, w.d1))));
+  const lineDir = (v: Id, r: Id): number | null => {
+    const pv = positions.get(v), pr = positions.get(r);
+    if (!pv || !pr || len(sub(pr, pv)) <= 1e-9) return null;
+    return ((Math.atan2(pr.y - pv.y, pr.x - pv.x) * 180) / Math.PI + 360) % 180;
+  };
+  const lineNear = (x: number, y: number): boolean => Math.min(Math.abs(x - y), 180 - Math.abs(x - y)) <= 1.5;
+  const knownKnee = (v: Id, a: Id, b: Id): boolean => {
+    const [l1, l2] = [lineDir(v, a), lineDir(v, b)];
+    if (l1 === null || l2 === null) return false;
+    return restKnees.some((k) => {
+      if (k.vertex !== v) return false;
+      const [k1, k2] = [lineDir(k.vertex, k.ray1), lineDir(k.vertex, k.ray2)];
+      return k1 !== null && k2 !== null && ((lineNear(k1, l1) && lineNear(k2, l2)) || (lineNear(k1, l2) && lineNear(k2, l1)));
+    });
+  };
   for (const { vertex, a, b, valueDeg } of atomicDefiniteAngles(relations.definiteAngles).sort((x, y) => x.valueDeg - y.valueDeg)) {
     const pv = positions.get(vertex);
     const pa = positions.get(a);
@@ -696,8 +727,10 @@ export function relationMarks(
       const wk = wedgeOf(vertex, a, b);
       if (wk && isShown(wk)) continue; // this corner is already labelled (∠AFD == ∠GFH via collinear points)
       if (wk) shownWedges.push(wk);
-      // A forced 90° draws the textbook right-angle SQUARE (the "knee"), not a "90°" number (operator request).
+      // A forced 90° draws the textbook right-angle SQUARE (the "knee"), not a "90°" number (operator request) —
+      // unless the figure already draws that right angle at rest (#1946: either side of the same two lines).
       if (Math.abs(valueDeg - 90) < 0.5) {
+        if (knownKnee(vertex, a, b)) continue;
         rightAngles.push({ vertex: pv, p1: pa, p2: pb, right: true });
         continue;
       }

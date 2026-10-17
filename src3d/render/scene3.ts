@@ -1291,6 +1291,18 @@ export function buildScene3(
       addIncident(id, def.b);
     }
   }
+  // #1946 (ADR-3D-366): a knee at a named point occupies a wedge its letter must not sit in. The knee's corner
+  // counts as one more incident direction, so the label takes the widest gap outside the mark — a named crossing
+  // has no incident edge, and its letter's default (NE) was exactly the corner «AC ⟂ BD» now marks.
+  wedges.forEach((m, i) => {
+    const hit = [...positions].find(([, p]) => dist3(p, m.vertex) <= radius * 1e-6);
+    const p = hit && screen.get(hit[0]);
+    if (!hit || !p) return;
+    const q = toScreen(projOf(wMarks[i][1]));
+    const list = incident.get(hit[0]) ?? [];
+    list.push({ dx: q.x - p.x, dy: q.y - p.y });
+    incident.set(hit[0], list);
+  });
 
   const points: ScenePoint3[] = [];
   for (const [id] of c.points) {

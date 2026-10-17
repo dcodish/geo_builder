@@ -127,7 +127,7 @@ describe('#1742 — controls: what the foot does not name stays as it was', () =
     const m = await decide(['משולש ABC'], 'התיכון AD = 5');
     expect(m.kind === 'commit' && m.commands).toContainEqual({ type: 'midpoint', id: 'D', a: 'B', b: 'C' });
     const h = await decide(['משולש ABC'], 'הגובה AD = 5');
-    expect(h.kind === 'commit' && h.commands).toContainEqual({ type: 'foot', id: 'D', from: 'A', a: 'B', b: 'C' });
+    expect(h.kind === 'commit' && h.commands).toContainEqual({ type: 'foot', id: 'D', from: 'A', a: 'B', b: 'C', named: true });
   });
 
   it('a quadrilateral has two sides opposite the apex holding C — the foot picks neither («התיכון AC» stays unread)', async () => {

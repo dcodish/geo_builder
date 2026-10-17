@@ -1196,7 +1196,7 @@ export type Command =
   // id BEYOND B — as a `collinear-order` whose residual flexes the figure to keep id on the named side in
   // every config (the ADR-127 mechanism, shared with line-circle-intersection; no sampler search).
   | { type: 'line-intersection'; id: Id; line1: Id; line2: Id; order?: Id[] }
-  | { type: 'foot'; id: Id; from: Id; a: Id; b: Id }
+  | { type: 'foot'; id: Id; from: Id; a: Id; b: Id; named?: true } // named (#1946, ADR-731): the STUDENT wrote the foot's letter («AD גובה», «F רגל האנך …») — the stated right angle is marked at it; absent for an auto-named foot or a construction's own touch point
   | { type: 'midpoint'; id: Id; a: Id; b: Id }
   // Phase 5c — circles and the points they produce.
   | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean; autoCenter?: boolean; freeRadius?: boolean; ifAbsent?: boolean; implied?: boolean | 'by-member'; apart?: boolean } // freeRadius: radius is a DOF (ADR-051); ifAbsent: a parser-injected implicit circle — skip if it already exists (don't clobber a real one); implied: minted by withImplicitCircles for a NAMED reference that matched no circle (#186 — the App may BIND that name to an unnamed circle instead of committing this creation); 'by-member' (#1694): a rule's own creation for a fresh letter beside unnamed circles — bound ONLY on a membership signal, else it stands; apart: a STANDALONE bare circle («מעגל O2» alone) seeds its NEW centre clear of every existing circle (#196 — an overlapping default silently draws intersections the student never stated; ADR-253 general position, circle edition). Placement only — the centre stays a free sampled DOF, no requirement is recorded.

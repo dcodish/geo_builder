@@ -29,7 +29,8 @@
         "id": "A",
         "from": "M",
         "a": "C",
-        "b": "D"
+        "b": "D",
+        "named": true
       },
       "enabled": true
     },

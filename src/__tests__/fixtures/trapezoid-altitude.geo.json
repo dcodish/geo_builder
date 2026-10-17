@@ -44,7 +44,8 @@
         "id": "E",
         "from": "C",
         "a": "A",
-        "b": "B"
+        "b": "B",
+        "named": true
       },
       "enabled": true
     },

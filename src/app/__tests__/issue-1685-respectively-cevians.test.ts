@@ -59,8 +59,8 @@ describe('#1685 — a plural cevian sentence with one side per segment, «בהת
 
   it('each segment goes to ITS side, in order — the altitude from O lands on BC, the one from B on OC', async () => {
     const v = cmds(await decide(['משולש OBC'], 'OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה'));
-    expect(v).toContainEqual({ type: 'foot', id: 'D', from: 'O', a: 'B', b: 'C' });
-    expect(v).toContainEqual({ type: 'foot', id: 'E', from: 'B', a: 'O', b: 'C' });
+    expect(v).toContainEqual({ type: 'foot', id: 'D', from: 'O', a: 'B', b: 'C', named: true });
+    expect(v).toContainEqual({ type: 'foot', id: 'E', from: 'B', a: 'O', b: 'C', named: true });
   });
 
   it.each([

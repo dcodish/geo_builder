@@ -1,0 +1,71 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "y8Pj-ZoVklASVwe9NPEeX",
+      "utterance": "ריבוע ABCD",
+      "cmd": {
+        "type": "square",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "uqEXk22qEjRWDjlXK3__X",
+      "utterance": "O נקודת חיתוך האלכסונים",
+      "cmd": {
+        "type": "line-line-intersection",
+        "id": "O",
+        "a": "A",
+        "b": "C",
+        "c": "B",
+        "d": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "XP37CPxtbuBBU6w-S4m7y",
+      "utterance": "AC ⟂ BD",
+      "group": "2viZUxANzpMwmqjFPK5BW",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "zAPr-rvv7zobnxl7gQW9Z",
+      "utterance": "AC ⟂ BD",
+      "group": "2viZUxANzpMwmqjFPK5BW",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "8fC2hhQhkqf7rOrNaqVfd",
+      "utterance": "AC ⟂ BD",
+      "group": "2viZUxANzpMwmqjFPK5BW",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "A",
+        "b": "C",
+        "c": "B",
+        "d": "D"
+      },
+      "enabled": true
+    }
+  ]
+}

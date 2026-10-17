@@ -13272,3 +13272,39 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Golden drift expected** (`decide-submit3-parity-1394`, the batch's): any sequence whose last line is an altitude onto an existing letter (`already-defined` → record), a bisector «זווית V» at a one-polygon vertex with several edges (`ambiguous-angle-vertex` → record, with `lastNotice` `vertex-angle-read-as`), or one of the 13 one-line spellings (`split-statements` → `split-roles`). Not re-recorded here.
 
 **Behaviour change for a student:** «משולש ABC · D על BC · AD גובה לצלע BC» builds (D slides to the foot) instead of «D כבר מוגדר בציור»; «AD תיכון לצלע BC · AD גובה לצלע BC» builds with AD both median and altitude; «AD תיכון לצלע BC · AD חוצה זווית A» builds with the note «הובן כ-∠CAB …» instead of asking which angle; «AD תיכון לצלע BC שהוא גם גובה» teaches the two lines instead of listing the parts.
+
+## ADR-3D-366 — A ⟂ at a named foot draws its knee there, and a named vertex's knee sits in the corner the statement names (#1946, #2103)
+
+**Status:** accepted · 2026-10-17 · feature (the 3-D half of [ADR-731](06-decisions.md#adr-731), one PR) · branch `feat/1946-perp-mark-named-foot` off `main` @ 688dfb96 · fix round #2318, stream I · **amends** [ADR-3D-360](#adr-3d-360) (`namedVertexOf` widens; an unnamed crossing still draws nothing) and [ADR-3D-093](#adr-3d-093) (the `foot-seg` knee's in-line arm) · applies [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B1 and B2 as amended (Am. 3)
+**Operator rulings:** the four quoted in ADR-731 (2026-10-10 option C and follow-up; 2026-10-14 card `d14b-1946-side` A; 2026-10-15 #2103 card 7 A): one knee at a named point, toward the other segment's second-named letter, toward each segment's second-named letter at a named crossing, never flipping, *"Same in 2-D and 3-D."*
+
+**Requirements:** [02b](02b-requirements-3d.md) **FR-RD-16** (widened: an endpoint the facts put on the other segment is a named vertex; the corner is the statement's) · **Design:** [04b](04b-design-3d.md) § *The knee lane's vertex* (`namedKneeOf`) · **LADDER stage:** render (`rightAngles3`, steps 2 and 3).
+
+**Root cause.** Two in `render/rightAngles.ts`. (1) Step 3 required `meetingPoint`, a crossing strictly inside both segments or a shared endpoint, so «D על BC» · «AD ⊥ BC» — D an endpoint of AD lying on BC — drew no knee, although the facts name D. (2) Every segment-pair knee's arms came from `armDir` (the farther endpoint), so a named crossing's corner was the drawing's choice: ∠AOB on a square (a tie), ∠COB on a rhombus — never the ruled ∠COD — and a foot's corner flipped as D moved past the midpoint. Class: *the corner of a right angle at a named point is chosen by geometry instead of by the statement* (shared with ADR-731).
+
+**Decision.**
+1. **`namedKneeOf(seg, c)`** answers the vertex and the corner; `namedVertexOf` (ADR-3D-360) is now its vertex. A shared endpoint keeps `armDir`. An endpoint whose DEFINITION puts it on the other segment's line (`on-segment`, `foot-seg`, `plane-cut`, `bisector-seg`, either arm of a `seg-cross`) is the vertex, arms toward the ⟂ segment's far end and the other segment's second-named letter; there the two segments meet at V by the facts, so `meetingPoint` is not asked (it is unchanged, and the stated-angle arc lane, ADR-3D-222, still reads it alone). A `seg-cross` of exactly the two segments keeps `meetingPoint` and points its arms at `seg.b` and `seg.d`. Reach: every `segPairs` source (`cos-angle` / `cos-angle-eq` pair atoms, `seg-angle` / `angle-seg-eq` at 90, `symbolPins` `seg-perp`), so every spelling. The R³ honesty check (both arms non-degenerate, |cos| within `RIGHT_TOL`) is unchanged.
+2. **A `foot-seg`** (every one is a foot the student named — `altitude-foot` always carries the letter) points its in-line arm at the side's second letter `def.b`, falling back to `armDir` only when the foot sits on that letter.
+3. **Marked once.** After the wedge-key dedup, a knee from arm 1's named-foot or crossing branch yields to another knee at the same vertex whose two arms are parallel to its own: «AD ⊥ BC» · «זווית ADB = 90» keeps ∠ADB alone.
+4. **The letter stays clear of the knee** (`scene3.ts`, label placement): a knee at a named point adds its corner's screen direction to that point's incident directions, so `labelDir` takes the widest gap outside the mark. Measured in the browser before this item: on «מעוין ABCD» · «O נקודת חיתוך האלכסונים» · «AC ⟂ BD» the letter O (no incident edge, so the NE default) sat on the new ∠COD knee and hid it.
+
+**Measured before / after** (`688dfb96`, store `submit` → `derive3` → `rightAngles3`):
+
+| sequence | before | after |
+|---|---|---|
+| «משולש ABC» · «D על BC» · «AD ⟂ BC» (also ⊥, «מאונך ל-», «AD גובה») | none | D: A, C |
+| … · «AD ⊥ CB» | none | D: A, B |
+| «משולש ABC» · «AD גובה» / «AD גובה לצלע CB» (D new) | D: A, C (farther) | D: A, C / D: A, B |
+| … · «AD ⊥ BC» · «זווית ADB = 90» | D: A, B | D: A, B (one) |
+| «ריבוע ABCD» · «O נקודת חיתוך האלכסונים» · «AC ⟂ BD» (also «הזווית בין AC ל-BD היא 90») | O: A, B | O: C, D |
+| … · «CA ⊥ BD» / «BD מאונך ל-AC» | O: A, B | O: A, D / O: C, D |
+| «מעוין ABCD» · «O נקודת חיתוך האלכסונים» · «AC ⟂ BD» | O: C, B | O: C, D |
+| … · «AC ⟂ BD» · «זווית AOB = 90» | O: A, B | O: A, B (one) |
+| «ריבוע ABCD» · «AC ⟂ BD» (unnamed crossing, ADR-3D-360) | B | B |
+| «משולש ABC» · «D על BC» · «הזווית בין AD לבין BC היא 55» | none | none |
+
+**Locks.** `src3d/__tests__/issue-1946-knee-at-named-foot.test.ts` (every row above, seeds 0–5); `issue-2091-unnamed-crossing-knee.test.ts` unchanged and green; fixtures `fixtures3/perp-knee-at-foot-1946.geo3.json`, `fixtures3/knee-named-crossing-2103.geo3.json`; parity rows `perp-knee-named-foot-1946`, `knee-named-crossing-2103`.
+
+**Found, not built.** «משולש ABC» · «D על BC» · «AD גובה לצלע CB» is refused `already-defined` in 3-D (the side-typed altitude onto an existing rider), where 2-D builds it — a verdict gap, #2321.
+
+**Behaviour change for a student:** «משולש ABC» · «D על BC» · «AD ⊥ BC» (every spelling, and «AD גובה») now shows a right-angle mark at D toward C (toward B for «AD ⊥ CB»); a named crossing's mark moves to the corner COD for «AC ⟂ BD»; and an altitude's mark («AD גובה לצלע CB») sits toward the side's second letter instead of its farther end.

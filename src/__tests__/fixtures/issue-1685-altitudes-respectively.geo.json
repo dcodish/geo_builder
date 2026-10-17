@@ -29,7 +29,8 @@
         "id": "D",
         "from": "O",
         "a": "B",
-        "b": "C"
+        "b": "C",
+        "named": true
       },
       "enabled": true
     },
@@ -53,7 +54,8 @@
         "id": "E",
         "from": "B",
         "a": "O",
-        "b": "C"
+        "b": "C",
+        "named": true
       },
       "enabled": true
     },

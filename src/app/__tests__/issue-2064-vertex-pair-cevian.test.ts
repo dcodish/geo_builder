@@ -210,7 +210,7 @@ describe('#2064 — controls: what the ruling did not touch', () => {
   it('«משולש ABC» · «D על BC» · «AD גובה» still places the foot D (a rider, not a polygon vertex)', async () => {
     await drive(['משולש ABC', 'D על BC']);
     const v = await decideHere('AD גובה');
-    expect(v.kind === 'commit' && v.commands).toContainEqual({ type: 'foot', id: 'D', from: 'A', a: 'B', b: 'C' });
+    expect(v.kind === 'commit' && v.commands).toContainEqual({ type: 'foot', id: 'D', from: 'A', a: 'B', b: 'C', named: true });
   });
   it('«משולש ABC» · «משולש ACD» · «AB תיכון» still builds B as the midpoint of CD (ruling item 2: medians are not members)', async () => {
     await drive(['משולש ABC', 'משולש ACD']);

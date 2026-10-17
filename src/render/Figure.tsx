@@ -360,7 +360,7 @@ export function Figure({
   // `relMarks` draws just that class, and a hovered length class also gets accent strokes on its members.
   const [hoverRel, setHoverRel] = useState<RelationPick | null>(null);
   const activeHover = relations ? hoverRel : null; // ignore a stale pick once the layer is off
-  const hoverMarks = relations && activeHover ? relationMarks(relationsForPick(relations, activeHover), oriented) : null;
+  const hoverMarks = relations && activeHover ? relationMarks(relationsForPick(relations, activeHover), oriented, [], (angleMarks ?? []).filter((m) => m.right)) : null;
   // #444: a DECLARED equality needs no hover — it is the named shape's own marking, and the student who
   // typed «דלתון» / «משולש שווה שוקיים» turned the layer on precisely to see it.
   const statedMarks =

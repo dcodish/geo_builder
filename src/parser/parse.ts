@@ -2410,7 +2410,7 @@ const foot: Rule = (s) => {
   // #1247 — «B רגל האנך מ-A ל-BC» names an existing vertex as the foot: a right angle at B, not a
   // new point. The same reading the altitude rule gives its own spelling.
   if (id === a || id === b) return altitudeAtVertex(from, id, [a, b]);
-  return [{ type: 'foot', id, from, a, b }];
+  return [{ type: 'foot', id, from, a, b, named: true }]; // #1946 (ADR-731): the student wrote the foot's letter
 };
 
 /** "M is the midpoint of AB" / "M אמצע AB" / "C is the midpoint of OB". */
@@ -11249,7 +11249,7 @@ const altitude: Rule = (s, ctx) => {
     if (options.length > 0) return [{ type: 'altitude-choice', options, variant: 0 }];
     return { clarify: 'cevian-redefines-vertex', apex, foot: namedFoot, side: [p, q] };
   }
-  cmds.push({ type: 'foot', id: f, from: apex, a: p, b: q });
+  cmds.push({ type: 'foot', id: f, from: apex, a: p, b: q, ...(f === namedFoot ? { named: true as const } : {}) }); // #1946 (ADR-731): a foot the student named
   cmds.push({ type: 'segment', a: apex, b: f });
   return cmds;
 };

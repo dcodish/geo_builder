@@ -31,7 +31,7 @@ import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed,
 import { resolveBinds } from './naming';
 import { narrowingNotes2D, type RowNouns } from './narrowing';
 import type { RingNote } from '../../shell/narrowing';
-import { ringOnOneCircle } from '@/engine/structure';
+import { Structure, pairKey, ringOnOneCircle } from '@/engine/structure';
 import { cyclicKiteCommands } from '@/engine/inscribe';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -91,8 +91,16 @@ export interface AngleMark {
   right: boolean;
 }
 
-/** The angle mark a single fact asserts, or null. */
-export function angleMarkFor(cmd: AnyCommand): AngleMark | null {
+/**
+ * The angle mark a single fact asserts, or null.
+ *
+ * #1946 + #2103 ([ADR-731](../../docs/06-decisions.md#adr-731)) — a stated ⟂ whose right angle sits at a point
+ * the student NAMED is a value, so it is marked at rest (operator rulings of 2026-10-10, 2026-10-14 and
+ * 2026-10-15; ADR-W-118 B2 as amended). `figure` is the construction the fact applied into: it is what says,
+ * STRUCTURALLY and never from positions, that an endpoint of one segment lies on the other, or that a point is
+ * defined as the crossing of the two. Without it only the shared-vertex arm can answer.
+ */
+export function angleMarkFor(cmd: AnyCommand, figure?: Construction): AngleMark | null {
   switch (cmd.type) {
     case 'measure-angle':
       return { vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, right: false };
@@ -108,13 +116,57 @@ export function angleMarkFor(cmd: AnyCommand): AngleMark | null {
     case 'set-perpendicular': {
       if (cmd.implicit) return null; // a tangency's radius⟂line is structural, not a stated right angle — no mark
       const shared = [cmd.a, cmd.b].find((x) => x === cmd.c || x === cmd.d); // AB ⟂ CD with a shared vertex
-      if (!shared) return null; // disjoint segments — the ⟂ is at an unnamed crossing; no mark
-      return { vertex: shared, ray1: cmd.a === shared ? cmd.b : cmd.a, ray2: cmd.c === shared ? cmd.d : cmd.c, right: true };
+      if (shared) return { vertex: shared, ray1: cmd.a === shared ? cmd.b : cmd.a, ray2: cmd.c === shared ? cmd.d : cmd.c, right: true };
+      // disjoint segments: marked only where the facts NAME the right angle's vertex (#1946 / #2103); a ⟂ at an
+      // unnamed crossing is a relation and stays unmarked (ADR-W-118 B2)
+      return figure ? namedPerpendicularMark(cmd, figure) : null;
     }
+    case 'foot':
+      // #1946: a foot the STUDENT named («AD גובה», «F רגל האנך מ-C ל-AD») states the right angle at that letter;
+      // an auto-named foot or a construction's own touch point does not. The side: the foot's line as the command
+      // carries it — its second-named letter (ADR-731's side rule).
+      return cmd.named ? { vertex: cmd.id, ray1: cmd.from, ray2: cmd.b, right: true } : null;
     default:
       return null;
   }
 }
+
+/**
+ * #1946 + #2103 ([ADR-731](../../docs/06-decisions.md#adr-731)) — the knee of a stated ⟂ between two segments
+ * that share no endpoint, at a vertex the construction NAMES, or null.
+ *
+ * - **A named foot on the other segment** («D על BC» · «AD ⟂ BC»): an endpoint V of one segment that the
+ *   construction puts on the other's line (`Structure.onLineBy` — a rider, a foot, a crossing, a stated
+ *   collinearity). The wedge runs from V to the ⟂ segment's far end and to the OTHER segment's second-named
+ *   letter as typed («BC» → C, «CB» → B), so it never flips when «הציגו תצורה אחרת» moves V.
+ * - **A named crossing** («O נקודת חיתוך האלכסונים» · «AC ⟂ BD»): a point DEFINED as the crossing of exactly
+ *   these two segments' lines. The wedge runs toward each segment's second-named letter («AC ⟂ BD» → ∠COD).
+ *
+ * Read from the definitions only: a letter that merely sits on the crossing in this drawing («O אמצע AC») names
+ * nothing, and neither does an unnamed crossing — those stay relations (ADR-W-118 B2).
+ */
+function namedPerpendicularMark(cmd: { a: Id; b: Id; c: Id; d: Id }, figure: Construction): AngleMark | null {
+  const s = new Structure(figure, []);
+  // [V, the far end of V's own segment, the other segment's two letters in typed order]
+  const ends: [Id, Id, Id, Id][] = [
+    [cmd.a, cmd.b, cmd.c, cmd.d],
+    [cmd.b, cmd.a, cmd.c, cmd.d],
+    [cmd.c, cmd.d, cmd.a, cmd.b],
+    [cmd.d, cmd.c, cmd.a, cmd.b],
+  ];
+  for (const [v, far, o1, o2] of ends) if (s.onLineBy(v, o1, o2)) return { vertex: v, ray1: far, ray2: o2, right: true };
+  const ab = pairKey(cmd.a, cmd.b), cd = pairKey(cmd.c, cmd.d);
+  for (const o of figure.objects) {
+    if (o.kind !== 'line-line-intersection') continue;
+    const [p, q] = [pairKey(o.a, o.b), pairKey(o.c, o.d)];
+    if ((p === ab && q === cd) || (p === cd && q === ab)) return { vertex: o.id, ray1: cmd.b, ray2: cmd.d, right: true };
+  }
+  return null;
+}
+
+/** #1946 (ADR-731): the knee a stated ⟂ reaches through a NAMED foot or crossing — a relation read as a value. */
+const isRelationKnee = (cmd: AnyCommand): boolean =>
+  cmd.type === 'foot' || (cmd.type === 'set-perpendicular' && ![cmd.a, cmd.b].some((x) => x === cmd.c || x === cmd.d));
 
 /** The display key that groups a fact's commands into one step row. */
 export const groupKey = (f: Fact): string => f.group ?? f.id;
@@ -2295,6 +2347,7 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   // a right-angle square or an angle arc. Deduped by vertex + ray pair.
   const angleMarks: AngleMark[] = [];
   const amSeen = new Set<string>();
+  const relationKnees = new Set<AngleMark>(); // #1946: knees a ⟂ reached through a named foot / crossing
   for (const fi of fold.iterOrder) {
     const f = facts[fi];
     if (status[f.id] !== 'ok') continue;
@@ -2302,7 +2355,7 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
     // figure actually built the right angle at — not the original last id. Without this the knee sits on a
     // now-acute vertex (e.g. a leftover knee at C while ∠B is the real 90°).
     const markCmd = f.cmd.type === 'right-triangle' ? { ...f.cmd, ids: rtEffectiveIds(f.cmd, rtReorder.get(f.id)) } : f.cmd;
-    const m = angleMarkFor(markCmd);
+    const m = angleMarkFor(markCmd, figure);
     if (!m || ![m.vertex, m.ray1, m.ray2].every((id) => e.ok && e.positions.has(id))) continue;
     // HONESTY GATE (ADR-223 Am.): a right-angle SQUARE (the "knee") is placed by the COMMAND'S INTENT
     // (`right-triangle …` / `∠=90` / `⟂`), NOT by measuring the figure — so if the solver could not
@@ -2324,6 +2377,27 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
     if (amSeen.has(key)) continue;
     amSeen.add(key);
     angleMarks.push(m);
+    if (m.right && isRelationKnee(markCmd)) relationKnees.add(m);
+  }
+  // #1946 (ADR-731, the operator's "the right angle is stated once, so it is marked once"): a ⟂ marks its right
+  // angle ONCE. A knee it reached through a named foot or crossing yields to any other knee at the same vertex
+  // between the same two LINES — a stated value («זווית ADB = 90») or an earlier ⟂ — whichever side that one sits on.
+  if (relationKnees.size && e.ok) {
+    const dirOf = (v: Id, r: Id): number => {
+      const V = e.positions.get(v)!, R = e.positions.get(r)!;
+      return ((Math.atan2(R.y - V.y, R.x - V.x) * 180) / Math.PI + 360) % 180;
+    };
+    const near = (x: number, y: number) => Math.min(Math.abs(x - y), 180 - Math.abs(x - y)) <= 1;
+    const sameLines = (m: AngleMark, n: AngleMark): boolean => {
+      const [m1, m2, n1, n2] = [dirOf(m.vertex, m.ray1), dirOf(m.vertex, m.ray2), dirOf(n.vertex, n.ray1), dirOf(n.vertex, n.ray2)];
+      return (near(m1, n1) && near(m2, n2)) || (near(m1, n2) && near(m2, n1));
+    };
+    const kept: AngleMark[] = [];
+    for (const m of angleMarks) {
+      const yields = relationKnees.has(m) && angleMarks.some((n) => n !== m && n.right && n.vertex === m.vertex && (!relationKnees.has(n) || kept.includes(n)) && sameLines(m, n));
+      if (!yields) kept.push(m);
+    }
+    angleMarks.splice(0, angleMarks.length, ...kept);
   }
   // Verify the OUTPUT against the ORIGINAL givens: relations the input asserted that don't actually
   // hold in the final coordinates (a point off its circle, …) — caught even when every step is 'ok'.

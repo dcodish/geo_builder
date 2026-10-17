@@ -783,6 +783,13 @@ needs both `meetingPoint` (the arms genuinely meet — honesty) and `namedVertex
 meeting: a shared endpoint, or a `seg-cross` point defined on exactly those two segments, read from
 `c.points`, never from positions). An unnamed crossing draws no knee; the arc lane keeps `meetingPoint`
 alone. A pair recorded from two named vectors (`SegPair.viaVectors`) keeps the crossing knee (#2093).
+`namedKneeOf` ([ADR-3D-366](06b-decisions-3d.md#adr-3d-366)) answers the vertex AND the corner: a shared
+endpoint (`armDir`, as before); an endpoint whose definition puts it on the other segment's line (`on-segment`,
+`foot-seg`, `plane-cut`, `bisector-seg`, `seg-cross`) — the vertex is that point, with no `meetingPoint`
+crossing required, arms toward the far end and the other segment's second-named letter; or a `seg-cross`, arms
+toward `seg.b` and `seg.d`. Those two arms are relation knees: after the wedge dedup, one yields to another knee
+at the same vertex whose arms are parallel to its own. A `foot-seg` knee's in-line arm points at the side's
+second letter (`def.b`), the far end only when the foot sits on it. In `buildScene3` a knee at a named point adds its corner's screen direction to that point's incident list, so `labelDir` places the letter outside the mark.
 
 **One dihedral geometry ([ADR-3D-264](06b-decisions-3d.md#adr-3d-264)).** `dihedralGeometry`
 (`render/dihedral.ts`) gives the foot on the seam and two unit arms ⟂ to it, oriented by
