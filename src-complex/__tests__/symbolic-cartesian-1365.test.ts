@@ -107,7 +107,10 @@ describe('#1365 — once the parameters are forced, the numeric reading takes ov
     const lit = pointOf(['z1 = 3+4i'], 'z1');
     expect(p.readingCart).toBe(lit.readingCart);
     expect(p.reading).toBe(lit.reading);
-    expect(p.defined).toBe('closed');
+    // #1818 (ADR-CX-082): the closed definition is now SOLVED as the literal it is — the exact carriers
+    // know both halves, exactly as for «z1 = 3+4i» — so it no longer needs stage 5d's `closed` reading
+    expect(p.modulusKnown && p.argumentKnown).toBe(true);
+    expect(p.defined).toBe(lit.defined);
     expect(v2Labels(d, 'cart')).toEqual(['z₁ = 3+4i']);
     expect(v2Labels(d, 'polar')).toEqual(['z₁ ≈ 5·cis53.13°']);
   });
