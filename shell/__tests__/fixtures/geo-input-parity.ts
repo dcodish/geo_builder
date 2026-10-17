@@ -1541,6 +1541,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2239 (ADR-692): two circles of equal stated radius stated internally tangent are refused, never resized ──
   { id: 'stated-radius-never-changed-2239', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 3', 'המעגלים O ו-P משיקים מבפנים'], expect: 'refused', exception: 'X8', note: '2-D committed green with P silently resized (the ADR-037 Am. 2 tangent-inner rewrite) before ADR-692; analytic already refused' },
+
+  // ── #1930 (ADR-3D-354): an unstated right angle moves to the vertex a later right angle names, in every spelling ──
+  { id: 'right-angle-seat-1930-01', family: 'angles', steps: ['משולש ישר זווית ABC', 'AC ⊥ BC'], expect: 'builds', note: '3-D refused givens-contradict before ADR-3D-354 (its default right angle at B never yielded to this spelling); the vertex is asserted in issue-1930-right-angle-seat.test.ts' },
+  { id: 'right-angle-seat-1930-02', family: 'angles', steps: ['משולש ישר זווית ABC', '∠A = 90°'], expect: 'builds' },
+  { id: 'right-angle-seat-1930-03', family: 'angles', steps: ['משולש ישר זווית ABC', 'BA ⊥ CA'], expect: 'builds' },
+  { id: 'right-angle-seat-1930-04', family: 'angles', steps: ['משולש ישר זווית ABC', 'AB ⊥ BC'], expect: 'builds' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

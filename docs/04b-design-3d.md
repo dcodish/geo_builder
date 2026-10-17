@@ -262,7 +262,13 @@ helper ink appears: a `vec-rel` command would draw its carrier segment (a diagon
 decides the arity, and an adjective is consumed only where `parse3` has a lowering**; an unconsumed one
 declines the rule, never dropped. `statedQuadBase` and the triangle qualifiers read it. The right trapezoid
 lowers to `quad-shape trapezoid` plus a **soft** AD ⟂ AB carrying its `ring`, which derive3 retires when a
-right angle is stated at any corner of that ring (M4; the #116 default, ring-scoped).
+right angle is stated at any corner of that ring (M4; the #116 default, ring-scoped). Which right angle a
+line STATES is read by one function, `statedRightAngle3` (`store3.ts`, #1930, [ADR-3D-354](06b-decisions-3d.md#adr-3d-354)),
+for every spelling: a stated `cos-angle` at 0 whose two pair arms span three labels (the vertex is the label
+both arms share, at either end — «AC ⊥ BC» as well as «CA ⊥ CB»), a three-letter claim at 90°, and a
+one-letter `vertex-angle` at 90°, which names the one soft right triangle with that corner (none or two:
+nothing yields, and apply's own `ambiguous-angle` reading stands). Only a soft default yields; a stated
+right angle never does.
 
 **A circle through a ring is a claim about the ring.** `circle3 {circum}` fits its centre to the ring, and:
 - **the lowering** — `polygonCircle3` emits the noun's `CYCLIC_MEMBER` fix (the #305 registry): rhombus →

@@ -242,6 +242,9 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   A word in an inscription sentence the tool does not read refuses the line, naming it («…לא הצלחנו לצייר: שווה צלעת…»);
   nothing is drawn and the model is not asked. «שוה» reads as «שווה». A shape declaration with a qualifier word no
   reader lowers («משולש שווה ABC», «טרפז ישר ABCD») is not drawn without it: the line goes to the model.
+  An unstated right angle moves to the vertex a later right angle names, however it is written (#1930):
+  after «משולש ישר זווית ABC», «AC ⊥ BC», «BC ⊥ AC», «∠C = 90°», «זווית C ישרה» and «∠ACB = 90°» all put it
+  at C, as 2-D and analytic do; a right angle the student stated never moves, so a second one is refused.
   Both voices of both relations are one sentence (#1975, operator 2026-10-14): a circle named FIRST — «מעגל O חוסם
   את המשולש ABC», «מעגל O חסום במשולש ABC», "the circle O circumscribes triangle ABC" — builds what «משולש ABC חסום
   במעגל O» / «משולש ABC חוסם את המעגל O» build, and the relative clause whose subject is the ring, «מעגל ש-ABC

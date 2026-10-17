@@ -519,6 +519,51 @@ function withShapeSentence3<E extends { code: string }>(e: E, utterance: string)
  * search folds SUBSETS of the list through this same function with `narrow: false` — the same fold, never a
  * second reader, and no recursion. A subset fold is not a "press", so it never counts in {@link deriveStats3}.
  */
+/**
+ * #1930 (ADR-3D-354, amends ADR-3D-042) — the triangle a right triangle's SOFT default right angle sits on,
+ * vertex first, or null. Only a triangle's soft angle (a ring-scoped one is a right trapezoid's, #1792).
+ */
+export function softRightTriangle3(cmd: Command3): Id[] | null {
+  if (cmd.type !== 'cos-angle' || !cmd.soft || cmd.ring || cmd.u.kind !== 'pair' || cmd.v.kind !== 'pair') return null;
+  if (cmd.u.from !== cmd.v.from) return null;
+  return [cmd.u.from, cmd.u.to, cmd.v.to];
+}
+
+/**
+ * #1930 (ADR-3D-354, amends ADR-3D-042) — THE STATED RIGHT ANGLE, READ OFF ANY SPELLING: `[vertex, p, q]`
+ * when `cmd` states a right angle on three labels, else null. One reader for every form, because the
+ * soft default yields to the student's right angle however it is written, and a pre-scan that knew only
+ * some spellings left the default standing beside it («משולש ישר זווית ABC» · «AC ⊥ BC» refused).
+ *  - a stated `cos-angle` at cos 0 whose two pair arms span exactly three labels: the vertex is the
+ *    label both arms share, at whichever end of each it sits («AB ⊥ AC», «AC ⊥ BC», «BA ⊥ CA»);
+ *  - a three-letter claim at 90° (`angle-seg-eq` over one vertex, `vertex-angle-eq`);
+ *  - a one-letter `vertex-angle` at 90° («∠C = 90°», «זווית C ישרה»): its arms are resolved at apply,
+ *    so here it names the ONE soft right triangle with V as a corner. None, or two, and nothing yields —
+ *    apply's own reading (and its `ambiguous-angle` refusal) stands.
+ * A soft angle is never a statement.
+ */
+export function statedRightAngle3(cmd: Command3, softTriangles: readonly (readonly Id[])[]): Id[] | null {
+  const right = (deg: number) => Math.abs(deg - 90) < 1e-9;
+  if (cmd.type === 'cos-angle') {
+    if (cmd.soft || Math.abs(cmd.cos) >= 1e-9 || cmd.u.kind !== 'pair' || cmd.v.kind !== 'pair') return null;
+    const [a, b] = [cmd.u.from, cmd.u.to];
+    const [c, d] = [cmd.v.from, cmd.v.to];
+    if (a === b || c === d || new Set([a, b, c, d]).size !== 3) return null;
+    const v = a === c || a === d ? a : b;
+    return [v, v === a ? b : a, v === c ? d : c];
+  }
+  if (cmd.type === 'claim' && cmd.claim.type === 'angle-seg-eq' && right(cmd.claim.deg) && cmd.claim.a1 === cmd.claim.a2)
+    return [cmd.claim.a1, cmd.claim.b1, cmd.claim.b2];
+  if (cmd.type === 'claim' && cmd.claim.type === 'vertex-angle-eq' && right(cmd.claim.deg))
+    return [cmd.claim.vertex, cmd.claim.p, cmd.claim.q];
+  if (cmd.type === 'vertex-angle' && right(cmd.deg)) {
+    const at = softTriangles.filter((t) => t.includes(cmd.vertex));
+    if (at.length !== 1) return null;
+    return [cmd.vertex, ...at[0].filter((l) => l !== cmd.vertex)];
+  }
+  return null;
+}
+
 function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 {
   /** #2235: the list as typed during the fold; after it, the same list with each shape reference resolved. */
   let facts = factsIn;
@@ -557,15 +602,20 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
   const explicitRightAngles = new Map<string, string[]>();
   const addRight = (labels: string[]) => explicitRightAngles.set(key3(labels), labels);
   const explicitEqualSides = new Set<string>();
+  // #1930 (ADR-3D-354): the soft right triangles, so a one-letter «∠C = 90°» can name its triangle
+  const softTriangles = new Map<string, Id[]>();
   for (const f of facts) {
     if (!f.enabled) continue;
     for (const cmd of f.cmds) {
-      if (cmd.type === 'cos-angle' && !cmd.soft && Math.abs(cmd.cos) < 1e-9 && cmd.u.kind === 'pair' && cmd.v.kind === 'pair' && cmd.u.from === cmd.v.from)
-        addRight([cmd.u.from, cmd.u.to, cmd.v.to]);
-      if (cmd.type === 'claim' && cmd.claim.type === 'angle-seg-eq' && Math.abs(cmd.claim.deg - 90) < 1e-9 && cmd.claim.a1 === cmd.claim.a2)
-        addRight([cmd.claim.a1, cmd.claim.b1, cmd.claim.b2]);
-      if (cmd.type === 'claim' && cmd.claim.type === 'vertex-angle-eq' && Math.abs(cmd.claim.deg - 90) < 1e-9)
-        addRight([cmd.claim.vertex, cmd.claim.p, cmd.claim.q]);
+      const t = softRightTriangle3(cmd);
+      if (t) softTriangles.set(key3(t), t);
+    }
+  }
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    for (const cmd of f.cmds) {
+      const stated = statedRightAngle3(cmd, [...softTriangles.values()]);
+      if (stated) addRight(stated);
       // an explicit |xy| = |zw| whose two pairs span exactly THREE labels names a triangle's side pair
       if (cmd.type === 'length-rel' && !cmd.soft && cmd.c === 1 && 'pair' in cmd.rhs) {
         const labels = new Set([cmd.a1, cmd.b1, ...cmd.rhs.pair]);
