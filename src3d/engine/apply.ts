@@ -17,7 +17,7 @@ import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
 import { carrierParams3, readCoordGiven } from './carriers';
-import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
+import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
@@ -825,6 +825,56 @@ function materializePlaneRun(next: Construction3, ids: Id[], face = false): void
   }
 }
 
+/**
+ * #1935 ([ADR-3D-356](../../docs/06b-decisions-3d.md#adr-3d-356)) — A FLAT RING OVER A FREE VERTEX DRIVES THAT VERTEX INTO THE PLANE.
+ *
+ * Operator ruling 2026-10-09 (option A): *"The free point rides into the plane. D moves so that ACBD really is a flat
+ * quadrilateral, and the figure holds."* «משולש ABC · משולש ABD · מרובע ACBD» drew a SKEW ring green: D was minted
+ * `free3` by the second triangle, and a ring declared over existing points recorded its ink and a collapse claim, but
+ * nothing said the ring is flat. A corner the declaration MINTS already rides the plane (ADR-3D-172); a corner that
+ * already exists as a free point got nothing.
+ *
+ * The ring's ANCHORS are its vertices that are placed by something other than a placeholder (not `free3`, not a #841
+ * `implied` rider), in ring order; with fewer than three, the earliest-minted free vertices are promoted (they stay
+ * free). Every other free vertex is re-homed onto the anchors' plane as an `implied` rider — the point kind a minted
+ * corner gets, with its two in-plane DOFs still sampled (ADR-052) and drivable, and still a placeholder a later real
+ * definition replaces (#841). With every vertex placed nothing changes: a skew ring is then #1928's `ring-not-flat`
+ * refusal. Collinear anchors are the collapse refusal's (ADR-3D-310). A triangle is flat by itself: n < 4 is a no-op.
+ * Returns whether anything was re-homed.
+ */
+const isRingPlaceholder3 = (c: Construction3, id: Id): boolean => {
+  const d = c.points.get(id);
+  return d?.kind === 'free3' || (d?.kind === 'on-plane' && d.implied === true);
+};
+/**
+ * #1935: a placeholder corner re-defined by its ring keeps its ORIGINAL place in the point order when every other ring
+ * corner precedes it — so a point defined from it later (a midpoint of AD) is still evaluated after it. Otherwise the
+ * new definition stays where the re-definition put it (last), after every corner it reads.
+ */
+function keepPointSlot3(next: Construction3, before: Construction3, id: Id, ring: readonly Id[]): Construction3 {
+  const order = [...before.points.keys()];
+  const slot = order.indexOf(id);
+  if (ring.some((q) => q !== id && order.indexOf(q) > slot)) return next;
+  const points = new Map<Id, PointDef>();
+  for (const k of order) if (next.points.has(k)) points.set(k, next.points.get(k)!);
+  for (const [k, d] of next.points) if (!points.has(k)) points.set(k, d);
+  return { ...next, points };
+}
+function flattenRingFreeVertices3(next: Construction3, ring: readonly Id[]): boolean {
+  if (ring.length < 4) return false;
+  const isFree = (id: Id): boolean => isRingPlaceholder3(next, id);
+  const order = [...next.points.keys()];
+  const free = ring.filter(isFree).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  if (free.length === 0) return false;
+  const anchors = ring.filter((id) => !isFree(id));
+  while (anchors.length < 3 && free.length > 0) anchors.push(free.shift()!);
+  if (anchors.length < 3 || free.length === 0) return false;
+  const plane = anchors.slice(0, 3);
+  materializePlaneRun(next, plane);
+  for (const id of free) next.points.set(id, { kind: 'on-plane', plane: plane.join(''), implied: true });
+  return true;
+}
+
 /** The coefficient a ratio statement puts between its two pairs: a number, or the LETTER the student
  *  wrote for it (`SE = t·SA` — name-only, ADR-3D-224). */
 type RatioCoeff = { k: number } | { sym: string };
@@ -1360,6 +1410,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           return { ok: true, next: drew ? nextRef : c };
         }
         nextRef.claims.push({ type: 'polygon-open', ids: [...cmd.ids], given: true });
+        // #1935 (ADR-3D-356): ...and the ring is FLAT — a free vertex rides the plane of the placed ones
+        flattenRingFreeVertices3(nextRef, cmd.ids);
         return { ok: true, next: nextRef };
       }
       // #774 (ADR-3D-172): the MIXED run — some labels exist, some are new. Ownership is explicit
@@ -1379,6 +1431,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           // a triangle is planar whatever its corners: each minted point is free3 (3 sampled DOFs,
           // ADR-052 — counted by freeDofCount3, moving on «show another configuration»)
           for (const id of fresh) next.points.set(id, { kind: 'free3' });
+        } else if (fresh.length === 1 && known.length >= 3 && known.some((id) => isRingPlaceholder3(c, id))) {
+          // #1935 (ADR-3D-356): a KNOWN corner is itself still free — the whole ring rides the placed corners' plane
+          next.points.set(fresh[0], { kind: 'free3' });
+          flattenRingFreeVertices3(next, cmd.ids);
         } else if (fresh.length === 1 && known.length >= 3) {
           // a quad/pentagon is FLAT by its own definition — the one minted corner rides the plane
           // of the known ones (2 free DOFs; planarity is the shape's meaning, not an invented given)
@@ -3236,7 +3292,20 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           // It drives, exactly as before — refusing here would mean a student could never SPECIALISE a
           // shape they had already drawn, which is ADR-052 upside down.
         }
-        const r = lower(c);
+        // #1935 (ADR-3D-356): ONE corner still a placeholder — it yields to the shape's own corner (ARM 2: a closed-form
+        // corner for the parallelogram family and the kite, a plane rider otherwise), the #841 rule applied to a ring.
+        // Lowering the family's relations onto a free corner instead left the pivot to find a rectangle by search,
+        // which it missed at some seeds.
+        const holders = cmd.ids.filter((id) => isRingPlaceholder3(c, id));
+        if (holders.length === 1) {
+          const without: Construction3 = { ...c, points: new Map(c.points) };
+          without.points.delete(holders[0]);
+          const y = applyCommand3(without, cmd);
+          if (y.ok) return { ok: true, next: keepPointSlot3(y.next, c, holders[0], cmd.ids) };
+        }
+        // ...and with several, the ring is flat before its family's relations are lowered on it
+        const flat = clone(c);
+        const r = lower(flattenRingFreeVertices3(flat, cmd.ids) ? flat : c);
         return r.ok ? { ok: true, next: recordShape(drawRing(r.next), cmd.base, cmd.ids, cmd.adj) } : r;
       }
 
