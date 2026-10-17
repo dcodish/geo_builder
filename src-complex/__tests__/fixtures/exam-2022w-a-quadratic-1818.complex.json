@@ -1,0 +1,13 @@
+{
+  "app": "complex-builder",
+  "version": 1,
+  "lines": [
+    "z1 = (2a^2+5a+4) + (2a^2+3a+2)i",
+    "z2 = (a^2+8a+8) + (2-a^2+2a)i",
+    "a = -1",
+    "z1 ו-z2 צמודים זה לזה"
+  ],
+  "freePos": {},
+  "seed": 0,
+  "view": "cart"
+}

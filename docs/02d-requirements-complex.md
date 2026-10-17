@@ -179,11 +179,14 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   a value the student gave it: after «a = 3» the canvas reads «z₁ = 3+bi», and the «a = 3» row carries
   the letter/value chip, which switches the canvas back to «z₁ = a+bi»; the choice survives «הציגו תצורה
   אחרת» and save/reload. A letter the tool solved from other givens stays a letter on the canvas. With
-  every letter valued the number reads exactly as the literal 3+4i, each view in its own form. The data
+  every letter valued the number reads exactly as the literal 3+4i, each view in its own form. A
+  definition in any polynomial form of its parameters («z1 = (2a²+5a+4) + (2a²+3a+2)i», «z1 = a·b + i»)
+  becomes that number, exactly, once they are known — typed or solved — so it counts as no free DOF and a
+  claim about it is decided, as for the literal. The data
   panel's «נקודות» substitutes every letter whose value the givens force. A glued
   `i` whose other letter is a complex number («zi») is ambiguous and is refused with the explicit
   product offered («z*i»); `pi` is never read as p·i.
-  - Sources: [ADR-CX-058](06d-decisions-complex.md#adr-cx-058), #1365 (operator ruling), #1410, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W8, #1862)
+  - Sources: [ADR-CX-058](06d-decisions-complex.md#adr-cx-058), #1365 (operator ruling), #1410, [ADR-CX-065](06d-decisions-complex.md#adr-cx-065) (B6/D1/W8, #1862), [ADR-CX-082](06d-decisions-complex.md#adr-cx-082) (#1818)
 - **FR-CN-11 (Must)** — **The trigonometric form is the same number as cis.** «z1 = 2(cos45 + i sin45)»,
   «z1 = √2(cos45 + i·sin45)», «z1 = cos45 + i sin45» (r omitted is 1), with `i·sin`, `i*sin`,
   `sin45·i`, the `°` or without it, a signed or parenthesised angle, and a symbolic one
