@@ -1,0 +1,811 @@
+{
+  "name": "round-2318",
+  "title": "Fix round #2318 (2026-10-17, round 4) — batch on main + PRs #2319, #2322, #2324, #2326",
+  "cases": [
+    {
+      "id": "T1",
+      "base": "http://localhost:5173",
+      "class": "play",
+      "product": "2d",
+      "path": "/",
+      "title": "A chord drawn after a tangent now builds (#2215)",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "AB משיק למעגל P",
+        "AB מיתר במעגל O"
+      ],
+      "lookFor": "The last line builds: A and B on circle O, line AB touching P, and both circles stay where they were.",
+      "before": "The last line was refused «…סותר את «AB משיק למעגל P»…» (the reverse order built)."
+    },
+    {
+      "id": "T2",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "2d",
+      "path": "/",
+      "title": "The same with the endpoints placed one at a time (#2215)",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "AB משיק למעגל P",
+        "A על מעגל O",
+        "B על מעגל O"
+      ],
+      "lookFor": "Both point lines build; AB is a chord of O touching P.",
+      "before": "The B line was refused."
+    },
+    {
+      "id": "T3",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "2d",
+      "path": "/",
+      "title": "A chord named next to a diameter is an ordinary chord (#2215)",
+      "lines": [
+        "מעגל O",
+        "AB קוטר במעגל O ו-CD מיתר במעגל O"
+      ],
+      "lookFor": "AB passes through the centre; CD does not, and is shorter than AB.",
+      "before": "CD was drawn as a second diameter."
+    },
+    {
+      "id": "T4",
+      "base": "http://localhost:5173",
+      "class": "verified",
+      "product": "2d",
+      "path": "/",
+      "title": "A tangent of O cannot also be a chord of O (#2215, refusal kept)",
+      "_probe": "verified-by-probe 2.0 s",
+      "lines": [
+        "מעגל O",
+        "AB משיק למעגל O",
+        "AB מיתר במעגל O"
+      ],
+      "lookFor": "Still refused: «לא ניתן: «AB מיתר במעגל O» סותר את «AB משיק למעגל O» — אי אפשר לקיים את שניהם יחד…».",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T5",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "2d",
+      "path": "/",
+      "title": "A named touch point on a drawn incircle builds (#2001)",
+      "lines": [
+        "משולש ABC",
+        "מעגל חסום במשולש ABC",
+        "AB משיק למעגל בנקודה D"
+      ],
+      "lookFor": "The line builds; D sits where the incircle touches AB; the circle does not move.",
+      "before": "Refused «משהו השתבש בבניית השורה הזאת…»."
+    },
+    {
+      "id": "T6",
+      "base": "http://localhost:5173",
+      "class": "play",
+      "product": "2d",
+      "path": "/",
+      "title": "Placing the touch point by two point lines now builds too (#2001 / #2328)",
+      "lines": [
+        "משולש ABC",
+        "מעגל חסום במשולש ABC",
+        "D על AB",
+        "D על המעגל"
+      ],
+      "lookFor": "All four lines green; D sits where the incircle touches AB. The #2001 stream reported this still refused (filed #2328); on the landed batch it builds — most likely the touch-root reading of #1820 reading. Press «הציגו תצורה אחרת» a few times: D stays on the touch point.",
+      "before": "Refused «משהו השתבש…»."
+    },
+    {
+      "id": "T7",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "2d",
+      "path": "/",
+      "title": "Equal areas put D on C, with the coincidence notice (#1820)",
+      "lines": [
+        "משולש ABC",
+        "D על BC",
+        "שטח ABD = שטח ABC"
+      ],
+      "expect": [
+        "נפלו על אותה נקודה"
+      ],
+      "lookFor": "Accepted; D drawn on C; the notice «C ו-D נפלו על אותה נקודה.».",
+      "before": "Refused «לא הצלחתי למקם את D על הקטע BC…»."
+    },
+    {
+      "id": "T8",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "2d",
+      "path": "/",
+      "title": "BD = BC puts D on C, with the notice (#1820)",
+      "lines": [
+        "משולש ABC",
+        "D על BC",
+        "BD = BC"
+      ],
+      "expect": [
+        "נפלו על אותה נקודה"
+      ],
+      "lookFor": "Accepted; D on C; «C ו-D נפלו על אותה נקודה.».",
+      "before": "Refused, the same message."
+    },
+    {
+      "id": "T9",
+      "base": "http://localhost:5173",
+      "class": "verified",
+      "product": "2d",
+      "path": "/",
+      "title": "A position inside the segment still wins (#1820, control)",
+      "lines": [
+        "משולש ABC",
+        "D על BC",
+        "שטח משולש ABD = 2 * שטח משולש ADC"
+      ],
+      "expectAbsent": [
+        "נפלו על אותה נקודה"
+      ],
+      "lookFor": "D inside BC, two-thirds of the way from B; no coincidence notice.",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T10",
+      "base": "http://localhost:5173",
+      "class": "play",
+      "product": "2d",
+      "path": "/",
+      "title": "Beyond the report, same ruling: «BG = BD» on a square puts G on D (#1820)",
+      "lines": [
+        "ריבוע ABCD",
+        "G על AD",
+        "BG = BD"
+      ],
+      "expect": [
+        "נפלו על אותה נקודה"
+      ],
+      "lookFor": "Accepted with G on D and the coincidence notice. Two more lines now behave the same way: «משולש ישר זווית ABC · זווית B = 90 · E על BC · AE = AC» and «משולש ABC · D על BC · זווית BAD = זווית BAC». Under your 2026-09-30 ruling (\"accept, always give a message\") — confirm.",
+      "before": "Refused."
+    },
+    {
+      "id": "T11",
+      "base": "http://localhost:5173",
+      "class": "play",
+      "product": "2d",
+      "path": "/",
+      "title": "A height typed with ⟂ about a point on the side builds (#2089)",
+      "lines": [
+        "מרובע ABCD",
+        "E על CD",
+        "AE ⟂ CD"
+      ],
+      "lookFor": "All three steps ✓; E strictly inside CD; AE meets CD at a right angle.",
+      "before": "Refused «cannot place E on segment CD so that AE ⟂ CD»."
+    },
+    {
+      "id": "T12",
+      "base": "http://localhost:5173",
+      "class": "verified",
+      "product": "2d",
+      "path": "/",
+      "title": "A ⟂ from a point on the line itself is still refused (#2089, refusal)",
+      "lines": [
+        "מרובע ABCD",
+        "E על CD",
+        "DE ⟂ CD"
+      ],
+      "expectRefusal": "לא הצלחתי למקם",
+      "lookFor": "Refused «לא הצלחתי למקם את E על הקטע CD כך שיתקיים DE ⟂ CD…»; nothing added.",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T13",
+      "base": "http://localhost:5173",
+      "class": "play",
+      "product": "2d",
+      "path": "/",
+      "title": "Rectangle: the geometry forces E onto B (#2089, needs your judgment)",
+      "lines": [
+        "מלבן ABCD",
+        "E על BC",
+        "AE ⟂ BC"
+      ],
+      "lookFor": "E drawn on B (the label reads «B=E»), with the note «B ו-E נפלו על אותה נקודה.». In a rectangle AB ⟂ BC, so the foot is B. Accept, or should this be refused?",
+      "before": "Refused."
+    },
+    {
+      "id": "T14",
+      "base": "http://localhost:5173",
+      "class": "verified",
+      "product": "2d",
+      "path": "/",
+      "title": "A third crossing on a chord is refused with the reason (#1834, refusal)",
+      "_probe": "verified-by-probe 2.2 s",
+      "lines": [
+        "מעגל O",
+        "A על מעגל O",
+        "C על מעגל O",
+        "AC חותך את המעגל בנקודה E"
+      ],
+      "lookFor": "«AC כבר חותך את המעגל ב-A וב-C — לישר אין נקודת חיתוך שלישית עם המעגל.»",
+      "before": "«…הישר משיק למעגל בנקודה אחת בלבד…» — a chord called a tangent."
+    },
+    {
+      "id": "T15",
+      "base": "http://localhost:5173",
+      "class": "verified",
+      "product": "2d",
+      "path": "/",
+      "title": "A real tangent still gets the tangent message (#1834, refusal kept)",
+      "lines": [
+        "מעגל O",
+        "A על מעגל O",
+        "הישר AP משיק למעגל O בנקודה A",
+        "AP חותך את המעגל בנקודה E"
+      ],
+      "expectRefusal": "משיק",
+      "lookFor": "«לא ניתן למקם את E: הישר משיק למעגל בנקודה אחת בלבד…».",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T16",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "2d",
+      "path": "/",
+      "title": "A right angle, then an angle given, is taught as three whole lines (#2096, refusal)",
+      "lines": [
+        "משולש ABC ישר זווית ב-A ו-∠ABC = 30"
+      ],
+      "expectRefusal": "(3) ∠ABC = 30",
+      "lookFor": "«כתבו בשורות נפרדות: (1) משולש ABC  (2) ∠CAB = 90°  (3) ∠ABC = 30» (display order: #2315).",
+      "before": "«(1) משולש ABC ישר זווית ב-A ו-∠  (2) ABC = 30»."
+    },
+    {
+      "id": "T17",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "2d",
+      "path": "/",
+      "title": "An angle stays whole in the split tip (#2096, refusal)",
+      "lines": [
+        "משולש ABC שווה שוקיים ∠A = 40"
+      ],
+      "expectRefusal": "(2) ∠A = 40",
+      "lookFor": "«(1) משולש ABC שווה שוקיים  (2) ∠A = 40».",
+      "before": "«(1) משולש ABC שווה שוקיים ∠  (2) A = 40»."
+    },
+    {
+      "id": "T18",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "2d",
+      "path": "/",
+      "title": "A chord's length and the arc's value are both readable (#2172)",
+      "lines": [
+        "מעגל O",
+        "A על המעגל O",
+        "B על המעגל O",
+        "AB = 7",
+        "קשת AB = 40 במעגל O"
+      ],
+      "expectRefusal": "נקלט",
+      "lookFor": "«40°» on the arc and «7» clearly apart, «7» inside the chord. Never «740°». (The blue «נקלט. בפעם הבאה אפשר לכתוב כך: ∠AOB = 40» note on the last line is existing teaching.)",
+      "before": "«7» drawn under «40°», reading «740°»."
+    },
+    {
+      "id": "T19",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "2d",
+      "path": "/",
+      "title": "Two stated diagonals stay readable (#2172)",
+      "lines": [
+        "מקבילית ABCD",
+        "AC = 8",
+        "BD = 6"
+      ],
+      "cycles": 2,
+      "lookFor": "«8» and «6» apart near the crossing in every view.",
+      "before": "They overlapped at one configuration."
+    },
+    {
+      "id": "T20",
+      "base": "http://localhost:5173",
+      "class": "play",
+      "product": "2d",
+      "path": "/",
+      "title": "«r = 4» with two sized circles is refused, naming both (#2177, refusal — wording)",
+      "lines": [
+        "מעגל O ברדיוס 3",
+        "מעגל P ברדיוס 5",
+        "r = 4"
+      ],
+      "expectRefusal": "לא ברור של איזה",
+      "lookFor": "«r = 4»: בסרטוט יש כמה מעגלים שרדיוסם נתון (O, P), ולכן לא ברור של איזה מהם r הוא הרדיוס. כתבו קודם את המעגל, למשל: «רדיוס מעגל P הוא r». Nothing added.",
+      "before": "Committed green; the 4 was ignored."
+    },
+    {
+      "id": "T21",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "2d",
+      "path": "/",
+      "title": "The taught next step builds (#2177)",
+      "lines": [
+        "מעגל O ברדיוס 3",
+        "מעגל P",
+        "רדיוס מעגל P הוא r",
+        "r = 4"
+      ],
+      "expectRefusal": "נקראה כסמל מידה",
+      "lookFor": "Every line green; circle P drawn with radius 4 (larger than O). The «r נקראה כסמל מידה» note on line 3 is existing teaching.",
+      "before": "«r = 4» was refused as contradicting «מעגל O ברדיוס 3»."
+    },
+    {
+      "id": "T22",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "2d",
+      "path": "/",
+      "title": "One sized circle beside an unsized one is refused (#2177, refusal)",
+      "lines": [
+        "מעגל O ברדיוס 3",
+        "מעגל P",
+        "r = 4"
+      ],
+      "expectRefusal": "לא ברור של איזה",
+      "lookFor": "«…בסרטוט יש כמה מעגלים (O, P), ולכן לא ברור של איזה מהם r הוא הרדיוס…».",
+      "before": "«לא ניתן: «r = 4» סותר את «מעגל O ברדיוס 3»…»."
+    },
+    {
+      "id": "T23",
+      "base": "http://localhost:5173",
+      "class": "play",
+      "product": "2d",
+      "path": "/",
+      "title": "«‖» is parallel in 2-D (#2069, cross-tool)",
+      "lines": [
+        "מרובע ABCD",
+        "AB ‖ CD"
+      ],
+      "lookFor": "Commits at once with AB ∥ CD; no AI call. «AB || CD» does the same.",
+      "before": "Sent to the AI."
+    },
+    {
+      "id": "T24",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "3d",
+      "path": "/3d.html",
+      "title": "A stated vector shows in the data panel at once (#2077)",
+      "lines": [
+        "פירמידה משולשת ABCD",
+        "AB = (k-1,k,3)"
+      ],
+      "expect": [
+        "(k-1, k, 3)"
+      ],
+      "lookFor": "«נתונים שנתתם» shows «AB⃗ = (k-1, k, 3)».",
+      "before": "No AB row."
+    },
+    {
+      "id": "T25",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "3d",
+      "path": "/3d.html",
+      "title": "…and switches to numbers once k is known (#2077)",
+      "lines": [
+        "פירמידה משולשת ABCD",
+        "AB = (k-1,k,3)",
+        "k = 2"
+      ],
+      "expect": [
+        "(1, 2, 3)"
+      ],
+      "lookFor": "The row reads «AB⃗ = (1, 2, 3)».",
+      "before": "No row."
+    },
+    {
+      "id": "T26",
+      "base": "http://localhost:5173",
+      "class": "play",
+      "product": "3d",
+      "path": "/3d.html",
+      "title": "A point keeps the letter you typed (#2077)",
+      "lines": [
+        "A(1,t,2)"
+      ],
+      "expect": [
+        "(1, t, 2)"
+      ],
+      "lookFor": "The panel shows «A(1, t, 2)», not «A(1, ?, 2)». A two-branch letter shows the same way: «D(3,p,0)» reads «D(3, p, 0)» until a sign is given.",
+      "before": "«A(1, ?, 2)»."
+    },
+    {
+      "id": "T27",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "3d",
+      "path": "/3d.html",
+      "title": "A root with a times sign is read (#2069)",
+      "lines": [
+        "מלבן ABCD",
+        "AD=2*√7"
+      ],
+      "lookFor": "The line records; AD marked 2√7.",
+      "before": "«לא הצלחתי להבין»."
+    },
+    {
+      "id": "T28",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "3d",
+      "path": "/3d.html",
+      "title": "Area stated with «הוא» (#2069)",
+      "lines": [
+        "משולש ABC",
+        "שטח המשולש ABC הוא 6"
+      ],
+      "lookFor": "Accepted exactly like «שטח המשולש ABC = 6» (measured on main: same row, and the panel says «אין עדיין נתונים יציבים להצגה» for both — the area is a claim on a free triangle).",
+      "before": "Not understood."
+    },
+    {
+      "id": "T29",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "3d",
+      "path": "/3d.html",
+      "title": "The triangle sign declares a triangle (#2069)",
+      "lines": [
+        "△ABC"
+      ],
+      "lookFor": "Triangle ABC drawn.",
+      "before": "Not understood."
+    },
+    {
+      "id": "T30",
+      "base": "http://localhost:5173",
+      "class": "verified",
+      "product": "3d",
+      "path": "/3d.html",
+      "title": "A norm is not mistaken for parallel (#2069, refusal kept)",
+      "lines": [
+        "טרפז ABCD",
+        "נסמן: AB = u",
+        "‖u‖ = 5"
+      ],
+      "expectRefusal": "לא הצלחתי להבין",
+      "lookFor": "Still «לא הצלחתי להבין»; no parallel drawn.",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T31",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "3d",
+      "path": "/3d.html",
+      "title": "A right triangle with a side length on one line is taught (#2088, refusal)",
+      "lines": [
+        "משולש ABC ישר זווית ב-B ו-AB = 4"
+      ],
+      "expectRefusal": "בכל שורה נתון אחד",
+      "lookFor": "«בכל שורה נתון אחד — … (1) משולש ABC  (2) ∠ABC = 90°  (3) AB = 4», no AI call.",
+      "before": "Sent to the AI."
+    },
+    {
+      "id": "T32",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "3d",
+      "path": "/3d.html",
+      "title": "Two givens after a comma continue to (4) (#2088, refusal)",
+      "lines": [
+        "משולש ABC ישר זווית ב-B, AB = 4, BC = 3"
+      ],
+      "expectRefusal": "(4) BC = 3",
+      "lookFor": "…«(3) AB = 4  (4) BC = 3».",
+      "before": "Sent to the AI."
+    },
+    {
+      "id": "T33",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "3d",
+      "path": "/3d.html",
+      "title": "Asking a basis vector by name gives its coordinates once (#2072)",
+      "lines": [
+        "פירמידה ABCDS שבסיסה ריבוע",
+        "המקצוע AS הוא גובה בפירמידה",
+        "אורך המקצוע AS שווה לאורך צלע הריבוע ABCD",
+        "SE = 3/4 SD",
+        "נסמן: AD = u, AB = v, AS = w",
+        "SN = k·SC",
+        "|EN| = (√6/4)·|w|",
+        "נתון: A(0,0,0), B(0,12,0)",
+        "הקודקוד D נמצא על החלק החיובי של ציר ה-x",
+        "S נמצא על החלק החיובי של ציר ה-z"
+      ],
+      "asks": [
+        "w"
+      ],
+      "lookFor": "The answer reads «w = (0, 0, 12)».",
+      "before": "«w = w = (0, 0, 12)»."
+    },
+    {
+      "id": "T34",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "3d",
+      "path": "/3d.html",
+      "title": "With no coordinates, a basis vector is honestly undetermined (#2072)",
+      "lines": [
+        "פירמידה ABCDS שבסיסה ריבוע",
+        "נסמן: AD = u, AB = v, AS = w"
+      ],
+      "asks": [
+        "u"
+      ],
+      "expect": [
+        "לא נקבע על ידי הנתונים"
+      ],
+      "lookFor": "«u — לא נקבע על ידי הנתונים».",
+      "before": "«u = u»."
+    },
+    {
+      "id": "T35",
+      "base": "http://localhost:5173",
+      "class": "look",
+      "product": "analytic",
+      "path": "/analytic.html",
+      "title": "Analytic: «AB ‖ CD» builds (#2069, cross-tool)",
+      "lines": [
+        "מרובע ABCD",
+        "AB ‖ CD"
+      ],
+      "lookFor": "Builds with AB ∥ CD.",
+      "before": "Refused."
+    },
+    {
+      "id": "T36",
+      "base": "http://localhost:5178",
+      "product": "2d",
+      "path": "/",
+      "class": "look",
+      "title": "Another drawing shows with no «השתנה» line (PR #2319)",
+      "lines": [
+        "משולש ABC"
+      ],
+      "cycles": 1,
+      "expectAbsent": [
+        "השתנה"
+      ],
+      "lookFor": "After «הציגו תצורה אחרת» the triangle redraws and no «השתנה: …» line appears.",
+      "before": "«השתנה: המיקום של A, המיקום של B, ועוד 1»."
+    },
+    {
+      "id": "T37",
+      "base": "http://localhost:5178",
+      "product": "2d",
+      "path": "/",
+      "class": "look",
+      "title": "Two unnamed circles redraw with no internal ids (PR #2319, settles #2314)",
+      "lines": [
+        "שני מעגלים"
+      ],
+      "cycles": 1,
+      "expectAbsent": [
+        "ctr-O",
+        "circle-O"
+      ],
+      "lookFor": "The circles redraw; neither «ctr-O@» nor «circle-O» appears anywhere.",
+      "before": "«השתנה: המיקום של ctr-O@, רדיוס circle-O, ועוד 2»."
+    },
+    {
+      "id": "T38",
+      "base": "http://localhost:5178",
+      "product": "2d",
+      "path": "/",
+      "class": "verified",
+      "title": "A shape with one configuration still says so (PR #2319, control)",
+      "lines": [
+        "ריבוע ABCD"
+      ],
+      "cycles": 1,
+      "expect": [
+        "אין תצורה אחרת"
+      ],
+      "lookFor": "«אין תצורה אחרת — הצורה נקבעה (רק הגודל/המיקום משתנים)».",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T39",
+      "base": "http://localhost:5179",
+      "product": "2d",
+      "path": "/",
+      "class": "play",
+      "title": "An angle named with a Latin letter builds and gets a suggestion (PR #2322)",
+      "lines": [
+        "משולש ABC",
+        "זוית B=b"
+      ],
+      "expectRefusal": "אותיות יווניות",
+      "lookFor": "Angle B labelled b, and «נקלט. לזוויות נהוג להשתמש באותיות יווניות — למשל «זוית B=β».».",
+      "before": "Built with no note."
+    },
+    {
+      "id": "T40",
+      "base": "http://localhost:5179",
+      "product": "2d",
+      "path": "/",
+      "class": "look",
+      "title": "The suggestion does not repeat for the same letter (PR #2322)",
+      "lines": [
+        "משולש ABC",
+        "זוית B=b",
+        "זוית C=b"
+      ],
+      "expectRefusal": "אותיות יווניות",
+      "lookFor": "The note shows once, on «זוית B=b»; the third line builds with no new note.",
+      "before": "No note on any line."
+    },
+    {
+      "id": "T41",
+      "base": "http://localhost:5179",
+      "product": "2d",
+      "path": "/",
+      "class": "verified",
+      "title": "A Greek letter gets no suggestion (PR #2322, control)",
+      "lines": [
+        "משולש ABC",
+        "זוית B=β"
+      ],
+      "expectAbsent": [
+        "אותיות יווניות"
+      ],
+      "lookFor": "Builds, no note.",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T42",
+      "base": "http://localhost:5180",
+      "product": "3d",
+      "path": "/3d.html",
+      "class": "play",
+      "title": "3-D: an altitude onto a point already on the side (PR #2324)",
+      "lines": [
+        "משולש ABC",
+        "D על BC",
+        "AD גובה לצלע BC"
+      ],
+      "lookFor": "Accepted; D at the foot of the perpendicular from A with a right-angle mark; A, B, C do not move.",
+      "before": "Refused «D כבר מוגדר בציור»."
+    },
+    {
+      "id": "T43",
+      "base": "http://localhost:5180",
+      "product": "3d",
+      "path": "/3d.html",
+      "class": "look",
+      "title": "3-D: the median is also the altitude (PR #2324)",
+      "lines": [
+        "משולש ABC",
+        "AD תיכון לצלע BC",
+        "AD גובה לצלע BC"
+      ],
+      "lookFor": "Both lines accepted; the triangle becomes isosceles with AD ⟂ BC. No right-angle mark is drawn at D in this order (the mark at a named foot is PR #2326’s job).",
+      "before": "The second line was refused «D כבר מוגדר בציור»."
+    },
+    {
+      "id": "T44",
+      "base": "http://localhost:5180",
+      "product": "3d",
+      "path": "/3d.html",
+      "class": "look",
+      "title": "3-D: a bisector after a median reads the triangle's angle and says so (PR #2324)",
+      "lines": [
+        "משולש ABC",
+        "AD תיכון לצלע BC",
+        "AD חוצה זווית A"
+      ],
+      "expect": [
+        "הזווית של המצולע"
+      ],
+      "lookFor": "Accepted, with «הובן כ-∠CAB — הזווית של המצולע בקודקוד הזה…».",
+      "before": "3-D asked which angle at A."
+    },
+    {
+      "id": "T45",
+      "base": "http://localhost:5180",
+      "product": "3d",
+      "path": "/3d.html",
+      "class": "look",
+      "title": "3-D: the one-line form is taught the two lines (PR #2324, refusal)",
+      "lines": [
+        "משולש ABC",
+        "AD תיכון לצלע BC שהוא גם גובה"
+      ],
+      "expectRefusal": "כתבו כל תפקיד בשורה נפרדת",
+      "lookFor": "«… כתבו כל תפקיד בשורה נפרדת: «AD תיכון לצלע BC», ואחר כך «AD גובה לצלע BC».»",
+      "before": "The parts list «(1) AD תיכון לצלע BC  (2) שהוא גם גובה»."
+    },
+    {
+      "id": "T46",
+      "base": "http://localhost:5180",
+      "product": "3d",
+      "path": "/3d.html",
+      "class": "verified",
+      "title": "3-D: a vertex of the triangle is still refused (PR #2324, refusal control)",
+      "lines": [
+        "משולש ABC",
+        "AB גובה לצלע BC"
+      ],
+      "expectRefusal": "כבר מוגדר",
+      "lookFor": "Refused «B כבר מוגדר בציור».",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T47",
+      "base": "http://localhost:5181",
+      "product": "2d",
+      "path": "/",
+      "class": "play",
+      "title": "A height to a named foot is marked at D, toward C (PR #2326)",
+      "lines": [
+        "משולש ABC",
+        "D על BC",
+        "AD ⟂ BC"
+      ],
+      "cycles": 1,
+      "lookFor": "One right-angle square at D between DA and DC, still on the DC side after «הציגו תצורה אחרת».",
+      "before": "No mark at D."
+    },
+    {
+      "id": "T48",
+      "base": "http://localhost:5181",
+      "product": "2d",
+      "path": "/",
+      "class": "look",
+      "title": "The side written the other way puts it toward B (PR #2326)",
+      "lines": [
+        "משולש ABC",
+        "D על BC",
+        "AD ⟂ CB"
+      ],
+      "lookFor": "One square at D between DA and DB.",
+      "before": "No mark."
+    },
+    {
+      "id": "T49",
+      "base": "http://localhost:5181",
+      "product": "2d",
+      "path": "/",
+      "class": "play",
+      "title": "A named crossing is marked in the corner COD (PR #2326)",
+      "lines": [
+        "ריבוע ABCD",
+        "O נקודת חיתוך האלכסונים",
+        "AC ⟂ BD"
+      ],
+      "lookFor": "One square at O between OC and OD, with the letter O moved clear of it.",
+      "before": "No mark at O."
+    },
+    {
+      "id": "T50",
+      "base": "http://localhost:5181",
+      "product": "3d",
+      "path": "/3d.html",
+      "class": "look",
+      "title": "3-D: the named crossing's mark moves to COD (PR #2326)",
+      "lines": [
+        "מעוין ABCD",
+        "O נקודת חיתוך האלכסונים",
+        "AC ⟂ BD"
+      ],
+      "lookFor": "One mark at O between OC and OD; the letter not on it.",
+      "before": "The mark sat in corner COB."
+    }
+  ]
+}
