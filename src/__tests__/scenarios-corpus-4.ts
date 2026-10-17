@@ -5107,6 +5107,29 @@ export const SCENARIOS_4: Scenario[] = [
       const stated = replay(factsOf(['מעגל O ברדיוס 5', 'מעגל P ברדיוס 5', 'OP = 10', 'המעגלים O ו-P משיקים']));
       expect(stated.labels.lengths.map((l) => `${l.a}${l.b}:${l.text}`), 'a stated OP still prints').toEqual(['OP:10']);
     },
+  },  {
+    id: 'typed-apex-base-height-pins-apex-1839',
+    title: '«משולש שווה שוקיים ABC» · «AD גובה לבסיס»: every configuration «הציגו תצורה אחרת» offers keeps A the apex and D the foot on the base BC (#1839, ADR-708)',
+    guards:
+      "#1839, answered by the record 2026-10-07 (FR-IN-13; charter P13 «a drawing that breaks a given is not one of the configurations»). Measured on b0e9dbea through decideDeterministic2D + searchAnotherView: the apex walked A → B → C, so after one press D was the foot on a LEG while the row still said «לבסיס». Root cause: ADR-596 keeps typed letters literal with no binding, and only the «הבסיס BC» spelling reached withRoleClaims' base equality, so nothing stated the role for a typed apex. Fix: one lowering (isoscelesRoleClaim) states the role about typed letters in every spelling — the base equality AB = AC here. Asserts A, B, C do not move when the line is added, and at the default view plus four presses A is the apex (AB = AC), D lies on BC with AD ⟂ BC, and every view is green. The class matrix (the median, the apex-angle bisector, English, a typed apex that is not the shown one, the legs, «AB = BC» → equilateral, the controls) is src/app/__tests__/issue-1839-typed-role-pins-apex.test.ts.",
+    steps: ['משולש שווה שוקיים ABC', 'AD גובה לבסיס'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const before = replay(factsOf(['משולש שווה שוקיים ABC']), 0);
+      const facts = factsOf(['משולש שווה שוקיים ABC', 'AD גובה לבסיס']);
+      const after = replay(facts, 0);
+      for (const id of ['A', 'B', 'C']) expect(dist(at(after, id), at(before, id)), `${id} does not move when the line is added`).toBeLessThan(1e-9);
+      const views = pressAll(facts, 4);
+      expect(views.length, 'the button still offers configurations').toBeGreaterThan(1);
+      for (const view of views) {
+        expect(Object.values(view.status).every((st) => st === 'ok'), 'every view is green').toBe(true);
+        const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => at(view, id));
+        expect(dist(A, B), 'A stays the apex').toBeCloseTo(dist(A, C), 6);
+        expect(dist(B, D) + dist(D, C), 'D on the base BC').toBeCloseTo(dist(B, C), 6);
+        expect((D.x - A.x) * (C.x - B.x) + (D.y - A.y) * (C.y - B.y), 'AD ⟂ BC').toBeCloseTo(0, 6);
+      }
+    },
   },
 ];
 

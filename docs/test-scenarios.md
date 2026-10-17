@@ -2016,3 +2016,7 @@ over all four (ADR-041).
 ### `tangency-distance-unlabelled-2262` — «שני מעגלים משיקים ברדיוס 5» prints no centre distance (#2262, ADR-693)
 
 **Guards against:** the tangency's own centre distance r₁ + r₂ printed as a measure label («10» at the touch point, centres hidden) — a number nobody stated (the operator's round #2245 T18 report). **Asserts** the operator's line builds green with two radius-5 circles touching and no length label, and that «מעגל O ברדיוס 5» · «מעגל P ברדיוס 5» · «OP = 10» · «המעגלים O ו-P משיקים» still prints 10 on OP. The matrix (the three-line form, the internal twin, «…בנקודה X», the circle-subject spelling, the values panel, the controls) is `src/app/__tests__/issue-2262-tangency-distance-label.test.ts`.
+
+### `typed-apex-base-height-pins-apex-1839` — a typed «AD גובה לבסיס» stays a height to the base in every configuration (#1839, ADR-708)
+
+**Guards against:** «משולש שווה שוקיים ABC» · «AD גובה לבסיס» letting «הציגו תצורה אחרת» move the apex to B and C, with D then the foot on a leg while the row still said «לבסיס» (answered by the record 2026-10-07: FR-IN-13, charter P13). **Asserts** A, B, C do not move when the line is added, and at the default view and four presses A is the apex, D lies on BC with AD ⟂ BC, every view green. The matrix (the median, the apex-angle bisector, English, «BD גובה לבסיס», the legs «BE גובה/תיכון לשוק AC», «AB = BC» → equilateral, the «…לבסיס BC» and unlettered controls) is `src/app/__tests__/issue-1839-typed-role-pins-apex.test.ts`.

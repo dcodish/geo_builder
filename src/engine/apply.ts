@@ -2021,6 +2021,11 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
     }
 
+    case 'set-side-role':
+      // #1839 (ADR-708): a pure REQUIREMENT record — `checkGivens` judges it against the apex variant in force,
+      // and `meetsRequirements` gates the configuration search on it. Nothing to drive, nothing to seat.
+      break;
+
     case 'set-polygon-convexity': {
       // #441 — a pure REQUIREMENT record (the ADR-244 shape): `checkGivens` re-derives the convexity
       // from the final coordinates and `meetsRequirements` gates sampling on a clean verifier, so

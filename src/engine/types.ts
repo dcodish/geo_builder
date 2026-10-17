@@ -1234,6 +1234,11 @@ export type Command =
   // stated; `checkGivens` enforces a stated one (figure.v.concavePolygon / convexPolygon), so sampling
   // and "show another configuration" can never flip it back.
   | { type: 'set-polygon-convexity'; ids: Id[]; convex: boolean }
+  // «BE גובה לשוק AC» (#1839, ADR-708): side a–b of the ISOSCELES triangle `ids` is a LEG. No single equality
+  // says it — the apex is one of its two ends and the words do not say which — so it is a REQUIREMENT record
+  // (ADR-244), never a constraint: `checkGivens` flags a configuration whose apex variant makes a–b the base
+  // (figure.v.legIsBase), and `meetsRequirements` keeps «הציגו תצורה אחרת» to the variants where it is a leg.
+  | { type: 'set-side-role'; role: 'leg'; a: Id; b: Id; ids: Id[] }
   // «CD חותך את AB» with NO crossing point named (issue #241, ADR-383): the two segments CROSS, stated as
   // a point-free REQUIREMENT — the ADR-166 within-both-segments meaning without minting a node (reading
   // (a): typing STATES the crossing; the ADR-380 forced-crossing dot then OFFERS the naming). The ADR-244

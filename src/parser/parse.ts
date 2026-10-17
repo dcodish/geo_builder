@@ -10345,14 +10345,32 @@ const roleSideLine: Rule = (s, ctx) => {
     else if (typed.length === 0) bindOpen = host;
     else return { clarify: 'ambiguous-hypotenuse' };
   }
+  // #1839 (ADR-708; FR-IN-13, charter P13 *"a drawing that breaks a given is not one of the configurations"*): ONE
+  // vertex of an isosceles triangle typed with an unlettered base / leg («AD גובה לבסיס», «BE גובה לשוק») names
+  // the cevian's apex, so it names the side too — the side opposite it — and the sentence is read as its letter
+  // form with the role claim about that side, exactly as «AD גובה לבסיס BC» / «BE גובה לשוק AC» states it
+  // ({@link isoscelesRoleClaim}). The typed letters stay literal (the #1810 ruling); the claim beside them is what
+  // keeps «הציגו תצורה אחרת» off the configurations in which the role is false.
+  let typedIso: { v: Id; side: [Id, Id]; ring: Id[]; at: Id } | null = null;
+  if ((role === 'base' || role === 'leg') && !afterNoun) {
+    const typedAll = statedLabelTokens(s);
+    const rings = new Map<string, (typeof cands)[number]>();
+    for (const r of cands) if (r.ring) rings.set([...r.ring].map(up).sort().join(), r);
+    const hits = [...rings.values()].flatMap((r) => {
+      const ring = r.ring!.map(up);
+      const typed = [...new Set(typedAll.filter((l) => ring.includes(l)))];
+      return typed.length === 1 && r.at ? [{ v: typed[0], side: ring.filter((x) => x !== typed[0]) as [Id, Id], ring, at: up(r.at!) }] : [];
+    });
+    if (hits.length === 1) typedIso = hits[0];
+  }
   const pick =
-    namedOpenSide || apexClaim ? null
+    namedOpenSide || apexClaim || typedIso ? null
     : bindOpen ?? selected ??
     (cands.length === 1 ? cands[0]
     : role === 'leg' && cands.length === 2 ? (cands.find((r) => !occupied(r.edge)) ?? cands[0])
     : null);
-  if (!pick && !namedOpenSide && !apexClaim) return { clarify: 'role-side-unresolved', role: noun };
-  const [p, q] = namedOpenSide ?? apexClaim?.side ?? pick!.edge;
+  if (!pick && !namedOpenSide && !apexClaim && !typedIso) return { clarify: 'role-side-unresolved', role: noun };
+  const [p, q] = namedOpenSide ?? apexClaim?.side ?? typedIso?.side ?? pick!.edge;
   const heb = /[א-ת]/.test(s);
   // a run restating the side right after the role noun («תיכון ליתר AB») folds into the rewrite;
   // any other letters stay untouched for the letter-form rules to read
@@ -10363,6 +10381,11 @@ const roleSideLine: Rule = (s, ctx) => {
   if (!r.ok) return null;
   // #2074 (ADR-659): the typed apex's claim, prepended as the role-claim post-pass prepends «היתר AB»'s
   if (apexClaim) return [{ type: 'set-angle', vertex: apexClaim.v, ray1: p, ray2: q, value: 90 }, ...r.commands];
+  if (typedIso) {
+    const claim = isoscelesRoleClaim(role as 'base' | 'leg', typedIso.ring, p, q, typedIso.at);
+    if (claim === 'leg-apex') return { clarify: 'role-claim', why: 'leg-apex', noun, a: p, b: q, other: typedIso.v };
+    return [claim, ...r.commands];
+  }
   // #1810 (ADR-596): the fact keeps the ROLE, not only the letters. The letters above are the resolution at
   // the configuration showing NOW; when the role hangs off an unstated choice (the isosceles apex, a re-seated
   // right angle), «show another configuration» moves it, and the replay fold re-resolves the binding
@@ -12531,7 +12554,48 @@ const refsId = (c: AnyCommand, x: Id): boolean =>
  * refusal, or `'unread'` when a noun has no lowering here (a tangent the winning rule read as a bare
  * segment) — the caller then lets a later rule try, never commits the drop.
  */
+/**
+ * #1839 ([ADR-708](docs/06-decisions.md#adr-708)) — the claim «<role> ab» states about isosceles triangle `ring`
+ * whose apex is `apex` in the configuration showing: a BASE is the equality that makes the opposite vertex the
+ * apex («הבסיס BC» → AB = AC, ADR-563, which pins the variant as a typed equality does, ADR-138); a LEG is the leg
+ * requirement when the apex is one of its ends (no single equality says "apex A or C", so it is checked, never
+ * driven), and `'leg-apex'` when it is not — the words do not say which end is the apex. One lowering for every
+ * spelling of a role stated about typed letters: `withRoleClaims` («לבסיס BC», «לשוק AC») and `roleSideLine`
+ * («AD גובה לבסיס», «BE גובה לשוק»).
+ */
+function isoscelesRoleClaim(role: 'base' | 'leg', ring: Id[], a: Id, b: Id, apex: Id | null): AnyCommand | 'leg-apex' {
+  const z = ring.find((v) => v !== a && v !== b)!;
+  if (role === 'base') return { type: 'set-equal', a: z, b: a, c: z, d: b };
+  return apex !== null && (apex === a || apex === b) ? { type: 'set-side-role', role: 'leg', a, b, ids: [...ring] } : 'leg-apex';
+}
+
+/** «זווית הראש» / "the apex angle" / "the vertex angle" — the angle at an isosceles triangle's apex (#1839). */
+const APEX_ANGLE_RX = /(?<![א-ת])(?:[וש])?(?:[לבכ]|מ(?=ה))?ה?זווית\s+הראש(?![א-ת])|\b(?:apex|vertex)\s+angle\b/i;
+
+/**
+ * #1839 ([ADR-708](docs/06-decisions.md#adr-708)) — «AD חוצה זווית הראש»: the sentence names the bisected angle's
+ * vertex AND says it is the apex. The bisector rule reads the vertex and the role word was dropped, so after
+ * «הציגו תצורה אחרת» the line bisected a base angle while the row still said «זווית הראש». The role is the base
+ * claim about the side opposite that vertex (the equality pinning it as the apex, {@link isoscelesRoleClaim}),
+ * stated only for a triangle the figure declares isosceles (`ctx.roleSides`, semantic — ADR-052).
+ */
+function withApexAngleClaim(commands: AnyCommand[], s: string, ctx: ParseContext): AnyCommand[] {
+  if (!APEX_ANGLE_RX.test(s)) return commands;
+  const isoRings = (ctx.roleSides ?? []).filter((r) => r.role === 'base' && r.ring).map((r) => r.ring!.map(up));
+  const extra: AnyCommand[] = [];
+  for (const c of commands) {
+    if (c.type !== 'bisector') continue;
+    const tri = [up(c.vertex), up(c.p), up(c.q)];
+    if (!isoRings.some((ring) => ring.length === 3 && tri.every((v) => ring.includes(v)))) continue;
+    const claim = isoscelesRoleClaim('base', tri, tri[1], tri[2], null) as AnyCommand;
+    const k = JSON.stringify(claim);
+    if (![...extra, ...commands].some((x) => JSON.stringify(x) === k)) extra.push(claim);
+  }
+  return extra.length ? [...extra, ...commands] : commands;
+}
+
 function withRoleClaims(commands: AnyCommand[], s: string, ctx: ParseContext): AnyCommand[] | Clarify | 'unread' {
+  commands = withApexAngleClaim(commands, s, ctx);
   const ops = roleOperands(s);
   if (!ops.length) return commands;
   const extra: AnyCommand[] = [];
@@ -12678,12 +12742,15 @@ function withRoleClaims(commands: AnyCommand[], s: string, ctx: ParseContext): A
     const h = relevant[0];
     if (h.ring.length === 3) {
       const z = h.ring.find((v) => v !== a && v !== b)!;
-      if (op.role === 'hypotenuse') add({ type: 'set-angle', vertex: z, ray1: a, ray2: b, value: 90 });
-      else if (op.role === 'base') add({ type: 'set-equal', a: z, b: a, c: z, d: b });
-      // A leg the figure's isosceles structure already makes one (its apex is an end of the pair) states
-      // nothing new — the #775/#805 reading of «גובה לשוק AC». Otherwise the apex is one of the two ends
-      // and the words do not say which: ask, teaching the equality that does.
-      else if (!(h.isoApex && (h.isoApex === a || h.isoApex === b))) return refuse(op, 'leg-apex', { other: z });
+      if (op.role === 'hypotenuse') { add({ type: 'set-angle', vertex: z, ray1: a, ray2: b, value: 90 }); continue; }
+      // A base: the equality pinning the opposite vertex as the apex. A leg the figure's isosceles structure
+      // already makes one (its apex is an end of the pair) is the #775/#805 reading of «גובה לשוק AC»; #1839
+      // (ADR-708): it is still a CLAIM — the leg requirement keeps «הציגו תצורה אחרת» off the variant whose
+      // base it is. Otherwise the apex is one of the two ends and the words do not say which: ask, teaching
+      // the equality that does.
+      const claim = isoscelesRoleClaim(op.role, h.ring, a, b, h.isoApex);
+      if (claim === 'leg-apex') return refuse(op, 'leg-apex', { other: z });
+      add(claim);
       continue;
     }
     // A trapezoid: the bases are the parallel pair. A base is parallel to its opposite side; a leg's two

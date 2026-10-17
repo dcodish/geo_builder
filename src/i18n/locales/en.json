@@ -261,6 +261,7 @@
     "offArcNotice": "{{point}} necessarily lies on the part of circle {{circle}} that is not drawn — the construction forces it there.",
     "degenerate": "{{object}} has collapsed onto a line — the givens force it: {{statements}}.",
     "v": {
+      "legIsBase": "{{pair}} is stated as a leg of triangle {{poly}}, but it is drawn as its base",
       "notADiagonal": "{{pair}} is drawn as a diagonal, but it is not a diagonal of any shape in the figure",
       "onCircle": "{{point}} should lie on circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
       "tangent": "tangency point {{point}} should lie on circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
