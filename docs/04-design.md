@@ -548,7 +548,7 @@ re-lettering each hidden token the sentence types to an unused letter as a `step
 `reletterHidden`. The student's letter is then an ordinary new letter: a reference («BO = 5») mints a free point,
 «מעגל O» declares a circle, «C על מעגל O» names an unnamed circle by use (ADR-347). Circles `autosInterchangeable`
 finds interchangeable (a crossing read as an unordered pair whose `branch` is seed, #1688; requirement records
-compared, ADR-567, #1709) are named in order; otherwise it asks.
+compared, ADR-567, #1709; an equality of two lengths — a `ratio` with k = 1 and no offset — read as an unordered pair, ADR-691, #2217) are named in order; otherwise it asks.
 
 `nameCentreFacts` absorbs a target letter nothing places (a bare `free-point`, no vertex, first used after the
 circle), exposed through `ctx.freePoints` to `parseNameCenter`, the `nameCenter` rule and `impliedCircleBinding`; a

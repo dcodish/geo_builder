@@ -275,7 +275,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2060': 'open', // #2024 (ADR-668): 3-D does not read a single-letter angle given a symbol («זוית B=b», «זוית B=α»)
 
   '#2140': 'open',
-  '#2190': 'open', // #2198 / #2216 (ADR-677) and #2149 (ADR-671): analytic does not read one «ברדיוס N» for a circle pair, nor the named two-circle sentences (centre segment, equal radii, touch point)
+  '#2190': 'open', // #2198 / #2216 (ADR-677), #2149 (ADR-671) and #2217 (ADR-691): analytic does not read one «ברדיוס N» for a circle pair, nor the named two-circle sentences (centre segment, equal radii, touch point), nor a fresh equal-radii pair
   '#2235': 'open', // #2205 (ADR-685): 3-D picks the first of two triangles for a definite «המשולש …» where 2-D asks
   '#2236': 'open', // #2205 (ADR-685): analytic does not read a definite unnamed shape noun with a predicate
 
@@ -1531,6 +1531,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'radius-restated-with-point-2119', family: 'circles', steps: ['מעגל O ברדיוס 3', 'A על מעגל O', 'מעגל O ברדיוס 4'], expect: 'refused', exception: 'X8', note: '2-D resized silently and committed green before ADR-683' },
   // ── #2242 (ADR-690): a size stated about «המעגל» sizes the drawn circle ──
   { id: 'definite-circle-area-2242', family: 'circles', steps: ['מעגל O', 'שטח המעגל הוא 9π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2244' }], note: '2-D drew a second circle P of radius 3 beside O, green, before ADR-690; analytic reads no circle area (not-handled)' },
+  // ── #2217 (ADR-691): a fresh pair stated with equal radii is named by use ──
+  { id: 'equal-pair-named-by-use-2217', family: 'circles', steps: ['שני מעגלים משיקים ברדיוסים שווים', 'רדיוס מעגל O הוא 5'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D refused input.unknownCircle before ADR-691; analytic does not read the equal-size pair sentence (not-handled)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
