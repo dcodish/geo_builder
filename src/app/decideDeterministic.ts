@@ -50,7 +50,7 @@ import {
 } from '@/parser';
 import { independentConstructs } from './independence';
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
-import { compoundNotHonoured, droppedClause } from './clauseCoverage';
+import { compoundNotHonoured, droppedClause, splitStatements } from './clauseCoverage';
 import { lostPartNote } from './unreadParts';
 import { lostRoleNote } from './unreadRoles';
 import { applyCommand, type AnyCommand, type Command, type Construction, type Id, type Vec } from '@/engine';
@@ -531,6 +531,16 @@ export async function decideFromParse(
   if (!r.ok && r.reason === 'incircle-not-drawn') {
     const shape = r.sides === 5 ? 'input.incircleShape5' : r.sides === 6 ? 'input.incircleShape6' : 'input.incircleShapeMany';
     return refuse('guided', { source: 'parser', result: `incircle-not-drawn:${r.sides}` }, { key: 'input.incircleKnownLimit', params: { shape: { t: shape } } });
+  }
+  /**
+   * #2263 ([ADR-702](../../docs/06-decisions.md#adr-702)): one radius stated for a NESTED pair — «שני מעגלים בעלי
+   * מרכז משותף O ברדיוס 5», «…מוכלים…», «…משיקים מבפנים…». Which circle has it the sentence does not say, and both
+   * cannot. Refused with FR-IN-4g's one-given-per-line message, the student's own parts numbered — never escalated:
+   * the model picked the outer circle in silence and passed every gate.
+   */
+  if (!r.ok && r.reason === 'nested-pair-radius') {
+    const note = splitStatements(r.parts);
+    return refuse('guided', { source: 'scope', result: 'scope:split-statements:nested-pair-radius' }, { key: note.messageKey, params: note.params });
   }
   // #1285: the same channel — the angle's stated vertex is not the bisector's own first letter.
   if (!r.ok && r.reason === 'bisector-wrong-apex') {

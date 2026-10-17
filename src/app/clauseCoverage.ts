@@ -118,7 +118,7 @@ function readClauses(utterance: string, ctx: ParseContext): ClauseRead[] | null 
 }
 
 /** The ONE shared compound-line message (operator ruling 2026-10-06), naming the student's own clauses. */
-function splitStatements(parts: string[]): ScopeMatch {
+export function splitStatements(parts: string[]): ScopeMatch {
   return {
     category: 'split-statements',
     messageKey: 'input.scope.split-statements',

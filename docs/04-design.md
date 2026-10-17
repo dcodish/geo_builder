@@ -741,8 +741,13 @@ exactly one such phrase governs the pair and it is not a named circle's own «מ
 creates is created PINNED at N (`freeRadius` dropped), a drawn one gets `set-radius N`. `withStatedRadius`'s consumers
 are `twoCirclesMeet` (all three branches), `twoCirclesPosition` (the disjoint pair only), `circlesTangent` (external
 only; its #757 leftover guard strips the phrase only then) and `commonTangent` (the two-touch construction). A pair
-that cannot be equal (contained, internally tangent, concentric) does not read it, so its number stays unread and the
-line escalates (ADR-678).
+that cannot be equal (contained, internally tangent, concentric) does not read it. Since [ADR-702](06-decisions.md#adr-702)
+(#2263) those rules ask the same reader through `nestedPairRadius` and return the owned `nested-pair-radius` refusal
+(parts: the pair, then the radius phrase, the student's own words); `decideDeterministic2D` shows it in FR-IN-4g's
+one-given-per-line frame (`input.scope.split-statements`) and the ✎ seam as `steps.editDropped` naming the phrase —
+never escalated, because the model picked a circle for the number in silence. The consumers: `concentricCircles`,
+`twoCirclesPosition` (the contained pair) and `circlesTangent` (internal; its #757 leftover guard now strips the phrase
+for either kind, so the internal refusal is reached only once the rest of the sentence is read).
 
 `withEqualRadii`'s consumers ([ADR-679](06-decisions.md#adr-679), #2186): `circlesTangent`, `twoCirclesPosition`,
 `twoCirclesBare` (ADR-455), and `twoCirclesMeet` (all three branches), `circleCircleIntersection`, `commonTangent` (every

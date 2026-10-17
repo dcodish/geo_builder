@@ -87,6 +87,10 @@ export type ParseResult =
   // #1891 (ADR-606): a circle inscribed in a polygon of `sides` ≥ 5 — 2-D draws no such incircle yet. Refused
   // with the W19 known-limit sentence, never escalated (the model could only drop the circle or misplace it).
   | { ok: false; reason: 'incircle-not-drawn'; sides: number }
+  // #2263 (ADR-702): ONE radius stated for a NESTED pair («שני מעגלים בעלי מרכז משותף O ברדיוס 5», «…מוכלים…», «…משיקים
+  // מבפנים…») — two nested circles cannot both have it, and which one has it the sentence does not say. Refused with
+  // FR-IN-4g's one-given-per-line frame; `parts` are the student's own words: the pair, then the radius phrase.
+  | { ok: false; reason: 'nested-pair-radius'; parts: [string, string] }
   | { ok: false; reason: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: string; shapes: string[]; side: string }
   // #1666 (ADR-561, ADR-W-107): a PROOF TARGET — «הוכיחו כי AB ⊥ AC», "prove that …" — is what the student
   // must SHOW, never a given. Every rule used to read the claim inside it and lower it as a constraint.
@@ -401,7 +405,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-definite-shape'; shapes: string[]; sides: number; example: string } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-definite-shape'; shapes: string[]; sides: number; example: string } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number } | { clarify: 'nested-pair-radius'; parts: [string, string] };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -5311,6 +5315,9 @@ const concentricCircles: Rule = (s, ctx) => {
     /\bconcentric\s+circles\b/i.test(s) ||
     (/\btwo\s+circles\b/i.test(s) && /common\s+cent(?:er|re)|same\s+cent(?:er|re)/i.test(s));
   if (!he && !heConcentric && !en) return null;
+  // #2263 (ADR-702): one radius for the pair — which circle has it? Refused, one given per line.
+  const nested = nestedPairRadius(s);
+  if (nested) return nested;
   // The centre letter: right after "משותף"/"קונצנטריים", or via the shared centre reader ("centered at O",
   // "common center O" — `cent\w*` covers it). Unnamed → auto-assigned and hidden until used (FR-RN-8).
   const m = s.match(/(?:משותף|קונצנטריים)\s+([A-Za-z]\d*)(?![A-Za-z])/);
@@ -8472,6 +8479,21 @@ const withStatedRadius = (s: string, cmds: AnyCommand[], id1: Id, id2: Id): AnyC
   for (const id of [id1, id2]) if (!made.has(id)) out.push({ type: 'set-radius', circle: id, value: r });
   return out;
 };
+/**
+ * #2263 ([ADR-702](../../docs/06-decisions.md#adr-702)) — the same reader asked by a NESTED pair: concentric
+ * (`concentricCircles`), contained (`twoCirclesPosition`) and internally tangent (`circlesTangent`). Two nested
+ * circles cannot both have the one stated radius, and which of them has it the sentence does not say — so the
+ * line is never built and never handed to the AI (which picked the outer circle in silence). It is refused with
+ * FR-IN-4g's one-given-per-line frame, the parts being the student's own words: the pair, then the radius phrase.
+ * Null when the sentence states no pair radius (`statedPairRadius` — a named circle's own size is not one).
+ */
+const nestedPairRadius = (s: string): { clarify: 'nested-pair-radius'; parts: [string, string] } | null => {
+  if (statedPairRadius(s) === null) return null;
+  const m = [...s.matchAll(STATED_PAIR_RADIUS)][0];
+  const tidy = (p: string) => p.replace(/\s+/g, ' ').trim().replace(/^[,.;:]+\s*|\s*[,.;:]+$/g, '').trim();
+  const pair = tidy(s.slice(0, m.index!) + ' ' + s.slice(m.index! + m[0].length));
+  return { clarify: 'nested-pair-radius', parts: [pair, tidy(m[0])] };
+};
 
 /**
  * #2149 ([ADR-671](../../docs/06-decisions.md#adr-671)) — the circles a sentence NAMES: the per-circle «מעגל X» /
@@ -8625,6 +8647,11 @@ const twoCirclesPosition: Rule = (s, ctx) => {
   const [c1, c2] =
     pair === 'introduce' ? ['O', freeLabel(['O', ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])] : pair.centres;
   if (up(c1) === up(c2)) return null;
+  // #2263 (ADR-702): one radius for a CONTAINED pair — which circle has it? Refused, one given per line.
+  if (relation === 'contained') {
+    const nested = nestedPairRadius(s);
+    if (nested) return nested;
+  }
   const id1 = circleId(c1), id2 = circleId(c2);
   const cmds: AnyCommand[] = [];
   if (!haveCircles.has(up(c1)))
@@ -8639,8 +8666,7 @@ const twoCirclesPosition: Rule = (s, ctx) => {
       ? { type: 'set-circle-position', relation, a: id1, b: id2 }
       : { type: 'set-circle-position', relation, a: isNamed ? id2 : id1, b: isNamed ? id1 : id2 },
   );
-  // #2198 / #2216: «שני מעגלים זרים ברדיוס 5» sizes both. A CONTAINED pair is never read so: two equal circles
-  // cannot nest (#2200's refusal, not landed), so its number stays unread and the line escalates.
+  // #2198 / #2216: «שני מעגלים זרים ברדיוס 5» sizes both. A CONTAINED pair stating one is refused above (#2263).
   return withEqualRadii(s, relation === 'disjoint' ? withStatedRadius(s, cmds, id1, id2) : cmds, id1, id2); // #761
 };
 
@@ -9194,9 +9220,10 @@ const circlesTangent: Rule = (s, ctx) => {
   // just the reported one — a stated radius, an area, a perpendicular, a further relation. Declining
   // is honest: the statement escalates instead of committing a figure that contradicts it.
   // #2198 / #2216: one radius stated for the pair is READ on external tangency, so it is vocabulary there only.
-  // Internal tangency of two equal circles is one circle (ADR-455 D2): never read, so it stays a leftover.
+  // Internal tangency of two equal circles is one circle (ADR-455 D2): never read — #2263 (ADR-702) refuses it below,
+  // one given per line, once the rest of the sentence is read (so the phrase is this rule's vocabulary either way).
   const internalWords = /\binternal\w*\b|\bfrom\s+inside\b|\binside\b|פנימ|מבפנים/i;
-  const readsRadius = !internalWords.test(s) && statedPairRadius(s) !== null;
+  const readsRadius = statedPairRadius(s) !== null;
   const tangentLeftover = s
     .replace(readsRadius ? STATED_PAIR_RADIUS : /,^/, ' ')
     .replace(EQUAL_SIZE_G, ' ') // #761: the rule READS this now, so it is its own vocabulary
@@ -9242,6 +9269,11 @@ const circlesTangent: Rule = (s, ctx) => {
   // internally tangent in the limit — so neither `verifyGivens` nor the radius-ratio check can see it,
   // and the figure draws degenerate under a green ✓ (measured: both radii 0.7, no error).
   if (internal && EQUAL_SIZE.test(s)) return 'stop';
+  // #2263 (ADR-702): one radius for an INTERNALLY tangent pair — which circle has it? Refused, one given per line.
+  if (internal) {
+    const nested = nestedPairRadius(s);
+    if (nested) return nested;
+  }
   // Touch point: a named "at M"/"בנקודה M", else AUTO-name it (the student drew "two tangent circles"
   // without naming the touch) — avoiding the centres and existing points. («מנקודה» is a FROM-marker,
   // deferred above — it is never in this alternation, #215.)
@@ -14356,6 +14388,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'arc-value-ambiguous') return { ok: false, reason: 'arc-value-ambiguous', value: res.value, a: res.a, b: res.b, center: res.center };
   if (res.clarify === 'inscribed-contradicts-noun') return { ok: false, reason: 'inscribed-contradicts-noun', shape: res.shape, forced: res.forced };
   if (res.clarify === 'incircle-not-drawn') return { ok: false, reason: 'incircle-not-drawn', sides: res.sides };
+  if (res.clarify === 'nested-pair-radius') return { ok: false, reason: 'nested-pair-radius', parts: res.parts };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 

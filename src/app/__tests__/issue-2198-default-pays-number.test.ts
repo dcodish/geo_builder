@@ -125,8 +125,8 @@ describe('#2198 — the operator ruling: one «ברדיוס N» on a two-circle 
 
 describe('#2198 — every other member of the class escalates exactly as its twin with another number does', () => {
   const ROWS: [string[], string, string][] = [
-    [[], 'שני מעגלים בעלי מרכז משותף O ברדיוס 5', 'שני מעגלים בעלי מרכז משותף O ברדיוס 4'],
-    [[], 'שני מעגלים מוכלים ברדיוס 5', 'שני מעגלים מוכלים ברדיוס 4'],
+    // #2263 (ADR-702): the nested pairs («בעלי מרכז משותף», «מוכלים», «משיקים מבפנים») + «ברדיוס N» are REFUSED now,
+    // one given per line, for every N — their matrix is issue-2263-nested-pair-radius.test.ts
     [[], 'שני מעגלים משיקים ברדיוסים שווים ל-5', 'שני מעגלים משיקים ברדיוסים שווים ל-4'],
     [[], 'שני מעגלים משיקים ברדיוסים שווים ל-1', 'שני מעגלים משיקים ברדיוסים שווים ל-2'], // k = 1, a structural constant
     [['מעגל O'], 'AB משיק למעגל O ואורכו 5', 'AB משיק למעגל O ואורכו 4'], // the ±5 line markers
@@ -172,10 +172,9 @@ describe('#2198 — controls: a number the reading reads is kept, at every seed'
     for (const seed of [0, 1, 2, 3]) expect(measure(facts, seed), `seed ${seed}`).toBeCloseTo(want, 4); // solver tolerance
   });
 
-  it('unchanged: respective radii, the bare pair, a drawn pair and internal tangency stay out of the reading', async () => {
+  it('unchanged: respective radii, the bare pair and a drawn pair stay out of the reading (internal tangency: #2263)', async () => {
     expect((await decide([], 'שני מעגלים נחתכים ברדיוסים 3 ו-5')).kind).toBe('escalate');
     expect((await decide([], 'שני מעגלים ברדיוס 5')).kind).toBe('escalate');
-    expect((await decide([], 'שני מעגלים משיקים מבפנים ברדיוס 5')).kind).toBe('escalate');
     expect((await decide(['מעגל O', 'מעגל P'], 'המעגלים O ו-P נחתכים ברדיוס 5')).kind).toBe('escalate');
   });
 });

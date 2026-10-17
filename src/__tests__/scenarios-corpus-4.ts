@@ -5108,6 +5108,22 @@ export const SCENARIOS_4: Scenario[] = [
       expect(stated.labels.lengths.map((l) => `${l.a}${l.b}:${l.text}`), 'a stated OP still prints').toEqual(['OP:10']);
     },
   },
+  {
+    id: 'concentric-pair-radius-refused-2263',
+    title: '«שני מעגלים בעלי מרכז משותף O ברדיוס 5» is refused, one given per line; the two-line form builds the outer circle at 10 (#2263, ADR-702)',
+    guards:
+      "#2263, the operator's report of 2026-10-16 (round #2245 T21): «should refuse since its not clear what circle gets radius 5 or both. reject asking to enter one line at a time». Measured at b0e9dbea through decideDeterministic2D: the concentric rule built the pair and left «ברדיוס 5» unread, the number gate escalated, and the live model gave 5 to the OUTER circle, committed green. Root cause: ADR-677 kept the nested pairs (concentric, contained, internally tangent) out of the one pair-radius reading because both circles cannot have it — and left the line to the AI instead of refusing it. Fix: every nested two-circle rule asks the one `statedPairRadius` reader and returns the owned `nested-pair-radius` refusal, shown in FR-IN-4g's one-given-per-line frame. Asserts the operator's line is refused with its two parts, and the operator's two-line form builds the pair with the outer radius 10. The matrix (every nested spelling, the English twins, the model never asked, the ✎ seam) is src/app/__tests__/issue-2263-nested-pair-radius.test.ts.",
+    steps: ['שני מעגלים בעלי מרכז משותף O ברדיוס 5', 'שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל חיצוני הוא 10'],
+    refusedSteps: [
+      { step: 1, reason: 'nested-pair-radius', with: { parts: ['שני מעגלים בעלי מרכז משותף O', 'ברדיוס 5'] }, why: 'ADR-702 (#2263): which of two concentric circles has radius 5 the line does not say — the operator ruled a one-given-per-line refusal' },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.circles.size, 'one pair, from the two-line form').toBe(2);
+      expect(fig.circles.get('circle-O')!.r, 'the outer circle has the stated 10').toBeCloseTo(10, 6);
+      expect(fig.circles.get('circle-O-2')!.r, 'the inner circle is inside it').toBeLessThan(10);
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */
