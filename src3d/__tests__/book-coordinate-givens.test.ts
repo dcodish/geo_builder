@@ -113,6 +113,7 @@ describe('#325 — parse: affine symbolic components', () => {
         type: 'point3', id: 'B', x: null, y: null, z: null,
         syms: ['t', 't', 'k'],
         symExprs: [{ terms: [{ sym: 't', k: 2 }], c: 0 }, { terms: [{ sym: 't', k: 1 }], c: 0 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }],
+        srcs: ['2t', 't', 'k'], // #2077 (ADR-3D-368): the typed text, display only
       }],
     });
   });
