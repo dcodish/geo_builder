@@ -39,6 +39,7 @@ import {
   statedLabelTokens,
   lowercaseLabelFold,
   lowercaseMeasureLetters,
+  latinAngleLetters,
   upperCasedLabelCandidate,
   hebrewLabelCandidate,
   parse,
@@ -107,7 +108,15 @@ export interface DecideState {
 /** A note for the input line: an i18n key + params, or a raw engine error the display layer humanizes. */
 export type DecideNote =
   /** a param may itself be a translated word, carried as `{ t: key }` for the caller to resolve */
-  | { readonly key: string; readonly params?: Record<string, unknown> }
+  | {
+      readonly key: string;
+      readonly params?: Record<string, unknown>;
+      /**
+       * #2173 ([ADR-726](../../docs/06-decisions.md#adr-726)): a second teaching note on the SAME successful step,
+       * shown after this one — a step can carry two independent tips (the operator's "both tips", 2026-10-16).
+       */
+      readonly also?: DecideNote;
+    }
   | { readonly explain: string };
 
 /** A log event the caller emits, in order — `kind`, `utterance` and `locale` are the caller's to add. */
@@ -849,7 +858,7 @@ export async function decideFromParse(
           const lm = lowercaseMeasureLetters(r.commands);
           if (lm.length) note = { key: 'input.measureCaseNote', params: { letter: lm.join(', ') } };
         }
-        return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: commitLogs, note };
+        return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: commitLogs, note: withGreekAngleTip(note, r.commands, facts) };
       }
       // A cleanly-parsed CONSTRAINT that errored only because it can't be satisfied AT THIS POSITION (an
       // under-determined coupled solve before its pinning givens arrive — e.g. "CE⟂AB" before "CD=36,
@@ -861,7 +870,7 @@ export async function decideFromParse(
       // configurations — must take the honest-refusal route below, never park as «waiting for givens».
       if (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands, seed, { seatsExhausted: outcome.seatsExhausted })) {
         return {
-          kind: 'commit', deferred: true, binds, commands: r.commands, note: readAsNote(r.angleReadings),
+          kind: 'commit', deferred: true, binds, commands: r.commands, note: withGreekAngleTip(readAsNote(r.angleReadings), r.commands, facts),
           logs: [...logs, { source: 'parser', result: 'deferred-constraint', detail: outcome.detail, commands: r.commands }],
         };
       }
@@ -1106,6 +1115,25 @@ export function missingOperandLetters(prev: Construction, commands: readonly Any
  */
 function readAsNote(readings: readonly string[] | undefined): DecideNote | null {
   return readings?.length ? { key: 'input.vertexAngleReadAs', params: { angles: readings.map((a) => `∠${a}`).join(', ') } } : null;
+}
+
+/**
+ * #2173 ([ADR-726](../../docs/06-decisions.md#adr-726), operator ruling 2026-10-15) — ADR-428's teach on acceptance
+ * for an angle named with a LATIN letter («זוית B=b», «∠ABC = 2x + 40»): the step commits with the student's
+ * letter, and carries «נקלט. לזוויות נהוג להשתמש באותיות יווניות — למשל «זוית B=β».». It rides BESIDE whatever
+ * note the step already has (`also`), never in place of it, so no other tip is lost and this one is never
+ * suppressed. Once per letter: a letter that already named an angle in the figure gets no second note.
+ */
+function withGreekAngleTip(note: DecideNote | null, commands: readonly AnyCommand[], facts: readonly Fact[]): DecideNote | null {
+  if (!latinAngleLetters(commands, facts.map((f) => f.cmd)).length) return note;
+  return appendNote(note, { key: 'input.greekAngleLetter' });
+}
+
+/** `tip` shown after `note` on the same step (the end of its `also` chain); a raw engine error carries none. */
+export function appendNote(note: DecideNote | null, tip: DecideNote): DecideNote {
+  if (!note) return tip;
+  if ('explain' in note) return note;
+  return { ...note, also: note.also ? appendNote(note.also, tip) : tip };
 }
 
 /** The whole pre-LLM lane in one call — for a caller with no spinner to paint (log-triage, #1358). */

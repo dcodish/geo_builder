@@ -137,6 +137,7 @@
     "tangentsExhaustedIntTangent": "The single common tangent is already drawn — internally tangent circles have exactly one, at the touch point.",
     "measureCaseNote": "The letter {{letter}} was read as a measure symbol (a radius) — lowercase letters are for measures; point labels are uppercase.",
     "canonicalHint": "Got it. Next time you can write: {{canonical}} — that form always works.",
+    "greekAngleLetter": "Got it. Angles are usually named with Greek letters — for example «angle B = β».",
     "vertexAngleReadAs": "Read as {{angles}} — the polygon's angle at that vertex. For another angle there, write its three letters.",
     "polygonNotSupported": "The polygon \"{{noun}}\" is not supported. Supported: {{offer}} — add \"regular\" for a regular one (e.g. \"regular pentagon\").",
     "incompleteComparative": "{{factor}} times WHAT? Name the segment it is compared to — e.g. \"{{subject}} is {{factor}} times AB\".",
