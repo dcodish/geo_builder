@@ -1,0 +1,74 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "y03uXyt1LfQPivBCbIyJk",
+      "utterance": "משולש שווה שוקיים ABC",
+      "cmd": {
+        "type": "shape-variant",
+        "shape": "isosceles",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ],
+        "variant": 1
+      },
+      "enabled": true
+    },
+    {
+      "id": "_hCj6hIGs3s0eZWYbep_9",
+      "utterance": "מעגל O ברדיוס 3",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 3
+      },
+      "enabled": true
+    },
+    {
+      "id": "lGJyXvU0w7CkT71boQ7yc",
+      "utterance": "מעגל P ברדיוס 2",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 2,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "BxQCOfQ_Oz4hW0OW6kbt4",
+      "utterance": "המעגלים O ו-P נחתכים בנקודות X ו-Y",
+      "group": "YJBjBFTxdCC_cfJyBdLdP",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "X",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "branch": 1
+      },
+      "enabled": true
+    },
+    {
+      "id": "LubGE4UuwzCW98CV2zbBt",
+      "utterance": "המעגלים O ו-P נחתכים בנקודות X ו-Y",
+      "group": "YJBjBFTxdCC_cfJyBdLdP",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "Y",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "branch": 1,
+        "avoid": "X"
+      },
+      "enabled": true
+    }
+  ]
+}
