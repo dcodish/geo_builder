@@ -97,6 +97,8 @@ describe('#2061 (2-D arm) — the same letter with another coefficient contradic
     [['משולש ABC', '∠ABC=2α', '∠ACB=2α'], '∠ABC=3α', contradicts('∠ABC=3α', '∠ABC=2α', '∠ABC = 3α')], // a line between
     [['משולש ABC', 'AB = 2a'], 'AB = 3a', contradicts('AB = 3a', 'AB = 2a', '|AB| = 3a')], // the length twin
     [['משולש ABC', 'AB = 2a'], 'BA = 3a', contradicts('BA = 3a', 'AB = 2a', '|BA| = 3a')],
+    [['משולש ABC', 'AB=2a'], 'AB=3a', contradicts('AB=3a', 'AB=2a', '|AB| = 3a')], // #2105: the operator's exact sequence (ADR-AG-295)
+    [['משולש ABC', 'AB=2a'], 'BA=3a', contradicts('BA=3a', 'AB=2a', '|BA| = 3a')], // #2105: was a self-ratio refusal naming «נתון קודם»
   ])('%j then «%s» → refused, naming the first line', async (prefix, line, sentence) => {
     const { v, said } = await decide(prefix as string[], line as string);
     expect(v.kind).toBe('refuse');

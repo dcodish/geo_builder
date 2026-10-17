@@ -12246,6 +12246,8 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 
 **Behaviour change for a student:** «זוית ABC=β» after «זוית B=α» is refused «לזווית ABC כבר יש שם: α (בשורה «זוית B=α»). לכל זווית שם אחד — המשיכו עם α.», and «AB=c» after «AB=a» «לקטע AB כבר יש שם: a (בשורה «AB=a»). לכל קטע שם אחד — המשיכו עם a.» — before, both letters were recorded. «∠ABC=3α» after «∠ABC=2α» is refused «לא ניתן: «∠ABC=3α» סותר את «∠ABC=2α» — אי אפשר לקיים את שניהם יחד. הסיבה: ∠ABC = 3α.» — before, the flat-triangle sentence, «לא נמצאה תצורה», or silence. A saved list holding both lines opens with the second refused.
 
+> **Amendment (2026-10-17) — the numeric twins and the constant member, built (#2105):** [ADR-AG-295](#adr-ag-295). Two different numbers on one target, and the same letter with another constant («∠ABC = α» · «∠ABC = α + 40»), are `measure-contradicts` too; the letter reader is affine (`affineIn`). «∠ABC=2α» · «∠ABC=3α+10» (both changed) stays with the solve.
+
 ## ADR-AG-276 — Analytic says when the givens forced a narrower kind, in the shared sentence family, once its configuration pool completes (#1996, #1899)
 
 **Status:** accepted · 2026-10-15 · feature (P2, analytic) · round #2128 · PR `feat/1996-narrowing-note` · the analytic half of [ADR-W-129](06w-decisions-workspace.md#adr-w-129) (rulings quoted there; analytic follows 2-D under B1, #1899's 2026-10-08 ruling).
@@ -12462,3 +12464,29 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Behaviour change for a student:** on a parabola or an ellipse, asking for a third crossing of a chord through two points on the curve, or a crossing of a line tangent at a named point, is refused with the circle's sentence and the curve's noun — before, E was drawn on top of A or C, green (or, for the coordinate chord, the two-lines sentence). On a circle, a crossing of AP with P free on a fixed tangent is now refused too.
 
 **Consequences.** `engine/derive.ts` (the two gates, the touch-first reading, the line's freedom), `engine/crossing-order.ts` (`lineQuadratic`, `conicTouchOf`, `straightWalkOf`, `conicSize` exported), `engine/evaluate.ts` (`Figure.freedomOfRead`), `engine/apply.ts` (`maxCrossings` exported), `app/submit.ts`, `app/errorText.ts`, `store/useAnalyticStore.ts`, `i18n/index.ts`; docs 02c R60, 04c.
+
+## ADR-AG-295 — A second, different number for one segment or angle, and the same letter with another constant, are refused naming the first line, in 2-D's frame (#2105)
+
+**Status:** accepted · 2026-10-17 · bug (P2, 2d+analytic) · fix round #2291, stream C · branch `fix/2105-length-restated-letter` from `main` @ `b0e9dbea` · LADDER stage: none (analytic M1 apply)
+**Requirements:** [02c](02c-requirements-analytic.md) R98a (the number and constant members) · **Design:** [04c](04c-design-analytic.md) § "Its dual: one angle or segment, two letters" (the two new members) · **Widens** [ADR-AG-277](#adr-ag-277) · **Sibling:** [ADR-661](06-decisions.md#adr-661) / [ADR-662](06-decisions.md#adr-662) (2-D, the reference)
+
+**The ruling.** 2026-10-15 (#2105, decisions ballot card 4, option A): a second, different size for the same thing is refused as a contradiction, everywhere, in 2-D's wording — *"The same verdict 2-D already gives «AB = 4» · «AB = 5»"*; item 2: analytic's numeric-contradiction sentence takes 2-D's frame «לא ניתן: «…» סותר את «…» — אי אפשר לקיים את שניהם יחד. הסיבה: …» (ADR-W-118 B1).
+
+**Re-measured at pickup** (`b0e9dbea`; 2-D `decideDeterministic2D` + `humanizeError`, analytic `decideSubmit` + `errorText`, seed 0). **Item 1 was already delivered:** «משולש ABC» · «AB=2a» · «AB=3a» (and «BA=3a») is refused in both builders in 2-D's frame naming «AB=2a» (ADR-661 / ADR-AG-277, round #2128) — the plan's provenance gap was closed there by the fact list, with no `statedSizeOwner`. **Item 2 remained:** analytic answered «לא נמצאה תצורה שבה מתקיים: "AB=5"» for «AB=4» · «AB=5» (and «BA=4» · «AB=5», «AB=√2» · «AB=1.5»), for «∠ABC=40» · «∠ABC=50» / «∠CBA=50» / «זווית B=40» · «זווית ABC=50», and for the same letter with another constant («∠ABC = α» · «∠ABC = α + 40», «AB=a» · «AB=a+3», «AB=a+3» · «AB=a+5» — the parity row `angle-same-letter-other-constant-1851` named this wording as #2105's); 2-D refuses every one in the frame.
+
+**The class.** *A second stated value for a segment or an angle whose stated value it cannot equal was judged only by the solve, which can say «no configuration» but never which line it fights.* Root cause: `measureRestatement` (`engine/statedMeasures.ts`) returned null as soon as the new value held no letter ("a number: a pin, the residual judges it"), and compared letters only as `k·s`, so a constant was outside its reading.
+
+**Decision (the same predicate, two members).**
+1. **Two numbers** (`value-conflict`): when the new value carries no symbol, every earlier stated value on the same target (vertex + unordered rays; unordered pair) that is also a number is compared; a difference beyond a relative 10⁻⁹ is `measure-contradicts` against that constraint. Equal numbers in another spelling stay with the absorb (`already-known` / `already-follows`).
+2. **The same letter, another constant**: the letter reader is now `affineIn` — `k·s + c` read by evaluating the value at s = 0…3 (any spelling of an affine value, «α + 40», «40 + α», «2(a+1)»), replacing the tree-shape `linearIn`. 2-D's rule (ADR-661/662): the same letter with exactly one of k, c changed is a contradiction; both changed is an equation that fixes the letter (the solve judges it, «AB=2a» · «AB=a+3» still records).
+3. **The reason clause** is one `reasonText`, 2-D's: «|AB| = 5», «∠ABC = 50°» (a numeric angle carries the degree sign, a letter does not — «∠ABC = 3α»), in the refused line's own letter order.
+
+**Measured after.** Every row above is refused byte for byte as 2-D says it, He and En. Unchanged: the same value twice, «AB=4» · «AB=4.0», «AB=a+3» · «AB=3+a», a number after a letter («AB=2a» · «AB=6»), «AB=2a» · «AB=a+3». **One analytic-only difference, recorded:** «ריבוע ABCD שצלעו 4» · «AB=5» now names the noun's line («סותר את «ריבוע ABCD שצלעו 4»»), where 2-D cannot attribute it and says «סותר נתון קודם»; the frame is the ruled one and the other side is the true line, so it is left, flagged to the operator.
+
+**Not in this class (left to the solve, found work):** a stated right angle lowers to a perpendicular relation, not an `angle` value, so «∠ABC=90» / «זווית ABC ישרה» / «AB⊥BC» against «∠ABC=60» (either order) still say «לא נמצאה תצורה» while 2-D uses the frame (its reason clause depends on the spelling: «∠ABC = 90°» vs «AB ⟂ BC»); a trig value against an angle («tan∠ABC=2» after «∠ABC=40»); a value reached through an equality («AB=AC» · «AB=4» · «AC=5»). Filed as #2293.
+
+**Sibling audit.** 2-D: the reference, unchanged (ADR-661/662). 3-D: «AB = 4» · «AB = 5» is `givens-contradict`; «2a» is read as a vector (#2253). Complex: no segments or angles.
+
+**Locks.** `src-analytic/__tests__/issue-2105-numeric-contradiction.test.ts` (every refused row, He and En, the operator's exact «AB=2a» · «AB=3a», the controls). 2-D: the operator's exact unspaced sequence joins `src/app/__tests__/issue-2023-second-symbol.test.ts`. Parity rows `length-numbers-twin-2105`, `angle-numbers-twin-2105` (refused in all three); the letter twin is not a parity row because 3-D refuses its context line (#2253).
+
+**Behaviour change for a student:** in analytic, «AB=5» after «AB=4» is refused «לא ניתן: «AB=5» סותר את «AB=4» — אי אפשר לקיים את שניהם יחד. הסיבה: |AB| = 5.», «∠ABC=50» after «∠ABC=40» «… הסיבה: ∠ABC = 50°.», and «∠ABC = α + 40» after «∠ABC = α» in the same frame — before, «לא נמצאה תצורה שבה מתקיים: …».

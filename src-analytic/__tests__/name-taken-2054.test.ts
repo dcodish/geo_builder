@@ -95,8 +95,9 @@ describe('unchanged', () => {
     expect(last(lines as string[]).kind).toBe(kind);
   });
 
-  it('the numeric twin and «3α+10» are judged by the solve, as before', () => {
-    expect(said(['משולש ABC', 'זוית B=40', 'זוית ABC=50'])).toMatch(/^לא נמצאה תצורה/);
+  it('«3α+10» (coefficient AND constant changed) is judged by the solve, as before; the numeric twin is #2105', () => {
+    // #2105 (ADR-AG-295): two different numbers now contradict the first line in 2-D's frame (was «לא נמצאה תצורה»)
+    expect(said(['משולש ABC', 'זוית B=40', 'זוית ABC=50'])).toBe(contradicts('זוית ABC=50', 'זוית B=40', '∠ABC = 50°'));
     expect(said(['משולש ABC', '∠ABC=2α', '∠ABC=3α+10'])).toMatch(/^לא נמצאה תצורה/);
   });
 });
