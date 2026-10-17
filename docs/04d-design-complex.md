@@ -161,6 +161,14 @@ never as a contradiction or a refutation.
   (the polar view stays bare, FR-KN-1). With no parameter left the number is closed and reads exactly as
   the literal would, in both views. `DerivedPoint.defined` tells the panel rows the reading has
   something to say. That is the PANEL's reading.
+- **A DETERMINED number with no exact form reads ≈ decimals** (stage 5d, `determinedReadings` in
+  `replay/derive2.ts`; [ADR-CX-080](06d-decisions-complex.md#adr-cx-080)). After the exact carriers and a
+  closed definition, a number defined by no parameter (`definitionOf` null) is asked through the ask
+  lane's own predicate (`judge` → `knowledgeOf` over every configuration's value of the number); known →
+  «z₁ ≈ 14.51+6.51i» / «z₁ ≈ 15.91·cis24.15°» through the same `readingOf` / `readingCartOf` composers
+  (`exactParts: null`, so an integer pair keeps `=` and anything else `≈`), with `defined: 'determined'`
+  for the panel rows. Not known → the bare name, unchanged. A parameter-free typed number's canvas label
+  is its reading (ADR-CX-065), so the canvas shows the same text.
 - **The canvas prints its own label** (`DerivedPoint.canvas` / `canvasCart`, stage 5d;
   [ADR-CX-065](06d-decisions-complex.md#adr-cx-065)). `statedAs` (`model/cartesianForm.ts`) reads how
   the student stated each number off the constraint shapes the lines themselves wrote (`FoldInput.stated`,

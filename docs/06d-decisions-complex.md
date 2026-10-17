@@ -4227,7 +4227,7 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Behaviour change for a student** (every line `[ruled]` in the #2134 plan; two are ruled by inference, flagged at arming):
 - «z1 = 15cis(π/7)» reads «z₁ = 15·cis180/7°» with |z1| = 15, its cartesian form «≈» decimals; the same for every modulus and every non-table angle («15cis20» → «= 15·cis20°»).
 - «|z1| = 15» and «z2 = 3z1» are accepted where they are true.
-- «z1 = 15cis(π/7) + 1» no longer shows a fraction under `=`. It reads exactly as its twin «z1 = 5cis(π/7) + 1» does: the bare name, since a numeric-tier sum carries no known value. (The plan said "≈ decimals"; the twin it cites shows the bare name. Recorded as a deviation.)
+- «z1 = 15cis(π/7) + 1» no longer shows a fraction under `=`. It reads exactly as its twin «z1 = 5cis(π/7) + 1» does: the bare name, since a numeric-tier sum carries no known value. (The plan said "≈ decimals"; the twin it cites shows the bare name. Recorded as a deviation.) **⚠ Amended by [ADR-CX-080](#adr-cx-080) (2026-10-17):** the deviation was wrong — the operator's 2026-09-27 ruling (#1436/#1460) already said exact form when exact, otherwise ≈ decimal; both now read «≈ …».
 
 **Siblings.** 2-D, analytic, 3-D and `shell/` have no float-to-rational read-back (grep for `fromNumber` / continued fractions / `maxDen`). In complex, `value.ts` `fromCartesian`'s 1e-12 angle snap and `polySet.lift`'s `exactModulus` have the same shape; proposed, not changed.
 
@@ -4279,3 +4279,31 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Siblings.** 2-D, 3-D and analytic already refuse (ADR-602, ADR-3D-310, ADR-AG-247); ADR-W-115's Adoptions line now names complex, which keeps its existing refusal sentence rather than ADR-W-115 §2's wording (found work, for the operator). Complex is not in `geo-input-parity`.
 
 **Locks.** `src-complex/__tests__/flat-polygon-2212.test.ts`: the report's exact error object; five spellings; eleven sizes, angles, coincident and polygon-arity rows; the forced-flat rows; both entry orders naming the polygon; the triangle and its circle get one verdict (six flat rows and two drawn controls); scale ×1/×10/×100; the drawn controls (the thin triangle, three-of-four quadrilateral, «1+i / 2», a bound letter, «z^3 = 8», «1 / i», free «משולש ABC» and «A = 0 · B = 4 · משולש ABC» at 24/24 seeds); a saved file holding the flat triangle (and its circle twin) loads without it and lists it in the load audit; `flatPoints` unit cases. Fixture `fixtures/triangle-not-flat-2212.complex.json` (the thin triangle and its circle, `unsatisfied: []`). The plan's segment control («הקטע z1z2» over 1 and 2) is not lockable: that line always reads as a length question (the #789 ask lane), so no segment is drawn either way; filed as found work.
+
+## ADR-CX-080 — A determined number with no exact form reads «≈ …», never its bare name (#2269)
+
+**Status:** accepted, 2026-10-17 · **Issue:** [#2269](https://github.com/dcodish/geo_builder/issues/2269) (bug, `P2`, `complex`) · fix round #2283 · operator report 2026-10-16 (round #2245 T87: *"way isnt the real and imaginary numbner shown ? it just says z1 and the data panel also doesnt give the full number"*) under the operator ruling of 2026-09-27 (#1436/#1460: *an answer recognised exact prints in exact form alone; otherwise ≈ decimal*) · **amends** [ADR-CX-071](#adr-cx-071)'s recorded deviation
+**Requirements:** [02d](02d-requirements-complex.md) FR-GP-7 (new: a number the givens determine always shows its value) ·
+**Design:** [04d](04d-design-complex.md), "A DETERMINED number with no exact form reads ≈ decimals" ·
+**Ladder:** stage 5d, the readings ([LADDER-CX](LADDER-CX.md))
+
+**Measured at pickup** (`main` @ `4b0b4592`, `submitLine` + `deriveLines`). «z1 = 15cis(π/7) + 1» was drawn at 14.51+6.51i and every surface read the bare «z₁»: `reading`, `readingCart`, `canvas`, `canvasCart`, and no panel row in either view. The same for «z1 = 5cis(π/7) + 1», «z1 = cis20 + 2» and «z1 = 2cis(π/9) - i». The asks «|z1|» and «Re(z1)» on the same figure answered «≈ 15.91» and «≈ 14.51»: the tool knew the value and printed it only when asked.
+
+**The class.** *A complex number the givens determine completely, but that has no exact form (a non-table angle plus a rational), is shown as its bare name instead of its ≈ value*, in every spelling whose value leaves the Gaussian rationals and the exact carriers.
+
+**Root cause.** Stage 5d (`replay/derive2.ts`) composed a value reading only from the EXACT carriers (`modulusKnown && argumentKnown`) or from a definition that closes to a Gaussian rational (`closedParts`, ADR-CX-058). A numeric-tier sum is neither, so `shownPoints` returned the point with its bare-name reading, and `v2Labels` filtered it out. The ≈ path existed for the ask lane (`verdict.known` → decimal) but not for a point's own reading.
+
+**Decision.**
+1. **One more branch at the same chokepoint, `determinedReadings`.** After the exact and closed branches, a number with no parameter definition (`definitionOf` null) whose carriers do not know both halves is asked through the ask lane's own predicate — `judge(false, env => env.at(name))`, i.e. `knowledgeOf` over every configuration — never "the sample has a value". Known → both readings through the existing composers (`readingOf` with both halves known and no exact label → «z₁ ≈ 15.91·cis24.15°»; `readingCartOf` with `exactParts: null` → «z₁ ≈ 14.51+6.51i», keeping its #1404 integer `=`), and `DerivedPoint.defined = 'determined'`.
+2. **`v2Labels` prints a `determined` number in both views.** No new formatter, no new string.
+3. **The canvas needs no change:** a parameter-free typed number's canvas label is its reading (ADR-CX-065), so it shows the same ≈ text; a COMPUTED number («z1 = 2z2» → z₂) keeps its bare name on the canvas and reads ≈ in the panel.
+4. **Nothing else.** A number not determined keeps the bare name (the no-guess ruling, 2026-08-18). The predicate is figure-wide, exactly as the asks are: «z1 = 15cis(π/7) + 1» beside a free «w = a + i» keeps its bare name, as «|z1|» there answers «free-dof-remain» — the panel and the ask lane cannot disagree. A number defined by parameters (ADR-CX-058's symbolic reading, e.g. «z1 = a + i · a = √3») is unchanged.
+
+**Behaviour change for a student** (every line `[asked]`/`[ruled]` in the #2269 plan):
+- «z1 = 15cis(π/7) + 1» reads «z₁ ≈ 14.51+6.51i» (polar view «z₁ ≈ 15.91·cis24.15°») in the panel and on the canvas.
+- The twin «z1 = 5cis(π/7) + 1», and every determined non-exact number («cis20 + 2», «2cis(π/9) − i»), read the same way; a number computed from one reads ≈ in the panel.
+- Unchanged: the exact literal «z1 = 15cis(π/7)» («z₁ = 15·cis180/7°»), Gaussian-rational literals, and every number with freedom left.
+
+**Siblings.** None: the reading composition is complex's stage 5d. 2-D, analytic and 3-D print a determined value through their own measured-value lanes.
+
+**Locks.** `src-complex/__tests__/approx-reading-2269.test.ts`: the report in both views, panel and canvas, at six seeds; the class (the twin, `cis20 + 2`, `2cis(π/9) − i`); a computed number (panel ≈, canvas bare); no `/` in any reading (the #2134 lock); the controls (a free parameter bare with no row; the exact literal; `3+4i`); and the one-predicate property — the panel prints z₁ exactly when «|z1|» answers, over four figures. `literal-exact-2134.test.ts`'s twin assertion now asserts the ≈ readings. Fixture `fixtures/approx-reading-2269.complex.json` (the operator's exact line).
