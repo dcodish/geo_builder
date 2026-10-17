@@ -677,6 +677,10 @@ export interface DistanceConstraint {
   a: Id;
   b: Id;
   value: number;
+  /** #2262 ([ADR-693](../../docs/06-decisions.md#adr-693)): PROVENANCE — the engine built this distance to realise
+   *  another statement (`'tangency'`: two stated-radius circles' centre distance r₁ ± r₂), so no student stated it.
+   *  Solved and verified like any distance; never printed as a measure label nor marked «נתון» in the values panel. */
+  derived?: 'tangency';
 }
 
 /** |a→b| = |c→d| (two equal segments). */

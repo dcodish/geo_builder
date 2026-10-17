@@ -5092,6 +5092,22 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'tangency-distance-unlabelled-2262',
+    title: '«שני מעגלים משיקים ברדיוס 5» draws two touching radius-5 circles with no «10» nobody stated; a stated «OP = 10» still prints (#2262, ADR-693)',
+    guards:
+      "#2262, the operator's report of 2026-10-16 (round #2245 T18): «the number 10 is the length between OP but no one asked for it and it should not show». Measured on the #2239 tip through decideDeterministic2D: a blue «10» at the touch point (centres hidden) — the label pass's surviving-constraint fill printed the tangency's own centre distance r₁ + r₂ as a stated length. Root cause: circles-tangent over two stated radii pins |c₁c₂| with an ordinary distance constraint, and the fill labels every distance constraint. Fix: the constraint carries provenance (`derived: 'tangency'`); the fill and the values panel's «נתון» marker skip it. Asserts the operator's line builds green with both radii 5, the circles touching and no length label; and the stated «OP = 10» control prints 10. The matrix is src/app/__tests__/issue-2262-tangency-distance-label.test.ts.",
+    steps: ['שני מעגלים משיקים ברדיוס 5'],
+    check(fig) {
+      allStepsOk(fig);
+      const rs = [...fig.circles.values()];
+      expect(rs.map((c) => c.r), 'two radius-5 circles').toEqual([5, 5]);
+      expect(Math.hypot(rs[0].center.x - rs[1].center.x, rs[0].center.y - rs[1].center.y), 'touching').toBeCloseTo(10, 3);
+      expect(fig.labels.lengths, 'no length nobody stated').toEqual([]);
+      const stated = replay(factsOf(['מעגל O ברדיוס 5', 'מעגל P ברדיוס 5', 'OP = 10', 'המעגלים O ו-P משיקים']));
+      expect(stated.labels.lengths.map((l) => `${l.a}${l.b}:${l.text}`), 'a stated OP still prints').toEqual(['OP:10']);
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

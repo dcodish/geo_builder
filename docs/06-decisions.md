@@ -17882,3 +17882,31 @@ Members: `shape-variant` (kite, isosceles), `inscribe`, `set-circle-position`, `
 **Locks.** `src/app/__tests__/issue-2239-stated-radius-held.test.ts` (every row above, both orders, English, #2208's spelling, a loaded list, ADR-554's letter order, the controls, the model never called); `src/engine/__tests__/radius-feasibility.test.ts` (the predicate: both orders fire; external, unequal, one free, 3 vs 3 + 1e-7 and an already-stated pair do not; `through` keeps 0a's message); `src/engine/__tests__/verify-stated-radius.test.ts`; scenario `stated-radius-never-changed-2239`; parity row. Rewritten old locks (both rulings quoted above): `circles-tangent.test.ts` "the inner radius is a first-class DOF" → the refusal with both radii 5 held; `circles-stated-tangent.test.ts` "equal stated radii, internal → true" → refused at stage 0a; `point-on-circle-witness.test.ts` re-based to radii 3 / 2.
 
 **Behaviour change for a student:** two circles of the same stated radius stated internally tangent — «מעגל O ברדיוס 3» · «מעגל P ברדיוס 3» · «המעגלים O ו-P משיקים מבפנים» — are refused «לא ניתן: «המעגלים O ו-P משיקים מבפנים» סותר את «מעגל P ברדיוס 3» — אי אפשר לקיים את שניהם יחד.» (before: drawn green with P silently resized to 0.95–1.70); with the tangency first, the radius line that makes them equal is refused naming the tangency (before: two coincident circles, green).
+
+## ADR-693 — The label pass prints only stated magnitudes: a tangency's derived centre distance carries provenance and is never labelled (#2262)
+
+**Status:** accepted · 2026-10-17 · bug (P2, 2-D) · fix round #2283, stream B · branch `fix/2262-tangency-distance-label`, stacked on `fix/2239-stated-radius-verified` ([ADR-692](#adr-692))
+**Requirements:** [02](02-requirements.md) FR-RN-2 — only a stated magnitude is printed; a length the tool derived to build another statement is neither labelled nor marked «נתון» · **Design:** [04](04-design.md) § "The three label sources" (the surviving-constraint fill reads provenance) · **LADDER stage:** none (display only; no gate, no solve change)
+**Cites** [ADR-037](#adr-037) (the fixed-radius tangency path), [ADR-491](#adr-491) (the three label sources), [ADR-677](#adr-677) (one radius for the pair, which widened the exposure)
+
+**The report.** Operator, 2026-10-16, playing round #2245 T18: *"the number 10 is the length between OP but no one asked for it and it should not show"* on «שני מעגלים משיקים ברדיוס 5».
+
+**Measured before** (the #2239 tip 35b7a5ec, `decideDeterministic2D` → the store → `replay`, model mocked). «שני מעגלים משיקים ברדיוס 5»: length label `@ctr-O–@ctr-P` «10» (the centres hidden). «מעגל O ברדיוס 5» · «מעגל P ברדיוס 5» · «המעגלים O ו-P משיקים»: `O–P` «10» (pre-existing on prod); the internal twin (5, 2): «3»; «…משיקים בנקודה X»: «10». «OP = 10» before or after the tangency: «10» (stated — correct). Crossing circles, free-radius tangent circles: none.
+
+**The class (docs/17 §1).** *A value the engine derived to build a relation is printed as a stated length.* `circles-tangent` over two stated radii pins |c₁c₂| = r₁ ± r₂ with an ordinary `distance` constraint (`apply.ts`, the external and internal pushes), and the surviving-constraint fill (`replay/core.ts`) labels every `distance` constraint in the figure — it could not tell a stated length from a derived one. The values panel's «נתון» marker (`valuesPanel.ts` `statedLen`) read the same constraints the same way. Audit of the other engine-built `distance` pushes: a `through` circle's stated radius (`applyRadiusGiven`) and a membership on a stated-radius circle (`point-on-circle` (c4)) carry the student's own radius value; `set-distance` is stated. Only the tangency is a derived value.
+
+**Decision.**
+1. **Provenance on the constraint, at the source.** `DistanceConstraint.derived?: 'tangency'`, set by the two tangency pushes only.
+2. **The fill and the «נתון» marker read it.** The surviving-constraint fill skips a `derived` distance; `statedLen` does too. The solver, the verifier, `metricImpossibility`, the samplers and every geometric reader are unchanged — the distance is solved and checked like any other. A stated length on the same pair is its own undecorated constraint and passes through the #474 fact pass, so it still prints.
+
+**Measured after.** Every derived row above prints no length label and still holds (no violation); «OP = 10» before or after the tangency prints «10»; crossing and free-radius rows unchanged.
+
+**Why not a patch (docs/17 §2).** No input or spelling is special-cased: the constraint says where it came from, and the one label reader that guessed now reads it.
+
+**Risk.** `constraintKey` is `JSON.stringify`, so a derived distance and a stated one on the same pair are now two keys (they were one); measured, a stated «OP = 10» after the tangency still commits and labels. A future engine-built constraint that is not a statement must carry the same mark (the design note).
+
+**Sibling audit / cross-tool.** Analytic consumes the 2-D engine, so the same derived distance stops printing there (ADR-W-117 Am. 1: analytic follows a 2-D change). 3-D: no circle pair (X8). Complex: no tangency construction.
+
+**Locks.** `src/app/__tests__/issue-2262-tangency-distance-label.test.ts` (the operator's line, the three-line form, the internal twin, «…בנקודה X», the circle-subject spelling, the values panel, the stated «OP = 10» both orders, crossing / free controls, the model never called); scenario `tangency-distance-unlabelled-2262`.
+
+**Behaviour change for a student:** «שני מעגלים משיקים ברדיוס 5» (and two stated-radius circles stated tangent in any spelling) no longer shows a centre-distance number nobody stated (before: «10» at the touch point; «3» for internal 5 / 2); a stated «OP = 10» still shows 10.
