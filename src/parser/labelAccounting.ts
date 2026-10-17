@@ -29,6 +29,8 @@
  * (objects referenced → their defining points). Re-widening the EXEMPTION is not.
  */
 import type { AnyCommand } from '@/engine';
+import { CEVIAN_NOUNS_EN, CEVIAN_NOUNS_HE } from './lexicon';
+import { ROLE_NOUNS, type RoleNoun } from './roleNouns';
 
 /** Latin unit tokens — never a run of point labels. */
 export const UNIT_WORDS: ReadonlySet<string> = new Set(['cm', 'mm']);
@@ -138,6 +140,52 @@ export function referencedContextLabels(s: string, commands: AnyCommand[], actx:
     const spanned = run.length === 3 && new Set(run).size === 3 && run.every((x) => existingPts.has(x));
     if ((ring || spanned) && run.some((x) => carried.has(x))) for (const x of run) out.add(x);
   }
+  return out;
+}
+
+/**
+ * #2228 ([ADR-695](../../docs/06-decisions.md#adr-695)) — the nouns a sentence reaches a figure object with,
+ * WITHOUT naming its points: «מעגל חוסם את **המשולש**», «E אמצע **הצלע**», «**גובה** ל-BC», «P מחוץ **למעגל**».
+ * Composed from the vocabularies that already exist — the scene nouns above, the role-noun registry, the
+ * cevian atoms — plus the two generic part nouns (side, vertex) and the circle's own parts (arc, centre).
+ * Matched as substrings, on purpose: a noun that matches too much only exempts a label (a missed warning);
+ * one that matches too little refuses a working decomposition.
+ */
+const CIRCLE_ROLES: ReadonlySet<RoleNoun> = new Set(['chord', 'diameter', 'radius', 'tangent']);
+const roleWords = (circle: boolean): string[] =>
+  ROLE_NOUNS.filter((r) => CIRCLE_ROLES.has(r.role) === circle).flatMap((r) => [r.he, r.hePlural, r.en, r.enPlural].filter((w): w is string => !!w));
+const POLY_FAMILY = new RegExp([POLY_NOUNS, 'צלע|קודקוד|side|vertex|vertices', CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, ...roleWords(false)].join('|'), 'i');
+const CIRCLE_FAMILY = new RegExp([CIRCLE_NOUNS, 'קשת|מרכז|arc|cent(?:er|re)', ...roleWords(true)].join('|'), 'i');
+const SEGMENT_FAMILY = /קטע|ישר|segment|line/i;
+
+/** The figure objects a noun can reach: polygon rings, circles (centre + members), drawn segments' endpoints. */
+export interface NounRefCtx {
+  polygons?: string[][];
+  circleMembers?: { id?: string; center: string; points: string[] }[];
+  segments?: string[][];
+}
+
+/**
+ * #2228 ([ADR-695](../../docs/06-decisions.md#adr-695)) — the EXISTING labels a sentence refers to by noun rather
+ * than by name: the invented-label gate's sibling of {@link referencedContextLabels} (objects referenced → their
+ * defining points, the sanctioned direction of the header).
+ *
+ * A polygon-family noun reaches the figure's polygons, a circle-family noun its circles (centre and members), a
+ * segment or line noun («הקטע», «הישר») its drawn segments' endpoints. When
+ * the sentence also names a point of one of them («גובה ל-BC» in △ABC beside a square DEFG), only the objects
+ * holding a named point are reached; otherwise every object of the family is. `stated` is the sentence's own labels,
+ * upper-cased; `s` must already be normalized.
+ */
+export function nounReferencedLabels(s: string, stated: ReadonlySet<string>, actx: NounRefCtx): Set<string> {
+  const out = new Set<string>();
+  const centreLetter = (c: string) => c.replace(/^@ctr-/, '').toUpperCase();
+  const reach = <T>(objs: T[], pts: (o: T) => string[]): void => {
+    const named = objs.filter((o) => pts(o).some((p) => stated.has(p)));
+    for (const o of named.length ? named : objs) for (const p of pts(o)) out.add(p);
+  };
+  if (POLY_FAMILY.test(s)) reach(actx.polygons ?? [], (v) => v.map((x) => x.toUpperCase()));
+  if (CIRCLE_FAMILY.test(s)) reach(actx.circleMembers ?? [], (c) => [centreLetter(c.center), ...c.points.map((p) => p.toUpperCase())]);
+  if (SEGMENT_FAMILY.test(s)) reach(actx.segments ?? [], (v) => v.map((x) => x.toUpperCase()));
   return out;
 }
 

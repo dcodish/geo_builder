@@ -34,9 +34,11 @@ describe('#255 — the reported session (i1mt2us8): the LLM invents a point', ()
 });
 
 describe('#255 — what must NEVER be flagged (a false flag would refuse a working decomposition)', () => {
-  it('a label already ON THE FIGURE is context, not an invention', () => {
-    // «המשולש» expanded to its letters is the LLM doing its job — those points exist.
-    expect(introducedNewLabels('המשולש שווה שוקיים', ['משולש ABC שווה שוקיים'], ['A', 'B', 'C'])).toEqual([]);
+  it('a label ON THE FIGURE that the sentence refers to is context, not an invention', () => {
+    // «המשולש» expanded to its letters is the LLM doing its job — those points exist, and the noun reaches them.
+    // #2228 (ADR-695): the figure's polygons are what the noun reaches; an existing label is no longer exempt by
+    // existing alone (issue-2228-invented-existing.test.ts).
+    expect(introducedNewLabels('המשולש שווה שוקיים', ['משולש ABC שווה שוקיים'], ['A', 'B', 'C'], { polygons: [['A', 'B', 'C']] })).toEqual([]);
   });
 
   it('a label the GRAMMAR mints while lowering appears in no line, so it cannot be seen here', () => {

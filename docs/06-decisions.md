@@ -17715,3 +17715,26 @@ No chokepoint grows: a per-order special case is removed and the copula is an at
 **Locks.** `src/app/__tests__/issue-2217-equal-pair-named-by-use.test.ts` (every reported row, both locales, the area spelling, the disjoint pair, «A על מעגל O/P»; the controls). `src/parser/__tests__/autos-interchangeable-2217.test.ts` (k = 1 → interchangeable; k = 2 and an offset → not; a stated radius → not; the bare pair → yes). Fixture `equal-radii-named-by-use-2217.geo.json` (the operator's two lines; both radii 5). Parity row `equal-pair-named-by-use-2217` (`builds`, X8, analytic gap #2190).
 
 **Behaviour change for a student:** «שני מעגלים משיקים ברדיוסים שווים» · «רדיוס מעגל O הוא 5» builds with both circles of radius 5 (and the «P», area, English, disjoint and «A על מעגל O» forms) — before: refused «אין מעגל בשם O…».
+
+## ADR-695 — The invented-label gate covers points already in the figure: an AI reading that pulls an existing point the sentence never refers to into a relation is refused (#2228)
+
+**Status:** accepted · 2026-10-17 · bug (P2) · fix round #2283, stream C · branch `fix/2228-invented-label-existing`
+**Requirements:** [02](02-requirements.md) FR-IN-2 (the AI reading's names) · **Design:** [04](04-design.md) "An existing label is context only through a reference" (the invented direction) · **LADDER stage:** none (the LLM seam)
+**Amends:** [ADR-436](#adr-436) (#255's mirror gate exempted every existing label) · **Siblings:** analytic [ADR-AG-281](06c-decisions-analytic.md#adr-ag-281) (#2225, the same widening on the shared `nameAccounting`); 3-D has no mirror gate (#1821); complex has no LLM lane
+
+**The ruling.** Operator, 2026-10-16 (from #2225): «should 2-D's guard also catch an existing letter pulled into an invented relation?» — "yes".
+
+**Measured** (`main` @ `4b0b4592`, `runSubmit` with the model mocked). «משולש ABC» · «נקודה P» · «חבר את A לנקודה כלשהי שם», answered «קטע PA»: the segment PA records, green, with no note. `introducedNewLabels('ישר l', ['ישר l דרך P'], [..., 'P'])` returns `[]`. The 2-D debug log's decompositions that write a label the sentence does not («גובה ל BC» → «גובה מ-A ל-BC», «מעגל חוסם את המשולש» → «מעגל חוסם את ABC», «מנקודה A … למעגל» → «… circle O …») each reach the written letters through a noun, so they are the false-positive set.
+
+**Root cause.** `introducedNewLabels` skipped every label the figure held, whether or not the sentence referred to it. The exemption is for an LLM that spells out the student's own reference («המשולש» → ABC), and it was applied to an LLM that picks a point the sentence never mentions.
+
+**Decision.**
+1. An existing label in the answer is the student's only when the sentence refers to it: by name (case-blind, #779, as before), or through a noun that reaches a figure object holding it. `nounReferencedLabels` (`src/parser/labelAccounting.ts`, beside ADR-597's `referencedContextLabels`) works by family. A polygon noun (shape nouns, side/vertex, the cevian atoms, the non-circle role nouns) reaches the figure's polygons. A circle noun (circle, arc, centre, chord/diameter/radius/tangent) reaches circles, meaning the centre and the members. A segment or line noun reaches drawn segments. When the sentence also names a point of such an object, only the objects holding a named point are reached. Nouns match as substrings, on purpose: too wide only misses a warning, too narrow refuses a working decomposition.
+2. The set difference is the shared core's `nameAccounting` (`shell/llm/honestyCore.ts`) with `exemptExistingFromInvented: false`. That is the call analytic's #2225 gate makes, so 2-D's copy of the loop is gone.
+3. The LLM second attempt (`submitPipeline.ts`) passes the figure's polygons, circles and segments. The refusal is the existing `input.labelsInvented` note, per the plan.
+
+**Not changed.** The deterministic seams (the grammar cannot invent a label). The order of the LLM-lane gates: the #779 fold nudge still answers a Latin lowercase line first.
+
+**Behaviour change for a student.** An AI reading that ties the sentence to a point already in the figure, one the sentence neither names nor reaches by a noun, is refused with «לא הבנתי איזו נקודה התכוונתם — כדי לבנות את זה צריך שם לנקודה P…». Before, it recorded silently, green.
+
+**Locks.** `src/app/__tests__/issue-2228-invented-existing.test.ts`: the seam refusal and its named twin; #2225's shape; a new label; the log's noun-reached decompositions; a noun reaches only the object holding a named point; a free point is never reached by «המשולש». `introduced-labels.test.ts`: «המשולש שווה שוקיים» now passes the triangle it reaches. There is no corpus scenario: the harness's LLM steps are committed facts and cannot express an AI-lane refusal.
