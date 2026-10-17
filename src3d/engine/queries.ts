@@ -481,6 +481,12 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCt
   }
 }
 
+/** #2072: the coefficients are exactly the unit vector on basis slot `i` (1 there, 0 elsewhere —
+ *  `decompStr`'s own tolerances, so "unit" here means "prints as the bare name"). */
+function isUnitOn(coefs: [number, number, number], i: number): boolean {
+  return i >= 0 && coefs.every((cf, j) => (j === i ? Math.abs(cf - 1) < 2e-3 : Math.abs(cf) < 1e-3));
+}
+
 /** The VECTOR forms of a query: its u/v/w decomposition (frame-INVARIANT — knowledge whenever the
  *  coefficients agree across seeds, even with a free scale), its PARAMETRIC form when the coefficients
  *  are affine in the construction's single parameter (#297: «AE» ⇒ `t·w`, shared with the data panel so
@@ -496,16 +502,22 @@ function vectorForms(c: Construction3, a: Atom, posArr: Positions3[], seeds: num
     const basisDefs = basisEntries.map(([, d]) => d);
     const ft: [Id, Id] | null = 'named' in a ? (() => { const d = c.vectors.get(a.named); return d ? ([d.from, d.to] as [Id, Id]) : null; })() : a.pair;
     let pushedDecomp = false;
+    let selfBasis = false;
     if (ft) {
       const coefs = basisDecompose(basisDefs, posArr, ft[0], ft[1]);
-      if (coefs) {
+      // #2072 (ADR-3D-371, completing ADR-3D-339): a basis vector asked by its OWN name decomposes to
+      // the unit vector on that name — «w» = 1·w — which restates the question («w = w = (0, 0, 12)»,
+      // «u = u»). The predicate is semantic (the coefficients ARE the asked name's unit vector), so a
+      // pair («AS» → «w») or a non-basis name keeps its decomposition: there it tells the student something.
+      selfBasis = !!coefs && 'named' in a && isUnitOn(coefs, names.indexOf(a.named));
+      if (coefs && !selfBasis) {
         parts.push(decompStr(coefs, names));
         pushedDecomp = true;
       }
     }
     // #297 — the numeric decomposition isn't stable (a driven-parameter vector: AE = t·w): show the
     // PARAMETRIC form instead, the same one the data panel surfaces (shared `parametricDecomp`).
-    if (!pushedDecomp && ft) {
+    if (!pushedDecomp && !selfBasis && ft) {
       const sym = parametricDecomp(c, ft[0], ft[1], seeds);
       if (sym) parts.push(sym);
     }

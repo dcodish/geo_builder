@@ -655,6 +655,9 @@ asks per crossing at `Resolved3.seed`, with `openParamProbes3` for an unpinned m
 answer; `pointCoords` keeps the partial form; anything else returns `null`. The ask lane answers either text
 WITHOUT the label: App3's row prints «<question> = <answer>», so every `QueryResult.answer` is the bare value,
 and a `params` row carries `value` beside `text` for the same reason ([ADR-3D-339](06b-decisions-3d.md#adr-3d-339), #1746).
+The vector answer (`vectorForms`, `queries.ts`) skips the decomposition when a NAMED atom decomposes to the unit
+vector on its own name (`isUnitOn`): a basis vector asked by its name answers only its coordinates, or nothing
+(the undetermined note) without a frame; a pair keeps its decomposition ([ADR-3D-371](06b-decisions-3d.md#adr-3d-371), #2072).
 
 ## The submit decision and refusals
 

@@ -114,3 +114,66 @@ describe('#1746 — the panel keeps its own rows (one decision, two surfaces)', 
     expect(row(CUBE, 'B')).toBe('B — undetermined');
   });
 });
+
+/**
+ * #2072 item 2 (ADR-3D-371, completing ADR-3D-339) — a declared BASIS vector asked by its own name.
+ * Measured at 688dfb96: the exam figure's «w» read «w = w = (0, 0, 12)», and a frameless figure's «u»
+ * read «u = u» — the decomposition of a basis entry over its own basis is the unit vector on the asked
+ * name, which restates the question. Ruled 2026-10-14 (option A): with a frame, the coordinates; without
+ * one, the existing undetermined answer. A PAIR keeps its decomposition — there it says something.
+ */
+describe('#2072 — a basis vector asked by its own name never answers itself', () => {
+  const EXAM = [
+    'פירמידה ABCDS שבסיסה ריבוע',
+    'המקצוע AS הוא גובה בפירמידה',
+    'אורך המקצוע AS שווה לאורך צלע הריבוע ABCD',
+    'SE = 3/4 SD',
+    'נסמן: AD = u, AB = v, AS = w',
+    'SN = k·SC',
+    '|EN| = (√6/4)·|w|',
+    'נתון: A(0,0,0), B(0,12,0)',
+    'הקודקוד D נמצא על החלק החיובי של ציר ה-x',
+    'S נמצא על החלק החיובי של ציר ה-z',
+  ];
+  const PYR = ['פירמידה ABCDS שבסיסה ריבוע', 'נסמן: AD = u, AB = v, AS = w'];
+  const BOX = ["תיבה ABCDA'B'C'D'", 'נסמן: AB = u', 'AC = p'];
+  /** #2072's sweep: every basis entry, framed and frameless — each case the joined row App3 prints. */
+  const CASES: readonly { lines: readonly string[]; q: string; want: string }[] = [
+    // with a frame: the coordinates, the label once (the report)
+    { lines: EXAM, q: 'w', want: 'w = (0, 0, 12)' },
+    { lines: EXAM, q: 'u', want: 'u = (12, 0, 0)' },
+    { lines: EXAM, q: 'v', want: 'v = (0, 12, 0)' },
+    // without a frame: the existing undetermined answer, never «u = u»
+    { lines: PYR, q: 'u', want: 'u — undetermined' },
+    { lines: PYR, q: 'v', want: 'v — undetermined' },
+    { lines: PYR, q: 'w', want: 'w — undetermined' },
+    // a basis of two (#311), the second declared vector asked by name
+    { lines: BOX, q: 'p', want: 'p — undetermined' },
+    // controls — a pair keeps its decomposition, framed or not
+    { lines: EXAM, q: 'AS', want: 'AS = w = (0, 0, 12)' },
+    { lines: EXAM, q: 'EN', want: 'EN = −1/4·u + 1/2·v + 1/4·w = (-3, 6, 3)' },
+    { lines: PYR, q: 'AS', want: 'AS = w' },
+    { lines: PYR, q: 'SC', want: 'SC = u + v − w' },
+    { lines: BOX, q: 'AC', want: 'AC = p' },
+  ];
+  for (const { lines, q, want } of CASES) {
+    it(`«${q}» reads «${want}»`, () => {
+      expect(row(lines, q).replace(/ {2}= {2}/g, ' = ')).toBe(want);
+    });
+  }
+
+  it('a FOURTH declared vector is not a basis entry: asked by name, it decomposes over u, v, w', () => {
+    const r = row([...PYR, 'AC = p'], 'p');
+    expect(r).toBe('p = u + v');
+  });
+
+  it('a frameless basis vector under a free named parameter says «undetermined», not «depends on α»', () => {
+    const Q2 = [
+      'פירמידה שבסיסה ריבוע', 'BD', 'AC', 'AS=w', 'AD=u', 'AB=v', 'AE=t*AS',
+      'מפגש אלכסונים בריבוע O', 'OE', 'OE אנך ל AS', '∠SAD=α', '∠SAB=α', '60<α<90', '|w|=3', '|u|=2',
+    ];
+    const st = build(Q2);
+    for (const q of ['u', 'v', 'w']) expect(ask(st, q)).toMatchObject({ answer: null, note: 'undetermined' });
+    expect(ask(st, 'AE').answer).toBe('t·w'); // control: the parametric form still answers
+  });
+});

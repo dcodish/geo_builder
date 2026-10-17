@@ -82,8 +82,8 @@ describe('ADR-3D-057 — the query lane answers only genuine knowledge', () => {
     it('a bare pair shows the u/v/w decomposition AND the coordinates', () => {
       expect(ans(EXAM, 'EN').answer).toBe('−1/4·u + 1/2·v + 1/4·w  =  (-3, 6, 3)');
     });
-    it('a declared vector shows itself + its coordinates', () => {
-      expect(ans(EXAM, 'w').answer).toBe('w  =  (0, 0, 12)');
+    it('a declared vector asked by its own name answers its coordinates, never itself (#2072, ADR-3D-371)', () => {
+      expect(ans(EXAM, 'w').answer).toBe('(0, 0, 12)');
     });
     it('the BARS still mean length — |EN| is a number, EN is the vector', () => {
       const len = ans(EXAM, '|EN|');

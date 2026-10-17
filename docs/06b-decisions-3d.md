@@ -12717,7 +12717,7 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 2. `DataPanel.params` rows carry `value` beside `text`, built by ONE `paramRow` helper, so the panel prints `text` («k = 2») and the ask lane answers `value` («2») from the same decision (the #481 rule).
 3. The sweep is total: `issue-1746-ask-row.test.ts` asserts the JOINED row text for every query kind through a `Record<QueryKind3, …>` (`QueryKind3` is newly exported), so a new kind cannot compile without a row case.
 
-**Not taken: a declared basis vector asked by its own name.** «w» answers its trivial decomposition «w», so the row reads «w = w = (0, 0, 12)» with a frame and «u = u» without one. Dropping the self-decomposition leaves a frameless figure nothing to answer, and what to show then is a product decision, so it is reported as a finding, not decided here.
+**Not taken: a declared basis vector asked by its own name.** «w» answers its trivial decomposition «w», so the row reads «w = w = (0, 0, 12)» with a frame and «u = u» without one. Dropping the self-decomposition leaves a frameless figure nothing to answer, and what to show then is a product decision, so it is reported as a finding, not decided here. *Decided by [ADR-3D-371](#adr-3d-371) (#2072, ruling 2026-10-14): the coordinates with a frame, «לא נקבע» without one.*
 
 **Locks.** `src3d/__tests__/issue-1746-ask-row.test.ts`: the operator's exact lines («B(1, t, 2)», then «B»), the joined row of every kind, and the panel's rows unchanged. Updated to the bare value: `query-point-plane`, `frame-gates`, `issue-803`, `issue-1547-component-given`, `issue-1506-two-configurations`, `issue-1450-ask-gate`. The params-row locks that compare whole rows (`issue-794`, `-797`, `-801`, `-815`, `-902`, `-939-symbol-display`, `book-coordinate-givens`) gain the `value` key; their `text` is byte-unchanged. Fixtures-first: not applicable. The ask lane is not part of a saved session, so a fixture cannot hold the row text.
 
@@ -13136,3 +13136,26 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Behaviour change for a student:** in 3-D, a model answer that drops a shape or role word the student typed — spelt right or one letter off — is refused with the dropped-given message naming it; an answer that keeps it records as before.
 
 **Slow-tier goldens that may drift:** `decide-submit3-parity-1394` replays the deterministic decision only — none expected.
+
+## ADR-3D-371 — A basis vector asked by its own name answers its coordinates, never itself (#2072)
+
+**Status:** accepted · 2026-10-17 · bug (P3) · fix round #2318, stream N · branch `fix/2072-3d-basis-self-query` · item 2 of #2072 (item 1 is analytic) · completes [ADR-3D-339](#adr-3d-339)'s *Not taken* paragraph · LADDER stage: none (display of the ask lane's existing verdicts)
+**Operator ruling (2026-10-14, card `d14-2072-basis`, option A):** *with a frame: «w = (0, 0, 12)», with no repeated label. Without a frame: the existing undetermined answer «לא נקבע».*
+**Requirements:** [02b](02b-requirements-3d.md) FR-EQ-4b (a declared vector asked by its own name) · **Design:** [04b](04b-design-3d.md) the ask lane's vector answer (`vectorForms`)
+
+**Measured before** (`main` @ 688dfb96, through `decideSubmit3` + `derive3` + `answerQuery`): on the 2020-ב exam figure (the frame from «נתון: A(0,0,0), B(0,12,0)» and the two axis lines) «w» → «w = w = (0, 0, 12)», «u» → «u = u = (12, 0, 0)»; on the frameless «פירמידה ABCDS שבסיסה ריבוע» · «נסמן: AD = u, AB = v, AS = w», «u» → «u = u»; on «תיבה ABCDA'B'C'D'» · «נסמן: AB = u» · «AC = p», «p» → «p = p». Pairs («AS» → «w», «EN», «SC», «AC» → «p») decompose informatively.
+
+**Root cause / class.** *A declared basis vector asked by its own name is decomposed over the basis it belongs to, so the answer restates the question.* `vectorForms` (`src3d/engine/queries.ts`) decomposes the asked atom over the first three declared vectors; when the atom is one of them, the coefficients are the unit vector on its own name, and `decompStr` prints the name.
+
+**Decision.**
+1. `vectorForms` skips the decomposition, and the parametric form, when the asked atom is NAMED and its coefficients are exactly the unit vector on that name (`isUnitOn`, `decompStr`'s own tolerances). The predicate is semantic, not a name lookup: a pair whose decomposition is a single basis vector («AS» → «w») keeps it, and so does a fourth declared vector, which is not a basis entry («p» → «u + v»).
+2. Nothing else in the answer path changes. With a stable frame the coordinates part answers («(0, 0, 12)»). With none, `forms` is empty, the panel fallback answers only when the scale is knowledge, and otherwise the existing `note: 'undetermined'`.
+3. Checked: the `pinFreeMeasures` «depends on α» note does not fire for a frameless basis vector (the bagrut Q2 figure with «∠SAB=α»: «u», «v», «w» → undetermined), because the pinned figure's `vectorForms` skips the self-decomposition too.
+
+**Sibling audit.** Vectors are 3-D only by design (docs/22 §10, exception X7). The data panel's vector rows already print a basis vector by its coordinates, with no self-decomposition, so the two surfaces agree.
+
+**Locks.** `src3d/__tests__/issue-1746-ask-row.test.ts` gains the #2072 sweep: every basis entry framed and frameless, a two-vector basis, the fourth-vector and pair controls, and the no-«depends» check. Re-based: `src3d/__tests__/queries.test.ts` («a declared vector shows itself + its coordinates» locked the echo; it now reads `(0, 0, 12)`). Fixtures-first: not applicable, the ask lane is not part of a saved session.
+
+**Behaviour change for a student:** in 3-D, asking a declared basis vector by its name reads «w = (0, 0, 12)» when the figure has a frame (was «w = w = (0, 0, 12)»), and «u — לא נקבע על ידי הנתונים» when it has none (was «u = u»). Asking a pair («AS = w = (0, 0, 12)») or any other vector is unchanged.
+
+**Slow-tier goldens that may drift:** `decide-submit3-parity-1394` replays the submit decision, not the ask lane — none expected.
