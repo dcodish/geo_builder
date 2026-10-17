@@ -2992,7 +2992,7 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     // already held, so a figure whose CURRENT variant a later given made impossible was refused although
     // another variant draws it — «sin∢ACB = 3/4» then «זווית ACB קהה». Seed-invariant like the seat
     // (a wrong root fails at every seed), so it runs here, before the mask × seed product.
-    const variantFound = choiceRescue(facts, deadline);
+    const variantFound = choiceRescue(facts, { deadline });
     if (variantFound) {
       lastConfigTier = 'variant';
       return variantFound;
@@ -3405,9 +3405,33 @@ function advanceAssignment(axes: readonly { n: number; cur: number }[], steps: n
  * reflection tier), so tier ORDER — and with it every default drawing — is unchanged. Zero cost when no fact
  * carries a cyclable variant and no composition recorded a side choice.
  */
-export function choiceRescue(facts: Fact[], deadline: number): { facts: Fact[]; seed: number } | null {
+export function choiceRescue(facts: Fact[], limit: { deadline: number } | { workCap: number }): { facts: Fact[]; seed: number } | null {
   const mayHaveSide = facts.some((f) => f.enabled && 'ids' in f.cmd);
   if (!mayHaveSide && variantAxes(facts).length === 0) return null;
+  if ('deadline' in limit) return choiceSweep(facts, () => Date.now() > limit.deadline);
+  // #1857 (ADR-709): the submit gate's rescue is bounded by WORK, in charged units (every memo hit charged the
+  // work it saved, ADR-582) — the seat sweep's ADR-584 shape — so whether the cure for an unstated choice
+  // counts is the same on every device and cold or warm. The axes' own fold is read inside the epoch, so it is
+  // charged once whether this thread already held it or not. A fold the cap cuts ends the rescue uncured.
+  choiceRescueStats.rescues++;
+  const d0 = work.done;
+  try {
+    return withWorkBudget(limit.workCap, () => {
+      const at = work.done + limit.workCap;
+      const aborts0 = solveBudget.aborts;
+      const cured = choiceSweep(facts, () => work.done > at || solveBudget.aborts !== aborts0);
+      if (cured) {
+        choiceRescueStats.cured++;
+        choiceRescueStats.maxCuredCharged = Math.max(choiceRescueStats.maxCuredCharged, work.done - d0);
+      }
+      return cured;
+    });
+  } finally {
+    choiceRescueStats.lastCharged = work.done - d0;
+    choiceRescueStats.charged += work.done - d0;
+  }
+}
+function choiceSweep(facts: Fact[], stop: () => boolean): { facts: Fact[]; seed: number } | null {
   // #1987 (ADR-622): the `reflex` axis joins this tier — a convexity default that YIELDED (ADR-613) is an
   // unstated choice exactly as a variant is, so a figure the convex seat cannot draw belongs here, not in a
   // refusal. Zero cost on a figure with no yielding ring ({@link reflexAxes} registers no axis).
@@ -3421,12 +3445,25 @@ export function choiceRescue(facts: Fact[], deadline: number): { facts: Fact[]; 
   for (const assignment of candidates) {
     const fc = withAssignment(facts, axes, assignment);
     for (let s = 0; s < 6; s++) {
-      if (Date.now() > deadline) return null;
-      if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
+      if (stop()) return null;
+      const ok = meetsRequirements(fc, s);
+      if (stop()) return null; // a fold the budget cut mid-ladder is not THE fold: it can neither cure nor refute
+      if (ok) return { facts: fc, seed: s };
     }
   }
   return null;
 }
+
+/** #1857 (ADR-709): the gate's choice-rescue counters — the locks count operations, never time. */
+export const choiceRescueStats = { rescues: 0, cured: 0, charged: 0, lastCharged: 0, maxCuredCharged: 0 };
+/**
+ * #1857 ([ADR-709](docs/06-decisions.md#adr-709)): the submit gate's choice-rescue budget, in CHARGED work units —
+ * a fixed amount of work, not the 1.5 s clock it replaced (the ADR-584 ruling's "same input, same answer"), so
+ * the verdict is the same on every device and cold or warm. Calibrated over the corpus scenarios, the fixtures
+ * and the gate locks: above the most expensive rescue there that CURED a line (see the ADR). A test may lower it.
+ */
+export const CHOICE_RESCUE_WORK_CAP = 4_000_000;
+export const choiceRescueConfig = { cap: CHOICE_RESCUE_WORK_CAP };
 
 /**
  * The SEAT sweep alone (#566/ADR-445's seat tier, extracted for #1441 arm 3): flip each UNPINNED
@@ -3784,7 +3821,7 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
     // another assignment of the figure's variant choices (the trial's own among them) admits the whole
     // trial figure, the step commits; `settleVariantDefaults` settles the new fact's own choice at commit
     // and the post-commit `autoResolve` (`findValidConfig`'s variant tier) flips an earlier one.
-    if (choiceRescue(all, Date.now() + 1500)) return { produced: true };
+    if (choiceRescue(all, { workCap: choiceRescueConfig.cap })) return { produced: true };
     // #1671 (ADR-584): a FINISHED sweep over at least one unpinned seat that cured nothing is a proof.
     return { produced: false, reason: 'error', detail: after.status[errored.id], ...(seats.complete && unpinnedSeats(all).length ? { seatsExhausted: true } : {}) };
   }

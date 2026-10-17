@@ -5108,6 +5108,18 @@ export const SCENARIOS_4: Scenario[] = [
       expect(stated.labels.lengths.map((l) => `${l.a}${l.b}:${l.text}`), 'a stated OP still prints').toEqual(['OP:10']);
     },
   },
+  {
+    id: 'isosceles-apex-rescue-deterministic-1857',
+    title: '«משולש שווה שוקיים ABC» · «AB = 4» · «BC = 8» (and «BC = 9») COMMITS at the door on every run — the unstated apex is the rescue’s to move, whatever the machine speed or cache warmth (#1857, ADR-709)',
+    guards:
+      "#1857, measured at b0e9dbea through decideDeterministic2D (model mocked): «BC = 8» was REFUSED cold as collapsed (1.7 s) and COMMITTED warm (0.12 s) — the dry run's unstated-choice rescue (choiceRescue) ran under Date.now() + 1500, and cold, the first candidate's fold (the apex at B, 4 = 8 impossible) cost ~2.1M evaluations before the curing apex was read. Root fix: the gate's rescue is bounded by a fixed WORK cap in charged units (CHOICE_RESCUE_WORK_CAP, every memo hit charged, ADR-582) — the seat sweep's ADR-584 shape. Asserts through the gate that both lines commit after the prefix, which builds green. The cold/warm/clock/cap matrix is src/app/__tests__/issue-1857-variant-rescue-work-cap.test.ts.",
+    steps: ['משולש שווה שוקיים ABC', 'AB = 4'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש שווה שוקיים ABC', 'AB = 4']);
+      for (const line of ['BC = 8', 'BC = 9']) expect(gateVerdict(facts, line).kind, `«${line}»: another apex draws it — the line commits`).toBe('commit');
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

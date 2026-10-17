@@ -793,6 +793,12 @@ test fails if `runSubmit` parses or refuses on its own, and the parity shards (`
   Am. 1) — and even then it is refused when the dry run's seat sweep finished and cured nothing (`StepOutcome.seatsExhausted`,
   [ADR-584](06-decisions.md#adr-584), #1671). `seatSweep` is bounded by `SEAT_SWEEP_WORK_CAP` charged units; the
   worker warms the rotated folds first (`seatSweepWarmup`; a transplanted fold carries `FoldNode.work`).
+- **The gate's budgets are work, never the clock** ([ADR-709](06-decisions.md#adr-709), #1857). After the seat
+  sweep, the dry run's unstated-choice rescue (`choiceRescue(all, { workCap: choiceRescueConfig.cap })`) decides
+  whether another variant / side / reflex assignment cures an erroring step; it runs under
+  `CHOICE_RESCUE_WORK_CAP` charged units (`withWorkBudget`, every memo hit charged, ADR-582), so a line's verdict
+  is the same cold and warm on every device. A fold the cap cuts ends the rescue uncured. `findValidConfig`'s
+  variant tier keeps its wall-clock deadline (`{ deadline }`) — an interactive view search, ADR-558's split.
 
 ### A one-line compound is all or nothing: the clause-coverage gate ([ADR-598](06-decisions.md#adr-598))
 

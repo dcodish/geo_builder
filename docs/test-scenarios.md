@@ -2016,3 +2016,7 @@ over all four (ADR-041).
 ### `tangency-distance-unlabelled-2262` — «שני מעגלים משיקים ברדיוס 5» prints no centre distance (#2262, ADR-693)
 
 **Guards against:** the tangency's own centre distance r₁ + r₂ printed as a measure label («10» at the touch point, centres hidden) — a number nobody stated (the operator's round #2245 T18 report). **Asserts** the operator's line builds green with two radius-5 circles touching and no length label, and that «מעגל O ברדיוס 5» · «מעגל P ברדיוס 5» · «OP = 10» · «המעגלים O ו-P משיקים» still prints 10 on OP. The matrix (the three-line form, the internal twin, «…בנקודה X», the circle-subject spelling, the values panel, the controls) is `src/app/__tests__/issue-2262-tangency-distance-label.test.ts`.
+
+### `isosceles-apex-rescue-deterministic-1857` — «משולש שווה שוקיים ABC · AB = 4 · BC = 8» commits on every run (#1857, ADR-709)
+
+**Guards against:** «BC = 8» after «משולש שווה שוקיים ABC» · «AB = 4» being refused as collapsed on a cold or slow run and committed on a warm one — the dry run's unstated-choice rescue ran under a 1.5 s wall clock, and cold, the first apex it tried (an impossible 4 = 8) cost ~2.1M evaluations before the curing apex was read. **Asserts** the prefix builds green and both «BC = 8» and «BC = 9» commit through the gate. The cold/warm/fast-clock/cap matrix (equal charged work cold and warm, the 4·8·8 and 4·9·9 drawings) is `src/app/__tests__/issue-1857-variant-rescue-work-cap.test.ts`.
