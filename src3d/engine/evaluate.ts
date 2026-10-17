@@ -174,6 +174,39 @@ export function solidDims(kind: SolidKind, key: string, seed: number, oblique?: 
   return [];
 }
 
+/**
+ * #1855 (ADR-3D-355) — A FIGURE THAT SHARES NO POINT WITH ANOTHER CARRIES ITS OWN SIMILARITY.
+ *
+ * Every solid (a flat polygon included) is built canonically with its first edge = 1, and the pivot carries
+ * ONE gauge for the whole construction. Two solids never share a vertex — `apply` refuses a solid whose
+ * ids exist (`already-defined`), and a polygon over existing points mints free points or a claim, never a
+ * second solid — so each solid is its own connected component, and the relative size, orientation and
+ * placement of solid i > 0 against solid 0 is genuinely free (ADR-052). It used to be a fixed default:
+ * «משולש ABC · משולש DEF» drew |AB| = |DE| with AB ∥ DE at every seed, so a length on each triangle was
+ * refused `givens-contradict` and «AB ∥ DE» `claim-refuted`.
+ *
+ * So every solid after the first appends a similarity to its dims — `[ln s, w (rotation vector), t]` —
+ * applied about its canonical centroid. They are ordinary dims: sampled here from the one seeded sampler
+ * (docs/17 M3), driven by the pivot like any shape dim, and counted by `freeDims` / `freeDofCount3`
+ * (`COMPONENT_SIM_DIMS`). The first solid keeps the construction's gauge, so a one-solid figure is
+ * bit-identical. The tilt range is modest so «הציגו תצורה אחרת» stays legible; the yaw is the full turn.
+ */
+export const COMPONENT_SIM_DIMS = 7;
+export function componentSimilarityDims(key: string, seed: number): number[] {
+  return [
+    sample(seed, `${key}-sim-logs`, Math.log(0.55), Math.log(1.8)),
+    sample(seed, `${key}-sim-wx`, -0.4, 0.4), sample(seed, `${key}-sim-wy`, -0.4, 0.4), sample(seed, `${key}-sim-wz`, -Math.PI, Math.PI),
+    sample(seed, `${key}-sim-tx`, -0.3, 0.3), sample(seed, `${key}-sim-ty`, -0.3, 0.3), sample(seed, `${key}-sim-tz`, -0.3, 0.3),
+  ];
+}
+/** Solid i's FULL dim vector: its shape dims, then (i > 0) its own similarity (#1855). */
+export function solidDimsAt(c: Construction3, i: number, seed: number): number[] {
+  const solid = c.solids[i];
+  const key = `solid-${solid.kind}-${solid.ids.join('')}`;
+  const shape = solidDims(solid.kind, key, seed, solid.oblique);
+  return i === 0 ? shape : [...shape, ...componentSimilarityDims(key, seed)];
+}
+
 /** A revolution solid's resolved size: stated dims pin; unstated ones are FREE sampled DOFs (ADR-052). */
 export function revolutionDims(c: Construction3, i: number, seed: number): { r: number; h: number; origin: Vec3 } {
   const rev = c.revolutions[i];
@@ -980,8 +1013,8 @@ function solve3x3(r1: Vec3, r2: Vec3, r3: Vec3, rhs: Vec3): Vec3 | null {
  */
 export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   let dims = 0;
-  c.solids.forEach((solid) => {
-    dims += solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, 0, solid.oblique).length;
+  c.solids.forEach((_solid, i) => {
+    dims += solidDimsAt(c, i, 0).length; // #1855: a further solid's own similarity is free too
   });
   for (const rev of c.revolutions) {
     if (rev.radius === undefined) dims++;
@@ -1788,7 +1821,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
     // #863 (ADR-3D-245): the solids' seeded dims are sampled ONCE here and threaded into every residual
     // evaluation — `evalCanonical` runs per LM iteration (680 k times on the issue's figure), and re-sampling
     // the same (seed, key) inside it was the whole 2 s. `dims0` is the same vector, flattened, exactly as before.
-    const perSolidDims = c.solids.map((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed, solid.oblique));
+    const perSolidDims = c.solids.map((_solid, i) => solidDimsAt(c, i, seed)); // #1855: + each further solid's similarity
     const dims0 = perSolidDims.flat();
     const evalCanonical = (
       dims: number[],
@@ -2822,12 +2855,19 @@ function evaluateSolidsAndPoints(
 ): void {
   let dimCursor = 0;
   c.solids.forEach((solid, i) => {
-    const key = `solid-${solid.kind}-${solid.ids.join('')}`;
     const origin = v3(i * 2.5, 0, 0); // side-by-side when a figure ever holds two solids
-    const own = sampledSolidDims?.[i] ?? solidDims(solid.kind, key, seed, solid.oblique);
+    const own = sampledSolidDims?.[i] ?? solidDimsAt(c, i, seed);
     const dims = dimOverride ? dimOverride.slice(dimCursor, dimCursor + own.length) : own;
     dimCursor += own.length;
-    const ps = solidPositions(solid.kind, dims, origin, solid.oblique);
+    const nShape = i === 0 ? dims.length : dims.length - COMPONENT_SIM_DIMS;
+    let ps = solidPositions(solid.kind, dims.slice(0, nShape), origin, solid.oblique);
+    if (i > 0) {
+      // #1855 (ADR-3D-355): this solid's own similarity, about its canonical centroid
+      const [ls, wx, wy, wz, tx, ty, tz] = dims.slice(nShape);
+      const ctr = centroid3(ps);
+      const g = { t: v3(tx, ty, tz), w: v3(wx, wy, wz), s: Math.exp(ls), mirror: false };
+      ps = ps.map((p) => add3(ctr, applyGauge(sub3(p, ctr), g)));
+    }
     // #1918 (ADR-3D-313): a SEATED base takes the generator's ring one place round, so its parallel pair
     // (a trapezoid's) lands on the sides the student stated parallel. Only the base ring moves.
     solid.ids.forEach((id, j) => pos.set(id, ps[solid.seat && j < 4 ? (j + 3) % 4 : j]));

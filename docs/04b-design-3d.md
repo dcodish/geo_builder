@@ -446,6 +446,14 @@ locks totality: every `c.*Pins` / `figure*(c)` family `solve3.ts` reads is a row
 rotation separately (`placementSampled` is their disjunction); a frame claim softens to
 `placement-not-fixed` only when a component it READS was sampled.
 
+**A figure that shares no point with another carries its own similarity (#1855, [ADR-3D-355](06b-decisions-3d.md#adr-3d-355)).**
+Two solids never share a vertex (`apply` refuses a solid over existing ids), so every solid is its own connected
+component. Solid 0 rides the construction's gauge; every further solid appends seven dims, `[ln s, w, t]`
+(`componentSimilarityDims`, applied about its canonical centroid by `evaluateSolidsAndPoints`), read through
+`solidDimsAt` by the sampler, the pivot's `perSolidDims` and `freeDofCount3`, and counted by `freeDims`. They are
+ordinary dims: a length on each figure, or a relation between them («AB ∥ DE»), is driven, and with nothing
+stated they resample. A one-solid figure appends nothing and is bit-identical.
+
 ### A never-positioned point is a pivot unknown (#1311, [ADR-3D-260](06b-decisions-3d.md#adr-3d-260))
 
 A `free3` point («וקטור AB» on an empty canvas, «קטע BE» from a known B, a mixed shape run) carries three

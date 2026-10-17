@@ -1541,6 +1541,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2239 (ADR-692): two circles of equal stated radius stated internally tangent are refused, never resized ──
   { id: 'stated-radius-never-changed-2239', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 3', 'המעגלים O ו-P משיקים מבפנים'], expect: 'refused', exception: 'X8', note: '2-D committed green with P silently resized (the ADR-037 Am. 2 tangent-inner rewrite) before ADR-692; analytic already refused' },
+
+  // ── #1855 (ADR-3D-355): two figures that share no point have a free relative size and orientation ──
+  { id: 'two-triangle-lengths-1855', family: 'lengths', steps: ['משולש ABC', 'משולש DEF', 'DE = 2', 'AB = 5'], expect: 'builds', note: '3-D refused the second length givens-contradict before ADR-3D-355' },
+  { id: 'two-triangle-parallel-1855', family: 'parallel-perpendicular', steps: ['משולש ABC', 'משולש DEF', 'AB ∥ DE'], expect: 'builds', note: '3-D refused claim-refuted before ADR-3D-355' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
