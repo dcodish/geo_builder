@@ -1,0 +1,58 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "2mhX0WI0dfnENsRtNshg_",
+      "utterance": "מעגל O",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "sYGaHDoPv1jaU5A9S5X9A",
+      "utterance": "מעגל P",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "S5GnMlCcStrE7RWiCjMrP",
+      "utterance": "מעגל P מוכל בתוך מעגל O",
+      "cmd": {
+        "type": "set-circle-position",
+        "relation": "contained",
+        "a": "circle-O",
+        "b": "circle-P"
+      },
+      "enabled": true
+    },
+    {
+      "id": "FxPRMQTrFhXPnSZJZTay0",
+      "utterance": "המעגלים O ו-P משיקים בנקודה X",
+      "cmd": {
+        "type": "circles-tangent",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "at": "X",
+        "external": true,
+        "kindStated": false
+      },
+      "enabled": true
+    }
+  ]
+}

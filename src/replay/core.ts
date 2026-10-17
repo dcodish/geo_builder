@@ -1031,6 +1031,35 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
   // real, visible centre point — order-independent (typed before or after the circle), pure replay (the
   // corpus and save/load ride it with no store op). Positional/definitional statements never emit the
   // marker, so the reported hijack class ('P על המשך BA') stays closed.
+  /**
+   * #2210 ([ADR-704](docs/06-decisions.md#adr-704)) — A DEFAULTED TANGENCY KIND YIELDS (M4, ADR-052). A tangency stated
+   * with no kind («המעגלים O ו-P משיקים») is external only by default (`kindStated: false`), so it takes, in this order:
+   * the kind of the FIRST kind-stated tangency on the same unordered pair anywhere in the list (a later «…משיקים
+   * מבפנים»); else internal when one circle of the pair is stated contained in the other (`set-circle-position
+   * contained`, either order); else the default. Position-independent (the stating line before or after), and derived
+   * from `(facts, seed)` alone, so deleting or unticking the stating line restores the default. Fact id → resolved kind.
+   */
+  const tangentKind = new Map<string, boolean>();
+  {
+    const pairKey = (a: Id, b: Id) => [a, b].sort().join('|');
+    const statedKind = new Map<string, boolean>();
+    const contained = new Set<string>();
+    for (const f of facts) {
+      if (!f.enabled) continue;
+      for (const c of lowerOne(f.cmd, symtab)) {
+        if (c.type === 'circles-tangent' && c.kindStated !== false) {
+          const k = pairKey(c.circle1, c.circle2);
+          if (!statedKind.has(k)) statedKind.set(k, c.external);
+        } else if (c.type === 'set-circle-position' && c.relation === 'contained') contained.add(pairKey(c.a, c.b));
+      }
+    }
+    for (const f of facts) {
+      if (!f.enabled || f.cmd.type !== 'circles-tangent' || f.cmd.kindStated !== false) continue;
+      const k = pairKey(f.cmd.circle1, f.cmd.circle2);
+      const ext = statedKind.has(k) ? statedKind.get(k)! : contained.has(k) ? false : undefined;
+      if (ext !== undefined && ext !== f.cmd.external) tangentKind.set(f.id, ext);
+    }
+  }
   const centrePromotions = new Map<string, string>(); // '@ctr-O' → 'O'
   for (const f of facts) {
     if (!f.enabled) continue;
@@ -1198,6 +1227,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       msr: [...msRiderMove].filter(([id]) => inPrefix(id)).map(([id, v]) => [factIdxById.get(id), v]),
       mss: [...msSvMove].filter(([id]) => inPrefix(id)).map(([id, v]) => [factIdxById.get(id), v]),
       ctr: [...centrePromotions].sort(),
+      tk: [...tangentKind].filter(([id]) => inPrefix(id)).map(([id, v]) => [factIdxById.get(id), v]),
       pair: [...pairSwapByGroup].filter(([g]) => prefixGroups.has(g)).map(([g, m]) => [groupPartition.get(g), [...m].sort()]),
       eqs: explicitEqs,
       ons: explicitOnSegs,
@@ -1322,6 +1352,9 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     // Re-seat the isosceles-trapezoid macro's leg equality onto the legs of the ring in force (#989, ADR-506).
     const legs = legsReseat.get(f.id);
     if (legs) engineCmds = engineCmds.map((ec) => (ec.type === 'set-equal' ? { ...ec, ...legs } : ec));
+    // A defaulted tangency kind takes the kind the list states for the pair (#2210, ADR-704 pre-scan).
+    const tk = tangentKind.get(f.id);
+    if (tk !== undefined) engineCmds = engineCmds.map((ec) => (ec.type === 'circles-tangent' ? { ...ec, external: tk } : ec));
     // Promote anonymous centres a semantic centre-use named (ADR-342, '@ctr-O' → 'O').
     engineCmds = promoteCentres(engineCmds as Command[]);
     // Swap a common-tangent group's soft touch↔circle pairing to the explicitly-stated one (ADR-239 pre-scan).

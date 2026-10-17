@@ -120,7 +120,7 @@ The list itself is the smell: each is a point where a general decision is being 
   midpointOf, lines, tangentAuxes, polygons, autoCenters, radiusSymbols, angleAliases,
   commonTangents, radiusOrder, arcs` (the drawn arcs and their identity — [ADR-632](06-decisions.md#adr-632)), `statedTangencies` (each
   circle pair the construction STATES tangent, with its touch point and stated kind — [ADR-671](06-decisions.md#adr-671); the only source of an
-  inherited tangency kind, which the deictic `circlePairPositions` never decides — [ADR-672](06-decisions.md#adr-672)). These may inform meaning freely.
+  inherited tangency kind, which the deictic `circlePairPositions` never decides — [ADR-672](06-decisions.md#adr-672); its kind is a STATED one only, never a default — [ADR-704](06-decisions.md#adr-704)). These may inform meaning freely.
 - **Deictic fields** are derived from the DRAWN SEED's positions and exist **only to resolve
   pointing references** — what the student is looking at: `circleSizes` («הגדול/הקטן» first
   assignment), `circleXs` («הימני/השמאלי»), `circlePairPositions` (tangency classification, 3%

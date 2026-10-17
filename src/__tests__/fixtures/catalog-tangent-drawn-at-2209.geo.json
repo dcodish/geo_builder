@@ -38,7 +38,8 @@
         "circle1": "circle-O",
         "circle2": "circle-P",
         "at": "M",
-        "external": true
+        "external": true,
+        "kindStated": false
       },
       "enabled": true
     }

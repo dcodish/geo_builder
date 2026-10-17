@@ -753,6 +753,18 @@ the equal-circle noun phrase («מעגלים שווים», "equal circles") must
 (`set-radius-ratio` k = 1, or two radii pinned at one value — `radiiMadeEqual`), or the gate reports «שווים» and the
 line escalates.
 
+### A circle pair's tangency kind: stated or defaulted ([ADR-704](06-decisions.md#adr-704))
+
+`circles-tangent.kindStated: false` marks a tangency whose line named no kind and inherited none (`circlesTangent`,
+`namedTouchPoint`, `commonTangent`'s at-new-point branch): its `external: true` is only the default. The replay fold's
+pre-scan (`tangentKind`, `replay/core.ts`, beside the other M4 pre-scans) resolves each such fact over the enabled list:
+the first kind-stated `circles-tangent` on the same unordered pair, else internal when the pair carries a
+`set-circle-position contained`, else the default. `lowerFact` lowers the resolved kind (the stored command never
+changes, so the source of truth stays `(facts, seed)`), and the memo signature carries the map. The tangency record
+(`requirementOf`) keeps `kindStated`, so the parser's `statedTangencies` inherits only a stated kind, while its touch
+point and operand order come from the first record (ADR-703). The verifier's containment check is closed
+(`d + r_b ≤ r_a + tol`) when the same pair is stated internally tangent, and strict otherwise.
+
 ### A fixed-run rule consumes the whole label body ([ADR-601](06-decisions.md#adr-601))
 
 `labelRun(body, n)` returns the first run of exactly n labels and nothing about the rest of the body, so a rule

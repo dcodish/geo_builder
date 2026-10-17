@@ -262,11 +262,14 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     // #2209 (ADR-703): the record also carries its OPERAND ORDER (`a`, `b` as first stated), so a restatement of the
     // pair in the other order lowers to the same command.
     statedTangencies: (() => {
-      const out: Record<string, { at: Id; external: boolean; a: Id; b: Id }> = {};
+      const out: Record<string, { at: Id; external?: boolean; a: Id; b: Id }> = {};
       for (const r of construction.requirements ?? []) {
         if (r.kind !== 'circle-position' || r.relation !== 'tangent') continue;
         const key = [r.a, r.b].sort().join('|');
-        if (!out[key]) out[key] = { at: r.at, external: r.external !== false, a: r.a, b: r.b };
+        // #2210 (ADR-704): the touch point and operand order come from the FIRST record; the kind only from the first
+        // record whose kind was STATED — a default is never inherited, so a later stated kind can still decide it.
+        if (!out[key]) out[key] = { at: r.at, a: r.a, b: r.b };
+        if (out[key].external === undefined && r.kindStated !== false) out[key].external = r.external !== false;
       }
       return out;
     })(),

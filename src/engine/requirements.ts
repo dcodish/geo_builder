@@ -21,7 +21,9 @@ export function sideRequirementOf(cmd: Command): SideRequirement | null {
   if (cmd.type === 'set-circle-position' && cmd.relation !== 'any') return { kind: 'circle-position', relation: cmd.relation, a: cmd.a, b: cmd.b };
   // #2080 (ADR-645): two circles STATED tangent — the pair has one common point
   // #2188 (ADR-672): with the stated KIND, so a restatement that names none inherits it (`statedTangencies`)
-  if (cmd.type === 'circles-tangent') return { kind: 'circle-position', relation: 'tangent', a: cmd.circle1, b: cmd.circle2, at: cmd.at, external: cmd.external };
+  // #2210 (ADR-704): and whether that kind was STATED, so a default (or the fold's resolution of it) is never inherited
+  if (cmd.type === 'circles-tangent')
+    return { kind: 'circle-position', relation: 'tangent', a: cmd.circle1, b: cmd.circle2, at: cmd.at, external: cmd.external, ...(cmd.kindStated === false ? { kindStated: false as const } : {}) };
   // #1918 (ADR-607): a ring declared as a phrase no circle can pass around («טרפז ישר זווית ABCD»)
   if (cmd.type === 'trapezoid' && cmd.kind && NOT_CYCLIC[cmd.kind]) return { kind: 'declared-shape', ring: [...cmd.ids], shape: cmd.kind };
   return null;

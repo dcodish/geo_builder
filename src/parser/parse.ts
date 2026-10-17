@@ -307,7 +307,7 @@ export interface ParseContext {
    *  circle ids: the touch point and the stated kind (the earliest record of the pair). The only source of an inherited
    *  tangency kind — the deictic `circlePairPositions` never decides it (docs/17 §3b law 2). #2209
    *  ([ADR-703](../../docs/06-decisions.md#adr-703)): `a`/`b` are the record's circles in the order first stated. */
-  statedTangencies?: Record<string, { at: string; external: boolean; a: string; b: string }>;
+  statedTangencies?: Record<string, { at: string; external?: boolean; a: string; b: string }>;
   /** Recorded SIZE roles between circles (`set-radius-order`, concentric or not — issue #102): lets
    *  «המעגל הגדול/הקטן» resolve consistently once assigned. */
   radiusOrder?: { outer: string; inner: string }[];
@@ -8497,7 +8497,7 @@ const namedCircleRefs = (s: string): string[] => {
 const inheritedExternal = (ctx: ParseContext, id1: Id, id2: Id): boolean | undefined =>
   ctx.statedTangencies?.[[id1, id2].sort().join('|')]?.external;
 /** The pair's stated tangency record (touch point + kind + operand order), or undefined. */
-const statedTangencyOf = (ctx: ParseContext, id1: Id, id2: Id): { at: string; external: boolean; a: string; b: string } | undefined =>
+const statedTangencyOf = (ctx: ParseContext, id1: Id, id2: Id): { at: string; external?: boolean; a: string; b: string } | undefined =>
   ctx.statedTangencies?.[[id1, id2].sort().join('|')];
 /**
  * #2209 ([ADR-703](../../docs/06-decisions.md#adr-703), FR-EN-9) — a statement about a pair already STATED tangent is
@@ -9272,8 +9272,12 @@ const circlesTangent: Rule = (s, ctx) => {
   // #2188 (ADR-672, operator ruling 2026-10-16 «Keep the kind stated earlier»): an explicit kind word wins; a line
   // naming none keeps the kind the construction already states for the pair; with none stated, external.
   const explicitExternal = /חיצונ|מבחוץ|\bexternal\w*|\boutside\b/i.test(s);
-  const external = internal ? false : explicitExternal ? true : (inheritedExternal(ctx, id1, id2) ?? true);
-  cmds.push({ type: 'circles-tangent', circle1: onRecord.pair[0], circle2: onRecord.pair[1], at, external });
+  const inherited = inheritedExternal(ctx, id1, id2);
+  const external = internal ? false : explicitExternal ? true : (inherited ?? true);
+  // #2210 (ADR-704, M4): no kind word and none stated for the pair — `external` is only the default, and says so, so a
+  // kind stated on another line or a containment of one circle in the other decides it in the fold.
+  const defaulted = !internal && !explicitExternal && inherited === undefined;
+  cmds.push({ type: 'circles-tangent', circle1: onRecord.pair[0], circle2: onRecord.pair[1], at, external, ...(defaulted ? { kindStated: false as const } : {}) });
   // #761: «…ברדיוסים שווים». INTERNAL tangency + equal radii is a CONTRADICTION (two internally
   // tangent circles of equal radius are the same circle: |c1c2| = |r1 - r2| = 0). It is lowered
   // anyway, deliberately — the engine then refuses it as an unsatisfiable given set, naming the
@@ -9343,7 +9347,8 @@ const namedTouchPoint: Rule = (s, ctx) => {
   if (at === names[0] || at === names[1]) return null; // a centre is never the touch point
   const id1 = circleId(names[0]), id2 = circleId(names[1]);
   const [r1, r2] = onStatedTangency(ctx, id1, id2).pair; // #2209 (ADR-703): the record's operand order
-  return [{ type: 'circles-tangent', circle1: r1, circle2: r2, at, external: inheritedExternal(ctx, id1, id2) ?? true }];
+  const inherited = inheritedExternal(ctx, id1, id2); // #2210 (ADR-704): none stated → the default, marked as such
+  return [{ type: 'circles-tangent', circle1: r1, circle2: r2, at, external: inherited ?? true, ...(inherited === undefined ? { kindStated: false as const } : {}) }];
 };
 
 /**
@@ -9508,7 +9513,9 @@ const commonTangent: Rule = (s, ctx) => {
       // M is new: "a common tangent at ONE point M" says the circles are TANGENT at M — the
       // circles-tangent device owns that state (free radii, gap-driving coincide). #2188: the circles' kind is
       // inherited (the line's own «חיצוני/פנימי» is the tangent LINE's kind, never the circles').
-      cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: inheritedExternal(ctx, id1, id2) ?? true });
+      // #2210 (ADR-704): with no kind stated for the pair, the circles' kind is the default (the line's word is the LINE's).
+      const inherited = inheritedExternal(ctx, id1, id2);
+      cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: inherited ?? true, ...(inherited === undefined ? { kindStated: false as const } : {}) });
     }
     cmds.push({ type: 'tangent', id: `tan-${at}`, circle: id1, at, visible: true });
     const fresh = (naming ?? []).filter((p) => !have.has(p));

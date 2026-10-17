@@ -136,7 +136,8 @@ describe('#2149 card 7 + #2123 — the named touch point states the tangency at 
     it(`no tangency stated: «${line}» → tangent at X (EXT), as «…משיקים בנקודה X»`, async () => {
       const r = await play(lang === 'en' ? PAIR_EN : PAIR, line, lang);
       expect(r.kind).toBe('commit');
-      expect(r.added).toEqual([{ type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'X', external: true }]);
+      // #2210 (ADR-704): no kind stated for the pair, so external is the default and says so
+      expect(r.added).toEqual([{ type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'X', external: true, kindStated: false }]);
       green();
     });
   for (const [line, lang] of FORMS)
@@ -177,7 +178,8 @@ describe('#2149 card 7 + #2123 — the named touch point states the tangency at 
   });
   it('three circles drawn: the NAMED pair is made tangent', async () => {
     const r = await play([...PAIR, 'מעגל Q'], 'X נקודת ההשקה של המעגלים O ו-P');
-    expect(r.added).toEqual([{ type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'X', external: true }]);
+    // #2210 (ADR-704): no kind stated for the pair, so external is the default and says so
+    expect(r.added).toEqual([{ type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'X', external: true, kindStated: false }]);
   });
   it('a named circle not drawn: not committed', async () => {
     const r = await play(['מעגל O'], 'X נקודת ההשקה של המעגלים O ו-P');
