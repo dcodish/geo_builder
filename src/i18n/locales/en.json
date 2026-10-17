@@ -283,6 +283,7 @@
       "concavePolygon": "{{poly}} should be concave, but it is drawn convex.",
       "convexPolygon": "{{poly}} should be convex, but it is drawn concave.",
       "insideRegion": "{{point}} should lie inside {{poly}}",
+      "radius": "the radius of circle {{circle}} should be {{value}} but is drawn {{drawn}}",
       "radiusRatio": "radius of circle {{c1}} ({{r1}}) should be {{k}} × radius of circle {{c2}} ({{r2}})",
       "circlesDisjoint": "circles {{c1}} and {{c2}} should be disjoint (centre gap {{d}} is not larger than the radii sum {{sum}})",
       "circleContained": "circle {{inner}} should lie strictly inside circle {{outer}} (centre gap + radius = {{reach}} is not below {{ro}})",

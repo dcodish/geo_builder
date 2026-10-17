@@ -703,6 +703,20 @@ seats the second crossing on the first; the drawn figure refuses, tagged `EvalEr
 it). The fold names the other side: the drop-one search finds the tangency or the length; for the other order the
 crossing's own statement is read from `ownerByObjId`.
 
+**A stated radius is never rewritten** ([ADR-692](06-decisions.md#adr-692), #2239). Over two stated (`length`) radii
+`circles-tangent` pins the centre distance (r₁ + r₂, or |r₁ − r₂| > 0) and never touches a radius; the ADR-037 Am. 2
+`tangent-inner` radius variant, which made the second of two equal circles the largest one inside the first, is gone.
+Equal stated radii stated internally tangent are refused at stage 0a by `equalInternalTangency`
+(`radiusFeasibility.ts`, beside `circlesTangentError`), in either order: over every internal tangency the construction
+states (its `circle-position` records) and the incoming commands state, a pair whose radii are both stated and equal
+(#2119's 1e-9 relative tolerance) after the step and was not before is refused in #2119's restated-size shape
+(`radius of <circle> = <v> cannot hold`, `errors.restatedSize`). The fold names the other side by provenance: a refused
+size names the tangency's statement (before the drop-one search, which would name the other circle's size); a refused
+tangency is left to the drop-one search first (a later statement that completed it, ADR-554 — a radius letter's value),
+then names the latest statement that sized either circle. The backstop is the givens verifier: the latest stated size
+of every circle (a sized `circle`, a `set-radius`) must equal its resolved radius to the length tolerance
+(`figure.v.radius`), so a future route that changes a stated radius can never draw green.
+
 ### The two-circle family's pair modifiers ([ADR-455](06-decisions.md#adr-455), [ADR-677](06-decisions.md#adr-677))
 
 A modifier stated for the PAIR lands on the pair the rule resolved (`resolveCirclePair`, the #215 chokepoint), through

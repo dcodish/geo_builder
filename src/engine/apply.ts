@@ -1910,7 +1910,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
             : 5
           : 'value' in circ.radius
             ? circ.radius.value
-            : 5 // a tangent-inner radius is internal state with no length at apply time — the seed only needs a scale
+            : 5 // no radius known at apply time — the seed only needs a scale
         : 5;
       const seedSpot = (): Vec => {
         // Seed on the stated side, in GENERAL POSITION around the centre: θ=0 (the textbook "external
@@ -2287,8 +2287,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         // #2084 (ADR-647): the witness is ANY point the construction puts on the circle — every kind
         // `pointOnCircle` reads (a rider, an antipode, an arc midpoint, a line∩circle or circle∩circle crossing,
         // the through-point, a circumcircle's vertex), a `radial-toward` on it (a tangency's touch / witness), and
-        // the touch point of a tangency STATED with it (on both circles by that statement — the only point an inner
-        // `tangent-inner` circle carries).
+        // the touch point of a tangency STATED with it (on both circles by that statement).
         const statedTouch = (prev.requirements ?? []).find(
           (r): r is Extract<SideRequirement, { relation: 'tangent' }> => r.kind === 'circle-position' && r.relation === 'tangent' && (r.a === cmd.circle || r.b === cmd.circle) && r.at !== cmd.id,
         )?.at;
@@ -2529,24 +2528,9 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         if (c1.radius.via === 'length' && c2.radius.via === 'length') {
           const r1 = c1.radius.value;
           const r2 = c2.radius.value;
-          if (!cmd.external && Math.abs(r1 - r2) < 1e-6) {
-            // Equal circles can't be internally tangent at a FIXED radius — but a radius is
-            // a flexible DOF (operator: "radius should be a DOF and not fixed"). Make the 2nd
-            // circle the largest one that fits inside the 1st and touches it (`tangent-inner`),
-            // so its radius DERIVES from the centre gap. Seed the 2nd centre at a gap of r1/2
-            // (⇒ inner radius r1/2); the centre stays a free DOF the sampler varies, the touch
-            // point tracks it, and the drawn radius is honest — no hidden ½. (ADR-037 Amend 2.)
-            objects[idx2] = { ...c2, radius: { via: 'tangent-inner', outer: c1.id } };
-            const ciIdx = objects.findIndex((o) => o.id === c2.center && o.kind === 'free-point');
-            const innerFree = ciIdx >= 0 ? (objects[ciIdx] as Extract<GeoObject, { kind: 'free-point' }>) : undefined;
-            if (innerFree && !innerFree.pinned) {
-              const oc = objects.find((o) => o.id === c1.center && o.kind === 'free-point') as Extract<GeoObject, { kind: 'free-point' }> | undefined;
-              objects[ciIdx] = { ...innerFree, x: (oc?.x ?? 0) + r1 / 2, y: oc?.y ?? 0 };
-            }
-            // Touch point: on the OUTER circle, on the ray toward the inner centre (tracks resample).
-            addObj(objects, { kind: 'radial-toward', id: cmd.at, circle: c1.id, toward: c2.center });
-            break;
-          }
+          // Both radii are STATED: neither is ever rewritten to make the pair fit (#2239, ADR-692 — superseding the
+          // ADR-037 Am. 2 `tangent-inner` rewrite). Equal radii stated internally tangent are refused at stage 0a
+          // (`equalInternalTangency`), so the internal branch below never meets |r₁ − r₂| = 0 from a step.
           if (cmd.external) {
             const d = r1 + r2;
             addObj(objects, { kind: 'on-segment', id: cmd.at, a: c1.center, b: c2.center, t: r1 / d });
@@ -2607,8 +2591,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // Resolve per how the circle's radius is defined: a `through` circle (its radius is |centre·point|,
       // e.g. an incircle through its tangent foot) becomes a distance constraint that FLEXES the figure; a
       // `free`-radius DOF and a `length` radius are simply set to the stated value (a stated size is a given,
-      // ADR-052). `tangent-inner` (radius derived from another circle) has no own size to pin → leave to the
-      // verifier to flag if it cannot hold.
+      // ADR-052).
       const idx = objects.findIndex((o) => o.kind === 'circle' && o.id === cmd.circle);
       if (idx >= 0) applyRadiusGiven(objects, constraints, idx, cmd.value);
       break;

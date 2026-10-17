@@ -96,27 +96,12 @@ describe('engine — internally tangent circles (one inside the other)', () => {
   });
 });
 
-describe('engine — internal tangency flexes a radius rather than failing (ADR-037 A1)', () => {
-  it('two EQUAL circles, internal → the 2nd shrinks to sit inside; M is on both', () => {
-    s().clear();
-    s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5 }, 'O');
-    s().execute({ type: 'circle', id: 'circle-P', center: 'P', radius: 5 }, 'P');
-    const r = parse('מעגל O ומעגל P משיקים מבפנים בנקודה M', { circles: ['O', 'P'] });
-    if (r.ok) r.commands.forEach((c) => s().execute(c, 'internal eq'));
-    const d = replay(s().facts);
-    const f = s().facts.find((x) => x.utterance === 'internal eq')!;
-    expect(d.status[f.id]).toBe('ok'); // works now — a radius is a flexible default
-    const O = d.positions.get('O')!;
-    const P = d.positions.get('P')!;
-    const M = d.positions.get('M')!;
-    // P shrank to 2.5; |OP| = 5 − 2.5 = 2.5; M on the big circle O (5) and the small P (2.5).
-    expect(dist(O, M)).toBeCloseTo(5, 3);
-    expect(dist(P, M)).toBeCloseTo(2.5, 3);
-    expect(dist(O, P)).toBeCloseTo(2.5, 3);
-  });
-});
-
-describe('engine — the inner radius is a first-class DOF (ADR-037 A2 / radius-as-DOF)', () => {
+describe('engine — equal stated radii are never flexed to make an internal tangency (#2239, ADR-692)', () => {
+  // ADR-037 Amendments 1–2 (operator 2026-06-14: "radius should be a DOF and not fixed") made the 2nd of two EQUAL
+  // circles shrink to sit inside the 1st. Since ADR-051/052 every UNSTATED radius is free, so that branch fired only
+  // on STATED radii — a stated magnitude silently changed, green. Superseded by ADR-692 (operator 2026-10-16, #2239:
+  // "a stated radius is never changed by a later constraint… or the line is refused"; #2206: "Equal radii with
+  // internal tangency … refused"). This lock is that refusal.
   const setup = () => {
     s().clear();
     s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5 }, 'O');
@@ -125,36 +110,21 @@ describe('engine — the inner radius is a first-class DOF (ADR-037 A2 / radius-
     if (r.ok) r.commands.forEach((c) => s().execute(c, 'internal eq'));
   };
 
-  it('the inner circle carries a DERIVED radius (no hidden ½ length pinned on it)', () => {
+  it('two EQUAL stated circles, internal → the tangency row is refused, naming the stated radius', () => {
     setup();
-    const c = replay(s().facts).construction.objects.find((o) => o.id === 'circle-P')!;
-    // Honest: the radius is not a frozen length but derives from the centre gap.
-    expect(c.kind === 'circle' && c.radius).toMatchObject({ via: 'tangent-inner', outer: 'circle-O' });
-    // …and the drawn radius matches reality (= r(outer) − |OP|), not the typed 5.
     const d = replay(s().facts);
-    const ri = dist(d.positions.get('P')!, d.positions.get('M')!);
-    expect(ri).toBeCloseTo(5 - dist(d.positions.get('O')!, d.positions.get('P')!), 6);
+    const f = s().facts.find((x) => x.utterance === 'internal eq')!;
+    expect(d.status[f.id]).toMatch(/^over-constrained: radius of circle-[OP] = 5 cannot hold/);
   });
 
-  it('"show another configuration" varies the inner radius while staying tangent', () => {
+  it('both stated radii stay 5 — no radius is rewritten', () => {
     setup();
-    const facts = s().facts;
-    const radii: number[] = [];
-    for (let seed = 0; seed < 30; seed++) {
-      const d = replay(facts, seed);
-      if (!d.positions.get('O') || !d.positions.get('P') || !d.positions.get('M')) continue;
-      const O = d.positions.get('O')!;
-      const P = d.positions.get('P')!;
-      const M = d.positions.get('M')!;
-      const ri = dist(P, M); // the inner circle's actual radius (M is on it)
-      // INVARIANT under every seed: M on the outer circle (5), and internal tangency
-      // |OP| + r_inner = r_outer (collinear, P between O and M).
-      expect(dist(O, M)).toBeCloseTo(5, 4);
-      expect(dist(O, P) + ri).toBeCloseTo(5, 4);
-      radii.push(ri);
+    const d = replay(s().facts);
+    for (const id of ['circle-O', 'circle-P']) {
+      const c = d.construction.objects.find((o) => o.id === id)!;
+      expect(c.kind === 'circle' && c.radius).toMatchObject({ via: 'length', value: 5 });
+      expect(d.circles.get(id)!.r).toBeCloseTo(5, 9);
     }
-    // The inner radius genuinely flexes across seeds — it is not stuck at the 2.5 default.
-    expect(Math.max(...radii) - Math.min(...radii)).toBeGreaterThan(0.3);
   });
 
   it('EXTERNAL tangency keeps the typed radii (a radius only flexes when forced)', () => {

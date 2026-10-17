@@ -477,12 +477,7 @@ export type RadiusSpec =
   // sampler varies it, so a figure with no stated radius (e.g. "two circles intersect at A and B") isn't
   // frozen at an arbitrary number that can't hold the problem's givens. A stated radius stays `length`.
   | { via: 'free'; value: number }
-  | { via: 'through'; point: Id }
-  // The largest circle that sits inside `outer` and is internally tangent to it, given
-  // wherever this circle's centre lands: r = r(outer) − |centre − centre(outer)|. The
-  // radius is thus a DOF the figure flexes (the centre is free), not a fixed pin — so two
-  // equal circles CAN be made internally tangent (ADR-037 Amendment 2 / radius-as-DOF).
-  | { via: 'tangent-inner'; outer: Id };
+  | { via: 'through'; point: Id };
 
 /** A circle: a centre point and a {@link RadiusSpec}. Unlike a line, a circle **is** drawn —
  *  unless `hidden`, in which case it constrains its on-circle points but is not rendered (a
@@ -648,7 +643,7 @@ export function objectParents(o: GeoObject): Id[] {
     case 'circle':
       return [
         o.center,
-        ...(o.radius.via === 'through' ? [o.radius.point] : o.radius.via === 'tangent-inner' ? [o.radius.outer] : []),
+        ...(o.radius.via === 'through' ? [o.radius.point] : []),
       ];
     case 'arc':
       return [o.center, o.from, o.to];
@@ -1037,7 +1032,7 @@ export type SideRequirement =
   /** #2080 ([ADR-645](../../docs/06-decisions.md#adr-645)): two circles STATED tangent («המעגלים O ו-P משיקים», every
    *  spelling — they all lower to `circles-tangent`), touching at `at`. Recorded so the construction itself says the
    *  pair has ONE common point, whichever way apply realised the tangency (a witness coincide over free radii, a pinned
-   *  centre distance over stated ones, a `tangent-inner` radius) — read by `circlesStatedTangent`, never by coordinates. */
+   *  centre distance over stated ones) — read by `circlesStatedTangent`, never by coordinates. */
   | { kind: 'circle-position'; relation: 'tangent'; a: Id; b: Id; at: Id;
       /** #2188 ([ADR-672](../../docs/06-decisions.md#adr-672)): the KIND the statement gave (`circles-tangent.external`) —
        *  read back by the parser (`statedTangencies`) so a later restatement that names no kind keeps it. */

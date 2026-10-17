@@ -65,16 +65,19 @@ describe('#2084 (d) — the witness reads every point on the circle', () => {
     expect(added.some((k) => k.type === 'length-radius') || drove, 'the membership is lowered, not dropped').toBe(true);
   });
 
-  it('the inner circle of an equal-radii internal tangency (no member at all): the stated touch point', () => {
+  it('the inner circle of a stated-radii internal tangency (no member at all): the membership is lowered', () => {
+    // #2239 (ADR-692): re-based from equal radii 3/3 — the retired `tangent-inner` rewrite, whose radius had no
+    // length and needed the stated touch point as its witness — to 3/2. The inner circle now keeps its stated
+    // radius, so the membership is the plain |P·C| = 2 residual: lowered, never dropped.
     const before = build([
       { type: 'circle', id: 'circle-O', center: 'O', radius: 3 },
-      { type: 'circle', id: 'circle-P', center: 'P', radius: 3, apart: true },
+      { type: 'circle', id: 'circle-P', center: 'P', radius: 2, apart: true },
       { type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'M', external: false },
       ...derived,
     ] as Command[]);
-    expect((obj(before, 'circle-P') as Extract<GeoObject, { kind: 'circle' }>).radius.via).toBe('tangent-inner');
+    expect((obj(before, 'circle-P') as Extract<GeoObject, { kind: 'circle' }>).radius).toMatchObject({ via: 'length', value: 2 });
     const c = applyCommand(before, { type: 'point-on-circle', id: 'C', circle: 'circle-P' } as Command);
-    const all = [...c.constraints, ...c.objects.flatMap((o) => ((o as { solve?: { constraint: unknown } }).solve ? [(o as { solve: { constraint: { type: string; witness?: string } } }).solve.constraint] : []))];
-    expect(all.some((k) => (k as { type: string; witness?: string }).type === 'length-radius' && (k as { witness?: string }).witness === 'M')).toBe(true);
+    expect(c.constraints.slice(before.constraints.length)).toContainEqual({ type: 'distance', a: 'P', b: 'C', value: 2 });
   });
+
 });

@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { applyCommand } from '../apply';
+import { applyStep } from '../step';
 import { circlesStatedTangent } from '../structure';
 import { circlesTouch } from '../evaluate';
 import type { Command, Construction } from '../types';
@@ -32,13 +33,16 @@ describe('#2080 — circlesStatedTangent', () => {
     expect(circlesStatedTangent(c, 'circle-P', 'circle-O')).toBe(true);
   });
 
-  it('equal stated radii, internal (the tangent-inner radius) → true', () => {
-    const c = build([
+  it('equal stated radii, internal → refused at stage 0a, so no such pair is ever built (#2239, ADR-692)', () => {
+    // Was: the `tangent-inner` rewrite (ADR-037 Am. 2) built the pair by changing the 2nd stated radius — superseded.
+    const before = build([
       { type: 'circle', id: 'circle-O', center: 'O', radius: 3 },
       { type: 'circle', id: 'circle-P', center: 'P', radius: 3, apart: true },
-      tan(false),
     ] as Command[]);
-    expect(circlesStatedTangent(c, 'circle-O', 'circle-P')).toBe(true);
+    const r = applyStep(before, tan(false));
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toBe('over-constrained: radius of circle-P = 3 cannot hold');
+    expect(circlesStatedTangent(r.construction, 'circle-O', 'circle-P')).toBe(false);
   });
 
   it('a crossing pair, and a pair that merely LOOKS tangent, → false', () => {

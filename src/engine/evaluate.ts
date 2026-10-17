@@ -1457,7 +1457,7 @@ export function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean
     progressed = false;
     for (const o of circleObjs) {
       if (!remainingCircles.has(o.id)) continue;
-      const r = resolveCircle(o, pos, circles);
+      const r = resolveCircle(o, pos);
       if (r === 'pending') continue;
       if (typeof r === 'string') return { ok: false, error: r, stuckIds: [o.id] };
       circles.set(o.id, r);
@@ -1567,19 +1567,12 @@ export function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean
 }
 
 /** Resolve one circle to its centre and radius: a {@link ResolvedCircle}, 'pending', or an error string. */
-export function resolveCircle(c: Circle, pos: Map<Id, Vec>, circles: Map<Id, ResolvedCircle>): ResolvedCircle | 'pending' | string {
+export function resolveCircle(c: Circle, pos: Map<Id, Vec>): ResolvedCircle | 'pending' | string {
   const center = pos.get(c.center);
   if (!center) return 'pending';
   if (c.radius.via === 'length' || c.radius.via === 'free') {
     if (c.radius.value <= 0) return `circle ${c.id}: radius must be positive`;
     return { center, r: c.radius.value };
-  }
-  if (c.radius.via === 'tangent-inner') {
-    const outer = circles.get(c.radius.outer); // resolved earlier in the sweep (it's a plain circle)
-    if (!outer) return 'pending';
-    const r = outer.r - len(sub(center, outer.center)); // largest circle inside `outer`, tangent to it
-    if (r < 1e-9) return `circle ${c.id}: its centre is too far from ${c.radius.outer} to sit inside it`;
-    return { center, r };
   }
   const p = pos.get(c.radius.point);
   if (!p) return 'pending';

@@ -35,6 +35,7 @@ import {
 import { sideImpossibility, sideImpossibilityError } from './sideFeasibility';
 import { collinearCircleError, collinearCircleImpossibility, notCyclicImpossibility, notCyclicImpossibilityError } from './cyclicFeasibility';
 import { recordRequirement, requirementsField } from './requirements';
+import { circlesTangentError, equalInternalTangency } from './radiusFeasibility';
 import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, polygonDefects, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, type PolygonDefect } from './degeneracy';
 import { allConstraints, applySeed, freeDofs, movableIds } from './sample';
 import { impliedByFigure } from './dofRank';
@@ -191,27 +192,6 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     // redefinition of it; apply's `refineRingKind` gives the polygon the narrower kind.
     if (o.kind === 'polygon' && existing.kind === 'polygon' && (isSupertypeRestatement(cmd, existing) || refinesDeclaredRing(prev, cmd))) continue;
     return `'${o.id}' is already defined — it can't be redefined as something different`;
-  }
-  return null;
-}
-
-/**
- * Reject a `circles-tangent` the engine genuinely can't size — only the
- * radius-through-a-point case (its radius isn't known at apply time). Equal-radii
- * internal tangency is NOT rejected: a radius is a flexible DOF, so the apply step
- * shrinks a circle to make it work (ADR-037 Amendment 1). Returns a message or null.
- */
-function circlesTangentError(prev: Construction, cmd: Command): string | null {
-  if (cmd.type !== 'circles-tangent') return null;
-  const circ = (id: Id) => prev.objects.find((o) => o.id === id && o.kind === 'circle') as Extract<GeoObject, { kind: 'circle' }> | undefined;
-  const c1 = circ(cmd.circle1);
-  const c2 = circ(cmd.circle2);
-  if (!c1 || !c2) return null; // a missing circle is handled by the normal flow
-  // A radius-through-a-point circle has no length known at apply time, so it can't be sized
-  // for tangency. A `tangent-inner` radius is our own internal state (a re-applied tangency) —
-  // allow it. Only `through` is the genuinely unsupported case.
-  if (c1.radius.via === 'through' || c2.radius.via === 'through') {
-    return 'tangent circles need a fixed radius (a radius-through-a-point circle is not supported yet)';
   }
   return null;
 }
@@ -1230,6 +1210,10 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   // probe called it a deferrable PENDING state. Sound one way only — a violation proves impossibility;
   // passing proves nothing and the ordinary ladder still runs.
   const probed = applyCommand(prev, cmd);
+  // #2239 (ADR-692), stage 0a: two circles of equal STATED radius stated internally tangent, in either order — the
+  // centres would coincide. Refused before the ladder; a stated radius is never rewritten to make the pair fit.
+  const equalErr = equalInternalTangency(prev, probed, [cmd]);
+  if (equalErr) return { ok: false, error: equalErr, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   const metricErr = metricImpossibility(probed.constraints);
   if (metricErr) {
     return { ok: false, error: metricImpossibilityError(metricErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
@@ -1469,6 +1453,9 @@ function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult
   let next = prev;
   for (const cmd of cmds) next = applyCommand(next, cmd, prevPositions);
   const newCons = next.constraints.slice(prev.constraints.length);
+  // #2239 (ADR-692): a coupled line can state the equal-radii internal tangency as well as one statement can.
+  const equalErr = equalInternalTangency(prev, next, cmds);
+  if (equalErr) return { ok: false, error: equalErr, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   // #1712 (ADR-587): a coupled line is still a list of statements — one that no configuration can take
   // on its own is refused by name here too, never handed to the joint solve to fail anonymously.
   const rangeErr = measureRangeImpossibility(newCons);

@@ -5031,6 +5031,30 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'stated-radius-never-changed-2239',
+    title: 'Two radius-3 circles «משיקים מבפנים» are refused naming the radius line, in either order; both radii stay 3 (#2239, ADR-692)',
+    guards:
+      "#2239 (P1), the operator's rulings of 2026-10-16 (#2239: «a stated radius is never changed by a later constraint. Either the figure holds it, or the line is refused, naming the conflicting statement»; #2206 line 2: «Equal radii with internal tangency … refused»). Measured on 4b0b4592 through decideDeterministic2D: «מעגל O ברדיוס 3» · «מעגל P ברדיוס 3» · «המעגלים O ו-P משיקים מבפנים» committed GREEN with P drawn at 0.95–1.70 by seed, and the other order (tangency first, then both radii 3) drew two coincident circles green. Root cause: the ADR-037 Am. 2 apply branch rewrote the second stated radius to `tangent-inner` (since ADR-051 it fired only on stated radii), and the verifier never compared a stated radius with the drawn one. Fix: stage 0a `equalInternalTangency` refuses the pair in either order, the rewrite and its `tangent-inner` variant are gone, and the verifier checks every stated radius. Asserts the filing's two lines build with r = 3, its third is refused at the door in #2119's sentence naming «מעגל P ברדיוס 3», and the other order is refused on its last line naming the tangency. The matrix is src/app/__tests__/issue-2239-stated-radius-held.test.ts.",
+    steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 3'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.circles.get('circle-O')!.r, 'O = 3').toBeCloseTo(3, 9);
+      expect(fig.circles.get('circle-P')!.r, 'P = 3').toBeCloseTo(3, 9);
+      const he = i18n.getFixedT('he');
+      const T = 'המעגלים O ו-P משיקים מבפנים';
+      for (const [before, line, other] of [
+        [['מעגל O ברדיוס 3', 'מעגל P ברדיוס 3'], T, 'מעגל P ברדיוס 3'], // the filing, verbatim
+        [['מעגל O', 'מעגל P', T, 'רדיוס מעגל O הוא 3'], 'רדיוס מעגל P הוא 3', T], // the other order (B1)
+      ] as [string[], string, string][]) {
+        const facts = factsOf(before);
+        const v = gateVerdict(facts, line);
+        expect(v.kind, `${before.join(' · ')} · ${line}`).toBe('refused');
+        const raw = (v as { detail?: string }).detail;
+        expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)))).toBe(`לא ניתן: «${line}» סותר את «${other}» — אי אפשר לקיים את שניהם יחד.`);
+      }
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

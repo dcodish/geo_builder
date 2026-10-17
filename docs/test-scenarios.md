@@ -2000,3 +2000,8 @@ over all four (ADR-041).
 ### `radius-restated-refused-2119` — a second, different stated radius is refused naming the first (#2119, ADR-683)
 
 **Guards against:** «מעגל O ברדיוס 4» after «מעגל O ברדיוס 3», and «רדיוס המעגל O הוא 3» after «מעגל O ברדיוס 5», answering «כבר קיים» with the second size dropped — and, with a point on the circle, resizing it silently and green (the operator's ruling of 2026-10-15). **Asserts** «מעגל O ברדיוס 3» builds with r = 3, and each second line is refused at the door «לא ניתן: «…» סותר את «…» — אי אפשר לקיים את שניהם יחד.» with the first radius standing. The matrix (with and without a point, English, circumference, area, the radius letter, the #2206 spelling, saved lists, the AI's `circle` command, the controls) is `src/app/__tests__/issue-2119-radius-restated.test.ts`.
+
+
+### `stated-radius-never-changed-2239` — two radius-3 circles «משיקים מבפנים» are refused, in either order (#2239, ADR-692)
+
+**Guards against:** «מעגל O ברדיוס 3» · «מעגל P ברדיוס 3» · «המעגלים O ו-P משיקים מבפנים» committing green with P silently drawn at 0.95–1.70 (the ADR-037 Am. 2 `tangent-inner` rewrite of a stated radius), and the other order (the tangency first, then both radii 3) drawing two coincident circles green. **Asserts** the filing's first two lines build with both radii 3, its third is refused at the door «לא ניתן: «המעגלים O ו-P משיקים מבפנים» סותר את «מעגל P ברדיוס 3» — אי אפשר לקיים את שניהם יחד.», and the other order is refused on «רדיוס מעגל P הוא 3» naming the tangency. The matrix (English, «רדיוס מעגל … הוא», a radius letter in both orders, an area, a third circle, a loaded list, the controls) is `src/app/__tests__/issue-2239-stated-radius-held.test.ts`.

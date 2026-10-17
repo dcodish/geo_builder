@@ -23,7 +23,7 @@ import { onCircleTol as onCircleTolShared, sideHolds, sideRequirementOf, type Si
 
 export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
-  relation: 'label' | 'not-a-diagonal' | 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'line-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | 'point-off-arc' | 'convexity' | Constraint['type'];
+  relation: 'label' | 'not-a-diagonal' | 'on-circle' | 'tangent' | 'radius' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'line-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | 'point-off-arc' | 'convexity' | Constraint['type'];
   ids: Id[];
   /** English fallback, e.g. "E should lie on circle P (radius 3.60) but is 7.42 from its centre". */
   message: string;
@@ -398,6 +398,30 @@ export function checkGivens(
         message: `radius of ${circleLabel(cmd.c1)} (${a.r.toFixed(2)}) should be ${cmd.k} × radius of ${circleLabel(cmd.c2)} (${b.r.toFixed(2)})`,
         messageKey: 'figure.v.radiusRatio',
         params: { c1: circleName(cmd.c1), c2: circleName(cmd.c2), k: String(cmd.k), r1: a.r.toFixed(2), r2: b.r.toFixed(2) },
+      });
+    }
+  }
+
+  // #2239 (ADR-692) — a STATED RADIUS against the drawn one. A radius is a size stored on the circle, not a
+  // constraint, so no residual above ever compared it: a route that rewrote it (ADR-037 Am. 2's `tangent-inner`)
+  // drew the changed circle green. The latest statement of each circle's size — a sized `circle` or a `set-radius`
+  // (every radius / circumference / area spelling, a valued radius letter) — must hold on the final figure.
+  {
+    const stated = new Map<Id, number>();
+    for (const cmd of commands) {
+      if (cmd.type === 'circle' && typeof cmd.radius === 'number' && !cmd.freeRadius && !cmd.ifAbsent) stated.set(cmd.id, cmd.radius);
+      else if (cmd.type === 'set-radius') stated.set(cmd.circle, cmd.value);
+    }
+    for (const [id, value] of stated) {
+      const c = circles.get(id);
+      if (!c) continue; // not placed — a different failure mode
+      if (Math.abs(c.r - value) <= residualTolerance({ type: 'distance', a: id, b: id, value }, value)) continue;
+      violations.push({
+        relation: 'radius',
+        ids: [id],
+        message: `the radius of ${circleLabel(id)} should be ${formatMeasure(value)} but is drawn ${c.r.toFixed(2)}`,
+        messageKey: 'figure.v.radius',
+        params: { circle: circleName(id), value: formatMeasure(value), drawn: c.r.toFixed(2) },
       });
     }
   }
