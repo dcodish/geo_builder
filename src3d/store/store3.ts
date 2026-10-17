@@ -942,6 +942,51 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
       others: namedStatements(placedBy, factId), sides: ids.length, ring: ids.join(''), forced: true,
     };
   };
+  /**
+   * #1847 (ADR-3D-361, amends ADR-3D-309) — A MEMBERSHIP THAT ONLY A FLAT POLYGON SATISFIES, STATED ABOUT A
+   * POINT THAT ALREADY EXISTS. «משולש ABC · M אמצע BC · M על AB»: M is derived, so «M על AB» is recorded as a
+   * `collinear3` claim about it (M1) and verified against the sampled triangle — `claim-refuted`, «בדקו את
+   * החישוב», while the other order («M על AB» first makes M a rider) reaches the pivot's collapse refusal naming
+   * both statements. One question, two answers by entry order.
+   *
+   * So a refuted membership claim gets the question the rider order is asked: could the givens hold with it at
+   * all? It is re-solved as the pin it states (lines a–b and a–c coincide, the `mutual` drive), on the pivot's
+   * own failure-path search — the open-figure retry. If no admissible placement exists and the pivot records a
+   * declared flat polygon collapsed, the claim is the line that completed the collapse, refused in the same
+   * words as the rider order, naming the statements that placed the claim's other points (the midpoint's
+   * line). A placement that exists keeps today's `claim-refuted`: the claim is judged, never made to drive.
+   * Gated on a flat polygon with free dims (the only figure whose collapse this is); one bounded resolve, on the
+   * failure path only (docs/17 §7).
+   */
+  const membershipCollapse = (factId: string, claim: Claim3): EngineError3 | null => {
+    if (claim.type !== 'collinear3' || claim.ids.length < 3) return null;
+    if (!c.solids.some((s) => FLAT_SOLID_KINDS.has(s.kind)) || freeDims(c) === 0) return null;
+    const [a, b, ...rest] = claim.ids;
+    const probe: Construction3 = {
+      ...c,
+      scalarPins: [
+        ...c.scalarPins,
+        ...rest.map((p) => ({ kind: 'mutual' as const, rel: 'coincident' as const, a: { kind: 'segment' as const, a, b }, b: { kind: 'segment' as const, a, b: p } })),
+      ],
+    };
+    const pivot = resolve3(probe, seed).pivot;
+    const flat = pivot && pivot.solutions === 0 ? pivot.collapse : undefined;
+    if (!flat || flat.solid) return null;
+    // the statements that PLACED the claim's points off the collapsed ring — the first naming each one
+    const ring = new Set(flat.ring);
+    const placedBy = new Set<string>();
+    for (const id of claim.ids) {
+      if (ring.has(id)) continue;
+      const mentions = (v: unknown): boolean =>
+        typeof v === 'string' ? v === id : typeof v === 'object' && v !== null && Object.values(v).some(mentions);
+      const first = facts.find((f) => f.enabled && f.id !== factId && f.cmds.some(mentions));
+      if (first) placedBy.add(first.id);
+    }
+    return {
+      code: 'polygon-collapsed', stated: facts.find((f) => f.id === factId)?.utterance ?? '',
+      others: namedStatements(placedBy, factId), sides: flat.ring.length, ring: flat.ring.join(''),
+    };
+  };
   if (paramContradiction) {
     const blamed = paramPinOwners[paramPinOwners.length - 1];
     if (status[blamed] === 'ok')
@@ -991,7 +1036,7 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
           status[owner.factId] =
             claim.type === 'polygon-open'
               ? boundPolygonCollapsed(owner.factId, claim.ids)
-              : (sampledCarrierVerdict(claim, c, resolved) ?? { code: 'claim-refuted' });
+              : (sampledCarrierVerdict(claim, c, resolved) ?? membershipCollapse(owner.factId, claim) ?? { code: 'claim-refuted' });
           break;
         }
       }

@@ -535,6 +535,8 @@ without the rider rows; if the ring opens, an incidence invented the collapse, a
 `collapse: { ring, riderKeys }` reaches `pivot.collapse`, where `derive3` refuses `polygon-collapsed`
 (`err.polygonCollapsed`).
 
+**The same conflict stated about an existing point** (#1847, [ADR-3D-361](06b-decisions-3d.md#adr-3d-361)). When the incidence is stated last, about a point that already exists («M אמצע BC · M על AB»), it is a `collinear3` claim, not a rider. A refuted `collinear3` claim on a figure with a `FLAT_SOLID_KINDS` solid and free dims (`membershipCollapse` in `derive3`, after `sampledCarrierVerdict`) is re-resolved once with the pin it states (`mutual` coincident lines a–b, a–c); if that pivot comes back empty with a non-solid `collapse` record, the claim is refused `polygon-collapsed` (not forced), naming the statements that first placed the claim's points off the ring. Otherwise it stays `claim-refuted`.
+
 **A declared polygon collapsed is refused, whatever forced it** (#1849, ADR-3D-310, ADR-W-115).
 `settleFlatRings` (formerly `preferUncollapsed`) keeps solutions with every declared ring open, then tries
 the frozen-dims retry and the **open-figure retry** (`openSolveOn(null)`, passing `degenerate`); with
