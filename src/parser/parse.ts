@@ -30,7 +30,8 @@ import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { foreignGiven } from './scope';
 import { readFrame } from './frame';
-import { NOTATION_WORDS, UNIT_WORDS, unaccountedLabels } from './labelAccounting';
+import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
+import { nameAccounting } from '../../shell/llm/honestyCore';
 import { readShapePhrase, lowerShape, shapeNounIsDefinite, shapeNounSpan, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
 
 export type ParseResult =
@@ -14524,19 +14525,34 @@ export function droppedNewLabels(utterance: string, commands: AnyCommand[], exis
  * Scaffolding is exempt by construction: `~`-hidden and `@`-anonymous ids are minted at apply and are
  * not uppercase label runs. Conservative on purpose — a missed invention is a missed warning, while a
  * false flag would refuse a working decomposition.
+ *
+ * #2228 ([ADR-695](../../docs/06-decisions.md#adr-695), operator ruling 2026-10-16) — an EXISTING label is an
+ * invention too. The figure exemption was unconditional, so a decomposition that pulled an existing point into a
+ * relation the sentence never stated («… דרך P» for a sentence that never mentions P, #2225's class) passed. An
+ * existing label is now the student's only when the sentence REFERS to it: by name (case-blind, as before), or by
+ * a noun that reaches a figure object holding it («מעגל חוסם את המשולש» → ABC, «גובה ל-BC» → A, «מחוץ למעגל» → O —
+ * {@link nounReferencedLabels}). `refs` carries the figure's polygons, circles and segments; without it an existing label is
+ * reached by name only. The set difference is the shared core's (`nameAccounting`, shell/llm) with existing names
+ * NOT exempt — the call analytic's #2225 gate makes.
  */
-export function introducedNewLabels(utterance: string, canonicalLines: string[], existingPoints: Id[] = []): Id[] {
+export function introducedNewLabels(
+  utterance: string,
+  canonicalLines: string[],
+  existingPoints: Id[] = [],
+  refs: NounRefCtx = {},
+): Id[] {
   // The STATED side is case-blind (#779): a label the student wrote in lowercase and the LLM echoed
   // uppercase is the student's own label, not an invention. The LINE side stays uppercase — canonical
   // lines are canonical, and lowercase glyphs there are never labels.
-  const labelsOf = (s: string): Set<string> => new Set(normalizeUtterance(s).match(/[A-Z]\d*/g) ?? []);
-  const stated = new Set(statedLabelTokens(normalizeUtterance(utterance)));
-  const have = new Set(existingPoints.map((p) => p.toUpperCase()));
-  const out = new Set<Id>();
-  for (const line of canonicalLines) {
-    for (const L of labelsOf(line)) if (!stated.has(L) && !have.has(L)) out.add(L);
-  }
-  return [...out];
+  const norm = normalizeUtterance(utterance);
+  const stated = new Set(statedLabelTokens(norm));
+  const written = canonicalLines.flatMap((line) => normalizeUtterance(line).match(/[A-Z]\d*/g) ?? []);
+  return nameAccounting({
+    stated: [...stated, ...nounReferencedLabels(norm, stated, refs)],
+    written,
+    existing: new Set(existingPoints.map((p) => p.toUpperCase())),
+    exemptExistingFromInvented: false,
+  }).invented;
 }
 
 /** English function words — never label candidates in Latin-only text (the article "a" in "a point D

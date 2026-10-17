@@ -451,10 +451,18 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
   // the ADR-263/270 auto-label family) is never mistaken for an invention. Refuse and keep the text:
   // naming a point is the student's, and a silent commit is the one outcome that cannot be undone by
   // reading the figure.
+  // #2228 (ADR-695): an EXISTING point the sentence never refers to is an invention too — the decomposition
+  // attached a relation to it («… דרך P») that the student never stated. The figure's polygons and circles say
+  // which existing points a noun in the sentence reaches («המשולש», «הצלע», «המעגל», «הקטע»).
   const invented = introducedNewLabels(
     utterance,
     out!.built.map((g) => g.step),
     llmFig.objects.filter(isGeoPoint).map((o) => o.id),
+    {
+      polygons: llmFig.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])),
+      circleMembers: circleMembers(llmFig),
+      segments: llmFig.objects.flatMap((o) => (o.kind === 'segment' ? [[o.a, o.b]] : [])),
+    },
   );
   if (invented.length > 0) {
     logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `invented-labels:${invented.join(',')}`, commands: llmCmds });

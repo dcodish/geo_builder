@@ -674,6 +674,8 @@ label stays `droppedNewLabels`'s question), whose `parseClause` asks again. `aug
 anonymous centre (`@ctr-O`) with `centrePoint`, as `buildParseCtx` does. Widening the reference closure is the
 sanctioned direction; re-widening the exemption is not.
 
+**The invented direction** ([ADR-695](06-decisions.md#adr-695), #2228). `introducedNewLabels` (the LLM second attempt's mirror gate, #255) asks the converse: is each label the model WROTE the student's? An existing label is the student's only by name or through `nounReferencedLabels` (same module). A polygon / circle / segment noun in the sentence reaches the figure's polygons, circles (centre and members) and drawn segments, narrowed to the objects holding a point the sentence names. The set difference is `nameAccounting` from `shell/llm/honestyCore.ts` with existing names not exempt, the call analytic's #2225 gate makes.
+
 ### A crossing draws what its subject is ([ADR-592](06-decisions.md#adr-592))
 
 Only the frame decides whether a crossing's operand lines are drawn. The verb frame — `lineLineIntersection`'s
