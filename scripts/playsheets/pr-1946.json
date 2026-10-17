@@ -1,0 +1,115 @@
+{
+  "name": "pr-1946",
+  "title": "PR #1946 + #2103 — a right angle at a named foot or crossing is marked, once, in the stated corner",
+  "cases": [
+    {
+      "id": "T1",
+      "base": "http://localhost:5239",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "A height to a named foot shows its right-angle mark at D, toward C",
+      "lines": [
+        "משולש ABC",
+        "D על BC",
+        "AD ⟂ BC"
+      ],
+      "cycles": 2,
+      "lookFor": "One right-angle square at D, in the corner between DA and DC; it stays on the DC side after each «הציגו תצורה אחרת».",
+      "before": "No mark at D."
+    },
+    {
+      "id": "T2",
+      "base": "http://localhost:5239",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "Writing the side the other way round puts the mark toward B",
+      "lines": [
+        "משולש ABC",
+        "D על BC",
+        "AD ⟂ CB"
+      ],
+      "lookFor": "One right-angle square at D, between DA and DB.",
+      "before": "No mark at D."
+    },
+    {
+      "id": "T3",
+      "base": "http://localhost:5239",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "The diagonals' crossing, named O, shows its right angle in the corner COD",
+      "lines": [
+        "ריבוע ABCD",
+        "O נקודת חיתוך האלכסונים",
+        "AC ⟂ BD"
+      ],
+      "lookFor": "One right-angle square at O, between OC and OD (plus the square's own corner marks, if any).",
+      "before": "No mark at O."
+    },
+    {
+      "id": "T4",
+      "base": "http://localhost:5239",
+      "path": "/3d.html",
+      "class": "look",
+      "product": "3d",
+      "title": "3-D: the same height draws its right-angle mark at D, toward C",
+      "lines": [
+        "משולש ABC",
+        "D על BC",
+        "AD ⊥ BC"
+      ],
+      "cycles": 2,
+      "lookFor": "One right-angle mark at D between DA and DC, on every configuration.",
+      "before": "No mark at D."
+    },
+    {
+      "id": "T5",
+      "base": "http://localhost:5239",
+      "path": "/3d.html",
+      "class": "look",
+      "product": "3d",
+      "title": "3-D: the named crossing's mark moves to the corner COD",
+      "lines": [
+        "מעוין ABCD",
+        "O נקודת חיתוך האלכסונים",
+        "AC ⟂ BD"
+      ],
+      "lookFor": "One right-angle mark at O, between OC and OD.",
+      "before": "The mark at O sat in the corner COB."
+    },
+    {
+      "id": "T6",
+      "base": "http://localhost:5239",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "Rhombus: the named crossing marks COD, the letter clear of it",
+      "lines": [
+        "מעוין ABCD",
+        "O נקודת חיתוך האלכסונים",
+        "AC ⟂ BD"
+      ],
+      "cycles": 2,
+      "lookFor": "One square at O between OC and OD; the letter O beside it, not on it.",
+      "before": "No mark at O."
+    },
+    {
+      "id": "T7",
+      "base": "http://localhost:5239",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "Quadrilateral: the named crossing marks COD",
+      "lines": [
+        "מרובע ABCD",
+        "O נקודת חיתוך האלכסונים",
+        "AC ⟂ BD"
+      ],
+      "cycles": 2,
+      "lookFor": "One square at O between OC and OD.",
+      "before": "No mark at O."
+    }
+  ]
+}

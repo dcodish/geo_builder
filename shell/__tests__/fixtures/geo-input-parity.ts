@@ -1599,6 +1599,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2097 (ADR-719): «|XY|» is the length XY in every slot — 2-D read it only in the sum, ordering and bound rules ──
   { id: 'abs-length-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = 4'], expect: 'builds', note: '2-D escalated it before ADR-719' },
   { id: 'abs-length-var-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = k'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2092' }], note: '2-D escalated it before ADR-719' },
+
+  // ── #1946 + #2103 (ADR-731, ADR-3D-366): a ⟂ at a NAMED foot / crossing draws one knee at rest, in the corner the statement names ──
+  { id: 'perp-knee-named-foot-1946', family: 'parallel-perpendicular', steps: ['משולש ABC', 'D על BC', 'AD ⟂ BC'], expect: 'builds', note: 'the knee at D (∠ADC) is locked per tool in issue-1946-knee-at-named-foot.test.ts (2-D and 3-D)' },
+  { id: 'knee-named-crossing-2103', family: 'parallel-perpendicular', steps: ['ריבוע ABCD', 'O נקודת חיתוך האלכסונים', 'AC ⟂ BD'], expect: 'builds', note: 'the knee at O (∠COD) is locked per tool in issue-1946-knee-at-named-foot.test.ts (2-D and 3-D)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

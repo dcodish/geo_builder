@@ -18374,3 +18374,46 @@ The kind words are the ones `circlesTangent` already reads. #2214's single kind 
 **Locks.** `src/app/__tests__/issue-2206-equal-nested.test.ts` (the nine word rows with their keys, both new sentences word for word, each taught step builds; thirteen value rows in both orders with the named statement and the reason, English, a loaded list, the controls; the model never called); `src/engine/__tests__/radius-feasibility.test.ts` (contained, concentric, ratio k = 1 either order, k = 2 / unequal / one free / apart do not fire); `src/parser/__tests__/two-circle-family.test.ts` (the #2206 block); rewritten for the ruled reason: `issue-2239-stated-radius-held.test.ts`, scenario `stated-radius-never-changed-2239`, the engine message in `circles-tangent.test.ts` and `circles-stated-tangent.test.ts`, `issue-2186-equal-size-two-circle-family.test.ts` (its concentric and internal escalation rows); `src/i18n/__tests__/humanize-error.test.ts` (the pattern's coverage, each relation); scenario `equal-circles-nested-values-2206`; three parity rows.
 
 **Behaviour change for a student:** «מעגל O ברדיוס 3» · «מעגל P ברדיוס 3» · «מעגל P מוכל בתוך מעגל O» is refused «לא ניתן: «מעגל P מוכל בתוך מעגל O» סותר את «מעגל P ברדיוס 3» — אי אפשר לקיים את שניהם יחד. הסיבה: שני מעגלים שרדיוסיהם שווים אינם יכולים להיות מוכלים זה בזה, כי מעגל שמוכל במעגל אחר קטן ממנו.» (before: drawn with a red warning); the same for a concentric pair stated with equal radii and for an equality on its own line; the internal tangency over equal stated radii keeps its refusal and now says why; «שני מעגלים משיקים מבפנים ברדיוסים שווים» and «שני מעגלים בעלי מרכז משותף O ברדיוסים שווים» (and their spellings) are refused naming the contradiction (before: sent to the AI).
+
+## ADR-731 — A stated ⟂ whose right angle sits at a NAMED point is marked at rest, once, in the corner the statement names (#1946, #2103)
+
+**Status:** accepted · 2026-10-17 · feature (2-D + 3-D, one PR) · branch `feat/1946-perp-mark-named-foot` off `main` @ 688dfb96 · fix round #2318, stream I · implements the #1946 fix plans of 2026-10-14 (second ruling) and 2026-10-15 (the #2103 amendment) · the 3-D half is [ADR-3D-366](06b-decisions-3d.md#adr-3d-366) · **amends** [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B2 (its Amendment 3)
+**Operator rulings:** 2026-10-10 on #1946, option C: *"a stated ⟂ whose right angle sits at a NAMED point is a VALUE, so the knee is drawn at rest, in both 2-D and 3-D"*, and its follow-up: *"A single knee at D, on the DC side — the right angle is stated once, so it is marked once."* 2026-10-14, card `d14b-1946-side`, A: *"The single right-angle mark at D sits toward the second-named letter of the other segment («AD ⟂ BC» → the DC side), in 2-D and 3-D. It never flips when the figure is cycled."* 2026-10-15 on #2103, card 7, A: *"at a named crossing, the right-angle mark sits in the corner toward each segment's second-named letter (for «AC ⟂ BD» at O: ∠COD). It never flips when the figure is cycled. Same in 2-D and 3-D."*
+
+**Requirements:** [02](02-requirements.md) **FR-RN-7** (a perpendicular is marked where its vertex is named, in the statement's corner, once) · **Design:** [04](04-design.md) §6, new bullet *The at-rest angle marks* (`angleMarkFor(cmd, figure)`, `namedPerpendicularMark`, the yield pass, `relationMarks`' `restKnees`) · **LADDER stage:** none (display: the replay's mark list and the renderer).
+
+**Root cause.** 2-D's at-rest knee comes from `angleMarkFor` (`src/replay/core.ts`), per command, from the command alone. Its `set-perpendicular` arm drew only when the two segments shared an endpoint ID (`if (!shared) return null`), and `foot` had no arm. So a right angle stated at a point the student named but that is an endpoint of only one segment — «D על BC» · «AD ⟂ BC», «AD גובה» — or at a point stated as the crossing — «O נקודת חיתוך האלכסונים» · «AC ⟂ BD» — had no mark at rest; the hover relations layer meanwhile showed both halves at D (∠ADB and ∠ADC). Class: *a stated right angle whose vertex is a named point is not marked at rest, or is marked in a corner the drawing chooses instead of the statement.*
+
+**Decision.**
+1. **`angleMarkFor(cmd, figure)`** takes the construction the fact applied into (its one caller in `replay` has it). For a `set-perpendicular` with no shared id, `namedPerpendicularMark`: (a) an endpoint V of one segment that `Structure.onLineBy` puts on the other's line — a rider, a foot, a crossing, a lowered collinearity, through the coincide classes; never a position — gives the knee {V, the ⟂ segment's far end, the OTHER segment's second id as typed}; (b) else a `line-line-intersection` of exactly the two segments' pairs gives {V, `cmd.b`, `cmd.d`}. Otherwise null: an unnamed crossing stays a relation (B2).
+2. **A named foot.** The `foot` command gains `named?: true`, set by the altitude rule when the foot is the student's letter (`namedFoot`) and by the «F רגל האנך …» rule. `angleMarkFor` marks it {foot, from, `b`} — the side as the command carries it: the student's order when typed («AD גובה לצלע CB» → B), the shape's own order when not. An auto-named foot («הגובה מ-A» → F) and a construction's own feet (touch points, orthocentre feet) carry no flag and draw nothing, as before.
+3. **Marked once.** After the existing honesty gate and id dedup, a knee reached through 1 or 2 yields to another knee at the same vertex between the same two lines (directions within 1°, either side): a stated «זווית ADB = 90» keeps its knee and «AD ⟂ BC» adds none; «AD ⟂ BC» and «AD גובה» together are one knee.
+4. **The relations layer** (`relationMarks`, opt-in, hover) takes the at-rest right knees and draws no forced-90° square between the same two lines at the same vertex — the "one knee, not two" of the ruling.
+5. **The letter stays clear of the knee** (`buildScene`): a right-angle knee's diagonal at a point counts as one more incident direction for that point's label, so the letter takes the widest gap outside the mark. A named crossing is no segment's endpoint, so its letter used to take the default direction, which can be the very corner the ruling marks. The knee is the visible half of the ruling, so keeping it uncovered is part of delivering it.
+
+**Measured before / after** (`688dfb96`, `decideDeterministic2D` → `commitVerdict` → `replay`, model mocked; D = (2, 0) on BC with B = (6, 0), C = (0, 0), so B is the FARTHER end):
+
+| sequence | before | after |
+|---|---|---|
+| «משולש ABC» · «D על BC» · «AD ⟂ BC» (also ⊥, «מאונך ל-») | none | D: A, C |
+| … · «AD ⟂ CB» | none | D: A, B |
+| … · «AD גובה» / «AD גובה לצלע CB» | none | D: A, C / D: A, B |
+| «משולש ABC» · «AD גובה» (D new) / «F רגל האנך מ-A ל-BC» | none | D: A, C / F: A, C |
+| «משולש ABC» · «הגובה מ-A» (auto-named foot) | none | none |
+| … · «D על BC» · «AD ⟂ BC» · «זווית ADB = 90» | D: A, B | D: A, B (one) |
+| «ריבוע/מעוין/מרובע ABCD» · «O נקודת חיתוך האלכסונים» · «AC ⟂ BD» (also «O נקודת החיתוך של AC ו-BD») | none | O: C, D |
+| … · «CA ⟂ BD» / «BD ⟂ AC» | none | O: A, D / O: C, D |
+| «ריבוע ABCD» · «AC ⟂ BD»; «ריבוע ABCD» · «O אמצע AC» · «AC ⟂ BD» | none | none |
+| «משולש ABC» · «AB ⟂ AC» | A | A |
+
+The corner holds at seeds 0–5 and across three «הציגו תצורה אחרת» presses.
+
+**Why not a patch (docs/17 §2).** No spelling or figure is special-cased: every ⟂ spelling lowers to the one `set-perpendicular` and every named-foot spelling to the one `foot` emit, and "lies on the other segment" is the structural reader the provers already share (`Structure.onLineBy`, ADR-651).
+
+**Risk.** A knee where a statement only LOOKS named: the reader is structural, so a positional coincidence names nothing (the «O אמצע AC» row). The `named` flag changes the stored command of every named altitude, so the parity goldens drift on scenarios with a named height (the batch's to judge, ADR-W-113) and the saved fixtures whose stored `foot` predates the flag re-lower with it (the load audit compares canonical commands).
+
+**Sibling audit / cross-tool.** 3-D: [ADR-3D-366](06b-decisions-3d.md#adr-3d-366) (same rule, same rows). Analytic (its own engine, outside this PR): measured at 688dfb96 through `decideSubmit` → `derive` — «D על BC» · «AD ⟂ BC» and the named crossing draw no knee, and «AD גובה» draws one toward the FARTHER end (#1241's rule); the verdicts agree (parity rows `perp-knee-named-foot-1946`, `knee-named-crossing-2103`, both `builds`), and the display gap is #2320. Complex: no ⟂ between segments.
+
+**Locks.** `src/render/__tests__/issue-1946-knee-at-named-foot.test.ts` (every row above, seeds 0–5 and three cycles on each family, the value and double-statement rows, the auto-named foot, the controls, and the relations layer's `restKnees`); fixtures `src/__tests__/fixtures/issue-1946-perp-knee-at-foot.geo.json`, `issue-2103-knee-named-crossing.geo.json`; parity rows `perp-knee-named-foot-1946`, `knee-named-crossing-2103`.
+
+**Behaviour change for a student:** «משולש ABC» · «D על BC» · «AD ⟂ BC» (and «AD גובה», «F רגל האנך מ-A ל-BC») now shows one right-angle square at D, in the corner toward C — toward B for «AD ⟂ CB» — where before it showed none; «O נקודת חיתוך האלכסונים» · «AC ⟂ BD» shows one square at O in the corner COD. Hovering the relations layer at D no longer adds the other half's square.

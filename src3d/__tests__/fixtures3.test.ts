@@ -373,6 +373,11 @@ const SEEDED: SeededCorpus = {
   // issue-2081-held-slots.test.ts; these are the build + drift net.
   'coords-claim-surd-2081.geo3.json': ['A(0,0,0)', 'B(√2,0,0)', 'B=(√2,0,0)'],
   'distance-surd-2081.geo3.json': ['פירמידה SABCD', 'המרחק בין S למישור ABC הוא √2'],
+  // #1946 + #2103 (ADR-3D-366) — the rule-4 locks: a ⟂ at a NAMED foot and at a NAMED crossing draws one knee in the
+  // corner the statement names (before: none at D; the crossing's on ∠AOB). The corners are asserted in
+  // issue-1946-knee-at-named-foot.test.ts; these are the build + drift net.
+  'perp-knee-at-foot-1946.geo3.json': ['משולש ABC', 'D על BC', 'AD ⟂ BC'],
+  'knee-named-crossing-2103.geo3.json': ['ריבוע ABCD', 'O נקודת חיתוך האלכסונים', 'AC ⟂ BD'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

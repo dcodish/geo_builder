@@ -1,0 +1,69 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "7d2ShXijpeh29V3ST5Flt",
+      "utterance": "משולש ABC",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "aJ5040By_U1U9WJ_LRV0F",
+      "utterance": "D על BC",
+      "group": "4W0H6wkR01P__s34rvYF3",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "PQyPETkOJT4_SzATdp0KO",
+      "utterance": "D על BC",
+      "group": "4W0H6wkR01P__s34rvYF3",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "D",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "C5YmBWCHfpvQNa36t1GFk",
+      "utterance": "AD ⟂ BC",
+      "group": "G_OHFSXyI4dXnq0C8sK9d",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "PtNVDoXwdGiRgDqOXdob4",
+      "utterance": "AD ⟂ BC",
+      "group": "G_OHFSXyI4dXnq0C8sK9d",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "A",
+        "b": "D",
+        "c": "B",
+        "d": "C"
+      },
+      "enabled": true
+    }
+  ]
+}

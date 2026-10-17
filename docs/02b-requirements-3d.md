@@ -562,7 +562,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   shared endpoint («AB ⟂ AC» at A), or a point stated as the crossing («O נקודת חיתוך האלכסונים»). Two
   segments stated ⟂ that cross at an unnamed point («ריבוע ABCD» · «AC ⟂ BD») draw no mark at rest, as in
   2-D; the relation shows in the givens list and the data panel. A line or segment ⟂ a plane keeps its knee.
-  - Sources: ADR-3D-360, ADR-W-118 B2, #2091.
+  An endpoint of one segment that the facts put on the other is a named vertex too («D על BC» · «AD ⟂ BC», «AD
+  גובה»): the knee is drawn at D. At a named foot and at a named crossing the knee sits in the corner the
+  statement names, as in 2-D — toward the other segment's second-named letter («AD ⟂ BC» → ∠ADC, «AD ⟂ CB» →
+  ∠ADB), and at a named crossing toward each segment's second-named letter («AC ⟂ BD» at O → ∠COD) — and never
+  moves when the figure is cycled. A right angle already stated as a value there («זווית ADB = 90») keeps its
+  own knee and the ⟂ adds none.
+  - Sources: ADR-3D-360, ADR-3D-366, ADR-W-118 B2 (Am. 3), #2091, #1946, #2103.
 
 ## Coverage
 

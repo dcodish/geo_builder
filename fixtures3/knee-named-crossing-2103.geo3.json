@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-17T16:25:21.185Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "ריבוע ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "square",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "O נקודת חיתוך האלכסונים",
+      "cmds": [
+        {
+          "type": "diag-intersection",
+          "id": "O",
+          "face": []
+        }
+      ]
+    },
+    {
+      "utterance": "AC ⟂ BD",
+      "cmds": [
+        {
+          "type": "cos-angle",
+          "u": {
+            "kind": "pair",
+            "from": "A",
+            "to": "C"
+          },
+          "v": {
+            "kind": "pair",
+            "from": "B",
+            "to": "D"
+          },
+          "cos": 0
+        }
+      ]
+    }
+  ]
+}

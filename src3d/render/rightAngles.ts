@@ -27,6 +27,14 @@
  * a letter that merely sits on the crossing in the drawing («O אמצע AC») is not one. The ⟂ still shows in
  * the givens list and the data panel. Two named VECTORS («u ⊥ v») keep the crossing knee (#2093, unruled).
  *
+ * **A named foot, and the corner a named vertex is marked in** (#1946 + #2103, ADR-3D-366). The named vertex
+ * may also be an endpoint of one segment that the facts put ON the other («D על BC» · «AD ⟂ BC»): the right
+ * angle is at D, so it is marked there, although the segments touch only at D's end. At a named foot or a named
+ * crossing the corner is read from the STATEMENT, never from the drawing — toward the other segment's
+ * second-named letter («AD ⟂ BC» → ∠ADC; «AC ⟂ BD» at O → ∠COD), so it never flips when the figure is cycled.
+ * A shared endpoint keeps `armDir`. A knee reached this way yields to another knee at the same vertex between
+ * the same two lines (a stated «∠ADB = 90»): the right angle is stated once, so it is marked once.
+ *
  * Pure: reads the construction + resolved positions, returns world-space geometry. The
  * renderer projects it, which is what makes the knee three-dimensional — it lies in the
  * plane of the two arms and foreshortens with the orbit rather than being a screen-space square.
@@ -139,17 +147,67 @@ export function meetingPoint(seg: SegPair, pos: Positions3, scale: number): Vec3
  * only happens to sit on the crossing in this drawing names nothing.
  */
 export function namedVertexOf(seg: SegPair, c: Construction3): Id | null {
+  return namedKneeOf(seg, c)?.vertex ?? null;
+}
+
+/**
+ * #1946 + #2103 (ADR-3D-366) — the named vertex of a segment pair's right angle AND the corner it is marked in.
+ * `arms` names the two letters the knee's arms point at; null means "toward each segment's farther end"
+ * (`armDir`, the shared-endpoint lane). `via` says how the vertex was named.
+ */
+export interface NamedKnee {
+  vertex: Id;
+  arms: [Id, Id] | null;
+  via: 'shared' | 'foot' | 'cross';
+}
+
+/** Does the point's DEFINITION put it on the line through p and q? (A rider, a foot, a crossing, a cut.) */
+function definedOnLine(id: Id, p: Id, q: Id, c: Construction3): boolean {
+  const def = c.points.get(id);
+  if (!def) return false;
+  const same = (a: Id, b: Id) => (a === p && b === q) || (a === q && b === p);
+  switch (def.kind) {
+    case 'on-segment':
+    case 'foot-seg':
+    case 'plane-cut':
+    case 'bisector-seg':
+      return same(def.a, def.b);
+    case 'seg-cross':
+      return same(def.a1, def.b1) || same(def.a2, def.b2);
+    default:
+      return false;
+  }
+}
+
+export function namedKneeOf(seg: SegPair, c: Construction3): NamedKnee | null {
   const shared = [seg.a, seg.b].filter((id) => id === seg.c || id === seg.d);
-  if (shared.length === 1) return shared[0];
+  if (shared.length === 1) return { vertex: shared[0], arms: null, via: 'shared' };
   if (shared.length > 1) return null;
-  const same = (p: Id, q: Id, r: Id, s: Id) => (p === r && q === s) || (p === s && q === r);
+  // #1946: an endpoint of one segment the facts put on the other — [V, V's far end, the other's letters as typed]
+  const ends: [Id, Id, Id, Id][] = [
+    [seg.a, seg.b, seg.c, seg.d],
+    [seg.b, seg.a, seg.c, seg.d],
+    [seg.c, seg.d, seg.a, seg.b],
+    [seg.d, seg.c, seg.a, seg.b],
+  ];
+  for (const [v, far, o1, o2] of ends) if (definedOnLine(v, o1, o2, c)) return { vertex: v, arms: [far, o2], via: 'foot' };
+  const same = (p: Id, q: Id, r: Id, t: Id) => (p === r && q === t) || (p === t && q === r);
   const isSeg1 = (p: Id, q: Id) => same(p, q, seg.a, seg.b);
   const isSeg2 = (p: Id, q: Id) => same(p, q, seg.c, seg.d);
   for (const [id, def] of c.points) {
     if (def.kind !== 'seg-cross') continue;
-    if ((isSeg1(def.a1, def.b1) && isSeg2(def.a2, def.b2)) || (isSeg2(def.a1, def.b1) && isSeg1(def.a2, def.b2))) return id;
+    // #2103: toward each segment's second-named letter, as the statement carries it («AC ⟂ BD» → ∠COD)
+    if ((isSeg1(def.a1, def.b1) && isSeg2(def.a2, def.b2)) || (isSeg2(def.a1, def.b1) && isSeg1(def.a2, def.b2))) return { vertex: id, arms: [seg.b, seg.d], via: 'cross' };
   }
   return null;
+}
+
+/** The unit direction from `vertex` toward point `id`, or null when it is missing or sits on the vertex. */
+function dirToward(id: Id, vertex: Vec3, pos: Positions3): Vec3 | null {
+  const p = pos.get(id);
+  if (!p) return null;
+  const d = sub3(p, vertex);
+  return norm3(d) > 1e-9 ? normalize3(d) : null;
 }
 
 /** The arm direction of segment a–b seen from `vertex`: toward the farther endpoint. */
@@ -205,6 +263,7 @@ export function rightAngles3(
   const segPairs: SegPair[] = [];
   const segPlanes: SegPlane[] = [];
   const out: RightAngle3[] = [];
+  const relationKnees = new Set<RightAngle3>(); // #1946: knees reached through a named foot / crossing
 
   const addAtoms = (u: VecAtom, v: VecAtom) => {
     const p = atomPair(u, c);
@@ -336,7 +395,9 @@ export function rightAngles3(
       const ln = resolved.lines.get(def.line);
       if (ln) u2 = normalize3(ln.dir);
     } else if (def.kind === 'foot-seg') {
-      u2 = armDir(def.a, def.b, foot, pos);
+      // #1946 (ADR-3D-366): every foot-seg is a foot the student named («AD גובה», «CD גובה לצלע AB»), so its knee
+      // sits toward the side's second-named letter — the far end only when the foot lands on that letter
+      u2 = dirToward(def.b, foot, pos) ?? armDir(def.a, def.b, foot, pos);
     } else {
       const pl = def.kind === 'foot-plane' ? resolved.planes.get(def.plane) ?? null : planeFromIds(def.face, pos);
       if (pl) u2 = inPlaneDir(pl, foot, pos);
@@ -346,18 +407,31 @@ export function rightAngles3(
 
   // --- (3) turn the stated witnesses into wedges, dropping the ones with no meeting point
   for (const seg of segPairs) {
-    const meet = meetingPoint(seg, pos, s);
-    if (!meet) continue; // SKEW / non-meeting — never invent an intersection
     // #2091 (ADR-3D-360): a knee at rest only at a vertex the facts NAME — a ⟂ at an unnamed crossing is a
     // relation (givens list + data panel), never a drawn value (ADR-W-118 B2, 2-D's rule)
-    const named = seg.viaVectors ? null : namedVertexOf(seg, c);
-    if (!seg.viaVectors && !named) continue;
-    const vertex = named ? pos.get(named) ?? meet : meet;
-    const u1 = armDir(seg.a, seg.b, vertex, pos);
-    const u2 = armDir(seg.c, seg.d, vertex, pos);
+    const knee = seg.viaVectors ? null : namedKneeOf(seg, c);
+    if (!seg.viaVectors && !knee) continue;
+    let vertex: Vec3;
+    if (knee?.via === 'foot') {
+      // #1946 (ADR-3D-366): the facts put V on the other segment's line, so the two meet AT V — an endpoint of
+      // one of them, which `meetingPoint`'s strict interior crossing excludes by design (the arc lane keeps it)
+      const v = pos.get(knee.vertex);
+      if (!v) continue;
+      vertex = v;
+    } else {
+      const meet = meetingPoint(seg, pos, s);
+      if (!meet) continue; // SKEW / non-meeting — never invent an intersection
+      vertex = knee ? pos.get(knee.vertex) ?? meet : meet;
+    }
+    const u1 = knee?.arms ? dirToward(knee.arms[0], vertex, pos) : armDir(seg.a, seg.b, vertex, pos);
+    const u2 = knee?.arms ? dirToward(knee.arms[1], vertex, pos) : armDir(seg.c, seg.d, vertex, pos);
     // #1592 (ADR-3D-290): a STATED right angle draws its knee only where it holds on the drawn figure — a
     // broken «∠BAD = 90» is marked on its row, never by a knee over a corner that is not square.
-    if (u1 && u2 && norm3(cross3(u1, u2)) > 1e-6 && Math.abs(dot3(u1, u2)) <= RIGHT_TOL * norm3(u1) * norm3(u2)) out.push({ vertex, u1, u2 });
+    if (u1 && u2 && norm3(cross3(u1, u2)) > 1e-6 && Math.abs(dot3(u1, u2)) <= RIGHT_TOL * norm3(u1) * norm3(u2)) {
+      const m: RightAngle3 = { vertex, u1, u2 };
+      out.push(m);
+      if (knee?.arms) relationKnees.add(m);
+    }
   }
   for (const sp of segPlanes) {
     const vertex = segMeetsPlane(sp.a, sp.b, sp.plane, pos, s);
@@ -380,12 +454,24 @@ export function rightAngles3(
   }
 
   const seen = new Set<string>();
-  return out.filter((m) => {
+  const unique = out.filter((m) => {
     const k = wedgeKey(m, s);
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
   });
+  if (!relationKnees.size) return unique;
+  // #1946 (ADR-3D-366): a knee a ⟂ reached through a named foot or crossing marks its right angle ONCE — it yields
+  // to another knee at the same vertex between the same two LINES (a stated «∠ADB = 90», or an earlier ⟂)
+  const parallel = (x: Vec3, y: Vec3) => norm3(cross3(x, y)) <= 1e-6;
+  const sameLines = (m: RightAngle3, n: RightAngle3) =>
+    dist3(m.vertex, n.vertex) <= s * 1e-6 && ((parallel(m.u1, n.u1) && parallel(m.u2, n.u2)) || (parallel(m.u1, n.u2) && parallel(m.u2, n.u1)));
+  const kept: RightAngle3[] = [];
+  for (const m of unique) {
+    const yields = relationKnees.has(m) && unique.some((n) => n !== m && (!relationKnees.has(n) || kept.includes(n)) && sameLines(m, n));
+    if (!yields) kept.push(m);
+  }
+  return kept;
 }
 
 const isPlanarOperand = (op: Operand3): boolean =>
