@@ -12988,3 +12988,30 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Performance.** The reported 40/50 line: 11–46 ms per submit (20–32 ms before, with the notice); the length-forced apex 478 ms (418 ms before, refused generically); the box 99 ms (322 ms before). Thin controls unchanged (23–27 ms).
 
 **Behaviour change for a student:** a pyramid, tetrahedron, prism or box whose givens force it flat is refused at the line that completes it, naming the statements («… מתקיימים רק אם הפירמידה SABCD שטוחה — וגוף שטוח אינו פירמידה.»), instead of being drawn flat with a notice, or refused with the generic contradiction. The flat-solid notice no longer appears anywhere. A thin but real solid still builds.
+
+## ADR-3D-360 — A ⟂ at an unnamed crossing of two segments is a relation, not a knee at rest (#2091)
+
+**Status:** accepted · 2026-10-17 · bug (P3) · branch `fix/2091-3d-no-knee-unnamed-crossing` off `main` @ de7c221f · fix round #2304 · implements the #2091 fix plan of 2026-10-14 · **amends** [ADR-3D-093](#adr-3d-093) (the crossing branch of the R³ honesty rule, for the knee lane only) · applies [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B2
+**Operator ruling (2026-10-14, card `d14b-2091-knee`, A):** *"3-D stops drawing a right-angle mark at rest where two segments stated ⟂ cross at an unnamed point (e.g. «ריבוע ABCD» · «AC ⟂ BD»), like 2-D (ADR-W-118 B2). A line ⟂ plane keeps its marks."*
+
+**Requirements:** [02b](02b-requirements-3d.md) **FR-RD-16** (new: a segment-pair knee only at a named vertex of the pair) · **Design:** [04b](04b-design-3d.md) § the stated-angle arc lane, new paragraph *The knee lane's vertex* (`namedVertexOf` beside `meetingPoint`) · **LADDER stage:** render (`rightAngles3`, step 3).
+
+**Root cause.** `rightAngles3` step (3) turned every stated segment pair into a wedge at `meetingPoint`, which returns a shared endpoint **or any** crossing strictly inside both segments — with no question of whether the facts name that point. A relation at an unnamed crossing was therefore drawn as a value at rest, which ADR-W-118 B2 rules out and 2-D's `angleMarkFor` (`src/replay/core.ts`, «disjoint segments — the ⟂ is at an unnamed crossing; no mark») never did. Class: *a stated ⟂ between two segments whose right angle sits at a point the facts do not name is drawn as a knee at rest.*
+
+**Decision.** One predicate, `namedVertexOf(seg, c)` (`render/rightAngles.ts`): a shared endpoint, or a point whose **definition** is the crossing of exactly those two segments (`seg-cross`, either order) — read from `c.points`, never from positions, so a letter that only sits on the crossing in the drawing («O אמצע AC») names nothing. The knee lane draws a segment pair only at that vertex. `meetingPoint` keeps its contract (the arc lane, ADR-3D-222, still needs the interior crossing for a non-right angle) and still gates honesty (skew / off-ink pairs draw nothing). Reach: every record feeding `segPairs` — `cos-angle` pins and `cos-angle-eq` claims over pair atoms, `seg-angle` / `angle-seg-eq` at 90, `symbolPins` `seg-perp` — so every spelling (⟂, ⊥, «מאונך ל-», «ניצב ל-», «הזווית בין … היא 90») and every host (square, rhombus, quad, cube, box, pyramid base). **Not reached, on purpose:** a pair recorded from two named VECTORS («u ⊥ v») keeps the crossing knee (`SegPair.viaVectors`), and the segment × named-line lane is untouched — both are 3-D-only families asked in #2093. Every plane lane, foot and dihedral knee is unchanged. #1946 widens the same predicate with an endpoint the facts put on the other segment.
+
+**Measured before / after** (`de7c221f`, store `submit` → `derive3` → `rightAngles3`):
+
+| sequence | before | after |
+|---|---|---|
+| «ריבוע ABCD» · «AC ⟂ BD» (also ⊥, «מאונך ל-», «הזווית בין AC ל-BD היא 90») | B + the centre | B |
+| «מעוין ABCD» / «מרובע ABCD» · «AC ⟂ BD» (also «ניצב ל-») | the crossing | none |
+| «קובייה …», «תיבה …», «פירמידה SABCD» · «AC ⟂ BD» | the centre | none |
+| «ריבוע ABCD» · «O אמצע AC» · «AC ⟂ BD» | B + O | B |
+| «ריבוע ABCD» · «O נקודת חיתוך האלכסונים» · «AC ⟂ BD» | B + O | B + O |
+| «משולש ABC» · «AB ⟂ AC» / «קובייה …» · «AA' ⟂ מישור ABC» / «AC' ⟂ מישור A'BD» | A / A / the crossing | unchanged |
+| «תיבה …» · «נסמן: AC=u, BD=v» · «u ⊥ v» | the centre | unchanged (#2093) |
+
+**Locks.** `src3d/__tests__/issue-2091-unnamed-crossing-knee.test.ts` (every row above); fixture `fixtures3/no-knee-unnamed-crossing-2091.geo3.json`; `right-angle-knee.test.ts`'s *"perpendicular diagonals that DO cross are marked at the crossing"* flipped to 0 wedges; `issue-923-917.test.ts`'s box-diagonal 90° knee flipped to 0 (its no-90°-arc half unchanged); `seg-angle-drive-909.test.ts`'s pin-arm knee lock now names the crossing («האלכסונים AC ו-BD נפגשים בנקודה O»). No parity row: no display lock yet (docs/22 §10).
+
+**Behaviour change for a student:** «ריבוע ABCD» · «AC ⟂ BD» (and the same on a rhombus, quadrilateral, cube, box or pyramid base, in every ⟂ spelling) no longer draws a right-angle mark where the diagonals cross; the relation stays in the givens list and the data panel. A crossing the student named as the intersection keeps its mark.

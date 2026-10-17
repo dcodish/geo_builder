@@ -29,6 +29,9 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2091 (ADR-3D-360) — the operator's exact sequence: two segments stated ⟂ crossing at an unnamed point. The knee
+  // withdrawal (and every spelling/host) is asserted in issue-2091-unnamed-crossing-knee.test.ts; this is the build + drift net.
+  'no-knee-unnamed-crossing-2091.geo3.json': ['ריבוע ABCD', 'AC ⟂ BD'],
   // #1907 (ADR-3D-315) — the operator's exact sequence: a bare height on a triangle is its ALTITUDE, D the foot on BC
   // (before: D on the normal at A, off BC and off the plane, green at every seed). The drawing, the sibling spellings,
   // the quad sides and the AI-lane forms are asserted in issue-1907-flat-height.test.ts; this is the build + drift net.
