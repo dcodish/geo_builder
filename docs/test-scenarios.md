@@ -2064,3 +2064,11 @@ over all four (ADR-041).
 ### `equal-circles-nested-values-2206` — «מעגל O ברדיוס 3» · «מעגל P ברדיוס 3» · «מעגל P מוכל בתוך מעגל O» is refused naming «מעגל P ברדיוס 3» with #2200's reason; so is the internal tangency, in either order (#2206, ADR-713)
 
 **Guards against:** two circles of equal stated radius stated contained drawn red, and the internal tangency over them refused without saying why (operator ruling 2026-10-16 on #2206: *"refused with #2200's sentence"*). **Asserts** the report's two lines build, its third is refused at the door «לא ניתן: «מעגל P מוכל בתוך מעגל O» סותר את «מעגל P ברדיוס 3» — אי אפשר לקיים את שניהם יחד. הסיבה: …», the internal tangency the same with its reason, and with the tangency first the last radius line is refused naming the tangency. The matrix (the word forms, concentric, a ratio k = 1 on another line, both orders, English, a loaded list, the controls, each taught step) is `src/app/__tests__/issue-2206-equal-nested.test.ts`; the predicate's unit lock is `src/engine/__tests__/radius-feasibility.test.ts`.
+
+### `rider-coincident-root-1820` — «משולש ABC» · «D על BC» · «שטח ABD = שטח ABC» is accepted, D is drawn on C and the coincidence notice names C and D (#1820, ADR-725)
+
+**Guards against:** an area equality whose one genuine solution puts the point on the segment's endpoint refused as «cannot place D on segment BC …» while analytic builds it (the #1595 ruling, 2026-09-30: *"when 2 dots are on top of each other we should accept but always give a message about it"*; 2-D FR-EN-20). **Asserts** the three lines build green, D sits on C, and the figure carries the coincidence [C, D] that 2-D's notice «C ו-D נפלו על אותה נקודה.» reads. The matrix (three spellings, 30 seeds, the interior control, the direction-condition spurious root still dropped) is `src/engine/__tests__/issue-1820-rider-coincident-root.test.ts`.
+
+### `rider-coincident-root-1820-length` — «משולש ABC» · «D על BC» · «BD = BC» is accepted the same way (#1820, ADR-725)
+
+**Guards against:** the length twin of the above — «BD = BC» with D on BC refused instead of drawn on C with the notice. **Asserts** the same as `rider-coincident-root-1820`.

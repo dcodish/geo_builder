@@ -696,6 +696,19 @@ export function directionRoots(con: Constraint, self: Id, a: Vec, b: Vec, pos: M
   return roots.filter((t) => t >= lo && t <= hi).sort((x, y) => x - y);
 }
 
+/**
+ * #1820 (ADR-725): whether `con` holds — and is DEFINED — with the rider `self` placed exactly on `at`, a point
+ * the constraint references. A direction or angle term collapsed by the coincidence makes `residual` NaN (it
+ * has no value there, so a sign flip across it is not a root); a length, area or perimeter term stays a
+ * number, and the coincidence is a genuine solution exactly when that number is within the constraint's
+ * own tolerance.
+ */
+function definedZeroAt(con: Constraint, self: Id, at: Vec, pos: Map<Id, Vec>): boolean {
+  const get = (id: Id): Vec => (id === self ? at : pos.get(id)!);
+  const r = residual(con, get);
+  return Number.isFinite(r) && Math.abs(r) <= residualTolerance(con, constraintScale(con, get));
+}
+
 export function solvedOnSegmentCandidates(
   p: SolvedOnSegmentPoint,
   pos: Map<Id, Vec>,
@@ -715,18 +728,39 @@ export function solvedOnSegmentCandidates(
   const ext = p.t0 !== undefined && (p.t0 < 0 || p.t0 > 1);
   const [lo, hi] = ext ? [Math.min(0, p.t0!) - 2, Math.max(1, p.t0!) + 2] : [0, 1];
   const roots = directionRoots(p.constraint, p.id, a, b, pos, lo, hi) ?? (ext ? solveParam(f, lo, hi) : solveParam(f));
-  // Discard a DEGENERATE root that collapses the point onto another point the constraint references
-  // (e.g. "CF ⟂ DF" with F on line AD has a spurious root at F = D, where DF has no direction). The
-  // residual sign-flips there, so the root finder brackets it; we drop it so the real foot is used.
+  // A root that puts the point ON another point the constraint references is judged by whether the
+  // constraint is DEFINED there (#1820, ADR-725). "CF ⟂ DF" with F on line AD sign-flips at F = D, where
+  // DF has no direction: the residual is NaN at the coincidence itself (the collapsed-ray discipline of
+  // `residual`), so that spurious root is dropped and the real foot is used. An area or length equality
+  // is defined at a coincidence — «D על BC · שטח ABD = שטח ABC» has its one genuine root at D = C — so
+  // such a root is a real zero and is kept, and the figure's coincidence notice reports it (FR-EN-20).
+  // A clean root always wins: a coincident one is used only when the carrier offers no other.
+  // The coincident roots are read off the referenced points that lie on the carrier, not off the root
+  // finder: there the residual often only TOUCHES zero (|area ABD| − area ABC ≤ 0 peaks at D = C), and
+  // a scan finds a touch only when float error happens to land it exactly on 0.
   const segLen = Math.max(1, dist(a, b));
   const others = constraintRefs(p.constraint)
     .filter((id) => id !== p.id)
     .map((id) => pos.get(id))
     .filter((v): v is Vec => !!v);
-  const cands = roots.filter((t) => {
+  const clean = roots.filter((t) => {
     const self = add(a, scale(sub(b, a), t));
     return others.every((o) => dist(self, o) > 1e-4 * segLen);
   });
+  const coincident: number[] = [];
+  if (clean.length === 0) {
+    const d = sub(b, a);
+    const l2 = d.x * d.x + d.y * d.y;
+    for (const o of others) {
+      if (l2 < 1e-18) break;
+      const t = Math.min(hi, Math.max(lo, ((o.x - a.x) * d.x + (o.y - a.y) * d.y) / l2));
+      if (dist(add(a, scale(d, t)), o) > 1e-4 * segLen) continue; // not on the carrier's range
+      if (coincident.some((u) => Math.abs(u - t) < 1e-7)) continue;
+      if (definedZeroAt(p.constraint, p.id, o, pos)) coincident.push(t);
+    }
+    coincident.sort((x, y) => x - y);
+  }
+  const cands = clean.length ? clean : coincident;
   // Order by proximity to the initial parameter so branch 0 is the solution NEAREST where
   // the point started — an extension point (t0>1, e.g. F on the continuation of CB) keeps
   // its root on the extension rather than snapping to a closer one on the segment proper.
