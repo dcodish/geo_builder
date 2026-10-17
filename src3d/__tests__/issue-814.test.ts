@@ -159,7 +159,9 @@ describe('#814 — the partial injection is UNCHANGED (the exam gates this fix m
     expect(state().lastError).toBeNull();
     const ys = [0, 1, 2].map((s) => derive3(state().facts, s).positions.get('D')!.y.toFixed(3));
     expect(new Set(ys).size).toBeGreaterThan(1);
-    expect(panel().find((t) => t.startsWith('D'))).toBe('D(3, ?, 0)'); // a sample is not knowledge
+    // a sample is not knowledge. #2077 (ADR-3D-368, ruling 2026-10-14 card d14-2077-point): the open axis reads
+    // the student's letter, never a sampled value
+    expect(panel().find((t) => t.startsWith('D'))).toBe('D(3, p, 0)');
   });
 });
 
@@ -172,16 +174,16 @@ describe('#814 — the parser carries the NAME, never the solver register', () =
 
   it('a bare letter emits `syms` and NOT `symExprs` — emitting the latter is what changes the solve', () => {
     expect(cmds('A(3,n,p)')).toEqual([
-      { type: 'point3', id: 'A', x: 3, y: null, z: null, syms: [null, 'n', 'p'] },
+      { type: 'point3', id: 'A', x: 3, y: null, z: null, syms: [null, 'n', 'p'], srcs: ['3', 'n', 'p'] }, // #2077: + the typed text
     ]);
   });
 
   it('the vector and pair lanes gain the same name-only channel', () => {
     expect(cmds('v = (3,p,0)')).toEqual([
-      { type: 'inject-vector', name: 'v', x: 3, y: null, z: 0, syms: [null, 'p', null] },
+      { type: 'inject-vector', name: 'v', x: 3, y: null, z: 0, syms: [null, 'p', null], srcs: ['3', 'p', '0'] },
     ]);
     expect(cmds('AD = (3,p,0)')).toEqual([
-      { type: 'inject-pair', a: 'A', b: 'D', x: 3, y: null, z: 0, syms: [null, 'p', null] },
+      { type: 'inject-pair', a: 'A', b: 'D', x: 3, y: null, z: 0, syms: [null, 'p', null], srcs: ['3', 'p', '0'] },
     ]);
   });
 
@@ -191,6 +193,7 @@ describe('#814 — the parser carries the NAME, never the solver register', () =
         type: 'inject-vector', name: 'v', x: null, y: null, z: 3,
         symExprs: [{ terms: [{ sym: 'k', k: 1 }], c: -1 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }, null],
         syms: ['k', 'k', null],
+        srcs: ['k-1', 'k', '3'],
       },
     ]);
   });

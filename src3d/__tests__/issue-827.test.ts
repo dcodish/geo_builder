@@ -38,6 +38,17 @@ const coordsAt = (seed: number, id: string) => {
   const d = derive3(st().facts, seed);
   return dataView(d.construction, seed).pointCoords[id]?.text;
 };
+/** #2077: the VALUE channel — what a component question reads; an open axis is «?» here whatever the row prints. */
+const compsAt = (seed: number, id: string) => {
+  const d = derive3(st().facts, seed);
+  return dataView(d.construction, seed).pointComps[id];
+};
+/**
+ * #2077 (ADR-3D-368, ruling 2026-10-14 card d14-2077-point, option A): an open axis the student wrote as a letter
+ * prints the LETTER — «D(3, p, 0)», like analytic — where it printed «?». A letter is a name, never a value: the
+ * two-branch y is still withheld (no ±4 printed), and `pointComps` keeps «?».
+ */
+const OPEN_D = '(3, p, 0)';
 
 /** The operator's sequence, verbatim. */
 const PYRAMID = [
@@ -58,10 +69,11 @@ const SEEDS = [0, 1, 3, 17, 42, 99];
 describe('#827 — with NO sign given, the two-branch coordinate reads open', () => {
   beforeEach(reset);
 
-  it('D reads (3, ?, 0) at EVERY seed — including 17 and 99, which printed 4 before', () => {
+  it('D reads (3, p, 0) at EVERY seed — the letter, never a branch value — including 17 and 99, which printed 4 before', () => {
     build(PYRAMID);
     for (const seed of SEEDS) {
-      expect(coordsAt(seed, 'D'), `seed ${seed}`).toBe('(3, ?, 0)');
+      expect(coordsAt(seed, 'D'), `seed ${seed}`).toBe(OPEN_D);
+      expect(compsAt(seed, 'D')?.[1], `seed ${seed}: the value channel stays open`).toBe('?');
     }
   });
 
@@ -70,7 +82,7 @@ describe('#827 — with NO sign given, the two-branch coordinate reads open', ()
     // figure printed 4 and then ?, and «הציגו תצורה אחרת» moved between them.
     build(PYRAMID);
     const seen = new Set(SEEDS.map((s) => coordsAt(s, 'D')));
-    expect([...seen]).toEqual(['(3, ?, 0)']);
+    expect([...seen]).toEqual([OPEN_D]);
   });
 });
 
@@ -92,7 +104,7 @@ describe('#827 — a STATED sign is knowledge, and still prints', () => {
     // that prints `?` for everything is honest and useless. The sign given is what makes it
     // determined, so the value must come back.
     build(PYRAMID);
-    expect(coordsAt(17, 'D')).toBe('(3, ?, 0)');
+    expect(coordsAt(17, 'D')).toBe(OPEN_D);
     st().submit('p חיובי');
     expect(st().lastError).toBeNull();
     expect(coordsAt(17, 'D')).toBe('(3, 4, 0)');
@@ -142,7 +154,8 @@ describe('#827 — the VECTOR lane tells the same story as the point lane', () =
     for (const seq of [PYRAMID, [...PYRAMID, 'p חיובי'], [...PYRAMID, 'p שלילי']]) {
       build(seq);
       for (const seed of SEEDS) {
-        const dOpen = (coordsAt(seed, 'D') ?? '').includes('?');
+        // #2077: "open" is the VALUE channel — the row shows the letter «p» on an open axis, which is still no value
+        const dOpen = (compsAt(seed, 'D') ?? []).includes('?');
         const vOpen = vecOf(seed, 'v')?.coords === null;
         expect(vOpen, `D open=${dOpen} but v open=${vOpen} at seed ${seed}`).toBe(dOpen);
       }
