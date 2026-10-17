@@ -181,3 +181,66 @@ export function readShapePhrase3(s: string): ShapePhrase3 | null {
   };
   return { noun, arity, stated, consumed, unconsumed, cyclic: forces ?? 'yes', strip };
 }
+
+/**
+ * #2235 ([ADR-3D-351](../../docs/06b-decisions-3d.md#adr-3d-351)) — how a shape noun is introduced. The 3-D copy of
+ * the PATTERN of 2-D's ADR-654 / #2205 reader (`src/parser/shapePhrase.ts` `shapeNounSpan`; copied, never imported:
+ * BOUNDARIES.json). `definite` («המשולש», «שהמשולש», «והמשולש», "the triangle") refers to the figure's shape;
+ * `prefixed` (a ב/ל/כ/מ prefix, «במשולש») hides the article in unpointed text; `indefinite` («משולש», «ומשולש»,
+ * "a triangle") is a new shape.
+ */
+export type ShapeArticle3 = 'definite' | 'prefixed' | 'indefinite';
+
+/** The first flat-polygon noun of a sentence: where its word ends, its arity, and its article. */
+export interface ShapeNounSpan3 {
+  /** the index just past the noun's word — where a vertex run naming it goes («המשולש| ישר זווית») */
+  readonly end: number;
+  readonly arity: 3 | 4 | 5 | 6;
+  readonly article: ShapeArticle3;
+}
+
+/** "the", then any shape adjectives, right before the English noun (2-D's `EN_DEFINITE`). */
+const EN_DEFINITE3 = /\bthe\s+(?:(?:right(?:[\s-]?angled?)?|isosceles|equilateral|regular)\s+)*$/i;
+
+/** Each flat-polygon noun's words (Hebrew, English) with its arity — built from the vocabulary above. */
+const NOUN_WORDS_ARITY3: ReadonlyArray<readonly [string, string, 3 | 4 | 5 | 6]> = [
+  ['משולש', 'triangle', 3],
+  ...QUAD_NOUN_WORDS.map(([, he, en]) => [he, en, 4] as const),
+  ['מחומש', 'pentagon', 5],
+  ['משושה', 'hexagon', 6],
+];
+
+/**
+ * The FIRST flat-polygon noun occurrence of `s` (any noun of the one vocabulary), or null. A Hebrew preposition prefix
+ * (ב/ל/כ/מ) → `prefixed`; the conjunction ו and the relative ש carry no article, so «ומשולש» stays `indefinite` while
+ * «שהמשולש» / «והמשולש» are `definite`. English "the" (shape adjectives allowed between) → `definite`.
+ */
+export function shapeNounSpan3(s: string): ShapeNounSpan3 | null {
+  let best: { at: number; end: number; arity: 3 | 4 | 5 | 6; article: ShapeArticle3 } | null = null;
+  for (const [he, en, arity] of NOUN_WORDS_ARITY3) {
+    const h = new RegExp(String.raw`(?:^|[^א-ת])([א-ת]*?)(?:${he})[א-ת]*`).exec(s);
+    if (h && (!best || h.index < best.at)) {
+      const glued = h[1].replace(/^[וש]+/, '');
+      best = { at: h.index, end: h.index + h[0].length, arity, article: glued === 'ה' ? 'definite' : glued ? 'prefixed' : 'indefinite' };
+    }
+    const e = new RegExp(String.raw`\b(?:${en})\w*`, 'i').exec(s);
+    if (e && (!best || e.index < best.at)) {
+      best = { at: e.index, end: e.index + e[0].length, arity, article: EN_DEFINITE3.test(s.slice(0, e.index)) ? 'definite' : 'indefinite' };
+    }
+  }
+  return best && { end: best.end, arity: best.arity, article: best.article };
+}
+
+/** The article of the first flat-polygon noun in `s` (`indefinite` when there is none — 2-D's rule). */
+export const shapeNounArticle3 = (s: string): ShapeArticle3 => shapeNounSpan3(s)?.article ?? 'indefinite';
+
+/**
+ * #2235 — the taught remedy of an ambiguous definite noun: the student's own sentence with `letters` written right
+ * after the noun («המשולש ישר זווית» → «המשולש ABC ישר זווית»), 2-D's #2205 `example`. It must itself be a sentence the
+ * tool records (docs/17 §9: a taught remedy is a grammar claim) — locked in `issue-2235-shape-ref.test.ts`.
+ */
+export function definiteShapeExample3(sentence: string, letters: string): string {
+  const s = sentence.trim();
+  const span = shapeNounSpan3(s);
+  return span ? `${s.slice(0, span.end)} ${letters}${s.slice(span.end)}`.trim() : s;
+}

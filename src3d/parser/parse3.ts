@@ -26,7 +26,7 @@ import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, Revolution
 import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, ringCircleId3, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX, SOLID_QUALIFIER_HE } from '../lexicon/nouns3';
 import { foldPrimes3, VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
-import { POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_WORDS3, statedPolygonArity3, type ShapeAdj3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
+import { POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_WORDS3, shapeNounArticle3, statedPolygonArity3, type ShapeAdj3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
 // #1545 (ADR-3D-300): the ONE prime fold lives in the vocabulary leaf; re-exported so every parser-side
 // reader (the ask lane, the LLM sequence gate) reaches it through the normaliser that applies it.
 export { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';
@@ -4440,14 +4440,13 @@ const rightTriangle: Rule = (s) => {
   // dropping the solid entirely. Escalating is honest; drawing the wrong dimensionality is not.
   if (/מנסרה|פירמידה|\bprism\b|\bpyramid\b/i.test(s)) return null;
   const toks = firstLabelRun(s);
-  const ids = toks.length === 3 ? toks : toks.length === 0 ? ['A', 'B', 'C'] : null;
-  if (!ids) return null;
-  const [, mid] = ids;
   // #424: a right triangle may ALSO be stated isosceles/equilateral — the qualifier must not vanish
   // just because this rule claimed the utterance first. #435: the right angle and the equal pair now
   // BOTH come from the one vocabulary, anchored at the right-angle vertex (a right triangle's equal
   // sides can only be its two legs), so this rule states no qualifier of its own.
-  return [{ type: 'solid', kind: 'polygon3', ids }, ...triShapeCommands(statedTriShape(s), ids, mid)];
+  const lower = (ids: Id[]): Command3[] => [{ type: 'solid', kind: 'polygon3', ids }, ...triShapeCommands(statedTriShape(s), ids, ids[1])];
+  if (toks.length === 0) return [shapeRef3(s, 3, lower)]; // #2235: no letters — apply picks the ring
+  return toks.length === 3 ? lower(toks) : null;
 };
 
 /** The polygon nouns an inscription statement can name — the LEXICON's one alternation per language
@@ -4721,8 +4720,7 @@ const planarPolygon: Rule = (s) => {
   if (!kind) return null;
   const n = kind === 'polygon3' ? 3 : kind === 'polygon4' ? 4 : 5;
   const toks = firstLabelRun(s);
-  const ids = toks.length === n ? toks : toks.length === 0 ? ['A', 'B', 'C', 'D', 'E'].slice(0, n) : null;
-  if (!ids) return null;
+  if (toks.length !== n && toks.length !== 0) return null;
   // #424: the stated qualifier lowers to its constraints (the V8-g flat lane was built for FREE-point
   // polygons and never got the macro treatment, so `ABC משולש שווה צלעות` silently drew a scalene
   // triangle — byte-identical to the plain `משולש ABC` — and reported ✓).
@@ -4738,10 +4736,26 @@ const planarPolygon: Rule = (s) => {
   // rule on every noun rather than being dropped on the one whose adjectives `statedTriShape` reads.
   const phrase = readShapePhrase3(s);
   if (phrase && phrase.unconsumed.length > 0) return null;
-  const lowered = quadShapeCommand(kind === 'polygon4' ? quadBase : null, ids, phrase);
-  if (lowered.length) return [...lowered, ...(quadBase ? quadAdjCommands(phrase, quadBase, ids, lowered) : [])];
-  return [{ type: 'solid', kind, ids }, ...triShapeCommands(shape, ids)];
+  const lower = (ids: Id[]): Command3[] => {
+    const lowered = quadShapeCommand(kind === 'polygon4' ? quadBase : null, ids, phrase);
+    if (lowered.length) return [...lowered, ...(quadBase ? quadAdjCommands(phrase, quadBase, ids, lowered) : [])];
+    return [{ type: 'solid', kind, ids }, ...triShapeCommands(shape, ids)];
+  };
+  // #2235 (ADR-3D-351): a label-less noun names no ring — apply, which knows the figure, picks it
+  return toks.length === 0 ? [shapeRef3(s, n, lower)] : lower(toks);
 };
+
+/**
+ * #2235 ([ADR-3D-351](../../docs/06b-decisions-3d.md#adr-3d-351)) — an UNNAMED shape noun («המשולש ישר זווית»,
+ * «משולש ישר זווית», «הריבוע») becomes a ring REFERENCE instead of the literal letters A, B, C, which M1's
+ * existing-id idempotency used to turn into a silent pick of whatever was called A, B, C. The parser says only what
+ * was written — the noun's article and arity — and `body` is the NAMED form's own lowering (`lower`) over the
+ * reserved placeholders `#1…#n`, so a resolved reference is byte-for-byte the sentence naming that ring.
+ */
+function shapeRef3(s: string, arity: 3 | 4 | 5, lower: (ids: Id[]) => Command3[]): Command3 {
+  const holes = Array.from({ length: arity }, (_, i) => `#${i + 1}`);
+  return { type: 'shape-ref3', article: shapeNounArticle3(s), arity, body: lower(holes) };
+}
 
 /**
  * V8-g: a triangle altitude — `גובה המשולש לצלע AB הוא CD` / `CD גובה לצלע AB` /

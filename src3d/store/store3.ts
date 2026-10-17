@@ -34,7 +34,8 @@ import { lostPart3, unreadParts3, type LostPart3 } from './unreadParts3';
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
-import { applyCommand3, flatHeightReading3, freeDims, ringKeyIds3 } from '../engine/apply';
+import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, ringKeyIds3 } from '../engine/apply';
+import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
 import { convexWhenSimple, declaredKind3, declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { declaredKindOf, kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
@@ -70,6 +71,10 @@ export interface Derived3 {
   /** #1918 (ADR-3D-313): what the DRAWN figure shows that a stated noun says it cannot be (a declared
    *  trapezoid drawn as a parallelogram) — the amber mismatch channel, derived per render. */
   shapeWarnings: ShapeWarning3[];
+  /** #2235 (ADR-3D-351): each applied fact holding an unnamed shape noun (`shape-ref3`), by id → its commands with the
+   *  ring the fold picked. The fact list keeps the reference; every reader that asks "what did this line state?" of
+   *  the figure reads these. */
+  resolvedCmds: Readonly<Record<string, readonly Command3[]>>;
 }
 
 export type StoreError3 =
@@ -502,12 +507,29 @@ function derive3Uncached(facts: Fact3[], seed: number): Derived3 {
   return deriveCore3(facts, seed, true);
 }
 
+/** #2235: an ambiguous definite noun's refusal, worded with the student's sentence and its taught remedy. */
+function withShapeSentence3<E extends { code: string }>(e: E, utterance: string): E {
+  if (e.code !== 'ambiguous-definite-shape') return e;
+  const shapes = (e as unknown as { shapes: string[] }).shapes;
+  return { ...e, sentence: utterance.trim(), example: definiteShapeExample3(utterance, shapes[0]) };
+}
+
 /**
  * The fold + verification of one fact list. `narrow` runs the #1996 forced-narrowing pass (ADR-3D-343); its cause
  * search folds SUBSETS of the list through this same function with `narrow: false` — the same fold, never a
  * second reader, and no recursion. A subset fold is not a "press", so it never counts in {@link deriveStats3}.
  */
-function deriveCore3(facts: Fact3[], seed: number, narrow: boolean): Derived3 {
+function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 {
+  /** #2235: the list as typed during the fold; after it, the same list with each shape reference resolved. */
+  let facts = factsIn;
+  /** #2235 (ADR-3D-351): the commands each fact holding a `shape-ref3` applied as, against the figure before it */
+  const resolvedCmds: Record<string, Command3[]> = {};
+  /** A fact's commands with its shape references resolved against `at` — or the refusal, worded with its sentence. */
+  const expandFact = (at: Construction3, f: Fact3): { ok: true; cmds: readonly Command3[] } | { ok: false; error: FactStatus3 } => {
+    if (!f.cmds.some((k) => k.type === 'shape-ref3')) return { ok: true, cmds: f.cmds };
+    const r = expandShapeRefs3(at, f.cmds);
+    return r.ok ? r : { ok: false, error: withShapeSentence3(r.error, f.utterance) };
+  };
   let c: Construction3 = emptyConstruction3();
   const status: Record<string, FactStatus3> = {};
   const claimOwners: { factId: string; from: number; to: number }[] = [];
@@ -616,13 +638,16 @@ function deriveCore3(facts: Fact3[], seed: number, narrow: boolean): Derived3 {
      * fact builds on a probe and the figure advances only when the whole fact holds.
      */
     let probe = c;
-    for (const cmd of f.cmds) {
+    const exp = expandFact(c, f); // #2235: an unnamed shape noun names the ring the figure holds NOW
+    if (!exp.ok) return exp.error;
+    for (const cmd of exp.cmds) {
       if (droppedSoft(cmd)) continue; // an explicit ∠=90 on this triangle superseded the soft default
       const r = applyCommand3(probe, seated(cmd));
       if (!r.ok) return r.error;
       probe = r.next;
     }
     c = probe;
+    if (exp.cmds !== f.cmds) resolvedCmds[f.id] = [...exp.cmds];
     // count-delta attribution: EVERY claim recorded while this fact applied belongs to
     // it — including claims composite commands create indirectly (none can escape)
     if (c.claims.length > claimsBefore) claimOwners.push({ factId: f.id, from: claimsBefore, to: c.claims.length });
@@ -685,7 +710,9 @@ function deriveCore3(facts: Fact3[], seed: number, narrow: boolean): Derived3 {
   /** The dry run's verdict against the CURRENT figure: null = the fact would apply cleanly. */
   const retryError = (f: Fact3): FactStatus3 | null => {
     let probe = c;
-    for (const cmd of f.cmds) {
+    const exp = expandFact(c, f);
+    if (!exp.ok) return exp.error;
+    for (const cmd of exp.cmds) {
       if (droppedSoft(cmd)) continue;
       const r = applyCommand3(probe, seated(cmd));
       if (!r.ok) return r.error;
@@ -717,6 +744,9 @@ function deriveCore3(facts: Fact3[], seed: number, narrow: boolean): Derived3 {
     const latest = retryError(f);
     if (latest !== null) status[f.id] = restatedAgainst(f, latest);
   }
+  // #2235 (ADR-3D-351): from here on every reader asks what each line stated ABOUT THE FIGURE — a shape reference is
+  // read as the ring it was applied to (the blame, crossing, collapse and narrowing passes below never see a placeholder)
+  if (Object.keys(resolvedCmds).length > 0) facts = facts.map((f) => (resolvedCmds[f.id] ? { ...f, cmds: resolvedCmds[f.id] } : f));
   /**
    * #1991 ([ADR-3D-327](../../docs/06b-decisions-3d.md#adr-3d-327)) — TWO DECLARED RINGS OVER THE SAME LETTERS IN
    * DIFFERENT CYCLIC ORDERS, ONE OF THEM CONVEX WHENEVER SIMPLE: the other crosses in every configuration.
@@ -1425,7 +1455,7 @@ function deriveCore3(facts: Fact3[], seed: number, narrow: boolean): Derived3 {
   // #1996 (ADR-3D-343): a declared ring the givens forced into a narrower named kind, with the statements that did
   // it — needs the facts and their utterances, so it is computed here and handed to the notice builder.
   const narrowed = narrow ? narrowingNotes3(facts, seed, c, (id) => status[id] === 'ok', { construct: (sub) => deriveCore3(sub as Fact3[], seed, false).construction }) : [];
-  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions) };
+  return { construction: c, resolved, positions, status, notices: buildNotices3(c, [resolved], narrowed), shapeWarnings: shapeWarnings3(c, positions), resolvedCmds };
 }
 
 export interface Geo3State {
@@ -1825,6 +1855,21 @@ export function decideCommands3(
   newId: () => string = () => nanoid(8),
 ): Verdict3 {
   const { facts, seed } = st;
+  /**
+   * #2235 (ADR-3D-351): what the line and the list STATE ABOUT THE FIGURE. An unnamed shape noun («המשולש ישר זווית»)
+   * is resolved against the figure as it stands — exactly as the candidate derive below will resolve it — so the
+   * honesty gates and the twin rule judge the ring it names, never the placeholders; an ambiguous definite noun is
+   * refused here, naming the shapes. Every earlier fact holding a reference is read as the ring it was applied to.
+   */
+  const refs = commands.some((k) => k.type === 'shape-ref3') || facts.some((f) => f.cmds.some((k) => k.type === 'shape-ref3'));
+  const view = refs ? derive3(facts, seed) : null;
+  let stated: readonly Command3[] = commands;
+  if (view && commands.some((k) => k.type === 'shape-ref3')) {
+    const exp = expandShapeRefs3(view.construction, commands);
+    if (!exp.ok) return { kind: 'refused', error: withShapeSentence3(exp.error, utterance) };
+    stated = exp.cmds;
+  }
+  const statedFacts = view ? facts.map((f) => (view.resolvedCmds[f.id] ? { ...f, cmds: [...view.resolvedCmds[f.id]] } : f)) : facts;
   // #424 / #438 / #440 / #535: the honesty gates guard the DETERMINISTIC path too — bound to the
   // EVENT, not to a commit path. The old reasoning ("the rules parse the utterance itself, so
   // nothing can leak") was falsified by #530: a rule CAN match an utterance and still drop part
@@ -1833,7 +1878,7 @@ export function decideCommands3(
   // (ADR-3D-147). The catalog corpus is asserted gate-clean in honesty3.test.ts, so the canonical
   // phrasings never pay this check with a false refusal.
   // #1888 (ADR-3D-316): and the read-extent member, on the deterministic lane (`opts.readExtent`); #1902's unread words ride along.
-  const refusal = honestyRefusal3(utterance, commands, { facts, seed }, opts.readExtent ?? false, opts.unread);
+  const refusal = honestyRefusal3(utterance, stated, { facts, seed }, opts.readExtent ?? false, opts.unread);
   if (refusal) return { kind: 'refused', error: refusal };
   // #613 (ADR-W-031, operator ruling 2026-08-16: "if a fact is already known - it should not be
   // added. this is true to all tools") — a RESTATED fact succeeds and appends no row. M1
@@ -1843,7 +1888,8 @@ export function decideCommands3(
   // This is the store-level rule 2-D has always had in `foldFact`, which is why this is a port and
   // not a new mechanism. A disabled twin is RE-ENABLED rather than duplicated (2-D's FR-EN-9).
   if (opts.twins) {
-    const twin = facts.find((f) => sameStatement(f.cmds, commands)) ?? ringRestatementTwin3(facts, commands);
+    const found = statedFacts.find((f) => sameStatement(f.cmds, stated)) ?? ringRestatementTwin3(statedFacts, stated);
+    const twin = found && facts.find((f) => f.id === found.id);
     if (twin) {
       return {
         kind: 'already-stated',
