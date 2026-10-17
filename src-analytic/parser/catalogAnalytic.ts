@@ -1323,6 +1323,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'circles', family: 'F5', he: 'שני מעגלים מוכלים', en: 'two nested circles' },
   { category: 'circles', family: 'F5', he: 'שני מעגלים בעלי מרכז משותף O', en: 'two circles with a common center O' },
   { category: 'circles', family: 'F5', he: 'שני מעגלים נחתכים בנקודות A ו-B', en: 'two circles intersect at A and B' },
+  { category: 'circles', family: 'F5', he: 'המעגלים O ו-P נחתכים בנקודות A ו-B', en: 'circles O and P intersect at A and B' },
   { category: 'circles', family: 'F5', he: 'מעגל P מוכל בתוך מעגל O', en: 'circle P is contained in circle O' },
   { category: 'circles', family: 'F5', he: 'מעגל מוכל בתוך המעגל הגדול', en: 'a circle contained inside the big circle' },
   { category: 'circles', family: 'F5', he: 'ישר החותך את המעגל בשתי נקודות', en: 'a line cutting the circle at two points' },
