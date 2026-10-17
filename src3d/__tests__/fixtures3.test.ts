@@ -361,6 +361,10 @@ const SEEDED: SeededCorpus = {
   // length refused givens-contradict at every seed). Both orders, «AB ∥ DE» and the free relative size are asserted in
   // issue-1855-separate-figures.test.ts; this is the build + drift net.
   'two-triangle-lengths-1855.geo3.json': ['משולש ABC', 'משולש DEF', 'DE = 2', 'AB = 5'],
+  // #1935 (ADR-3D-356) — the operator's exact sequence: a quadrilateral over a free vertex drives it into the plane
+  // (before: a skew ring drawn green at every seed). Flatness, stability and the controls are asserted in
+  // ring-free-vertex-1935.test.ts; this is the build + drift net.
+  'ring-free-vertex-1935.geo3.json': ['משולש ABC', 'משולש ABD', 'מרובע ACBD'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

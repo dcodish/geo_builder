@@ -12909,3 +12909,27 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 **Golden drift (expected).** `decide-submit3-parity-1394` sequences holding two separate solids drift in positions and may now record where they refused; the batch judges them.
 
 **Locks.** `src3d/__tests__/issue-1855-separate-figures.test.ts` (the reported rows ×24 seeds, both lengths drawn, «AB ∥ DE», the free ratio and angle, the DOF count, the one-solid bit-identity); fixture `fixtures3/two-triangle-lengths-1855.geo3.json`; parity rows `two-triangle-lengths-1855` and `two-triangle-parallel-1855`.
+
+## ADR-3D-356 — A flat ring declared over a FREE vertex drives that vertex into the plane; with every vertex placed it stays #1928's refusal (#1935)
+
+**Status:** accepted · 2026-10-17 · **Issue:** #1935 · fix round #2291. Boundary against [ADR-3D-319](#adr-3d-319) (#1928); the representation of [ADR-3D-172](#adr-3d-172) (a minted corner rides the plane); [ADR-W-121](06w-decisions-workspace.md) §4's "a ring with a free vertex (a configuration choice)".
+**Operator ruling (verbatim):** 2026-10-09, option A — *"The free point rides into the plane. D moves so that ACBD really is a flat quadrilateral, and the figure holds."*
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-7 (the polygon row; the placed vertices stay put) · **Design:** [04b](04b-design-3d.md) "A ring over a FREE vertex is made flat at apply" · **LADDER stage:** apply.
+
+**Context — measured at 9d734201** through `decideSubmit3` → `derive3`, seeds 0–11: «משולש ABC · משולש ABD · מרובע ACBD» recorded green with D `free3` and det(AB, AC, AD) = 0.423 at seed 0, skew at 12/12; likewise «מלבן ACBD», «ריבוע ACBD», the other ring orders, the English spelling, A, B, C pinned by coordinates, and «משולש ABC · משולש CDE · מחומש ABCDE» (D, E both free). «טרפז ACBD» happened to be flat (its ∥ claim forces it); «מקבילית ACBD» was refused at 15/24 seeds (`point-not-determined` / `polygon-collapsed`). The #1928 all-placed skew ring was refused `ring-not-flat`.
+
+**Class.** A flat-shape declaration over existing points, at least one still free, recorded the ring without lowering its planarity onto the free points. Members: the polygon all-existing arm (every flat noun, any order, either direction, English), the mixed run whose known corners include a free one, and `quad-shape`'s all-known arm (the shape nouns). Triangles are flat by themselves (no member).
+
+**Decision.**
+1. `flattenRingFreeVertices3`: the ring's anchors are its non-placeholder vertices, in ring order, topped up to three with the earliest-minted free vertices (which stay free); every other free vertex is re-homed onto the anchors' plane run as an `implied` on-plane rider — two sampled, drivable in-plane DOFs (ADR-052), still a placeholder a later real definition replaces (#841). With every vertex placed it does nothing: a skew ring is #1928's refusal, unchanged. Collinear anchors are the collapse refusal's (ADR-3D-310).
+2. `quad-shape` with exactly ONE placeholder corner yields that corner to ARM 2 — the #841 rule applied to a ring — so the family supplies its own corner (closed form for the parallelogram family and the kite). Lowering the family's relations onto a re-homed rider instead left the pivot to find a rectangle by search, and it missed: «מלבן ACBD» 3/24, «ריבוע ACBD» 1/24, «מעוין ACBD» 2/24 refused `givens-contradict` in the first attempt. `keepPointSlot3` keeps the corner's original place in the point order when every other ring corner precedes it, so a point defined from it later is still evaluated after it. With several placeholders, step 1 runs before the relations are lowered.
+
+**Measured after** (seeds 0–23): every class row records and is flat (skew < 1e-9); for «מרובע», the reversed ring, the other order, English, the pentagon and the pinned row, A, B, C are bit-identical before and after the ring line, and D still re-samples in the plane; «מלבן», «מקבילית», «מעוין», «דלתון» record 24/24 (the triangle is driven where the noun states a relation on it — a rectangle's right angle at C); «ריבוע ACBD» records 24/24 with D the square's determined corner; «מקבילית ACBD» went from 15/24 refused to 24/24 recorded. Controls unchanged: #1928 refused `ring-not-flat`; «משולש ABC · מרובע ABCD» and «טרפז ACBD» flat.
+
+**Deviation from the plan's lock.** The plan asked A, B, C bit-identical on EVERY class row; for «מלבן / ריבוע ACBD» over an existing triangle that is not an honest demand, because the noun states ∠ACB = 90° (and |CA| = |CB|) on that triangle — the givens move C. Locked as flatness there; bit-identity on the rows whose noun states nothing about A, B, C.
+
+**Found work.** A free corner that closes a ring is sampled anywhere in the plane, so the ring is drawn CROSSED at many seeds — «מרובע ACBD» 17/24, and the ADR-3D-172 control «משולש ABC · מרובע ABCD» 11/24 on main already — against FR-RD-7's "drawn simple by choice of configuration". Filed #2300 (bug, P2). Not built here: a configuration-choosing seat is a new mechanism.
+
+**Sibling audit.** 2-D and analytic are planar by construction: no member. Complex has no rings in space. Other 3-D lanes declaring a ring over existing points: the polygon solid arms and `quad-shape` (both covered); `rect-complete` lowers to `quad-shape` (covered).
+
+**Locks.** `src3d/__tests__/ring-free-vertex-1935.test.ts` (eleven class rows ×24 seeds, the stability and freedom checks, the three controls, a triangle re-homes nothing); fixture `fixtures3/ring-free-vertex-1935.geo3.json`.

@@ -579,6 +579,16 @@ other statement to name it falls back to `givensContradictAlone`. Never `ringCon
 the letters cannot flatten four non-coplanar points. **Order at the site: collapse → skew → crossing**; a skew ring
 has no plane in which to judge a crossing.
 
+**A ring over a FREE vertex is made flat at apply** (#1935, [ADR-3D-356](06b-decisions-3d.md#adr-3d-356)). The skew check
+above only judges rings whose every vertex is placed; a ring that still has a placeholder vertex (`free3`, or a #841
+`implied` rider) is flattened where it is declared. `flattenRingFreeVertices3` (apply.ts) takes the ring's placed
+vertices as anchors (promoting the earliest-minted free ones up to three), materialises their plane run and re-homes
+every other free vertex onto it as an `implied` rider — the corner kind ADR-3D-172 mints. It runs in the all-existing
+flat-polygon arm, in the mixed run when a known corner is itself free, and in `quad-shape`'s all-known arm; there a
+ring with exactly ONE placeholder corner first yields it to ARM 2 (the family's own corner: closed form for the
+parallelogram family and the kite, a plane rider otherwise), keeping the point's original slot in the order
+(`keepPointSlot3`) so its dependents still follow it.
+
 ### Claims
 
 Recorded on `Construction3.claims` at apply and verified in `derive3`, so **a claim cannot escape inside a
