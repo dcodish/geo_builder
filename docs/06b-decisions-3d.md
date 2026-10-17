@@ -12864,6 +12864,6 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 
 **Decision.** The two `planes.set(k.id, …)` writes in `evaluate.ts` are deleted. A circle carries its plane in its own `circles3` record (centre + normal), which is what its outline and the `point-on-circle3` check already read. Every plane surface then stops showing it with no per-surface change; a plane the student names («מישור ABC», «π1») is drawn and listed once.
 
-**Not built (found work).** For a circle tangent to a line no sentence reaches its plane («מישור המעגל» is not understood); asking for it needs new syntax — to be filed `needs-operator`, proposed P3.
+**Not built (found work).** For a circle tangent to a line no sentence reaches its plane («מישור המעגל» is not understood); asking for it needs new syntax — filed as #2155 (feature, P3).
 
 **Locks.** `src3d/__tests__/issue-2126-circle-plane.test.ts` (eight circle figures: circle still drawn, no `circle-*` plane, no `circle-*` scene label; the triangle control; «מישור ABC» in both orders → `['ABC']`; π1 → `['π1']`; the crossing offers equal the circle-less figure's); fixture `fixtures3/circle-no-plane-2126.geo3.json` (the operator's figure).
