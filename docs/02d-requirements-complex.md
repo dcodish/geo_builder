@@ -287,6 +287,17 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   spelling of the student's own line and a pointer to the √ button (the 2-D #246 guidance). The √
   palette chip wraps the selection.
   - Sources: [ADR-CX-056](06d-decisions-complex.md#adr-cx-056) amendment 1, #1435
+- **FR-LN-5 (Must)** — **Two numbers side by side are refused, never multiplied; the fraction glyphs are
+  numbers.** A number, a space, then another number, in any slot a number is read in, is ambiguous as
+  written and is refused before any rule reads it. An ASCII mixed number («z = 2 1/2 + i», «|z| = 2 1/2»,
+  «2 1⁄2») is refused with analytic's teaching sentence: «לא ברור אם "2 1/2" הוא מספר מעורב או מכפלה.
+  כתבו 2.5 (מספר עשרוני) או 2+1/2 למספר המעורב, או 2*1/2 למכפלה.» (no decimal is offered when the
+  fraction does not terminate, «2 1/3»; after an operator the sum is parenthesised, «3 - (2+1/2)»). Any
+  other pair («|z| = 2 3») is refused with the product spelled out: «לא ברור אם הכוונה לכפל — אם כן,
+  כתבו את הכפל במפורש: "|z| = 2*3" במקום "|z| = 2 3".». The glyphs «2½», «2¼», «2¾» are 2.5, 2.25,
+  2.75 exactly, and a lone «½» is 0.5 (analytic's set). Unchanged: «2+1/2», «2*1/2», «2.5», «5/2»,
+  «2i», «1/2i», and a number next to anything that is not a number («2 i», «2 √3», «2 cis 30», «2 z1»).
+  - Sources: [ADR-CX-081](06d-decisions-complex.md#adr-cx-081) ([#2247](https://github.com/dcodish/geo_builder/issues/2247)), adopting analytic's [ADR-AG-284](06c-decisions-analytic.md#adr-ag-284)
 - **FR-LN-3 (Should)** — **Series are in scope**, being part of the corpus question rather than an
   extension of it.
   - Sources: [docs/27](archive/27-complex-numbers-tool.md) §2

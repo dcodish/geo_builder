@@ -12,7 +12,7 @@ import { whyText } from '../replay/scene2';
 import type { InputError } from '../store/useComplexStore';
 
 /** Every refusal but the reserved constants, which choose between two sentences below. */
-const ERROR_KEY: Record<Exclude<InputError['key'], 'reserved-constant'>, string> = {
+const ERROR_KEY: Record<Exclude<InputError['key'], 'reserved-constant' | 'mixed-number'>, string> = {
   'not-handled': 'errNotHandled',
   // #1919 — the two ruled sentences for a script this tool does not read, 2-D's wording verbatim
   'unread-name': 'errUnreadName',
@@ -30,6 +30,8 @@ const ERROR_KEY: Record<Exclude<InputError['key'], 'reserved-constant'>, string>
   refused: 'errRefused',
   'word-root': 'errWordRoot',
   'glued-i': 'errGluedI',
+  // #2247 (ADR-CX-081) — «2 3» asks the glued-`i` question, in its sentence: is this a product? write it explicitly
+  'juxtaposed-numbers': 'errGluedI',
   'trig-mismatch': 'errTrigMismatch',
 };
 
@@ -43,7 +45,14 @@ const RESERVED_KEY: Record<ReservedConstant, string> = { i: 'errReservedI', o: '
 
 /** The locale key a refusal is worded by. */
 const keyOf = (e: InputError): string =>
-  e.key === 'reserved-constant' ? RESERVED_KEY[e.constant] : ERROR_KEY[e.key];
+  e.key === 'reserved-constant'
+    ? RESERVED_KEY[e.constant]
+    : // #2247 (ADR-CX-081) — analytic's two sentences: a decimal is offered only when the fraction terminates
+      e.key === 'mixed-number'
+      ? e.decimal
+        ? 'errMixedNumber'
+        : 'errMixedNumberNoDecimal'
+      : ERROR_KEY[e.key];
 
 /**
  * An error's interpolation values: its detail, the letter when the error names one (#1405), and the
@@ -54,6 +63,8 @@ const errParams = (e: InputError, t: Translate): Record<string, string> =>
     ? { detail: e.detail, constant: e.constant }
     : 'word' in e
     ? { detail: e.detail, word: e.word }
+    : 'sum' in e
+    ? { detail: e.detail, decimal: e.decimal ?? '', sum: e.sum, product: e.product }
     : 'cos' in e
     ? { detail: e.detail, cos: e.cos, sin: e.sin }
     : 'suggestion' in e

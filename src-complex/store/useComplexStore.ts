@@ -72,6 +72,17 @@ export type InputError =
    */
   | { key: 'glued-i'; detail: string; suggestion: string }
   /**
+   * #2247 (ADR-CX-081) — an ASCII mixed number («2 1/2»): ambiguous, so refused with analytic's teaching sentence
+   * (ADR-AG-284). `detail` is the student's «2 1/2»; `decimal` (absent when the fraction does not terminate), `sum`
+   * and `product` are its unambiguous spellings.
+   */
+  | { key: 'mixed-number'; detail: string; decimal?: string; sum: string; product: string }
+  /**
+   * #2247 (ADR-CX-081) — any other number–space–number («|z| = 2 3»): refused, with `suggestion` — the line with
+   * the explicit product (`2*3`), which the grammar has already read — in the glued-`i` clarification's sentence.
+   */
+  | { key: 'juxtaposed-numbers'; detail: string; suggestion: string }
+  /**
    * #1534 — a trigonometric form whose `cos` and `sin` disagree («cos45 + i sin30»): it is not r·cisθ
    * for any θ, so it is refused naming the two angles, never read as one of them.
    */

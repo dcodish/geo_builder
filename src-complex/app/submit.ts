@@ -44,7 +44,7 @@ import { unreadScript } from '../../shell/inputScript';
 import { parseLineV2 } from '../parser/rules';
 import { trigAngleMismatch } from '../parser/normalize';
 import { complexScopeOf, parseAsk } from './deriveLines';
-import { type ComplexScope, gluedISpelledOut } from '../parser/exprParse';
+import { type ComplexScope, gluedISpelledOut, juxtaposedNumbersSpelledOut } from '../parser/exprParse';
 import type { Derived2 } from '../replay/derive2';
 import { type InputError, type SavedSession, useComplexStore } from '../store/useComplexStore';
 import { deriveLines } from './deriveLines';
@@ -177,6 +177,16 @@ function unreadRefusal(parsed: Extract<ReturnType<typeof parseLineV2>, { ok: fal
   // the constant is. Before the two taught suggestions, which answer a different question — those
   // offer a different SPELLING of the same line, and no spelling makes `i` a number the figure holds.
   if (parsed.reason === 'reserved-constant') return { key: 'reserved-constant', detail: line, constant: parsed.constant };
+  // #2247 (ADR-CX-081) — two numbers side by side: the mixed number gets analytic's teaching sentence; any other pair
+  // is asked as a product, with the explicit spelling offered only when it reads (a taught remedy must drive — #1156)
+  if (parsed.reason === 'juxtaposed-numbers') {
+    const f = parsed.found;
+    if (f.kind === 'mixed') return { key: 'mixed-number', detail: f.text, ...(f.decimal ? { decimal: f.decimal } : {}), sum: f.sum, product: f.product };
+    const product = juxtaposedNumbersSpelledOut(line);
+    return product !== null && parseInFigure(product, lines).ok
+      ? { key: 'juxtaposed-numbers', detail: line, suggestion: product }
+      : { key: 'not-handled', detail: line };
+  }
   const suggestion = wordRootSuggestion(line, lines);
   if (suggestion) return { key: 'word-root', detail: line, suggestion };
   const product = gluedISuggestion(line, lines);

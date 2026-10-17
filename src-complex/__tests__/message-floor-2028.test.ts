@@ -56,6 +56,9 @@ const COMPLEX: Record<ComplexError['key'], Payload[]> = {
   'complex-as-real': [{ letter: 'u' }],
   'word-root': [{ detail: 'שורש של 3', suggestion: '√3' }],
   'glued-i': [{ detail: 'zi', suggestion: 'z*i' }],
+  // #2247 (ADR-CX-081) — analytic's two mixed-number sentences, and the «2 3» product question
+  'mixed-number': [{ detail: '2 1/2', decimal: '2.5', sum: '2+1/2', product: '2*1/2' }, { detail: '2 1/3', sum: '2+1/3', product: '2*1/3' }],
+  'juxtaposed-numbers': [{ detail: '|z| = 2 3', suggestion: '|z| = 2*3' }],
   'trig-mismatch': [{ detail: 'cos45 + i sin30', cos: '45', sin: '30' }],
   refused: Object.entries(WHY).map(([code, w]) => ({ why: { code, ...w } })),
   unaccounted: [{}],

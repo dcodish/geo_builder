@@ -281,7 +281,99 @@ export function gluedISpelledOut(line: string, scope: ComplexScope = NO_SCOPE): 
   return changed ? out : null;
 }
 
+// ---------------------------------------------------------------------------
+// Two numbers side by side — refused, never multiplied (#2247, ADR-CX-081)
+// ---------------------------------------------------------------------------
+
+/**
+ * A NUMBER, WHITESPACE, THEN ANOTHER NUMBER — «2 1/2», «2 3», «2.5 4».
+ *
+ * Juxtaposition (`parseExpr`'s implicit product) reads two operands in a row as a product, and a digit run is an
+ * operand like any other — so «z = 2 1/2 + i» was drawn at 1 + i and «|z| = 2 3» was a modulus of 6, silently, for
+ * values the student never stated. Written that way the text is AMBIGUOUS: the exam's mixed number (2.5), a product
+ * (1), or a slip. **Operator rulings, 2026-10-16** (#2247): complex follows analytic's #2222 ruling (ADR-AG-284) —
+ * *"yes - on complex too"*: the ASCII mixed number is refused with analytic's teaching sentence, the glyph «2½» reads
+ * 2.5 (`normalize.ts`) — and, widened on the second decisions pass: *"Any 'number space number' is refused, so
+ * «|z| = 2 3» no longer reads 6."*
+ *
+ * Defined ONCE here: `lex` refuses the shape (so no reader of a value can multiply it, whichever rule reaches
+ * `parseExpr`), and `parseLineV2` asks this detector before every rule, so the student gets one teaching sentence
+ * instead of each rule's own verdict. A NUMBER is a digit run (optionally with a decimal tail) that stands alone: a
+ * letter, digit, `_` or `.` before it makes it a name's index («z1 2» is z1·2, a name and a number) or a decimal's
+ * tail — exactly the runs `lex` reads as a `num` token, so the two agree by construction. A number next to anything
+ * else — `2 i`, `2 √3`, `2 cis 30`, `2 z1`, `2 (1+i)` — is juxtaposition as before.
+ *
+ * The mixed number's spellings are analytic's (`findMixedNumber`, src-analytic/engine/expr.ts — copied, never
+ * imported; the text lock in `mixed-number-2247.test.ts` keeps the two detectors and sentences agreeing).
+ */
+const MIXED_NUMBER_RE = /(?<![A-Za-z0-9_.])(\d+)\s+(\d+)\s*[/⁄]\s*(\d+)(?![\d.])/;
+const JUXTAPOSED_NUMBERS_RE = /(?<![A-Za-z0-9_.])(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/;
+
+/** What a refused pair of numbers teaches: the student's text and its unambiguous spellings. */
+export type JuxtaposedNumbers =
+  | {
+      /** an integer then a fraction — «2 1/2»: analytic's mixed number (ADR-AG-284) */
+      readonly kind: 'mixed';
+      /** the student's own text, as typed — «2 1/2» */
+      readonly text: string;
+      /** the mixed number as a decimal — `2.5`; absent when the fraction does not terminate («2 1/3») */
+      readonly decimal?: string;
+      /** the mixed number as a sum — `2+1/2`, parenthesised after an operator so it reads the same in place */
+      readonly sum: string;
+      /** the product reading — `2*1/2` */
+      readonly product: string;
+    }
+  | {
+      /** any other number–space–number — «2 3» */
+      readonly kind: 'numbers';
+      readonly text: string;
+    };
+
+const gcdN = (a: number, b: number): number => (b === 0 ? a : gcdN(b, a % b));
+
+/** The first pair of side-by-side numbers in `src`, or null. The one detector `lex` and the line gate share. */
+export function findJuxtaposedNumbers(src: string): JuxtaposedNumbers | null {
+  const m = MIXED_NUMBER_RE.exec(src);
+  if (m) {
+    const [whole, num, den] = [m[1], m[2], m[3]];
+    let d = Number(den) / gcdN(Number(num), Number(den));
+    while (d > 1 && d % 2 === 0) d /= 2;
+    while (d > 1 && d % 5 === 0) d /= 5;
+    const terminates = Number(den) > 0 && d === 1;
+    const afterOperator = /[-*/^]\s*$/.test(src.slice(0, m.index));
+    const sum = `${whole}+${num}/${den}`;
+    return {
+      kind: 'mixed',
+      text: m[0],
+      ...(terminates ? { decimal: String(Number(whole) + Number(num) / Number(den)) } : {}),
+      sum: afterOperator ? `(${sum})` : sum,
+      product: `${whole}*${num}/${den}`,
+    };
+  }
+  const n = JUXTAPOSED_NUMBERS_RE.exec(src);
+  return n ? { kind: 'numbers', text: n[0] } : null;
+}
+
+/**
+ * The line with every number–space–number written as the explicit product (`2 3` → `2*3`), or null when it has
+ * none — the clarification the submit path offers for a `numbers` refusal (the #1365 `gluedISpelledOut` posture: the
+ * caller parses the suggestion before offering it, because a taught remedy must drive — #1156).
+ */
+export function juxtaposedNumbersSpelledOut(line: string): string | null {
+  const all = new RegExp(JUXTAPOSED_NUMBERS_RE.source, 'g');
+  let out = line;
+  let prev = '';
+  // a run «2 3 4» needs two passes: the second pair starts where the first one's last number ends
+  while (out !== prev) {
+    prev = out;
+    out = out.replace(all, '$1*$2');
+  }
+  return out === line ? null : out;
+}
+
 function lex(src: string, from: number, to: number, scope: ComplexScope = NO_SCOPE): Tok[] | null {
+  // #2247 (ADR-CX-081) — two numbers side by side are ambiguous as written: a refusal here, never a product
+  if (findJuxtaposedNumbers(src.slice(from, to))) return null;
   const out: Tok[] = [];
   TOKEN.lastIndex = from;
   let pos = from;

@@ -56,6 +56,8 @@ import {
   NO_SCOPE,
   canonName,
   declarabilityOf,
+  findJuxtaposedNumbers,
+  type JuxtaposedNumbers,
   foldConstants,
   isComplexName,
   isDeclarableName,
@@ -332,6 +334,16 @@ export type ParseOutcome =
       readonly reason: 'reserved-constant';
       readonly normalized: string;
       readonly constant: ReservedConstant;
+    }
+  /**
+   * #2247 (ADR-CX-081) — two numbers side by side («2 1/2», «2 3»): ambiguous as written, so refused before every
+   * rule, with what was found (`findJuxtaposedNumbers`) for the teaching sentence.
+   */
+  | {
+      readonly ok: false;
+      readonly reason: 'juxtaposed-numbers';
+      readonly normalized: string;
+      readonly found: JuxtaposedNumbers;
     };
 
 const empty = (): ParsedLine => ({
@@ -1427,6 +1439,9 @@ export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = 
 export function parseLineV2(raw: string, scope: ComplexScope = NO_SCOPE): ParseOutcome {
   const normalized = normalize(raw);
   if (!normalized) return { ok: false, reason: 'not-handled', normalized };
+  // #2247 (ADR-CX-081) — «2 1/2» / «2 3» is refused before any rule reads it, so every rule gets the one sentence
+  const found = findJuxtaposedNumbers(normalized);
+  if (found) return { ok: false, reason: 'juxtaposed-numbers', normalized, found };
   /**
    * #1974 — the first reserved-constant decline, remembered rather than thrown away. It does NOT
    * stop the rule list: a later rule that really reads the line still wins, so the set of lines

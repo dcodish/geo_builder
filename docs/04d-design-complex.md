@@ -132,6 +132,15 @@ never as a contradiction or a refutation.
   label), a constant (`ii`, `oi`), or the run is glued to a following operand (`ib z1`); `pi` and `im`
   are words and never split. For a complex letter the submit path offers the explicit product
   (`z*i`) as a clarification, only once the grammar has read it.
+- **Two numbers side by side are refused, decided ONCE** (`findJuxtaposedNumbers` in `exprParse.ts`;
+  [ADR-CX-081](06d-decisions-complex.md#adr-cx-081)). A digit run standing alone (no letter, digit, `_` or
+  `.` before it — exactly the runs the lexer reads as a `num` token), whitespace, then another such run is
+  not a product: `lex` returns null on it, so no reader of a value can multiply it, and `parseLineV2` asks
+  the same detector before every rule and returns `juxtaposed-numbers` with what it found. An integer then
+  `a/b` is the mixed number, with analytic's regex copied verbatim (a text lock keeps them equal); the
+  submit seam words it with analytic's sentence, and any other pair with the glued-`i` clarification,
+  offering `2*3` only once the grammar has read it. The glyphs `½ ¼ ¾` are spelled as decimals at the
+  orthography chokepoint (`normalize.ts`), whole part standing alone, so «2½» lexes as the exact 5/2.
 - **The trigonometric form is a SPELLING of cis, fixed at the orthography chokepoint** (`trigToCis` in
   `parser/normalize.ts`; [ADR-CX-059](06d-decisions-complex.md#adr-cx-059)). `(cos θ + i sin θ)` becomes
   `cis(θ)` before any rule reads the line, so `2(…)`, `√2(…)`, `r(…)`, `|z1|(…)` attach a modulus
