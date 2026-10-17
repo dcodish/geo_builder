@@ -72,6 +72,7 @@ import {
 } from '@/store/geoStore';
 import { spanShadow } from '@/parser/spanAccounting';
 import { findProofTarget } from '../../shell/proofTarget';
+import { findRadianAngle } from '../../shell/radianAngle';
 import { unreadScript } from '../../shell/inputScript';
 import { honestyGateReport } from './honestyGates';
 import { honoursConstruct, roleReadings, thalesReadings } from './roleReadings';
@@ -224,6 +225,13 @@ export function decidePreParse(utterance: string, view: DecideView): Verdict2D |
   const proof = findProofTarget(utterance);
   if (proof) {
     return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:proof' }], note: { key: 'input.scope.proof-target', params: { sentence: proof.sentence } } };
+  }
+  // AN ANGLE WRITTEN IN RADIANS (#1837, ADR-710 / ADR-W-142) — «∠ABC = π/2»: radians are the complex builder's
+  // notation only (operator rulings 2026-10-07 "Refuse and teach degrees", 2026-10-08). Refused here, PRE-parse
+  // and `guided`, so it never reaches the model (every spelling escalated) and «∠ABC = pi/2» no longer commits
+  // 2°. The rule is shared by the plane-geometry builders (`shell/radianAngle`); the note teaches degrees.
+  if (findRadianAngle(utterance)) {
+    return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:radian-angle' }], note: { key: 'input.scope.radian-angle' } };
   }
   // A letter this tool cannot read (#1919, ADR-626) — «משולש ДЖФ» COMMITTED triangle A, B, C, because a
   // letter outside the label alphabet is invisible to every gate that counts labels, so the shape read as

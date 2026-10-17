@@ -63,6 +63,7 @@ import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, 
 import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
+import { findRadianAngle } from '../../shell/radianAngle';
 import {
   centreClauses,
   describedCircles,
@@ -109,6 +110,12 @@ export type ParseFailure =
    * must never become a constraint.
    */
   | { code: 'proof-target'; detail: string }
+  /**
+   * #1837 (ADR-W-142; operator ruling 2026-10-08: *"analytics tool should not support radians at all. only the
+   * complex tool should"*) — an angle measure written with π. «∠ABC = π/2» RECORDED, in degrees: an angle of 1.57°.
+   * The shared rule is `shell/radianAngle`; `detail` is the π value as typed.
+   */
+  | { code: 'radian-angle'; detail: string }
   /**
    * #1919 (ADR-626, the operator's ruling of 2026-10-08: *"we only support english or hebrew … rejected.
    * in all tools"*) — a letter this tool cannot read. Analytic had no member of the class: it handed
@@ -7454,6 +7461,10 @@ export function parseLine(raw: string): ParseResult {
   // must leave out; nothing of the line is recorded, as before.
   const proof = findProofTarget(line) ?? findProofTarget(unwrap(line));
   if (proof) return { ok: false, code: 'proof-target', detail: proof.sentence };
+  // #1837 (ADR-W-142): an angle measure in radians, refused before every rule and before the model — radians are
+  // the complex builder's notation only. π as a number («AB = π», «מעגל שהיקפו 6π») is not an angle and still reads.
+  const radian = findRadianAngle(line);
+  if (radian) return { ok: false, code: 'radian-angle', detail: radian.value };
   // #1919: the shared input-script rule, called where the proof target is — before every rule and before
   // the model. The detail is the student's own run(s); `orthography` has already folded the look-alikes.
   const unread = unreadScript(line);

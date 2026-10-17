@@ -161,6 +161,8 @@ export function errorText(error: InputError, t: Translate): string {
     'bad-equation': 'errBadEquation',
     'out-of-scope': 'errOutOfScope',
     'proof-target': 'errProofTarget',
+    // #1837 (ADR-W-142) — 2-D's ruled degrees sentence, verbatim
+    'radian-angle': 'errRadianAngle',
     // #1919 — the operator chose THIS sentence for a name the tool cannot read, in every builder.
     'unread-name': 'errRenameBadName',
     'unread-word': 'errUnreadWord',

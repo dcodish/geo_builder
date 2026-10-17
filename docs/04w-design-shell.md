@@ -335,6 +335,21 @@ it teaches scores zero, so the gate can never brush off a sentence the tool acce
 
 **The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/proof-target-rows.ts`. Each builder's thin lock hands over a `ProofGate`: its REAL submit decision on a figure with A, B and C, answering `{ proof, recorded, text }`. The rows check that every spelling is refused as a proof target, recorded by none and quoted by the refusal, and that the negatives are never refused as one. The meta-lock proves each check can fail.
 
+### Angles in radians ([ADR-W-142](06w-decisions-workspace.md#adr-w-142))
+
+`shell/radianAngle.ts` decides whether a typed line gives an ANGLE MEASURE written with π. It is pure, knows no product and returns no strings: `findRadianAngle(text)` returns `{ radian: true, span: [start, end), value }` or `null`, with indices into the string the caller passed.
+
+| match | examples |
+| --- | --- |
+| an angle + a copula + a π value | «∠ABC = π/2», «∠B = π/2», «∢ABC=π/3», «זווית ABC שווה ל-π/4», «הזווית ABC היא π/2», «זווית מרכזית COD = π/3», «הזווית בין AB ל-AC היא π/6» (segment operands), «angle ABC = π/2», «the angle ABC is π/3» |
+| «בזווית» / «with angle» + a π value | «גזרה AOB בזווית π/3», «a sector with angle π/4» |
+
+A π value is π, kπ, π/n, kπ/n, k/n π, with spaces and parentheses; π is the glyph or the ASCII word `pi`. **Not matched:** π as a number in a length or a size («AB = π», «מעגל שהיקפו 6π»), π followed by a digit or letter (a name: «π2»), a space angle with a plane operand («הזווית בין AB למישור π1»), LaTeX `\pi` (each builder keeps its LaTeX answer), an arc («קשת AB = 4π», #2032), and a bare number (degrees).
+
+**Each plane-geometry builder calls it where it calls `findProofTarget`** and answers one sentence (the operator's, 2026-10-07): 2-D `decidePreParse` (`guided`, `scope:radian-angle`, `input.scope.radian-angle`), `runEditCommit` and `parseEntry` (`reason: 'radian-angle'`); 3-D `readStatement3` (`{ code: 'radian-angle' }`, `guided`); analytic `parseLine` (`radian-angle`, `errRadianAngle`). The complex builder does not call it: radians are its notation.
+
+**The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/radian-angle-rows.ts`: each builder's thin lock hands over its REAL submit decision on a triangle as a `RadianGate` answering `{ radian, recorded, escalated, text }`; the rows check every spelling is refused as radians, recorded by none, never escalated, and worded with the ruled sentence, and that the controls are never refused as radians. The meta-lock proves each check can fail; `suite-vocabulary.test.ts` holds the sentence as one role.
+
 ### Sentence boundaries ([ADR-W-125](06w-decisions-workspace.md#adr-w-125))
 
 `shell/sentences.ts` turns a pasted paragraph into the sentences a builder submits one by one. It is pure, knows no product and returns no strings.

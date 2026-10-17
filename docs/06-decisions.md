@@ -18059,3 +18059,29 @@ The kind words are the ones `circlesTangent` already reads. #2214's single kind 
 **Sibling audit.** The door's other clocks: `impliedByPrior` (the «כבר קיים» test) samples a narrow pool under `SAMPLE_BUDGET_MS` and walks the choice alternatives under the same clock — both fail open (commit), but the verdict still reads time; `settleVariantDefaults` at commit picks a new fact's variant under `SEARCH_BUDGET_MS`. Both filed as #2294 (same class, not in this change). 3-D, analytic and complex submit paths: no wall-clock deadline (only the log-triage replay tools time themselves). Analytic consumes the 2-D gate, so it gets this verdict too.
 
 **Behaviour change for a student:** none intended beyond the fix — «משולש שווה שוקיים ABC» · «AB = 4» · «BC = 8» is now drawn as a 4·8·8 isosceles triangle on every run and every computer (before: refused as a straight line on a cold or slow run). On a cold run that line takes about 4 s.
+
+## ADR-710 — An angle written with π is refused in 2-D and taught in degrees, never sent to the model (#1837)
+
+**Status:** accepted · 2026-10-17 · bug (P2, 2-D) · fix round #2291, stream G · branch `fix/1837-angle-pi` · the workspace rule is [ADR-W-142](06w-decisions-workspace.md#adr-w-142) (3-D and analytic) · follows the `shell/proofTarget` precedent ([ADR-W-107](06w-decisions-workspace.md#adr-w-107)) · amends [ADR-600](#adr-600) (FR-IN-4h's π example)
+**Operator rulings (verbatim):** #1837, 2026-10-07 — *"Refuse and teach degrees"*, with the sentence «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90»; 2026-10-08 — *"analytics tool should not support radians at all. only the complex tool should"*.
+**Requirements:** [02](02-requirements.md) FR-IN-15a (new), FR-IN-4h (its π example moved) · [02w](02w-requirements-workspace.md) FR-SU-20 · **Design:** [04](04-design.md) the pre-parse / `parseEntry` guards · [04w](04w-design-shell.md) *Angles in radians* (new) · **LADDER stage:** none (an input-boundary refusal; no engine, solver or ladder change)
+
+**Measured before** (`main` b0e9dbea, `decideDeterministic2D` after «משולש ABC», model mocked). «∠ABC = π/2», «∠ABC = π», «זווית ABC = π/3», «זווית ABC שווה ל-π/4», «∠ABC = 2π/3», «∠B = π/2», «הזווית ABC היא π/2», «הזווית בין AB ל-AC היא π/6», "angle ABC = π/2", «זווית מרכזית COD = π/3»: every one `escalate` (to the paid model; «∠ABC = π» and «0.5π» with ADR-600's `dropped:symbol:π`). «∠ABC = pi/2» **committed** `set-angle B = 2` — 2°, green: the word dropped. Controls «∠ABC = 90», «AB = π», «מעגל O שהיקפו 6π» build; «∠ABC = \pi/2» gets the LaTeX guide.
+
+**The class (docs/17 §1).** *An angle measure written with π is read as degrees, as a free letter, or not at all, in every plane-geometry builder; none answers it deterministically.* No gate looked at the unit; each builder's angle reader handled π its own way.
+
+**Decision.** One shared predicate, `findRadianAngle` (`shell/radianAngle.ts`, ADR-W-142), called in 2-D at the three statement positions the proof target uses: `decidePreParse` (refuse, `guided`, `preParse`, log `scope:radian-angle`, note `input.scope.radian-angle` — the ruled sentence, no parameters), `runEditCommit` (the same note), and `parseEntry` (`{ ok: false, reason: 'radian-angle', value }`), so no caller of `parse` — the LLM lowering included — can commit «∠ABC = pi/2» as 2°. `guided` is what keeps it from ever escalating.
+
+**What it matches.** An angle (∠/∡/∢, «זווית»/«זוית» with «ה»/«ו»/an adjective, "angle", «הזווית בין XY ל-ZW» with segment operands) + a copula («=», «שווה ל-», «היא», «הוא», «בת», "is") + a π value (π, kπ, π/n, kπ/n, with spaces or parentheses; the glyph or ASCII `pi`); and «בזווית π/3» / "with angle π/4". Never π as a number, π as a name («π2»), LaTeX `\pi`, an arc (#2032) or a bare number.
+
+**Why not a patch (docs/17 §2).** No input is special-cased: the predicate is the unit question, asked once at the boundary, and the reported spellings are its rows. The ASCII `pi` spelling is the same class in another spelling (CLAUDE.md rule 1) — it was committing a wrong angle — so it is in the rule, inside the ruled outcome ("an angle written with π … is refused").
+
+**Measured after.** Every spelling above is `refuse` / `guided` with the ruled sentence; the model is never called; nothing is added; «∠ABC = 90» then builds. The controls are unchanged. No 2-D catalog line matches the predicate.
+
+**Sibling audit.** 3-D and analytic: ADR-W-142 (same rule, same sentence). Complex: not called — radians are its notation (#1754). Analytic consumes 2-D's engine but not this gate; it calls the predicate itself.
+
+**Locks.** `src/app/__tests__/radian-angle-1837.test.ts` (the shared rows through `decideDeterministic2D`; `runSubmit` never calls the model and shows the sentence; the ✎ edit seam; English; the catalog), `shell/__tests__/radian-angle-meta-1837.test.ts`, parity rows `radian-angle-1837-01…04`, the `radianAngle` role in `suite-vocabulary.test.ts`, scenario `radian-angle-refused-1837` (corpus chunk 4).
+
+**Behaviour change for a student:** «∠ABC = π/2» (and every angle written with π) no longer goes to the AI and is refused at once with «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90»; «∠ABC = pi/2» no longer draws a 2° angle.
+
+**Slow-tier goldens that may drift (batch's to re-record):** `decide-parity-1395-*` if any case types a π angle (it would move from `escalate` to `refuse`).

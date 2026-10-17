@@ -224,6 +224,7 @@ A letter the tool cannot read is
 (`shell/inputScript.ts`) is asked right after the proof target, so the line never reaches a rule and never
 reaches the model, and the two refusals are worded from `errRenameBadName` and `errUnreadWord`. The
 look-alike letters fold first, in `orthography`'s `foldGlyphs`, so «משולש КМО» now reads as KMO and records.
+An angle measure written in radians is `radian-angle` (#1837, [ADR-W-142](06w-decisions-workspace.md#adr-w-142)): `findRadianAngle` (`shell/radianAngle.ts`) is asked right after the proof target, before every rule and the model, worded from `errRadianAngle` (2-D's sentence); `detail` is the π value. The angle readers it covers are the ones analytic has — the angle given and the sector's «בזווית»; measured at b0e9dbea, an inclination, an angle between two lines and a trig argument are not read even in degrees.
 
 **Entailment is judged over configurations** ([ADR-AG-188](06c-decisions-analytic.md#adr-ag-188)): the line's
 constraints (`Derivation.constraintLine`) must hold across the pool (`evaluate.holdsInEveryConfiguration`, with

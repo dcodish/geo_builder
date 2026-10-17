@@ -28,6 +28,7 @@ import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
+import { findRadianAngle } from '../../shell/radianAngle';
 import { foreignGiven } from './scope';
 import { readFrame } from './frame';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
@@ -106,6 +107,12 @@ export type ParseResult =
   // `detail` is the student's own run(s); `name` is a run that could be a point name, `word` a word in
   // another language.
   | { ok: false; reason: 'unread-script'; kind: 'name' | 'word'; detail: string }
+  // #1837 (ADR-710, ADR-W-142): an angle written in RADIANS — «∠ABC = π/2», «∠ABC = pi/2». Radians are the
+  // complex builder's notation only (operator rulings 2026-10-07 / 2026-10-08). «∠ABC = pi/2» lowered to
+  // `set-angle B = 2` (the word dropped, 2°). The submit and ✎ edit gates refuse it earlier with the ruled
+  // sentence; this is the same shared rule (`shell/radianAngle`) at the boundary every caller reads, the LLM
+  // lowering included. `value` is the π value as typed.
+  | { ok: false; reason: 'radian-angle'; value: string }
   // #1698 (ADR-566): a trigonometric function of an angle («sin∢ACB = 3/4», «cos∢B = 2», «tan∢B > 1»)
   // that `trigGiven` cannot lower to exactly one angle. Refused naming the function, never handed to an
   // angle rule (which read it as degrees) and never escalated. `fn` is the student's own spelling.
@@ -13818,6 +13825,10 @@ function parseEntry(raw: string, ctx: ParseContext): ParseResult {
   // (`shell/inputScript`), on the NORMALIZED text, so the look-alike twins are already Latin letters.
   const unread = unreadScript(s);
   if (unread) return { ok: false, reason: 'unread-script', kind: unread.kind, detail: unread.detail };
+  // #1837 (ADR-710): an angle written in radians never reaches a rule (`shell/radianAngle`), on the raw line
+  // as the proof target is (the glyph π is what the rule reads).
+  const radian = findRadianAngle(raw);
+  if (radian) return { ok: false, reason: 'radian-angle', value: radian.value };
   // #1654–#1657 (ADR-562): a foreign given is refused before ANY rule may read part of the sentence — the
   // LaTeX/negation placement, for their reason: the partial reading is a different, wrong given.
   const foreign = foreignGiven(s);

@@ -1396,6 +1396,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'unread-word-1919', family: 'frame', steps: ['треугольник ABC'], expect: 'refused', note: 'a WORD in another language takes the other ruled sentence' },
   { id: 'unread-greek-vertex-1919', family: 'polygons', steps: ['משולש ΓΔΘ'], expect: 'not-handled', note: 'Greek is math (the ruling), so a Greek vertex name goes to the model as in 2-D — 3-D recorded A, B, C before #1919' },
   { id: 'unread-lookalike-1919', family: 'polygons', steps: ['משולש КМО'], expect: 'builds', note: 'the Cyrillic look-alikes fold to K, M, O (the ruling: «fold them silently») — 2-D always did; 3-D recorded A, B, C and analytic read nothing' },
+  // #1837 (ADR-710 / ADR-W-142) — AN ANGLE WRITTEN WITH π IS REFUSED, deterministically, in every plane-geometry
+  // builder (operator rulings 2026-10-07 «Refuse and teach degrees», 2026-10-08 «only the complex tool should»).
+  // 2-D sent these to the model, 3-D recorded «∠ABC = π» as a mark labelled π, analytic drew them in degrees.
+  { id: 'radian-angle-1837-01', family: 'angles', steps: ['משולש ABC', '∠ABC = π/2'], expect: 'refused', note: 'analytic drew 1.57°; 2-D and 3-D asked the model' },
+  { id: 'radian-angle-1837-02', family: 'angles', steps: ['משולש ABC', '∠ABC = π'], expect: 'refused', note: '3-D recorded an angle mark labelled π' },
+  { id: 'radian-angle-1837-03', family: 'angles', steps: ['משולש ABC', 'זווית ABC שווה ל-π/4'], expect: 'refused' },
+  { id: 'radian-angle-1837-04', family: 'angles', steps: ['משולש ABC', '∠ABC = pi/2'], expect: 'refused', note: 'the ASCII spelling: 2-D committed 2°' },
 
   // ── #1864 (ADR-AG-267): an angle's acuteness named by its VERTEX alone — 2-D's «∠C קהה/חדה» ──
   { id: 'vertex-obtuse-1864', family: 'angles', steps: ['משולש ABC', 'זווית A קהה'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the line the obtuse-triangle note teaches' },

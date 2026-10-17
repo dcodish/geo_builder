@@ -5971,3 +5971,35 @@ He is right, and the failure is instructive: **isolation fixes a Hebrew run agai
 **Sibling audit.** 3-D: ADR-3D-345 (merge note) and ADR-3D-346 (third noun). 2-D is the reference except #2193 (filed).
 
 **Locks.** `src-analytic/__tests__/quad-noun-pairs-2169.test.ts` (the shared rows; D1 both orders, another reading, English, the three-noun exclusion, seeds 0–7; the implied rows and a green, unwarned figure; `nounsExclude` = `kindRelation`'s `excludes` both ways; the fixture `issue-2171-rectangle-rhombus.analytic.json` builds and says the merge note in he and en); re-based `issue-1926-trapezoid-over-parallelogram.test.ts` (the exclusion pairs now include the kite and iso × right).
+
+## ADR-W-142 — Radians are the complex builder's notation only: an angle written with π is refused in every plane-geometry builder, by one shared rule (#1837)
+
+**Status:** accepted · 2026-10-17 · bug (P2; 2d + 3d + analytic) · fix round #2291, stream G · **Issue:** #1837 · 2-D's side is [ADR-710](06-decisions.md#adr-710) · **Extends** [ADR-W-016](#adr-w-016) (a new `shell/` decision) and follows [ADR-W-107](#adr-w-107) (the shared-predicate shape) and [ADR-W-071](#adr-w-071) (docs/28 §5c rows). The 3-D port and analytic's change are recorded here (one rule, three gates) rather than as separate 06b / 06c entries.
+**Operator rulings (verbatim):** #1837, 2026-10-07 — *"Refuse and teach degrees"*, the sentence «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90», reaching 3-D through the parity rule, "analytic follows"; 2026-10-08 — *"analytics tool should not support radians at all. only the complex tool should"*.
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-20 (new) and the behaviour-table row "An angle written with π" (**Same**) · [02](02-requirements.md) FR-IN-15a · [02b](02b-requirements-3d.md) FR-SP-21a · [02c](02c-requirements-analytic.md) §3a *Out of the language* · **Design:** [04w](04w-design-shell.md) *Angles in radians* (new) · [04](04-design.md), [04b](04b-design-3d.md), [04c](04c-design-analytic.md) — the gate sites. **Product:** workspace (2d + 3d + analytic).
+
+**Measured before** (`main` b0e9dbea, after «משולש ABC», no model called).
+
+| line | 2-D | 3-D | analytic |
+|---|---|---|---|
+| «∠ABC = π/2», «זווית ABC = π/3», «זווית ABC שווה ל-π/4», «∠ABC = 2π/3», «∠B = π/2» | escalate | `not-understood` (the model) | **recorded in degrees** (π/2 drawn as 1.57°) |
+| «∠ABC = π», «∠ABC = 0.5π» | escalate | **recorded: `angle-mark` labelled π** | recorded in degrees |
+| «∠ABC = pi/2» | **committed 2°** | `not-understood` | recorded |
+| «גזרה AOB בזווית π/3» | escalate | `not-understood` | `not-handled` («בזווית 80» records) |
+| «AB = π», «מעגל O שהיקפו 6π» | build | `not-understood` | record |
+| «B על המישור π2» | 3-D's (2-D: foreign given) | records | `not-handled` |
+
+The 2026-10-08 plan update asked analytic for every reader of an angle measure. Measured: an inclination («זווית הנטייה של l1 היא 45», «הישר l1 נוטה בזווית …»), the angle between two lines («הזווית בין הישרים l1 ו-l2 היא 60», «הזווית בין l1 לציר ה-x היא 45») and a trig argument («שיפוע l1 הוא tan(30)», «AB = cos(30)», «tan∢ABC = tan(π/3)») are not read even in degrees (`not-handled` / `bad-equation`), so a π there is never drawn today. They are left as they are: teaching «∠ABC = 90» would teach a sentence the next Enter also refuses. A bare decimal («∠ABC = 1.2») carries nothing that says radians, so it stays degrees in every builder.
+
+**The class.** *An angle measure written with π is read as degrees, as a free letter, or not at all; no plane-geometry builder answers it deterministically.* Three readers, three behaviours, no gate on the unit.
+
+**Decision.**
+1. **One predicate in `shell/`.** `findRadianAngle(text)` (`shell/radianAngle.ts`) — pure, product-free, no strings — returns the span and π value of the first angle measure written with π (the 04w table), or `null`. π as a number, π as a name, a plane operand, LaTeX `\pi`, an arc and a bare number never match.
+2. **Every plane-geometry builder calls it where it calls `findProofTarget`, and answers the ruled sentence.** 2-D: `decidePreParse`, `runEditCommit`, `parseEntry` (ADR-710). 3-D: `readStatement3` → `{ code: 'radian-angle' }`, `STORE_CATEGORY3` `guided`, `err.radianAngle` — submit and the ✎ edit. Analytic: `parseLine` → `radian-angle`, `errRadianAngle`, before every rule and the model.
+3. **Complex does not call it.** «cis(π/3)» is its notation (#1754); that is the ruling's "only the complex tool should".
+
+**Locks.** `shell/__tests__/fixtures/radian-angle-rows.ts` (16 spellings that must be refused — never recorded, never escalated, worded exactly — and 11 controls that must never be refused as radians), driven through each builder's real gate by `src/app/__tests__/radian-angle-1837.test.ts`, `src3d/__tests__/radian-angle-1837.test.ts`, `src-analytic/__tests__/radian-angle-1837.test.ts`; the meta-lock `shell/__tests__/radian-angle-meta-1837.test.ts` (no gate, an escalating gate, a π-bans-all detector, a glyph-only detector, a reworded refusal — each caught); `geo-input-parity` rows `radian-angle-1837-01…04` (`expect: 'refused'` in all three); the `radianAngle` role in `shell/__tests__/suite-vocabulary.test.ts`.
+
+**Behaviour change for a student:** in 2-D, 3-D and analytic, an angle written with π («∠ABC = π/2», «∠ABC = pi/2», «גזרה AOB בזווית π/3») is refused at once with «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90». Before: 2-D asked the AI (and drew pi/2 as 2°), 3-D drew a mark labelled π or asked the AI, analytic drew the angle in degrees (π/2 as 1.57°). π as a number, 3-D's plane names and the complex builder are unchanged.
+
+**Slow-tier goldens that may drift (batch's to re-record):** `decide-submit3-parity-1394` if a case types a π angle (`record`/`not-understood` → `refused`); `decide-parity-1395-*` as ADR-710 says.
