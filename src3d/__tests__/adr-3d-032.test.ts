@@ -42,9 +42,10 @@ const BASE = [
 
 describe('ADR-3D-032 — parse', () => {
   it('M(k,1,3) keeps the symbol; the appositive sign clause rides; standalone param-sign', () => {
-    expect(cmd('M(k,1,3)')).toEqual([{ type: 'point3', id: 'M', x: null, y: 1, z: 3, syms: ['k', null, null] }]);
+    // #2077 (ADR-3D-368): + `srcs`, the typed text — display only
+    expect(cmd('M(k,1,3)')).toEqual([{ type: 'point3', id: 'M', x: null, y: 1, z: 3, syms: ['k', null, null], srcs: ['k', '1', '3'] }]);
     expect(cmd('נתונה נקודה M(k,1,3), k הוא פרמטר חיובי')).toEqual([
-      { type: 'point3', id: 'M', x: null, y: 1, z: 3, syms: ['k', null, null] },
+      { type: 'point3', id: 'M', x: null, y: 1, z: 3, syms: ['k', null, null], srcs: ['k', '1', '3'] },
       { type: 'param-sign', sym: 'k', positive: true },
     ]);
     expect(cmd('point M(k,1,3), k is a positive parameter')).toHaveLength(2);
