@@ -27,7 +27,8 @@ const CEILINGS = {
   // circumscribes pattern composes the LABEL atom — lowered to the measured count (342 → 334, earlier drift included).
   // #1814 (ADR-600): the number gate's subscript blank composes NAME_LETTER (shell/indexedName) — 334 → 333.
   parse2Label: 333, // '[A-Za-z]\d*' in parse.ts
-  parse2Num: 31, //    '\d+(?:\.\d+)?' in parse.ts
+  // #2065 (ADR-700): the two-term ratio patterns share one `UDEC` spelling — 31 → 30.
+  parse2Num: 30, //    '\d+(?:\.\d+)?' in parse.ts
   parse3Label: 163, // '[A-Z]\d*' in parse3.ts
   // #513 (ADR-3D-135) swept parse3's number fragment onto the new `UNUM` atom while widening the
   // radicand: 24 → 14. The ratchet worked exactly as designed — it caught the fix inlining fresh

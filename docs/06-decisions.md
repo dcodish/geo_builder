@@ -17669,3 +17669,30 @@ No chokepoint grows: a per-order special case is removed and the copula is an at
 **Locks.** `src-analytic/__tests__/issue-2119-radius-restated.test.ts` (both spellings, English, the same radius still known); `message-floor-2028.test.ts` payloads; the parity rows of ADR-683.
 
 **Behaviour change for a student (analytic):** «מעגל O ברדיוס 4» after «מעגל O ברדיוס 3» says «לא ניתן: «מעגל O ברדיוס 4» סותר את «מעגל O ברדיוס 3» — אי אפשר לקיים את שניהם יחד.» (was «המשפט לא נוסף — הוא סותר את מה שכבר נקבע: "מעגל O ברדיוס 4"»).
+
+## ADR-700 — A stated fraction or root is paid whole, never by one of its parts; a similarity ratio reads «p ל-q»; a letter k is never the ratio (#2065)
+
+**Status:** accepted · 2026-10-17 · bug (P2, 2-D) · fix round #2283, stream H · branch `fix/2065-dropped-number-gate` off `main` @ `4b0b4592` · operator rulings 2026-10-14 (item 1 is mechanism; his note *"nowhere will k represent the ratio. if a ratio is given, it will be in words: ביחס של 1:2 or something similar"*) and 2026-10-15 (card 10, A: the k row keeps `errors.unboundVariable`) · ports [ADR-3D-340](06b-decisions-3d.md#adr-3d-340) §4 · extends [ADR-637](#adr-637) · LADDER stage: none (the parser's reader and the honesty gates)
+**Requirements:** [02](02-requirements.md) FR-EN-12 — «ביחס p ל-q» is a stated similarity ratio; a letter is never the ratio · **Design:** [04](04-design.md) § "A fraction is paid whole, and «p ל-q» is one pair"
+
+**Measured before** (`main` 4b0b4592; `droppedGivenNumbers` directly, and `decideDeterministic2D` → `commitVerdict` → `replay` with the model mocked). The gate returned `[]` for «AB = 1/2» read as a lone `1` or a lone `2`, «AB = 2/√3» as a lone `2`, «AB = √2» as a lone `1` (an angle equality's `k: 1`). «ABC ∽ DEF ביחס 1 ל-2» (also «של», «ביחס 1 ל 2», «ביחס דמיון 1 ל-2», «המשולשים ABC ו-DEF דומים ביחס 1 ל-2», «ביחס 2 ל-3») escalated `not-handled` (the paid model) while «ביחס 1:2» built. «ABC ∽ DEF, k = 2» committed the similarity and a red k row reading «האות k אינה מוגדרת באף משפט — …», as the 2026-10-15 re-check recorded.
+
+**The classes (docs/17 §1).**
+1. *A stated fraction or root is counted as consumed when only one of its parts appears in the commands.* The fraction pass accounted an occurrence when ANY of `[value, numerator, denominator]` had an unspent account.
+2. *A similarity ratio written as «p ל-q» is not read* — and, once read, *the number gates know a two-term ratio only by its colon*, so the reading would escalate `weak:dropped`.
+
+**Decision.**
+1. **Fractions** (the ADR-3D-340 §4 port, in `droppedGivenNumbers`): a slash fraction is accounted by its value, OR by its numerator AND denominator together, spending one of each (`okPair`; equal parts need two accounts). A lone radical is accounted by its value only — the implied `/1` is no candidate.
+2. **One pair atom, three consumers.** `RATIO_SEP` (`src/parser/lexicon.ts`, «:» or «ל-?») is composed by the similarity reader (`statedSimilarityRatio` reads `RATIO_PQ | NUMEXPR`, value p/q — «1 ל-2» is k = ½ as «1:2» is), by the gate's pair pass and by the span accountant's colon pass. A «ל» pair is claimed whole only when a ratio account pays for it, because «ל» is also the "to" of a range («מ-3 ל-5»); otherwise its digits fall through to the single-number pass. A colon pair is claimed as before. The divider keeps the colon-only `RATPQ` (its «ל-» spelling is not in this ruling).
+3. **k is never the ratio** (the ruling): no code. «ABC ∽ DEF, k = 2» and the own-line «k = 2» keep committing the similarity unscaled with the k row's `errors.unboundVariable` text; now locked.
+4. **Number words** («ביחס של אחד לשניים», «1 לשניים») wait on #2068's word atom and still escalate; the lock asserts it, and #2068's commit flips it.
+
+**Sweep** (the ADR-3D-340 bar). The old and new predicate ran side by side inside `droppedGivenNumbers` (an env-gated harness, removed before commit), logging every call where they differed, over the whole `test:fast` tier (1,286 files, 26,167 tests, all products — every fixture, catalog, parity and scenario corpus the fast tier drives) and the 52 slow-tier `src/`/`shell/` files plus the three products' parity lanes and `fixtures.test.ts` (1,302 tests). **Changed verdicts on existing coverage: zero.** Every logged difference came from this ADR's own new rows (the gate table and the «ל-» similarity forms) and one probe line, «ABC ~ DEF, k=1/2», which escalated before (`symbol:k`) and still does.
+
+**Not taken.** The divider «G מחלקת את BC ביחס 1 ל-2» (still escalates; found work, proposed to the operator on #2065). The pre-fill of the first 2026-10-14 ruling (withdrawn by his note).
+
+**Sibling audit.** 3-D: ADR-3D-340 §4 already closed the fraction half; its lone radical still lets the implied `1` pay — filed #2285 (P2). Analytic: its LLM gate (`shell/llm/honestyCore` `scanNumbers`) reads a fraction as one value, so no part can pay for it — not this class. Parity row `similarity-ratio-to-2065` (analytic and 3-D read no similarity ratio: known gaps on #2067).
+
+**Locks.** `src/parser/__tests__/dropped-given-fraction-parts.test.ts` (every gate row, the multiset, the «ל» pair and the range), `src/app/__tests__/issue-2065-similarity-k.test.ts` (the k row, each «ל-» form equal to its colon twin and drawn, the number-word and divider controls, the forms that built before), fixture `similarity-ratio-in-words-2065.geo.json` (rule 4), the ratchet lowered 31 → 30.
+
+**Behaviour change for a student:** «ABC ∽ DEF ביחס 1 ל-2» (and «ביחס של 1 ל-2», «ביחס 1 ל 2», «ביחס דמיון 1 ל-2», «… דומים ביחס 1 ל-2», «ביחס 2 ל-3») draws the similarity at its ratio — before: sent to the AI. A line whose stated fraction or root was only half read now escalates instead of committing; no line in the corpus changed.

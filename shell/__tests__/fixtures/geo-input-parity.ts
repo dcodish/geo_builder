@@ -279,6 +279,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2235': 'open', // #2205 (ADR-685): 3-D picks the first of two triangles for a definite «המשולש …» where 2-D asks
   '#2236': 'open', // #2205 (ADR-685): analytic does not read a definite unnamed shape noun with a predicate
 
+  '#2067': 'open', // #2065 (ADR-700): analytic and 3-D read no similarity ratio, «ביחס p ל-q» included
+
   '#2253': 'open', // #2165 (ADR-681): analytic and 3-D read no value line for a length letter; 3-D refuses «AB = 2a»
 
 };
@@ -1527,6 +1529,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'radius-restated-2119', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל O ברדיוס 4'], expect: 'refused', exception: 'X8', note: '2-D answered «כבר קיים» before ADR-683; analytic refused in its own conflict sentence before ADR-684' },
   { id: 'radius-restated-sentence-2119', family: 'circles', steps: ['מעגל O ברדיוס 5', 'רדיוס המעגל O הוא 3'], expect: 'refused', exception: 'X8' },
   { id: 'radius-restated-with-point-2119', family: 'circles', steps: ['מעגל O ברדיוס 3', 'A על מעגל O', 'מעגל O ברדיוס 4'], expect: 'refused', exception: 'X8', note: '2-D resized silently and committed green before ADR-683' },
+  // ── #2065 (ADR-700): a similarity ratio in words, «ביחס p ל-q», reads as «ביחס p:q» in 2-D ──
+  { id: 'similarity-ratio-to-2065', family: 'angles', steps: ['משולש ABC', 'משולש DEF', 'ABC ∽ DEF ביחס של 1 ל-2'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2067' }, { product: '3d', issue: '#2067' }], note: '2-D escalated to the AI before ADR-700; analytic and 3-D read no similarity ratio (#2067)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

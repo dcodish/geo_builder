@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -4048,7 +4048,15 @@ const segmentRatioColon: Rule = (s) => {
  * Keyword-anchored on `divides`/`מחלק` or `ratio`/`יחס` PLUS a literal `p:q`, so it never claims a plain
  * segment, a `XY = …` equality, or a `AB/CD = …` segment-ratio (those carry no `:`-ratio + divide/ratio word).
  */
-const RATPQ = String.raw`(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)`;
+/** An unsigned decimal — the one inline spelling the two-term ratio patterns below share (S2.1 ratchet). */
+const UDEC = String.raw`\d+(?:\.\d+)?`;
+const RATPQ = String.raw`(${UDEC})\s*:\s*(${UDEC})`;
+/**
+ * #2065 ([ADR-700](docs/06-decisions.md#adr-700)) — a two-term ratio in either spelling, «p:q» or «p ל-q» (the shared
+ * `RATIO_SEP` atom, which the dropped-number gate's pair pass composes too). The SIMILARITY slot reads it; the
+ * divider keeps the colon-only `RATPQ` (its «ל-» spelling is not in that ruling).
+ */
+const RATIO_PQ = String.raw`(${UDEC})${RATIO_SEP}(${UDEC})`;
 const dividesInRatio: Rule = (s) => {
   // (a) divider-first: "G divides DC in ratio p:q" / "G מחלקת את DC ביחס p:q".
   const div = s.match(
@@ -11491,7 +11499,7 @@ const SIM_RATIO_KW = /ב?יחס|ratio|scale\s+factor/i;
  * #2027 ([ADR-637](docs/06-decisions.md#adr-637)) — the RATIO a similarity sentence states, as |first|/|second|.
  * `null` when the sentence states none; `'unreadable'` when it names a ratio whose value this grammar cannot read
  * (or anything unread follows it), so the caller escalates instead of drawing the similarity without it. The value
- * is a colon ratio `p:q` (→ p/q) or the shared NUMEXPR value atom (`2`, `0.5`, `1/2`, `√2`, `√2/2`; a vulgar glyph
+ * is a two-term ratio `p:q` or «p ל-q» (→ p/q; #2065, `RATIO_PQ`) or the shared NUMEXPR value atom (`2`, `0.5`, `1/2`, `√2`, `√2/2`; a vulgar glyph
  * is spelled out by the caller). The labels are blanked first, so the triangles may sit between the keyword and
  * the value («יחס הדמיון בין המשולשים ABC ו-DEF הוא 1:2»).
  */
@@ -11499,7 +11507,7 @@ const statedSimilarityRatio = (s: string): number | null | 'unreadable' => {
   const kw = SIM_RATIO_KW.exec(s);
   if (!kw) return null;
   const tail = s.slice(kw.index + kw[0].length).replace(new RegExp(LABEL, 'g'), (m) => ' '.repeat(m.length));
-  const m = tail.match(new RegExp(String.raw`^[^\d√]*?(?:${RATPQ}|${NUMEXPR('k')})\s*[.,]?\s*$`));
+  const m = tail.match(new RegExp(String.raw`^[^\d√]*?(?:${RATIO_PQ}|${NUMEXPR('k')})\s*[.,]?\s*$`));
   if (!m) return 'unreadable';
   const k = m[1] !== undefined ? parseFloat(m[1]) / parseFloat(m[2]) : numexprVal(m.groups ?? {}, 'k')?.value;
   return k !== undefined && Number.isFinite(k) && k > 0 ? k : 'unreadable';
@@ -12844,6 +12852,16 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
     }
     return false;
   };
+  /** #2065 — account an occurrence by BOTH of two parts at once (a fraction's numerator and denominator), or neither. */
+  const okPair = (a: number, b: number): boolean => {
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+    const ka = q(a), kb = q(b);
+    const need = ka === kb ? 2 : 1;
+    if ((acc.get(ka) ?? 0) < need || (acc.get(kb) ?? 0) < need) return false;
+    acc.set(ka, acc.get(ka)! - 1);
+    acc.set(kb, acc.get(kb)! - 1);
+    return true;
+  };
   // stated numbers: counts and name indices blanked, by the one scanner the read-extent probe shares (#2198)
   const { raw, counted, s } = statedNumberText(utterance);
   // #1161 (ADR-523) — the scan is SIGN-AWARE. A stated number’s leading minus belongs to the number:
@@ -12902,15 +12920,24 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
   // accounted GENEROUSLY (the value it can legitimately produce from either side, as a ratio or as a
   // position along the segment) per this gate's own doctrine: a false account only suppresses a warning,
   // while a false drop breaks a working input.
-  // built from the shared `num` atom (S2.1 lexical ratchet — no fresh inline number fragments)
-  for (const m of s.matchAll(new RegExp(String.raw`${num}\s*:\s*${num}`, 'g'))) {
+  // built from the shared `num` atom (S2.1 lexical ratchet — no fresh inline number fragments).
+  // #2065 (ADR-700): the separator is the lexicon's `RATIO_SEP` — the atom the similarity reader composes — so «1 ל-2»
+  // is consumed whole exactly as «1:2» is (read as k = ½, its two digits were otherwise hunted for one by one and
+  // reported dropped). The «ל» spelling is also the Hebrew "to" of a range («מ-3 ל-5»), so unlike the colon it claims
+  // the pair only when a ratio account pays for it; otherwise its digits fall through to the single-number pass.
+  for (const m of s.matchAll(new RegExp(String.raw`${num}${RATIO_SEP}(-?${UDEC})`, 'g'))) {
     const i = m.index!;
     if (spans.some(([x, y]) => i >= x && i < y)) continue;
-    spans.push([i, i + m[0].length]);
+    const colon = m[0].includes(':');
     const p = parseFloat(m[1]);
     const qv = parseFloat(m[2]);
     const sum = p + qv;
     const cands = [p / qv, qv / p, ...(sum !== 0 ? [p / sum, qv / sum] : [])];
+    if (!colon) {
+      if (ok(cands)) spans.push([i, i + m[0].length]);
+      continue;
+    }
+    spans.push([i, i + m[0].length]);
     if (!ok(cands) && !seen.has(m[0])) {
       seen.add(m[0]);
       dropped.push(q(p / qv));
@@ -12926,7 +12953,12 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
     const denV = m[2] !== undefined ? evalTerm(m[2]) : 1;
     const val = denV !== 0 ? numV / denV : numV;
     const key = (sign < 0 ? '-' : '') + m[0];
-    if (!ok([val, numV, denV]) && !seen.has(key)) {
+    // #2065 (ADR-700, the 2-D port of ADR-3D-340 §4): a FRACTION is accounted by its value, or by its numerator AND
+    // its denominator together (spending one of each — a ratio keeps «2/3» as `p`/`q`). Never by one part alone: the
+    // old `ok([val, numV, denV])` let any payload `1` or `2` (an angle equality's `k: 1`) pay for a dropped «1/2»,
+    // and a lone radical's implied `/1` let a `1` pay for a dropped «√2». A lone radical has no parts: its value only.
+    const accounted = m[2] !== undefined ? ok([val]) || okPair(numV, denV) : ok([val]);
+    if (!accounted && !seen.has(key)) {
       seen.add(key);
       dropped.push(val);
     }

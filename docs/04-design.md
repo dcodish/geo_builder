@@ -836,6 +836,16 @@ k = 1 of «שווים» for «שווים ל-1». Two layers now:
   structural-constant member no field predicate can foresee. Cost: one parse per stated number on lines every older
   number check passed.
 
+#### A fraction is paid whole, and «p ל-q» is one pair ([ADR-700](06-decisions.md#adr-700))
+
+- **Fraction parts** (the 2-D port of ADR-3D-340 §4): the gate's radical-aware pass accounts a `TERM / TERM`
+  occurrence by its value, or by its numerator AND denominator together (one of each spent, `okPair`); a lone radical
+  (`√2`, `5√2`, `√(2/3)`) by its value only. One part never pays for the whole, and the implied `/1` is no candidate.
+- **The ratio pair atom** `RATIO_SEP` (`src/parser/lexicon.ts`: «:» or «ל-?») has three consumers: the similarity
+  reader (`statedSimilarityRatio`, `RATIO_PQ`, value p/q), the gate's pair pass and the span accountant's colon pass.
+  A «ל» pair is claimed whole only when a ratio account pays for it (it is also the "to" of a range); a colon pair is
+  claimed always, as before. The divider keeps the colon-only `RATPQ`.
+
 #### An unread item is named ONCE, on every seam ([ADR-627](06-decisions.md#adr-627))
 
 The battery is a SUPERSET of overlapping gates by design — the label gate and the span accountant both account a
