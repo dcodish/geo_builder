@@ -67,6 +67,9 @@ function expectTangent(kind: 'EXT' | 'INT', labels: string[]) {
 beforeEach(() => llmParseMock.mockReset());
 
 const PAIR = ['מעגל O', 'מעגל P'];
+/** The note a committed verdict carries, by key (null when none). */
+const noteKey = (v: { kind: string; note?: unknown }): string | null =>
+  v.kind === 'commit' && v.note && typeof v.note === 'object' && 'key' in v.note ? String((v.note as { key: string }).key) : null;
 /** #2210 (ADR-704): a line that states no kind (and inherits none) marks its `external` as the default. */
 const KIND_WORD = /מבפנים|מבחוץ|פנימ|חיצונ|internal|external/i;
 const defaultedIf = (line: string) => (KIND_WORD.test(line) ? {} : { kindStated: false as const });
@@ -88,11 +91,14 @@ describe('#2209 item 1 — the catalog\'s «מעגל O ומעגל P משיקים
       expect(v.kind).toBe('commit');
       expect(added).toEqual([{ type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'M', external: kind === 'EXT', ...defaultedIf(line) }]);
       expectTangent(kind, ['M', 'O', 'P']);
+      // ADR-703 Am. 1: ONE statement over the drawn pair — never the «ציירנו את שני הנתונים…» one-input-per-line note
+      expect(noteKey(v), 'no split advisory').not.toBe('input.scope.split-advisory');
     });
 
   it('the named touch is the student\'s letter: «…משיקים בנקודה K» draws K', async () => {
     const { v } = await play(PAIR, 'מעגל O ומעגל P משיקים בנקודה K');
     expect(v.kind).toBe('commit');
+    expect(noteKey(v), 'no split advisory').not.toBe('input.scope.split-advisory');
     expectTangent('EXT', ['K', 'O', 'P']);
   });
 
@@ -108,17 +114,23 @@ describe('#2209 item 1 — the catalog\'s «מעגל O ומעגל P משיקים
       expect(added).toEqual([{ type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'M', external, ...defaultedIf(line) }]);
     });
 
-  // S5/S6: «מעגל O» is a DECLARATION there (a given), so the line is two statements and keeps its advisory
-  for (const [pre, line] of [
-    [[], 'מעגל O ומעגל P משיקים'],
-    [['מעגל O'], 'מעגל O ומעגל P משיקים בנקודה M'],
-  ] as const)
-    it(`unchanged: «${[...pre, line].join(' · ')}» commits with the one-input-per-line tip`, async () => {
-      const { v } = await play([...pre], line);
-      expect(v.kind).toBe('commit');
-      expect(v.kind === 'commit' && v.note && 'key' in v.note && v.note.key).toBe('input.scope.split-advisory');
-      expectTangent('EXT', ['M', 'O', 'P']);
-    });
+  // S5: on an empty figure «מעגל O» is a DECLARATION (a given), so the line is two statements and keeps its advisory
+  it('unchanged: «מעגל O ומעגל P משיקים» on an empty figure commits with the one-input-per-line tip', async () => {
+    const { v } = await play([], 'מעגל O ומעגל P משיקים');
+    expect(v.kind).toBe('commit');
+    expect(noteKey(v)).toBe('input.scope.split-advisory');
+    expectTangent('EXT', ['M', 'O', 'P']);
+  });
+
+  // S6: with O drawn, «מעגל O» only REFERS to it, so the line is one statement (it introduces P tangent to O) and the
+  // advisory, which would list «מעגל O» as a given, does not show (ADR-703 Am. 1 — flagged for the operator's ruling:
+  // the #2209 plan listed this row as unchanged)
+  it('only O drawn: «מעגל O ומעגל P משיקים בנקודה M» commits with no split advisory', async () => {
+    const { v } = await play(['מעגל O'], 'מעגל O ומעגל P משיקים בנקודה M');
+    expect(v.kind).toBe('commit');
+    expect(noteKey(v)).not.toBe('input.scope.split-advisory');
+    expectTangent('EXT', ['M', 'O', 'P']);
+  });
 
   // S7: sibling pair sentences on a drawn pair still commit
   for (const [pre, line] of [

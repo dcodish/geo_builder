@@ -171,6 +171,17 @@ function readClauses(utterance: string, ctx: ParseContext): ClauseRead[] | null 
   return out.length < 2 ? null : out;
 }
 
+/**
+ * #2209 ([ADR-703](../../docs/06-decisions.md#adr-703) Am. 1) — the line's STATEMENTS as the clause gate reads them in this
+ * figure: the splitter's pieces with every reference-only piece joined to the next (`readClauses`). The commit path's
+ * one-input-per-line advisory (ADR-460 Am. 2) asks this, so «מעגל O ומעגל P משיקים» over two drawn circles, ONE
+ * statement to the gate, is never shown to the student as two givens.
+ */
+export function statementClauses(utterance: string, ctx: ParseContext): string[] {
+  const read = readClauses(utterance, ctx);
+  return read ? read.map((r) => r.clause) : [utterance.trim()];
+}
+
 /** The ONE shared compound-line message (operator ruling 2026-10-06), naming the student's own clauses. */
 export function splitStatements(parts: string[]): ScopeMatch {
   return {

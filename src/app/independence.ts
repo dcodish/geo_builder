@@ -149,8 +149,12 @@ function standsAlone(clause: string): boolean {
  * no definite back-reference to it. Both halves matter: sharing a label is what makes «ריבוע ABCD,
  * נקודה G על AD» one statement, and the back-reference is what makes «מעגל O, נקודה A על המעגל» one.
  */
-export function independentConstructs(utterance: string): ScopeMatch | null {
-  const parts = clausesOf(utterance);
+export function independentConstructs(
+  utterance: string,
+  /** #2209 (ADR-703 Am. 1): the line's STATEMENTS when the caller has the figure (`statementClauses`, the clause gate's
+   *  joined reading), so a piece that only refers to a drawn object is never counted as a given of its own. */
+  parts: string[] = clausesOf(utterance),
+): ScopeMatch | null {
   if (parts.length < 2) return null;
   if (!parts.every(standsAlone)) return null;
 

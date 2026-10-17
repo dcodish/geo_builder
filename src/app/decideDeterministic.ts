@@ -50,7 +50,7 @@ import {
 } from '@/parser';
 import { independentConstructs } from './independence';
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
-import { compoundNotHonoured, droppedClause, splitStatements } from './clauseCoverage';
+import { compoundNotHonoured, droppedClause, splitStatements, statementClauses } from './clauseCoverage';
 import { lostPartNote } from './unreadParts';
 import { lostRoleNote } from './unreadRoles';
 import { applyCommand, type AnyCommand, type Command, type Construction, type Id, type Vec } from '@/engine';
@@ -819,7 +819,8 @@ export async function decideFromParse(
         // label, no back-reference), so a supported connector compound («ריבוע ABCD, נקודה G על AD») — whose
         // later clause CONSTRAINS the earlier — gets no tip. A false "independent" here costs a spurious tip,
         // not a refusal: the safe direction, which is why the check may sit in the deterministic lane at all.
-        const packed = independentConstructs(utterance);
+        // #2209 (ADR-703 Am. 1): judged over the clause gate's statements in this figure, not the raw pieces
+        const packed = independentConstructs(utterance, statementClauses(utterance, pctx));
         // An ADOPTED reading is its own canonical spelling (#1012): the sentence we actually built is
         // the one to teach, and teaching it is what keeps the adoption from being silent (#778).
         const teach = adopted ?? (packed ? null : teachCanonical(utterance, r.commands, locale));
