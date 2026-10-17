@@ -981,7 +981,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       if (!f.enabled) continue;
       ei++;
       const r = measureRestatement(f.cmd, prior, symtab);
-      const st = r && (f.cmd.type === 'measure-angle' || f.cmd.type === 'measure-length') ? measureRestatementStatus(f.cmd, r, symtab) : null;
+      const st = r && (f.cmd.type === 'measure-angle' || f.cmd.type === 'measure-length' || f.cmd.type === 'angle-alias') ? measureRestatementStatus(f.cmd, r, symtab) : null;
       if (r && st) {
         tailed(f, priorAt[r.at], st);
         continue;

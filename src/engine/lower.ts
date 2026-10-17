@@ -121,22 +121,36 @@ const sameAngle = (a: Id[], b: Id[]): boolean => a.length === 3 && b.length === 
  * letter in another form (a constant or a power: an equation the solver judges, «AB = 2a» · «AB = a + 3»), and
  * areas and arc lengths (outside both rulings).
  *
+ * #2191 ([ADR-720](../../docs/06-decisions.md#adr-720)) — an ALIAS is a name for the same one-name rule: «נסמן זוית
+ * ABC כ-B2» on an angle an earlier ALIAS already named (A1) is `name-taken` at that first alias, and the identical
+ * alias is `same` (null status, today's path). Only alias against alias is compared: a measure letter beside an
+ * alias is not a second name (ruling #2113 B), so neither arm ever reads the other kind.
+ *
  * `prior` is the statements BEFORE this one, in order; `at` is the index in `prior` of the earlier statement the
  * verdict is about (its first measure of that target, or for `coef-conflict` the first with that letter).
  */
-export type MeasureRestatement = { kind: 'same' | 'coef-conflict' | 'name-taken'; at: number; earlier: Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' }> };
+export type RestatedNaming = Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' }> | Extract<AnyCommand, { type: 'angle-alias' }>;
+export type MeasureRestatement = { kind: 'same' | 'coef-conflict' | 'name-taken'; at: number; earlier: RestatedNaming };
 export function measureRestatement(cmd: AnyCommand, prior: readonly AnyCommand[], tab: SymTab): MeasureRestatement | null {
+  const pair = (a: Id, b: Id) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  if (cmd.type === 'angle-alias') {
+    const key = (c: { vertex: Id; ray1: Id; ray2: Id }) => `${c.vertex}:${pair(c.ray1, c.ray2)}`;
+    const at = prior.findIndex((c) => c.type === 'angle-alias' && key(c) === key(cmd));
+    if (at < 0) return null;
+    const earlier = prior[at] as Extract<AnyCommand, { type: 'angle-alias' }>;
+    const same = prior.findIndex((c) => c.type === 'angle-alias' && key(c) === key(cmd) && c.name === cmd.name);
+    return same >= 0 ? { kind: 'same', at: same, earlier: prior[same] as RestatedNaming } : { kind: 'name-taken', at, earlier };
+  }
   if (cmd.type !== 'measure-length' && cmd.type !== 'measure-angle') return null;
   const e = cmd.expr;
   if (!('var' in e)) return null;
   const valued = (name: string) => tab.vars.get(name)?.value !== undefined;
   const radiusLetter = (name: string) => tab.radiusOf.has(name) || /^[Rr]$/.test(name);
   if (valued(e.var) || radiusLetter(e.var)) return null;
-  const pair = (a: Id, b: Id) => (a < b ? `${a}|${b}` : `${b}|${a}`);
   const targetOf = (c: AnyCommand): string | null =>
     c.type === 'measure-length' ? `len:${pair(c.a, c.b)}` : c.type === 'measure-angle' ? `ang:${c.vertex}:${pair(c.ray1, c.ray2)}` : null;
   const target = targetOf(cmd);
-  type M = MeasureRestatement['earlier'];
+  type M = Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' }>;
   const onTarget: { i: number; c: M }[] = [];
   let boundElsewhere = false;
   prior.forEach((c, i) => {
@@ -166,9 +180,14 @@ export function measureRestatement(cmd: AnyCommand, prior: readonly AnyCommand[]
  * The fold status a refused restatement carries (#2023 + #2061, ADR-661), without the `[vs #i]` tail the fold adds.
  * `coef-conflict` is the over-constrained frame («∠ABC = 3α cannot hold», «|AB| = 3a cannot hold» — the refused
  * measure, in the refused line's own letter order); `name-taken` names the target as the refused line spells it and
- * the earlier letter as the student wrote it. `same` refuses nothing (null).
+ * the earlier letter as the student wrote it. `same` refuses nothing (null). A second ALIAS (#2191, ADR-720) is the
+ * same `name-taken` frame, naming the earlier alias's full bound name (A1).
  */
-export function measureRestatementStatus(cmd: Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' }>, r: MeasureRestatement, tab: SymTab): string | null {
+export function measureRestatementStatus(cmd: RestatedNaming, r: MeasureRestatement, tab: SymTab): string | null {
+  if (cmd.type === 'angle-alias' || r.earlier.type === 'angle-alias') {
+    if (r.kind !== 'name-taken' || cmd.type !== 'angle-alias' || r.earlier.type !== 'angle-alias') return null;
+    return `name-taken: angle ${cmd.ray1}${cmd.vertex}${cmd.ray2} is already named ${r.earlier.name}`;
+  }
   const angle = cmd.type === 'measure-angle';
   const name = cmd.type === 'measure-angle' ? `${cmd.ray1}${cmd.vertex}${cmd.ray2}` : `${cmd.a}${cmd.b}`;
   if (r.kind === 'coef-conflict') return `over-constrained: ${angle ? `∠${name}` : `|${name}|`} = ${measureLabelText(cmd, tab)} cannot hold`;

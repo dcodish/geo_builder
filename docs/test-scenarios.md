@@ -2052,3 +2052,7 @@ over all four (ADR-041).
 ### `diagonal-height-refused-2117` — «ריבוע ABCD» · «AC גובה» is refused naming the square: the diagonal is perpendicular to no side (#2117, ADR-718)
 
 **Guards against:** a diagonal of a square, rectangle or rhombus called a height being refused with the failure of the first side the tool tried («…סותר נתון קודם… הסיבה: AC ⟂ CB.») — a reason true of one option and false for a sentence that named no side, with no other statement named. **Asserts** the operator's ruled sentence of 2026-10-15 exactly: «לא ניתן: «AC גובה» סותר את «ריבוע ABCD» — אי אפשר לקיים את שניהם יחד. הסיבה: האלכסון AC אינו מאונך לאף צלע של הריבוע.» The matrix (both diagonals, square / rectangle / rhombus, «AC הוא גובה», English, the parallelogram / «AB גובה» / stated-side controls) is `src/app/__tests__/issue-2117-diagonal-height.test.ts`; the parity row is `diagonal-height-refused-2117`.
+
+### `second-alias-refused-2191` — a second alias on a named angle is refused with the one-name sentence; A1 stays (#2191, ADR-720)
+
+**Guards against:** «נסמן זוית ABC כ-B2» after «נסמן זוית ABC כ-A1» committing and A1 vanishing from the figure without a word. **Asserts** the first two lines build with the label A1, the third is refused at the door, and a loaded list holding all three keeps A1 and shows the alias row refused in ADR-661's sentence naming the first line. The spelling matrix is `src/app/__tests__/issue-2191-second-alias.test.ts`.
