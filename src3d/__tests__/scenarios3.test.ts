@@ -473,7 +473,8 @@ describe('GATE — V6 solids-trig (cone / cylinder / sphere with stated sizes; f
     submit('חרוט שקודקודו S ומרכז בסיסו O');
     expect(state().facts).toHaveLength(1); // free-size cone builds (r,h are free DOFs)
     submit('נפח החרוט = 100π');
-    expect(state().lastError).toEqual({ code: 'free-size-claim', id: 'cone' }); // honest: size the solid first
+    // #2076 (ADR-3D-363): the one size refusal, worded by the solid — was `free-size-claim` with the raw id
+    expect(state().lastError).toEqual({ code: 'given-not-drivable', object: { kind: 'size', solid: 'cone' } });
     useGeo3.getState().clear();
     submit('חרוט שקודקודו S ומרכז בסיסו O, רדיוסו 5 וגובהו 12');
     submit('נפח החרוט = 100π');

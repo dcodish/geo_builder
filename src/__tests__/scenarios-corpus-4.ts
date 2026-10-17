@@ -60,6 +60,7 @@ import { drivenSolveStats } from '@/engine/evaluate';
 import { buildScene } from '@/render/scene';
 import { rowNouns } from '@/store/rowNouns';
 import { narrowingText } from '@/app/narrowingText';
+import { valueRowText } from '@/render/valueRowText';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -5088,7 +5089,7 @@ export const SCENARIOS_4: Scenario[] = [
         const v = gateVerdict(facts, line);
         expect(v.kind, `${before.join(' · ')} · ${line}`).toBe('refused');
         const raw = (v as { detail?: string }).detail;
-        expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)))).toBe(`לא ניתן: «${line}» סותר את «${other}» — אי אפשר לקיים את שניהם יחד.`);
+        expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)))).toBe(`לא ניתן: «${line}» סותר את «${other}» — אי אפשר לקיים את שניהם יחד. הסיבה: שני מעגלים שרדיוסיהם שווים אינם יכולים להיות משיקים מבפנים, כי שני מעגלים כאלה הם אותו מעגל.`); // #2206 (ADR-713): #2200's reason
       }
     },
   },
@@ -5106,6 +5107,221 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.labels.lengths, 'no length nobody stated').toEqual([]);
       const stated = replay(factsOf(['מעגל O ברדיוס 5', 'מעגל P ברדיוס 5', 'OP = 10', 'המעגלים O ו-P משיקים']));
       expect(stated.labels.lengths.map((l) => `${l.a}${l.b}:${l.text}`), 'a stated OP still prints').toEqual(['OP:10']);
+    },
+  },  {
+    id: 'typed-apex-base-height-pins-apex-1839',
+    title: '«משולש שווה שוקיים ABC» · «AD גובה לבסיס»: every configuration «הציגו תצורה אחרת» offers keeps A the apex and D the foot on the base BC (#1839, ADR-708)',
+    guards:
+      "#1839, answered by the record 2026-10-07 (FR-IN-13; charter P13 «a drawing that breaks a given is not one of the configurations»). Measured on b0e9dbea through decideDeterministic2D + searchAnotherView: the apex walked A → B → C, so after one press D was the foot on a LEG while the row still said «לבסיס». Root cause: ADR-596 keeps typed letters literal with no binding, and only the «הבסיס BC» spelling reached withRoleClaims' base equality, so nothing stated the role for a typed apex. Fix: one lowering (isoscelesRoleClaim) states the role about typed letters in every spelling — the base equality AB = AC here. Asserts A, B, C do not move when the line is added, and at the default view plus four presses A is the apex (AB = AC), D lies on BC with AD ⟂ BC, and every view is green. The class matrix (the median, the apex-angle bisector, English, a typed apex that is not the shown one, the legs, «AB = BC» → equilateral, the controls) is src/app/__tests__/issue-1839-typed-role-pins-apex.test.ts.",
+    steps: ['משולש שווה שוקיים ABC', 'AD גובה לבסיס'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const before = replay(factsOf(['משולש שווה שוקיים ABC']), 0);
+      const facts = factsOf(['משולש שווה שוקיים ABC', 'AD גובה לבסיס']);
+      const after = replay(facts, 0);
+      for (const id of ['A', 'B', 'C']) expect(dist(at(after, id), at(before, id)), `${id} does not move when the line is added`).toBeLessThan(1e-9);
+      const views = pressAll(facts, 4);
+      expect(views.length, 'the button still offers configurations').toBeGreaterThan(1);
+      for (const view of views) {
+        expect(Object.values(view.status).every((st) => st === 'ok'), 'every view is green').toBe(true);
+        const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => at(view, id));
+        expect(dist(A, B), 'A stays the apex').toBeCloseTo(dist(A, C), 6);
+        expect(dist(B, D) + dist(D, C), 'D on the base BC').toBeCloseTo(dist(B, C), 6);
+        expect((D.x - A.x) * (C.x - B.x) + (D.y - A.y) * (C.y - B.y), 'AD ⟂ BC').toBeCloseTo(0, 6);
+      }
+    },
+  },
+  {
+    id: 'concentric-pair-radius-refused-2263',
+    title: '«שני מעגלים בעלי מרכז משותף O ברדיוס 5» is refused, one given per line; the two-line form builds the outer circle at 10 (#2263, ADR-702)',
+    guards:
+      "#2263, the operator's report of 2026-10-16 (round #2245 T21): «should refuse since its not clear what circle gets radius 5 or both. reject asking to enter one line at a time». Measured at b0e9dbea through decideDeterministic2D: the concentric rule built the pair and left «ברדיוס 5» unread, the number gate escalated, and the live model gave 5 to the OUTER circle, committed green. Root cause: ADR-677 kept the nested pairs (concentric, contained, internally tangent) out of the one pair-radius reading because both circles cannot have it — and left the line to the AI instead of refusing it. Fix: every nested two-circle rule asks the one `statedPairRadius` reader and returns the owned `nested-pair-radius` refusal, shown in FR-IN-4g's one-given-per-line frame. Asserts the operator's line is refused with its two parts, and the operator's two-line form builds the pair with the outer radius 10. The matrix (every nested spelling, the English twins, the model never asked, the ✎ seam) is src/app/__tests__/issue-2263-nested-pair-radius.test.ts.",
+    steps: ['שני מעגלים בעלי מרכז משותף O ברדיוס 5', 'שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל חיצוני הוא 10'],
+    refusedSteps: [
+      { step: 1, reason: 'nested-pair-radius', with: { parts: ['שני מעגלים בעלי מרכז משותף O', 'ברדיוס 5'] }, why: 'ADR-702 (#2263): which of two concentric circles has radius 5 the line does not say — the operator ruled a one-given-per-line refusal' },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.circles.size, 'one pair, from the two-line form').toBe(2);
+      expect(fig.circles.get('circle-O')!.r, 'the outer circle has the stated 10').toBeCloseTo(10, 6);
+      expect(fig.circles.get('circle-O-2')!.r, 'the inner circle is inside it').toBeLessThan(10);
+    },
+  },
+  {
+    id: 'tangent-restated-idempotent-2209',
+    title: '«המעגלים O ו-P משיקים» typed a second time adds nothing and the touch stays M; the reversed twin «…P ו-O משיקים בנקודה X» renames M to X (#2209, ADR-703)',
+    guards:
+      "#2209, found by the /decisions pass and ruled by the operator on 2026-10-16 (ballot row d2209-accept: *\"The touch letter stays M on a restatement (an idempotent restatement, as for «משולש חסום …» typed twice), and no M is drawn beside a student's X\"*). Measured on b0e9dbea through decideDeterministic2D → commitVerdict: «המעגלים O ו-P משיקים» typed twice committed `rename M→T, T→M, M→T` and the touch letter M became T; «מעגל P משיק למעגל O» after it added a second touch T beside M; «המעגלים P ו-O משיקים בנקודה X» left M and X both drawn with «M ו-X נפלו על אותה נקודה». Root cause: the touch letter was minted per line (`freeLabel`) and the pair read in the line's own order, so a restatement was a different command (a new letter, or a touch point defined on the other circle) that ADR-653's structural identity could not see as the same point. Fix: a statement about a pair already stated tangent lowers onto the pair's record (`statedTangencies`: its operand order and, with no «בנקודה», its touch letter), so a restatement is the identical command (the door's «זה כבר קיים באיור») and the reversed twin is the forward twin's command (ADR-653 binds M→X). The class matrix (every spelling, both locales, the fresh pair, the controls, the catalog's «מעגל O ומעגל P משיקים» on a drawn pair) is src/app/__tests__/issue-2209-tangency-restatement.test.ts; the builds are the fixtures catalog-tangent-drawn-2209, catalog-tangent-drawn-at-2209 and tangent-reversed-twin-2209.",
+    steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('M'), 'the touch is M').toBe(true);
+      const facts = factsOf(['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים']);
+      for (const line of ['המעגלים O ו-P משיקים', 'מעגל P משיק למעגל O', 'המעגלים P ו-O משיקים']) {
+        expect(gateVerdict(facts, line).kind, `«${line}» restates the tangency`).toBe('noop');
+      }
+      const twin = factsOf(['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'המעגלים P ו-O משיקים בנקודה X']);
+      const t = replay(twin);
+      expect(t.positions.has('X') && !t.positions.has('M'), 'the reversed twin renames M to X').toBe(true);
+      expect(t.coincidences, 'no «M ו-X» notice').toEqual([]);
+      expect(t.violations).toEqual([]);
+    },
+  },
+  {
+    id: 'isosceles-apex-rescue-deterministic-1857',
+    title: '«משולש שווה שוקיים ABC» · «AB = 4» · «BC = 8» (and «BC = 9») COMMITS at the door on every run — the unstated apex is the rescue’s to move, whatever the machine speed or cache warmth (#1857, ADR-709)',
+    guards:
+      "#1857, measured at b0e9dbea through decideDeterministic2D (model mocked): «BC = 8» was REFUSED cold as collapsed (1.7 s) and COMMITTED warm (0.12 s) — the dry run's unstated-choice rescue (choiceRescue) ran under Date.now() + 1500, and cold, the first candidate's fold (the apex at B, 4 = 8 impossible) cost ~2.1M evaluations before the curing apex was read. Root fix: the gate's rescue is bounded by a fixed WORK cap in charged units (CHOICE_RESCUE_WORK_CAP, every memo hit charged, ADR-582) — the seat sweep's ADR-584 shape. Asserts through the gate that both lines commit after the prefix, which builds green. The cold/warm/clock/cap matrix is src/app/__tests__/issue-1857-variant-rescue-work-cap.test.ts.",
+    steps: ['משולש שווה שוקיים ABC', 'AB = 4'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש שווה שוקיים ABC', 'AB = 4']);
+      for (const line of ['BC = 8', 'BC = 9']) expect(gateVerdict(facts, line).kind, `«${line}»: another apex draws it — the line commits`).toBe('commit');
+    },
+  },
+  {
+    id: 'radian-angle-refused-1837',
+    title: '«משולש ABC» · «∠ABC = π/2» — an angle written in radians is refused and taught in degrees, never drawn; «∠ABC = 90» then builds (#1837, ADR-710)',
+    guards:
+      "#1837, the operator's ruling of 2026-10-07 («Refuse and teach degrees»; 2026-10-08: radians are the complex builder's only). Measured on main b0e9dbea: 2-D handed every π angle to the AI fallback and committed «∠ABC = pi/2» as set-angle B = 2 (2°); 3-D recorded «∠ABC = π» as an angle mark labelled π; analytic drew «∠ABC = π/2» as 1.57°. Root cause: each builder's angle reader handled π its own way and no gate looked at the unit. Fix: one shared rule (shell/radianAngle.ts) called at every plane-geometry builder's statement seam and at 2-D's parse boundary. Asserts the ruled sequence refuses its second line at the parser as `radian-angle`, draws nothing of it, and that the degrees remedy the note teaches builds a right angle at B. The cross-builder matrix is shell/__tests__/fixtures/radian-angle-rows.ts with its three thin locks.",
+    steps: ['משולש ABC', '∠ABC = π/2', '∠ABC = 90'],
+    refusedSteps: [
+      { step: 2, reason: 'radian-angle', with: { value: 'π/2' }, why: 'the operator’s ruling of 2026-10-07: an angle written with π is refused and taught in degrees, never drawn' },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const [a, b, c] = ['A', 'B', 'C'].map((id) => fig.positions.get(id)!);
+      const deg = (Math.abs(Math.atan2((a.x - b.x) * (c.y - b.y) - (a.y - b.y) * (c.x - b.x), (a.x - b.x) * (c.x - b.x) + (a.y - b.y) * (c.y - b.y))) * 180) / Math.PI;
+      expect(deg, 'the degrees remedy draws a right angle at B').toBeCloseTo(90, 6);
+      expect(replay(factsOf(['משולש ABC', '∠ABC = pi/2'], [{ step: 2, reason: 'radian-angle', with: { value: 'pi/2' }, why: 'the ASCII spelling committed 2°' }])).construction.constraints.length, 'pi/2 adds no constraint').toBe(replay(factsOf(['משולש ABC'])).construction.constraints.length);
+    },
+  },
+  {
+    id: 'merged-ring-third-noun-restates-2193',
+    title: "«מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD»: the third noun answers «כבר קיים», not the engine's «'C' is already defined» (#2193, ADR-711)",
+    guards:
+      "#2193 (P2), outcome ruled by ADR-656 decision 3 (operator ruling 2026-10-16, ballot round 5, card 7: «Accept at P2»). Measured on b0e9dbea through decideDeterministic2D: the third line was refused with the engine's id-conflict text naming C, and every pair whose meet is a third kind (rectangle + kite, parallelogram + kite) did the same naming C or D. Root cause: impliedShapeRestatement returned early when the declared kind equalled the stated one, assuming the ring was built by that noun's own command; a sibling merge stamps the meet on a ring no such command built, so the noun was re-applied as a fresh shape. Fix: the rewrite reads the reflexive relation (quadRelation = kindRelation). Asserts the report's two lines build and the third is a no-op through the submit gate. The matrix is src/app/__tests__/issue-2193-merged-ring-restated.test.ts.",
+    steps: ['מלבן ABCD', 'מעוין ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const v = gateVerdict(factsOf(['מלבן ABCD', 'מעוין ABCD']), 'ריבוע ABCD');
+      expect(v.kind, JSON.stringify(v)).toBe('noop');
+    },
+  },  {
+    id: 'diagonal-height-refused-2117',
+    title: '«ריבוע ABCD» · «AC גובה» — a diagonal is a height to no side: refused naming the square, with the ruled reason (#2117, ADR-718)',
+    guards:
+      "#2117 (P3), the operator's ruling of 2026-10-15 (decisions ballot, card 3, option A: the sentence approved as written). Measured on de7c221f through decideDeterministic2D: «AC גובה» on a square, rectangle or rhombus was refused «…סותר נתון קודם… הסיבה: AC ⟂ CB.» — the failure of the first option of the ADR-644 `altitude-choice`, with no other statement named. Root cause: a choice none of whose options can hold was refused with its first option's failure, and the drop-one search could name nothing because removing «ריבוע ABCD» removes the letters. Fix: a stage-0 theorem prover (`diagonalHeightImpossibility`, src/engine/heightFeasibility.ts) read on the fact's own altitude-choice against the ring's declared kind (`DIAGONAL_NEVER_PERPENDICULAR`, derived from the lattice), the declaring statement named from the fold's provenance. Asserts the exact ruled sentence. The matrix (both diagonals, three kinds, «AC הוא גובה», English wording, the controls) is src/app/__tests__/issue-2117-diagonal-height.test.ts.",
+    steps: ['ריבוע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
+      const facts = factsOf(['ריבוע ABCD']);
+      const v = gateVerdict(facts, 'AC גובה');
+      expect(v.kind === 'refused' && v.reason, '«AC גובה» is refused before it becomes a fact').toBe('error');
+      const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+      expect(humanizeError(detail, he, 'AC גובה', otherUtteranceForError(facts, detail)).replace(/[\u2066-\u2069]/g, ''), 'the exact ruled words').toBe(
+        'לא ניתן: «AC גובה» סותר את «ריבוע ABCD» — אי אפשר לקיים את שניהם יחד. הסיבה: האלכסון AC אינו מאונך לאף צלע של הריבוע.',
+      );
+    },
+  },
+  {
+    id: 'concentric-circle-names-2264',
+    title: '«שני מעגלים בעלי מרכז משותף O» · radii 10 and 9: the values panel names «המעגל החיצוני» / «המעגל הפנימי», never «O» twice (#2264, ADR-714)',
+    guards:
+      '#2264 (P3), operator ruling 2026-10-16 (option A). Measured on de7c221f through parse -> replay -> computeValues -> valueRowText: the panel printed «רדיוס O = 10» and «רדיוס O = 9», «שטח (O)» twice. Root cause: circleRefs (ADR-552) named a circle by its centre letter even when another drawn circle shares that centre; the pair\'s own record (innerOf, from set-radius-order) was not read. Fix: a centre shared by exactly two drawn circles, one innerOf the other, names each by role. Asserts the operator\'s three lines build green and the radius rows read «רדיוס המעגל החיצוני» = 10 and «רדיוס המעגל הפנימי» = 9. The matrix is src/__tests__/issue-2264-concentric-circle-names.test.ts.',
+    steps: ['שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל חיצוני הוא 10', 'רדיוס מעגל פנימי 9'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const rows = computeValues(factsOf(['שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל חיצוני הוא 10', 'רדיוס מעגל פנימי 9'])).rows
+        .filter((r) => r.kind === 'radius')
+        .map((r) => [stripFormatControls(valueRowText(r, (k, p) => he(k, p) as string)), r.value] as const);
+      expect(rows.map(([l]) => l)).toEqual(['רדיוס המעגל החיצוני', 'רדיוס המעגל הפנימי']);
+      expect(rows[0][1]).toBeCloseTo(10, 6);
+      expect(rows[1][1]).toBeCloseTo(9, 6);
+    },
+  },
+  ...(['טרפז ABCD חסום במעגל', 'מעגל חוסם את הטרפז ABCD'] as const).map((line, i): Scenario => ({
+    id: `cyclic-trapezoid-every-seed-2118${i === 0 ? '' : '-circle-voice'}`,
+    title: `«טרפז ABCD» · «${line}»: the inscribed trapezoid is determined at every one of the 24 seeds, and the first «הציגו תצורה אחרת» from the starting figure lands on a valid one (#2118, ADR-717)`,
+    guards:
+      "#2118 (P3), operator ruling 2026-10-15 (decisions ballot, «Accept at P3»; FR-HS-12: the inscribed trapezoid is determined at every seed). Measured on de7c221f through the submit door and a 24-seed sweep: 23/24 in both voices — seed 1 read «not determined: A, B, D are still free, so A, B, C, D concyclic cannot be judged» after ~320 ms, and the button skipped that configuration. Root cause (ADR-717): a driven SHAPE SCALAR (the trapezoid top's scaled-offset k) had no bracketed range in resolveMixedCarriers, so a root outside the near solve's and the cardinal restarts' reach (k = 1.590 from k₀ = 0.6, beside the collapsed root k = 0) failed although it exists. Fix: on the failure path only, each driven shape scalar gets a bracket and the binding-aware sweep seeds one more multi-start. The engine lock is src/engine/__tests__/issue-2118-shape-scalar-bracket.test.ts.",
+    steps: ['טרפז ABCD', line],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['טרפז ABCD', line]);
+      for (let seed = 0; seed < 24; seed++) expect(meetsRequirements(facts, seed), `seed ${seed} meets the givens`).toBe(true);
+      const next = searchAnotherView(facts, 0);
+      expect(next, 'the button offers another configuration').not.toBeNull();
+      expect(meetsRequirements(next!.facts, next!.seed), 'the first press lands on a valid configuration').toBe(true);
+    },
+  })),
+  {
+    id: 'second-alias-refused-2191',
+    title: '«משולש ABC» · «נסמן זוית ABC כ-A1» · «נסמן זוית ABC כ-B2»: the second alias is refused with the one-name sentence and A1 stays (#2191, ADR-720)',
+    guards:
+      "#2191 (P3), operator ruling 2026-10-16 (ballot round 5, card 5 `second-alias`, option A: «Refuse it with the one-name sentence»). Measured on de7c221f: the third line committed, the angle's one label slot took «2» and A1 vanished without a word. Root cause: measureRestatement (ADR-661's one-name judge) read only symbolic measures, so a second alias never reached the fold's restatement pre-scan. Fix: an alias arm, alias against alias only. Asserts the report's first two lines build with the label A1, the third is refused at the door with the dry run's name-taken status, and a loaded list holding all three keeps A1 and renders ADR-661's sentence naming the first line. The spelling matrix is src/app/__tests__/issue-2191-second-alias.test.ts.",
+    steps: ['משולש ABC', 'נסמן זוית ABC כ-A1'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.labels.angles.map((a) => a.text)).toEqual(['A1']);
+      const v = gateVerdict(factsOf(['משולש ABC', 'נסמן זוית ABC כ-A1']), 'נסמן זוית ABC כ-B2');
+      expect(v.kind, JSON.stringify(v)).toBe('refused');
+      const loaded = factsOf(['משולש ABC', 'נסמן זוית ABC כ-A1', 'נסמן זוית ABC כ-B2']);
+      const d = replay(loaded, 0);
+      const bad = [loaded[loaded.length - 1]];
+      expect(bad[0].cmd.type).toBe('angle-alias');
+      expect(loaded.filter((f) => f.group !== bad[0].group).every((f) => d.status[f.id] === 'ok'), 'the earlier lines stay green').toBe(true);
+      const raw = d.status[bad[0].id] as string;
+      const he = (k: string, o?: Record<string, unknown>) => i18n.t(k, { ...o, lng: 'he' }) as string;
+      expect(stripFormatControls(humanizeError(raw, he, bad[0].utterance, otherUtteranceForError(loaded, raw)))).toBe('לזווית ABC כבר יש שם: A1 (בשורה «נסמן זוית ABC כ-A1»). לכל זווית שם אחד — המשיכו עם A1.');
+      expect(d.labels.angles.map((a) => a.text)).toEqual(['A1']);
+    },
+  },
+  {
+    id: 'equal-circles-nested-2200',
+    title: '«שני מעגלים מוכלים ברדיוסים שווים» is refused naming the contradiction; «שני מעגלים ברדיוסים שווים» draws two equal circles (#2200, ADR-712)',
+    guards:
+      "#2200 (P3), operator ruling 2026-10-16 (ballot round 5, card 20, option A: «Build the first; refuse the second with a sentence naming the contradiction»). Measured at de7c221f through decideDeterministic2D: «שני מעגלים ברדיוסים שווים» escalated not-handled (twoCirclesBare's leftover never stripped the equal-size words it reads) and «שני מעגלים מוכלים ברדיוסים שווים» committed red (figure.v.circleContained: twoCirclesPosition lowered the containment, then appended k = 1). Root cause: the bare rule did not strip its own vocabulary, and no two-circle rule refused a containment stated with an equal size, though a circle strictly inside another is smaller. Fix: the bare rule reads the equality and its pair admits only the crossing / apart configurations; twoCirclesPosition and containedNewInExisting refuse contained + equal size from the words (equal-circles-nested). Asserts the report's second line is refused and the first builds two equal circles. The matrix (every spelling, the configurations, the message in both locales, the model never asked) is src/app/__tests__/issue-2200-equal-circles.test.ts.",
+    steps: ['שני מעגלים מוכלים ברדיוסים שווים', 'שני מעגלים ברדיוסים שווים'],
+    refusedSteps: [
+      { step: 1, reason: 'equal-circles-nested', why: 'ADR-712 (#2200): two circles of equal radius cannot be contained one in the other — the operator ruled a refusal naming the contradiction' },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.circles.size, 'one pair, from the second line').toBe(2);
+      const [a, b] = [...fig.circles.values()];
+      expect(Math.abs(a.r - b.r), 'equal radii').toBeLessThan(1e-6);
+    },
+  },
+  {
+    id: 'equal-circles-nested-values-2206',
+    title: '«מעגל O ברדיוס 3» · «מעגל P ברדיוס 3» · «מעגל P מוכל בתוך מעגל O» is refused naming «מעגל P ברדיוס 3» with #2200\'s reason; so is the internal tangency, in either order (#2206, ADR-713)',
+    guards:
+      "#2206 (P3), operator ruling 2026-10-16 (d2206-accept, A): «מעגל O ברדיוס 3 / מעגל P ברדיוס 3 / מעגל P מוכל בתוך מעגל O is refused with #2200's sentence» and «Equal radii with internal tangency or concentric: refused with #2200's sentence». Measured at c43e9fbc through decideDeterministic2D: the containment committed RED (figure.v.circleContained), the concentric pair with both radii 3 RED, a ratio k = 1 on another line RED, and the internal tangency was refused (ADR-692) in the bare restated-size sentence; the word forms (internally tangent / concentric + ברדיוסים שווים) escalated. Root cause: ADR-692's stage-0a predicate judged one nesting (internal tangency) over one equality (two stated radii), and the parser escalated the word forms instead of refusing them like #2200's contained pair. Fix: equalNestedPair judges every nesting (internal tangency, containment, one centre) over every stated equality (equal stated radii, a ratio k = 1), in either order, and the parser's twins return #2200's owned refusal with their relation. Asserts the report's two lines build, its third is refused at the door naming «מעגל P ברדיוס 3» with the containment reason, and the internal tangency in the other order is refused on its last radius line naming the tangency. The matrix is src/app/__tests__/issue-2206-equal-nested.test.ts.",
+    steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 3'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const C = 'מעגל P מוכל בתוך מעגל O';
+      const T = 'המעגלים O ו-P משיקים מבפנים';
+      const reason = {
+        contained: 'שני מעגלים שרדיוסיהם שווים אינם יכולים להיות מוכלים זה בזה, כי מעגל שמוכל במעגל אחר קטן ממנו',
+        tangent: 'שני מעגלים שרדיוסיהם שווים אינם יכולים להיות משיקים מבפנים, כי שני מעגלים כאלה הם אותו מעגל',
+      };
+      for (const [before, line, other, why] of [
+        [['מעגל O ברדיוס 3', 'מעגל P ברדיוס 3'], C, 'מעגל P ברדיוס 3', reason.contained], // the report, verbatim
+        [['מעגל O ברדיוס 3', 'מעגל P ברדיוס 3'], T, 'מעגל P ברדיוס 3', reason.tangent],
+        [['מעגל O', 'מעגל P', T, 'רדיוס מעגל O הוא 3'], 'רדיוס מעגל P הוא 3', T, reason.tangent], // the other order
+      ] as [string[], string, string, string][]) {
+        const facts = factsOf(before);
+        const v = gateVerdict(facts, line);
+        expect(v.kind, `${before.join(' · ')} · ${line}`).toBe('refused');
+        const raw = (v as { detail?: string }).detail;
+        expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)))).toBe(`לא ניתן: «${line}» סותר את «${other}» — אי אפשר לקיים את שניהם יחד. הסיבה: ${why}.`);
+      }
     },
   },
 ];

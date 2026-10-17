@@ -208,6 +208,11 @@ export type ApplyErrorCode =
    */
   | 'degenerate-role'
   /**
+   * #2115 (ADR-AG-299; 2-D's ADR-643 §4) — a bisector named by a SIDE of a declared polygon at the angle's vertex
+   * («משולש ABC» · «AB חוצה זווית»): `pair` is the side as typed, `vertex` the angle's vertex, `polygonKind` the host.
+   */
+  | 'bisector-is-side'
+  /**
    * «AD גובה» · «גובה לצלע BC» where the figure holds the apex (or the side) in SEVERAL triangles with
    * different targets (#1240, ADR-AG-209) — a question, never a guess (02c R32): the student names the side
    * or the triangle. And `cevian-no-triangle` when it holds it in none: there is no side to draw it to.
@@ -247,7 +252,7 @@ export type ApplyErrorCode =
   | 'coordinate-restriction'
   /** #2054 (ADR-AG-277): a second letter for an angle or a segment that already has one — `holder` is the first letter, `nameOf` the target as the line spells it. */
   | 'name-taken'
-  /** #2061 (ADR-AG-277): the same letter with another coefficient for an angle or segment — `what` is 2-D's reason clause. */
+  /** #2061 (ADR-AG-277): the same letter with another coefficient for an angle or segment, or (#2105, ADR-AG-295) two different numbers — `what` is 2-D's reason clause. */
   | 'measure-contradicts'
   /** #2119 (ADR-684): a second, different radius for a circle whose radius a line already stated — `circle` is its id;
    *  `derive` names the line that sized it (2-D's ruled sentence, no reason clause). */
@@ -351,6 +356,9 @@ export interface ApplyError {
   against?: Constraint;
   /** For `radius-contradicts` (#2119): the circle whose stated radius the line contradicts. */
   circle?: Id;
+  /** For `bisector-is-side` (#2115): the angle's vertex, and the host polygon's kind (`triangle`, `square`, `n4`, `n5`…). */
+  vertex?: Id;
+  polygonKind?: string;
 }
 
 /** How a found curve can be called in a sentence — its name, or (unnamed) its equation. */
@@ -531,6 +539,43 @@ function edgesAt(c: Construction, v: Id): Id[] {
     }
   }
   return [...out].sort();
+}
+
+/**
+ * #2115 ([ADR-AG-299](../../docs/06c-decisions-analytic.md#adr-ag-299); 2-D's `polygonSideHost`, ADR-643 §4) — the KIND
+ * of a declared polygon whose ring has `a` and `b` as consecutive vertices: `triangle` for any three-ring, a named
+ * quadrilateral's kind, else `n<arity>`. `third` (the angle's other arm) prefers a ring that holds it; else the first
+ * ring in declaration order. Structure only — never coordinates. `null`: the pair is no polygon's side.
+ */
+const NAMED_QUAD_KINDS: ReadonlySet<string> = new Set(['square', 'rectangle', 'rhombus', 'parallelogram', 'kite', 'trapezoid', 'isosceles-trapezoid', 'right-trapezoid']);
+function polygonSideKind(c: Construction, a: Id, b: Id, third: Id | null): string | null {
+  let best: string | null = null;
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon') continue;
+    const ring = o.vertices;
+    const i = ring.indexOf(a);
+    if (i < 0 || (ring[(i + 1) % ring.length] !== b && ring[(i + ring.length - 1) % ring.length] !== b)) continue;
+    const q = o.noun ? shapeRow(o.noun)?.kind : undefined;
+    const kind = ring.length === 3 ? 'triangle' : ring.length === 4 && q && NAMED_QUAD_KINDS.has(q) ? q : `n${ring.length}`;
+    if (third === null || ring.includes(third)) return kind;
+    best ??= kind;
+  }
+  return best;
+}
+
+/** The side refusal (#2115): the segment as the student typed it, the angle's vertex, the host's kind. */
+function bisectorIsSide(f: Extract<Fact, { t: 'bisects' }>, vertex: Id, polygonKind: string): ApplyError {
+  const pair = (f.seg ?? [vertex, f.p!]).join('');
+  return { code: 'bisector-is-side', detail: f.src, pair, vertex, polygonKind };
+}
+
+/**
+ * A bisector whose far end `p` is an ARM of the angle it bisects — a zero angle, never a bisector. When a declared
+ * polygon holds the pair as a side, 2-D's side sentence (#2115); else the generic `degenerate-role` (#1231), as before.
+ */
+function bisectorOnArm(c: Construction, f: Extract<Fact, { t: 'bisects' }>, at: AngleRef): { ok: false; error: ApplyError } {
+  const kind = polygonSideKind(c, at.v, f.p!, f.p === at.a ? at.b : at.a);
+  return { ok: false, error: kind ? bisectorIsSide(f, at.v, kind) : { code: 'degenerate-role', detail: f.src } };
 }
 
 /**
@@ -3888,6 +3933,14 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * bisector's foot on the line through the angle's ray points; an existing `p` lies on the bisector's ray.
      */
     case 'bisects': {
+      // #2115 (ADR-AG-299): the role-noun spellings say only "XY is a bisector" — answered when XY is a polygon's side.
+      if (f.roleNoun && f.p !== undefined) {
+        const kind = polygonSideKind(c, f.at.v, f.p, null);
+        return { ok: false, error: kind ? bisectorIsSide(f, f.at.v, kind) : { code: 'not-handled', detail: f.src } };
+      }
+      // A three-letter angle whose arm is the segment's far end is decided on structure alone, before the figure is
+      // asked for its points — the parser's old refusal moved here, unchanged where no declared polygon holds the pair.
+      if (f.p !== undefined && isAngleRef(f.at) && (f.p === f.at.a || f.p === f.at.b)) return bisectorOnArm(c, f, f.at);
       const at = resolveAngleName(c, f.at, f.src);
       if (!at.ok) return at;
       for (const id of [at.ref.v, at.ref.a, at.ref.b]) {
@@ -3909,7 +3962,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           at,
         );
       }
-      if (f.p === at.ref.a || f.p === at.ref.b) return { ok: false, error: { code: 'degenerate-role', detail: f.src } };
+      if (f.p === at.ref.a || f.p === at.ref.b) return bisectorOnArm(c, f, at.ref);
       const prior = objectById(c, f.p);
       if (prior && !isPositional(prior)) {
         return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };

@@ -140,10 +140,13 @@
     "polygonForced": "Can't do that: «{{stated}}» together with {{others}} hold only if {{shape}} is flat (all its vertices on one line) — and a line is not a {{kind}}.",
     "polygonForcedAlone": "Can't do that: «{{stated}}» holds only if {{shape}} is flat (all its vertices on one line) — and a line is not a {{kind}}.",
     "polygonKind": { "3": "triangle", "4": "quadrilateral", "5": "pentagon" },
+    "solidForced": "Can't do that: «{{stated}}» together with {{others}} hold only if {{shape}} is flat — and a flat solid is not a {{kind}}.",
+    "solidForcedAlone": "Can't do that: «{{stated}}» holds only if {{shape}} is flat — and a flat solid is not a {{kind}}.",
+    "solidShape": { "pyramid": "pyramid {{ids}}", "cube": "cube {{ids}}", "box": "box {{ids}}", "prism": "prism {{ids}}" },
+    "solidKind": { "pyramid": "pyramid", "cube": "cube", "box": "box", "prism": "prism" },
     "signUnsatisfiable": "No solution satisfies the stated coordinate sign of «{{id}}»",
     "noSuchSolid": "The figure doesn't have exactly one «{{id}}» — the claim is ambiguous",
     "ambiguousSolid": "The figure has {{count}} solids matching this statement — name the letters of the one you mean",
-    "freeSizeClaim": "The «{{id}}» has no stated sizes — give a radius/height before a volume or area claim",
     "twoUnknowns": "A vector relation may define only one unknown point («{{id}}» is a second)",
     "lineMissesPlane": "The line is parallel to the plane at the chosen parameter value — no crossing point «{{id}}»",
     "segmentsDoNotMeet": "Segments «{{s1}}» and «{{s2}}» do not meet in the figure — there is no meeting point «{{id}}»",
@@ -171,6 +174,7 @@
     "inscribedContradictsNounVs": "Can't do that: «{{sentence}}» contradicts «{{other}}» — they can't both hold. The reason: a circle through the four vertices would make a {{shape}} a {{forced}}, and a {{forced}} is not a {{shape}}.",
     "ringContradictsNoun": "The points you gave do not form that shape in this order: «{{detail}}». Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.",
     "proofTarget": "That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{sentence}}»",
+    "radianAngle": "In plane geometry, angles are written in degrees — for example ∠ABC = 90",
     "unreadName": "«{{detail}}» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.",
     "unreadWord": "This tool reads Hebrew and English only — «{{detail}}» is in neither. Try writing the line in Hebrew or English.",
     "droppedGiven": "The statement was not added to the figure, because we could not draw: {{items}}. Try splitting it into shorter givens or rephrasing",
@@ -184,7 +188,7 @@
     "planeNotDetermined": "Plane {{id}} has no stated equation or orientation yet — this statement needs a determined plane. Pin it with an equation, three points on it, or a ∥/⊥ relation",
     "pointNotDetermined": "Point {{id}} has no determined position yet, so this statement cannot be checked — pin the point first: its coordinates, or a length or angle that fixes it",
     "givenNotDrivablePoint": "The tool can't yet move point {{id}} so that this given holds, so it wasn't added — this is a limit of the tool",
-    "givenNotDrivableSize": "The tool can't yet set the {{solid}}'s size from a given like this, so it wasn't added — this is a limit of the tool",
+    "givenNotDrivableSize": "The tool can't yet set the {{solid}}'s size from a given like this — this capability is in development, so the step wasn't added.",
     "lineNotDetermined": "Line {{id}} has no determined direction or position yet — this statement needs a determined line. Pin it with two points on it, a parametric form, or a ∥/⊥ relation",
     "ambiguousAngleVertex": "More than one angle meets at {{vertex}}: {{angles}}. Name all three letters of the one you mean (e.g. \"AD bisects angle {{angles}}\" — using one of those).",
     "ambiguousAngleVertexBare": "More than one angle can meet at {{vertex}}, so \"angle {{vertex}}\" does not say which. Name all three letters of the angle you mean.",
@@ -373,14 +377,7 @@
       "perp": "it already follows from the solid you defined",
       "parallel": "it already follows from the solid you defined"
     },
-    "alreadyStated": "That is already stated («{{utterance}}») — the figure is unchanged and no row was added",
-    "solidDegenerate": "What you stated forces {{ids}} to be flat — {{because}}. The drawing satisfies every given, but the solid has no volume.",
-    "solidDegenerateBare": "What you stated forces {{ids}} to be flat. The drawing satisfies every given, but the solid has no volume.",
-    "causeJoin": " and ",
-    "cause": {
-      "angle": "angle {{ids}} = {{value}}°",
-      "length": "{{ids}} = {{value}}"
-    }
+    "alreadyStated": "That is already stated («{{utterance}}») — the figure is unchanged and no row was added"
   },
   "display": {
     "witnesses": "Show the distance witness segment (the height)"

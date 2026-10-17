@@ -381,8 +381,12 @@ function equalityClasses<T>(pairs: ReadonlyArray<[T, T]>, key: (t: T) => string)
  * against a value side (`length-eq`, read by {@link plainMeasure} / {@link isValueSide} — the canvas's own definition
  * of a stated value). Over the student's letters (not a term placeholder, a tool symbol or an angle label):
  *
- * - `coef-conflict` — the same single letter with another coefficient (k₁·α against k₂·α forces α = 0): refused as
+ * - `coef-conflict` — the same single letter with another coefficient (k₁·α against k₂·α forces α = 0), or the same
+ *   coefficient with another constant («∠ABC = α» · «∠ABC = α + 40», #2105 — 2-D's ADR-662 member): refused as
  *   contradicting the earlier line (operator ruling 2026-10-14, #2061);
+ * - `value-conflict` — two NUMBERS that differ («AB = 4» · «AB = 5», «∠ABC = 40» · «∠CBA = 50»): refused as
+ *   contradicting the earlier line, 2-D's verdict for the same pair (#2105, ADR-AG-295; operator ruling 2026-10-15,
+ *   ADR-W-118 B1). The solve could only say «לא נמצאה תצורה» and never named the line it fights;
  * - `name-taken` — a fresh letter set (no letter in it appears anywhere else in the figure — another quantity's
  *   letter, a radius, a valued letter) on a target whose earlier value's letters are all different and not valued:
  *   a second name (operator rulings 2026-10-13, #2023/#2054).
@@ -391,7 +395,7 @@ function equalityClasses<T>(pairs: ReadonlyArray<[T, T]>, key: (t: T) => string)
  * form (an equation the solve judges) — is null. `earlier` is the constraint the verdict is about (an object
  * reference, so the fold's attribution finds its line whatever was removed since).
  */
-export type MeasureRestatement = { kind: 'coef-conflict' | 'name-taken'; earlier: Constraint; holder: string; name: string; what: string };
+export type MeasureRestatement = { kind: 'coef-conflict' | 'value-conflict' | 'name-taken'; earlier: Constraint; holder: string; name: string; what: string };
 type MeasureTarget = { key: string; name: string; value: Expr; angle: boolean };
 function measureTargetOf(k: Constraint): MeasureTarget | null {
   if (k.t === 'angle' && !k.measure) return { key: `ang:${k.at.v}:${[k.at.a, k.at.b].sort().join('|')}`, name: `${k.at.a}${k.at.v}${k.at.b}`, value: k.value, angle: true };
@@ -405,17 +409,48 @@ function measureTargetOf(k: Constraint): MeasureTarget | null {
 const studentLetters = (e: Expr): string[] => [...new Set(symbolsOf(e))].filter((s) => !isTermPlaceholder(s) && !s.startsWith('θ_') && angleLabelName(s) === null);
 /** Every expression symbol anywhere inside a constraint or an object (a circle's radius letter, a parameter's value). */
 const symbolNamesIn = (x: unknown): string[] => [...JSON.stringify(x).matchAll(/"kind":"sym","name":"([^"]*)"/g)].map((m) => m[1]);
-/** `k·s` for one letter s, else null. */
-function linearIn(e: Expr): { s: string; k: number } | null {
-  if (e.kind === 'sym') return { s: e.name, k: 1 };
-  if (e.kind === 'neg') { const x = linearIn(e.a); return x ? { s: x.s, k: -x.k } : null; }
-  if (e.kind === 'mul' && e.a.kind === 'num' && e.b.kind === 'sym') return { s: e.b.name, k: e.a.value };
-  if (e.kind === 'mul' && e.b.kind === 'num' && e.a.kind === 'sym') return { s: e.a.name, k: e.b.value };
-  return null;
+/**
+ * `k·s + c` for ONE letter s — «3α», «α + 40», «2(a + 3)» — else null. Read by evaluation, not by the tree's shape, so
+ * every spelling of the same affine value is one reading: the value at s = 0…3 must lie on one line (#2105, ADR-AG-295;
+ * 2-D's affine tail, ADR-662).
+ */
+function affineIn(e: Expr): { s: string; k: number; c: number } | null {
+  const syms = [...new Set(symbolsOf(e))];
+  if (syms.length !== 1) return null;
+  const [s] = syms;
+  const f = [0, 1, 2, 3].map((x) => evalExpr(e, { [s]: x }));
+  if (!f.every(Number.isFinite)) return null;
+  const k = f[1] - f[0];
+  const tol = 1e-9 * Math.max(1, ...f.map(Math.abs));
+  if (Math.abs(f[2] - f[0] - 2 * k) > tol || Math.abs(f[3] - f[0] - 3 * k) > tol || Math.abs(k) <= tol) return null;
+  return { s, k, c: f[0] };
 }
+const near = (x: number, y: number): boolean => Math.abs(x - y) <= 1e-9 * Math.max(1, Math.abs(x), Math.abs(y));
+/** The value as a plain number when it carries no symbol at all («5», «√2», «3/4»), else null. */
+function numberOf(e: Expr): number | null {
+  if (symbolsOf(e).length > 0) return null;
+  const v = evalExpr(e);
+  return Number.isFinite(v) ? v : null;
+}
+/** What 2-D's reason clause says about the refused measure: «|AB| = 5», «∠ABC = 50°», «∠ABC = 3α». */
+const reasonText = (t: MeasureTarget): string =>
+  t.angle ? `∠${t.name} = ${statedText(t.value)}${numberOf(t.value) !== null ? '°' : ''}` : `|${t.name}| = ${statedText(t.value)}`;
 export function measureRestatement(c: Construction, k: Constraint): MeasureRestatement | null {
   const t = measureTargetOf(k);
   if (!t) return null;
+  const n = numberOf(t.value);
+  if (n !== null) {
+    // Two numbers on one target: they agree (the absorb, or the solve for another spelling of the same value) or they
+    // contradict. Same tolerance as the duplicate check's numeric reading — a relative 1e-9.
+    for (const e of c.constraints) {
+      const et = measureTargetOf(e);
+      if (!et || et.key !== t.key) continue;
+      const m = numberOf(et.value);
+      if (m !== null && !near(m, n))
+        return { kind: 'value-conflict', earlier: e, holder: statedText(et.value), name: t.name, what: reasonText(t) };
+    }
+    return null;
+  }
   const letters = studentLetters(t.value);
   if (letters.length === 0) return null;
   const onTarget: { k: Constraint; t: MeasureTarget }[] = [];
@@ -427,11 +462,15 @@ export function measureRestatement(c: Construction, k: Constraint): MeasureResta
   }
   if (onTarget.length === 0) return null;
   const valued = new Set(c.constraints.flatMap((e) => (e.t === 'param-eq' ? [e.sym.name] : [])));
-  const lin = linearIn(t.value);
-  const what = `${t.angle ? `∠${t.name}` : `|${t.name}|`} = ${statedText(t.value)}`;
+  const lin = affineIn(t.value);
+  const what = reasonText(t);
   for (const o of onTarget) {
-    const ol = linearIn(o.t.value);
-    if (lin && ol && lin.s === ol.s && lin.k !== ol.k && !valued.has(lin.s)) return { kind: 'coef-conflict', earlier: o.k, holder: statedText(o.t.value), name: t.name, what };
+    const ol = affineIn(o.t.value);
+    // The same letter, one of its coefficient or its constant changed (k₁·α + c against k₂·α + c, or k·α + c₁ against
+    // k·α + c₂): no α satisfies both. Both changed is an equation that fixes α — the solve judges it (2-D's ADR-662 rule).
+    const kSame = lin && ol ? near(lin.k, ol.k) : false;
+    const cSame = lin && ol ? near(lin.c, ol.c) : false;
+    if (lin && ol && lin.s === ol.s && kSame !== cSame && !valued.has(lin.s)) return { kind: 'coef-conflict', earlier: o.k, holder: statedText(o.t.value), name: t.name, what };
   }
   if (onTarget.some((o) => studentLetters(o.t.value).some((s) => letters.includes(s)))) return null; // a shared letter: an equation
   const first = onTarget[0];

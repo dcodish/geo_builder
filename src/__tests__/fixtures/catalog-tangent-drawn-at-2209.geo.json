@@ -1,0 +1,47 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "Sr3MlZ2rTieJSYA0hRToX",
+      "utterance": "מעגל O",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "8wddaJbggIto6FwkVFTBD",
+      "utterance": "מעגל P",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "hOAuR0Knj7YehBvuxn66S",
+      "utterance": "מעגל O ומעגל P משיקים בנקודה M",
+      "cmd": {
+        "type": "circles-tangent",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "at": "M",
+        "external": true,
+        "kindStated": false
+      },
+      "enabled": true
+    }
+  ]
+}

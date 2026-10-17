@@ -29,6 +29,9 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2091 (ADR-3D-360) — the operator's exact sequence: two segments stated ⟂ crossing at an unnamed point. The knee
+  // withdrawal (and every spelling/host) is asserted in issue-2091-unnamed-crossing-knee.test.ts; this is the build + drift net.
+  'no-knee-unnamed-crossing-2091.geo3.json': ['ריבוע ABCD', 'AC ⟂ BD'],
   // #1907 (ADR-3D-315) — the operator's exact sequence: a bare height on a triangle is its ALTITUDE, D the foot on BC
   // (before: D on the normal at A, off BC and off the plane, green at every seed). The drawing, the sibling spellings,
   // the quad sides and the AI-lane forms are asserted in issue-1907-flat-height.test.ts; this is the build + drift net.
@@ -357,6 +360,19 @@ const SEEDED: SeededCorpus = {
   // right-angled). The rings and the refusal with two triangles are asserted in issue-2235-shape-ref.test.ts.
   'definite-triangle-one-2235.geo3.json': ['משולש DEF', 'המשולש ישר זווית'],
   'indefinite-triangle-new-2235.geo3.json': ['משולש ABC', 'משולש ישר זווית'],
+  // #1855 (ADR-3D-355) — the operator's exact sequence: a length on each of two separate triangles (before: the second
+  // length refused givens-contradict at every seed). Both orders, «AB ∥ DE» and the free relative size are asserted in
+  // issue-1855-separate-figures.test.ts; this is the build + drift net.
+  'two-triangle-lengths-1855.geo3.json': ['משולש ABC', 'משולש DEF', 'DE = 2', 'AB = 5'],
+  // #1935 (ADR-3D-356) — the operator's exact sequence: a quadrilateral over a free vertex drives it into the plane
+  // (before: a skew ring drawn green at every seed). Flatness, stability and the controls are asserted in
+  // ring-free-vertex-1935.test.ts; this is the build + drift net.
+  'ring-free-vertex-1935.geo3.json': ['משולש ABC', 'משולש ABD', 'מרובע ACBD'],
+  // #2081 (ADR-3D-362) — the rule-4 locks: a radical in the coordinate-claim slot and in the distance slot (before: both
+  // `not-understood` while «A(√2,0,0)» and «… הוא 2» built). The refusals and the uppercase axis letter are asserted in
+  // issue-2081-held-slots.test.ts; these are the build + drift net.
+  'coords-claim-surd-2081.geo3.json': ['A(0,0,0)', 'B(√2,0,0)', 'B=(√2,0,0)'],
+  'distance-surd-2081.geo3.json': ['פירמידה SABCD', 'המרחק בין S למישור ABC הוא √2'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

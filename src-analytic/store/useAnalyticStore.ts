@@ -89,6 +89,8 @@ export type InputError =
   | { key: 'out-of-scope'; detail: string }
   /** A claim to PROVE, never a given (#1618; the shared rule since #1666, `shell/proofTarget`) — `detail` is the proof sentence. */
   | { key: 'proof-target'; detail: string }
+  /** #1837 (ADR-W-142) — an angle measure written in radians (`shell/radianAngle`); `detail` is the π value as typed. */
+  | { key: 'radian-angle'; detail: string }
   /** #1919 — a letter the tool cannot read; `detail` is the run(s) as typed (`shell/inputScript`). */
   | { key: 'unread-name' | 'unread-word'; detail: string }
   /** #2222 (ADR-AG-284) — an ASCII mixed number «5 1/2», refused with its unambiguous spellings (`engine/expr.findMixedNumber`). */
@@ -105,6 +107,8 @@ export type InputError =
   | { key: 'apex-not-a-vertex'; detail: string }
   /** An angle bisector that does not start at its angle's vertex (#1284, ADR-AG-209). */
   | { key: 'bisector-wrong-apex'; detail: string }
+  /** #2115 (ADR-AG-299) — a bisector named by a declared polygon's side: the side as typed, the vertex, the host's kind. */
+  | { key: 'bisector-is-side'; detail: string; pair?: string; vertex?: string; polygonKind?: string }
   | { key: 'length-xy'; detail: string }
   /** A domain stated for x or y — «y = 2x + 1, x > 0»: a restriction on the curve, which the tool cannot draw (#1832, ADR-AG-246). */
   | { key: 'coordinate-restriction'; detail: string }
@@ -213,6 +217,8 @@ export type InputError =
   | { key: 'measure-contradicts'; detail: string; what?: string; declared?: string }
   /** #2119 (ADR-684) — a second, different radius for a circle: the line that sized it. */
   | { key: 'radius-contradicts'; detail: string; declared?: string }
+  /** #1963 (ADR-AG-296) — a circle through three points a statement puts on one line: the other lines, the three letters. */
+  | { key: 'forced-collinear'; detail: string; declaredLines?: string[]; collinear?: string[] }
   /**
    * A RENAME the tool understood and declined (#1154) — each names what the student wrote. `detail` is
    * the letter (or, for `rename-unsafe`, the line that could not be rewritten faithfully; empty when

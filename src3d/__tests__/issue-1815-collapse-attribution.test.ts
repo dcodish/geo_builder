@@ -137,16 +137,11 @@ describe('#1815 — an incidence that only a flat triangle satisfies is refused'
     );
   });
 
-  it('the reverse order («M אמצע BC» then «M על AB») is refused, the triangle unchanged', () => {
-    // The plan asked for the SAME named refusal here. It is not reachable by this mechanism: the reverse
-    // order records «M על AB» as a CLAIM about a derived point (no rider, no pivot), so it keeps its
-    // pre-existing `claim-refuted`. Refused either way — never drawn flat. (Deviation recorded in ADR-3D-309;
-    // the wording is #1847.)
-    for (const seed of [0, 1, 2, 3]) {
-      const r = run(['משולש ABC', 'M אמצע BC', 'M על AB'], seed);
-      expect(r.refusedAt).toBe(2);
-      expect(ringArea(derive3(r.st.facts, r.st.seed).positions, ['A', 'B', 'C'])).toBeGreaterThan(0.1);
-    }
+  it('the reverse order («M אמצע BC» then «M על AB») is refused by the same named collapse (#1847), the triangle unchanged', () => {
+    // ADR-3D-309 recorded this order as a deviation: «M על AB» is a CLAIM about a derived point there, so it
+    // kept `claim-refuted`. #1847 (ADR-3D-361) re-solves a refuted membership claim as the pin it states; its
+    // own locks are in issue-1847-reverse-collapse.test.ts.
+    for (const seed of [0, 1, 2, 3]) refusesCollapse(['משולש ABC', 'M אמצע BC', 'M על AB'], seed, 'M על AB', 'M אמצע BC');
   });
 });
 

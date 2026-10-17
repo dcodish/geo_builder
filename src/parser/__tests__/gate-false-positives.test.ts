@@ -53,6 +53,7 @@ import {
   parse,
 } from '@/parser';
 import type { AnyCommand, Id } from '@/engine';
+import { droppedPropertyWords } from '@/parser/propertyWords';
 
 /** Every gate, called the way the submit path calls it. A gate is "clean" when it reports nothing. */
 const GATES: Record<string, (u: string, cmds: AnyCommand[], pts: Id[]) => unknown[] | boolean> = {
@@ -71,6 +72,9 @@ const GATES: Record<string, (u: string, cmds: AnyCommand[], pts: Id[]) => unknow
   // against the student's text. Fed the example as its own canonical line, it asserts the property
   // that matters here — a construct stated in its documented form invents nothing.
   introducedNewLabels: (u, _c, pts) => introducedNewLabels(u, [u], pts),
+  // #1906 (ADR-722): the AI-answer word member. A standalone example may PRESUPPOSE its polygon («חצי מעגל על
+  // צלע AB מחוץ למשולש ABC»), so the line's own letters stand on the figure, as in its own catalog net.
+  droppedPropertyWords: (u, c, pts) => droppedPropertyWords(u, c, { points: [...pts, ...(u.match(/[A-Z]\d*/g) ?? [])], circles: ['O'] }),
 };
 
 const isClean = (v: unknown[] | boolean): boolean => (typeof v === 'boolean' ? !v : v.length === 0);

@@ -7,7 +7,8 @@
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
 import { centreIdOf, circleByName, curveKindOf, fold, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
-import { noFreedomReaches, reportedDof } from './carriers';
+import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
+import { forcedCollinear } from './collinear';
 import { collapsedByGivens, completingStatement, curveAtOf, drawableAt, hardRingFaults, holdsOn, viewBox, type Figure } from './evaluate';
 import { conicSize, straightWalkOf, touchPointOf } from './crossing-order';
 import { resolveCurve, type Box } from './curves';
@@ -31,7 +32,7 @@ function incidenceIds(k: { t: string; id?: string }): string[] {
 
 export interface LineFault {
   index: number;
-  code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch' | 'third-crossing' | 'tangent-no-second-crossing';
+  code: ParseFailure['code'] | ApplyError['code'] | 'kind-mismatch' | 'third-crossing' | 'tangent-no-second-crossing' | 'forced-collinear';
   detail: string;
   /** For a name clash: what the name already holds, as a token the locale renders (#1046). */
   existing?: ApplyError['existing'];
@@ -64,6 +65,9 @@ export interface LineFault {
   pair?: string;
   /** For `ambiguous-role-side` (#2018, ADR-AG-298): the role the cevian named — the refusal words it. */
   role?: 'base' | 'leg';
+  /** For a bisector named by a polygon's side (#2115, ADR-AG-299): the angle's vertex and the host's kind (`pair` is the side). */
+  vertex?: string;
+  polygonKind?: string;
   /** For a second name or another coefficient (#2054, #2061): the target as the line spells it, its kind, and 2-D's reason clause. */
   nameOf?: string;
   nameKind?: 'angle' | 'length';
@@ -79,6 +83,12 @@ export interface LineFault {
   point?: string;
   /** For either of those two (#1909, #1932 — ADR-AG-292): the KIND of the curve the line meets, for its noun. */
   curve?: SecondCrossingCurve;
+  /**
+   * For a circle through three points a statement puts on one line (#1963, ADR-AG-296): the OTHER lines the proof used,
+   * as typed and in the student's order, and the three letters as the circle's sentence wrote them.
+   */
+  declaredLines?: string[];
+  collinear?: string[];
 }
 
 /** The curves a line meets at most twice (`maxCrossings('line', kind) === 2`) — the second-crossing arms' reach. */
@@ -206,7 +216,9 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       ? { shape: e.shape }
       : e.code === 'diagonal-is-side' || e.code === 'diagonal-none-here'
         ? { polygon: e.polygon, pair: e.pair }
-        : {};
+        : e.code === 'bisector-is-side' // #2115 (ADR-AG-299): the side as typed, the angle's vertex, the host's kind
+          ? { pair: e.pair, vertex: e.vertex, polygonKind: e.polygonKind }
+          : {};
   /** #2054 / #2061 (ADR-AG-277): the line that stated the earlier value a restatement is refused against — by provenance. */
   const restatedAgainst = (e: ApplyError): Partial<LineFault> => {
     if (e.code !== 'name-taken' && e.code !== 'measure-contradicts') return {};
@@ -796,7 +808,23 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       faults.push({ index, code: 'out-of-scope', detail: lines[index] });
       continue;
     }
-    if (freedom > 0) continue; // another configuration may yet have it
+    /**
+     * THE OBJECT'S OWN FREEDOM, NEVER THE FIGURE'S (#1963, ADR-AG-296) — the third and last instance of #1929's gate.
+     * This waited for the WHOLE figure to reach `reportedDof = 0`, so «נקודה Q» typed first (2 DOF nobody refers to)
+     * silenced «מעגל שעובר דרך A, B ו-C» on three pinned collinear points: named, drawn nowhere, nothing said. The
+     * question is whether anything the object is BUILT FROM can move (`inputsOf`, read at the solved configuration by
+     * `freedomOfRead`): `0` is "not at any value", whatever moves elsewhere. Unmeasured (`undefined`), or a figure built
+     * by hand, falls back to the whole figure's freedom — the old gate, never a false refusal.
+     */
+    const inputs = inputsOf(construction, v.id);
+    const own = figure.freedomOfRead?.((pos, env) => [
+      ...inputs.points.flatMap((p) => {
+        const q = pos.get(p);
+        return q ? [q.x, q.y] : [Number.NaN, Number.NaN];
+      }),
+      ...inputs.syms.map((s) => env[s] ?? Number.NaN),
+    ]);
+    if ((own ?? freedom) !== 0) continue; // another configuration may yet have it
     const o = objectById(construction, v.id);
     faults.push({
       index,
@@ -804,6 +832,41 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       detail: lines[index],
       existing: o ? existingKindOf(o) : undefined,
     });
+  }
+
+  /**
+   * A CIRCLE THROUGH THREE POINTS A STATEMENT PUTS ON ONE LINE (#1963, ADR-AG-296; operator ruling 2026-10-14, card
+   * `d14b-1963-proved` A: *"Refuse only when it is certain the circle can never exist (here: D was stated on AB), naming
+   * that statement. No refusal on search evidence alone."*). «משולש ABC» · «D על AB» · «מעגל שעובר דרך A, D ו-B»: A, B
+   * and D can all move, so the arm above stays silent, yet the circle exists in no configuration. `forcedCollinear`
+   * proves it from the construction alone (an incidence, a midpoint, a named line — never a coordinate), and the line
+   * that COMPLETES the proof is refused naming the others — the circle line when it comes last, the incidence when the
+   * circle came first. Asked of every such circle, vacant or not: a collinear triple can still leave a "circle" of
+   * radius 10⁷ drawn by round-off («D על הישר AB»), which is the same impossibility. A collinearity only the drawing
+   * shows is not proved, and is not refused.
+   */
+  {
+    const constraintOn = construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]]));
+    const refused = new Set(faults.filter((f) => f.code === 'does-not-exist').map((f) => f.index));
+    for (const o of construction.objects) {
+      if (o.kind !== 'circle-thru' || o.def.t !== 'through') continue;
+      const own = lineOf.get(o.id);
+      if (own === undefined || refused.has(own)) continue;
+      const proof = forcedCollinear(construction, o.def.pts);
+      if (!proof) continue;
+      const used = proof.by.map((w) => (w.k === 'constraint' ? constraintOn[w.at] : (lineOf.get(w.id) ?? -1)));
+      if (used.some((l) => l < 0)) continue; // a statement no line owns cannot be named — say nothing rather than half
+      const all = [...new Set([own, ...used])].sort((a, b) => a - b);
+      const index = all[all.length - 1];
+      if (faults.some((f) => f.index === index && f.code !== 'unsatisfiable')) continue; // a truer message is already there
+      faults.push({
+        index,
+        code: 'forced-collinear',
+        detail: lines[index],
+        declaredLines: all.filter((l) => l !== index).map((l) => lines[l]),
+        collinear: [...o.def.pts],
+      });
+    }
   }
 
   /**
@@ -899,9 +962,11 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   // tangent's missing second crossing, is not also refused as a failed search or a second name for the point it would
   // coincide with; those are the same contradiction read twice.
   {
-    const third = new Set(faults.filter((f) => f.code === 'third-crossing' || f.code === 'tangent-no-second-crossing').map((f) => f.index));
+    const third = new Set(faults.filter((f) => f.code === 'third-crossing' || f.code === 'tangent-no-second-crossing' || f.code === 'forced-collinear').map((f) => f.index));
     const kept = faults.filter((f) => !(third.has(f.index) && (f.code === 'unsatisfiable' || f.code === 'crossing-already-named')));
-    faults.splice(0, faults.length, ...kept);
+    // #1963 (ADR-AG-296): a line some other arm refuses for its own reason (a collapsed polygon) keeps that refusal alone.
+    const other = new Set(kept.filter((f) => f.code !== 'forced-collinear').map((f) => f.index));
+    faults.splice(0, faults.length, ...kept.filter((f) => !(f.code === 'forced-collinear' && other.has(f.index))));
   }
   /**
    * Roll the per-FACT effects up to per-LINE outcomes (#1045).

@@ -17,7 +17,8 @@ import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint
 import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { NOT_CYCLIC_VS, collinearCircleImpossibility, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
-import { equalInternalTangency } from '@/engine/radiusFeasibility';
+import { DIAGONAL_HEIGHT_VS, diagonalHeightError, diagonalHeightImpossibility } from '@/engine/heightFeasibility';
+import { EQUAL_NESTED_CANNOT_HOLD, equalNestedPair, type NestedRelation } from '@/engine/radiusFeasibility';
 import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
@@ -740,8 +741,6 @@ export const OVER_CONSTRAINED_VS = /^over-constrained: (.+) cannot hold(?: \[vs 
 const RADIUS_RELATION_DESC = /^radius\(([^()]+)\) = \S+ · radius\(([^()]+)\)$/;
 /** #2080 (ADR-645): `oneCommonPointError` — a second crossing of two circles with one common point, untagged. */
 const ONE_COMMON_POINT = /^over-constrained: (\S+) coincides with (\S+) cannot hold$/;
-/** #2239 (ADR-692): stage 0a's equal-radii internal tangency — #2119's restated-size shape, untagged. */
-const RADIUS_CANNOT_HOLD = /^over-constrained: radius of (\S+) = .+ cannot hold$/;
 /**
  * #1849 ([ADR-602](docs/06-decisions.md#adr-602)) — a DECLARED polygon the step would flatten
  * (`collapsedPolygonError`, step.ts), with the same optional `[vs #<fact index>]` tail. Group 1 is the
@@ -980,7 +979,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       if (!f.enabled) continue;
       ei++;
       const r = measureRestatement(f.cmd, prior, symtab);
-      const st = r && (f.cmd.type === 'measure-angle' || f.cmd.type === 'measure-length') ? measureRestatementStatus(f.cmd, r, symtab) : null;
+      const st = r && (f.cmd.type === 'measure-angle' || f.cmd.type === 'measure-length' || f.cmd.type === 'angle-alias') ? measureRestatementStatus(f.cmd, r, symtab) : null;
       if (r && st) {
         tailed(f, priorAt[r.at], st);
         continue;
@@ -1031,6 +1030,35 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
   // real, visible centre point — order-independent (typed before or after the circle), pure replay (the
   // corpus and save/load ride it with no store op). Positional/definitional statements never emit the
   // marker, so the reported hijack class ('P על המשך BA') stays closed.
+  /**
+   * #2210 ([ADR-704](docs/06-decisions.md#adr-704)) — A DEFAULTED TANGENCY KIND YIELDS (M4, ADR-052). A tangency stated
+   * with no kind («המעגלים O ו-P משיקים») is external only by default (`kindStated: false`), so it takes, in this order:
+   * the kind of the FIRST kind-stated tangency on the same unordered pair anywhere in the list (a later «…משיקים
+   * מבפנים»); else internal when one circle of the pair is stated contained in the other (`set-circle-position
+   * contained`, either order); else the default. Position-independent (the stating line before or after), and derived
+   * from `(facts, seed)` alone, so deleting or unticking the stating line restores the default. Fact id → resolved kind.
+   */
+  const tangentKind = new Map<string, boolean>();
+  {
+    const pairKey = (a: Id, b: Id) => [a, b].sort().join('|');
+    const statedKind = new Map<string, boolean>();
+    const contained = new Set<string>();
+    for (const f of facts) {
+      if (!f.enabled) continue;
+      for (const c of lowerOne(f.cmd, symtab)) {
+        if (c.type === 'circles-tangent' && c.kindStated !== false) {
+          const k = pairKey(c.circle1, c.circle2);
+          if (!statedKind.has(k)) statedKind.set(k, c.external);
+        } else if (c.type === 'set-circle-position' && c.relation === 'contained') contained.add(pairKey(c.a, c.b));
+      }
+    }
+    for (const f of facts) {
+      if (!f.enabled || f.cmd.type !== 'circles-tangent' || f.cmd.kindStated !== false) continue;
+      const k = pairKey(f.cmd.circle1, f.cmd.circle2);
+      const ext = statedKind.has(k) ? statedKind.get(k)! : contained.has(k) ? false : undefined;
+      if (ext !== undefined && ext !== f.cmd.external) tangentKind.set(f.id, ext);
+    }
+  }
   const centrePromotions = new Map<string, string>(); // '@ctr-O' → 'O'
   for (const f of facts) {
     if (!f.enabled) continue;
@@ -1198,6 +1226,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       msr: [...msRiderMove].filter(([id]) => inPrefix(id)).map(([id, v]) => [factIdxById.get(id), v]),
       mss: [...msSvMove].filter(([id]) => inPrefix(id)).map(([id, v]) => [factIdxById.get(id), v]),
       ctr: [...centrePromotions].sort(),
+      tk: [...tangentKind].filter(([id]) => inPrefix(id)).map(([id, v]) => [factIdxById.get(id), v]),
       pair: [...pairSwapByGroup].filter(([g]) => prefixGroups.has(g)).map(([g, m]) => [groupPartition.get(g), [...m].sort()]),
       eqs: explicitEqs,
       ons: explicitOnSegs,
@@ -1322,6 +1351,9 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     // Re-seat the isosceles-trapezoid macro's leg equality onto the legs of the ring in force (#989, ADR-506).
     const legs = legsReseat.get(f.id);
     if (legs) engineCmds = engineCmds.map((ec) => (ec.type === 'set-equal' ? { ...ec, ...legs } : ec));
+    // A defaulted tangency kind takes the kind the list states for the pair (#2210, ADR-704 pre-scan).
+    const tk = tangentKind.get(f.id);
+    if (tk !== undefined) engineCmds = engineCmds.map((ec) => (ec.type === 'circles-tangent' ? { ...ec, external: tk } : ec));
     // Promote anonymous centres a semantic centre-use named (ADR-342, '@ctr-O' → 'O').
     engineCmds = promoteCentres(engineCmds as Command[]);
     // Swap a common-tangent group's soft touch↔circle pairing to the explicitly-stated one (ADR-239 pre-scan).
@@ -1520,6 +1552,17 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
         claimDefined();
         continue;
       }
+      // #2117 (ADR-718), stage 0: a two-vertex height none of whose sides it can be a height to, by theorem — a
+      // diagonal of a ring declared a square, rectangle or rhombus. Read on the fact's own `altitude-choice` (the
+      // engine sees only one option's lowering), so the refusal is the statement's, not its first option's.
+      const noSide = diagonalHeightImpossibility(cur, f.cmd);
+      if (noSide) {
+        status[f.id] = diagonalHeightError(noSide);
+        rigid.add(f.id); // a theorem on the declared kind: never waiting for givens
+        failedWith.set(f.id, cur);
+        claimDefined();
+        continue;
+      }
       // TRANSACTIONAL — a fact's lowering is ALL-OR-NOTHING ([ADR-337](docs/06-decisions.md#adr-337)).
       // ONE fact can lower to MANY engine commands (every macro: `inscribe` ADR-262, `shape-variant`
       // ADR-138, the named shapes ADR-110, regular polygon ADR-111, common tangent ADR-239, the concentric
@@ -1594,6 +1637,10 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
           continue;
         }
         if (lostDefinition(fi, engineCmds)) continue;
+        if (diagonalHeightImpossibility(cur, f.cmd)) {
+          failedWith.set(f.id, cur); // #2117: still refuted by the theorem on this figure
+          continue;
+        }
         const r = attemptFact(cur, engineCmds);
         if (r.ok) {
           cur = r.construction;
@@ -1886,6 +1933,25 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     }
   }
   /**
+   * #2117 ([ADR-718](docs/06-decisions.md#adr-718)) — the same provenance for a diagonal called a height of a ring
+   * declared a square, rectangle or rhombus: the other side is the statement that DECLARED the ring (the polygon's
+   * `ownerByObjId`), read from the fold, never searched for — the drop-one search's removal of «ריבוע ABCD» removes
+   * the letters themselves, so it could name nothing.
+   */
+  if (attribute && hoistDepth === 0) {
+    for (const f of failedFacts) {
+      const st = status[f.id];
+      if (typeof st !== 'string') continue;
+      const m = DIAGONAL_HEIGHT_VS.exec(st);
+      if (!m || m[4] !== undefined) continue;
+      const poly = cur.objects.find((o) => o.kind === 'polygon' && o.vertices.join('') === m[3]);
+      const declared = poly ? ownerByObjId.get(poly.id) : undefined;
+      if (declared === undefined || !facts[declared]?.enabled || groupKey(facts[declared]) === groupKey(f)) continue;
+      const tagged = `${st} [vs #${declared}]`;
+      for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
+    }
+  }
+  /**
    * #2080 / #2083 ([ADR-645](docs/06-decisions.md#adr-645)) — the same provenance for a second crossing of two
    * circles that have one common point (`oneCommonPointError`: «X coincides with Y», Y the crossing that avoids X on
    * the same pair). When the refused line is NOT the one that placed the crossings — a tangency, or a length, typed
@@ -1910,32 +1976,44 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     }
   }
   /**
-   * #2239 ([ADR-692](docs/06-decisions.md#adr-692)) — the same provenance for two circles of equal stated radius
-   * stated internally tangent (stage 0a's `equalInternalTangency`, #2119's restated-size shape).
-   *  - The refused line is a SIZE (the tangency was stated first): the other side is the statement of the internal
-   *    tangency over that circle, READ before the drop-one search — which would name the other circle's size.
-   *  - The refused line is the TANGENCY: the drop-one search runs first, so a LATER statement that completed the
+   * #2239 ([ADR-692](docs/06-decisions.md#adr-692)), widened by #2206 ([ADR-713](docs/06-decisions.md#adr-713)) — the
+   * same provenance for two circles of equal radius by statement that a statement nests (stage 0a's `equalNestedPair`:
+   * internally tangent, contained or concentric).
+   *  - The refused line is a SIZE or an EQUALITY (the nesting was stated first): the other side is the statement that
+   *    nests that circle, READ before the drop-one search — which would name the other circle's size.
+   *  - The refused line is the NESTING: the drop-one search runs first, so a LATER statement that completed the
    *    contradiction (a radius letter's value, ADR-554) is the one named; when it names none (removing a circle's
    *    sizing line removes the circle), the other side is the latest statement that sized either circle of the pair.
    */
-  const tagEqualTangency = (tangencyCase: boolean) => {
+  const tagEqualNested = (nestingCase: boolean) => {
     for (const f of failedFacts) {
       const st = status[f.id];
       if (typeof st !== 'string') continue;
-      const m = RADIUS_CANNOT_HOLD.exec(st);
+      const m = EQUAL_NESTED_CANNOT_HOLD.exec(st);
       if (!m) continue;
+      const rel = m[2] as NestedRelation;
       const own = groupKey(f);
       const ownCmds = facts.filter((x) => groupKey(x) === own).flatMap((x) => lowerOne(x.cmd, symtab));
-      const tangency = ownCmds.find((c): c is Extract<Command, { type: 'circles-tangent' }> => c.type === 'circles-tangent' && !c.external);
-      if (!!tangency !== tangencyCase) continue;
-      const sizes = (c: Command, circle: Id) => (c.type === 'circle' && c.id === circle && !c.freeRadius && !c.ifAbsent) || (c.type === 'set-radius' && c.circle === circle);
-      const internalOver = (c: Command, circle: Id) => c.type === 'circles-tangent' && !c.external && (c.circle1 === circle || c.circle2 === circle);
+      const nestedPair = (c: Command): [Id, Id] | null =>
+        rel === 'int-tangent' && c.type === 'circles-tangent' && !c.external
+          ? [c.circle1, c.circle2]
+          : rel === 'contained' && c.type === 'set-circle-position' && c.relation === 'contained'
+            ? [c.a, c.b]
+            : rel === 'concentric' && c.type === 'set-radius-order'
+              ? [c.outer, c.inner]
+              : null;
+      const nesting = ownCmds.map(nestedPair).find((p): p is [Id, Id] => p !== null);
+      if (!!nesting !== nestingCase) continue;
+      const sizes = (c: Command, circle: Id) =>
+        (c.type === 'circle' && c.id === circle && !c.freeRadius && !c.ifAbsent) ||
+        (c.type === 'set-radius' && c.circle === circle) ||
+        (c.type === 'set-radius-ratio' && c.k === 1 && (c.c1 === circle || c.c2 === circle));
       let declared = -1;
       for (let j = facts.length - 1; j >= 0; j--) {
         const g = facts[j];
         if (!g.enabled || groupKey(g) === own || status[g.id] !== 'ok') continue;
         const cs = lowerOne(g.cmd, symtab);
-        if (tangency ? cs.some((c) => sizes(c, tangency.circle1) || sizes(c, tangency.circle2)) : cs.some((c) => internalOver(c, m[1]))) {
+        if (nesting ? cs.some((c) => sizes(c, nesting[0]) || sizes(c, nesting[1])) : cs.some((c) => nestedPair(c)?.includes(m[1]))) {
           declared = j;
           break;
         }
@@ -1946,7 +2024,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
     }
   };
-  if (attribute && hoistDepth === 0) tagEqualTangency(false);
+  if (attribute && hoistDepth === 0) tagEqualNested(false);
   if (attribute && hoistDepth === 0) {
     const ownerIdx = new Set(ownerByConKey.values());
     const searched = new Set<string>();
@@ -2042,7 +2120,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     }
   }
 
-  if (attribute && hoistDepth === 0) tagEqualTangency(true); // #2239: after the drop-one search (above)
+  if (attribute && hoistDepth === 0) tagEqualNested(true); // #2239 / #2206: after the drop-one search (above)
   const buildError = !pending && failedFacts.length ? (status[failedFacts[failedFacts.length - 1].id] as string) : null;
   return {
     cur,
@@ -2383,8 +2461,8 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   if (cmds.some((cmd) => notCyclicImpossibility(probe, cmd))) return false;
   // #2099 (ADR-651): a circle through three points the incidences put on one line — no later given bends the line.
   if (cmds.some((cmd) => collinearCircleImpossibility(cur, probe, cmd))) return false;
-  // #2239 (ADR-692): equal stated radii stated internally tangent — no later given makes the centres apart.
-  if (equalInternalTangency(cur, probe, cmds)) return false;
+  // #2239 (ADR-692) / #2206 (ADR-713): equal circles stated nested — no later given makes them unequal or apart.
+  if (equalNestedPair(cur, probe, cmds)) return false;
   return newCons.some((con) => {
     const vals: number[] = [];
     for (const s of [0, 1, 2, 3, 4]) {
@@ -2992,7 +3070,7 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
     // already held, so a figure whose CURRENT variant a later given made impossible was refused although
     // another variant draws it — «sin∢ACB = 3/4» then «זווית ACB קהה». Seed-invariant like the seat
     // (a wrong root fails at every seed), so it runs here, before the mask × seed product.
-    const variantFound = choiceRescue(facts, deadline);
+    const variantFound = choiceRescue(facts, { deadline });
     if (variantFound) {
       lastConfigTier = 'variant';
       return variantFound;
@@ -3405,9 +3483,33 @@ function advanceAssignment(axes: readonly { n: number; cur: number }[], steps: n
  * reflection tier), so tier ORDER — and with it every default drawing — is unchanged. Zero cost when no fact
  * carries a cyclable variant and no composition recorded a side choice.
  */
-export function choiceRescue(facts: Fact[], deadline: number): { facts: Fact[]; seed: number } | null {
+export function choiceRescue(facts: Fact[], limit: { deadline: number } | { workCap: number }): { facts: Fact[]; seed: number } | null {
   const mayHaveSide = facts.some((f) => f.enabled && 'ids' in f.cmd);
   if (!mayHaveSide && variantAxes(facts).length === 0) return null;
+  if ('deadline' in limit) return choiceSweep(facts, () => Date.now() > limit.deadline);
+  // #1857 (ADR-709): the submit gate's rescue is bounded by WORK, in charged units (every memo hit charged the
+  // work it saved, ADR-582) — the seat sweep's ADR-584 shape — so whether the cure for an unstated choice
+  // counts is the same on every device and cold or warm. The axes' own fold is read inside the epoch, so it is
+  // charged once whether this thread already held it or not. A fold the cap cuts ends the rescue uncured.
+  choiceRescueStats.rescues++;
+  const d0 = work.done;
+  try {
+    return withWorkBudget(limit.workCap, () => {
+      const at = work.done + limit.workCap;
+      const aborts0 = solveBudget.aborts;
+      const cured = choiceSweep(facts, () => work.done > at || solveBudget.aborts !== aborts0);
+      if (cured) {
+        choiceRescueStats.cured++;
+        choiceRescueStats.maxCuredCharged = Math.max(choiceRescueStats.maxCuredCharged, work.done - d0);
+      }
+      return cured;
+    });
+  } finally {
+    choiceRescueStats.lastCharged = work.done - d0;
+    choiceRescueStats.charged += work.done - d0;
+  }
+}
+function choiceSweep(facts: Fact[], stop: () => boolean): { facts: Fact[]; seed: number } | null {
   // #1987 (ADR-622): the `reflex` axis joins this tier — a convexity default that YIELDED (ADR-613) is an
   // unstated choice exactly as a variant is, so a figure the convex seat cannot draw belongs here, not in a
   // refusal. Zero cost on a figure with no yielding ring ({@link reflexAxes} registers no axis).
@@ -3421,12 +3523,25 @@ export function choiceRescue(facts: Fact[], deadline: number): { facts: Fact[]; 
   for (const assignment of candidates) {
     const fc = withAssignment(facts, axes, assignment);
     for (let s = 0; s < 6; s++) {
-      if (Date.now() > deadline) return null;
-      if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
+      if (stop()) return null;
+      const ok = meetsRequirements(fc, s);
+      if (stop()) return null; // a fold the budget cut mid-ladder is not THE fold: it can neither cure nor refute
+      if (ok) return { facts: fc, seed: s };
     }
   }
   return null;
 }
+
+/** #1857 (ADR-709): the gate's choice-rescue counters — the locks count operations, never time. */
+export const choiceRescueStats = { rescues: 0, cured: 0, charged: 0, lastCharged: 0, maxCuredCharged: 0 };
+/**
+ * #1857 ([ADR-709](docs/06-decisions.md#adr-709)): the submit gate's choice-rescue budget, in CHARGED work units —
+ * a fixed amount of work, not the 1.5 s clock it replaced (the ADR-584 ruling's "same input, same answer"), so
+ * the verdict is the same on every device and cold or warm. Calibrated over the corpus scenarios, the fixtures
+ * and the gate locks: above the most expensive rescue there that CURED a line (see the ADR). A test may lower it.
+ */
+export const CHOICE_RESCUE_WORK_CAP = 4_000_000;
+export const choiceRescueConfig = { cap: CHOICE_RESCUE_WORK_CAP };
 
 /**
  * The SEAT sweep alone (#566/ADR-445's seat tier, extracted for #1441 arm 3): flip each UNPINNED
@@ -3784,7 +3899,7 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
     // another assignment of the figure's variant choices (the trial's own among them) admits the whole
     // trial figure, the step commits; `settleVariantDefaults` settles the new fact's own choice at commit
     // and the post-commit `autoResolve` (`findValidConfig`'s variant tier) flips an earlier one.
-    if (choiceRescue(all, Date.now() + 1500)) return { produced: true };
+    if (choiceRescue(all, { workCap: choiceRescueConfig.cap })) return { produced: true };
     // #1671 (ADR-584): a FINISHED sweep over at least one unpinned seat that cured nothing is a proof.
     return { produced: false, reason: 'error', detail: after.status[errored.id], ...(seats.complete && unpinnedSeats(all).length ? { seatsExhausted: true } : {}) };
   }

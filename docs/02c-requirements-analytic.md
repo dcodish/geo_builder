@@ -155,6 +155,11 @@ A student types on a keyboard and the exam is typeset. Both reach one internal f
   accented Latin letter. It is refused quoting the letters as typed, in the same two sentences every builder
   uses ([FR-SU-18](02w-requirements-workspace.md)), and no longer handed to the model. A look-alike letter
   folds to its Latin twin first («משולש КМО» reads as KMO), and Greek stays mathematics.
+- An angle measure written in radians — «∠ABC = π/2», «זווית ABC = π/3», «הזווית בין AB ל-AC היא π/6», «גזרה AOB
+  בזווית π/3». Radians are the complex Builder's notation only (operator, 2026-10-08: *"analytics tool should not
+  support radians at all"*). It is refused with 2-D's sentence «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90», where it used to be drawn
+  in degrees (π/2 as 1.57°) ([FR-SU-20](02w-requirements-workspace.md), ADR-W-142). π as a number («AB = π», «מעגל
+  שהיקפו 6π») still reads.
 
 ### 8b — Two new input families (F16, F17)
 
@@ -216,9 +221,9 @@ From the «lines and points» corpus (§8), numbered onward.
 **R124 — a given typed in the exam's own frame is understood as the given; a proof target is refused, with a reason**. *(Operator: "refuse and explain that this is not a proof engine".)* A line copied as printed — a given-prefix, a figure reference, «A(2;10)», «∢», the shape as context or predicate, the origin, «בהתאמה», two givens on one line — is the bare given it states, accepted whole or not at all. A request to prove is never drawn (FR-SU-15, ADR-W-107).
 - «טרפז ישר זווית ABCD (AB ∥ CD, AB ⊥ AD)» → the shape and its givens
 - «הוכיחו כי …» → refused as a claim to prove
-- **A line that loses a part is refused whole, never drawn without it and never handed to the model** *(operator, 2026-10-08: "a line that loses a part gets the existing one-input-per-line message … in every builder"; "refuse it too" when the lost part happens to hold)*. A part is lost when the reading never read it: a trailing label the line's reading does not depend on («C מחלקת את AB ביחס 3:2 ב-B»), or the rest of a declined line that adds only letters the readable part already names («AC ו-BD נפגשים בנקודה E על AB»). The message is 2-D's one-input-per-line message with the parts in the student's words; «משולש ABC ישר זווית ב-B» (any vertex) instead teaches «משולש ABC», then «∠ABC = 90°» *("teach the right form")*. A line whose every part is read keeps building («AC ו-BD נפגשים בנקודה E שהיא אמצע BD»: E is the midpoint); a rest that says something («בקודקוד B», «ש-AE = EC») is still the model's.
+- **A line that loses a part is refused whole, never drawn without it and never handed to the model** *(operator, 2026-10-08: "a line that loses a part gets the existing one-input-per-line message … in every builder"; "refuse it too" when the lost part happens to hold)*. A part is lost when the reading never read it: a trailing label the line's reading does not depend on («C מחלקת את AB ביחס 3:2 ב-B»), or the rest of a declined line that adds only letters the readable part already names («AC ו-BD נפגשים בנקודה E על AB»). The message is 2-D's one-input-per-line message with the parts in the student's words; «משולש ABC ישר זווית ב-B» (any vertex) instead teaches «משולש ABC», then «∠ABC = 90°» *("teach the right form")*, as 2-D's one numbered list: «(1) משולש ABC  (2) ∠ABC = 90°»; further givens on the same line continue that list, «משולש ABC ישר זווית ב-B ו-AB = 4» → «… (3) AB = 4» *(operator, 2026-10-10: "port it to 3-D and analytic"; ADR-AG-301, #1947)* — each further piece must itself record, or the line goes on as before. A line whose every part is read keeps building («AC ו-BD נפגשים בנקודה E שהיא אמצע BD»: E is the midpoint); a rest that says something («בקודקוד B», «ש-AE = EC») is still the model's.
 - **A point stated on a list of carriers is on each** *(operator, 2026-10-16: "A is only on O and not on P but line is green")*: «A על מעגל O ועל מעגל P», «A ו-B על מעגל O ועל מעגל P» and "A on circle O and on circle P" put each named point on each named carrier (circles, lines, diagonals, mixed), as the two lines would; «בהתאמה» / "respectively" pairs them; "A on circle O and B on circle P" puts each point on its own; never a carrier dropped (ADR-AG-282, #2199).
-- Sources: ADR-AG-187, #1618, #1616, #1666, FR-SU-15, ADR-W-107; the lost part: ADR-AG-251, ADR-W-120, #1888, #1889.
+- Sources: ADR-AG-187, #1618, #1616, #1666, FR-SU-15, ADR-W-107; the lost part: ADR-AG-251, ADR-W-120, #1888, #1889; the numbered teaching: ADR-AG-301, #1947.
 
 **R114 — the tool never accepts a sentence a textbook would not print; it teaches the one it would**. The textbook sentence is pre-filled for the student to confirm, only when it would be accepted; the exam's imperatives («העבירו», «הורידו», «בחרו») are taught the same way.
 - «הוסף C מחלקת את AB ביחס 3:2» → pre-fills «C מחלקת את AB ביחס 3:2»
@@ -437,7 +442,8 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 **R162 — the circle and tangent sentences of the 2-D tool build here too, and two fresh circles are named by order**. *(Operator, on #1688: "first mention names one".)* Two circles keep their stated relation always.
 - «מעגל סביב O רדיוס 5», «מעגל O שהיקפו 6π» (radius 3)
 - «שני מעגלים נחתכים בנקודות A ו-B», «AB משיק משותף חיצוני / פנימי לשני המעגלים»
-- Sources: ADR-AG-219, #1622, #1693, #1688.
+- the plural subject crosses too: «המעגלים O ו-P נחתכים בנקודות X ו-Y» (the stated radii kept), «המעגלים O ו-P נחתכים» (the crossings take the tool's letters), «(שני) המעגלים נחתכים …» (the two circles the figure holds), "circles O and P intersect at X and Y" (ADR-AG-300, #2108)
+- Sources: ADR-AG-219, #1622, #1693, #1688, #2108.
 
 **R163 — arcs, sectors, semicircles and the diameter from a point build as they do in the 2-D tool**. *(Operator ruling: analytic gives 2-D's verdict, and the arc rows are ported.)* An arc's measure is its central angle.
 - «קשת AB = 40 במעגל O», «⌢{AC} = 60°»
@@ -492,7 +498,8 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «תיכון מ-A במשולש ABC» → foot named M, «הכלי קרא לנקודה M»
 - «OD ו-BE הם גבהים לצלעות BC ו-OC בהתאמה»
 - Either end of a named cevian may be written first, for all three roles, with or without «הוא/היא/הינו», in Hebrew and English: «AM תיכון לצלע CD», «AM חוצה את זווית M במשולש CMD», "AM is the height to side CD" on «משולש CMD» draw what «MA …» draws; and every spelling 2-D reads vertex-first is read here ("MA median to CD", "MA is the median of triangle CMD", «הקטע MA הוא תיכון לצלע CD», «MA חוצה זווית CMD לצלע CD», «MA גובה לצלע CD במשולש CMD») ([ADR-AG-278](06c-decisions-analytic.md#adr-ag-278)).
-- Sources: ADR-AG-209, #1284, #1222, #1240, #1263, #1999.
+- A segment that is a SIDE of a declared polygon at the angle's vertex is never its bisector: «משולש ABC» · «AB חוצה זווית» (and «AB חוצה את זווית A / B», «… BAC», «AB הוא חוצה זווית», «חוצה הזווית AB», English) is refused in 2-D's sentence «AB היא צלע של המשולש ולכן אינה יכולה לחצות את זווית A — …», and on any other polygon «AB היא צלע של המרובע (הריבוע / …) ולכן אינה יכולה לחצות את זווית A.». The vertex-less verb «AD חוצה זווית» reads the angle at the first letter and builds ([ADR-AG-299](06c-decisions-analytic.md#adr-ag-299)).
+- Sources: ADR-AG-209, #1284, #1222, #1240, #1263, #1999, #2115.
 
 **R103d — a HEIGHT is drawn on any ring that has a side opposite the apex, and which side is 2-D's choice**. *(ADR-W-118 B1: 2-D is the reference for the verdict and for the drawing.)* The trapezoid's parallel base ([ADR-169](06-decisions.md#adr-169)), else the ring's first opposite side (the draw-one steer, [ADR-263](06-decisions.md#adr-263)); a diagonal is never a target. Two shapes giving the apex different sides ASK. `cevian-no-triangle` is kept for a figure with no such side, and the **median** keeps the triangle-only host, because 2-D defers it on a ring.
 - «טרפז ABCD» · «AE גובה» → the foot on DC · «מקבילית ABCD» · «AE גובה» → the foot on BC
@@ -676,11 +683,14 @@ a sentence the tool parsed.
 - «∠ABC=2α» · «∠ABC=3α» → «לא ניתן: «∠ABC=3α» סותר את «∠ABC=2α» — אי אפשר לקיים את שניהם יחד. הסיבה: ∠ABC = 3α.»
 - Not a second name: a letter naming another quantity («AB=a» · «BC=a», «CB=c» · «AB=a» · «AB=c»), a number, a shared-letter equation («AB=2a» · «AB=a+3»), a trig measure, an angle label.
 - Sources: #2054, #2061, ADR-AG-277.
+- **A second, different NUMBER for the same segment or angle, or the same letter with another constant, contradicts the first line** in the same frame (2-D's verdict, [ADR-AG-295](06c-decisions-analytic.md#adr-ag-295), #2105; operator ruling 2026-10-15): «AB=4» · «AB=5» → «לא ניתן: «AB=5» סותר את «AB=4» — אי אפשר לקיים את שניהם יחד. הסיבה: |AB| = 5.»; «∠ABC=40» · «∠CBA=50» → «… הסיבה: ∠CBA = 50°.»; «∠ABC = α» · «∠ABC = α + 40» → «… הסיבה: ∠ABC = α + 40.» The same value in another spelling is known; a letter whose coefficient AND constant change («AB=2a» · «AB=a+3») is an equation.
 - **A second, different radius for a circle is refused in 2-D's sentence** ([ADR-684](06-decisions.md#adr-684), #2119; operator ruling 2026-10-15, every builder): «מעגל O ברדיוס 4» after «מעגל O ברדיוס 3», and «רדיוס המעגל O הוא 3» after «מעגל O ברדיוס 5», say «לא ניתן: «…» סותר את «…» — אי אפשר לקיים את שניהם יחד.», naming the line that sized the circle. The same radius again is known.
 
 **R55 — an object that cannot exist is REPORTED once the figure has no freedom left**. Silent while another configuration may yet have it (ADR-AG-008).
 - the circumcentre of three fixed collinear points → named as not existing
-- Sources: ADR-AG-031, ADR-AG-008.
+- **"No freedom left" is the object's own** ([ADR-AG-296](06c-decisions-analytic.md#adr-ag-296), #1963): refused when nothing the object is built from can move, whatever else is free. «נקודה Q» · `A(0,0)` · `B(1,1)` · `C(2,2)` · «מעגל שעובר דרך A, B ו-C» is refused in the same sentence as without Q.
+- **…or when a statement puts its three points on one line** (ADR-AG-296; operator ruling 2026-10-14): «משולש ABC» · «D על AB» · «מעגל שעובר דרך A, D ו-B» is refused naming that statement — «לא ניתן: «…» סותר את «D על AB» — אי אפשר לקיים את שניהם יחד. הסיבה: A, D ו-B על ישר אחד, ואין מעגל שעובר דרך שלוש נקודות על ישר אחד.» Likewise the line AB or its extension, a midpoint, points stated on one named line or axis, in either order (the line that completes the proof is refused). Never on search evidence: three points on one line only by chance of the drawing are not refused.
+- Sources: ADR-AG-031, ADR-AG-008, ADR-AG-296.
 
 **R105 — a given set that holds only in a degenerate limit is REFUSED, never drawn as a needle**. Thinness is never the test; an exact solution is.
 - «משולש ABC» · «AB = AC» · «∠ABC = 90» → refused at every configuration

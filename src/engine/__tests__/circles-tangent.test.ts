@@ -114,7 +114,7 @@ describe('engine — equal stated radii are never flexed to make an internal tan
     setup();
     const d = replay(s().facts);
     const f = s().facts.find((x) => x.utterance === 'internal eq')!;
-    expect(d.status[f.id]).toMatch(/^over-constrained: radius of circle-[OP] = 5 cannot hold/);
+    expect(d.status[f.id]).toMatch(/^over-constrained: equal circles circle-[OP] nested int-tangent cannot hold/); // #2206 (ADR-713)
   });
 
   it('both stated radii stay 5 — no radius is rewritten', () => {

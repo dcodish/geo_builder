@@ -149,6 +149,26 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   sentence followed by the rest. A paste that carries a claim to prove is not split; it is refused whole
   (FR-SU-15). The operator's ruling: «split into rows».
   - Sources: [ADR-W-125](06w-decisions-workspace.md#adr-w-125), #1778.
+- **FR-SU-20 (Must)** — **Radians are the complex Builder's notation only.** In the 2-D, 3-D and analytic
+  builders an angle measure written with π («∠ABC = π/2», «∠ABC = pi/2», «גזרה AOB בזווית π/3») is refused at
+  once, never sent to the AI fallback and never drawn, with one sentence: «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90».
+  π as a number (a length, a circumference) and π as a name (3-D's planes π1, π2) are unchanged; the complex
+  Builder keeps reading π inside «cis». The operator's rulings: «Refuse and teach degrees» (2026-10-07), «only
+  the complex tool should» (2026-10-08).
+  - Sources: [ADR-W-142](06w-decisions-workspace.md#adr-w-142), [ADR-710](06-decisions.md#adr-710), #1837.
+- **FR-SU-21 (Must)** — **An AI answer keeps every shape and role word the student typed.** When a line goes
+  to the AI fallback, every shape-property word («שווה צלעות», «שווה שוקיים», «ישר זווית», «משוכלל», a
+  quadrilateral noun such as «מלבן»), every cevian role word («גובה», «תיכון», «חוצה זווית») and every
+  inscription verb («חסום» / «חוסם», which names the circle inside or the circle through the vertices) must
+  survive into the answer's lowering, or the answer is refused with the builder's existing dropped-given
+  message naming the word as the student typed it, the text kept for editing. A word **misspelt by one letter**
+  («שווה צלעת», «גובח», «isoceles») counts too: the AI may fix the typo, and the answer is accepted when it
+  carries the property the word plausibly names. Each word needs its own evidence — one role's lowering never
+  pays for another role's word. A word two letters from every property word is not recognised (two edits reach
+  other real words). Holds in the 2-D and 3-D builders; analytic follows in its own fix, and the complex builder
+  has no AI fallback. The operator's ruling (2026-10-08): «must survive into the AI answer's lowering, or the
+  answer is refused».
+  - Sources: [ADR-W-144](06w-decisions-workspace.md#adr-w-144), [ADR-722](06-decisions.md#adr-722), [ADR-3D-364](06b-decisions-3d.md#adr-3d-364), #1906.
 - **FR-SU-15 (Must)** — **A claim to prove is never drawn as a given.** **⚠ Ruled to change (2026-10-07, ADR-W-118 B14/D3 · #1870):** the complex builder refuses a proof-verb line like the others, while keeping its claim check for a bare statement. The text below describes the code until that ships. In every builder, a line that asks the student to PROVE something — «הוכיחו כי …», «הוכח ש …», «הראו כי …», «יש להוכיח …», "prove that …", "show that …", with or without an item marker («א.», «(1)») and also when it follows a given on the same line («נתון AB = AC. הוכיחו כי AB ⊥ AC») — is refused, and nothing of the line is recorded. The refusal says that it is a claim to prove, not a given, that the tool draws the givens and does not check proofs, and quotes the claim so the student knows which part to leave out. «כי» and «ש» in their other senses («נתון כי …», «כך ש-…») and «הראו» as "show me" are never refused for this. Sources: [ADR-W-107](06w-decisions-workspace.md#adr-w-107), #1666, #1649, #1618.
 - **FR-SU-16 (Must)** — **A plane-geometry sentence gets the same answer in every builder that reads plane geometry.** When a student types a plane-geometry sentence, the 2-D builder and the analytic builder give the same verdict: both build it, both refuse it, or both ask the same kind of question. The 2-D builder's verdict is the reference — except where 2-D is the lenient tool and what it shows can never resolve (a pending row no later given can clear): then the builders agree on the honest refusal and 2-D changes (rulings 2026-10-09/10 on #1936, ADR-W-118 Amendment 2). The 3-D builder is to give the same verdict for the core plane families: polygons, lengths, angles, midpoints and ratios, cevians, parallel and perpendicular, and area — that parity is **parked, not realised**: most of 3-D's known-gap rows are owned by #1679, which is in the icebox (as are 2-D's own phrasing gaps, #1677). The exceptions are topic families that one builder reads by design: coordinates, equations, R³ lines and planes, named lines, parameters, coordinate notation, solids and vectors, circle geometry in 3-D, and free points in 3-D. A builder that does not read such a family answers it honestly, with a refusal, a question or the model, and never draws it as something else. A known difference is listed with the issue that will remove it. The operator's ruling: «analytics and 2d should have same user experience».
   - Sources: [ADR-W-108](06w-decisions-workspace.md#adr-w-108), #1649, [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B15 and Amendment 2, #1861, #1936.
@@ -282,6 +302,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | Behaviour | 2-D | 3-D | Analytic | Complex | Status |
 | --- | --- | --- | --- | --- | --- |
 | A pasted paragraph | one row per sentence | same | same | same | **Same** (ADR-W-125, FR-SU-19) |
+| An AI answer that drops a shape or role word the student typed («שווה צלעת» answered «משולש ABC») | refused, the word named (dropped-given) | same | records today | n/a (no AI fallback) | **Ruled** — 2026-10-08 (#1906, ADR-W-144, FR-SU-21); analytic's half is #1906's third item; one reader, `shell/llm/honestyCore.ts` `propertyWords` |
 | Plane-geometry sentence verdicts | reference | core families; most gaps parked | locked to 2-D | n/a (not plane geometry) | **Ruled** — ADR-W-108; 3-D parity parked (#1679, icebox; B15) |
 | Givens list: mute, edit, delete | shared list | same | same | same | **Same** |
 | Undo / redo | yes | yes | yes | yes | **Same** |
@@ -309,11 +330,13 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | A one-line compound that loses a part («משולש ABC ישר זווית ב-B», «…בנקודה E שהיא אמצע BD») | refused whole, parts listed; the right-angle syntax taught (ADR-603) | refused whole, parts listed; the right-angle syntax taught (ADR-3D-316); «…בנקודה E…» not read (#1679) | refused whole, parts listed; the right-angle syntax taught; «…שהיא אמצע BD» reads both parts and builds (ADR-AG-251) | n/a | **Ruled change** — refused in every builder (2026-10-08, #1888/#1889, ADR-W-120); a dropped ROLE word the same way (#1904: 2-D ADR-604, 3-D ADR-3D-317) |
 | Two points on one spot | refused or redrawn | same | same | not measured | **Same** for 2-D/3-D/analytic (ADR-W-066/072); complex **Open** |
 | A declared polygon forced flat | refused | refused | refused | n/a | **Same** (ADR-W-115) |
+| A declared solid forced flat | n/a (no solids) | refused (ADR-3D-358) | n/a (no solids) | n/a | **Ruled** — refused, never noticed (#1860, 2026-10-07; ADR-W-115 Am. 1) |
 | A declared polygon over coordinate points, crossed | n/a (no coordinates) | refused | refused | n/a | **Same** (ruled, #1923: ADR-3D-314, ADR-AG-129) |
 | A declared trapezoid forced into a parallelogram | amber warning | amber warning | amber warning | n/a | **Same** (#1918: ADR-165, ADR-3D-313, ADR-AG-189 Am. 1). A stated pair of the other two sides becomes the trapezoid's pair in all three; a circle through a declared right trapezoid is refused in all three, either order, naming both statements (operator, 2026-10-08) |
 | A declared polygon whose placed vertices cross in every configuration | refused (ADR-608, ADR-613) | refused (ADR-3D-322) | refused (ADR-AG-250, ADR-AG-256) | n/a | **Same** (ruled, #1927: ADR-W-121) — one message, ending «או לשנות את מקומות הנקודות»; refused only when nothing the sentence exposes can save the ring ("search first, refuse last", 2026-10-09). A ring a dart saves («דלתון ABCD · מרובע ABDC») builds in all three; 2-D and analytic draw the dart, 3-D the convex kite (#1986) |
 | A declared ring a coordinate letter can make simple («A(k,0) · … · טרפז ABCD») | n/a (no coordinates) | recorded, drawn crossed (#1986) | drawn simple, the letter searched (ADR-AG-256, #1939) | n/a | **Ruled** (#1939, 2026-10-09) — drawn, never refused, never crossed; 3-D is a known gap |
 | A proof target «הוכיחו כי» | refused | refused | refused | checked as a claim | **Ruled change** — refuse proof verbs, keep the bare-claim check (B14, D3, #1870) |
+| An angle written with π «∠ABC = π/2» | refused, degrees taught | same | same | reads radians (`cis`) | **Same** — ruled 2026-10-07 / 2026-10-08 (#1837, ADR-W-142, FR-SU-20); one rule, `shell/radianAngle.ts` |
 | AI fallback for unread input | yes | yes | yes | none | **Ruled change** — build it (B14, #1869) |
 | Save, load, share link | shared | same | same | same | **Same** |
 | Image export | yes | yes | yes | yes | **Same** |

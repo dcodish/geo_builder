@@ -145,8 +145,38 @@ export function ambiguousCurveExample(detail: string, theNoun: string, name: str
   return `${detail.slice(0, end)} ${name}${detail.slice(end)}`;
 }
 
+/** «X, Y ו-Z» — `sep` between all but the last two, `last` before the last (#1963, the locale's own `listAnd`). */
+const joinAnd = (items: readonly string[], sep: string, last: string): string =>
+  items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(sep)}${last}${items[items.length - 1]}`;
+
 /** A registry noun in English — the first English spelling the table maps onto it (the table is the one source). */
 const enNoun = (he: string | undefined): string => (he ? Object.keys(EN_SHAPE).find((k) => EN_SHAPE[k] === he) ?? he : '');
+
+/**
+ * #2115 (ADR-AG-299) — the definite noun of a polygon kind (`square`, `n5`…), 2-D's `input.shapeNounDefinite` table:
+ * the three trapezoid kinds share «הטרפז», and an arity past the table is «המצולע».
+ */
+const POLYGON_NOUN_KEY: Readonly<Record<string, string>> = {
+  square: 'shapeTheNounSquare',
+  rectangle: 'shapeTheNounRectangle',
+  rhombus: 'shapeTheNounRhombus',
+  parallelogram: 'shapeTheNounParallelogram',
+  kite: 'shapeTheNounKite',
+  trapezoid: 'shapeTheNounTrapezoid',
+  'isosceles-trapezoid': 'shapeTheNounTrapezoid',
+  'right-trapezoid': 'shapeTheNounTrapezoid',
+  n4: 'shapeTheNounN4',
+  n5: 'shapeTheNounN5',
+  n6: 'shapeTheNounN6',
+  n7: 'shapeTheNounN7',
+  n8: 'shapeTheNounN8',
+  n9: 'shapeTheNounN9',
+  n10: 'shapeTheNounN10',
+};
+const polygonNounKey = (kind: string | undefined): string => (kind && POLYGON_NOUN_KEY[kind]) || 'shapeTheNounPolygon';
+
+/** 2-D's one-fact-per-line list format (`src/app/unreadParts.ts` `numbered`): «(n) part», two-space separators. */
+const numbered = (parts: readonly string[], from = 1): string => parts.map((p, i) => `(${i + from}) ${p}`).join('  ');
 
 /** The sentence a student reads for `error`, in the locale `t` speaks. */
 export function errorText(error: InputError, t: Translate): string {
@@ -161,6 +191,8 @@ export function errorText(error: InputError, t: Translate): string {
     'bad-equation': 'errBadEquation',
     'out-of-scope': 'errOutOfScope',
     'proof-target': 'errProofTarget',
+    // #1837 (ADR-W-142) — 2-D's ruled degrees sentence, verbatim
+    'radian-angle': 'errRadianAngle',
     // #1919 — the operator chose THIS sentence for a name the tool cannot read, in every builder.
     'unread-name': 'errRenameBadName',
     'unread-word': 'errUnreadWord',
@@ -174,6 +206,8 @@ export function errorText(error: InputError, t: Translate): string {
     'degenerate-role': 'errDegenerateRole',
     'apex-not-a-vertex': 'errApexNotAVertex',
     'bisector-wrong-apex': 'errBisectorWrongApex',
+    // #2115 (ADR-AG-299) — 2-D's sentences: the triangle's, with its cevian clause; any other polygon's, naming it
+    'bisector-is-side': error.key === 'bisector-is-side' && error.polygonKind !== 'triangle' ? 'errBisectorIsPolygonSide' : 'errBisectorIsSide',
     'length-xy': 'errLengthXY',
     'coordinate-restriction': 'errCoordinateRestriction',
     'ambiguous-cevian': 'errAmbiguousCevian',
@@ -238,6 +272,8 @@ export function errorText(error: InputError, t: Translate): string {
     'measure-contradicts': error.key === 'measure-contradicts' && error.declared ? 'errMeasureContradicts' : 'errMeasureContradictsAlone',
     // #2119 (ADR-684) — 2-D's errors.restatedSize, verbatim; with no line to name, the old conflict sentence
     'radius-contradicts': error.key === 'radius-contradicts' && error.declared ? 'errRadiusContradicts' : 'errConflict',
+    // #1963 (ADR-AG-296) — the operator's ruled refusal, in 2-D's «X» סותר את «Y» frame (#1868), naming the statements
+    'forced-collinear': 'errForcedCollinear',
     // #1154 — a rename understood and declined, each naming what the student wrote
     'rename-bad-name': 'errRenameBadName',
     'rename-same': 'errRenameSame',
@@ -298,13 +334,19 @@ export function errorText(error: InputError, t: Translate): string {
     toCurve: t(TO_THE_NOUN_KEY[crossed]),
     reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '',
     definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '',
-    all: error.key === 'split-statements' ? error.parts.map((p, i) => `(${i + 1}) ${p}`).join('  ') : '',
+    all: error.key === 'split-statements' ? numbered(error.parts) : '',
     triangle: error.key === 'split-statements' && error.teach ? error.teach.triangle : '',
     angle: error.key === 'split-statements' && error.teach ? error.teach.angle : '',
+    // #1947 (ADR-AG-301) — the taught pair is items (1) and (2); the line's further parts continue the SAME list from (3)
+    more: error.key === 'split-statements' && error.teach && error.parts.length > 2 ? `  ${numbered(error.parts.slice(2), 3)}` : '',
     // #1554 ruling 1 (ADR-AG-198): the two nouns, in each locale's spelling (the registry key is the Hebrew).
     shapeHe: 'shape' in error ? (error.shape ?? '') : '',
     polygon: 'polygon' in error ? (error.polygon ?? '') : '',
-    declared: 'declared' in error ? (error.declared ?? '') : '',
+    // #1963: several declaring lines read «X», «Y» ו-«Z» inside the template's own guillemets.
+    declared: error.key === 'forced-collinear'
+      ? joinAnd(error.declaredLines ?? [], '», «', `»${t('listAnd')}«`)
+      : 'declared' in error ? (error.declared ?? '') : '',
+    points: error.key === 'forced-collinear' ? joinAnd(error.collinear ?? [], ', ', t('listAnd')) : '',
     forcedHe: 'forced' in error ? (error.forced ?? '') : '',
     shapeEn: 'shape' in error ? enNoun(error.shape) : '',
     forcedEn: 'forced' in error ? enNoun(error.forced) : '',
@@ -319,5 +361,8 @@ export function errorText(error: InputError, t: Translate): string {
     sum: error.key === 'mixed-number' ? error.sum : '',
     product: error.key === 'mixed-number' ? error.product : '',
     role: error.key === 'ambiguous-role-side' ? t(error.role === 'leg' ? 'roleWordLeg' : 'roleWordBase') : '',
+    side: error.key === 'bisector-is-side' ? (error.pair ?? '') : '',
+    vertex: error.key === 'bisector-is-side' ? (error.vertex ?? '') : '',
+    polygonNoun: error.key === 'bisector-is-side' ? t(polygonNounKey(error.polygonKind)) : '',
   }) + near;
 }

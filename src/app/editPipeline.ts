@@ -27,6 +27,7 @@ import { forcedCrossedRing, impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
+import { findRadianAngle } from '../../shell/radianAngle';
 
 export interface EditDeps {
   t: (key: string, opts?: Record<string, unknown>) => string;
@@ -86,6 +87,11 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   const proof = findProofTarget(editText);
   if (proof) {
     setInputNote(t('input.scope.proof-target', { sentence: proof.sentence }));
+    return false;
+  }
+  // #1837 (ADR-710): an angle written in radians is refused here exactly as at submit.
+  if (findRadianAngle(editText)) {
+    setInputNote(t('input.scope.radian-angle'));
     return false;
   }
   // #1919 (ADR-626): an edit is a statement too — a letter the tool cannot read is refused here exactly
@@ -150,6 +156,12 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   if (!r.ok && r.reason === 'ambiguous-definite-shape') {
     const note = ambiguousDefiniteShapeNote(r, editText);
     setInputNote(t(note.key, { ...note.params, plural: t(note.params.plural.t) }));
+    return false;
+  }
+  // #2263 (ADR-702): one radius on a nested pair — the edit is refused naming the radius phrase it cannot keep,
+  // the note this seam gave the same line before (`editDropped`), never the generic «not read»
+  if (!r.ok && r.reason === 'nested-pair-radius') {
+    setInputNote(t('steps.editDropped', { items: r.parts[1] }));
     return false;
   }
   if (!r.ok || r.commands.length === 0) {

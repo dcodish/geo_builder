@@ -19,7 +19,7 @@
  * no digits). Keywords are bilingual; the same rule matches either language.
  */
 
-import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
+import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
 import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
@@ -28,6 +28,7 @@ import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
+import { findRadianAngle } from '../../shell/radianAngle';
 import { foreignGiven } from './scope';
 import { readFrame } from './frame';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
@@ -87,6 +88,15 @@ export type ParseResult =
   // #1891 (ADR-606): a circle inscribed in a polygon of `sides` ≥ 5 — 2-D draws no such incircle yet. Refused
   // with the W19 known-limit sentence, never escalated (the model could only drop the circle or misplace it).
   | { ok: false; reason: 'incircle-not-drawn'; sides: number }
+  // #2263 (ADR-702): ONE radius stated for a NESTED pair («שני מעגלים בעלי מרכז משותף O ברדיוס 5», «…מוכלים…», «…משיקים
+  // מבפנים…») — two nested circles cannot both have it, and which one has it the sentence does not say. Refused with
+  // FR-IN-4g's one-given-per-line frame; `parts` are the student's own words: the pair, then the radius phrase.
+  | { ok: false; reason: 'nested-pair-radius'; parts: [string, string] }
+  // #2200 (ADR-712): two circles stated CONTAINED one in the other AND of equal size («שני מעגלים מוכלים ברדיוסים
+  // שווים») — a circle strictly inside another is smaller, so the words alone contradict. Refused naming the
+  // contradiction (operator ruling 2026-10-16, card 20 A), never drawn red, never escalated.
+  // #2206 (ADR-713): the same for a pair stated internally tangent or concentric and equal — `relation` names the nesting.
+  | { ok: false; reason: 'equal-circles-nested'; relation: NestedPairRelation }
   | { ok: false; reason: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: string; shapes: string[]; side: string }
   // #1666 (ADR-561, ADR-W-107): a PROOF TARGET — «הוכיחו כי AB ⊥ AC», "prove that …" — is what the student
   // must SHOW, never a given. Every rule used to read the claim inside it and lower it as a constraint.
@@ -102,6 +112,12 @@ export type ParseResult =
   // `detail` is the student's own run(s); `name` is a run that could be a point name, `word` a word in
   // another language.
   | { ok: false; reason: 'unread-script'; kind: 'name' | 'word'; detail: string }
+  // #1837 (ADR-710, ADR-W-142): an angle written in RADIANS — «∠ABC = π/2», «∠ABC = pi/2». Radians are the
+  // complex builder's notation only (operator rulings 2026-10-07 / 2026-10-08). «∠ABC = pi/2» lowered to
+  // `set-angle B = 2` (the word dropped, 2°). The submit and ✎ edit gates refuse it earlier with the ruled
+  // sentence; this is the same shared rule (`shell/radianAngle`) at the boundary every caller reads, the LLM
+  // lowering included. `value` is the π value as typed.
+  | { ok: false; reason: 'radian-angle'; value: string }
   // #1698 (ADR-566): a trigonometric function of an angle («sin∢ACB = 3/4», «cos∢B = 2», «tan∢B > 1»)
   // that `trigGiven` cannot lower to exactly one angle. Refused naming the function, never handed to an
   // angle rule (which read it as degrees) and never escalated. `fn` is the student's own spelling.
@@ -305,8 +321,9 @@ export interface ParseContext {
   /** #2149 / #2188 ([ADR-671](../../docs/06-decisions.md#adr-671), [ADR-672](../../docs/06-decisions.md#adr-672)) — SEMANTIC:
    *  each circle pair the construction STATES tangent (its `circles-tangent` record, ADR-645), keyed by the sorted pair of
    *  circle ids: the touch point and the stated kind (the earliest record of the pair). The only source of an inherited
-   *  tangency kind — the deictic `circlePairPositions` never decides it (docs/17 §3b law 2). */
-  statedTangencies?: Record<string, { at: string; external: boolean }>;
+   *  tangency kind — the deictic `circlePairPositions` never decides it (docs/17 §3b law 2). #2209
+   *  ([ADR-703](../../docs/06-decisions.md#adr-703)): `a`/`b` are the record's circles in the order first stated. */
+  statedTangencies?: Record<string, { at: string; external?: boolean; a: string; b: string }>;
   /** Recorded SIZE roles between circles (`set-radius-order`, concentric or not — issue #102): lets
    *  «המעגל הגדול/הקטן» resolve consistently once assigned. */
   radiusOrder?: { outer: string; inner: string }[];
@@ -401,7 +418,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-definite-shape'; shapes: string[]; sides: number; example: string } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-definite-shape'; shapes: string[]; sides: number; example: string } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number } | { clarify: 'nested-pair-radius'; parts: [string, string] } | { clarify: 'equal-circles-nested'; relation: NestedPairRelation };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -5311,6 +5328,12 @@ const concentricCircles: Rule = (s, ctx) => {
     /\bconcentric\s+circles\b/i.test(s) ||
     (/\btwo\s+circles\b/i.test(s) && /common\s+cent(?:er|re)|same\s+cent(?:er|re)/i.test(s));
   if (!he && !heConcentric && !en) return null;
+  // #2206 (ADR-713): two equal circles on one centre are one circle — refused from the words (ruling 2026-10-16).
+  const eq = equalNested(s, 'concentric');
+  if (eq) return eq;
+  // #2263 (ADR-702): one radius for the pair — which circle has it? Refused, one given per line.
+  const nested = nestedPairRadius(s);
+  if (nested) return nested;
   // The centre letter: right after "משותף"/"קונצנטריים", or via the shared centre reader ("centered at O",
   // "common center O" — `cent\w*` covers it). Unnamed → auto-assigned and hidden until used (FR-RN-8).
   const m = s.match(/(?:משותף|קונצנטריים)\s+([A-Za-z]\d*)(?![A-Za-z])/);
@@ -5960,6 +5983,10 @@ const HE_POLY_NAME_N: Record<string, number> = {
   מחומש: 5, משושה: 6, משובע: 7, מתומן: 8, משומן: 8, מתושע: 9, מעושר: 10,
 };
 
+/** Every polygon-name word of the two tables above, word → vertex count — for the AI-answer word member (#1906),
+ *  which composes its ring vocabulary from them rather than re-spelling them. */
+export const POLYGON_NAME_ARITY: Readonly<Record<string, number>> = { ...POLY_NAME_N, ...HE_POLY_NAME_N };
+
 /** The n-gon nouns (n ≥ 5) of the tables above, per language — composed, never re-spelled (#1891). */
 const NGON_WORDS_EN = Object.entries(POLY_NAME_N).filter(([, n]) => n >= 5).map(([w]) => w).join('|');
 const NGON_WORDS_HE = Object.keys(HE_POLY_NAME_N).join('|');
@@ -6071,6 +6098,19 @@ const isCircleInPolygon = (s: string): boolean => {
   const polyIdx = s.search(new RegExp(`${POLY_WORDS_EN}|${POLY_WORDS_HE}`, 'i'));
   return circIdx >= 0 && polyIdx >= 0 && circIdx < polyIdx;
 };
+
+/**
+ * #1906 ([ADR-722](../../docs/06-decisions.md#adr-722)) — WHICH CIRCLE an inscription sentence states, asked of the
+ * grammar's own two readers: the «חוסם» voice reader ({@link inscriptionVoice}) when the active verb is there, else
+ * the container-marker reader ({@link isCircleInPolygon}). `'in'` is the circle inside the polygon (the incircle),
+ * `'around'` the circle through its vertices. The AI-answer word member asks it of the STUDENT's line, spelt right,
+ * so an answer that draws the other circle is refused naming the word.
+ */
+export function statedCircleDirection(s: string): 'in' | 'around' {
+  const voice = inscriptionVoice(s);
+  if (voice) return voice.container === 'shape' ? 'in' : 'around';
+  return isCircleInPolygon(s) ? 'in' : 'around';
+}
 
 /**
  * The vocabulary an INSCRIPTION sentence sits in — stripped before the subject's labels are read.
@@ -8414,6 +8454,13 @@ const parallelCircleIntersection: Rule = (s, ctx) => {
  * words contradict themselves there and the word-relation gate (`droppedWordRelations`, its equal-size member)
  * keeps the line from being drawn. A rule that forgets the helper is caught by that gate, not by luck.
  *
+ * #2200 ([ADR-712](docs/06-decisions.md#adr-712)) — `twoCirclesBare` READS it now (its leftover strips the vocabulary,
+ * as `circlesTangent` does), and an equal bare pair admits no containment configuration (`admits`). A CONTAINED pair
+ * stated equal — `twoCirclesPosition` and `containedNewInExisting` both — is refused from the words
+ * (`equalCirclesNested`): a circle strictly inside another is smaller.
+ * #2206 ([ADR-713](docs/06-decisions.md#adr-713)) — and so are its twins: `circlesTangent` internal (ADR-455 D2's `'stop'`
+ * became this refusal) and `concentricCircles` (#2186's escalation became it), per the operator's 2026-10-16 ruling.
+ *
  * ADR-052 note: an unstated size is a free DOF, seeded APART so a pair reads as two circles. A STATED
  * equality removes that DOF — which is exactly the difference between a default and a given.
  *
@@ -8431,6 +8478,12 @@ const EQUAL_SIZE_G = rx(EQUAL_SIZE.source, 'gi');
  *  so the constraint always lands on the circles the sentence is actually about. */
 const withEqualRadii = (s: string, cmds: AnyCommand[], id1: Id, id2: Id): AnyCommand[] =>
   EQUAL_SIZE.test(s) ? [...cmds, { type: 'set-radius-ratio', c1: id1, c2: id2, k: 1 } as AnyCommand] : cmds;
+/** The nestings two circles can be stated in (#2200 / #2206) — none of them holds for two equal circles. */
+export type NestedPairRelation = 'contained' | 'int-tangent' | 'concentric';
+/** #2200 (ADR-712): a containment stated with an equal size cannot hold — a circle strictly inside another is
+ *  smaller — so the words alone decide: the line is refused naming the contradiction (ruling 2026-10-16). */
+const equalNested = (s: string, relation: NestedPairRelation): { clarify: 'equal-circles-nested'; relation: NestedPairRelation } | null =>
+  EQUAL_SIZE.test(s) ? { clarify: 'equal-circles-nested', relation } : null;
 
 /**
  * #2198 / #2216 ([ADR-677](docs/06-decisions.md#adr-677)) — ONE radius stated for the PAIR: «שני מעגלים נחתכים
@@ -8472,6 +8525,21 @@ const withStatedRadius = (s: string, cmds: AnyCommand[], id1: Id, id2: Id): AnyC
   for (const id of [id1, id2]) if (!made.has(id)) out.push({ type: 'set-radius', circle: id, value: r });
   return out;
 };
+/**
+ * #2263 ([ADR-702](../../docs/06-decisions.md#adr-702)) — the same reader asked by a NESTED pair: concentric
+ * (`concentricCircles`), contained (`twoCirclesPosition`) and internally tangent (`circlesTangent`). Two nested
+ * circles cannot both have the one stated radius, and which of them has it the sentence does not say — so the
+ * line is never built and never handed to the AI (which picked the outer circle in silence). It is refused with
+ * FR-IN-4g's one-given-per-line frame, the parts being the student's own words: the pair, then the radius phrase.
+ * Null when the sentence states no pair radius (`statedPairRadius` — a named circle's own size is not one).
+ */
+const nestedPairRadius = (s: string): { clarify: 'nested-pair-radius'; parts: [string, string] } | null => {
+  if (statedPairRadius(s) === null) return null;
+  const m = [...s.matchAll(STATED_PAIR_RADIUS)][0];
+  const tidy = (p: string) => p.replace(/\s+/g, ' ').trim().replace(/^[,.;:]+\s*|\s*[,.;:]+$/g, '').trim();
+  const pair = tidy(s.slice(0, m.index!) + ' ' + s.slice(m.index! + m[0].length));
+  return { clarify: 'nested-pair-radius', parts: [pair, tidy(m[0])] };
+};
 
 /**
  * #2149 ([ADR-671](../../docs/06-decisions.md#adr-671)) — the circles a sentence NAMES: the per-circle «מעגל X» /
@@ -8495,9 +8563,20 @@ const namedCircleRefs = (s: string): string[] => {
  *  that names no kind keeps it; an explicit kind word on the line always wins (the callers read it first). */
 const inheritedExternal = (ctx: ParseContext, id1: Id, id2: Id): boolean | undefined =>
   ctx.statedTangencies?.[[id1, id2].sort().join('|')]?.external;
-/** The pair's stated tangency record (touch point + kind), or undefined. */
-const statedTangencyOf = (ctx: ParseContext, id1: Id, id2: Id): { at: string; external: boolean } | undefined =>
+/** The pair's stated tangency record (touch point + kind + operand order), or undefined. */
+const statedTangencyOf = (ctx: ParseContext, id1: Id, id2: Id): { at: string; external?: boolean; a: string; b: string } | undefined =>
   ctx.statedTangencies?.[[id1, id2].sort().join('|')];
+/**
+ * #2209 ([ADR-703](../../docs/06-decisions.md#adr-703), FR-EN-9) — a statement about a pair already STATED tangent is
+ * lowered onto that record: the pair in the record's operand order (whatever order this line names it in) and, when the
+ * line names no touch point, the record's touch point. A pure restatement is then the identical command (the door's dry
+ * run answers «זה כבר קיים באיור»), and the reversed twin at X is the forward twin's command (ADR-653 binds M→X). The
+ * record is what the construction SAYS (`statedTangencies`), never the drawn coordinates (docs/17 §3b law 2).
+ */
+const onStatedTangency = (ctx: ParseContext, id1: Id, id2: Id): { pair: [Id, Id]; at?: string } => {
+  const rec = statedTangencyOf(ctx, id1, id2);
+  return rec ? { pair: [rec.a, rec.b], at: rec.at } : { pair: [id1, id2] };
+};
 
 const resolveCirclePair = (
   s: string,
@@ -8555,12 +8634,14 @@ const definiteTwoCircles = (s: string, ctx: ParseContext): [Id, Id] | null => {
 const containedNewInExisting = (
   s: string,
   ctx: ParseContext,
-): AnyCommand[] | { clarify: 'ambiguous-container'; centers: string[] } | null => {
+): AnyCommand[] | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'equal-circles-nested'; relation: NestedPairRelation } | null => {
   // an INDEFINITE subject: the circle noun right before מוכל carries no definite ה and no letter
   // (one optional Hebrew adjective tolerated: «מעגל קטן מוכל…»); En "a circle … contained"
   const subj =
     /(?:^|[^א-תA-Za-z])מעגל(?:\s+(?!מוכל)[א-ת]+)?\s+מוכל/.test(s) || /\ba\s+circle\b(?:\s+\w+){0,2}?\s+(?:is\s+)?contained\b/i.test(s);
   if (!subj) return null;
+  const eq = equalNested(s, 'contained'); // #2200: «מעגל מוכל (במעגל O) ברדיוסים שווים» — refused from the words
+  if (eq) return eq;
   const circs = (ctx.circles ?? []).filter((c) => !c.startsWith('~')).map(up);
   const objM = s.match(/(?:בתוך|\binside\b|\bin\b)\s+(?:ה?מעגל|(?:the\s+)?circle)(?:\s+([A-Za-z]\d*))?/i);
   let outer: string;
@@ -8625,6 +8706,14 @@ const twoCirclesPosition: Rule = (s, ctx) => {
   const [c1, c2] =
     pair === 'introduce' ? ['O', freeLabel(['O', ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])] : pair.centres;
   if (up(c1) === up(c2)) return null;
+  // #2263 (ADR-702): one radius for a CONTAINED pair — which circle has it? Refused, one given per line.
+  // #2200 (ADR-712): a CONTAINED pair stated equal in size is refused from the words, before anything is read.
+  if (relation === 'contained') {
+    const eq = equalNested(s, 'contained');
+    if (eq) return eq;
+    const nested = nestedPairRadius(s);
+    if (nested) return nested;
+  }
   const id1 = circleId(c1), id2 = circleId(c2);
   const cmds: AnyCommand[] = [];
   if (!haveCircles.has(up(c1)))
@@ -8639,8 +8728,8 @@ const twoCirclesPosition: Rule = (s, ctx) => {
       ? { type: 'set-circle-position', relation, a: id1, b: id2 }
       : { type: 'set-circle-position', relation, a: isNamed ? id2 : id1, b: isNamed ? id1 : id2 },
   );
-  // #2198 / #2216: «שני מעגלים זרים ברדיוס 5» sizes both. A CONTAINED pair is never read so: two equal circles
-  // cannot nest (#2200's refusal, not landed), so its number stays unread and the line escalates.
+  // #2198 / #2216: «שני מעגלים זרים ברדיוס 5» sizes both. A CONTAINED pair stating one is refused above (#2263),
+  // and so is a contained pair stated equal (#2200) — only the disjoint pair reaches the equality here.
   return withEqualRadii(s, relation === 'disjoint' ? withStatedRadius(s, cmds, id1, id2) : cmds, id1, id2); // #761
 };
 
@@ -8655,15 +8744,20 @@ const twoCirclesBare: Rule = (s, ctx) => {
   if (!/שני\s+מעגלים|\btwo\s+circles\b/i.test(s)) return null;
   const leftover = s
     .replace(/שני\s+מעגלים|\btwo\s+circles\b|נתונים|נתון|יש/gi, ' ')
+    .replace(EQUAL_SIZE_G, ' ') // #2200 (ADR-712): the rule READS this (withEqualRadii below), so it is its own vocabulary
     .replace(FILLER, ' ')
+    .replace(/[,.;:]/g, ' ') // the apposition «שני מעגלים, רדיוסיהם שווים» — punctuation carries no given
     .trim();
   if (leftover) return null;
+  // #2200 (ADR-712): an EQUAL pair cannot nest, so its unstated position admits only crossing and apart (M4 — the
+  // configuration set comes from what was stated); «שני מעגלים» alone keeps all three.
+  const admits: CirclePositionCase[] | null = EQUAL_SIZE.test(s) ? ['meet', 'disjoint'] : null;
   const c1 = 'O';
   const c2 = freeLabel([c1, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
   return withEqualRadii(s, [
     { type: 'circle', id: circleId(c1), center: c1, radius: RADIUS_DEFAULT, freeRadius: true, autoCenter: true, ifAbsent: true },
     { type: 'circle', id: circleId(c2), center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, autoCenter: true, ifAbsent: true },
-    { type: 'set-circle-position', relation: 'any', a: circleId(c1), b: circleId(c2), variant: 0 },
+    { type: 'set-circle-position', relation: 'any', a: circleId(c1), b: circleId(c2), variant: 0, ...(admits ? { admits } : {}) },
   ], circleId(c1), circleId(c2)); // #761
 };
 
@@ -9194,9 +9288,10 @@ const circlesTangent: Rule = (s, ctx) => {
   // just the reported one — a stated radius, an area, a perpendicular, a further relation. Declining
   // is honest: the statement escalates instead of committing a figure that contradicts it.
   // #2198 / #2216: one radius stated for the pair is READ on external tangency, so it is vocabulary there only.
-  // Internal tangency of two equal circles is one circle (ADR-455 D2): never read, so it stays a leftover.
+  // Internal tangency of two equal circles is one circle (ADR-455 D2): never read — #2263 (ADR-702) refuses it below,
+  // one given per line, once the rest of the sentence is read (so the phrase is this rule's vocabulary either way).
   const internalWords = /\binternal\w*\b|\bfrom\s+inside\b|\binside\b|פנימ|מבפנים/i;
-  const readsRadius = !internalWords.test(s) && statedPairRadius(s) !== null;
+  const readsRadius = statedPairRadius(s) !== null;
   const tangentLeftover = s
     .replace(readsRadius ? STATED_PAIR_RADIUS : /,^/, ' ')
     .replace(EQUAL_SIZE_G, ' ') // #761: the rule READS this now, so it is its own vocabulary
@@ -9237,17 +9332,30 @@ const circlesTangent: Rule = (s, ctx) => {
   // «מוכל» → 'stop' in `twoCirclesPosition`) and uses the same mechanism for the same reason:
   // recognised but unreadable, so escalate whole rather than half-parse.
   //
+  // #2206 (ADR-713, the operator's 2026-10-16 ruling: «refused with #2200's sentence»): no longer escalated — the
+  // owned `equal-circles-nested` refusal names the contradiction, as for a contained pair (#2200).
+  //
   // It is an HONESTY guard, not tidiness. Lowered anyway, the pair collapses to coincident circles and
   // every stated relation holds AT the collapse — the ratio IS 1, and coincident circles are
   // internally tangent in the limit — so neither `verifyGivens` nor the radius-ratio check can see it,
   // and the figure draws degenerate under a green ✓ (measured: both radii 0.7, no error).
-  if (internal && EQUAL_SIZE.test(s)) return 'stop';
+  if (internal) {
+    const eq = equalNested(s, 'int-tangent');
+    if (eq) return eq;
+  }
+  // #2263 (ADR-702): one radius for an INTERNALLY tangent pair — which circle has it? Refused, one given per line.
+  if (internal) {
+    const nested = nestedPairRadius(s);
+    if (nested) return nested;
+  }
   // Touch point: a named "at M"/"בנקודה M", else AUTO-name it (the student drew "two tangent circles"
   // without naming the touch) — avoiding the centres and existing points. («מנקודה» is a FROM-marker,
   // deferred above — it is never in this alternation, #215.)
   const atM = s.match(/(?:\bat\b|בנקוד\S*)\s*([A-Za-z]\d*)\b/i);
-  const at = atM ? up(atM[1]) : freeLabel([c1, c2, ...(ctx.points ?? [])], ['M', 'T', 'N', 'K']);
   const id1 = circleId(c1), id2 = circleId(c2);
+  // #2209 (ADR-703): a pair already stated tangent keeps its record's operand order and, with no «בנקודה», its touch.
+  const onRecord = onStatedTangency(ctx, id1, id2);
+  const at = atM ? up(atM[1]) : (onRecord.at ?? freeLabel([c1, c2, ...(ctx.points ?? [])], ['M', 'T', 'N', 'K']));
   const have = new Set((ctx.circles ?? []).map((x) => x.toUpperCase()));
   const cmds: AnyCommand[] = [];
   // Each circle is a FREE-radius circle (ADR-052: unstated radius is a DOF), distinct seeds so it doesn't
@@ -9258,8 +9366,12 @@ const circlesTangent: Rule = (s, ctx) => {
   // #2188 (ADR-672, operator ruling 2026-10-16 «Keep the kind stated earlier»): an explicit kind word wins; a line
   // naming none keeps the kind the construction already states for the pair; with none stated, external.
   const explicitExternal = /חיצונ|מבחוץ|\bexternal\w*|\boutside\b/i.test(s);
-  const external = internal ? false : explicitExternal ? true : (inheritedExternal(ctx, id1, id2) ?? true);
-  cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external });
+  const inherited = inheritedExternal(ctx, id1, id2);
+  const external = internal ? false : explicitExternal ? true : (inherited ?? true);
+  // #2210 (ADR-704, M4): no kind word and none stated for the pair — `external` is only the default, and says so, so a
+  // kind stated on another line or a containment of one circle in the other decides it in the fold.
+  const defaulted = !internal && !explicitExternal && inherited === undefined;
+  cmds.push({ type: 'circles-tangent', circle1: onRecord.pair[0], circle2: onRecord.pair[1], at, external, ...(defaulted ? { kindStated: false as const } : {}) });
   // #761: «…ברדיוסים שווים». INTERNAL tangency + equal radii is a CONTRADICTION (two internally
   // tangent circles of equal radius are the same circle: |c1c2| = |r1 - r2| = 0). It is lowered
   // anyway, deliberately — the engine then refuses it as an unsatisfiable given set, naming the
@@ -9328,7 +9440,9 @@ const namedTouchPoint: Rule = (s, ctx) => {
   if (!known.has(names[0]) || !known.has(names[1])) return null; // a named circle not drawn: decline
   if (at === names[0] || at === names[1]) return null; // a centre is never the touch point
   const id1 = circleId(names[0]), id2 = circleId(names[1]);
-  return [{ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: inheritedExternal(ctx, id1, id2) ?? true }];
+  const [r1, r2] = onStatedTangency(ctx, id1, id2).pair; // #2209 (ADR-703): the record's operand order
+  const inherited = inheritedExternal(ctx, id1, id2); // #2210 (ADR-704): none stated → the default, marked as such
+  return [{ type: 'circles-tangent', circle1: r1, circle2: r2, at, external: inherited ?? true, ...(inherited === undefined ? { kindStated: false as const } : {}) }];
 };
 
 /**
@@ -9493,7 +9607,9 @@ const commonTangent: Rule = (s, ctx) => {
       // M is new: "a common tangent at ONE point M" says the circles are TANGENT at M — the
       // circles-tangent device owns that state (free radii, gap-driving coincide). #2188: the circles' kind is
       // inherited (the line's own «חיצוני/פנימי» is the tangent LINE's kind, never the circles').
-      cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: inheritedExternal(ctx, id1, id2) ?? true });
+      // #2210 (ADR-704): with no kind stated for the pair, the circles' kind is the default (the line's word is the LINE's).
+      const inherited = inheritedExternal(ctx, id1, id2);
+      cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: inherited ?? true, ...(inherited === undefined ? { kindStated: false as const } : {}) });
     }
     cmds.push({ type: 'tangent', id: `tan-${at}`, circle: id1, at, visible: true });
     const fresh = (naming ?? []).filter((p) => !have.has(p));
@@ -10345,14 +10461,32 @@ const roleSideLine: Rule = (s, ctx) => {
     else if (typed.length === 0) bindOpen = host;
     else return { clarify: 'ambiguous-hypotenuse' };
   }
+  // #1839 (ADR-708; FR-IN-13, charter P13 *"a drawing that breaks a given is not one of the configurations"*): ONE
+  // vertex of an isosceles triangle typed with an unlettered base / leg («AD גובה לבסיס», «BE גובה לשוק») names
+  // the cevian's apex, so it names the side too — the side opposite it — and the sentence is read as its letter
+  // form with the role claim about that side, exactly as «AD גובה לבסיס BC» / «BE גובה לשוק AC» states it
+  // ({@link isoscelesRoleClaim}). The typed letters stay literal (the #1810 ruling); the claim beside them is what
+  // keeps «הציגו תצורה אחרת» off the configurations in which the role is false.
+  let typedIso: { v: Id; side: [Id, Id]; ring: Id[]; at: Id } | null = null;
+  if ((role === 'base' || role === 'leg') && !afterNoun) {
+    const typedAll = statedLabelTokens(s);
+    const rings = new Map<string, (typeof cands)[number]>();
+    for (const r of cands) if (r.ring) rings.set([...r.ring].map(up).sort().join(), r);
+    const hits = [...rings.values()].flatMap((r) => {
+      const ring = r.ring!.map(up);
+      const typed = [...new Set(typedAll.filter((l) => ring.includes(l)))];
+      return typed.length === 1 && r.at ? [{ v: typed[0], side: ring.filter((x) => x !== typed[0]) as [Id, Id], ring, at: up(r.at!) }] : [];
+    });
+    if (hits.length === 1) typedIso = hits[0];
+  }
   const pick =
-    namedOpenSide || apexClaim ? null
+    namedOpenSide || apexClaim || typedIso ? null
     : bindOpen ?? selected ??
     (cands.length === 1 ? cands[0]
     : role === 'leg' && cands.length === 2 ? (cands.find((r) => !occupied(r.edge)) ?? cands[0])
     : null);
-  if (!pick && !namedOpenSide && !apexClaim) return { clarify: 'role-side-unresolved', role: noun };
-  const [p, q] = namedOpenSide ?? apexClaim?.side ?? pick!.edge;
+  if (!pick && !namedOpenSide && !apexClaim && !typedIso) return { clarify: 'role-side-unresolved', role: noun };
+  const [p, q] = namedOpenSide ?? apexClaim?.side ?? typedIso?.side ?? pick!.edge;
   const heb = /[א-ת]/.test(s);
   // a run restating the side right after the role noun («תיכון ליתר AB») folds into the rewrite;
   // any other letters stay untouched for the letter-form rules to read
@@ -10363,6 +10497,11 @@ const roleSideLine: Rule = (s, ctx) => {
   if (!r.ok) return null;
   // #2074 (ADR-659): the typed apex's claim, prepended as the role-claim post-pass prepends «היתר AB»'s
   if (apexClaim) return [{ type: 'set-angle', vertex: apexClaim.v, ray1: p, ray2: q, value: 90 }, ...r.commands];
+  if (typedIso) {
+    const claim = isoscelesRoleClaim(role as 'base' | 'leg', typedIso.ring, p, q, typedIso.at);
+    if (claim === 'leg-apex') return { clarify: 'role-claim', why: 'leg-apex', noun, a: p, b: q, other: typedIso.v };
+    return [claim, ...r.commands];
+  }
   // #1810 (ADR-596): the fact keeps the ROLE, not only the letters. The letters above are the resolution at
   // the configuration showing NOW; when the role hangs off an unstated choice (the isosceles apex, a re-seated
   // right angle), «show another configuration» moves it, and the replay fold re-resolves the binding
@@ -12531,7 +12670,48 @@ const refsId = (c: AnyCommand, x: Id): boolean =>
  * refusal, or `'unread'` when a noun has no lowering here (a tangent the winning rule read as a bare
  * segment) — the caller then lets a later rule try, never commits the drop.
  */
+/**
+ * #1839 ([ADR-708](docs/06-decisions.md#adr-708)) — the claim «<role> ab» states about isosceles triangle `ring`
+ * whose apex is `apex` in the configuration showing: a BASE is the equality that makes the opposite vertex the
+ * apex («הבסיס BC» → AB = AC, ADR-563, which pins the variant as a typed equality does, ADR-138); a LEG is the leg
+ * requirement when the apex is one of its ends (no single equality says "apex A or C", so it is checked, never
+ * driven), and `'leg-apex'` when it is not — the words do not say which end is the apex. One lowering for every
+ * spelling of a role stated about typed letters: `withRoleClaims` («לבסיס BC», «לשוק AC») and `roleSideLine`
+ * («AD גובה לבסיס», «BE גובה לשוק»).
+ */
+function isoscelesRoleClaim(role: 'base' | 'leg', ring: Id[], a: Id, b: Id, apex: Id | null): AnyCommand | 'leg-apex' {
+  const z = ring.find((v) => v !== a && v !== b)!;
+  if (role === 'base') return { type: 'set-equal', a: z, b: a, c: z, d: b };
+  return apex !== null && (apex === a || apex === b) ? { type: 'set-side-role', role: 'leg', a, b, ids: [...ring] } : 'leg-apex';
+}
+
+/** «זווית הראש» / "the apex angle" / "the vertex angle" — the angle at an isosceles triangle's apex (#1839). */
+const APEX_ANGLE_RX = /(?<![א-ת])(?:[וש])?(?:[לבכ]|מ(?=ה))?ה?זווית\s+הראש(?![א-ת])|\b(?:apex|vertex)\s+angle\b/i;
+
+/**
+ * #1839 ([ADR-708](docs/06-decisions.md#adr-708)) — «AD חוצה זווית הראש»: the sentence names the bisected angle's
+ * vertex AND says it is the apex. The bisector rule reads the vertex and the role word was dropped, so after
+ * «הציגו תצורה אחרת» the line bisected a base angle while the row still said «זווית הראש». The role is the base
+ * claim about the side opposite that vertex (the equality pinning it as the apex, {@link isoscelesRoleClaim}),
+ * stated only for a triangle the figure declares isosceles (`ctx.roleSides`, semantic — ADR-052).
+ */
+function withApexAngleClaim(commands: AnyCommand[], s: string, ctx: ParseContext): AnyCommand[] {
+  if (!APEX_ANGLE_RX.test(s)) return commands;
+  const isoRings = (ctx.roleSides ?? []).filter((r) => r.role === 'base' && r.ring).map((r) => r.ring!.map(up));
+  const extra: AnyCommand[] = [];
+  for (const c of commands) {
+    if (c.type !== 'bisector') continue;
+    const tri = [up(c.vertex), up(c.p), up(c.q)];
+    if (!isoRings.some((ring) => ring.length === 3 && tri.every((v) => ring.includes(v)))) continue;
+    const claim = isoscelesRoleClaim('base', tri, tri[1], tri[2], null) as AnyCommand;
+    const k = JSON.stringify(claim);
+    if (![...extra, ...commands].some((x) => JSON.stringify(x) === k)) extra.push(claim);
+  }
+  return extra.length ? [...extra, ...commands] : commands;
+}
+
 function withRoleClaims(commands: AnyCommand[], s: string, ctx: ParseContext): AnyCommand[] | Clarify | 'unread' {
+  commands = withApexAngleClaim(commands, s, ctx);
   const ops = roleOperands(s);
   if (!ops.length) return commands;
   const extra: AnyCommand[] = [];
@@ -12678,12 +12858,15 @@ function withRoleClaims(commands: AnyCommand[], s: string, ctx: ParseContext): A
     const h = relevant[0];
     if (h.ring.length === 3) {
       const z = h.ring.find((v) => v !== a && v !== b)!;
-      if (op.role === 'hypotenuse') add({ type: 'set-angle', vertex: z, ray1: a, ray2: b, value: 90 });
-      else if (op.role === 'base') add({ type: 'set-equal', a: z, b: a, c: z, d: b });
-      // A leg the figure's isosceles structure already makes one (its apex is an end of the pair) states
-      // nothing new — the #775/#805 reading of «גובה לשוק AC». Otherwise the apex is one of the two ends
-      // and the words do not say which: ask, teaching the equality that does.
-      else if (!(h.isoApex && (h.isoApex === a || h.isoApex === b))) return refuse(op, 'leg-apex', { other: z });
+      if (op.role === 'hypotenuse') { add({ type: 'set-angle', vertex: z, ray1: a, ray2: b, value: 90 }); continue; }
+      // A base: the equality pinning the opposite vertex as the apex. A leg the figure's isosceles structure
+      // already makes one (its apex is an end of the pair) is the #775/#805 reading of «גובה לשוק AC»; #1839
+      // (ADR-708): it is still a CLAIM — the leg requirement keeps «הציגו תצורה אחרת» off the variant whose
+      // base it is. Otherwise the apex is one of the two ends and the words do not say which: ask, teaching
+      // the equality that does.
+      const claim = isoscelesRoleClaim(op.role, h.ring, a, b, h.isoApex);
+      if (claim === 'leg-apex') return refuse(op, 'leg-apex', { other: z });
+      add(claim);
       continue;
     }
     // A trapezoid: the bases are the parallel pair. A base is parallel to its opposite side; a leg's two
@@ -13550,7 +13733,15 @@ export function normalizeUtterance(raw: string): string {
     // (a non-Hebrew character on each side) and to sit where a connective sits: before a hyphen, or
     // between two uppercase labels.
     .replace(/(?<![א-ת])ן(?=-)/g, 'ו')
-    .replace(/(?<=[A-Z]\d?\s)ן(?=\s*[A-Z])/g, 'ו');
+    .replace(/(?<=[A-Z]\d?\s)ן(?=\s*[A-Z])/g, 'ו')
+    // #2097 ([ADR-719](../../docs/06-decisions.md#adr-719)): the absolute-value spelling of a length, «|AB|», IS the
+    // length AB. It was stripped rule by rule (the sum, product, ordering and bound readers), so «|AB| + |AC| = 10»
+    // committed while «|AB| = 4», «|AB| = k», «|AB| = |AC|» and «|AB|:|AC| = 2:3» escalated — the ADR-405 "each rule
+    // hard-codes one spelling" class. Folded HERE, after the glyph fold, so every rule and every honesty gate reads
+    // one spelling. TWO uppercase labels only: «|z|», «|w|» (not 2-D's vocabulary) and a three-letter «|ABC|» keep
+    // their current path. Guarded against a doubled bar on either side, so a keyboard «AB || CD || EF» is never read
+    // as «|CD|».
+    .replace(/(?<!\|)\|\s*([A-Z]\d*)\s*([A-Z]\d*)\s*\|(?!\|)/g, '$1$2');
   // #185: number words before a degree word → digits, THEN the angle/arc word-equality → `=` (its value
   // lookahead needs the digits), THEN the shape-with-side appositive rewrite. All three are scoped (a
   // degree suffix / an angle-arc operand / an equilateral-sided shape), so nothing else is touched.
@@ -13697,6 +13888,10 @@ function parseEntry(raw: string, ctx: ParseContext): ParseResult {
   // (`shell/inputScript`), on the NORMALIZED text, so the look-alike twins are already Latin letters.
   const unread = unreadScript(s);
   if (unread) return { ok: false, reason: 'unread-script', kind: unread.kind, detail: unread.detail };
+  // #1837 (ADR-710): an angle written in radians never reaches a rule (`shell/radianAngle`), on the raw line
+  // as the proof target is (the glyph π is what the rule reads).
+  const radian = findRadianAngle(raw);
+  if (radian) return { ok: false, reason: 'radian-angle', value: radian.value };
   // #1654–#1657 (ADR-562): a foreign given is refused before ANY rule may read part of the sentence — the
   // LaTeX/negation placement, for their reason: the partial reading is a different, wrong given.
   const foreign = foreignGiven(s);
@@ -13999,8 +14194,21 @@ export function droppedMidsegment(utterance: string, commands: AnyCommand[]): bo
  * existing polygons) restates, and is exempt — the `droppedShapeNoun` exemptions, unchanged.
  */
 export function droppedShapeAdjective(s: string, commands: AnyCommand[], ctx: ParseContext): boolean {
+  if (polygonNounsAllReferences(s, ctx)) return false; // no noun: the standalone shape's own; all references: a restatement
+  const accounts = shapeAdjectiveAccounts(commands);
+  return (Object.keys(accounts) as (keyof typeof accounts)[]).some(
+    (adj) => new RegExp(SHAPE_ADJ_WORDS[adj], 'i').test(s) && !accounts[adj](),
+  );
+}
+
+/**
+ * ADR-595's REFERENCE exemption, as one predicate (extracted for #1906, behaviour unchanged): true when the line
+ * names no polygon noun (a noun-less adjective is the standalone right/isosceles triangle's own), or when every
+ * polygon noun it names is a REFERENCE — its letter run already drawn, or a bare noun beside existing polygons.
+ */
+export function polygonNounsAllReferences(s: string, ctx: ParseContext): boolean {
   const nouns = [...s.matchAll(POLY_NOUN)];
-  if (!nouns.length) return false; // a noun-less adjective is the standalone right/isosceles triangle's own
+  if (!nouns.length) return true;
   const pts = new Set((ctx.points ?? []).map((p) => p.toUpperCase()));
   const isReference = (m: RegExpMatchArray): boolean => {
     const run =
@@ -14009,14 +14217,21 @@ export function droppedShapeAdjective(s: string, commands: AnyCommand[], ctx: Pa
     if (!run) return (ctx.polygons?.length ?? 0) > 0;
     return (run.match(/[A-Z]\d*/g) ?? []).every((l) => pts.has(l));
   };
-  if (nouns.every(isReference)) return false;
+  return nouns.every(isReference);
+}
+
+/**
+ * ADR-595's evidence families for the three shape adjectives — what in a lowering makes each TRUE (extracted for
+ * #1906, behaviour unchanged, so the AI-answer word member asks the same question per occurrence):
+ *  - right: a right-triangle, a ⟂, a 90° angle, a rectangle/square, or a diameter (Thales);
+ *  - isosceles: an equal pair, a shape variant, or a trapezoid on a circle (a cyclic trapezoid IS isosceles);
+ *  - equilateral: two equal pairs, or a square/rhombus.
+ */
+export function shapeAdjectiveAccounts(commands: AnyCommand[]): Record<keyof typeof SHAPE_ADJ_WORDS, () => boolean> {
   const has = (t: AnyCommand['type']) => commands.some((c) => c.type === t);
   const count = (t: AnyCommand['type']) => commands.filter((c) => c.type === t).length;
-  const onCircle = commands.flatMap((c) => (c.type === 'point-on-circle' && typeof c.theta === 'number' ? [c] : []));
-  const diameter = onCircle.some((p, i) =>
-    onCircle.some((q, j) => j > i && p.circle === q.circle && Math.abs(Math.abs(p.theta! - q.theta!) - Math.PI) < 1e-9),
-  );
-  const accounts: Record<keyof typeof SHAPE_ADJ_WORDS, () => boolean> = {
+  const diameter = hasDiameter(commands);
+  return {
     right: () =>
       has('right-triangle') || has('set-perpendicular') || has('rectangle') || has('square') || diameter ||
       commands.some((c) => c.type === 'set-angle' && Math.abs(c.value - 90) < 1e-9),
@@ -14026,20 +14241,26 @@ export function droppedShapeAdjective(s: string, commands: AnyCommand[], ctx: Pa
         (has('point-on-circle') || has('set-concyclic'))),
     equilateral: () => count('set-equal') >= 2 || has('square') || has('rhombus'),
   };
-  return (Object.keys(accounts) as (keyof typeof accounts)[]).some(
-    (adj) => new RegExp(SHAPE_ADJ_WORDS[adj], 'i').test(s) && !accounts[adj](),
+}
+
+/** Two vertices antipodal on one circle — the Thales lowering of a right angle (ADR-595). */
+export function hasDiameter(commands: AnyCommand[]): boolean {
+  const onCircle = commands.flatMap((c) => (c.type === 'point-on-circle' && typeof c.theta === 'number' ? [c] : []));
+  return onCircle.some((p, i) =>
+    onCircle.some((q, j) => j > i && p.circle === q.circle && Math.abs(Math.abs(p.theta! - q.theta!) - Math.PI) < 1e-9),
   );
 }
 
 /** Each polygon noun's vertex count — what a MATERIALISED polygon must have to account for it (#1790). */
 const polyNounArity = (noun: string): number =>
   /משולש|triangle/i.test(noun) ? 3 : /מחומש|pentagon/i.test(noun) ? 5 : /משושה|hexagon/i.test(noun) ? 6 : 4;
-export function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseContext): boolean {
-  // #1790 (ADR-595): a noun is accounted for by a materialised polygon of ITS arity, not by any polygon. The
-  // old first line returned false as soon as ANY command carried a ≥3-id run, so a triangle accounted for
-  // «טרפז» and «טרפז ישר זווית חסום במעגל» committed a triangle green. The ring a command materialises is its
-  // `ids` (a shape) or `container` (a polygon-in-polygon's host).
-  const arities = new Set(
+
+/**
+ * The ring sizes a lowering MATERIALISES (#1790, ADR-595; extracted for #1906): a command's `ids` (a shape) or
+ * `container` (a polygon-in-polygon's host), three or more ids.
+ */
+export function materialisedArities(commands: AnyCommand[]): Set<number> {
+  return new Set(
     commands.flatMap((c) =>
       (['ids', 'container'] as const).flatMap((k) => {
         const v = (c as Record<string, unknown>)[k];
@@ -14047,6 +14268,14 @@ export function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseCo
       }),
     ),
   );
+}
+
+export function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseContext): boolean {
+  // #1790 (ADR-595): a noun is accounted for by a materialised polygon of ITS arity, not by any polygon. The
+  // old first line returned false as soon as ANY command carried a ≥3-id run, so a triangle accounted for
+  // «טרפז» and «טרפז ישר זווית חסום במעגל» committed a triangle green. The ring a command materialises is its
+  // `ids` (a shape) or `container` (a polygon-in-polygon's host).
+  const arities = materialisedArities(commands);
   const known = new Set([
     ...(ctx.points ?? []).map((p) => p.toUpperCase()),
     ...(JSON.stringify(commands).match(/[A-Z]\d*/g) ?? []),
@@ -14356,6 +14585,8 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'arc-value-ambiguous') return { ok: false, reason: 'arc-value-ambiguous', value: res.value, a: res.a, b: res.b, center: res.center };
   if (res.clarify === 'inscribed-contradicts-noun') return { ok: false, reason: 'inscribed-contradicts-noun', shape: res.shape, forced: res.forced };
   if (res.clarify === 'incircle-not-drawn') return { ok: false, reason: 'incircle-not-drawn', sides: res.sides };
+  if (res.clarify === 'nested-pair-radius') return { ok: false, reason: 'nested-pair-radius', parts: res.parts };
+  if (res.clarify === 'equal-circles-nested') return { ok: false, reason: 'equal-circles-nested', relation: res.relation };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 

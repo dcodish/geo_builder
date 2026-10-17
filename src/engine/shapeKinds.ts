@@ -111,3 +111,12 @@ export const quadRelation = (declared: QuadKind, stated: QuadKind): QuadRelation
 
 /** The kind a ring declared `declared` becomes when `stated` is said of it too (null when they exclude). */
 export const quadAfter = (declared: QuadKind, stated: QuadKind): QuadKind | null => quadMeet(declared, stated);
+
+/**
+ * #2117 ([ADR-718](../../docs/06-decisions.md#adr-718)) — THE KINDS WHOSE DIAGONAL IS PERPENDICULAR TO NO SIDE.
+ * In a rectangle the angle between a diagonal and a side at its end is arctan of the side ratio; in a rhombus it is
+ * half an interior angle — strictly inside (0°, 90°) either way. So every kind that implies one of the two (the
+ * square implies both) has no diagonal that is a height to any of its sides. Derived from the lattice, never a
+ * second list: a kind the lattice adds below the rectangle or the rhombus joins on its own.
+ */
+export const DIAGONAL_NEVER_PERPENDICULAR: readonly QuadKind[] = QUAD_KINDS.filter((k) => quadImplies(k, 'rectangle') || quadImplies(k, 'rhombus'));

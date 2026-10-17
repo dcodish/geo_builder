@@ -20,10 +20,11 @@ import { angleOffSpans, angleOnSpans, drawnArcSpans, type ArcSpan } from './arcs
 import { constraintRefs, describeConstraint, isSatisfied, residual, residualTolerance } from './solve';
 import { formatMeasure } from '../format';
 import { onCircleTol as onCircleTolShared, sideHolds, sideRequirementOf, type SideRecord } from './requirements';
+import { roleSidesOf } from './roleSides';
 
 export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
-  relation: 'label' | 'not-a-diagonal' | 'on-circle' | 'tangent' | 'radius' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'line-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | 'point-off-arc' | 'convexity' | Constraint['type'];
+  relation: 'label' | 'not-a-diagonal' | 'leg-is-base' | 'on-circle' | 'tangent' | 'radius' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'line-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | 'point-off-arc' | 'convexity' | Constraint['type'];
   ids: Id[];
   /** English fallback, e.g. "E should lie on circle P (radius 3.60) but is 7.42 from its centre". */
   message: string;
@@ -103,6 +104,10 @@ const onCircleTol = onCircleTolShared;
 const circleLabel = (id: Id) => id.replace(/^circle-/, 'circle ');
 /** The circle's bare letter (e.g. `circle-P` → `P`) for the i18n `params` (the locale supplies "circle"/"מעגל"). */
 const circleName = (id: Id) => id.replace(/^circle-/, '');
+
+/** #2210 (ADR-704): do these commands state the pair {a, b} internally tangent (as the fold resolved its kind)? */
+const internallyTangent = (commands: readonly Command[], a: Id, b: Id): boolean =>
+  commands.some((c) => c.type === 'circles-tangent' && !c.external && ((c.circle1 === a && c.circle2 === b) || (c.circle1 === b && c.circle2 === a)));
 
 /**
  * Check the figure's final coordinates against the relations its commands ASSERT. Returns the
@@ -324,7 +329,11 @@ export function checkGivens(
           params: { c1: circleName(cmd.a), c2: circleName(cmd.b), d: d.toFixed(2), sum: (a.r + b.r).toFixed(2) },
         });
       }
-    } else if (d + b.r >= a.r - tol) {
+    } else if (
+      // #2210 (ADR-704): a containment stated beside an INTERNAL tangency of the same pair is closed — the inner circle
+      // touches the outer one, so reach = R is the statement, not a violation. Containment alone stays strict.
+      internallyTangent(commands, cmd.a, cmd.b) ? d + b.r > a.r + tol : d + b.r >= a.r - tol
+    ) {
       violations.push({
         relation: 'circle-contained',
         ids: [cmd.a, cmd.b],
@@ -446,6 +455,33 @@ export function checkGivens(
         message: `${cmd.id} should lie ${cmd.side} ${polyName}`,
         messageKey: cmd.side === 'outside' ? 'figure.v.outsideRegion' : 'figure.v.insideRegion',
         params: { point: cmd.id, poly: polyName },
+      });
+    }
+  }
+
+  // A stated LEG of an isosceles triangle (#1839, ADR-708): «BE גובה לשוק AC» says AC is a leg, so a configuration
+  // whose apex variant makes AC the base breaks a given (charter P13: such a drawing is not one of the
+  // configurations). Judged on the construction's DECLARED roles (`roleSidesOf`), never on measured lengths
+  // (ADR-052); an equilateral figure makes every side a leg, so it holds there.
+  if (construction) {
+    const roles = roleSidesOf(construction);
+    const seenLeg = new Set<string>();
+    for (const cmd of commands) {
+      if (cmd.type !== 'set-side-role') continue;
+      const key = `${[cmd.a, cmd.b].sort().join('')}@${[...cmd.ids].sort().join('')}`;
+      if (seenLeg.has(key)) continue;
+      seenLeg.add(key);
+      const onRing = roles.filter((r) => (r.role === 'leg' || r.role === 'base') && r.ring.length === cmd.ids.length && cmd.ids.every((v) => r.ring.includes(v)));
+      if (!onRing.length) continue; // no isosceles structure in force — the claim has nothing to be judged against
+      const isLeg = onRing.some((r) => r.role === 'leg' && [cmd.a, cmd.b].every((v) => r.edge.includes(v)));
+      if (isLeg) continue;
+      const pair = `${cmd.a}${cmd.b}`;
+      violations.push({
+        relation: 'leg-is-base',
+        ids: [cmd.a, cmd.b],
+        message: `${pair} is stated as a leg of triangle ${cmd.ids.join('')}, but it is drawn as its base`,
+        messageKey: 'figure.v.legIsBase',
+        params: { pair, poly: cmd.ids.join('') },
       });
     }
   }

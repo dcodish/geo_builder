@@ -137,7 +137,8 @@ describe('#343 — the bisector RAY, with a free rider on it', () => {
     };
     const v0 = vol(before.positions);
     st().submit('AD חוצה זווית BAC');
-    expect(st().lastError?.code, 'it refuses').toBe('givens-contradict');
+    // #1860 (ADR-3D-358, operator ruling 2026-10-07): the reason is said — the pyramid would be flat
+    expect(st().lastError, 'it refuses as the flattened pyramid').toMatchObject({ code: 'polygon-collapsed', forced: true, solid: 'pyramid' });
     expect((st().lastError as { stated?: string }).stated, 'it names the statement the student typed').toContain('חוצה');
     // the standing figure is untouched — the pyramid was NOT flattened to buy the given
     expect(vol(derive3(st().facts, st().seed).positions)).toBeCloseTo(v0, 8);

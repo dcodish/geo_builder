@@ -1002,3 +1002,132 @@ export function labelScale(sidePx: number, text: string, fontSize: number): numb
   if (!Number.isFinite(sidePx) || sidePx <= 0 || width <= 0) return 1;
   return Math.min(1, Math.max(sidePx / width, MIN_MARK_SCALE));
 }
+
+/**
+ * AN ANGLE'S VALUE FITS ITS WEDGE (#2175, [ADR-715](../../docs/06-decisions.md#adr-715), amends ADR-544).
+ *
+ * **Operator, 2026-10-15** (round #2128, «משולש CMD» · «AM חוצה זווית CMD» · «זוית C=α» · «זוית AMD=β+30»):
+ * *"note that the beta+30 doesnt look nice on the page"* — side DM ran through «β + 30».
+ *
+ * {@link angleValueOffset} puts the value at one distance along the bisector whatever the TEXT'S WIDTH and the
+ * angle's OPENING. ADR-544 fitted a corner's marks to its side LENGTH; this adds the opening. **The class:** *an
+ * angle's value is placed without regard to its width vs. the wedge's opening, so a long label at a narrow angle
+ * overlaps the rays* — any expression («β + 30», «2α − 10»), a long decimal, at any narrow angle.
+ *
+ * The rule, in screen px, in order:
+ * 1. **Today's place, when it already fits.** The label's ink box at `angleValueOffset` clears both rays (a ray may
+ *    cut the estimated box's edge, {@link INK_TOLERANCE}) → it stays there exactly, so a short value («40°», «α») at an ordinary
+ *    angle never moves.
+ * 2. **Further out along the bisector**, to the nearest distance where the box clears both rays (and stays
+ *    outside its own arc) — so long as it still sits on the vertex's side of the chord between the two ray ends
+ *    (the side the wedge is closed by) and within the nearer half of the shorter ray, so it never lands beside
+ *    another corner and reads as that corner's.
+ * 3. **Smaller** (ADR-544's ruling — shrink, never drop), down to `minFont`, at the distance that fits.
+ * 4. **Beside the arc, just outside the wedge**, at the corner's font — a needle no box fits inside. Across the
+ *    ray whose outer side faces away from `away` (the figure's centre), so it lands off the figure.
+ *
+ * `box1` is the label's box at font size 1 (`mathLabelBox(text, 1)`): every metric is linear in the font.
+ * Pure, so the lock calls it rather than reproducing the arithmetic (ADR-W-053).
+ */
+/**
+ * How far (× font size) a ray may cut into the EDGE of a label's estimated ink box and still leave today's spot standing.
+ * The box is a conservative character estimate (widths rounded up, the full ascender-to-descender height), and the white
+ * halo covers the rest, so a cut this shallow does not touch a glyph.
+ */
+export const INK_TOLERANCE = 0.1;
+
+export interface AngleValuePlacement {
+  x: number;
+  y: number;
+  fontSize: number;
+  /** Which step of the rule placed it — `today` is the unchanged position. */
+  fit: 'today' | 'outward' | 'shrunk' | 'outside';
+}
+
+export function placeAngleValue(a: {
+  v: Vec;
+  p1: Vec;
+  p2: Vec;
+  /** Unit screen direction into the angle (the bisector the label sat on before). */
+  dir: Vec;
+  /** The drawn arc's radius, px. */
+  arcR: number;
+  /** The corner's font (ADR-544 already applied). */
+  fontSize: number;
+  minFont: number;
+  box1: { w: number; h: number };
+  away?: Vec;
+}): AngleValuePlacement {
+  const { v, dir, arcR, box1 } = a;
+  const at = (d: number, fs: number, fit: AngleValuePlacement['fit']): AngleValuePlacement => ({ x: v.x + dir.x * d, y: v.y + dir.y * d, fontSize: fs, fit });
+  const d0 = (fs: number) => angleValueOffset(arcR / ANGLE_ARC_R, fs);
+  const today = at(d0(a.fontSize), a.fontSize, 'today');
+  const u = [unit(sub(a.p1, v)), unit(sub(a.p2, v))];
+  if (![...u, dir].every((w) => Number.isFinite(w.x) && Number.isFinite(w.y) && len(w) > 0.5)) return today;
+
+  const margin = (fs: number) => 0.05 * fs; // a hair of air: the ink box leaves out the halo, which may graze a line
+  const half = (fs: number) => ({ a: (box1.w * fs) / 2, b: (box1.h * fs) / 2 });
+  /** How far the box reaches along unit `n` from its centre. */
+  const support = (n: Vec, fs: number) => half(fs).a * Math.abs(n.x) + half(fs).b * Math.abs(n.y);
+  // Each ray's normal pointing INTO the wedge; the bisector's component along it is sin(half-opening).
+  const inward = u.map((w) => {
+    const n = rot90(w);
+    return n.x * dir.x + n.y * dir.y >= 0 ? n : { x: -n.x, y: -n.y };
+  });
+  const along = inward.map((n) => n.x * dir.x + n.y * dir.y);
+  /** The nearest distance along `dir` at which the box clears both rays. */
+  const dRays = (fs: number, air = margin(fs)) => Math.max(...inward.map((n, i) => (along[i] < 1e-6 ? Infinity : (support(n, fs) + air) / along[i])));
+  // Today's spot stands while a ray at most cuts the estimated box's edge (INK_TOLERANCE): a value that reads fine
+  // today must not move because the estimate is generous.
+  if (d0(a.fontSize) >= dRays(a.fontSize, -INK_TOLERANCE * a.fontSize)) return today;
+
+  /** The nearest distance at which the whole box is outside its own arc. */
+  const dArc = (fs: number) => {
+    const { a: ha, b: hb } = half(fs);
+    const need = arcR + margin(fs);
+    const clear = (d: number) => Math.hypot(Math.max(Math.abs(d * dir.x) - ha, 0), Math.max(Math.abs(d * dir.y) - hb, 0)) >= need;
+    let lo = 0;
+    let hi = need + Math.hypot(ha, hb);
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (clear(mid)) hi = mid;
+      else lo = mid;
+    }
+    return hi;
+  };
+  // The chord p1–p2 closes the wedge: the box must stay on the vertex's side of it.
+  const chord = sub(a.p2, a.p1);
+  let nc = len(chord) < 1e-9 ? { x: -dir.x, y: -dir.y } : unit(rot90(chord));
+  if (nc.x * (v.x - a.p1.x) + nc.y * (v.y - a.p1.y) < 0) nc = { x: -nc.x, y: -nc.y };
+  const vToChord = nc.x * (v.x - a.p1.x) + nc.y * (v.y - a.p1.y); // > 0: the vertex's height over the chord
+  const towardChord = -(nc.x * dir.x + nc.y * dir.y); // how fast moving along `dir` closes on the chord
+  // …and nearer its own vertex than the far end of the shorter ray: past half of it the value sits beside ANOTHER
+  // corner (the letter there, its marks) and reads as that corner's.
+  const room = Math.min(len(sub(a.p1, v)), len(sub(a.p2, v)));
+  const dMax = (fs: number) =>
+    Math.min(towardChord < 1e-9 ? Infinity : (vToChord - support(nc, fs) - margin(fs)) / towardChord, room / 2 - support(dir, fs));
+  const dNeed = (fs: number) => Math.max(d0(fs), dRays(fs), dArc(fs));
+  const fits = (fs: number) => dNeed(fs) <= dMax(fs);
+
+  if (fits(a.fontSize)) return at(dNeed(a.fontSize), a.fontSize, 'outward');
+  const floor = Math.min(a.minFont, a.fontSize);
+  if (floor < a.fontSize && fits(floor)) {
+    let lo = floor;
+    let hi = a.fontSize;
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) lo = mid;
+      else hi = mid;
+    }
+    return at(dNeed(lo), lo, 'shrunk');
+  }
+
+  // A needle: beside the arc, across the ray whose outer side faces away from the figure.
+  const fs = a.fontSize;
+  const outer = inward.map((n) => ({ x: -n.x, y: -n.y }));
+  const away = a.away ? sub(v, a.away) : null;
+  const j = away && outer[1].x * away.x + outer[1].y * away.y > outer[0].x * away.x + outer[0].y * away.y ? 1 : 0;
+  const t = Math.max(arcR, support(u[j], fs) + margin(fs)); // along the ray: wholly ahead of the vertex
+  const o = support(outer[j], fs) + margin(fs);
+  return { x: v.x + u[j].x * t + outer[j].x * o, y: v.y + u[j].y * t + outer[j].y * o, fontSize: fs, fit: 'outside' };
+}

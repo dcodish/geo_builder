@@ -9052,6 +9052,8 @@ read of a persisted map.
 
 ### ADR-3D-234 — A solid whose givens force it COPLANAR is said out loud, naming the statements (#936)
 
+**⚠ Superseded by [ADR-3D-358](#adr-3d-358) (2026-10-17, operator ruling 2026-10-07):** the notice is retired; a solid the givens force flat is refused. The calibration (1e-2, `SOLID_THIN_RATIO`) and the 41/50 boundary carry over.
+
 **Status:** accepted, 2026-09-09 (fix-round #949, item 3) · **Issue:** #936 · **Adopts:** [ADR-W-048](06w-decisions-workspace.md#adr-w-048)
 **Requirements:** [02b](02b-requirements-3d.md) FR-RD-7 (new) · **Design:** [04b](04b-design-3d.md) — the notice channel
 
@@ -11522,7 +11524,7 @@ could only be satisfied by flattening a solid to zero area is now refused instea
 
 ## ADR-3D-291 — A given the tool cannot drive is refused as the tool's limit, never «בדקו את החישוב» (#1590)
 
-**Status:** accepted · 2026-09-30 · bug fix on `main` (P1, operator ruling 2026-09-30 on #1590) · plan: the #1590 body. **Extends** [ADR-3D-260](#adr-3d-260)'s not-determined table with two rows; builds on ADR-3D-282/284/285 ("pin drives, claim arbitrates").
+**Status:** accepted · 2026-09-30 · bug fix on `main` (P1, operator ruling 2026-09-30 on #1590) · plan: the #1590 body. **Extends** [ADR-3D-260](#adr-3d-260)'s not-determined table with two rows; builds on ADR-3D-282/284/285 ("pin drives, claim arbitrates"). *Amended by [ADR-3D-363](#adr-3d-363) (#2076): the SIZE sentence is re-worded «… — היכולת הזאת נמצאת בפיתוח, ולכן הצעד לא נוסף.»; the point sentence is unchanged.*
 
 **Requirements:** docs/02b FR-SP-5 ("A refusal never tells a student who may be right that they miscalculated") · **Design:** docs/04b — the not-determined rule paragraph
 
@@ -12080,6 +12082,8 @@ The degradation policy is deliberately unchanged (a line this code does not comm
 **Behaviour change for a student:** «M על AB» followed by «M אמצע BC» (or any point on one side declared the midpoint of another) is now refused, naming both sentences and saying the triangle would have to be flat. Before, a flattened "triangle" was drawn with every row green. A triangle the student's own lengths force flat (5, 3, 8) is still drawn.
 
 ## ADR-3D-310 — A declared polygon the givens collapse flat is refused, whatever forced it (#1849)
+
+**Amended by [ADR-3D-358](#adr-3d-358) (2026-10-17):** the same judgement now covers declared SOLIDS — the "a flattened SOLID keeps the #936 notice" scope below is withdrawn.
 
 **Status:** accepted · 2026-10-07 · bug (P1, honesty) · branch `fix/1849-3d-refuse-flat` off `main` @ 3032fcbb · the 3-D slice of #1849 · implements the operator ruling of 2026-10-07 (workspace ADR-W-115, which reverses ADR-W-048's notice for declared polygons) · amends [ADR-3D-309](#adr-3d-309) and [ADR-3D-268](#adr-3d-268) part 2
 
@@ -12692,7 +12696,7 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 1. **`MAG`**, the lexical half of `evalRadical`, defined beside it, is the one source a stated-magnitude slot composes from: `7`, `2.5`, `7/2`, `√7`, `√(7)`, `2√7`, `√7/2`, `√(3/4)`. Its paired reader is `magValue`, which is `evalRadical` with a sign. `lengthClaim`, `areaClaim`, the three `readHeight3` frames and `heightFromApex` match `MAG` and read through `magValue`, never through `+`/`Number`. A malformed value (`√-2`, `3/0`) still refuses, so a NaN or an Infinity never reaches a figure.
 2. **`sqrt` is the root sign.** `normalize3` folds `\sqrt{…}` to `√(…)` and `sqrt` to `√`. That is the one boundary every rule and the honesty gate read, so «|AB| = sqrt(2)» and «C(sqrt(2),1,0)» read wherever their √ twins already did. The fold is 3-D's own. The shared `shell/glyphFold` table is unchanged, because 2-D reads `sqrt` inside its own length rule.
 3. **The gate reads radicals with the parser's atom.** `droppedGivenNumbers3` keeps a radicand's own parentheses (`√` + the exported `RADICAND`) when it blanks the others, and it values a radical term with the exported `evalRadical`. A line the parser reads can no longer be refused because the gate valued it differently.
-4. **Held, not changed.** The distance slot, the `A = (…)` coordinates claim, the ratio `AB:CD = m:n` and the cone/cylinder sizes still take decimals. 2-D reads none of these sentences, so reading a radical there is a `[proposed]` outcome that waits for the operator. Angles stay decimal. *Amended by [ADR-3D-340](#adr-3d-340) (#2079): the cone/cylinder/sphere size slots still read only decimals, but a fraction or root there is now refused whole; before, the slot read its first digits and drew them.*
+4. **Held, not changed.** The distance slot, the `A = (…)` coordinates claim, the ratio `AB:CD = m:n` and the cone/cylinder sizes still take decimals. 2-D reads none of these sentences, so reading a radical there is a `[proposed]` outcome that waits for the operator. Angles stay decimal. *Amended by [ADR-3D-340](#adr-3d-340) (#2079): the cone/cylinder/sphere size slots still read only decimals, but a fraction or root there is now refused whole; before, the slot read its first digits and drew them.* *Amended by [ADR-3D-362](#adr-3d-362) (#2081, ruling 2026-10-14): the distance slot and the `A = (…)` claim now read a radical, as their twins do; the ratio stays held.*
 
 **Locks.** `src3d/parser/__tests__/issue-1827-magnitude-atom.test.ts`: a totality sweep over 8 rule frames × 11 spellings, with a guard on how many rules were exercised; the gate sweep (no line the parser reads is flagged, and a radical the commands do not carry still is); and the operator's exact sequence through `decideDeterministic3` with |AD| = √7 at seed 0. Fixtures `rect-surd-side-1827`, `pyramid-surd-height-1827` and `triangle-surd-area-1827`. Parity rows `surd-length-1827`, `surd-length-paren-1827`, `surd-length-sqrt-1827` and `surd-area-1827` (docs/22 §10), which build in 2-D, analytic and 3-D.
 
@@ -12743,7 +12747,7 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 
 **Locks.** `src3d/parser/__tests__/issue-2079-solid-size-fraction.test.ts`: the issue's five exact lines and ten twins (spaced slash, «הוא», the named cone, English, four roots) refused with the size error, the rendered Hebrew message, eight integer/decimal controls built to exactly their stated size, and the gate units (numerator alone, denominator alone, the value, the ratio pair, a radical fraction's denominator alone). Parity row `ex-sphere-fraction-2079` (X7, refused in 3-D; 2-D and analytic must not build it).
 
-**Behaviour change for a student:** «כדור שרדיוסו 1/2» (and every fraction or root radius or height inside a cone, cylinder or sphere declaration) is refused with «הכלי עדיין לא יודע לקבוע את גודל הכדור לפי נתון כזה, ולכן הוא לא נוסף — זו מגבלה של הכלי». It was drawn green with the numerator. «חרוט שרדיוסו √2 וגובהו 3» reads this message instead of «לא הצלחנו לצייר: √2 … נסו לפצל». «חרוט שגובהו √3» and «כדור שרדיוסו sqrt(2)» are answered by it instead of going to the AI. Whole-number and decimal sizes build as before.
+**Behaviour change for a student:** «כדור שרדיוסו 1/2» (and every fraction or root radius or height inside a cone, cylinder or sphere declaration) is refused with «הכלי עדיין לא יודע לקבוע את גודל הכדור לפי נתון כזה, ולכן הוא לא נוסף — זו מגבלה של הכלי». It was drawn green with the numerator. «חרוט שרדיוסו √2 וגובהו 3» reads this message instead of «לא הצלחנו לצייר: √2 … נסו לפצל». «חרוט שגובהו √3» and «כדור שרדיוסו sqrt(2)» are answered by it instead of going to the AI. Whole-number and decimal sizes build as before. *Amended by [ADR-3D-363](#adr-3d-363) (#2076, ruling 2026-10-14): the sentence now says the capability is in development, and every other unsupported size form gets it too.*
 
 ## ADR-3D-341 — Both inscription voices with a circle named first, and the relative clause's subject is the ring (#1975)
 
@@ -12888,3 +12892,247 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 **Golden drift — read and attributed.** `decide-submit3-parity-1394.golden.json` is re-recorded. Every sequence that holds a label-less shape line drifts in its saved commands (the fact now keeps the `shape-ref3`). Compared at the level of what the student sees (error, notice, fact count, statuses, points, rings) against 4b0b4592 over all 2400 harvested sequences, 49 differ, and in each the first differing line is a label-less shape noun: the definite rows now act on the one triangle (DEF, SAB) instead of minting ABC; the two-shape rows are refused `ambiguous-definite-shape`; and the indefinite rows — «משולש», «משולש ישר זווית», «משולש שווה שוקיים», «במשולש ישר זווית», «ריבוע», and the bare noun lines of harvested vocabulary lists («ריבוע» · «מלבן», "trapezoid" after «טרפז ABCD …») — draw a new ring (DEF / GHI / EFGH) where they used to answer «already stated» or restate ABC(D). That last group is the indefinite rule applied to every flat noun, as 2-D does («ריבוע ABCD» · «ריבוע» → EFGH measured in 2-D at 4b0b4592). No drift outside the class.
 
 **Locks.** `src3d/__tests__/issue-2235-shape-ref.test.ts` (the article reader; every measured row at its ruled outcome; the refusals with their example; definite = named, positions within 1e-9 at seeds 0–3; the indefinite letters equal 2-D's; entry order); fixtures `fixtures3/definite-triangle-one-2235.geo3.json`, `fixtures3/indefinite-triangle-new-2235.geo3.json`; the parity table loses its 3-D gap on `definite-triangle-two-2205` and gains `indefinite-triangle-new-2235`; the message floor rows for the new code.
+
+## ADR-3D-355 — A figure that shares no point with another carries its own similarity: separate figures have a free relative size, orientation and placement (#1855)
+
+**Status:** accepted · 2026-10-17 · **Issue:** #1855 · fix round #2291. Applies [ADR-052](06-decisions.md#adr-052) to the pivot's gauge; 2-D's behaviour (measured at 5edeeca1 in the plan, re-measured as the issue states).
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-2 (amended: two figures that share no point) · **Design:** [04b](04b-design-3d.md) "Gauge, and why the landing funnel exists" (the per-solid similarity paragraph) · **LADDER stage:** the pivot (dims).
+
+**Context — measured at b0e9dbea** through `decideDeterministic3` → `derive3`, seeds 0–3: «משולש ABC · משולש DEF · DE = 2 · AB = 5» refused the second length `givens-contradict` («אין גוף שמקיים את «AB = 5» יחד עם «DE = 2»») at every seed, in either order and with «AB = 5» before «משולש DEF»; «ריבוע ABCD · משולש EFG · AB = 4 · EF = 7» and the cube twin likewise; «משולש ABC · משולש DEF · AB ∥ DE» `claim-refuted`; and the two triangles alone drew |AB| = |DE| = 1 with AB ∥ DE at every seed. 2-D builds every row and varies the ratio and the angle per seed.
+
+**Class.** Two figures that share no point were placed rigidly relative to each other: every solid (a flat polygon included) is built canonically with its first edge = 1, and the pivot carries ONE gauge `[translation | rotation | scale]` for the whole construction. Their relative size, orientation and placement were fixed defaults, so any given that pins each one's own size, or relates the two, was refused. Members: every pair of solids, flat or not, and every relation kind between them (lengths, ∥, ⟂, angles, ratios).
+
+**Decision.** A solid never shares a vertex with another — `apply` refuses a solid over existing ids (`already-defined`), and a polygon over existing points binds them (a claim, free points, a plane rider) rather than minting a solid — so each solid IS one connected component. Solid 0 keeps the construction's gauge. Every further solid appends seven dims to its own dim vector — `[ln s, w (rotation vector), t]`, `componentSimilarityDims` in `evaluate.ts` — applied about its canonical centroid in `evaluateSolidsAndPoints`. They are ordinary dims: sampled from the one seeded sampler (docs/17 M3, keys `<solid>-sim-*`; the yaw over the full turn, the tilt within ±0.4 rad, the scale in [0.55, 1.8], the offset within ±0.3), read through `solidDimsAt` by every consumer (the one-shot placement, the pivot's `perSolidDims`, `freeDofCount3`), driven by the pivot like any shape dim, and counted by `freeDims` (+7 per further solid), so a statement about a second figure routes to the pivot, not to the claim lane. Nothing is appended for a one-solid figure, which is bit-identical.
+
+**DOF cue.** «דרגות חופש» for two separate figures is now the two figures' own counts plus 7 (the relative similarity; locked). 2-D counts the same freedom by its formula (raw movable DOF minus ONE similarity gauge for the whole figure), so a second figure's relative placement is free there too.
+
+**Measured after.** Every row above records at seeds 0–23 with the stated lengths exact; «AB ∥ DE» records and holds; the two triangles alone vary |AB|/|DE| and the angle between AB and DE per seed; the cube, the right square pyramid and «משולש ABC · AB = 5 · ∠ABC = 50°» reproduce b0e9dbea's positions at seed 0 to 1e-12.
+
+**Sibling audit.** 2-D and analytic place every point independently (no per-figure canonical frame): the class is absent, and both build these rows. Complex has no solids. Revolutions (sphere, cone, cylinder) sit beside the solids at a fixed offset with a sampled size; their orientation is axis-symmetric about the vertical and no sentence relates a revolution's size to a separate solid's today — out of this class, unchanged.
+
+**Golden drift (expected).** `decide-submit3-parity-1394` sequences holding two separate solids drift in positions and may now record where they refused; the batch judges them.
+
+**Locks.** `src3d/__tests__/issue-1855-separate-figures.test.ts` (the reported rows ×24 seeds, both lengths drawn, «AB ∥ DE», the free ratio and angle, the DOF count, the one-solid bit-identity); fixture `fixtures3/two-triangle-lengths-1855.geo3.json`; parity rows `two-triangle-lengths-1855` and `two-triangle-parallel-1855`.
+
+**Amendment 1 (2026-10-17, batch gate #2291) — the dims are sampled once per (solid list, seed).** The first landing sampled every solid's full dim vector afresh in each one-shot placement, so the seven similarity keys took two-solid figures past the #863 ceiling (`issue-863-sample-hoist`: `trapezoid-circumcircle-1792` 120, `two-triangle-lengths-1855` 88, ceiling 64). `solidDimsAll3` (evaluate.ts) memoises the vectors on the `solids` array's identity per seed, and the one-shot placement, the pivot's `perSolidDims`, `solidDimsAt` and the DOF count all read it — the ADR-3D-245 law, now total over the one-shot callers too.
+
+## ADR-3D-356 — A flat ring declared over a FREE vertex drives that vertex into the plane; with every vertex placed it stays #1928's refusal (#1935)
+
+**Status:** accepted · 2026-10-17 · **Issue:** #1935 · fix round #2291. Boundary against [ADR-3D-319](#adr-3d-319) (#1928); the representation of [ADR-3D-172](#adr-3d-172) (a minted corner rides the plane); [ADR-W-121](06w-decisions-workspace.md) §4's "a ring with a free vertex (a configuration choice)".
+**Operator ruling (verbatim):** 2026-10-09, option A — *"The free point rides into the plane. D moves so that ACBD really is a flat quadrilateral, and the figure holds."*
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-7 (the polygon row; the placed vertices stay put) · **Design:** [04b](04b-design-3d.md) "A ring over a FREE vertex is made flat at apply" · **LADDER stage:** apply.
+
+**Context — measured at 9d734201** through `decideSubmit3` → `derive3`, seeds 0–11: «משולש ABC · משולש ABD · מרובע ACBD» recorded green with D `free3` and det(AB, AC, AD) = 0.423 at seed 0, skew at 12/12; likewise «מלבן ACBD», «ריבוע ACBD», the other ring orders, the English spelling, A, B, C pinned by coordinates, and «משולש ABC · משולש CDE · מחומש ABCDE» (D, E both free). «טרפז ACBD» happened to be flat (its ∥ claim forces it); «מקבילית ACBD» was refused at 15/24 seeds (`point-not-determined` / `polygon-collapsed`). The #1928 all-placed skew ring was refused `ring-not-flat`.
+
+**Class.** A flat-shape declaration over existing points, at least one still free, recorded the ring without lowering its planarity onto the free points. Members: the polygon all-existing arm (every flat noun, any order, either direction, English), the mixed run whose known corners include a free one, and `quad-shape`'s all-known arm (the shape nouns). Triangles are flat by themselves (no member).
+
+**Decision.**
+1. `flattenRingFreeVertices3`: the ring's anchors are its non-placeholder vertices, in ring order, topped up to three with the earliest-minted free vertices (which stay free); every other free vertex is re-homed onto the anchors' plane run as an `implied` on-plane rider — two sampled, drivable in-plane DOFs (ADR-052), still a placeholder a later real definition replaces (#841). With every vertex placed it does nothing: a skew ring is #1928's refusal, unchanged. Collinear anchors are the collapse refusal's (ADR-3D-310).
+2. `quad-shape` with exactly ONE placeholder corner yields that corner to ARM 2 — the #841 rule applied to a ring — so the family supplies its own corner (closed form for the parallelogram family and the kite). Lowering the family's relations onto a re-homed rider instead left the pivot to find a rectangle by search, and it missed: «מלבן ACBD» 3/24, «ריבוע ACBD» 1/24, «מעוין ACBD» 2/24 refused `givens-contradict` in the first attempt. `keepPointSlot3` keeps the corner's original place in the point order when every other ring corner precedes it, so a point defined from it later is still evaluated after it. With several placeholders, step 1 runs before the relations are lowered.
+
+**Measured after** (seeds 0–23): every class row records and is flat (skew < 1e-9); for «מרובע», the reversed ring, the other order, English, the pentagon and the pinned row, A, B, C are bit-identical before and after the ring line, and D still re-samples in the plane; «מלבן», «מקבילית», «מעוין», «דלתון» record 24/24 (the triangle is driven where the noun states a relation on it — a rectangle's right angle at C); «ריבוע ACBD» records 24/24 with D the square's determined corner; «מקבילית ACBD» went from 15/24 refused to 24/24 recorded. Controls unchanged: #1928 refused `ring-not-flat`; «משולש ABC · מרובע ABCD» and «טרפז ACBD» flat.
+
+**Deviation from the plan's lock.** The plan asked A, B, C bit-identical on EVERY class row; for «מלבן / ריבוע ACBD» over an existing triangle that is not an honest demand, because the noun states ∠ACB = 90° (and |CA| = |CB|) on that triangle — the givens move C. Locked as flatness there; bit-identity on the rows whose noun states nothing about A, B, C.
+
+**Found work.** A free corner that closes a ring is sampled anywhere in the plane, so the ring is drawn CROSSED at many seeds — «מרובע ACBD» 17/24, and the ADR-3D-172 control «משולש ABC · מרובע ABCD» 11/24 on main already — against FR-RD-7's "drawn simple by choice of configuration". Filed #2300 (bug, P2). Not built here: a configuration-choosing seat is a new mechanism.
+
+**Sibling audit.** 2-D and analytic are planar by construction: no member. Complex has no rings in space. Other 3-D lanes declaring a ring over existing points: the polygon solid arms and `quad-shape` (both covered); `rect-complete` lowers to `quad-shape` (covered).
+
+**Locks.** `src3d/__tests__/ring-free-vertex-1935.test.ts` (eleven class rows ×24 seeds, the stability and freedom checks, the three controls, a triangle re-homes nothing); fixture `fixtures3/ring-free-vertex-1935.geo3.json`.
+
+## ADR-3D-358 — A declared solid the givens force flat is refused, never drawn with a notice: one collapse judgement for rings and solids (#1860)
+
+**Status:** accepted · 2026-10-17 · bug (P2, ruled 2026-10-08 "keep P2") · branch `fix/1860-3d-flat-solid-refused` off `main` @ b0e9dbea · fix round #2291 · implements the #1860 `/decisions` fix plan of 2026-10-07 · **supersedes** [ADR-3D-234](#adr-3d-234)'s notice · **amends** [ADR-3D-310](#adr-3d-310) (its judgement now covers solids) · adopts [ADR-W-115](06w-decisions-workspace.md#adr-w-115) Am. 1
+**Operator ruling (verbatim, 2026-10-07, in #1860's body):** *"we should refuse this as well since it contradicts the pramid statement"* — and *"a flat figure is not a pyramid / prism / …"*.
+
+**Requirements:** [02b](02b-requirements-3d.md) **FR-RD-7** (rewritten: a declared solid is never drawn flat) · [02w](02w-requirements-workspace.md) behaviour table (new row "A declared solid forced flat") · **Design:** [04b](04b-design-3d.md) § the ⟂-from-an-in-plane-point disposition, new paragraph *A declared solid forced flat is refused the same way*; § *The degeneracy notice* marked retired · **LADDER stage:** solve (`settleFlatRings`, the empty-pool exits) + derive (routing and wording).
+
+**Measured before** (`b0e9dbea`, `decideDeterministic3` ×24 seeds, no LLM):
+
+| sequence | before |
+|---|---|
+| «פירמידה SABCD · ∠BAS = 40 · ∠DAS = 50» (either order) | builds 24/24 with the `solid-degenerate` notice |
+| «פירמידה ישרה SABCD שבסיסה מלבן · AB = 6 · BC = 8 · SA = 5» (SA = half the diagonal) | refused 24/24 with the generic «הנתונים סותרים זה את זה — אין גוף שמקיים את «SA = 5» יחד עם «AB = 6», «BC = 8»» — not why |
+| controls «∠BAS = 41 · ∠DAS = 50», «50 · 60», «SA = 5.1» | build 24/24, no notice |
+
+**Root cause / class.** *A declared solid whose givens force it flat was either drawn flat with a notice or refused without its reason, depending on how exactly the solver landed.* Two predicates split one class: the pivot's #872 hard gate (`collapsed()`, off-plane spread ≤ 1e-4 of span) silently rejected an EXACTLY flat solution, so the pool came back empty and the store said `givens-contradict` (the length case); a solution that stopped just above it (the 40/50 apex at z ≈ 0.001, the `invariantOnly` lane's anchor equilibrium) was accepted and the #936 band (`DEGENERATE_FLAT_RATIO`, 1e-2) drew it with the notice. Rings stopped splitting this way in ADR-3D-310; solids had been left out by the ADR-W-115 scope the operator has now withdrawn.
+
+**Decision.**
+1. **One collapse judgement.** `settleFlatRings` (`solve3.ts`) judges every solid, not only the flat kinds: `closedFigure(r)` = a declared ring collapsed or a released ring sliver (ADR-3D-310, unchanged) **or** `solidSliver(r)` — a non-flat solid already flat (`flatSolidAt`, the #872 off-plane test), or THIN (`flatnessRatio < SOLID_THIN_RATIO`, #936's calibrated 1e-2, moved into `solve3.ts`) and, released on its own residuals, exact and flat. The open members are kept; with none, the frozen-dims retry and the open-figure retry run (their results judged by the same predicate), and otherwise the pool comes back empty, marked `collapse: { ring: solid ids, forced: true, solid: kind }`. A thin real solid (41/50) is exact where it stands, so the release does not move it and it stays open.
+2. **The hard gate's silent rejection feeds the same record.** An EXACT candidate (primary < 1e-10) that `degenerate` discards as a flat solid sets `flatSolidSeen` (`noteFlatSolid`, at every acceptance site: the cold starts, the dims widening, `collect`, the `invariantOnly` starts). When the pool then comes back empty — the gauge path after the frozen-dims retry and the #1735 re-seat, or the `invariantOnly` lane's `failed()` — `flatSolidRefusal` runs the open-figure retry and otherwise returns the marked pool. A pool emptied with no exact flat candidate is unchanged (`givens-contradict`).
+3. **The store names the solid** (`derive3`'s pin-owner guard, as for rings): `polygon-collapsed` with `solid: nounOfKind(kind)` (`solidSubject.ts`; derived from the kind's name like `nounAdmits`, `tetra` → pyramid) and the letters as the declaring statement wrote them (`solidAsWritten`: «SABCD», not the engine's apex-last «ABCDS»). `others` is the existing forced-collapse attribution — the pin owners on the solid's own vertices, never the declaration — and the claim pass skips them as for #1815 / #1849. **A statement whose claim is its own arbiter keeps its register:** when the newest pin owner recorded a claim with no `given` (the ADR-3D-030 pin-and-claim pattern — «AM = u + v + w» on a prism, a ratio, a plane coincidence), the solid record is ignored and the claim pass refutes it (`claim-refuted`), as it did before. That is the store's existing rule for an empty pivot ("a wrong exam answer is the student's answer and is refuted in that register"); without it, ten answer locks (scenarios3, exam-2026-2, #748, #1156, #1183, #1523, #1590) read «… מתקיים רק אם המנסרה שטוחה» for a wrong decomposition.
+4. **Text** (`errorText3`, he/en): `err.solidForced` / `err.solidForcedAlone` over `err.solidShape.{pyramid,cube,box,prism}` and `err.solidKind.*` — the shipped `polygonForced` frame with the solid's noun, without the «(כל קודקודיו על ישר אחד)» parenthesis: «לא ניתן: «∠DAS = 50» יחד עם «∠BAS = 40» מתקיימים רק אם הפירמידה SABCD שטוחה — וגוף שטוח אינו פירמידה.» / "Can't do that: «∠DAS = 50» together with «∠BAS = 40» hold only if pyramid SABCD is flat — and a flat solid is not a pyramid." Every solid noun is feminine in Hebrew, so «שטוחה» is part of the frame.
+5. **The notice is retired**, not left as a dead path: `degenerateSolids`, `flatnessRatio`/`causesFor`/`DegenerateCause`/`DEGENERATE_FLAT_RATIO`/`FLAT_BY_DESIGN` (`notices.ts`), the `solid-degenerate` notice kind, its `App3` branch and `notice.solidDegenerate*` / `notice.causeJoin` / `notice.cause.*` (he, en).
+
+**Measured after** (same door; 24 seeds unless noted):
+
+| sequence | after |
+|---|---|
+| «פירמידה SABCD · ∠BAS = 40 · ∠DAS = 50», either order | refused at the third line 24/24, the sentence above (11–46 ms per seed) |
+| «פירמידה ישרה SABCD שבסיסה מלבן · AB = 6 · BC = 8 · SA = 5» | refused 24/24: «לא ניתן: «SA = 5» יחד עם «AB = 6», «BC = 8» מתקיימים רק אם הפירמידה SABCD שטוחה — וגוף שטוח אינו פירמידה.» |
+| «פירמידה SABC · ∠BAS = 30 · ∠CAS = 20 · ∠BAC = 50» (tetrahedron) · «פירמידה SABC · SA = 1 · SB = 2 · AB = 3» | refused, «… הפירמידה SABC שטוחה …» |
+| «תיבה ABCDA'B'C'D' · AB = 3 · BC = 4 · A'C = 5» · «מנסרה ישרה משולשת ABCA'B'C' · AB = 3 · A'B = 3» (zero height) | refused 24/24, «… התיבה ABCDA'B'C'D' שטוחה — וגוף שטוח אינו תיבה.» / «… המנסרה …» (was `givens-contradict`) |
+| «תיבה ABCDA'B'C'D' · המישור ABC מתלכד עם המישור A'B'C'» (a claim-arbitered relation) | `claim-refuted`, unchanged |
+| «פירמידה SABCD · SB מקביל למישור ACD» · «פירמידה משולשת ABCD · AD חוצה זווית BAC» | refused as the flattened pyramid (were `givens-contradict`) |
+| controls 41/50, 50/60, «SA = 5.1», the tetrahedron at 49° | build 24/24, no notice |
+| «AB = 5 · BC = 3 · AC = 8» on a triangle (ADR-3D-310) | unchanged: refused with the polygon sentence |
+
+The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim-refuted` as well (a rigid figure, and a claim-arbitered relation).
+
+**Locks.** New `src3d/__tests__/issue-1860-flat-solid-refused.test.ts` (the reported sequence both orders ×24 with the exact he/en wording; the solid named as written; the length-forced right pyramid ×24; the tetrahedron by angles and by lengths, a box and two prisms driven to zero height; `nounOfKind` over the kinds; the thin controls ×24). Flipped in place, citing this ruling: `issue-936-degenerate.test.ts` (notice → refusal; the 41/50 boundary, the near-miss family, the band constant and the `fixtures3/` corpus sweep — now "no corpus figure is refused as a flat solid" — stay), `issue-1849-flat-polygon-refused.test.ts` ("a SOLID … keeps its #936 notice" → refused as that solid), `issue-821.test.ts` and `issue-343-bisector-ray.test.ts` (`givens-contradict` → the solid refusal, the statement still named), and `issue-928-wedge-direction.test.ts` (its two-wedge figure was the 40/50 pyramid; now 50/60). Fixtures-first does not apply: the essence is a refusal with a specific message. No parity rows: solids exist only in 3-D.
+
+**Golden drift expected** (`decide-submit3-parity-1394`, the batch's to re-record): only sequences that flatten a declared solid — the 40/50 family (record + notice → refused) and the length-forced apex (`givens-contradict` → `polygon-collapsed`). Not re-recorded here.
+
+**Sibling audit.** 2-D and analytic have no solids (n/a in the 02w row). The ring half (ADR-3D-310) is unchanged; its sliver release and this one share the release-then-judge shape and the 1e-4 / 1e-2 lines.
+
+**Performance.** The reported 40/50 line: 11–46 ms per submit (20–32 ms before, with the notice); the length-forced apex 478 ms (418 ms before, refused generically); the box 99 ms (322 ms before). Thin controls unchanged (23–27 ms).
+
+**Behaviour change for a student:** a pyramid, tetrahedron, prism or box whose givens force it flat is refused at the line that completes it, naming the statements («… מתקיימים רק אם הפירמידה SABCD שטוחה — וגוף שטוח אינו פירמידה.»), instead of being drawn flat with a notice, or refused with the generic contradiction. The flat-solid notice no longer appears anywhere. A thin but real solid still builds.
+
+## ADR-3D-360 — A ⟂ at an unnamed crossing of two segments is a relation, not a knee at rest (#2091)
+
+**Status:** accepted · 2026-10-17 · bug (P3) · branch `fix/2091-3d-no-knee-unnamed-crossing` off `main` @ de7c221f · fix round #2304 · implements the #2091 fix plan of 2026-10-14 · **amends** [ADR-3D-093](#adr-3d-093) (the crossing branch of the R³ honesty rule, for the knee lane only) · applies [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B2
+**Operator ruling (2026-10-14, card `d14b-2091-knee`, A):** *"3-D stops drawing a right-angle mark at rest where two segments stated ⟂ cross at an unnamed point (e.g. «ריבוע ABCD» · «AC ⟂ BD»), like 2-D (ADR-W-118 B2). A line ⟂ plane keeps its marks."*
+
+**Requirements:** [02b](02b-requirements-3d.md) **FR-RD-16** (new: a segment-pair knee only at a named vertex of the pair) · **Design:** [04b](04b-design-3d.md) § the stated-angle arc lane, new paragraph *The knee lane's vertex* (`namedVertexOf` beside `meetingPoint`) · **LADDER stage:** render (`rightAngles3`, step 3).
+
+**Root cause.** `rightAngles3` step (3) turned every stated segment pair into a wedge at `meetingPoint`, which returns a shared endpoint **or any** crossing strictly inside both segments — with no question of whether the facts name that point. A relation at an unnamed crossing was therefore drawn as a value at rest, which ADR-W-118 B2 rules out and 2-D's `angleMarkFor` (`src/replay/core.ts`, «disjoint segments — the ⟂ is at an unnamed crossing; no mark») never did. Class: *a stated ⟂ between two segments whose right angle sits at a point the facts do not name is drawn as a knee at rest.*
+
+**Decision.** One predicate, `namedVertexOf(seg, c)` (`render/rightAngles.ts`): a shared endpoint, or a point whose **definition** is the crossing of exactly those two segments (`seg-cross`, either order) — read from `c.points`, never from positions, so a letter that only sits on the crossing in the drawing («O אמצע AC») names nothing. The knee lane draws a segment pair only at that vertex. `meetingPoint` keeps its contract (the arc lane, ADR-3D-222, still needs the interior crossing for a non-right angle) and still gates honesty (skew / off-ink pairs draw nothing). Reach: every record feeding `segPairs` — `cos-angle` pins and `cos-angle-eq` claims over pair atoms, `seg-angle` / `angle-seg-eq` at 90, `symbolPins` `seg-perp` — so every spelling (⟂, ⊥, «מאונך ל-», «ניצב ל-», «הזווית בין … היא 90») and every host (square, rhombus, quad, cube, box, pyramid base). **Not reached, on purpose:** a pair recorded from two named VECTORS («u ⊥ v») keeps the crossing knee (`SegPair.viaVectors`), and the segment × named-line lane is untouched — both are 3-D-only families asked in #2093. Every plane lane, foot and dihedral knee is unchanged. #1946 widens the same predicate with an endpoint the facts put on the other segment.
+
+**Measured before / after** (`de7c221f`, store `submit` → `derive3` → `rightAngles3`):
+
+| sequence | before | after |
+|---|---|---|
+| «ריבוע ABCD» · «AC ⟂ BD» (also ⊥, «מאונך ל-», «הזווית בין AC ל-BD היא 90») | B + the centre | B |
+| «מעוין ABCD» / «מרובע ABCD» · «AC ⟂ BD» (also «ניצב ל-») | the crossing | none |
+| «קובייה …», «תיבה …», «פירמידה SABCD» · «AC ⟂ BD» | the centre | none |
+| «ריבוע ABCD» · «O אמצע AC» · «AC ⟂ BD» | B + O | B |
+| «ריבוע ABCD» · «O נקודת חיתוך האלכסונים» · «AC ⟂ BD» | B + O | B + O |
+| «משולש ABC» · «AB ⟂ AC» / «קובייה …» · «AA' ⟂ מישור ABC» / «AC' ⟂ מישור A'BD» | A / A / the crossing | unchanged |
+| «תיבה …» · «נסמן: AC=u, BD=v» · «u ⊥ v» | the centre | unchanged (#2093) |
+
+**Locks.** `src3d/__tests__/issue-2091-unnamed-crossing-knee.test.ts` (every row above); fixture `fixtures3/no-knee-unnamed-crossing-2091.geo3.json`; `right-angle-knee.test.ts`'s *"perpendicular diagonals that DO cross are marked at the crossing"* flipped to 0 wedges; `issue-923-917.test.ts`'s box-diagonal 90° knee flipped to 0 (its no-90°-arc half unchanged); `seg-angle-drive-909.test.ts`'s pin-arm knee lock now names the crossing («האלכסונים AC ו-BD נפגשים בנקודה O»). No parity row: no display lock yet (docs/22 §10).
+
+**Behaviour change for a student:** «ריבוע ABCD» · «AC ⟂ BD» (and the same on a rhombus, quadrilateral, cube, box or pyramid base, in every ⟂ spelling) no longer draws a right-angle mark where the diagonals cross; the relation stays in the givens list and the data panel. A crossing the student named as the intersection keeps its mark.
+
+## ADR-3D-361 — A membership stated about an existing point that only a flat polygon satisfies is refused by name, in either order (#1847)
+
+**Status:** accepted · 2026-10-17 · bug (P3) · branch `fix/1847-3d-names-both-statements` off `main` @ de7c221f · fix round #2304 · implements the #1847 `/decisions` fix plan of 2026-10-07 (option 1) · **amends** [ADR-3D-309](#adr-3d-309) (its recorded deviation: the reverse order kept `claim-refuted`)
+
+**Requirements:** [02b](02b-requirements-3d.md) **FR-RD-7** ("an incidence on a rider is refused, naming the statements" now reads: on a rider or on an existing point, in whichever order) · **Design:** [04b](04b-design-3d.md) § the ⟂-from-an-in-plane-point disposition, new paragraph *The same conflict stated about an existing point* · **LADDER stage:** derive (the claim pass's verdict; the solve is the pivot's existing failure-path search).
+
+**Measured before** (`de7c221f`, `decideDeterministic3` ×24 seeds, no LLM):
+
+| sequence | before |
+|---|---|
+| «משולש ABC · M אמצע BC · M על AB» (the report) · mirror «D אמצע AC · D על AB» · English | refused `claim-refuted` 24/24: «הטענה לא מתקיימת בציור — בדקו את החישוב» |
+| «משולש ABC · M על AB · M אמצע BC» (#1815's order) | refused `polygon-collapsed` 24/24, both statements named |
+| «פירמידה SABC · SO גובה הפירמידה · M אמצע BC · O על AM» | `claim-refuted` 24/24 |
+
+2-D and analytic refuse both orders naming the collapse (measured by the plan at 5edeeca1); the disparity is 3-D only, and only in this order.
+
+**Root cause / class.** *A membership statement about an existing derived point, which can hold only if a declared polygon is flat, was judged as a student's answer (`claim-refuted`) instead of as the collapse refusal every other route and builder gives.* Stated first, «M על AB» makes M a rider and reaches the pivot, whose #1815 attribution names both statements. Stated last, M is already the midpoint, so «M על AB» lowers (M1) to a `collinear3` claim, and the claim pass only asked whether it holds on the sampled triangle — never whether any triangle could hold it.
+
+**Decision.** In `derive3`'s claim pass, a refuted claim with no sampled-carrier verdict gets one more look before `claim-refuted` (`membershipCollapse`, `store3.ts`): when it is a `collinear3` membership and the figure carries a `FLAT_SOLID_KINDS` solid with free dims, the construction is re-resolved with the pin the claim states (lines a–b and a–c coincide, the existing `mutual` drive). The pivot then runs its own failure path — the frozen-dims retry and the anchored open-figure search (`openSolveOn`, #1849). If it comes back empty with a non-solid `collapse` record, the claim is refused `polygon-collapsed` (not forced, so `err.polygonCollapsed`, the forward order's own frame), `stated` the claiming line, `others` the statements that first placed the claim's points off the collapsed ring (the midpoint's line; a metric given on the ring is not named). If a placement exists, the claim keeps `claim-refuted`: it is judged, never made to drive (option 2, lowering it to a driving pin, was rejected by the plan — it would build sentences the report did not describe). One bounded resolve, on the failure path only.
+
+**Measured after** (same door, 24 seeds):
+
+| sequence | after |
+|---|---|
+| «משולש ABC · M אמצע BC · M על AB» | refused 24/24: «לא ניתן: «M על AB» סותר את «M אמצע BC» — אי אפשר לקיים את שניהם יחד: הם מתקיימים רק אם המשולש ABC שטוח (כל קודקודיו על ישר אחד).» (~8 ms per seed) |
+| mirror, «AB = 3» first, the long Hebrew form, English | refused 24/24 the same way; «AB = 3» not named |
+| «משולש ABC · M אמצע BC · N אמצע AC · M על AN» | refused 24/24, naming «M אמצע BC», «N אמצע AC» |
+| #1815's order · the centroid «E מפגש התיכונים … · E על AM» · the pyramid above | unchanged (refused by name · records · `claim-refuted`) |
+
+**Locks.** New `src3d/__tests__/issue-1847-reverse-collapse.test.ts` (the reported order and its variants ×24 with the exact he/en wording, keep-prior and the open standing triangle; the forward order, the centroid and the pyramid scope lock unchanged — #1897, armed, will flip the pyramid lock in place when it lands). `issue-1815-collapse-attribution.test.ts`'s reverse-order case, which recorded ADR-3D-309's deviation, now asserts the named refusal. Parity row `midpoint-rider-collapse-1847` beside `rider-midpoint-collapse-1815` (`expect: 'refused'`; all three builders refuse). Fixtures-first does not apply: the essence is a refusal with a specific message.
+
+**Sibling audit.** 2-D and analytic: class absent (both orders named, the plan's measurement). Quadrilaterals and pentagons are outside this class and unchanged: «מרובע ABCD · M אמצע BC · M על AB» stays `claim-refuted`; its forward order is itself seed-dependent today (records 9/24, `claim-refuted` 15/24), reported separately.
+
+**Golden drift expected** (`decide-submit3-parity-1394`, the batch's): only sequences whose last line is a membership on an existing point that collapses a declared triangle (`claim-refuted` → `polygon-collapsed`). Not re-recorded here.
+
+**Behaviour change for a student:** «משולש ABC · M אמצע BC · M על AB» is refused naming both statements, as the other order already was, instead of «בדקו את החישוב».
+
+## ADR-3D-362 — The held value slots read what their twins read: a radical in «A = (…)» and in a distance, and an uppercase axis letter (#2081)
+
+**Status:** accepted · 2026-10-17 · bug (P3) · fix round #2304, stream L · branch `fix/2081-3d-value-readers` off `main` @ `de7c221f` · plan: the #2081 fix plan of 2026-10-14 (second ruling) · amends [ADR-3D-337](#adr-3d-337) §4 (the distance and `A = (…)` slots are read, no longer held) · LADDER stage: none (the parser's lexical seam)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-22 (the distance and coordinates-claim slots join the radical list) and FR-SP-14 (the uppercase axis letter) · **Design:** [04b](04b-design-3d.md) the magnitude-atom paragraph, and *One coordinate of a point* (the axis fold at `normalize3`)
+
+**Ruling.** Operator, 2026-10-14 (the second /decisions ballot): card `d14b-2081-roots` A — *"Read them, as the length slot does («A=(√2,0,0)»)"*; card `d14b-2081-upper` A — *"Read it, as analytic does."* The ratio slot `AB:CD = m:n` is not in the ruling and is unchanged (#1808).
+
+**Measured before** (`main` @ `de7c221f`, through `decideSubmit3`): after «תיבה ABCDA'B'C'D'», «A=(√2,0,0)», «A=(-√2,0,0)», «A=(2√3,1,0)», «A=(√2/2,0,0)», «A=(0,0,√(3/4))», «A=(sqrt(2),0,0)», «A=(1/2,0,0)», «A=(½,0,0)» and «A=(√1,0,0)» were `not-understood`, while «A=(0,0,0)» and «A(√2,0,0)» recorded. After «פירמידה SABCD», «המרחק בין S למישור ABC הוא √2» (and «3/2», «המרחק מ S לישר AB הוא 2√3», "the distance between S and plane ABC is sqrt(2)") were `not-understood`, while «… הוא 2» recorded. «X_B=3», «X_{B}=3», «B_X=3», «Z_B=3» and «X_B>0» were `not-understood`, while «x_B=3» and «B_x=3» recorded.
+
+**Root cause (two classes).**
+1. *A stated value is read by the private decimal atom of the rule it reaches.* `coordsClaim` composed from `NUM` and read with `+`; `distanceGiven` did the same. ADR-3D-337 made `MAG`/`magValue` the magnitude pair and #510 made `VAL`/`literalValue` the tuple-component pair; these two rules were held out of both.
+2. *A coordinate token whose axis letter is uppercase is not read.* `COMPONENT_FRAMES` spell the axis `[xyz]` (the class ADR-AG-274 fixed in analytic).
+
+**Decision.**
+1. **`coordsClaim` composes each component from `VAL` and reads it with `literalValue`**, so «A=(…)» reads exactly the components «A(…)» reads (√, `a√b`, `√b/n`, a fraction, a fraction glyph, a sign). A component the reader cannot value (`3/0`) declines the line; no NaN reaches a claim.
+2. **`distanceGiven` matches `-?\s*MAG` and reads it with `magValue`**, as `lengthClaim` does. The sign stays admitted exactly as the decimal `NUM` admitted it, so a negative distance keeps the verdict it had (`claim-refuted`). (The plan said "the unsigned `MAG`"; keeping the sign is the smaller change and changes no verdict.)
+3. **The uppercase axis is folded once at `normalize3`** (`SUB_AXIS_FIRST3` / `SUB_AXIS_LAST3`): `X_B` / `X_{B}` → `x_B` / `x_{B}`, `B_X` / `B_{X}` → `B_x` / `B_{x}`. It needs a label after the `_`, or the axis letter after a label's `_`, so `A_1`, `X_1`, `X_{12}` (digit subscripts are labels), the segment `XB` and `S_{XYZ}` stay as typed. The stored fact row keeps what was typed.
+4. **The honesty gate needs no change.** `droppedGivenNumbers3` already values a radical with the parser's `evalRadical` (ADR-3D-337 §3); the extended sweep holds it.
+
+**Not reached, on purpose.** The ratio slot (not ruled; #1808). A radical in a line's direction or a plane's equation (#2094, `needs-operator`).
+
+**Locks.** `src3d/parser/__tests__/issue-1827-magnitude-atom.test.ts`: the totality sweep gains six frames (`coordsClaim` spaced and glued; `distanceGiven` «בין … ל…», «מ … ל…», «שווה ל-», English) × its 11 spellings, with the exercised-rules guard, plus the gate sweep and three malformed rows. New `src3d/__tests__/issue-2081-held-slots.test.ts` through `decideSubmit3` + `derive3`: true radical claims verify, a false one is `claim-refuted` like its decimal twin, the box sweep matches «A=(0,0,0)»'s verdict, the pyramid's distance S–ABC is √2 at seed 0, every uppercase spelling gets its lowercase twin's verdict and commands on a box, on a stated point and on an empty canvas, the recorded line is the typed one, and the fold leaves `A_1`, `X_1`, `X_{12}`, `XB`, `AX_BC`, `S_{XYZ}` alone; the ratio and the symbolic claim stay `not-understood`. Fixtures `coords-claim-surd-2081` and `distance-surd-2081`. No parity rows: coordinates and the distance sentence are `EXCEPTIONS` X1–X3 (3-D/analytic only), and analytic already folds the case.
+
+**Sibling audit.** Analytic folds the axis case (ADR-AG-274). 2-D has no coordinate claim or point–plane distance.
+
+**Golden drift expected** (`decide-submit3-parity-1394`, the batch's to judge): only cases whose line is one of these spellings (`not-understood` → `record`). Not re-recorded here.
+
+**Behaviour change for a student:** «A=(√2,0,0)» (and «A=(-√2,0,0)», «A=(2√3,1,0)», «A=(√2/2,0,0)», «A=(1/2,0,0)», «A=(½,0,0)», «A=(sqrt(2),0,0)») is read as «A(√2,0,0)» is; a false one is refused as a wrong claim. «המרחק בין S למישור ABC הוא √2» builds as «… הוא 2» does, with «3/2», «2√3», «√(3/4)» and «sqrt(2)» too. «X_B=3», «X_{B}=3», «B_X=3», «Z_B=3» and «X_B>0» get exactly the verdict of their lowercase twins.
+
+## ADR-3D-363 — Every cone, cylinder or sphere size the declaration cannot read gets one answer, saying the capability is in development (#2076)
+
+**Status:** accepted · 2026-10-17 · bug (P3) · fix round #2304, stream L (stacked on ADR-3D-362) · branch `fix/2076-3d-solid-size-unsupported` off `fix/2081-3d-value-readers` @ `87f8291e` · plan: the #2076 fix plan of 2026-10-14 · amends [ADR-3D-340](#adr-3d-340) (its sentence, and its reach widened to every unsupported size form) and [ADR-3D-291](#adr-3d-291) (the size sentence it shares) · LADDER stage: none (the parser's refusal seam)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-5 (every unsupported revolution size form, and the re-worded sentence) · **Design:** [04b](04b-design-3d.md) *The normalisation seam*, the magnitude-atom paragraph (the size-noun vocabulary and `revolutionSizeLine`)
+
+**Ruling.** Operator, 2026-10-13: *"the message should be 'not supported yet'"*, *"רדיוס החרוט הוא 2 - is not supported so only a limitted set of syntaxes is supported"*, *"include all variations of input including the גובה החרוט"*; 2026-10-14 (card `d14-2076`): *"option A - but say that this is in development instead of not supported"*.
+
+**Measured before** (`fix/2081-3d-value-readers` @ `87f8291e`, through `decideSubmit3`, a 345-sequence phrasing sweep): 292 `not-understood` (every size on its own line, any noun, Hebrew or English; «כדור שקוטרו 6»; «גליל שנפחו 12π»), 23 `free-size-claim` (a volume or area line on a free-size solid, worded with the raw engine id «cone»), 7 `dropped-given` («חרוט שקוטרו 4 וגובהו 3» → «לא הצלחנו לצייר: 4 … נסו לפצל», «…ויוצרו 5», «…ונפחו 10π»), 4 `given-not-drivable` (the root/fraction forms and «SO = 3»). And one silent wrong figure: "cone with radius 2 and slant height 5" recorded a cone of HEIGHT 5, green (`HEIGHT_SLOT`'s `height` read the tail of "slant height").
+
+**Root cause (a class).** *A size statement about a solid of revolution that the tool cannot use is answered by whichever mechanism fails first, not by one typed refusal.* `revolutionSolid` knew two slot nouns, so a diameter, slant-height, volume or area clause was left unclaimed for the honesty gate to blame (or, in English, half-read by the height slot); no rule recognised a size noun phrase on its own line, so it went to the model; and apply answered a volume/area claim on a free-size solid with `free-size-claim`.
+
+**Decision.**
+1. **One vocabulary of revolution size nouns**, `src3d/lexicon/revolutionSize3.ts`: radius / base radius, diameter / base diameter, height, slant height («יוצר», «אורך היוצר»), volume, base, lateral and total surface area, Hebrew and English, plus the declaration's possessive clauses that are not slots («שקוטרו», «ויוצרו», «ונפחו», «שאורך היוצר שלו», "diameter", "slant height", "volume"). The noun PHRASE is the unit: «שטח הבסיס» counts only beside a solid noun; «יוצר» is the cone's alone.
+2. **Declaration:** a size clause whose noun is not a slot, followed by a value (`UNREAD_SIZE_CLAUSE`), flags the solid exactly as ADR-3D-340's unread value does. It is checked before the slots, so "slant height 5" is never read as the height.
+3. **Own line:** `revolutionSizeLine` (after the volume/area claim rules) reads «<size noun> (של)? ה<solid> (labels)? (הוא|=|bare) <value>», the cone-only «(אורך )?היוצר …», and "the <size noun> of the <solid> is|= <value>". It never claims a line; it records the solid in `SOLID_SIZE_UNREAD`, and `parse3` refuses `solid-size-unread` only after every rule declined. A value is required, so a question («רדיוס החרוט?») is untouched.
+4. **A volume or area claim on a free-size solid** is apply's `given-not-drivable` size refusal (the solid's kind), so the raw id and the work-around hint are gone. `free-size-claim`, its type member, its `errorText3` case and its `err.freeSizeClaim` keys are retired. A claim on a sized solid is unchanged. The admin dashboard's label for the old code stays, for logs already written.
+5. **The sentence** (`err.givenNotDrivableSize`, one key, the solid's own noun): he «הכלי עדיין לא יודע לקבוע את גודל ה{{solid}} לפי נתון כזה — היכולת הזאת נמצאת בפיתוח, ולכן הצעד לא נוסף.»; en "The tool can't yet set the {{solid}}'s size from a given like this — this capability is in development, so the step wasn't added." This is the plan's draft, tagged `[asked]`. ADR-3D-291's «SO = 3» on a cone of unstated height shares the key and shows the new sentence.
+
+**Measured after** (same sweep): 326 `given-not-drivable`, each naming the right solid, in the one sentence. The 15 controls record unchanged (the bare solids, «חרוט שרדיוסו 2 וגובהו 3», «…2.5…», «חרוט שרדיוס בסיסו 5 וגובהו 12», «חרוט שגובהו 3», «גליל שרדיוסו 2 וגובהו 5», «כדור שרדיוסו 2», the named cone, English, a volume claim on a sized cone, the pyramid height, the box volume); questions about a size are unchanged. A regression sweep of 542 sequences (every `fixtures3/` figure and both languages of the catalog), before vs after: **zero** changed verdicts.
+
+**Not changed.** The supported declaration spellings; the capability itself (reading a diameter or a separate size line), parked with #1569.
+
+**Locks.** New `src3d/parser/__tests__/issue-2076-revolution-size-in-development.test.ts`: the phrasing sweep (over 300 sequences, guarded) with the rendered Hebrew sentence per solid, the locale text (he/en), the retired key, twelve controls built to exactly their size, a volume claim on a sized cone verifying, questions untouched, the pyramid and box untouched. Re-based: `issue-2079-solid-size-fraction.test.ts` (rendered text), `issue-1590-given-not-drivable.test.ts` (the size sentence says «בפיתוח» / "in development"), `v5v6.test.ts` and `scenarios3.test.ts` (`free-size-claim` → the size refusal), `message-floor-2028.test.ts` (the retired code). Fixtures-first does not apply: the essence is a refusal with a specific message. No parity rows: solids of revolution are 3-D only (exception X7); `ex-sphere-fraction-2079` is unchanged (still refused).
+
+**Golden drift expected** (`decide-submit3-parity-1394`, the batch's to judge): a recorded case with one of these sentences (`not-understood` / `dropped-given` / `free-size-claim` → `given-not-drivable`), and the rendered text of the existing size refusals. Not re-recorded here.
+
+**Behaviour change for a student:** the size refusal now reads «הכלי עדיין לא יודע לקבוע את גודל החרוט לפי נתון כזה — היכולת הזאת נמצאת בפיתוח, ולכן הצעד לא נוסף.» (הגליל / הכדור for the other solids). A diameter, slant height, volume or area inside the declaration, any size on its own line («רדיוס החרוט הוא 2», «גובה החרוט 3», «אורך היוצר 5», "the height of the cone is 3"), and a volume or area line on a solid of unstated size get it, instead of «לא הצלחנו לצייר: …», the AI, or «מידות ה«cone» לא נתונות …». "cone with radius 2 and slant height 5" is refused instead of drawing a cone of height 5.
+
+## ADR-3D-364 — The model lane keeps every shape and role word the student typed: a misspelt word asks the owning gates, a role word its own family (#1906)
+
+**Status:** accepted · 2026-10-17 · bug (P2, 2d + 3d) · fix round #2304, stream Q · branch `fix/1906-model-keeps-shape-word` · implements the #1906 fix plan of 2026-10-08 (3-D half) · 2-D's side is [ADR-722](06-decisions.md#adr-722); the shared reader is [ADR-W-144](06w-decisions-workspace.md#adr-w-144) · **Amends** [ADR-3D-147](#adr-3d-147) (the model lane runs one more member)
+**Operator ruling (verbatim, 2026-10-08):** *"must survive into the AI answer's lowering, or the answer is refused"*, *"in 2-D and 3-D"*.
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-15 (new paragraph: the model's answer keeps every shape and role word) · [02w](02w-requirements-workspace.md) FR-SU-21 · **Design:** [04b](04b-design-3d.md) § "The submit decision" → *The model lane keeps every shape and role word* · **LADDER stage:** none (the honesty gates)
+
+**Measured before** (`main` @ de7c221f, `decideDeterministic3` then `decideSteps3` with canned answers). Recorded green: «משולש שווה צלעת ABC», «משולש שווה שוקיימ ABC», "equilaterl / isoceles triangle ABC" → the bare triangle; «מלבנ ABCD» / «מעוינ ABCD» → «מרובע ABCD»; «טרפז שווה שוקים ABCD» → «טרפז ABCD»; «AD גובה לצלע BC שהוא גם חוצה זווית» → «AD גובה לצלע BC» (the bisector gone — 3-D has no verb gate) or → «AD חוצה זווית BAC» (the altitude gone); «AD גובח / תיכנ לצלע BC» → the other cevian. Refused already: «משולש ישר-זויתי ABC» («ישר-זוית», the adjective regex reads the prefix) and «נתון משולש שווה צלעות ABC כלשהו» (spelt right).
+
+**The class.** As ADR-722: a property word reached the model-lane gates only when spelt as this grammar's regexes spell it, and role and direction words never.
+
+**Decision.**
+1. `decideSteps3` passes `lane: 'model'` through `decideCommands3` and `honestyRefusal3` to `lostGivens3`, which then adds `droppedPropertyWords3` (`src3d/parser/propertyWords3.ts`) and merges its items FIRST through the shared `mergeWordItems` (an older gate's own naming of the same word wins — «ישר-זוית» stays as measured; a construct noun inside the phrase gives way). The deterministic lane is unchanged.
+2. **Where:** the shared reader over `PROPERTY_VOCABULARY3` (a projection of `SHAPE_ADJ_WORDS3`, the quadrilateral nouns, `CEVIAN_NOUNS3_*` and the inscription verbs, locked to its atoms), vetoed by the new `readsWord3` (the declaration vocabulary, qualifiers, construct and neutral words).
+3. **Whether, per occurrence:** a SHAPE word asks the owning gates (`droppedShapeNoun3`, `droppedShapeAdjective3`) of the line spelt right against the same line without the word — their `length-rel` / `cos-angle` / `quad-shape.base` families, never a copy; an altitude needs `altitude-foot`, `tetra-altitude`, `height-to-face`, a ⟂ to a plane, `cos-angle` 0 or a `height` field; a median `point-on-segment3` at ½, `centroid3`, `midpoint-auto` or an equal pair; a bisector `bisector-ray` / `-dir` / `-point` or an angle equality; «חסום» / «חוסם» the `circle3` kind `statedCircleDirection3` (the grammar's `circleContains3`, now exported through it) gives the student's line.
+
+**Measured after.** Every "before" row refuses with `dropped-given` naming the word as typed («המשפט לא נוסף לציור, כי לא הצלחנו לצייר: שווה צלעת. …»); the faithful twins record; the two already-refused rows keep their message. False refusals: 0 of 248 `fixtures3/` facts (33 with a property word; a #2235 shape reference is skipped, since the lane judges the ring it expands to), 0 of 470 catalog examples, and of 29 recorded model answers only the true catch «מנסרה שבסיסה מלבן» answered «… מקבילית» (the base-noun gate refuses it too). The lexicon veto reads the parallel word through `PARALLEL_WORD3`, the one spelling `PAR_SPLIT` now composes, so «מקבילים» is never a slip for «מקבילית». A definite role noun naming drawn letters («הגובה AB») is a reference, as in 2-D.
+
+**Sibling audit.** 2-D: ADR-722. Analytic: #1906's third item. Complex: no lane. 3-D's grammar seam (#1902's unread words) is untouched.
+
+**Locks.** `src3d/__tests__/issue-1906-ai-answer-words3.test.ts` (the reported sequence and its exact text, every row, the twins, the circles, the shared rows, the vocabulary lock, the fixture / catalog / recorded-answer nets; `recorded-ai-answers-1906.json`).
+
+**Behaviour change for a student:** in 3-D, a model answer that drops a shape or role word the student typed — spelt right or one letter off — is refused with the dropped-given message naming it; an answer that keeps it records as before.
+
+**Slow-tier goldens that may drift:** `decide-submit3-parity-1394` replays the deterministic decision only — none expected.

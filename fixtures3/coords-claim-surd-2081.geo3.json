@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-17T13:22:21.523Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "A(0,0,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "B(√2,0,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "B",
+          "x": 1.4142135623730951,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "B=(√2,0,0)",
+      "cmds": [
+        {
+          "type": "claim",
+          "claim": {
+            "type": "coords-eq",
+            "id": "B",
+            "x": 1.4142135623730951,
+            "y": 0,
+            "z": 0
+          }
+        }
+      ]
+    }
+  ]
+}

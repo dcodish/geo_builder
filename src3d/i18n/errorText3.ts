@@ -86,6 +86,9 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #1666: the tool draws the givens; a claim to prove is named and left out.
     case 'proof-target':
       return t('err.proofTarget', { sentence: err.sentence });
+    // #1837 (ADR-W-142): an angle in radians — 2-D's ruled degrees sentence, verbatim (ADR-W-118 B1).
+    case 'radian-angle':
+      return t('err.radianAngle');
     // #1919 (ADR-3D-328): a letter the tool cannot read — the operator's two sentences, 2-D's wording
     // verbatim (ADR-W-118 B1), with the student's own letters.
     case 'unread-name':
@@ -182,6 +185,15 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
         : t('err.noRoots', { sym: err.sym, stated: err.stated });
     // #1815 (ADR-3D-309): 2-D's «X סותר את Y — אי אפשר לקיים את שניהם יחד» frame, with the geometric reason
     case 'polygon-collapsed': {
+      // #1860 (ADR-3D-358, operator ruling 2026-10-07): a declared SOLID the givens force flat — the shipped
+      // `polygonForced` frame with the solid's own noun, without the «all its vertices on one line» parenthesis
+      if (err.solid) {
+        const solidShape = t(`err.solidShape.${err.solid}`, { ids: err.ring });
+        const solidKind = t(`err.solidKind.${err.solid}`);
+        return err.others.length > 0
+          ? t('err.solidForced', { stated: err.stated, others: quoteList(err.others), shape: solidShape, kind: solidKind })
+          : t('err.solidForcedAlone', { stated: err.stated, shape: solidShape, kind: solidKind });
+      }
       const shape = t(`err.polygonNoun.${err.sides}`, { ring: err.ring });
       // #1849 (ADR-3D-310): a flatness the givens force on their own — named together, and why it is refused
       if (err.forced) {
@@ -249,8 +261,6 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #766: several declared solids answer the sentence — ask for more specific letters, never guess.
     case 'ambiguous-solid':
       return t('err.ambiguousSolid', { id: err.id, count: err.count });
-    case 'free-size-claim':
-      return t('err.freeSizeClaim', { id: err.id });
     case 'two-unknowns':
       return t('err.twoUnknowns', { id: err.id });
     case 'size-on-solid':

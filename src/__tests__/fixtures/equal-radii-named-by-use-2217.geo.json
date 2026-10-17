@@ -42,7 +42,8 @@
         "circle1": "circle-O",
         "circle2": "circle-P",
         "at": "M",
-        "external": true
+        "external": true,
+        "kindStated": false
       },
       "utterance": "שני מעגלים משיקים ברדיוסים שווים",
       "group": "g0",

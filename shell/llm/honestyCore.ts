@@ -176,3 +176,190 @@ export function unionByMax(...sources: readonly (readonly number[])[]): number[]
   for (const [k, n] of best) for (let i = 0; i < n; i++) out.push(k);
   return out;
 }
+
+/* ────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ * THE PROPERTY-WORD READER (#1906, [ADR-W-144](../../docs/06w-decisions-workspace.md#adr-w-144)).
+ *
+ * The operator's ruling (2026-10-08): *every shape or role word the student typed must survive into the AI
+ * answer's lowering, or the answer is refused*, and a MISSPELT word counts as present when the answer carries
+ * the property it plausibly names. So two questions, and this half answers the first: where in the student's
+ * line does a property word stand, and which properties may it name? The second (does the answer carry one of
+ * them) is each product's, over its own commands.
+ *
+ * The match, as the plan defined and measured it:
+ *  1. FOLD both sides with the product's folds (final letters, doubled vav/yod, case) and PEEL up to two clitic
+ *     letters, every way (a stem may begin with a clitic letter: «מלבן» is not «מ» + «לבן»).
+ *  2. A token IS the word w when a peeling is w, or w plus one of the closed INFLECTIONS.
+ *  3. Otherwise it is a NEAR MISS of w (w at least four letters) when a peeling is one Damerau-Levenshtein edit
+ *     from w, unless the product's lexicon READS the token as another word («מקבילים» is «מקביל» + «ים», never a
+ *     slip for «מקבילית»). Two edits reach other real words (measured: «מבחוץ», «שווים», «קובייה»), so one is the limit.
+ *  4. A phrase of several words («שווה צלעות») matches when each word, adjacent and in order, matches.
+ *  5. A near miss may name several properties; the occurrence keeps every candidate, and the product accounts
+ *     for it when the answer carries ANY of them.
+ *
+ * Product-neutral by construction (ADR-W-016): the vocabulary, the folds, the clitics, the inflections and the
+ * lexicon test all come from the caller.
+ * ──────────────────────────────────────────────────────────────────────────────────────────────────────────── */
+
+/** One vocabulary phrase: its word slots (each slot's spellings, as the product writes them) and what it names. */
+export interface PropertyPhrase<P> {
+  readonly slots: readonly (readonly string[])[];
+  readonly props: readonly P[];
+  /** false: only the word itself or an inflection, for a short or common word whose one-edit neighbours are other words */
+  readonly nearMiss?: boolean;
+}
+
+/** The product's word knowledge the reader needs, every piece of it the caller's own. */
+export interface WordReaderSpec {
+  /** fold one word (final letters to medial, doubled letters, case) */
+  fold(word: string): string;
+  /** the clitic letters a word may carry in front (peeled up to two, every way) */
+  readonly clitics: string;
+  /** the closed inflection set, as typed (folded by `fold` before use) */
+  readonly inflections: readonly string[];
+  /** does the product's lexicon read this word, as typed, as a word of its own (a stem plus an inflection, or filler)? */
+  readsWord(word: string): boolean;
+  /** the shortest vocabulary word a near miss may name. Default 4. */
+  readonly minNearMiss?: number;
+}
+
+/** One property phrase found in the student's line. */
+export interface PropertyOccurrence<P> {
+  /** the student's own words, as typed */
+  readonly text: string;
+  readonly start: number;
+  readonly end: number;
+  /** every phrase this occurrence may be, each with the canonical spelling it stands for */
+  readonly candidates: readonly { readonly phrase: PropertyPhrase<P>; readonly canonical: string }[];
+  /** true when every word is the vocabulary word itself (or an inflection), false for a near miss */
+  readonly exact: boolean;
+}
+
+/**
+ * Damerau-Levenshtein distance (optimal string alignment: insert, delete, substitute, swap two neighbours),
+ * stopped early once it exceeds `cap`.
+ */
+export function editDistance(a: string, b: string, cap = 2): number {
+  if (Math.abs(a.length - b.length) > cap) return cap + 1;
+  const d: number[][] = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) d[i][0] = i;
+  for (let j = 0; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let rowMin = Infinity;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let v = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, d[i - 2][j - 2] + 1);
+      d[i][j] = v;
+      rowMin = Math.min(rowMin, v, d[i][0]);
+    }
+    if (rowMin > cap) return cap + 1;
+  }
+  return d[a.length][b.length];
+}
+
+/** The word tokens of a line: runs of Hebrew or Latin letters. A label run (all capitals) is never a word. */
+function wordTokens(text: string): { text: string; start: number; end: number }[] {
+  const out: { text: string; start: number; end: number }[] = [];
+  for (const m of text.matchAll(/[א-ת]+|[A-Za-z]+/g)) {
+    if (/^[A-Z]+$/.test(m[0])) continue;
+    out.push({ text: m[0], start: m.index!, end: m.index! + m[0].length });
+  }
+  return out;
+}
+
+/** The folded peelings of a token: itself, and with one or two clitic letters taken off the front. */
+function peelings(folded: string, clitics: string): string[] {
+  const out = [folded];
+  if (folded.length > 2 && clitics.includes(folded[0])) {
+    out.push(folded.slice(1));
+    if (folded.length > 3 && clitics.includes(folded[1])) out.push(folded.slice(2));
+  }
+  return out;
+}
+
+/**
+ * Every property phrase the student's line states, exact or one edit off, left to right. A word belongs to one
+ * occurrence: the longest phrase that starts at it.
+ */
+export function propertyWords<P>(text: string, vocabulary: readonly PropertyPhrase<P>[], spec: WordReaderSpec): PropertyOccurrence<P>[] {
+  const min = spec.minNearMiss ?? 4;
+  const inflections = spec.inflections.map((i) => spec.fold(i));
+  const toks = wordTokens(text).map((t) => {
+    const variants = peelings(spec.fold(t.text), spec.clitics);
+    return { ...t, variants, read: spec.readsWord(t.text) };
+  });
+  const isWord = (variants: readonly string[], w: string): boolean =>
+    variants.some((v) => v === w || inflections.some((i) => v === w + i));
+  const folded = vocabulary.map((ph) => ph.slots.map((slot) => slot.map((w) => ({ raw: w, f: spec.fold(w) }))));
+  // a token that IS some vocabulary word is never a near miss of another
+  const anyExact = toks.map((t) => folded.some((ph) => ph.some((slot) => slot.some((w) => isWord(t.variants, w.f)))));
+  /** how token `ti` fills `slot`: the spelling it is, the spelling it is one edit from, or null */
+  const fill = (ti: number, slot: readonly { raw: string; f: string }[], near: boolean): { how: 'exact' | 'near'; raw: string } | null => {
+    const t = toks[ti];
+    for (const w of slot) if (isWord(t.variants, w.f)) return { how: 'exact', raw: w.raw };
+    if (!near || anyExact[ti] || t.read) return null;
+    for (const w of slot) if (w.f.length >= min && t.variants.some((v) => editDistance(v, w.f, 1) <= 1)) return { how: 'near', raw: w.raw };
+    return null;
+  };
+  const adjacent = (a: number, b: number): boolean => /^[\s\-־]*$/.test(text.slice(toks[a].end, toks[b].start));
+
+  const out: PropertyOccurrence<P>[] = [];
+  for (let i = 0; i < toks.length; ) {
+    let best: { len: number; exact: boolean; phrase: PropertyPhrase<P>; canonical: string }[] = [];
+    vocabulary.forEach((ph, pi) => {
+      const slots = folded[pi];
+      if (i + slots.length > toks.length) return;
+      const words: string[] = [];
+      let exact = true;
+      for (let j = 0; j < slots.length; j++) {
+        if (j > 0 && !adjacent(i + j - 1, i + j)) return;
+        const f = fill(i + j, slots[j], ph.nearMiss !== false);
+        if (!f) return;
+        if (f.how === 'near') exact = false;
+        words.push(f.raw);
+      }
+      const cand = { len: slots.length, exact, phrase: ph, canonical: words.join(' ') };
+      if (best.length === 0 || cand.len > best[0].len) best = [cand];
+      else if (cand.len === best[0].len) best.push(cand);
+    });
+    if (best.length === 0) {
+      i++;
+      continue;
+    }
+    // an exact reading wins over a near miss of the same length
+    const exactOnes = best.filter((b) => b.exact);
+    const chosen = exactOnes.length ? exactOnes : best;
+    const len = chosen[0].len;
+    out.push({
+      text: text.slice(toks[i].start, toks[i + len - 1].end),
+      start: toks[i].start,
+      end: toks[i + len - 1].end,
+      candidates: chosen.map((c) => ({ phrase: c.phrase, canonical: c.canonical })),
+      exact: exactOnes.length > 0,
+    });
+    i += len;
+  }
+  return out;
+}
+
+/** `text` with one span replaced: the line as the student would have written it with the word spelt right. */
+export function withSpan(text: string, start: number, end: number, replacement: string): string {
+  return text.slice(0, start) + replacement + text.slice(end);
+}
+
+/**
+ * The ONE merge of the word member's items into the other gates' (#1906): a word the student typed is named once.
+ * An item that is a whole-word part of a word phrase («מעגל» inside «מעגל חסומ») gives way to the phrase; a word
+ * phrase another item already covers («ישר-זויתי» against the older gate's own «ישר-זוית») is not repeated.
+ * Returns the word items first, then the others, each in its original order.
+ */
+export function mergeWordItems(others: readonly string[], words: readonly string[]): string[] {
+  const norm = (s: string): string => ` ${s.replace(/[\s\-־]+/g, ' ').trim()} `;
+  const wholePart = (part: string, whole: string): boolean => part !== whole && norm(whole).includes(norm(part));
+  const keptWords = words.filter(
+    (w, i) => words.indexOf(w) === i && !others.some((o) => o === w || o.includes(w) || (w.includes(o) && !wholePart(o, w))),
+  );
+  const keptOthers = others.filter((o) => !keptWords.some((w) => wholePart(o, w)));
+  return [...keptWords, ...keptOthers];
+}

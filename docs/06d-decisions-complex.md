@@ -4338,3 +4338,65 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Performance (docs/17 §7).** Two regex tests per line and one per `lex`; no fold, solve or sample change.
 
 **Locks.** `src-complex/__tests__/mixed-number-2247.test.ts`: the slot grid (real part, imaginary part, modulus, polar modulus in both spellings, the cis angle, a root equation, the fraction slash, a spaced slash, a leading sign — each row's decimal twin accepted first), the he + en sentences, the no-decimal and parenthesised forms, each taught spelling read back to its value, refusal on a populated figure; the `numbers` grid with each offered product driving to its modulus; the lexer refusal; eleven unchanged twins; the glyphs (|z| = 2½ → modulus «5/2»; «z1½» not a decimal); the text lock (the mixed-number regex and the four sentences equal analytic's). The two new keys in `message-floor-2028.test.ts`. Fixture `fixtures/mixed-number-glyph-2247.complex.json` («z1 = 2½ + i» · «|z2| = 2½» · «z3 = 1¼ - 2¾i» · «w = ½z1»).
+
+## ADR-CX-082 — A definition whose parameters are known is the number they make it (#1818)
+
+**Status:** accepted, 2026-10-17 · **Issue:** [#1818](https://github.com/dcodish/geo_builder/issues/1818) (bug, `P2`, `complex`) · fix round #2291, stream M · branch `fix/1818-complex-quadratic-param` from `main` @ `b0e9dbea` · plan of 2026-10-07 (`/decisions` pass), armed `auto-ok` 2026-10-08
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-10 (one sentence: a definition in any polynomial form of its parameters becomes that number, exactly, once they are known) ·
+**Design:** [04d](04d-design-complex.md), "A definition whose parameters are known is the number they make it" ·
+**Ladder:** stage 1a′, a known definition is re-classified ([LADDER-CX](LADDER-CX.md))
+
+**Measured at pickup** (`main` @ `b0e9dbea`, `deriveLines` with the ask lane). «a = -1» · «z1 = (2a^2+5a+4) + (2a^2+3a+2)i»: drawn at 1+i, but read «z₁ ≈ 1.41·cis45°», «|z1|» answered «1.41», `freeDof = [|z1|, arg z1]`. The exam's four lines (2022 חורף Q3 א: both definitions, «a = -1», «z1 ו-z2 צמודים זה לזה»), in either order: both numbers the bare «z₁»/«z₂», four free DOF, the claim `unknown` (`undecided-mod-pair`); with «a = 4» the same. «a = 2 · z1 = a^2 + i», «a = 2 · b = 3 · z1 = a*b + i», «a = 1/2 · z1 = a^3 + ai», the solved «z1 = 3+4i · |z1| = 10r · z2 = r^2 + i», and the affine «a = -1 · z1 = (2a+5)+(3a+2)i» all kept `[|z|, arg z]` free. The plan's account held; ADR-CX-080 had since turned the bare name into «≈» for the affine and non-affine spellings with a valued parameter.
+
+**The class.** *A number DEFINED by an expression in real parameters was carried only as a deferred numeric residual, and never became the number its known parameters make it* — in every polynomial spelling, for a typed or a solved parameter, the affine one included (whose reading ADR-CX-058 already substituted, but whose DOF count and claims were still wrong).
+
+**Root cause.** Tier 1 reads monomial rows only; the parser's `foldConstants`, which makes a typed `1+i` exact, runs per line before any parameter value is known; the closed-definition pass (ADR-CX-050) evaluates only a parameter-free definition; and only stage 5d's reading (`cartesianForm.ts`) substituted known parameters, into an affine form. So the exact carriers, the DOF count, knowledge and the claim verifier never learned the value.
+
+**Decision.**
+1. **The value core moves out of the parser** to `model/fold.ts` (`radicalValue`, `constValue`, `closedValue`, `foldConstants`), so replay may call it without importing the parser (`import-direction.test.ts`). The parser re-exports `foldConstants` and calls it unchanged. The core gains an integer-power case (bounded at 64, repeated exact multiplication); the parser's fold never reaches it, because it asks `constValue` first and that is null for any power, so a typed power stays as written. New `closedUnder(E, known, atoms)`: substitute the known rationals, read with the exact walk, return the literal or null (a name left, a closed zero, a pair the table cannot carry).
+2. **Stage 1a′ in the fold** (`closeKnownDefinitions`, `replay/derive2.ts`): solve tier 1; take each parameter that solve makes an exact rational with a known sign (`knownRationalParams` — the parameters section's own predicate, a sign-free parameter's sign known only when every enumerated branch agrees); replace each deferred `eq` row `name = E` (E naming no complex number) that `closedUnder` closes with `name = literal`; re-solve; repeat while a round closes a row. The claim drive rows (ADR-CX-029) are computed from the result. No new solver concept: the row is the one a typed literal lowers to, so everything downstream (exact carriers, readings, knowledge, DOF, conjugates/type verifiers) is the literal's path.
+3. **The student's own rows are kept** for what reads statements rather than values: the canvas (`statedList`), the valued-letter chips, the formulas and the rotations, and the parameter sampling. A parameter still free, irrational (`a = √2`) or of unknown sign leaves the row untouched — today's reading, unchanged.
+
+**Behaviour change for a student** (every line `[ruled]` in the plan):
+- «a = -1» · «z1 = (2a^2+5a+4) + (2a^2+3a+2)i»: «מהו z1?» answers «1+i», «|z1|» answers «√2»; z₁ reads «z₁ = 1+i» / «z₁ = √2·cis45°» in the panel and on the canvas, exactly as the typed «z1 = 1+i». Before: «≈ 1.41», «≈ 1.41·cis45°».
+- With the parameter known, the status no longer counts the number as free (the exam figure: «הציור נקבע במלואו»).
+- «z1 ו-z2 צמודים זה לזה» over the exam's two definitions holds with «a = -1» and does not hold with «a = 4». Before: "can't tell" in both.
+- Unchanged: a definition whose parameter is still free (the claim does not FIND a = −1 — #1410, parked, and FR-KN-2 vs ADR-CX-029 remain the operator's question).
+
+**Siblings.** 2-D and 3-D have no complex definitions. Analytic, measured at `b0e9dbea` with «a = -1» · «A(a, a^2)» (and «A(2a^2+5a+4, 2a^2+3a+2)»): the line «a = -1» is `not-handled` there, so the point stays parametric at a sampled a — a different lowering and a different gap (analytic has no "parameter = value" sentence), not this mechanism; not changed here.
+
+**Performance (docs/17 §7).** One extra tier-1 solve per round that closes a row (bounded by the row count, in practice one); a figure with no known parameter or no deferred definition costs one map scan.
+
+**Locks.** `src-complex/__tests__/param-definition-closed-1818.test.ts`: the exam sequence in three orders (`a = -1` first, after the definitions, last) at 24 seeds each — `freeDof = []`, the claim holds, «z1» → «1+i», «z2» → «1-i», «|z1|» → «√2»; the reading equals the typed literal's; «a = 4» refuted with z₁ = 56+46i, z₂ = 56−6i; a free a unchanged; the class (`a^2`, `a*b`, `a^3`, the affine form, the solved r → z₂ = 1/4+i); `a = √2` not claimed exact; `closedUnder` units (integer power, unknown parameter, complex name, zero, fractional power). Fixture `fixtures/exam-2022w-a-quadratic-1818.complex.json` (the exam's four lines). #1535's lock 6 may now swap to this sequence, as its plan says.
+
+## ADR-CX-084 — A restatement the exact solve already entails adds no row, and says so (#2268)
+
+**Status:** accepted, 2026-10-17 · **Issue:** [#2268](https://github.com/dcodish/geo_builder/issues/2268) (bug, `P3`, `complex`) · fix round #2304, stream P · branch `fix/2268-complex-entailed-noop` from `main` @ `de7c221f` · plan armed `auto-ok` 2026-10-16
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-5 (a restatement that adds nothing is answered, not recorded) ·
+**Design:** [04d](04d-design-complex.md), "A restatement the exact solve already entails adds no row" ·
+**Ladder:** stage 0e′, already entailed ([LADDER-CX](LADDER-CX.md))
+
+**Measured at pickup** (`main` @ `de7c221f`, `submitLine` + `deriveLines`). «z1 = 15cis(π/7)» · «|z1| = 15» (T85) and «z1 = 5cis(π/7)» · «z2 = 15cis(π/7)» · «z2 = 3z1» (T86): the last line accepted and recorded as a new row, no sentence. «z1 = 3+4i» · «|z1| = 5», «z1 = 2cis30» · «arg z1 = 30», «|z1| = 5» twice, «|z1| = 5» · «z2 = 2z1» · «|z2| = 10», «z1 = 3+4i» · «z1 = 3+4i», «a = 2» twice: the same. Controls as the plan says: «|z1| = 15» alone recorded; «|z1| = 14» after «z1 = 15cis(π/7)» refused `incompatible`. The plan's account held.
+
+**The class.** *A complex statement already entailed exactly by the earlier statements is recorded as a new given instead of answered as already known.*
+
+**Root cause.** `submitLine` had two outcomes for a line that reads: refused by the gate (stage 0e), or recorded. Nothing asked whether the line added anything. Since ADR-CX-071 tier 1 carries these literals exactly, so the question can be answered from the exact solve alone.
+
+**Decision.**
+1. **One predicate, `entailedBy(before, after)`** (`replay/derive2.ts`), over the lowered statements of the active lines without and with the new one. The line is entailed when it adds constraint rows and nothing else (no name, object, claim, measure, filter, sequence, selection, solution set, typed-real letter, alias or unread line), none of its rows is deferred to the numeric tier, and tier 1 after it (base and claim-driven) is consistent with the same free directions, parameter signs, free parameters, exact moduli, parameter values, impossible and undecided lists, and the same enumerated branches as directions (`sameDirection`, provable equality only). Tier 1 is linear over ℚ, so a consistent row that changes none of these lies in the span of the earlier rows: a theorem of them for every configuration. Nothing is sampled. The fold's exact half moves into `exactSolve`, which `foldConstraints` and `entailedBy` share, so the two cannot disagree.
+2. **`submitLine` asks it** (`lineEntailed`, `app/deriveLines.ts`) after the line reads and before the gate. Entailed → `true`, no row, `lastNote = { key: 'already-known' }`, shown as a notice banner with 2-D's `input.alreadyDrawn` sentence «זה כבר קיים באיור — אין מה להוסיף.» (en twin). The note is transient (outside undo) and cleared by the next step, like `lastError`.
+3. **A load replays as saved** (`submitLine(line, true)` from `hydrateSession`): a restatement saved by an older build stays a row. The session is the student's record, and the #2134 fixture is unchanged.
+4. **Conservative in the harmless direction.** Re/Im, a distance and every other deferred relation are recorded as today, even when they happen to be true: the #2134 lesson, a float landing near a value is not identity. A claim («z1 ממשי») is the student's answer and is never "already known".
+
+**Behaviour change for a student** (plan lines `[asked]` and `[2-D]`):
+- «|z1| = 15» after «z1 = 15cis(π/7)» is accepted with «זה כבר קיים באיור — אין מה להוסיף.» and adds no row (T85).
+- «z2 = 3z1» after «z1 = 5cis(π/7)» · «z2 = 15cis(π/7)» likewise (T86).
+- The same answer for every restatement tier 1 decides exactly, the sibling rows measured: a modulus, an argument, a relation `z = k·w`, a conjugate in both entry orders, a definition the givens already make («z1 = 5cis30» after «|z1| = 5» · «arg z1 = 30»), the same given typed twice, a parameter value. Unchanged: «Re(z1) = 3» / «Im(z1) = 4» after «z1 = 3+4i» are recorded (numeric tier); «|z1| = 15» over a free z1 is recorded; «|z1| = 14» is refused.
+
+**Cross-builder (ADR-W-118 B1).** One verdict for a true restatement: 2-D answers it with this sentence as a noop (measured in the plan at `4da0e990`), and analytic answers «כבר ידוע» (#1045). 3-D is not changed here.
+
+**Not changed.** `editLine` and `toggleLine` keep their gate: editing a row into a restatement leaves it a row. 2-D's edit path says «already drawn» there; this is proposed as found work, not built.
+
+**Performance (docs/17 §7).** Two extra exact solves per typed line (tier 1 without and with the line), no numeric tier; the gate's fold runs as before for every line that is not entailed.
+
+**Locks.** `src-complex/__tests__/entailed-noop-2268.test.ts`: T85 and T86 (no row, the note, no error, the figure unchanged, the next line clears the note); the 2-D sentence in both languages; the eleven sibling rows; the controls (a free z1, an unrelated modulus, a new name, a claim, Re/Im, «|z1| = 14», an argument that cuts an enumerated pair); the #2134 fixture replays all three lines on load. No fixture: the essence is a noop, which a saved session cannot carry.

@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-17T09:35:44.954Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "משולש DEF",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "D",
+            "E",
+            "F"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "DE = 2",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "D",
+          "b": "E"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "D",
+            "b": "E",
+            "value": 2
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "AB = 5",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "B",
+            "value": 5
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -31,7 +31,7 @@ import { cArgDeg, cPolar, evaluate, exact, formatPolar, fromCartesian } from '..
 import { closedParts, definitionOf, statedAs, substituteKnown, symbolicParts, valuedParamOf } from '../model/cartesianForm';
 import { type Rat, rat, toNumber, add as ratAdd, sub as ratSub, mul as ratMul, div as ratDiv, neg as ratNeg, isZero as ratIsZero, sqrtExact } from '../value/rational';
 import { composeCartesian, gaussianRationalParts, numericPart, ratPart, readableCartesianParts } from '../value/cartesian';
-import { type ExpVec, evaluate as evalMod, format as fmtMod, fromRational as modFromRational, pow as modPow, isOne as modIsOne, isParametric } from '../value/modulus';
+import { type ExpVec, eq as modEq, evaluate as evalMod, format as fmtMod, fromRational as modFromRational, pow as modPow, isOne as modIsOne, isParametric } from '../value/modulus';
 import {
   type Angle,
   add as angAdd,
@@ -43,7 +43,8 @@ import {
   zero as angZero,
 } from '../value/angle';
 import { type Expr, paramsOf, refsOf } from '../model/expr';
-import { type Branch, isTurnUnknown, solveTier1, substituteSolvedParams } from '../solve/tier1';
+import { type Branch, type Tier1Result, isTurnUnknown, solveTier1, substituteSolvedParams } from '../solve/tier1';
+import { closedUnder } from '../model/fold';
 import { isSignUnknown, linearize, paramOfSignUnknown, signUnknown } from '../solve/logpolar';
 import { paramSigns } from '../model/paramSign';
 import type { Claim as Assertion, CheckedClaim } from '../model/claim';
@@ -386,6 +387,181 @@ const magnitudes = (m: ReadonlyMap<string, number>): Map<string, number> =>
 const HALF_TURN = fromTurns(rat(1, 2));
 
 /**
+ * #1818 — every parameter a tier-1 solve makes an exact RATIONAL with a known sign: the predicate the
+ * parameters section prints from (`rationalParams`), asked of one solve before any filter. A sign-free
+ * parameter's sign is known only when EVERY enumerated branch agrees on it; filters only remove
+ * branches, so agreement here is agreement after them. An irrational value (√2) is never substituted.
+ */
+function knownRationalParams(t: Tier1Result): Map<string, Rat> {
+  const out = new Map<string, Rat>();
+  for (const [p, v] of t.paramValues) {
+    if (isParametric(v)) continue;
+    let dir = angZero();
+    if (t.signedParams.includes(p)) {
+      if (!t.branches.length || t.branchesTruncated) continue;
+      const dirs = t.branches.map((b) => b.angles.get(signUnknown(p)));
+      if (dirs.every((a) => a !== undefined && sameDirection(a, HALF_TURN))) dir = HALF_TURN;
+      else if (!dirs.every((a) => a !== undefined && sameDirection(a, angZero()))) continue;
+    }
+    const q = gaussianRationalParts(v, dir);
+    if (q && ratIsZero(q.im)) out.set(p, q.re);
+  }
+  return out;
+}
+
+/**
+ * #1818 ([ADR-CX-082](../../docs/06d-decisions-complex.md#adr-cx-082)) — STAGE 1b: a DEFINITION whose
+ * parameters are known is the number they make it.
+ *
+ * `z1 = (2a^2+5a+4) + (2a^2+3a+2)i` is not monomial, so tier 1 defers it to the numeric residue — and
+ * it stayed there after `a = -1` made it 1+i: drawn in the right place, but with no exact carrier, so
+ * the DOF cue counted it free, its reading had no value and a claim about it could not be decided. The
+ * parser cannot fold it (it reads one line, before any value is known); only the fold knows.
+ *
+ * So: solve once, substitute every known rational parameter into each deferred `name = E` whose E names
+ * no complex number, and when the exact walk (the parser's own core, `model/fold.ts`) closes E to a
+ * literal, the row becomes `name = literal` — the row a typed literal lowers to — and tier 1 is solved
+ * again. Repeated while a round closes a row, so a parameter solved only through a closed definition
+ * reaches the next one. A definition still holding an unknown parameter is left exactly as it was.
+ */
+function closeKnownDefinitions(
+  given: readonly Constraint[],
+  signed: ReadonlySet<string>,
+  givenAtoms: ReadonlyMap<string, number>,
+): { constraints: readonly Constraint[]; atoms: ReadonlyMap<string, number>; t1: Tier1Result } {
+  const atoms = new Map(givenAtoms);
+  let rows = given;
+  let t1 = solveTier1(rows, signed, atoms);
+  for (let round = 0; round < given.length && !t1.inconsistent; round++) {
+    const known = knownRationalParams(t1);
+    if (!known.size) break;
+    const deferred = new Set(t1.deferred);
+    let changed = false;
+    const next = rows.map((c): Constraint => {
+      if (!deferred.has(c) || (c.kind ?? 'eq') !== 'eq') return c;
+      const side = c.lhs.t === 'ref' ? 'rhs' : c.rhs.t === 'ref' ? 'lhs' : null;
+      if (!side || paramsOf(c[side]).length === 0) return c;
+      const lit = closedUnder(c[side], known, atoms);
+      if (!lit) return c;
+      changed = true;
+      return side === 'rhs' ? { ...c, rhs: lit } : { ...c, lhs: lit };
+    });
+    if (!changed) break;
+    rows = next;
+    t1 = solveTier1(rows, signed, atoms);
+  }
+  return { constraints: rows, atoms, t1 };
+}
+
+/** The exact half of a fold — everything stages 1a…1a′ and the claim drive decide, before any sample. */
+interface ExactSolve {
+  readonly signed: ReadonlySet<string>;
+  readonly constraints: readonly Constraint[];
+  readonly literalSample: ReadonlyMap<string, number>;
+  readonly t1Base: Tier1Result;
+  readonly t1: Tier1Result;
+}
+
+/**
+ * The fold's EXACT solve, the one definition `foldConstraints` and {@link entailedBy} share — pure over
+ * the lowered statements, independent of the seed and of the configuration index.
+ */
+function exactSolve(input: Omit<FoldInput, 'configIndex' | 'seed'>): ExactSolve {
+  const { constraints: given, atoms: givenAtoms, assertions = [], objects = [], measures = [], realTyped = [] } = input;
+  const realLetters = new Set(realTyped);
+  /**
+   * #1387/#1406 (ADR-CX-045) — a parameter's SIGN follows its use: a size (`|z1| = 9r`, a radius, a
+   * measure, a scale factor) is positive; any other use (`a + b·i`, `u^5 = -32`) is any real. Decided
+   * ONCE here, over everything the figure states, and read by both tiers.
+   */
+  const { signed } = paramSigns({ constraints: given, objects, measures });
+  // #1481 — the literal atoms' degrees are fixed constants: tier 1 decides an opaque atom with them.
+  // #1818 — and a definition its known parameters close is solved as the literal it is (stage 1b)
+  const { constraints, atoms: literalSample, t1: t1Base } = closeKnownDefinitions(given, signed, givenAtoms);
+  // #1894 — a claim about a real-parameter letter is checked by its type, never driven: driving it
+  // would make the letter a complex unknown, the phantom point this lane exists to prevent
+  const driveRows = claimDriveRows(assertions.filter((a) => !('name' in a) || !realLetters.has(a.name)), t1Base);
+  const t1 = driveRows.length ? solveTier1([...constraints, ...driveRows], signed, literalSample) : t1Base;
+  return { signed, constraints, literalSample, t1Base, t1 };
+}
+
+/**
+ * #2268 ([ADR-CX-084](../../docs/06d-decisions-complex.md#adr-cx-084)) — STAGE 0e′: is the new statement
+ * ALREADY ENTAILED, exactly, by the ones before it?
+ *
+ * `after` is `before` plus one line. It is entailed when that line adds nothing but exact rows, and those
+ * rows leave tier 1's solution set exactly as it was: still consistent, the same free directions, the
+ * same exact moduli and parameters, the same enumerated branches. Tier 1 is linear over ℚ, so a
+ * consistent row that changes none of these lies in the span of the rows already there: it is a theorem
+ * of them, for every configuration at once. That is the whole test; nothing is sampled.
+ *
+ * Conservative on purpose, in the one direction that is harmless: anything the line brings besides
+ * tier-1 rows (a new name, an object, a claim, a measure, a filter, a sequence, a row tier 1 defers to the
+ * numeric residue, a statement left unread) makes it NOT entailed, and it is recorded as today. A float
+ * landing near a value is never identity (the #2134 lesson), so a deferred row is never "already known".
+ */
+export function entailedBy(
+  before: Omit<FoldInput, 'configIndex' | 'seed'>,
+  after: Omit<FoldInput, 'configIndex' | 'seed'>,
+): boolean {
+  const len = (xs: { readonly length: number } | { readonly size: number } | undefined): number =>
+    xs === undefined ? 0 : 'size' in xs ? xs.size : xs.length;
+  // the line contributes ROWS and nothing else
+  if (after.constraints.length <= before.constraints.length) return false;
+  const others = (f: typeof before): number[] =>
+    [f.filters, f.assertions, f.objects, f.measures, f.sequences, f.selections, f.solutionSets, f.realTyped, f.untranslated, f.aliases].map(len);
+  const [was, now] = [others(before), others(after)];
+  if (was.some((n, i) => n !== now[i])) return false;
+  const a = exactSolve(before);
+  const b = exactSolve(after);
+  const [s, t] = [a.t1, b.t1];
+  if (s.inconsistent || t.inconsistent || a.t1Base.inconsistent || b.t1Base.inconsistent) return false;
+  // a name the line brought into existence is a definition, never a restatement
+  const known = new Set([...s.names, ...before.declared]);
+  if (t.names.some((n) => !known.has(n)) || after.declared.some((n) => !known.has(n))) return false;
+  if (t.impossible.length !== s.impossible.length || t.undecided.length !== s.undecided.length) return false;
+  if (t.deferred.length !== s.deferred.length || b.t1Base.deferred.length !== a.t1Base.deferred.length) return false;
+  if (!sameSet(a.signed, b.signed) || !sameList(s.signedParams, t.signedParams)) return false;
+  if (!sameList([...s.freeDof].sort(), [...t.freeDof].sort())) return false;
+  if (!sameList([...s.params.free].sort(), [...t.params.free].sort())) return false;
+  if (!sameExpMap(s.knownModulus, t.knownModulus) || !sameExpMap(s.paramValues, t.paramValues)) return false;
+  return sameBranches(s, t);
+}
+
+const sameList = (x: readonly string[], y: readonly string[]): boolean => x.length === y.length && x.every((v, i) => v === y[i]);
+const sameSet = (x: ReadonlySet<string>, y: ReadonlySet<string>): boolean => x.size === y.size && [...x].every((v) => y.has(v));
+
+function sameExpMap(x: ReadonlyMap<string, ExpVec>, y: ReadonlyMap<string, ExpVec>): boolean {
+  if (x.size !== y.size) return false;
+  for (const [k, v] of x) {
+    const w = y.get(k);
+    if (!w || !modEq(v, w)) return false;
+  }
+  return true;
+}
+
+/** The same enumerated configurations, as directions — provable equality only (`sameDirection`). */
+function sameBranches(s: Tier1Result, t: Tier1Result): boolean {
+  if (s.branchesTruncated || t.branchesTruncated || s.branches.length !== t.branches.length) return false;
+  const dirs = (b: Branch): [string, Angle][] => [...b.angles].filter(([n]) => !isTurnUnknown(n));
+  const same = (p: Branch, q: Branch): boolean => {
+    const pd = dirs(p);
+    const qd = new Map(dirs(q));
+    return pd.length === qd.size && pd.every(([n, ang]) => {
+      const o = qd.get(n);
+      return o !== undefined && sameDirection(ang, o);
+    });
+  };
+  const used = new Set<number>();
+  return s.branches.every((p) => {
+    const i = t.branches.findIndex((q, j) => !used.has(j) && same(p, q));
+    if (i < 0) return false;
+    used.add(i);
+    return true;
+  });
+}
+
+/**
  * #1427 — how many multi-start solves the n-D census may spend over ALL branches of one fold. Split
  * evenly (at least 4 per branch), fixed rather than timed so the configuration set is deterministic:
  * a timed census would draw a different list on a slower machine.
@@ -499,10 +675,9 @@ export interface ResolvedSelection extends SolutionSelection {
  */
 export function foldConstraints(input: FoldInput): Derived2 {
   const {
-    constraints,
+    constraints: given,
     filters: filterList,
     declared: declaredNames,
-    atoms: literalSample,
     untranslated,
     configIndex,
     seed,
@@ -532,22 +707,13 @@ export function foldConstraints(input: FoldInput): Derived2 {
    * so a per-line lowering structurally CANNOT decide "is my subject already pinned?". `foldConstraints`
    * is the one place that knows — it already holds tier 1's `freeDof` and `knownModulus` — and #680 hits
    * the same wall with `rootsMode`, so fixing the seam once serves both. See `solve/claimDrive.ts`.
+   * The solve itself is `exactSolve`, shared with `entailedBy` (#2268).
    */
-  /**
-   * #1387/#1406 (ADR-CX-045) — a parameter's SIGN follows its use: a size (`|z1| = 9r`, a radius, a
-   * measure, a scale factor) is positive; any other use (`a + b·i`, `u^5 = -32`) is any real. Decided
-   * ONCE here, over everything the figure states, and read by both tiers.
-   */
-  const { signed } = paramSigns({ constraints, objects, measures });
-  // #1481 — the literal atoms' degrees are fixed constants: tier 1 decides an opaque atom with them
-  const t1Base = solveTier1(constraints, signed, literalSample);
-  // #1894 — a claim about a real-parameter letter is checked by its type, never driven: driving it
-  // would make the letter a complex unknown, the phantom point this lane exists to prevent
-  const driveRows = claimDriveRows(assertions.filter((a) => !('name' in a) || !realLetters.has(a.name)), t1Base);
-  const t1 = driveRows.length ? solveTier1([...constraints, ...driveRows], signed, literalSample) : t1Base;
+  const { signed, constraints, literalSample, t1 } = exactSolve(input);
 
   const baseSample = new Map(literalSample);
-  for (const c of constraints) {
+  // the parameters the student's own rows mention, a closed definition's included (#1818)
+  for (const c of given) {
     for (const p of collectParams(c)) if (!baseSample.has(p)) baseSample.set(p, paramSample(p, seed));
   }
   // An OBJECT or a MEASURE can be the only mention of a parameter — «המעגל שמרכזו O ורדיוסו r» and
@@ -1979,10 +2145,10 @@ export function foldConstraints(input: FoldInput): Derived2 {
    *   the view's own form; still holding a letter → the typed form in BOTH views (W8: its polar form
    *   depends on the letter's sign, which nothing states). A letter the TOOL solved stays a letter.
    */
-  const studentValued = new Set(valuedBy ? valuedBy.keys() : constraints.map(valuedParamOf).filter((p): p is string => p !== null));
+  const studentValued = new Set(valuedBy ? valuedBy.keys() : given.map(valuedParamOf).filter((p): p is string => p !== null));
   const shownValues = new Map([...rationalParams].filter(([p]) => studentValued.has(p) && !letterParams.has(p)));
   const setMembers = stated ? new Set<string>() : new Set([...solutionSets.values()].flat());
-  const statedList = stated ?? constraints;
+  const statedList = stated ?? given;
   const aliasOf = new Map<string, string>([...aliases, ...selectionAliases]);
   const competing = new Set<string>();
   const canvasPoints: DerivedPoint[] = shownPoints.map((p) => {
@@ -2062,7 +2228,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     points: canvasPoints,
     objects: resolvedObjects.drawn,
     sequences: t1.inconsistent ? [] : resolveSequences(sequences, points),
-    rotations: t1.inconsistent ? [] : resolveRotations(constraints, points),
+    rotations: t1.inconsistent ? [] : resolveRotations(given, points),
     enumeratedConfigCount,
     hasConfiguration,
     configIndex: index,
@@ -2084,7 +2250,7 @@ export function foldConstraints(input: FoldInput): Derived2 {
     canCycle: configCount > 1 || closure.remainingDof > 0,
     emptiedBy,
     claims: verifyClaims(assertions, t1, branch, realLetters),
-    formulas: t1.inconsistent ? [] : surfacedFormulas(constraints, enumeratedConfigCount),
+    formulas: t1.inconsistent ? [] : surfacedFormulas(given, enumeratedConfigCount),
   };
 }
 

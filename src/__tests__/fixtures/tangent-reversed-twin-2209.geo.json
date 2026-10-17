@@ -1,0 +1,73 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "wh3AdMyz6C4l9Vll0EDJa",
+      "utterance": "מעגל O",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "ezuMlIPvpgE2HrIbgbsMX",
+      "utterance": "מעגל P",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "XuP3x_sQLGUzBUuKH1e3W",
+      "utterance": "המעגלים O ו-P משיקים",
+      "cmd": {
+        "type": "circles-tangent",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "at": "M",
+        "external": true,
+        "kindStated": false
+      },
+      "enabled": true
+    },
+    {
+      "id": "pt3IEt0exiOhlXdPqkrsA",
+      "utterance": "המעגלים P ו-O משיקים בנקודה X",
+      "group": "FhdL0xBc5iy972VcDPydn",
+      "cmd": {
+        "type": "name-by-use",
+        "op": "point",
+        "from": "M",
+        "to": "X"
+      },
+      "enabled": true
+    },
+    {
+      "id": "AJdbhwzPS3lglyP0jw3zA",
+      "utterance": "המעגלים P ו-O משיקים בנקודה X",
+      "group": "FhdL0xBc5iy972VcDPydn",
+      "cmd": {
+        "type": "circles-tangent",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "at": "X",
+        "external": true,
+        "kindStated": false
+      },
+      "enabled": true
+    }
+  ]
+}

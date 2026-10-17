@@ -177,7 +177,7 @@ describe('#1600 arm B — the side of an edge-built shape is a stored, cyclable 
     );
     expect(meetsRequirements(facts, 0), 'the inside basin violates the stated side').toBe(false);
     // the shared rescue tier (findValidConfig's choice tier and the submit gate's curable test) flips the side
-    const cured = choiceRescue(facts, Number.POSITIVE_INFINITY);
+    const cured = choiceRescue(facts, { deadline: Number.POSITIVE_INFINITY });
     expect(cured, 'the side axis cures it').not.toBeNull();
     expect(cured!.facts.find((f) => f.cmd.type === 'triangle')!.cmd).not.toHaveProperty('edgeSide');
     expect(meetsRequirements(cured!.facts, cured!.seed)).toBe(true);

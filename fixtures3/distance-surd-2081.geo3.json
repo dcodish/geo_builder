@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-17T13:22:21.618Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "פירמידה SABCD",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "pyramid4gr",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "S"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "המרחק בין S למישור ABC הוא √2",
+      "cmds": [
+        {
+          "type": "distance-rel",
+          "a": {
+            "kind": "point",
+            "id": "S"
+          },
+          "b": {
+            "kind": "plane-run",
+            "ids": [
+              "A",
+              "B",
+              "C"
+            ]
+          },
+          "value": 1.4142135623730951
+        }
+      ]
+    }
+  ]
+}

@@ -8,13 +8,13 @@
  * existing points is fitted to them, instead of keeping absolute defaults.
  */
 
-import type { Command, Constraint, Construction, GeoObject, Id, SideRequirement, SolveDirective, Vec } from './types';
+import type { CirclePositionCase, Command, Constraint, Construction, GeoObject, Id, SideRequirement, SolveDirective, Vec } from './types';
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
 import { ringOnOneCircle } from './structure';
 import { referencesCircle } from './lower';
 import { add, circleCircleIntersect, circumcenter, dist, footOnLine, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringKey, ringSimple, scale, sub } from './geometry';
-import { isQuadKind, QUAD_IMPLIES, quadAfter, quadImplies, quadImpliesInEveryReading, quadRelation, quadsExclude, type QuadKind } from './shapeKinds';
+import { isQuadKind, QUAD_IMPLIES, quadAfter, quadImpliesInEveryReading, quadRelation, quadsExclude, type QuadKind } from './shapeKinds';
 import { constraintKey, constraintRefs, residual, residualTolerance } from './solve';
 import { evaluateCore } from './evaluate';
 import { applySeed } from './sample';
@@ -674,13 +674,33 @@ export function declaredQuadKind(prev: Construction, ids: readonly Id[]): QuadKi
  * pipeline answers «זה כבר קיים באיור». One predicate, one path, and the ADR-157 refusal of a genuine
  * re-declaration is untouched: an EXCLUDING noun is refused upstream (`shapeExclusion`) and a NARROWING one
  * still lowers to its constraints.
+ *
+ * #2193 ([ADR-711](../../docs/06-decisions.md#adr-711)) — REFLEXIVE: every kind implies itself (`quadRelation`'s
+ * `implies`, the shared `kindRelation`), so the noun the ring already IS restates it too. The old
+ * `declared === stated` early return assumed a ring declared X was built by X's own command, which a sibling
+ * merge breaks: «מלבן ABCD» · «מעוין ABCD» stamps `square` (ADR-656) on a ring no square command built, and
+ * «ריבוע ABCD» was then applied as a fresh square whose derived corner collided with the rectangle's («'C' is
+ * already defined»). A same-noun restatement of a ring its own noun built takes the same generic path, with the
+ * same «כבר קיים».
+ *
+ * Only the noun is re-spelled. A shape command carrying any STATED field beyond its vertices and its kind (the
+ * square's `side`, which no rule emits today) keeps its own path, so no magnitude can vanish through the rewrite;
+ * a side the parser states is a separate `set-distance` command and commits on its own.
  */
+/**
+ * The fields a quadrilateral-noun command may carry and still be a pure restatement (#2193, ADR-711): its vertices
+ * and its kind (`kind` on the trapezoid, `declaredAs` on the generic ring), plus `reflex` — a configuration
+ * choice the config search writes and the student never states (ADR-622). Anything else is a stated given.
+ */
+const RESTATEMENT_FIELDS: ReadonlySet<string> = new Set(['type', 'ids', 'kind', 'declaredAs', 'reflex']);
+
 function impliedShapeRestatement(prev: Construction, cmd: Command): Command | null {
   const stated = statedQuadKind(cmd);
   if (!stated || !('ids' in cmd)) return null;
   const ids = cmd.ids as Id[];
+  if (Object.keys(cmd).some((k) => !RESTATEMENT_FIELDS.has(k))) return null;
   const declared = declaredQuadKind(prev, ids);
-  if (!declared || declared === stated) return null;
+  if (!declared) return null;
   const key = ringKey(ids);
   const ring = prev.objects.find((o) => o.kind === 'polygon' && o.vertices.length === 4 && ringKey(o.vertices) === key);
   if (!ring || ring.kind !== 'polygon') return null;
@@ -689,7 +709,7 @@ function impliedShapeRestatement(prev: Construction, cmd: Command): Command | nu
   // sides survives it (`quadImpliesInEveryReading`). A trapezoid read the other way round is a different
   // statement, not a restatement (ADR-506, ADR-618).
   const sameSpelling = ring.vertices.every((v, i) => v === ids[i]);
-  if (!(sameSpelling ? quadImplies(declared, stated) : quadImpliesInEveryReading(declared, stated))) return null;
+  if (!(sameSpelling ? quadRelation(declared, stated) === 'implies' : quadImpliesInEveryReading(declared, stated))) return null;
   return { type: 'quadrilateral', ids: [...ring.vertices] as [Id, Id, Id, Id] };
 }
 
@@ -2021,6 +2041,11 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
     }
 
+    case 'set-side-role':
+      // #1839 (ADR-708): a pure REQUIREMENT record — `checkGivens` judges it against the apex variant in force,
+      // and `meetsRequirements` gates the configuration search on it. Nothing to drive, nothing to seat.
+      break;
+
     case 'set-polygon-convexity': {
       // #441 — a pure REQUIREMENT record (the ADR-244 shape): `checkGivens` re-derives the convexity
       // from the final coordinates and `meetsRequirements` gates sampling on a clean verifier, so
@@ -2530,7 +2555,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
           const r2 = c2.radius.value;
           // Both radii are STATED: neither is ever rewritten to make the pair fit (#2239, ADR-692 — superseding the
           // ADR-037 Am. 2 `tangent-inner` rewrite). Equal radii stated internally tangent are refused at stage 0a
-          // (`equalInternalTangency`), so the internal branch below never meets |r₁ − r₂| = 0 from a step.
+          // (`equalNestedPair`), so the internal branch below never meets |r₁ − r₂| = 0 from a step.
           if (cmd.external) {
             const d = r1 + r2;
             addObj(objects, { kind: 'on-segment', id: cmd.at, a: c1.center, b: c2.center, t: r1 / d });
@@ -2650,7 +2675,11 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         // VARIANT — 0 intersecting / 1 disjoint / 2 contained — so "show another configuration" steps
         // through the cases (ADR-052/M4). No requirement is recorded: nothing was stated, every case is
         // a valid drawing. Deterministic per variant (stable replays).
-        const v = ((cmd.variant ?? 0) % 3 + 3) % 3;
+        // #2200 (ADR-712): the variant indexes the cases the sentence ADMITS (all three when absent) — an equal
+        // pair cycles crossing ↔ apart and is never seated as a "contained" pair it cannot be.
+        const cases: CirclePositionCase[] = cmd.admits?.length ? cmd.admits : ['meet', 'disjoint', 'contained'];
+        const pick = cases[(((cmd.variant ?? 0) % cases.length) + cases.length) % cases.length];
+        const v = pick === 'meet' ? 0 : pick === 'disjoint' ? 1 : 2;
         const mv = movable(cb) ? cb : movable(ca) ? ca : null;
         if (!mv) break;
         if (v === 2 && cb.radius.via === 'free' && rb >= ra * 0.8) {

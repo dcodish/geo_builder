@@ -30,6 +30,7 @@ import { nanoid } from 'nanoid';
 import { ingestTypedText } from '../../shell/bidi';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
+import { findRadianAngle } from '../../shell/radianAngle';
 import { lostPart3, unreadParts3, type LostPart3 } from './unreadParts3';
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
@@ -40,6 +41,8 @@ import { convexWhenSimple, declaredKind3, declaredQuads3, spaceDiagonals, diagon
 import { declaredKindOf, kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
+import { nounOfKind } from '../engine/solidSubject';
+import { foldPrimes3 } from '../lexicon/marks3';
 import { checkInSpan, componentValue, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
@@ -48,6 +51,8 @@ import { namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
 import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
+import { droppedPropertyWords3 } from '../parser/propertyWords3';
+import { mergeWordItems } from '../../shell/llm/honestyCore';
 import { isBareAltitude3, parse3, parseRewrite3 } from '../parser/parse3';
 
 export interface Fact3 {
@@ -93,6 +98,10 @@ export type StoreError3 =
   /** #1666 (ADR-3D-295, ADR-W-107): a PROOF TARGET («הוכיחו כי …», "prove that …") — what the student must
    *  show, never a given. `sentence` is the proof sentence as typed. Typed, so it never escalates. */
   | { code: 'proof-target'; sentence: string }
+  /** #1837 (ADR-W-142, ADR-710): a plane-geometry angle written in radians («∠ABC = π/2») — radians are the
+   *  complex builder's notation only. «∠ABC = π» RECORDED an angle mark labelled π; the rest went to the model.
+   *  Typed, so it never escalates; answered with 2-D's degrees sentence. */
+  | { code: 'radian-angle' }
   /** #1919 (ADR-3D-328, ADR-626): a letter this tool cannot read — «משולש ДЖФ» RECORDED A, B, C, because a
    *  letter outside the label alphabet is invisible to `declLeftover`, so the shape read as unlabelled and
    *  `planarPolygon` drew its default names. `detail` is the student's own run(s); `name` is a run that
@@ -870,8 +879,20 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
    */
   const riderOwnerIds = new Set<string>();
   const collapseOwnerIds = new Set<string>();
-  if (resolved.pivot?.collapse) {
-    const keys = new Set(resolved.pivot.collapse.riderKeys);
+  /**
+   * #1860 (ADR-3D-358): a SOLID collapse is the givens' — a statement whose recorded claim is an ANSWER (no
+   * `given`, the ADR-3D-030 pin-and-claim pattern: «AM = u + v + w» on a prism) keeps its claim as the arbiter, so
+   * a wrong exam answer that only a flat prism would satisfy is still `claim-refuted`, never "the prism would be
+   * flat". CLAIMS are the student's answer, never a driver (src3d/CLAUDE.md).
+   */
+  const newestPinOwner = [...pinOwnerIds].pop();
+  const answersByClaim = (factId: string | undefined): boolean =>
+    factId !== undefined &&
+    claimOwners.some((o) => o.factId === factId && c.claims.slice(o.from, o.to).some((cl) => !('given' in cl && cl.given)));
+  const pivotCollapse =
+    resolved.pivot?.collapse && !(resolved.pivot.collapse.solid && answersByClaim(newestPinOwner)) ? resolved.pivot.collapse : undefined;
+  if (pivotCollapse) {
+    const keys = new Set(pivotCollapse.riderKeys);
     const riderPoints = new Set<string>();
     for (const [id, def] of c.points) {
       if (!carrierParams3(c, id, def).some((cp) => keys.has(cp.key))) continue;
@@ -885,7 +906,7 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
       return walk;
     };
     const namesRider = names(riderPoints);
-    if (!resolved.pivot.collapse.forced) {
+    if (!pivotCollapse.forced) {
       for (const f of facts) if (riderOwnerIds.has(f.id) || (pinOwnerIds.has(f.id) && f.cmds.some(namesRider))) collapseOwnerIds.add(f.id);
     } else {
       /**
@@ -895,7 +916,7 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
        * is a given on another object. Their claims are skipped exactly as #1815's are: the figure the claim
        * pass would read is the unsolved sample, never a figure of the givens.
        */
-      const namesRing = names(new Set(resolved.pivot.collapse.ring));
+      const namesRing = names(new Set(pivotCollapse.ring));
       for (const f of facts) if (pinOwnerIds.has(f.id) && f.cmds.some(namesRing) && !f.cmds.some(namesRider)) collapseOwnerIds.add(f.id);
     }
     const blamed = [...pinOwnerIds].pop();
@@ -921,6 +942,51 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
     return {
       code: 'polygon-collapsed', stated: facts.find((f) => f.id === factId)?.utterance ?? '',
       others: namedStatements(placedBy, factId), sides: ids.length, ring: ids.join(''), forced: true,
+    };
+  };
+  /**
+   * #1847 (ADR-3D-361, amends ADR-3D-309) — A MEMBERSHIP THAT ONLY A FLAT POLYGON SATISFIES, STATED ABOUT A
+   * POINT THAT ALREADY EXISTS. «משולש ABC · M אמצע BC · M על AB»: M is derived, so «M על AB» is recorded as a
+   * `collinear3` claim about it (M1) and verified against the sampled triangle — `claim-refuted`, «בדקו את
+   * החישוב», while the other order («M על AB» first makes M a rider) reaches the pivot's collapse refusal naming
+   * both statements. One question, two answers by entry order.
+   *
+   * So a refuted membership claim gets the question the rider order is asked: could the givens hold with it at
+   * all? It is re-solved as the pin it states (lines a–b and a–c coincide, the `mutual` drive), on the pivot's
+   * own failure-path search — the open-figure retry. If no admissible placement exists and the pivot records a
+   * declared flat polygon collapsed, the claim is the line that completed the collapse, refused in the same
+   * words as the rider order, naming the statements that placed the claim's other points (the midpoint's
+   * line). A placement that exists keeps today's `claim-refuted`: the claim is judged, never made to drive.
+   * Gated on a flat polygon with free dims (the only figure whose collapse this is); one bounded resolve, on the
+   * failure path only (docs/17 §7).
+   */
+  const membershipCollapse = (factId: string, claim: Claim3): EngineError3 | null => {
+    if (claim.type !== 'collinear3' || claim.ids.length < 3) return null;
+    if (!c.solids.some((s) => FLAT_SOLID_KINDS.has(s.kind)) || freeDims(c) === 0) return null;
+    const [a, b, ...rest] = claim.ids;
+    const probe: Construction3 = {
+      ...c,
+      scalarPins: [
+        ...c.scalarPins,
+        ...rest.map((p) => ({ kind: 'mutual' as const, rel: 'coincident' as const, a: { kind: 'segment' as const, a, b }, b: { kind: 'segment' as const, a, b: p } })),
+      ],
+    };
+    const pivot = resolve3(probe, seed).pivot;
+    const flat = pivot && pivot.solutions === 0 ? pivot.collapse : undefined;
+    if (!flat || flat.solid) return null;
+    // the statements that PLACED the claim's points off the collapsed ring — the first naming each one
+    const ring = new Set(flat.ring);
+    const placedBy = new Set<string>();
+    for (const id of claim.ids) {
+      if (ring.has(id)) continue;
+      const mentions = (v: unknown): boolean =>
+        typeof v === 'string' ? v === id : typeof v === 'object' && v !== null && Object.values(v).some(mentions);
+      const first = facts.find((f) => f.enabled && f.id !== factId && f.cmds.some(mentions));
+      if (first) placedBy.add(first.id);
+    }
+    return {
+      code: 'polygon-collapsed', stated: facts.find((f) => f.id === factId)?.utterance ?? '',
+      others: namedStatements(placedBy, factId), sides: flat.ring.length, ring: flat.ring.join(''),
     };
   };
   if (paramContradiction) {
@@ -972,7 +1038,7 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
           status[owner.factId] =
             claim.type === 'polygon-open'
               ? boundPolygonCollapsed(owner.factId, claim.ids)
-              : (sampledCarrierVerdict(claim, c, resolved) ?? { code: 'claim-refuted' });
+              : (sampledCarrierVerdict(claim, c, resolved) ?? membershipCollapse(owner.factId, claim) ?? { code: 'claim-refuted' });
           break;
         }
       }
@@ -996,15 +1062,33 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
    * this one arrived, so marking all of them red — which the previous loop did — accuses statements
    * that are not at fault. `pinOwnerIds` is insertion-ordered in fact order, so the last is the newest.
    */
+  /**
+   * #1860 (ADR-3D-358): a solid's letters the way the student WROTE them («פירמידה SABCD», not the engine's
+   * apex-last «ABCDS») — the letter run of its declaring statement that spells exactly its vertices. Falls back
+   * to the engine order when no single run does (a solid built from several statements).
+   */
+  const solidAsWritten = (ids: readonly Id[]): string => {
+    const want = [...ids].sort().join('|');
+    const declares = (cmd: Command3) => cmd.type === 'solid' && [...cmd.ids].sort().join('|') === want;
+    const decl = facts.find((x) => x.enabled && x.cmds.some(declares));
+    // every prime glyph is one prime, as the parse seam folds them (`foldPrimes3`, #1545)
+    for (const run of foldPrimes3(decl?.utterance ?? '').match(/(?:[A-Z]\d*'*)+/g) ?? []) {
+      const tokens = run.match(/[A-Z]\d*'*/g) ?? [];
+      if (tokens.length === ids.length && [...tokens].sort().join('|') === want) return run;
+    }
+    return ids.join('');
+  };
   const blamedPinOwner = [...pinOwnerIds].pop();
   if (blamedPinOwner !== undefined && status[blamedPinOwner] === 'ok' && resolved.pivot && resolved.pivot.solutions === 0) {
     const f = facts.find((x) => x.id === blamedPinOwner)!;
-    const collapse = resolved.pivot.collapse;
+    const collapse = pivotCollapse;
     status[blamedPinOwner] = collapse
       ? {
           code: 'polygon-collapsed', stated: f.utterance, others: namedStatements(collapseOwnerIds, blamedPinOwner),
-          sides: collapse.ring.length, ring: collapse.ring.join(''),
+          sides: collapse.ring.length, ring: collapse.solid ? solidAsWritten(collapse.ring) : collapse.ring.join(''),
           ...(collapse.forced ? { forced: true as const } : {}),
+          // #1860 (ADR-3D-358): a declared solid the givens force flat is named as that solid
+          ...(collapse.solid && nounOfKind(collapse.solid) ? { solid: nounOfKind(collapse.solid)! } : {}),
         }
       : coordPinOwnerIds.has(blamedPinOwner)
         ? { code: 'injection-unsatisfiable' }
@@ -1685,6 +1769,9 @@ function readStatement3(
   // what the student was asked to prove. The rule is shared with 2-D and analytic (`shell/proofTarget`).
   const proof = findProofTarget(utterance);
   if (proof) return { ok: false, error: { code: 'proof-target', sentence: proof.sentence } };
+  // #1837 (ADR-W-142): a plane-geometry angle written in radians, refused at the same reader with 2-D's rule
+  // (`shell/radianAngle`) — never recorded as a π-labelled mark, never sent to the model.
+  if (findRadianAngle(utterance)) return { ok: false, error: { code: 'radian-angle' } };
   // #1919 (ADR-3D-328): a letter the tool cannot read, refused at the one statement reader both seams
   // share — the shared rule every builder calls (`shell/inputScript`), run after the glyph fold's
   // look-alike row, so «משולש КМО» still records KMO and «משולש ДЖФ» is refused naming Д, Ж, Ф.
@@ -1743,9 +1830,15 @@ function readStatement3(
  * The honesty gates, ONE list for every statement seam (#424 / #438 / #440 / #535, ADR-3D-147): what a
  * stated line names that the commands never carry. `prior` is the figure the line is added to.
  */
-function lostGivens3(utterance: string, commands: readonly Command3[], prior: Construction3, unread: readonly string[] = []): string[] {
+function lostGivens3(
+  utterance: string,
+  commands: readonly Command3[],
+  prior: Construction3,
+  unread: readonly string[] = [],
+  lane: 'grammar' | 'model' = 'grammar',
+): string[] {
   const cmds = [...commands];
-  const lost = [
+  const gates = [
     ...droppedNewLabels3(utterance, cmds, [...prior.points.keys()], [...prior.vectors.keys()]),
     ...droppedGivenNumbers3(utterance, cmds),
     ...droppedShapeNoun3(utterance, cmds), // #587 / ADR-3D-084: a stated base shape the lane cannot lower
@@ -1753,6 +1846,10 @@ function lostGivens3(utterance: string, commands: readonly Command3[], prior: Co
     ...droppedConstructNoun3(utterance, cmds), // #438/#440: a stated OBJECT never materialised
     ...droppedGivenRelations3(utterance, cmds), // #1730: a stated pair relation no command carries
   ];
+  // #1906 (ADR-3D-364): on the MODEL lane, every shape and role word the student typed must survive into the answer —
+  // per occurrence, a misspelt word included («שווה צלעת» answered «משולש ABC»). First, and named once: an older
+  // gate's own naming of the same word wins, a construct noun inside the phrase («מעגל» in «מעגל חסומ») gives way.
+  const lost = lane === 'model' ? mergeWordItems(gates, droppedPropertyWords3(utterance, cmds, prior.circles3.length > 0, [...prior.points.keys()])) : gates;
   // #1902 (ADR-3D-312): the words the answering rule could not read («שווה צלעת») — reported only when no
   // other gate fired, so a line a gate already refuses keeps its exact message («…שמרכזו M» → «M»).
   return lost.length > 0 ? lost : [...unread];
@@ -1775,11 +1872,12 @@ function honestyRefusal3(
   st: { facts: Fact3[]; seed: number },
   readExtent: boolean,
   unreadWords: readonly string[] = [],
+  lane: 'grammar' | 'model' = 'grammar',
 ): NonNullable<StoreError3> | null {
   const prior = derive3(st.facts, st.seed).construction;
   // ADR-603 Am. 1, ported (round #1940): the read-extent members speak only where no older gate fired. A word the
   // older gates already name («שקוטרו», «M») keeps its own refusal; the parts / roles lists never pre-empt it.
-  const lost = lostGivens3(utterance, commands, prior, unreadWords);
+  const lost = lostGivens3(utterance, commands, prior, unreadWords, lane);
   if (lost.length > 0) return { code: 'dropped-given', items: lost.join(', ') };
   const roles = readExtent ? unreadRoles3(utterance, commands) : null;
   if (roles) {
@@ -1851,7 +1949,7 @@ export function decideCommands3(
   st: { facts: Fact3[]; seed: number },
   utterance: string,
   commands: readonly Command3[],
-  opts: { twins: boolean; seedSearch: boolean; unread?: readonly string[]; readExtent?: boolean },
+  opts: { twins: boolean; seedSearch: boolean; unread?: readonly string[]; readExtent?: boolean; lane?: 'grammar' | 'model' },
   newId: () => string = () => nanoid(8),
 ): Verdict3 {
   const { facts, seed } = st;
@@ -1878,7 +1976,7 @@ export function decideCommands3(
   // (ADR-3D-147). The catalog corpus is asserted gate-clean in honesty3.test.ts, so the canonical
   // phrasings never pay this check with a false refusal.
   // #1888 (ADR-3D-316): and the read-extent member, on the deterministic lane (`opts.readExtent`); #1902's unread words ride along.
-  const refusal = honestyRefusal3(utterance, stated, { facts, seed }, opts.readExtent ?? false, opts.unread);
+  const refusal = honestyRefusal3(utterance, stated, { facts, seed }, opts.readExtent ?? false, opts.unread, opts.lane);
   if (refusal) return { kind: 'refused', error: refusal };
   // #613 (ADR-W-031, operator ruling 2026-08-16: "if a fact is already known - it should not be
   // added. this is true to all tools") — a RESTATED fact succeeds and appends no row. M1
@@ -1936,7 +2034,8 @@ export function decideSteps3(
     unread.push(...(p.unread ?? []));
   }
   if (all.length === 0) return { kind: 'not-understood' };
-  return decideCommands3(st, utterance, all, { twins: false, seedSearch: false, unread }, newId);
+  // #1906 (ADR-3D-364): the model lane — the answer must keep every shape and role word the student typed
+  return decideCommands3(st, utterance, all, { twins: false, seedSearch: false, unread, lane: 'model' }, newId);
 }
 
 export const useGeo3 = create<Geo3State>()(

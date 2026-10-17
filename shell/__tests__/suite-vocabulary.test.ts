@@ -81,6 +81,9 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   measureContradictsAlone: { '2d': ['errors.overConstrained_said'], '3d': null, complex: null, analytic: ['errMeasureContradictsAlone'] },
   // #2119 (ADR-684): a second, different radius — 2-D's ruled sentence, no reason clause, in analytic too
   radiusContradicts: { '2d': ['errors.restatedSize_said_vs'], '3d': null, complex: null, analytic: ['errRadiusContradicts'] },
+  // #1837 (ADR-710, ADR-W-142; operator ruling 2026-10-07): an angle written in radians, one sentence in every plane-geometry
+  // builder. The complex builder reads radians by design (`cis(π/3)`), so it has no such refusal.
+  radianAngle: { '2d': ['input.scope.radian-angle'], '3d': ['err.radianAngle'], complex: null, analytic: ['errRadianAngle'] },
 };
 
 /** The ruled wording (the "Explicit set", 2026-09-27) — the lock's anchor, not just "all equal". */
@@ -99,6 +102,7 @@ const RULED: Record<string, Record<Lang, string>> = {
   askSubmit: { he: 'שאלו', en: 'Ask' },
   saveQuestion: { he: 'הורידו שאלה', en: 'Download question' },
   questionHeading: { he: 'נתון:', en: 'Given:' },
+  radianAngle: { he: 'בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90', en: 'In plane geometry, angles are written in degrees — for example ∠ABC = 90' },
   // the operator's verbatim sentences (2026-10-13, cards d4-2023 and d5-2023-length), placeholders normalised
   angleNameTaken: {
     he: 'לזווית {{N}} כבר יש שם: {{N}} (בשורה «{{N}}»). לכל זווית שם אחד — המשיכו עם {{N}}.',

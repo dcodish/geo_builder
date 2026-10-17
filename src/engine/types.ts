@@ -1046,7 +1046,10 @@ export type SideRequirement =
   | { kind: 'circle-position'; relation: 'tangent'; a: Id; b: Id; at: Id;
       /** #2188 ([ADR-672](../../docs/06-decisions.md#adr-672)): the KIND the statement gave (`circles-tangent.external`) —
        *  read back by the parser (`statedTangencies`) so a later restatement that names no kind keeps it. */
-      external?: boolean }
+      external?: boolean;
+      /** #2210 ([ADR-704](../../docs/06-decisions.md#adr-704)): `false` when nobody stated the kind (the default, or the
+       *  fold's resolution of it) — the parser then never inherits it. Absent = the kind was stated. */
+      kindStated?: false }
   /** #1918 ([ADR-607](../../docs/06-decisions.md#adr-607)): a ring DECLARED as a shape phrase no circle can pass
    *  around (`NOT_CYCLIC`) — «טרפז ישר זווית ABCD». Recorded so the stage-0 prover sees the declaration whichever
    *  order the circle and the noun arrive in; not a side, so no side reader consumes it. */
@@ -1234,6 +1237,11 @@ export type Command =
   // stated; `checkGivens` enforces a stated one (figure.v.concavePolygon / convexPolygon), so sampling
   // and "show another configuration" can never flip it back.
   | { type: 'set-polygon-convexity'; ids: Id[]; convex: boolean }
+  // «BE גובה לשוק AC» (#1839, ADR-708): side a–b of the ISOSCELES triangle `ids` is a LEG. No single equality
+  // says it — the apex is one of its two ends and the words do not say which — so it is a REQUIREMENT record
+  // (ADR-244), never a constraint: `checkGivens` flags a configuration whose apex variant makes a–b the base
+  // (figure.v.legIsBase), and `meetsRequirements` keeps «הציגו תצורה אחרת» to the variants where it is a leg.
+  | { type: 'set-side-role'; role: 'leg'; a: Id; b: Id; ids: Id[] }
   // «CD חותך את AB» with NO crossing point named (issue #241, ADR-383): the two segments CROSS, stated as
   // a point-free REQUIREMENT — the ADR-166 within-both-segments meaning without minting a node (reading
   // (a): typing STATES the crossing; the ADR-380 forced-crossing dot then OFFERS the naming). The ADR-244
@@ -1258,7 +1266,14 @@ export type Command =
   | { type: 'circle-circle-intersection'; id: Id; circle1: Id; circle2: Id; branch?: number; avoid?: Id }
   | { type: 'tangent'; id: Id; circle: Id; at: Id; visible?: boolean }
   | { type: 'point-on-line'; id: Id; line: Id; offset: number } // a fixed marker on a drawn line (names it by a point)
-  | { type: 'circles-tangent'; circle1: Id; circle2: Id; at: Id; external: boolean } // two circles touch at one point `at`
+  | {
+      type: 'circles-tangent'; circle1: Id; circle2: Id; at: Id; external: boolean; // two circles touch at one point `at`
+      /** #2210 ([ADR-704](../../docs/06-decisions.md#adr-704), M4): `false` when the line stated NO kind and none was
+       *  inherited, so `external` is only the default. The replay fold resolves such a tangency against the list: the
+       *  kind of the first kind-stated tangency on the same pair, else internal when one circle is stated contained in
+       *  the other, else external. Absent = the kind was stated (every older command keeps its meaning). */
+      kindStated?: false;
+    }
   // Two circles' MUTUAL POSITION as a stated INEQUALITY (#196 — «שני מעגלים זרים» / «מעגל O2 מוכל בתוך
   // מעגל O1»): 'disjoint' = each outside the other (|c1c2| > r1+r2), 'contained' = `b` strictly inside `a`
   // (|c1c2| + r_b < r_a). A REQUIREMENT in the ADR-244 radius-order shape — the equality members of the
@@ -1266,10 +1281,12 @@ export type Command =
   // nothing to drive: the givens verifier flags a violating config (figure.v.circlesDisjoint /
   // figure.v.circleContained), so `meetsRequirements` (sampler / "show another") skips it; apply only
   // improves the DEFAULT (re-seats a free centre / free radius seed onto the stated side).
-  | { type: 'set-circle-position'; relation: 'disjoint' | 'contained' | 'any'; a: Id; b: Id; variant?: number }
+  | { type: 'set-circle-position'; relation: 'disjoint' | 'contained' | 'any'; a: Id; b: Id; variant?: number; admits?: CirclePositionCase[] }
   // relation 'any' (bare «שני מעגלים», #196 Am.): the mutual position is UNSTATED — a cyclable VARIANT
   // (0 intersecting / 1 disjoint / 2 contained) "show another configuration" steps through (ADR-052/M4);
   // no requirement is recorded, apply only seats the default per variant.
+  // `admits` (#2200, ADR-712): the cases the SENTENCE leaves open, in variant order, written by the reading — absent
+  // means all three. «שני מעגלים ברדיוסים שווים» writes ['meet', 'disjoint']: equal circles cannot nest (M4).
   // A COMMON tangent's configuration record (#197): the tangent touching `circle1` at `a` and `circle2`
   // at `b`. `kind` (when the student said «חיצוני»/«פנימי» / external/internal) is a REQUIREMENT — the
   // two centres must lie on the SAME side of line a-b (external) or OPPOSITE sides (internal); unstated ⇒
@@ -1418,6 +1435,9 @@ export interface RoleSideBinding {
 /** What the parser produces and a `Fact` stores: engine commands plus the symbolic layer. `roleSide` (#1810,
  *  ADR-596): the side a role noun («הבסיס», «היתר», «השוק») was resolved to at parse time, re-resolved by the
  *  replay fold against the configuration in force — see `engine/roleSides.ts`. The engine ignores it. */
+/** One mutual position of an unstated two-circle pair (#196 Am.; #2200 `admits`): crossing, apart, one inside the other. */
+export type CirclePositionCase = 'meet' | 'disjoint' | 'contained';
+
 export type AnyCommand = (Command | SymbolicCommand) & { consumed?: Consumed; roleSide?: RoleSideBinding };
 
 /**

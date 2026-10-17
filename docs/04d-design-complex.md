@@ -170,6 +170,29 @@ never as a contradiction or a refutation.
   (the polar view stays bare, FR-KN-1). With no parameter left the number is closed and reads exactly as
   the literal would, in both views. `DerivedPoint.defined` tells the panel rows the reading has
   something to say. That is the PANEL's reading.
+- **A definition whose parameters are known is the number they make it** (stage 1a′,
+  `closeKnownDefinitions` in `replay/derive2.ts`; [ADR-CX-082](06d-decisions-complex.md#adr-cx-082)). Before
+  any reading, the fold solves tier 1 once, takes every parameter that solve makes an exact rational with a
+  known sign (`knownRationalParams`: the parameters section's predicate, every enumerated branch agreeing on
+  the sign), substitutes them into each deferred `name = E` with no complex name in E, and closes E with
+  `closedUnder` (`model/fold.ts`). That file is the parser's value core (`radicalValue` / `constValue` /
+  `foldConstants`), moved below both layers so replay calls the same code the parser does; its `pow` case
+  reads an integer power, which the parser's fold never reaches. A closed row is replaced by `name = literal`
+  and tier 1 is re-solved (a fixpoint, bounded by the row count), so the number takes exactly the path a
+  typed literal takes: exact carriers, the reading, knowledge, the DOF list, the claim verifiers. The claim
+  drive rows (ADR-CX-029) are computed after it. The student's own rows (`given`) stay what the canvas,
+  the formulas and the rotations read; a closed zero stays the numeric residue (the log-polar carrier has
+  no zero).
+- **A restatement the exact solve already entails adds no row** (stage 0e′, `entailedBy` in
+  `replay/derive2.ts`, asked by `submitLine` through `lineEntailed`; [ADR-CX-084](06d-decisions-complex.md#adr-cx-084)).
+  The fold's exact half (`exactSolve`: parameter signs, stage 1a′, the claim drive rows) is one function that
+  `foldConstraints` and `entailedBy` share. A typed line is entailed when its lowering adds only constraint
+  rows (no name, object, claim, measure, filter, sequence, selection or unread line), none of them deferred,
+  and tier 1 after it is consistent with the same free directions, exact moduli, parameter values and
+  enumerated branches (`sameDirection`) as before. Tier 1 is linear over ℚ, so such a row lies in the span of
+  the earlier ones. Seed-free; a sampled agreement never counts. The store carries the answer as `lastNote`
+  (a notice banner, outside undo), never as a refusal. `hydrateSession` replays with `replaying` set, so a
+  saved restatement stays a row.
 - **A DETERMINED number with no exact form reads ≈ decimals** (stage 5d, `determinedReadings` in
   `replay/derive2.ts`; [ADR-CX-080](06d-decisions-complex.md#adr-cx-080)). After the exact carriers and a
   closed definition, a number defined by no parameter (`definitionOf` null) is asked through the ask

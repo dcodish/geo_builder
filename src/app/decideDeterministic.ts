@@ -50,7 +50,7 @@ import {
 } from '@/parser';
 import { independentConstructs } from './independence';
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
-import { compoundNotHonoured, droppedClause } from './clauseCoverage';
+import { compoundNotHonoured, droppedClause, splitStatements } from './clauseCoverage';
 import { lostPartNote } from './unreadParts';
 import { lostRoleNote } from './unreadRoles';
 import { applyCommand, type AnyCommand, type Command, type Construction, type Id, type Vec } from '@/engine';
@@ -72,6 +72,7 @@ import {
 } from '@/store/geoStore';
 import { spanShadow } from '@/parser/spanAccounting';
 import { findProofTarget } from '../../shell/proofTarget';
+import { findRadianAngle } from '../../shell/radianAngle';
 import { unreadScript } from '../../shell/inputScript';
 import { honestyGateReport } from './honestyGates';
 import { honoursConstruct, roleReadings, thalesReadings } from './roleReadings';
@@ -224,6 +225,13 @@ export function decidePreParse(utterance: string, view: DecideView): Verdict2D |
   const proof = findProofTarget(utterance);
   if (proof) {
     return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:proof' }], note: { key: 'input.scope.proof-target', params: { sentence: proof.sentence } } };
+  }
+  // AN ANGLE WRITTEN IN RADIANS (#1837, ADR-710 / ADR-W-142) — «∠ABC = π/2»: radians are the complex builder's
+  // notation only (operator rulings 2026-10-07 "Refuse and teach degrees", 2026-10-08). Refused here, PRE-parse
+  // and `guided`, so it never reaches the model (every spelling escalated) and «∠ABC = pi/2» no longer commits
+  // 2°. The rule is shared by the plane-geometry builders (`shell/radianAngle`); the note teaches degrees.
+  if (findRadianAngle(utterance)) {
+    return { kind: 'refuse', category: 'guided', preParse: true, binds: [], logs: [{ source: 'scope', result: 'scope:radian-angle' }], note: { key: 'input.scope.radian-angle' } };
   }
   // A letter this tool cannot read (#1919, ADR-626) — «משולש ДЖФ» COMMITTED triangle A, B, C, because a
   // letter outside the label alphabet is invisible to every gate that counts labels, so the shape read as
@@ -531,6 +539,26 @@ export async function decideFromParse(
   if (!r.ok && r.reason === 'incircle-not-drawn') {
     const shape = r.sides === 5 ? 'input.incircleShape5' : r.sides === 6 ? 'input.incircleShape6' : 'input.incircleShapeMany';
     return refuse('guided', { source: 'parser', result: `incircle-not-drawn:${r.sides}` }, { key: 'input.incircleKnownLimit', params: { shape: { t: shape } } });
+  }
+  /**
+   * #2263 ([ADR-702](../../docs/06-decisions.md#adr-702)): one radius stated for a NESTED pair — «שני מעגלים בעלי
+   * מרכז משותף O ברדיוס 5», «…מוכלים…», «…משיקים מבפנים…». Which circle has it the sentence does not say, and both
+   * cannot. Refused with FR-IN-4g's one-given-per-line message, the student's own parts numbered — never escalated:
+   * the model picked the outer circle in silence and passed every gate.
+   */
+  if (!r.ok && r.reason === 'nested-pair-radius') {
+    const note = splitStatements(r.parts);
+    return refuse('guided', { source: 'scope', result: 'scope:split-statements:nested-pair-radius' }, { key: note.messageKey, params: note.params });
+  }
+  /**
+   * #2200 ([ADR-712](../../docs/06-decisions.md#adr-712)): «שני מעגלים מוכלים ברדיוסים שווים» — a circle strictly
+   * inside another is smaller, so the words contradict themselves. Refused naming the contradiction and quoting the
+   * line, with one next step (operator ruling 2026-10-16, card 20 A; ADR-W-130). Never drawn red, never escalated.
+   * #2206 ([ADR-713](../../docs/06-decisions.md#adr-713)): the internally tangent and concentric twins, each with its own
+   * reason (ruling 2026-10-16 on #2206: «refused with #2200's sentence») — before, handed to the AI.
+   */
+  if (!r.ok && r.reason === 'equal-circles-nested') {
+    return refuse('conflict', { source: 'parser', result: `equal-circles-nested:${r.relation}` }, { key: `input.equalCirclesNested.${r.relation}`, params: { detail: utterance.trim() } });
   }
   // #1285: the same channel — the angle's stated vertex is not the bisector's own first letter.
   if (!r.ok && r.reason === 'bisector-wrong-apex') {

@@ -43,6 +43,15 @@ const areaOf: Reader = (cmds) => {
   for (const c of cmds) if (c.type === 'claim' && c.claim.type === 'area-eq') return c.claim.value;
   return undefined;
 };
+/** #2081 (ADR-3D-362): the two slots ADR-3D-337 §4 held for the operator's ruling. */
+const coordXOf: Reader = (cmds) => {
+  for (const c of cmds) if (c.type === 'claim' && c.claim.type === 'coords-eq') return c.claim.x ?? undefined;
+  return undefined;
+};
+const distanceOf: Reader = (cmds) => {
+  for (const c of cmds) if (c.type === 'distance-rel') return c.value;
+  return undefined;
+};
 const heightLenOf: Reader = (cmds) => {
   for (const c of cmds) if (c.type === 'perp-to-base') return c.len;
   return undefined;
@@ -58,6 +67,13 @@ const RULES: ReadonlyArray<{ rule: string; template: string; read: Reader }> = [
   { rule: 'readHeight3, English', template: 'SO is the height of the pyramid = {v}', read: lengthOf },
   { rule: 'readHeight3, noun-first', template: 'גובה הפירמידה SO = {v}', read: lengthOf },
   { rule: 'heightFromApex', template: 'גובה הפירמידה הוא {v}', read: heightLenOf },
+  // #2081 (ADR-3D-362, ruling 2026-10-14 card d14b-2081-roots A): the coordinate-claim and distance slots
+  { rule: 'coordsClaim (A = (v,0,0))', template: 'A = ({v},0,0)', read: coordXOf },
+  { rule: 'coordsClaim, no spaces', template: 'A=({v},0,0)', read: coordXOf },
+  { rule: 'distanceGiven, «בין … ל…» point–plane', template: 'המרחק בין S למישור ABC הוא {v}', read: distanceOf },
+  { rule: 'distanceGiven, «מ … ל…» point–line', template: 'המרחק מ S לישר AB הוא {v}', read: distanceOf },
+  { rule: 'distanceGiven, «שווה ל-»', template: 'המרחק בין S למישור ABC שווה ל-{v}', read: distanceOf },
+  { rule: 'distanceGiven, English', template: 'the distance between S and plane ABC is {v}', read: distanceOf },
 ];
 
 describe('#1827 — every stated-magnitude slot reads every value spelling', () => {
@@ -89,7 +105,7 @@ describe('#1827 — every stated-magnitude slot reads every value spelling', () 
   });
 
   it('a malformed value still refuses — never a NaN or an Infinity in a figure', () => {
-    for (const line of ['AD = √-2', 'AD = 3/0', 'AD = √(1/0)', 'שטח המשולש ABC = 3/0', 'גובה הפירמידה הוא 3/0']) {
+    for (const line of ['AD = √-2', 'AD = 3/0', 'AD = √(1/0)', 'שטח המשולש ABC = 3/0', 'גובה הפירמידה הוא 3/0', 'A=(3/0,0,0)', 'A=(√(1/0),0,0)', 'המרחק בין S למישור ABC הוא 3/0']) {
       expect(parse3(line).ok, line).toBe(false);
     }
   });

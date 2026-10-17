@@ -47,7 +47,7 @@ import { complexScopeOf, parseAsk } from './deriveLines';
 import { type ComplexScope, gluedISpelledOut, juxtaposedNumbersSpelledOut } from '../parser/exprParse';
 import type { Derived2 } from '../replay/derive2';
 import { type InputError, type SavedSession, useComplexStore } from '../store/useComplexStore';
-import { deriveLines } from './deriveLines';
+import { deriveLines, lineEntailed } from './deriveLines';
 
 /** This product's save-file envelope (shell/save): the marker `serialize()` writes, and the
  *  highest `SavedSession.version` this build can read. */
@@ -372,7 +372,15 @@ export function submitQuery(raw: string): boolean {
  * capability reachable from only one of two entry points is invisible to tests aimed at the other,
  * which is how #680 shipped and how #686 stayed green describing it.
  */
-export function submitLine(raw: string): boolean {
+export function submitLine(
+  raw: string,
+  /**
+   * #2268 — a LOAD replays the saved lines as the student recorded them: a restatement saved by an
+   * older build stays a row (the session is the student's record). Only a typed line is answered
+   * «already known».
+   */
+  replaying = false,
+): boolean {
   const st = () => useComplexStore.getState();
   const line = raw.trim();
 
@@ -407,6 +415,13 @@ export function submitLine(raw: string): boolean {
   if (!parsed.ok) {
     st().setError(unreadRefusal(parsed, line, activeLines()));
     return false;
+  }
+
+  // #2268 (ADR-CX-084, LADDER-CX stage 0e′) — a statement the exact solve already entails adds nothing:
+  // no row, 2-D's noop sentence. Seed-free, so a value that merely holds in this drawing is still recorded.
+  if (!replaying && lineEntailed(activeLines(), line)) {
+    st().setNote({ key: 'already-known', detail: line });
+    return true;
   }
 
   // the gate reads the ACTIVE figure — a muted line must not veto a new statement (B5)
@@ -475,7 +490,7 @@ export function hydrateSession(data: unknown): boolean {
       else st().recordDisabledLine(line);
       return;
     }
-    if (!submitLine(line))
+    if (!submitLine(line, true))
       failed.push({ line, reason: st().lastError ?? { key: 'not-handled', detail: line } });
   }
   // #789 — the lane's own saved field (files written by this version onward); lenient like 3-D:

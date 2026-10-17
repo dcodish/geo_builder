@@ -18,8 +18,14 @@
  * skew segments has a well-defined 90° between direction vectors and no intersection.
  * A knee there would draw a crossing that does not exist, so a witness only yields a mark
  * where the two arms genuinely share a point — a shared endpoint, or a true crossing
- * inside both segments (a rhombus's diagonals). A skew ⊥ is left unmarked; the relation
- * still shows in the data panel.
+ * inside both segments. A skew ⊥ is left unmarked; the relation still shows in the data panel.
+ *
+ * **A knee sits only at a NAMED vertex of the pair** (#2091, ADR-3D-360, ADR-W-118 B2). Two segments
+ * stated ⟂ that cross at a point the student never named («ריבוע ABCD» · «AC ⟂ BD») assert a RELATION,
+ * not a value, so the knee lane draws nothing there — 2-D's `angleMarkFor` rule. The named vertex is a
+ * shared endpoint, or a point whose DEFINITION is the crossing of the two segments ({@link namedVertexOf});
+ * a letter that merely sits on the crossing in the drawing («O אמצע AC») is not one. The ⟂ still shows in
+ * the givens list and the data panel. Two named VECTORS («u ⊥ v») keep the crossing knee (#2093, unruled).
  *
  * Pure: reads the construction + resolved positions, returns world-space geometry. The
  * renderer projects it, which is what makes the knee three-dimensional — it lies in the
@@ -57,6 +63,8 @@ export interface SegPair {
   b: Id;
   c: Id;
   d: Id;
+  /** #2091: stated between two named VECTORS («u ⊥ v») — keeps the crossing knee until #2093 is ruled. */
+  viaVectors?: true;
 }
 
 /** A perpendicularity between a segment and a PLANE (given as a point run or a resolved plane). */
@@ -124,6 +132,26 @@ export function meetingPoint(seg: SegPair, pos: Positions3, scale: number): Vec3
   return c1;
 }
 
+/**
+ * #2091 (ADR-3D-360) — the vertex the FACTS name for a segment pair's angle, or null: a shared endpoint
+ * (2-D's `angleMarkFor` rule), or a point DEFINED as the crossing of the two segments (`seg-cross`, as
+ * «O נקודת חיתוך האלכסונים» records). Read from the definitions, never from positions, so a point that
+ * only happens to sit on the crossing in this drawing names nothing.
+ */
+export function namedVertexOf(seg: SegPair, c: Construction3): Id | null {
+  const shared = [seg.a, seg.b].filter((id) => id === seg.c || id === seg.d);
+  if (shared.length === 1) return shared[0];
+  if (shared.length > 1) return null;
+  const same = (p: Id, q: Id, r: Id, s: Id) => (p === r && q === s) || (p === s && q === r);
+  const isSeg1 = (p: Id, q: Id) => same(p, q, seg.a, seg.b);
+  const isSeg2 = (p: Id, q: Id) => same(p, q, seg.c, seg.d);
+  for (const [id, def] of c.points) {
+    if (def.kind !== 'seg-cross') continue;
+    if ((isSeg1(def.a1, def.b1) && isSeg2(def.a2, def.b2)) || (isSeg2(def.a1, def.b1) && isSeg1(def.a2, def.b2))) return id;
+  }
+  return null;
+}
+
 /** The arm direction of segment a–b seen from `vertex`: toward the farther endpoint. */
 function armDir(a: Id, b: Id, vertex: Vec3, pos: Positions3): Vec3 | null {
   const pa = pos.get(a);
@@ -181,7 +209,9 @@ export function rightAngles3(
   const addAtoms = (u: VecAtom, v: VecAtom) => {
     const p = atomPair(u, c);
     const q = atomPair(v, c);
-    if (p && q) segPairs.push({ a: p[0], b: p[1], c: q[0], d: q[1] });
+    if (!p || !q) return;
+    const viaVectors = u.kind === 'named' || v.kind === 'named';
+    segPairs.push({ a: p[0], b: p[1], c: q[0], d: q[1], ...(viaVectors ? { viaVectors: true as const } : {}) });
   };
   const addPlaneRun = (a: Id, b: Id, ids: Id[]) => {
     const pl = planeFromIds(ids, pos);
@@ -316,8 +346,13 @@ export function rightAngles3(
 
   // --- (3) turn the stated witnesses into wedges, dropping the ones with no meeting point
   for (const seg of segPairs) {
-    const vertex = meetingPoint(seg, pos, s);
-    if (!vertex) continue; // SKEW / non-meeting — never invent an intersection
+    const meet = meetingPoint(seg, pos, s);
+    if (!meet) continue; // SKEW / non-meeting — never invent an intersection
+    // #2091 (ADR-3D-360): a knee at rest only at a vertex the facts NAME — a ⟂ at an unnamed crossing is a
+    // relation (givens list + data panel), never a drawn value (ADR-W-118 B2, 2-D's rule)
+    const named = seg.viaVectors ? null : namedVertexOf(seg, c);
+    if (!seg.viaVectors && !named) continue;
+    const vertex = named ? pos.get(named) ?? meet : meet;
     const u1 = armDir(seg.a, seg.b, vertex, pos);
     const u2 = armDir(seg.c, seg.d, vertex, pos);
     // #1592 (ADR-3D-290): a STATED right angle draws its knee only where it holds on the drawn figure — a

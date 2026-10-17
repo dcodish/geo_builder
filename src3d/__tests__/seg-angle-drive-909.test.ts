@@ -214,8 +214,10 @@ describe('#909 — a stated right angle is still DRAWN', () => {
    * the drive removes that claim, so without the `seg-angle` arm this figure would build the right
    * angle and stop drawing it.
    */
+  // #2091 (ADR-3D-360): a knee at a crossing needs the crossing NAMED, so the crossing is named here
+  // («… נפגשים בנקודה O»); the lock is unchanged — the seg-angle PIN arm is what draws it.
   it('90° between two crossing segments still emits a knee, now off the PIN', () => {
-    const { st, construction, resolved } = build([BOX, 'הזווית בין AC לבין BD היא 90']);
+    const { st, construction, resolved } = build([BOX, 'האלכסונים AC ו-BD נפגשים בנקודה O', 'הזווית בין AC לבין BD היא 90']);
     expect(st.lastError).toBeNull();
     expect(construction.scalarPins[0]).toMatchObject({ kind: 'seg-angle', deg: 90 });
     const marks = rightAngles3(construction, resolved, 1.5);

@@ -307,6 +307,20 @@ from two sources pays once) and `LATIN_FILLER`. What a name or a number is stays
 first consumer (`faithfulnessAnalytic`); 2-D's and 3-D's own copies move onto it in a follow-up, behaviour-identical.
 Lock: `shell/__tests__/honesty-core-1355.test.ts`.
 
+**The property-word reader** ([ADR-W-144](06w-decisions-workspace.md#adr-w-144), #1906) is the core's second half:
+`propertyWords(text, vocabulary, spec)` finds every shape or role phrase in the STUDENT's line — exact, inflected,
+or one Damerau-Levenshtein edit off (`editDistance`) — and returns each occurrence with the canonical spelling of
+every phrase it may be. The caller passes everything that is language or product: the vocabulary (phrases of word
+slots, each naming the caller's properties; `nearMiss: false` for a short or common word), the `fold` (final letters,
+doubled letters, case), the clitic letters peeled up to two every way, the closed inflection set, and `readsWord`
+(the product lexicon's veto: a word it reads as itself, «מקבילים», is never a near miss of another, «מקבילית»).
+`withSpan` writes the line spelt right, and `mergeWordItems` is the one merge into the other gates' items (a word
+phrase first; a construct noun inside it, «מעגל» in «מעגל חסומ», gives way; an older gate's own naming of the same
+word wins). Whether an AI answer CARRIES each word is the product's question, over its commands: 2-D's
+`src/parser/propertyWords.ts` (the AI seam in `submitPipeline.ts`), 3-D's `src3d/parser/propertyWords3.ts` (the
+model lane of `decideSteps3`). Locks: `shell/__tests__/property-words-1906.test.ts` and the shared rows
+`shell/__tests__/fixtures/honesty-rows.ts`, run through each tree's vocabulary by its own lock.
+
 ### The junk gate ([ADR-W-087](06w-decisions-workspace.md#adr-w-087))
 
 `shell/llm/constructionSignal.ts` answers one question for every builder that escalates to the model:
@@ -334,6 +348,21 @@ it teaches scores zero, so the gate can never brush off a sentence the tool acce
 - Analytic: `parseLine`.
 
 **The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/proof-target-rows.ts`. Each builder's thin lock hands over a `ProofGate`: its REAL submit decision on a figure with A, B and C, answering `{ proof, recorded, text }`. The rows check that every spelling is refused as a proof target, recorded by none and quoted by the refusal, and that the negatives are never refused as one. The meta-lock proves each check can fail.
+
+### Angles in radians ([ADR-W-142](06w-decisions-workspace.md#adr-w-142))
+
+`shell/radianAngle.ts` decides whether a typed line gives an ANGLE MEASURE written with π. It is pure, knows no product and returns no strings: `findRadianAngle(text)` returns `{ radian: true, span: [start, end), value }` or `null`, with indices into the string the caller passed.
+
+| match | examples |
+| --- | --- |
+| an angle + a copula + a π value | «∠ABC = π/2», «∠B = π/2», «∢ABC=π/3», «זווית ABC שווה ל-π/4», «הזווית ABC היא π/2», «זווית מרכזית COD = π/3», «הזווית בין AB ל-AC היא π/6» (segment operands), «angle ABC = π/2», «the angle ABC is π/3» |
+| «בזווית» / «with angle» + a π value | «גזרה AOB בזווית π/3», «a sector with angle π/4» |
+
+A π value is π, kπ, π/n, kπ/n, k/n π, with spaces and parentheses; π is the glyph or the ASCII word `pi`. **Not matched:** π as a number in a length or a size («AB = π», «מעגל שהיקפו 6π»), π followed by a digit or letter (a name: «π2»), a space angle with a plane operand («הזווית בין AB למישור π1»), LaTeX `\pi` (each builder keeps its LaTeX answer), an arc («קשת AB = 4π», #2032), and a bare number (degrees).
+
+**Each plane-geometry builder calls it where it calls `findProofTarget`** and answers one sentence (the operator's, 2026-10-07): 2-D `decidePreParse` (`guided`, `scope:radian-angle`, `input.scope.radian-angle`), `runEditCommit` and `parseEntry` (`reason: 'radian-angle'`); 3-D `readStatement3` (`{ code: 'radian-angle' }`, `guided`); analytic `parseLine` (`radian-angle`, `errRadianAngle`). The complex builder does not call it: radians are its notation.
+
+**The cross-product lock** (docs/28 §5c) is `shell/__tests__/fixtures/radian-angle-rows.ts`: each builder's thin lock hands over its REAL submit decision on a triangle as a `RadianGate` answering `{ radian, recorded, escalated, text }`; the rows check every spelling is refused as radians, recorded by none, never escalated, and worded with the ruled sentence, and that the controls are never refused as radians. The meta-lock proves each check can fail; `suite-vocabulary.test.ts` holds the sentence as one role.
 
 ### Sentence boundaries ([ADR-W-125](06w-decisions-workspace.md#adr-w-125))
 

@@ -103,7 +103,7 @@ The figure is a set of **objects**, each with a *definition* referencing earlier
 - **The re-stated given yields ([ADR-623](06-decisions.md#adr-623), #1943/#1819).** `driveOrCheck` picks a constraint's carrier EAGERLY, before anything is solved. For a row the figure is already FORCED to satisfy that pick both re-opens the configuration choice (the driven re-solve lands in another valid drawing — the jump) and removes the carrier from `freeDofs` (a freedom the figure never lost stops being sampled — the ADR-052 smell). `releaseImpliedOwnership` (`engine/step.ts`) wraps every ladder exit of `applyStep`/`applyCoupledStep` and gives the claim back when, on the prior figure, the row already holds (`isSatisfied`) **and** is forced — `impliedByFigure` (`engine/dofRank.ts`), ADR-536's own rank Jacobian, so the DOF count and the ownership decision read one definition of "this row adds nothing". The mirror of ADR-399's `ensureOwnership`, which states the same rule for the branch the eager pick did not claim. Try-and-verify, failing open at every rung: the released figure must evaluate (which checks the re-stated row), be a figure, sit exactly where it sat, and survive re-sampling. The constraint is never dropped — it stays a listed check the evaluator, the verifier, the givens list and the DOF count all read. Ladder token `implied:release`.
 - **Over-constraint / contradiction:** before committing a step, check satisfiability. If unsatisfiable, reject the step, keep the previous figure, and surface a clear message.
 - **A fact whose subject is gone (ADR-483, #926):** the fold asks `isSymbolBound` (`engine/lower.ts`) before applying a `set-var`; a value for an unbound letter is stamped into the "no longer available" register, and a definition re-added anywhere binds it again. The ✎ edit seam (`app/editPipeline.ts`) names the rows an edit orphaned while committing it.
-- **A second letter, or another coefficient, for a measured angle or segment (ADR-661, #2023/#2061).** `measureRestatement` (`engine/lower.ts`) reads a symbolic `measure-angle`/`measure-length` against the EARLIER statements: the target is the angle as its vertex plus an unordered ray pair, the segment as an unordered pair. The same letter in the same form with another coefficient is `coef-conflict`; a fresh letter (no value, not a radius letter, bound to no other quantity earlier) on a target whose earlier letters all differ is `name-taken`; the identical measure is `same`. The fold pre-scans the list in order (`computeFoldInScope`, beside the soft-equal pre-scan) and stamps a refused restatement with `measureRestatementStatus` — the over-constrained frame, or `name-taken: angle|segment <name> is already named <letter>` — plus a `[vs #i]` tail naming the earlier statement's first row by provenance (the drop-one search could never find it: a representative measure owns no constraint). The stamped fact is skipped as `prior`, never retried and never waits. `lowerOne` reads the representative's target unordered too, so «∠CBA = 3α» no longer lowers to a self-ratio. `humanizeError` renders `name-taken` with `errors.angleNameTaken`/`errors.lengthNameTaken` (`_vs` with the earlier line — the `namesOtherLine` family, not #943's `namesOther`).
+- **A second letter, or another coefficient, for a measured angle or segment (ADR-661, #2023/#2061).** `measureRestatement` (`engine/lower.ts`) reads a symbolic `measure-angle`/`measure-length` against the EARLIER statements: the target is the angle as its vertex plus an unordered ray pair, the segment as an unordered pair. The same letter in the same form with another coefficient is `coef-conflict`; a fresh letter (no value, not a radius letter, bound to no other quantity earlier) on a target whose earlier letters all differ is `name-taken`; the identical measure is `same`. The fold pre-scans the list in order (`computeFoldInScope`, beside the soft-equal pre-scan) and stamps a refused restatement with `measureRestatementStatus` — the over-constrained frame, or `name-taken: angle|segment <name> is already named <letter>` — plus a `[vs #i]` tail naming the earlier statement's first row by provenance (the drop-one search could never find it: a representative measure owns no constraint). The stamped fact is skipped as `prior`, never retried and never waits. `lowerOne` reads the representative's target unordered too, so «∠CBA = 3α» no longer lowers to a self-ratio. `humanizeError` renders `name-taken` with `errors.angleNameTaken`/`errors.lengthNameTaken` (`_vs` with the earlier line — the `namesOtherLine` family, not #943's `namesOther`). **The alias arm (ADR-720, #2191):** an `angle-alias` is judged by the same predicate against the EARLIER `angle-alias` commands only, on the same vertex + unordered ray key — another name is `name-taken` at the first alias (status `name-taken: angle <ray1><vertex><ray2> is already named <name>`, the same render path), the identical name `same`; a measure letter and an alias never compare (ruling #2113 B). The alias line's two idempotent segment facts stay green, so the door's dry run refuses the line on its alias fact alone.
 - **One affine tail for every symbolic value (ADR-662, #1851).** `AFFINE_TAIL` / `affineTailOf` (`parser/parse.ts`) read «± c» or «± c/d» after the letter, for `measureLength` and for `angleValueOf` (so `measureAngle` emits `expr.const` + its faithful `text`). `lowerOne`'s `measure-angle` lowers the constant as `measure-length` does: `coef·value + const` once the letter has a value; else an affine `set-angle-ratio` (`add`, degrees — the `angle-ratio` residual `∠1 − (k·∠2 + add)`) against the letter's first PURE binding (an affine binding is marked `affine` in the symbol table and never anchors a ratio). On the representative's own angle only the identical measure lowers to nothing; another form there is the equation it states (∠ABC = ½∠ABC + 40). `measureRestatement` treats the same letter and coefficient with another constant as `coef-conflict`.
 - **A letter's value lowers at its binding (ADR-648, #2101).** `lowerOne` resolves a `set-var` at the row that binds the letter, never at the value row itself: a measure (`measure-length`, …) lowers to its value; a radius binding (`radius-symbol`) lowers to the naming plus `set-radius` on its circle, the stated-radius path (ADR-087). `symbolsConsumedBy` lists the binding, so ADR-492 blames a value that breaks the figure on the value row. The parser's `setVar` reads an uppercase letter only when `ParseContext.radiusSymbols` binds it; an unbound capital is a point name. The reserved R/r on a FREE-radius circle (no `radius-symbol`, no fixed-radius circle — `SymTab.radiusCircle`) is bound by its measure row: `buildSymTab` records the fallback circle whether or not the letter has a stated value, and a valued letter's `measure-length` lowers to `set-length-radius` plus `set-radius{circle, value}` (ADR-699, #2111) — ADR-071's "no value" gate guards the default only, never a stated value.
 - **The letter system (ADR-681/682, #2165/#2135/#2133).** `buildSymTab` builds the table through `letterSystem(cmds, radiusOf)` (`engine/lower.ts`): the linear single-letter equations every statement states, keyed by target — a segment (unordered pair), an angle (vertex + unordered ray pair) or `radius(circle)` — judged in LIST ORDER. Sources: `set-var`; two expressions on one target, or an expression against a number (`measure-length/-angle`, `set-distance`, `set-angle`, a sized `circle`, `set-radius`); `radius-symbol`; the reserved R/r when exactly one circle has a stated size (`statedSizeCircles`). A consistent row adds nothing or determines a letter with an admissible value, stored as `derived` (`SymTab.vars[x].derived`; `value` is a STATED value only); an inconsistent row (`0 = c`, the same constant with another coefficient, a second value, an inadmissible value) lands in `SymTab.refused` keyed by its index, with `at` = the statement that supplied the earlier value, and its equations are dropped for the rows after it. Two numbers on one length or angle are left to the solve (a residual), a value for an unbound letter waits (#926), and multi-letter equations, powers and area/perimeter targets add nothing. `lowerOne` reads `value ?? derived` (a determined letter lowers to a pin); `measureLabelForms` reads `value` only, so the labels stay as typed. The fold's restatement pre-scan reads `symtab.refused` beside `measureRestatement` with the same `[vs #i]` tail; `dryRunOutcome`'s `bindsLetter` counts a symbolic measure binding a letter to a target in a new form as produced. A radius target renders `errors.restatedSize` (the #2119 frame, no reason clause). On a radius target two NUMBERS are judged too (a stated radius is a size, not a constraint, so no residual sees it — ADR-683): the latest earlier sizing statement is the `at`; and `foldCommand` resizes a re-stated standalone circle in place only when the earlier fact states no size or the same size, appending a different one so the pre-scan judges it.
@@ -127,7 +127,7 @@ polygon at the angle's vertex is `bisector-is-side` (with `host`, the polygon's 
 - **A crossing is refused when its own letters make it an existing point (ADR-531, #1274).** The check sits inside `cross`, the single emit point of the two-named-lines family, so no spelling reaches `line-line-intersection` around it; it travels the `Clarify` road. ADR-123's boundary holds, and ADR-489's within-margin exemption stays for `rename` and `merge`.
 - **The letter-holder question (ADR-520, #238).** `letterHolder` (`store/geoStore.ts`) answers who holds a letter and whether it can be taken back, returned with every `target-taken` refusal from `renameFacts` and `nameCentreFacts`. Reclaimable means dropping the holder removes that letter and nothing else; `reclaim` re-asks before acting.
 - **A point-menu control declares its own colour (ADR-520 Am. 2, #1277).** `ctrlBtn` carries `color: var(--color-text)` instead of inheriting `--color-text-muted`; whether a `<button>` inherits `color` is UA behaviour, so every menu control states it.
-- **Driven parameters are solved as jointly as they are coupled — no more (ADR-557, #1602).** `resolveDriven` sends driven carriers to the joint Nelder–Mead only when coupled (a parent of another's constraint refs, a cycle, or `also`); independent carriers take the exact ADR-028 1-D root path in dependency order, checked by the joint solver's accept. An `on-segment-solved` rider driven by ⟂ / ∥ / collinear takes the exact roots of its polynomial in t; a relation holding by construction claims no carrier (`driveOrCheck`). Locked by `drivenSolveStats.joint`.
+- **Driven parameters are solved as jointly as they are coupled — no more (ADR-557, #1602).** `resolveDriven` sends driven carriers to the joint Nelder–Mead only when coupled (a parent of another's constraint refs, a cycle, or `also`); independent carriers take the exact ADR-028 1-D root path in dependency order, checked by the joint solver's accept. An `on-segment-solved` rider driven by ⟂ / ∥ / collinear takes the exact roots of its polynomial in t; a relation holding by construction claims no carrier (`driveOrCheck`). Locked by `drivenSolveStats.joint`. An unbounded driven shape scalar (k, dist, angle) whose root lies beyond the joint solve's restarts gets a bracket on the failure path only — the ADR-071 radius bracket, extended ([ADR-717](06-decisions.md#adr-717), #2118; `drivenSolveStats.shapeRescue`).
 - **A measure operand is a polygon or a round figure ([ADR-632](06-decisions.md#adr-632), #172).** The ADR-118 area and ADR-228 perimeter constraints, commands and the `measure-area` / `measure-perimeter` symbolic layer carry an optional `RoundOperand` per side: `ids` = [centre, from, to] names a sector (area ½·θ·r²) or its arc (length θ·r), `whole` with [centre, P] the circle (π·r², 2π·r). `engine/roundMeasure.ts` is the one formula seam every consumer calls (residual, scale, verifier, label check), and the arc's identity (`spanDeg`/`minor`, copied from the drawn `arc` by the parser through the semantic `ctx.arcs`) goes through the shared `orientArc`, so the measured sector is the drawn one. `driveOrCheck`'s `driveRoundMeasure` routes by meaning: an absolute size drives the circle's free RADIUS (scale — a lone size resizes, never reshapes), a ratio or a size over a pinned radius drives the arc's free end (the central angle). A polygon over the same letters is another operand (labels key apart, a shared letter relates them). Labels print inside the drawn wedge (its centroid) or on the drawn arc (`render/scene.ts` `roundLabelPlacement`).
 - **Fit transform:** map computed coordinates into the viewport; persist the transform so the view is stable across steps.
 
@@ -214,7 +214,8 @@ Seams recorded against the layout:
 - **valuesPanel's symbol lane (ADR-485, #929)** reads the ADR-031 symbol table: every letter the student named
   gets a row (natun when valued, nigzar when forced) and is askable through the `var` query. Circles are named
   through `circleRef` (ADR-552, #1442) — drawn circles only, a visible centre by its letter, an unnamed one as
-  "the circle" or its ADR-342 token; `render/valueRowText` words every row label.
+  "the circle" or its ADR-342 token; two drawn circles on one centre, ordered by `innerOf`, by their role
+  (`via: 'role'`, ADR-714, #2264); `render/valueRowText` words every row label.
 - **The clarification family (ADR-490, ADR-494).** A rule may return a `Clarify`, which `refusalOf` maps to a
   refusal reason of the same name and `submitPipeline` renders as a note that keeps the text; `not-handled` is the
   escalation seam. `isAmbiguityQuestion` is the explicit whitelist `parseResolved` may not turn back into an
@@ -282,6 +283,25 @@ genuinely absent returns a `Clarify` and asks, keeping the student's text: anyth
 given never stated (ADR-052). Members: `incompleteComparative` (#777) and the role-side ask (#775). A new member is
 registered **after** the rule that owns the complete form, and its absence is **structural** (an end-of-line
 anchor), never inferred from another rule failing.
+
+### The AI answer keeps every shape and role word (#1906, [ADR-722](06-decisions.md#adr-722))
+
+The AI second attempt in `submitPipeline.ts` runs one more member beside ADR-430's object gate:
+`droppedPropertyWords(utterance, llmCmds, ctx)` (`src/parser/propertyWords.ts`). It finds the student's property words
+with the shared reader (`shell/llm/honestyCore.ts` `propertyWords`, [ADR-W-144](06w-decisions-workspace.md#adr-w-144))
+over `PROPERTY_VOCABULARY2` — a canonical-spelling projection of `SHAPE_ADJ_WORDS`, `SHAPE_NOUN_WORDS`,
+`POLYGON_NAME_ARITY` (the n-gon tables), `CEVIAN_NOUNS_*` and the inscription verbs, folded as the span accountant
+folds and vetoed by its `KEYWORD_STEMS` / `FILLER` — and asks, PER OCCURRENCE, whether the answer's commands carry the
+property: ADR-595's `shapeAdjectiveAccounts` (extracted from `droppedShapeAdjective`), the shared `quadImplies` lattice
+for a quadrilateral noun (a ring's command type, `declaredAs`, a trapezoid's `kind`, the kite variant, `inscribe`, a
+Thales ring), `materialisedArities` for a polygon name, an even ring on one circle for «משוכלל», a foot / ⟂ / 90° for an
+altitude, a midpoint / equal pair / ratio for a median, `bisector` / an angle ratio / an arc midpoint for «חוצה זווית»
+(ADR-292's whole bisect family for an English "bisects"), and for «חסום» / «חוסם» the circle `statedCircleDirection`
+gives the student's line spelt right (`inscriptionVoice`, else `isCircleInPolygon`). Shape words are exempt when every
+polygon noun is a reference (`polygonNounsAllReferences`, ADR-595's exemption); a definite «המעגל החוסם» over a drawn
+circle is a reference too. When ADR-292's verb gate already names «חוצה/bisect», the bisector words are skipped, and
+`mergeWordItems` names a word once. The grammar seam is unchanged. Nets: `issue-1906-ai-answer-words-net.test.ts`
+(every committed corpus step, every catalog example, the recorded AI answers).
 
 ### An incircle 2-D does not draw, and a bare n-gon in the object gate (#1891, [ADR-606](06-decisions.md#adr-606))
 
@@ -590,6 +610,8 @@ phrase }`. Because it is `parse`, every seam inherits it: the submit lane (`deci
 edit seam, the scenario harness (`refusedSteps`) and log-triage. The pre-parse guard and the post-failure register
 read the same `RULES` entries.
 
+**An angle written in radians** (#1837, [ADR-710](06-decisions.md#adr-710)) takes the same positions: `findRadianAngle` (`shell/radianAngle.ts`, [04w](04w-design-shell.md)) is asked in `decidePreParse` right after the proof target — `refuse`, `guided`, logged `scope:radian-angle`, note `input.scope.radian-angle` — in `runEditCommit`, and at the top of `parseEntry` (`{ ok: false, reason: 'radian-angle', value }`), so no caller of `parse` can draw «∠ABC = pi/2» as 2°.
+
 **A letter the tool cannot read** (#1919, [ADR-626](06-decisions.md#adr-626)) takes the same two positions.
 `unreadScript` (`shell/inputScript.ts`, the shared rule all four builders call) is asked in
 `decidePreParse` — refusing with `input.scope.unread-name` or `input.scope.unread-word`, the student's own
@@ -638,6 +660,16 @@ must be one `readShapePhrase` lowers whole, its arity must match the letters and
 phrase's own or the generic «מרובע». Anything else is returned unchanged. It is the second copy of analytic's
 `frameAnalytic.ts` (copied, BOUNDARIES.json); a third copy (3-D, #1679/#1888) moves the pure part to `shell/`.
 
+### The bar spelling of a length, folded at the normalize boundary ([ADR-719](06-decisions.md#adr-719))
+
+`normalizeUtterance` folds a **two-label** absolute-value pair to the pair — `|AB|` → `AB`, `| A1B1 |` → `A1B1` — right
+after the look-alike glyph fold (`foldGlyphs`) and the ן-connective fold, so every length rule and every honesty gate
+reads one spelling. Uppercase labels only, guarded against a doubled bar on either side (`AB || CD || EF` is not
+`|CD|`); `|z|`, `|ABC|` and anything else pass through untouched. The four older per-rule strips (`parseMeasureSide`,
+`parseProductSide`, the product-term reader, `lengthOrder`'s `SEG`) stay as written: they also accept a lowercase pair
+(and the sum and product readers any bar) the fold does not, and removing them would change those readings. No catalog row: the panel teaches
+«AB = 4»; the bar is a tolerated variant, like the «מעויין» fold.
+
 ### A second shape noun over a declared ring ([ADR-619](06-decisions.md#adr-619))
 
 `engine/shapeKinds.ts` reads the quadrilateral hierarchy from the ONE shared lattice (`shell/narrowing.ts`
@@ -649,9 +681,12 @@ the ring's kind through `nounOfKind` (an adjective trapezoid is «הטרפז»).
 rows are the curriculum's EXCLUSIVE reading (exactly one parallel pair), which `shapeConstraints` already assumes.
 Three derived readers, three directions, no list of pairs:
 
-- `quadImplies(declared, stated)` → `impliedShapeRestatement` (apply.ts) re-spells the line to the GENERIC ring
+- `quadRelation(declared, stated) === 'implies'` → `impliedShapeRestatement` (apply.ts) re-spells the line to the GENERIC ring
   command over the declared spelling, so it takes ADR-595's path and the submit pipeline answers «כבר קיים» with no
-  row. A rewrite, not a new `commandConflict` carve-out.
+  row. A rewrite, not a new `commandConflict` carve-out. The implication is REFLEXIVE ([ADR-711](06-decisions.md#adr-711)):
+  the noun the ring already is restates it too, so a kind a sibling merge stamped (`refineRingKind`), which no command
+  of that noun built, is never re-applied as a fresh shape. Only the noun is re-spelled: a command carrying a stated
+  field beyond its vertices and kind (the square's `side`) keeps its own path (`RESTATEMENT_FIELDS`).
 - `quadsExclude(declared, stated)` → `shapeExclusion` / `shapeExclusionError`, a stage-0 prover beside ADR-607's,
   rendered by `humanizeError`'s `errors.shapeExcluded` with both nouns read from `shapes.name.*` (`paramKeys`: a
   param whose value is a translation key).
@@ -721,7 +756,15 @@ crossing's own statement is read from `ownerByObjId`.
 **A stated radius is never rewritten** ([ADR-692](06-decisions.md#adr-692), #2239). Over two stated (`length`) radii
 `circles-tangent` pins the centre distance (r₁ + r₂, or |r₁ − r₂| > 0) and never touches a radius; the ADR-037 Am. 2
 `tangent-inner` radius variant, which made the second of two equal circles the largest one inside the first, is gone.
-Equal stated radii stated internally tangent are refused at stage 0a by `equalInternalTangency`
+Since [ADR-713](06-decisions.md#adr-713) (#2206) the predicate is `equalNestedPair` and its message
+`over-constrained: equal circles <circle> nested <contained|int-tangent|concentric> cannot hold`, humanized in the
+over-constrained frame with the relation's reason (`errors.equalNestedReason.*`, #2200's sentence); its nestings are the
+internal-tangency and containment records plus the incoming commands, and two circles of the applied construction on one
+centre; "equal" is both radii stated equal or a radius ratio k = 1 on the pair (`ratio` with `radii`). The fold's
+`tagEqualNested` names the other side for each relation (the nesting's statement, or the latest size / equality). The
+words half is the parser's: `circlesTangent` (internal) and `concentricCircles` return the owned `equal-circles-nested`
+clarify with its `relation`, as `twoCirclesPosition` does for the contained pair (ADR-712). As ADR-692 built it:
+equal stated radii stated internally tangent are refused at stage 0a by `equalInternalTangency`
 (`radiusFeasibility.ts`, beside `circlesTangentError`), in either order: over every internal tangency the construction
 states (its `circle-position` records) and the incoming commands state, a pair whose radii are both stated and equal
 (#2119's 1e-9 relative tolerance) after the step and was not before is refused in #2119's restated-size shape
@@ -741,8 +784,13 @@ exactly one such phrase governs the pair and it is not a named circle's own «מ
 creates is created PINNED at N (`freeRadius` dropped), a drawn one gets `set-radius N`. `withStatedRadius`'s consumers
 are `twoCirclesMeet` (all three branches), `twoCirclesPosition` (the disjoint pair only), `circlesTangent` (external
 only; its #757 leftover guard strips the phrase only then) and `commonTangent` (the two-touch construction). A pair
-that cannot be equal (contained, internally tangent, concentric) does not read it, so its number stays unread and the
-line escalates (ADR-678).
+that cannot be equal (contained, internally tangent, concentric) does not read it. Since [ADR-702](06-decisions.md#adr-702)
+(#2263) those rules ask the same reader through `nestedPairRadius` and return the owned `nested-pair-radius` refusal
+(parts: the pair, then the radius phrase, the student's own words); `decideDeterministic2D` shows it in FR-IN-4g's
+one-given-per-line frame (`input.scope.split-statements`) and the ✎ seam as `steps.editDropped` naming the phrase —
+never escalated, because the model picked a circle for the number in silence. The consumers: `concentricCircles`,
+`twoCirclesPosition` (the contained pair) and `circlesTangent` (internal; its #757 leftover guard now strips the phrase
+for either kind, so the internal refusal is reached only once the rest of the sentence is read).
 
 `withEqualRadii`'s consumers ([ADR-679](06-decisions.md#adr-679), #2186): `circlesTangent`, `twoCirclesPosition`,
 `twoCirclesBare` (ADR-455), and `twoCirclesMeet` (all three branches), `circleCircleIntersection`, `commonTangent` (every
@@ -752,6 +800,28 @@ two-circle context, or one circle noun with a plural size noun («מעגל מו�
 the equal-circle noun phrase («מעגלים שווים», "equal circles") must land in a lowering that makes two radii equal
 (`set-radius-ratio` k = 1, or two radii pinned at one value — `radiiMadeEqual`), or the gate reports «שווים» and the
 line escalates.
+
+Since [ADR-712](06-decisions.md#adr-712) (#2200) `twoCirclesBare`'s leftover strips the EQUAL_SIZE vocabulary it reads
+(ADR-455's bare reading was dead code before), and an equal bare pair writes `admits: ['meet', 'disjoint']` on its
+`set-circle-position any`: the **configuration set comes from what was stated** (M4). `admits` is the cases the
+sentence leaves open, in variant order (absent = all three); `variantCountOf` returns its length and `apply.ts` seats
+the default of the case the variant indexes, so «הציגו תצורה אחרת» on an equal pair cycles crossing ↔ apart and never
+seats a "contained" pair it cannot be. A **contained pair stated equal is refused from the words** — a circle strictly
+inside another is smaller: `twoCirclesPosition` (the contained branch, before `nestedPairRadius`) and
+`containedNewInExisting` (after its subject test) return the owned `equal-circles-nested` clarify, which
+`decideDeterministic2D` refuses as `input.equalCirclesNested.contained`, quoting the line, with one next step.
+
+### A circle pair's tangency kind: stated or defaulted ([ADR-704](06-decisions.md#adr-704))
+
+`circles-tangent.kindStated: false` marks a tangency whose line named no kind and inherited none (`circlesTangent`,
+`namedTouchPoint`, `commonTangent`'s at-new-point branch): its `external: true` is only the default. The replay fold's
+pre-scan (`tangentKind`, `replay/core.ts`, beside the other M4 pre-scans) resolves each such fact over the enabled list:
+the first kind-stated `circles-tangent` on the same unordered pair, else internal when the pair carries a
+`set-circle-position contained`, else the default. `lowerFact` lowers the resolved kind (the stored command never
+changes, so the source of truth stays `(facts, seed)`), and the memo signature carries the map. The tangency record
+(`requirementOf`) keeps `kindStated`, so the parser's `statedTangencies` inherits only a stated kind, while its touch
+point and operand order come from the first record (ADR-703). The verifier's containment check is closed
+(`d + r_b ≤ r_a + tol`) when the same pair is stated internally tangent, and strict otherwise.
 
 ### A fixed-run rule consumes the whole label body ([ADR-601](06-decisions.md#adr-601))
 
@@ -793,6 +863,12 @@ test fails if `runSubmit` parses or refuses on its own, and the parity shards (`
   Am. 1) — and even then it is refused when the dry run's seat sweep finished and cured nothing (`StepOutcome.seatsExhausted`,
   [ADR-584](06-decisions.md#adr-584), #1671). `seatSweep` is bounded by `SEAT_SWEEP_WORK_CAP` charged units; the
   worker warms the rotated folds first (`seatSweepWarmup`; a transplanted fold carries `FoldNode.work`).
+- **The gate's budgets are work, never the clock** ([ADR-709](06-decisions.md#adr-709), #1857). After the seat
+  sweep, the dry run's unstated-choice rescue (`choiceRescue(all, { workCap: choiceRescueConfig.cap })`) decides
+  whether another variant / side / reflex assignment cures an erroring step; it runs under
+  `CHOICE_RESCUE_WORK_CAP` charged units (`withWorkBudget`, every memo hit charged, ADR-582), so a line's verdict
+  is the same cold and warm on every device. A fold the cap cuts ends the rescue uncured. `findValidConfig`'s
+  variant tier keeps its wall-clock deadline (`{ deadline }`) — an interactive view search, ADR-558's split.
 
 ### A one-line compound is all or nothing: the clause-coverage gate ([ADR-598](06-decisions.md#adr-598))
 
@@ -810,6 +886,13 @@ test fails if `runSubmit` parses or refuses on its own, and the parity shards (`
 `clausesOf` cuts at punctuation (not a decimal point), the explicit connectives, and «ו» before a Hebrew word or a
 label, never leaving a piece that only names points, and keeps a subject-less piece with the clause before it when
 the two read as a statement.
+
+**A reference-only piece is the co-subject of the next** ([ADR-703](06-decisions.md#adr-703), #2209). Inside the
+gate's reading (`readClauses`, never in `clausesOf`), a piece whose lowering only declares ids the figure already
+has (`refersOnly`, the same test as coverage rule (3)) is re-joined to the next piece with the line's own separator
+text, and the joined text is read as one clause, provided it reads. «מעגל O ומעגל P משיקים» on two drawn circles is
+therefore one clause, and «מעגל P משיקים» is never read without its co-subject. On an empty figure «מעגל O»
+declares a new id, so nothing is joined and ADR-460's advisory is unchanged.
 
 #### A part the reading never read ([ADR-603](06-decisions.md#adr-603), [ADR-W-120](06w-decisions-workspace.md#adr-w-120))
 
@@ -1059,6 +1142,17 @@ unbound (the claim «תיכון ליתר AB» states); more than one host (anoth
 `role-side-unresolved`. `ambiguous-hypotenuse` is left only for a pair after the noun that is no side of the
 triangle («תיכון ליתר AD»). The Thales reader keeps reading only a STATED hypotenuse.
 
+**A role stated about typed letters is a claim, in every spelling ([ADR-708](06-decisions.md#adr-708), #1839).** Typed
+letters stay literal (no binding), and the sentence also states its role through one lowering, `isoscelesRoleClaim`
+(`parser/parse.ts`): a base → the equality making the opposite vertex the apex (ADR-563's claim, which pins the
+variant, ADR-138); a leg → the requirement record `set-side-role { role: 'leg', a, b, ids }` when the apex shown is
+one of its ends, else the `leg-apex` question. Its callers: `withRoleClaims` («לבסיס BC», «לשוק AC»);
+`roleSideLine` when ONE ring vertex is typed with an unlettered base / leg («AD גובה לבסיס», «BE גובה לשוק» — the
+side is the one opposite the typed apex); `withApexAngleClaim` («זווית הראש» / "apex angle" with a winning
+`bisector` at a vertex of an isosceles-declared triangle). The leg requirement is ADR-244's shape: `applyCommand`
+records nothing, `checkGivens` flags a construction whose declared roles (`roleSidesOf`) make the pair the base
+and not a leg (`figure.v.legIsBase`), and `meetsRequirements` keeps every configuration search off that variant.
+
 ### A stated side is a requirement record, checked at stage 0g′ and read wherever a point is placed ([ADR-549](06-decisions.md#adr-549), [ADR-594](06-decisions.md#adr-594))
 
 - **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`): `circle-side`, `polygon-side`,
@@ -1123,6 +1217,19 @@ amends ADR-W-048).
   `errors.polygonCornerStraight` (the n-gon would become an (n−1)-gon, nouns from `errors.ngonDefinite` /
   `errors.ngonIndefinite`). The corner wire form carries no `[vs #i]` (`COLLAPSED_VS` does not read it), so the
   student reads the ruled «עם «…»» sentence.
+
+### A diagonal called a height of a shape whose diagonals are perpendicular to no side (#2117, [ADR-718](06-decisions.md#adr-718))
+
+- **The table** — `DIAGONAL_NEVER_PERPENDICULAR` (`engine/shapeKinds.ts`): every quadrilateral kind that implies `rectangle`
+  or `rhombus` in the shared lattice (square, rectangle, rhombus). A diagonal of any of them makes an angle strictly
+  inside (0°, 90°) with every side.
+- **The proof** — stage 0, `diagonalHeightImpossibility` (`engine/heightFeasibility.ts`): an `altitude-choice` (ADR-644)
+  every option of which is a diagonal of a ring declared a table kind against an edge of that ring. Called by the fold
+  (`replay/core.ts`, the in-order pass and the ADR-104 retry) on the FACT's command, because `applyStep` sees only the
+  selected option's lowering; a hit is filed rigid (never pending).
+- **One message**, `over-constrained: diagonal AC of square ABCD is perpendicular to no side cannot hold`; the fold
+  tags `[vs #i]` with the ring's declaring statement (`ownerByObjId`, ADR-602's provenance); humanised as
+  `errors.overConstrained` with the nested reason `errors.diagonalNoSideReason` (`shape` from `input.shapeNounDefinite`).
 
 ### A circle through three points the givens put on one line is refused (#2099, [ADR-651](06-decisions.md#adr-651))
 
@@ -1317,6 +1424,25 @@ never stroked, so its sides count through their segments). `Figure.tsx` paints i
 no hit-target.
 
 *Identifiers:* `carryingLines` · `offInkExtensions` · `Scene.extensions` · `data-role="extension"`
+
+### An angle's value fits its corner: side length and opening ([ADR-544](06-decisions.md#adr-544), [ADR-715](06-decisions.md#adr-715), #1337, #2175)
+
+A stated angle's arc and value are sized by the corner (`markScale`, the shorter adjacent side, ADR-544), and the
+value is then PLACED to fit the wedge's opening (`placeAngleValue`, `src/render/scene.ts`). It works in screen px
+on the label's ink box, which `src/render/mathMetrics.ts` (`mathLabelBox`) computes from the same widths `MathSvg`
+lays the label out with. In order:
+
+1. Today's spot (`angleValueOffset`, just outside the arc) when the box clears both rays (a ray may cut the estimated box's edge by `INK_TOLERANCE`).
+2. Further out along the bisector, at the nearest distance where the box clears both rays and the arc, while it
+   stays on the vertex's side of the chord between the two ray ends and within the nearer half of the shorter
+   ray (past it, the value reads as another corner's).
+3. Smaller, down to `MIN_MEASURE_FONT_PX`, at the distance that fits.
+4. Beside the arc, just outside the wedge, across the ray whose outer side faces away from the figure's centre.
+
+The label is never dropped. Analytic places its stated values through its own candidate search
+(`src-analytic/render/scene.ts`), not this function.
+
+*Identifiers:* `placeAngleValue` · `mathLabelBox` · `INK_TOLERANCE` · `angleValueOffset` · `markScale`
 
 ### The measure-label seam and the display choice (#948, [ADR-488](06-decisions.md#adr-488))
 
