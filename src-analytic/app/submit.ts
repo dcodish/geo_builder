@@ -143,6 +143,8 @@ const collapseFields = (f: Derivation['faults'][number]) =>
             ? { shape: f.shape }
             : f.code === 'diagonal-is-side' || f.code === 'diagonal-none-here'
               ? { polygon: f.polygon, pair: f.pair }
+              : f.code === 'bisector-is-side' // #2115 (ADR-AG-299)
+              ? { pair: f.pair, vertex: f.vertex, polygonKind: f.polygonKind }
               : // #1893 (ADR-AG-271) — a third crossing: the line as written and the two points it already crosses at.
                 f.code === 'third-crossing'
                 ? { line: f.line, a: f.a, b: f.b, curve: f.curve }

@@ -323,8 +323,12 @@ export type Fact =
    * on the line through the angle's two ray points (`cevianFacts`), and an existing `p` lies on the bisector's
    * ray (`onBisectorFacts`). A lone vertex («זווית A») is resolved by the one angle resolver. With NO `p` —
    * «חוצה זווית ABC» on its own — the bisector is drawn as a line through the vertex (2-D's visible `bisector`).
+   *
+   * #2115 (ADR-AG-299): `seg` is the segment AS TYPED («AB» in «AB חוצה זווית B»), for the side refusal's sentence.
+   * `roleNoun` marks the role-noun spellings («AB הוא חוצה זווית», «חוצה הזווית AB», "the bisector AB"): M1 answers
+   * them only when the pair is a side of a declared polygon, and declines them (`not-handled`) otherwise, as 2-D does.
    */
-  | (FactBase & { t: 'bisects'; at: AngleName; p?: Id })
+  | (FactBase & { t: 'bisects'; at: AngleName; p?: Id; seg?: [Id, Id]; roleNoun?: true })
   /**
    * «שטח הדלתון הוא 24» — a shape named by its NOUN, with no vertices (#1049).
    *

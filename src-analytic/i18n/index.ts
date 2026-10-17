@@ -392,6 +392,24 @@ const he = {
   errBisectorWrongApex:
     'חוצה זווית יוצא מקודקוד הזווית שהוא חוצה, ובמשפט "{{detail}}" הקטע אינו יוצא מהקודקוד הזה. ' +
     'כתבו קטע שמתחיל בקודקוד הזווית, למשל "AD חוצה את הזווית BAC".',
+  // #2115 (ADR-AG-299; operator ruling 2026-10-15) — 2-D's `input.cevianBisectorIsSide` / `…IsPolygonSide`, verbatim (B1).
+  errBisectorIsSide: '{{side}} היא צלע של המשולש ולכן אינה יכולה לחצות את זווית {{vertex}} — חוצה זווית יוצא מקודקוד אל הצלע שמולו.',
+  errBisectorIsPolygonSide: '{{side}} היא צלע של {{polygonNoun}} ולכן אינה יכולה לחצות את זווית {{vertex}}.',
+  // The host polygon's definite noun for that sentence — 2-D's `input.shapeNounDefinite`, verbatim (the trapezoid kinds share one).
+  shapeTheNounSquare: 'הריבוע',
+  shapeTheNounRectangle: 'המלבן',
+  shapeTheNounRhombus: 'המעוין',
+  shapeTheNounParallelogram: 'המקבילית',
+  shapeTheNounKite: 'הדלתון',
+  shapeTheNounTrapezoid: 'הטרפז',
+  shapeTheNounN4: 'המרובע',
+  shapeTheNounN5: 'המחומש',
+  shapeTheNounN6: 'המשושה',
+  shapeTheNounN7: 'המשובע',
+  shapeTheNounN8: 'המתומן',
+  shapeTheNounN9: 'המתושע',
+  shapeTheNounN10: 'המעושר',
+  shapeTheNounPolygon: 'המצולע',
   // #1240 (ADR-AG-209) — a cevian whose target the figure does not determine: ask, never guess.
   errAmbiguousCevian:
     'הקודקוד או הצלע במשפט "{{detail}}" שייכים ליותר ממשולש אחד בשרטוט, ולכן לא ברור לאיזו צלע הוא יורד. ' +
@@ -941,6 +959,24 @@ const en: typeof he = {
   errBisectorWrongApex:
     'An angle bisector starts at the VERTEX of the angle it bisects, and the segment in "{{detail}}" does not. ' +
     'Start the segment at the angle’s vertex — for example "AD bisects angle BAC".',
+  // #2115 (ADR-AG-299) — 2-D's sentences, verbatim.
+  errBisectorIsSide: '{{side}} is a side of the triangle, so it cannot bisect angle {{vertex}} — an angle bisector runs from a vertex to the opposite side.',
+  errBisectorIsPolygonSide: '{{side}} is a side of {{polygonNoun}}, so it cannot bisect angle {{vertex}}.',
+  // The host polygon's definite noun for that sentence — 2-D's `input.shapeNounDefinite`, verbatim (the trapezoid kinds share one).
+  shapeTheNounSquare: 'the square',
+  shapeTheNounRectangle: 'the rectangle',
+  shapeTheNounRhombus: 'the rhombus',
+  shapeTheNounParallelogram: 'the parallelogram',
+  shapeTheNounKite: 'the kite',
+  shapeTheNounTrapezoid: 'the trapezoid',
+  shapeTheNounN4: 'the quadrilateral',
+  shapeTheNounN5: 'the pentagon',
+  shapeTheNounN6: 'the hexagon',
+  shapeTheNounN7: 'the heptagon',
+  shapeTheNounN8: 'the octagon',
+  shapeTheNounN9: 'the nonagon',
+  shapeTheNounN10: 'the decagon',
+  shapeTheNounPolygon: 'the polygon',
   errAmbiguousCevian:
     'The vertex or side in "{{detail}}" belongs to more than one triangle in your figure, so it is unclear which side it is drawn to. ' +
     'Name the side or the triangle — for example "AD is the altitude to side BC" or "AD is the altitude in triangle ABC".',
