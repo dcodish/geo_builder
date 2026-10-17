@@ -5207,6 +5207,23 @@ export const SCENARIOS_4: Scenario[] = [
       const v = gateVerdict(factsOf(['מלבן ABCD', 'מעוין ABCD']), 'ריבוע ABCD');
       expect(v.kind, JSON.stringify(v)).toBe('noop');
     },
+  },  {
+    id: 'diagonal-height-refused-2117',
+    title: '«ריבוע ABCD» · «AC גובה» — a diagonal is a height to no side: refused naming the square, with the ruled reason (#2117, ADR-718)',
+    guards:
+      "#2117 (P3), the operator's ruling of 2026-10-15 (decisions ballot, card 3, option A: the sentence approved as written). Measured on de7c221f through decideDeterministic2D: «AC גובה» on a square, rectangle or rhombus was refused «…סותר נתון קודם… הסיבה: AC ⟂ CB.» — the failure of the first option of the ADR-644 `altitude-choice`, with no other statement named. Root cause: a choice none of whose options can hold was refused with its first option's failure, and the drop-one search could name nothing because removing «ריבוע ABCD» removes the letters. Fix: a stage-0 theorem prover (`diagonalHeightImpossibility`, src/engine/heightFeasibility.ts) read on the fact's own altitude-choice against the ring's declared kind (`DIAGONAL_NEVER_PERPENDICULAR`, derived from the lattice), the declaring statement named from the fold's provenance. Asserts the exact ruled sentence. The matrix (both diagonals, three kinds, «AC הוא גובה», English wording, the controls) is src/app/__tests__/issue-2117-diagonal-height.test.ts.",
+    steps: ['ריבוע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
+      const facts = factsOf(['ריבוע ABCD']);
+      const v = gateVerdict(facts, 'AC גובה');
+      expect(v.kind === 'refused' && v.reason, '«AC גובה» is refused before it becomes a fact').toBe('error');
+      const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+      expect(humanizeError(detail, he, 'AC גובה', otherUtteranceForError(facts, detail)).replace(/[\u2066-\u2069]/g, ''), 'the exact ruled words').toBe(
+        'לא ניתן: «AC גובה» סותר את «ריבוע ABCD» — אי אפשר לקיים את שניהם יחד. הסיבה: האלכסון AC אינו מאונך לאף צלע של הריבוע.',
+      );
+    },
   },
 ];
 

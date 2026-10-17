@@ -5,6 +5,7 @@ import { describeConstraint } from '@/engine/solve';
 import { applyCommand, shapeExclusionError } from '@/engine/apply';
 import { collapsedPolygonError, diagonalClaimRefusal } from '@/engine/step';
 import { collinearCircleError, notCyclicImpossibilityError } from '@/engine/cyclicFeasibility';
+import { diagonalHeightError } from '@/engine/heightFeasibility';
 import type { Constraint } from '@/engine/types';
 import { stripFormatControls } from '../../../shell/bidi';
 
@@ -36,6 +37,7 @@ const CASES: { raw: string; contains: string[] }[] = [
   { raw: `${notCyclicImpossibilityError({ ring: ['A', 'B', 'C', 'D'], shape: 'right-trapezoid', forced: 'rectangle' })} [vs #0]`, contains: ['טרפז ישר זווית', 'למלבן'] },
   // #2099 (ADR-651): the structural refusal and the evaluator's numeric backstop — one ruled reason, never half-English
   { raw: `${collinearCircleError({ points: ['A', 'D', 'B'], centre: 'O' })} [vs #1]`, contains: ['A, D', 'B', 'ואין מעגל שעובר דרך שלוש נקודות על ישר אחד'] },
+  { raw: `${diagonalHeightError({ diagonal: ['A', 'C'], ring: ['A', 'B', 'C', 'D'], shape: 'square' })} [vs #0]`, contains: ['האלכסון', 'AC', 'אינו מאונך לאף צלע של הריבוע'] },
   { raw: 'cannot construct O: A, D, B are collinear (no circumscribed circle)', contains: ['A, D', 'B', 'ואין מעגל שעובר דרך שלוש נקודות על ישר אחד'] },
   // apply.ts shapeExclusionError (#1985, ADR-619) — two nouns no quadrilateral carries at once. Both shape words
   // are `paramKeys` (translation keys), so the gate also proves no English noun survives into the sentence.

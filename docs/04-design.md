@@ -1170,6 +1170,19 @@ amends ADR-W-048).
   `errors.ngonIndefinite`). The corner wire form carries no `[vs #i]` (`COLLAPSED_VS` does not read it), so the
   student reads the ruled «עם «…»» sentence.
 
+### A diagonal called a height of a shape whose diagonals are perpendicular to no side (#2117, [ADR-718](06-decisions.md#adr-718))
+
+- **The table** — `DIAGONAL_NEVER_PERPENDICULAR` (`engine/shapeKinds.ts`): every quadrilateral kind that implies `rectangle`
+  or `rhombus` in the shared lattice (square, rectangle, rhombus). A diagonal of any of them makes an angle strictly
+  inside (0°, 90°) with every side.
+- **The proof** — stage 0, `diagonalHeightImpossibility` (`engine/heightFeasibility.ts`): an `altitude-choice` (ADR-644)
+  every option of which is a diagonal of a ring declared a table kind against an edge of that ring. Called by the fold
+  (`replay/core.ts`, the in-order pass and the ADR-104 retry) on the FACT's command, because `applyStep` sees only the
+  selected option's lowering; a hit is filed rigid (never pending).
+- **One message**, `over-constrained: diagonal AC of square ABCD is perpendicular to no side cannot hold`; the fold
+  tags `[vs #i]` with the ring's declaring statement (`ownerByObjId`, ADR-602's provenance); humanised as
+  `errors.overConstrained` with the nested reason `errors.diagonalNoSideReason` (`shape` from `input.shapeNounDefinite`).
+
 ### A circle through three points the givens put on one line is refused (#2099, [ADR-651](06-decisions.md#adr-651))
 
 - **The proof** — stage 0g‴, `collinearCircleImpossibility` (`engine/cyclicFeasibility.ts`): for every `circumcenter`

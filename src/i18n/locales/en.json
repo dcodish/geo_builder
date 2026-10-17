@@ -434,6 +434,7 @@
     "restatedSize_said_vs": "Can't do that: «{{said}}» contradicts «{{other}}» — they can't both hold.",
     "notCyclicReason": "a circle through the four vertices would make a {{shape}} a {{forced}}, and a {{forced}} is not a {{shape}}",
     "collinearCircleReason": "{{a}}, {{b}} and {{c}} are on one line, and no circle passes through three points on one line",
+    "diagonalNoSideReason": "the diagonal {{d}} is perpendicular to no side of {{shape}}",
     "notDeterminedHere": "Your givens are fine. {{who}} are not determined yet, and in the placement the tool picked for them {{what}} can't hold — press «show another configuration».",
     "notDeterminedHereBare": "Your givens are fine. In the placement the tool picked, {{what}} can't hold — press «show another configuration».",
     "unknownPoint": "{{what}} refers to a point that hasn't been defined yet. Create it first.",
