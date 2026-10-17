@@ -11727,7 +11727,7 @@ and closing the issue would misreport the work.
 
 ## ADR-517 — «SHOW ANOTHER CONFIGURATION» SAYS WHAT IT CHANGED AND WHAT IT KEPT (#65)
 
-**Status:** accepted, 2026-09-14 · **Issue:** #65 (feature, P3 — external architecture review, operator-commissioned 2026-07-11) · round #1006 · feature route (PR) · makes [ADR-052](#adr-052) visible; the cue sibling of [ADR-101](#adr-101)/[ADR-112](#adr-112); rests on the invariance of [ADR-065](#adr-065)/[ADR-514](#adr-514) · **⚠ Ruled to change 2026-10-07 (ADR-W-118 B11 · #1866):** reworded in a student's words
+**Status:** accepted, 2026-09-14 · **Issue:** #65 (feature, P3 — external architecture review, operator-commissioned 2026-07-11) · round #1006 · feature route (PR) · makes [ADR-052](#adr-052) visible; the cue sibling of [ADR-101](#adr-101)/[ADR-112](#adr-112); rests on the invariance of [ADR-065](#adr-065)/[ADR-514](#adr-514) · **⚠ Superseded by [ADR-734](#adr-734) (2026-10-17):** the note is removed outright (operator ruling 2026-10-07, #1866), and `viewDelta` with it
 **Requirements:** [02](02-requirements.md) — FR-TH-6a: the press accounts for the choice it moved · **Design:** [04](04-design.md) — the view delta
 
 **What the student saw.** The figure jumped, with no account of which unstated choice moved. The mechanism
@@ -18600,3 +18600,22 @@ The kind words are the ones `circlesTangent` already reads. #2214's single kind 
 **Locks.** `src/app/__tests__/issue-2177-reserved-r-several-circles.test.ts` (the matrix through `runSubmit`, English, a loaded list, the taught steps, the controls, the predicate); `humanize-error.test.ts` CASES gains both raw shapes from the engine's own function; scenario `reserved-r-several-circles-2177`; parity row.
 
 **Behaviour change for a student:** «מעגל O ברדיוס 3» · «מעגל P ברדיוס 5» · «r = 4» (also «r = 3», «AB = r», and one sized circle beside an unsized one) is now refused, naming the circles, with «רדיוס מעגל P הוא r» as the next step, instead of committing green with the value ignored (or, beside an unsized circle, a contradiction with the sized one).
+
+## ADR-734 — «הציגו תצורה אחרת» says nothing when it finds another drawing: ADR-517's varied/kept note is removed (#1866)
+
+**Status:** accepted · 2026-10-17 · feature (2-D) · fix round #2318, stream H · feature route (PR), branch `feat/1866-remove-view-delta-note` · **Supersedes** [ADR-517](#adr-517) · amends [ADR-W-118](06w-decisions-workspace.md#adr-w-118) B11 · operator ruling 2026-10-07 on #1866: *"I dont understand why we need this. user sees on screen what changes and what is fixed. using the term ענף is confusing"*, then, asked whether to remove the whole note or only its «נשמר: …» part: **"Remove the whole note"** · LADDER stage: none (UI)
+**Requirements:** [02](02-requirements.md) — FR-TH-6a withdrawn · **Design:** [04](04-design.md) — § 4 Engine, the "view delta" bullet removed
+
+**Measured before** (`688dfb96`). A press that found another view set `altNote` from `deltaNote(viewDeltaOf(...))` (`src/App.tsx` `runResample`): «משולש ABC» + the press → «השתנה: המיקום של A, המיקום של B, ועוד 1»; «שני מעגלים» + the press → «השתנה: המיקום של ctr-O@, רדיוס circle-O, ועוד 2» (internal ids, #2314). The store computed `viewDelta` (two extra replays) on every `resample` and `applyView`. Only 2-D has the note: no `viewDelta` import and no `viewChanged*`/`delta*` key in `src3d/`, `src-analytic/`, `src-complex/` or `shell/`.
+
+**Root cause / class (docs/17 §1).** Not a defect: a ruled removal of one feature on one surface, so there is no class to widen.
+
+**Decision.** Delete the note end to end. `src/App.tsx`: `deltaNote` and its call go; a press that finds another view sets no note. The «אין תצורה אחרת…» note (`actions.onlyConfig`) for a press that finds nothing is unchanged — the ruling names only the «השתנה / נשמר» line. `src/store/geoStore.ts`: `lastViewDelta`, `clearViewDelta`, `viewDeltaOf` and the two `viewDelta(...)` computations go, so each press costs two replays less. `src/replay/viewDelta.ts` (no other importer) and its re-export are deleted. Locales: `actions.viewChanged`, `viewChangedKept`, `deltaPoint`, `deltaRadius`, `deltaBranch`, `deltaVariant`, `deltaMore` are deleted from `he.json` and `en.json`.
+
+**Why not a patch (docs/17 §2).** The note is removed at its one source (the store's delta and App's one sink), not hidden for some inputs; #2314's internal ids disappear because the line no longer exists, not because unnamed circles are filtered.
+
+**Sibling audit / cross-tool.** Only 2-D had the note (grep above), so no other builder changes (ADR-W-118 B1 holds: the other three never showed it).
+
+**Locks.** `src/store/__tests__/issue-1866-no-view-delta-note.test.ts`: the seven keys are absent in both locales (`i18n.exists`, the pattern of `issue-1444-config-status.test.ts`), the store exposes no `lastViewDelta`/`clearViewDelta` after a press (on «משולש ABC» and on #2314's «שני מעגלים»), and `actions.onlyConfig` still resolves while «ריבוע ABCD» still answers the press with "no other view". Retired: `src/store/__tests__/issue-65-view-delta.test.ts` (the feature it locked is gone).
+
+**Behaviour change for a student:** after «הציגו תצורה אחרת» redraws the figure, no «השתנה: … · נשמר: …» line appears under the canvas (before: «השתנה: המיקום של A, המיקום של B, ועוד 1», and internal ids for unnamed circles, #2314). A press that finds no other drawing still says «אין תצורה אחרת — הצורה נקבעה (רק הגודל/המיקום משתנים)».
