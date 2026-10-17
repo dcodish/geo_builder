@@ -28,14 +28,11 @@ import type { FigureFile } from './figureFile';
 // S1.2 (docs/24): the replay layer moved to src/replay/core.ts — re-exported here so every
 // existing consumer path ('@/store/geoStore') keeps working; the store is now a thin stateful shell.
 export * from '@/replay/core';
-export * from '@/replay/viewDelta';
 export * from '@/replay/naming';
 import { nameCentreFacts, reletterHiddenFacts, relabelUtterance, renameFacts, renameInCommand, resolveBinds, type RenameResult } from '@/replay/naming';
 import { replay, groupKey, foldCommand, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, commandPointIds, BRANCH_CYCLE_KINDS } from '@/replay/core';
 import type { DetectAllResult, Determinacy, Fact } from '@/replay/core';
 import type { RingNote } from '../../shell/narrowing';
-import { viewDelta } from '@/replay/viewDelta';
-import type { ViewDelta } from '@/replay/viewDelta';
 import { geoWork, geoValues, isCancelled } from './geoWork';
 import { toggleSegFlag } from '../../shell/frame/segmentDisplay';
 import { pruneDisplayMode, toggleDisplayMode, displayModeFromIndexed, type DisplayModeMap } from '../../shell/displayMode';
@@ -247,19 +244,6 @@ export interface GeoState {
   /** Re-sample the figure's residual freedom — a different valid drawing (ADR-018). Returns `true` if it
    *  found a genuinely DIFFERENT drawing, `false` if the shape is determined (only size/placement vary). */
   resample: () => boolean;
-  /**
-   * #65 ([ADR-517](docs/06-decisions.md#adr-517)) — what the LAST «show another configuration» press moved,
-   * and what it kept.
-   *
-   * It carries the VIEW IT DESCRIBES (`facts`, `seed`) with it, and {@link viewDeltaOf} hands it back only
-   * while that view is still the one on screen. So it invalidates ITSELF: a later statement, an edit, an
-   * undo, a load — anything that moves the session off that view — silently retires the note, without a
-   * clearing call at each of those sites. A list of sites to clear at is precisely the kind that goes stale
-   * the next time one is added, and a note describing a view the student has since left is worse than none.
-   */
-  lastViewDelta: { delta: ViewDelta; facts: Fact[]; seed: number } | null;
-  /** Dismiss the varied/kept note (the student read it, or moved on). */
-  clearViewDelta: () => void;
   /** Before drawing, if the figure doesn't meet every requirement, search alternative configurations
    *  (seeds + branches) for one that does and apply it ([ADR-106](docs/06-decisions.md#adr-106)).
    *  Returns `true` if the figure now meets every requirement, `false` if none was found (kept as-is). */
@@ -379,23 +363,10 @@ function commitCommands(
   set({ facts: next });
 }
 
-/**
- * The varied/kept note, IF it still describes the view on screen (#65, [ADR-517](docs/06-decisions.md#adr-517)).
- *
- * The self-invalidation the stored value exists for: identity on `facts` is enough because every store
- * action builds a NEW array (the store never mutates one), so any statement, edit, undo or load moves the
- * reference and the note retires on its own.
- */
-export function viewDeltaOf(s: Pick<GeoState, 'lastViewDelta' | 'facts' | 'seed'>): ViewDelta | null {
-  const v = s.lastViewDelta;
-  return v && v.facts === s.facts && v.seed === s.seed ? v.delta : null;
-}
-
 export const useGeoStore = create<GeoState>()(
   temporal(
     (set, get) => ({
       facts: [],
-      lastViewDelta: null,
       selectedId: null,
       figureName: '',
       seed: 0,
@@ -673,31 +644,15 @@ export const useGeoStore = create<GeoState>()(
         set({
           ...(found.facts !== was ? { facts: found.facts } : {}),
           seed: found.seed,
-          // #65: both views exist right here, so the account of what moved is a comparison, not a search.
-          lastViewDelta: {
-            delta: viewDelta(was, replay(was, wasSeed), found.facts, replay(found.facts, found.seed)),
-            facts: found.facts,
-            seed: found.seed,
-          },
         });
         return true;
       },
 
-      clearViewDelta: () => set({ lastViewDelta: null }),
-
       applyView: (patch) => {
-        // #41 (ADR-290): the worker's answer arrives here, so the note is computed on the SAME two views
-        // the student is shown — the main-thread path above and this one can't drift.
-        const { facts: was, seed: wasSeed } = get();
-        const nextFacts = patch.facts ?? was;
+        // #41 (ADR-290): the worker's answer arrives here as one undo-tracked transition.
         set({
           ...(patch.facts ? { facts: patch.facts } : {}),
           seed: patch.seed,
-          lastViewDelta: {
-            delta: viewDelta(was, replay(was, wasSeed), nextFacts, replay(nextFacts, patch.seed)),
-            facts: nextFacts,
-            seed: patch.seed,
-          },
         });
       },
 
