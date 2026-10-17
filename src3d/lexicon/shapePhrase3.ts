@@ -46,7 +46,15 @@ const QUAD_NOUN_WORDS: ReadonlyArray<readonly [QuadNoun3, string, string]> = [
 const QUAD_NOUN_RE: ReadonlyArray<readonly [QuadNoun3, RegExp, RegExp]> = QUAD_NOUN_WORDS.map(
   ([noun, he, en]) => [noun, new RegExp(he), new RegExp(String.raw`\b${en}\b`, 'i')] as const,
 );
-const TRIANGLE_RE = /משולש|\btriangle\b/i;
+/**
+ * #2069 ([ADR-3D-369](../../docs/06b-decisions-3d.md#adr-3d-369)): the triangle SIGN before a label run («△ABC»,
+ * «▲ABC», «△ ABC») is the triangle noun, as 2-D reads it (`triShape(/triangle|משולש|[△▲]/…)`). A sign with no
+ * label run after it is not a noun. Every reader of this vocabulary (the declaration, the shape phrase, the
+ * polygon arity) gets it at once.
+ */
+const TRIANGLE_RE = /משולש|\btriangle\b|[△▲](?=\s*[A-Z])/i;
+/** Does `s` state the triangle noun, in any of its spellings (#2069)? */
+export const isTriangleNoun3 = (s: string): boolean => TRIANGLE_RE.test(s);
 const PENTAGON_RE = /מחומש|\bpentagon\b/i;
 const HEXAGON_RE = /משושה|\bhexagon\b/i;
 const GENERIC_POLY_RE = /מצולע|\bpolygon\b/i;

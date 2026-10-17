@@ -68,3 +68,27 @@ describe('#1912 — every look-alike glyph folds onto its symbol', () => {
     for (const f of GLYPH_FOLDS) expect(f.why.length).toBeGreaterThan(20);
   });
 });
+
+/**
+ * #2069 ([ADR-W-145](../../docs/06w-decisions-workspace.md#adr-w-145)) — the parallel look-alikes «‖» (U+2016) and
+ * «||» fold to ∥ BETWEEN TWO OPERANDS only; every wrapping use of the same bars is untouched.
+ */
+describe('#2069 — «‖» and «||» are ∥ between two operands, never a wrapper', () => {
+  it.each([
+    ['AB ‖ CD', 'AB ∥ CD'],
+    ['AB‖CD', 'AB∥CD'],
+    ['AB || CD', 'AB ∥ CD'],
+    ['AB||CD', 'AB∥CD'],
+    ["AA' || BB'", "AA' ∥ BB'"],
+    ['ℓ1 || ℓ2', 'ℓ1 ∥ ℓ2'],
+    ['π1 ‖ π2', 'π1 ∥ π2'],
+    ['u ‖ v', 'u ∥ v'],
+    ['AB ‖ CD ‖ EF', 'AB ∥ CD ∥ EF'],
+  ])('«%s» → «%s»', (line, folded) => {
+    expect(foldGlyphs(line)).toBe(folded);
+  });
+
+  it.each(['‖u‖ = 5', '‖AB‖ = ‖CD‖', '|AB||CD|', '|AB|·|CD|', '|x|| y', '‖', '||', 'AB ‖', '|| CD'])('«%s» is untouched', (line) => {
+    expect(foldGlyphs(line)).toBe(line);
+  });
+});

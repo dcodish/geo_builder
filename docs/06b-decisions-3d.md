@@ -13214,3 +13214,27 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Behaviour change for a student:** in 3-D, asking a declared basis vector by its name reads «w = (0, 0, 12)» when the figure has a frame (was «w = w = (0, 0, 12)»), and «u — לא נקבע על ידי הנתונים» when it has none (was «u = u»). Asking a pair («AS = w = (0, 0, 12)») or any other vector is unchanged.
 
 **Slow-tier goldens that may drift:** `decide-submit3-parity-1394` replays the submit decision, not the ask lane — none expected.
+
+## ADR-3D-369 — The value readers 2-D already had: a root with an explicit product, the area with «הוא», and the triangle sign (#2069)
+
+**Status:** accepted · 2026-10-17 · bug (P3, 3d) · fix round #2318, stream K · branch `fix/2069-3d-value-readers-2` (stacked on ADR-3D-368's branch) · implements the #2069 fix plan of 2026-10-14, items 2, 3 and 5 in 3-D; item 6 (the glyph fold) is [ADR-W-145](06w-decisions-workspace.md#adr-w-145) · **Amends** [ADR-3D-337](#adr-3d-337) (the magnitude atom)
+**Requirements:** [02b](02b-requirements-3d.md) — the magnitude paragraph (the product, the area copula, the triangle sign) · **Design:** [04b](04b-design-3d.md) § *The normalisation seam* (`MAG` / `ROOT_PRODUCT`, `isTriangleNoun3`) · **LADDER stage:** none (grammar)
+
+**Measured before** (`decideSubmit3` @ 8b01f3bd): «מלבן ABCD» · «AD=2*√7» / «AD = 2 * √7» / «AD=2·√7» / «AD=3*√2/2» / «AD=2*sqrt(7)» / «|AD|=2*√7» → not understood (2-D builds every one); «משולש ABC» · «שטח המשולש ABC הוא 6» / «… הוא 2√3» / «… הוא 2.5» / «שטח ABC הוא 6» / «… שווה 6» / "the area of triangle ABC is 6" → not understood (2-D builds every one); «△ABC», «▲ABC», «△ ABC» → not understood (2-D declares the triangle). The plan's table, re-measured. Two corrections to the plan, both measured in 2-D at this tip: `·` is not folded to `*` by `normalize3` (the atom reads both itself), and 2-D escalates «שטח המשולש ABC היא 6», «שטח △ABC = 6» and «2×√7», so those stay out (one sentence, one verdict); 2-D builds a bare «שווה», so it is in.
+
+**The classes.** (2) *A radical magnitude written with an explicit product is not a magnitude in any slot built from `MAG`.* (3) *An area given stated with a copula instead of «=» is not read.* (5) *The △/▲ sign is not read as the triangle noun where the declaration reads its noun.*
+
+**Decision.**
+1. `MAG` and `evalRadical`'s `RADICAL_RE` share `ROOT_PRODUCT` (`[*·]` followed by √), so every `MAG` slot — the bare and bar lengths, the area, the heights, the distance — reads «2*√7» at once, and the atom stays paired with its reader. The tuple slot «A = (…)» keeps its component grammar (held, #2081), and the revolution size its decimal-only refusal (ADR-3D-340).
+2. `areaClaim` takes «=», «הוא», a bare «שווה» and English "is", 2-D's `area` copulas.
+3. The lexicon's `TRIANGLE_RE` (`lexicon/shapePhrase3.ts`) reads «△»/«▲» before a label run, exported as `isTriangleNoun3`, which `planarPolygon` now asks instead of its inline noun test — so the shape phrase, the polygon arity and the declaration read one noun. This is the third copy of 2-D's `[△▲]` alternation (2-D, analytic's congruence rule, here): tripwire 8 classifies it `lexicon` (a noun mapped to a shape), which `BOUNDARIES.json` keeps per product, so it is copied, not shared.
+
+**Measured after.** Every "before" row records with the stated value; «AD=2*7», «AD=2×√7», «שטח המשולש ABC היא 6», «… שווה ל-6», «שטח המשולש הוא 6», «△ABC ≅ △DEF» (#1679) and «כדור שרדיוסו 2*√2» keep their verdicts.
+
+**Sibling audit.** 2-D is the reference (all three already read). Analytic reads items 2 and 3; its polygon declaration does not read «△ABC» — that arm is **not built here**, because `src-analytic/parser` is in open PR #2299; it stays on #2069 as the parity known gap `triangle-sign-2069` (analytic). Complex: no such sentences.
+
+**Locks.** `src3d/__tests__/issue-2069-value-readers.test.ts`; the `issue-1827-magnitude-atom` sweep gains the product spellings (the tuple slot exempt, and asserted refusing); parity rows `root-product-2069`, `root-product-dot-2069`, `area-copula-2069`, `area-copula-en-2069`, `triangle-sign-2069`; fixtures `rect-root-product-2069`, `triangle-sign-area-copula-2069`. The parity row `cat-2d-070` («שטח המשולש ABC הוא 13», a parked #1679 gap in 3-D) healed and moved to the parity rows; the 2-D lock `issue-2097-abs-length` re-based «AB || CD || EF» (still never an absolute value; now the parallels, ADR-W-145).
+
+**Behaviour change for a student:** in 3-D, «AD=2*√7», «שטח המשולש ABC הוא 6» and «△ABC» build, as in 2-D.
+
+**Slow-tier goldens that may drift:** `decide-submit3-parity-1394` — a recorded line in these spellings would move from not-understood to record; expected drift, this item's.

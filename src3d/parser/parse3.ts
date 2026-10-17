@@ -27,7 +27,7 @@ import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, ringCircleId3, soleSymOf, symsO
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX, SOLID_QUALIFIER_HE } from '../lexicon/nouns3';
 import { REV_CONE_ONLY_NOUN_HE, REV_SIZE_NOUN_EN, REV_SIZE_NOUN_HE, REV_SOLID_EN, REV_SOLID_HE, REV_UNREAD_SLOT_EN, REV_UNREAD_SLOT_HE } from '../lexicon/revolutionSize3';
 import { foldPrimes3, VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
-import { POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_WORDS3, shapeNounArticle3, statedPolygonArity3, type ShapeAdj3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
+import { isTriangleNoun3, POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_WORDS3, shapeNounArticle3, statedPolygonArity3, type ShapeAdj3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
 // #1545 (ADR-3D-300): the ONE prime fold lives in the vocabulary leaf; re-exported so every parser-side
 // reader (the ask lane, the LLM sequence gate) reaches it through the normaliser that applies it.
 export { foldPrimes3, PRIME_GLYPHS3 } from '../lexicon/marks3';
@@ -1887,7 +1887,13 @@ function radicandValue(raw: string): number | null {
 
 /** Evaluate a small numeric expression with radicals: 3, 3/4, √6/4, 2√3, (√6/4), and — #513 — a
  *  parenthesised radicand: √(48), 2√(3), √(12/4), √(48)/4. */
-const RADICAL_RE = new RegExp(String.raw`^(${UNUM})?\s*(?:√\s*(${RADICAND}))?\s*(?:\/\s*(${UNUM}))?$`);
+/**
+ * #2069 ([ADR-3D-369](../../docs/06b-decisions-3d.md#adr-3d-369)): the explicit product between a coefficient and
+ * the ROOT — «2*√7», «2 * √7», «2·√7» — which 2-D's value grammar reads as 2√7. Only before √: «2*7» stays outside
+ * the atom (2-D escalates it), and so does «×» (2-D escalates «2×√7»).
+ */
+const ROOT_PRODUCT = String.raw`(?:[*·]\s*(?=√))`;
+const RADICAL_RE = new RegExp(String.raw`^(${UNUM})?\s*${ROOT_PRODUCT}?\s*(?:√\s*(${RADICAND}))?\s*(?:\/\s*(${UNUM}))?$`);
 /**
  * #1827 ([ADR-3D-341](../../docs/06b-decisions-3d.md#adr-3d-337)) — THE MAGNITUDE ATOM: the lexical
  * half of {@link evalRadical}, and the ONE source every stated-magnitude slot composes from. `7`, `2.5`,
@@ -1902,7 +1908,7 @@ const RADICAL_RE = new RegExp(String.raw`^(${UNUM})?\s*(?:√\s*(${RADICAND}))?\
  * (the `magnitude-atom` sweep in `issue-1827-magnitude-atom.test.ts` holds that, rule by rule).
  * An ANGLE stays decimal (`ANGLE_VAL`): its unit is the degree.
  */
-const MAG = String.raw`(?:(?:${UNUM})?\s*√\s*${RADICAND}|${UNUM})(?:\s*\/\s*${UNUM})?`;
+const MAG = String.raw`(?:(?:${UNUM}\s*${ROOT_PRODUCT}?)?\s*√\s*${RADICAND}|${UNUM})(?:\s*\/\s*${UNUM})?`;
 /** The reader paired with {@link MAG}: a signed magnitude literal's value, null when it is not one. */
 function magValue(raw: string): number | null {
   const t = raw.trim();
@@ -4424,7 +4430,9 @@ const lengthClaim: Rule = (s) => {
 /** `שטח המשולש ABC = 4.5` / `the area of triangle ABC = 4.5` — an area CLAIM (draws the triangle). */
 const areaClaim: Rule = (s) => {
   const m = s.match(
-    new RegExp(`^(?:שטח\\s+(?:ה?משולש\\s+)?|the area of (?:the )?triangle\\s+|area of\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(-?\\s*${MAG})$`),
+    // #2069 (ADR-3D-369): the copula 2-D's `area` rule takes (ADR-118) — «הוא», a bare «שווה», English "is" — beside
+    // «=». «היא» and «שווה ל-» stay out: 2-D escalates both, and one sentence gets one verdict.
+    new RegExp(`^(?:שטח\\s+(?:ה?משולש\\s+)?|the area of (?:the )?triangle\\s+|area of\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)(?:\\s*=\\s*|\\s+(?:הוא|שווה|is)\\s+)(-?\\s*${MAG})$`),
   );
   const value = m ? magValue(m[4]) : null; // #1827: «שטח המשולש ABC = √3» is a magnitude too
   if (!m || value === null) return null;
@@ -4806,7 +4814,7 @@ const planarPolygon: Rule = (s) => {
   // quadrilateral — the #424/ADR-3D-084 silent-drop class, quad edition.
   const quadBase = statedQuadBase(s);
   const kind: 'polygon3' | 'polygon4' | 'polygon5' | null =
-    /משולש/.test(s) || /\btriangle\b/i.test(s) ? 'polygon3' :
+    isTriangleNoun3(s) ? 'polygon3' : // #2069: the lexicon's one triangle noun, «△ABC» included
     quadBase || /\bquad\b/i.test(s) ? 'polygon4' :
     /מחומש/.test(s) || /\bpentagon\b/i.test(s) ? 'polygon5' : null;
   if (!kind) return null;

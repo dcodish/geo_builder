@@ -118,12 +118,14 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   Unicode glyph a student gets for a mathematical sign is decided by their keyboard, the symbol palette or
   the PDF they pasted from, never by what they meant — so «AC ⟂ AB» reads as «AC ⊥ AB», «∡ABC» and «∢ABC»
   read as «∠ABC», a keyboard `<` before a run of letters reads as «∠», «40⁰», «40º» and «40˚» read as 40°,
-  and the Hebrew word «שורש» before a value reads as √. This holds in the 2-D, 3-D and analytic builders,
+  and the Hebrew word «שורש» before a value reads as √, and «‖» (U+2016) or two keyboard bars «||» BETWEEN
+  two operands read as the parallel sign «∥» («AB ‖ CD», «AB || CD») — never as a wrapping pair, so the norm
+  «‖u‖» and an absolute value «|AB||CD|» stay as written. This holds in the 2-D, 3-D and analytic builders,
   for a statement and for a question in the data panel alike. A comparison is never turned into an angle:
   «AB < CD», «k < 0» and «0 < t < 1» stay comparisons. The complex builder is excluded, because there a
   superscript digit is an exponent. **The row keeps exactly what the student typed** — the reading is folded
   at the parser boundary, not in the saved line.
-  - Sources: [ADR-3D-329](06b-decisions-3d.md#adr-3d-329), #1912; the earlier per-builder halves
+  - Sources: [ADR-3D-329](06b-decisions-3d.md#adr-3d-329), #1912; [ADR-W-145](06w-decisions-workspace.md#adr-w-145), #2069 (the parallel look-alikes); the earlier per-builder halves
     ADR-299 (#45), ADR-381 (#237), ADR-318 (#105), [ADR-AG-187](06c-decisions-analytic.md#adr-ag-187) (#1555).
 - **FR-SU-18 (Must)** — **The tool reads Hebrew and English, and a letter it cannot read is refused by
   name — never replaced.** A letter or a word in any other script is rejected in all four builders, with the

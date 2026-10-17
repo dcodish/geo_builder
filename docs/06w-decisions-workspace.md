@@ -6022,3 +6022,21 @@ The 2026-10-08 plan update asked analytic for every reader of an angle measure. 
 **Locks.** `shell/__tests__/property-words-1906.test.ts` (the algebra on a toy vocabulary); the shared rows `shell/__tests__/fixtures/honesty-rows.ts` (positives «שווה צלעת», «ישר זוות», «גובח», «תיכנ», "equilaterl", "isoceles", "inscibed"; negatives «מקבילים», «צלע», «מבחוץ», «שווים», «שיפוע», «קובייה», «תיבה», "eight"), run through each tree's own vocabulary by its product lock.
 
 **Behaviour change for a student:** in 2-D and 3-D, an AI answer that drops a shape or role word the student typed is refused with that builder's existing dropped-given message, naming the word; analytic is unchanged until its item lands.
+
+## ADR-W-145 — «‖» and «||» between two operands are the parallel sign ∥ in every plane builder: two rows in the shared glyph fold (#2069)
+
+**Status:** accepted · 2026-10-17 · bug (P3; 2d + 3d + analytic) · fix round #2318, stream K · branch `fix/2069-3d-value-readers-2` · **Amends** [ADR-3D-329](06b-decisions-3d.md#adr-3d-329) (the shared table gains two rows) · product side: [ADR-3D-369](06b-decisions-3d.md#adr-3d-369)
+**Ruling:** FR-SU-17 (the operator's 2026-10-08 ruling on #1912): *"A symbol typed as any of its look-alike glyphs reads as the symbol"*, in 2-D, 3-D and analytic.
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-17 (the parallel look-alikes); [02c](02c-requirements-analytic.md) §3a (the glyph paragraph) · **Design:** [04w](04w-design-shell.md) § *Look-alike glyphs* · **Product:** workspace (2d + 3d + analytic)
+
+**Measured before** (`fix/2077-3d-param-vector-panel` @ 8b01f3bd, which is `main` @ 688dfb96 plus a 3-D panel change; 2-D `decideDeterministic2D`, 3-D `decideSubmit3`, analytic `decideSubmit`, model mocked): after «מרובע ABCD», «AB ‖ CD» (U+2016) escalated in 2-D, was not understood in 3-D and refused `not-handled` in analytic; «AB || CD» escalated in 2-D and built in 3-D and analytic; «AB ∥ CD» (the control) built in all three.
+
+**The class.** *A look-alike glyph of ∥ is not folded at the shared parser boundary, so the builders disagree on one parallel sentence* — FR-SU-17's class, one symbol over.
+
+**Decision.** Two rows in `GLYPH_FOLDS` (`shell/glyphFold.ts`), after ⟂: «‖» → ∥ and «||» → ∥, through one guarded folder `foldParallelLookalike`. The bars are also a wrapping notation (the norm «‖u‖», two absolute values «|AB||CD|»), so the fold is INFIX only: an operand directly before and after it, whitespace ignored, and no unclosed bar of the same kind before it, scanned left to right so a bar already folded is not counted. No import edge is added (every caller already imports the table; `BOUNDARIES.json` unchanged), and complex still calls no glyph fold.
+
+**Measured after.** «AB ‖ CD», «AB‖CD», «AB || CD», «AB||CD» build the parallel in 2-D (`set-parallel`, the same commands as «AB ∥ CD»), 3-D (`mutual-rel parallel`) and analytic. Untouched: «‖u‖ = 5», «‖AB‖ = ‖CD‖», «|AB||CD|», «|AB|·|CD|», «|x|| y».
+
+**Student-visible change outside 3-D (rule 7, measured):** in 2-D, «AB ‖ CD» and «AB || CD» now build the parallel (before: handed to the model); in analytic, «AB ‖ CD» now builds (before: «לא הבנתי»). Both are FR-SU-17 `[ruled]` lines of the plan. Nothing else moved in the parity and catalog sweeps of the three builders.
+
+**Locks.** `shell/__tests__/glyph-fold.test.ts` (the folds and the untouched wrappers); `src/__tests__/issue-2069-parallel-lookalike.test.ts` (2-D lowers and draws it); parity rows `parallel-u2016-2069`, `parallel-bars-2069` (all three builders build); 3-D in `src3d/__tests__/issue-2069-value-readers.test.ts` and fixture `quad-parallel-lookalike-2069`.

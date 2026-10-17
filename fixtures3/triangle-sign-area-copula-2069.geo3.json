@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-17T18:04:21.941Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "△ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "שטח המשולש ABC הוא 6",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "segment3",
+          "a": "B",
+          "b": "C"
+        },
+        {
+          "type": "segment3",
+          "a": "C",
+          "b": "A"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "area-eq",
+            "ids": [
+              "A",
+              "B",
+              "C"
+            ],
+            "value": 6
+          }
+        }
+      ]
+    }
+  ]
+}

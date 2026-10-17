@@ -347,6 +347,11 @@ const SEEDED: SeededCorpus = {
   // The panel rows («AB⃗ = (k-1, k, 3)», then «AB⃗ = (1, 2, 3)») are asserted in issue-2077-stated-vector-rows.test.ts;
   // this is the build + drift net (it also locks the typed-text `srcs` channel the parser now carries).
   'pyramid-param-pair-vector-2077.geo3.json': ['פירמידה משולשת ABCD', 'AB = (k-1,k,3)', 'k = 2'],
+  // #2069 (ADR-3D-369, ADR-W-145) — the reported lines, each "not understood" before: a root with an explicit product,
+  // the area with «הוא», the triangle sign, and «‖» as ∥. Every spelling is asserted in issue-2069-value-readers.test.ts.
+  'rect-root-product-2069.geo3.json': ['מלבן ABCD', 'AD=2*√7'],
+  'triangle-sign-area-copula-2069.geo3.json': ['△ABC', 'שטח המשולש ABC הוא 6'],
+  'quad-parallel-lookalike-2069.geo3.json': ['מרובע ABCD', 'AB ‖ CD'],
   // #1996 (ADR-3D-343) — the rule-4 lock of the forced-narrowing note's reference row: a declared parallelogram a
   // circle through its vertices makes a rectangle. The essence here is "builds green and verifies" (the drift net);
   // the note's exact sentence, the cause attribution and the lifecycle live in narrowing-note-1996.test.ts.
