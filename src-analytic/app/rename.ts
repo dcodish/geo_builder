@@ -269,6 +269,8 @@ export interface RenameState {
   seedNames?: LetterMap;
   /** #1653 — the segment display map (keyed by endpoint pair); absent = none. */
   segStyle?: SegDisplayMap;
+  /** #2238 — the curve display map (keyed by curve object id); absent = none. */
+  curveStyle?: SegDisplayMap;
 }
 
 /**
@@ -288,6 +290,28 @@ export interface RelabelCommit {
   seedNames: Record<string, string>;
   /** #1653 — the segment display map, its endpoint-pair keys relabelled: a hidden AB stays hidden as XB. */
   segStyle: SegDisplayMap;
+  /** #2238 — the curve display map, re-keyed to the curve ids the relabelled lines mint: a hidden `circle-at-O` stays hidden as `circle-at-K`. */
+  curveStyle: SegDisplayMap;
+}
+
+/**
+ * #2238 — re-key a curve display map from one construction to its relabelled twin. A curve's id may carry the
+ * letters (`circle-at-O`, `circle-thru-ABC`) or a hash of its text (`curve-…`), so it cannot be re-spelled from
+ * the letter map; it is matched by POSITION instead. The relabel is proven to be the same construction mapped
+ * (`constructionShape`) at the same seed, and the lines keep their order, so the k-th drawn curve before IS the
+ * k-th after.
+ * A key that names no curve of `before` (a stale entry) is kept as it was.
+ */
+export function relabelCurveStyle(style: SegDisplayMap, before: Derivation, after: Derivation): SegDisplayMap {
+  const ids = (d: Derivation) => d.figure.curves.map((c) => c.id);
+  const from = ids(before);
+  const to = ids(after);
+  const out: SegDisplayMap = {};
+  for (const [k, v] of Object.entries(style)) {
+    const i = from.indexOf(k);
+    out[i >= 0 && from.length === to.length ? to[i] : k] = { ...v };
+  }
+  return out;
 }
 
 /** #1653 — re-key a segment display map under a letter map (a rename's one entry, a swap's two). */
@@ -501,6 +525,7 @@ function relabelSession(
     spokenFor: Object.fromEntries(Object.entries(state.spokenFor).map(([k, v]) => [k, relabelMap(v, map)])),
     seedNames,
     segStyle: relabelSegStyle(state.segStyle ?? {}, map),
+    curveStyle: relabelCurveStyle(state.curveStyle ?? {}, current, after),
   };
 }
 
@@ -607,7 +632,7 @@ export interface SwapActions {
   setError: (e: InputError | null) => void;
 }
 
-const commitOf = (v: RelabelCommit): RelabelCommit => ({ lines: v.lines, queries: v.queries, spokenFor: v.spokenFor, seedNames: v.seedNames, segStyle: v.segStyle });
+const commitOf = (v: RelabelCommit): RelabelCommit => ({ lines: v.lines, queries: v.queries, spokenFor: v.spokenFor, seedNames: v.seedNames, segStyle: v.segStyle, curveStyle: v.curveStyle });
 
 /**
  * DISPATCH A RENAME — decide, then write ONE commit (one undo step) or show the refusal.

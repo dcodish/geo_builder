@@ -41,6 +41,8 @@ export function loadAnalyticSession(envelope: Record<string, unknown>, fallbackN
     seedNames: envelope.seedNames as Record<string, string> | undefined,
     // #1653 — the segment display choices; the store keeps only key → {hidden?, dashed?: true}
     segStyle: envelope.segStyle,
+    // #2238 — the curve display choices, cleaned by the store the same way
+    curveStyle: envelope.curveStyle,
   });
   /**
    * #1548 — a MUTED line loads muted, so the audit replays the figure the student will actually see:

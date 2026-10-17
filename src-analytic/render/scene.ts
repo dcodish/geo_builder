@@ -14,7 +14,7 @@ import { analyticBidi } from '../i18n/bidi';
 import type { Figure } from '../engine/evaluate';
 import type { CurveKind } from '../engine/types';
 import { tickStep } from '../../shell/ticks';
-import { segInk, type SegDisplayMap, type SegInk } from '../../shell/frame/segmentDisplay';
+import { segInk, type SegDisplay, type SegDisplayMap, type SegInk } from '../../shell/frame/segmentDisplay';
 import { angleArcPoints, equalTickSegments, markFitScale, rightAngleKnee, unitOf, wedgeBisector, type MarkPt } from '../../shell/marks';
 import type { StatedMeasures, StatedValue } from '../engine/statedMeasures';
 
@@ -80,6 +80,27 @@ export interface SceneCurve {
    * [ADR-297](../../docs/06-decisions.md#adr-297) fixed in the 2-D tree.
    */
   centre?: { cx: number; cy: number; label?: string };
+  /** #2238 — how the curve is inked, from the student's display choice ({@link curveInk}). */
+  ink: CurveInk;
+}
+
+/**
+ * HOW A CURVE IS INKED (#2238) — the segment menu's decision (`shell`'s `segInk`) widened to curves, with 2-D's
+ * circle rule:
+ *
+ * - a line, parabola or ellipse inks exactly as a segment does: `solid`, `dashed`, or `ghost` when hidden (a
+ *   faint dashed edit affordance, never exported, so the menu can bring it back);
+ * - a CIRCLE offers hide/show alone (2-D's circle menu, `src/render/Figure.tsx`), so it is `solid` or `none`:
+ *   hidden, it draws nothing at all, as 2-D's does — its transparent hit target stays clickable on the former
+ *   outline. A dash flag on a circle (a hand-edited file) is ignored.
+ *
+ * A hidden curve is display only: it is still in the figure for every crossing, measurement and question.
+ */
+export type CurveInk = SegInk | 'none';
+
+export function curveInk(kind: CurveKind, d: SegDisplay | undefined): CurveInk {
+  if (kind === 'circle') return d?.hidden ? 'none' : 'solid';
+  return segInk(d);
 }
 
 /**
@@ -516,6 +537,8 @@ export interface SceneKnowledge {
    * handed in like the others. A hidden segment is still in the figure; only its ink goes.
    */
   segStyle?: SegDisplayMap;
+  /** #2238 — the student's per-curve display choices, keyed by the curve's object id. */
+  curveStyle?: SegDisplayMap;
   /**
    * What the student STATED about a measure (#1714, ADR-AG-225) — `Derivation.stated`, handed in like the
    * knowledge gates: which constraint is a statement is a question about the fold, which the renderer cannot see.
@@ -577,43 +600,49 @@ export function buildScene(
    * the student sees shows what the student asked for. This is the renderer's own decision, which
    * is why it lives here and not in `evaluate`.
    */
-  const curves: SceneCurve[] = fig.curves.filter((c) => c.stated).map((c) => ({
-    id: c.id,
-    kind: c.curve.kind,
-    name: c.label.name,
-    d: polylines(c.curve, box)
-      .map((pl) => pl.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${t.sx(x).toFixed(2)},${t.sy(y).toFixed(2)}`).join(''))
-      .join(' '),
-    /**
-     * The centre is marked whenever there IS one, and labelled only when it is knowledge (#1024).
-     *
-     * Those are two different questions and they get two different answers: the mark says "this
-     * circle has a centre, here", which is true at every configuration; the label states a value,
-     * which may be said only when the givens fix it.
-     */
-    centre: c.curve.kind === 'circle'
-      ? {
-          cx: t.sx(c.curve.cx),
-          cy: t.sy(c.curve.cy),
-          /**
-           * The label is the mark's only when NO point stands there (#1086).
-           *
-           * Operator, 2026-09-15: *"the label O hides the x value"*. A circle given by its centre
-           * (ADR-AG-038) has BOTH — the mark's coordinates from #1024 and the student's own point
-           * `O` from #1059 — drawn at one place, overlapping into «O, 5)».
-           *
-           * The POINT wins, and not by luck of ordering: a point the student named carries its own
-           * label under the canvas-is-the-question rule (#1032), and a second label for the same
-           * place could only ever repeat it or contradict it.
-           */
-          label:
-            knows.curveKnown?.(c.id) &&
-            !hasPointAt(fig, c.curve.cx, c.curve.cy)
-              ? lbl(`(${fmtAnalytic(c.curve.cx)}, ${fmtAnalytic(c.curve.cy)})`)
-              : undefined,
-        }
-      : undefined,
-  }));
+  const curves: SceneCurve[] = fig.curves.filter((c) => c.stated).map((c) => {
+    const ink = curveInk(c.curve.kind, knows.curveStyle?.[c.id]);
+    return {
+      id: c.id,
+      kind: c.curve.kind,
+      name: c.label.name,
+      ink,
+      d: polylines(c.curve, box)
+        .map((pl) => pl.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${t.sx(x).toFixed(2)},${t.sy(y).toFixed(2)}`).join(''))
+        .join(' '),
+      /**
+       * The centre is marked whenever there IS one, and labelled only when it is knowledge (#1024).
+       *
+       * Those are two different questions and they get two different answers: the mark says "this
+       * circle has a centre, here", which is true at every configuration; the label states a value,
+       * which may be said only when the givens fix it.
+       */
+      // #2238: a HIDDEN circle's centre cross goes with it — the cross is a feature of the curve, not a point (a
+      // point the student named there is drawn as every point is, and stays)
+      centre: c.curve.kind === 'circle' && ink !== 'none'
+        ? {
+            cx: t.sx(c.curve.cx),
+            cy: t.sy(c.curve.cy),
+            /**
+             * The label is the mark's only when NO point stands there (#1086).
+             *
+             * Operator, 2026-09-15: *"the label O hides the x value"*. A circle given by its centre
+             * (ADR-AG-038) has BOTH — the mark's coordinates from #1024 and the student's own point
+             * `O` from #1059 — drawn at one place, overlapping into «O, 5)».
+             *
+             * The POINT wins, and not by luck of ordering: a point the student named carries its own
+             * label under the canvas-is-the-question rule (#1032), and a second label for the same
+             * place could only ever repeat it or contradict it.
+             */
+            label:
+              knows.curveKnown?.(c.id) &&
+              !hasPointAt(fig, c.curve.cx, c.curve.cy)
+                ? lbl(`(${fmtAnalytic(c.curve.cx)}, ${fmtAnalytic(c.curve.cy)})`)
+                : undefined,
+          }
+        : undefined,
+    };
+  });
 
   // A segment is already resolved to endpoints by `evaluate`, so this is a pure projection — the
   // renderer never looks a vertex up, which is what keeps it a consumer rather than a second

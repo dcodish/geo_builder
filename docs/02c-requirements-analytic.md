@@ -1004,7 +1004,8 @@ a sentence the tool parsed.
 **R138 — a clicked segment can be hidden or dashed, and a clicked unnamed centre takes the letter the student types**. *(Operator: "click on a segment and hide it like we have in 2d".)* Persisted with the figure; a canonical centre stays O (R123).
 - a clicked segment → «הסתירו קטע», «מקווקו»
 - a clicked unlettered centre, typed M → «M מרכז המעגל x²+y²=16»
-- Sources: ADR-AG-201, #1653, #1598.
+- **A clicked curve has the same menu** *(operator, 2026-10-16: "in 2d, i can click a line and hide it or make it dashed … this is needed")*: a line, a parabola or an ellipse → «הסתירו קטע», «מקווקו», then its measure entries; a circle → «הסתירו קטע» alone (2-D's circle menu). A hidden line stays as a faint ghost to click; a hidden circle draws nothing, centre cross included, and is clicked on its former outline. Undoable, saved, and carried by a letter change; the givens, crossings and answers are unchanged.
+- Sources: ADR-AG-201, #1653, #1598, ADR-AG-297, #2238.
 
 ---
 
