@@ -45,13 +45,15 @@ const T7 = [
 ];
 
 describe('#1746 — the operator\'s report', () => {
-  it('«B(1, t, 2)» then asking «B» reads «B = (1, ?, 2)», the label once', () => {
-    expect(row(['B(1, t, 2)'], 'B')).toBe('B = (1, ?, 2)');
+  // #2077 (ADR-3D-368, ruling 2026-10-14 card d14-2077-point): the free axis reads the student's letter, so the
+  // row is «B = (1, t, 2)»; what #1746 locks here — the label once — is unchanged.
+  it('«B(1, t, 2)» then asking «B» reads «B = (1, t, 2)», the label once', () => {
+    expect(row(['B(1, t, 2)'], 'B')).toBe('B = (1, t, 2)');
   });
 
   it('the same point asked in words', () => {
-    expect(row(['B(1, t, 2)'], 'שיעורי B')).toBe('שיעורי B = (1, ?, 2)');
-    expect(row(['B(1, t, 2)'], 'coordinates of B')).toBe('coordinates of B = (1, ?, 2)');
+    expect(row(['B(1, t, 2)'], 'שיעורי B')).toBe('שיעורי B = (1, t, 2)');
+    expect(row(['B(1, t, 2)'], 'coordinates of B')).toBe('coordinates of B = (1, t, 2)');
   });
 });
 
@@ -59,7 +61,7 @@ describe('#1746 — the class: every query kind\'s JOINED row names its subject 
   /** One case per kind — `Record`, so the sweep is total over the kinds. */
   const CASES: Record<QueryKind3, readonly { lines: readonly string[]; q: string; want: string }[]> = {
     point: [
-      { lines: ['B(1, t, 2)'], q: 'B', want: 'B = (1, ?, 2)' },
+      { lines: ['B(1, t, 2)'], q: 'B', want: 'B = (1, t, 2)' },
       { lines: ['A(1,2,3)'], q: 'A', want: 'A = (1, 2, 3)' },
       // #1867's two-configuration point: the panel row's own text after the name
       { lines: T7, q: 'S', want: 'S = (1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)' },
@@ -103,10 +105,10 @@ describe('#1746 — the panel keeps its own rows (one decision, two surfaces)', 
     expect(ask(st, 'k').answer).toBe(p.value);
   });
 
-  it('the points row still prints «B(1, ?, 2)»; the ask answers the coordinates after the name', () => {
+  it('the points row still prints «B(1, t, 2)»; the ask answers the coordinates after the name', () => {
     const st = build(['B(1, t, 2)']);
     const panel = dataView(derive3(st.facts, st.seed).construction, st.seed);
-    expect(panel.points).toContain('B(1, ?, 2)');
+    expect(panel.points).toContain('B(1, t, 2)');
     expect(ask(st, 'B').answer).toBe(panel.pointCoords.B.text);
   });
 

@@ -124,7 +124,7 @@ describe('#509 — the shared multi-symbol affine form', () => {
     it('the single-symbol reading is byte-identical to ADR-3D-032’s', () => {
       const p = parse3('M(k,1,3)');
       expect(p.ok).toBe(true);
-      if (p.ok) expect(p.commands).toEqual([{ type: 'point3', id: 'M', x: null, y: 1, z: 3, syms: ['k', null, null] }]);
+      if (p.ok) expect(p.commands).toEqual([{ type: 'point3', id: 'M', x: null, y: 1, z: 3, syms: ['k', null, null], srcs: ['k', '1', '3'] }]); // #2077: + the typed text
     });
 
     it('the appositive sign clause still rides a multi-symbol tuple', () => {
@@ -263,15 +263,20 @@ describe('#884 — the coordinate readout survives a wide root pool', () => {
     return dataView(d.construction, 0).pointCoords as Record<string, { text: string; kind: string }>;
   };
 
-  it.each(['C(p+q,1,0)', 'C(2p+3q,1,0)'])('«%s» prints C(?, 1, 0) — the pinned components are knowledge', (line) => {
+  // #2077 (ADR-3D-368, ruling 2026-10-14 card d14-2077-point): the free axis prints the letters the student
+  // wrote («C(p+q, 1, 0)», like analytic) where it printed «?»; the pinned components are still the knowledge.
+  it.each([
+    ['C(p+q,1,0)', '(p+q, 1, 0)'],
+    ['C(2p+3q,1,0)', '(2p+3q, 1, 0)'],
+  ])('«%s» prints the pinned components, and the typed letters on the free axis', (line, text) => {
     const c = coordsOf(line);
     expect(c.C, 'the row must exist at all — it did not').toBeDefined();
-    expect(c.C.text).toBe('(?, 1, 0)');
+    expect(c.C.text).toBe(text);
     expect(c.C.kind).toBe('partial');
   });
 
-  it('the single-symbol form is unchanged', () => {
-    expect(coordsOf('C(p,1,0)').C.text).toBe('(?, 1, 0)');
+  it('the single-symbol form prints its letter', () => {
+    expect(coordsOf('C(p,1,0)').C.text).toBe('(p, 1, 0)');
   });
 
   it('the pin HOLDS at every sampled seed — this was always display-only', () => {
@@ -287,12 +292,11 @@ describe('#884 — the coordinate readout survives a wide root pool', () => {
     // the loosened tolerance is relative (1e-4 of the point's size) — orders of magnitude below any
     // real branch split, so «open until a sign narrows it» must survive untouched
     for (const u of [BOX, 'C(p,1,0)', '|AC| = 5']) useGeo3.getState().submit(u);
-    const c = dataView(derive3(useGeo3.getState().facts, 0).construction, 0).pointCoords as Record<
-      string,
-      { text: string }
-    >;
-    // whatever it reports, it must not claim a definite x when ±roots exist
-    if (c.C) expect(c.C.text).toContain('?');
+    const panel = dataView(derive3(useGeo3.getState().facts, 0).construction, 0);
+    // whatever it reports, it must not claim a definite x when ±roots exist. #2077: the row now shows the
+    // LETTER («p», a name, never a value), so the value channel `pointComps` is what must stay open.
+    if (panel.pointComps.C) expect(panel.pointComps.C[0]).toBe('?');
+    if (panel.pointCoords.C) expect(panel.pointCoords.C.text.split(',')[0]).toMatch(/[?p]/);
   });
 });
 

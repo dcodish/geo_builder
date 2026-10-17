@@ -67,8 +67,10 @@ describe('#1547 — every spelling of the frame reads, and reads the same comman
     const pin = parse3('B(3, n, p)');
     expect(pin.ok).toBe(true);
     if (!pin.ok) return;
-    const { syms: _syms, ...bare } = pin.commands[0] as { syms?: unknown };
+    // #2077: `srcs` (the typed text, a display channel) goes with the names — «x_B = 3» types no tuple
+    const { syms: _syms, srcs: _srcs, ...bare } = pin.commands[0] as { syms?: unknown; srcs?: unknown };
     void _syms;
+    void _srcs;
     expect(parse3('x_B = 3')).toEqual({ ok: true, commands: [bare] });
   });
 

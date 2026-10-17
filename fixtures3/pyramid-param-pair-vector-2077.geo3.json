@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-17T16:51:41.141Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "פירמידה משולשת ABCD",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "tetra",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AB = (k-1,k,3)",
+      "cmds": [
+        {
+          "type": "inject-pair",
+          "a": "A",
+          "b": "B",
+          "x": null,
+          "y": null,
+          "z": 3,
+          "symExprs": [
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": -1
+            },
+            {
+              "terms": [
+                {
+                  "sym": "k",
+                  "k": 1
+                }
+              ],
+              "c": 0
+            },
+            null
+          ],
+          "syms": [
+            "k",
+            "k",
+            null
+          ],
+          "srcs": [
+            "k-1",
+            "k",
+            "3"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "k = 2",
+      "cmds": [
+        {
+          "type": "symbol-value",
+          "symbol": "k",
+          "value": 2
+        }
+      ]
+    }
+  ]
+}

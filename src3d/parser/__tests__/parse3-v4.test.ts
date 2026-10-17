@@ -15,14 +15,14 @@ const cmds = (input: string) => {
 describe('the נתון injection list', () => {
   it('vectors + a point in one utterance (2020-ג)', () => {
     expect(cmds('נתון: v = (10,-5,0), u = (5,5,-5), P(0,4,6)')).toEqual([
-      { type: 'inject-vector', name: 'v', x: 10, y: -5, z: 0 },
-      { type: 'inject-vector', name: 'u', x: 5, y: 5, z: -5 },
+      { type: 'inject-vector', name: 'v', x: 10, y: -5, z: 0, srcs: ['10', '-5', '0'] }, // #2077: the typed text rides
+      { type: 'inject-vector', name: 'u', x: 5, y: 5, z: -5, srcs: ['5', '5', '-5'] },
       { type: 'point3', id: 'P', x: 0, y: 4, z: 6 },
     ]);
-    expect(cmds('given: v = (10,-5,0)')).toEqual([{ type: 'inject-vector', name: 'v', x: 10, y: -5, z: 0 }]);
+    expect(cmds('given: v = (10,-5,0)')).toEqual([{ type: 'inject-vector', name: 'v', x: 10, y: -5, z: 0, srcs: ['10', '-5', '0'] }]);
   });
   it('a standalone vector injection', () => {
-    expect(cmds('u = (5,5,-5)')).toEqual([{ type: 'inject-vector', name: 'u', x: 5, y: 5, z: -5 }]);
+    expect(cmds('u = (5,5,-5)')).toEqual([{ type: 'inject-vector', name: 'u', x: 5, y: 5, z: -5, srcs: ['5', '5', '-5'] }]);
   });
   // #794 (ADR-3D-168): the numeric-only gate is LIFTED — vector components take the same COMP
   // grammar as point components. A bare distinct letter is a placeholder (that component does
@@ -32,7 +32,7 @@ describe('the נתון injection list', () => {
   // address the component the student named instead of refusing it.
   it('a bare letter in a vector value is a placeholder component, and its NAME rides (#794/#814)', () => {
     expect(cmds('נתון: v = (10,n,0)')).toEqual([
-      { type: 'inject-vector', name: 'v', x: 10, y: null, z: 0, syms: [null, 'n', null] },
+      { type: 'inject-vector', name: 'v', x: 10, y: null, z: 0, syms: [null, 'n', null], srcs: ['10', 'n', '0'] },
     ]);
   });
   it('a vector value with affine symbolic components carries symExprs (#794)', () => {
@@ -41,6 +41,7 @@ describe('the נתון injection list', () => {
         type: 'inject-vector', name: 'v', x: null, y: null, z: 3,
         symExprs: [{ terms: [{ sym: 'k', k: 1 }], c: -1 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }, null],
         syms: ['k', 'k', null], // #814: the name rides alongside the solver register
+        srcs: ['k-1', 'k', '3'], // #2077: the typed text, display only
       },
     ]);
   });
@@ -55,13 +56,14 @@ describe('the נתון injection list', () => {
         type: 'inject-pair', a: 'A', b: "A'", x: null, y: null, z: null,
         symExprs: [{ terms: [{ sym: 'k', k: 1 }], c: -1 }, { terms: [{ sym: 'k', k: 1 }], c: -7 }, { terms: [{ sym: 'k', k: 1 }], c: 1 }],
         syms: ['k', 'k', 'k'],
+        srcs: ['k-1', 'k-7', 'k+1'],
       },
     ];
     expect(cmds("AA'=(k-1,k-7, k+1)")).toEqual(expected);
     expect(cmds("נתון: AA' = (k-1, k-7, k+1)")).toEqual(expected);
   });
   it('«נתון: AB = (1,2,3)» is a pair-vector given, never point B (#793 → #794)', () => {
-    expect(cmds('נתון: AB = (1,2,3)')).toEqual([{ type: 'inject-pair', a: 'A', b: 'B', x: 1, y: 2, z: 3 }]);
+    expect(cmds('נתון: AB = (1,2,3)')).toEqual([{ type: 'inject-pair', a: 'A', b: 'B', x: 1, y: 2, z: 3, srcs: ['1', '2', '3'] }]);
   });
   it('a «נתון:» list mixes pair items with vector and point items (#794)', () => {
     expect(cmds('נתון: AB = (k-1, k, 3), AC = (k+1, 0, k-3)')).toEqual([
@@ -69,24 +71,27 @@ describe('the נתון injection list', () => {
         type: 'inject-pair', a: 'A', b: 'B', x: null, y: null, z: 3,
         symExprs: [{ terms: [{ sym: 'k', k: 1 }], c: -1 }, { terms: [{ sym: 'k', k: 1 }], c: 0 }, null],
         syms: ['k', 'k', null],
+        srcs: ['k-1', 'k', '3'],
       },
       {
         type: 'inject-pair', a: 'A', b: 'C', x: null, y: 0, z: null,
         symExprs: [{ terms: [{ sym: 'k', k: 1 }], c: 1 }, null, { terms: [{ sym: 'k', k: 1 }], c: -3 }],
         syms: ['k', null, 'k'],
+        srcs: ['k+1', '0', 'k-3'],
       },
     ]);
   });
+  // #2077 (ADR-3D-368): byte-identical in every SOLVING field; the typed text now rides as a display channel
   it('the numeric pair injection is byte-identical to before (#794)', () => {
-    expect(cmds('BD = (-4,5,12)')).toEqual([{ type: 'inject-pair', a: 'B', b: 'D', x: -4, y: 5, z: 12 }]);
+    expect(cmds('BD = (-4,5,12)')).toEqual([{ type: 'inject-pair', a: 'B', b: 'D', x: -4, y: 5, z: 12, srcs: ['-4', '5', '12'] }]);
   });
   it('residue between items defers the whole utterance (#793)', () => {
     expect(parse3('נתון: v = (1,2,3) junk u = (4,5,6)')).toEqual({ ok: false, reason: 'not-handled' });
   });
   it('a bare list conjunction between items is a separator, not residue (#793)', () => {
     expect(cmds('נתון: v = (1,2,3) ו-u = (4,5,6)')).toEqual([
-      { type: 'inject-vector', name: 'v', x: 1, y: 2, z: 3 },
-      { type: 'inject-vector', name: 'u', x: 4, y: 5, z: 6 },
+      { type: 'inject-vector', name: 'v', x: 1, y: 2, z: 3, srcs: ['1', '2', '3'] },
+      { type: 'inject-vector', name: 'u', x: 4, y: 5, z: 6, srcs: ['4', '5', '6'] },
     ]);
     expect(cmds('given: v = (1,2,3) and u = (4,5,6)')).toHaveLength(2);
   });
@@ -94,7 +99,7 @@ describe('the נתון injection list', () => {
 
 describe('symbolic point components', () => {
   it('A(3,n,p) — letters become null (only numerics constrain); ADR-3D-032 keeps the letters for apply', () => {
-    expect(cmds('A(3,n,p)')).toEqual([{ type: 'point3', id: 'A', x: 3, y: null, z: null, syms: [null, 'n', 'p'] }]);
+    expect(cmds('A(3,n,p)')).toEqual([{ type: 'point3', id: 'A', x: 3, y: null, z: null, syms: [null, 'n', 'p'], srcs: ['3', 'n', 'p'] }]);
   });
 });
 

@@ -402,7 +402,16 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   the panel’s own hint promises «בכתיב וקטורי, בקואורדינטות ובגדלים» in that order and vector notation is
   the one of the three that needs no determined figure at all. Stated only (operator: *"only stated
   vectors. anything else, the user can ask for specifically"*).
-  - Sources: ADR-3D-254, #1196.
+  A **component given** is a stated vector too, by pair or by name: «AB = (k-1,k,3)» lists
+  `AB⃗ = (k-1, k, 3)` at once, its components **as the student typed them** («1/2» stays «1/2»); a
+  component switches to its **value** once every letter in it is known (`AB⃗ = (1, 2, 3)` after «k = 2»),
+  and a component whose letter is still open keeps its typed form (`AB⃗ = (2, t, 1)`). "Known" is the
+  parameters section's own verdict, so the two never disagree. Operator, 2026-10-14: *"the data panel holds
+  the truth. so once k is known, we use it."* Rows are listed in the order they were stated.
+  A stated **point** keeps the letter the student wrote on a free axis — «A(1,t,2)» reads `A(1, t, 2)`, never
+  `A(1, ?, 2)`, like analytic — and its value once the letter is known; asking «A» answers the same text, while
+  a single coordinate («y של A») stays undetermined, since a letter is a name, not a value.
+  - Sources: ADR-3D-254, #1196; [ADR-3D-368](06b-decisions-3d.md#adr-3d-368), #2077.
 
 ## Equations — the algebraic lane
 
@@ -433,7 +442,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   **«m = ?»** and the ask lane says the value is not determined (#1861). A point with exactly two
   configurations reads one row, **«S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»**, and asking «S» answers the same coordinates,
   naming the point once: **«S = (1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»**. Every ask answer is the bare value after the
-  question («B = (1, ?, 2)», «k = 2»), never the label again.
+  question («B = (1, t, 2)», «k = 2»), never the label again.
   - Sources: ADR-3D-303, #1591, [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867, [ADR-3D-339](06b-decisions-3d.md#adr-3d-339), #1746.
 
 ## Claims — the student's answer, never a driver

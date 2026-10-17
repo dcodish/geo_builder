@@ -101,10 +101,11 @@ describe('#1506 — exactly two configurations print both, in one row joined by 
 });
 
 describe('#1506 — anything but exactly two stable configurations keeps «?»', () => {
-  it('MORE than two (a box with «C(p+q,1,0)» — a continuum the pool samples many times) keeps C(?, 1, 0)', () => {
+  // #2077 (ADR-3D-368): the open axis now reads the letters the student typed instead of «?»; still ONE row
+  it('MORE than two (a box with «C(p+q,1,0)» — a continuum the pool samples many times) keeps one open row, C(p+q, 1, 0)', () => {
     build(["תיבה ABCDA'B'C'D'", 'C(p+q,1,0)']);
     const rows = rowsOf(panelAt(0).panel.points, 'C');
-    expect(rows).toEqual(['C(?, 1, 0)']);
+    expect(rows).toEqual(['C(p+q, 1, 0)']);
   });
 
   it('a pair that MOVES with the seed (C on a circle: |AC| = 5, |BC| = 3) keeps C(4, ?, ?)', () => {

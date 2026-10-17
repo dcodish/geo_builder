@@ -635,6 +635,20 @@ export const MAX_SYM_DEGREE = 3;
 /** The name every existing consumer knows this carrier by. */
 export type SymComp = SymAffine;
 
+/** #2077 (ADR-3D-368) — a tuple's three component texts AS THE STUDENT TYPED THEM (only whitespace
+ *  trimmed). Carried by the parser on every component reader (point3 / inject-pair / inject-vector),
+ *  for DISPLAY only: nothing solves from it. */
+export type CompSrcs = [string, string, string];
+
+/** #2077 (ADR-3D-368) — a component given as stated, recorded beside the pin that solves it: the typed
+ *  text, the letters each component names (an affine form's symbols, or a bare letter's name), and the
+ *  given's ordinal among the stated tuples, so the panel lists them in fact order across pin families. */
+export interface StatedComps {
+  texts: CompSrcs;
+  letters: [string[], string[], string[]];
+  ord: number;
+}
+
 /** The distinct symbols an affine component names, in first-written order. */
 export const symsOfAffine = (e: SymAffine): string[] => {
   const out: string[] = [];
@@ -671,6 +685,8 @@ export interface Point3Command {
    *  id these become symbolic pivot pins (each distinct symbol an extra pivot unknown, left
    *  OPEN until data determines it); a NEW id supports one distinct symbol (coord-sym). */
   symExprs?: [SymComp | null, SymComp | null, SymComp | null];
+  /** #2077 (ADR-3D-368): each component's text as typed (whitespace trimmed) — display only. */
+  srcs?: CompSrcs;
 }
 
 /** ADR-3D-032: `k הוא פרמטר חיובי` — a sign given on the figure's symbolic parameter
@@ -705,6 +721,8 @@ export interface InjectVectorCommand {
    *  letter still lowers to a null (free) component; this only records what the student CALLED it,
    *  so `param-sign` can address it. Emitting `symExprs` instead would change how it solves. */
   syms?: [string | null, string | null, string | null];
+  /** #2077 (ADR-3D-368): each component's text as typed (whitespace trimmed) — display only. */
+  srcs?: CompSrcs;
 }
 
 /** `שיעור ה-z של C' חיובי` — a SIGN branch given (selects among pivot solutions). */
@@ -1135,7 +1153,7 @@ export type Command3 =
   // BD = (-4,5,12) — a pair-vector injection (V7 T2). #794 (ADR-3D-168): components take the same
   // grammar as point3 — number | null (placeholder letter) | affine symbolic via symExprs
   // (`AA' = (k-1, k-7, k+1)` — the symbol joins the pivot as an open unknown).
-  | { type: 'inject-pair'; a: Id; b: Id; x: number | null; y: number | null; z: number | null; symExprs?: [SymComp | null, SymComp | null, SymComp | null]; syms?: [string | null, string | null, string | null] } // #814: `syms` is name-only (see InjectVectorCommand)
+  | { type: 'inject-pair'; a: Id; b: Id; x: number | null; y: number | null; z: number | null; symExprs?: [SymComp | null, SymComp | null, SymComp | null]; syms?: [string | null, string | null, string | null]; srcs?: CompSrcs } // #814: `syms` is name-only (see InjectVectorCommand); #2077: `srcs` as typed
   | { type: 'rel-plane'; name: string; rel: 'perp' | 'par'; through: Id[]; a: Id; b: Id } // V8-b (G1): plane ⟂/∥ edge a–b
   | { type: 'plane-cut'; id: Id; plane: string; a: Id; b: Id } // V8-b (G2): a point = plane ∩ segment a–b
   | { type: 'height-to-face'; id: Id; from: Id; face: Id[] } // V8-e (G5): `AF גובה … לפאה BDC` — F = foot of ⟂ from A onto plane BDC
@@ -1244,7 +1262,7 @@ export type PointDef =
   // ADR-3D-032: `M(k,1,3)` — typed coordinates carrying the figure's SINGLE symbolic
   // parameter (LinExpr components; absolute, never gauge). Unpinned k = a sampled free
   // DOF; a recorded given referencing the point (paramGivens) root-finds it post-pivot.
-  | { kind: 'coord-sym'; x: LinExpr; y: LinExpr; z: LinExpr }
+  | { kind: 'coord-sym'; x: LinExpr; y: LinExpr; z: LinExpr; stated?: StatedComps } // #2077: the typed tuple
   // ADR-3D-080: the RIGHT-pyramid apex seated on its carrier plane — the ⊥ line through the
   // base's centre (triangle: circumcentre; quad: centroid) cut with the point-run plane.
   | { kind: 'right-apex'; base: Id[]; plane: string }
@@ -1361,11 +1379,11 @@ export interface Construction3 {
   /** V4 — coordinate injections on existing points (null components don't constrain).
    *  #325 (ADR-3D-079): a component may be a symbolic AFFINE expression (`B(2t,t,k)`) —
    *  each distinct symbol joins the pivot as an extra unknown, OPEN until data pins it. */
-  pins: { id: Id; x: number | null | SymComp; y: number | null | SymComp; z: number | null | SymComp }[];
+  pins: { id: Id; x: number | null | SymComp; y: number | null | SymComp; z: number | null | SymComp; stated?: StatedComps }[];
   /** V4 — injected values for declared vectors. #794 (ADR-3D-168): a component is a number,
    *  null (placeholder — does not constrain), or a symbolic AFFINE expression, exactly as in
    *  `pins` — the #325 widening reaching the vector lane. */
-  vectorPins: { name: string; x: number | null | SymComp; y: number | null | SymComp; z: number | null | SymComp }[];
+  vectorPins: { name: string; x: number | null | SymComp; y: number | null | SymComp; z: number | null | SymComp; stated?: StatedComps }[];
   /** V4 — sign branch givens (select among pivot solutions). */
   signGivens: SignGivenCommand[];
   /**
@@ -1442,7 +1460,7 @@ export interface Construction3 {
   scalarPins: ScalarPin[];
   /** V7 T2 — pair-vector injections (`BD = (-4,5,12)`), residuals like vectorPins.
    *  #794 (ADR-3D-168): components carry the same number | null | SymComp grammar as `pins`. */
-  pairPins: { a: Id; b: Id; x: number | null | SymComp; y: number | null | SymComp; z: number | null | SymComp }[];
+  pairPins: { a: Id; b: Id; x: number | null | SymComp; y: number | null | SymComp; z: number | null | SymComp; stated?: StatedComps }[];
   /** ADR-3D-030 (M1) — a stated plane EQUATION on a solid-bearing figure is a GIVEN:
    *  each named point must satisfy cx·x + cy·y + cz·z + d = 0 (pivot residuals, like
    *  coordinate injections — it drives the free gauge/dims, verifies when determined). */
