@@ -162,6 +162,13 @@ export interface Figure {
    * still compares and serialises as the fields it always had. Absent on a figure built by hand.
    */
   separationDof?: (a: Id, b: Id) => number | undefined;
+  /**
+   * HOW FREE IS THIS PART OF THE FIGURE? (#1932, ADR-AG-292) — {@link freedomOf} over the configuration this figure
+   * was solved at, for a `read` the caller builds (a straight's own position, a curve's numbers, a point). `0` means
+   * no configuration the givens allow moves those quantities; `undefined` is UNMEASURED and reads as "not proven
+   * fixed". Not memoised (each caller's `read` is its own), non-enumerable, and paid only when asked.
+   */
+  freedomOfRead?: (read: (pos: Map<Id, Pt>, env: Env) => number[]) => number | undefined;
   /** Per point: what the student's OWN givens fix about it — the canvas label (#1032). */
   provenance: Record<Id, PointProvenance>;
   /** The register symbols some object or constraint reads (#1343) — the ones a configuration is made of. */
@@ -796,6 +803,13 @@ function withSeparationDof(f: Figure, c: Construction, sys: CarrierSystem, x: nu
         memo.set(key, dof === null ? undefined : dof);
       }
       return memo.get(key);
+    },
+  });
+  Object.defineProperty(f, 'freedomOfRead', {
+    enumerable: false,
+    value: (read: (pos: Map<Id, Pt>, env: Env) => number[]): number | undefined => {
+      const dof = freedomOf(c, sys, x, read);
+      return dof === null ? undefined : dof;
     },
   });
   return f;

@@ -970,7 +970,20 @@ within that floor of Q; or **by construction** — Q on K for good, Q on ℓ, an
 and K's radius at Q (`{radius, K, Q}` or K's centre and Q, via `centreIdOf`), or ℓ is K's tangent object at Q, or runs
 through Q and a point on it. Same blame, one-fault-per-line filter and positional skip as the chord member.
 
-*Identifiers:* `SOLVE_TOL` · `separationDof` · `freedomOf` · `onCurveByConstruction` · `noFreedomReaches` · `third-crossing` · `touchPointOf` · `tangent-no-second-crossing`
+**Both members reach every curve a line meets at most twice** ([ADR-AG-292](06c-decisions-analytic.md#adr-ag-292), #1909,
+#1932). The gate is `maxCrossings('line', curveKindOf(K)) === 2` (`apply.ts`, the Bézout bound #1114 counts by) — a circle, a
+parabola, an ellipse — and each fault carries the curve's kind (`curve`), which picks the noun: «המעגל / הפרבולה / האליפסה»
+(`THE_NOUN_KEY`) in the chord sentence, «למעגל / לפרבולה / לאליפסה» (`TO_THE_NOUN_KEY`) in the tangent one. Three readings
+the widening needs, all generic: `touchPointOf` on a conic reads the quadratic ℓ leaves in it (`lineQuadratic`, shared with
+`conicMeet`) — the chord `√|disc|/|A|` under the same floor, scaled by `conicSize` — so it is TANGENCY, not "meets once": the
+line parallel to a parabola's axis leaves no `t²` term and is never a touch. The touch is read first; K and Q stay
+structurally fixed (`noFreedomReaches` — a plural's sibling letter the constraints pin is not "already there"), and ℓ is fixed
+structurally **or** by the rank of its own position (unit normal and offset, via `straightWalkOf`) — `Figure.freedomOfRead`,
+`freedomOf` over the solved configuration — so a point riding a fixed tangent («P על הישר l1») leaves ℓ fixed and the row is
+refused, on a circle too. The by-construction tangency (⊥ the radius) stays circle-only by
+nature: a conic has no radius, and analytic has no conic-tangency sentence.
+
+*Identifiers:* `SOLVE_TOL` · `separationDof` · `freedomOf` · `freedomOfRead` · `onCurveByConstruction` · `noFreedomReaches` · `maxCrossings` · `third-crossing` · `touchPointOf` · `straightWalkOf` · `tangent-no-second-crossing`
 
 ## Knowledge gates
 
