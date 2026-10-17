@@ -445,8 +445,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   **«m = ?»** and the ask lane says the value is not determined (#1861). A point with exactly two
   configurations reads one row, **«S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»**, and asking «S» answers the same coordinates,
   naming the point once: **«S = (1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»**. Every ask answer is the bare value after the
-  question («B = (1, t, 2)», «k = 2»), never the label again.
-  - Sources: ADR-3D-303, #1591, [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867, [ADR-3D-339](06b-decisions-3d.md#adr-3d-339), #1746.
+  question («B = (1, t, 2)», «k = 2»), never the label again. A declared basis vector asked by its own name
+  answers its coordinates when they are knowledge (**«w = (0, 0, 12)»**) and otherwise «לא נקבע על ידי הנתונים»,
+  never its own name; a pair keeps its decomposition («AS = w = (0, 0, 12)»).
+  - Sources: ADR-3D-303, #1591, [ADR-3D-336](06b-decisions-3d.md#adr-3d-336), #1867, [ADR-3D-339](06b-decisions-3d.md#adr-3d-339), #1746, [ADR-3D-371](06b-decisions-3d.md#adr-3d-371), #2072.
 
 ## Claims — the student's answer, never a driver
 
