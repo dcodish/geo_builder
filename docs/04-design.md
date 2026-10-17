@@ -214,7 +214,8 @@ Seams recorded against the layout:
 - **valuesPanel's symbol lane (ADR-485, #929)** reads the ADR-031 symbol table: every letter the student named
   gets a row (natun when valued, nigzar when forced) and is askable through the `var` query. Circles are named
   through `circleRef` (ADR-552, #1442) — drawn circles only, a visible centre by its letter, an unnamed one as
-  "the circle" or its ADR-342 token; `render/valueRowText` words every row label.
+  "the circle" or its ADR-342 token; two drawn circles on one centre, ordered by `innerOf`, by their role
+  (`via: 'role'`, ADR-714, #2264); `render/valueRowText` words every row label.
 - **The clarification family (ADR-490, ADR-494).** A rule may return a `Clarify`, which `refusalOf` maps to a
   refusal reason of the same name and `submitPipeline` renders as a note that keeps the text; `not-handled` is the
   escalation seam. `isAmbiguityQuestion` is the explicit whitelist `parseResolved` may not turn back into an

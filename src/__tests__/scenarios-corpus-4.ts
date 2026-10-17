@@ -60,6 +60,7 @@ import { drivenSolveStats } from '@/engine/evaluate';
 import { buildScene } from '@/render/scene';
 import { rowNouns } from '@/store/rowNouns';
 import { narrowingText } from '@/app/narrowingText';
+import { valueRowText } from '@/render/valueRowText';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -5206,6 +5207,23 @@ export const SCENARIOS_4: Scenario[] = [
       allStepsOk(fig);
       const v = gateVerdict(factsOf(['מלבן ABCD', 'מעוין ABCD']), 'ריבוע ABCD');
       expect(v.kind, JSON.stringify(v)).toBe('noop');
+    },
+  },
+  {
+    id: 'concentric-circle-names-2264',
+    title: '«שני מעגלים בעלי מרכז משותף O» · radii 10 and 9: the values panel names «המעגל החיצוני» / «המעגל הפנימי», never «O» twice (#2264, ADR-714)',
+    guards:
+      '#2264 (P3), operator ruling 2026-10-16 (option A). Measured on de7c221f through parse -> replay -> computeValues -> valueRowText: the panel printed «רדיוס O = 10» and «רדיוס O = 9», «שטח (O)» twice. Root cause: circleRefs (ADR-552) named a circle by its centre letter even when another drawn circle shares that centre; the pair\'s own record (innerOf, from set-radius-order) was not read. Fix: a centre shared by exactly two drawn circles, one innerOf the other, names each by role. Asserts the operator\'s three lines build green and the radius rows read «רדיוס המעגל החיצוני» = 10 and «רדיוס המעגל הפנימי» = 9. The matrix is src/__tests__/issue-2264-concentric-circle-names.test.ts.',
+    steps: ['שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל חיצוני הוא 10', 'רדיוס מעגל פנימי 9'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const rows = computeValues(factsOf(['שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל חיצוני הוא 10', 'רדיוס מעגל פנימי 9'])).rows
+        .filter((r) => r.kind === 'radius')
+        .map((r) => [stripFormatControls(valueRowText(r, (k, p) => he(k, p) as string)), r.value] as const);
+      expect(rows.map(([l]) => l)).toEqual(['רדיוס המעגל החיצוני', 'רדיוס המעגל הפנימי']);
+      expect(rows[0][1]).toBeCloseTo(10, 6);
+      expect(rows[1][1]).toBeCloseTo(9, 6);
     },
   },
 ];

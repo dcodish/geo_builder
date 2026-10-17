@@ -574,7 +574,7 @@ export function computeValuesPanel(
     if (o.kind !== 'circle') continue;
     const ref = refs.get(o.id);
     if (!ref) continue;
-    const name = ref.via === 'sole' ? '' : ref.name;
+    const name = ref.via === 'sole' || ref.via === 'role' ? '' : ref.name; // #2264: a role is worded by the display layer
     const radiusAt = (_pos: Map<Id, Vec>, i: number) => circlesPerSample[i]?.get(o.id)?.r ?? null;
     // a STATED radius stays via 'length' (free/through/tangent are derived)
     magnitude('radius', [o.center], name, o.radius.via === 'length', 1, radiusAt, ref);
