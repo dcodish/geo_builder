@@ -105,7 +105,8 @@ describe('#1590 — the message names the tool, never the student’s calculatio
     expect(render('he', cone)).toContain('החרוט');
     expect(render('he', point)).toContain('P');
     for (const e of [cone, point]) {
-      expect(render('he', e)).toContain('מגבלה של הכלי');
+      // #2076 (ADR-3D-363): the size sentence says the capability is in development; the point one keeps its wording
+      expect(render('he', e)).toMatch(e === cone ? /בפיתוח/ : /מגבלה של הכלי/);
       expect(render('he', e)).not.toContain('בדקו את החישוב');
     }
   });
@@ -113,7 +114,7 @@ describe('#1590 — the message names the tool, never the student’s calculatio
     expect(render('en', cone)).toContain('cone');
     expect(render('en', point)).toContain('P');
     for (const e of [cone, point]) {
-      expect(render('en', e)).toContain('limit of the tool');
+      expect(render('en', e)).toMatch(e === cone ? /in development/ : /limit of the tool/);
       expect(render('en', e)).not.toMatch(/check the computation/i);
     }
   });

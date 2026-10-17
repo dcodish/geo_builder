@@ -59,7 +59,6 @@ const ERRORS3: Record<Code3, Payload[]> = {
   'ring-not-flat': [{ stated: 'AB = 3', others, sides: 4, vertices: ['A', 'B'] }, { stated: 'AB = 3', others: [], sides: 4, vertices: ['A', 'B'] }],
   'sign-unsatisfiable': [{ id: 'P' }],
   'no-such-solid': [{ id: 'pyramid' }, { id: 'ABCD' }],
-  'free-size-claim': [{ id: 'ABCD' }],
   'two-unknowns': [{ id: 'P' }],
   'size-on-solid': [{}],
   'unknown-symbol': [{ id: 'k' }],

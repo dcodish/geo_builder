@@ -794,7 +794,9 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       const r = matches[0];
       const needsHeight = r.kind !== 'sphere';
       if (r.radius === undefined || (needsHeight && r.height === undefined)) {
-        return { code: 'free-size-claim', id: claim.solid }; // sizes unstated ⇒ the value is a scale statement, not a check
+        // sizes unstated ⇒ the value would SET the size, not check it. #2076 (ADR-3D-363): that is the one size
+        // refusal every unsupported size form gets, worded by the solid — no raw engine id, no work-around hint.
+        return { code: 'given-not-drivable', object: { kind: 'size', solid: r.kind } };
       }
       return null;
     }

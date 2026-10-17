@@ -25,6 +25,7 @@ import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, RevolutionKind, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, ringCircleId3, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX, SOLID_QUALIFIER_HE } from '../lexicon/nouns3';
+import { REV_CONE_ONLY_NOUN_HE, REV_SIZE_NOUN_EN, REV_SIZE_NOUN_HE, REV_SOLID_EN, REV_SOLID_HE, REV_UNREAD_SLOT_EN, REV_UNREAD_SLOT_HE } from '../lexicon/revolutionSize3';
 import { foldPrimes3, VECTOR_ARROW_CLASS, VECTOR_ARROW_RE, VECTOR_WORD_SRC } from '../lexicon/marks3';
 import { POLY_NOUN_EN3, POLY_NOUN_HE3, quadNoun3, readShapePhrase3, SHAPE_ADJ_WORDS3, shapeNounArticle3, statedPolygonArity3, type ShapeAdj3, type ShapePhrase3 } from '../lexicon/shapePhrase3';
 // #1545 (ADR-3D-300): the ONE prime fold lives in the vocabulary leaf; re-exported so every parser-side
@@ -252,6 +253,11 @@ export function normalize3(s: string): string {
       // every rule AND the honesty gate read, so no √-reading slot can miss a spelling another one takes.
       .replace(/\\?sqrt\s*\{([^{}]*)\}/g, '√($1)')
       .replace(/\\?sqrt/g, '√')
+      // #2081 ([ADR-3D-362](../../docs/06b-decisions-3d.md#adr-3d-362)): the AXIS LETTER of a subscripted
+      // coordinate token has one case — «X_B=3» is «x_B=3», «B_X» is «B_x» (the ADR-AG-274 shape). Every
+      // component reader (`COMPONENT_FRAMES`, its value / sign / comparison tails) spells the axis `[xyz]`.
+      .replace(SUB_AXIS_FIRST3, (_m, ax: string, rest: string) => `${ax.toLowerCase()}${rest}`)
+      .replace(SUB_AXIS_LAST3, (_m, head: string, ax: string) => `${head}${ax.toLowerCase()}`)
       .replace(/½/g, '1/2')
       .replace(/¼/g, '1/4')
       .replace(/¾/g, '3/4')
@@ -275,6 +281,15 @@ const LBL = String.raw`[A-Z]\d*'?`;
  *  retires more inline copies than the fix adds, so the recorded ceiling moves DOWN. *  Declared beside {@link LBL} (#1730 integration, round 2026-10-04) so module-level rules that sit
  *  above its old place — `WHOLE_RATIO` — compose from it instead of inlining the fragment. */
 const UNUM = String.raw`\d+(?:\.\d+)?`;
+
+/**
+ * #2081 ([ADR-3D-362](../../docs/06b-decisions-3d.md#adr-3d-362)) — the uppercase AXIS LETTER of a subscripted
+ * coordinate token, folded once in {@link normalize3}. It is unambiguous because a point label's subscript is
+ * DIGITS (`A_1`, `X_1`, `X_{12}`): only a LABEL after the `_` (or the axis letter after a label's `_`) makes the
+ * token a coordinate component, so those stay as typed, and the bare run `XB` (a segment) is never touched.
+ */
+const SUB_AXIS_FIRST3 = new RegExp(String.raw`(?<![A-Za-z0-9_'])([XYZ])(\s*_\s*\{?\s*${LBL}\s*\}?)(?![A-Za-z0-9_'])`, 'g');
+const SUB_AXIS_LAST3 = new RegExp(String.raw`(?<![A-Za-z0-9_'])(${LBL}\s*_\s*\{?\s*)([XYZ])(?![A-Za-z0-9_'])`, 'g');
 
 /**
  * #486 — Hebrew noun gates, shared. Two things a student writes freely and a hand-written rule keeps
@@ -3728,6 +3743,17 @@ function readSizeSlot(s: string, slot: RegExp): SizeSlot {
 /** #2079: the solid whose size slot held a value the slot does not read — refused after every rule declined. */
 let SOLID_SIZE_UNREAD: RevolutionKind | null = null;
 
+/**
+ * #2076 ([ADR-3D-363](../../docs/06b-decisions-3d.md#adr-3d-363)): where a stated value may begin — a digit, a root,
+ * a fraction glyph, a sign, a decimal point or an opening parenthesis. A size noun followed by one states a size.
+ */
+const VALUE_START = String.raw`(?=[-\d√½¼¾⅓⅔.(])`;
+/** A size clause the declaration's two slots do not read (a diameter, a slant height, a volume, an area). */
+const UNREAD_SIZE_CLAUSE = new RegExp(
+  String.raw`(?:(?<![א-ת])[וש]?${REV_UNREAD_SLOT_HE}\s*(?:הוא\s*|=\s*)?|\b${REV_UNREAD_SLOT_EN}(?:\s+is)?\s*(?:=\s*)?)${VALUE_START}`,
+  'i',
+);
+
 /** `חרוט שקודקודו S ומרכז בסיסו O, רדיוס הבסיס 5 וגובהו 12` — a solid of revolution; unstated sizes stay FREE. */
 const revolutionSolid: Rule = (s) => {
   const kind = /חרוט|\bcone\b/i.test(s) ? 'cone' : /גליל|\bcylinder\b/i.test(s) ? 'cylinder' : /כדור|\bsphere\b/i.test(s) ? 'sphere' : null;
@@ -3737,8 +3763,10 @@ const revolutionSolid: Rule = (s) => {
   const radiusSlot = readSizeSlot(s, RADIUS_SLOT);
   const heightSlot = readSizeSlot(s, HEIGHT_SLOT);
   if (kind !== 'cone' && apex) return null; // only a cone has an apex
-  // #2079: a size stated in a form the slot does not read is refused whole — never drawn from part of it
-  if (radiusSlot === 'unread' || heightSlot === 'unread') {
+  // #2079: a size stated in a form the slot does not read is refused whole — never drawn from part of it.
+  // #2076 (ADR-3D-363): so is a size clause whose NOUN is not a slot («שקוטרו 4», «ויוצרו 5», "slant height 5"),
+  // decided by the noun plus a value. Checked before the slots, so "slant height 5" is never read as a height.
+  if (UNREAD_SIZE_CLAUSE.test(s) || radiusSlot === 'unread' || heightSlot === 'unread') {
     SOLID_SIZE_UNREAD = kind;
     return null;
   }
@@ -3752,6 +3780,30 @@ const revolutionSolid: Rule = (s) => {
 
 const REV_KIND: Record<string, 'cylinder' | 'cone' | 'sphere'> = {
   חרוט: 'cone', גליל: 'cylinder', כדור: 'sphere', cone: 'cone', cylinder: 'cylinder', sphere: 'sphere',
+};
+
+/**
+ * #2076 ([ADR-3D-363](../../docs/06b-decisions-3d.md#adr-3d-363)) — a revolution size stated on its OWN line:
+ * «רדיוס החרוט הוא 2», «גובה החרוט = 3», «קוטר הגליל 4», «אורך היוצר 5», "the height of the cone is 3".
+ *
+ * No rule reads these (the size of a cone is set only inside its declaration; #1569 parks the rest), so they went
+ * to the model lane. The rule never claims a line: it RECORDS the solid in `SOLID_SIZE_UNREAD`, and `parse3` refuses
+ * with the one size sentence only after every rule has declined — a volume or area claim the claim rules read stays
+ * a claim. A value is required, so a question («רדיוס החרוט?») is never answered by it.
+ */
+const SIZE_COPULA = String.raw`\s*(?:(?:הוא|היא|=|:|שווה\s+ל-?)\s*)?`;
+const SIZE_LABELS = String.raw`(?:\s+(?:${LBL})+)?`;
+const SIZE_LINE_HE = new RegExp(String.raw`^ה?${REV_SIZE_NOUN_HE}(?:\s+של)?\s+ה?(?<solid>${REV_SOLID_HE})${SIZE_LABELS}${SIZE_COPULA}${VALUE_START}\S.*$`);
+const SIZE_LINE_CONE_HE = new RegExp(String.raw`^ה?${REV_CONE_ONLY_NOUN_HE}(?:\s+(?:של\s+)?ה?חרוט)?${SIZE_LABELS}${SIZE_COPULA}${VALUE_START}\S.*$`);
+const SIZE_LINE_EN = new RegExp(
+  String.raw`^(?:the\s+)?${REV_SIZE_NOUN_EN}\s+of\s+(?:the\s+)?(?<solid>${REV_SOLID_EN})${SIZE_LABELS}\s*(?:is|=|equals)\s*${VALUE_START}\S.*$`,
+  'i',
+);
+const revolutionSizeLine: Rule = (s) => {
+  const m = s.match(SIZE_LINE_HE) ?? s.match(SIZE_LINE_EN);
+  if (m?.groups) SOLID_SIZE_UNREAD = REV_KIND[m.groups.solid.toLowerCase()];
+  else if (SIZE_LINE_CONE_HE.test(s)) SOLID_SIZE_UNREAD = 'cone';
+  return null;
 };
 
 /** `נפח החרוט = 100π` / `the volume of the cone = 100π` — a volume claim (π multiplies). */
@@ -4323,11 +4375,21 @@ const rectComplete: Rule = (s) => {
   return quadShapeCommand('rectangle', [m[1], m[2], m[3], m[4]]);
 };
 
-/** `A = (2, 0, -10)` — a coordinates CLAIM (the student's answer for a derived point). */
+/**
+ * `A = (2, 0, -10)` — a coordinates CLAIM (the student's answer for a derived point).
+ *
+ * #2081 ([ADR-3D-362](../../docs/06b-decisions-3d.md#adr-3d-362)): a component is the tuple-component
+ * VALUE atom `VAL`, read by its paired reader `literalValue` — the pair «A(…)» reads with (#510). The rule
+ * composed from the decimal `NUM` and read with `+`, so «A=(√2,0,0)» was "not understood" while
+ * «A(√2,0,0)» built: one value, two verdicts, decided by which rule's private atom it reached. A component
+ * the reader cannot value declines the line, so no NaN reaches a claim.
+ */
 const coordsClaim: Rule = (s) => {
-  const m = s.match(new RegExp(`^([A-Z]\\d*'?)\\s*=\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)$`));
+  const m = s.match(new RegExp(`^([A-Z]\\d*'?)\\s*=\\s*\\(\\s*(${VAL})\\s*,\\s*(${VAL})\\s*,\\s*(${VAL})\\s*\\)$`));
   if (!m) return null;
-  return [{ type: 'claim', claim: { type: 'coords-eq', id: m[1], x: +m[2], y: +m[3], z: +m[4] } }];
+  const [x, y, z] = [m[2], m[3], m[4]].map(literalValue);
+  if (x === null || y === null || z === null) return null;
+  return [{ type: 'claim', claim: { type: 'coords-eq', id: m[1], x, y, z } }];
 };
 
 /**
@@ -4997,9 +5059,13 @@ const distanceGiven: Rule = (s) => {
   // rules were checked once per the plan: the angle family's «בין» is not stated «מ…ל» in natural
   // Hebrew — no change there.)
   const m =
-    s.match(new RegExp(`^ה?מרחק\\s+(?:(?:ש)?בין\\s+|מ-?\\s*(?:ה?נקודה\\s+)?)(.+?)\\s+(?:[לו]בין\\s+|ל-?\\s*|ו-?\\s*)(.+?)\\s*(?:הוא|היא|=|שווה\\s+ל?-?)\\s*(${NUM})\\s*$`)) ??
-    s.match(new RegExp(`^(?:the\\s+)?distance\\s+(?:from|between)\\s+(.+?)\\s+(?:and|to)\\s+(.+?)\\s*(?:is|=)\\s*(${NUM})\\s*$`, 'i'));
-  if (!m) return null;
+    s.match(new RegExp(`^ה?מרחק\\s+(?:(?:ש)?בין\\s+|מ-?\\s*(?:ה?נקודה\\s+)?)(.+?)\\s+(?:[לו]בין\\s+|ל-?\\s*|ו-?\\s*)(.+?)\\s*(?:הוא|היא|=|שווה\\s+ל?-?)\\s*(-?\\s*${MAG})\\s*$`)) ??
+    s.match(new RegExp(`^(?:the\\s+)?distance\\s+(?:from|between)\\s+(.+?)\\s+(?:and|to)\\s+(.+?)\\s*(?:is|=)\\s*(-?\\s*${MAG})\\s*$`, 'i'));
+  // #2081 ([ADR-3D-362](../../docs/06b-decisions-3d.md#adr-3d-362)): the value is a MAGNITUDE («… הוא √2»),
+  // read by its paired reader as `lengthClaim` reads it (ADR-3D-337) — never `+m[3]`. The sign is admitted
+  // exactly as the decimal `NUM` admitted it, so a negative distance keeps the verdict it had.
+  const value = m ? magValue(m[3]) : null;
+  if (!m || value === null) return null;
   const a = readOperand(m[1]);
   const b = readOperand(m[2]);
   if (!a || !b) return null;
@@ -5010,7 +5076,7 @@ const distanceGiven: Rule = (s) => {
     op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) }
     : op.kind === 'line' ? { kind: 'line', name: canonLineName(op.name) }
     : op;
-  return [{ type: 'distance-rel', a: canon(a.op), b: canon(b.op), value: +m[3] }];
+  return [{ type: 'distance-rel', a: canon(a.op), b: canon(b.op), value }];
 };
 
 
@@ -5043,6 +5109,7 @@ export const RULES: Rule[] = [
   volumeClaim,
   lateralAreaClaim,
   surfaceAreaClaim, // #1449: the total surface of a cone/cylinder
+  revolutionSizeLine, // #2076: AFTER the claim rules; it never claims a line, it only records the refusal
   parametricLine, // before planeByEquation: both carry `:`, but ℓ ≠ π so either order is safe — kept explicit
   planeByEquation,
   freePlaneDecl, // #487: AFTER planeByEquation — a name followed by an equation is never stolen (this rule demands END after the name)

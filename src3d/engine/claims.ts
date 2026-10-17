@@ -288,7 +288,7 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
     case 'lateral-area-eq':
     case 'surface-area-eq': {
       const rev = c.revolutions.find((r) => r.kind === claim.solid);
-      // guarded upstream (no-such-solid / free-size-claim)
+      // guarded upstream (no-such-solid / the given-not-drivable size refusal, #2076)
       const actual = rev ? revolutionMeasure(rev, claim.type === 'volume-eq' ? 'volume' : claim.type === 'lateral-area-eq' ? 'lateral' : 'surface') : null;
       if (actual === null) return false;
       return Math.abs(actual - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
