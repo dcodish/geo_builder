@@ -287,6 +287,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2253': 'open', // #2165 (ADR-681): analytic and 3-D read no value line for a length letter; 3-D refuses «AB = 2a»
 
+  '#2327': 'open', // #2177 (ADR-733): analytic does not read the reserved r on a several-circle figure; 2-D refuses it naming the circles
 };
 
 export interface ParityRow {
@@ -1599,6 +1600,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2097 (ADR-719): «|XY|» is the length XY in every slot — 2-D read it only in the sum, ordering and bound rules ──
   { id: 'abs-length-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = 4'], expect: 'builds', note: '2-D escalated it before ADR-719' },
   { id: 'abs-length-var-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = k'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2092' }], note: '2-D escalated it before ADR-719' },
+  // ── #2177 (ADR-733): the reserved r on a figure with several circles names none of them — refused, never a pick ──
+  { id: 'reserved-r-several-circles-2177', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 5', 'r = 4'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2327' }], note: '2-D committed it green and ignored the 4 before ADR-733; analytic does not read it (not-handled)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
