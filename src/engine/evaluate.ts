@@ -1734,6 +1734,30 @@ function tangentNoSecondCrossing(pointId: Id, lineName: string, circleId: Id, to
 }
 
 /**
+ * #1834 ([ADR-729](docs/06-decisions.md#adr-729)) — the line∩circle crossings when BOTH are distinct points already
+ * placed: the named point at each root, ordered along the line's direction ({@link bySide}), so the line through
+ * A and C reads «AC». Null for a single or double root (a tangency) or a root no placed point sits on. A student's name is
+ * preferred over an internal one (`@…`), so the sentence carries only the student's letters.
+ */
+export function chordCrossings(sols: Vec[], pos: Map<Id, Vec>, line: ResolvedLine): [Id, Id] | null {
+  if (sols.length !== 2 || dist(sols[0], sols[1]) < LEN_EPS) return null;
+  const [s0, s1] = bySide(sols, line.anchor, line.dir);
+  const at = (s: Vec): Id | null => {
+    const ids = [...pos].filter(([, q]) => dist(s, q) < LEN_EPS).map(([id]) => id);
+    return ids.find((id) => !id.startsWith('@')) ?? ids[0] ?? null;
+  };
+  const a = at(s0);
+  const b = at(s1);
+  if (!a || !b || a === b) return null;
+  return [a, b];
+}
+
+/** #1834 (ADR-729): the engine's sentence for "a third crossing asked of a chord" (`humanizeError` → `errors.thirdCrossing`). */
+function thirdCrossingError(pointId: Id, [a, b]: [Id, Id], circleId: Id): string {
+  return `cannot place ${pointId}: line ${a}${b} already crosses circle ${circleId} at ${a} and ${b} — a line has no third crossing with a circle`;
+}
+
+/**
  * #1931 (ADR-640) — the second caller of {@link tangentTouch}: an ON-CIRCLE point driven onto a line by
  * `collinear(E, X, Y)` (the lowering of «E על הישר AP · E על מעגל O», ADR-050) IS that line's crossing with
  * the circle, spelled as a carrier. When the line XY is tangent to E's circle at X or Y, the only root the
@@ -2154,9 +2178,12 @@ function tryEval(
       // function with the branch count (#1600, ADR-593) — see {@link crossingChoice}.
       const choice = crossingChoice(p, sols, pos, l);
       if (choice) return choice.pick;
-      // No NEW crossing: the line meets the circle ONLY at points already placed — it is tangent at
-      // `avoid` (touches just there), or both its named ends are on the circle (a chord). Report it
-      // clearly instead of collapsing the new point onto `avoid` (the tangent-extension crash).
+      // No NEW crossing: the line meets the circle ONLY at points already placed. Two situations, two
+      // sentences (#1834, ADR-729): two distinct crossings both already named — a CHORD, asked for a third
+      // meeting a line never has — or one (double) crossing, a tangency the ruler above did not catch.
+      // Reported clearly instead of collapsing the new point onto `avoid` (the tangent-extension crash).
+      const chord = chordCrossings(sols, pos, l);
+      if (chord) return thirdCrossingError(p.id, chord, p.circle);
       return tangentNoSecondCrossing(p.id, p.line, p.circle, String(p.avoid));
     }
 

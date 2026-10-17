@@ -2072,3 +2072,7 @@ over all four (ADR-041).
 ### `rider-coincident-root-1820-length` — «משולש ABC» · «D על BC» · «BD = BC» is accepted the same way (#1820, ADR-725)
 
 **Guards against:** the length twin of the above — «BD = BC» with D on BC refused instead of drawn on C with the notice. **Asserts** the same as `rider-coincident-root-1820`.
+
+### `chord-third-crossing-1834` — «AC חותך את המעגל בנקודה E» with A and C on the circle is refused saying a line meets a circle at most twice, never «the line is tangent» (#1834, ADR-729)
+
+**Guards against:** a third crossing asked of a chord whose two crossings are already named being refused with the tangent sentence «…הישר משיק למעגל בנקודה אחת בלבד…» — calling a chord a tangent (and, with a third point already on the circle, naming the asked point «⟨…⟩»). **Asserts** the operator's ruled sentence of 2026-10-07 exactly: «AC כבר חותך את המעגל ב-A וב-C — לישר אין נקודת חיתוך שלישית עם המעגל.» The matrix («הישר AC … O», «המיתר AC», a diameter, a chord with a point on it, the asked point already on the circle, English, the genuine-tangent control, the two-circles control) is `src/app/__tests__/issue-1834-chord-third-crossing.test.ts`; the parity row is `chord-third-crossing-1893`.

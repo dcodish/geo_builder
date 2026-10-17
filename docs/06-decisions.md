@@ -18486,3 +18486,31 @@ The kind words are the ones `circlesTangent` already reads. #2214's single kind 
 **Locks.** `src/engine/__tests__/issue-2089-rider-perp-foot.test.ts` (the predicate: four argument orders; X on the line, X an endpoint, an extension rider, another segment, no rider, a re-placed P; `applyStep` builds through `m1:rider-foot` with B, C, D unmoved; a ⟂ that builds keeps its own constraint); `src/app/__tests__/issue-2089-rider-foot.test.ts` (the student's path: five spellings, the shown figure; ⟂ = foot at seeds 0–23; stability; the triangle altitude keeps its solve; «DE ⟂ CD» still refused); fixtures `issue-2089-rider-perp-quad`, `issue-2089-rider-foot-quad` (saved at the seed the app lands on); parity row `rider-perp-foot-2089`.
 
 **Behaviour change for a student:** «מרובע ABCD» · «E על CD» · «AE ⟂ CD» (and «AE מאונך ל-CD», «CD ⟂ EA») draws E inside CD with AE ⟂ CD — before: refused «cannot place E on segment CD so that AE ⟂ CD». The same ⟂ line on a trapezoid now builds; on a square it draws E on D with the coincidence notice, and on a rectangle E on B with the degenerate-figure note — both before: refused, and both what the «גובה לצלע» spelling already drew.
+
+## ADR-729 — A third crossing asked of a chord is refused saying a line meets a circle at most twice, never as a tangent (#1834)
+
+**Status:** accepted · 2026-10-17 · bug (P3, 2-D) · fix round #2318, stream E · branch `fix/1834-chord-not-tangent`
+**Requirements:** [02](02-requirements.md) FR-EN-8 — a third crossing asked of a line that already meets the circle at two named points is refused naming those points · **Design:** none (internal) · **LADDER stage:** none — the evaluate-time `line-circle` refusal, unchanged in where it fires; only its sentence
+
+**The report / ruling.** «מעגל O · A על מעגל O · C על מעגל O · AC חותך את המעגל בנקודה E» was refused «line chord-AC is tangent to circle…» — a chord called a tangent. Operator, 2026-10-07 (`/decisions` pass, «Say why, in the student's terms»): «AC כבר חותך את המעגל ב-A וב-C — לישר אין נקודת חיתוך שלישית עם המעגל.», and *"any third crossing asked of a line that already has two named points on the circle gets this sentence, with the letters filled in"*. Per #1868's ruling this is a genuine contradiction of the student's givens, not a tool limit.
+
+**Measured before** (`main` @ 688dfb96, `decideDeterministic2D` + the real `humanizeError` / `he.json`, model mocked). Refused «לא ניתן למקם את E: הישר משיק למעגל בנקודה אחת בלבד — אין נקודת חיתוך נוספת להמשיך אליה.»: the report, «הישר AC חותך את המעגל O בנקודה E», «המיתר AC חותך את המעגל בנקודה E», «AB קוטר · AB חותך את המעגל בנקודה E», «C על AB · AB חותך את המעגל בנקודה E»; with «D על מעגל O» placed first, «AC חותך את המעגל בנקודה D» read «לא ניתן למקם את ⟨…⟩: …». **Divergence from the plan:** its two-circles row («שני מעגלים נחתכים בנקודות A ו-B · C על מעגל P · AC חותך את המעגל השמאלי בנקודה D») now COMMITS — the left circle is O and C is on P, so AC is a chord of P and genuinely crosses O again (D between A and C). It is not in the class; it is locked as a control that builds.
+
+**The class (docs/17 §1).** *A crossing sentence that asks a line for a third meeting with a circle it already meets at two named points is refused with the tangent sentence.* `evaluate.ts` `case 'line-circle'`: when `crossingChoice` finds no fresh root it returned `tangentNoSecondCrossing` for two situations its own comment named — a tangency at `avoid`, or a chord with both crossings placed.
+
+**Decision.**
+1. **`chordCrossings` (evaluate.ts).** Two distinct roots, each the position of a placed point → those two names, ordered along the line's direction (`bySide`, so the line through A and C reads «AC»), a student name preferred over an internal `@…` id. A single or double root, or a root no placed point sits on, is not a chord: the tangent sentence stays (the ADR-640 `tangentTouch` check before it is untouched).
+2. **The engine sentence** `cannot place <id>: line <AB> already crosses circle <c> at <A> and <B> — a line has no third crossing with a circle`, carrying the two crossings' letters, never the engine's line id.
+3. **`humanizeError`** maps it to the new key `errors.thirdCrossing`: he «{{line}} כבר חותך את המעגל ב-{{a}} וב-{{b}} — לישר אין נקודת חיתוך שלישית עם המעגל.» (the ruled words), en "{{line}} already crosses the circle at {{a}} and {{b}} — a line has no third crossing with a circle." (the literal rendering, aligned with analytic's `errThirdCrossing`). The point being placed is not named, so the «⟨…⟩» subject disappears. 2-D's retry tail (`errors.retryHint`, #1868) is untouched.
+
+**Measured after.** Every "before" row reads the ruled sentence with its own letters (AC / AB), the model never called; English renders the literal line; a genuine tangent («הישר AP משיק למעגל O בנקודה A · AP חותך את המעגל בנקודה E») keeps `errors.tangentNoSecondCrossing`.
+
+**Why not a patch (docs/17 §2).** The judgment is on the evaluated geometry (both roots, each a placed point) at the one site every line∩circle crossing resolves, so every spelling and every line kind share it; no utterance is matched.
+
+**Not changed.** The tangent sentence and where both refusals fire; circle∩circle's "meet only at" message; the parity row `chord-third-crossing-1893` (already a plain `refused` row — the verdict, not the text).
+
+**Sibling audit / cross-tool.** Analytic refuses the same sentence with `errThirdCrossing` (#1893, ADR-AG-271); its en text matches. 3-D: X8 (circle geometry not expected). Complex: not touched (its tree is held by open PRs this round).
+
+**Locks.** `src/app/__tests__/issue-1834-chord-third-crossing.test.ts` (the predicate, six spellings incl. the «⟨…⟩» case, English, studentText, the tangent and two-circles controls); a `humanize-error.test.ts` row; scenario `chord-third-crossing-1834`.
+
+**Behaviour change for a student:** «AC חותך את המעגל בנקודה E» with A and C on the circle is still refused, now saying «AC כבר חותך את המעגל ב-A וב-C — לישר אין נקודת חיתוך שלישית עם המעגל.» instead of calling AC a tangent.
