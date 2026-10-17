@@ -694,7 +694,12 @@ no substitution changes is unread. Exempt: a co-reference (shell) and a run righ
 «…במשולש SBC», «פירמידה SABC שבסיסה משולש ABC»). 3-D reads no compound, so the line is one clause, cut at the
 shortest prefix that reads the same (`cutAtReading`): a lost tail is `split-statements` (`err.splitStatements`,
 2-D's text) or, when the read part is a bare right triangle and the tail one of its vertices, `right-angle-vertex`
-(`err.rightAngleVertex`, the taught lines). An unread run with read labels after it joins `dropped-given`. The LLM
+(`err.rightAngleVertex`, the taught lines). An unread run with read labels after it joins `dropped-given`.
+A line `parse3` FAILS on whole (#2088, [ADR-3D-370](06b-decisions-3d.md#adr-3d-370)) reaches it through
+`readStatement3`'s `not-understood` branch (`compoundLostPart3`): the line is cut into clauses (`clausesOf3`, 2-D's
+`clausesOf` ported, after the shared `foldConjunctionSpacing`), and when every trailing clause reads alone and the head's
+own submit decision is exactly its lost-part note, that note is re-issued over the head's cut with the trailing
+clauses appended (`withTrailing3` → `lostPart3`): the taught list continues from (3), the parts list after the head's parts. The LLM
 lane (`decideSteps3`) is not re-read: its commands are the model's, not a reading of the utterance.
 
 **A role word the reading never read (#1904, [ADR-3D-317](06b-decisions-3d.md#adr-3d-317)).** `honestyRefusal3` asks
