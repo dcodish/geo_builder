@@ -13678,7 +13678,15 @@ export function normalizeUtterance(raw: string): string {
     // (a non-Hebrew character on each side) and to sit where a connective sits: before a hyphen, or
     // between two uppercase labels.
     .replace(/(?<![א-ת])ן(?=-)/g, 'ו')
-    .replace(/(?<=[A-Z]\d?\s)ן(?=\s*[A-Z])/g, 'ו');
+    .replace(/(?<=[A-Z]\d?\s)ן(?=\s*[A-Z])/g, 'ו')
+    // #2097 ([ADR-719](../../docs/06-decisions.md#adr-719)): the absolute-value spelling of a length, «|AB|», IS the
+    // length AB. It was stripped rule by rule (the sum, product, ordering and bound readers), so «|AB| + |AC| = 10»
+    // committed while «|AB| = 4», «|AB| = k», «|AB| = |AC|» and «|AB|:|AC| = 2:3» escalated — the ADR-405 "each rule
+    // hard-codes one spelling" class. Folded HERE, after the glyph fold, so every rule and every honesty gate reads
+    // one spelling. TWO uppercase labels only: «|z|», «|w|» (not 2-D's vocabulary) and a three-letter «|ABC|» keep
+    // their current path. Guarded against a doubled bar on either side, so a keyboard «AB || CD || EF» is never read
+    // as «|CD|».
+    .replace(/(?<!\|)\|\s*([A-Z]\d*)\s*([A-Z]\d*)\s*\|(?!\|)/g, '$1$2');
   // #185: number words before a degree word → digits, THEN the angle/arc word-equality → `=` (its value
   // lookahead needs the digits), THEN the shape-with-side appositive rewrite. All three are scoped (a
   // degree suffix / an angle-arc operand / an equilateral-sided shape), so nothing else is touched.

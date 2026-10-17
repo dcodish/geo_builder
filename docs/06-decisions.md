@@ -18223,3 +18223,27 @@ The kind words are the ones `circlesTangent` already reads. #2214's single kind 
 **Locks.** `src/app/__tests__/issue-2117-diagonal-height.test.ts` (the table, the prover's hits and non-hits, the three kinds × both diagonals, «AC הוא גובה», English, the controls); `humanize-error.test.ts` CASES gains the raw shape; scenario `diagonal-height-refused-2117`; parity row `diagonal-height-refused-2117`.
 
 **Behaviour change for a student:** «ריבוע ABCD» · «AC גובה» (and the rectangle, the rhombus, BD) now reads «…סותר את «ריבוע ABCD» … הסיבה: האלכסון AC אינו מאונך לאף צלע של הריבוע.» instead of «…סותר נתון קודם … הסיבה: AC ⟂ CB.». Still refused, as before.
+
+## ADR-719 — «|XY|» is the length XY, folded at the parse boundary (#2097)
+
+**Status:** accepted · 2026-10-17 · bug (P3, 2-D) · fix round #2304, stream G · branch `fix/2097-abs-length-spelling` · the [ADR-405](#adr-405) family (a spelling variant folds at the one boundary every rule reads)
+**Operator ruling (verbatim):** #2097, 2026-10-15 (decisions ballot, "Found work", Accept at P3) — *"2-D reads «|AB| = 4» and «|AB| = k» as «AB = 4» / «AB = k»"*.
+**Requirements:** [02](02-requirements.md) FR-IN-4i (new) · **Design:** [04](04-design.md) § "The bar spelling of a length, folded at the normalize boundary" · **LADDER stage:** none (a parser-boundary spelling fold; no engine, solver or ladder change)
+
+**Measured before** (`main` de7c221f, `decideDeterministic2D` after «משולש ABC», model mocked). «|AB| = 4», «|AB| = k», «|AB| = |AC|», «|AB|=2|AC|», «|AB| = √2», «|BC| = 2k», «|AB|:|AC| = 2:3» and, on «ריבוע ABCD», «|AC| = 5»: every one `escalate` (to the paid model). «|AB| + |AC| = 10» (`set-measure-sum`), «|AB| > |AC|» (`set-length-order`) and «|AB| < 5» (`set-length-bound`) committed. Analytic records all of them; 3-D records «|AB| = 4» and «|AB| = |AC|» and does not read «|AB| = k» (#2092).
+
+**The class (docs/17 §1).** *The bar spelling of a length is read rule by rule, not at the boundary.* Four rules strip «|…|» locally (the sum reader `parseMeasureSide`, `parseProductSide`, the product-term reader, `lengthOrder`'s `SEG`); the equality, value, letter-length and ratio rules do not, so the same length is a length in one slot and unreadable in the next.
+
+**Decision.** One fold in `normalizeUtterance`, after `foldGlyphs`: `/(?<!\|)\|\s*([A-Z]\d*)\s*([A-Z]\d*)\s*\|(?!\|)/g → '$1$2'`. Every rule and every honesty gate (they normalize the student's line themselves) read «AB». Scope: two uppercase labels, an optional digit index each; «|z|», «|w|» (not 2-D's vocabulary), a three-letter «|ABC|» and a doubled bar («AB || CD || EF») are untouched. The four per-rule strips stay (they also accept a lowercase pair, and the sum/product readers any bar; removing them would change those readings, which nothing ruled), each now redundant for the uppercase pair. No catalog row: the commands panel keeps teaching «AB = 4».
+
+**Why not a patch (docs/17 §2).** No rule and no input is special-cased: the reported «|AB| = 4» and «|AB| = k» are two rows of a fold every length slot inherits, including ones the report did not name (equality, ratio, radical, colon ratio) — the same class in other slots, inside the ruled outcome ("two spellings of one length").
+
+**Measured after.** Every "before" row commits exactly the commands its bar-less twin does («|AB| = 4» → `segment` + `set-distance 4`; «|AB| = k» → `measure-length`; «|AB| = |AC|» → `set-equal`; «|AB|=2|AC|» → `set-ratio 2`; «|AB|:|AC| = 2:3» → `set-ratio ⅔`; «|AC| = 5» on the square draws AC). The sum, order and bound rows are unchanged. «|AB|² = 8» escalates, as «AB² = 8» does.
+
+**Sibling audit / cross-tool.** Analytic already reads the bar spelling (its own boundary), but by [ADR-AG-200](06c-decisions-analytic.md#adr-ag-200) draws no segment for it, while 2-D now draws AB — a display difference for one plane sentence, raised to the operator on #2097 and not decided here. 3-D: «|AB| = k» is #2092 (open), recorded as a known gap on the new parity row. Complex: «|z|» is its modulus — a different tool, untouched.
+
+**Locks.** `src/parser/__tests__/issue-2097-abs-length.test.ts` (each bar spelling ≡ its twin through `decideDeterministic2D`; the sum/order/bound must-not-change rows; the fold's scope through `normalizeUtterance`); fixture `src/__tests__/fixtures/issue-2097-abs-length.geo.json` («משולש ABC · |AB| = 4 · |AC| = k», green + parser-drift net); parity rows `abs-length-2097`, `abs-length-var-2097` (3-D gap #2092).
+
+**Behaviour change for a student:** «|AB| = 4», «|AB| = k», «|AB| = |AC|» and every bar-spelled length now build at once exactly as «AB = 4», «AB = k», «AB = AC» do, instead of going to the AI.
+
+**Slow-tier goldens that may drift (batch's to re-record):** `decide-parity-1395-*` only if a case types a two-label bar pair in an equality/value/ratio slot (it would move from `escalate` to `commit`).

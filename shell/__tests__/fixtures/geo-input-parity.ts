@@ -257,6 +257,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2013': 'open',
   '#2047': 'open',
   '#2185': 'open', // #2199 (ADR-AG-282): 2-D drops the second carrier of an English per-point line and of a line list (#2185 removes these)
+  '#2092': 'open', // #2097 (ADR-719): 3-D does not read a bar-spelled length set to a letter («|AB| = k»)
   '#2260': 'open', // #2199 (ADR-AG-282): 3-D does not read a point stated on a list of lines
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
   '#2110': 'open', // #2101/#2100 (ADR-648/649): analytic does not read a radius letter's value or a radius ratio
@@ -1570,6 +1571,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #1855 (ADR-3D-355): two figures that share no point have a free relative size and orientation ──
   { id: 'two-triangle-lengths-1855', family: 'lengths', steps: ['משולש ABC', 'משולש DEF', 'DE = 2', 'AB = 5'], expect: 'builds', note: '3-D refused the second length givens-contradict before ADR-3D-355' },
   { id: 'two-triangle-parallel-1855', family: 'parallel-perpendicular', steps: ['משולש ABC', 'משולש DEF', 'AB ∥ DE'], expect: 'builds', note: '3-D refused claim-refuted before ADR-3D-355' },
+
+  // ── #2097 (ADR-719): «|XY|» is the length XY in every slot — 2-D read it only in the sum, ordering and bound rules ──
+  { id: 'abs-length-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = 4'], expect: 'builds', note: '2-D escalated it before ADR-719' },
+  { id: 'abs-length-var-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = k'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2092' }], note: '2-D escalated it before ADR-719' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
