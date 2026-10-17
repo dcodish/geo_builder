@@ -146,3 +146,20 @@ export function roleOperands(s: string): RoleOperand[] {
   }
   return out;
 }
+
+/**
+ * #2215 ([ADR-723](../../docs/06-decisions.md#adr-723)) — does the sentence's own wording give one of `pairs` to
+ * the `rival` role noun instead of `role`? The question a role rule asks before it distributes ITS noun over a
+ * label list: `diameter`'s plural reading paired every label run in «AB קוטר במעגל O ו-CD מיתר במעגל O» and
+ * drew CD — which the words call a CHORD — as a second diameter (an unstated special case, ADR-052). A pair the
+ * rival noun governs and `role`'s noun does not is another clause, so the rule declines and the
+ * clause-by-clause reading draws each pair as its own noun says. Read from {@link roleOperands} (the one
+ * registry), never a word test: «AB ו-CD קוטרים» (one noun over the list) still distributes.
+ */
+export function rivalRoleGoverns(s: string, role: RoleNoun, rival: RoleNoun, pairs: readonly (readonly [string, string])[]): boolean {
+  const ops = roleOperands(s);
+  const key = (a: string, b: string): string => [up(a), up(b)].sort().join('|');
+  const mine = new Set(ops.filter((o) => o.role === role).map((o) => key(o.a, o.b)));
+  const theirs = new Set(ops.filter((o) => o.role === rival).map((o) => key(o.a, o.b)));
+  return pairs.some(([a, b]) => theirs.has(key(a, b)) && !mine.has(key(a, b)));
+}
