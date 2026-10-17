@@ -18111,3 +18111,32 @@ The kind words are the ones `circlesTangent` already reads. #2214's single kind 
 **Locks.** `src/app/__tests__/issue-2193-merged-ring-restated.test.ts` (every "before" row in both locales, the BCDA / DCBA readings, English, no «already defined» anywhere, the side-5 commit, the `side`-carrying-command guard, the controls, the model never called); the three-noun rows of `shell/__tests__/fixtures/quad-noun-pairs.ts` lose their `gap: { '2d': 2193 }` (the meta-lock's "a gap that starts passing" check moves to a synthetic row); scenario `merged-ring-third-noun-restates-2193`.
 
 **Behaviour change for a student:** «ריבוע ABCD» after «מלבן ABCD» · «מעוין ABCD» (and every order, reading and sibling pair like it) answers «זה כבר קיים באיור — אין מה להוסיף.» instead of «'C' is already defined…»; «ריבוע ABCD שצלעו 5» there sets the side to 5 instead of being refused.
+
+## ADR-714 — Two circles on one centre are named by their role in the values panel: «המעגל החיצוני» / «המעגל הפנימי» (#2264)
+
+**Status:** accepted · 2026-10-17 · bug (P3, 2-D) · fix round #2304, stream B · branch `fix/2264-values-panel-circle-names` · **Amends** [ADR-552](#adr-552) (the circle-naming seam gains a role reference)
+**Requirements:** [02](02-requirements.md) FR-RV-8 — a concentric pair's rows read «רדיוס המעגל החיצוני» / «רדיוס המעגל הפנימי» · **Design:** [04](04-design.md) § valuesPanel seams (`circleRef` names a concentric pair by role) · **LADDER stage:** none (read-back only)
+**Cites** [ADR-244](#adr-244) (`set-radius-order` and the `innerOf` concentric-pair marker), [ADR-342](#adr-342) (the anonymous-centre token)
+
+**The report / ruling.** Operator, 2026-10-16 (round #2245, T21): «שני מעגלים בעלי מרכז משותף O» · «רדיוס מעגל חיצוני הוא 10» · «רדיוס מעגל פנימי 9» — *"the data panel needs a way to show different data for each circle since both are O"*. Ruling the same day, option A: *"2264 - A"* — the two circles are named by their role, «המעגל החיצוני» / «המעגל הפנימי».
+
+**Measured before** (`main` @ de7c221f, real `parse → replay → computeValues → valueRowText`). The panel printed «רדיוס O = 10», «שטח (O)», «היקף (O)», «רדיוס O = 9», «שטח (O)», «היקף (O)». The unnamed form («שני מעגלים בעלי מרכז משותף», both centres `@ctr-O`) collided the same way on its token; English input («two concentric circles with centre O» …) the same.
+
+**The class (docs/17 §1).** *A circle named by its centre's letter when another drawn circle shares that centre.* `circleRefs` (ADR-552) is the one seam the panel names circles through, and it keyed the name on the centre alone. The construction already records which of two same-centre circles is which: `set-radius-order` stamps `innerOf` on the inner circle only when the pair shares a centre (ADR-244 / ADR-304).
+
+**Decision.**
+1. **One seam, one new reference.** `CircleRef` gains `{ via: 'role'; role: 'outer' | 'inner' }`. `circleRefs` groups the drawn circles by centre; a centre shared by exactly two drawn circles, one of which is `innerOf` the other, names each by its role. Every other circle keeps the ADR-552 branches unchanged (a unique centre → its letter).
+2. **No invented role.** A shared centre with no recorded order, or three circles on one centre, keeps the old reference. The grammar measured produces neither: a second «מעגל שמרכזו O ורדיוסו 5» over «מעגל O ברדיוס 3» resolves to the same circle and is refused as a contradiction, and «שלושה מעגלים בעלי מרכז משותף O» does not parse. A size order between circles on different centres (`orderedBelow` only) is not a role.
+3. **Whole phrases.** `valueRowText` words a role row with whole keys (`values.radiusOuter` … `values.perimeterInner`, he + en), never «רדיוס {{c}}» with a Hebrew parameter, which the ADR-464 bidi post-processor would isolate and the row's LTR `<bdi>` would then lay out with «רדיוס» on the wrong side.
+
+**Measured after.** «רדיוס המעגל החיצוני = 10», «שטח המעגל החיצוני = 100π», «היקף המעגל החיצוני = 20π», «רדיוס המעגל הפנימי = 9», «שטח המעגל הפנימי = 81π», «היקף המעגל הפנימי = 18π»; English "radius of the outer circle" …; the unnamed-centre and English-input forms the same; a single circle O and two circles O, P unchanged.
+
+**Why not a patch (docs/17 §2).** Nothing keys on the reported letters or on the concentric-pair sentence: the seam reads the construction's own pair record, so every spelling that records the pair (Hebrew, English, a named or unnamed centre) is told apart the same way.
+
+**Out of scope — filed.** The plan's step 1 also named the violation sentences and notices. Those name circles by `circleName(id)` in `verify.ts` (the inner circle would print «מעגל O-2»), and routing them through the seam needs per-template wording («רדיוס מעגל {{circle}}» cannot take a role) — a student-visible change outside this plan's *What the student will see*. Filed as #2305 (`needs-operator`).
+
+**Sibling audit / cross-tool.** Analytic reads no `circleRefs` panel; 3-D and complex name no 2-D circles. `circleRefs` has no other consumer today.
+
+**Locks.** `src/__tests__/issue-2264-concentric-circle-names.test.ts` (the operator's lines, both locales, every row; English input; the unnamed centre; the controls; `circleRefs` — the role, a different-centre order is not one, three on a centre, a hidden circle on the centre); scenario `concentric-circle-names-2264`; the ADR-552 class lock (`values-panel-labels-1442.test.ts`) still green over every fixture.
+
+**Behaviour change for a student:** with two circles sharing a centre, the values panel names them «המעגל החיצוני» and «המעגל הפנימי» instead of «O» twice.

@@ -2040,3 +2040,7 @@ over all four (ADR-041).
 ### `merged-ring-third-noun-restates-2193` — «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD» answers «כבר קיים» (#2193, ADR-711)
 
 **Guards against:** a shape noun the ring already is, after a sibling merge made it so, refused with the engine's «'C' is already defined — it can't be redefined as something different» (the noun re-applied as a fresh shape whose derived corner collided). **Asserts** the report's first two lines build green and the third is a no-op through the submit gate. The matrix (every order, the BCDA / DCBA readings, rectangle + kite, parallelogram + kite in both orders, the four-noun chain, English, «ריבוע ABCD שצלעו 5» committing |AB| = 5, the side-carrying-command guard, the controls) is `src/app/__tests__/issue-2193-merged-ring-restated.test.ts`; the three-noun rows of `shell/__tests__/fixtures/quad-noun-pairs.ts` no longer carry a 2-D gap.
+
+### `concentric-circle-names-2264` — two circles on centre O are «המעגל החיצוני» / «המעגל הפנימי» in the values panel (#2264, ADR-714)
+
+**Guards against:** «שני מעגלים בעלי מרכז משותף O» · «רדיוס מעגל חיצוני הוא 10» · «רדיוס מעגל פנימי 9» printing «רדיוס O = 10» and «רדיוס O = 9» — two circles under one name (the operator's round #2245 T21 report). **Asserts** the three lines build green and the radius rows read «רדיוס המעגל החיצוני» = 10 and «רדיוס המעגל הפנימי» = 9. The matrix (every row in both locales, English input, the unnamed centre, the controls, the `circleRefs` unit rows) is `src/__tests__/issue-2264-concentric-circle-names.test.ts`.
