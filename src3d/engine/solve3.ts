@@ -827,14 +827,17 @@ export function solvePivot(
         }
         const d1 = sub3(p, vtx);
         const d2 = sub3(q, vtx);
-        const den = Math.max(norm3(d1) * norm3(d2), 1e-12);
-        out.push(dot3(d1, d2) / den - Math.cos((pin.deg * Math.PI) / 180));
+        // #1859 (ADR-3D-357): the residual is the ANGLE itself (radians), atan2(|d1×d2|, d1·d2) − θ₀ — uniform
+        // sensitivity from 0° to 180°. It was cos θ − cos θ₀, whose sensitivity sin θ vanishes at both ends: an
+        // accepted 1° solve was 0.0008° off (over the claim verifier's 0.001° at 19/24 seeds), and the drive
+        // toward 170°–179° sat beside the cosine's minimum. Exactly what `vertexAngleDeg` judges.
+        out.push(Math.atan2(norm3(cross3(d1, d2)), dot3(d1, d2)) - (pin.deg * Math.PI) / 180);
       } else if (pin.kind === 'seg-angle') {
-        // #909 — the two-segment angle. |cos| (not the signed cos `vangle` uses above): the two
-        // segments are independent, so which endpoint each was written from is arbitrary, and a
-        // signed target would make «BC'» and «C'B» state different things. |cos| is exactly what
-        // `verifyClaim`/`angle-seg-eq` measures. The kink at |cos| = 0 is harmless: LM minimises the
-        // SQUARE of this residual, and cos(deg) = 0 (a 90° given) sits at that square's smooth floor.
+        // #909 — the two-segment angle, UNDIRECTED (|u·w|, not the signed dot `vangle` uses above): the
+        // two segments are independent, so which endpoint each was written from is arbitrary, and a
+        // signed target would make «BC'» and «C'B» state different things. The undirected line angle is
+        // exactly what `verifyClaim`/`angle-seg-eq` measures. The kink at 90° is harmless: LM minimises
+        // the SQUARE of this residual, and near 90° that square is (π/2 − θ)² ≈ cos²θ, a smooth floor.
         const a1 = at(pin.a1);
         const b1 = at(pin.b1);
         const a2 = at(pin.a2);
@@ -845,8 +848,10 @@ export function solvePivot(
         }
         const u = sub3(b1, a1);
         const w = sub3(b2, a2);
-        const den = Math.max(norm3(u) * norm3(w), 1e-12);
-        out.push(Math.abs(dot3(u, w)) / den - Math.cos((pin.deg * Math.PI) / 180));
+        // #1859 (ADR-3D-357): in ANGLE space (radians), the line angle atan2(|u×w|, |u·w|) ∈ [0°, 90°] — the
+        // quantity `lineAngleDeg` judges. A |cos| residual has sensitivity sin θ, which vanishes at 0°, so an
+        // accepted solve left a 1° line angle further off than the verifier's 0.001° (refuted at 18/24 seeds).
+        out.push(Math.atan2(norm3(cross3(u, w)), Math.abs(dot3(u, w))) - (pin.deg * Math.PI) / 180);
       } else if (pin.kind === 'dot') {
         const d1v = c.vectors.get(pin.v1);
         const d2v = c.vectors.get(pin.v2);
@@ -1184,8 +1189,15 @@ export function solvePivot(
     return out;
   };
 
+  /** #1859: whether any candidate this call judged was a collapsed solid — gates the empty-pool open retry. */
+  let sawCollapse = false;
   /** The SOLID half of `degenerate` (#1735 split it out): a collapsed solid is not a figure. */
   const collapsed = (x: number[]): boolean => {
+    const v = collapsedSolid(x);
+    if (v) sawCollapse = true;
+    return v;
+  };
+  const collapsedSolid = (x: number[]): boolean => {
     // S3 (#378): NOT gated on `planeDrive` any more. A collapsed solid is not a figure whatever
     // given caused the collapse — the gate was a per-path proxy for the semantic question (the
     // ADR-3D-101 class, and the same shape as `scalePinned`'s exclusion list). It let a plane
@@ -1438,6 +1450,70 @@ export function solvePivot(
         if (pm(x) < EXACT && !ringCollapsedAt(x) && (mask !== null || !degenerate(x))) return { x, mirror };
       }
     }
+    // the open-figure retry only (the attribution's reduced system keeps its answer): see `edgeRepelledSolve`
+    return mask === null ? edgeRepelledSolve(chiral, plain, mirrored, invariantOnly, tail) : null;
+  };
+  /**
+   * #1859 (ADR-3D-357) — THE NEAREST ADMISSIBLE POINT TO THE SAMPLE CAN BE THE EDGE.
+   *
+   * Every anchored search above measures "near the seed's sample" in DIMS space, and for a stated angle
+   * that metric points at a collapse: «משולש ABC · ∠ABC = 170°» admits C anywhere on a ray from B, and a
+   * sample whose C lies behind that ray (any C over segment AB — most samples) has B ITSELF as its nearest
+   * admissible point. So every start slid C into B: the pool came back collapsed (`polygon-collapsed`,
+   * «… מתקיים רק אם המשולש ABC שטוח», which is false) or empty (`givens-contradict`) at 24 of 24 seeds,
+   * while any |BC| > 0 satisfies the given. A side driven to zero is the edge of the admissible set, not a
+   * place the givens chose — the #1854 drift (ADR-3D-332), met on the failure path.
+   *
+   * So the last attempt measures nearness where a collapse is FAR: in the LOGARITHM of every pairwise
+   * vertex distance of every declared solid, a coordinate in which a side driven to 0 sits at −∞. The givens
+   * are held hard (weight `HOLD`) while the log-distances pull toward the sample's, which picks the
+   * admissible figure whose proportions are nearest the sample's; the RELEASE on the givens' rows alone then
+   * closes the hold's last gap, so the anchor never decides whether the givens hold. Accepted only exact,
+   * with every declared ring open and no degenerate solid — a flatness the givens FORCE («AB = 5 · BC = 3 ·
+   * AC = 8») has no exact open figure, so it is still refused. Failure path only: a figure that builds today
+   * never reaches it.
+   */
+  const HOLD = 1e3;
+  const edgeRepelledSolve = (
+    chiral: boolean,
+    plain: (x: number[]) => number[],
+    mirrored: (x: number[]) => number[],
+    frozenGauge: boolean,
+    tail: number[],
+  ): { x: number[]; mirror: boolean } | null => {
+    const pairs: [Id, Id][] = [];
+    for (const s of c.solids) for (let i = 0; i < s.ids.length; i++) for (let j = i + 1; j < s.ids.length; j++) pairs.push([s.ids[i], s.ids[j]]);
+    if (pairs.length === 0 || coupled) return null;
+    const logDists = (dims: number[], riderTs?: ReadonlyMap<Id, number>): number[] | null => {
+      const pos = evalCanonical(dims, undefined, riderTs);
+      const out: number[] = [];
+      for (const [a, b] of pairs) {
+        const pa = pos.get(a);
+        const pb = pos.get(b);
+        if (!pa || !pb) return null;
+        out.push(Math.log(Math.max(norm3(sub3(pb, pa)), 1e-12)));
+      }
+      return out;
+    };
+    const ridersAt = (x: number[]) => (nRider > 0 ? new Map(riders.map((r, i) => [r.id, x[riderBase + i]])) : undefined);
+    const target = logDists(dims0, nRider > 0 ? new Map(riders.map((r) => [r.id, r.t0])) : undefined);
+    if (!target) return null;
+    const lift = (y: number[]): number[] => (frozenGauge ? [0, 0, 0, 0, 0, 0, 0, ...y] : y);
+    const drop = (x: number[]): number[] => (frozenGauge ? x.slice(7) : x);
+    const EXACT = 1e-20;
+    for (const mirror of chiral ? [false, true] : [false]) {
+      const fm = mirror ? mirrored : plain;
+      const pm = (x: number[]): number => fm(x).reduce((sum, v) => sum + v * v, 0);
+      const held = (x: number[]): number[] => {
+        const ld = logDists(x.slice(7, 7 + nDims), ridersAt(x));
+        return [...fm(x).map((v) => HOLD * v), ...(ld ? ld.map((v, k) => v - target[k]) : target.map(() => 10))];
+      };
+      const x0 = drop([0, 0, 0, 0, 0, 0, 0, ...dims0, ...tail]);
+      const h = leastSquares((y) => held(lift(y)), x0);
+      const x = lift(leastSquares((y) => fm(lift(y)), h.x).x);
+      const ringOpen = !collapsedRing({ dims: x.slice(7, 7 + nDims), ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((r, i) => [r.id, x[riderBase + i]])) } : {}) });
+      if (pm(x) < EXACT && ringOpen && !degenerate(x)) return { x, mirror };
+    }
     return null;
   };
   /**
@@ -1625,7 +1701,11 @@ export function solvePivot(
         if (primary >= 1e-10 || degenerate([0, 0, 0, 0, 0, 0, 0, ...r.x])) continue;
         if (!found || primary < found.primary) found = { x: r.x, primary };
       }
-      return found ? invResult(found.x, found.primary) : [];
+      if (found) return invResult(found.x, found.primary);
+      // #1859 (ADR-3D-357): every candidate collapsed a solid — a free side slid to the edge — so ask the
+      // open-figure retry whether an open exact figure exists before the empty pool reads as a contradiction
+      const reopened = sawCollapse ? openFigureRetry() : [];
+      return reopened.length > 0 ? invResult(reopened[0].x.slice(7), reopened[0].err) : [];
     };
     if (!best) return failed();
     const primary = pd(best.x);
@@ -2166,6 +2246,12 @@ export function solvePivot(
     // #1735 (ADR-3D-306): …and only then, the off-host candidates the acceptance sites discarded are
     // re-seated onto their hosts (the frozen retry's own recursive solve has already had this chance).
     for (const stage of reseatStages) stage();
+    // #1859 (ADR-3D-357): …and when a candidate was discarded as a collapsed solid, the open-figure retry
+    // (whose last attempt measures nearness where a collapse is far) before the pool reads as a contradiction
+    if (results.length === 0 && sawCollapse) {
+      const reopened = openFigureRetry();
+      if (reopened.length > 0) return reopened;
+    }
   }
   // #1499: …or it found figures that collapse a declared polygon's ring — keep only the open ones, or a
   // figure the frozen-dims retry finds open; with none, the pool is empty and marked (#1849, ADR-3D-310:

@@ -469,6 +469,19 @@ path** (`collectAll`), where a slide would move a discrete branch the sign/root 
 rows were measured and rejected: the 1e-4 gradient sits under LM's improvement floor (#518's lesson), so the
 dim crawls and the stalled iterations cost 2.9 s against 11 ms.
 
+**An angle residual is the angle, and a collapse is far from the sample** (#1859, [ADR-3D-357](06b-decisions-3d.md#adr-3d-357)).
+The `vangle` and `seg-angle` residuals are `atan2(|d1×d2|, d1·d2) − θ₀` (the line angle takes `|d1·d2|`) in
+radians — the quantity `vertexAngleDeg` / `lineAngleDeg` judge, with uniform sensitivity from 0° to 180°. A
+cosine residual's sensitivity is sin θ, so an accepted 1° solve missed the 0.001° claim tolerance. The
+open-figure retry (`openSolveOn(null)`, ADR-3D-310) ends with `edgeRepelledSolve`: the givens held at weight
+1e3 while the LOG of every declared solid's pairwise vertex distance pulls toward the sample's, then a release
+on the givens alone; accepted only exact, every declared ring open and no solid degenerate. Dims-space
+nearness points at a collapse when the admissible set is a ray from a vertex («∠ABC = 170°»: the nearest
+point to most samples is C = B); in log distances a side driven to 0 sits at −∞. The same retry also runs
+when a pool came back EMPTY after a candidate was discarded as a collapsed solid (`sawCollapse`), in both
+lanes, before the empty pool reads as a contradiction. Failure path only. `solidFaceCollapsed` (the #817
+preference) skips a face a stated vertex angle under its 0.02 sine makes thin.
+
 **The not-determined rule** (`sampledCarrierVerdict`, `store3.ts`): a failing claim that reads a sampled
 carrier (a free plane, a free line, the frame placement, a free point) is refused naming it, never
 `claim-refuted`. Two rows read only a `given: true` arbiter and answer `given-not-drivable`, the tool's limit

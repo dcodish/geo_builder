@@ -1260,6 +1260,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'flat-quadrilateral-lengths-1849', family: 'lengths', steps: ['מרובע ABCD', 'AB = 1', 'BC = 1', 'CD = 1', 'AD = 3'], expect: 'refused' },
   { id: 'thin-triangle-control-1849', family: 'lengths', steps: ['משולש ABC', 'זווית BAC = 3'], expect: 'builds', note: 'a thin triangle is still a triangle (ADR-413’s control)' },
   // end #1849
+  // #1859 (ADR-3D-357): a stated angle near 0° or 180° is a real, thin triangle — 3-D refused both before (claim-refuted / givens-contradict)
+  { id: 'thin-vertex-angle-1-1859', family: 'angles', steps: ['משולש ABC', '∠ABC = 1°'], expect: 'builds' },
+  { id: 'thin-vertex-angle-179-1859', family: 'angles', steps: ['משולש ABC', '∠ABC = 179°'], expect: 'builds' },
   // #1849 (ADR-W-115, operator ruling 2026-10-07): givens that force a DECLARED polygon flat are refused in every builder,
   // naming the statements — a flat figure is not a triangle. Analytic column (ADR-AG-247); the 2-D and 3-D streams close their gaps.
   { id: 'flat-polygon-1849-04', family: 'polygons', steps: ['מרובע ABCD', 'AB = 5', 'BC = 3', 'AC = 8'], expect: 'refused', knownGap: [{ product: '2d', issue: '#1858' }, { product: '3d', issue: '#1858' }], note: 'B on the diagonal AC: the quadrilateral has a straight corner' },

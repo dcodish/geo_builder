@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-17T10:55:35.961Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "∠ABC = 179°",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "B",
+          "b": "A"
+        },
+        {
+          "type": "segment3",
+          "a": "B",
+          "b": "C"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "vertex-angle-eq",
+            "vertex": "B",
+            "p": "A",
+            "q": "C",
+            "deg": 179
+          }
+        }
+      ]
+    }
+  ]
+}

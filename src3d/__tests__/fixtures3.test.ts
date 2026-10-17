@@ -357,6 +357,11 @@ const SEEDED: SeededCorpus = {
   // right-angled). The rings and the refusal with two triangles are asserted in issue-2235-shape-ref.test.ts.
   'definite-triangle-one-2235.geo3.json': ['משולש DEF', 'המשולש ישר זווית'],
   'indefinite-triangle-new-2235.geo3.json': ['משולש ABC', 'משולש ישר זווית'],
+  // #1859 (ADR-3D-357) — the rule-4 locks: a thin real triangle builds and verifies (before: «∠ABC = 1°» refused
+  // claim-refuted at 19/24 seeds, «∠ABC = 179°» refused givens-contradict at 24/24). The angle sweep, the drawn-angle
+  // tolerance and the refusals that stay are asserted in issue-1859-thin-angles.test.ts.
+  'thin-triangle-1deg-1859.geo3.json': ['משולש ABC', '∠ABC = 1°'],
+  'thin-triangle-179deg-1859.geo3.json': ['משולש ABC', '∠ABC = 179°'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

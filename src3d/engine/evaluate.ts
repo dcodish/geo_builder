@@ -3540,8 +3540,22 @@ export function meetsRequirements3(c: Construction3, seed: number): boolean {
  * a solid that names its own base («שבסיסה מקבילית») had no general-position guarantee at all.
  */
 export function solidFaceCollapsed(c: Construction3, positions: Positions3, tol = 0.02): boolean {
+  /**
+   * #1859 (ADR-3D-357): a face a STATED vertex angle makes thin is thin by the givens, not by the draw.
+   * «משולש ABC · ∠ABC = 179°» has every corner under the 0.02 sine at every seed (the stated corner, and
+   * the two it leaves under 1°), so the preference failed at all 200 seeds of the sweep and fell back to
+   * the first valid one after 1.5 s; «פירמידה SABCD · ∠ASB = 1°» paid 4 s. A preference that no seed can
+   * meet because the student stated it is not a preference about the drawing — the face is not judged.
+   */
+  const statedThin = [
+    ...c.scalarPins.flatMap((p) => (p.kind === 'vangle' ? [p] : [])),
+    ...c.claims.flatMap((q) => (q.type === 'vertex-angle-eq' ? [q] : [])),
+  ].filter((a) => Math.abs(Math.sin((a.deg * Math.PI) / 180)) <= tol);
+  const thinByStatement = (face: readonly Id[]): boolean =>
+    statedThin.some((a) => face.includes(a.vertex) && face.includes(a.p) && face.includes(a.q));
   for (const solid of c.solids) {
     for (const face of solid.faces) {
+      if (thinByStatement(face)) continue;
       const ring = face.map((id) => positions.get(id));
       if (ring.some((p) => !p)) continue; // unresolvable: nothing to judge, never a veto
       const r = ring as Vec3[];
