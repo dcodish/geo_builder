@@ -104,6 +104,12 @@ export type InputError =
    */
   | { key: 'reserved-constant'; detail: string; constant: ReservedConstant };
 
+/**
+ * #2268 (ADR-CX-084) — a NOTE about the line just typed, not a refusal: the statement is true and the
+ * figure already knew it, so nothing was recorded. 2-D's noop sentence; `detail` is the student's line.
+ */
+export type InputNote = { key: 'already-known'; detail: string };
+
 /** Save format (suffix `-complex.json`, the per-product convention): the SOURCE LINES in
  * order — loading replays them through the real parse path, so a saved session doubles as
  * a parser-drift net (the fixtures-first idea). */
@@ -166,6 +172,8 @@ interface ComplexState {
   seed: number;
   view: 'cart' | 'polar';
   lastError: InputError | null;
+  /** #2268 — the last line added nothing (already known); shown as a notice, cleared by the next step */
+  lastNote: InputNote | null;
   /** The load audit (ADR-242, via shell/save): what the last load could NOT restore — the report
    *  the App shows so a dropped line is never silent. Null = nothing to report. */
   loadAudit: LoadAudit<InputError> | null;
@@ -192,6 +200,7 @@ interface ComplexState {
   undo: () => void;
   redo: () => void;
   setError: (e: InputError) => void;
+  setNote: (n: InputNote) => void;
   setLoadAudit: (a: LoadAudit<InputError> | null) => void;
   resetSession: () => void;
   restoreView: (v: {
@@ -230,13 +239,14 @@ export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
   toggleDisplay: (index) => set(({ display }) => ({ display: toggleDisplayMode(display, String(index)) })),
   setDisplay: (display) => set({ display }),
   replaceLine: (index, line, seed) =>
-    set(({ lines }) => ({ lines: lines.map((l, i) => (i === index ? cleanLine(line) : l)), seed, lastError: null })),
+    set(({ lines }) => ({ lines: lines.map((l, i) => (i === index ? cleanLine(line) : l)), seed, lastError: null, lastNote: null })),
   recordDisabledLine: (line) =>
     set(({ lines, disabled }) => ({ lines: [...lines, cleanLine(line)], disabled: [...disabled, lines.length] })),
   freePos: {},
   seed: 0,
   view: 'cart',
   lastError: null,
+  lastNote: null,
   loadAudit: null,
 
   // a removal SHIFTS the disabled indexes (and the chip choices) above it — they name positions, not texts
@@ -256,8 +266,8 @@ export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
   // OLD configuration and are released (the sibling "show another configuration" semantics)
   nextConfig: () => set(({ seed }) => ({ seed: seed + 1, freePos: {} })),
   clearAll: () =>
-    set({ lines: [], queries: [], name: '', disabled: [], display: {}, freePos: {}, seed: 0, lastError: null, loadAudit: null }),
-  clearError: () => set({ lastError: null }),
+    set({ lines: [], queries: [], name: '', disabled: [], display: {}, freePos: {}, seed: 0, lastError: null, lastNote: null, loadAudit: null }),
+  clearError: () => set({ lastError: null, lastNote: null }),
 
   serialize: () => {
     const { lines, queries, freePos, seed, view, name, disabled, display } = get();
@@ -277,11 +287,12 @@ export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
   },
 
   recordLine: (line, seed) =>
-    set(({ lines }) => ({ lines: [...lines, cleanLine(line)], seed, lastError: null })),
-  setError: (lastError) => set({ lastError }),
+    set(({ lines }) => ({ lines: [...lines, cleanLine(line)], seed, lastError: null, lastNote: null })),
+  setError: (lastError) => set({ lastError, lastNote: null }),
+  setNote: (lastNote) => set({ lastNote, lastError: null }),
   setLoadAudit: (loadAudit) => set({ loadAudit }),
   resetSession: () =>
-    set({ lines: [], queries: [], name: '', disabled: [], display: {}, freePos: {}, seed: 0, lastError: null, loadAudit: null }),
+    set({ lines: [], queries: [], name: '', disabled: [], display: {}, freePos: {}, seed: 0, lastError: null, lastNote: null, loadAudit: null }),
   restoreView: ({ freePos, seed, view, name }) => set({ freePos, seed, view, ...(name !== undefined ? { name } : {}) }),
 
   /**
@@ -290,11 +301,11 @@ export const useComplexStore = create<ComplexState>()(temporal((set, get) => ({
    */
   undo: () => {
     useComplexStore.temporal.getState().undo();
-    set({ lastError: null });
+    set({ lastError: null, lastNote: null });
   },
   redo: () => {
     useComplexStore.temporal.getState().redo();
-    set({ lastError: null });
+    set({ lastError: null, lastNote: null });
   },
 }), {
   /**

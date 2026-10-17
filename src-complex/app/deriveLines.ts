@@ -42,7 +42,15 @@ import { linearize } from '../solve/logpolar';
 import { type ExpVec, eq as modEq, mul as modMul, pow as modPow } from '../value/modulus';
 import { type Angle, add as angAdd, scale as angScale, sub as angSub } from '../value/angle';
 import { isInt, rat } from '../value/rational';
-import { type Derived2, type FoldInput, type ResolvedSelection, type Untranslated, foldConstraints } from '../replay/derive2';
+import { type Derived2, type FoldInput, type ResolvedSelection, type Untranslated, entailedBy, foldConstraints } from '../replay/derive2';
+
+/**
+ * #2268 (ADR-CX-084) — does `raw`, read after `lines`, add nothing the exact solve does not already
+ * know? Both lists are lowered in order (a second mention of a name is a given, ADR-CX-005), and the
+ * fold's own exact solve decides — `entailedBy`, seed-free.
+ */
+export const lineEntailed = (lines: readonly string[], raw: string): boolean =>
+  entailedBy(lowerLines(lines), lowerLines([...lines, raw]));
 
 /**
  * Fold the student's LINES through the v2 parser and the exact solver.
