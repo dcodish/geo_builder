@@ -143,6 +143,8 @@ const collapseFields = (f: Derivation['faults'][number]) =>
             ? { shape: f.shape }
             : f.code === 'diagonal-is-side' || f.code === 'diagonal-none-here'
               ? { polygon: f.polygon, pair: f.pair }
+              : f.code === 'bisector-is-side' // #2115 (ADR-AG-299)
+              ? { pair: f.pair, vertex: f.vertex, polygonKind: f.polygonKind }
               : // #1893 (ADR-AG-271) — a third crossing: the line as written and the two points it already crosses at.
                 f.code === 'third-crossing'
                 ? { line: f.line, a: f.a, b: f.b, curve: f.curve }
@@ -316,8 +318,10 @@ function decideOnce(
      * read; a rest of labels it already carries, with no word that says anything, is the part that was not.
      */
     if (parsed.code === 'not-handled') {
-      const lost = declinedPart(line, (prefix) => {
-        const k = decideOnce(prefix, lines, seed, current).kind;
+      const lost = declinedPart(line, (piece, before) => {
+        // #1947 (ADR-AG-301) — a further piece is asked in the figure the prefix (and the pieces before it) make
+        const held = before.length ? [...lines, ...before] : lines;
+        const k = decideOnce(piece, held, seed, before.length ? derive(held, seed) : current).kind;
         return k === 'record' || k === 'already-known' || k === 'already-follows';
       });
       if (lost) return lostPartRefusal(line, lost);

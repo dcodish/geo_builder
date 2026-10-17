@@ -1281,10 +1281,12 @@ export type Command =
   // nothing to drive: the givens verifier flags a violating config (figure.v.circlesDisjoint /
   // figure.v.circleContained), so `meetsRequirements` (sampler / "show another") skips it; apply only
   // improves the DEFAULT (re-seats a free centre / free radius seed onto the stated side).
-  | { type: 'set-circle-position'; relation: 'disjoint' | 'contained' | 'any'; a: Id; b: Id; variant?: number }
+  | { type: 'set-circle-position'; relation: 'disjoint' | 'contained' | 'any'; a: Id; b: Id; variant?: number; admits?: CirclePositionCase[] }
   // relation 'any' (bare «שני מעגלים», #196 Am.): the mutual position is UNSTATED — a cyclable VARIANT
   // (0 intersecting / 1 disjoint / 2 contained) "show another configuration" steps through (ADR-052/M4);
   // no requirement is recorded, apply only seats the default per variant.
+  // `admits` (#2200, ADR-712): the cases the SENTENCE leaves open, in variant order, written by the reading — absent
+  // means all three. «שני מעגלים ברדיוסים שווים» writes ['meet', 'disjoint']: equal circles cannot nest (M4).
   // A COMMON tangent's configuration record (#197): the tangent touching `circle1` at `a` and `circle2`
   // at `b`. `kind` (when the student said «חיצוני»/«פנימי» / external/internal) is a REQUIREMENT — the
   // two centres must lie on the SAME side of line a-b (external) or OPPOSITE sides (internal); unstated ⇒
@@ -1433,6 +1435,9 @@ export interface RoleSideBinding {
 /** What the parser produces and a `Fact` stores: engine commands plus the symbolic layer. `roleSide` (#1810,
  *  ADR-596): the side a role noun («הבסיס», «היתר», «השוק») was resolved to at parse time, re-resolved by the
  *  replay fold against the configuration in force — see `engine/roleSides.ts`. The engine ignores it. */
+/** One mutual position of an unstated two-circle pair (#196 Am.; #2200 `admits`): crossing, apart, one inside the other. */
+export type CirclePositionCase = 'meet' | 'disjoint' | 'contained';
+
 export type AnyCommand = (Command | SymbolicCommand) & { consumed?: Consumed; roleSide?: RoleSideBinding };
 
 /**

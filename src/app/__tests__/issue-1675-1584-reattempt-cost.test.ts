@@ -97,7 +97,7 @@ describe('#1675 — the operator\'s refusals cost one failed solve, not six (exe
 });
 
 describe('#1584 — the refusals the round measured, bounded', () => {
-  it('«רבע מעגל CAB»: ≤ 3.1M executed (was 8.72M), the same refusal', async () => {
+  it('«רבע מעגל CAB»: ≤ 3.2M executed (was 8.72M), the same refusal', async () => {
     clearReplayCaches();
     const cold = await measure(RIGHT_15_10, 'רבע מעגל CAB');
     const warm = await measure(RIGHT_15_10, 'רבע מעגל CAB');
@@ -106,7 +106,8 @@ describe('#1584 — the refusals the round measured, bounded', () => {
     expect(warm.note).toBe(cold.note);
     // The plan aimed at ~2.5M; the re-attempt cap cannot sit below the most expensive SUCCESSFUL re-attempt the
     // calibration sweep measured (511k), so two cut re-attempts at 750k each remain (ADR-583, measured 3.03M).
-    expect(cold.executed).toBeLessThanOrEqual(3_100_000);
+    // ADR-717 (#2118) adds one failure-path multi-start for the driven shape scalar: 3,032,084 → 3,116,119.
+    expect(cold.executed).toBeLessThanOrEqual(3_200_000);
   }, 240_000);
 
   /**

@@ -891,7 +891,7 @@ export function warmStartCarriers(to: Construction, from: Construction): Constru
  * vertex) and height (a perp-offset dist) solve together. Works in normalised coordinates.
  */
 /** #1602 (ADR-557): how often the joint optimizer ran — the operation-count lock's probe (never time). */
-export const drivenSolveStats = { joint: 0 };
+export const drivenSolveStats = { joint: 0, shapeRescue: 0 };
 
 function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construction {
   drivenSolveStats.joint++;
@@ -1001,6 +1001,32 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
       }
       ki += s.n;
     }
+    // The binding-aware Gauss-Seidel sweep over `rs` (each ranged carrier argMin'd on its OWN constraint, the
+    // others held), from the seed. Shared by the bounded-carrier restarts below and the shape-scalar rescue
+    // (#2118, ADR-717).
+    const bindingSweep = (rs: { ui: number; lo: number; hi: number; own?: Constraint }[]): number[] => {
+      const bindSeed = seedU.slice();
+      for (let iter = 0; iter < 8; iter++) {
+        let moved = false;
+        for (const { ui, lo, hi, own } of rs) {
+          if (!own) continue; // a recruited free vertex drives no constraint — skip the Gauss-Seidel sweep
+          const ownResid = (t: number): number => {
+            const r = evaluateCore(place(bindSeed.map((x, j) => (j === ui ? t : x))), { skipConstraints: true });
+            if (!r.ok) return Infinity;
+            for (const id of constraintRefs(own)) if (!r.positions.has(id)) return Infinity;
+            const v = residual(own, (id) => r.positions.get(id)!);
+            return isFinite(v) ? Math.abs(v) : Infinity; // a degenerate root (collinear NaN at a collapsed ray) is skipped
+          };
+          const v = argMin(ownResid, lo, hi);
+          if (Math.abs(v - bindSeed[ui]) > 1e-9) {
+            bindSeed[ui] = v;
+            moved = true;
+          }
+        }
+        if (!moved) break;
+      }
+      return bindSeed;
+    };
     // When bounded parametric carriers are present, two extra steps ported from the former coupled-param
     // solver (R5 Pass 2): (1) NEAR-FIRST — a local solve from the current seed, returned if valid, so a
     // figure needing only a small reshape keeps its current (e.g. convex cyclic-quad) configuration instead
@@ -1034,27 +1060,7 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
       // `cost` pulls D toward both and satisfies neither (it returns the seed). Solving D on its OWN constraint
       // (line AC, ignoring E) then E on its own (line DB, with D placed) recovers the exact sequential solution.
       // For genuinely coupled systems this may not converge — it's then just one more restart the search vets.
-      const bindSeed = seedU.slice();
-      for (let iter = 0; iter < 8; iter++) {
-        let moved = false;
-        for (const { ui, lo, hi, own } of ranges) {
-          if (!own) continue; // a recruited free vertex drives no constraint — skip the Gauss-Seidel sweep
-          const ownResid = (t: number): number => {
-            const r = evaluateCore(place(bindSeed.map((x, j) => (j === ui ? t : x))), { skipConstraints: true });
-            if (!r.ok) return Infinity;
-            for (const id of constraintRefs(own)) if (!r.positions.has(id)) return Infinity;
-            const v = residual(own, (id) => r.positions.get(id)!);
-            return isFinite(v) ? Math.abs(v) : Infinity; // a degenerate root (collinear NaN at a collapsed ray) is skipped
-          };
-          const v = argMin(ownResid, lo, hi);
-          if (Math.abs(v - bindSeed[ui]) > 1e-9) {
-            bindSeed[ui] = v;
-            moved = true;
-          }
-        }
-        if (!moved) break;
-      }
-      extraRestarts.push(bindSeed);
+      extraRestarts.push(bindingSweep(ranges));
     }
     // Nearest basin (regularised search from the seed) + the grid-informed seed + cardinal restarts (each DOF
     // pushed by a range of magnitudes in normalised units); polish on the residual through several decades so
@@ -1087,6 +1093,31 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     if (!best.ok || b0 > 0) {
       const retry = run(regCostB);
       if (retry.ok && barrierAt(retry.u) < b0) best = retry;
+    }
+    // THE SHAPE-SCALAR BRACKET RESCUE (#2118, [ADR-717](docs/06-decisions.md#adr-717) — ADR-071's radius
+    // bracket, extended). A driven SHAPE SCALAR (scaled-offset k, perp-offset dist, rotated angle) is unbounded,
+    // so the searches above reach its root only within the near solve and the cardinal restarts (u ± 0.5…2): a
+    // sampled configuration whose root lies farther away failed although a solution exists. Failure path only —
+    // a solve that succeeded above never reaches this, so every green figure is bit-identical. Each scalar gets
+    // a wide bracket (the lower bound keeps k and dist off the collapsed root at 0), the binding-aware sweep
+    // seeds one more multi-start from it, and the same `acc` judges the result.
+    if (!best.ok) {
+      const shapeRanges: { ui: number; lo: number; hi: number; own?: Constraint }[] = [];
+      let si = 0;
+      for (const s of specs) {
+        const car = carrierList.find((o) => o.id === s.id) as (GeoObject & { solve?: { constraint: Constraint } }) | undefined;
+        const own = car?.solve?.constraint;
+        const sc = s.scale[0];
+        if (own && car?.kind === 'scaled-offset') shapeRanges.push({ ui: si, lo: 0.05 / sc, hi: Math.max(10, 4 * Math.abs(car.k)) / sc, own });
+        else if (own && car?.kind === 'perp-offset') shapeRanges.push({ ui: si, lo: 0.05 / sc, hi: Math.max(5 * span, 4 * Math.abs(car.dist)) / sc, own });
+        else if (own && car?.kind === 'rotated') shapeRanges.push({ ui: si, lo: -180 / sc, hi: 180 / sc, own });
+        si += s.n;
+      }
+      if (shapeRanges.length > 0) {
+        drivenSolveStats.shapeRescue++;
+        const u = multiStartSolve(bindingSweep([...ranges, ...shapeRanges]), [], 0.3, regCost, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, acc);
+        if (acc(u)) best = { u, ok: true };
+      }
     }
     return { result: place(best.u), ok: best.ok };
   };

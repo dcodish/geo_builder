@@ -55,13 +55,22 @@ are the lexical half and the reader of `evalRadical`, defined side by side, so a
 one the reader values. Never `+m[n]`: the decimal-only `NUM`/`UNUM` in a magnitude slot is how «AD = √7»
 refused while «|AD| = √7» built. `normalize3` folds `sqrt` / `\sqrt{…}` to `√`, so the atom only ever sees
 the glyph. The honesty gate (`droppedGivenNumbers3`) values a radical with the same exported `RADICAND` and
-`evalRadical`, and keeps a radicand's own parentheses. The distance, `A = (…)`, ratio and solid-size slots still
-take decimals until the operator rules on them. Angles are degrees and stay `ANGLE_VAL`.
+`evalRadical`, and keeps a radicand's own parentheses. The distance slot (`distanceGiven`) matches `MAG` and
+reads it with `magValue` too, and the `A = (…)` claim (`coordsClaim`) composes from the tuple-component atom
+`VAL` and reads it with `literalValue`, the pair `A(…)` reads with (#2081,
+[ADR-3D-362](06b-decisions-3d.md#adr-3d-362)). The ratio and solid-size slots still take decimals until the
+operator rules on them. Angles are degrees and stay `ANGLE_VAL`.
 The revolution solid's size slots (`RADIUS_SLOT` / `HEIGHT_SLOT`, #2079,
 [ADR-3D-340](06b-decisions-3d.md#adr-3d-340)) match the whole `MAG` value, anchored (`SIZE_VALUE`), so no
 prefix of a number is ever taken, and `readSizeSlot` reads only a plain decimal. A fraction or root there is
 UNREAD: the rule declines and flags it, and after every rule has declined `parse3` returns
-`solid-size-unread`, which the store words as apply's own `given-not-drivable` size refusal. The gate values a
+`solid-size-unread`, which the store words as apply's own `given-not-drivable` size refusal. Every other size
+form reaches the same refusal (#2076, [ADR-3D-363](06b-decisions-3d.md#adr-3d-363)). The size nouns are one
+vocabulary, `lexicon/revolutionSize3.ts`: inside a declaration, a size clause whose noun is not a slot
+(`UNREAD_SIZE_CLAUSE`: «שקוטרו», «ויוצרו», «ונפחו», "slant height") flags the solid before the slots are read; on its
+own line, `revolutionSizeLine` (after the volume/area claim rules) reads «<size noun> (של)? ה<solid> (הוא|=)?
+<value>» and its English mirror and only RECORDS the solid, so it never claims a line another rule reads. A
+volume/area claim on a free-size solid is apply's same size refusal; `free-size-claim` is retired. The gate values a
 fraction by its value, or by numerator AND denominator together (the ratio's `p`/`q`), never by one part alone.
 
 **An angle written in radians is refused** (#1837, [ADR-W-142](06w-decisions-workspace.md#adr-w-142)). `readStatement3` asks `findRadianAngle` (`shell/radianAngle.ts`) right after `findProofTarget` and answers `{ code: 'radian-angle' }` — `guided` in `STORE_CATEGORY3`, worded `err.radianAngle` (2-D's sentence) — so «∠ABC = π» is no longer an angle mark labelled π and the other spellings never reach the model.
@@ -381,7 +390,10 @@ something, and the number gate ignores the digit in a command's `type` name.
 «x_B = 3» is «B(3, ·, ·)» (analytic's ADR-AG-042 identity): `componentGiven` lowers it to a `point3` whose
 other components are null with no `syms` — an existing id takes the M1 pin and the `coords-eq` claim, a new
 id is the ADR-3D-094 `partial` point. One frame table, `COMPONENT_FRAMES`, is read by the value tail, the
-sign tail (formerly `signGiven`) and the ask head (`componentAskOf`). The answer is `dataView`'s per-axis
+sign tail (formerly `signGiven`) and the ask head (`componentAskOf`). Its axis letter is lowercase; an
+uppercase one is folded once in `normalize3` (`SUB_AXIS_FIRST3` / `SUB_AXIS_LAST3`, the ADR-AG-274 shape:
+a label after the `_`, or the axis after a label's `_`; a digit subscript is a label and stays), #2081,
+[ADR-3D-362](06b-decisions-3d.md#adr-3d-362). The answer is `dataView`'s per-axis
 decision (`pointComps`, beside `pointCoords`); a `partial` point's stated components are placed absolutely.
 
 ### Who may introduce a point: the drawing registers (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253))
@@ -535,6 +547,8 @@ without the rider rows; if the ring opens, an incidence invented the collapse, a
 `collapse: { ring, riderKeys }` reaches `pivot.collapse`, where `derive3` refuses `polygon-collapsed`
 (`err.polygonCollapsed`).
 
+**The same conflict stated about an existing point** (#1847, [ADR-3D-361](06b-decisions-3d.md#adr-3d-361)). When the incidence is stated last, about a point that already exists («M אמצע BC · M על AB»), it is a `collinear3` claim, not a rider. A refuted `collinear3` claim on a figure with a `FLAT_SOLID_KINDS` solid and free dims (`membershipCollapse` in `derive3`, after `sampledCarrierVerdict`) is re-resolved once with the pin it states (`mutual` coincident lines a–b, a–c); if that pivot comes back empty with a non-solid `collapse` record, the claim is refused `polygon-collapsed` (not forced), naming the statements that first placed the claim's points off the ring. Otherwise it stays `claim-refuted`.
+
 **A declared polygon collapsed is refused, whatever forced it** (#1849, ADR-3D-310, ADR-W-115).
 `settleFlatRings` (formerly `preferUncollapsed`) keeps solutions with every declared ring open, then tries
 the frozen-dims retry and the **open-figure retry** (`openSolveOn(null)`, passing `degenerate`); with
@@ -659,6 +673,18 @@ predicate's `quad` row, no longer a kind test). A parse's
 LLM lane collects them from every model line. A new
 branch belongs in the decision; a parity lock replays recorded sequences.
 
+**The model lane keeps every shape and role word (#1906, [ADR-3D-364](06b-decisions-3d.md#adr-3d-364)).**
+`decideSteps3` passes `lane: 'model'` through `decideCommands3` and `honestyRefusal3` to `lostGivens3`, which then adds
+`droppedPropertyWords3` (`src3d/parser/propertyWords3.ts`) and merges its items first (`mergeWordItems`, shared). The
+member finds the student's property words with the shared reader (`shell/llm/honestyCore.ts` `propertyWords`,
+[ADR-W-144](06w-decisions-workspace.md#adr-w-144)), vetoed by `readsWord3` (the declaration vocabulary, qualifiers,
+construct and neutral words), and asks per occurrence: a SHAPE word asks the owning gates (`droppedShapeNoun3`,
+`droppedShapeAdjective3`) of the line spelt right against the same line without the word; a role word needs its own
+family (altitude: `altitude-foot`, `tetra-altitude`, `height-to-face`, a ⟂ to a plane, `cos-angle` 0, a `height` field;
+median: `point-on-segment3` at ½, `centroid3`, `midpoint-auto`, an equal pair; bisector: `bisector-ray` / `-dir` /
+`-point` or an angle equality); an inscription verb needs the `circle3` kind `statedCircleDirection3` (the grammar's
+`circleContains3`) gives the student's line. The deterministic lane is unchanged.
+
 **A part the reading never read (#1888, [ADR-3D-316](06b-decisions-3d.md#adr-3d-316)).** On the deterministic lane
 (`decideSubmit3` → `decideCommands3` with `readExtent`, and the ✎ `replaceFact`) the honesty verdict
 `honestyRefusal3` runs `lostGivens3` plus `unreadParts3` (`src3d/store/unreadParts3.ts`), the 3-D member over
@@ -725,6 +751,12 @@ Vertex arcs are ONE map keyed by wedge — the vertex plus its two ray DIRECTION
 (`rightAngles.ts`, the knee's own answer), on its ≤ 90° side, and is absent for skew or off-ink pairs. A
 stated value is painted only where the verifier's measure holds (ADR-3D-290, #1592). `wedgeArc` is the one
 arc geometry; its radius is `min(ARC_PX, ARM_FRAC × shortest PROJECTED arm) / k` (ADR-3D-229).
+
+**The knee lane's vertex ([ADR-3D-360](06b-decisions-3d.md#adr-3d-360)).** A stated segment pair's knee
+needs both `meetingPoint` (the arms genuinely meet — honesty) and `namedVertexOf` (the facts name the
+meeting: a shared endpoint, or a `seg-cross` point defined on exactly those two segments, read from
+`c.points`, never from positions). An unnamed crossing draws no knee; the arc lane keeps `meetingPoint`
+alone. A pair recorded from two named vectors (`SegPair.viaVectors`) keeps the crossing knee (#2093).
 
 **One dihedral geometry ([ADR-3D-264](06b-decisions-3d.md#adr-3d-264)).** `dihedralGeometry`
 (`render/dihedral.ts`) gives the foot on the seam and two unit arms ⟂ to it, oriented by

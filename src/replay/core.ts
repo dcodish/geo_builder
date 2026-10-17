@@ -17,7 +17,8 @@ import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint
 import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { NOT_CYCLIC_VS, collinearCircleImpossibility, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
-import { equalInternalTangency } from '@/engine/radiusFeasibility';
+import { DIAGONAL_HEIGHT_VS, diagonalHeightError, diagonalHeightImpossibility } from '@/engine/heightFeasibility';
+import { EQUAL_NESTED_CANNOT_HOLD, equalNestedPair, type NestedRelation } from '@/engine/radiusFeasibility';
 import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
@@ -740,8 +741,6 @@ export const OVER_CONSTRAINED_VS = /^over-constrained: (.+) cannot hold(?: \[vs 
 const RADIUS_RELATION_DESC = /^radius\(([^()]+)\) = \S+ · radius\(([^()]+)\)$/;
 /** #2080 (ADR-645): `oneCommonPointError` — a second crossing of two circles with one common point, untagged. */
 const ONE_COMMON_POINT = /^over-constrained: (\S+) coincides with (\S+) cannot hold$/;
-/** #2239 (ADR-692): stage 0a's equal-radii internal tangency — #2119's restated-size shape, untagged. */
-const RADIUS_CANNOT_HOLD = /^over-constrained: radius of (\S+) = .+ cannot hold$/;
 /**
  * #1849 ([ADR-602](docs/06-decisions.md#adr-602)) — a DECLARED polygon the step would flatten
  * (`collapsedPolygonError`, step.ts), with the same optional `[vs #<fact index>]` tail. Group 1 is the
@@ -980,7 +979,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       if (!f.enabled) continue;
       ei++;
       const r = measureRestatement(f.cmd, prior, symtab);
-      const st = r && (f.cmd.type === 'measure-angle' || f.cmd.type === 'measure-length') ? measureRestatementStatus(f.cmd, r, symtab) : null;
+      const st = r && (f.cmd.type === 'measure-angle' || f.cmd.type === 'measure-length' || f.cmd.type === 'angle-alias') ? measureRestatementStatus(f.cmd, r, symtab) : null;
       if (r && st) {
         tailed(f, priorAt[r.at], st);
         continue;
@@ -1553,6 +1552,17 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
         claimDefined();
         continue;
       }
+      // #2117 (ADR-718), stage 0: a two-vertex height none of whose sides it can be a height to, by theorem — a
+      // diagonal of a ring declared a square, rectangle or rhombus. Read on the fact's own `altitude-choice` (the
+      // engine sees only one option's lowering), so the refusal is the statement's, not its first option's.
+      const noSide = diagonalHeightImpossibility(cur, f.cmd);
+      if (noSide) {
+        status[f.id] = diagonalHeightError(noSide);
+        rigid.add(f.id); // a theorem on the declared kind: never waiting for givens
+        failedWith.set(f.id, cur);
+        claimDefined();
+        continue;
+      }
       // TRANSACTIONAL — a fact's lowering is ALL-OR-NOTHING ([ADR-337](docs/06-decisions.md#adr-337)).
       // ONE fact can lower to MANY engine commands (every macro: `inscribe` ADR-262, `shape-variant`
       // ADR-138, the named shapes ADR-110, regular polygon ADR-111, common tangent ADR-239, the concentric
@@ -1627,6 +1637,10 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
           continue;
         }
         if (lostDefinition(fi, engineCmds)) continue;
+        if (diagonalHeightImpossibility(cur, f.cmd)) {
+          failedWith.set(f.id, cur); // #2117: still refuted by the theorem on this figure
+          continue;
+        }
         const r = attemptFact(cur, engineCmds);
         if (r.ok) {
           cur = r.construction;
@@ -1919,6 +1933,25 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     }
   }
   /**
+   * #2117 ([ADR-718](docs/06-decisions.md#adr-718)) — the same provenance for a diagonal called a height of a ring
+   * declared a square, rectangle or rhombus: the other side is the statement that DECLARED the ring (the polygon's
+   * `ownerByObjId`), read from the fold, never searched for — the drop-one search's removal of «ריבוע ABCD» removes
+   * the letters themselves, so it could name nothing.
+   */
+  if (attribute && hoistDepth === 0) {
+    for (const f of failedFacts) {
+      const st = status[f.id];
+      if (typeof st !== 'string') continue;
+      const m = DIAGONAL_HEIGHT_VS.exec(st);
+      if (!m || m[4] !== undefined) continue;
+      const poly = cur.objects.find((o) => o.kind === 'polygon' && o.vertices.join('') === m[3]);
+      const declared = poly ? ownerByObjId.get(poly.id) : undefined;
+      if (declared === undefined || !facts[declared]?.enabled || groupKey(facts[declared]) === groupKey(f)) continue;
+      const tagged = `${st} [vs #${declared}]`;
+      for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
+    }
+  }
+  /**
    * #2080 / #2083 ([ADR-645](docs/06-decisions.md#adr-645)) — the same provenance for a second crossing of two
    * circles that have one common point (`oneCommonPointError`: «X coincides with Y», Y the crossing that avoids X on
    * the same pair). When the refused line is NOT the one that placed the crossings — a tangency, or a length, typed
@@ -1943,32 +1976,44 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     }
   }
   /**
-   * #2239 ([ADR-692](docs/06-decisions.md#adr-692)) — the same provenance for two circles of equal stated radius
-   * stated internally tangent (stage 0a's `equalInternalTangency`, #2119's restated-size shape).
-   *  - The refused line is a SIZE (the tangency was stated first): the other side is the statement of the internal
-   *    tangency over that circle, READ before the drop-one search — which would name the other circle's size.
-   *  - The refused line is the TANGENCY: the drop-one search runs first, so a LATER statement that completed the
+   * #2239 ([ADR-692](docs/06-decisions.md#adr-692)), widened by #2206 ([ADR-713](docs/06-decisions.md#adr-713)) — the
+   * same provenance for two circles of equal radius by statement that a statement nests (stage 0a's `equalNestedPair`:
+   * internally tangent, contained or concentric).
+   *  - The refused line is a SIZE or an EQUALITY (the nesting was stated first): the other side is the statement that
+   *    nests that circle, READ before the drop-one search — which would name the other circle's size.
+   *  - The refused line is the NESTING: the drop-one search runs first, so a LATER statement that completed the
    *    contradiction (a radius letter's value, ADR-554) is the one named; when it names none (removing a circle's
    *    sizing line removes the circle), the other side is the latest statement that sized either circle of the pair.
    */
-  const tagEqualTangency = (tangencyCase: boolean) => {
+  const tagEqualNested = (nestingCase: boolean) => {
     for (const f of failedFacts) {
       const st = status[f.id];
       if (typeof st !== 'string') continue;
-      const m = RADIUS_CANNOT_HOLD.exec(st);
+      const m = EQUAL_NESTED_CANNOT_HOLD.exec(st);
       if (!m) continue;
+      const rel = m[2] as NestedRelation;
       const own = groupKey(f);
       const ownCmds = facts.filter((x) => groupKey(x) === own).flatMap((x) => lowerOne(x.cmd, symtab));
-      const tangency = ownCmds.find((c): c is Extract<Command, { type: 'circles-tangent' }> => c.type === 'circles-tangent' && !c.external);
-      if (!!tangency !== tangencyCase) continue;
-      const sizes = (c: Command, circle: Id) => (c.type === 'circle' && c.id === circle && !c.freeRadius && !c.ifAbsent) || (c.type === 'set-radius' && c.circle === circle);
-      const internalOver = (c: Command, circle: Id) => c.type === 'circles-tangent' && !c.external && (c.circle1 === circle || c.circle2 === circle);
+      const nestedPair = (c: Command): [Id, Id] | null =>
+        rel === 'int-tangent' && c.type === 'circles-tangent' && !c.external
+          ? [c.circle1, c.circle2]
+          : rel === 'contained' && c.type === 'set-circle-position' && c.relation === 'contained'
+            ? [c.a, c.b]
+            : rel === 'concentric' && c.type === 'set-radius-order'
+              ? [c.outer, c.inner]
+              : null;
+      const nesting = ownCmds.map(nestedPair).find((p): p is [Id, Id] => p !== null);
+      if (!!nesting !== nestingCase) continue;
+      const sizes = (c: Command, circle: Id) =>
+        (c.type === 'circle' && c.id === circle && !c.freeRadius && !c.ifAbsent) ||
+        (c.type === 'set-radius' && c.circle === circle) ||
+        (c.type === 'set-radius-ratio' && c.k === 1 && (c.c1 === circle || c.c2 === circle));
       let declared = -1;
       for (let j = facts.length - 1; j >= 0; j--) {
         const g = facts[j];
         if (!g.enabled || groupKey(g) === own || status[g.id] !== 'ok') continue;
         const cs = lowerOne(g.cmd, symtab);
-        if (tangency ? cs.some((c) => sizes(c, tangency.circle1) || sizes(c, tangency.circle2)) : cs.some((c) => internalOver(c, m[1]))) {
+        if (nesting ? cs.some((c) => sizes(c, nesting[0]) || sizes(c, nesting[1])) : cs.some((c) => nestedPair(c)?.includes(m[1]))) {
           declared = j;
           break;
         }
@@ -1979,7 +2024,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
     }
   };
-  if (attribute && hoistDepth === 0) tagEqualTangency(false);
+  if (attribute && hoistDepth === 0) tagEqualNested(false);
   if (attribute && hoistDepth === 0) {
     const ownerIdx = new Set(ownerByConKey.values());
     const searched = new Set<string>();
@@ -2075,7 +2120,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     }
   }
 
-  if (attribute && hoistDepth === 0) tagEqualTangency(true); // #2239: after the drop-one search (above)
+  if (attribute && hoistDepth === 0) tagEqualNested(true); // #2239 / #2206: after the drop-one search (above)
   const buildError = !pending && failedFacts.length ? (status[failedFacts[failedFacts.length - 1].id] as string) : null;
   return {
     cur,
@@ -2416,8 +2461,8 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   if (cmds.some((cmd) => notCyclicImpossibility(probe, cmd))) return false;
   // #2099 (ADR-651): a circle through three points the incidences put on one line — no later given bends the line.
   if (cmds.some((cmd) => collinearCircleImpossibility(cur, probe, cmd))) return false;
-  // #2239 (ADR-692): equal stated radii stated internally tangent — no later given makes the centres apart.
-  if (equalInternalTangency(cur, probe, cmds)) return false;
+  // #2239 (ADR-692) / #2206 (ADR-713): equal circles stated nested — no later given makes them unequal or apart.
+  if (equalNestedPair(cur, probe, cmds)) return false;
   return newCons.some((con) => {
     const vals: number[] = [];
     for (const s of [0, 1, 2, 3, 4]) {

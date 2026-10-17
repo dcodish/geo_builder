@@ -154,7 +154,10 @@ describe('the corpus is not disturbed — the §2b capstone builds line by line'
   it('a restatement that AGREES is not a contradiction', () => {
     expect(submitLine('z1 = 3+4i')).toBe(true);
     expect(submitLine('|z1| = 5')).toBe(true); // ADR-CX-009 §1: a second mention is a given
-    expect(store().lines).toEqual(['z1 = 3+4i', '|z1| = 5']);
+    // #2268 (ADR-CX-084): one the exact solve already entails adds no row, and says so
+    expect(store().lines).toEqual(['z1 = 3+4i']);
+    expect(store().lastNote).toEqual({ key: 'already-known', detail: '|z1| = 5' });
+    expect(store().lastError).toBeNull();
   });
 });
 

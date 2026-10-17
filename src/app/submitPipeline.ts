@@ -35,6 +35,8 @@ import {
   lowercaseLabelFold,
 } from '@/parser';
 import { llmParse } from '@/parser/llm';
+import { droppedPropertyWords } from '@/parser/propertyWords';
+import { mergeWordItems } from '../../shell/llm/honestyCore';
 import { figureContext } from '@/parser/llmShared';
 import { circleMembers, isGeoPoint } from '@/engine';
 import type { Construction, Id, Vec } from '@/engine';
@@ -386,7 +388,21 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
   // assembled through the battery's one merge (`unreadItems`) — the same merge `honestyGateReport.items`
   // uses, so a gate added to either seam is de-duplicated the day it is written. The superset of gates
   // and the order of distinct items are unchanged; only repeats go.
-  const stillDropped: string[] = unreadItems(
+  const lostVerbs = droppedGivenVerbs(utterance, llmCmds);
+  // #1906 (ADR-722 / ADR-W-144): every shape and role word the student typed must survive into the answer — per
+  // occurrence, a misspelt word included («שווה צלעת» answered «משולש ABC»). The bisect verb gate names its own
+  // statement in its own words, so the member does not repeat it.
+  const lostWords = droppedPropertyWords(
+    utterance,
+    llmCmds,
+    {
+      points: llmFig.objects.filter(isGeoPoint).map((o) => o.id),
+      polygons: llmFig.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])),
+      circles: llmFig.objects.flatMap((o) => (o.kind === 'circle' ? [o.id] : [])),
+    },
+    { skip: lostVerbs.includes('חוצה/bisect') ? ['angle-bisector', 'bisect'] : [] },
+  );
+  const stillDropped: string[] = mergeWordItems(unreadItems(
     droppedNewLabels(
       utterance,
       llmCmds,
@@ -401,7 +417,7 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
     droppedGivenRelations(utterance, llmCmds),
     // and the VERB gate (ADR-292, the #82 P1): a decomposition that loses a stated tangency/
     // bisection/… verb must name it — never a silent drop on the second attempt either
-    droppedGivenVerbs(utterance, llmCmds),
+    lostVerbs,
     // and the WORD gate (ADR-360, #210): a decomposition that loses a word-stated circle relation
     // (זרים/מוכל) must name it — the exact prod class where two unrelated circles committed green
     droppedWordRelations(utterance, llmCmds),
@@ -437,7 +453,7 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
       circleMembers: circleMembers(llmFig),
       polygons: llmFig.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])),
     }).map((x) => x.text),
-  );
+  ), lostWords); // #1906: the word items first; an ADR-430 «מעגל» inside «מעגל חסומ» is named once, as the phrase
   if (stillDropped.length > 0) {
     logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `dropped-labels:${stillDropped.join(',')}`, commands: llmCmds });
     ui.setInputNote(t('input.labelsDropped', { labels: stillDropped.join(', ') }));

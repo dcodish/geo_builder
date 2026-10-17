@@ -190,7 +190,9 @@ const he = {
   errOutOfScope: 'המשפט מובן, אך אינו נתמך בכלי הזה: "{{detail}}"',
   // #1888 / #1889 (ADR-AG-251) — 2-D's text (`input.scope.split-statements`, `right-angle-vertex`), ADR-W-118 B1
   errSplitStatements: 'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. זיהינו כאן שני נתונים — נסו להקליד אותם בשני שלבים: {{all}}',
-  errRightAngleVertex: 'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו קודם «משולש {{triangle}}», ואחר כך בשורה נפרדת «∠{{angle}} = 90°».',
+  // #1947 (ADR-AG-301) — 2-D's `input.scope.right-angle-vertex`, byte for byte (ADR-611 / ADR-3D-331); locked by
+  // shell/__tests__/one-fact-per-line-parity-1962.test.ts
+  errRightAngleVertex: 'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו בשורות נפרדות: (1) משולש {{triangle}}  (2) ∠{{angle}} = 90°{{more}}',
   errProofTarget:
     'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "{{detail}}"',
   errConflict: 'המשפט לא נוסף — הוא סותר את מה שכבר נקבע: "{{detail}}"',
@@ -392,6 +394,24 @@ const he = {
   errBisectorWrongApex:
     'חוצה זווית יוצא מקודקוד הזווית שהוא חוצה, ובמשפט "{{detail}}" הקטע אינו יוצא מהקודקוד הזה. ' +
     'כתבו קטע שמתחיל בקודקוד הזווית, למשל "AD חוצה את הזווית BAC".',
+  // #2115 (ADR-AG-299; operator ruling 2026-10-15) — 2-D's `input.cevianBisectorIsSide` / `…IsPolygonSide`, verbatim (B1).
+  errBisectorIsSide: '{{side}} היא צלע של המשולש ולכן אינה יכולה לחצות את זווית {{vertex}} — חוצה זווית יוצא מקודקוד אל הצלע שמולו.',
+  errBisectorIsPolygonSide: '{{side}} היא צלע של {{polygonNoun}} ולכן אינה יכולה לחצות את זווית {{vertex}}.',
+  // The host polygon's definite noun for that sentence — 2-D's `input.shapeNounDefinite`, verbatim (the trapezoid kinds share one).
+  shapeTheNounSquare: 'הריבוע',
+  shapeTheNounRectangle: 'המלבן',
+  shapeTheNounRhombus: 'המעוין',
+  shapeTheNounParallelogram: 'המקבילית',
+  shapeTheNounKite: 'הדלתון',
+  shapeTheNounTrapezoid: 'הטרפז',
+  shapeTheNounN4: 'המרובע',
+  shapeTheNounN5: 'המחומש',
+  shapeTheNounN6: 'המשושה',
+  shapeTheNounN7: 'המשובע',
+  shapeTheNounN8: 'המתומן',
+  shapeTheNounN9: 'המתושע',
+  shapeTheNounN10: 'המעושר',
+  shapeTheNounPolygon: 'המצולע',
   // #1240 (ADR-AG-209) — a cevian whose target the figure does not determine: ask, never guess.
   errAmbiguousCevian:
     'הקודקוד או הצלע במשפט "{{detail}}" שייכים ליותר ממשולש אחד בשרטוט, ולכן לא ברור לאיזו צלע הוא יורד. ' +
@@ -773,7 +793,7 @@ const en: typeof he = {
   errBadEquation: 'I could not read the equation: "{{detail}}"',
   errOutOfScope: 'Understood, but not supported in this tool: "{{detail}}"',
   errSplitStatements: 'One given per line — that way the tool can build and verify each one separately. We spotted two givens here; try entering them as two steps: {{all}}',
-  errRightAngleVertex: 'One given per line — that way the tool can build and verify each one separately. Write «triangle {{triangle}}» first, and then, on a separate line, «∠{{angle}} = 90°».',
+  errRightAngleVertex: 'One given per line — that way the tool can build and verify each one separately. Write them on separate lines: (1) triangle {{triangle}}  (2) ∠{{angle}} = 90°{{more}}',
   errProofTarget:
     'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "{{detail}}"',
   errConflict: 'Not added — it contradicts what is already fixed: "{{detail}}"',
@@ -941,6 +961,24 @@ const en: typeof he = {
   errBisectorWrongApex:
     'An angle bisector starts at the VERTEX of the angle it bisects, and the segment in "{{detail}}" does not. ' +
     'Start the segment at the angle’s vertex — for example "AD bisects angle BAC".',
+  // #2115 (ADR-AG-299) — 2-D's sentences, verbatim.
+  errBisectorIsSide: '{{side}} is a side of the triangle, so it cannot bisect angle {{vertex}} — an angle bisector runs from a vertex to the opposite side.',
+  errBisectorIsPolygonSide: '{{side}} is a side of {{polygonNoun}}, so it cannot bisect angle {{vertex}}.',
+  // The host polygon's definite noun for that sentence — 2-D's `input.shapeNounDefinite`, verbatim (the trapezoid kinds share one).
+  shapeTheNounSquare: 'the square',
+  shapeTheNounRectangle: 'the rectangle',
+  shapeTheNounRhombus: 'the rhombus',
+  shapeTheNounParallelogram: 'the parallelogram',
+  shapeTheNounKite: 'the kite',
+  shapeTheNounTrapezoid: 'the trapezoid',
+  shapeTheNounN4: 'the quadrilateral',
+  shapeTheNounN5: 'the pentagon',
+  shapeTheNounN6: 'the hexagon',
+  shapeTheNounN7: 'the heptagon',
+  shapeTheNounN8: 'the octagon',
+  shapeTheNounN9: 'the nonagon',
+  shapeTheNounN10: 'the decagon',
+  shapeTheNounPolygon: 'the polygon',
   errAmbiguousCevian:
     'The vertex or side in "{{detail}}" belongs to more than one triangle in your figure, so it is unclear which side it is drawn to. ' +
     'Name the side or the triangle — for example "AD is the altitude to side BC" or "AD is the altitude in triangle ABC".',

@@ -109,15 +109,23 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   - For the coordinate, vector and measure rules: a true restatement stays green, an unstated or symbolic
     component is not checked, and on a solid or a free figure the statement drives instead.
   - **A refusal never tells a student who may be right that they miscalculated:** a given the tool cannot
-    yet make hold («|SO| = 4» on a cone of unstated height) is refused as the tool's limit («… זו מגבלה של
-    הכלי»); «בדקו את החישוב» is kept for a given the student's own data contradicts.
+    yet make hold («|SO| = 4» on a cone of unstated height) is refused as the tool's limit (for a solid's size,
+    «… היכולת הזאת נמצאת בפיתוח, ולכן הצעד לא נוסף.», ADR-3D-363); «בדקו את החישוב» is kept for a given the student's own data contradicts.
   - **A cone, cylinder or sphere size is read whole or refused, never cut:** inside the declaration the
     radius and height take a whole number or a decimal («חרוט שרדיוסו 2.5 וגובהו 3»). A size written as a
     fraction or a root («כדור שרדיוסו 1/2», «חרוט שרדיוסו √2 וגובהו 3») is refused with the same «not yet»
     message («הכלי עדיין לא יודע לקבוע את גודל הכדור לפי נתון כזה …»), never drawn as part of its number.
+  - **Every other way of stating a cone, cylinder or sphere size gets that one answer, saying the capability is
+    in development** («הכלי עדיין לא יודע לקבוע את גודל החרוט לפי נתון כזה — היכולת הזאת נמצאת בפיתוח, ולכן הצעד
+    לא נוסף.», the solid's own noun; English "… this capability is in development, so the step wasn't added."): a
+    diameter, slant height, volume or area inside the declaration («חרוט שקוטרו 4 וגובהו 3», «…ויוצרו 5», «כדור
+    שקוטרו 6», "cone with radius 2 and slant height 5"); any size on its own line, any noun, «הוא» / «=» / bare,
+    in Hebrew or English («רדיוס החרוט הוא 2», «גובה החרוט 3», «אורך היוצר 5», "the height of the cone is 3");
+    and a volume or area line on a solid whose size is not stated («נפח החרוט 10»). Never the model, never «לא
+    הצלחנו לצייר: …», never a slant height drawn as the height. A volume claim on a sized solid still verifies.
   - Sources: ADR-3D-217, ADR-3D-281, ADR-3D-282, ADR-3D-284, ADR-3D-285, ADR-3D-290, ADR-3D-291,
-    ADR-3D-292, ADR-3D-293, [ADR-3D-340](06b-decisions-3d.md#adr-3d-340); #909, #1546, #1550, #1560, #1561,
-    #1567, #1569, #1573, #1590, #1615, #2079.
+    ADR-3D-292, ADR-3D-293, [ADR-3D-340](06b-decisions-3d.md#adr-3d-340), [ADR-3D-363](06b-decisions-3d.md#adr-3d-363); #909, #1546, #1550, #1560, #1561,
+    #1567, #1569, #1573, #1590, #1615, #2076, #2079.
 - **FR-SP-6 (Must)** — **A stated new label must land on the figure.** A decomposition that loses a point
   the student named is **refused, naming the label** — never committed with the point missing. A label
   that already exists is context, not a drop.
@@ -158,6 +166,8 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   can state they can ask (FR-CL-4). A comparison is never turned into an angle. The fact row keeps exactly
   the glyph that was typed. A stated length, area or height takes a RADICAL value («AD = √7», «2√7»,
   «√7/2», «√(3/4)») wherever it takes a decimal, as 2-D does: «AD = √7» and «|AD| = √7» are one given.
+  So do a stated DISTANCE («המרחק בין S למישור ABC הוא √2», «… הוא 3/2») and a coordinates claim
+  («A=(√2,0,0)», «A=(½,0,0)»), which reads exactly the components «A(√2,0,0)» reads (ADR-3D-362, #2081).
   - Sources: [ADR-3D-329](06b-decisions-3d.md#adr-3d-329), #1912; the prime fold ADR-3D-300 is the same
     seam one symbol over; [ADR-3D-337](06b-decisions-3d.md#adr-3d-337), #1827 (the `sqrt` spelling and the
     radical value in every stated-magnitude slot).
@@ -231,8 +241,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   state B's x and nothing else: on a new B the point is created with x = 3 and its y and z free (they move
   on «הציגו תצורה אחרת»); on a solid's vertex the solid follows; on a typed point a false value is refused
   and a true one stays green. A sign is read too; a letter value («x_B = 2t») is refused by name. The
-  question is the statement with its value dropped («x_B», «מהו שיעור ה-x של B?»).
-  - Sources: ADR-3D-299, #1547.
+  question is the statement with its value dropped («x_B», «מהו שיעור ה-x של B?»). The axis letter may be
+  typed in capitals: «X_B = 3», «X_{B}=3», «B_X = 3» and «X_B > 0» are «x_B = 3», «x_{B}=3», «B_x = 3» and
+  «x_B > 0», as analytic reads them; a digit subscript («X_1») stays a label.
+  - Sources: ADR-3D-299, ADR-3D-362, #1547, #2081.
 - **FR-SP-15 (Must)** — **A shape's adjective is honoured, and a circle through a polygon passes through every
   vertex.** An adjective stated on a polygon noun («טרפז ישר זווית», «טרפז שווה שוקיים», «משולש ישר זווית», "isosceles
   trapezoid", "right triangle") is drawn, standalone and inside an inscription in either direction; one the noun
@@ -251,6 +263,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   A word in an inscription sentence the tool does not read refuses the line, naming it («…לא הצלחנו לצייר: שווה צלעת…»);
   nothing is drawn and the model is not asked. «שוה» reads as «שווה». A shape declaration with a qualifier word no
   reader lowers («משולש שווה ABC», «טרפז ישר ABCD») is not drawn without it: the line goes to the model.
+  **The model's answer keeps every shape and role word** ([02w](02w-requirements-workspace.md) FR-SU-21, #1906,
+  [ADR-3D-364](06b-decisions-3d.md#adr-3d-364)): a shape adjective or quadrilateral noun, a cevian role word («גובה»,
+  «תיכון», «חוצה זווית») or an inscription verb («חסום» / «חוסם») the student typed — spelt right or one letter off
+  («שווה צלעת», «מלבנ», «גובח», "isoceles") — that the answer does not carry refuses the step with `dropped-given`
+  naming the word as typed («המשפט לא נוסף לציור, כי לא הצלחנו לצייר: שווה צלעת. …»); an answer that keeps it (typo
+  fixed) records as before. One role's lowering never pays for another's.
   Both voices of both relations are one sentence (#1975, operator 2026-10-14): a circle named FIRST — «מעגל O חוסם
   את המשולש ABC», «מעגל O חסום במשולש ABC», "the circle O circumscribes triangle ABC" — builds what «משולש ABC חסום
   במעגל O» / «משולש ABC חוסם את המעגל O» build, and the relative clause whose subject is the ring, «מעגל ש-ABC
@@ -479,7 +497,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «לא ניתן: «∠DAS = 50» יחד עם «∠BAS = 40» מתקיימים רק אם הפירמידה SABCD שטוחה — וגוף שטוח אינו פירמידה.» (operator
   ruling 2026-10-07, #1860; it was a notice before). A thin but real solid («∠BAS = 41 · ∠DAS = 50») builds with no
   notice and no refusal. **A declared polygon is never drawn flat:** the line that collapses one («AB = 5 · BC = 3 · AC = 8» on
-  «משולש ABC», or an incidence on a rider) is refused, naming the statements — a straight line is not a
+  «משולש ABC», or an incidence on a rider or on a point that already exists, in whichever order the two are stated — «M על AB · M אמצע BC» and «M אמצע BC · M על AB» alike, #1847) is refused, naming the statements — a straight line is not a
   triangle. **A declared polygon over points fixed by coordinates is never drawn crossed:** when its ring, in the
   order named, crosses itself («A(0,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD»), the line that completed it
   — the declaration, or the coordinate typed last — is refused in analytic's words. **The same holds for points a
@@ -540,6 +558,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
 - **FR-RD-15 (Must)** — **A stated angle is painted only where it holds.** A value on an arc, and a right-angle
   knee, appear only while the drawn figure satisfies the given.
   - Sources: ADR-3D-263, ADR-3D-290, #1592.
+- **FR-RD-16 (Must)** — **A ⟂ between two segments draws its knee only at a vertex the student named.** A
+  shared endpoint («AB ⟂ AC» at A), or a point stated as the crossing («O נקודת חיתוך האלכסונים»). Two
+  segments stated ⟂ that cross at an unnamed point («ריבוע ABCD» · «AC ⟂ BD») draw no mark at rest, as in
+  2-D; the relation shows in the givens list and the data panel. A line or segment ⟂ a plane keeps its knee.
+  - Sources: ADR-3D-360, ADR-W-118 B2, #2091.
 
 ## Coverage
 

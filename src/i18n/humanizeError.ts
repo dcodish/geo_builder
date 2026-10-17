@@ -307,6 +307,16 @@ export const PATTERNS: Pattern[] = [
     saysSubject: true,
     namesOther: true,
   },
+  // heightFeasibility.ts (#2117, ADR-718) — `over-constrained: diagonal AC of square ABCD is perpendicular to no side
+  // cannot hold`: the operator's 2026-10-15 ruling — the over-constrained frame naming the declaring statement (the
+  // fold's `[vs #i]`), its reason «האלכסון AC אינו מאונך לאף צלע של הריבוע», the kind the student's own noun.
+  {
+    re: /^over-constrained: diagonal (\S+) of (\S+) \S+ is perpendicular to no side cannot hold(?: \[vs #\d+\])?$/,
+    key: 'errors.overConstrained',
+    nested: (m) => ({ what: { key: 'errors.diagonalNoSideReason', params: { shape: `input.shapeNounDefinite.${m[2]}` }, letters: { d: m[1] } } }),
+    saysSubject: true,
+    namesOther: true,
+  },
   // cyclicFeasibility.ts (#2099, ADR-651) — `over-constrained: a circle through A, D, B on one line cannot hold`: the
   // operator's 2026-10-14 ruling — the over-constrained frame naming the statement that put the points on the line
   // (the fold's `[vs #i]`), its reason «A, D ו-B על ישר אחד, ואין מעגל שעובר דרך שלוש נקודות על ישר אחד».
@@ -349,6 +359,17 @@ export const PATTERNS: Pattern[] = [
     keys: ['errors.angleNameTaken', 'errors.lengthNameTaken'],
     params: (m) => ({ name: m[2], symbol: m[3] }),
     namesOtherLine: true,
+  },
+  // radiusFeasibility.ts equalNestedPair (#2239 ADR-692, #2206 ADR-713) — `over-constrained: equal circles P nested
+  // int-tangent cannot hold [vs #i]`: two circles of equal radius by statement that a statement nests. The over-constrained
+  // frame naming both statements (the #2119 ruled «X» סותר את «Y»), its reason #2200's ruled sentence for the relation
+  // (operator ruling 2026-10-16 on #2206: «refused with #2200's sentence»). Before the generic entry.
+  {
+    re: /^over-constrained: equal circles (\S+) nested (contained|int-tangent|concentric) cannot hold(?: \[vs #\d+\])?$/,
+    key: 'errors.overConstrained',
+    nested: (m) => ({ what: { key: `errors.equalNestedReason.${m[2]}`, params: {} } }),
+    saysSubject: true,
+    namesOther: true,
   },
   // engine/lower.ts letterSystem (#2165 + #2119, ADR-681) — `over-constrained: radius of O = 4 cannot hold [vs #i]`: a
   // second, different size for a circle whose size a statement already gave (a radius letter's value, a reserved r, a

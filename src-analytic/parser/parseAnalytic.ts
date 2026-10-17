@@ -3369,6 +3369,50 @@ function oneCircleSlot(text: string | undefined): CircleSlot {
   return text ? { k: 'named', name: text } : { k: 'the' };
 }
 
+/**
+ * TWO CIRCLES CROSSING — the one lowering for every sentence that says two circles meet (ADR-AG-219, #2108 ADR-AG-300):
+ * the two crossings, each on both circles, distinct, of two circles that cross. `slots` says which circles — drawn
+ * («שני מעגלים»), named («המעגלים O ו-P») or contextual («המעגלים») — and `a`/`b` the crossings the sentence names,
+ * else the tool's letters (`TOOL_LETTERS.crossing`).
+ */
+function twoCircleCrossing(slots: CircleSlot[], a: string | undefined, b: string | undefined, line: string): ParseResult {
+  const [p, q] = namedPair(a, b, 'crossing', 'two-circles');
+  // Two crossings of two DIFFERENT circles: both points on both is also true of one circle drawn twice.
+  return aboutCircles(slots, [
+    ...crossingsOn([p, q], [SLOT1, SLOT2], line),
+    { t: 'selector', sel: { kind: 'sign', q: { k: 'circles', a: SLOT1, b: SLOT2, rel: 'cross' }, positive: true }, src: line },
+  ], line);
+}
+
+/**
+ * «(שני) המעגלים (O ו-P) נחתכים (זה עם זה) בנקודות X ו-Y» / "(the) (two) circles (O and P) intersect at X and Y" — the
+ * PLURAL circle subject crossing (#2108, ADR-AG-300). The subject is `readCircleSubject`'s plural reading, the one the
+ * tangency family already reads «המעגלים O ו-P משיקים» with; the singular-joined «מעגל O ומעגל P נחתכים …» stays on
+ * `bothCrossings`. Named circles the figure lacks are stated (#1688); unnamed ones are the two the figure holds.
+ */
+const PLURAL_CROSS_HE = new RegExp(
+  `^(.+?)\\s+${MEET_VERB_HE}(?:\\s+(?:זה\\s+עם\\s+זה|זו\\s+עם\\s+זו))?(?:\\s+ב(?:נקודות|-)?\\s*(${NAME})${AND_HE}(${NAME}))?$`,
+);
+const PLURAL_CROSS_EN = new RegExp(
+  `^(.+?)\\s+(?:intersect|meet)(?:\\s+(?:each\\s+other|one\\s+another))?(?:\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME}))?$`,
+  'i',
+);
+const ONE_NAME = new RegExp(`^${NAME}$`);
+function pluralCircleCrossing(g: string, line: string): RuleOutcome {
+  const m = PLURAL_CROSS_HE.exec(g) ?? PLURAL_CROSS_EN.exec(g);
+  if (!m) return null;
+  const subjectText = trim(m[1]);
+  if (!SUBJECT_PLURAL.test(subjectText)) return null;
+  const subject = readCircleSubject(subjectText);
+  if (!subject || subject.kind !== 'pair') return null;
+  const [o, p] = subject.names;
+  if (o !== undefined && !(ONE_NAME.test(o) && ONE_NAME.test(p))) return null; // a numeral pair is not read here
+  if (o !== undefined && o === p) return refuse('repeated-vertex', line); // «המעגלים O ו-O» names one circle twice
+  if (m[2] !== undefined && m[2] === m[3]) return refuse('repeated-vertex', line); // «בנקודות X ו-X»
+  const slots: CircleSlot[] = o !== undefined ? [{ k: 'named', name: o }, { k: 'named', name: p }] : [{ k: 'the' }, { k: 'the' }];
+  return twoCircleCrossing(slots, m[2], m[3], line);
+}
+
 function parseCircleFamilies(raw: string): RuleOutcome {
   const line = trim(raw);
   const g = line.replace(/^נתו(?:ן|נה|נים|נות)\s*:?\s+/, '').replace(/^given\s*:?\s+/i, '');
@@ -3434,14 +3478,7 @@ function parseCircleFamilies(raw: string): RuleOutcome {
       (he ? new RegExp(`^נחתכים(?:\\s+(?:זה\\s+עם\\s+זה\\s+)?ב(?:נקודות|-)?\\s*(${NAME})${AND_HE}(${NAME}))?$`).exec(rest) : null) ??
       (!he && adjective === 'intersecting' && !rest ? ([''] as unknown as RegExpExecArray) : null) ??
       (!he && !adjective ? new RegExp(`^intersect(?:\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME}))?$`, 'i').exec(rest) : null);
-    if (cross) {
-      const [a, b] = namedPair(cross[1], cross[2], 'crossing', 'two-circles');
-      // Two crossings of two DIFFERENT circles: both points on both is also true of one circle drawn twice.
-      return aboutCircles(pair, [
-        ...crossingsOn([a, b], [SLOT1, SLOT2], line),
-        { t: 'selector', sel: { kind: 'sign', q: { k: 'circles', a: SLOT1, b: SLOT2, rel: 'cross' }, positive: true }, src: line },
-      ], line);
-    }
+    if (cross) return twoCircleCrossing(pair, cross[1], cross[2], line);
     const concentric =
       (he ? new RegExp(`^(?:בעלי|עם)\\s+מרכז\\s+משותף\\s+(${NAME})$`).exec(rest) : null) ??
       (!he ? new RegExp(`^with\\s+(?:a\\s+)?common\\s+cent(?:re|er)\\s+(${NAME})$`, 'i').exec(rest) : null) ??
@@ -3462,6 +3499,10 @@ function parseCircleFamilies(raw: string): RuleOutcome {
     }
     return null;
   }
+
+  // «המעגלים O ו-P נחתכים בנקודות X ו-Y» — the plural subject crossing (#2108), after the indefinite «שני מעגלים».
+  const pluralCross = pluralCircleCrossing(g, line);
+  if (pluralCross) return pluralCross;
 
   // «מעגל P מוכל בתוך מעגל O» · «מעגל מוכל בתוך המעגל הגדול» — one circle strictly inside the other.
   const inside =
@@ -5037,6 +5078,24 @@ const BISECTS_EN = new RegExp(
 /** «חוצה זווית ABC» · «חוצה הזווית B» · "the bisector of angle ABC" — the bisector drawn on its own (cat-2d-044). */
 const BISECTOR_ALONE_HE = new RegExp(`^${HE_GIVEN}${BISECTOR_HE}\\s+${BIS_ANGLE}$`);
 const BISECTOR_ALONE_EN = new RegExp(`^(?:the\\s+|an\\s+)?(?:angle\\s+)?bisector\\s+of\\s+(?:the\\s+)?angle\\s+${BIS_ANGLE}$`, 'i');
+/**
+ * #2115 (ADR-AG-299) — the bisector VERB with no angle: «AB חוצה זווית», "AD bisects the angle". 2-D reads the angle at
+ * the FIRST letter (measured at HEAD: AB→A, BA→B, AD→A), so the line is rewritten to «XY חוצה את זווית X» and the
+ * named rule owns it. The copula and role-noun spellings are NOT this sentence (below).
+ */
+const BISECTS_NO_ANGLE_HE = new RegExp(`^${HE_GIVEN}(?:ה?(?:אלכסון|קטע|ישר|צלע)\\s+)?(${NAME})(${NAME})\\s+חוצה(?:-|\\s+)(?:את\\s+)?ה?זו?וית$`);
+const BISECTS_NO_ANGLE_EN = new RegExp(`^(?:[Tt]he\\s+)?(?:(?:diagonal|segment|line|side)\\s+)?(${NAME})(${NAME})\\s+bisects\\s+(?:(?:the|an)\\s+)?angle$`);
+/**
+ * #2115 (ADR-AG-299) — the ROLE-NOUN spellings 2-D's `bisectorRoleNounOnSide` reads: «AB הוא חוצה זווית», «חוצה הזווית
+ * AB [= 5]», "AB is an angle bisector", "the bisector AB". They say only that XY is a bisector; M1 answers them when XY is
+ * a declared polygon's side and declines them otherwise (`roleNoun`).
+ */
+const BISECTOR_ROLE_NOUN: readonly RegExp[] = [
+  new RegExp(`^${HE_GIVEN}(${NAME})(${NAME})\\s+(?:הוא|היא)\\s+ה?חוצה(?:-|\\s+)ה?זו?וית$`),
+  new RegExp(`^${HE_GIVEN}ה?חוצה(?:-|\\s+)ה?זו?וית\\s+(${NAME})(${NAME})(?:\\s*=\\s*\\S.*)?$`),
+  new RegExp(`^(${NAME})(${NAME})\\s+is\\s+(?:an?|the)\\s+(?:angle\\s+)?bisector$`),
+  new RegExp(`^(?:[Tt]he\\s+)?(?:angle\\s+)?bisector\\s+(${NAME})(${NAME})(?:\\s*=\\s*\\S.*)?$`),
+];
 /** The angles of a bisector LIST — «BAC ו-BCA», «A ו-C», «ABC, BCD ו-CDA». */
 const ANGLE_LIST = `((?:[∠∢]?\\s*(?:${NAME}){1,3})(?:\\s*,\\s*[∠∢]?\\s*(?:${NAME}){1,3})*\\s*,?\\s+ו-?\\s*[∠∢]?\\s*(?:${NAME}){1,3})`;
 /** «E חיתוך חוצי הזוויות BAC ו-BCA» · «E נקודת החיתוך של חוצי הזוויות A ו-C» · «E נקודת המפגש של חוצי …». */
@@ -5320,6 +5379,17 @@ function parseCevianFamily(line: string): RuleOutcome {
     const [apex, foot] = at && at.v === y ? [y, x] : [x, y];
     const side = cevianSide(apex, u0, v0, triRun);
     if (typeof side === 'string') return refuse(side, line);
+    /*
+     * #2115 (ADR-AG-299): the far end an END of the target side — «AB חוצה זווית לצלע BC». The segment then lies on an
+     * arm of the angle the side subtends at the apex, ∠BAC: lowered to that `bisects`, so M1 answers it with 2-D's side
+     * sentence when a polygon holds the pair, and with `degenerate-role` (as before) when none does.
+     */
+    if ((foot === side.u || foot === side.v) && apex !== side.u && apex !== side.v) {
+      if (at && isAngleRef(at) && !([at.a, at.b].includes(side.u) && [at.a, at.b].includes(side.v))) return null;
+      const tri = side.ring ? namedShapeFacts('משולש', side.ring, line) : [];
+      if (tri === 'bad-arity') return refuse('bad-arity', line);
+      return made([...tri, { t: 'bisects', at: { v: apex, a: side.u, b: side.v }, p: foot, seg: [x, y], src: line }]);
+    }
     const made0 = cevianWithTarget('bisector', apex, foot, side, line);
     // a three-letter angle names its arms: a side that is not between them is not this sentence's target
     if (made0.ok && at && isAngleRef(at) && !([at.a, at.b].includes(side.u) && [at.a, at.b].includes(side.v))) return null;
@@ -5337,8 +5407,18 @@ function parseCevianFamily(line: string): RuleOutcome {
     // The segment runs FROM the angle's vertex — either end may be written first («AM הוא חוצה זווית CMD»).
     if (at.v !== x && at.v !== y) return refuse('bisector-wrong-apex', line);
     const p = at.v === x ? y : x;
-    if (isAngleRef(at) && (p === at.a || p === at.b)) return refuse('degenerate-role', line);
-    return made([{ t: 'bisects', at, p, src: line }]);
+    // #2115 (ADR-AG-299): a far end on the angle's arm is M1's to answer — the side sentence when a polygon holds it.
+    return made([{ t: 'bisects', at, p, seg: [x, y], src: line }]);
+  }
+
+  // #2115 (ADR-AG-299): the verb with no angle — the angle at the first letter, as 2-D reads it.
+  const na = BISECTS_NO_ANGLE_HE.exec(line) ?? BISECTS_NO_ANGLE_EN.exec(line);
+  if (na) return na[1] === na[2] ? refuse('repeated-vertex', line) : viaSentences(line, [`${na[1]}${na[2]} חוצה את זווית ${na[1]}`]);
+
+  // #2115 (ADR-AG-299): "XY is a bisector" — M1 answers it only when XY is a declared polygon's side.
+  for (const re of BISECTOR_ROLE_NOUN) {
+    const rn = re.exec(line);
+    if (rn) return rn[1] === rn[2] ? null : made([{ t: 'bisects', at: { v: rn[1] }, p: rn[2], seg: [rn[1], rn[2]], roleNoun: true, src: line }]);
   }
 
   // ── the bisector on its own ──

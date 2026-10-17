@@ -194,7 +194,7 @@ describe('REFUSAL — a letter used as a size (or an angle) cannot be declared c
   });
 
   it('editing a line into the conflict is refused the same way', () => {
-    feed(['r מספר מרוכב', 'z1 = 3+4i', '|z1| = 5']);
+    feed(['r מספר מרוכב', 'z1 = 3+4i', 'z2 = 2z1']); // #2268: a restatement would add no row to edit
     expect(editLine(2, '|z1| = 9r')).toBe(false);
     expect(store().lastError).toMatchObject({ key: 'complex-as-real', detail: '|z1| = 9r' });
   });

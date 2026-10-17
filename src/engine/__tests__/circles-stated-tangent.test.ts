@@ -41,7 +41,7 @@ describe('#2080 — circlesStatedTangent', () => {
     ] as Command[]);
     const r = applyStep(before, tan(false));
     expect(r.ok).toBe(false);
-    expect(!r.ok && r.error).toBe('over-constrained: radius of circle-P = 3 cannot hold');
+    expect(!r.ok && r.error).toBe('over-constrained: equal circles circle-P nested int-tangent cannot hold'); // #2206 (ADR-713): equalNestedPair's message
     expect(circlesStatedTangent(r.construction, 'circle-O', 'circle-P')).toBe(false);
   });
 

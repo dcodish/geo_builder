@@ -62,6 +62,9 @@ export interface LineFault {
   stated?: string;
   /** For a diagonal claim the figure refutes (#1737, ADR-AG-265): the pair as written (the ring is `polygon`). */
   pair?: string;
+  /** For a bisector named by a polygon's side (#2115, ADR-AG-299): the angle's vertex and the host's kind (`pair` is the side). */
+  vertex?: string;
+  polygonKind?: string;
   /** For a second name or another coefficient (#2054, #2061): the target as the line spells it, its kind, and 2-D's reason clause. */
   nameOf?: string;
   nameKind?: 'angle' | 'length';
@@ -210,7 +213,9 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       ? { shape: e.shape }
       : e.code === 'diagonal-is-side' || e.code === 'diagonal-none-here'
         ? { polygon: e.polygon, pair: e.pair }
-        : {};
+        : e.code === 'bisector-is-side' // #2115 (ADR-AG-299): the side as typed, the angle's vertex, the host's kind
+          ? { pair: e.pair, vertex: e.vertex, polygonKind: e.polygonKind }
+          : {};
   /** #2054 / #2061 (ADR-AG-277): the line that stated the earlier value a restatement is refused against — by provenance. */
   const restatedAgainst = (e: ApplyError): Partial<LineFault> => {
     if (e.code !== 'name-taken' && e.code !== 'measure-contradicts') return {};

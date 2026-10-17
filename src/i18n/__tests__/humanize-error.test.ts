@@ -5,6 +5,9 @@ import { describeConstraint } from '@/engine/solve';
 import { applyCommand, shapeExclusionError } from '@/engine/apply';
 import { collapsedPolygonError, diagonalClaimRefusal } from '@/engine/step';
 import { collinearCircleError, notCyclicImpossibilityError } from '@/engine/cyclicFeasibility';
+import { diagonalHeightError } from '@/engine/heightFeasibility';
+
+import { equalNestedMessage } from '@/engine/radiusFeasibility';
 import type { Constraint } from '@/engine/types';
 import { stripFormatControls } from '../../../shell/bidi';
 
@@ -36,6 +39,7 @@ const CASES: { raw: string; contains: string[] }[] = [
   { raw: `${notCyclicImpossibilityError({ ring: ['A', 'B', 'C', 'D'], shape: 'right-trapezoid', forced: 'rectangle' })} [vs #0]`, contains: ['טרפז ישר זווית', 'למלבן'] },
   // #2099 (ADR-651): the structural refusal and the evaluator's numeric backstop — one ruled reason, never half-English
   { raw: `${collinearCircleError({ points: ['A', 'D', 'B'], centre: 'O' })} [vs #1]`, contains: ['A, D', 'B', 'ואין מעגל שעובר דרך שלוש נקודות על ישר אחד'] },
+  { raw: `${diagonalHeightError({ diagonal: ['A', 'C'], ring: ['A', 'B', 'C', 'D'], shape: 'square' })} [vs #0]`, contains: ['האלכסון', 'AC', 'אינו מאונך לאף צלע של הריבוע'] },
   { raw: 'cannot construct O: A, D, B are collinear (no circumscribed circle)', contains: ['A, D', 'B', 'ואין מעגל שעובר דרך שלוש נקודות על ישר אחד'] },
   // apply.ts shapeExclusionError (#1985, ADR-619) — two nouns no quadrilateral carries at once. Both shape words
   // are `paramKeys` (translation keys), so the gate also proves no English noun survives into the sentence.
@@ -77,6 +81,10 @@ const CASES: { raw: string; contains: string[] }[] = [
   { raw: 'over-constrained: |AC| = 9 cannot hold', contains: ['|AC| = 9'] },
   // #2165 + #2119 (ADR-681): a second size for a stated circle — the ruled frame without a reason clause
   { raw: 'over-constrained: radius of circle-O = 4 cannot hold', contains: ['רדיוס המעגל', 'O = 4'] },
+  // radiusFeasibility.ts equalNestedPair (#2206, ADR-713) — built by the engine's own function, each relation's reason.
+  { raw: `${equalNestedMessage('circle-P', 'int-tangent')} [vs #1]`, contains: ['משיקים מבפנים', 'אותו מעגל'] },
+  { raw: equalNestedMessage('circle-P', 'contained'), contains: ['מוכלים זה בזה', 'קטן ממנו'] },
+  { raw: equalNestedMessage('circle-O-2', 'concentric'), contains: ['ומרכזם משותף', 'אותו מעגל'] },
   // replay/core.ts (#2023, ADR-661) — a second letter for an angle or a segment that already has one
   { raw: 'name-taken: angle ABC is already named α [vs #1]', contains: ['ABC', 'α'] },
   { raw: 'name-taken: segment AB is already named 2a', contains: ['AB', '2a'] },

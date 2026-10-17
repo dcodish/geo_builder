@@ -1,0 +1,68 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "שני מעגלים ששטחם שווה",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "freeRadius": true,
+        "autoCenter": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "שני מעגלים ששטחם שווה",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "@ctr-P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "autoCenter": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "שני מעגלים ששטחם שווה",
+      "group": "g0",
+      "cmd": {
+        "type": "set-circle-position",
+        "relation": "any",
+        "a": "circle-O",
+        "b": "circle-P",
+        "variant": 0,
+        "admits": [
+          "meet",
+          "disjoint"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.3",
+      "utterance": "שני מעגלים ששטחם שווה",
+      "group": "g0",
+      "cmd": {
+        "type": "set-radius-ratio",
+        "c1": "circle-O",
+        "c2": "circle-P",
+        "k": 1
+      },
+      "enabled": true
+    }
+  ]
+}

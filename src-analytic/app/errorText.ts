@@ -152,6 +152,32 @@ const joinAnd = (items: readonly string[], sep: string, last: string): string =>
 /** A registry noun in English — the first English spelling the table maps onto it (the table is the one source). */
 const enNoun = (he: string | undefined): string => (he ? Object.keys(EN_SHAPE).find((k) => EN_SHAPE[k] === he) ?? he : '');
 
+/**
+ * #2115 (ADR-AG-299) — the definite noun of a polygon kind (`square`, `n5`…), 2-D's `input.shapeNounDefinite` table:
+ * the three trapezoid kinds share «הטרפז», and an arity past the table is «המצולע».
+ */
+const POLYGON_NOUN_KEY: Readonly<Record<string, string>> = {
+  square: 'shapeTheNounSquare',
+  rectangle: 'shapeTheNounRectangle',
+  rhombus: 'shapeTheNounRhombus',
+  parallelogram: 'shapeTheNounParallelogram',
+  kite: 'shapeTheNounKite',
+  trapezoid: 'shapeTheNounTrapezoid',
+  'isosceles-trapezoid': 'shapeTheNounTrapezoid',
+  'right-trapezoid': 'shapeTheNounTrapezoid',
+  n4: 'shapeTheNounN4',
+  n5: 'shapeTheNounN5',
+  n6: 'shapeTheNounN6',
+  n7: 'shapeTheNounN7',
+  n8: 'shapeTheNounN8',
+  n9: 'shapeTheNounN9',
+  n10: 'shapeTheNounN10',
+};
+const polygonNounKey = (kind: string | undefined): string => (kind && POLYGON_NOUN_KEY[kind]) || 'shapeTheNounPolygon';
+
+/** 2-D's one-fact-per-line list format (`src/app/unreadParts.ts` `numbered`): «(n) part», two-space separators. */
+const numbered = (parts: readonly string[], from = 1): string => parts.map((p, i) => `(${i + from}) ${p}`).join('  ');
+
 /** The sentence a student reads for `error`, in the locale `t` speaks. */
 export function errorText(error: InputError, t: Translate): string {
   const kind: RefKind | undefined = 'expected' in error ? error.expected : undefined;
@@ -180,6 +206,8 @@ export function errorText(error: InputError, t: Translate): string {
     'degenerate-role': 'errDegenerateRole',
     'apex-not-a-vertex': 'errApexNotAVertex',
     'bisector-wrong-apex': 'errBisectorWrongApex',
+    // #2115 (ADR-AG-299) — 2-D's sentences: the triangle's, with its cevian clause; any other polygon's, naming it
+    'bisector-is-side': error.key === 'bisector-is-side' && error.polygonKind !== 'triangle' ? 'errBisectorIsPolygonSide' : 'errBisectorIsSide',
     'length-xy': 'errLengthXY',
     'coordinate-restriction': 'errCoordinateRestriction',
     'ambiguous-cevian': 'errAmbiguousCevian',
@@ -304,9 +332,11 @@ export function errorText(error: InputError, t: Translate): string {
     toCurve: t(TO_THE_NOUN_KEY[crossed]),
     reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '',
     definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '',
-    all: error.key === 'split-statements' ? error.parts.map((p, i) => `(${i + 1}) ${p}`).join('  ') : '',
+    all: error.key === 'split-statements' ? numbered(error.parts) : '',
     triangle: error.key === 'split-statements' && error.teach ? error.teach.triangle : '',
     angle: error.key === 'split-statements' && error.teach ? error.teach.angle : '',
+    // #1947 (ADR-AG-301) — the taught pair is items (1) and (2); the line's further parts continue the SAME list from (3)
+    more: error.key === 'split-statements' && error.teach && error.parts.length > 2 ? `  ${numbered(error.parts.slice(2), 3)}` : '',
     // #1554 ruling 1 (ADR-AG-198): the two nouns, in each locale's spelling (the registry key is the Hebrew).
     shapeHe: 'shape' in error ? (error.shape ?? '') : '',
     polygon: 'polygon' in error ? (error.polygon ?? '') : '',
@@ -328,5 +358,8 @@ export function errorText(error: InputError, t: Translate): string {
     decimal: error.key === 'mixed-number' ? (error.decimal ?? '') : '',
     sum: error.key === 'mixed-number' ? error.sum : '',
     product: error.key === 'mixed-number' ? error.product : '',
+    side: error.key === 'bisector-is-side' ? (error.pair ?? '') : '',
+    vertex: error.key === 'bisector-is-side' ? (error.vertex ?? '') : '',
+    polygonNoun: error.key === 'bisector-is-side' ? t(polygonNounKey(error.polygonKind)) : '',
   }) + near;
 }

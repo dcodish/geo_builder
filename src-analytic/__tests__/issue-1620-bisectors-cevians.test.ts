@@ -283,7 +283,9 @@ describe('honest refusals', () => {
     ['a segment that does not start at the angle\'s vertex', ['משולש ABC', 'XD חוצה זווית BAC'], 'bisector-wrong-apex'],
     ['the apex stated twice, disagreeing', ['משולש ABC', 'CE חוצה זווית A במשולש ABC'], 'bisector-wrong-apex'],
     ['a lone vertex that is not the segment\'s', ['משולש ABC', 'AD חוצה זווית C'], 'bisector-wrong-apex'],
-    ['a bisector ending on one of its own rays', ['משולש ABC', 'AB חוצה זווית BAC'], 'degenerate-role'],
+    // #2115 (ADR-AG-299): on a declared polygon's side it is 2-D's side sentence; with free points the generic refusal stays
+    ['a bisector ending on one of its own rays, a side of the triangle', ['משולש ABC', 'AB חוצה זווית BAC'], 'bisector-is-side'],
+    ['a bisector ending on one of its own rays, free points', ['נקודה A', 'נקודה B', 'נקודה C', 'AB חוצה זווית BAC'], 'degenerate-role'],
     ['an apex in two triangles — a question', ['משולש ABC', 'משולש ABD', 'AE גובה'], 'ambiguous-cevian'],
     ['an apex in no triangle', ['נקודה A', 'AD גובה'], 'cevian-no-triangle'],
     ['a foot that is a vertex of the side (#1231 through the figure)', ['משולש ABC', 'AB גובה'], 'degenerate-role'],

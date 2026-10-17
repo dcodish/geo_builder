@@ -16,34 +16,8 @@
  */
 import type { JSX } from 'react';
 import { hasMath } from '../../shell/math';
-
-const NUM = String.raw`\d+(?:\.\d+)?`;
-const RADICAND = String.raw`\(\s*${NUM}(?:\s*\/\s*${NUM})?\s*\)|${NUM}`;
-const RADICAL = new RegExp(String.raw`^(${NUM})?\s*[*·]?\s*√\s*(${RADICAND})$`);
-
-/** Approximate the rendered width of a run of glyphs at font size `fs` (no DOM metrics in the pure renderer). */
-function textW(s: string, fs: number): number {
-  let w = 0;
-  for (const ch of s) {
-    if (ch === '√') w += 0.72 * fs;
-    else if (/[.,'|]/.test(ch)) w += 0.28 * fs;
-    else if (ch === '°') w += 0.42 * fs;
-    else if (/[a-z0-9α-ωΑ-Ω]/i.test(ch)) w += 0.56 * fs;
-    else w += 0.5 * fs;
-  }
-  return w;
-}
-
-/** Split a value at its TOP-LEVEL `/` (not one inside a `√(…)` group), or null. Mirrors `mathText`. */
-function splitSlash(v: string): [string, string] | null {
-  let depth = 0;
-  for (let i = 0; i < v.length; i++) {
-    if (v[i] === '(') depth++;
-    else if (v[i] === ')') depth--;
-    else if (v[i] === '/' && depth === 0) return [v.slice(0, i), v.slice(i + 1)];
-  }
-  return null;
-}
+// #2175 (ADR-715): the widths live in `mathMetrics` so the angle-value placement reasons about the box drawn here.
+import { FRACTION_PART_SCALE, fractionOverhang, mathLayoutOf, mathRise, radicalPad, radicalSignW, textW } from './mathMetrics';
 
 /** A laid-out fragment: its approximate width + a renderer that draws it CENTERED at `(cx, cy)`. */
 interface Box {
@@ -95,9 +69,9 @@ function rule(x1: number, x2: number, y: number, st: Style, k: string): JSX.Elem
 
 function radical(coef: string | undefined, radicand: string, fs: number, st: Style): Box {
   const cb = coef ? plain(coef, fs, st) : null;
-  const rb = value(radicand.replace(/[()]/g, ''), fs, st); // drop the √() display parens
-  const sqrtW = 0.72 * fs;
-  const pad = 0.12 * fs;
+  const rb = value(radicand, fs, st); // the √() display parens are already dropped by `mathLayoutOf`
+  const sqrtW = radicalSignW(fs);
+  const pad = radicalPad(fs);
   const w = (cb?.w ?? 0) + sqrtW + rb.w + pad;
   return {
     w,
@@ -114,7 +88,7 @@ function radical(coef: string | undefined, radicand: string, fs: number, st: Sty
         </text>,
       );
       x += sqrtW;
-      els.push(...rule(x, x + rb.w + pad, cy - fs * 0.55, st, `${k}v`)); // vinculum over the radicand
+      els.push(...rule(x, x + rb.w + pad, cy - mathRise(fs), st, `${k}v`)); // vinculum over the radicand
       els.push(...rb.render(x + (rb.w + pad) / 2, cy, `${k}n`));
       return els;
     },
@@ -122,28 +96,26 @@ function radical(coef: string | undefined, radicand: string, fs: number, st: Sty
 }
 
 function fraction(num: string, den: string, fs: number, st: Style): Box {
-  const fsp = fs * 0.9; // parts a touch smaller, textbook-style
+  const fsp = fs * FRACTION_PART_SCALE; // parts a touch smaller, textbook-style
   const nb = value(num, fsp, st);
   const db = value(den, fsp, st);
-  const w = Math.max(nb.w, db.w) + 0.2 * fs;
+  const w = Math.max(nb.w, db.w) + fractionOverhang(fs);
   return {
     w,
     render: (cx, cy, k) => [
-      ...nb.render(cx, cy - fs * 0.55, `${k}n`),
+      ...nb.render(cx, cy - mathRise(fs), `${k}n`),
       ...rule(cx - w / 2, cx + w / 2, cy, st, `${k}b`),
-      ...db.render(cx, cy + fs * 0.55, `${k}d`),
+      ...db.render(cx, cy + mathRise(fs), `${k}d`),
     ],
   };
 }
 
 /** Lay out a value expression: a top-level fraction, a radical, or plain text. */
 function value(text: string, fs: number, st: Style): Box {
-  const t = text.trim();
-  const slash = splitSlash(t);
-  if (slash && /√|\d/.test(slash[0]) && /√|\d/.test(slash[1])) return fraction(slash[0], slash[1], fs, st);
-  const rad = t.match(RADICAL);
-  if (rad) return radical(rad[1], rad[2], fs, st);
-  return plain(t, fs, st);
+  const L = mathLayoutOf(text);
+  if (L.kind === 'fraction') return fraction(L.num, L.den, fs, st);
+  if (L.kind === 'radical') return radical(L.coef, L.radicand, fs, st);
+  return plain(L.text, fs, st);
 }
 
 /**

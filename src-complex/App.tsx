@@ -71,6 +71,7 @@ export function App() {
     seed,
     view,
     lastError,
+    lastNote,
     loadAudit,
     removeLine,
     display,
@@ -758,6 +759,8 @@ export function App() {
               {lastError && (
                 <Banner kind="error">{errorText(lastError, t)}</Banner>
               )}
+              {/* #2268 (ADR-CX-084): a true restatement added nothing — a notice, not a refusal */}
+              {lastNote && <Banner kind="notice">{t('noteAlreadyKnown')}</Banner>}
             </InputArea>
           </>}
           factsZone={<>
