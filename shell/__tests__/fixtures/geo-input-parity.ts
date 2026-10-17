@@ -288,6 +288,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2323': 'open', // #2215 (ADR-723): analytic does not read «AB קוטר במעגל O ו-CD מיתר במעגל O» (not-handled)
 
+  '#2342': 'open', // #2096 (ADR-730) × #2088 (ADR-3D-370): 3-D teaches a trailing length given, not a trailing angle given («ו-∠ABC = 30»)
   '#2327': 'open', // #2177 (ADR-733): analytic does not read the reserved r on a several-circle figure; 2-D refuses it naming the circles
 
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
@@ -1614,7 +1615,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'rider-perp-foot-2089', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'E על CD', 'AE ⟂ CD'], expect: 'builds', note: '2-D refused it before ADR-728' },
 
   // ── #2096 / #2106 (ADR-730): a right-angle vertex then «ו-∠…» is refused with the taught list, never a cut inside the angle ──
-  { id: 'unread-vertex-2106', family: 'angles', steps: ['משולש ABC ישר זווית ב-A ו-∠ABC = 30'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2088' }], note: '2-D taught «(1) … ב-A ו-∠  (2) ABC = 30» before ADR-730 (analytic already refused, measured at 688dfb96); the list is locked in src/app/__tests__/issue-2096-split-cut.test.ts' },
+  { id: 'unread-vertex-2106', family: 'angles', steps: ['משולש ABC ישר זווית ב-A ו-∠ABC = 30'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2342' }], note: '2-D taught «(1) … ב-A ו-∠  (2) ABC = 30» before ADR-730 (analytic already refused, measured at 688dfb96); the list is locked in src/app/__tests__/issue-2096-split-cut.test.ts' },
 
   // ── #2177 (ADR-733): the reserved r on a figure with several circles names none of them — refused, never a pick ──
   { id: 'reserved-r-several-circles-2177', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 5', 'r = 4'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2327' }], note: '2-D committed it green and ignored the 4 before ADR-733; analytic does not read it (not-handled)' },
