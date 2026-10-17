@@ -19,7 +19,7 @@
  * no digits). Keywords are bilingual; the same rule matches either language.
  */
 
-import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
+import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
 import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { roleOperands, type RoleOperand } from './roleNouns';
@@ -92,6 +92,11 @@ export type ParseResult =
   // מבפנים…») — two nested circles cannot both have it, and which one has it the sentence does not say. Refused with
   // FR-IN-4g's one-given-per-line frame; `parts` are the student's own words: the pair, then the radius phrase.
   | { ok: false; reason: 'nested-pair-radius'; parts: [string, string] }
+  // #2200 (ADR-712): two circles stated CONTAINED one in the other AND of equal size («שני מעגלים מוכלים ברדיוסים
+  // שווים») — a circle strictly inside another is smaller, so the words alone contradict. Refused naming the
+  // contradiction (operator ruling 2026-10-16, card 20 A), never drawn red, never escalated.
+  // #2206 (ADR-713): the same for a pair stated internally tangent or concentric and equal — `relation` names the nesting.
+  | { ok: false; reason: 'equal-circles-nested'; relation: NestedPairRelation }
   | { ok: false; reason: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: string; shapes: string[]; side: string }
   // #1666 (ADR-561, ADR-W-107): a PROOF TARGET — «הוכיחו כי AB ⊥ AC», "prove that …" — is what the student
   // must SHOW, never a given. Every rule used to read the claim inside it and lower it as a constraint.
@@ -413,7 +418,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-definite-shape'; shapes: string[]; sides: number; example: string } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number } | { clarify: 'nested-pair-radius'; parts: [string, string] };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-definite-shape'; shapes: string[]; sides: number; example: string } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number } | { clarify: 'nested-pair-radius'; parts: [string, string] } | { clarify: 'equal-circles-nested'; relation: NestedPairRelation };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -5323,6 +5328,9 @@ const concentricCircles: Rule = (s, ctx) => {
     /\bconcentric\s+circles\b/i.test(s) ||
     (/\btwo\s+circles\b/i.test(s) && /common\s+cent(?:er|re)|same\s+cent(?:er|re)/i.test(s));
   if (!he && !heConcentric && !en) return null;
+  // #2206 (ADR-713): two equal circles on one centre are one circle — refused from the words (ruling 2026-10-16).
+  const eq = equalNested(s, 'concentric');
+  if (eq) return eq;
   // #2263 (ADR-702): one radius for the pair — which circle has it? Refused, one given per line.
   const nested = nestedPairRadius(s);
   if (nested) return nested;
@@ -8446,6 +8454,13 @@ const parallelCircleIntersection: Rule = (s, ctx) => {
  * words contradict themselves there and the word-relation gate (`droppedWordRelations`, its equal-size member)
  * keeps the line from being drawn. A rule that forgets the helper is caught by that gate, not by luck.
  *
+ * #2200 ([ADR-712](docs/06-decisions.md#adr-712)) — `twoCirclesBare` READS it now (its leftover strips the vocabulary,
+ * as `circlesTangent` does), and an equal bare pair admits no containment configuration (`admits`). A CONTAINED pair
+ * stated equal — `twoCirclesPosition` and `containedNewInExisting` both — is refused from the words
+ * (`equalCirclesNested`): a circle strictly inside another is smaller.
+ * #2206 ([ADR-713](docs/06-decisions.md#adr-713)) — and so are its twins: `circlesTangent` internal (ADR-455 D2's `'stop'`
+ * became this refusal) and `concentricCircles` (#2186's escalation became it), per the operator's 2026-10-16 ruling.
+ *
  * ADR-052 note: an unstated size is a free DOF, seeded APART so a pair reads as two circles. A STATED
  * equality removes that DOF — which is exactly the difference between a default and a given.
  *
@@ -8463,6 +8478,12 @@ const EQUAL_SIZE_G = rx(EQUAL_SIZE.source, 'gi');
  *  so the constraint always lands on the circles the sentence is actually about. */
 const withEqualRadii = (s: string, cmds: AnyCommand[], id1: Id, id2: Id): AnyCommand[] =>
   EQUAL_SIZE.test(s) ? [...cmds, { type: 'set-radius-ratio', c1: id1, c2: id2, k: 1 } as AnyCommand] : cmds;
+/** The nestings two circles can be stated in (#2200 / #2206) — none of them holds for two equal circles. */
+export type NestedPairRelation = 'contained' | 'int-tangent' | 'concentric';
+/** #2200 (ADR-712): a containment stated with an equal size cannot hold — a circle strictly inside another is
+ *  smaller — so the words alone decide: the line is refused naming the contradiction (ruling 2026-10-16). */
+const equalNested = (s: string, relation: NestedPairRelation): { clarify: 'equal-circles-nested'; relation: NestedPairRelation } | null =>
+  EQUAL_SIZE.test(s) ? { clarify: 'equal-circles-nested', relation } : null;
 
 /**
  * #2198 / #2216 ([ADR-677](docs/06-decisions.md#adr-677)) — ONE radius stated for the PAIR: «שני מעגלים נחתכים
@@ -8613,12 +8634,14 @@ const definiteTwoCircles = (s: string, ctx: ParseContext): [Id, Id] | null => {
 const containedNewInExisting = (
   s: string,
   ctx: ParseContext,
-): AnyCommand[] | { clarify: 'ambiguous-container'; centers: string[] } | null => {
+): AnyCommand[] | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'equal-circles-nested'; relation: NestedPairRelation } | null => {
   // an INDEFINITE subject: the circle noun right before מוכל carries no definite ה and no letter
   // (one optional Hebrew adjective tolerated: «מעגל קטן מוכל…»); En "a circle … contained"
   const subj =
     /(?:^|[^א-תA-Za-z])מעגל(?:\s+(?!מוכל)[א-ת]+)?\s+מוכל/.test(s) || /\ba\s+circle\b(?:\s+\w+){0,2}?\s+(?:is\s+)?contained\b/i.test(s);
   if (!subj) return null;
+  const eq = equalNested(s, 'contained'); // #2200: «מעגל מוכל (במעגל O) ברדיוסים שווים» — refused from the words
+  if (eq) return eq;
   const circs = (ctx.circles ?? []).filter((c) => !c.startsWith('~')).map(up);
   const objM = s.match(/(?:בתוך|\binside\b|\bin\b)\s+(?:ה?מעגל|(?:the\s+)?circle)(?:\s+([A-Za-z]\d*))?/i);
   let outer: string;
@@ -8684,7 +8707,10 @@ const twoCirclesPosition: Rule = (s, ctx) => {
     pair === 'introduce' ? ['O', freeLabel(['O', ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S'])] : pair.centres;
   if (up(c1) === up(c2)) return null;
   // #2263 (ADR-702): one radius for a CONTAINED pair — which circle has it? Refused, one given per line.
+  // #2200 (ADR-712): a CONTAINED pair stated equal in size is refused from the words, before anything is read.
   if (relation === 'contained') {
+    const eq = equalNested(s, 'contained');
+    if (eq) return eq;
     const nested = nestedPairRadius(s);
     if (nested) return nested;
   }
@@ -8702,7 +8728,8 @@ const twoCirclesPosition: Rule = (s, ctx) => {
       ? { type: 'set-circle-position', relation, a: id1, b: id2 }
       : { type: 'set-circle-position', relation, a: isNamed ? id2 : id1, b: isNamed ? id1 : id2 },
   );
-  // #2198 / #2216: «שני מעגלים זרים ברדיוס 5» sizes both. A CONTAINED pair stating one is refused above (#2263).
+  // #2198 / #2216: «שני מעגלים זרים ברדיוס 5» sizes both. A CONTAINED pair stating one is refused above (#2263),
+  // and so is a contained pair stated equal (#2200) — only the disjoint pair reaches the equality here.
   return withEqualRadii(s, relation === 'disjoint' ? withStatedRadius(s, cmds, id1, id2) : cmds, id1, id2); // #761
 };
 
@@ -8717,15 +8744,20 @@ const twoCirclesBare: Rule = (s, ctx) => {
   if (!/שני\s+מעגלים|\btwo\s+circles\b/i.test(s)) return null;
   const leftover = s
     .replace(/שני\s+מעגלים|\btwo\s+circles\b|נתונים|נתון|יש/gi, ' ')
+    .replace(EQUAL_SIZE_G, ' ') // #2200 (ADR-712): the rule READS this (withEqualRadii below), so it is its own vocabulary
     .replace(FILLER, ' ')
+    .replace(/[,.;:]/g, ' ') // the apposition «שני מעגלים, רדיוסיהם שווים» — punctuation carries no given
     .trim();
   if (leftover) return null;
+  // #2200 (ADR-712): an EQUAL pair cannot nest, so its unstated position admits only crossing and apart (M4 — the
+  // configuration set comes from what was stated); «שני מעגלים» alone keeps all three.
+  const admits: CirclePositionCase[] | null = EQUAL_SIZE.test(s) ? ['meet', 'disjoint'] : null;
   const c1 = 'O';
   const c2 = freeLabel([c1, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
   return withEqualRadii(s, [
     { type: 'circle', id: circleId(c1), center: c1, radius: RADIUS_DEFAULT, freeRadius: true, autoCenter: true, ifAbsent: true },
     { type: 'circle', id: circleId(c2), center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, autoCenter: true, ifAbsent: true },
-    { type: 'set-circle-position', relation: 'any', a: circleId(c1), b: circleId(c2), variant: 0 },
+    { type: 'set-circle-position', relation: 'any', a: circleId(c1), b: circleId(c2), variant: 0, ...(admits ? { admits } : {}) },
   ], circleId(c1), circleId(c2)); // #761
 };
 
@@ -9300,11 +9332,17 @@ const circlesTangent: Rule = (s, ctx) => {
   // «מוכל» → 'stop' in `twoCirclesPosition`) and uses the same mechanism for the same reason:
   // recognised but unreadable, so escalate whole rather than half-parse.
   //
+  // #2206 (ADR-713, the operator's 2026-10-16 ruling: «refused with #2200's sentence»): no longer escalated — the
+  // owned `equal-circles-nested` refusal names the contradiction, as for a contained pair (#2200).
+  //
   // It is an HONESTY guard, not tidiness. Lowered anyway, the pair collapses to coincident circles and
   // every stated relation holds AT the collapse — the ratio IS 1, and coincident circles are
   // internally tangent in the limit — so neither `verifyGivens` nor the radius-ratio check can see it,
   // and the figure draws degenerate under a green ✓ (measured: both radii 0.7, no error).
-  if (internal && EQUAL_SIZE.test(s)) return 'stop';
+  if (internal) {
+    const eq = equalNested(s, 'int-tangent');
+    if (eq) return eq;
+  }
   // #2263 (ADR-702): one radius for an INTERNALLY tangent pair — which circle has it? Refused, one given per line.
   if (internal) {
     const nested = nestedPairRadius(s);
@@ -14548,6 +14586,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'inscribed-contradicts-noun') return { ok: false, reason: 'inscribed-contradicts-noun', shape: res.shape, forced: res.forced };
   if (res.clarify === 'incircle-not-drawn') return { ok: false, reason: 'incircle-not-drawn', sides: res.sides };
   if (res.clarify === 'nested-pair-radius') return { ok: false, reason: 'nested-pair-radius', parts: res.parts };
+  if (res.clarify === 'equal-circles-nested') return { ok: false, reason: 'equal-circles-nested', relation: res.relation };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 

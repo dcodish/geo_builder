@@ -35,7 +35,7 @@ import {
 import { sideImpossibility, sideImpossibilityError } from './sideFeasibility';
 import { collinearCircleError, collinearCircleImpossibility, notCyclicImpossibility, notCyclicImpossibilityError } from './cyclicFeasibility';
 import { recordRequirement, requirementsField } from './requirements';
-import { circlesTangentError, equalInternalTangency } from './radiusFeasibility';
+import { circlesTangentError, equalNestedPair } from './radiusFeasibility';
 import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, polygonDefects, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, type PolygonDefect } from './degeneracy';
 import { allConstraints, applySeed, freeDofs, movableIds } from './sample';
 import { impliedByFigure } from './dofRank';
@@ -1211,8 +1211,9 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   // passing proves nothing and the ordinary ladder still runs.
   const probed = applyCommand(prev, cmd);
   // #2239 (ADR-692), stage 0a: two circles of equal STATED radius stated internally tangent, in either order — the
+  // (#2206, ADR-713: also contained or concentric, and an equality stated as a ratio k = 1) —
   // centres would coincide. Refused before the ladder; a stated radius is never rewritten to make the pair fit.
-  const equalErr = equalInternalTangency(prev, probed, [cmd]);
+  const equalErr = equalNestedPair(prev, probed, [cmd]);
   if (equalErr) return { ok: false, error: equalErr, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   const metricErr = metricImpossibility(probed.constraints);
   if (metricErr) {
@@ -1454,7 +1455,7 @@ function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult
   for (const cmd of cmds) next = applyCommand(next, cmd, prevPositions);
   const newCons = next.constraints.slice(prev.constraints.length);
   // #2239 (ADR-692): a coupled line can state the equal-radii internal tangency as well as one statement can.
-  const equalErr = equalInternalTangency(prev, next, cmds);
+  const equalErr = equalNestedPair(prev, next, cmds);
   if (equalErr) return { ok: false, error: equalErr, construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
   // #1712 (ADR-587): a coupled line is still a list of statements — one that no configuration can take
   // on its own is refused by name here too, never handed to the joint solve to fail anonymously.

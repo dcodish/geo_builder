@@ -684,3 +684,61 @@ describe('#2186 (ADR-679) — the equal size rides EVERY pair-resolving rule, an
     expect(droppedWordRelations('הרדיוס שווה ל-5 במעגל O', free.slice(0, 1))).not.toContain('שווים');
   });
 });
+
+describe('#2200 (ADR-712) — the bare pair reads the equality; a contained pair stated equal is refused from the words', () => {
+  const k1 = (cmds: AnyCommand[]) => cmds.some((c) => c.type === 'set-radius-ratio' && (c as { k: number }).k === 1);
+  const ctxAfter = (steps: string[]) => {
+    const { construction, positions } = replay(buildFacts(steps));
+    return buildParseCtx(construction, positions);
+  };
+
+  it('twoCirclesBare joins the family: every equal-size spelling lowers k = 1 and admits crossing / apart only', () => {
+    for (const u of ['שני מעגלים ברדיוסים שווים', 'שני מעגלים שרדיוסיהם שווים', 'שני מעגלים, רדיוסיהם שווים', 'שני מעגלים ששטחם שווה', 'שני מעגלים שהיקפם שווה', 'two circles with equal radii']) {
+      const r = parse(u);
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) continue;
+      expect(k1(r.commands), u).toBe(true);
+      const pos = r.commands.find((c) => c.type === 'set-circle-position');
+      expect(pos && (pos as { admits?: string[] }).admits, u).toEqual(['meet', 'disjoint']);
+    }
+    // the bare pair without the equality keeps every case (no `admits`)
+    const bare = parse('שני מעגלים');
+    expect(bare.ok && bare.commands.some((c) => c.type === 'set-circle-position' && !(c as { admits?: unknown }).admits)).toBe(true);
+  });
+
+  it('refused from the words: twoCirclesPosition and containedNewInExisting, every spelling they read', () => {
+    for (const [pre, u] of [
+      [[], 'שני מעגלים מוכלים ברדיוסים שווים'],
+      [[], 'שני מעגלים מוכלים ששטחם שווה'],
+      [[], 'two contained circles with equal radii'],
+      [[], 'שני מעגלים, אחד מוכל בשני, ברדיוסים שווים'],
+      [['מעגל O', 'מעגל P'], 'מעגל P מוכל במעגל O ברדיוסים שווים'],
+      [['מעגל O', 'מעגל P'], 'המעגלים מוכלים ברדיוסים שווים'],
+      [['מעגל O'], 'מעגל מוכל במעגל O ברדיוסים שווים'],
+      [[], 'מעגל מוכל ברדיוסים שווים'],
+      [['מעגל O'], 'מעגל מוכל במעגל O ששטחם שווה'],
+    ] as [string[], string][]) {
+      expect(parse(u, ctxAfter(pre)), u).toEqual({ ok: false, reason: 'equal-circles-nested', relation: 'contained' });
+    }
+    // the contained pair without the equality, and the disjoint pair with it, are untouched
+    expect(parse('שני מעגלים מוכלים').ok).toBe(true);
+    const dj = parse('שני מעגלים זרים ברדיוסים שווים');
+    expect(dj.ok && k1(dj.commands)).toBe(true);
+  });
+});
+
+describe('#2206 (ADR-713) — the internally tangent and concentric twins are refused from the words, with their relation', () => {
+  it.each([
+    ['שני מעגלים משיקים מבפנים ברדיוסים שווים', 'int-tangent'],
+    ['שני מעגלים משיקים מבפנים ששטחם שווה', 'int-tangent'],
+    ['two circles tangent internally with equal radii', 'int-tangent'],
+    ['שני מעגלים בעלי מרכז משותף O ברדיוסים שווים', 'concentric'],
+    ['שני מעגלים קונצנטריים ברדיוסים שווים', 'concentric'],
+    ['two concentric circles with equal radii', 'concentric'],
+  ])('«%s» → equal-circles-nested (%s)', (u, relation) => {
+    expect(parse(u)).toEqual({ ok: false, reason: 'equal-circles-nested', relation });
+  });
+  it('without the equality both still build', () => {
+    for (const u of ['שני מעגלים משיקים מבפנים', 'שני מעגלים בעלי מרכז משותף O']) expect(parse(u).ok, u).toBe(true);
+  });
+});

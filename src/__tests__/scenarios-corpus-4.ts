@@ -5089,7 +5089,7 @@ export const SCENARIOS_4: Scenario[] = [
         const v = gateVerdict(facts, line);
         expect(v.kind, `${before.join(' · ')} · ${line}`).toBe('refused');
         const raw = (v as { detail?: string }).detail;
-        expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)))).toBe(`לא ניתן: «${line}» סותר את «${other}» — אי אפשר לקיים את שניהם יחד.`);
+        expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)))).toBe(`לא ניתן: «${line}» סותר את «${other}» — אי אפשר לקיים את שניהם יחד. הסיבה: שני מעגלים שרדיוסיהם שווים אינם יכולים להיות משיקים מבפנים, כי שני מעגלים כאלה הם אותו מעגל.`); // #2206 (ADR-713): #2200's reason
       }
     },
   },
@@ -5278,6 +5278,50 @@ export const SCENARIOS_4: Scenario[] = [
       const he = (k: string, o?: Record<string, unknown>) => i18n.t(k, { ...o, lng: 'he' }) as string;
       expect(stripFormatControls(humanizeError(raw, he, bad[0].utterance, otherUtteranceForError(loaded, raw)))).toBe('לזווית ABC כבר יש שם: A1 (בשורה «נסמן זוית ABC כ-A1»). לכל זווית שם אחד — המשיכו עם A1.');
       expect(d.labels.angles.map((a) => a.text)).toEqual(['A1']);
+    },
+  },
+  {
+    id: 'equal-circles-nested-2200',
+    title: '«שני מעגלים מוכלים ברדיוסים שווים» is refused naming the contradiction; «שני מעגלים ברדיוסים שווים» draws two equal circles (#2200, ADR-712)',
+    guards:
+      "#2200 (P3), operator ruling 2026-10-16 (ballot round 5, card 20, option A: «Build the first; refuse the second with a sentence naming the contradiction»). Measured at de7c221f through decideDeterministic2D: «שני מעגלים ברדיוסים שווים» escalated not-handled (twoCirclesBare's leftover never stripped the equal-size words it reads) and «שני מעגלים מוכלים ברדיוסים שווים» committed red (figure.v.circleContained: twoCirclesPosition lowered the containment, then appended k = 1). Root cause: the bare rule did not strip its own vocabulary, and no two-circle rule refused a containment stated with an equal size, though a circle strictly inside another is smaller. Fix: the bare rule reads the equality and its pair admits only the crossing / apart configurations; twoCirclesPosition and containedNewInExisting refuse contained + equal size from the words (equal-circles-nested). Asserts the report's second line is refused and the first builds two equal circles. The matrix (every spelling, the configurations, the message in both locales, the model never asked) is src/app/__tests__/issue-2200-equal-circles.test.ts.",
+    steps: ['שני מעגלים מוכלים ברדיוסים שווים', 'שני מעגלים ברדיוסים שווים'],
+    refusedSteps: [
+      { step: 1, reason: 'equal-circles-nested', why: 'ADR-712 (#2200): two circles of equal radius cannot be contained one in the other — the operator ruled a refusal naming the contradiction' },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.circles.size, 'one pair, from the second line').toBe(2);
+      const [a, b] = [...fig.circles.values()];
+      expect(Math.abs(a.r - b.r), 'equal radii').toBeLessThan(1e-6);
+    },
+  },
+  {
+    id: 'equal-circles-nested-values-2206',
+    title: '«מעגל O ברדיוס 3» · «מעגל P ברדיוס 3» · «מעגל P מוכל בתוך מעגל O» is refused naming «מעגל P ברדיוס 3» with #2200\'s reason; so is the internal tangency, in either order (#2206, ADR-713)',
+    guards:
+      "#2206 (P3), operator ruling 2026-10-16 (d2206-accept, A): «מעגל O ברדיוס 3 / מעגל P ברדיוס 3 / מעגל P מוכל בתוך מעגל O is refused with #2200's sentence» and «Equal radii with internal tangency or concentric: refused with #2200's sentence». Measured at c43e9fbc through decideDeterministic2D: the containment committed RED (figure.v.circleContained), the concentric pair with both radii 3 RED, a ratio k = 1 on another line RED, and the internal tangency was refused (ADR-692) in the bare restated-size sentence; the word forms (internally tangent / concentric + ברדיוסים שווים) escalated. Root cause: ADR-692's stage-0a predicate judged one nesting (internal tangency) over one equality (two stated radii), and the parser escalated the word forms instead of refusing them like #2200's contained pair. Fix: equalNestedPair judges every nesting (internal tangency, containment, one centre) over every stated equality (equal stated radii, a ratio k = 1), in either order, and the parser's twins return #2200's owned refusal with their relation. Asserts the report's two lines build, its third is refused at the door naming «מעגל P ברדיוס 3» with the containment reason, and the internal tangency in the other order is refused on its last radius line naming the tangency. The matrix is src/app/__tests__/issue-2206-equal-nested.test.ts.",
+    steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 3'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const C = 'מעגל P מוכל בתוך מעגל O';
+      const T = 'המעגלים O ו-P משיקים מבפנים';
+      const reason = {
+        contained: 'שני מעגלים שרדיוסיהם שווים אינם יכולים להיות מוכלים זה בזה, כי מעגל שמוכל במעגל אחר קטן ממנו',
+        tangent: 'שני מעגלים שרדיוסיהם שווים אינם יכולים להיות משיקים מבפנים, כי שני מעגלים כאלה הם אותו מעגל',
+      };
+      for (const [before, line, other, why] of [
+        [['מעגל O ברדיוס 3', 'מעגל P ברדיוס 3'], C, 'מעגל P ברדיוס 3', reason.contained], // the report, verbatim
+        [['מעגל O ברדיוס 3', 'מעגל P ברדיוס 3'], T, 'מעגל P ברדיוס 3', reason.tangent],
+        [['מעגל O', 'מעגל P', T, 'רדיוס מעגל O הוא 3'], 'רדיוס מעגל P הוא 3', T, reason.tangent], // the other order
+      ] as [string[], string, string, string][]) {
+        const facts = factsOf(before);
+        const v = gateVerdict(facts, line);
+        expect(v.kind, `${before.join(' · ')} · ${line}`).toBe('refused');
+        const raw = (v as { detail?: string }).detail;
+        expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)))).toBe(`לא ניתן: «${line}» סותר את «${other}» — אי אפשר לקיים את שניהם יחד. הסיבה: ${why}.`);
+      }
     },
   },
 ];

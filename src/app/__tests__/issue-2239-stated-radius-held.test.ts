@@ -51,7 +51,9 @@ async function submit(lines: string[], t: Translate = he) {
   }
   return out;
 }
-const contradicts = (line: string, other: string) => `לא ניתן: «${line}» סותר את «${other}» — אי אפשר לקיים את שניהם יחד.`;
+// #2206 (ADR-713, ruling 2026-10-16 «refused with #2200's sentence»): the same frame, with the relation's reason.
+const contradicts = (line: string, other: string) =>
+  `לא ניתן: «${line}» סותר את «${other}» — אי אפשר לקיים את שניהם יחד. הסיבה: שני מעגלים שרדיוסיהם שווים אינם יכולים להיות משיקים מבפנים, כי שני מעגלים כאלה הם אותו מעגל.`;
 /** every committed fact holds its stated radius at seeds 0–3, and the committed figure is green */
 const statedRadiiHeld = (radii: Record<string, number>) => {
   const st = useGeoStore.getState();
@@ -84,7 +86,7 @@ describe('#2239 — equal stated radii, internal tangency last: the tangency is 
   it('the English twin, in English', async () => {
     const lines = ['circle O with radius 3', 'circle P with radius 3', 'circle P is internally tangent to circle O'];
     const out = await submit(lines, en);
-    expect(out[2]).toEqual({ kind: 'refuse', said: "Can't do that: «circle P is internally tangent to circle O» contradicts «circle P with radius 3» — they can't both hold." });
+    expect(out[2]).toEqual({ kind: 'refuse', said: "Can't do that: «circle P is internally tangent to circle O» contradicts «circle P with radius 3» — they can't both hold. The reason: two circles with equal radii cannot be internally tangent, because two such circles are the same circle." });
     statedRadiiHeld({ 'circle-O': 3, 'circle-P': 3 });
   });
 });
