@@ -61,6 +61,7 @@
     "src/app/__tests__/narrowing-note-1996.test.ts",
     "src/app/__tests__/quad-noun-pairs-2169.test.ts",
     "src/app/__tests__/resolve-view.test.ts",
+    "src/app/__tests__/submitPipeline.test.ts",
     "src/engine/__tests__/dof-vacuous.test.ts",
     "src/engine/__tests__/inscribe-joint-solve.test.ts",
     "src/engine/__tests__/issue-1328-tolerance-artefact.test.ts",

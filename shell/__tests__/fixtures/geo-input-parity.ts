@@ -256,7 +256,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1969': 'open',
   '#2013': 'open',
   '#2047': 'open',
-  '#1963': 'open',
   '#2185': 'open', // #2199 (ADR-AG-282): 2-D drops the second carrier of an English per-point line and of a line list (#2185 removes these)
   '#2260': 'open', // #2199 (ADR-AG-282): 3-D does not read a point stated on a list of lines
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
@@ -1431,9 +1430,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2099 (ADR-651, operator ruling 2026-10-14): a circle through three points the incidences put on ONE line is refused,
   // naming the statement that put them there — 2-D committed the solved-rider rows green with a centre at ~10⁷ ──
-  { id: 'collinear-circle-2099-line', family: 'circles', steps: ['משולש ABC', 'D על הישר AB', 'מעגל שעובר דרך A, D ו-B'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1963' }], note: 'the reported row; analytic draws the circle, its port is #1963 (the proved-collinear arm)' },
-  { id: 'collinear-circle-2099-segment', family: 'circles', steps: ['משולש ABC', 'D על AB', 'מעגל שעובר דרך A, D ו-B'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1963' }] },
-  { id: 'collinear-circle-2099-midpoint', family: 'circles', steps: ['משולש ABC', 'M אמצע AB', 'מעגל שעובר דרך A, M ו-B'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#1963' }] },
+  { id: 'collinear-circle-2099-line', family: 'circles', steps: ['משולש ABC', 'D על הישר AB', 'מעגל שעובר דרך A, D ו-B'], expect: 'refused', exception: 'X8', note: 'the reported row; analytic drew the circle until ADR-AG-296 (#1963, the proved-collinear arm)' },
+  { id: 'collinear-circle-2099-segment', family: 'circles', steps: ['משולש ABC', 'D על AB', 'מעגל שעובר דרך A, D ו-B'], expect: 'refused', exception: 'X8' },
+  { id: 'collinear-circle-2099-midpoint', family: 'circles', steps: ['משולש ABC', 'M אמצע AB', 'מעגל שעובר דרך A, M ו-B'], expect: 'refused', exception: 'X8' },
   { id: 'collinear-circle-2099-circumscribed', family: 'circles', steps: ['משולש ABC', 'D על הישר AB', 'מעגל חוסם את המשולש ADB'], expect: 'refused', exception: 'X8' },
   { id: 'collinear-circle-2099-control', family: 'circles', steps: ['משולש ABC', 'D על AC', 'מעגל שעובר דרך A, D ו-B'], expect: 'builds', exception: 'X8', note: 'D off line AB — a real circle' },
 
