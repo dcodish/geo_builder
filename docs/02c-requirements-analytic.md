@@ -442,7 +442,8 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 **R162 — the circle and tangent sentences of the 2-D tool build here too, and two fresh circles are named by order**. *(Operator, on #1688: "first mention names one".)* Two circles keep their stated relation always.
 - «מעגל סביב O רדיוס 5», «מעגל O שהיקפו 6π» (radius 3)
 - «שני מעגלים נחתכים בנקודות A ו-B», «AB משיק משותף חיצוני / פנימי לשני המעגלים»
-- Sources: ADR-AG-219, #1622, #1693, #1688.
+- the plural subject crosses too: «המעגלים O ו-P נחתכים בנקודות X ו-Y» (the stated radii kept), «המעגלים O ו-P נחתכים» (the crossings take the tool's letters), «(שני) המעגלים נחתכים …» (the two circles the figure holds), "circles O and P intersect at X and Y" (ADR-AG-300, #2108)
+- Sources: ADR-AG-219, #1622, #1693, #1688, #2108.
 
 **R163 — arcs, sectors, semicircles and the diameter from a point build as they do in the 2-D tool**. *(Operator ruling: analytic gives 2-D's verdict, and the arc rows are ported.)* An arc's measure is its central angle.
 - «קשת AB = 40 במעגל O», «⌢{AC} = 60°»

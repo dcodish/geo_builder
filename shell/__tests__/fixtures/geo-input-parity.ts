@@ -268,7 +268,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2074': 'open', // #2074 (ADR-659): analytic's half of «תיכון ליתר» on an open right triangle waits for #2018 // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
 
-  '#2108': 'open',
   '#2130': 'open', // #2125 (ADR-3D-342): analytic refuses an unnamed circumcircle stated after the incircle
 
   '#2060': 'open', // #2024 (ADR-668): 3-D does not read a single-letter angle given a symbol («זוית B=b», «זוית B=α»)
@@ -1494,7 +1493,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'circum-passive-then-incircle-2125', family: 'inscribed', steps: ['משולש ABC', 'משולש ABC חסום במעגל', 'מעגל חסום במשולש ABC'], expect: 'builds' },
 
   // ── #2083 (ADR-646): a sentence that only NAMES an existing circle is a reference — the stated radii are kept ──
-  { id: 'named-crossing-keeps-radii-2083', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'המעגלים O ו-P נחתכים בנקודות X ו-Y'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2108' }], note: 'analytic refuses the crossing line bad-operand (#2108, needs-operator). 2-D replaced both radii with free defaults (r 5 and 3.6) before ADR-646; the verdict was builds then too — the radii are locked in src/app/__tests__/issue-2083-circle-reference.test.ts' },
+  { id: 'named-crossing-keeps-radii-2083', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'המעגלים O ו-P נחתכים בנקודות X ו-Y'], expect: 'builds', exception: 'X8', note: 'analytic refused the crossing line bad-operand before ADR-AG-300 (#2108). 2-D replaced both radii with free defaults (r 5 and 3.6) before ADR-646; the verdict was builds then too — the radii are locked in src/app/__tests__/issue-2083-circle-reference.test.ts' },
+
+  // ── #2108 (ADR-AG-300): the PLURAL circle subject crosses in analytic as in 2-D — letterless, contextual, English ──
+  { id: 'plural-circles-cross-empty-2108', family: 'circles', steps: ['המעגלים O ו-P נחתכים בנקודות A ו-B'], expect: 'builds', exception: 'X8', note: 'the catalog sentence: on an empty figure both builders draw the two circles first' },
+  { id: 'plural-circles-cross-letterless-2108', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'המעגלים O ו-P נחתכים'], expect: 'builds', exception: 'X8' },
+  { id: 'plural-circles-cross-contextual-2108', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'שני המעגלים נחתכים בנקודות X ו-Y'], expect: 'builds', exception: 'X8' },
+  { id: 'plural-circles-cross-en-2108', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 2', 'circles O and P intersect at X and Y'], expect: 'builds', exception: 'X8' },
 
   // ── #2080 / #2083 (ADR-645): two circles with ONE common point have no two-point crossing — refused with the contradiction sentence ──
   { id: 'circles-tangent-then-cross-2080', family: 'circles', steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'המעגלים O ו-P נחתכים בנקודות X ו-Y'], expect: 'refused', exception: 'X8', note: '2-D committed X = Y on the touch point before ADR-645' },

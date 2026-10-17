@@ -3369,6 +3369,50 @@ function oneCircleSlot(text: string | undefined): CircleSlot {
   return text ? { k: 'named', name: text } : { k: 'the' };
 }
 
+/**
+ * TWO CIRCLES CROSSING — the one lowering for every sentence that says two circles meet (ADR-AG-219, #2108 ADR-AG-300):
+ * the two crossings, each on both circles, distinct, of two circles that cross. `slots` says which circles — drawn
+ * («שני מעגלים»), named («המעגלים O ו-P») or contextual («המעגלים») — and `a`/`b` the crossings the sentence names,
+ * else the tool's letters (`TOOL_LETTERS.crossing`).
+ */
+function twoCircleCrossing(slots: CircleSlot[], a: string | undefined, b: string | undefined, line: string): ParseResult {
+  const [p, q] = namedPair(a, b, 'crossing', 'two-circles');
+  // Two crossings of two DIFFERENT circles: both points on both is also true of one circle drawn twice.
+  return aboutCircles(slots, [
+    ...crossingsOn([p, q], [SLOT1, SLOT2], line),
+    { t: 'selector', sel: { kind: 'sign', q: { k: 'circles', a: SLOT1, b: SLOT2, rel: 'cross' }, positive: true }, src: line },
+  ], line);
+}
+
+/**
+ * «(שני) המעגלים (O ו-P) נחתכים (זה עם זה) בנקודות X ו-Y» / "(the) (two) circles (O and P) intersect at X and Y" — the
+ * PLURAL circle subject crossing (#2108, ADR-AG-300). The subject is `readCircleSubject`'s plural reading, the one the
+ * tangency family already reads «המעגלים O ו-P משיקים» with; the singular-joined «מעגל O ומעגל P נחתכים …» stays on
+ * `bothCrossings`. Named circles the figure lacks are stated (#1688); unnamed ones are the two the figure holds.
+ */
+const PLURAL_CROSS_HE = new RegExp(
+  `^(.+?)\\s+${MEET_VERB_HE}(?:\\s+(?:זה\\s+עם\\s+זה|זו\\s+עם\\s+זו))?(?:\\s+ב(?:נקודות|-)?\\s*(${NAME})${AND_HE}(${NAME}))?$`,
+);
+const PLURAL_CROSS_EN = new RegExp(
+  `^(.+?)\\s+(?:intersect|meet)(?:\\s+(?:each\\s+other|one\\s+another))?(?:\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME}))?$`,
+  'i',
+);
+const ONE_NAME = new RegExp(`^${NAME}$`);
+function pluralCircleCrossing(g: string, line: string): RuleOutcome {
+  const m = PLURAL_CROSS_HE.exec(g) ?? PLURAL_CROSS_EN.exec(g);
+  if (!m) return null;
+  const subjectText = trim(m[1]);
+  if (!SUBJECT_PLURAL.test(subjectText)) return null;
+  const subject = readCircleSubject(subjectText);
+  if (!subject || subject.kind !== 'pair') return null;
+  const [o, p] = subject.names;
+  if (o !== undefined && !(ONE_NAME.test(o) && ONE_NAME.test(p))) return null; // a numeral pair is not read here
+  if (o !== undefined && o === p) return refuse('repeated-vertex', line); // «המעגלים O ו-O» names one circle twice
+  if (m[2] !== undefined && m[2] === m[3]) return refuse('repeated-vertex', line); // «בנקודות X ו-X»
+  const slots: CircleSlot[] = o !== undefined ? [{ k: 'named', name: o }, { k: 'named', name: p }] : [{ k: 'the' }, { k: 'the' }];
+  return twoCircleCrossing(slots, m[2], m[3], line);
+}
+
 function parseCircleFamilies(raw: string): RuleOutcome {
   const line = trim(raw);
   const g = line.replace(/^נתו(?:ן|נה|נים|נות)\s*:?\s+/, '').replace(/^given\s*:?\s+/i, '');
@@ -3434,14 +3478,7 @@ function parseCircleFamilies(raw: string): RuleOutcome {
       (he ? new RegExp(`^נחתכים(?:\\s+(?:זה\\s+עם\\s+זה\\s+)?ב(?:נקודות|-)?\\s*(${NAME})${AND_HE}(${NAME}))?$`).exec(rest) : null) ??
       (!he && adjective === 'intersecting' && !rest ? ([''] as unknown as RegExpExecArray) : null) ??
       (!he && !adjective ? new RegExp(`^intersect(?:\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME}))?$`, 'i').exec(rest) : null);
-    if (cross) {
-      const [a, b] = namedPair(cross[1], cross[2], 'crossing', 'two-circles');
-      // Two crossings of two DIFFERENT circles: both points on both is also true of one circle drawn twice.
-      return aboutCircles(pair, [
-        ...crossingsOn([a, b], [SLOT1, SLOT2], line),
-        { t: 'selector', sel: { kind: 'sign', q: { k: 'circles', a: SLOT1, b: SLOT2, rel: 'cross' }, positive: true }, src: line },
-      ], line);
-    }
+    if (cross) return twoCircleCrossing(pair, cross[1], cross[2], line);
     const concentric =
       (he ? new RegExp(`^(?:בעלי|עם)\\s+מרכז\\s+משותף\\s+(${NAME})$`).exec(rest) : null) ??
       (!he ? new RegExp(`^with\\s+(?:a\\s+)?common\\s+cent(?:re|er)\\s+(${NAME})$`, 'i').exec(rest) : null) ??
@@ -3462,6 +3499,10 @@ function parseCircleFamilies(raw: string): RuleOutcome {
     }
     return null;
   }
+
+  // «המעגלים O ו-P נחתכים בנקודות X ו-Y» — the plural subject crossing (#2108), after the indefinite «שני מעגלים».
+  const pluralCross = pluralCircleCrossing(g, line);
+  if (pluralCross) return pluralCross;
 
   // «מעגל P מוכל בתוך מעגל O» · «מעגל מוכל בתוך המעגל הגדול» — one circle strictly inside the other.
   const inside =

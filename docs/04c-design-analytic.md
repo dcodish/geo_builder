@@ -697,8 +697,11 @@ A diameter works on any circle (`diameter-of` → both ends `on-curve` plus a ra
 
 `circles-about { slots, about }` resolves `new` / `named` / `the` slots at M1; position relations are `Quantity`
 `circles { a, b, rel }` selectors, drawn by `relateCircles`; two fresh circles are named by order (`namingByOrder`).
+Every two-circle crossing sentence lowers through one helper, `twoCircleCrossing(slots, a, b)`; the plural subject
+(«המעגלים O ו-P נחתכים …», `pluralCircleCrossing`) is read by `readCircleSubject`, the tangency family's subject reader
+([ADR-AG-300](06c-decisions-analytic.md#adr-ag-300), #2108).
 
-*Identifiers:* `types.ts` · `CIRCLE_SLOT_SENTINELS` · `touchedCircleFacts(src, id, r?)` · `circle-new<k>` · `circle-pair<k>-1` · `-2` · `tangent-of { circleId, at }` · `beyond` · `toolLetters.ts` · `apart` · `inside` · `larger` · `cross` · `centres-side { a, b, p, q }` · `params { e }` · `circlePairQuantity` · `coord` · `θ_<id>.k/s/g/m` · `θ_<id>.r` · `circleToName` · `interchangeable`
+*Identifiers:* `types.ts` · `CIRCLE_SLOT_SENTINELS` · `touchedCircleFacts(src, id, r?)` · `circle-new<k>` · `circle-pair<k>-1` · `-2` · `tangent-of { circleId, at }` · `beyond` · `toolLetters.ts` · `apart` · `inside` · `larger` · `cross` · `centres-side { a, b, p, q }` · `params { e }` · `circlePairQuantity` · `coord` · `θ_<id>.k/s/g/m` · `θ_<id>.r` · `circleToName` · `interchangeable` · `twoCircleCrossing` · `pluralCircleCrossing` · `readCircleSubject`
 
 ### The two tangents meet; the meet verbs; a floor that does not collapse with the figure ([ADR-AG-213](06c-decisions-analytic.md#adr-ag-213), #1620 S7)
 
