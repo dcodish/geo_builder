@@ -5031,6 +5031,25 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'radius-ratio-refusal-names-radii-2112',
+    title: '«רדיוס מעגל O גדול פי 2 מרדיוס מעגל P» after «מעגל O ברדיוס 4» · «מעגל P ברדיוס 3» is refused naming «מעגל O ברדיוס 4», the reason the radii (#2112, ADR-698)',
+    guards:
+      "#2112, the operator's ruling of 2026-10-15 (card 3, A, the sentence approved as written). Measured on 4b0b4592 through decideDeterministic2D: refused «… סותר נתון קודם … הסיבה: |O⟨…⟩| = 2·|P⟨…⟩|.» — the hidden on-circle witness the ratio is lowered to, and no other side. Root cause: set-radius-ratio lowers to a plain `ratio` over (centre, witness) and describeConstraint described the witness distance; a stated radius owns no constraint, so the drop-one search never names it. Fix: the ratio carries `radii`, describeConstraint names radius(circle-O), the humaniser reads «רדיוס מעגל O», and the fold names the statement that sized c1 by provenance. Asserts the two circles build green and the ratio line is refused at the door in the ruled sentence, verbatim. The matrix is src/app/__tests__/issue-2112-radius-ratio-reason.test.ts.",
+    steps: ['מעגל O ברדיוס 4', 'מעגל P ברדיוס 3'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const facts = factsOf(['מעגל O ברדיוס 4', 'מעגל P ברדיוס 3']);
+      const line = 'רדיוס מעגל O גדול פי 2 מרדיוס מעגל P';
+      const v = gateVerdict(facts, line);
+      expect(v.kind).toBe('refused');
+      const raw = (v as { detail?: string }).detail;
+      expect(stripFormatControls(humanizeError(raw, he as never, line, otherUtteranceForError(facts, raw)))).toBe(
+        'לא ניתן: «רדיוס מעגל O גדול פי 2 מרדיוס מעגל P» סותר את «מעגל O ברדיוס 4» — אי אפשר לקיים את שניהם יחד. הסיבה: רדיוס מעגל O = 2 · רדיוס מעגל P.',
+      );
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

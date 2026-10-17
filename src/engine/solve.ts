@@ -576,6 +576,9 @@ export function describeConstraint(con: Constraint): string {
     case 'equal':
       return `|${con.a}${con.b}| = |${con.c}${con.d}|`;
     case 'ratio':
+      // #2112 (ADR-698): a radius relation is described as the radii the student related, never as the witness
+      // distances it is lowered to (`|O~radw-circle-O|`, or `|OA|` when a point rides the circle).
+      if (con.radii) return `radius(${con.radii.c1}) = ${con.k} · radius(${con.radii.c2})`;
       return `|${con.a}${con.b}| = ${con.k}·|${con.c}${con.d}|${con.add ? ` ${con.add > 0 ? '+' : '−'} ${Math.abs(con.add)}` : ''}`;
     case 'length-radius':
       return `|${con.a}${con.b}| = ${con.k}·R${con.add ? ` ${con.add > 0 ? '+' : '−'} ${Math.abs(con.add)}` : ''}`;

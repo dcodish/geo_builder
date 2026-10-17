@@ -735,6 +735,8 @@ function foldForSearch(facts: Fact[]): FoldNode {
 }
 /** #943: the structured tail an over-constrained status carries once the other side is known — `[vs #<fact index>]`. */
 export const OVER_CONSTRAINED_VS = /^over-constrained: (.+) cannot hold(?: \[vs #(\d+)\])?$/;
+/** #2112 (ADR-698): `describeConstraint`'s radius-relation reason, `radius(circle-O) = 2 · radius(circle-P)` — groups c₁, c₂. */
+const RADIUS_RELATION_DESC = /^radius\(([^()]+)\) = \S+ · radius\(([^()]+)\)$/;
 /** #2080 (ADR-645): `oneCommonPointError` — a second crossing of two circles with one common point, untagged. */
 const ONE_COMMON_POINT = /^over-constrained: (\S+) coincides with (\S+) cannot hold$/;
 /**
@@ -1965,6 +1967,37 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
         for (const h of facts) if (status[h.id] === st) status[h.id] = tagged;
         break;
       }
+    }
+  }
+  /**
+   * #2112 ([ADR-698](docs/06-decisions.md#adr-698)) — a RADIUS RELATION's other side by provenance, when the drop-one
+   * search above named none. A stated radius is a circle PROPERTY that owns no constraint (#2119), so «מעגל O ברדיוס 4»
+   * is never a relevant earlier candidate and «רדיוס מעגל O גדול פי 2 מרדיוס מעגל P» was refused «סותר נתון קודם».
+   * The operator's ruled sentence (2026-10-15) names the statement that sized the circle the relation is ABOUT (c₁),
+   * else the one that sized c₂ — read from the fact list (the latest statement stating that circle's size), never
+   * searched for. Runs after the search so a statement that completed the contradiction keeps ADR-554's precedence.
+   */
+  if (attribute && hoistDepth === 0) {
+    for (const f of failedFacts) {
+      const st = status[f.id];
+      if (typeof st !== 'string') continue;
+      const m = OVER_CONSTRAINED_VS.exec(st);
+      if (!m || m[2] !== undefined) continue;
+      const r = RADIUS_RELATION_DESC.exec(m[1]);
+      if (!r) continue;
+      const own = groupKey(f);
+      const sizer = (circle: Id): number => {
+        for (let j = facts.length - 1; j >= 0; j--) {
+          const g = facts[j];
+          if (g.enabled && groupKey(g) !== own && statedSizeCircles(lowerOne(g.cmd, symtab)).has(circle)) return j;
+        }
+        return -1;
+      };
+      const j = [r[1], r[2]].map(sizer).find((x) => x >= 0);
+      if (j === undefined) continue;
+      const first = facts.findIndex((g) => groupKey(g) === groupKey(facts[j]));
+      const tagged = `${st} [vs #${first}]`;
+      for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
     }
   }
   const buildError = !pending && failedFacts.length ? (status[failedFacts[failedFacts.length - 1].id] as string) : null;

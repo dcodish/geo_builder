@@ -368,7 +368,8 @@
       "coincidesWith": "coincides with",
       "coincidesTarget": "coincides with its constructed target",
       "areaOf": "area(",
-      "perimeterOf": "perimeter("
+      "perimeterOf": "perimeter(",
+      "radiusOf": "radius of circle {{circle}}"
     },
     "stmt": {
       "centreOfCircle": "is the centre of circle",
