@@ -332,6 +332,8 @@ export type RelPlaneDef =
  * (#766/#765, ADR-3D-169); the vocabulary lives here because the CLAIM carries it.
  */
 export type SolidNoun = 'pyramid' | 'tetra' | 'cube' | 'box' | 'prism' | 'any';
+/** #1860: the one noun a declared solid KIND is named by in a refusal (`nounOfKind`, solidSubject.ts). */
+export type SolidNounOf = 'pyramid' | 'cube' | 'box' | 'prism';
 
 export type SolidKind =
   | 'cube' | 'box' | 'prism3' | 'pyramid4' | 'pyramid3' | 'tetra' | 'prism4r' | 'pyramid4g' | 'pyramid4r' | 'pyramid4gr'
@@ -1841,7 +1843,7 @@ export type EngineError3 =
   // on the student's figure. #1849 (ADR-3D-310): every such collapse is refused; `forced` says the
   // non-incidence givens force the flatness on their own (lengths 5·3·8, a stated coincidence) rather
   // than an incidence on a rider inventing it, which changes only the wording.
-  | { code: 'polygon-collapsed'; stated: string; others: string[]; sides: number; ring: string; forced?: true }
+  | { code: 'polygon-collapsed'; stated: string; others: string[]; sides: number; ring: string; forced?: true; /** #1860 (ADR-3D-358): the collapsed figure is a declared SOLID — the noun it is named by */ solid?: SolidNounOf }
   /** #1923 (ADR-3D-314): a polygon DECLARED over points fixed by coordinates whose ring, in the order named, crosses
    *  itself — not that shape. `stated` is the line that completed it (the declaration, or the coordinate that came
    *  last). Analytic's `ring-contradicts-noun` (ADR-AG-129), worded as analytic's. */

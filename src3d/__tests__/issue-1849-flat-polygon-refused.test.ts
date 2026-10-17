@@ -11,8 +11,8 @@
  * force it. A polygon declared over points that ALREADY exist is a statement about them (M1, #116): its
  * ring-open meaning is now recorded as a `polygon-open` claim and verified, so the same rule reaches it.
  *
- * Not changed: the #936 notice for a SOLID the givens flatten (a pyramid's apex in its base plane) — a solid
- * is not a declared polygon (ADR-W-115 keeps the notice there), and a thin-but-real triangle builds.
+ * Not changed here: a thin-but-real triangle builds. (A SOLID the givens flatten kept the #936 notice until #1860,
+ * ADR-3D-358, refused it too.)
  * Everything runs through the real submit decision `decideSubmit3`.
  */
 import { describe, expect, it } from 'vitest';
@@ -149,11 +149,12 @@ describe('#1849 — controls: a thin but real figure builds, and so does a coinc
     for (const seed of SEEDS_24) expect(builds(lines, seed, ring), `seed ${seed}`).toBeGreaterThan(1e-3);
   }, 120_000);
 
-  it('a SOLID the givens flatten keeps its #936 notice (ADR-W-115 scopes the refusal to declared polygons)', () => {
+  // flipped in place by #1860 (ADR-3D-358, operator ruling 2026-10-07): a solid the givens flatten is refused too
+  it('a SOLID the givens flatten is refused as that solid (#1860 extends the refusal to declared solids)', () => {
     const lines = ['פירמידה SABCD', '∠BAS = 40', '∠DAS = 50'];
     const r = run(lines, 0);
-    expect(r.refusedAt).toBe(-1);
-    expect(derive3(r.st.facts, r.st.seed).notices.some((n) => n.kind === 'solid-degenerate')).toBe(true);
+    expect(r.refusedAt).toBe(2);
+    expect(r.error).toMatchObject({ code: 'polygon-collapsed', forced: true, solid: 'pyramid' });
   });
 });
 

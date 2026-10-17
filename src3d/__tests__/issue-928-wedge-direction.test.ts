@@ -59,9 +59,10 @@ describe('#928 — the same corner named two ways draws ONE arc', () => {
 
 describe('#928 — the guard that matters: genuinely different wedges still draw separately', () => {
   it('two DIFFERENT corners at the same vertex keep their own arcs', () => {
-    const b = build([PYR, '∠BAS = 40', '∠DAS = 50']);
+    // 50/60, not 40/50: a complementary pair at a square corner flattens the pyramid, refused since #1860 (ADR-3D-358)
+    const b = build([PYR, '∠BAS = 50', '∠DAS = 60']);
     // ∠BAS and ∠DAS share the vertex A but not their rays (AB ⟂ AD in a square base).
-    expect(texts(b).sort()).toEqual(['40°', '50°']);
+    expect(texts(b).sort()).toEqual(['50°', '60°']);
   });
 
   it('the same ray pair at DIFFERENT vertices is not collapsed', () => {

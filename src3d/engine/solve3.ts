@@ -230,6 +230,8 @@ export interface InventedCollapse3 {
   ring: Id[];
   riderKeys: string[];
   forced: boolean;
+  /** #1860 (ADR-3D-358): set when the figure collapsed is a declared SOLID (its kind; `ring` is its vertex ids). */
+  solid?: SolidKind;
 }
 /** A solve's pool — the solutions, plus the #1815/#1849 record when it is empty because of a collapse. */
 export type PivotPool = PivotResult[] & { readonly collapse?: InventedCollapse3 };
@@ -303,6 +305,36 @@ export function scalePinned(c: Construction3): boolean {
  * `polygon3/4/5` are V8-g's 2-D vector lane, modelled as "solids" to reuse the dims sampler.
  */
 export const FLAT_SOLID_KINDS: ReadonlySet<SolidKind> = new Set<SolidKind>(['polygon3', 'polygon4', 'polygon5']);
+
+/**
+ * #1860 (ADR-3D-358) — how THIN a solid is: its greatest out-of-plane deviation over its greatest vertex
+ * separation (scale-free). Moved here from `notices.ts`, where #936 (ADR-3D-234) calibrated it for the
+ * flat-solid notice that this ADR retires: the reported 40/50 pyramid measured 1.8e-3, the nearest thin
+ * real one (41/50) 9.8e-2, so 1e-2 sits about a decade from each. A solution under the band is RELEASED on
+ * its own residuals before it counts as a figure (`solidSliver`); the band only decides which solution is
+ * re-examined, never what is refused.
+ */
+export const SOLID_THIN_RATIO = 1e-2;
+function flatnessRatio(pts: readonly Vec3[]): number | null {
+  if (pts.length < 4) return null;
+  let extent = 0;
+  for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) extent = Math.max(extent, norm3(sub3(pts[i], pts[j])));
+  if (!(extent > 1e-9)) return null; // collapsed to a point: the pairwise gate's business
+  // the best-supported plane: the triple whose normal is longest is the most numerically trustworthy
+  let bestN: Vec3 | null = null;
+  let bestLen = 0;
+  for (let i = 0; i < pts.length; i++)
+    for (let j = i + 1; j < pts.length; j++)
+      for (let k = j + 1; k < pts.length; k++) {
+        const n = cross3(sub3(pts[j], pts[i]), sub3(pts[k], pts[i]));
+        const len = norm3(n);
+        if (len > bestLen) { bestLen = len; bestN = n; }
+      }
+  if (!bestN || !(bestLen > 1e-12)) return 0; // every triple collinear: flat
+  let maxOff = 0;
+  for (const q of pts) maxOff = Math.max(maxOff, Math.abs(dot3(sub3(q, pts[0]), bestN) / bestLen));
+  return maxOff / extent;
+}
 
 /**
  * #872 — how far the vertices stray from ONE plane, in absolute units.
@@ -1184,6 +1216,13 @@ export function solvePivot(
     return out;
   };
 
+  /**
+   * #1860 (ADR-3D-358): an EXACT candidate the #872 hard gate below discards as a flat solid — the givens hold
+   * on a flat figure. When the pool then comes back empty and no open figure exists, the refusal says the solid
+   * would be flat («פירמידה ישרה SABCD שבסיסה מלבן · AB = 6 · BC = 8 · SA = 5», the apex in the base) instead of
+   * the generic contradiction. Recorded at the acceptance sites (`noteFlatSolid`), read by `flatSolidRefusal`.
+   */
+  let flatSolidSeen: SolidObj | null = null;
   /** The SOLID half of `degenerate` (#1735 split it out): a collapsed solid is not a figure. */
   const collapsed = (x: number[]): boolean => {
     // S3 (#378): NOT gated on `planeDrive` any more. A collapsed solid is not a figure whatever
@@ -1508,16 +1547,85 @@ export function solvePivot(
       ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((rd, i) => [rd.id, x[riderBase + i]])) } : {}),
     });
   };
+  /**
+   * #1860 (ADR-3D-358, operator ruling 2026-10-07; amends ADR-3D-310, retires ADR-3D-234's notice) — A
+   * DECLARED SOLID THE GIVENS FORCE FLAT IS NOT A FIGURE EITHER: "a flat figure is not a pyramid / prism / …".
+   * The #872 hard gate (`collapsed`, 1e-4 of span) already rejected an EXACTLY flat solid, silently, and a
+   * solution that stopped just above it («פירמידה SABCD · ∠BAS = 40 · ∠DAS = 50», apex at z ≈ 0.001) was
+   * drawn with the #936 notice: which one a student got depended on how exactly the solver landed. Now one
+   * judgement, the declared-polygon one: a solution whose non-flat solid is THIN (`SOLID_THIN_RATIO`) is
+   * released on its own residuals, and if the released figure is exact and flat, the open one was the
+   * anchor's, and it is judged flat. A genuinely thin solid (41/50) is exact where it stands and stays open.
+   */
+  const flatSolidAt = (pos: Positions3): SolidObj | null => {
+    for (const solid of c.solids) {
+      if (FLAT_SOLID_KINDS.has(solid.kind)) continue;
+      const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
+      if (pts.length < 4) continue;
+      let maxD = 0;
+      for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) maxD = Math.max(maxD, norm3(sub3(pts[j], pts[i])));
+      if (maxD > 1e-12 && offPlaneSpread(pts) <= 1e-4 * maxD) return solid;
+    }
+    return null;
+  };
+  const solidPosAt = (dims: number[], riderTs?: Record<Id, number>): Positions3 =>
+    evalCanonical(dims, undefined, riderTs ? new Map(Object.entries(riderTs)) : undefined);
+  const ridersOf = (x: number[]): Record<Id, number> | undefined =>
+    nRider > 0 ? Object.fromEntries(riders.map((rd, i) => [rd.id, x[riderBase + i]])) : undefined;
+  const sliverMemo = new WeakMap<PivotResult, SolidObj | null>();
+  /** The declared solid this solution draws flat, or as a sliver of a flat figure; null when every solid is open. */
+  const solidSliver = (r: PivotResult): SolidObj | null => {
+    if (coupled || r.x.length !== fullLen) return null;
+    const memo = sliverMemo.get(r);
+    if (memo !== undefined) return memo;
+    const pos = solidPosAt(r.dims, r.riderTs);
+    let out: SolidObj | null = flatSolidAt(pos);
+    const thin =
+      !out &&
+      c.solids.some((s) => {
+        if (FLAT_SOLID_KINDS.has(s.kind)) return false;
+        const ratio = flatnessRatio(s.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p));
+        return ratio !== null && ratio < SOLID_THIN_RATIO;
+      });
+    if (thin) {
+      const f = residualsFor(r.mirror);
+      const lift = (y: number[]): number[] => (invariantOnly ? [0, 0, 0, 0, 0, 0, 0, ...y] : y);
+      const x = lift(leastSquares((y) => f(lift(y)), invariantOnly ? r.x.slice(7) : [...r.x]).x);
+      const err = f(x).reduce((sum, v) => sum + v * v, 0);
+      if (err < EXACT_RELEASE) out = flatSolidAt(solidPosAt(x.slice(7, 7 + nDims), ridersOf(x)));
+    }
+    sliverMemo.set(r, out);
+    return out;
+  };
+  const hasFlatKind = c.solids.some((s) => FLAT_SOLID_KINDS.has(s.kind));
+  /** Not an admissible configuration: a declared ring collapsed (or a released sliver), or a declared solid flat. */
+  const closedFigure = (r: PivotResult): boolean => (hasFlatKind && (collapsedRing(r) || anchorSliver(r))) || solidSliver(r) !== null;
+  /** The marked empty pool for a declared solid the givens force flat (the store refuses it, naming the statements). */
+  const flatSolidPool = (solid: SolidObj): PivotPool =>
+    Object.assign([] as PivotResult[], { collapse: { ring: [...solid.ids], riderKeys: riders.map((r) => r.id), forced: true, solid: solid.kind } });
+  const noteFlatSolid = (x: number[], primary: number): void => {
+    if (flatSolidSeen || primary >= 1e-10) return;
+    flatSolidSeen = flatSolidAt(solidPosAt(x.slice(7, 7 + nDims), ridersOf(x)));
+  };
+  /** The empty pool after an exact flat-solid rejection: an open figure if the retry finds one, else the refusal. */
+  const flatSolidRefusal = (): PivotPool => {
+    if (!flatSolidSeen) return [];
+    const reopened = openFigureRetry().filter((r) => !closedFigure(r));
+    return reopened.length > 0 ? reopened : flatSolidPool(flatSolidSeen);
+  };
   const settleFlatRings = (rs: PivotResult[]): PivotPool => {
     if (rs.length === 0 || probe) return [];
-    if (!c.solids.some((s) => FLAT_SOLID_KINDS.has(s.kind))) return [];
-    const open = rs.filter((r) => !collapsedRing(r) && !anchorSliver(r));
+    if (c.solids.length === 0) return [];
+    const open = rs.filter((r) => !closedFigure(r));
     if (open.length === rs.length) return [];
     if (open.length > 0) return open; // a collapsed member is not a configuration to cycle to
-    const frozenOpen = retryFrozenDims().filter((r) => !collapsedRing(r) && !anchorSliver(r));
+    const frozenOpen = retryFrozenDims().filter((r) => !closedFigure(r));
     if (frozenOpen.length > 0) return frozenOpen;
-    const reopened = openFigureRetry();
+    const reopened = openFigureRetry().filter((r) => !closedFigure(r));
     if (reopened.length > 0) return reopened;
+    // #1860: a declared solid the givens force flat is refused as that solid (the store names the statements)
+    const flatSolid = solidSliver(rs[0]);
+    if (flatSolid && !(hasFlatKind && (collapsedRing(rs[0]) || anchorSliver(rs[0])))) return flatSolidPool(flatSolid);
     // the attribution's reduced re-solve reads the rider rows; with none (or a V8-c layout) the
     // non-incidence givens are all there is, so they forced it
     const forced = nRider === 0 || coupled !== undefined || collapseIsStated();
@@ -1591,6 +1699,7 @@ export function solvePivot(
       // collapsed solid is not a figure, whichever solver produced it.
       const full = [0, 0, 0, 0, 0, 0, 0, ...r.x];
       if (degenerate(full)) {
+        noteFlatSolid(full, pd(r.x)); // #1860
         if (invOffHost.length < RESEAT_CAP && offHostOnly(full, pd(r.x))) invOffHost.push(r.x);
         continue;
       }
@@ -1625,7 +1734,7 @@ export function solvePivot(
         if (primary >= 1e-10 || degenerate([0, 0, 0, 0, 0, 0, 0, ...r.x])) continue;
         if (!found || primary < found.primary) found = { x: r.x, primary };
       }
-      return found ? invResult(found.x, found.primary) : [];
+      return found ? invResult(found.x, found.primary) : flatSolidRefusal(); // #1860: [] unless an exact flat solid was seen
     };
     if (!best) return failed();
     const primary = pd(best.x);
@@ -1917,6 +2026,7 @@ export function solvePivot(
     /** Accept/dedup/push one converged candidate into the pool (collectAll only). */
     const collect = (cand0: { x: number[]; err: number }): void => {
       if (degenerate(cand0.x)) {
+        noteFlatSolid(cand0.x, primaryErr(cand0.x)); // #1860
         noteOffHost(cand0.x); // #1735: kept for the re-seat, never admitted as it stands
         return; // a collapsed solid is not a figure (general position)
       }
@@ -1974,6 +2084,7 @@ export function solvePivot(
         r0 = r2;
       }
       if (degenerate(r0.x)) {
+        noteFlatSolid(r0.x, primaryErr(r0.x)); // #1860
         noteOffHost(r0.x); // #1735
         continue;
       }
@@ -2105,6 +2216,7 @@ export function solvePivot(
               r = r2;
             }
             if (degenerate(r.x)) {
+              noteFlatSolid(r.x, primaryErr(r.x)); // #1860
               noteOffHost(r.x); // #1735
               continue;
             }
@@ -2166,6 +2278,8 @@ export function solvePivot(
     // #1735 (ADR-3D-306): …and only then, the off-host candidates the acceptance sites discarded are
     // re-seated onto their hosts (the frozen retry's own recursive solve has already had this chance).
     for (const stage of reseatStages) stage();
+    // #1860 (ADR-3D-358): an exact candidate was discarded as a flat solid — refused as that solid, unless open
+    if (results.length === 0 && flatSolidSeen) return flatSolidRefusal();
   }
   // #1499: …or it found figures that collapse a declared polygon's ring — keep only the open ones, or a
   // figure the frozen-dims retry finds open; with none, the pool is empty and marked (#1849, ADR-3D-310:

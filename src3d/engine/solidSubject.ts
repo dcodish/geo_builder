@@ -21,7 +21,7 @@
  * enumeration is not a rule"*) — and one resolver for both consumers, the CLAIM lane and the QUERY
  * lane, which had drifted into two different readings of the same sentence.
  */
-import type { Construction3, Id, SolidKind, SolidNoun, SolidObj } from './types';
+import type { Construction3, Id, SolidKind, SolidNoun, SolidNounOf, SolidObj } from './types';
 import { centroid3, cross3, dot3, sub3, type Vec3 } from './vec3';
 
 /**
@@ -46,6 +46,20 @@ export function nounAdmits(noun: SolidNoun, kind: SolidKind): boolean {
     case 'prism':
       return kind.startsWith('prism') || kind === 'parallelepiped' || kind === 'box' || kind === 'cube';
   }
+}
+
+/**
+ * #1860 (ADR-3D-358) — the noun a declared solid KIND is named by in a refusal («הפירמידה SABCD», «המנסרה …»):
+ * the most specific noun that admits it. Derived from the kind's own name like {@link nounAdmits}, so a kind
+ * added tomorrow is named the same day; a flat polygon kind is not a solid (null). `tetra` is a triangular
+ * pyramid («פירמידה ABCD» is how it is declared).
+ */
+export function nounOfKind(kind: SolidKind): SolidNounOf | null {
+  if (kind.startsWith('polygon')) return null;
+  if (kind === 'cube') return 'cube';
+  if (kind === 'box') return 'box';
+  if (kind.startsWith('pyramid') || kind === 'tetra') return 'pyramid';
+  return 'prism'; // prism*, parallelepiped
 }
 
 export type SolidSubject =

@@ -140,6 +140,10 @@
     "polygonForced": "Can't do that: «{{stated}}» together with {{others}} hold only if {{shape}} is flat (all its vertices on one line) — and a line is not a {{kind}}.",
     "polygonForcedAlone": "Can't do that: «{{stated}}» holds only if {{shape}} is flat (all its vertices on one line) — and a line is not a {{kind}}.",
     "polygonKind": { "3": "triangle", "4": "quadrilateral", "5": "pentagon" },
+    "solidForced": "Can't do that: «{{stated}}» together with {{others}} hold only if {{shape}} is flat — and a flat solid is not a {{kind}}.",
+    "solidForcedAlone": "Can't do that: «{{stated}}» holds only if {{shape}} is flat — and a flat solid is not a {{kind}}.",
+    "solidShape": { "pyramid": "pyramid {{ids}}", "cube": "cube {{ids}}", "box": "box {{ids}}", "prism": "prism {{ids}}" },
+    "solidKind": { "pyramid": "pyramid", "cube": "cube", "box": "box", "prism": "prism" },
     "signUnsatisfiable": "No solution satisfies the stated coordinate sign of «{{id}}»",
     "noSuchSolid": "The figure doesn't have exactly one «{{id}}» — the claim is ambiguous",
     "ambiguousSolid": "The figure has {{count}} solids matching this statement — name the letters of the one you mean",
@@ -373,14 +377,7 @@
       "perp": "it already follows from the solid you defined",
       "parallel": "it already follows from the solid you defined"
     },
-    "alreadyStated": "That is already stated («{{utterance}}») — the figure is unchanged and no row was added",
-    "solidDegenerate": "What you stated forces {{ids}} to be flat — {{because}}. The drawing satisfies every given, but the solid has no volume.",
-    "solidDegenerateBare": "What you stated forces {{ids}} to be flat. The drawing satisfies every given, but the solid has no volume.",
-    "causeJoin": " and ",
-    "cause": {
-      "angle": "angle {{ids}} = {{value}}°",
-      "length": "{{ids}} = {{value}}"
-    }
+    "alreadyStated": "That is already stated («{{utterance}}») — the figure is unchanged and no row was added"
   },
   "display": {
     "witnesses": "Show the distance witness segment (the height)"

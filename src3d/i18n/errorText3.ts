@@ -182,6 +182,15 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
         : t('err.noRoots', { sym: err.sym, stated: err.stated });
     // #1815 (ADR-3D-309): 2-D's «X סותר את Y — אי אפשר לקיים את שניהם יחד» frame, with the geometric reason
     case 'polygon-collapsed': {
+      // #1860 (ADR-3D-358, operator ruling 2026-10-07): a declared SOLID the givens force flat — the shipped
+      // `polygonForced` frame with the solid's own noun, without the «all its vertices on one line» parenthesis
+      if (err.solid) {
+        const solidShape = t(`err.solidShape.${err.solid}`, { ids: err.ring });
+        const solidKind = t(`err.solidKind.${err.solid}`);
+        return err.others.length > 0
+          ? t('err.solidForced', { stated: err.stated, others: quoteList(err.others), shape: solidShape, kind: solidKind })
+          : t('err.solidForcedAlone', { stated: err.stated, shape: solidShape, kind: solidKind });
+      }
       const shape = t(`err.polygonNoun.${err.sides}`, { ring: err.ring });
       // #1849 (ADR-3D-310): a flatness the givens force on their own — named together, and why it is refused
       if (err.forced) {

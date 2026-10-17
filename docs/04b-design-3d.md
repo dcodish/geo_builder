@@ -531,8 +531,20 @@ the frozen-dims retry and the **open-figure retry** (`openSolveOn(null)`, passin
 nothing open, the pool is marked `collapse: { ring, riderKeys, forced }` — `forced: false` names the riders'
 statements, `forced: true` the ring's own pin owners (`err.polygonForced` / `err.polygonForcedAlone`). A
 polygon over existing points records a `polygon-open` claim (`given`), judged by `ringCollapsed3`; a sliver
-(`ringOpenness3` < 1e-2) is released and counts as collapsed if it lands flat. A flattened SOLID keeps the
-#936 notice.
+(`ringOpenness3` < 1e-2) is released and counts as collapsed if it lands flat.
+
+**A declared solid forced flat is refused the same way** (#1860, [ADR-3D-358](06b-decisions-3d.md#adr-3d-358)).
+`settleFlatRings` judges every solid, not only the flat kinds: `closedFigure(r)` adds `solidSliver(r)` — a non-flat
+solid whose `flatnessRatio` is under `SOLID_THIN_RATIO` (1e-2, #936's calibration, moved into `solve3.ts`) is
+released on its own residuals and counts as flat if the release is exact and `flatSolidAt` (the #872
+off-plane test, 1e-4 of span) holds. An EXACT candidate the #872 hard gate discards records `flatSolidSeen`
+(`noteFlatSolid`, at every acceptance site); an empty pool with one runs the open-figure retry and otherwise
+comes back `collapse: { ring: solid ids, forced: true, solid: kind }`. `derive3` names it as a solid
+(`polygon-collapsed` with `solid: nounOfKind(kind)`, the letters as the declaring statement wrote them) and
+`errorText3` words it with `err.solidForced` / `err.solidForcedAlone` over `err.solidShape.*` / `err.solidKind.*`.
+A newest pin owner whose recorded claim has no `given` (a claim-arbitered answer, ADR-3D-030) keeps `claim-refuted`:
+the store ignores a SOLID collapse record for it.
+The #936 notice (`degenerateSolids`, `solid-degenerate`) is deleted.
 
 **A declared polygon over fixed points must be a simple ring** (#1923, [ADR-3D-314](06b-decisions-3d.md#adr-3d-314)).
 `ringSelfCrossing3` (vec3.ts, beside `ringCollapsed3`) asks whether two non-adjacent sides properly cross in the
@@ -754,12 +766,11 @@ the decision is `factRowDir3` (`render/FactRow3.tsx`). `VecMath` emits each expr
 The lengths come from `statedLengths` (`engine/dataView.ts`), shared with the panel and keyed by the
 unordered pair; not gated by `showWitnesses` or by edge visibility.
 
-### The degeneracy notice (#936, [ADR-3D-234](06b-decisions-3d.md#adr-3d-234))
+### The degeneracy notice (#936, [ADR-3D-234](06b-decisions-3d.md#adr-3d-234)) — retired
 
-`degenerateSolids` joins `buildNotices3`, derived from the construction and the resolved sample:
-`flatnessRatio(pts)` (out-of-plane deviation ÷ vertex separation, widest-spread normal); `FLAT_BY_DESIGN`
-exempts `polygon3/4/5`; `causesFor(c, ids)` names the stated `scalarPins` in the solid. The threshold is
-`DEGENERATE_FLAT_RATIO`.
+Deleted by #1860 ([ADR-3D-358](06b-decisions-3d.md#adr-3d-358)): a solid the givens force flat is refused at the
+pivot (see *A declared solid forced flat is refused the same way*). `flatnessRatio` and its calibrated band
+(`SOLID_THIN_RATIO`) live in `solve3.ts`.
 
 ### The DOF cue: measured, not inferred (#370, #990 — [ADR-3D-247](06b-decisions-3d.md#adr-3d-247), [ADR-3D-248](06b-decisions-3d.md#adr-3d-248))
 

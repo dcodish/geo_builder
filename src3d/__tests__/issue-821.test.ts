@@ -82,7 +82,8 @@ describe('#821 — ∥ draws the named plane’s ring, as ⟂ does', () => {
   it('«SB מקביל למישור ACD» on a pyramid REFUSES — it can only hold by flattening the solid', () => {
     reset();
     ['פירמידה SABCD', 'SB מקביל למישור ACD'].forEach(submit);
-    expect(state().lastError?.code).toBe('givens-contradict');
+    // #1860 (ADR-3D-358, operator ruling 2026-10-07): refused as the flattened pyramid, no longer the generic contradiction
+    expect(state().lastError).toMatchObject({ code: 'polygon-collapsed', forced: true, solid: 'pyramid', stated: 'SB מקביל למישור ACD' });
   });
 
   beforeEach(reset);

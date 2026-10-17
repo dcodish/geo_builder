@@ -9052,6 +9052,8 @@ read of a persisted map.
 
 ### ADR-3D-234 — A solid whose givens force it COPLANAR is said out loud, naming the statements (#936)
 
+**⚠ Superseded by [ADR-3D-358](#adr-3d-358) (2026-10-17, operator ruling 2026-10-07):** the notice is retired; a solid the givens force flat is refused. The calibration (1e-2, `SOLID_THIN_RATIO`) and the 41/50 boundary carry over.
+
 **Status:** accepted, 2026-09-09 (fix-round #949, item 3) · **Issue:** #936 · **Adopts:** [ADR-W-048](06w-decisions-workspace.md#adr-w-048)
 **Requirements:** [02b](02b-requirements-3d.md) FR-RD-7 (new) · **Design:** [04b](04b-design-3d.md) — the notice channel
 
@@ -12081,6 +12083,8 @@ The degradation policy is deliberately unchanged (a line this code does not comm
 
 ## ADR-3D-310 — A declared polygon the givens collapse flat is refused, whatever forced it (#1849)
 
+**Amended by [ADR-3D-358](#adr-3d-358) (2026-10-17):** the same judgement now covers declared SOLIDS — the "a flattened SOLID keeps the #936 notice" scope below is withdrawn.
+
 **Status:** accepted · 2026-10-07 · bug (P1, honesty) · branch `fix/1849-3d-refuse-flat` off `main` @ 3032fcbb · the 3-D slice of #1849 · implements the operator ruling of 2026-10-07 (workspace ADR-W-115, which reverses ADR-W-048's notice for declared polygons) · amends [ADR-3D-309](#adr-3d-309) and [ADR-3D-268](#adr-3d-268) part 2
 
 **Requirements:** [docs/02b](02b-requirements-3d.md) FR-RD-7 — a declared polygon is never drawn flat; the line that completes the collapse is refused, naming the statements; the notice stays for a flattened SOLID · **Design:** [docs/04b](04b-design-3d.md) § "The ⟂-from-an-in-plane-point disposition", new paragraph *A declared polygon collapsed is refused, whatever forced it* · **LADDER stage:** solve (the pool decision and the open-figure retry, failure path only) + apply (the binding path's `polygon-open` claim) + derive (routing and wording).
@@ -12888,3 +12892,52 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 **Golden drift — read and attributed.** `decide-submit3-parity-1394.golden.json` is re-recorded. Every sequence that holds a label-less shape line drifts in its saved commands (the fact now keeps the `shape-ref3`). Compared at the level of what the student sees (error, notice, fact count, statuses, points, rings) against 4b0b4592 over all 2400 harvested sequences, 49 differ, and in each the first differing line is a label-less shape noun: the definite rows now act on the one triangle (DEF, SAB) instead of minting ABC; the two-shape rows are refused `ambiguous-definite-shape`; and the indefinite rows — «משולש», «משולש ישר זווית», «משולש שווה שוקיים», «במשולש ישר זווית», «ריבוע», and the bare noun lines of harvested vocabulary lists («ריבוע» · «מלבן», "trapezoid" after «טרפז ABCD …») — draw a new ring (DEF / GHI / EFGH) where they used to answer «already stated» or restate ABC(D). That last group is the indefinite rule applied to every flat noun, as 2-D does («ריבוע ABCD» · «ריבוע» → EFGH measured in 2-D at 4b0b4592). No drift outside the class.
 
 **Locks.** `src3d/__tests__/issue-2235-shape-ref.test.ts` (the article reader; every measured row at its ruled outcome; the refusals with their example; definite = named, positions within 1e-9 at seeds 0–3; the indefinite letters equal 2-D's; entry order); fixtures `fixtures3/definite-triangle-one-2235.geo3.json`, `fixtures3/indefinite-triangle-new-2235.geo3.json`; the parity table loses its 3-D gap on `definite-triangle-two-2205` and gains `indefinite-triangle-new-2235`; the message floor rows for the new code.
+
+## ADR-3D-358 — A declared solid the givens force flat is refused, never drawn with a notice: one collapse judgement for rings and solids (#1860)
+
+**Status:** accepted · 2026-10-17 · bug (P2, ruled 2026-10-08 "keep P2") · branch `fix/1860-3d-flat-solid-refused` off `main` @ b0e9dbea · fix round #2291 · implements the #1860 `/decisions` fix plan of 2026-10-07 · **supersedes** [ADR-3D-234](#adr-3d-234)'s notice · **amends** [ADR-3D-310](#adr-3d-310) (its judgement now covers solids) · adopts [ADR-W-115](06w-decisions-workspace.md#adr-w-115) Am. 1
+**Operator ruling (verbatim, 2026-10-07, in #1860's body):** *"we should refuse this as well since it contradicts the pramid statement"* — and *"a flat figure is not a pyramid / prism / …"*.
+
+**Requirements:** [02b](02b-requirements-3d.md) **FR-RD-7** (rewritten: a declared solid is never drawn flat) · [02w](02w-requirements-workspace.md) behaviour table (new row "A declared solid forced flat") · **Design:** [04b](04b-design-3d.md) § the ⟂-from-an-in-plane-point disposition, new paragraph *A declared solid forced flat is refused the same way*; § *The degeneracy notice* marked retired · **LADDER stage:** solve (`settleFlatRings`, the empty-pool exits) + derive (routing and wording).
+
+**Measured before** (`b0e9dbea`, `decideDeterministic3` ×24 seeds, no LLM):
+
+| sequence | before |
+|---|---|
+| «פירמידה SABCD · ∠BAS = 40 · ∠DAS = 50» (either order) | builds 24/24 with the `solid-degenerate` notice |
+| «פירמידה ישרה SABCD שבסיסה מלבן · AB = 6 · BC = 8 · SA = 5» (SA = half the diagonal) | refused 24/24 with the generic «הנתונים סותרים זה את זה — אין גוף שמקיים את «SA = 5» יחד עם «AB = 6», «BC = 8»» — not why |
+| controls «∠BAS = 41 · ∠DAS = 50», «50 · 60», «SA = 5.1» | build 24/24, no notice |
+
+**Root cause / class.** *A declared solid whose givens force it flat was either drawn flat with a notice or refused without its reason, depending on how exactly the solver landed.* Two predicates split one class: the pivot's #872 hard gate (`collapsed()`, off-plane spread ≤ 1e-4 of span) silently rejected an EXACTLY flat solution, so the pool came back empty and the store said `givens-contradict` (the length case); a solution that stopped just above it (the 40/50 apex at z ≈ 0.001, the `invariantOnly` lane's anchor equilibrium) was accepted and the #936 band (`DEGENERATE_FLAT_RATIO`, 1e-2) drew it with the notice. Rings stopped splitting this way in ADR-3D-310; solids had been left out by the ADR-W-115 scope the operator has now withdrawn.
+
+**Decision.**
+1. **One collapse judgement.** `settleFlatRings` (`solve3.ts`) judges every solid, not only the flat kinds: `closedFigure(r)` = a declared ring collapsed or a released ring sliver (ADR-3D-310, unchanged) **or** `solidSliver(r)` — a non-flat solid already flat (`flatSolidAt`, the #872 off-plane test), or THIN (`flatnessRatio < SOLID_THIN_RATIO`, #936's calibrated 1e-2, moved into `solve3.ts`) and, released on its own residuals, exact and flat. The open members are kept; with none, the frozen-dims retry and the open-figure retry run (their results judged by the same predicate), and otherwise the pool comes back empty, marked `collapse: { ring: solid ids, forced: true, solid: kind }`. A thin real solid (41/50) is exact where it stands, so the release does not move it and it stays open.
+2. **The hard gate's silent rejection feeds the same record.** An EXACT candidate (primary < 1e-10) that `degenerate` discards as a flat solid sets `flatSolidSeen` (`noteFlatSolid`, at every acceptance site: the cold starts, the dims widening, `collect`, the `invariantOnly` starts). When the pool then comes back empty — the gauge path after the frozen-dims retry and the #1735 re-seat, or the `invariantOnly` lane's `failed()` — `flatSolidRefusal` runs the open-figure retry and otherwise returns the marked pool. A pool emptied with no exact flat candidate is unchanged (`givens-contradict`).
+3. **The store names the solid** (`derive3`'s pin-owner guard, as for rings): `polygon-collapsed` with `solid: nounOfKind(kind)` (`solidSubject.ts`; derived from the kind's name like `nounAdmits`, `tetra` → pyramid) and the letters as the declaring statement wrote them (`solidAsWritten`: «SABCD», not the engine's apex-last «ABCDS»). `others` is the existing forced-collapse attribution — the pin owners on the solid's own vertices, never the declaration — and the claim pass skips them as for #1815 / #1849. **A statement whose claim is its own arbiter keeps its register:** when the newest pin owner recorded a claim with no `given` (the ADR-3D-030 pin-and-claim pattern — «AM = u + v + w» on a prism, a ratio, a plane coincidence), the solid record is ignored and the claim pass refutes it (`claim-refuted`), as it did before. That is the store's existing rule for an empty pivot ("a wrong exam answer is the student's answer and is refuted in that register"); without it, ten answer locks (scenarios3, exam-2026-2, #748, #1156, #1183, #1523, #1590) read «… מתקיים רק אם המנסרה שטוחה» for a wrong decomposition.
+4. **Text** (`errorText3`, he/en): `err.solidForced` / `err.solidForcedAlone` over `err.solidShape.{pyramid,cube,box,prism}` and `err.solidKind.*` — the shipped `polygonForced` frame with the solid's noun, without the «(כל קודקודיו על ישר אחד)» parenthesis: «לא ניתן: «∠DAS = 50» יחד עם «∠BAS = 40» מתקיימים רק אם הפירמידה SABCD שטוחה — וגוף שטוח אינו פירמידה.» / "Can't do that: «∠DAS = 50» together with «∠BAS = 40» hold only if pyramid SABCD is flat — and a flat solid is not a pyramid." Every solid noun is feminine in Hebrew, so «שטוחה» is part of the frame.
+5. **The notice is retired**, not left as a dead path: `degenerateSolids`, `flatnessRatio`/`causesFor`/`DegenerateCause`/`DEGENERATE_FLAT_RATIO`/`FLAT_BY_DESIGN` (`notices.ts`), the `solid-degenerate` notice kind, its `App3` branch and `notice.solidDegenerate*` / `notice.causeJoin` / `notice.cause.*` (he, en).
+
+**Measured after** (same door; 24 seeds unless noted):
+
+| sequence | after |
+|---|---|
+| «פירמידה SABCD · ∠BAS = 40 · ∠DAS = 50», either order | refused at the third line 24/24, the sentence above (11–46 ms per seed) |
+| «פירמידה ישרה SABCD שבסיסה מלבן · AB = 6 · BC = 8 · SA = 5» | refused 24/24: «לא ניתן: «SA = 5» יחד עם «AB = 6», «BC = 8» מתקיימים רק אם הפירמידה SABCD שטוחה — וגוף שטוח אינו פירמידה.» |
+| «פירמידה SABC · ∠BAS = 30 · ∠CAS = 20 · ∠BAC = 50» (tetrahedron) · «פירמידה SABC · SA = 1 · SB = 2 · AB = 3» | refused, «… הפירמידה SABC שטוחה …» |
+| «תיבה ABCDA'B'C'D' · AB = 3 · BC = 4 · A'C = 5» · «מנסרה ישרה משולשת ABCA'B'C' · AB = 3 · A'B = 3» (zero height) | refused 24/24, «… התיבה ABCDA'B'C'D' שטוחה — וגוף שטוח אינו תיבה.» / «… המנסרה …» (was `givens-contradict`) |
+| «תיבה ABCDA'B'C'D' · המישור ABC מתלכד עם המישור A'B'C'» (a claim-arbitered relation) | `claim-refuted`, unchanged |
+| «פירמידה SABCD · SB מקביל למישור ACD» · «פירמידה משולשת ABCD · AD חוצה זווית BAC» | refused as the flattened pyramid (were `givens-contradict`) |
+| controls 41/50, 50/60, «SA = 5.1», the tetrahedron at 49° | build 24/24, no notice |
+| «AB = 5 · BC = 3 · AC = 8» on a triangle (ADR-3D-310) | unchanged: refused with the polygon sentence |
+
+The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim-refuted` as well (a rigid figure, and a claim-arbitered relation).
+
+**Locks.** New `src3d/__tests__/issue-1860-flat-solid-refused.test.ts` (the reported sequence both orders ×24 with the exact he/en wording; the solid named as written; the length-forced right pyramid ×24; the tetrahedron by angles and by lengths, a box and two prisms driven to zero height; `nounOfKind` over the kinds; the thin controls ×24). Flipped in place, citing this ruling: `issue-936-degenerate.test.ts` (notice → refusal; the 41/50 boundary, the near-miss family, the band constant and the `fixtures3/` corpus sweep — now "no corpus figure is refused as a flat solid" — stay), `issue-1849-flat-polygon-refused.test.ts` ("a SOLID … keeps its #936 notice" → refused as that solid), `issue-821.test.ts` and `issue-343-bisector-ray.test.ts` (`givens-contradict` → the solid refusal, the statement still named), and `issue-928-wedge-direction.test.ts` (its two-wedge figure was the 40/50 pyramid; now 50/60). Fixtures-first does not apply: the essence is a refusal with a specific message. No parity rows: solids exist only in 3-D.
+
+**Golden drift expected** (`decide-submit3-parity-1394`, the batch's to re-record): only sequences that flatten a declared solid — the 40/50 family (record + notice → refused) and the length-forced apex (`givens-contradict` → `polygon-collapsed`). Not re-recorded here.
+
+**Sibling audit.** 2-D and analytic have no solids (n/a in the 02w row). The ring half (ADR-3D-310) is unchanged; its sliver release and this one share the release-then-judge shape and the 1e-4 / 1e-2 lines.
+
+**Performance.** The reported 40/50 line: 11–46 ms per submit (20–32 ms before, with the notice); the length-forced apex 478 ms (418 ms before, refused generically); the box 99 ms (322 ms before). Thin controls unchanged (23–27 ms).
+
+**Behaviour change for a student:** a pyramid, tetrahedron, prism or box whose givens force it flat is refused at the line that completes it, naming the statements («… מתקיימים רק אם הפירמידה SABCD שטוחה — וגוף שטוח אינו פירמידה.»), instead of being drawn flat with a notice, or refused with the generic contradiction. The flat-solid notice no longer appears anywhere. A thin but real solid still builds.
