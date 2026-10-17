@@ -283,6 +283,25 @@ given never stated (ADR-052). Members: `incompleteComparative` (#777) and the ro
 registered **after** the rule that owns the complete form, and its absence is **structural** (an end-of-line
 anchor), never inferred from another rule failing.
 
+### The AI answer keeps every shape and role word (#1906, [ADR-722](06-decisions.md#adr-722))
+
+The AI second attempt in `submitPipeline.ts` runs one more member beside ADR-430's object gate:
+`droppedPropertyWords(utterance, llmCmds, ctx)` (`src/parser/propertyWords.ts`). It finds the student's property words
+with the shared reader (`shell/llm/honestyCore.ts` `propertyWords`, [ADR-W-144](06w-decisions-workspace.md#adr-w-144))
+over `PROPERTY_VOCABULARY2` — a canonical-spelling projection of `SHAPE_ADJ_WORDS`, `SHAPE_NOUN_WORDS`,
+`POLYGON_NAME_ARITY` (the n-gon tables), `CEVIAN_NOUNS_*` and the inscription verbs, folded as the span accountant
+folds and vetoed by its `KEYWORD_STEMS` / `FILLER` — and asks, PER OCCURRENCE, whether the answer's commands carry the
+property: ADR-595's `shapeAdjectiveAccounts` (extracted from `droppedShapeAdjective`), the shared `quadImplies` lattice
+for a quadrilateral noun (a ring's command type, `declaredAs`, a trapezoid's `kind`, the kite variant, `inscribe`, a
+Thales ring), `materialisedArities` for a polygon name, an even ring on one circle for «משוכלל», a foot / ⟂ / 90° for an
+altitude, a midpoint / equal pair / ratio for a median, `bisector` / an angle ratio / an arc midpoint for «חוצה זווית»
+(ADR-292's whole bisect family for an English "bisects"), and for «חסום» / «חוסם» the circle `statedCircleDirection`
+gives the student's line spelt right (`inscriptionVoice`, else `isCircleInPolygon`). Shape words are exempt when every
+polygon noun is a reference (`polygonNounsAllReferences`, ADR-595's exemption); a definite «המעגל החוסם» over a drawn
+circle is a reference too. When ADR-292's verb gate already names «חוצה/bisect», the bisector words are skipped, and
+`mergeWordItems` names a word once. The grammar seam is unchanged. Nets: `issue-1906-ai-answer-words-net.test.ts`
+(every committed corpus step, every catalog example, the recorded AI answers).
+
 ### An incircle 2-D does not draw, and a bare n-gon in the object gate (#1891, [ADR-606](06-decisions.md#adr-606))
 
 The inscription noun lists (`POLY_WORDS_HE/EN`) compose the n-gon lane's own tables (`POLY_NAME_N`,

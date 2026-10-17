@@ -64,5 +64,5 @@ export type { ValueRow, AreaClassRow, ValuesPanelResult } from './valuesPanel';
 
 export { degeneratePolygons, polygonFlatness, polygonDefects, collapsedToPoint, straightCorner, DEGENERATE_EXTENT_RATIO, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR } from './degeneracy';
 export type { DegeneratePolygon, PolygonDefect } from './degeneracy';
-export { NOT_CYCLIC, nounOfKind } from './shapeKinds';
+export { NOT_CYCLIC, nounOfKind, quadImplies, isQuadKind } from './shapeKinds';
 export { impliedByFigure, constraintRank, constraintJacobian, RANK_TOL, ZERO_ROW_TOL } from './dofRank';

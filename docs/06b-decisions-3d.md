@@ -12988,3 +12988,28 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Performance.** The reported 40/50 line: 11–46 ms per submit (20–32 ms before, with the notice); the length-forced apex 478 ms (418 ms before, refused generically); the box 99 ms (322 ms before). Thin controls unchanged (23–27 ms).
 
 **Behaviour change for a student:** a pyramid, tetrahedron, prism or box whose givens force it flat is refused at the line that completes it, naming the statements («… מתקיימים רק אם הפירמידה SABCD שטוחה — וגוף שטוח אינו פירמידה.»), instead of being drawn flat with a notice, or refused with the generic contradiction. The flat-solid notice no longer appears anywhere. A thin but real solid still builds.
+
+## ADR-3D-364 — The model lane keeps every shape and role word the student typed: a misspelt word asks the owning gates, a role word its own family (#1906)
+
+**Status:** accepted · 2026-10-17 · bug (P2, 2d + 3d) · fix round #2304, stream Q · branch `fix/1906-model-keeps-shape-word` · implements the #1906 fix plan of 2026-10-08 (3-D half) · 2-D's side is [ADR-722](06-decisions.md#adr-722); the shared reader is [ADR-W-144](06w-decisions-workspace.md#adr-w-144) · **Amends** [ADR-3D-147](#adr-3d-147) (the model lane runs one more member)
+**Operator ruling (verbatim, 2026-10-08):** *"must survive into the AI answer's lowering, or the answer is refused"*, *"in 2-D and 3-D"*.
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-15 (new paragraph: the model's answer keeps every shape and role word) · [02w](02w-requirements-workspace.md) FR-SU-21 · **Design:** [04b](04b-design-3d.md) § "The submit decision" → *The model lane keeps every shape and role word* · **LADDER stage:** none (the honesty gates)
+
+**Measured before** (`main` @ de7c221f, `decideDeterministic3` then `decideSteps3` with canned answers). Recorded green: «משולש שווה צלעת ABC», «משולש שווה שוקיימ ABC», "equilaterl / isoceles triangle ABC" → the bare triangle; «מלבנ ABCD» / «מעוינ ABCD» → «מרובע ABCD»; «טרפז שווה שוקים ABCD» → «טרפז ABCD»; «AD גובה לצלע BC שהוא גם חוצה זווית» → «AD גובה לצלע BC» (the bisector gone — 3-D has no verb gate) or → «AD חוצה זווית BAC» (the altitude gone); «AD גובח / תיכנ לצלע BC» → the other cevian. Refused already: «משולש ישר-זויתי ABC» («ישר-זוית», the adjective regex reads the prefix) and «נתון משולש שווה צלעות ABC כלשהו» (spelt right).
+
+**The class.** As ADR-722: a property word reached the model-lane gates only when spelt as this grammar's regexes spell it, and role and direction words never.
+
+**Decision.**
+1. `decideSteps3` passes `lane: 'model'` through `decideCommands3` and `honestyRefusal3` to `lostGivens3`, which then adds `droppedPropertyWords3` (`src3d/parser/propertyWords3.ts`) and merges its items FIRST through the shared `mergeWordItems` (an older gate's own naming of the same word wins — «ישר-זוית» stays as measured; a construct noun inside the phrase gives way). The deterministic lane is unchanged.
+2. **Where:** the shared reader over `PROPERTY_VOCABULARY3` (a projection of `SHAPE_ADJ_WORDS3`, the quadrilateral nouns, `CEVIAN_NOUNS3_*` and the inscription verbs, locked to its atoms), vetoed by the new `readsWord3` (the declaration vocabulary, qualifiers, construct and neutral words).
+3. **Whether, per occurrence:** a SHAPE word asks the owning gates (`droppedShapeNoun3`, `droppedShapeAdjective3`) of the line spelt right against the same line without the word — their `length-rel` / `cos-angle` / `quad-shape.base` families, never a copy; an altitude needs `altitude-foot`, `tetra-altitude`, `height-to-face`, a ⟂ to a plane, `cos-angle` 0 or a `height` field; a median `point-on-segment3` at ½, `centroid3`, `midpoint-auto` or an equal pair; a bisector `bisector-ray` / `-dir` / `-point` or an angle equality; «חסום» / «חוסם» the `circle3` kind `statedCircleDirection3` (the grammar's `circleContains3`, now exported through it) gives the student's line.
+
+**Measured after.** Every "before" row refuses with `dropped-given` naming the word as typed («המשפט לא נוסף לציור, כי לא הצלחנו לצייר: שווה צלעת. …»); the faithful twins record; the two already-refused rows keep their message. False refusals: 0 of 248 `fixtures3/` facts (33 with a property word; a #2235 shape reference is skipped, since the lane judges the ring it expands to), 0 of 470 catalog examples, and of 29 recorded model answers only the true catch «מנסרה שבסיסה מלבן» answered «… מקבילית» (the base-noun gate refuses it too). The lexicon veto reads the parallel word through `PARALLEL_WORD3`, the one spelling `PAR_SPLIT` now composes, so «מקבילים» is never a slip for «מקבילית». A definite role noun naming drawn letters («הגובה AB») is a reference, as in 2-D.
+
+**Sibling audit.** 2-D: ADR-722. Analytic: #1906's third item. Complex: no lane. 3-D's grammar seam (#1902's unread words) is untouched.
+
+**Locks.** `src3d/__tests__/issue-1906-ai-answer-words3.test.ts` (the reported sequence and its exact text, every row, the twins, the circles, the shared rows, the vocabulary lock, the fixture / catalog / recorded-answer nets; `recorded-ai-answers-1906.json`).
+
+**Behaviour change for a student:** in 3-D, a model answer that drops a shape or role word the student typed — spelt right or one letter off — is refused with the dropped-given message naming it; an answer that keeps it records as before.
+
+**Slow-tier goldens that may drift:** `decide-submit3-parity-1394` replays the deterministic decision only — none expected.

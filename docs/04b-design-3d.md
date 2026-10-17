@@ -659,6 +659,18 @@ predicate's `quad` row, no longer a kind test). A parse's
 LLM lane collects them from every model line. A new
 branch belongs in the decision; a parity lock replays recorded sequences.
 
+**The model lane keeps every shape and role word (#1906, [ADR-3D-364](06b-decisions-3d.md#adr-3d-364)).**
+`decideSteps3` passes `lane: 'model'` through `decideCommands3` and `honestyRefusal3` to `lostGivens3`, which then adds
+`droppedPropertyWords3` (`src3d/parser/propertyWords3.ts`) and merges its items first (`mergeWordItems`, shared). The
+member finds the student's property words with the shared reader (`shell/llm/honestyCore.ts` `propertyWords`,
+[ADR-W-144](06w-decisions-workspace.md#adr-w-144)), vetoed by `readsWord3` (the declaration vocabulary, qualifiers,
+construct and neutral words), and asks per occurrence: a SHAPE word asks the owning gates (`droppedShapeNoun3`,
+`droppedShapeAdjective3`) of the line spelt right against the same line without the word; a role word needs its own
+family (altitude: `altitude-foot`, `tetra-altitude`, `height-to-face`, a ⟂ to a plane, `cos-angle` 0, a `height` field;
+median: `point-on-segment3` at ½, `centroid3`, `midpoint-auto`, an equal pair; bisector: `bisector-ray` / `-dir` /
+`-point` or an angle equality); an inscription verb needs the `circle3` kind `statedCircleDirection3` (the grammar's
+`circleContains3`) gives the student's line. The deterministic lane is unchanged.
+
 **A part the reading never read (#1888, [ADR-3D-316](06b-decisions-3d.md#adr-3d-316)).** On the deterministic lane
 (`decideSubmit3` → `decideCommands3` with `readExtent`, and the ✎ `replaceFact`) the honesty verdict
 `honestyRefusal3` runs `lostGivens3` plus `unreadParts3` (`src3d/store/unreadParts3.ts`), the 3-D member over

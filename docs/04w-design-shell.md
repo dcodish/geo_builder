@@ -307,6 +307,20 @@ from two sources pays once) and `LATIN_FILLER`. What a name or a number is stays
 first consumer (`faithfulnessAnalytic`); 2-D's and 3-D's own copies move onto it in a follow-up, behaviour-identical.
 Lock: `shell/__tests__/honesty-core-1355.test.ts`.
 
+**The property-word reader** ([ADR-W-144](06w-decisions-workspace.md#adr-w-144), #1906) is the core's second half:
+`propertyWords(text, vocabulary, spec)` finds every shape or role phrase in the STUDENT's line — exact, inflected,
+or one Damerau-Levenshtein edit off (`editDistance`) — and returns each occurrence with the canonical spelling of
+every phrase it may be. The caller passes everything that is language or product: the vocabulary (phrases of word
+slots, each naming the caller's properties; `nearMiss: false` for a short or common word), the `fold` (final letters,
+doubled letters, case), the clitic letters peeled up to two every way, the closed inflection set, and `readsWord`
+(the product lexicon's veto: a word it reads as itself, «מקבילים», is never a near miss of another, «מקבילית»).
+`withSpan` writes the line spelt right, and `mergeWordItems` is the one merge into the other gates' items (a word
+phrase first; a construct noun inside it, «מעגל» in «מעגל חסומ», gives way; an older gate's own naming of the same
+word wins). Whether an AI answer CARRIES each word is the product's question, over its commands: 2-D's
+`src/parser/propertyWords.ts` (the AI seam in `submitPipeline.ts`), 3-D's `src3d/parser/propertyWords3.ts` (the
+model lane of `decideSteps3`). Locks: `shell/__tests__/property-words-1906.test.ts` and the shared rows
+`shell/__tests__/fixtures/honesty-rows.ts`, run through each tree's vocabulary by its own lock.
+
 ### The junk gate ([ADR-W-087](06w-decisions-workspace.md#adr-w-087))
 
 `shell/llm/constructionSignal.ts` answers one question for every builder that escalates to the model:

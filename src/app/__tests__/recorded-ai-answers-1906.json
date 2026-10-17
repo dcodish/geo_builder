@@ -1,0 +1,441 @@
+{
+ "$comment": "Recorded AI answers (#1906): every distinct source:llm result:ok submit in the local dev logs and prod pulls up to 2026-10-17 (logs/ does not travel). Each is a model answer to the student line; the word member must flag only true catches.",
+ "answers": [
+  {
+   "utterance": "נקודה P מחיוץ למעגל",
+   "commands": [
+    {
+     "type": "point-circle-side",
+     "id": "P",
+     "circle": "circle-O",
+     "side": "outside"
+    }
+   ]
+  },
+  {
+   "utterance": "הנקודה E היא החיתוך של המשיקים למעגל בנקודות D ו-C בהתאמה",
+   "commands": [
+    {
+     "type": "tangent",
+     "id": "tan-D",
+     "circle": "circle-O",
+     "at": "D",
+     "visible": true
+    },
+    {
+     "type": "tangent",
+     "id": "tan-C",
+     "circle": "circle-O",
+     "at": "C",
+     "visible": true
+    },
+    {
+     "type": "line-intersection",
+     "id": "E",
+     "line1": "tan-D",
+     "line2": "tan-C"
+    }
+   ]
+  },
+  {
+   "utterance": "מהנקודה E מעבירי קטע שחותך את DC בנקודה G ואת AB בנקודה F",
+   "commands": [
+    {
+     "type": "segment",
+     "a": "E",
+     "b": "G"
+    },
+    {
+     "type": "segment",
+     "a": "E",
+     "b": "F"
+    },
+    {
+     "type": "segment",
+     "a": "D",
+     "b": "C"
+    },
+    {
+     "type": "point-on-segment",
+     "id": "G",
+     "a": "D",
+     "b": "C"
+    },
+    {
+     "type": "segment",
+     "a": "A",
+     "b": "B"
+    },
+    {
+     "type": "point-on-segment",
+     "id": "F",
+     "a": "A",
+     "b": "B"
+    }
+   ]
+  },
+  {
+   "utterance": "דרך נקודה A הנמצאת מחוץ למעגל שמרכזו O העבירו שני ישרים המשיקים למעגל בנקודות B ו-C",
+   "commands": [
+    {
+     "type": "circle",
+     "id": "circle-O",
+     "center": "O",
+     "radius": 5,
+     "freeRadius": true
+    },
+    {
+     "type": "point-circle-side",
+     "id": "A",
+     "circle": "circle-O",
+     "side": "outside"
+    },
+    {
+     "type": "midpoint",
+     "id": "~tanmid-OA",
+     "a": "O",
+     "b": "A"
+    },
+    {
+     "type": "circle-through",
+     "id": "tanaux-OA",
+     "center": "~tanmid-OA",
+     "through": "O",
+     "hidden": true
+    },
+    {
+     "type": "circle-circle-intersection",
+     "id": "B",
+     "circle1": "circle-O",
+     "circle2": "tanaux-OA",
+     "branch": 0
+    },
+    {
+     "type": "circle-circle-intersection",
+     "id": "C",
+     "circle1": "circle-O",
+     "circle2": "tanaux-OA",
+     "branch": 1
+    },
+    {
+     "type": "segment",
+     "a": "A",
+     "b": "B"
+    },
+    {
+     "type": "segment",
+     "a": "A",
+     "b": "C"
+    }
+   ]
+  },
+  {
+   "utterance": "נתןן דלתון ABCD",
+   "commands": [
+    {
+     "type": "shape-variant",
+     "shape": "kite",
+     "ids": [
+      "A",
+      "B",
+      "C",
+      "D"
+     ],
+     "variant": 0
+    }
+   ]
+  },
+  {
+   "utterance": "מעגל חסום במחומש ABCDE",
+   "commands": [
+    {
+     "type": "polygon",
+     "ids": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E"
+     ],
+     "place": true
+    }
+   ]
+  },
+  {
+   "utterance": "ריבוע ABCD. אלכסון ",
+   "commands": [
+    {
+     "type": "square",
+     "ids": [
+      "A",
+      "B",
+      "C",
+      "D"
+     ]
+    },
+    {
+     "type": "segment",
+     "a": "A",
+     "b": "C",
+     "diagonal": true
+    }
+   ]
+  },
+  {
+   "utterance": "אלכסון BD. נקודת מפגש אלכסונים O. קטע מנקודה E על AB לנקודה F על BC, מאונך לאלכסון BD וחוצה את OB.",
+   "commands": [
+    {
+     "type": "segment",
+     "a": "B",
+     "b": "D"
+    },
+    {
+     "type": "line-line-intersection",
+     "id": "O",
+     "a": "A",
+     "b": "C",
+     "c": "B",
+     "d": "D"
+    },
+    {
+     "type": "segment",
+     "a": "A",
+     "b": "B"
+    },
+    {
+     "type": "point-on-segment",
+     "id": "E",
+     "a": "A",
+     "b": "B"
+    },
+    {
+     "type": "segment",
+     "a": "B",
+     "b": "C"
+    },
+    {
+     "type": "point-on-segment",
+     "id": "F",
+     "a": "B",
+     "b": "C"
+    },
+    {
+     "type": "segment",
+     "a": "E",
+     "b": "F"
+    },
+    {
+     "type": "segment",
+     "a": "E",
+     "b": "F"
+    },
+    {
+     "type": "segment",
+     "a": "B",
+     "b": "D"
+    },
+    {
+     "type": "set-perpendicular",
+     "a": "E",
+     "b": "F",
+     "c": "B",
+     "d": "D"
+    },
+    {
+     "type": "segment",
+     "a": "O",
+     "b": "B"
+    },
+    {
+     "type": "midpoint",
+     "id": "M",
+     "a": "O",
+     "b": "B"
+    },
+    {
+     "type": "segments-cross",
+     "a": "E",
+     "b": "F",
+     "c": "O",
+     "d": "B"
+    },
+    {
+     "type": "set-line",
+     "points": [
+      "E",
+      "M",
+      "F"
+     ]
+    }
+   ]
+  },
+  {
+   "utterance": "הגובה AB = 5",
+   "commands": [
+    {
+     "type": "segment",
+     "a": "A",
+     "b": "B"
+    },
+    {
+     "type": "set-distance",
+     "a": "A",
+     "b": "B",
+     "value": 5
+    }
+   ]
+  },
+  {
+   "utterance": "רדיוסי המעגלים O ו-P שווים",
+   "commands": [
+    {
+     "type": "circle",
+     "id": "circle-O",
+     "center": "O",
+     "radius": 5,
+     "freeRadius": true
+    },
+    {
+     "type": "circle",
+     "id": "circle-P",
+     "center": "P",
+     "radius": 3.5999999999999996,
+     "freeRadius": true,
+     "apart": true
+    }
+   ]
+  },
+  {
+   "utterance": "GFH ישר",
+   "steps": [
+    "line GFH"
+   ]
+  },
+  {
+   "utterance": "GFH ישר",
+   "steps": [
+    "ישר GFH"
+   ]
+  },
+  {
+   "utterance": "מנקודה A יוצא ותך AE למעגל",
+   "steps": [
+    "AD cuts circle O at E"
+   ]
+  },
+  {
+   "utterance": "מלבן ABCD עם אלכסון AC",
+   "steps": [
+    "מלבן ABCD",
+    "segment AC"
+   ]
+  },
+  {
+   "utterance": "הנקודות F ו- G הן אמצעי הקטעים BC ן- DO",
+   "steps": [
+    "F אמצע BC",
+    "G אמצע DO"
+   ]
+  },
+  {
+   "utterance": "שני מעגלים משיקים מבחוץ ואלכסון AB",
+   "steps": [
+    "שני מעגלים משיקים מבחוץ",
+    "קטע AB"
+   ]
+  },
+  {
+   "utterance": "משולש ABC וריבוע WERT",
+   "steps": [
+    "משולש ABC",
+    "ריבוע WERT"
+   ]
+  },
+  {
+   "utterance": "T מפגש חוצי הזויות במשולש ABC",
+   "steps": [
+    "T מפגש חוצי הזוויות במשולש ABC"
+   ]
+  },
+  {
+   "utterance": "נסמן את מרכז המעגל O",
+   "steps": [
+    "O מרכז המעגל"
+   ]
+  },
+  {
+   "utterance": "איבוע שצלעו 4",
+   "steps": [
+    "ריבוע שצלעו 4"
+   ]
+  },
+  {
+   "utterance": "ריבוע ABCD שהצלע שלו 6",
+   "steps": [
+    "ריבוע ABCD שצלעו הוא 6"
+   ]
+  },
+  {
+   "utterance": "אורך הקטע BC גדול מ-10",
+   "steps": [
+    "BC > 10"
+   ]
+  },
+  {
+   "utterance": "אורך הקטע BC > 10",
+   "steps": [
+    "BC > 10"
+   ]
+  },
+  {
+   "utterance": "אורך הקטע BC לפחות 10",
+   "steps": [
+    "BC ≥ 10"
+   ]
+  },
+  {
+   "utterance": "C נמצאת שך BD",
+   "steps": [
+    "C על BD"
+   ]
+  },
+  {
+   "utterance": "AB = 3, בלה בלה",
+   "steps": [
+    "AB = 3"
+   ]
+  },
+  {
+   "utterance": "גובה ל BC",
+   "steps": [
+    "גובה מ-A ל-BC"
+   ]
+  },
+  {
+   "utterance": "מעגל חוסם את המשולש",
+   "steps": [
+    "מעגל חוסם את ABC"
+   ]
+  },
+  {
+   "utterance": "שני מעגלים בעלי מרכז משותף O ברדיוס 5",
+   "steps": [
+    "שני מעגלים בעלי מרכז משותף O",
+    "מעגל O שרדיוסו 5"
+   ]
+  },
+  {
+   "utterance": "AB משיק למעגל O ואורכו 5",
+   "steps": [
+    "AB משיק למעגל O",
+    "AB = 5"
+   ]
+  },
+  {
+   "utterance": "מעגל חוסם את המשולש",
+   "steps": [
+    "משולש ABC חסום במעגל"
+   ]
+  }
+ ]
+}
