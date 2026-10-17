@@ -17,6 +17,8 @@ const ERROR_KEY: Record<Exclude<InputError['key'], 'reserved-constant' | 'mixed-
   // #1919 — the two ruled sentences for a script this tool does not read, 2-D's wording verbatim
   'unread-name': 'errUnreadName',
   'unread-word': 'errUnreadWord',
+  // #1870 (ADR-CX-083) — a claim to prove: 2-D's sentence verbatim, as the other three builders say it
+  'proof-target': 'errProofTarget',
   'parse-error': 'errParse',
   'duplicate-name': 'errDuplicate',
   'wrong-app': 'errWrongApp',

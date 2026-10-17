@@ -4369,6 +4369,34 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 
 **Locks.** `src-complex/__tests__/param-definition-closed-1818.test.ts`: the exam sequence in three orders (`a = -1` first, after the definitions, last) at 24 seeds each — `freeDof = []`, the claim holds, «z1» → «1+i», «z2» → «1-i», «|z1|» → «√2»; the reading equals the typed literal's; «a = 4» refuted with z₁ = 56+46i, z₂ = 56−6i; a free a unchanged; the class (`a^2`, `a*b`, `a^3`, the affine form, the solved r → z₂ = 1/4+i); `a = √2` not claimed exact; `closedUnder` units (integer power, unknown parameter, complex name, zero, fractional power). Fixture `fixtures/exam-2022w-a-quadratic-1818.complex.json` (the exam's four lines). #1535's lock 6 may now swap to this sequence, as its plan says.
 
+## ADR-CX-083 — A claim to prove is refused, never read: complex adopts ADR-W-107 (#1870)
+
+**Status:** accepted, 2026-10-17 · **Issue:** [#1870](https://github.com/dcodish/geo_builder/issues/1870) (feature, `P2`, `complex`) · fix round #2291, stream O · branch `feat/1870-complex-proof-verb` from `main` @ `b0e9dbea` · adopts [ADR-W-107](06w-decisions-workspace.md#adr-w-107) (Amendment 1)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-15 (the ⚠ marker drops; D3's carve-out stated) and its parity row (now **Same**) · [02d](02d-requirements-complex.md) FR-KN-2 and G8 (markers drop) ·
+**Design:** [04d](04d-design-complex.md), Boundaries — "A claim to prove" ·
+**Ladder:** stage 0⁻, the submit seam before the ask routing and the grammar ([LADDER-CX](LADDER-CX.md))
+
+**The ruling.** ADR-W-118 B14 (operator, 2026-10-07): *"complex gets the same proof-target refusal as the other tools"*; D3: *"a bare statement that the givens already decide keeps complex's claim check"*; the wording is 2-D's (B13).
+
+**Measured at pickup** (`main` @ `b0e9dbea`, `submitLine` + `deriveLines` on «z1 = 3+4i · z2 = 3-4i · w = z1·z2»). «הוכיחו כי |z1| = 5», «הוכיחו כי z1 ו-z2 צמודים», «הוכיחו ש-w ממשי», «הראו ש-arg(z1) > 0», the mixed «נתון z1 = 3+4i. הוכיחו כי |z1| = 5» and "prove that w is real" → each `not-handled`, the generic "I could not understand". (The plan measured on `5edeeca1` that "prove that w is real" was RECORDED as a ✓ claim about a number named "prove"; that misread has since gone, the generic refusal remains.) The bare «z1 ו-z2 צמודים» / «w ממשי» / «w מדומה טהור» → holds / holds / refuted.
+
+**The class.** *A builder's submit gate does not run the shared proof-target rule, so a claim to prove reaches the grammar*, where it is refused generically or, if a rule happens to read it, recorded. Complex was the one builder that made no call; its gate entry points are `submitLine` and `editLine` (`hydrateSession` replays through `submitLine`).
+
+**Decision.**
+1. **`submitLine` and `editLine` call `findProofTarget` first** (`refusedAsProofTarget` in `app/submit.ts`), before `unreadScript`, the ask routing and `parseInFigure` — 2-D's placement (`decidePreParse`), so no partial reading records half of a mixed line. `editLine` refuses a muted row too (2-D's edit seam refuses a proof edit outright).
+2. **The error `proof-target`** (`InputError`), `detail` = the proof sentence; worded by `errProofTarget`, 2-D's he and en sentences verbatim (analytic carries the same).
+3. **Unchanged:** `shell/proofTarget.ts`; the claim pipeline (`assertions` → `verifyClaims`) and its three verdicts; the ask lane. A bare statement has no proof verb and keeps its claim check (D3).
+
+**Behaviour change for a student** (every line `[ruled]` in the #1870 plan):
+- A line with a proof verb («הוכיחו כי |z1| = 5», "prove that w is real", the mixed «נתון z1 = 3+4i. הוכיחו כי |z1| = 5») is refused: «זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "הוכיחו כי |z1| = 5"», and nothing of it is recorded — before, "I could not understand". The quote is the proof sentence as `findProofTarget` returns it (verb included), as 2-D and analytic quote it.
+- A bare statement keeps today's verdicts: «z1 ו-z2 צמודים» ✓, «w ממשי» ✓, «w מדומה טהור» ✗.
+
+**Siblings.** None changed. 3-D's sentence quotes with «…» (2-D, analytic and now complex use "…"); that difference is #1868's, so the new wording role leaves 3-D out until it lands.
+
+**Performance (docs/17 §7).** Three regex tests per submitted line; no fold, solve or sample change.
+
+**Locks.** `src-complex/__tests__/proof-target-1666.test.ts`: the shared rows (`proofTargetFaults`) through the real `submitLine`, each on a fresh session; the issue's five complex lines refused as `proof-target` with the exact he sentence and nothing recorded; the en sentence; D3's three bare claims keep holds/holds/refuted; no catalog line reads as a proof target; `editLine` into a proof line refused on an enabled and on a muted row. `message-floor-2028.test.ts` gains the key; `shell/__tests__/suite-vocabulary.test.ts` gains the role `proofTarget` (2-D, analytic, complex), anchored to 2-D's text.
+
 ## ADR-CX-084 — A restatement the exact solve already entails adds no row, and says so (#2268)
 
 **Status:** accepted, 2026-10-17 · **Issue:** [#2268](https://github.com/dcodish/geo_builder/issues/2268) (bug, `P3`, `complex`) · fix round #2304, stream P · branch `fix/2268-complex-entailed-noop` from `main` @ `de7c221f` · plan armed `auto-ok` 2026-10-16

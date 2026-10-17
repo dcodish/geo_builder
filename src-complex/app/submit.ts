@@ -41,6 +41,7 @@
 import { readEnvelope, type LoadAudit } from '../../shell/save';
 import { readDisplayMode } from '../../shell/displayMode';
 import { unreadScript } from '../../shell/inputScript';
+import { findProofTarget } from '../../shell/proofTarget';
 import { parseLineV2 } from '../parser/rules';
 import { trigAngleMismatch } from '../parser/normalize';
 import { complexScopeOf, parseAsk } from './deriveLines';
@@ -312,6 +313,9 @@ export function editLine(index: number, raw: string): boolean {
   const { lines, disabled, seed } = st();
   const line = raw.trim();
   if (index < 0 || index >= lines.length || line === '') return false;
+  // #1870 — a claim to prove is refused as an edit too, muted row or not (2-D's editPipeline posture):
+  // a muted row is a given waiting to be re-enabled, and a proof sentence is never one
+  if (refusedAsProofTarget(line)) return false;
   const parsed = parseInFigure(line, activeOf(lines, disabled));
   if (!parsed.ok) {
     st().setError(unreadRefusal(parsed, line, activeOf(lines, disabled)));
@@ -365,6 +369,19 @@ export function submitQuery(raw: string): boolean {
 }
 
 /**
+ * #1870 — is `line` a claim the student must PROVE? The shared rule (`shell/proofTarget`, ADR-W-107) all
+ * four builders call at their submit gate; on a hit the refusal quotes the proof sentence and nothing is
+ * recorded. One helper for both gate entry points (`submitLine`, `editLine`); the load path replays
+ * through `submitLine`, so an old file's proof line is reported in the load audit, not silently ✓.
+ */
+function refusedAsProofTarget(line: string): boolean {
+  const proof = findProofTarget(line);
+  if (!proof) return false;
+  useComplexStore.getState().setError({ key: 'proof-target', detail: proof.sentence });
+  return true;
+}
+
+/**
  * THE ONE ENTRY POINT the input box uses.
  *
  * It routed between two engines until the cutover deleted the second
@@ -383,6 +400,13 @@ export function submitLine(
 ): boolean {
   const st = () => useComplexStore.getState();
   const line = raw.trim();
+
+  // #1870 (ADR-CX-083, ADR-W-107; ruling B14) — a claim to PROVE, refused first: before the ask routing and
+  // before the grammar, the 2-D placement, so no partial reading records half of a mixed line
+  // («נתון z1 = 3+4i. הוכיחו כי |z1| = 5») and no rule reads the claim inside the sentence («prove that w is
+  // real» once recorded a ✓ claim about a number named "prove"). A BARE statement («w ממשי») has no proof
+  // verb and keeps its claim check (D3).
+  if (refusedAsProofTarget(line)) return false;
 
   // #1919 (ADR-626): a letter this tool cannot read, refused before the ask routing and before the
   // grammar — the shared rule all four builders call (`shell/inputScript`). Complex folds no glyphs (a
