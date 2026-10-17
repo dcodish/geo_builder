@@ -67,7 +67,7 @@ describe('#181 — NO THEFT: the case-significant lanes are untouched', () => {
   it('axis sign givens, figure parameters, and coord-sym points are byte-unchanged', () => {
     expect(cmds('שיעור ה-z של A שלילי')).toEqual([{ type: 'sign-given', id: 'A', axis: 'z', positive: false }]);
     expect(cmds('k הוא פרמטר חיובי')).toEqual([{ type: 'param-sign', sym: 'k', positive: true }]);
-    expect(cmds('M(k,1,3)')).toEqual([{ type: 'point3', id: 'M', x: null, y: 1, z: 3, syms: ['k', null, null] }]);
+    expect(cmds('M(k,1,3)')).toEqual([{ type: 'point3', id: 'M', x: null, y: 1, z: 3, syms: ['k', null, null], srcs: ['k', '1', '3'] }]); // #2077: + the typed text
   });
 
   it('the vector-angle phrasing keeps w and u lowercase (no anchor precedes them)', () => {

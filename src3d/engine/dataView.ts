@@ -19,10 +19,10 @@ import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
 import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
 import { knowledgeSamples3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
-import { angleMarkText, figureSymbolsOf, symbolOwnersOf } from './types';
+import { angleMarkText, evalAffine, figureSymbolsOf, symbolOwnersOf } from './types';
 import { COMBINING_ARROW } from '../lexicon/marks3';
 import { angleBetweenOperands, componentValue, containmentDeviation, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
-import type { Construction3, Id, MutualRel3, Operand3, Positions3 } from './types';
+import type { Construction3, Id, MutualRel3, Operand3, Positions3, StatedComps, SymComp } from './types';
 
 /** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
 type VecDef = Construction3['vecDefs'][number];
@@ -1210,7 +1210,11 @@ export function dataView(c: Construction3, seed: number): DataPanel {
           return sg ? (sg.positive ? '+?' : '−?') : '?';
         };
         const comps = axes.map((ax, i) => (stableAx[i] ? cleanMag(ps[0]![ax]) : free(ax))) as [string, string, string];
-        const cs = `(${comps.join(', ')})`;
+        // #2077 (ADR-3D-079 Am. 3): a free axis the student wrote a LETTER in prints that letter as typed:
+        // «A(1, t, 2)», like analytic, never «?». The letter is a name, not a value, so `pointComps` (what a
+        // single-coordinate question reads) keeps «?»; once the letter is known the axis is stable above.
+        const shown = comps.map((v, i) => (v === '?' ? (statedLetterText(c, id, i) ?? v) : v));
+        const cs = `(${shown.join(', ')})`;
         pointCoords[id] = { text: cs, kind: 'partial' };
         pointComps[id] = comps;
         if (!two) points.push(`${id}${cs}`);
@@ -1247,9 +1251,14 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // #325 (ADR-3D-079 Am. 2): the pins' open symbols — determined values print, free ones read
   // open, so `B(2t, t, k)` visibly registers even while the coordinates still read `?`.
   const params: DataPanel['params'] = [];
+  // #2077 (ADR-3D-368): the value of every letter the params rows call DETERMINED, read off the same
+  // decision that prints «k = 2», so a stated row switches to values exactly when that row closes.
+  const known = new Map<string, number>();
   // #1746 (ADR-3D-339): ONE builder for a params row — the panel prints `text`, the ask row prints `value`.
-  const paramRow = (sym: string, value: string | null): DataPanel['params'][number] =>
-    value ? { sym, text: `${sym} = ${value}`, value, open: false } : { sym, text: `${sym} = ?`, value: '?', open: true };
+  const paramRow = (sym: string, value: string | null, num?: number): DataPanel['params'][number] => {
+    if (value && num !== undefined && Number.isFinite(num)) known.set(sym, num);
+    return value ? { sym, text: `${sym} = ${value}`, value, open: false } : { sym, text: `${sym} = ?`, value: '?', open: true };
+  };
   for (const sym of figureSymbolsOf(c)) {
     // #480: the ALGEBRAIC lane's parameter is not a pivot pin symbol — its value lives in
     // `resolved.param`, and its branch set is the answer whenever the givens leave more than one.
@@ -1259,7 +1268,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       // does not, the symbol is not knowledge and reads open rather than picking a seed's version
       const agree = perSeed.every((b) => b.length === perSeed[0].length && b.every((v, i) => Math.abs(v - perSeed[0][i]) <= 1e-6 * Math.max(1, Math.abs(v))));
       const text = agree ? branchAnswer(sym, perSeed[0]) : null;
-      params.push(paramRow(sym, text));
+      params.push(paramRow(sym, text, perSeed[0].length === 1 ? perSeed[0][0] : undefined));
       continue;
     }
     /**
@@ -1321,12 +1330,12 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     const stable =
       singleRoot &&
       nums.length === resolved.length && nums.every((v) => Math.abs(v - nums[0]) <= 1e-4 * Math.max(1, Math.abs(nums[0])));
-    params.push(paramRow(sym, stable ? cleanNum(nums[0], 1e-4) : null));
+    params.push(paramRow(sym, stable ? cleanNum(nums[0], 1e-4) : null, nums[0]));
   }
 
   // #1196: the STATED vector rows need no sampling — they are givens, not measurements — so they are
   // composed from the construction rather than from the three resolved configurations above.
-  return { stated: statedVectorRows(c), relations, mutual, vectors: entries, points, pointCoords, pointComps, pointOptions, planes, params };
+  return { stated: statedVectorRows(c, known), relations, mutual, vectors: entries, points, pointCoords, pointComps, pointOptions, planes, params };
 }
 
 /**
@@ -1359,17 +1368,85 @@ export function dataView(c: Construction3, seed: number): DataPanel {
  * carries — comes from `lexicon/marks3`, the leaf that imports nothing and exists so the grammar and
  * the display cannot drift about a marking (#1194).
  */
-export function statedVectorRows(c: {
-  vectors: Map<string, { from: string; to: string }>;
-  claims: readonly { type: string; lhs?: VecTermLike[]; rhs?: VecTermLike[] }[];
-}): string[] {
+export function statedVectorRows(
+  c: {
+    vectors: Map<string, { from: string; to: string }>;
+    claims: readonly { type: string; lhs?: VecTermLike[]; rhs?: VecTermLike[] }[];
+    pairPins?: readonly StatedPin[];
+    vectorPins?: readonly StatedPin[];
+  },
+  known: ReadonlyMap<string, number> = new Map(),
+): string[] {
   const rows: string[] = [];
   for (const [name, { from, to }] of c.vectors) rows.push(`${name} = ${pairArrow(from, to)}`);
+  /**
+   * #2077 (ADR-3D-368): every COMPONENT GIVEN the student typed as a tuple, by pair or by name:
+   * «AB = (k-1,k,3)» prints «AB⃗ = (k-1, k, 3)». Operator, 2026-10-13: *"AB = (k-1,k,3) - shouldnt the data
+   * panel show this?"* Each component prints AS TYPED while any letter in it is open, and as its VALUE once
+   * every letter in it is known (ruling 2026-10-14: *"the data panel holds the truth. so once k is known, we
+   * use it"*). "Known" is the params rows' own decision (`known`), never re-decided here.
+   */
+  const tuples = [
+    ...(c.pairPins ?? []).map((p) => ({ head: pairArrow(p.a ?? '?', p.b ?? '?'), p })),
+    ...(c.vectorPins ?? []).map((p) => ({ head: p.name ?? '?', p })),
+  ]
+    .filter((t) => t.p.stated)
+    .sort((a, b) => a.p.stated!.ord - b.p.stated!.ord);
+  for (const { head, p } of tuples) rows.push(`${head} = (${statedTupleText(p, known).join(', ')})`);
   for (const claim of c.claims) {
     if (claim.type !== 'vec-eq' || !claim.lhs || !claim.rhs) continue;
     rows.push(`${vecSide(claim.lhs)} = ${vecSide(claim.rhs)}`);
   }
   return rows;
+}
+
+/** A pin as {@link statedVectorRows} reads it: its solved components and the tuple as stated (#2077). */
+type StatedPin = {
+  a?: string;
+  b?: string;
+  name?: string;
+  x: number | null | SymComp;
+  y: number | null | SymComp;
+  z: number | null | SymComp;
+  stated?: StatedComps;
+};
+
+/**
+ * #2077 (ADR-3D-368): one stated tuple's components for display. As typed, except a component whose
+ * letters are ALL known, which prints its value: an affine form evaluated by {@link evalAffine}, or a bare
+ * letter (which the pin holds as a null) at the letter's own value. A numeric component stays as typed.
+ */
+function statedTupleText(p: StatedPin, known: ReadonlyMap<string, number>): string[] {
+  const st = p.stated!;
+  const comps = [p.x, p.y, p.z];
+  return st.texts.map((text, i) => {
+    const letters = st.letters[i];
+    if (letters.length === 0 || !letters.every((l) => known.has(l))) return text;
+    const comp = comps[i];
+    const v =
+      comp !== null && typeof comp === 'object' ? evalAffine(comp, (l) => known.get(l)!)
+      : comp === null && letters.length === 1 ? known.get(letters[0])!
+      : undefined;
+    return v !== undefined && Number.isFinite(v) ? cleanMag(v) : text;
+  });
+}
+
+/**
+ * #2077: the letter the student wrote in axis `i` of a point's stated tuple, as typed, or null. Read from
+ * the coord-sym definition («A(1,t,2)» on a new point) or the latest stated pin on an existing point
+ * («B(2t,t,k)»). Only a component that names a letter qualifies: a typed number never stands in for «?».
+ */
+function statedLetterText(c: Construction3, id: Id, i: number): string | null {
+  const def = c.points.get(id);
+  const sources: (StatedComps | undefined)[] = [
+    def?.kind === 'coord-sym' ? def.stated : undefined,
+    ...c.pins.filter((p) => p.id === id).map((p) => p.stated),
+  ];
+  for (let k = sources.length - 1; k >= 0; k--) {
+    const st = sources[k];
+    if (st && st.letters[i].length > 0) return st.texts[i];
+  }
+  return null;
 }
 
 /** One side of a vector equation: `3u`, `DC⃗`, `2AB⃗ + v`. */

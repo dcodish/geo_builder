@@ -264,9 +264,10 @@ describe('#482 — the bidi alphabet cannot drift from the palette the tool offe
       expect(r.ok, line).toBe(true);
       if (r.ok) expect(r.commands[0].type, line).toBe('point3');
     }
-    expect(JSON.stringify(parse3('C(p²,1,0)')), 'the two spellings are one command').toBe(
-      JSON.stringify(parse3('C(p^2,1,0)')),
-    );
+    // #2077 (ADR-3D-368): one command in every SOLVING field; `srcs` is the display channel and keeps each
+    // spelling as typed («p²» / «p^2»), so it is the one field the two may differ in.
+    const solving = (line: string) => JSON.stringify(parse3(line), (k, v) => (k === 'srcs' ? undefined : v));
+    expect(solving('C(p²,1,0)'), 'the two spellings are one command').toBe(solving('C(p^2,1,0)'));
   });
 });
 

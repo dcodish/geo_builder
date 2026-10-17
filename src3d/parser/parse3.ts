@@ -22,7 +22,7 @@ import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
 import { isPlanar, sameOperand } from '../engine/operands';
-import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, RevolutionKind, SolidKind, SolidNoun, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
+import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, RevolutionKind, SolidKind, SolidNoun, SymComp, SymTerm, CompSrcs, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, ringCircleId3, soleSymOf, symsOfAffine } from '../engine/types';
 import { DECL_WORDS_EN, DECL_WORDS_HE, HE_PREFIX, SOLID_QUALIFIER_HE } from '../lexicon/nouns3';
 import { REV_CONE_ONLY_NOUN_HE, REV_SIZE_NOUN_EN, REV_SIZE_NOUN_HE, REV_SOLID_EN, REV_SOLID_HE, REV_UNREAD_SLOT_EN, REV_UNREAD_SLOT_HE } from '../lexicon/revolutionSize3';
@@ -1166,7 +1166,7 @@ const pairInjection: Rule = (s) => {
   if (comps.some(unreadableComp)) return null; // #510: a malformed literal is never an unknown component
   const symExprs = symStructure(comps);
   const syms = symNames(comps);
-  return [{ type: 'inject-pair', a: m[1], b: m[2], x: comps[0].num, y: comps[1].num, z: comps[2].num, ...(symExprs ? { symExprs } : {}), ...(syms ? { syms } : {}) }];
+  return [{ type: 'inject-pair', a: m[1], b: m[2], x: comps[0].num, y: comps[1].num, z: comps[2].num, ...(symExprs ? { symExprs } : {}), ...(syms ? { syms } : {}), srcs: compSrcs([m[3], m[4], m[5]]) }];
 };
 
 /**
@@ -2589,6 +2589,10 @@ const symNames = (
     ? (comps.map((t) => (t.expr ? soleSymOf(t.expr) : null)) as [string | null, string | null, string | null])
     : undefined;
 
+/** #2077 (ADR-3D-368): the three components AS TYPED, only whitespace trimmed — the display channel every
+ *  component reader attaches, so the data panel prints a given the way the student wrote it (#1497). */
+const compSrcs = (raw: readonly string[]): CompSrcs => [raw[0].trim(), raw[1].trim(), raw[2].trim()];
+
 /** Parse one component: a plain number, or {sym, k, c} for k·sym + c. */
 function parseComp(t: string): { num: number | null; expr: SymComp | null } {
   const s = t.replace(/\s+/g, '');
@@ -2635,7 +2639,7 @@ const coordPoint: Rule = (s) => {
   const symExprs = symStructure(comps);
   const cmds: Command3[] = [
     comps.some((t) => t.expr !== null)
-      ? { type: 'point3', id, x: comps[0].num, y: comps[1].num, z: comps[2].num, syms, ...(symExprs ? { symExprs } : {}) }
+      ? { type: 'point3', id, x: comps[0].num, y: comps[1].num, z: comps[2].num, syms, ...(symExprs ? { symExprs } : {}), srcs: compSrcs([x, y, z]) }
       : { type: 'point3', id, x: comps[0].num, y: comps[1].num, z: comps[2].num },
   ];
   let rest = restRaw.trim();
@@ -3393,16 +3397,18 @@ const injectionList: Rule = (s) => {
     // symbolic affine components exactly as point items do (the lifted "must be numeric" gate).
     const symExprs = symStructure(comps);
     const syms = symNames(comps);
+    const srcs = compSrcs([gr.c1, gr.c2, gr.c3]); // #2077
     if (gr.vec) {
-      cmds.push({ type: 'inject-vector', name: gr.vec, x, y, z, ...(symExprs ? { symExprs } : {}), ...(syms ? { syms } : {}) });
+      cmds.push({ type: 'inject-vector', name: gr.vec, x, y, z, ...(symExprs ? { symExprs } : {}), ...(syms ? { syms } : {}), srcs });
     } else if (gr.pa) {
-      cmds.push({ type: 'inject-pair', a: gr.pa, b: gr.pb!, x, y, z, ...(symExprs ? { symExprs } : {}), ...(syms ? { syms } : {}) });
+      cmds.push({ type: 'inject-pair', a: gr.pa, b: gr.pb!, x, y, z, ...(symExprs ? { symExprs } : {}), ...(syms ? { syms } : {}), srcs });
     } else if (comps.some((t) => t.expr !== null)) {
       // #325: symbolic affine components ride the list too (`נתונות הנקודות: B(2t, t, k)`)
       cmds.push({
         type: 'point3', id: gr.pt!, x, y, z,
         syms: comps.map((t) => (t.expr ? soleSymOf(t.expr) : null)) as [string | null, string | null, string | null],
         ...(symExprs ? { symExprs } : {}),
+        srcs,
       });
     } else {
       cmds.push({ type: 'point3', id: gr.pt!, x, y, z });
@@ -3510,7 +3516,7 @@ const vectorInjection: Rule = (s) => {
   if (comps.some(unreadableComp)) return null;
   const symExprs = symStructure(comps);
   const syms = symNames(comps);
-  return [{ type: 'inject-vector', name: m[1], x: comps[0].num, y: comps[1].num, z: comps[2].num, ...(symExprs ? { symExprs } : {}), ...(syms ? { syms } : {}) }];
+  return [{ type: 'inject-vector', name: m[1], x: comps[0].num, y: comps[1].num, z: comps[2].num, ...(symExprs ? { symExprs } : {}), ...(syms ? { syms } : {}), srcs: compSrcs([m[2], m[3], m[4]]) }];
 };
 
 /**

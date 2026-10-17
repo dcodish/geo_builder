@@ -17,7 +17,7 @@ import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
 import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
 import { carrierParams3, readCoordGiven } from './carriers';
-import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
+import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointDef, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, StatedComps, SymbolOwner, SymComp, VecAtom } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
@@ -581,6 +581,28 @@ function bindPartialNames(
     if (next.partialNames.some((b) => b.sym === sym)) return; // first binding wins; a re-use is not a re-bind
     next.partialNames.push({ sym, target, axis: axes[i] });
   });
+}
+
+/**
+ * #2077 (ADR-3D-368) — the tuple AS STATED, recorded beside the pin (or coord-sym point) it lowers to: the
+ * typed component texts, the letters each component names, and its ordinal among the stated tuples.
+ * Display only — the data panel prints a given as typed until its letters are known. A command with no
+ * typed text (an internal lowering such as {@link componentGiven}) records nothing.
+ */
+function statedComps(
+  c: Construction3,
+  cmd: { srcs?: [string, string, string]; symExprs?: [SymComp | null, SymComp | null, SymComp | null]; syms?: [string | null, string | null, string | null] },
+): { stated?: StatedComps } {
+  if (!cmd.srcs) return {};
+  const lettersAt = (i: number): string[] => {
+    const e = cmd.symExprs?.[i];
+    if (e) return symsOfAffine(e);
+    const n = cmd.syms?.[i];
+    return n ? [n] : [];
+  };
+  // monotone across the pin families, so rows from several families keep the order they were stated in
+  const ord = c.pins.length + c.vectorPins.length + c.pairPins.length;
+  return { stated: { texts: cmd.srcs, letters: [lettersAt(0), lettersAt(1), lettersAt(2)], ord } };
 }
 
 /** #902 (ADR-3D-219) — a stated number for ONE component of an injection target, as the injection
@@ -2281,7 +2303,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
         const comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp] =
           [comp(cmd.x, exprs[0]), comp(cmd.y, exprs[1]), comp(cmd.z, exprs[2])];
-        next.pins.push({ id: cmd.id, x: comps[0], y: comps[1], z: comps[2] });
+        next.pins.push({ id: cmd.id, x: comps[0], y: comps[1], z: comps[2], ...statedComps(next, cmd) });
         // #1546 (ADR-3D-282): the pin is the DRIVER; a recorded claim is the FINAL ARBITER (the ADR-3D-030
         // pattern its siblings — plane pins, coord-plane-rel, on-line, the `A = (…)` twin — already follow).
         // A pin acts only where the pivot owns something that moves the point (a solid's gauge and dims, a
@@ -2357,6 +2379,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
             x: comp(cmd.x, cmd.syms![0], exprs[0]),
             y: comp(cmd.y, cmd.syms![1], exprs[1]),
             z: comp(cmd.z, cmd.syms![2], exprs[2]),
+            ...statedComps(c, cmd),
           });
           next.param = sym;
           return { ok: true, next };
@@ -2618,7 +2641,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
       const comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp] =
         [comp(cmd.x, exprs[0]), comp(cmd.y, exprs[1]), comp(cmd.z, exprs[2])];
-      next.vectorPins.push({ name: cmd.name, x: comps[0], y: comps[1], z: comps[2] });
+      next.vectorPins.push({ name: cmd.name, x: comps[0], y: comps[1], z: comps[2], ...statedComps(next, cmd) });
       recordPinGiven(next, { type: 'vec-val', atom: { kind: 'named', name: cmd.name }, x: cmd.x, y: cmd.y, z: cmd.z }); // #1560
       bindPartialNames(next, { kind: 'vector', name: cmd.name }, cmd.syms, comps); // #814
       return { ok: true, next };
@@ -3372,7 +3395,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
       const comps: [number | null | SymComp, number | null | SymComp, number | null | SymComp] =
         [comp(cmd.x, exprs[0]), comp(cmd.y, exprs[1]), comp(cmd.z, exprs[2])];
-      next.pairPins.push({ a: cmd.a, b: cmd.b, x: comps[0], y: comps[1], z: comps[2] });
+      next.pairPins.push({ a: cmd.a, b: cmd.b, x: comps[0], y: comps[1], z: comps[2], ...statedComps(next, cmd) });
       recordPinGiven(next, { type: 'vec-val', atom: { kind: 'pair', from: cmd.a, to: cmd.b }, x: cmd.x, y: cmd.y, z: cmd.z }); // #1560
       bindPartialNames(next, { kind: 'pair', a: cmd.a, b: cmd.b }, cmd.syms, comps); // #814
       return { ok: true, next };

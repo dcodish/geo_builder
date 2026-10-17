@@ -839,7 +839,18 @@ the fallback.
 | measurement (`points`, `vectors`, `planes`, `params`, `relations`, `mutual`) | three sampled configurations, intersected | yes |
 | given (`stated`) | the construction | no |
 
-`stated` comes from `c.vectors` and the `vec-eq` claims; `panelIsEmpty` counts both kinds (#296). The
+`stated` comes from `c.vectors`, the `vec-eq` claims and, since #2077 ([ADR-3D-368](06b-decisions-3d.md#adr-3d-368)),
+every pair / named-vector pin that carries a `stated` record; `panelIsEmpty` counts both kinds (#296).
+
+**The typed-text channel (#2077).** Every component reader in `parse3.ts` (`pairInjection`, `vectorInjection`,
+`coordPoint`'s symbolic arm, `injectionList`) attaches `srcs`, the three components as typed with only whitespace
+trimmed, through one helper (`compSrcs`). `apply.ts` copies it, with each component's letters and an ordinal across
+the pin families, onto the pin (`pins` / `vectorPins` / `pairPins`) or the `coord-sym` point as `stated:
+StatedComps`. Nothing solves from it. `dataView` prints a component as typed until every letter in it is in
+`known`, the map the `params` loop fills at the same `paramRow` decision that prints «k = 2» (one decision, the
+#481 rule), and then as `cleanMag(evalAffine(…))`. The points loop's free axis prints the stated letter
+(`statedLetterText`) in `points` / `pointCoords`, while `pointComps` keeps «?». A command without `srcs` (an
+internal lowering such as `componentGiven`, or a figure saved before #2077) records no row. The
 composer sits in the engine (`render → engine`); a row's arrow comes from `lexicon/marks3`. `bidi3.test.ts`
 asserts the section count and `dir: 'app'` on each (never a section-level `dir: 'ltr'`, #559). Every
 measurement field of `DataPanel` keeps only what agrees across the samples.
