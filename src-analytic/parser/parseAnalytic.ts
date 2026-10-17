@@ -5037,6 +5037,24 @@ const BISECTS_EN = new RegExp(
 /** «חוצה זווית ABC» · «חוצה הזווית B» · "the bisector of angle ABC" — the bisector drawn on its own (cat-2d-044). */
 const BISECTOR_ALONE_HE = new RegExp(`^${HE_GIVEN}${BISECTOR_HE}\\s+${BIS_ANGLE}$`);
 const BISECTOR_ALONE_EN = new RegExp(`^(?:the\\s+|an\\s+)?(?:angle\\s+)?bisector\\s+of\\s+(?:the\\s+)?angle\\s+${BIS_ANGLE}$`, 'i');
+/**
+ * #2115 (ADR-AG-299) — the bisector VERB with no angle: «AB חוצה זווית», "AD bisects the angle". 2-D reads the angle at
+ * the FIRST letter (measured at HEAD: AB→A, BA→B, AD→A), so the line is rewritten to «XY חוצה את זווית X» and the
+ * named rule owns it. The copula and role-noun spellings are NOT this sentence (below).
+ */
+const BISECTS_NO_ANGLE_HE = new RegExp(`^${HE_GIVEN}(?:ה?(?:אלכסון|קטע|ישר|צלע)\\s+)?(${NAME})(${NAME})\\s+חוצה(?:-|\\s+)(?:את\\s+)?ה?זו?וית$`);
+const BISECTS_NO_ANGLE_EN = new RegExp(`^(?:[Tt]he\\s+)?(?:(?:diagonal|segment|line|side)\\s+)?(${NAME})(${NAME})\\s+bisects\\s+(?:(?:the|an)\\s+)?angle$`);
+/**
+ * #2115 (ADR-AG-299) — the ROLE-NOUN spellings 2-D's `bisectorRoleNounOnSide` reads: «AB הוא חוצה זווית», «חוצה הזווית
+ * AB [= 5]», "AB is an angle bisector", "the bisector AB". They say only that XY is a bisector; M1 answers them when XY is
+ * a declared polygon's side and declines them otherwise (`roleNoun`).
+ */
+const BISECTOR_ROLE_NOUN: readonly RegExp[] = [
+  new RegExp(`^${HE_GIVEN}(${NAME})(${NAME})\\s+(?:הוא|היא)\\s+ה?חוצה(?:-|\\s+)ה?זו?וית$`),
+  new RegExp(`^${HE_GIVEN}ה?חוצה(?:-|\\s+)ה?זו?וית\\s+(${NAME})(${NAME})(?:\\s*=\\s*\\S.*)?$`),
+  new RegExp(`^(${NAME})(${NAME})\\s+is\\s+(?:an?|the)\\s+(?:angle\\s+)?bisector$`),
+  new RegExp(`^(?:[Tt]he\\s+)?(?:angle\\s+)?bisector\\s+(${NAME})(${NAME})(?:\\s*=\\s*\\S.*)?$`),
+];
 /** The angles of a bisector LIST — «BAC ו-BCA», «A ו-C», «ABC, BCD ו-CDA». */
 const ANGLE_LIST = `((?:[∠∢]?\\s*(?:${NAME}){1,3})(?:\\s*,\\s*[∠∢]?\\s*(?:${NAME}){1,3})*\\s*,?\\s+ו-?\\s*[∠∢]?\\s*(?:${NAME}){1,3})`;
 /** «E חיתוך חוצי הזוויות BAC ו-BCA» · «E נקודת החיתוך של חוצי הזוויות A ו-C» · «E נקודת המפגש של חוצי …». */
@@ -5320,6 +5338,17 @@ function parseCevianFamily(line: string): RuleOutcome {
     const [apex, foot] = at && at.v === y ? [y, x] : [x, y];
     const side = cevianSide(apex, u0, v0, triRun);
     if (typeof side === 'string') return refuse(side, line);
+    /*
+     * #2115 (ADR-AG-299): the far end an END of the target side — «AB חוצה זווית לצלע BC». The segment then lies on an
+     * arm of the angle the side subtends at the apex, ∠BAC: lowered to that `bisects`, so M1 answers it with 2-D's side
+     * sentence when a polygon holds the pair, and with `degenerate-role` (as before) when none does.
+     */
+    if ((foot === side.u || foot === side.v) && apex !== side.u && apex !== side.v) {
+      if (at && isAngleRef(at) && !([at.a, at.b].includes(side.u) && [at.a, at.b].includes(side.v))) return null;
+      const tri = side.ring ? namedShapeFacts('משולש', side.ring, line) : [];
+      if (tri === 'bad-arity') return refuse('bad-arity', line);
+      return made([...tri, { t: 'bisects', at: { v: apex, a: side.u, b: side.v }, p: foot, seg: [x, y], src: line }]);
+    }
     const made0 = cevianWithTarget('bisector', apex, foot, side, line);
     // a three-letter angle names its arms: a side that is not between them is not this sentence's target
     if (made0.ok && at && isAngleRef(at) && !([at.a, at.b].includes(side.u) && [at.a, at.b].includes(side.v))) return null;
@@ -5337,8 +5366,18 @@ function parseCevianFamily(line: string): RuleOutcome {
     // The segment runs FROM the angle's vertex — either end may be written first («AM הוא חוצה זווית CMD»).
     if (at.v !== x && at.v !== y) return refuse('bisector-wrong-apex', line);
     const p = at.v === x ? y : x;
-    if (isAngleRef(at) && (p === at.a || p === at.b)) return refuse('degenerate-role', line);
-    return made([{ t: 'bisects', at, p, src: line }]);
+    // #2115 (ADR-AG-299): a far end on the angle's arm is M1's to answer — the side sentence when a polygon holds it.
+    return made([{ t: 'bisects', at, p, seg: [x, y], src: line }]);
+  }
+
+  // #2115 (ADR-AG-299): the verb with no angle — the angle at the first letter, as 2-D reads it.
+  const na = BISECTS_NO_ANGLE_HE.exec(line) ?? BISECTS_NO_ANGLE_EN.exec(line);
+  if (na) return na[1] === na[2] ? refuse('repeated-vertex', line) : viaSentences(line, [`${na[1]}${na[2]} חוצה את זווית ${na[1]}`]);
+
+  // #2115 (ADR-AG-299): "XY is a bisector" — M1 answers it only when XY is a declared polygon's side.
+  for (const re of BISECTOR_ROLE_NOUN) {
+    const rn = re.exec(line);
+    if (rn) return rn[1] === rn[2] ? null : made([{ t: 'bisects', at: { v: rn[1] }, p: rn[2], seg: [rn[1], rn[2]], roleNoun: true, src: line }]);
   }
 
   // ── the bisector on its own ──

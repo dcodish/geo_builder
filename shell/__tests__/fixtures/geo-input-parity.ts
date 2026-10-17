@@ -261,7 +261,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2260': 'open', // #2199 (ADR-AG-282): 3-D does not read a point stated on a list of lines
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
   '#2110': 'open', // #2101/#2100 (ADR-648/649): analytic does not read a radius letter's value or a radius ratio
-  '#2115': 'open', // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
   '#2129': 'open',
   '#2041': 'open', // #2041 (ADR-664): analytic reads a symbol on an arc as degrees — its half of the ruling waits for #2013 // #2037 (ADR-663): analytic does not put a fresh arc's endpoints on its circle — the cross-tool question
 
@@ -1462,7 +1461,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'radius-ratio-2100', family: 'circles', steps: ['מעגל O', 'מעגל P', 'רדיוס מעגל O גדול פי 2 מרדיוס מעגל P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }] },
   { id: 'radius-ratio-after-2100', family: 'circles', steps: ['מעגל O', 'מעגל P', 'רדיוס מעגל O גדול מרדיוס מעגל P פי 2'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }] },
   // ── #2066 (ADR-643): a side of the triangle is never its bisector — 2-D refuses with a sentence ──
-  { id: 'bisector-on-a-side-2066', family: 'cevians-centres', steps: ['משולש ABC', 'AB חוצה זווית'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2115' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D: «AB היא צלע של המשולש ולכן אינה יכולה לחצות את זווית A…»' },
+  { id: 'bisector-on-a-side-2066', family: 'cevians-centres', steps: ['משולש ABC', 'AB חוצה זווית'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D: «AB היא צלע של המשולש ולכן אינה יכולה לחצות את זווית A…»' },
+  // #2115 (ADR-AG-299): the same predicate on a quadrilateral, and the vertex-less verb that builds over a non-side
+  { id: 'bisector-on-a-quad-side-2115', family: 'cevians-centres', steps: ['מרובע ABCD', 'AB חוצה זווית'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D: «AB היא צלע של המרובע ולכן אינה יכולה לחצות את זווית A.»' },
+  { id: 'bisector-vertexless-builds-2115', family: 'cevians-centres', steps: ['משולש ABC', 'AD חוצה זווית'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D: the bisector from A, D on BC' },
 
   // ── #2098 (ADR-650): a bare run as the SUBJECT of «חוסם» encloses the circle — the incircle in every builder ──
   // ── #1975 (ADR-652, ADR-3D-341, ADR-AG-275): both voices of both inscription relations, every shape, all tools ──

@@ -30,6 +30,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'degenerate-role': [{}],
   'apex-not-a-vertex': [{}],
   'bisector-wrong-apex': [{}],
+  'bisector-is-side': [{ pair: 'AB', vertex: 'A', polygonKind: 'triangle' }, { pair: 'AB', vertex: 'A', polygonKind: 'square' }, { pair: 'AB', vertex: 'A', polygonKind: 'n5' }], // #2115 (ADR-AG-299)
   'length-xy': [{}],
   'coordinate-restriction': [{}],
   'ambiguous-cevian': [{}],
