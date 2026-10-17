@@ -466,6 +466,8 @@ This requires a **pinned-vs-free distinction on points** that the engine current
 
 **Amendment 2 (2026-10-16, [ADR-682](#adr-682), #2133) — ⚠ the "explicit `set-var R` still wins" clause is retired for one stated circle.** With exactly one stated-size circle, a valued R/r still names its radius: a value that differs is refused in the #2119 frame, never a silent second meaning. Two or more stated circles keep this amendment's reading (unruled).
 
+**Amendment 3 (2026-10-17, [ADR-733](#adr-733), #2177) — with several circles the reserved letter names none of them.** A row that values or uses an unbound R/r while two or more circles, at least one with a stated size, precede it is refused, naming the circles, with one next step («רדיוס מעגל P הוא r»); nothing is picked by list order. Amendment 2's «unruled» clause is settled by the operator's 2026-10-16 ruling. A letter used while only one circle existed keeps the meaning it had; two or more circles with no stated size are unchanged.
+
 ## ADR-035 — Relabel a point as a fact-list rewrite, kept out of the engine
 
 **Status:** Accepted (2026-06-14)
@@ -18543,3 +18545,58 @@ The kind words are the ones `circlesTangent` already reads. #2214's single kind 
 **Locks.** `src/app/__tests__/issue-2096-split-cut.test.ts` (every spelling, the fallback cut and its property, the splitter, the must-not-change rows, the pinned English row, the joined subject and its controls); `src/app/__tests__/issue-2209-tangency-restatement.test.ts` S5/S6 now expect no tip; scenario `one-fact-tip-whole-lines-2096`; parity row `unread-vertex-2106`.
 
 **Behaviour change for a student:** «משולש ABC ישר זווית ב-A ו-∠ABC = 30» (and its «∢», «זווית», «∠B», «שבו AB = 4» twins) is taught «(1) משולש ABC  (2) ∠CAB = 90°  (3) ∠ABC = 30» instead of a list cut inside the angle; «משולש ABC שווה שוקיים ∠A = 40» is taught «(1) משולש ABC שווה שוקיים  (2) ∠A = 40»; «מעגל O ומעגל P משיקים» builds with no one-input-per-line tip.
+
+## ADR-732 — No value label covers another: every measure label is placed in one function with a collision pass (#2172)
+
+**Status:** accepted · 2026-10-17 · bug (P3, 2-D) · fix round #2318, stream G · branch `fix/2172-label-collision` · **Amends** [ADR-544](#adr-544) (a label is sized by its room; it is now also placed clear of every other label) · builds on [ADR-715](#adr-715)
+**Requirements:** none (internal) — the honesty invariant already promises it (every stated value is visible and readable) · **Design:** [04](04-design.md) § "Every measure label is placed in one function, and none covers another" · **LADDER stage:** none (render)
+**Cites** [ADR-031](#adr-031) (measure labels), [ADR-335](#adr-335) (an arc's value on its arc), [ADR-715](#adr-715) (an angle's value fits its wedge)
+
+**The report / ruling.** Found work: «מעגל O» · «A על המעגל O» · «B על המעגל O» · «AB = 7» · «קשת AB = 40 במעגל O» drew the chord's «7» under the arc's «40°», reading «740°». Operator, 2026-10-16 (decisions ballot round 4, card 10, option A): *"Accept at P3, built with #2175's label fitting"*; the outcome is ruled by the honesty invariant: the two values never overlap.
+
+**Measured before** (`main` @ 688dfb96, `replay` → `buildScene` → `fitTransform` 800×600 padding 48 → the renderer's placement). The chord's «7» sat at its own spot (157.5, 239.6), the arc's «40°» at (168.2, 242.3): the boxes meet at seeds 0–2 in both statement orders. The arc's value is nudged inward 12.7 px, onto the chord; the chord's value outward 12.7 px, onto the arc; the sagitta of a 40° arc is smaller than the two nudges. Also met: «AB = 12.5» with the 40° arc; a parallelogram's «AC = 8» · «BD = 6» and a rectangle's «AC = 8» · «BD = 8» at seed 2 (both diagonals' midpoints are the crossing). Clear: the 70° and 120° arcs, «משולש ABC» · «AB = 7» · «זוית C = 170».
+
+**The class (docs/17 §1).** *Every measure label is placed independently from its own anchor and nudge, and no step compares one label's box with another's; two labels whose anchors coincide or whose nudges converge print on each other.* Members: a chord and its short arc, two stated diagonals at their crossing, any two values whose spots meet. It is the sibling of #2175's class (a label placed without regard to its box), so it shares the box (`mathLabelBox`).
+
+**Decision.**
+1. **One placement function.** `placeMeasureLabels(measures, toScreen, {r, fontSize, away})` (`src/render/scene.ts`) holds the arithmetic `Figure.tsx` did inline: an angle through `placeAngleValue`, a length at its midpoint nudged outward and shrunk by `labelScale`, an arc on its arc nudged inward, an area at its centroid. `Figure.tsx` draws its result and nothing else.
+2. **A collision pass** over the ink boxes grown by `LABEL_AIR` (0.12·font each side, the halo), in a fixed order by kind (`MEASURE_LABEL_PRIORITY`: angle > arc > area > length; within a kind by the anchor's screen position), so the drawing never depends on typing order. An angle, arc or area value keeps its spot. A length that meets an earlier label yields: the mirror across its segment, then both sides at `off + k·boxHeight` (k = 1..4), the side away from the label it met first (past an arc's value the length would sit behind that label's own arc and read as its). It takes the first spot that meets nothing, else the least-covered one; never dropped (ADR-544).
+3. A label that meets nothing is exactly where it was (`moved: false`): over the 2-D fixtures (29 labels) only the new fixture's «7» moves.
+
+**Measured after.** The reported figure: «40°» unchanged at (168.2, 242.3); «7» on the chord's inner side at (192.8, 248.4), ~10 px clear, at every seed and in both orders (identical). «12.5» with the 40° arc and both diagonal pairs at seed 2: apart. The 70°/120° arcs and the triangles: every label at its old spot to the bit.
+
+**Why not a patch (docs/17 §2).** No figure, text or kind pair is named: every label goes through the same boxes, priority and candidate ladder.
+
+**Sibling audit / cross-tool.** Analytic already places its labels through a priority search in which a later label yields to an earlier one (`placeSceneLabels`, #1717/#1733), so it is not a member (its order differs: angle values, then lengths, then the rest). 3-D and complex draw no planar measure labels through this path.
+
+**Locks.** `src/render/__tests__/label-collision-2172.test.ts` (the reported figure at seeds 0–2 in both orders: no boxes meet, «40°» stays, «7» yields, the old spots met, the two orders draw the same; the class rows; the unchanged rows to the bit; synthetic: the priority, a mirror, never dropped). #2175's locks unchanged. Fixture `src/__tests__/fixtures/issue-2172-chord-arc-labels.geo.json`.
+
+**Behaviour change for a student:** a chord's length and its arc's value are drawn apart (the length moves to the chord's inner side), and so are any two values that would land on each other, such as two stated diagonals at their crossing. Every other label is where it was.
+
+## ADR-733 — With several circles the reserved R/r names none of them: a value or a use is refused, naming the circles, with one next step (#2177)
+
+**Status:** accepted · 2026-10-17 · bug (P3, 2-D) · fix round #2318, stream G · branch `fix/2177-reserved-r-ambiguous` · **Amends** [ADR-034](#adr-034) (Amendment 3), [ADR-681](#adr-681) (the letter system's reserved-letter source)
+**Operator ruling (verbatim):** #2177, 2026-10-16 (ballot card 3, `d2177-r-multi-circle`) — *"Ask 'which circle?', using 2-D's existing which-circle question. If that question cannot bind a letter, fall back to B."* B: *"Refuse, naming both circles, and show one next step (for example «רדיוס מעגל P הוא 4»)."* Second pass the same day (row `h-r-one-sized-p`): «מעגל O ברדיוס 3» / «מעגל P» / «r = 4» gets the same refusal.
+**Requirements:** [02](02-requirements.md) FR-EN-22a — the reserved letter with several circles · **Design:** [04](04-design.md) § the letter system (`reservedAmbiguity`, `Pattern.nextStep`) · **LADDER stage:** 5 (the fold's restatement pre-scan, ADR-661/681's channel; no solver change)
+
+**Measured before** (`main` @ 688dfb96 + #2172, `runSubmit` with the model mocked, 0 calls). «מעגל O ברדיוס 3» · «מעגל P ברדיוס 5» · «r = 4» committed green, O 3, P 5: the 4 constrained nothing. «r = 3» and a third unsized circle the same. «מעגל O ברדיוס 3» · «מעגל P» · «r = 4» was refused as a contradiction with O's 3 (the letter system bound r to the one sized circle). «מעגל O» · «מעגל P» · «r = 4» commits. «R = 4» escalates (capital R is #2144's). The ruling's ask: `input.ambiguousCircleRef` is a refusal note with no answer channel, and its taught answer «מעגל O» is a no-op «כבר קיים» — it cannot bind a letter, so fallback B applies (the plan's pickup measurement, re-read).
+
+**The class (docs/17 §1).** *On a figure with several circles the reserved radius letter is resolved by list order, so a choice the student never made is taken.* Valued, it bound to nothing and was dropped green (ADR-034 Am. 1's first-sized-circle fallback skips a valued letter); used in a measure, it silently named the first sized circle's radius; beside one unsized circle it named the sized one.
+
+**Decision.**
+1. **`reservedAmbiguity(cmds, i, radiusOf)`** (`engine/lower.ts`): row `i` values or uses (`set-var`, `symbolsConsumedBy`) an R/r no `radius-symbol` binds, while the circles stated before it are two or more with at least one stated size (`statedSizeCircles`) → the raw `reserved radius ambiguous: r names no one circle of O, P (stated sizes)` — the sized circles when two or more are sized, else every circle (`(circles)`).
+2. **The letter system refuses it first** (`letterSystem`, before the reserved-circle binding), with `at` = the row itself, so the fold's pre-scan (`symtab.refused`) refuses the typed line and a loaded list's row alike, with no `[vs]` tail. Nothing is added; the refused row's value never reaches a letter.
+3. **The sentence** (#1995 3b: the statement, one next step) — `errors.reservedRadiusAmbiguousSized_said` / `errors.reservedRadiusAmbiguous_said`: ««r = 4»: בסרטוט יש כמה מעגלים שרדיוסם נתון (O, P), ולכן לא ברור של איזה מהם r הוא הרדיוס. כתבו קודם את המעגל, למשל: «רדיוס מעגל P הוא r».» (the mixed case drops «שרדיוסם נתון», which would be false). The next step names the circle stated last. It is the binding sentence, not the ruling's example «רדיוס מעגל P הוא 4», which does not build on the ruling's own figure (P is already 5) — a taught remedy must build. The pattern carries `nextStep`, so `explainError` appends no generic retry hint after the sentence's own next step (the rule the floor sentence follows, #2028).
+4. **Unchanged:** one circle (ADR-034 Am. 1/2); a letter bound explicitly («מעגל O ברדיוס r»); a letter used while only one circle existed keeps the meaning it had when written («מעגל O ברדיוס 3» · A, B on O · «AB = r» · «מעגל P ברדיוס 5»: AB = 3, all green); two or more circles with no stated size (not in the ruling).
+
+**Measured after.** Every "before" row in the ruling's scope is refused with the sentence, in Hebrew and English, nothing added, the model never called; «AB = r» on the two sized circles too. The taught «רדיוס מעגל P הוא r» commits; «r = 4» after it is refused as a contradiction with «מעגל P ברדיוס 5» (honest). In the mixed case the taught step then «r = 4» sizes P to 4.
+
+**Entry order (the plan's open check, reported, not picked).** «מעגל O» (unsized) · A, B on O · «AB = r» · «מעגל P ברדיוס 7»: all rows stay green, as before this change, but the figure jumps: before «מעגל P ברדיוס 7» AB = 3.481 = O's free radius; after it AB = 7 = P's radius while O stays 5 — the #2165 letter system re-reads r as the one sized circle's radius. This change leaves it as it was (no pick); whether r keeps naming O there, or the second circle's row is refused, is put to the operator as #2333.
+
+**Why not a patch (docs/17 §2).** No sentence or circle is named: one predicate over the circles before the row, read by the one letter-system channel both doors share.
+
+**Sibling audit / cross-tool.** Analytic refuses the report `not-handled` (generic); the 2-D sentence’s port is filed as #2327 (the standing analytic rule of 2026-10-16). Parity row `reserved-r-several-circles-2177` (`expect: 'refused'`, X8; analytic known gap #2327). 3-D: X8. Complex: none.
+
+**Locks.** `src/app/__tests__/issue-2177-reserved-r-several-circles.test.ts` (the matrix through `runSubmit`, English, a loaded list, the taught steps, the controls, the predicate); `humanize-error.test.ts` CASES gains both raw shapes from the engine's own function; scenario `reserved-r-several-circles-2177`; parity row.
+
+**Behaviour change for a student:** «מעגל O ברדיוס 3» · «מעגל P ברדיוס 5» · «r = 4» (also «r = 3», «AB = r», and one sized circle beside an unsized one) is now refused, naming the circles, with «רדיוס מעגל P הוא r» as the next step, instead of committing green with the value ignored (or, beside an unsized circle, a contradiction with the sized one).

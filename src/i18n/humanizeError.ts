@@ -185,6 +185,12 @@ interface Pattern {
    * Unlike {@link nested} it interpolates a word into this template, not a whole sentence.
    */
   paramKeys?: (m: RegExpMatchArray) => Record<string, string>;
+  /**
+   * #2177 ([ADR-733](../../docs/06-decisions.md#adr-733)) — the sentence already ends with its ONE next step (#1995 3b:
+   * name the statement, give one next step), so {@link explainError} does not append the generic retry hint after it —
+   * the rule the floor sentence already follows (#2028).
+   */
+  nextStep?: true;
 }
 
 // Order matters only where one pattern's text is a prefix of another's; each regex below is
@@ -195,6 +201,18 @@ interface Pattern {
  * entry is English on a Hebrew screen; that is exactly how the two diagonal refusals shipped broken.
  */
 export const PATTERNS: Pattern[] = [
+  // lower.ts reservedAmbiguity (#2177, ADR-733) — `reserved radius ambiguous: r names no one circle of O, P (stated sizes)`:
+  // the reserved R/r valued or used on a figure with several circles. Names the circles and the one next step (the
+  // binding sentence on the circle stated last), never a pick.
+  {
+    re: /^reserved radius ambiguous: ([Rr]) names no one circle of (.+) \((stated sizes|circles)\)$/,
+    key: 'errors.reservedRadiusAmbiguous',
+    keyOf: (m) => (m[3] === 'stated sizes' ? 'errors.reservedRadiusAmbiguousSized' : 'errors.reservedRadiusAmbiguous'),
+    keys: ['errors.reservedRadiusAmbiguousSized', 'errors.reservedRadiusAmbiguous'],
+    params: (m) => ({ letter: m[1], circles: m[2], next: m[2].split(', ').pop()! }),
+    saysSubject: true,
+    nextStep: true,
+  },
   // metricFeasibility.ts (#420, ADR-417) — `impossible: |AC| = 9 exceeds 8, the distance from A to C via B`
   //
   // TWO wordings, because the message must state the geometry that actually applies. With exactly one
@@ -491,6 +509,8 @@ export interface Humanized {
   text: string;
   /** True when no ruled message could say this honestly: no pattern matched, or a matched value carried an engine token. */
   floor: boolean;
+  /** True when the message gives its own next step (a pattern's `nextStep`, #2177): no retry hint follows it. */
+  nextStep?: boolean;
 }
 
 /**
@@ -509,8 +529,8 @@ export function humanizeError(raw: string | null | undefined, t: Translate, said
  * next step and is ruled as the whole message. Both the banner and the submit pipeline render through this.
  */
 export function explainError(raw: string | null | undefined, t: Translate, said?: string, other?: string): string {
-  const { text, floor } = humanizeErrorOutcome(raw, t, said, other);
-  return text && !floor ? `${text} ${t('errors.retryHint')}` : text;
+  const { text, floor, nextStep } = humanizeErrorOutcome(raw, t, said, other);
+  return text && !floor && !nextStep ? `${text} ${t('errors.retryHint')}` : text;
 }
 
 /** {@link humanizeError}, reporting whether the result is the floor sentence (#2028). */
@@ -553,10 +573,10 @@ export function humanizeErrorOutcome(raw: string | null | undefined, t: Translat
     const sub = said?.trim();
     const oth = other?.trim();
     // #943 half B: both sides known ⇒ the sentence AND the earlier given it contradicts are the subject.
-    if (p.namesOther && sub && oth) return { text: t(`${key}_said_vs`, { ...translated, said: sub, other: oth }), floor: false };
-    if (p.namesOtherLine && oth) return { text: t(`${key}_vs`, { ...translated, other: oth }), floor: false };
-    if (p.saysSubject && sub) return { text: t(`${key}_said`, { ...translated, said: sub }), floor: false };
-    return { text: t(key, translated), floor: false };
+    if (p.namesOther && sub && oth) return { text: t(`${key}_said_vs`, { ...translated, said: sub, other: oth }), floor: false, ...(p.nextStep ? { nextStep: true } : {}) };
+    if (p.namesOtherLine && oth) return { text: t(`${key}_vs`, { ...translated, other: oth }), floor: false, ...(p.nextStep ? { nextStep: true } : {}) };
+    if (p.saysSubject && sub) return { text: t(`${key}_said`, { ...translated, said: sub }), floor: false, ...(p.nextStep ? { nextStep: true } : {}) };
+    return { text: t(key, translated), floor: false, ...(p.nextStep ? { nextStep: true } : {}) };
   }
   // #2028 (ADR-W-130): no known shape. The floor sentence, never the engine's English — and never a partial
   // translation of it, which spliced Hebrew vocabulary into an English sentence («cannot place point על הקטע»).

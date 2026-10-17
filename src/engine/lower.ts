@@ -476,6 +476,13 @@ export function letterSystem(
   };
 
   cmds.forEach((c, i) => {
+    // #2177 (ADR-733, ADR-034 Am. 3): a row that values or uses the reserved letter when it cannot name one circle
+    // is refused before anything is judged — nothing is picked for the student.
+    const ambiguous = reservedAmbiguity(cmds, i, radiusOf);
+    if (ambiguous) {
+      refuse(i, { status: ambiguous, at: i });
+      return;
+    }
     if (reservedCircle !== undefined && cmds.slice(0, i).some((x) => statedSizeCircles([x]).has(reservedCircle))) {
       for (const name of lettersOf(c)) if (/^[Rr]$/.test(name) && !radiusOf.has(name) && !reservedBound.has(name)) bindReserved(i, name);
     }
@@ -508,6 +515,39 @@ export function letterSystem(
   const out = new Map<string, { stated?: number; derived?: number }>();
   for (const [k, v] of values) out.set(k, { ...(v.stated !== undefined ? { stated: v.stated } : {}), ...(v.derived !== undefined ? { derived: v.derived } : {}) });
   return { values: out, refused };
+}
+
+/**
+ * #2177 ([ADR-733](../../docs/06-decisions.md#adr-733), ADR-034 Am. 3) — THE RESERVED R/r NAMES ONE CIRCLE OR NONE.
+ *
+ * Operator ruling 2026-10-16 (ballot card 3, fallback B; second pass: one sized circle beside an unsized one too):
+ * with several circles, the reserved radius letter is not resolved by list order. «מעגל O ברדיוס 3» · «מעגל P ברדיוס 5»
+ * · «r = 4» committed green and the 4 constrained nothing (the fallback took the first sized circle, and a valued letter
+ * skipped it); «AB = r» silently used O's radius. **The class:** *the reserved letter is resolved by list order on a
+ * figure with several circles, so a choice the student never made is taken.*
+ *
+ * Row `i` values or uses an unbound R/r (no `radius-symbol` binds that spelling) while the circles stated before it are
+ * two or more with at least one stated size → the raw refusal
+ * `reserved radius ambiguous: r names no one circle of O, P (stated sizes|circles)`: the circles with a stated size
+ * when two or more have one, else every circle. Two or more circles with NO stated size are left as they were (not in
+ * the ruling). A letter used while only one circle existed keeps the meaning it had when it was written. Null otherwise.
+ */
+export function reservedAmbiguity(cmds: readonly AnyCommand[], i: number, radiusOf: SymTab['radiusOf']): string | null {
+  const c = cmds[i];
+  const used = c.type === 'set-var' ? [c.name] : c.type === 'radius-symbol' ? [] : symbolsConsumedBy(c);
+  const letter = used.find((n) => /^[Rr]$/.test(n) && !radiusOf.has(n));
+  if (!letter) return null;
+  const circles = new Map<Id, Id>(); // circle id → its centre letter, in the order the student stated them
+  for (const x of cmds.slice(0, i)) {
+    const d = circleDefinedBy(x);
+    if (d && !circles.has(d.id)) circles.set(d.id, d.center);
+  }
+  if (circles.size < 2) return null;
+  const sized = statedSizeCircles(cmds.slice(0, i));
+  const sizedIds = [...circles.keys()].filter((id) => sized.has(id));
+  if (sizedIds.length === 0) return null;
+  const named = sizedIds.length >= 2 ? sizedIds : [...circles.keys()];
+  return `reserved radius ambiguous: ${letter} names no one circle of ${named.map((id) => circles.get(id)).join(', ')} (${sizedIds.length >= 2 ? 'stated sizes' : 'circles'})`;
 }
 
 /**

@@ -99,9 +99,10 @@ describe('letterSystem — inconsistent rows are refused with the statement they
     expect(buildSymTab([CIRCLE3, val('r', 4)]).refused.get(1)).toEqual({ at: 0, status: 'over-constrained: radius of circle-O = 4 cannot hold' });
   });
 
-  it('the reserved r is NOT bound when two circles have a stated radius (unruled — today\'s reading kept)', () => {
+  it('the reserved r names no circle when two have a stated radius: its value is refused, naming both (#2177, ADR-733)', () => {
     const P: AnyCommand = { type: 'circle', id: 'circle-P', center: 'P', radius: 5 };
-    expect(buildSymTab([CIRCLE3, P, val('r', 4)]).refused.size).toBe(0);
+    const refused = buildSymTab([CIRCLE3, P, val('r', 4)]).refused;
+    expect([...refused.entries()]).toEqual([[2, { status: 'reserved radius ambiguous: r names no one circle of O, P (stated sizes)', at: 2 }]]);
   });
 
   it('a value for a letter nothing binds waits (#926) — it contradicts nothing yet', () => {

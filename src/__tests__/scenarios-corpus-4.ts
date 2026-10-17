@@ -5370,6 +5370,26 @@ export const SCENARIOS_4: Scenario[] = [
       expect(clausesOf('משולש ABC ישר זווית ב-B ו-∠BAC = 30'), '#2096, verbatim').toEqual(['משולש ABC ישר זווית ב-B', '∠BAC = 30']);
     },
   },
+  {
+    id: 'reserved-r-several-circles-2177',
+    title: '«מעגל O ברדיוס 3» · «מעגל P ברדיוס 5» · «r = 4» is refused naming both circles with one next step, which builds (#2177, ADR-733)',
+    guards:
+      '#2177 (P3), operator ruling 2026-10-16 (ballot card 3, choice A with fallback B: «Refuse, naming both circles, and show one next step»; the which-circle ask cannot bind a letter, measured). Second pass 2026-10-16: one sized circle beside an unsized one gets the same refusal. Measured at 688dfb96 through runSubmit: the report committed green and the 4 constrained nothing (O 3, P 5). Root cause: the reserved R/r was resolved by list order on a figure with several circles — the legacy fallback took the first sized circle, and a valued letter skipped it. Fix: lower.ts reservedAmbiguity — a row that values or uses an unbound R/r while two or more circles with at least one stated size precede it is refused by the letter system (the fold pre-scan), naming the circles and the binding sentence on the circle stated last. Asserts the report is refused word for word, nothing added, and the taught «רדיוס מעגל P הוא r» commits. The matrix is src/app/__tests__/issue-2177-reserved-r-several-circles.test.ts.',
+    steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 5'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const facts = factsOf(['מעגל O ברדיוס 3', 'מעגל P ברדיוס 5']);
+      const v = gateVerdict(facts, 'r = 4');
+      expect(v.kind, 'the report').toBe('refused');
+      const raw = (v as { detail?: string }).detail;
+      expect(stripFormatControls(humanizeError(raw, he as never, 'r = 4', otherUtteranceForError(facts, raw)))).toBe(
+        '«r = 4»: בסרטוט יש כמה מעגלים שרדיוסם נתון (O, P), ולכן לא ברור של איזה מהם r הוא הרדיוס. כתבו קודם את המעגל, למשל: «רדיוס מעגל P הוא r».',
+      );
+      expect(gateVerdict(facts, 'רדיוס מעגל P הוא r').kind, 'the taught next step builds').toBe('commit');
+      expect([...fig.circles.values()].map((c) => c.r).sort(), 'nothing changed the radii').toEqual([3, 5]);
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

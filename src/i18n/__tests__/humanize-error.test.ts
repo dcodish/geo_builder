@@ -10,6 +10,20 @@ import { diagonalHeightError } from '@/engine/heightFeasibility';
 import { equalNestedMessage } from '@/engine/radiusFeasibility';
 import type { Constraint } from '@/engine/types';
 import { stripFormatControls } from '../../../shell/bidi';
+import { reservedAmbiguity } from '@/engine/lower';
+import type { AnyCommand } from '@/engine';
+
+/** #2177: the circles a reserved-r refusal names — two sized, and one sized beside an unsized one. */
+const RESERVED_TWO_SIZED = [
+  { type: 'circle', id: 'circle-O', center: 'O', radius: 3 },
+  { type: 'circle', id: 'circle-P', center: 'P', radius: 5 },
+  { type: 'set-var', name: 'r', value: 4 },
+] as AnyCommand[];
+const RESERVED_ONE_SIZED = [
+  { type: 'circle', id: 'circle-O', center: 'O', radius: 3 },
+  { type: 'circle', id: 'circle-P', center: 'P', radius: 3.6, freeRadius: true },
+  { type: 'set-var', name: 'r', value: 4 },
+] as AnyCommand[];
 
 // Use the real configured i18n instance (Hebrew-pinned, as the app runs) so the test
 // exercises the actual key → message resolution, not a stub.
@@ -23,6 +37,10 @@ const hasHebrew = (s: string) => /[֐-׿]/.test(s);
  * site is added to the engine, add its raw shape here so coverage stays complete.
  */
 const CASES: { raw: string; contains: string[] }[] = [
+  // lower.ts reservedAmbiguity (#2177, ADR-733) — the reserved r on a figure with several circles, BOTH wordings (two sized
+  // circles; one sized beside an unsized one). Built by the engine's own function, never re-spelled here.
+  { raw: reservedAmbiguity(RESERVED_TWO_SIZED, 2, new Map())!, contains: ['O, P', 'שרדיוסם נתון', 'הוא הרדיוס', 'רדיוס מעגל'] },
+  { raw: reservedAmbiguity(RESERVED_ONE_SIZED, 2, new Map())!, contains: ['O, P', 'הוא הרדיוס', 'רדיוס מעגל'] },
   // step.ts collapsedPolygonError (#1849, ADR-602) — a declared polygon the step would flatten; the noun is the
   // polygon's own, so all three wordings (triangle, quadrilateral, polygon) and the no-statement form are exercised.
   // Built by the engine's own function, never re-spelled here.

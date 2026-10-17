@@ -14,6 +14,8 @@ import { isGeoPoint } from '@/engine/types';
 import { len, rot90, sub, unit } from '@/engine/geometry';
 import { formatMeasure, formatAngle } from '@/format';
 import { visibleCoincidences } from './pointDescriptions';
+import { mathLabelBox } from './mathMetrics';
+import { hasMath } from '../../shell/math';
 import { MARK_FIT_FRACTION, MIN_MARK_SCALE, markFitScale } from '../../shell/marks';
 import { offInkExtensions } from '../../shell/offInk';
 import { carryingLines, resolveCircle, resolveDrawnLines, orientArc, type DefiniteAngle, type DefiniteLength, type RelationsResult, type ResolvedCircle } from '@/engine';
@@ -1130,4 +1132,135 @@ export function placeAngleValue(a: {
   const t = Math.max(arcR, support(u[j], fs) + margin(fs)); // along the ray: wholly ahead of the vertex
   const o = support(outer[j], fs) + margin(fs);
   return { x: v.x + u[j].x * t + outer[j].x * o, y: v.y + u[j].y * t + outer[j].y * o, fontSize: fs, fit: 'outside' };
+}
+
+/**
+ * EVERY MEASURE LABEL IS PLACED HERE, AND NONE COVERS ANOTHER (#2172, [ADR-732](../../docs/06-decisions.md#adr-732),
+ * amends ADR-544; builds on #2175's {@link placeAngleValue}).
+ *
+ * **Found work, ruled 2026-10-16** (decisions ballot round 4, card 10 A): a chord's «7» was drawn under its arc's
+ * «40°» and read «740°». Each label was placed from its own anchor and nudge, and no step compared one label's box
+ * with another's. **The class:** *two value labels whose anchors coincide or whose nudges converge print on each
+ * other* — a chord and its short arc (the sagitta is smaller than the two nudges), two stated diagonals meeting at
+ * one point.
+ *
+ * 1. **Each label's own spot**, exactly as the renderer placed it before: an angle by {@link placeAngleValue}, a
+ *    length at its midpoint nudged outward (shrunk to its side, {@link labelScale}), an arc on the arc nudged inward,
+ *    an area at its centroid.
+ * 2. **A collision pass**, in a fixed priority order by KIND — angle > arc > area > length — so the drawing does not
+ *    depend on the order the student typed the facts (within a kind, by the anchor's screen position). A label tied
+ *    to a mark or an arc keeps its spot; a LENGTH, which has two sides of its segment, yields: it tries today's spot,
+ *    the mirror across its segment, then today's side and the mirror at `off + k·boxHeight` (k = 1..4), and takes
+ *    the first whose box covers no label already placed — else the least-overlap one. It is never dropped (ADR-544:
+ *    shrink, never drop).
+ * 3. A label that covers nothing is exactly where it was (`moved: false`) — no layout churn.
+ *
+ * Boxes are the typesetter's ink box ({@link mathLabelBox}) grown by {@link LABEL_AIR} on every side — the white halo
+ * — so two labels that would touch, and read as one number, count as covering each other.
+ * Works in screen px; pure, so the lock calls it rather than reproducing the arithmetic (ADR-W-053).
+ */
+export const MEASURE_LABEL_PRIORITY: Readonly<Record<SceneMeasure['kind'], number>> = { angle: 0, arc: 1, area: 2, length: 3 };
+
+/** The air (× font size) around a label's ink box on every side when labels are compared: the halo (0.22·fs stroke). */
+export const LABEL_AIR = 0.12;
+
+export interface MeasureLabelPlacement {
+  /** Centre of the label, screen px — what `MathSvg` is given. */
+  x: number;
+  y: number;
+  fontSize: number;
+  /** The ink box, px, centred on (x, y). */
+  w: number;
+  h: number;
+  /** True when the collision pass moved the label off its own spot. */
+  moved: boolean;
+  /** The label's own spot (step 1), where it sat before the collision pass. */
+  own: Vec;
+}
+
+interface LabelBox {
+  x: number;
+  y: number;
+  hw: number;
+  hh: number;
+}
+const overlapArea = (a: LabelBox, b: LabelBox) =>
+  Math.max(0, Math.min(a.x + a.hw, b.x + b.hw) - Math.max(a.x - a.hw, b.x - b.hw)) *
+  Math.max(0, Math.min(a.y + a.hh, b.y + b.hh) - Math.max(a.y - a.hh, b.y - b.hh));
+
+export function placeMeasureLabels(
+  measures: readonly SceneMeasure[],
+  toScreen: (v: Vec) => Vec,
+  o: {
+    /** The renderer's base unit, px (4 / zoom). */
+    r: number;
+    /** The renderer's base font, px (16 / zoom). */
+    fontSize: number;
+    /** The figure's centre, screen px — where a needle's value must not go (#2175). */
+    away?: Vec;
+  },
+): MeasureLabelPlacement[] {
+  const { r, fontSize } = o;
+  const seats = measures.map((m) => {
+    const s = toScreen(m.pos);
+    const dl = Math.hypot(m.dir.x, m.dir.y);
+    const sd = dl < 1e-9 ? { x: 0, y: 0 } : { x: m.dir.x / dl, y: -m.dir.y / dl }; // world→screen Y-flip
+    // #1337 — THE MARK IS SIZED BY ITS CORNER: shrink to fit, never drop.
+    const ends = m.ends?.map((e) => toScreen(e));
+    const roomPx = ends ? Math.min(...ends.map((e) => Math.hypot(e.x - s.x, e.y - s.y))) : Infinity;
+    const base = fontSize * (m.kind === 'angle' ? 1.05 : 0.85);
+    const k =
+      m.kind === 'angle'
+        ? markScale(roomPx, r)
+        : m.kind === 'length' && ends
+          ? labelScale(Math.hypot(ends[1].x - ends[0].x, ends[1].y - ends[0].y), m.text, base)
+          : 1;
+    const mFont = Math.max(MIN_MEASURE_FONT_PX, base * k);
+    const box1 = mathLabelBox(m.text, 1, !hasMath(m.text));
+    // #2175 (ADR-715): an angle's value fits its wedge.
+    if (m.kind === 'angle' && ends) {
+      const fit = placeAngleValue({ v: s, p1: ends[0], p2: ends[1], dir: sd, arcR: ANGLE_ARC_R * r * k, fontSize: mFont, minFont: MIN_MEASURE_FONT_PX, box1, away: o.away });
+      return { s, sd, off: 0, x: fit.x, y: fit.y, fontSize: fit.fontSize, box1 };
+    }
+    const off = m.kind === 'area' ? 0 : m.kind === 'angle' ? angleValueOffset(r * k, mFont) : r * 1.4 * k + mFont * 0.55;
+    return { s, sd, off, x: s.x + sd.x * off, y: s.y + sd.y * off, fontSize: mFont, box1 };
+  });
+
+  const boxAt = (i: number, x: number, y: number): LabelBox => {
+    const { box1, fontSize: fs } = seats[i];
+    return { x, y, hw: (box1.w * fs) / 2 + LABEL_AIR * fs, hh: (box1.h * fs) / 2 + LABEL_AIR * fs };
+  };
+  const out: MeasureLabelPlacement[] = seats.map((p) => ({ x: p.x, y: p.y, fontSize: p.fontSize, w: p.box1.w * p.fontSize, h: p.box1.h * p.fontSize, moved: false, own: { x: p.x, y: p.y } }));
+  const order = measures
+    .map((_, i) => i)
+    .sort((i, j) => MEASURE_LABEL_PRIORITY[measures[i].kind] - MEASURE_LABEL_PRIORITY[measures[j].kind] || seats[i].s.x - seats[j].s.x || seats[i].s.y - seats[j].s.y || i - j);
+  const placed: LabelBox[] = [];
+  const cover = (b: LabelBox) => placed.reduce((t, q) => t + overlapArea(b, q), 0);
+  for (const i of order) {
+    const p = seats[i];
+    let best = boxAt(i, p.x, p.y);
+    const yields = measures[i].kind === 'length' && (p.sd.x !== 0 || p.sd.y !== 0);
+    if (yields && cover(best) > 0) {
+      const h = p.box1.h * p.fontSize;
+      // Further out, the side AWAY from the labels it hit goes first: past a label that sits on today's side (an arc's
+      // value just beyond its chord) the length would land behind that label's own ink and read as its.
+      const toward = placed.filter((q) => overlapArea(best, q) > 0).reduce((t, q) => t + (q.x - p.s.x) * p.sd.x + (q.y - p.s.y) * p.sd.y, 0);
+      const sides = toward > 0 ? [-1, 1] : [1, -1];
+      const spots: Vec[] = [{ x: p.s.x - p.sd.x * p.off, y: p.s.y - p.sd.y * p.off }];
+      for (let k = 1; k <= 4; k++) for (const side of sides) spots.push({ x: p.s.x + side * p.sd.x * (p.off + k * h), y: p.s.y + side * p.sd.y * (p.off + k * h) });
+      let bestCover = cover(best);
+      for (const q of spots) {
+        const b = boxAt(i, q.x, q.y);
+        const c = cover(b);
+        if (c < bestCover) {
+          best = b;
+          bestCover = c;
+          if (c === 0) break;
+        }
+      }
+      out[i] = { ...out[i], x: best.x, y: best.y, moved: best.x !== p.x || best.y !== p.y };
+    }
+    placed.push(best);
+  }
+  return out;
 }
