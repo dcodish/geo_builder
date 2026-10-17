@@ -640,6 +640,16 @@ must be one `readShapePhrase` lowers whole, its arity must match the letters and
 phrase's own or the generic «מרובע». Anything else is returned unchanged. It is the second copy of analytic's
 `frameAnalytic.ts` (copied, BOUNDARIES.json); a third copy (3-D, #1679/#1888) moves the pure part to `shell/`.
 
+### The bar spelling of a length, folded at the normalize boundary ([ADR-719](06-decisions.md#adr-719))
+
+`normalizeUtterance` folds a **two-label** absolute-value pair to the pair — `|AB|` → `AB`, `| A1B1 |` → `A1B1` — right
+after the look-alike glyph fold (`foldGlyphs`) and the ן-connective fold, so every length rule and every honesty gate
+reads one spelling. Uppercase labels only, guarded against a doubled bar on either side (`AB || CD || EF` is not
+`|CD|`); `|z|`, `|ABC|` and anything else pass through untouched. The four older per-rule strips (`parseMeasureSide`,
+`parseProductSide`, the product-term reader, `lengthOrder`'s `SEG`) stay as written: they also accept a lowercase pair
+(and the sum and product readers any bar) the fold does not, and removing them would change those readings. No catalog row: the panel teaches
+«AB = 4»; the bar is a tolerated variant, like the «מעויין» fold.
+
 ### A second shape noun over a declared ring ([ADR-619](06-decisions.md#adr-619))
 
 `engine/shapeKinds.ts` reads the quadrilateral hierarchy from the ONE shared lattice (`shell/narrowing.ts`

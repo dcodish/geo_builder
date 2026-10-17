@@ -1,0 +1,62 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T00:00:00.000Z",
+  "name": "issue-2097-abs-length",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "jLyXEgG_b8IU85msBKFAw",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "5cYWFIRsB4m1kqPB7IjhY",
+      "utterance": "|AB| = 4",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "uCn7HhpghsoxKRj_n3AjP",
+      "utterance": "|AB| = 4",
+      "group": "g1",
+      "cmd": {
+        "type": "set-distance",
+        "a": "A",
+        "b": "B",
+        "value": 4
+      },
+      "enabled": true
+    },
+    {
+      "id": "kyl5BAUmYoF7DNUOmGhB7",
+      "utterance": "|AC| = k",
+      "group": "g3",
+      "cmd": {
+        "type": "measure-length",
+        "a": "A",
+        "b": "C",
+        "expr": {
+          "coef": 1,
+          "var": "k"
+        }
+      },
+      "enabled": true
+    }
+  ]
+}
