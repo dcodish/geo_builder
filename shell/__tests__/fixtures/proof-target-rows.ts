@@ -8,7 +8,8 @@
  * The rule lives once (`shell/proofTarget.ts`), but whether each builder CALLS it at its submit gate is not
  * visible from `shell/`, which may not import a product. So each tree hands its REAL submit decision over as
  * a {@link ProofGate} (a thin lock: `src/app/__tests__/proof-target-1666.test.ts`,
- * `src3d/__tests__/proof-target-1666.test.ts`, `src-analytic/__tests__/proof-target-1666.test.ts`), and
+ * `src3d/__tests__/proof-target-1666.test.ts`, `src-analytic/__tests__/proof-target-1666.test.ts`, and complex's
+ * `src-complex/__tests__/proof-target-1666.test.ts`, #1870), and
  * `shell/__tests__/proof-target-meta-1666.test.ts` proves these checks catch a broken gate.
  *
  * Every line here speaks of A, B and C only, so each builder's setup needs just a figure with those three
