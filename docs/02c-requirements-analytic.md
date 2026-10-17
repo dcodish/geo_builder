@@ -675,6 +675,7 @@ a sentence the tool parsed.
 - «∠ABC=2α» · «∠ABC=3α» → «לא ניתן: «∠ABC=3α» סותר את «∠ABC=2α» — אי אפשר לקיים את שניהם יחד. הסיבה: ∠ABC = 3α.»
 - Not a second name: a letter naming another quantity («AB=a» · «BC=a», «CB=c» · «AB=a» · «AB=c»), a number, a shared-letter equation («AB=2a» · «AB=a+3»), a trig measure, an angle label.
 - Sources: #2054, #2061, ADR-AG-277.
+- **A second, different NUMBER for the same segment or angle, or the same letter with another constant, contradicts the first line** in the same frame (2-D's verdict, [ADR-AG-295](06c-decisions-analytic.md#adr-ag-295), #2105; operator ruling 2026-10-15): «AB=4» · «AB=5» → «לא ניתן: «AB=5» סותר את «AB=4» — אי אפשר לקיים את שניהם יחד. הסיבה: |AB| = 5.»; «∠ABC=40» · «∠CBA=50» → «… הסיבה: ∠CBA = 50°.»; «∠ABC = α» · «∠ABC = α + 40» → «… הסיבה: ∠ABC = α + 40.» The same value in another spelling is known; a letter whose coefficient AND constant change («AB=2a» · «AB=a+3») is an equation.
 - **A second, different radius for a circle is refused in 2-D's sentence** ([ADR-684](06-decisions.md#adr-684), #2119; operator ruling 2026-10-15, every builder): «מעגל O ברדיוס 4» after «מעגל O ברדיוס 3», and «רדיוס המעגל O הוא 3» after «מעגל O ברדיוס 5», say «לא ניתן: «…» סותר את «…» — אי אפשר לקיים את שניהם יחד.», naming the line that sized the circle. The same radius again is known.
 
 **R55 — an object that cannot exist is REPORTED once the figure has no freedom left**. Silent while another configuration may yet have it (ADR-AG-008).

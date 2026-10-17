@@ -240,7 +240,7 @@ export type ApplyErrorCode =
   | 'coordinate-restriction'
   /** #2054 (ADR-AG-277): a second letter for an angle or a segment that already has one — `holder` is the first letter, `nameOf` the target as the line spells it. */
   | 'name-taken'
-  /** #2061 (ADR-AG-277): the same letter with another coefficient for an angle or segment — `what` is 2-D's reason clause. */
+  /** #2061 (ADR-AG-277): the same letter with another coefficient for an angle or segment, or (#2105, ADR-AG-295) two different numbers — `what` is 2-D's reason clause. */
   | 'measure-contradicts'
   /** #2119 (ADR-684): a second, different radius for a circle whose radius a line already stated — `circle` is its id;
    *  `derive` names the line that sized it (2-D's ruled sentence, no reason clause). */
