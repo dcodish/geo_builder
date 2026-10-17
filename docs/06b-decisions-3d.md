@@ -12910,6 +12910,8 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 
 **Locks.** `src3d/__tests__/issue-1855-separate-figures.test.ts` (the reported rows ×24 seeds, both lengths drawn, «AB ∥ DE», the free ratio and angle, the DOF count, the one-solid bit-identity); fixture `fixtures3/two-triangle-lengths-1855.geo3.json`; parity rows `two-triangle-lengths-1855` and `two-triangle-parallel-1855`.
 
+**Amendment 1 (2026-10-17, batch gate #2291) — the dims are sampled once per (solid list, seed).** The first landing sampled every solid's full dim vector afresh in each one-shot placement, so the seven similarity keys took two-solid figures past the #863 ceiling (`issue-863-sample-hoist`: `trapezoid-circumcircle-1792` 120, `two-triangle-lengths-1855` 88, ceiling 64). `solidDimsAll3` (evaluate.ts) memoises the vectors on the `solids` array's identity per seed, and the one-shot placement, the pivot's `perSolidDims`, `solidDimsAt` and the DOF count all read it — the ADR-3D-245 law, now total over the one-shot callers too.
+
 ## ADR-3D-356 — A flat ring declared over a FREE vertex drives that vertex into the plane; with every vertex placed it stays #1928's refusal (#1935)
 
 **Status:** accepted · 2026-10-17 · **Issue:** #1935 · fix round #2291. Boundary against [ADR-3D-319](#adr-3d-319) (#1928); the representation of [ADR-3D-172](#adr-3d-172) (a minted corner rides the plane); [ADR-W-121](06w-decisions-workspace.md) §4's "a ring with a free vertex (a configuration choice)".

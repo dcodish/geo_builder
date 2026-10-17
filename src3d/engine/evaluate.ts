@@ -201,10 +201,30 @@ export function componentSimilarityDims(key: string, seed: number): number[] {
 }
 /** Solid i's FULL dim vector: its shape dims, then (i > 0) its own similarity (#1855). */
 export function solidDimsAt(c: Construction3, i: number, seed: number): number[] {
-  const solid = c.solids[i];
-  const key = `solid-${solid.kind}-${solid.ids.join('')}`;
-  const shape = solidDims(solid.kind, key, seed, solid.oblique);
-  return i === 0 ? shape : [...shape, ...componentSimilarityDims(key, seed)];
+  return [...solidDimsAll3(c, seed)[i]];
+}
+
+/**
+ * Every solid's FULL dim vector at `seed`, sampled ONCE per (solid list, seed) — the #863 law (ADR-3D-245): a pure
+ * per-seed quantity is derived once, never per call. Keyed on the `solids` array's identity (apply clones the
+ * construction for every change; nothing mutates a solid list in place), so the one-shot placements, the pivot's
+ * `perSolidDims` and the DOF count all read the same draws. #1855's per-solid similarity added seven keys to every
+ * further solid, and sampling them again in each one-shot placement took two-solid figures past the #863 ceiling.
+ */
+const solidDimsMemo3 = new WeakMap<readonly unknown[], Map<number, readonly (readonly number[])[]>>();
+export function solidDimsAll3(c: Construction3, seed: number): readonly (readonly number[])[] {
+  let bySeed = solidDimsMemo3.get(c.solids);
+  if (!bySeed) solidDimsMemo3.set(c.solids, (bySeed = new Map()));
+  let all = bySeed.get(seed);
+  if (!all) {
+    all = c.solids.map((solid, i) => {
+      const key = `solid-${solid.kind}-${solid.ids.join('')}`;
+      const shape = solidDims(solid.kind, key, seed, solid.oblique);
+      return i === 0 ? shape : [...shape, ...componentSimilarityDims(key, seed)];
+    });
+    bySeed.set(seed, all);
+  }
+  return all;
 }
 
 /** A revolution solid's resolved size: stated dims pin; unstated ones are FREE sampled DOFs (ADR-052). */
@@ -1821,7 +1841,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
     // #863 (ADR-3D-245): the solids' seeded dims are sampled ONCE here and threaded into every residual
     // evaluation — `evalCanonical` runs per LM iteration (680 k times on the issue's figure), and re-sampling
     // the same (seed, key) inside it was the whole 2 s. `dims0` is the same vector, flattened, exactly as before.
-    const perSolidDims = c.solids.map((_solid, i) => solidDimsAt(c, i, seed)); // #1855: + each further solid's similarity
+    const perSolidDims = solidDimsAll3(c, seed).map((d) => [...d]); // #1855: + each further solid's similarity (memoised, #863)
     const dims0 = perSolidDims.flat();
     const evalCanonical = (
       dims: number[],
@@ -2856,7 +2876,7 @@ function evaluateSolidsAndPoints(
   let dimCursor = 0;
   c.solids.forEach((solid, i) => {
     const origin = v3(i * 2.5, 0, 0); // side-by-side when a figure ever holds two solids
-    const own = sampledSolidDims?.[i] ?? solidDimsAt(c, i, seed);
+    const own = sampledSolidDims?.[i] ?? solidDimsAll3(c, seed)[i];
     const dims = dimOverride ? dimOverride.slice(dimCursor, dimCursor + own.length) : own;
     dimCursor += own.length;
     const nShape = i === 0 ? dims.length : dims.length - COMPONENT_SIM_DIMS;
