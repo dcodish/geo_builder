@@ -1083,6 +1083,17 @@ unbound (the claim «תיכון ליתר AB» states); more than one host (anoth
 `role-side-unresolved`. `ambiguous-hypotenuse` is left only for a pair after the noun that is no side of the
 triangle («תיכון ליתר AD»). The Thales reader keeps reading only a STATED hypotenuse.
 
+**A role stated about typed letters is a claim, in every spelling ([ADR-708](06-decisions.md#adr-708), #1839).** Typed
+letters stay literal (no binding), and the sentence also states its role through one lowering, `isoscelesRoleClaim`
+(`parser/parse.ts`): a base → the equality making the opposite vertex the apex (ADR-563's claim, which pins the
+variant, ADR-138); a leg → the requirement record `set-side-role { role: 'leg', a, b, ids }` when the apex shown is
+one of its ends, else the `leg-apex` question. Its callers: `withRoleClaims` («לבסיס BC», «לשוק AC»);
+`roleSideLine` when ONE ring vertex is typed with an unlettered base / leg («AD גובה לבסיס», «BE גובה לשוק» — the
+side is the one opposite the typed apex); `withApexAngleClaim` («זווית הראש» / "apex angle" with a winning
+`bisector` at a vertex of an isosceles-declared triangle). The leg requirement is ADR-244's shape: `applyCommand`
+records nothing, `checkGivens` flags a construction whose declared roles (`roleSidesOf`) make the pair the base
+and not a leg (`figure.v.legIsBase`), and `meetsRequirements` keeps every configuration search off that variant.
+
 ### A stated side is a requirement record, checked at stage 0g′ and read wherever a point is placed ([ADR-549](06-decisions.md#adr-549), [ADR-594](06-decisions.md#adr-594))
 
 - **Record.** `Construction.requirements?: SideRequirement[]` (`engine/types.ts`): `circle-side`, `polygon-side`,
