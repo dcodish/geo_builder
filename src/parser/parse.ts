@@ -22,7 +22,7 @@
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
 import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
-import { roleOperands, type RoleOperand } from './roleNouns';
+import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
@@ -7763,6 +7763,9 @@ const chord: Rule = (s, ctx) => {
     chordPairs = [ids];
   }
   if (chordPairs.some(([a, b]) => a === b)) return null; // a degenerate "AA" pair is not a chord list
+  // #2215 (ADR-723): the chord noun spreads only over the pairs IT governs — a pair the words call a DIAMETER
+  // («AB מיתר במעגל O ו-CD קוטר במעגל O») is another clause; the compound reading draws each as stated.
+  if (rivalRoleGoverns(s, 'chord', 'diameter', chordPairs as [Id, Id][])) return null;
   // #221: unnamed beside SEVERAL circles — resolve by the endpoints' MEMBERSHIP (the one common host).
   if (!center && chordPairs.length === 1) center = commonHostCentre(ctx, chordPairs[0][0], chordPairs[0][1]);
   if (!center) {
@@ -7943,6 +7946,10 @@ const diameter: Rule = (s, ctx) => {
     diaPairs = [ids];
   }
   if (diaPairs.some(([a, b]) => a === b)) return null; // a degenerate "AA" pair is not a diameter list
+  // #2215 (ADR-723): the diameter noun spreads only over the pairs IT governs. «AB קוטר במעגל O ו-CD מיתר
+  // במעגל O» calls CD a CHORD, and the distribution above drew it as a second diameter (an unstated special
+  // case, ADR-052). That pair is another clause — decline; the compound reading draws each as stated.
+  if (rivalRoleGoverns(s, 'diameter', 'chord', diaPairs as [Id, Id][])) return null;
   // #221: unnamed beside SEVERAL circles — resolve by the endpoints' MEMBERSHIP (the one common host).
   if (!center && diaPairs.length === 1) center = commonHostCentre(ctx, diaPairs[0][0], diaPairs[0][1]);
   if (!center) return null;

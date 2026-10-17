@@ -1,0 +1,118 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "CitL65UHz1U7p6EnEStTV",
+      "utterance": "מעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "WeFDHCgdzwliWOGWAcTvW",
+      "utterance": "מעגל P",
+      "group": "g1",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "-XEF-v8YI07HnUutFN5ZB",
+      "utterance": "AB משיק למעגל P",
+      "group": "g2",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "@touch-P",
+        "circle": "circle-P",
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "NHZQgnDwmGaleI2xyNGwF",
+      "utterance": "AB משיק למעגל P",
+      "group": "g2",
+      "cmd": {
+        "type": "tangent",
+        "id": "tan-@touch-P",
+        "circle": "circle-P",
+        "at": "@touch-P",
+        "visible": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "7pFDQ_WBuX0wxLPerRW4V",
+      "utterance": "AB משיק למעגל P",
+      "group": "g2",
+      "cmd": {
+        "type": "point-on-line",
+        "id": "A",
+        "line": "tan-@touch-P",
+        "offset": 5
+      },
+      "enabled": true
+    },
+    {
+      "id": "3xbIxNYVkheVP9JcVUXsz",
+      "utterance": "AB משיק למעגל P",
+      "group": "g2",
+      "cmd": {
+        "type": "point-on-line",
+        "id": "B",
+        "line": "tan-@touch-P",
+        "offset": -5
+      },
+      "enabled": true
+    },
+    {
+      "id": "SJxUg5sE3C3-9_VMi4bDt",
+      "utterance": "AB מיתר במעגל O",
+      "group": "g6",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "WHWm_JfeZffuPusIcDzcI",
+      "utterance": "AB מיתר במעגל O",
+      "group": "g6",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "LJVHvy2gmJow5R0ylcOja",
+      "utterance": "AB מיתר במעגל O",
+      "group": "g6",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    }
+  ]
+}

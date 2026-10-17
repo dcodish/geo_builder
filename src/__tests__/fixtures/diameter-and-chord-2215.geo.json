@@ -1,0 +1,67 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "1SlLRM1m6J_-zreNwlJ58",
+      "utterance": "מעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "_cJSxXmU0HCdwPLth8kYr",
+      "utterance": "AB קוטר במעגל O ו-CD מיתר במעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "diameter",
+        "id1": "A",
+        "id2": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "n3n8j4CxEytDReL6WxdS9",
+      "utterance": "AB קוטר במעגל O ו-CD מיתר במעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "4bI1ESD0hcp6JLnbFt6Ca",
+      "utterance": "AB קוטר במעגל O ו-CD מיתר במעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "8Ia1U5JLNN1VDopEj0mYH",
+      "utterance": "AB קוטר במעגל O ו-CD מיתר במעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    }
+  ]
+}

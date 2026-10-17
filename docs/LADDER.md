@@ -76,7 +76,7 @@ Degenerate pre-gate per command → attach ALL constraints → one evaluate (`co
 
 Cooperative budget (`budgetExceeded()`) can bail between cases — armed only around view searches, never the primary submit fold.
 
-> **The candidate universe** (stages 2g/3 and the S3.2 component partition alike) is defined by the `ancestors(…,'drivable')` walk, which since [ADR-438](06-decisions.md#adr-438) traverses a DERIVED circle centre (midpoint/circumcenter/…) to the DOFs behind it — so a constraint on a Thales-aux tangency touch reaches the external apex's parameter. Before that, pinning a radius could remove the walk's only visible escape and refuse a satisfiable figure.
+> **The candidate universe** (stages 2g/3 and the S3.2 component partition alike) is defined by the `ancestors(…,'drivable')` walk, which since [ADR-438](06-decisions.md#adr-438) traverses a DERIVED circle centre (midpoint/circumcenter/…) to the DOFs behind it — so a constraint on a Thales-aux tangency touch reaches the external apex's parameter. Before that, pinning a radius could remove the walk's only visible escape and refuse a satisfiable figure. Since [ADR-723](06-decisions.md#adr-723) it also hops a drawn line's named MARKER (`on-line`) to the line's definition (a tangent's touch point), and lists a free on-circle point's own angle before the circle it rides (nearest first — the order (B)'s one-DOF-at-a-time rung tries), so a chord stated on a tangent's two endpoints turns the touch point instead of being refused or moving the circle.
 
 | # | Case | What | Verified? | Trace token |
 |---|---|---|---|---|

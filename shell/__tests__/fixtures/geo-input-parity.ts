@@ -287,6 +287,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2253': 'open', // #2165 (ADR-681): analytic and 3-D read no value line for a length letter; 3-D refuses «AB = 2a»
 
+  '#2323': 'open', // #2215 (ADR-723): analytic does not read «AB קוטר במעגל O ו-CD מיתר במעגל O» (not-handled)
+
 };
 
 export interface ParityRow {
@@ -1599,6 +1601,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2097 (ADR-719): «|XY|» is the length XY in every slot — 2-D read it only in the sum, ordering and bound rules ──
   { id: 'abs-length-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = 4'], expect: 'builds', note: '2-D escalated it before ADR-719' },
   { id: 'abs-length-var-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = k'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2092' }], note: '2-D escalated it before ADR-719' },
+
+  // ── #2215 (ADR-723): a chord after a tangent builds in either order; a role noun spreads only over the pairs it governs ──
+  { id: 'tangent-then-chord-2215', family: 'circles', steps: ['מעגל O', 'מעגל P', 'AB משיק למעגל P', 'AB מיתר במעגל O'], expect: 'builds', exception: 'X8', note: '2-D refused the chord as a conflict with the tangent before ADR-723 (the reverse order built); analytic already built it' },
+  { id: 'diameter-and-chord-2215', family: 'circles', steps: ['מעגל O', 'AB קוטר במעגל O ו-CD מיתר במעגל O'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2323' }], note: '2-D built it with CD drawn as a second diameter before ADR-723 (a builds verdict then too; the drawing is locked in src/parser/__tests__/role-distribution-2215.test.ts); analytic does not read the compound line (not-handled)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

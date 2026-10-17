@@ -1674,6 +1674,13 @@ function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', 
     seen.add(id);
     const o = byId.get(id);
     if (!o) continue;
+    // #2215 ([ADR-723](docs/06-decisions.md#adr-723)) — NEAREST FIRST: a free on-circle point's own angle is one
+    // hop closer than the circle it rides (radius, centre), so it is listed before them. The order is the
+    // order (B)'s one-DOF-at-a-time rung tries candidates in (ADR-281's least ownership), and the circle-first
+    // listing made a tangent's later chord move the WHOLE circle P (12 units, into circle O) where turning
+    // the touch point satisfies it and leaves both circles where the student saw them.
+    const selfFirst = mode === 'drivable' && o.kind === 'on-circle' && isParamCarrier(o) && avail(o);
+    if (selfFirst) result.push(id);
     if (mode === 'drivable') {
       // A point on a circle can be moved by RESIZING the circle (its free radius — ADR-051) OR by MOVING
       // its centre (a free, non-pinned centre point — ADR-103). The latter matters when a constraint needs
@@ -1740,8 +1747,16 @@ function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', 
     // on-circle carrier is [], so this is effectively scoped to on-segment/extension points; the circle
     // DOFs behind an on-circle point are already surfaced above. Only the failure path uses `drivable`,
     // and the joint solver's regulariser keeps a surfaced-but-unneeded parent at its seed.)
-    if (free1) { result.push(id); queue.push(...pointParents(o)); continue; }
+    if (free1) { if (!selfFirst) result.push(id); queue.push(...pointParents(o)); continue; }
     if (free2) { result.push(id); continue; } // a free vertex (2 DOF) is terminal — no parents
+    // #2215 ([ADR-723](docs/06-decisions.md#adr-723)) — a drawn line's named MARKER rides its LINE: walk on to
+    // the line's definition (a tangent's touch point, a through-line's two points — the `line` hop above), as
+    // a `line-intersection` already walks its defining lines. The walk used to dead-end at the marker
+    // (`pointParents` has no case for it), so a later incidence on BOTH markers of a tangent («AB משיק למעגל
+    // P» · «AB מיתר במעגל O») could move only the marker offsets — whose ±5 seeds bake in an unstated
+    // |AB| = 10 (ADR-052) — and was refused, while the reverse order built. The marker itself stays the
+    // `driveOrCheck` carrier (ADR-036); the hop only surfaces the free DOFs the line rides on.
+    if (o.kind === 'on-line') { queue.push(o.line); continue; }
     if (isShapeCarrier(o) && avail(o)) result.push(id); // shape scalar — keep walking past it too
     if (o.kind === 'line-intersection') { queue.push(o.line1, o.line2); continue; }
     queue.push(...pointParents(o));
