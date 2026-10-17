@@ -44,7 +44,8 @@ enumeration). Four corrections to the plain compiler reading hold:
    ([docs/17](17-design-rules.md) §3b).
 3. **The stored artifact is source plus lowering.** A fact carries its utterance and its lowered commands; an
    edited step re-lowers against its own prefix (ADR-241); on load a deterministic step adopts the current
-   lowering and an LLM step keeps its saved commands (`refreshLoadedFigure`, ADR-314), audited for drift and
+   lowering and an LLM step keeps its saved commands (`refreshLoadedFigure`, ADR-314), compared up to its configuration —
+   a cycled choice is kept, or carried onto the re-lowered command (`lowersAsSaved`, ADR-697) — audited for drift and
    dropped labels (ADR-242, ADR-321).
 4. **The solve ladder is part of the semantics** ([docs/LADDER.md](LADDER.md)): the stage that fired is
    observable (`StepResult.ladder`) and contract-tested (`ladder-contract.test.ts`).

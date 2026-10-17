@@ -23,6 +23,8 @@ import { foldCommand, groupKey, replay } from './geoStore';
 import { buildParseCtx, droppedNewLabels, parse } from '@/parser';
 import { indefiniteShapeReading } from './indefiniteShape';
 import type { AnyCommand } from '@/engine';
+import { variantCountOf, withVariant } from '@/engine';
+import { BRANCH_CYCLE_KINDS } from '@/replay/core';
 
 export interface LoadAuditFinding {
   /** 1-based index of the step group (the fact-list row). */
@@ -78,10 +80,89 @@ export function committedStepCommands(prefix: Fact[], cmds: AnyCommand[]): AnyCo
  */
 const isNaming = (c: AnyCommand) => c.type === 'name-by-use';
 
+/**
+ * #2114 ([ADR-697](../../docs/06-decisions.md#adr-697)): a command's CONFIGURATION — the choice «הציגו תצורה אחרת»
+ * steps through and the save keeps — is a view datum, like the seed, never parser output. It is exactly:
+ *
+ *   - the `variant` of a variant command (kite axis, isosceles apex, inscribe placement, circle position, common
+ *     tangent, two-vertex height side, and an angle given's root — whose `expr.value` follows it, `withVariant`);
+ *   - the `branch` of a {@link BRANCH_CYCLE_KINDS} command (which crossing point is which).
+ *
+ * Nothing else. A wider form would hide real parser drift from the load refresh, the load audit and the
+ * fixtures net, which all compare through {@link canonicalStepCommands}.
+ */
+export interface Configuration {
+  variant?: number;
+  branch?: number;
+}
+
+const isVariantKind = (cmd: AnyCommand) => withVariant(cmd, 0) !== cmd; // `withVariant` returns a non-variant command as is
+
+/** `cmd` with its configuration removed — "the same command up to its configuration" (#2114). Variant 0 and an
+ *  absent variant are one reading (0 is the default), as are branch 0 and an absent branch. */
+export function canonicalCommand(cmd: AnyCommand): AnyCommand {
+  let c: AnyCommand = cmd;
+  if (isVariantKind(c)) {
+    const { variant: _v, ...rest } = withVariant(c, 0) as AnyCommand & { variant?: number };
+    c = rest as AnyCommand;
+  }
+  if (BRANCH_CYCLE_KINDS.has(c.type) && 'branch' in c) {
+    const { branch: _b, ...rest } = c as AnyCommand & { branch?: number };
+    c = rest as AnyCommand;
+  }
+  return c;
+}
+
+/** The configuration a command carries (#2114). */
+export function configurationOf(cmd: AnyCommand): Configuration {
+  const out: Configuration = {};
+  const v = (cmd as { variant?: number }).variant;
+  if (isVariantKind(cmd) && v !== undefined) out.variant = v;
+  const b = (cmd as { branch?: number }).branch;
+  if (BRANCH_CYCLE_KINDS.has(cmd.type) && b !== undefined) out.branch = b;
+  return out;
+}
+
+/** `cmd` carrying `cfg` (#2114): the variant through `withVariant` (so an angle root's value follows), reduced
+ *  modulo this command's own count; the branch set as is. A field `cfg` lacks is left as `cmd` has it. */
+export function withConfiguration(cmd: AnyCommand, cfg: Configuration): AnyCommand {
+  let c = cmd;
+  if (cfg.variant !== undefined && isVariantKind(c)) {
+    const n = Math.max(1, variantCountOf(c));
+    c = withVariant(c, ((cfg.variant % n) + n) % n);
+  }
+  if (cfg.branch !== undefined && BRANCH_CYCLE_KINDS.has(c.type)) c = { ...c, branch: cfg.branch } as AnyCommand;
+  return c;
+}
+
+/** What a commit of `cmds` onto `prefix` stores, up to configuration — the one form a saved step and a fresh
+ *  parse are compared in (#1604 the fold, #2114 the configuration). The fixtures drift net calls this too. */
+export function canonicalStepCommands(prefix: Fact[], cmds: AnyCommand[]): AnyCommand[] {
+  return committedStepCommands(prefix, cmds).map(canonicalCommand);
+}
+
 /** Does today's parse of a step store the same rows the save stored? (#1604) — both sides through the
- *  commit's fold, so a duplicate the commit dropped never reads as drift. */
-function lowersAsSaved(prefix: Fact[], fresh: AnyCommand[], saved: AnyCommand[]): boolean {
-  return JSON.stringify(committedStepCommands(prefix, fresh)) === JSON.stringify(committedStepCommands(prefix, saved));
+ *  commit's fold, so a duplicate the commit dropped never reads as drift; and up to configuration (#2114), so a
+ *  choice «הציגו תצורה אחרת» made is never mistaken for an old reading. THE load comparator. */
+export function lowersAsSaved(prefix: Fact[], fresh: AnyCommand[], saved: AnyCommand[]): boolean {
+  return JSON.stringify(canonicalStepCommands(prefix, fresh)) === JSON.stringify(canonicalStepCommands(prefix, saved));
+}
+
+/**
+ * #2114: the fresh rows of a step that really re-lowered, each carrying the configuration of the saved row it is
+ * the same command as (up to configuration). A fresh command with no such saved row is a reading that changed —
+ * its old choice indexed a different set of drawings — and keeps the parser's default.
+ */
+function carryConfiguration(fresh: AnyCommand[], saved: AnyCommand[]): AnyCommand[] {
+  const keys = saved.map((c) => JSON.stringify(canonicalCommand(c)));
+  const used = new Set<number>();
+  return fresh.map((cmd) => {
+    const k = JSON.stringify(canonicalCommand(cmd));
+    const j = keys.findIndex((key, i) => !used.has(i) && key === k);
+    if (j < 0) return cmd;
+    used.add(j);
+    return withConfiguration(cmd, configurationOf(saved[j]));
+  });
 }
 
 /**
@@ -140,7 +221,7 @@ export function refreshLoadedFigure(facts: Fact[], budgetMs = 4000): { facts: Fa
       const enabled = groupFacts[0].enabled; // a step toggles enabled as a unit
       refreshed.push(i + 1);
       out.push(...namingFacts);
-      fresh.forEach((cmd, j) => {
+      carryConfiguration(fresh, stated).forEach((cmd, j) => {
         out.push({
           id: statedFacts[j]?.id ?? `${step.start}r${j}`,
           utterance: step.utterance,
