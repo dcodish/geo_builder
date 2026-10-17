@@ -141,8 +141,9 @@ describe('#2208 — restatements (moved, the 2-D reading of the same statement)'
   };
   it('after «…משיקים מבפנים» the report is accepted, still internal (was refused «no more tangents»)', async () =>
     expectRestated(await play([...PAIR, 'המעגלים O ו-P משיקים מבפנים'], 'מעגל P משיק למעגל O מבפנים'), 'INT'));
+  // #2210 (ADR-704): «מבחוץ» over a defaulted kind states it, so the line is recorded — still one circles-tangent, no AB
   it('after «…משיקים» «…מבחוץ» draws no segment AB', async () =>
-    expectRestated(await play([...PAIR, 'המעגלים O ו-P משיקים'], 'מעגל P משיק למעגל O מבחוץ'), 'EXT'));
+    expectTangency(await play([...PAIR, 'המעגלים O ו-P משיקים'], 'מעגל P משיק למעגל O מבחוץ'), 'EXT'));
   it('after «…זרים» the report draws the circles tangent and the disjoint row reads red', async () => {
     const r = await play([...PAIR, 'המעגלים O ו-P זרים'], 'מעגל P משיק למעגל O מבפנים');
     expect(r.kind).toBe('commit');

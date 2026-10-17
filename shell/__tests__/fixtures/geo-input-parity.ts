@@ -282,6 +282,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2067': 'open', // #2065 (ADR-700): analytic and 3-D read no similarity ratio, «ביחס p ל-q» included
 
+  '#2302': 'open', // #2210 (ADR-704): analytic's containment is strict, so «…מוכל…» then a tangency of the pair is refused unsatisfiable
+
   '#2253': 'open', // #2165 (ADR-681): analytic and 3-D read no value line for a length letter; 3-D refuses «AB = 2a»
 
 };
@@ -1548,6 +1550,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2209 (ADR-703): the catalog's named-pair tangency builds on two drawn circles (cat-2d-139 is the empty-figure case) ──
   { id: 'catalog-tangent-drawn-2209', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל O ומעגל P משיקים'], expect: 'builds', exception: 'X8', note: '2-D refused it as two statements (input.scope.split-statements) before ADR-703; analytic already recorded it' },
+
+  // ── #2210 (ADR-704): a defaulted tangency kind yields to a later stated kind or a containment ──
+  { id: 'tangent-later-internal-2210', family: 'circles', steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'המעגלים O ו-P משיקים מבפנים'], expect: 'builds', exception: 'X8', note: '2-D drew it external with the internal row red before ADR-704 (a builds verdict then too; the kind is locked in src/app/__tests__/issue-2210-tangency-record.test.ts); analytic already drew it internal (ADR-AG-167)' },
+  { id: 'contained-then-tangent-2210', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל P מוכל בתוך מעגל O', 'המעגלים O ו-P משיקים בנקודה X'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2302' }], note: '2-D drew it external with the containment row red before ADR-704; analytic refuses it unsatisfiable (its containment is strict)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

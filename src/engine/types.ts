@@ -1046,7 +1046,10 @@ export type SideRequirement =
   | { kind: 'circle-position'; relation: 'tangent'; a: Id; b: Id; at: Id;
       /** #2188 ([ADR-672](../../docs/06-decisions.md#adr-672)): the KIND the statement gave (`circles-tangent.external`) —
        *  read back by the parser (`statedTangencies`) so a later restatement that names no kind keeps it. */
-      external?: boolean }
+      external?: boolean;
+      /** #2210 ([ADR-704](../../docs/06-decisions.md#adr-704)): `false` when nobody stated the kind (the default, or the
+       *  fold's resolution of it) — the parser then never inherits it. Absent = the kind was stated. */
+      kindStated?: false }
   /** #1918 ([ADR-607](../../docs/06-decisions.md#adr-607)): a ring DECLARED as a shape phrase no circle can pass
    *  around (`NOT_CYCLIC`) — «טרפז ישר זווית ABCD». Recorded so the stage-0 prover sees the declaration whichever
    *  order the circle and the noun arrive in; not a side, so no side reader consumes it. */
@@ -1258,7 +1261,14 @@ export type Command =
   | { type: 'circle-circle-intersection'; id: Id; circle1: Id; circle2: Id; branch?: number; avoid?: Id }
   | { type: 'tangent'; id: Id; circle: Id; at: Id; visible?: boolean }
   | { type: 'point-on-line'; id: Id; line: Id; offset: number } // a fixed marker on a drawn line (names it by a point)
-  | { type: 'circles-tangent'; circle1: Id; circle2: Id; at: Id; external: boolean } // two circles touch at one point `at`
+  | {
+      type: 'circles-tangent'; circle1: Id; circle2: Id; at: Id; external: boolean; // two circles touch at one point `at`
+      /** #2210 ([ADR-704](../../docs/06-decisions.md#adr-704), M4): `false` when the line stated NO kind and none was
+       *  inherited, so `external` is only the default. The replay fold resolves such a tangency against the list: the
+       *  kind of the first kind-stated tangency on the same pair, else internal when one circle is stated contained in
+       *  the other, else external. Absent = the kind was stated (every older command keeps its meaning). */
+      kindStated?: false;
+    }
   // Two circles' MUTUAL POSITION as a stated INEQUALITY (#196 — «שני מעגלים זרים» / «מעגל O2 מוכל בתוך
   // מעגל O1»): 'disjoint' = each outside the other (|c1c2| > r1+r2), 'contained' = `b` strictly inside `a`
   // (|c1c2| + r_b < r_a). A REQUIREMENT in the ADR-244 radius-order shape — the equality members of the

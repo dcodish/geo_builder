@@ -104,6 +104,10 @@ const circleLabel = (id: Id) => id.replace(/^circle-/, 'circle ');
 /** The circle's bare letter (e.g. `circle-P` → `P`) for the i18n `params` (the locale supplies "circle"/"מעגל"). */
 const circleName = (id: Id) => id.replace(/^circle-/, '');
 
+/** #2210 (ADR-704): do these commands state the pair {a, b} internally tangent (as the fold resolved its kind)? */
+const internallyTangent = (commands: readonly Command[], a: Id, b: Id): boolean =>
+  commands.some((c) => c.type === 'circles-tangent' && !c.external && ((c.circle1 === a && c.circle2 === b) || (c.circle1 === b && c.circle2 === a)));
+
 /**
  * Check the figure's final coordinates against the relations its commands ASSERT. Returns the
  * relations that DON'T hold (empty = the drawing matches every stated given).
@@ -324,7 +328,11 @@ export function checkGivens(
           params: { c1: circleName(cmd.a), c2: circleName(cmd.b), d: d.toFixed(2), sum: (a.r + b.r).toFixed(2) },
         });
       }
-    } else if (d + b.r >= a.r - tol) {
+    } else if (
+      // #2210 (ADR-704): a containment stated beside an INTERNAL tangency of the same pair is closed — the inner circle
+      // touches the outer one, so reach = R is the statement, not a violation. Containment alone stays strict.
+      internallyTangent(commands, cmd.a, cmd.b) ? d + b.r > a.r + tol : d + b.r >= a.r - tol
+    ) {
       violations.push({
         relation: 'circle-contained',
         ids: [cmd.a, cmd.b],

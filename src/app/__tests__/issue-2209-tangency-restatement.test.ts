@@ -67,6 +67,9 @@ function expectTangent(kind: 'EXT' | 'INT', labels: string[]) {
 beforeEach(() => llmParseMock.mockReset());
 
 const PAIR = ['מעגל O', 'מעגל P'];
+/** #2210 (ADR-704): a line that states no kind (and inherits none) marks its `external` as the default. */
+const KIND_WORD = /מבפנים|מבחוץ|פנימ|חיצונ|internal|external/i;
+const defaultedIf = (line: string) => (KIND_WORD.test(line) ? {} : { kindStated: false as const });
 const PAIR_EN = ['circle O', 'circle P'];
 
 describe('#2209 item 1 — the catalog\'s «מעגל O ומעגל P משיקים» builds on a drawn pair', () => {
@@ -83,7 +86,7 @@ describe('#2209 item 1 — the catalog\'s «מעגל O ומעגל P משיקים
     it(`«${line}» → commits, ${kind} at M`, async () => {
       const { v, added } = await play(pre, line);
       expect(v.kind).toBe('commit');
-      expect(added).toEqual([{ type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'M', external: kind === 'EXT' }]);
+      expect(added).toEqual([{ type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'M', external: kind === 'EXT', ...defaultedIf(line) }]);
       expectTangent(kind, ['M', 'O', 'P']);
     });
 
@@ -102,7 +105,7 @@ describe('#2209 item 1 — the catalog\'s «מעגל O ומעגל P משיקים
     it(`unchanged: «${line}» → the same command`, async () => {
       const { v, added } = await play(PAIR, line);
       expect(v.kind).toBe('commit');
-      expect(added).toEqual([{ type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'M', external }]);
+      expect(added).toEqual([{ type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'M', external, ...defaultedIf(line) }]);
     });
 
   // S5/S6: «מעגל O» is a DECLARATION there (a given), so the line is two statements and keeps its advisory
@@ -144,7 +147,6 @@ describe('#2209 items 2–3 — a restated tangency lands on the stated one', ()
     ['the catalog form after the plural', [...PAIR, 'המעגלים O ו-P משיקים'], 'מעגל O ומעגל P משיקים', ['M', 'O', 'P']],
     ['English', [...PAIR_EN, 'circles O and P are tangent'], 'circles O and P are tangent', ['M', 'O', 'P']],
     ['«מבחוץ» then plain', [...PAIR, 'המעגלים O ו-P משיקים מבחוץ'], 'המעגלים O ו-P משיקים', ['M', 'O', 'P']],
-    ['plain then «מבחוץ»', [...PAIR, 'המעגלים O ו-P משיקים'], 'המעגלים O ו-P משיקים מבחוץ', ['M', 'O', 'P']],
     ['«מבפנים» twice', [...PAIR, 'המעגלים O ו-P משיקים מבפנים'], 'המעגלים O ו-P משיקים מבפנים', ['M', 'O', 'P']],
     ['the student named the touch X', [...PAIR, 'המעגלים O ו-P משיקים בנקודה X'], 'המעגלים P ו-O משיקים', ['O', 'P', 'X']],
   ];
@@ -178,10 +180,19 @@ describe('#2209 items 2–3 — a restated tangency lands on the stated one', ()
       expect(v.kind).toBe('commit');
       expect(v.kind === 'commit' && v.binds).toEqual([{ op: 'rename', from: 'M', to: 'X' }]);
       expect(added.filter((c) => c.type === 'circles-tangent')).toEqual([
-        { type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'X', external: kind === 'EXT' },
+        // the kind is stated on neither line only when neither names one
+        { type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'X', external: kind === 'EXT', ...(KIND_WORD.test(pre[2] + line) ? {} : { kindStated: false as const }) },
       ]);
       expectTangent(kind, ['O', 'P', 'X']);
     });
+
+  // #2210 (ADR-704): «…מבחוץ» over a DEFAULTED kind states the kind (it pins it), so it is recorded — the touch stays M
+  it('plain then «מבחוץ»: the kind is stated, the touch stays M, no T', async () => {
+    const { v, added } = await play([...PAIR, 'המעגלים O ו-P משיקים'], 'המעגלים O ו-P משיקים מבחוץ');
+    expect(v.kind).toBe('commit');
+    expect(added).toEqual([{ type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'M', external: true }]);
+    expectTangent('EXT', ['M', 'O', 'P']);
+  });
 
   it('control: «…משיקים» · «…משיקים בנקודה M» is still a no-op', async () => {
     const { v } = await play([...PAIR, 'המעגלים O ו-P משיקים'], 'המעגלים O ו-P משיקים בנקודה M');
@@ -190,7 +201,7 @@ describe('#2209 items 2–3 — a restated tangency lands on the stated one', ()
 
   it('a pair not yet stated tangent still mints M in the line\'s own order', async () => {
     const { added } = await play(PAIR, 'מעגל P משיק למעגל O');
-    expect(added).toEqual([{ type: 'circles-tangent', circle1: 'circle-P', circle2: 'circle-O', at: 'M', external: true }]);
+    expect(added).toEqual([{ type: 'circles-tangent', circle1: 'circle-P', circle2: 'circle-O', at: 'M', external: true, kindStated: false }]);
   });
 });
 
