@@ -373,6 +373,11 @@ const SEEDED: SeededCorpus = {
   // issue-2081-held-slots.test.ts; these are the build + drift net.
   'coords-claim-surd-2081.geo3.json': ['A(0,0,0)', 'B(√2,0,0)', 'B=(√2,0,0)'],
   'distance-surd-2081.geo3.json': ['פירמידה SABCD', 'המרחק בין S למישור ABC הוא √2'],
+  // #1942 (ADR-3D-367) — the operator's exact sequences: an altitude onto an EXISTING foot (before: refused «D כבר מוגדר
+  // בציור»), as a rider and as a median's foot. The drawing at 24 seeds, the bisector's read-as note, the one-line lesson
+  // and the `already-defined` controls are asserted in cevian-on-existing-point-1942.test.ts; this is the build + drift net.
+  'altitude-on-existing-d-1942.geo3.json': ['משולש ABC', 'D על BC', 'AD גובה לצלע BC'],
+  'median-then-altitude-1942.geo3.json': ['משולש ABC', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

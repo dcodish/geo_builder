@@ -43,37 +43,51 @@ const PARTS = (all: string) => ({ code: 'split-statements', all });
 
 describe('#1904 — a dropped role is refused whole, never recorded without it (the 24 measured 3-D lines)', () => {
   it.each([
-    ['AD תיכון לצלע BC שהוא גם גובה', '(1) AD תיכון לצלע BC  (2) שהוא גם גובה'],
-    ['AD תיכון לצלע BC שהיא גם גובה', '(1) AD תיכון לצלע BC  (2) שהיא גם גובה'],
-    ['AD תיכון לצלע BC שהוא גם חוצה זווית', '(1) AD תיכון לצלע BC  (2) שהוא גם חוצה זווית'],
-    ['AD תיכון לצלע BC שהוא גם חוצה זווית A', '(1) AD תיכון לצלע BC  (2) שהוא גם חוצה זווית A'],
     ['AD תיכון לצלע BC שהוא גם אנך', '(1) AD תיכון לצלע BC  (2) שהוא גם אנך'],
     ['AD תיכון לצלע BC שהוא גם אנך ל-BC', '(1) AD תיכון לצלע BC  (2) שהוא גם אנך ל-BC'],
     ['AD תיכון לצלע BC שהוא גם מאונך ל-BC', '(1) AD תיכון לצלע BC  (2) שהוא גם מאונך ל-BC'],
-    ['AD תיכון לצלע BC שהוא גם גובה לצלע BC', '(1) AD תיכון לצלע BC  (2) שהוא גם גובה לצלע BC'],
-    ['AD תיכון במשולש ABC שהוא גם גובה', '(1) AD תיכון במשולש ABC  (2) שהוא גם גובה'],
-    ['AD תיכון לצלע BC, שהוא גם גובה', '(1) AD תיכון לצלע BC,  (2) שהוא גם גובה'],
-    ['AD תיכון לצלע BC והוא גם גובה', '(1) AD תיכון לצלע BC  (2) והוא גם גובה'],
-    ['AD תיכון לצלע BC וגם גובה', '(1) AD תיכון לצלע BC  (2) וגם גובה'],
     ['AD תיכון לצלע BC ומאונך לה', '(1) AD תיכון לצלע BC  (2) ומאונך לה'],
     ['AD תיכון לצלע BC שמאונך לה', '(1) AD תיכון לצלע BC  (2) שמאונך לה'],
     ['AD תיכון לצלע BC שחוצה את זווית A', '(1) AD תיכון לצלע BC  (2) שחוצה את זווית A'],
     ['AD תיכון לצלע BC וחוצה את זווית A', '(1) AD תיכון לצלע BC  (2) וחוצה את זווית A'],
     ['AD תיכון לצלע BC שהוא גם חוצה את הזווית', '(1) AD תיכון לצלע BC  (2) שהוא גם חוצה את הזווית'],
     ['AD תיכון לצלע BC שהוא גם חוצה את BC', '(1) AD תיכון לצלע BC  (2) שהוא גם חוצה את BC'],
-    ['AD תיכון לצלע BC והגובה AD', '(1) AD תיכון לצלע BC  (2) והגובה AD'],
-    ['AD תיכון לצלע BC ו-AD גובה', '(1) AD תיכון לצלע BC  (2) ו-AD גובה'],
-    ['AD תיכון לצלע BC שגם הוא גובה', '(1) AD תיכון לצלע BC  (2) שגם הוא גובה'],
-    ['AD is the median to BC that is also the angle bisector', '(1) AD is the median to BC  (2) that is also the angle bisector'],
   ])('«%s»', (line, all) => {
     const err = refusal(line);
     expect(err).toEqual(PARTS(all));
     expect(refusalCategory3(err!)).toBe('guided');
   });
 
+  // #1942 (ADR-3D-367): 3-D now places an altitude and a bisector on an EXISTING D, so the taught pair records and the
+  // lesson replaces the parts list for these lines (ADR-3D-317's own rule) — each verdict is 2-D's (measured at 688dfb96).
+  it.each([
+    ['AD תיכון לצלע BC שהוא גם גובה', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'],
+    ['AD תיכון לצלע BC שהיא גם גובה', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'],
+    ['AD תיכון לצלע BC שהוא גם גובה לצלע BC', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'],
+    ['AD תיכון במשולש ABC שהוא גם גובה', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'],
+    ['AD תיכון לצלע BC, שהוא גם גובה', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'],
+    ['AD תיכון לצלע BC והוא גם גובה', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'],
+    ['AD תיכון לצלע BC וגם גובה', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'],
+    ['AD תיכון לצלע BC והגובה AD', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'],
+    ['AD תיכון לצלע BC ו-AD גובה', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'],
+    ['AD תיכון לצלע BC שגם הוא גובה', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'],
+    ['AD תיכון לצלע BC שהוא גם חוצה זווית', 'AD תיכון לצלע BC', 'AD חוצה זווית A'],
+    ['AD תיכון לצלע BC שהוא גם חוצה זווית A', 'AD תיכון לצלע BC', 'AD חוצה זווית A'],
+    ['AD is the median to BC that is also the angle bisector', 'AD is the median to BC', 'AD is the bisector of angle A'],
+  ])('«%s» is taught one line per role', (line, first, second) => {
+    const err = refusal(line);
+    expect(err).toEqual({ code: 'split-roles', first, second });
+    expect(refusalCategory3(err!)).toBe('guided');
+  });
+
   it('the reported line, in the exact Hebrew the student reads', () => {
+    // #1942: the lesson, now that both taught lines record — 2-D's `input.scope.split-roles` sentence for the same line
     expect(render('he', refusal('AD תיכון לצלע BC שהוא גם גובה')!)).toBe(
-      'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. זיהינו כאן שני נתונים — נסו להקליד אותם בשני שלבים: (1) AD תיכון לצלע BC  (2) שהוא גם גובה',
+      'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו כל תפקיד בשורה נפרדת: «AD תיכון לצלע BC», ואחר כך «AD גובה לצלע BC».',
+    );
+    // a line whose second part is not a taught role keeps the parts list, word for word
+    expect(render('he', refusal('AD תיכון לצלע BC שהוא גם אנך')!)).toBe(
+      'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. זיהינו כאן שני נתונים — נסו להקליד אותם בשני שלבים: (1) AD תיכון לצלע BC  (2) שהוא גם אנך',
     );
   });
 });
@@ -100,10 +114,10 @@ describe('#1904 — W22: the refusal teaches one line per role when the taught l
     }
   });
 
-  it('a taught pair that does not record on the figure is never offered: the median-first pair falls back to the parts', () => {
-    // «AD תיכון לצלע BC» then «AD גובה לצלע BC» is refused by 3-D today (`already-defined D`): no lesson that fails
-    expect(() => run(['משולש ABC', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'])).toThrow();
-    expect(refusal('AD תיכון לצלע BC שהוא גם גובה')!.code).toBe('split-statements');
+  it('#1942: the median-first pair now RECORDS, so the one-line form is taught (the proof the lesson rests on)', () => {
+    // until #1942 «AD תיכון לצלע BC» then «AD גובה לצלע BC» was refused `already-defined D` and the line fell back to the parts
+    expect(() => run(['משולש ABC', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'])).not.toThrow();
+    expect(refusal('AD תיכון לצלע BC שהוא גם גובה')).toEqual({ code: 'split-roles', first: 'AD תיכון לצלע BC', second: 'AD גובה לצלע BC' });
   });
 
   it('the ✎ edit seam refuses the same edit and keeps the old statement', () => {
@@ -112,7 +126,7 @@ describe('#1904 — W22: the refusal teaches one line per role when the taught l
     useGeo3.getState().submit('AD תיכון לצלע BC');
     const fid = useGeo3.getState().facts[1].id;
     expect(useGeo3.getState().replaceFact(fid, 'AD תיכון לצלע BC שהוא גם גובה')).toBe(false);
-    expect(useGeo3.getState().lastError).toEqual(PARTS('(1) AD תיכון לצלע BC  (2) שהוא גם גובה'));
+    expect(useGeo3.getState().lastError).toEqual({ code: 'split-roles', first: 'AD תיכון לצלע BC', second: 'AD גובה לצלע BC' });
     expect(useGeo3.getState().facts[1].utterance).toBe('AD תיכון לצלע BC');
   });
 });

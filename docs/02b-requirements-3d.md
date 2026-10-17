@@ -147,7 +147,16 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   is never minted **on the apex**, and the line is never drawn perpendicular to the polygon's own plane. An
   apex the host names no opposite side for (a free point, or a rider on a side) is **refused**, as 2-D
   refuses it. A SOLID's base is unchanged: the foot drops on the base face.
-  - Sources: ADR-3D-146, ADR-3D-268, ADR-3D-315, ADR-3D-321; #579, #1499, #1907, #1944.
+  **A role stated about a point that already exists is a given about it.** «D על BC · AD גובה לצלע BC» (and «D
+  אמצע BC», «AD תיכון לצלע BC» or «AD חוצה זווית A» before it; on a solid's edge «SD גובה לצלע BC»; English "AD
+  is the altitude to BC") builds, as 2-D does: a free rider slides to the foot and nothing else moves; a foot
+  already fixed (a midpoint, a bisector's foot) makes the free figure yield so that AD ⟂ BC; a figure the givens
+  fix is refused naming the statements. A letter that is the apex, an end of the side or a vertex of a declared
+  figure («AB גובה לצלע BC») is still refused as already defined. «זווית A» in a bisector sentence at a vertex of
+  exactly ONE polygon is that polygon's angle, said aloud with 2-D's note «הובן כ-∠CAB — הזווית של המצולע בקודקוד
+  הזה. …»; a vertex with one angle is read silently, and one shared by several faces still asks.
+  - Sources: ADR-3D-146, ADR-3D-268, ADR-3D-315, ADR-3D-321, [ADR-3D-367](06b-decisions-3d.md#adr-3d-367); #579,
+    #1499, #1907, #1944, #1942 (operator rulings 2026-10-09 / 2026-10-10 / 2026-10-14).
 
 ## Reading a statement — read, asked, refused
 
@@ -234,8 +243,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   with one role only. The refusal teaches one line per role («כתבו כל תפקיד בשורה נפרדת: «AD is the altitude to BC», ואחר
   כך «AD is the median to BC».») when those lines record on the figure, and otherwise lists the parts («(1) AD תיכון לצלע
   BC  (2) שהוא גם גובה»). The ✎ editor refuses the same edits. A role word stated twice and read once is not a loss.
+  Since 3-D places an altitude and a bisector on an existing point (ADR-3D-367), «AD תיכון לצלע BC שהוא גם גובה» and
+  «…שהוא גם חוצה זווית A» are taught their two lines, as in 2-D.
   The 2-D twin is FR-IN-4g.
-  - Sources: ADR-3D-317; #1904 (operator rulings 2026-10-08, W22).
+  - Sources: ADR-3D-317, ADR-3D-367; #1904 (operator rulings 2026-10-08, W22), #1942.
 - **FR-SP-14 (Must)** — **One coordinate of a point can be stated and asked.** «x_B = 3», «x_{B}=3», «B_x = 3»,
   «שיעור ה-x של (נקודה) B הוא 3», «x של B הוא 3», «שיעור ה-x של B שווה ל-3» and "the x-coordinate of B is 3"
   state B's x and nothing else: on a new B the point is created with x = 3 and its y and z free (they move

@@ -1599,6 +1599,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2097 (ADR-719): «|XY|» is the length XY in every slot — 2-D read it only in the sum, ordering and bound rules ──
   { id: 'abs-length-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = 4'], expect: 'builds', note: '2-D escalated it before ADR-719' },
   { id: 'abs-length-var-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = k'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2092' }], note: '2-D escalated it before ADR-719' },
+
+  // ── #1942 (ADR-3D-367): a role stated about an EXISTING point is a given about it, never a re-creation ──
+  { id: 'altitude-on-existing-d-1942', family: 'cevians-centres', steps: ['משולש ABC', 'D על BC', 'AD גובה לצלע BC'], expect: 'builds', note: '3-D refused already-defined D before ADR-3D-367' },
+  { id: 'median-then-altitude-1942', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'], expect: 'builds', note: '3-D refused already-defined D before ADR-3D-367' },
+  { id: 'median-then-bisector-1942', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון לצלע BC', 'AD חוצה זווית A'], expect: 'builds', note: '3-D asked which angle at A before ADR-3D-367; «זווית A» is the triangle angle, said aloud' },
+  { id: 'median-also-altitude-oneline-1942', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון לצלע BC שהוא גם גובה'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1905' }], note: 'guided: 2-D and 3-D teach the two lines (3-D gave the parts list before ADR-3D-367); analytic as role-clause-1904-02' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
