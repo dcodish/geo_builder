@@ -157,9 +157,11 @@ export interface DerivedPoint {
    * through its exact carriers: `symbolic` while a parameter is still free (the cartesian reading is
    * «z₁ = a+bi», the polar one stays bare), `closed` once every parameter is forced to an exact
    * rational (both readings print the number). Null otherwise. What the panel rows read to decide
-   * whether a reading has something to say.
+   * whether a reading has something to say. #2269 (ADR-CX-080): `determined` — the exact carriers
+   * know nothing closed, yet the value is the same in every configuration with no freedom left
+   * («z1 = 15cis(π/7) + 1»): both readings print it as an ≈ decimal.
    */
-  readonly defined: 'symbolic' | 'closed' | null;
+  readonly defined: 'symbolic' | 'closed' | 'determined' | null;
 }
 
 /**
@@ -1925,11 +1927,33 @@ export function foldConstraints(input: FoldInput): Derived2 {
       readingCart: readingCartOf({ display, z, known: true, exactParts: readableCartesianParts(lit.mod, lit.arg) }),
     };
   };
+  /**
+   * #2269 (ADR-CX-080) — STAGE 5d, the third reading: a number the givens DETERMINE but that has no
+   * exact form («z1 = 15cis(π/7) + 1»: a non-table angle plus a rational) reads «z₁ ≈ 14.51+6.51i» /
+   * «z₁ ≈ 15.91·cis24.15°» — the operator's 2026-09-27 ruling (#1436/#1460): exact form when exact,
+   * otherwise ≈ decimal, never the bare name. "Determined" is the ASK lane's own predicate
+   * ({@link knowledgeOf} over every configuration, through `judge`), never "the sample has a value",
+   * so the panel prints a number exactly when «|z1|» / «Re(z1)» would answer one. A number with any
+   * freedom left keeps its bare name (the no-guess ruling, B6 follow-up 2026-08-18).
+   */
+  const determinedReadings = (p: DerivedPoint): DerivedPoint | null => {
+    if (!judge(false, (env) => env.at(p.name) ?? null).known) return null;
+    const reading = readingOf({
+      display: p.display,
+      exactLabel: null,
+      modulus: p.modulus,
+      modulusKnown: true,
+      argumentDeg: p.argumentDeg,
+      argumentKnown: true,
+    });
+    return { ...p, reading, readingCart: readingCartOf({ display: p.display, z: p.z, known: true, exactParts: null }), defined: 'determined' };
+  };
   const shownPoints: DerivedPoint[] = points.map((p) => {
     const parametric = parametricNames.has(p.name);
     if (p.modulusKnown && p.argumentKnown && !parametric) return p;
     const def = definitionOf(p.name, constraints);
-    if (!def) return p;
+    // an exact carrier that knows both halves already composed the reading (a parametric one included)
+    if (!def) return p.modulusKnown && p.argumentKnown ? p : determinedReadings(p) ?? p;
     const form = substituteKnown(def, rationalParams);
     const closed = closedParts(form);
     if (!closed) {

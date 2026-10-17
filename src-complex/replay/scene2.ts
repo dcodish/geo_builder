@@ -165,7 +165,14 @@ export const v2Labels = (d: Derived2, view: 'polar' | 'cart' = 'polar'): string[
   // #1365 (ADR-CX-058): a number DEFINED by real parameters has something to say — «z₁ = a+bi» in the
   // cartesian view while a parameter is free, the number itself in both views once all are forced.
   d.points
-    .filter((p) => (p.modulusKnown && p.argumentKnown) || p.defined === 'closed' || (view === 'cart' && p.defined === 'symbolic'))
+    // #2269 (ADR-CX-080): a DETERMINED number with no exact form reads «≈ …» in both views
+    .filter(
+      (p) =>
+        (p.modulusKnown && p.argumentKnown) ||
+        p.defined === 'closed' ||
+        p.defined === 'determined' ||
+        (view === 'cart' && p.defined === 'symbolic'),
+    )
     .map((p) => (view === 'cart' ? p.readingCart : p.reading));
 
 /**

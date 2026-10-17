@@ -68,6 +68,13 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   axis numbers span the whole visible canvas, at every zoom and on a canvas wider than it is tall, and
   their step grows as the view zooms out.
   - Sources: [ADR-W-094](06w-decisions-workspace.md#adr-w-094), #1465
+- **FR-GP-7 (Must)** — **A number the givens determine always shows its value.** Exact form when the
+  value is exact; otherwise ≈ decimals — never the bare name, and never a fraction standing in for a
+  value that is not one. «z1 = 15cis(π/7) + 1» reads «z₁ ≈ 14.51+6.51i» (polar view «z₁ ≈ 15.91·cis24.15°»)
+  in the panel and, being typed with no parameter, on the canvas. "Determined" is the same test a
+  question («|z1|») is answered by, so the panel prints a number exactly when that question would get one;
+  a number with freedom left keeps its bare name.
+  - Sources: [ADR-CX-080](06d-decisions-complex.md#adr-cx-080), #2269 (operator ruling 2026-09-27, #1436/#1460)
 
 ## Exactness and configuration
 

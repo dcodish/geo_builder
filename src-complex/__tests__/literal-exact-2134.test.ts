@@ -130,15 +130,14 @@ describe('#2134 — true statements are accepted (a true answer is never marked 
     expect(derived().points.find((q) => q.display === 'z₁')!.reading).toBe('z₁ = 15·cis20°');
   });
 
-  it('«z1 = 15cis(π/7) + 1» carries no fraction under `=` — it reads as its twin «5cis(π/7) + 1» does', () => {
+  // #2269 (ADR-CX-080) amends this lock: the value has no exact form, so it reads «≈» decimals — never a
+  // fraction under `=` (this lock), and never the bare name the twin comparison here once accepted
+  it('«z1 = 15cis(π/7) + 1» carries no fraction under `=` — it reads «≈» decimals (#2269)', () => {
     expect(play('z1 = 15cis(π/7) + 1')).toEqual([true]);
     const p = derived().points.find((q) => q.display === 'z₁')!;
     expect(p.readingCart).not.toMatch(/\//);
     expect(Math.abs(p.z.re - (15 * Math.cos(Math.PI / 7) + 1))).toBeLessThan(1e-9);
-    store().resetSession();
-    play('z1 = 5cis(π/7) + 1');
-    const twin = derived().points.find((q) => q.display === 'z₁')!;
-    expect([p.reading, p.readingCart]).toEqual([twin.reading, twin.readingCart]);
+    expect([p.reading, p.readingCart]).toEqual(['z₁ ≈ 15.91·cis24.15°', 'z₁ ≈ 14.51+6.51i']);
   });
 });
 
