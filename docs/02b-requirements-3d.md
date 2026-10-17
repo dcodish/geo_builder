@@ -472,11 +472,13 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   letter; an unvalued letter stays on the canvas. Built for the angle arc; the coordinate lane's panel
   chip is a later adoption.
   - Sources: ADR-3D-233, ADR-W-047; #925, #937.
-- **FR-RD-7 (Should)** — **A figure whose givens force a solid FLAT says so, naming the statements.** When the
-  stated givens collapse a named solid's defining extent — «פירמידה SABCD שבסיסה ריבוע» with «∠BAS = 40» and
-  «∠DAS = 50», where `cos²40° + cos²50° ≡ 1` puts the apex exactly in the base plane — the tool must not hand back
-  a flat quadrilateral with every fact green and say nothing. For a solid this is a notice, not a refusal.
-  **A declared polygon is never drawn flat:** the line that collapses one («AB = 5 · BC = 3 · AC = 8» on
+- **FR-RD-7 (Should)** — **A declared solid is never drawn flat.** When the stated givens collapse a declared
+  solid's extent — «פירמידה SABCD שבסיסה ריבוע» with «∠BAS = 40» and «∠DAS = 50», where `cos²40° + cos²50° ≡ 1`
+  puts the apex exactly in the base plane, or «פירמידה ישרה SABCD שבסיסה מלבן · AB = 6 · BC = 8 · SA = 5» — the line
+  that completes the flatness is refused, either order, naming the statements and the solid in its own noun:
+  «לא ניתן: «∠DAS = 50» יחד עם «∠BAS = 40» מתקיימים רק אם הפירמידה SABCD שטוחה — וגוף שטוח אינו פירמידה.» (operator
+  ruling 2026-10-07, #1860; it was a notice before). A thin but real solid («∠BAS = 41 · ∠DAS = 50») builds with no
+  notice and no refusal. **A declared polygon is never drawn flat:** the line that collapses one («AB = 5 · BC = 3 · AC = 8» on
   «משולש ABC», or an incidence on a rider) is refused, naming the statements — a straight line is not a
   triangle. **A declared polygon over points fixed by coordinates is never drawn crossed:** when its ring, in the
   order named, crosses itself («A(0,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD»), the line that completed it

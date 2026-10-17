@@ -41,6 +41,8 @@ import { convexWhenSimple, declaredKind3, declaredQuads3, spaceDiagonals, diagon
 import { declaredKindOf, kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { scaleGivenActive, scaleGivenPower } from '../engine/scaleGiven';
 import { FLAT_SOLID_KINDS, scalePinned } from '../engine/solve3';
+import { nounOfKind } from '../engine/solidSubject';
+import { foldPrimes3 } from '../lexicon/marks3';
 import { checkInSpan, componentValue, firstSatisfyingSeed3, knowledgeSamples3, memberHolds3, onLineHolds3, pinningGivens, resolve3, solidFaceCollapsed, type Resolved3 } from '../engine/evaluate';
 import { claimSeeds, verifyClaim } from '../engine/claims';
 import { carrierParams3, statedDataAdmits } from '../engine/carriers';
@@ -875,8 +877,20 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
    */
   const riderOwnerIds = new Set<string>();
   const collapseOwnerIds = new Set<string>();
-  if (resolved.pivot?.collapse) {
-    const keys = new Set(resolved.pivot.collapse.riderKeys);
+  /**
+   * #1860 (ADR-3D-358): a SOLID collapse is the givens' — a statement whose recorded claim is an ANSWER (no
+   * `given`, the ADR-3D-030 pin-and-claim pattern: «AM = u + v + w» on a prism) keeps its claim as the arbiter, so
+   * a wrong exam answer that only a flat prism would satisfy is still `claim-refuted`, never "the prism would be
+   * flat". CLAIMS are the student's answer, never a driver (src3d/CLAUDE.md).
+   */
+  const newestPinOwner = [...pinOwnerIds].pop();
+  const answersByClaim = (factId: string | undefined): boolean =>
+    factId !== undefined &&
+    claimOwners.some((o) => o.factId === factId && c.claims.slice(o.from, o.to).some((cl) => !('given' in cl && cl.given)));
+  const pivotCollapse =
+    resolved.pivot?.collapse && !(resolved.pivot.collapse.solid && answersByClaim(newestPinOwner)) ? resolved.pivot.collapse : undefined;
+  if (pivotCollapse) {
+    const keys = new Set(pivotCollapse.riderKeys);
     const riderPoints = new Set<string>();
     for (const [id, def] of c.points) {
       if (!carrierParams3(c, id, def).some((cp) => keys.has(cp.key))) continue;
@@ -890,7 +904,7 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
       return walk;
     };
     const namesRider = names(riderPoints);
-    if (!resolved.pivot.collapse.forced) {
+    if (!pivotCollapse.forced) {
       for (const f of facts) if (riderOwnerIds.has(f.id) || (pinOwnerIds.has(f.id) && f.cmds.some(namesRider))) collapseOwnerIds.add(f.id);
     } else {
       /**
@@ -900,7 +914,7 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
        * is a given on another object. Their claims are skipped exactly as #1815's are: the figure the claim
        * pass would read is the unsolved sample, never a figure of the givens.
        */
-      const namesRing = names(new Set(resolved.pivot.collapse.ring));
+      const namesRing = names(new Set(pivotCollapse.ring));
       for (const f of facts) if (pinOwnerIds.has(f.id) && f.cmds.some(namesRing) && !f.cmds.some(namesRider)) collapseOwnerIds.add(f.id);
     }
     const blamed = [...pinOwnerIds].pop();
@@ -1001,15 +1015,33 @@ function deriveCore3(factsIn: Fact3[], seed: number, narrow: boolean): Derived3 
    * this one arrived, so marking all of them red — which the previous loop did — accuses statements
    * that are not at fault. `pinOwnerIds` is insertion-ordered in fact order, so the last is the newest.
    */
+  /**
+   * #1860 (ADR-3D-358): a solid's letters the way the student WROTE them («פירמידה SABCD», not the engine's
+   * apex-last «ABCDS») — the letter run of its declaring statement that spells exactly its vertices. Falls back
+   * to the engine order when no single run does (a solid built from several statements).
+   */
+  const solidAsWritten = (ids: readonly Id[]): string => {
+    const want = [...ids].sort().join('|');
+    const declares = (cmd: Command3) => cmd.type === 'solid' && [...cmd.ids].sort().join('|') === want;
+    const decl = facts.find((x) => x.enabled && x.cmds.some(declares));
+    // every prime glyph is one prime, as the parse seam folds them (`foldPrimes3`, #1545)
+    for (const run of foldPrimes3(decl?.utterance ?? '').match(/(?:[A-Z]\d*'*)+/g) ?? []) {
+      const tokens = run.match(/[A-Z]\d*'*/g) ?? [];
+      if (tokens.length === ids.length && [...tokens].sort().join('|') === want) return run;
+    }
+    return ids.join('');
+  };
   const blamedPinOwner = [...pinOwnerIds].pop();
   if (blamedPinOwner !== undefined && status[blamedPinOwner] === 'ok' && resolved.pivot && resolved.pivot.solutions === 0) {
     const f = facts.find((x) => x.id === blamedPinOwner)!;
-    const collapse = resolved.pivot.collapse;
+    const collapse = pivotCollapse;
     status[blamedPinOwner] = collapse
       ? {
           code: 'polygon-collapsed', stated: f.utterance, others: namedStatements(collapseOwnerIds, blamedPinOwner),
-          sides: collapse.ring.length, ring: collapse.ring.join(''),
+          sides: collapse.ring.length, ring: collapse.solid ? solidAsWritten(collapse.ring) : collapse.ring.join(''),
           ...(collapse.forced ? { forced: true as const } : {}),
+          // #1860 (ADR-3D-358): a declared solid the givens force flat is named as that solid
+          ...(collapse.solid && nounOfKind(collapse.solid) ? { solid: nounOfKind(collapse.solid)! } : {}),
         }
       : coordPinOwnerIds.has(blamedPinOwner)
         ? { code: 'injection-unsatisfiable' }
