@@ -5324,6 +5324,18 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  ...(['שטח ABD = שטח ABC', 'BD = BC'] as const).map((line, i): Scenario => ({
+    id: `rider-coincident-root-1820${i === 0 ? '' : '-length'}`,
+    title: `«משולש ABC» · «D על BC» · «${line}»: accepted, D is drawn on C and the coincidence notice names C and D (#1820, ADR-725)`,
+    guards:
+      '#1820 (P2), ruled by the #1595 ruling 2026-09-30 ("when 2 dots are on top of each other we should accept but always give a message about it") and 2-D FR-EN-20. Measured on 688dfb96 through decideDeterministic2D -> commitVerdict -> replay: the third line was refused «cannot place D on segment BC …» while analytic built it. Root cause (ADR-725): solvedOnSegmentCandidates dropped every root that put the rider on a point its constraint references — a filter for the spurious sign-flip of a direction condition («CF ⟂ DF» at F = D) — so an area or length equality whose one genuine root is D = C reported no position. Fix: a coincident root is kept when the constraint is defined there (a finite residual within tolerance, never the collapsed-ray NaN), and only when the carrier offers no clean root. The matrix is src/engine/__tests__/issue-1820-rider-coincident-root.test.ts.',
+    steps: ['משולש ABC', 'D על BC', line],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'D'), at(fig, 'C'))).toBeLessThan(1e-9);
+      expect(fig.coincidences).toEqual([['C', 'D']]);
+    },
+  })),
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */
