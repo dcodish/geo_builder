@@ -5208,6 +5208,21 @@ export const SCENARIOS_4: Scenario[] = [
       expect(v.kind, JSON.stringify(v)).toBe('noop');
     },
   },
+  ...(['טרפז ABCD חסום במעגל', 'מעגל חוסם את הטרפז ABCD'] as const).map((line, i): Scenario => ({
+    id: `cyclic-trapezoid-every-seed-2118${i === 0 ? '' : '-circle-voice'}`,
+    title: `«טרפז ABCD» · «${line}»: the inscribed trapezoid is determined at every one of the 24 seeds, and the first «הציגו תצורה אחרת» from the starting figure lands on a valid one (#2118, ADR-717)`,
+    guards:
+      "#2118 (P3), operator ruling 2026-10-15 (decisions ballot, «Accept at P3»; FR-HS-12: the inscribed trapezoid is determined at every seed). Measured on de7c221f through the submit door and a 24-seed sweep: 23/24 in both voices — seed 1 read «not determined: A, B, D are still free, so A, B, C, D concyclic cannot be judged» after ~320 ms, and the button skipped that configuration. Root cause (ADR-717): a driven SHAPE SCALAR (the trapezoid top's scaled-offset k) had no bracketed range in resolveMixedCarriers, so a root outside the near solve's and the cardinal restarts' reach (k = 1.590 from k₀ = 0.6, beside the collapsed root k = 0) failed although it exists. Fix: on the failure path only, each driven shape scalar gets a bracket and the binding-aware sweep seeds one more multi-start. The engine lock is src/engine/__tests__/issue-2118-shape-scalar-bracket.test.ts.",
+    steps: ['טרפז ABCD', line],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['טרפז ABCD', line]);
+      for (let seed = 0; seed < 24; seed++) expect(meetsRequirements(facts, seed), `seed ${seed} meets the givens`).toBe(true);
+      const next = searchAnotherView(facts, 0);
+      expect(next, 'the button offers another configuration').not.toBeNull();
+      expect(meetsRequirements(next!.facts, next!.seed), 'the first press lands on a valid configuration').toBe(true);
+    },
+  })),
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */
