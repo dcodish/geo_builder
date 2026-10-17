@@ -30,6 +30,9 @@ const he = {
   errNotHandled: 'לא הצלחתי להבין את המשפט: "{{detail}}"',
   // #1919 — a script this tool does not read: the operator's two sentences, identical in every builder
   errUnreadName: '"{{detail}}" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
+  // #1870 (ADR-CX-083, B14) — a claim to prove is refused, in 2-D's words
+  errProofTarget:
+    'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "{{detail}}"',
   errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — "{{detail}}" אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
   errParse: 'שגיאת ניסוח בביטוי: "{{detail}}"',
   errDuplicate: 'השם כבר הוגדר במשפט: "{{detail}}"',
@@ -287,6 +290,8 @@ const en: typeof he = {
   emptyHint: 'No givens yet. Try the example, or type: z1 = 3+4i',
   errNotHandled: 'I could not understand the statement: "{{detail}}"',
   errUnreadName: '"{{detail}}" is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
+  errProofTarget:
+    'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "{{detail}}"',
   errUnreadWord: 'This tool reads Hebrew and English only — "{{detail}}" is in neither. Try writing the line in Hebrew or English.',
   errParse: 'Could not parse the expression: "{{detail}}"',
   errDuplicate: 'This name is already defined by: "{{detail}}"',

@@ -5163,6 +5163,8 @@ So in two builders the figure was made to satisfy the claim the student had to p
 
 **Consequences.** `shell/proofTarget.ts` (new); the per-product call sites as listed. Locks: one shell fixture and meta-lock, three thin locks, the 2-D scenario `proof-target-refused-1666`, and `parse3-v1.test.ts` drops its proof-prefix input. Analytic's `issue-1618-sentence-frame.test.ts` locks are unchanged and green.
 
+**Amendment 1 (2026-10-17, #1870, [ADR-CX-083](06d-decisions-complex.md#adr-cx-083)) — complex is the fourth caller.** Ruling ADR-W-118 B14/D3 (2026-10-07): *"complex gets the same proof-target refusal as the other tools"*, while *"a bare statement that the givens already decide keeps complex's claim check"*. Complex calls `findProofTarget` first in `submitLine` and `editLine`, with 2-D's sentence. Its thin lock is `src-complex/__tests__/proof-target-1666.test.ts` (`submitLine`); `shell/proofTarget.ts` is unchanged. The cross-product wording role `proofTarget` in `shell/__tests__/suite-vocabulary.test.ts` holds 2-D, analytic and complex to one sentence; 3-D quotes with «…» and joins it with #1868.
+
 ## ADR-W-108 — One plane-geometry sentence, one verdict in every builder: the cross-product input-parity lock (#1649)
 
 **Status:** accepted · 2026-10-02 · feature (branch `feat/1649-parity-lock`) · `auto-ok` as transcription of the operator's approval (ADR-W-014). Applies [ADR-W-071](#adr-w-071) (docs/28 §5c). Rulings cited:

@@ -39,6 +39,11 @@ export type InputError =
    * understand": its share of the ruling is the WORDING, which names the letters. `shell/inputScript`.
    */
   | { key: 'unread-name' | 'unread-word'; detail: string }
+  /**
+   * #1870 (ADR-CX-083, ADR-W-107; ruling B14/D3) — a claim the student is asked to PROVE («הוכיחו כי |z1| = 5»),
+   * never a given. `detail` is the proof sentence `shell/proofTarget` found, which the refusal quotes.
+   */
+  | { key: 'proof-target'; detail: string }
   | { key: 'duplicate-name'; detail: string }
   /** the loaded file belongs to another builder — its `app` marker is named (shell/save envelope) */
   | { key: 'wrong-app'; detail: string }

@@ -47,6 +47,8 @@ const COMPLEX: Record<ComplexError['key'], Payload[]> = {
   'parse-error': [{}],
   'unread-name': [{ detail: 'ДЖФ' }],
   'unread-word': [{ detail: 'ДЖФ' }],
+  // #1870 (ADR-CX-083) — a claim to prove, 2-D's sentence quoting the proof sentence
+  'proof-target': [{ detail: 'הוכיחו כי |z1| = 5' }],
   'duplicate-name': [{ detail: 'z1' }],
   'wrong-app': [{}],
   'newer-version': [{}],

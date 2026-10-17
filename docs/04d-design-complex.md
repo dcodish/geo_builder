@@ -358,6 +358,13 @@ document alike.
 
 ## Boundaries
 
+**A claim to prove** (#1870, [ADR-CX-083](06d-decisions-complex.md#adr-cx-083)) is refused FIRST in `submitLine` and
+in `editLine` (a muted row too), before the ask routing and before the grammar, by the shared rule `findProofTarget`
+(`shell/proofTarget.ts`, [ADR-W-107](06w-decisions-workspace.md#adr-w-107)) — the error `proof-target`, worded by
+`errProofTarget` in 2-D's sentence, quoting the proof sentence. Nothing of the line is recorded, the mixed line
+«נתון … . הוכיחו כי …» included. The load path replays through `submitLine`, so a saved proof line lands in the
+load audit. A bare statement has no proof verb and reaches the claim pipeline unchanged.
+
 **A letter this tool cannot read** (#1919, [ADR-626](06-decisions.md#adr-626)) is refused in `submitLine`,
 before the ask routing and before the grammar, by the shared rule `unreadScript` (`shell/inputScript.ts`) —
 with the same two sentences the other builders use (`errUnreadName`, `errUnreadWord`), quoting the letters as

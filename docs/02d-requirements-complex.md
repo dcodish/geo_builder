@@ -238,9 +238,13 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   בוודאות» — and prints nothing.
   - Sources: [ADR-CX-049](06d-decisions-complex.md#adr-cx-049) (operator ruling)
 - **FR-KN-2 (Must)** — **A claim is the student's answer: verified, never obeyed.** A claim never
-  reshapes the figure to become true. **⚠ Ruled to change (2026-10-07, ADR-W-118 B14/D3 · #1870):** a line
-  that asks the student to PROVE something («הוכיחו כי …») is refused like in the other builders
-  ([FR-SU-15](02w-requirements-workspace.md)); a bare statement keeps its claim check.
+  reshapes the figure to become true. A line
+  that asks the student to PROVE something («הוכיחו כי …», "prove that …", also after a given on the same line)
+  is refused like in the other builders, quoting the proof sentence, and nothing of it is recorded
+  ([FR-SU-15](02w-requirements-workspace.md); ADR-W-118 B14, #1870, [ADR-CX-083](06d-decisions-complex.md#adr-cx-083)).
+  **⚠ Ruled to change (2026-10-17, #2338):** a bare statement («w ממשי», «w מדומה טהור») is a given, not a claim to
+  check, and the one that contradicts the givens is refused (changes ruling ADR-W-118 D3). The rest of this
+  requirement describes the code until that ships.
 - **FR-KN-3 (Must)** — **A claim gets one of THREE verdicts, and the third is not optional:**
   - **holds** — the givens force it, decided exactly;
   - **refuted** — the givens forbid it, decided exactly;
@@ -384,7 +388,7 @@ family covered; five of the new families carry three or four independent witness
 | G5 | **Incidence on a regular n-gon**: stated points ARE vertices, driving the integer `n`; per-vertex existence and uniqueness; vertex-count equality between two polygons | `נתון כי D, C, B הן קדקודים של המצולע` · `לכל קדקוד קיים קודקוד אחד בדיוק ש…` · `מספר הקדקודים של II שווה למספר הקדקודים של I` | 2021 חורף ב, 2021 חורף א, 2023 מיוחד — **3** |
 | G6 | **Equation synthesis (inverse F8)**: write an equation whose solution set is a given point set | `כתבו משוואה שפתרונותיה הם 12 המספרים` | 2021 חורף א, 2021 חורף ב — **2** |
 | G7 | **Sums over a SET, and of an expression in the terms**, not only consecutive sequence terms | `z₁·z̄₁ + z₂·z̄₂ + … + z₁₀·z̄₁₀` · `סכום המספרים שהתקבלו הוא אפס` | 2024 חורף, 2021 חורף א — **2** |
-| G8 | **Real-parameter algebra**: sign claims, parameter ratios, ratios of two measures, answers demanded symbolically. **⚠ Ruled to change (2026-10-07, ADR-W-118 B14/D3 · #1870):** a line that asks to prove («הוכיחו כי …») is refused as in the other builders (FR-SU-15, FR-KN-2); the sign claim is then typed as a bare statement, which keeps its claim check | `a·b > 0` (the exam: `הוכיחו כי a·b > 0`) · `מצאו את היחס b/a` · `מצאו את היחס בין השטחים` · `הביעו באמצעות a ו-b` | 2021 קיץ ב ×3, 2020 חורף — **2 exams, 4 statements** |
+| G8 | **Real-parameter algebra**: sign claims, parameter ratios, ratios of two measures, answers demanded symbolically. A line that asks to prove («הוכיחו כי …») is refused as in the other builders (FR-SU-15, FR-KN-2, #1870); the sign claim is typed as a bare statement, which keeps its claim check. **⚠ Ruled to change (2026-10-17, #2338):** a bare statement is a given, not a claim to check (changes ruling ADR-W-118 D3); this row describes the code until that ships | `a·b > 0` (the exam: `הוכיחו כי a·b > 0`) · `מצאו את היחס b/a` · `מצאו את היחס בין השטחים` · `הביעו באמצעות a ו-b` | 2021 קיץ ב ×3, 2020 חורף — **2 exams, 4 statements** |
 | G9 | **Non-linear loci**: a locus in `z²` that falls outside the closed locus list; `z̄` with a squared modulus and moduli of constants on both sides | `\|z² − i\| = \|z² + 3i\|` → `y = −1/(2x)` · `\|6 − z̄ − 8i\|² − \|10i\| = \|9+12i\|` | 2023 מיוחד, 2024 חורף — **2** |
 
 **Deferred, and named** (a deferral is recorded, never silent): **G10** Re/Im extraction of a solution
