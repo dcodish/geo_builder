@@ -774,6 +774,41 @@ export function normalizeShapeComposition(prev: Construction, cmd: Command): Com
 }
 
 /**
+ * #2089 ([ADR-728](../../docs/06-decisions.md#adr-728)) — M1: «XP ⟂ CD» about a point P that already RIDES
+ * segment CD is the statement «XP גובה לצלע CD»: P is the foot of the perpendicular from X onto CD. This returns
+ * that `foot` placement of the existing P, which `applyStep`'s redefinition arm turns into `P ≡ ~P` (ADR-028) with
+ * P's own slide as the primary carrier and the ordinary failure ladder behind it. `applyStep` asks it only when the
+ * ⟂ form and its whole failure ladder have no figure: the ⟂ form drives P's slide (`driveOrCheck`) and, when the
+ * foot of X falls outside CD, its recruiter never offers the free vertex X — so «מרובע ABCD · E על CD · AE ⟂ CD»
+ * was refused while «AE גובה לצלע CD» built. Where the ⟂ form builds it is kept untouched (its convex-ladder
+ * recruitment is the better-conditioned solve there, ADR-585's kite).
+ *
+ * Structural, from what the construction SAYS: P is an `on-segment` rider of exactly {c, d} (an interior rider —
+ * an EXTENSION rider is a recruit-only carrier, ADR-074, and keeps its own path), X exists, is neither c nor d
+ * and is not itself a rider of {c, d} (a ⟂ from a point of the line is degenerate — that refusal is unchanged),
+ * and P has not been re-placed before (`~P` free). Returns null when the command is not this statement.
+ */
+export function riderPerpendicularAsFoot(prev: Construction, cmd: Command): Command | null {
+  if (cmd.type !== 'set-perpendicular') return null;
+  const byId = (id: Id) => prev.objects.find((o) => o.id === id);
+  const samePair = (x: Id, y: Id, u: Id, v: Id) => (x === u && y === v) || (x === v && y === u);
+  const ridesPair = (p: Id, u: Id, v: Id): boolean => {
+    const o = byId(p);
+    return !!o && o.kind === 'on-segment' && !o.extension && samePair(o.a, o.b, u, v);
+  };
+  const tryPair = (x: Id, p: Id, u: Id, v: Id): Command | null => {
+    if (x === p || x === u || x === v || p === u || p === v) return null;
+    if (!ridesPair(p, u, v) || ridesPair(x, u, v)) return null;
+    const xo = byId(x);
+    if (!xo || !isGeoPoint(xo)) return null;
+    if (byId(`~${p}`)) return null;
+    return { type: 'foot', id: p, from: x, a: u, b: v };
+  };
+  const { a, b, c, d } = cmd;
+  return tryPair(a, b, c, d) ?? tryPair(b, a, c, d) ?? tryPair(c, d, a, b) ?? tryPair(d, c, a, b);
+}
+
+/**
  * Mirror a composed shape to the *other* side of the edge through its two reused
  * points: reflect its new **free** vertices, and toggle the `flip` of its new
  * **derived** corners (square/rectangle/rhombus, whose side is set by a rule, not

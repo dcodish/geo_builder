@@ -1599,6 +1599,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2097 (ADR-719): «|XY|» is the length XY in every slot — 2-D read it only in the sum, ordering and bound rules ──
   { id: 'abs-length-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = 4'], expect: 'builds', note: '2-D escalated it before ADR-719' },
   { id: 'abs-length-var-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = k'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2092' }], note: '2-D escalated it before ADR-719' },
+  // ── #2089 (ADR-728): «AE ⟂ CD» about a rider E of CD is the foot statement «AE גובה לצלע CD» — the quadrilateral yields ──
+  { id: 'rider-perp-foot-2089', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'E על CD', 'AE ⟂ CD'], expect: 'builds', note: '2-D refused it before ADR-728' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
