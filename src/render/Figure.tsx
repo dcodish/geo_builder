@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
-import { ANGLE_ARC_R, MIN_MEASURE_FONT_PX, angleValueOffset, buildScene, labelScale, markScale, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
+import { ANGLE_ARC_R, MIN_MEASURE_FONT_PX, angleValueOffset, buildScene, placeAngleValue, labelScale, markScale, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
 // #742 / ADR-W-024: the canvas corner cluster (↺ − +) — one look and one arithmetic in every
 // builder, from the shell contract. (The exports left this file for the top tool row.)
 import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../../shell/frame/canvasControls';
@@ -26,6 +26,8 @@ import type { RelationsResult, ResolvedCircle } from '@/engine';
 import { findInkCrossings, drawnPointIds, resolveDrawnLines } from '@/engine';
 import type { Crossing } from '@/engine';
 import { MathSvg } from './mathSvg';
+import { mathLabelBox } from './mathMetrics';
+import { hasMath } from '../../shell/math';
 import { alignRotation, fitTransform, keepOrRefit, orient } from './transform';
 import type { Transform } from './transform';
 
@@ -390,6 +392,13 @@ export function Figure({
   const pointR = 2 / view.zoom;
   const stroke = 1.5 / view.zoom;
   const fontSize = 16 / view.zoom;
+  // #2175: a needle's value goes beside its arc on the side AWAY from the figure — its centre, in screen px.
+  const figureCentre: Vec | undefined = scene.points.length
+    ? (() => {
+        const ps = scene.points.map((p) => transform.toScreen(p.pos));
+        return { x: ps.reduce((t, p) => t + p.x, 0) / ps.length, y: ps.reduce((t, p) => t + p.y, 0) / ps.length };
+      })()
+    : undefined;
   const REL = '#0d9488'; // the "view relations" layer colour (teal) — distinct from the blue stated-angle marks
   // One colour PER equality class, so equal segments / equal angles that share a colour are read as equal at
   // a glance even where their marks overlap (operator request). Avoids the stated-angle blue (#1d4ed8). The
@@ -906,6 +915,22 @@ export function Figure({
                     ? labelScale(Math.hypot(ends[1].x - ends[0].x, ends[1].y - ends[0].y), m.text, base)
                     : 1;
               const mFont = Math.max(MIN_MEASURE_FONT_PX, base * k);
+              // #2175 (ADR-715): an angle's value is placed to FIT ITS WEDGE — today's spot when the box already
+              // clears both rays, else further out along the bisector, else smaller, else beside the arc.
+              if (m.kind === 'angle' && ends) {
+                const fit = placeAngleValue({
+                  v: s,
+                  p1: ends[0],
+                  p2: ends[1],
+                  dir: sd,
+                  arcR: ANGLE_ARC_R * r * k,
+                  fontSize: mFont,
+                  minFont: MIN_MEASURE_FONT_PX,
+                  box1: mathLabelBox(m.text, 1, !hasMath(m.text)),
+                  away: figureCentre,
+                });
+                return <MathSvg key={`m-${i}`} text={m.text} cx={fit.x} cy={fit.y} fontSize={fit.fontSize} />;
+              }
               const off = m.kind === 'area' ? 0 : m.kind === 'angle' ? angleValueOffset(r * k, mFont) : r * 1.4 * k + mFont * 0.55;
               // A measure is a math expression (12√2, 7k/5, 2α, 37°). `MathSvg` lays out a radical (√ + a real
               // vinculum) or a fraction as pure SVG so it EXPORTS (#98 — MathML/foreignObject rasterizes blank);

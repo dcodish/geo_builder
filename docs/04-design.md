@@ -1364,6 +1364,25 @@ no hit-target.
 
 *Identifiers:* `carryingLines` · `offInkExtensions` · `Scene.extensions` · `data-role="extension"`
 
+### An angle's value fits its corner: side length and opening ([ADR-544](06-decisions.md#adr-544), [ADR-715](06-decisions.md#adr-715), #1337, #2175)
+
+A stated angle's arc and value are sized by the corner (`markScale`, the shorter adjacent side, ADR-544), and the
+value is then PLACED to fit the wedge's opening (`placeAngleValue`, `src/render/scene.ts`). It works in screen px
+on the label's ink box, which `src/render/mathMetrics.ts` (`mathLabelBox`) computes from the same widths `MathSvg`
+lays the label out with. In order:
+
+1. Today's spot (`angleValueOffset`, just outside the arc) when the box clears both rays (a ray may cut the estimated box's edge by `INK_TOLERANCE`).
+2. Further out along the bisector, at the nearest distance where the box clears both rays and the arc, while it
+   stays on the vertex's side of the chord between the two ray ends and within the nearer half of the shorter
+   ray (past it, the value reads as another corner's).
+3. Smaller, down to `MIN_MEASURE_FONT_PX`, at the distance that fits.
+4. Beside the arc, just outside the wedge, across the ray whose outer side faces away from the figure's centre.
+
+The label is never dropped. Analytic places its stated values through its own candidate search
+(`src-analytic/render/scene.ts`), not this function.
+
+*Identifiers:* `placeAngleValue` · `mathLabelBox` · `INK_TOLERANCE` · `angleValueOffset` · `markScale`
+
 ### The measure-label seam and the display choice (#948, [ADR-488](06-decisions.md#adr-488))
 
 A symbolic measure becomes figure text at one place, `measureLabelForms` (`src/engine/lower.ts`), reached from the
