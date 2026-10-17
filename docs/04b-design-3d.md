@@ -711,6 +711,11 @@ and inherit it when that row goes, and `App3` passes row status (#847: an amber 
 `planesNamedBy` is the one structural reader — `plane-run` / `plane-named` operands at any depth, a field `plane`, a declaration's
 `name`, and the `ids` of the four plane kinds.
 
+**The plane map is the student's planes** ([ADR-3D-350](06b-decisions-3d.md#adr-3d-350), #2126). `Resolved3.planes`
+holds only stated planes and the ones a relation materialises from a typed point run; every plane surface (patch,
+label, fold framing, «מישורים» rows and chips, crossing offers) reads it. A circle carries its plane in
+`Resolved3.circles3` (centre + normal) and never publishes it under its id.
+
 **A plane's display default is DERIVED, not stored** (ADR-3D-278, #1485). `planeDisplay` holds only toggles;
 `defaultPlaneDisplay3(c, name)` reads `Construction3.faceNamed`, recorded by `materializePlaneRun` from an
 operand's `face: true`, so the default re-derives on load.

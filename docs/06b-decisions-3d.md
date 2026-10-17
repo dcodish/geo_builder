@@ -456,6 +456,8 @@ Parser `commonPerp` (`הישר d מאונך לישר AB ולישר CD` / `d is t
 
 ## ADR-3D-029 — V8-i: a circle lying in a plane in R³, tangent to a line (2026-07-09)
 
+**⚠ Partly superseded by [ADR-3D-350](#adr-3d-350) (2026-10-17, operator ruling):** the clause exposing the circle's PLANE in the `planes` map under its id is withdrawn: a circle carries its plane in `circles3` only, and draws no plane of its own.
+
 **Context (G13).** 2016-קיץ-ב Q2: a circle centred at O, lying in a plane π, **tangent to a line ℓ₁ at B**, with a second point A (= ℓ₂ ∩ π) lying on it. The tool had no circle in R³ — the biggest single V8 gap (a whole new primitive with its own rendering).
 
 **Decision — a first-class `Circle3` object (centre + plane-normal + radius), resolved from final positions/lines and rendered as a projected ellipse.**
@@ -12849,3 +12851,19 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 **Decision.** Before the per-fact loop, `ringRestatementTwin3` collects every ENABLED fact that declares the same ring, with its `declaredKindOf3` kind (adjective included); if the meet of those read in the stated reading implies the stated kind, or the meet of all of them implies it in every reading (`kindImpliesInEveryReading`), the twin is the first such fact. A muted noun does not count — re-typing «ריבוע» over a muted «מעוין» records the square. The per-fact arms (the generic word, the same statement in a symmetric reading) are unchanged, now over kinds.
 
 **Locks.** `src3d/__tests__/quad-noun-pairs-2169.test.ts` (#2180 block: both three-noun sequences, another reading, «מלבן · דלתון · ריבוע»; the muted-sibling negative); the shared rows' three-noun entries.
+
+## ADR-3D-350 — A circle's carrier plane is not a student plane: a circle draws no plane, label or «מישורים» row of its own (#2126)
+
+**Status:** accepted · 2026-10-17 · **Issue:** #2126 · fix round #2283. Partly supersedes [ADR-3D-029](#adr-3d-029) (the plane-exposure clause).
+**Operator ruling (verbatim):** 2026-10-15, decisions ballot card 6, **A** — *"a circle's plane is not drawn unless the student names it or asks for it. This matches a triangle (no plane) and 2-D."* It covers the canvas patch and the נתונים row.
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-15 · **Design:** [04b](04b-design-3d.md) "Rendering" (the plane map is the student's planes).
+
+**Context — measured at 4b0b4592** through `decideSubmit3` → `derive3` → `buildScene3` / `openCrossings3`: every circle kind published its carrier plane into `resolved.planes` under the circle's internal id — «משולש ABC» · «משולש ABC חסום במעגל» drew a full blue patch labelled «circle-ABC» and a «circle-ABC» row under «מישורים»; likewise `circle-in-ABC` (the incircle), `circle-O`, `circle-ABCD` (a square), a pyramid face's circle and `circle-A` (a circle tangent to a line). With «מישור ABC» the same plane drew twice (ABC and circle-ABC, coincident); with «מעגל O במישור π1 …» it was π1 and circle-O; a line through a pyramid face's circle was offered a crossing point with «circle-ABC». Cause: `evaluate3`'s circle pass wrote `planes.set(k.id, …)` *"so a line can intersect it"* (ADR-3D-029), and every reader of `resolved.planes` — the scene's patches, labels and fold framing, the panel's «מישורים» rows and plane chips, the crossing offers, an `'any'`-plane membership — treats that map as the student's planes. Nothing read the plane back by the circle's id (no parser rule emits `circle-*` as a plane name; grepped at HEAD).
+
+**Class.** A plane the student never stated is published into the student-plane map, so every plane surface shows it. It reaches every circle kind (`circum`, `incircle`, `tangent-line`, `center-plane-radius`) on every route; it does not reach the planes a relation materialises from a typed point run (ADR-3D-148) or `pointPlanes` / `relPlanes`. 2-D has no planes; analytic and complex have no 3-D planes.
+
+**Decision.** The two `planes.set(k.id, …)` writes in `evaluate.ts` are deleted. A circle carries its plane in its own `circles3` record (centre + normal), which is what its outline and the `point-on-circle3` check already read. Every plane surface then stops showing it with no per-surface change; a plane the student names («מישור ABC», «π1») is drawn and listed once.
+
+**Not built (found work).** For a circle tangent to a line no sentence reaches its plane («מישור המעגל» is not understood); asking for it needs new syntax — filed as #2155 (feature, P3).
+
+**Locks.** `src3d/__tests__/issue-2126-circle-plane.test.ts` (eight circle figures: circle still drawn, no `circle-*` plane, no `circle-*` scene label; the triangle control; «מישור ABC» in both orders → `['ABC']`; π1 → `['π1']`; the crossing offers equal the circle-less figure's); fixture `fixtures3/circle-no-plane-2126.geo3.json` (the operator's figure).

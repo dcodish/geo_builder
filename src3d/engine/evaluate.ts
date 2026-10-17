@@ -2499,8 +2499,9 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
     return { kind: rev.kind, center: (rev.center && pos.get(rev.center)) || origin, apex: rev.apex ? pos.get(rev.apex) : undefined, r, h };
   });
 
-  // ---- V8-i: circles in R³, resolved from the final positions/lines/planes. Also exposes each
-  // circle's PLANE (under its id) so a line can intersect it.
+  // ---- V8-i: circles in R³, resolved from the final positions/lines/planes. A circle carries its
+  // plane in its own record (centre + normal) and NEVER in `planes`: that map is the student's planes,
+  // and every plane surface (patch, label, «מישורים» row, crossing offer) reads it (#2126, ADR-3D-350).
   const circles3: Resolved3['circles3'] = [];
   for (const k of c.circles3) {
     let normal: Vec3, radius: number, e1: Vec3, e2: Vec3;
@@ -2525,7 +2526,6 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
       e1 = normalize3(cross3(normal, seedC));
       e2 = cross3(normal, e1);
       circles3.push({ id: k.id, center: solved.center, normal, radius: solved.radius, e1, e2 });
-      planes.set(k.id, { n: normal, d: -dot3(normal, solved.center) });
       continue;
     }
     const center = pos.get(k.def.center);
@@ -2550,7 +2550,6 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
       radius = k.def.radius;
     }
     circles3.push({ id: k.id, center, normal, radius, e1, e2 });
-    planes.set(k.id, { n: normal, d: -dot3(normal, center) }); // the circle's plane, for line∩plane
   }
 
   // ---- a FINAL fill for foot-line points whose named line only resolved late (a through-line
