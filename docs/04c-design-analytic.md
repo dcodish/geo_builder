@@ -612,7 +612,15 @@ circle «BD קוטר» means is M1's `diameter-of` (`curveKindOf`; Thales on a t
 `coord-compare {id, axis, greater, rhs: {point} | {value: Expr}}` and `axis-side` are selectors read by `compareOf`,
 with `swappedStarts` restarts.
 
-*Identifiers:* `failingSelectors`
+**A strict side is judged at the solver's resolution** ([ADR-AG-291](06c-decisions-analytic.md#adr-ag-291), #2230).
+Every strict arm of `failingSelectors` reads one predicate, `sideOfBound(v, bound, scale)`: a value within
+`SOLVE_RESOLUTION × scale` of its bound is ON it (`0`), so a strict comparison fails there and a closed one holds. The
+scale is the quantity's own size: the figure's span (`spanOf`) for a coordinate, `max(1, |v|)` for a parameter order,
+the sides for `acute`'s dot product, the direction's length for a slope sign (within it of horizontal or vertical,
+no sign). The region quantities (`circleQuantity`, `circlePairQuantity`, `orderQuantity`) band where they are
+measured, and `signHolds` reads their sign.
+
+*Identifiers:* `failingSelectors` · `sideOfBound` · `signHolds`
 
 #### An order between measures ([ADR-AG-216](06c-decisions-analytic.md#adr-ag-216), #1621 D3)
 

@@ -17,6 +17,7 @@ import { ask } from '../app/ask';
 import { drawnLoci } from '../app/answers';
 import { derive } from '../engine/derive';
 import { locusOf } from '../engine/locus';
+import { SOLVE_RESOLUTION } from '../engine/solve';
 import { fmtAnalytic } from '../format';
 
 type P = { x: number; y: number };
@@ -72,11 +73,12 @@ describe('#1817 lock 1 — a coordinate range on a line: the trace is the segmen
         expect(p.x).toBeLessThan(3 + EPS);
         expect(Math.abs(p.x - p.y)).toBeLessThan(1e-6);
       }
-      // The ends are REFINED onto the boundary (bisection), not left up to a step short.
-      const span = Math.hypot(d.box.maxX - d.box.minX, d.box.maxY - d.box.minY);
+      // The ends are REFINED onto the boundary (bisection), not left up to a step short (a step here is ~0.024).
+      // The boundary of an OPEN bound is the strict judge's band (#2230, ADR-AG-291): a value within
+      // SOLVE_RESOLUTION × the figure's span (1 for a lone point) of x = 1 is ON it, so the end stops just outside.
       const xs = pts.map((p) => p.x);
-      expect(Math.min(...xs) - 1).toBeLessThan(1e-3 * span);
-      expect(3 - Math.max(...xs)).toBeLessThan(1e-3 * span);
+      expect(Math.min(...xs) - 1).toBeLessThan(2 * SOLVE_RESOLUTION);
+      expect(3 - Math.max(...xs)).toBeLessThan(2 * SOLVE_RESOLUTION);
     });
   }
 });

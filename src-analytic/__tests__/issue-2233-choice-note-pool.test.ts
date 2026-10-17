@@ -36,6 +36,8 @@ describe('#2233 — the axes note goes once the givens fix every vertex, in any 
 
   it.each([
     ['signs', ['x_A > 0', 'x_C < 0', 'y_B > 0']],
+    // #2230 (ADR-AG-291): with the strict judge banded, A's side alone leaves one axis assignment in the pool.
+    ["A's side alone", ['x_A > 0']],
     ['one vertex on an axis — the rhombus forces the rest', ['A על ציר ה-x']],
     ['two vertices on axes', ['A על ציר ה-x', 'B על ציר ה-y']],
   ])('%s: no note', (_, tail) => {

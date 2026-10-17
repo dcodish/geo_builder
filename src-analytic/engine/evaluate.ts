@@ -1195,6 +1195,23 @@ function sideOfLine(p: Pt, a: Pt, b: Pt): number | null {
   return ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) / len;
 }
 
+/**
+ * ONE STRICT-SIDE RULE (#2230, ADR-AG-291) — which side of `bound` a solved value is on, at the solver's resolution.
+ *
+ * A configuration whose value the givens put ON its bound comes out of the solve as rounding noise either side of it
+ * (A on the y-axis as x_A ≈ +1.5·10⁻¹⁰), so a bare `v > bound` decides a strict given on the SIGN OF THE ROUNDING
+ * ERROR: «x_A > 0» admitted A = (0, 5). A value within `SOLVE_RESOLUTION × scale` of the bound is ON it — `0`,
+ * neither side — so a strict comparison fails there and a closed one (≤ / ≥) holds. `scale` is the judged
+ * quantity's own size (the figure's span for a coordinate, the sides for a dot product), so it states no magnitude
+ * (ADR-052). Every strict arm of `failingSelectors` reads this; the region quantities (`circleQuantity`,
+ * `circlePairQuantity`, `orderQuantity`) apply the same band where they are measured, and {@link signHolds} then
+ * reads their sign.
+ */
+export function sideOfBound(v: number, bound: number, scale: number): -1 | 0 | 1 {
+  const d = v - bound;
+  return Math.abs(d) <= SOLVE_RESOLUTION * scale ? 0 : d > 0 ? 1 : -1;
+}
+
 /** Does a sign selector's quantity sit on its named side — the judge's own test, shared with the seeding below. */
 const signHolds = (s: Extract<Selector, { kind: 'sign' }>, q: number): boolean =>
   s.positive ? (s.closed ? q >= 0 : q > 0) : s.closed ? q <= 0 : q < 0;
@@ -1283,13 +1300,12 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       if (s.q.k === 'params') {
         const v = evalExpr(s.q.e, env);
         if (!Number.isFinite(v)) return true; // a symbol not in this configuration judges nothing, as below
-        const zero = Math.abs(v) <= SOLVE_RESOLUTION * Math.max(1, Math.abs(v));
-        return !zero && (s.positive ? v > 0 : v < 0);
+        return sideOfBound(v, 0, Math.max(1, Math.abs(v))) === (s.positive ? 1 : -1);
       }
       if (s.q.k === 'circles' || s.q.k === 'centres-side') {
         const q = circlePairQuantity(s.q, atFn, curveAtOf(c, env, atFn));
         if (q === null) return true; // an operand not placed judges nothing, as below
-        return s.positive ? q > 0 : q < 0;
+        return signHolds(s, q); // banded where it is measured (`circlePairQuantity`)
       }
       /** AN ORDER (#1621 D3, ADR-AG-216) — strict unless the student wrote ≤ / ≥ (`closed`). */
       if (s.q.k === 'order') {
@@ -1300,13 +1316,17 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       if (s.q.k !== 'slope') {
         const q = circleQuantity(s.q, atFn, curveAtOf(c, env, atFn));
         if (q === null) return true; // an operand not placed (or a vacant circle) judges nothing, as below
-        return s.positive ? q > 0 : q < 0;
+        return signHolds(s, q); // banded where it is measured (`circleQuantity`)
       }
       const v = dirVector(s.q.u, atFn, curveAtOf(c, env, atFn), env);
       if (!v) return true; // an operand that is not placed yet judges nothing, as below
-      if (Math.abs(v.x) < 1e-9 * Math.hypot(v.x, v.y)) return false;
-      const positive = v.x * v.y > 0;
-      return s.positive ? positive : !positive;
+      // Relative to the direction's own length (#2230): within the resolution of vertical there is no slope, within it
+      // of horizontal the slope is 0 — neither has the stated sign, so neither passes on a rounding.
+      const n = Math.hypot(v.x, v.y);
+      const sx = sideOfBound(v.x, 0, n);
+      const sy = sideOfBound(v.y, 0, n);
+      if (sx === 0 || sy === 0) return false;
+      return (sx === sy) === s.positive;
     }
     /**
      * EVERY ANGLE ACUTE (#1619 B2, ADR-AG-194) — at each vertex the two sides make a positive dot product.
@@ -1325,7 +1345,7 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
         const uy = p.y - v.y;
         const wx = q.x - v.x;
         const wy = q.y - v.y;
-        if (ux * wx + uy * wy <= SOLVE_RESOLUTION * Math.hypot(ux, uy) * Math.hypot(wx, wy)) return false;
+        if (sideOfBound(ux * wx + uy * wy, 0, Math.hypot(ux, uy) * Math.hypot(wx, wy)) !== 1) return false;
       }
       return true;
     }
@@ -1419,7 +1439,8 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       const lhs = cmp.axis === 'x' ? p.x : p.y;
       const rhs = rhsOf(cmp, (id) => at.get(id) ?? null, env);
       if (rhs === null) return true; // an operand that is not placed yet judges nothing, as above
-      return cmp.greater ? lhs > rhs : lhs < rhs;
+      // Strict, at the figure's resolution (#2230): a coordinate ON its bound is on neither side.
+      return sideOfBound(lhs, rhs, spanOf(at)) === (cmp.greater ? 1 : -1);
     }
     /** ON THE BISECTOR'S OWN RAY (#1284, ADR-AG-209) — the angle's side of the perpendicular at its vertex. */
     if (s.kind === 'angle-side') {
