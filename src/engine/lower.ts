@@ -224,15 +224,20 @@ export function buildSymTab(cmds: AnyCommand[]): SymTab {
   // #2165 (ADR-681, ADR-034 Am. 2): with EXACTLY ONE stated-size circle the reserved letter is an equation of the
   // letter system (its value is derived from that radius, and a contradicting value is refused); the fallback
   // below keeps today's reading for two or more stated circles (which one r names is unruled).
+  // #2111 (ADR-699, ADR-071 Am. 1): the FREE-radius branch below also runs for a letter with a STATED value. ADR-071's
+  // "no value" gate was there so the fallback never froze a free radius to its DEFAULT — a value the student stated is
+  // not a default: it is the radius (ADR-034 Am. 1), and the measure lowers it into the circle (`lowerOne`). The
+  // fixed-radius branch keeps its gate (a valued letter there is the letter system's equation, #2165).
   let radiusCircle: SymTab['radiusCircle'];
   for (const name of ['R', 'r']) {
     const rad = vars.get(name);
-    if (!rad || rad.value !== undefined || radiusOf.has(name)) continue;
+    if (!rad || radiusOf.has(name)) continue;
     const circ = cmds.find(
       (c) => c.type === 'circle' && typeof (c as { radius?: unknown }).radius === 'number' && !(c as { freeRadius?: boolean }).freeRadius,
     ) as { radius: number } | undefined;
-    if (circ) rad.value = circ.radius;
-    else if (!radiusCircle) {
+    if (circ) {
+      if (rad.value === undefined) rad.value = circ.radius;
+    } else if (!radiusCircle) {
       // No fixed-radius circle, but R is used → it denotes a FREE-radius circle. Record it (+ a point on
       // it that witnesses the radius) so R-measures couple to the radius DOF rather than freezing it (ADR-071).
       const free = cmds.find((c) => c.type === 'circle' && (c as { freeRadius?: boolean }).freeRadius) as
@@ -588,11 +593,20 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       // Resolution (issue #54): an EXPLICIT per-circle binding wins ("שרדיוסו r" → THAT circle); an
       // unbound reserved R/r falls back to the legacy single-circle bind. A bound circle with no known
       // on-circle witness gets a hidden pinned `~radw-*` rider minted here (idempotent at apply).
-      const rc = tab.radiusOf.get(e.var) ?? (/^[Rr]$/.test(e.var) && tab.vars.get(e.var)?.value === undefined ? tab.radiusCircle : undefined);
+      // #2111 (ADR-699): the reserved fallback no longer lets go of a VALUED letter — «AB = r» · «r = 3» on a bare
+      // circle: the measure row IS the letter's binding (as `radius-symbol` is for «מעגל O ברדיוס r», ADR-648), so it
+      // also lowers the stated value into that circle's size. The circle is the one the unvalued r already names.
+      const reserved = !tab.radiusOf.has(e.var) && /^[Rr]$/.test(e.var);
+      const rc = tab.radiusOf.get(e.var) ?? (reserved ? tab.radiusCircle : undefined);
       if (rc && (e.pow ?? 1) === 1) {
         const witness = rc.witness ?? `~radw-${rc.id}`;
         const mint: Command[] = rc.witness ? [] : [{ type: 'point-on-circle', id: witness, circle: rc.id, theta: 0.9 }];
-        return [...mint, { type: 'set-length-radius', a: cmd.a, b: cmd.b, circle: rc.id, center: rc.center, witness, k: e.coef, ...(konst ? { add: konst } : {}) }];
+        const stated = reserved ? tab.vars.get(e.var)?.value : undefined;
+        return [
+          ...mint,
+          { type: 'set-length-radius', a: cmd.a, b: cmd.b, circle: rc.id, center: rc.center, witness, k: e.coef, ...(konst ? { add: konst } : {}) },
+          ...(stated !== undefined ? [{ type: 'set-radius', circle: rc.id, value: stated } as Command] : []),
+        ];
       }
       const info = tab.vars.get(e.var);
       const known = valueOf(tab, e.var); // #2165 (ADR-681): stated, else derived by the letter system

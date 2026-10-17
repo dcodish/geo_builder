@@ -17669,3 +17669,31 @@ No chokepoint grows: a per-order special case is removed and the copula is an at
 **Locks.** `src-analytic/__tests__/issue-2119-radius-restated.test.ts` (both spellings, English, the same radius still known); `message-floor-2028.test.ts` payloads; the parity rows of ADR-683.
 
 **Behaviour change for a student (analytic):** «מעגל O ברדיוס 4» after «מעגל O ברדיוס 3» says «לא ניתן: «מעגל O ברדיוס 4» סותר את «מעגל O ברדיוס 3» — אי אפשר לקיים את שניהם יחד.» (was «המשפט לא נוסף — הוא סותר את מה שכבר נקבע: "מעגל O ברדיוס 4"»).
+
+## ADR-699 — The reserved r keeps naming its free circle once it has a value: «AB = r» · «r = 3» sizes the circle (#2111; ADR-071 Am. 1)
+
+**Status:** accepted · 2026-10-17 · bug (P2, 2-D) · operator ruling 2026-10-15 on #2111 (decisions ballot, "Found work") · fix round #2283, stream G · branch `fix/2111-reserved-r-binds-radius`
+**Requirements:** [02](02-requirements.md) FR-EN-22a — the reserved letter on a circle with no stated radius letter takes its value the same way · **Design:** [04](04-design.md) § "A letter's value lowers at its binding" · **LADDER stage:** none — a lowering at the symbolic middle-end ([ADR-031](#adr-031)); no solve stage changes
+**Amends** [ADR-071](#adr-071) (the reserved-letter fallback's "no value" gate) · **Cites** [ADR-034](#adr-034) Am. 1 ("R … should always mean [the radius]"), [ADR-648](#adr-648) (a radius letter's value lowers at its binding), [ADR-682](#adr-682) (the stated-circle case)
+
+**The ruling.** 2026-10-15: *"«AB = r» · «r = 3» on a circle with no stated radius letter gives the circle radius 3, with AB = r."*
+
+**Measured before** (`main` 4b0b4592, the submit gate → `replay`, model mocked). «מעגל O» · «A, B על מעגל O» · «AB = r» · «r = 3»: green, circle r = 5, |AB| = 3, |OA| = 5. The value typed first: the same. «AB = 2r» · «r = 3»: r = 5, |AB| = 6. Two circles («מעגל O» · «מעגל P» · A, B on O): r_O = 5, |AB| = 3. Without a value «AB = r» already couples |AB| to the radius (ADR-071).
+
+**The class (docs/17 §1).** *The reserved radius letter denotes the circle's radius only until it gets a value.* `buildSymTab` skipped the free-radius fallback for a valued letter (`rad.value !== undefined → continue`) and `lowerOne`'s `measure-length` gated `radiusCircle` on `value === undefined`, so a stated «r = 3» detached r from the circle and lowered as a plain `set-distance` on AB; the radius stayed its default. ADR-071 added the gate so the fallback never froze a FREE radius to its default — correct for the default, but it also caught a value the student stated. Same class in every spelling that reaches the fallback (any coefficient, any order, R or r). Not reached: angle/area measures (they never used the fallback).
+
+**Decision.** (`engine/lower.ts`)
+1. `buildSymTab`: the free-radius branch of the reserved fallback runs whether or not the letter has a stated value — same circle, same witness rule as the unvalued case (the first free circle, with a point on it). The fixed-radius branch keeps its gate (there a valued letter is the letter system's equation, ADR-682).
+2. `lowerOne` `measure-length`: the reserved fallback no longer requires an unvalued letter; when it is used and the letter has a STATED value, the lowering is the coupling plus `set-radius{circle, value}` — ADR-648's "the binding lowers the letter's value into its circle's size", applied to the implicit binding (the measure row). An explicit `radius-symbol` keeps its own lowering (the binding sizes, the measure couples). A value the letter system only derived is left to the coupling, as before.
+
+**Measured after.** The four reported rows: radius 3, |AB| = 3 (|AB| = 6 for «AB = 2r»), every row green and verified, 24 of 24 seeds. Two circles: r_O = 3, P untouched. Unchanged: «AB = r» with no value (radius free, |AB| = radius), «מעגל O ברדיוס r» · … · «r = 3» (#2101), a circle with no point on it («מעגל O» · «משולש ABC» · «AB = r» · «r = 3»: |AB| = 3, radius free 5), a stated-radius circle («מעגל O ברדיוס 4» · … · «r = 3» is refused, ADR-682).
+
+**Why not a patch (docs/17 §2).** No input is special-cased; the gate that dropped the value is narrowed to what it was for (a default), at the one chokepoint that reads it.
+
+**Out of scope.** Which circle the reserved r names with two or more circles (#2177) is unchanged: the circle is exactly the one the unvalued r already named.
+
+**Sibling audit.** Analytic has no reserved-letter fallback (its radius is `r_O`); 3-D has no plane circles; complex: none. No parity row lists «AB = r».
+
+**Locks.** `src/engine/__tests__/issue-2111-reserved-radius-value.test.ts` (the lowering), `src/app/__tests__/issue-2111.test.ts` (the rows above, the 24-seed sweep, stability of the centre and of A's ray), fixture `src/__tests__/fixtures/issue-2111-reserved-r-valued.geo.json` (the operator's exact sequence).
+
+**Behaviour change for a student:** «מעגל O» · «A, B על מעגל O» · «AB = r» · «r = 3» draws the circle with radius 3 and AB = 3 (was: radius 5, AB = 3); «AB = 2r» · «r = 3» draws radius 3 and AB = 6 (was: radius 5).

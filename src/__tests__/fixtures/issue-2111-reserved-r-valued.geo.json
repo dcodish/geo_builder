@@ -1,0 +1,71 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T00:00:00.000Z",
+  "name": "issue-2111-reserved-r-valued",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "A, B על מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "utterance": "A, B על מעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3.3",
+      "utterance": "AB = r",
+      "group": "g3",
+      "cmd": {
+        "type": "measure-length",
+        "a": "A",
+        "b": "B",
+        "expr": {
+          "coef": 1,
+          "var": "r"
+        }
+      },
+      "enabled": true
+    },
+    {
+      "id": "g4.4",
+      "utterance": "r = 3",
+      "group": "g4",
+      "cmd": {
+        "type": "set-var",
+        "name": "r",
+        "value": 3
+      },
+      "enabled": true
+    }
+  ]
+}
