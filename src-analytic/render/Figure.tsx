@@ -237,10 +237,20 @@ export function Figure({
       </g>
 
       {/* curves */}
+      {/*
+        #2238 — each curve is inked as the student chose (`scene.ts` `curveInk`): solid, dashed, a ghost while a
+        hidden line stays clickable (the segment rule, never exported), or nothing for a hidden circle (2-D's).
+      */}
       <g fill="none" stroke={CURVE} strokeWidth={2}>
-        {curves.map((c) => (
-          <path key={c.id} d={c.d} data-kind={c.kind} data-id={c.id} />
-        ))}
+        {curves.map((c) =>
+          c.ink === 'none' ? null : c.ink === 'ghost' ? (
+            onPick ? (
+              <path key={c.id} d={c.d} data-kind={c.kind} data-id={c.id} data-ink="ghost" data-noexport="1" stroke={GHOST} strokeDasharray="3 6" />
+            ) : null
+          ) : (
+            <path key={c.id} d={c.d} data-kind={c.kind} data-id={c.id} data-ink={c.ink} strokeDasharray={c.ink === 'dashed' ? '8 6' : undefined} />
+          ),
+        )}
         {/* the drawn arcs (#1622 E4) — a semicircle, a quarter circle, a sector, inked like a curve */}
         {(arcs ?? []).map((a) => (
           <path key={a.id} d={a.d} data-kind="arc" data-id={a.id} strokeLinejoin="round" />

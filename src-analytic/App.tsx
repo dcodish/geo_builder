@@ -74,6 +74,7 @@ import { SegmentMenu } from '../shell/frame/SegmentMenu';
 import { centreLabelOf, centrePopoverOps } from './app/centreName';
 import { segKey } from './render/scene';
 import { segmentName } from './app/lines';
+import { curveMenuOf, type CurveMenuTarget } from './app/curveDisplay';
 import type { LetterRenameResult } from '../shell/frame/letterOffer';
 import { anotherConfiguration } from './app/another';
 import { offersOf, pointAt } from './engine/crossings';
@@ -158,6 +159,9 @@ export function App() {
     segStyle,
     toggleSegHidden,
     toggleSegDashed,
+    curveStyle,
+    toggleCurveHidden,
+    toggleCurveDashed,
     removeLine,
     replaceLine,
     clearAll,
@@ -504,7 +508,7 @@ export function App() {
    */
   /** `rename` (#1154) is the draft «שנה אות» puts in the input box — null when the click offers none. */
   /** #1653: a clicked SEGMENT also carries its display key and name — it opens the shared segment menu. */
-  const [pick, setPick] = useState<{ items: Measurable[]; letter: string | null; segment?: { key: string; name: string }; x: number; y: number; seq: number } | null>(null);
+  const [pick, setPick] = useState<{ items: Measurable[]; letter: string | null; segment?: { key: string; name: string }; curve?: CurveMenuTarget; x: number; y: number; seq: number } | null>(null);
   /** #1598: a clicked unnamed circle CENTRE — the offer it is, and where (viewport px) to open the letter popover. */
   const [centrePick, setCentrePick] = useState<{ offerId: string; x: number; y: number; seq: number } | null>(null);
   /** The input zone — «שנה אות» focuses its box after filling it (the shared InputArea takes no ref). */
@@ -941,6 +945,7 @@ export function App() {
     seed: live.seed,
     seedNames: live.seedNames,
     segStyle: live.segStyle,
+    curveStyle: live.curveStyle,
   });
 
   /** Answers whether the model's lines were recorded — the sentence was taken (#1778: the paragraph chain goes on). */
@@ -1035,11 +1040,13 @@ export function App() {
       crossings: offersOf(d.figure, d.construction),
       // #1653 — the student's per-segment display choices (hidden / dashed)
       segStyle,
+      // #2238 — the student's per-curve display choices (hidden / dashed)
+      curveStyle,
       // #1714 — what the student STATED about a length, angle, area or arc, written on the figure
       stated: d.stated,
     });
     // poolTick: the pool completed, re-read the gates (#1473)
-  }, [d, view, canvasSize, answers, poolTick, segStyle]);
+  }, [d, view, canvasSize, answers, poolTick, segStyle, curveStyle]);
 
   const errorText = error ? errorTextOf(error, t as unknown as Translate) : null;
 
@@ -1515,7 +1522,9 @@ export function App() {
                 // #1653: a drawn segment always has a menu now — hide/show and dashed/solid, its measures inside
                 const ends = what.kind === 'segment' ? d.figure.segments.find((sg) => sg.id === what.id)?.ends : undefined;
                 const segment = ends ? { key: segKey(ends), name: segmentName(d.construction, what.id) ?? ends.join('') } : undefined;
-                setPick(items.length || letter || segment ? { items, letter, segment, x: screen.x, y: screen.y, seq: Date.now() } : null);
+                // #2238: a drawn curve always has a menu too — hide/show, and dashed/solid unless it is a circle
+                const curve = what.kind === 'curve' ? (curveMenuOf(d.figure, what.id) ?? undefined) : undefined;
+                setPick(items.length || letter || segment || curve ? { items, letter, segment, curve, x: screen.x, y: screen.y, seq: Date.now() } : null);
               }}
               /* #1598 — an unnamed circle's centre opens the letter popover: the student picks the letter. */
               onCentre={(offerId, screen) => setCentrePick({ offerId, x: screen.x, y: screen.y, seq: Date.now() })}
@@ -2122,7 +2131,7 @@ export function App() {
             level (it must not scale with the zoom or clip at the canvas edge) and the popover places
             itself inside its positioned container.
           */
-          const state = { lines, disabled, queries, spokenFor, seed, seedNames, segStyle };
+          const state = { lines, disabled, queries, spokenFor, seed, seedNames, segStyle, curveStyle };
           const letter = pick.letter;
           const onRename = (from: string, to: string): LetterRenameResult => {
             // A taken letter is answered IN the popover (its holder, the swap offer); every other refusal
@@ -2183,6 +2192,33 @@ export function App() {
             </div>
           );
         }
+        if (pick.curve) {
+          /*
+            A CURVE gets the same shared segment menu (#2238) — a line, parabola or ellipse with hide/show and
+            dashed/solid, a circle with hide/show alone (2-D's circle menu) — its #1048 measure entries inside.
+            The choice is filed under the curve's id (`curveStyle`); `render/scene.ts` `curveInk` inks it.
+          */
+          const { id: curveId, title: curveTitle, dash } = pick.curve;
+          return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 40 }}>
+              <SegmentMenu
+                key={pick.seq}
+                x={pick.x}
+                y={pick.y}
+                bounds={{ width: window.innerWidth, height: window.innerHeight }}
+                title={<MathText text={analyticBidi.isolateLtrRuns(curveTitle)} />}
+                state={curveStyle[curveId] ?? {}}
+                onToggleHidden={() => toggleCurveHidden(curveId)}
+                onToggleDashed={dash ? () => toggleCurveDashed(curveId) : undefined}
+                strings={{ hide: t('segHide'), show: t('segShow'), dashed: t('segDashed'), solid: t('segSolid') }}
+                onClose={() => setPick(null)}
+                testId="curve-menu"
+              >
+                {measureItems.length > 0 && <div style={{ borderTop: `1px solid ${color.border}`, paddingTop: 4, display: 'flex', flexDirection: 'column' }}>{measureItems}</div>}
+              </SegmentMenu>
+            </div>
+          );
+        }
         return (
           <>
             <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setPick(null)} aria-hidden="true" />
@@ -2199,7 +2235,7 @@ export function App() {
         taken letter quotes its holder and offers the swap, like every LetterPopover.
       */}
       {centrePick && (() => {
-        const state = { lines, disabled, queries, spokenFor, seed, seedNames, segStyle };
+        const state = { lines, disabled, queries, spokenFor, seed, seedNames, segStyle, curveStyle };
         const ops = centrePopoverOps(
           centrePick.offerId,
           state,

@@ -12601,3 +12601,41 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Behaviour change for a student:** in analytic, «משולש ABC ישר זווית ב-B ו-AB = 4» is answered «בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו בשורות נפרדות: (1) משולש ABC  (2) ∠ABC = 90°  (3) AB = 4» (before: sent to the model). The bare «משולש ABC ישר זווית ב-B» reads «… (1) משולש ABC  (2) ∠ABC = 90°» (before: «כתבו קודם … ואחר כך …»).
 
 **Consequences.** `app/lostPart.ts` (`isLostPart`, `conjunctionPieces`, `declinedPart`'s callback takes `before`), `app/submit.ts` (the callback), `app/errorText.ts` (`numbered`, `more`), `i18n/index.ts`; docs 02c R124, 04c; the parity fixture and the #1962 lock.
+
+## ADR-AG-297 — Click a line, a circle or a conic to hide it, or (not a circle) dash it (#2238)
+
+**Date:** 2026-10-17 · **Status:** accepted · feature (P2, analytic), fix round #2291 (stream N); branch `feat/2238-analytic-line-menu` from `main` @ `b0e9dbea`, through a PR. `auto-ok` as transcription of the operator's approval (2026-10-16). **Widens** [ADR-AG-201](#adr-ag-201) (the segment menu) from segments to every drawn curve. LADDER stage: none (display only).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R138 (the "a clicked curve has the same menu" bullet). · **Design:** [04c](04c-design-analytic.md), "The canvas's click menus" (the "Curves too" paragraph).
+
+**Request and rulings.** Operator, 2026-10-16: *"in 2d, i can click a line and hide it or make it dashed but in analytics i cant and this is needed"*. Ruling the same day on the parabola and the ellipse: **(a)**, the same as a line (hide/show and dashed/solid). The circle follows 2-D's circle menu, hide/show alone, measured in `src/render/Figure.tsx` (`openMenu('circle', …)` → `SegmentMenu` with `onToggleHidden` only).
+
+**Measured at pickup** (`b0e9dbea`). A curve click (`Figure` `onPick({ kind: 'curve' })`) opened only the #1048 measure popover, and a curve with no measure entry (a parabola, a circle by its centre) opened nothing. The store had no curve display state.
+
+**Decision.**
+1. **State.** `curveStyle: SegDisplayMap` beside `segStyle`, keyed by the curve's id. It is toggled by `toggleCurveHidden(id)` and `toggleCurveDashed(id)`, through the shared `toggleSegFlag`. It travels everywhere `segStyle` does: the undo slice (`partialize` + `equality`), `serialize` (written when non-empty), `loadAnalyticSession` → `restore` (`cleanSegDisplay`), the session-persist trigger, `clearAll`, and the letter-change commit (`RelabelCommit`, `letterCommit`, `centreName`).
+2. **A letter change re-keys it by POSITION.** A curve id may carry letters (`circle-at-O`, `circle-thru-ABC`) or a hash of its text (`curve-…`), so it cannot be re-spelled from the letter map. `relabelCurveStyle(style, before, after)` maps the k-th drawn curve of the old derivation to the k-th of the relabelled one. `relabelSession` has already proven that relabelled derivation to be the same construction at the same seed.
+3. **What a click offers** is `app/curveDisplay.ts` `curveMenuOf(figure, id)`. It is read off `figure.curves`, not the object list, because a stated equation, a line through two points, a circle by its centre and a perpendicular bisector are different object kinds, and each is one drawn curve. `dash` is `curveDashable(kind)`, true for every kind but a circle. App opens the shared `SegmentMenu` titled with the curve's name, or its equation when it has no name. The menu has hide/show, has dashed/solid only when `dash` is true, and keeps the #1048 measure entries as children. Every curve has the menu, including one with no measure entry. The wording is 2-D's, for lines and circles alike: 2-D's circle menu reads `segMenu.hide` = «הסתירו קטע».
+4. **Ink.** `render/scene.ts` `curveInk(kind, display)`. A line, parabola or ellipse inks through `segInk`: `solid`, `dashed` (`8 6`), or a `ghost` when hidden. The ghost is a faint dashed path, `data-noexport`, drawn only while picks are wired, the segment rule of ADR-AG-201. A circle is `solid` or `none`. A hidden circle draws nothing, as 2-D's does, and a dash flag on one (from a hand-edited file) is ignored. **A hidden circle's centre cross goes with it.** The cross is a feature of the curve, not a point (#1024). A point the student named at the centre is drawn as every point is, and stays. The transparent hit layer is unchanged, so a hidden curve is clicked on its former outline to show it again.
+5. **Not touched.** A hidden curve is a display choice, not a given. Its line in the list, its crossings, the data-panel rows and the ask answers are unchanged.
+
+**Locks.** `src-analytic/__tests__/curve-display-2238.test.tsx` (20):
+- A named line, an anonymous line, a line through two points, a parabola and an ellipse each pass the shared §5c contract (`shell/__tests__/fixtures/segment-display-rows.ts`): hide gives no ink, the statements are unchanged, the curve is still drawn data, one undo restores it, show restores it, the dash survives save → load, hidden survives save → load, and un-hiding keeps the dash.
+- The menu decision per kind: line, parabola and ellipse offer two toggles, the circle one. The title is the name, or else the equation. A point opens no curve menu. The line's measure entries are unchanged under a hide.
+- The circle: hidden means no ink and no centre cross while the hit path stays; undo restores it; save → load keeps it hidden; a dash flag is ignored.
+- A hidden line's ghost is `data-noexport` and absent from a read-only canvas.
+- A rename carries a hidden `circle-at-O` to `circle-at-K`, and undo puts it back.
+- «נקה הכל» clears the map; a hand-edited save is cleaned; a save from before this ADR loads solid.
+
+`issue-1637-g3-app.test.ts`: the whole-envelope key list gains `curveStyle`.
+
+**Browser** (`/analytic.html`, port 5176, through `browser-harness`, screenshots read). With «נתון הישר l1: y=x», «נתון מעגל שמרכזו (2,3) ורדיוסו 5» and «נתונה פרבולה שמשוואתה y^2=8x»:
+- Clicking the line opens «l1»: «הסתירו קטע», «מקווקו», then the three measure entries.
+- The circle offers «הסתירו קטע» alone; the parabola offers «הסתירו קטע» and «מקווקו».
+- «מקווקו» dashes the line. Hiding the circle removes its ink and its cross. Hiding the parabola leaves a ghost, and clicking the ghost offers «הציגו קטע». One «בטל» undoes the last toggle.
+
+**Parity (docs/22 §10).** No input row: no sentence changed. On display, the line and the circle follow 2-D (B1). The parabola and the ellipse have no 2-D counterpart, so their menu rests on the operator's ruling (a) above, recorded here as that ruling.
+
+**Behaviour change for a student:** clicking any drawn line, circle, parabola or ellipse opens a menu that hides it (and, except on a circle, dashes it), with the measure entries the click already offered underneath. Before, a curve click offered only the measures, and a curve with none opened nothing.
+
+**Consequences.** `store/useAnalyticStore.ts`, `app/curveDisplay.ts` (new), `app/rename.ts`, `app/centreName.ts`, `app/loadSession.ts`, `app/sessionPersistAn.ts`, `render/scene.ts`, `render/Figure.tsx`, `App.tsx`; docs 02c R138, 04c.

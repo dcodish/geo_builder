@@ -74,8 +74,8 @@ export function decideCentreSwap(
   const named: RenameState = { ...state, lines: [...state.lines, first.verdict.line] };
   const sv = decideSwap(auto, taken, named);
   if (sv.kind === 'refused') return sv;
-  const { lines, queries, spokenFor, seedNames, segStyle } = sv;
-  return { kind: 'apply', commit: { lines, queries, spokenFor, seedNames, segStyle } };
+  const { lines, queries, spokenFor, seedNames, segStyle, curveStyle } = sv;
+  return { kind: 'apply', commit: { lines, queries, spokenFor, seedNames, segStyle, curveStyle } };
 }
 
 /** The store actions the dispatch writes through — the real ones, so the locks drive what App drives. */

@@ -1218,6 +1218,14 @@ The store keeps `segStyle` per pair (`segKey`), saved and undoable, drawn by `Fi
 `SegmentMenu` and `LetterPopover` (`app/centreName.ts` `centrePopoverOps(offerId, state, actions, d)`,
 `decideCentreName`, `decideCentreSwap`) handle a segment and an unlettered centre.
 
+**Curves too** ([ADR-AG-297](06c-decisions-analytic.md#adr-ag-297), #2238). The store keeps `curveStyle` beside `segStyle` — the same
+`{hidden?, dashed?}` map and the same `toggleSegFlag` / `cleanSegDisplay`, keyed by the curve's id — in the undo slice, the save
+envelope and the persist trigger. A curve click resolves through `app/curveDisplay.ts` `curveMenuOf(figure, id)` (read off
+`figure.curves`, so every curve-producing object kind is one target) and opens `SegmentMenu` with dashed wired only when
+`curveDashable(kind)` (not a circle). `render/scene.ts` `curveInk(kind, display)` is the ink decision: `segInk` for a line or
+conic, `solid` / `none` for a circle (a hidden circle also drops its centre cross). A letter change re-keys it by POSITION
+(`relabelCurveStyle(style, before, after)` over the two derivations' drawn curves), because a curve id may carry letters or a hash.
+
 *Identifiers:* `serialize` · `{hidden?, dashed?}` · `shell` · `cleanSegDisplay` · `knows.segStyle` · `SceneSegment` · `key` · `ink` · `solid` · `dashed` · `ghost` · `measurablesOf` · `centreOf` · `onCentre(offerId, screen)` · `onCrossing` · `nameInUse` · `centreSentenceOf(figure, offerId, letter)` · `centreLabelOf` · `label` · `decideSwap(auto, taken)`
 
 ## The app: submit, ask, locus
