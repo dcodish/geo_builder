@@ -1,0 +1,162 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "yGrNe9Lp58hxqDMK98AeK",
+      "utterance": "משולש ABC",
+      "group": "g0",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "dXamIMjD79BkIF44QEIkA",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "g1",
+      "cmd": {
+        "type": "bisector",
+        "id": "bis-CAB",
+        "vertex": "A",
+        "p": "C",
+        "q": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "N93u_fcEZHbNeGwfb1d00",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "g1",
+      "cmd": {
+        "type": "bisector",
+        "id": "bis-ABC",
+        "vertex": "B",
+        "p": "A",
+        "q": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "DoXwIow6W7WABzIuLCoS1",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "g1",
+      "cmd": {
+        "type": "line-intersection",
+        "id": "@ctr-O",
+        "line1": "bis-CAB",
+        "line2": "bis-ABC"
+      },
+      "enabled": true
+    },
+    {
+      "id": "8qExIGms8b1-MBWKwmliM",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "g1",
+      "cmd": {
+        "type": "foot",
+        "id": "@f-AB",
+        "from": "@ctr-O",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "MqCRtT2oBFtg7dXB_d0m5",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "g1",
+      "cmd": {
+        "type": "circle-through",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "through": "@f-AB",
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "Dmcli1hab-fZeknFbB4XO",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "g1",
+      "cmd": {
+        "type": "foot",
+        "id": "@f-BC",
+        "from": "@ctr-O",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "lObwIy102ZB-e5r_RvKn3",
+      "utterance": "מעגל חסום במשולש ABC",
+      "group": "g1",
+      "cmd": {
+        "type": "foot",
+        "id": "@f-CA",
+        "from": "@ctr-O",
+        "a": "C",
+        "b": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "oCMMKsHC1Y4kTy37ZUA_7",
+      "utterance": "AB משיק למעגל בנקודה D",
+      "group": "g8",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "Sl1Ps70vYXvAxBJs8g1PY",
+      "utterance": "AB משיק למעגל בנקודה D",
+      "group": "g8",
+      "cmd": {
+        "type": "foot",
+        "id": "D",
+        "from": "@ctr-O",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "Wm8mN28mxY4JRA1l0sbVl",
+      "utterance": "AB משיק למעגל בנקודה D",
+      "group": "g8",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "PmsdOt6mCl5DHWzDmlx77",
+      "utterance": "AB משיק למעגל בנקודה D",
+      "group": "g8",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "A",
+          "D",
+          "B"
+        ]
+      },
+      "enabled": true
+    }
+  ]
+}

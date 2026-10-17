@@ -67,8 +67,10 @@ describe('#2028 — #2001’s sequence: no rendered message carries an engine to
       expect(m, `«${m}»`).not.toMatch(/[@~]/);
       expect(hasEngineToken(m), `«${m}»`).toBe(false);
     }
-    // non-vacuity: the refusal this issue measured still fires — measured after the fix it reads the floor sentence
-    // (if #2001 lands a build, this count is what changes; the token assertion above is the lock that must survive)
-    expect(notes.length + rows.length + (banner ? 1 : 0)).toBeGreaterThan(0);
+    // #2001 landed a build (ADR-724, round #2318): the refusal this lock was written over is gone — the line
+    // commits, no row is red, no banner shows, and D is drawn. The token assertion above still guards every
+    // message the sequence can render; the outcome it now reads is the build.
+    expect(rows.length + (banner ? 1 : 0)).toBe(0);
+    expect(d.positions.has('D')).toBe(true);
   });
 });

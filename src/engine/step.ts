@@ -39,7 +39,7 @@ import { circlesTangentError, equalNestedPair } from './radiusFeasibility';
 import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, polygonDefects, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, type PolygonDefect } from './degeneracy';
 import { allConstraints, applySeed, freeDofs, movableIds } from './sample';
 import { impliedByFigure } from './dofRank';
-import { constraintKey, constraintRefs, describeConstraint, isSatisfied, solvedOnSegmentCandidates } from './solve';
+import { collapsibleTermPairs, constraintKey, constraintRefs, describeConstraint, isSatisfied, solvedOnSegmentCandidates } from './solve';
 
 export interface StepOk {
   ok: true;
@@ -291,16 +291,20 @@ function newConstraintsNonVacuous(c: Construction, positions: Map<Id, Vec>, newC
   for (const con of newCons) {
     if (con.type === 'coincide') continue;
     const refs = [...new Set(constraintRefs(con))];
-    const pts = refs.map((id) => positions.get(id));
     let ext = 1;
-    for (const p of pts) if (p) ext = Math.max(ext, Math.abs(p.x), Math.abs(p.y));
+    for (const id of refs) {
+      const p = positions.get(id);
+      if (p) ext = Math.max(ext, Math.abs(p.x), Math.abs(p.y));
+    }
     const eps = 1e-3 * ext;
-    for (let i = 0; i < refs.length; i++)
-      for (let j = i + 1; j < refs.length; j++) {
-        if (merged.has([refs[i], refs[j]].sort().join('|'))) continue;
-        const p = pts[i], q = pts[j];
-        if (p && q && Math.hypot(p.x - q.x, p.y - q.y) < eps) return false;
-      }
+    // #2001 (ADR-724): judge the measured TERMS — a pair whose meeting collapses a length or an angle (or, for
+    // an incidence row, any two of its points) — never two references of different terms that merely
+    // coincide (a named touch point landing on the incircle's own touch witness).
+    for (const [a, b] of collapsibleTermPairs(con)) {
+      if (a === b || merged.has([a, b].sort().join('|'))) continue;
+      const p = positions.get(a), q = positions.get(b);
+      if (p && q && Math.hypot(p.x - q.x, p.y - q.y) < eps) return false;
+    }
   }
   return true;
 }

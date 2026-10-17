@@ -123,6 +123,69 @@ export function constraintRefs(con: Constraint): Id[] {
   }
 }
 
+/**
+ * #2001 ([ADR-724](../../docs/06-decisions.md#adr-724)) — the point pairs whose COINCIDENCE collapses one of the
+ * constraint's measured terms, i.e. satisfies it by 0 = 0 instead of by geometry. The vacuity gate
+ * (`step.ts` `newConstraintsNonVacuous`, issue #7 / B13) reads these, not every pair of {@link constraintRefs}:
+ *  - a LENGTH term collapses when its two ends coincide (|GA| = |AC| with A on C);
+ *  - an ANGLE term collapses when its vertex meets an arm point;
+ *  - an INCIDENCE or region row (collinear, concyclic, ∥, ⟂, an order, a polygon's area/perimeter) is
+ *    degenerate when ANY two of its points meet — the gate's original rule, kept for them.
+ * Two references of DIFFERENT terms meeting is no collapse: «AB משיק למעגל בנקודה D» on an incircle lowers to
+ * |OD| = |O·@f-AB| with D exactly the incircle's own touch point, both terms the radius — a satisfied given.
+ * Exhaustive over the constraint kinds, so a new kind decides here.
+ */
+export function collapsibleTermPairs(con: Constraint): [Id, Id][] {
+  const all = (ids: readonly Id[]): [Id, Id][] => {
+    const out: [Id, Id][] = [];
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) out.push([ids[i], ids[j]]);
+    return out;
+  };
+  const strided = (ids: readonly Id[]): [Id, Id][] => {
+    const out: [Id, Id][] = [];
+    for (let i = 0; i + 1 < ids.length; i += 2) out.push([ids[i], ids[i + 1]]);
+    return out;
+  };
+  const vertexArms = (v: Id, a: Id, b: Id): [Id, Id][] => [[v, a], [v, b]];
+  switch (con.type) {
+    case 'distance':
+    case 'length-bound':
+      return [[con.a, con.b]];
+    case 'equal':
+    case 'ratio':
+    case 'length-order':
+      return [[con.a, con.b], [con.c, con.d]];
+    case 'length-radius':
+      return [[con.a, con.b], [con.center, con.witness]];
+    case 'length-product':
+      return [...strided(con.lhs), ...strided(con.rhs)];
+    case 'angle':
+    case 'angle-bound':
+      return vertexArms(con.vertex, con.ray1, con.ray2);
+    case 'angle-ratio':
+    case 'angle-order':
+      return [...vertexArms(con.v1, con.a1, con.b1), ...vertexArms(con.v2, con.a2, con.b2)];
+    case 'measure-sum': {
+      if (con.unit === 'length') return strided(con.points);
+      const out: [Id, Id][] = [];
+      for (let i = 0; i + 2 < con.points.length; i += 3) out.push(...vertexArms(con.points[i + 1], con.points[i], con.points[i + 2]));
+      return out;
+    }
+    case 'coincide':
+      return [];
+    case 'parallel':
+    case 'perpendicular':
+    case 'collinear':
+    case 'collinear-order':
+    case 'concyclic':
+    case 'area':
+    case 'perimeter':
+    case 'area-ratio':
+    case 'perimeter-ratio':
+      return all([...new Set(constraintRefs(con))]);
+  }
+}
+
 /** One measure-sum term's value at these positions: |pair| (stride 2) or ∠ at the middle id (stride 3). */
 function measureSumTerm(con: { unit: 'length' | 'angle'; points: Id[] }, i: number, get: (id: Id) => Vec): number {
   return con.unit === 'length'
