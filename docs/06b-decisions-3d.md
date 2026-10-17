@@ -13136,3 +13136,33 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Behaviour change for a student:** in 3-D, a model answer that drops a shape or role word the student typed — spelt right or one letter off — is refused with the dropped-given message naming it; an answer that keeps it records as before.
 
 **Slow-tier goldens that may drift:** `decide-submit3-parity-1394` replays the deterministic decision only — none expected.
+
+## ADR-3D-370 — A taught head keeps its one-fact-per-line note when givens trail it on the same line (#2088)
+
+**Status:** accepted · 2026-10-17 · bug (P3) · branch `fix/2088-3d-compound-taught` off `main` @ 688dfb96 · fix round #2318 · implements the operator's ruling of 2026-10-14 on #2088 (card `d14b-found-accept`, A: *"«משולש ABC ישר זווית ב-B ו-AB = 4» is taught in 3-D and analytic as the #1962 ruling says, carrying the trailing givens"*) and #1962's of 2026-10-10 (*"port it to 3-D and analytic"*) · amends [ADR-3D-316](#adr-3d-316) (*"the line is one clause"* holds only for a line `parse3` reads) and [ADR-3D-331](#adr-3d-331) (its `more` continuation is now reachable) · the analytic arm is [ADR-AG-301](06c-decisions-analytic.md#adr-ag-301) (#1947)
+
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-16 — trailing givens continue the list · **Design:** [04b](04b-design-3d.md) — `unreadParts3` cuts a failed line into clauses.
+
+**Context (measured at pickup, `decideSubmit3` + `errorText3`, real locale; 2-D `decideDeterministic2D`).** Every compound row was `not-understood` in 3-D (handed to the model): «משולש ABC ישר זווית ב-B ו-AB = 4», «… ו-AB = 4 ו-BC = 3», «… ב-B, AB = 4», «… ו-AB=4», «ישר זוית …», every vertex, «משולש KLM ישר זווית ב-K ו-KL = 5», «משולש ABC שווה שוקיים ב-B ו-AB = 4». 2-D answers each with its list continued («(3) AB = 4», «(4) BC = 3»; the isosceles head «(1) משולש ABC שווה שוקיים  (2) ב-B  (3) AB = 4»).
+
+**Root cause.** 3-D refused a lost part only when `parse3` read the line and left a part unread (ADR-3D-316). A trailing «ו-AB = 4» makes `parse3` fail on the whole line, so `unreadParts3` never ran and the line fell to `not-understood`. Class: *a line whose head 3-D refuses with the one-fact-per-line note loses that note, and goes to the model, when further givens trail it.*
+
+**Decision.**
+1. **Where:** `readStatement3` — the one reader both statement seams share (submit, the ✎ `replaceFact`) — at its final `not-understood` branch only, so no line 3-D reads today can change. `compoundLostPart3` runs there.
+2. **The cut:** `clausesOf3` in `src3d/store/unreadParts3.ts`, 2-D's `clausesOf` (`src/app/independence.ts`) ported, never imported (src3d boundary): its separators, its operand-pair rule and its subject-continuation rule read by `parse3`. The spaced «ו-» spellings are folded first by the shared `shell/conjunction` chokepoint, as ADR-AG-301 does.
+3. **When:** `trailingGivens3` — at least one trailing clause, and EVERY one reads alone (`parse3`). The HEAD is asked the submit decision itself (`decideSubmit3`), and must be refused with `right-angle-vertex` or `split-statements` equal to `lostPart3` over the head's own `unreadParts3` cut (so a role list or another gate's refusal is never extended).
+4. **What:** `withTrailing3` — the same `lostPart3` over the head's cut with the trailing clauses appended: the taught list continues from (3) (ADR-3D-331's `TAUGHT_LINES + 1`), the parts list after the head's parts. One function, so the bare and the compound line cannot word it apart. No new string.
+
+**Not reached, on purpose.** «… ב-B שבו AB = 4», «… ב-B ו-∠BAC = 30» (no clause boundary there — 2-D quotes fragments, #2096), the English compound (its head is not refused with the note in 3-D), a trailing piece that does not read («ו-שלום עולם»), and «משולש ABC ישר זווית ושווה שוקיים ב-B ו-AB = 4» (its head clause «משולש ABC ישר זווית» records): all stay `not-understood`.
+
+**Measured after.** Every context row is refused with 2-D's list byte for byte (he and en). Where 3-D and 2-D differ: «… ב-B ו- AB = 4» (a spaced hyphen) — 3-D, folding the spacing, answers «(3) AB = 4»; 2-D quotes the fragment «(1) משולש ABC ישר זווית ב-B ו-  (2) AB = 4» (a 2-D gap, reported to the round). Pre-existing and untouched: «… ב-B ו-AB ⊥ BC» and «… ב-B ו-AB = BC» are read WHOLE by `parse3` and refused by ADR-3D-316's cut with the parts «(1) משולש ABC ישר זווית  (2) ב-B ו-AB ⊥ BC», where 2-D teaches «(3) AB ⊥ BC» — reported to the round, not changed here.
+
+**Locks.** `src3d/__tests__/issue-2088-compound-taught3.test.ts` — every row above (the exact he text; en for the reported line), the isosceles list, each taught item typed line by line records through `decideSubmit3` in the listed order, the non-reach rows, the clause cut, and the ✎ seam. `src3d/__tests__/issue-1962-numbered-parts3.test.ts` — ADR-3D-331's planned tripwire flipped to the ruled text. `shell/__tests__/fixtures/geo-input-parity.ts` — row `unread-vertex-1947-01` loses its 3-D known gap (and `#2088` its `GAP_ISSUES` entry). Fixtures-first does not apply: the line is refused, nothing is built.
+
+**Sibling audit.** 2-D is the reference, untouched. Analytic: ADR-AG-301 (#1947), landed. Complex: n/a.
+
+**Behaviour change for a student:**
+- 3-D: «משולש ABC ישר זווית ב-B ו-AB = 4» is answered «בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו בשורות נפרדות: (1) משולש ABC  (2) ∠ABC = 90°  (3) AB = 4» instead of going to the AI; further givens continue the list («(4) BC = 3»), joined by «ו-» or «,».
+- 3-D: «משולש ABC שווה שוקיים ב-B ו-AB = 4» gets «(1) משולש ABC שווה שוקיים  (2) ב-B  (3) AB = 4», as 2-D does.
+
+**Slow-tier goldens that may drift:** `decide-submit3-parity-1394`, if its corpus holds a compound line whose head is a taught right triangle (it would move from `not-understood` to `refused`).

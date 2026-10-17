@@ -31,7 +31,7 @@ import { ingestTypedText } from '../../shell/bidi';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
-import { lostPart3, unreadParts3, type LostPart3 } from './unreadParts3';
+import { lostPart3, trailingGivens3, unreadParts3, withTrailing3, type LostPart3 } from './unreadParts3';
 import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
@@ -1822,8 +1822,31 @@ function readStatement3(
                     : parsed.reason === 'solid-size-unread'
                       ? // #2079 (ADR-3D-340): apply's own «not yet» size refusal (ADR-3D-291), reused — no new sentence
                         { code: 'given-not-drivable', object: { kind: 'size', solid: parsed.solid } }
-                      : { code: 'not-understood' },
+                      : (compoundLostPart3(st, utterance) ?? { code: 'not-understood' }),
   };
+}
+
+/**
+ * #2088 ([ADR-3D-370](../../docs/06b-decisions-3d.md#adr-3d-370)) — a line the grammar does not read WHOLE, whose
+ * head clause it refuses with a lost-part note: «משולש ABC ישר זווית ב-B ו-AB = 4». The head alone is taught
+ * («(1) משולש ABC  (2) ∠ABC = 90°»), but the trailing given made `parse3` fail on the line, so the note never ran and
+ * the line went to the model. Here, at the one reader both statement seams share (submit, the ✎ edit), the line is
+ * cut into clauses (`trailingGivens3`: every trailing clause must read alone) and the HEAD is asked the submit
+ * decision itself; when that decision is exactly the head's own lost-part note, the note continues with the
+ * trailing clauses («(3) AB = 4»). Anything else — a head that records, a head refused for another reason, a
+ * trailing clause that does not read — returns null and the line keeps `not-understood`.
+ */
+function compoundLostPart3(st: { facts: Fact3[]; seed: number }, utterance: string): LostPart3 | null {
+  const split = trailingGivens3(utterance);
+  if (!split) return null;
+  const head = decideSubmit3(st, split.head, () => 'compound-head');
+  if (head.kind !== 'refused' || (head.error.code !== 'right-angle-vertex' && head.error.code !== 'split-statements')) return null;
+  const read = parse3(split.head);
+  if (!read.ok) return null;
+  const unread = unreadParts3(split.head, read.commands, [...derive3(st.facts, st.seed).construction.points.keys()]);
+  // the head's refusal must BE its lost part (not a role list or another gate's note that shares the code)
+  if (!unread?.cut || JSON.stringify(lostPart3(unread.cut)) !== JSON.stringify(head.error)) return null;
+  return withTrailing3(unread.cut, split.trailing);
 }
 
 /**

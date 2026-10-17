@@ -94,8 +94,8 @@ describe('#1962 — the second key and its hard-coded offset are GONE', () => {
 });
 
 describe('#1962 — the continuation format, held at the unit level', () => {
-  // 3-D reads no compound line today (#1679), so these cuts cannot come from a real utterance yet. The
-  // numbering must still be right the day it can: three parts continue to (3), four to (4), two end at (2).
+  // Since #2088 (ADR-3D-370) a real compound reaches these cuts (issue-2088-compound-taught3.test.ts); the
+  // unit rows hold the format alone: three parts continue to (3), four to (4), two end at (2).
   it('a three-part line continues the SAME list at (3)', () => {
     const p = lostPart3(cutOf(['משולש ABC ישר זווית', 'ב-B', 'AB = 4'], ['A', 'B', 'C'], 'B'));
     expect(p).toEqual({ code: 'right-angle-vertex', triangle: 'ABC', angle: 'ABC', more: '  (3) AB = 4' });
@@ -123,10 +123,18 @@ describe('#1962 — the continuation format, held at the unit level', () => {
 });
 
 describe('#1962 — the issue’s own example, measured', () => {
-  it('«משולש ABC ישר זווית ב-B ו-AB = 4» is still not-understood in 3-D: it never reached this message', () => {
-    // The record correction: 3-D reads no «ו-» compound (#1679), so the line goes to the model rather than
-    // to a list beginning at (3). Asserted so the claim is measured, not assumed, and so the day 3-D reads
-    // the compound this lock fails and the new numbering is checked against the ruling.
-    expect(decideSubmit3(EMPTY, 'משולש ABC ישר זווית ב-B ו-AB = 4', id).kind).toBe('not-understood');
+  it('«משולש ABC ישר זווית ב-B ו-AB = 4» now reaches this message, continued at (3) (#2088, ADR-3D-370)', () => {
+    // The planned tripwire: this row asserted `not-understood` until 3-D refused the compound with its note. #2088
+    // (operator ruling 2026-10-14, «carrying the trailing givens») cuts the failed line into clauses, so the
+    // continuation ADR-3D-331 built is reachable — and the numbering is the ruled one, 2-D's byte for byte.
+    const v = decideSubmit3(EMPTY, 'משולש ABC ישר זווית ב-B ו-AB = 4', id);
+    expect(v.kind === 'refused' && v.error).toEqual({ code: 'right-angle-vertex', triangle: 'ABC', angle: 'ABC', more: '  (3) AB = 4' });
+    if (v.kind !== 'refused') return;
+    expect(render('he', v.error)).toBe(
+      'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו בשורות נפרדות: (1) משולש ABC  (2) ∠ABC = 90°  (3) AB = 4',
+    );
+    expect(render('en', v.error)).toBe(
+      'One given per line — that way the tool can build and verify each one separately. Write them on separate lines: (1) triangle ABC  (2) ∠ABC = 90°  (3) AB = 4',
+    );
   });
 });

@@ -224,11 +224,14 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «כתבו בשורות נפרדות: (1) משולש ABC  (2) ∠ABC = 90°», the angle named at the student's vertex, and anything
   else the line said continuing the list from (3). One numbered list from (1), whatever the line holds —
   never a second list and never a list starting where the student can see no (1); it is the same list and
-  the same words 2-D shows. The ✎ editor refuses the same edits. A scene the statement lives in
+  the same words 2-D shows. Givens typed after the head on the same line («…ב-B ו-AB = 4», «…ב-B, AB = 4»)
+  continue it: «(3) AB = 4», «(4) BC = 3», and after the parts list too («(1) משולש ABC שווה שוקיים  (2) ב-B
+  (3) AB = 4») — only when every such given reads on its own line; otherwise the line goes on as before. The ✎ editor refuses the same edits. A scene the statement lives in
   («…במשולש SBC» on a pyramid, «פירמידה SABC שבסיסה משולש ABC») is context, not a part. The 2-D twin is FR-IN-4g.
   - Sources: ADR-3D-316, ADR-W-120; #1888 (operator rulings 2026-10-08); the numbered single list is
     [ADR-3D-331](06b-decisions-3d.md#adr-3d-331) / #1962 (operator ruling 2026-10-10), porting
-    [ADR-611](06-decisions.md#adr-611).
+    [ADR-611](06-decisions.md#adr-611); the trailing givens are [ADR-3D-370](06b-decisions-3d.md#adr-3d-370) / #2088
+    (operator ruling 2026-10-14).
 - **FR-SP-17 (Must)** — **A role the reading drops refuses the line.** A cevian or ⟂ word the reading did not read
   («AD תיכון לצלע BC שהוא גם גובה», «…שמאונך לה», "…that is also a median") refuses the line whole, never recording AD
   with one role only. The refusal teaches one line per role («כתבו כל תפקיד בשורה נפרדת: «AD is the altitude to BC», ואחר

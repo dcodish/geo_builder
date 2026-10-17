@@ -19,13 +19,22 @@
  * names the vertices the pyramid declares). Context the statement lives in, never a given of its own — 3-D's
  * form of 2-D's ADR-597 scene exemption (`referencedContextLabels` reads the commands' labels too).
  *
- * THE PARTS. 3-D reads no compound line (#1679), so the line is one clause; it is cut where its reading
- * stops (`cutAtReading`). An unread run with read labels after it is a lost operand, not a lost part: the
+ * THE PARTS. 3-D reads no compound line (#1679), so a line `parse3` READS is one clause; it is cut where its
+ * reading stops (`cutAtReading`). An unread run with read labels after it is a lost operand, not a lost part: the
  * existing `dropped-given` refusal names it.
+ *
+ * A LINE `parse3` FAILS ON (#2088, [ADR-3D-370](../../docs/06b-decisions-3d.md#adr-3d-370)). «משולש ABC ישר זווית
+ * ב-B ו-AB = 4» is not read whole, so the member above never ran on it and the line went to the model — losing the
+ * one-fact-per-line note its head alone gets. Such a line is cut into clauses ({@link clausesOf3}, 2-D's `clausesOf`
+ * ported, never imported), and when its head is refused with a lost-part note and EVERY trailing clause reads on its
+ * own ({@link trailingGivens3}), the note carries the trailing clauses as the list's continuation
+ * ({@link withTrailing3}). A trailing clause that does not read keeps the line `not-understood`: the note never
+ * teaches a line the tool cannot read (docs/17 §9).
  */
 import { parse3 } from '../parser/parse3';
 import { HE_PREFIX, PART_HE, POLYGON_EN, POLYGON_HE, QUALIFIER_HE } from '../lexicon/nouns3';
 import type { Command3 } from '../engine/types';
+import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { cutAtReading, labelRuns, locate, readLabelRuns, type Occurrence, type PartsCut, type Reader } from '../../shell/readExtent';
 
 /** A 3-D label run: capitals with digits and primes, glued («ABCA'B'C'», «A1»). */
@@ -150,4 +159,64 @@ export function lostPart3(cut: PartsCut<string>): LostPart3 {
     };
   }
   return { code: 'split-statements', all: numbered(cut.parts) };
+}
+
+/**
+ * #2088 (ADR-3D-370) — the clause separators, 2-D's `SEPARATORS` (`src/app/independence.ts`) ported byte for
+ * byte: a comma, semicolon, newline or sentence stop; «וגם», «ואז», "and", "then", "with"; a «ו» glued to a Hebrew
+ * word; a «ו» / «ו-» before a Latin label. «ו-∠…» and «שבו» are not boundaries, so their trailing parts stay inside
+ * the line (and the line `not-understood`), as 2-D's own clause cut leaves them.
+ */
+const SEPARATORS3 = /([,;\n]|(?<!\d)\.|\.(?!\d)|\s+(?:וגם|ואז|and|then|with)\s+|\s+ו(?=[א-ת])|\s+ו-?(?=[A-Z]))/;
+
+/** A piece that only NAMES points — half of an operand pair («AC ו-BD»), never a clause of its own (2-D's `BARE_LABELS`). */
+const BARE_LABELS3 = /^(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?[A-Z]\d*(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+|\s*)[A-Z]\d*)*$/;
+
+/**
+ * The line's clauses — 2-D's `clausesOf` (ADR-603's one splitter), read by `parse3`. A boundary is cut only when the
+ * text on both sides says more than naming points, and a piece with no subject of its own continues the clause
+ * before it when that subject with the piece reads as a statement. The spaced «ו-» spellings are folded first by the
+ * shared `shell/conjunction` chokepoint (#1691), as analytic's arm does (ADR-AG-301).
+ */
+export function clausesOf3(utterance: string): string[] {
+  const bits = foldConjunctionSpacing(utterance).split(SEPARATORS3);
+  const clean = (p: string) => p.replace(/^\s*[ו]?-?\s*/, '').trim();
+  const continues = (prev: string, piece: string): boolean => {
+    if (/^[A-Z]/.test(piece)) return false;
+    const subject = prev.match(/^(?:[A-Z]\d*)+(?![A-Za-z\d])/)?.[0];
+    if (!subject) return false;
+    return reader3.read(`${subject} ${piece}`) !== null;
+  };
+  const out: string[] = [];
+  let cur = bits[0] ?? '';
+  for (let i = 1; i < bits.length; i += 2) {
+    const sep = bits[i];
+    const next = bits[i + 1] ?? '';
+    if (BARE_LABELS3.test(clean(cur)) || BARE_LABELS3.test(clean(next)) || continues(clean(cur), clean(next))) cur += sep + next;
+    else {
+      out.push(cur);
+      cur = next;
+    }
+  }
+  out.push(cur);
+  return out.map(clean).filter((p) => p.length > 1);
+}
+
+/**
+ * #2088 — a line cut into its HEAD clause and the givens trailing it, when it has trailing clauses and EVERY one of
+ * them reads alone (`parse3`, context-free). Null otherwise: the line keeps its verdict.
+ */
+export function trailingGivens3(utterance: string): { head: string; trailing: string[] } | null {
+  const [head, ...trailing] = clausesOf3(utterance);
+  if (!head || trailing.length === 0) return null;
+  return trailing.every((c) => reader3.read(c) !== null) ? { head, trailing } : null;
+}
+
+/**
+ * #2088 — the head's lost-part note, continued with the trailing givens in typed order: the right-angle list from
+ * (3) (ADR-3D-331's `more`, now reachable), or the plain parts list with them after the head's parts. The same
+ * {@link lostPart3}, over the head's cut with the clauses appended, so the two cannot word it apart.
+ */
+export function withTrailing3(cut: PartsCut<string>, trailing: readonly string[]): LostPart3 {
+  return lostPart3({ ...cut, parts: [...cut.parts, ...trailing] });
 }
