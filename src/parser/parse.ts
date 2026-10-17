@@ -309,8 +309,9 @@ export interface ParseContext {
   /** #2149 / #2188 ([ADR-671](../../docs/06-decisions.md#adr-671), [ADR-672](../../docs/06-decisions.md#adr-672)) — SEMANTIC:
    *  each circle pair the construction STATES tangent (its `circles-tangent` record, ADR-645), keyed by the sorted pair of
    *  circle ids: the touch point and the stated kind (the earliest record of the pair). The only source of an inherited
-   *  tangency kind — the deictic `circlePairPositions` never decides it (docs/17 §3b law 2). */
-  statedTangencies?: Record<string, { at: string; external: boolean }>;
+   *  tangency kind — the deictic `circlePairPositions` never decides it (docs/17 §3b law 2). #2209
+   *  ([ADR-703](../../docs/06-decisions.md#adr-703)): `a`/`b` are the record's circles in the order first stated. */
+  statedTangencies?: Record<string, { at: string; external: boolean; a: string; b: string }>;
   /** Recorded SIZE roles between circles (`set-radius-order`, concentric or not — issue #102): lets
    *  «המעגל הגדול/הקטן» resolve consistently once assigned. */
   radiusOrder?: { outer: string; inner: string }[];
@@ -8517,9 +8518,20 @@ const namedCircleRefs = (s: string): string[] => {
  *  that names no kind keeps it; an explicit kind word on the line always wins (the callers read it first). */
 const inheritedExternal = (ctx: ParseContext, id1: Id, id2: Id): boolean | undefined =>
   ctx.statedTangencies?.[[id1, id2].sort().join('|')]?.external;
-/** The pair's stated tangency record (touch point + kind), or undefined. */
-const statedTangencyOf = (ctx: ParseContext, id1: Id, id2: Id): { at: string; external: boolean } | undefined =>
+/** The pair's stated tangency record (touch point + kind + operand order), or undefined. */
+const statedTangencyOf = (ctx: ParseContext, id1: Id, id2: Id): { at: string; external: boolean; a: string; b: string } | undefined =>
   ctx.statedTangencies?.[[id1, id2].sort().join('|')];
+/**
+ * #2209 ([ADR-703](../../docs/06-decisions.md#adr-703), FR-EN-9) — a statement about a pair already STATED tangent is
+ * lowered onto that record: the pair in the record's operand order (whatever order this line names it in) and, when the
+ * line names no touch point, the record's touch point. A pure restatement is then the identical command (the door's dry
+ * run answers «זה כבר קיים באיור»), and the reversed twin at X is the forward twin's command (ADR-653 binds M→X). The
+ * record is what the construction SAYS (`statedTangencies`), never the drawn coordinates (docs/17 §3b law 2).
+ */
+const onStatedTangency = (ctx: ParseContext, id1: Id, id2: Id): { pair: [Id, Id]; at?: string } => {
+  const rec = statedTangencyOf(ctx, id1, id2);
+  return rec ? { pair: [rec.a, rec.b], at: rec.at } : { pair: [id1, id2] };
+};
 
 const resolveCirclePair = (
   s: string,
@@ -9278,8 +9290,10 @@ const circlesTangent: Rule = (s, ctx) => {
   // without naming the touch) — avoiding the centres and existing points. («מנקודה» is a FROM-marker,
   // deferred above — it is never in this alternation, #215.)
   const atM = s.match(/(?:\bat\b|בנקוד\S*)\s*([A-Za-z]\d*)\b/i);
-  const at = atM ? up(atM[1]) : freeLabel([c1, c2, ...(ctx.points ?? [])], ['M', 'T', 'N', 'K']);
   const id1 = circleId(c1), id2 = circleId(c2);
+  // #2209 (ADR-703): a pair already stated tangent keeps its record's operand order and, with no «בנקודה», its touch.
+  const onRecord = onStatedTangency(ctx, id1, id2);
+  const at = atM ? up(atM[1]) : (onRecord.at ?? freeLabel([c1, c2, ...(ctx.points ?? [])], ['M', 'T', 'N', 'K']));
   const have = new Set((ctx.circles ?? []).map((x) => x.toUpperCase()));
   const cmds: AnyCommand[] = [];
   // Each circle is a FREE-radius circle (ADR-052: unstated radius is a DOF), distinct seeds so it doesn't
@@ -9291,7 +9305,7 @@ const circlesTangent: Rule = (s, ctx) => {
   // naming none keeps the kind the construction already states for the pair; with none stated, external.
   const explicitExternal = /חיצונ|מבחוץ|\bexternal\w*|\boutside\b/i.test(s);
   const external = internal ? false : explicitExternal ? true : (inheritedExternal(ctx, id1, id2) ?? true);
-  cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external });
+  cmds.push({ type: 'circles-tangent', circle1: onRecord.pair[0], circle2: onRecord.pair[1], at, external });
   // #761: «…ברדיוסים שווים». INTERNAL tangency + equal radii is a CONTRADICTION (two internally
   // tangent circles of equal radius are the same circle: |c1c2| = |r1 - r2| = 0). It is lowered
   // anyway, deliberately — the engine then refuses it as an unsatisfiable given set, naming the
@@ -9360,7 +9374,8 @@ const namedTouchPoint: Rule = (s, ctx) => {
   if (!known.has(names[0]) || !known.has(names[1])) return null; // a named circle not drawn: decline
   if (at === names[0] || at === names[1]) return null; // a centre is never the touch point
   const id1 = circleId(names[0]), id2 = circleId(names[1]);
-  return [{ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: inheritedExternal(ctx, id1, id2) ?? true }];
+  const [r1, r2] = onStatedTangency(ctx, id1, id2).pair; // #2209 (ADR-703): the record's operand order
+  return [{ type: 'circles-tangent', circle1: r1, circle2: r2, at, external: inheritedExternal(ctx, id1, id2) ?? true }];
 };
 
 /**

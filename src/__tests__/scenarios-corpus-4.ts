@@ -5124,6 +5124,26 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.circles.get('circle-O-2')!.r, 'the inner circle is inside it').toBeLessThan(10);
     },
   },
+  {
+    id: 'tangent-restated-idempotent-2209',
+    title: '«המעגלים O ו-P משיקים» typed a second time adds nothing and the touch stays M; the reversed twin «…P ו-O משיקים בנקודה X» renames M to X (#2209, ADR-703)',
+    guards:
+      "#2209, found by the /decisions pass and ruled by the operator on 2026-10-16 (ballot row d2209-accept: *\"The touch letter stays M on a restatement (an idempotent restatement, as for «משולש חסום …» typed twice), and no M is drawn beside a student's X\"*). Measured on b0e9dbea through decideDeterministic2D → commitVerdict: «המעגלים O ו-P משיקים» typed twice committed `rename M→T, T→M, M→T` and the touch letter M became T; «מעגל P משיק למעגל O» after it added a second touch T beside M; «המעגלים P ו-O משיקים בנקודה X» left M and X both drawn with «M ו-X נפלו על אותה נקודה». Root cause: the touch letter was minted per line (`freeLabel`) and the pair read in the line's own order, so a restatement was a different command (a new letter, or a touch point defined on the other circle) that ADR-653's structural identity could not see as the same point. Fix: a statement about a pair already stated tangent lowers onto the pair's record (`statedTangencies`: its operand order and, with no «בנקודה», its touch letter), so a restatement is the identical command (the door's «זה כבר קיים באיור») and the reversed twin is the forward twin's command (ADR-653 binds M→X). The class matrix (every spelling, both locales, the fresh pair, the controls, the catalog's «מעגל O ומעגל P משיקים» on a drawn pair) is src/app/__tests__/issue-2209-tangency-restatement.test.ts; the builds are the fixtures catalog-tangent-drawn-2209, catalog-tangent-drawn-at-2209 and tangent-reversed-twin-2209.",
+    steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('M'), 'the touch is M').toBe(true);
+      const facts = factsOf(['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים']);
+      for (const line of ['המעגלים O ו-P משיקים', 'מעגל P משיק למעגל O', 'המעגלים P ו-O משיקים']) {
+        expect(gateVerdict(facts, line).kind, `«${line}» restates the tangency`).toBe('noop');
+      }
+      const twin = factsOf(['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'המעגלים P ו-O משיקים בנקודה X']);
+      const t = replay(twin);
+      expect(t.positions.has('X') && !t.positions.has('M'), 'the reversed twin renames M to X').toBe(true);
+      expect(t.coincidences, 'no «M ו-X» notice').toEqual([]);
+      expect(t.violations).toEqual([]);
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */
