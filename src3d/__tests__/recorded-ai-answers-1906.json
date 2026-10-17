@@ -1,0 +1,192 @@
+{
+ "$comment": "Recorded AI answers (#1906): every distinct source:llm result:ok submit in the local dev logs and prod pulls up to 2026-10-17 (logs/ does not travel). Each is a model answer to the student line; the word member must flag only true catches.",
+ "answers": [
+  {
+   "utterance": "תוסיף תיבה מלבנית",
+   "steps": [
+    "תיבה ABCDA'B'C'D'"
+   ]
+  },
+  {
+   "utterance": "נקודה E במישור ABC",
+   "steps": [
+    "E על המישור ABC"
+   ]
+  },
+  {
+   "utterance": "משוואת מישור A'B'C'D' היא x+4y-8z-126=0",
+   "steps": [
+    "המישור A'B'C'D': x+4y-8z-126=0"
+   ]
+  },
+  {
+   "utterance": "E מפםגש אלכסוני הבסיס",
+   "steps": [
+    "E מפגש האלכסונים של הפאה ABCD"
+   ]
+  },
+  {
+   "utterance": "מנסרה שבסיסה מלבן",
+   "steps": [
+    "מנסרה שבסיסה מקבילית"
+   ]
+  },
+  {
+   "utterance": "ABCD מונח על מישור מקביל ל [xy]",
+   "steps": [
+    "הבסיס ABCD מונח על מישור שמקביל למישור [xy]"
+   ]
+  },
+  {
+   "utterance": "B=(2t,t,k)",
+   "steps": [
+    "B(2t, t, k)"
+   ]
+  },
+  {
+   "utterance": "תיבה ABCDA'B'C'D' גדולה",
+   "steps": [
+    "תיבה ABCDA'B'C'D'"
+   ]
+  },
+  {
+   "utterance": "הישר ⁦l⁩: ⁦x=(1,2,3)+t(m-2,m,m+2)⁩",
+   "steps": [
+    "הישר ℓ: x = (1,2,3) + t(m-2, m, m+2)"
+   ]
+  },
+  {
+   "utterance": "אלכסוני ABCD נחתכים בנקודה",
+   "steps": [
+    "O מפגש האלכסונים של הפאה ABCD"
+   ]
+  },
+  {
+   "utterance": "אלכסוני ABCD נחתכים ",
+   "steps": [
+    "AC ו-BD נחתכים"
+   ]
+  },
+  {
+   "utterance": "גובה הפירמידה לבסיס ABC",
+   "steps": [
+    "גובה מנקודה D לבסיס ABC"
+   ]
+  },
+  {
+   "utterance": "G נקודת החיתוך של הקטע CC'G חיתוך המישור ADE עם CC' עם המישור ADE",
+   "steps": [
+    "G היא חיתוך של הקטע CC' עם המישור ADE"
+   ]
+  },
+  {
+   "utterance": "נתון: AB = (1,2,3)",
+   "steps": [
+    "AB = (1,2,3)"
+   ]
+  },
+  {
+   "utterance": "B(0,5,0) S(0,0,6) D(3,p,0)",
+   "steps": [
+    "B(0,5,0)",
+    "S(0,0,6)",
+    "D(3,p,0)"
+   ]
+  },
+  {
+   "utterance": "AB = u, AD = v, AS = w",
+   "steps": [
+    "נסמן: AB = u, AD = v, AS = w"
+   ]
+  },
+  {
+   "utterance": "AB = 5, BC=3, AC=7.9",
+   "steps": [
+    "AB = 5",
+    "BC = 3",
+    "AC = 7.9"
+   ]
+  },
+  {
+   "utterance": "AD גובה, AD תיכון",
+   "steps": [
+    "AD גובה במשולש ABC",
+    "AD תיכון במשולש ABC"
+   ]
+  },
+  {
+   "utterance": "AB = 3, BC = 4",
+   "steps": [
+    "AB = 3",
+    "BC = 4"
+   ]
+  },
+  {
+   "utterance": "AB = 3 ו-BC = 4",
+   "steps": [
+    "AB = 3",
+    "BC = 4"
+   ]
+  },
+  {
+   "utterance": "AD גובה ו-AD תיכון",
+   "steps": [
+    "AD גובה במשולש ABC",
+    "AD תיכון במשולש ABC"
+   ]
+  },
+  {
+   "utterance": "משולש ABC, AB = 5",
+   "steps": [
+    "משולש ABC",
+    "AB = 5"
+   ]
+  },
+  {
+   "utterance": "ריבוע ABCD, נקודה G על AD",
+   "steps": [
+    "ריבוע ABCD",
+    "G על AD"
+   ]
+  },
+  {
+   "utterance": "משולש ABC, ריבוע WERT",
+   "steps": [
+    "משולש ABC",
+    "ריבוע WERT"
+   ]
+  },
+  {
+   "utterance": "D אמצע AB, E אמצע AC",
+   "steps": [
+    "D אמצע AB",
+    "E אמצע AC"
+   ]
+  },
+  {
+   "utterance": "AB = 3, בלה בלה",
+   "steps": [
+    "AB = 3"
+   ]
+  },
+  {
+   "utterance": "AB = AC, ∠A = 40°",
+   "steps": [
+    "isosceles triangle ABC",
+    "∠BAC = 40"
+   ]
+  },
+  {
+   "utterance": "ABC",
+   "steps": [
+    "triangle ABC"
+   ]
+  },
+  {
+   "utterance": "BCA'",
+   "steps": [
+    "triangle BCA'"
+   ]
+  }
+ ]
+}

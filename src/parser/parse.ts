@@ -5975,6 +5975,10 @@ const HE_POLY_NAME_N: Record<string, number> = {
   מחומש: 5, משושה: 6, משובע: 7, מתומן: 8, משומן: 8, מתושע: 9, מעושר: 10,
 };
 
+/** Every polygon-name word of the two tables above, word → vertex count — for the AI-answer word member (#1906),
+ *  which composes its ring vocabulary from them rather than re-spelling them. */
+export const POLYGON_NAME_ARITY: Readonly<Record<string, number>> = { ...POLY_NAME_N, ...HE_POLY_NAME_N };
+
 /** The n-gon nouns (n ≥ 5) of the tables above, per language — composed, never re-spelled (#1891). */
 const NGON_WORDS_EN = Object.entries(POLY_NAME_N).filter(([, n]) => n >= 5).map(([w]) => w).join('|');
 const NGON_WORDS_HE = Object.keys(HE_POLY_NAME_N).join('|');
@@ -6086,6 +6090,19 @@ const isCircleInPolygon = (s: string): boolean => {
   const polyIdx = s.search(new RegExp(`${POLY_WORDS_EN}|${POLY_WORDS_HE}`, 'i'));
   return circIdx >= 0 && polyIdx >= 0 && circIdx < polyIdx;
 };
+
+/**
+ * #1906 ([ADR-722](../../docs/06-decisions.md#adr-722)) — WHICH CIRCLE an inscription sentence states, asked of the
+ * grammar's own two readers: the «חוסם» voice reader ({@link inscriptionVoice}) when the active verb is there, else
+ * the container-marker reader ({@link isCircleInPolygon}). `'in'` is the circle inside the polygon (the incircle),
+ * `'around'` the circle through its vertices. The AI-answer word member asks it of the STUDENT's line, spelt right,
+ * so an answer that draws the other circle is refused naming the word.
+ */
+export function statedCircleDirection(s: string): 'in' | 'around' {
+  const voice = inscriptionVoice(s);
+  if (voice) return voice.container === 'shape' ? 'in' : 'around';
+  return isCircleInPolygon(s) ? 'in' : 'around';
+}
 
 /**
  * The vocabulary an INSCRIPTION sentence sits in — stripped before the subject's labels are read.
@@ -14139,8 +14156,21 @@ export function droppedMidsegment(utterance: string, commands: AnyCommand[]): bo
  * existing polygons) restates, and is exempt — the `droppedShapeNoun` exemptions, unchanged.
  */
 export function droppedShapeAdjective(s: string, commands: AnyCommand[], ctx: ParseContext): boolean {
+  if (polygonNounsAllReferences(s, ctx)) return false; // no noun: the standalone shape's own; all references: a restatement
+  const accounts = shapeAdjectiveAccounts(commands);
+  return (Object.keys(accounts) as (keyof typeof accounts)[]).some(
+    (adj) => new RegExp(SHAPE_ADJ_WORDS[adj], 'i').test(s) && !accounts[adj](),
+  );
+}
+
+/**
+ * ADR-595's REFERENCE exemption, as one predicate (extracted for #1906, behaviour unchanged): true when the line
+ * names no polygon noun (a noun-less adjective is the standalone right/isosceles triangle's own), or when every
+ * polygon noun it names is a REFERENCE — its letter run already drawn, or a bare noun beside existing polygons.
+ */
+export function polygonNounsAllReferences(s: string, ctx: ParseContext): boolean {
   const nouns = [...s.matchAll(POLY_NOUN)];
-  if (!nouns.length) return false; // a noun-less adjective is the standalone right/isosceles triangle's own
+  if (!nouns.length) return true;
   const pts = new Set((ctx.points ?? []).map((p) => p.toUpperCase()));
   const isReference = (m: RegExpMatchArray): boolean => {
     const run =
@@ -14149,14 +14179,21 @@ export function droppedShapeAdjective(s: string, commands: AnyCommand[], ctx: Pa
     if (!run) return (ctx.polygons?.length ?? 0) > 0;
     return (run.match(/[A-Z]\d*/g) ?? []).every((l) => pts.has(l));
   };
-  if (nouns.every(isReference)) return false;
+  return nouns.every(isReference);
+}
+
+/**
+ * ADR-595's evidence families for the three shape adjectives — what in a lowering makes each TRUE (extracted for
+ * #1906, behaviour unchanged, so the AI-answer word member asks the same question per occurrence):
+ *  - right: a right-triangle, a ⟂, a 90° angle, a rectangle/square, or a diameter (Thales);
+ *  - isosceles: an equal pair, a shape variant, or a trapezoid on a circle (a cyclic trapezoid IS isosceles);
+ *  - equilateral: two equal pairs, or a square/rhombus.
+ */
+export function shapeAdjectiveAccounts(commands: AnyCommand[]): Record<keyof typeof SHAPE_ADJ_WORDS, () => boolean> {
   const has = (t: AnyCommand['type']) => commands.some((c) => c.type === t);
   const count = (t: AnyCommand['type']) => commands.filter((c) => c.type === t).length;
-  const onCircle = commands.flatMap((c) => (c.type === 'point-on-circle' && typeof c.theta === 'number' ? [c] : []));
-  const diameter = onCircle.some((p, i) =>
-    onCircle.some((q, j) => j > i && p.circle === q.circle && Math.abs(Math.abs(p.theta! - q.theta!) - Math.PI) < 1e-9),
-  );
-  const accounts: Record<keyof typeof SHAPE_ADJ_WORDS, () => boolean> = {
+  const diameter = hasDiameter(commands);
+  return {
     right: () =>
       has('right-triangle') || has('set-perpendicular') || has('rectangle') || has('square') || diameter ||
       commands.some((c) => c.type === 'set-angle' && Math.abs(c.value - 90) < 1e-9),
@@ -14166,20 +14203,26 @@ export function droppedShapeAdjective(s: string, commands: AnyCommand[], ctx: Pa
         (has('point-on-circle') || has('set-concyclic'))),
     equilateral: () => count('set-equal') >= 2 || has('square') || has('rhombus'),
   };
-  return (Object.keys(accounts) as (keyof typeof accounts)[]).some(
-    (adj) => new RegExp(SHAPE_ADJ_WORDS[adj], 'i').test(s) && !accounts[adj](),
+}
+
+/** Two vertices antipodal on one circle — the Thales lowering of a right angle (ADR-595). */
+export function hasDiameter(commands: AnyCommand[]): boolean {
+  const onCircle = commands.flatMap((c) => (c.type === 'point-on-circle' && typeof c.theta === 'number' ? [c] : []));
+  return onCircle.some((p, i) =>
+    onCircle.some((q, j) => j > i && p.circle === q.circle && Math.abs(Math.abs(p.theta! - q.theta!) - Math.PI) < 1e-9),
   );
 }
 
 /** Each polygon noun's vertex count — what a MATERIALISED polygon must have to account for it (#1790). */
 const polyNounArity = (noun: string): number =>
   /משולש|triangle/i.test(noun) ? 3 : /מחומש|pentagon/i.test(noun) ? 5 : /משושה|hexagon/i.test(noun) ? 6 : 4;
-export function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseContext): boolean {
-  // #1790 (ADR-595): a noun is accounted for by a materialised polygon of ITS arity, not by any polygon. The
-  // old first line returned false as soon as ANY command carried a ≥3-id run, so a triangle accounted for
-  // «טרפז» and «טרפז ישר זווית חסום במעגל» committed a triangle green. The ring a command materialises is its
-  // `ids` (a shape) or `container` (a polygon-in-polygon's host).
-  const arities = new Set(
+
+/**
+ * The ring sizes a lowering MATERIALISES (#1790, ADR-595; extracted for #1906): a command's `ids` (a shape) or
+ * `container` (a polygon-in-polygon's host), three or more ids.
+ */
+export function materialisedArities(commands: AnyCommand[]): Set<number> {
+  return new Set(
     commands.flatMap((c) =>
       (['ids', 'container'] as const).flatMap((k) => {
         const v = (c as Record<string, unknown>)[k];
@@ -14187,6 +14230,14 @@ export function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseCo
       }),
     ),
   );
+}
+
+export function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseContext): boolean {
+  // #1790 (ADR-595): a noun is accounted for by a materialised polygon of ITS arity, not by any polygon. The
+  // old first line returned false as soon as ANY command carried a ≥3-id run, so a triangle accounted for
+  // «טרפז» and «טרפז ישר זווית חסום במעגל» committed a triangle green. The ring a command materialises is its
+  // `ids` (a shape) or `container` (a polygon-in-polygon's host).
+  const arities = materialisedArities(commands);
   const known = new Set([
     ...(ctx.points ?? []).map((p) => p.toUpperCase()),
     ...(JSON.stringify(commands).match(/[A-Z]\d*/g) ?? []),

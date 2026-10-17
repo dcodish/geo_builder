@@ -263,6 +263,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   A word in an inscription sentence the tool does not read refuses the line, naming it («…לא הצלחנו לצייר: שווה צלעת…»);
   nothing is drawn and the model is not asked. «שוה» reads as «שווה». A shape declaration with a qualifier word no
   reader lowers («משולש שווה ABC», «טרפז ישר ABCD») is not drawn without it: the line goes to the model.
+  **The model's answer keeps every shape and role word** ([02w](02w-requirements-workspace.md) FR-SU-21, #1906,
+  [ADR-3D-364](06b-decisions-3d.md#adr-3d-364)): a shape adjective or quadrilateral noun, a cevian role word («גובה»,
+  «תיכון», «חוצה זווית») or an inscription verb («חסום» / «חוסם») the student typed — spelt right or one letter off
+  («שווה צלעת», «מלבנ», «גובח», "isoceles") — that the answer does not carry refuses the step with `dropped-given`
+  naming the word as typed («המשפט לא נוסף לציור, כי לא הצלחנו לצייר: שווה צלעת. …»); an answer that keeps it (typo
+  fixed) records as before. One role's lowering never pays for another's.
   Both voices of both relations are one sentence (#1975, operator 2026-10-14): a circle named FIRST — «מעגל O חוסם
   את המשולש ABC», «מעגל O חסום במשולש ABC», "the circle O circumscribes triangle ABC" — builds what «משולש ABC חסום
   במעגל O» / «משולש ABC חוסם את המעגל O» build, and the relative clause whose subject is the ring, «מעגל ש-ABC

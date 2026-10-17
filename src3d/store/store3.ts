@@ -51,6 +51,8 @@ import { namedPointAt } from '../engine/crossings3';
 import { CLAIM_REL_TOL, meaningKey, mutualHolds, MUTUAL_VERIFY_TOL } from '../engine/operands';
 import { claimPointIds, defaultPlaneDisplay3, emptyConstruction3, incircleRefusal3, pinSymsOf, symbolValueOf, type Claim3, type Command3, type Construction3, type EngineError3, type Id, type PointDef, type Positions3 } from '../engine/types';
 import { droppedConstructNoun3, droppedGivenNumbers3, droppedGivenRelations3, droppedNewLabels3, droppedShapeNoun3, droppedShapeAdjective3 } from '../parser/honesty3';
+import { droppedPropertyWords3 } from '../parser/propertyWords3';
+import { mergeWordItems } from '../../shell/llm/honestyCore';
 import { isBareAltitude3, parse3, parseRewrite3 } from '../parser/parse3';
 
 export interface Fact3 {
@@ -1828,9 +1830,15 @@ function readStatement3(
  * The honesty gates, ONE list for every statement seam (#424 / #438 / #440 / #535, ADR-3D-147): what a
  * stated line names that the commands never carry. `prior` is the figure the line is added to.
  */
-function lostGivens3(utterance: string, commands: readonly Command3[], prior: Construction3, unread: readonly string[] = []): string[] {
+function lostGivens3(
+  utterance: string,
+  commands: readonly Command3[],
+  prior: Construction3,
+  unread: readonly string[] = [],
+  lane: 'grammar' | 'model' = 'grammar',
+): string[] {
   const cmds = [...commands];
-  const lost = [
+  const gates = [
     ...droppedNewLabels3(utterance, cmds, [...prior.points.keys()], [...prior.vectors.keys()]),
     ...droppedGivenNumbers3(utterance, cmds),
     ...droppedShapeNoun3(utterance, cmds), // #587 / ADR-3D-084: a stated base shape the lane cannot lower
@@ -1838,6 +1846,10 @@ function lostGivens3(utterance: string, commands: readonly Command3[], prior: Co
     ...droppedConstructNoun3(utterance, cmds), // #438/#440: a stated OBJECT never materialised
     ...droppedGivenRelations3(utterance, cmds), // #1730: a stated pair relation no command carries
   ];
+  // #1906 (ADR-3D-364): on the MODEL lane, every shape and role word the student typed must survive into the answer —
+  // per occurrence, a misspelt word included («שווה צלעת» answered «משולש ABC»). First, and named once: an older
+  // gate's own naming of the same word wins, a construct noun inside the phrase («מעגל» in «מעגל חסומ») gives way.
+  const lost = lane === 'model' ? mergeWordItems(gates, droppedPropertyWords3(utterance, cmds, prior.circles3.length > 0, [...prior.points.keys()])) : gates;
   // #1902 (ADR-3D-312): the words the answering rule could not read («שווה צלעת») — reported only when no
   // other gate fired, so a line a gate already refuses keeps its exact message («…שמרכזו M» → «M»).
   return lost.length > 0 ? lost : [...unread];
@@ -1860,11 +1872,12 @@ function honestyRefusal3(
   st: { facts: Fact3[]; seed: number },
   readExtent: boolean,
   unreadWords: readonly string[] = [],
+  lane: 'grammar' | 'model' = 'grammar',
 ): NonNullable<StoreError3> | null {
   const prior = derive3(st.facts, st.seed).construction;
   // ADR-603 Am. 1, ported (round #1940): the read-extent members speak only where no older gate fired. A word the
   // older gates already name («שקוטרו», «M») keeps its own refusal; the parts / roles lists never pre-empt it.
-  const lost = lostGivens3(utterance, commands, prior, unreadWords);
+  const lost = lostGivens3(utterance, commands, prior, unreadWords, lane);
   if (lost.length > 0) return { code: 'dropped-given', items: lost.join(', ') };
   const roles = readExtent ? unreadRoles3(utterance, commands) : null;
   if (roles) {
@@ -1936,7 +1949,7 @@ export function decideCommands3(
   st: { facts: Fact3[]; seed: number },
   utterance: string,
   commands: readonly Command3[],
-  opts: { twins: boolean; seedSearch: boolean; unread?: readonly string[]; readExtent?: boolean },
+  opts: { twins: boolean; seedSearch: boolean; unread?: readonly string[]; readExtent?: boolean; lane?: 'grammar' | 'model' },
   newId: () => string = () => nanoid(8),
 ): Verdict3 {
   const { facts, seed } = st;
@@ -1963,7 +1976,7 @@ export function decideCommands3(
   // (ADR-3D-147). The catalog corpus is asserted gate-clean in honesty3.test.ts, so the canonical
   // phrasings never pay this check with a false refusal.
   // #1888 (ADR-3D-316): and the read-extent member, on the deterministic lane (`opts.readExtent`); #1902's unread words ride along.
-  const refusal = honestyRefusal3(utterance, stated, { facts, seed }, opts.readExtent ?? false, opts.unread);
+  const refusal = honestyRefusal3(utterance, stated, { facts, seed }, opts.readExtent ?? false, opts.unread, opts.lane);
   if (refusal) return { kind: 'refused', error: refusal };
   // #613 (ADR-W-031, operator ruling 2026-08-16: "if a fact is already known - it should not be
   // added. this is true to all tools") — a RESTATED fact succeeds and appends no row. M1
@@ -2021,7 +2034,8 @@ export function decideSteps3(
     unread.push(...(p.unread ?? []));
   }
   if (all.length === 0) return { kind: 'not-understood' };
-  return decideCommands3(st, utterance, all, { twins: false, seedSearch: false, unread }, newId);
+  // #1906 (ADR-3D-364): the model lane — the answer must keep every shape and role word the student typed
+  return decideCommands3(st, utterance, all, { twins: false, seedSearch: false, unread, lane: 'model' }, newId);
 }
 
 export const useGeo3 = create<Geo3State>()(

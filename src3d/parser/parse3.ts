@@ -3064,7 +3064,9 @@ const linePerpPlane: Rule = (s) => {
 export const PERP_WORDS3 = String.raw`מאונ[ךכ](?:ים|ות|ת)?|אנך|⊥|perpendicular`;
 const PERP_SPLIT = new RegExp(String.raw`\s*(?:(?:is|are)\s+)?(?:${PERP_WORDS3}|ניצב(?:ים|ות|ה)?)\s*(?:ל(?=\S)|to\s+)?-?\s*`);
 // #821: `||` is how the operator TYPED ∥ («ACD||AB») — an Israeli keyboard has no ∥ glyph (the #493 argument).
-const PAR_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מקביל(?:ים|ות|ה)?|∥|\|\||parallel)\s*(?:ל(?=\S)|to\s+)?-?\s*/;
+/** The Hebrew parallel word this grammar reads (one spelling: `PAR_SPLIT` and `readsWord3`'s veto, #1906). */
+const PARALLEL_WORD3 = String.raw`מקביל(?:ים|ות|ה)?`;
+const PAR_SPLIT = new RegExp(String.raw`\s*(?:(?:is|are)\s+)?(?:${PARALLEL_WORD3}|∥|\|\||parallel)\s*(?:ל(?=\S)|to\s+)?-?\s*`);
 
 /**
  * #614 (ADR-3D-189) — CONTAINMENT, verb-headed: «ℓ מוכל במישור P», «נמצא ב…», «מונח על…»,
@@ -4579,6 +4581,28 @@ function inscriptionRing3(s: string): Id[] {
  * triangle", "in this triangle", "in regular pentagon"), not an adjective list: a word the list lacked
  * broke the marker the same way the adjective did before #1792, and drew the circumcircle.
  */
+/**
+ * #1906 (ADR-3D-364) — which circle an inscription sentence states, asked of the grammar's own direction reader:
+ * `'around'` (the circle through the ring), `'in'` (the circle inside it), or null when the sentence decides neither.
+ * The AI-answer word member asks it of the STUDENT's line, spelt right.
+ */
+export function statedCircleDirection3(s: string): 'in' | 'around' | null {
+  const n = normalize3(s);
+  const c = circleContains3(n, inscriptionRing3(n));
+  return c === null ? null : c ? 'around' : 'in';
+}
+
+/**
+ * #1906 (ADR-3D-364) — does this grammar READ the word, as typed, as a word of its own: a declaration noun, a
+ * qualifier phrase, a construct noun, or a neutral word, wholly consumed? The AI-answer word member asks it before it
+ * calls a word a misspelling of another («מקבילים» is a word of its own, never a slip for «מקבילית»).
+ */
+export function readsWord3(word: string): boolean {
+  if (new RegExp(String.raw`^[ובלכשמה]{0,2}(?:${PARALLEL_WORD3})$`).test(word)) return true;
+  const rest = word.replace(QUALIFIER_PHRASES3, ' ').replace(CONSTRUCT_NOUNS, ' ').replace(DECL_VOCAB, ' ');
+  return rest.trim() === '' || unreadWords3(rest, 'any').length === 0;
+}
+
 function circleContains3(s: string, ring: readonly Id[]): boolean | null {
   const polyRe = new RegExp(`${POLY_WORDS_HE3}|${POLY_WORDS_EN3}`, 'i');
   // #586: the polygon NOUN is OPTIONAL. The ring is what identifies the polygon, and students write it

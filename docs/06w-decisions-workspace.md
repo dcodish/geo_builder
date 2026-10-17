@@ -6005,3 +6005,20 @@ The 2026-10-08 plan update asked analytic for every reader of an angle measure. 
 **Behaviour change for a student:** in 2-D, 3-D and analytic, an angle written with π («∠ABC = π/2», «∠ABC = pi/2», «גזרה AOB בזווית π/3») is refused at once with «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90». Before: 2-D asked the AI (and drew pi/2 as 2°), 3-D drew a mark labelled π or asked the AI, analytic drew the angle in degrees (π/2 as 1.57°). π as a number, 3-D's plane names and the complex builder are unchanged.
 
 **Slow-tier goldens that may drift (batch's to re-record):** `decide-submit3-parity-1394` if a case types a π angle (`record`/`not-understood` → `refused`); `decide-parity-1395-*` as ADR-710 says.
+
+## ADR-W-144 — An AI answer keeps every shape and role word the student typed: one shared word reader, a product evidence check (#1906)
+
+**Status:** accepted · 2026-10-17 · bug (P2; 2d + 3d, analytic to follow) · fix round #2304, stream Q · **Extends** [ADR-AG-280](06c-decisions-analytic.md#adr-ag-280)'s honesty core (`shell/llm/honestyCore.ts`) and [ADR-W-016](#adr-w-016) (no vocabulary in `shell/`) · product sides: [ADR-722](06-decisions.md#adr-722) (2-D), [ADR-3D-364](06b-decisions-3d.md#adr-3d-364) (3-D)
+**Operator ruling (verbatim, #1906, 2026-10-08):** *"Every shape or role word the student typed … must survive into the AI answer's lowering, or the answer is refused. The AI can still fix typos and read lines the grammar cannot. A misspelt word counts as present when the AI's answer carries the property it plausibly names; the planning session defines that match and measures it."* Priority P2 (same day).
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-21 (new) and the behaviour-table row "An AI answer that drops a shape or role word" · **Design:** [04w](04w-design-shell.md) § *The honesty accounting core* → *The property-word reader* · **Product:** workspace (2d + 3d)
+
+**The class.** *A word the student typed that names a shape property, a cevian role or a circle's direction is never compared with the AI's answer, so an answer that drops it commits green; and a misspelling hides the word from every gate that does compare.* Measured in 2-D, 3-D and analytic (the plan's table, re-measured at de7c221f for 2-D and 3-D).
+
+**Decision.**
+1. **One reader in `shell/`:** `propertyWords(text, vocabulary, spec)` + `editDistance` + `withSpan` + `mergeWordItems`. The match is the plan's: fold both sides (the caller's fold), peel up to two clitic letters every way, a word or a word plus a closed inflection IS the word; otherwise one Damerau-Levenshtein edit from a word of four letters or more is a NEAR MISS, unless the product's lexicon reads the token as a word of its own; a phrase matches word by word, adjacent and in order; a near miss keeps every candidate. Everything language- or product-specific is passed in.
+2. **Each product asks whether its answer CARRIES each occurrence**, from its own existing gates (ADR-722, ADR-3D-364). Why one edit: the plan measured 104 unread tokens two edits from a property word — every one another real word.
+3. **Analytic** consumes the same reader in #1906's third item (its lane checks no word today). **Complex** has no AI lane and no shape vocabulary: nothing to build.
+
+**Locks.** `shell/__tests__/property-words-1906.test.ts` (the algebra on a toy vocabulary); the shared rows `shell/__tests__/fixtures/honesty-rows.ts` (positives «שווה צלעת», «ישר זוות», «גובח», «תיכנ», "equilaterl", "isoceles", "inscibed"; negatives «מקבילים», «צלע», «מבחוץ», «שווים», «שיפוע», «קובייה», «תיבה», "eight"), run through each tree's own vocabulary by its product lock.
+
+**Behaviour change for a student:** in 2-D and 3-D, an AI answer that drops a shape or role word the student typed is refused with that builder's existing dropped-given message, naming the word; analytic is unchanged until its item lands.

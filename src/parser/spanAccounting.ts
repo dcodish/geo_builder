@@ -97,7 +97,7 @@ function carriedSymbols(commands: AnyCommand[]): { values: Set<string>; declared
 /** Words that carry no geometric content — safe to leave unclaimed. Deliberately conservative:
  *  a word NOT here and NOT a known keyword lands in `unknown-word`, which is a REPORT bucket,
  *  never a silent pass. */
-const FILLER = new Set([
+export const FILLER: ReadonlySet<string> = new Set([
   // Hebrew connectives/articles/prepositions/copulas
   'של', 'את', 'עם', 'על', 'אל', 'מן', 'בין', 'לבין', 'הוא', 'היא', 'הם', 'הן', 'זה', 'זו', 'זהו',
   'כך', 'ש', 'כי', 'גם', 'או', 'אז', 'יש', 'אשר', 'כאשר', 'שבו', 'שבה', 'בו', 'בה', 'לה', 'לו',
@@ -114,7 +114,7 @@ const FILLER = new Set([
 
 /** Keyword STEMS (prefix-match after stripping ה/ב/ל/ו/ש/מ/כ prefixes) — the construct vocabulary.
  *  Compact by design: stems, not full alternations; a stem match accounts the word. */
-const KEYWORD_STEMS = [
+export const KEYWORD_STEMS: readonly string[] = [
   // shapes & objects
   'משולש', 'ריבוע', 'מלבן', 'מעוין', 'מעויין', 'טרפז', 'מקבילית', 'דלתון', 'מרובע', 'מחומש', 'משושה', 'משובע', 'מתומן', 'משומן', 'מתושע', 'מעושר', 'מצולע',
   'מעגל', 'עיגול', 'קטע', 'ישר', 'צלע', 'קודקוד', 'נקוד', 'אלכסון', 'מיתר', 'קוטר', 'רדיוס', 'קשת',
