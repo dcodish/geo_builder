@@ -1607,6 +1607,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'diameter-and-chord-2215', family: 'circles', steps: ['מעגל O', 'AB קוטר במעגל O ו-CD מיתר במעגל O'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2323' }], note: '2-D built it with CD drawn as a second diameter before ADR-723 (a builds verdict then too; the drawing is locked in src/parser/__tests__/role-distribution-2215.test.ts); analytic does not read the compound line (not-handled)' },
   // ── #2001 arm 2 (ADR-724): a named touch point on a drawn incircle builds — the vacuity gate reads collapsed terms ──
   { id: 'incircle-named-touch-2001', family: 'circles', steps: ['משולש ABC', 'מעגל חסום במשולש ABC', 'AB משיק למעגל בנקודה D'], expect: 'builds', exception: 'X8', note: '2-D refused it «משהו השתבש…» before ADR-724 (D is the own touch witness of the incircle, read as a collapse); analytic already built it' },
+
+  // ── #2089 (ADR-728): «AE ⟂ CD» about a rider E of CD is the foot statement «AE גובה לצלע CD» — the quadrilateral yields ──
+  { id: 'rider-perp-foot-2089', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'E על CD', 'AE ⟂ CD'], expect: 'builds', note: '2-D refused it before ADR-728' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

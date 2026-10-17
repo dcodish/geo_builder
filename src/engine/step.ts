@@ -9,7 +9,7 @@
 
 import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Polygon, SideChoice, SolveDirective, Vec } from './types';
 import { LEN_EPS, edgeSideToward, isGeoPoint, isOrderConstraint } from './types';
-import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, refinesDeclaredRing, shapeExclusion, shapeExclusionError, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
+import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, refinesDeclaredRing, riderPerpendicularAsFoot, shapeExclusion, shapeExclusionError, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
 import { lower } from './lower';
 import { circlesTouch, oneCommonPointError } from './evaluate';
 import { circlesStatedTangent } from './structure';
@@ -1189,6 +1189,21 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   return withSideChoices(withRequirements(commitDrawnFreeVertices(releaseImpliedOwnership(prev, applyStepLadder(prev, cmd))), prev, [cmd]), prev);
 }
 
+/** The M1 redefinition arm's solve: a reinterpreted placement (ADR-028) is accepted on its primary evaluate, else it
+ *  takes the SAME failure path a typed constraint gets. One statement, one semantics, ONE solve path (M1/ADR-231;
+ *  unified by S1.1 — the honest failure surfaces the RELATION that can't hold, never "already defined"). Shared by
+ *  the redefinition arm and #2089's rider-foot re-reading (ADR-728). */
+function solveReinterpreted(prev: Construction, constrained: Construction, prevPositions: Map<Id, Vec>, trace: string[]): StepResult {
+  const newCons = constrained.constraints.slice(prev.constraints.length);
+  const r = evaluate(constrained);
+  if (r.ok && stepAccepted(constrained, r.positions, newCons)) {
+    const owned = ensureOwnership(constrained, newCons, r.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF
+    if (owned) return { ok: true, construction: owned.construction, positions: owned.positions, ladder: [...trace, 'm1:primary', 'm1:own'] };
+    return { ok: true, construction: constrained, positions: r.positions, ladder: [...trace, 'm1:primary'] };
+  }
+  return runFailureLadder(prev, constrained, newCons, prevPositions, r, trace, 'm1');
+}
+
 function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   const trace: string[] = []; // the ladder trace (docs/LADDER.md) — diagnostic only
   const prevEval = evaluate(prev);
@@ -1353,19 +1368,7 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
     if (!constrained && (constrained = reinterpretAsCollinear(prev, ncmd, prevPositions))) trace.push('m1:collinear');
     if (!constrained && (constrained = replaceCyclicForDiameter(prev, ncmd))) trace.push('m1:cyclic-diameter');
     if (!constrained && (constrained = reinterpretDiameter(prev, ncmd))) trace.push('m1:diameter');
-    if (constrained) {
-      const newCons = constrained.constraints.slice(prev.constraints.length);
-      const r = evaluate(constrained);
-      if (r.ok && stepAccepted(constrained, r.positions, newCons)) {
-        const owned = ensureOwnership(constrained, newCons, r.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF
-        if (owned) return { ok: true, construction: owned.construction, positions: owned.positions, ladder: [...trace, 'm1:primary', 'm1:own'] };
-        return { ok: true, construction: constrained, positions: r.positions, ladder: [...trace, 'm1:primary'] };
-      }
-      // The reinterpreted statement is a CONSTRAINT — give it the SAME failure path a typed constraint
-      // gets. One statement, one semantics, ONE solve path (M1/ADR-231; unified by S1.1 — the honest
-      // failure surfaces the RELATION that can't hold, never "already defined").
-      return runFailureLadder(prev, constrained, newCons, prevPositions, r, trace, 'm1');
-    }
+    if (constrained) return solveReinterpreted(prev, constrained, prevPositions, trace);
     return { ok: false, error: conflict, construction: prev, positions: prevPositions, ladder: ['m1:conflict-refuse'] };
   }
 
@@ -1409,7 +1412,18 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
     // A constraint its direct carrier alone can't satisfy ("cannot place F on AB so |DE|=|DF|" — F is
     // stuck on the segment) may still hold if the figure's OTHER free DOFs move too (ADR-028, extended):
     // the unified failure ladder (S1.1) — orphan re-home → settle → recruit → scale → honest refusal.
-    return runFailureLadder(prev, next, newConsMain, prevPositions, res, trace, 'main');
+    const failed = runFailureLadder(prev, next, newConsMain, prevPositions, res, trace, 'main');
+    if (failed.ok) return failed;
+    // #2089 (ADR-728): «XP ⟂ CD» about a rider P of CD that no rescue of the ⟂ form can satisfy is the foot statement
+    // «XP גובה לצלע CD» — re-read through the foot placement's own M1 path (the free vertex X may then yield), and
+    // kept only when that builds; otherwise the ⟂ form's own refusal stands, wording unchanged.
+    const asFoot = riderPerpendicularAsFoot(prev, ncmd);
+    const footed = asFoot && commandConflict(prev, asFoot) ? reinterpretAsConstraint(prev, asFoot) : null;
+    if (footed) {
+      const viaFoot = solveReinterpreted(prev, footed, prevPositions, [...trace, 'm1:rider-foot']);
+      if (viaFoot.ok) return viaFoot;
+    }
+    return failed;
   }
   {
     const owned = ensureOwnership(next, newConsMain, res.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF

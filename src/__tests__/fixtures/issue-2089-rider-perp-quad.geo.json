@@ -1,0 +1,72 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T12:00:00.000Z",
+  "name": "issue-2089-rider-perp-quad",
+  "seed": 2,
+  "facts": [
+    {
+      "id": "f2089-p0",
+      "utterance": "מרובע ABCD",
+      "group": "g0",
+      "cmd": {
+        "type": "quadrilateral",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "f2089-p1",
+      "utterance": "E על CD",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "f2089-p2",
+      "utterance": "E על CD",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "E",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "f2089-p3",
+      "utterance": "AE ⟂ CD",
+      "group": "g3",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "E"
+      },
+      "enabled": true
+    },
+    {
+      "id": "f2089-p4",
+      "utterance": "AE ⟂ CD",
+      "group": "g3",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "A",
+        "b": "E",
+        "c": "C",
+        "d": "D"
+      },
+      "enabled": true
+    }
+  ]
+}

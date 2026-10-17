@@ -38,7 +38,11 @@ enumeration). Four corrections to the plain compiler reading hold:
    structure: a point already on one circle of a STATED tangency (`circles-tangent`'s record) is the touch point,
    and takes the touch point's own definition (`tangentTouchCopy`, so ADR-123's coincidence records X = M); a
    residual membership is held through a witness that is any point the construction puts on the circle — a
-   `radial-toward` and a stated touch point included ([ADR-647](06-decisions.md#adr-647), #2084).
+   `radial-toward` and a stated touch point included ([ADR-647](06-decisions.md#adr-647), #2084). «XP ⟂ CD» about a
+   point P already riding segment CD is the foot statement «XP גובה לצלע CD» (`riderPerpendicularAsFoot`,
+   `engine/apply.ts`): when the ⟂ form and its failure ladder have no figure, `applyStep` re-reads it as P's `foot`
+   placement through the redefinition arm's own solve (`solveReinterpreted`), so the free vertex X may yield; where
+   the ⟂ form builds it is kept ([ADR-728](06-decisions.md#adr-728), #2089).
 2. **The parser may read the drawing, but only to resolve a pointing reference** («המעגל הגדול», «הימני»,
    «נקודת ההשקה»), through `ParseContext`'s deictic fields, each read emitting a locking assertion
    ([docs/17](17-design-rules.md) §3b).
