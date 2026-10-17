@@ -357,6 +357,10 @@ const SEEDED: SeededCorpus = {
   // right-angled). The rings and the refusal with two triangles are asserted in issue-2235-shape-ref.test.ts.
   'definite-triangle-one-2235.geo3.json': ['משולש DEF', 'המשולש ישר זווית'],
   'indefinite-triangle-new-2235.geo3.json': ['משולש ABC', 'משולש ישר זווית'],
+  // #1855 (ADR-3D-355) — the operator's exact sequence: a length on each of two separate triangles (before: the second
+  // length refused givens-contradict at every seed). Both orders, «AB ∥ DE» and the free relative size are asserted in
+  // issue-1855-separate-figures.test.ts; this is the build + drift net.
+  'two-triangle-lengths-1855.geo3.json': ['משולש ABC', 'משולש DEF', 'DE = 2', 'AB = 5'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

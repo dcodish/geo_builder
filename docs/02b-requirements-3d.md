@@ -80,8 +80,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
 - **FR-SP-2 (Must)** — **Under-determination is welcome.** An unstated dimension stays a free degree of
   freedom that resamples on "another configuration", while everything the student *did* pin stands still.
   A stated shape is *respected*: a corner the shape does not determine is minted free (and drivable by later
-  givens), never refused and never invented at a specific value.
-  - Sources: ADR-3D-244 (operator ruling 2026-09-11).
+  givens), never refused and never invented at a specific value. **Two figures that share no point** (two
+  triangles, a square beside a triangle, a cube beside a triangle) have a free relative size, orientation and
+  placement: a length on each builds, a relation between them («AB ∥ DE») is driven, and «הציגו תצורה אחרת»
+  varies them (#1855).
+  - Sources: ADR-3D-244 (operator ruling 2026-09-11); ADR-3D-355 (#1855, 2-D's behaviour).
 - **FR-SP-3 (Must)** — **Defaults yield to statements; nothing unstated is ever invented.** A prism not
   stated to be right is **oblique**. A recognised-but-dropped qualifier is a silent given.
   - Sources: ADR-052 (this is its 3-D form).

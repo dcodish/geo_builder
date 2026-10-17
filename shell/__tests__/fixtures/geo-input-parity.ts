@@ -1565,6 +1565,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2210 (ADR-704): a defaulted tangency kind yields to a later stated kind or a containment ──
   { id: 'tangent-later-internal-2210', family: 'circles', steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים', 'המעגלים O ו-P משיקים מבפנים'], expect: 'builds', exception: 'X8', note: '2-D drew it external with the internal row red before ADR-704 (a builds verdict then too; the kind is locked in src/app/__tests__/issue-2210-tangency-record.test.ts); analytic already drew it internal (ADR-AG-167)' },
   { id: 'contained-then-tangent-2210', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל P מוכל בתוך מעגל O', 'המעגלים O ו-P משיקים בנקודה X'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2302' }], note: '2-D drew it external with the containment row red before ADR-704; analytic refuses it unsatisfiable (its containment is strict)' },
+
+  // ── #1855 (ADR-3D-355): two figures that share no point have a free relative size and orientation ──
+  { id: 'two-triangle-lengths-1855', family: 'lengths', steps: ['משולש ABC', 'משולש DEF', 'DE = 2', 'AB = 5'], expect: 'builds', note: '3-D refused the second length givens-contradict before ADR-3D-355' },
+  { id: 'two-triangle-parallel-1855', family: 'parallel-perpendicular', steps: ['משולש ABC', 'משולש DEF', 'AB ∥ DE'], expect: 'builds', note: '3-D refused claim-refuted before ADR-3D-355' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

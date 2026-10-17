@@ -215,7 +215,9 @@ export const solidDimCount = (s: { kind: SolidCommand['kind']; oblique?: true })
   DIM_COUNT[s.kind] + (s.oblique && s.kind !== 'parallelepiped' ? 2 : 0);
 export function freeDims(c: Construction3): number {
   let n = 0;
-  for (const s of c.solids) n += solidDimCount(s);
+  // #1855 (ADR-3D-355): every solid after the first carries its own similarity (7 dims) — separate
+  // figures' relative size and orientation are free (`componentSimilarityDims`, evaluate.ts).
+  c.solids.forEach((s, i) => { n += solidDimCount(s) + (i > 0 ? 7 : 0); });
   for (const r of c.revolutions) {
     if (r.radius === undefined) n++;
     if (r.kind !== 'sphere' && r.height === undefined) n++;
