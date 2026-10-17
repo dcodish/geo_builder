@@ -18140,3 +18140,31 @@ The kind words are the ones `circlesTangent` already reads. #2214's single kind 
 **Locks.** `src/__tests__/issue-2264-concentric-circle-names.test.ts` (the operator's lines, both locales, every row; English input; the unnamed centre; the controls; `circleRefs` — the role, a different-centre order is not one, three on a centre, a hidden circle on the centre); scenario `concentric-circle-names-2264`; the ADR-552 class lock (`values-panel-labels-1442.test.ts`) still green over every fixture.
 
 **Behaviour change for a student:** with two circles sharing a centre, the values panel names them «המעגל החיצוני» and «המעגל הפנימי» instead of «O» twice.
+
+## ADR-715 — An angle's value fits its wedge: the opening joins the side length in placing it (#2175)
+
+**Status:** accepted · 2026-10-17 · bug (P3, 2-D) · fix round #2304, stream C · branch `fix/2175-angle-label-fit` · **Amends** [ADR-544](#adr-544) (a corner's marks were fitted to its side LENGTH; the value is now also fitted to its OPENING)
+**Requirements:** none (internal) — display only; FR-RN's promise (every stated value stays visible) is unchanged · **Design:** [04](04-design.md) § "An angle's value fits its corner: side length and opening" · **LADDER stage:** none (render)
+**Cites** [ADR-031](#adr-031) (measure labels), the #475 placement (the value just outside its own arc), [ADR-662](#adr-662) (expression labels such as «β + 30» became common)
+
+**The report.** Operator, 2026-10-15, playing round #2128 (screenshot): *"note that the beta+30 doesnt look nice on the page"* — «משולש CMD» · «AM חוצה זווית CMD» · «זוית C=α» · «זוית AMD=β+30»: side DM ran through «β + 30» at M and over its arc.
+
+**Measured before** (`main` @ de7c221f, `replay` → `buildScene` → the renderer's placement at an 800×600 fit). At seeds 0–3 ∠AMD opens 17°–32°; the value sat at 36 px along the bisector, where the wedge is 5.5–10 px half-wide, against a label ~27 px half-wide. «α» at C (60°–87°) fitted.
+
+**The class (docs/17 §1).** *An angle's value is placed without regard to its width against the wedge's opening, so a long label at a narrow angle overlaps the rays.* `angleValueOffset` is one distance whatever the text and the angle. Members: any expression label («β + 30», «2α + 15»), a long decimal, and a short value at a needle, in every orientation. ADR-544 is the sibling: it fitted marks to the corner's side length, not its opening.
+
+**Decision.** `placeAngleValue` (`src/render/scene.ts`) is the one placement of every 2-D angle value, called by `Figure.tsx`. It works in screen px on the label's ink box, `mathLabelBox` (`src/render/mathMetrics.ts`), which owns the widths `MathSvg` lays the label out with. `MathSvg` now imports them instead of keeping a private copy, so the two boxes cannot drift. The steps:
+1. **Today's spot, unchanged,** when the box there clears both rays. The box is a generous estimate, so a ray may cut its edge by `INK_TOLERANCE` (0.1·fs) and the value still stays. Swept over every orientation, a short value moves only at a narrow angle: «α» below 19°, «2α» below 30°, «40°» below 41°; a long one sooner («12.5°» below 64°, «β + 30» below 91°).
+2. **Further out along the bisector,** to the nearest distance where the box clears both rays and its arc. The box must stay on the vertex's side of the chord between the ray ends, and within the nearer half of the shorter ray (past that it sits beside another corner and reads as that corner's).
+3. **Smaller,** down to `MIN_MEASURE_FONT_PX` (ADR-544's shrink, never drop), at the distance that fits.
+4. **Beside the arc, just outside the wedge,** at the corner's font, when no box fits inside (a needle). It goes across the ray whose outer side faces away from the figure's centre.
+
+**Measured after.** The operator's figure at seeds 0–5: «β + 30» crosses neither ray, the arc, nor the closing side, and stays nearer M than half the shorter side. «α» at C, «40°» in a plain triangle and «37°» in the 2-D smoke figure (screenshot pixel-identical to `main`) keep today's spot. In «משולש ABC» · «∠BAC = 8» · «∠ABC = 2α + 15», «8°» is shrunk to the 8 px floor inside the wedge at A, and «2α + 15» goes beside B outside the needle; before, both crossed their rays. The 2-D fixtures' angle values all keep today's spot.
+
+**Why not a patch (docs/17 §2).** No label text, angle size or figure is special-cased. Every angle value runs the same geometry, and the box comes from the typesetter's own metrics.
+
+**Sibling audit / cross-tool.** Analytic places its stated values through its own candidate search (`src-analytic/render/scene.ts` `angleCandidates`). That search lets a value cross its own arms (`mayCross`, "as 2-D writes it"), so it has not adopted this rule. Aligning it is a change to what analytic students see, and it needs the operator's ruling (reported, not built). 3-D and complex draw no planar stated-angle values through this path.
+
+**Locks.** `src/render/__tests__/issue-2175-angle-value-fit.test.ts`: the operator's sequence at six seeds checks that no ray, arc or closing side runs through the box and that the label stays near M; a non-vacuity check that the old spot crossed; short values stay put; synthetic wedges cover each step. Fixture `src/__tests__/fixtures/issue-2175-long-angle-label-thin-angle.geo.json` (the operator's sequence builds green).
+
+**Behaviour change for a student:** a long angle value at a narrow angle («β + 30» at a 20° corner) is drawn inside the angle clear of both sides, further from the vertex; at a very small corner it is drawn smaller, or beside the corner outside the angle; short values at ordinary angles are where they were.
