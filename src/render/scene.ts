@@ -378,7 +378,7 @@ export function buildScene(
   for (const o of c.objects) if (o.kind === 'circle' && o.autoCenter) autoCenters.add(o.center);
 
   // Resolve every circle to centre+radius. Prefer the ENGINE's PUBLISHED map (`evaluate` already solved
-  // every free / tangent-inner radius — ADR-200/D2): the renderer is a pure consumer and no longer
+  // every free radius — ADR-200/D2): the renderer is a pure consumer and no longer
   // reconstructs a solver-driven free radius from a point on the circle. The CENTRE is read from the
   // (already view-oriented) positions so it tracks a flip/rotation; the radius is a scalar, so the
   // engine's orientation-invariant value is correct as-is. Direct callers that don't thread the map
@@ -399,7 +399,7 @@ export function buildScene(
           progressed = true;
           continue;
         }
-        const rc = resolveCircle(o, positions, resolvedCircles); // fallback: the object's declared radius
+        const rc = resolveCircle(o, positions); // fallback: the object's declared radius
         if (rc === 'pending' || typeof rc === 'string') continue; // missing point / invalid → not drawn
         resolvedCircles.set(o.id, rc);
         progressed = true;

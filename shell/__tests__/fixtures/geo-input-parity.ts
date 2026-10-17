@@ -1538,6 +1538,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2065 (ADR-700): a similarity ratio in words, «ביחס p ל-q», reads as «ביחס p:q» in 2-D ──
   { id: 'similarity-ratio-to-2065', family: 'angles', steps: ['משולש ABC', 'משולש DEF', 'ABC ∽ DEF ביחס של 1 ל-2'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2067' }, { product: '3d', issue: '#2067' }], note: '2-D escalated to the AI before ADR-700; analytic and 3-D read no similarity ratio (#2067)' },
+
+  // ── #2239 (ADR-692): two circles of equal stated radius stated internally tangent are refused, never resized ──
+  { id: 'stated-radius-never-changed-2239', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 3', 'המעגלים O ו-P משיקים מבפנים'], expect: 'refused', exception: 'X8', note: '2-D committed green with P silently resized (the ADR-037 Am. 2 tangent-inner rewrite) before ADR-692; analytic already refused' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

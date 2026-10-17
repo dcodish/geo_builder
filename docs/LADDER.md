@@ -11,6 +11,7 @@ _Instrumentation: `StepResult.ladder` (an ordered string trace of the stages tra
 | # | Gate | Trace token | Refusal |
 |---|---|---|---|
 | 0a | `circlesTangentError` — a `circles-tangent` with a `through` radius can't be sized | `pre:tangent` | yes |
+| 0a′ | `equalInternalTangency` (`radiusFeasibility.ts`) — two circles of EQUAL stated radius stated internally tangent, in either order (the tangency over two equal sizes, or the size that makes an internally tangent pair equal); read on the step's applied construction, also in `applyCoupledStep` ([ADR-692](06-decisions.md#adr-692)) | `pre:impossible` | yes |
 | 0b | `degenerateConstraintError` — structurally-NaN operand by id ("BB" ⟂, "∠ABB") | `pre:degenerate` | yes |
 | 0c | `danglingCircleError` — a NEW point riding a circle id that exists nowhere | `pre:dangling` | yes |
 | 0e | `metricImpossibility` — a pinned distance longer than the shortest pinned PATH between its endpoints ([ADR-417](06-decisions.md#adr-417); as-found, recorded here by ADR-538) | `pre:impossible` | yes |
