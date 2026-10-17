@@ -345,6 +345,10 @@ const he = {
   errMeasureContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errMeasureContradictsAlone: 'לא ניתן: «{{detail}}» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errRadiusContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד.',
+  // #1963 (ADR-AG-296; operator ruling 2026-10-14) — a circle through three points a statement puts on one line.
+  errForcedCollinear:
+    'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. ' +
+    'הסיבה: {{points}} על ישר אחד, ואין מעגל שעובר דרך שלוש נקודות על ישר אחד.',
   errInscribedContradictsDeclared:
     'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. ' +
     'הסיבה: מעגל שעובר דרך ארבעת הקודקודים הופך {{shapeHe}} ל{{forcedHe}}, ו{{forcedHe}} אינו {{shapeHe}}.',
@@ -898,6 +902,9 @@ const en: typeof he = {
   errMeasureContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold. The reason: {{what}}.',
   errMeasureContradictsAlone: 'Can\'t do that: «{{detail}}» contradicts an earlier given — they can\'t both hold. The reason: {{what}}.',
   errRadiusContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold.',
+  errForcedCollinear:
+    "Can't do that: «{{detail}}» contradicts «{{declared}}» — they can't both hold. " +
+    'The reason: {{points}} lie on one line, and no circle passes through three points on one line.',
   errInscribedContradictsDeclared:
     "Can't do that: «{{detail}}» contradicts «{{declared}}» — they can't both hold. " +
     'The reason: a circle through the four vertices would make a {{shapeEn}} a {{forcedEn}}, and a {{forcedEn}} is not a {{shapeEn}}.',

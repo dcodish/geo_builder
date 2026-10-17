@@ -685,7 +685,9 @@ a sentence the tool parsed.
 
 **R55 — an object that cannot exist is REPORTED once the figure has no freedom left**. Silent while another configuration may yet have it (ADR-AG-008).
 - the circumcentre of three fixed collinear points → named as not existing
-- Sources: ADR-AG-031, ADR-AG-008.
+- **"No freedom left" is the object's own** ([ADR-AG-296](06c-decisions-analytic.md#adr-ag-296), #1963): refused when nothing the object is built from can move, whatever else is free. «נקודה Q» · `A(0,0)` · `B(1,1)` · `C(2,2)` · «מעגל שעובר דרך A, B ו-C» is refused in the same sentence as without Q.
+- **…or when a statement puts its three points on one line** (ADR-AG-296; operator ruling 2026-10-14): «משולש ABC» · «D על AB» · «מעגל שעובר דרך A, D ו-B» is refused naming that statement — «לא ניתן: «…» סותר את «D על AB» — אי אפשר לקיים את שניהם יחד. הסיבה: A, D ו-B על ישר אחד, ואין מעגל שעובר דרך שלוש נקודות על ישר אחד.» Likewise the line AB or its extension, a midpoint, points stated on one named line or axis, in either order (the line that completes the proof is refused). Never on search evidence: three points on one line only by chance of the drawing are not refused.
+- Sources: ADR-AG-031, ADR-AG-008, ADR-AG-296.
 
 **R105 — a given set that holds only in a degenerate limit is REFUSED, never drawn as a needle**. Thinness is never the test; an exact solution is.
 - «משולש ABC» · «AB = AC» · «∠ABC = 90» → refused at every configuration
