@@ -17,6 +17,7 @@ import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint
 import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
 import { NOT_CYCLIC_VS, collinearCircleImpossibility, notCyclicImpossibility, spellsRing } from '@/engine/cyclicFeasibility';
+import { DIAGONAL_HEIGHT_VS, diagonalHeightError, diagonalHeightImpossibility } from '@/engine/heightFeasibility';
 import { equalInternalTangency } from '@/engine/radiusFeasibility';
 import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
@@ -1553,6 +1554,17 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
         claimDefined();
         continue;
       }
+      // #2117 (ADR-718), stage 0: a two-vertex height none of whose sides it can be a height to, by theorem — a
+      // diagonal of a ring declared a square, rectangle or rhombus. Read on the fact's own `altitude-choice` (the
+      // engine sees only one option's lowering), so the refusal is the statement's, not its first option's.
+      const noSide = diagonalHeightImpossibility(cur, f.cmd);
+      if (noSide) {
+        status[f.id] = diagonalHeightError(noSide);
+        rigid.add(f.id); // a theorem on the declared kind: never waiting for givens
+        failedWith.set(f.id, cur);
+        claimDefined();
+        continue;
+      }
       // TRANSACTIONAL — a fact's lowering is ALL-OR-NOTHING ([ADR-337](docs/06-decisions.md#adr-337)).
       // ONE fact can lower to MANY engine commands (every macro: `inscribe` ADR-262, `shape-variant`
       // ADR-138, the named shapes ADR-110, regular polygon ADR-111, common tangent ADR-239, the concentric
@@ -1627,6 +1639,10 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
           continue;
         }
         if (lostDefinition(fi, engineCmds)) continue;
+        if (diagonalHeightImpossibility(cur, f.cmd)) {
+          failedWith.set(f.id, cur); // #2117: still refuted by the theorem on this figure
+          continue;
+        }
         const r = attemptFact(cur, engineCmds);
         if (r.ok) {
           cur = r.construction;
@@ -1914,6 +1930,25 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       if (!m || m[4] !== undefined) continue;
       const declared = facts.findIndex((g) => g.enabled && g.cmd.type === 'trapezoid' && g.cmd.kind === m[1] && spellsRing(g.cmd.ids, m[2]));
       if (declared < 0 || groupKey(facts[declared]) === groupKey(f)) continue;
+      const tagged = `${st} [vs #${declared}]`;
+      for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
+    }
+  }
+  /**
+   * #2117 ([ADR-718](docs/06-decisions.md#adr-718)) — the same provenance for a diagonal called a height of a ring
+   * declared a square, rectangle or rhombus: the other side is the statement that DECLARED the ring (the polygon's
+   * `ownerByObjId`), read from the fold, never searched for — the drop-one search's removal of «ריבוע ABCD» removes
+   * the letters themselves, so it could name nothing.
+   */
+  if (attribute && hoistDepth === 0) {
+    for (const f of failedFacts) {
+      const st = status[f.id];
+      if (typeof st !== 'string') continue;
+      const m = DIAGONAL_HEIGHT_VS.exec(st);
+      if (!m || m[4] !== undefined) continue;
+      const poly = cur.objects.find((o) => o.kind === 'polygon' && o.vertices.join('') === m[3]);
+      const declared = poly ? ownerByObjId.get(poly.id) : undefined;
+      if (declared === undefined || !facts[declared]?.enabled || groupKey(facts[declared]) === groupKey(f)) continue;
       const tagged = `${st} [vs #${declared}]`;
       for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
     }

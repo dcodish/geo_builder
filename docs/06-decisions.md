@@ -18194,3 +18194,32 @@ The kind words are the ones `circlesTangent` already reads. #2214's single kind 
 **Locks.** `src/engine/__tests__/issue-2118-shape-scalar-bracket.test.ts` (the reported seed's construction solves from k₀ = 0.6 to the closed-form root, via the rescue; a green solve never reaches it); scenarios `cyclic-trapezoid-every-seed-2118` and `-circle-voice` (24/24 seeds, the first press valid).
 
 **Behaviour change for a student:** no figure drawn today changes. «הציגו תצורה אחרת» on the inscribed trapezoid now also offers the configuration it used to skip, so the first press from the starting figure shows a different (valid) inscribed trapezoid than before, and answers at once instead of after ~350 ms.
+
+## ADR-718 — A diagonal of a square, rectangle or rhombus called a height is refused naming the shape: it is perpendicular to no side (#2117)
+
+**Status:** accepted · 2026-10-17 · bug (P3, 2-D) · fix round #2304, stream F · branch `fix/2117-diagonal-height-refusal` · **Amends** [ADR-644](#adr-644) (an `altitude-choice` none of whose options the theorem allows is refused as a statement, not by its first option)
+**Requirements:** [02](02-requirements.md) FR-IN-4c — a diagonal of a square, rectangle or rhombus called a height is refused: it is perpendicular to no side · **Design:** [04](04-design.md) § "A diagonal called a height of a shape whose diagonals are perpendicular to no side" · **LADDER stage:** 0 (a structural prover beside ADR-607's, read on the fact)
+**Cites** [ADR-602](#adr-602) (the declaring statement named from the fold's provenance), [ADR-607](#adr-607) (the stage-0 prover shape), [ADR-619](#adr-619) (the shared kind lattice)
+
+**The report / ruling.** «ריבוע ABCD» · «AC גובה» was refused naming only the first side tried. Operator, 2026-10-15 (decisions ballot): found work accepted at P3 (card 1), and the sentence approved as written (card 3, option A): «לא ניתן: «AC גובה» סותר את «ריבוע ABCD» — אי אפשר לקיים את שניהם יחד. הסיבה: האלכסון AC אינו מאונך לאף צלע של הריבוע.» — the kind and the letters the student's own.
+
+**Measured before** (`main` @ de7c221f, `decideDeterministic2D` + `humanizeError`, model mocked). «ריבוע / מלבן / מעוין ABCD» · «AC גובה» / «BD גובה» / «AC הוא גובה» → «…סותר נתון קודם — … הסיבה: AC ⟂ CB.» (BD: «BD ⟂ DC»), raw `over-constrained: AC ⟂ CB cannot hold` with no `[vs]`. Controls already right: «מקבילית ABCD» · «AC גובה» commits; «ריבוע ABCD» · «AB גובה» «כבר קיים»; «ריבוע ABCD» · «AC גובה לצלע BC» refused «…סותר את «ריבוע ABCD» … הסיבה: AC ⟂ CB.» (a stated side: that reason is true).
+
+**The class (docs/17 §1).** *A choice none of whose options can hold is refused with the failure of the first option tried.* «AC גובה» with no side is an `altitude-choice` (four options: AC ⟂ CB / CD / AD / AB). The fold lowered variant 0, its ⟂ failed, the choice rescue found no other variant, and the step reported option 0's reason — true of that option, false as the reason for a sentence that named no side. No other statement was named because the drop-one search's removal of «ריבוע ABCD» removes A–D themselves. For the square, rectangle and rhombus this is a theorem, not a search result: the angle between a diagonal and a side at its end is arctan of the side ratio (rectangle) or half an interior angle (rhombus), strictly inside (0°, 90°).
+
+**Decision.**
+1. **One table, derived.** `DIAGONAL_NEVER_PERPENDICULAR` (`engine/shapeKinds.ts`) = the kinds that imply `rectangle` or `rhombus` in the shared lattice — square, rectangle, rhombus — never a second list.
+2. **A stage-0 prover read on the fact.** `diagonalHeightImpossibility` (`engine/heightFeasibility.ts`) proves the choice impossible when EVERY option's pair is a diagonal of a ring whose `declaredAs` is in the table and the option's side is an edge of that ring; one option the theorem does not cover and it proves nothing. It is called in the fold (`replay/core.ts`, in-order pass and ADR-104 retry) on the fact's own `altitude-choice`, because the engine's `applyStep` only ever sees one option's lowering — not in `step.ts` as the fix plan sketched. A hit is a rigid contradiction (never "waiting for givens").
+3. **The other side by provenance.** As ADR-602 does for a flattened polygon, the fold tags `[vs #i]` with the statement that put the ring in the figure (`ownerByObjId`).
+4. **Wording.** `over-constrained: diagonal AC of square ABCD is perpendicular to no side cannot hold` → `errors.overConstrained` with the nested reason `errors.diagonalNoSideReason` («האלכסון {{d}} אינו מאונך לאף צלע של {{shape}}», `shape` from `input.shapeNounDefinite`; en "the diagonal {{d}} is perpendicular to no side of {{shape}}").
+5. A stated side («AC גובה לצלע BC») is not an `altitude-choice` and keeps its true reason.
+
+**Measured after.** Every "before" row reads the ruled sentence with the student's kind and letters (`…של הריבוע / המלבן / המעוין`); every control unchanged.
+
+**Why not a patch (docs/17 §2).** No input is special-cased: the prover reads the declared kind from the one lattice and every option the choice carries; a kind the lattice adds below the rectangle or rhombus joins on its own.
+
+**Sibling audit / cross-tool.** Parity row `diagonal-height-refused-2117` (expect `refused`): analytic refuses too; 3-D does not read a two-vertex height at all — known gap `#1679` (parked), the gap its sibling two-vertex-height rows already name. The kite («דלתון ABCD» · «AC גובה» is refused as a flattened quadrilateral; «BD גובה» commits) is not covered: its axis is an unstated variant, so the theorem does not hold for the noun — the caller files it `needs-operator`.
+
+**Locks.** `src/app/__tests__/issue-2117-diagonal-height.test.ts` (the table, the prover's hits and non-hits, the three kinds × both diagonals, «AC הוא גובה», English, the controls); `humanize-error.test.ts` CASES gains the raw shape; scenario `diagonal-height-refused-2117`; parity row `diagonal-height-refused-2117`.
+
+**Behaviour change for a student:** «ריבוע ABCD» · «AC גובה» (and the rectangle, the rhombus, BD) now reads «…סותר את «ריבוע ABCD» … הסיבה: האלכסון AC אינו מאונך לאף צלע של הריבוע.» instead of «…סותר נתון קודם … הסיבה: AC ⟂ CB.». Still refused, as before.

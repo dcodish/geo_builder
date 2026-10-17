@@ -307,6 +307,16 @@ export const PATTERNS: Pattern[] = [
     saysSubject: true,
     namesOther: true,
   },
+  // heightFeasibility.ts (#2117, ADR-718) — `over-constrained: diagonal AC of square ABCD is perpendicular to no side
+  // cannot hold`: the operator's 2026-10-15 ruling — the over-constrained frame naming the declaring statement (the
+  // fold's `[vs #i]`), its reason «האלכסון AC אינו מאונך לאף צלע של הריבוע», the kind the student's own noun.
+  {
+    re: /^over-constrained: diagonal (\S+) of (\S+) \S+ is perpendicular to no side cannot hold(?: \[vs #\d+\])?$/,
+    key: 'errors.overConstrained',
+    nested: (m) => ({ what: { key: 'errors.diagonalNoSideReason', params: { shape: `input.shapeNounDefinite.${m[2]}` }, letters: { d: m[1] } } }),
+    saysSubject: true,
+    namesOther: true,
+  },
   // cyclicFeasibility.ts (#2099, ADR-651) — `over-constrained: a circle through A, D, B on one line cannot hold`: the
   // operator's 2026-10-14 ruling — the over-constrained frame naming the statement that put the points on the line
   // (the fold's `[vs #i]`), its reason «A, D ו-B על ישר אחד, ואין מעגל שעובר דרך שלוש נקודות על ישר אחד».
