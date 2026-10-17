@@ -18085,3 +18085,29 @@ The kind words are the ones `circlesTangent` already reads. #2214's single kind 
 **Behaviour change for a student:** «∠ABC = π/2» (and every angle written with π) no longer goes to the AI and is refused at once with «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90»; «∠ABC = pi/2» no longer draws a 2° angle.
 
 **Slow-tier goldens that may drift (batch's to re-record):** `decide-parity-1395-*` if any case types a π angle (it would move from `escalate` to `refuse`).
+
+## ADR-711 — A noun the ring already is restates it, including after a sibling merge: the implied-noun rewrite is reflexive (#2193)
+
+**Status:** accepted · 2026-10-17 · bug (P2, 2-D) · fix round #2291, stream H · branch `fix/2193-third-noun-merge-text` · **Amends** [ADR-619](#adr-619) (the implied-noun rewrite reads the reflexive relation) and [ADR-656](#adr-656) (its decision 3, «מלבן» · «מעוין» · «ריבוע» is «כבר קיים», is now held by the code)
+**Requirements:** [02](02-requirements.md) FR-EN-9 — the noun the ring already is, including a kind two earlier nouns made it, is «כבר קיים» · **Design:** [04](04-design.md) § "A second shape noun over a declared ring" (the implication is reflexive; only the noun is re-spelled) · **LADDER stage:** none (apply's shape-composition normalisation)
+**Cites** [ADR-595](#adr-595) (the generic ring's «כבר קיים» path), [ADR-618](#adr-618) (any reading of the ring), [ADR-W-131](06w-decisions-workspace.md#adr-w-131) (the shared `kindRelation`)
+
+**The report / ruling.** «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD» answered «'C' is already defined — it can't be redefined as something different». Operator, 2026-10-16 (ballot round 5, card 7): *"Accept at P2"*; the outcome is ADR-656 decision 3, «זה כבר קיים באיור — אין מה להוסיף.».
+
+**Measured before** (`main` @ b0e9dbea, `decideDeterministic2D` → `commitVerdict` → `replay`, model mocked). Refused with the engine's id-conflict text: the report, its English spelling, «ריבוע BCDA», «מעוין · מלבן · ריבוע», «מלבן · דלתון · ריבוע», «מקבילית · מלבן · מעוין · ריבוע» (naming C); «מקבילית · דלתון · מעוין», «דלתון · מקבילית · מעוין» (naming D); «… · ריבוע ABCD שצלעו 5» (the side lost with it). Controls «ריבוע · ריבוע», «מלבן · מעוין · מלבן / מקבילית / דלתון», «מלבן · מעוין · טרפז» (ADR-619's sentence), «מקבילית · דלתון · ריבוע» (commits) were already right. Analytic answers `already-known`; 3-D already passes the shared three-noun rows (ADR-3D-346).
+
+**The class (docs/17 §1).** *A shape noun stated over a ring whose kind an earlier sibling merge refined is rebuilt as a new shape whenever the noun equals the refined kind.* `impliedShapeRestatement` returned early on `declared === stated`, assuming a ring declared X was built by X's own command, so restating X is idempotent. ADR-656's `refineRingKind` breaks that: it stamps the meet (`square`, `rhombus`) on a ring the two sibling commands built, so the third noun was applied as a fresh shape and its derived corner collided with the existing one. Members: every pair whose meet is a third kind (rectangle + rhombus, rectangle + kite → square; parallelogram + kite → rhombus), in every order and reading, and every longer chain ending in such a merge. A narrowing chain with no merge is not a member (the narrowed kind is the stated noun, built by its own lowering, and was already «כבר קיים»).
+
+**Decision.**
+1. **Reflexive, one predicate.** The early return is gone; the declared spelling tests `quadRelation(declared, stated) === 'implies'` (= the shared `kindRelation`, where every kind implies itself), any other reading `quadImpliesInEveryReading` as before. A same-noun restatement of a ring its own noun built now takes the same generic path, with the same «כבר קיים» it gave before — no branch for it. This removes a special case; no list grows.
+2. **Only the noun is re-spelled.** A shape command carrying any field beyond its vertices, its kind (`kind`, `declaredAs`) and the unstated configuration `reflex` (ADR-622) keeps its own path (`RESTATEMENT_FIELDS`), so a stated magnitude can never vanish through the rewrite. Today the only such field is the square's `side`, which no rule emits: a side the parser reads is a separate `set-distance`, so «… · ריבוע ABCD שצלעו 5» after the merge commits |AB| = 5, exactly as «ריבוע ABCD · ריבוע ABCD שצלעו 5» does.
+
+**Measured after.** Every "before" row answers «זה כבר קיים באיור — אין מה להוסיף.» (English «That's already on the figure — nothing to add.») with no row added; the side-5 row commits |AB| = 5; every control unchanged; the shared quad-noun rows pass in 2-D, 3-D and analytic with no gap left.
+
+**Why not a patch (docs/17 §2).** No noun, pair or reading is special-cased: the rewrite reads the one relation every builder reads, in its reflexive form, and the assumption that made the early return safe is dropped rather than worked around.
+
+**Sibling audit / cross-tool.** Analytic consumes the 2-D engine and already answered `already-known`; 3-D passes the shared rows through its own ARM 3 (ADR-3D-346). Complex declares no polygons. Triangles: no merge stamps a triangle kind through this rewrite (`statedQuadKind` is quadrilateral-only).
+
+**Locks.** `src/app/__tests__/issue-2193-merged-ring-restated.test.ts` (every "before" row in both locales, the BCDA / DCBA readings, English, no «already defined» anywhere, the side-5 commit, the `side`-carrying-command guard, the controls, the model never called); the three-noun rows of `shell/__tests__/fixtures/quad-noun-pairs.ts` lose their `gap: { '2d': 2193 }` (the meta-lock's "a gap that starts passing" check moves to a synthetic row); scenario `merged-ring-third-noun-restates-2193`.
+
+**Behaviour change for a student:** «ריבוע ABCD» after «מלבן ABCD» · «מעוין ABCD» (and every order, reading and sibling pair like it) answers «זה כבר קיים באיור — אין מה להוסיף.» instead of «'C' is already defined…»; «ריבוע ABCD שצלעו 5» there sets the side to 5 instead of being refused.

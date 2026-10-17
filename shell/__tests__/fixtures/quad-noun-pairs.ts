@@ -135,8 +135,8 @@ export const QUAD_NOUN_ROWS: readonly PairRow[] = [
   { nouns: ['טרפז ישר זווית', 'טרפז'], last: 'restates' },
   { nouns: ['טרפז ישר זווית', 'טרפז שווה שוקיים'], last: 'refused', refusal: EXCL('טרפז ישר זווית', 'טרפז שווה שוקיים') },
   { nouns: ['טרפז ישר זווית', 'טרפז ישר זווית'], last: 'restates' },
-  { nouns: ['מלבן', 'מעוין', 'ריבוע'], last: 'restates', notes: [MERGED('ריבוע', 'מלבן', 'מעוין')], gap: { '2d': 2193 } },
-  { nouns: ['מקבילית', 'דלתון', 'מעוין'], last: 'restates', notes: [MERGED('מעוין', 'מקבילית', 'דלתון')], gap: { '2d': 2193 } },
+  { nouns: ['מלבן', 'מעוין', 'ריבוע'], last: 'restates', notes: [MERGED('ריבוע', 'מלבן', 'מעוין')] },
+  { nouns: ['מקבילית', 'דלתון', 'מעוין'], last: 'restates', notes: [MERGED('מעוין', 'מקבילית', 'דלתון')] },
   { nouns: ['טרפז', 'טרפז שווה שוקיים', 'מלבן'], last: 'refused', refusal: EXCL('טרפז שווה שוקיים', 'מלבן') },
   { nouns: ['טרפז', 'טרפז שווה שוקיים', 'טרפז ישר זווית'], last: 'refused', refusal: EXCL('טרפז שווה שוקיים', 'טרפז ישר זווית') },
 ];

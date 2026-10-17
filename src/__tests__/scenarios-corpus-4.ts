@@ -5196,6 +5196,18 @@ export const SCENARIOS_4: Scenario[] = [
       expect(replay(factsOf(['משולש ABC', '∠ABC = pi/2'], [{ step: 2, reason: 'radian-angle', with: { value: 'pi/2' }, why: 'the ASCII spelling committed 2°' }])).construction.constraints.length, 'pi/2 adds no constraint').toBe(replay(factsOf(['משולש ABC'])).construction.constraints.length);
     },
   },
+  {
+    id: 'merged-ring-third-noun-restates-2193',
+    title: "«מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD»: the third noun answers «כבר קיים», not the engine's «'C' is already defined» (#2193, ADR-711)",
+    guards:
+      "#2193 (P2), outcome ruled by ADR-656 decision 3 (operator ruling 2026-10-16, ballot round 5, card 7: «Accept at P2»). Measured on b0e9dbea through decideDeterministic2D: the third line was refused with the engine's id-conflict text naming C, and every pair whose meet is a third kind (rectangle + kite, parallelogram + kite) did the same naming C or D. Root cause: impliedShapeRestatement returned early when the declared kind equalled the stated one, assuming the ring was built by that noun's own command; a sibling merge stamps the meet on a ring no such command built, so the noun was re-applied as a fresh shape. Fix: the rewrite reads the reflexive relation (quadRelation = kindRelation). Asserts the report's two lines build and the third is a no-op through the submit gate. The matrix is src/app/__tests__/issue-2193-merged-ring-restated.test.ts.",
+    steps: ['מלבן ABCD', 'מעוין ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const v = gateVerdict(factsOf(['מלבן ABCD', 'מעוין ABCD']), 'ריבוע ABCD');
+      expect(v.kind, JSON.stringify(v)).toBe('noop');
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

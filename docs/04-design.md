@@ -651,9 +651,12 @@ the ring's kind through `nounOfKind` (an adjective trapezoid is «הטרפז»).
 rows are the curriculum's EXCLUSIVE reading (exactly one parallel pair), which `shapeConstraints` already assumes.
 Three derived readers, three directions, no list of pairs:
 
-- `quadImplies(declared, stated)` → `impliedShapeRestatement` (apply.ts) re-spells the line to the GENERIC ring
+- `quadRelation(declared, stated) === 'implies'` → `impliedShapeRestatement` (apply.ts) re-spells the line to the GENERIC ring
   command over the declared spelling, so it takes ADR-595's path and the submit pipeline answers «כבר קיים» with no
-  row. A rewrite, not a new `commandConflict` carve-out.
+  row. A rewrite, not a new `commandConflict` carve-out. The implication is REFLEXIVE ([ADR-711](06-decisions.md#adr-711)):
+  the noun the ring already is restates it too, so a kind a sibling merge stamped (`refineRingKind`), which no command
+  of that noun built, is never re-applied as a fresh shape. Only the noun is re-spelled: a command carrying a stated
+  field beyond its vertices and kind (the square's `side`) keeps its own path (`RESTATEMENT_FIELDS`).
 - `quadsExclude(declared, stated)` → `shapeExclusion` / `shapeExclusionError`, a stage-0 prover beside ADR-607's,
   rendered by `humanizeError`'s `errors.shapeExcluded` with both nouns read from `shapes.name.*` (`paramKeys`: a
   param whose value is a translation key).
