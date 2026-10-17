@@ -1,0 +1,81 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-17T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "A על המעגל O",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.2",
+      "utterance": "B על המעגל O",
+      "group": "g2",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3.3",
+      "utterance": "AB = 7",
+      "group": "g3",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3.4",
+      "utterance": "AB = 7",
+      "group": "g3",
+      "cmd": {
+        "type": "set-distance",
+        "a": "A",
+        "b": "B",
+        "value": 7
+      },
+      "enabled": true
+    },
+    {
+      "id": "g4.5",
+      "utterance": "קשת AB = 40 במעגל O",
+      "group": "g4",
+      "cmd": {
+        "type": "set-angle",
+        "vertex": "O",
+        "ray1": "A",
+        "ray2": "B",
+        "value": 40,
+        "arcOf": "circle-O"
+      },
+      "enabled": true
+    }
+  ]
+}

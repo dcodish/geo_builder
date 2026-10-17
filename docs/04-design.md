@@ -1444,6 +1444,26 @@ The label is never dropped. Analytic places its stated values through its own ca
 
 *Identifiers:* `placeAngleValue` · `mathLabelBox` · `INK_TOLERANCE` · `angleValueOffset` · `markScale`
 
+### Every measure label is placed in one function, and none covers another ([ADR-732](06-decisions.md#adr-732), #2172)
+
+`placeMeasureLabels` (`src/render/scene.ts`) places every 2-D measure label; `Figure.tsx` only draws its result.
+
+1. **Each label's own spot**, the arithmetic the renderer used inline before: an angle through `placeAngleValue`
+   (above), a length at its midpoint nudged outward and shrunk to its side (`labelScale`), an arc's value on the arc
+   nudged inward, an area at its centroid.
+2. **A collision pass** over the labels' ink boxes (`mathLabelBox`, grown by `LABEL_AIR` on every side, the halo),
+   in a fixed order by kind, `MEASURE_LABEL_PRIORITY`: angle > arc > area > length (within a kind, by the anchor's
+   screen position, so the typing order never changes the drawing). An angle, arc or area value keeps its spot. A
+   length whose box meets an earlier label yields: it tries the mirror across its segment, then both sides at
+   `off + k·boxHeight` (k = 1..4), the side away from the label it hit first, and takes the first spot that meets
+   nothing, else the least-covered one. It is never dropped.
+3. A label that meets nothing is exactly where it was (`moved: false`).
+
+Analytic places its labels through its own priority search (`placeSceneLabels` in `src-analytic/render/scene.ts`,
+#1717/#1733), which already makes a later label yield to an earlier one.
+
+*Identifiers:* `placeMeasureLabels` · `MEASURE_LABEL_PRIORITY` · `LABEL_AIR` · `MeasureLabelPlacement`
+
 ### The measure-label seam and the display choice (#948, [ADR-488](06-decisions.md#adr-488))
 
 A symbolic measure becomes figure text at one place, `measureLabelForms` (`src/engine/lower.ts`), reached from the

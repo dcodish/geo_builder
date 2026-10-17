@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
-import { ANGLE_ARC_R, MIN_MEASURE_FONT_PX, angleValueOffset, buildScene, placeAngleValue, labelScale, markScale, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
+import { ANGLE_ARC_R, buildScene, placeMeasureLabels, markScale, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
 // #742 / ADR-W-024: the canvas corner cluster (↺ − +) — one look and one arithmetic in every
 // builder, from the shell contract. (The exports left this file for the top tool row.)
 import { CANVAS_ZOOM_STEP, canvasClusterStyle, canvasCtrlStyle, clampZoom } from '../../shell/frame/canvasControls';
@@ -26,8 +26,6 @@ import type { RelationsResult, ResolvedCircle } from '@/engine';
 import { findInkCrossings, drawnPointIds, resolveDrawnLines } from '@/engine';
 import type { Crossing } from '@/engine';
 import { MathSvg } from './mathSvg';
-import { mathLabelBox } from './mathMetrics';
-import { hasMath } from '../../shell/math';
 import { alignRotation, fitTransform, keepOrRefit, orient } from './transform';
 import type { Transform } from './transform';
 
@@ -892,60 +890,14 @@ export function Figure({
               (only world coordinates were oriented), in blue to set them apart from
               point names. Hidden when the host turns measures off. */}
           {showMeasures &&
-            scene.measures.map((m, i) => {
-              const s = transform.toScreen(m.pos);
-              const sd = unitVec({ x: m.dir.x, y: -m.dir.y }); // world→screen Y-flip
-              // An angle value sits OUTSIDE its own arc, along the wedge bisector, and is drawn a bit LARGER
-              // than a length — so it is clear WHICH angle it labels and the number is never overprinted by
-              // the mark (#475). Moving outward also carries it AWAY from a vertex sitting on the figure's
-              // edge, where the old inside-the-arc placement clipped it against the frame.
-              // An AREA label sits AT the polygon's centroid (no offset).
-              /**
-               * #1337 — THE MARK IS SIZED BY ITS CORNER. A value written for a ~60 px corner cannot be
-               * shown at a corner of 5 px, and the operator's ruling is to shrink everything to fit
-               * rather than drop anything: a stated value stays visible, small.
-               */
-              const ends = m.ends?.map((e) => transform.toScreen(e));
-              const roomPx = ends ? Math.min(...ends.map((e) => Math.hypot(e.x - s.x, e.y - s.y))) : Infinity;
-              const base = fontSize * (m.kind === 'angle' ? 1.05 : 0.85);
-              const k =
-                m.kind === 'angle'
-                  ? markScale(roomPx, r)
-                  : m.kind === 'length' && ends
-                    ? labelScale(Math.hypot(ends[1].x - ends[0].x, ends[1].y - ends[0].y), m.text, base)
-                    : 1;
-              const mFont = Math.max(MIN_MEASURE_FONT_PX, base * k);
-              // #2175 (ADR-715): an angle's value is placed to FIT ITS WEDGE — today's spot when the box already
-              // clears both rays, else further out along the bisector, else smaller, else beside the arc.
-              if (m.kind === 'angle' && ends) {
-                const fit = placeAngleValue({
-                  v: s,
-                  p1: ends[0],
-                  p2: ends[1],
-                  dir: sd,
-                  arcR: ANGLE_ARC_R * r * k,
-                  fontSize: mFont,
-                  minFont: MIN_MEASURE_FONT_PX,
-                  box1: mathLabelBox(m.text, 1, !hasMath(m.text)),
-                  away: figureCentre,
-                });
-                return <MathSvg key={`m-${i}`} text={m.text} cx={fit.x} cy={fit.y} fontSize={fit.fontSize} />;
-              }
-              const off = m.kind === 'area' ? 0 : m.kind === 'angle' ? angleValueOffset(r * k, mFont) : r * 1.4 * k + mFont * 0.55;
-              // A measure is a math expression (12√2, 7k/5, 2α, 37°). `MathSvg` lays out a radical (√ + a real
-              // vinculum) or a fraction as pure SVG so it EXPORTS (#98 — MathML/foreignObject rasterizes blank);
-              // a plain label stays the single haloed <text> it always was. LTR is forced inside so the RTL page
-              // doesn't reorder `12√2` → `2√12`.
-              return (
-                <MathSvg
-                  key={`m-${i}`}
-                  text={m.text}
-                  cx={s.x + sd.x * off}
-                  cy={s.y + sd.y * off}
-                  fontSize={mFont}
-                />
-              );
-            })}
+            // #2172 (ADR-732): every value is placed by one function — an angle fits its wedge (#2175), a length at
+            // its midpoint nudged outward, an arc on its arc, an area at its centroid — and then no label covers
+            // another (a length yields to the mirror side of its segment). This component only draws the result.
+            // A measure is a math expression (12√2, 7k/5, 2α, 37°): `MathSvg` lays out a radical or a fraction as
+            // pure SVG so it EXPORTS (#98); LTR is forced inside so the RTL page doesn't reorder `12√2` → `2√12`.
+            placeMeasureLabels(scene.measures, transform.toScreen, { r, fontSize, away: figureCentre }).map((p, i) => (
+              <MathSvg key={`m-${i}`} text={scene.measures[i].text} cx={p.x} cy={p.y} fontSize={p.fontSize} />
+            ))}
 
           {/* Angle marks the student asserted (only — never a computed 90°): a right-angle square,
               or an angle arc sampled the short (interior) way. Same blue as the measures. */}
