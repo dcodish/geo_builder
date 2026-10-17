@@ -123,6 +123,8 @@ export type InputError =
   | { key: 'ambiguous-hypotenuse'; detail: string }
   /** «תיכון ליתר» with no right angle in the figure (#1222). */
   | { key: 'ambiguous-no-right-angle'; detail: string }
+  /** «תיכון לבסיס» / «גובה לשוק» with no single isosceles triangle to read the role on — 2-D's question (#2018). */
+  | { key: 'ambiguous-role-side'; detail: string; role?: 'base' | 'leg' }
   /** A crossing the student named that the figure already names — carrying WHO holds it (#1175). */
   | { key: 'crossing-already-named'; detail: string; holder: string; operands?: [string, string] }
   /**

@@ -37,6 +37,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'cevian-no-triangle': [{}],
   'ambiguous-hypotenuse': [{}],
   'ambiguous-no-right-angle': [{}],
+  'ambiguous-role-side': [{ detail: 'תיכון לבסיס', role: 'base' }, { detail: 'גובה לשוק', role: 'leg' }], // #2018 (ADR-AG-298)
   'crossing-already-named': [{ holder: 'P' }, { holder: 'P', operands: ['AB', 'CD'] }],
   'third-crossing': [{ line: 'AB', a: 'A', b: 'B' }],
   'tangent-no-second-crossing': [{ id: 'P' }],

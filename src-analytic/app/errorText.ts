@@ -214,6 +214,8 @@ export function errorText(error: InputError, t: Translate): string {
     'cevian-no-triangle': 'errCevianNoTriangle',
     'ambiguous-hypotenuse': 'errAmbiguousHypotenuse',
     'ambiguous-no-right-angle': 'errCevianNoRightAngle',
+    // #2018 (ADR-AG-298) — 2-D's input.roleSideUnresolved, verbatim
+    'ambiguous-role-side': 'errRoleSideUnresolved',
     // #1416 — the operands named when the figure can say them; the straights' wording is for two straights only
     'crossing-already-named': error.key === 'crossing-already-named' && error.operands ? 'errCrossingAlreadyNamedOperands' : 'errCrossingAlreadyNamed',
     'self-crossing': 'errSelfCrossing',
@@ -358,6 +360,7 @@ export function errorText(error: InputError, t: Translate): string {
     decimal: error.key === 'mixed-number' ? (error.decimal ?? '') : '',
     sum: error.key === 'mixed-number' ? error.sum : '',
     product: error.key === 'mixed-number' ? error.product : '',
+    role: error.key === 'ambiguous-role-side' ? t(error.role === 'leg' ? 'roleWordLeg' : 'roleWordBase') : '',
     side: error.key === 'bisector-is-side' ? (error.pair ?? '') : '',
     vertex: error.key === 'bisector-is-side' ? (error.vertex ?? '') : '',
     polygonNoun: error.key === 'bisector-is-side' ? t(polygonNounKey(error.polygonKind)) : '',

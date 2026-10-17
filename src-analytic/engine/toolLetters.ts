@@ -23,7 +23,7 @@
  * ruling (#1281: the reserved `P₁`, `derive.resolveMints`) — it is not a construct with a role.
  */
 import { sameDerivation } from './sameDerivation';
-import type { Fact, Id } from './types';
+import { ROLE_SIDE_SENTINELS, type Fact, type Id } from './types';
 
 export type ToolPointRole = 'midpoint' | 'midpoint-2' | 'foot' | 'end' | 'diameter-end' | 'crossing' | 'secant' | 'touch' | 'common' | 'vertex';
 
@@ -91,8 +91,11 @@ export function resolveToolLetters(
     // below, so its id is never where a placeholder is discovered.
     const scan = f0.t === 'segment' || f0.t === 'polygon' ? { ...f0, id: '' } : f0;
     let text = JSON.stringify(scan);
-    // A vertex placeholder belongs to its LINE (see `TOOL_LETTERS.vertex`); every other role to what the point is.
-    const nameKey = (ph: string): string => (ph.startsWith(`${TOOL_PREFIX}vertex|`) ? `${owner[i]}#${ph}` : ph);
+    // A vertex placeholder belongs to its LINE (see `TOOL_LETTERS.vertex`); every other role to what the point is —
+    // except a foot on a side named by its ROLE (#2018, ADR-AG-298): «תיכון לשוק» twice is two legs, so two points,
+    // and which side each is only M1 knows; its key says the role, never the side, so it belongs to its line too.
+    const nameKey = (ph: string): string =>
+      ph.startsWith(`${TOOL_PREFIX}vertex|`) || ROLE_SIDE_SENTINELS.some((z) => ph.includes(z)) ? `${owner[i]}#${ph}` : ph;
     for (const ph of new Set(text.match(PLACEHOLDER) ?? [])) {
       if (names.has(nameKey(ph))) continue;
       const role = ph.slice(TOOL_PREFIX.length).split('|')[0] as ToolPointRole;
