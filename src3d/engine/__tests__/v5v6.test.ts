@@ -93,10 +93,10 @@ describe('solids of revolution (V6)', () => {
     expect(verifyClaim({ type: 'lateral-area-eq', solid: 'cylinder', value: 42 * Math.PI }, cyl, 0)).toBe(true);
   });
 
-  it('a size claim on an unstated-size solid refuses at APPLY (free-size-claim); a missing solid refuses too', () => {
+  it('a size claim on an unstated-size solid refuses at APPLY (the given-not-drivable size refusal, #2076); a missing solid refuses too', () => {
     const free = build([{ type: 'revolution', kind: 'cone', center: 'O', apex: 'S' }]);
     const r1 = applyCommand3(free, { type: 'claim', claim: { type: 'volume-eq', solid: 'cone', value: 1 } });
-    expect(r1).toMatchObject({ ok: false, error: { code: 'free-size-claim' } });
+    expect(r1).toMatchObject({ ok: false, error: { code: 'given-not-drivable', object: { kind: 'size', solid: 'cone' } } });
     const r2 = applyCommand3(free, { type: 'claim', claim: { type: 'volume-eq', solid: 'sphere', value: 1 } });
     expect(r2).toMatchObject({ ok: false, error: { code: 'no-such-solid' } });
   });

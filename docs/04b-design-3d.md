@@ -64,7 +64,13 @@ The revolution solid's size slots (`RADIUS_SLOT` / `HEIGHT_SLOT`, #2079,
 [ADR-3D-340](06b-decisions-3d.md#adr-3d-340)) match the whole `MAG` value, anchored (`SIZE_VALUE`), so no
 prefix of a number is ever taken, and `readSizeSlot` reads only a plain decimal. A fraction or root there is
 UNREAD: the rule declines and flags it, and after every rule has declined `parse3` returns
-`solid-size-unread`, which the store words as apply's own `given-not-drivable` size refusal. The gate values a
+`solid-size-unread`, which the store words as apply's own `given-not-drivable` size refusal. Every other size
+form reaches the same refusal (#2076, [ADR-3D-363](06b-decisions-3d.md#adr-3d-363)). The size nouns are one
+vocabulary, `lexicon/revolutionSize3.ts`: inside a declaration, a size clause whose noun is not a slot
+(`UNREAD_SIZE_CLAUSE`: «שקוטרו», «ויוצרו», «ונפחו», "slant height") flags the solid before the slots are read; on its
+own line, `revolutionSizeLine` (after the volume/area claim rules) reads «<size noun> (של)? ה<solid> (הוא|=)?
+<value>» and its English mirror and only RECORDS the solid, so it never claims a line another rule reads. A
+volume/area claim on a free-size solid is apply's same size refusal; `free-size-claim` is retired. The gate values a
 fraction by its value, or by numerator AND denominator together (the ratio's `p`/`q`), never by one part alone.
 
 **An angle written in radians is refused** (#1837, [ADR-W-142](06w-decisions-workspace.md#adr-w-142)). `readStatement3` asks `findRadianAngle` (`shell/radianAngle.ts`) right after `findProofTarget` and answers `{ code: 'radian-angle' }` — `guided` in `STORE_CATEGORY3`, worded `err.radianAngle` (2-D's sentence) — so «∠ABC = π» is no longer an angle mark labelled π and the other spellings never reach the model.

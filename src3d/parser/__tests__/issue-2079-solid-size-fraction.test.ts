@@ -65,10 +65,11 @@ describe('#2079 — a fraction or root size in a revolution declaration is refus
     expect(v.error).toEqual({ code: 'given-not-drivable', object: { kind: 'size', solid } });
   });
 
-  it('the message is the existing ADR-3D-291 sentence, in the student’s solid noun', () => {
+  // #2076 (ADR-3D-363, ruling 2026-10-14 card d14-2076): the sentence now says the capability is in development
+  it('the message is the one size sentence, in the student’s solid noun', () => {
     const v = decide('כדור שרדיוסו 1/2');
     if (v.kind !== 'refused') throw new Error(JSON.stringify(v));
-    expect(errorText3(he, v.error)).toBe('הכלי עדיין לא יודע לקבוע את גודל הכדור לפי נתון כזה, ולכן הוא לא נוסף — זו מגבלה של הכלי');
+    expect(errorText3(he, v.error)).toBe('הכלי עדיין לא יודע לקבוע את גודל הכדור לפי נתון כזה — היכולת הזאת נמצאת בפיתוח, ולכן הצעד לא נוסף.');
   });
 
   it.each(BUILDS)('«%s» still builds, with exactly its stated size', (line, rev) => {

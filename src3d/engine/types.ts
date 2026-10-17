@@ -1854,7 +1854,6 @@ export type EngineError3 =
   | { code: 'ring-not-flat'; stated: string; others: string[]; sides: number; vertices: string[] }
   | { code: 'sign-unsatisfiable'; id: Id } // no pivot solution has the stated coordinate sign
   | { code: 'no-such-solid'; id: string } // a volume/area claim names a solid kind the figure doesn't have (or has twice)
-  | { code: 'free-size-claim'; id: string } // a numeric volume/area claim on a solid whose dims are unstated
   | { code: 'two-unknowns'; id: Id } // a vector relation with more than one undefined point
   | { code: 'size-on-solid' } // a numeric size on a free-dim solid figure — not supported yet (honest boundary)
   | { code: 'unknown-symbol'; id: string } // a value was assigned to a parameter no relation defines

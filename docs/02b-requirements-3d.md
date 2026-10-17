@@ -109,15 +109,23 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   - For the coordinate, vector and measure rules: a true restatement stays green, an unstated or symbolic
     component is not checked, and on a solid or a free figure the statement drives instead.
   - **A refusal never tells a student who may be right that they miscalculated:** a given the tool cannot
-    yet make hold («|SO| = 4» on a cone of unstated height) is refused as the tool's limit («… זו מגבלה של
-    הכלי»); «בדקו את החישוב» is kept for a given the student's own data contradicts.
+    yet make hold («|SO| = 4» on a cone of unstated height) is refused as the tool's limit (for a solid's size,
+    «… היכולת הזאת נמצאת בפיתוח, ולכן הצעד לא נוסף.», ADR-3D-363); «בדקו את החישוב» is kept for a given the student's own data contradicts.
   - **A cone, cylinder or sphere size is read whole or refused, never cut:** inside the declaration the
     radius and height take a whole number or a decimal («חרוט שרדיוסו 2.5 וגובהו 3»). A size written as a
     fraction or a root («כדור שרדיוסו 1/2», «חרוט שרדיוסו √2 וגובהו 3») is refused with the same «not yet»
     message («הכלי עדיין לא יודע לקבוע את גודל הכדור לפי נתון כזה …»), never drawn as part of its number.
+  - **Every other way of stating a cone, cylinder or sphere size gets that one answer, saying the capability is
+    in development** («הכלי עדיין לא יודע לקבוע את גודל החרוט לפי נתון כזה — היכולת הזאת נמצאת בפיתוח, ולכן הצעד
+    לא נוסף.», the solid's own noun; English "… this capability is in development, so the step wasn't added."): a
+    diameter, slant height, volume or area inside the declaration («חרוט שקוטרו 4 וגובהו 3», «…ויוצרו 5», «כדור
+    שקוטרו 6», "cone with radius 2 and slant height 5"); any size on its own line, any noun, «הוא» / «=» / bare,
+    in Hebrew or English («רדיוס החרוט הוא 2», «גובה החרוט 3», «אורך היוצר 5», "the height of the cone is 3");
+    and a volume or area line on a solid whose size is not stated («נפח החרוט 10»). Never the model, never «לא
+    הצלחנו לצייר: …», never a slant height drawn as the height. A volume claim on a sized solid still verifies.
   - Sources: ADR-3D-217, ADR-3D-281, ADR-3D-282, ADR-3D-284, ADR-3D-285, ADR-3D-290, ADR-3D-291,
-    ADR-3D-292, ADR-3D-293, [ADR-3D-340](06b-decisions-3d.md#adr-3d-340); #909, #1546, #1550, #1560, #1561,
-    #1567, #1569, #1573, #1590, #1615, #2079.
+    ADR-3D-292, ADR-3D-293, [ADR-3D-340](06b-decisions-3d.md#adr-3d-340), [ADR-3D-363](06b-decisions-3d.md#adr-3d-363); #909, #1546, #1550, #1560, #1561,
+    #1567, #1569, #1573, #1590, #1615, #2076, #2079.
 - **FR-SP-6 (Must)** — **A stated new label must land on the figure.** A decomposition that loses a point
   the student named is **refused, naming the label** — never committed with the point missing. A label
   that already exists is context, not a drop.
