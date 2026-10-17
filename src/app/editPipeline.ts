@@ -152,6 +152,12 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     setInputNote(t(note.key, { ...note.params, plural: t(note.params.plural.t) }));
     return false;
   }
+  // #2263 (ADR-702): one radius on a nested pair — the edit is refused naming the radius phrase it cannot keep,
+  // the note this seam gave the same line before (`editDropped`), never the generic «not read»
+  if (!r.ok && r.reason === 'nested-pair-radius') {
+    setInputNote(t('steps.editDropped', { items: r.parts[1] }));
+    return false;
+  }
   if (!r.ok || r.commands.length === 0) {
     setInputNote(t('steps.editRefused'));
     return false;

@@ -2016,3 +2016,7 @@ over all four (ADR-041).
 ### `tangency-distance-unlabelled-2262` — «שני מעגלים משיקים ברדיוס 5» prints no centre distance (#2262, ADR-693)
 
 **Guards against:** the tangency's own centre distance r₁ + r₂ printed as a measure label («10» at the touch point, centres hidden) — a number nobody stated (the operator's round #2245 T18 report). **Asserts** the operator's line builds green with two radius-5 circles touching and no length label, and that «מעגל O ברדיוס 5» · «מעגל P ברדיוס 5» · «OP = 10» · «המעגלים O ו-P משיקים» still prints 10 on OP. The matrix (the three-line form, the internal twin, «…בנקודה X», the circle-subject spelling, the values panel, the controls) is `src/app/__tests__/issue-2262-tangency-distance-label.test.ts`.
+
+### `concentric-pair-radius-refused-2263` — «שני מעגלים בעלי מרכז משותף O ברדיוס 5» is refused, one given per line; the two-line form builds the outer circle at 10 (#2263, ADR-702)
+
+**Guards against:** one radius on a nested pair handed to the AI, which gave the 5 to the outer circle and committed green (operator 2026-10-16: *"reject asking to enter one line at a time"*). **Asserts** the operator's line is refused `nested-pair-radius` with the parts «שני מעגלים בעלי מרכז משותף O» · «ברדיוס 5», and «שני מעגלים בעלי מרכז משותף O» · «רדיוס מעגל חיצוני הוא 10» builds the pair with the outer radius 10. The matrix (every nested spelling, the English twins, the model never asked, the ✎ seam) is `src/app/__tests__/issue-2263-nested-pair-radius.test.ts`.
