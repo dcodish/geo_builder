@@ -774,6 +774,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #1815 (ADR-3D-309, 2-D ADR-413) — a rider's incidence that holds only on a FLAT triangle is refused, not drawn flat
   { id: 'rider-midpoint-collapse-1815', family: 'midpoint-ratio', steps: ['משולש ABC', 'M על AB', 'M אמצע BC'], expect: 'refused', note: 'M on AB and the midpoint of BC only when ABC is flat' },
   { id: 'rider-midpoint-collapse-mirror-1815', family: 'midpoint-ratio', steps: ['משולש ABC', 'D על AB', 'D אמצע AC'], expect: 'refused' },
+  // #1847 (ADR-3D-361) — the same conflict in the other order: the membership is stated about an EXISTING midpoint
+  { id: 'midpoint-rider-collapse-1847', family: 'midpoint-ratio', steps: ['משולש ABC', 'M אמצע BC', 'M על AB'], expect: 'refused', note: 'the reverse order of rider-midpoint-collapse-1815' },
   // #1849 (operator ruling 2026-10-07, ADR-W-115; 3-D ADR-3D-310) — a DECLARED polygon the givens force flat is
   // refused on the line that completes the collapse, in every builder: "a flat line is not a triangle". The 2-D
   // gap is this issue's own 2-D stream (today 2-D builds it flat with ADR-W-048's notice); it closes there.

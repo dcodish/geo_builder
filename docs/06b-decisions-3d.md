@@ -13015,3 +13015,40 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Locks.** `src3d/__tests__/issue-2091-unnamed-crossing-knee.test.ts` (every row above); fixture `fixtures3/no-knee-unnamed-crossing-2091.geo3.json`; `right-angle-knee.test.ts`'s *"perpendicular diagonals that DO cross are marked at the crossing"* flipped to 0 wedges; `issue-923-917.test.ts`'s box-diagonal 90° knee flipped to 0 (its no-90°-arc half unchanged); `seg-angle-drive-909.test.ts`'s pin-arm knee lock now names the crossing («האלכסונים AC ו-BD נפגשים בנקודה O»). No parity row: no display lock yet (docs/22 §10).
 
 **Behaviour change for a student:** «ריבוע ABCD» · «AC ⟂ BD» (and the same on a rhombus, quadrilateral, cube, box or pyramid base, in every ⟂ spelling) no longer draws a right-angle mark where the diagonals cross; the relation stays in the givens list and the data panel. A crossing the student named as the intersection keeps its mark.
+
+## ADR-3D-361 — A membership stated about an existing point that only a flat polygon satisfies is refused by name, in either order (#1847)
+
+**Status:** accepted · 2026-10-17 · bug (P3) · branch `fix/1847-3d-names-both-statements` off `main` @ de7c221f · fix round #2304 · implements the #1847 `/decisions` fix plan of 2026-10-07 (option 1) · **amends** [ADR-3D-309](#adr-3d-309) (its recorded deviation: the reverse order kept `claim-refuted`)
+
+**Requirements:** [02b](02b-requirements-3d.md) **FR-RD-7** ("an incidence on a rider is refused, naming the statements" now reads: on a rider or on an existing point, in whichever order) · **Design:** [04b](04b-design-3d.md) § the ⟂-from-an-in-plane-point disposition, new paragraph *The same conflict stated about an existing point* · **LADDER stage:** derive (the claim pass's verdict; the solve is the pivot's existing failure-path search).
+
+**Measured before** (`de7c221f`, `decideDeterministic3` ×24 seeds, no LLM):
+
+| sequence | before |
+|---|---|
+| «משולש ABC · M אמצע BC · M על AB» (the report) · mirror «D אמצע AC · D על AB» · English | refused `claim-refuted` 24/24: «הטענה לא מתקיימת בציור — בדקו את החישוב» |
+| «משולש ABC · M על AB · M אמצע BC» (#1815's order) | refused `polygon-collapsed` 24/24, both statements named |
+| «פירמידה SABC · SO גובה הפירמידה · M אמצע BC · O על AM» | `claim-refuted` 24/24 |
+
+2-D and analytic refuse both orders naming the collapse (measured by the plan at 5edeeca1); the disparity is 3-D only, and only in this order.
+
+**Root cause / class.** *A membership statement about an existing derived point, which can hold only if a declared polygon is flat, was judged as a student's answer (`claim-refuted`) instead of as the collapse refusal every other route and builder gives.* Stated first, «M על AB» makes M a rider and reaches the pivot, whose #1815 attribution names both statements. Stated last, M is already the midpoint, so «M על AB» lowers (M1) to a `collinear3` claim, and the claim pass only asked whether it holds on the sampled triangle — never whether any triangle could hold it.
+
+**Decision.** In `derive3`'s claim pass, a refuted claim with no sampled-carrier verdict gets one more look before `claim-refuted` (`membershipCollapse`, `store3.ts`): when it is a `collinear3` membership and the figure carries a `FLAT_SOLID_KINDS` solid with free dims, the construction is re-resolved with the pin the claim states (lines a–b and a–c coincide, the existing `mutual` drive). The pivot then runs its own failure path — the frozen-dims retry and the anchored open-figure search (`openSolveOn`, #1849). If it comes back empty with a non-solid `collapse` record, the claim is refused `polygon-collapsed` (not forced, so `err.polygonCollapsed`, the forward order's own frame), `stated` the claiming line, `others` the statements that first placed the claim's points off the collapsed ring (the midpoint's line; a metric given on the ring is not named). If a placement exists, the claim keeps `claim-refuted`: it is judged, never made to drive (option 2, lowering it to a driving pin, was rejected by the plan — it would build sentences the report did not describe). One bounded resolve, on the failure path only.
+
+**Measured after** (same door, 24 seeds):
+
+| sequence | after |
+|---|---|
+| «משולש ABC · M אמצע BC · M על AB» | refused 24/24: «לא ניתן: «M על AB» סותר את «M אמצע BC» — אי אפשר לקיים את שניהם יחד: הם מתקיימים רק אם המשולש ABC שטוח (כל קודקודיו על ישר אחד).» (~8 ms per seed) |
+| mirror, «AB = 3» first, the long Hebrew form, English | refused 24/24 the same way; «AB = 3» not named |
+| «משולש ABC · M אמצע BC · N אמצע AC · M על AN» | refused 24/24, naming «M אמצע BC», «N אמצע AC» |
+| #1815's order · the centroid «E מפגש התיכונים … · E על AM» · the pyramid above | unchanged (refused by name · records · `claim-refuted`) |
+
+**Locks.** New `src3d/__tests__/issue-1847-reverse-collapse.test.ts` (the reported order and its variants ×24 with the exact he/en wording, keep-prior and the open standing triangle; the forward order, the centroid and the pyramid scope lock unchanged — #1897, armed, will flip the pyramid lock in place when it lands). `issue-1815-collapse-attribution.test.ts`'s reverse-order case, which recorded ADR-3D-309's deviation, now asserts the named refusal. Parity row `midpoint-rider-collapse-1847` beside `rider-midpoint-collapse-1815` (`expect: 'refused'`; all three builders refuse). Fixtures-first does not apply: the essence is a refusal with a specific message.
+
+**Sibling audit.** 2-D and analytic: class absent (both orders named, the plan's measurement). Quadrilaterals and pentagons are outside this class and unchanged: «מרובע ABCD · M אמצע BC · M על AB» stays `claim-refuted`; its forward order is itself seed-dependent today (records 9/24, `claim-refuted` 15/24), reported separately.
+
+**Golden drift expected** (`decide-submit3-parity-1394`, the batch's): only sequences whose last line is a membership on an existing point that collapses a declared triangle (`claim-refuted` → `polygon-collapsed`). Not re-recorded here.
+
+**Behaviour change for a student:** «משולש ABC · M אמצע BC · M על AB» is refused naming both statements, as the other order already was, instead of «בדקו את החישוב».
