@@ -155,6 +155,11 @@ A student types on a keyboard and the exam is typeset. Both reach one internal f
   accented Latin letter. It is refused quoting the letters as typed, in the same two sentences every builder
   uses ([FR-SU-18](02w-requirements-workspace.md)), and no longer handed to the model. A look-alike letter
   folds to its Latin twin first («משולש КМО» reads as KMO), and Greek stays mathematics.
+- An angle measure written in radians — «∠ABC = π/2», «זווית ABC = π/3», «הזווית בין AB ל-AC היא π/6», «גזרה AOB
+  בזווית π/3». Radians are the complex Builder's notation only (operator, 2026-10-08: *"analytics tool should not
+  support radians at all"*). It is refused with 2-D's sentence «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90», where it used to be drawn
+  in degrees (π/2 as 1.57°) ([FR-SU-20](02w-requirements-workspace.md), ADR-W-142). π as a number («AB = π», «מעגל
+  שהיקפו 6π») still reads.
 
 ### 8b — Two new input families (F16, F17)
 

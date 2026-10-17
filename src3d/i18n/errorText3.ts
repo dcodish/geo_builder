@@ -86,6 +86,9 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     // #1666: the tool draws the givens; a claim to prove is named and left out.
     case 'proof-target':
       return t('err.proofTarget', { sentence: err.sentence });
+    // #1837 (ADR-W-142): an angle in radians — 2-D's ruled degrees sentence, verbatim (ADR-W-118 B1).
+    case 'radian-angle':
+      return t('err.radianAngle');
     // #1919 (ADR-3D-328): a letter the tool cannot read — the operator's two sentences, 2-D's wording
     // verbatim (ADR-W-118 B1), with the student's own letters.
     case 'unread-name':

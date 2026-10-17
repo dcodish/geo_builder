@@ -27,6 +27,7 @@ import { forcedCrossedRing, impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
+import { findRadianAngle } from '../../shell/radianAngle';
 
 export interface EditDeps {
   t: (key: string, opts?: Record<string, unknown>) => string;
@@ -86,6 +87,11 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   const proof = findProofTarget(editText);
   if (proof) {
     setInputNote(t('input.scope.proof-target', { sentence: proof.sentence }));
+    return false;
+  }
+  // #1837 (ADR-710): an angle written in radians is refused here exactly as at submit.
+  if (findRadianAngle(editText)) {
+    setInputNote(t('input.scope.radian-angle'));
     return false;
   }
   // #1919 (ADR-626): an edit is a statement too — a letter the tool cannot read is refused here exactly

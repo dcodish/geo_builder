@@ -590,6 +590,8 @@ phrase }`. Because it is `parse`, every seam inherits it: the submit lane (`deci
 edit seam, the scenario harness (`refusedSteps`) and log-triage. The pre-parse guard and the post-failure register
 read the same `RULES` entries.
 
+**An angle written in radians** (#1837, [ADR-710](06-decisions.md#adr-710)) takes the same positions: `findRadianAngle` (`shell/radianAngle.ts`, [04w](04w-design-shell.md)) is asked in `decidePreParse` right after the proof target — `refuse`, `guided`, logged `scope:radian-angle`, note `input.scope.radian-angle` — in `runEditCommit`, and at the top of `parseEntry` (`{ ok: false, reason: 'radian-angle', value }`), so no caller of `parse` can draw «∠ABC = pi/2» as 2°.
+
 **A letter the tool cannot read** (#1919, [ADR-626](06-decisions.md#adr-626)) takes the same two positions.
 `unreadScript` (`shell/inputScript.ts`, the shared rule all four builders call) is asked in
 `decidePreParse` — refusing with `input.scope.unread-name` or `input.scope.unread-word`, the student's own

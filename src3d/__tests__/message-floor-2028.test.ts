@@ -84,6 +84,7 @@ const ERRORS3: Record<Code3, Payload[]> = {
   'ambiguous-main-diagonal': [{ pairs: 'AG, BH' }, { pairs: '' }],
   'ambiguous-angle-vertex': [{ vertex: 'B', angles: '∠ABC, ∠ABD' }, { vertex: 'B', angles: '' }],
   'proof-target': [{ sentence: 'הוכיחו כי AB = CD' }],
+  'radian-angle': [{}],
   'unread-name': [{ detail: 'ДЖФ' }],
   'unread-word': [{ detail: 'ДЖФ' }],
   'component-symbolic': [{ component: 'x_B' }],

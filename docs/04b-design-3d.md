@@ -64,6 +64,8 @@ UNREAD: the rule declines and flags it, and after every rule has declined `parse
 `solid-size-unread`, which the store words as apply's own `given-not-drivable` size refusal. The gate values a
 fraction by its value, or by numerator AND denominator together (the ratio's `p`/`q`), never by one part alone.
 
+**An angle written in radians is refused** (#1837, [ADR-W-142](06w-decisions-workspace.md#adr-w-142)). `readStatement3` asks `findRadianAngle` (`shell/radianAngle.ts`) right after `findProofTarget` and answers `{ code: 'radian-angle' }` — `guided` in `STORE_CATEGORY3`, worded `err.radianAngle` (2-D's sentence) — so «∠ABC = π» is no longer an angle mark labelled π and the other spellings never reach the model.
+
 **A letter the tool cannot read is refused by name** (#1919, [ADR-3D-328](06b-decisions-3d.md#adr-3d-328)).
 `readStatement3` — the one reader submit and the ✎ edit share — asks `unreadScript` (`shell/inputScript.ts`,
 the shared rule all four builders call) right after `findProofTarget`, and answers

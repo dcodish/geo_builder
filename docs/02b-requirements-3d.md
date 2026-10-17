@@ -165,6 +165,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   GREEK vertex name («משולש ΓΔΘ», «משולש αβγ») goes to the model as it does in 2-D, where it used to record
   A, B, C. Greek as notation — a measure name, «ΔABC» — is unchanged.
   - Sources: [ADR-3D-328](06b-decisions-3d.md#adr-3d-328), [ADR-626](06-decisions.md#adr-626), #1919.
+- **FR-SP-21a (Must)** — **A plane-geometry angle written in radians is refused and taught in degrees**
+  ([FR-SU-20](02w-requirements-workspace.md)). «∠ABC = π» recorded an angle mark labelled π; «∠ABC = π/2» and the
+  other spellings went to the model. Each is now refused at the one statement reader submit and the ✎ edit share,
+  with 2-D's sentence «בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90». π as a plane name («B על המישור π2») and a space angle
+  with a plane operand are unchanged.
+  - Sources: [ADR-W-142](06w-decisions-workspace.md#adr-w-142), [ADR-710](06-decisions.md#adr-710), #1837.
 
 - **FR-SP-23 (Must)** — **A point given with TWO coordinates sends the student to the analytic Builder, in
   2-D's words.** «A(0,0)», «A = (1, 2)», «נקודה A(1,2)», «הנקודה E נמצאת ב-(-1,7)», «A(2;10)» and «A = 3,4»

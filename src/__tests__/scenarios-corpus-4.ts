@@ -5108,6 +5108,23 @@ export const SCENARIOS_4: Scenario[] = [
       expect(stated.labels.lengths.map((l) => `${l.a}${l.b}:${l.text}`), 'a stated OP still prints').toEqual(['OP:10']);
     },
   },
+  {
+    id: 'radian-angle-refused-1837',
+    title: '«משולש ABC» · «∠ABC = π/2» — an angle written in radians is refused and taught in degrees, never drawn; «∠ABC = 90» then builds (#1837, ADR-710)',
+    guards:
+      "#1837, the operator's ruling of 2026-10-07 («Refuse and teach degrees»; 2026-10-08: radians are the complex builder's only). Measured on main b0e9dbea: 2-D handed every π angle to the AI fallback and committed «∠ABC = pi/2» as set-angle B = 2 (2°); 3-D recorded «∠ABC = π» as an angle mark labelled π; analytic drew «∠ABC = π/2» as 1.57°. Root cause: each builder's angle reader handled π its own way and no gate looked at the unit. Fix: one shared rule (shell/radianAngle.ts) called at every plane-geometry builder's statement seam and at 2-D's parse boundary. Asserts the ruled sequence refuses its second line at the parser as `radian-angle`, draws nothing of it, and that the degrees remedy the note teaches builds a right angle at B. The cross-builder matrix is shell/__tests__/fixtures/radian-angle-rows.ts with its three thin locks.",
+    steps: ['משולש ABC', '∠ABC = π/2', '∠ABC = 90'],
+    refusedSteps: [
+      { step: 2, reason: 'radian-angle', with: { value: 'π/2' }, why: 'the operator’s ruling of 2026-10-07: an angle written with π is refused and taught in degrees, never drawn' },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const [a, b, c] = ['A', 'B', 'C'].map((id) => fig.positions.get(id)!);
+      const deg = (Math.abs(Math.atan2((a.x - b.x) * (c.y - b.y) - (a.y - b.y) * (c.x - b.x), (a.x - b.x) * (c.x - b.x) + (a.y - b.y) * (c.y - b.y))) * 180) / Math.PI;
+      expect(deg, 'the degrees remedy draws a right angle at B').toBeCloseTo(90, 6);
+      expect(replay(factsOf(['משולש ABC', '∠ABC = pi/2'], [{ step: 2, reason: 'radian-angle', with: { value: 'pi/2' }, why: 'the ASCII spelling committed 2°' }])).construction.constraints.length, 'pi/2 adds no constraint').toBe(replay(factsOf(['משולש ABC'])).construction.constraints.length);
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */
