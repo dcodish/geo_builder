@@ -496,14 +496,22 @@ letters after the noun). It is an ambiguity question (`isAmbiguityQuestion`), so
 the model sees it; `ambiguousDefiniteShapeNote` (`app/decideDeterministic.ts`) renders it for the submit and ✎ edit
 seams (`input.ambiguousDefiniteShape`, the plural from `input.shapePlural` by arity).
 
-### A through-statement about a drawn circle is a reference ([ADR-548](06-decisions.md#adr-548))
+### A through- or size-statement about a drawn circle is a reference ([ADR-548](06-decisions.md#adr-548), [ADR-690](06-decisions.md#adr-690))
 
 The circle definition rules (`circle`, `circumcircle` in `src/parser/parse.ts`) ask ADR-029's introduce-vs-resolve
-question through `circleThroughReference`: a reference when its named centre's circle exists, or when it says
+question through `definiteCircleReference`: a reference when its named centre's circle exists, or when it says
 «המעגל» and a circle is drawn. It resolves through `circumscribingRef` → `directionalCircleRef` →
 `existingCircleRef` (ADR-443's tie-break); unbindable → `ambiguous-circle-ref`. It lowers to one `point-on-circle`
 per label (the M1 membership shared), a stated size as `set-radius`, and defers on any residue. `throughClause` is
 the one reader of the through list; a definition lowers one through point, a longer list is the circumcircle.
+
+**A size statement asks the same predicate** (ADR-690). `circleSizeExisting` («שטח/היקף המעגל הוא …», "the area of
+the circle is …") asks it when no named circle or bare circle label is read, and lowers the resolved circle to the
+`set-radius` its named form emits (or returns the ask). The `circle` definition rule asks it for an unnamed definite
+noun with a size and no through clause (`lowerSizeReference`: «המעגל ששטחו 9π», «המעגל ברדיוס 3»): a numeric size
+is `set-radius`, a radius letter is `radius-symbol` (its twin «רדיוס המעגל R»'s command), the same residue guard
+applies, and a reference it cannot read whole defers — never a definition. A named centre keeps its own path
+(ADR-683's restatement).
 
 **The membership seats the circle, not the point** ([ADR-576](06-decisions.md#adr-576)): before apply branch (c2)
 converts an existing free vertex to an `on-circle` rider, `reseatFreeCircle` moves the circle's unstated seat

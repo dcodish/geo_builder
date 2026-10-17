@@ -5342,8 +5342,8 @@ const throughClause = (s: string): { labels: Id[]; text: string } | null => {
 const DEFINITE_CIRCLE = /(?<![א-ת])[וש]?המעגל(?![א-ת])|\bthe\s+circle\b/i;
 
 /**
- * #1438 ([ADR-548](../../docs/06-decisions.md#adr-548)) — is this through-statement a REFERENCE to a circle
- * the figure already has? ADR-029 (introduce-vs-resolve) asked that question of every circle-CONSUMING
+ * #1438 ([ADR-548](../../docs/06-decisions.md#adr-548)), widened by #2242 ([ADR-690](../../docs/06-decisions.md#adr-690))
+ * — is this circle statement (a through clause, or a SIZE) a REFERENCE to a circle the figure already has? ADR-029 (introduce-vs-resolve) asked that question of every circle-CONSUMING
  * rule but never of the circle DEFINITION rules, so «מעגל O · נקודה A · המעגל עובר דרך A» minted a
  * second circle through A (centre P, green) while circle O stayed where it was. A statement about an
  * existing circle is lowered to MEMBERSHIP on it (M1, docs/17 §4) — never re-created:
@@ -5354,8 +5354,13 @@ const DEFINITE_CIRCLE = /(?<![א-ת])[וש]?המעגל(?![א-ת])|\bthe\s+circle
  *    bind → ASK which (`ambiguous-circle-ref`), never a silent pick and never a third circle.
  * Null ⇒ not a reference: an indefinite «מעגל העובר דרך A», a fresh named centre, or «המעגל» with no
  * circle drawn yet — the DEFINITION path keeps those.
+ *
+ * #2242 (ADR-690): the same question is asked of a definite SIZE statement — «שטח המעגל הוא 9π», «המעגל ששטחו
+ * 9π», «המעגל ברדיוס 3», "the area of the circle is 9π" — by `circleSizeExisting` and by the `circle`
+ * definition rule ({@link lowerSizeReference}). It used to be asked only inside the through branch, so a size
+ * about «המעגל» minted a second circle beside the drawn one (and a third beside two).
  */
-const circleThroughReference = (s: string, ctx: ParseContext, named: string | null): { center: string } | Clarify | null => {
+const definiteCircleReference = (s: string, ctx: ParseContext, named: string | null): { center: string } | Clarify | null => {
   const circles = (ctx.circles ?? []).filter((c) => !c.startsWith('~'));
   if (circles.length === 0) return null;
   if (named) {
@@ -5384,7 +5389,7 @@ const lowerThroughReference = (
   named: string | null,
   r: ReturnType<typeof parseRadius>,
 ): AnyCommand[] | Clarify | null => {
-  const ref = circleThroughReference(s, ctx, named);
+  const ref = definiteCircleReference(s, ctx, named);
   if (!ref) return null;
   if (r.symbolic) return null; // a radius SYMBOL on a reference is a naming statement — not this path's
   const rest = s
@@ -5413,6 +5418,39 @@ const lowerThroughReference = (
   ];
 };
 
+/**
+ * #2242 ([ADR-690](../../docs/06-decisions.md#adr-690)) — lower a SIZE statement about the definite «המעגל» /
+ * "the circle" onto the circle the figure already has: {@link lowerThroughReference} with no through list. A
+ * NUMERIC size is `set-radius` on the resolved circle (the command the named «המעגל O ברדיוס 3» / «שטח המעגל O
+ * הוא 9π» emits); a radius SYMBOL is `radius-symbol` on it (the command its twin «רדיוס המעגל R» emits) — on the
+ * through path a symbol rides beside another given, here it IS the statement. The same leftover guard: what the
+ * path reads is stripped and any residue defers whole. Beside several circles it cannot bind it ASKS
+ * (`ambiguous-circle-ref`), once the sentence is otherwise fully read. Null ⇒ not a definite size reference.
+ */
+const lowerSizeReference = (s: string, ctx: ParseContext, r: ReturnType<typeof parseRadius>): AnyCommand[] | Clarify | null => {
+  if (!r.numeric && !(r.symbolic && r.sym)) return null;
+  const ref = definiteCircleReference(s, ctx, null);
+  if (!ref) return null;
+  const rest = s
+    .replace(new RegExp(CIRCUM_REF_SRC, 'i'), ' ')
+    .replace(/ה?מעגל\s+ה?(?:ימני|שמאלי)|\bthe\s+(?:right|left)(?:-hand)?\s+circle\b/gi, ' ')
+    .replace(/circles?|[ושבל]?ה?מעגל\w*/gi, ' ')
+    .replace(/[ושב]{0,2}(?:רדיוס|היק[פף]|שטח|קוטר)[והם]?|radius|circumference|perimeter|diameter|area|π|√|ס["״']?מ|מ["״']?מ|שווה(?:\s+ל-?)?/gi, ' ')
+    .replace(r.numeric ? rx(NUM, 'g') : new RegExp(String.raw`(?<![A-Za-z\d])${r.sym}(?![A-Za-z\d])`, 'g'), ' ')
+    .replace(REQUEST_WORDS, ' ')
+    .replace(FILLER, ' ')
+    .replace(/(?<![א-ת])(?:גם|הוא|היא|אכן|של)(?![א-ת])/g, ' ')
+    .replace(/[.,:;·=?!/-]/g, ' ')
+    .trim();
+  if (rest) return null;
+  if ('clarify' in ref) return ref;
+  const circ = circleId(ref.center);
+  if (r.numeric) return [{ type: 'set-radius', circle: circ, value: r.radius, ...piDeclared(r) }];
+  // The letter must not BE the circle («המעגל ברדיוס O» on circle O) — the `radiusSymbol` rule's own guard (#772).
+  if (up(r.sym!) === up(ref.center)) return null;
+  return [{ type: 'radius-symbol', circle: circ, name: r.sym! }];
+};
+
 /** "circle centered at O radius 5" / "circle O radius R" / "מעגל שמרכזו O רדיוסו 5". */
 const circle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
@@ -5437,7 +5475,16 @@ const circle: Rule = (s, ctx) => {
   if (thr) {
     const asRef = lowerThroughReference(s, ctx, thr, named, r);
     if (asRef) return asRef;
-    if (circleThroughReference(s, ctx, named)) return null;
+    if (definiteCircleReference(s, ctx, named)) return null;
+  }
+  // #2242 (ADR-690): the same question for a SIZE about the definite «המעגל» / "the circle" with no through clause
+  // («המעגל ששטחו 9π», «המעגל ברדיוס 3», «המעגל ברדיוס R») — it sizes the drawn circle, or asks which. A reference
+  // the path cannot read whole defers; it never falls through to a definition (ADR-548's own rule). A NAMED centre
+  // keeps its path (the re-statement of a drawn «מעגל O ברדיוס 4» is #2119's contradiction, not a reference here).
+  if (!thr && !named && (r.numeric || r.symbolic)) {
+    const asRef = lowerSizeReference(s, ctx, r);
+    if (asRef) return asRef;
+    if (definiteCircleReference(s, ctx, null)) return null;
   }
   // «דרך X» / "through X" is a circle DEFINITION only when no OTHER construct owns the through (#180):
   // «דרך A עובר משיק למעגל» is a TANGENT through A, and claiming it here minted a phantom circle
@@ -5797,7 +5844,16 @@ const circleSizeExisting: Rule = (s, ctx) => {
     const labels = (s.match(/[A-Z]\d*/g) ?? []).map(up);
     center = (ctx.circles ?? []).map(up).find((c) => labels.includes(c)) ?? null;
   }
-  if (!center) return null;
+  if (!center) {
+    // #2242 (ADR-690): the definite «שטח המעגל הוא 9π» / "the area of the circle is 9π" is a REFERENCE to the drawn
+    // circle — the one the shared resolver binds, or the ask beside several. It used to return null here and the
+    // `circle` definition rule minted a second circle P with the stated size, green. No circle drawn, or the
+    // indefinite «שטח מעגל הוא 9π» ⇒ null, and the definition path keeps it (FR-IN-12, ADR-654).
+    const ref = definiteCircleReference(s, ctx, null);
+    if (!ref) return null;
+    if ('clarify' in ref) return ref;
+    center = ref.center;
+  }
   if (!(ctx.circles ?? []).some((c) => up(c) === up(center))) {
     // FRESH name: only the keyword-FIRST reference form claims it (#538 — «היקף מעגל O1 הוא 6π»); a
     // noun-first creation description («מעגל O1 שהיקפו 6π», "circle O1 whose area is 9π") is the circle
@@ -10165,7 +10221,7 @@ const circumcircle: Rule = (s, ctx) => {
   // #1438 (ADR-548): the DEFINITE through-statement «המעגל עובר דרך A, B ו-C» beside a drawn circle is a
   // REFERENCE to it (ADR-029), not a new circumcircle — the `circle` rule lowers it to membership (or asks
   // which circle). A circumscription («המעגל החוסם…») is a self-identifying description and stays here.
-  if (!/circumscrib|חוסם/i.test(s) && throughClause(s) && circleThroughReference(s, ctx, null)) return null;
+  if (!/circumscrib|חוסם/i.test(s) && throughClause(s) && definiteCircleReference(s, ctx, null)) return null;
   // "circle through A B C D" — FOUR existing points: a unique circle can't pass through four arbitrary
   // points, so draw the circumcircle of three and make the fourth concyclic by driving a free DOF
   // (ADR-041). Only when all four already exist (else it's a fresh on-circle placement, not this rule).
