@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-17T18:04:21.955Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מרובע ABCD",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon4",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AB ‖ CD",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "segment3",
+          "a": "C",
+          "b": "D"
+        },
+        {
+          "type": "mutual-rel",
+          "rel": "parallel",
+          "a": {
+            "kind": "segment",
+            "a": "A",
+            "b": "B"
+          },
+          "b": {
+            "kind": "segment",
+            "a": "C",
+            "b": "D"
+          }
+        }
+      ]
+    }
+  ]
+}

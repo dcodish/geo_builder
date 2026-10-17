@@ -74,8 +74,12 @@ describe('#2097 — the fold is scoped to a two-label bar pair', () => {
   it.each([
     '|z| = 4', // not 2-D's vocabulary — left to its current path
     '|ABC| = 4', // three labels — not a length
-    'AB || CD || EF', // a doubled bar is never half of an absolute value
   ])('«%s» is untouched', (raw) => {
     expect(normalizeUtterance(raw)).toBe(raw);
+  });
+  // a doubled bar is never half of an absolute value. #2069 (ADR-W-145): between two operands it is the parallel
+  // sign's look-alike, folded to ∥ by the shared glyph table — still not a length.
+  it('«AB || CD || EF» is never an absolute value: it reads as the parallels «AB ∥ CD ∥ EF»', () => {
+    expect(normalizeUtterance('AB || CD || EF')).toBe('AB ∥ CD ∥ EF');
   });
 });

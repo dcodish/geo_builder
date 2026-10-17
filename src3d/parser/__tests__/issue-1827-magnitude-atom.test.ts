@@ -19,6 +19,10 @@ import { decideDeterministic3 } from '../../app/decideDeterministic3';
 import { derive3, type Fact3 } from '../../store/store3';
 import type { Command3 } from '../../engine/types';
 
+/** Each spelling a slot reads: the product spellings are not the tuple slot's (#2069). */
+const spellingsOf = (r: { tupleSlot?: true }) => SPELLINGS.filter(([sp]) => !(r.tupleSlot && PRODUCT_SPELLINGS.has(sp)));
+const SWEEP_SIZE = () => RULES.reduce((n, r) => n + spellingsOf(r).length, 0);
+
 /** Each spelling and the value it states. The `sqrt` rows are the keyboard spellings 2-D reads as √. */
 const SPELLINGS: ReadonlyArray<readonly [string, number]> = [
   ['√7', Math.sqrt(7)],
@@ -31,6 +35,12 @@ const SPELLINGS: ReadonlyArray<readonly [string, number]> = [
   ['3', 3],
   ['sqrt(7)', Math.sqrt(7)],
   ['sqrt7', Math.sqrt(7)],
+  // #2069 (ADR-3D-369): the explicit product before the root, which 2-D reads as 2√7
+  ['2*√7', 2 * Math.sqrt(7)],
+  ['2 * √7', 2 * Math.sqrt(7)],
+  ['2·√7', 2 * Math.sqrt(7)],
+  ['3*√2/2', (3 * Math.SQRT2) / 2],
+  ['2*sqrt(7)', 2 * Math.sqrt(7)],
   ['\\sqrt{7}', Math.sqrt(7)],
 ];
 
@@ -58,7 +68,10 @@ const heightLenOf: Reader = (cmds) => {
 };
 
 /** Every rule whose slot states a magnitude a 2-D sentence also states, with a template and its reader. */
-const RULES: ReadonlyArray<{ rule: string; template: string; read: Reader }> = [
+/** #2069 (ADR-3D-369): the explicit-product spellings — read by every slot that composes `MAG`; the coordinate
+ *  slot reads the tuple's component grammar instead (held by #2081's plan), so it is exempt, and refuses them. */
+const PRODUCT_SPELLINGS = new Set(['2*√7', '2 * √7', '2·√7', '3*√2/2', '2*sqrt(7)']);
+const RULES: ReadonlyArray<{ rule: string; template: string; read: Reader; tupleSlot?: true }> = [
   { rule: 'lengthClaim (bare AB = v)', template: 'AD = {v}', read: lengthOf },
   { rule: 'lengthClaim, no spaces (the reported line)', template: 'AD={v}', read: lengthOf },
   { rule: 'lengthRel (|AB| = v)', template: '|AD| = {v}', read: lengthOf },
@@ -68,8 +81,8 @@ const RULES: ReadonlyArray<{ rule: string; template: string; read: Reader }> = [
   { rule: 'readHeight3, noun-first', template: 'גובה הפירמידה SO = {v}', read: lengthOf },
   { rule: 'heightFromApex', template: 'גובה הפירמידה הוא {v}', read: heightLenOf },
   // #2081 (ADR-3D-362, ruling 2026-10-14 card d14b-2081-roots A): the coordinate-claim and distance slots
-  { rule: 'coordsClaim (A = (v,0,0))', template: 'A = ({v},0,0)', read: coordXOf },
-  { rule: 'coordsClaim, no spaces', template: 'A=({v},0,0)', read: coordXOf },
+  { rule: 'coordsClaim (A = (v,0,0))', template: 'A = ({v},0,0)', read: coordXOf, tupleSlot: true },
+  { rule: 'coordsClaim, no spaces', template: 'A=({v},0,0)', read: coordXOf, tupleSlot: true },
   { rule: 'distanceGiven, «בין … ל…» point–plane', template: 'המרחק בין S למישור ABC הוא {v}', read: distanceOf },
   { rule: 'distanceGiven, «מ … ל…» point–line', template: 'המרחק מ S לישר AB הוא {v}', read: distanceOf },
   { rule: 'distanceGiven, «שווה ל-»', template: 'המרחק בין S למישור ABC שווה ל-{v}', read: distanceOf },
@@ -80,8 +93,9 @@ describe('#1827 — every stated-magnitude slot reads every value spelling', () 
   it('rule × spelling: parses, and the value is the one the spelling states', () => {
     const exercised = new Set<string>();
     let checks = 0;
-    for (const { rule, template, read } of RULES) {
-      for (const [spelling, value] of SPELLINGS) {
+    for (const r0 of RULES) {
+      const { rule, template, read } = r0;
+      for (const [spelling, value] of spellingsOf(r0)) {
         const line = template.replace('{v}', spelling);
         const r = parse3(line);
         expect(r.ok, `${rule}: «${line}»`).toBe(true);
@@ -94,7 +108,7 @@ describe('#1827 — every stated-magnitude slot reads every value spelling', () 
     }
     // the guard: the sweep cannot pass by matching nothing
     expect(exercised.size).toBe(RULES.length);
-    expect(checks).toBe(RULES.length * SPELLINGS.length);
+    expect(checks).toBe(SWEEP_SIZE());
   });
 
   it('the atom and its reader agree: the glyph spellings evaluate exactly as the parser lowers them', () => {
@@ -110,6 +124,12 @@ describe('#1827 — every stated-magnitude slot reads every value spelling', () 
     }
   });
 
+  it('#2069: the tuple slot keeps its own grammar — the explicit product refuses there, and «2*7» refuses everywhere', () => {
+    expect(parse3('A = (2*√7,0,0)').ok).toBe(false);
+    expect(parse3('AD = 2*7').ok).toBe(false); // 2-D escalates it: the product is admitted before a root only
+    expect(parse3('AD = 2×√7').ok).toBe(false); // 2-D escalates «×»
+  });
+
   it('an ANGLE stays a decimal slot (its unit is the degree; out of scope)', () => {
     expect(parse3('∠ABC = √3').ok).toBe(false);
   });
@@ -118,8 +138,9 @@ describe('#1827 — every stated-magnitude slot reads every value spelling', () 
 describe('#1827 — the honesty gate agrees with the parser on every value it reads', () => {
   it('a line the parser reads is never flagged dropped-given', () => {
     let checks = 0;
-    for (const { template } of RULES) {
-      for (const [spelling] of SPELLINGS) {
+    for (const r0 of RULES) {
+      const { template } = r0;
+      for (const [spelling] of spellingsOf(r0)) {
         const line = template.replace('{v}', spelling);
         const r = parse3(line);
         if (!r.ok) continue;
@@ -127,7 +148,7 @@ describe('#1827 — the honesty gate agrees with the parser on every value it re
         checks++;
       }
     }
-    expect(checks).toBe(RULES.length * SPELLINGS.length);
+    expect(checks).toBe(SWEEP_SIZE());
   });
 
   it('the gate still flags a radical the commands did NOT carry', () => {

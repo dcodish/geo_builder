@@ -287,6 +287,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2253': 'open', // #2165 (ADR-681): analytic and 3-D read no value line for a length letter; 3-D refuses «AB = 2a»
 
+  '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
 export interface ParityRow {
@@ -569,7 +570,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'cat-2d-067', family: 'chords-arcs', steps: ['נקודה A', 'נקודה C', 'נקודה B', 'נקודה E', 'נקודה D', 'נקודה O', 'קשת AC + קשת BE = קשת AD + קשת BC במעגל O'], expect: 'builds', exception: 'X8', note: 'ADR-663 (#2049): the arc puts its existing endpoints ON circle O — before, the row built with them left off it' },
   { id: 'cat-2d-068', family: 'lengths', steps: ['נקודה D', 'נקודה M', 'נקודה E', 'נקודה B', 'נקודה R', 'DM*ME = BM*DR'], expect: 'builds', exception: 'X9' },
   { id: 'cat-2d-069', family: 'chords-arcs', steps: ['זוית מרכזית COD'], expect: 'builds', exception: 'X8' },
-  { id: 'cat-2d-070', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC הוא 13'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
+  { id: 'cat-2d-070', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC הוא 13'], expect: 'builds', note: '3-D healed by #2069 (ADR-3D-369, the area copula); was a parked #1679 gap' },
   { id: 'cat-2d-071', family: 'area-perimeter', steps: ['נקודה A', 'נקודה B', 'נקודה F', 'נקודה E', 'שטח ABF גדול פי 2 משטח BFE'], expect: 'builds', exception: 'X9' },
   { id: 'cat-2d-072', family: 'area-perimeter', steps: ['נסמן את שטח ABCD ב-S'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   { id: 'cat-2d-073', family: 'area-perimeter', steps: ['משולש ABC', 'היקף המשולש ABC = 20'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
@@ -1599,6 +1600,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2097 (ADR-719): «|XY|» is the length XY in every slot — 2-D read it only in the sum, ordering and bound rules ──
   { id: 'abs-length-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = 4'], expect: 'builds', note: '2-D escalated it before ADR-719' },
   { id: 'abs-length-var-2097', family: 'lengths', steps: ['משולש ABC', '|AB| = k'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2092' }], note: '2-D escalated it before ADR-719' },
+  // #2069 (ADR-3D-369, ADR-W-145): the value readers 2-D already had, and the parallel look-alikes folded at the shared boundary
+  { id: 'root-product-2069', family: 'lengths', steps: ['מלבן ABCD', 'AD=2*√7'], expect: 'builds', note: '3-D did not read the explicit product before ADR-3D-369' },
+  { id: 'root-product-dot-2069', family: 'lengths', steps: ['מלבן ABCD', 'AD=2·√7'], expect: 'builds', note: '3-D did not read the explicit product before ADR-3D-369' },
+  { id: 'area-copula-2069', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC הוא 2√3'], expect: 'builds', note: '3-D read the area only with «=» before ADR-3D-369' },
+  { id: 'area-copula-en-2069', family: 'area-perimeter', steps: ['משולש ABC', 'the area of triangle ABC is 6'], expect: 'builds', note: '3-D read the area only with «=» before ADR-3D-369' },
+  { id: 'triangle-sign-2069', family: 'polygons', steps: ['△ABC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2069' }], note: '3-D did not read the sign before ADR-3D-369' },
+  { id: 'parallel-u2016-2069', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB ‖ CD'], expect: 'builds', note: 'escalated in 2-D, not understood in 3-D, refused in analytic before ADR-W-145' },
+  { id: 'parallel-bars-2069', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB || CD'], expect: 'builds', note: '2-D escalated it before ADR-W-145' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

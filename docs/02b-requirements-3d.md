@@ -166,6 +166,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   can state they can ask (FR-CL-4). A comparison is never turned into an angle. The fact row keeps exactly
   the glyph that was typed. A stated length, area or height takes a RADICAL value («AD = √7», «2√7»,
   «√7/2», «√(3/4)») wherever it takes a decimal, as 2-D does: «AD = √7» and «|AD| = √7» are one given.
+  The coefficient may be joined to the root by an explicit product, «2*√7» / «2 · √7» / «3*√2/2», as 2-D reads
+  it (#2069, [ADR-3D-369](06b-decisions-3d.md#adr-3d-369)); a product without a root («2*7») is not a value.
+  An area is stated with «=», «הוא», a bare «שווה» or English "is" («שטח המשולש ABC הוא 6»), the copulas 2-D's
+  area reads, and the triangle sign «△ABC» / «▲ABC» declares triangle ABC, as in 2-D.
   So do a stated DISTANCE («המרחק בין S למישור ABC הוא √2», «… הוא 3/2») and a coordinates claim
   («A=(√2,0,0)», «A=(½,0,0)»), which reads exactly the components «A(√2,0,0)» reads (ADR-3D-362, #2081).
   - Sources: [ADR-3D-329](06b-decisions-3d.md#adr-3d-329), #1912; the prime fold ADR-3D-300 is the same

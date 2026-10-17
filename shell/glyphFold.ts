@@ -64,6 +64,36 @@ const LOOKALIKE_LETTERS: Record<string, string> = {
 export const foldLookalikeLetters = (s: string): string =>
   s.replace(/[АВСЕНКМОРТХ]/g, (ch) => LOOKALIKE_LETTERS[ch]);
 
+/**
+ * #2069 ([ADR-W-145](../docs/06w-decisions-workspace.md#adr-w-145)) — THE PARALLEL LOOK-ALIKES, «‖» (U+2016 DOUBLE
+ * VERTICAL LINE) and two ASCII bars «||», as ∥ (U+2225 PARALLEL TO). Both are also a WRAPPING notation — the norm
+ * «‖u‖» and two absolute values «|AB||CD|» — so the fold is INFIX only: an operand directly before it (a label, a
+ * line or vector name, a digit, a closing bracket) and an operand directly after it (a letter or «(»), ignoring
+ * whitespace, and no unclosed bar of the same kind before it on the line. «‖u‖ = 5», «|AB||CD|» and «|AB|·|CD|»
+ * are never turned into a parallel.
+ */
+const PAR_OPERAND_BEFORE = /[A-Za-zα-ω0-9'ℓ)\]]$/;
+const PAR_OPERAND_AFTER = /^[A-Za-zα-ωℓ(]/;
+const foldParallelLookalike =
+  (glyph: RegExp, bar: string) =>
+  (s: string): string => {
+    // left to right, so a bar already read as ∥ is not counted as a wrapper («AB ‖ CD ‖ EF» folds both)
+    let out = '';
+    let last = 0;
+    for (const m of s.matchAll(glyph)) {
+      const off = m.index ?? 0;
+      out += s.slice(last, off);
+      last = off + m[0].length;
+      const unclosed = out.split(bar).length % 2 === 0; // an open bar of the same kind: this one closes a wrapper
+      const infix =
+        !unclosed &&
+        PAR_OPERAND_BEFORE.test(out.replace(/\s+$/, '')) &&
+        PAR_OPERAND_AFTER.test(s.slice(last).replace(/^\s+/, ''));
+      out += infix ? '∥' : m[0];
+    }
+    return out + s.slice(last);
+  };
+
 /** The keyboard `<` as the angle sign — 2-D's guard (ADR-381), the one place it is spelled. */
 const foldKeyboardAngle = (s: string): string =>
   s.replace(/</g, (m, off: number, str: string) => {
@@ -81,6 +111,14 @@ export const GLYPH_FOLDS: readonly GlyphFold[] = [
   {
     why: '⟂ (U+27C2) is ⊥ (U+22A5): every builder’s symbol palette inserts ⊥, and a line copied from a book or another builder may carry either',
     apply: (s) => s.replace(/⟂/g, '⊥'),
+  },
+  {
+    why: '«‖» (U+2016 DOUBLE VERTICAL LINE) between two operands is ∥ (U+2225), the parallel sign (#2069, FR-SU-17) — never as the norm’s wrapping pair «‖u‖»',
+    apply: foldParallelLookalike(/‖/g, '‖'),
+  },
+  {
+    why: 'two ASCII bars «||» between two operands are ∥ (#2069, FR-SU-17), the keyboard spelling 3-D and analytic already read — never inside an absolute value («|AB||CD|»)',
+    apply: foldParallelLookalike(/\|\|/g, '|'),
   },
   {
     why: '∡ (MEASURED ANGLE) and ∢ (SPHERICAL ANGLE) are the book’s ∠ (#45, ADR-299)',
