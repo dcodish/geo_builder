@@ -27,7 +27,7 @@ import { decideDeterministic2D } from '@/app/decideDeterministic';
 import { otherUtteranceForError } from '@/app/errorSubject';
 import { runSubmit, type SubmitDeps } from '@/app/submitPipeline';
 import { replay, useGeoStore } from '@/store/geoStore';
-import { choiceRescue, COLLAPSED_VS } from '@/replay/core';
+import { choiceRescue, choiceRescueConfig, COLLAPSED_VS } from '@/replay/core';
 import { factsOf } from '@/__tests__/scenario-pipeline';
 import { driveThroughGate } from '@/__tests__/submit-gate';
 import { DEGENERATE_EXTENT_RATIO, degeneratePolygons } from '@/engine';
@@ -189,12 +189,11 @@ describe('#1849 — the false-refusal net: what is not forced flat still builds'
 
   it('«משולש שווה שוקיים ABC · AB = 4 · BC = 8» is NOT forced flat: only the DEFAULT apex flattens it, and another apex is a real 4·8·8 triangle (M4)', () => {
     // The step refuses the default seat (apex A: 4·4·8 is a line) exactly as it refuses 4·4·9 there (the metric
-    // prover); the unstated apex is the variant rescue's to flip (ADR-573). Asserted on the rescue itself with an
-    // unhurried deadline — the gate's 1.5 s wall-clock budget is the rescue's, measured at 1.6 s for this figure
-    // on the dev machine (reported with #1849; the 4·4·9 twin pays the same).
+    // prover); the unstated apex is the variant rescue's to flip (ADR-573). Asserted on the rescue itself under the
+    // gate's own work cap (#1857, ADR-709 — it was a 1.5 s wall clock this figure overran cold, at 1.6 s).
     const facts = factsOf(['משולש שווה שוקיים ABC', 'AB = 4', 'BC = 8']);
     expect(replay(facts, 0).lastError, 'the default apex is refused, as a collapse').toMatch(COLLAPSED_VS);
-    const cured = choiceRescue(facts, Date.now() + 60_000);
+    const cured = choiceRescue(facts, { workCap: choiceRescueConfig.cap });
     expect(cured, 'another apex admits the figure').not.toBeNull();
     const fig = replay(cured!.facts, cured!.seed);
     expect(fig.lastError).toBeNull();

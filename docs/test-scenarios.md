@@ -2028,3 +2028,7 @@ over all four (ADR-041).
 ### `typed-apex-base-height-pins-apex-1839` — a typed «AD גובה לבסיס» stays a height to the base in every configuration (#1839, ADR-708)
 
 **Guards against:** «משולש שווה שוקיים ABC» · «AD גובה לבסיס» letting «הציגו תצורה אחרת» move the apex to B and C, with D then the foot on a leg while the row still said «לבסיס» (answered by the record 2026-10-07: FR-IN-13, charter P13). **Asserts** A, B, C do not move when the line is added, and at the default view and four presses A is the apex, D lies on BC with AD ⟂ BC, every view green. The matrix (the median, the apex-angle bisector, English, «BD גובה לבסיס», the legs «BE גובה/תיכון לשוק AC», «AB = BC» → equilateral, the «…לבסיס BC» and unlettered controls) is `src/app/__tests__/issue-1839-typed-role-pins-apex.test.ts`.
+
+### `isosceles-apex-rescue-deterministic-1857` — «משולש שווה שוקיים ABC · AB = 4 · BC = 8» commits on every run (#1857, ADR-709)
+
+**Guards against:** «BC = 8» after «משולש שווה שוקיים ABC» · «AB = 4» being refused as collapsed on a cold or slow run and committed on a warm one — the dry run's unstated-choice rescue ran under a 1.5 s wall clock, and cold, the first apex it tried (an impossible 4 = 8) cost ~2.1M evaluations before the curing apex was read. **Asserts** the prefix builds green and both «BC = 8» and «BC = 9» commit through the gate. The cold/warm/fast-clock/cap matrix (equal charged work cold and warm, the 4·8·8 and 4·9·9 drawings) is `src/app/__tests__/issue-1857-variant-rescue-work-cap.test.ts`.
