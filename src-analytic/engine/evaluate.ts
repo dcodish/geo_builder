@@ -4019,6 +4019,25 @@ export function admittedToPool(f: Figure): boolean {
   return admittedFigure(f);
 }
 
+/**
+ * THE ADMITTED POOL, FOR A DISCRETE VERDICT (#2233, ADR-AG-290) — the configurations a surface reads "which option
+ * do the givens leave?" off, the same set `isKnowledge` judges values over. `null` when the pool CANNOT TELL yet:
+ * a deferred pool not yet complete (reported pending, so the page re-renders when it completes), none admitted,
+ * or a starved pool (#1642) — the caller then keeps what it said before, never a provisional verdict.
+ */
+export function admittedPool(c: Construction): Figure[] | null {
+  const pool = poolOf(c);
+  if (!pool.complete()) {
+    if (pool.deferred) {
+      pool.notePending();
+      return null;
+    }
+    pool.fill();
+  }
+  const figs = admittedOf(c, pool.ready());
+  return figs.length === 0 || starved(figs) ? null : figs;
+}
+
 /** The admitted configurations at these seeds. */
 function admittedOf(c: Construction, seeds: readonly number[]): Figure[] {
   const out: Figure[] = [];
