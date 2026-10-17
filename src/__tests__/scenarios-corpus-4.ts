@@ -5031,6 +5031,24 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  // ── #2242 (ADR-690): a size stated about «המעגל» beside two circles asks which; nothing is added ──
+  {
+    id: 'definite-circle-size-two-circles-2242',
+    title: '«שטח המעגל הוא 9π» beside circles O and P is refused asking which circle (input.ambiguousCircleRef); no third circle (#2242, ADR-690)',
+    guards:
+      "#2242 (P1), FR-IN-12: «המעגל» means the circle already drawn, and beside several it asks which. Measured at 4b0b4592 through decideDeterministic2D: «מעגל O · מעגל P · שטח המעגל הוא 9π» (and «היקף המעגל הוא 10π», «המעגל ברדיוס 3», «המעגל ששטחו 9π») minted a THIRD circle Q of the stated size, green. Root cause: the circle definition rule asked ADR-548's reference question only for a through clause, and `circleSizeExisting` resolved only a named circle, so a definite «המעגל» with a size minted a new circle. Fix: the one predicate `definiteCircleReference` is asked by both size paths. Asserts the two circles build, each line is refused by the parser with the circle question, and the figure keeps exactly two circles. The one-circle matrix is src/app/__tests__/issue-2242-definite-circle-size.test.ts; the one-circle build is the fixture definite-circle-area-2242.geo.json.",
+    steps: ['מעגל O', 'מעגל P'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.circles.size, 'two circles').toBe(2);
+      const facts = factsOf(['מעגל O', 'מעגל P']);
+      for (const line of ['שטח המעגל הוא 9π', 'היקף המעגל הוא 10π', 'המעגל ברדיוס 3', 'המעגל ששטחו 9π', 'the area of the circle is 9π']) {
+        const v = gateVerdict(facts, line);
+        expect(v, line).toEqual({ kind: 'refused', reason: 'parse', detail: 'ambiguous-circle-ref' });
+      }
+      expect(replay(facts).circles.size, 'nothing is added').toBe(2);
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

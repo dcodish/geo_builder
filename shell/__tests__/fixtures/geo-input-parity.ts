@@ -279,6 +279,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2235': 'open', // #2205 (ADR-685): 3-D picks the first of two triangles for a definite «המשולש …» where 2-D asks
   '#2236': 'open', // #2205 (ADR-685): analytic does not read a definite unnamed shape noun with a predicate
 
+  '#2244': 'open', // #2242 (ADR-690): analytic reads no circle area or circumference, so «מעגל O · שטח המעגל הוא 9π» is not-handled
+
   '#2253': 'open', // #2165 (ADR-681): analytic and 3-D read no value line for a length letter; 3-D refuses «AB = 2a»
 
 };
@@ -1527,6 +1529,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'radius-restated-2119', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל O ברדיוס 4'], expect: 'refused', exception: 'X8', note: '2-D answered «כבר קיים» before ADR-683; analytic refused in its own conflict sentence before ADR-684' },
   { id: 'radius-restated-sentence-2119', family: 'circles', steps: ['מעגל O ברדיוס 5', 'רדיוס המעגל O הוא 3'], expect: 'refused', exception: 'X8' },
   { id: 'radius-restated-with-point-2119', family: 'circles', steps: ['מעגל O ברדיוס 3', 'A על מעגל O', 'מעגל O ברדיוס 4'], expect: 'refused', exception: 'X8', note: '2-D resized silently and committed green before ADR-683' },
+  // ── #2242 (ADR-690): a size stated about «המעגל» sizes the drawn circle ──
+  { id: 'definite-circle-area-2242', family: 'circles', steps: ['מעגל O', 'שטח המעגל הוא 9π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2244' }], note: '2-D drew a second circle P of radius 3 beside O, green, before ADR-690; analytic reads no circle area (not-handled)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
