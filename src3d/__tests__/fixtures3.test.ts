@@ -365,6 +365,11 @@ const SEEDED: SeededCorpus = {
   // (before: a skew ring drawn green at every seed). Flatness, stability and the controls are asserted in
   // ring-free-vertex-1935.test.ts; this is the build + drift net.
   'ring-free-vertex-1935.geo3.json': ['משולש ABC', 'משולש ABD', 'מרובע ACBD'],
+  // #2081 (ADR-3D-362) — the rule-4 locks: a radical in the coordinate-claim slot and in the distance slot (before: both
+  // `not-understood` while «A(√2,0,0)» and «… הוא 2» built). The refusals and the uppercase axis letter are asserted in
+  // issue-2081-held-slots.test.ts; these are the build + drift net.
+  'coords-claim-surd-2081.geo3.json': ['A(0,0,0)', 'B(√2,0,0)', 'B=(√2,0,0)'],
+  'distance-surd-2081.geo3.json': ['פירמידה SABCD', 'המרחק בין S למישור ABC הוא √2'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

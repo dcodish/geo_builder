@@ -158,6 +158,8 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   can state they can ask (FR-CL-4). A comparison is never turned into an angle. The fact row keeps exactly
   the glyph that was typed. A stated length, area or height takes a RADICAL value («AD = √7», «2√7»,
   «√7/2», «√(3/4)») wherever it takes a decimal, as 2-D does: «AD = √7» and «|AD| = √7» are one given.
+  So do a stated DISTANCE («המרחק בין S למישור ABC הוא √2», «… הוא 3/2») and a coordinates claim
+  («A=(√2,0,0)», «A=(½,0,0)»), which reads exactly the components «A(√2,0,0)» reads (ADR-3D-362, #2081).
   - Sources: [ADR-3D-329](06b-decisions-3d.md#adr-3d-329), #1912; the prime fold ADR-3D-300 is the same
     seam one symbol over; [ADR-3D-337](06b-decisions-3d.md#adr-3d-337), #1827 (the `sqrt` spelling and the
     radical value in every stated-magnitude slot).
@@ -231,8 +233,10 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   state B's x and nothing else: on a new B the point is created with x = 3 and its y and z free (they move
   on «הציגו תצורה אחרת»); on a solid's vertex the solid follows; on a typed point a false value is refused
   and a true one stays green. A sign is read too; a letter value («x_B = 2t») is refused by name. The
-  question is the statement with its value dropped («x_B», «מהו שיעור ה-x של B?»).
-  - Sources: ADR-3D-299, #1547.
+  question is the statement with its value dropped («x_B», «מהו שיעור ה-x של B?»). The axis letter may be
+  typed in capitals: «X_B = 3», «X_{B}=3», «B_X = 3» and «X_B > 0» are «x_B = 3», «x_{B}=3», «B_x = 3» and
+  «x_B > 0», as analytic reads them; a digit subscript («X_1») stays a label.
+  - Sources: ADR-3D-299, ADR-3D-362, #1547, #2081.
 - **FR-SP-15 (Must)** — **A shape's adjective is honoured, and a circle through a polygon passes through every
   vertex.** An adjective stated on a polygon noun («טרפז ישר זווית», «טרפז שווה שוקיים», «משולש ישר זווית», "isosceles
   trapezoid", "right triangle") is drawn, standalone and inside an inscription in either direction; one the noun

@@ -252,6 +252,11 @@ export function normalize3(s: string): string {
       // every rule AND the honesty gate read, so no √-reading slot can miss a spelling another one takes.
       .replace(/\\?sqrt\s*\{([^{}]*)\}/g, '√($1)')
       .replace(/\\?sqrt/g, '√')
+      // #2081 ([ADR-3D-362](../../docs/06b-decisions-3d.md#adr-3d-362)): the AXIS LETTER of a subscripted
+      // coordinate token has one case — «X_B=3» is «x_B=3», «B_X» is «B_x» (the ADR-AG-274 shape). Every
+      // component reader (`COMPONENT_FRAMES`, its value / sign / comparison tails) spells the axis `[xyz]`.
+      .replace(SUB_AXIS_FIRST3, (_m, ax: string, rest: string) => `${ax.toLowerCase()}${rest}`)
+      .replace(SUB_AXIS_LAST3, (_m, head: string, ax: string) => `${head}${ax.toLowerCase()}`)
       .replace(/½/g, '1/2')
       .replace(/¼/g, '1/4')
       .replace(/¾/g, '3/4')
@@ -275,6 +280,15 @@ const LBL = String.raw`[A-Z]\d*'?`;
  *  retires more inline copies than the fix adds, so the recorded ceiling moves DOWN. *  Declared beside {@link LBL} (#1730 integration, round 2026-10-04) so module-level rules that sit
  *  above its old place — `WHOLE_RATIO` — compose from it instead of inlining the fragment. */
 const UNUM = String.raw`\d+(?:\.\d+)?`;
+
+/**
+ * #2081 ([ADR-3D-362](../../docs/06b-decisions-3d.md#adr-3d-362)) — the uppercase AXIS LETTER of a subscripted
+ * coordinate token, folded once in {@link normalize3}. It is unambiguous because a point label's subscript is
+ * DIGITS (`A_1`, `X_1`, `X_{12}`): only a LABEL after the `_` (or the axis letter after a label's `_`) makes the
+ * token a coordinate component, so those stay as typed, and the bare run `XB` (a segment) is never touched.
+ */
+const SUB_AXIS_FIRST3 = new RegExp(String.raw`(?<![A-Za-z0-9_'])([XYZ])(\s*_\s*\{?\s*${LBL}\s*\}?)(?![A-Za-z0-9_'])`, 'g');
+const SUB_AXIS_LAST3 = new RegExp(String.raw`(?<![A-Za-z0-9_'])(${LBL}\s*_\s*\{?\s*)([XYZ])(?![A-Za-z0-9_'])`, 'g');
 
 /**
  * #486 — Hebrew noun gates, shared. Two things a student writes freely and a hand-written rule keeps
@@ -4323,11 +4337,21 @@ const rectComplete: Rule = (s) => {
   return quadShapeCommand('rectangle', [m[1], m[2], m[3], m[4]]);
 };
 
-/** `A = (2, 0, -10)` — a coordinates CLAIM (the student's answer for a derived point). */
+/**
+ * `A = (2, 0, -10)` — a coordinates CLAIM (the student's answer for a derived point).
+ *
+ * #2081 ([ADR-3D-362](../../docs/06b-decisions-3d.md#adr-3d-362)): a component is the tuple-component
+ * VALUE atom `VAL`, read by its paired reader `literalValue` — the pair «A(…)» reads with (#510). The rule
+ * composed from the decimal `NUM` and read with `+`, so «A=(√2,0,0)» was "not understood" while
+ * «A(√2,0,0)» built: one value, two verdicts, decided by which rule's private atom it reached. A component
+ * the reader cannot value declines the line, so no NaN reaches a claim.
+ */
 const coordsClaim: Rule = (s) => {
-  const m = s.match(new RegExp(`^([A-Z]\\d*'?)\\s*=\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)$`));
+  const m = s.match(new RegExp(`^([A-Z]\\d*'?)\\s*=\\s*\\(\\s*(${VAL})\\s*,\\s*(${VAL})\\s*,\\s*(${VAL})\\s*\\)$`));
   if (!m) return null;
-  return [{ type: 'claim', claim: { type: 'coords-eq', id: m[1], x: +m[2], y: +m[3], z: +m[4] } }];
+  const [x, y, z] = [m[2], m[3], m[4]].map(literalValue);
+  if (x === null || y === null || z === null) return null;
+  return [{ type: 'claim', claim: { type: 'coords-eq', id: m[1], x, y, z } }];
 };
 
 /**
@@ -4997,9 +5021,13 @@ const distanceGiven: Rule = (s) => {
   // rules were checked once per the plan: the angle family's «בין» is not stated «מ…ל» in natural
   // Hebrew — no change there.)
   const m =
-    s.match(new RegExp(`^ה?מרחק\\s+(?:(?:ש)?בין\\s+|מ-?\\s*(?:ה?נקודה\\s+)?)(.+?)\\s+(?:[לו]בין\\s+|ל-?\\s*|ו-?\\s*)(.+?)\\s*(?:הוא|היא|=|שווה\\s+ל?-?)\\s*(${NUM})\\s*$`)) ??
-    s.match(new RegExp(`^(?:the\\s+)?distance\\s+(?:from|between)\\s+(.+?)\\s+(?:and|to)\\s+(.+?)\\s*(?:is|=)\\s*(${NUM})\\s*$`, 'i'));
-  if (!m) return null;
+    s.match(new RegExp(`^ה?מרחק\\s+(?:(?:ש)?בין\\s+|מ-?\\s*(?:ה?נקודה\\s+)?)(.+?)\\s+(?:[לו]בין\\s+|ל-?\\s*|ו-?\\s*)(.+?)\\s*(?:הוא|היא|=|שווה\\s+ל?-?)\\s*(-?\\s*${MAG})\\s*$`)) ??
+    s.match(new RegExp(`^(?:the\\s+)?distance\\s+(?:from|between)\\s+(.+?)\\s+(?:and|to)\\s+(.+?)\\s*(?:is|=)\\s*(-?\\s*${MAG})\\s*$`, 'i'));
+  // #2081 ([ADR-3D-362](../../docs/06b-decisions-3d.md#adr-3d-362)): the value is a MAGNITUDE («… הוא √2»),
+  // read by its paired reader as `lengthClaim` reads it (ADR-3D-337) — never `+m[3]`. The sign is admitted
+  // exactly as the decimal `NUM` admitted it, so a negative distance keeps the verdict it had.
+  const value = m ? magValue(m[3]) : null;
+  if (!m || value === null) return null;
   const a = readOperand(m[1]);
   const b = readOperand(m[2]);
   if (!a || !b) return null;
@@ -5010,7 +5038,7 @@ const distanceGiven: Rule = (s) => {
     op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) }
     : op.kind === 'line' ? { kind: 'line', name: canonLineName(op.name) }
     : op;
-  return [{ type: 'distance-rel', a: canon(a.op), b: canon(b.op), value: +m[3] }];
+  return [{ type: 'distance-rel', a: canon(a.op), b: canon(b.op), value }];
 };
 
 
