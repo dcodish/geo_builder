@@ -68,6 +68,7 @@ const ERRORS3: Record<Code3, Payload[]> = {
   'no-prism-to-make-right': [{}],
   'ambiguous-prism': [{}],
   'ambiguous-solid': [{ id: 'ABCD', count: 2 }],
+  'ambiguous-definite-shape': [{ shapes: ['ABC', 'ABCD'], sides: 3, sentence: 'משולש ABC', example: 'משולש ABC' }, { shapes: ['ABCD', 'ABCDE'], sides: 4 }, { shapes: ['ABCDE', 'ABC'], sides: 5 }],
   'bound-unsatisfiable': [{ id: 'P' }],
   'vacuous-relation': [{}],
   'plane-not-determined': [{ id: 'π1' }],

@@ -281,6 +281,17 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   מעוין.» ([ADR-3D-345](06b-decisions-3d.md#adr-3d-345)); and the restatement is judged against what EVERY enabled noun
   makes the ring together — «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD» adds no row ([ADR-3D-346](06b-decisions-3d.md#adr-3d-346), #2180).
   - Sources: ADR-3D-324, ADR-3D-326, ADR-3D-345, ADR-3D-346; #1953, #1988, #2171, #2180.
+- **FR-SP-24 (Must)** — **An unnamed shape noun is read against the figure: a definite one is the drawn shape, an
+  indefinite one a new shape.** A definite noun with no letters («המשולש ישר זווית», «המשולש», «המשולש שווה שוקיים»,
+  "the triangle is isosceles", «הריבוע») with ONE flat polygon of that size declared does exactly what the same
+  sentence naming it does («המשולש DEF ישר זווית» — acts on it, or answers «כבר קיים»), whatever its letters
+  («משולש DEF», «משולש SAB» on a pyramid); with two or more it is refused with 2-D's sentence, naming them, with the
+  student's own sentence naming the first as the next step («המשולש ABC ישר זווית»); with none it draws on A, B, C as
+  before. An indefinite or prefixed noun («משולש ישר זווית», «משולש», «במשולש ישר זווית», "a right triangle»,
+  «ריבוע») draws a NEW shape on the first free letters — the letters 2-D gives («משולש ABC» · «משולש ישר זווית» → DEF).
+  A solid's faces are not declared polygons here (a definite triangle on a bare pyramid is unchanged). The twin of
+  2-D FR-IN-11's definite / indefinite sentences.
+  - Sources: ADR-3D-351; #2235 (operator ruling 2026-10-16, card `g2235-3d`); 2-D ADR-654, ADR-685 (#2205).
 - **FR-SP-20 (Must)** — **A crossing ORDER of a ring's letters is refused for its order, whatever noun it carries.**
   When two declared rings spell the same four letters in different cyclic orders and either noun is convex whenever
   simple (every quad noun but «דלתון» and the bare «מרובע»), the other order crosses in every configuration — four

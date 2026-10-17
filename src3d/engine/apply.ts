@@ -15,9 +15,9 @@ import { baseKind3, CYCLIC_MEMBER, declaredKind3, declaredQuads3, diagonalClaimV
 import { declaredKindOf, kindRelation, narrowImplies, type NarrowKind } from '../../shell/narrowing';
 import { notCyclic3, type ShapeAdj3 } from '../lexicon/shapePhrase3';
 import { angleMarkText, claimPointIds, INCIRCLE_RING_ARITIES3, incircleRefusal3, isNonLinear, pinSymsOf, symbolOwnersOf, symsOfAffine } from './types';
-import { firstFreeLetter } from './freeLetter';
+import { firstFreeLetter, freeVertexRun3 } from './freeLetter';
 import { carrierParams3, readCoordGiven } from './carriers';
-import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, ScalarPin, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
+import type { ApplyResult3, Claim3, Command3, ComponentTarget, Construction3, EngineError3, Id, Line3Def, LinExpr, Operand3, PointOnSegment3Command, ScalarPin, ShapeRef3Command, SolidCommand, SolidKind, SolidObj, SymbolOwner, SymComp, VecAtom } from './types';
 import { FLAT_SOLID_KINDS } from './solve3';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
@@ -1168,6 +1168,73 @@ function placeholderYields(c: Construction3, cmd: Command3): Construction3 | nul
  */
 let APPLY_DEPTH = 0;
 
+/**
+ * #2235 ([ADR-3D-351](../../docs/06b-decisions-3d.md#adr-3d-351)) — the figure's declared FLAT rings of `arity` corners, in
+ * declaration order: every flat polygon solid, every flat polygon stated over points that already existed («משולש SAB» on
+ * a pyramid — M1's statement, recorded as its `polygon-open` claim), and a quad shape stated on a ring that is not one
+ * (a square stated on a pyramid's base). 2-D's candidate set for an unnamed definite noun (ADR-029: the declared
+ * polygons of that size). A solid's own faces are not in it (#2235 Found work 1 — whether they are "triangles drawn" is the operator's question).
+ */
+export function declaredFlatRings3(c: Construction3, arity: number): Id[][] {
+  const out: Id[][] = [];
+  const add = (ids: readonly Id[]) => {
+    if (ids.length === arity && !out.some((r) => ringKeyIds3(r) === ringKeyIds3(ids))) out.push([...ids]);
+  };
+  for (const sld of c.solids) if (polygonN(sld.kind) === arity) add(sld.ids);
+  for (const k of c.claims) if (k.type === 'polygon-open') add(k.ids);
+  if (arity === 4) for (const q of c.quadShapes) add(q.ids);
+  return out;
+}
+
+/** `body` with each reserved placeholder `#k` replaced by `ring[k-1]` — a pure rename over the command data. */
+function fillShapeHoles3(body: readonly Command3[], ring: readonly Id[]): Command3[] {
+  const fill = (v: unknown): unknown => {
+    if (typeof v === 'string') {
+      const m = /^#(\d+)$/.exec(v);
+      return m ? ring[Number(m[1]) - 1] : v;
+    }
+    if (Array.isArray(v)) return v.map(fill);
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, fill(x)]));
+    return v;
+  };
+  return body.map((k) => fill(k) as Command3);
+}
+
+/**
+ * #2235 ([ADR-3D-351](../../docs/06b-decisions-3d.md#adr-3d-351)) — WHICH RING an unnamed shape noun is, read against the
+ * figure (operator ruling 2026-10-16, card `g2235-3d`: *"3-D follows 2-D"*):
+ *  - **definite** («המשולש …», "the triangle …"): the figure's ONE declared flat ring of that size; two or more →
+ *    `ambiguous-definite-shape`, naming them; none → the default letters A, B, C… (today's reading, unchanged);
+ *  - **indefinite / prefixed** («משולש …», «במשולש …»): a NEW ring on the first free letters ({@link freeVertexRun3}).
+ * The result is the named sentence's own commands over that ring.
+ */
+export function resolveShapeRef3(c: Construction3, cmd: ShapeRef3Command): { ok: true; ring: Id[]; cmds: Command3[] } | { ok: false; error: EngineError3 } {
+  let ring: Id[];
+  if (cmd.article === 'definite') {
+    const rings = declaredFlatRings3(c, cmd.arity);
+    if (rings.length > 1) return { ok: false, error: { code: 'ambiguous-definite-shape', shapes: rings.map((r) => r.join('')), sides: cmd.arity } };
+    ring = rings[0] ?? ['A', 'B', 'C', 'D', 'E'].slice(0, cmd.arity);
+  } else {
+    ring = freeVertexRun3(cmd.arity, (id) => c.points.has(id));
+  }
+  return { ok: true, ring, cmds: fillShapeHoles3(cmd.body, ring) };
+}
+
+/** Every `shape-ref3` in `cmds` replaced by its resolution against `c` (other commands as they are). */
+export function expandShapeRefs3(c: Construction3, cmds: readonly Command3[]): { ok: true; cmds: Command3[] } | { ok: false; error: EngineError3 } {
+  const out: Command3[] = [];
+  for (const k of cmds) {
+    if (k.type !== 'shape-ref3') {
+      out.push(k);
+      continue;
+    }
+    const r = resolveShapeRef3(c, k);
+    if (!r.ok) return r;
+    out.push(...r.cmds);
+  }
+  return { ok: true, cmds: out };
+}
+
 export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
   /**
    * «AA'=3BC» ON EXISTING POINTS IS AMBIGUOUS, AND IS ASKED ABOUT — never refuted (#1156).
@@ -1235,6 +1302,17 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     if (r.ok) return r;
   }
   switch (cmd.type) {
+    case 'shape-ref3': {
+      // #2235 (ADR-3D-351): pick the ring, then apply the named sentence's own commands over it
+      const r = resolveShapeRef3(c, cmd);
+      if (!r.ok) return r;
+      let out: ApplyResult3 = { ok: true, next: c };
+      for (const k of r.cmds) {
+        if (!out.ok) return out;
+        out = applyCommand3(out.next, k);
+      }
+      return out;
+    }
     case 'solid': {
       // #349 (ADR-3D-089): `parallelepiped` is the legacy spelling of `prism4` + `oblique` — normalize it
       // HERE, at the one entry point every construction passes through (typed commands and loaded

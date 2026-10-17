@@ -360,6 +360,24 @@ export type SolidKind =
 // tetra: `פירמידה ABCD` — a GENERAL triangular pyramid (free apex, 5 dims);
 // prism4r: `מנסרה ישרה שבסיסה מעוין` — rhombus base (dims: base angle + height).
 
+/**
+ * #2235 ([ADR-3D-351](../../docs/06b-decisions-3d.md#adr-3d-351)) — AN UNNAMED SHAPE NOUN, resolved at apply.
+ *
+ * «המשולש ישר זווית» / «משולש ישר זווית» carry no letters, and `parse3` is context-free, so it cannot know which ring
+ * the sentence is about. It records what was WRITTEN — the noun's `article` and `arity` — and `body`, the commands the
+ * named form lowers to, written over the reserved placeholders `'#1'…'#n'` (never typeable). Apply, which knows the
+ * figure, picks the ring (`resolveShapeRef3`): a definite noun is the figure's one declared flat polygon of that size
+ * (refused naming them when there are two or more; today's default letters when there is none); an indefinite or
+ * prefixed one is a NEW ring on the first free letters. The fact keeps this command, never the resolved letters, so
+ * the parser-drift net, undo and an edit of an earlier line all re-resolve it deterministically.
+ */
+export interface ShapeRef3Command {
+  type: 'shape-ref3';
+  article: 'definite' | 'prefixed' | 'indefinite';
+  arity: 3 | 4 | 5;
+  body: Command3[];
+}
+
 export interface SolidCommand {
   type: 'solid';
   kind: SolidKind;
@@ -1110,6 +1128,7 @@ export type Command3 =
   // when the student stated the OTHER two sides parallel (and not the named pair), so the trapezoid's one
   // parallel pair is the stated one — sides 1/3 of the ring as named instead of 0/2 (2-D's ADR-506).
   | { type: 'quad-shape'; base: QuadBase; ids: [Id, Id, Id, Id]; adj?: ShapeAdj3; seat?: 1 }
+  | ShapeRef3Command
   | { type: 'dot-given'; v1: string; v2: string; value: number } // u·v = 24 (V7 T2)
   // BD = (-4,5,12) — a pair-vector injection (V7 T2). #794 (ADR-3D-168): components take the same
   // grammar as point3 — number | null (placeholder letter) | affine symbolic via symExprs
@@ -1851,6 +1870,10 @@ export type EngineError3 =
   // #766: «נפח הפירמידה = 11» where the figure holds more than one pyramid — the operator's ruling is
   // to ASK for more specific letters, never to pick one (ADR-052: picking asserts an unstated given).
   | { code: 'ambiguous-solid'; id: string; count: number }
+  // #2235 (ADR-3D-351): a DEFINITE unnamed shape noun («המשולש ישר זווית») on a figure holding two or more declared
+  // flat polygons of its size — which one is the student's to say (operator ruling 2026-10-16, card `g2235-3d`).
+  // `shapes` in figure order. `sentence` / `example` are filled by the store, which knows the utterance.
+  | { code: 'ambiguous-definite-shape'; shapes: string[]; sides: number; sentence?: string; example?: string }
   | { code: 'bound-unsatisfiable'; id: Id } // #273: no sampled configuration puts the measure inside the stated bound
   | { code: 'vacuous-relation' } // S4 (#378): a mutual position stated between an object and itself
   | { code: 'plane-not-determined'; id: string } // #487: this construct needs a plane with a stated equation — π is still free

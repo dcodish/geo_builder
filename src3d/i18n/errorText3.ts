@@ -154,6 +154,14 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
       return t('err.noPrismToMakeRight');
     case 'ambiguous-prism':
       return t('err.ambiguousPrism');
+    // #2235 (ADR-3D-351): 2-D's #2205 sentence, verbatim — the shapes named and the named form as the next step
+    case 'ambiguous-definite-shape':
+      return t('err.ambiguousDefiniteShape', {
+        sentence: err.sentence ?? '',
+        plural: t(`err.shapePlural.${err.sides === 3 || err.sides === 4 ? err.sides : 'n'}`),
+        shapes: err.shapes.join(', '),
+        example: err.example ?? err.shapes[0],
+      });
     case 'unknown-vector':
       return t('err.unknownVector', { id: err.id });
     case 'unknown-plane':

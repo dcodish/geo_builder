@@ -79,6 +79,24 @@ measure rules read Greek as they did, so «α < β» keeps its own typed refusal
 run of two or more characters — never an English prose word (`NOUN_EN`/`EN_STOP`, from `parse3`) — runs
 only on a failed parse, and fires only if the candidate parses.
 
+### An unnamed shape noun is a reference, resolved at apply (#2235, [ADR-3D-351](06b-decisions-3d.md#adr-3d-351))
+
+A triangle / quad / pentagon sentence with no letters («המשולש ישר זווית», «משולש», «הריבוע») cannot name its ring
+in a context-free parser, and the old default letters A, B, C… made M1's existing-id idempotency pick whatever was
+called that. `rightTriangle` and `planarPolygon` now emit **`shape-ref3`** `{ article, arity, body }`: the article from
+`shapeNounArticle3` (`lexicon/shapePhrase3.ts`, the copy of 2-D's ADR-654 / #2205 reader), and `body` the named form's
+own lowering over the reserved placeholders `#1…#n`. Labelled sentences are untouched.
+
+`resolveShapeRef3` (`engine/apply.ts`) picks the ring against the figure: **definite** — the one ring of
+`declaredFlatRings3` (flat polygon solids, M1 polygon statements over existing points — their `polygon-open`
+claim — and quad shapes), `ambiguous-definite-shape` naming them when there are two or more, the default letters
+when there is none; **indefinite / prefixed** — `freeVertexRun3` (`engine/freeLetter.ts`, 2-D's `autoVertexLabels`
+rule). The fact KEEPS the reference (the fixture parser-drift net, undo and edits re-resolve it). `derive3` expands it
+per fact against the figure before that fact (so `droppedSoft` / `seated` see real letters), exposes the result as
+`Derived3.resolvedCmds`, and from the end of the fold on reads each fact as the ring it was applied to (blame,
+crossing, collapse and narrowing passes). `decideCommands3` resolves the line the same way before the honesty gates
+and the twin rule, and words the refusal with the sentence and its taught remedy (`definiteShapeExample3`).
+
 ### Relations as a disposition map
 
 `relationTable.ts` maps each `relation × operand-kind` pair to a status and the actions it licenses

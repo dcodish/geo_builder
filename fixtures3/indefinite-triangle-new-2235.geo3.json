@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-17T06:15:13.940Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "משולש ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "polygon3",
+          "ids": [
+            "A",
+            "B",
+            "C"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "משולש ישר זווית",
+      "cmds": [
+        {
+          "type": "shape-ref3",
+          "article": "indefinite",
+          "arity": 3,
+          "body": [
+            {
+              "type": "solid",
+              "kind": "polygon3",
+              "ids": [
+                "#1",
+                "#2",
+                "#3"
+              ]
+            },
+            {
+              "type": "cos-angle",
+              "u": {
+                "kind": "pair",
+                "from": "#2",
+                "to": "#1"
+              },
+              "v": {
+                "kind": "pair",
+                "from": "#2",
+                "to": "#3"
+              },
+              "cos": 0,
+              "soft": true,
+              "origin": "shape"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

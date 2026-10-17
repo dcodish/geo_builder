@@ -179,6 +179,8 @@
     "splitRoles": "One given per line — that way the tool can build and verify each one separately. Write each role on its own line: «{{first}}», and then «{{second}}».",
     "noPrismToMakeRight": "there is no prism in the figure to make right — build a prism or a parallelepiped first",
     "ambiguousPrism": "there is more than one prism in the figure — it's unclear which one you mean",
+    "shapePlural": { "3": "triangles", "4": "quadrilaterals", "n": "polygons" },
+    "ambiguousDefiniteShape": "«{{sentence}}» — the figure has several {{plural}} ({{shapes}}), so it isn't clear which one you mean. Name it, e.g. «{{example}}».",
     "planeNotDetermined": "Plane {{id}} has no stated equation or orientation yet — this statement needs a determined plane. Pin it with an equation, three points on it, or a ∥/⊥ relation",
     "pointNotDetermined": "Point {{id}} has no determined position yet, so this statement cannot be checked — pin the point first: its coordinates, or a length or angle that fixes it",
     "givenNotDrivablePoint": "The tool can't yet move point {{id}} so that this given holds, so it wasn't added — this is a limit of the tool",

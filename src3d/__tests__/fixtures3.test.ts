@@ -351,6 +351,12 @@ const SEEDED: SeededCorpus = {
   // circle's own (before: a full patch labelled «circle-ABC» and a «מישורים» row). Every circle kind, the named plane
   // drawn once and the crossing offers are asserted in issue-2126-circle-plane.test.ts; this is the build + drift net.
   'circle-no-plane-2126.geo3.json': ['משולש ABC', 'משולש ABC חסום במעגל'],
+
+  // #2235 (ADR-3D-351) — the rule-4 locks: a definite unnamed triangle applies to the ONE triangle drawn (before: a second
+  // triangle ABC was minted beside DEF), and an indefinite one draws a NEW triangle (before: ABC itself was made
+  // right-angled). The rings and the refusal with two triangles are asserted in issue-2235-shape-ref.test.ts.
+  'definite-triangle-one-2235.geo3.json': ['משולש DEF', 'המשולש ישר זווית'],
+  'indefinite-triangle-new-2235.geo3.json': ['משולש ABC', 'משולש ישר זווית'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side
