@@ -145,6 +145,10 @@ export function ambiguousCurveExample(detail: string, theNoun: string, name: str
   return `${detail.slice(0, end)} ${name}${detail.slice(end)}`;
 }
 
+/** «X, Y ו-Z» — `sep` between all but the last two, `last` before the last (#1963, the locale's own `listAnd`). */
+const joinAnd = (items: readonly string[], sep: string, last: string): string =>
+  items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(sep)}${last}${items[items.length - 1]}`;
+
 /** A registry noun in English — the first English spelling the table maps onto it (the table is the one source). */
 const enNoun = (he: string | undefined): string => (he ? Object.keys(EN_SHAPE).find((k) => EN_SHAPE[k] === he) ?? he : '');
 
@@ -236,6 +240,8 @@ export function errorText(error: InputError, t: Translate): string {
     'measure-contradicts': error.key === 'measure-contradicts' && error.declared ? 'errMeasureContradicts' : 'errMeasureContradictsAlone',
     // #2119 (ADR-684) — 2-D's errors.restatedSize, verbatim; with no line to name, the old conflict sentence
     'radius-contradicts': error.key === 'radius-contradicts' && error.declared ? 'errRadiusContradicts' : 'errConflict',
+    // #1963 (ADR-AG-296) — the operator's ruled refusal, in 2-D's «X» סותר את «Y» frame (#1868), naming the statements
+    'forced-collinear': 'errForcedCollinear',
     // #1154 — a rename understood and declined, each naming what the student wrote
     'rename-bad-name': 'errRenameBadName',
     'rename-same': 'errRenameSame',
@@ -302,7 +308,11 @@ export function errorText(error: InputError, t: Translate): string {
     // #1554 ruling 1 (ADR-AG-198): the two nouns, in each locale's spelling (the registry key is the Hebrew).
     shapeHe: 'shape' in error ? (error.shape ?? '') : '',
     polygon: 'polygon' in error ? (error.polygon ?? '') : '',
-    declared: 'declared' in error ? (error.declared ?? '') : '',
+    // #1963: several declaring lines read «X», «Y» ו-«Z» inside the template's own guillemets.
+    declared: error.key === 'forced-collinear'
+      ? joinAnd(error.declaredLines ?? [], '», «', `»${t('listAnd')}«`)
+      : 'declared' in error ? (error.declared ?? '') : '',
+    points: error.key === 'forced-collinear' ? joinAnd(error.collinear ?? [], ', ', t('listAnd')) : '',
     forcedHe: 'forced' in error ? (error.forced ?? '') : '',
     shapeEn: 'shape' in error ? enNoun(error.shape) : '',
     forcedEn: 'forced' in error ? enNoun(error.forced) : '',

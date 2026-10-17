@@ -267,6 +267,30 @@ export function noFreedomReaches(c: Construction, id: Id, seen: Set<Id> = new Se
 }
 
 /**
+ * WHAT AN OBJECT IS BUILT FROM (#1963, ADR-AG-296) — every POINT it is transitively defined from (its {@link objectDeps},
+ * a derived point's curve parents included, walked as {@link noFreedomReaches} walks them) and every parameter symbol
+ * on that walk ({@link symbolDeps}, its own included). The object itself is not among `points`: a vacant one has no
+ * position to read. The vacancy arm reads these at the solved configuration and asks their freedom
+ * (`Figure.freedomOfRead`): `0` means nothing the object is made of can move, whatever moves elsewhere.
+ */
+export function inputsOf(c: Construction, id: Id): { points: Id[]; syms: string[] } {
+  const points: Id[] = [];
+  const syms = new Set<string>();
+  const seen = new Set<Id>();
+  const walk = (at: Id, root: boolean) => {
+    if (seen.has(at)) return;
+    seen.add(at);
+    const o = c.objects.find((q) => q.id === at);
+    if (!o) return;
+    if (!root && (o.kind === 'point' || o.kind === 'free' || o.kind === 'derived')) points.push(at);
+    for (const s of symbolDeps(o)) syms.add(s);
+    for (const d of o.kind === 'derived' ? [...objectDeps(o), ...curveParentsOf(o.rule)] : objectDeps(o)) walk(d, false);
+  };
+  walk(id, true);
+  return { points, syms: [...syms] };
+}
+
+/**
  * Does every object's dependencies precede it in the list?
  *
  * This is the property a topological sort would otherwise have to establish, and it holds **by

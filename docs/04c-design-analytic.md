@@ -909,6 +909,15 @@ loop and skips lines already in `faults`. A collapse the givens force is `polygo
 ([ADR-AG-247](06c-decisions-analytic.md#adr-ag-247): `Figure.collapsedRings`, `collapsedByGivens(c, seed)`,
 `errPolygonCollapsed`). A fault is also the refusal: `decideSubmit` refuses when one lands on the new line.
 
+**The vacancy arm reads the OBJECT's freedom, and a stated collinearity is a proof** ([ADR-AG-296](06c-decisions-analytic.md#adr-ag-296), #1963).
+A `vacant` object is refused `does-not-exist` when `Figure.freedomOfRead` over its inputs (`inputsOf`, `carriers.ts`:
+the points it is transitively built from and the symbols on that walk) is `0`; unmeasured falls back to the whole
+figure's `reportedDof`. Beside it, every `circle-thru` through three points asks `forcedCollinear` (`collinear.ts`), a
+proof read off the construction alone: carriers from `on-line-2pt`, the `midpoint` constraint, `on-line`, `on-curve` on
+a line, `derived-at`, and the derived `midpoint` / `side-touch` / `foot` / `diagonals` rules. A proof refuses the line
+that completes it `forced-collinear` (`declaredLines`, `collinear`, `errForcedCollinear`), vacant or not; a line another
+arm refuses keeps that refusal alone.
+
 **The pinned-ring arm reads the RING'S freedom, never the figure's** ([ADR-AG-249](06c-decisions-analytic.md#adr-ag-249), #1929).
 `evaluate` gives each HARD ring fault `RingFault.ringDof` = `freedomOf(c, sys, x, read)` with `read` = the ring's vertex
 coordinates: `figureDofOf` − `freeRank` over the equations plus `read`'s rows, so freedom elsewhere cancels and a derived
