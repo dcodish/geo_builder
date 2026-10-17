@@ -140,7 +140,8 @@ describe('#1938 — the false-refusal net', () => {
    * better sentence («AC כבר חותך את המעגל ב-A וב-C …», #1834) that belongs to those issues.
    *
    * RE-BASED by #1893 (ADR-AG-271): the circle's chord now carries that sentence — `third-crossing`, the structural
-   * arm — and still never this arm's `crossing-already-named`. The parabola row below is #1909's and is unchanged.
+   * arm — and still never this arm's `crossing-already-named`. RE-BASED again by #1909 (ADR-AG-292): the parabola's
+   * chord carries the same sentence with «הפרבולה».
    */
   it('#1893 — a free circle’s chord: E lands on A, the pair is still free, and this arm stays silent (the third-crossing arm refuses it)', () => {
     const lines = ['מעגל O', 'A על מעגל O', 'C על מעגל O', 'AC חותך את המעגל בנקודה E'];
@@ -156,7 +157,7 @@ describe('#1938 — the false-refusal net', () => {
     const lines = ['y^2=4x', 'A על הפרבולה', 'C על הפרבולה', 'AC חותך את הפרבולה בנקודה E'];
     const d = derive(lines);
     expect(d.figure.separationDof?.('E', 'C')).toBeGreaterThan(0);
-    expect(d.faults).toEqual([]);
+    expect(d.faults).toMatchObject([{ index: 3, code: 'third-crossing', line: 'AC', a: 'A', b: 'C', curve: 'parabola' }]);
   });
 
   /**
@@ -168,13 +169,16 @@ describe('#1938 — the false-refusal net', () => {
    * is #1595's carve-out («they stay refusals — they name the holder»); the BETTER sentence for that family
    * («AC כבר חותך … אין נקודת חיתוך שלישית», #1834) is #1893/#1909's own work, and when it lands in analytic
    * this row changes key — deliberately loud.
+   *
+   * LANDED (#1909, ADR-AG-292): the structural arm now owns the row at every seed, so seed 3 carries the third-crossing
+   * sentence too — one fault on the line, never `crossing-already-named` beside it. The rank reading is unchanged.
    */
-  it('#1909 at seed 3: the same row IS refused, naming C — the predicate reaching a configuration the old gate could not', () => {
+  it('#1909 at seed 3: the rank still reads the pair forced, and the row now carries the third-crossing sentence', () => {
     const lines = ['y^2=4x', 'A על הפרבולה', 'C על הפרבולה', 'AC חותך את הפרבולה בנקודה E'];
     const d = derive(lines, 3);
     expect(d.figure.carrierDof).toBeGreaterThan(0);
     expect(d.figure.separationDof?.('E', 'C')).toBe(0);
-    expect(d.faults).toMatchObject([{ index: 3, code: 'crossing-already-named', holder: 'C' }]);
+    expect(d.faults).toEqual([{ index: 3, code: 'third-crossing', detail: lines[3], line: 'AC', a: 'A', b: 'C', curve: 'parabola' }]);
   });
 
   /** #1254's own CONTROL: one letter different, the crossing is clear of every point — and a free point

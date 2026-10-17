@@ -78,6 +78,15 @@ export function walkOfCoefficients(a: number, b: number, c: number): Walk | null
  */
 export function conicMeet(w: Walk, conic: NumCurve): { roots: Pt[]; touching: boolean } {
   const { p0, d } = w;
+  const q = lineQuadratic(w, conic);
+  if (!q) return { roots: [], touching: false };
+  const { A, B, C } = q;
+  return rootsOf(p0, d, A, B, C);
+}
+
+/** The quadratic `A·t² + B·t + C` a walked straight `p0 + t·d` leaves in a canonical conic — `null` for a non-conic. */
+function lineQuadratic(w: Walk, conic: NumCurve): { A: number; B: number; C: number } | null {
+  const { p0, d } = w;
   let A = 0;
   let B = 0;
   let C = 0;
@@ -99,9 +108,12 @@ export function conicMeet(w: Walk, conic: NumCurve): { roots: Pt[]; touching: bo
     B = 2 * p0.y * d.y - two * d.x;
     C = p0.y * p0.y - two * p0.x;
   } else {
-    return { roots: [], touching: false };
+    return null;
   }
+  return { A, B, C };
+}
 
+function rootsOf(p0: Pt, d: Pt, A: number, B: number, C: number): { roots: Pt[]; touching: boolean } {
   const ts: number[] = [];
   let touching = false;
   if (Math.abs(A) < 1e-12) {
@@ -261,6 +273,12 @@ function sideOf(k: Constraint, at: (id: Id) => Pt | null, curveAt: (id: Id) => N
   return null;
 }
 
+/** An incidence's straight, walked — `null` when it is not a straight readable here (#1932, ADR-AG-292). */
+export function straightWalkOf(k: Constraint, at: (id: Id) => Pt | null, curveAt: (id: Id) => NumCurve | null): Walk | null {
+  const s = sideOf(k, at, curveAt);
+  return s && s.k === 'straight' ? s.w : null;
+}
+
 /**
  * The crossings of a crossing sentence's two incidences, in the canonical order — or `null` when the
  * pair has no order this module defines (two straights meet once; ADR-AG-157) or cannot be read here.
@@ -309,7 +327,7 @@ export function nthHolds(
 }
 
 /** A conic's own size — the scale its crossings are told apart at (a circle's radius, a conic's larger axis). */
-function conicSize(cu: NumCurve): number {
+export function conicSize(cu: NumCurve): number {
   if (cu.kind === 'circle') return Math.abs(cu.r);
   if (cu.kind === 'ellipse') return Math.max(Math.abs(cu.a), Math.abs(cu.b));
   if (cu.kind === 'parabola') return Math.abs(cu.p);
@@ -317,9 +335,10 @@ function conicSize(cu: NumCurve): number {
 }
 
 /**
- * WHERE A STRAIGHT ONLY TOUCHES A CIRCLE (#1924, [ADR-AG-272](../../docs/06c-decisions-analytic.md#adr-ag-272)) — the
- * touch point when the incidence `k` is a straight whose two crossings with `circle` are ONE point to the solver's
- * resolution, else `null` (it crosses twice, it misses, or it is not a straight readable here).
+ * WHERE A STRAIGHT ONLY TOUCHES A CONIC (#1924, [ADR-AG-272](../../docs/06c-decisions-analytic.md#adr-ag-272); the
+ * parabola and the ellipse, #1932, [ADR-AG-292](../../docs/06c-decisions-analytic.md#adr-ag-292)) — the touch point
+ * when the incidence `k` is a straight whose two crossings with `circle` are ONE point to the solver's resolution, else
+ * `null` (it crosses twice, it misses, or it is not a straight readable here).
  *
  * The floor is {@link meetsTwice}'s: two roots closer than `SOLVE_RESOLUTION` relative to the circle's size are one
  * point. Read symmetrically — the chord the straight would cut, `2·√|r² − d²|` — so a tangent computed from exact
@@ -331,9 +350,10 @@ export function touchPointOf(
   at: (id: Id) => Pt | null,
   curveAt: (id: Id) => NumCurve | null,
 ): Pt | null {
-  if (circle.kind !== 'circle') return null;
   const s = sideOf(k, at, curveAt);
   if (!s || s.k !== 'straight') return null;
+  if (circle.kind === 'parabola' || circle.kind === 'ellipse') return conicTouchOf(s.w, circle);
+  if (circle.kind !== 'circle') return null;
   const { p0, d } = s.w;
   const n2 = d.x * d.x + d.y * d.y;
   if (!(n2 > 0)) return null;
@@ -343,6 +363,29 @@ export function touchPointOf(
   const r = Math.abs(circle.r);
   if (!(r > 0)) return null;
   return 2 * Math.sqrt(Math.abs(r * r - dist * dist)) <= SOLVE_RESOLUTION * r ? foot : null;
+}
+
+/**
+ * {@link touchPointOf} on a parabola or an ellipse (#1932, ADR-AG-292): the same question — are the straight's two
+ * crossings ONE point to the solver's resolution relative to the conic's size? — read off the quadratic the straight
+ * leaves in the conic, symmetrically (`√|disc|`, so a tangent that misses by rounding is the same touch as one that
+ * crosses by a hair). On a circle that chord is exactly #1924's `2·√|r² − d²|`.
+ *
+ * TANGENCY, NOT "MEETS ONCE": a straight parallel to a parabola's axis leaves no `t²` term — it crosses the curve once
+ * without touching it, and is never a touch.
+ */
+function conicTouchOf(w: Walk, conic: NumCurve): Pt | null {
+  const q = lineQuadratic(w, conic);
+  const size = conicSize(conic);
+  const n2 = w.d.x * w.d.x + w.d.y * w.d.y;
+  if (!q || !(size > 0) || !(n2 > 0)) return null;
+  const { A, B, C } = q;
+  // The parabola's `A = d.y²`: below round-off of the walk's own scale the equation is linear (axis-parallel).
+  if (!(Math.abs(A) > 1e-12 * n2)) return null;
+  const chord = (Math.sqrt(Math.abs(B * B - 4 * A * C)) / Math.abs(A)) * Math.sqrt(n2);
+  if (!(chord <= SOLVE_RESOLUTION * size)) return null;
+  const t = -B / (2 * A);
+  return { x: w.p0.x + t * w.d.x, y: w.p0.y + t * w.d.y };
 }
 
 /**

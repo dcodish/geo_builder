@@ -101,6 +101,14 @@ const THE_NOUN_KEY: Record<RefKind, string> = {
   curve: 'nounTheCurve',
 };
 
+/**
+ * The curve a line has no further crossing with (#1909, #1932 — ADR-AG-292): the definite noun «הפרבולה», the
+ * indefinite "a parabola" (English's second clause), and the noun after «משיק» — «לפרבולה» / "to the parabola".
+ */
+type SecondCrossingCurve = 'circle' | 'parabola' | 'ellipse';
+const A_NOUN_KEY: Record<SecondCrossingCurve, string> = { circle: 'nounACircle', parabola: 'nounAParabola', ellipse: 'nounAnEllipse' };
+const TO_THE_NOUN_KEY: Record<SecondCrossingCurve, string> = { circle: 'nounToTheCircle', parabola: 'nounToTheParabola', ellipse: 'nounToTheEllipse' };
+
 /** The DEFINITE plural — «הישרים» / "the lines" — before a list of names (#1750). */
 const THE_PLURAL_KEY: Record<RefKind, string> = {
   point: 'nounThePoints',
@@ -249,6 +257,8 @@ export function errorText(error: InputError, t: Translate): string {
     'load-too-large': 'errLoadTooLarge',
     'load-unreadable': 'errLoadUnreadable',
   }[error.key];
+  const crossed: SecondCrossingCurve =
+    (error.key === 'third-crossing' || error.key === 'tangent-no-second-crossing') && error.curve ? error.curve : 'circle';
   const near = error.key === 'unknown-reference' && error.nearMiss ? ` ${nearMissText(kind ?? 'curve', error.nearMiss, t)}` : '';
   return t(key, {
     detail: error.detail,
@@ -281,6 +291,9 @@ export function errorText(error: InputError, t: Translate): string {
     a: error.key === 'third-crossing' ? (error.a ?? '') : '',
     b: error.key === 'third-crossing' ? (error.b ?? '') : '',
     id: error.key === 'tangent-no-second-crossing' ? (error.id ?? '') : '',
+    curve: t(THE_NOUN_KEY[crossed]),
+    aCurve: t(A_NOUN_KEY[crossed]),
+    toCurve: t(TO_THE_NOUN_KEY[crossed]),
     reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '',
     definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '',
     all: error.key === 'split-statements' ? error.parts.map((p, i) => `(${i + 1}) ${p}`).join('  ') : '',

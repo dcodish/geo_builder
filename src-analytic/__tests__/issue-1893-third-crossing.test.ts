@@ -9,8 +9,8 @@
  * «AC כבר חותך את המעגל ב-A וב-C — לישר אין נקודת חיתוך שלישית עם המעגל.»
  *
  * The arm is structural (`derive.ts`): a point on the line through a and b and on circle K, where a and b are on K by
- * construction (a defining point, a stated incidence) or because nothing can move them and they lie on it. Circles
- * only — a conic's wording is unruled (#1909, #1932), so the parabola and ellipse rows keep today's verdict.
+ * construction (a defining point, a stated incidence) or because nothing can move them and they lie on it. Widened to
+ * the parabola and the ellipse by #1909 (ADR-AG-292), whose locks live beside this file.
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
@@ -63,7 +63,7 @@ describe('#1893 — the operator’s four lines', () => {
   it('one fault on the line — never the two-straights «crossing-already-named» or a failed search beside it', () => {
     for (const seed of [0, 4]) {
       const d = derive(HIS, seed);
-      expect(d.faults).toEqual([{ index: 3, code: 'third-crossing', detail: HIS[3], line: 'AC', a: 'A', b: 'C' }]);
+      expect(d.faults).toEqual([{ index: 3, code: 'third-crossing', detail: HIS[3], line: 'AC', a: 'A', b: 'C', curve: 'circle' }]);
     }
   });
 });
@@ -120,13 +120,5 @@ describe('#1893 — the controls: a line with a real second crossing keeps it', 
   });
 });
 
-describe('#1893 — scope: a conic chord is not this arm’s (#1909, #1932 — unruled wording)', () => {
-  it.each([
-    ['the parabola', ['y^2=4x', 'A על הפרבולה', 'C על הפרבולה', 'AC חותך את הפרבולה בנקודה E']],
-    ['the ellipse', ['x^2/9+y^2/4=1', 'A על האליפסה', 'C על האליפסה', 'AC חותך את האליפסה בנקודה E']],
-  ] as Array<[string, string[]]>)('%s: never refused as a third crossing', (_what, lines) => {
-    for (let seed = 0; seed < 6; seed++) {
-      expect(derive(lines, seed).faults.filter((f) => f.code === 'third-crossing')).toEqual([]);
-    }
-  });
-});
+// The scope lock that stood here («a conic chord is not this arm's») is REPLACED by #1909's own locks
+// (`issue-1909-third-crossing-conics.test.ts`, ADR-AG-292): the parabola and the ellipse now get the ruled sentence.

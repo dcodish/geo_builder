@@ -1808,7 +1808,7 @@ function carrierKind(c: Construction, carrier: string): string | null {
  * `null` means "no useful bound", and then nothing is refused: a bound that is not certain must never
  * turn into a refusal, because refusing a satisfiable figure is the worse defect of the two.
  */
-function maxCrossings(a: string | null, b: string | null): number | null {
+export function maxCrossings(a: string | null, b: string | null): number | null {
   if (!a || !b) return null;
   const isConic = (k: string) => k === 'circle' || k === 'ellipse' || k === 'parabola';
   if (a === 'line' && b === 'line') return 1;

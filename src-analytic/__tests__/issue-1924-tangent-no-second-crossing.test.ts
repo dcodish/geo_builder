@@ -8,7 +8,8 @@
  * shows for «מעגל O · A על מעגל O · מנקודה P משיק נוגע במעגל O בנקודה A · PA חותך את המעגל בנקודה E».
  *
  * The arm (`derive.ts`) reads the tangency two ways: nothing can move and the line only touches the circle at the named
- * point, or the tangency is stated (⊥ the radius at the point, the tangent object, a point on it). Circles only.
+ * point, or the tangency is stated (⊥ the radius at the point, the tangent object, a point on it). Widened to the
+ * parabola and the ellipse by #1932 (ADR-AG-292), whose locks live beside this file.
  */
 import { describe, expect, it } from 'vitest';
 import { derive } from '../engine/derive';
@@ -64,7 +65,7 @@ describe('#1924 — the issue’s four lines', () => {
   });
 
   it('one fault on the line', () => {
-    expect(derive(HIS, 0).faults).toEqual([{ index: 3, code: 'tangent-no-second-crossing', detail: HIS[3], point: 'E' }]);
+    expect(derive(HIS, 0).faults).toEqual([{ index: 3, code: 'tangent-no-second-crossing', detail: HIS[3], point: 'E', curve: 'circle' }]);
   });
 });
 
@@ -136,8 +137,7 @@ describe('#1924 — the controls keep their crossing', () => {
 
 describe('#1924 — scope', () => {
   it.each([
-    ['a parabola tangent', ['y^2=4x', 'A(1,2)', 'P(-1,0)', 'AP חותך את הפרבולה בנקודה E']],
-    ['an ellipse tangent', ['x^2/9+y^2/4=1', 'A(3,0)', 'P(3,5)', 'AP חותך את האליפסה בנקודה E']],
+    // The parabola and ellipse tangents that stood here are now #1932's (ADR-AG-292, `issue-1932-tangent-conics.test.ts`).
     ['two touching circles (2-D commits its analogue)', ['מעגל I: x^2+y^2=25', 'מעגל II: (x-6)^2+(y-8)^2=25', 'A(3,4)', 'המעגל I חותך את המעגל II בנקודה E']],
   ] as Array<[string, string[]]>)('%s: not this arm’s', (_what, lines) => {
     for (let seed = 0; seed < 3; seed++) {

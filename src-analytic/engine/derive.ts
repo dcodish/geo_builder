@@ -6,10 +6,10 @@
  * that fails is reported with its own index and its own words — never dropped, and never blamed on
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
-import { centreIdOf, circleByName, curveKindOf, fold, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
+import { centreIdOf, circleByName, curveKindOf, fold, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { noFreedomReaches, reportedDof } from './carriers';
 import { collapsedByGivens, completingStatement, curveAtOf, drawableAt, hardRingFaults, holdsOn, viewBox, type Figure } from './evaluate';
-import { touchPointOf } from './crossing-order';
+import { conicSize, straightWalkOf, touchPointOf } from './crossing-order';
 import { resolveCurve, type Box } from './curves';
 import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
 import { resolveToolLetters } from './toolLetters';
@@ -74,6 +74,15 @@ export interface LineFault {
   b?: string;
   /** For a crossing asked of a line tangent to the circle at a point the figure has (#1924, ADR-AG-272): the point placed. */
   point?: string;
+  /** For either of those two (#1909, #1932 — ADR-AG-292): the KIND of the curve the line meets, for its noun. */
+  curve?: SecondCrossingCurve;
+}
+
+/** The curves a line meets at most twice (`maxCrossings('line', kind) === 2`) — the second-crossing arms' reach. */
+export type SecondCrossingCurve = 'circle' | 'parabola' | 'ellipse';
+/** `kind` when a line meets a curve of it at most twice — else null (#1909, #1932, ADR-AG-292). */
+function twiceMet(kind: string | null): SecondCrossingCurve | null {
+  return maxCrossings('line', kind) === 2 && (kind === 'circle' || kind === 'parabola' || kind === 'ellipse') ? kind : null;
 }
 
 /**
@@ -532,14 +541,15 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       construction.constraints.forEach((onK, ki) => {
         if (thirdCrossed.has(P) || onK.t !== 'on-curve' || onK.id !== P) return;
         const K = objectById(construction, onK.curve);
-        if (!K || curveKindOf(K) !== 'circle') return;
+        const kind = K ? twiceMet(curveKindOf(K)) : null;
+        if (!K || !kind) return;
         const atA = onForGood(K, line.a);
         const atB = atA === null ? null : onForGood(K, line.b);
         if (atA === null || atB === null) return;
         const index = Math.max(constraintOn[li], constraintOn[ki], atA, atB);
         if (index < 0) return;
         thirdCrossed.add(P);
-        faults.push({ index, code: 'third-crossing', detail: lines[index], line: `${line.a}${line.b}`, a: line.a, b: line.b });
+        faults.push({ index, code: 'third-crossing', detail: lines[index], line: `${line.a}${line.b}`, a: line.a, b: line.b, curve: kind });
       });
     });
 
@@ -620,6 +630,17 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       }
       return null;
     };
+    /**
+     * ℓ's OWN position as numbers (#1932, ADR-AG-292) — its unit normal and offset, not its points, so a point riding a
+     * fixed line leaves it fixed. A straight this configuration cannot place is NaN, which `freedomOf` reads as
+     * UNMEASURED — never as "fixed".
+     */
+    const straightRead = (k: (typeof construction.constraints)[number], pos: Map<string, { x: number; y: number }>, env: Parameters<typeof curveAtOf>[1]): number[] => {
+      const at = (id: string) => pos.get(id) ?? null;
+      const w = straightWalkOf(k, at, curveAtOf(construction, env, at));
+      const n = w ? Math.hypot(w.d.x, w.d.y) : 0;
+      return w && n > 0 ? [w.d.y / n, -w.d.x / n, (w.d.y * w.p0.x - w.d.x * w.p0.y) / n] : [NaN, NaN, NaN];
+    };
     const fixedStraight = (s: Straight) =>
       s.pts.every((x) => noFreedomReaches(construction, x)) && (s.curve === undefined || noFreedomReaches(construction, s.curve));
     construction.constraints.forEach((onK, ki) => {
@@ -627,7 +648,8 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       const P = onK.id;
       if (thirdCrossed.has(P) || tangentCrossed.has(P)) return;
       const K = objectById(construction, onK.curve);
-      if (!K || curveKindOf(K) !== 'circle') return;
+      const kind = K ? twiceMet(curveKindOf(K)) : null;
+      if (!K || !kind) return;
       const mine = declaredAt.get(P) ?? Number.POSITIVE_INFINITY;
       construction.constraints.forEach((k, li) => {
         if (tangentCrossed.has(P) || li === ki || (k as { id?: string }).id !== P) return;
@@ -644,20 +666,29 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
             const tan = tangentByConstruction(s, K, Q);
             if (tan !== null) evidence = Math.max(onKAt, onLAt, tan);
           }
-          // Nothing can move: ℓ only touches K, at Q.
-          if (evidence === null && fixedStraight(s) && noFreedomReaches(construction, K.id) && noFreedomReaches(construction, Q)) {
+          // Nothing can move: ℓ only touches K, at Q. The touch is read first (cheap). K and Q are fixed structurally
+          // (a Q the constraints merely pin — a plural's sibling letter — is not "already there"); ℓ is fixed
+          // structurally or — when a point of ℓ is free yet ℓ itself is not («P על הישר l1») — by the rank of its own
+          // position (#1932, ADR-AG-292).
+          if (evidence === null) {
             const cu = curveAt(K.id);
             const foot = cu ? touchPointOf(k, cu, atFig, curveAt) : null;
             const qp = posOf.get(Q)!;
-            if (foot && cu && cu.kind === 'circle' && Math.hypot(foot.x - qp.x, foot.y - qp.y) <= SOLVE_RESOLUTION * Math.abs(cu.r)) {
-              evidence = Math.max(objectLine(Q), objectLine(K.id), ...s.pts.map((x) => objectLine(x)), s.curve ? objectLine(s.curve) : -1);
+            if (foot && cu && Math.hypot(foot.x - qp.x, foot.y - qp.y) <= SOLVE_RESOLUTION * conicSize(cu)) {
+              const fixed =
+                noFreedomReaches(construction, K.id) &&
+                noFreedomReaches(construction, Q) &&
+                (fixedStraight(s) || figure.freedomOfRead?.((pos, env) => straightRead(k, pos, env)) === 0);
+              if (fixed) {
+                evidence = Math.max(objectLine(Q), objectLine(K.id), ...s.pts.map((x) => objectLine(x)), s.curve ? objectLine(s.curve) : -1);
+              }
             }
           }
           if (evidence === null) continue;
           const index = Math.max(constraintOn[ki], constraintOn[li], evidence);
           if (index < 0) continue;
           tangentCrossed.add(P);
-          faults.push({ index, code: 'tangent-no-second-crossing', detail: lines[index], point: P });
+          faults.push({ index, code: 'tangent-no-second-crossing', detail: lines[index], point: P, curve: kind });
           return;
         }
       });
