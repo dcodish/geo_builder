@@ -61,6 +61,7 @@ import { buildScene } from '@/render/scene';
 import { rowNouns } from '@/store/rowNouns';
 import { narrowingText } from '@/app/narrowingText';
 import { valueRowText } from '@/render/valueRowText';
+import { clausesOf } from '@/app/independence';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -5353,6 +5354,20 @@ export const SCENARIOS_4: Scenario[] = [
       expect(stripFormatControls(humanizeError(raw, he, line, otherUtteranceForError(facts, raw))), 'the exact ruled words').toBe(
         'AC כבר חותך את המעגל ב-A וב-C — לישר אין נקודת חיתוך שלישית עם המעגל.',
       );
+    },
+  },
+  {
+    id: 'one-fact-tip-whole-lines-2096',
+    title: '#2096 / #2106 (ADR-730): «משולש ABC ישר זווית ב-A ו-∠ABC = 30» teaches whole lines — the splitter cuts at «ו-∠», «ו-זווית» and «שבו», and the taught list «משולש ABC» · «∠CAB = 90°» · «∠ABC = 30» builds',
+    guards:
+      "Operator ruling 2026-10-15 (#2096 / #2106): *\"the numbered list (1) משולש ABC (2) ∠CAB = 90° (3) ∠ABC = 30, never a cut inside an angle\"*. Measured at 688dfb96 through decideDeterministic2D: «משולש ABC ישר זווית ב-A ו-∠ABC = 30» taught «(1) משולש ABC ישר זווית ב-A ו-∠  (2) ABC = 30»; «…ב-B ו-∠BAC = 30», «…ו-∢…», «…ו-זווית ABC = 30», «…ו-∠B = 30» and «…ב-B שבו AB = 4» the same. Root cause: the one clause splitter (clausesOf) did not cut at «ו» before an angle sign, at «ו-» before a Hebrew word, or at the relative «שבו», so the reading-based right-angle teaching never saw the trailing given as a part; the fallback cutter (splitGuidance) walked back only over letters and stopped inside the angle's name. Fix: those separators join SEPARATORS, and the fallback cut keeps an angle marker with its operand and trims a dangling connective. Asserts the operator's two lines split whole at the splitter and that the taught lines build with the angles where they were named. The refusals (decision verdicts, not parses) are src/app/__tests__/issue-2096-split-cut.test.ts.",
+    steps: ['משולש ABC', '∠CAB = 90°', '∠ABC = 30'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'C'), at(fig, 'A'), at(fig, 'B')), 'the right angle is at A, where the student named it').toBeCloseTo(90, 6);
+      expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), '∠ABC = 30').toBeCloseTo(30, 6);
+      expect(clausesOf('משולש ABC ישר זווית ב-A ו-∠ABC = 30'), '#2106, verbatim').toEqual(['משולש ABC ישר זווית ב-A', '∠ABC = 30']);
+      expect(clausesOf('משולש ABC ישר זווית ב-B ו-∠BAC = 30'), '#2096, verbatim').toEqual(['משולש ABC ישר זווית ב-B', '∠BAC = 30']);
     },
   },
 ];

@@ -108,15 +108,16 @@ describe('#2209 item 1 — the catalog\'s «מעגל O ומעגל P משיקים
       expect(added).toEqual([{ type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'M', external, ...defaultedIf(line) }]);
     });
 
-  // S5/S6: «מעגל O» is a DECLARATION there (a given), so the line is two statements and keeps its advisory
+  // S5/S6: «מעגל O» is a DECLARATION there (a given), so the line builds the pair. #2096 (ADR-730, operator ruling
+  // 2026-10-16): its subject is JOINED, so the one-input-per-line tip, which quoted the fragment «(2) מעגל P משיקים», is dropped
   for (const [pre, line] of [
     [[], 'מעגל O ומעגל P משיקים'],
     [['מעגל O'], 'מעגל O ומעגל P משיקים בנקודה M'],
   ] as const)
-    it(`unchanged: «${[...pre, line].join(' · ')}» commits with the one-input-per-line tip`, async () => {
+    it(`«${[...pre, line].join(' · ')}» commits with no fragment tip (#2096)`, async () => {
       const { v } = await play([...pre], line);
       expect(v.kind).toBe('commit');
-      expect(v.kind === 'commit' && v.note && 'key' in v.note && v.note.key).toBe('input.scope.split-advisory');
+      expect(v.kind === 'commit' && v.note).toBeNull();
       expectTangent('EXT', ['M', 'O', 'P']);
     });
 

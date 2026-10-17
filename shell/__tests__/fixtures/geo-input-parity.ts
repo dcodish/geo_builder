@@ -1610,6 +1610,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2089 (ADR-728): «AE ⟂ CD» about a rider E of CD is the foot statement «AE גובה לצלע CD» — the quadrilateral yields ──
   { id: 'rider-perp-foot-2089', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'E על CD', 'AE ⟂ CD'], expect: 'builds', note: '2-D refused it before ADR-728' },
+
+  // ── #2096 / #2106 (ADR-730): a right-angle vertex then «ו-∠…» is refused with the taught list, never a cut inside the angle ──
+  { id: 'unread-vertex-2106', family: 'angles', steps: ['משולש ABC ישר זווית ב-A ו-∠ABC = 30'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2088' }], note: '2-D taught «(1) … ב-A ו-∠  (2) ABC = 30» before ADR-730 (analytic already refused, measured at 688dfb96); the list is locked in src/app/__tests__/issue-2096-split-cut.test.ts' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

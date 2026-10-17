@@ -896,7 +896,15 @@ gate's reading (`readClauses`, never in `clausesOf`), a piece whose lowering onl
 has (`refersOnly`, the same test as coverage rule (3)) is re-joined to the next piece with the line's own separator
 text, and the joined text is read as one clause, provided it reads. «מעגל O ומעגל P משיקים» on two drawn circles is
 therefore one clause, and «מעגל P משיקים» is never read without its co-subject. On an empty figure «מעגל O»
-declares a new id, so nothing is joined and ADR-460's advisory is unchanged.
+declares a new id, so nothing is joined.
+
+**Angle givens, relatives and joined subjects** ([ADR-730](06-decisions.md#adr-730), #2096). `SEPARATORS` also cuts at
+«ו» before an angle sign («ו-∠», «ו-∢»), at «ו-» before a Hebrew word («ו-זווית»), and at the relatives «שבו» / «שבה»;
+the connective and relative words are one list (`CLAUSE_CONNECTIVES` / `CLAUSE_RELATIVES`, `src/parser/scope.ts`) that
+`splitGuidance`'s fallback cut also reads. That cut moves an angle marker («∠», «∢», «[ה]זווית») ending its head into
+the tail, so the operand keeps its angle, and trims a connective left dangling on the head. ADR-460's commit-path
+advisory is skipped when the line's subject is JOINED (`joinedSubject`, `clauseCoverage.ts`): a piece that only
+declares objects, whose text through the next piece reads as a relation over them («מעגל O ומעגל P משיקים»).
 
 #### A part the reading never read ([ADR-603](06-decisions.md#adr-603), [ADR-W-120](06w-decisions-workspace.md#adr-w-120))
 
