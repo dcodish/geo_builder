@@ -5047,8 +5047,8 @@ export const SCENARIOS_4: Scenario[] = [
         expect(v, line).toEqual({ kind: 'refused', reason: 'parse', detail: 'ambiguous-circle-ref' });
       }
       expect(replay(facts).circles.size, 'nothing is added').toBe(2);
-      },
     },
+  },
   {
     id: 'radius-ratio-refusal-names-radii-2112',
     title: '«רדיוס מעגל O גדול פי 2 מרדיוס מעגל P» after «מעגל O ברדיוס 4» · «מעגל P ברדיוס 3» is refused naming «מעגל O ברדיוס 4», the reason the radii (#2112, ADR-698)',
