@@ -5324,6 +5324,25 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'chord-third-crossing-1834',
+    title: '«מעגל O» · «A על מעגל O» · «C על מעגל O» · «AC חותך את המעגל בנקודה E» — refused saying a line meets a circle at most twice, never «the line is tangent» (#1834, ADR-729)',
+    guards:
+      "#1834 (P3), operator ruling 2026-10-07 (/decisions pass, «Say why, in the student's terms»): «AC כבר חותך את המעגל ב-A וב-C — לישר אין נקודת חיתוך שלישית עם המעגל.», generalised to any third crossing asked of a line with two named points on the circle. Measured on 688dfb96 through decideDeterministic2D: the fourth line was refused «לא ניתן למקם את E: הישר משיק למעגל בנקודה אחת בלבד…» — a chord called a tangent. Root cause: evaluate.ts case 'line-circle' returned the tangent sentence whenever no fresh crossing remained, for a true tangency and for a chord whose two crossings are already placed alike. Fix: chordCrossings tells the two apart (two distinct roots, each a placed point) and the chord case gets its own engine sentence → errors.thirdCrossing. Asserts the operator's three lines build and the fourth is refused before it becomes a fact with the exact ruled words. The matrix (every spelling, the «⟨…⟩» case, English, the tangent control) is src/app/__tests__/issue-1834-chord-third-crossing.test.ts.",
+    steps: ['מעגל O', 'A על מעגל O', 'C על מעגל O'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = (k: string, o?: Record<string, unknown>) => i18n.getFixedT('he')(k, o) as string;
+      const facts = factsOf(['מעגל O', 'A על מעגל O', 'C על מעגל O']);
+      const line = 'AC חותך את המעגל בנקודה E';
+      const v = gateVerdict(facts, line);
+      expect(v.kind, JSON.stringify(v)).toBe('refused');
+      const raw = (v as { detail?: string }).detail ?? '';
+      expect(stripFormatControls(humanizeError(raw, he, line, otherUtteranceForError(facts, raw))), 'the exact ruled words').toBe(
+        'AC כבר חותך את המעגל ב-A וב-C — לישר אין נקודת חיתוך שלישית עם המעגל.',
+      );
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

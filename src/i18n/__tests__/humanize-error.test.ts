@@ -101,6 +101,8 @@ const CASES: { raw: string; contains: string[] }[] = [
     raw: 'cannot place E: line line-CA is tangent to circle circle-O at A — it has no second crossing to extend onto',
     contains: ['E'],
   },
+  // #1834 (ADR-729): a third crossing asked of a chord — the line is named by its two crossings, the asked point is not.
+  { raw: 'cannot place ~D: line AC already crosses circle circle-O at A and C — a line has no third crossing with a circle', contains: ['AC', 'A', 'C'] },
   { raw: 'cannot place E: B is at the centre of circle-O', contains: ['E', 'B'] },
   { raw: 'cannot take a tangent at the centre of circle-O', contains: ['O'] },
   { raw: 'cannot construct A: circles circle-O and circle-P do not meet', contains: ['A', 'O', 'P'] },

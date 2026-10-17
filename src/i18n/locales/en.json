@@ -460,6 +460,7 @@
     "alreadyDefined": "{{id}} is already defined and can't be redefined as something different. To change it, edit or delete the earlier step.",
     "cannotPlaceOnSegment": "I couldn't place {{id}} on segment {{seg}} so that {{what}} holds — there may be no such position on the segment.",
     "circlesDontMeet": "Can't build {{id}}: circles {{c1}} and {{c2}} don't intersect. The sizes may need adjusting.",
+    "thirdCrossing": "{{line}} already crosses the circle at {{a}} and {{b}} — a line has no third crossing with a circle.",
     "tangentNoSecondCrossing": "Can't place {{id}}: the line is tangent to the circle (touches at one point) — there's no second crossing to extend onto.",
     "tangentAtCentre": "Can't draw a tangent at the centre of circle {{circle}}.",
     "towardAtCentre": "Can't place {{id}}: {{toward}} is at the circle's centre, so the direction is undefined.",

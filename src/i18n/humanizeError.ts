@@ -398,6 +398,15 @@ export const PATTERNS: Pattern[] = [
   },
   { re: /^not determined: (.+) cannot be judged in this configuration$/, key: 'errors.notDeterminedHereBare', params: (m) => ({ what: m[1] }) },
 
+  // #1834 (ADR-729) — evaluate.ts `thirdCrossingError`: `cannot place E: line AC already crosses circle circle-O at A
+  // and C — a line has no third crossing with a circle`. The point being placed is not named (it may be an internal
+  // id); `line` is the two crossings' own letters, never the engine's line id.
+  {
+    re: new RegExp(`^cannot place \\S+: line \\S+ already crosses circle \\S+ at (\\S+) and (\\S+) ${EMDASH} a line has no third crossing with a circle$`),
+    key: 'errors.thirdCrossing',
+    params: (m) => ({ line: `${m[1]}${m[2]}`, a: m[1], b: m[2] }),
+  },
+
   // evaluate.ts:1183 — `cannot place E: line line-CA is tangent to circle circle-O at A — it has no second crossing to extend onto`
   {
     re: new RegExp(`^cannot place (\\S+): line .+ is tangent to circle .+ at .+ ${EMDASH} it has no second crossing to extend onto$`),
