@@ -18619,3 +18619,31 @@ The kind words are the ones `circlesTangent` already reads. #2214's single kind 
 **Locks.** `src/store/__tests__/issue-1866-no-view-delta-note.test.ts`: the seven keys are absent in both locales (`i18n.exists`, the pattern of `issue-1444-config-status.test.ts`), the store exposes no `lastViewDelta`/`clearViewDelta` after a press (on «משולש ABC» and on #2314's «שני מעגלים»), and `actions.onlyConfig` still resolves while «ריבוע ABCD» still answers the press with "no other view". Retired: `src/store/__tests__/issue-65-view-delta.test.ts` (the feature it locked is gone).
 
 **Behaviour change for a student:** after «הציגו תצורה אחרת» redraws the figure, no «השתנה: … · נשמר: …» line appears under the canvas (before: «השתנה: המיקום של A, המיקום של B, ועוד 1», and internal ids for unnamed circles, #2314). A press that finds no other drawing still says «אין תצורה אחרת — הצורה נקבעה (רק הגודל/המיקום משתנים)».
+
+## ADR-726 — An angle named with a Latin letter builds, and the step suggests a Greek letter (#2173)
+
+**Status:** accepted · 2026-10-17 · feature (P3, 2-D) · fix round #2318, stream C · branch `feat/2173-latin-angle-symbol-note` (PR) · plan: the #2173 body, finalised by the operator's rulings of 2026-10-15 and 2026-10-16 · **Extends** [ADR-428](#adr-428) (teach on acceptance) with a second note on the same step
+**Requirements:** [02](02-requirements.md) FR-IN-6 — an angle given a Latin letter is accepted with that letter and the step suggests a Greek one · **Design:** [04](04-design.md) § "The pre-LLM decision" (a commit note's `also` chain) · **LADDER stage:** none (the commit seam's teaching note; nothing is solved differently)
+
+**The report / ruling.** Operator, 2026-10-15 (playing round #2128's T5, «משולש ABC» · «זוית B=b»): *"T5 works but it should suggest the user to greek letters for angles"*. The same day: *"i accept the sentance"* — «נקלט. לזוויות נהוג להשתמש באותיות יווניות — למשל «זוית B=β».» — and *"yes - same logic"* for 3-D and analytic. 2026-10-16 (ballot round 4, card 3, option B, *"Both tips"*): the suggestion shows beside #2174's arc note, never suppressed.
+
+**Measured before** (`main` @ 688dfb96, `decideDeterministic2D` → `commitVerdict` → `replay`, model mocked). After «משולש ABC»: «זוית B=b», «∠ABC = x», «זווית ABC היא k», «∠ABC = x + 40», «∠ABC = 2x», "angle B = b" each committed their `measure-angle` with `note: null`, labelled with the student's letter, green. «∠ABC = K» (uppercase) is not read as a symbol and escalates — untouched.
+
+**The class (docs/17 §1).** *A committed step that names an angle with a Latin letter is accepted without the convention ever being said.* Every spelling lowers to one `measure-angle` whose `expr.var` is the letter, so the class is one predicate on the committed commands, at ADR-428's one teach-on-acceptance seam (`decideFromParse`'s commit branch, and its deferred twin).
+
+**Decision.**
+1. **The predicate** `latinAngleLetters(commands, earlier)` (`src/parser/parse.ts`): the Latin `expr.var` letters of the committed `measure-angle` commands, less any letter an `earlier` (the figure's) `measure-angle` already used. Once per letter, as the plan stated: «זוית B=b» · «זוית C=b» tells the student once. A letter used before only as a LENGTH («AB = x» · «∠ABC = x») still gets it — it names an angle for the first time. Lengths are never read.
+2. **The note rides beside, not instead.** `DecideNote` gains `also?: DecideNote` — a second note on the same successful step; `appendNote` puts the tip at the end of the chain, and `runSubmit`'s `noteText` shows the chain on one line. So the existing tips (the canonical hint, «הובן כ-∠ABC», the lowercase measure note) keep showing, and this one is never lost to them; #2174's arc note uses the same chain ("both tips").
+3. **Never a refusal.** The step commits exactly as before, with the student's letter.
+
+**Measured after.** Every "before" row commits unchanged and carries `input.greekAngleLetter`; «∠ABC = β», «∠ABC = 2α», «∠ABC = 40», «AB = b», «AB = 3x» carry none; in △ABC with a cevian BD, «זוית B=b» shows «הובן כ-∠ABC» then the suggestion. The taught example «זוית B=β» builds.
+
+**Why not a patch (docs/17 §2).** No spelling is matched: the predicate reads the parsed command at the one seam every committed line passes, so every current and future spelling that lowers to a lettered `measure-angle` is covered.
+
+**Not changed.** The parse, the label, the solve; «∠ABC = K» (escalates as before); the LLM lane (its commits carry no teaching note, as for every ADR-428 tip).
+
+**Sibling audit / cross-tool.** **3-D**: «∠ABC = x», «זווית ABC היא k», "angle ABC = x", «∠SDB = 2x» record an `angle-mark` with a Latin `label`, silently — but 3-D does not read the ruled example: «משולש ABC» · «זוית B=β» (and «זוית B=b») is `not-understood`. Teaching a sentence 3-D sends to the AI is a measured divergence from the ruling's premise, so the 3-D arm is escalated on #2173 for a ruling on its wording (no 3-D change here; ADR-3D-365 stays reserved). **Analytic** waits for open PR #2299 (it edits `src-analytic/`'s parser and App). Complex names no angles with letters.
+
+**Locks.** `src/app/__tests__/issue-2173-latin-angle-note.test.ts` (six Hebrew spellings + English, the letter kept, the controls, once per letter, a length letter, the chain beside «הובן כ-∠ABC», the pipeline's rendered line, the ruled sentence in both locales, the example builds, the predicate, `appendNote`); scenario `latin-angle-letter-2173`. The parity goldens (`decide-parity-1395-*`) are expected to drift on any corpus row that commits a Latin angle letter (its verdict's `note` gains the tip) — the batch's to judge.
+
+**Behaviour change for a student:** «משולש ABC» · «זוית B=b» builds as before and now says «נקלט. לזוויות נהוג להשתמש באותיות יווניות — למשל «זוית B=β».» — the first time each Latin letter names an angle, beside any other note the step has.

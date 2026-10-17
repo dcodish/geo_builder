@@ -14969,6 +14969,20 @@ export function lowercaseMeasureLetters(commands: AnyCommand[]): string[] {
 }
 
 /**
+ * #2173 ([ADR-726](../../docs/06-decisions.md#adr-726), operator ruling 2026-10-15) — the LATIN letters a parse
+ * gives an ANGLE as its symbol: «זוית B=b», «∠ABC = x», «∠ABC = 2x + 40». Greek is the convention for angles
+ * (FR-IN-6), so a committed step that names an angle with a Latin letter carries a suggestion — never a refusal.
+ * A letter that already named an angle in `earlier` (the figure's commands) is not counted again: the note
+ * fires once per letter, not on every later line that reuses it. Lengths are never read here.
+ */
+export function latinAngleLetters(commands: readonly AnyCommand[], earlier: readonly AnyCommand[] = []): string[] {
+  const angleLetters = (cs: readonly AnyCommand[]) =>
+    cs.flatMap((c) => (c.type === 'measure-angle' && 'var' in c.expr ? [c.expr.var] : []));
+  const seen = new Set(angleLetters(earlier));
+  return [...new Set(angleLetters(commands).filter((v) => /^[A-Za-z]/.test(v) && !seen.has(v)))];
+}
+
+/**
  * #779 — the FAILED-parse half of the same nudge, the direct 3-D mirror: lift the lowercase runs and
  * let the caller PROOF re-parse the candidate (the note fires only if the candidate parses, so a
  * genuine gap stays a genuine gap). Hebrew text lifts every standalone run, singles included; Latin

@@ -178,8 +178,11 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
   // #1849 (ADR-602): a refusal at the door names the OTHER side too, when the fold could name one. The dry run's
   // status carries the same `[vs #i]` tail the banner resolves (ADR-508), indexed into the committed facts the
   // trial array shares — so the note says «AC = 8» סותר את «משולש ABC» instead of «AC = 8» against "an earlier given".
-  const noteText = (n: DecideNote) =>
-    'explain' in n ? deps.explainError(n.explain, utterance, otherUtteranceForError(store().facts, n.explain)) : t(n.key, resolveParams(n.params));
+  // #2173 (ADR-726): a step's second tip (`also`) is shown after the first, on the same line.
+  const noteText = (n: DecideNote): string =>
+    'explain' in n
+      ? deps.explainError(n.explain, utterance, otherUtteranceForError(store().facts, n.explain))
+      : n.also ? `${t(n.key, resolveParams(n.params))} ${noteText(n.also)}` : t(n.key, resolveParams(n.params));
 
   const pre = decidePreParse(utterance, deps.view());
   if (pre?.kind === 'store-op') {

@@ -51,7 +51,7 @@ import { gateVerdict } from './submit-gate';
 import i18n from '@/i18n';
 import { humanizeError } from '@/i18n/humanizeError';
 import { otherUtteranceForError } from '@/app/errorSubject';
-import { parse } from '@/parser';
+import { latinAngleLetters, parse } from '@/parser';
 import { COLLINEAR_CIRCLE_VS } from '@/engine/cyclicFeasibility';
 import { stripFormatControls } from '../../shell/bidi';
 import { COLLAPSED_VS, computeValues, detectAll, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
@@ -5388,6 +5388,23 @@ export const SCENARIOS_4: Scenario[] = [
       );
       expect(gateVerdict(facts, 'רדיוס מעגל P הוא r').kind, 'the taught next step builds').toBe('commit');
       expect([...fig.circles.values()].map((c) => c.r).sort(), 'nothing changed the radii').toEqual([3, 5]);
+    },
+  },
+  {
+    id: 'latin-angle-letter-2173',
+    title: '«משולש ABC» · «זוית B=b» builds with the letter b, and the step suggests a Greek letter (#2173, ADR-726)',
+    guards:
+      "#2173 (P3 feature), operator 2026-10-15 (playing round #2128's T5): *\"it should suggest the user to greek letters for angles\"*, the sentence ruled the same day. Measured on 688dfb96 through decideDeterministic2D: «זוית B=b» (and «∠ABC = x», «זווית ABC היא k», «∠ABC = x + 40», «∠ABC = 2x», 'angle B = b') committed with note: null. Root cause: ADR-428's teach-on-acceptance seam had no rule for an angle's Latin letter. Fix: latinAngleLetters on the committed commands (once per letter against the figure), appended to the step's note chain (DecideNote.also) so it rides beside any other tip. Asserts the report builds green with the label b, the committed angle's letter is the one the note keys on, a second angle reusing b is not counted again, and the Hebrew sentence is the ruled one. The decision-path matrix is src/app/__tests__/issue-2173-latin-angle-note.test.ts.",
+    steps: ['משולש ABC', 'זוית B=b'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.labels.angles.map((a) => a.text)).toEqual(['b']);
+      const facts = factsOf(['משולש ABC', 'זוית B=b']);
+      const last = facts[facts.length - 1];
+      expect(latinAngleLetters([last.cmd], facts.slice(0, -1).map((f) => f.cmd))).toEqual(['b']);
+      const again = factsOf(['משולש ABC', 'זוית B=b', 'זוית C=b']);
+      expect(latinAngleLetters([again[again.length - 1].cmd], again.slice(0, -1).map((f) => f.cmd)), 'once per letter').toEqual([]);
+      expect(stripFormatControls(i18n.t('input.greekAngleLetter', { lng: 'he' }) as string)).toBe('נקלט. לזוויות נהוג להשתמש באותיות יווניות — למשל «זוית B=β».');
     },
   },
 ];

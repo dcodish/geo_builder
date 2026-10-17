@@ -849,6 +849,10 @@ seam guards — is `decideDeterministic2D` in `app/decideDeterministic.ts`, a pu
 its binds, log events and note. `runSubmit` applies the verdict and `log-triage` calls the same function; the mirror
 test fails if `runSubmit` parses or refuses on its own, and the parity shards (`decide-parity-1395-*`) hold the corpus.
 
+- **Two tips on one step** ([ADR-726](06-decisions.md#adr-726)): a commit's `note` is a chain — `DecideNote.also` is a
+  second note shown after the first on the same line (`appendNote`; `runSubmit`'s `noteText` joins them). The
+  Greek-letter suggestion (`latinAngleLetters`, once per letter against the figure's earlier commands) is appended
+  to whatever ADR-428 note the step already has, never in its place.
 - **An incircle 2-D does not draw** ([ADR-606](06-decisions.md#adr-606)): `incircle-not-drawn` → `refuse('guided')`,
   logged `incircle-not-drawn:<sides>` so log-triage counts the demand; never escalated.
 - **An unresolved operand** ([ADR-571](06-decisions.md#adr-571)): a dry run failing in the topological evaluator
