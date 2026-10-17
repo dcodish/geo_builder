@@ -27,11 +27,20 @@
  * (#1049), a stated part narrows it (ADR-AG-267), a stated region replaces its region choice, a named pair pins or
  * displaces the assumption (#1159). A choice left with one option is no longer the tool's, and is not said.
  *
+ * **"Unstated" is also judged on the configuration POOL** (#2233, [ADR-AG-290](../../docs/06c-decisions-analytic.md#adr-ag-290)):
+ * the apply step's narrowing is SYNTACTIC — it removes an option only when a statement names part of it — so a sign
+ * («x_A > 0»), an axis side, a coordinate or the geometry itself can leave one option drawable while several stay
+ * written. A choice is said only while the admitted configurations (`admittedPool`, the set `isKnowledge` reads) do
+ * not AGREE on an option: no option holds in every one. For `axes`, `open` is the vertices whose axis differs across
+ * them. While the pool cannot tell (deferred and incomplete on the page, starved, none admitted) the note stays as
+ * the written options say — it never flickers off and back on. The assumed parallel pair is NOT judged this way: the
+ * assumption is imposed in every configuration, so the pool cannot see its alternative (#2284).
+ *
  * **WHICH option is drawn is read off the drawn figure** (#1719's rule, as `statedMeasures` reads it): `drawableAt`
  * may have drawn another seed's configuration, so the seed alone does not say.
  */
 import type { Derivation } from './derive';
-import { holdsOn, selectorsHold } from './evaluate';
+import { admittedPool, holdsOn, selectorsHold, type Figure } from './evaluate';
 import { parseLengthExpr } from './lengths';
 import { promisesOneParallelPair } from './shapes';
 import { resolveChoices, sameConstraint, type Constraint } from './solve';
@@ -115,6 +124,17 @@ function drawnRegion(d: Derivation, s: Extract<Selector, { kind: 'choice' }>): S
   return s.options[((at % n) + n) % n];
 }
 
+/** The figure's positions, as `selectorsHold` reads them. */
+const positionsOf = (f: Figure) => new Map(f.points.map((p) => [p.id, { x: p.x, y: p.y }]));
+
+/**
+ * DO THE ADMITTED CONFIGURATIONS AGREE ON AN OPTION? (#2233) — true when one option holds in every one of them: the
+ * givens settled the choice, whatever spelling settled it. `null` pool (it cannot tell yet) is never agreement.
+ */
+function poolAgrees<O>(pool: readonly Figure[] | null, options: readonly O[], holds: (o: O, f: Figure) => boolean): boolean {
+  return pool !== null && options.some((o) => pool.every((f) => holds(o, f)));
+}
+
 /** The ring an assumed parallel pair belongs to — a declared polygon whose noun promises one parallel pair. */
 function trapezoidOf(d: Derivation, k: Extract<Constraint, { t: 'relation' }>): Id[] | null {
   if (k.u.k !== 'points' || k.v.k !== 'points') return null;
@@ -132,6 +152,9 @@ export function unstatedChoices(d: Derivation): UnstatedChoice[] {
   const faulted = new Set(d.faults.map((f) => f.index));
   const out: UnstatedChoice[] = [];
   const said = (line: number) => line >= 0 && !faulted.has(line);
+  // The pool is read only when a choice is there to judge — once, shared by every choice on the figure.
+  let pool: Figure[] | null | undefined;
+  const poolOnce = () => (pool === undefined ? (pool = admittedPool(d.construction)) : pool);
 
   d.construction.constraints.forEach((k, at) => {
     const line = d.constraintLine[at] ?? -1;
@@ -140,6 +163,7 @@ export function unstatedChoices(d: Derivation): UnstatedChoice[] {
     if (k.t === 'choice' && k.options.length > 1) {
       const equalities = k.options.map((o) => membersOf(o).map(segmentEquality));
       if (equalities.every((ms) => ms.length > 0 && ms.every((m) => m !== null))) {
+        if (poolAgrees(poolOnce(), k.options, (o, f) => holdsOn(d.construction, o, f))) return;
         const pairs = membersOf(drawnOption(d, k)).map((m) => segmentEquality(m)!);
         out.push({ kind: 'equal-pair', line, pairs });
         return;
@@ -148,7 +172,22 @@ export function unstatedChoices(d: Derivation): UnstatedChoice[] {
       if (axes.every((ms) => ms.length > 0 && ms.every((m) => m !== null))) {
         const drawn = membersOf(drawnOption(d, k)).map((m) => axisOf(m)!);
         const axisIn = (ms: Array<{ id: Id; axis: 'x' | 'y' } | null>, id: Id) => ms.find((m) => m!.id === id)?.axis;
-        const open = drawn.map((m) => m.id).filter((id) => new Set(axes.map((ms) => axisIn(ms, id))).size > 1);
+        const written = drawn.map((m) => m.id).filter((id) => new Set(axes.map((ms) => axisIn(ms, id))).size > 1);
+        const figs = poolOnce();
+        // The pool's reading: per configuration, the option it holds (its first, as `drawnOption` reads it); a vertex
+        // is open while two configurations put it on different axes. A configuration holding none is no evidence.
+        const open =
+          figs === null
+            ? written
+            : written.filter((id) => {
+                const seen = new Set<'x' | 'y' | undefined>();
+                for (const f of figs) {
+                  const at = k.options.findIndex((o) => holdsOn(d.construction, o, f));
+                  if (at >= 0) seen.add(axisIn(axes[at], id));
+                }
+                return seen.size > 1;
+              });
+        if (open.length === 0) return;
         out.push({ kind: 'axes', line, onX: drawn.filter((m) => m.axis === 'x').map((m) => m.id), onY: drawn.filter((m) => m.axis === 'y').map((m) => m.id), open });
       }
       return;
@@ -177,6 +216,7 @@ export function unstatedChoices(d: Derivation): UnstatedChoice[] {
     const line = d.selectorLine[at] ?? -1;
     if (!said(line) || s.kind !== 'choice' || s.options.length < 2) return;
     if (!s.options.every((o) => obtuseVertexOf(o) !== null)) return;
+    if (poolAgrees(poolOnce(), s.options, (o, f) => selectorsHold({ ...d.construction, selectors: [o] }, positionsOf(f), f.env))) return;
     out.push({ kind: 'obtuse-vertex', line, vertex: obtuseVertexOf(drawnRegion(d, s))! });
   });
 

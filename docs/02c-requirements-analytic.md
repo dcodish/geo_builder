@@ -709,7 +709,8 @@ a sentence the tool parsed.
 - «אחד המוקדים», which axis crossing is `A` → discrete; «E נקודה על האליפסה» → continuous
 - **A discrete choice the tool made is SAID, for as long as it is unstated** (02 FR-HS-13, B10, #1864, ADR-AG-267): a note under the row that opened it, in 2-D's words, naming what is drawn now, a line that pins it, and «הציגו תצורה אחרת»; a cue «בחירות שהכלי עשה במקומכם — עד שתכתבו אותן» beside the button while any note is up. Said for: which pair is equal («משולש שווה שוקיים», «אורך השוק AB הוא 5» on a plain triangle), which pair is parallel (the trapezoid family, legs named when they are equal), which angle is obtuse («משולש קהה זווית»), which vertex is on which axis («קודקודי המשולש מונחים על הצירים»). Not said: a right angle's seat (ADR-556), a tangency, a sine's two angles, an inscribed shape's placement. The kite's pair is #2006.
 - The note goes when the student states the choice in any spelling («AC=AB», «זווית BAC קהה», «זווית A קהה», «A על ציר ה-x» narrows the axes choice), and comes back if that line is muted.
-- Sources: ADR-481; ADR-AG-267.
+- **"Unstated" means the drawable configurations still differ** (#2233, ADR-AG-290): the note also goes when the givens settle the choice without naming it — signs («x_A > 0»), an axis side, coordinates, or the geometry forcing the rest — matching the data panel; the axes note teaches only a vertex whose axis still differs. Until the configurations are all read, the note stays as it was. Not yet for the trapezoid's assumed pair (#2284).
+- Sources: ADR-481; ADR-AG-267; ADR-AG-290.
 
 **R15 — The tool never has to work out that an ambiguity is harmless.** No special case for "this one happens not to matter".
 

@@ -592,14 +592,6 @@ export function App() {
     [lines, disabled, spokenFor, d],
   );
 
-  /**
-   * #1864 (ADR-AG-267, docs/10 P4): every choice the tool made for an unstated given, worded — SAID under the row
-   * that opened it and gathered beside «הציגו תצורה אחרת», for as long as it is unstated. 2-D's two surfaces.
-   */
-  const unstatedNotes = useMemo(
-    () => unstatedChoices(d).map((c) => ({ line: c.line, text: unstatedChoiceText(c, (k, o) => t(k, o)) })),
-    [d, t],
-  );
 
   /**
    * THE POOL COMPLETES AFTER THE RENDER (#1473). One seed per slice, yielding to the browser between seeds; a re-render when it completes,
@@ -619,6 +611,17 @@ export function App() {
   const shapeWarnings = useMemo(() => shapeWarningsOf(active, d), [active, d]);
   const [poolTick, setPoolTick] = useState(0);
   useLayoutEffect(() => completePoolAfterRender(configurationPool(d.construction), () => setPoolTick((n) => n + 1)), [d]);
+  /**
+   * #1864 (ADR-AG-267, docs/10 P4): every choice the tool made for an unstated given, worded — SAID under the row
+   * that opened it and gathered beside «הציגו תצורה אחרת», for as long as it is unstated. 2-D's two surfaces.
+   * #2233 (ADR-AG-290): "unstated" is judged on the configuration pool too; while it is incomplete the note stays as
+   * written and reports pending, so the pool's completion re-reads it.
+   */
+  const unstatedNotes = useMemo(
+    () => unstatedChoices(d).map((c) => ({ line: c.line, text: unstatedChoiceText(c, (k, o) => t(k, o)) })),
+    // poolTick: the pool completed, re-read the gate
+    [d, t, poolTick],
+  );
   /**
    * THE GIVENS FORCED A NARROWER KIND (#1996, ADR-AG-276 — operator rulings 2026-10-13): one ⓘ line per declared ring the
    * givens force into a narrower named kind, naming the cause. Read off the COMPLETE configuration pool only, and computed

@@ -403,13 +403,22 @@ sine's two roots, an inscribed square — is not said. Which option is drawn is 
 - `canonicalConstraint` sorts a `length-eq`'s segment points and its two sides, so «AC=AB» pins «AB = AC».
 - «זווית A קהה» is a `vertex-angle` fact whose `order` right side M1 resolves to the three-letter selector.
 
+#### "Unstated" is judged on the pool ([ADR-AG-290](06c-decisions-analytic.md#adr-ag-290), #2233)
+
+The apply step's narrowing is syntactic, so a sign, a coordinate or the geometry can leave one option drawable while
+several stay written. `unstatedChoices` therefore also reads `admittedPool(c)` (`engine/evaluate.ts`, the set `isKnowledge`
+judges): a constraint or region `choice` is said only while no option holds in every admitted configuration, and the axes
+note's `open` is the vertices whose axis differs across them. `admittedPool` answers `null` while it cannot tell (deferred and
+incomplete — reported pending —, none admitted, starved); the note then stays as written, and `App.tsx` re-reads it on
+`poolTick`. An `assumed` parallel pair is imposed in every configuration, so the pool cannot judge it (#2284).
+
 #### Wording
 
 `app/unstatedChoice.ts` mirrors 2-D's `src/ui/unstatedChoice.ts`; the templates are 2-D's `steps.*` verbatim,
 held equal by `shell/__tests__/suite-vocabulary.test.ts`. `App.tsx` shows each note in its row's `notes` slot and
 the `unstatedTitle` cue beside «הציגו תצורה אחרת».
 
-*Identifiers:* `unstatedChoices.ts` · `unstatedChoice.ts` · `selectorLine`
+*Identifiers:* `unstatedChoices.ts` · `unstatedChoice.ts` · `selectorLine` · `admittedPool`
 
 ### The shape registry ([ADR-AG-035](06c-decisions-analytic.md#adr-ag-035))
 
