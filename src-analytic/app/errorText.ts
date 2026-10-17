@@ -175,6 +175,9 @@ const POLYGON_NOUN_KEY: Readonly<Record<string, string>> = {
 };
 const polygonNounKey = (kind: string | undefined): string => (kind && POLYGON_NOUN_KEY[kind]) || 'shapeTheNounPolygon';
 
+/** 2-D's one-fact-per-line list format (`src/app/unreadParts.ts` `numbered`): «(n) part», two-space separators. */
+const numbered = (parts: readonly string[], from = 1): string => parts.map((p, i) => `(${i + from}) ${p}`).join('  ');
+
 /** The sentence a student reads for `error`, in the locale `t` speaks. */
 export function errorText(error: InputError, t: Translate): string {
   const kind: RefKind | undefined = 'expected' in error ? error.expected : undefined;
@@ -329,9 +332,11 @@ export function errorText(error: InputError, t: Translate): string {
     toCurve: t(TO_THE_NOUN_KEY[crossed]),
     reusedId: 'reusedId' in error ? (error.reusedId ?? '') : '',
     definedBy: 'definedBy' in error ? (error.definedBy ?? '') : '',
-    all: error.key === 'split-statements' ? error.parts.map((p, i) => `(${i + 1}) ${p}`).join('  ') : '',
+    all: error.key === 'split-statements' ? numbered(error.parts) : '',
     triangle: error.key === 'split-statements' && error.teach ? error.teach.triangle : '',
     angle: error.key === 'split-statements' && error.teach ? error.teach.angle : '',
+    // #1947 (ADR-AG-301) — the taught pair is items (1) and (2); the line's further parts continue the SAME list from (3)
+    more: error.key === 'split-statements' && error.teach && error.parts.length > 2 ? `  ${numbered(error.parts.slice(2), 3)}` : '',
     // #1554 ruling 1 (ADR-AG-198): the two nouns, in each locale's spelling (the registry key is the Hebrew).
     shapeHe: 'shape' in error ? (error.shape ?? '') : '',
     polygon: 'polygon' in error ? (error.polygon ?? '') : '',

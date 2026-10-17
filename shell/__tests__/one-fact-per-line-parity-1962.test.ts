@@ -12,9 +12,10 @@
  * `length-copula-parity` pattern): `shell/` may not import a product tree, and a product tree may not
  * import another (`BOUNDARIES.json`).
  *
- * **Analytic is NOT listed yet.** The same ruling gives it the teaching it has never had (#1947), and that
- * arm is not built here — see ADR-3D-331's sibling audit. When it lands, its locale joins `SAYS_IT` and
- * this lock holds all three.
+ * **Analytic joined in #1947** ([ADR-AG-301](../../docs/06c-decisions-analytic.md#adr-ag-301)). Its locale is a
+ * TypeScript module (`src-analytic/i18n/index.ts`, `he` then `en`), not JSON, so its key is read off disk by
+ * source text: the key appears exactly twice, once per locale, in that order, as a single-quoted literal with no
+ * escapes. Reading the source rather than importing it keeps `shell/` from importing a product tree.
  */
 import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
@@ -26,11 +27,26 @@ const readJson = (rel: string) => JSON.parse(fs.readFileSync(path.join(ROOT, rel
 
 const at = (obj: unknown, keys: readonly string[]): unknown => keys.reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], obj);
 
+/** Analytic's locale module: every `  <key>: '<text>',` literal of `key`, in file order (the `he` block, then `en`). */
+const ANALYTIC_I18N = 'src-analytic/i18n/index.ts';
+const analyticLiterals = (key: string): string[] => {
+  const src = fs.readFileSync(path.join(ROOT, ANALYTIC_I18N), 'utf8');
+  return [...src.matchAll(new RegExp(String.raw`^\s*${key}:\s*'([^'\\]*)',\s*$`, 'gm'))].map((m) => m[1]);
+};
+const analyticText = (key: string, lng: 'he' | 'en'): string | undefined => {
+  const all = analyticLiterals(key);
+  return all.length === 2 ? all[lng === 'he' ? 0 : 1] : undefined;
+};
+
 /** The right-angle-vertex teaching, per builder: the locale file and the path to the key inside it. */
 const SAYS_IT = {
   '2d': { he: 'src/i18n/locales/he.json', en: 'src/i18n/locales/en.json', at: ['input', 'scope', 'right-angle-vertex'] },
   '3d': { he: 'src3d/i18n/locales/he.json', en: 'src3d/i18n/locales/en.json', at: ['err', 'rightAngleVertex'] },
 } as const;
+
+/** The teaching's text in `product`'s `lng` locale, read off disk. */
+const textOf = (product: keyof typeof SAYS_IT | 'analytic', lng: 'he' | 'en'): unknown =>
+  product === 'analytic' ? analyticText('errRightAngleVertex', lng) : at(readJson(SAYS_IT[product][lng]), SAYS_IT[product].at);
 
 /** The key the ADR-611 edit DELETED, per builder — a second message is a second format. */
 const RETIRED = {
@@ -40,22 +56,27 @@ const RETIRED = {
 
 describe('#1962 — the one-fact-per-line teaching is one sentence in every builder that gives it', () => {
   it('every builder in the list carries the key (the lock is not vacuous)', () => {
-    for (const [product, cfg] of Object.entries(SAYS_IT)) {
+    for (const product of [...Object.keys(SAYS_IT), 'analytic'] as const) {
       for (const lng of ['he', 'en'] as const) {
-        expect(typeof at(readJson(cfg[lng]), cfg.at), `${product}/${lng}`).toBe('string');
+        expect(typeof textOf(product as keyof typeof SAYS_IT | 'analytic', lng), `${product}/${lng}`).toBe('string');
       }
     }
+    // analytic: one literal per locale — a third copy would be a second message
+    expect(analyticLiterals('errRightAngleVertex')).toHaveLength(2);
   });
 
   it.each(['he', 'en'] as const)('%s: 3-D’s string is 2-D’s, byte for byte', (lng) => {
-    const text = (product: keyof typeof SAYS_IT) => at(readJson(SAYS_IT[product][lng]), SAYS_IT[product].at);
-    expect(text('3d')).toBe(text('2d'));
+    expect(textOf('3d', lng)).toBe(textOf('2d', lng));
+  });
+
+  it.each(['he', 'en'] as const)('%s: analytic’s string is 2-D’s, byte for byte (#1947)', (lng) => {
+    expect(textOf('analytic', lng)).toBe(textOf('2d', lng));
   });
 
   it('it is ONE numbered list from (1) with a {{more}} continuation — never a second list', () => {
-    for (const cfg of Object.values(SAYS_IT)) {
+    for (const product of [...Object.keys(SAYS_IT), 'analytic'] as const) {
       for (const lng of ['he', 'en'] as const) {
-        const s = at(readJson(cfg[lng]), cfg.at) as string;
+        const s = textOf(product as keyof typeof SAYS_IT | 'analytic', lng) as string;
         expect(s).toContain('(1)');
         expect(s).toContain('(2)');
         expect(s).toContain('{{more}}');
@@ -71,5 +92,6 @@ describe('#1962 — the one-fact-per-line teaching is one sentence in every buil
         expect(at(readJson(cfg[lng]), cfg.at), `${product}/${lng}`).toBeUndefined();
       }
     }
+    expect(fs.readFileSync(path.join(ROOT, ANALYTIC_I18N), 'utf8'), 'analytic').not.toMatch(/errRightAngleVertexMore/);
   });
 });

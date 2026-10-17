@@ -20,6 +20,9 @@
  *    junk test, `shell/llm/constructionSignal.ts`, over analytic's own `VOCABULARY_ANALYTIC` — no new word list),
  *    the rest is a part the tool cannot read about objects it has, and the line is refused with its two parts.
  *    A rest that says something — «בקודקוד B», «ש-AE = EC», «שהיא אמצע BD» — is left to the reading or the model.
+ *    #1947 ([ADR-AG-301](../../docs/06c-decisions-analytic.md#adr-ag-301)): a rest that says something AFTER its lost
+ *    part — «ב-B ו-AB = 4» — is cut at its conjunctions; the first piece must be the lost part (the same test), and
+ *    every further piece a given that records on its own after the prefix. Its parts are then all listed.
  *
  * The right-angle syntax is TAUGHT instead of listed: when the read part is a triangle whose right angle the
  * reading left open (a `choice` of perpendiculars at its vertices) and the lost part names one of its vertices.
@@ -27,6 +30,7 @@
  */
 import { cutAtReading, labelRuns, locate, readLabelRuns, type Reader } from '../../shell/readExtent';
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
+import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { VOCABULARY_ANALYTIC } from '../parser/scopeAnalytic';
 import { parseLine } from '../parser/parseAnalytic';
 import type { Fact } from '../engine/types';
@@ -77,8 +81,9 @@ export function rightAngleTeach(facts: readonly Fact[], tail: string): LostPart[
   return undefined;
 }
 
+// #1947 (ADR-AG-301) — taught whatever follows the vertex: further parts continue the numbered list from (3)
 const withTeach = (parts: string[], facts: readonly Fact[]): LostPart => {
-  const teach = parts.length === 2 ? rightAngleTeach(facts, parts[1]) : undefined;
+  const teach = parts.length >= 2 ? rightAngleTeach(facts, parts[1]) : undefined;
   return teach ? { parts, teach } : { parts };
 };
 
@@ -101,33 +106,60 @@ export function unreadPart(line: string, facts: readonly Fact[], figureLabels: r
 const carriedLabels = (facts: readonly Fact[]): Set<string> =>
   new Set(loweringKey(facts).match(/[A-Z]\d*/g) ?? []);
 
+/** Is `rest` a lost part — labels `carried` already has, and particles with no construction signal? */
+function isLostPart(rest: string, carried: ReadonlySet<string>): boolean {
+  const runs = labelRuns(rest);
+  if (runs.length === 0) return false;
+  if (!runs.every((r) => r.parts.every((l) => carried.has(l)))) return false;
+  let words0 = '';
+  let from = 0;
+  for (const r of runs) {
+    words0 += rest.slice(from, r.at) + ' ';
+    from = r.end;
+  }
+  words0 += rest.slice(from);
+  // nothing but particles: no digit, no relation mark, no word of the tool's vocabulary
+  return !/\d/.test(words0) && !hasConstructionSignal(words0, VOCABULARY_ANALYTIC);
+}
+
+/**
+ * #1947 — a rest cut at its top-level conjunctions: the Hebrew «ו-» (its spacings folded by the shared
+ * `shell/conjunction` chokepoint, never re-spelled here) and the English "and".
+ */
+const conjunctionPieces = (rest: string): string[] =>
+  foldConjunctionSpacing(rest)
+    .split(/\s+ו-(?=\S)|\s+and\s+/i)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
 /**
  * ARM 2 — a DECLINED line (`not-handled`) whose longest recording prefix leaves a rest that adds only labels the
- * prefix already carries. `records(prefix)` is the caller's own submit decision («would this prefix record, in
- * this figure, now?»), so a part offered as "read" is one the next Enter accepts.
+ * prefix already carries. `records(piece, before)` is the caller's own submit decision («would this piece record,
+ * in this figure with `before` appended, now?»), so a part offered as "read" is one the next Enter accepts.
+ *
+ * #1947 (ADR-AG-301) — when the rest is not a lost part WHOLE, it may be a lost part FOLLOWED BY GIVENS
+ * («ב-B ו-AB = 4»): cut at its conjunctions, the first piece must be a lost part and each further piece must record
+ * after the prefix and the pieces before it. Then every part is listed; any piece that does not record leaves the
+ * line to the model, as before.
  */
-export function declinedPart(line: string, records: (prefix: string) => boolean): LostPart | null {
+export function declinedPart(line: string, records: (piece: string, before: readonly string[]) => boolean): LostPart | null {
   const words = line.split(/\s+/).filter(Boolean);
   for (let cut = words.length - 1; cut >= 1; cut--) {
     const prefix = words.slice(0, cut).join(' ');
     const parsed = parseLine(prefix);
-    if (!parsed.ok || parsed.facts.length === 0 || !records(prefix)) continue;
+    if (!parsed.ok || parsed.facts.length === 0 || !records(prefix, [])) continue;
     // the LONGEST prefix that records decides: its rest is the lost part, or the line is not this class
     const rest = words.slice(cut).join(' ');
-    const runs = labelRuns(rest);
-    if (runs.length === 0) return null;
     const carried = carriedLabels(parsed.facts);
-    if (!runs.every((r) => r.parts.every((l) => carried.has(l)))) return null;
-    let words0 = '';
-    let from = 0;
-    for (const r of runs) {
-      words0 += rest.slice(from, r.at) + ' ';
-      from = r.end;
+    if (isLostPart(rest, carried)) return withTeach([prefix, rest], parsed.facts);
+    const [lost, ...more] = conjunctionPieces(rest);
+    if (more.length === 0 || !isLostPart(lost, carried)) return null;
+    const held = [prefix];
+    for (const piece of more) {
+      if (!records(piece, held)) return null;
+      held.push(piece);
     }
-    words0 += rest.slice(from);
-    // nothing but particles: no digit, no relation mark, no word of the tool's vocabulary
-    if (/\d/.test(words0) || hasConstructionSignal(words0, VOCABULARY_ANALYTIC)) return null;
-    return withTeach([prefix, rest], parsed.facts);
+    return withTeach([prefix, lost, ...more], parsed.facts);
   }
   return null;
 }
