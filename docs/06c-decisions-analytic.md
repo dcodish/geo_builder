@@ -12519,3 +12519,28 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Behaviour change for a student:** a circle through three fixed collinear points is refused in the existing «לא קיים» sentence even when something unrelated on the canvas is free (before: recorded, drawn nowhere, nothing said). A circle through three points a sentence puts on one line («D על AB», «M אמצע AB», three points on «l») is refused naming that sentence (before: recorded and drawn nowhere, or for «D על הישר AB» drawn as a radius-10⁷ arc).
 
 **Consequences.** `engine/carriers.ts` (`inputsOf`), `engine/collinear.ts` (new), `engine/derive.ts` (the two arms, `LineFault.declaredLines` / `collinear`, the one-fault filter), `app/submit.ts`, `app/errorText.ts` (`joinAnd`), `store/useAnalyticStore.ts`, `i18n/index.ts` (`errForcedCollinear`); docs 02c R55, 04c.
+
+## ADR-AG-301 — «משולש ABC ישר זווית ב-B ו-AB = 4» is taught with 2-D's numbered list, its further givens continuing it (#1947)
+
+**Date:** 2026-10-17 · **Status:** accepted · P3, fix round #2304 (stream O); branch `fix/1947-analytic-compound-taught` from `main` @ `de7c221f`. **Amends** [ADR-AG-251](#adr-ag-251) (arm 2 and the taught form). Analytic's arm of the ruling 2-D shipped as [ADR-611](06-decisions.md#adr-611) and 3-D as [ADR-3D-331](06b-decisions-3d.md#adr-3d-331). LADDER stage: none (the submit decision; no solver).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R124 (the lost-part bullet: the taught pair as one numbered list, further givens continuing it). · **Design:** [04c](04c-design-analytic.md), "A line that loses a part" (arm 2's conjunction cut, `{{more}}`).
+
+**Ruling.** Operator, 2026-10-10 ([#1947](https://github.com/dcodish/geo_builder/issues/1947#issuecomment-6095755009), the same answer as #1962, option A): *"port it to 3-D and analytic"*. Both student-facing lines of the plan are `[asked]`.
+
+**Re-measurement at pickup** (`de7c221f`, `decideSubmit` + `errorText`): as the plan says. «משולש ABC ישר זווית ב-B» was taught in the retired «כתבו קודם «משולש ABC», ואחר כך בשורה נפרדת «∠ABC = 90°».» wording; «… ב-B ו-AB = 4», «… ו-AB = 4 ו-BC = 3» and "right triangle ABC at B and AB = 4" were `not-handled` (to the model).
+
+**Class.** *A declined line whose lost part is the right angle's vertex AND which carries further readable givens is not cut into its parts, so it is neither taught nor listed; and analytic's taught pair used the retired two-step format.* Root cause: `declinedPart` (`app/lostPart.ts`) accepted the rest after the longest recording prefix only when the WHOLE rest was labels and particles (`/\d/` or a construction signal → null), and `withTeach` taught only a two-part line.
+
+**Decision.**
+1. **Cut the rest at its conjunctions.** When the whole rest is not a lost part, `declinedPart` cuts it at «ו-» (folded by `shell/conjunction`'s `foldConjunctionSpacing`, the chokepoint, never re-spelled) and English "and". The first piece must pass the unchanged lost-part test; each further piece must record after the prefix and the pieces before it. The caller's `records(piece, before)` is the same submit decision over a figure it derives with `before` appended. Then `parts = [prefix, lost, ...further]`. Any further piece that does not record (e.g. «ו-AB = 4 ו-AB = 5») returns null and the line goes on as before. A rest that passed the old whole-rest test («ב-B ו-C») is answered exactly as before: that test runs first.
+2. **Teach whatever follows.** `withTeach` drops its `parts.length === 2` gate: `rightAngleTeach(parts[1])` decides, unchanged.
+3. **One string.** `errRightAngleVertex` (He, En) is 2-D's `input.scope.right-angle-vertex` byte for byte, with `{{more}}`. `errorText` fills it with `'  ' + numbered(parts.slice(2), 3)`, numbered as 2-D's `numbered`; the `{{all}}` list uses the same helper. No second key.
+
+**Siblings.** 2-D is the reference (ADR-611), and the plan measured it. 3-D answers the further-givens line `not-understood`; that is #2088, not changed here. The parity row carries a 3-D `knownGap` naming it.
+
+**Locks.** `src-analytic/__tests__/issue-1947-right-angle-teach.test.ts`: exact Hebrew for the operator's line, the bare line, two further givens, vertices A and C, a trailing angle («ו-∠ABC = 30», held here and not by parity until #2106) and a coordinate, «ישר-זווית», «ו- AB»; exact English for "right triangle ABC at B and AB = 4" and for the Hebrew line in the English locale; with «משולש ABC» already in the figure; a further piece that does not record stays `not-handled`; each taught line list records in order (docs/17 §9). `src-analytic/__tests__/issue-1888-lost-part.test.ts`'s taught text moves to the numbered list. `shell/__tests__/one-fact-per-line-parity-1962.test.ts`: analytic joins, its key read off disk from `src-analytic/i18n/index.ts` by source text (a TS module, not JSON; exactly one literal per locale, `he` then `en`; no `errRightAngleVertexMore`). Parity row `unread-vertex-1947-01` (refused; 3-D gap #2088).
+
+**Behaviour change for a student:** in analytic, «משולש ABC ישר זווית ב-B ו-AB = 4» is answered «בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו בשורות נפרדות: (1) משולש ABC  (2) ∠ABC = 90°  (3) AB = 4» (before: sent to the model). The bare «משולש ABC ישר זווית ב-B» reads «… (1) משולש ABC  (2) ∠ABC = 90°» (before: «כתבו קודם … ואחר כך …»).
+
+**Consequences.** `app/lostPart.ts` (`isLostPart`, `conjunctionPieces`, `declinedPart`'s callback takes `before`), `app/submit.ts` (the callback), `app/errorText.ts` (`numbered`, `more`), `i18n/index.ts`; docs 02c R124, 04c; the parity fixture and the #1962 lock.

@@ -269,6 +269,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2074': 'open', // #2074 (ADR-659): analytic's half of «תיכון ליתר» on an open right triangle waits for #2018 // #2066 (ADR-643): analytic does not read «AB חוצה זווית» on a side
 
   '#2108': 'open',
+  '#2088': 'open', // #1947 (ADR-AG-301): 3-D does not read «משולש ABC ישר זווית ב-B ו-AB = 4»
   '#2130': 'open', // #2125 (ADR-3D-342): analytic refuses an unnamed circumcircle stated after the incircle
 
   '#2060': 'open', // #2024 (ADR-668): 3-D does not read a single-letter angle given a symbol («זוית B=b», «זוית B=α»)
@@ -1269,6 +1270,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // 2-D lands first; 3-D (ADR-3D-316) and analytic (ADR-AG-251) close their gaps in the same round.
   { id: 'unread-vertex-1888-01', family: 'angles', steps: ['משולש ABC ישר זווית ב-B'], expect: 'refused', note: '2-D, 3-D and analytic teach «משולש ABC» then «∠ABC = 90°»' },
   { id: 'unread-vertex-1888-02', family: 'angles', steps: ['משולש ABC ישר זווית ב-C'], expect: 'refused', note: 'any vertex — even C, where the default angle already sits' },
+  // #1947 (ADR-AG-301, operator ruling 2026-10-10 «port it to 3-D and analytic»): the same line with a further given is taught
+  // with the further given continuing the numbered list «(3) AB = 4». 3-D answers it not-understood (#2088).
+  { id: 'unread-vertex-1947-01', family: 'angles', steps: ['משולש ABC ישר זווית ב-B ו-AB = 4'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2088' }], note: '2-D and analytic: (1) משולש ABC (2) ∠ABC = 90° (3) AB = 4' },
   { id: 'unread-tail-1889-01', family: 'intersections', steps: ['מרובע ABCD', 'AC ו-BD נפגשים בנקודה E על AB'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }] },
   // #1904 (ADR-604, operator rulings 2026-10-08): a second ROLE the reading drops refuses the line, teaching one line per role
   { id: 'role-clause-1904-01', family: 'cevians-centres', steps: ['משולש ABC', 'AD גובה לצלע BC שהוא גם תיכון'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1905' }, { product: '3d', issue: '#1905' }], note: 'analytic and 3-D hand it to the model; reading the relative clause is #1905' },

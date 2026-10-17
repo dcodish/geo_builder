@@ -316,8 +316,10 @@ function decideOnce(
      * read; a rest of labels it already carries, with no word that says anything, is the part that was not.
      */
     if (parsed.code === 'not-handled') {
-      const lost = declinedPart(line, (prefix) => {
-        const k = decideOnce(prefix, lines, seed, current).kind;
+      const lost = declinedPart(line, (piece, before) => {
+        // #1947 (ADR-AG-301) — a further piece is asked in the figure the prefix (and the pieces before it) make
+        const held = before.length ? [...lines, ...before] : lines;
+        const k = decideOnce(piece, held, seed, before.length ? derive(held, seed) : current).kind;
         return k === 'record' || k === 'already-known' || k === 'already-follows';
       });
       if (lost) return lostPartRefusal(line, lost);

@@ -44,7 +44,8 @@ const textOf = (v: SubmitVerdict, t: T) => {
 
 const SPLIT_HE = 'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. זיהינו כאן שני נתונים — נסו להקליד אותם בשני שלבים: ';
 const taughtHe = (triangle: string, angle: string) =>
-  `בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו קודם «משולש ${triangle}», ואחר כך בשורה נפרדת «∠${angle} = 90°».`;
+  // #1947 (ADR-AG-301) — 2-D's numbered list (ADR-611), ported
+  `בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו בשורות נפרדות: (1) משולש ${triangle}  (2) ∠${angle} = 90°`;
 
 describe('#1888 — «משולש ABC ישר זווית ב-<V>» is refused and TEACHES the two lines (any vertex, any context)', () => {
   const CASES: Array<[string, string[], string]> = [
@@ -66,7 +67,7 @@ describe('#1888 — «משולש ABC ישר זווית ב-<V>» is refused and T
   it('English: the same refusal, worded as 2-D words it', () => {
     const { v } = typed(['right triangle ABC at B']);
     expect(textOf(v, en)).toBe(
-      'One given per line — that way the tool can build and verify each one separately. Write «triangle ABC» first, and then, on a separate line, «∠ABC = 90°».',
+      'One given per line — that way the tool can build and verify each one separately. Write them on separate lines: (1) triangle ABC  (2) ∠ABC = 90°',
     );
   });
 
