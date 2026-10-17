@@ -763,6 +763,16 @@ the equal-circle noun phrase («מעגלים שווים», "equal circles") must
 (`set-radius-ratio` k = 1, or two radii pinned at one value — `radiiMadeEqual`), or the gate reports «שווים» and the
 line escalates.
 
+Since [ADR-712](06-decisions.md#adr-712) (#2200) `twoCirclesBare`'s leftover strips the EQUAL_SIZE vocabulary it reads
+(ADR-455's bare reading was dead code before), and an equal bare pair writes `admits: ['meet', 'disjoint']` on its
+`set-circle-position any`: the **configuration set comes from what was stated** (M4). `admits` is the cases the
+sentence leaves open, in variant order (absent = all three); `variantCountOf` returns its length and `apply.ts` seats
+the default of the case the variant indexes, so «הציגו תצורה אחרת» on an equal pair cycles crossing ↔ apart and never
+seats a "contained" pair it cannot be. A **contained pair stated equal is refused from the words** — a circle strictly
+inside another is smaller: `twoCirclesPosition` (the contained branch, before `nestedPairRadius`) and
+`containedNewInExisting` (after its subject test) return the owned `equal-circles-nested` clarify, which
+`decideDeterministic2D` refuses as `input.equalCirclesNested.contained`, quoting the line, with one next step.
+
 ### A circle pair's tangency kind: stated or defaulted ([ADR-704](06-decisions.md#adr-704))
 
 `circles-tangent.kindStated: false` marks a tangency whose line named no kind and inherited none (`circlesTangent`,

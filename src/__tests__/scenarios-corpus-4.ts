@@ -5208,6 +5208,22 @@ export const SCENARIOS_4: Scenario[] = [
       expect(v.kind, JSON.stringify(v)).toBe('noop');
     },
   },
+  {
+    id: 'equal-circles-nested-2200',
+    title: '«שני מעגלים מוכלים ברדיוסים שווים» is refused naming the contradiction; «שני מעגלים ברדיוסים שווים» draws two equal circles (#2200, ADR-712)',
+    guards:
+      "#2200 (P3), operator ruling 2026-10-16 (ballot round 5, card 20, option A: «Build the first; refuse the second with a sentence naming the contradiction»). Measured at de7c221f through decideDeterministic2D: «שני מעגלים ברדיוסים שווים» escalated not-handled (twoCirclesBare's leftover never stripped the equal-size words it reads) and «שני מעגלים מוכלים ברדיוסים שווים» committed red (figure.v.circleContained: twoCirclesPosition lowered the containment, then appended k = 1). Root cause: the bare rule did not strip its own vocabulary, and no two-circle rule refused a containment stated with an equal size, though a circle strictly inside another is smaller. Fix: the bare rule reads the equality and its pair admits only the crossing / apart configurations; twoCirclesPosition and containedNewInExisting refuse contained + equal size from the words (equal-circles-nested). Asserts the report's second line is refused and the first builds two equal circles. The matrix (every spelling, the configurations, the message in both locales, the model never asked) is src/app/__tests__/issue-2200-equal-circles.test.ts.",
+    steps: ['שני מעגלים מוכלים ברדיוסים שווים', 'שני מעגלים ברדיוסים שווים'],
+    refusedSteps: [
+      { step: 1, reason: 'equal-circles-nested', why: 'ADR-712 (#2200): two circles of equal radius cannot be contained one in the other — the operator ruled a refusal naming the contradiction' },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.circles.size, 'one pair, from the second line').toBe(2);
+      const [a, b] = [...fig.circles.values()];
+      expect(Math.abs(a.r - b.r), 'equal radii').toBeLessThan(1e-6);
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

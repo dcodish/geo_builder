@@ -8,7 +8,7 @@
  * existing points is fitted to them, instead of keeping absolute defaults.
  */
 
-import type { Command, Constraint, Construction, GeoObject, Id, SideRequirement, SolveDirective, Vec } from './types';
+import type { CirclePositionCase, Command, Constraint, Construction, GeoObject, Id, SideRequirement, SolveDirective, Vec } from './types';
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
 import { ringOnOneCircle } from './structure';
@@ -2675,7 +2675,11 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         // VARIANT — 0 intersecting / 1 disjoint / 2 contained — so "show another configuration" steps
         // through the cases (ADR-052/M4). No requirement is recorded: nothing was stated, every case is
         // a valid drawing. Deterministic per variant (stable replays).
-        const v = ((cmd.variant ?? 0) % 3 + 3) % 3;
+        // #2200 (ADR-712): the variant indexes the cases the sentence ADMITS (all three when absent) — an equal
+        // pair cycles crossing ↔ apart and is never seated as a "contained" pair it cannot be.
+        const cases: CirclePositionCase[] = cmd.admits?.length ? cmd.admits : ['meet', 'disjoint', 'contained'];
+        const pick = cases[(((cmd.variant ?? 0) % cases.length) + cases.length) % cases.length];
+        const v = pick === 'meet' ? 0 : pick === 'disjoint' ? 1 : 2;
         const mv = movable(cb) ? cb : movable(ca) ? ca : null;
         if (!mv) break;
         if (v === 2 && cb.radius.via === 'free' && rb >= ra * 0.8) {

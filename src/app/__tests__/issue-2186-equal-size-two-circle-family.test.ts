@@ -113,8 +113,8 @@ describe('#2186 — where the words cannot be drawn, the line is not committed',
     [[], 'שני מעגלים שווים נחתכים'], // the equal-circle noun phrase, not read yet (#2187)
     [[], 'שני מעגלים שווים משיקים'],
     [[], 'two equal circles intersect'],
-    [['מעגל O'], 'מעגל מוכל במעגל O ברדיוסים שווים'], // a circle inside another is smaller
-    [[], 'מעגל מוכל ברדיוסים שווים'],
+    // «מעגל מוכל (במעגל O) ברדיוסים שווים» moved to a refusal naming the contradiction: #2200 (ADR-712), its lock
+    // issue-2200-equal-circles.test.ts.
   ] as [string[], string][])('%j «%s» → escalate (weak: dropped), never drawn unequal', async (prefix, line) => {
     const v = await decide(prefix, line);
     expect(v.kind, line).toBe('escalate');

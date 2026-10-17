@@ -550,6 +550,14 @@ export async function decideFromParse(
     const note = splitStatements(r.parts);
     return refuse('guided', { source: 'scope', result: 'scope:split-statements:nested-pair-radius' }, { key: note.messageKey, params: note.params });
   }
+  /**
+   * #2200 ([ADR-712](../../docs/06-decisions.md#adr-712)): «שני מעגלים מוכלים ברדיוסים שווים» — a circle strictly
+   * inside another is smaller, so the words contradict themselves. Refused naming the contradiction and quoting the
+   * line, with one next step (operator ruling 2026-10-16, card 20 A; ADR-W-130). Never drawn red, never escalated.
+   */
+  if (!r.ok && r.reason === 'equal-circles-nested') {
+    return refuse('conflict', { source: 'parser', result: 'equal-circles-nested:contained' }, { key: 'input.equalCirclesNested.contained', params: { detail: utterance.trim() } });
+  }
   // #1285: the same channel — the angle's stated vertex is not the bisector's own first letter.
   if (!r.ok && r.reason === 'bisector-wrong-apex') {
     return refuse('guided', { source: 'parser', result: `bisector-wrong-apex:${r.apex}:${r.stated}` }, { key: 'input.bisectorWrongApex', params: { apex: r.apex, stated: r.stated } });

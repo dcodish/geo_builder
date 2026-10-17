@@ -29,7 +29,8 @@ export function variantCountOf(cmd: AnyCommand): number {
   if (cmd.type === 'altitude-choice') return cmd.options.length;
   if (cmd.type === 'inscribe') return inscribeVariantCount(cmd);
   // The UNSTATED two-circle mutual position (#196 Am.): intersecting / disjoint / contained.
-  if (cmd.type === 'set-circle-position') return cmd.relation === 'any' ? 3 : 1;
+  // #2200 (ADR-712): the cases are the ones the sentence admits — equal radii admit no containment.
+  if (cmd.type === 'set-circle-position') return cmd.relation === 'any' ? (cmd.admits?.length ?? 3) : 1;
   // A common tangent's UNSTATED basin (#197 Am.): all 4 tangents; a stated kind keeps its 2.
   if (cmd.type === 'common-tangent') return cmd.kind ? 2 : 4;
   // A stated angle value that fits several angles — the acute and obtuse root of a sine (#1711).

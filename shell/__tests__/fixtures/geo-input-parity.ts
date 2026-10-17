@@ -1524,6 +1524,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'internal-tangent-pair-radius-refused-2263', family: 'circles', steps: ['שני מעגלים משיקים מבפנים ברדיוס 5'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D escalated to the model (not-handled) before ADR-702; analytic does not read the sentence (not-handled)' },
   // ── #2186 (ADR-679): a stated equal size on intersecting circles is drawn ──
   { id: 'equal-radii-intersecting-2186', family: 'circles', steps: ['שני מעגלים נחתכים ברדיוסים שווים'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D drew 5 / 3.6 green before ADR-679 (the equality dropped); analytic does not read the sentence (not-handled)' },
+  // ── #2200 (ADR-712): the bare equal pair builds; a contained pair stated equal is refused from the words ──
+  { id: 'equal-circles-bare-2200', family: 'circles', steps: ['שני מעגלים ברדיוסים שווים'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D escalated not-handled before ADR-712 (the bare rule never stripped the equal-size words); analytic does not read the sentence (not-handled)' },
+  { id: 'equal-circles-nested-2200', family: 'circles', steps: ['שני מעגלים מוכלים ברדיוסים שווים'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D committed red (figure.v.circleContained) before ADR-712; analytic does not read the sentence (not-handled)' },
   // ── #2199 (ADR-AG-282) / #2185: a point stated on a LIST of carriers is on each ──
   { id: 'point-on-two-circles-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A על מעגל O ועל מעגל P'], expect: 'builds', exception: 'X8' },
   { id: 'points-on-two-circles-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A ו-B על מעגל O ועל מעגל P'], expect: 'builds', exception: 'X8' },
