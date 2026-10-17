@@ -17720,6 +17720,8 @@ No chokepoint grows: a per-order special case is removed and the copula is an at
 
 **Behaviour change for a student:** «שני מעגלים משיקים ברדיוסים שווים» · «רדיוס מעגל O הוא 5» builds with both circles of radius 5 (and the «P», area, English, disjoint and «A על מעגל O» forms) — before: refused «אין מעגל בשם O…».
 
+**Integration note (round #2283 batch, 2026-10-17).** [ADR-698](#adr-698) (#2112) gives the radius  a  field naming the circles a refusal reads. For a k = 1 equality that pair is the same unordered pair as the segments, so  serializes it as a sorted pair too. Without this, the batch measured every row of this ADR refused  again;  is the lock.
+
 ## ADR-695 — The invented-label gate covers points already in the figure: an AI reading that pulls an existing point the sentence never refers to into a relation is refused (#2228)
 
 **Status:** accepted · 2026-10-17 · bug (P2) · fix round #2283, stream C · branch `fix/2228-invented-label-existing`

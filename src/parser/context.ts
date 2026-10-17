@@ -79,7 +79,10 @@ function autosInterchangeable(construction: Construction): boolean {
       // segments serialize as an unordered pair. Any other k, or an offset, is ordered (r_O = 2·r_P is not r_P = 2·r_O).
       if (o.type === 'ratio' && o.k === 1 && !o.add) {
         out.segments = [[norm(o.a, swap), norm(o.b, swap)], [norm(o.c, swap), norm(o.d, swap)]].map((x) => JSON.stringify(x)).sort();
-        for (const k of Object.keys(o).sort()) if (!['a', 'b', 'c', 'd', 'add', 'solve'].includes(k)) out[k] = norm(o[k], swap);
+        // #2112 (ADR-698): the ratio's `radii` (which circles a refusal names) is the same pair, so it is unordered too.
+        const r = o.radii as { c1: unknown; c2: unknown } | undefined;
+        if (r) out.radii = [norm(r.c1, swap), norm(r.c2, swap)].map((x) => JSON.stringify(x)).sort();
+        for (const k of Object.keys(o).sort()) if (!['a', 'b', 'c', 'd', 'add', 'solve', 'radii'].includes(k)) out[k] = norm(o[k], swap);
         return out;
       }
       if (o.kind === 'circle-circle') {
