@@ -109,6 +109,14 @@ never as a contradiction or a refutation.
   **Collinearity is a shape verdict** ([ADR-CX-072](06d-decisions-complex.md#adr-cx-072)): `circumcircle` has no circle when
   |d|/2 ≤ `FLATNESS_FLOOR` (asked through `flatPoints`) · span², span² the widest chord squared and the floor 1e-9
   (the operator's #2109 ruling, equal to analytic's `isDegenerate`), never an absolute epsilon. **One flatness predicate** ([ADR-CX-073](06d-decisions-complex.md#adr-cx-073)): `flatPoints` (the widest chord as the base, every point within the floor of it) is asked by `circumcircle` and by the polygon branch, so a polygon is undrawn when `flatPoints` holds and a triangle and its circle can never disagree; a segment is never flat-tested.
+- **The marked origin is an OBJECT, never a number** ([ADR-CX-085](06d-decisions-complex.md#adr-cx-085), #2021).
+  `originMarker` (`parser/rules.ts`, after `named-shape`, before `bare-expression`) reads «O», «נקודה O»,
+  «O ראשית הצירים», «ראשית הצירים» … from the lexicon atoms `ORIGIN_KW` / `ORIGIN_LETTER_KW` / `POINT_KW`
+  and lowers to `{ kind: 'origin' }` (`model/figure.ts`): it declares nothing, so `o` never becomes an
+  unknown and the reserved-constant refusal is untouched. `resolveObjects` turns it into a `point`
+  object at (0,0), known; `buildScene` lifts point objects out of `shapes` into `marks` (one per label),
+  and the renderer draws a mark in the point layer's ink and drops the axis letter O while one is shown.
+  Because a bare «O» now parses as a statement, the ask lane (#789) never sees it — no routing change.
 - **A second mention of a name is a GIVEN, and that decision lives at ONE seam.** Rules ask
   `existingRef()` rather than each deciding for itself
   ([ADR-CX-005](06d-decisions-complex.md), [ADR-CX-009](06d-decisions-complex.md)) — the difference

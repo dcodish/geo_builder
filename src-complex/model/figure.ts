@@ -33,11 +33,17 @@ export type FigureObject =
   /** «המעגל שמרכזו O ורדיוסו r» — a centre and a radius the student stated */
   | { readonly kind: 'circle'; readonly center: string; readonly radius: Expr; readonly src: string }
   /** «המעגל החוסם את המשולש ABC» — the circle through three named points */
-  | { readonly kind: 'circumcircle'; readonly points: readonly string[]; readonly src: string };
+  | { readonly kind: 'circumcircle'; readonly points: readonly string[]; readonly src: string }
+  /**
+   * #2021 (ADR-CX-085) — «O ראשית הצירים», «נקודה O», «O»: the origin MARKED as a point. A marker, not
+   * a number: it claims nothing, declares nothing, and never makes `o` an unknown — the origin is
+   * always (0,0). The statement only asks the canvas to draw the dot and its label.
+   */
+  | { readonly kind: 'origin'; readonly src: string };
 
 /** Every name an object mentions, the origin included. */
 export const objectPoints = (o: FigureObject): readonly string[] =>
-  o.kind === 'circle' ? [o.center] : o.points;
+  o.kind === 'circle' ? [o.center] : o.kind === 'origin' ? [ORIGIN] : o.points;
 
 /**
  * The names an object brings into the figure — the origin excluded.

@@ -174,7 +174,8 @@ export interface DerivedPoint {
  * sampled vertices is one configuration of many and the ink says so.
  */
 export interface DerivedObject {
-  readonly kind: 'segment' | 'polygon' | 'circle';
+  /** `point` — #2021 (ADR-CX-085): the marked origin, one vertex at (0,0) */
+  readonly kind: 'segment' | 'polygon' | 'circle' | 'point';
   readonly key: string;
   readonly label: string;
   /** the endpoints or vertices, in the stated order; empty for a circle */
@@ -2347,6 +2348,11 @@ function resolveObjects(
 
     if (o.kind === 'segment') {
       drawn.push({ kind: o.kind, key, label, vertices, known });
+      return;
+    }
+    if (o.kind === 'origin') {
+      // #2021 (ADR-CX-085) — the marked origin: always (0,0), always known
+      drawn.push({ kind: 'point', key, label, vertices, known });
       return;
     }
     if (o.kind === 'polygon') {

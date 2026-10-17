@@ -72,6 +72,9 @@ import {
   ARITHMETIC_KW,
   OF_KW,
   CENTER_KW,
+  ORIGIN_KW,
+  ORIGIN_LETTER_KW,
+  POINT_KW,
   BETWEEN_KW,
   EQUATES_KW,
   RATIO_KW,
@@ -999,6 +1002,23 @@ const namedShape: Rule = (s) => {
 };
 
 /**
+ * F6 — #2021 (ADR-CX-085): the ORIGIN MARKED as a point — «O», «נקודה O», «O ראשית הצירים»,
+ * «O היא ראשית הצירים», «ראשית הצירים», «ראשית הצירים O», «מרכז הצירים», «O is the origin», «the origin»,
+ * «point O».
+ *
+ * The origin is always a point of the plane (any polygon may already use it), but until this rule no
+ * statement could point at it on its own. The line lowers to an origin OBJECT — never a number named
+ * `o`, never a redefinition of the constant: an object claims nothing (ADR-CX-012). It is listed before
+ * `bare-expression`, which would otherwise read a bare «O» as a question about a parameter `o`.
+ */
+const originMarker: Rule = (s) => {
+  const named = rx(`^(?:${POINT_KW}\\s+)?${ORIGIN_LETTER_KW}(?:\\s+${COPULA_KW}${OF_A}${ORIGIN_KW})?$`);
+  const phrase = rx(`^${OF_A}${ORIGIN_KW}(?:\\s+${ORIGIN_LETTER_KW})?$`);
+  if (!named.test(s) && !phrase.test(s)) return null;
+  return objectLine({ kind: 'origin', src: s }, s);
+};
+
+/**
  * F6 — a BARE run: «OZ₁Z₂Z₃» on its own line is the figure.
  *
  * No separator is tolerated here, and that is the operator's drawing convention rather than an
@@ -1415,6 +1435,8 @@ export const RULES: readonly { readonly name: string; readonly rule: Rule }[] = 
   { name: 'circumscribed-circle', rule: circumscribedCircle },
   { name: 'circle-centre-radius', rule: circleByCenterRadius },
   { name: 'named-shape', rule: namedShape },
+  // #2021: the origin marked as a point — before `bare-expression` reads a bare «O» as a question
+  { name: 'origin-marker', rule: originMarker },
   { name: 'argument-relation', rule: argumentRelation },
   // #1437: the bare-argument QUESTION, after the relation/inequality forms have claimed their '='/'<'
   { name: 'argument-query', rule: argumentQuery },
