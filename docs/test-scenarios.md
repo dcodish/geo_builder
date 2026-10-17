@@ -2044,3 +2044,7 @@ over all four (ADR-041).
 ### `concentric-circle-names-2264` — two circles on centre O are «המעגל החיצוני» / «המעגל הפנימי» in the values panel (#2264, ADR-714)
 
 **Guards against:** «שני מעגלים בעלי מרכז משותף O» · «רדיוס מעגל חיצוני הוא 10» · «רדיוס מעגל פנימי 9» printing «רדיוס O = 10» and «רדיוס O = 9» — two circles under one name (the operator's round #2245 T21 report). **Asserts** the three lines build green and the radius rows read «רדיוס המעגל החיצוני» = 10 and «רדיוס המעגל הפנימי» = 9. The matrix (every row in both locales, English input, the unnamed centre, the controls, the `circleRefs` unit rows) is `src/__tests__/issue-2264-concentric-circle-names.test.ts`.
+
+### `cyclic-trapezoid-every-seed-2118` / `cyclic-trapezoid-every-seed-2118-circle-voice` — «טרפז ABCD» · «טרפז ABCD חסום במעגל» is determined at every seed (#2118, ADR-717)
+
+**Guards against:** the inscribed trapezoid left undetermined at one seed in 24 («A, B, D are still free, so A, B, C, D concyclic cannot be judged»), so «הציגו תצורה אחרת» skipped a valid configuration and the first press paid ~300 ms of failing solve — a driven shape scalar whose root lay beyond the joint solve's restarts. **Asserts**, in both voices («טרפז ABCD חסום במעגל», «מעגל חוסם את הטרפז ABCD»), that all 24 seeds meet the givens and the first press from seed 0 lands on a valid configuration. The engine lock (the reported seed's construction, the closed-form root, the success path never reaching the rescue) is `src/engine/__tests__/issue-2118-shape-scalar-bracket.test.ts`.
