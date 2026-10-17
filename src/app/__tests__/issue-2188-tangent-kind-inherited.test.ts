@@ -85,7 +85,8 @@ describe('#2188 — after «…משיקים מבפנים», a restatement naming
   for (const line of ['המעגלים O ו-P משיקים', 'מעגל O משיק למעגל P', 'המעגלים משיקים'])
     it(`no touch named: «${line}» → stays INT, green`, async () => {
       const r = await play(INT, line);
-      expect(r.kind).toBe('commit');
+      // #2209 (ADR-703): the restatement lowers onto the stated tangency (its touch M, its kind), so it adds nothing
+      expect(r.kind).toBe('noop');
       for (const seed of [0, 1, 2, 3]) expect(kindAt(seed).kind).toBe('INT');
       expect(kindAt(0).r.violations).toEqual([]);
     });

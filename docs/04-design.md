@@ -811,6 +811,13 @@ test fails if `runSubmit` parses or refuses on its own, and the parity shards (`
 label, never leaving a piece that only names points, and keeps a subject-less piece with the clause before it when
 the two read as a statement.
 
+**A reference-only piece is the co-subject of the next** ([ADR-703](06-decisions.md#adr-703), #2209). Inside the
+gate's reading (`readClauses`, never in `clausesOf`), a piece whose lowering only declares ids the figure already
+has (`refersOnly`, the same test as coverage rule (3)) is re-joined to the next piece with the line's own separator
+text, and the joined text is read as one clause, provided it reads. «מעגל O ומעגל P משיקים» on two drawn circles is
+therefore one clause, and «מעגל P משיקים» is never read without its co-subject. On an empty figure «מעגל O»
+declares a new id, so nothing is joined and ADR-460's advisory is unchanged.
+
 #### A part the reading never read ([ADR-603](06-decisions.md#adr-603), [ADR-W-120](06w-decisions-workspace.md#adr-w-120))
 
 The clause gate sees only the pieces `clausesOf` cuts, and every token gate counts a label read wherever a command

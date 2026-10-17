@@ -1541,6 +1541,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2239 (ADR-692): two circles of equal stated radius stated internally tangent are refused, never resized ──
   { id: 'stated-radius-never-changed-2239', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 3', 'המעגלים O ו-P משיקים מבפנים'], expect: 'refused', exception: 'X8', note: '2-D committed green with P silently resized (the ADR-037 Am. 2 tangent-inner rewrite) before ADR-692; analytic already refused' },
+
+  // ── #2209 (ADR-703): the catalog's named-pair tangency builds on two drawn circles (cat-2d-139 is the empty-figure case) ──
+  { id: 'catalog-tangent-drawn-2209', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל O ומעגל P משיקים'], expect: 'builds', exception: 'X8', note: '2-D refused it as two statements (input.scope.split-statements) before ADR-703; analytic already recorded it' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

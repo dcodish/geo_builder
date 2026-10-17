@@ -131,10 +131,18 @@ describe('#2208 — at a named point: the kind stated, no tangent line', () => {
 });
 
 describe('#2208 — restatements (moved, the 2-D reading of the same statement)', () => {
+  // #2209 (ADR-703): a restatement lowers onto the stated tangency, so it is the «כבר קיים» no-op — nothing added
+  // (no segment AB, no second touch), the kind kept
+  const expectRestated = (r: { kind: string; added: AnyCommand[] }, kind: 'EXT' | 'INT') => {
+    expect(r.kind).toBe('noop');
+    expect(r.added).toEqual([]);
+    expect(kindAt(0).kind).toBe(kind);
+    expect(kindAt(0).r.violations).toEqual([]);
+  };
   it('after «…משיקים מבפנים» the report is accepted, still internal (was refused «no more tangents»)', async () =>
-    expectTangency(await play([...PAIR, 'המעגלים O ו-P משיקים מבפנים'], 'מעגל P משיק למעגל O מבפנים'), 'INT'));
+    expectRestated(await play([...PAIR, 'המעגלים O ו-P משיקים מבפנים'], 'מעגל P משיק למעגל O מבפנים'), 'INT'));
   it('after «…משיקים» «…מבחוץ» draws no segment AB', async () =>
-    expectTangency(await play([...PAIR, 'המעגלים O ו-P משיקים'], 'מעגל P משיק למעגל O מבחוץ'), 'EXT'));
+    expectRestated(await play([...PAIR, 'המעגלים O ו-P משיקים'], 'מעגל P משיק למעגל O מבחוץ'), 'EXT'));
   it('after «…זרים» the report draws the circles tangent and the disjoint row reads red', async () => {
     const r = await play([...PAIR, 'המעגלים O ו-P זרים'], 'מעגל P משיק למעגל O מבפנים');
     expect(r.kind).toBe('commit');

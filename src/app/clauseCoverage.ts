@@ -26,6 +26,11 @@
  * ADR-156 / ADR-542.) Only a clause that still changes the figure was dropped. Measured on the corpus: the
  * type trace alone false-refused 12 of 1497 steps, all such fragments; with entailment, none.
  *
+ * Entailment absorbs a noun-phrase operand only when the fragment after it misreads into something already true.
+ * «מעגל O ומעגל P משיקים» on two drawn circles cut to «מעגל P משיקים», which reads alone as a new tangent LINE, so
+ * the catalog's own sentence was refused (#2209). So a piece that only REFERS to drawn objects is read as the
+ * co-subject of the next piece ({@link refersOnly}, in {@link readClauses}; [ADR-703](../../docs/06-decisions.md#adr-703)).
+ *
  * A clause that does not lower ALONE is no evidence of a drop on this path: the liberal splitter over-splits
  * («a circle with center O»), and the honesty battery has already accounted every token of the line. Only a
  * clause the tool can read on its own, and then cannot find in the line's lowering, refuses the line.
@@ -90,12 +95,27 @@ function traced(clause: AnyCommand[], whole: readonly AnyCommand[], known: Set<s
     if (wholeLabels.some((w) => w.type === c.type && need.every((l) => w.labels.has(l)))) return true;
     const id = idOf(c);
     if (id && wholeIds.has(id)) return true;
-    if (DECLARATION.has(c.type)) {
+    return refersOnly([c], known);
+  });
+}
+
+/**
+ * #2209 ([ADR-703](../../docs/06-decisions.md#adr-703)) — does this lowering only REFER to objects the figure already
+ * has? True when every significant command DECLARES an id that is already known (rule (3) of {@link traced}): «מעגל O»
+ * with circle O drawn names it and states nothing. On an empty figure the same words declare a NEW id, so it is false.
+ * An incidence («D על BC») or any other relation is never a reference.
+ */
+export function refersOnly(cmds: readonly AnyCommand[], known: Set<string>): boolean {
+  const sig = significant([...cmds]);
+  return (
+    sig.length > 0 &&
+    sig.every((c) => {
+      if (!DECLARATION.has(c.type)) return false;
+      const id = idOf(c);
       const ids = id ? [id] : ((c as { ids?: unknown }).ids as string[] | undefined) ?? [];
       return ids.length > 0 && ids.every((x) => known.has(x));
-    }
-    return false;
-  });
+    })
+  );
 }
 
 interface ClauseRead extends ClauseReading {
@@ -103,18 +123,52 @@ interface ClauseRead extends ClauseReading {
   known: Set<string>;
 }
 
-/** Each clause lowered alone, in the figure's context plus the clauses before it. Null for a single clause. */
+/**
+ * Each clause lowered alone, in the figure's context plus the clauses before it. Null for a single clause.
+ *
+ * #2209 ([ADR-703](../../docs/06-decisions.md#adr-703)): a clause that only REFERS to objects the figure already has
+ * ({@link refersOnly}: «מעגל O» in «מעגל O ומעגל P משיקים» with both circles drawn) is not a statement. It is the
+ * CO-SUBJECT of the clause after it, so it is re-joined to that clause with the line's own separator text and the joined
+ * text is read as ONE clause, provided the joined text reads at all. Otherwise the pieces are read as before, so a join
+ * never hides a clause that reads alone. The splitter ({@link clausesOf}) is untouched: its other readers (ADR-460's
+ * advisory, ADR-603's parts probe) see the same pieces.
+ */
 function readClauses(utterance: string, ctx: ParseContext): ClauseRead[] | null {
   const parts = clausesOf(utterance);
   if (parts.length < 2) return null;
+  // Each piece's span in the line (a piece is a trimmed substring of it), so a join keeps the separator text.
+  const spans: [number, number][] = [];
+  for (let i = 0, pos = 0; i < parts.length; i++) {
+    const at = utterance.indexOf(parts[i], pos);
+    if (at < 0) break;
+    spans.push([at, at + parts[i].length]);
+    pos = at + parts[i].length;
+  }
+  const located = spans.length === parts.length;
+  const reads = (r: ReturnType<typeof parse>): r is Extract<ReturnType<typeof parse>, { ok: true }> => r.ok && r.commands.length > 0;
   let cur = ctx;
-  return parts.map((clause) => {
+  const out: ClauseRead[] = [];
+  for (let i = 0; i < parts.length; i++) {
     const known = knownIds(cur);
-    const r = parse(clause, cur);
-    if (!r.ok || r.commands.length === 0) return { clause, commands: null, known };
+    const start = located ? spans[i][0] : 0;
+    let clause = parts[i];
+    let r = parse(clause, cur);
+    while (located && i + 1 < parts.length && reads(r) && refersOnly(r.commands, known)) {
+      const joined = utterance.slice(start, spans[i + 1][1]);
+      const jr = parse(joined, cur);
+      if (!reads(jr)) break;
+      clause = joined;
+      r = jr;
+      i++;
+    }
+    if (!reads(r)) {
+      out.push({ clause, commands: null, known });
+      continue;
+    }
     cur = augmentParseCtx(cur, r.commands);
-    return { clause, commands: r.commands, known };
-  });
+    out.push({ clause, commands: r.commands, known });
+  }
+  return out.length < 2 ? null : out;
 }
 
 /** The ONE shared compound-line message (operator ruling 2026-10-06), naming the student's own clauses. */
