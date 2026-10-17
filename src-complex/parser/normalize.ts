@@ -147,6 +147,23 @@ const TRANSFORMS: readonly { readonly why: string; readonly apply: (s: string) =
   { why: 'the division sign is a slash', apply: (s) => s.replace(/÷/g, '/') },
   {
     /**
+     * #2247 ([ADR-CX-081](../../docs/06d-decisions-complex.md#adr-cx-081)) — the fraction GLYPHS are numbers: «2½» is
+     * 2.5, «2¼» 2.25, «2¾» 2.75, a lone «½» is 0.5 (a lone ¼ or ¾ stays unread, as in analytic) — analytic's set and spelling (`frameAnalytic.orthography`), by the
+     * operator's ruling (2026-10-16, *"yes - on complex too"*, applying #2222's *"if the user used a symbol of 1/2 so
+     * yes - it should be 5.5"*). A decimal is an exact rational in the expression lexer, so «2½» is 5/2 exactly.
+     * The whole part stands alone (no letter, digit, `_` or `.` before it): «z1½» is not z1.5 — it stays unread.
+     * The ASCII «2 1/2» is a different story: ambiguous, so refused (`findJuxtaposedNumbers`, exprParse.ts).
+     */
+    why: 'a fraction glyph is its number (½ ¼ ¾)',
+    apply: (s) =>
+      s
+        .replace(/(?<![A-Za-z0-9_.])(\d+)\s*½/g, '$1.5')
+        .replace(/(?<![A-Za-z0-9_.])(\d+)\s*¼/g, '$1.25')
+        .replace(/(?<![A-Za-z0-9_.])(\d+)\s*¾/g, '$1.75')
+        .replace(/(?<![A-Za-z0-9_.])½/g, '0.5'),
+  },
+  {
+    /**
      * #1435 — `³√8` is the cube root of 8: a superscript run that runs straight into `√` is the
      * root's INDEX (`ⁿ√` is one root token in the expression lexer) — UNLESS it is attached to an
      * operand, where a superscript is always that operand's power: `x³`, `z1³`, `2³√8` = 2^3·√8.

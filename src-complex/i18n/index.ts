@@ -48,6 +48,9 @@ const he = {
   errWordRoot: 'כתבו את השורש עם הסמל √ — יש כפתור √ בלוח «סמלים». למשל "{{suggestion}}" במקום "{{detail}}".',
   // #1365 — «zi» glues a complex number to i: z·i, or a name? Asked, with the product spelled out
   errGluedI: 'לא ברור אם הכוונה לכפל — אם כן, כתבו את הכפל במפורש: "{{suggestion}}" במקום "{{detail}}".',
+  // #2247 (ADR-CX-081) — an ASCII mixed number «2 1/2»: analytic's sentence (ADR-AG-284), byte for byte
+  errMixedNumber: 'לא ברור אם "{{detail}}" הוא מספר מעורב או מכפלה. כתבו {{decimal}} (מספר עשרוני) או {{sum}} למספר המעורב, או {{product}} למכפלה.',
+  errMixedNumberNoDecimal: 'לא ברור אם "{{detail}}" הוא מספר מעורב או מכפלה. כתבו {{sum}} למספר המעורב, או {{product}} למכפלה.',
   // #1974 (ADR-CX-063) — a RESERVED CONSTANT as the subject: the tool knows what the name is, so it
   // says so instead of «לא הצלחתי להבין». The operator's two sentences (2026-10-10); their shapes
   // differ on purpose — `i` IS a number, `o` MARKS a position and the student may pick another name.
@@ -295,6 +298,8 @@ const en: typeof he = {
   errRefused: 'Statement "{{detail}}" not added — {{reason}}',
   errWordRoot: 'Write the root with the √ symbol — there is a √ button under «Symbols». E.g. "{{suggestion}}" instead of "{{detail}}".',
   errGluedI: 'Is this a product? If so, write it explicitly: "{{suggestion}}" instead of "{{detail}}".',
+  errMixedNumber: '"{{detail}}" could be a mixed number or a product. Write {{decimal}} (a decimal) or {{sum}} for the mixed number, or {{product}} for the product.',
+  errMixedNumberNoDecimal: '"{{detail}}" could be a mixed number or a product. Write {{sum}} for the mixed number, or {{product}} for the product.',
   // #1974 — the Hebrew sentences are the operator's; these are their English readings
   errReservedI: '{{constant}} is an imaginary number',
   errReservedO: '{{constant}} marks the origin — you may choose another name',
