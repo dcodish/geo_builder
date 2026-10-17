@@ -283,6 +283,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2302': 'open', // #2210 (ADR-704): analytic's containment is strict, so «…מוכל…» then a tangency of the pair is refused unsatisfiable
 
+  '#2204': 'open', // #2191 (ADR-720): analytic records a second alias on the same angle; 2-D refuses it
+
   '#2253': 'open', // #2165 (ADR-681): analytic and 3-D read no value line for a length letter; 3-D refuses «AB = 2a»
 
 };
@@ -1498,6 +1500,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2023 / #2061 (ADR-661): a second letter for a measured angle or segment, or the same letter with another
   // coefficient, is refused naming the earlier line (operator rulings 2026-10-13 and 2026-10-14: all three builders) ──
   { id: 'angle-second-name-2023', family: 'angles', steps: ['משולש ABC', 'זווית ABC=α', 'זווית ABC=β'], expect: 'refused', note: 'before ADR-AG-277 / ADR-3D-344 analytic recorded both names and 3-D relabelled the arc to β (#2054)' },
+  // #2191 (ADR-720): a second ALIAS on an angle an earlier alias named is the same one-name refusal (ruling 2026-10-16)
+  { id: 'angle-second-alias-2191', family: 'angles', steps: ['משולש ABC', 'נסמן זוית ABC כ-A1', 'נסמן זוית ABC כ-B2'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#2204' }, { product: '3d', issue: '#1679', parked: true }], note: '2-D committed it and A1 vanished before ADR-720; analytic records both names (#2204); 3-D does not read the alias (#1679)' },
   { id: 'angle-coef-restated-2061', family: 'angles', steps: ['משולש ABC', '∠ABC=2α', '∠ABC=3α'], expect: 'refused', note: 'before ADR-3D-344 3-D recorded both and kept 2α; analytic refused it as a flat triangle (ADR-AG-277 gives it 2-D sentence)' },
   // ── #2105 (ADR-AG-295): a second, different NUMBER for one segment or angle is refused naming the first line, in 2-D's wording
   // (the letter twin «AB = 2a» · «AB = 3a» is locked per product: 3-D reads «2a» as a vector, #2253) ──

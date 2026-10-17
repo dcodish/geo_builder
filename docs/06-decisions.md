@@ -18111,3 +18111,31 @@ The kind words are the ones `circlesTangent` already reads. #2214's single kind 
 **Locks.** `src/app/__tests__/issue-2193-merged-ring-restated.test.ts` (every "before" row in both locales, the BCDA / DCBA readings, English, no «already defined» anywhere, the side-5 commit, the `side`-carrying-command guard, the controls, the model never called); the three-noun rows of `shell/__tests__/fixtures/quad-noun-pairs.ts` lose their `gap: { '2d': 2193 }` (the meta-lock's "a gap that starts passing" check moves to a synthetic row); scenario `merged-ring-third-noun-restates-2193`.
 
 **Behaviour change for a student:** «ריבוע ABCD» after «מלבן ABCD» · «מעוין ABCD» (and every order, reading and sibling pair like it) answers «זה כבר קיים באיור — אין מה להוסיף.» instead of «'C' is already defined…»; «ריבוע ABCD שצלעו 5» there sets the side to 5 instead of being refused.
+
+## ADR-720 — A second alias on an angle an earlier alias named is refused with the one-name sentence (#2191)
+
+**Status:** accepted · 2026-10-17 · bug (P3, 2-D) · fix round #2304, stream H · branch `fix/2191-second-angle-alias` · **Amends** [ADR-661](#adr-661) (an alias is a name for the one-name rule; a measure letter beside an alias is not) and [ADR-386](#adr-386) (an angle carries one alias)
+**Requirements:** [02](02-requirements.md) FR-IN-6 — an angle carries one alias name too; a second «נסמן זוית … כ-…» on a named angle is refused naming the earlier line · **Design:** [04](04-design.md) § "A second letter, or another coefficient, for a measured angle or segment" (the alias arm) · **LADDER stage:** 5 (the fold's restatement pre-scan, ADR-661's seam, unchanged)
+
+**The report / ruling.** «משולש ABC» · «נסמן זוית ABC כ-A1» · «נסמן זוית ABC כ-B2» was accepted and A1 silently disappeared. Operator, 2026-10-16 (ballot round 5, card 5 `second-alias`, option A): *"Refuse it with the one-name sentence"*, naming the line that gave the first name.
+
+**Measured before** (`main` @ de7c221f, `decideDeterministic2D` → gate → `replay`, model mocked). Committed, the angle's label became «2» and A1 vanished: the report, «נסמן זוית CBA כ-B2», «נסמן ∠ABC=B2», «נסמן זוית ABC כ 2», "label angle ABC as B2"; B2 first then A1 likewise (label A1, B2 gone). Controls already right: the same name on another angle (`alias-taken`), aliases on two angles (both shown).
+
+**The class (docs/17 §1).** *A naming statement about an angle that an earlier line already named is never judged against that line, so the later name silently replaces the earlier one.* `angleAliasRule` guards only the same NAME on another angle; the fold writes every alias into the angle's one label slot (last wins); and ADR-661's judge `measureRestatement` returned null for anything that is not a symbolic measure, so an alias never reached the pre-scan that refuses a second letter.
+
+**Decision.**
+1. **An alias arm in `measureRestatement`.** For an `angle-alias`, the earlier `angle-alias` commands on the same vertex + unordered ray pair (the measure arm's key): the same name → `same` (null status, today's path); another name → `name-taken` at the first such alias. Only alias against alias: a measure letter and an alias on one angle are not two names (ruling #2113 B, #1702's amendment), so neither arm reads the other kind.
+2. **Wording.** `measureRestatementStatus` gives `name-taken: angle <ray1><vertex><ray2> is already named <earlier name>` in the refused line's ray order; the fold adds `[vs #first]` as for a measure, and `humanizeError`'s existing `name-taken` pattern renders `errors.angleNameTaken_vs`. No new key, no new pattern, no parser change.
+3. **The door.** The alias line is a group (two idempotent segments + the alias); the dry run refuses it on the alias fact's restated status — measured, no change needed in the door.
+
+**Measured after.** Every "before" row is refused «לזווית ABC כבר יש שם: A1 (בשורה «נסמן זוית ABC כ-A1»). לכל זווית שם אחד — המשיכו עם A1.» (CBA in the reversed spelling; B2 in the reverse order), the model never called, the label stays A1; a loaded list shows the alias fact refused in the same sentence. Controls unchanged.
+
+**Why not a patch (docs/17 §2).** No spelling is special-cased: the judgment is on the parsed `angle-alias` command at the one seam every naming statement passes, so every alias spelling and a loaded list share one verdict.
+
+**Not changed.** `alias-taken` (same name, another angle); two aliases on two angles; the identical alias (escalates `weak:empty` as before); the vertex-only form (not read); a measure letter beside an alias — measured at de7c221f, «נסמן זוית ABC כ-A1» · «זוית ABC=β» now commits with the label β (the plan recorded a noop); that pair is owned by #1702's amendment (both shown) and is untouched here.
+
+**Sibling audit / cross-tool.** Analytic records both aliases (#2204, the known gap on the parity row); 3-D does not read the alias (#1679). Complex has no angle aliases.
+
+**Locks.** `src/app/__tests__/issue-2191-second-alias.test.ts` (every spelling, the reverse order, a line between, English render, label stays A1, the loaded list, the controls, the predicate); scenario `second-alias-refused-2191`; parity row `angle-second-alias-2191`.
+
+**Behaviour change for a student:** after «נסמן זוית ABC כ-A1», «נסמן זוית ABC כ-B2» is refused with the one-name sentence naming the first line, and A1 stays on the figure, instead of being accepted with A1 vanishing.

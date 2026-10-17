@@ -2040,3 +2040,7 @@ over all four (ADR-041).
 ### `merged-ring-third-noun-restates-2193` — «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD» answers «כבר קיים» (#2193, ADR-711)
 
 **Guards against:** a shape noun the ring already is, after a sibling merge made it so, refused with the engine's «'C' is already defined — it can't be redefined as something different» (the noun re-applied as a fresh shape whose derived corner collided). **Asserts** the report's first two lines build green and the third is a no-op through the submit gate. The matrix (every order, the BCDA / DCBA readings, rectangle + kite, parallelogram + kite in both orders, the four-noun chain, English, «ריבוע ABCD שצלעו 5» committing |AB| = 5, the side-carrying-command guard, the controls) is `src/app/__tests__/issue-2193-merged-ring-restated.test.ts`; the three-noun rows of `shell/__tests__/fixtures/quad-noun-pairs.ts` no longer carry a 2-D gap.
+
+### `second-alias-refused-2191` — a second alias on a named angle is refused with the one-name sentence; A1 stays (#2191, ADR-720)
+
+**Guards against:** «נסמן זוית ABC כ-B2» after «נסמן זוית ABC כ-A1» committing and A1 vanishing from the figure without a word. **Asserts** the first two lines build with the label A1, the third is refused at the door, and a loaded list holding all three keeps A1 and shows the alias row refused in ADR-661's sentence naming the first line. The spelling matrix is `src/app/__tests__/issue-2191-second-alias.test.ts`.
