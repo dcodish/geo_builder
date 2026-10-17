@@ -2804,7 +2804,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       if (!c1 || !c2) break; // a missing circle is a dangling ref — the verifier/pending machinery reports
       const w1 = witness(cmd.c1);
       const w2 = witness(cmd.c2);
-      if (w1 && w2) driveOrCheck(objects, constraints, { type: 'ratio', a: c1.center, b: w1, c: c2.center, d: w2, k: cmd.k });
+      if (w1 && w2) driveOrCheck(objects, constraints, { type: 'ratio', a: c1.center, b: w1, c: c2.center, d: w2, k: cmd.k, radii: { c1: cmd.c1, c2: cmd.c2 } }); // #2112: the reason names the radii
       break;
     }
 

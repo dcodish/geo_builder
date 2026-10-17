@@ -368,7 +368,8 @@
       "coincidesWith": "מתלכדת עם",
       "coincidesTarget": "מתלכדת עם הנקודה שנבנתה לה",
       "areaOf": "שטח(",
-      "perimeterOf": "היקף("
+      "perimeterOf": "היקף(",
+      "radiusOf": "רדיוס מעגל {{circle}}"
     },
     "stmt": {
       "centreOfCircle": "הוא מרכז המעגל",

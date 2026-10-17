@@ -17761,3 +17761,33 @@ Members: `shape-variant` (kite, isosceles), `inscribe`, `set-circle-position`, `
 **Locks.** `src/store/__tests__/issue-2114-configuration-survives-load.test.ts` — every member kind through a catalog sentence, via the saved file and via the link payload with `resetHistory` (configuration, seed and every point equal, `refreshed = []`, audit silent); the drift-plus-configuration case (a really stale step refreshes and keeps its apex); the comparator's width (what is and is not configuration); the ✎ edit still resetting. Fixture `src/__tests__/fixtures/issue-2114-cycled-configuration.geo.json` (isosceles at apex variant 1 + a cycled crossing) under the fixtures net and the #1604 round-trip.
 
 **Behaviour change for a student (2-D):** a figure saved, restored or opened from a shared link after «הציגו תצורה אחרת» opens in the configuration it was saved in (was: back at the first configuration), and no longer says «הקובץ נשמר בגרסה קודמת — N צעדים עודכנו לגרסה הנוכחית.» when nothing was saved by an older version.
+
+## ADR-698 — A radius relation's refusal names the radii and the statement that sized the circle, never a helper distance (#2112)
+
+**Status:** accepted · 2026-10-17 · bug (P2, 2-D) · fix round #2283, stream F · branch `fix/2112-refusal-no-helper-text` off `main` @ 4b0b4592
+**Requirements:** [02](02-requirements.md) FR-EN-8 — a radius relation's reason names the radii; the other side is the statement that sized the circle · **Design:** [04](04-design.md) § errorSubject.ts (the radius-relation paragraph) · **LADDER stage:** none — the reason renderer (`describeConstraint`) and the fold's attribution pass; no solve, residual or drive change
+**Cites** [ADR-508](#adr-508) / [ADR-554](#adr-554) (the other side; the newest statement keeps the blame), [ADR-602](#adr-602) (the other side by provenance), [ADR-683](#adr-683) (a stated radius is a size, not a constraint), #2100 (the sentence), #54 («R = 2r»)
+
+**The ruling.** 2026-10-15 (decisions ballot card 3, A, *"New refusal sentence approved as written"*): «לא ניתן: «רדיוס מעגל O גדול פי 2 מרדיוס מעגל P» סותר את «מעגל O ברדיוס 4» — אי אפשר לקיים את שניהם יחד. הסיבה: רדיוס מעגל O = 2 · רדיוס מעגל P.» — the circle names and numbers the student's own.
+
+**Measured before** (4b0b4592, `decideDeterministic2D` + `humanizeError` with `otherUtteranceForError`, model mocked). «מעגל O ברדיוס 4» · «מעגל P ברדיוס 3» · «רדיוס מעגל O גדול פי 2 מרדיוס מעגל P»: «… סותר נתון קודם — … הסיבה: |O⟨…⟩| = 2·|P⟨…⟩|.» With «A על מעגל O» · «B על מעגל P»: «… הסיבה: |OA| = 2·|PB|.» «מעגל O ברדיוס R» · «מעגל P ברדיוס r» · «R = 2r» · «R = 4» · «r = 3»: the ratio row ✗ `[vs «r = 3»]`, reason «|O⟨…⟩| = 2·|P⟨…⟩|». The reversed order («מעגל O ברדיוס 4» last): «… סותר את «רדיוס מעגל O …» … הסיבה: |O⟨…⟩| = 2·|P⟨…⟩|.»
+
+**The class (docs/17 §1).** *A radius relation is described as the helper distance it is lowered to.* `set-radius-ratio` lowers radius(c₁) = k·radius(c₂) to an ordinary `ratio` over (centre, on-circle witness) pairs — a hidden `~radw-*` rider when no point is on the circle — and `describeConstraint`, the one chokepoint every over-constrained reason passes through, wrote `|centre·witness|`; `sanitizeIds` could only blank the witness to «⟨…⟩». The other side was missing because a stated radius owns no constraint (ADR-683), so ADR-508's drop-one search never tries the sizing statements.
+
+**Decision.**
+1. **The constraint says what it means:** `RatioConstraint.radii?: { c1, c2 }`, set by `set-radius-ratio` (`apply.ts`); residual, drive and `constraintKey` ignore it.
+2. **`describeConstraint`:** a `ratio` carrying `radii` reads `radius(circle-O) = 2 · radius(circle-P)` (every caller: step errors, the fold, the verifier's `params.desc`).
+3. **`translateConstraintWords`:** a `DESC_WORDS` entry may name params for its capture groups; `radius(O)` → `errors.desc.radiusOf` «רדיוס מעגל {{circle}}» / "radius of circle {{circle}}".
+4. **The other side by provenance** (`replay/core.ts`, after the drop-one search so ADR-554's newest-statement rule keeps precedence): an over-constrained radius relation still without `[vs]` is tagged with the latest enabled statement whose lowering states c₁'s size (`statedSizeCircles`), else c₂'s.
+
+**Measured after.** The filing and the two-points variant read the ruled sentence verbatim; the reversed order «… סותר את «רדיוס מעגל O גדול פי 2 מרדיוס מעגל P» … הסיבה: רדיוס מעגל O = 2 · רדיוס מעגל P.»; the «R = 2r» banner «… «R = 2r» סותר את «r = 3» … הסיבה: רדיוס מעגל O = 2 · רדיוס מעגל P.»; English "… radius of circle O = 2 · radius of circle P". Unchanged: which statements are refused, every non-radius reason, a satisfiable ratio builds green.
+
+**Why not a patch (docs/17 §2).** The fix sits at the describer every reason passes through, not at the reported message; no utterance or circle id is special-cased; the provenance tag reads the fact list (ADR-602's pattern) and runs only on a refused fold.
+
+**Worst-case multiplier (docs/17 M3):** none — the tag is a scan of the fact list on a refused statement only.
+
+**Sibling audit.** Analytic has no radius-ratio sentence; 3-D has no plane circles; complex none. No parity row.
+
+**Locks.** `src/app/__tests__/issue-2112-radius-ratio-reason.test.ts` (the filing verbatim, points on both circles, the reversed order, «R = 2r»'s banner via `explainError`, English, the green control, `describeConstraint` with and without `radii`); `humanize-error.test.ts` CASES row + the #413 radius-relation row; scenario `radius-ratio-refusal-names-radii-2112` (last corpus chunk).
+
+**Behaviour change for a student:** a radius ratio that contradicts the stated radii now says which line it contradicts («סותר את «מעגל O ברדיוס 4»») and gives the reason as «רדיוס מעגל O = 2 · רדיוס מעגל P» instead of «|O⟨…⟩| = 2·|P⟨…⟩|».

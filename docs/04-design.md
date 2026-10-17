@@ -231,7 +231,11 @@ Seams recorded against the layout:
   and the failing row's `status`. **Against what (ADR-508):** `otherUtteranceForError(facts, raw)` resolves the
   fold's `[vs #<index>]` tail into the earlier statement's words, and `humanizeError(raw, t, said, other)` renders
   `_said_vs` («X» סותר את «Y»), else `_said`. The search runs in the fold's attribution pass on a refused statement
-  only, later statements first, latest first (ADR-554, #1203).
+  only, later statements first, latest first (ADR-554, #1203). **A radius relation (ADR-698, #2112):** `set-radius-ratio`'s
+  `ratio` carries `radii: { c1, c2 }` (display only), so `describeConstraint` writes `radius(circle-O) = 2 · radius(circle-P)`
+  and `translateConstraintWords` renders «רדיוס מעגל O» (a `DESC_WORDS` entry whose capture group is a param); when the
+  drop-one search names no other side, the fold tags the latest statement that sized c₁ (else c₂) by provenance
+  (`statedSizeCircles` over the fact's lowering) — a stated radius owns no constraint, so the search never tries it.
 - **Which row owns a refusal (ADR-492, #956).** `computeFold`'s attribution pass moves a refusal from the row that
   shaped a constraint to a later row that valued its symbol — attribution only. `symbolsConsumedBy`
   (`engine/lower.ts`) is derived from `lowerOne`'s own call sites.

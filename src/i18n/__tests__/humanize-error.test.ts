@@ -6,6 +6,7 @@ import { applyCommand, shapeExclusionError } from '@/engine/apply';
 import { collapsedPolygonError, diagonalClaimRefusal } from '@/engine/step';
 import { collinearCircleError, notCyclicImpossibilityError } from '@/engine/cyclicFeasibility';
 import type { Constraint } from '@/engine/types';
+import { stripFormatControls } from '../../../shell/bidi';
 
 // Use the real configured i18n instance (Hebrew-pinned, as the app runs) so the test
 // exercises the actual key → message resolution, not a stub.
@@ -110,6 +111,8 @@ const CASES: { raw: string; contains: string[] }[] = [
   // against the pattern that must recognise it.
   { raw: 'AB is not a diagonal of ABCD — it is a side', contains: ['AB', 'ABCD'] },
   { raw: 'AB is not a diagonal — ABC has no diagonals', contains: ['AB', 'ABC'] },
+  // #2112 (ADR-698): a radius relation's reason names the radii, never the hidden witness distance |O~radw-circle-O|
+  { raw: `over-constrained: ${describeConstraint({ type: 'ratio', a: 'O', b: '~radw-circle-O', c: 'P', d: '~radw-circle-P', k: 2, radii: { c1: 'circle-O', c2: 'circle-P' } })} cannot hold [vs #0]`, contains: ['רדיוס מעגל', ' = 2 · '] },
 ];
 
 describe('humanizeError', () => {
@@ -233,6 +236,15 @@ describe('#413 — no English word survives in a student-facing message', () => 
     expect(out?.desc).toContain('H, C, D');
     // a non-fragment param is untouched
     expect(translateParams({ center: 'O2' }, t)?.center).toBe('O2');
+  });
+
+  it('#2112: a radius relation (a ratio carrying radii) is translated with its circle letters, in both locales', () => {
+    const desc = describeConstraint({ type: 'ratio', a: 'O', b: 'A', c: 'P', d: 'B', k: 2, radii: { c1: 'circle-O', c2: 'circle-P' } });
+    const he = stripFormatControls(humanizeError(`over-constrained: ${desc} cannot hold`, t));
+    expect(he).toContain('רדיוס מעגל O = 2 · רדיוס מעגל P');
+    expect(he).not.toMatch(LOWERCASE_RUN);
+    const en: Translate = (k, o) => i18n.t(k, { ...o, lng: 'en' }) as string;
+    expect(stripFormatControls(humanizeError(`over-constrained: ${desc} cannot hold`, en))).toContain('radius of circle O = 2 · radius of circle P');
   });
 
   it('symbolic fragments are left alone (they are locale-neutral)', () => {

@@ -703,6 +703,12 @@ export interface RatioConstraint {
   d: Id;
   k: number;
   add?: number;
+  /**
+   * #2112 ([ADR-698](docs/06-decisions.md#adr-698)) — set when the ratio IS a radius relation (`set-radius-ratio`):
+   * |a·b| is radius(c1) and |c·d| radius(c2) through on-circle witnesses (often hidden `~radw-*` helpers). Display
+   * only — residual, drive and key ignore it; `describeConstraint` names the radii instead of the witness distances.
+   */
+  radii?: { c1: Id; c2: Id };
 }
 
 /**

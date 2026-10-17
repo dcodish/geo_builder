@@ -69,8 +69,12 @@ export function sanitizeIds(s: string): string {
  * introduces a new word fails the build or the test rather than leaking silently.
  *
  * Longest-first: `coincides with its constructed target` must be tried before `coincides with`.
+ *
+ * An entry may name the PARAMS its capture groups fill (#2112, ADR-698): `radius(O)` → «רדיוס מעגל O», the circle's
+ * letter interpolated into the word, since Hebrew puts the noun phrase around it.
  */
-const DESC_WORDS: [RegExp, string][] = [
+const DESC_WORDS: [RegExp, string, string[]?][] = [
+  [/\bradius\(([^()]+)\)/g, 'errors.desc.radiusOf', ['circle']],
   [/\bcoincides with its constructed target\b/g, 'errors.desc.coincidesTarget'],
   [/\bcoincides with\b/g, 'errors.desc.coincidesWith'],
   [/\bin order on a line\b/g, 'errors.desc.inOrderOnALine'],
@@ -108,7 +112,8 @@ const STATEMENT_WORDS: [RegExp, string][] = [
 /** Replace every English word of the constraint (and side-statement) vocabulary with its translation. Pure; unknown text passes through. */
 export function translateConstraintWords(s: string, t: Translate): string {
   let out = s;
-  for (const [re, key] of DESC_WORDS) out = out.replace(re, () => t(key));
+  for (const [re, key, names] of DESC_WORDS)
+    out = out.replace(re, (...g: string[]) => t(key, names ? Object.fromEntries(names.map((n, i) => [n, g[i + 1]])) : undefined));
   for (const [re, key] of STATEMENT_WORDS) out = out.replace(re, () => t(key));
   return out;
 }
