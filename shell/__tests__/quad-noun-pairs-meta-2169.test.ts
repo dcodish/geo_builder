@@ -60,11 +60,15 @@ describe('#2169 — the shared two-noun rows catch a broken gate', () => {
   });
 
   it('a known gap that starts passing says "move it"', async () => {
+    // The shared rows carry no gap since #2193 closed 2-D's (ADR-711); the mechanism is held on a synthetic row.
+    const gapped: PairRow[] = [{ ...rowOf(['מלבן ABCD', 'מעוין ABCD', 'ריבוע ABCD']), gap: { '2d': 2193 } }];
     const healed: PairGate = (steps) => {
       const row = rowOf(steps);
       return { last: row.last, ...(row.refusal ? { refusal: row.refusal } : {}), notes: [...(row.notes ?? [])], earlierAccepted: true };
     };
-    expect((await pairFaults(healed, '2d')).join('\n')).toMatch(/known gap #2193 closed: move it/);
+    expect((await pairFaults(healed, '2d', gapped)).join('\n')).toMatch(/known gap #2193 closed: move it/);
+    // …and a gap row that still fails is not a fault
+    expect(await pairFaults(conforming('2d', (v) => ({ ...v, last: 'refused', refusal: 'gap' })), '2d', gapped)).toEqual([]);
   });
 });
 
