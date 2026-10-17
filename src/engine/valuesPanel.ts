@@ -472,7 +472,7 @@ export function computeValuesPanel(
   const statedArea = new Set<string>();
   const statedPerim = new Set<string>();
   for (const con of c.constraints) {
-    if (con.type === 'distance') statedLen.add(segKey(con.a, con.b));
+    if (con.type === 'distance' && !con.derived) statedLen.add(segKey(con.a, con.b)); // a derived distance states nothing (#2262)
     if (con.type === 'angle' && !con.arcOf) statedAng.add(`${con.vertex}|${con.ray1}|${con.ray2}`);
     // a POLYGON's stated area/perimeter — a sector or arc over the same letters (ADR-632) states nothing about it
     if (con.type === 'area' && !con.round) statedArea.add([...con.ids].sort().join(''));

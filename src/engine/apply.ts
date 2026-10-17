@@ -2534,7 +2534,8 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
           if (cmd.external) {
             const d = r1 + r2;
             addObj(objects, { kind: 'on-segment', id: cmd.at, a: c1.center, b: c2.center, t: r1 / d });
-            driveOrCheck(objects, constraints, { type: 'distance', a: c1.center, b: c2.center, value: d });
+            // #2262 (ADR-693): the centre distance is the tangency's own construction, not a stated length.
+            driveOrCheck(objects, constraints, { type: 'distance', a: c1.center, b: c2.center, value: d, derived: 'tangency' });
           } else {
             // The bigger circle is the outer one; the touch point lies on the ray from
             // the outer centre through the inner centre, at the outer radius.
@@ -2546,7 +2547,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
             const d = ro - ri;
             if (d > 1e-9) {
               addObj(objects, { kind: 'on-segment', id: cmd.at, a: co, b: ci, t: ro / d });
-              driveOrCheck(objects, constraints, { type: 'distance', a: co, b: ci, value: d });
+              driveOrCheck(objects, constraints, { type: 'distance', a: co, b: ci, value: d, derived: 'tangency' });
             }
           }
         }

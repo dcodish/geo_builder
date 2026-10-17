@@ -2164,9 +2164,11 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number): Derived {
   }
   // Numeric measures (a plain `AB = 5` / `∠ABC = 37`, and symbolic ones once resolved)
   // surface as distance/angle constraints — label them from the figure, filling any
-  // key a symbolic fact didn't already own (FR-RN-2).
+  // key a symbolic fact didn't already own (FR-RN-2). A distance the engine DERIVED to realise another statement
+  // (`derived`, #2262 / ADR-693 — a tangency's centre distance) is no stated magnitude and prints nothing; a stated
+  // length on the same pair arrives through the fact pass above and its own undecorated constraint.
   for (const con of figure.constraints) {
-    if (con.type === 'distance') addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-length', a: con.a, b: con.b }, fmtMeasure(con.value), true);
+    if (con.type === 'distance' && !con.derived) addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-length', a: con.a, b: con.b }, fmtMeasure(con.value), true);
     else if (con.type === 'angle') {
       // An ARC measure (ADR-335): the value prints ON the arc — never at the (often hidden) centre vertex.
       if (con.arcOf) arcByKey.set(`${con.arcOf}:${[con.ray1, con.ray2].sort().join('')}`, { circle: con.arcOf, a: con.ray1, b: con.ray2, text: `${fmtMeasure(con.value)}°` });

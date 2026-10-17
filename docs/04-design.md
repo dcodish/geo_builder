@@ -1320,3 +1320,11 @@ prints the `70°` another line supplied. Labels are fold state like `applied` an
 fact identity does not, so no provenance is stored on a label. `checkLabels` (`engine/verify.ts`) then holds every
 decimal label to the drawn measure at the verifier's tolerance plus the print rounding, reporting `figure.v.label`
 whatever the source. A new label source states which of these three shapes it is.
+
+**The surviving-constraint fill reads provenance, never guesses** ([ADR-693](06-decisions.md#adr-693), #2262). A
+constraint the engine builds to realise ANOTHER statement carries it on the constraint: `DistanceConstraint.derived`
+(`'tangency'` — `circles-tangent` over two stated radii pins |c₁c₂| = r₁ ± r₂). The fill and the values panel's
+«נתון» marker skip a `derived` distance; the solver, the verifier and every geometric reader treat it as any distance.
+A stated length on the same pair («OP = 10») is its own undecorated constraint and the #474 fact pass, so it still
+prints. Audited: the other engine-built distances are a stated value already (a `through` circle's stated radius, a
+membership on a stated-radius circle, `set-distance`).
