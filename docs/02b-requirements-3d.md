@@ -540,6 +540,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
 - **FR-RD-15 (Must)** — **A stated angle is painted only where it holds.** A value on an arc, and a right-angle
   knee, appear only while the drawn figure satisfies the given.
   - Sources: ADR-3D-263, ADR-3D-290, #1592.
+- **FR-RD-16 (Must)** — **A ⟂ between two segments draws its knee only at a vertex the student named.** A
+  shared endpoint («AB ⟂ AC» at A), or a point stated as the crossing («O נקודת חיתוך האלכסונים»). Two
+  segments stated ⟂ that cross at an unnamed point («ריבוע ABCD» · «AC ⟂ BD») draw no mark at rest, as in
+  2-D; the relation shows in the givens list and the data panel. A line or segment ⟂ a plane keeps its knee.
+  - Sources: ADR-3D-360, ADR-W-118 B2, #2091.
 
 ## Coverage
 

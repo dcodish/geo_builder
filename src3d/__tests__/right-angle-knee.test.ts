@@ -10,8 +10,8 @@
  * `foot-face` / `foot-seg` went unmarked. Tests are in three layers:
  *   (1) every statement form now yields a knee (the class, not the reported instance);
  *   (2) the knee is genuinely 3-D — its legs track the arms as the camera orbits;
- *   (3) honesty — a SKEW ⊥ gets no knee (it has no intersection to mark), and the same
- *       corner asserted twice is marked once.
+ *   (3) honesty — a SKEW ⊥ gets no knee (it has no intersection to mark), nor does a ⟂ at an
+ *       UNNAMED crossing (#2091, ADR-3D-360), and the same corner asserted twice is marked once.
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -192,13 +192,11 @@ describe('#307 — honesty: no knee where the arms do not meet', () => {
     expect(Math.abs(dot3(u, v)) / (norm3(u) * norm3(v))).toBeLessThan(1e-9);
   });
 
-  it('perpendicular diagonals that DO cross are marked at the crossing', () => {
+  // #2091 (ADR-3D-360, operator ruling 2026-10-14): flipped — diagonals stated ⟂ that cross at an UNNAMED
+  // point assert a relation, not a value, so no knee at rest (ADR-W-118 B2, 2-D's rule). Was: one knee at the centre.
+  it('perpendicular diagonals crossing at an UNNAMED point draw no knee at the crossing', () => {
     const ms = wedges(['פירמידה SABCD שבסיסה ריבוע', 'AC מאונך ל-BD']);
-    expect(ms).toHaveLength(1);
-    const d = derived();
-    const p = (id: string) => d.resolved.positions.get(id)!;
-    const mid = { x: (p('A').x + p('C').x) / 2, y: (p('A').y + p('C').y) / 2, z: (p('A').z + p('C').z) / 2 };
-    expect(dist3(ms[0].vertex, mid)).toBeLessThan(1e-9); // the square's centre, not an endpoint
+    expect(ms).toHaveLength(0);
   });
 
   it('the SAME corner asserted twice (stated + stated again) is marked once', () => {

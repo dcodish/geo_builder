@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-17T13:11:18.641Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "ריבוע ABCD",
+      "cmds": [
+        {
+          "type": "quad-shape",
+          "base": "square",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AC ⟂ BD",
+      "cmds": [
+        {
+          "type": "cos-angle",
+          "u": {
+            "kind": "pair",
+            "from": "A",
+            "to": "C"
+          },
+          "v": {
+            "kind": "pair",
+            "from": "B",
+            "to": "D"
+          },
+          "cos": 0
+        }
+      ]
+    }
+  ]
+}

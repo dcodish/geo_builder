@@ -125,9 +125,11 @@ describe('#917 — a stated angle between two segments that CROSS is drawn where
     expect(texts(build([BOX, 'הזווית בין AC לבין BA היא 40']).scene)).toEqual(['40°']);
   });
 
-  it('the 90° knee is unchanged — a knee, and NOT also an arc labelled 90° (#307)', () => {
+  // #2091 (ADR-3D-360, ruling 2026-10-14): the diagonals cross at an UNNAMED point, so the 90° is a relation —
+  // no knee at rest (was: one). The arc half of this lock is unchanged: still no arc labelled 90°.
+  it('a 90° at an unnamed crossing draws neither a knee (#2091) nor an arc labelled 90° (#307)', () => {
     const { scene, knees } = build([BOX, 'הזווית בין AC לבין BD היא 90']);
-    expect(knees.length).toBe(1);
+    expect(knees.length).toBe(0);
     expect(texts(scene)).toEqual([]);
   });
 

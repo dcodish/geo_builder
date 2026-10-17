@@ -726,6 +726,12 @@ Vertex arcs are ONE map keyed by wedge — the vertex plus its two ray DIRECTION
 stated value is painted only where the verifier's measure holds (ADR-3D-290, #1592). `wedgeArc` is the one
 arc geometry; its radius is `min(ARC_PX, ARM_FRAC × shortest PROJECTED arm) / k` (ADR-3D-229).
 
+**The knee lane's vertex ([ADR-3D-360](06b-decisions-3d.md#adr-3d-360)).** A stated segment pair's knee
+needs both `meetingPoint` (the arms genuinely meet — honesty) and `namedVertexOf` (the facts name the
+meeting: a shared endpoint, or a `seg-cross` point defined on exactly those two segments, read from
+`c.points`, never from positions). An unnamed crossing draws no knee; the arc lane keeps `meetingPoint`
+alone. A pair recorded from two named vectors (`SegPair.viaVectors`) keeps the crossing knee (#2093).
+
 **One dihedral geometry ([ADR-3D-264](06b-decisions-3d.md#adr-3d-264)).** `dihedralGeometry`
 (`render/dihedral.ts`) gives the foot on the seam and two unit arms ⟂ to it, oriented by
 `dihedralAnchors`. `rightAngles3` draws every `plane-rel` ⟂ / 90° claim's knee through `operandPairKnee`,
