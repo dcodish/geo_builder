@@ -92,6 +92,14 @@ export const spellVulgarFractions = (s: string): string =>
       return `${before}${n}/${d}${after}`;
     });
 
+/**
+ * #2065 ([ADR-700](../../docs/06-decisions.md#adr-700)) — the SEPARATOR of a two-term ratio «p:q» / «p ל-q» /
+ * «p ל q» («אחד ל-2» is the same statement as «1:2»). One atom with two consumers, so they can never disagree:
+ * the similarity reader (`statedSimilarityRatio`, value p/q) and the dropped-number gate's pair pass (which
+ * accounts the pair whole). Bare alternation, no capture, whitespace included — `${n}${RATIO_SEP}${n}`.
+ */
+export const RATIO_SEP = String.raw`\s*(?::|ל-?)\s*`;
+
 // ── Word fractions (#1611 ADR-591's tables; one reader since #2040, ADR-636) ─────────────────────
 /** Hebrew denominators: singular (numerator 1) and plural (numerator ≥ 2). חצי has no plural in use. */
 export const HE_FRACTION_DENOM: readonly { sing: string; plur?: string; q: number }[] = [

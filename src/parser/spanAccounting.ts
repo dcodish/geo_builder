@@ -42,7 +42,7 @@
 import type { AnyCommand } from '@/engine';
 import { normalizeUtterance } from './parse';
 import { unaccountedLabels, type LabelAccountCtx } from './labelAccounting';
-import { GREEK_LETTER, INDEX } from './lexicon';
+import { GREEK_LETTER, INDEX, RATIO_SEP } from './lexicon';
 
 export interface UnaccountedSpan {
   kind: 'label' | 'number' | 'relation' | 'symbol' | 'unknown-word';
@@ -227,8 +227,9 @@ export function accountUtterance(utterance: string, commands: AnyCommand[], actx
       ratioPairs.add(m[2]);
     }
   }
-  // colon ratios «DF:FC=1:4» lower to the single parameter a/(a+b) (or its complement)
-  for (const m of s.matchAll(/(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/g)) {
+  // colon ratios «DF:FC=1:4» lower to the single parameter a/(a+b) (or its complement). #2065 (ADR-700): the
+  // separator is the lexicon's `RATIO_SEP` — «1 ל-2» is the same pair as «1:2» (the similarity reader composes it too)
+  for (const m of s.matchAll(new RegExp(String.raw`(\d+(?:\.\d+)?)${RATIO_SEP}(\d+(?:\.\d+)?)`, 'g'))) {
     const a = Number(m[1]), b = Number(m[2]);
     const t1 = a / (a + b), t2 = b / (a + b), t3 = a / b;
     if (cmdNumbers.some((c) => [t1, t2, t3].some((t) => Math.abs(c - t) < 1e-9))) {

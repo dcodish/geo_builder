@@ -321,6 +321,7 @@
  "fixture:issue-989-trapezoid-after-triangle.geo.json": "0703ef8c37579057",
  "fixture:issue-989-trapezoid-stated-pair.geo.json": "5ac9c9b206c76b86",
  "fixture:parallel-chords.geo.json": "54f8605ea57acfa6",
+ "fixture:similarity-ratio-in-words-2065.geo.json": "65622c9fd630bcac",
  "fixture:tangent-twin-internal-2188.geo.json": "f1861bd568a7b892",
  "fixture:trapezoid-altitude.geo.json": "15aef81809001d5b",
  "fixture:two-circles-disjoint-radius-both-2216.geo.json": "6f5aeacdafa8bbc1",

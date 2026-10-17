@@ -281,6 +281,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2244': 'open', // #2242 (ADR-690): analytic reads no circle area or circumference, so «מעגל O · שטח המעגל הוא 9π» is not-handled
 
+  '#2067': 'open', // #2065 (ADR-700): analytic and 3-D read no similarity ratio, «ביחס p ל-q» included
+
   '#2253': 'open', // #2165 (ADR-681): analytic and 3-D read no value line for a length letter; 3-D refuses «AB = 2a»
 
 };
@@ -1533,6 +1535,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'definite-circle-area-2242', family: 'circles', steps: ['מעגל O', 'שטח המעגל הוא 9π'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2244' }], note: '2-D drew a second circle P of radius 3 beside O, green, before ADR-690; analytic reads no circle area (not-handled)' },
   // ── #2217 (ADR-691): a fresh pair stated with equal radii is named by use ──
   { id: 'equal-pair-named-by-use-2217', family: 'circles', steps: ['שני מעגלים משיקים ברדיוסים שווים', 'רדיוס מעגל O הוא 5'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D refused input.unknownCircle before ADR-691; analytic does not read the equal-size pair sentence (not-handled)' },
+
+  // ── #2065 (ADR-700): a similarity ratio in words, «ביחס p ל-q», reads as «ביחס p:q» in 2-D ──
+  { id: 'similarity-ratio-to-2065', family: 'angles', steps: ['משולש ABC', 'משולש DEF', 'ABC ∽ DEF ביחס של 1 ל-2'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2067' }, { product: '3d', issue: '#2067' }], note: '2-D escalated to the AI before ADR-700; analytic and 3-D read no similarity ratio (#2067)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
