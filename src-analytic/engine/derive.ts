@@ -17,7 +17,8 @@ import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
 import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
-import { SOLVE_RESOLUTION, SOLVE_TOL, resolveChoices, sameConstraint } from './solve';
+import { SOLVE_RESOLUTION, SOLVE_TOL, resolveChoices, sameConstraint, type Constraint } from './solve';
+import { followObjects } from './roles';
 import { NO_STATED_MEASURES, statedMeasures, type StatedMeasures } from './statedMeasures';
 import { incidenceWords } from './crossings';
 import { convexWhenSimple, shapeRow } from './shapes';
@@ -61,6 +62,8 @@ export interface LineFault {
   stated?: string;
   /** For a diagonal claim the figure refutes (#1737, ADR-AG-265): the pair as written (the ring is `polygon`). */
   pair?: string;
+  /** For `ambiguous-role-side` (#2018, ADR-AG-298): the role the cevian named — the refusal words it. */
+  role?: 'base' | 'leg';
   /** For a second name or another coefficient (#2054, #2061): the target as the line spells it, its kind, and 2-D's reason clause. */
   nameOf?: string;
   nameKind?: 'angle' | 'length';
@@ -234,7 +237,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null, e.options ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e), ...radiusAgainst(e, i) });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'ambiguous-role-side' && e.role ? { role: e.role } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e), ...radiusAgainst(e, i) });
   });
 
   /**
@@ -928,23 +931,33 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   });
 
   const constraintLine = construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]]));
+  // WHICH option the drawn figure took (#1719): the first that holds on it, read off the figure — `drawableAt` may
+  // have drawn another seed's configuration, so the seed alone does not say. None holding (a faulted figure): the seed's.
+  const drawnOption = (k: Extract<Constraint, { t: 'choice' }>): Constraint[] => {
+    const held = k.options.find((o) => holdsOn(construction, o, figure));
+    return resolveChoices([held ?? k], figure.choiceSeed ?? seed);
+  };
+  /**
+   * THE OBJECTS AS THE CANVAS LETTERS THEM (#2018, ADR-AG-298). An object bound to a role («תיכון לבסיס»'s foot M and
+   * its segment) follows the configuration (`resolvedAt`), so the construction every reader of a derivation sees —
+   * the panel, «הצג בנייה»'s rows, the stated measures, the question export, the tool letters — carries the letters
+   * of the configuration DRAWN, never option 0's. Only the objects are resolved: the constraints keep their choices,
+   * which the cycling and the gates read. With no bound object this is the construction itself, unchanged.
+   */
+  const shownObjects = followObjects(construction.objects, construction.constraints.flatMap((k) => (k.t === 'choice' ? drawnOption(k) : [k])));
+  const shown: Construction = shownObjects === construction.objects ? construction : { ...construction, objects: shownObjects };
   // #1714: a constraint the parser built as a noun's or a correspondence's DEFINITION is not a stated measure; every
   // other one is a statement (the fold's own attribution, never a list of statement kinds).
   const stated = statedMeasures(
-    construction,
+    shown,
     (at) => {
       const f = constraintFact[at] === undefined ? undefined : facts[constraintFact[at]];
       return f === undefined ? undefined : f.t === 'constraint' && f.definition ? 'definition' : 'statement';
     },
-    // WHICH option the drawn figure took (#1719): the first that holds on it, read off the figure — `drawableAt` may
-    // have drawn another seed's configuration, so the seed alone does not say. None holding (a faulted figure): the seed's.
-    (k) => {
-      const held = k.options.find((o) => holdsOn(construction, o, figure));
-      return resolveChoices([held ?? k], figure.choiceSeed ?? seed);
-    },
+    drawnOption,
   );
   const selectorLine = construction.selectors.map((_, at) => (selectorFact[at] === undefined ? -1 : owner[selectorFact[at]]));
-  return { construction, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices, constraintLine, selectorLine, stated };
+  return { construction: shown, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices, constraintLine, selectorLine, stated };
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */

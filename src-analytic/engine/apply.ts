@@ -21,7 +21,7 @@ import { parabolaDirectrix, resolveCurve } from './curves';
 import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule, type FootLine } from './derived';
 import { sameDerivation } from './sameDerivation';
-import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, sameConstraint, sineAngle, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
+import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
@@ -29,6 +29,7 @@ import { measureRestatement } from './statedMeasures';
 import { RESERVED_SYMBOLS, radiusSymbol, toolSymbol } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
 import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
+import { followObjects, isoscelesKeys, roleVertexOf } from './roles';
 import {
   CENTRE_SENTINEL,
   ROLE_SIDE_SENTINELS,
@@ -221,6 +222,12 @@ export type ApplyErrorCode =
   | 'ambiguous-hypotenuse'
   | 'ambiguous-no-right-angle'
   /**
+   * «תיכון לבסיס» / «גובה לשוק» where no single polygon gives the role a side (#2018, ADR-AG-298): a plain triangle,
+   * an equilateral one, a trapezoid (2-D reads the role on a triangle only), none, or several. 2-D's `clarify`
+   * (`input.roleSideUnresolved`), its sentence verbatim; `role` carries which role, for the locale to word.
+   */
+  | 'ambiguous-role-side'
+  /**
    * A STATED value substituted into a symbol whose domain it violates (#1432 amendment 1) — «רדיוס
    * המעגל הוא -3», «שרדיוסו 0». The radius symbol carries `{min: 0, minOpen}` and the substitution
    * used to drop it unchecked, so the circle vanished with no message. Checked at the ONE seam every
@@ -333,6 +340,8 @@ export interface ApplyError {
   /** For `diagonal-is-side` / `diagonal-none-here` (#1737): the ring holding the pair, and the pair, as written. */
   polygon?: string;
   pair?: string;
+  /** For `ambiguous-role-side` (#2018): the role the sentence named. */
+  role?: 'base' | 'leg';
   /** For `name-taken` (#2054): the target as the refused line spells it (`ABC`, `AB`), and whether it is an angle or a segment. */
   nameOf?: string;
   nameKind?: 'angle' | 'length';
@@ -1646,6 +1655,8 @@ function applyHeightOf(c: Construction, f: Extract<Fact, { t: 'height-of' }>): A
  */
 function applyRoleSide(c: Construction, f: Extract<Fact, { t: 'role-side' }>): ApplyOutcome {
   const [s1, s2] = ROLE_SIDE_SENTINELS;
+  const cevian = f.facts.length === 1 && f.facts[0].t === 'cevian-of' ? f.facts[0] : null;
+  if (cevian) return f.role === 'hypotenuse' ? { ok: false, error: { code: 'not-handled', detail: f.src } } : applyRoleCevian(c, f.role, cevian, f.src);
   type Option = { side: [Id, Id]; with?: Constraint };
   type Reading = { poly: PolygonObject; options: Option[]; seat?: number; trapezoid?: true };
   const sideOf = (ring: readonly Id[], i: number): [Id, Id] => {
@@ -1666,11 +1677,8 @@ function applyRoleSide(c: Construction, f: Extract<Fact, { t: 'role-side' }>): A
     if (ring.length === 3) {
       let keys: Constraint[];
       if (f.role === 'hypotenuse') keys = [rightAngleAt(ring[0], ring[1], ring[2]), rightAngleAt(ring[1], ring[0], ring[2]), rightAngleAt(ring[2], ring[0], ring[1])];
-      else if (noun === 'משולש שווה שוקיים') {
-        const given = shapeRow(noun)!.givens([...ring])[0];
-        if (given.t !== 'choice') return null;
-        keys = given.options;
-      } else return null;
+      else if (noun === 'משולש שווה שוקיים') keys = isoscelesKeys(ring);
+      else return null;
       const sidesAt = (i: number): Array<[Id, Id]> =>
         f.role === 'leg' ? sideOf(ring, i).map((x): [Id, Id] => [ring[i], x]) : [sideOf(ring, i)];
       const s = seatOver(keys);
@@ -1747,6 +1755,63 @@ function applyRoleSide(c: Construction, f: Extract<Fact, { t: 'role-side' }>): A
   const constraints = [...drawn.next.constraints];
   constraints[seat] = choice;
   return { ok: true, effect: 'created', next: { ...drawn.next, constraints } };
+}
+
+/**
+ * A CEVIAN TO A SIDE NAMED BY ITS ROLE (#2018, ADR-AG-298) — «תיכון לבסיס», «גובה לשוק», "the median to the base".
+ *
+ * Operator, #1807 (2026-10-06): *"תיכון לבסיס should be allowed and it should change with other configs"*. 2-D's
+ * reading (ADR-596), measured at HEAD through `decideDeterministic2D`: the role is read on an ISOSCELES triangle only;
+ * the base is the side opposite the apex, a leg a side through it, and a second leg cevian of the same kind takes
+ * the other leg (a third adds nothing). The cevian `g` arrives written over {@link ROLE_SIDE_SENTINELS}.
+ *
+ * - No single isosceles triangle (a plain or equilateral triangle, a trapezoid, none, several) → 2-D's question,
+ *   `ambiguous-role-side`. A plain triangle has no base (operator ruling 2026-10-13 on #2018).
+ * - SETTLED apex (a stated equal pair) → the lettered twin, exactly («תיכון לצלע BC»), so the figure is the one the
+ *   letters draw and nothing rotates.
+ * - OPEN apex (the noun's choice) → the derived foot and the segment from the apex, built at the letters of the
+ *   option the choice takes at choice seed 0 and BOUND to the role (`follows`); `resolvedAt` re-letters them per
+ *   configuration. The choice itself is untouched — the objects are 0-DOF and add no constraint, so adding the line
+ *   never moves the triangle. The segment's id is role-anonymous: no fixed pair of letters names it.
+ */
+function applyRoleCevian(c: Construction, role: 'base' | 'leg', g: Extract<Fact, { t: 'cevian-of' }>, src: string): ApplyOutcome {
+  const [s1, s2] = ROLE_SIDE_SENTINELS;
+  const ask: ApplyOutcome = { ok: false, error: { code: 'ambiguous-role-side', detail: src, role } };
+  const hosts = c.objects.filter(
+    (o): o is PolygonObject => o.kind === 'polygon' && o.vertices.length === 3 && o.noun !== undefined && normalizeShapeNoun(o.noun) === 'משולש שווה שוקיים',
+  );
+  if (hosts.length !== 1) return ask;
+  const ring = hosts[0].vertices as [Id, Id, Id];
+  const stated = roleVertexOf(c.constraints, ring, role);
+  const atSeed0 = resolveChoices(c.constraints, 0);
+  const apexes = stated.length > 0 ? stated : roleVertexOf(atSeed0, ring, role);
+  if (apexes.length !== 1) return ask; // equal on every side: no one base
+  const apex = apexes[0];
+  const [p, q] = ring.filter((x) => x !== apex);
+  const sides: Array<[Id, Id]> = role === 'base' ? [[p, q]] : [[apex, p], [apex, q]];
+  const kind = g.role;
+  /** The derivation a cevian of this kind to side `uv` gives its foot — the opposite vertex is its apex. */
+  const ruleFor = ([u, v]: [Id, Id]) => toolFootRule(kind, ring.find((x) => x !== u && x !== v)!, u, v);
+  const onSide = <T>(x: T, [u, v]: readonly [Id, Id]): T => JSON.parse(JSON.stringify(x).split(s1).join(u).split(s2).join(v)) as T;
+  // The figure's objects at the letters `apex` was read at (seed 0's configuration): a bound cevian is compared there.
+  const shown = followObjects(c.objects, atSeed0);
+  if (stated.length === 1) {
+    // A leg not yet holding a cevian of this kind (2-D's #805 pick), else the first: the twin then reuses it.
+    const free = sides.find((sd) => !shown.some((o) => o.kind === 'derived' && sameDerivation(o.rule, ruleFor(sd))));
+    return applyFact(c, onSide(g, free ?? sides[0]));
+  }
+  // OPEN. Which sides already carry a bound cevian of this kind.
+  if (g.measure) return { ok: false, error: { code: 'not-handled', detail: src } };
+  const taken = (sd: [Id, Id]) =>
+    shown.some((o) => o.kind === 'derived' && o.follows?.role === role && sameDerivation(o.rule, ruleFor(sd)));
+  const side = sides.find((sd) => !taken(sd));
+  if (!side) return { ok: true, effect: 'known', next: c };
+  const from = ring.find((x) => x !== side[0] && x !== side[1])!;
+  const follows = { role, ring: [...ring] as [Id, Id, Id], at: apex };
+  const facts = toolFootFacts(kind, from, g.foot, side[0], side[1], src).map((h): Fact =>
+    h.t === 'derived' ? { ...h, follows } : h.t === 'segment' ? { ...h, id: `seg-${role}-${anonOf([kind, g.foot, ring])}`, follows } : h,
+  );
+  return applyAll(c, facts);
 }
 
 /** A stable, content-derived suffix for the anonymous line a role sentence draws — the same line, the same id. */
@@ -3799,7 +3864,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (f.toolFoot && !objectById(c, f.foot)) {
         // The same point derived the same way already has a name (#1153): the cevian runs to IT.
         const rule = toolFootRule(f.role, apex, u, v);
-        const same = c.objects.find((o) => o.kind === 'derived' && sameDerivation(o.rule, rule));
+        const same = c.objects.find((o) => o.kind === 'derived' && !o.follows && sameDerivation(o.rule, rule));
         if (same) return applyAll(c, [{ t: 'segment', id: `seg-${[apex, same.id].sort().join('')}`, a: apex, b: same.id, src: f.src }, ...measured(same.id)]);
         return applyAll(c, [...toolFootFacts(f.role, apex, f.foot, u, v, f.src), ...measured(f.foot)]);
       }
@@ -4239,9 +4304,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * «B(3,4)» are two independent statements that merely coincide, which is a different question
        * and deliberately NOT answered here (see the ADR; escalated to the operator).
        */
-      if (f.t === 'derived') {
+      // #2018 (ADR-AG-298): a point bound to a role is not «the midpoint of BC» in every configuration — its letters
+      // follow the drawn apex — so it never holds a lettered derivation's position, nor is held by one.
+      if (f.t === 'derived' && !f.follows) {
         const holder = c.objects.find(
-          (o) => o.kind === 'derived' && o.id !== f.id && sameDerivation(o.rule, f.rule),
+          (o) => o.kind === 'derived' && !o.follows && o.id !== f.id && sameDerivation(o.rule, f.rule),
         );
         if (holder) {
           return { ok: false, error: { code: 'already-named', detail: f.src, holder: statedName(holder.id) } };
@@ -4250,9 +4317,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
 
       const made: GeoObject =
         f.t === 'derived'
-          ? { kind: 'derived', id: f.id, rule: f.rule }
+          ? { kind: 'derived', id: f.id, rule: f.rule, ...(f.follows ? { follows: f.follows } : {}) }
           : f.t === 'segment'
-            ? { kind: 'segment', id: f.id, a: f.a, b: f.b }
+            ? { kind: 'segment', id: f.id, a: f.a, b: f.b, ...(f.follows ? { follows: f.follows } : {}) }
             : { kind: 'polygon', id: f.id, vertices: f.vertices, noun: f.noun, ...circleFlags };
       return { ok: true, effect: 'created', next: { ...c, objects: [...c.objects, made] } };
     }

@@ -7970,6 +7970,8 @@ const ROLE_SIDE_WORD: Readonly<Record<string, 'base' | 'leg' | 'hypotenuse'>> = 
   בסיס: 'base', שוק: 'leg', יתר: 'hypotenuse', base: 'base', leg: 'leg', hypotenuse: 'hypotenuse',
 };
 function parseRoleSide(line: string): RuleOutcome {
+  const cevian = parseRoleCevian(line);
+  if (cevian) return cevian;
   const he = [...line.matchAll(BARE_ROLE_HE)];
   const en = he.length ? [] : [...line.matchAll(BARE_ROLE_EN)];
   const hits = he.length ? he : en;
@@ -7984,6 +7986,43 @@ function parseRoleSide(line: string): RuleOutcome {
   const onLine = r.facts.some((f) => f.t === 'curve' && f.id.includes(s1) && f.id.includes(s2));
   if (!onLine) return null;
   return made([{ t: 'role-side', role, facts: r.facts.map((f) => ({ ...f, src: line })), src: line }]);
+}
+
+/*
+ * A CEVIAN TO A SIDE NAMED BY ITS ROLE (#2018, ADR-AG-298) — «תיכון לבסיס», «הגובה לשוק», "the median to the base".
+ *
+ * Operator, #1807 (2026-10-06): *"תיכון לבסיס should be allowed and it should change with other configs"*. The role
+ * after the particle («ל-», "to the") is written as its lettered twin «… לצלע Z₄Z₅» / "… to side Z₄Z₅" and read by the
+ * real cevian grammar; the reading is kept only when it is a cevian the TOOL completes — no apex typed, its foot a
+ * tool letter — so M1 (`applyRoleCevian`) can resolve the side against the figure. Out of reach, as 2-D's reading
+ * of them waits on #1839: a typed apex or foot («AD תיכון לבסיס») and a lettered leg («גובה לשוק AC»). The hypotenuse
+ * («תיכון ליתר») keeps its own rule. A LETTERED base («תיכון לבסיס BC») is 2-D's ADR-563 reading: the claim «הבסיס BC»
+ * (which settles the apex) and the cevian «תיכון לצלע BC», both existing sentences.
+ */
+const ROLE_CEVIAN_HE = /(^|\s)ל-?(בסיס|שוק)(?=$|[\s,.:)])/;
+const ROLE_CEVIAN_EN = /\bto\s+the\s+(base|leg)\b/i;
+const ROLE_LETTERS = new RegExp(`^\\s+(${NAME})(${NAME})(?=$|[\\s,.:)])`);
+function parseRoleCevian(line: string): RuleOutcome {
+  const he = ROLE_CEVIAN_HE.exec(line);
+  const en = he ? null : ROLE_CEVIAN_EN.exec(line);
+  const m = he ?? en;
+  if (!m) return null;
+  const role = ROLE_SIDE_WORD[(he ? he[2] : en![1]).toLowerCase()] as 'base' | 'leg';
+  const start = m.index + (he ? he[1].length : 0);
+  const rest = line.slice(m.index + m[0].length);
+  const letters = ROLE_LETTERS.exec(rest);
+  if (letters ? role !== 'base' : /^\s+[A-Z]/.test(rest)) return null;
+  const [s1, s2] = ROLE_SIDE_SENTINELS;
+  const side = letters ? `${letters[1]}${letters[2]}` : `${s1}${s2}`;
+  const r = parseClause(`${line.slice(0, start)}${he ? 'לצלע' : 'to side'} ${side}${rest.slice(letters ? letters[0].length : 0)}`);
+  if (!r.ok || r.facts.length !== 1) return null;
+  const g = r.facts[0];
+  if (g.t !== 'cevian-of' || g.apex || !g.toolFoot || !g.side || !g.foot.startsWith(TOOL_PREFIX)) return null;
+  if (letters) {
+    const claim = parseClause(he ? `הבסיס ${side}` : `the base ${side}`);
+    return claim.ok ? made([...claim.facts, g].map((f) => ({ ...f, src: line }))) : null;
+  }
+  return made([{ t: 'role-side', role, facts: [{ ...g, src: line }], src: line }]);
 }
 
 /** The facts that MAKE a point of their id — a point the clause defines (or already declares) is left as the clause has it. */
