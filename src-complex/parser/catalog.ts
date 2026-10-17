@@ -191,6 +191,13 @@ export const CATALOG: readonly CatalogEntry[] = [
   },
   {
     family: 'F6',
+    he: 'O ראשית הצירים',
+    en: 'O is the origin',
+    descHe: 'סימון ראשית הצירים (0,0) כנקודה O — גם «נקודה O», «O» או «ראשית הצירים»',
+    descEn: 'mark the origin (0,0) as the point O — also «point O», «O» or «the origin»',
+  },
+  {
+    family: 'F6',
     he: 'הקטע z1z2',
     en: 'segment z1z2',
     descHe: 'קטע בין שני מספרים',

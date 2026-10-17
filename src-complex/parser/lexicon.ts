@@ -236,6 +236,19 @@ export const CIRCUMSCRIBED_KW = String.raw`(?:${HE_PREFIX}חוס${MEM}${HE_SUFFI
 /** «מרכז» / «centre» — both spellings of the English, which students and textbooks split on. */
 export const CENTER_KW = String.raw`(?:${HE_PREFIX}${MEM}רכז${HE_SUFFIX}ו?|cent(?:re|er))`;
 
+/**
+ * #2021 (ADR-CX-085) — the ORIGIN as a phrase: «ראשית הצירים», «הראשית», «מרכז הצירים», «origin».
+ * The operator's ruling (2026-10-12): *"O should be recognized and the center. and ראשית הצירים shold
+ * also be recognized"* — so «הראשית» and «מרכז הצירים» are the same noun as «ראשית הצירים».
+ */
+export const ORIGIN_KW = String.raw`(?:${HE_PREFIX}ראשית(?:\s+${HE_PREFIX}צירים)?|${CENTER_KW}\s+${HE_PREFIX}צירים|origin)`;
+
+/** #2021 — the letter that names the origin, `o` (`model/figure` ORIGIN; the rule flags fold the case). */
+export const ORIGIN_LETTER_KW = String.raw`o`;
+
+/** #2021 — «נקודה» / «הנקודה» / «point», the noun before a point's name. */
+export const POINT_KW = String.raw`(?:${HE_PREFIX}נקוד(?:ה|ת)|point)`;
+
 /** «רדיוס» / «radius». */
 export const RADIUS_KW = String.raw`(?:${HE_PREFIX}רדיוס${HE_SUFFIX}ו?|radius)`;
 
@@ -417,6 +430,9 @@ export const ATOM_SOURCES: Readonly<Record<string, string>> = {
   CIRCLE_KW,
   CIRCUMSCRIBED_KW,
   CENTER_KW,
+  ORIGIN_KW,
+  ORIGIN_LETTER_KW,
+  POINT_KW,
   RADIUS_KW,
   ACCUSATIVE_KW,
   WITH_KW,

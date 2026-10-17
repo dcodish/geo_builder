@@ -193,7 +193,11 @@ export function PolarPlane({
       <line x1={X(0)} y1={0} x2={X(0)} y2={H} stroke={INK.axis} strokeWidth={1.5} />
       <text x={W - 16} y={Y(0) - 6} fontSize={12} fill={INK.axis}>Re</text>
       <text x={X(0) + 6} y={14} fontSize={12} fill={INK.axis}>Im</text>
-      <text x={X(0) - 12} y={Y(0) + 15} fontSize={12} fill={INK.axis}>O</text>
+      {/* #2021 (ADR-CX-085): once the student MARKS the origin, its point-layer label replaces the
+          axis letter — one «O» on the canvas, never two */}
+      {!scene.marks.some((m) => m.label === 'O') && (
+        <text x={X(0) - 12} y={Y(0) + 15} fontSize={12} fill={INK.axis}>O</text>
+      )}
 
       {/* modulus rings: where else this magnitude could sit — the rings LAYER (#722, opt-in) */}
       {layers.rings && scene.rings.map((ring) => (
@@ -400,6 +404,25 @@ export function PolarPlane({
               {i + 1}
             </text>
           ))}
+        </g>
+      ))}
+
+      {/* #2021 (ADR-CX-085): marked points that are not numbers — the origin — in the point layer's
+          own ink; the label sits below-left of the dot, where the axis letter was */}
+      {scene.marks.map((m) => (
+        <g key={m.key} data-mark={m.label}>
+          <circle cx={X(m.z.re)} cy={Y(m.z.im)} r={6} fill={INK.known} stroke="#fff" strokeWidth={1.5} />
+          <text
+            x={X(m.z.re) - 10}
+            y={Y(m.z.im) + 18}
+            fontSize={13}
+            fontWeight={600}
+            fill={INK.known}
+            textAnchor="end"
+            style={{ userSelect: 'none' }}
+          >
+            {m.label}
+          </text>
         </g>
       ))}
 

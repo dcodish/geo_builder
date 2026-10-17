@@ -217,6 +217,7 @@ describe('span accounting is ENFORCING, not advisory', () => {
       'circumscribed-circle',
       'circle-centre-radius',
       'named-shape',
+      'origin-marker',
       'argument-relation',
       'argument-query',
       'equation',

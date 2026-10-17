@@ -32,7 +32,8 @@ describe('F6 — the sentence forms', () => {
     const l = ok(line);
     expect(l.objects).toHaveLength(1);
     expect(l.objects[0].kind).toBe(kind);
-    expect(l.objects[0].kind === 'circle' ? [] : l.objects[0].points).toHaveLength(n);
+    const o = l.objects[0];
+    expect(o.kind === 'circle' || o.kind === 'origin' ? [] : o.points).toHaveLength(n);
   });
 
   /**

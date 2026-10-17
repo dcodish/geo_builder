@@ -4368,3 +4368,32 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Performance (docs/17 §7).** One extra tier-1 solve per round that closes a row (bounded by the row count, in practice one); a figure with no known parameter or no deferred definition costs one map scan.
 
 **Locks.** `src-complex/__tests__/param-definition-closed-1818.test.ts`: the exam sequence in three orders (`a = -1` first, after the definitions, last) at 24 seeds each — `freeDof = []`, the claim holds, «z1» → «1+i», «z2» → «1-i», «|z1|» → «√2»; the reading equals the typed literal's; «a = 4» refuted with z₁ = 56+46i, z₂ = 56−6i; a free a unchanged; the class (`a^2`, `a*b`, `a^3`, the affine form, the solved r → z₂ = 1/4+i); `a = √2` not claimed exact; `closedUnder` units (integer power, unknown parameter, complex name, zero, fractional power). Fixture `fixtures/exam-2022w-a-quadratic-1818.complex.json` (the exam's four lines). #1535's lock 6 may now swap to this sequence, as its plan says.
+
+## ADR-CX-085 — The origin can be marked as a point: «O», «נקודה O», «O ראשית הצירים», «ראשית הצירים» (#2021)
+
+**Status:** accepted, 2026-10-17 · **Issue:** [#2021](https://github.com/dcodish/geo_builder/issues/2021) (feature, `P2`, `complex`) · fix round #2304, stream R · branch `feat/2021-complex-origin-point` from `main` @ `de7c221f` · plan of 2026-10-12, armed `auto-ok` 2026-10-12 · **the origin half only**
+**Requirements:** [02d](02d-requirements-complex.md) FR-GP-8 (new), the F6 family row ·
+**Design:** [04d](04d-design-complex.md), "The marked origin is an OBJECT, never a number" ·
+**Ladder:** stage 0b (a new rule, `origin-marker`), 3e (resolved with every object), 5c (`buildScene`'s `marks`) ([LADDER-CX](LADDER-CX.md))
+
+**The request.** Operator, playing round #1998 T31 on «z1 = 3+4i» · «w = z1*i»: *"i wanted to be able to mark the center of axis (0,0) and there is no way to do it. I also wanted to draw the angle between z1 and w and coulnt due to same issue"*. Ruling, 2026-10-12: *"O should be recognized and the center. and ראשית הצירים shold also be recognized"* — «O ראשית הצירים», «נקודה O», a bare «O» and «ראשית הצירים» all name the origin; order *"ok"*: the origin half now, in complex only, the angle half with #1981.
+
+**Measured at pickup** (`main` @ `de7c221f`, the real `submitLine`, no model call). After the two lines: «נקודה O», «O ראשית הצירים», «O מרכז הצירים», «ראשית הצירים», «הראשית O», «O is the origin», «the origin» → `not-handled`; a bare «O» → filed in the ask lane as a question about a parameter `o` (`bare-expression`); «∠z1Ow», «הזווית בין z1 ל-w» → `not-handled`; «המשולש Oz1w» builds. As the issue said.
+
+**The class.** *A point the complex figure always has — the origin — cannot be named by a statement*, so nothing that has to start from it has a sentence. `ORIGIN = 'o'` is a reserved constant every object may use, but no rule lowered a statement about it alone.
+
+**Decision.**
+1. **One rule, `origin-marker`** (`parser/rules.ts`, after `named-shape`, before `bare-run`/`bare-expression`), over three new lexicon atoms: `ORIGIN_KW` («ראשית הצירים», «הראשית», «מרכז הצירים», `origin`, with the Hebrew prefixes), `ORIGIN_LETTER_KW` (`o`) and `POINT_KW` («נקודה», «הנקודה», `point`). Two whole-line shapes: `[POINT] O [copula the ORIGIN]` and `[the] ORIGIN [O]`. It claims the whole line.
+2. **It lowers to an OBJECT**, `{ kind: 'origin' }` (`model/figure.ts`) — never a number named `o`, never a redefinition of the constant (ADR-CX-012: objects claim nothing). It declares nothing, so no point, no unknown and no free DOF is added, and the reserved-constant refusal («o ממשי», ADR-CX-063) is untouched.
+3. **Resolved at 3e with every object** (`resolveObjects`): a `point` object at (0,0), known. **`buildScene`** lifts point objects out of `shapes` into a new `marks` list, one per label (marking it twice draws one dot). **The renderer** draws a mark in the point layer's ink with its label below-left, and drops the faint axis letter O while a mark labelled O is shown — one «O» on the canvas.
+4. **No routing change.** A bare «O» now parses as a statement, so `readAsk` returns `statement` and #789's ask-lane routing never sees it; `submit.ts` is not touched.
+5. **The angle half is not built.** #1981 (the mark-only angle row the plan sequences it behind) closed `not planned` on 2026-10-16, replaced by #2181 (the «סימונים» marks panel, open). «∠z1Ow» / «הזווית בין z1 ל-w» stay `not-handled`; the issue stays open for that half.
+
+**Behaviour change for a student** (every line `[asked]`, item 1 of the 2026-10-12 ruling):
+- «O», «O ראשית הצירים», «נקודה O» and «ראשית הצירים» (and «O היא ראשית הצירים», «ראשית הצירים O», «הנקודה O», «הראשית O», «מרכז הצירים», «O מרכז הצירים», «O is the origin», «the origin», «point O», «the origin O») draw a dot at (0,0) labelled O, as a given in the list. Before: not understood; a bare «O» went to the questions panel.
+
+**Siblings.** None. The origin as a sentence is complex's (2-D, 3-D and analytic name points with coordinates or constructions, and analytic's origin is its own grammar); no shared code.
+
+**Performance (docs/17 §7).** Two anchored regex tests per line that reaches the rule; one object per marker line.
+
+**Locks.** `src-complex/__tests__/origin-marker-2021.test.tsx`: fourteen spellings through `submitLine` (a given, not a question; one mark labelled O at (0,0)) and through `parseLineV2` (an origin object, nothing declared); no point added; first line of an empty figure; twice → one dot; muting hides it; «o ממשי» still `reserved-constant`; a polygon through O draws no marker; the canvas renders the dot and one «O», and the axis letter alone without a marker. `parser/__tests__/rules.test.ts`: the rule order. Fixture `fixtures/origin-marked-2021.complex.json` («z1 = 3+4i» · «w = z1*i» · «O ראשית הצירים»). The catalog row («O ראשית הצירים»).

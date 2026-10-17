@@ -122,8 +122,21 @@ export interface SceneShape {
   readonly known: boolean;
 }
 
+/**
+ * #2021 (ADR-CX-085) — a MARKED point that is not a number: the origin, once the student stated
+ * «O ראשית הצירים» / «נקודה O» / «O». Drawn in the point layer, as a dot with its label; it carries no
+ * reading because it is no number — it is (0,0) by definition.
+ */
+export interface SceneMark {
+  readonly key: string;
+  readonly label: string;
+  readonly z: Cx;
+}
+
 export interface Scene {
   readonly points: readonly ScenePoint[];
+  /** #2021 — marked points that are not numbers (the origin), drawn in the point layer */
+  readonly marks: readonly SceneMark[];
   readonly radii: readonly SceneRadius[];
   readonly arcs: readonly SceneArgArc[];
   readonly rings: readonly SceneModRing[];
@@ -273,7 +286,14 @@ export function buildScene(figure: SceneInput, display: SceneDisplay = {}): Scen
   });
   const modRings: SceneModRing[] = [...byMagnitude.values()].sort((a, b) => a.r - b.r);
 
-  const shapes: SceneShape[] = objects.map((o) => ({
+  // #2021 — a marked point is a dot, not a path; two lines marking the origin draw one dot
+  const marks: SceneMark[] = [];
+  for (const o of objects) {
+    if (o.kind !== 'point' || marks.some((m) => m.label === o.label)) continue;
+    marks.push({ key: o.key, label: o.label, z: o.vertices[0] });
+  }
+
+  const shapes: SceneShape[] = objects.filter((o) => o.kind !== 'point').map((o) => ({
     key: o.key,
     label: o.label,
     vertices: o.vertices,
@@ -285,6 +305,7 @@ export function buildScene(figure: SceneInput, display: SceneDisplay = {}): Scen
 
   return {
     points: scenePoints,
+    marks,
     radii,
     arcs,
     rings: modRings,
