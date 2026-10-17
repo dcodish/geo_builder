@@ -7,13 +7,12 @@
  * «הוכיחו ש-w ממשי», «הראו ש-arg(z1) > 0» and the exam's mixed line «נתון z1 = 3+4i. הוכיחו כי |z1| = 5» were each
  * refused `not-handled` — the generic "I could not understand" — with nothing saying it is a claim to prove.
  * (On 5edeeca1 «prove that w is real» was even RECORDED as a ✓ claim about a number named "prove".)
- * Now each is refused as `proof-target`, quoting the proof sentence, and nothing of it is recorded; a BARE
- * statement keeps the claim check (D3).
+ * Now each is refused as `proof-target`, quoting the proof sentence, and nothing of it is recorded. How a BARE
+ * statement («w ממשי») is read is not this file's to lock: ruled to change (#2338, 2026-10-17).
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { editLine, submitLine, toggleLine } from '../app/submit';
 import { errorText } from '../app/errorText';
-import { deriveLines } from '../app/deriveLines';
 import { complexI18n } from '../i18n';
 import { CATALOG } from '../parser/catalog';
 import { useComplexStore } from '../store/useComplexStore';
@@ -84,17 +83,6 @@ describe('#1870 — complex refuses a proof target at the submit gate (the share
     expect(errorText(st().lastError!, tEn)).toBe(
       'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "prove that w is real"',
     );
-  });
-
-  it.each([
-    ['z1 ו-z2 צמודים', 'holds'],
-    ['w ממשי', 'holds'],
-    ['w מדומה טהור', 'refuted'],
-  ])('D3: the bare statement «%s» keeps its claim check (%s)', (line, status) => {
-    const v = verdict(line);
-    expect(v.ok).toBe(true);
-    const claims = deriveLines(st().lines, st().seed, st().seed).claims;
-    expect(claims.map((c) => [c.claim.src, c.verdict.status])).toContainEqual([line, status]);
   });
 
   it('no line of the complex catalog reads as a proof target', () => {

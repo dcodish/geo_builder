@@ -4372,7 +4372,7 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 ## ADR-CX-083 — A claim to prove is refused, never read: complex adopts ADR-W-107 (#1870)
 
 **Status:** accepted, 2026-10-17 · **Issue:** [#1870](https://github.com/dcodish/geo_builder/issues/1870) (feature, `P2`, `complex`) · fix round #2291, stream O · branch `feat/1870-complex-proof-verb` from `main` @ `b0e9dbea` · adopts [ADR-W-107](06w-decisions-workspace.md#adr-w-107) (Amendment 1)
-**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-15 (the ⚠ marker drops; D3's carve-out stated) and its parity row (now **Same**) · [02d](02d-requirements-complex.md) FR-KN-2 and G8 (markers drop) ·
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-15 (the ⚠ marker drops; D3's carve-out stated) and its parity row (now **Same**) · [02d](02d-requirements-complex.md) FR-KN-2 and G8 (the #1870 markers drop; both stamped «⚠ Ruled to change» for #2338, see the pre-merge note) ·
 **Design:** [04d](04d-design-complex.md), Boundaries — "A claim to prove" ·
 **Ladder:** stage 0⁻, the submit seam before the ask routing and the grammar ([LADDER-CX](LADDER-CX.md))
 
@@ -4396,6 +4396,8 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Performance (docs/17 §7).** Three regex tests per submitted line; no fold, solve or sample change.
 
 **Locks.** `src-complex/__tests__/proof-target-1666.test.ts`: the shared rows (`proofTargetFaults`) through the real `submitLine`, each on a fresh session; the issue's five complex lines refused as `proof-target` with the exact he sentence and nothing recorded; the en sentence; D3's three bare claims keep holds/holds/refuted; no catalog line reads as a proof target; `editLine` into a proof line refused on an enabled and on a muted row. `message-floor-2028.test.ts` gains the key; `shell/__tests__/suite-vocabulary.test.ts` gains the role `proofTarget` (2-D, analytic, complex), anchored to 2-D's text.
+
+**Pre-merge note (2026-10-17, #2338).** On play the operator ruled that a bare statement is a GIVEN, not a claim to check (T46: «w מדומה טהור» after «w = 25» is to be refused) — this changes D3. That change is #2338's, not this ADR's: the code here leaves bare statements as they were, but this PR no longer locks D3. Removed before merge: the D3 test above ("D3's three bare claims keep holds/holds/refuted") and the PR's play case that checked ✓/✗ on «w ממשי» / «w מדומה טהור»; 02d FR-KN-2 and G8 are stamped «⚠ Ruled to change (2026-10-17, #2338)», and 02w FR-SU-15 no longer restates D3. The D3 lines in **The ruling**, **Decision** 3 and **Behaviour change** above record what was ruled at pickup.
 
 ## ADR-CX-084 — A restatement the exact solve already entails adds no row, and says so (#2268)
 
