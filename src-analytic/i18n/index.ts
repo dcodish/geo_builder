@@ -423,6 +423,12 @@ const he = {
   errPolygonNotSupported:
     'מצולע כזה נבנה רק כשהוא משוכלל: "{{detail}}". אפשר לכתוב אותו כמשוכלל (למשל "משובע משוכלל ABCDEFG"), ' +
     'או להשתמש במחומש, משושה או מתומן.',
+  // #2018 (ADR-AG-298) — 2-D's input.roleSideUnresolved, verbatim (ADR-W-118 B1: status wording follows 2-D)
+  errRoleSideUnresolved:
+    'אין בסרטוט צלע יחידה שמתאימה ל"{{role}}" — הצהירו קודם על המשולש המתאים (למשל "משולש ישר זווית ABC" בשביל היתר, ' +
+    '"משולש שווה שוקיים ABC" בשביל הבסיס), או ציינו את הצלע באותיות (למשל "תיכון לצלע AB").',
+  roleWordBase: 'בסיס',
+  roleWordLeg: 'שוק',
   errAmbiguousHypotenuse:
     'לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: "{{detail}}". ' +
     'כתבו איזו צלע היא היתר, למשל "תיכון ליתר AB", או איזו זווית ישרה, למשל "זווית C ישרה".',
@@ -988,6 +994,12 @@ const en: typeof he = {
   errPolygonNotSupported:
     'A polygon with this many sides is built only when it is regular: "{{detail}}". Write it as regular ' +
     '(for example "regular heptagon ABCDEFG"), or use a pentagon, hexagon or octagon.',
+  // #2018 (ADR-AG-298) — 2-D's input.roleSideUnresolved, verbatim
+  errRoleSideUnresolved:
+    'The figure has no single side matching "{{role}}" — declare the matching triangle first (e.g. "right triangle ABC" for the hypotenuse, ' +
+    '"isosceles triangle ABC" for the base), or name the side by its letters (e.g. "median to side AB").',
+  roleWordBase: 'base',
+  roleWordLeg: 'leg',
   errAmbiguousHypotenuse:
     'Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: "{{detail}}". ' +
     'Name the hypotenuse — for example "the median to the hypotenuse AB" — or the right angle, for example "angle C is right".',

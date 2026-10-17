@@ -159,10 +159,13 @@ const collapseFields = (f: Derivation['faults'][number]) =>
                       : // #2119 (ADR-684) — a second radius: the line that sized the circle
                         f.code === 'radius-contradicts'
                         ? { declared: f.declared }
-                        : // #1963 (ADR-AG-296) — three points a statement puts on one line: the other lines and the letters
-                          f.code === 'forced-collinear'
-                          ? { declaredLines: f.declaredLines, collinear: f.collinear }
-                          : {};
+                        : // #2018 (ADR-AG-298) — a role cevian with no single host: which role, for the sentence
+                          f.code === 'ambiguous-role-side'
+                          ? { role: f.role }
+                          : // #1963 (ADR-AG-296) — three points a statement puts on one line: the other lines and the letters
+                            f.code === 'forced-collinear'
+                            ? { declaredLines: f.declaredLines, collinear: f.collinear }
+                            : {};
 
 /** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
 const definingLineOf = (lines: readonly string[], id: string): string | null => {

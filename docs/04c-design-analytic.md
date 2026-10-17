@@ -563,6 +563,14 @@ The line is COMPOSED, never rewritten (2-D's ADR-574/575 shape). `parseRoleLengt
 
 *Identifiers:* `BARE_ROLE_HE/EN` · `parseRoleSide` · `role-side` · `ROLE_SIDE_SENTINELS` · `applyRoleSide` · `seatOver` · `readingOf` · `anonOf` · the joint-option collapse in `applyFact`'s constraint arm
 
+### A cevian to a side named by its role ([ADR-AG-298](06c-decisions-analytic.md#adr-ag-298), #2018)
+
+A cevian MINTS a point whose definition differs per option of the isosceles `choice`, and an object cannot sit in an option, so the role is kept on the OBJECT and resolved where the constraints are. `parseRoleCevian` (first in `parseRoleSide`) writes «ל-בסיס» / «לשוק» / "to the base / leg" as «לצלע Z₄Z₅» / "to side Z₄Z₅" and keeps the reading only when it is a tool-completed cevian (no typed apex, a tool-letter foot) → `role-side { role, facts: [cevian-of] }`; a lettered base («תיכון לבסיס BC») is the claim «הבסיס BC» plus «תיכון לצלע BC». M1's `applyRoleCevian` reads the role on the one isosceles triangle: a STATED apex (`roleVertexOf` over the raw constraints) applies the lettered twin; an OPEN one builds `toolFootFacts` at the letters of choice seed 0's option, the segment role-anonymous (`seg-<role>-<hash>`), both carrying `follows: RoleBinding { role, ring, at }`. A second leg cevian takes the leg no bound cevian of its kind holds; none left → `known`. No single host → `ambiguous-role-side` (2-D's `input.roleSideUnresolved`).
+
+**`resolvedAt` resolves OBJECTS too.** After `resolveChoices`, `followObjects` re-letters every bound object against the configuration's constraints: `roleVertexOf` answers the vertex carrying the role there; if it is one other vertex than `at`, the ring letters inside the object rotate by the step between them and `at` moves with them (canonical, so re-resolving is the identity); otherwise unchanged. A list with no bound object is returned as the same array. `derive` returns its `construction` with the objects of the configuration DRAWN (the option that holds on the figure, `drawnOption`), so every reader of a derivation — the panel rows, the stated measures, the tool letters, the question export — agrees with the canvas; the constraints keep their choices. A bound point never holds, nor is held by, a lettered derivation of the same rule.
+
+*Identifiers:* `parseRoleCevian` · `ROLE_CEVIAN_HE/EN` · `applyRoleCevian` · `RoleBinding` · `follows` · `engine/roles.ts` (`isoscelesKeys`, `roleVertexOf`, `followObjects`) · `resolvedAt` · `drawnOption` · `ambiguous-role-side` · `errRoleSideUnresolved`
+
 ### The perpendicular from a point, and the line through a point that cuts a side ([ADR-AG-207](06c-decisions-analytic.md#adr-ag-207), #1620)
 
 The foot is `DerivedRule { t: 'foot'; from; onto: FootLine }` (`engine/derived.ts`, `footOn`, `curveParentsOf`).

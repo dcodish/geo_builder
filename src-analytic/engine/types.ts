@@ -180,12 +180,12 @@ export type Fact =
    * called `O` by default. It yields to anything already holding the id (the fold absorbs it as
    * `known`), where a student's own derivation of an existing point is a CONDITION on it (#1320).
    */
-  | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule; auto?: true })
+  | (FactBase & { t: 'derived'; id: Id; rule: DerivedRule; auto?: true; follows?: RoleBinding })
   /**
    * `ref` (#1639, ADR-AG-198) — the segment is drawn by a sentence that REFERS to its ends («AC קוטר במעגל»), so
    * the ends must already exist: it never introduces them, as the bare «AC» line (which NAMES the segment) does.
    */
-  | (FactBase & { t: 'segment'; id: Id; a: Id; b: Id; ref?: true })
+  | (FactBase & { t: 'segment'; id: Id; a: Id; b: Id; ref?: true; follows?: RoleBinding })
   /**
    * «הישר BC» — THE LINE through two named points, DRAWN (#1639, ADR-AG-198): the line-noun twin of the
    * segment a bare «BC» declares. A sentence that names a line draws it, whichever relation it states, and
@@ -646,6 +646,22 @@ export type PolygonOrRadiusRole = 'radius' | 'leg' | 'base' | 'hypotenuse' | 'di
  */
 export const CEVIAN_MEASURE_SENTINELS = ['Z₂', 'Z₃'] as const;
 
+/**
+ * WHICH ROLE AN OBJECT'S LETTERS WERE RESOLVED FOR (#2018, ADR-AG-298 — 2-D's `RoleSideBinding`, ADR-596).
+ *
+ * «תיכון לבסיס» on an isosceles triangle whose apex is still the noun's open choice mints a point (the base's midpoint)
+ * and a segment (apex → it) whose LETTERS differ per option, and an object cannot sit inside a `choice` option. So the
+ * objects are built at the letters of the option the choice takes at choice seed 0, and carry this binding: the role,
+ * the triangle's ring and the vertex that carried the role when they were lettered. `resolvedAt` re-letters them per
+ * configuration (`engine/roles.ts` `followObjects`) by the ring rotation that carries `at` to the vertex holding the
+ * role there — the one configuration seam (ADR-AG-245), so the canvas, the panel and every reader agree.
+ */
+export interface RoleBinding {
+  role: 'base' | 'leg';
+  ring: [Id, Id, Id];
+  at: Id;
+}
+
 /** The stand-ins a `role-side` sentence carries for its side's two ends (#1807, ADR-AG-266) — names no student writes. */
 export const ROLE_SIDE_SENTINELS = ['Z₄', 'Z₅'] as const;
 
@@ -707,7 +723,7 @@ export type GeoObject =
    * solver-free: given its parents there is exactly one answer, in closed form. This is the kind
    * that makes the object→object dependency relation non-empty for the first time.
    */
-  | { kind: 'derived'; id: Id; rule: DerivedRule }
+  | { kind: 'derived'; id: Id; rule: DerivedRule; follows?: RoleBinding }
   /**
    * A point the student NAMED but did not place — «משולש ABC» introduces three of them (#1017).
    *
@@ -719,7 +735,7 @@ export type GeoObject =
    */
   | { kind: 'free'; id: Id }
   /** `הקטע AB` — drawn between two points, and what gives «אמצע הצלע BC» a referent. */
-  | { kind: 'segment'; id: Id; a: Id; b: Id }
+  | { kind: 'segment'; id: Id; a: Id; b: Id; follows?: RoleBinding }
   /** `משולש ABC` over vertices that are ALREADY stated — its sides. Free vertices are B3's job. */
   /**
    * The NOUN the student used, in its registry spelling (#1049).

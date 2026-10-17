@@ -24,6 +24,7 @@ import { nthHolds, orderedCrossings } from './crossing-order';
 import { withinSegment } from './extent';
 import { carryingLines } from './carryingLines';
 import { segmentIdOf } from './cevian';
+import { followObjects } from './roles';
 import { offInkExtensions } from '../../shell/offInk';
 import { curveByName, inDomain, isFree, objectById, type ArcDef, type Construction, type Domain, type GeoObject, type Id, type CurveLabel, type NumCurve, type OrderSide, type Selector } from './types';
 
@@ -1872,10 +1873,14 @@ export function choiceSeedOf(c: Construction, seed: number): number {
  * the SAME selector set the canvas was judged with — never a second reading of which option a seed takes.
  */
 export function resolvedAt(raw: Construction, seed: number, choiceSeed = seed): Construction {
+  const constraints = resolveChoices(raw.constraints, choiceSeed);
   return {
     ...raw,
-    constraints: resolveChoices(raw.constraints, choiceSeed),
+    constraints,
     selectors: resolveSelectorChoices(cycledPairs(raw.selectors, seed), choiceSeed),
+    // #2018 (ADR-AG-298): an object bound to a role («תיכון לבסיס»'s foot and segment) is lettered by the option this
+    // configuration took — resolved here with the constraints, so nothing downstream reads another option's letters.
+    objects: followObjects(raw.objects, constraints),
   };
 }
 
