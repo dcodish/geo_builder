@@ -40,6 +40,10 @@ const ctrToken = (centerId: string): string => (centerId.startsWith('@ctr-') ? c
  * records, not only its objects and constraints. A stated inequality (a containment, a side) drives nothing, so it
  * lives there — and a check blind to them read «מעגל מוכל בתוך המעגל הגדול» as two identical circles and named the
  * OUTER one by order. A disjoint pair is an unordered relation, so it serializes as a set.
+ *
+ * #2217 ([ADR-691](../../docs/06-decisions.md#adr-691)): so does an EQUALITY of two lengths (a `ratio` with k = 1 and no
+ * offset — «ברדיוסים שווים», «ששטחם שווה»). A fresh pair stated with equal radii is still two circles nothing tells
+ * apart, so a later «רדיוס מעגל O הוא 5» names one of them by use, as it does without the equality.
  */
 function autosInterchangeable(construction: Construction): boolean {
   const autos = construction.objects.filter(
@@ -69,6 +73,14 @@ function autosInterchangeable(construction: Construction): boolean {
       if (o.kind === 'circle-position' && (o.relation === 'disjoint' || o.relation === 'tangent')) {
         // #2080 (ADR-645): a stated tangency is unordered too (its touch point is the pair's one common point)
         return { kind: o.kind, relation: o.relation, circles: [norm(o.a, swap), norm(o.b, swap)].map((x) => JSON.stringify(x)).sort(), ...(o.at !== undefined ? { at: norm(o.at, swap) } : {}), ...(o.external !== undefined ? { external: o.external } : {}) };
+      }
+      // #2217 (ADR-691): a length ratio with k = 1 and no offset is an EQUALITY, |ab| = |cd| — the same statement
+      // whichever segment is listed first (the encoding of «ברדיוסים שווים», equal areas, equal perimeters). Its two
+      // segments serialize as an unordered pair. Any other k, or an offset, is ordered (r_O = 2·r_P is not r_P = 2·r_O).
+      if (o.type === 'ratio' && o.k === 1 && !o.add) {
+        out.segments = [[norm(o.a, swap), norm(o.b, swap)], [norm(o.c, swap), norm(o.d, swap)]].map((x) => JSON.stringify(x)).sort();
+        for (const k of Object.keys(o).sort()) if (!['a', 'b', 'c', 'd', 'add', 'solve'].includes(k)) out[k] = norm(o[k], swap);
+        return out;
       }
       if (o.kind === 'circle-circle') {
         out.circles = [norm(o.circle1, swap), norm(o.circle2, swap)].map((x) => JSON.stringify(x)).sort();
