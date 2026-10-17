@@ -182,7 +182,9 @@
     "incircleShapeMany": "polygon with more than six sides",
     "inscribedContradictsNoun": "A {{shape}} cannot be inscribed in a circle: \"{{detail}}\". A circle around it would make it a {{forced}}, and a {{forced}} is not a {{shape}}. If the shape is a {{forced}}, write \"{{forced}} ABCD is inscribed in a circle\".",
     "equalCirclesNested": {
-      "contained": "\"{{detail}}\": two circles with equal radii cannot be contained one in the other, because a circle inside another circle is smaller than it. State only one of the two: \"contained\" or \"with equal radii\"."
+      "contained": "\"{{detail}}\": two circles with equal radii cannot be contained one in the other, because a circle inside another circle is smaller than it. State only one of the two: \"contained\" or \"with equal radii\".",
+      "int-tangent": "\"{{detail}}\": two circles with equal radii cannot be internally tangent, because two such circles are the same circle. State only one of the two: \"internally tangent\" or \"with equal radii\".",
+      "concentric": "\"{{detail}}\": two circles with equal radii and a common centre are the same circle. State only one of the two: \"concentric\" or \"with equal radii\"."
     },
     "ringContradictsNoun": "The points you gave do not form that shape in this order: \"{{detail}}\". Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.",
     "shapeNoun": {
@@ -436,6 +438,11 @@
     "restatedSize_said": "Can't do that: «{{said}}» contradicts an earlier given — they can't both hold.",
     "restatedSize_said_vs": "Can't do that: «{{said}}» contradicts «{{other}}» — they can't both hold.",
     "notCyclicReason": "a circle through the four vertices would make a {{shape}} a {{forced}}, and a {{forced}} is not a {{shape}}",
+    "equalNestedReason": {
+      "contained": "two circles with equal radii cannot be contained one in the other, because a circle inside another circle is smaller than it",
+      "int-tangent": "two circles with equal radii cannot be internally tangent, because two such circles are the same circle",
+      "concentric": "two circles with equal radii and a common centre are the same circle"
+    },
     "collinearCircleReason": "{{a}}, {{b}} and {{c}} are on one line, and no circle passes through three points on one line",
     "notDeterminedHere": "Your givens are fine. {{who}} are not determined yet, and in the placement the tool picked for them {{what}} can't hold — press «show another configuration».",
     "notDeterminedHereBare": "Your givens are fine. In the placement the tool picked, {{what}} can't hold — press «show another configuration».",

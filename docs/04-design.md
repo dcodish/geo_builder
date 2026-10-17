@@ -726,7 +726,15 @@ crossing's own statement is read from `ownerByObjId`.
 **A stated radius is never rewritten** ([ADR-692](06-decisions.md#adr-692), #2239). Over two stated (`length`) radii
 `circles-tangent` pins the centre distance (r₁ + r₂, or |r₁ − r₂| > 0) and never touches a radius; the ADR-037 Am. 2
 `tangent-inner` radius variant, which made the second of two equal circles the largest one inside the first, is gone.
-Equal stated radii stated internally tangent are refused at stage 0a by `equalInternalTangency`
+Since [ADR-713](06-decisions.md#adr-713) (#2206) the predicate is `equalNestedPair` and its message
+`over-constrained: equal circles <circle> nested <contained|int-tangent|concentric> cannot hold`, humanized in the
+over-constrained frame with the relation's reason (`errors.equalNestedReason.*`, #2200's sentence); its nestings are the
+internal-tangency and containment records plus the incoming commands, and two circles of the applied construction on one
+centre; "equal" is both radii stated equal or a radius ratio k = 1 on the pair (`ratio` with `radii`). The fold's
+`tagEqualNested` names the other side for each relation (the nesting's statement, or the latest size / equality). The
+words half is the parser's: `circlesTangent` (internal) and `concentricCircles` return the owned `equal-circles-nested`
+clarify with its `relation`, as `twoCirclesPosition` does for the contained pair (ADR-712). As ADR-692 built it:
+equal stated radii stated internally tangent are refused at stage 0a by `equalInternalTangency`
 (`radiusFeasibility.ts`, beside `circlesTangentError`), in either order: over every internal tangency the construction
 states (its `circle-position` records) and the incoming commands state, a pair whose radii are both stated and equal
 (#2119's 1e-9 relative tolerance) after the step and was not before is refused in #2119's restated-size shape

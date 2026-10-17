@@ -2555,7 +2555,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
           const r2 = c2.radius.value;
           // Both radii are STATED: neither is ever rewritten to make the pair fit (#2239, ADR-692 — superseding the
           // ADR-037 Am. 2 `tangent-inner` rewrite). Equal radii stated internally tangent are refused at stage 0a
-          // (`equalInternalTangency`), so the internal branch below never meets |r₁ − r₂| = 0 from a step.
+          // (`equalNestedPair`), so the internal branch below never meets |r₁ − r₂| = 0 from a step.
           if (cmd.external) {
             const d = r1 + r2;
             addObj(objects, { kind: 'on-segment', id: cmd.at, a: c1.center, b: c2.center, t: r1 / d });

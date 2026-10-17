@@ -718,11 +718,27 @@ describe('#2200 (ADR-712) — the bare pair reads the equality; a contained pair
       [[], 'מעגל מוכל ברדיוסים שווים'],
       [['מעגל O'], 'מעגל מוכל במעגל O ששטחם שווה'],
     ] as [string[], string][]) {
-      expect(parse(u, ctxAfter(pre)), u).toEqual({ ok: false, reason: 'equal-circles-nested' });
+      expect(parse(u, ctxAfter(pre)), u).toEqual({ ok: false, reason: 'equal-circles-nested', relation: 'contained' });
     }
     // the contained pair without the equality, and the disjoint pair with it, are untouched
     expect(parse('שני מעגלים מוכלים').ok).toBe(true);
     const dj = parse('שני מעגלים זרים ברדיוסים שווים');
     expect(dj.ok && k1(dj.commands)).toBe(true);
+  });
+});
+
+describe('#2206 (ADR-713) — the internally tangent and concentric twins are refused from the words, with their relation', () => {
+  it.each([
+    ['שני מעגלים משיקים מבפנים ברדיוסים שווים', 'int-tangent'],
+    ['שני מעגלים משיקים מבפנים ששטחם שווה', 'int-tangent'],
+    ['two circles tangent internally with equal radii', 'int-tangent'],
+    ['שני מעגלים בעלי מרכז משותף O ברדיוסים שווים', 'concentric'],
+    ['שני מעגלים קונצנטריים ברדיוסים שווים', 'concentric'],
+    ['two concentric circles with equal radii', 'concentric'],
+  ])('«%s» → equal-circles-nested (%s)', (u, relation) => {
+    expect(parse(u)).toEqual({ ok: false, reason: 'equal-circles-nested', relation });
+  });
+  it('without the equality both still build', () => {
+    for (const u of ['שני מעגלים משיקים מבפנים', 'שני מעגלים בעלי מרכז משותף O']) expect(parse(u).ok, u).toBe(true);
   });
 });

@@ -109,7 +109,7 @@ describe('#2186 — intersecting circles stated equal are drawn equal, in every 
 
 describe('#2186 — where the words cannot be drawn, the line is not committed', () => {
   it.each([
-    [[], 'שני מעגלים בעלי מרכז משותף O ברדיוסים שווים'], // two equal concentric circles are one circle
+    // «שני מעגלים בעלי מרכז משותף O ברדיוסים שווים» is refused naming the contradiction since #2206 (ADR-713).
     [[], 'שני מעגלים שווים נחתכים'], // the equal-circle noun phrase, not read yet (#2187)
     [[], 'שני מעגלים שווים משיקים'],
     [[], 'two equal circles intersect'],
@@ -127,13 +127,13 @@ describe('#2186 — where the words cannot be drawn, the line is not committed',
     for (const c of fig.circles.values()) expect(c.r).toBeCloseTo(5, 9);
   });
 
-  it('unchanged: the tangent and disjoint lanes, the internal-tangency escalation, the clause refusal', async () => {
+  it('unchanged: the tangent and disjoint lanes, the internal-tangency refusal (#2206), the clause refusal', async () => {
     for (const line of ['שני מעגלים משיקים ברדיוסים שווים', 'שני מעגלים זרים ברדיוסים שווים']) {
       const { fig } = build([line]);
       const [r1, r2] = [...fig.circles.values()].map((c) => c.r);
       expect(Math.abs(r1 - r2), line).toBeLessThan(1e-6);
     }
-    expect((await decide([], 'שני מעגלים משיקים מבפנים ברדיוסים שווים')).kind).toBe('escalate');
+    expect((await decide([], 'שני מעגלים משיקים מבפנים ברדיוסים שווים')).kind).toBe('refuse'); // #2206 (ADR-713): refused, no longer escalated
     const split = await decide([], 'שני מעגלים נחתכים בנקודות A ו-B, AB=6');
     expect(split.kind).toBe('refuse');
   });

@@ -5,6 +5,7 @@ import { describeConstraint } from '@/engine/solve';
 import { applyCommand, shapeExclusionError } from '@/engine/apply';
 import { collapsedPolygonError, diagonalClaimRefusal } from '@/engine/step';
 import { collinearCircleError, notCyclicImpossibilityError } from '@/engine/cyclicFeasibility';
+import { equalNestedMessage } from '@/engine/radiusFeasibility';
 import type { Constraint } from '@/engine/types';
 import { stripFormatControls } from '../../../shell/bidi';
 
@@ -77,6 +78,10 @@ const CASES: { raw: string; contains: string[] }[] = [
   { raw: 'over-constrained: |AC| = 9 cannot hold', contains: ['|AC| = 9'] },
   // #2165 + #2119 (ADR-681): a second size for a stated circle — the ruled frame without a reason clause
   { raw: 'over-constrained: radius of circle-O = 4 cannot hold', contains: ['רדיוס המעגל', 'O = 4'] },
+  // radiusFeasibility.ts equalNestedPair (#2206, ADR-713) — built by the engine's own function, each relation's reason.
+  { raw: `${equalNestedMessage('circle-P', 'int-tangent')} [vs #1]`, contains: ['משיקים מבפנים', 'אותו מעגל'] },
+  { raw: equalNestedMessage('circle-P', 'contained'), contains: ['מוכלים זה בזה', 'קטן ממנו'] },
+  { raw: equalNestedMessage('circle-O-2', 'concentric'), contains: ['ומרכזם משותף', 'אותו מעגל'] },
   // replay/core.ts (#2023, ADR-661) — a second letter for an angle or a segment that already has one
   { raw: 'name-taken: angle ABC is already named α [vs #1]', contains: ['ABC', 'α'] },
   { raw: 'name-taken: segment AB is already named 2a', contains: ['AB', '2a'] },

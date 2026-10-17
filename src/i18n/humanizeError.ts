@@ -350,6 +350,17 @@ export const PATTERNS: Pattern[] = [
     params: (m) => ({ name: m[2], symbol: m[3] }),
     namesOtherLine: true,
   },
+  // radiusFeasibility.ts equalNestedPair (#2239 ADR-692, #2206 ADR-713) — `over-constrained: equal circles P nested
+  // int-tangent cannot hold [vs #i]`: two circles of equal radius by statement that a statement nests. The over-constrained
+  // frame naming both statements (the #2119 ruled «X» סותר את «Y»), its reason #2200's ruled sentence for the relation
+  // (operator ruling 2026-10-16 on #2206: «refused with #2200's sentence»). Before the generic entry.
+  {
+    re: /^over-constrained: equal circles (\S+) nested (contained|int-tangent|concentric) cannot hold(?: \[vs #\d+\])?$/,
+    key: 'errors.overConstrained',
+    nested: (m) => ({ what: { key: `errors.equalNestedReason.${m[2]}`, params: {} } }),
+    saysSubject: true,
+    namesOther: true,
+  },
   // engine/lower.ts letterSystem (#2165 + #2119, ADR-681) — `over-constrained: radius of O = 4 cannot hold [vs #i]`: a
   // second, different size for a circle whose size a statement already gave (a radius letter's value, a reserved r, a
   // restated radius). The operator's 2026-10-15 ruling on #2119, verbatim: «לא ניתן: «X» סותר את «Y» — אי אפשר לקיים

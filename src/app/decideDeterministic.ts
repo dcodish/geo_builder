@@ -554,9 +554,11 @@ export async function decideFromParse(
    * #2200 ([ADR-712](../../docs/06-decisions.md#adr-712)): «שני מעגלים מוכלים ברדיוסים שווים» — a circle strictly
    * inside another is smaller, so the words contradict themselves. Refused naming the contradiction and quoting the
    * line, with one next step (operator ruling 2026-10-16, card 20 A; ADR-W-130). Never drawn red, never escalated.
+   * #2206 ([ADR-713](../../docs/06-decisions.md#adr-713)): the internally tangent and concentric twins, each with its own
+   * reason (ruling 2026-10-16 on #2206: «refused with #2200's sentence») — before, handed to the AI.
    */
   if (!r.ok && r.reason === 'equal-circles-nested') {
-    return refuse('conflict', { source: 'parser', result: 'equal-circles-nested:contained' }, { key: 'input.equalCirclesNested.contained', params: { detail: utterance.trim() } });
+    return refuse('conflict', { source: 'parser', result: `equal-circles-nested:${r.relation}` }, { key: `input.equalCirclesNested.${r.relation}`, params: { detail: utterance.trim() } });
   }
   // #1285: the same channel — the angle's stated vertex is not the bisector's own first letter.
   if (!r.ok && r.reason === 'bisector-wrong-apex') {
