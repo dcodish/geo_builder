@@ -860,7 +860,9 @@ export default function App3() {
           )}
           {lastNotice && !lastError && !busy && (
             <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-              {t('notice.alreadyStated', { utterance: lastNotice.utterance })}
+              {lastNotice.code === 'already-stated'
+                ? t('notice.alreadyStated', { utterance: lastNotice.utterance })
+                : t('notice.vertexAngleReadAs', { angles: lastNotice.angles }) /* #1942: 2-D's «הובן כ-∠CAB» */}
             </div>
           )}
           {guidanceNote && !lastError && !busy && (

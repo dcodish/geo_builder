@@ -3742,7 +3742,44 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
 
     // V8-g: the foot of a triangle altitude — D = foot of ⟂ from vertex `from` onto side a–b.
     case 'altitude-foot': {
-      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      if (c.points.has(cmd.id)) {
+        /**
+         * #1942 ([ADR-3D-367](../../docs/06b-decisions-3d.md#adr-3d-367)) — M1: an altitude onto an EXISTING foot is a
+         * GIVEN about that point, never a re-creation (the ADR-3D-047 duality the median and the on-segment rider
+         * already have). «D על BC · AD גובה לצלע BC» refused `already-defined D` while «D על BC · AD ⊥ BC» built:
+         * two spellings of one construction disagreeing. The foot's DEFINING incidences are lowered as the givens
+         * 3-D already has — D on BC (the on-segment M1 arm: a free bisector ray settles on BC, anything else is the
+         * collinear3 line-membership claim) and AD ⟂ BC (the cos-angle the «⊥» spelling reads) — and the altitude
+         * is drawn. They DRIVE what is still free (a rider slides to the foot; a midpoint foot makes the triangle
+         * yield, A above the midpoint) and are VERIFIED where nothing moves (`claim-refuted`). A letter that is
+         * genuinely another object — the apex, an endpoint of the side, a vertex of a declared figure («AB גובה
+         * לצלע BC») — keeps the honest `already-defined`.
+         */
+        if (cmd.id === cmd.from || cmd.id === cmd.a || cmd.id === cmd.b || c.solids.some((s) => s.ids.includes(cmd.id)))
+          return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+        const missingSide = missingPoint(c, [cmd.from, cmd.a, cmd.b]);
+        if (missingSide) return { ok: false, error: missingSide };
+        // A FREE rider of this very side (no stated t, no named parameter) has not been placed yet, so the altitude is
+        // the given that DETERMINES it — a definition update, as #748 does for a stated t and #343 for a bisector ray:
+        // D slides to the foot and nothing else moves. (Driving it through the claims below would also move the
+        // triangle — the least-change solve spreads over every free DOF — and the figure would jump.)
+        const rider = c.points.get(cmd.id);
+        const freeRider =
+          rider?.kind === 'on-segment' &&
+          rider.t === undefined &&
+          ((rider.a === cmd.a && rider.b === cmd.b) || (rider.a === cmd.b && rider.b === cmd.a)) &&
+          !c.riderNames.some((b) => b.id === cmd.id);
+        if (freeRider) {
+          const next = clone(c);
+          next.points.set(cmd.id, { kind: 'foot-seg', from: cmd.from, a: cmd.a, b: cmd.b });
+          if (!hasSegment(next, cmd.from, cmd.id)) next.segments.push([cmd.from, cmd.id]);
+          return { ok: true, next };
+        }
+        let r = applyCommand3(c, { type: 'point-on-segment3', id: cmd.id, a: cmd.a, b: cmd.b });
+        if (r.ok) r = applyCommand3(r.next, { type: 'cos-angle', u: { kind: 'pair', from: cmd.from, to: cmd.id }, v: { kind: 'pair', from: cmd.a, to: cmd.b }, cos: 0 });
+        if (r.ok && !hasSegment(r.next, cmd.from, cmd.id)) r = applyCommand3(r.next, { type: 'segment3', a: cmd.from, b: cmd.id });
+        return r;
+      }
       const missing = missingPoint(c, [cmd.from, cmd.a, cmd.b]);
       if (missing) return { ok: false, error: missing };
       const next = clone(c);

@@ -41,7 +41,8 @@ describe('#613 — a restated fact adds no row', () => {
     submit('משולש ABC');
     expect(st().lastError).toBeNull();
     expect(st().lastNotice?.code).toBe('already-stated');
-    expect(st().lastNotice?.utterance, 'the notice names the row it repeats').toBe('משולש ABC');
+    const notice = st().lastNotice; // #1942: the notice is a union; this one is the restatement
+    expect(notice?.code === 'already-stated' ? notice.utterance : null, 'the notice names the row it repeats').toBe('משולש ABC');
   });
 
   it('the notice is CLEARED by the next ordinary statement', () => {

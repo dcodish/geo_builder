@@ -1628,6 +1628,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'triangle-sign-2069', family: 'polygons', steps: ['△ABC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2069' }], note: '3-D did not read the sign before ADR-3D-369' },
   { id: 'parallel-u2016-2069', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB ‖ CD'], expect: 'builds', note: 'escalated in 2-D, not understood in 3-D, refused in analytic before ADR-W-145' },
   { id: 'parallel-bars-2069', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB || CD'], expect: 'builds', note: '2-D escalated it before ADR-W-145' },
+
+  // ── #1942 (ADR-3D-367): a role stated about an EXISTING point is a given about it, never a re-creation ──
+  { id: 'altitude-on-existing-d-1942', family: 'cevians-centres', steps: ['משולש ABC', 'D על BC', 'AD גובה לצלע BC'], expect: 'builds', note: '3-D refused already-defined D before ADR-3D-367' },
+  { id: 'median-then-altitude-1942', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון לצלע BC', 'AD גובה לצלע BC'], expect: 'builds', note: '3-D refused already-defined D before ADR-3D-367' },
+  { id: 'median-then-bisector-1942', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון לצלע BC', 'AD חוצה זווית A'], expect: 'builds', note: '3-D asked which angle at A before ADR-3D-367; «זווית A» is the triangle angle, said aloud' },
+  { id: 'median-also-altitude-oneline-1942', family: 'cevians-centres', steps: ['משולש ABC', 'AD תיכון לצלע BC שהוא גם גובה'], expect: 'refused', knownGap: [{ product: 'analytic', issue: '#1905' }], note: 'guided: 2-D and 3-D teach the two lines (3-D gave the parts list before ADR-3D-367); analytic as role-clause-1904-02' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

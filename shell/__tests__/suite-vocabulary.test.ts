@@ -84,6 +84,10 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   // #1837 (ADR-710, ADR-W-142; operator ruling 2026-10-07): an angle written in radians, one sentence in every plane-geometry
   // builder. The complex builder reads radians by design (`cis(π/3)`), so it has no such refusal.
   radianAngle: { '2d': ['input.scope.radian-angle'], '3d': ['err.radianAngle'], complex: null, analytic: ['errRadianAngle'] },
+  // #1942 (ADR-3D-367): a lone vertex read as its one polygon's angle, said aloud on the committed step — 3-D copies 2-D's
+  // sentence (ADR-590). Analytic's own notice (ADR-AG-243, `noticeAngleReadAs`) says «הצורה» where 2-D says «המצולע»:
+  // a measured wording difference outside this issue, reported as found work, so it is not asserted here.
+  vertexAngleReadAs: { '2d': ['input.vertexAngleReadAs'], '3d': ['notice.vertexAngleReadAs'], complex: null, analytic: null },
 };
 
 /** The ruled wording (the "Explicit set", 2026-09-27) — the lock's anchor, not just "all equal". */

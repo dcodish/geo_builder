@@ -36,6 +36,7 @@ import { lostRole3, unreadRoles3, type LostRole3 } from './unreadRoles3';
 import { pruneDisplayMode, toggleDisplayMode, type DisplayModeMap } from '../../shell/displayMode';
 import { pruneDihedralShown, toggleDihedralShown, type DihedralShownMap } from './dihedralChips';
 import { applyCommand3, expandShapeRefs3, flatHeightReading3, freeDims, ringKeyIds3 } from '../engine/apply';
+import { angleCandidates3, vertexAngleAt3 } from '../engine/vertexAngle3';
 import { definiteShapeExample3 } from '../lexicon/shapePhrase3';
 import { convexWhenSimple, declaredKind3, declaredQuads3, spaceDiagonals, diagonalClaimVerdict, QUAD_PYRAMIDS, trapezoidRingInForce3 } from '../engine/baseShapes';
 import { declaredKindOf, kindImpliesInEveryReading, narrowImplies, type NarrowKind } from '../../shell/narrowing';
@@ -348,24 +349,10 @@ function mainDiagonalCandidates(st: { facts: Fact3[]; seed: number }): string {
  *
  * Returns '' when the figure cannot answer (the vertex is unknown, or fewer than two edges meet it) —
  * the caller then shows the bare ask rather than an empty list, exactly as the main-diagonal path does.
+ * #1942: the enumeration is the engine's `angleCandidates3`, the candidate list of the one vertex-angle resolver.
  */
 function angleCandidatesAt(st: { facts: Fact3[]; seed: number }, vertex: string): string[] {
-  const c = derive3(st.facts, st.seed).construction;
-  const nb = new Set<string>();
-  for (const [a, b] of c.segments) {
-    if (a === vertex) nb.add(b);
-    else if (b === vertex) nb.add(a);
-  }
-  for (const s of c.solids) for (const f of s.faces) for (let i = 0; i < f.length; i++) {
-    const [x, y] = [f[i], f[(i + 1) % f.length]];
-    if (x === vertex) nb.add(y);
-    else if (y === vertex) nb.add(x);
-  }
-  const ids = [...nb].sort();
-  if (ids.length < 2) return [];
-  const out: string[] = [];
-  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) out.push(`${ids[i]}${vertex}${ids[j]}`);
-  return out;
+  return angleCandidates3(derive3(st.facts, st.seed).construction, vertex);
 }
 
 /**
@@ -1552,7 +1539,7 @@ export interface Geo3State {
    * is not a mistake reads harshly (option (a), rejected by the operator's ruling). Cleared by every
    * other submit, so it never lingers over an unrelated line.
    */
-  lastNotice: { code: 'already-stated'; utterance: string } | null;
+  lastNotice: { code: 'already-stated'; utterance: string } | { code: 'vertex-angle-read-as'; angles: string } | null;
   submit: (utterance: string) => void;
   /** #1692 (ADR-3D-305): DISPATCH a verdict already decided by `decideSubmit3` (or by the App's
    *  `decideDeterministic3`, which wraps it). `submit` is exactly `dispatchVerdict(decideSubmit3(...))`; the App
@@ -1762,7 +1749,7 @@ function dependentsBroken(before: Fact3[], after: Fact3[], seed: number, changed
 function readStatement3(
   st: { facts: Fact3[]; seed: number },
   utterance: string,
-): { ok: true; commands: Command3[]; unread: string[] } | { ok: false; error: NonNullable<StoreError3> } {
+): { ok: true; commands: Command3[]; unread: string[]; readAs?: string[] } | { ok: false; error: NonNullable<StoreError3> } {
   // #1666 (ADR-3D-295): a PROOF TARGET is refused BEFORE the grammar, at the one reader both statement
   // seams share (`submit`, the ✎ edit). It used to parse: ADR-3D-002 stripped «הוכיחו כי» / "prove that" and
   // read the claim, which since the T2 addendum DRIVES a free figure — so the figure was made to satisfy
@@ -1783,9 +1770,16 @@ function readStatement3(
   // does). The figure is known here, so the canonical three-letter sentence is rebuilt and read by
   // the SAME grammar: no command is synthesised in the store, and the student's own wording stays
   // on the fact. Two or more candidates is the operator's case and still asks.
+  // #1942 (ADR-3D-367): …unless the vertex belongs to exactly ONE polygon — then «זווית A» is that polygon's
+  // angle, as 2-D reads it (ADR-590), and the reading is said aloud (`readAs` → 2-D's «הובן כ-∠CAB» note).
+  // The one resolver is the engine's `vertexAngleAt3`; the rider is excluded as an arm.
+  let readAs: string[] | undefined;
   if (!parsed.ok && parsed.reason === 'ambiguous-angle-vertex') {
-    const only = angleCandidatesAt(st, parsed.vertex);
-    if (only.length === 1) parsed = parse3(`${parsed.vertex}${parsed.rider} חוצה זווית ${only[0]}`);
+    const r = vertexAngleAt3(derive3(st.facts, st.seed).construction, parsed.vertex, [parsed.rider]);
+    if (r.kind !== 'ambiguous') {
+      parsed = parse3(`${parsed.vertex}${parsed.rider} חוצה זווית ${r.angle}`);
+      if (r.kind === 'polygon') readAs = [r.angle];
+    }
   }
   if (parsed.ok) {
     // #1907 (ADR-3D-315): a height stated against the base of a FLAT polygon is that polygon's altitude,
@@ -1798,7 +1792,7 @@ function readStatement3(
       if (flat.flat && (!flat.reading || parsed.commands.length !== 1 || !isBareAltitude3(utterance)))
         return { ok: false, error: { code: 'not-understood' } };
     }
-    return { ok: true, commands: parsed.commands, unread: parsed.unread ?? [] };
+    return { ok: true, commands: parsed.commands, unread: parsed.unread ?? [], ...(readAs ? { readAs } : {}) };
   }
   // #516: every TYPED refusal keeps its identity — only a genuine `not-handled` may read as
   // not-understood, because not-understood is what the App escalates to the LLM lane.
@@ -1940,7 +1934,8 @@ export type Verdict3 =
   | { readonly kind: 'refused'; readonly error: NonNullable<StoreError3> }
   /** #613 (ADR-W-031): already stated — nothing is appended; a MUTED twin is re-enabled instead */
   | { readonly kind: 'already-stated'; readonly twin: Fact3; readonly facts: Fact3[] }
-  | { readonly kind: 'record'; readonly fact: Fact3; readonly facts: Fact3[]; readonly seed: number };
+  /** `readAs` (#1942): the polygon angle a lone vertex was read as — said aloud on the committed step, 2-D's note */
+  | { readonly kind: 'record'; readonly fact: Fact3; readonly facts: Fact3[]; readonly seed: number; readonly readAs?: readonly string[] };
 
 export function decideSubmit3(
   st: { facts: Fact3[]; seed: number },
@@ -1960,7 +1955,8 @@ export function decideSubmit3(
   if (rw?.kind === 'rename') return { kind: 'rename', from: rw.from, to: rw.to };
   const read = readStatement3(st, utterance);
   if (!read.ok) return read.error.code === 'not-understood' ? { kind: 'not-understood' } : { kind: 'refused', error: read.error };
-  return decideCommands3(st, utterance, read.commands, { twins: true, seedSearch: true, unread: read.unread, readExtent: true }, newId);
+  const v = decideCommands3(st, utterance, read.commands, { twins: true, seedSearch: true, unread: read.unread, readExtent: true }, newId);
+  return v.kind === 'record' && read.readAs ? { ...v, readAs: read.readAs } : v;
 }
 
 /**
@@ -2097,7 +2093,13 @@ export const useGeo3 = create<Geo3State>()(
             set({ facts: v.facts, lastError: null, lastNotice: { code: 'already-stated', utterance: v.twin.utterance } });
             return;
           case 'record':
-            set({ facts: v.facts, seed: v.seed, lastError: null, lastNotice: null });
+            set({
+              facts: v.facts,
+              seed: v.seed,
+              lastError: null,
+              // #1942: a lone vertex read as its polygon's angle is said aloud, never a silent pick (2-D's note)
+              lastNotice: v.readAs?.length ? { code: 'vertex-angle-read-as', angles: v.readAs.map((a) => `∠${a}`).join(', ') } : null,
+            });
             return;
         }
       },

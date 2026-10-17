@@ -545,6 +545,15 @@ lies wholly in the flat host's ring (the unstated sentinel, and a face named fro
 `altitude-foot`, and still appends the `len` claim; an apex that is not a ring vertex refuses
 (`unknown-plane` `base`). A ⟂ from a point off the ring, and every solid's base, keep their reading.
 
+**An altitude onto an existing foot is M1** (#1942, [ADR-3D-367](06b-decisions-3d.md#adr-3d-367)). The
+`altitude-foot` arm, with `cmd.id` already a point, lowers instead of refusing `already-defined`: a free
+`on-segment` rider of that very side (no `t`, no named parameter) is **re-defined** as the `foot-seg` (the #748 /
+#343 definition-update pattern — D slides, nothing else moves); any other point gets the foot's two defining
+incidences as the givens 3-D already has, `point-on-segment3` on the existing id (its M1 arm: a bisector ray settles,
+else a `collinear3` claim) and the «⊥» spelling's `cos-angle` 0, then the segment. They drive what is free and are
+verified where nothing moves. A letter that is the apex, an end of the side, or a vertex of any declared solid keeps
+`already-defined`. No new solver term.
+
 **Which givens forced the collapse** (#1815, ADR-3D-309). `collapseIsStated` re-solves `[gauge | dims]`
 without the rider rows; if the ring opens, an incidence invented the collapse, and the empty pool marked
 `collapse: { ring, riderKeys }` reaches `pivot.collapse`, where `derive3` refuses `polygon-collapsed`
@@ -744,7 +753,13 @@ other coordinate-tuple rule, whose own patterns require a 3-tuple — the two ar
 derives the candidates from the construction and composes the message. `ambiguous-main-diagonal` (#836)
 and `ambiguous-angle-vertex` (#866) share that shape. Where the figure yields one reading, the store rebuilds
 the canonical sentence and runs it through `parse3`, so the grammar stays the only authority. Unlike 2-D's
-ADR-164, 3-D asks whenever the figure gives more than one reading.
+ADR-164, 3-D asks whenever the figure gives more than one reading — **except** (#1942,
+[ADR-3D-367](06b-decisions-3d.md#adr-3d-367)) a bisector's «זווית V» at a vertex of exactly one polygon of the figure
+(a flat ring or a solid face, one per vertex set), which is that polygon's angle, as 2-D's ADR-590 reads it. The one
+resolver is `vertexAngleAt3` (`src3d/engine/vertexAngle3.ts`: one angle → silent; one polygon → its ring neighbours,
+the bisector's own foot excluded as an arm; else the candidates, `angleCandidates3`). A polygon reading travels as
+`readAs` on the `record` verdict and `dispatchVerdict` sets `lastNotice` `vertex-angle-read-as`, shown with
+`notice.vertexAngleReadAs` — 2-D's `input.vertexAngleReadAs` sentence (locked in `shell/__tests__/suite-vocabulary.test.ts`).
 
 ## What the student sees
 
