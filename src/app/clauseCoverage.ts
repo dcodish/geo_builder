@@ -171,6 +171,39 @@ function readClauses(utterance: string, ctx: ParseContext): ClauseRead[] | null 
   return out.length < 2 ? null : out;
 }
 
+/**
+ * #2096 ([ADR-730](../../docs/06-decisions.md#adr-730), operator ruling 2026-10-16: *"the tip quotes whole rebuilt
+ * statements, or is dropped when the subject is joined"*) — is a piece of this line the JOINED SUBJECT of the piece
+ * after it? True when a piece only DECLARES objects («מעגל O») and the text from it through the next piece («מעגל O
+ * ומעגל P משיקים») reads as a statement that RELATES the declared objects (a command other than a declaration naming
+ * their labels). The next piece alone («מעגל P משיקים») is then a fragment of that statement, so a one-input-per-line
+ * tip that quotes the pieces would teach a line no tool reads. Decided by the grammar, in an empty context like
+ * `independentConstructs`, never by a word list.
+ */
+export function joinedSubject(utterance: string): boolean {
+  const parts = clausesOf(utterance);
+  if (parts.length < 2) return false;
+  const spans: [number, number][] = [];
+  for (let i = 0, pos = 0; i < parts.length; i++) {
+    const at = utterance.indexOf(parts[i], pos);
+    if (at < 0) return false;
+    spans.push([at, at + parts[i].length]);
+    pos = at + parts[i].length;
+  }
+  const lowered = (text: string): AnyCommand[] | null => {
+    const r = parse(text, {});
+    return r.ok && r.commands.length > 0 ? significant(r.commands) : null;
+  };
+  for (let i = 0; i + 1 < parts.length; i++) {
+    const own = lowered(parts[i]);
+    if (!own || !own.every((c) => DECLARATION.has(c.type))) continue;
+    const declared = new Set(own.flatMap((c) => [...labelsOf(c)]));
+    const joined = lowered(utterance.slice(spans[i][0], spans[i + 1][1]));
+    if (joined?.some((c) => !DECLARATION.has(c.type) && [...declared].every((l) => labelsOf(c).has(l)))) return true;
+  }
+  return false;
+}
+
 /** The ONE shared compound-line message (operator ruling 2026-10-06), naming the student's own clauses. */
 export function splitStatements(parts: string[]): ScopeMatch {
   return {

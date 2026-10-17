@@ -339,6 +339,17 @@ const tidy = (p: string) => p.replace(/\s+/g, ' ').trim().replace(/[.,;]+$/, '')
 /** A text that ENDS on a shape noun (any clitic before it) — the noun's labels are what follows it. */
 const SHAPE_NOUN_LAST = new RegExp(`(?:${SHAPE_NOUNS_HE.join('|')})$|\\b(?:${SHAPE_NOUNS_EN.join('|')})$`, 'i');
 
+/**
+ * #2096 ([ADR-730](../../docs/06-decisions.md#adr-730)) — the clause CONNECTIVES and RELATIVES, ONE list for both
+ * cutters: `clausesOf`'s separators (src/app/independence.ts) cut at them, and {@link splitGuidance} trims one left
+ * dangling at the end of its head. Regex source fragments (alternations), not regexes, so each reader anchors them.
+ */
+export const CLAUSE_CONNECTIVES = 'וגם|ואז|and|then|with';
+export const CLAUSE_RELATIVES = 'ש(?:בו|בה)';
+const TRAILING_CONNECTIVE = new RegExp(`\\s+(?:ו-?|${CLAUSE_CONNECTIVES}|${CLAUSE_RELATIVES})$`);
+/** An angle marker ending a text: the sign («∠», «∢») or the word «[ה]זווית» / «זוית» (the vav class, ADR-3D-032). */
+const ANGLE_MARK_END = /(?:[∠∢]|(?<=^|[\s-])ה?זוו?ית\s*)$/;
+
 export function splitGuidance(utterance: string): ScopeMatch | null {
   const s = utterance.trim();
   const parts = (list: string[]): ScopeMatch => ({
@@ -364,7 +375,12 @@ export function splitGuidance(utterance: string): ScopeMatch | null {
     if (own) cut += own[0].length;
     if (!/[A-Za-z0-9]/.test(s.slice(cut, op))) return null;
   }
-  const head = tidy(s.slice(0, cut));
+  // #2096 (ADR-730): an angle given keeps its ANGLE MARKER. The walk-back stops at «∠», «∢» or the word «זווית», so
+  // without this the cut lands inside the angle's name («… ∠ | A = 40», «… זווית | ABC = 30»). The marker moves into
+  // the tail, and a connective left dangling at the end of the head («ו-», «שבו», "and") is trimmed off it.
+  const mark = s.slice(0, cut).match(ANGLE_MARK_END);
+  if (mark) cut -= mark[0].length;
+  const head = tidy(s.slice(0, cut)).replace(TRAILING_CONNECTIVE, '');
   const tail = tidy(s.slice(cut));
   if (head.length < 2 || tail.length < 2 || !SHAPE_NOUN.test(head)) return null;
   return parts([head, tail]);

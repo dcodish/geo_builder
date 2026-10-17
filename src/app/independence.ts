@@ -37,7 +37,7 @@
  * clause form) therefore never reaches it. See ADR-460 for the four residual false positives this
  * property covers, and `independence.test.ts` for the net that fails if the property stops holding.
  */
-import { parse } from '@/parser';
+import { CLAUSE_CONNECTIVES, CLAUSE_RELATIVES, parse } from '@/parser';
 import type { ScopeMatch } from '@/parser';
 import { replay } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
@@ -51,8 +51,15 @@ import type { AnyCommand } from '@/engine';
  * #1798 ([ADR-598](../../docs/06-decisions.md#adr-598)): «ו» before a LABEL splits too («AB מקביל ל-CD ו-D על BC»,
  * «מעגל חוסם את המשולש ABC ו-AD מאונך ל-BC») — before it, the clause after «ו-X» was invisible to every
  * clause reader. What keeps that from cutting an OPERAND PAIR is {@link clausesOf}'s rule, not this list.
+ *
+ * #2096 ([ADR-730](../../docs/06-decisions.md#adr-730)): «ו» before an ANGLE SIGN («ו-∠ABC = 30», «ו-∢ABC = 30»),
+ * «ו-» with its hyphen before a Hebrew word («ו-זווית ABC = 30»), and the relative «שבו» / «שבה» («משולש ABC … שבו
+ * AB = 4») split too. Before it the line stayed ONE clause, so the reading-based teaching (ADR-603 / ADR-611) never
+ * saw the angle given as a part of its own, and the fallback cutter taught a cut inside the angle's name.
  */
-const SEPARATORS = /([,;\n]|(?<!\d)\.|\.(?!\d)|\s+(?:וגם|ואז|and|then|with)\s+|\s+ו(?=[א-ת])|\s+ו-?(?=[A-Z]))/;
+const SEPARATORS = new RegExp(
+  `([,;\\n]|(?<!\\d)\\.|\\.(?!\\d)|\\s+(?:${CLAUSE_CONNECTIVES})\\s+|\\s+ו-?(?=[א-ת])|\\s+ו-?(?=[A-Z∠∢])|\\s+(?:${CLAUSE_RELATIVES})\\s+)`,
+);
 
 /** A piece that only NAMES points (with an optional point word) — half of an operand pair or a conjoined
  *  subject, never a statement: «AC ו-BD», «D ו-E על BC», «AB and CD are parallel», «נקודות F, G, H על …». */
