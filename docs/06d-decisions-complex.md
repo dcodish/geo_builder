@@ -4368,3 +4368,35 @@ controls, and the class guard over the catalog and the fixtures. The fixture
 **Performance (docs/17 §7).** One extra tier-1 solve per round that closes a row (bounded by the row count, in practice one); a figure with no known parameter or no deferred definition costs one map scan.
 
 **Locks.** `src-complex/__tests__/param-definition-closed-1818.test.ts`: the exam sequence in three orders (`a = -1` first, after the definitions, last) at 24 seeds each — `freeDof = []`, the claim holds, «z1» → «1+i», «z2» → «1-i», «|z1|» → «√2»; the reading equals the typed literal's; «a = 4» refuted with z₁ = 56+46i, z₂ = 56−6i; a free a unchanged; the class (`a^2`, `a*b`, `a^3`, the affine form, the solved r → z₂ = 1/4+i); `a = √2` not claimed exact; `closedUnder` units (integer power, unknown parameter, complex name, zero, fractional power). Fixture `fixtures/exam-2022w-a-quadratic-1818.complex.json` (the exam's four lines). #1535's lock 6 may now swap to this sequence, as its plan says.
+
+## ADR-CX-084 — A restatement the exact solve already entails adds no row, and says so (#2268)
+
+**Status:** accepted, 2026-10-17 · **Issue:** [#2268](https://github.com/dcodish/geo_builder/issues/2268) (bug, `P3`, `complex`) · fix round #2304, stream P · branch `fix/2268-complex-entailed-noop` from `main` @ `de7c221f` · plan armed `auto-ok` 2026-10-16
+**Requirements:** [02d](02d-requirements-complex.md) FR-CN-5 (a restatement that adds nothing is answered, not recorded) ·
+**Design:** [04d](04d-design-complex.md), "A restatement the exact solve already entails adds no row" ·
+**Ladder:** stage 0e′, already entailed ([LADDER-CX](LADDER-CX.md))
+
+**Measured at pickup** (`main` @ `de7c221f`, `submitLine` + `deriveLines`). «z1 = 15cis(π/7)» · «|z1| = 15» (T85) and «z1 = 5cis(π/7)» · «z2 = 15cis(π/7)» · «z2 = 3z1» (T86): the last line accepted and recorded as a new row, no sentence. «z1 = 3+4i» · «|z1| = 5», «z1 = 2cis30» · «arg z1 = 30», «|z1| = 5» twice, «|z1| = 5» · «z2 = 2z1» · «|z2| = 10», «z1 = 3+4i» · «z1 = 3+4i», «a = 2» twice: the same. Controls as the plan says: «|z1| = 15» alone recorded; «|z1| = 14» after «z1 = 15cis(π/7)» refused `incompatible`. The plan's account held.
+
+**The class.** *A complex statement already entailed exactly by the earlier statements is recorded as a new given instead of answered as already known.*
+
+**Root cause.** `submitLine` had two outcomes for a line that reads: refused by the gate (stage 0e), or recorded. Nothing asked whether the line added anything. Since ADR-CX-071 tier 1 carries these literals exactly, so the question can be answered from the exact solve alone.
+
+**Decision.**
+1. **One predicate, `entailedBy(before, after)`** (`replay/derive2.ts`), over the lowered statements of the active lines without and with the new one. The line is entailed when it adds constraint rows and nothing else (no name, object, claim, measure, filter, sequence, selection, solution set, typed-real letter, alias or unread line), none of its rows is deferred to the numeric tier, and tier 1 after it (base and claim-driven) is consistent with the same free directions, parameter signs, free parameters, exact moduli, parameter values, impossible and undecided lists, and the same enumerated branches as directions (`sameDirection`, provable equality only). Tier 1 is linear over ℚ, so a consistent row that changes none of these lies in the span of the earlier rows: a theorem of them for every configuration. Nothing is sampled. The fold's exact half moves into `exactSolve`, which `foldConstraints` and `entailedBy` share, so the two cannot disagree.
+2. **`submitLine` asks it** (`lineEntailed`, `app/deriveLines.ts`) after the line reads and before the gate. Entailed → `true`, no row, `lastNote = { key: 'already-known' }`, shown as a notice banner with 2-D's `input.alreadyDrawn` sentence «זה כבר קיים באיור — אין מה להוסיף.» (en twin). The note is transient (outside undo) and cleared by the next step, like `lastError`.
+3. **A load replays as saved** (`submitLine(line, true)` from `hydrateSession`): a restatement saved by an older build stays a row. The session is the student's record, and the #2134 fixture is unchanged.
+4. **Conservative in the harmless direction.** Re/Im, a distance and every other deferred relation are recorded as today, even when they happen to be true: the #2134 lesson, a float landing near a value is not identity. A claim («z1 ממשי») is the student's answer and is never "already known".
+
+**Behaviour change for a student** (plan lines `[asked]` and `[2-D]`):
+- «|z1| = 15» after «z1 = 15cis(π/7)» is accepted with «זה כבר קיים באיור — אין מה להוסיף.» and adds no row (T85).
+- «z2 = 3z1» after «z1 = 5cis(π/7)» · «z2 = 15cis(π/7)» likewise (T86).
+- The same answer for every restatement tier 1 decides exactly, the sibling rows measured: a modulus, an argument, a relation `z = k·w`, a conjugate in both entry orders, a definition the givens already make («z1 = 5cis30» after «|z1| = 5» · «arg z1 = 30»), the same given typed twice, a parameter value. Unchanged: «Re(z1) = 3» / «Im(z1) = 4» after «z1 = 3+4i» are recorded (numeric tier); «|z1| = 15» over a free z1 is recorded; «|z1| = 14» is refused.
+
+**Cross-builder (ADR-W-118 B1).** One verdict for a true restatement: 2-D answers it with this sentence as a noop (measured in the plan at `4da0e990`), and analytic answers «כבר ידוע» (#1045). 3-D is not changed here.
+
+**Not changed.** `editLine` and `toggleLine` keep their gate: editing a row into a restatement leaves it a row. 2-D's edit path says «already drawn» there; this is proposed as found work, not built.
+
+**Performance (docs/17 §7).** Two extra exact solves per typed line (tier 1 without and with the line), no numeric tier; the gate's fold runs as before for every line that is not entailed.
+
+**Locks.** `src-complex/__tests__/entailed-noop-2268.test.ts`: T85 and T86 (no row, the note, no error, the figure unchanged, the next line clears the note); the 2-D sentence in both languages; the eleven sibling rows; the controls (a free z1, an unrelated modulus, a new name, a claim, Re/Im, «|z1| = 14», an argument that cuts an enumerated pair); the #2134 fixture replays all three lines on load. No fixture: the essence is a noop, which a saved session cannot carry.

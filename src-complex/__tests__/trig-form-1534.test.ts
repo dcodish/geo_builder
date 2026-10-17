@@ -84,8 +84,11 @@ describe('#1534 — the student\'s line stays as typed', () => {
   );
 
   it('a second mention in trig form is the same given; a different modulus is refused as «3cis45» is', () => {
-    expect(submitLine('z1 = 2cis45')).toBe(true);
+    // #2268 (ADR-CX-084): the same number restated adds no row — answered «already known» in either spelling
     expect(submitLine('z1 = 2(cos45 + i sin45)')).toBe(true);
+    expect(submitLine('z1 = 2cis45')).toBe(true);
+    expect(store().lastNote?.key).toBe('already-known');
+    expect(store().lines).toEqual(['z1 = 2(cos45 + i sin45)']);
     expect(submitLine('z1 = 3(cos45 + i sin45)')).toBe(false);
     const trigError = store().lastError;
     store().resetSession();
@@ -93,7 +96,7 @@ describe('#1534 — the student\'s line stays as typed', () => {
     expect(submitLine('z1 = 2cis45')).toBe(true);
     expect(submitLine('z1 = 3cis45')).toBe(false);
     expect(trigError?.key).toBe(store().lastError?.key);
-    expect(trigError?.detail).toBe('z1 = 3(cos45 + i sin45)'); // the refusal quotes the student's own line
+    expect(trigError?.detail).toBe('z1 = 2(cos45 + i sin45)'); // the refusal quotes the student's own line
   });
 });
 

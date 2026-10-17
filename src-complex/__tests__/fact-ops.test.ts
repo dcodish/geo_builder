@@ -24,8 +24,8 @@ beforeEach(() => {
 describe('disable — out of the figure, in the list', () => {
   it('a disabled line stops driving the figure', () => {
     expect(submitLine('z1 = 3+4i')).toBe(true);
-    expect(submitLine('|z1| = 5')).toBe(true);
-    expect(deriveLines(activeLines(), 0, 0).points.find((p) => p.name === 'z1')?.modulusKnown).toBe(true);
+    expect(submitLine('z2 = 2z1')).toBe(true); // #2268: a line that adds information (a restatement adds no row)
+    expect(deriveLines(activeLines(), 0, 0).points.find((p) => p.name === 'z2')?.modulusKnown).toBe(true);
 
     expect(toggleLine(1)).toBe(true);
     expect(store().disabled).toEqual([1]);
@@ -82,9 +82,9 @@ describe('edit — in place, re-parsed, gated', () => {
 
   it('an edit that breaks the figure is refused, naming the conflicting statement', () => {
     submitLine('z1 = 3+4i'); // fixes |z1| = 5 exactly
-    submitLine('|z1| = 5');
+    submitLine('z2 = 2z1'); // #2268: «|z1| = 5» here would be already known and add no row
     expect(editLine(1, '|z1| = 7')).toBe(false);
-    expect(store().lines[1]).toBe('|z1| = 5'); // a refused edit changes nothing
+    expect(store().lines[1]).toBe('z2 = 2z1'); // a refused edit changes nothing
     expect(store().lastError?.key).toBe('incompatible');
     expect(store().lastError?.detail).toBe('z1 = 3+4i');
   });
@@ -112,14 +112,14 @@ describe('bookkeeping', () => {
 
   it('a muted line survives save/load muted, ungated, and unaudited', () => {
     submitLine('z1 = 3+4i');
-    submitLine('|z1| = 5');
+    submitLine('z2 = 2z1');
     toggleLine(1);
     const saved = store().serialize();
     expect(saved.disabled).toEqual([1]);
 
     store().resetSession();
     expect(hydrateSession(JSON.parse(JSON.stringify(saved)))).toBe(true);
-    expect(store().lines).toEqual(['z1 = 3+4i', '|z1| = 5']);
+    expect(store().lines).toEqual(['z1 = 3+4i', 'z2 = 2z1']);
     expect(store().disabled).toEqual([1]);
     expect(store().loadAudit).toBeNull();
     expect(activeLines()).toEqual(['z1 = 3+4i']);
