@@ -17,7 +17,7 @@
 
 import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
 import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
-import { knowledgeSamples3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
+import { knowledgeSamples3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3, type Axis3 } from './evaluate';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { angleMarkText, evalAffine, figureSymbolsOf, symbolOwnersOf } from './types';
 import { COMBINING_ARROW } from '../lexicon/marks3';
@@ -246,6 +246,17 @@ export function canonicalPlaneEq(
   const keys = ['x', 'y', 'z', 'd'] as const;
   if (!canon.every((v) => keys.every((k) => Math.abs(v![k] - canon[0]![k]) < 1e-4))) return null;
   return canon[0]!;
+}
+
+/**
+ * #2340 (ADR-3D-373) — is a plane equation's d-TERM knowledge, given which translation axes the givens
+ * anchor? Translating the figure by t moves d by n·t, so the offset is frozen gauge exactly when the normal
+ * has a component along an axis nothing anchors. The plane is knowledge only when every such component is
+ * zero («z = 2» after «z_A = 2», if the plane's normal is the stable z axis). One predicate, read by the
+ * panel's planes block and by the query lane, so the two cannot disagree.
+ */
+export function planeOffsetAnchored3(eq: { x: number; y: number; z: number }, anchored: ReadonlySet<Axis3>): boolean {
+  return (['x', 'y', 'z'] as const).every((ax) => anchored.has(ax) || Math.abs(eq[ax]) < 1e-6);
 }
 
 /**
@@ -685,7 +696,10 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // #517: both anchors are the SHARED predicates in evaluate.ts — a fresh `C(2,1,0)` lands in
   // `c.points` as kind 'coord', never in `c.pins`, and the private `c.pins.length > 0` enumeration
   // here suppressed every knowledge family for a figure of bare injected points.
-  const translationPinned = translationKnown3(c);
+  // #2340 (ADR-3D-373): asked PER AXIS — a component pin («z_A = 2») anchors only its own axis, and the
+  // others stay at the frozen gauge, which reads seed-stable and must not print. All three ⇒ the old gate.
+  const anchoredAxes = translationAnchoredAxes3(c);
+  const translationPinned = anchoredAxes.size === 3;
   // Vector coordinates (a difference — translation cancels) keep the FRAME + seed-stability gate:
   // the seeds VARY the rotation/dims gauge (operator-validated 2026-07-25: with only DE=(0,2,0)
   // pinned, u's coords correctly do NOT print while v = 3·DE — parallel to the pin, genuinely
@@ -1153,9 +1167,11 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     const axes = ['x', 'y', 'z'] as const;
     for (const id of positions[0].keys()) {
       const def = c.points.get(id);
-      const statedOnly = !translationPinned;
+      // #2340 (ADR-3D-373): an axis is JUDGED (then must pass seed + branch agreement) when the givens
+      // anchor the figure's translation on it, or it is this point's own stated component (#1547).
+      const statedOnly = anchoredAxes.size === 0;
       if (statedOnly && def?.kind !== 'partial') continue;
-      const stated = (ax: 'x' | 'y' | 'z'): boolean => !statedOnly || (def?.kind === 'partial' && def[ax] !== null);
+      const stated = (ax: 'x' | 'y' | 'z'): boolean => anchoredAxes.has(ax) || (def?.kind === 'partial' && def[ax] !== null);
       const ps = positions.map((pos) => pos.get(id));
       if (ps.some((p) => !p)) continue;
       /**
@@ -1187,7 +1203,8 @@ export function dataView(c: Construction3, seed: number): DataPanel {
        * canvas label (`pointCoords`) keeps the #827 partial form: the node shows ONE configuration,
        * and a component that is a branch choice is still not knowledge about the point on screen.
        */
-      const two = nStable < 3 && !statedOnly ? twoConfigurations3(resolved.map((r, k) => ({ roots: r.pivot?.pointRoots?.[id], drawn: ps[k]! }))) : null;
+      // the two rows print FULL coordinates, so they need every axis anchored (#2340)
+      const two = nStable < 3 && translationPinned ? twoConfigurations3(resolved.map((r, k) => ({ roots: r.pivot?.pointRoots?.[id], drawn: ps[k]! }))) : null;
       // #1867 (ADR-3D-336): ONE row, the two configurations joined by «או» — «S(1.33, 7/2, 3.33) או (-4.33, 7/2, -2.33)»
       // (the issue: "align both on «או»"; analytic's point rows read the same way). The ask lane answers the same text.
       if (two) {
@@ -1228,7 +1245,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // 2026-07-09: `מישור ABB'A'` should surface its equation, the exam's מצאו את משוואת
   // המישור). An equation-plane was GIVEN by equation — nothing to derive.
   const planes: string[] = [];
-  if (translationPinned) { // #315: a plane equation's d-term is translation-dependent — same anchor requirement
+  if (anchoredAxes.size > 0) { // #315: a plane equation's d-term is translation-dependent — same anchor requirement, per axis (#2340)
     // #487 (ADR-3D-124): a FREE plane joins the same multi-sample gate — while unpinned it RESAMPLES,
     // so the agreement check drops it (a sampled equation is not knowledge, the #371/#481 rule); once
     // pinned it is identical in every configuration and its forced equation surfaces, which is exactly
@@ -1239,11 +1256,12 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       const per = resolved.map((r) => r.planes.get(name));
       if (per.some((p) => !p)) continue;
       const eq = canonicalPlaneEq(per);
-      if (!eq) continue;
+      if (!eq || !planeOffsetAnchored3(eq, anchoredAxes)) continue;
       planes.push(`${name}: ${planeEqStr(eq)}`);
       // the parametric form rides when the run's anchor point and spanning edges are stable. Shared
       // with the query lane (#317) so a plane's two representations are derived once, never twice.
-      const par = parametricPlaneForm(c.pointPlanes.get(name), positions, symbols.get(name) ?? 'π');
+      // #2340: the parametric ANCHOR is a full point, so it needs every axis anchored
+      const par = translationPinned ? parametricPlaneForm(c.pointPlanes.get(name), positions, symbols.get(name) ?? 'π') : null;
       if (par) planes.push(`${name}: ${par}`);
     }
   }

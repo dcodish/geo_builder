@@ -399,6 +399,16 @@ a label after the `_`, or the axis after a label's `_`; a digit subscript is a l
 [ADR-3D-362](06b-decisions-3d.md#adr-3d-362). The answer is `dataView`'s per-axis
 decision (`pointComps`, beside `pointCoords`); a `partial` point's stated components are placed absolutely.
 
+**The translation anchor is per axis** (#2340, [ADR-3D-373](06b-decisions-3d.md#adr-3d-373)).
+`translationAnchoredAxes3` (`engine/evaluate.ts`) answers which axes of the figure's translation the givens
+anchor: all three for a coordinate point or the #639/#803 frame reasons, otherwise the union of the axes each
+point pin gives a value (a null component, lettered or not, anchors nothing). `translationKnown3` is its
+`size === 3` and `vectorFramePinned3` its `size > 0`. Every translation-dependent knowledge surface reads it:
+the points loop judges an axis only when it is anchored or the point's own stated component, the two-configuration
+row and a plane's parametric form need all three, and a plane's d-term needs every axis its normal has a
+component along (`planeOffsetAnchored3`, shared by the panel and the query lane). The resolver does not read it:
+the figure is unchanged.
+
 ### Who may introduce a point: the drawing registers (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253))
 
 A **carrier** («נסמן: AB = u») never introduces its own subject (`v7-t1`); only a **drawing register** —

@@ -1430,7 +1430,8 @@ export function placementSampled3(c: Construction3): boolean {
  *
  * The rule, asked of the construction rather than listed:
  *
- *  1. a stated absolute POSITION determines the placement outright — knowledge, as before;
+ *  1. a stated absolute POSITION determines the placement outright — knowledge, as before; a COMPONENT
+ *     pin determines only its own axes (#2340, {@link translationAnchoredAxes3}, which this now reads);
  *  2. with no absolute frame object at all, translation is a pure gauge the funnel freezes — nothing is
  *     knowledge, and #315's figures are untouched;
  *  3. otherwise the frame is absolute, and the question is only whether the figure's GAUGE-PLACED content
@@ -1445,8 +1446,42 @@ export function placementSampled3(c: Construction3): boolean {
  * direction and the reason the funnel's own predicate is what is asked here.
  */
 export function translationKnown3(c: Construction3): boolean {
-  if (c.pins.length > 0 || absolutePointCount(c) > 0) return true;
-  if (!hasAbsoluteFrameObject(c)) return false;
+  return translationAnchoredAxes3(c).size === 3;
+}
+
+/** One coordinate axis of the absolute frame. */
+export type Axis3 = 'x' | 'y' | 'z';
+const ALL_AXES3: ReadonlySet<Axis3> = new Set<Axis3>(['x', 'y', 'z']);
+
+/**
+ * #2340 (ADR-3D-373) — WHICH AXES of the figure's translation the givens anchor. The #517/#639/#803 gate
+ * answered one boolean, and it opened on `c.pins.length > 0`; but a pin is a whole-figure flag while a
+ * COMPONENT pin («x_B = 3», «z_A = 2», a null component in «D(3, p, 0)») anchors only the axes it gives a
+ * value. The axes it does not anchor stay at the canonical gauge (a vertex at the origin), are never
+ * sampled (gauge, not DOF), and so read perfectly seed-stable: «A(0, 0, 2)» printed as a fact after only
+ * «z_A = 2» — the frozen gauge is one drawing's sample, which the operator's 2026-07-09 rule says is not
+ * knowledge.
+ *
+ * So the question is asked per axis, of the construction:
+ *  - a stated absolute POSITION (a coordinate point) anchors all three;
+ *  - the #639/#803 frame reasons (sampled placement, nothing gauge-placed, placement driven by an
+ *    absolute pin) anchor all three, exactly as before — seed-stability stays the per-quantity arbiter;
+ *  - otherwise each point pin anchors the axes it gives a value: a number, or an affine expression in the
+ *    pin's symbols (determined by data or sampled — either way not a frozen gauge). A null component is
+ *    "no value given", even when the student named it with a letter (#814: the letter is a name).
+ * Every knowledge surface that reads a translation-dependent number (point coordinates, a plane's d-term,
+ * the parametric anchor) asks THIS, so none can re-decide it (the #517 rule).
+ */
+export function translationAnchoredAxes3(c: Construction3): ReadonlySet<Axis3> {
+  if (absolutePointCount(c) > 0) return ALL_AXES3;
+  if (hasAbsoluteFrameObject(c) && translationFrameAbsolute3(c)) return ALL_AXES3;
+  const axes = new Set<Axis3>();
+  for (const p of c.pins) for (const ax of ALL_AXES3) if (p[ax] !== null) axes.add(ax);
+  return axes;
+}
+
+/** The #639/#803 frame reasons (case 3 of {@link translationKnown3}'s rule), asked once. */
+function translationFrameAbsolute3(c: Construction3): boolean {
   // #803 (ADR-3D-180): the third way a placement is not frozen at the canonical gauge — DRIVEN by
   // absolute pins. Case 3 asked only {sampled, nothing to hide} and left pin-driven placement silent,
   // so the exam's prism (two line equations lowered to eight plane pins, every vertex identical at every
@@ -1477,7 +1512,9 @@ export function translationDrivenAbsolute3(c: Construction3): boolean {
  *  data panel and the query lane so they can never disagree: any absolute position, or a pinned
  *  orientation source (vector/pair/plane pins). Seed-stability stays the per-quantity arbiter. */
 export function vectorFramePinned3(c: Construction3): boolean {
-  return translationKnown3(c) || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
+  // #2340: a vector is a difference (translation cancels), so ANY anchored axis is a frame source here,
+  // exactly as any pin was before — the per-axis split matters only to translation-dependent quantities.
+  return translationAnchoredAxes3(c).size > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
 }
 
 /**
