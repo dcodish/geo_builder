@@ -55,22 +55,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
-      "bisectorIntersection",
-    ],
-    "text": "O is the intersection of the angle bisectors of triangle ABC",
-    "winner": "specialPointMeet",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
-      "bisectorIntersection",
-    ],
-    "text": "P is the intersection of the perpendicular bisectors of triangle ABC",
-    "winner": "specialPointMeet",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
       "segment",
     ],
     "text": "midsegment to BC in triangle ABC",

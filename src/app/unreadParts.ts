@@ -22,11 +22,11 @@
  * clauses before it — what a one-per-line student would type — with an offending clause cut where its
  * reading stops (`cutAtReading`).
  */
-import { augmentParseCtx, normalizeUtterance, parse } from '@/parser';
+import { augmentParseCtx, normalizeUtterance, parse, rightAngledAtVertex } from '@/parser';
 import type { ParseContext } from '@/parser';
 import { endsWithSceneNoun, referencedContextLabels } from '@/parser/labelAccounting';
 import type { AnyCommand } from '@/engine';
-import { cutAtReading, labelRuns, locate, readLabelRuns, type Occurrence, type PartsCut, type Reader } from '../../shell/readExtent';
+import { cutAtReading, locate, readLabelRuns, type Occurrence, type PartsCut, type Reader } from '../../shell/readExtent';
 import { clausesOf } from './independence';
 
 /** A lowering as the probe compares it: the commands without their `consumed` bookkeeping. */
@@ -66,44 +66,32 @@ const numbered = (parts: readonly string[], from = 1): string => parts.map((p, i
 const TAUGHT_LINES = 2;
 
 /**
+ * #2234 / #2143 ([ADR-737](../../docs/06-decisions.md#adr-737)) — the note for "right-angled at X", ONE spelling for the
+ * submit and the edit seam. The parser decides the phrase by its words (`right-angle-vertex`); this only words it:
+ * the two lines that build it (operator ruling 2026-10-08, #1888 follow-up 2: *"Teach the right form"*), the line's
+ * other parts continuing the same list from (3) (ADR-611's one format), cut by the one clause splitter. With no
+ * triangle to name (a square's corner, two segments) the existing «couldn't read this yet» — an honest refusal that
+ * reuses an existing message (CLAUDE.md rule 7's P1 exception), never the AI.
+ */
+export function rightAngleVertexNote(r: { triangle?: string; angle?: string; rest: string }, utterance?: string): { key: string; params?: Record<string, string> } {
+  if (!r.triangle || !r.angle) return { key: 'input.notUnderstood' };
+  // the further parts in the student's own characters (the parser read the normalized line: «∢» → «∠»)
+  const raw = utterance === undefined ? null : rightAngledAtVertex(utterance);
+  const restText = raw ? raw.rest : r.rest;
+  const rest = restText ? clausesOf(restText) : [];
+  return { key: 'input.scope.right-angle-vertex', params: { triangle: r.triangle, angle: r.angle, more: rest.length ? `  ${numbered(rest, TAUGHT_LINES + 1)}` : '' } };
+}
+
+/**
  * The refusal a lost part gets: the one shared one-input-per-line message listing EVERY part of the line as one
- * numbered list from (1) (ADR-598's key and format, the numbering ruled 2026-10-09 — ADR-611) — except where the
- * lost tail names the RIGHT ANGLE'S VERTEX of the triangle its reading built («משולש ABC ישר זווית ב-B»,
- * "right triangle ABC at B"). That syntax is TAUGHT instead (operator ruling 2026-10-08, #1888 follow-up 2:
- * *"Teach the right form"*): the two lines that build it — the triangle, then the angle at the named vertex with
- * its two neighbours in the triangle's name (∠ABC for ב-B, ∠CAB for ב-A, ∠BCA for ב-C). Decided by the READING
- * (the read part lowered to a right triangle, the tail is one of its vertices), never by the spelling.
+ * numbered list from (1) (ADR-598's key and format, the numbering ruled 2026-10-09 — ADR-611).
  *
- * ONE FORMAT, both branches (#1957): the taught pair is items (1) and (2) of the same numbered list, and the
- * line's further parts continue it from (3) — never a second list, never a list that starts where the student
- * can see no (1). A message added to this family inherits the format instead of inventing a third shape.
+ * #2234 (ADR-737): the right-angle-at-the-vertex branch that lived here is gone. It TAUGHT «משולש ABC ישר זווית ב-B»
+ * when the reading happened to lower to a right triangle and leave the vertex unread — decided by the reading, so every
+ * spelling the reading did not cover reached the AI or was read as an angle. The phrase is now refused by its words in
+ * the parser (`right-angle-vertex`, {@link rightAngleVertexNote}), before any reading.
  */
 export function lostPartNote(cut: PartsCut<string>): { key: string; params: Record<string, string> } {
-  for (const c of cut.cuts) {
-    const tailLabels = labelRuns(c.tail);
-    if (tailLabels.length !== 1 || tailLabels[0].parts.length !== 1) continue;
-    const v = tailLabels[0].parts[0];
-    const tri = (JSON.parse(c.lowering) as AnyCommand[]).find(
-      (x): x is AnyCommand & { ids: string[] } => x.type === 'right-triangle' && Array.isArray((x as { ids?: unknown }).ids) && (x as { ids: string[] }).ids.includes(v),
-    );
-    if (!tri || tri.ids.length !== 3) continue;
-    // The taught pair REPLACES `parts[c.part]` (the read prefix) and `parts[c.part + 1]` (its tail), and the
-    // message puts it at (1) and (2) — true only when nothing the student typed comes before it. Measured: a
-    // right-triangle lowering always opens the line. Anything else falls to the plain list, which numbers every
-    // part in the order it was typed, so no stated part can be mis-ordered or lost.
-    if (c.part !== 0) continue;
-    const i = tri.ids.indexOf(v);
-    const angle = `${tri.ids[(i + 2) % 3]}${v}${tri.ids[(i + 1) % 3]}`;
-    const rest = cut.parts.slice(TAUGHT_LINES);
-    return {
-      key: 'input.scope.right-angle-vertex',
-      params: {
-        triangle: tri.ids.join(''),
-        angle,
-        more: rest.length ? `  ${numbered(rest, TAUGHT_LINES + 1)}` : '',
-      },
-    };
-  }
   return { key: 'input.scope.split-statements', params: { first: cut.parts[0], second: cut.parts[1], all: numbered(cut.parts) } };
 }
 

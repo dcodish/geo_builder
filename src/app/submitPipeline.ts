@@ -371,7 +371,7 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
   // the case-blind gates see every label accounted, and the commit stores labels the student never
   // typed in that case — the silent rewrite again, one seam over.
   {
-    const fold = lowercaseLabelFold(utterance, llmCmds);
+    const fold = lowercaseLabelFold(utterance, llmCmds, parseCtxNow().points ?? []); // #2195: the teaching criterion, on this lane too
     if (fold) {
       logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:lowercase-labels', commands: llmCmds });
       ui.setInputNote(t('input.scope.lowercase-labels', { corrected: fold.corrected }));

@@ -125,10 +125,10 @@ describe('#2096 — must not change: these lines still commit', () => {
       expect((await play(pre, line)).kind).toBe('commit');
     });
 
-  // the English row needs a new reading (#2143, open): its output is pinned, unchanged
-  it('unchanged (out of scope, a new reading — #2143): «triangle ABC right-angled at B and AB = 4»', async () => {
+  // #2234 / #2143 (ADR-737, ruling 2026-10-18): the English row is refused by its words with the same teach — never read
+  it('«triangle ABC right-angled at B and AB = 4» is taught like its Hebrew twin (#2143 reversed)', async () => {
     const v = await play([], 'triangle ABC right-angled at B and AB = 4');
-    expect(noteOf(v)?.params?.all).toBe('(1) triangle ABC right-  (2) angled at B and AB = 4');
+    expect(noteOf(v)).toEqual(taught('ABC', '  (3) AB = 4'));
   });
 });
 

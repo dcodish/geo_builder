@@ -144,6 +144,11 @@ A single boundary: `utterance → command[]`.
 - **The input preview seam carries bidi AND maths (#997, ADR-504).** The shared `InputArea`'s `preview` prop
   shows the maths renderer when the line has maths, else `inputPreview` (the bidi isolator with the live-tail
   rule), only when isolation would change the layout; the box stays raw. The 3-D twin is `inputPreview3` (ADR-3D-123).
+- **English keywords are whole words ([ADR-738](06-decisions.md#adr-738), #2195).** `enWord` guards both sides
+  (`EN_START` / `EN_END`), and every angle-family rule tests and strips `ANGLE_KW` (compiled without `/i`: its English
+  half `ANGLE_EN` spells its case, so a following lowercase letter — «angled» — is refused while a glued uppercase
+  label — «angleABC» — is not); its Hebrew half is the singular the rules always spelled inline. The `the` / `of` /
+  bisector-word strips are `\b`-bounded. `angleArms` refuses three letters that are not three points («ALL»).
 - **One vocabulary home (#361, ADR-501).** `src/parser/lexicon.ts` holds the keyword and token atoms the grammar
   consumes; a rule's alternation (`INTERSECT_KW`, `BISECTOR_KW`) is compiled from it, and
   `lexicon-consumers.test.ts` fails on an atom nothing composes from. 3-D keeps its own leaf (`src3d/lexicon/nouns3.ts`).
@@ -949,12 +954,39 @@ member `unreadParts` (`src/app/unreadParts.ts`, in `honestyGateReport`, so both 
   before it, as typed. A clause that reads alone and lost everything is listed whole. An unread run with read runs
   after it in its statement has no cut: the weak path.
 - **The verdict** (`decideFromParse`, the `!gates.clean` branch, only when no older gate fired — `GateReport.onlyReadExtent`; otherwise the line keeps its weak path): parts → refuse `guided`,
-  `scope:split-statements:unread-part`, never escalated. `lostPartNote` picks `input.scope.right-angle-vertex`
-  when the lost tail is one vertex of a `right-triangle` the read part lowered to, else `input.scope.split-statements`.
+  `scope:split-statements:unread-part`, never escalated. `lostPartNote` answers `input.scope.split-statements`;
+  since [ADR-737](06-decisions.md#adr-737) it no longer picks `input.scope.right-angle-vertex` — "right-angled at X" is
+  refused by its words before any reading (below), so the reading-decided branch was deleted.
   **One format, both keys** ([ADR-611](06-decisions.md#adr-611)): every part of the line is ONE numbered list from (1).
   The taught pair is items (1) and (2) — their nouns are localized vocabulary, so the locale string carries those two
   numbers and `{{more}}` continues the same list from `TAUGHT_LINES + 1`; the taught branch is taken only when the
   right-triangle clause OPENS the line, so nothing the student typed can precede item (1). The ✎ seam refuses with `steps.editDropped`, the lost parts as its items.
+
+#### "Right-angled at X" is never a given ([ADR-737](06-decisions.md#adr-737))
+
+The phrase is decided by its WORDS, at the parse boundary, before any rule reads the line. Two lexicon atoms,
+`RIGHT_ANGLED` (the adjective: «ישר[הת]? [ה]זווית», `right[- ]?angled`, `right` before the triangle noun — never the
+noun «זווית ישרה» / "right angle") and `AT_VERTEX` («ב-X», «בקודקוד X», "at [the] [vertex] X"), compose the recognizer
+`rightAngledAtVertex` (`src/parser/scope.ts`): the adjective, then at most a triangle noun, a three-label run and a
+copula, then the locative, in one clause; a non-triangle polygon noun before it («טרפז/מלבן ABCD …») is not its.
+`parseResolved` asks `rightAngleVertexRefusal` FIRST and returns `{ reason: 'right-angle-vertex', triangle, angle, rest }`:
+the triangle the line names, else the definite noun's (ADR-685's `definiteShapeVertices`; two or more is its
+`ambiguous-definite-shape`), else the angle at X by the one lone-vertex resolver (`ambiguous-angle` for none or
+several; one angle held by a figure triangle → that triangle; held by none → no triangle). Every caller of `parse` gets
+the same answer: the submit seam refuses `guided` (`scope:right-angle-vertex`) with `rightAngleVertexNote`
+(`src/app/unreadParts.ts` — the two lines, `rest` cut by `clausesOf` and numbered from (3); `input.notUnderstood` with no
+triangle); the ✎ seam shows the same note; the LLM lane's re-parse drops a model step carrying the phrase; the clause
+readers see a clause that does not read.
+
+#### Letters read out of English prose ([ADR-738](06-decisions.md#adr-738))
+
+The battery member `latinProseLabels` (`src/parser/parse.ts`, in `honestyGateReport`, so both seams): a label the commands
+reference is STATED when the student typed it as a capital (not the capital that merely starts a word), when the
+figure has it, or when the line defines it by name (`definedLabels`: a shape's `ids`, a point's `id`/`id1`/`id2`, a
+circle's `center`, a two-circle tangency's minted touch points; a compound object id such as `circle-O` is not a point label and `@`/`~` scaffolding never). One that is none of these, whose letter occurs in the line only inside a
+lowercase Latin word, makes the line weak `dropped` (it escalates); the item is the word. The #779 teaching uses the
+same criterion (`teachableLetters`): any run on an empty figure, else only letters that exist or the line defines —
+`lowercaseLabelFold` (both seams and the LLM lane) and the failed-parse lift (`liftTeachable`).
 
 #### A role word the reading never read ([ADR-604](06-decisions.md#adr-604))
 

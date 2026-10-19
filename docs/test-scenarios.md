@@ -2090,3 +2090,15 @@ over all four (ADR-041).
 ### `latin-angle-letter-2173` — «משולש ABC» · «זוית B=b» builds with the letter b, and the step suggests a Greek letter (#2173, ADR-726)
 
 **Guards against:** an angle named with a Latin letter accepted without a word about the convention (operator, 2026-10-15: *"it should suggest the user to greek letters for angles"*). **Asserts** the report's two lines build green with the label b, the committed angle's letter is the one the suggestion keys on (`latinAngleLetters`), a second angle reusing b is not counted again, and the Hebrew sentence is the ruled one. The decision-path matrix (every spelling, English, the controls, the chain beside «הובן כ-∠ABC», the rendered line) is `src/app/__tests__/issue-2173-latin-angle-note.test.ts`.
+
+### `right-angled-at-vertex-refused-2234` — «משולש ABC» · «המשולש ישר זווית ב-B» is refused with the two lines that build it — never read, never the AI (#2234, ADR-737)
+
+**Guards against:** "right-angled at X" read as an angle or handed to the AI (operator ruling 2026-10-18 on #2234: *"the syntax of המשולש ישר זווית ב-B is not accepted … not even through AI"*). **Asserts** step 2 is refused `right-angle-vertex` with triangle ABC and angle ABC (the teach «(1) משולש ABC  (2) ∠ABC = 90°»), and the figure keeps △ABC with no right angle.
+
+### `english-shape-word-not-labels-2234` — «משולש ABC» · "the triangle is right-angled" draws no points T, R, I — the line goes to the AI (#2234, ADR-738)
+
+**Guards against:** an English word read as point labels — ∠TRI = 90 drawn green on three invented points (#2195 card 6: *"lowercase English words are never read as point labels"*). **Asserts** the deterministic parse no longer reads the line (`not-handled`, so it escalates) and no T, R or I exists.
+
+### `english-words-not-labels-2195` — «משולש ABC» · "highlight right triangles" records no ∠TRI = s — never committed (#2195, ADR-738)
+
+**Guards against:** «triangles» read as T, R, I and committed as a green measure row. **Asserts** the line no longer parses, and the battery's `latinProseLabels` flags the reading it used to make.

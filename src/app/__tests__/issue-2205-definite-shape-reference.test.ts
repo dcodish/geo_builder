@@ -195,8 +195,14 @@ describe('#2205 — unchanged (measured at ef78f15c)', () => {
     await play([T, 'משולש DEF', 'ריבוע חסום במשולש']);
     expect(polys()).toContain('GHI');
   });
-  it.each([['המשולש חד זווית'], ['המשולש ישר זווית ב-B']])('D5 «%s» (no reader) still escalates with two triangles', async (line) => {
+  it.each([['המשולש חד זווית']])('D5 «%s» (no reader) still escalates with two triangles', async (line) => {
     expect((await play([T, 'משולש DEF', line])).last.kind).toBe('escalate');
+  });
+  // #2234 (ADR-737, ruling 2026-10-18): «ישר זווית ב-X» is refused by its words, never the AI — with two triangles drawn,
+  // the definite noun gets this ADR's own question, naming them
+  it('D5 «המשולש ישר זווית ב-B» with two triangles is refused with the which-triangle question (#2234), never escalated', async () => {
+    const g = await play([T, 'משולש DEF', 'המשולש ישר זווית ב-B']);
+    expect(g.last.kind).toBe('refuse');
   });
   it('D5 «המרובע מקבילית» still escalates', async () => {
     expect((await play(['מרובע ABCD', 'מרובע EFGH', 'המרובע מקבילית'])).last.kind).toBe('escalate');

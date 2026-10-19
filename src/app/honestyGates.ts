@@ -38,6 +38,7 @@ import {
   droppedRadiusSymbol,
   droppedRegionSubject,
   droppedWordRelations,
+  latinProseLabels,
 } from '@/parser';
 import { unaccountedSpans } from '@/parser/spanAccounting';
 import type { AnyCommand, Id } from '@/engine';
@@ -94,6 +95,8 @@ export interface GateReport {
   droppedCmp: boolean;
   droppedConstruct: string[];
   unaccounted: { kind: string; text: string }[];
+  /** #2195 (ADR-738): the lowercase English words whose letters the lowering read as point labels */
+  latinProse: string[];
   /** #1888 (ADR-603): the label runs no reading depends on, and the line's parts when they are lost PARTS */
   unread: UnreadReport | null;
   /** #1904 (ADR-604): the cevian role words no reading depends on — the word sibling of `unread` */
@@ -196,8 +199,13 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
   // THE WORD SIBLING (#1904, ADR-604): a cevian role word («גובה», «תיכון», «חוצה זווית») the reading does not depend
   // on — deleting it leaves the lowering unchanged — was dropped, however well the family-presence gates account it.
   const unreadRole = unreadRoles(utterance, commands, ctx);
+  // LETTERS READ OUT OF PROSE (#2195, ADR-738): a label the lowering references that the student never typed as a
+  // capital, the figure does not have and the line does not define — its letter sits only inside an English word
+  // («the triangle is right-angled» → ∠TRI). Ruled: English words are never read as point labels.
+  const latinProse = latinProseLabels(utterance, commands, pts);
 
   const clean =
+    latinProse.length === 0 &&
     unaccounted.length === 0 &&
     dropped.length === 0 &&
     droppedNums.length === 0 &&
@@ -211,6 +219,7 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     unreadRole === null;
   const onlyReadExtent =
     !clean &&
+    latinProse.length === 0 &&
     unaccounted.length === 0 &&
     dropped.length === 0 &&
     droppedNums.length === 0 &&
@@ -230,6 +239,7 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     droppedWordRels,
     droppedConstruct,
     unaccounted.map((x) => x.text),
+    latinProse,
     unread?.items ?? [],
     unreadRole?.items ?? [],
   );
@@ -245,6 +255,7 @@ export function honestyGateReport(utterance: string, commands: AnyCommand[], ctx
     droppedCmp,
     droppedConstruct,
     unaccounted,
+    latinProse,
     unread,
     unreadRole,
     onlyReadExtent,

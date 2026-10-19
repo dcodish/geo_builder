@@ -41,6 +41,7 @@ import {
   lowercaseMeasureLetters,
   latinAngleLetters,
   upperCasedLabelCandidate,
+  liftTeachable,
   hebrewLabelCandidate,
   parse,
   parseMerge,
@@ -52,7 +53,7 @@ import {
 import { independentConstructs } from './independence';
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { compoundNotHonoured, droppedClause, joinedSubject, splitStatements } from './clauseCoverage';
-import { lostPartNote } from './unreadParts';
+import { lostPartNote, rightAngleVertexNote } from './unreadParts';
 import { lostRoleNote } from './unreadRoles';
 import { applyCommand, type AnyCommand, type Command, type Construction, type Id, type Vec } from '@/engine';
 import {
@@ -362,6 +363,12 @@ export async function decideFromParse(
   }
   // #2127 (ADR-654): an indefinite «משולש …» bound to the figure's triangle is a new triangle unless it restates it
   r = indefiniteShapeReading(r, utterance, pctx, facts, seed);
+  // ── #2234 / #2143 (ADR-737) ── "right-angled at X" is refused by its words, never read and never escalated (ruling
+  // 2026-10-18: "not even through AI"): the two lines that build it, else the existing «couldn't read this yet».
+  if (!r.ok && r.reason === 'right-angle-vertex') {
+    return refuse('guided', { source: 'scope', result: 'scope:right-angle-vertex' }, rightAngleVertexNote(r, utterance));
+  }
+  // ── end #2234 ──
   // #770 — a definite SHAPE reference whose named kind is not in the figure («אלכסוני הריבוע» on a
   // trapezoid-only figure): refuse naming the statement, keep the text. Deterministic — the LLM could
   // only bind something the student did not say (ADR-052).
@@ -681,7 +688,7 @@ export async function decideFromParse(
   // P1's mechanism). Runs BEFORE the honesty battery so no lowercase-label utterance reaches any
   // commit path, deterministic or LLM. Mirrors 3-D's `scope:lowercase-labels`.
   if (r.ok) {
-    const fold = lowercaseLabelFold(utterance, r.commands);
+    const fold = lowercaseLabelFold(utterance, r.commands, pctx.points ?? []);
     if (fold) {
       return refuse('guided', { source: 'scope', result: 'scope:lowercase-labels', commands: r.commands }, { key: 'input.scope.lowercase-labels', params: { corrected: fold.corrected } });
     }
@@ -986,7 +993,7 @@ export async function decideFromParse(
         return refuse('guided', { source: 'scope', result: 'scope:split-statements:unread-part', commands: r.commands }, lost);
       }
       weak = 'dropped'; // a typo dropped a stated label/number/relation/verb/compound-structure/object → escalate rather than commit the partial parse
-      logs.push({ source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct, ...unaccounted.map((x) => `${x.kind}:${x.text}`), ...(gates.unread?.items ?? []).map((x) => `unread:${x}`), ...(gates.unreadRole?.items ?? []).map((x) => `unread-role:${x}`)].join(',')}`, commands: r.commands, intermediate: true });
+      logs.push({ source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct, ...unaccounted.map((x) => `${x.kind}:${x.text}`), ...gates.latinProse.map((x) => `latin-prose:${x}`), ...(gates.unread?.items ?? []).map((x) => `unread:${x}`), ...(gates.unreadRole?.items ?? []).map((x) => `unread-role:${x}`)].join(',')}`, commands: r.commands, intermediate: true });
       // #1798 / #553 (ADR-598): the dropped content belongs to a COMPOUND whose every clause reads on its own —
       // «F אמצע DO, O - חיתוך של AC ו-BD». All or nothing: refused whole with the shared message listing the
       // clauses, instead of a paid call that would re-read the compound the ruling says to type line by line.
@@ -1032,8 +1039,10 @@ export async function decideFromParse(
     const lifted = upperCasedLabelCandidate(utterance);
     if (lifted) {
       const v = viewNow();
-      const lr = parse(lifted, buildParseCtx(v.construction, v.positions));
-      if (lr.ok && lr.commands.length > 0) {
+      const lctx = buildParseCtx(v.construction, v.positions);
+      const lr = parse(lifted, lctx);
+      // #2195 (ADR-738): taught only when the lifted letters exist or the line defines them (ruling 2026-10-18)
+      if (lr.ok && lr.commands.length > 0 && liftTeachable(utterance, lr.commands, lctx.points ?? [])) {
         return refuse('guided', { source: 'scope', result: 'scope:lowercase-labels' }, { key: 'input.scope.lowercase-labels', params: { corrected: lifted } });
       }
     }

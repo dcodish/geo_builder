@@ -204,13 +204,20 @@ export const HE_END = String.raw`(?![א-ת])`;
 /** The English twin. `\b` does work for Latin, but spelling it as a lookahead keeps the two halves of
  *  a bilingual pattern symmetrical — and `parallel` ⊂ `parallelogram` is the same trap in English. */
 export const EN_END = String.raw`(?![A-Za-z])`;
+/** #2195 ([ADR-738](../../docs/06-decisions.md#adr-738)): the LEADING English boundary — no Latin letter before the word. */
+export const EN_START = String.raw`(?<![A-Za-z])`;
 
 /** A Hebrew stem plus its own inflection, bounded: matches the word and its forms, never inside a
  *  longer word. NO capture group — wrap at the use site. */
 export const heWord = (stem: string): string => String.raw`(?:${stem})${HE_SUFFIX}${HE_END}`;
 /** The English twin. `suffix` is per-word because English derivation is not uniform: `bisect` must
- *  still reach `bisector`, while `parallel` must NOT reach `parallelogram`. */
-export const enWord = (stem: string, suffix = String.raw`s?`): string => String.raw`(?:${stem})(?:${suffix})${EN_END}`;
+ *  still reach `bisector`, while `parallel` must NOT reach `parallelogram`.
+ *
+ *  #2195 ([ADR-738](../../docs/06-decisions.md#adr-738)): BOTH sides are guarded. English has no prefix clitics, so
+ *  the leading guard {@link EN_START} loses nothing a student writes, and it closes the trap Hebrew cannot have: a
+ *  keyword matched INSIDE a longer word («tri**angle**», «rect**angle**», «non**parallel**»), whose leftover letters
+ *  («tri») a label reader then took for points the student never named. */
+export const enWord = (stem: string, suffix = String.raw`s?`): string => String.raw`${EN_START}(?:${stem})(?:${suffix})${EN_END}`;
 /**
  * A bilingual WORD-form keyword — {@link heWord} | {@link enWord}, the shape every atom below uses.
  *
@@ -220,10 +227,45 @@ export const enWord = (stem: string, suffix = String.raw`s?`): string => String.
 export const wordForm = (he: string, en: string, enSuffix = String.raw`s?`): string =>
   String.raw`${heWord(he)}|${enWord(en, enSuffix)}`;
 
-/** The angle noun — single-vav and double-vav spellings (the ADR-3D-032 class: `זוית` keystrokes are
- *  as common as the full `זווית`), plus the symbol and the English word. The stem stops before the
- *  ת so {@link HE_SUFFIX} supplies both the singular (`זווית`) and the plural (`זוויות`). */
-export const ANGLE_KW = String.raw`(?:∠|${wordForm(String.raw`זו?וי`, 'angle')})`;
+/**
+ * #2195 ([ADR-738](../../docs/06-decisions.md#adr-738)) — THE ENGLISH ANGLE NOUN, as a whole word. «tri**angle**»,
+ * «rect**angle**», «quadr**angle**» and «**angle**d» contain it; matched inside them, the angle rules read the leftover
+ * «tri» / «d» as point labels (∠TRI = 90 on three invented points, green). The leading guard is {@link EN_START}.
+ *
+ * The case is SPELLED, so a consumer compiles it WITHOUT `/i`: the back guard then refuses a following LOWERCASE
+ * letter («angled», «angles» aside — the plural is the suffix) and still admits a glued UPPERCASE label («angleABC = 40»,
+ * read before this guard existed and kept). Under `/i` it degrades to {@link EN_END} (any following letter refused) —
+ * never to a match inside a word.
+ */
+export const ANGLE_EN = String.raw`${EN_START}(?:[Aa]ngle|ANGLE)[sS]?(?![a-z])`;
+/**
+ * The angle noun — the glyph (∢ folds to ∠ at the parser boundary; both are listed so a consumer never depends on
+ * the fold), the Hebrew noun as the angle rules have always spelled it (`ה?זוו?ית`: the singular, single- or
+ * double-vav — the ADR-3D-032 class: `זוית` keystrokes are as common as the full `זווית`), and the English noun
+ * as a WORD ({@link ANGLE_EN}).
+ *
+ * #2195 ([ADR-738](../../docs/06-decisions.md#adr-738)): every angle-family rule now tests and strips THIS atom. Until
+ * then ~15 rules spelled `angle|∠|זוו?ית` inline, unbounded, and the atom (then `wordForm('זו?וי', 'angle')`) was
+ * consumed by nothing. Its Hebrew half is the inline spelling, not `heWord`'s, deliberately: `heWord` admits the
+ * plural «זוויות», and adopting it would have moved Hebrew readings this fix was not about. Compile WITHOUT `/i`
+ * ({@link ANGLE_EN}'s case is spelled).
+ */
+export const ANGLE_KW = String.raw`(?:∠|∢|ה?זוו?ית|${ANGLE_EN})`;
+/**
+ * #2234 ([ADR-737](../../docs/06-decisions.md#adr-737)) — the ADJECTIVE "right-angled": «ישר זווית» / «ישר-זווית» /
+ * «ישרת זווית» / «ישר הזווית» (either vav spelling), English `right-angled` / `right angled`, and `right` (or
+ * `right-angle`) standing before the triangle noun ("right triangle ABC"). NEVER the noun — «זווית ישרה», "a right
+ * angle", "right angle at B" state an angle and are read as one; this atom does not match them by construction.
+ * Bare alternation, no capture.
+ */
+export const RIGHT_ANGLED = String.raw`(?:(?<![א-ת])[ו]?ישר[הת]?[-\s]?ה?זוו?ית(?![א-ת])|${EN_START}right[-\s]?angled${EN_END}|${EN_START}right(?:[-\s]?angle)?(?=\s+(?:triangle|△)))`;
+/**
+ * #2234 ([ADR-737](../../docs/06-decisions.md#adr-737)) — a VERTEX LOCATIVE: «ב-B», «ב B», «בקודקוד B», «ב-קודקוד B»,
+ * English "at B", "at vertex B", "at the vertex B". The label is the lexicon's {@link LABEL} (either case — the
+ * reader upper-cases it), bounded on the right. Bare alternation, no capture: a reader that needs the letter takes
+ * the last label of the match.
+ */
+export const AT_VERTEX = String.raw`(?:(?<![א-ת])ב-?\s*(?:ה?קודקוד\s*-?\s*)?|${EN_START}at\s+(?:the\s+)?(?:vertex\s+)?)${LABEL}(?![A-Za-z\d])`;
 /** Perpendicular (word forms): מאונך/מאונכת/מאונכים/מאונכות + English. Symbol ⟂/⊥ handled where
  *  symbols are read. NOTE `ניצב` is also the NOUN for a right triangle's LEG («הניצב AB»), so a
  *  consumer that must not read a leg as a stated perpendicularity picks its own stems (the honesty
