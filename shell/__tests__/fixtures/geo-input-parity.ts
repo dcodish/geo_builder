@@ -291,6 +291,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2342': 'open', // #2096 (ADR-730) × #2088 (ADR-3D-370): 3-D teaches a trailing length given, not a trailing angle given («ו-∠ABC = 30»)
   '#2327': 'open', // #2177 (ADR-733): analytic does not read the reserved r on a several-circle figure; 2-D refuses it naming the circles
 
+  '#2344': 'open', // #2344 (ADR-W-146): 2-D draws a green sliver for a triangle whose givens hold only flat in the limit (the tangent root)
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -800,6 +801,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'flat-polygon-1849-448', family: 'lengths', steps: ['משולש ABC', 'AB = 4', 'BC = 4', 'AC = 8'], expect: 'refused' },
   { id: 'flat-polygon-1849-coincide', family: 'polygons', steps: ['מרובע ABCD', 'AB מתלכד עם CD'], expect: 'refused', exception: 'X7', note: 'two sides of one quadrilateral on one line (T31); «מתלכד» is 3-D vocabulary (X7)' },
   { id: 'flat-polygon-1849-thin-control', family: 'lengths', steps: ['משולש ABC', 'AB = 5', 'BC = 3', 'AC = 7.9'], expect: 'builds', note: 'thin but a real triangle — the control' },
+  // #2292 / #2344 (ADR-W-146; 3-D ADR-3D-372) — givens that hold only in the LIMIT where a declared polygon collapses
+  // (the tangent root: |BA| = |BC| with a right angle at C forces C = A) are refused like any forced collapse, never
+  // drawn as a sliver. 3-D reads «AB = BC» as a vector question, so its context spells the lengths «|BA| = |BC|».
+  { id: 'impossible-right-isosceles-2292-perp', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB = BC', 'AC ⊥ BC'], contextFor: { '3d': ['משולש ABC', '|BA| = |BC|'] }, expect: 'refused', knownGap: [{ product: '2d', issue: '#2344' }], note: 'a right angle at C makes BC a leg and AB the hypotenuse, so AB = BC only if C = A' },
+  { id: 'impossible-right-isosceles-2292-angle', family: 'angles', steps: ['משולש ABC', 'AB = BC', '∠ACB = 90'], contextFor: { '3d': ['משולש ABC', '|BA| = |BC|'] }, expect: 'refused', knownGap: [{ product: '2d', issue: '#2344' }] },
+  { id: 'impossible-right-isosceles-2292-other-leg', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB = BC', 'AB ⊥ AC'], contextFor: { '3d': ['משולש ABC', '|BA| = |BC|'] }, expect: 'refused', knownGap: [{ product: '2d', issue: '#2344' }] },
+  { id: 'thin-right-triangle-2292-control', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB = 2', 'BC = 1', 'AC ⊥ BC'], expect: 'builds', note: 'a real right triangle — the control' },
   { id: 'incircle-in', family: 'inscribed', steps: ['משולש ABC', 'במשולש ABC חסום מעגל'], expect: 'builds', exception: 'X8' },
   { id: 'length-noun-q2', family: 'lengths', steps: ['משולש ABC', 'אורך AB=BC'], expect: 'builds', note: "3-D's own spelling of an equal length (Q2): builds in all three" },
   // #1650 — a tangency typed first creates its circle (was refused in 2-D at the audit; both build now)

@@ -568,12 +568,18 @@ nothing open, the pool is marked `collapse: { ring, riderKeys, forced }` — `fo
 statements, `forced: true` the ring's own pin owners (`err.polygonForced` / `err.polygonForcedAlone`). A
 polygon over existing points records a `polygon-open` claim (`given`), judged by `ringCollapsed3`; a sliver
 (`ringOpenness3` < 1e-2) is released and counts as collapsed if it lands flat.
+**The release is a tightened re-solve** (#2292, [ADR-3D-372](06b-decisions-3d.md#adr-3d-372), ADR-W-146). `tightResolve` re-solves the
+thin candidate on its own residuals (the gauge frozen where its path froze it). `limitRoot` judges it against `TIGHT_FLOOR`
+(`TIGHT_TOLERANCE_FACTOR`² × 1e-12 = 4e-16 on the squared residual, 2-D's 0.02). The candidate is collapsed when the
+re-solved ring is collapsed, or when the re-solve misses the floor while the ring thins to ≤ `LIMIT_THINNING` (0.9) of
+its openness: a limit (tangent) root, approached sublinearly, such as «|BA| = |BC| · ∠ACB = 90°». A genuine thin ring
+re-solves exact where it stands. The re-solve replaces the old "exact AND collapsed" release one for one.
 
 **A declared solid forced flat is refused the same way** (#1860, [ADR-3D-358](06b-decisions-3d.md#adr-3d-358)).
 `settleFlatRings` judges every solid, not only the flat kinds: `closedFigure(r)` adds `solidSliver(r)` — a non-flat
 solid whose `flatnessRatio` is under `SOLID_THIN_RATIO` (1e-2, #936's calibration, moved into `solve3.ts`) is
-released on its own residuals and counts as flat if the release is exact and `flatSolidAt` (the #872
-off-plane test, 1e-4 of span) holds. An EXACT candidate the #872 hard gate discards records `flatSolidSeen`
+released on its own residuals and counts as flat if the re-solved solid is flat (`flatSolidAt`, the #872
+off-plane test, 1e-4 of span), or a limit root by the same `limitRoot` verdict on its `flatnessRatio` (ADR-3D-372). An EXACT candidate the #872 hard gate discards records `flatSolidSeen`
 (`noteFlatSolid`, at every acceptance site); an empty pool with one runs the open-figure retry and otherwise
 comes back `collapse: { ring: solid ids, forced: true, solid: kind }`. `derive3` names it as a solid
 (`polygon-collapsed` with `solid: nounOfKind(kind)`, the letters as the declaring statement wrote them) and

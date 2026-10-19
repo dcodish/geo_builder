@@ -12083,6 +12083,8 @@ The degradation policy is deliberately unchanged (a line this code does not comm
 
 ## ADR-3D-310 — A declared polygon the givens collapse flat is refused, whatever forced it (#1849)
 
+**Amended by [ADR-3D-372](#adr-3d-372) (2026-10-19):** the sliver release (the *Am.* below) is a tightened re-solve. A thin candidate that cannot meet a 0.02× tightened floor without thinning is a limit root, refused like a collapse; "exact AND collapsed" was the old test.
+
 **Amended by [ADR-3D-358](#adr-3d-358) (2026-10-17):** the same judgement now covers declared SOLIDS — the "a flattened SOLID keeps the #936 notice" scope below is withdrawn.
 
 **Status:** accepted · 2026-10-07 · bug (P1, honesty) · branch `fix/1849-3d-refuse-flat` off `main` @ 3032fcbb · the 3-D slice of #1849 · implements the operator ruling of 2026-10-07 (workspace ADR-W-115, which reverses ADR-W-048's notice for declared polygons) · amends [ADR-3D-309](#adr-3d-309) and [ADR-3D-268](#adr-3d-268) part 2
@@ -12942,6 +12944,8 @@ Two scopes are deliberate. It does not run when `planeDrive` already anchors the
 
 ## ADR-3D-358 — A declared solid the givens force flat is refused, never drawn with a notice: one collapse judgement for rings and solids (#1860)
 
+**Amended by [ADR-3D-372](#adr-3d-372) (2026-10-19):** the solid release (decision 1, "released on its own residuals, exact and flat") is the same tightened re-solve as the ring's.
+
 **Status:** accepted · 2026-10-17 · bug (P2, ruled 2026-10-08 "keep P2") · branch `fix/1860-3d-flat-solid-refused` off `main` @ b0e9dbea · fix round #2291 · implements the #1860 `/decisions` fix plan of 2026-10-07 · **supersedes** [ADR-3D-234](#adr-3d-234)'s notice · **amends** [ADR-3D-310](#adr-3d-310) (its judgement now covers solids) · adopts [ADR-W-115](06w-decisions-workspace.md#adr-w-115) Am. 1
 **Operator ruling (verbatim, 2026-10-07, in #1860's body):** *"we should refuse this as well since it contradicts the pramid statement"* — and *"a flat figure is not a pyramid / prism / …"*.
 
@@ -13191,6 +13195,53 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 - 3-D: «משולש ABC שווה שוקיים ב-B ו-AB = 4» gets «(1) משולש ABC שווה שוקיים  (2) ב-B  (3) AB = 4», as 2-D does.
 
 **Slow-tier goldens that may drift:** `decide-submit3-parity-1394`, if its corpus holds a compound line whose head is a taught right triangle (it would move from `not-understood` to `refused`).
+
+## ADR-3D-372 — Givens that hold only in the limit where a declared polygon collapses are refused: the sliver release becomes a tightened re-solve (#2292)
+
+**Status:** accepted · 2026-10-19 · bug (P1, honesty) · fix round #2353, stream D · branch `fix/2292-3d-sliver-tight-resolve` off `main` @ b7d6223c · implements the #2292 fix plan of 2026-10-18 (armed under CLAUDE.md rule 7's P1 exception: an honest refusal reusing an existing message) · **amends** [ADR-3D-310](#adr-3d-310) Am. (the sliver release) and [ADR-3D-358](#adr-3d-358) (its solid twin) · member of [ADR-W-146](06w-decisions-workspace.md#adr-w-146) · LADDER stage: solve (`settleFlatRings`'s admissibility predicate `closedFigure`, the ADR-3D-310 stage)
+**Requirements:** [02b](02b-requirements-3d.md) FR-RD-7 (a polygon whose givens hold only flat in the LIMIT is refused too) · **Design:** [04b](04b-design-3d.md) § *A declared polygon collapsed is refused, whatever forced it* and § *A declared solid forced flat is refused the same way* (the release is the tightened re-solve)
+
+**Measured before** (`b7d6223c`, `decideSubmit3` + `derive3`, model mocked):
+
+| sequence | before |
+|---|---|
+| «משולש ABC · \|BA\| = \|BC\| · ∠ACB = 90°» (and «AC ⊥ BC», «CA ⊥ CB», either order; «משולש ישר זווית שווה שוקיים ABC · ∠ACB = 90°») | every line `ok` at every seed measured; \|AB\| = \|BC\| = 1, **\|AC\| = 2.3e-3 – 2.8e-3**, drawn green |
+| «… · AB ⊥ AC» | refused `polygon-collapsed` (honest) |
+| «\|AB\| = 2 · \|BC\| = 2 · AC ⊥ BC» | `givens-contradict` (a red line at seeds 0, 2, 3; refused at seed 1). This is not the green sliver the plan's table recorded |
+| control «\|AB\| = 2 · \|BC\| = 1 · AC ⊥ BC» | a real triangle |
+
+**Hypothesis confirmed first** (instrumented, then removed): `anchorSliver` RAN on every candidate (not `coupled`, `x.length === fullLen`, the `invariantOnly` lane). The candidate stood at err ≈ 1e-11 with openness ≈ 2.5e-3: inside `SLIVER_BAND` (1e-2), above the 1e-4 collapse line. Its release reached err ≈ 1.5e-12 and openness ≈ 1.6e-3, which is neither the `EXACT_RELEASE` 1e-20 nor the collapse line, so it reported "not exact" and the sliver was KEPT. On the way down err ∝ openness⁴. This is the tangent root: the sphere |BC| = |BA| about B and the Thales sphere on AB touch only at A. More iterations do not rescue the old test (400 reach openness 7.6e-4 at err 8.5e-14, a sublinear descent), and rescaling the residuals changes nothing.
+
+**Root cause / class** (shared, [ADR-W-146](06w-decisions-workspace.md#adr-w-146)): *a given set whose only solutions lie in a degenerate limit is accepted, because the residual tolerance admits a nearly degenerate figure, and the accept gate asks whether the residuals are small, never whether the tolerance is what made them small.* The 3-D release asked the inverse question, "did the release reach an EXACT collapse?", which a limit root, approached sublinearly, never answers yes.
+
+**Decision.**
+1. **The trigger is unchanged:** a declared flat ring with openness under `SLIVER_BAND` (1e-2), or a non-flat solid under `SOLID_THIN_RATIO` (1e-2). An ordinary figure pays nothing.
+2. **The release is the tightened re-solve** (`tightResolve`: the same LM release on the candidate's own residuals, so it costs no extra solve). It is judged against `TIGHT_FLOOR` = `TIGHT_TOLERANCE_FACTOR`² × 1e-12 = 4e-16 on the squared residual: the tightest acceptance floor, tightened by 2-D's 0.02 (ADR-537; analytic ADR-AG-143) in residual units. The verdict (`limitRoot`):
+   - **collapsed** when the re-solved figure is collapsed (ring openness ≤ 1e-4, or `flatSolidAt`). LM only lowers the error, so that figure meets the givens at least as well as the candidate did;
+   - **collapsed** when the re-solve fails the tightened floor AND the ring (solid) thinned to ≤ `LIMIT_THINNING` (0.9) of its openness (flatness ratio);
+   - otherwise the candidate stands. Sound one way only.
+3. **The refusal is the existing one:** `polygon-collapsed`, `forced: true`, naming the stated line and the attributed givens, exactly as «AB ⊥ AC» is refused: «לא ניתן: «∠ACB = 90°» יחד עם «|BA| = |BC|» מתקיימים רק אם המשולש ABC שטוח (כל קודקודיו על ישר אחד) — וקו ישר אינו משולש.»
+4. **The solid twin** (`solidSliver`) uses the same re-solve and verdict, on the `flatnessRatio` of the thinnest non-flat solid.
+
+**Deviation from the plan (measured, mechanism only).** The plan's failure branch asked for the openness to fall "≥ 10×". One re-solve cannot do that on a sublinear descent. Over 24 seeds, every tangent-root candidate's re-solve thinned the ring to ×0.59–×0.79. Every genuine thin root that triggered the band (5 · 3 · 7.9999, 5 : 3 : 7.999, |AC| = 1.9999|AB|) stayed at ×0.989–×1.000 AND reached the floor (err 1e-25 – 1e-29). `LIMIT_THINNING` = 0.9 sits between the two. Reaching 10× would need ~3000 iterations per thin candidate, far over the plan's budget of one solve.
+
+**Measured after** (same door, 24 seeds):
+
+| sequence | after |
+|---|---|
+| the reported sequence, «AC ⊥ BC», «CA ⊥ CB», the reversed order, the right-isosceles head | refused `polygon-collapsed` (forced) at the completing line, **24/24** each |
+| «… · AB ⊥ AC» | refused `polygon-collapsed`, 24/24 (unchanged) |
+| «\|AB\| = 2 · \|BC\| = 2 · AC ⊥ BC» | refused 24/24: `polygon-collapsed` 16, `givens-contradict` 8 |
+| «\|AB\| = 2 · \|BC\| = 1 · AC ⊥ BC», «∠ACB = 90° · \|BA\| = 1.0001\|BC\|», 5 · 3 · 7.99, 5 · 3 · 7.9999, 5 : 3 : 7.999, \|AC\| = 1.9999\|AB\| | build 24/24, every line `ok` |
+| the 40/50 pyramid · the 41/50 pyramid · 5 : 3 : 8 | refused · builds · refused, 24/24 (unchanged) |
+
+**Performance** (`decideSubmit3`, the whole sequence, this machine): the reported sequence went from **~560 ms to ~44 ms** per seed. Before, the sliver ran ~200 thin-candidate releases and was then kept; now the refusal settles the pool. «|AB| = 2 · |BC| = 2 · AC ⊥ BC» went from 1.1–2.2 s to ~1.2 s on average. The control stays at 30–35 ms. The re-solve replaces the old release one for one: zero extra LM solves per thin candidate.
+
+**Locks.** `src3d/__tests__/issue-2292-limit-collapse.test.ts`: the seven refused spellings ×24 seeds, naming the givens, keep-prior; the exact He and En text; «|AB| = 2 · |BC| = 2» never drawn ×24; five thin-but-real controls ×24. Parity rows `impossible-right-isosceles-2292-perp` / `-angle` / `-other-leg` (`expect: 'refused'`, 3-D context «|BA| = |BC|», 2-D `knownGap #2344`) and the control `thin-right-triangle-2292-control` (`builds`). Fixture: none. Nothing is built; the refusal is the lock.
+
+**Golden drift expected** (`decide-submit3-parity-1394`, the batch's to judge): only sequences that reach a tangent-root sliver, record → `polygon-collapsed` on the completing line. None is known among the recorded keys.
+
+**Behaviour change for a student:** in 3-D, «משולש ABC · |BA| = |BC| · ∠ACB = 90°» is refused at the line that makes it impossible, with the message «AB ⊥ AC» already gets. Before, it drew a green sliver with C 0.003 from A. The same holds for the ⊥ spellings, in either order, and for «משולש ישר זווית שווה שוקיים ABC · ∠ACB = 90°». A thin but real triangle still builds.
 
 ## ADR-3D-371 — A basis vector asked by its own name answers its coordinates, never itself (#2072)
 
