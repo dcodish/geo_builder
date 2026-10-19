@@ -181,7 +181,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   area reads, and the triangle sign «△ABC» / «▲ABC» declares triangle ABC, as in 2-D.
   So do a stated DISTANCE («המרחק בין S למישור ABC הוא √2», «… הוא 3/2») and a coordinates claim
   («A=(√2,0,0)», «A=(½,0,0)»), which reads exactly the components «A(√2,0,0)» reads (ADR-3D-362, #2081).
-  - Sources: [ADR-3D-329](06b-decisions-3d.md#adr-3d-329), #1912; the prime fold ADR-3D-300 is the same
+  **A number written with a fraction glyph is that number** wherever a number is read — a coordinate, a
+  length, an angle, a radius, a plane equation, a vector coefficient — as 2-D reads it (ADR-635): a MIXED
+  number is one number («A(2½, 3, 1)» is x = 2.5, «2 ½» too, «AB = 2⅓» is 7/3, «∠ABC = 22½» is 22.5°),
+  all 18 glyphs (½ ⅓ ⅔ ¼ ¾ ⅕ … ⅒) are read, and «½√3» is √3/2. A value is never silently changed: before
+  #2255, «2½» read as 21/2 = 10.5, green ([ADR-3D-374](06b-decisions-3d.md#adr-3d-374)).
+  - Sources: [ADR-3D-329](06b-decisions-3d.md#adr-3d-329), #1912; [ADR-3D-374](06b-decisions-3d.md#adr-3d-374), #2255 (the fraction glyphs); the prime fold ADR-3D-300 is the same
     seam one symbol over; [ADR-3D-337](06b-decisions-3d.md#adr-3d-337), #1827 (the `sqrt` spelling and the
     radical value in every stated-magnitude slot).
 - **FR-SP-21 (Must)** — **A letter the tool cannot read is refused by name, never replaced**

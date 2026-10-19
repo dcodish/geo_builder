@@ -393,6 +393,11 @@ const SEEDED: SeededCorpus = {
   // issue-1946-knee-at-named-foot.test.ts; these are the build + drift net.
   'perp-knee-at-foot-1946.geo3.json': ['משולש ABC', 'D על BC', 'AD ⟂ BC'],
   'knee-named-crossing-2103.geo3.json': ['ריבוע ABCD', 'O נקודת חיתוך האלכסונים', 'AC ⟂ BD'],
+
+  // #2255 (ADR-3D-374) — the reported cube: a MIXED number typed with a fraction glyph (before: «AB = 2½» recorded a cube
+  // edge of 10.5, green). The edge 2.5, the coordinates, the palette and the vector coefficients are asserted in
+  // vulgar-fraction-2255.test.ts; this is the build + drift net.
+  'mixed-fraction-2255.geo3.json': ["קובייה ABCDA'B'C'D'", 'AB = 2½'],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

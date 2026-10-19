@@ -6044,3 +6044,18 @@ The 2026-10-08 plan update asked analytic for every reader of an angle measure. 
 **Student-visible change outside 3-D (rule 7, measured):** in 2-D, «AB ‖ CD» and «AB || CD» now build the parallel (before: handed to the model); in analytic, «AB ‖ CD» now builds (before: «לא הבנתי»). Both are FR-SU-17 `[ruled]` lines of the plan. Nothing else moved in the parity and catalog sweeps of the three builders.
 
 **Locks.** `shell/__tests__/glyph-fold.test.ts` (the folds and the untouched wrappers); `src/__tests__/issue-2069-parallel-lookalike.test.ts` (2-D lowers and draws it); parity rows `parallel-u2016-2069`, `parallel-bars-2069` (all three builders build); 3-D in `src3d/__tests__/issue-2069-value-readers.test.ts` and fixture `quad-parallel-lookalike-2069`.
+
+## ADR-W-147 — One vulgar-fraction reader for 2-D and 3-D: `spellVulgarFractions` moves to `shell/` (#2255)
+
+**Status:** accepted · 2026-10-19 · bug (P1; 3d, with a 2-D move) · fix round #2353, stream F · branch `fix/2255-3d-vulgar-fractions` · product side: [ADR-3D-374](06b-decisions-3d.md#adr-3d-374) · moves [ADR-635](06-decisions.md#adr-635)'s reader unchanged
+**Requirements:** [02w](02w-requirements-workspace.md) the cross-builder row *A number written with a fraction glyph* · **Design:** [04w](04w-design-shell.md) § *Fraction glyphs*
+
+**Context.** The vulgar-fraction spelling had three copies: 2-D's `spellVulgarFractions` (ADR-635, all 18 glyphs, a mixed number is one number), analytic's partial fold (`src-analytic/parser/frameAnalytic.ts`: ½ ¼ ¾ only), and 3-D's five `.replace` rows, which turned «2½» into «21/2» = 10.5 (#2255, P1). A third copy is the docs/22 §9 trigger for the shared tree.
+
+**Decision.** `spellVulgarFractions` and its tables move byte-identical to `shell/vulgarFractions.ts`, composing `UNGLUED` from `shell/indexedName`. It is pure string surgery with no product knowledge (a number-spelling leaf, not engine), so it fits `shell/`'s rule. `src/parser/lexicon.ts` re-exports it, so every 2-D import and 2-D's behaviour are unchanged; 2-D's ADR-635 locks (`vulgar-fraction-2008.test.ts`) are the move proof. 3-D's `normalize3` is its second caller (ADR-3D-374). No import edge is added: src → shell and src3d → shell are already declared in `BOUNDARIES.json`.
+
+**Not taken here.** Analytic's adoption is the open sibling, #2349 (P3): its partial fold is honest (an unread glyph goes to the AI), and with the shared module its fix is one call. #2047 (one shared table of glyphs AND fraction words) stays open for the words and for analytic.
+
+**Locks.** 2-D `src/parser/__tests__/vulgar-fraction-2008.test.ts` (unchanged); 3-D `src3d/__tests__/vulgar-fraction-2255.test.ts`; parity row `vulgar-mixed-length-2255` (builds in every builder).
+
+**Behaviour change for a student:** none in 2-D; 3-D's is ADR-3D-374's.

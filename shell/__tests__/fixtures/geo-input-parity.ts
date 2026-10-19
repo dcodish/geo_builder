@@ -1445,6 +1445,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2008 (ADR-635): a vulgar-fraction glyph is its value — 2-D spells the whole Unicode block at its boundary ──
   { id: 'glyph-fraction-ratio-2008', family: 'lengths', steps: ['משולש ABC', 'AB = ¼ BC'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2047' }, { product: '3d', issue: '#2047' }], note: 'analytic and 3-D each fold their own subset of the glyphs; one shared table is #2047 (needs-operator)' },
+  // #2255 (ADR-W-147 / ADR-3D-374): a MIXED number is one number — 3-D spelled «2½» as «21/2» = 10.5, green. 3-D now calls
+  // the shared `shell/vulgarFractions`; the |AB| = 2.5 thin locks are 2-D's vulgar-fraction-2008 and 3-D's vulgar-fraction-2255.
+  { id: 'vulgar-mixed-length-2255', family: 'lengths', steps: ['משולש ABC', 'AB = 2½'], expect: 'builds' },
 
   // ── #2040 (ADR-636): «קטן פי N» is the inverse factor — 2-D drew it as «גדול פי N»; analytic always read it as half ──
   { id: 'comparative-smaller-2040', family: 'lengths', steps: ['משולש ABC', 'AB קטן פי 2 מ-AC'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'the reported line; 3-D reads no «פי» comparative (not-understood)' },

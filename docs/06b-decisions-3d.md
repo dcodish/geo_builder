@@ -13308,3 +13308,28 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Found, not built.** «משולש ABC» · «D על BC» · «AD גובה לצלע CB» is refused `already-defined` in 3-D (the side-typed altitude onto an existing rider), where 2-D builds it — a verdict gap, #2321.
 
 **Behaviour change for a student:** «משולש ABC» · «D על BC» · «AD ⊥ BC» (every spelling, and «AD גובה») now shows a right-angle mark at D toward C (toward B for «AD ⊥ CB»); a named crossing's mark moves to the corner COD for «AC ⟂ BD»; and an altitude's mark («AD גובה לצלע CB») sits toward the side's second letter instead of its farther end.
+
+## ADR-3D-374 — A number written with a fraction glyph is that number: 3-D's boundary calls the shared vulgar-fraction reader (#2255)
+
+**Status:** accepted · 2026-10-19 · bug (P1, 3d) · fix round #2353, stream F · branch `fix/2255-3d-vulgar-fractions` · the 3-D half of [ADR-W-147](06w-decisions-workspace.md#adr-w-147) · LADDER stage: none (the parser boundary)
+**Ruling:** the operator's #2222 ruling (*"if the user used a symbol of 1/2 … it should be 5.5"*), and 2-D's ADR-635 reading (measured at b7d6223c: «AB = 2½» → `set-distance 2.5`, «AB = 2 ½» → 2.5, «AB = 1¼» → 1.25, «AB = 2⅓» → 2.333).
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-22 (the fraction-glyph paragraph) · **Design:** [04b](04b-design-3d.md) § *The normalisation seam*
+
+**Measured before** (`main` @ b7d6223c, `decideSubmit3` + `derive3`, model mocked, 0 calls): «A(2½, 3, 1)» drawn at x = 10.5, green; «A(1¼, 0, 0)» x = 2.75; «A(0, 2¾, 0)» y = 5.75; «A(2⅓, 0, 0)» x = 7; «A(-2½, 0, 0)» x = −10.5; «קובייה ABCDA'B'C'D'» · «AB = 2½» recorded, edge 10.5, green («AB = 2.5» gives 2.5); «משולש ABC» · «AB = 2½» `length-eq` 10.5; «AM = 2½u» coefficient 10.5. Not understood: «A(2⅕, 0, 0)», «A(2 ½, 3, 1)», «∠ABC = 22½», «המישור π1: z - 2½ = 0», «AB = ½√3», «AM = ½√3u». Refused `given-not-drivable`: «כדור שמרכזו O ורדיוסו 2½». Correct: «A(½, 0, 0)» 0.5, «A(5/2, 3, 1)» 2.5, «AM = ½u + ½v» (0.5, 0.5), «AM = ⅓u - ¾v + ⅔w», «AM = ½AB + ½AD».
+
+**Root cause / class.** *A number written with a vulgar-fraction glyph is spelled as text at 3-D's parser boundary with no separator, so a mixed number becomes a different number in every slot that reads it.* `normalize3` carried five rows (`.replace(/½/g, '1/2')` and four siblings): «2½» became «21/2» = 10.5, only ½ ¼ ¾ ⅓ ⅔ were read, and «½√3» became «1/2√3», which the number grammar reads as 1/(2√3) and the magnitude atom refused. 2-D fixed exactly this class at its own boundary in ADR-635 (#2008).
+
+**Decision.**
+1. `normalize3` calls the shared `spellVulgarFractions` (`shell/vulgarFractions.ts`, ADR-W-147) at the same position the five rows held: wrapping the fold chain, after the glyph, √ and axis-letter folds and before whitespace is collapsed. It is the one boundary every rule, the honesty gates (`honesty3.ts`) and the ask lane read, so every slot is covered at once — coordinates, lengths, angles, radii, plane equations and vector coefficients.
+2. The glyph branches below the boundary, now unreachable, are removed so there is one place: `FRACTION_GLYPHS` in `parseCoeff`, the glyph classes in the vector `TERM`, `SYM_TERM` and the `VAL` atom, and the glyphs in `VALUE_START`. No glyph character class is left in `parse3.ts`.
+3. The palette's ½ and ¾ buttons (`ui/symbols3.ts`) are unchanged; after a digit they now insert the mixed number the student sees.
+
+**Measured after.** «A(2½, 3, 1)» x = 2.5; «A(1¼, 0, 0)» 1.25; «A(0, 2¾, 0)» 2.75; «A(2⅓, 0, 0)» 7/3; «A(-2½, 0, 0)» −2.5; «A(2 ½, 3, 1)» 2.5; «A(2⅕, 0, 0)» 2.2; the cube's «AB = 2½» edge 2.5, the same commands as «AB = 2.5»; «∠ABC = 22½» 22.5°; «z - 2½ = 0» the plane of «z - 2.5 = 0»; the sphere «ורדיוסו 2½» records radius 2.5, as «ורדיוסו 2.5» does; «AB = ½√3» √3/2; «AM = ½√3u» √3/2·u; «AM = 2½u» 2.5u. **The plan's gate held:** every lone-glyph vector coefficient lowers exactly as before («½u + ½v», «⅓u - ¾v + ⅔w», «½AB + ½AD» — the normalised text is byte-identical), so no vector reading moved.
+
+**Sibling audit.** 2-D is the reference and is unchanged (its function moved, ADR-W-147). Analytic folds ½ ¼ ¾ only and sends «2⅓» to the AI: honest, not wrong, and filed as #2349 (P3); with the shared module its fix is one call. Complex reads no glyphs. The parity row `glyph-fraction-ratio-2008` («AB = ¼ BC») keeps its 3-D known gap: 3-D refuses it `ambiguous-vector-length`, exactly as it refuses «AB = 0.25 BC» — a different class, not this one.
+
+**Locks.** `src3d/__tests__/vulgar-fraction-2255.test.ts` (each value against its decimal twin, the stored row, the palette's ½ and ¾ after a digit, the vector-coefficient gate); fixture `fixtures3/mixed-fraction-2255.geo3.json` (the reported cube); parity row `vulgar-mixed-length-2255`. `src3d/parser/__tests__/parse3-v1.test.ts` now feeds `parseVecExpr` the normalised text, since the reader no longer reads glyphs itself.
+
+**Behaviour change for a student:** in 3-D, a mixed number typed with a fraction sign is that number — «A(2½, 3, 1)» is drawn at x = 2.5 (was 10.5) and «AB = 2½» on a cube gives edge 2.5 (was 10.5) — and «A(2⅕, 0, 0)», «A(2 ½, 3, 1)», «∠ABC = 22½», «z - 2½ = 0», «AB = ½√3» and the sphere «ורדיוסו 2½» build, where they went to the AI or were refused.
+
+**Slow-tier goldens that may drift:** `decide-submit3-parity-1394` — any recorded line with a mixed glyph number moves to its correct value, and the lines above move from not-understood or refused to record; expected drift, this item's.

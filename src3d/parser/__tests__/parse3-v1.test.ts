@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { parse3, parseVecExpr } from '../parse3';
+import { normalize3, parse3, parseVecExpr } from '../parse3';
 
 const cmds = (input: string) => {
   const r = parse3(input);
@@ -19,7 +19,8 @@ describe('parseVecExpr', () => {
       { coeff: 0.5, atom: { kind: 'named', name: 'v' } },
       { coeff: 5 / 3, atom: { kind: 'named', name: 'w' } },
     ]);
-    expect(parseVecExpr('-⅓u - ⅓v + ⅓w')).toEqual([
+    // a glyph is spelled at the boundary (#2255, ADR-3D-374), so the reader is fed the normalised text
+    expect(parseVecExpr(normalize3('-⅓u - ⅓v + ⅓w'))).toEqual([
       { coeff: -1 / 3, atom: { kind: 'named', name: 'u' } },
       { coeff: -1 / 3, atom: { kind: 'named', name: 'v' } },
       { coeff: 1 / 3, atom: { kind: 'named', name: 'w' } },
