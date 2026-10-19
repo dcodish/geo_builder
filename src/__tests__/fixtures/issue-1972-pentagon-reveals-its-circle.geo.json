@@ -97,6 +97,58 @@
       "enabled": true
     },
     {
+      "id": "UnFvNjunTmePYhlZBaR8U.7",
+      "utterance": "מחומש משוכלל ABCDE",
+      "group": "UnFvNjunTmePYhlZBaR8U",
+      "cmd": {
+        "type": "set-equal",
+        "a": "A",
+        "b": "B",
+        "c": "B",
+        "d": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "UnFvNjunTmePYhlZBaR8U.8",
+      "utterance": "מחומש משוכלל ABCDE",
+      "group": "UnFvNjunTmePYhlZBaR8U",
+      "cmd": {
+        "type": "set-equal",
+        "a": "B",
+        "b": "C",
+        "c": "C",
+        "d": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "UnFvNjunTmePYhlZBaR8U.9",
+      "utterance": "מחומש משוכלל ABCDE",
+      "group": "UnFvNjunTmePYhlZBaR8U",
+      "cmd": {
+        "type": "set-equal",
+        "a": "C",
+        "b": "D",
+        "c": "D",
+        "d": "E"
+      },
+      "enabled": true
+    },
+    {
+      "id": "UnFvNjunTmePYhlZBaR8U.10",
+      "utterance": "מחומש משוכלל ABCDE",
+      "group": "UnFvNjunTmePYhlZBaR8U",
+      "cmd": {
+        "type": "set-equal",
+        "a": "D",
+        "b": "E",
+        "c": "E",
+        "d": "A"
+      },
+      "enabled": true
+    },
+    {
       "id": "UbiwmZvDBhJTmiPVwvcfL",
       "utterance": "מחומש ABCDE חסום במעגל",
       "group": "dcnUNX5plYn_aXJEe2c3s",

@@ -1655,6 +1655,10 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-on-circle",
       "point-on-circle",
       "polygon",
+      "set-equal",
+      "set-equal",
+      "set-equal",
+      "set-equal",
     ],
     "he": [
       "circle",
@@ -1664,6 +1668,10 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-on-circle",
       "point-on-circle",
       "polygon",
+      "set-equal",
+      "set-equal",
+      "set-equal",
+      "set-equal",
     ],
   },
   "regular pentagon ABCDE inscribed in a circle": {
@@ -1675,6 +1683,10 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-on-circle",
       "point-on-circle",
       "polygon",
+      "set-equal",
+      "set-equal",
+      "set-equal",
+      "set-equal",
     ],
     "he": [
       "circle",
@@ -1684,6 +1696,10 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-on-circle",
       "point-on-circle",
       "polygon",
+      "set-equal",
+      "set-equal",
+      "set-equal",
+      "set-equal",
     ],
   },
   "rhombus ABCD": {

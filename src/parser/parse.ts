@@ -6182,8 +6182,26 @@ function ringOnCircle(opts: {
     cmds.push({ type: 'point-on-circle', id, circle: circ, theta: (degs[i] * Math.PI) / 180, ...(regular ? {} : { free: true }) });
   });
   cmds.push({ type: 'polygon', ids });
+  if (regular) cmds.push(...regularRingSides(ids));
   return cmds;
 }
+
+/**
+ * #2265 ([ADR-739](../../docs/06-decisions.md#adr-739)) — REGULARITY IS STATED, NOT ONLY PLACED. A regular n-gon's
+ * n−1 equal CONSECUTIVE sides (|AB| = |BC|, |BC| = |CD|, …), as ordinary `set-equal` constraints the solver must
+ * hold and the givens verifier checks. On one circle, equal chords in ring order are equal arcs, so with the
+ * ring's membership and the convex-ring validity of a declared polygon they make the ring regular.
+ *
+ * The pinned θ of {@link ringOnCircle} were the ONLY statement of regularity: they place NEW vertices at the
+ * 360/n spread, but over vertices that already exist a `point-on-circle` lowers to membership alone (M1), so
+ * «מחומש ABCDE» · «המחומש משוכלל» committed GREEN with five unequal sides — nothing stated them equal, so
+ * nothing could fail. The θ stay as the SEED for new vertices; these constraints are the statement.
+ */
+const regularRingSides = (ids: Id[]): AnyCommand[] =>
+  ids.slice(0, -1).map((id, i): AnyCommand => {
+    const n = ids.length;
+    return { type: 'set-equal', a: id, b: ids[i + 1], c: ids[i + 1], d: ids[(i + 2) % n] };
+  });
 
 /**
  * A CONVEX but IRREGULAR default spread of n vertices around the circle (n ≥ 5) — the generalisation of
@@ -6354,6 +6372,10 @@ function inscribedNgon(s: string, ctx: ParseContext, hidden: boolean): AnyComman
       ...revealReusedCircle(ctx, circleId(reused), hidden),
       { type: 'polygon', ids },
       ...ids.map((id): AnyCommand => ({ type: 'point-on-circle', id, circle: circleId(reused) })),
+      // #2265 (ADR-739): a REGULAR re-entry states its equal sides too — this branch mints no scaffold, so it
+      // never reaches ringOnCircle, and «מחומש ABCDE חסום במעגל» · «מחומש משוכלל ABCDE חסום במעגל» committed
+      // green with the ring as irregular as before.
+      ...(regular ? regularRingSides(ids) : []),
     ];
   }
   const existing = boundInscribeCircle(s, ctx, ids, named, r) ?? undefined;
@@ -6824,7 +6846,12 @@ const regularPolygon: Rule = (s, ctx) => {
   // #1891 (ADR-610): the lowering is THE shared scaffold emitter — `inscribedPolygon`'s n-gon branch emits
   // the same scaffold with the circle DRAWN, and a second copy of it is how the two readings drifted apart.
   const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
-  return ringOnCircle({ ids, center, r, named: named != null, regular: true, hidden: true });
+  // #2265 (ADR-739): a ring that already RIDES one circle («מחומש ABCDE חסום במעגל» · «המחומש משוכלל») is made
+  // regular ON that circle — the ADR-156 reuse the inscribed reading already asks. Minting a second hidden circle
+  // there left its auto-centre undetermined («@ctr-P is still free») once the sides had to hold. A stated radius
+  // keeps the minted circle (binding would drop it, §6 honesty), as `boundInscribeCircle` does.
+  const onto = r.numeric || r.symbolic ? null : reusedInscribeCircle(ctx, ids, named);
+  return ringOnCircle({ ids, center, r, named: named != null, regular: true, hidden: true, existing: onto ?? undefined });
 };
 
 /**

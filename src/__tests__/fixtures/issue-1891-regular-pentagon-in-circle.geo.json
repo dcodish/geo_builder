@@ -94,6 +94,58 @@
         ]
       },
       "enabled": true
+    },
+    {
+      "id": "g0.7",
+      "utterance": "מחומש משוכלל ABCDE חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "set-equal",
+        "a": "A",
+        "b": "B",
+        "c": "B",
+        "d": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.8",
+      "utterance": "מחומש משוכלל ABCDE חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "set-equal",
+        "a": "B",
+        "b": "C",
+        "c": "C",
+        "d": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.9",
+      "utterance": "מחומש משוכלל ABCDE חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "set-equal",
+        "a": "C",
+        "b": "D",
+        "c": "D",
+        "d": "E"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.10",
+      "utterance": "מחומש משוכלל ABCDE חסום במעגל",
+      "group": "g0",
+      "cmd": {
+        "type": "set-equal",
+        "a": "D",
+        "b": "E",
+        "c": "E",
+        "d": "A"
+      },
+      "enabled": true
     }
   ]
 }

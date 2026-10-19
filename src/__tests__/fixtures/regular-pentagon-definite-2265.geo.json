@@ -1,0 +1,170 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-19T12:00:00.000Z",
+  "name": "regular-pentagon-definite-2265",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מחומש ABCDE",
+      "group": "g0",
+      "cmd": {
+        "type": "polygon",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E"
+        ],
+        "place": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "המחומש משוכלל",
+      "group": "g1",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "freeRadius": true,
+        "hidden": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "utterance": "המחומש משוכלל",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O",
+        "theta": 1.5707963267948966
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.3",
+      "utterance": "המחומש משוכלל",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O",
+        "theta": 2.827433388230814
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.4",
+      "utterance": "המחומש משוכלל",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O",
+        "theta": 4.084070449666731
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.5",
+      "utterance": "המחומש משוכלל",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-O",
+        "theta": 5.340707511102648
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.6",
+      "utterance": "המחומש משוכלל",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "E",
+        "circle": "circle-O",
+        "theta": 6.5973445725385655
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.7",
+      "utterance": "המחומש משוכלל",
+      "group": "g1",
+      "cmd": {
+        "type": "polygon",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.8",
+      "utterance": "המחומש משוכלל",
+      "group": "g1",
+      "cmd": {
+        "type": "set-equal",
+        "a": "A",
+        "b": "B",
+        "c": "B",
+        "d": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.9",
+      "utterance": "המחומש משוכלל",
+      "group": "g1",
+      "cmd": {
+        "type": "set-equal",
+        "a": "B",
+        "b": "C",
+        "c": "C",
+        "d": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.10",
+      "utterance": "המחומש משוכלל",
+      "group": "g1",
+      "cmd": {
+        "type": "set-equal",
+        "a": "C",
+        "b": "D",
+        "c": "D",
+        "d": "E"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.11",
+      "utterance": "המחומש משוכלל",
+      "group": "g1",
+      "cmd": {
+        "type": "set-equal",
+        "a": "D",
+        "b": "E",
+        "c": "E",
+        "d": "A"
+      },
+      "enabled": true
+    }
+  ]
+}
