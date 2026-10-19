@@ -718,7 +718,8 @@ The point-on-carrier rules (`pointOnExtension`, `pointOnSegment`) match a prefix
 The span accountant's label pass lives in `src/parser/labelAccounting.ts` (`spanAccounting.ts` imports `parse.ts`,
 so the parser cannot import the accountant). Every stated label is **carried** by a command value, **masked** as
 notation, or an **existing label the lowering refers to**: a member or the centre of a referenced circle
-(`circle-X`, `ParseContext.circleMembers`); a circle's name when the lowering touches a circle; a vertex of a
+(`circle-X`, `ParseContext.circleMembers`); a circle's name when the lowering touches THAT circle (`circle-X`, a
+concentric `circle-X-2`, `@ctr-X`, the centre X — [ADR-735](06-decisions.md#adr-735) narrowed it from "a circle at all"); a vertex of a
 polygon the sentence names with its noun (`ParseContext.polygons`). Callers: `honestyGateReport` (commit and ✎
 seams; `GateCtx` carries `circleMembers` and `polygons`), the LLM second attempt in `submitPipeline`, and
 `parseResolved`, where an unaccounted existing label routes to the clause split (`splitStatements`, ADR-264; a new
@@ -727,6 +728,23 @@ anonymous centre (`@ctr-O`) with `centrePoint`, as `buildParseCtx` does. Widenin
 sanctioned direction; re-widening the exemption is not.
 
 **The invented direction** ([ADR-695](06-decisions.md#adr-695), #2228). `introducedNewLabels` (the LLM second attempt's mirror gate, #255) asks the converse: is each label the model WROTE the student's? An existing label is the student's only by name or through `nounReferencedLabels` (same module). A polygon / circle / segment noun in the sentence reaches the figure's polygons, circles (centre and members) and drawn segments, narrowed to the objects holding a point the sentence names. The set difference is `nameAccounting` from `shell/llm/honestyCore.ts` with existing names not exempt, the call analytic's #2225 gate makes.
+
+### A point stated on several carriers is on each ([ADR-735](06-decisions.md#adr-735))
+
+`src/parser/incidenceList.ts` is the one incidence-list distributor: a subject run, «על»/"on" before each of two or more
+carrier references (an optional carrier noun and one or two labels), and an optional «בהתאמה»/"respectively"
+(`RESPECTIVELY`, `lexicon.ts`). It returns one clause per incidence — every subject on every carrier, or subject i
+on carrier i when paired (a count mismatch is null). Two readers share it, never a fork: `parseResolved` reads a
+line it distributes as that distribution through the ADR-264 clause path (`parseClauses` / `parseClause`), ahead of
+the whole-line rules and all or nothing (a clause that does not read gives `not-handled`); `clausesOf` returns it,
+so the coverage gate sees each incidence. `withOnCircleMembership` binds each «X על [ה]מעגל K» to its own named
+circle K («A על מעגל O ו-B על מעגל P» puts B on P), and an unnamed «X על המעגל» to the resolved definite circle.
+
+**An arc named on a circle lives on that circle.** `arcMidpoint` (both the fixed midpoint and the free point on the
+arc): when the sentence names a circle, that circle is the arc's; if an end is a member of another circle and not of
+the named one, the rule returns null (the line is `not-handled` and goes to the model). With no circle named, the
+circle holding both ends (`circleContaining`) is the arc's, else the single circle. The named circle is never
+replaced by membership (operator ruling 2026-10-18; ADR-042's override withdrawn).
 
 ### A crossing draws what its subject is ([ADR-592](06-decisions.md#adr-592))
 
@@ -885,15 +903,20 @@ test fails if `runSubmit` parses or refuses on its own, and the parity shards (`
 - **Commit path** (`droppedClause`, after a clean honesty battery, before the dry run): the clauses from `clausesOf`
   (`independence.ts`, the one splitter) are each lowered alone in the figure's context plus the earlier clauses
   (`augmentParseCtx`). A clause is **covered** when a significant command of it (1) has a same-type whole-line
-  command naming all its labels, (2) defines an object the whole line defines (same `id`), (3) only declares an
+  command naming all its labels, (2) defines an object the whole line defines (same `id`) with a definition that
+  names every label of the clause's command — the same carrier, never another incidence on the same point
+  ([ADR-735](06-decisions.md#adr-735)), (3) only declares an
   existing object, or (4) is **entailed** — dry-run after the line, `empty` or `implied` (ADR-156 / ADR-542). An
   uncovered clause refuses the line, `guided`, with `input.scope.split-statements`.
 - **Weak path** (`compoundNotHonoured`, after an honesty gate fired): a compound whose every clause lowers alone is
   refused with the same message instead of escalating.
 
 `clausesOf` cuts at punctuation (not a decimal point), the explicit connectives, and «ו» before a Hebrew word or a
-label, never leaving a piece that only names points, and keeps a subject-less piece with the clause before it when
-the two read as a statement.
+label, never leaving a piece that only names points (a label run closed by «בהתאמה» / "respectively" is such a
+piece, the closing half of a pairing: «AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה» is one clause, ADR-735), never cutting a
+label list «O ו-P» whose right piece does not read alone («AB משיק משותף למעגלים O ו-P בנקודה X», ADR-735), and keeps
+a subject-less piece with the clause before it when the two read as a statement. An incidence list is returned as
+its distribution (`incidenceList`, the parser's own helper).
 
 **A reference-only piece is the co-subject of the next** ([ADR-703](06-decisions.md#adr-703), #2209). Inside the
 gate's reading (`readClauses`, never in `clausesOf`), a piece whose lowering only declares ids the figure already

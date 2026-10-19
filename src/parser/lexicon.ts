@@ -243,6 +243,13 @@ export const PARALLEL_KW = String.raw`(?:${wordForm('מקביל', 'parallel')})`
  * "a meeting EVENT owns this phrasing" reads the same atom. Bit-identical to the constant it replaces.
  */
 export const MEET_KW = String.raw`intersect|∩|חיתוך|נחתך|נחתכ|נפגש|פוגש|פגש|חות[כך]|\bcuts?\b|\bmeets?\b`;
+/**
+ * «בהתאמה» / "respectively" — the word that PAIRS a label run with a list in order (#2185,
+ * [ADR-735](docs/06-decisions.md#adr-735)). One spelling, bounded both ways: the incidence-list distributor reads it as
+ * the pairing, and the clause splitter's operand guard reads «A ו-C בהתאמה» as the closing half of a pairing, never a
+ * clause of its own.
+ */
+export const RESPECTIVELY = String.raw`(?:בהתאמה${HE_END}|respectively${EN_END})`;
 /** Tangent (word forms): משיק/משיקים/tangent. */
 export const TANGENT_KW = String.raw`(?:${wordForm('משיק', 'tangent')})`;
 /** Bisector keyword — the grammar's alternation, moved here from parse.ts's `BISECTOR_KW` (#361, ADR-501):

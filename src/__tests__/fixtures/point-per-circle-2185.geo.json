@@ -1,0 +1,56 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-16T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g97-Ca3e1wTHrqZ0CoeK6",
+      "utterance": "מעגל O",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "LqQQBy2EX2gtrZ__GmGME",
+      "utterance": "מעגל P",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "ioK4iAqT0WZT8vLI90VvU",
+      "utterance": "A על מעגל O ו-B על מעגל P",
+      "group": "jyfF6GJFJ5cMmbOyWcDMn",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-P"
+      },
+      "enabled": true
+    },
+    {
+      "id": "3cBrJ0sItMVentpbH-OIh",
+      "utterance": "A על מעגל O ו-B על מעגל P",
+      "group": "jyfF6GJFJ5cMmbOyWcDMn",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    }
+  ]
+}

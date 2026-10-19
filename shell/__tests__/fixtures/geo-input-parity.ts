@@ -256,7 +256,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#1969': 'open',
   '#2013': 'open',
   '#2047': 'open',
-  '#2185': 'open', // #2199 (ADR-AG-282): 2-D drops the second carrier of an English per-point line and of a line list (#2185 removes these)
   '#2092': 'open', // #2097 (ADR-719): 3-D does not read a bar-spelled length set to a letter («|AB| = k»)
   '#2260': 'open', // #2199 (ADR-AG-282): 3-D does not read a point stated on a list of lines
   '#2072': 'open', // #2064 (ADR-643): analytic refuses a two-vertex height 2-D answers «כבר קיים» — the cross-tool question
@@ -1574,8 +1573,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'point-on-two-circles-en-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A on circle O and on circle P'], expect: 'builds', exception: 'X8' },
   { id: 'point-on-three-circles-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל Q', 'A על מעגל O, על מעגל P ועל מעגל Q'], expect: 'builds', exception: 'X8' },
   { id: 'points-respectively-en-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A and B on circle O and on circle P respectively'], expect: 'builds', exception: 'X8' },
-  { id: 'point-per-circle-en-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A on circle O and B on circle P'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2185' }], note: '2-D refuses it split-statements today; #2185 reads it' },
-  { id: 'point-on-two-lines-2185', family: 'points-incidence', steps: ['ריבוע ABCD', 'P על הישר AC ועל הישר BD'], expect: 'builds', knownGap: [{ product: '2d', issue: '#2185' }, { product: '3d', issue: '#2260' }], note: '2-D escalates it today; #2185 reads it' },
+  { id: 'point-per-circle-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A על מעגל O ו-B על מעגל P'], expect: 'builds', exception: 'X8', note: '2-D put B on circle O (swapped), green, before ADR-735; analytic already put each on its own circle' },
+  { id: 'point-per-circle-en-2185', family: 'circles', steps: ['מעגל O', 'מעגל P', 'A on circle O and B on circle P'], expect: 'builds', exception: 'X8', note: '2-D refused it split-statements before ADR-735 (#2185)' },
+  { id: 'point-on-two-lines-2185', family: 'points-incidence', steps: ['ריבוע ABCD', 'P על הישר AC ועל הישר BD'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2260' }], note: '2-D escalated it before ADR-735 (#2185)' },
   // ── #2165 + #2135 + #2133 (ADR-681): a letter's values are judged in list order — a second value is an equation or a
   // contradiction, never «כבר קיים» or last-wins ──
   { id: 'letter-equation-2165', family: 'lengths', steps: ['משולש ABC', 'AB = 2a', 'AB = a + 3'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2253' }], note: 'the operator (2026-10-15): «commits the equation: a = 3, |AB| = 6, as analytic does»; 2-D answered «כבר קיים» before ADR-681' },

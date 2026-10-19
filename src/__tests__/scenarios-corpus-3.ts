@@ -1414,16 +1414,16 @@ export const SCENARIOS_3: Scenario[] = [
   },
   {
     id: 'arc-resolves-to-circle-holding-both-endpoints',
-    title: '"arc BC" picks the circle that actually contains both B and C (not a wrongly-named one)',
+    title: '"arc BC" with no circle named picks the circle that actually contains both B and C',
     guards:
-      'with two circles present (O through A,B,E,D; P through A,B,C) the arc-midpoint of BC was placed on circle O — but C is not on O, so F landed in a meaningless spot. The arc rule now resolves to the circle containing BOTH endpoints (P), overriding a wrong named circle even on the LLM re-parse path.',
+      'with two circles present (O through A,B,E,D; P through A,B,C) the arc-midpoint of BC was placed on circle O — but C is not on O, so F landed in a meaningless spot. With no circle named, the arc rule resolves to the circle containing BOTH endpoints (P). The old override of a WRONGLY NAMED circle («… במעגל O» redrawn on P) is withdrawn (#2185, ADR-735, operator ruling 2026-10-18: a named circle is never swapped — that line is not drawn and goes to the AI; locked in src/app/__tests__/issue-2185-point-on-carrier-list.test.ts).',
     steps: [
       'משולש CDE',
       'A על CD',
       'B על CE',
       'מרובע ABED חסום במעגל', // circle-O (B on it, C is NOT)
       'משולש ABC חסום במעגל', // circle-P (both B and C on it)
-      'F אמצע הקשת BC במעגל O', // LLM canonical with the WRONG circle O — must be corrected to P
+      'F אמצע הקשת BC', // no circle named — the arc lives on the circle holding both ends (P)
     ],
     check(fig) {
       allStepsOk(fig);

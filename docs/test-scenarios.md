@@ -850,13 +850,15 @@ to the circle holding **both** B and C (P). (F sits at the arc's midpoint; a fre
 future refinement.)
 **Asserts:** all steps OK (parses deterministically, no LLM); F is on circle P; F is equidistant from B and C (on arc BC).
 
-### `arc-resolves-to-circle-holding-both-endpoints` — "arc BC" picks the circle that contains B and C
+### `arc-resolves-to-circle-holding-both-endpoints` — "arc BC" with no circle named picks the circle that contains B and C
 **Steps:** `משולש CDE`, `A על CD`, `B על CE`, `מרובע ABED חסום במעגל` (circle-O), `משולש ABC חסום במעגל`
-(circle-P), `F אמצע הקשת BC במעגל O` (the LLM canonical line, with the WRONG circle O).
+(circle-P), `F אמצע הקשת BC` (no circle named).
 **Guards against:** the arc-midpoint of BC landing on circle O — but C is not on O (only on P), so F sat in a
 meaningless spot ("placement of F is wrong"). The parser now carries point→circle membership
 (`ParseContext.circleMembers`, from the engine's `circleMembers`), so the arc rule resolves to the circle
-holding **both** endpoints (P) — overriding a wrong named circle even on the LLM re-parse path.
+holding **both** endpoints (P). Re-based by #2185 (ADR-735, operator ruling 2026-10-18): the step used to be
+`F אמצע הקשת BC במעגל O` and the rule overrode the wrongly named circle; a named circle is never swapped now, so
+that line is not drawn and goes to the AI (locked in `issue-2185-point-on-carrier-list.test.ts`).
 **Asserts:** all steps OK; |PF| = radius of P (F on circle P); F is NOT on circle O.
 
 ### `second-inscribed-circle-fresh-centre` — a 2nd inscribed circle doesn't collide on centre O
