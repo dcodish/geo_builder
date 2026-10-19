@@ -12,9 +12,9 @@
  * WHY it can't be answered — never a sampled number dressed as a fact (ADR-052).
  */
 
-import { knowledgeSamples3, resolve3, scaleKnown3, translationKnown3, vectorFramePinned3 } from './evaluate';
+import { knowledgeSamples3, resolve3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3 } from './evaluate';
 import { SHAPE_SUBJ } from '../lexicon/nouns3';
-import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, branchAnswer, decompStr, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr, planeSymbols } from './dataView';
+import { basisDecompose, canonicalPlaneEq, cleanNum, coordStr, dataView, branchAnswer, decompStr, linePlaneAngleAt, parametricDecomp, parametricPlaneForm, planeEqStr, planeOffsetAnchored3, planeSymbols } from './dataView';
 import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
 import { resolveSolidSubject, subjectVolume } from './solidSubject';
 import { angleBetweenOperands, distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
@@ -716,7 +716,10 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
     // placement may be known. One note for two states told the student the tool knew nothing about a
     // plane whose area and relations it was printing inches above. The frameless case gets its own
     // note and still reports what IS knowledge (the plane's seed-invariant properties).
-    if (!translationKnown3(c)) return framelessPlane(c, text, q, seed);
+    // #2340 (ADR-3D-373): asked PER AXIS, through the panel's own predicate — the d-term is knowledge
+    // only when no normal component lies along an axis the givens leave at the frozen gauge.
+    const anchoredAxes = translationAnchoredAxes3(c);
+    if (anchoredAxes.size === 0) return framelessPlane(c, text, q, seed);
     const resolvedPer = knowledgeSamples3(c, seeds);
     const per = resolvedPer.map((r) => {
       if (q.name) return r.planes.get(q.name);
@@ -728,6 +731,7 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
     });
     const eq = canonicalPlaneEq(per);
     if (!eq) return { text, answer: null, note: 'undetermined' };
+    if (!planeOffsetAnchored3(eq, anchoredAxes)) return framelessPlane(c, text, q, seed);
     // A plane has TWO standard representations and the panel has always printed both (operator,
     // 2026-08-15: "whenever giving a plane, always give both representations if possible"). Derived by
     // the SAME helper the panel calls, so the two forms can never describe different planes. "If
@@ -750,7 +754,7 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
         ([, ids]) => run !== undefined && ids.length === run.length && ids.every((id) => run.includes(id)),
       )?.[0];
     const symbol = (byRun !== undefined ? symbols.get(byRun) : undefined) ?? 'π';
-    const par = parametricPlaneForm(run, resolvedPer.map((r) => r.positions), symbol);
+    const par = anchoredAxes.size === 3 ? parametricPlaneForm(run, resolvedPer.map((r) => r.positions), symbol) : null;
     const standard = planeEqStr(eq);
     // one representation per ROW — never joined by `|` (operator, 2026-08-30)
     return par ? { text, answer: standard, rows: [standard, par] } : { text, answer: standard };

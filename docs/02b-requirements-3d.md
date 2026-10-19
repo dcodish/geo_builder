@@ -261,8 +261,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   and a true one stays green. A sign is read too; a letter value («x_B = 2t») is refused by name. The
   question is the statement with its value dropped («x_B», «מהו שיעור ה-x של B?»). The axis letter may be
   typed in capitals: «X_B = 3», «X_{B}=3», «B_X = 3» and «X_B > 0» are «x_B = 3», «x_{B}=3», «B_x = 3» and
-  «x_B > 0», as analytic reads them; a digit subscript («X_1») stays a label.
-  - Sources: ADR-3D-299, ADR-3D-362, #1547, #2081.
+  «x_B > 0», as analytic reads them; a digit subscript («X_1») stays a label. A stated component places the figure
+  on **that axis only**: after «x_B = 3» on a box, no other point of it reads a coordinate it was merely drawn at
+  (A gets no row; B reads «B(3, ?, ?)»), and after «z_A = 2» A reads «A(?, ?, 2)» and «x_A» is not determined. A
+  plane's equation prints only when its normal lies along axes the givens place.
+  - Sources: ADR-3D-299, ADR-3D-362, #1547, #2081, [ADR-3D-373](06b-decisions-3d.md#adr-3d-373), #2340.
 - **FR-SP-15 (Must)** — **A shape's adjective is honoured, and a circle through a polygon passes through every
   vertex.** An adjective stated on a polygon noun («טרפז ישר זווית», «טרפז שווה שוקיים», «משולש ישר זווית», "isosceles
   trapezoid", "right triangle") is drawn, standalone and inside an inscription in either direction; one the noun
