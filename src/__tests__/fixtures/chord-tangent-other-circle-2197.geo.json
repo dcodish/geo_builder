@@ -1,0 +1,105 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-19T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "jeg-B0grjqgOptn-32_lA",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "utterance": "מעגל O",
+      "enabled": true
+    },
+    {
+      "id": "k5Jda7B_N9HpH5w4iUnmU",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "utterance": "מעגל P",
+      "enabled": true
+    },
+    {
+      "id": "fBoJh7ApxEJFFgxgMW_OS",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "utterance": "AB מיתר במעגל O ומשיק למעגל P",
+      "group": "Cw9AKaiZyOFVaXrL4Nf9i",
+      "enabled": true
+    },
+    {
+      "id": "OnKJJpdbWutpC66wnCrwW",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O"
+      },
+      "utterance": "AB מיתר במעגל O ומשיק למעגל P",
+      "group": "Cw9AKaiZyOFVaXrL4Nf9i",
+      "enabled": true
+    },
+    {
+      "id": "G69lFfu8MK8BcBm6SHtK3",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "utterance": "AB מיתר במעגל O ומשיק למעגל P",
+      "group": "Cw9AKaiZyOFVaXrL4Nf9i",
+      "enabled": true
+    },
+    {
+      "id": "7vQVKyNJUZvMT33etK4f1",
+      "cmd": {
+        "type": "foot",
+        "id": "@tang-P-A-B",
+        "from": "P",
+        "a": "A",
+        "b": "B"
+      },
+      "utterance": "AB מיתר במעגל O ומשיק למעגל P",
+      "group": "Cw9AKaiZyOFVaXrL4Nf9i",
+      "enabled": true
+    },
+    {
+      "id": "JCdgiobV8H2getTsW4xRf",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "@tang-P-A-B",
+        "circle": "circle-P"
+      },
+      "utterance": "AB מיתר במעגל O ומשיק למעגל P",
+      "group": "Cw9AKaiZyOFVaXrL4Nf9i",
+      "enabled": true
+    },
+    {
+      "id": "TW0BWy9wpAbeD69ac-2rU",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "A",
+          "@tang-P-A-B",
+          "B"
+        ]
+      },
+      "utterance": "AB מיתר במעגל O ומשיק למעגל P",
+      "group": "Cw9AKaiZyOFVaXrL4Nf9i",
+      "enabled": true
+    }
+  ]
+}

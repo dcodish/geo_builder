@@ -9750,28 +9750,57 @@ const commonTangent: Rule = (s, ctx) => {
  * vk346px4). Must run BEFORE `circlesTangent` (and `chord`, which would drop the tangency).
  */
 const tangentChord: Rule = (s, ctx) => {
-  if (!/chord|מיתר/i.test(s)) return null;
+  if (!/chord|מיתר|diameter|קוטר/i.test(s)) return null;
   if (!/tangent|משיק/i.test(s)) return null;
   if (INTERSECT_KW.test(s)) return null; // a CUTTING event ("חותך"/"meets") → tangentMeetsOtherCircle owns it
   // Split at the tangent keyword: the chord + its host circle precede it; the tangency circle + point follow.
   const ti = s.search(/tangent|משיק/i);
   const before = s.slice(0, ti);
   const after = s.slice(ti);
+  // #2197 (ADR-736): the DIAMETER noun is the same statement with a stronger host role («AB קוטר במעגל O ומשיק
+  // למעגל P») — read here, not by a tangent rule that misbinds the second circle's name as an apex.
+  const isDiameter = /diameter|קוטר/i.test(before);
+  if (!isDiameter && !/chord|מיתר/i.test(before)) return null; // the role noun names the HOST pair, before the tangent word
   const host = circleCenter(before); // the chord's host circle ("…במעגל P משיק…")
   const target = circleCenter(after); // the circle it is tangent to ("…משיק למעגל O…")
   if (!host || !target || up(host) === up(target)) return null; // two DIFFERENT named circles
-  const ends = labelRun(dropCircleRef(before).replace(/chord|מיתר/gi, ' '), 2); // the chord's endpoints
-  if (!ends) return null;
+  const ends = labelRun(dropCircleRef(before).replace(/chords?|מיתר|diameters?|קוטר/gi, ' '), 2); // the chord's endpoints
+  if (!ends || ends[0] === ends[1]) return null;
   const zM = after.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i); // the touch point ("…at A" / "…בנקודה A")
   const Z = zM ? up(zM[1]) : null;
-  if (!Z || !ends.includes(Z)) return null; // the touch point must be one of the chord's own endpoints
+  if (Z && !ends.includes(Z)) return null; // a named touch must be one of the chord's own endpoints
   const hostCirc = circleId(host);
+  const [a, b] = ends;
+  const exists = (p: string) => (ctx.points ?? []).some((q) => up(q) === p);
+  // The host role: a chord's ends on the host circle; a diameter's ends on it AND through its centre (the `diameter`
+  // rule's own lowering — the command for new ends, memberships + the centre collinearity for existing ones).
+  const hostRole: AnyCommand[] = !isDiameter
+    ? [
+        { type: 'point-on-circle', id: a, circle: hostCirc }, // both endpoints lie on the HOST circle (a chord)
+        { type: 'point-on-circle', id: b, circle: hostCirc },
+      ]
+    : exists(a) && exists(b)
+      ? [...circleMembership(ctx, host, a), ...circleMembership(ctx, host, b), { type: 'set-collinear', a, b: centrePt(ctx, up(host)), c: b }]
+      : [{ type: 'diameter', id1: a, id2: b, circle: hostCirc }];
+  if (Z)
+    return [
+      ...hostRole,
+      { type: 'point-on-circle', id: Z, circle: circleId(target) }, // the touch point lies on the TARGET circle (idempotent at a shared intersection)
+      { type: 'set-perpendicular', a: centrePt(ctx, up(target)), b: Z, c: a, d: b, implicit: true }, // radius(target→Z) ⟂ the chord ⇒ tangent at Z
+      { type: 'segment', a, b }, // draw the chord
+    ];
+  // #2197 (ADR-736): NO touch named — the tangency CONSTRAINT `tangentLine` states for «AB משיק למעגל P» (#203,
+  // ADR-369): the touch is the ⟂ foot from the target centre onto AB, ON the target circle, within the segment. The
+  // group is exactly the two lines «AB מיתר במעגל O» · «AB משיק למעגל P». Both circles must be on the figure.
+  const known = new Set((ctx.circles ?? []).map(up));
+  if (!known.has(up(host)) || !known.has(up(target))) return null;
+  const F = anonId('tang', up(target), a, b);
   return [
-    { type: 'point-on-circle', id: ends[0], circle: hostCirc }, // both endpoints lie on the HOST circle (a chord)
-    { type: 'point-on-circle', id: ends[1], circle: hostCirc },
-    { type: 'point-on-circle', id: Z, circle: circleId(target) }, // the touch point lies on the TARGET circle (idempotent at a shared intersection)
-    { type: 'set-perpendicular', a: centrePt(ctx, up(target)), b: Z, c: ends[0], d: ends[1], implicit: true }, // radius(target→Z) ⟂ the chord ⇒ tangent at Z
-    { type: 'segment', a: ends[0], b: ends[1] }, // draw the chord
+    ...hostRole,
+    { type: 'segment', a, b }, // draw the chord
+    { type: 'foot', id: F, from: centrePt(ctx, up(target)), a, b }, // the touch = the ⟂ foot from the target centre
+    { type: 'point-on-circle', id: F, circle: circleId(target) }, // membership ⟺ dist(target centre, AB) = r — the tangency
+    { type: 'set-line', points: [a, F, b] }, // the touch WITHIN the chord (ADR-077)
   ];
 };
 
@@ -15372,6 +15401,22 @@ function statedVerbOperands(s: string, verbAt: number, verbLen: number): Id[] {
   return [...new Set(out)];
 }
 
+/** #2197 (ADR-736): the circles a tangent word governs by name — «משיק[ה/ים] ל[ה]מעגל P», "tangent to [the] circle P". */
+const GOVERNED_TANGENT = rx(String.raw`(?:משיק[א-ת]*\s+ל-?ה?מעגל|tangent\s+to\s+(?:the\s+)?circle)\s+(${ULABEL})(?![A-Za-z\d])`, 'gi');
+function governedTangentCircles(s: string): string[] {
+  return [...new Set([...s.matchAll(GOVERNED_TANGENT)].map((m) => up(m[1])))];
+}
+/** Is this evidence command ABOUT circle X? A declared tangency (ADR-462) always is; otherwise it names X's circle
+ *  (`circle-X`, a concentric `circle-X-n`) or X's anonymous centre, or it is a radius-⟂ / foot whose source is X's
+ *  centre (the ADR-115 / #226 encodings — the corner tangent «AB ו AD משיקים למעגל O» states it as radius-⟂s). */
+function evidenceAboutCircle(c: AnyCommand, X: string): boolean {
+  if (c.consumed?.verbs?.includes(VERB_TANGENT)) return true;
+  const j = JSON.stringify(c);
+  if (j.includes(`"circle-${X}"`) || j.includes(`"circle-${X}-`) || j.includes(`"@ctr-${X}"`)) return true;
+  const src = (v: unknown) => v === X || v === `@ctr-${X}`;
+  return (c.type === 'set-perpendicular' && src(c.a)) || (c.type === 'foot' && src(c.from));
+}
+
 export function droppedGivenVerbs(utterance: string, commands: AnyCommand[]): string[] {
   const s = normalizeUtterance(utterance);
   const out: string[] = [];
@@ -15382,6 +15427,16 @@ export function droppedGivenVerbs(utterance: string, commands: AnyCommand[]): st
     if (evidence.length === 0) {
       out.push(g.verb); // the verb's meaning is entirely absent from the lowering (the original #82 class)
       continue;
+    }
+    // #2197 (ADR-736): a tangent word that GOVERNS a named circle («משיק למעגל P», "tangent to circle P") is
+    // evidenced only by a construction about THAT circle. A tangent to another circle (the Thales aux of a tangent
+    // from P to circle O) paid for «AB … משיק למעגל P» and the line committed green with nothing tangent to P.
+    if (g.tangency) {
+      const governed = governedTangentCircles(s);
+      if (governed.some((X) => !evidence.some((c) => evidenceAboutCircle(c, X)))) {
+        out.push(g.verb);
+        continue;
+      }
     }
     // #226 — OPERAND accounting, the second half of the class: family-token presence is not enough when
     // the utterance NAMES the verb's operands. A lowering that carries a tangent/parallel/… command

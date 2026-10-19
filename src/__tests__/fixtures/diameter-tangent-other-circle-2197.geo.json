@@ -1,0 +1,95 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-19T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "oElpJYOhS2Il5XDYDzZfJ",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "utterance": "מעגל O",
+      "enabled": true
+    },
+    {
+      "id": "eaxwyx2lSpjwERv0KCE9i",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "utterance": "מעגל P",
+      "enabled": true
+    },
+    {
+      "id": "Qvipq_s27ZaF2kDwIuEU-",
+      "cmd": {
+        "type": "diameter",
+        "id1": "A",
+        "id2": "B",
+        "circle": "circle-O"
+      },
+      "utterance": "AB קוטר במעגל O ומשיק למעגל P",
+      "group": "1U-uz8DT25nniBJy9F4VN",
+      "enabled": true
+    },
+    {
+      "id": "rlE3A_NLN-UO4691DOX7t",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "utterance": "AB קוטר במעגל O ומשיק למעגל P",
+      "group": "1U-uz8DT25nniBJy9F4VN",
+      "enabled": true
+    },
+    {
+      "id": "H-IV3W8I7MPehv2H8BeaM",
+      "cmd": {
+        "type": "foot",
+        "id": "@tang-P-A-B",
+        "from": "P",
+        "a": "A",
+        "b": "B"
+      },
+      "utterance": "AB קוטר במעגל O ומשיק למעגל P",
+      "group": "1U-uz8DT25nniBJy9F4VN",
+      "enabled": true
+    },
+    {
+      "id": "m0EjMXQoGN2bWVmwCeFwl",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "@tang-P-A-B",
+        "circle": "circle-P"
+      },
+      "utterance": "AB קוטר במעגל O ומשיק למעגל P",
+      "group": "1U-uz8DT25nniBJy9F4VN",
+      "enabled": true
+    },
+    {
+      "id": "hZeyfQGgJrc3U7oOxvfT3",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "A",
+          "@tang-P-A-B",
+          "B"
+        ]
+      },
+      "utterance": "AB קוטר במעגל O ומשיק למעגל P",
+      "group": "1U-uz8DT25nniBJy9F4VN",
+      "enabled": true
+    }
+  ]
+}
