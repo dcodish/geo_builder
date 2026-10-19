@@ -40,7 +40,12 @@ split. **The look-alike glyph fold is the SHARED table** ([ADR-3D-329](06b-decis
 `shell/glyphFold.ts` `foldGlyphs` (⟂ → ⊥, ∡/∢ → ∠, the guarded `<` → ∠, ⁰/º/˚ → °, «שורש N» → √, the infix «‖» / «||» → ∥), called by
 `normalize3` right after `foldPrimes3` and by the ask lane's `parseQuery` — 3-D folded none of them, which is
 why «AC ⟂ AB» was not-understood while «AC ⊥ AB» built (#1912); 2-D's and analytic's boundaries call the same
-table (docs/04w, *Look-alike glyphs*). **The magnitude atom `MAG`** (ADR-3D-337) admits `ROOT_PRODUCT`, a `*` or
+table (docs/04w, *Look-alike glyphs*). **The fraction glyphs are spelled by the SHARED reader**
+([ADR-3D-374](06b-decisions-3d.md#adr-3d-374), #2255): `shell/vulgarFractions.ts` `spellVulgarFractions` (2-D's
+ADR-635 reader, moved by ADR-W-147) wraps the fold chain in `normalize3`, after the glyph, √ and axis-letter folds,
+so a mixed number is one number («2½» → `2.5`, «2⅓» → `7/3`), a radical's glyph coefficient moves below it («½√3»
+→ `√3/2`), and a lone glyph is `a/b`. No reader below the boundary keeps a glyph branch: `parseCoeff`, the vector
+`TERM`, `SYM_TERM`, `VAL` and `VALUE_START` read digits only. **The magnitude atom `MAG`** (ADR-3D-337) admits `ROOT_PRODUCT`, a `*` or
 `·` between the coefficient and √ only (#2069, [ADR-3D-369](06b-decisions-3d.md#adr-3d-369)); `evalRadical`'s
 `RADICAL_RE` reads the same token, so the atom and its reader stay paired. The triangle noun is the lexicon's
 `TRIANGLE_RE` (`lexicon/shapePhrase3.ts`, `isTriangleNoun3`), which reads «△»/«▲» before a label run. **The prime fold is

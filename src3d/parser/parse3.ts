@@ -21,6 +21,7 @@ import { readOperand, readRelationSides } from './operandToken';
 import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
+import { spellVulgarFractions } from '../../shell/vulgarFractions';
 import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, RevolutionKind, SolidKind, SolidNoun, SymComp, SymTerm, CompSrcs, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { INCIRCLE_RING_ARITIES3, MAX_SYM_DEGREE, ringCircleId3, soleSymOf, symsOfAffine } from '../engine/types';
@@ -173,6 +174,8 @@ export function normalize3(s: string): string {
     // so «AC ⟂ AB» was "not understood" while «AC ⊥ AB» built; the table is the shared `shell/glyphFold`,
     // which 2-D's boundary calls too. It runs BEFORE `upliftLowercaseLabels` (whose anchor set reads
     // `[∠∡∢]`) and before every rule, and the stored fact row keeps the glyph the student typed.
+    // #2255 (ADR-3D-374): `spellVulgarFractions` wraps the folds below — see where it closes.
+    spellVulgarFractions(
     foldConjunctionSpacing(foldGlyphs(foldPrimes3(stripFormatControls(s))))
       // #531 ([ADR-3D-144](../../docs/06b-decisions-3d.md)): INVISIBLE bidi/format controls are not
       // something the student typed — the APP injects them (`isolateLtrRuns3` isolates LTR runs for
@@ -257,12 +260,15 @@ export function normalize3(s: string): string {
       // coordinate token has one case — «X_B=3» is «x_B=3», «B_X» is «B_x» (the ADR-AG-274 shape). Every
       // component reader (`COMPONENT_FRAMES`, its value / sign / comparison tails) spells the axis `[xyz]`.
       .replace(SUB_AXIS_FIRST3, (_m, ax: string, rest: string) => `${ax.toLowerCase()}${rest}`)
-      .replace(SUB_AXIS_LAST3, (_m, head: string, ax: string) => `${head}${ax.toLowerCase()}`)
-      .replace(/½/g, '1/2')
-      .replace(/¼/g, '1/4')
-      .replace(/¾/g, '3/4')
-      .replace(/⅓/g, '1/3')
-      .replace(/⅔/g, '2/3')
+      .replace(SUB_AXIS_LAST3, (_m, head: string, ax: string) => `${head}${ax.toLowerCase()}`),
+    )
+      // #2255 ([ADR-3D-374](../../docs/06b-decisions-3d.md#adr-3d-374)): a VULGAR-FRACTION glyph is spelled ONCE,
+      // here, after the glyph and √ folds, by the shared `spellVulgarFractions` (2-D's ADR-635 reader, moved to
+      // shell/ by ADR-W-147) that wraps the chain above. The five rows it replaced glued each glyph's digits to
+      // whatever came before, so a MIXED number became another number — «2½» → «21/2» = 10.5 in a coordinate, a
+      // length, a vector coefficient — and only ½ ¼ ¾ ⅓ ⅔ were read. A mixed number is ONE number («2½» → 2.5,
+      // «2⅓» → 7/3, «2 ½» too), all 18 glyphs are read, and «½√3» is √3/2. Every rule and honesty gate reads
+      // this text, so no reader keeps a glyph branch of its own.
       .replace(/\s+/g, ' ')
       .trim()
       // ADR-3D-079 Am. 2: a trailing sentence period is decoration (book lines end with «.» —
@@ -1419,15 +1425,10 @@ const stripStatementPrefix = (s: string): string =>
     '',
   );
 
-const FRACTION_GLYPHS: Record<string, number> = {
-  '½': 1 / 2, '⅓': 1 / 3, '⅔': 2 / 3, '¼': 1 / 4, '¾': 3 / 4,
-  '⅕': 1 / 5, '⅖': 2 / 5, '⅗': 3 / 5, '⅘': 4 / 5, '⅙': 1 / 6, '⅚': 5 / 6, '⅛': 1 / 8,
-};
-
-/** `5/3`, `0.5`, `2`, `½`, `√2`, `2√3`, `√6/4`… — absent ⇒ 1. Null on malformed. */
+/** `5/3`, `0.5`, `2`, `√2`, `2√3`, `√6/4`… — absent ⇒ 1. Null on malformed. A fraction GLYPH never reaches
+ *  here: {@link normalize3} spells it as digits (#2255, ADR-3D-374), so no reader keeps a glyph table. */
 function parseCoeff(s: string | undefined): number | null {
   if (s === undefined || s === '') return 1;
-  if (FRACTION_GLYPHS[s] !== undefined) return FRACTION_GLYPHS[s];
   const frac = s.match(/^(\d+)\s*\/\s*(\d+)$/);
   if (frac) {
     const den = parseInt(frac[2], 10);
@@ -1440,7 +1441,7 @@ function parseCoeff(s: string | undefined): number | null {
   return Number.isFinite(v) ? v : null;
 }
 
-/** #510 — the reader paired with the `VAL` atom: a signed VALUE literal (`-√2`, `½`, `5/3`, `1.5`).
+/** #510 — the reader paired with the `VAL` atom: a signed VALUE literal (`-√2`, `1/2`, `5/3`, `1.5`).
  *  One reader for the family, so a coordinate, a vector injection and a point in an injection LIST can
  *  never disagree about what «√6/4» means. Null on malformed — never a silent NaN in a figure. */
 function literalValue(raw: string): number | null {
@@ -1451,7 +1452,7 @@ function literalValue(raw: string): number | null {
 }
 
 const TERM =
-  /^([+-])?\s*((?:\d+\s*\/\s*\d+)|(?:\d*\.\d+)|(?:\d+)|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛])?\s*[·×*]?\s*(?:([a-z])|([A-Z]\d*'?)([A-Z]\d*'?))\s*$/;
+  /^([+-])?\s*((?:\d+\s*\/\s*\d+)|(?:\d*\.\d+)|(?:\d+))?\s*[·×*]?\s*(?:([a-z])|([A-Z]\d*'?)([A-Z]\d*'?))\s*$/;
 
 /**
  * Split a linear expression into its terms at TOP-LEVEL `+`/`-` only
@@ -1812,7 +1813,7 @@ export const RADICAND = String.raw`(?:\(\s*${UNUM}(?:\s*\/\s*${UNUM})?\s*\)|${UN
  * `2k·u`, `t·BE`, plus every numeric form. Null on anything else.
  */
 const SYM_TERM = new RegExp(
-  String.raw`^([+-])?\s*(?:\(([^()]+)\)\s*[·×*]?\s*)?((?:${UNUM})?\s*(?:√\s*${RADICAND})?(?:\s*\/\s*${UNUM})?|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛])?\s*[·×*]?\s*([a-w])?\s*[·×*]?\s*(?:([A-Z]\d*'?)([A-Z]\d*'?)|([a-z]))\s*(?:\/\s*(${UNUM}))?$`,
+  String.raw`^([+-])?\s*(?:\(([^()]+)\)\s*[·×*]?\s*)?((?:${UNUM})?\s*(?:√\s*${RADICAND})?(?:\s*\/\s*${UNUM})?)?\s*[·×*]?\s*([a-w])?\s*[·×*]?\s*(?:([A-Z]\d*'?)([A-Z]\d*'?)|([a-z]))\s*(?:\/\s*(${UNUM}))?$`,
 );
 
 export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string } | null {
@@ -2521,7 +2522,7 @@ const ANGLE_LABEL_RE = /^[αβγδθ]$/;
 
 /**
  * #510 — a VALUE literal: everything {@link parseCoeff} already reads. `√2`, `2√3`, `√6/4`, `5/3`,
- * `0.5`, `½` — the forms this tool offers on its own symbol palette and accepts as a stated magnitude
+ * `0.5`, `½` (as `1/2`: {@link normalize3} spells every glyph, #2255) — the forms this tool offers on its own symbol palette and accepts as a stated magnitude
  * («|BD'| = √48» parses today). A coordinate component accepted only DECIMALS, so «C(√2,1,0)» refused
  * while the same character in a length given worked: offered in one slot and refused in another, the
  * asymmetry #493 was filed on.
@@ -2532,7 +2533,7 @@ const ANGLE_LABEL_RE = /^[αβγδθ]$/;
  * reader turns «√48» into `NaN` INSIDE a committed figure — far worse than the refusal it fixes.
  * Migrating those rules onto `VAL` one at a time, each with its reader, is filed as follow-up work.
  */
-const VAL = String.raw`-?(?:\d+\s*\/\s*\d+|\d*\.\d+|(?:${UNUM})?\s*√\s*${RADICAND}(?:\s*\/\s*${UNUM})?|\d+|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛])`;
+const VAL = String.raw`-?(?:\d+\s*\/\s*\d+|\d*\.\d+|(?:${UNUM})?\s*√\s*${RADICAND}(?:\s*\/\s*${UNUM})?|\d+)`;
 
 /** A tuple component: a VALUE literal (#510), or an AFFINE symbolic expression (#325, ADR-3D-079) —
  *  `t` / `2t` / `-t` / `2·t` / `t+1` / `2t-3` is coefficient·symbol + constant.
@@ -3761,7 +3762,7 @@ let SOLID_SIZE_UNREAD: RevolutionKind | null = null;
  * #2076 ([ADR-3D-363](../../docs/06b-decisions-3d.md#adr-3d-363)): where a stated value may begin — a digit, a root,
  * a fraction glyph, a sign, a decimal point or an opening parenthesis. A size noun followed by one states a size.
  */
-const VALUE_START = String.raw`(?=[-\d√½¼¾⅓⅔.(])`;
+const VALUE_START = String.raw`(?=[-\d√.(])`;
 /** A size clause the declaration's two slots do not read (a diameter, a slant height, a volume, an area). */
 const UNREAD_SIZE_CLAUSE = new RegExp(
   String.raw`(?:(?<![א-ת])[וש]?${REV_UNREAD_SLOT_HE}\s*(?:הוא\s*|=\s*)?|\b${REV_UNREAD_SLOT_EN}(?:\s+is)?\s*(?:=\s*)?)${VALUE_START}`,
