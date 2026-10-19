@@ -83,7 +83,9 @@ describe('#835 (c) — «משוכלל» still means REGULAR', () => {
     const c = cmds(utterance);
     expect(c[0].type).toBe('circle');
     expect(c.filter((x) => x.type === 'point-on-circle')).toHaveLength(n);
-    expect(c[c.length - 1].type).toBe('polygon');
+    // #2265 (ADR-739): the ring, then its n−1 equal consecutive sides — regularity is STATED, not only placed
+    expect(c[c.length - n].type).toBe('polygon');
+    expect(c.slice(-(n - 1)).map((x) => x.type)).toEqual(Array(n - 1).fill('set-equal'));
   });
 });
 

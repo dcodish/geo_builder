@@ -346,6 +346,20 @@ rule's sentence. `inscribedNgon` takes a bare run of five or more as its arity w
 `uninscribableIncircle` reads the shape-as-subject verdict from the reader. The inscription predicates' gender is
 folded at the utterance boundary (`normalizeInscriptionSlip`: «חסומה» → «חסום», «חוסמת» → «חוסם»).
 
+### The n ≥ 5 ring scaffold states regularity as constraints (#2265, [ADR-739](06-decisions.md#adr-739))
+
+`ringOnCircle` (parse.ts) is the one emitter of the n-gon-on-a-circle scaffold (ADR-610): the circle (or an
+`existing` one), one `point-on-circle` per vertex, the ring. With `regular` it also emits
+`regularRingSides(ids)` — the n−1 consecutive `set-equal`s |AB| = |BC|, …, |(n−1)th side| = |nth side|. The pinned
+θ (90 + 360·i/n) are only the SEED that places NEW vertices; over existing ids a `point-on-circle` lowers to
+membership (M1) and the θ say nothing, so the equalities are the statement the solver holds and the givens
+verifier checks. Concyclic + equal consecutive chords + the simple-ring floor of a declared `polygon` (ADR-616)
+is exactly the convex regular n-gon; the pentagram (equal chords, crossed) fails the floor and is never shown.
+The two regular lowerings that do not mint the scaffold call the same helper: `inscribedNgon`'s re-entry
+branch (the ring already on the circle, ADR-156) appends `regularRingSides`, and `regularPolygon` puts a ring that
+already rides one circle onto that circle (`reusedInscribeCircle` → `existing`) instead of minting a second
+hidden one whose auto-centre the equal sides leave undetermined; a stated radius keeps the minted circle.
+
 ### Addressing an angle: one reader, many value kinds (#967, [ADR-496](06-decisions.md#adr-496))
 
 An angle statement has two halves: **which angle** is named and **what is said about it**. **`angleArms` is the

@@ -18782,3 +18782,67 @@ The corner holds at seeds 0–5 and across three «הציגו תצורה אחר�
 **Locks.** `src/app/__tests__/issue-2195-latin-prose-labels.test.ts` (every row over △ABC, «מעגל O», «מלבן ABCD» and ∅; the side effects; the teaching on ∅ and on △ABC; the unchanged controls); units in `issue-2234-2195-lexicon-units.test.ts` (`ANGLE_KW` / `enWord`, `angleArms`, `latinProseLabels`, `definedLabels`); `lexical-ratchet.test.ts` (inline `angle|∠` 18 → 4, the leading-guard row); scenarios `english-shape-word-not-labels-2234`, `english-words-not-labels-2195`.
 
 **Behaviour change for a student:** after a triangle, "the triangle is right-angled" (and the acute / obtuse / plural / "other" twins), "highlight right triangles", "show the triangles" and "angles are 40" no longer draw or record anything on invented points T, R, I (or teach «∠TRI = 90»); they go to the AI. "the circle / rectangle / line is right-angled" go to the AI instead of a refusal about a vertex D. "the triangle is isosceles and right-angled" goes to the AI with no fragment list. "mark all right angles" / "show all angles" get «סימונים על השרטוט… מופיעים אוטומטית…». On a drawn figure "angle at the top is 40", "angle one is 40", "a circle through all vertices" are no longer taught in capitals (they go to the AI); on an empty figure, and for "ab = 5", "point d on ab", "triangle abc", "circle o", the lesson is unchanged.
+
+---
+
+## ADR-739 — A regular n-gon STATES its equal sides: regularity held and verified whether the vertices are new or already drawn (#2265)
+
+**Status:** accepted · 2026-10-19 · bug (P1, 2-D, honesty class) · branch `fix/2265-regular-polygon-equal-sides` off `main` @ b7d6223c · fix round #2353, stream C · amends [ADR-610](#adr-610) (the one scaffold emitter now states regularity as constraints) · cites [ADR-111](#adr-111) (the regular n-gon), [ADR-156](#adr-156) (reuse the circle a ring rides), [ADR-616](#adr-616) (the simple-ring floor), [ADR-685](#adr-685) (the definite noun)
+
+**Operator:** 2026-10-16, T50 of round #2245: *"מחומש משוכלל means all sides are equal and this is not the case so this is a P1"*; plan approved 2026-10-18 («2265 - i approve»), as amended by the 2026-10-18 plan check.
+
+**Requirements:** [02](02-requirements.md) **FR-EN-14** (regular means equal sides, held and verified, whether the vertices are new or already drawn; a contradicting regular statement is refused naming the earlier statement) · **Design:** [04](04-design.md) §*The n ≥ 5 ring scaffold states regularity as constraints*
+
+**Class (docs/17 §1).** A polygon property stated by **placement alone**, with no constraint the solver must hold and the verifier can check, is silently dropped when the vertices already exist.
+
+**Root cause.** `regularPolygon` lowers n ≥ 5 through `ringOnCircle`: a hidden circle and one `point-on-circle` per vertex at θ pinned to 90 + 360·i/n. Regularity was expressed **only** by those θ. They place NEW vertices; over existing ids (the free ring of an earlier «מחומש ABCDE») a `point-on-circle` lowers to membership (M1) and the θ say nothing, so the ring kept its own spread. No constraint stated equal sides, so the givens verifier had nothing to check and the step was green. The n = 3 and n = 4 routes were right because they lower to constraints or a typed shape (`set-equal`, `square`).
+
+**Decision.**
+1. **`ringOnCircle` with `regular` emits `regularRingSides(ids)`**: the n−1 consecutive `set-equal`s |AB| = |BC|, |BC| = |CD|, …, up to the last side equal to the first. On one circle, equal consecutive chords are equal arcs. With the simple-ring floor every declared `polygon` carries (ADR-616), that is exactly the convex regular n-gon: the pentagram (equal chords, crossed) fails the floor and is never displayed. The pinned θ stay as the SEED for new vertices. There is one emitter, so `regularPolygon` and `inscribedNgon` both state it.
+2. **The two regular lowerings that do not reach the scaffold call the same helper.** `inscribedNgon`'s re-entry branch (the ring already on the circle, ADR-156) appends `regularRingSides` when `regular`. `regularPolygon` puts a ring that already rides one circle onto THAT circle (`reusedInscribeCircle` → `ringOnCircle({ existing })`) instead of minting a second hidden circle, whose auto-centre the equal sides left undetermined (measured: «@ctr-P is still free» at seed 2, and seed 0 not displayable). A stated radius keeps the minted circle, as `boundInscribeCircle` does (§6 honesty).
+3. **The verifier checks it.** The equalities are ordinary constraints, so a regular statement that the stated sides contradict is refused before commit in the contradiction frame. It is the same message the square analog gives.
+
+**Measured before / after** (`driveThroughGate` → `replay`, model mocked, seed 0; before = `b7d6223c`):
+
+| sequence | before | after |
+|---|---|---|
+| «מחומש ABCDE» · «המחומש משוכלל» | 5.861 / 5.951 / 4.722 / 4.806 / 4.684, green | 5.222 ×5, green |
+| «מחומש ABCDE» · «המחומש ABCDE משוכלל» | same, green | 5.222 ×5 |
+| «משושה ABCDEF» · «המשושה משוכלל» | 5.032 / 5.104 / 3.831 / 3.867 / 3.840 / 3.610, green | 4.230 ×6 |
+| «מתומן ABCDEFGH» · «המתומן משוכלל» | 3.925 / 3.970 / 2.665 / 2.750 / 2.421 / 2.114 / 2.514 / 2.707, green | 2.897 ×8 |
+| "pentagon ABCDE" · "regular pentagon ABCDE" | the same lowering, irregular | regular |
+| «מחומש משוכלל ABCDE» (one line, new points) | 5.878 ×5 | 5.878 ×5, every vertex identical at seeds 0–23 |
+| «מחומש ABCDE» · «AB = 3» · «BC = 4» · «המחומש משוכלל» | 3 / 4 / 6.382 / 8.381 / 6.497, **green** | refused: `over-constrained: \|AB\| = \|BC\| cannot hold [vs #3]` |
+| «מרובע ABCD» · «AB = 3» · «BC = 4» · «ABCD ריבוע» (the [2-D] reference) | refused, the same message | unchanged |
+| «מחומש ABCDE» · «מחומש משוכלל ABCDE חסום במעגל» (bound) | 5.861 / 5.951 / 4.722 / 4.806 / 4.684, green | 5.222 ×5 |
+| «מחומש ABCDE חסום במעגל» · «מחומש משוכלל ABCDE חסום במעגל» (re-entry) | 5.196 / 5.541 / 5.878 / 6.204 / 6.520, green | regular |
+| «מחומש ABCDE חסום במעגל» · «המחומש משוכלל» | 0.081 / 9.982 / 0.010 / 7.449 / 6.136, green (two circles) | 6.505 ×5, one circle |
+
+**Whole-rate (docs/17 §9, a finding).** Displayable seeds out of 24 (`meetsRequirements`): pentagon 15, hexagon 15, octagon 22, bound inscribed 15, re-entry 17, definite over an inscribed ring 17. The square-analog control is 24, because a typed shape re-places its corners. Every displayable seed is the convex regular ring with every step verified. The other seeds start the solve from the earlier free ring and land on the pentagram or do not converge. Nothing a student can see is lost: a regular n-gon has one shape up to similarity, and seed 0, where a structural edit lands (ADR-484), always shows it. But «הציגו תצורה אחרת» pays one replay per skipped seed. Seeding existing vertices toward the 360/n spread is the obvious improvement. It is a solver-start change and is not taken here.
+
+**Why not a patch (docs/17 §2).** No spelling, noun or figure is special-cased. The statement is added at the one scaffold emitter that every regular n ≥ 5 reading passes through, and the two branches that bypass the scaffold call the same helper. The new capability: a regular n-gon's regularity is a constraint the solver holds and the verifier checks, never only a placement.
+
+**Sibling audit.** A grep of the parser for pinned `theta` / `place` emitters:
+- `ringOnCircle` non-regular (`cyclicSpread`, `free: true`) states only membership. Correct.
+- `inscribedPolygon` 3-/4-gon (`INSCRIBED_ANGLES`, pinned for the rigid kinds) has **the same class, live**: «מרובע ABCD» · «ריבוע ABCD חסום במעגל» commits green with angles 84.27 / 78.69 / 95.73 / 101.31. The rectangle and the right triangle behave the same way, and «מרובע ABCD» · «AB = 3» · «BC = 4» · «ריבוע ABCD חסום במעגל» is green. The equilateral triangle holds, because its equalities are constraints. Filed **#2355** (P1, 2-D). It is a different chokepoint (`inscribedPolygon`'s shape lowering), so it is not widened here.
+- Semicircle, diameter, quarter-circle and sector: an existing endpoint gets `set-collinear` / `set-angle`. Correct.
+- The incircle touch points are `free: true`. Correct.
+- `regularPolygon` n = 3 / n = 4 lower to `set-equal` / `square`. Correct.
+
+Sibling products, measured at this branch's tip:
+- **Analytic** has its own engine, and a regular n-gon there is DERIVED vertices (the closed-form vertex of `engine/derived.ts`, ADR-AG-217), not a placement. «מחומש ABCDE» · «מחומש משוכלל ABCDE» through `decideSubmit` records 4.174 ×5, regular. The class is not present. «המחומש משוכלל» and «המחומש ABCDE משוכלל» are `not-handled` there: an honest refusal and a reading gap against 2-D, not a wrong drawing. It is the ADR-685 definite-predicate reading, which analytic does not have, so it is not this fix.
+- **3-D** draws «משוכלל» on a square alone and declines it on every other noun (`parse3.ts`, #1891). It has no n ≥ 5 regular lowering. Not present.
+- **Complex** has no polygon lowering. Not present.
+
+**Risk.** The stored commands of every regular n ≥ 5 line gain n−1 `set-equal`s. The three saved fixtures that hold one (`issue-1891-regular-pentagon-in-circle{,-en}`, `issue-1972-pentagon-reveals-its-circle`) were re-lowered through today's parser, with every earlier fact byte-identical. An old save with the old lowering loads as it did, since new vertices sit on the regular θ anyway. The decide-parity goldens record lowered commands, so any golden row with a regular n ≥ 5 line moves by those `set-equal`s.
+
+**Locks.** `src/app/__tests__/issue-2265-regular-polygon-sides.test.ts` covers:
+- n = 5, 6, 8, definite and named, plus the English twin, at 24 seeds: equal sides to 1e-6, interior angles (n−2)·180/n, convex, every step verified, and the whole-rate floor;
+- the one-line form unchanged at every seed (positions identical to the same figure without the new equalities);
+- the stated-unequal-side refusal and its square analog;
+- the bound, re-entry and definite-over-inscribed rows;
+- the emitted equalities.
+
+Fixtures `regular-pentagon-definite-2265` and `regular-pentagon-named-2265` hold the operator's two lines.
+
+**Behaviour change for a student:** «מחומש ABCDE» · «המחומש משוכלל» now draws the regular polygon. So do «משושה», «מתומן», the named form and the inscribed forms over existing vertices. A regular statement that contradicts stated sides is refused naming the earlier statement, as the square is.
