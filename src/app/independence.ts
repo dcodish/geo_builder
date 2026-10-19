@@ -37,8 +37,9 @@
  * clause form) therefore never reaches it. See ADR-460 for the four residual false positives this
  * property covers, and `independence.test.ts` for the net that fails if the property stops holding.
  */
-import { CLAUSE_CONNECTIVES, CLAUSE_RELATIVES, parse } from '@/parser';
+import { CLAUSE_CONNECTIVES, CLAUSE_RELATIVES, incidenceList, parse } from '@/parser';
 import type { ScopeMatch } from '@/parser';
+import { RESPECTIVELY } from '@/parser/lexicon';
 import { replay } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
@@ -62,8 +63,12 @@ const SEPARATORS = new RegExp(
 );
 
 /** A piece that only NAMES points (with an optional point word) — half of an operand pair or a conjoined
- *  subject, never a statement: «AC ו-BD», «D ו-E על BC», «AB and CD are parallel», «נקודות F, G, H על …». */
-const BARE_LABELS = /^(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?[A-Z]\d*(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+|\s*)[A-Z]\d*)*$/;
+ *  subject, never a statement: «AC ו-BD», «D ו-E על BC», «AB and CD are parallel», «נקודות F, G, H על …».
+ *  A run closed by «בהתאמה» / "respectively" is the closing half of a pairing (#2185, ADR-735): «… בנקודות A ו-C
+ *  בהתאמה» is one statement, never «… בנקודות A» plus a clause «C בהתאמה». */
+const BARE_LABELS = new RegExp(
+  String.raw`^(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?[A-Z]\d*(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+|\s*)[A-Z]\d*)*(?:\s*,?\s*${RESPECTIVELY})?$`,
+);
 
 /**
  * The line's clauses — THE splitter (#763's `independentConstructs` and #1798's clause-coverage gate both
@@ -76,6 +81,10 @@ const BARE_LABELS = /^(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?[A-Z]\d
  * with the piece reads as a statement («AB משיק למעגל P»).
  */
 export const clausesOf = (utterance: string): string[] => {
+  // #2185 (ADR-735): an incidence list («A על מעגל O ועל מעגל P») is its distribution — one clause per incidence,
+  // through the parser's own distributor, so the coverage gate sees each carrier. Shared, never forked.
+  const dist = incidenceList(utterance);
+  if (dist && dist.length >= 2) return dist;
   const bits = utterance.split(SEPARATORS);
   const clean = (p: string) => p.replace(/^\s*[ו]?-?\s*/, '').trim();
   const continues = (prev: string, piece: string): boolean => {
@@ -85,12 +94,22 @@ export const clausesOf = (utterance: string): string[] => {
     const r = parse(`${subject} ${piece}`, {});
     return r.ok && r.commands.length > 0;
   };
+  // #2185 (ADR-735): a «ו» between two single labels that is not a clause boundary — «… למעגלים O ו-P בנקודה X» is the
+  // operand list «O ו-P», never «… למעגלים O» plus a piece «P בנקודה X». Decided by the grammar: the left piece ends
+  // with a standalone label, the right one opens with one, and the right piece says nothing alone (it does not read).
+  // «A על מעגל O ו-B על מעגל P» keeps its cut: «B על מעגל P» reads.
+  const operandList = (sep: string, prev: string, piece: string): boolean => {
+    if (!/^\s+ו-?$/.test(sep) || !/(?:^|\s)[A-Z]\d*$/.test(prev) || !/^[A-Z]\d*(?![A-Za-z\d])/.test(piece)) return false;
+    const r = parse(piece, {});
+    return !(r.ok && r.commands.length > 0);
+  };
   const out: string[] = [];
   let cur = bits[0] ?? '';
   for (let i = 1; i < bits.length; i += 2) {
     const sep = bits[i];
     const next = bits[i + 1] ?? '';
-    if (BARE_LABELS.test(clean(cur)) || BARE_LABELS.test(clean(next)) || continues(clean(cur), clean(next))) cur += sep + next;
+    if (BARE_LABELS.test(clean(cur)) || BARE_LABELS.test(clean(next)) || continues(clean(cur), clean(next)) || operandList(sep, clean(cur), clean(next)))
+      cur += sep + next;
     else {
       out.push(cur);
       cur = next;

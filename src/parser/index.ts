@@ -5,6 +5,7 @@ export { parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCirc
   statedLabelTokens, typedLabels, lowercaseLabelFold, lowercaseMeasureLetters, latinAngleLetters, upperCasedLabelCandidate, hebrewLabelCandidate, VERB_GATES, augmentParseCtx, cevianPairReadings } from './parse';
 export type { ParseResult, ParseContext, CevianPairSegment } from './parse';
 export { buildParseCtx } from './context';
+export { incidenceList } from './incidenceList';
 export { CLAUSE_CONNECTIVES, CLAUSE_RELATIVES, classifyOutOfScope,foreignGiven, looksCompound, looksLikeLatex, splitGuidance, statedNegation, wordRootMagnitude, SHAPE_NOUNS_HE, SHAPE_NOUNS_EN } from './scope';
 export type { ScopeCategory, ScopeMatch } from './scope';
 export { COMMAND_CATALOG, CATEGORY_ORDER, CATEGORY_LABELS } from './catalog';

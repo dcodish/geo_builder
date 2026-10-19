@@ -195,9 +195,12 @@ describe('#2208 — controls (unchanged at ef78f15c)', () => {
       const ct = r.added.find((c) => c.type === 'circles-tangent') as Extract<AnyCommand, { type: 'circles-tangent' }>;
       expect(ct.external).toBe(ext);
     });
-  // #2211: a circle subject OUTSIDE the named pair is not this mechanism — pinned as today, re-based knowingly by #2211.
-  it('K4 (#2211): «מעגל Q משיק מבחוץ למעגלים O ו-P» keeps today\'s common tangent of O and P', async () => {
+  // #2211: a circle subject OUTSIDE the named pair is not this mechanism. Re-based knowingly by #2185 (ADR-735): the
+  // label accountant no longer excuses the named circle Q because O and P were touched, so the line that drew a common
+  // tangent of O and P with Q dropped, green, now escalates whole — never drawn with Q missing. #2211 builds it.
+  it('K4 (#2211): «מעגל Q משיק מבחוץ למעגלים O ו-P» is never committed with Q dropped', async () => {
     const r = await play([...PAIR, 'מעגל Q'], 'מעגל Q משיק מבחוץ למעגלים O ו-P');
-    expect(types(r.added)).toContain('common-tangent');
+    expect(r.kind).toBe('escalate');
+    expect(r.added).toEqual([]);
   });
 });
