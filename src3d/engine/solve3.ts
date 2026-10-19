@@ -1529,23 +1529,57 @@ export function solvePivot(
    * collapsed. A genuinely thin triangle (3°, 5·3·7.99) is exact where it stands and stays open.
    */
   const SLIVER_BAND = 1e-2;
-  const EXACT_RELEASE = 1e-20;
   const fullLen = 7 + nDims + nSym + nPinSym + nRider;
-  const anchorSliver = (r: PivotResult): boolean => {
-    if (coupled || r.x.length !== fullLen) return false;
-    const pos = evalCanonical(r.dims, undefined, r.riderTs ? new Map(Object.entries(r.riderTs)) : undefined);
-    const thin = c.solids.some(
-      (s) => FLAT_SOLID_KINDS.has(s.kind) && ringOpenness3(s.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p)) < SLIVER_BAND,
-    );
-    if (!thin) return false;
+  /**
+   * #2292 (ADR-3D-372, ADR-W-146; amends ADR-3D-310 Am. and ADR-3D-358) — THE TIGHTENED RE-SOLVE. The release
+   * above asked "is the released figure EXACT (err < 1e-20) and collapsed?" — which rewards the very case it
+   * exists to catch. A given set whose only solution is a TANGENT (limit) root — «משולש ABC · |BA| = |BC| ·
+   * ∠ACB = 90°»: the sphere |BC| = |BA| about B and the Thales sphere on AB touch only at A — is approached
+   * sublinearly: the residual vanishes only to second order as C → A (measured: err ∝ openness⁴), so the
+   * release reaches neither 1e-20 nor the 1e-4 collapse line, read "not exact", and KEPT the sliver (C 0.003
+   * from A, drawn green). The residual is not the signal; the existence of an exact solution is (ADR-537).
+   *
+   * So the thin candidate is re-solved on its own residuals (no anchor; the gauge stays frozen where its path
+   * froze it) and judged against a floor tightened by `TIGHT_TOLERANCE_FACTOR` (2-D's 0.02, ADR-537; the
+   * analytic ADR-AG-143): on the squared residual that is 0.02² of the tightest acceptance floor (1e-12).
+   *  - collapsed after the re-solve (openness under the 1e-4 line) → the open one was the tolerance's. LM only
+   *    ever lowers the error, so the collapsed figure meets the givens at least as well as the candidate did.
+   *  - the re-solve fails the tightened floor AND the ring thinned as it descended (`LIMIT_THINNING`) → a limit
+   *    root: the only way to satisfy the givens better is to flatten further.
+   *  - otherwise (it reached the floor, or failed it without thinning) the candidate stands. A genuine thin
+   *    triangle (5 · 3 · 7.9999, a stated 0.3°, 5 : 3 : 7.999) re-solves to 1e-25 where it stands (measured).
+   * Sound one way only: a re-solve that keeps the ring open changes nothing. It REPLACES the old release solve
+   * one for one, so it costs no extra solve. The band (`SLIVER_BAND`) only decides which candidate is asked.
+   */
+  const TIGHT_TOLERANCE_FACTOR = 0.02;
+  const TIGHT_FLOOR = TIGHT_TOLERANCE_FACTOR ** 2 * 1e-12;
+  /**
+   * How much a failed tightened re-solve must thin the ring to read as a limit root. Measured over 24 seeds:
+   * on the tangent root every candidate's re-solve (120 iterations, the old release's budget) thinned the ring
+   * to ×0.59–×0.79 of its openness (the descent is sublinear, so one solve never gets near 10×); on the genuine
+   * thin controls (5 · 3 · 7.9999, 5 : 3 : 7.999, |AC| = 1.9999|AB|, ∠ACB = 90° · |BA| = 1.0001|BC|, the 41/50
+   * pyramid) it stayed at ×0.989–×1.000 AND reached the floor. 0.9 sits between the two.
+   */
+  const LIMIT_THINNING = 0.9;
+  /** The candidate re-solved on its own residuals from where it stands: its unknown vector and error. */
+  const tightResolve = (r: PivotResult): { x: number[]; err: number } => {
     const f = residualsFor(r.mirror);
     const lift = (y: number[]): number[] => (invariantOnly ? [0, 0, 0, 0, 0, 0, 0, ...y] : y);
     const x = lift(leastSquares((y) => f(lift(y)), invariantOnly ? r.x.slice(7) : [...r.x]).x);
-    const err = f(x).reduce((sum, v) => sum + v * v, 0);
-    return err < EXACT_RELEASE && collapsedRing({
-      dims: x.slice(7, 7 + nDims),
-      ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((rd, i) => [rd.id, x[riderBase + i]])) } : {}),
-    });
+    return { x, err: f(x).reduce((sum, v) => sum + v * v, 0) };
+  };
+  /** The verdict for a measure of openness (a ring's, or a solid's) before and after the tightened re-solve. */
+  const limitRoot = (err: number, before: number, after: number): boolean => err >= TIGHT_FLOOR && after <= LIMIT_THINNING * before;
+  const flatOpenness = (pos: Positions3): number =>
+    Math.min(Infinity, ...c.solids.filter((s) => FLAT_SOLID_KINDS.has(s.kind)).map((s) => ringOpenness3(s.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p))));
+  const anchorSliver = (r: PivotResult): boolean => {
+    if (coupled || r.x.length !== fullLen) return false;
+    const before = flatOpenness(evalCanonical(r.dims, undefined, r.riderTs ? new Map(Object.entries(r.riderTs)) : undefined));
+    if (!(before < SLIVER_BAND)) return false;
+    const { x, err } = tightResolve(r);
+    const released = { dims: x.slice(7, 7 + nDims), ...(nRider > 0 ? { riderTs: Object.fromEntries(riders.map((rd, i) => [rd.id, x[riderBase + i]])) } : {}) };
+    if (collapsedRing(released)) return true;
+    return limitRoot(err, before, flatOpenness(evalCanonical(released.dims, undefined, released.riderTs ? new Map(Object.entries(released.riderTs)) : undefined)));
   };
   /**
    * #1860 (ADR-3D-358, operator ruling 2026-10-07; amends ADR-3D-310, retires ADR-3D-234's notice) — A
@@ -1580,19 +1614,25 @@ export function solvePivot(
     if (memo !== undefined) return memo;
     const pos = solidPosAt(r.dims, r.riderTs);
     let out: SolidObj | null = flatSolidAt(pos);
-    const thin =
-      !out &&
-      c.solids.some((s) => {
-        if (FLAT_SOLID_KINDS.has(s.kind)) return false;
-        const ratio = flatnessRatio(s.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p));
-        return ratio !== null && ratio < SOLID_THIN_RATIO;
-      });
-    if (thin) {
-      const f = residualsFor(r.mirror);
-      const lift = (y: number[]): number[] => (invariantOnly ? [0, 0, 0, 0, 0, 0, 0, ...y] : y);
-      const x = lift(leastSquares((y) => f(lift(y)), invariantOnly ? r.x.slice(7) : [...r.x]).x);
-      const err = f(x).reduce((sum, v) => sum + v * v, 0);
-      if (err < EXACT_RELEASE) out = flatSolidAt(solidPosAt(x.slice(7, 7 + nDims), ridersOf(x)));
+    // #2292 (ADR-3D-372): the thinnest non-flat solid, judged by the same tightened re-solve as a declared ring
+    const thinnest = (p: Positions3): { solid: SolidObj; ratio: number } | null => {
+      let best: { solid: SolidObj; ratio: number } | null = null;
+      for (const s of c.solids) {
+        if (FLAT_SOLID_KINDS.has(s.kind)) continue;
+        const ratio = flatnessRatio(s.ids.map((id) => p.get(id)).filter((q): q is Vec3 => !!q));
+        if (ratio !== null && (!best || ratio < best.ratio)) best = { solid: s, ratio };
+      }
+      return best;
+    };
+    const thin = out ? null : thinnest(pos);
+    if (thin && thin.ratio < SOLID_THIN_RATIO) {
+      const { x, err } = tightResolve(r);
+      const released = solidPosAt(x.slice(7, 7 + nDims), ridersOf(x));
+      out = flatSolidAt(released);
+      if (!out) {
+        const after = thinnest(released);
+        if (after && limitRoot(err, thin.ratio, after.ratio)) out = after.solid;
+      }
     }
     sliverMemo.set(r, out);
     return out;

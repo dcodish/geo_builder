@@ -527,7 +527,11 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   ruling 2026-10-07, #1860; it was a notice before). A thin but real solid («∠BAS = 41 · ∠DAS = 50») builds with no
   notice and no refusal. **A declared polygon is never drawn flat:** the line that collapses one («AB = 5 · BC = 3 · AC = 8» on
   «משולש ABC», or an incidence on a rider or on a point that already exists, in whichever order the two are stated — «M על AB · M אמצע BC» and «M אמצע BC · M על AB» alike, #1847) is refused, naming the statements — a straight line is not a
-  triangle. **A declared polygon over points fixed by coordinates is never drawn crossed:** when its ring, in the
+  triangle. **The same holds when the givens hold only in the LIMIT of a collapse** («משולש ABC · |BA| = |BC| ·
+  ∠ACB = 90°», or «AC ⊥ BC» / «CA ⊥ CB», in either order, or «משולש ישר זווית שווה שוקיים ABC · ∠ACB = 90°»: the right angle
+  at C makes BA the hypotenuse, so the lengths agree only when C = A). The completing line is refused with the same words,
+  never drawn as a sliver (#2292, ADR-3D-372, ADR-W-146); a thin but real triangle («|AB| = 2 · |BC| = 1 · AC ⊥ BC»)
+  builds. **A declared polygon over points fixed by coordinates is never drawn crossed:** when its ring, in the
   order named, crosses itself («A(0,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD»), the line that completed it
   — the declaration, or the coordinate typed last — is refused in analytic's words. **The same holds for points a
   SHAPE placed** («ריבוע ABCD · מרובע ACBD», a cube's «מרובע ACBD», the midpoint ring «מרובע ABED», and the ring
