@@ -28,6 +28,7 @@
  */
 
 import { hasConstructionSignal } from '../../shell/llm/constructionSignal';
+import { AT_VERTEX, COPULA_HE, RIGHT_ANGLED } from './lexicon';
 
 export type ScopeCategory =
   | 'analytic'
@@ -476,6 +477,74 @@ export const wordRootMagnitude = (utterance: string): boolean => /שורש\s*[\d
  */
 const NEGATION_WORDS =
   /(?:^|[\s,.;:!?("'‘’“”-])(?:[שוה]?לא|אינ[הוםן]|איננ[הו]|אין)(?=$|[\s,.;:!?)"'‘’“”-])|≠|\bnot\b|\bisn't\b|\baren't\b|\bdoesn't\b/i;
+
+/**
+ * #2234 / #2143 ([ADR-737](../../docs/06-decisions.md#adr-737)) — "RIGHT-ANGLED AT X" IS NEVER A GIVEN.
+ *
+ * Operator ruling, 2026-10-18 (#2234): *"the syntax of המשולש ישר זווית ב-B is not accepted. user should separate this
+ * to 2 lines and the term ישר זווית ב- X is not have to define an angle. This might require some removal of code but i
+ * do not want to accept this syntax - not even through AI."*
+ *
+ * So the phrase is recognised by its WORDS — the adjective {@link RIGHT_ANGLED}, then (inside one clause) at most a
+ * triangle noun, a three-label run and a copula, then the vertex locative {@link AT_VERTEX} — and `parseResolved` asks
+ * here before any rule reads the line. Before this, 2-D refused it only where a reading happened to cover it (ADR-603's
+ * read-extent battery saw the tail «ב-B» unread after a right-triangle reading); every other spelling either reached
+ * the AI or was read as an angle («right-angled at B» → ∠ABC = 90, green).
+ *
+ * Returns the vertex (upper-cased), the triangle the line NAMES (the uppercase run after a triangle noun, or a bare
+ * three-label subject right before the adjective), and `rest`: what the line says besides the phrase (the text after
+ * the vertex, and any stated part before the statement), for the teach to number from (3). Null when the line does
+ * not carry the phrase, or when the adjective belongs to a polygon noun that is not a triangle («טרפז ABCD ישר זווית
+ * ב-B», «מלבן ABCD …» — not this ruling's, left as they were).
+ */
+export interface RightAngledAtVertex {
+  vertex: string;
+  /** the triangle the line names, upper-cased — null when it names none */
+  named: string[] | null;
+  rest: string;
+}
+const RA_TRI_NOUN = String.raw`(?:ה|the\s+)?(?:משולש|triangle|△)`;
+const RA_RUN = String.raw`(?:[A-Z]\d*\s*){3}`;
+/** «…ישר זווית שהזווית הישרה שלו ב-B»: a relative that restates the right angle before the locative is the same phrase. */
+const RA_RESTATED = String.raw`ש(?:בו\s+|בה\s+)?ה?זוו?ית\s+ה?ישרה(?:\s+(?:שלו|שלה|היא|הוא|נמצאת|נמצא))*\s*`;
+const RIGHT_ANGLED_AT = new RegExp(
+  String.raw`(${RIGHT_ANGLED})\s*(?:${RA_TRI_NOUN}\s*)?(?:${RA_RUN})?\s*(?:(?:${COPULA_HE}|is)\s+)?(?:${RA_RESTATED})?(${AT_VERTEX})`,
+  'i',
+);
+const RA_POLYGON_NOUN = new RegExp(`(${SHAPE_NOUNS_HE.join('|')})|\\b(${SHAPE_NOUNS_EN.join('|')}|trapezium)s?\\b|[△▲]`, 'gi');
+const RA_TRIANGLE_RUN = new RegExp(String.raw`(?:משולש|\btriangle|[△▲])[^A-Za-z]*?(?:${RIGHT_ANGLED}\s*)?((?:[A-Z]\d*\s*){3})(?![A-Za-z\d])`);
+const RA_BARE_SUBJECT = new RegExp(String.raw`(?<![A-Za-z\d])((?:[A-Z]\d*\s*){3})\s*(?:(?:${COPULA_HE}|is)\s+)?$`);
+const RA_LEADING_JOIN = new RegExp(String.raw`^[\s,;]*(?:(?:${CLAUSE_CONNECTIVES}|${CLAUSE_RELATIVES})(?![A-Za-zא-ת])|ו-?)?\s*`, 'i');
+const labelsIn = (run: string): string[] => (run.match(/[A-Z]\d*/g) ?? []).map((x) => x.toUpperCase());
+
+export function rightAngledAtVertex(utterance: string): RightAngledAtVertex | null {
+  const s = utterance;
+  const m = RIGHT_ANGLED_AT.exec(s);
+  if (!m) return null;
+  const head = s.slice(0, m.index + m[0].length - m[2].length);
+  // the polygon the adjective is said of: the last polygon noun before the locative
+  const nouns = [...head.matchAll(RA_POLYGON_NOUN)];
+  const noun = nouns.at(-1)?.[0];
+  if (noun && !/משולש|triangle|[△▲]/i.test(noun)) return null;
+  const vertex = (m[2].match(/[A-Za-z]\d*(?=[^A-Za-z\d]*$)/)?.[0] ?? '').toUpperCase();
+  if (!vertex) return null;
+  // the statement's start: its triangle noun (with its article / clitics), else a bare subject run, else the adjective
+  const tri = RA_TRIANGLE_RUN.exec(head);
+  const bare = tri ? null : RA_BARE_SUBJECT.exec(s.slice(0, m.index));
+  const named = tri ? labelsIn(tri[1]) : bare ? labelsIn(bare[1]) : null;
+  const nounAt = nouns.length ? nouns.at(-1)!.index! : -1;
+  let start = tri ? Math.min(tri.index, nounAt < 0 ? tri.index : nounAt) : bare ? bare.index : nounAt >= 0 ? nounAt : m.index;
+  // the clitics / article glued to the noun belong to the statement («המשולש», "the triangle")
+  start = Math.min(start, m.index); // «right triangle ABC at B»: the adjective opens the statement
+  const lead = s.slice(0, start).match(/(?:(?<![A-Za-z])the\s+|[והבלש]+)$/i);
+  if (lead) start -= lead[0].length;
+  const before = s.slice(0, start);
+  // the connective that joined the next part to the phrase is not part of it («ו-AB = 4», "and AB = 4")
+  const after = s.slice(m.index + m[0].length).replace(RA_LEADING_JOIN, '');
+  // a part stated BEFORE the statement is kept only when it states something (a label or a number) — «נתון» is not a part
+  const rest = [/[A-Za-z\d]/.test(before) ? before.replace(/[\s,;.]+$/, '') : '', after.trim()].filter(Boolean).join(', ');
+  return { vertex, named: named && named.length === 3 ? named : null, rest };
+}
 
 /** The negation a statement carries, or null. One vocabulary: the pipeline's refusal reads exactly this. */
 export const statedNegation = (utterance: string): string | null => {

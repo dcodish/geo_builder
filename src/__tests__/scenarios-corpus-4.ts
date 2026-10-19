@@ -51,7 +51,7 @@ import { gateVerdict } from './submit-gate';
 import i18n from '@/i18n';
 import { humanizeError } from '@/i18n/humanizeError';
 import { otherUtteranceForError } from '@/app/errorSubject';
-import { latinAngleLetters, parse } from '@/parser';
+import { latinAngleLetters, latinProseLabels, parse } from '@/parser';
 import { COLLINEAR_CIRCLE_VS } from '@/engine/cyclicFeasibility';
 import { stripFormatControls } from '../../shell/bidi';
 import { COLLAPSED_VS, computeValues, detectAll, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
@@ -5405,6 +5405,50 @@ export const SCENARIOS_4: Scenario[] = [
       const again = factsOf(['משולש ABC', 'זוית B=b', 'זוית C=b']);
       expect(latinAngleLetters([again[again.length - 1].cmd], again.slice(0, -1).map((f) => f.cmd)), 'once per letter').toEqual([]);
       expect(stripFormatControls(i18n.t('input.greekAngleLetter', { lng: 'he' }) as string)).toBe('נקלט. לזוויות נהוג להשתמש באותיות יווניות — למשל «זוית B=β».');
+    },
+  },
+  {
+    id: 'right-angled-at-vertex-refused-2234',
+    title: '«משולש ABC» · «המשולש ישר זווית ב-B» is refused with the two lines that build it — never read, never the AI (#2234, ADR-737)',
+    guards:
+      "#2234 (P1), operator ruling 2026-10-18: *\"the syntax of המשולש ישר זווית ב-B is not accepted. user should separate this to 2 lines … i do not want to accept this syntax - not even through AI.\"* Measured at b7d6223c through decideDeterministic2D: the line escalated to the AI (and «right-angled at B» committed ∠ABC = 90). Root cause: the phrase was refused only where a reading happened to cover it (ADR-603's read extent after a right-triangle reading). Fix: the lexicon's RIGHT_ANGLED / AT_VERTEX atoms compose the recognizer rightAngledAtVertex, and parseResolved refuses `right-angle-vertex` before any rule. Step 2 is a declared refusal naming the triangle and the angle the teach shows; the figure keeps △ABC with no right angle. The decision matrix (every spelling, both seams, the residual messages, the LLM lane) is src/app/__tests__/issue-2234-right-angled-at-vertex.test.ts.",
+    steps: ['משולש ABC', 'המשולש ישר זווית ב-B'],
+    refusedSteps: [{ step: 2, reason: 'right-angle-vertex', with: { triangle: 'ABC', angle: 'ABC', vertex: 'B' }, why: '#2234 ruling 2026-10-18: «ישר זווית ב-X» is not accepted; teach the two lines' }],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC']);
+      expect(facts.map((f) => f.cmd.type)).toEqual(['triangle']);
+      expect(facts.some((f) => f.cmd.type === 'set-angle' || f.cmd.type === 'right-triangle'), 'no right angle was stated').toBe(false);
+    },
+  },
+  {
+    id: 'english-shape-word-not-labels-2234',
+    title: '«משולש ABC» · "the triangle is right-angled" draws no points T, R, I — the line goes to the AI (#2234, ADR-738)',
+    guards:
+      "#2234 (P1, the report): after «משולש ABC», \"the triangle is right-angled\" committed ∠TRI = 90 on three new points, green, teaching «∠TRI = 90» — the angle noun matched inside «tri**angle**» and the label reader took «tri». Rulings: #2195 card 6 (2026-10-16) *\"lowercase English words are never read as point labels\"*; #2234's outcome line (the named form escalates). Fix: bounded English keywords (enWord's leading guard, ANGLE_KW at every angle-family site) and the battery's latinProseLabels net. The scenario holds the parse refusal (the deterministic path no longer reads it, so the app escalates) and that no T, R or I exists. The class test is src/app/__tests__/issue-2195-latin-prose-labels.test.ts.",
+    steps: ['משולש ABC'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC']);
+      const r = parse('the triangle is right-angled', ctxOf(facts));
+      expect(r.ok, JSON.stringify(r)).toBe(false);
+      expect(!r.ok && r.reason).toBe('not-handled');
+      expect([...fig.positions.keys()].filter((k) => /^[TRI]$/.test(k))).toEqual([]);
+    },
+  },
+  {
+    id: 'english-words-not-labels-2195',
+    title: '«משולש ABC» · "highlight right triangles" records no ∠TRI = s — never committed (#2195, ADR-738)',
+    guards:
+      "#2195 (P2, fixed with #2234): \"highlight right triangles\" committed a green measure row ∠TRI = s at a vertex R that is not drawn — «triangles» read as T, R, I. Ruling 2026-10-16 (card 6): *\"lowercase English words are never read as point labels.\"* Fix: the bounded angle noun (ANGLE_KW) — no rule reads the line, so it escalates — and latinProseLabels as the net. The scenario holds that the deterministic parse no longer reads the line and that the battery's net would flag the reading it used to make.",
+    steps: ['משולש ABC'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['משולש ABC']);
+      const r = parse('highlight right triangles', ctxOf(facts));
+      expect(r.ok, JSON.stringify(r)).toBe(false);
+      const old = [{ type: 'measure-angle', vertex: 'R', ray1: 'T', ray2: 'I', expr: { coef: 1, var: 's' } }] as AnyCommand[];
+      expect(latinProseLabels('highlight right triangles', old, ['A', 'B', 'C']).length, 'the net flags the old reading').toBeGreaterThan(0);
     },
   },
 ];

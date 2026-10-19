@@ -291,6 +291,9 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2342': 'open', // #2096 (ADR-730) × #2088 (ADR-3D-370): 3-D teaches a trailing length given, not a trailing angle given («ו-∠ABC = 30»)
   '#2327': 'open', // #2177 (ADR-733): analytic does not read the reserved r on a several-circle figure; 2-D refuses it naming the circles
 
+  '#2356': 'open', // #2234 (ADR-737): 3-D sends «ישר זווית ב-X» / "right-angled at X" (definite, bare, English) to the LLM lane
+  '#2357': 'open', // #2234 (ADR-737): analytic sends the same spellings to the model
+
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1628,6 +1631,14 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2096 / #2106 (ADR-730): a right-angle vertex then «ו-∠…» is refused with the taught list, never a cut inside the angle ──
   { id: 'unread-vertex-2106', family: 'angles', steps: ['משולש ABC ישר זווית ב-A ו-∠ABC = 30'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2342' }], note: '2-D taught «(1) … ב-A ו-∠  (2) ABC = 30» before ADR-730 (analytic already refused, measured at 688dfb96); the list is locked in src/app/__tests__/issue-2096-split-cut.test.ts' },
+
+  // ── #2234 / #2143 (ADR-737): "right-angled at X" is never a given and never the AI's, in any spelling (ruling 2026-10-18) ──
+  { id: 'right-angled-at-definite-2234', family: 'angles', steps: ['משולש ABC', 'המשולש ישר זווית ב-B'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2356' }, { product: 'analytic', issue: '#2357' }], note: '2-D escalated it before ADR-737; 3-D and analytic still hand it to their model' },
+  { id: 'right-angled-at-bare-2234', family: 'angles', steps: ['משולש ABC', 'ישר זווית ב-B'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2356' }, { product: 'analytic', issue: '#2357' }], note: '2-D escalated it before ADR-737' },
+  { id: 'right-angled-at-english-2234', family: 'angles', steps: ['triangle ABC is right-angled at B'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2356' }, { product: 'analytic', issue: '#2357' }], note: '2-D escalated it before ADR-737 (#2143 asked it be read; reversed 2026-10-18)' },
+  { id: 'right-angled-at-english-and-2143', family: 'angles', steps: ['triangle ABC right-angled at B and AB = 4'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2356' }, { product: 'analytic', issue: '#2357' }], note: '2-D gave a fragment list «(1) triangle ABC right-  (2) angled at B …» before ADR-737; now the teach with «(3) AB = 4»' },
+  // ── #2195 (ADR-738): an English word is never read as point labels ──
+  { id: 'english-words-not-labels-2195', family: 'angles', steps: ['משולש ABC', 'highlight right triangles'], expect: 'not-handled', note: '2-D committed ∠TRI = s («triangles» read as T, R, I) before ADR-738; analytic and 3-D already did not read it' },
 
   // ── #2177 (ADR-733): the reserved r on a figure with several circles names none of them — refused, never a pick ──
   { id: 'reserved-r-several-circles-2177', family: 'circles', steps: ['מעגל O ברדיוס 3', 'מעגל P ברדיוס 5', 'r = 4'], expect: 'refused', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2327' }], note: '2-D committed it green and ignored the 4 before ADR-733; analytic does not read it (not-handled)' },

@@ -43,7 +43,8 @@ const gateOf = (utterance: string, points: string[] = []) => {
 
 describe('#1898 — the battery assembles its list through that merge', () => {
   // Utterances whose lowering leaves something unread, so more than one gate has something to say.
-  const rows = ['מרכזו O. שתי נקודות על המעגל A ו B', 'משולש ABC ישר זווית ב-B', 'AD גובה לצלע BC שהוא גם תיכון'];
+  // #2234 (ADR-737): «משולש ABC ישר זווית ב-B» no longer parses (refused by its words), so its twin with a lost vertex tail stands in
+  const rows = ['מרכזו O. שתי נקודות על המעגל A ו B', 'משולש ABC שווה שוקיים ב-B', 'AD גובה לצלע BC שהוא גם תיכון'];
 
   for (const u of rows) {
     it(`«${u}» — items is exactly unreadItems over the gate outputs, with no repeats`, () => {
@@ -58,6 +59,7 @@ describe('#1898 — the battery assembles its list through that merge', () => {
           g.droppedWordRels,
           g.droppedConstruct,
           g.unaccounted.map((x) => x.text),
+          g.latinProse,
           g.unread?.items ?? [],
           g.unreadRole?.items ?? [],
         ),

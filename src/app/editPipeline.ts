@@ -23,6 +23,7 @@ import { autoNamedLabels, groupKey, impliedIdentityBinding, mergeFacts, nameByUs
 import { ambiguousDefiniteShapeNote, roleReadingConfig, type DecideBind } from './decideDeterministic';
 import { vertexPairVerdict } from './vertexPairCevian';
 import { honestyGateReport } from './honestyGates';
+import { rightAngleVertexNote } from './unreadParts';
 import { forcedCrossedRing, impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
 import { findProofTarget } from '../../shell/proofTarget';
@@ -158,6 +159,12 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     setInputNote(t(note.key, { ...note.params, plural: t(note.params.plural.t) }));
     return false;
   }
+  // #2234 (ADR-737): "right-angled at X" — the submit seam's refusal, in the same words
+  if (!r.ok && r.reason === 'right-angle-vertex') {
+    const note = rightAngleVertexNote(r, editText);
+    setInputNote(t(note.key, note.params));
+    return false;
+  }
   // #2263 (ADR-702): one radius on a nested pair — the edit is refused naming the radius phrase it cannot keep,
   // the note this seam gave the same line before (`editDropped`), never the generic «not read»
   if (!r.ok && r.reason === 'nested-pair-radius') {
@@ -170,7 +177,7 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   }
   // #779 — the convention nudge holds on the EDIT seam too (a commit seam is a commit seam):
   // an edited step whose parse read a lowercase label refuses with the corrected sentence.
-  const fold = lowercaseLabelFold(editText, r.commands);
+  const fold = lowercaseLabelFold(editText, r.commands, ectx.points ?? []);
   if (fold) {
     setInputNote(t('input.scope.lowercase-labels', { corrected: fold.corrected }));
     return false;

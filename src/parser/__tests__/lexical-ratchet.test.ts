@@ -13,6 +13,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { ANGLE_KW, EN_START, enWord } from '../lexicon';
 
 const root = path.resolve(__dirname, '../../..');
 const parse2 = readFileSync(path.join(root, 'src/parser/parse.ts'), 'utf8');
@@ -39,6 +40,10 @@ const CEILINGS = {
   // the uses 33 → 22 (the NUMTERM atom itself is five of them). The sites left REQUIRE the next token right after
   // the number (a π, a letter, a √, `$`), so a quotient fails to match and escalates — it is never truncated.
   parse2Coef: 22, // '${COEF}' in parse.ts
+  // #2195 (ADR-738): the angle-family rules test and strip the lexicon's bounded ANGLE_KW; the unbounded inline
+  // English noun matched inside «tri**angle**» / «**angle**d» and handed «tri» / «d» to the label reader. 18 → 4 (a doc
+  // comment, a coefficient finder that reads no label, a copula rewrite, and a gate's atom classifier).
+  parse2AngleInline: 4, // 'angle|∠' in parse.ts
 };
 
 describe('lexical ratchet — inline fragment counts must not grow (docs/24 S2.1)', () => {
@@ -57,6 +62,13 @@ describe('lexical ratchet — inline fragment counts must not grow (docs/24 S2.1
   it('parse.ts legacy-decimal COEF uses ≤ ceiling (#2008 — a coefficient slot reads NUMEXPR)', () => {
     expect(count(parse2, '${COEF}')).toBeLessThanOrEqual(CEILINGS.parse2Coef);
     expect(count(parse2, '${COEF}')).toBeGreaterThan(0);
+  });
+  it('parse.ts inline angle-noun alternations ≤ ceiling (#2195 — compose ANGLE_KW)', () => {
+    expect(count(parse2, 'angle|∠')).toBeLessThanOrEqual(CEILINGS.parse2AngleInline);
+  });
+  it('#2195: an English keyword atom is bounded on BOTH sides (enWord carries the leading guard)', () => {
+    expect(enWord('parallel').startsWith(EN_START)).toBe(true);
+    expect(ANGLE_KW).toContain(EN_START);
   });
   it('non-vacuity: the counters actually see the fragments', () => {
     expect(count(parse2, String.raw`[A-Za-z]\d*`)).toBeGreaterThan(100);

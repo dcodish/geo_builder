@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -29,7 +29,7 @@ import { foldGlyphs } from '../../shell/glyphFold';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
-import { foreignGiven } from './scope';
+import { foreignGiven, rightAngledAtVertex } from './scope';
 import { readFrame } from './frame';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
 import { nameAccounting } from '../../shell/llm/honestyCore';
@@ -156,6 +156,11 @@ export type ParseResult =
   // (operator ruling 2026-10-16: refuse, naming them, with the named form as the next step). `shapes` in figure
   // order; `sides` the arity they share; `example` the student's own sentence with the first one's letters after the noun.
   | { ok: false; reason: 'ambiguous-definite-shape'; shapes: string[]; sides: number; example: string }
+  // #2234 / #2143 ([ADR-737](../../docs/06-decisions.md#adr-737)): "right-angled at X" («ישר זווית ב-X») — never a given,
+  // in any spelling, and never the AI's (operator ruling 2026-10-18). Decided by the phrase, before any rule reads the
+  // line (`rightAngledAtVertex`). `triangle` / `angle`: the two lines that build it («משולש ABC», «∠ABC = 90°») when a
+  // triangle holds the vertex; absent when none does. `rest`: the line's other parts, for the teach to continue from (3).
+  | { ok: false; reason: 'right-angle-vertex'; vertex: string; triangle?: string; angle?: string; rest: string }
   // #889: the OTHER ambiguity, and a different question. #461's shape-plus-construct rule knows
   // exactly which shape it is about — «מרובע ABCD עם אלכסון» — and cannot know WHICH VARIANT of the
   // construct: either diagonal, one of three altitudes. The candidates are constructs that do not
@@ -923,6 +928,43 @@ const definiteShapeVertices = (s: string, ctx: ParseContext, n: number, from = 0
 };
 /** A {@link definiteShapeVertices} result that is the question, not vertices. */
 const isClarify = (v: Id[] | Clarify | null): v is Clarify => v !== null && !Array.isArray(v);
+
+/**
+ * #2234 / #2143 ([ADR-737](../../docs/06-decisions.md#adr-737)) — THE REFUSAL OF "RIGHT-ANGLED AT X", decided by the
+ * phrase (`rightAngledAtVertex`, the lexicon's `RIGHT_ANGLED` and `AT_VERTEX`), ahead of every rule. Which triangle
+ * the teach names:
+ *  - the one the line names («משולש ABC …», "triangle ABC …", "ABC is right-angled at B");
+ *  - else the definite noun's («המשולש …», "the triangle …"): ADR-685's resolver — two or more triangles drawn is its
+ *    `ambiguous-definite-shape` question;
+ *  - else (no noun, or the vertex is not the named triangle's) the angle at X, by the ONE lone-vertex resolver (#1445):
+ *    no angle there or several → its `ambiguous-angle` answer (the message the line got before); exactly one, held by a
+ *    triangle of the figure → that triangle; held by none (a square's corner, two segments) → no triangle, which the
+ *    seams answer with the existing «couldn't read this yet».
+ * The angle is the vertex with its two neighbours in the triangle's order (∠ABC for B, ∠CAB for A, ∠BCA for C).
+ */
+function rightAngleVertexRefusal(s: string, ctx: ParseContext): ParseResult | null {
+  const m = rightAngledAtVertex(s);
+  if (!m) return null;
+  const v = m.vertex;
+  const teach = (ids: Id[]): ParseResult => {
+    const i = ids.indexOf(v);
+    return { ok: false, reason: 'right-angle-vertex', vertex: v, triangle: ids.join(''), angle: `${ids[(i + 2) % 3]}${v}${ids[(i + 1) % 3]}`, rest: m.rest };
+  };
+  let tri: Id[] | null = m.named;
+  if (!tri) {
+    const def = definiteShapeVertices(s, ctx, 3);
+    if (isClarify(def)) {
+      if (def.clarify !== 'ambiguous-definite-shape') return null;
+      return { ok: false, reason: 'ambiguous-definite-shape', shapes: def.shapes, sides: def.sides, example: def.example };
+    }
+    tri = def;
+  }
+  if (tri && tri.includes(v)) return teach(tri);
+  const at = resolveVertexAngle(v, ctx);
+  if ('clarify' in at) return { ok: false, reason: 'ambiguous-angle', vertex: at.vertex, ...(at.options ? { options: at.options } : {}) };
+  const holder = (ctx.polygons ?? []).map((p) => p.map(up)).find((p) => p.length === 3 && [at.ray1, at.vertex, at.ray2].every((x) => p.includes(x)));
+  return holder ? teach(holder) : { ok: false, reason: 'right-angle-vertex', vertex: v, rest: m.rest };
+}
 
 /** #2127 ([ADR-654](../../docs/06-decisions.md#adr-654)): the outermost `parse` call collects the existing polygons an
  *  INDEFINITE shape noun was bound to; only one the winning commands name is reported (`indefiniteShape`). */
@@ -2378,7 +2420,7 @@ const bisectorIntersection: Rule = (s, ctx) => {
   }
   // Strip every keyword word so only the point label + the two angle triples remain.
   const kw =
-    /bisectors?|angles?|intersection|intersect\w*|meets?|points?|of|the|is|are|and|זוו?ית|הזוו?יות|חוצי|חוצה|חוצ|חיתוך|נחתכים|נקודת|המפגש|מפגש|נפגשים|של|הם|בנקודה/gi;
+    /\b(?:bisectors?|angles?|intersection|intersect\w*|meets?|points?|of|the|is|are|and)\b|זוו?ית|הזוו?יות|חוצי|חוצה|חוצ|חיתוך|נחתכים|נקודת|המפגש|מפגש|נפגשים|של|הם|בנקודה/gi; // #2195: English words whole
   const labels = s.replace(kw, ' ').replace(/-/g, ' ').match(/\b[A-Za-z]{1,3}\b/g) ?? [];
   const point = labels.find((l) => l.length === 1);
   const triples = labels.filter((l) => l.length === 3).map((l) => l.toUpperCase());
@@ -2585,7 +2627,7 @@ const centralAngle: Rule = (s, ctx) => {
     if (!centre) return null; // can't resolve the circle → defer honestly (never guess a centre)
   } else {
     // three-letter form "COD": the MIDDLE letter is the centre
-    const cleaned = body.replace(/מרכזית|central|angle|∠|זוו?ית|נשענת|subtend\w*|על|the/gi, ' ');
+    const cleaned = body.replace(ANGLE_KW_G, ' ').replace(/מרכזית|\bcentral\b|נשענת|\bsubtend\w*|על|\bthe\b/gi, ' '); // #2195: bounded
     const ids = labelRun(cleaned, 3);
     if (!ids) return null;
     [a, centre, b] = ids;
@@ -2730,6 +2772,12 @@ function angleReadingsOf(cmds: AnyCommand[], sink: AngleArms[]): string[] {
  * match inside «ABC», so the triple spelling can never be re-read as a segment pair.
  */
 const ANGLE_SIDE_PAIR_RE = /\b([A-Z]\d*)([A-Z]\d*)\b/g;
+/** #2195 ([ADR-738](../../docs/06-decisions.md#adr-738)) — the angle-family rules' noun, compiled WITHOUT `/i` (the
+ *  lexicon atom spells its case, so «angleABC = 40» still reads while «angled» does not): the test and the strip. */
+const ANGLE_KW_RE = new RegExp(ANGLE_KW);
+const ANGLE_KW_G = new RegExp(ANGLE_KW, 'g');
+/** The angle REFERENCES of a line, counted by `angleValueBlocked` (the word, then a glyph pressed after it, is one). */
+const ANGLE_REF_COUNT = new RegExp(String.raw`(?:ה?זוו?ית|${ANGLE_EN})(?:\s*∠)?|∠|∢`, 'g');
 function angleBetweenSides(text: string): AngleArms | Clarify | null {
   // Gated on the connective, so this lane can only fire on the "between" phrasing and never shadows a
   // reading the triple/single-vertex lanes already own.
@@ -2751,6 +2799,9 @@ function angleArms(text: string, ctx: ParseContext): AngleArms | Clarify | null 
   const sides = angleBetweenSides(text);
   if (sides) return sides;
   const three = labelRun(text, 3);
+  // #2195 (ADR-738): three letters name an angle only when they are three POINTS — «show ALL angles» read ∠ALL, its
+  // vertex on its own arm, green. `angleAliasRule`'s check, at the one reader.
+  if (three && new Set(three).size !== 3) return null;
   if (three) return { ray1: three[0], vertex: three[1], ray2: three[2] };
   // SINGLE-vertex form — «∠B = …». Well-defined only when the named vertex has EXACTLY two edges in
   // the figure (one possible angle): resolve its arms from `ctx.neighbors`. With any other number
@@ -2810,7 +2861,8 @@ function angleValueBlocked(s: string): boolean {
   // Count REFERENCES, not raw keyword tokens: the word immediately followed by the glyph ("זווית ∠ABC",
   // a student typing the word then pressing the ∠ toolbar button) is ONE angle — counting it as two
   // regressed that form to an LLM escalation (review 2026-07-03, P2).
-  return ((s.replace(/right[\s-]?angle/gi, ' ').match(/(?:angle|זוו?ית)(?:\s*∠)?|∠/gi) ?? []).length) > 1;
+  // #2195 (ADR-738): the English noun counted as a WORD — «triangle ABC» is not a second angle reference.
+  return ((s.replace(/right[\s-]?angle/gi, ' ').match(ANGLE_REF_COUNT) ?? []).length) > 1;
 }
 
 /**
@@ -2880,15 +2932,18 @@ const VALUE_SYMBOL_LEFT = new RegExp(
 );
 
 const angle: Rule = (s, ctx) => {
-  if (!/(?:angle|∠|זוו?ית)/i.test(s)) return null;
-  // The comparison bail (ADR-390) and the multi-angle bail now live WITH the value reader (#969), so
-  // the numeric and symbolic lanes can never again apply a different set of them.
-  if (angleValueBlocked(s)) return null;
   // The right-angle WORD form (#45 / ADR-299): "זוית B ישרה" / "זוית ABC ישרה" / "angle ABC is a right
   // angle" ≡ "= 90". Detected on the raw utterance; the "right angle" phrase is NOT a second angle
   // reference (`angleValueBlocked` counts on a copy with the phrase removed).
   const rightWord = /ישרה|right[\s-]?angle/i.test(s);
-  const stripped = s.replace(/angle|∠|זוו?ית|ישרה|right/gi, ' ');
+  // #2195 (ADR-738): the angle noun is a WORD (`ANGLE_KW`) — it used to match inside «tri**angle**» and «**angle**d»,
+  // and the strip below left «tri» / «d» for `angleArms` to read as labels (∠TRI = 90 on invented points, green).
+  // #2234 amendment 1: the right-angle WORD stays a trigger, so «ABC is right-angled» keeps its reading (∠ABC = 90).
+  if (!ANGLE_KW_RE.test(s) && !rightWord) return null;
+  // The comparison bail (ADR-390) and the multi-angle bail now live WITH the value reader (#969), so
+  // the numeric and symbolic lanes can never again apply a different set of them.
+  if (angleValueBlocked(s)) return null;
+  const stripped = s.replace(ANGLE_KW_G, ' ').replace(/ישרה|\bright\b/gi, ' ');
   const val = angleValueOf(stripped);
   // #969: this rule can now SEE a symbolic value instead of mistaking its coefficient for degrees — but
   // it never claims one. `measureAngle` runs first and owns that kind, so a symbol reaching here means
@@ -2954,8 +3009,8 @@ const boundOperand = (raw: string, ctx: ParseContext): BoundOperand | Clarify | 
   const t = raw.trim();
   if (!t) return null;
   if (new RegExp(String.raw`^${VAR}$`).test(t)) return { kind: 'var', name: t };
-  if (/(?:∠|∢|angle|זוו?ית)/i.test(t)) {
-    const stripped = t.replace(/∠|∢|angle|זוו?ית|the|של|את/gi, ' ');
+  if (ANGLE_KW_RE.test(t)) {
+    const stripped = t.replace(ANGLE_KW_G, ' ').replace(/\bthe\b|של|את/gi, ' '); // #2195: bounded
     // #970 (ADR-500): the ONE reader, here too. The copy this replaced could not carry a REFUSAL — its
     // return type had no channel for one — so «הזווית בין BD ל-CA גדולה מ-40» (two segments that never
     // meet) escalated to the paid model instead of being told what was wrong, while the identical
@@ -3097,7 +3152,8 @@ const angleAcuteness: Rule = (s, ctx) => {
   const obtuse = /קהה|obtuse/i.test(s);
   const acute = /חדה|acute/i.test(s);
   if (obtuse === acute) return null; // need exactly one of obtuse/acute (and not both)
-  const stripped = s.replace(/angle|∠|∢|זוו?ית|הזוו?ית|קהה|obtuse|חדה|acute|is|the|של|את/gi, ' ');
+  // #2195 (ADR-738): every English word stripped WHOLE — «tri**angle**» left «tri» (∠TRI acute on invented points)
+  const stripped = s.replace(ANGLE_KW_G, ' ').replace(/קהה|\bobtuse\b|חדה|\bacute\b|\bis\b|\bthe\b|של|את/gi, ' ');
   // #970 (ADR-500): the ONE reader. This rule used to carry a hand-copy of the triple and single-vertex
   // lanes, so #967's segment-pair mode had to be pasted in by hand and #831/ADR-468's stated guarantee
   // — "`angleArms` is the one place that answers WHICH angle is being named" — was not actually true.
@@ -3122,10 +3178,10 @@ const angleAcuteness: Rule = (s, ctx) => {
  * symbolic VALUE is handled by `angle` / `measureAngle`; this fires only when BOTH sides are angles.
  */
 const angleEquality: Rule = (s, ctx) => {
-  if (!/(?:angle|∠|∢|זוו?ית)/i.test(s)) return null;
+  if (!ANGLE_KW_RE.test(s)) return null; // #2195: the noun as a word
   const parts = s.split('=');
   if (parts.length !== 2) return null; // a single '=' (a chain "∠1=∠2=∠3" is handled by chainedEquality)
-  const strip = (p: string) => p.replace(/angle|∠|∢|זוו?ית/gi, ' ');
+  const strip = (p: string) => p.replace(ANGLE_KW_G, ' ');
   // A side is a full 3-letter triple, or — the book's «∠B=∠C» (issue #235, the ADR-164 pattern) — a
   // SINGLE vertex carrying its OWN angle keyword, resolved from the figure when the vertex has exactly
   // two edges (one possible angle). ≠2 edges is the honest ambiguity — the clarification now also
@@ -3133,7 +3189,7 @@ const angleEquality: Rule = (s, ctx) => {
   const sideTriple = (p: string): [Id, Id, Id] | null | AmbiguousAngle => {
     const t = labelRun(strip(p), 3);
     if (t) return t as [Id, Id, Id];
-    if (!/(?:angle|∠|∢|זוו?ית)/i.test(p)) return null; // a single-vertex side must carry its own keyword
+    if (!ANGLE_KW_RE.test(p)) return null; // a single-vertex side must carry its own keyword
     const one = labelRun(strip(p), 1);
     if (!one) return null; // numeric/symbolic side ("= 37°", "= 2α") → defer to angle/measureAngle
     const at = resolveVertexAngle(one[0], ctx); // #1445: the one lone-vertex resolver
@@ -3169,18 +3225,18 @@ const angleEquality: Rule = (s, ctx) => {
  */
 const angleAliasRule: Rule = (s, ctx) => {
   if (!/נסמן|נסמנה|סימון|לסמן|מסמנים|denote|\bmark\b|\blabel\b/i.test(s)) return null;
-  if (!/(?:angle|∠|∢|זוו?ית)/i.test(s)) return null;
+  if (!ANGLE_KW_RE.test(s)) return null; // #2195: the noun as a word
   // The name may be decorated («כזוית A1», «כ-∠A1») and may be the BARE DIGIT of the book convention
   // («נסמן זוית CAD כ 1» — the sign near the vertex IS the digit): a bare digit binds the canonical
   // VERTEX-letter + digit name (CAD כ 1 ⇒ A1), displayed as the digit alone (#262/#263, ADR-386 Am.).
   const m =
     s.match(
-      /(?:angle|∠|∢|ה?זוו?ית)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b[^A-Za-z\d]*?(?:כ|ב(?:תור)?|\bas\b|\bby\b)-?\s*(?:∠|∢|זוו?ית)?\s*-?\s*([A-Z]\d+|\d+)(?![A-Za-z\d])/,
+      new RegExp(String.raw`${ANGLE_KW}\s*(${LABEL})\s*(${LABEL})\s*(${LABEL})\b[^A-Za-z\d]*?(?:כ|ב(?:תור)?|\bas\b|\bby\b)-?\s*(?:∠|∢|זוו?ית)?\s*-?\s*([A-Z]\d+|\d+)(?![A-Za-z\d])`),
     ) ??
     // The «=» binder (#267): «נסמן ∠CAD=A1» / «denote ∠CAD = A1» — the notation-first spelling the toolbar
     // «∠» invites. The name MUST be a letter+digit LABEL (A1/B2), never a bare number — «∠CAD=40» is a
     // VALUE (owned by the `angle` rule) and «∠CAD=∠DEF» an EQUALITY; both are excluded by requiring `[A-Z]\d+`.
-    s.match(new RegExp(String.raw`(?:angle|∠|∢|ה?זוו?ית)\s*(${LABEL})\s*(${LABEL})\s*(${LABEL})\b\s*=\s*(?:∠|∢|זוו?ית)?\s*([A-Z]\d+)(?![A-Za-z\d])`));
+    s.match(new RegExp(String.raw`${ANGLE_KW}\s*(${LABEL})\s*(${LABEL})\s*(${LABEL})\b\s*=\s*(?:∠|∢|זוו?ית)?\s*([A-Z]\d+)(?![A-Za-z\d])`));
   if (!m) {
     // ALL-OR-NOTHING (the ADR-024 leftover guard; issue #262 P1): a NAMING-shaped utterance — the
     // sign/denote verb + an angle + ANY digit and no stated «=» — that this rule cannot bind must
@@ -3684,7 +3740,6 @@ type MeasureTerm = { coef: number; kind: 'length' | 'angle'; ids: Id[]; arc?: tr
 type MeasureSide = { terms: MeasureTerm[]; constant: number };
 
 const ARC_KW = /arcs?|הקשת|קשת|⌢|⏜/i;
-const ANGLE_KW = /angle|∠|∢|הזוו?ית|זוו?ית/i;
 
 // ── A trigonometric function OF an angle (#1698, ADR-566) ────────────────────────────────────────
 //
@@ -3731,7 +3786,7 @@ let trigLineRe: RegExp | null = null;
  */
 const trigLine = (): RegExp =>
   (trigLineRe ??= new RegExp(
-    String.raw`^(?:(?:נתון|ידוע)(?:\s+(?:ש-?|כי))?\s*:?\s*|given\s*(?:that\s+)?:?\s*)?(?:${TRIG_FN_EN}|${TRIG_FN_HE})\s*(?:(?:of|של)\s+)?(?:the\s+)?\(?\s*(?:${ANGLE_KW.source})?\s*(?<lab>(?:${ULABEL}\s*){1,3}|${LABEL})\s*\)?\s*(?:=|(?:הוא|היא|שווה)(?:\s*ל-?)?|is(?:\s+equal\s+to)?|equals)\s*(?<sg>[-−])?\s*${NUMEXPR('tv')}\s*\.?$`,
+    String.raw`^(?:(?:נתון|ידוע)(?:\s+(?:ש-?|כי))?\s*:?\s*|given\s*(?:that\s+)?:?\s*)?(?:${TRIG_FN_EN}|${TRIG_FN_HE})\s*(?:(?:of|של)\s+)?(?:the\s+)?\(?\s*(?:${ANGLE_KW})?\s*(?<lab>(?:${ULABEL}\s*){1,3}|${LABEL})\s*\)?\s*(?:=|(?:הוא|היא|שווה)(?:\s*ל-?)?|is(?:\s+equal\s+to)?|equals)\s*(?<sg>[-−])?\s*${NUMEXPR('tv')}\s*\.?$`,
     'iu',
   ));
 
@@ -3751,7 +3806,7 @@ function trigGiven(s: string, ctx: ParseContext): ParseResult | null {
   // or is the label the function is applied to («tan B = 2»).
   const after = s.slice(fnM.index! + fnM[0].length);
   const appliedToLabel = new RegExp(String.raw`^\s*(?:(?:of|של)\s+)?(?:the\s+)?\(?\s*${ULABEL}`, 'u').test(after);
-  if (!ANGLE_KW.test(s) && !appliedToLabel) return null;
+  if (!ANGLE_KW_RE.test(s) && !appliedToLabel) return null;
   const word = fnM.groups!.en ?? fnM.groups!.enw ?? fnM.groups!.he ?? '';
   const fn = trigFnOf(word);
   const shown = /[א-ת]/.test(word) || /^(?:tangent|cotangent|sine|cosine)$/i.test(word) ? fn : word.toLowerCase();
@@ -3863,8 +3918,8 @@ function parseMeasureSide(raw: string, ctx: ParseContext, center: string | null)
       continue;
     }
     // 4) an ANGLE term — 3 letters (vertex middle) or a single vertex resolved from the figure
-    if (ANGLE_KW.test(chunk)) {
-      const stripped = chunk.replace(new RegExp(ANGLE_KW.source, 'gi'), ' ');
+    if (ANGLE_KW_RE.test(chunk)) {
+      const stripped = chunk.replace(ANGLE_KW_G, ' ');
       if (labels.length === 3) {
         const tri = labelRun(stripped, 3);
         if (!tri) return null;
@@ -4699,12 +4754,12 @@ const measurePower: Rule = (s) => {
  * part of this rule's vocabulary, and cannot go stale against the other lane's.
  */
 const measureAngle: Rule = (s, ctx) => {
-  if (!/angle|∠|זוו?ית/i.test(s)) return null;
+  if (!ANGLE_KW_RE.test(s)) return null; // #2195 (ADR-738): «tri**angle**s» is not the angle noun
   if (angleValueBlocked(s)) return null;
   // The right-angle WORD is 90°, never a symbol — and «…is a right angle» ends in a letter this rule
   // must not read as one. `angle` owns that form.
   if (/ישרה|right[\s-]?angle/i.test(s)) return null;
-  const stripped = s.replace(/angle|∠|זוו?ית/gi, ' ');
+  const stripped = s.replace(ANGLE_KW_G, ' ');
   const v = angleValueOf(stripped);
   if (v?.kind !== 'sym') return null; // numeric or unreadable → let `angle` take the numeric case
   // #831: the SAME vertex reader the numeric lane uses — so «זווית A = α» resolves its arms from
@@ -8310,7 +8365,7 @@ const bisectorSegmentIntersection: Rule = (s) => {
   if (!BISECTOR_KW.test(s)) return null;
   if (!(INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s))) return null;
   const stripped = s
-    .replace(/bisectors?|angles?|of|the|is|are|and|with|זוו?ית|הזוו?יות|חוצי|חוצה|חוצ|intersection|intersect\w*|meets?|עם|חיתוך|נחתך\w*|נקודת|המפגש|של/gi, ' ')
+    .replace(/\b(?:bisectors?|angles?|of|the|is|are|and|with|intersection|intersect\w*|meets?)\b|זוו?ית|הזוו?יות|חוצי|חוצה|חוצ|עם|חיתוך|נחתך\w*|נקודת|המפגש|של/gi, ' ') // #2195: English words whole
     .replace(/-/g, ' ');
   const labels = stripped.match(/\b[A-Za-z]{1,3}\b/g) ?? [];
   const point = labels.find((l) => l.length === 1);
@@ -10115,7 +10170,7 @@ const bisectorLine: Rule = (s) => {
   if (!/bisector|חוצ/i.test(s)) return null;
   if (INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s)) return null;
   if (BISECTOR_SUBJECT.test(s)) return null; // "AD bisects ∠.." / «AD הוא חוצה …» = placing a point (deferred) — #1999: the shared subject
-  const ids = labelRun(s.replace(/bisector|angle|זוו?ית|הזוו?ית|חוצה|חוצי|חוצ|את/gi, ' '), 3);
+  const ids = labelRun(s.replace(ANGLE_KW_G, ' ').replace(/bisector|חוצה|חוצי|חוצ|את/gi, ' '), 3); // #2195: the noun as a word
   if (!ids) return null;
   return [{ type: 'bisector', id: `bis-${ids.join('')}`, vertex: ids[1], p: ids[0], q: ids[2], visible: true }];
 };
@@ -10336,7 +10391,7 @@ const circumcircle: Rule = (s, ctx) => {
   if (!circumscribes && !/through|דרך/i.test(s)) return null;
   if (circleCenter(s)) return null; // a named centre ⇒ it's a centre-based circle, not a circumcircle
   const rest = s
-    .replace(/circles?|מעגל|circumscrib\w*|through|דרך|חוסם|את|of|the|around|triangle|משולש|מרובע/gi, ' ')
+    .replace(/circles?|מעגל|circumscrib\w*|through|דרך|חוסם|את|\bof\b|\bthe\b|around|triangle|משולש|מרובע/gi, ' ') // #2195: «of»/«the» as words
     // #1438 (ADR-548): a LIST-spelled run — «A, B ו-C», "A, B and C" — is the same three points as the
     // spaced «A B C». Unread, the separators hid the run and the `circle` rule committed a circle through
     // A alone with B and C dropped. Only separators BETWEEN uppercase labels are normalised.
@@ -10735,7 +10790,7 @@ const median: Rule = (s, ctx) => {
       // utterance ("AD median in ABC"), else from the figure when it's a single
       // triangle (apex + exactly two other points). Otherwise escalate, never guess.
       const triPart = s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ');
-      const tri = triPart ? labelRun(triPart.replace(/triangle|the/gi, ' '), 3) : null;
+      const tri = triPart ? labelRun(triPart.replace(/triangle|\bthe\b/gi, ' '), 3) : null;
       if (tri && tri.includes(apex)) {
         opp = tri.filter((x) => x !== apex) as [Id, Id];
       } else {
@@ -10794,7 +10849,7 @@ const median: Rule = (s, ctx) => {
   }
   // The triangle is named after "in"/"במשולש"; read it there so the apex letter isn't double-counted.
   const triPart = s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s;
-  const tri = labelRun(triPart.replace(/triangle|the/gi, ' '), 3);
+  const tri = labelRun(triPart.replace(/triangle|\bthe\b/gi, ' '), 3);
   if (!tri) {
     // No triangle named («תיכון מ-C» alone) — the #168 sibling: resolve the opposite side from the
     // polygon the apex belongs to (exactly one non-touching edge = a triangle; else defer).
@@ -11172,7 +11227,7 @@ const altitude: Rule = (s, ctx) => {
     // are a diagonal, not an edge.
     // A triangle the sentence itself names is a stated given: the placed-foot narrowing reads the figure's rings
     // and must not overrule it (the ring base keeps its old precedence over the named triangle).
-    const namesTriangle = (labelRun((s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s).replace(/triangle|the/gi, ' '), 3) ?? []).filter((x) => x !== apex).length === 2;
+    const namesTriangle = (labelRun((s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s).replace(/triangle|\bthe\b/gi, ' '), 3) ?? []).filter((x) => x !== apex).length === 2;
     const base = (namesTriangle ? null : footNarrowedSide(apex, ctx, namedFoot)) ?? ringParallelBase(apex, ctx);
     if (base) {
       [p, q] = base; // tri stays null — the trapezoid already exists; don't re-emit a shape
@@ -11184,7 +11239,7 @@ const altitude: Rule = (s, ctx) => {
       // already-drawn triangle parses deterministically instead of escalating to the LLM (which strips the
       // named foot → the "CF" bug). Mirrors the `median` rule's context fallback.
       const triPart = s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s;
-      tri = labelRun(triPart.replace(/triangle|the/gi, ' '), 3);
+      tri = labelRun(triPart.replace(/triangle|\bthe\b/gi, ' '), 3);
       const others = tri?.filter((x) => x !== apex) ?? [];
       if (tri && others.length === 2) {
         [p, q] = others as [Id, Id];
@@ -11448,7 +11503,7 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
   const triangle = statedTriangle(tail);
   // #1999 (ADR-666): the English role noun («bisector of») and its lowercase fillers are stripped too — never read as labels
   let after = (triangle ? tail.replace(triangle.match, ' ') : tail)
-    .replace(/bisectors?|bisects?|חוצ\w*|angles?|the|את|הזוו?ית|זוו?ית|של/gi, ' ')
+    .replace(/\b(?:bisectors?|bisects?|angles?|the)\b|חוצ\w*|את|הזוו?ית|זוו?ית|של/gi, ' ') // #2195: English words whole
     .replace(/\b(?:of|is|an?)\b/g, ' ');
   const statedInAfter = statedSide(after);
   if (statedInAfter) after = after.replace(statedInAfter.match, ' ');
@@ -11508,7 +11563,7 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
     // — e.g. a triangle's corner. A different edge count leaves the intended angle ambiguous, so ASK for
     // the three letters rather than guessing or dropping it to the LLM (which drew a bare line with no
     // equal-angle constraint — the reported bug).
-    if (!/angle|זוו?ית/i.test(s)) return null;
+    if (!ANGLE_KW_RE.test(s)) return null; // #2195: «triangle» is not the angle word
     const at = resolveVertexAngle(apex, ctx); // #1445: the one lone-vertex resolver
     if (!('clarify' in at)) tri = [at.ray1, apex, at.ray2];
     else if ((ctx.points ?? []).includes(apex)) return at;
@@ -13910,7 +13965,7 @@ function parseEntry(raw: string, ctx: ParseContext): ParseResult {
   // reference rewrites (the name right after an angle keyword): a bare `A1` stays a point token (the
   // ADR-228 subscript convention), and the naming statement's own «כ-A1» is untouched.
   for (const al of ctx.angleAliases ?? []) {
-    const re = new RegExp(String.raw`((?:angle|∠|∢|ה?זוו?ית)\s*)${al.name}(?![A-Za-z\d])`, 'gi');
+    const re = new RegExp(String.raw`(${ANGLE_KW}\s*)${al.name}(?![A-Za-z\d])`, 'gi'); // #2195: the noun as a word
     s = s.replace(re, `$1${al.ray1}${al.vertex}${al.ray2}`);
   }
   // #1698 (ADR-566): a trig function of an angle is decided WHOLE before any angle rule can read the
@@ -14021,6 +14076,9 @@ function droppedLabelSpan(s: string, commands: AnyCommand[], ctx: ParseContext):
 
 /** The parse body AFTER normalization + size-qualifier resolution (the pre-#102 `parse`). */
 function parseResolved(s: string, ctx: ParseContext): ParseResult {
+  // #2234 / #2143 (ADR-737): «ישר זווית ב-X» / "right-angled at X" is refused by its words, before any rule reads it
+  const rightAngled = rightAngleVertexRefusal(s, ctx);
+  if (rightAngled) return rightAngled;
   const whole = runRules(s, ctx);
   // ADR-264 Am. 1 / issue #33: a winning parse (or a rule's clarification) that silently DROPPED something
   // the student stated — a shape NOUN left unmaterialized, a circle predicate, a radius symbol, a REGION
@@ -14881,6 +14939,81 @@ export function introducedNewLabels(
   }).invented;
 }
 
+/**
+ * #2195 ([ADR-738](../../docs/06-decisions.md#adr-738)) — the labels a line DEFINES BY NAME: a shape's vertices (`ids`),
+ * a point's own id (`id`, `id1`/`id2` — a constructed point, an auto-named foot or midpoint included), a circle's
+ * centre. A label that is only REFERENCED — a segment's end, an angle's vertex or arm — is not defined: that is how
+ * «tri» in «the triangle is right-angled» became the points T, R, I of ∠TRI. Scaffolding (`@`/`~` ids) is never a label.
+ */
+export function definedLabels(commands: readonly AnyCommand[]): Set<string> {
+  const out = new Set<string>();
+  const label = (v: unknown) => typeof v === 'string' && /^[A-Z]\d*$/.test(v) && out.add(v);
+  for (const c of commands as readonly Record<string, unknown>[]) {
+    if (Array.isArray(c.ids)) c.ids.forEach(label);
+    for (const k of ['id', 'id1', 'id2', 'center']) label(c[k]);
+    // the touch points a two-circle tangency MINTS («two tangent circles» → M; a common tangent's two touches)
+    if (c.type === 'circles-tangent') label(c.at);
+    if (c.type === 'common-tangent') { label(c.a); label(c.b); }
+  }
+  return out;
+}
+
+/** The teaching criterion (ruling 2026-10-18 on #2195): any letter on an empty figure, else a figure point or a
+ *  letter the line defines by name. One predicate for the fold and the failed-parse lift. */
+const teachableLetters = (commands: readonly AnyCommand[], existingPoints: readonly string[]): ((tok: string) => boolean) => {
+  if (existingPoints.length === 0) return () => true;
+  const ok = new Set([...existingPoints.map((p) => p.toUpperCase()), ...definedLabels(commands)]);
+  return (tok) => ok.has(tok);
+};
+
+/** #2195 (ADR-738): may the lift's candidate be TAUGHT? Every run {@link upperCasedLabelCandidate} lifted names letters
+ *  the criterion admits, given the commands the candidate parsed to. */
+export function liftTeachable(utterance: string, commands: readonly AnyCommand[], existingPoints: readonly string[] = []): boolean {
+  const teachable = teachableLetters(commands, existingPoints);
+  return liftedRuns(utterance).every((run) => (run.toUpperCase().match(/[A-Z]\d*/g) ?? []).every(teachable));
+}
+
+/**
+ * #2195 ([ADR-738](../../docs/06-decisions.md#adr-738)) — LETTERS READ OUT OF ENGLISH PROSE, the honesty battery's net.
+ *
+ * Operator ruling 2026-10-16 (#2195, card 6): *"lowercase English words are never read as point labels."* A label the
+ * commands reference is STATED when the student typed it as a capital (a Latin run's uppercase letters — not the
+ * capital that merely starts a word such as "The"), when the figure has it, or when the line defines it by name
+ * ({@link definedLabels}). One that is none of these, and whose letter occurs in the line only inside a lowercase Latin
+ * word, was read out of prose — «tri» of «triangle», «how» of «show». Returns those words, as typed. The fold teaches
+ * first on an empty figure (#779), so this speaks where the fold declined. No word list: a statement about the commands.
+ */
+export function latinProseLabels(utterance: string, commands: readonly AnyCommand[], existingPoints: readonly string[] = []): string[] {
+  const s = normalizeUtterance(utterance);
+  const runs = s.match(/(?<![A-Za-z\d])[A-Za-z][A-Za-z\d]*/g) ?? [];
+  const typed = new Set<string>();
+  for (const run of runs) {
+    for (const m of run.matchAll(/[A-Z]\d*/g)) {
+      const capitalisedWord = m.index === 0 && /^[A-Z][a-z]/.test(run) && run.length > 1;
+      if (!capitalisedWord) typed.add(m[0]);
+    }
+  }
+  const stated = new Set([...typed, ...existingPoints.map((p) => p.toUpperCase()), ...definedLabels(commands)]);
+  const referenced = new Set<string>();
+  const walk = (v: unknown): void => {
+    // a POINT label is a whole value; a compound object id («circle-O», «seg-AB», «bis-ABC») names an object the line built
+    if (typeof v === 'string') { if (/^[A-Z]\d*$/.test(v)) referenced.add(v); }
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => k !== 'type' && walk(x));
+  };
+  commands.forEach(walk);
+  const words = runs.filter((r) => /[a-z]/.test(r));
+  const out = new Set<string>();
+  for (const l of referenced) {
+    if (stated.has(l)) continue;
+    const letter = l[0].toLowerCase();
+    // named by the longest word that carries the letter («triangle», not «is»)
+    const word = words.filter((w) => w.toLowerCase().includes(letter)).sort((x, y) => y.length - x.length)[0];
+    if (word) out.add(word);
+  }
+  return [...out];
+}
+
 /** English function words — never label candidates in Latin-only text (the article "a" in "a point D
  *  on AB" must not read as the label A). Mirrors the FILLER regex, as a word set. */
 const EN_FILLER_WORDS = new Set(['a', 'an', 'to', 'the', 'and', 'of', 'is', 'are', 'at', 'on', 'in', 'with', 'from', 'that', 'so', 'such']);
@@ -14905,8 +15038,11 @@ const EN_FILLER_WORDS = new Set(['a', 'an', 'to', 'the', 'and', 'of', 'is', 'are
  * as b exactly as «AB=c» does, and «זוית B=b» names the angle at B as b. Before, the coincidence alone (b on AB,
  * b at vertex B) read as a folded label and the tool "corrected" the line to the non-sentence «AB=B».
  */
-export function lowercaseLabelFold(utterance: string, commands: AnyCommand[]): { folded: Id[]; corrected: string } | null {
+export function lowercaseLabelFold(utterance: string, commands: AnyCommand[], existingPoints: readonly string[] = []): { folded: Id[]; corrected: string } | null {
   const s = normalizeUtterance(utterance);
+  // #2195 (ADR-738, operator ruling 2026-10-18): on a DRAWN figure a run is taught only when its letters are points of
+  // the figure or points the line defines by name; on an empty figure, as before.
+  const teachable = teachableLetters(commands, existingPoints);
   // Labels the commands reference, from string VALUES only — the raw-JSON read would donate field
   // names' letters (`freeRadius` contains R), and a phantom R false-nudges the legitimate lowercase
   // measure «שרדיוסו r» (the "TYPE contains E" trap, field-name edition).
@@ -14923,7 +15059,7 @@ export function lowercaseLabelFold(utterance: string, commands: AnyCommand[]): {
   const foldToks = (run: string): Id[] | null => {
     if (symbols.has(run)) return null; // #2024: a symbol the commands carry is not a folded label
     const toks = run.toUpperCase().match(/[A-Z]\d*/g) ?? [];
-    return toks.length > 0 && toks.every((tok) => referenced.has(tok)) ? toks : null;
+    return toks.length > 0 && toks.every((tok) => referenced.has(tok) && teachable(tok)) ? toks : null;
   };
   // Pass 1 — DETECT on unambiguous runs only: in Latin text an English function word never proves a
   // fold on its own (the article "a" vs the label A is undecidable at token level).
@@ -14988,6 +15124,14 @@ export function latinAngleLetters(commands: readonly AnyCommand[], earlier: read
  * genuine gap stays a genuine gap). Hebrew text lifts every standalone run, singles included; Latin
  * text lifts non-filler runs of at most 4 letters (the 3-D cap — real English words stay words).
  */
+const LIFT_RUN = /(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g;
+/** The runs {@link upperCasedLabelCandidate} lifts. */
+const liftable = (run: string, heb: boolean): boolean => {
+  const low = run.toLowerCase();
+  if (UNIT_WORDS.has(low)) return false;
+  return heb || !(EN_FILLER_WORDS.has(low) || run.replace(/\d/g, '').length > 4);
+};
+const liftedRuns = (utterance: string): string[] => (utterance.match(LIFT_RUN) ?? []).filter((run) => liftable(run, hasHebrewScript(utterance)));
 export function upperCasedLabelCandidate(utterance: string): string | null {
   // Lifted from the RAW text (same fidelity ruling as the fold's corrected sentence) — the candidate
   // is both re-parsed (parse normalizes internally) and SHOWN, so it must read as what the student
@@ -14995,10 +15139,8 @@ export function upperCasedLabelCandidate(utterance: string): string | null {
   const s = utterance;
   const heb = hasHebrewScript(s);
   let changed = false;
-  const out = s.replace(/(?<![A-Za-z\d])(?=[A-Za-z]*[a-z])[A-Za-z][A-Za-z\d]*(?![A-Za-z\d])/g, (run) => {
-    const low = run.toLowerCase();
-    if (UNIT_WORDS.has(low)) return run;
-    if (!heb && (EN_FILLER_WORDS.has(low) || run.replace(/\d/g, '').length > 4)) return run;
+  const out = s.replace(LIFT_RUN, (run) => {
+    if (!liftable(run, heb)) return run;
     changed = true;
     return run.toUpperCase();
   });

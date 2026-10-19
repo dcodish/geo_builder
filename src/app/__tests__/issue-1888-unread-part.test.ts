@@ -50,7 +50,8 @@ async function expectRefused(prefix: readonly string[], line: string, note: { ke
   if (v.kind !== 'refuse') return;
   expect(v.category).toBe('guided');
   expect(v.note).toEqual(note);
-  expect(v.logs.at(-1)).toMatchObject({ source: 'scope', result: 'scope:split-statements:unread-part' });
+  // #2234 (ADR-737): the taught form is refused by its words at the parse boundary — its own log tag
+  expect(v.logs.at(-1)).toMatchObject({ source: 'scope', result: note.key === 'input.scope.right-angle-vertex' ? 'scope:right-angle-vertex' : 'scope:split-statements:unread-part' });
   expect(v.binds, 'nothing changes on the figure').toEqual([]);
   commitVerdict(v, line);
   expect(st().facts.length, 'nothing is committed').toBe(before);
@@ -287,7 +288,6 @@ describe('the ✎ edit seam refuses the same lines inline, naming the unread par
     return groupKey(f[f.length - 1]);
   }
   it.each([
-    [['משולש ABC'], 'משולש ABC ישר זווית ב-B', 'ב-B'],
     [['מרובע ABCD', 'AC ו-BD נפגשים בנקודה E'], 'AC ו-BD נפגשים בנקודה E שהיא אמצע BD', 'שהיא אמצע BD'],
     [['מרובע ABCD', 'AC ו-BD נפגשים בנקודה E'], 'AC ו-BD נפגשים בנקודה E על AB', 'על AB'],
     // ADR-598's flagship — committed on this seam before, with D dropped
