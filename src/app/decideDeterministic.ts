@@ -52,7 +52,7 @@ import {
 } from '@/parser';
 import { independentConstructs } from './independence';
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
-import { compoundNotHonoured, droppedClause, joinedSubject, splitStatements } from './clauseCoverage';
+import { clauseCoverageVerdict, compoundNotHonoured, joinedSubject, splitStatements } from './clauseCoverage';
 import { lostPartNote, rightAngleVertexNote } from './unreadParts';
 import { lostRoleNote } from './unreadRoles';
 import { applyCommand, type AnyCommand, type Command, type Construction, type Id, type Vec } from '@/engine';
@@ -707,13 +707,8 @@ export async function decideFromParse(
       // its own but leaves no trace in the whole-line lowering was dropped by a rule that read only part of the
       // line — every token of it can still be "accounted" («AB מקביל ל-CD ו-D על BC»: D, B, C ride the parallel).
       // The line is refused whole with the one shared message, never committed and never escalated.
-      const parsedCmds = r.commands;
-      const drop = droppedClause(utterance, parsedCmds, pctx, (clause) => {
-        // entailment: after the whole line's own commands, the clause adds nothing (empty / implied)
-        const whole = trialFacts(facts, parsedCmds).map((f) => (f.group === '~try' ? { ...f, id: f.id.replace('~try', '~line'), group: '~line' } : f));
-        const o = dryRunOutcome(whole, clause, seed);
-        return !o.produced && (o.reason === 'empty' || o.reason === 'implied');
-      });
+      // #2197 (ADR-736): the one verdict both commit seams ask (the ✎ seam calls it too)
+      const drop = clauseCoverageVerdict(utterance, r.commands, pctx, facts, seed);
       if (drop) {
         return refuse('guided', { source: 'scope', result: 'scope:split-statements:dropped-clause', commands: r.commands }, { key: drop.messageKey, params: drop.params });
       }

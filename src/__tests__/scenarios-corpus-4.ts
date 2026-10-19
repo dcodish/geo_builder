@@ -3607,6 +3607,17 @@ export const SCENARIOS_4: Scenario[] = [
       // «AE=u, AF=v, AG=w» names three measures (no constraint, no new point) — allStepsOk above proves every clause applied
       // one statement about HK with two predicates: K is on circle O, and HK touches circle P
       expect(fig.construction.objects.some((o) => o.id === 'H') && fig.construction.objects.some((o) => o.id === 'K'), 'the chord exists').toBe(true);
+      // #2197 (ADR-736): …and the two predicates HOLD — before, this step drew a tangent from P to circle O (segment PH),
+      // no HK, nothing tangent to P, green. H and K on circle O, the chord HK drawn, and HK touching circle P inside HK.
+      const H = at(fig, 'H'), K = at(fig, 'K'), O = at(fig, 'O'), P = at(fig, 'P');
+      const rO = fig.circles.get('circle-O')!.r, rP = fig.circles.get('circle-P')!.r;
+      expect(dist(O, H), 'H on circle O').toBeCloseTo(rO, 6);
+      expect(dist(O, K), 'K on circle O').toBeCloseTo(rO, 6);
+      expect(fig.construction.objects.some((o) => o.id === 'seg-HK' || o.id === 'seg-KH'), 'the chord HK is drawn').toBe(true);
+      const L = dist(H, K);
+      expect(Math.abs((K.x - H.x) * (P.y - H.y) - (K.y - H.y) * (P.x - H.x)) / L, 'HK tangent to circle P').toBeCloseTo(rP, 6);
+      const t = ((P.x - H.x) * (K.x - H.x) + (P.y - H.y) * (K.y - H.y)) / (L * L);
+      expect(t >= 0 && t <= 1, 'the touch lies inside HK').toBe(true);
     },
   },
   {

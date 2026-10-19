@@ -24,6 +24,7 @@ import { ambiguousDefiniteShapeNote, roleReadingConfig, type DecideBind } from '
 import { vertexPairVerdict } from './vertexPairCevian';
 import { honestyGateReport } from './honestyGates';
 import { rightAngleVertexNote } from './unreadParts';
+import { clauseCoverageVerdict } from './clauseCoverage';
 import { forcedCrossedRing, impliedByPrior } from '@/replay/core';
 import { logDebug } from '@/debug/sessionLog';
 import { findProofTarget } from '../../shell/proofTarget';
@@ -211,6 +212,14 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
    */
   const bindCmds = nameByUseCommands(binds);
   const prefixFacts = bindCmds.length ? trialFacts(prefixRaw, bindCmds) : prefixRaw; // #1697: with the edit's own naming
+  // #2197 (ADR-736): the clause-coverage gate, on this seam too — the submit seam's one verdict against the PREFIX
+  // (ADR-W-006). An edit whose lowering leaves a clause of the line untraced is refused naming the line's clauses.
+  const dropClause = clauseCoverageVerdict(editText, r.commands, ectx, prefixFacts, store().seed);
+  if (dropClause) {
+    logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-dropped-clause', commands: r.commands });
+    setInputNote(t('steps.editDropped', { items: dropClause.params?.all ?? editText.trim() }));
+    return false;
+  }
   // #1927 (ADR-608): the crossed-ring refusal, on this seam too, through the same predicate and against the same
   // PREFIX facts — an edit that makes a row declare a ring the figure's placed points can only cross is refused
   // inline with the submit seam's text (ADR-W-006).

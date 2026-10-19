@@ -272,6 +272,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2060': 'open', // #2024 (ADR-668): 3-D does not read a single-letter angle given a symbol («זוית B=b», «זוית B=α»)
 
   '#2140': 'open',
+  '#2218': 'open', // #2197 (ADR-736): analytic does not read a chord / diameter of one circle tangent to another in its relative and diameter forms
   '#2190': 'open', // #2198 / #2216 (ADR-677), #2149 (ADR-671) and #2217 (ADR-691): analytic does not read one «ברדיוס N» for a circle pair, nor the named two-circle sentences (centre segment, equal radii, touch point), nor a fresh equal-radii pair
   '#2236': 'open', // #2205 (ADR-685): analytic does not read a definite unnamed shape noun with a predicate
 
@@ -1047,7 +1048,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'common-tangent-internal-1622', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'AB משיק משותף פנימי לשני המעגלים'], expect: 'builds', exception: 'X8' },
   { id: 'centre-of-given-circle-1622', family: 'circles', steps: ['נתון מעגל', 'מרכז המעגל'], expect: 'builds', exception: 'X8' },
   { id: 'radius-of-created-circle-1622', family: 'circles', steps: ['A על המעגל', 'רדיוס המעגל הוא 5'], expect: 'builds', exception: 'X8' },
-  { id: 'chord-tangent-other-circle-1622', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'AB מיתר במעגל O ומשיק למעגל P'], expect: 'builds', exception: 'X8' },
+  { id: 'chord-tangent-other-circle-1622', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'AB מיתר במעגל O ומשיק למעגל P'], expect: 'builds', exception: 'X8', note: '2-D drew a tangent from P to circle O and no AB, green (a builds verdict then too) before ADR-736; the figure is locked in src/app/__tests__/issue-2197-role-pair-two-circles.test.ts' },
+  // ── #2197 (ADR-736): a chord / diameter of one circle tangent to another — AB drawn, touching the other circle ──
+  { id: 'chord-tangent-relative-2197', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'המיתר AB במעגל O משיק למעגל P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2218' }], note: '2-D drew a tangent from P to circle O before ADR-736; analytic answers not-handled' },
+  { id: 'diameter-tangent-other-circle-2197', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'AB קוטר במעגל O ומשיק למעגל P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2218' }], note: '2-D put A on B before ADR-736; analytic answers not-handled' },
   { id: 'circle-inside-the-circle-1622', family: 'circles', steps: ['מעגל O', 'מעגל מוכל בתוך המעגל'], expect: 'builds', exception: 'X8' },
   { id: 'circle-by-circumference', family: 'circles', steps: ['מעגל O שהיקפו 6π'], expect: 'builds', exception: 'X8' },
   // ── #1621 D2 (ADR-AG-215): an angle named by a Greek letter, the «נסמן» lead-in, the pin, and tan/cos of an angle ──

@@ -166,6 +166,13 @@ A single boundary: `utterance → command[]`.
   accountant's `symbol` kind requires every Greek glyph with its index (and in Latin-only text a lone lowercase
   letter beside an operator) to be carried as a whole value (`expr.var`, a measure name); `π` is paid for only
   by a rule declaring `consumed.symbols: ['π']` (ADR-462) — `measurePi`, `setRadius`'s size read.
+- **A tangent verb is evidenced by its own circle (#2197, ADR-736).** In `droppedGivenVerbs`, when the line names
+  the circle the tangent word governs («משיק ל[ה]מעגל X», "tangent to [the] circle X"), the `VERB_TANGENT` evidence
+  must include a command about X (`evidenceAboutCircle`): one naming `circle-X` / `circle-X-n` / `@ctr-X`, a
+  radius-⟂ or a foot whose source is X's centre, or a declared tangency (ADR-462). A tangent to another circle no
+  longer pays. `tangentChord` reads its statement without a named touch — the touch is the ⟂ foot from the target
+  centre on the target circle within AB, the `tangentLine` no-touch group (ADR-369) — and with the diameter noun
+  (the host lowered as `diameter`).
 - **Contextual plurals resolve against a per-family context registry (#554, ADR-503).** A line naming no
   object of its own («המשיקים נחתכים בנקודה E») resolves against `ParseContext` — `ctx.commonTangents`,
   `ctx.tangentLines`: two candidates build, more ask (`tangents-ambiguous`), fewer are not that rule. A
@@ -927,6 +934,7 @@ test fails if `runSubmit` parses or refuses on its own, and the parity shards (`
   ([ADR-735](06-decisions.md#adr-735)), (3) only declares an
   existing object, or (4) is **entailed** — dry-run after the line, `empty` or `implied` (ADR-156 / ADR-542). An
   uncovered clause refuses the line, `guided`, with `input.scope.split-statements`.
+- **Both seams** ([ADR-736](06-decisions.md#adr-736)): the commit-path check is one function, `clauseCoverageVerdict(utterance, cmds, ctx, facts, seed)` (the entailment dry run included), called by `decideFromParse` and by `runEditCommit` (`editPipeline.ts`, against the edited row's prefix; refused inline with `steps.editDropped`).
 - **Weak path** (`compoundNotHonoured`, after an honesty gate fired): a compound whose every clause lowers alone is
   refused with the same message instead of escalating.
 

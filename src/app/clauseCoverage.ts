@@ -39,6 +39,7 @@ import { augmentParseCtx, parse } from '@/parser';
 import type { ParseContext, ScopeMatch } from '@/parser';
 import type { AnyCommand } from '@/engine';
 import { clausesOf } from './independence';
+import { dryRunOutcome, trialFacts, type Fact } from '@/store/geoStore';
 
 interface ClauseReading {
   clause: string;
@@ -233,6 +234,20 @@ export function droppedClause(
   if (!read) return null;
   const dropped = read.some((r) => r.commands !== null && !traced(r.commands, commands, r.known) && !entailed(significant(r.commands)));
   return dropped ? splitStatements(read.map((r) => r.clause)) : null;
+}
+
+/**
+ * #2197 ([ADR-736](../../docs/06-decisions.md#adr-736)) — THE clause-coverage verdict both commit seams ask
+ * (ADR-W-006: derive, don't duplicate). The submit seam (`decideFromParse`) and the ✎ seam (`runEditCommit`) call
+ * this one function with the facts the line is applied after; the entailment test is the dry run of the clause after
+ * the whole line's own commands (`empty` / `implied`, ADR-156 / ADR-542). Before it, the ✎ seam had no clause gate.
+ */
+export function clauseCoverageVerdict(utterance: string, commands: readonly AnyCommand[], ctx: ParseContext, facts: Fact[], seed: number): ScopeMatch | null {
+  return droppedClause(utterance, commands, ctx, (clause) => {
+    const whole = trialFacts(facts, [...commands]).map((f) => (f.group === '~try' ? { ...f, id: f.id.replace('~try', '~line'), group: '~line' } : f));
+    const o = dryRunOutcome(whole, clause, seed);
+    return !o.produced && (o.reason === 'empty' || o.reason === 'implied');
+  });
 }
 
 /**
