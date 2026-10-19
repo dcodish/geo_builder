@@ -1,0 +1,849 @@
+{
+  "name": "round-2353",
+  "title": "Fix round #2353 (2026-10-19, P1): two circles, right-angled at X, regular polygons, 3-D sliver, 3-D coordinates, 3-D fractions",
+  "cases": [
+    {
+      "id": "T1",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "A point stated on two circles sits on both (#2185)",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "A על מעגל O ועל מעגל P"
+      ],
+      "lookFor": "A sits on BOTH circles, green. Press «הציגו תצורה אחרת»: A stays at a crossing of O and P.",
+      "before": "A was put on circle O only, green.",
+      "cycles": 1
+    },
+    {
+      "id": "T2",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "Two points on two circles each sit on both (#2185, riskiest)",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "A ו-B על מעגל O ועל מעגל P"
+      ],
+      "lookFor": "A and B each on both circles. At some configurations A and B coincide, exactly as the two-line form does.",
+      "before": "A and B were put on circle O only, green.",
+      "cycles": 2
+    },
+    {
+      "id": "T3",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "«A על מעגל O ו-B על מעגל P» puts each point on its own circle (#2185)",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "A על מעגל O ו-B על מעגל P"
+      ],
+      "lookFor": "A on O and B on P. The line is drawn, with the tip «ציירנו את שני הנתונים שכתבתם בשורה אחת… כדאי להקליד נתון אחד בכל שורה».",
+      "before": "B was silently put on O.",
+      "expectRefusal": "ציירנו את שני הנתונים"
+    },
+    {
+      "id": "T4",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "«בהתאמה» pairs the points with the circles (#2185)",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "A ו-B על מעגל O ועל מעגל P בהתאמה"
+      ],
+      "lookFor": "A on O and B on P. The line is drawn, with the tip «ציירנו את שני הנתונים שכתבתם בשורה אחת… כדאי להקליד נתון אחד בכל שורה».",
+      "before": "Both points on O.",
+      "expectRefusal": "ציירנו את שני הנתונים"
+    },
+    {
+      "id": "T5",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "A point on both diagonals of a square is their crossing (#2185)",
+      "lines": [
+        "ריבוע ABCD",
+        "P על האלכסון AC ועל האלכסון BD"
+      ],
+      "lookFor": "P at the centre of the square, on both diagonals.",
+      "before": "P on AC only."
+    },
+    {
+      "id": "T6",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "Refusal: an arc midpoint on a circle the arc is not on is not drawn on another circle (#2185, withdrawn behaviour)",
+      "lines": [
+        "משולש CDE",
+        "A על CD",
+        "B על CE",
+        "מרובע ABED חסום במעגל",
+        "משולש ABC חסום במעגל",
+        "F אמצע הקשת BC במעגל O"
+      ],
+      "expectRefusal": "לא הצלחתי לקרוא",
+      "lookFor": "F is not drawn. The last line goes to the AI (on this server, with no model, it ends «לא הצלחתי לקרוא את זה עדיין…»).",
+      "before": "F was drawn on the OTHER circle, green."
+    },
+    {
+      "id": "T7",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "verified",
+      "product": "2d",
+      "title": "An arc midpoint with no circle named still builds (regression guard)",
+      "lines": [
+        "משולש CDE",
+        "A על CD",
+        "B על CE",
+        "מרובע ABED חסום במעגל",
+        "משולש ABC חסום במעגל",
+        "F אמצע הקשת BC"
+      ],
+      "lookFor": "F drawn at the midpoint of arc BC, green.",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T8",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "A chord of one circle tangent to another is drawn as both (#2197)",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "AB מיתר במעגל O ומשיק למעגל P"
+      ],
+      "lookFor": "Segment AB with A and B on circle O, touching circle P at a point inside AB, green.",
+      "before": "No segment AB at all; a tangent was drawn from P instead, green."
+    },
+    {
+      "id": "T9",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "A diameter of one circle tangent to another (#2197)",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "AB קוטר במעגל O ומשיק למעגל P"
+      ],
+      "lookFor": "A diameter AB of circle O (through O) touching circle P.",
+      "before": "A and B landed on the same point."
+    },
+    {
+      "id": "T10",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "verified",
+      "product": "2d",
+      "title": "A common tangent at a named point still builds (regression guard)",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "המעגלים O ו-P משיקים מבחוץ",
+        "AB משיק משותף למעגלים O ו-P בנקודה X"
+      ],
+      "lookFor": "Builds green; the circles touch externally at X and AB is tangent there.",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T11",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "Refusal: a chord of both circles is not drawn with one circle dropped (#2197)",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "AB מיתר במעגל O ומיתר במעגל P"
+      ],
+      "expectRefusal": "לא הצלחתי לקרוא",
+      "lookFor": "Nothing is committed; the line goes to the AI (here, with no model: «לא הצלחתי לקרוא את זה עדיין…»). Approved but NOT delivered: building it whole needs #1950.",
+      "before": "A chord of O only, circle P silently dropped, green."
+    },
+    {
+      "id": "T12",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "A chord tangent to two more circles goes to the AI instead of a self-conflict message (not asked for)",
+      "lines": [
+        "מעגל O",
+        "מעגל P",
+        "מעגל Q",
+        "AB מיתר במעגל O ומשיק למעגל P ולמעגל Q"
+      ],
+      "expectRefusal": "לא הצלחתי לקרוא",
+      "lookFor": "Nothing is committed; the line goes to the AI. Judge whether this is acceptable.",
+      "before": "Refused with the «sentence contradicts itself» message."
+    },
+    {
+      "id": "T13",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "\"right-angled at B\" after a triangle is refused with the two lines, not drawn (#2234, riskiest)",
+      "lines": [
+        "משולש ABC",
+        "right-angled at B"
+      ],
+      "expectRefusal": "∠ABC = 90°",
+      "lookFor": "«בכל שורה נתון אחד … (1) משולש ABC  (2) ∠ABC = 90°». No right angle drawn.",
+      "before": "∠ABC = 90 was drawn green, with the note «∠ABC = 90»."
+    },
+    {
+      "id": "T14",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "«המשולש ישר זווית ב-B» is refused with the two lines and never reaches the AI (#2234, your line)",
+      "lines": [
+        "משולש ABC",
+        "המשולש ישר זווית ב-B"
+      ],
+      "expectRefusal": "∠ABC = 90°",
+      "lookFor": "The same two-line refusal. No «חושב…» spinner.",
+      "before": "Handed to the AI."
+    },
+    {
+      "id": "T15",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "\"ABC is right-angled\" still builds the right angle at B (riskiest, unchanged)",
+      "lines": [
+        "משולש ABC",
+        "ABC is right-angled"
+      ],
+      "lookFor": "∠ABC = 90 drawn green, with the note «נקלט. בפעם הבאה אפשר לכתוב כך: ∠ABC = 90».",
+      "before": "Unchanged.",
+      "expectRefusal": "נקלט"
+    },
+    {
+      "id": "T16",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "Refusal: the English named form gets the three-line teach (#2143 reversed)",
+      "lines": [
+        "triangle ABC right-angled at B and AB = 4"
+      ],
+      "expectRefusal": "(3) AB = 4",
+      "lookFor": "«(1) משולש ABC  (2) ∠ABC = 90°  (3) AB = 4».",
+      "before": "A fragment list «(1) triangle ABC right-  (2) angled at B and AB = 4»."
+    },
+    {
+      "id": "T17",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "Refusal: the bare phrase with two triangles at B lists the angles there",
+      "lines": [
+        "משולש ABC",
+        "משולש BDE",
+        "ישר זווית ב-B"
+      ],
+      "expectRefusal": "יש כמה זוויות",
+      "lookFor": "«בקודקוד B יש כמה זוויות…», with the example ∠ABC = 90.",
+      "before": "Handed to the AI."
+    },
+    {
+      "id": "T18",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "Refusal on a square's corner reuses «couldn't read this yet» (P1 message reuse)",
+      "lines": [
+        "ריבוע ABCD",
+        "right-angled at B"
+      ],
+      "expectRefusal": "לא הצלחתי לקרוא",
+      "lookFor": "«לא הצלחתי לקרוא את זה עדיין — נסו אחת מהדוגמאות למטה.» Nothing drawn, not sent to the AI.",
+      "before": "∠ABC = 90 committed."
+    },
+    {
+      "id": "T19",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "\"the triangle is right-angled\" invents no points T, R, I (#2234)",
+      "lines": [
+        "משולש ABC",
+        "the triangle is right-angled"
+      ],
+      "expectRefusal": "לא הצלחתי לקרוא",
+      "expectAbsent": [
+        "∠TRI"
+      ],
+      "lookFor": "No new points T, R, I and no «∠TRI = 90» note; the line goes to the AI.",
+      "before": "Three new points T, R, I with a right angle, green."
+    },
+    {
+      "id": "T20",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "Refusal: \"show all angles\" gets the marks message",
+      "lines": [
+        "משולש ABC",
+        "show all angles"
+      ],
+      "expectRefusal": "אוטומטית",
+      "lookFor": "«סימונים על השרטוט… מופיעים אוטומטית…».",
+      "before": "«נסו: show ALL angles»."
+    },
+    {
+      "id": "T21",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "verified",
+      "product": "2d",
+      "title": "Lowercase teaching still works on a drawn triangle (regression guard)",
+      "lines": [
+        "משולש ABC",
+        "ab = 5"
+      ],
+      "expectRefusal": "באות לטינית גדולה",
+      "lookFor": "«שמות נקודות נכתבים באות לטינית גדולה. נסו: AB = 5».",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T22",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "An English word on a drawn figure is not taught as capital letters",
+      "lines": [
+        "משולש ABC",
+        "angle at the top is 40"
+      ],
+      "expectRefusal": "לא יצר שום דבר",
+      "expectAbsent": [
+        "TOP"
+      ],
+      "lookFor": "No «…the TOP…» nudge and nothing drawn; the line goes to the AI (here, with no model: «הבנתי את זה אבל זה לא יצר שום דבר באיור…»).",
+      "before": "«נסו: angle at the TOP is 40»."
+    },
+    {
+      "id": "T23",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "verified",
+      "product": "2d",
+      "title": "A right angle stated as an angle still builds (regression guard)",
+      "lines": [
+        "משולש ABC",
+        "זווית ישרה ב-B"
+      ],
+      "lookFor": "∠ABC = 90 drawn green.",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T24",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "A drawn pentagon declared regular gets five equal sides (#2265)",
+      "lines": [
+        "מחומש ABCDE",
+        "המחומש משוכלל"
+      ],
+      "lookFor": "All five sides equal, green.",
+      "before": "Green with sides 5.86 / 5.95 / 4.72 / 4.81 / 4.68."
+    },
+    {
+      "id": "T25",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "The same with the pentagon named (#2265)",
+      "lines": [
+        "מחומש ABCDE",
+        "המחומש ABCDE משוכלל"
+      ],
+      "lookFor": "Five equal sides.",
+      "before": "The same unequal sides, green."
+    },
+    {
+      "id": "T26",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "A drawn hexagon declared regular (#2265)",
+      "lines": [
+        "משושה ABCDEF",
+        "המשושה משוכלל"
+      ],
+      "lookFor": "Six equal sides.",
+      "before": "5.03 / 5.10 / 3.83 / 3.87 / 3.84 / 3.61, green."
+    },
+    {
+      "id": "T27",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "look",
+      "product": "2d",
+      "title": "A drawn octagon declared regular (#2265)",
+      "lines": [
+        "מתומן ABCDEFGH",
+        "המתומן משוכלל"
+      ],
+      "lookFor": "Eight equal sides.",
+      "before": "Unequal, green."
+    },
+    {
+      "id": "T28",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "Refusal: «regular» against two stated unequal sides (#2265)",
+      "lines": [
+        "מחומש ABCDE",
+        "AB = 3",
+        "BC = 4",
+        "המחומש משוכלל"
+      ],
+      "lookFor": "After a long «חושב…» (about 17 s, filed as #2359), the last line is refused: «לא ניתן: «המחומש משוכלל» סותר את «BC = 4» — אי אפשר לקיים את שניהם יחד». AB = 3 and BC = 4 stay.",
+      "before": "Green with sides 3 / 4 / 6.38 / 8.38 / 6.50.",
+      "_probe": "verified-by-probe on main @ 2662bd4d: refused after 17.5 s with «לא ניתן: «המחומש משוכלל» סותר את «BC = 4» … הסיבה: |AB| = |BC|» (the square analog: 3.0 s). The slow wait is #2359."
+    },
+    {
+      "id": "T29",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "verified",
+      "product": "2d",
+      "title": "A regular pentagon typed in one line is unchanged (regression guard)",
+      "lines": [
+        "מחומש משוכלל ABCDE"
+      ],
+      "lookFor": "A regular pentagon, as before.",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T30",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "Every other configuration stays a regular pentagon, never a star (#2265, riskiest)",
+      "lines": [
+        "מחומש ABCDE",
+        "המחומש משוכלל"
+      ],
+      "lookFor": "Press «הציגו תצורה אחרת» three times (each takes ~3.5 s): every drawing is a regular, convex pentagon, never a star.",
+      "before": "Each drawing irregular.",
+      "_probe": "verified-by-probe on main @ 2662bd4d: three presses, each settled in ~3.5 s; every drawing a regular pentagon (label-to-label sides 323 ×5 each time)."
+    },
+    {
+      "id": "T31",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "An inscribed pentagon restated as regular becomes regular (#2265, another spelling)",
+      "lines": [
+        "מחומש ABCDE חסום במעגל",
+        "מחומש משוכלל ABCDE חסום במעגל"
+      ],
+      "lookFor": "A regular pentagon on the one drawn circle.",
+      "before": "Irregular, green."
+    },
+    {
+      "id": "T32",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "«המחומש משוכלל» over an inscribed pentagon uses its circle (#2265, another spelling)",
+      "lines": [
+        "מחומש ABCDE חסום במעגל",
+        "המחומש משוכלל"
+      ],
+      "lookFor": "A regular pentagon on the ONE drawn circle; no collapsed vertices.",
+      "before": "Sides 0.08 / 9.98 / 0.01 / 7.45 / 6.14 on a second hidden circle, green."
+    },
+    {
+      "id": "T33",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "play",
+      "product": "3d",
+      "title": "3-D refusal: isosceles at B with a right angle at C cannot be a triangle (#2292)",
+      "lines": [
+        "משולש ABC",
+        "|BA| = |BC|",
+        "∠ACB = 90°"
+      ],
+      "expectRefusal": "שטוח",
+      "lookFor": "The third line refused: «…מתקיימים רק אם המשולש ABC שטוח (כל קודקודיו על ישר אחד) — וקו ישר אינו משולש.» The triangle stays as before.",
+      "before": "All green, C drawn 0.003 from A (a sliver)."
+    },
+    {
+      "id": "T34",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "look",
+      "product": "3d",
+      "title": "3-D refusal: the same with the ⊥ sign (#2292)",
+      "lines": [
+        "משולש ABC",
+        "|BA| = |BC|",
+        "AC ⊥ BC"
+      ],
+      "expectRefusal": "שטוח",
+      "lookFor": "The same refusal, naming «AC ⊥ BC».",
+      "before": "A green sliver."
+    },
+    {
+      "id": "T35",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "look",
+      "product": "3d",
+      "title": "3-D refusal: the givens in reverse order (#2292)",
+      "lines": [
+        "משולש ABC",
+        "∠ACB = 90°",
+        "|BA| = |BC|"
+      ],
+      "expectRefusal": "שטוח",
+      "lookFor": "Refused on the third line, naming «|BA| = |BC|» with «∠ACB = 90°».",
+      "before": "A green sliver."
+    },
+    {
+      "id": "T36",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "look",
+      "product": "3d",
+      "title": "3-D refusal: a right isosceles triangle with the right angle at C (#2292)",
+      "lines": [
+        "משולש ישר זווית שווה שוקיים ABC",
+        "∠ACB = 90°"
+      ],
+      "expectRefusal": "שטוח",
+      "lookFor": "The second line refused, naming the first.",
+      "before": "A green sliver."
+    },
+    {
+      "id": "T37",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "verified",
+      "product": "3d",
+      "title": "3-D: the other leg is still refused (regression guard)",
+      "lines": [
+        "משולש ABC",
+        "|BA| = |BC|",
+        "AB ⊥ AC"
+      ],
+      "expectRefusal": "שטוח",
+      "lookFor": "The same refusal wording.",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T38",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "verified",
+      "product": "3d",
+      "title": "3-D: a real right triangle builds (regression guard)",
+      "lines": [
+        "משולש ABC",
+        "|AB| = 2",
+        "|BC| = 1",
+        "AC ⊥ BC"
+      ],
+      "lookFor": "All green: a 2-1-√3 triangle, right angle at C.",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T39",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "play",
+      "product": "3d",
+      "title": "3-D: a very thin but real triangle still builds on every configuration (#2292, riskiest)",
+      "lines": [
+        "משולש ABC",
+        "AB = 5",
+        "BC = 3",
+        "AC = 7.9999"
+      ],
+      "cycles": 3,
+      "lookFor": "All green, a very flat but drawn triangle; «הציגו תצורה אחרת» never refuses it.",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T40",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "look",
+      "product": "3d",
+      "title": "3-D: a needle-thin right triangle that is almost isosceles still builds",
+      "lines": [
+        "משולש ABC",
+        "∠ACB = 90°",
+        "|BA| = 1.0001|BC|"
+      ],
+      "lookFor": "All green, a needle-thin right triangle.",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T41",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "play",
+      "product": "3d",
+      "title": "3-D: one coordinate of B does not invent coordinates for A (#2340)",
+      "lines": [
+        "תיבה ABCDA'B'C'D'",
+        "X_B=3"
+      ],
+      "expectAbsent": [
+        "A(?, 0, 0)"
+      ],
+      "lookFor": "The data panel and the canvas show B(3, ?, ?) only. A has no coordinate row or label.",
+      "before": "«A(?, 0, 0)» — «no one defined that»."
+    },
+    {
+      "id": "T42",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "look",
+      "product": "3d",
+      "title": "3-D: the same with the lowercase spelling on a cube (#2340)",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "x_B=3"
+      ],
+      "expectAbsent": [
+        "A(?, 0, 0)"
+      ],
+      "lookFor": "Only B(3, ?, ?).",
+      "before": "A(?, 0, 0)."
+    },
+    {
+      "id": "T43",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "play",
+      "product": "3d",
+      "title": "3-D: the z of A given leaves its x and y unknown (#2340)",
+      "lines": [
+        "תיבה ABCDA'B'C'D'",
+        "z_A=2"
+      ],
+      "expectAbsent": [
+        "A(0, 0, 2)"
+      ],
+      "lookFor": "A(?, ?, 2).",
+      "before": "A(0, 0, 2) shown as a known fact."
+    },
+    {
+      "id": "T44",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "play",
+      "product": "3d",
+      "title": "3-D: asking for an unstated coordinate gets an honest answer (#2340)",
+      "lines": [
+        "תיבה ABCDA'B'C'D'",
+        "z_A=2"
+      ],
+      "expect": [
+        "לא נקבע על ידי הנתונים"
+      ],
+      "lookFor": "Type «x_A» in the «שאלו» box: the answer «לא נקבע על ידי הנתונים».",
+      "before": "0.",
+      "asks": [
+        "x_A"
+      ]
+    },
+    {
+      "id": "T45",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "play",
+      "product": "3d",
+      "title": "3-D: a plane's equation shows only when the givens fix it (#2340, riskiest)",
+      "lines": [
+        "תיבה ABCDA'B'C'D'",
+        "AB=(1,0,0)",
+        "AD=(0,1,0)",
+        "AA'=(0,0,2)",
+        "z_A=2",
+        "מישור ABCD",
+        "מישור ABB'A'"
+      ],
+      "expectAbsent": [
+        "y = 0"
+      ],
+      "lookFor": "The panel shows «ABCD: z - 2 = 0» with no parametric row, and NO equation for ABB'A'. Vertices read A(?, ?, 2) … A'(?, ?, 4).",
+      "before": "Every vertex had full coordinates, and «ABB'A': y = 0» was printed."
+    },
+    {
+      "id": "T46",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "verified",
+      "product": "3d",
+      "title": "3-D: a fully placed box is unchanged (regression guard)",
+      "lines": [
+        "תיבה ABCDA'B'C'D'",
+        "A(0,0,0)"
+      ],
+      "lookFor": "A(0, 0, 0).",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T47",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "look",
+      "product": "3d",
+      "title": "3-D: a point at a mixed-number coordinate (#2255)",
+      "lines": [
+        "A(2½, 3, 1)"
+      ],
+      "expectAbsent": [
+        "10.5"
+      ],
+      "lookFor": "A at x = 2.5 in the data panel.",
+      "before": "x = 10.5."
+    },
+    {
+      "id": "T48",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "play",
+      "product": "3d",
+      "title": "3-D: a cube with a mixed-number edge (#2255, the reported case)",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "AB = 2½"
+      ],
+      "expectAbsent": [
+        "10.5"
+      ],
+      "lookFor": "Edge 2.5, green; the same figure as «AB = 2.5».",
+      "before": "Edge 10.5, green."
+    },
+    {
+      "id": "T49",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "look",
+      "product": "3d",
+      "title": "3-D: a thirds coordinate (#2255)",
+      "lines": [
+        "A(2⅓, 0, 0)"
+      ],
+      "lookFor": "x ≈ 2.333.",
+      "before": "x = 7."
+    },
+    {
+      "id": "T50",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "play",
+      "product": "3d",
+      "title": "3-D: the ½ palette button after a digit (#2255)",
+      "lines": [
+        "משולש ABC",
+        "AB = 2½"
+      ],
+      "lookFor": "Type «AB = 2», press the ½ button on the palette, then Enter: |AB| = 2.5. (With ¾: 2.75.) The pre-play typed the glyph directly.",
+      "before": "10.5 (5.75 with ¾)."
+    },
+    {
+      "id": "T51",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "play",
+      "product": "3d",
+      "title": "3-D: vector coefficients are unchanged (#2255, riskiest)",
+      "lines": [
+        "קובייה ABCDA'B'C'D'",
+        "נסמן: AB=u, AD=v, AA'=w",
+        "AM = ½u + ½v"
+      ],
+      "lookFor": "M at the centre of face ABCD, exactly as before.",
+      "before": "Unchanged."
+    },
+    {
+      "id": "T52",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "look",
+      "product": "3d",
+      "title": "3-D: an angle with a mixed number now builds (#2255)",
+      "lines": [
+        "משולש ABC",
+        "∠ABC = 22½"
+      ],
+      "lookFor": "The angle reads 22.5°.",
+      "before": "Not understood."
+    },
+    {
+      "id": "T53",
+      "base": "http://localhost:5173",
+      "path": "/3d.html",
+      "class": "look",
+      "product": "3d",
+      "title": "3-D: a plane equation with a mixed number now builds (#2255)",
+      "lines": [
+        "המישור π1: z - 2½ = 0"
+      ],
+      "lookFor": "A plane at z = 2.5, the same as «z - 2.5 = 0».",
+      "before": "Not understood."
+    },
+    {
+      "id": "T54",
+      "base": "http://localhost:5173",
+      "path": "/",
+      "class": "play",
+      "product": "2d",
+      "title": "«המעגלים O ו-P משיקים בנקודה X» after one circle now builds instead of a fragment list (side effect, not asked for)",
+      "lines": [
+        "מעגל O",
+        "המעגלים O ו-P משיקים בנקודה X"
+      ],
+      "lookFor": "Circle P is created touching circle O at X, green. Judge whether this is right.",
+      "before": "Refused with «(1) המעגלים O  (2) P משיקים בנקודה X» (measured at b7d6223c)."
+    }
+  ]
+}
