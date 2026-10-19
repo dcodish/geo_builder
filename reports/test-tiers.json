@@ -6,7 +6,7 @@
     "minMeanMult": 3,
     "hysteresis": 0.25
   },
-  "updatedAt": "2026-10-17",
+  "updatedAt": "2026-10-19",
   "slow": [
     "src-analytic/__tests__/issue-1334-tolerance-artefact.test.ts",
     "src-analytic/__tests__/issue-1353-imperatives-taught.test.ts",
@@ -61,6 +61,7 @@
     "src/app/__tests__/issue-1913-cyclic-member-lowering.test.ts",
     "src/app/__tests__/issue-1936-false-refusal-net.test.ts",
     "src/app/__tests__/issue-2117-diagonal-height.test.ts",
+    "src/app/__tests__/issue-2265-regular-polygon-sides.test.ts",
     "src/app/__tests__/narrowing-note-1996.test.ts",
     "src/app/__tests__/quad-noun-pairs-2169.test.ts",
     "src/app/__tests__/resolve-view.test.ts",
@@ -92,6 +93,7 @@
     "src3d/__tests__/issue-1792-shape-phrase.test.ts",
     "src3d/__tests__/issue-1815-collapse-attribution.test.ts",
     "src3d/__tests__/issue-1918-trapezoid-identity.test.ts",
+    "src3d/__tests__/issue-2292-limit-collapse.test.ts",
     "src3d/__tests__/issue-814.test.ts",
     "src3d/__tests__/issue-815.test.ts",
     "src3d/__tests__/issue-816.test.ts",

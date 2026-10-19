@@ -9,7 +9,7 @@
  "scenario:segment-bisection-statement": "3785c1af0f56bc91",
  "scenario:clicked-crossing-stays-within-its-segments": "3c9c37ece46e3540",
  "scenario:circle-contained-in-definite-circle": "5ec1177efaedc000",
- "scenario:second-bare-point-never-stacks": "fd319e54f722d1dc",
+ "scenario:second-bare-point-never-stacks": "668a7e157efa4d07",
  "scenario:bare-point-then-angle-ratio-stays-off-existing": "544d97350a03b1ec",
  "scenario:tangent-at-existing-touch-carries-membership": "fd3076347ac9d03f",
  "scenario:chord-endpoints-on-derived-corners-driven": "86b7dbe1049f1c46",
