@@ -30,7 +30,7 @@
         "מעגל P",
         "A ו-B על מעגל O ועל מעגל P"
       ],
-      "lookFor": "A and B each on both circles. At some configurations A and B coincide, exactly as the two-line form does.",
+      "lookFor": "A and B each sit on both circles, on every configuration. At some configurations A and B coincide, exactly as the two-line form does (three presses in the pre-play never landed on one).",
       "before": "A and B were put on circle O only, green.",
       "cycles": 2
     },
@@ -604,14 +604,14 @@
         "AC = 7.9999"
       ],
       "cycles": 3,
-      "lookFor": "All green, a very flat but drawn triangle; «הציגו תצורה אחרת» never refuses it.",
+      "lookFor": "All green, a very flat but drawn triangle; «הציגו תצורה אחרת» never refuses it. Known and unrelated to this round: the edge label and panel show «8» for the stated 7.9999 (#2361, on prod too).",
       "before": "Unchanged."
     },
     {
       "id": "T40",
       "base": "http://localhost:5173",
       "path": "/3d.html",
-      "class": "look",
+      "class": "play",
       "product": "3d",
       "title": "3-D: a needle-thin right triangle that is almost isosceles still builds",
       "lines": [
@@ -619,7 +619,7 @@
         "∠ACB = 90°",
         "|BA| = 1.0001|BC|"
       ],
-      "lookFor": "All green, a needle-thin right triangle.",
+      "lookFor": "All green, a needle-thin right triangle. Known and NOT caused by this round: the panel also shows a FALSE note that ABC was narrowed to a right isosceles triangle (#2360, on prod too).",
       "before": "Unchanged."
     },
     {
@@ -742,7 +742,7 @@
       "expectAbsent": [
         "10.5"
       ],
-      "lookFor": "A at x = 2.5 in the data panel.",
+      "lookFor": "A at x = 2.5: the panel shows A(5/2, 3, 1).",
       "before": "x = 10.5."
     },
     {
@@ -759,7 +759,7 @@
       "expectAbsent": [
         "10.5"
       ],
-      "lookFor": "Edge 2.5, green; the same figure as «AB = 2.5».",
+      "lookFor": "Edge 2.5, green: the edge label and panel read 5/2 (|AB| = 5/2 · AB² = 25/4), the same figure as «AB = 2.5».",
       "before": "Edge 10.5, green."
     },
     {
@@ -772,7 +772,7 @@
       "lines": [
         "A(2⅓, 0, 0)"
       ],
-      "lookFor": "x ≈ 2.333.",
+      "lookFor": "x = 7/3 ≈ 2.333: the panel shows A(7/3, 0, 0).",
       "before": "x = 7."
     },
     {
@@ -828,8 +828,8 @@
       "lines": [
         "המישור π1: z - 2½ = 0"
       ],
-      "lookFor": "A plane at z = 2.5, the same as «z - 2.5 = 0».",
-      "before": "Not understood."
+      "lookFor": "A horizontal plane, listed exactly as its decimal twin «המישור π1: z - 2.5 = 0» is today (a face only, no equation row yet).",
+      "before": "Not understood; prod also listed a stray plane «z - 3 = 0»."
     },
     {
       "id": "T54",
