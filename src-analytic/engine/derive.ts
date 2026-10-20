@@ -6,13 +6,13 @@
  * that fails is reported with its own index and its own words — never dropped, and never blamed on
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
-import { centreIdOf, circleByName, curveKindOf, fold, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
+import { centreIdOf, circleByName, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
 import { forcedCollinear } from './collinear';
-import { collapsedByGivens, completingStatement, curveAtOf, drawableAt, hardRingFaults, holdsOn, viewBox, type Figure } from './evaluate';
+import { collapsedByGivens, completingStatement, curveAtOf, drawableAt, hardRingFaults, holdsOn, lineCompareNoSide, viewBox, type Figure } from './evaluate';
 import { conicSize, straightWalkOf, touchPointOf } from './crossing-order';
 import { resolveCurve, type Box } from './curves';
-import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
+import { MINT_PREFIX, parseLine, type ParseFailure, type SideWord } from '../parser/parseAnalytic';
 import { resolveToolLetters } from './toolLetters';
 import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
@@ -57,6 +57,8 @@ export interface LineFault {
   polygon?: string;
   shape?: string;
   declared?: string;
+  /** For `radius-letter-taken` (#2388, ADR-AG-307): the reading of the radius capital the figure held first. */
+  reading?: 'point' | 'radius';
   /** For a circle through a ring its noun forbids (#1918, ADR-AG-252): the noun the circle would force (registry key). */
   forced?: string;
   /** For a ring re-declared as a shape its noun excludes (#1926, ADR-AG-260): the ring's noun and the refused one (registry keys). */
@@ -90,6 +92,8 @@ export interface LineFault {
    */
   declaredLines?: string[];
   collinear?: string[];
+  /** For a position word against a line with no such side (#2386, ADR-AG-310): the word, as the refusal quotes it. */
+  side?: SideWord;
 }
 
 /** The curves a line meets at most twice (`maxCrossings('line', kind) === 2`) — the second-crossing arms' reach. */
@@ -124,6 +128,12 @@ export interface Derivation {
    * Carried rather than re-derived, so a consumer cannot disagree with its own figure by construction.
    */
   seed: number;
+  /**
+   * THE LINES THIS DERIVATION IS OF (#2393 R10, ADR-AG-316) — carried, as `seed` is (#1176), so a question that names its
+   * own condition («… של כל הנקודות M המקיימות MA = MB») is traced on THIS figure plus that condition, never on lines
+   * re-assembled elsewhere. Optional: a hand-built derivation has none, and such a question is then read without it.
+   */
+  lines?: readonly string[];
   /** One entry per failing line. An empty array means every line landed. */
   faults: LineFault[];
   /** One entry per input line, positionally — what that line actually did. */
@@ -171,7 +181,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   lines.forEach((line, index) => {
     const r = parseLine(line);
     if (!r.ok) {
-      faults.push({ index, code: r.code, detail: r.detail });
+      faults.push({ index, code: r.code, detail: r.detail, ...('side' in r ? { side: r.side } : {}) });
       return;
     }
     for (const f of r.facts) {
@@ -245,13 +255,27 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     for (let j = i - 1; j >= 0; j--) if (owner[j] < owner[i] && !errors[j] && sizes(facts[j])) return { declared: lines[owner[j]] };
     return {};
   };
+  /**
+   * #2388 (ADR-AG-307): the line that gave the radius capital its FIRST reading — the earliest line after which the folded
+   * figure holds it as a point (or as the radius parameter). Folded line by line, on the refusal path only.
+   */
+  const letterAgainst = (e: ApplyError, i: number): Partial<LineFault> => {
+    if (e.code !== 'radius-letter-taken' || !e.holder || !e.reading) return { reading: e.reading };
+    for (let k = 0; k < owner[i]; k++) {
+      const upTo = facts.flatMap((f, j) => (owner[j] <= k && !errors[j] ? [{ f, g: owner[j] }] : []));
+      const held = fold(upTo.map((x) => x.f), upTo.map((x) => x.g)).construction;
+      const r = letterReadings(held, e.holder);
+      if (e.reading === 'point' ? r.point : r.radius) return { reading: e.reading, declared: lines[k] };
+    }
+    return { reading: e.reading };
+  };
   const reported = new Set<string>();
   errors.forEach((e, i) => {
     if (!e) return;
     const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null, e.options ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'ambiguous-role-side' && e.role ? { role: e.role } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e), ...radiusAgainst(e, i) });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'ambiguous-role-side' && e.role ? { role: e.role } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e), ...radiusAgainst(e, i), ...(e.code === 'radius-letter-taken' ? letterAgainst(e, i) : {}) });
   });
 
   /**
@@ -383,8 +407,23 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     // Only the sentences whose selector FAILED (#1268): a triangle's `distinct` did not make a crossing's
     // ordinal impossible. Without the per-selector verdict, every selector line, as before.
     const failing = new Set((figure.selectorsFailing ?? []).map((s) => JSON.stringify(s)));
+    /**
+     * A SIDE THE LINE DOES NOT HAVE (#2386, operator ruling 2026-10-20 option (a); ADR-AG-310). A failing «M מעל הישר l»
+     * whose line is VERTICAL in the figure drawn («מימין» and a HORIZONTAL one) failed because the line has no such
+     * side, not because the search missed — so the refusal says that, with the ruled sentence. Read off the drawn
+     * figure: a line vertical only in some configurations is never refused this way, those configurations are just
+     * not valid, and every other failure keeps «unsatisfiable».
+     */
+    const drawnAt = new Map(figure.points.map((p) => [p.id, { x: p.x, y: p.y }]));
+    const noSide = new Map<number, LineFault>();
     facts.forEach((f, i) => {
-      if (f.t === 'selector' && (failing.size === 0 || failing.has(JSON.stringify(f.sel)))) blamed.add(owner[i]);
+      if (f.t === 'selector' && (failing.size === 0 || failing.has(JSON.stringify(f.sel)))) {
+        blamed.add(owner[i]);
+        if (f.sel.kind !== 'line-compare') return;
+        const none = lineCompareNoSide(construction, f.sel, drawnAt, figure.env);
+        const side = f.sel.axis === 'y' ? (f.sel.greater ? 'above' : 'below') : f.sel.greater ? 'right' : 'left';
+        if (none) noSide.set(owner[i], { index: owner[i], code: none === 'vertical' ? 'side-of-vertical' : 'side-of-horizontal', detail: lines[owner[i]], side });
+      }
     });
     // A selector M1 BUILT from a contextual sentence («B נמצאת מחוץ למעגל», #1619 B1) has no `selector`
     // fact of its own — it is blamed on the line the fold recorded as adding it.
@@ -394,7 +433,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       if (failing.size === 0 || failing.has(JSON.stringify(s))) blamed.add(owner[fact]);
     });
     for (const index of blamed) {
-      faults.push({ index, code: 'unsatisfiable', detail: lines[index] });
+      faults.push(noSide.get(index) ?? { index, code: 'unsatisfiable', detail: lines[index] });
     }
   }
 
@@ -1026,7 +1065,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     drawnOption,
   );
   const selectorLine = construction.selectors.map((_, at) => (selectorFact[at] === undefined ? -1 : owner[selectorFact[at]]));
-  return { construction: shown, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices, constraintLine, selectorLine, stated };
+  return { construction: shown, figure, box: viewBox(figure), seed, lines: [...lines], faults, outcomes, minted, notices, constraintLine, selectorLine, stated };
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */

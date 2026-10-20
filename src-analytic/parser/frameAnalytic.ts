@@ -22,7 +22,7 @@
  * line that is STORED is always the one the student typed.
  */
 import { ANGLE_STEM_HE, EN_SHAPE, SHAPES, normalizeShapeNoun } from '../engine/shapes';
-import { isNumeralName } from '../engine/names';
+import { NUMERAL_ALT, isNumeralName } from '../engine/names';
 import { stripFormatControls } from '../../shell/bidi';
 import { foldConjunctionSpacing } from '../../shell/conjunction';
 import { foldGlyphs } from '../../shell/glyphFold';
@@ -50,6 +50,17 @@ const SUB_AXIS_FIRST = /(?<![A-Za-z0-9_])([XY])(\s*_\s*\{?\s*[A-Z][0-9₀-₉]?\
 const SUB_AXIS_LAST = /(?<![A-Za-z0-9_])([A-Z][0-9₀-₉]?\s*_\s*\{?\s*)([XY])(?![A-Za-z0-9_])/g;
 
 /**
+ * A POINT'S INDEX TYPED WITH AN UNDERSCORE IS THE INDEX THE EXAM PRINTS (#2391, ADR-AG-315) — `N_2`, `N_{2}` are `N₂`,
+ * the subscript glyph `NAME` already reads (2-D reads `N_2` too). A CAPITAL base and a DIGIT run only: a lowercase base
+ * (`x_B`, `r_M`), a letter index (`S_ABC`, the area notation) and the axis forms above are never touched, and the stored
+ * line keeps the raw text (ADR-W-111: the typeset row reads either spelling).
+ */
+// A name may follow another — `N_1N_2` is the pair N₁N₂ — so a digit before the base and a capital after the index bound it.
+const SUB_INDEX = /(?<![A-Za-z_])([A-Z])\s*_\s*(?:\{\s*([0-9]+)\s*\}|([0-9]+))(?![a-z0-9_])/g;
+const SUBSCRIPT_DIGITS = '₀₁₂₃₄₅₆₇₈₉';
+const subscriptOf = (digits: string): string => [...digits].map((d) => SUBSCRIPT_DIGITS[Number(d)]).join('');
+
+/**
  * One spelling per symbol. ∢ (U+2222) and ∡ (U+2221) are the exam's angle glyphs and mean ∠ (#1555);
  * ⁰ is typed for °; the Israeli coordinate pair «A(2;10)» separates with a semicolon; «10½» is 10.5;
  * «קודקוד» is the plene spelling of «קדקוד»; the maqaf and the NBSP are a hyphen and a space.
@@ -69,6 +80,7 @@ export function orthography(raw: string): string {
     .replace(/(?<![א-ת])ה-\s+([xy])(?![A-Za-z0-9])/g, 'ה-$1')
     .replace(SUB_AXIS_FIRST, (_m, ax: string, rest: string) => `${ax.toLowerCase()}${rest}`)
     .replace(SUB_AXIS_LAST, (_m, head: string, ax: string) => `${head}${ax.toLowerCase()}`)
+    .replace(SUB_INDEX, (_m, base: string, braced: string | undefined, bare: string | undefined) => `${base}${subscriptOf(braced ?? bare ?? '')}`)
     // LOOK-ALIKE GLYPHS → the symbol they render as — the SHARED table every builder's parser boundary
     // calls (#1912, [ADR-3D-329](../../docs/06b-decisions-3d.md#adr-3d-329); `shell/glyphFold`). It holds
     // the ∢/∡ and ⁰ folds that were spelled here, in the same order, and adds the rows analytic never
@@ -191,6 +203,13 @@ const FIGURE = String.raw`(?:ה)?(?:ציור|סרטוט|שרטוט|איור)(?:\
 const SEE_FIGURE = String.raw`(?:כמתואר|כמו\s+שמתואר|כפי\s+שמתואר|ראה|ראו|ראי|רא(?:ה|ו)\s+גם)\s+(?:ב)?${FIGURE}`;
 const SEE_FIGURE_EN = String.raw`(?:see|as\s+(?:shown|drawn)\s+in)\s+(?:the\s+)?(?:figure|diagram|drawing|sketch)`;
 
+/** The tail of a cardinal that opens with «ש» — «(ש)ני», «(ש)תי», «(ש)לוש», «(ש)מונה» … — from the number words above. */
+const CARDINAL_SHIN = `(?:${[...Object.keys(HE_NUM_UNITS), ...Object.keys(HE_NUM_TENS)]
+  .filter((w) => w.startsWith('ש'))
+  .map((w) => w.slice(1))
+  .sort((a, b) => b.length - a.length)
+  .join('|')})(?![א-ת])`;
+
 const UNWRAP: ReadonlyArray<[RegExp, string]> = [
   // A whole line in parentheses — «(O היא ראשית הצירים)».
   [/^\((.*)\)$/, '$1'],
@@ -199,7 +218,9 @@ const UNWRAP: ReadonlyArray<[RegExp, string]> = [
   [/^ו(?=ה[א-ת]|ידוע|נתו|עוד\s)/, ''],
   // The given-prefixes, in every form the corpus prints — «נתון», «נתון:», «נתון כי», «נתון גם», «נתון בנוסף:»,
   // «עוד נתון:», «ידוע כי», «ידוע גם ש-». The four inflections are written out: «נתון» ends in FINAL nun.
-  [/^(?:עוד\s+)?נתו(?:ן|נה|נים|נות)(?:\s+(?:גם|בנוסף|עוד))?\s*(?::\s*|\s+כי\s+|\s+ש-?|\s+)/, ''],
+  // The glued relative «ש-» («נתון שהישר …») is never the first letter of a CARDINAL: «נתונים שני מעגלים» is "two circles
+  // are given", and reading «ש» off «שני» left «ני מעגלים» for every rule (#2391, ADR-AG-315).
+  [new RegExp(`^(?:עוד\\s+)?נתו(?:ן|נה|נים|נות)(?:\\s+(?:גם|בנוסף|עוד))?\\s*(?::\\s*|\\s+כי\\s+|\\s+ש-?(?!${CARDINAL_SHIN})|\\s+)`), ''],
   [/^ידוע\s+(?:גם\s+)?(?:כי\s+|ש-?)/, ''],
   // «נסמן ∢DCB = 2α», «נסמן: זווית ADB = α» (#1621, ADR-AG-215) — "let us denote": the exam introducing a symbol by
   // the equation that follows, which is the given itself (the symbol is free until a later given pins it). Only an
@@ -261,6 +282,11 @@ function dropShapeQualifier(s: string): string {
 // ---------------------------------------------------------------------------
 
 const NAME = '[A-Z][0-9₀-₉]?';
+/**
+ * A CIRCLE's name in a reference slot (#2391, ADR-AG-315) — a numeral first («II» before «I», `NUMERAL_ALT` is longest
+ * first; «מעגל II» is never the point I), else a centre letter. Case-sensitive on purpose (the [IVX] trap).
+ */
+const CIRCLE_REF = `(?:${NUMERAL_ALT}|${NAME})(?![A-Za-z0-9₀-₉])`;
 const ORIGIN_HE = 'ראשית\\s+(?:ה)?צירים';
 
 /**
@@ -540,6 +566,15 @@ const PLACE_PRED = '(?:נמצא(?:ת|ים|ות)?\\s|על\\s|ב-?\\s*(?:ה?נקו
  * M. A NUMERAL after «המעגל» is the circle's own name (ADR-AG-118), never a centre letter, so it is not read.
  */
 export function centreClauses(line: string): string[] | null {
+  /*
+   * THE CENTRE NAMED AFTER ITS CIRCLE (#2391 A3, ADR-AG-315) — «מרכז המעגל I הוא K», «מרכזו של המעגל I הוא K», «המרכז של
+   * מעגל I בנקודה K», "the centre of circle I is K": the naming «K מרכז המעגל I», said in the other order. The slot after
+   * «המעגל» is a CIRCLE's name (a numeral first — «מעגל II» is never the point I), and the centre's is a point's.
+   */
+  const after = new RegExp(`^(?:ה?מרכז|מרכזו)\\s+(?:של\\s+)?ה?מעגל\\s+(${CIRCLE_REF})\\s+(?:(?:הוא|היא)\\s+)?(?:ב-?\\s*)?(?:ה?נקודה\\s+)?(${NAME})$`).exec(line);
+  if (after) return [`${after[2]} מרכז המעגל ${after[1]}`];
+  const afterEn = new RegExp(`^(?:[Tt]he\\s+)?cent(?:re|er)\\s+of\\s+(?:the\\s+)?circle\\s+(${CIRCLE_REF})\\s+is\\s+(?:at\\s+)?(?:the\\s+point\\s+)?(${NAME})$`).exec(line);
+  if (afterEn) return [`${afterEn[2]} is the centre of circle ${afterEn[1]}`];
   // «מרכז המעגל הוא M» (#1643, ADR-AG-198) — the copula form of the naming is the same naming.
   const named = new RegExp(`^(?:ה?נקודת\\s+)?ה?מרכז\\s+(?:של\\s+)?ה?מעגל\\s+(?:(?:הוא|היא)\\s+)?(${NAME})(?:\\s+(.+))?$`).exec(line);
   if (named && !isNumeralName(named[1])) {
@@ -599,6 +634,13 @@ const PIECE_VERB = '(?:מקביל|מאונכ|מאונך|ניצב|חותכ|חות
  */
 export function diameterClauses(line: string): string[] | null {
   const DIAM = `(?:(?:הוא|היא)\\s+)?(?:ה)?קוטר`;
+  /*
+   * «הקטע N₂A הוא קוטר המעגל M», «N₂A קוטר של המעגל M» (#2391 A8, ADR-AG-315) — the construct «קוטר המעגל M» is «קוטר
+   * במעגל M». Rewritten to that sentence, which the readings below and the grammar already own («הקטע» still names the
+   * segment), so the two spellings cannot lower apart.
+   */
+  const construct = new RegExp(`^((?:ה?(?:קטע|צלע)\\s+)?(?:${NAME}){2})\\s+(?:(?:הוא|היא)\\s+)?(?:ה)?קוטר\\s+(?:של\\s+)?ה?מעגל\\s+(${CIRCLE_REF})$`).exec(line);
+  if (construct) return [`${construct[1]} הוא קוטר במעגל ${construct[2]}`];
   const centred = new RegExp(
     `^(?:ה?(קטע|צלע)\\s+)?((?:${NAME}){2})\\s+${DIAM}\\s+ב(?:ה)?מעגל\\s+ש(?:ה)?מרכזו\\s+(?:(?:הוא|היא)\\s+)?(${NAME})$`,
   ).exec(line);
@@ -613,6 +655,111 @@ export function diameterClauses(line: string): string[] | null {
     const [, circle, pair, where] = onLine;
     // The incidence first: it introduces the two ends when they are new, and the diameter refers to them.
     return [`${pair} נמצא ${where}`, `${pair} קוטר במעגל${circle ? ` ${circle}` : ''}`];
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// The exam's two-circle and centre sentences (#2391, ADR-AG-315)
+// ---------------------------------------------------------------------------
+
+/**
+ * TWO LISTS PAIRED BY «בהתאמה» / "respectively" — the i-th of `left` with the i-th of `right`, or null when the lists
+ * differ in length (a pairing the sentence does not make is never guessed). The one helper every «בהתאמה» reading
+ * composes (#2391 A4; #2392's touch points reuse it).
+ */
+export function respectively<T, U>(left: readonly T[], right: readonly U[]): Array<[T, U]> | null {
+  if (left.length < 2 || left.length !== right.length) return null;
+  return left.map((l, i) => [l, right[i]]);
+}
+
+/** An equation inside a sentence — everything up to a top-level comma, so a trailing «, a הוא פרמטר חיובי» stays a clause. */
+const EQ_TEXT = '([^,]+?)';
+const AT_POINT = '(?:(?:הוא|היא)\\s+)?(?:ב-?\\s*)?(?:ה?נקודה\\s+)?';
+
+/**
+ * - «נתון מעגל I שמשוואתו (x − 3)² + (y − 4)² = 9 , ומרכזו בנקודה K», «… ומרכזו K», «מעגל I שמרכזו K ומשוואתו …», "circle I
+ *   with equation … and centre K" (A1) — a circle stated by its equation AND its centre named: the circle, then the naming
+ *   («K מרכז המעגל I»).
+ * - «מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא (x − a)² + y² = r²», «נתון מעגל שמרכזו M ומשוואתו …» (A2) — a circle
+ *   with no name of its own, named by its centre and stated by its equation: «M מרכז המעגל (x − a)² + y² = r²», which
+ *   states the circle and names its centre. «האחד / האחר» carries no meaning while no pair has been introduced (#2397).
+ *
+ * Each is a rewrite to the twin's own text, so it cannot lower differently from it (ADR-W-053).
+ */
+export function circleCentreClauses(line: string): string[] | null {
+  const he =
+    new RegExp(`^ה?מעגל\\s+(${CIRCLE_REF})\\s+שמשוואתו\\s+(?:(?:היא|הוא)\\s+)?${EQ_TEXT}\\s*,?\\s+ו?מרכזו\\s+${AT_POINT}(${NAME})$`).exec(line);
+  if (he) return [`נתון מעגל ${he[1]} שמשוואתו ${he[2].trim()}`, `${he[3]} מרכז המעגל ${he[1]}`];
+  const heRev = new RegExp(`^ה?מעגל\\s+(${CIRCLE_REF})\\s+שמרכזו\\s+${AT_POINT}(${NAME})\\s*,?\\s+ו?משוואתו\\s+(?:(?:היא|הוא)\\s+)?([^,]+)$`).exec(line);
+  if (heRev) return [`נתון מעגל ${heRev[1]} שמשוואתו ${heRev[3].trim()}`, `${heRev[2]} מרכז המעגל ${heRev[1]}`];
+  const en =
+    new RegExp(`^(?:[Tt]he\\s+|[Aa]\\s+)?[Cc]ircle\\s+(${CIRCLE_REF})\\s+(?:with|whose)\\s+equation\\s+(?:is\\s+)?${EQ_TEXT}\\s*,?\\s+and\\s+(?:with\\s+)?(?:its\\s+)?cent(?:re|er)\\s+(?:is\\s+)?(?:at\\s+)?(?:the\\s+point\\s+)?(${NAME})$`).exec(line);
+  if (en) return [`circle ${en[1]}: ${en[2].trim()}`, `${en[3]} is the centre of circle ${en[1]}`];
+  const enRev =
+    new RegExp(`^(?:[Tt]he\\s+|[Aa]\\s+)?[Cc]ircle\\s+(${CIRCLE_REF})\\s+(?:with|whose)\\s+(?:its\\s+)?cent(?:re|er)\\s+(?:is\\s+)?(?:at\\s+)?(?:the\\s+point\\s+)?(${NAME})\\s*,?\\s+and\\s+(?:with\\s+)?(?:its\\s+)?equation\\s+(?:is\\s+)?([^,]+)$`).exec(line);
+  if (enRev) return [`circle ${enRev[1]}: ${enRev[3].trim()}`, `${enRev[2]} is the centre of circle ${enRev[1]}`];
+  const unnamed = new RegExp(
+    `^(?:ה?מעגל\\s+ש?מרכזו|מרכזו\\s+של\\s+ה?מעגל(?:\\s+ה?(?:אחד|אחר|ראשון|שני))?)\\s+${AT_POINT}(${NAME})\\s*,?\\s+ו?משוואתו\\s+(?:(?:היא|הוא)\\s+)?([^,]+)$`,
+  ).exec(line);
+  if (unnamed) return [`${unnamed[1]} מרכז המעגל ${unnamed[2].trim()}`];
+  const unnamedEn = new RegExp(
+    `^(?:[Tt]he\\s+|[Aa]\\s+)?[Cc]ircle\\s+(?:(?:centred|centered)\\s+at|with\\s+(?:its\\s+)?cent(?:re|er)(?:\\s+at)?)\\s+(?:the\\s+point\\s+)?(${NAME})\\s*,?\\s+(?:and\\s+)?(?:with\\s+)?(?:its\\s+)?equation\\s+(?:is\\s+)?([^,]+)$`,
+  ).exec(line);
+  if (unnamedEn) return [`${unnamedEn[1]} מרכז המעגל ${unnamedEn[2].trim()}`];
+  return null;
+}
+
+/**
+ * «K ו-L (הם) מרכזי המעגלים I ו-II בהתאמה», «מרכזי המעגלים I ו-II הם K ו-L בהתאמה», "K and L are the centres of circles I
+ * and II respectively" (#2391 A4) — two namings paired: «K מרכז המעגל I», «L מרכז המעגל II».
+ */
+export function centresRespectivelyClauses(line: string): string[] | null {
+  const pair = `(${CIRCLE_REF})\\s+ו-?\\s*(${CIRCLE_REF})`;
+  const points = `(${NAME})\\s+ו-?\\s*(${NAME})`;
+  const he1 = new RegExp(`^${points}\\s+(?:(?:הם|הן)\\s+)?(?:ה)?מרכזי\\s+ה?מעגלים\\s+${pair}\\s+בהתאמה$`).exec(line);
+  const he2 = he1 ? null : new RegExp(`^(?:ה)?מרכזי\\s+ה?מעגלים\\s+${pair}\\s+(?:(?:הם|הן)\\s+)?(?:ה?נקודות\\s+)?${points}\\s+בהתאמה$`).exec(line);
+  const en = he1 || he2
+    ? null
+    : new RegExp(`^(${NAME})\\s+and\\s+(${NAME})\\s+are\\s+(?:the\\s+)?cent(?:re|er)s\\s+of\\s+(?:the\\s+)?circles\\s+(${CIRCLE_REF})\\s+and\\s+(${CIRCLE_REF})\\s*,?\\s+respectively$`).exec(line);
+  const [centres, circles] = he1 ? [[he1[1], he1[2]], [he1[3], he1[4]]] : he2 ? [[he2[3], he2[4]], [he2[1], he2[2]]] : en ? [[en[1], en[2]], [en[3], en[4]]] : [null, null];
+  const pairs = centres && circles ? respectively(centres, circles) : null;
+  if (!pairs) return null;
+  return pairs.map(([k, c]) => (en ? `${k} is the centre of circle ${c}` : `${k} מרכז המעגל ${c}`));
+}
+
+/**
+ * «M מקיימת MA = MB», «הנקודה M מקיימת …», "M satisfies MA = MB" (#2391 A6, 2-D's reading) — the statement, with the
+ * point as its subject. The caller takes it only when the statement's facts MENTION the point, so «M מקיימת AB = CD»
+ * is not this sentence and M is never silently dropped.
+ */
+export function satisfiesClause(line: string): { subject: string; clause: string } | null {
+  const m = new RegExp(`^(?:ה?נקודה\\s+|(?:[Tt]he\\s+)?[Pp]oint\\s+)?(${NAME})\\s+(?:מקיימ(?:ת|ים|ות)?|satisfies)\\s+(.+)$`).exec(line);
+  return m ? { subject: m[1], clause: m[2].trim() } : null;
+}
+
+/**
+ * «(נתונים) שני מעגלים שמרכזיהם בנקודות N₁ ו-N₂ והרדיוס של כל אחד מהם הוא 10, משיקים למעגל M בנקודה A», "two circles
+ * centred N1 and N2, each of radius 10, are tangent to circle M at A" (#2391 A7) — a plural subject DISTRIBUTED over its
+ * named members: each circle stated on its centre with the shared radius, and the predicate said of each. The predicate
+ * is any sentence «מעגל X …» reads; a parenthetical aside («( N₁ משמאל ל- N₂ )») is the aside reading's own clause.
+ */
+export function namedCirclesClauses(line: string): string[] | null {
+  const he = new RegExp(
+    `^שני\\s+מעגלים\\s+ש(?:ה)?מרכזיהם\\s+(?:ב?ה?נקודות\\s+)?(${NAME})\\s+ו-?\\s*(${NAME})\\s+ו?ה?רדיוס\\s+(?:של\\s+)?כל\\s+אחד\\s+מהם\\s+(?:(?:הוא|היא)\\s+)?([^\\s,]+)\\s*,?\\s+(.+)$`,
+  ).exec(line);
+  if (he) {
+    const [, x, y, r, pred] = he;
+    return [x, y].flatMap((c) => [`נתון מעגל שמרכזו ${c} ורדיוסו ${r}`, `מעגל ${c} ${pred.trim()}`]);
+  }
+  const en = new RegExp(
+    `^(?:[Tt]wo\\s+)?circles\\s+(?:centred|centered)\\s+(?:at\\s+)?(${NAME})\\s+and\\s+(${NAME})\\s*,?\\s+each\\s+(?:of|with)\\s+radius\\s+([^\\s,]+)\\s*,?\\s+(.+)$`,
+  ).exec(line);
+  if (en) {
+    const [, x, y, r, pred] = en;
+    // The plural verb is said of each circle: "are tangent" → "is tangent".
+    const one = pred.trim().replace(/^are\s+/, 'is ');
+    return [x, y].flatMap((c) => [`circle centred at ${c} with radius ${r}`, `circle ${c} ${one}`]);
   }
   return null;
 }

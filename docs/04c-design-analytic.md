@@ -98,7 +98,10 @@ or an unread name, at every claiming site including `matchCurve` (ADR-AG-114); t
 through `mentionsPlane` (`carriers.ts`), and `equationExpr` refuses a capital as a symbol. A measure value naming a
 point DECLINES ([ADR-AG-238](06c-decisions-analytic.md#adr-ag-238): `mentionsPointName`, `measureValue`,
 `POINT_TOKEN`), and an indexed name declines on `INDEXED_TOKEN` ([ADR-AG-244](06c-decisions-analytic.md#adr-ag-244)).
-A length admits the radius `R` (2-D ADR-034, `LENGTH_CAPITALS`).
+The radius capital `R` is the one exception, in every reader that takes a size or an equation — a length (2-D ADR-034),
+`equationExpr`, `roleScalar`, `radiusOfSize` — through one set, `RADIUS_CAPITALS` ([ADR-AG-307](06c-decisions-analytic.md#adr-ag-307));
+a radius naming any other capital declines. A point R beside a used symbol R is refused at `applyFact`
+(`radiusLetterClash`, `letterReadings`; `radius-letter-taken`, its first reading's line found by `derive`).
 
 **A parameter is never a plane coordinate** ([ADR-AG-246](06c-decisions-analytic.md#adr-ag-246)):
 A `param` fact (an F11 domain) that names `x` or `y` (`RESERVED_SYMBOLS`) is refused at the apply boundary (`applyStatement`, `engine/apply.ts`) with `coordinate-restriction`, whatever produced it.
@@ -239,6 +242,21 @@ constraints (`Derivation.constraintLine`) must hold across the pool (`evaluate.h
 
 *Identifiers:* `poolScheduler`
 *ADRs:* ADR-AG-119.
+
+**The exam's circle-and-centre sentences** ([ADR-AG-315](06c-decisions-analytic.md#adr-ag-315), #2391) are frame readings
+that rewrite to the twin's own text, so no second lowering exists: `circleCentreClauses` (a circle with its centre, or
+named by its centre with an equation), `centresRespectivelyClauses` (two namings paired by the shared `respectively`
+helper), `namedCirclesClauses` (a plural subject distributed over its named members), the copula/construct forms in
+`centreClauses` and `diameterClauses`, and `satisfiesClause` (taken in `readLine` only when the statement's facts name
+the point; the point is then declared). `orthography` folds a capital's underscored digit index into the subscript
+glyph (`SUB_INDEX`), and `unwrap`'s glued «ש-» after a given-word never takes the first letter of a cardinal
+(`CARDINAL_SHIN`). Two forms are not text: «… מרכזי המעגלים …» is the `centres-distance` fact (`parseCentresDistance`,
+its lettered twin over `CENTRES_SENTINELS`), which M1 resolves through `circlePairOf` — the pair resolver
+`tangent-circles` uses — writing the two centres in (`centreIdOf`; a centre with no letter is `unknown-reference`, as
+`via-centre`); and «דרך P עובר משיק למעגל» is `tangent-through`, which M1 lowers to `tangent-line-at` when the figure
+puts P on that circle (`onCurveByConstruction`) and to the #1430 from-point construction otherwise. The trailing
+«דרך …» of the construction register is `TRAILING_THROUGH` in `constructionCandidates`, which also splits conjoined
+tangent phrases and pairs «משיקים למעגלים … בנקודות … בהתאמה», joining the canonicals with the top-level «;».
 
 ### An imperative wrapper is TAUGHT ([ADR-AG-150](06c-decisions-analytic.md#adr-ag-150))
 
@@ -618,7 +636,10 @@ points). A bounded noun (`tangentTargets`, `BOUNDED_NOUN`) adds hinge rows on th
 With `t` the centre's projection parameter onto A→B, rows `max(0, −t)·|AB|` and `max(0, t−1)·|AB|` pull the touch point inside the side.
 They are BOUNDS ([ADR-AG-178](06c-decisions-analytic.md#adr-ag-178)): `residualRows` tags `{ eq, bound }` and
 `carrierDofOf` ranks `eq` alone (`CarrierSystem.equalitiesAt`, `freeRank`). Circle to circle is
-`tangent-circle {centre, r, other, otherR, branch}` behind `choice[external, internal]`; `readCircleSubject`,
+`tangent-circle {a, b: CircleSide, branch}` behind `choice[external, internal]`, a side being `{centre, r}` (a centred
+circle's point and radius) or `{circle}` (an equation circle, its centre and radius read off `curveAt` as `tangent-curve`
+does; `constraintCurveRefs` lists it, `constraintRefs` only the point sides — [ADR-AG-306](06c-decisions-analytic.md#adr-ag-306)).
+With an equation side, concentric is judged structurally at M1 (`centresAlwaysCoincide` over the probe environments); `readCircleSubject`,
 `TANGENT_BRANCH` and `peelMods` read the sentence; `touch-point {a, b}` names the touch; `inDomain(d, v, floor)` with
 `openBoundFloor` keeps a forced-zero radius off the bound.
 
@@ -647,6 +668,30 @@ no sign). The region quantities (`circleQuantity`, `circlePairQuantity`, `orderQ
 measured, and `signHolds` reads their sign.
 
 *Identifiers:* `failingSelectors` · `sideOfBound` · `signHolds`
+
+**A point's side of a straight line** ([ADR-AG-310](06c-decisions-analytic.md#adr-ag-310), #2386) is `coord-compare`'s
+family with the line's value at the point as the bound: `line-compare {id, line: points | curve, axis, greater}`.
+`parseCompare` reads it after the point and axis forms (`POSITION_LINE_HE` / `_EN`, the operand through `direction()`).
+`lineCompareLine` resolves the line in the configuration (two points, or `curveAtOf` for a named line); the judge
+compares y_P with −(a·x_P + c)/b (axis `y`) or x_P with −(b·y_P + c)/a (axis `x`) through `sideOfBound` at `spanOf`.
+`lineHasNoSide` (on `isVerticalLine` / `isHorizontal`) makes a y-side selector false on a vertical line and an x-side one
+false on a horizontal line. The seeding loop folds a free subject to the named side, keeping its offset. In `derive`'s
+selector arm, a failing `line-compare` whose line has no such side IN THE DRAWN FIGURE (`lineCompareNoSide`) is refused
+`side-of-vertical` / `side-of-horizontal`, carrying the word (`side`); the parser refuses the same for an axis. M1
+checks the subject, the line's points, and that a named operand is a straight line (`curveKindOf`); `selectorIdentity`
+sorts a two-letter line's ends.
+
+**A stated distinctness** ([ADR-AG-311](06c-decisions-analytic.md#adr-ag-311), #2395). `parseDistinct` (after the
+parameter domains, before `parseCompare`) emits `distinct-of {names, noun?}`; M1 (`case 'distinct-of'`) resolves the
+names: a written noun decides, else a name that is a point reads them all as points, else the first curve's kind.
+Points lower to the existing `distinct`; circles and lines to `distinct-curves {ids}`, judged in `failingSelectors` by
+`curvesCoincide` at `apartOf` (lines: unit normals within `SOLVE_RESOLUTION` and the figure centre's foot on one within
+`apart` of the other; circles: centres and radii within `apart`). No mover: `drawableAt`'s walk finds the other roots.
+`selectorIdentity` sorts both kinds' ids.
+
+*Identifiers:* `distinct-of` · `distinct-curves` · `parseDistinct` · `curvesCoincide`
+
+*Identifiers:* `line-compare` · `lineCompareLine` · `lineHasNoSide` · `lineCompareNoSide` · `POSITION_LINE_HE` · `side-of-vertical` · `side-of-horizontal` · `SideWord`
 
 #### An order between measures ([ADR-AG-216](06c-decisions-analytic.md#adr-ag-216), #1621 D3)
 
@@ -731,8 +776,28 @@ stated touch point (`touchPointOf`, the `touch-point` derived point) is a letter
 (`footOnPair`), or an earlier line puts it there (`onLine`, written by `earlierOnCommonTangents` in `fold`, because the
 deferral fixpoint lands «T על AB» after the line that declares A and B), it lowers as the tangent at that point;
 otherwise `a` touches the first circle and `b` the second ([ADR-AG-312](06c-decisions-analytic.md#adr-ag-312), #2385).
+The common tangent is a LINE: M1 draws it through `name-line { a, b, name }` (the sentence's name, «הישר l משיק …»
+`namedCommonTangent`, or the pair's), the `line-at` through a along a→b, listed by its name. `name-line` («נסמן את הישר
+PQ ב-l», `parseNameLine`) re-names the figure's line over the pair (`lineOverPair`), re-identifying it as `lineIdOf(name)`
+with its references (`replaceId`), or draws the line on a segment. The `axis-cut { line, axis, greater }` selector
+(`parseAxisCut`) is judged in `failingSelectors` from the line's triple (`lineTriple`): −c/b on the y-axis, −c/a on the
+x-axis, strict through `sideOfBound` ([ADR-AG-313](06c-decisions-analytic.md#adr-ag-313), #2392).
 
-*Identifiers:* `types.ts` · `CIRCLE_SLOT_SENTINELS` · `touchedCircleFacts(src, id, r?)` · `circle-new<k>` · `circle-pair<k>-1` · `-2` · `tangent-of { circleId, at }` · `beyond` · `toolLetters.ts` · `apart` · `inside` · `larger` · `cross` · `centres-side { a, b, p, q }` · `params { e }` · `circlePairQuantity` · `coord` · `θ_<id>.k/s/g/m` · `θ_<id>.r` · `circleToName` · `interchangeable` · `twoCircleCrossing` · `pluralCircleCrossing` · `readCircleSubject` · `common-tangent` · `touchPointOf` · `earlierOnCommonTangents` · `onLine`
+*Identifiers:* `types.ts` · `CIRCLE_SLOT_SENTINELS` · `touchedCircleFacts(src, id, r?)` · `circle-new<k>` · `circle-pair<k>-1` · `-2` · `tangent-of { circleId, at }` · `beyond` · `toolLetters.ts` · `apart` · `inside` · `larger` · `cross` · `centres-side { a, b, p, q }` · `params { e }` · `circlePairQuantity` · `coord` · `θ_<id>.k/s/g/m` · `θ_<id>.r` · `circleToName` · `interchangeable` · `twoCircleCrossing` · `pluralCircleCrossing` · `readCircleSubject` · `common-tangent` · `touchPointOf` · `earlierOnCommonTangents` · `onLine` · `name-line` · `lineOverPair` · `replaceId` · `axis-cut` · `lineTriple` · `namedCommonTangent` · `parseNameLine` · `parseAxisCut`
+
+### Common tangents ([ADR-AG-314](06c-decisions-analytic.md#adr-ag-314), #2390)
+
+`common-tangent { circles, family, name }` is a closed-form line from two circles (`engine/commonTangents.ts`,
+`commonTangentLine`): unit normal n with n·u = (r₂ − r₁)/d (external) or −(r₁ + r₂)/d (internal), family `a` the tangent left
+of the directed line of centres, `b` the right; `touch` the double root of a tangent pair within `TOUCH_TOLERANCE` (1e-6,
+relative). 0 DOF, deps the two circles; a family a configuration lacks is a vacancy. M1 reads how the pair sits
+(`pairPositionOf`: the stated `circles` selectors and `tangent-circle` branches, else two determined circles measured by
+`positionOfCircles`, else `null`) and lowers `common-tangents` to `FAMILIES_OF[position]` and `common-touch-tangent` to
+one `touch` (`statedTangent` admits a tangency of unstated kind). Names: the student's or `freeLineNames` (l1, l2, …, a
+numeral taken in any notation by `nameReading`). The ask lane resolves the touch tangent by `touchTangentNoun`; the exam's
+sketch line is `SKETCH_FRAME` in `scopeAnalytic.ts`.
+
+*Identifiers:* `commonTangents.ts` · `common-tangent` · `CommonTangentFamily` · `commonTangentLine` · `TOUCH_TOLERANCE` · `FAMILIES_OF` · `PairPosition` · `positionOfCircles` · `pairPositionOf` · `statedTangent` · `circleAtProbe` · `freeLineNames` · `common-tangents` · `common-touch-tangent` · `commonTangentSet` · `touchTangentNoun` · `SKETCH_FRAME` · `no-common-tangent` · `errNoCommonTangent`
 
 ### The two tangents meet; the meet verbs; a floor that does not collapse with the figure ([ADR-AG-213](06c-decisions-analytic.md#adr-ag-213), #1620 S7)
 
@@ -764,7 +829,9 @@ A letter in a length is a free length, never x or y (`planeLetterLength` → `le
 ### A Greek angle name is a parameter; tan and cos are measures of the angle ([ADR-AG-215](06c-decisions-analytic.md#adr-ag-215), #1621)
 
 A Greek letter is a `SYMBOL_RE` symbol, free through `paramRegister`, its sample narrowed by `impliedRange`; «α = 30» is
-`param-eq`; tan and cos ride the `angle` row as `measure?: 'tan' | 'cos'`.
+`param-eq`. A relation between parameters the figure uses («R = 2r», «k = 2t», «r:R = 1:2» as q·X = p·Y) is `param-rel
+{left, right}`, evaluated (L − R)/max(1, |L|, |R|), read by `parseParamRelation` after the Greek pin; a symbol nothing
+uses is `not-handled` at M1 ([ADR-AG-307](06c-decisions-analytic.md#adr-ag-307)); tan and cos ride the `angle` row as `measure?: 'tan' | 'cos'`.
 
 *Identifiers:* `sampleEnv` · `value: α` · `measure-angle` · `narrowedDomain` · `(env[sym] − value)` · `parseParamValue` · `vertex-angle.rhs.measure` · `(sin θ − t·cos θ)/√(1+t²)` · `(cos θ − c)/2` · `frameAnalytic` · `UNWRAP`
 
@@ -778,6 +845,9 @@ A value `p:q` becomes `q·X = p·Y`; any other value `r` becomes `X = r·Y`. The
 ### Arcs, sectors and the diameter from a point ([ADR-AG-220](06c-decisions-analytic.md#adr-ag-220), #1622 E4)
 
 `arc-sum` (`engine/solve.ts`) is one constraint for every arc measure, Σ kᵢ·⌢(aᵢbᵢ) = value, on the RESOLVED circle.
+The second reader of a resolved circle's radius is `radius-ratio {a, b, k}` — r(a) − k·r(b), «היחס בין רדיוסי המעגלים … הוא
+p:q» ([ADR-AG-307](06c-decisions-analytic.md#adr-ag-307)): a circle by centre, by equation or by points is one operand; the
+unnamed «המעגלים» is a `choice` over both orders.
 The parser's `arc-of { circle?, terms, value }` (`parseArcMeasure`) reads a copula as `=`, each side split into `k·arc` terms and at most one number.
 **A drawn arc is an object.** `GeoObject` `arc { def: ArcDef }`, `ArcDef = { circle, from, to, pick: 'ccw' | 'minor' | 'major', away?, toward?, radii? }`. No freedom (`carrierOf` null, `symbolDeps` []), `objectDeps` its circle, ends and side point. `evaluate`'s `arcOf` reads the resolved `NumCurve` and the placed ends: `start` the angle of `from`, `sweep` the counter-clockwise turn to `to`, or the shorter / longer one, or — with `away` / `toward` — the half whose middle is on the far / near side of the chord from that point.
 Circles under arcs are `hidden` (`stated: false`).
@@ -1084,7 +1154,10 @@ the smallest span, so one flung free point cannot widen it.
 `knownValues(c, read, size, { fillPool? })` answers known, pending, `options` (at most `MAX_LISTED_VALUES = 2`) or
 open; `valueText` (`app/panelRows.ts`) prints a value or two through `shell/valueOptions` — «±2» for opposites,
 else ascending, the row's name repeated before the second value when the caller passes it («AB = 2 או AB = 4»;
-[ADR-AG-270](06c-decisions-analytic.md#adr-ag-270), #1867).
+[ADR-AG-270](06c-decisions-analytic.md#adr-ag-270), #1867). The parameter rows are `paramRows(d, pk, fmt, words)`
+(`app/panelRows.ts`, rendered by `App.tsx`): two-valued parameters whose pairwise joint `knownValues` read is again
+two options are TIED, grouped by transitive closure and confirmed by one joint read, and print one vector row in the
+point rows' form, the drawn option bracketed ([ADR-AG-304](06c-decisions-analytic.md#adr-ag-304)).
 
 *Identifiers:* `Knowledge` · `knownCurveOptions` · `panelKnowledge` · `segmentKnowledge` · `fillPool: true`
 
@@ -1139,8 +1212,11 @@ shown in the `<details>` disclosure (ADR-AG-094); numbers go through `fmtAnalyti
 
 ### The tree's display formatter ([ADR-AG-084](06c-decisions-analytic.md#adr-ag-084))
 
-`src-analytic/format.ts` is the one display formatter: `fmtAnalytic(v) = fractionText(v) ?? fmtNum(v)`, above
-`shell/format.ts`.
+`src-analytic/format.ts` is the one display formatter: `fmtAnalytic(v) = fractionText(v) ?? surdText(v) ?? fmtNum(v)`,
+above `shell/format.ts`. `surdText` is 2-D's `exactFormOf` rational·√n search, copied (q ≤ 12, p ≤ 999, n ≤ 50
+ascending; [ADR-AG-304](06c-decisions-analytic.md#adr-ag-304)). A number inside an equation goes through
+`fmtCoefficient` (fraction, then `fmtNum`, never a surd): `curveText.ts`'s `fmt` and the locus equation; a curve's
+details (centre, radius, slope, focus) are standalone and use `fmtAnalytic` (`val`).
 
 *Identifiers:* `fmtNum` · `1.33` · `exactFormOf` · `cleanNum` · `p/q`
 
@@ -1315,6 +1391,24 @@ cluster within `SOLVE_RESOLUTION` (`solve.ts`) is one point (`knownOptions`, `is
 `apart()` ask a different question.
 
 *Identifiers:* `fact` · `value: null` · `10·√SOLVE_TOL`
+
+#### The exam's questions ([ADR-AG-316](06c-decisions-analytic.md#adr-ag-316), #2393)
+
+The exam's question forms are read in front of the existing arms. Each new spelling resolves to the arm that already answered its twin:
+- `COORDS_OF` (a point by «שיעורי») rewrites to the bare name;
+- `PARAM_ASK` answers a symbol the register holds and reads, through `knownValue` → `valueText` (the panel's parameter row);
+- `CIRCLE_CENTRED_AT` finds the circle whose centre is X (`centreIdOf`);
+- `THE_CURVE` takes the one host of its kind (`hostsOf`, the radius role's rule);
+- `EQUATION_OF` admits the English noun;
+- a tangent is read by the parser's own `readTangentNoun`.
+
+Every arm that resolves a curve object answers through `curveAnswer` → `curveEquationOf` (`app/curveText.ts`): the known equation, else the options, else null. The panel's curve row (`panelKnowledge`) calls the same function, so «משוואת l1» and the row cannot disagree.
+
+`ask` wraps `askOne`. A question that did not read whole is split by `splitAsk` (enumerated joiners, and a plural noun over named members) into `Answer.parts`. `App.tsx` renders each part through the extracted `answerBody`.
+
+`SET_FORMER` reads «כל הנקודות M (המקיימות S)». With S, the trial `derive([...d.lines, S])` is traced (`Derivation.lines`, carried like `seed`), and a fault there is `Answer.refused`, worded by `errorText`. A measure of the locus (`LOCUS_PHRASE`) is `Answer.unsupported`, worded by `errOutOfScope`. Yes/no questions are not read (the operator's ruling of 2026-10-20).
+
+*Identifiers:* `curveEquationOf` · `askOne` · `splitAsk` · `answerBody` · `Answer.parts` · `Answer.refused` · `Answer.unsupported`
 
 ### Measuring by clicking
 

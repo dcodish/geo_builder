@@ -437,6 +437,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'circles', family: 'F5', he: 'המעגלים משיקים מבחוץ', en: 'the circles are tangent externally', needs: ['נתון מעגל K', 'נתון מעגל M'] },
   // The operator's own spelling (#1504 pre-play): two named circles as ONE subject.
   { category: 'circles', family: 'F5', he: 'מעגל O ומעגל M משיקים מבחוץ', en: 'circle O and circle M are tangent externally' },
+  // #2388 (ADR-AG-307): R is the one capital that names a size — the exam's «(x−13)²+y²=R²».
+  { category: 'circles', family: 'F5', he: 'נתון מעגל שמשוואתו (x-13)^2+y^2=R^2', en: 'the circle (x-13)^2+y^2=R^2' },
   // The touch point, named (#1504 amendment 1) — a derived point on the line of centres.
   {
     category: 'circles',
@@ -469,6 +471,53 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'circles', family: 'F5', he: 'המשיקים למעגל O בנקודות A ו-C נפגשים בנקודה D', en: 'the tangents to circle O at A and C meet at D' },
   { category: 'circles', family: 'F5', he: 'המשיקים נפגשים בנקודה D', en: 'the tangents meet at D', needs: ['מעגל O', 'המשיק למעגל O בנקודה A', 'המשיק למעגל O בנקודה C'] },
   { category: 'circles', family: 'F5', he: 'דרך P עובר משיק למעגל', en: 'a tangent to the circle passes through P', needs: ['נתון מעגל x^2+y^2=25', 'P(10,0)'] },
+  // The exam's own two-circle and centre sentences (#2391, ADR-AG-315) — each reads as its canonical twin.
+  { category: 'circles', family: 'F5', he: 'נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9 ומרכזו K', en: 'circle I with equation (x-3)^2+(y-4)^2=9 and centre K' },
+  { category: 'circles', family: 'F5', he: 'מרכז המעגל I הוא K', en: 'the centre of circle I is K', needs: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9'] },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'K ו-L מרכזי המעגלים I ו-II בהתאמה',
+    en: 'K and L are the centres of circles I and II respectively',
+    needs: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1'],
+  },
+  { category: 'circles', family: 'F5', he: 'שני המשיקים נחתכים בנקודה D', en: 'the two tangents meet at D', needs: ['מעגל O', 'המשיק למעגל O בנקודה A', 'המשיק למעגל O בנקודה C'] },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'נתונים שני מעגלים המשיקים זה לזה מבחוץ',
+    en: 'the two circles touch each other externally',
+    needs: ['נתון מעגל שמרכזו M ורדיוסו 3', 'נתון מעגל שמרכזו N ורדיוסו 6'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'אורכו של הקטע המחבר את מרכזי המעגלים הוא 9',
+    en: 'the length of the segment joining the centres is 9',
+    needs: ['נתון מעגל שמרכזו M ורדיוסו 3', 'נתון מעגל שמרכזו N ורדיוסו 6'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'המרחק בין מרכזי המעגלים הוא 9',
+    en: 'the distance between the centres of the circles is 9',
+    needs: ['נתון מעגל שמרכזו M ורדיוסו 3', 'נתון מעגל שמרכזו N ורדיוסו 6'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'שני מעגלים שמרכזיהם בנקודות N₁ ו-N₂ והרדיוס של כל אחד מהם הוא 10, משיקים למעגל M בנקודה A',
+    en: 'two circles centred N1 and N2, each of radius 10, are tangent to circle M at A',
+    needs: ['מעגל שמרכזו M(8,-3) משיק לישר 4x+3y+2=0 בנקודה A'],
+  },
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'N₂A הוא קוטר המעגל M',
+    en: 'N₂A is a diameter of circle M',
+    needs: ['מעגל שמרכזו M(8,-3) משיק לישר 4x+3y+2=0 בנקודה A', 'נתון מעגל שמרכזו N₂ ורדיוסו 10', 'מעגל N₂ משיק למעגל M בנקודה A'],
+  },
+  { category: 'relations', family: 'F17', he: 'M מקיימת MA = MB', en: 'M satisfies MA = MB', needs: ['A(0,0)', 'B(4,0)'] },
   // #1430 (ADR-AG-233): the two tangents from a point, touches named by the tool (2-D's T, S) — the sentence «מהנקודה P העבירו משיקים למעגל» is taught onto.
   { category: 'circles', family: 'F5', he: 'מנקודה P יוצאים שני משיקים למעגל', en: 'from point P two tangents are drawn to the circle', needs: ['נתון מעגל x^2+y^2=25', 'P(10,0)'] },
   { category: 'circles', family: 'F5', he: 'AB מיתר במעגל', en: 'AB is a chord of the circle', needs: ['נתון מעגל x^2+y^2=25'] },
@@ -974,6 +1023,17 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'α = 30',
     needs: ['משולש ABC', '∢ABC = α'],
   },
+  // #2388 (ADR-AG-307): relations between parameters, and the ratio of two circles' radii (Q2, summer 2022).
+  { category: 'relations', family: 'F17', he: 'R = 2r', en: 'R = 2r', needs: ['נתון מעגל M שרדיוסו r', 'נתון מעגל N שרדיוסו R'] },
+  { category: 'relations', family: 'F17', he: 'r:R = 1:2', en: 'r:R = 1:2', needs: ['נתון מעגל M שרדיוסו r', 'נתון מעגל N שרדיוסו R'] },
+  { category: 'relations', family: 'F17', he: 'היחס בין R ל-r הוא 2:1', en: 'the ratio of R to r is 2:1', needs: ['נתון מעגל M שרדיוסו r', 'נתון מעגל N שרדיוסו R'] },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'היחס בין אורכי הרדיוסים של המעגלים הוא 1:2',
+    en: 'the ratio of the radii of the circles is 1:2',
+    needs: ['נתון מעגל M שרדיוסו r', 'נתון מעגל N שרדיוסו R'],
+  },
   {
     category: 'relations',
     family: 'F17',
@@ -1336,6 +1396,13 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'circles', family: 'F5', he: 'AB משיק משותף למעגלים O ו-P', en: 'AB is a common tangent to circles O and P' },
   { category: 'circles', family: 'F5', he: 'AB משיק משותף חיצוני לשני המעגלים', en: 'AB is an external common tangent of the two circles' },
   { category: 'circles', family: 'F5', he: 'CD משיק משותף למעגלים O ו-P בנקודה M', en: 'CD is a common tangent to circles O and P at M' },
+  // #2390 (ADR-AG-314): every common tangent of the pair, named l1, l2, …; the tangent at the touching circles' common point.
+  { category: 'circles', family: 'F5', he: 'כל המשיקים המשותפים לשני המעגלים', en: 'all the common tangents of the two circles', needs: ['שני מעגלים זרים'] },
+  { category: 'circles', family: 'F5', he: 'המשיק העובר בנקודה המשותפת לשני המעגלים', en: 'the tangent through the common point of the two circles', needs: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T'] },
+  // #2392 (ADR-AG-313): the common tangent named by its line (the exam's Q3 ג), the name given after, and the axis side.
+  { category: 'circles', family: 'F5', he: 'הישר l משיק למעגלים O ו-P בנקודות A ו-B בהתאמה', en: 'the line l is tangent to circles O and P at A and B respectively', needs: ['נתון מעגל שמרכזו O(0,0) ורדיוסו 2', 'נתון מעגל שמרכזו P(10,0) ורדיוסו 3'] },
+  { category: 'relations', family: 'F17', he: 'נסמן את הישר AB ב-l', en: 'denote the line AB by l', needs: ['A(1,2)', 'B(3,5)', 'הישר AB'] },
+  { category: 'relations', family: 'F17', he: 'הישר AB חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x', en: 'line AB crosses the y-axis above the x-axis', needs: ['A(1,2)', 'B(3,5)', 'הישר AB'] },
   { category: 'circles', family: 'F5', he: 'מנקודה A יוצאים שני משיקים לשני המעגלים', en: 'from point A two tangents to the two circles' },
   { category: 'circles', family: 'F5', he: 'AB מיתר במעגל O ומשיק למעגל P', en: 'AB is a chord of circle O and tangent to circle P', needs: ['מעגל O', 'מעגל P'] },
   /*
@@ -1353,6 +1420,14 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'shapes', family: 'F17', he: 'משולש קהה זווית ABC', en: 'obtuse triangle ABC' },
   { category: 'relations', family: 'F17', he: 'D מעל A', en: 'D is above A', needs: ['נקודה A', 'נקודה D'] },
   { category: 'relations', family: 'F17', he: 'C מימין ל-B', en: 'C is to the right of B', needs: ['נקודה B', 'נקודה C'] },
+  // #2386 (ADR-AG-310) — a position word against a straight line: y against the line's y at the point («מעל»), x against
+  // its x («מימין»), operator rulings of 2026-10-20
+  { category: 'relations', family: 'F17', he: 'M מעל הישר KL', en: 'M is above the line KL', needs: ['K(3,4)', 'L(-5,2)', 'נקודה M'] },
+  { category: 'relations', family: 'F17', he: 'M מימין לישר l', en: 'M is to the right of the line l', needs: ['נתון ישר l: y=2x', 'נקודה M'] },
+  // #2395 (ADR-AG-311) — a stated distinctness: two points, two circles or two lines kept apart
+  { category: 'relations', family: 'F17', he: 'P ≠ Q', en: 'P ≠ Q', needs: ['נקודה P', 'נקודה Q'] },
+  { category: 'relations', family: 'F17', he: 'המעגלים N1 ו-N2 שונים', en: 'the circles N1 and N2 are distinct', needs: ['נתון מעגל שמרכזו N1 ורדיוסו 2', 'נתון מעגל שמרכזו N2 ורדיוסו 3'] },
+  { category: 'relations', family: 'F17', he: 'הישרים l1 ו-l2 שונים', en: 'the lines l1 and l2 are distinct', needs: ['נתון ישר l1: y=2x+1', 'נתון ישר l2: y=-x'] },
   // #1622 E5 (ADR-AG-221) — an order between angle aliases (2-D's measure-order / measure-bound), an angle named by a
   // label (2-D's angle-alias), and an area label that introduces the region it names
   { category: 'relations', family: 'F17', he: 'α < β', en: 'α < β', needs: ['משולש ABC', '∢ABC = α', '∢BAC = β'] },

@@ -347,6 +347,13 @@ const he = {
   errMeasureContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errMeasureContradictsAlone: 'לא ניתן: «{{detail}}» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errRadiusContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד.',
+  // #2390 (ADR-AG-314) — 2-D's input.tangentsExhaustedContained, byte for byte.
+  errNoCommonTangent: 'למעגל המוכל בתוך מעגל אין אף משיק משותף.',
+  // #2388 (ADR-AG-307; operator ruling 2026-10-20) — the radius capital as a point AND the radius parameter: both readings, the earlier line.
+  errRadiusLetterIsPoint: '{{holder}} כבר שם של נקודה בשרטוט (בשורה «{{declared}}»), ובשורה «{{detail}}» {{holder}} הוא פרמטר הרדיוס. שם אחד מסמן דבר אחד: שנו את שם הנקודה, למשל «שנה שם {{holder}} ל-T».',
+  errRadiusLetterIsPointAlone: '{{holder}} כבר שם של נקודה בשרטוט, ובשורה «{{detail}}» {{holder}} הוא פרמטר הרדיוס. שם אחד מסמן דבר אחד: שנו את שם הנקודה, למשל «שנה שם {{holder}} ל-T».',
+  errRadiusLetterIsRadius: '{{holder}} כבר מסמן את פרמטר הרדיוס (בשורה «{{declared}}»), ובשורה «{{detail}}» {{holder}} הוא שם של נקודה. שם אחד מסמן דבר אחד: בחרו לנקודה שם אחר.',
+  errRadiusLetterIsRadiusAlone: '{{holder}} כבר מסמן את פרמטר הרדיוס, ובשורה «{{detail}}» {{holder}} הוא שם של נקודה. שם אחד מסמן דבר אחד: בחרו לנקודה שם אחר.',
   // #1963 (ADR-AG-296; operator ruling 2026-10-14) — a circle through three points a statement puts on one line.
   errForcedCollinear:
     'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. ' +
@@ -472,6 +479,13 @@ const he = {
   errBadOperand:
     'הבנתי את היחס במשפט "{{detail}}", אבל לא זיהיתי את אחד האגפים. אפשר לציין שני קודקודים (AB), ' +
     'צלע (הצלע AB), ישר (הישר l1) או ציר (ציר ה-x).',
+  // #2386 (ADR-AG-310) — the operator's ruled sentence (2026-10-20, option (a)); the horizontal one is its mirror
+  errSideOfVertical: 'לישר אנכי אין "{{word}}" — נסו "מימין ל-" או "משמאל ל-"',
+  errSideOfHorizontal: 'לישר אופקי אין "{{word}}" — נסו "מעל" או "מתחת"',
+  sideWordAbove: 'מעל',
+  sideWordBelow: 'מתחת',
+  sideWordRight: 'מימין ל-',
+  sideWordLeft: 'משמאל ל-',
   // What a taken name already holds, for errNameClash — the construct's own corpus noun.
   kindObject: 'עצם אחר בשרטוט',
   kindPoint: 'נקודה שהוגדרה בשיעורים',
@@ -928,6 +942,11 @@ const en: typeof he = {
   errMeasureContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold. The reason: {{what}}.',
   errMeasureContradictsAlone: 'Can\'t do that: «{{detail}}» contradicts an earlier given — they can\'t both hold. The reason: {{what}}.',
   errRadiusContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold.',
+  errNoCommonTangent: 'A circle contained inside another has no common tangent at all.',
+  errRadiusLetterIsPoint: '{{holder}} is already the name of a point in the figure (in the line «{{declared}}»), and in the line «{{detail}}» {{holder}} is the radius parameter. One name marks one thing: rename the point, e.g. «rename {{holder}} to T».',
+  errRadiusLetterIsPointAlone: '{{holder}} is already the name of a point in the figure, and in the line «{{detail}}» {{holder}} is the radius parameter. One name marks one thing: rename the point, e.g. «rename {{holder}} to T».',
+  errRadiusLetterIsRadius: '{{holder}} already marks the radius parameter (in the line «{{declared}}»), and in the line «{{detail}}» {{holder}} is the name of a point. One name marks one thing: give the point another name.',
+  errRadiusLetterIsRadiusAlone: '{{holder}} already marks the radius parameter, and in the line «{{detail}}» {{holder}} is the name of a point. One name marks one thing: give the point another name.',
   errForcedCollinear:
     "Can't do that: «{{detail}}» contradicts «{{declared}}» — they can't both hold. " +
     'The reason: {{points}} lie on one line, and no circle passes through three points on one line.',
@@ -1028,6 +1047,12 @@ const en: typeof he = {
   errBadOperand:
     'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +
     'a side (side AB), a line (line l1) or an axis (the x-axis).',
+  errSideOfVertical: 'A vertical line has no "{{word}}" — try "to the right of" or "to the left of"',
+  errSideOfHorizontal: 'A horizontal line has no "{{word}}" — try "above" or "below"',
+  sideWordAbove: 'above',
+  sideWordBelow: 'below',
+  sideWordRight: 'to the right of',
+  sideWordLeft: 'to the left of',
   // What a taken name already holds, for errNameClash — the construct's own corpus noun.
   kindObject: 'another object in the figure',
   kindPoint: 'a point given by coordinates',

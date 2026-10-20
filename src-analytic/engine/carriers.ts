@@ -73,8 +73,15 @@ const NO_CAPITALS: ReadonlySet<string> = new Set();
  */
 export const mentionsPointName = (e: Expr, allow: ReadonlySet<string> = NO_CAPITALS): boolean =>
   symbolsOf(e).some((s) => /^[A-Z]$/.test(s) && !allow.has(s));
-/** The capital a LENGTH's value may carry — 2-D's radius symbol (`LVAR`, ADR-034). An angle admits none. */
-export const LENGTH_CAPITALS: ReadonlySet<string> = new Set(['R']);
+/**
+ * THE ONE CAPITAL THAT NAMES A SIZE — the radius `R` (2-D's radius symbol, `LVAR`, ADR-034; operator ruling 2026-10-20 on
+ * #2388, option b: *"it is very common to use R and r for radiuses of different circles so R can be an exception"*).
+ * Every reader that takes a value or an equation asks this one set (#2388, ADR-AG-307): a length («AC = 1.6R»), an
+ * equation («(x−13)²+y²=R²»), a radius («ורדיוסו R», «רדיוס המעגל O הוא R», «שרדיוסו R») and a relation («R = 2r»).
+ * Every other capital stays a point's name (ADR-AG-163). An angle admits none. A point R beside the parameter R is the
+ * clash `radius-letter-taken` (`apply.ts`).
+ */
+export const RADIUS_CAPITALS: ReadonlySet<string> = new Set(['R']);
 /**
  * The same test on text the expression layer cannot read — «A₁», «A_1»: a capital standing alone (no letter beside
  * it), with an optional index. A reader uses it to decline rather than answer `bad-equation` about a point's name.
@@ -154,6 +161,9 @@ export function carrierOf(o: GeoObject): Carrier | null {
     // A DRAWN ARC (#1622 E4): which part of a circle is inked — its circle and ends are counted where they live.
     case 'arc':
       return null;
+    // A COMMON TANGENT (#2390, ADR-AG-314): a closed form of two circles, whose freedom is counted where it lives.
+    case 'common-tangent':
+      return null;
     default: {
       const unclassified: never = o;
       throw new Error(`object kind carries no DOF classification: ${JSON.stringify(unclassified)}`);
@@ -196,6 +206,7 @@ export function symbolDeps(o: GeoObject): string[] {
       // Defined by reference alone (#1464): no expression, nothing to register. So is a drawn arc (#1622 E4).
       case 'circle-thru':
       case 'arc':
+      case 'common-tangent': // its two circles, by reference (#2390)
         return [];
       default: {
         const unwalked: never = o;
@@ -242,6 +253,9 @@ export function objectDeps(o: GeoObject): Id[] {
     // Its circle and its ends — and the point it bulges away from (#1622 E4) — all placed before it is drawn.
     case 'arc':
       return [o.def.circle, o.def.from, o.def.to, ...[o.def.away, o.def.toward].filter((x): x is Id => x !== undefined)];
+    // Its two circles, both placed before it is drawn (#2390, ADR-AG-314).
+    case 'common-tangent':
+      return [...o.circles];
     default: {
       const undeclared: never = o;
       throw new Error(`object kind declares no dependencies: ${JSON.stringify(undeclared)}`);

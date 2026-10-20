@@ -30,7 +30,7 @@
  * reject. That property is what #778 wanted from deriving the sentence out of the commands; re-parsing
  * the exact string gets it more directly, with no renderer in between.
  */
-import { unwrap } from './frameAnalytic';
+import { respectively, unwrap } from './frameAnalytic';
 
 /**
  * The closed imperative lexicon.
@@ -42,6 +42,8 @@ import { unwrap } from './frameAnalytic';
 export const IMPERATIVE_VERBS_HE = [
   'הוסף', 'תוסיף', 'הוסיפו', 'להוסיף',
   'שרטט', 'תשרטט', 'שרטטו',
+  // #2390 (ADR-AG-314) — the exam spells «שרטטו» with ס (Q2 ב: «סרטטו במערכת צירים אחת סקיצה …»).
+  'סרטט', 'תסרטט', 'סרטטו',
   'צייר', 'תצייר', 'ציירו', 'לצייר',
   'בנה', 'תבנה', 'בנו',
   'העבר', 'תעביר',
@@ -127,6 +129,14 @@ const SETTING_NOUN = '(?:משולש|מרובע|ריבוע|מלבן|מעוי?י?�
 const FROM_ADV = new RegExp(String.raw`^(?:מן\s+|מ-?)(?:ה?(${ANCHOR_NOUN})\s+)?(${LBL_LIST})(?=[\s,]|$)\s*,?\s*`);
 /** «דרך E», «דרך הנקודה D», «דרך הנקודה D שעל המעגל». The rider is kept: a frame decides what it implies. */
 const THROUGH_ADV = new RegExp(String.raw`^דרך\s+(?:ה?(${ANCHOR_NOUN})\s+)?(${LBL})(?=[\s,]|$)(?:\s+ש(?:על|נמצאת\s+על)\s+(ה[א-ת]+))?\s*,?\s*`);
+/** «… דרך הנקודה A» at the END of the object (#2391 B2): what precedes it, and the anchor. */
+const TRAILING_THROUGH = new RegExp(String.raw`^(.*?)\s*,?\s*(?:^|\s)דרך\s+(?:ה?(${ANCHOR_NOUN})\s+)?(${LBL})$`);
+/** A circle's name in the register — a numeral (Roman or digit) or a centre letter. */
+const CIRCLE_LBL = String.raw`(?:VIII|VII|III|IV|VI|IX|II|I|V|[1-9]|${LBL})`;
+/** «למעגלים I ו-II בנקודות A ו-B בהתאמה» (#2391 B2). */
+const TANGENTS_RESPECTIVELY = new RegExp(
+  String.raw`^ל(?:ה)?מעגלים\s+(${CIRCLE_LBL})\s+ו-?\s*(${CIRCLE_LBL})\s+ב(?:ה)?נקודות\s+(${LBL})\s+ו-?\s*(${LBL})\s+בהתאמה$`,
+);
 /** «במשולש OBC», «במשולש ישר זווית ABC». */
 const IN_ADV = new RegExp(String.raw`^(ב${SETTING_NOUN}(?:\s+[א-ת-]+){0,3}?\s+(?:${LBL}){3,4})(?=[\s,]|$)\s*,?\s*`);
 
@@ -214,6 +224,17 @@ export function constructionCandidates(raw: string): ImperativeCandidate[] {
   }
   if (!verb) return [];
 
+  /*
+   * #2391 B2 (ADR-AG-315) — TWO TANGENTS IN ONE SENTENCE: «מעבירים משיק למעגל I דרך הנקודה A ומשיק למעגל II דרך הנקודה
+   * B». Each conjoined noun phrase is its own construction with the same verb; the lesson is their canonicals joined by
+   * the top-level «;» `readLine` already splits. Every piece must compose, or the line is not this grammar.
+   */
+  const pieces = from || through || setting ? [s] : s.split(/\s+ו(?=ה?משיק(?:ים)?(?![א-ת]))/);
+  if (pieces.length > 1) {
+    const each = pieces.map((p) => constructionCandidates(`${verb} ${p}`)[0]?.remainder);
+    return each.every((r): r is string => !!r) ? [{ verb, remainder: each.join('; '), exam: true }] : [];
+  }
+
   const nm = s.match(NOUN_RE);
   if (!nm) return [];
   const noun = nm[2];
@@ -224,7 +245,24 @@ export function constructionCandidates(raw: string): ImperativeCandidate[] {
   const lm = s.match(LABELS_AFTER_NOUN);
   const labels = lm ? lm[1] : '';
   if (lm) s = s.slice(lm[0].length);
-  const rest = predicate(s.replace(/^,\s*/, ''));
+  let rest = predicate(s.replace(/^,\s*/, ''));
+  if (noun === 'משיק' || noun === 'משיקים') {
+    /*
+     * #2391 B2 (ADR-AG-315) — the through-adverbial AFTER the noun phrase («מעבירים משיק למעגל I דרך הנקודה A») is the
+     * one the register reads before it («דרך הנקודה A מעבירים משיק למעגל I»): the same anchor, so the same lesson.
+     */
+    const trailing = !from && !through ? TRAILING_THROUGH.exec(rest) : null;
+    if (trailing) {
+      through = { noun: trailing[2], label: trailing[3] };
+      rest = trailing[1].trim();
+    }
+    // «משיקים למעגלים I ו-II בנקודות A ו-B בהתאמה» — two tangents, each at its own point: two canonicals, paired.
+    const paired = spec.plural && !from && !through && !labels ? TANGENTS_RESPECTIVELY.exec(rest) : null;
+    if (paired) {
+      const pairs = respectively([paired[1], paired[2]], [paired[3], paired[4]]);
+      return pairs ? [{ verb, remainder: pairs.map(([c, p]) => `המשיק למעגל ${c} בנקודה ${p}`).join('; '), exam: true }] : [];
+    }
+  }
   const join = (...parts: string[]) => parts.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
 
   const out: string[] = [];
@@ -284,6 +322,9 @@ export function constructionCandidates(raw: string): ImperativeCandidate[] {
   return done();
 }
 
+/** «במערכת צירים (אחת) סקיצה של X ושל Y» — the exam's sketch instruction (Q2 ב, #2390): X, then Y. */
+const SKETCH_FRAME = /^במערכת\s+צירים(?:\s+אחת)?\s*,?\s+(?:סקיצה|שרטוט)\s+של\s+(.+?)\s+ו(?:גם\s+)?של\s+(.+)$/;
+
 const HE_VERB = new Set<string>(IMPERATIVE_VERBS_HE);
 const EN_VERB = new Set<string>(IMPERATIVE_VERBS_EN);
 const HE_PARTICLE = new Set(PARTICLES_HE);
@@ -319,6 +360,16 @@ export function imperativeCandidates(raw: string): ImperativeCandidate[] {
   };
   push(after); // particles stripped — the tightest reading
   push(1); // the verb alone removed, in case a "particle" was really part of the sentence
+  // #2390 (ADR-AG-314) — the exam's sketch frame: «סרטטו במערכת צירים אחת סקיצה של X ושל Y» draws X and Y. The figure
+  // already holds X (the givens), so Y is the sentence to teach; «X ו-Y» is offered after it. Candidates only: the
+  // submit decision keeps whichever records (ADR-AG-206), with the exam register's already-known rule.
+  for (const c of [...out]) {
+    const sketch = SKETCH_FRAME.exec(c.remainder);
+    if (!sketch) continue;
+    for (const remainder of [sketch[2], `${sketch[1]} ו-${sketch[2]}`]) {
+      if (!out.some((o) => o.remainder === remainder)) out.push({ verb: head, remainder, exam: true });
+    }
+  }
   return out;
 }
 

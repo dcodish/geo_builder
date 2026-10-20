@@ -91,13 +91,13 @@ export interface ExceptionFamily {
  */
 export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
   X1: {
-    title: 'coordinates, the origin, the axes, quadrants, position words between points',
+    title: 'coordinates, the origin, the axes, quadrants, position words between points, or against a line',
     reason:
-      "the coordinate frame: 2-D is coordinate-free by design and sends these to the analytic builder. A position word between two points («D מעל A», «C מימין ל-B») is the frame too: analytic's axes are fixed, so it compares coordinates there (#1706, operator ruling 2026-10-03), while 2-D refuses screen orientation (input.scope.orientation) — those rows carry only: ['analytic']",
+      "the coordinate frame: 2-D is coordinate-free by design and sends these to the analytic builder. A position word between two points («D מעל A», «C מימין ל-B») is the frame too: analytic's axes are fixed, so it compares coordinates there (#1706, operator ruling 2026-10-03), while 2-D refuses screen orientation (input.scope.orientation) — those rows carry only: ['analytic']. A position word against a LINE («M מעל הישר KL», «M מימין לישר l») is the same frame: y against the line's y at the point, x against its x (#2386, operator rulings 2026-10-20, ADR-AG-310) — analytic's alone, only: ['analytic']",
     products: ['analytic', '3d'],
     mustRefuse: ['2d'],
     topic: true,
-    patterns: [/\(\s*[-\w√.+ ]+,/, /ציר ה-?\s?[xyz]/, /ראשית/, /רביע/, /הצירים/, /(?:^|\()[A-Z]\d?\s+(?:מעל|מתחת|מימין|משמאל)\s*ל?-?\s*[A-Z]\d?(?:$|\))/],
+    patterns: [/\(\s*[-\w√.+ ]+,/, /ציר ה-?\s?[xyz]/, /ראשית/, /רביע/, /הצירים/, /(?:^|\()[A-Z]\d?\s+(?:מעל|מתחת|מימין|משמאל)\s*ל?-?\s*[A-Z]\d?(?:$|\))/, /(?:מעל|מתחת|מימין|משמאל)\s*ל?-?\s*ה?ישר/, /(?:above|below|to the (?:right|left) of) (?:the )?line/i],
   },
   X2: {
     title: 'equations of lines, circles and conics; slopes; focus and directrix',
@@ -272,7 +272,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2060': 'open', // #2024 (ADR-668): 3-D does not read a single-letter angle given a symbol («זוית B=b», «זוית B=α»)
 
   '#2140': 'open',
-  '#2390': 'open', // #2407 / #2406 (ADR-740): analytic does not read the tangent through the circles' common point (its D3)
   '#2218': 'open', // #2197 (ADR-736): analytic does not read a chord / diameter of one circle tangent to another in its relative and diameter forms
   '#2190': 'open', // #2198 / #2216 (ADR-677), #2149 (ADR-671) and #2217 (ADR-691): analytic does not read one «ברדיוס N» for a circle pair, nor the named two-circle sentences (centre segment, equal radii, touch point), nor a fresh equal-radii pair
   '#2236': 'open', // #2205 (ADR-685): analytic does not read a definite unnamed shape noun with a predicate
@@ -296,6 +295,11 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2357': 'open', // #2234 (ADR-737): analytic sends the same spellings to the model
 
   '#2344': 'open', // #2344 (ADR-W-146): 2-D draws a green sliver for a triangle whose givens hold only flat in the limit (the tangent root)
+  '#2417': 'open', // #2395 (ADR-AG-311): 2-D does not read a stated distinctness («P ≠ Q», «המעגלים N1 ו-N2 שונים»)
+
+  '#2415': 'open', // #2391 (ADR-AG-315): 2-D does not read «M מקיימת …», the centres' distance by role, or the distributed named circle pair
+  '#2420': 'open', // #2391 (ADR-AG-315): 3-D does not read «M מקיימת …» or an underscore index «N_2»
+  '#2421': 'open', // #2388 (ADR-AG-307): 2-D does not read «R = 2r», «r:R = 1:2» or the unnamed ratio of two radii
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1054,7 +1058,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'chord-tangent-relative-2197', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'המיתר AB במעגל O משיק למעגל P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2218' }], note: '2-D drew a tangent from P to circle O before ADR-736; analytic answers not-handled' },
   { id: 'diameter-tangent-other-circle-2197', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'AB קוטר במעגל O ומשיק למעגל P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2218' }], note: '2-D put A on B before ADR-736; analytic answers not-handled' },
   // ── #2407 + #2406 (ADR-740): a common tangent through the circles' touch point is the tangent AT the touch ──
-  { id: 'tangent-through-common-point-2406', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'המעגלים משיקים בנקודה T', 'המשיק העובר בנקודה המשותפת לשני המעגלים'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2390' }], note: '2-D drew a two-touch tangent through neither touch, green, before ADR-740; analytic reads the tangent at the common point with #2390' },
+  { id: 'tangent-through-common-point-2406', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'המעגלים משיקים בנקודה T', 'המשיק העובר בנקודה המשותפת לשני המעגלים'], expect: 'builds', exception: 'X8', note: '2-D drew a two-touch tangent through neither touch, green, before ADR-740; analytic reads it since ADR-AG-314 (#2390)' },
   { id: 'common-tangent-through-touch-internal-2407', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים מבפנים בנקודה T', 'T על AB', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', note: '2-D sent it to the AI before ADR-740 (the figure is locked in src/__tests__/issue-2407-common-tangent-at-touch.test.ts); analytic builds it since ADR-AG-312 (#2385 D1 reads the internal pair too)' },
   { id: 'circle-inside-the-circle-1622', family: 'circles', steps: ['מעגל O', 'מעגל מוכל בתוך המעגל'], expect: 'builds', exception: 'X8' },
   { id: 'circle-by-circumference', family: 'circles', steps: ['מעגל O שהיקפו 6π'], expect: 'builds', exception: 'X8' },
@@ -1151,6 +1155,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'ex-position-below-1706', family: 'topic', steps: ['נקודה A', 'נקודה D', 'D מתחת ל-A'], expect: 'builds', exception: 'X1', only: ['analytic'] },
   { id: 'ex-position-right-1706', family: 'topic', steps: ['נקודה B', 'נקודה C', 'C מימין ל-B'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '2-D refuses it as input.scope.orientation' },
   { id: 'ex-position-left-1706', family: 'topic', steps: ['נקודה B', 'נקודה C', 'C משמאל ל-B'], expect: 'builds', exception: 'X1', only: ['analytic'] },
+  { id: 'ex-position-above-line-2386', family: 'topic', steps: ['נקודה K', 'נקודה L', 'נקודה M', 'M מעל הישר KL'], expect: 'builds', exception: 'X1', only: ['analytic'], note: "#2386 (ADR-AG-310): y_M above the line's y at x_M; 2-D does not read screen orientation" },
+  { id: 'ex-position-below-line-2386', family: 'topic', steps: ['נקודה K', 'נקודה L', 'נקודה M', 'M מתחת לישר KL'], expect: 'builds', exception: 'X1', only: ['analytic'] },
+  { id: 'ex-position-right-line-2386', family: 'topic', steps: ['נקודה K', 'נקודה L', 'נקודה M', 'M מימין לישר KL'], expect: 'builds', exception: 'X1', only: ['analytic'] },
+  { id: 'distinct-points-2395', family: 'points-incidence', steps: ['נקודה P', 'נקודה Q', 'P ≠ Q'], expect: 'builds', exception: 'X9', knownGap: [{ product: '2d', issue: '#2417' }], note: '#2395 (ADR-AG-311): a stated distinctness of two points; 2-D does not read it yet (#2417)' },
+  { id: 'distinct-circles-2395', family: 'circles', steps: ['נתון מעגל שמרכזו N1 ורדיוסו 2', 'נתון מעגל שמרכזו N2 ורדיוסו 3', 'המעגלים N1 ו-N2 שונים'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2417' }], note: '#2395 (ADR-AG-311): two circles stated different; 2-D does not read it yet (#2417)' },
+  { id: 'ex-distinct-lines-2395', family: 'topic', steps: ['נתון ישר l1: y=2x+1', 'נתון ישר l2: y=-x', 'הישרים l1 ו-l2 שונים'], contextFor: { '2d': [] }, expect: 'builds', exception: 'X4', only: ['analytic'], note: '#2395 (ADR-AG-311): two named lines stated different' },
+  { id: 'ex-position-left-line-2386', family: 'topic', steps: ['נקודה K', 'נקודה L', 'נקודה M', 'M משמאל לישר KL'], expect: 'builds', exception: 'X1', only: ['analytic'] },
   { id: 'ex-position-aside-1706', family: 'topic', steps: ['A ו-D על ציר ה-y (D מעל A), B ו-C על ציר ה-x (C מימין ל-B)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: 'corpus 6/5 line 3: the position words inside the asides' },
   { id: 'ex-median-equation-1662', family: 'topic', steps: ['משולש ABC', 'משוואת התיכון AD היא y=x'], expect: 'builds', exception: 'X2', note: '#1662: the median claim is kept — D is the midpoint of BC' },
   { id: 'ex-altitude-equation-ask-1662', family: 'topic', steps: ['משולש ABC', 'משולש ABE', 'משוואת הגובה AD היא y=x'], expect: 'asks', exception: 'X2', note: '#1662: two triangles have the vertex A and neither side holds D' },
@@ -1683,6 +1694,34 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2385 (ADR-AG-312): a common tangent through the circles' stated touch point is the tangent at it ──
   { id: 'common-tangent-through-touch-2385', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'T על AB', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', note: '2-D builds it since ADR-740 (#2407); analytic since ADR-AG-312 (#2385)' },
+
+  // ── #2390 (ADR-AG-314): every common tangent in one sentence; the tangent at the touching circles' common point ──
+  { id: 'all-common-tangents-2390', family: 'tangents', steps: ['שני מעגלים זרים', 'כל המשיקים המשותפים לשני המעגלים'], expect: 'builds', exception: 'X8', note: 'the verdicts agree; the drawing does not: 2-D draws ONE tangent (found work, filed with #2390), analytic draws the four' },
+  { id: 'touch-tangent-2390', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'המשיק המשותף בנקודת ההשקה'], expect: 'builds', exception: 'X8', note: 'analytic did not read it before ADR-AG-314' },
+  { id: 'touch-tangent-through-2390', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'המשיק העובר בנקודה המשותפת לשני המעגלים'], expect: 'builds', exception: 'X8', note: 'the verdicts agree; 2-D draws a two-touch tangent there, not the tangent at T (found work); analytic did not read it before ADR-AG-314' },
+
+  // ── #2392 (ADR-AG-313): the common tangent named by its line, a line named after, the axis side of a crossing — analytic's ──
+  { id: 'named-common-tangent-2392', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'הישר l משיק למעגלים O ו-P בנקודות A ו-B בהתאמה'], expect: 'builds', exception: 'X4', only: ['analytic'], note: '2-D names no line (X4); analytic did not read it before ADR-AG-313' },
+  { id: 'name-line-2392', family: 'topic', steps: ['נקודה A', 'נקודה B', 'AB', 'נסמן את הישר AB ב-l'], expect: 'builds', exception: 'X4', only: ['analytic'], note: 'analytic did not read it before ADR-AG-313' },
+  { id: 'axis-cut-2392', family: 'topic', steps: ['נקודה A', 'נקודה B', 'הישר AB', 'הישר AB חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x'], expect: 'builds', exception: 'X1', only: ['analytic'], note: 'the axis side of a crossing, no point made; analytic did not read it before ADR-AG-313' },
+
+  // ── #2388 (ADR-AG-307): a relation between the radius letters, and the ratio of two circles' radii ──
+  { id: 'radius-relation-2388', family: 'circles', steps: ['נתון מעגל M שרדיוסו r', 'נתון מעגל N שרדיוסו R', 'R = 2r'], contextFor: { '2d': ['מעגל M ברדיוס r', 'מעגל N ברדיוס R'] }, expect: 'builds', exception: 'X8', note: '2-D reads it too (measured on the #2414 tip)' },
+  { id: 'radius-ratio-colon-2388', family: 'circles', steps: ['נתון מעגל M שרדיוסו r', 'נתון מעגל N שרדיוסו R', 'r:R = 1:2'], contextFor: { '2d': ['מעגל M ברדיוס r', 'מעגל N ברדיוס R'] }, expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2421' }] },
+  { id: 'radius-ratio-words-2388', family: 'circles', steps: ['נתון מעגל M שרדיוסו r', 'נתון מעגל N שרדיוסו R', 'היחס בין R ל-r הוא 2:1'], contextFor: { '2d': ['מעגל M ברדיוס r', 'מעגל N ברדיוס R'] }, expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2421' }] },
+  { id: 'radius-ratio-unnamed-2388', family: 'circles', steps: ['נתון מעגל שמרכזו M(0,0) ורדיוסו r', 'נתון מעגל שמרכזו N(9,0) ורדיוסו R', 'היחס בין אורכי הרדיוסים של המעגלים הוא 1:2'], contextFor: { '2d': ['מעגל M', 'מעגל N'] }, expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2421' }], note: '2-D asks which circle (ambiguous-circle-ref)' },
+
+  // ── #2391 (ADR-AG-315): the exam's own two-circle and centre sentences, each read as its canonical twin ──
+  { id: 'satisfies-2391', family: 'lengths', steps: ['נקודה A', 'נקודה B', 'M מקיימת MA = MB'], contextFor: { '3d': ['A(0,0,0)', 'B(4,0,0)'] }, expect: 'builds', knownGap: [{ product: '2d', issue: '#2415' }, { product: '3d', issue: '#2420' }], note: 'analytic did not read «מקיימת» before ADR-AG-315; 2-D escalates it to the model' },
+  { id: 'underscore-index-2391', family: 'points-incidence', steps: ['נקודה N_2'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2420' }], note: 'analytic did not read `N_2` before ADR-AG-315 (it is `N₂` there; 2-D reads it as `N2`)' },
+  { id: 'two-tangents-meet-2391', family: 'tangents', steps: ['מעגל O', 'המשיק למעגל O בנקודה A', 'המשיק למעגל O בנקודה C', 'שני המשיקים נחתכים בנקודה D'], expect: 'builds', exception: 'X8' },
+  { id: 'centres-distance-2391', family: 'circles', steps: ['מעגל M ברדיוס 3', 'מעגל N ברדיוס 6', 'המרחק בין מרכזי המעגלים הוא 9'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2415' }], note: '2-D asks which circle (input.ambiguousCircleRef)' },
+  { id: 'centres-segment-2391', family: 'circles', steps: ['מעגל M ברדיוס 3', 'מעגל N ברדיוס 6', 'אורכו של הקטע המחבר את מרכזי המעגלים הוא 9'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2415' }], note: '2-D asks which circle (input.ambiguousCircleRef)' },
+  { id: 'given-pair-tangent-2391', family: 'circles', steps: ['מעגל M ברדיוס 3', 'מעגל N ברדיוס 6', 'נתונים שני מעגלים המשיקים זה לזה מבחוץ'], expect: 'builds', exception: 'X8' },
+  { id: 'named-pair-distributed-2391', family: 'circles', steps: ['מעגל M ברדיוס 5', 'שני מעגלים שמרכזיהם בנקודות N₁ ו-N₂ והרדיוס של כל אחד מהם הוא 10, משיקים למעגל M בנקודה A'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2415' }], note: '2-D escalates it to the model' },
+  { id: 'diameter-construct-2391', family: 'circles', steps: ['מעגל M', 'N₂A הוא קוטר המעגל M'], expect: 'builds', exception: 'X8' },
+  { id: 'centre-after-circle-2391', family: 'circles', steps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'מרכז המעגל I הוא K'], expect: 'builds', exception: 'X8', only: ['analytic'], note: 'a numeral circle is named by its equation (#1257), so only analytic can state the context' },
+  { id: 'centres-respectively-2391', family: 'circles', steps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1', 'K ו-L מרכזי המעגלים I ו-II בהתאמה'], expect: 'builds', exception: 'X8', only: ['analytic'], note: 'as centre-after-circle-2391' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

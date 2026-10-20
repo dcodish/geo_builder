@@ -20,7 +20,7 @@
  * parameter — `2a·AB` keeps its `a`.
  */
 import { evalExpr, normalizeMath, parseExpr, type Env, type Expr } from './expr';
-import { LENGTH_CAPITALS, mentionsPlane, mentionsPointName } from './carriers';
+import { RADIUS_CAPITALS, mentionsPlane, mentionsPointName } from './carriers';
 import type { Pt } from './derived';
 import type { Id } from './types';
 
@@ -180,7 +180,8 @@ const LENGTH_TOKEN = /(?<![A-Za-z])([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)(?![A
  * being able to come back: a frame that matches hands over exactly two operands, and the roles are
  * decided in one place for all of them.
  */
-const OPERAND = String.raw`[A-Za-zℓ][0-9]?[A-Z]?[0-9]?`;
+// A point name carries its index in either spelling — «N1», «N₁» (#2391, ADR-AG-315: `IS_POINT` below already did).
+const OPERAND = String.raw`[A-Za-zℓ][0-9₀-₉]?[A-Z]?[0-9₀-₉]?`;
 /** An optional noun before either operand -- «המרחק מ-C לישר AB». */
 // #1431: the POINT nouns join the slot — «המרחק של הנקודה A מהישר l1» is the same sentence with
 // the optional subject noun (`הנקודה A ≡ A`, the #1134/#1151 shape), for the ask and the given alike.
@@ -234,7 +235,7 @@ const DISTANCE_FRAMES: RegExp[] = [
  * `d_{A,l1}` fall through to `LENGTH_TOKEN`, which would eat a pair out of the middle of it and
  * answer a DIFFERENT measurement — the exact honesty failure #1151 records for the English form.
  */
-const SYM_OPERAND = String.raw`[A-Za-zℓ][0-9]?[A-Z]?[0-9]?`;
+const SYM_OPERAND = String.raw`[A-Za-zℓ][0-9₀-₉]?[A-Z]?[0-9₀-₉]?`;
 const SYMBOLIC_DISTANCE: Array<[RegExp, string]> = [
   // d_{AB} · d_{A,B} · d_{A,l1}
   [new RegExp(String.raw`\bd\s*_\s*\{\s*(${SYM_OPERAND})\s*,?\s*(${SYM_OPERAND})\s*\}`, 'g'), 'המרחק בין $1 ל-$2'],
@@ -413,7 +414,7 @@ function readLength(src: string, named?: Set<number>): LengthExpr | null {
   // parameter (#1701, ADR-AG-238) — the radius R excepted, as in 2-D. An AREA's label is a capital in 2-D's grammar
   // («שטח ABC = S», its `parseAreaExpr`), so an expression that measures an area keeps its capitals.
   if (!expr || mentionsPlane(expr)) return null;
-  if (!terms.some((t) => t.kind === 'area') && mentionsPointName(expr, LENGTH_CAPITALS)) return null;
+  if (!terms.some((t) => t.kind === 'area') && mentionsPointName(expr, RADIUS_CAPITALS)) return null;
   return { expr, terms };
 }
 
@@ -425,7 +426,7 @@ function readLength(src: string, named?: Set<number>): LengthExpr | null {
 export function constantLengthExpr(src: string, ofArea = false): LengthExpr | null {
   const expr = parseExpr(normalizeMath(src));
   if (!expr || mentionsPlane(expr)) return null;
-  return ofArea || !mentionsPointName(expr, LENGTH_CAPITALS) ? { expr, terms: [] } : null;
+  return ofArea || !mentionsPointName(expr, RADIUS_CAPITALS) ? { expr, terms: [] } : null;
 }
 
 

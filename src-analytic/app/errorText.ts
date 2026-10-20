@@ -178,6 +178,9 @@ const polygonNounKey = (kind: string | undefined): string => (kind && POLYGON_NO
 /** 2-D's one-fact-per-line list format (`src/app/unreadParts.ts` `numbered`): «(n) part», two-space separators. */
 const numbered = (parts: readonly string[], from = 1): string => parts.map((p, i) => `(${i + from}) ${p}`).join('  ');
 
+/** The position words a side-of-line refusal quotes (#2386, ADR-AG-310). */
+const SIDE_WORD_KEY = { above: 'sideWordAbove', below: 'sideWordBelow', right: 'sideWordRight', left: 'sideWordLeft' } as const;
+
 /** The sentence a student reads for `error`, in the locale `t` speaks. */
 export function errorText(error: InputError, t: Translate): string {
   const kind: RefKind | undefined = 'expected' in error ? error.expected : undefined;
@@ -203,6 +206,9 @@ export function errorText(error: InputError, t: Translate): string {
     'reserved-coordinate': 'errReservedCoordinate',
     'bad-arity': 'errBadArity',
     'repeated-vertex': 'errRepeatedVertex',
+    // #2386 (ADR-AG-310) — the operator's ruled sentence (2026-10-20, option (a)) and its horizontal mirror
+    'side-of-vertical': 'errSideOfVertical',
+    'side-of-horizontal': 'errSideOfHorizontal',
     'degenerate-role': 'errDegenerateRole',
     'apex-not-a-vertex': 'errApexNotAVertex',
     'bisector-wrong-apex': 'errBisectorWrongApex',
@@ -272,8 +278,14 @@ export function errorText(error: InputError, t: Translate): string {
     'measure-contradicts': error.key === 'measure-contradicts' && error.declared ? 'errMeasureContradicts' : 'errMeasureContradictsAlone',
     // #2119 (ADR-684) — 2-D's errors.restatedSize, verbatim; with no line to name, the old conflict sentence
     'radius-contradicts': error.key === 'radius-contradicts' && error.declared ? 'errRadiusContradicts' : 'errConflict',
+    // #2388 (ADR-AG-307) — one name, one thing: the reading the figure held first, and the line that gave it
+    'radius-letter-taken': error.key === 'radius-letter-taken' && error.reading === 'radius'
+      ? (error.declared ? 'errRadiusLetterIsRadius' : 'errRadiusLetterIsRadiusAlone')
+      : error.key === 'radius-letter-taken' && error.declared ? 'errRadiusLetterIsPoint' : 'errRadiusLetterIsPointAlone',
     // #1963 (ADR-AG-296) — the operator's ruled refusal, in 2-D's «X» סותר את «Y» frame (#1868), naming the statements
     'forced-collinear': 'errForcedCollinear',
+    // #2390 (ADR-AG-314) — 2-D's input.tangentsExhaustedContained, byte for byte
+    'no-common-tangent': 'errNoCommonTangent',
     // #1154 — a rename understood and declined, each naming what the student wrote
     'rename-bad-name': 'errRenameBadName',
     'rename-same': 'errRenameSame',
@@ -364,5 +376,7 @@ export function errorText(error: InputError, t: Translate): string {
     side: error.key === 'bisector-is-side' ? (error.pair ?? '') : '',
     vertex: error.key === 'bisector-is-side' ? (error.vertex ?? '') : '',
     polygonNoun: error.key === 'bisector-is-side' ? t(polygonNounKey(error.polygonKind)) : '',
+    // #2386: the position word the student used, in the locale's spelling
+    word: (error.key === 'side-of-vertical' || error.key === 'side-of-horizontal') && error.side ? t(SIDE_WORD_KEY[error.side]) : '',
   }) + near;
 }

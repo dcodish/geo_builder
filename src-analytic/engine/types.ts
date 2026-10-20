@@ -222,6 +222,12 @@ export type Fact =
    */
   | (FactBase & { t: 'selector'; sel: Selector })
   /**
+   * «N1 ≠ N2» · «המעגלים N1 ו-N2 שונים» · «הישרים l1 ו-l2 שונים» — A STATED DISTINCTNESS between named objects of one
+   * kind (#2395, ADR-AG-311). The parser cannot know what a name denotes, so the noun (when written) rides along and
+   * M1 resolves: points → `distinct`, circles or lines → `distinct-curves`.
+   */
+  | (FactBase & { t: 'distinct-of'; names: string[]; noun?: 'point' | 'circle' | 'line' })
+  /**
    * INTRODUCE a point without placing it — the declaration half of the distinction #1017 draws.
    *
    * «AD תיכון לצלע BC» names `D` for the first time, so the sentence introduces it; the constraint
@@ -463,8 +469,29 @@ export type Fact =
    * `onLine` is written by the fold, never the parser: the points the student's EARLIER lines put on the line ab. The
    * fold applies such a line AFTER this one when this one is what declares a and b («T על AB» typed first waits, in the
    * deferral fixpoint, for the line that defines A and B), so the figure M1 holds here cannot show it.
+   *
+   * `name` (#2392, ADR-AG-313) is the line's own name when the sentence gave one («הישר l משיק למעגלים N1 ו-N2 בנקודות
+   * P ו-Q»). The common tangent is a LINE: M1 draws it as the `line-at` through a along a→b, named `name` or the pair,
+   * and a name the figure already holds as a line is that line (the touches are stated on it, no second line).
    */
-  | (FactBase & { t: 'common-tangent'; a: Id; b: Id; circles: [Id, Id]; onLine?: Id[] })
+  | (FactBase & { t: 'common-tangent'; a: Id; b: Id; circles: [Id, Id]; onLine?: Id[]; name?: string })
+  /**
+   * «נסמן את הישר PQ ב-l» — THE LINE THROUGH a AND b TAKES THE NAME `name` (#2392, ADR-AG-313), the line twin of «נסמן
+   * את שטח ABCD ב-S». Which line is M1's question: the figure's line through the pair (it is re-named), or, when the
+   * figure draws only the segment, a new line on it under that name.
+   */
+  | (FactBase & { t: 'name-line'; a: Id; b: Id; name: string })
+  /**
+   * «כל המשיקים המשותפים לשני המעגלים» — EVERY COMMON TANGENT OF THE PAIR (#2390, ADR-AG-314), written over the
+   * circle-slot sentinels inside `circles-about`. M1 reads how the pair sits (`pairPositionOf`) and draws the families
+   * that position has, each a `common-tangent` object named by `names` (the student's) or the next free l1, l2, ….
+   */
+  | (FactBase & { t: 'common-tangents'; circles: [Id, Id]; names?: string[] })
+  /**
+   * «המשיק העובר בנקודה המשותפת לשני המעגלים» — THE COMMON TANGENT AT THE TOUCHING CIRCLES' COMMON POINT (#2390,
+   * ADR-AG-314): the `touch` family, for a pair the figure says is tangent; `name` the student's («המשיק l …»).
+   */
+  | (FactBase & { t: 'common-touch-tangent'; circles: [Id, Id]; name?: string })
   /**
    * «המשיק למעגל בנקודה A» — THE TANGENT AS AN OBJECT (#1619 B3, ADR-AG-195): the line through A
    * perpendicular to the radius to A, on the circle `circle` names (contextual when absent). M1 resolves
@@ -509,6 +536,12 @@ export type Fact =
    * point when the sentence did («…בנקודה T») — a `touch-point` derived point (amendment 1).
    */
   | (FactBase & { t: 'tangent-circles'; a?: string; b?: string; branch?: 'external' | 'internal'; at?: Id })
+  /**
+   * «היחס בין אורכי הרדיוסים של המעגלים (M ו-N) הוא p:q» — the ratio of two circles' radii (#2388, ADR-AG-307), `k` = p/q.
+   * Which circles is M1's question (`circleByName`, or the figure's exactly two); named circles are ORDERED (r(a) = k·r(b)),
+   * unnamed ones are an unstated order — a `choice` over both (R14, ADR-052).
+   */
+  | (FactBase & { t: 'radius-ratio'; circles?: [string, string]; k: Expr })
   /**
    * «E נקודת החיתוך של הישרים» — a crossing whose operands are named only by their KIND (#1429).
    *
@@ -648,12 +681,32 @@ export type Fact =
    * - `the` is «המעגל» / «שני המעגלים»: the figure's circles when it holds exactly that many, drawn when it holds
    *   none, refused as ambiguous otherwise (ADR-AG-196's none → create, one → bind, several → ask).
    */
-  | (FactBase & { t: 'circles-about'; slots: CircleSlot[]; about: Fact[] });
+  | (FactBase & { t: 'circles-about'; slots: CircleSlot[]; about: Fact[] })
+  /**
+   * «אורכו של הקטע המחבר את מרכזי המעגלים הוא 9» · «המרחק בין מרכזי המעגלים הוא 9» — A MEASURE BETWEEN THE CENTRES OF TWO
+   * CIRCLES the sentence names by role (#2391 B1, ADR-AG-315). `facts` is the lettered twin («Z₆Z₇ = 9», «המרחק בין Z₆
+   * ל-Z₇ הוא 9») over {@link CENTRES_SENTINELS}; M1 resolves the two circles through the one pair resolver
+   * `tangent-circles` uses (named, or the figure's exactly two) and writes their centres in.
+   */
+  | (FactBase & { t: 'centres-distance'; circles?: [string, string]; facts: Fact[] })
+  /**
+   * «דרך הנקודה A עובר משיק למעגל I» · "the tangent to circle I through A" — A TANGENT THROUGH A POINT (#2391, ADR-AG-315,
+   * the found-work note). Which tangent depends on where the point is, and only the figure knows: a point the figure puts
+   * ON that circle is the touch point (the tangent AT it, «המשיק למעגל I בנקודה A»); any other point is the from-point
+   * construction `facts` carries (#1430, a free-direction line through it, tangent to the circle). M1 decides.
+   */
+  | (FactBase & { t: 'tangent-through'; at: Id; circle?: string; facts: Fact[] });
+
+/** The stand-ins a `centres-distance` sentence carries for the two centres (#2391, ADR-AG-315) — names no student writes. */
+export const CENTRES_SENTINELS = ['Z₆', 'Z₇'] as const;
 
 /** One circle a `circles-about` sentence speaks of (ADR-AG-219). */
 export type CircleSlot = { k: 'new'; r?: Expr } | { k: 'named'; name: string } | { k: 'the' };
 
 /** The stand-ins a `circles-about` statement carries for its circles, by slot (ADR-AG-219) — names no student writes. */
+/** The common-tangent families (#2390, ADR-AG-314): the external pair, the internal pair, and a tangent pair's double root. */
+export type CommonTangentFamily = 'ext-a' | 'ext-b' | 'int-a' | 'int-b' | 'touch';
+
 export const CIRCLE_SLOT_SENTINELS = ['⟨circle-1⟩', '⟨circle-2⟩'] as const;
 
 /** The role claims that need the FIGURE to lower (#1651, ADR-AG-200) — the rest lower in the parser. */
@@ -703,7 +756,10 @@ export const factsWithin = (f: Fact): Fact[] =>
       : // #1737 (ADR-AG-265): the trapezoid a height sentence introduces by its letters.
         f.t === 'height-of' && f.declare
         ? [f, ...f.declare.flatMap(factsWithin)]
-        : [f];
+        : // #2391 (ADR-AG-315): a tangent-through applies the tangent AT its point, or the from-point construction.
+          f.t === 'tangent-through'
+          ? [f, { t: 'tangent-line-at', at: f.at, ...(f.circle !== undefined ? { circle: f.circle } : {}), src: f.src }, ...f.facts.flatMap(factsWithin)]
+          : [f];
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list
@@ -816,6 +872,16 @@ export type GeoObject =
    * anonymous line.
    */
   | { kind: 'line-at'; id: Id; through: Id; dir: Direction; perp: boolean; name?: string; drawn?: false }
+  /**
+   * ONE COMMON TANGENT OF TWO CIRCLES, AS AN OBJECT (#2390, ADR-AG-314) — a straight line in CLOSED FORM from the two
+   * solved circles, 0 DOF and solver-free (the `derived.ts` discipline). With d the distance between the centres and u
+   * the unit vector from the first to the second, its unit normal n has n·u = (r₂ − r₁)/d for the EXTERNAL pair and
+   * −(r₁ + r₂)/d for the INTERNAL pair; `a` / `b` is the normal's side of u (left, right), stable across configurations.
+   * `touch` is the double root of a TANGENT pair (the merged internal pair of externally tangent circles, the merged
+   * external pair of internally tangent ones). A family the configuration lacks is a vacancy. `name` is the student's
+   * or the tool's («l1»), shown on the figure and in the panel.
+   */
+  | { kind: 'common-tangent'; id: Id; circles: [Id, Id]; family: CommonTangentFamily; name: string }
   /**
    * A circle COMPUTED FROM POINTS (#1464, #1324, [ADR-AG-160](../../docs/06c-decisions-analytic.md#adr-ag-160))
    * — «מעגל ABD», the circle through three points, and «BD קוטר במעגל», the circle on a diameter.
@@ -991,6 +1057,12 @@ export type Selector =
    */
   | { kind: 'distinct'; ids: Id[] }
   /**
+   * TWO CURVES ARE DIFFERENT CURVES (#2395, ADR-AG-311) — «המעגלים N1 ו-N2 שונים», «הישרים l1 ו-l2 שונים». `distinct`'s
+   * twin for curves: a region, D7's kind 2, consuming no freedom; judged at the figure's visible resolution (`apartOf`),
+   * so it states no magnitude (ADR-052). `ids` are the curve ids M1 resolved.
+   */
+  | { kind: 'distinct-curves'; ids: Id[] }
+  /**
    * TWO CROSSINGS OF THE SAME PAIR ARE TWO POINTS (#1113).
    *
    * An intersection is not a derived point — it is a `declare` plus two incidences, and the joint
@@ -1068,6 +1140,26 @@ export type Selector =
    * the data, never a third sign rule. `rhs` is another point or a value; a value may carry a parameter.
    */
   | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr } }
+  /**
+   * «M מעל הישר KL» · «M מתחת לישר KL» · «M מימין לישר l» · «M משמאל לישר l» — A POINT'S SIDE OF A STRAIGHT LINE
+   * (#2386, ADR-AG-310). Operator ruling 2026-10-20: *"above means the y of the point is higher than the y of the other
+   * line at that point"* — `axis: 'y'` is y_P − y_ℓ(x_P) with the sign of `greater`; and *"for right and left - yes"* —
+   * `axis: 'x'` is x_P − x_ℓ(y_P). `coord-compare`'s family (ADR-AG-161), with the line's value at the point as the
+   * bound: D7's kind 2, it consumes no freedom, judged strictly at the figure's resolution, and seeded.
+   *
+   * `line` is a line through two points or a named straight line (`points` / `curve`). A line VERTICAL in the
+   * configuration has no y at a given x, so a y-side selector fails there; a HORIZONTAL one fails an x-side selector —
+   * and when the figure drawn has that line, `derive` refuses with the ruled sentence (`side-of-vertical` /
+   * `side-of-horizontal`) rather than «unsatisfiable».
+   */
+  | { kind: 'line-compare'; id: Id; line: Extract<Direction, { k: 'points' | 'curve' }>; axis: 'x' | 'y'; greater: boolean }
+  /**
+   * «הישר l חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x» — WHERE A LINE CROSSES AN AXIS, NO POINT MADE (#2392,
+   * ADR-AG-313). The line `line` meets the `axis` at a point whose other coordinate is > 0 (`greater`) or < 0: the
+   * y-axis at y = −c/b, the x-axis at x = −c/a. A region over configurations (D7 kind 2), strict at the solver's
+   * resolution; a line parallel to that axis meets it nowhere, so it fails both readings.
+   */
+  | { kind: 'axis-cut'; line: Direction; axis: 'x' | 'y'; greater: boolean }
   /**
    * «משולש חד זוויות ABC» — EVERY ANGLE OF THE TRIANGLE IS ACUTE (#1619 B2, ADR-AG-194).
    *
@@ -1201,6 +1293,8 @@ export function curveByName(c: Construction, name: string): GeoObject | undefine
           o.id === numeralCurveId('parabola', name) ||
           o.id === numeralCurveId('ellipse', name))) ||
       (o.kind === 'line-at' && (o.name === name || o.id === lineIdOf(name))) ||
+      // A common tangent by the name the student or the tool gave it (#2390, ADR-AG-314).
+      (o.kind === 'common-tangent' && (o.name === name || o.id === lineIdOf(name))) ||
       // A computed circle by the name the student gave it (#1464), and a circle stated by its centre by
       // that centre's letter — «A על המעגל O» after «נתון מעגל O» (#1464 step 3).
       (o.kind === 'circle-thru' && (o.name === name || o.id === numeralCurveId('circle', name))) ||

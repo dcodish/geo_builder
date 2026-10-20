@@ -160,6 +160,7 @@ export function lineClass(line: string, facts: readonly Fact[], isCircle: (curve
       }
       case 'polygon':
       case 'selector':
+      case 'distinct-of':
       case 'declare':
       case 'segment':
       case 'param':

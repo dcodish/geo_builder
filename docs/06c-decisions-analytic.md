@@ -4660,7 +4660,9 @@ So the shared formatter was never the defect. **Analytic is the one tree that ne
 
 **Copied, not imported**: `src-analytic/CLAUDE.md` boundary 1 — 2-D's lives in `src/`, which this tree may not import. A third recogniser in the workspace is the architecture `shell/format.ts` describes, not a new sin.
 
-**No surd tier**, deliberately: no witness in this tree's corpus yet, and a tier with no witness has no test that could fail. √2 falls to the decimal, honestly.
+> **⚠ Superseded by [ADR-AG-304](#adr-ag-304)** (operator ruling 2026-10-20 on #2394, option (a): exact forms everywhere): the surd tier now exists, recognised from the float as 2-D does; equation coefficients still follow ADR-AG-085.
+
+~~**No surd tier**, deliberately: no witness in this tree's corpus yet, and a tier with no witness has no test that could fail. √2 falls to the decimal, honestly.~~
 
 **Consequences.** `src-analytic/format.ts` (new), one line in `App.tsx`, three labels in `scene.ts`. `issue-1120-exact-forms.test.ts` (7), whose load-bearing case is the counter-direction. Analytic lane 82 files / 1246 tests — **no display assertion moved.**
 
@@ -7945,7 +7947,7 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 
 ## ADR-AG-163 — A value never mentions the plane, and a capital is never a parameter (#1496)
 
-**Status:** accepted · 2026-09-27 · P1, operator fix-now in session (built with #1495, #1281)
+**Status:** accepted · 2026-09-27 · P1, operator fix-now in session (built with #1495, #1281) · **⚠ Amended by [ADR-AG-307](#adr-ag-307) (2026-10-20, operator ruling on #2388):** the radius capital R is the one capital that may be a parameter.
 
 **Requirements:** none (internal) — the honesty invariant already promises that a given parses to a constraint, escalates or errors, and never vanishes. · **Design:** [04c](04c-design-analytic.md#the-parsers-rule-contract-adr-ag-017), "A value never mentions the plane"
 
@@ -7962,6 +7964,8 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 **Sibling audit.** *Analytic:* above. *Products:* 2-D and 3-D have no juxtaposition-product expression grammar over free letters (lengths and angles there are numbers or named symbols), so the class cannot occur. Nothing to file. #1495 is the English spelling that should BUILD «the side BC lies on the line y=x-4»; it is a different sentence from «side AB is y=x-4», which stays not understood.
 
 **Consequences.** `engine/carriers.ts` (`mentionsPlane`), `engine/lengths.ts`, `parser/parseAnalytic.ts` (`valueExpr`, `equationExpr`). Lock: `issue-1496-value-never-mentions-plane.test.ts`.
+
+**Amendment (ADR-AG-307, 2026-10-20).** Operator ruling on #2388, option (b): *"R can be an exception"*. Inside an equation and as a radius, R is a radius parameter («(x−13)²+y²=R²», «ורדיוסו R»), read through `RADIUS_CAPITALS`; every other capital stays a point's name. A point R beside the parameter R is refused (`radius-letter-taken`).
 
 ## ADR-AG-164 — Incidence in every order and over every operand: the line first, a side as subject, a point by its coordinates (named by the tool) (#1281, #1495)
 
@@ -8028,7 +8032,7 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 
 ## ADR-AG-167 — Circle-to-circle tangency: one equation, a cycling touch (#1504)
 
-**Status:** accepted · 2026-09-28 · operator go-ahead playing PR #1502's T9 (*"passes but when i do build both circles, its still refused"*) · round #1510
+**Status:** accepted · 2026-09-28 · operator go-ahead playing PR #1502's T9 (*"passes but when i do build both circles, its still refused"*) · round #1510 · **⚠ Superseded in part by [ADR-AG-306](#adr-ag-306) (2026-10-20, #2387):** the two circles no longer both arrive as `circle-at` — an equation circle is a `{circle}` side read off its curve; the rest stands.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R122 · **Design:** [04c](04c-design-analytic.md#tangent-to-a-line-adr-ag-165) (the family's section grows the circle member)
 
@@ -11312,6 +11316,8 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 
 **Consequences.** `engine/carriers.ts` (`mentionsPointName`, `LENGTH_CAPITALS`, `POINT_TOKEN`); `engine/lengths.ts` (`constantLengthExpr`, `readLength`); `parser/parseAnalytic.ts` (`measureValue` and its six callers, the length rule's `ofArea`); `shell/__tests__/fixtures/geo-input-parity.ts` (`expect: Verdict`, the rows).
 
+**Amendment (ADR-AG-307, 2026-10-20).** `LENGTH_CAPITALS` is now `RADIUS_CAPITALS`, and it is used by every reader that takes a size or an equation (`equationExpr`, `roleScalar`, `radiusOfSize`, the length), per the operator's ruling on #2388. A measure (angle) value still admits no capital.
+
 ## ADR-AG-239 — The spaced «ו-» conjunction is folded once, in `shell/`, at every builder's parser boundary (#1691)
 
 **Date:** 2026-10-05 · **Status:** accepted · fix-round #1776 (bug item). #1691 `auto-ok` 2026-10-05 (/status-update pass, ADR-W-014 Am. 1). **The mechanism is SHARED** — `shell/conjunction.ts`, called by 2-D, 3-D and analytic — and is logged here because the reported defect is analytic's; the 2-D and 3-D lanes were run too.
@@ -12892,3 +12898,426 @@ No other sequence moved.
 **Behaviour change for a student:** in analytic, after two touching circles and «T על AB», «AB משיק משותף למעגלים M ו-N» draws AB as the common tangent at T (before: «לא נמצאה תצורה…»).
 
 **Consequences.** `engine/types.ts` (`common-tangent`), `engine/apply.ts` (`case 'common-tangent'`, `touchPointOf`, `earlierOnCommonTangents`), `parser/parseAnalytic.ts` (`commonTangentFacts`); `shell/__tests__/fixtures/geo-input-parity.ts`; docs 02c R162, 04c.
+
+## ADR-AG-304 — Tied parameters read as one row; a standalone value prints its radical (#2394)
+
+**Date:** 2026-10-20 · **Status:** accepted · P3 feature, fix round #2414 (stream A, item 3); branch `feat/2394-analytic-paired-exact`, stacked on `fix/2380-analytic-pin-roots` ([ADR-AG-303](#adr-ag-303)) and `fix/2381-analytic-choice-odometer` ([ADR-AG-302](#adr-ag-302)). **Operator ruling, 2026-10-20** ([#2394](https://github.com/dcodish/geo_builder/issues/2394)): *"2394 - option a"* — exact forms (radicals) everywhere in analytic, as 2-D does: lengths, coordinates, parameter values and ask answers; equation coefficients follow ADR-AG-085. **Amends** [ADR-AG-084](#adr-ag-084) (⚠ its "No surd tier" paragraph is superseded) and extends [ADR-AG-226](#adr-ag-226) / [ADR-AG-270](#adr-ag-270) (a vector row beside W1's scalar spelling). LADDER stage: none (display).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R94 amended (a standalone value that is p/q·√n prints exactly; an equation's coefficients do not), and "The data panel's rows" (tied parameters read paired). · **Design:** [04c](04c-design-analytic.md), "The tree's display formatter" and "One value gate; up to two values".
+
+**Re-measurement at pickup** (`fe494926`, #2380's tip, `derive` → `panelKnowledge` → `valueText(…, fmtAnalytic)`): as the plan's table. Centres and radii, the circles by their equations, and Q2's canonical route with «a < 13» each read «m = ±0.35», «n = ±1.77», while the joint read `knownValues([m, n], 2)` held exactly two options, (−0.35355, −1.76777) and (0.35355, 1.76777). With #2380 landed, Q2's route WITHOUT «a < 13» has a ∈ {4, 22}: m = ±√2/4 at both, n takes four values, so (a, m, n) is not tied and m, n, a keep their own rows — measured and correct. The plan's correction holds: `format.ts` had no surd tier and `fmtAnalytic(√2)` was locked to `'1.41'`.
+
+**Gap / class.** (1) *Parameters whose values are tied across the admissible configurations were asked of the value gate one symbol at a time*, so a configuration's values were split across rows and which goes with which was lost. (2) *The tree had no √ tier*, so every standalone radical — a parameter, a length, a coordinate, an answer — printed as a decimal while 2-D prints √2/4.
+
+**Decision.**
+1. **A surd tier, recognised from the float** (`format.ts` `surdText`, 2-D's `exactFormOf` rational·√n search, copied: q ≤ 12, p ≤ 999, a non-square n ≤ 50 ascending so √12 prints `2√3`, relative tolerance 1e-6; no π forms, no witness). `fmtAnalytic` = integer → fraction → surd → `fmtNum`, written in this tree's sign convention: `√2/4`, `-5√2/4`, `2√5`, `√10`, `12√3`. No CAS: nothing is derived symbolically. Callers already gate on invariance, so a sampled coincidence never reaches the tier (ADR-AG-084's second discipline, unchanged), and `1.4142` typed by a student stays `1.41`.
+2. **Position decides (ADR-AG-085 kept).** `fmtCoefficient` = fraction → `fmtNum`, no surd tier, for every number inside an equation: `curveText.ts`'s `fmt` (the line terms, the conic's constants and denominators, a role line's `x = c`) and the ask lane's locus equation. A curve's DETAILS are standalone values and use `fmtAnalytic` (`val`): the centre, the radius, the slope, a focus, an ellipse's a and b. So `1.41x + y = 0` is unchanged and «r = √10» reads exactly.
+3. **Paired parameter rows** (`app/panelRows.ts` `paramRows`, extracted from `App.tsx`'s inline `knows.params.map(…)` so a lock CALLS it, ADR-W-053). Parameters whose verdict is two options are TIED pairwise when the joint read `knownValues(c, f => [env[s1], env[s2]], 2)` is again exactly two options; groups are the transitive closure, confirmed by one joint read over the whole group, and a group reading more than two options keeps its members' rows. One row replaces a group's rows, in the point rows' form: «(m, n) = (-√2/4, -5√2/4) או [(√2/4, 5√2/4)]» — the gate's order (ascending), the DRAWN configuration bracketed. No `±` on a tuple. Single two-valued parameters keep W1's spelling; known, open, pending and unused rows are unchanged. The joint reads use the rows' own non-filling mode: no new solve, no pool fill (measured on Q2: the parameter rows take 18–42 ms with the pool warm, under the 50 ms escalation bar).
+
+**Siblings.** 2-D and 3-D already print radicals (2-D `exactFormOf`, 3-D `cleanNum`): analytic is the outlier being aligned, no sibling change. Paired parameter rows were not measured in 3-D or complex and no port is proposed (plan).
+
+**Display assertions moved** (the whole analytic lane, 390 files, run with the tier on): ONE — `issue-1120-exact-forms.test.ts`, `fmtAnalytic(Math.SQRT2)` `'1.41'` → `'√2'` (ADR-AG-084's "no surd tier" lock, superseded; its counter-direction, `1.4142` stays `1.41`, is kept and added beside it). Every other analytic assertion holds unchanged: the locks that print radicals inject their own formatter (e.g. `issue-1433-known-options`' `«AC» = '3.16 או 5.83'` uses a decimal stub, so it did not move; the real formatter's «√10 או √34» is locked in this ADR's test instead). No coefficient or label inside an equation moved, so the position split did not leak.
+
+**Plan lock not honoured as written.** The plan's fixture string «(m, n) = (√2/4, 5√2/4) או [(-√2/4, -5√2/4)]» puts the positive option first and brackets the negative. The plan's own mechanism — "the point rows' order, the drawn configuration bracketed" — gives the gate's ascending order with the drawn one bracketed, and seed 0 draws the positive tangent: «(m, n) = (-√2/4, -5√2/4) או [(√2/4, 5√2/4)]». Built to the mechanism (docs/17 §9); flagged for the operator.
+
+**Locks.** Fixture `src-analytic/__tests__/fixtures/issue-2394-q2-d-paired.analytic.json` (Q2's canonical route with «a < 13»). `src-analytic/__tests__/issue-2394-paired-exact.test.ts`: the fixture records and its rows are `["a = 4", "r = 3", "(m, n) = …"]` with the drawn option bracketed at seeds 0–3; the two other spellings give the same row; controls — two independent two-valued parameters (a 2×2 set, reachable since #2381/#2380) keep «a = ±2» and «b = ±3», a known, an open and an unused parameter keep their rows, a single two-valued parameter keeps «a = 4 או a = 22»; the tier — √2/4, -5√2/4, √20, √10, 12√3, √12 and √2 give 2-D's strings, 1.4142 and 7.34 stay decimals, 4/3, 5 and 0 unchanged; a coefficient stays decimal (`1.41x + y = 0`); a circle's equation keeps `= 10` while its detail reads «r = √10»; a length through the ask lane («√10 או √34») and a coordinate in the panel («(-√2, -√2) או (√2, √2)»). The exam's own wording for section ד («הישר mx − y + n = 0 הוא משיק משותף לשני המעגלים») is #2390/#2391 grammar and gets its fixture from whichever lands last (plan). (k, t) for Q2 ה and (r, R) for #2388 are added when those sentences build.
+
+**Behaviour change for a student:** every standalone analytic number that is a simple radical prints exactly — a parameter («m = ±√2/4»), a length («√10 או √34», was «3.16 או 5.83»), a coordinate («(√2, √2)»), an ask answer, a curve's radius or centre, a canvas label; equations keep their numbers (`1.41x + y = 0`). Tied parameters read as one paired row, «(m, n) = (-√2/4, -5√2/4) או [(√2/4, 5√2/4)]» (was «m = ±0.35» and «n = ±1.77» apart).
+
+**Consequences.** `format.ts` (`surdText`, `fmtCoefficient`, `fmtAnalytic`'s tier order); `app/curveText.ts` (`fmt` / `val`); `app/ask.ts` (the locus equation's formatter); `app/panelRows.ts` (`paramRows`); `App.tsx` (renders `paramRows`); docs 02c R94 and the panel rows, 04c.
+
+## ADR-AG-310 — A position word against a straight line: «M מעל הישר KL» compares y with the line's y at the point, and a side the line does not have is refused (#2386)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream D); branch `feat/2386-analytic-side-of-line` from `main` @ `3cae7f25`. Part of #2379 (Q1 summer 2024, section ג). **Extends** [ADR-AG-161](#adr-ag-161) (a coordinate compared) and [ADR-AG-222](#adr-ag-222) (position words between points). LADDER stage: none (a branch selector inside validity; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R165 (the line form and the two refusals). · **Design:** [04c](04c-design-analytic.md), "A coordinate compared" (`line-compare`, its judge, seeding and refusal arm).
+
+**Rulings.** Operator, 2026-10-20 on #2386: *"above means the y of the point is higher than the y of the othjer line at that point"*; follow-up: *"for x=3 example we should refuse as saying its above a different line will mean nothing. for right and left - yes. we need similar support"* (option (a), with the vertical sentence offered in chat). The horizontal refusal is the follow-up's "by symmetry" reading, its wording the vertical one mirrored. Every student-facing line of the plan is `[asked]` or `[ruled]`.
+
+**Re-measurement at pickup** (`3cae7f25`, `decideSubmit` → `derive`, model mocked, 0 calls): as the plan says. Q1's eleven lines + «שטח המשולש KLM הוא 9» drew M = (−0.941, 0.765) at seeds 0–3; «M מעל הישר KL» was `not-handled`; the control «M מעל L» drew (−2, 5); «M מעל ציר ה-y» was `not-handled`; `direction()` still refuses an inline equation (`bad-operand`).
+
+**Class.** *A point's position word against a straight line* — four words («מעל / מתחת / מימין ל- / משמאל ל-», and the English four) × three operands (two letters, a named line, an axis) — *was read for the axis operand only, and only for the side the axis has*: no selector compared a point with a line's value at the point, and the pairing with no meaning was silently `not-handled`.
+
+**Decision.**
+1. **One new selector kind, two orientations**: `line-compare {id, line: points | curve, axis, greater}` (`engine/types.ts`, D7 kind 2, no freedom consumed). `axis: 'y'` is y_P − y_ℓ(x_P) with the sign of `greater`, `axis: 'x'` is x_P − x_ℓ(y_P). A `sign` quantity was rejected: the ruling and ADR-AG-161 put it in `coord-compare`'s family, and the judge shares that family's strict rule.
+2. **Judge** (`failingSelectors`): the line from `lineCompareLine` (its two points, or `curveAtOf` for a named line — the resolver every constraint reads), the bound −(a·x_P + c)/b or −(b·y_P + c)/a, strict through `sideOfBound(v, bound, spanOf(at))` (#2230): a point ON the line is on neither side. A line vertical in the configuration fails a y-side selector, a horizontal one an x-side selector (`lineHasNoSide`, on `isVerticalLine` / `isHorizontal`, the one verticality answer, #1276) — false, never "cannot judge", the slope precedent (#1323). An unplaced operand judges nothing.
+3. **Seeding**: a free subject on the wrong side is folded to the named side keeping its offset — `coord-compare`'s against-a-value rule with the line's value as the bound. A start, never a verdict.
+4. **Parser** (`parseCompare`): `POSITION_LINE_HE` / `_EN` with `POSITION_WORD_*`'s subject, verb and word, after the point and axis forms. The operand is `direction()`, so «הישר KL», «KL», «הישר l1» mean what they mean in the slope rule; only `points` / `curve` are kept. A non-direction operand is `bad-operand` only behind the line noun («הישר …»); otherwise the sentence is not this rule's (`null`, as before). A subject that is one of the line's letters is `repeated-vertex`. The English verb is optional ("M above the line KL", the issue's spelling).
+5. **The ruled refusal**, two codes carrying the student's word (`side: above | below | right | left`): `side-of-vertical` «לישר אנכי אין "{word}" — נסו "מימין ל-" או "משמאל ל-"» and `side-of-horizontal` «לישר אופקי אין "{word}" — נסו "מעל" או "מתחת"» (En: "A vertical line has no "{word}" — try …"). From two places: the parser for an axis («M מעל ציר ה-y», which was `return null`), and `derive`'s selector arm, which pushes the code instead of `unsatisfiable` when the blamed selector is a `line-compare` whose line has no such side in the DRAWN figure (`lineCompareNoSide`). Pickup check 3 measured: the arm's gate opens for «x=3 · M free · M מעל הישר l» (`unsatisfied` empty) and for K(3,4) L(3,−2); no second refusal path. A line vertical only in some configurations (two free letters) is never refused; every other failure (a determined M below KL) keeps `unsatisfiable`.
+6. **M1** (`case 'selector'`): the subject and the line's points must exist; a named operand must be a straight line the figure holds (`CURVE_BEARING` + `curveKindOf === 'line'`), else `unknown-reference`. `selectorIdentity` sorts a two-letter line's ends, so «M מעל הישר LK» restates «… KL».
+7. **Parity**: family X1 widens to "…position words between points, or against a line" (two patterns, He and En); rows `ex-position-{above,below,right,left}-line-2386`, `only: ['analytic']`. No new family.
+
+**Siblings.** 2-D (`src/parser/parse.ts`, `scope.ts`): «M מעל הישר KL» is `not-handled` and «מימין ל / משמאל ל» is refused as `input.scope.orientation` — 2-D is coordinate-free by design, so screen directions are analytic's own (X1, as #1706). 3-D has no reading and none is owed. Nothing to port; nothing filed.
+
+**Locks.** Fixture `src-analytic/__tests__/fixtures/exam-2379-q1-above-kl-2386.analytic.json` (Q1's eleven lines, the area, «M מעל הישר KL»). Class test `src-analytic/__tests__/issue-2386-side-of-line.test.ts`: Q1 M = (−2, 5) at seeds 0–23, «מתחת» gives (−0.941, 0.765), the order reversed gives (−2, 5); every spelling (4 words × «הישר KL» / «ל-KL» / «KL» / «הישר l1» × with and without «נמצאת», and four English) parses to the right `{axis, greater, line}`; the swapped-letter restatement is absorbed; a free P right of `y=2x` at seeds 0–23 keeps dof 2; two roots across a slanted line are picked by «מימין / משמאל»; a free M above a fixed KL at seeds 0–23; a line through two free points is never refused. Refusals, each its own case: `x=3` + «מעל» (He and En, exact), vertical KL, «M מתחת לציר ה-y», «M מעל ציר ה-y», `y=2` + «מימין» (He and En), «M משמאל לציר ה-x», determined-below → `unsatisfiable`, «K מעל הישר KL» → `repeated-vertex`, an absent line → `unknown-reference`, «הישר y=2x+1» → `bad-operand`. Controls: «D מעל A», «N1 משמאל ל-N2», «M מעל ציר ה-x», «שיפוע הישר KL שלילי», «M מעל המעגל» (`not-handled`). `message-floor-2028` gains the two codes. The plan's "a circle as operand → `unknown-reference`" has no spelling to reach it (a named-line operand is `l`/`ℓ` only, and a circle is never called that), so the absent-line case locks the same M1 arm.
+
+**Behaviour change for a student:** «M מעל הישר KL» (and «M מעל KL», «M נמצאת מעל הישר KL», "M above the line KL") draws the M above the line; in Q1 ג that is (−2, 5) (before: `not-handled`, M drawn below). «מתחת / מימין ל- / משמאל ל-» a line likewise. «M מעל ציר ה-y» and «מעל» a vertical line are refused «לישר אנכי אין "מעל" — נסו "מימין ל-" או "משמאל ל-"»; «מימין ל-» a horizontal line or the x-axis «לישר אופקי אין "מימין ל-" — נסו "מעל" או "מתחת"» (before: `not-handled`, to the model).
+
+**Consequences.** `engine/types.ts`, `engine/evaluate.ts` (`lineCompareLine`, `lineHasNoSide`, `lineCompareNoSide`, judge, seeding), `engine/apply.ts`, `engine/derive.ts` (`side` on `LineFault`), `parser/parseAnalytic.ts` (`SideWord`, two codes), `app/errorText.ts`, `app/submit.ts` (`collapseFields`), `store/useAnalyticStore.ts`, `i18n/index.ts`, `parser/catalogAnalytic.ts` (F17), `shell/__tests__/fixtures/geo-input-parity.ts`; docs 02c R165, 04c, 22 §10.
+
+## ADR-AG-311 — A stated distinctness: «N1 ≠ N2», «המעגלים N1 ו-N2 שונים», «הישרים l1 ו-l2 שונים» keep two named objects apart (#2395)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream D); branch `feat/2395-analytic-distinct`, stacked on `feat/2386-analytic-side-of-line` @ `f5c0605f`. Part of #2379 (Q2 summer 2022 ד, Q3 ב). **Extends** the `distinct` selector (#1077) to a sentence and to curves. LADDER stage: none (a branch selector inside validity; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R184 (new). · **Design:** [04c](04c-design-analytic.md), "A coordinate compared" (the distinctness paragraph: `distinct-of`, `distinct-curves`, `curvesCoincide`).
+
+**Request.** #2379, the operator: *"things that are missing, i need to add to the tool"*; the issue's line: «N1 ≠ N2» (and two lines stated different) keeps them apart. Every student-facing line of the plan is `[asked]` or `[ruled]` (an impossible distinctness refused «unsatisfiable», R118 / ADR-AG-161).
+
+**Re-measurement at pickup** (`f5c0605f`, `decideSubmit` → `derive`, model mocked, 0 calls): as the plan says. Every spelling `not-handled`; Q3 N1 = N2 at every seed ((−4, −12) or (12, 0)); Q2's l1 = l2 at seeds 0, 2, 3, 5 of 0–7. #2381 has **not** landed on this branch, so Q3's acceptance is not reachable here (pickup check 1).
+
+**Class.** *A stated distinctness between two named objects of one kind* — points, circles or lines — *had no sentence, and the curve half had no selector*: the engine kept shape vertices and crossings apart (`distinct`, `crossing-distinct`), but nothing a student wrote reached them, and two lines or circles the givens leave on separate roots could be drawn as one.
+
+**Decision.**
+1. **Parser** `parseDistinct` (pure over the line, after the parameter domains so «a ≠ 0» stays a domain, before the comparisons): the symbol «N1 ≠ N2» / «N1 != N2»; «(ה)נקודות / (ה)מעגלים / (ה)ישרים X ו-Y שונים/שונות», the noun also after the pair («P ו-Q הן נקודות שונות»), the bare plural «P ו-Q שונות»; English "P and Q are distinct/different (points)", "the circles / lines … are distinct/different". Anchored `^…$`, so «C ו-D בצדדים שונים של AB» keeps its rule. A name twice is `repeated-vertex`; two different nouns is not this rule's. It emits `distinct-of {names, noun?}`.
+2. **M1** (`case 'distinct-of'`): a written noun decides; with none, a name that is a point reads the set as points (so a missing partner is named), else the first resolving curve's kind. Points lower to the existing `distinct`; circles and lines (`curveByName`, which answers «N1» with `circle-at-N1` and `l1` with its line) to `distinct-curves {ids}`. A name that is no object of that kind is `unknown-reference`, naming it with the kind expected.
+3. **`distinct-curves`** (`engine/types.ts`, D7 kind 2): judged in `failingSelectors` by `curvesCoincide` at `apartOf` (no stated magnitude, ADR-052): two lines coincide when their unit normals agree within `SOLVE_RESOLUTION` and the foot of the figure's centre on one is within `apart` of the other; two circles when centres and radii are within `apart`; different kinds never. No mover: `drawableAt`'s existing walk reaches the other roots (Q2 measured: distinct at seeds 0–23). `selectorIdentity` sorts both kinds' ids, so «Q ≠ P» restates «P ≠ Q».
+4. **Parity** (ADR-W-108): `distinct-points-2395` (X9) and `distinct-circles-2395` (X8) carry a 2-D `knownGap` #2417 (filed: feature, P3, `needs-operator`); `ex-distinct-lines-2395` is X4, `only: ['analytic']`, with an empty 2-D context. The plan's 3-D #1679 gap does not apply: neither X8 nor X9 names 3-D.
+
+**Q3 is held behind #2381.** At this tip the distinctness given, honestly, makes Q3 `unsatisfiable` (as «N1 משמאל ל-N2» already does), because independent two-way choices always take the same option. The fixture `exam-2379-q3-distinct-2395.analytic.json` is written and its lock (`describe.skip`, reason naming #2381) un-skips on the batch tip once #2381 is in. Never weakened.
+
+**Siblings.** 2-D: «P ≠ Q», «הנקודות P ו-Q שונות», «המעגלים N1 ו-N2 שונים» are `not-handled` → #2417. 3-D has no reading; no plane-geometry obligation there beyond its parked #1679.
+
+**Locks.** Fixtures `exam-2379-q2-two-tangents-2395.analytic.json` and `exam-2379-q3-distinct-2395.analytic.json` (skipped until #2381). Class test `src-analytic/__tests__/issue-2395-distinct-given.test.ts`: Q2 l1 ≠ l2 at seeds 0–23 and the symbol form; sixteen spellings to the right noun; two free points keep dof 4; two crossings of a line with a circle stated different are the two roots; the reversed restatement is absorbed; `curvesCoincide` on lines, circles and mixed kinds. Refusals, each its own case: equal points, two lines the givens make equal, two equal circles (all `unsatisfiable` naming the sentence), «N1 ≠ N1» (`repeated-vertex`), a missing point and a missing circle (`unknown-reference`). Controls: «C ו-D בצדדים שונים של AB», «a ≠ 0».
+
+**Behaviour change for a student:** «N1 ≠ N2», «המעגלים N1 ו-N2 שונים», «הישרים l1 ו-l2 שונים» and their spellings are read and keep the two apart; in Q2 the two common tangents are two lines at every configuration (before: `not-handled`, and one line at half the seeds). A distinctness that cannot hold is refused «unsatisfiable» on its line.
+
+**Consequences.** `engine/types.ts` (`distinct-of`, `distinct-curves`), `engine/apply.ts`, `engine/evaluate.ts` (`curvesCoincide`, the judge), `parser/parseAnalytic.ts` (`parseDistinct`), `app/narrowing.ts`, `parser/catalogAnalytic.ts` (F17), `shell/__tests__/fixtures/geo-input-parity.ts` (three rows, `#2417` in `GAP_ISSUES`); docs 02c R180, 04c.
+
+## ADR-AG-313 — The common tangent is a named line: «הישר l משיק … בנקודות P ו-Q בהתאמה», «נסמן את הישר PQ ב-l», and where a line crosses an axis with no point made (#2392, #2390 §3)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature (P2, analytic) · fix round #2414, stream E · branch `feat/2392-analytic-named-common-tangent`, stacked on `fix/2385-analytic-tangent-at-touch` ([ADR-AG-312](#adr-ag-312)) · LADDER stage: none (M1 lowerings and a branch selector; no solver change)
+**Requirements:** [02c](02c-requirements-analytic.md) R182 (new: the named common tangent, «נסמן את הישר PQ ב-l», the axis side of a line's crossing) · **Design:** [04c](04c-design-analytic.md) § "Circles a sentence draws; two circles named by order" (the common tangent's line, `name-line`, `axis-cut`) · **Builds on** [ADR-AG-312](#adr-ag-312) (the `common-tangent` fact) · ADR-W-118 B1 (exceptions X4 / X1)
+
+**The request.** Operator, on #2379 (the three exam questions he gives his students): *"things that are missing, i need to add to the tool since this is an exam I give my students"*. Q3 ג writes «הישר l משיק לשני מעגלים N1 ו- N2 בנקודות P ו- Q בהתאמה» and «הישר l חותך את ציר ה- y בנקודה הנמצאת מעל ציר ה- x»; #2390 §3 asks that a common tangent be shown as a line with its equation. The «מתחת» and «מימין / משמאל» twins are the #2386 rulings (*"«מתחת» is the reverse"*; *"for right and left - yes"*).
+
+**Re-measured at pickup** (the D1 tip, `8cf155ff`, `decideSubmit` → `derive` → `panelKnowledge` / `ask`, model mocked). As the plan's table: every named sentence, «נסמן את הישר PQ ב-l» and the letterless axis sentences were `not-handled`; «PQ משיק משותף …» drew the segment PQ only, with no panel row; «הישר PQ חותך את ציר ה- y בנקודה B» minted B(0, 3.5).
+
+**The capability.** *A common tangent had no line object and no name of its own, and analytic had no sentence that names a line after the fact, nor one that reads which side of the origin a line crosses an axis without minting a point.*
+
+**Decision.**
+1. **The common tangent is a line.** M1's `common-tangent` (ADR-AG-312) now also draws the `line-at` through a along a→b, named by the sentence or by its pair (`line-PQ`, name «PQ»), the object the at-form's «הישר CD» already is. It is named, so `panelListsCurve` lists it: its equation when known, «… או …» when the configurations hold two lines, «—» otherwise. The common tangent no longer draws its segment (the line replaces that ink); a segment the figure already had («T על AB») stays. Drawn through `name-line` (item 3), so a line the figure already has over the pair is that line.
+2. **«הישר l משיק …»** (`namedCommonTangent`, in `parseCircleFamilies` before the line-first tangency of `parseCircleAt`): «הישר l משיק (לשני )?(ה)?מעגלים N1 ו-N2 בנקודות P ו-Q (בהתאמה)?», «… לשני המעגלים בנקודות P ו-Q», the split «הישר l משיק למעגל N1 בנקודה P ולמעגל N2 בנקודה Q», and the English "the line l is tangent to (the) circles N1 and N2 at P and Q (respectively)" / "… to circle N1 at P and to circle N2 at Q". Each lowers to the same `common-tangent { a: P, b: Q, name: 'l' }` as «PQ משיק משותף …», P on the first circle and Q on the second. `twoCircleSlots` also reads «לשני (ה)?מעגלים N1 ו-N2». The exam's «ו- N2» spacing is folded by `shell/conjunction` at the frame, never re-spelled. When the figure already holds l as a line, the touches are stated ON it (`tangent-of` with the curve), and no second line is drawn; l held by another kind of object is `name-kind-clash`.
+3. **«נסמן את הישר PQ ב-l»**, «נסמן ב-l את הישר PQ», "denote the line PQ by l" → a new fact `name-line { a, b, name }`. The verb is optional in the reading because the frame may already have unwrapped it (as for «… את שטח ABCD ב-S»). M1: the figure's line over the pair (`lineOverPair`: a `line-at` along the pair, or the line named by it) is RE-NAMED, its id becoming `lineIdOf(name)` and every reference following it (`replaceId`), so «הישר l …» finds it the way every named line is found; only a segment or nothing over the pair → the `line-at` is drawn under that name; a missing letter → `unknown-reference`; the name held by another object, or a line that already carries a student name other than its letters → `name-kind-clash`.
+4. **The axis side of a line's crossing** — a new branch selector `axis-cut { line: Direction, axis, greater }`, D7's kind 2 (a region over configurations, consuming no freedom). Judged in `failingSelectors` from the line's own triple in that configuration (`lineTriple`: two points, a named line's resolved curve): the y-axis cut −c/b, the x-axis cut −c/a, strict through `sideOfBound` at the figure's span, as `coord-compare`. A line parallel to that axis (within the resolution of its own direction) fails both readings. Read by `parseAxisCut`, before the general chain and only with no letter: «(ה)?ישר X חותך את ציר ה-y (בנקודה ה?נמצאת )?מעל|מתחת ל?ציר ה-x», «… ציר ה-x … מימין|משמאל ל?ציר ה-y», «… חותך את החלק החיובי|השלילי של ציר ה-y|x», and English ("crosses the y-axis above the x-axis", "… to the left of the y-axis", "… the positive part of the y-axis"). X is «l», «l1» or a pair «PQ». A side told against the wrong axis («ציר ה-y … מימין לציר ה-y») is not read (unchanged). «… בנקודה B» keeps minting B (unchanged). A side no configuration has is the existing `unsatisfiable` («לא נמצאה תצורה שבה מתקיים: "…"»).
+
+**Deviations from the plan, by measurement.**
+- The plan named the refusal for a taken name `name-taken`. In analytic that key is the angle / length label refusal; the existing refusal for a line name held by another object is `name-kind-clash`, and a second «הישר l: …» equation is `conflicting-restatement`. Those existing messages are used; no new wording.
+- The plan kept the re-named line's id. Every line reference in this grammar is by id (`direction()` reads «הישר l» as `line-l`), so a kept id would leave «הישר l …» unresolved after «נסמן». The line is re-identified instead, its references following it (item 3).
+- The plan's `axis-cut` reads the line through `engine/lines.ts`'s resolver "shared with #2386". #2386 is not on this branch (stream D), so the selector reads the line through the existing `curveAtOf` / point positions; the batch reconciles the two when #2386 lands.
+
+**Measured after.** Q3 with fixed centres through the exam's own two lines: l = 3x − 4y + 14 = 0, P(−10,−4), Q(6,8), no point added; with «A(4,-6)», «שטח המשולש APQ» = 100. Before the axis sentence the panel lists l as «3x − 4y + 14 = 0 או 3x − 4y − 86 = 0»; «מתחת» picks 3x − 4y − 86 = 0 with P(2,−20), Q(18,−8). «PQ משיק משותף …» lists `line-PQ` with the same two options. The at-form draws its one `line-AB` (x = 7), as before.
+
+**Sibling audit.** 2-D has no named lines (X4) and no coordinate frame (X1): the named line, «נסמן» and the axis sentences are analytic's (`only: ['analytic']` rows). 3-D: X8 (no plane circles). Complex: no line grammar. Class not present elsewhere.
+
+**Locks.** `src-analytic/__tests__/issue-2392-named-common-tangent.test.ts` (the fixture; nine spellings; l already a line; the clash; the line and its options for «PQ …»; «… בנקודה B» unchanged; the at-form unchanged; «נסמן» on a line, a segment, a missing pair, a taken name, a named line; every axis spelling held and failed; the parallel refusal; the wrong-axis pairing; «מתחת») and the fixture `src-analytic/__tests__/fixtures/exam-2379-q3-c-named-tangent-2392.analytic.json`. Catalog F5 / F17 rows (He and En, the guard). Parity rows `named-common-tangent-2392`, `name-line-2392` (X4) and `axis-cut-2392` (X1), `only: ['analytic']`.
+
+**Behaviour change for a student:** in analytic, a common tangent is drawn as a full line with its equation row («PQ משיק משותף …» drew the segment PQ only); «הישר l משיק לשני מעגלים N1 ו- N2 בנקודות P ו- Q בהתאמה» draws the tangent named l; «נסמן את הישר PQ ב-l» names the line; «הישר l חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x» (and its twins) keeps the line crossing there, adding no point (each was sent to the AI before).
+
+**Consequences.** `engine/types.ts` (`common-tangent.name`, `name-line`, the `axis-cut` selector), `engine/apply.ts` (`common-tangent` draws its line, `name-line`, `lineOverPair`, `replaceId`, the selector's references), `engine/evaluate.ts` (`lineTriple`, the `axis-cut` judge), `parser/parseAnalytic.ts` (`commonTangentFacts`, `namedCommonTangent`, `parseNameLine`, `parseAxisCut`, `twoCircleSlots`), `parser/catalogAnalytic.ts`; `shell/__tests__/fixtures/geo-input-parity.ts`; docs 02c R180, 04c.
+
+## ADR-AG-314 — The common-tangent object: every common tangent of a pair in one sentence, each named; the tangent at the touching circles' common point (#2390)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature (P2, analytic) · fix round #2414, stream E · branch `feat/2390-analytic-all-common-tangents`, stacked on `feat/2392-analytic-named-common-tangent` ([ADR-AG-313](#adr-ag-313)) · LADDER stage: none (a closed-form derived curve and an M1 reading of the construction; no solver change)
+**Requirements:** [02c](02c-requirements-analytic.md) R181 (new: the set sentence, the touch-tangent sentence, the counts by position, the naming rule, the unsettled case, 2-D's nested refusal, the taught Q2 ב line, the ask) · **Design:** [04c](04c-design-analytic.md) § "Common tangents" (new: the `common-tangent` object, its families and tolerance, `pairPositionOf`, the names) · **Builds on** [ADR-AG-312](#adr-ag-312), [ADR-AG-313](#adr-ag-313) · [ADR-AG-206](#adr-ag-206) (the exam register is taught)
+
+**The rulings.** Operator, 2026-10-20 ([#2390](https://github.com/dcodish/geo_builder/issues/2390#issuecomment-6287209959)): *"we should name them so the user can refer to them later. this is good practice in general"* — the transcription: the student's names when given, otherwise the tool assigns the next free names in a documented pattern, shown on the figure and in the panel, and a tool-assigned name obeys #2362's provenance rule (*"if the user presses show centers, he knows what the centers are so its as if he defined them"*: a name on screen counts as named). The request is #2379's (*"things that are missing, i need to add to the tool since this is an exam I give my students"*); answers in the ask box are fine (#2393 ruling).
+
+**Re-measured at pickup** (the D2 tip, `32518ee7`). As the plan's table: «כל המשיקים המשותפים לשני המעגלים», «המשיקים המשותפים …», English, the Q2 ב sentence with «סרטטו», «המשיק העובר בנקודה המשותפת לשני המעגלים», «המשיק בנקודת ההשקה של המעגלים», «המשיק המשותף בנקודת ההשקה» were `not-handled`; the ask «משוואת המשיק העובר בנקודה המשותפת …» answered `missing`.
+
+**The capability.** *There was no object for "a common tangent of these two circles" independent of letters, so no sentence could draw the set — whose count depends on how the circles sit — nor the tangent at the common point, which has no letters at all.*
+
+**Decision.**
+1. **A new object kind `common-tangent { circles, family, name }`** (`engine/commonTangents.ts`, `commonTangentLine`): a straight line in closed form from the two circles of each configuration, 0 DOF, solver-free. With d the distance between the centres and u the unit vector from the first to the second, the unit normal has n·u = (r₂ − r₁)/d for the external pair and −(r₁ + r₂)/d for the internal pair; `a` is the tangent on the left of the directed line of centres, `b` the right one, stable across configurations. `touch` is the double root of a tangent pair (|n·u| = 1 within a relative `TOUCH_TOLERANCE` of 1e-6, so a tangency solved to ~1e-9 is one line, never two or none). A family the configuration lacks is a vacancy. Every exhaustive switch carries it: `carriers.ts` (no freedom; its two circles as deps), `evaluate.ts` (`curveAtOf`, the figure's curve with its name), `curveByName`, `curveKindOf` (a line), `existingKindOf` (a constructed line), `CURVE_BEARING`.
+2. **How the pair sits, as M1 reads it** (`pairPositionOf`): a position the student STATED — the `circles` selectors of «שני מעגלים זרים» / «נחתכים» / «מוכל», the branch of «… משיקים מבחוץ / מבפנים» (`tangent-circle`), one centre for both (inside); else two DETERMINED circles (constant centre and radius at every probe) measured (`positionOfCircles`); else `null`. **Deviation from the plan, by design:** the plan asked the configuration pool (`knownValue`). The pool is deferred on the page and completes after the render (ADR-AG-180), so an M1 decision read from it would depend on timing, which M3 forbids for a verdict; the structural reading gives the plan's answer on every case the plan names (Q2, Q2 before «a < 13», the fixed pairs, the stated relations, the unsettled pairs) and is free. A position only a solve would reveal is `null`: the sentence goes to the model, as today.
+3. **«כל המשיקים המשותפים לשני המעגלים»** (also «המשיקים המשותפים …», «… למעגלים O ו-P», "(all) (the) common tangents of …", and the student-named «… המשותפים l1, l2 ו-l3 …») → `common-tangents { circles, names? }` in `circles-about`. apart → ext-a, ext-b, int-a, int-b; externally tangent → ext-a, ext-b, touch; crossing → ext-a, ext-b; internally tangent → touch; inside → `no-common-tangent`, the new key `errNoCommonTangent`, 2-D's `input.tangentsExhaustedContained` byte for byte («למעגל המוכל בתוך מעגל אין אף משיק משותף.» / "A circle contained inside another has no common tangent at all."); `null` → `not-handled`.
+4. **Names** (the ruling): the student's when given — a count that differs from the pair's is `unsatisfiable` (the existing message), a name the figure holds is the existing clash `name-kind-clash` — otherwise the next free line numerals l1, l2, l3, l4 in family order, external first (`freeLineNames`: a numeral is taken when any line already reads as it in any notation — «l3», «ℓ3», «ישר 3», «III» are one name, `nameReading`). Each is a named line, drawn with its label and listed with its equation row. **Provenance (#2362):** the name is on screen from its creation, so a later «הישר l2 …» means that tangent, and a new «הישר l1: …» is the existing clash refusal; tool line names are not put on `minted` (a point-worded note).
+5. **The tangent at the common point** — «המשיק העובר בנקודה המשותפת לשני המעגלים», «המשיק בנקודת ההשקה של המעגלים», «המשיק המשותף בנקודת ההשקה», "the tangent through the common point of the two circles", "the common tangent at the touch point", with an optional name («המשיק l …») → `common-touch-tangent { circles, name? }`: one `touch` object, named by the student or the next free lN. It needs only that the circles touch, so «המעגלים משיקים (בנקודה T)» with no stated kind qualifies (`statedTangent`: either kind has the one tangent at T). Crossing or apart circles → `not-handled`, as today.
+6. **The exam's Q2 ב sentence is taught** (ADR-AG-206): «סרטט», «תסרטט», «סרטטו» join `IMPERATIVE_VERBS_HE` (the exam's ס spelling), and the sketch frame «במערכת צירים( אחת)? סקיצה של X ו?של Y» (`SKETCH_FRAME`) offers Y, then «X ו-Y», as candidates the submit decision keeps only when one records. So «סרטטו במערכת צירים אחת סקיצה של שני המעגלים ושל כל המשיקים המשותפים לשני המעגלים» teaches «כל המשיקים המשותפים לשני המעגלים».
+7. **The ask lane reads the same noun** (`touchTangentNoun`, the parser's own reader): «(מצאו את) משוואת המשיק העובר בנקודה המשותפת לשני המעגלים» resolves to the drawn `touch` object of the figure and answers its equation; none drawn → `missing`, as before.
+
+**Measured after.** Q2: l1: x − 2.83y + 5 = 0, l2: x + 2.83y + 5 = 0, l3: x − 7 = 0, three lines at seeds 0–23 (the merge never draws 2 or 4), the same before «a < 13»; «המשיק העובר בנקודה המשותפת …» draws l1: x − 7 = 0 and the ask answers it. Fixed pairs give 4 / 3 / 2 / 1 lines, each at distance r from both centres (checked in the lock from the circles, never through the closed form); nested circles are refused with 2-D's sentence. «שני מעגלים» and «המעגלים משיקים» without a kind stay `not-handled`. The tool-named tangents are used by later sentences («E נקודת החיתוך של הישרים l1 ו-l2», «F על הישר l3», «שיפוע הישר l1», the distance from a centre). Performance: the position is a structural read and the object a closed form; no pool evaluation, no solve.
+
+**Found work, not built (the plan's §10, for the orchestrator to file):** 2-D draws ONE tangent for «שני מעגלים זרים» · «כל המשיקים המשותפים …», and a two-touch tangent for «המשיק העובר בנקודה המשותפת …» after «המעגלים משיקים בנקודה T» (wrong figures shown as success — proposed P1). Analytic's repeated letter-tangents («AB / CD / EF משיק משותף …») still collapse onto each other; the `common-tangent` families are the natural fix, not built here. «החלף l1 ב-l7» is read as a rename of a POINT «L1» (measured: `decideSubmit` → `rename` from «L1»), so a tool-named line cannot be renamed by that sentence; line renaming is not built here (the plan's pickup check 7, recorded).
+
+**Sibling audit.** 2-D: the parity rows record the verdicts agree and the drawings do not (found work above). 3-D: X8 (no plane circles). Complex: no common-tangent grammar.
+
+**Locks.** `src-analytic/__tests__/issue-2390-all-common-tangents.test.ts` (the two fixtures; 24 seeds of the merge; the count per position, fixed and stated; the nested refusal in He and En; the unsettled pairs; the names: tool, skipped, student's, mismatch, taken, later reference, new «הישר l1: …»; every touch spelling, named, internal, unstated kind, the crossing / apart refusals; the ask; the taught Q2 ב line with ס and ש; stability) and the fixtures `exam-2379-q2-b-all-common-tangents-2390.analytic.json`, `exam-2379-q2-c-touch-tangent-2390.analytic.json`. Catalog F5 rows (He and En). Parity rows `all-common-tangents-2390`, `touch-tangent-2390`, `touch-tangent-through-2390` (X8). The message-floor payload for `no-common-tangent`.
+
+**Behaviour change for a student:** in analytic, «כל המשיקים המשותפים לשני המעגלים» draws every common tangent, named l1, l2, … with their equation rows; «המשיק העובר בנקודה המשותפת לשני המעגלים» (and its twins) draws the tangent at the touching circles' common point; «סרטטו …» is taught like «שרטטו …»; the Q2 ב sentence is taught as «כל המשיקים המשותפים לשני המעגלים»; the ask answers the touch tangent's equation (each was sent to the AI, or answered missing, before). A circle inside the other is refused «למעגל המוכל בתוך מעגל אין אף משיק משותף.».
+
+**Consequences.** `engine/commonTangents.ts` (new), `engine/types.ts` (`common-tangent` object, `CommonTangentFamily`, `common-tangents`, `common-touch-tangent`, `curveByName`), `engine/apply.ts` (both facts, `pairPositionOf`, `statedTangent`, `circleAtProbe`, `freeLineNames`, `no-common-tangent`), `engine/evaluate.ts`, `engine/carriers.ts`, `parser/parseAnalytic.ts` (`commonTangentSet`, `touchTangentNoun`), `parser/scopeAnalytic.ts` (ס verbs, `SKETCH_FRAME`), `parser/catalogAnalytic.ts`, `app/ask.ts`, `app/errorText.ts`, `i18n/index.ts`, `store/useAnalyticStore.ts`; `shell/__tests__/fixtures/geo-input-parity.ts`; docs 02c R181, 04c.
+
+## ADR-AG-315 — The exam's two-circle and centre sentences read as their canonical twins (#2391)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream F); branch `feat/2391-analytic-exam-sentences` from `main` @ `3cae7f25`. Parts A and B of the #2391 plan; Part C (two circles introduced before they are described) is #2397, not built. LADDER stage: none (the sentence frame and the M1 boundary; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) F5 (§3a, the new forms) and R124 (the exam's circle-and-centre sentences), R114 (the trailing through-phrase taught). · **Design:** [04c](04c-design-analytic.md), «The sentence frame» (the exam's circle-and-centre sentences) and «The exam's construction register».
+
+**Context.** The operator gives his students three analytic exam questions (#2379). Measured on `3cae7f25` through `decideSubmit` (model mocked), most of the exam's own sentences were `not-handled` while a canonical twin recorded. Examples: «נתון מעגל I שמשוואתו … , ומרכזו בנקודה K», «מרכז המעגל I הוא K», «K ו-L מרכזי המעגלים I ו-II בהתאמה», «שני המשיקים נחתכים בנקודה M», «M מקיימת MA = MB», «מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא …», «אורכו של הקטע המחבר את מרכזי המעגלים הוא 9», «שני מעגלים שמרכזיהם בנקודות N₁ ו-N₂ … כל אחד מהם …», «הקטע N₂A הוא קוטר המעגל M», `N_2`, and «מעבירים משיק למעגל I דרך הנקודה A ומשיק …». The full table is on #2391.
+
+**Class.** An exam sentence that says a canonical sentence in another ORDER, or with another CONNECTIVE, is unread. The forms: the centre named after its circle; «שני» or a given-word before a plural subject; a predicate wrapped in «מקיימת»; a plural subject distributed over named members; a construct «קוטר המעגל»; a through-adverbial after the noun.
+
+**Decision.**
+1. **Frame rewrites, each to the twin's own text** (`parser/frameAnalytic.ts`, the ADR-AG-187 mechanism). Because each form is rewritten to its twin's text, it cannot lower differently from the twin ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)).
+   - `circleCentreClauses` (A1, A2): a circle with its centre gives the circle, then «K מרכז המעגל I». A circle named only by its centre, with an equation, gives «M מרכז המעגל EQ». The equation slot stops at a top-level comma, so «…, a הוא פרמטר חיובי» is the comma partition's second clause. «האחד/האחר» carries no meaning while no pair has been introduced (#2397).
+   - `centreClauses` (A3): «(ה)מרכז / מרכזו (של) (ה)מעגל C (הוא|ב…) K» gives «K מרכז המעגל C». The slot after «המעגל» reads a numeral first (`CIRCLE_REF`), so «מעגל II» is never the point I.
+   - `centresRespectivelyClauses` (A4): two such namings, paired by the shared `respectively` helper, which #2392 reuses.
+   - `satisfiesClause` (A6, 2-D's sentence): «X מקיימת S» is read as S, but `readLine` takes it only when S's facts name X. The point is then declared, as «נקודה M» declares it, so «M מקיימת AB = CD» is not read and M is never dropped.
+   - `namedCirclesClauses` (A7): each named circle is stated on its centre with the shared radius, and the predicate is said of each. The parenthetical aside is the existing aside reading's clause.
+   - `diameterClauses` (A8): «… קוטר (של) המעגל C» gives «… הוא קוטר במעגל C».
+2. **Two orthography and unwrap folds.**
+   - `SUB_INDEX` (A9): a CAPITAL with an underscored digit index is folded into the subscript glyph the exam prints, so `N_2` and `N_{2}` become `N₂`. A lowercase base (`x_B`, `r_M`), a letter index (`S_ABC`) and the axis forms of ADR-AG-274 are untouched. The stored line keeps the raw text.
+   - `unwrap`'s glued «ש-» after a given-word no longer takes the first letter of a cardinal (`CARDINAL_SHIN`, derived from the number words). This was the real cause of «נתונים שני מעגלים …» being unread: it reached every rule as «ני מעגלים …». The plan had placed the fix in the plural subject; the subject already read the sentence (A5).
+3. **«שני» before the plural tangents** (`TANGENTS_BARE`, `TANGENTS_AT_*`), and the English verb "touch each other" (A5). Both lower to their twins' facts.
+4. **B1, the measure between the centres** (`centres-distance`). The parser reads it as its lettered twin over `CENTRES_SENTINELS`. The segment spelling's twin is «Z₆Z₇ = 9»: it names the segment, so it draws it. The distance spelling's twin is «המרחק בין Z₆ ל-Z₇ הוא 9»: it names nothing (operator ruling 2026-10-02, ADR-AG-200). M1 finds the circles through `circlePairOf`, the pair resolver now shared with `tangent-circles`: named circles, or the figure's exactly two, else `ambiguous-shape` with the host count. It then writes the centres in. A centre with no letter is `unknown-reference`, as `via-centre` refuses «מרכז המעגל». The length layer's distance operand now reads a subscripted name (`N₁`) as `IS_POINT` already did. That was found here: «המרחק בין N₁ ל-N₂ הוא 9» was `not-handled`.
+5. **B2, the trailing through-adverbial** (`constructionCandidates`):
+   - «… משיק למעגל I דרך הנקודה A» is the register's existing «דרך … העבירו משיק» reading, so it teaches «המשיק למעגל I בנקודה A»;
+   - two conjoined tangent phrases are each composed;
+   - «משיקים למעגלים I ו-II בנקודות A ו-B בהתאמה» is paired.
+
+   The lesson joins the canonicals with the top-level «;» that `readLine` splits. The verdict stays `teach`, and the taught line records on the next Enter.
+6. **A tangent THROUGH a point on the circle is the tangent AT it** (found-work note on #2391). «דרך הנקודה A עובר משיק למעגל I» and "the tangent to circle I through A" are now `tangent-through`. M1 lowers it to `tangent-line-at` when the figure puts A on that circle (`onCurveByConstruction`, the one answer). Otherwise it is the #1430 from-point construction, unchanged. Before, Q1 built two free-direction lines tangent to their circles, «המשיקים נפגשים בנקודה M» was `ambiguous-shape`, and M's locus lost its equation.
+
+**Sibling audit.**
+- **2-D.** 2-D's deterministic lane (`decideDeterministic2D`, measured on this branch) escalates «M מקיימת MA = MB» and the distributed named pair, and asks which circle for the centres' distance. It already reads «שני המשיקים נחתכים», «נתונים שני מעגלים המשיקים …», «הקטע AB הוא קוטר המעגל M» and `N_2`. Known-gap rows name **#2415** (the 2-D port, `needs-operator`).
+- **The plan's account of 2-D.** The plan tagged A6 `[2-D]`, but 2-D at the student's entry point does not read it. The reading stands on the plan's `[asked]` line.
+- **3-D.** 3-D has no circle grammar for these sentences (X8). Complex has no plane circles.
+- **Analytic.** The from-point reading «מנקודה P יוצא משיק למעגל» keeps its from-point meaning, which is what it says.
+
+**Not built.**
+
+| Item | Why |
+|---|---|
+| Part C — «נתונים שני מעגלים …» before any circle, and «האחד/האחר» promoting it | #2397 |
+| the `N2` / `N₂` identity | a product change, not ruled |
+| an implicit origin O | no exam sentence writes it |
+
+**Locks.**
+- `src-analytic/__tests__/issue-2391-exam-twins.test.ts`, the class lock. Every spelling of the #2391 table, He and En. Each row asserts that its facts equal the twins' facts (src stripped), that its verdict is the twins', and that its drawn figure equals the twins' at seeds 0 and 1.
+- The same file holds B2's teach rows: each taught line records at seeds 0 and 1, and the taught pair draws the canonical figure.
+- It also holds the found-work rows: the tangents meet, and the locus is 4x + y + 3 = 0. A control checks that an off-circle point keeps the from-point tangent.
+- Its controls:
+  - «M מקיימת AB = KL» is not-handled;
+  - the twin's refusal with no circle I;
+  - three circles give `ambiguous-shape`, and a named pair is taken;
+  - A9 leaves `x_B`, `r_M`, `S_ABC` untouched;
+  - «מעגל II» is never the point I;
+  - the given-word's glued «ש-» still works;
+  - the empty-canvas pair is refused alike (#2397).
+- `src-analytic/__tests__/issue-2391-exam-fixtures.test.ts` runs four fixtures:
+  - `issue-2391-q1-exam-wording` (Q1 verbatim, line 4 as taught; the locus);
+  - `-q2-centres`;
+  - `-q2-exam-wording`, pending #2387 and #2388;
+  - `-q3-two-circles`, pending #2381. Its aside is refused `unsatisfiable` until the two circles' choices can differ.
+- Catalog: ten F5/F17 rows, He and En.
+- Parity: eight plain rows and two analytic-only rows; four of them are known gaps for 2-D (#2415).
+- `issue-1773-uppercase-axis-letter.test.ts` is re-based: `X_1` is now `X₁`. The capital is still never lowercased.
+
+**Behaviour change for a student.** Every exam sentence above reads as its canonical twin, builds the same figure, and refuses with the same message where the twin refuses. «מעבירים משיק … דרך הנקודה A ומשיק …» pre-fills «המשיק למעגל I בנקודה A; המשיק למעגל II בנקודה B». A tangent «דרך» a point on its circle is drawn as the tangent at that point. «המרחק בין N₁ ל-N₂ הוא 9» now reads.
+
+**Consequences.** `parser/frameAnalytic.ts`, `parser/parseAnalytic.ts` (`readLine`, `parseCentresDistance`, `tangent-through`, the tangent subjects), `parser/scopeAnalytic.ts`, `engine/types.ts` (`centres-distance`, `tangent-through`, `CENTRES_SENTINELS`), `engine/apply.ts` (`circlePairOf`, the two cases), `engine/lengths.ts` (the distance operand), `parser/catalogAnalytic.ts`, `shell/__tests__/fixtures/geo-input-parity.ts`.
+
+## ADR-AG-316 — The ask lane reads the exam's questions: coordinates, a parameter, a curve by centre, by «THE» noun and by tangent noun, conjunctions, the set-former (#2393)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream F); branch `feat/2393-analytic-ask-lane`, stacked on `feat/2391-analytic-exam-sentences` (ADR-AG-315). **Phase R only.** Phase Y (yes/no questions) is dropped by the operator's ruling of 2026-10-20 on #2393: *«the tool doesnt answer such questions. its a drawing tool and not a solver per se»*. Such a question keeps the lane's existing «לא הבנתי את השאלה». It also takes #2389's honesty item («שיפוע המקום הגיאומטרי של M»), per the ruling on #2389. LADDER stage: none (the ask lane; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R69a (new: the exam's own questions are askable). · **Design:** [04c](04c-design-analytic.md), «The ask lane» → «The exam's questions».
+
+**Context.** Measured on `3cae7f25` (`derive` → `ask`, model mocked) over the three exam figures:
+- «מצאו את שיעורי הנקודה M», «a», «מצאו את m ואת n» and the set-former's «… של כל הנקודות M המקיימות MA = MB» answered `unreadable`, or named the noun phrase as a missing point;
+- «משוואת המעגל שמרכזו N», «משוואת המעגל», "the equation of circle M" and «משוואת המשיק» answered `missing` curve;
+- «משוואת l1» answered null while the panel row beside it listed two equations, and «שיפוע l1» answered «±0.35»;
+- «שיפוע המקום הגיאומטרי של M» answered «אין בשרטוט ישר או מעגל בשם המקום הגיאומטרי של M».
+
+**Class.** The rule of 02c R23 is "sayable ⇒ askable, through the parser's own readers". Each gap was a reference form the lane did not resolve, or a question shape it did not frame. The «משוואת l1» defect had its own cause: **two curve resolvers for one question**. The by-name branch asked `knownCurve` alone, while the two-point-line branch and the panel row also fell back to the configurations' options (#1433, #1716).
+
+**Decision** (`app/ask.ts` unless named).
+1. **R1** `COORDS_OF`: «שיעורי (הנקודה) M», «הקואורדינטות של M» and "the coordinates of (point) M" rewrite to «M», so the answer is the point arm's (`pointText`, the panel's own decision).
+2. **R2** `PARAM_ASK`: «(הערך של) a» and "the value of a" are read only for a symbol the figure's register holds and reads (`paramRegister`, `usedSymbols`, never a direction symbol). The answer goes through the panel row's gate and spelling, `knownValue` → `valueText` (ADR-AG-270). Any other letter (`x`, or `m` before a line uses it) falls through unchanged.
+3. **R3** `CIRCLE_CENTRED_AT`: the circle whose centre is X (`centreIdOf`: `circle-at-X`, or an equation circle whose named centre is X). X not a point gives `missing` point. A point that is no circle's centre keeps `missing` curve.
+4. **R4** `THE_CURVE`: «משוואת המעגל / הפרבולה / האליפסה» takes the one host of that kind (`hostsOf`, the radius role's rule). None, or several, gives the existing `host` answer. «הישר» is not included: it has no host message.
+5. **R5**: `EQUATION_OF`'s English branch admits the noun ("the equation of circle M").
+6. **R6**: a tangent by its noun goes through the parser's exported `readTangentNoun`. It resolves to the tangent at T, or to the figure's one tangent object; none or several keeps `missing`. When #2390 adds a noun to that reader, this arm reads it with no change here.
+7. **R7, the root cause**: `curveEquationOf(c, id)` (`app/curveText.ts`) returns the known equation, else the options, else null. Callers:
+   - every ask arm that resolves a curve object (`curveAnswer`, which also keeps the two-point trace);
+   - the panel's curve row (`panelKnowledge`).
+
+   So «משוואת l1» now answers the row's two equations.
+8. **R8**: «(את) שתי / כל האפשרויות ל-…» is a second opener in `normaliseAsk`, and a trailing «(שתי אפשרויות)» is dropped. Both are enumerated.
+9. **R9** `splitAsk`:
+   - `ask` now wraps `askOne`. A question that did not read whole (unreadable or missing) is split at an enumerated joiner («… ואת …», «… ו-…», "… and …"), or at a plural noun over named members («משוואות המעגלים M ו-N»).
+   - The split is kept only when every part reads. When the whole was unreadable, one readable part is enough («מצאו את m ואת z» gives m's value, and z unread).
+   - The answer carries `parts`. `App.tsx` renders the question once, then each part through the extracted `answerBody`. There is no new wording.
+10. **R10** `SET_FORMER`:
+    - «(כל) (ה)נקודות M (המקיימות / ש- / such that S)» names M;
+    - with a condition S, the set is traced on the trial `derive([...d.lines, S])`, which is discarded after (02c R24). `Derivation.lines` is carried as `seed` is (#1176), and the trial's trace is its own;
+    - a condition the figure refuses is `Answer.refused`, worded by the input's own `errorText` (for example `errUnsatisfiable`).
+11. **#2389's honesty item.** The locus's slope («שיפוע המקום הגיאומטרי (של M)», "the slope of the locus") is `Answer.unsupported`, worded by the existing `errOutOfScope`. Per the operator's ruling of 2026-10-20 on #2389, the locus is an answer read from the panel, not an object.
+
+**Not built.** Phase Y (ruled out). The pairing of m with n (#2394).
+
+**Sibling audit.** 2-D, 3-D and complex have no ask lane with these arms. 3-D's ask box reads none of these forms; filing them is not this item's.
+
+**Measured cost.** One extra `derive` and one trace only for a set-former question with a condition (measured on Q1 with the condition unstated: 76 ms, against 0 ms for the cached plain locus ask). Every other arm is a regex in front of an existing arm.
+
+**Locks.**
+- `src-analytic/__tests__/issue-2393-exam-asks.test.ts` runs on the #2391 fixtures' own lines (`issue-2391-q1-exam-wording`, `-q2-centres`) and Q3's head. It checks:
+  - R1: each answer equals the bare name's;
+  - R2: `a` is 4 and equals `valueText(knownValue)`; `x`, and `m` before l1, are unchanged;
+  - R3–R5: each answer equals «משוואת מעגל X»; Q3 א gives (x - 8)² + (y + 3)² = 25; several circles give `host`; Z gives `missing` point;
+  - R6: Q2 ג gives x - 7 = 0 in five spellings;
+  - R7: «משוואת l1» equals the panel row's options, and «שיפוע l1» is unchanged;
+  - R8/R9: parts for Q2 א as printed, m and n, the plural noun, the «m ואת z» control, and a whole question that is never split;
+  - R10: four set-former spellings equal «המקום הגיאומטרי של M»; an unstated condition is traced, with the figure untouched; ML = MK gives `refused unsatisfiable`; a missing Q is named;
+  - #2389: three spellings give `unsupported`;
+  - the ruling: four yes/no questions stay `unreadable`.
+
+**Behaviour change for a student.**
+- The exam's «מצאו …» questions answer with the panel's values.
+- «משוואת l1» lists the row's two equations.
+- A conjoined question shows one answer per part under the question.
+- The set-former answers the locus it names.
+- «שיפוע המקום הגיאומטרי של M» says «המשפט מובן, אך אינו נתמך בכלי הזה» instead of "no such curve".
+
+**Consequences.** `app/ask.ts`, `app/curveText.ts` (`curveEquationOf`), `app/panelRows.ts`, `engine/derive.ts` (`Derivation.lines`), `parser/parseAnalytic.ts` (`readTangentNoun` exported), `App.tsx` (`answerBody`, the parts rows).
+
+## ADR-AG-306 — Two circles given by their equations can be tangent: each side of the touch is a circle reference (#2387)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream B); branch `feat/2387-analytic-equation-circle-tangency`, stacked on ADR-AG-305's branch, for the operator's play-and-approve. Part B of the joint #2382 + #2387 plan. **Supersedes in part** [ADR-AG-167](#adr-ag-167) (its "both circles arrive as `circle-at`" clause) and 02c R120's leftover "still refused … in a circle-to-circle tangency". LADDER stage: none (analytic's joint solve; LADDER describes 2-D's ladder).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R122 (tangent circles: either circle may be given by its equation; concentric equation circles refused; a computed circle still refused) and R120's superseded line. · **Design:** [04c](04c-design-analytic.md) "Tangent to a line": `tangent-circle {a, b: CircleSide, branch}` and the structural concentric check.
+
+**Rulings.** Operator (#2379): *"this is an exam I give my students and i want the tool to support it"* — Q2 (summer 2022) gives both circles by equation. ADR-AG-167 Am. 1 (5), operator 2026-09-29: concentric circles are never tangent. The operator's go-ahead for the round: «we bypass P1 issues so we can ensure delivery of these questions» (#2379).
+
+**Re-measurement at pickup** (ADR-AG-305's tip). The plan's table held: `(x−a)²+y²=r²` · `(x−13)²+y²=(2r)²` · «המעגלים משיקים מבחוץ» was refused `out-of-scope`, and so were the constant pair, the k/t pair and the mixed pair. The plan's "the mixed pair pinned k = 15" is |k| = 15: the touch holds at k = ±15, so the panel shows k unsettled until a sign is given. That is honest, and it is what the class test asserts.
+
+**Gap.** `tangent-circles` resolved both names and then required `kind === 'circle-at'`, because its constraint carried `{centre, r}` as a point and an `Expr`. An equation circle has a centre and radius only as its resolved `NumCurve`. The family already had that reading: `tangent-curve` (ADR-AG-195) reads a determined circle off `curveAt`. The circle–circle member never got it.
+
+**Decision.**
+1. **`CircleSide = { centre: Id; r: Expr } | { circle: Id }`** (`engine/solve.ts`). `tangent-circle` becomes `{ a: CircleSide; b: CircleSide; branch }`. Its parts:
+   - **The residual** reads a `{circle}` side through `curveAt`: its `cx`, `cy` and `r`. So the equation's parameters (a, r, k, t) are what the register's joint solve pins, as `tangent-curve` pins a line's.
+   - **`constraintRefs`** returns only the point sides' centres. **`constraintCurveRefs`** returns the `{circle}` ids, so the existence check and `depsPrecedeDependents` see them.
+   - **`canonicalConstraint` and `describeConstraint`** key and name a side by its centre or its circle id.
+   - **Unchanged:** the open concentric floor, `choice[external, internal]`, the branch words and `touch-point {a, b}`.
+2. **The apply arm** (`tangent-circles`, `engine/apply.ts`). A `circle-at` side is `{centre, r}`, and an equation circle (`curve`) side is `{circle}`. A computed `circle-thru` stays refused `out-of-scope` by name: it was not asked for (rule 7).
+3. **Concentric, judged structurally** (`centresAlwaysCoincide`). When a side is an equation circle, both centres are read at the probe environments: off the resolved curve, or off a centre point stated by coordinates. If they coincide at every probe, the sentence is refused `unsatisfiable` naming it. This is the 2026-09-29 ruling, which the open floor alone could not enforce when neither centre can move: `x²+y²=4` · `x²+y²=r²` · «המעגלים משיקים» built green in the plan's prototype. A centre that is a free or derived point keeps the floor's judgement.
+
+**Sibling audit.**
+- **2-D:** has no equation circles. Its «מעגל O ומעגל P משיקים» (`cat-2d-139`, exception `X8`) is unchanged.
+- **3-D and complex:** no circle equations of this kind.
+- **The other two reference families in this product:**
+  - `tangent-of` (line, axis) already reads a determined circle (ADR-AG-195);
+  - `radius-of` on an equation circle is a claim judged at the probes.
+  - Only the circle–circle member lacked the reading.
+
+**Behaviour change for a student.**
+- Two circles given by their equations, or one by its equation and one by its centre, can be stated tangent: «המעגלים משיקים מבחוץ / מבפנים», «מעגל I ומעגל II משיקים», «מעגל N משיק למעגל I», each with «בנקודה T».
+- Without a branch word, «הציגו תצורה אחרת» cycles both touches.
+- Two equation circles with one centre stated tangent are refused, as centre-given ones are.
+- Before, every one of these was refused «מחוץ לתחום».
+
+**Measured cost.** The residual reads two `curveAt` lookups for an equation side, the cost `tangent-curve` already pays. The concentric check is two probe resolutions at M1, once per sentence.
+
+**Seed sweep** (docs/17 §9, the same 24-seed set as ADR-AG-305). The sweep covered the tangency sequences common to both runs (199). Before this change, 3,096 of them were whole; after it, 3,120. The only sequence that moved is `issue-1504`'s «נתון מעגל I שמשוואתו x^2+y^2=9» · «מעגל M משיק למעגל I», which went from 0 to 24 (it is now built). No other sequence moved.
+
+**Locks.**
+- `src-analytic/__tests__/issue-2387-equation-circle-tangency.test.ts`:
+  - {equation–equation, equation–centre, centre–equation} × {מבחוץ, מבפנים, no branch, «בנקודה T»}. At 12 seeds, the drawn circles satisfy |centres| = r₁ + r₂ or |r₁ − r₂| as stated. With no branch, both touches are reached across the seeds. With «בנקודה T», T is on both circles.
+  - The contextual spelling. The constant pair that already touches is answered `already-follows`, and its impossible branch is refused. In the mixed pair, |k| = 15.
+  - Refusals: concentric equation circles in five spellings; an equation circle and a circle on the same stated centre; a circle tangent to itself; three circles under «המעגלים» (`ambiguous-shape`); an equation circle tangent to an axis (`out-of-scope`); a computed circle tangent to a circle (`out-of-scope`).
+  - The two fixtures, read by the test.
+- Fixtures (`src-analytic/__tests__/fixtures/`):
+  - `issue-2387-q2-equation-circles` (Q2 א in its equation form, the centres named with «M מרכז מעגל I»): a = 4, both equations known, and r honestly «?» because r appears only as r².
+  - `issue-2387-q2-section-he` (ה): |k − t| = 9 holds with one honest DOF left.
+  - Until #2388 these use `(2r)²` for `R²`, and until #2391 «M מרכז מעגל I» for the exam's wrapper sentence.
+- **Rewritten:**
+  - `issue-1504-circle-tangency` «tangency to an EQUATION circle is out of scope» now asserts that the touch is built, citing this ADR.
+  - `issue-1271-1336-conic-naming`: «מעגל 1 ומעגל II משיקים» over `x²+y²=4` and `(x−5)²+y²=9`, which already touch, is now `already-follows` (it was `out-of-scope`). The numeral-notation refusals beside it are unchanged.
+
+**Consequences.** `engine/solve.ts` (`CircleSide`, the `tangent-circle` type, refs, curve refs, canonical, describe, residual), `engine/apply.ts` (`tangent-circles`, `centresAlwaysCoincide`); docs 02c R120, R122; 04c.
+
+## ADR-AG-307 — Relations between parameters; R is the one capital that names a size (#2388)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream B); branch `feat/2388-analytic-param-relations`, stacked on ADR-AG-306's branch, for the operator's play-and-approve. **Amends** [ADR-AG-163](#adr-ag-163) (a capital is never a parameter, except R) and [ADR-AG-238](#adr-ag-238) (`LENGTH_CAPITALS` → `RADIUS_CAPITALS`, now used by every reader). LADDER stage: none (analytic's joint solve; LADDER describes 2-D's ladder).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R183 (new: relations and proportions between parameters, the radius ratio, R as the radius capital, the clash refusal); R164 notes R's wider reading. · **Design:** [04c](04c-design-analytic.md) "A value never mentions the plane" (the R exception), "A Greek angle name is a parameter" (the Latin relation), "Arcs, sectors and the diameter from a point" (`radius-ratio` reads the resolved circle's radius).
+
+**Rulings.**
+- Operator (#2379): *"this is an exam I give my students and i want the tool to support it"* (the relations).
+- Operator 2026-10-20 on #2388, option (b): *"it is very common to use R and r for radiuses of different circles so R can be an exception"*. R is a radius parameter inside an equation and in «ורדיוסו R»; *"Every other capital letter stays a point name"*; *"Detect the clash and refuse, naming both readings"*.
+- R14, the operator's ruling that every unstated choice is a DOF: the unordered ratio.
+
+**Re-measurement at pickup** (ADR-AG-306's tip, `decideSubmit`, model mocked). Both of the plan's tables held:
+- The five relation spellings were `not-handled`; «r < R» recorded a sign selector.
+- `(x-13)^2+y^2=R^2` was `not-handled`. «מעגל N: …=R²» and «ורדיוסו R» gave `bad-equation`, and «רדיוס המעגל O הוא R» was `not-handled`.
+- «שרדיוסו R» and «שרדיוסו K» both recorded a parameter.
+- A point R (or «PQRS», or «K(1,1)» with «שרדיוסו K») recorded silently beside the parameter of the same name.
+
+**Class.**
+1. *No parameter-to-parameter relation existed for Latin symbols*: any equation in parameters only, any proportion «X:Y = p:q» between them, and the ratio of two circles' radii had no reader and no constraint.
+2. *"Which capital is a size" was decided four ways in four readers* (`equationExpr` none, `roleScalar` none, `radiusOfSize` any, `lengths.ts` R only), and nothing checked that a letter is not both a point and a parameter.
+
+**Decision.**
+1. **One radius capital, one predicate.** `RADIUS_CAPITALS = {R}` (`carriers.ts`, renamed from `LENGTH_CAPITALS`) is used by every value or equation reader:
+   - `equationExpr` declines any other capital;
+   - `roleScalar` reads R and declines a point name;
+   - `radiusOfSize` takes a lowercase letter or R;
+   - a circle-subject radius that names a point («ורדיוסו K») now declines (`not-handled`) instead of answering `bad-equation`.
+   - Coordinates and slopes are unchanged. ADR-AG-238's "Not changed": analytic's own families, outside the ruling's two places.
+2. **The clash, at the chokepoint** (`applyFact`, beside the `alias-taken` check). The test is asked of the construction:
+   - *Clash:* the figure holds a positional object R and something reads the symbol R, and this statement introduced one of the two. That covers every naming path, in both orders. The line is refused `radius-letter-taken`, carrying `holder`, `reading` (the reading held first) and `declared`.
+   - *`declared`:* `derive` folds line by line on the refusal path to find the earlier line.
+   - *Wording:* two sentences in 02c's refusal style (He and En, with and without the earlier line), naming both readings and the statement.
+   - *The taught remedy, «שנה שם R ל-T»,* is locked to work.
+3. **Two constraint kinds** (`solve.ts`; NO CAS, each residual is evaluated, never rearranged):
+   - `param-rel {left, right}`: (L − R) / max(1, |L|, |R|). It has no point refs, and its symbols are registered by the structural walk (#1343).
+   - `radius-ratio {a, b, k}`: r(a) − k·r(b), each radius read off the resolved circle (`curveAt`, the `arc-sum` discipline). A circle given by centre, by equation or by points is one operand.
+4. **The readers** (`parseParamRelation`, after the Greek pin).
+   - *Equations.* An equation of parameter expressions (no plane letter, no point name but R) naming at least two symbols becomes a `param-rel`. A one-symbol pin («a = 5», «r=5») keeps its refusal.
+   - *Proportions.* «X:Y = p:q», «היחס בין X ל-Y הוא p:q» and "the ratio of/between X to/and Y is p:q" lower by their definition, q·X = p·Y. A slash «r/R=1/2» is kept as typed.
+   - *Radii.* «היחס בין (אורכי) (ה)רדיוסים של המעגלים …», «היחס בין רדיוסי המעגלים (M ו-N) …» and "the ratio of the radii of the circles (M and N) is p:q" become a `radius-ratio` fact. At M1:
+     - named circles are ordered;
+     - «המעגלים» unnamed means the figure's exactly two circles, else `ambiguous-shape`;
+     - the unstated order is a `choice` over both (R14), and «r < R» picks it.
+   - *Unused symbols.* A relation over a symbol the figure does not use is `not-handled` at M1, HEAD's verdict.
+5. **Catalog.** Four non-featured relation rows and the R equation row, in He and En.
+
+**Pickup checks.**
+- (1) Both tables re-measured as above. #2380, #2381 and #2391 are not on this stack. The issue-1496 and issue-1701 locks assert nothing about R in an equation, so neither needed amending.
+- (2) The readers that can now see R are the equation, the radius readers and the length. Coordinates still read any capital as a parameter (ADR-AG-238, "Not changed"), and stay as they were.
+- (3) The tool's letter resolver treats a used R as taken, because its `used` set reads every quoted capital in earlier facts. Locked: with M, N, P and Q taken, a median's foot is S, not R.
+- (4) A rename onto R while R is the radius is refused `rename-unsafe` (the re-derive faults), and nothing changes.
+- (5) Q2 is a, r, R against MN = 9, the touch and the relation. MN pins a alone, and the touch and the relation pin r and R jointly: no 3-DOF joint pin.
+- (6) «המעגלים משיקים» (a choice) with the unordered ratio (a choice) and «r < R» is not refused on this stack. It builds r = 3, R = 6 in the canonical route, without #2381.
+
+**The exam's equation form: measured, not inferred.** With both circles by equation (`(x−a)²+y²=r²`, `(x−13)²+y²=R²`), the ratio sentence and «r < R», the radii appear only as r² and R². «r < R» therefore does not make them positive: (r, R) = (3, 6) and (−6, 3) both satisfy every given.
+- The panel prints a = 4 and lists each equation with its two options.
+- With «R = 2r» instead of the ratio, r = 3 and R = 6 are known.
+- No `r > 0` is inferred. That is the #2382/#2387 plan's pickup check 4, and whether a radius parameter written in an equation is positive is a question for the operator (#2419, `needs-operator`).
+
+**Parity.** None. 2-D reads R and r as ONE radius symbol (ADR-034), so «R = 2r» means nothing there; 3-D and complex have no radius parameters. The divergence is deliberate (the exam uses both letters). No port issue.
+
+**Sibling audit.** The four capital readers above are every reader that takes a radius, a length or an equation (grepped `parseExpr`/`valueExpr` call sites). `measureValue` keeps declining R for an angle. 3-D and complex have no letter-parameter grammar.
+
+**Behaviour change for a student.**
+- «R = 2r», «r:R = 1:2», «r/R=1/2», «היחס בין R ל-r הוא 2:1» and «היחס בין אורכי הרדיוסים של המעגלים הוא 1:2» are read, and Q2 shows r = 3, R = 6.
+- The unordered ratio cycles both orders until «r < R».
+- R reads in «(x−13)²+y²=R²», «ורדיוסו R» and «רדיוס המעגל O הוא R».
+- A point R beside the radius R is refused in either order.
+- **WITHDRAWN:** «נתון מעגל O שרדיוסו K» (any capital but R) is no longer accepted (not understood), and «ורדיוסו K» says so too, where it said `bad-equation`.
+
+**Locks.**
+- `src-analytic/__tests__/issue-2388-parameter-relations.test.ts`:
+  - seven relation spellings (He and En) give r = 3, R = 6 at 12 seeds;
+  - the colon and slash lowerings;
+  - four unnamed radii spellings with «r < R»; the unordered ratio reaching both orders; the named ratio ordered; the ratio on equation circles; three circles `ambiguous-shape`;
+  - «k = 2t» and «a = b + 1» hold at every seed and consume one DOF; an unused letter is `not-handled`;
+  - every R reader registers R;
+  - the clash matrix: three point paths × five radius paths, and the radius first × three point paths, each with both readings and the earlier line in He and En; the rename onto R; the taught remedy; the tool letter;
+  - controls: «a = 5», «r=5», «AB is y=x-4», «x²+y²=K²», «α = 30», «α = 2β», «PQRS» / «AB = RS», «R > r»;
+  - the withdrawal;
+  - both fixtures.
+- Fixtures: `issue-2388-q2-relations` (Q2 canonical + «R = 2r» + «r < R»: a = 4, r = 3, R = 6) and `issue-2388-q2-exam-equations` (the exam's equation form with «R²», the ratio sentence and «r < R»: a = 4, each equation with its two options).
+- `message-floor-2028` registers the new key.
+
+**Consequences.** `engine/carriers.ts` (`RADIUS_CAPITALS`), `engine/lengths.ts`, `engine/types.ts` (`radius-ratio` fact), `engine/solve.ts` (`param-rel`, `radius-ratio`), `engine/apply.ts` (the clash, `letterReadings`, the `param-rel` use check, the `radius-ratio` arm), `engine/derive.ts` (`letterAgainst`), `parser/parseAnalytic.ts` (`equationExpr`, `roleScalar`, `radiusOfSize`, `circleSubjectGate`, `parseParamRelation`), `parser/catalogAnalytic.ts`, `app/submit.ts`, `app/errorText.ts`, `store/useAnalyticStore.ts`, `i18n/index.ts`; docs 02c, 04c.

@@ -32,14 +32,22 @@
  * the canvas and the ask lane cannot round differently.
  */
 import { isolateRtlName } from '../../shell/bidi';
-import { fmtAnalytic, fractionClearingFactor } from '../format';
+import { fmtAnalytic, fmtCoefficient, fractionClearingFactor } from '../format';
 import { ellipseFoci, parabolaDirectrix, parabolaFocus } from '../engine/curves';
 import { isVerticalLine } from '../engine/lines';
 import { evalExpr, exprText, isConstant, symbolsOf, type Expr } from '../engine/expr';
-import type { NumCurve } from '../engine/types';
+import type { Construction, Id, NumCurve } from '../engine/types';
+import { knownCurve, knownCurveOptions } from '../engine/evaluate';
 import type { LocusShape } from '../engine/locusFit';
 
-const fmt = (v: number): string => fmtAnalytic(v);
+/**
+ * TWO POSITIONS, TWO FORMATTERS (#2394, ADR-AG-304; ADR-AG-085's position rule). A number INSIDE an equation — a
+ * coefficient, a constant, a conic's denominator — is `fmt`: fractions (cleared by `lineText`), never a surd, so
+ * `√2/4x` cannot appear. A STANDALONE value in a curve's details — its centre, its radius, its slope, a focus — is
+ * `val`, the tree's one display formatter with its surd tier: «r = √10», «m = √2/4».
+ */
+const fmt = (v: number): string => fmtCoefficient(v);
+const val = (v: number): string => fmtAnalytic(v);
 
 /**
  * `a x + b y + c = 0`, written the way a textbook writes it: no `1x`, no `+ 0`, no `+ -3`. The raw
@@ -458,14 +466,14 @@ export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): Cu
        */
       if (explicit === null) return { equation, ...(words ? { details: [{ text: words.vertical }] } : {}) };
       const m = slopeOf(c.a, c.b)!;
-      return { equation, details: [{ text: `${explicit}, m = ${fmt(m)}` }] };
+      return { equation, details: [{ text: `${explicit}, m = ${val(m)}` }] };
     }
     case 'circle':
       return {
         equation: `${shifted('x', c.cx)} + ${shifted('y', c.cy)} = ${fmt(c.r * c.r)}`,
         details: [
-          { label: 'curveCentreLabel', text: at(nameAt, c.cx, c.cy, `${fmt(c.cx)}, ${fmt(c.cy)}`) },
-          { text: `r = ${fmt(c.r)}` },
+          { label: 'curveCentreLabel', text: at(nameAt, c.cx, c.cy, `${val(c.cx)}, ${val(c.cy)}`) },
+          { text: `r = ${val(c.r)}` },
         ],
       };
     case 'parabola': {
@@ -477,7 +485,7 @@ export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): Cu
         equation: `y² = ${k < 0 ? '-' : ''}${mag}x`,
         // The focus and the directrix from their own derivations — no coordinate assumed (#1432 am. 1).
         details: [
-          { label: 'curveFocusLabel', text: at(nameAt, f.x, f.y, `${fmt(f.x)}, ${fmt(f.y)}`) },
+          { label: 'curveFocusLabel', text: at(nameAt, f.x, f.y, `${val(f.x)}, ${val(f.y)}`) },
           { label: 'curveDirectrixLabel', text: directrixText(c) },
         ],
       };
@@ -487,8 +495,8 @@ export function curveParts(c: NumCurve, nameAt?: NameAt, words?: CurveWords): Cu
       return {
         equation: `x²/${fmt(c.a * c.a)} + y²/${fmt(c.b * c.b)} = 1`,
         details: [
-          { text: `a = ${fmt(c.a)}, b = ${fmt(c.b)}` },
-          { label: 'curveFociLabel', text: `${at(nameAt, f1.x, f1.y, `${fmt(f1.x)}, ${fmt(f1.y)}`)}, ${at(nameAt, f2.x, f2.y, `${fmt(f2.x)}, ${fmt(f2.y)}`)}` },
+          { text: `a = ${val(c.a)}, b = ${val(c.b)}` },
+          { label: 'curveFociLabel', text: `${at(nameAt, f1.x, f1.y, `${val(f1.x)}, ${val(f1.y)}`)}, ${at(nameAt, f2.x, f2.y, `${val(f2.x)}, ${val(f2.y)}`)}` },
         ],
       };
     }
@@ -604,4 +612,18 @@ export function locusEquation(shape: LocusShape, fmt: (v: number) => string): st
     case 'ellipse':
       return `x²/${fmt(c.a * c.a)} + y²/${fmt(c.b * c.b)} = 1`;
   }
+}
+
+/**
+ * WHAT A CURVE'S EQUATION IS, AS FAR AS THE GIVENS FIX IT (#2393 R7, ADR-AG-316) — the one decision the panel row and every
+ * ask arm print from: the known equation (every coefficient invariant, `knownCurve`), else the finite set the
+ * configurations give (`knownCurveOptions`, #1716), else nothing. «משוואת l1» answered null while the panel row listed
+ * two options because the ask's by-name branch asked only the first half; one function, so they cannot disagree again.
+ */
+export type CurveEquation = { known: NumCurve } | { options: NumCurve[] } | null;
+export function curveEquationOf(c: Construction, id: Id): CurveEquation {
+  const known = knownCurve(c, id);
+  if (known) return { known };
+  const options = knownCurveOptions(c, id);
+  return options ? { options } : null;
 }
