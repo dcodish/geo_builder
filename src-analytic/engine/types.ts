@@ -454,6 +454,18 @@ export type Fact =
    */
   | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: TangentLineRef[]; circle?: string; circleId?: Id; at?: Id; ring?: Id[] })
   /**
+   * «AB משיק משותף למעגלים M ו-N» — THE LINE ab IS TANGENT TO BOTH CIRCLES (#2385, ADR-AG-312). Written over the
+   * circle-slot sentinels inside `circles-about`, so `circles` are the two circle ids by the time M1 reads it. M1 decides
+   * WHERE it touches, because the parser cannot see the figure: when the figure already puts the circles' stated touch
+   * point on the line ab (one of its letters, or a point the figure places on ab), the line is the tangent AT that point;
+   * otherwise `a` touches the first circle and `b` the second (the lowering every common tangent had before).
+   *
+   * `onLine` is written by the fold, never the parser: the points the student's EARLIER lines put on the line ab. The
+   * fold applies such a line AFTER this one when this one is what declares a and b («T על AB» typed first waits, in the
+   * deferral fixpoint, for the line that defines A and B), so the figure M1 holds here cannot show it.
+   */
+  | (FactBase & { t: 'common-tangent'; a: Id; b: Id; circles: [Id, Id]; onLine?: Id[] })
+  /**
    * «המשיק למעגל בנקודה A» — THE TANGENT AS AN OBJECT (#1619 B3, ADR-AG-195): the line through A
    * perpendicular to the radius to A, on the circle `circle` names (contextual when absent). M1 resolves
    * the circle and lowers it to A on the circle plus a `line-at` whose direction is that radius turned a

@@ -3336,12 +3336,15 @@ const touchAt = (slot: string, at: Id, a: Id, b: Id, src: string): Fact => ({
   src,
 });
 
-/** A common tangent `a``b` touching the circle in `s1` at `a` and the one in `s2` at `b`; `kind` its stated kind. */
+/**
+ * A common tangent `a``b` of the circles in `s1` and `s2`; `kind` its stated kind. Where it touches is M1's question
+ * (`common-tangent`, #2385 ADR-AG-312): the parser cannot see whether the figure already puts the circles' touch point
+ * on ab.
+ */
 function commonTangentFacts(a: Id, b: Id, s1: string, s2: string, kind: 'external' | 'internal' | undefined, src: string): Fact[] {
   return [
     ...declareAll([a, b], src),
-    touchAt(s1, a, a, b, src),
-    touchAt(s2, b, a, b, src),
+    { t: 'common-tangent', a, b, circles: [s1, s2], src },
     { t: 'selector', sel: { kind: 'distinct', ids: [a, b] }, src },
     ...(kind ? [{ t: 'selector' as const, sel: { kind: 'sign' as const, q: { k: 'centres-side' as const, a: s1, b: s2, p: a, q: b }, positive: kind === 'external' }, src }] : []),
     segmentFact(a, b, src),
