@@ -139,6 +139,16 @@ export type TangentLineRef =
       bounded?: true;
     };
 
+/**
+ * ONE SIDE OF A CIRCLE-TO-CIRCLE TOUCH (#2387, ADR-AG-306) — a circle REFERENCE: a circle on a centre POINT (its point
+ * and radius expression, so the centre and the radius symbol can give way), or a circle the figure determines by its
+ * EQUATION (`circle`, read off the resolved curve, so the equation's parameters give way).
+ */
+export type CircleSide = { centre: Id; r: Expr } | { circle: Id };
+const circleSideKey = (s: CircleSide): string => ('centre' in s ? `p:${s.centre}` : `c:${s.circle}`);
+const circleSidePoint = (s: CircleSide): Id[] => ('centre' in s ? [s.centre] : []);
+const circleSideName = (s: CircleSide): string => ('centre' in s ? s.centre : s.circle.replace(/^circle-/, ''));
+
 export type Constraint =
   /** `A(6,4)` on a point that is not free to be replaced — one or both coordinates pinned. */
   | { t: 'coord'; id: Id; x?: Expr; y?: Expr }
@@ -352,10 +362,12 @@ export type Constraint =
    * (internal). The sentence without a branch word lowers to a `choice` over both — the two
    * configurations cycle under «הציגו תצורה אחרת», never a silently picked seat (ADR-052, the
    * #1049 pattern) — and «מבחוץ»/«מבפנים» collapse it exactly as «זווית B ישרה» collapses a
-   * right-angle seat. Both circles arrive as centre+radius (`circle-at`), resolved at the apply
-   * boundary; a circle with neither free is refused there, never here.
+   * right-angle seat. Each SIDE is a circle reference, resolved at the apply boundary (#2387, ADR-AG-306): a
+   * circle on a centre POINT carries the point and its radius expression; a circle the figure DETERMINES (stated
+   * by its equation) carries its id, and its centre and radius are read off the resolved curve (`curveAt`), as
+   * `tangent-curve` reads them for a line — so a parameter in the equation is what the touch pins.
    */
-  | { t: 'tangent-circle'; centre: Id; r: Expr; other: Id; otherR: Expr; branch: 'external' | 'internal' }
+  | { t: 'tangent-circle'; a: CircleSide; b: CircleSide; branch: 'external' | 'internal' }
   /**
    * A DERIVATION RESTATED ABOUT AN EXISTING POINT — «M אמצע AB» when `M` is already the y-axis crossing
    * (#1320, ADR-AG-144; #1046's converse, which the M1 boundary never got).
@@ -380,6 +392,19 @@ export type Constraint =
    * Carried as the node the walk reads, the subject is registered by the same mechanism every value is.
    */
   | { t: 'param-eq'; sym: Extract<Expr, { kind: 'sym' }>; value: Expr }
+  /**
+   * «R = 2r» · «r:R = 1:2» · «k = 2t» — A RELATION BETWEEN PARAMETERS (#2388, ADR-AG-307). Two parameter expressions that
+   * must be equal; the residual is EVALUATED, never rearranged (NO CAS, ADR-AG-001 D1). Like `param-eq` it names no
+   * point: the freedom it consumes is the register's, and its symbols reach the register by the structural walk
+   * (`constraintSymbols`, #1343) every value uses. A colon proportion arrives already as its definition, q·X = p·Y.
+   */
+  | { t: 'param-rel'; left: Expr; right: Expr }
+  /**
+   * «היחס בין אורכי הרדיוסים של המעגלים הוא 1:2» — THE RATIO OF TWO CIRCLES' RADII (#2388, ADR-AG-307): r(a) = k·r(b), each
+   * radius read off the RESOLVED circle at the iterate (`curveAt`), the `arc-sum` discipline (ADR-AG-220): a circle by
+   * centre and radius, by equation, or computed from points is one operand.
+   */
+  | { t: 'radius-ratio'; a: Id; b: Id; k: Expr }
   /**
    * Σ kᵢ·⌢(aᵢbᵢ) = value — ARC MEASURES, in degrees (#1622 E4, ADR-AG-220; 2-D's ADR-116 identity: an arc's measure IS
    * its central angle). Each arc is the unsigned angle at the CENTRE of its resolved circle between the radii to its
@@ -491,7 +516,7 @@ export function canonicalConstraint(k: Constraint): string {
   // «מעגל M משיק למעגל K» is «מעגל K משיק למעגל M» — undirected; the BRANCH is part of the
   // statement (externally and internally tangent are different givens, #1504).
   if (k.t === 'tangent-circle') {
-    const [p, q] = [k.centre, k.other].sort();
+    const [p, q] = [circleSideKey(k.a), circleSideKey(k.b)].sort();
     return `tangent-circle|${p}|${q}|${k.branch}`;
   }
   // The equation fields are SPELLING (#1429) — apply strips them, but a raw constraint compared
@@ -568,13 +593,18 @@ export function constraintRefs(k: Constraint): Id[] {
     // The circle is a CURVE ref; only a two-point line moves points.
     case 'tangent-curve':
       return k.line.kind === 'points' ? [k.line.a, k.line.b] : [];
-    // Both centres may move — either circle can give way to satisfy the touch.
+    // Both centres may move — either circle can give way to satisfy the touch. An equation side names no
+    // point: its freedom is its parameters', and its curve is a CURVE ref (#2387).
     case 'tangent-circle':
-      return [k.centre, k.other];
+      return [...circleSidePoint(k.a), ...circleSidePoint(k.b)];
     case 'derived-at':
       return [k.id, ...parentsOf(k.rule)];
     // A parameter's value names no point: its freedom lives in the register.
     case 'param-eq':
+    case 'param-rel':
+      return [];
+    // Two circles' radii: each circle is a CURVE ref (`constraintCurveRefs`); no point moves.
+    case 'radius-ratio':
       return [];
     // The arcs' ends; each circle is a CURVE ref (`constraintCurveRefs`), as the radius direction's is.
     case 'arc-sum':
@@ -643,6 +673,10 @@ export function describeConstraint(k: Constraint): string {
       return `${k.measure ?? ''}∠${k.at.a}${k.at.v}${k.at.b} = ${exprText(k.value)}${k.obtuse ? ' (∠ > 90°)' : ''}`;
     case 'param-eq':
       return `${k.sym.name} = ${exprText(k.value)}`;
+    case 'param-rel':
+      return `${exprText(k.left)} = ${exprText(k.right)}`;
+    case 'radius-ratio':
+      return `r(${k.a.replace(/^circle-(?:at-)?/, '')}) = ${exprText(k.k)}·r(${k.b.replace(/^circle-(?:at-)?/, '')})`;
     case 'angle-ratio':
       return `∠${k.left.a}${k.left.v}${k.left.b} = ${exprText(k.k) === '1' ? '' : exprText(k.k)}∠${k.right.a}${k.right.v}${k.right.b}`;
     case 'relation':
@@ -662,7 +696,7 @@ export function describeConstraint(k: Constraint): string {
     case 'tangent-curve':
       return `${k.line.kind === 'curve' ? k.line.label : `${k.line.a}${k.line.b}`} משיק למעגל`;
     case 'tangent-circle':
-      return `מעגל ${k.centre} משיק למעגל ${k.other}${k.branch === 'internal' ? ' מבפנים' : ' מבחוץ'}`;
+      return `מעגל ${circleSideName(k.a)} משיק למעגל ${circleSideName(k.b)}${k.branch === 'internal' ? ' מבפנים' : ' מבחוץ'}`;
     case 'derived-at':
       return `${k.id} = ${describeRule(k.rule)}`;
     case 'arc-sum':
@@ -718,6 +752,9 @@ export function constraintCurveRefs(k: Constraint): Id[] {
       return k.line.kind === 'curve' ? [k.line.id] : [];
     case 'tangent-curve':
       return k.line.kind === 'curve' ? [k.circle, k.line.id] : [k.circle];
+    // An equation circle on either side of a circle-to-circle touch must exist to be touched (#2387).
+    case 'tangent-circle':
+      return [k.a, k.b].flatMap((s) => ('circle' in s ? [s.circle] : []));
     case 'relation':
       return [...ofDir(k.u), ...ofDir(k.v)];
     case 'slope':
@@ -726,6 +763,8 @@ export function constraintCurveRefs(k: Constraint): Id[] {
       return curveParentsOf(k.rule);
     case 'arc-sum':
       return [...new Set(k.terms.map((t) => t.circle))];
+    case 'radius-ratio':
+      return [k.a, k.b];
     case 'choice':
       return [...new Set(k.options.flatMap(constraintCurveRefs))];
     case 'all':
@@ -1006,6 +1045,20 @@ export function residualRows(
       // Relative to the value, like the area and length rows, so «α = 30» and «k = 0.5» converge alike.
       return { eq: [(have - want) / Math.max(1, Math.abs(want))] };
     }
+    case 'param-rel': {
+      const l = evalExpr(k.left, env);
+      const r = evalExpr(k.right, env);
+      if (!Number.isFinite(l) || !Number.isFinite(r)) return null; // an unbound symbol judges nothing
+      // Relative to the sides' own size, so «R = 2r» and «k = 2t» converge alike whatever the scale.
+      return { eq: [(l - r) / Math.max(1, Math.abs(l), Math.abs(r))] };
+    }
+    case 'radius-ratio': {
+      const ca = curveAt?.(k.a) ?? null;
+      const cb = curveAt?.(k.b) ?? null;
+      const ratio = evalExpr(k.k, env);
+      if (!ca || ca.kind !== 'circle' || !cb || cb.kind !== 'circle' || !Number.isFinite(ratio)) return null;
+      return { eq: [(ca.r - ratio * cb.r) / Math.max(1, ca.r, Math.abs(ratio * cb.r))] };
+    }
     case 'angle-ratio': {
       const [v1, a1, b1, v2, a2, b2] = p;
       const left = angleAt(v1, a1, b1);
@@ -1124,13 +1177,26 @@ export function residualRows(
       return lineTangencyRows({ x: circle.cx, y: circle.cy }, circle.r, k.line, p, curveAt);
     }
     case 'tangent-circle': {
-      const r1 = evalExpr(k.r, env);
-      const r2 = evalExpr(k.otherR, env);
+      /*
+       * Each side's centre and radius (#2387, ADR-AG-306): a centre POINT from `p` (in `constraintRefs` order) and its
+       * radius expression, or a resolved equation circle's own (`curveAt`). A vacancy judges nothing.
+       */
+      let at = 0;
+      const side = (s: CircleSide): { c: Pt; r: number } | null => {
+        if ('centre' in s) return { c: p[at++], r: evalExpr(s.r, env) };
+        const circle = curveAt?.(s.circle) ?? null;
+        return circle && circle.kind === 'circle' ? { c: { x: circle.cx, y: circle.cy }, r: circle.r } : null;
+      };
+      const sa = side(k.a);
+      const sb = side(k.b);
+      if (!sa || !sb) return null;
+      const r1 = sa.r;
+      const r2 = sb.r;
       if (!Number.isFinite(r1) || !Number.isFinite(r2)) return null; // an unbound radius judges nothing
       // The DISTANCE between the centres IS the radii's sum (external) or the radii's absolute
       // difference (internal) — the formula sheet's two cases, one row each; which one holds is
       // the `choice` resolved before this runs (#1049), never a judgement made here.
-      const [a, b] = p;
+      const [a, b] = [sa.c, sb.c];
       const d = Math.hypot(b.x - a.x, b.y - a.y);
       const miss = d - (k.branch === 'external' ? r1 + r2 : Math.abs(r1 - r2));
       /**

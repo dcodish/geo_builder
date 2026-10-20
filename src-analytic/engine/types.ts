@@ -537,6 +537,12 @@ export type Fact =
    */
   | (FactBase & { t: 'tangent-circles'; a?: string; b?: string; branch?: 'external' | 'internal'; at?: Id })
   /**
+   * «היחס בין אורכי הרדיוסים של המעגלים (M ו-N) הוא p:q» — the ratio of two circles' radii (#2388, ADR-AG-307), `k` = p/q.
+   * Which circles is M1's question (`circleByName`, or the figure's exactly two); named circles are ORDERED (r(a) = k·r(b)),
+   * unnamed ones are an unstated order — a `choice` over both (R14, ADR-052).
+   */
+  | (FactBase & { t: 'radius-ratio'; circles?: [string, string]; k: Expr })
+  /**
    * «E נקודת החיתוך של הישרים» — a crossing whose operands are named only by their KIND (#1429).
    *
    * WHICH two objects is a question about the construction, so M1 answers it: exactly two of the

@@ -22,7 +22,7 @@ import { cevianFacts, measureFacts, toolFootFacts, type CevianRole } from '../en
 import { TOOL_PREFIX, toolPoint, type ToolPointRole } from '../engine/toolLetters';
 import { isAngleRef, sineAngle, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { evalExpr, findMixedNumber, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
-import { INDEXED_TOKEN, POINT_TOKEN, RESERVED_SYMBOLS, directionSymbol, mentionsPlane, mentionsPointName, toolSymbol } from '../engine/carriers';
+import { INDEXED_TOKEN, POINT_TOKEN, RADIUS_CAPITALS, RESERVED_SYMBOLS, directionSymbol, mentionsPlane, mentionsPointName, toolSymbol } from '../engine/carriers';
 
 /** A student's VALUE — a number or an expression in parameters, never the plane's x/y (#1496, `mentionsPlane`). */
 function valueExpr(src: string): Expr | null {
@@ -554,8 +554,11 @@ export function equationExpr(src: string): Expr | null {
    * read letter by letter: «AB is y=x-4», once the length rule declined it, came here as the curve
    * `A·B·i·s·y = x−4` — four invented parameters and the stated line nowhere. Declining sends it to
    * `not-handled` and the LLM seam, which is what #1068 intended for words.
+   *
+   * The ONE exception is the radius capital `R` (`RADIUS_CAPITALS`; operator ruling 2026-10-20 on #2388, ADR-AG-307):
+   * «(x−13)²+y²=R²» is the exam's own circle, and R is its radius parameter as r is. «AB is y=x-4» still declines.
    */
-  if ([...symbolsOf(a), ...symbolsOf(b)].some((s) => /^[A-Z]/.test(s))) return null;
+  if ([...symbolsOf(a), ...symbolsOf(b)].some((s) => /^[A-Z]/.test(s) && !RADIUS_CAPITALS.has(s))) return null;
   return { kind: 'sub', a, b };
 }
 
@@ -2677,12 +2680,18 @@ export function readRoleRef(raw: string): RoleRef | null {
   return null;
 }
 
-/** A scalar the student states for a radius or a perimeter — a number or a parameter expression, never a point name. */
+/**
+ * A scalar the student states for a radius or a perimeter — a number or a parameter expression, never a point name. The
+ * radius capital `R` is a size, not a point (`RADIUS_CAPITALS`, ADR-AG-307): «ורדיוסו R», «רדיוס המעגל O הוא R».
+ */
 function roleScalar(src: string): Expr | null {
   const t = trim(src);
-  if (!claimable(t) || /[A-Z]/.test(t)) return null;
-  return valueExpr(t);
+  if (!claimable(t) || /[A-Z]/.test(t.replace(RADIUS_CAPITAL_RUN, ''))) return null;
+  const v = valueExpr(t);
+  return v && !mentionsPointName(v, RADIUS_CAPITALS) ? v : null;
 }
+/** A radius capital standing as a SYMBOL (no Latin letter beside it): the `R` of «2R», «R/2», never of «RS». */
+const RADIUS_CAPITAL_RUN = new RegExp(`(?<![A-Za-z])[${[...RADIUS_CAPITALS].join('')}](?![A-Za-z])`, 'g');
 
 /**
  * THE WAYS A ROLE GIVEN SPLITS INTO ITS TWO SIDES — in order of preference.
@@ -2916,9 +2925,14 @@ function oneCircleFacts(subject: CircleSubject & { kind: 'one' }, targets: Tange
  * re-read with the tool's point name in its place (the #1263 mint, `viaCanonical`), and an unreadable
  * radius or centre is refused by name. `null` = carry on.
  */
+const LONE_POINT_NAME = new RegExp(`^${POINT_TOKEN.source}$`);
 function circleSubjectGate(subject: CircleSubject | null, line: string): RuleOutcome {
   if (!subject || subject.kind !== 'one') return null;
-  if (subject.radius !== undefined && !roleScalar(subject.radius)) return unreadable(subject.radius);
+  if (subject.radius !== undefined && !roleScalar(subject.radius)) {
+    // A radius that is a POINT'S NAME («ורדיוסו K») is declined, never «unreadable»: only R names a size (ADR-AG-307).
+    if (LONE_POINT_NAME.test(trim(subject.radius))) return { ok: false, code: 'not-handled', detail: line };
+    return unreadable(subject.radius);
+  }
   if (subject.placed !== undefined) {
     const placed = parseClause(`${subject.name}${subject.placed}`);
     if (!placed.ok) return placed;
@@ -3352,8 +3366,9 @@ const SIZE_WORD: Record<string, 'r' | 'd' | 'c' | 'a'> = {
 function radiusOfSize(word: string, text: string): Expr | null {
   const kind = SIZE_WORD[word.toLowerCase()];
   if (!kind) return null;
-  // A radius LETTER — «שרדיוסו R» — names the radius (2-D's radius symbol); it stays free (ADR-052).
-  if (kind === 'r' && /^[A-Za-z]$/.test(text) && !RESERVED_SYMBOLS.has(text)) return { kind: 'sym', name: text };
+  // A radius LETTER — «שרדיוסו r», «שרדיוסו R» — names the radius; it stays free (ADR-052). A lowercase letter or the one
+  // radius capital (`RADIUS_CAPITALS`, ADR-AG-307): «שרדיוסו K» names a point, so it declines (the `measureValue` verdict).
+  if (kind === 'r' && (/^[a-z]$/.test(text) || RADIUS_CAPITALS.has(text)) && !RESERVED_SYMBOLS.has(text)) return { kind: 'sym', name: text };
   const v = roleScalar(text);
   if (!v) return null;
   if (kind === 'r') return v;
@@ -6210,6 +6225,72 @@ function parseParamValue(line: string): RuleOutcome {
 }
 
 /**
+ * RELATIONS BETWEEN PARAMETERS (#2388, ADR-AG-307) — «R = 2r», «r:R = 1:2», «r/R=1/2», «היחס בין R ל-r הוא 2:1», «k = 2t»,
+ * and the ratio of two circles' radii «היחס בין אורכי הרדיוסים של המעגלים הוא 1:2». Operator (#2379): *"this is an exam I
+ * give my students and i want the tool to support it"*.
+ *
+ * - An equation whose two sides are parameter expressions only — no plane letter, no point name but the radius capital
+ *   (`RADIUS_CAPITALS`) — and that names AT LEAST TWO symbols is a `param-rel`. A one-symbol pin («a = 5», «r=5») keeps
+ *   its standing refusal (#1432: a fresh `r` beside a circle would pin a new symbol, not the radius). Whether the
+ *   symbols are the figure's own is M1's question (a relation over a letter nothing uses stays `not-handled`).
+ * - A colon proportion «X:Y = p:q» / «היחס בין X ל-Y הוא p:q» lowers by its definition, q·X = p·Y (a fixed template, no
+ *   division); a slash «X/Y = p/q» is kept as typed and evaluated.
+ * - The radii of the circles, named or not → `radius-ratio`, resolved at M1.
+ * After the Greek pin (`parseParamValue`), which keeps «α = 2β».
+ */
+const REL_SYM = '([a-wzR])';
+const REL_NUM = '(\\d+(?:\\.\\d+)?)';
+const REL_RATIO = `${REL_NUM}\\s*:\\s*${REL_NUM}`;
+const REL_COPULA_HE = '\\s*(?:=|הוא|היא)\\s*';
+const REL_COPULA_EN = '\\s*(?:=|is)\\s*';
+const REL_COLON = new RegExp(`^${REL_SYM}\\s*:\\s*${REL_SYM}\\s*=\\s*${REL_RATIO}$`);
+const REL_RATIO_HE = new RegExp(`^ה?יחס\\s+(?:בין\\s+)?${REL_SYM}\\s+ל\\s*-?\\s*${REL_SYM}${REL_COPULA_HE}${REL_RATIO}$`);
+const REL_RATIO_EN = new RegExp(`^the\\s+ratio\\s+(?:of|between)\\s+${REL_SYM}\\s+(?:to|and)\\s+${REL_SYM}${REL_COPULA_EN}${REL_RATIO}$`, 'i');
+const RADII_RATIO_HE = new RegExp(
+  `^ה?יחס\\s+(?:בין\\s+)?(?:(?:אורכי\\s+)?ה?רדיוסים\\s+של\\s+ה?מעגלים|(?:אורכי\\s+)?רדיוסי\\s+ה?מעגלים)(?:\\s+(?<a>${CIRCLE_NAME})\\s+ו-?\\s*(?<b>${CIRCLE_NAME}))?${REL_COPULA_HE}${REL_RATIO}$`,
+);
+const RADII_RATIO_EN = new RegExp(
+  `^the\\s+ratio\\s+(?:of|between)\\s+the\\s+radii\\s+of\\s+the\\s+circles(?:\\s+(?<a>${CIRCLE_NAME})\\s+and\\s+(?<b>${CIRCLE_NAME}))?${REL_COPULA_EN}${REL_RATIO}$`,
+  'i',
+);
+const relNum = (s: string): Expr => ({ kind: 'num', value: Number(s) });
+const relSym = (s: string): Expr => ({ kind: 'sym', name: s });
+const relMul = (a: Expr, b: Expr): Expr => ({ kind: 'mul', a, b });
+
+/** A parameter expression: parsed, no plane letter, no point name but the radius capital. */
+function paramSide(src: string): Expr | null {
+  const e = valueExpr(src);
+  return e && !mentionsPointName(e, RADIUS_CAPITALS) ? e : null;
+}
+
+function parseParamRelation(raw: string): RuleOutcome {
+  const line = trim(normalizeMath(raw));
+  const radii = RADII_RATIO_HE.exec(line) ?? RADII_RATIO_EN.exec(line);
+  if (radii) {
+    const { a, b } = radii.groups ?? {};
+    const n = radii.length;
+    const k: Expr = { kind: 'div', a: relNum(radii[n - 2]), b: relNum(radii[n - 1]) };
+    if (Number(radii[n - 1]) === 0 || Number(radii[n - 2]) === 0) return null;
+    return made([{ t: 'radius-ratio', ...(a && b ? { circles: [a, b] as [string, string] } : {}), k, src: raw }]);
+  }
+  const prop = REL_COLON.exec(line) ?? REL_RATIO_HE.exec(line) ?? REL_RATIO_EN.exec(line);
+  if (prop) {
+    const [, x, y, p, q] = prop;
+    if (x === y || Number(p) === 0 || Number(q) === 0) return null;
+    // X:Y = p:q ⇔ q·X = p·Y — the definition of the proportion, never a rearrangement.
+    return made([{ t: 'constraint', k: { t: 'param-rel', left: relMul(relNum(q), relSym(x)), right: relMul(relNum(p), relSym(y)) }, src: raw }]);
+  }
+  const parts = line.split('=');
+  if (parts.length !== 2) return null;
+  const left = paramSide(parts[0]);
+  const right = paramSide(parts[1]);
+  if (!left || !right) return null;
+  const syms = new Set([...symbolsOf(left), ...symbolsOf(right)]);
+  if (syms.size < 2 || [...syms].some((s) => RESERVED_SYMBOLS.has(s))) return null;
+  return made([{ t: 'constraint', k: { t: 'param-rel', left, right }, src: raw }]);
+}
+
+/**
  * TWO SEGMENTS THAT CROSS, AND ONE THAT BISECTS ANOTHER (#1622, ADR-AG-218) — 2-D's lowerings, copied:
  *
  * - «CD חותך את AB» · «AB ו-CD נחתכים» · «הקטעים AB ו-CD נחתכים» · "CD cuts AB" · "AB and CD intersect" — the two
@@ -8797,6 +8878,9 @@ function parseClauseRules(raw: string): ParseResult {
   // A stated distinctness (#2395) — after the parameter domains («a ≠ 0» is a domain), before the comparisons.
   const distinct = parseDistinct(line);
   if (distinct) return distinct;
+  // A relation between parameters (#2388, ADR-AG-307) — after the Greek pin, which keeps «α = 2β».
+  const related = parseParamRelation(line);
+  if (related) return related;
 
   // A coordinate compared (#1462) — after the parameter domains, whose atoms are single symbols.
   const compared = parseCompare(line);

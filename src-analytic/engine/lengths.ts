@@ -20,7 +20,7 @@
  * parameter — `2a·AB` keeps its `a`.
  */
 import { evalExpr, normalizeMath, parseExpr, type Env, type Expr } from './expr';
-import { LENGTH_CAPITALS, mentionsPlane, mentionsPointName } from './carriers';
+import { RADIUS_CAPITALS, mentionsPlane, mentionsPointName } from './carriers';
 import type { Pt } from './derived';
 import type { Id } from './types';
 
@@ -414,7 +414,7 @@ function readLength(src: string, named?: Set<number>): LengthExpr | null {
   // parameter (#1701, ADR-AG-238) — the radius R excepted, as in 2-D. An AREA's label is a capital in 2-D's grammar
   // («שטח ABC = S», its `parseAreaExpr`), so an expression that measures an area keeps its capitals.
   if (!expr || mentionsPlane(expr)) return null;
-  if (!terms.some((t) => t.kind === 'area') && mentionsPointName(expr, LENGTH_CAPITALS)) return null;
+  if (!terms.some((t) => t.kind === 'area') && mentionsPointName(expr, RADIUS_CAPITALS)) return null;
   return { expr, terms };
 }
 
@@ -426,7 +426,7 @@ function readLength(src: string, named?: Set<number>): LengthExpr | null {
 export function constantLengthExpr(src: string, ofArea = false): LengthExpr | null {
   const expr = parseExpr(normalizeMath(src));
   if (!expr || mentionsPlane(expr)) return null;
-  return ofArea || !mentionsPointName(expr, LENGTH_CAPITALS) ? { expr, terms: [] } : null;
+  return ofArea || !mentionsPointName(expr, RADIUS_CAPITALS) ? { expr, terms: [] } : null;
 }
 
 

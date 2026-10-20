@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import { decideSubmit } from '../app/submit';
 import { derive } from '../engine/derive';
-import { paramRegister, mentionsPointName, LENGTH_CAPITALS, POINT_TOKEN } from '../engine/carriers';
+import { paramRegister, mentionsPointName, RADIUS_CAPITALS, POINT_TOKEN } from '../engine/carriers';
 import { parseExpr, normalizeMath } from '../engine/expr';
 import { constantLengthExpr, parseLengthExpr } from '../engine/lengths';
 import { parseLine } from '../parser/parseAnalytic';
@@ -36,9 +36,9 @@ describe('#1701 — the predicate', () => {
     for (const s of ['a', '2a', 'k+1', '40', 'α', '√3']) expect(mentionsPointName(expr(s)), s).toBe(false);
   });
   it('a length admits the radius R (2-D ADR-034) and nothing else', () => {
-    expect(mentionsPointName(expr('1.6R'), LENGTH_CAPITALS)).toBe(false);
+    expect(mentionsPointName(expr('1.6R'), RADIUS_CAPITALS)).toBe(false);
     expect(mentionsPointName(expr('R'))).toBe(true);
-    expect(mentionsPointName(expr('2A'), LENGTH_CAPITALS)).toBe(true);
+    expect(mentionsPointName(expr('2A'), RADIUS_CAPITALS)).toBe(true);
   });
   it('the text test catches what the expression layer cannot read', () => {
     for (const s of ['A₁', 'A_1', 'A_{1}', 'A1']) expect(POINT_TOKEN.test(s), s).toBe(true);

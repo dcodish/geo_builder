@@ -22,12 +22,12 @@ import { FAMILIES_OF, positionOfCircles, type PairPosition } from './commonTange
 import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule, type FootLine } from './derived';
 import { sameDerivation } from './sameDerivation';
-import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
+import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
 import { measureRestatement } from './statedMeasures';
-import { RESERVED_SYMBOLS, radiusSymbol, toolSymbol } from './carriers';
+import { RADIUS_CAPITALS, RESERVED_SYMBOLS, radiusSymbol, toolSymbol, usedSymbols } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
 import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
 import { followObjects, isoscelesKeys, roleVertexOf } from './roles';
@@ -261,7 +261,13 @@ export type ApplyErrorCode =
    *  `derive` names the line that sized it (2-D's ruled sentence, no reason clause). */
   | 'radius-contradicts'
   /** #2390 (ADR-AG-314): «כל המשיקים המשותפים» about a circle inside the other — 2-D's `tangentsExhaustedContained`. */
-  | 'no-common-tangent';
+  | 'no-common-tangent'
+  /**
+   * #2388 (ADR-AG-307; operator ruling 2026-10-20, *"Detect the clash and refuse, naming both readings"*): the radius
+   * capital `R` is a point AND the radius parameter in one figure. `holder` is the letter; `reading` is the reading the
+   * figure held FIRST (`point` or `radius`); `derive` names the line that introduced it (`declared`).
+   */
+  | 'radius-letter-taken';
 
 /**
  * WHICH OBJECT a contextual reference needed, and how many the figure holds (#1432 amendment 1).
@@ -361,6 +367,8 @@ export interface ApplyError {
   against?: Constraint;
   /** For `radius-contradicts` (#2119): the circle whose stated radius the line contradicts. */
   circle?: Id;
+  /** For `radius-letter-taken` (#2388): which reading of the letter the figure held first. */
+  reading?: 'point' | 'radius';
   /** For `bisector-is-side` (#2115): the angle's vertex, and the host polygon's kind (`triangle`, `square`, `n4`, `n5`…). */
   vertex?: Id;
   polygonKind?: string;
@@ -855,6 +863,41 @@ export function centreIdOf(c: Construction, o: GeoObject): Id | null {
   if (!rule) return null;
   const held = c.objects.find((p) => p.kind === 'derived' && sameDerivation(p.rule, rule));
   return held ? held.id : null;
+}
+
+/**
+ * TWO CIRCLES WHOSE CENTRES COINCIDE FOR EVERY VALUE OF THE PARAMETERS (#2387, ADR-AG-306) — the structural form of
+ * "concentric" for a circle-to-circle touch with an equation side. Each centre is read at the probe environments: an
+ * equation circle's off its resolved curve, a centred circle's off its centre point when that point is stated by
+ * coordinates. A centre that is a free or derived point can move, so the pair is not structurally concentric (the
+ * residual's open floor keeps them apart instead). Probes a curve cannot be resolved at are skipped; none resolved is
+ * "cannot say" (false).
+ */
+function centresAlwaysCoincide(c: Construction, a: GeoObject, b: GeoObject): boolean {
+  const centreAt = (o: GeoObject, env: Env): { x: number; y: number } | null | 'moves' => {
+    if (o.kind === 'curve') {
+      const r = resolveCurve(o.curve, env);
+      return r.ok && r.curve.kind === 'circle' ? { x: r.curve.cx, y: r.curve.cy } : null;
+    }
+    if (o.kind === 'circle-at') {
+      const p = objectById(c, o.centre);
+      if (!p || p.kind !== 'point') return 'moves';
+      const x = evalExpr(p.x, env);
+      const y = evalExpr(p.y, env);
+      return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+    }
+    return 'moves';
+  };
+  let judged = 0;
+  for (const env of PROBE_ENVS) {
+    const p = centreAt(a, env);
+    const q = centreAt(b, env);
+    if (p === 'moves' || q === 'moves') return false;
+    if (!p || !q) continue;
+    if (Math.hypot(p.x - q.x, p.y - q.y) > 1e-9 * Math.max(1, Math.abs(p.x), Math.abs(p.y))) return false;
+    judged++;
+  }
+  return judged > 0;
 }
 
 /**
@@ -2118,8 +2161,36 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
     const taken = out.next.objects.find((o) => labels.has(o.id) && !objectById(c, o.id));
     if (taken) return { ok: false, error: { code: 'alias-taken', detail: f.src, holder: taken.id } };
   }
+  /*
+   * ONE NAME, ONE THING (#2388, ADR-AG-307): the radius capital R names a point OR the radius parameter, never both. Asked
+   * of the CONSTRUCTION, here where every statement lands, so every naming path is covered in both orders: a point, a
+   * polygon vertex, a centre, a crossing — and an equation, a radius, a length «AB = 1.6R», a relation.
+   */
+  const clash = radiusLetterClash(c, out.next);
+  if (clash) return { ok: false, error: { code: 'radius-letter-taken', detail: f.src, holder: clash.letter, reading: clash.first } };
   const notice = readingTwin(c, f);
   return notice ? { ...out, notice } : out;
+}
+
+/** Which readings the figure gives a radius capital: a positional object by that id, and a symbol something reads. */
+export function letterReadings(c: Construction, letter: string): { point: boolean; radius: boolean } {
+  const o = objectById(c, letter);
+  const point = !!o && isPositional(o);
+  return { point, radius: usedSymbols(c).has(letter) };
+}
+
+/** The clash a statement introduced: the letter, and the reading the figure held before it (`null` = none). */
+function radiusLetterClash(before: Construction, after: Construction): { letter: string; first: 'point' | 'radius' } | null {
+  for (const letter of RADIUS_CAPITALS) {
+    const o = objectById(after, letter);
+    if (!o || !isPositional(o)) continue; // the cheap test first: most figures have no point R
+    const now = letterReadings(after, letter);
+    if (!now.radius) continue;
+    const was = letterReadings(before, letter);
+    if (was.point && was.radius) continue; // not this statement's doing
+    return { letter, first: was.radius ? 'radius' : 'point' };
+  }
+  return null;
 }
 
 function applyStatement(c: Construction, f: Fact): ApplyOutcome {
@@ -2444,6 +2515,15 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * המשולש ABC הוא 20» before ABC exists is a statement about nothing.
      */
     case 'constraint': {
+      /*
+       * A RELATION BETWEEN PARAMETERS IS ABOUT THE FIGURE'S OWN SYMBOLS (#2388, ADR-AG-307). «R = 2r» relates symbols the
+       * figure already uses; a letter nothing uses would be a new symbol the relation invents (#1432's «r=5» concern), so
+       * the line keeps HEAD's verdict, `not-handled` — the LLM seam, nothing new shown.
+       */
+      if (f.k.t === 'param-rel') {
+        const used = usedSymbols(c);
+        if ([...symbolsOf(f.k.left), ...symbolsOf(f.k.right)].some((s) => !used.has(s))) return { ok: false, error: { code: 'not-handled', detail: f.src } };
+      }
       /**
        * AN EQUATION OPERAND RESOLVES TO THE CURVE IT DENOTES (#1429, the ADR-AG-023/#1342
        * identity class). «…עם המעגל (x-3)²+(y-4)²=9» while circle I carries that equation is a
@@ -3998,19 +4078,21 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // landing back on the named one) has no configuration.
       if (a === b) return { ok: false, error: { code: 'unsatisfiable', detail: f.src } };
       /**
-       * Tangency pins each RADIUS against each CENTRE, so BOTH circles need both to pull on —
-       * the `tangent-of` rule, applied twice. An equation circle or a computed `circle-thru` is
-       * refused by name (`out-of-scope`), never dropped.
+       * EACH SIDE IS A CIRCLE REFERENCE (#2387, ADR-AG-306; supersedes ADR-AG-167's "both circles arrive as
+       * `circle-at`"). A circle on a centre point gives its point and radius; a circle stated by its EQUATION gives
+       * itself, and the residual reads its centre and radius off the resolved curve — `tangent-curve`'s reading
+       * (ADR-AG-195), so «(x−a)²+y²=r²» touching «(x−13)²+y²=(2r)²» is what pins a and r. A computed `circle-thru`
+       * is refused by name (`out-of-scope`), never dropped: not asked.
        */
-      if (a!.kind !== 'circle-at' || b!.kind !== 'circle-at') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
-      const mk = (branch: 'external' | 'internal') => ({
-        t: 'tangent-circle' as const,
-        centre: a!.centre,
-        r: a!.r,
-        other: b!.centre,
-        otherR: b!.r,
-        branch,
-      });
+      const sideOf = (o: GeoObject): CircleSide | null =>
+        o.kind === 'circle-at' ? { centre: o.centre, r: o.r } : o.kind === 'curve' ? { circle: o.id } : null;
+      const sa = sideOf(a!);
+      const sb = sideOf(b!);
+      if (!sa || !sb) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      // Concentric circles are never tangent (operator 2026-09-29, ADR-AG-167 Am. 1 (5)) — judged STRUCTURALLY when a
+      // side is an equation circle, whose centre no solve can move apart unless its parameters do.
+      if (('circle' in sa || 'circle' in sb) && centresAlwaysCoincide(c, a!, b!)) return { ok: false, error: { code: 'unsatisfiable', detail: f.src } };
+      const mk = (branch: 'external' | 'internal') => ({ t: 'tangent-circle' as const, a: sa, b: sb, branch });
       // A branch word collapses the choice (the «זווית B ישרה» pattern); without one, BOTH
       // touches are admissible and «הציגו תצורה אחרת» cycles them (ADR-052, #1049).
       const k = f.branch ? mk(f.branch) : { t: 'choice' as const, options: [mk('external'), mk('internal')] };
@@ -4019,6 +4101,30 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         ? [{ t: 'derived' as const, id: f.at, rule: { t: 'touch-point' as const, a: a!.id, b: b!.id }, src: f.src }]
         : [];
       return applyAll(c, [{ t: 'constraint', k, src: f.src }, ...touch]);
+    }
+
+    /**
+     * «היחס בין אורכי הרדיוסים של המעגלים (M ו-N) הוא p:q» (#2388, ADR-AG-307) — which circles, answered here: named ones
+     * through the one name chain (ordered as written, r(a) = k·r(b)); «המעגלים» unnamed is the figure's exactly two
+     * (the `tangent-circles` contextual reading), whose ORDER the sentence does not state, so it is a `choice` over both
+     * orders (R14, ADR-052), cycled by «הציגו תצורה אחרת» until a given such as «r < R» picks one.
+     */
+    case 'radius-ratio': {
+      let pair: [GeoObject, GeoObject];
+      if (f.circles) {
+        const [a, b] = f.circles.map((n) => circleByName(c, n));
+        if (!a || curveKindOf(a) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circles[0])) };
+        if (!b || curveKindOf(b) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circles[1])) };
+        if (a === b) return { ok: false, error: { code: 'unsatisfiable', detail: f.src } };
+        pair = [a, b];
+      } else {
+        const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
+        if (circles.length !== 2) return { ok: false, error: noHost(f.src, 'circle', circles.length, 2) };
+        pair = [circles[0], circles[1]];
+      }
+      const ratio = (a: GeoObject, b: GeoObject): Constraint => ({ t: 'radius-ratio', a: a.id, b: b.id, k: f.k });
+      const k: Constraint = f.circles ? ratio(pair[0], pair[1]) : { t: 'choice', options: [ratio(pair[0], pair[1]), ratio(pair[1], pair[0])] };
+      return applyFact(c, { t: 'constraint', k, src: f.src });
     }
 
     case 'area-of': {

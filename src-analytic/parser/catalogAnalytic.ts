@@ -437,6 +437,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'circles', family: 'F5', he: 'המעגלים משיקים מבחוץ', en: 'the circles are tangent externally', needs: ['נתון מעגל K', 'נתון מעגל M'] },
   // The operator's own spelling (#1504 pre-play): two named circles as ONE subject.
   { category: 'circles', family: 'F5', he: 'מעגל O ומעגל M משיקים מבחוץ', en: 'circle O and circle M are tangent externally' },
+  // #2388 (ADR-AG-307): R is the one capital that names a size — the exam's «(x−13)²+y²=R²».
+  { category: 'circles', family: 'F5', he: 'נתון מעגל שמשוואתו (x-13)^2+y^2=R^2', en: 'the circle (x-13)^2+y^2=R^2' },
   // The touch point, named (#1504 amendment 1) — a derived point on the line of centres.
   {
     category: 'circles',
@@ -1020,6 +1022,17 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     he: 'α = 30',
     en: 'α = 30',
     needs: ['משולש ABC', '∢ABC = α'],
+  },
+  // #2388 (ADR-AG-307): relations between parameters, and the ratio of two circles' radii (Q2, summer 2022).
+  { category: 'relations', family: 'F17', he: 'R = 2r', en: 'R = 2r', needs: ['נתון מעגל M שרדיוסו r', 'נתון מעגל N שרדיוסו R'] },
+  { category: 'relations', family: 'F17', he: 'r:R = 1:2', en: 'r:R = 1:2', needs: ['נתון מעגל M שרדיוסו r', 'נתון מעגל N שרדיוסו R'] },
+  { category: 'relations', family: 'F17', he: 'היחס בין R ל-r הוא 2:1', en: 'the ratio of R to r is 2:1', needs: ['נתון מעגל M שרדיוסו r', 'נתון מעגל N שרדיוסו R'] },
+  {
+    category: 'relations',
+    family: 'F17',
+    he: 'היחס בין אורכי הרדיוסים של המעגלים הוא 1:2',
+    en: 'the ratio of the radii of the circles is 1:2',
+    needs: ['נתון מעגל M שרדיוסו r', 'נתון מעגל N שרדיוסו R'],
   },
   {
     category: 'relations',

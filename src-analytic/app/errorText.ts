@@ -278,6 +278,10 @@ export function errorText(error: InputError, t: Translate): string {
     'measure-contradicts': error.key === 'measure-contradicts' && error.declared ? 'errMeasureContradicts' : 'errMeasureContradictsAlone',
     // #2119 (ADR-684) — 2-D's errors.restatedSize, verbatim; with no line to name, the old conflict sentence
     'radius-contradicts': error.key === 'radius-contradicts' && error.declared ? 'errRadiusContradicts' : 'errConflict',
+    // #2388 (ADR-AG-307) — one name, one thing: the reading the figure held first, and the line that gave it
+    'radius-letter-taken': error.key === 'radius-letter-taken' && error.reading === 'radius'
+      ? (error.declared ? 'errRadiusLetterIsRadius' : 'errRadiusLetterIsRadiusAlone')
+      : error.key === 'radius-letter-taken' && error.declared ? 'errRadiusLetterIsPoint' : 'errRadiusLetterIsPointAlone',
     // #1963 (ADR-AG-296) — the operator's ruled refusal, in 2-D's «X» סותר את «Y» frame (#1868), naming the statements
     'forced-collinear': 'errForcedCollinear',
     // #2390 (ADR-AG-314) — 2-D's input.tangentsExhaustedContained, byte for byte
