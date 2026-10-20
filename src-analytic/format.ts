@@ -88,15 +88,64 @@ export function fractionText(v: number): string | null {
 }
 
 /**
- * The number a student reads, in this tree.
+ * The largest radicand the surd tier tries (#2394) — 2-D's bound (`src/format.ts` `exactFormOf`). Ascending, so
+ * `√12` prints as `2√3`: the first square-free radicand that divides it out is the smallest.
+ */
+const MAX_RADICAND = 50;
+/** The largest numerator a surd's rational part may have — 2-D's bound, so the tier stays recognition, not search. */
+const MAX_NUMER = 999;
+
+/**
+ * `v` as `(p/q)·√n` (#2394, [ADR-AG-304](../docs/06c-decisions-analytic.md#adr-ag-304), amending ADR-AG-084's "no surd
+ * tier") — `√2/4`, `-5√2/4`, `2√5`, `√10` — or null. RECOGNISED from the float, never derived (no CAS): 2-D's
+ * `exactFormOf` search, copied (boundary 1), with this tree's two disciplines — the same tight relative tolerance
+ * (`EXACT_TOL`) and small denominator (`MAX_DENOM`), and a caller that has already gated the value on invariance.
+ * So `1.4142` typed by a student stays `1.41` (3e-6 from √2, outside the bar) and `7.34` stays `7.34`. A value
+ * that is rational is not this tier's (`fractionText` and the integer print it); π forms are not copied (no witness).
+ * Written in this tree's sign convention (`-`, as `fractionText`), the coefficient before the root, the
+ * denominator after it: the panel's typesetter binds `√` to its factor, so `5√2/4` reads (5√2)/4 (ADR-298).
+ */
+export function surdText(v: number): string | null {
+  if (!Number.isFinite(v) || Math.abs(v) < 1e-12) return null;
+  const sign = v < 0 ? '-' : '';
+  const a = Math.abs(v);
+  for (let n = 2; n <= MAX_RADICAND; n += 1) {
+    if (Number.isInteger(Math.sqrt(n))) continue;
+    const x = a / Math.sqrt(n);
+    const bar = EXACT_TOL * Math.max(x, 1);
+    for (let q = 1; q <= MAX_DENOM; q += 1) {
+      const p = Math.round(x * q);
+      if (p < 1 || p > MAX_NUMER || Math.abs(x - p / q) > bar) continue;
+      const d = gcd(p, q);
+      const [num, den] = [p / d, q / d];
+      return `${sign}${num === 1 ? '' : num}√${n}${den === 1 ? '' : `/${den}`}`;
+    }
+  }
+  return null;
+}
+
+/**
+ * The number a student reads, in this tree — a STANDALONE value: a parameter, a length, a coordinate, an answer.
  *
  * ONE function, so the panel and the canvas cannot print the same value two ways — `fmtNum`'s own
- * rule («never per-call-site rounding sweeps») applied one level up. Exact first, decimals after.
+ * rule («never per-call-site rounding sweeps») applied one level up. Exact first, decimals after: the integer
+ * (`fmtNum`), the fraction, the surd (#2394), then the decimal.
  *
- * For a number sitting INSIDE an equation, see {@link fractionClearingFactor} — a bare `4/3` is right
- * as a standalone value and ambiguous as a coefficient.
+ * A number sitting INSIDE an equation is a coefficient, and goes through {@link fmtCoefficient}: a bare `4/3` or
+ * `√2/4` is right as a standalone value and ambiguous before an `x` (ADR-AG-085's position rule).
  */
 export function fmtAnalytic(v: number): string {
+  const z = Math.abs(v) < 1e-12 ? 0 : v;
+  return fractionText(z) ?? surdText(z) ?? fmtNum(z);
+}
+
+/**
+ * A number IN AN EQUATION'S POSITION — a coefficient, a constant term, a conic's denominator (#2394, ADR-AG-085's
+ * position rule kept): the fraction tier (which `fractionClearingFactor` then clears), never the surd tier.
+ * `√2/4x` is the ambiguity the coefficient ruling cleared away, so an uncleared surd coefficient stays decimal,
+ * exactly as before (`1.41x + y = 0`).
+ */
+export function fmtCoefficient(v: number): string {
   const z = Math.abs(v) < 1e-12 ? 0 : v;
   return fractionText(z) ?? fmtNum(z);
 }

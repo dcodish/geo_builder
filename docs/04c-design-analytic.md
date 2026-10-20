@@ -1061,7 +1061,10 @@ the smallest span, so one flung free point cannot widen it.
 `knownValues(c, read, size, { fillPool? })` answers known, pending, `options` (at most `MAX_LISTED_VALUES = 2`) or
 open; `valueText` (`app/panelRows.ts`) prints a value or two through `shell/valueOptions` — «±2» for opposites,
 else ascending, the row's name repeated before the second value when the caller passes it («AB = 2 או AB = 4»;
-[ADR-AG-270](06c-decisions-analytic.md#adr-ag-270), #1867).
+[ADR-AG-270](06c-decisions-analytic.md#adr-ag-270), #1867). The parameter rows are `paramRows(d, pk, fmt, words)`
+(`app/panelRows.ts`, rendered by `App.tsx`): two-valued parameters whose pairwise joint `knownValues` read is again
+two options are TIED, grouped by transitive closure and confirmed by one joint read, and print one vector row in the
+point rows' form, the drawn option bracketed ([ADR-AG-304](06c-decisions-analytic.md#adr-ag-304)).
 
 *Identifiers:* `Knowledge` · `knownCurveOptions` · `panelKnowledge` · `segmentKnowledge` · `fillPool: true`
 
@@ -1116,8 +1119,11 @@ shown in the `<details>` disclosure (ADR-AG-094); numbers go through `fmtAnalyti
 
 ### The tree's display formatter ([ADR-AG-084](06c-decisions-analytic.md#adr-ag-084))
 
-`src-analytic/format.ts` is the one display formatter: `fmtAnalytic(v) = fractionText(v) ?? fmtNum(v)`, above
-`shell/format.ts`.
+`src-analytic/format.ts` is the one display formatter: `fmtAnalytic(v) = fractionText(v) ?? surdText(v) ?? fmtNum(v)`,
+above `shell/format.ts`. `surdText` is 2-D's `exactFormOf` rational·√n search, copied (q ≤ 12, p ≤ 999, n ≤ 50
+ascending; [ADR-AG-304](06c-decisions-analytic.md#adr-ag-304)). A number inside an equation goes through
+`fmtCoefficient` (fraction, then `fmtNum`, never a surd): `curveText.ts`'s `fmt` and the locus equation; a curve's
+details (centre, radius, slope, focus) are standalone and use `fmtAnalytic` (`val`).
 
 *Identifiers:* `fmtNum` · `1.33` · `exactFormOf` · `cleanNum` · `p/q`
 

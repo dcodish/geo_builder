@@ -1,11 +1,11 @@
 import type { Derivation } from '../engine/derive';
-import { isKnowledge, knownCurve, knownCurveOptions, knownValue, settled, type Figure, type Knowledge } from '../engine/evaluate';
+import { isKnowledge, knownCurve, knownCurveOptions, knownValue, knownValues, settled, type Figure, type Knowledge } from '../engine/evaluate';
 import type { NumCurve } from '../engine/types';
 import { angleAt, type AngleRef, type Constraint } from '../engine/solve';
 import { VERTICAL_TOL, verticality } from '../engine/lines';
 import { lineAngleOf } from './lineAngle';
 import { isDirectionSymbol, paramRegister, usedSymbols } from '../engine/carriers';
-import { type Construction, type ParamDecl, positionalOf } from '../engine/types';
+import { domainText, type Construction, type ParamDecl, positionalOf } from '../engine/types';
 import { exprText, symbolsOf, type Expr } from '../engine/expr';
 import { curveEquationText, type DetailLabelKey, type DetailLine } from './curveText';
 import { isolateRtlName } from '../../shell/bidi';
@@ -249,6 +249,84 @@ export function valueText(k: PanelKnown, fmt: (v: number) => string, label?: str
   if (!k.options) return null;
   const o = realValueOptions(k.options, 1e-6);
   return o ? valueOptionsText(o, fmt, { or: 'או', ...(label ? { label } : {}) }) : null;
+}
+
+/**
+ * THE PARAMETER ROWS (#2394, [ADR-AG-304](../../docs/06c-decisions-analytic.md#adr-ag-304)) — the decision `App.tsx` made
+ * inline, extracted so a lock CALLS it (ADR-W-053, the move #1473/#1659 made for the other rows).
+ *
+ * A row per parameter, as before: its value or its two values (W1's scalar spelling, «a = 4 או a = 22», «m = ±√2/4»),
+ * «בודק…» while pending, else its domain («לא בשימוש» when nothing reads it). **Except TIED parameters**: two
+ * parameters each taking two values are tied when the joint read of the pair is again exactly two options — each
+ * value of one comes with one value of the other («הישר mx-y+n=0 משיק לשני המעגלים»: m = √2/4 goes with n = 5√2/4).
+ * Printed apart, the rows hid which goes with which. Groups are the transitive closure of tied pairs, confirmed by
+ * one joint read over the whole group; a group that reads more than two options is not tied and its members keep
+ * their rows. A group's ONE row is written as the point rows write a vector option set (`pointText`):
+ * «(m, n) = (-√2/4, -5√2/4) או [(√2/4, 5√2/4)]», in the gate's order, the DRAWN configuration bracketed — the link
+ * to «הציגו תצורה אחרת». No `±` on a tuple: W1's ± is a scalar spelling (ADR-AG-270).
+ *
+ * Reads the configuration pool that already exists, in the parameter rows' own non-filling mode (the B′ ruling): no
+ * new solve, no pool fill.
+ */
+export function paramRows(
+  d: Pick<Derivation, 'construction' | 'figure'>,
+  pk: Pick<PanelKnowledge, 'params'>,
+  fmt: (v: number) => string,
+  words: { checking: string; unused: string },
+): Array<{ key: string; text: string }> {
+  const c = d.construction;
+  const envOf = (f: Figure, syms: readonly string[]) => {
+    const v = syms.map((s) => f.env[s]);
+    return v.every((x) => x !== undefined && Number.isFinite(x)) ? v : null;
+  };
+  const jointOptions = (syms: readonly string[]) => {
+    const j = knownValues(c, (f) => envOf(f, syms), syms.length);
+    return !j.known && !j.pending && j.options?.length === 2 ? j.options : null;
+  };
+  const two = pk.params.filter((p) => p.used && !p.k.known && !p.k.pending && p.k.options?.length === 2).map((p) => p.sym);
+  // Union-find over the tied pairs.
+  const root = new Map(two.map((s) => [s, s] as const));
+  const find = (s: string): string => (root.get(s) === s ? s : find(root.get(s)!));
+  for (let i = 0; i < two.length; i += 1)
+    for (let j = i + 1; j < two.length; j += 1) if (jointOptions([two[i], two[j]])) root.set(find(two[j]), find(two[i]));
+  const groups = new Map<string, string[]>();
+  for (const s of two) {
+    const g = groups.get(find(s)) ?? [];
+    g.push(s);
+    groups.set(find(s), g);
+  }
+  const rowOf = new Map<string, { syms: string[]; options: number[][] }>();
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    const options = jointOptions(g);
+    if (options) for (const s of g) rowOf.set(s, { syms: g, options });
+  }
+  const out: Array<{ key: string; text: string }> = [];
+  for (const { sym, domain, used, k } of pk.params) {
+    const group = rowOf.get(sym);
+    if (group) {
+      if (group.syms[0] !== sym) continue;
+      const drawn = envOf(d.figure, group.syms);
+      const text = group.options
+        .map((o) => {
+          const t = `(${o.map(fmt).join(', ')})`;
+          const here = drawn !== null && o.every((v, i) => Math.abs(drawn[i] - v) <= 1e-6 * Math.max(1, Math.abs(v)));
+          return here ? `[${t}]` : t;
+        })
+        .join(' או ');
+      out.push({ key: group.syms.join(','), text: `(${group.syms.join(', ')}) = ${text}` });
+      continue;
+    }
+    const shown = valueText(k, fmt, sym);
+    const text =
+      shown !== null
+        ? `${sym} = ${shown}`
+        : !k.known && k.pending
+          ? `${sym} = ${words.checking}`
+          : `${domainText(sym, domain)}${used ? '' : ` ${words.unused}`}`;
+    out.push({ key: sym, text });
+  }
+  return out;
 }
 
 /** Does the panel print at least one quantity as UNKNOWN? (the #1289 invariant's right-hand side) */

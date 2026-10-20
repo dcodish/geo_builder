@@ -24,6 +24,7 @@ import { derive, type Derivation } from '../engine/derive';
 import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
 import { isKnowledge, knownCurve, knownOptions, settled, type Figure } from '../engine/evaluate';
 import { locusOf } from '../engine/locus';
+import { fmtCoefficient } from '../format';
 
 import { curveByName, objectById, type Id } from '../engine/types';
 import { numeralCurveId, numeralTwin, statedName, type NumeralKind } from '../engine/names';
@@ -395,7 +396,8 @@ export function ask(
       // figure does not determine this», and it is the honest one here too.
       return { question, value: null };
     }
-    const parts = shapes.map((s) => ({ kind: s.curve.kind, eq: locusEquation(s, fmt) }));
+    // An equation's numbers are COEFFICIENTS (#2394, ADR-AG-085's position rule): the inventory rows' formatter, never the surd tier.
+    const parts = shapes.map((s) => ({ kind: s.curve.kind, eq: locusEquation(s, fmtCoefficient) }));
     /**
      * The ROW reads the same at every seed (#1500): which component the walk found first depends on
      * where the seed put the point, so the row's parts are ordered canonically — the drawn

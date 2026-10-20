@@ -872,9 +872,10 @@ a sentence the tool parsed.
 - «נתונה פרבולה שמשוואתה y²=2px» → `y^2 - 2·p·x = 0`
 - Sources: ADR-AG-046.
 
-**R94 — a value the student stated exactly is DISPLAYED exactly**. Small rationals, where the value is knowledge; a decimal the student typed stays theirs (#723).
-- slope of «y=(4/3)x» → `4/3`, not `1.33`
-- Sources: #1120, #723.
+**R94 — a value the student stated exactly is DISPLAYED exactly**. Small rationals and simple radicals (p/q·√n), where the value is knowledge; a decimal the student typed stays theirs (#723). *(Operator ruling 2026-10-20 on #2394: exact forms everywhere, as 2-D.)* A standalone value — a parameter, a length, a coordinate, an answer — prints its radical; an equation's coefficients do not (ADR-AG-085).
+- slope of «y=(4/3)x» → `4/3`, not `1.33`; m of a common tangent → `√2/4`, not `0.35`; a length «√10 או √34», not «3.16 או 5.83»; `1.41x + y = 0` stays
+- **Tied parameters read as ONE row** (#2394): when each value of one parameter comes with one value of another, «(m, n) = (-√2/4, -5√2/4) או [(√2/4, 5√2/4)]», the drawn configuration bracketed as the point rows bracket it
+- Sources: #1120, #723, #2394, ADR-AG-304.
 
 **R99 — a panel heading names what the rows ARE, in the student's own word**. A heading is a promise about its rows.
 - «משוואות» / «Equations», not «עקומים» (`kind: 'curve'`)
