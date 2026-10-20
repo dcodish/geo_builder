@@ -67,8 +67,10 @@ describe('#1120 — the tier itself', () => {
     expect(fmtAnalytic(1.3333)).toBe('1.33'); // NOT 4/3
     expect(fmtAnalytic(7.34)).toBe('7.34');
     expect(fmtAnalytic(0.334)).toBe('0.33'); // NOT 1/3
-    // No surd tier in this tree (no witness in the corpus yet) — √2 falls to the decimal, honestly.
-    expect(fmtAnalytic(Math.SQRT2)).toBe('1.41');
+    // #2394 (ADR-AG-304, operator ruling 2026-10-20 «exact forms everywhere»): the surd tier now exists, and √2 IS √2.
+    // The counter-direction this lock guards is unchanged: 1.4142 TYPED stays a decimal (it is 3e-6 from √2).
+    expect(fmtAnalytic(Math.SQRT2)).toBe('√2');
+    expect(fmtAnalytic(1.4142)).toBe('1.41');
     // π is not 22/7, and must not be printed as it.
     expect(fmtAnalytic(Math.PI)).toBe('3.14');
   });

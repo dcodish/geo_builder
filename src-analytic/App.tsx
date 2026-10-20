@@ -37,13 +37,12 @@ import { submitTyped, type SentenceOutcome } from '../shell/sentences';
 import { activeOf, rowOf } from './app/active';
 import { errorText as errorTextOf, type Translate } from './app/errorText';
 import { fallbackRefusal, runFallback } from './app/fallback';
-import { detailRowText, openCurveText, panelKnowledge, panelRowText, segmentKnowledge, slopeRowText, valueText } from './app/panelRows';
+import { detailRowText, openCurveText, panelKnowledge, panelRowText, paramRows, segmentKnowledge, slopeRowText, valueText } from './app/panelRows';
 import { isolateRtlName } from '../shell/bidi';
 import { completePoolAfterRender } from './app/poolScheduler';
 import { hostKey } from './app/hostKey';
 import { angleText } from './app/lineAngle';
 import { llmParseAnalytic, LLM_TIMEOUT_MS_ANALYTIC } from './parser/llmAnalytic';
-import { domainText } from './engine/types';
 import { configurationPool, knownCurve, settled } from './engine/evaluate';
 import { pointText as pointTextOf } from './app/pointText';
 import { drawnBox as composeDrawnBox } from './app/drawnBox';
@@ -1696,20 +1695,8 @@ export function App() {
                  * not a row: it is counted in the cue and shown by the line's own row, like a free
                  * vertex's coordinates.
                  */
-                rows: knows.params.map(({ sym, domain, used, k }) => {
-                  const label = sym;
-                  // A symbol nothing reads is never asked of the gate (#1343): it is not part of any
-                  // configuration, and one sample of it is not knowledge — it printed «m = -3.46» once.
-                  // #1473: a value not yet read over the whole pool is «בודק…», never its domain as if open.
-                  // #1716 (ADR-AG-226): one value, or two («α = 30 או 150»), through the panel's one gate.
-                  const shown = valueText(k, fmtAnalytic, label);
-                  const text = shown !== null
-                    ? `${label} = ${shown}`
-                    : !k.known && k.pending
-                      ? `${label} = ${checking}`
-                      : `${domainText(label, domain)}${used ? '' : ` ${t('paramUnused')}`}`;
-                  return <span key={sym}><ValueRow text={text} /></span>;
-                }),
+                // #2394 (ADR-AG-304): one decision, `paramRows` — tied parameters read as one paired row.
+                rows: paramRows(d, knows, fmtAnalytic, { checking, unused: t('paramUnused') }).map(({ key, text }) => <span key={key}><ValueRow text={text} /></span>),
               },
               {
                 key: 'points',
