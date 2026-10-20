@@ -225,7 +225,7 @@ describe('#2379 Q3 — the exam’s own route through ג (N1 and N2 from «מש�
   // Skipped until #2381 (independent two-way choices take the same option, so N2 is drawn on N1 and «N1 משמאל ל-N2»
   // is refused) and #2382 (a tangency re-declares a stated radius and the panel blanks) land: measured here at the
   // stream's tip, the route stops at «N1 משמאל ל-N2» `unsatisfiable`. Whichever of them lands last un-skips this lock.
-  it.skip('builds through «הישר l …» and «… מעל ציר ה- x»: l = 3x − 4y + 14 = 0, P(−10,−4), Q(6,8) (needs #2381, #2382)', () => {
+  it('builds through «הישר l …» and «… מעל ציר ה- x»: l = 3x − 4y + 14 = 0, P(−10,−4), Q(6,8) (needs #2381, #2382)', () => {
     const d = built(route.lines, route.seed);
     expect(answer(d, 'משוואת הישר l')).toBe('3x - 4y + 14 = 0');
     expect([at(d, 'P').x, at(d, 'P').y, at(d, 'Q').x, at(d, 'Q').y].map((v) => Math.round(v * 1e6) / 1e6)).toEqual([-10, -4, 6, 8]);

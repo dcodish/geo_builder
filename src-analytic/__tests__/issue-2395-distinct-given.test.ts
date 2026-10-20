@@ -66,7 +66,7 @@ describe('#2395 — Q2 ד: «הישרים l1 ו-l2 שונים» draws the two co
  * N1 = N2, so the distinctness given — honestly — makes the figure unsatisfiable, as «N1 משמאל ל-N2» already does.
  * The fixture is written and kept; the orchestrator un-skips this block on the batch tip once #2381 has landed.
  */
-describe.skip('#2395 — Q3 ב (waits on #2381: two-way choices always take the same option)', () => {
+describe('#2395 — Q3 ב (waits on #2381: two-way choices always take the same option)', () => {
   it('every fixture line records; N1 = (−4, −12) and N2 = (12, 0) at seeds 0–23', () => {
     expect(submitAll(q3.lines)).toEqual(q3.lines.map(() => 'record'));
     for (const seed of SEEDS) {
