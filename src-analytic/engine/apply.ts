@@ -1762,9 +1762,8 @@ function pairPositionOf(c: Construction, c1: Id, c2: Id): PairPosition | null {
   if (!o1 || !o2) return null;
   if (o1.kind === 'circle-at' && o2.kind === 'circle-at') {
     if (o1.centre === o2.centre) return 'inside';
-    const centres = (u: Id, v: Id) => (u === o1.centre && v === o2.centre) || (u === o2.centre && v === o1.centre);
     for (const k of c.constraints) {
-      if (k.t === 'tangent-circle' && centres(k.centre, k.other)) return k.branch === 'external' ? 'ext-tangent' : 'int-tangent';
+      if (k.t === 'tangent-circle' && sidesAre(k.a, k.b, o1, c1, o2, c2)) return k.branch === 'external' ? 'ext-tangent' : 'int-tangent';
     }
   }
   const at = PROBE_ENVS.map((env) => [circleAtProbe(c, o1, env), circleAtProbe(c, o2, env)] as const);
@@ -1776,6 +1775,15 @@ function pairPositionOf(c: Construction, c1: Id, c2: Id): PairPosition | null {
   return positionOfCircles(p0, q0);
 }
 
+/**
+ * Is a `tangent-circle`'s pair of sides (#2387, ADR-AG-306: a centre with its radius, or a circle by id) exactly these two
+ * circles, in either order? A side names a centre-and-radius circle by its centre point, an equation circle by its id.
+ */
+function sidesAre(a: CircleSide, b: CircleSide, o1: GeoObject, c1: Id, o2: GeoObject, c2: Id): boolean {
+  const is = (s: CircleSide, o: GeoObject, id: Id) => ('centre' in s ? o.kind === 'circle-at' && s.centre === o.centre : s.circle === id);
+  return (is(a, o1, c1) && is(b, o2, c2)) || (is(a, o2, c2) && is(b, o1, c1));
+}
+
 /** Does the figure STATE the two circles tangent — with or without its kind (a `tangent-circle`, or the choice of both)? */
 function statedTangent(c: Construction, c1: Id, c2: Id): boolean {
   const o1 = objectById(c, c1);
@@ -1783,7 +1791,7 @@ function statedTangent(c: Construction, c1: Id, c2: Id): boolean {
   if (o1?.kind !== 'circle-at' || o2?.kind !== 'circle-at') return false;
   const ours = (k: Constraint): boolean =>
     k.t === 'tangent-circle'
-      ? (k.centre === o1.centre && k.other === o2.centre) || (k.centre === o2.centre && k.other === o1.centre)
+      ? sidesAre(k.a, k.b, o1, c1, o2, c2)
       : k.t === 'choice' && k.options.length > 0 && k.options.every(ours);
   return c.constraints.some(ours);
 }
