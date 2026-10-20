@@ -34,7 +34,7 @@
 import { admissibleAt, carrierSystem, choiceSeedOf, drawableAt, resolvedAt, viewBox, type CarrierSystem } from './evaluate';
 import { agreeingUnion, conicPointsIn, curveOfTrace, distToConic, shapeOfTrace, type LocusShape } from './locusFit';
 import type { Conic } from './conic';
-import { solveLM, SOLVE_TOL } from './solve';
+import { jacobianRank, solveLM, SOLVE_TOL } from './solve';
 import type { Env } from './expr';
 import type { Pt } from './derived';
 import { isFree, type Construction, type Id } from './types';
@@ -116,9 +116,10 @@ function dot(a: number[], b: number[]): number {
  * A unit vector in the null space of the Jacobian at `x` — the direction the figure is still free to
  * move in.
  *
- * This is `freeRank`'s Jacobian and its elimination, carried one step further: that function counts
- * the free directions and throws them away, and a tracer needs one of them. Written here rather than
- * widening `freeRank` because the DOF cue wants a number and must keep wanting only a number.
+ * This is `freeRank`'s rank carried one step further: that function counts the free directions and
+ * throws them away, and a tracer needs one of them. Both read `jacobianRank` (`solve.ts`, ADR-AG-309) —
+ * until #2383 this was a second copy of the elimination, which read rank at a different seed-dependent
+ * bar from nobody's acceptance tolerance.
  *
  * Returns `null` unless the null space is exactly ONE-dimensional. Zero means the figure is
  * determined and there is no locus; two or more means the freedom is not a curve, and drawing a
@@ -126,60 +127,13 @@ function dot(a: number[], b: number[]): number {
  * describe.
  */
 export function nullDirection(x: number[], residuals: (v: number[]) => number[]): number[] | null {
-  const n = x.length;
-  const r0 = residuals(x);
-  const m = r0.length;
-  if (n === 0) return null;
-  if (m === 0) return null; // no constraints ⇒ the freedom is the whole plane, not a curve
-
-  const J: number[][] = Array.from({ length: m }, () => new Array(n).fill(0));
-  for (let j = 0; j < n; j += 1) {
-    const h = Math.max(1e-6, Math.abs(x[j]) * 1e-6);
-    const up = [...x];
-    const dn = [...x];
-    up[j] += h;
-    dn[j] -= h;
-    const ru = residuals(up);
-    const rd = residuals(dn);
-    for (let i = 0; i < m; i += 1) J[i][j] = (ru[i] - rd[i]) / (2 * h);
-  }
-
-  // Row-reduce to RREF, tracking which columns are pivots. The tolerance is relative to the largest
-  // entry so a figure measured in thousands and one measured in units are judged the same way —
-  // `freeRank`'s rule, for `freeRank`'s reason.
-  const scale = Math.max(1e-12, ...J.flat().map(Math.abs));
-  const tol = 1e-9 * scale;
-  const rows = J.map((r) => [...r]);
-  const pivotCol: number[] = [];
-  let rank = 0;
-  for (let col = 0; col < n && rank < m; col += 1) {
-    let piv = -1;
-    for (let r = rank; r < m; r += 1) if (Math.abs(rows[r][col]) > tol) { piv = r; break; }
-    if (piv < 0) continue;
-    [rows[rank], rows[piv]] = [rows[piv], rows[rank]];
-    const lead = rows[rank][col];
-    for (let cc = 0; cc < n; cc += 1) rows[rank][cc] /= lead;
-    for (let r = 0; r < m; r += 1) {
-      if (r === rank) continue;
-      const factor = rows[r][col];
-      if (Math.abs(factor) < 1e-300) continue;
-      for (let cc = 0; cc < n; cc += 1) rows[r][cc] -= factor * rows[rank][cc];
-    }
-    pivotCol.push(col);
-    rank += 1;
-  }
-
-  if (n - rank !== 1) return null;
-
-  // The single free column is the one no pivot claimed. Set it to 1; every pivot variable then reads
-  // off its own row as the negative of that column's coefficient.
-  const free = [...Array(n).keys()].find((col) => !pivotCol.includes(col));
-  if (free === undefined) return null;
-  const d = new Array(n).fill(0);
-  d[free] = 1;
-  pivotCol.forEach((col, r) => {
-    d[col] = -rows[r][free];
-  });
+  if (x.length === 0) return null;
+  if (residuals(x).length === 0) return null; // no constraints ⇒ the freedom is the whole plane, not a curve
+  // The ONE rank chokepoint (#2383, ADR-AG-309): the same singular values `freeRank` counts, so the DOF cue and the
+  // tracer can never disagree about whether a figure has a curve's worth of freedom.
+  const { nullBasis } = jacobianRank(x, residuals);
+  if (nullBasis.length !== 1) return null;
+  const d = nullBasis[0];
   const norm = Math.hypot(...d);
   return norm > 1e-12 ? d.map((v) => v / norm) : null;
 }

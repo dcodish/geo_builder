@@ -46,7 +46,14 @@ never from F11 declarations (#1014); `carrierOf` / `symbolDeps` / `objectDeps` a
 ([ADR-AG-144](06c-decisions-analytic.md#adr-ag-144)). **There is deliberately no topological sort**: `apply` refuses a
 reference to a missing object, so declaration order is evaluation order (`depsPrecedeDependents`, #1028).
 
-*Identifiers:* `y²=2ax` · `NaN`
+**The freedom count has one rank** ([ADR-AG-309](06c-decisions-analytic.md#adr-ag-309), #2383): `solve.ts`
+`jacobianRank` — the central-difference Jacobian, rows equilibrated to unit length, a one-sided Jacobi SVD, a singular
+value counted above `RANK_REL_TOL · σ_max` (`10 · SOLVE_TOL`, the residue a dependent row keeps at an accepted solve).
+`freeRank` (the DOF cue, the entailment gate, `freedomOf`), the locus tracer's `nullDirection` and
+`tangentFreedomOf`'s equation null space all read it; a given implied by the others only through the construction is
+dependent at every seed.
+
+*Identifiers:* `y²=2ax` · `NaN` · `jacobianRank` · `RANK_REL_TOL`
 
 ### Boundaries
 

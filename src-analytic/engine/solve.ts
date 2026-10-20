@@ -1548,12 +1548,45 @@ function gaussian(A: number[][], n: number): number[] | null {
  * row differentiated at its boundary is a half-slope, and a rank counts it as an equation it is not.
  */
 export function freeRank(x: number[], equalities: (v: number[]) => number[]): number {
-  const residuals = equalities;
+  const n = x.length;
+  if (n === 0 || equalities(x).length === 0) return n;
+  return Math.max(0, n - jacobianRank(x, equalities).rank);
+}
+
+/**
+ * THE RANK THRESHOLD (#2383, ADR-AG-309) — a singular value counts when it exceeds `RANK_REL_TOL · σ_max`.
+ *
+ * Derived from the solver's own acceptance, not chosen: a given DEPENDENT on the others only through the
+ * construction (Q1's «MA = MB» is the radical axis once both tangents hold) is dependent exactly on the solution set,
+ * and `solveLM` accepts a point within `SOLVE_TOL` of it, so its row's residue there is of order `SOLVE_TOL` relative
+ * (measured on Q1 over 24 seeds: σ₆/σ₁ ≤ 2.6e-8, while σ₅/σ₁ ≥ 0.1). The central difference's own error is O(h²) ≈ 1e-12, negligible. Ten
+ * times `SOLVE_TOL` keeps that residue out of the rank with a decade of margin, while a genuinely independent row of
+ * relative size 1e-3 or more is three decades above it. The old bar (1e-9 of the largest ENTRY, first row above it
+ * as pivot) sat inside the residue and counted it at some seeds and not others.
+ */
+export const RANK_REL_TOL = 10 * SOLVE_TOL;
+
+/**
+ * THE ONE RANK OF AN ANALYTIC JACOBIAN (#2383, ADR-AG-309) — `rank` and an orthonormal basis of the null space
+ * (`nullBasis`) and the singular values themselves (`sigma`, unsorted, one per column), from the singular values of the central-difference Jacobian of `residuals` at `x`.
+ *
+ * One-sided Jacobi (Hestenes): the columns of `J` are rotated pairwise until orthogonal, the rotations accumulated in
+ * `V`; each column's norm is then a singular value and the columns of `V` whose value is under the threshold span the
+ * null space. Rotation-based, so no pivot order or small-pivot division decides the answer — the defect of the
+ * elimination it replaces. n ≤ ~20 here; a few sweeps converge.
+ *
+ * Every rank the analytic engine takes goes through here: `freeRank` (the DOF cue, the entailment gate, `freedomOf`)
+ * and the locus tracer's `nullDirection` (docs/17 §3 chokepoint registry).
+ */
+export function jacobianRank(x: number[], residuals: (v: number[]) => number[]): { rank: number; nullBasis: number[][]; sigma: number[] } {
   const n = x.length;
   const m = residuals(x).length;
-  if (n === 0 || m === 0) return n;
+  const identity = (): number[][] => Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));
+  if (n === 0) return { rank: 0, nullBasis: [], sigma: [] };
+  if (m === 0) return { rank: 0, nullBasis: identity(), sigma: new Array(n).fill(0) };
 
-  const J: number[][] = Array.from({ length: m }, () => new Array(n).fill(0));
+  // U = J, column-major for the rotations: U[j] is column j.
+  const U: number[][] = Array.from({ length: n }, () => new Array(m).fill(0));
   for (let j = 0; j < n; j += 1) {
     const h = Math.max(1e-6, Math.abs(x[j]) * 1e-6);
     const up = [...x];
@@ -1562,26 +1595,63 @@ export function freeRank(x: number[], equalities: (v: number[]) => number[]): nu
     dn[j] -= h;
     const ru = residuals(up);
     const rd = residuals(dn);
-    for (let i = 0; i < m; i += 1) J[i][j] = (ru[i] - rd[i]) / (2 * h);
+    for (let i = 0; i < m; i += 1) U[j][i] = (ru[i] - rd[i]) / (2 * h);
+  }
+  /**
+   * ROWS EQUILIBRATED FIRST: each row scaled to unit length, so the threshold compares DIRECTIONS, not the sizes the
+   * residuals happen to carry. Measured on the corpus471 pool: one row of 7/4 at seed 17 has a gradient of 3.5e4 while
+   * a genuinely independent direction sits at 1.2e-2 — relative to σ_max that is 3e-7, under the bar, and the
+   * figure's freedom read one too many. 2-D's `dofRank` normalises its rows for the same reason. A row whose gradient
+   * is itself negligible (under 1e-9 of the largest, the old elimination's bar) is no equation at this point and is
+   * dropped, never inflated into a unit direction of noise.
+   */
+  const rowNorm = Array.from({ length: m }, (_, i) => Math.hypot(...U.map((col) => col[i])));
+  const biggest = Math.max(0, ...rowNorm);
+  for (let i = 0; i < m; i += 1) {
+    const k = rowNorm[i] > 1e-9 * biggest && rowNorm[i] > 0 ? 1 / rowNorm[i] : 0;
+    for (let j = 0; j < n; j += 1) U[j][i] *= k;
+  }
+  const V = identity(); // V[j] is column j of V.
+
+  for (let sweep = 0; sweep < 60; sweep += 1) {
+    let rotated = false;
+    for (let p = 0; p < n - 1; p += 1) {
+      for (let q = p + 1; q < n; q += 1) {
+        let alpha = 0;
+        let beta = 0;
+        let gamma = 0;
+        for (let i = 0; i < m; i += 1) {
+          alpha += U[p][i] * U[p][i];
+          beta += U[q][i] * U[q][i];
+          gamma += U[p][i] * U[q][i];
+        }
+        if (gamma === 0 || Math.abs(gamma) <= 1e-15 * Math.sqrt(alpha * beta)) continue;
+        rotated = true;
+        const zeta = (beta - alpha) / (2 * gamma);
+        const t = (zeta >= 0 ? 1 : -1) / (Math.abs(zeta) + Math.sqrt(1 + zeta * zeta));
+        const c = 1 / Math.sqrt(1 + t * t);
+        const s = c * t;
+        for (let i = 0; i < m; i += 1) {
+          const a = U[p][i];
+          const b = U[q][i];
+          U[p][i] = c * a - s * b;
+          U[q][i] = s * a + c * b;
+        }
+        for (let i = 0; i < n; i += 1) {
+          const a = V[p][i];
+          const b = V[q][i];
+          V[p][i] = c * a - s * b;
+          V[q][i] = s * a + c * b;
+        }
+      }
+    }
+    if (!rotated) break;
   }
 
-  // Gaussian elimination counting pivots. The tolerance is relative to the largest entry, so a
-  // figure measured in thousands and one measured in units are judged the same way.
-  const scale = Math.max(1e-12, ...J.flat().map(Math.abs));
-  const tol = 1e-9 * scale;
-  let rank = 0;
-  const rows = J.map((r) => [...r]);
-  for (let col = 0; col < n && rank < m; col += 1) {
-    let piv = -1;
-    for (let r = rank; r < m; r += 1) if (Math.abs(rows[r][col]) > tol) { piv = r; break; }
-    if (piv < 0) continue;
-    [rows[rank], rows[piv]] = [rows[piv], rows[rank]];
-    for (let r = 0; r < m; r += 1) {
-      if (r === rank) continue;
-      const factor = rows[r][col] / rows[rank][col];
-      for (let cc = col; cc < n; cc += 1) rows[r][cc] -= factor * rows[rank][cc];
-    }
-    rank += 1;
-  }
-  return Math.max(0, n - rank);
+  const sigma = U.map((col) => Math.hypot(...col));
+  const top = Math.max(0, ...sigma);
+  if (!(top > 1e-300)) return { rank: 0, nullBasis: identity(), sigma };
+  const tol = RANK_REL_TOL * top;
+  const nullBasis = V.filter((_, j) => !(sigma[j] > tol));
+  return { rank: n - nullBasis.length, nullBasis, sigma };
 }
