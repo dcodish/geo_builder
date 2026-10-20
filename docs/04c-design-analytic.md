@@ -551,6 +551,15 @@ A point on an object rides a carrier with one DOF; «על הצלע BC» emits `o
 the incidence alone, «על הישר y=x» an `on-curve` on a minted curve. `bounded` reads the noun. The curve's `stated`
 flag decides whether the renderer draws it; restating the equation promotes it.
 
+**The role of an inline curve, and the tool's l-number** ([ADR-AG-319](06c-decisions-analytic.md#adr-ag-319)). The
+parser gives every equation operand its role and M1 applies it (`equationOperand`): a tangency's line
+(`tangentTargets`) and the subject of «<eq> עובר דרך A» (`statedOperands` marks the `on-curve` `stated`) are `stated`;
+«P על <eq>» stays a carrier. A curve that becomes stated as a LINE with no name — minted, or a carrier promoted — gets
+`freeLineNames(c, 1)[0]` with `label.auto` (`toolNamed`, in the `curve` arm, the one place every stated line passes).
+The twin scan lets a student's name replace an `auto` one (Q3); a new curve whose name another curve carries is a
+`conflicting-restatement`. `submit.ts` `objectsGained` counts a curve newly drawn, so a promotion that also states a
+constraint records.
+
 *Identifiers:* `D על הצלע BC` · `על הקטע BC` · `D על הישר BC` · `B על הישר y=x` · `צלע|קטע|side|segment` · `ישר|מעגל|פרבולה|אליפסה`
 
 #### Incidence in every order ([ADR-AG-164](06c-decisions-analytic.md#adr-ag-164), #1281, #1495)

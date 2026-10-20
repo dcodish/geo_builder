@@ -432,13 +432,14 @@ describe('anonymous curves share ONE namespace, whichever phrasing minted them',
       'נתונה אליפסה שמשוואתה x^2/9+y^2/16=1',
       'הישר y=2x+1',
       'משוואת המעגל x^2+y^2-2x=0',
-      'נתון הישר l1: y=x',
+      // l7, not l1: «הישר y=2x+1» above carries the tool's l1 since #2425 (ADR-AG-319), and l1 again is refused.
+      'נתון הישר l7: y=x',
       'נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9',
     ], 0);
     expect(d.faults).toEqual([]);
     const ids = d.figure.curves.map((c) => c.id);
     expect(ids.filter((i) => i.startsWith('curve-'))).toHaveLength(4);
-    expect(ids).toContain('line-l1');
+    expect(ids).toContain('line-l7');
     expect(ids).toContain('circle-I');
   });
 });

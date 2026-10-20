@@ -81,18 +81,17 @@ describe('#2432 — the tangency readers resolve their equation operand at M1', 
     expect(a.x).toBeCloseTo(3, 6);
     expect(a.y).toBeCloseTo(4, 6);
   });
-  it('with no such line the tangency holds a carrier, still undrawn (ADR-AG-032 role, unchanged here)', () => {
+  it('with no such line the tangency mints its line under the content id (drawn since #2425, ADR-AG-319)', () => {
     const lines = [FREE, 'הישר 3x+4y=25 משיק למעגל M'];
     expect(verdicts(lines)).toEqual(['record', 'record']);
-    const curves = derive(lines, 0).figure.curves.filter((k) => k.curve.kind === 'line');
-    expect(curves).toHaveLength(1);
-    expect(curves[0].stated).toBe(false);
+    expect(lineObjects(lines)).toHaveLength(1);
   });
-  it('«A על הישר 3x+4y=25» still mints an undrawn carrier, and a later tangency on that equation is the same object', () => {
+  it('«A על הישר 3x+4y=25» then a tangency on that equation: the same object, one line', () => {
     const lines = [FREE, 'A על הישר 3x+4y=25', 'הישר 3x+4y=25 משיק למעגל M'];
     expect(verdicts(lines)).toEqual(['record', 'record', 'record']);
     expect(lineObjects(lines)).toHaveLength(1);
-    expect(lineObjects(lines)[0].stated).toBe(false);
+    // The carrier role «A על …» gives (ADR-AG-032) stands on its own line: undrawn until the tangency states it.
+    expect(lineObjects(lines.slice(0, 2))[0].stated).toBe(false);
   });
 });
 

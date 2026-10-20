@@ -1870,6 +1870,19 @@ function freeLineNames(c: Construction, n: number): string[] {
   return out;
 }
 
+/**
+ * A DRAWN LINE THE STUDENT DID NOT NAME TAKES THE NEXT FREE l-NUMBER (#2425, [ADR-AG-319](../../docs/06c-decisions-analytic.md#adr-ag-319);
+ * operator 2026-10-20: *"i want the line to also be drawn and named with l1 or l2 or whatever number is free"*, and Q4:
+ * «נתון ישר <eq>» too). Given at M1, the one place with figure context, when the line becomes stated — minted stated,
+ * or a carrier promoted — and marked `auto`, so a name the student gives the same line later replaces it (Q3). The id is
+ * never rewritten (the narrowing rule): the name rides the label, and `resolveLineRefs` (ADR-AG-317) makes every slot
+ * read it. Allocated in fold order, so undo, the seed and «הציגו תצורה אחרת» never renumber a line.
+ */
+function toolNamed(c: Construction, o: CurveObject): CurveObject {
+  if (!o.stated || o.label.name !== '' || curveKindOf(o) !== 'line') return o;
+  return { ...o, label: { ...o.label, name: freeLineNames(c, 1)[0], auto: true } };
+}
+
 /** `value` with every string equal to `from` replaced by `to`, structurally — an object's references re-pointed. */
 function replaceId<T>(value: T, from: Id, to: Id): T {
   if (value === from) return to as T;
@@ -2466,12 +2479,13 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
              * student's own and cannot be erased by an anonymous restatement.
              */
             const label = { ...prior.label, ...f.label, name: prior.label.name || f.label.name };
+            const promoted = toolNamed(c, { ...prior, label, stated: true });
             return {
               ok: true,
               effect: 'created',
               next: {
                 ...c,
-                objects: c.objects.map((o) => (o.id === f.id ? { ...prior, label, stated: true } : o)),
+                objects: c.objects.map((o) => (o.id === f.id ? promoted : o)),
               },
             };
           }
@@ -2532,6 +2546,16 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (twin) {
         const incoming = f.label.name;
         const held = twin.label.name;
+        // The TOOL's l-number yields to the student's own name for the same line (#2425 Q3, ADR-AG-319).
+        if (incoming && held && incoming !== held && twin.label.auto) {
+          const { auto: _tool, ...own } = twin.label;
+          const label = { ...own, ...f.label, name: incoming };
+          return {
+            ok: true,
+            effect: 'narrowed',
+            next: { ...c, objects: c.objects.map((o) => (o.id === twin.id ? { ...twin, label, stated: twin.stated || f.stated } : o)) },
+          };
+        }
         if (incoming && held && incoming !== held) {
           return { ok: false, error: { code: 'already-named', detail: f.src, holder: held } };
         }
@@ -2542,14 +2566,15 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
          */
         if ((incoming && !held) || (f.stated && !twin.stated)) {
           const label = { ...twin.label, ...f.label, name: held || incoming };
+          // The student's name is his own, never the tool's (a held tool name is kept only when he gave none).
+          if (incoming && !held) delete label.auto;
+          const merged = toolNamed(c, { ...twin, label, stated: twin.stated || f.stated });
           return {
             ok: true,
             effect: incoming && !held ? 'narrowed' : 'created',
             next: {
               ...c,
-              objects: c.objects.map((o) =>
-                o.id === twin.id ? { ...twin, label, stated: twin.stated || f.stated } : o,
-              ),
+              objects: c.objects.map((o) => (o.id === twin.id ? merged : o)),
             },
           };
         }
@@ -2574,12 +2599,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        */
       const inheritedStated =
         f.inheritExtent && segmentOverSameEnds(c, f.id) ? false : f.stated;
+      /*
+       * A NAME ANOTHER CURVE ALREADY CARRIES (#2425, ADR-AG-319): «נתון הישר l1: <eq>» where l1 is the label of a different
+       * line — named by restatement (#1342) or by the tool — would draw a second «l1». It is the same restatement as
+       * «הישר l1» given twice with two equations, and refused the same way.
+       */
+      if (f.label.name) {
+        const holder = curveByName(c, f.label.name);
+        if (holder && holder.id !== f.id) return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+      }
+      const made = toolNamed(c, { kind: 'curve', id: f.id, label: f.label, curve: f.curve, stated: inheritedStated });
       return {
         ok: true,
         effect: 'created',
         next: {
           ...c,
-          objects: [...c.objects, { kind: 'curve', id: f.id, label: f.label, curve: f.curve, stated: inheritedStated }],
+          objects: [...c.objects, made],
         },
       };
     }
@@ -2612,10 +2647,14 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * `curve-anon…` `unknown-reference` leak (#1145's class): the id now always exists.
        */
       if (f.k.t === 'on-curve' && f.k.eqSrc !== undefined) {
-        const { eqSrc, eq, ...bare } = f.k;
+        const { eqSrc, eq, stated, ...bare } = f.k;
         if (!eq) return applyFact(c, { t: 'constraint', k: bare, src: f.src });
-        // The one equation-operand resolver (#2432, ADR-AG-318): a point placed on an equation holds a CARRIER.
-        const op = equationOperand(c, { kind: 'eq', id: f.k.curve, label: eqSrc, eqSrc, eq: eq as Expr, role: 'carrier' }, f.src);
+        /*
+         * The one equation-operand resolver (#2432, ADR-AG-318). A point placed on an equation holds a CARRIER (ADR-AG-032,
+         * the #2423 ruling); a sentence ABOUT the curve («הישר <eq> עובר דרך A», #2425 Q1) states it.
+         */
+        const role = stated ? 'stated' : 'carrier';
+        const op = equationOperand(c, { kind: 'eq', id: f.k.curve, label: eqSrc, eqSrc, eq: eq as Expr, role }, f.src);
         if (!op.ok) return op;
         return applyFact(op.next, { t: 'constraint', k: { ...bare, curve: op.id }, src: f.src });
       }

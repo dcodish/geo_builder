@@ -154,6 +154,12 @@ export interface CurveLabel {
    * Absent on a curve that HAS a name, where the name is the way to refer to it.
    */
   eqSrc?: string;
+  /**
+   * `auto` (#2425, [ADR-AG-319](../../docs/06c-decisions-analytic.md#adr-ag-319)) — the name is the TOOL's: a drawn line
+   * the student did not name takes the next free l-number at M1. A name the student gives the same line later
+   * replaces it (operator ruling 2026-10-20, Q3); his own name is never replaced.
+   */
+  auto?: true;
 }
 
 // ---------------------------------------------------------------------------

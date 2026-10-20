@@ -262,6 +262,11 @@ export type Constraint =
        */
       eqSrc?: string;
       eq?: unknown;
+      /**
+       * The sentence is ABOUT the curve — «הישר <eq> עובר דרך A» (#2425 Q1, ADR-AG-319) — so M1 mints it drawn; absent,
+       * the curve only carries the point (ADR-AG-032). Stripped at M1 with the equation.
+       */
+      stated?: true;
     }
   /**
    * `D` is collinear with `a` and `b` — «D על הישר BC», «D על הצלע BC» (#1069, #1073).

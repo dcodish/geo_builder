@@ -2455,7 +2455,8 @@ function tangentTargets(tail: string): TangentTargets | null {
       if (eq && symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
         // The operand is READ here and resolved at M1 (#2432, ADR-AG-318): the figure's own line with this equation,
         // or a carrier minted there — never a `curve` fact referred to by an id the twin scan may absorb.
-        const ref: EqOperand = { kind: 'eq', id: `curve-${anonIndex(bare)}`, label: trim(bare), eqSrc: trim(bare), eq, role: 'carrier' };
+        // A tangency's line is what the sentence is ABOUT (#2425, ADR-AG-319): drawn, and named by M1.
+        const ref: EqOperand = { kind: 'eq', id: `curve-${anonIndex(bare)}`, label: trim(bare), eqSrc: trim(bare), eq, role: 'stated' };
         out.lines.push(ref);
         out.ordered.push({ line: ref });
         continue;
@@ -9570,16 +9571,26 @@ function parseIncidence(line: string): RuleOutcome {
      * resolved by the one rule that owns a point on a circle (contextual, by numeral, or by centre letter).
      * Three listed points are the computed circle's sentence (`parseCircleThru`), which answers first.
      */
-    if (obj.k === 'curve') return viaCanonical(line, slot, (p) => [`${p} על ${trim(conv[1])}`]);
+    if (obj.k === 'curve') return statedOperands(viaCanonical(line, slot, (p) => [`${p} על ${trim(conv[1])}`]));
     if (obj.k === 'pair') {
       const on = viaCanonical(line, slot, (p) => [`${p} על ${pairText(obj)}`]);
       return on?.ok ? made([...on.facts, ...pieceFacts(pieceNounOf(obj.noun), obj.a, obj.b, line)]) : on;
     }
     // A NAMED line: «דרך P עובר ישר l3» — M1 decides whether it is an incidence on the existing line or a new one.
     if (obj.k === 'named') return viaCanonical(line, slot, (p) => [`דרך ${p} עובר ישר ${obj.name}`]);
-    return viaCanonical(line, slot, (p) => [`${p} על הישר ${obj.src}`]);
+    return statedOperands(viaCanonical(line, slot, (p) => [`${p} על הישר ${obj.src}`]));
   }
   return null;
+}
+
+/**
+ * «הישר <eq> עובר דרך A» · «המעגל <eq> עובר דרך A» — the converse of «A על <eq>», but ABOUT the curve (#2425 Q1, operator
+ * ruling 2026-10-20; ADR-AG-319): the equation operand it lowers to is marked `stated`, so M1 draws the curve. «A על
+ * <eq>» itself keeps its carrier (ADR-AG-032, the #2423 ruling).
+ */
+function statedOperands(r: RuleOutcome): RuleOutcome {
+  if (!r || !r.ok) return r;
+  return made(r.facts.map((f) => (f.t === 'constraint' && f.k.t === 'on-curve' && f.k.eqSrc !== undefined ? { ...f, k: { ...f.k, stated: true as const } } : f)));
 }
 
 /**
