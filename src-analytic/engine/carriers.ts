@@ -517,6 +517,18 @@ export const radiusSymbol = (centre: Id): string => `r_${centre}`;
 const RADIUS_PREFIX = radiusSymbol('');
 
 /**
+ * EVERY MINTED RADIUS IS READ (#2382, ADR-AG-305) — the structural guard for "a circle's radius is created in one place
+ * only". A {@link radiusSymbol} stands in the register only because a circle was created with it, so a declared `r_X`
+ * that no object or constraint reads is a radius some lowering minted for a circle that already had one: the phantom
+ * free DOF that blanked a fully stated figure (#1642's starved-sample rule) and let a tangency hold for a radius the
+ * circle does not have. Lock-facing: asserted over the corpus, never consulted by production code.
+ */
+export function radiusSymbolsRead(c: Construction): boolean {
+  const used = usedSymbols(c);
+  return c.params.every((p) => !p.sym.startsWith(RADIUS_PREFIX) || used.has(p.sym));
+}
+
+/**
  * THE ONE OWNER OF EVERY SYMBOL SPELLED FROM AN ID (#1667, ADR-AG-205) — map the id a symbol is spelled from,
  * and leave every other symbol alone.
  *

@@ -235,7 +235,8 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   const radiusAgainst = (e: ApplyError, i: number): Partial<LineFault> => {
     if (e.code !== 'radius-contradicts' || !e.circle) return {};
     const sizes = (f: Fact): boolean => {
-      if (f.t === 'circle-at') return f.id === e.circle && !(typeof f.r === 'object' && f.r !== null && (f.r as { kind?: string }).kind === 'sym');
+      // A circle-at with NO radius is a reference (#2382, ADR-AG-305): it sizes nothing; its radius sentence does.
+      if (f.t === 'circle-at') return f.id === e.circle && f.r !== undefined && !(typeof f.r === 'object' && f.r !== null && (f.r as { kind?: string }).kind === 'sym');
       if (f.t !== 'radius-of') return false;
       if (f.circleId !== undefined) return f.circleId === e.circle;
       if (f.circle !== undefined) return circleByName(folded, f.circle)?.id === e.circle;

@@ -8094,7 +8094,7 @@ The pre-played sheet (20 cases, 8 red) and the operator ruling of the same day. 
 
 **Status:** accepted · 2026-09-29 · the pre-played sheet on PR #1513 (20 cases, 10 red) and the operator's go-ahead to fix the five open PRs the same day.
 
-**Requirements:** [02c](02c-requirements-analytic.md) R122 (new) · **Design:** [04c](04c-design-analytic.md#measure-roles-one-reader-one-ask-normaliser-one-substitution-seam-adr-ag-169-am-1)
+**Requirements:** [02c](02c-requirements-analytic.md) R180 (new; numbered R122 until #2404) · **Design:** [04c](04c-design-analytic.md#measure-roles-one-reader-one-ask-normaliser-one-substitution-seam-adr-ag-169-am-1)
 
 **Context — the classes the sheet found, measured on the merged branch.** (a) **Honesty:** «רדיוס המעגל הוא -3», «שרדיוסו -3», «שרדיוסו 0» were ACCEPTED and the circle vanished with no message: the post-hoc pin substituted the value into `r_O` and retired the parameter without reading its domain `{min: 0, minOpen}`, and the creation tail put the literal in with no parameter at all (`apply.ts` radius-of; `circleAtFacts`). (b) **One spelling per role:** each given and each ask was its own hand-written regex, so «רדיוס המעגל הוא 5» worked while «רדיוס המעגל 5», «שווה 5», «אורך הרדיוס הוא 5», «ברדיוס 5», «שמרכזו (2,3) ורדיוסו 5» did not; «מדריך הפרבולה» answered while «משוואת המדריך» fell to `EQUATION_OF` and reported a missing curve named «המדריך». (c) **Openers:** every ask — the new four AND the old ones («מהו AB», «AB?», «מהי משוואת הישר AB») — was unreadable behind «מהו/מצא את/…?», because only `LOCUS_OF` listed openers, inside its own pattern. (d) **The issue's own table was not covered:** perimeter as a given, the focus by coordinates, «מוקד הפרבולה הוא F». (e) **Wrong remedy:** every contextual refusal taught «שטח הדלתון ABCD הוא 24». (f) **Latent:** the ask printed the directrix as `x = −c/a`, true only for a vertical directrix.
 
@@ -12738,3 +12738,67 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Behaviour change for a student:** after «MN = 9», a = 4 is drawn first and «הציגו תצורה אחרת» reaches a = 22; the panel shows «a = 4 או a = 22», M «(4, 0) או (22, 0)» and both equations of circle M (before: a = 4 and M = (4, 0) as known); «a < 13» shows a = 4 as known; «M(a,0) · N(5,0) · MN = 9» with a > 0 builds with a = 14 (before: refused as unsatisfiable).
 
 **Consequences.** `engine/pinRoots.ts` (new: `scanRoots`, `walkPins`, `liveRoots`, `pinReach`, `GRID`, `ROOT_EPS`); `engine/evaluate.ts` (`seedPinRoots`, `ROOT_STREAM`, `Figure.rootKey`, `drawableAt`'s assignment comparison); docs 02c R14 and R61, 04c.
+
+## ADR-AG-305 — A sentence about a circle never mints its radius again: the circle is created once, at M1, and every relation reads its own centre and radius (#2382)
+
+**Date:** 2026-10-20 · **Status:** accepted · P1 bug, fix round #2414 (stream B); branch `fix/2382-analytic-one-radius-param` from `main` @ `3cae7f25`. Part A of the joint #2382 + #2387 plan. Also fixes #2404 (02c's duplicate R122). LADDER stage: none (the M1 boundary; LADDER describes 2-D's ladder).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R120 and R122 (a tangency about a circle whose radius is given uses that radius; a mismatch is refused); R122's second definition (radius, focus, directrix, perimeter) renumbered R180 (#2404). · **Design:** [04c](04c-design-analytic.md) "A circle on a point": the `param r_O` mint moves into `circle-at` creation (`stateCircleOn`).
+
+**Rulings.** The honesty invariants (CLAUDE.md): every stated value is visible; no stated magnitude is silently dropped. The contextual twin «המעגל משיק …» already refused a false tangency at `3cae7f25`, and ADR-AG-195 gave it its verdict on an equation circle. Raised to P1 by the triage session (ADR-W-117 Am. 1) for the false tangency.
+
+**Re-measurement at pickup** (`3cae7f25`, `decideSubmit` → `derive` → `panelKnowledge`, model mocked, 0 calls). As the plan's table:
+- S1/S3/S5 left `r_N` (or `r_M r_N`) in the register as «(unused)» and blanked M, N and both equations.
+- C1, C3 and C4 left `r_M (unused)`.
+- Q2 canonical left `r_M (unused)` and `r_N (unused)`.
+- Q3 ב left `r_N1 (unused)`, so M, A, N1 and every equation showed «?».
+- F1, F2 and F3 built green with `r_M` = 4 or 5 against a stated radius of 3.
+- C5 created `circle-at-M` beside circle I.
+- One divergence, from no change: the S4 control («המעגלים משיקים מבחוץ») is answered `already-follows` («זה כבר נובע»), not recorded. The plan's "all filled" described the panel, which the first two lines already fill.
+
+**Class.** *A sentence that refers to an existing circle by its centre letter re-ran the circle's creation lowering.* `circleAtFacts` serves every named circle subject: «מעגל N משיק…», the plural, «נתון מעגל M» through `namedCircleFacts`, and the touch-point forms. It emitted `declare · param r_X · circle-at r_X` without knowing whether the circle existed. It also baked `r_X` into its own axis and line tangencies, and lowered a stated radius onto `circle-at-X` by id. M1 then absorbed the `circle-at` as `known` without comparing radii, and re-created the `param` that an earlier `radius-of` had retired. That gave three symptoms:
+- a phantom free DOF that starved the knowledge pool (#1642), the reported one;
+- a tangency judged against the phantom, not the circle's radius, so a false tangency built green;
+- a second circle invented on a centre named after an equation circle.
+
+**Decision.**
+1. **`circle-at` with no `r` is a reference** (`engine/types.ts`, `engine/apply.ts`). M1 looks the circle up by its id, else through `circleByName` (the one name chain, which knows `centreIdOf`). An existing circle makes the fact `known` (a sector's hidden circle is un-hidden, as before). Only a centre with no circle is created.
+2. **`stateCircleOn(c, X, id, src, hidden?)`** is the one place a centred circle gets a free radius. It adds the object and `param r_X > 0` in one step. `statingNamedCircle` (#1670) and the sector's hidden circle now emit the no-`r` fact, so no other mint site remains. A `circle-at` with an explicit `r` and its own id (the concentric `circle-at-O-2`) keeps its creation semantics and never looks anything up. That is the lesson of the prototype, which broke `issue-1622-e3`.
+3. **`circleAtFacts` stops minting** (`parser/parseAnalytic.ts`). It emits `declare X · circle-at X`, then the sentence's relations by name: axes and lines as one `tangent-of {circle: X}` (exactly what the contextual and line-first orders emit), circles as `tangent-circles {a: X}`, and a stated radius as `radius-of {circle: X}` last. `namedCircleFacts`' radius is by name too. Each relation reads the resolved circle:
+   - a `circle-at` host copies its `r` into the constraint, and the later substitution reaches it (#1432 Am. 1's ordering);
+   - an equation host gets `tangent-curve` for a line and `out-of-scope` for an axis (ADR-AG-195).
+4. **`radiusSymbolsRead(c)`** (`engine/carriers.ts`, lock-facing) states that every `r_X` in the register is read by some object or constraint. It is asserted over the whole analytic corpus.
+5. `derive.ts`' #2119 provenance (`radiusAgainst`) no longer treats a no-`r` `circle-at` as the line that sized the circle.
+
+**Sibling audit.** Grepped every `radiusSymbol(` call (three mint sites: parser, `statingNamedCircle`, the hidden sector circle; all three now go through `stateCircleOn`) and every reader of a `circle-at` fact's `r` (`derive.ts` `radiusAgainst`, fixed; `submit.ts` `restatedCentres` and the inscribed reader read only `id`/`centre`).
+- **2-D:** circles are objects resolved by id at apply (ADR-011's resize family), and a tangency reads the circle's own radius; the class is not present.
+- **3-D and complex:** no centre-named circle with a radius parameter; not present.
+
+**Behaviour change for a student.**
+- A given radius stays visible after «מעגל N משיק למעגל M», «המעגלים M ו-N משיקים», «מעגל M ומעגל N משיקים», «נתון מעגל M» restated and «מעגל M משיק לציר / לישר … (בנקודה A)». The panel shows M, N and the equations instead of «?» and an «(unused)» radius row.
+- When the touch already holds (S1), the line is answered «זה כבר נובע», as its contextual twin is.
+- «מעגל M משיק לציר ה-x / לישר …» about a circle whose given radius does not fit is refused as contradictory (F1–F3), as «המעגל משיק…» is.
+- After «M מרכז מעגל I», «מעגל M משיק…» is about circle I. An axis gets the contextual refusal, and «y=k» pins k on circle I; no second circle is drawn.
+- Not in the plan's lines, but required by its mechanism: «מעגל M משיק לישר AB» on a figure with no A and B now introduces them as free points, as «המעגל משיק לישר AB» already did (#1670, ADR-AG-210). It used to be refused `unknown-reference`. The `issue-1501` lock is rewritten to assert the two spellings agree.
+
+**Measured cost.** No new solve, sampler or loop: one name lookup per circle-subject sentence.
+
+**Seed sweep** (ADR-AG-167 Am. 1's check, docs/17 §9). `derive` at 24 seeds over every `analyticCorpus()` sequence with a tangency (203 sequences, 4,872 runs), whole = no fault and nothing unsatisfied. Before: 3,168. After: 3,120. All four changed sequences change as intended:
+- F1, F2 and F3 (24 → 0) are now refused.
+- «מעגל M משיק לישר AB» (0 → 24) now introduces A and B.
+
+No other sequence moved.
+
+**Locks.**
+- `src-analytic/__tests__/issue-2382-circle-identity.test.ts`:
+  - every subject spelling against both orders of a stated radius: no `r_<centre>`, no «(unused)» row, every point, equation and parameter printed;
+  - the axis and line targets, with and without «בנקודה A»;
+  - F1–F3 refused `unsatisfiable`, the contextual twin's verdict, and refused by the fold;
+  - C5: axis `out-of-scope`, «y=k» pins k, no `circle-at`, «שרדיוסו 4» `already-known`;
+  - controls: S6, the axis and a line pin a free radius; «שני מעגלים בעלי מרכז משותף O» keeps two circles; a letter change O → K gives `r_K`;
+  - the three fixtures;
+  - the corpus invariant `radiusSymbolsRead` over `analyticCorpus()`.
+- Fixtures (`src-analytic/__tests__/fixtures/`): `issue-2382-stated-radius-tangent` (S1 verbatim), `issue-2382-q2-centre-radius` (Q2 canonical, «מעגל M ומעגל N משיקים מבחוץ»), `issue-2382-q3-tangent-circles` (Q3 ב with the y-axis selector).
+- Amended: `issue-1464-1324-1462-kite-exercise` («נתון מעגל O» parses to `declare · circle-at`) and `issue-1501-tangent-line` (above).
+
+**Consequences.** `engine/types.ts`, `engine/apply.ts` (`circle-at`, `stateCircleOn`, `statingNamedCircle`, the hidden sector circle), `engine/carriers.ts` (`radiusSymbolsRead`), `engine/derive.ts`, `parser/parseAnalytic.ts` (`circleAtFacts`, `namedCircleFacts`); docs 02c R120, R122, R180; 04c; DOCS.json drops R122 from `duplicatesGrandfathered`.

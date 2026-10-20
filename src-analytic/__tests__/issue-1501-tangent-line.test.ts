@@ -97,9 +97,17 @@ describe('#1501 — tangent to the line through two POINTS', () => {
     expect(Math.abs(f.centre('M')!.y)).toBeCloseTo(f.radius()!, 5);
   });
 
-  it('a tangency naming points the figure does not have is refused, never invented', () => {
+  /*
+   * The named form reads the line exactly as its contextual twin «המעגל משיק לישר AB» does (#2382, ADR-AG-305: one
+   * `tangent-of` for every subject order), so new letters are introduced by the #1670 rule (ADR-AG-210, operator
+   * 2026-10-02: "accept new letter with same logic the 2d tool has") rather than refused — the two spellings agree.
+   */
+  it('a tangency naming points the figure does not have introduces them, as its contextual twin does', () => {
     const d = derive(['מעגל M משיק לישר AB'], 0);
-    expect(d.faults.map((f) => f.code)).toEqual(['unknown-reference']);
+    const twin = derive(['המעגל משיק לישר AB'], 0);
+    expect(twin.faults).toEqual([]);
+    expect(d.faults).toEqual([]);
+    for (const id of ['A', 'B']) expect(d.construction.objects.some((o) => o.id === id)).toBe(true);
   });
 });
 

@@ -22,7 +22,7 @@ import { cevianFacts, measureFacts, toolFootFacts, type CevianRole } from '../en
 import { TOOL_PREFIX, toolPoint, type ToolPointRole } from '../engine/toolLetters';
 import { isAngleRef, sineAngle, type AngleName, type Constraint, type Direction, type TangentLineRef } from '../engine/solve';
 import { evalExpr, findMixedNumber, parseExpr, normalizeMath, symbolsOf, type Expr } from '../engine/expr';
-import { INDEXED_TOKEN, POINT_TOKEN, RESERVED_SYMBOLS, directionSymbol, mentionsPlane, mentionsPointName, radiusSymbol, toolSymbol } from '../engine/carriers';
+import { INDEXED_TOKEN, POINT_TOKEN, RESERVED_SYMBOLS, directionSymbol, mentionsPlane, mentionsPointName, toolSymbol } from '../engine/carriers';
 
 /** A student's VALUE — a number or an expression in parameters, never the plane's x/y (#1496, `mentionsPlane`). */
 function valueExpr(src: string): Expr | null {
@@ -2450,30 +2450,27 @@ function tangentTargets(tail: string, src: string): TangentTargets | null {
 }
 
 /**
- * The facts a circle-on-a-point lowers to: the centre as a free vertex, a positive radius, and the
- * circle itself. Shared by every subject that NAMES its centre letter, so they cannot drift.
+ * The facts a circle-on-a-point sentence lowers to: the centre as a point, THE CIRCLE ON IT, and the relations the
+ * sentence states about that circle. Shared by every subject that NAMES its centre letter, so they cannot drift.
+ *
+ * The circle is a REFERENCE (#2382, ADR-AG-305): `circle-at` with no radius. Whether the circle already exists — and
+ * so whether the sentence creates it or is a statement about it — is the M1 boundary's question (`apply.ts`), never
+ * this lowering's; only a creation mints the radius parameter. So nothing here names `r_<centre>`: the axis and line
+ * tangencies ride `tangent-of` BY NAME (exactly what the contextual «המעגל משיק…» and the line-first order emit), and
+ * each reads the resolved circle's own centre and radius. A lowering that baked its own `r_<centre>` into the
+ * constraint once built a circle of radius 3 "tangent" to an axis at distance 4.
  *
  * The minted-curve facts come FIRST: a tangency constraint may name a line its own sentence
  * created, and the apply boundary checks the curve exists before the constraint lands (#1150).
  */
 function circleAtFacts(centre: Id, targets: TangentTargets, line: string, at?: Id, rStated?: Expr): Fact[] {
-  const sym = radiusSymbol(centre);
-  const r: Expr = { kind: 'sym', name: sym };
   return [
     ...targets.facts,
     { t: 'declare', id: centre, src: line },
-    { t: 'param', sym, domain: { ...UNBOUNDED, min: 0, minOpen: true }, src: line },
-    { t: 'circle-at', id: `circle-at-${centre}`, centre, r, src: line },
-    ...targets.axes.map((axis) => ({
-      t: 'constraint' as const,
-      k: { t: 'tangent-axis' as const, centre, r, axis },
-      src: line,
-    })),
-    ...targets.lines.map((ref) => ({
-      t: 'constraint' as const,
-      k: { t: 'tangent-line' as const, centre, r, line: ref },
-      src: line,
-    })),
+    { t: 'circle-at', id: `circle-at-${centre}`, centre, src: line },
+    ...(targets.axes.length + targets.lines.length > 0
+      ? [{ t: 'tangent-of' as const, axes: targets.axes, ...(targets.lines.length ? { lines: targets.lines } : {}), circle: centre, src: line }]
+      : []),
     // A circle target names the OTHER circle (#1504) — which circle the name means is M1's
     // question, so the fact carries the names and the apply boundary resolves both.
     ...targets.circles.map((t) => ({
@@ -2486,11 +2483,12 @@ function circleAtFacts(centre: Id, targets: TangentTargets, line: string, at?: I
     })),
     /**
      * A STATED radius (#1432) is the SAME given the post-hoc «רדיוס המעגל הוא 5» is — so it lowers to
-     * the same `radius-of` fact, applied to this very circle LAST — after the tangencies, so the substitution reaches their `r` too — instead of a literal slipped past the
-     * radius's domain (am. 1: «שרדיוסו -3» was accepted and the circle vanished). The substitution
+     * the same `radius-of` fact, about this very circle BY NAME (the circle M1 resolved, #2382) and LAST — after the
+     * tangencies, so the substitution reaches the radius `tangent-of` copied into them — instead of a literal slipped
+     * past the radius's domain (am. 1: «שרדיוסו -3» was accepted and the circle vanished). The substitution
      * seam checks the domain and retires the parameter: born with 2 DOF, not 3, as before.
      */
-    ...(rStated ? [{ t: 'radius-of' as const, circleId: `circle-at-${centre}`, value: rStated, src: line }] : []),
+    ...(rStated ? [{ t: 'radius-of' as const, circle: centre, value: rStated, src: line }] : []),
   ];
 }
 
@@ -3310,7 +3308,8 @@ const sizeOfEn = (m: RegExpExecArray, from: number): Expr | null => radiusOfSize
 function namedCircleFacts(centre: Id, r: Expr | null, line: string): Fact[] | null {
   const base = parseClause(`נתון מעגל ${centre}`);
   if (!base.ok) return null;
-  return [...base.facts, ...(r ? [{ t: 'radius-of' as const, circleId: `circle-at-${centre}`, value: r, src: line }] : [])].map((f) => ({ ...f, src: line }));
+  // The radius is about the circle the name resolves to (#2382): the one M1 found or created on that centre.
+  return [...base.facts, ...(r ? [{ t: 'radius-of' as const, circle: centre, value: r, src: line }] : [])].map((f) => ({ ...f, src: line }));
 }
 
 /** The two points a sentence names («בנקודות A ו-B», "at A and B"), or the tool's letters for its role. */
