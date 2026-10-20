@@ -357,6 +357,8 @@
  "fixture:issue-2175-long-angle-label-thin-angle.geo.json": "4bdeb621f1c831be",
  "fixture:issue-2406-tangent-through-common-point.geo.json": "34b8d726affc503c",
  "fixture:issue-2407-tangent-at-touch.geo.json": "997b04ceafa53bb3",
+ "fixture:issue-2428-external-pair-internal-tangent-free-ab.geo.json": "c9817737cd1c0ced",
+ "fixture:issue-2428-internal-pair-free-ab-tangent-at-t.geo.json": "57bc8e2167cafc19",
  "fixture:issue-260-two-host-membership.geo.json": "167ca5c3e43619c1",
  "fixture:issue-497-right-trapezoid-typo.geo.json": "a45b0bed598dbd4a",
  "fixture:issue-556-two-tangents-free-apex.geo.json": "57c0f2f25d1d0349",

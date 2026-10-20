@@ -9699,6 +9699,18 @@ const commonTangent: Rule = (s, ctx) => {
     return (ctx.collinearWith?.[T] ?? []).some(([x, y]) => (x === a && y === b) || (x === b && y === a)) ? [a, b] : null;
   };
   /**
+   * #2428 (ADR-741): when the tangent at T is the ONLY common tangent the sentence can name (the capacity exit below:
+   * an internally tangent pair has no two-touch tangent; an externally tangent pair has no internal one, nor a third),
+   * the line's two EXISTING letters name that tangent even with nothing stating them collinear with T — the line can
+   * be no other. A bare free point (`freePoints`, semantic: nothing places it) is seated onto it by the `at` record,
+   * as the stated-collinear letters are; a letter something else places is not, and the accountant declines the line.
+   */
+  const freeSeat = (T: string, letters: string[]): [string, string] | null => {
+    if (letters.length !== 2 || letters.includes(T)) return null;
+    const free = new Set(ctx.freePoints ?? []);
+    return letters.every((p) => have.has(p) && free.has(p)) ? [letters[0], letters[1]] : null;
+  };
+  /**
    * The ONE at-touch lowering: `membership` (T on both circles, #2188's shape — the line refers to both circles it
    * names), the drawn tangent `tan-T` (one identity, so Am. 3/4/7's capacity reader and Am. 6's meets see it), FRESH
    * naming letters as markers on it (the at-variant, byte for byte), and EXISTING letters through T seated onto it by
@@ -9706,8 +9718,8 @@ const commonTangent: Rule = (s, ctx) => {
    * 0, nothing else moves — engine/apply.ts). An existing letter that does not reach T is not lowered; the label
    * accountant declines the line, as before.
    */
-  const touchTangent = (T: string, letters: string[], membership: AnyCommand[]): AnyCommand[] => {
-    const seat = lettersThrough(T, letters);
+  const touchTangent = (T: string, letters: string[], membership: AnyCommand[], only = false): AnyCommand[] => {
+    const seat = lettersThrough(T, letters) ?? (only ? freeSeat(T, letters) : null);
     // The `at` record names both circles itself, so a STATED touch's implied memberships are not re-asserted beside it
     // (measured: on a region-recruited prefix each one re-ran the whole solve, ~1 s); (a)'s own memberships always stay.
     const keep = seat && membership.every((c) => c.type === 'point-on-circle' && c.id === T && stated?.at === T) ? [] : membership;
@@ -9824,7 +9836,8 @@ const commonTangent: Rule = (s, ctx) => {
     if (touchFree && wantPairs === 1 && (kind === undefined || kind === touchKind)) {
       // #2407 (ADR-740, R3): the one at-touch lowering — T on both circles the line names, its letters as markers —
       // where this exit used to emit the line on circle 1 alone and drop the letters (the accountant then declined it).
-      return touchTangent(up(touch), lineLetters, touchMembership(up(touch)));
+      // #2428 (ADR-741): it is the only tangent left, so two existing free letters are seated on it (`only`).
+      return touchTangent(up(touch), lineLetters, touchMembership(up(touch)), true);
     }
     return { clarify: 'tangents-exhausted', kind: kind ?? 'any', ...(touchy && touchFree ? { hint: 'at-touch' as const } : {}), ...(position ? { position } : {}) };
   }

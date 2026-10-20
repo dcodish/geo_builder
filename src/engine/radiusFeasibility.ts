@@ -111,3 +111,35 @@ export function equalNestedPair(prev: Construction, next: Construction, cmds: re
   }
   return null;
 }
+
+/** The engine message of {@link commonTangentCapacityError}; the humanizer reads it back (`TANGENTS_EXHAUSTED`). */
+export const tangentsExhaustedMessage = (a: Id, b: Id, kind: 'external' | 'internal' | 'any', position: 'int-tangent' | 'ext-tangent' | 'contained'): string =>
+  `tangents-exhausted: common tangent ${a}${b} of kind ${kind} on ${position} circles`;
+export const TANGENTS_EXHAUSTED = /^tangents-exhausted: common tangent (\S+) of kind (external|internal|any) on (int-tangent|ext-tangent|contained) circles$/;
+
+/**
+ * #2428 ([ADR-741](../../docs/06-decisions.md#adr-741)) — A TWO-TOUCH COMMON TANGENT ON A PAIR THAT HAS NONE OF THAT KIND.
+ *
+ * A `common-tangent` without `at` asks for a line touching each circle at its OWN point. The pair's STATED position
+ * decides whether one exists: circles stated internally tangent have no two-touch tangent at all (their one common
+ * tangent is the tangent at the touch, the `at` record); circles stated externally tangent have no internal one (the
+ * internal tangent is the tangent at the touch); a circle stated inside another has no common tangent. Before ADR-741
+ * the capacity rule lived only in the parser, so a record that reached apply anyway (the AI lane's re-parse with a
+ * partial context) was solved toward its degenerate limit by shrinking the circles' free radii — A ≈ B ≈ T, green.
+ *
+ * Read from the construction's stated circle-position records (ADR-567 / ADR-645), never from coordinates. A count
+ * beyond capacity (a third external tangent) is not judged here: the `avoid` requirement and the verifier own it.
+ */
+export function commonTangentCapacityError(prev: Construction, cmd: Command): string | null {
+  if (cmd.type !== 'common-tangent' || cmd.at !== undefined) return null;
+  const pair = (r: { a: Id; b: Id }) => (r.a === cmd.circle1 && r.b === cmd.circle2) || (r.a === cmd.circle2 && r.b === cmd.circle1);
+  const kind = cmd.kind ?? 'any';
+  for (const r of prev.requirements ?? []) {
+    if (r.kind !== 'circle-position' || !pair(r)) continue;
+    if (r.relation === 'contained') return tangentsExhaustedMessage(cmd.a, cmd.b, kind, 'contained');
+    if (r.relation !== 'tangent') continue;
+    if (r.external === false) return tangentsExhaustedMessage(cmd.a, cmd.b, kind, 'int-tangent');
+    if (cmd.kind === 'internal') return tangentsExhaustedMessage(cmd.a, cmd.b, kind, 'ext-tangent');
+  }
+  return null;
+}

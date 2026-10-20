@@ -35,7 +35,7 @@ import {
 import { sideImpossibility, sideImpossibilityError } from './sideFeasibility';
 import { collinearCircleError, collinearCircleImpossibility, notCyclicImpossibility, notCyclicImpossibilityError } from './cyclicFeasibility';
 import { recordRequirement, requirementsField } from './requirements';
-import { circlesTangentError, equalNestedPair } from './radiusFeasibility';
+import { circlesTangentError, commonTangentCapacityError, equalNestedPair } from './radiusFeasibility';
 import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, polygonDefects, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, type PolygonDefect } from './degeneracy';
 import { allConstraints, applySeed, freeDofs, movableIds } from './sample';
 import { impliedByFigure } from './dofRank';
@@ -1211,6 +1211,10 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
 
   const tangentErr = circlesTangentError(prev, cmd);
   if (tangentErr) return { ok: false, error: tangentErr, construction: prev, positions: prevPositions, ladder: ['pre:tangent'] };
+  // #2428 (ADR-741): a two-touch common tangent on a pair whose stated position has none of that kind — refused by
+  // name, never solved toward its degenerate limit by shrinking the circles.
+  const capacityErr = commonTangentCapacityError(prev, cmd);
+  if (capacityErr) return { ok: false, error: capacityErr, construction: prev, positions: prevPositions, ladder: ['pre:tangent'] };
 
   // A constraint on a structurally degenerate operand ("BB" ∥/⟂, "∠ABB", a repeated collinear point)
   // has a NaN residual: reject it here, before the solver churns on it (a freeze in the config search).
@@ -1467,6 +1471,8 @@ function applyCoupledStepLadder(prev: Construction, cmds: Command[]): StepResult
   for (const cmd of cmds) {
     const degenErr = degenerateConstraintError(cmd);
     if (degenErr) return { ok: false, error: degenErr, construction: prev, positions: prevPositions, ladder: ['pre:degenerate'] };
+    const capacityErr = commonTangentCapacityError(prev, cmd); // #2428 (ADR-741)
+    if (capacityErr) return { ok: false, error: capacityErr, construction: prev, positions: prevPositions, ladder: ['pre:tangent'] };
   }
   // ATTACH every constraint before solving once (see above — this is the whole mechanism).
   let next = prev;
