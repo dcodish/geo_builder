@@ -3338,17 +3338,16 @@ const touchAt = (slot: string, at: Id, a: Id, b: Id, src: string): Fact => ({
 });
 
 /**
- * A common tangent `a``b` of the circles in `s1` and `s2`; `kind` its stated kind. Where it touches is M1's question
- * (`common-tangent`, #2385 ADR-AG-312): the parser cannot see whether the figure already puts the circles' touch point
- * on ab.
+ * A common tangent `a``b` of the circles in `s1` and `s2`; `kind` its stated kind, `name` the line's own name. Where it
+ * touches is M1's question (`common-tangent`, #2385 ADR-AG-312): the parser cannot see whether the figure already puts
+ * the circles' touch point on ab. It is drawn as a LINE, named, with its equation row (#2392, ADR-AG-313): M1 draws it.
  */
-function commonTangentFacts(a: Id, b: Id, s1: string, s2: string, kind: 'external' | 'internal' | undefined, src: string): Fact[] {
+function commonTangentFacts(a: Id, b: Id, s1: string, s2: string, kind: 'external' | 'internal' | undefined, src: string, name?: string): Fact[] {
   return [
     ...declareAll([a, b], src),
-    { t: 'common-tangent', a, b, circles: [s1, s2], src },
+    { t: 'common-tangent', a, b, circles: [s1, s2], ...(name !== undefined ? { name } : {}), src },
     { t: 'selector', sel: { kind: 'distinct', ids: [a, b] }, src },
     ...(kind ? [{ t: 'selector' as const, sel: { kind: 'sign' as const, q: { k: 'centres-side' as const, a: s1, b: s2, p: a, q: b }, positive: kind === 'external' }, src }] : []),
-    segmentFact(a, b, src),
   ];
 }
 
@@ -3362,7 +3361,7 @@ function twoCircleSlots(text: string): CircleSlot[] | null {
   const t = trim(text);
   if (/^(?:ל|של\s+)?שני\s+ה?מעגלים$|^(?:to|of)\s+(?:the\s+)?(?:two|both)\s+circles$/i.test(t)) return [{ k: 'the' }, { k: 'the' }];
   const named =
-    new RegExp(`^(?:ל|של\\s+)?ה?מעגלים\\s+(${NAME})${AND_HE}(${NAME})$`).exec(t) ??
+    new RegExp(`^(?:ל|של\\s+)?(?:שני\\s+)?ה?מעגלים\\s+(${NAME})${AND_HE}(${NAME})$`).exec(t) ??
     new RegExp(`^(?:to|of)\\s+(?:the\\s+)?circles\\s+(${NAME})${AND_ANY}(${NAME})$`, 'i').exec(t);
   return named && named[1] !== named[2] ? [{ k: 'named', name: named[1] }, { k: 'named', name: named[2] }] : null;
 }
@@ -3634,6 +3633,10 @@ function parseCircleFamilies(raw: string): RuleOutcome {
       { t: 'selector', sel: { kind: 'between', id: at, a, b }, src: line },
     ], line);
   }
+
+  // «הישר l משיק למעגלים N1 ו-N2 בנקודות P ו-Q בהתאמה» — the same common tangent, its line named l (#2392).
+  const namedTangent = namedCommonTangent(g, line);
+  if (namedTangent) return namedTangent;
 
   // «מנקודה A יוצאים שני משיקים לשני המעגלים» — the two common tangents through A (2-D's B, C and D, E their touches).
   const fromA =
@@ -6455,6 +6458,109 @@ const THROUGH_FREE_EN = new RegExp(
   `^(?:[Aa]\\s+|[Tt]he\\s+)?[Ll]ine(?:\\s+(${FREE_LINE_NAME}))?\\s+(?:passes\\s+)?through\\s+(?:(?:the\\s+)?point\\s+)?(${NAME})$`,
 );
 
+/**
+ * «הישר l משיק (לשני )?(ה)?מעגלים N1 ו-N2 בנקודות P ו-Q (בהתאמה)?» · «הישר l משיק למעגל N1 בנקודה P ולמעגל N2 בנקודה Q» ·
+ * "the line l is tangent to (the) circles N1 and N2 at P and Q (respectively)" — A COMMON TANGENT NAMED BY ITS LINE (#2392,
+ * ADR-AG-313; the exam's Q3 ג). The same `common-tangent` as «PQ משיק משותף למעגלים N1 ו-N2», P on the first circle and Q
+ * on the second (in the written order, «בהתאמה» or not), its line named l. Read in `parseCircleFamilies`, before the
+ * line-first tangency of `parseCircleAt` («הישר l1 משיק למעגל M»), which would refuse the line it does not yet have.
+ */
+const NAMED_TANGENT_HE = new RegExp(
+  `^ה?ישר\\s+(${FREE_LINE_NAME})\\s+משיק\\s+(ל.+?)\\s+ב(?:נקודות\\s+)?(${NAME})${AND_HE}(${NAME})(?:\\s*,?\\s+בהתאמה)?$`,
+);
+const NAMED_TANGENT_EN = new RegExp(
+  `^(?:the\\s+)?line\\s+(${FREE_LINE_NAME})\\s+is\\s+(?:a\\s+)?tangent\\s+((?:to|of)\\s+.+?)\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})${AND_ANY}(${NAME})(?:\\s*,?\\s+respectively)?$`,
+  'i',
+);
+const NAMED_TANGENT_SPLIT_HE = new RegExp(
+  `^ה?ישר\\s+(${FREE_LINE_NAME})\\s+משיק\\s+למעגל\\s+(${NAME})\\s+בנקודה\\s+(${NAME})${AND_HE}למעגל\\s+(${NAME})\\s+בנקודה\\s+(${NAME})$`,
+);
+const NAMED_TANGENT_SPLIT_EN = new RegExp(
+  `^(?:the\\s+)?line\\s+(${FREE_LINE_NAME})\\s+is\\s+tangent\\s+to\\s+(?:the\\s+)?circle\\s+(${NAME})\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})${AND_ANY}to\\s+(?:the\\s+)?circle\\s+(${NAME})\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`,
+  'i',
+);
+function namedCommonTangent(g: string, line: string): RuleOutcome {
+  const split = NAMED_TANGENT_SPLIT_HE.exec(g) ?? NAMED_TANGENT_SPLIT_EN.exec(g);
+  if (split) {
+    const [, name, o, p, k, q] = split;
+    if (o === k || p === q) return refuse('repeated-vertex', line);
+    return aboutCircles([{ k: 'named', name: o }, { k: 'named', name: k }], commonTangentFacts(p, q, SLOT1, SLOT2, undefined, line, name), line);
+  }
+  const m = NAMED_TANGENT_HE.exec(g) ?? NAMED_TANGENT_EN.exec(g);
+  if (!m) return null;
+  const [, name, target, p, q] = m;
+  const slots = twoCircleSlots(target);
+  if (!slots) return null;
+  if (p === q) return refuse('repeated-vertex', line);
+  return aboutCircles(slots, commonTangentFacts(p, q, SLOT1, SLOT2, undefined, line, name), line);
+}
+
+/**
+ * «נסמן את הישר PQ ב-l» · «נסמן ב-l את הישר PQ» · "denote the line PQ by l": THE LINE THROUGH P AND Q TAKES A NAME
+ * (#2392, ADR-AG-313), the line twin of «נסמן את שטח ABCD ב-S». M1 decides which line (`name-line`).
+ */
+// The verb is optional: the frame may already have unwrapped the «נסמן» / "denote" lead-in (#1621), as «… את שטח ABCD ב-S».
+const NAME_LINE_HE = new RegExp(`^(?:(?:נסמן|נסמנה|מסמנים|לסמן)\\s+)?את\\s+ה?ישר\\s+(${NAME})(${NAME})\\s+ב-?\\s*(${FREE_LINE_NAME})$`);
+const NAME_LINE_HE_FIRST = new RegExp(`^(?:(?:נסמן|נסמנה|מסמנים|לסמן)\\s+)?ב-?\\s*(${FREE_LINE_NAME})\\s+את\\s+ה?ישר\\s+(${NAME})(${NAME})$`);
+const NAME_LINE_EN = new RegExp(`^(?:(?:let\\s+us\\s+)?(?:denote|call|label|name)\\s+)?(?:the\\s+)?line\\s+(${NAME})(${NAME})\\s+(?:by|as)\\s+(${FREE_LINE_NAME})$`, 'i');
+function parseNameLine(line: string): RuleOutcome {
+  const first = NAME_LINE_HE_FIRST.exec(line);
+  const m = first ? [first[2], first[3], first[1]] : (NAME_LINE_HE.exec(line) ?? NAME_LINE_EN.exec(line))?.slice(1, 4);
+  if (!m) return null;
+  const [a, b, name] = m;
+  if (a === b) return refuse('repeated-vertex', line);
+  return made([{ t: 'name-line', a, b, name, src: line }]);
+}
+
+/**
+ * «הישר l חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x» — WHERE A LINE CROSSES AN AXIS, NO POINT MADE (#2392, ADR-AG-313; the
+ * exam's Q3 ג). Also «מתחת ל…», the x-axis «מימין / משמאל לציר ה-y», «… חותך את החלק החיובי / השלילי של ציר ה-y» with no
+ * letter, and English. Read only with no letter: «… בנקודה B» is the lettered crossing, which mints B, unchanged. A side
+ * that does not belong to the axis («ציר ה-y … מימין לציר ה-y») is not this sentence.
+ */
+const AXIS_WORD_HE = 'ציר\\s+(?:ה\\s*-?\\s*)?([xy])';
+const AXIS_CUT_HE = new RegExp(
+  `^ה?ישר\\s+(${FREE_LINE_NAME}|${NAME}${NAME})\\s+(?:ה|ש)?חות(?:ך|כת)\\s+את\\s+${AXIS_WORD_HE}\\s+(?:בנקודה\\s+(?:ה|ש)?נמצאת\\s+)?(מעל|מתחת|מימין|משמאל)\\s+(?:ל-?\\s*)?${AXIS_WORD_HE}$`,
+);
+const AXIS_PART_HE = new RegExp(
+  `^ה?ישר\\s+(${FREE_LINE_NAME}|${NAME}${NAME})\\s+(?:ה|ש)?חות(?:ך|כת)\\s+את\\s+החלק\\s+ה(חיובי|שלילי)\\s+של\\s+${AXIS_WORD_HE}$`,
+);
+const AXIS_CUT_EN = new RegExp(
+  `^(?:the\\s+)?line\\s+(${FREE_LINE_NAME}|${NAME}${NAME})\\s+(?:crosses|cuts|intersects|meets)\\s+the\\s+([xy])[- ]axis\\s+(?:at\\s+a\\s+point\\s+)?(above|below|(?:to\\s+the\\s+)?(?:right|left)\\s+of)\\s+the\\s+([xy])[- ]axis$`,
+  'i',
+);
+const AXIS_PART_EN = new RegExp(
+  `^(?:the\\s+)?line\\s+(${FREE_LINE_NAME}|${NAME}${NAME})\\s+(?:crosses|cuts|intersects|meets)\\s+the\\s+(positive|negative)\\s+(?:part|half)\\s+of\\s+the\\s+([xy])[- ]axis$`,
+  'i',
+);
+/** Which axis a side word is told against, and which side of it. */
+const AXIS_SIDE: Readonly<Record<string, { of: 'x' | 'y'; greater: boolean }>> = {
+  מעל: { of: 'x', greater: true }, מתחת: { of: 'x', greater: false }, above: { of: 'x', greater: true }, below: { of: 'x', greater: false },
+  מימין: { of: 'y', greater: true }, משמאל: { of: 'y', greater: false }, right: { of: 'y', greater: true }, left: { of: 'y', greater: false },
+};
+function axisCutLine(name: string): Direction {
+  const pair = new RegExp(`^(${NAME})(${NAME})$`).exec(name);
+  return pair ? { k: 'points', a: pair[1], b: pair[2] } : { k: 'curve', id: lineIdOf(name) };
+}
+function parseAxisCut(line: string): RuleOutcome {
+  const part = AXIS_PART_HE.exec(line) ?? AXIS_PART_EN.exec(line);
+  if (part) {
+    const [, name, sign, axis] = part;
+    if (name.length === 2 && name[0] === name[1]) return refuse('repeated-vertex', line);
+    const greater = /^(?:חיובי|positive)$/i.test(sign);
+    return made([{ t: 'selector', sel: { kind: 'axis-cut', line: axisCutLine(name), axis: axis.toLowerCase() as 'x' | 'y', greater }, src: line }]);
+  }
+  const cut = AXIS_CUT_HE.exec(line) ?? AXIS_CUT_EN.exec(line);
+  if (!cut) return null;
+  const [, name, axisRaw, sideRaw, ofRaw] = cut;
+  const side = AXIS_SIDE[sideRaw.toLowerCase().replace(/^(?:to\s+the\s+)?(right|left)\s+of$/, '$1')];
+  const axis = axisRaw.toLowerCase() as 'x' | 'y';
+  // The side is told against the OTHER axis: the y-axis crossing is above / below the x-axis, the x-axis one right / left of the y-axis.
+  if (!side || side.of !== ofRaw.toLowerCase() || side.of === axis) return null;
+  if (name.length === 2 && name[0] === name[1]) return refuse('repeated-vertex', line);
+  return made([{ t: 'selector', sel: { kind: 'axis-cut', line: axisCutLine(name), axis, greater: side.greater }, src: line }]);
+}
+
 function parseThroughLine(line: string): RuleOutcome {
   const he = THROUGH_FREE_HE.exec(line);
   const en = he ? null : THROUGH_FREE_EN.exec(line);
@@ -8727,6 +8833,10 @@ function parseClauseRules(raw: string): ParseResult {
    * Only the third continues the chain — a rule that recognised the sentence and found it wrong
    * gets the last word, rather than having its refusal overwritten by `not-handled` downstream.
    */
+  // «נסמן את הישר PQ ב-l», and where a line crosses an axis with no point named (#2392, ADR-AG-313).
+  const lineNamed = parseNameLine(line) ?? parseAxisCut(line);
+  if (lineNamed) return lineNamed;
+
   const matched =
     // `parseThroughLine` FIRST (#1093). «דרך P עובר ישר מקביל ל AB» ends in a relation phrase, so
     // RELATION_HE matches it with «דרך P עובר ישר» as its left operand and then refuses an operand

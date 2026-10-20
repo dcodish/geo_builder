@@ -1336,6 +1336,10 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'circles', family: 'F5', he: 'AB משיק משותף למעגלים O ו-P', en: 'AB is a common tangent to circles O and P' },
   { category: 'circles', family: 'F5', he: 'AB משיק משותף חיצוני לשני המעגלים', en: 'AB is an external common tangent of the two circles' },
   { category: 'circles', family: 'F5', he: 'CD משיק משותף למעגלים O ו-P בנקודה M', en: 'CD is a common tangent to circles O and P at M' },
+  // #2392 (ADR-AG-313): the common tangent named by its line (the exam's Q3 ג), the name given after, and the axis side.
+  { category: 'circles', family: 'F5', he: 'הישר l משיק למעגלים O ו-P בנקודות A ו-B בהתאמה', en: 'the line l is tangent to circles O and P at A and B respectively', needs: ['נתון מעגל שמרכזו O(0,0) ורדיוסו 2', 'נתון מעגל שמרכזו P(10,0) ורדיוסו 3'] },
+  { category: 'relations', family: 'F17', he: 'נסמן את הישר AB ב-l', en: 'denote the line AB by l', needs: ['A(1,2)', 'B(3,5)', 'הישר AB'] },
+  { category: 'relations', family: 'F17', he: 'הישר AB חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x', en: 'line AB crosses the y-axis above the x-axis', needs: ['A(1,2)', 'B(3,5)', 'הישר AB'] },
   { category: 'circles', family: 'F5', he: 'מנקודה A יוצאים שני משיקים לשני המעגלים', en: 'from point A two tangents to the two circles' },
   { category: 'circles', family: 'F5', he: 'AB מיתר במעגל O ומשיק למעגל P', en: 'AB is a chord of circle O and tangent to circle P', needs: ['מעגל O', 'מעגל P'] },
   /*

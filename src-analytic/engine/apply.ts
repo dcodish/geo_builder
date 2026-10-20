@@ -1628,6 +1628,29 @@ function touchPointOf(c: Construction, c1: Id, c2: Id): Id | null {
 }
 
 /**
+ * THE FIGURE'S LINE THROUGH a AND b (#2392, ADR-AG-313) — a `line-at` along a→b through one of them (whatever name it
+ * carries), or the line object named by the pair («הישר AB», «הישר AB: …»). Read off the construction, never a sample.
+ */
+function lineOverPair(c: Construction, a: Id, b: Id): GeoObject | undefined {
+  const pair = (u: Id, v: Id) => (u === a && v === b) || (u === b && v === a);
+  return c.objects.find(
+    (o) =>
+      (o.kind === 'line-at' && !o.perp && o.dir.k === 'points' && pair(o.dir.a, o.dir.b) && (o.through === a || o.through === b)) ||
+      ((o.kind === 'line-at' || o.kind === 'curve') && (o.id === lineIdOf(`${a}${b}`) || o.id === lineIdOf(`${b}${a}`))),
+  );
+}
+
+/** `value` with every string equal to `from` replaced by `to`, structurally — an object's references re-pointed. */
+function replaceId<T>(value: T, from: Id, to: Id): T {
+  if (value === from) return to as T;
+  if (Array.isArray(value)) return value.map((v) => replaceId(v, from, to)) as T;
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, replaceId(v, from, to)])) as T;
+  }
+  return value;
+}
+
+/**
  * A HEIGHT STATED AS A MAGNITUDE, RESOLVED AGAINST THE FIGURE (#1737, ADR-AG-265) — 2-D's `shapeHeight` (ADR-575),
  * measured at `403efe66`, read here at M1 because this parser is context-free.
  *
@@ -3493,18 +3516,75 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * already puts the circles' stated touch point on ab («T על AB», or T one of the letters), the line is lowered as
      * the tangent to the first circle at T, the at-form's lowering («… בנקודה T»), which the second circle shares.
      * Otherwise `a` touches the first circle and `b` the second, as every common tangent was lowered before.
+     *
+     * THE COMMON TANGENT IS A LINE (#2392, #2390 §3, ADR-AG-313): it is drawn as the `line-at` through a along a→b —
+     * the object the at-form's «הישר CD» is — named by the sentence («הישר l …») or by its pair, so it is listed with
+     * its equation row. A line the figure already has over the pair is that line (named now, when the sentence names
+     * it); a name the figure already holds as a line is that line, and the touches are stated on it.
      */
     case 'common-tangent': {
       const [c1, c2] = f.circles;
+      if (f.name !== undefined) {
+        const held = curveByName(c, f.name);
+        if (held && curveKindOf(held) !== 'line') return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(held) } };
+        if (held) {
+          const on: TangentLineRef = { kind: 'curve', id: held.id, label: f.name };
+          return applyAll(c, [
+            { t: 'tangent-of', axes: [], lines: [on], circleId: c1, at: f.a, src: f.src },
+            { t: 'tangent-of', axes: [], lines: [on], circleId: c2, at: f.b, src: f.src },
+          ]);
+        }
+      }
       const line: TangentLineRef = { kind: 'points', a: f.a, b: f.b };
       const touch = touchPointOf(c, c1, c2);
-      if (touch !== null && (touch === f.a || touch === f.b || f.onLine?.includes(touch) || footOnPair(c, touch, f.a, f.b))) {
-        return applyFact(c, { t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: touch, src: f.src });
+      const touches: Fact[] =
+        touch !== null && (touch === f.a || touch === f.b || f.onLine?.includes(touch) || footOnPair(c, touch, f.a, f.b))
+          ? [{ t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: touch, src: f.src }]
+          : [
+              { t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: f.a, src: f.src },
+              { t: 'tangent-of', axes: [], lines: [line], circleId: c2, at: f.b, src: f.src },
+            ];
+      const touched = applyAll(c, touches);
+      if (!touched.ok) return touched;
+      const drawn = applyFact(touched.next, { t: 'name-line', a: f.a, b: f.b, name: f.name ?? `${f.a}${f.b}`, src: f.src });
+      return drawn.ok ? { ...drawn, effect: 'created' } : drawn;
+    }
+
+    /**
+     * «נסמן את הישר PQ ב-l» — THE LINE THROUGH TWO POINTS TAKES A NAME (#2392, ADR-AG-313). The figure's line over the
+     * pair (`lineOverPair`) is RE-NAMED: its id becomes the name's (`lineIdOf`), so «הישר l …» finds it as every named
+     * line is found, and every reference to the old id follows it. Only the segment, or nothing, over the pair: the
+     * `line-at` through a along a→b is drawn under that name (the common tangent's own line comes here too). A line
+     * that already carries a student name other than its letters, or a name the figure holds as another object, is
+     * the existing clash refusal.
+     */
+    case 'name-line': {
+      for (const id of [f.a, f.b]) {
+        const p = objectById(c, id);
+        if (!p || !isPositional(p)) return { ok: false, error: unknownRef(c, id) };
       }
-      return applyAll(c, [
-        { t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: f.a, src: f.src },
-        { t: 'tangent-of', axes: [], lines: [line], circleId: c2, at: f.b, src: f.src },
-      ]);
+      if (f.a === f.b) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
+      const id = lineIdOf(f.name);
+      const prior = lineOverPair(c, f.a, f.b);
+      const holder = curveByName(c, f.name) ?? objectById(c, id);
+      if (holder && holder !== prior) return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(holder) } };
+      if (!prior) {
+        return applyFact(c, { t: 'line-at', id, through: f.a, dir: { k: 'points', a: f.a, b: f.b }, perp: false, name: f.name, src: f.src });
+      }
+      const letters = (n: string | undefined) => n === undefined || n === '' || n === `${f.a}${f.b}` || n === `${f.b}${f.a}`;
+      const own = prior.kind === 'line-at' ? prior.name : prior.kind === 'curve' ? prior.label.name : undefined;
+      if (prior.id === id && own === f.name) return { ok: true, effect: 'known', next: c };
+      if (!letters(own)) return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(prior) } };
+      const renamed: GeoObject =
+        prior.kind === 'line-at' ? { ...prior, id, name: f.name } : prior.kind === 'curve' ? { ...prior, id, label: { ...prior.label, name: f.name } } : prior;
+      if (renamed === prior) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      const next: Construction = {
+        ...c,
+        objects: c.objects.map((o) => (o === prior ? renamed : replaceId(o, prior.id, id))),
+        constraints: c.constraints.map((k) => replaceId(k, prior.id, id)),
+        selectors: c.selectors.map((s) => replaceId(s, prior.id, id)),
+      };
+      return { ok: true, effect: 'narrowed', next };
     }
 
     /**
@@ -4094,7 +4174,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
                       ? [...sel.ids, sel.a, sel.b]
                       : sel.kind === 'in-polygon'
                         ? [sel.id, ...sel.ring]
-                        : [sel.id, sel.a, sel.b];
+                        : // #2392 (ADR-AG-313): the line's two points, when it is named by them.
+                          sel.kind === 'axis-cut'
+                          ? dirRefs(sel.line)
+                          : [sel.id, sel.a, sel.b];
       const refs = refsOf(f.sel);
       for (const id of refs) {
         const o = objectById(c, id);
@@ -4107,6 +4190,12 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (f.sel.kind === 'sign' && f.sel.q.k === 'slope' && f.sel.q.u.k === 'curve') {
         const o = objectById(c, f.sel.q.u.id);
         if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(c, f.sel.q.u.id) };
+      }
+      // …and so does where a named line crosses an axis (#2392, ADR-AG-313) — a line, not another curve.
+      if (f.sel.kind === 'axis-cut' && f.sel.line.k === 'curve') {
+        const o = objectById(c, f.sel.line.id);
+        if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(c, f.sel.line.id) };
+        if (curveKindOf(o) !== 'line') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
       }
       // A circle region names the circle M1 resolved (#1619 B1) — it must still be one.
       if (f.sel.kind === 'sign' && (f.sel.q.k === 'power' || f.sel.q.k === 'arc-side')) {

@@ -447,6 +447,13 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - a common tangent through the circles' stated touch point is the tangent there: «המעגלים משיקים בנקודה T» · «T על AB» · «AB משיק משותף למעגלים M ו-N» draws AB as the tangent at T (also «TB משיק משותף …»); other letters are still its two touches, and «… חיצוני …» through T is refused (ADR-AG-312, #2385)
 - Sources: ADR-AG-219, #1622, #1693, #1688, #2108, #2385.
 
+**R180 — a common tangent is a named line, a line can be named after the fact, and a line's axis crossing can be placed without a point**. *(Operator, on #2379: "things that are missing, i need to add to the tool since this is an exam I give my students"; the «מתחת» / «מימין / משמאל» twins per the #2386 rulings.)*
+- a common tangent is drawn as a full line with its equation row; while the givens leave two candidate lines, the row lists both («3x − 4y + 14 = 0 או 3x − 4y − 86 = 0»)
+- «הישר l משיק לשני מעגלים N1 ו- N2 בנקודות P ו- Q בהתאמה» (also «למעגלים …», «לשני המעגלים …», without «בהתאמה», «הישר l משיק למעגל N1 בנקודה P ולמעגל N2 בנקודה Q», English) draws the common tangent named l, touching N1 at P and N2 at Q; when l is already a line, the touches are on it
+- «נסמן את הישר PQ ב-l» (also «נסמן ב-l את הישר PQ», "denote the line PQ by l") names the line through P and Q; on a segment only, the line is drawn under that name; a name already taken, or a line already named, is refused
+- «הישר l חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x» keeps the configurations whose crossing is there and adds no point; likewise «מתחת ל…», «… ציר ה-x … מימין / משמאל לציר ה-y», «… חותך את החלק החיובי / השלילי של ציר ה-y / x», English. A side no configuration has is refused «לא נמצאה תצורה…»; a line parallel to that axis meets it nowhere; «… בנקודה B» still names the crossing B
+- Sources: ADR-AG-313, #2392, #2390, #2379.
+
 **R163 — arcs, sectors, semicircles and the diameter from a point build as they do in the 2-D tool**. *(Operator ruling: analytic gives 2-D's verdict, and the arc rows are ported.)* An arc's measure is its central angle.
 - «קשת AB = 40 במעגל O», «⌢{AC} = 60°»
 - «חצי מעגל שקוטרו AB», «גזרה AOB בזווית 80»

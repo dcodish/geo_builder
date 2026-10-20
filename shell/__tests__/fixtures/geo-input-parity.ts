@@ -1680,6 +1680,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2385 (ADR-AG-312): a common tangent through the circles' stated touch point is the tangent at it ──
   { id: 'common-tangent-through-touch-2385', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'T על AB', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2407' }], note: '2-D refuses it over-constrained (T, A, B collinear): the P1 port #2407; analytic was unsatisfiable before ADR-AG-312' },
+
+  // ── #2392 (ADR-AG-313): the common tangent named by its line, a line named after, the axis side of a crossing — analytic's ──
+  { id: 'named-common-tangent-2392', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'הישר l משיק למעגלים O ו-P בנקודות A ו-B בהתאמה'], expect: 'builds', exception: 'X4', only: ['analytic'], note: '2-D names no line (X4); analytic did not read it before ADR-AG-313' },
+  { id: 'name-line-2392', family: 'topic', steps: ['נקודה A', 'נקודה B', 'AB', 'נסמן את הישר AB ב-l'], expect: 'builds', exception: 'X4', only: ['analytic'], note: 'analytic did not read it before ADR-AG-313' },
+  { id: 'axis-cut-2392', family: 'topic', steps: ['נקודה A', 'נקודה B', 'הישר AB', 'הישר AB חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x'], expect: 'builds', exception: 'X1', only: ['analytic'], note: 'the axis side of a crossing, no point made; analytic did not read it before ADR-AG-313' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

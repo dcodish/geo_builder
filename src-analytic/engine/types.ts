@@ -456,8 +456,18 @@ export type Fact =
    * `onLine` is written by the fold, never the parser: the points the student's EARLIER lines put on the line ab. The
    * fold applies such a line AFTER this one when this one is what declares a and b («T על AB» typed first waits, in the
    * deferral fixpoint, for the line that defines A and B), so the figure M1 holds here cannot show it.
+   *
+   * `name` (#2392, ADR-AG-313) is the line's own name when the sentence gave one («הישר l משיק למעגלים N1 ו-N2 בנקודות
+   * P ו-Q»). The common tangent is a LINE: M1 draws it as the `line-at` through a along a→b, named `name` or the pair,
+   * and a name the figure already holds as a line is that line (the touches are stated on it, no second line).
    */
-  | (FactBase & { t: 'common-tangent'; a: Id; b: Id; circles: [Id, Id]; onLine?: Id[] })
+  | (FactBase & { t: 'common-tangent'; a: Id; b: Id; circles: [Id, Id]; onLine?: Id[]; name?: string })
+  /**
+   * «נסמן את הישר PQ ב-l» — THE LINE THROUGH a AND b TAKES THE NAME `name` (#2392, ADR-AG-313), the line twin of «נסמן
+   * את שטח ABCD ב-S». Which line is M1's question: the figure's line through the pair (it is re-named), or, when the
+   * figure draws only the segment, a new line on it under that name.
+   */
+  | (FactBase & { t: 'name-line'; a: Id; b: Id; name: string })
   /**
    * «המשיק למעגל בנקודה A» — THE TANGENT AS AN OBJECT (#1619 B3, ADR-AG-195): the line through A
    * perpendicular to the radius to A, on the circle `circle` names (contextual when absent). M1 resolves
@@ -1061,6 +1071,13 @@ export type Selector =
    * the data, never a third sign rule. `rhs` is another point or a value; a value may carry a parameter.
    */
   | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr } }
+  /**
+   * «הישר l חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x» — WHERE A LINE CROSSES AN AXIS, NO POINT MADE (#2392,
+   * ADR-AG-313). The line `line` meets the `axis` at a point whose other coordinate is > 0 (`greater`) or < 0: the
+   * y-axis at y = −c/b, the x-axis at x = −c/a. A region over configurations (D7 kind 2), strict at the solver's
+   * resolution; a line parallel to that axis meets it nowhere, so it fails both readings.
+   */
+  | { kind: 'axis-cut'; line: Direction; axis: 'x' | 'y'; greater: boolean }
   /**
    * «משולש חד זוויות ABC» — EVERY ANGLE OF THE TRIANGLE IS ACUTE (#1619 B2, ADR-AG-194).
    *

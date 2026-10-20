@@ -19,7 +19,7 @@ import { evalLengthExpr, type LengthExpr } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
-import { angleAt, dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
+import { angleAt, dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type Direction, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { withinSegment } from './extent';
 import { carryingLines } from './carryingLines';
@@ -1293,6 +1293,20 @@ function seedOrder(
   }
 }
 
+/** A line operand as its `ax + by + c = 0` triple in this configuration (#2392, ADR-AG-313); `null` while unplaced. */
+function lineTriple(d: Direction, at: (id: Id) => Pt | null, curveAt: (id: Id) => NumCurve | null): { a: number; b: number; c: number } | null {
+  if (d.k === 'axis') return d.axis === 'x' ? { a: 0, b: 1, c: 0 } : { a: 1, b: 0, c: 0 };
+  if (d.k === 'curve') {
+    const k = curveAt(d.id);
+    return k && k.kind === 'line' ? { a: k.a, b: k.b, c: k.c } : null;
+  }
+  if (d.k !== 'points') return null;
+  const p = at(d.a);
+  const q = at(d.b);
+  if (!p || !q || Math.hypot(q.x - p.x, q.y - p.y) < 1e-12) return null;
+  return { a: q.y - p.y, b: p.x - q.x, c: (q.x - p.x) * p.y - (q.y - p.y) * p.x };
+}
+
 function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[] {
   const apart = apartOf(at);
 
@@ -1408,6 +1422,20 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       }
       if (sides.some((x) => x === 0)) return false;
       return s.same ? sides.every((x) => x === sides[0]) : sides[0] !== sides[1];
+    }
+    /**
+     * WHERE A LINE CROSSES AN AXIS (#2392, ADR-AG-313) — «הישר l חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x». The line's
+     * own triple in this configuration (the one line resolver's normal form, `lineTriple`): the y-axis cut is −c/b, the
+     * x-axis cut −c/a. Strict at the figure's resolution, as `coord-compare`; a line parallel to that axis (within the
+     * resolution of its own direction) meets it nowhere, so neither reading holds.
+     */
+    if (s.kind === 'axis-cut') {
+      const atFn = (id: Id) => at.get(id) ?? null;
+      const t = lineTriple(s.line, atFn, curveAtOf(c, env, atFn));
+      if (!t) return true; // a line not placed yet judges nothing, as below
+      const across = s.axis === 'y' ? t.b : t.a;
+      if (Math.abs(across) <= SOLVE_RESOLUTION * Math.hypot(t.a, t.b)) return false;
+      return sideOfBound(-t.c / across, 0, spanOf(at)) === (s.greater ? 1 : -1);
     }
     const p = at.get(s.id);
     if (!p) return true; // a selector about an absent point judges nothing
