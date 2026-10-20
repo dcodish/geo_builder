@@ -330,6 +330,10 @@ export interface ParseContext {
    *  tangency kind — the deictic `circlePairPositions` never decides it (docs/17 §3b law 2). #2209
    *  ([ADR-703](../../docs/06-decisions.md#adr-703)): `a`/`b` are the record's circles in the order first stated. */
   statedTangencies?: Record<string, { at: string; external?: boolean; a: string; b: string }>;
+  /** #2407 ([ADR-740](../../docs/06-decisions.md#adr-740)) — SEMANTIC: for each point, the point pairs the construction
+   *  states it collinear with (`collinear` / `collinear-order` constraints, on-line / on-segment riders). Lets a common
+   *  tangent whose own letters pass through the circles' touch («T על AB» · «AB משיק משותף…») read as the tangent AT it. */
+  collinearWith?: Record<string, [string, string][]>;
   /** Recorded SIZE roles between circles (`set-radius-order`, concentric or not — issue #102): lets
    *  «המעגל הגדול/הקטן» resolve consistently once assigned. */
   radiusOrder?: { outer: string; inner: string }[];
@@ -9645,9 +9649,11 @@ const commonTangent: Rule = (s, ctx) => {
     .replace(/(?:\bat\b|בנקודה)\s*[A-Za-z]\d*\b/gi, ' ')
     .replace(/(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)[A-Za-z]\d*(?![A-Za-z])/gi, ' ')
     .replace(/tangent|משיק\S*|\bcommon\b|משותף|משותפת|\bline\b|הישר|הקו|למעגלים|מעגלים|לשני|המעגלים/gi, ' ');
-  const naming = [...new Set((namingText.match(/\b[A-Z]\d*(?:[A-Z]\d*)?\b/g) ?? []).flatMap((run) => run.match(/[A-Z]\d*/g) ?? []).map(up))].filter(
-    (p) => p !== at && p !== centres[0] && p !== centres[1] && p !== apex,
+  // `lineLetters` keeps a typed touch letter («TB משיק משותף … בנקודה T»); `naming` is the line's OTHER letters.
+  const lineLetters = [...new Set((namingText.match(/\b[A-Z]\d*(?:[A-Z]\d*)?\b/g) ?? []).flatMap((run) => run.match(/[A-Z]\d*/g) ?? []).map(up))].filter(
+    (p) => p !== centres[0] && p !== centres[1] && p !== apex,
   );
+  const naming = lineLetters.filter((p) => p !== at);
   const [c1, c2] = centres;
   const id1 = circleId(c1), id2 = circleId(c2);
   /** #2186 (ADR-679): a stated equal size lands on the pair, whichever construction this returns. */
@@ -9657,31 +9663,89 @@ const commonTangent: Rule = (s, ctx) => {
   // gets an auto (hidden-until-used) centre, per the family convention.
   const unstated = introduce || (resolved !== null && resolved !== 'introduce' && resolved.kind !== 'named');
   const haveCircles = new Set((ctx.circles ?? []).map((x) => x.toUpperCase()));
+  // #2407 (ADR-740, R1): a common tangent PRESUPPOSES its circles, so the letters of «למעגלים M ו-N» are a REFERENCE —
+  // tagged `implied` (ADR-347), so `impliedCircleBinding` names a drawn unnamed pair by them (interchangeable circles
+  // by order, ADR-565 d7) instead of drawing two more circles beside it. On an empty figure nothing binds: a creation.
+  const referenced = resolved !== null && resolved !== 'introduce' && resolved.kind === 'named';
   const mk: AnyCommand[] = [];
-  if (!haveCircles.has(c1)) mk.push({ type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, ...(unstated ? { autoCenter: true } : {}) });
-  if (!haveCircles.has(c2)) mk.push({ type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ifAbsent: true, ...(unstated ? { autoCenter: true } : {}) });
+  if (!haveCircles.has(c1)) mk.push({ type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, ...(unstated ? { autoCenter: true } : {}), ...(referenced ? { implied: true } : {}) });
+  if (!haveCircles.has(c2)) mk.push({ type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ifAbsent: true, ...(unstated ? { autoCenter: true } : {}), ...(referenced ? { implied: true } : {}) });
   // The touch point referenced by ROLE — «בנקודת ההשקה»/«בנקודת המגע» / "at the touch/tangency point"
   // (#197 Am. 5, the operator's exact follow-up to the at-touch hint): resolve THE common member of the
   // two circles. Without this the role phrase silently fell through to the label-less path and built a
   // SECOND external tangent — a wrong figure, all green. No common member (the circles aren't tangent
   // there) → escalate whole, never a silent mis-build.
-  let atResolved = at;
-  if (!atResolved && /בנקודת\s+ה?השקה|בנקודת\s+ה?מגע|at\s+the\s+touch(?:\s*point)?|at\s+the\s+tangency(?:\s*point)?/i.test(s)) {
+  // #2407 / #2406 (ADR-740) — THE TANGENT AT THE TOUCH. A common tangent through the pair's touch point is the tangent
+  // AT it (its two touches coincide there). Four exits reach it — a named «בנקודה X» (a), the touch by ROLE (b, #197
+  // Am. 5's lexicon widened to the common-point family), the line's OWN letters through the touch (c), and the capacity
+  // overflow below (Am. 7/8) — and all four lower through the one `touchTangent`, so none drops what the sentence names.
+  const stated = statedTangencyOf(ctx, id1, id2);
+  const pairKey = [id1, id2].sort().join('|');
+  /** The touch tangent's kind by geometry (Am. 8): externally tangent circles → internal; internally tangent → external. */
+  const touchKindOf = (): 'external' | 'internal' | undefined => {
+    if (stated) return stated.external === false ? 'external' : 'internal';
+    const p = ctx.circlePairPositions?.[pairKey];
+    return p === 'ext-tangent' ? 'internal' : p === 'int-tangent' ? 'external' : undefined;
+  };
+  /** The line's EXISTING letters through T: one of them IS T, or both are STATED collinear with T (semantic, never drawn). */
+  const lettersThrough = (T: string, letters: string[]): [string, string] | null => {
+    if (letters.length !== 2) return null;
+    if (letters.includes(T)) {
+      const other = letters.find((p) => p !== T)!;
+      return have.has(other) ? [T, other] : null;
+    }
+    const [a, b] = letters;
+    if (!have.has(a) || !have.has(b)) return null;
+    return (ctx.collinearWith?.[T] ?? []).some(([x, y]) => (x === a && y === b) || (x === b && y === a)) ? [a, b] : null;
+  };
+  /**
+   * The ONE at-touch lowering: `membership` (T on both circles, #2188's shape — the line refers to both circles it
+   * names), the drawn tangent `tan-T` (one identity, so Am. 3/4/7's capacity reader and Am. 6's meets see it), FRESH
+   * naming letters as markers on it (the at-variant, byte for byte), and EXISTING letters through T seated onto it by
+   * the `at` record, which then states the radius ⟂ itself (the #197 Am. 4 seat-before-⟂ order: it verifies at residual
+   * 0, nothing else moves — engine/apply.ts). An existing letter that does not reach T is not lowered; the label
+   * accountant declines the line, as before.
+   */
+  const touchTangent = (T: string, letters: string[], membership: AnyCommand[]): AnyCommand[] => {
+    const seat = lettersThrough(T, letters);
+    // The `at` record names both circles itself, so a STATED touch's implied memberships are not re-asserted beside it
+    // (measured: on a region-recruited prefix each one re-ran the whole solve, ~1 s); (a)'s own memberships always stay.
+    const keep = seat && membership.every((c) => c.type === 'point-on-circle' && c.id === T && stated?.at === T) ? [] : membership;
+    const cmds: AnyCommand[] = [...mk, ...keep, { type: 'tangent', id: `tan-${T}`, circle: id1, at: T, visible: true }];
+    const fresh = letters.filter((p) => p !== T && !have.has(p));
+    if (fresh.length) cmds.push(...lineMarkers(`tan-${T}`, fresh));
+    if (seat) cmds.push({ type: 'common-tangent', a: seat[0], b: seat[1], circle1: id1, circle2: id2, at: T } as AnyCommand);
+    return equal(cmds);
+  };
+  /** T's two memberships when it is the pair's STATED touch (implied by the tangency; kept for the accountant's rule 3). */
+  const touchMembership = (T: string): AnyCommand[] =>
+    stated?.at === T ? [{ type: 'point-on-circle', id: T, circle: id1 }, { type: 'point-on-circle', id: T, circle: id2 }] : [];
+  // (b) THE TOUCH BY ROLE — «(ה)עובר ב/דרך הנקודה המשותפת (לשני המעגלים)», «בנקודה המשותפת…», «בנקודת ההשקה/המגע»,
+  // "through/at the common point", "at the touch/tangency/contact point", "at the point of tangency/contact". The
+  // circles' common point is their touch only when they are tangent — crossing circles have two, apart ones none —
+  // so no touch escalates whole, never a mis-build (Am. 5). T is what the construction STATES (docs/17 §3b law 2); the
+  // deictic touch answers only for a pair with no stated record (Am. 5, as before).
+  const ROLE_TOUCH =
+    /(?:(?<![א-ת])ה?עובר\s+(?:ב|דרך\s+)|(?<![א-ת])ב)ה?נקודה\s+המשותפת|בנקודת\s+ה?(?:השקה|מגע)|\b(?:(?:passing\s+)?through|at)\s+the\s+common\s+point\b|\bat\s+the\s+(?:touch|tangency|contact)(?:\s*point)?\b|\bat\s+the\s+point\s+of\s+(?:tangency|contact)\b/i;
+  if (!at && ROLE_TOUCH.test(s)) {
     if (apex) return 'stop'; // an apex + the at-touch role form is a compound this rule can't couple — escalate, never drop A
-    const touch = ctx.circlePairTouches?.[[id1, id2].sort().join('|')];
-    if (!touch) return 'stop'; // the circles aren't tangent (no shared point) — escalate, never mis-build
-    // The role phrase REFERENCES the existing tangency (that's how the touch was resolved) — it asserts
-    // nothing new, so the lowering is ONLY the drawn tangent line at the touch. Re-asserting the
-    // memberships/collinearity (the at-variant's creation path) coupled into the existing tangency's
-    // joint solve and ground it for ~55 s.
-    return equal([...mk, { type: 'tangent', id: `tan-${up(touch)}`, circle: id1, at: up(touch), visible: true }]);
+    // the deictic common point answers only for a pair DRAWN tangent: a point on two crossing circles is one of two
+    const drawnTangent = ctx.circlePairPositions?.[pairKey] === 'ext-tangent' || ctx.circlePairPositions?.[pairKey] === 'int-tangent';
+    const touch = stated?.at ?? (drawnTangent ? ctx.circlePairTouches?.[pairKey] : undefined);
+    if (!touch) return 'stop'; // the circles aren't tangent (no single shared point) — escalate, never mis-build
+    const tk = touchKindOf();
+    if (kind && tk && kind !== tk) return 'stop'; // a kind the touch tangent is not names no line — escalate, never a two-touch one
+    return touchTangent(up(touch), lineLetters, touchMembership(up(touch)));
   }
-  if (atResolved) {
+  // (c) THE LINE'S OWN LETTERS REACH THE TOUCH — «T על AB» · «AB משיק משותף…», or «TB משיק משותף…»: only the tangent at T
+  // passes through T, so the two-touch construction (two DISTINCT touches on one line through T) cannot hold. A stated
+  // kind that is not the touch tangent's keeps the two-touch reading and its honest refusal.
+  if (!at && !apex && stated && lineLetters.length === 2 && (lineLetters.includes(stated.at) || lettersThrough(stated.at, lineLetters)) && (!kind || kind === touchKindOf()))
+    return touchTangent(stated.at, lineLetters, touchMembership(stated.at));
+  if (at) {
     if (apex) return 'stop'; // an apex + a named touch is a compound this rule can't couple yet — escalate, never drop A
-    const at = atResolved;
     // Variant 2 — the common tangent AT the shared touch point M ("tangent at the intersection").
-    const cmds: AnyCommand[] = [...mk];
-    const stated = statedTangencyOf(ctx, id1, id2);
+    const cmds: AnyCommand[] = [];
     if (have.has(at) && stated?.at === at) {
       // #2188 (ADR-672): M IS the pair's stated touch point — the tangency already makes it the common point with the
       // centres collinear, so the centre line states nothing new: re-asserting `set-line` forced an external order
@@ -9707,10 +9771,9 @@ const commonTangent: Rule = (s, ctx) => {
       const inherited = inheritedExternal(ctx, id1, id2);
       cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: inherited ?? true, ...(inherited === undefined ? { kindStated: false as const } : {}) });
     }
-    cmds.push({ type: 'tangent', id: `tan-${at}`, circle: id1, at, visible: true });
-    const fresh = (naming ?? []).filter((p) => !have.has(p));
-    if (fresh.length) cmds.push(...lineMarkers(`tan-${at}`, fresh));
-    return equal(cmds);
+    // (a)'s memberships are above; the line itself is the one at-touch lowering (#2407, ADR-740): fresh letters as
+    // markers (unchanged), existing ones through the touch seated onto it («T על AB» · «… בנקודה T»).
+    return touchTangent(at, lineLetters, cmds);
   }
   // (`kind` is hoisted to the trigger above, #212: «חיצוני»/«מבחוץ» external ⇔ centres on the same
   // side of the tangent; «פנימי»/«מבפנים»/«אלכסוני» internal ⇔ opposite sides — a REQUIREMENT
@@ -9759,7 +9822,9 @@ const commonTangent: Rule = (s, ctx) => {
     // the touch kind BUILDS it directly.
     const touchKind = position === 'ext-tangent' ? 'internal' : 'external';
     if (touchFree && wantPairs === 1 && (kind === undefined || kind === touchKind)) {
-      return equal([...mk, { type: 'tangent', id: `tan-${up(touch)}`, circle: id1, at: up(touch), visible: true }]);
+      // #2407 (ADR-740, R3): the one at-touch lowering — T on both circles the line names, its letters as markers —
+      // where this exit used to emit the line on circle 1 alone and drop the letters (the accountant then declined it).
+      return touchTangent(up(touch), lineLetters, touchMembership(up(touch)));
     }
     return { clarify: 'tangents-exhausted', kind: kind ?? 'any', ...(touchy && touchFree ? { hint: 'at-touch' as const } : {}), ...(position ? { position } : {}) };
   }

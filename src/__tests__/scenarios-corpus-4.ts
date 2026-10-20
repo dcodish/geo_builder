@@ -5462,6 +5462,22 @@ export const SCENARIOS_4: Scenario[] = [
       expect(latinProseLabels('highlight right triangles', old, ['A', 'B', 'C']).length, 'the net flags the old reading').toBeGreaterThan(0);
     },
   },
+  {
+    id: 'common-tangent-external-through-touch-refused-2407',
+    title: '«T על AB» through the touch of two externally tangent circles, then «AB משיק משותף חיצוני …» is refused — no external common tangent passes through T (#2407, ADR-740)',
+    guards:
+      "#2407 (P1), operator ruling 2026-10-20 on #2385: *\"it draws the wrong line and says its impossible\"*. ADR-740 makes a common tangent whose own letters pass through the circles' touch point the tangent AT the touch («T על AB» · «AB משיק משותף למעגלים M ו-N», «… פנימי …», «TB …»). The tangent at the touch of externally tangent circles is an INTERNAL common tangent (Am. 8), so a stated «חיצוני» names no line through T: the at-touch reading is not taken and the two-touch reading's honest refusal stands, exactly as at 3cae7f25 (`over-constrained: T, A, B collinear cannot hold`). The figure keeps the circles, T and segment AB, with no tangent drawn. The class test is src/__tests__/issue-2407-common-tangent-at-touch.test.ts.",
+    steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'T על AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'T על AB']);
+      const v = gateVerdict(facts, 'AB משיק משותף חיצוני למעגלים M ו-N');
+      expect(v.kind, JSON.stringify(v)).toBe('refused');
+      expect(v.kind === 'refused' && v.reason, 'refused by the engine, before commit').toBe('error');
+      expect(v.kind === 'refused' && v.detail, 'names the collinearity the external tangent cannot keep').toContain('T, A, B collinear cannot hold');
+      expect(gateVerdict(facts, 'AB משיק משותף פנימי למעגלים M ו-N').kind, 'the touch tangent\'s own kind builds').toBe('commit');
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

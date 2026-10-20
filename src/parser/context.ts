@@ -273,6 +273,37 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
       }
       return out;
     })(),
+    // #2407 ([ADR-740](../../docs/06-decisions.md#adr-740)) — SEMANTIC: for each point, the point pairs the construction
+    // STATES it collinear with — its `collinear` / `collinear-order` constraints («T על AB» over a placed T), and the
+    // two-point line or segment an on-line / on-segment rider sits on. Read off the constraints and object kinds, never
+    // off coordinates (docs/17 §3b): it is how the common tangent learns that its own letters pass through the touch.
+    collinearWith: (() => {
+      const out: Record<Id, [Id, Id][]> = {};
+      const add = (p: Id, a: Id, b: Id) => {
+        if (p === a || p === b || a === b) return;
+        const list = (out[p] ??= []);
+        if (!list.some(([x, y]) => (x === a && y === b) || (x === b && y === a))) list.push([a, b]);
+      };
+      const triple = (pts: Id[]) => {
+        for (const p of pts) {
+          const others = pts.filter((q) => q !== p);
+          for (let i = 0; i < others.length; i++) for (let j = i + 1; j < others.length; j++) add(p, others[i], others[j]);
+        }
+      };
+      for (const k of construction.constraints) {
+        if (k.type === 'collinear') triple([k.a, k.b, k.c]);
+        else if (k.type === 'collinear-order') triple(k.points);
+      }
+      const lineById = new Map(construction.objects.flatMap((o) => (o.kind === 'line' && o.spec.via === 'through' ? [[o.id, [o.spec.a, o.spec.b] as [Id, Id]] as const] : [])));
+      for (const o of construction.objects) {
+        if (o.kind === 'on-segment') triple([o.id, o.a, o.b]);
+        else if (o.kind === 'on-line') {
+          const ab = lineById.get(o.line);
+          if (ab) triple([o.id, ab[0], ab[1]]);
+        }
+      }
+      return out;
+    })(),
     // The TOUCH POINT of each tangent circle pair, resolved POSITIONALLY (#197 Am. 5): the point lying
     // on both circles (within tol) — the referent of the ROLE phrase «בנקודת ההשקה» / "at the touch
     // point". Membership lists can't answer this (the coincide-driven construction registers the touch

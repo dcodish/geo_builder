@@ -871,6 +871,27 @@ changes, so the source of truth stays `(facts, seed)`), and the memo signature c
 point and operand order come from the first record (ADR-703). The verifier's containment check is closed
 (`d + r_b ≤ r_a + tol`) when the same pair is stated internally tangent, and strict otherwise.
 
+### The common tangent at the touch ([ADR-740](06-decisions.md#adr-740))
+
+`commonTangent` asks one resolver before its two-touch path, in this order: (a) a named «בנקודה X»; (b) the touch by
+ROLE (`ROLE_TOUCH`: «(ה)עובר ב/דרך הנקודה המשותפת…», «בנקודה המשותפת…», «בנקודת ההשקה/המגע», "through/at the common
+point", "at the touch/tangency/contact point"); (c) the line's own letters reach the touch — T is one of them, or both
+exist and `ctx.collinearWith[T]` holds the pair. T comes from `statedTangencies`; Am. 5's deictic `circlePairTouches`
+answers (b) only for a pair with no stated record that is drawn tangent. (b) with no touch, or with a kind the touch
+tangent is not (internal for an externally tangent pair, external for an internally tangent one), is `'stop'`; (c)
+then falls to the two-touch path. `collinearWith` is a semantic field: `collinear` / `collinear-order` constraints and
+on-segment / on-line riders, never coordinates.
+
+Every exit — (a), (b), (c) and the capacity overflow (Am. 7/8) — lowers through `touchTangent`: the stated touch's two
+memberships, the drawn `tangent tan-T`, fresh letters as `lineMarkers`, and existing letters through T as the seat
+record `common-tangent { a, b, circle1, circle2, at: T }` (a seated line drops the stated touch's memberships — the record
+names both circles; (a) keeps its own). The record's apply arm makes each free letter (a free point, or one solved only by
+the collinearity through T) an `on-line` rider of `tan-T` at its signed distance from T along the stated line (so the
+radius ⟂ holds by construction at every sample), and re-seeds the circles' free radii at the drawn touch. A letter
+something else places is not moved; the radius ⟂ (centre1·T ⟂ a·b) is then the plain statement (`driveOrCheck`). An `at` record has one configuration (`variantCountOf`), no kind and no
+`avoid`, and is not a two-touch entry of `ctx.commonTangents`. The rule's creations of named circles carry
+`implied: true`, so `impliedCircleBinding` names a drawn unnamed pair by them (ADR-347, ADR-565 d7).
+
 ### A fixed-run rule consumes the whole label body ([ADR-601](06-decisions.md#adr-601))
 
 `labelRun(body, n)` returns the first run of exactly n labels and nothing about the rest of the body, so a rule

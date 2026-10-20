@@ -2102,3 +2102,7 @@ over all four (ADR-041).
 ### `english-words-not-labels-2195` — «משולש ABC» · "highlight right triangles" records no ∠TRI = s — never committed (#2195, ADR-738)
 
 **Guards against:** «triangles» read as T, R, I and committed as a green measure row. **Asserts** the line no longer parses, and the battery's `latinProseLabels` flags the reading it used to make.
+
+### `common-tangent-external-through-touch-refused-2407` — «T על AB» through the touch of two externally tangent circles, then «AB משיק משותף חיצוני …» is refused — no external common tangent passes through T (#2407, ADR-740)
+
+**Guards against:** the at-touch reading (ADR-740) taken for a stated kind the touch tangent is not, which would draw an "external" tangent that is internal. **Asserts** the external line is refused by the engine before commit, naming `T, A, B collinear cannot hold` (as at 3cae7f25), and the touch tangent's own kind («פנימי») commits.
