@@ -422,6 +422,15 @@ interface AnalyticState {
  */
 export const spokenPart = (spoken: string, k: number, n: number): string => (n > 1 ? `${spoken} (${k + 1}/${n})` : spoken);
 export const spokenSentence = (label: string): string => label.replace(/ \(\d+\/\d+\)$/, '');
+/**
+ * THE TEXT A ROW SHOWS (#2424, ADR-AG-326 — the operator's ruling (c), 2026-10-20): the student's sentence when the
+ * model answered it with ONE line (#1297, unchanged), and the row's OWN machine line when the model split it into
+ * parts — a marked label is a part, and showing the same sentence on every part read as a duplicate. The marker
+ * stays in the store: the question export (#1872), rename and saves read it. Every surface that names a row by
+ * its text (the givens list, the shape warning, the narrowing note) reads it through here.
+ */
+export const rowShownText = (line: string, spoken: string | undefined): string =>
+  spoken !== undefined && spokenSentence(spoken) === spoken ? spoken : line;
 
 /** One letter change, as one set — lines, ask rows, display sentences, seed names (#1154, #1631). */
 const letterCommit = ({ lines, queries, spokenFor, seedNames, segStyle, curveStyle }: LetterCommit) => ({

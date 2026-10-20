@@ -78,7 +78,7 @@ import type { LetterRenameResult } from '../shell/frame/letterOffer';
 import { anotherConfiguration } from './app/another';
 import { offersOf, pointAt } from './engine/crossings';
 import { VERTICAL_TOL } from './engine/lines';
-import { useAnalyticStore, type InputError } from './store/useAnalyticStore';
+import { rowShownText, useAnalyticStore, type InputError } from './store/useAnalyticStore';
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
 import { forgetSessionAn, offeredSessionAn, restoreSessionAn, startSessionPersistAn } from './app/sessionPersistAn';
 // #1372 (ADR-W-080): a figure travels as a LINK here too — the operator could not share an analytic session.
@@ -1375,7 +1375,7 @@ export function App() {
                   {shapeWarningText(
                     w,
                     t,
-                    analyticBidi.isolateLtrRuns(spokenFor[rows[w.forcedBy]] ?? w.line),
+                    analyticBidi.isolateLtrRuns(rowShownText(w.line, spokenFor[rows[w.forcedBy]])),
                     analyticBidi.isolateLtrRuns(w.shape),
                   )}
                 </Banner>
@@ -1392,7 +1392,7 @@ export function App() {
                   {narrowingText(
                     n,
                     (k, o) => t(k, o) as string,
-                    (i) => analyticBidi.isolateLtrRuns(spokenFor[rows[i]] ?? active[i] ?? ''),
+                    (i) => analyticBidi.isolateLtrRuns(rowShownText(active[i] ?? '', spokenFor[rows[i]])),
                     (ring) => analyticBidi.isolateLtrRuns(ring),
                   )}
                 </Banner>
@@ -1424,8 +1424,8 @@ export function App() {
                  */
                 content: (
                   <>
-                    {/* #1297: a fallback-built row shows the STUDENT's sentence, never model output. */}
-                    <MathText text={analyticBidi.isolateLtrRuns(spokenFor[i] ?? line)} />
+                    {/* #1297: a fallback-built row shows the STUDENT's sentence; a PART of a split answer shows its own line (#2424). */}
+                    <MathText text={analyticBidi.isolateLtrRuns(rowShownText(line, spokenFor[i]))} />
                     {/* #1281 — a name the TOOL chose is said on the row that caused it (the #1263 ruling). */}
                     {d.minted
                       .filter((m) => rows[m.index] === i)

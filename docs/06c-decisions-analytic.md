@@ -8193,6 +8193,8 @@ The pre-played sheet (20 cases, 8 red) and the operator ruling of the same day. 
 
 ## ADR-AG-172 — The fallback teaches the session's language: a one-locale prompt, and rows that show the student's own sentence (#1297)
 
+**⚠ Partly superseded by [ADR-AG-326](#adr-ag-326) (2026-10-20):** a row that is one PART of a split answer shows its own line, not the sentence. A one-line answer still shows the sentence, and the stored annotation stands.
+
 **Status:** accepted · 2026-09-28 · operator rulings 2026-09-24 (*"nothing should be in english if data was entered in hebrew"*) and 2026-09-27 (*"student's words now, form later"* — the proper-form-beside split to #1468) · round #1510. Numbered 172 beside the round's parallel branches.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R104 family (the escape's promise) · **Design:** [04c](04c-design-analytic.md) fallback
@@ -13508,3 +13510,23 @@ No other sequence moved.
 - `message-floor-2028` registers the key.
 
 **Consequences.** `app/capitalSize.ts` (new), `app/submit.ts` (`decideOnce`, `decideEdit`), `app/errorText.ts`, `store/useAnalyticStore.ts`, `i18n/index.ts`; `shell/__tests__/fixtures/geo-input-parity.ts` (X11); docs 02c R183, R193; 04c; 22 §10.
+
+## ADR-AG-326 — A sentence the fallback splits into parts shows one row per part, worded as the part (#2424)
+
+**Status:** accepted · 2026-10-20 · operator report playing round #2414 T21 (*"the part where an input is separated into 2 is not clear to users since they just see the same line twice. so it looks like a bug"*), ruling **(c)** the same day · round #2436.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R194 (new), R136 (one clause) · **Design:** [04c](04c-design-analytic.md) — a row's shown text
+
+**Context.** [ADR-AG-172](#adr-ag-172) made every fallback-built row display the student's sentence over the machine line, with a part marker «(k/n)» past one line. When the model split one sentence into n lines, the student saw the same sentence n times, told apart only by the marker, which does not say what each row holds. Every surface that names a row by its text read `spokenFor[i] ?? line`: the givens list, the shape warning and the narrowing note.
+
+**Decision.** One function, `rowShownText(line, spoken)`, in `store/useAnalyticStore.ts` beside the marker's writer (`spokenPart`) and reader (`spokenSentence`): the sentence when it carries no part marker, else the row's own machine line, through the same `MathText` and bidi isolation as a typed line. All three surfaces read it. The marker is still written by `recordLlmLines` and stored, because the question export (#1872, ADR-AG-269), rename and saves read it; the export still prints the sentence once. Old saves carry the same markers and load unchanged.
+
+**Rejected.** (a) one row per sentence and (b) one row with its parts beneath — the operator chose (c). Dropping the marker from the store — the export groups a split answer by it.
+
+**Parity.** 2-D and 3-D show the model's own lines one per row, so this converges on them. Complex has no `spokenFor` (grepped). No port issue.
+
+**Behaviour change for a student.** A sentence the AI answers with several lines lists each line as its own row; a one-line AI answer still shows the student's sentence. The shape warning and the narrowing note, when they name such a row, name its line.
+
+**Locks.** `src-analytic/__tests__/issue-2424-split-answer-rows.test.tsx` — the rule; the real App's givens list for a 2- and a 3-part answer (own lines, no sentence, no marker), a one-line answer (the sentence), a mixed list; the fixture `issue-2424-split-answer-t21.analytic.json` (the oracle's two lines for T21's first sentence, with the markers an old save carries) builds K = (3, 4), loads with no failure and lists the two lines; the export prints the sentence once; a source lock that App.tsx names no row through `spokenFor[...] ??`. `issue-1297-hebrew-fact` and `question-export-1872` unchanged and green.
+
+**Consequences.** `store/useAnalyticStore.ts` (`rowShownText`), `App.tsx` (three call sites); docs 02c, 04c.
