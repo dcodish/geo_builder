@@ -219,7 +219,10 @@ describe('#1622 E5 — «נסמן זוית BAM כ-A1»: an angle named by a labe
 describe('#1622 E5 — «נסמן את שטח ABCD ב-S» on an empty canvas introduces the quadrilateral it names', () => {
   it('builds: the quadrilateral ABCD with free vertices, and S is the area of the drawn ring at every seed', () => {
     expect(kinds(['נסמן את שטח ABCD ב-S'])).toEqual(['record']);
-    const areas = SEEDS.map((seed) => {
+    // Re-based for #2419 (ADR-AG-323): S is an area, so it is positive and starts every solve from a positive value. The
+    // first ten seeds now reach one drawable configuration (the negative starts were what landed seeds 0–2 elsewhere),
+    // so the window that shows S moving is sixteen seeds.
+    const areas = Array.from({ length: 16 }, (_, i) => i).map((seed) => {
       const d = clean(['נסמן את שטח ABCD ב-S'], seed);
       expect(d.figure.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'D']);
       expect(d.figure.segments.filter((s) => s.id.startsWith('poly-ABCD')).length).toBe(4);

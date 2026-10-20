@@ -46,6 +46,25 @@ never from F11 declarations (#1014); `carrierOf` / `symbolDeps` / `objectDeps` a
 ([ADR-AG-144](06c-decisions-analytic.md#adr-ag-144)). **There is deliberately no topological sort**: `apply` refuses a
 reference to a missing object, so declaration order is evaluation order (`depsPrecedeDependents`, #1028).
 
+**A letter's role can give it a domain** ([ADR-AG-323](06c-decisions-analytic.md#adr-ag-323), #2419): `sizeLetters(c)`
+reads which letters stand for a size, numerically and without a CAS — `linear` (a circle-at radius `m·t`, m > 0, or a
+length / distance / perimeter / area constraint valued by `m·t`, the `impliedRange` three-evaluation test) and `even`
+(an equation circle whose radius is `m·|t|` at t ∈ {1, 2, −1.5} with the centre fixed). `paramRegister` intersects the
+stated domain with (0, ∞) **in place** (`sizeDomain`), so the register's order, and with it every sampler salt, is
+unchanged; an `even` letter whose stated domain has no positive value keeps it. The domain is derived, never stored, so
+roles only grow as facts are added. The apply boundary asks one question of the construction after every statement,
+beside `radiusLetterClash`: `sizeContradiction` (a `linear` letter whose stated domain has no positive value) refuses
+the statement `out-of-domain`, and a declaration the role already implies is `known`. `emptyDomain` is the one
+emptiness test, shared with `admitStated`.
+
+**The sampler works in the figure's units** ([ADR-AG-324](06c-decisions-analytic.md#adr-ag-324), #2426): `statedScale`
+(`pinRoots.ts`, the largest stated literal, ≥ 1; `pinReach` is 64× it) sets the half-bounded / unbounded magnitude of
+`sampleParam` to [1, max(4, 1.5·S)) and the free-vertex seeding box to at least 1.5·S a side — only for what
+`reachedByGivens` (`carriers.ts`: every symbol and object a constraint touches, through `inputsOf`) leaves
+unreached; a solved parameter or vertex keeps the old start. Configuration 0 never widens: `evaluate(c, seed, reach,
+wide)` carries the flag through the choice walk, the created-shape fit, the restarts and `drawableAt`'s walk from 0.
+`residualScale` keeps the ruled span.
+
 **The freedom count has one rank** ([ADR-AG-309](06c-decisions-analytic.md#adr-ag-309), #2383): `solve.ts`
 `jacobianRank` — the central-difference Jacobian, rows equilibrated to unit length, a one-sided Jacobi SVD, a singular
 value counted above `RANK_REL_TOL · σ_max` (`10 · SOLVE_TOL`, the residue a dependent row keeps at an accepted solve).

@@ -1403,7 +1403,7 @@ the closed-endpoint ruling and a scale check at 1000×.
 
 ## ADR-AG-022 — An unbounded parameter varies in SIGN; seed 0 may still be the familiar draw (#1019)
 
-**Status:** accepted, 2026-09-15 · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056)
+**Status:** accepted, 2026-09-15 · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056) · **Amended by [ADR-AG-324](#adr-ag-324) (2026-10-20, #2426):** past configuration 0 the magnitude is in the figure's own units, [1, max(4, 1.5·S)), for a parameter no given reaches; seed 0 keeps [1, 4)
 
 **Requirements:** [02c](02c-requirements-analytic.md) §9 R46. **Design:** none (internal to
 `engine/evaluate.ts`'s sampler).
@@ -8096,7 +8096,7 @@ The pre-played sheet (20 cases, 8 red) and the operator ruling of the same day. 
 
 ### ADR-AG-169 Am. 1 — the pre-played sheet: one role reader, one ask normaliser, one substitution seam (2026-09-29 pre-play)
 
-**Status:** accepted · 2026-09-29 · the pre-played sheet on PR #1513 (20 cases, 10 red) and the operator's go-ahead to fix the five open PRs the same day.
+**Status:** accepted · 2026-09-29 · the pre-played sheet on PR #1513 (20 cases, 10 red) and the operator's go-ahead to fix the five open PRs the same day. **Amended by [ADR-AG-323](#adr-ag-323) (2026-10-20, #2419):** the domain of a positive multiple («שרדיוסו 2a») is now carried back onto `a` (a > 0) through the size-letter role, not through this seam.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R180 (new; numbered R122 until #2404) · **Design:** [04c](04c-design-analytic.md#measure-roles-one-reader-one-ask-normaliser-one-substitution-seam-adr-ag-169-am-1)
 
@@ -13238,7 +13238,7 @@ No other sequence moved.
 
 ## ADR-AG-307 — Relations between parameters; R is the one capital that names a size (#2388)
 
-**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream B); branch `feat/2388-analytic-param-relations`, stacked on ADR-AG-306's branch, for the operator's play-and-approve. **Amends** [ADR-AG-163](#adr-ag-163) (a capital is never a parameter, except R) and [ADR-AG-238](#adr-ag-238) (`LENGTH_CAPITALS` → `RADIUS_CAPITALS`, now used by every reader). LADDER stage: none (analytic's joint solve; LADDER describes 2-D's ladder).
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream B); branch `feat/2388-analytic-param-relations`, stacked on ADR-AG-306's branch, for the operator's play-and-approve. **⚠ Partly superseded by [ADR-AG-323](#adr-ag-323) (2026-10-20, #2419):** its line "No `r > 0` is inferred" no longer holds: a radius written squared in an equation is positive, so Q2 in the exam's form shows one equation per circle. **Amends** [ADR-AG-163](#adr-ag-163) (a capital is never a parameter, except R) and [ADR-AG-238](#adr-ag-238) (`LENGTH_CAPITALS` → `RADIUS_CAPITALS`, now used by every reader). LADDER stage: none (analytic's joint solve; LADDER describes 2-D's ladder).
 
 **Requirements:** [02c](02c-requirements-analytic.md) R183 (new: relations and proportions between parameters, the radius ratio, R as the radius capital, the clash refusal); R164 notes R's wider reading. · **Design:** [04c](04c-design-analytic.md) "A value never mentions the plane" (the R exception), "A Greek angle name is a parameter" (the Latin relation), "Arcs, sectors and the diameter from a point" (`radius-ratio` reads the resolved circle's radius).
 
@@ -13293,7 +13293,7 @@ No other sequence moved.
 **The exam's equation form: measured, not inferred.** With both circles by equation (`(x−a)²+y²=r²`, `(x−13)²+y²=R²`), the ratio sentence and «r < R», the radii appear only as r² and R². «r < R» therefore does not make them positive: (r, R) = (3, 6) and (−6, 3) both satisfy every given.
 - The panel prints a = 4 and lists each equation with its two options.
 - With «R = 2r» instead of the ratio, r = 3 and R = 6 are known.
-- No `r > 0` is inferred. That is the #2382/#2387 plan's pickup check 4, and whether a radius parameter written in an equation is positive is a question for the operator (#2419, `needs-operator`).
+- **⚠ Superseded by [ADR-AG-323](#adr-ag-323):** ~~No `r > 0` is inferred.~~ That is the #2382/#2387 plan's pickup check 4, and whether a radius parameter written in an equation is positive is a question for the operator (#2419, `needs-operator`).
 
 **Parity.** None. 2-D reads R and r as ONE radius symbol (ADR-034), so «R = 2r» means nothing there; 3-D and complex have no radius parameters. The divergence is deliberate (the exam uses both letters). No port issue.
 
@@ -13387,3 +13387,88 @@ No other sequence moved.
 **Behaviour change for a student:** «נתונים שני מעגלים המשיקים זה לזה מבחוץ» (and its siblings) on an empty canvas draws two tangent circles with unlettered centres (before: «which circles?»); «מרכזו של המעגל האחד / האחר …» then describes them (before: a third and fourth circle, tangency lost); «O מרכז המעגל» names a tangent pair by order (before: asked); a drawn circle takes a later «משוואת המעגל …» (before: refused as a contradiction).
 
 **Consequences.** `engine/apply.ts` (`describeDrawnCircle`, `standardCircleParts`, `normaliseSymmetric`, `circle-eq`, `centre-of`, `tangent-circles`), `engine/types.ts` (`tangent-circles.circles`, `centre-of.ofPair`), `parser/parseAnalytic.ts` (`circleSubjectFacts`, `centreOfCircle`, `PAIR_ORDINAL`), `parser/frameAnalytic.ts` (`circleCentreClauses`), `parser/catalogAnalytic.ts`; `shell/__tests__/fixtures/geo-input-parity.ts`; docs 02c R190, R162, R140; 04c; ADR-AG-219 and ADR-AG-315 stamped.
+
+## ADR-AG-323 — A letter that stands for a size is positive (#2419)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature (P2, analytic), fix round #2436 (stream C); branch `feat/2419-size-letters-positive`, for the operator's play-and-approve. **Partly supersedes** [ADR-AG-307](#adr-ag-307) ("No `r > 0` is inferred"); **amends** [ADR-AG-169](#adr-ag-169) Am. 1 (the domain of `2a`, "not built", is built) and R46 ([ADR-AG-022](#adr-ag-022): sign included, except a size). LADDER stage: none (a parameter domain read from the construction; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R191 (new: the class, what is not in it, the refusal, «r > 0» already known), R46 (amended: except a letter that stands for a size) · **Design:** [04c](04c-design-analytic.md) § "The model — objects, and the register that makes them free" (`sizeLetters`, `sizeDomain` in the register, `sizeContradiction` at the apply boundary, `emptyDomain`)
+
+**Ruling.** Operator, 2026-10-20 on #2419: *"r for radius like any letter represending size needs to be positive"*. Option (a), and wider: a letter that stands for a size (a radius, including one squared in a circle's equation, a length, a distance) is positive, as «שרדיוסו r» already is.
+
+**Class.** *A letter whose role in the figure is a size is sampled and solved over both signs.* Positivity was inferred in one statement family only (`radius-of`, through `admitStated`'s lone-symbol merge). A radius written inside an equation (`(x−a)²+y²=r²`, `R²`, `4r²`), a positive multiple (`שרדיוסו 2r`) and a length, distance, perimeter or area valued by a letter (`length-eq`, `area`) never asked. Q2 in the exam's form listed each circle with two options ((r, R) = (3, 6) and (−6, 3) both satisfy every given); «x²+y²=r²» · A(3,4) on it read «r = −5 או 5».
+
+**Decision.**
+1. **`sizeLetters(c)`** (`engine/carriers.ts`, the DOF contract) reads each letter's role numerically (no CAS). `linear`: a circle-at radius, or a length-eq / area constraint whose one side is a positive measure (no parameter, positive at three probe term assignments) and whose other side is `m·t`, m > 0 (three evaluations, the `impliedRange` device; only a constraint that holds, top level or inside `all`, never a `choice` option). `even`: an equation circle whose radius is `m·|t|` at t ∈ {1, 2, −1.5} with the centre fixed. A letter that moves the centre in the same equation (`(x−a)²+y²=a²`) is not a size. The tool's own symbols (`r_O`, `θ_…`) carry their own domains and are skipped. Memoized on the (immutable) construction.
+2. **The register applies it in place.** `paramRegister` intersects each role letter's stated domain with (0, ∞) (`sizeDomain`). Every reader (the sampler, the pin-root scan, `admissible`, the panel's `domainText`) reads the register, so all see one domain. **Deviation from the plan, mechanism only:** the plan stored the narrowing as a `params` entry through the `param` merge. A stored entry moves the letter into the declared block of the register, which re-orders it, and with it every sampler salt. Measured, it would have moved seed 0 of an undeclared `(x−a)²+y²=r²` (a's salt 1 → 2). Derived in place, the order and every salt are unchanged, and a role can never be lost (roles only grow as facts are added).
+3. **One question at the apply boundary**, beside `radiusLetterClash` in `applyFact` (every statement lands there, in both orders). `sizeContradiction` (a `linear` letter whose stated domain has no positive value) refuses the statement `out-of-domain` with the radius's own message (range «> 0»), naming the statement: «a < 0» · «AB = a» names «AB = a»; «AB = a» · «a < 0» names «a < 0» (both were `unsatisfiable`). An `even` letter declared negative is accepted: `x²+y²=a²` reads a² only and contradicts nothing (a circle of radius |a|).
+4. **A declaration the role already implies is `known`**: «r > 0», «k > 0» or «r הוא פרמטר» after the size answers «already known», as after «שרדיוסו r». A bound that narrows further («r < 4») records.
+5. `emptyDomain` is the one emptiness test; `admitStated` uses it.
+
+**Stability.** `sampleParam({min: 0, minOpen: true})` is exactly `|sampleParam({})|` at every seed and reach (locked), so a squared-radius circle is drawn identically at every seed. The configurations that leave are the negative-radius ones the ruling removes: the exam's seeds 1–5 solved (r, R) = (−6, −3) or (−6, 3), drawn as radii 6 and 3; now every seed is 3 and 6. Seed 0 is unchanged. A `linear` letter that a solve pins (`AB = k` on a free B, an area letter) now always starts the solve from a positive value, so at the seeds whose start was negative the descent can land another basin. One lock re-based for this: `issue-1622-e5-last-rows`, where «נסמן את שטח ABCD ב-S» reaches a second drawable quadrilateral at seed 10 (it did at seed 3), so its window is sixteen seeds. Perf: the exam corpus (13 fixtures × 3 seeds × 3 repeats) derived in the same time with and without the reader, within machine noise (17.5 s vs 19.2 s, then 31.9 s vs 31.6 s, alternated on a loaded machine).
+
+**Not in the class** (kept, by the ruling's "stands for a size"): a coordinate, slope or intercept (`M(a,0)`, `y=mx+n` keep both signs); a squared radius that also places the centre in its equation; a ratio (`radius-ratio`, `angle-ratio`); an angle (`impliedRange`). A letter-valued point-to-line distance does not parse today; it joins the class when it lowers to a `length-eq`.
+
+**Sibling audit.** Grepped `paramRegister` / `sampleParam` / `minOpen` in `src/`, `src3d/`, `src-complex/`: no free letter domains exist there (2-D's sizes are magnitudes by construction; complex's modulus is positive, #2078). Class not present.
+
+**Behaviour change for a student.**
+- Q2 written as the exam writes it shows r = 3, R = 6, one equation per circle.
+- «x²+y²=r²» · A(3,4) on it shows «r = 5»; the row of an open size letter reads «0 < r».
+- «שרדיוסו 2r», «AB = k», «אורך AB הוא k», «המרחק בין A ל-B הוא d», «שטח/היקף המשולש ABC הוא k» read the letter as positive.
+- «a < 0» with «AB = a», in either order, is refused with the out-of-range message naming the later sentence.
+- «r > 0» after such a size answers «already known».
+
+**Locks.**
+- `src-analytic/__tests__/issue-2419-size-letters.test.ts` (30 tests): the role table (the plan's 14 rows); r = 5 known; six size spellings positive at 12 seeds; the refusal in both orders, with the radius route as control; the guards (a negative squared radius accepted, `(x−a)²+y²=a²` → a = −2, a coordinate and two line coefficients keep both signs over 30 seeds); «already known» four ways and the narrowing control; the `sampleParam` equality (s 0..30, reach 1 and 2); the equation circle's radius equal to the unbounded draw at 12 seeds; both Q2 exam fixtures (`issue-2388-q2-exam-equations`, `issue-2391-q2-exam-wording`) with r = 3, R = 6 known at 12 seeds.
+- `issue-2388-parameter-relations.test.ts`: the exam-form case flipped to one equation per circle (circle I (4,0) r 3, circle II (13,0) r 6 at 12 seeds); in the equation-circle ratio case, «c>0» is now already known.
+
+**Consequences.** `engine/carriers.ts` (`sizeLetters`, `sizeDomain`, `sizeContradiction`, `impliesPositive`, `emptyDomain`, `positivePart`; `paramRegister`), `engine/apply.ts` (`applyFact`'s size question, `sameRegisterDomain`, `admitStated` on `emptyDomain`); docs 02c, 04c.
+
+## ADR-AG-324 — A free parameter, and a free vertex, are sampled in the figure's own units (#2426)
+
+**Date:** 2026-10-20 · **Status:** accepted · bug (P2, analytic), fix round #2436 (stream C); branch `fix/2426-param-figure-units`, stacked on `feat/2419-size-letters-positive` ([ADR-AG-323](#adr-ag-323)). **Amends** [ADR-AG-022](#adr-ag-022) (the half-bounded and unbounded magnitude is no longer the fixed [1, 4) past configuration 0) and R46. LADDER stage: the solve's seeding (the sampler and the free-vertex box), before stage one.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R192 (new: the range of a free parameter and a free vertex in the figure's units, the first drawing unchanged), R46 (amended: "in the figure's own units") · **Design:** [04c](04c-design-analytic.md) § "The model — objects, and the register that makes them free" (`statedScale`, `sampleParam`'s scale, `reachedByGivens`, `evaluate`'s `wide`)
+
+**Report.** Operator, round #2414 T9: *"before i write MN = 9, all different configs have a<13"*. With «a הוא פרמטר חיובי» · «M(a,0)» · «N(13,0)», 30 presses drew a only in [1.16, 3.95]. «M(a,0)» · «N(130,0)» drew the same values. A free M beside N(13,0) stayed in x ∈ [7.3, 18.6].
+
+**Ruling.** Operator, 2026-10-20 ("accept recommendations"): a half-bounded or unbounded free parameter ranges up to 1.5× the largest number stated in the construction (2-D's [ADR-526](06-decisions.md#adr-526)), and a free point's sampling box follows the same rule. Mechanism (the round orchestrator, on this item's escalation, 2026-10-20): widen only what no given reaches. A parameter a constraint solves keeps today's window as the solve's starting point.
+
+**Class.** *A free degree of freedom that nothing bounds is drawn at a magnitude that ignores the figure's scale.* The parameter sampler (`sampleParam`) used a constant [1, 4), and the free-vertex box used a constant "at least 6 a side". The engine already knew the figure's scale for the pin scan (`pinReach`, ADR-AG-303) and for the residuals (`residualScale`, ADR-AG-231). Sampling [1, 4) beside N(13,0) asserts M ∈ [1, 4), a given the question never stated (the ADR-052 smell).
+
+**Decision.**
+1. **One scale.** `statedScale(…)` (`engine/pinRoots.ts`) is the construction's largest numeric literal, at least 1. It is read off what the student stated, never off a position a parameter moves. `pinReach` is `64 · statedScale`.
+2. **The magnitude** of a half-bounded or unbounded parameter is drawn from [1, max(4, 1.5·S)). It never goes below 1 (ADR-AG-022: away from the degenerate 0) and is never narrower than the [1, 4) it had, so a figure whose numbers are all ≤ 8/3 is unchanged at every seed. `reach > 1` (ADR-AG-256's ring search) multiplies the new base. The bounded branch is unchanged. A free line's direction is an angle, not a figure unit, and keeps [1, 4).
+3. **Only what no given reaches widens** (`reachedByGivens`, `engine/carriers.ts`). A symbol or an object is reached when a constraint touches it, directly or through what it names: the curve a tangency names, the points a length names, and everything those are made of (`inputsOf`). The walk is structural, so a later constraint kind is covered. A reached parameter is solved, and its sample is only where the solve starts. **Measured, the plan's blanket widening broke this:** Q2 ד's tangent lines `mx−y+n=0` started at |m| up to 19.5 chased the circles' third, vertical common tangent (x = 7), which the form cannot hold. 15 of 24 configurations were unsatisfied, and the panel read «m = √2/4» as known at seed 0, because the pool lost the other tangent.
+4. **The free-vertex box** grows by at least 1.5·S a side for an unreached free vertex, past configuration 0. This is seeding only: `residualScale` keeps the span ADR-AG-231 ruled.
+5. **Seed 0 is the first drawing it always was** (ADR-AG-022). `sampleParam` at seed 0 ignores the scale. Configuration 0's restarts (`seed + 1000·salt`) and its `drawableAt` walk (which evaluates seeds 1…24 to prefer a well-spread neighbour) evaluate at the old range: `evaluate(c, seed, reach, wide)`, memoized under its own key. Without the walk's half, `exam-2379-q2-two-tangents` changed its first figure.
+
+**Measured after.**
+- T9's three lines over 30 presses: a ∈ [2.0, 19.2], with a > 13 at 12 presses.
+- «M(a,0)» · «N(130,0)»: |a| ∈ [11.5, 191.5].
+- A free M beside N(13,0): x ∈ [−5.6, 31.2].
+- With «MN = 9» added, a = 4 and a = 22 are both still reached.
+- Q2 ד holds at seeds 0–23.
+- Seed 0 is byte-identical on all 45 sets measured (39 analytic fixtures plus 6 probes). At seeds 1–2 only the three unconstrained probes moved, and no fixture did.
+- `test:fast` green with **no lock re-based**.
+
+**Sibling audit.** 2-D already samples in the figure's units (ADR-526, the reference). 3-D and complex have no coordinate-parameter sampler (grepped `sampleParam` / `paramRegister`). Class not present there.
+
+**Behaviour change for a student.**
+- «הציגו תצורה אחרת» on a figure with a free parameter or a free point now reaches values and positions across the stated figure. With N(13,0), M can be drawn beyond N or on the origin's side.
+- The first drawing does not change.
+- Anything a given solves is drawn as before.
+
+**Locks.** `src-analytic/__tests__/issue-2426-param-figure-units.test.ts` (10 tests):
+- T9 through `anotherConfiguration`;
+- the 130 scale;
+- the free vertex;
+- seed 0 and the ≤ 8/3 identity of `sampleParam`;
+- seed 0 in [1, 4) on three probes;
+- `reachedByGivens` on a lone, a pinned and a tangency-solved parameter;
+- Q2 ד at seeds 0–23 with the panel's m still open;
+- «MN = 9» reaching both roots.
+
+`issue-2419-size-letters` keeps the half-bounded / unbounded equality, which this change preserves (both branches use one span).
+
+**Consequences.** `engine/pinRoots.ts` (`statedScale`), `engine/carriers.ts` (`reachedByGivens`), `engine/evaluate.ts` (`sampleParam`'s `scale`, `sampleEnv`'s `wide`, the seeding box, `evaluate` / `evaluateTryingChoices` / `evaluateUncached` / `fitCreatedShapes` threading `wide`, `drawableAt`'s walk). Docs: 02c, 04c. The issue named ADR-AG-019 as the sign ADR; it is ADR-AG-022.

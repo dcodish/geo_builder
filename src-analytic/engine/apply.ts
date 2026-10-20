@@ -27,7 +27,7 @@ import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, no
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
 import { measureRestatement } from './statedMeasures';
-import { RADIUS_CAPITALS, RESERVED_SYMBOLS, radiusSymbol, toolSymbol, usedSymbols } from './carriers';
+import { RADIUS_CAPITALS, RESERVED_SYMBOLS, emptyDomain, paramRegister, positivePart, radiusSymbol, sizeContradiction, sizeLetters, toolSymbol, usedSymbols } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
 import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
 import { followObjects, isoscelesKeys, roleVertexOf } from './roles';
@@ -436,11 +436,7 @@ function admitStated(
     const r = applyFact(c, { t: 'param', sym: value.name, domain, src });
     if (!r.ok) return r;
     const merged = r.next.params.find((p) => p.sym === value.name)?.domain;
-    const empty =
-      merged?.min !== undefined &&
-      merged.max !== undefined &&
-      (merged.min > merged.max || (merged.min === merged.max && (merged.minOpen || merged.maxOpen)));
-    return empty ? refuse : { ok: true, next: r.next };
+    return merged && emptyDomain(merged) ? refuse : { ok: true, next: r.next };
   }
   const somewhere = PROBE_ENVS.some((env) => inDomain(domain, evalExpr(value, env)));
   return somewhere ? { ok: true, next: c } : refuse;
@@ -2324,8 +2320,26 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
    */
   const clash = radiusLetterClash(c, out.next);
   if (clash) return { ok: false, error: { code: 'radius-letter-taken', detail: f.src, holder: clash.letter, reading: clash.first } };
+  /*
+   * A LETTER THAT STANDS FOR A SIZE IS POSITIVE (#2419, ADR-AG-323). Asked of the CONSTRUCTION, here where every
+   * statement lands, so every family and both orders are one question: «a < 0» · «AB = a» and «AB = a» · «a < 0» are
+   * the same contradiction, refused naming the statement that completed it, as «a < 0» · «שרדיוסו a» already is.
+   */
+  if (sizeContradiction(out.next) !== null) {
+    return { ok: false, error: { code: 'out-of-domain', detail: f.src, domain: positivePart({}) } };
+  }
+  // A declaration a letter's size role already implies («r > 0» after «x²+y²=r²») adds nothing: already known.
+  if (f.t === 'param' && sizeLetters(c).has(f.sym) && sameRegisterDomain(c, out.next, f.sym)) return { ok: true, effect: 'known', next: c };
   const notice = readingTwin(c, f);
   return notice ? { ...out, notice } : out;
+}
+
+/** The register gives `sym` the same domain before and after (the role-implied one, #2419). */
+function sameRegisterDomain(before: Construction, after: Construction, sym: string): boolean {
+  const d = (k: Construction) => paramRegister(k).find((p) => p.sym === sym)?.domain;
+  const a = d(before);
+  const b = d(after);
+  return !!a && !!b && JSON.stringify(normalizeDomain(a)) === JSON.stringify(normalizeDomain(b));
 }
 
 /** Which readings the figure gives a radius capital: a positional object by that id, and a symbol something reads. */

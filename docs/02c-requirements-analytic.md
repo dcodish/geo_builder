@@ -782,8 +782,19 @@ a sentence the tool parsed.
 
 ### Choosing and cycling configurations
 
-**R46 — a free magnitude is sampled across everything the student left open, SIGN INCLUDED**. Later configurations reach the other sign within a few presses; degenerate values are avoided (ADR-052).
-- Sources: ADR-AG-022, ADR-052.
+**R46 — a free magnitude is sampled across everything the student left open, SIGN INCLUDED**. Later configurations reach the other sign within a few presses; degenerate values are avoided (ADR-052). **Except a letter that stands for a size** (R191): it is positive, so it has no other sign to reach. The magnitude is in the figure's own units (R192).
+- Sources: ADR-AG-022, ADR-052, ADR-AG-323, ADR-AG-324.
+
+**R192 — a free parameter and a free point range across the stated figure**. *(Operator ruling 2026-10-20 on #2426: up to 1.5× the largest number stated, 2-D's rule.)* A parameter or a free point that no given reaches is drawn, over «הציגו תצורה אחרת», up to 1.5× the largest number the construction states (never less than today's 1 to 4); the first drawing is the one it always was, and anything a given solves is drawn as before.
+- «a הוא פרמטר חיובי» · «M(a,0)» · «N(13,0)» → M is drawn beyond N (a > 13) and before it; «M(a,0)» · «N(130,0)» → |a| up to about 195
+- «N(13,0)» · «נקודה M» → M reaches the origin's side
+- Sources: ADR-AG-324, #2426 (round #2414 T9).
+
+**R191 — a letter that stands for a size is positive**. *(Operator ruling 2026-10-20 on #2419: "r for radius like any letter represending size needs to be positive".)* A circle's radius however it is written (by its centre «שרדיוסו r», a positive multiple «שרדיוסו 2r», squared in its equation «(x−a)²+y²=r²», «x²+y²=4r²», «R²»), and a length, a distance, a perimeter or an area valued by a letter or a positive multiple of one («AB = k», «אורך AB הוא k», «המרחק בין A ל-B הוא d», «היקף המשולש ABC הוא k», «שטח המשולש ABC הוא k»): the letter's row reads «0 < r» while it is open, and only its positive values are configurations. «r > 0» typed after it is already known.
+- «x²+y²=r²» · «A(3,4)» · «A על המעגל» → «r = 5» (not «r = −5 או 5»); Q2 in the exam's own form → r = 3, R = 6, one equation per circle
+- «a < 0» then «AB = a», or «AB = a» then «a < 0» → refused, naming the later sentence, with the radius's out-of-range message
+- Not a size, and unchanged: a coordinate or a slope («M(a,0)», «y=mx+n») keeps both signs; a squared radius that also places the centre («(x−a)²+y²=a²» with A(−2,2) on it draws a = −2); a squared radius declared negative («a < 0» · «x²+y²=a²») is accepted, a circle of radius |a|; a ratio and an angle
+- Sources: ADR-AG-323, #2419 (#2379, the operator's exam questions).
 
 **R118 — a comparison of coordinates chooses the configuration**. It consumes no freedom; an unsatisfiable comparison is refused, naming the sentence.
 - «שיעור ה-x של B גדול משיעור ה-x של D», `x_B > 3`, «שיעור ה-x של B חיובי»
