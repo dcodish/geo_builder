@@ -448,8 +448,14 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «מעגל סביב O רדיוס 5», «מעגל O שהיקפו 6π» (radius 3)
 - «שני מעגלים נחתכים בנקודות A ו-B», «AB משיק משותף חיצוני / פנימי לשני המעגלים»
 - the plural subject crosses too: «המעגלים O ו-P נחתכים בנקודות X ו-Y» (the stated radii kept), «המעגלים O ו-P נחתכים» (the crossings take the tool's letters), «(שני) המעגלים נחתכים …» (the two circles the figure holds), "circles O and P intersect at X and Y" (ADR-AG-300, #2108)
-- a common tangent through the circles' stated touch point is the tangent there: «המעגלים משיקים בנקודה T» · «T על AB» · «AB משיק משותף למעגלים M ו-N» draws AB as the tangent at T (also «TB משיק משותף …»); other letters are still its two touches, and «… חיצוני …» through T is refused (ADR-AG-312, #2385)
-- Sources: ADR-AG-219, #1622, #1693, #1688, #2108, #2385.
+- a common tangent through the circles' stated touch point is the tangent there: «המעגלים משיקים בנקודה T» · «T על AB» · «AB משיק משותף למעגלים M ו-N» draws AB as the tangent at T (also «TB משיק משותף …»), in either order (R189); other letters are still its two touches, and «… חיצוני …» through T is refused (ADR-AG-312, #2385)
+- Sources: ADR-AG-219, #1622, #1693, #1688, #2108, #2385, #2418.
+
+**R189 — a common tangent through the circles' touch point is the same figure in any order, and a pair with only the touch tangent draws it**. *(Operator ruling 2026-10-20 on #2418: «AB משיק משותף…» first, then «T על AB»: AB is redrawn as the common tangent at T, the same figure as the other order.)*
+- after two touching circles and «AB משיק משותף למעגלים M ו-N», a later «T על AB» redraws AB as the common tangent at T; so do «T על הישר AB», «T נמצאת על AB», «הישר AB עובר דרך הנקודה T», «AB עובר דרך T», «AB משיק למעגל M בנקודה T» and «AB משיק משותף למעגלים M ו-N בנקודה T». Each is recorded in the givens list, never answered «already known»
+- on circles touching from inside at T, «AB משיק משותף …» draws AB as the tangent at T, with existing A and B on it; so does «AB משיק משותף פנימי …» on circles touching from outside at T
+- a line that truly follows, such as «T על הישר AB» after the inside pair's tangent, is «already known»; «AB משיק משותף חיצוני …» then «T על AB» is still refused, naming «T על AB»
+- Sources: ADR-AG-321, #2418, ADR-AG-312.
 
 **R182 — a common tangent is a named line, a line can be named after the fact, and a line's axis crossing can be placed without a point**. *(Operator, on #2379: "things that are missing, i need to add to the tool since this is an exam I give my students"; the «מתחת» / «מימין / משמאל» twins per the #2386 rulings.)*
 - a common tangent is drawn as a full line with its equation row; while the givens leave two candidate lines, the row lists both («3x − 4y + 14 = 0 או 3x − 4y − 86 = 0»)

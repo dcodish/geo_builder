@@ -771,11 +771,17 @@ Every two-circle crossing sentence lowers through one helper, `twoCircleCrossing
 («המעגלים O ו-P נחתכים …», `pluralCircleCrossing`) is read by `readCircleSubject`, the tangency family's subject reader
 ([ADR-AG-300](06c-decisions-analytic.md#adr-ag-300), #2108).
 
-A common tangent is the fact `common-tangent { a, b, circles, onLine? }`; M1 decides where it touches. When the circles'
-stated touch point (`touchPointOf`, the `touch-point` derived point) is a letter of the pair, lies on the pair's line
-(`footOnPair`), or an earlier line puts it there (`onLine`, written by `earlierOnCommonTangents` in `fold`, because the
-deferral fixpoint lands «T על AB» after the line that declares A and B), it lowers as the tangent at that point;
-otherwise `a` touches the first circle and `b` the second ([ADR-AG-312](06c-decisions-analytic.md#adr-ag-312), #2385).
+A common tangent is the fact `common-tangent { a, b, circles, onLine?, kind? }`; M1 decides where it touches. When the
+circles' stated touch point (`touchPointOf`, the `touch-point` derived point) is a letter of the pair, lies on the pair's
+line (`footOnPair`), the pair has only the touch tangent of the stated kind (`pairPositionOf` is `int-tangent` and the
+kind is not internal, or `ext-tangent` and the kind is internal), or another line puts it there (`onLine`), it lowers
+as the tangent at that point; otherwise `a` touches the first circle and `b` the second
+([ADR-AG-312](06c-decisions-analytic.md#adr-ag-312), #2385). `onLine` is written by `statedOnCommonTangents` in `fold`
+from EVERY other admitted line, in any order: the `on-line-2pt` incidence and the `at` of a `tangent-of` over the
+pair's points (an earlier «T על AB» lands after the line that declares A and B in the deferral fixpoint; a later one
+pins the drawn tangent). When `onLine` alone decided the touch, M1 says so (`touchByOnLine`), and `reDecidedBy` records
+each later contributing line whose facts came out `known` as `narrowed`, so it records instead of «already known»
+([ADR-AG-321](06c-decisions-analytic.md#adr-ag-321), #2418).
 The common tangent is a LINE: M1 draws it through `name-line { a, b, name }` (the sentence's name, «הישר l משיק …»
 `namedCommonTangent`, or the pair's), the `line-at` through a along a→b, listed by its name. `name-line` («נסמן את הישר
 PQ ב-l», `parseNameLine`) re-names the figure's line over the pair (`lineOverPair`), re-identifying it as `lineIdOf(name)`
@@ -783,7 +789,7 @@ with its references (`replaceId`), or draws the line on a segment. The `axis-cut
 (`parseAxisCut`) is judged in `failingSelectors` from the line's triple (`lineTriple`): −c/b on the y-axis, −c/a on the
 x-axis, strict through `sideOfBound` ([ADR-AG-313](06c-decisions-analytic.md#adr-ag-313), #2392).
 
-*Identifiers:* `types.ts` · `CIRCLE_SLOT_SENTINELS` · `touchedCircleFacts(src, id, r?)` · `circle-new<k>` · `circle-pair<k>-1` · `-2` · `tangent-of { circleId, at }` · `beyond` · `toolLetters.ts` · `apart` · `inside` · `larger` · `cross` · `centres-side { a, b, p, q }` · `params { e }` · `circlePairQuantity` · `coord` · `θ_<id>.k/s/g/m` · `θ_<id>.r` · `circleToName` · `interchangeable` · `twoCircleCrossing` · `pluralCircleCrossing` · `readCircleSubject` · `common-tangent` · `touchPointOf` · `earlierOnCommonTangents` · `onLine` · `name-line` · `lineOverPair` · `replaceId` · `axis-cut` · `lineTriple` · `namedCommonTangent` · `parseNameLine` · `parseAxisCut`
+*Identifiers:* `types.ts` · `CIRCLE_SLOT_SENTINELS` · `touchedCircleFacts(src, id, r?)` · `circle-new<k>` · `circle-pair<k>-1` · `-2` · `tangent-of { circleId, at }` · `beyond` · `toolLetters.ts` · `apart` · `inside` · `larger` · `cross` · `centres-side { a, b, p, q }` · `params { e }` · `circlePairQuantity` · `coord` · `θ_<id>.k/s/g/m` · `θ_<id>.r` · `circleToName` · `interchangeable` · `twoCircleCrossing` · `pluralCircleCrossing` · `readCircleSubject` · `common-tangent` · `touchPointOf` · `statedOnCommonTangents` · `onLine` · `touchByOnLine` · `reDecidedBy` · `name-line` · `lineOverPair` · `replaceId` · `axis-cut` · `lineTriple` · `namedCommonTangent` · `parseNameLine` · `parseAxisCut`
 
 ### Common tangents ([ADR-AG-314](06c-decisions-analytic.md#adr-ag-314), #2390)
 

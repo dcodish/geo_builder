@@ -3422,7 +3422,7 @@ const touchAt = (slot: string, at: Id, a: Id, b: Id, src: string): Fact => ({
 function commonTangentFacts(a: Id, b: Id, s1: string, s2: string, kind: 'external' | 'internal' | undefined, src: string, name?: string): Fact[] {
   return [
     ...declareAll([a, b], src),
-    { t: 'common-tangent', a, b, circles: [s1, s2], ...(name !== undefined ? { name } : {}), src },
+    { t: 'common-tangent', a, b, circles: [s1, s2], ...(name !== undefined ? { name } : {}), ...(kind ? { kind } : {}), src },
     { t: 'selector', sel: { kind: 'distinct', ids: [a, b] }, src },
     ...(kind ? [{ t: 'selector' as const, sel: { kind: 'sign' as const, q: { k: 'centres-side' as const, a: s1, b: s2, p: a, q: b }, positive: kind === 'external' }, src }] : []),
   ];

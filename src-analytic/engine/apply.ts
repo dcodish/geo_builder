@@ -734,8 +734,12 @@ export type ApplyOutcome =
   /**
    * `restates` (#2169, ADR-W-131): a shape noun the ring's own nouns already IMPLY («ריבוע ABCD» · «דלתון ABCD») — the
    * fold takes the rest of that sentence's noun definition as already held, so the whole line is «already known».
+   *
+   * `touchByOnLine` (#2418, ADR-AG-321): a common tangent was lowered at the circles' touch point ONLY because a line the
+   * fold told it of (`onLine`) puts the touch point on it — not one of its letters, not the figure, not the pair's
+   * position. The fold then records that line's own statement as `narrowed`, never `known`: it re-decided the tangent.
    */
-  | { ok: true; next: Construction; effect: LineEffect; notice?: ApplyNotice; restates?: true }
+  | { ok: true; next: Construction; effect: LineEffect; notice?: ApplyNotice; restates?: true; touchByOnLine?: true }
   | { ok: false; error: ApplyError };
 
 /**
@@ -2095,14 +2099,16 @@ function anonOf(curve: unknown): string {
 function applyAll(c: Construction, facts: readonly Fact[]): ApplyOutcome {
   let next = c;
   let effect: LineEffect = 'known';
+  let touchByOnLine = false;
   for (const f of facts) {
     const out = applyFact(next, f);
     if (!out.ok) return out;
     next = out.next;
     if (out.effect === 'created') effect = 'created';
     else if (out.effect === 'narrowed' && effect !== 'created') effect = 'narrowed';
+    if (out.touchByOnLine) touchByOnLine = true;
   }
-  return { ok: true, next, effect };
+  return { ok: true, next, effect, ...(touchByOnLine ? { touchByOnLine: true as const } : {}) };
 }
 
 /**
@@ -3781,9 +3787,19 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       const line: TangentLineRef = { kind: 'points', a: f.a, b: f.b };
       const touch = touchPointOf(c, c1, c2);
+      /*
+       * THE PAIR HAS ONLY THE TOUCH TANGENT (#2418, ADR-AG-321): circles touching from inside have one common tangent, the
+       * line through their common point; circles touching from outside have one INTERNAL common tangent, the same line.
+       * Either way the two-touch lowering has no configuration in any order, so the line is the tangent at the stated
+       * touch point — how the pair sits read off the figure as stated (`pairPositionOf`, ADR-AG-314), 2-D's capacity exit.
+       */
+      const position = touch !== null ? pairPositionOf(c, c1, c2) : null;
+      const onlyTouch = (position === 'int-tangent' && f.kind !== 'internal') || (position === 'ext-tangent' && f.kind === 'internal');
+      const figureSays = touch !== null && (touch === f.a || touch === f.b || onlyTouch || footOnPair(c, touch, f.a, f.b));
+      const linesSay = touch !== null && !figureSays && f.onLine?.includes(touch) === true;
       const touches: Fact[] =
-        touch !== null && (touch === f.a || touch === f.b || f.onLine?.includes(touch) || footOnPair(c, touch, f.a, f.b))
-          ? [{ t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: touch, src: f.src }]
+        figureSays || linesSay
+          ? [{ t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: touch!, src: f.src }]
           : [
               { t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: f.a, src: f.src },
               { t: 'tangent-of', axes: [], lines: [line], circleId: c2, at: f.b, src: f.src },
@@ -3791,7 +3807,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       const touched = applyAll(c, touches);
       if (!touched.ok) return touched;
       const drawn = applyFact(touched.next, { t: 'name-line', a: f.a, b: f.b, name: f.name ?? `${f.a}${f.b}`, src: f.src });
-      return drawn.ok ? { ...drawn, effect: 'created' } : drawn;
+      return drawn.ok ? { ...drawn, effect: 'created', ...(linesSay ? { touchByOnLine: true as const } : {}) } : drawn;
     }
 
     /**
@@ -5075,32 +5091,52 @@ function declaredRingSpelling(facts: readonly Fact[], group: readonly number[]):
 }
 
 /**
- * #2385 ([ADR-AG-312](../../docs/06c-decisions-analytic.md#adr-ag-312)) — WHAT THE EARLIER LINES PUT ON A COMMON
- * TANGENT'S LINE. «T על AB» · «AB משיק משותף למעגלים M ו-N»: the first line names A and B before anything defines them,
- * so the fold DEFERS it (the deferral fixpoint, ADR-AG-133) and the common tangent's own line is what declares A and
- * B. Its M1 lowering therefore sees a figure without T on AB, though the student stated it first and saw it drawn. Each
- * `common-tangent` is told here, as `onLine`, the points an earlier admitted line puts on its pair's line, so its
- * lowering reads the prefix the student stated, whatever order the fold lands it in. Only EARLIER lines: a later
- * «T על AB» is a statement about a common tangent already drawn. Positional, like `declaredRingSpelling`.
+ * #2385 ([ADR-AG-312](../../docs/06c-decisions-analytic.md#adr-ag-312)), #2418 ([ADR-AG-321](../../docs/06c-decisions-analytic.md#adr-ag-321))
+ * — WHAT THE STATED LINES PUT ON A COMMON TANGENT'S LINE. Each `common-tangent` is told here, as `onLine`, the points any
+ * OTHER admitted line puts on its pair's line, so where it touches is decided by the whole list, never by the order
+ * the lines were typed in. «T על AB» · «AB משיק משותף …»: the first line names A and B before anything defines them, so
+ * the fold defers it and the tangent's lowering sees a figure without T on AB. «AB משיק משותף …» · «T על AB»: the later
+ * line is the one that pins the line to the touch point (the operator's 2026-10-20 ruling on #2418: the same figure as
+ * the other order). Two shapes put a point on the pair's line: the `on-line-2pt` incidence («T על AB», «הישר AB עובר
+ * דרך T»), and a `tangent-of` over the points a, b at a touch («AB משיק למעגל M בנקודה T»), which gives its `at`.
+ * A faulted line is excluded by `include`, so its contribution drops with it (the fold's fixpoint re-runs this).
+ *
+ * `from` records, per common-tangent fact index, the LINES (groups) that contributed — `fold` reads it to record a
+ * later contributing line as `narrowed` (see `fold`). Positional, like `declaredRingSpelling`.
  */
-function earlierOnCommonTangents(facts: readonly Fact[], group: readonly number[], include: (i: number) => boolean): readonly Fact[] {
-  if (!facts.some((f) => f.t === 'circles-about' && f.about.some((g) => g.t === 'common-tangent'))) return facts;
+function statedOnCommonTangents(
+  facts: readonly Fact[],
+  group: readonly number[],
+  include: (i: number) => boolean,
+): { facts: readonly Fact[]; from: Map<number, Map<Id, Set<number>>> } {
+  const from = new Map<number, Map<Id, Set<number>>>();
+  if (!facts.some((f) => f.t === 'circles-about' && f.about.some((g) => g.t === 'common-tangent'))) return { facts, from };
   const pair = (u: Id, v: Id, a: Id, b: Id) => (u === a && v === b) || (u === b && v === a);
-  return facts.map((f, i) => {
+  const out = facts.map((f, i) => {
     if (f.t !== 'circles-about' || !f.about.some((g) => g.t === 'common-tangent')) return f;
     const about = f.about.map((g) => {
       if (g.t !== 'common-tangent') return g;
-      const on = new Set<Id>();
+      const on = new Map<Id, Set<number>>();
+      const put = (id: Id, j: number) => {
+        if (!on.has(id)) on.set(id, new Set());
+        on.get(id)!.add(group[j]);
+      };
       facts.forEach((h, j) => {
-        if (group[j] >= group[i] || !include(j)) return;
+        if (group[j] === group[i] || !include(j)) return;
         for (const k of factsWithin(h)) {
-          if (k.t === 'constraint' && k.k.t === 'on-line-2pt' && pair(k.k.a, k.k.b, g.a, g.b)) on.add(k.k.id);
+          if (k.t === 'constraint' && k.k.t === 'on-line-2pt' && pair(k.k.a, k.k.b, g.a, g.b)) put(k.k.id, j);
+          if (k.t === 'tangent-of' && k.at !== undefined && (k.lines ?? []).some((l) => l.kind === 'points' && pair(l.a, l.b, g.a, g.b))) put(k.at, j);
         }
       });
-      return on.size > 0 ? { ...g, onLine: [...on] } : g;
+      if (on.size === 0) return g;
+      const prior = from.get(i) ?? new Map<Id, Set<number>>();
+      on.forEach((lines, id) => prior.set(id, new Set([...(prior.get(id) ?? []), ...lines])));
+      from.set(i, prior);
+      return { ...g, onLine: [...on.keys()] };
     });
     return { ...f, about };
   });
+  return { facts: out, from };
 }
 
 export interface FoldResult {
@@ -5159,7 +5195,9 @@ export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldR
   const excluded = new Map<number, ApplyError>(); // line → the error that faulted it
   for (;;) {
     const include = (i: number) => !excluded.has(group[i]);
-    const r = foldPass(earlierOnCommonTangents(facts, group, include), include, group);
+    const stated = statedOnCommonTangents(facts, group, include);
+    const r = foldPass(stated.facts, include, group);
+    reDecidedBy(r, stated.from, group);
     let newly = 0;
     r.errors.forEach((e, i) => {
       if (e && !excluded.has(group[i])) {
@@ -5184,7 +5222,7 @@ export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldR
 }
 
 /** One fold over the facts `include` admits: the in-order pass, then the deferral fixpoint. */
-function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group?: readonly number[]): FoldResult {
+function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group?: readonly number[]): FoldResult & { touchByOnLine?: boolean[] } {
   let c = EMPTY_CONSTRUCTION;
   const errors: Array<ApplyError | null> = facts.map(() => null);
   const effects: Array<LineEffect | null> = facts.map(() => null);
@@ -5206,7 +5244,9 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
   // The same attribution for SELECTORS (#1619 B1): a region («מחוץ למעגל») is a selector M1 builds from a
   // contextual fact, so the line that stated it can only be found from the construction, as for constraints.
   const selectorFact: number[] = [];
-  const commit = (i: number, next: Construction, effect: LineEffect, notice?: ApplyNotice) => {
+  const touchByOnLine: boolean[] = facts.map(() => false);
+  const commit = (i: number, next: Construction, effect: LineEffect, notice?: ApplyNotice, byOnLine?: true) => {
+    touchByOnLine[i] = byOnLine === true;
     const before = c.constraints;
     const beforeSel = c.selectors;
     c = next;
@@ -5243,7 +5283,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
     }
     const out = applyFact(c, f);
     if (out.ok) {
-      commit(i, out.next, out.effect, out.notice);
+      commit(i, out.next, out.effect, out.notice, out.touchByOnLine);
       if (out.restates) restated.add(lineOfFact(i));
     } else errors[i] = out.error;
   });
@@ -5259,7 +5299,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
         if (failedOn.get(i) === c) return;
         const out = applyFact(c, f);
         if (out.ok) {
-          commit(i, out.next, out.effect, out.notice);
+          commit(i, out.next, out.effect, out.notice, out.touchByOnLine);
           progressed = true;
         } else {
           errors[i] = out.error;
@@ -5319,13 +5359,36 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
         next = out.next;
       }
       if (landed.length !== failing.length) continue;
-      for (const { j, out } of landed) commit(j, out.next, j === landed[0].j ? 'created' : out.effect, out.notice);
+      for (const { j, out } of landed) commit(j, out.next, j === landed[0].j ? 'created' : out.effect, out.notice, out.touchByOnLine);
       minted = true;
     }
     if (!minted) break;
     fixpoint();
   }
-  return { construction: c, errors, effects, constraintFact, selectorFact, notices };
+  return { construction: c, errors, effects, constraintFact, selectorFact, notices, touchByOnLine };
+}
+
+/**
+ * A LINE THAT RE-DECIDED AN EARLIER COMMON TANGENT IS NARROWED, NOT KNOWN (#2418, ADR-AG-321). «AB משיק משותף …» ·
+ * «T על הישר AB»: the later line is the only reason the tangent is lowered at T (`touchByOnLine`), and once it is, the
+ * tangent entails the line — so the line's own facts come out `known`, and `decideSubmit` would answer «already known»
+ * and drop the one line that changed the figure. A contributing line AFTER the tangent's line, whose facts the tangent
+ * absorbed, is therefore `narrowed` (it records). A line that genuinely follows — the tangent already at T for its
+ * letters, the figure, or the pair's position — is not marked, and keeps `known` (ADR-AG-020).
+ */
+function reDecidedBy(r: FoldResult & { touchByOnLine?: boolean[] }, from: Map<number, Map<Id, Set<number>>>, group: readonly number[]): void {
+  const by = r.touchByOnLine;
+  delete r.touchByOnLine;
+  if (!by || from.size === 0) return;
+  const later = new Set<number>();
+  from.forEach((points, i) => {
+    if (!by[i] || r.errors[i]) return;
+    points.forEach((lines) => lines.forEach((g) => g > group[i] && later.add(g)));
+  });
+  if (later.size === 0) return;
+  r.effects.forEach((e, j) => {
+    if (e === 'known' && later.has(group[j])) r.effects[j] = 'narrowed';
+  });
 }
 
 /**
