@@ -117,7 +117,8 @@ describe('#2393 R7 — «משוואת l1» answers what the panel row shows (one
     expect(value(Q2_D, 'משוואת l1')).toBe(panel);
     expect(value(Q2_D, 'משוואת הישר l1')).toBe(panel);
     expect(panel).toContain(' או ');
-    expect(value(Q2_D, 'שיפוע l1')).toBe('±0.35');
+    // #2394 (ADR-AG-304, operator ruling (a) 2026-10-20): exact forms everywhere in analytic, so ±√2/4, not ±0.35.
+    expect(value(Q2_D, 'שיפוע l1')).toBe('±√2/4');
   });
 });
 

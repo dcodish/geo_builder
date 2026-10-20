@@ -47,7 +47,8 @@ function lastVerdict(lines: readonly string[]): Verdict {
 
 const SEEDS = Array.from({ length: 12 }, (_, i) => i);
 /** Q2's canonical route (centre + radius), every line recording at HEAD; the panel shows a = 4, r and R open. */
-const CTX = ['M(a,0)', 'a הוא פרמטר חיובי', 'נתון מעגל M שרדיוסו r', 'N(13,0)', 'נתון מעגל N שרדיוסו R', 'MN = 9', 'המעגלים משיקים מבחוץ'];
+// «a < 13» is the exam's own given (Q2, before ב): with #2380 (ADR-AG-303) a has two roots, 4 and 22, until it is stated.
+const CTX = ['M(a,0)', 'a הוא פרמטר חיובי', 'a < 13', 'נתון מעגל M שרדיוסו r', 'N(13,0)', 'נתון מעגל N שרדיוסו R', 'MN = 9', 'המעגלים משיקים מבחוץ'];
 
 /** r and R at a seed, read off the drawn figure's environment. */
 const rR = (lines: readonly string[], seed: number) => {
