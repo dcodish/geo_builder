@@ -4024,6 +4024,39 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       return { ok: true, effect: 'created', next: { ...c, objects: [...c.objects, { kind: 'free', id: f.id }] } };
     }
 
+    /**
+     * A STATED DISTINCTNESS (#2395, ADR-AG-311) — what the names DENOTE is decided here, at the M1 boundary, because
+     * the parser is pure over one line. A written noun decides the kind; with none, points are read first (so «N1 ≠
+     * N2» about two centres keeps the centres apart), then curves. A name that is no object of that kind, or names of
+     * mixed kinds, is `unknown-reference` naming the first one that fails.
+     */
+    case 'distinct-of': {
+      if (new Set(f.names).size !== f.names.length) return { ok: false, error: { code: 'repeated-vertex', detail: f.src } };
+      const pointOf = (n: string) => {
+        const o = objectById(c, n);
+        return o && isPositional(o) ? o : null;
+      };
+      const curveOf = (n: string, kind: 'circle' | 'line') => {
+        const o = curveByName(c, n);
+        return o && CURVE_BEARING.has(o.kind) && curveKindOf(o) === kind ? o : null;
+      };
+      const kindOf = (n: string): 'circle' | 'line' | null => (curveOf(n, 'circle') ? 'circle' : curveOf(n, 'line') ? 'line' : null);
+      const missingRef = (n: string, kind: 'point' | 'circle' | 'line') =>
+        unknownRef(c, kind === 'point' ? n : kind === 'line' ? lineIdOf(n) : numeralCurveId('circle', n));
+      // With no noun, the names that resolve decide: a point among them reads them all as points (the missing one is then
+      // named), else the first curve's kind; a set where nothing resolves is read as points, so the refusal names a letter.
+      const asPoints = f.noun === 'point' || (f.noun === undefined && (f.names.some((n) => pointOf(n)) || f.names.every((n) => !kindOf(n))));
+      if (asPoints) {
+        const missing = f.names.find((n) => !pointOf(n));
+        if (missing !== undefined) return { ok: false, error: missingRef(missing, 'point') };
+        return applyFact(c, { t: 'selector', sel: { kind: 'distinct', ids: [...f.names] }, src: f.src });
+      }
+      const kind: 'circle' | 'line' = f.noun === 'circle' || f.noun === 'line' ? f.noun : (f.names.map(kindOf).find((k) => k !== null) ?? 'circle');
+      const missing = f.names.find((n) => !curveOf(n, kind));
+      if (missing !== undefined) return { ok: false, error: missingRef(missing, kind) };
+      return applyFact(c, { t: 'selector', sel: { kind: 'distinct-curves', ids: f.names.map((n) => curveOf(n, kind)!.id) }, src: f.src });
+    }
+
     /** A selector names a point and constrains nothing — it filters configurations after the solve. */
     case 'selector': {
       /**
@@ -4035,6 +4068,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         // A choice («משולש קהה זווית», #1708) names every point of every option.
         sel.kind === 'choice'
           ? sel.options.flatMap(refsOf)
+          : sel.kind === 'distinct-curves'
+          ? [] // #2395: names curves only, checked below
           : sel.kind === 'axis-side' || sel.kind === 'crossing-distinct' || sel.kind === 'crossing-nth'
           ? [sel.id]
           : sel.kind === 'distinct' || sel.kind === 'acute'
@@ -4080,6 +4115,13 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (f.sel.kind === 'sign' && f.sel.q.k === 'slope' && f.sel.q.u.k === 'curve') {
         const o = objectById(c, f.sel.q.u.id);
         if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(c, f.sel.q.u.id) };
+      }
+      // Two curves stated different (#2395, ADR-AG-311) name curves the figure holds.
+      if (f.sel.kind === 'distinct-curves') {
+        for (const id of f.sel.ids) {
+          const o = objectById(c, id);
+          if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(c, id) };
+        }
       }
       // A side of a NAMED line (#2386, ADR-AG-310) names a STRAIGHT line the figure holds — a circle has no «מעל הישר».
       if (f.sel.kind === 'line-compare' && f.sel.line.k === 'curve') {
@@ -4395,7 +4437,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
  * canonical over the ring's rotations and reversals) was absorbed.
  */
 function selectorIdentity(sel: Selector): string {
-  if (sel.kind === 'distinct') return JSON.stringify({ ...sel, ids: [...sel.ids].sort() });
+  if (sel.kind === 'distinct' || sel.kind === 'distinct-curves') return JSON.stringify({ ...sel, ids: [...sel.ids].sort() });
   // The line through K and L is the line through L and K (#2386): «M מעל הישר LK» restates «M מעל הישר KL».
   if (sel.kind === 'line-compare' && sel.line.k === 'points') {
     return JSON.stringify({ ...sel, line: { k: 'points', a: [sel.line.a, sel.line.b].sort()[0], b: [sel.line.a, sel.line.b].sort()[1] } });

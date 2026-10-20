@@ -1009,6 +1009,33 @@ export function lineCompareNoSide(c: Construction, s: LineCompare, at: Map<Id, P
 }
 
 /**
+ * DO TWO CURVES DRAW AS ONE (#2395, ADR-AG-311) — the `distinct-curves` judge, at the figure's visible resolution so it
+ * states no magnitude (ADR-052). Two LINES coincide when their unit normals agree within `SOLVE_RESOLUTION` and the foot
+ * of the figure's centre on one lies within `apart` of the other; two CIRCLES when their centres and their radii are
+ * within `apart`. Curves of different kinds (or conics this does not compare) never coincide.
+ */
+export function curvesCoincide(p: NumCurve, q: NumCurve, at: Map<Id, Pt>, apart: number): boolean {
+  if (p.kind === 'line' && q.kind === 'line') {
+    const np = Math.hypot(p.a, p.b);
+    const nq = Math.hypot(q.a, q.b);
+    if (!(np > 0) || !(nq > 0)) return false;
+    if (Math.abs((p.a / np) * (q.b / nq) - (p.b / np) * (q.a / nq)) > SOLVE_RESOLUTION) return false;
+    const pts = [...at.values()];
+    const cx = pts.length ? (Math.min(...pts.map((t) => t.x)) + Math.max(...pts.map((t) => t.x))) / 2 : 0;
+    const cy = pts.length ? (Math.min(...pts.map((t) => t.y)) + Math.max(...pts.map((t) => t.y))) / 2 : 0;
+    // The foot of the centre on p, then its distance to q.
+    const d = (p.a * cx + p.b * cy + p.c) / (np * np);
+    const fx = cx - p.a * d;
+    const fy = cy - p.b * d;
+    return Math.abs(q.a * fx + q.b * fy + q.c) / nq < apart;
+  }
+  if (p.kind === 'circle' && q.kind === 'circle') {
+    return Math.hypot(p.cx - q.cx, p.cy - q.cy) < apart && Math.abs(p.r - q.r) < apart;
+  }
+  return false;
+}
+
+/**
  * WHICH selectors fail here (#1268) — so a refusal blames the sentence whose selector failed, not every
  * sentence that happens to carry one. `derive` blamed every selector line when any failed, which named
  * «משולש ABC» (its vertices' `distinct`) beside the crossing sentence that was actually impossible.
@@ -1437,6 +1464,19 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
         for (let j = i + 1; j < ps.length; j += 1) {
           if (Math.hypot(ps[i]!.x - ps[j]!.x, ps[i]!.y - ps[j]!.y) < apart) return false;
         }
+      }
+      return true;
+    }
+    /**
+     * TWO CURVES ARE DIFFERENT CURVES (#2395, ADR-AG-311) — `distinct`'s twin, at the same visible resolution.
+     */
+    if (s.kind === 'distinct-curves') {
+      const atFn = (id: Id) => at.get(id) ?? null;
+      const curveAt = curveAtOf(c, env, atFn);
+      const ks = s.ids.map((id) => curveAt(id));
+      if (ks.some((k) => !k)) return true; // an unplaced curve judges nothing, as below
+      for (let i = 0; i < ks.length; i += 1) {
+        for (let j = i + 1; j < ks.length; j += 1) if (curvesCoincide(ks[i]!, ks[j]!, at, apart)) return false;
       }
       return true;
     }

@@ -222,6 +222,12 @@ export type Fact =
    */
   | (FactBase & { t: 'selector'; sel: Selector })
   /**
+   * «N1 ≠ N2» · «המעגלים N1 ו-N2 שונים» · «הישרים l1 ו-l2 שונים» — A STATED DISTINCTNESS between named objects of one
+   * kind (#2395, ADR-AG-311). The parser cannot know what a name denotes, so the noun (when written) rides along and
+   * M1 resolves: points → `distinct`, circles or lines → `distinct-curves`.
+   */
+  | (FactBase & { t: 'distinct-of'; names: string[]; noun?: 'point' | 'circle' | 'line' })
+  /**
    * INTRODUCE a point without placing it — the declaration half of the distinction #1017 draws.
    *
    * «AD תיכון לצלע BC» names `D` for the first time, so the sentence introduces it; the constraint
@@ -971,6 +977,12 @@ export type Selector =
    * a thousandth of the figure`s span apart are the same point for every purpose a student has.
    */
   | { kind: 'distinct'; ids: Id[] }
+  /**
+   * TWO CURVES ARE DIFFERENT CURVES (#2395, ADR-AG-311) — «המעגלים N1 ו-N2 שונים», «הישרים l1 ו-l2 שונים». `distinct`'s
+   * twin for curves: a region, D7's kind 2, consuming no freedom; judged at the figure's visible resolution (`apartOf`),
+   * so it states no magnitude (ADR-052). `ids` are the curve ids M1 resolved.
+   */
+  | { kind: 'distinct-curves'; ids: Id[] }
   /**
    * TWO CROSSINGS OF THE SAME PAIR ARE TWO POINTS (#1113).
    *

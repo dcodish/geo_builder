@@ -8513,6 +8513,48 @@ function parseArcFamily(line: string): RuleOutcome {
   );
 }
 
+// ---------------------------------------------------------------------------
+// A STATED DISTINCTNESS — «N1 ≠ N2», «המעגלים N1 ו-N2 שונים», «הישרים l1 ו-l2 שונים» (#2395, ADR-AG-311)
+// ---------------------------------------------------------------------------
+
+/**
+ * Two named objects of one kind are DIFFERENT objects. The parser is pure over one line and cannot know what a name
+ * denotes, so it emits `distinct-of` with the noun the student wrote (if any) and M1 resolves points, circles or lines.
+ * Anchored `^…$`, so «C ו-D בצדדים שונים של AB» and every «שונים» inside a longer sentence stay with their own rules.
+ * The morphology is written out (`שונים` / `שונות`, the subject noun and the predicate noun), per the tree's trap list.
+ */
+const DISTINCT_NAME = `(?:${NAME}|[ℓl][0-9₀-₉]?)`;
+const DISTINCT_SYM = new RegExp(`^${HE_GIVEN}(${DISTINCT_NAME})\\s*(?:≠|!=)\\s*(${DISTINCT_NAME})$`);
+const DISTINCT_NOUN_HE = '(נקודות|מעגלים|ישרים)';
+const DISTINCT_HE = new RegExp(
+  `^${HE_GIVEN}(?:ה?${DISTINCT_NOUN_HE}\\s+)?(${DISTINCT_NAME})\\s+ו-?\\s*(${DISTINCT_NAME})\\s+(?:(?:הן|הם|הינן|הינם)\\s+)?(?:${DISTINCT_NOUN_HE}\\s+)?(?:שונות|שונים)$`,
+);
+const DISTINCT_EN = new RegExp(
+  `^(?:[Tt]he\\s+)?(?:(points|circles|lines)\\s+)?(${DISTINCT_NAME})\\s+and\\s+(${DISTINCT_NAME})\\s+are\\s+(?:distinct|different)(?:\\s+(points|circles|lines))?$`,
+);
+const DISTINCT_NOUN: Record<string, 'point' | 'circle' | 'line'> = {
+  נקודות: 'point', מעגלים: 'circle', ישרים: 'line', points: 'point', circles: 'circle', lines: 'line',
+};
+
+function parseDistinct(line: string): RuleOutcome {
+  const sym = DISTINCT_SYM.exec(line);
+  const he = sym ? null : DISTINCT_HE.exec(line);
+  const en = sym || he ? null : DISTINCT_EN.exec(line);
+  const parts: [string | undefined, string, string, string | undefined] | null = sym
+    ? [undefined, sym[1], sym[2], undefined]
+    : he
+      ? [he[1], he[2], he[3], he[4]]
+      : en
+        ? [en[1], en[2], en[3], en[4]]
+        : null;
+  if (!parts) return null;
+  const [lead, a, b, tail] = parts;
+  const nouns = [lead, tail].filter((n): n is string => n !== undefined).map((n) => DISTINCT_NOUN[n]);
+  if (nouns.length === 2 && nouns[0] !== nouns[1]) return null;
+  if (a === b) return refuse('repeated-vertex', line);
+  return made([{ t: 'distinct-of', names: [a, b], ...(nouns[0] ? { noun: nouns[0] } : {}), src: line }]);
+}
+
 function parseClauseRules(raw: string): ParseResult {
   const line = trim(raw);
   if (!line) return { ok: false, code: 'not-handled', detail: raw };
@@ -8522,6 +8564,10 @@ function parseClauseRules(raw: string): ParseResult {
 
   const pin = parseParamValue(line);
   if (pin) return pin;
+
+  // A stated distinctness (#2395) — after the parameter domains («a ≠ 0» is a domain), before the comparisons.
+  const distinct = parseDistinct(line);
+  if (distinct) return distinct;
 
   // A coordinate compared (#1462) — after the parameter domains, whose atoms are single symbols.
   const compared = parseCompare(line);

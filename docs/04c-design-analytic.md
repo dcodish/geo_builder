@@ -643,6 +643,16 @@ selector arm, a failing `line-compare` whose line has no such side IN THE DRAWN 
 checks the subject, the line's points, and that a named operand is a straight line (`curveKindOf`); `selectorIdentity`
 sorts a two-letter line's ends.
 
+**A stated distinctness** ([ADR-AG-311](06c-decisions-analytic.md#adr-ag-311), #2395). `parseDistinct` (after the
+parameter domains, before `parseCompare`) emits `distinct-of {names, noun?}`; M1 (`case 'distinct-of'`) resolves the
+names: a written noun decides, else a name that is a point reads them all as points, else the first curve's kind.
+Points lower to the existing `distinct`; circles and lines to `distinct-curves {ids}`, judged in `failingSelectors` by
+`curvesCoincide` at `apartOf` (lines: unit normals within `SOLVE_RESOLUTION` and the figure centre's foot on one within
+`apart` of the other; circles: centres and radii within `apart`). No mover: `drawableAt`'s walk finds the other roots.
+`selectorIdentity` sorts both kinds' ids.
+
+*Identifiers:* `distinct-of` · `distinct-curves` · `parseDistinct` · `curvesCoincide`
+
 *Identifiers:* `line-compare` · `lineCompareLine` · `lineHasNoSide` · `lineCompareNoSide` · `POSITION_LINE_HE` · `side-of-vertical` · `side-of-horizontal` · `SideWord`
 
 #### An order between measures ([ADR-AG-216](06c-decisions-analytic.md#adr-ag-216), #1621 D3)
