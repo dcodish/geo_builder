@@ -21,7 +21,7 @@ import { parabolaDirectrix, resolveCurve } from './curves';
 import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule, type FootLine } from './derived';
 import { sameDerivation } from './sameDerivation';
-import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type Constraint, type Direction, type TangentLineRef } from './solve';
+import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
@@ -808,6 +808,41 @@ export function centreIdOf(c: Construction, o: GeoObject): Id | null {
   if (!rule) return null;
   const held = c.objects.find((p) => p.kind === 'derived' && sameDerivation(p.rule, rule));
   return held ? held.id : null;
+}
+
+/**
+ * TWO CIRCLES WHOSE CENTRES COINCIDE FOR EVERY VALUE OF THE PARAMETERS (#2387, ADR-AG-306) — the structural form of
+ * "concentric" for a circle-to-circle touch with an equation side. Each centre is read at the probe environments: an
+ * equation circle's off its resolved curve, a centred circle's off its centre point when that point is stated by
+ * coordinates. A centre that is a free or derived point can move, so the pair is not structurally concentric (the
+ * residual's open floor keeps them apart instead). Probes a curve cannot be resolved at are skipped; none resolved is
+ * "cannot say" (false).
+ */
+function centresAlwaysCoincide(c: Construction, a: GeoObject, b: GeoObject): boolean {
+  const centreAt = (o: GeoObject, env: Env): { x: number; y: number } | null | 'moves' => {
+    if (o.kind === 'curve') {
+      const r = resolveCurve(o.curve, env);
+      return r.ok && r.curve.kind === 'circle' ? { x: r.curve.cx, y: r.curve.cy } : null;
+    }
+    if (o.kind === 'circle-at') {
+      const p = objectById(c, o.centre);
+      if (!p || p.kind !== 'point') return 'moves';
+      const x = evalExpr(p.x, env);
+      const y = evalExpr(p.y, env);
+      return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+    }
+    return 'moves';
+  };
+  let judged = 0;
+  for (const env of PROBE_ENVS) {
+    const p = centreAt(a, env);
+    const q = centreAt(b, env);
+    if (p === 'moves' || q === 'moves') return false;
+    if (!p || !q) continue;
+    if (Math.hypot(p.x - q.x, p.y - q.y) > 1e-9 * Math.max(1, Math.abs(p.x), Math.abs(p.y))) return false;
+    judged++;
+  }
+  return judged > 0;
 }
 
 /**
@@ -3714,19 +3749,21 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       // landing back on the named one) has no configuration.
       if (a === b) return { ok: false, error: { code: 'unsatisfiable', detail: f.src } };
       /**
-       * Tangency pins each RADIUS against each CENTRE, so BOTH circles need both to pull on —
-       * the `tangent-of` rule, applied twice. An equation circle or a computed `circle-thru` is
-       * refused by name (`out-of-scope`), never dropped.
+       * EACH SIDE IS A CIRCLE REFERENCE (#2387, ADR-AG-306; supersedes ADR-AG-167's "both circles arrive as
+       * `circle-at`"). A circle on a centre point gives its point and radius; a circle stated by its EQUATION gives
+       * itself, and the residual reads its centre and radius off the resolved curve — `tangent-curve`'s reading
+       * (ADR-AG-195), so «(x−a)²+y²=r²» touching «(x−13)²+y²=(2r)²» is what pins a and r. A computed `circle-thru`
+       * is refused by name (`out-of-scope`), never dropped: not asked.
        */
-      if (a!.kind !== 'circle-at' || b!.kind !== 'circle-at') return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
-      const mk = (branch: 'external' | 'internal') => ({
-        t: 'tangent-circle' as const,
-        centre: a!.centre,
-        r: a!.r,
-        other: b!.centre,
-        otherR: b!.r,
-        branch,
-      });
+      const sideOf = (o: GeoObject): CircleSide | null =>
+        o.kind === 'circle-at' ? { centre: o.centre, r: o.r } : o.kind === 'curve' ? { circle: o.id } : null;
+      const sa = sideOf(a!);
+      const sb = sideOf(b!);
+      if (!sa || !sb) return { ok: false, error: { code: 'out-of-scope', detail: f.src } };
+      // Concentric circles are never tangent (operator 2026-09-29, ADR-AG-167 Am. 1 (5)) — judged STRUCTURALLY when a
+      // side is an equation circle, whose centre no solve can move apart unless its parameters do.
+      if (('circle' in sa || 'circle' in sb) && centresAlwaysCoincide(c, a!, b!)) return { ok: false, error: { code: 'unsatisfiable', detail: f.src } };
+      const mk = (branch: 'external' | 'internal') => ({ t: 'tangent-circle' as const, a: sa, b: sb, branch });
       // A branch word collapses the choice (the «זווית B ישרה» pattern); without one, BOTH
       // touches are admissible and «הציגו תצורה אחרת» cycles them (ADR-052, #1049).
       const k = f.branch ? mk(f.branch) : { t: 'choice' as const, options: [mk('external'), mk('internal')] };

@@ -95,9 +95,12 @@ describe('#1504 — every order and the contextual forms', () => {
 });
 
 describe('#1504 — refusals, never silent drops', () => {
-  it('tangency to an EQUATION circle is out of scope, by name — no centre and no radius to pull on', () => {
+  // Superseded by ADR-AG-306 (#2387): an equation circle is a circle reference whose centre and radius are read off
+  // its curve, so the touch is built — the free circle M gives way: |MO| = r_M + 3 or |r_M − 3|.
+  it('tangency to an EQUATION circle is built: the other circle gives way (ADR-AG-306)', () => {
     const d = derive(['נתון מעגל I שמשוואתו x^2+y^2=9', 'מעגל M משיק למעגל I'], 0);
-    expect(d.faults.map((f) => f.code)).toEqual(['out-of-scope']);
+    expect(d.faults).toEqual([]);
+    expect(d.figure.unsatisfied).toEqual([]);
   });
 
   it('a circle named that does not exist is unknown-reference', () => {

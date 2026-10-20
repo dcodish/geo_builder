@@ -431,9 +431,10 @@ describe('Merge with #1511 + #1513 — one host seam, one naming chokepoint', ()
     for (const line of ['מעגל I ומעגל II משיקים', 'המעגלים I ו-II משיקים', 'המעגל I משיק למעגל II', 'המעגל I משיק לציר ה-x']) {
       expect(refusal([...setup, line]).key, line).toBe('numeral-notation');
     }
-    // Same notation: understood, and refused only for what it is (tangency of EQUATION circles is out of scope, #1504).
+    // Same notation: understood. Equation circles can be tangent since ADR-AG-306 (#2387), and these two already touch
+    // (|centres| = 5 = 2 + 3), so the sentence adds nothing: «זה כבר נובע».
     for (const line of ['מעגל 1 ומעגל II משיקים', 'המעגלים 1 ו-II משיקים']) {
-      expect(refusal([...setup, line]).key, line).toBe('out-of-scope');
+      expect(decideSubmit(line, setup, 0).kind, line).toBe('already-follows');
     }
     // No phantom centre point «I» is ever minted from a numeral subject.
     expect(parseLine('המעגלים I ו-II משיקים').ok && (parseLine('המעגלים I ו-II משיקים') as { facts: { t: string }[] }).facts.map((f) => f.t)).toEqual(['tangent-circles']);

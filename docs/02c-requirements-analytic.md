@@ -380,6 +380,7 @@ From the «lines and points» corpus (§8), numbered onward.
 
 **R120 — a circle can be pinned by tangency to a LINE, in every order**. The distance from the centre to the line is the radius; «לצלע» bounds the touch to the side, and the side the circle sits on is not asserted. Equation-only circles and circle-to-circle tangency are refused by name. A tangency about a circle whose radius is given uses that radius, whichever words name the circle («מעגל M משיק…» or «המעגל משיק…»); a radius that does not fit is refused as contradictory, never drawn (ADR-AG-305).
 - **⚠ Superseded by R122 (ADR-AG-167) and R132 (ADR-AG-195):** the last sentence, in part — two circles stated by their centres can be tangent, and a line can touch an equation-only or computed circle (`tangent-curve`); still refused by name: such a circle touching an axis, or in a circle-to-circle tangency.
+- **⚠ Superseded by R122 (ADR-AG-306)** for the circle-to-circle part: a circle given by its EQUATION can be tangent to another circle; only a computed circle (through points) is still refused there.
 - «מעגל M משיק לישרים l1 ו-l2», «הישר l1 משיק למעגל M»
 - Sources: ADR-AG-165, #1501, #1503.
 
@@ -388,7 +389,8 @@ From the «lines and points» corpus (§8), numbered onward.
 - «מוקד הפרבולה הוא (2,0)» → pins the parabola
 - Sources: #1432, ADR-AG-169. Numbered R122 until #2404 (the id was defined twice).
 
-**R122 — two circles can be stated tangent, and which touch is a configuration until the student says**. Sum or difference of radii, cycled by «הציגו תצורה אחרת» until «מבחוץ»/«מבפנים» pins it; concentric circles are never tangent (operator ruling). A circle named by its centre letter is the circle the figure already has on that centre: its given radius stays its radius, and no free radius is added beside it (ADR-AG-305).
+**R122 — two circles can be stated tangent, and which touch is a configuration until the student says**. Sum or difference of radii, cycled by «הציגו תצורה אחרת» until «מבחוץ»/«מבפנים» pins it; concentric circles are never tangent (operator ruling). A circle named by its centre letter is the circle the figure already has on that centre: its given radius stays its radius, and no free radius is added beside it (ADR-AG-305). Either circle may be given by its EQUATION («(x−a)²+y²=r²», «מעגל I ומעגל II משיקים מבחוץ»): its centre and radius are read off the equation, so the touch pins the equation's parameters; two equation circles with one centre are refused like any concentric pair; a circle computed from points is still refused by name (ADR-AG-306).
+- «נתון מעגל I שמשוואתו (x−a)²+y²=r²» · «נתון מעגל II שמשוואתו (x−13)²+y²=(2r)²» · «המעגלים משיקים מבחוץ»
 - «מעגל M משיק למעגל K», «מעגל O ומעגל M משיקים מבחוץ»
 - Sources: ADR-AG-167, #1504.
 

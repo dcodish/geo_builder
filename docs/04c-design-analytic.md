@@ -611,7 +611,10 @@ points). A bounded noun (`tangentTargets`, `BOUNDED_NOUN`) adds hinge rows on th
 With `t` the centre's projection parameter onto A→B, rows `max(0, −t)·|AB|` and `max(0, t−1)·|AB|` pull the touch point inside the side.
 They are BOUNDS ([ADR-AG-178](06c-decisions-analytic.md#adr-ag-178)): `residualRows` tags `{ eq, bound }` and
 `carrierDofOf` ranks `eq` alone (`CarrierSystem.equalitiesAt`, `freeRank`). Circle to circle is
-`tangent-circle {centre, r, other, otherR, branch}` behind `choice[external, internal]`; `readCircleSubject`,
+`tangent-circle {a, b: CircleSide, branch}` behind `choice[external, internal]`, a side being `{centre, r}` (a centred
+circle's point and radius) or `{circle}` (an equation circle, its centre and radius read off `curveAt` as `tangent-curve`
+does; `constraintCurveRefs` lists it, `constraintRefs` only the point sides — [ADR-AG-306](06c-decisions-analytic.md#adr-ag-306)).
+With an equation side, concentric is judged structurally at M1 (`centresAlwaysCoincide` over the probe environments); `readCircleSubject`,
 `TANGENT_BRANCH` and `peelMods` read the sentence; `touch-point {a, b}` names the touch; `inDomain(d, v, floor)` with
 `openBoundFloor` keeps a forced-zero radius off the bound.
 

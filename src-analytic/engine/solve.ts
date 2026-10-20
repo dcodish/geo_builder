@@ -138,6 +138,16 @@ export type TangentLineRef =
       bounded?: true;
     };
 
+/**
+ * ONE SIDE OF A CIRCLE-TO-CIRCLE TOUCH (#2387, ADR-AG-306) — a circle REFERENCE: a circle on a centre POINT (its point
+ * and radius expression, so the centre and the radius symbol can give way), or a circle the figure determines by its
+ * EQUATION (`circle`, read off the resolved curve, so the equation's parameters give way).
+ */
+export type CircleSide = { centre: Id; r: Expr } | { circle: Id };
+const circleSideKey = (s: CircleSide): string => ('centre' in s ? `p:${s.centre}` : `c:${s.circle}`);
+const circleSidePoint = (s: CircleSide): Id[] => ('centre' in s ? [s.centre] : []);
+const circleSideName = (s: CircleSide): string => ('centre' in s ? s.centre : s.circle.replace(/^circle-/, ''));
+
 export type Constraint =
   /** `A(6,4)` on a point that is not free to be replaced — one or both coordinates pinned. */
   | { t: 'coord'; id: Id; x?: Expr; y?: Expr }
@@ -351,10 +361,12 @@ export type Constraint =
    * (internal). The sentence without a branch word lowers to a `choice` over both — the two
    * configurations cycle under «הציגו תצורה אחרת», never a silently picked seat (ADR-052, the
    * #1049 pattern) — and «מבחוץ»/«מבפנים» collapse it exactly as «זווית B ישרה» collapses a
-   * right-angle seat. Both circles arrive as centre+radius (`circle-at`), resolved at the apply
-   * boundary; a circle with neither free is refused there, never here.
+   * right-angle seat. Each SIDE is a circle reference, resolved at the apply boundary (#2387, ADR-AG-306): a
+   * circle on a centre POINT carries the point and its radius expression; a circle the figure DETERMINES (stated
+   * by its equation) carries its id, and its centre and radius are read off the resolved curve (`curveAt`), as
+   * `tangent-curve` reads them for a line — so a parameter in the equation is what the touch pins.
    */
-  | { t: 'tangent-circle'; centre: Id; r: Expr; other: Id; otherR: Expr; branch: 'external' | 'internal' }
+  | { t: 'tangent-circle'; a: CircleSide; b: CircleSide; branch: 'external' | 'internal' }
   /**
    * A DERIVATION RESTATED ABOUT AN EXISTING POINT — «M אמצע AB» when `M` is already the y-axis crossing
    * (#1320, ADR-AG-144; #1046's converse, which the M1 boundary never got).
@@ -491,7 +503,7 @@ export function canonicalConstraint(k: Constraint): string {
   // «מעגל M משיק למעגל K» is «מעגל K משיק למעגל M» — undirected; the BRANCH is part of the
   // statement (externally and internally tangent are different givens, #1504).
   if (k.t === 'tangent-circle') {
-    const [p, q] = [k.centre, k.other].sort();
+    const [p, q] = [circleSideKey(k.a), circleSideKey(k.b)].sort();
     return `tangent-circle|${p}|${q}|${k.branch}`;
   }
   // The equation fields are SPELLING (#1429) — apply strips them, but a raw constraint compared
@@ -568,9 +580,10 @@ export function constraintRefs(k: Constraint): Id[] {
     // The circle is a CURVE ref; only a two-point line moves points.
     case 'tangent-curve':
       return k.line.kind === 'points' ? [k.line.a, k.line.b] : [];
-    // Both centres may move — either circle can give way to satisfy the touch.
+    // Both centres may move — either circle can give way to satisfy the touch. An equation side names no
+    // point: its freedom is its parameters', and its curve is a CURVE ref (#2387).
     case 'tangent-circle':
-      return [k.centre, k.other];
+      return [...circleSidePoint(k.a), ...circleSidePoint(k.b)];
     case 'derived-at':
       return [k.id, ...parentsOf(k.rule)];
     // A parameter's value names no point: its freedom lives in the register.
@@ -662,7 +675,7 @@ export function describeConstraint(k: Constraint): string {
     case 'tangent-curve':
       return `${k.line.kind === 'curve' ? k.line.label : `${k.line.a}${k.line.b}`} משיק למעגל`;
     case 'tangent-circle':
-      return `מעגל ${k.centre} משיק למעגל ${k.other}${k.branch === 'internal' ? ' מבפנים' : ' מבחוץ'}`;
+      return `מעגל ${circleSideName(k.a)} משיק למעגל ${circleSideName(k.b)}${k.branch === 'internal' ? ' מבפנים' : ' מבחוץ'}`;
     case 'derived-at':
       return `${k.id} = ${describeRule(k.rule)}`;
     case 'arc-sum':
@@ -718,6 +731,9 @@ export function constraintCurveRefs(k: Constraint): Id[] {
       return k.line.kind === 'curve' ? [k.line.id] : [];
     case 'tangent-curve':
       return k.line.kind === 'curve' ? [k.circle, k.line.id] : [k.circle];
+    // An equation circle on either side of a circle-to-circle touch must exist to be touched (#2387).
+    case 'tangent-circle':
+      return [k.a, k.b].flatMap((s) => ('circle' in s ? [s.circle] : []));
     case 'relation':
       return [...ofDir(k.u), ...ofDir(k.v)];
     case 'slope':
@@ -1124,13 +1140,26 @@ export function residualRows(
       return lineTangencyRows({ x: circle.cx, y: circle.cy }, circle.r, k.line, p, curveAt);
     }
     case 'tangent-circle': {
-      const r1 = evalExpr(k.r, env);
-      const r2 = evalExpr(k.otherR, env);
+      /*
+       * Each side's centre and radius (#2387, ADR-AG-306): a centre POINT from `p` (in `constraintRefs` order) and its
+       * radius expression, or a resolved equation circle's own (`curveAt`). A vacancy judges nothing.
+       */
+      let at = 0;
+      const side = (s: CircleSide): { c: Pt; r: number } | null => {
+        if ('centre' in s) return { c: p[at++], r: evalExpr(s.r, env) };
+        const circle = curveAt?.(s.circle) ?? null;
+        return circle && circle.kind === 'circle' ? { c: { x: circle.cx, y: circle.cy }, r: circle.r } : null;
+      };
+      const sa = side(k.a);
+      const sb = side(k.b);
+      if (!sa || !sb) return null;
+      const r1 = sa.r;
+      const r2 = sb.r;
       if (!Number.isFinite(r1) || !Number.isFinite(r2)) return null; // an unbound radius judges nothing
       // The DISTANCE between the centres IS the radii's sum (external) or the radii's absolute
       // difference (internal) — the formula sheet's two cases, one row each; which one holds is
       // the `choice` resolved before this runs (#1049), never a judgement made here.
-      const [a, b] = p;
+      const [a, b] = [sa.c, sb.c];
       const d = Math.hypot(b.x - a.x, b.y - a.y);
       const miss = d - (k.branch === 'external' ? r1 + r2 : Math.abs(r1 - r2));
       /**
