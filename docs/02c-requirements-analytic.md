@@ -871,6 +871,11 @@ a sentence the tool parsed.
 - «ישר דרך A מקביל לישר l1» → the line through A is drawn; with no l1 (or no C in «… ל-CD») → refused, naming it
 - Sources: ADR-AG-317, #2431 (exam Q1 ב(1), #2379).
 
+**R186 — an equation written inside a sentence denotes the figure's own curve with that equation, and no message ever shows an internal id**. *(Honesty invariant: an error names the statement, never internal state.)*
+- «נתון הישר l: 3x+4y=25» · «משוואת המשיק היא 3x+4y=25» → about l (on a circle of radius 5 at distance 5, «כבר נובע»)
+- «הישר 3x+4y=25 משיק למעגל M», «המעגל M משיק לישר 3x+4y=25» after l → about l, no second line
+- Sources: ADR-AG-318, #2432.
+
 **R61 — a circle marks its centre**. Its value shows only when the givens fix it; the centre owns no letter (amended by R123).
 - Sources: ADR-AG-036.
 

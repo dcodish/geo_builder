@@ -58,7 +58,7 @@ function unreadable(src: string): RuleOutcome {
 }
 import { angleLabelSymbol, constantLengthExpr, namedLengthPairs, planeLetterLength, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
-import { CENTRE_SENTINEL, CENTRES_SENTINELS, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
+import { CENTRE_SENTINEL, CENTRES_SENTINELS, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type EqOperand, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow, BARE_POLYGON_NOT_BUILT } from '../engine/shapes';
 import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
@@ -2358,14 +2358,14 @@ function peelMods(text: string, where: 'head' | 'tail', mods: TangencyMods): str
  *  inline equations mint. */
 interface TangentTargets {
   axes: Array<'x' | 'y'>;
-  lines: TangentLineRef[];
+  lines: Array<TangentLineRef | EqOperand>;
   /** CIRCLE targets (#1504) — the other circle by the name the sentence used (letter or
    *  numeral; a numeral names an equation circle, which the apply boundary refuses by name),
    *  with the touch branch when the student said it on the piece itself. */
   circles: Array<{ name?: string; branch?: 'external' | 'internal' }>;
   facts: Fact[];
   /** The axis and line targets IN THE STUDENT'S ORDER — what «בנקודות A ו-C בהתאמה» pairs with (#1619 B3). */
-  ordered: Array<{ axis: 'x' | 'y' } | { line: TangentLineRef }>;
+  ordered: Array<{ axis: 'x' | 'y' } | { line: TangentLineRef | EqOperand }>;
   /** Each two-point target with the noun it was written with (#1639): the piece the sentence draws. */
   pieces: Array<{ a: Id; b: Id; noun: PieceNoun }>;
 }
@@ -2384,7 +2384,7 @@ interface TangentTargets {
  * piece this grammar cannot read still declines the WHOLE sentence (`null`) — guessing half a
  * target list would build half the student's given.
  */
-function tangentTargets(tail: string, src: string): TangentTargets | null {
+function tangentTargets(tail: string): TangentTargets | null {
   const out: TangentTargets = { axes: [], lines: [], circles: [], facts: [], ordered: [], pieces: [] };
   /*
    * A PLURAL noun heads the whole list — «הצלעות AO, BO ו-AB», "the sides AB, BC and CA" (#1619 B2's touch
@@ -2453,9 +2453,9 @@ function tangentTargets(tail: string, src: string): TangentTargets | null {
     if (bare.includes('=')) {
       const eq = equationExpr(bare);
       if (eq && symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
-        const cid = `curve-${anonIndex(bare)}`;
-        out.facts.push({ t: 'curve', id: cid, label: { name: '', eqSrc: trim(bare) }, curve: { eq }, stated: false, src });
-        const ref: TangentLineRef = { kind: 'curve', id: cid, label: trim(bare) };
+        // The operand is READ here and resolved at M1 (#2432, ADR-AG-318): the figure's own line with this equation,
+        // or a carrier minted there — never a `curve` fact referred to by an id the twin scan may absorb.
+        const ref: EqOperand = { kind: 'eq', id: `curve-${anonIndex(bare)}`, label: trim(bare), eqSrc: trim(bare), eq, role: 'carrier' };
         out.lines.push(ref);
         out.ordered.push({ line: ref });
         continue;
@@ -3092,11 +3092,11 @@ function parseTangentObject(line: string): RuleOutcome {
     if (!noun.at) return made([{ t: 'tangent-eq', id, eq, eqSrc, ...(noun.circle ? { circle: noun.circle } : {}), src: line }]);
     return made([
       ...tangentObjectFacts(trim(eqm[1]), line),
-      { t: 'curve', id, label: { name: '', eqSrc }, curve: { eq }, stated: false, src: line },
       {
         t: 'tangent-of',
         axes: [],
-        lines: [{ kind: 'curve', id, label: eqSrc }],
+        // The equation is resolved at M1 (#2432, ADR-AG-318): an existing line with it IS the tangent's line.
+        lines: [{ kind: 'eq', id, label: eqSrc, eqSrc, eq, role: 'carrier' }],
         ...(noun.circle ? { circle: noun.circle } : {}),
         at: noun.at,
         src: line,
@@ -3821,10 +3821,10 @@ function parseCircleAt(line: string): RuleOutcome {
 
   // THE LINE-FIRST ORDER — the subject is a target list, the object ONE circle (named or contextual),
   // both read by the one target reader.
-  const object = tangentTargets(objectText, line);
+  const object = tangentTargets(objectText);
   if (!object || object.circles.length !== 1 || object.axes.length + object.lines.length + object.facts.length > 0) return null;
   if (object.circles[0].branch) return null;
-  const targets = tangentTargets(subjectText, line);
+  const targets = tangentTargets(subjectText);
   if (!targets) return null;
   // «הישר BC משיק למעגל בנקודה B», «AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה» (#1619 B3, #1430).
   if (touchApplies(targets, mods)) {
@@ -3883,7 +3883,7 @@ function withSentenceMods(
 
 /** The facts for a sentence whose subject is a CIRCLE (or two) — `null` when it is not this reading. */
 function circleSubjectFacts(subject: CircleSubject, objectText: string | null, mods: TangencyMods, line: string): Fact[] | null {
-  const targets = objectText === null ? null : tangentTargets(objectText, line);
+  const targets = objectText === null ? null : tangentTargets(objectText);
   if (objectText !== null && !targets) return null;
 
   if (subject.kind === 'one') {

@@ -372,6 +372,13 @@ holds a line id reads it through this one step, and a reference to no line is le
 `line-at` holds its `dir` to the same reference check as a relation (`dirRefs` + `dirCurveRefs`). `derive` blames a
 failing selector by the selector AS APPLIED (`selectorFact`), not as written.
 
+**The equation operand** ([ADR-AG-318](06c-decisions-analytic.md#adr-ag-318)). An equation written inside another
+sentence reaches M1 as an `EqOperand` (`{ kind: 'eq', id, eqSrc, eq, role }`), never as a `curve` fact the parser
+minted. `equationOperand` is the one resolver: the figure's own curve with that equation (`resolveCurveByEq`) is the
+operand (a `stated` role promotes a carrier it finds); otherwise the curve is minted in its role (`stated` drawn,
+`carrier` per ADR-AG-032), and a stated mint absorbed by the twin scan resolves to its absorber. `tangent-of`
+resolves its `eq` lines first; `tangent-eq` and the #1429 `on-curve` arm call the same function.
+
 ### Curve identity and the promotion path ([ADR-AG-090](06c-decisions-analytic.md#adr-ag-090))
 
 Content-derived ids make a later «y=x» PROMOTE the carrier of «נקודה B על הישר y=x» (#1076): the carrier is minted

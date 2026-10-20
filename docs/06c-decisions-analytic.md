@@ -13356,3 +13356,35 @@ The distance slot (`curveByName`) found the line.
 - fixture `exam-2379-q1-named-perpendicular-2431.analytic.json` (exam Q1 ב(1)): one line named l1, and the wrong «מקביל» refused `unsatisfiable`.
 
 **Consequences.** `engine/apply.ts` (`resolveLineRefs`, the `line-at` direction check), `engine/solve.ts` (`dirCurveRefs`), `engine/derive.ts` (the selector blame); docs 02c, 04c.
+
+## ADR-AG-318 — An equation written as an operand is resolved against the figure at M1, never minted by the parser (#2432)
+
+**Date:** 2026-10-20 · **Status:** accepted · bug, fix round #2436 (stream A); branch `fix/2432-eq-operand-at-m1`, stacked on `fix/2431-line-name-resolves` (ADR-AG-317). Step 1 of the #2429 plan; #2425 and #2429 reuse the resolver. LADDER stage: none (the M1 boundary; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R186 (new). · **Design:** [04c](04c-design-analytic.md), "Curve identity at the M1 boundary" (the equation operand).
+
+**Context.** Measured on main `17168818` (`decideSubmit` → `derive`, no model call):
+- «נתון הישר l: 3x+4y=25» · «משוואת המשיק היא 3x+4y=25» was refused `unknown-reference curve-anonex0oaz`, an internal id in a student message. The `tangent-eq` arm minted a stated `curve` under the content id, the twin scan (#1342) absorbed it into l, and the `tangent-of` that followed named the absorbed id.
+- «הישר 3x+4y=25 משיק למעגל M», «המעגל M משיק לישר 3x+4y=25 …» and «משוואת המשיק למעגל בנקודה A היא 3x+4y=25» after l recorded, but against a SECOND, hidden carrier with l's equation: the parser's tangency readers (`tangentTargets`, `parseTangentObject`) emitted their own `curve` fact, and carriers do not join the twin scan.
+
+**Class.** *An equation written as an operand is turned into a curve before the figure is consulted*, so it is a new object (or a dangling id) where the figure already holds the curve it denotes. The `on-curve` arm already resolved first (#1429); the tangency operands did not.
+
+**Decision.**
+1. **`EqOperand`** (`engine/types.ts`): `{ kind: 'eq', id, label, eqSrc, eq, role, line? }`. The parser only reads the operand: the content-derived id a mint would take, and the role the sentence gives the curve (`stated`: drawn; `carrier`: holds something, ADR-AG-032). It rides `tangent-of.lines` and never reaches a constraint.
+2. **`equationOperand(c, op, src)`** (`engine/apply.ts`), the one resolver:
+   - the figure's own curve with that equation (`resolveCurveByEq`) IS the operand; a `stated` role promotes a carrier it finds (the #1076/#1149 path);
+   - otherwise the curve is minted in its role under the content id. A stated mint may still be absorbed by the twin scan (a scaled spelling, `identicalCurve`); the operand is then the line that absorbed it;
+   - it reports `minted`, so the statement carrying it is `created`, never «כבר ידוע», when only the operand changed the figure.
+3. **Callers.** `tangent-of` resolves every `eq` line first, then reads only ids. `tangent-eq` lowers to one `tangent-of` whose operand is `stated` (no tangent object: the sentence states its line, drawn, as before) or `carrier` (one tangent object: one line is never drawn twice, ADR-AG-195). The #1429 `on-curve` arm calls it with `carrier`, unchanged in behaviour. The parser's two `curve` mints are gone.
+
+**Roles are unchanged here.** Every operand keeps the role it had: the tangency readers' operands are carriers until #2425 gives them `stated`. The student-visible effect is the identity: a sentence about a line the figure holds is about THAT line. When that makes the sentence already true («משוואת המשיק היא 3x+4y=25» on a circle of radius 5 at distance 5), it is «כבר נובע» rather than recorded beside a hidden twin.
+
+**Sibling audit.** Grepped `parseAnalytic.ts` for `t: 'curve'` facts emitted beside a reference: the two tangency sites were the only operand mints (the `inheritExtent` declaration and the bounded-noun segment are declarations, not operands). `apply.ts`'s other `curve` mints are declarations. 2-D and 3-D have no equation operands (docs/22 §10 X2). The class is not present there.
+
+**Tests.** `src-analytic/__tests__/issue-2432-equation-operand-m1.test.ts`, through `decideSubmit` → `derive`:
+- the reported two lines (no refusal; the tangency already holds), and on a free radius He/En and a scaled spelling: r = 5 at seeds 0–3 and l stays the one line;
+- the three tangency spellings after l are about l; the tangent at A after l puts A at (3, 4);
+- the carrier role kept: an unresolved tangency operand and «A על הישר …» stay undrawn, one object;
+- a guard over 5 setups × 8 sentences: no refusal text or payload contains `curve-anon`.
+
+**Consequences.** `engine/types.ts` (`EqOperand`, `tangent-of.lines`), `engine/apply.ts` (`equationOperand`, the `tangent-of`, `tangent-eq` and #1429 arms), `parser/parseAnalytic.ts` (`tangentTargets`, `parseTangentObject`); docs 02c, 04c.

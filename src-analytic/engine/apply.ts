@@ -53,6 +53,7 @@ import {
   type Curve,
   type CurveObject,
   type Domain,
+  type EqOperand,
   type Fact,
   type Selector,
   type ArcDef,
@@ -1021,6 +1022,42 @@ function resolveCurveByEq(c: Construction, eq: unknown): Id | null {
     if (match) return o.id;
   }
   return null;
+}
+
+/**
+ * A CURVE OPERAND GIVEN BY ITS EQUATION, RESOLVED TO THE OBJECT IT DENOTES (#2432, [ADR-AG-318](../../docs/06c-decisions-analytic.md#adr-ag-318)).
+ *
+ * The one place an equation written inside another sentence becomes a curve. The parser only reads it (`EqOperand`);
+ * here, against the figure:
+ *  1. **The figure's own curve with that equation IS the operand** (`resolveCurveByEq`): a named `l`, a declared
+ *     `נתון ישר <eq>`, a carrier. A `stated` role promotes a carrier it finds (the #1076/#1149 path, the label kept).
+ *  2. **Otherwise the curve is minted** under the operand's content id: drawn for `stated`, a carrier for `carrier`
+ *     (ADR-AG-032, unchanged). A stated mint still meets the twin scan (#1342), which may absorb it into a line the
+ *     probe identity did not match (a scaled spelling) — the operand is then the line that absorbed it.
+ *
+ * Before this, the `tangent-eq` arm and the parser's tangency readers minted a `curve` fact and then referred to
+ * it by id; when the twin scan absorbed the mint the reference dangled, and the student read `curve-anon…`.
+ * `minted` says the figure changed, so the statement that carries the operand is never «כבר ידוע» for it.
+ */
+function equationOperand(
+  c: Construction,
+  op: EqOperand,
+  src: string,
+): { ok: true; next: Construction; id: Id; minted: boolean } | { ok: false; error: ApplyError } {
+  const curve: Curve = { ...(op.line ? { kind: 'line' as const } : {}), eq: op.eq as Curve['eq'] };
+  const label = { name: '', eqSrc: op.eqSrc, ...(op.line ? { kind: 'line' as const } : {}) };
+  const found = resolveCurveByEq(c, op.eq);
+  if (found !== null) {
+    const held = objectById(c, found) as CurveObject;
+    if (op.role !== 'stated' || held.stated) return { ok: true, next: c, id: found, minted: false };
+    const promoted = applyFact(c, { t: 'curve', id: found, label, curve: { ...curve, ...held.curve }, stated: true, src });
+    return promoted.ok ? { ok: true, next: promoted.next, id: found, minted: promoted.next !== c } : promoted;
+  }
+  const mint = applyFact(c, { t: 'curve', id: op.id, label, curve, stated: op.role === 'stated', src });
+  if (!mint.ok) return mint;
+  if (objectById(mint.next, op.id)) return { ok: true, next: mint.next, id: op.id, minted: mint.next !== c };
+  const twin = mint.next.objects.find((o): o is CurveObject => o.kind === 'curve' && identicalCurve(o.curve, curve));
+  return twin ? { ok: true, next: mint.next, id: twin.id, minted: mint.next !== c } : { ok: false, error: { code: 'not-handled', detail: src } };
 }
 
 /**
@@ -2576,21 +2613,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        */
       if (f.k.t === 'on-curve' && f.k.eqSrc !== undefined) {
         const { eqSrc, eq, ...bare } = f.k;
-        const resolved = resolveCurveByEq(c, eq) ?? f.k.curve;
-        let host = c;
-        if (resolved === f.k.curve && !objectById(c, resolved) && eq) {
-          const mint = applyFact(c, {
-            t: 'curve',
-            id: resolved,
-            label: { name: '', eqSrc },
-            curve: { eq: eq as Parameters<typeof resolveCurve>[0]['eq'] },
-            stated: false,
-            src: f.src,
-          });
-          if (!mint.ok) return mint;
-          host = mint.next;
-        }
-        return applyFact(host, { t: 'constraint', k: { ...bare, curve: resolved }, src: f.src });
+        if (!eq) return applyFact(c, { t: 'constraint', k: bare, src: f.src });
+        // The one equation-operand resolver (#2432, ADR-AG-318): a point placed on an equation holds a CARRIER.
+        const op = equationOperand(c, { kind: 'eq', id: f.k.curve, label: eqSrc, eqSrc, eq: eq as Expr, role: 'carrier' }, f.src);
+        if (!op.ok) return op;
+        return applyFact(op.next, { t: 'constraint', k: { ...bare, curve: op.id }, src: f.src });
       }
       /*
        * AN ANGLE LABEL NAMES ONE ANGLE (#1622 E5, ADR-AG-221; 2-D's ADR-386 `alias-taken`). «נסמן זוית BAM כ-A1» binds the
@@ -3721,6 +3748,29 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'tangent-of': {
+      /*
+       * A LINE GIVEN BY ITS EQUATION is resolved before anything reads the lines (#2432, ADR-AG-318): the figure's own
+       * line with that equation, or a curve minted in the operand's role. The tangency below then reads only ids.
+       */
+      if (f.lines?.some((l) => l.kind === 'eq')) {
+        let cur = c;
+        let minted = false;
+        const lines: TangentLineRef[] = [];
+        for (const l of f.lines) {
+          if (l.kind !== 'eq') {
+            lines.push(l);
+            continue;
+          }
+          const op = equationOperand(cur, l, f.src);
+          if (!op.ok) return op;
+          cur = op.next;
+          minted ||= op.minted;
+          lines.push({ kind: 'curve', id: op.id, label: l.label });
+        }
+        const out = applyFact(cur, { ...f, lines });
+        return out.ok && minted && out.effect === 'known' ? { ...out, effect: 'created' } : out;
+      }
+      const tangentLines = (f.lines ?? []) as TangentLineRef[];
       let host: GeoObject | undefined;
       if (f.circleId !== undefined) {
         host = objectById(c, f.circleId);
@@ -3770,7 +3820,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         host = circles[0];
       }
       // THE TOUCH POINT NAMED (#1619 B3, ADR-AG-195): any circle — the radius reads the resolved one.
-      if (f.at !== undefined) return applyTouchAt(c, host, f.at, f.axes, f.lines ?? [], f.src);
+      if (f.at !== undefined) return applyTouchAt(c, host, f.at, f.axes, tangentLines, f.src);
       /**
        * A circle the figure DETERMINES — stated by its equation, or computed from points (#1430 step 1,
        * ADR-AG-195): the distance from ITS centre to the line is ITS radius, both read off the resolved
@@ -3783,7 +3833,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const circleId = host.id;
         return applyAll(
           c,
-          (f.lines ?? []).map((line) => ({ t: 'constraint' as const, k: { t: 'tangent-curve' as const, circle: circleId, line }, src: f.src })),
+          tangentLines.map((line) => ({ t: 'constraint' as const, k: { t: 'tangent-curve' as const, circle: circleId, line }, src: f.src })),
         );
       }
       const circle = host;
@@ -3793,7 +3843,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           k: { t: 'tangent-axis' as const, centre: circle.centre, r: circle.r, axis },
           src: f.src,
         })),
-        ...(f.lines ?? []).map((line) => ({
+        ...tangentLines.map((line) => ({
           t: 'constraint' as const,
           k: { t: 'tangent-line' as const, centre: circle.centre, r: circle.r, line },
           src: f.src,
@@ -3939,19 +3989,26 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     case 'tangent-eq': {
       const tangents = c.objects.filter(isTangentObject);
       if (tangents.length > 1) return { ok: false, error: noHost(f.src, 'line', tangents) };
-      const id = f.id;
+      /*
+       * The stated line is an EQUATION OPERAND (#2432, ADR-AG-318): when the figure already holds a line with that
+       * equation, the tangent IS that line. With a tangent object it is a carrier of the object's equation (one line is
+       * never drawn twice, ADR-AG-195); with none it is the line the sentence states, drawn.
+       */
+      const operand = (role: EqOperand['role']): EqOperand => ({
+        kind: 'eq',
+        id: f.id,
+        label: f.eqSrc,
+        eqSrc: f.eqSrc,
+        eq: f.eq,
+        role,
+        ...(role === 'stated' ? { line: true as const } : {}),
+      });
       if (tangents.length === 1) {
         const t = tangents[0] as Extract<GeoObject, { kind: 'line-at' }>;
         const circleId = t.dir.k === 'radius' ? t.dir.circle : undefined;
-        return applyAll(c, [
-          { t: 'curve', id, label: { name: '', eqSrc: f.eqSrc }, curve: { eq: f.eq }, stated: false, src: f.src },
-          { t: 'tangent-of', axes: [], lines: [{ kind: 'curve', id, label: f.eqSrc }], ...(circleId ? { circleId } : {}), at: t.through, src: f.src },
-        ]);
+        return applyFact(c, { t: 'tangent-of', axes: [], lines: [operand('carrier')], ...(circleId ? { circleId } : {}), at: t.through, src: f.src });
       }
-      return applyAll(c, [
-        { t: 'curve', id, label: { name: '', eqSrc: f.eqSrc, kind: 'line' }, curve: { kind: 'line', eq: f.eq }, stated: true, src: f.src },
-        { t: 'tangent-of', axes: [], lines: [{ kind: 'curve', id, label: f.eqSrc }], ...(f.circle !== undefined ? { circle: f.circle } : {}), src: f.src },
-      ]);
+      return applyFact(c, { t: 'tangent-of', axes: [], lines: [operand('stated')], ...(f.circle !== undefined ? { circle: f.circle } : {}), src: f.src });
     }
 
     case 'radius-of': {

@@ -165,6 +165,21 @@ export interface FactBase {
   src: string;
 }
 
+/**
+ * A CURVE OPERAND WRITTEN AS ITS EQUATION (#2432, [ADR-AG-318](../../docs/06c-decisions-analytic.md#adr-ag-318)) — «…משיק
+ * לישר 3x+4y=25», «משוואת המשיק … היא 3x+4y=25». The parser only READS it: the id is the content-derived one a mint
+ * would take, and the role says what the sentence makes of the curve. Which object it denotes — the figure's own curve
+ * with that equation, or a new one — is decided once, at M1 (`equationOperand`), never by a `curve` fact minted at
+ * parse time and then referred to by an id the twin scan may absorb. It never reaches a constraint: M1 resolves it to
+ * a `{ kind: 'curve', id }` reference first.
+ *
+ * - `stated`: the curve is what the sentence is about — drawn, as a curve stated on its own line;
+ * - `carrier`: the curve exists to hold something (ADR-AG-032) — undrawn, a carrier the figure may later promote.
+ *
+ * `line` — the sentence's noun says the curve is a LINE («המשיק»), so a mint claims the family (R6).
+ */
+export type EqOperand = { kind: 'eq'; id: Id; label: string; eqSrc: string; eq: Expr; role: 'stated' | 'carrier'; line?: true };
+
 export type Fact =
   | (FactBase & { t: 'param'; sym: string; domain: Domain })
   | (FactBase & { t: 'point'; id: Id; x: Expr; y: Expr })
@@ -458,7 +473,7 @@ export type Fact =
    * a circle the sentence must create is that ring's incircle (the only circle tangent to every side at a point ON
    * it — an excircle touches extensions): created closed form, never as a free circle the solve must fit.
    */
-  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: TangentLineRef[]; circle?: string; circleId?: Id; at?: Id; ring?: Id[] })
+  | (FactBase & { t: 'tangent-of'; axes: Array<'x' | 'y'>; lines?: Array<TangentLineRef | EqOperand>; circle?: string; circleId?: Id; at?: Id; ring?: Id[] })
   /**
    * «AB משיק משותף למעגלים M ו-N» — THE LINE ab IS TANGENT TO BOTH CIRCLES (#2385, ADR-AG-312). Written over the
    * circle-slot sentinels inside `circles-about`, so `circles` are the two circle ids by the time M1 reads it. M1 decides
