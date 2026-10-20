@@ -1062,6 +1062,72 @@ export function App() {
   // poolTick, as above
   const segs = useMemo(() => segmentKnowledge(d), [d, poolTick]);
   const checking = t('checking');
+  /**
+   * ONE ASK ROW'S BODY (#2393, ADR-AG-316) — what the lane answered, worded. Extracted from the row so a conjoined question
+   * (`Answer.parts`) words each part exactly as a row of its own. Two arms joined: a condition the figure refuses is
+   * worded by the input's own refusal text, and a question the tool understands but does not answer by `errOutOfScope`.
+   */
+  const answerBody = (a: Answer) =>
+    a.refused ? (
+      `${a.question} — ${errorTextOf({ key: a.refused.key, detail: a.refused.detail } as Parameters<typeof errorTextOf>[0], t as unknown as Translate)}`
+    ) : a.unsupported ? (
+      t('errOutOfScope', { detail: a.question })
+    ) : a.missing ? (
+      `${a.question} — ${t(a.missing.used ? 'askNumeralNotation' : a.missing.kind === 'point' ? 'askMissingPoint' : 'askMissingCurve', { name: a.missing.name, used: a.missing.used })}`
+    ) : a.contextual ? (
+      /* #1431 — the contextual «המרחק של הנקודה מהישר» could not resolve: name WHICH
+         noun is ambiguous (or absent), never «לא הבנתי» */
+      `${a.question} — ${t(
+        a.contextual.points !== 1 && a.contextual.lines !== 1
+          ? 'askContextualBoth'
+          : a.contextual.points !== 1
+            ? 'askContextualPoint'
+            : 'askContextualLine',
+        { points: a.contextual.points, lines: a.contextual.lines },
+      )}`
+    ) : a.host ? (
+      /* #1432 am. 1 — a role question whose host is absent or plural: say which, never «לא הבנתי» */
+      `${a.question} — ${t(hostKey('askHost', a.host))}`
+    ) : a.unreadable ? (
+      `${a.question} — ${t('askUnreadable')}`
+    ) : a.pending ? (
+      /* #1473 — a gate this answer reads still waits for the configuration pool: «בודק…», never a provisional value */
+      `${a.question} = ${checking}`
+    ) : (
+      /**
+       * A VERTICAL SLOPE IS AN ANSWER, NOT A FAILURE (#1223).
+       *
+       * `a.fact` is checked before the `figureIsOpen` guess, because that guess
+       * only ever chooses between two kinds of *absence* and this is neither. It
+       * reuses `slopeVertical` — the string the «שיפועים» section already prints
+       * for a vertical segment — so the two surfaces cannot come to disagree
+       * about what a vertical thing's slope is.
+       *
+       * A union locus carries `\n` between its equations (#1508 — "where there are
+       * 2 answers, each on a separate line"), so the row renders per line, each
+       * typeset independently — the #1221 rule the trace rows below already follow.
+       */
+      `${a.question}${a.value && a.value.includes('=') ? ':' : ' ='} ${
+        a.value ??
+        (a.fact === 'vertical'
+          ? t('slopeVertical')
+          : a.fact === 'lines-cross'
+            ? t('askLinesCross')
+            : a.fact === 'points' && a.points
+              ? /* #1227 (ADR-AG-136): a determined point's locus IS the point(s) — the
+                   locus lane's own grammar, «נקודה · (4, 3)» beside «ישר · x = 4» */
+                `${a.points.length === 1 ? t('askPointOne') : a.points.length === 2 ? t('askPointTwo') : t('askPointMany', { count: a.points.length })} · ${a.points
+                  .map((p) => `(${fmt(p.x)}, ${fmt(p.y)})`)
+                  .join(', ')}`
+              : t(figureIsOpen(d) ? 'askOpen' : 'askNoValue'))
+      }`
+        .split('\n')
+        .map((line, k) => (
+          <div key={k}>
+            <MathText text={analyticBidi.isolateLtrRuns(line)} />
+          </div>
+        ))
+    );
 
   // NO `suiteActions`: AppFrame renders the language toggle AND the About button itself, using this
   // product's own `language` key. Passing a toggle here put two «English» buttons on the suite bar.
@@ -1952,61 +2018,23 @@ export function App() {
                       one rule for every present and future question kind, instead of a list of the ones
                       that happen to return equations.
                     */}
-                    {a.missing ? (
-                      `${a.question} — ${t(a.missing.used ? 'askNumeralNotation' : a.missing.kind === 'point' ? 'askMissingPoint' : 'askMissingCurve', { name: a.missing.name, used: a.missing.used })}`
-                    ) : a.contextual ? (
-                      /* #1431 — the contextual «המרחק של הנקודה מהישר» could not resolve: name WHICH
-                         noun is ambiguous (or absent), never «לא הבנתי» */
-                      `${a.question} — ${t(
-                        a.contextual.points !== 1 && a.contextual.lines !== 1
-                          ? 'askContextualBoth'
-                          : a.contextual.points !== 1
-                            ? 'askContextualPoint'
-                            : 'askContextualLine',
-                        { points: a.contextual.points, lines: a.contextual.lines },
-                      )}`
-                    ) : a.host ? (
-                      /* #1432 am. 1 — a role question whose host is absent or plural: say which, never «לא הבנתי» */
-                      `${a.question} — ${t(hostKey('askHost', a.host))}`
-                    ) : a.unreadable ? (
-                      `${a.question} — ${t('askUnreadable')}`
-                    ) : a.pending ? (
-                      /* #1473 — a gate this answer reads still waits for the configuration pool: «בודק…», never a provisional value */
-                      `${a.question} = ${checking}`
-                    ) : (
-                      /**
-                       * A VERTICAL SLOPE IS AN ANSWER, NOT A FAILURE (#1223).
-                       *
-                       * `a.fact` is checked before the `figureIsOpen` guess, because that guess
-                       * only ever chooses between two kinds of *absence* and this is neither. It
-                       * reuses `slopeVertical` — the string the «שיפועים» section already prints
-                       * for a vertical segment — so the two surfaces cannot come to disagree
-                       * about what a vertical thing's slope is.
-                       *
-                       * A union locus carries `\n` between its equations (#1508 — "where there are
-                       * 2 answers, each on a separate line"), so the row renders per line, each
-                       * typeset independently — the #1221 rule the trace rows below already follow.
-                       */
-                      `${a.question}${a.value && a.value.includes('=') ? ':' : ' ='} ${
-                        a.value ??
-                        (a.fact === 'vertical'
-                          ? t('slopeVertical')
-                          : a.fact === 'lines-cross'
-                            ? t('askLinesCross')
-                            : a.fact === 'points' && a.points
-                              ? /* #1227 (ADR-AG-136): a determined point's locus IS the point(s) — the
-                                   locus lane's own grammar, «נקודה · (4, 3)» beside «ישר · x = 4» */
-                                `${a.points.length === 1 ? t('askPointOne') : a.points.length === 2 ? t('askPointTwo') : t('askPointMany', { count: a.points.length })} · ${a.points
-                                  .map((p) => `(${fmt(p.x)}, ${fmt(p.y)})`)
-                                  .join(', ')}`
-                              : t(figureIsOpen(d) ? 'askOpen' : 'askNoValue'))
-                      }`
-                        .split('\n')
-                        .map((line, k) => (
-                          <div key={k}>
-                            <MathText text={analyticBidi.isolateLtrRuns(line)} />
+                    {/*
+                      ONE QUESTION THAT ASKED SEVERAL (#2393 R9, ADR-AG-316): the student's question once, then each
+                      part with the ordinary row body, stacked — no new wording.
+                    */}
+                    {a.parts ? (
+                      <>
+                        <div>
+                          <MathText text={analyticBidi.isolateLtrRuns(a.question)} />
+                        </div>
+                        {a.parts.map((part, k) => (
+                          <div key={k} style={{ paddingInlineStart: 12 }}>
+                            {answerBody(part)}
                           </div>
-                        ))
+                        ))}
+                      </>
+                    ) : (
+                      answerBody(a)
                     )}
 
                     {/*

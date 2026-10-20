@@ -123,6 +123,12 @@ export interface Derivation {
    * Carried rather than re-derived, so a consumer cannot disagree with its own figure by construction.
    */
   seed: number;
+  /**
+   * THE LINES THIS DERIVATION IS OF (#2393 R10, ADR-AG-316) — carried, as `seed` is (#1176), so a question that names its
+   * own condition («… של כל הנקודות M המקיימות MA = MB») is traced on THIS figure plus that condition, never on lines
+   * re-assembled elsewhere. Optional: a hand-built derivation has none, and such a question is then read without it.
+   */
+  lines?: readonly string[];
   /** One entry per failing line. An empty array means every line landed. */
   faults: LineFault[];
   /** One entry per input line, positionally — what that line actually did. */
@@ -1022,7 +1028,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     drawnOption,
   );
   const selectorLine = construction.selectors.map((_, at) => (selectorFact[at] === undefined ? -1 : owner[selectorFact[at]]));
-  return { construction: shown, figure, box: viewBox(figure), seed, faults, outcomes, minted, notices, constraintLine, selectorLine, stated };
+  return { construction: shown, figure, box: viewBox(figure), seed, lines: [...lines], faults, outcomes, minted, notices, constraintLine, selectorLine, stated };
 }
 
 /** `n` in subscript digits — `P₁`, `P₁₂`. */

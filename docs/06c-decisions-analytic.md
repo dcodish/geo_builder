@@ -12742,3 +12742,67 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 **Behaviour change for a student.** Every exam sentence above reads as its canonical twin, builds the same figure, and refuses with the same message where the twin refuses. «מעבירים משיק … דרך הנקודה A ומשיק …» pre-fills «המשיק למעגל I בנקודה A; המשיק למעגל II בנקודה B». A tangent «דרך» a point on its circle is drawn as the tangent at that point. «המרחק בין N₁ ל-N₂ הוא 9» now reads.
 
 **Consequences.** `parser/frameAnalytic.ts`, `parser/parseAnalytic.ts` (`readLine`, `parseCentresDistance`, `tangent-through`, the tangent subjects), `parser/scopeAnalytic.ts`, `engine/types.ts` (`centres-distance`, `tangent-through`, `CENTRES_SENTINELS`), `engine/apply.ts` (`circlePairOf`, the two cases), `engine/lengths.ts` (the distance operand), `parser/catalogAnalytic.ts`, `shell/__tests__/fixtures/geo-input-parity.ts`.
+
+## ADR-AG-316 — The ask lane reads the exam's questions: coordinates, a parameter, a curve by centre, by «THE» noun and by tangent noun, conjunctions, the set-former (#2393)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream F); branch `feat/2393-analytic-ask-lane`, stacked on `feat/2391-analytic-exam-sentences` (ADR-AG-315). **Phase R only.** Phase Y (yes/no questions) is dropped by the operator's ruling of 2026-10-20 on #2393: *«the tool doesnt answer such questions. its a drawing tool and not a solver per se»*. Such a question keeps the lane's existing «לא הבנתי את השאלה». It also takes #2389's honesty item («שיפוע המקום הגיאומטרי של M»), per the ruling on #2389. LADDER stage: none (the ask lane; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R69a (new: the exam's own questions are askable). · **Design:** [04c](04c-design-analytic.md), «The ask lane» → «The exam's questions».
+
+**Context.** Measured on `3cae7f25` (`derive` → `ask`, model mocked) over the three exam figures:
+- «מצאו את שיעורי הנקודה M», «a», «מצאו את m ואת n» and the set-former's «… של כל הנקודות M המקיימות MA = MB» answered `unreadable`, or named the noun phrase as a missing point;
+- «משוואת המעגל שמרכזו N», «משוואת המעגל», "the equation of circle M" and «משוואת המשיק» answered `missing` curve;
+- «משוואת l1» answered null while the panel row beside it listed two equations, and «שיפוע l1» answered «±0.35»;
+- «שיפוע המקום הגיאומטרי של M» answered «אין בשרטוט ישר או מעגל בשם המקום הגיאומטרי של M».
+
+**Class.** The rule of 02c R23 is "sayable ⇒ askable, through the parser's own readers". Each gap was a reference form the lane did not resolve, or a question shape it did not frame. The «משוואת l1» defect had its own cause: **two curve resolvers for one question**. The by-name branch asked `knownCurve` alone, while the two-point-line branch and the panel row also fell back to the configurations' options (#1433, #1716).
+
+**Decision** (`app/ask.ts` unless named).
+1. **R1** `COORDS_OF`: «שיעורי (הנקודה) M», «הקואורדינטות של M» and "the coordinates of (point) M" rewrite to «M», so the answer is the point arm's (`pointText`, the panel's own decision).
+2. **R2** `PARAM_ASK`: «(הערך של) a» and "the value of a" are read only for a symbol the figure's register holds and reads (`paramRegister`, `usedSymbols`, never a direction symbol). The answer goes through the panel row's gate and spelling, `knownValue` → `valueText` (ADR-AG-270). Any other letter (`x`, or `m` before a line uses it) falls through unchanged.
+3. **R3** `CIRCLE_CENTRED_AT`: the circle whose centre is X (`centreIdOf`: `circle-at-X`, or an equation circle whose named centre is X). X not a point gives `missing` point. A point that is no circle's centre keeps `missing` curve.
+4. **R4** `THE_CURVE`: «משוואת המעגל / הפרבולה / האליפסה» takes the one host of that kind (`hostsOf`, the radius role's rule). None, or several, gives the existing `host` answer. «הישר» is not included: it has no host message.
+5. **R5**: `EQUATION_OF`'s English branch admits the noun ("the equation of circle M").
+6. **R6**: a tangent by its noun goes through the parser's exported `readTangentNoun`. It resolves to the tangent at T, or to the figure's one tangent object; none or several keeps `missing`. When #2390 adds a noun to that reader, this arm reads it with no change here.
+7. **R7, the root cause**: `curveEquationOf(c, id)` (`app/curveText.ts`) returns the known equation, else the options, else null. Callers:
+   - every ask arm that resolves a curve object (`curveAnswer`, which also keeps the two-point trace);
+   - the panel's curve row (`panelKnowledge`).
+
+   So «משוואת l1» now answers the row's two equations.
+8. **R8**: «(את) שתי / כל האפשרויות ל-…» is a second opener in `normaliseAsk`, and a trailing «(שתי אפשרויות)» is dropped. Both are enumerated.
+9. **R9** `splitAsk`:
+   - `ask` now wraps `askOne`. A question that did not read whole (unreadable or missing) is split at an enumerated joiner («… ואת …», «… ו-…», "… and …"), or at a plural noun over named members («משוואות המעגלים M ו-N»).
+   - The split is kept only when every part reads. When the whole was unreadable, one readable part is enough («מצאו את m ואת z» gives m's value, and z unread).
+   - The answer carries `parts`. `App.tsx` renders the question once, then each part through the extracted `answerBody`. There is no new wording.
+10. **R10** `SET_FORMER`:
+    - «(כל) (ה)נקודות M (המקיימות / ש- / such that S)» names M;
+    - with a condition S, the set is traced on the trial `derive([...d.lines, S])`, which is discarded after (02c R24). `Derivation.lines` is carried as `seed` is (#1176), and the trial's trace is its own;
+    - a condition the figure refuses is `Answer.refused`, worded by the input's own `errorText` (for example `errUnsatisfiable`).
+11. **#2389's honesty item.** The locus's slope («שיפוע המקום הגיאומטרי (של M)», "the slope of the locus") is `Answer.unsupported`, worded by the existing `errOutOfScope`. Per the operator's ruling of 2026-10-20 on #2389, the locus is an answer read from the panel, not an object.
+
+**Not built.** Phase Y (ruled out). The pairing of m with n (#2394).
+
+**Sibling audit.** 2-D, 3-D and complex have no ask lane with these arms. 3-D's ask box reads none of these forms; filing them is not this item's.
+
+**Measured cost.** One extra `derive` and one trace only for a set-former question with a condition (measured on Q1 with the condition unstated: 76 ms, against 0 ms for the cached plain locus ask). Every other arm is a regex in front of an existing arm.
+
+**Locks.**
+- `src-analytic/__tests__/issue-2393-exam-asks.test.ts` runs on the #2391 fixtures' own lines (`issue-2391-q1-exam-wording`, `-q2-centres`) and Q3's head. It checks:
+  - R1: each answer equals the bare name's;
+  - R2: `a` is 4 and equals `valueText(knownValue)`; `x`, and `m` before l1, are unchanged;
+  - R3–R5: each answer equals «משוואת מעגל X»; Q3 א gives (x - 8)² + (y + 3)² = 25; several circles give `host`; Z gives `missing` point;
+  - R6: Q2 ג gives x - 7 = 0 in five spellings;
+  - R7: «משוואת l1» equals the panel row's options, and «שיפוע l1» is unchanged;
+  - R8/R9: parts for Q2 א as printed, m and n, the plural noun, the «m ואת z» control, and a whole question that is never split;
+  - R10: four set-former spellings equal «המקום הגיאומטרי של M»; an unstated condition is traced, with the figure untouched; ML = MK gives `refused unsatisfiable`; a missing Q is named;
+  - #2389: three spellings give `unsupported`;
+  - the ruling: four yes/no questions stay `unreadable`.
+
+**Behaviour change for a student.**
+- The exam's «מצאו …» questions answer with the panel's values.
+- «משוואת l1» lists the row's two equations.
+- A conjoined question shows one answer per part under the question.
+- The set-former answers the locus it names.
+- «שיפוע המקום הגיאומטרי של M» says «המשפט מובן, אך אינו נתמך בכלי הזה» instead of "no such curve".
+
+**Consequences.** `app/ask.ts`, `app/curveText.ts` (`curveEquationOf`), `app/panelRows.ts`, `engine/derive.ts` (`Derivation.lines`), `parser/parseAnalytic.ts` (`readTangentNoun` exported), `App.tsx` (`answerBody`, the parts rows).

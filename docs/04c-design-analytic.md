@@ -1297,6 +1297,24 @@ cluster within `SOLVE_RESOLUTION` (`solve.ts`) is one point (`knownOptions`, `is
 
 *Identifiers:* `fact` · `value: null` · `10·√SOLVE_TOL`
 
+#### The exam's questions ([ADR-AG-316](06c-decisions-analytic.md#adr-ag-316), #2393)
+
+The exam's question forms are read in front of the existing arms. Each new spelling resolves to the arm that already answered its twin:
+- `COORDS_OF` (a point by «שיעורי») rewrites to the bare name;
+- `PARAM_ASK` answers a symbol the register holds and reads, through `knownValue` → `valueText` (the panel's parameter row);
+- `CIRCLE_CENTRED_AT` finds the circle whose centre is X (`centreIdOf`);
+- `THE_CURVE` takes the one host of its kind (`hostsOf`, the radius role's rule);
+- `EQUATION_OF` admits the English noun;
+- a tangent is read by the parser's own `readTangentNoun`.
+
+Every arm that resolves a curve object answers through `curveAnswer` → `curveEquationOf` (`app/curveText.ts`): the known equation, else the options, else null. The panel's curve row (`panelKnowledge`) calls the same function, so «משוואת l1» and the row cannot disagree.
+
+`ask` wraps `askOne`. A question that did not read whole is split by `splitAsk` (enumerated joiners, and a plural noun over named members) into `Answer.parts`. `App.tsx` renders each part through the extracted `answerBody`.
+
+`SET_FORMER` reads «כל הנקודות M (המקיימות S)». With S, the trial `derive([...d.lines, S])` is traced (`Derivation.lines`, carried like `seed`), and a fault there is `Answer.refused`, worded by `errorText`. A measure of the locus (`LOCUS_PHRASE`) is `Answer.unsupported`, worded by `errOutOfScope`. Yes/no questions are not read (the operator's ruling of 2026-10-20).
+
+*Identifiers:* `curveEquationOf` · `askOne` · `splitAsk` · `answerBody` · `Answer.parts` · `Answer.refused` · `Answer.unsupported`
+
 ### Measuring by clicking
 
 `app/measurable.ts` composes sentences (`measurablesOf(construction, what)`) and `ask(d, sentence, fmt, describeCurve)`

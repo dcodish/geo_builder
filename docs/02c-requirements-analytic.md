@@ -956,6 +956,20 @@ a sentence the tool parsed.
 - «AB», «שטח ABC», «AB + BC», «משוואת הישר ℓ1»
 - Sources: ADR-AG-044.
 
+**R69a — the exam's own questions are askable** *(operator, #2379: "things that are missing, i need to add to the tool since this is an exam I give my students")*. Each answers with the value the data panel shows for the same object (ADR-AG-316, #2393):
+- «מצאו את שיעורי הנקודה A» ≡ «A»
+- «מצאו את a» → the parameter's value
+- «מצאו את משוואת המעגל שמרכזו N»
+- «מצאו את משוואת המעגל» (the one circle)
+- "the equation of circle M"
+- «משוואת המשיק (בנקודה T)»
+- «משוואת l1» → the two options the panel row lists
+- «מצאו את m ואת n», and «… ואת שתי האפשרויות ל…» → one answer per part
+- «המקום הגיאומטרי של כל הנקודות M המקיימות MA = MB» → the locus of M under that condition, a condition the figure refuses being the input's own refusal
+- «שיפוע המקום הגיאומטרי של M» → understood, not supported (the locus is read from the panel: ruling 2026-10-20 on #2389)
+- A yes/no question («האם …») is not answered (ruling 2026-10-20 on #2393: «the tool doesnt answer such questions»).
+- Sources: ADR-AG-316, #2393, #2389.
+
 **R96 — every spelling of one question gets one answer, and the operands decide the roles**. Roles come from what an operand IS; crossing lines have no distance and are refused saying why (operator ruling); a BOUND is never an equality.
 - *"`d_{AB}` should also work for questions. as well as `|AB|`"*
 - «המרחק בין C ל-AB» ≡ «המרחק בין AB ל-C»

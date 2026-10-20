@@ -1,5 +1,5 @@
 import type { Derivation } from '../engine/derive';
-import { isKnowledge, knownCurve, knownCurveOptions, knownValue, settled, type Figure, type Knowledge } from '../engine/evaluate';
+import { isKnowledge, knownCurve, knownValue, settled, type Figure, type Knowledge } from '../engine/evaluate';
 import type { NumCurve } from '../engine/types';
 import { angleAt, type AngleRef, type Constraint } from '../engine/solve';
 import { VERTICAL_TOL, verticality } from '../engine/lines';
@@ -7,7 +7,7 @@ import { lineAngleOf } from './lineAngle';
 import { isDirectionSymbol, paramRegister, usedSymbols } from '../engine/carriers';
 import { type Construction, type ParamDecl, positionalOf } from '../engine/types';
 import { exprText, symbolsOf, type Expr } from '../engine/expr';
-import { curveEquationText, type DetailLabelKey, type DetailLine } from './curveText';
+import { curveEquationOf, curveEquationText, type DetailLabelKey, type DetailLine } from './curveText';
 import { isolateRtlName } from '../../shell/bidi';
 import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
 
@@ -110,10 +110,12 @@ export function panelKnowledge(d: Pick<Derivation, 'construction' | 'figure'>): 
       }),
     })),
     curves: d.figure.curves.filter(panelListsCurve).map((cu) => {
-      const s = settled(() => knownCurve(c, cu.id));
-      // #1716: an equation with exactly two values across the configurations lists both, through the one gate.
-      const options = s.value || s.pending ? null : knownCurveOptions(c, cu.id);
-      return { id: cu.id, known: s.value, pending: s.pending, options };
+      // #1716: an equation with exactly two values across the configurations lists both, through the one gate —
+      // `curveEquationOf`, the decision the ask lane prints from too (#2393, ADR-AG-316).
+      const s = settled(() => curveEquationOf(c, cu.id));
+      const known = s.value && 'known' in s.value ? s.value.known : null;
+      const options = s.value && 'options' in s.value ? s.value.options : null;
+      return { id: cu.id, known, pending: s.pending, options };
     }),
   };
 }

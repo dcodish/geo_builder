@@ -22,10 +22,13 @@
 import { reportedDof } from '../engine/carriers';
 import { derive, type Derivation } from '../engine/derive';
 import { evalLengthExpr, parseLengthExpr } from '../engine/lengths';
-import { isKnowledge, knownCurve, knownOptions, settled, type Figure } from '../engine/evaluate';
+import { isKnowledge, knownCurve, knownOptions, knownValue, settled, type Figure } from '../engine/evaluate';
 import { locusOf } from '../engine/locus';
 
-import { curveByName, objectById, type Id } from '../engine/types';
+import { curveByName, objectById, tangentLineId, type Id } from '../engine/types';
+import { centreIdOf, curveKindOf } from '../engine/apply';
+import { isDirectionSymbol, paramRegister, usedSymbols } from '../engine/carriers';
+import { valueText } from './panelRows';
 import { numeralCurveId, numeralTwin, statedName, type NumeralKind } from '../engine/names';
 
 /**
@@ -47,10 +50,10 @@ import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techni
 import { isVerticalLine } from '../engine/lines';
 import { asPair, lineNamed, lineNamesOf } from './lines';
 import { pointText, scalarText } from './pointText';
-import { readAngleAsk, readRoleRef, type RoleRef } from '../parser/parseAnalytic';
+import { readAngleAsk, readRoleRef, readTangentNoun, type RoleRef } from '../parser/parseAnalytic';
 import { angleAt } from '../engine/solve';
 import { angleText, lineAngleOf } from './lineAngle';
-import { curveParts, directrixText, locusEquation } from './curveText';
+import { curveEquationOf, curveParts, directrixText, locusEquation } from './curveText';
 import { ellipseFoci, parabolaFocus } from '../engine/curves';
 import { ringsNamed } from '../engine/shapes';
 
@@ -192,6 +195,23 @@ export interface Answer {
    * Absent means drawn — a freshly asked measurement shows itself.
    */
   shown?: boolean;
+  /**
+   * ONE QUESTION THAT ASKS SEVERAL (#2393 R9, ADR-AG-316) — «מצאו את משוואת המעגל שמרכזו N ואת … המעגל שמרכזו M», «m ו-n»:
+   * each part answered by `ask` on its own, and the row shows each with the ordinary row body, stacked. Present only when
+   * the whole question did not read as one.
+   */
+  parts?: Answer[];
+  /**
+   * THE QUESTION NAMES ITS OWN CONDITION AND THE FIGURE REFUSES IT (#2393 R10) — «המקום הגיאומטרי של כל הנקודות M המקיימות
+   * S» where S cannot hold: the refusal the input gives S, worded by the input's own text (`errorText`), never a new one.
+   */
+  refused?: { key: string; detail: string };
+  /**
+   * UNDERSTOOD, NOT SUPPORTED (#2389 → #2393, ADR-AG-316) — «שיפוע המקום הגיאומטרי של M»: the locus is an answer, not an
+   * object (operator ruling 2026-10-20 on #2389), so a measure of it is not a question this tool answers. Worded with the
+   * existing `errOutOfScope`; it used to say the figure had no curve by that name.
+   */
+  unsupported?: true;
 }
 
 /**
@@ -227,7 +247,8 @@ const ANGLE_WITH_X_HE = new RegExp(
 const ANGLE_WITH_X_EN = /^(?:the\s+)?angle\s+(?:between|of)\s+(?:the\s+)?(?:line\s+|segment\s+)?(\S+)\s+(?:and|with)\s+(?:the\s+)?(?:positive\s+)?(?:direction\s+of\s+the\s+)?x-?\s*axis$/i;
 
 /** «משוואת …» / «the equation of …» — a question about a curve rather than a value. */
-const EQUATION_OF = /^(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+(?:ה?(?:ישר|מעגל|פרבולה|אליפסה|אלכסון)\s+)?(.+)$/;
+// #2393 R5 (ADR-AG-316): the English noun before the name, as the Hebrew one — "the equation of circle M".
+const EQUATION_OF = /^(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+(?:ה?(?:ישר|מעגל|פרבולה|אליפסה|אלכסון)\s+|(?:the\s+)?(?:line|circle|parabola|ellipse)\s+(?=\S))?(.+)$/;
 
 /**
  * «המקום הגיאומטרי של P» · «locus of P» — the question this whole lane exists for (#1137).
@@ -264,6 +285,34 @@ const EQUATION_OF = /^(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+(?:ה?(?:יש
  */
 const LOCUS_OF =
   /^(?:(?:ה?משוואת|[Tt]he\s+equation\s+of|[Ee]quation\s+of)\s+)?(?:ה?מקום\s+ה?גי?אומטרי|[Tt]he\s+locus|[Ll]ocus)\s+(?:של\s+|of\s+)?(?:ה?נקודה\s+)?(.+)$/;
+
+/**
+ * THE SET-FORMER (#2393 R10, ADR-AG-316) — «(המקום הגיאומטרי של) כל הנקודות M (המקיימות S)», "all the points M such that
+ * S": the exam's own phrasing of «המקום הגיאומטרי של M», whose noun phrase used to be read as a POINT's name («אין בשרטוט
+ * נקודה בשם כל הנקודות M …»). The condition's joiners are enumerated.
+ */
+const SET_FORMER =
+  /^(?:(?:כל\s+)?ה?נקודות\s+|(?:all\s+)?(?:the\s+)?points\s+)([A-Z][0-9₀-₉]?)(?:\s+(?:ה?מקיימות|ה?מקיימים|ש-?|such\s+that|satisfying|that\s+satisfy)\s*(.+))?$/;
+
+/** A question about the locus AS A CURVE — «שיפוע המקום הגיאומטרי של M» (#2389 → #2393): the locus is an answer, not an object. */
+const LOCUS_PHRASE = /^(?:ה?מקום\s+ה?גי?אומטרי|(?:[Tt]he\s+)?locus)(?:\s+(?:של|of)\s+.+)?$/;
+
+/** «שיעורי (הנקודה) M», «הקואורדינטות של M», "the coordinates of (point) M" (#2393 R1). */
+const COORDS_OF =
+  /^(?:ה?שיעורי|ה?קואורדינטות(?:\s+של)?|(?:[Tt]he\s+)?coordinates\s+of)\s+(?:ה?נקודה\s+|(?:the\s+)?point\s+)?([A-Z][0-9₀-₉]?)$/;
+
+/** «(הערך של) a», "the value of a" — a parameter by its symbol (#2393 R2); taken only for a symbol the register holds. */
+const PARAM_ASK = /^(?:ה?ערך\s+(?:של\s+)?|(?:the\s+)?value\s+of\s+)?([a-zα-ω](?:_\w+)?)$/;
+
+/** «(משוואת) המעגל שמרכזו N», "the circle centred at N" — a circle by its centre (#2393 R3). */
+const CIRCLE_CENTRED_AT =
+  /^(?:(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+)?(?:ה?מעגל\s+ש(?:ה)?מרכזו\s+(?:(?:הוא|היא)\s+)?(?:ב?ה?נקודה\s+)?|(?:the\s+|a\s+)?circle\s+(?:cent(?:red|ered)\s+at|with\s+(?:its\s+)?cent(?:re|er)(?:\s+at)?|whose\s+cent(?:re|er)\s+is)\s+(?:the\s+point\s+)?)([A-Z][0-9₀-₉]?)$/;
+
+/** «משוואת המעגל / הפרבולה / האליפסה», "the equation of the circle" — THE curve of that kind (#2393 R4). */
+const THE_CURVE = /^(?:ה?משוואת\s+ה(מעגל|פרבולה|אליפסה)|[Tt]he\s+equation\s+of\s+the\s+(circle|parabola|ellipse))$/;
+const THE_CURVE_KIND: Readonly<Record<string, 'circle' | 'parabola' | 'ellipse'>> = {
+  מעגל: 'circle', פרבולה: 'parabola', אליפסה: 'ellipse', circle: 'circle', parabola: 'parabola', ellipse: 'ellipse',
+};
 
 /**
  * Answer one question against the figure the student has built.
@@ -307,9 +356,49 @@ export function ask(
   // plural is locale exactly as the singular is. The seam WIDENS, it is not forked.
   kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind'], count: number) => string = (k) => k,
 ): Answer {
+  const whole = askOne(d, question, fmt, kindWord);
+  /*
+   * #2393 R9 (ADR-AG-316) — A CONJUNCTION OF QUESTIONS, read only when the whole did not read as one question: a question
+   * that answers (or names what is missing) is never split. The parts must each read, except that a whole the lane could
+   * not read at all is split as soon as one part reads («מצאו את m ואת z»: m's value, and z unread).
+   */
+  if (!whole.unreadable && !whole.missing) return whole;
+  const pieces = splitAsk(question);
+  if (!pieces) return whole;
+  const parts = pieces.map((p) => askOne(d, p, fmt, kindWord));
+  const ok = whole.unreadable ? parts.some((p) => !p.unreadable) : parts.every((p) => !p.unreadable);
+  return ok ? { question, value: null, parts } : whole;
+}
+
+/**
+ * THE JOINERS OF A CONJOINED QUESTION (#2393 R9) — ENUMERATED, never `.*` (the #1301 anti-widening rule): «… ואת …», «…,
+ * ואת …», «… ו-…», "… and …"; and a plural noun over named members, «משוואות המעגלים N1 ו-N2» → one question per member.
+ * Null when the question has no joiner.
+ */
+function splitAsk(question: string): string[] | null {
+  const t = normaliseAsk(question);
+  const plural = /^ה?משוואות\s+ה?(ישרים|מעגלים)\s+(\S+)\s+ו-?\s*(\S+)$/.exec(t);
+  if (plural) {
+    const noun = plural[1] === 'ישרים' ? 'הישר' : 'המעגל';
+    return [`משוואת ${noun} ${plural[2]}`, `משוואת ${noun} ${plural[3]}`];
+  }
+  const parts = t.split(/\s*,?\s+ואת\s+|\s+ו-(?=\S)|\s+and\s+/).map((p) => p.trim()).filter(Boolean);
+  return parts.length > 1 ? parts : null;
+}
+
+function askOne(
+  d: Derivation,
+  question: string,
+  fmt: (v: number) => string,
+  kindWord: (kind: NonNullable<ReturnType<typeof knownCurve>>['kind'], count: number) => string = (k) => k,
+): Answer {
   // The wrapper a student puts round a question («מהו …», «מצא את …», «…?») is not the question (#1432 am. 1).
   let text = normaliseAsk(question);
   if (!text) return { question, value: null, unreadable: true };
+
+  // #2393 R1 (ADR-AG-316) — «(מצאו את) שיעורי (הנקודה) M», "the coordinates of (point) M": the point's own question.
+  const coords = COORDS_OF.exec(text);
+  if (coords) text = coords[1];
 
   /**
    * #1431 — THE CONTEXTUAL DISTANCE: «המרחק של הנקודה מהישר», no letters at all.
@@ -344,7 +433,23 @@ export function ask(
    */
   const loc = LOCUS_OF.exec(text);
   if (loc) {
-    const name = loc[1].trim();
+    let name = loc[1].trim();
+    const set = SET_FORMER.exec(name);
+    if (set) {
+      name = set[1];
+      const condition = set[2]?.trim();
+      /*
+       * THE QUESTION'S OWN CONDITION (#2393 R10): the set it names is M under S. Traced on THIS figure plus S — the trial
+       * derivation, discarded after (02c R24) — so the trace is the trial's own; a condition the figure already holds draws
+       * the same set as asking without it. A condition the figure refuses is answered with the input's own refusal of it.
+       */
+      if (condition && d.lines && objectById(d.construction, name)) {
+        const trial = derive([...d.lines, condition], d.seed, d.construction.seedNames ?? {});
+        const fault = trial.faults.find((f) => f.index === d.lines!.length);
+        if (fault) return { question, value: null, refused: { key: fault.code, detail: condition } };
+        return { ...askOne(trial, `המקום הגיאומטרי של ${name}`, fmt, kindWord), question };
+      }
+    }
     const o = objectById(d.construction, name);
     if (!o) return { question, value: null, missing: { name, kind: 'point' } };
     /**
@@ -457,6 +562,18 @@ export function ask(
     return { question, value: t === '—' ? null : t };
   }
 
+  /*
+   * --- a PARAMETER, by its symbol (#2393 R2, ADR-AG-316): «a», «מצאו את a», «הערך של a» ---
+   * Only a symbol the figure's register holds and reads (the panel's own parameter rows, `panelKnowledge`), answered
+   * through the panel row's one gate and spelling (`knownValue` → `valueText`, ADR-AG-270). Any other letter — `x`, or
+   * `m` before a line uses it — falls through to the lane's existing handling.
+   */
+  const param = PARAM_ASK.exec(text);
+  if (param && !isDirectionSymbol(param[1]) && usedSymbols(d.construction).has(param[1]) && paramRegister(d.construction).some((p) => p.sym === param[1])) {
+    const sym = param[1];
+    return { question, value: valueText(knownValue(d.construction, (f) => f.env[sym] ?? null), fmt) };
+  }
+
   /**
    * --- a line, by name: its SLOPE (#1048) ---
    *
@@ -522,6 +639,9 @@ export function ask(
   const sl = SLOPE_OF.exec(text);
   if (sl) {
     const name = sl[1].trim();
+    // #2389 → #2393 (ADR-AG-316): «שיפוע המקום הגיאומטרי של M» is understood, and not a question this tool answers —
+    // never «אין בשרטוט ישר או מעגל בשם …». The locus's equation is the locus question's answer (ruling on #2389).
+    if (LOCUS_PHRASE.test(name)) return { question, value: null, unsupported: true };
     const line = lineNamed(d.figure, name);
     if (!line) return { question, value: null, missing: missingCurve(d, name) };
     /**
@@ -561,10 +681,42 @@ export function ask(
   const role = readRoleRef(text);
   if (role) return roleAnswer(d, role, question, fmt, kindWord);
 
+  // --- #2393 R3 (ADR-AG-316): a circle by its CENTRE — «משוואת המעגל שמרכזו N», "the circle centred at N" ---
+  const centred = CIRCLE_CENTRED_AT.exec(text);
+  if (centred) {
+    const centre = centred[1];
+    if (!objectById(d.construction, centre)) return { question, value: null, missing: { name: centre, kind: 'point' } };
+    const circle = d.construction.objects.find((o) => curveKindOf(o) === 'circle' && centreIdOf(d.construction, o) === centre);
+    if (!circle) return { question, value: null, missing: missingCurve(d, text.replace(/^(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+/, '')) };
+    return curveAnswer(d, circle.id, null, question, fmt);
+  }
+
+  // --- #2393 R4: THE circle / parabola / ellipse — the one host of that kind (the radius role's rule, #1432 am. 1) ---
+  const the = THE_CURVE.exec(text);
+  if (the) {
+    const kind = THE_CURVE_KIND[the[1] ?? the[2]];
+    const hosts = hostsOf(d, kind);
+    if (hosts.length !== 1) return { question, value: null, host: { kind, found: hosts.length } };
+    return curveAnswer(d, hosts[0].id, null, question, fmt);
+  }
+
   // --- a curve, by name: its equation ---
   const eq = EQUATION_OF.exec(text);
   if (eq) {
     const name = eq[1].trim();
+    /*
+     * #2393 R6 — A TANGENT BY ITS NOUN: «משוואת המשיק (למעגל M)? (בנקודה T)?», "the equation of the tangent (at T)", read by
+     * the parser's own noun reader (`readTangentNoun`): the tangent at T, or the figure's one tangent. None or several
+     * keeps the missing-curve answer.
+     */
+    const tangent = readTangentNoun(name);
+    if (tangent) {
+      const ids = tangent.at
+        ? [tangentLineId(tangent.at)].filter((id) => objectById(d.construction, id))
+        : d.construction.objects.filter((o) => o.kind === 'line-at' && o.dir.k === 'radius' && o.perp).map((o) => o.id);
+      if (ids.length !== 1) return { question, value: null, missing: missingCurve(d, name) };
+      return curveAnswer(d, ids[0], null, question, fmt);
+    }
     // The ONE by-name lookup (ADR-AG-144): a line constructed through a point answers to its name too.
     const curve = curveByName(d.construction, name);
     /**
@@ -617,27 +769,7 @@ export function ask(
         ...(trace ? { trace } : {}),
       };
     }
-    const known = knownCurve(d.construction, curve.id);
-    /**
-     * A LINE NAMED BY TWO POINTS gets the move that produces it (#1053) — the operator's second
-     * case: *"when I select to see … an equation of a line"*.
-     *
-     * Only when the name IS two points. «הישר l1» was given by its equation, so there is no
-     * technique behind it: the student wrote it down, and printing a derivation for a given would be
-     * the tool explaining the student to themselves.
-     */
-    let trace: string | undefined;
-    const pair = asPair(name);
-    if (pair && known?.kind === 'line') {
-      const a0 = d.figure.points.find((q) => q.id === pair[0]);
-      const b0 = d.figure.points.find((q) => q.id === pair[1]);
-      if (a0 && b0) trace = traceLine2pt(a0, b0, fmt);
-    }
-    return {
-      question,
-      value: known ? curveParts(known).equation : null,
-      ...(trace && known ? { trace } : {}),
-    };
+    return curveAnswer(d, curve.id, name, question, fmt);
   }
 
   // --- anything else: a measure expression, through the one grammar ---
@@ -759,11 +891,50 @@ export function ask(
 const ASK_OPENER =
   /^(?:(?:מצא(?:י|ו)?|חשב(?:י|ו)?)\s+את\s+|מה(?:ו|י|ם|ן)\s+|מה\s+ה(?:וא|יא|ם|ן)\s+|מה\s+|(?:find|calculate|compute)\s+|what\s+(?:is|are)\s+)/i;
 const ASK_CLOSER = /\s*(?:=\s*)?[?？]\s*$|\s*=\s*$/;
+/**
+ * #2393 R8 (ADR-AG-316) — «(את) שתי האפשרויות ל-…», «כל האפשרויות ל…»: the options are what a curve's answer already lists,
+ * so the phrase is a second opener; and a trailing hint «(שתי אפשרויות)» says nothing the answer does not.
+ */
+const OPTIONS_OPENER = /^(?:את\s+)?(?:שתי|כל)\s+ה?אפשרויות\s+ל-?(?=[א-ת])/;
+const OPTIONS_HINT = /\s*\(\s*(?:שתי|כל\s+ה?)\s*אפשרויות\s*\)\s*$/;
 export function normaliseAsk(question: string): string {
-  let t = question.trim().replace(ASK_CLOSER, '').trim();
+  let t = question.trim().replace(ASK_CLOSER, '').trim().replace(OPTIONS_HINT, '').replace(ASK_CLOSER, '').trim();
   const open = ASK_OPENER.exec(t);
   if (open && open[0].length < t.length) t = t.slice(open[0].length).trim();
+  const options = OPTIONS_OPENER.exec(t);
+  if (options && options[0].length < t.length) t = t.slice(options[0].length).trim();
   return t;
+}
+
+/**
+ * A CURVE OBJECT'S EQUATION, AS THE PANEL ROW PRINTS IT (#2393 R7, ADR-AG-316) — through `curveEquationOf`, the one decision
+ * the row reads: the known equation, else its options joined by «או» (#1716), else the lane's honest `null`. Every arm
+ * that resolves a curve object (by name, by centre, THE curve, a tangent) answers here, so none can lose the options again.
+ */
+function curveAnswer(d: Derivation, id: Id, name: string | null, question: string, fmt: (v: number) => string): Answer {
+  const eqn = curveEquationOf(d.construction, id);
+  const known = eqn && 'known' in eqn ? eqn.known : null;
+  /**
+   * A LINE NAMED BY TWO POINTS gets the move that produces it (#1053) — the operator's second
+   * case: *"when I select to see … an equation of a line"*.
+   *
+   * Only when the name IS two points. «הישר l1» was given by its equation, so there is no
+   * technique behind it: the student wrote it down, and printing a derivation for a given would be
+   * the tool explaining the student to themselves.
+   */
+  let trace: string | undefined;
+  const pair = name ? asPair(name) : null;
+  if (pair && known?.kind === 'line') {
+    const a0 = d.figure.points.find((q) => q.id === pair[0]);
+    const b0 = d.figure.points.find((q) => q.id === pair[1]);
+    if (a0 && b0) trace = traceLine2pt(a0, b0, fmt);
+  }
+  const options = eqn && 'options' in eqn ? [...new Set(eqn.options.map((o) => curveParts(o).equation))] : null;
+  return {
+    question,
+    value: known ? curveParts(known).equation : options && options.length > 1 ? options.join(' או ') : null,
+    ...(trace && known ? { trace } : {}),
+  };
 }
 
 /** The host a role needs, counted in the figure the student is looking at. */
