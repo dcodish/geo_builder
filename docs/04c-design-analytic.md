@@ -392,6 +392,20 @@ reading** ([ADR-AG-183](06c-decisions-analytic.md#adr-ag-183)): `nameReading` (`
 
 *Identifiers:* `\|cos\|` · `III`
 
+**A line referred to by its name** ([ADR-AG-317](06c-decisions-analytic.md#adr-ag-317)). A narrowed line keeps its
+id, so `applyFact` first runs `resolveLineRefs`: every line-id reference in the fact (never the id the fact introduces)
+that names no object, while a line carries that name (`curveByName`), is re-pointed at that line's id. Every slot that
+holds a line id reads it through this one step, and a reference to no line is left for the slot's `unknownRef`.
+`line-at` holds its `dir` to the same reference check as a relation (`dirRefs` + `dirCurveRefs`). `derive` blames a
+failing selector by the selector AS APPLIED (`selectorFact`), not as written.
+
+**The equation operand** ([ADR-AG-318](06c-decisions-analytic.md#adr-ag-318)). An equation written inside another
+sentence reaches M1 as an `EqOperand` (`{ kind: 'eq', id, eqSrc, eq, role }`), never as a `curve` fact the parser
+minted. `equationOperand` is the one resolver: the figure's own curve with that equation (`resolveCurveByEq`) is the
+operand (a `stated` role promotes a carrier it finds); otherwise the curve is minted in its role (`stated` drawn,
+`carrier` per ADR-AG-032), and a stated mint absorbed by the twin scan resolves to its absorber. `tangent-of`
+resolves its `eq` lines first; `tangent-eq` and the #1429 `on-curve` arm call the same function.
+
 ### Curve identity and the promotion path ([ADR-AG-090](06c-decisions-analytic.md#adr-ag-090))
 
 Content-derived ids make a later «y=x» PROMOTE the carrier of «נקודה B על הישר y=x» (#1076): the carrier is minted
@@ -567,6 +581,15 @@ capped by `residualScale`; `completingStatement` is the drop-one blame for the w
 A point on an object rides a carrier with one DOF; «על הצלע BC» emits `on-line-2pt` and `between D B C`, «על הישר»
 the incidence alone, «על הישר y=x» an `on-curve` on a minted curve. `bounded` reads the noun. The curve's `stated`
 flag decides whether the renderer draws it; restating the equation promotes it.
+
+**The role of an inline curve, and the tool's l-number** ([ADR-AG-319](06c-decisions-analytic.md#adr-ag-319)). The
+parser gives every equation operand its role and M1 applies it (`equationOperand`): a tangency's line
+(`tangentTargets`) and the subject of «<eq> עובר דרך A» (`statedOperands` marks the `on-curve` `stated`) are `stated`;
+«P על <eq>» stays a carrier. A curve that becomes stated as a LINE with no name — minted, or a carrier promoted — gets
+`freeLineNames(c, 1)[0]` with `label.auto` (`toolNamed`, in the `curve` arm, the one place every stated line passes).
+The twin scan lets a student's name replace an `auto` one (Q3); a new curve whose name another curve carries is a
+`conflicting-restatement`. `submit.ts` `objectsGained` counts a curve newly drawn, so a promotion that also states a
+constraint records.
 
 *Identifiers:* `D על הצלע BC` · `על הקטע BC` · `D על הישר BC` · `B על הישר y=x` · `צלע|קטע|side|segment` · `ישר|מעגל|פרבולה|אליפסה`
 

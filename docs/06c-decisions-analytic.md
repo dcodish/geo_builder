@@ -2171,7 +2171,7 @@ which is a mechanism rather than a rule. [#1060](https://github.com/dcodish/geo_
 ## ADR-AG-032 — A CARRIER is not a stated object (#1076)
 
 **Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-029](#adr-ag-029) (#1073) ·
-**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067) · **⚠ Partly superseded by [ADR-AG-041](#adr-ag-041) (2026-09-15):** the panel half is reversed: the data panel shows slopes, not the carrier.
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067) · **⚠ Partly superseded by [ADR-AG-041](#adr-ag-041) (2026-09-15):** the panel half is reversed: the data panel shows slopes, not the carrier. · **⚠ Amended by [ADR-AG-319](#adr-ag-319) (2026-10-20, operator ruling on #2425):** a carrier is a curve minted to hold a POINT, not every inline curve; a curve the sentence is about is drawn and named.
 
 **Requirements:** [02c](02c-requirements-analytic.md) §9 R56. **Design:**
 [04c](04c-design-analytic.md) "A point on an object".
@@ -13530,3 +13530,107 @@ No other sequence moved.
 **Locks.** `src-analytic/__tests__/issue-2424-split-answer-rows.test.tsx` — the rule; the real App's givens list for a 2- and a 3-part answer (own lines, no sentence, no marker), a one-line answer (the sentence), a mixed list; the fixture `issue-2424-split-answer-t21.analytic.json` (the oracle's two lines for T21's first sentence, with the markers an old save carries) builds K = (3, 4), loads with no failure and lists the two lines; the export prints the sentence once; a source lock that App.tsx names no row through `spokenFor[...] ??`. `issue-1297-hebrew-fact` and `question-export-1872` unchanged and green.
 
 **Consequences.** `store/useAnalyticStore.ts` (`rowShownText`), `App.tsx` (three call sites); docs 02c, 04c.
+
+## ADR-AG-317 — A line named by restatement is that line to every slot; a line through a point names a direction the figure has (#2431)
+
+**Date:** 2026-10-20 · **Status:** accepted · bug (P1), fix round #2436 (stream A); branch `fix/2431-line-name-resolves`. Step 0 of the #2429 plan, shared with #2425. LADDER stage: none (the M1 boundary; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R185 (new). · **Design:** [04c](04c-design-analytic.md), "Curve identity at the M1 boundary" (a line referred to by its name).
+
+**Context.** Measured on main `17168818` (`decideSubmit` → `derive`, no model call). After «נתון ישר 2x-y+3=0» · «נתון הישר l1: 2x-y+3=0» the line keeps its content-derived id (`curve-anon…`, the #1342 narrowing, ADR-AG-147) and only `label.name` says l1. Then:
+- «הישר AB מקביל לישר l1», «C על הישר l1», «שיפוע הישר l1 שלילי», «C נקודת החיתוך של הישר l1 עם ציר ה-x», «A מעל הישר l1» and «המעגל M משיק לישר l1» were refused `unknown-reference l1`;
+- «ישר דרך A מקביל לישר l1» RECORDED with no fault and drew nothing: its `dir` held `line-l1`, which no object has;
+- exam Q1 ב(1) in its named spelling («M על הישר 4x+y+3=0» · «נתון הישר l1: 4x+y+3=0» · «הישר l1 מאונך ל-KL») was refused.
+
+The distance slot (`curveByName`) found the line.
+
+**Class.** *A line operand named by the label of a line whose id is content-derived does not resolve in the slots that look a line up by id*, and *a line through a point is created with a direction that names nothing*. One name had two readings, depending on the slot.
+
+**Decision.**
+1. **`resolveLineRefs` (`engine/apply.ts`), the first step of `applyFact`.** Take every string in the fact that is a line id (`refKindOf` = line), names no object, and is the name of a LINE (`curveByName` → a curve of kind line, a `line-at`, a common tangent). It is replaced, structurally (`replaceId`), by that line's id.
+   - The id the fact itself introduces (`f.id`) and its `src` are never touched, so a restatement still meets its own id's handling (`already-named`, the twin scan).
+   - Ids are never rewritten on objects: the narrowing rule stands.
+   - A reference to a line nobody has is left as written, so the slot's own `unknownRef` names what the student typed.
+2. **`line-at` checks its direction.** The points (`dirRefs`) must be placed and the curves (`dirCurveRefs`, now exported from `solve.ts` and used by `constraintCurveRefs`) must exist, exactly as a relation's operands are held (#1150). «ישר דרך A מקביל לישר l7» with no l7, or «… ל-CD» with no C, is refused `unknown-reference`. It is never created and dropped.
+3. **`derive` blames a failing selector as applied.** The selector fault compared the fact's selector, as written, with the failing applied one. Once M1 re-points a reference they differ, so a failing «שיפוע הישר l1 שלילי» on the restated line was blamed on no sentence and the figure drew green. The blame now also matches the fact's applied selector (`selectorFact`), and the no-such-side reading (ADR-AG-310) reads the applied line.
+
+**Not changed.** The by-name slots (distances, the ask lane) already resolved the label. English "the line l1 is perpendicular to …" / "the line AB is parallel to the line l1" is refused `bad-operand` for a line named directly too. That is the English relation frame, not this class; it belongs with #2429, whose equation arm reads the same "the line" operand.
+
+**Sibling audit.** Grepped `apply.ts` for id-based line lookups (`lineIdOf(`, `objectById` on a direction's id): every one reads ids carried by the fact, so the one step at the top of `applyFact` covers them all. The selector blame in `derive.ts` was the only consumer comparing a fact's content with the applied construction (`JSON.stringify(f.sel)`). 2-D and 3-D have no content-derived line ids (no equations, docs/22 §10 X2): a 2-D named line's id is its name. The class is not present there.
+
+**Tests.** `src-analytic/__tests__/issue-2431-line-name-resolves.test.ts` (23 cases, 18 fail before), through `decideSubmit` → `derive`, He and En:
+- every slot above, each with its geometry: AB's slope 2, C on l1, the crossing (−1.5, 0), A above l1, r = 3/√5, the line through A drawn with slope 2;
+- the slope sign judged, and the vertical-line side refusal;
+- the refusals for l7 and CD; a line named directly is unchanged;
+- fixture `exam-2379-q1-named-perpendicular-2431.analytic.json` (exam Q1 ב(1)): one line named l1, and the wrong «מקביל» refused `unsatisfiable`.
+
+**Consequences.** `engine/apply.ts` (`resolveLineRefs`, the `line-at` direction check), `engine/solve.ts` (`dirCurveRefs`), `engine/derive.ts` (the selector blame); docs 02c, 04c.
+
+## ADR-AG-318 — An equation written as an operand is resolved against the figure at M1, never minted by the parser (#2432)
+
+**Date:** 2026-10-20 · **Status:** accepted · bug, fix round #2436 (stream A); branch `fix/2432-eq-operand-at-m1`, stacked on `fix/2431-line-name-resolves` (ADR-AG-317). Step 1 of the #2429 plan; #2425 and #2429 reuse the resolver. LADDER stage: none (the M1 boundary; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R186 (new). · **Design:** [04c](04c-design-analytic.md), "Curve identity at the M1 boundary" (the equation operand).
+
+**Context.** Measured on main `17168818` (`decideSubmit` → `derive`, no model call):
+- «נתון הישר l: 3x+4y=25» · «משוואת המשיק היא 3x+4y=25» was refused `unknown-reference curve-anonex0oaz`, an internal id in a student message. The `tangent-eq` arm minted a stated `curve` under the content id, the twin scan (#1342) absorbed it into l, and the `tangent-of` that followed named the absorbed id.
+- «הישר 3x+4y=25 משיק למעגל M», «המעגל M משיק לישר 3x+4y=25 …» and «משוואת המשיק למעגל בנקודה A היא 3x+4y=25» after l recorded, but against a SECOND, hidden carrier with l's equation: the parser's tangency readers (`tangentTargets`, `parseTangentObject`) emitted their own `curve` fact, and carriers do not join the twin scan.
+
+**Class.** *An equation written as an operand is turned into a curve before the figure is consulted*, so it is a new object (or a dangling id) where the figure already holds the curve it denotes. The `on-curve` arm already resolved first (#1429); the tangency operands did not.
+
+**Decision.**
+1. **`EqOperand`** (`engine/types.ts`): `{ kind: 'eq', id, label, eqSrc, eq, role, line? }`. The parser only reads the operand: the content-derived id a mint would take, and the role the sentence gives the curve (`stated`: drawn; `carrier`: holds something, ADR-AG-032). It rides `tangent-of.lines` and never reaches a constraint.
+2. **`equationOperand(c, op, src)`** (`engine/apply.ts`), the one resolver:
+   - the figure's own curve with that equation (`resolveCurveByEq`) IS the operand; a `stated` role promotes a carrier it finds (the #1076/#1149 path);
+   - otherwise the curve is minted in its role under the content id. A stated mint may still be absorbed by the twin scan (a scaled spelling, `identicalCurve`); the operand is then the line that absorbed it;
+   - it reports `minted`, so the statement carrying it is `created`, never «כבר ידוע», when only the operand changed the figure.
+3. **Callers.** `tangent-of` resolves every `eq` line first, then reads only ids. `tangent-eq` lowers to one `tangent-of` whose operand is `stated` (no tangent object: the sentence states its line, drawn, as before) or `carrier` (one tangent object: one line is never drawn twice, ADR-AG-195). The #1429 `on-curve` arm calls it with `carrier`, unchanged in behaviour. The parser's two `curve` mints are gone.
+
+**Roles are unchanged here.** Every operand keeps the role it had: the tangency readers' operands are carriers until #2425 gives them `stated`. The student-visible effect is the identity: a sentence about a line the figure holds is about THAT line. When that makes the sentence already true («משוואת המשיק היא 3x+4y=25» on a circle of radius 5 at distance 5), it is «כבר נובע» rather than recorded beside a hidden twin.
+
+**Sibling audit.** Grepped `parseAnalytic.ts` for `t: 'curve'` facts emitted beside a reference: the two tangency sites were the only operand mints (the `inheritExtent` declaration and the bounded-noun segment are declarations, not operands). `apply.ts`'s other `curve` mints are declarations. 2-D and 3-D have no equation operands (docs/22 §10 X2). The class is not present there.
+
+**Tests.** `src-analytic/__tests__/issue-2432-equation-operand-m1.test.ts`, through `decideSubmit` → `derive`:
+- the reported two lines (no refusal; the tangency already holds), and on a free radius He/En and a scaled spelling: r = 5 at seeds 0–3 and l stays the one line;
+- the three tangency spellings after l are about l; the tangent at A after l puts A at (3, 4);
+- the carrier role kept: an unresolved tangency operand and «A על הישר …» stay undrawn, one object;
+- a guard over 5 setups × 8 sentences: no refusal text or payload contains `curve-anon`.
+
+**Consequences.** `engine/types.ts` (`EqOperand`, `tangent-of.lines`), `engine/apply.ts` (`equationOperand`, the `tangent-of`, `tangent-eq` and #1429 arms), `parser/parseAnalytic.ts` (`tangentTargets`, `parseTangentObject`); docs 02c, 04c.
+
+## ADR-AG-319 — A curve given inline in a sentence ABOUT it is drawn; a drawn line the student did not name takes the next free l-number (#2425)
+
+**Date:** 2026-10-20 · **Status:** accepted · bug, fix round #2436 (stream A); branch `fix/2425-inline-curve-drawn`, stacked on `fix/2432-eq-operand-at-m1` (ADR-AG-318). **Amends** [ADR-AG-032](#adr-ag-032). Operator: round #2414 T27 (*"the line should have been drawn with dof"*), T14 (*"i want the line to also be drawn and named with l1 or l2 or whatever number is free"*), the ruling of 2026-10-20 on #2425 (Q1–Q4 yes) and #2423's ruling («P על הישר <eq>» stays undrawn). LADDER stage: none (the M1 boundary and the submit gate; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R187 (new); R56's scope note. · **Design:** [04c](04c-design-analytic.md), "A point on an object, and the carrier that holds it" (the role of an inline curve, the tool's l-number).
+
+**Context.** Measured on main `17168818` and on #2432's tip (`decideSubmit` → `derive`, no model call):
+- T27 («הישר mx-y+n=0 משיק למעגל M», then «… N»): the engine solved m, n and cycled the two roots, but the line was a carrier (`stated: false`) and never drawn.
+- The class: «הישר 3x+4y=25 משיק למעגל M», «המעגל M משיק לישר y=mx+10», «מעגל שמרכזו M(8,−3) משיק לישר 4x+3y+2=0 בנקודה A», «מעגל O משיק לישר y=2 ולציר ה-x», «הישר y=mx+1 עובר דרך A», «המעגל (x-a)^2+y^2=4 עובר דרך A»: none drawn.
+- «נתון ישר 4x+3y+2=0» drew a line with no name.
+
+**Root cause.** An inline-equation curve was minted as a CARRIER whatever role it played in the sentence. ADR-AG-032's ruling is about a curve that exists to HOLD A POINT; the tangency readers and the converse «<eq> עובר דרך A» copied its `stated: false`.
+
+**Decision.**
+1. **The role is the sentence's** (`EqOperand.role`, ADR-AG-318). A tangency's line is `stated` (`tangentTargets`, every tangency order). «הישר/המעגל <eq> עובר דרך A» marks its `on-curve` operand `stated` (`statedOperands`), so `equationOperand` mints it drawn or promotes the carrier it finds. «P על <eq>» keeps `carrier` (ADR-AG-032, the #2423 ruling).
+2. **`toolNamed` in the `curve` arm**, the one place every stated curve passes: a curve that becomes stated as a LINE with no name, minted or promoted, takes `freeLineNames(c, 1)[0]` (ADR-AG-314's allocator) and `label.auto`. This covers every line this issue draws, «נתון ישר <eq>» (Q4) and a bare equation, which R6/R51 read as the same declaration. The id is never rewritten; `resolveLineRefs` (ADR-AG-317) makes every slot read the name. Names are allocated in fold order, so the seed and «הציגו תצורה אחרת» never renumber a line, and undoing a line renames nothing before it.
+3. **Q3: the student's name replaces the tool's.** In the twin scan an `auto` name yields to an incoming one («נתון הישר l5: <same eq>» → `narrowed`, l5). A student's own name is never replaced (`already-named`, unchanged).
+4. **A name another curve carries is refused.** «נתון הישר l1: <another equation>» while l1 is the label of a different line (the tool's, or one named by restatement) is `conflicting-restatement`, the refusal «הישר l1» given twice already gets. It used to draw a second «l1».
+5. **A promotion is never «כבר נובע»** (`app/submit.ts`): `objectsGained` counts a curve newly drawn. So «A על הישר 3x+4y=25» then «הישר 3x+4y=25 משיק למעגל M» (already at that distance) records and draws the line.
+
+**Q2 (crossings and the «משוואות» row)** needs no code. A drawn, named line is listed (`panelListsCurve`) and offered in crossings like any stated line. The row prints its equation only as knowledge (`knownCurve`).
+
+**Sibling audit.** 2-D and 3-D have no equation curves (docs/22 §10 X2). The nearest 2-D rule, "a sentence draws what it names", already holds for two-point lines in analytic (ADR-AG-264). Class not present elsewhere.
+
+**Re-based locks** (the ruled change, measured): `crossings.test.ts` #1092 (the ring names «הישר l1»), `curve-display-2238` (the menu is titled l1), `engine.test.ts` namespaces (the named line is l7, since l1 is taken by the tool), the #2431 tests (the narrowing renames the tool's l1 to l3), and two #2432 rows (the tangency operand is drawn).
+
+**Tests.** `src-analytic/__tests__/issue-2425-inline-curve-drawn.test.ts` (29 cases), with fixture `issue-2425-t27-common-tangent.analytic.json` (the operator's 8 lines, verbatim):
+- T27: the line drawn and named l1 after line 7 at seeds 0–3 with m varying; after line 8, both signs of m across seeds 0–7; the #2394 row unchanged; a, r, M and N unmoved;
+- T14: l1 with its row and A = (4, −6); l2 after «נתון הישר l1: y=x»; names stable across seeds; the circle-subject constant line;
+- the class rows He/En; the circle through A drawn, with no l-number;
+- the carrier guards: «A על הישר y=mx+1», «A על המעגל …» and «M על הישר 4x+y+3=0» stay undrawn; the promotion records;
+- Q4, Q3, the refused second «l1», the tool's name in «ישר דרך A מקביל לישר l1», and undo.
+
+Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and on the #2431 exam fixture.
+
+**Consequences.** `engine/types.ts` (`CurveLabel.auto`), `engine/solve.ts` (`on-curve.stated`), `engine/apply.ts` (`toolNamed`, the `curve` arm's name checks, the `on-curve` role), `parser/parseAnalytic.ts` (`tangentTargets`' role, `statedOperands`), `app/submit.ts` (`objectsGained`); docs 02c, 04c.

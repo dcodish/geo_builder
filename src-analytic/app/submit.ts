@@ -96,11 +96,19 @@ export type SubmitVerdict =
 const constraintsAdded = (before: Derivation, after: Derivation): number =>
   after.construction.constraints.length - before.construction.constraints.length;
 
-/** What the construction GAINED — objects, parameters and selectors. Constraints are not here. */
+/**
+ * What the construction GAINED — objects, parameters, selectors, and curves newly DRAWN. Constraints are not here.
+ *
+ * A carrier promoted to a stated curve is a line the canvas gains (#1076), and a sentence can promote one AND state a
+ * constraint: «A על הישר 3x+4y=25» then «הישר 3x+4y=25 משיק למעגל M» on a circle already at that distance (#2425,
+ * ADR-AG-319). Counted here, the line it drew is never «כבר נובע».
+ */
+const drawnCurves = (d: Derivation): number => d.construction.objects.filter((o) => o.kind === 'curve' && o.stated).length;
 const objectsGained = (before: Derivation, after: Derivation): number =>
   after.construction.objects.length - before.construction.objects.length +
   (after.construction.params.length - before.construction.params.length) +
-  (after.construction.selectors.length - before.construction.selectors.length);
+  (after.construction.selectors.length - before.construction.selectors.length) +
+  Math.max(0, drawnCurves(after) - drawnCurves(before));
 
 /**
  * #1423 — the POINT ids a parsed line takes as its SUBJECT, structurally (never by sentence kind):

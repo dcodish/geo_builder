@@ -101,8 +101,9 @@ describe('#2238 — the curve menu: what a click offers', () => {
   it('the menu is titled by the curve’s name, or its equation when it has none', () => {
     build(['נתון הישר l1: 4y-3x-20=0']);
     expect(curveMenuOf(current().figure, curveId())!.title).toMatch(/l\s*1|ℓ/);
+    // A declared line the student did not name carries the tool's l1 since #2425 (ADR-AG-319, ruling Q4).
     build(['הישר y=x']);
-    expect(curveMenuOf(current().figure, curveId())!.title).toBe('y=x');
+    expect(curveMenuOf(current().figure, curveId())!.title).toMatch(/l\s*1|ℓ/);
   });
 
   it('a point or a segment id opens no curve menu', () => {

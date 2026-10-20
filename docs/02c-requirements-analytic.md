@@ -305,6 +305,7 @@ From the «lines and points» corpus (§8), numbered onward.
 **R56 — a curve minted to CARRY a point is not drawn**. Stating the curve on its own line draws it, as a recorded change; the carrier stays in the data panel.
 - **⚠ Superseded by R66 (ADR-AG-041):** the panel clause only — an anonymous carrier gets no data-panel row (`panelListsCurve`); its dependency shows on the point, `B = (x_B, x_B)`. It is still not drawn.
 - «נקודה B על הישר y=x» → B is (t,t); no line drawn
+- **Scope (R187, ADR-AG-319):** only a curve that holds a POINT is a carrier. A curve the sentence is about («הישר <eq> משיק …», «הישר <eq> עובר דרך A») is drawn.
 - Sources: ADR-AG-032.
 
 **R80 — a line can be CONSTRUCTED through a point**. The direction is copied from AB, a named line or an axis; no freedom is added, and a missing anchor is introduced with its DOF.
@@ -899,6 +900,22 @@ a sentence the tool parsed.
 - «המעגלים N1 ו-N2 שונים» → two circles; «הישרים l1 ו-l2 שונים», «l1 ≠ l2» → two lines
 - «A(1,2) · B(1,2) · A ≠ B» → refused, naming «A ≠ B»; «N1 ≠ N1» → the same letter twice
 - Sources: ADR-AG-311, #2395 (#2379, the operator's exam questions).
+
+**R185 — a line named by restatement is that line to every sentence that takes a line, and a sentence about a line the figure does not have is refused**. *(2-D: a named line resolves everywhere; honesty invariant: a stated given never vanishes.)* «נתון ישר 4x+y+3=0» then «נתון הישר l1: 4x+y+3=0» names the one line, and every slot reads l1 as that line.
+- «הישר AB מקביל לישר l1», «C על הישר l1», «שיפוע הישר l1 שלילי», «C נקודת החיתוך של הישר l1 עם ציר ה-x», «A מעל הישר l1», «המעגל M משיק לישר l1» → about that line
+- «ישר דרך A מקביל לישר l1» → the line through A is drawn; with no l1 (or no C in «… ל-CD») → refused, naming it
+- Sources: ADR-AG-317, #2431 (exam Q1 ב(1), #2379).
+
+**R186 — an equation written inside a sentence denotes the figure's own curve with that equation, and no message ever shows an internal id**. *(Honesty invariant: an error names the statement, never internal state.)*
+- «נתון הישר l: 3x+4y=25» · «משוואת המשיק היא 3x+4y=25» → about l (on a circle of radius 5 at distance 5, «כבר נובע»)
+- «הישר 3x+4y=25 משיק למעגל M», «המעגל M משיק לישר 3x+4y=25» after l → about l, no second line
+- Sources: ADR-AG-318, #2432.
+
+**R187 — a curve given inline in a sentence ABOUT it is drawn, and a drawn line the student did not name carries the next free l-number**. *(Operator, round #2414 T27/T14 and ruling 2026-10-20 Q1–Q4: "the line should have been drawn with dof"; "named with l1 or l2 or whatever number is free".)* The line keeps its freedom, which «הציגו תצורה אחרת» samples; the name is on the figure and in «משוואות» from creation, and every sentence can use it.
+- «הישר mx-y+n=0 משיק למעגל M», «מעגל שמרכזו M(8,−3) משיק לישר 4x+3y+2=0 בנקודה A», «הישר y=mx+1 עובר דרך A», «המעגל (x-a)^2+y^2=4 עובר דרך A» → drawn (a line as l1, or l2 when l1 is taken)
+- «נתון ישר 4x+3y+2=0» → l1; a later «נתון הישר l5: …» of the same line replaces the tool's name; «נתון הישר l1: <another equation>» → refused
+- «A על הישר y=mx+1», «M על הישר 4x+y+3=0» → still undrawn (R56, the #2423 ruling)
+- Sources: ADR-AG-319, #2425, #2423.
 
 **R61 — a circle marks its centre**. Its value shows only when the givens fix it; the centre owns no letter (amended by R123).
 - Sources: ADR-AG-036.
