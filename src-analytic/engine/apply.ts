@@ -40,6 +40,7 @@ import {
   inDomain,
   circleDefPoints,
   curveByName,
+  factsWithin,
   diameterCircleId,
   incircleId,
   isPositional,
@@ -1616,6 +1617,14 @@ function footOnPair(c: Construction, id: Id, u: Id, v: Id): boolean {
   if (o.rule.t === 'midpoint') return pair(o.rule.a, o.rule.b);
   if (o.rule.t === 'foot' && o.rule.onto.k === 'points') return pair(o.rule.onto.a, o.rule.onto.b);
   return false;
+}
+
+/** The point the figure STATES the two circles touch at («המעגלים משיקים בנקודה T») — its `touch-point`; `null` if none. */
+function touchPointOf(c: Construction, c1: Id, c2: Id): Id | null {
+  const o = c.objects.find(
+    (q) => q.kind === 'derived' && q.rule.t === 'touch-point' && ((q.rule.a === c1 && q.rule.b === c2) || (q.rule.a === c2 && q.rule.b === c1)),
+  );
+  return o ? o.id : null;
 }
 
 /**
@@ -3478,6 +3487,27 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     /**
+     * A COMMON TANGENT'S TOUCHES, DECIDED AGAINST THE FIGURE (#2385, ADR-AG-312). The line ab is tangent to both
+     * circles. A common tangent through the circles' common point T can only be the tangent AT T (a line through a
+     * point of a circle, tangent to it, touches it there), and there its two touches coincide. So when the figure
+     * already puts the circles' stated touch point on ab («T על AB», or T one of the letters), the line is lowered as
+     * the tangent to the first circle at T, the at-form's lowering («… בנקודה T»), which the second circle shares.
+     * Otherwise `a` touches the first circle and `b` the second, as every common tangent was lowered before.
+     */
+    case 'common-tangent': {
+      const [c1, c2] = f.circles;
+      const line: TangentLineRef = { kind: 'points', a: f.a, b: f.b };
+      const touch = touchPointOf(c, c1, c2);
+      if (touch !== null && (touch === f.a || touch === f.b || f.onLine?.includes(touch) || footOnPair(c, touch, f.a, f.b))) {
+        return applyFact(c, { t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: touch, src: f.src });
+      }
+      return applyAll(c, [
+        { t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: f.a, src: f.src },
+        { t: 'tangent-of', axes: [], lines: [line], circleId: c2, at: f.b, src: f.src },
+      ]);
+    }
+
+    /**
      * «המשיק למעגל בנקודה A» — the tangent line as an OBJECT (#1619 B3, ADR-AG-195). The circle is
      * resolved by the `tangent-of` chain; A lies on it, and the line through A is perpendicular to the
      * radius there — a `line-at` on the radius direction turned a quarter, 0 DOF, closed form.
@@ -4586,6 +4616,35 @@ function declaredRingSpelling(facts: readonly Fact[], group: readonly number[]):
   return out ?? facts;
 }
 
+/**
+ * #2385 ([ADR-AG-312](../../docs/06c-decisions-analytic.md#adr-ag-312)) — WHAT THE EARLIER LINES PUT ON A COMMON
+ * TANGENT'S LINE. «T על AB» · «AB משיק משותף למעגלים M ו-N»: the first line names A and B before anything defines them,
+ * so the fold DEFERS it (the deferral fixpoint, ADR-AG-133) and the common tangent's own line is what declares A and
+ * B. Its M1 lowering therefore sees a figure without T on AB, though the student stated it first and saw it drawn. Each
+ * `common-tangent` is told here, as `onLine`, the points an earlier admitted line puts on its pair's line, so its
+ * lowering reads the prefix the student stated, whatever order the fold lands it in. Only EARLIER lines: a later
+ * «T על AB» is a statement about a common tangent already drawn. Positional, like `declaredRingSpelling`.
+ */
+function earlierOnCommonTangents(facts: readonly Fact[], group: readonly number[], include: (i: number) => boolean): readonly Fact[] {
+  if (!facts.some((f) => f.t === 'circles-about' && f.about.some((g) => g.t === 'common-tangent'))) return facts;
+  const pair = (u: Id, v: Id, a: Id, b: Id) => (u === a && v === b) || (u === b && v === a);
+  return facts.map((f, i) => {
+    if (f.t !== 'circles-about' || !f.about.some((g) => g.t === 'common-tangent')) return f;
+    const about = f.about.map((g) => {
+      if (g.t !== 'common-tangent') return g;
+      const on = new Set<Id>();
+      facts.forEach((h, j) => {
+        if (group[j] >= group[i] || !include(j)) return;
+        for (const k of factsWithin(h)) {
+          if (k.t === 'constraint' && k.k.t === 'on-line-2pt' && pair(k.k.a, k.k.b, g.a, g.b)) on.add(k.k.id);
+        }
+      });
+      return on.size > 0 ? { ...g, onLine: [...on] } : g;
+    });
+    return { ...f, about };
+  });
+}
+
 export interface FoldResult {
   construction: Construction;
   /** Per-fact outcome, positionally — the fact list renders refusals in place. */
@@ -4641,7 +4700,8 @@ export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldR
   facts = declaredRingSpelling(facts, group);
   const excluded = new Map<number, ApplyError>(); // line → the error that faulted it
   for (;;) {
-    const r = foldPass(facts, (i) => !excluded.has(group[i]), group);
+    const include = (i: number) => !excluded.has(group[i]);
+    const r = foldPass(earlierOnCommonTangents(facts, group, include), include, group);
     let newly = 0;
     r.errors.forEach((e, i) => {
       if (e && !excluded.has(group[i])) {

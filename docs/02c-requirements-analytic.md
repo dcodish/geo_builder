@@ -444,7 +444,8 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «מעגל סביב O רדיוס 5», «מעגל O שהיקפו 6π» (radius 3)
 - «שני מעגלים נחתכים בנקודות A ו-B», «AB משיק משותף חיצוני / פנימי לשני המעגלים»
 - the plural subject crosses too: «המעגלים O ו-P נחתכים בנקודות X ו-Y» (the stated radii kept), «המעגלים O ו-P נחתכים» (the crossings take the tool's letters), «(שני) המעגלים נחתכים …» (the two circles the figure holds), "circles O and P intersect at X and Y" (ADR-AG-300, #2108)
-- Sources: ADR-AG-219, #1622, #1693, #1688, #2108.
+- a common tangent through the circles' stated touch point is the tangent there: «המעגלים משיקים בנקודה T» · «T על AB» · «AB משיק משותף למעגלים M ו-N» draws AB as the tangent at T (also «TB משיק משותף …»); other letters are still its two touches, and «… חיצוני …» through T is refused (ADR-AG-312, #2385)
+- Sources: ADR-AG-219, #1622, #1693, #1688, #2108, #2385.
 
 **R163 — arcs, sectors, semicircles and the diameter from a point build as they do in the 2-D tool**. *(Operator ruling: analytic gives 2-D's verdict, and the arc rows are ported.)* An arc's measure is its central angle.
 - «קשת AB = 40 במעגל O», «⌢{AC} = 60°»

@@ -295,6 +295,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2357': 'open', // #2234 (ADR-737): analytic sends the same spellings to the model
 
   '#2344': 'open', // #2344 (ADR-W-146): 2-D draws a green sliver for a triangle whose givens hold only flat in the limit (the tangent root)
+  '#2407': 'open', // #2385 (ADR-AG-312): 2-D refuses the common tangent through the circles' touch point (the P1 port)
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1676,6 +1677,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #1946 + #2103 (ADR-731, ADR-3D-366): a ⟂ at a NAMED foot / crossing draws one knee at rest, in the corner the statement names ──
   { id: 'perp-knee-named-foot-1946', family: 'parallel-perpendicular', steps: ['משולש ABC', 'D על BC', 'AD ⟂ BC'], expect: 'builds', note: 'the knee at D (∠ADC) is locked per tool in issue-1946-knee-at-named-foot.test.ts (2-D and 3-D)' },
   { id: 'knee-named-crossing-2103', family: 'parallel-perpendicular', steps: ['ריבוע ABCD', 'O נקודת חיתוך האלכסונים', 'AC ⟂ BD'], expect: 'builds', note: 'the knee at O (∠COD) is locked per tool in issue-1946-knee-at-named-foot.test.ts (2-D and 3-D)' },
+
+  // ── #2385 (ADR-AG-312): a common tangent through the circles' stated touch point is the tangent at it ──
+  { id: 'common-tangent-through-touch-2385', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'T על AB', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2407' }], note: '2-D refuses it over-constrained (T, A, B collinear): the P1 port #2407; analytic was unsatisfiable before ADR-AG-312' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
