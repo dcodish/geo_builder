@@ -16,7 +16,8 @@
         "AB משיק משותף למעגלים M ו-N"
       ],
       "lookFor": "Two circles, labelled M and N, and AB the line through T touching both (vertical at T); every row ✓.",
-      "before": "Four circles; AB cut the drawn pair at T."
+      "before": "Four circles; AB cut the drawn pair at T.",
+      "_probe": "verified-by-probe on main @ a0797cef: the last line settles in 2.1 s (the driver read it mid-«חושב…»); then two circles M and N, AB the vertical tangent at T, all 4 rows ✓."
     },
     {
       "id": "T2",
@@ -33,7 +34,8 @@
         "AB משיק משותף למעגלים M ו-N"
       ],
       "lookFor": "AB is the tangent at T.",
-      "before": "Sent to the AI."
+      "before": "Sent to the AI.",
+      "_probe": "verified-by-probe on main @ a0797cef: the last line settles in 0.8 s; AB the tangent at T on the internal pair, all 5 rows ✓."
     },
     {
       "id": "T3",
@@ -303,7 +305,7 @@
         "MA = MB",
         "M על הישר 4x+y+3=0"
       ],
-      "lookFor": "The line records and is drawn; «הציגו תצורה אחרת» still moves M; the locus asks answer «ישר · 4x + y + 3 = 0».",
+      "lookFor": "The line records; «הציגו תצורה אחרת» still moves M along it; the locus ask answers «ישר · 4x + y + 3 = 0». (The inline line itself is not drawn — as before this round; filed separately.)",
       "before": "M froze and the locus had no answer.",
       "asks": [
         "המקום הגיאומטרי של M"
