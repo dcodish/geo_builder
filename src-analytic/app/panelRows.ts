@@ -1,5 +1,5 @@
 import type { Derivation } from '../engine/derive';
-import { isKnowledge, knownCurve, knownCurveOptions, knownValue, knownValues, settled, type Figure, type Knowledge } from '../engine/evaluate';
+import { isKnowledge, knownCurve, knownValue, knownValues, settled, type Figure, type Knowledge } from '../engine/evaluate';
 import type { NumCurve } from '../engine/types';
 import { angleAt, type AngleRef, type Constraint } from '../engine/solve';
 import { VERTICAL_TOL, verticality } from '../engine/lines';
