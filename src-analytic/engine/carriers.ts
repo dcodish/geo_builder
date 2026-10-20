@@ -36,6 +36,7 @@ import { evalExpr, exprText, symbolsOf, type Env, type Expr } from './expr';
 import { constraintRefs, dirRefs, freeDirectionSymbol } from './solve';
 import { UNBOUNDED, circleDefPoints, type Construction, type Domain, type GeoObject, type Id, type NumCurve, type ParamDecl } from './types';
 import { INDEXED_NAME_RE } from '../../shell/indexedName';
+import { resolveCurve } from './curves';
 
 /**
  * The plane's own coordinates. A curve is the zero set of `f(x, y; params)`, so `x` and `y` occur
@@ -364,7 +365,167 @@ export function paramRegister(c: Construction): ParamDecl[] {
     seen.add(sym);
     out.push({ sym, domain: UNBOUNDED });
   }
+  // A LETTER THAT STANDS FOR A SIZE IS POSITIVE (#2419, ADR-AG-323): the domain its role implies, read here, so the
+  // sampler, the pin-root filter and the panel see one domain. In place, so the register's order (the sampler's salt)
+  // is the one it always had.
+  const roles = sizeLetters(c);
+  if (roles.size === 0) return out;
+  return out.map((p) => {
+    const role = roles.get(p.sym);
+    const domain = role ? sizeDomain(p.domain, role) : p.domain;
+    return domain === p.domain ? p : { sym: p.sym, domain };
+  });
+}
+
+/**
+ * HOW A LETTER STANDS FOR A SIZE (#2419, ADR-AG-323; operator ruling 2026-10-20: *"r for radius like any letter
+ * represending size needs to be positive"*).
+ *
+ * - `linear` — the letter, or a positive multiple of it, IS a size: a circle's radius given by its centre
+ *   («שרדיוסו r», «שרדיוסו 2r»), a length, a distance, a perimeter or an area valued by it («AB = k», «AB = 2k»,
+ *   «שטח המשולש ABC הוא k»). The size is positive, so the letter is; a declared domain with no positive value
+ *   («a < 0» · «AB = a») is a contradiction the apply boundary refuses.
+ * - `even` — the letter is a circle's radius written SQUARED in its equation («(x−a)²+y²=r²», «x²+y²=4r²»): the
+ *   radius is a positive multiple of |t| and the centre does not move with t. The equation reads r² only, so a
+ *   declared negative letter («a < 0» · «x²+y²=a²») contradicts nothing and keeps its stated domain.
+ *
+ * Not a size: a letter that also places the centre in the same equation («(x−a)²+y²=a²» — the centre moves with a),
+ * a coordinate, a slope, an intercept, a ratio, an angle. Roles only ever grow as facts are added (a statement never
+ * takes one away), so a domain this reads never reverts behind a student's back.
+ *
+ * Numeric, never symbolic (no CAS, ADR-AG-001 D1): a multiple is tested by evaluating the expression at three
+ * values of the letter, the `impliedRange` device; an equation circle by resolving it at three values. Memoized on
+ * the construction, which is immutable: the register is read many times per evaluation.
+ */
+export type SizeRole = 'linear' | 'even';
+const sizeCache = new WeakMap<Construction, ReadonlyMap<string, SizeRole>>();
+
+/** A probe value per symbol for the letters an equation holds besides the one under test. */
+const SIZE_PROBES = [1.7, 2.3, 1.3, 0.7, 2.1, 1.9, 1.1, 2.7, 3.1, 0.9];
+
+/** `e` is `m·sym` with m > 0, and mentions no other symbol. */
+function positiveMultipleOf(e: Expr): string | null {
+  const syms = symbolsOf(e).filter((s) => !RESERVED_SYMBOLS.has(s));
+  if (syms.length !== 1 || isTermPlaceholder(syms[0])) return null;
+  const sym = syms[0];
+  const f = (t: number) => evalExpr(e, { [sym]: t });
+  const m = f(1);
+  if (!Number.isFinite(m) || m <= 1e-12 || Math.abs(f(0)) > 1e-12) return null;
+  return Math.abs(f(2) - 2 * m) <= 1e-9 * Math.max(1, m) && Math.abs(f(-1.5) + 1.5 * m) <= 1e-9 * Math.max(1, m) ? sym : null;
+}
+
+const isTermPlaceholder = (s: string): boolean => s.length === 1 && s.charCodeAt(0) >= 0xe000 && s.charCodeAt(0) <= 0xf8ff;
+
+/** A side of a length equation that is a positive MEASURE: a combination of measure terms, positive however long they are, and no parameter. */
+function positiveMeasure(side: { expr: Expr; terms: readonly unknown[] }): boolean {
+  if (side.terms.length === 0) return false;
+  const syms = symbolsOf(side.expr);
+  if (syms.some((s) => !isTermPlaceholder(s))) return false;
+  return [
+    [1, 1, 1, 1, 1, 1],
+    [1, 2, 3, 0.5, 1.5, 2.5],
+    [3, 0.5, 1, 2, 0.7, 1.1],
+  ].every((lens) => {
+    const env: Record<string, number> = {};
+    for (const s of syms) env[s] = lens[(s.charCodeAt(0) - 0xe000) % lens.length];
+    const v = evalExpr(side.expr, env);
+    return Number.isFinite(v) && v > 0;
+  });
+}
+
+/** The letter a circle EQUATION holds as its (squared) radius, with the centre independent of it — or none. */
+function evenRadiusLetters(eq: Expr): string[] {
+  const syms = symbolsOf(eq).filter((s) => !RESERVED_SYMBOLS.has(s));
+  const out: string[] = [];
+  for (const sym of syms) {
+    const base: Record<string, number> = {};
+    syms.forEach((s, i) => (base[s] = SIZE_PROBES[i % SIZE_PROBES.length]));
+    const at = [1, 2, -1.5].map((t) => {
+      const r = resolveCurve({ eq }, { ...base, [sym]: t });
+      return r.ok && r.curve.kind === 'circle' ? { ...r.curve, t } : null;
+    });
+    if (at.some((q) => q === null)) continue;
+    const [p, ...rest] = at as Array<{ cx: number; cy: number; r: number; t: number }>;
+    const k = p.r / Math.abs(p.t);
+    const close = (u: number, v: number) => Math.abs(u - v) <= 1e-9 * Math.max(1, Math.abs(u), Math.abs(v));
+    if (k > 1e-12 && rest.every((q) => close(q.cx, p.cx) && close(q.cy, p.cy) && close(q.r, k * Math.abs(q.t)))) out.push(sym);
+  }
   return out;
+}
+
+export function sizeLetters(c: Construction): ReadonlyMap<string, SizeRole> {
+  const hit = sizeCache.get(c);
+  if (hit) return hit;
+  const out = new Map<string, SizeRole>();
+  const linear = (sym: string | null) => {
+    if (sym !== null) out.set(sym, 'linear');
+  };
+  for (const o of c.objects) {
+    if (o.kind === 'circle-at') linear(positiveMultipleOf(o.r));
+    else if (o.kind === 'curve' && symbolsOf(o.curve.eq).some((s) => !RESERVED_SYMBOLS.has(s)) && curveIsCircle(o.curve)) {
+      for (const sym of evenRadiusLetters(o.curve.eq)) if (!out.has(sym)) out.set(sym, 'even');
+    }
+  }
+  // A size valued by a letter — only a constraint that HOLDS (top level, or inside `all`); a `choice` option may not.
+  const visit = (k: Construction['constraints'][number]): void => {
+    if (k.t === 'all') k.of.forEach(visit);
+    else if (k.t === 'area') linear(positiveMultipleOf(k.value));
+    else if (k.t === 'length-eq') {
+      for (const [m, v] of [
+        [k.left, k.right],
+        [k.right, k.left],
+      ] as const) {
+        if (v.terms.length === 0 && positiveMeasure(m)) linear(positiveMultipleOf(v.expr));
+      }
+    }
+  };
+  c.constraints.forEach(visit);
+  for (const [sym] of out) if (sym.startsWith(RADIUS_PREFIX) || isDirectionSymbol(sym)) out.delete(sym); // the tool's own symbols carry their own domains
+  sizeCache.set(c, out);
+  return out;
+}
+
+/** Is the curve a circle at a probe environment (the kind does not turn on its parameters' values in any corpus form)? */
+function curveIsCircle(curve: { eq: Expr; kind?: string }): boolean {
+  if (curve.kind) return curve.kind === 'circle';
+  const env: Record<string, number> = {};
+  symbolsOf(curve.eq).forEach((s, i) => (env[s] = SIZE_PROBES[i % SIZE_PROBES.length]));
+  const r = resolveCurve({ eq: curve.eq }, env);
+  return r.ok && r.curve.kind === 'circle';
+}
+
+/** Every value of `d` is positive. */
+export const impliesPositive = (d: Domain): boolean => d.min !== undefined && (d.min > 0 || (d.min === 0 && !!d.minOpen));
+
+/** Does the domain hold no value at all? (An excluded point never empties an interval wider than a point.) */
+export function emptyDomain(d: Domain): boolean {
+  return d.min !== undefined && d.max !== undefined && (d.min > d.max || (d.min === d.max && (!!d.minOpen || !!d.maxOpen)));
+}
+
+/** `d ∩ (0, ∞)`. */
+export function positivePart(d: Domain): Domain {
+  if (impliesPositive(d)) return d;
+  const above = d.min !== undefined && d.min > 0;
+  return { ...d, min: above ? d.min : 0, minOpen: above ? d.minOpen : true };
+}
+
+/**
+ * THE DOMAIN A SIZE ROLE GIVES A LETTER (#2419, ADR-AG-323) — its stated domain, intersected with (0, ∞).
+ * An empty intersection keeps the stated domain: for `linear` the apply boundary has refused that statement already
+ * ({@link sizeContradiction}); for `even` the squared radius contradicts nothing (a < 0 · x²+y²=a² is a circle of |a|).
+ */
+export function sizeDomain(stated: Domain, role: SizeRole | undefined): Domain {
+  if (!role || impliesPositive(stated)) return stated;
+  const d = positivePart(stated);
+  return emptyDomain(d) ? stated : d;
+}
+
+/** The first letter whose SIZE role the stated domains contradict (`a < 0` beside `AB = a`), or null. */
+export function sizeContradiction(c: Construction): string | null {
+  const negative = c.params.filter((p) => !impliesPositive(p.domain) && emptyDomain(positivePart(p.domain)));
+  if (negative.length === 0) return null; // the cheap test first: almost no figure declares a letter with no positive value
+  const roles = sizeLetters(c);
+  return negative.find((p) => roles.get(p.sym) === 'linear')?.sym ?? null;
 }
 
 /**

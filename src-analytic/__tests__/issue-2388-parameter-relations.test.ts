@@ -119,7 +119,8 @@ describe('#2388 (1) — the ratio of the circles’ radii', () => {
 
   it('on circles given by their EQUATIONS the ratio reads the resolved circles', () => {
     const lines = ['נתון מעגל I שמשוואתו (x-a)^2+y^2=4', 'נתון מעגל II שמשוואתו (x-13)^2+y^2=c^2', 'c>0', 'היחס בין רדיוסי המעגלים I ו-II הוא 1:2'];
-    expect(submitAll(lines)).toEqual(lines);
+    // «c>0» is already known: c is circle II's radius, and a letter that stands for a size is positive (#2419).
+    expect(submitAll(lines)).toEqual(lines.filter((l) => l !== 'c>0'));
     for (const seed of SEEDS) {
       const d = derive(lines, seed);
       expect(d.faults).toEqual([]);
@@ -289,20 +290,25 @@ describe('#2388 — the saved questions', () => {
 
   /**
    * The exam's own lines as far as the grammar on this stack reaches (the wrapper sentences are #2391's): both circles
-   * by equation with «R²», the ratio sentence and «r < R». The radii appear only as r² and R², so «r < R» does not say
-   * they are positive: (r, R) = (3, 6) and (−6, 3) both hold, and the panel honestly lists both equations (no inferred
-   * r > 0 — the #2382/#2387 plan's pickup check 4). a = 4 is known.
+   * by equation with «R²», the ratio sentence and «r < R». The radii appear only as r² and R² — and a letter that
+   * stands for a size is positive (#2419, ADR-AG-323, operator ruling 2026-10-20), so (r, R) = (−6, 3) is not a
+   * configuration: r = 3, R = 6 and ONE equation per circle. a = 4 is known.
    */
-  it('Q2 in the exam’s equation form: a = 4; each equation listed with its two options', () => {
+  it('Q2 in the exam’s equation form: a = 4; r = 3, R = 6 and one equation per circle (#2419)', () => {
     expect(submitAll(exam.lines)).toEqual(exam.lines);
     const d = derive(exam.lines, exam.seed);
     expect(d.faults).toEqual([]);
     const pk = panelKnowledge(d);
     const a = pk.params.find((p) => p.sym === 'a')!.k;
     expect((a.known ? [a.value] : [...(a.options ?? [])]).some((x) => Math.abs(x - 4) < 1e-5)).toBe(true);
-    for (const id of ['circle-I', 'circle-II']) {
+    for (const [id, cx, r] of [['circle-I', 4, 3], ['circle-II', 13, 6]] as const) {
       const c = pk.curves.find((q) => q.id === id)!;
-      expect(c.known !== null || (c.options?.length ?? 0) === 2, id).toBe(true);
+      expect(c.known, id).not.toBeNull();
+      expect(c.options ?? [], id).toHaveLength(0);
+      for (const seed of SEEDS) {
+        const drawn = derive(exam.lines, seed).figure.curves.find((q) => q.id === id)!.curve;
+        expect(drawn, `${id} @ ${seed}`).toMatchObject({ kind: 'circle', cx: expect.closeTo(cx, 5), cy: expect.closeTo(0, 5), r: expect.closeTo(r, 5) });
+      }
     }
   });
 });
