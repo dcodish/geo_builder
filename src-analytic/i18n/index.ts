@@ -375,6 +375,10 @@ const he = {
   errReservedCoordinate:
     'האותיות x ו-y שמורות לצירי מערכת הצירים, ולכן אי אפשר להשתמש בהן כנעלם בשיעורי נקודה: "{{detail}}". ' +
     'אפשר להשתמש באות אחרת, למשל M(3,t).',
+  // #2427 (ADR-AG-325) — operator ruling 2026-10-20: a capital is a point's name; sizes are lowercase, except R.
+  errCapitalMagnitude:
+    'אות גדולה היא שם של נקודה, ולכן {{letter}} לא יכולה לסמן גודל. גדלים מסמנים באות קטנה (r, a, k…), מלבד R לרדיוס. ' +
+    'נסו: "{{corrected}}"',
   errBadArity:
     'מספר הקודקודים אינו מתאים לשם הצורה במשפט "{{detail}}" — במשולש שלושה קודקודים ובמרובע ארבעה.',
   errRepeatedVertex: 'באותו משפט אותה אות מופיעה יותר מפעם אחת: "{{detail}}". לכל קודקוד צריך שם משלו.',
@@ -963,6 +967,9 @@ const en: typeof he = {
   errReservedCoordinate:
     'The letters x and y name the axes, so they cannot be a point\'s unknown: "{{detail}}". ' +
     'Use another letter — for example M(3,t).',
+  errCapitalMagnitude:
+    'A capital letter is a point\'s name, so {{letter}} cannot mark a size. Sizes are marked with a lowercase letter (r, a, k…), except R for a radius. ' +
+    'Try: "{{corrected}}"',
   errBadArity:
     'The number of vertices does not match the shape named in "{{detail}}" — a triangle has three ' +
     'vertices and a quadrilateral four.',

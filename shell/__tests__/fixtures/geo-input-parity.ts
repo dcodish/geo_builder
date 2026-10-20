@@ -65,7 +65,7 @@ export interface StepVerdict {
  */
 export type StepRunner = (steps: readonly string[]) => readonly StepVerdict[] | Promise<readonly StepVerdict[]>;
 
-export type ExceptionId = 'X1' | 'X2' | 'X3' | 'X4' | 'X5' | 'X6' | 'X7' | 'X8' | 'X9' | 'X10';
+export type ExceptionId = 'X1' | 'X2' | 'X3' | 'X4' | 'X5' | 'X6' | 'X7' | 'X8' | 'X9' | 'X10' | 'X11';
 
 export interface ExceptionFamily {
   title: string;
@@ -181,6 +181,15 @@ export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
     mustRefuse: ['analytic'],
     topic: false,
     patterns: [/[A-Z]{2}\s*=\s*(?:[A-Z]{2}\s*=\s*)?[\d√]*\s*[xy](?![A-Za-z])/],
+  },
+  X11: {
+    title: 'a capital letter as a size in analytic («נתון מעגל O שרדיוסו K», «AB = AC + D»)',
+    reason:
+      "operator ruling 2026-10-20 on #2427 (ADR-AG-325, amending ADR-AG-307's \"only R\"): in analytic a capital letter is a point's name, so a size written with one — a radius, a length, an angle, a parameter — is refused with a teaching message (sizes are lowercase, except R for a radius and an area's label); \"Only R\" stays analytic-only, so 2-D keeps reading a capital radius («שרדיוסו K») and declines «AB = AC + D». Every other spelling is a plain parity row",
+    products: ['2d', '3d'],
+    mustRefuse: ['analytic'],
+    topic: false,
+    patterns: [/(?:רדיוס\S*|radius)\s+[A-QS-Z](?![A-Za-z0-9₀-₉_'])/, /[=+−-]\s*\d*[A-QS-Z](?![A-Za-z0-9₀-₉_'])\s*$/],
   },
 };
 
@@ -1237,7 +1246,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'point-value-angle-order-1701', family: 'angles', steps: ['משולש ABC', '∢ABC < A'], expect: 'not-handled' },
   { id: 'point-value-length-1701', family: 'lengths', steps: ['משולש ABC', 'AB = A1'], expect: 'not-handled' },
   { id: 'point-value-length-coef-1701', family: 'lengths', steps: ['משולש ABC', 'AB = 2A'], expect: 'not-handled' },
-  { id: 'point-value-length-sum-1701', family: 'lengths', steps: ['משולש ABC', 'AB = AC + D'], expect: 'not-handled', note: 'a capital left over after the pairs were read' },
+  { id: 'point-value-length-sum-1701', family: 'lengths', steps: ['משולש ABC', 'AB = AC + D'], expect: 'not-handled', exception: 'X11', note: 'a capital left over after the pairs were read; D is no point of the figure, so analytic refuses it as a capital size (#2427, ADR-AG-325)' },
   { id: 'point-value-length-order-1701', family: 'lengths', steps: ['משולש ABC', 'AB < C'], expect: 'not-handled' },
   { id: 'radius-value-length-1701', family: 'lengths', steps: ['משולש ABC', 'AB = 1.6R'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'control — the radius R is the one capital a length value admits (2-D ADR-034)' },
   { id: 'area-label-capital-1701', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC = S'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'control — an area label is a capital in 2-D (parseAreaExpr)' },
@@ -1734,6 +1743,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'diameter-construct-2391', family: 'circles', steps: ['מעגל M', 'N₂A הוא קוטר המעגל M'], expect: 'builds', exception: 'X8' },
   { id: 'centre-after-circle-2391', family: 'circles', steps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'מרכז המעגל I הוא K'], expect: 'builds', exception: 'X8', only: ['analytic'], note: 'a numeral circle is named by its equation (#1257), so only analytic can state the context' },
   { id: 'centres-respectively-2391', family: 'circles', steps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1', 'K ו-L מרכזי המעגלים I ו-II בהתאמה'], expect: 'builds', exception: 'X8', only: ['analytic'], note: 'as centre-after-circle-2391' },
+  // ── #2427 (ADR-AG-325): a capital letter as a size — analytic refuses it with the lowercase lesson; "only R" is analytic's ──
+  { id: 'capital-radius-2427', family: 'circles', steps: ['נתון מעגל O שרדיוסו K'], expect: 'builds', exception: 'X11', only: ['2d'], note: 'the T38 line (#2414); 2-D reads K as its radius symbol' },
+  { id: 'capital-radius-centre-2427', family: 'circles', steps: ['מעגל שמרכזו O ורדיוסו K'], expect: 'builds', exception: 'X11', only: ['2d'] },
+  { id: 'capital-length-2427', family: 'lengths', steps: ['משולש ABC', 'AB = K'], expect: 'not-handled', exception: 'X11', note: '2-D and 3-D hand it to the model; analytic refuses it, teaching «AB = k» (#2427)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

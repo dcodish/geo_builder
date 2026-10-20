@@ -121,6 +121,12 @@ The radius capital `R` is the one exception, in every reader that takes a size o
 `equationExpr`, `roleScalar`, `radiusOfSize` — through one set, `RADIUS_CAPITALS` ([ADR-AG-307](06c-decisions-analytic.md#adr-ag-307));
 a radius naming any other capital declines. A point R beside a used symbol R is refused at `applyFact`
 (`radiusLetterClash`, `letterReadings`; `radius-letter-taken`, its first reading's line found by `derive`).
+**A capital used as a size is refused, owned** ([ADR-AG-325](06c-decisions-analytic.md#adr-ag-325)): `app/capitalSize.ts`,
+asked by `decideOnce` and `decideEdit` because both readings need the figure (a capital that is a point of the figure is
+left as it was). A `not-handled` line is read again with one lone capital lowercased (`capitalSizeRetry`, 2-D's
+lowercase-labels pattern); a parsed line is asked whether it ADDED a capital to the parameter register (`capitalParamOf`,
+`paramRegister` before and after the trial fold). R, and a capital inside the fact that states an area, are sizes. Either answer is `capital-magnitude`
+`{ letter, corrected }`, never `not-handled`, so it never reaches the model.
 
 **A parameter is never a plane coordinate** ([ADR-AG-246](06c-decisions-analytic.md#adr-ag-246)):
 A `param` fact (an F11 domain) that names `x` or `y` (`RESERVED_SYMBOLS`) is refused at the apply boundary (`applyStatement`, `engine/apply.ts`) with `coordinate-restriction`, whatever produced it.

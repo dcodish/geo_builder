@@ -32,6 +32,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'unread-word': [{}],
   'mixed-number': [{ detail: '2', decimal: '45', sum: '30', product: '2' }, { detail: '2', sum: '30', product: '2' }],
   'reserved-coordinate': [{}],
+  'capital-magnitude': [{ detail: 'נתון מעגל O שרדיוסו K', letter: 'K', corrected: 'נתון מעגל O שרדיוסו k' }], // #2427 (ADR-AG-325)
   'bad-arity': [{}],
   'repeated-vertex': [{}],
   'side-of-vertical': [{ side: 'above' }, { side: 'below' }], // #2386 (ADR-AG-310)

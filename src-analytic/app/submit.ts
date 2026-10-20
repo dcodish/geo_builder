@@ -30,6 +30,7 @@ import { factsWithin, type Fact } from '../engine/types';
 import { activeOf, rowOf } from './active';
 import { namesOfKind, nearMissOf, withName } from './nearMiss';
 import { declinedPart, unreadPart, type LostPart } from './lostPart';
+import { capitalParamOf, capitalSizeRetry, mayHoldCapitalSize } from './capitalSize';
 import type { SentenceOutcome } from '../../shell/sentences';
 
 /** What a recorded line tells the student (#1350) — the engine's notice, without the line index. */
@@ -321,6 +322,15 @@ function decideOnce(
   const parsed = parseLine(line);
   if (!parsed.ok) {
     /**
+     * #2427 (ADR-AG-325) — A CAPITAL USED AS A SIZE. «נתון מעגל O שרדיוסו K»: every value reader declines the capital, so
+     * the line was `not-handled` and reached the model. Read with the letter lowercased it parses, so the tool understood
+     * it: an owned refusal that teaches the lowercase sentence. A capital that is a point of the figure is left alone.
+     */
+    if (parsed.code === 'not-handled') {
+      const capital = capitalSizeRetry(line, figureLabelsOf(current));
+      if (capital) return { kind: 'refused', error: { key: 'capital-magnitude', detail: line, ...capital } };
+    }
+    /**
      * #1888 / #1889 (ADR-AG-251) — A DECLINED LINE WHOSE REST IS A LOST PART. «משולש ABC ישר זווית ב-B» and «…בנקודה E
      * על AB» are declined whole, so they used to reach the model: the operator ruled them refused with the one-input-
      * per-line message, in every builder. The longest prefix this same decision would accept is the part that was
@@ -355,6 +365,14 @@ function decideOnce(
    */
   // #1631: the trial is THIS figure plus the line — the same seed names, so it starts where the canvas drew.
   const trial = derive([...lines, line], seed, current.construction.seedNames ?? {});
+  /**
+   * #2427 (ADR-AG-325) — a capital the grammar READ as a parameter («M(K,0)», «K הוא פרמטר חיובי», «שיפוע AB הוא M»):
+   * asked of the register, so every family is one question. R, S beside an area, and a point of the figure are not this.
+   */
+  const capitalParam = mayHoldCapitalSize(line)
+    ? capitalParamOf(line, parsed.facts, current.construction, trial.construction, figureLabelsOf(current))
+    : null;
+  if (capitalParam) return { kind: 'refused', error: { key: 'capital-magnitude', detail: line, ...capitalParam } };
   /** A `record` verdict carries the new line's notice, if the fold raised one (#1350). */
   const raised = trial.notices.find((n) => n.index === lines.length);
   const recorded: SubmitVerdict = raised
@@ -637,7 +655,13 @@ export function decideEdit(
   if (disabled.includes(index)) return true;
   const edited = lines.map((l, j) => (j === index ? next : l));
   const at = rowOf(lines.length, disabled).indexOf(index);
-  return !derive(activeOf(edited, disabled), seed, seedNames).faults.some((f) => f.index === at);
+  const after = derive(activeOf(edited, disabled), seed, seedNames);
+  // #2427 (ADR-AG-325): the typed line's capital-size question, asked of the edit too (ADR-W-006: one gate, both seams)
+  if (mayHoldCapitalSize(next)) {
+    const before = derive(activeOf(lines, disabled), seed, seedNames);
+    if (capitalParamOf(next.trim(), parsed.facts, before.construction, after.construction, figureLabelsOf(before))) return false;
+  }
+  return !after.faults.some((f) => f.index === at);
 }
 
 /**

@@ -649,11 +649,16 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «sin∢ABC = 0.5» → «30° או 150°», cycled
 - Sources: ADR-AG-227, #1719.
 
-**R183 — a relation between parameters, a proportion, and the ratio of two circles' radii are givens; R is the one capital that names a size**. *(Operator ruling 2026-10-20: "it is very common to use R and r for radiuses of different circles so R can be an exception".)* An equation in the figure's own parameters relates them; a proportion means q·X = p·Y; the radii's ratio of «המעגלים» unnamed leaves the order to the configuration until a given («r < R») picks it. R is a radius parameter inside an equation and as a radius; every other capital is a point's name, and «שרדיוסו K» is not understood. A point R together with the radius R is refused in either order, naming both and the earlier line.
+**R183 — a relation between parameters, a proportion, and the ratio of two circles' radii are givens; R is the one capital that names a size**. *(Operator ruling 2026-10-20: "it is very common to use R and r for radiuses of different circles so R can be an exception".)* An equation in the figure's own parameters relates them; a proportion means q·X = p·Y; the radii's ratio of «המעגלים» unnamed leaves the order to the configuration until a given («r < R») picks it. R is a radius parameter inside an equation and as a radius; every other capital is a point's name, and «שרדיוסו K» is refused (R193). A point R together with the radius R is refused in either order, naming both and the earlier line.
 - «R = 2r», «r:R = 1:2», «r/R=1/2», «היחס בין R ל-r הוא 2:1», «היחס בין אורכי הרדיוסים של המעגלים הוא 1:2» → r = 3, R = 6 in Q2
 - «(x−13)²+y²=R²», «ורדיוסו R», «רדיוס המעגל O הוא R»
 - «R(1,2)» · «נתון מעגל N שרדיוסו R» → refused, naming «R(1,2)»
 - Sources: ADR-AG-307, #2388, #2379.
+
+**R193 — a capital letter used as a size is refused with a sentence that teaches the lowercase letter; R for a radius and an area's label are sizes**. *(Operator: "Need a message to user saying that sizes are small letters except for R".)* A radius, a length, an angle, a parameter in an equation, a coordinate, a declaration or a slope written with a capital that is not a point of the figure is refused — never handed to the model — with «אות גדולה היא שם של נקודה, ולכן K לא יכולה לסמן גודל. גדלים מסמנים באות קטנה (r, a, k…), מלבד R לרדיוס. נסו: "…"», the student's line with the letter lowercased. A capital that is a point of the figure is the student naming that point, and is read as before. 2-D keeps reading a capital radius (ruled analytic-only).
+- «נתון מעגל O שרדיוסו K», «AB = 2K», «y = Kx + 1», «זווית ABC = K», «M(K,0)», «K הוא פרמטר חיובי», «שיפוע AB הוא M» → refused, teaching «…k» / «…m»
+- «שטח המשולש ABC הוא S», «נסמן את שטח ABCD ב-S», «שטח ABC = T», «שרדיוסו R» → accepted; «K(1,1)» · «M(K,0)» → as before
+- Sources: ADR-AG-325, #2427, ADR-AG-307.
 
 ---
 

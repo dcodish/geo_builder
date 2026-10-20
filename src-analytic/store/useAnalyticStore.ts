@@ -100,6 +100,11 @@ export type InputError =
   | { key: 'mixed-number'; detail: string; decimal?: string; sum: string; product: string }
   /** `x` or `y` used as a point's unknown — they are the plane's own variables (#1039). */
   | { key: 'reserved-coordinate'; detail: string }
+  /**
+   * #2427 (ADR-AG-325) — a capital letter used as a size («שרדיוסו K», «AB = K», «M(K,0)»): a capital is a point's name,
+   * sizes are lowercase except R. `letter` is the capital, `corrected` the student's line with it lowercased.
+   */
+  | { key: 'capital-magnitude'; detail: string; letter: string; corrected: string }
   /** A shape noun and a vertex count that disagree (#1042). */
   | { key: 'bad-arity'; detail: string }
   /** One label used for two vertices of the same figure (#1042). */

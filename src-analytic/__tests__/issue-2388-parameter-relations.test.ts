@@ -253,7 +253,7 @@ describe('#2388 (2) — the clash: a point R and the radius R, refused naming bo
 });
 
 describe('#2388 — controls (unchanged) and the withdrawn behaviour', () => {
-  it.each(['a = 5', 'r=5', 'AB is y=x-4', 'x^2+y^2=K^2'])('«%s» stays not-handled', (s) => {
+  it.each(['a = 5', 'r=5', 'AB is y=x-4'])('«%s» stays not-handled', (s) => {
     expect(notHandled(decideSubmit(s, [], 0) as Verdict)).toBe(true);
   });
   it('«α = 30» and «α = 2β» unchanged', () => {
@@ -268,9 +268,12 @@ describe('#2388 — controls (unchanged) and the withdrawn behaviour', () => {
   it('«R > r» still reads as an order between the radii', () => {
     expect(submitAll([...CTX, 'R > r'])).toHaveLength(CTX.length + 1);
   });
-  it('WITHDRAWN: «נתון מעגל O שרדיוסו K» is no longer accepted (K names a point; operator ruling, option b)', () => {
-    expect(notHandled(decideSubmit('נתון מעגל O שרדיוסו K', [], 0) as Verdict)).toBe(true);
-    expect(notHandled(decideSubmit('נתון מעגל שמרכזו O ורדיוסו K', [], 0) as Verdict)).toBe(true);
+  // #2427 (ADR-AG-325): no longer the generic not-understood — an owned refusal that teaches the lowercase letter
+  it('WITHDRAWN: «נתון מעגל O שרדיוסו K» and «x^2+y^2=K^2» are not accepted (K names a point; operator ruling, option b)', () => {
+    for (const s of ['נתון מעגל O שרדיוסו K', 'נתון מעגל שמרכזו O ורדיוסו K', 'x^2+y^2=K^2']) {
+      const v = decideSubmit(s, [], 0) as Verdict;
+      expect(v.kind === 'refused' && v.error?.key, s).toBe('capital-magnitude');
+    }
   });
 });
 
