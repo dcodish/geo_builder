@@ -42,6 +42,8 @@ import { unwrap } from './frameAnalytic';
 export const IMPERATIVE_VERBS_HE = [
   'הוסף', 'תוסיף', 'הוסיפו', 'להוסיף',
   'שרטט', 'תשרטט', 'שרטטו',
+  // #2390 (ADR-AG-314) — the exam spells «שרטטו» with ס (Q2 ב: «סרטטו במערכת צירים אחת סקיצה …»).
+  'סרטט', 'תסרטט', 'סרטטו',
   'צייר', 'תצייר', 'ציירו', 'לצייר',
   'בנה', 'תבנה', 'בנו',
   'העבר', 'תעביר',
@@ -284,6 +286,9 @@ export function constructionCandidates(raw: string): ImperativeCandidate[] {
   return done();
 }
 
+/** «במערכת צירים (אחת) סקיצה של X ושל Y» — the exam's sketch instruction (Q2 ב, #2390): X, then Y. */
+const SKETCH_FRAME = /^במערכת\s+צירים(?:\s+אחת)?\s*,?\s+(?:סקיצה|שרטוט)\s+של\s+(.+?)\s+ו(?:גם\s+)?של\s+(.+)$/;
+
 const HE_VERB = new Set<string>(IMPERATIVE_VERBS_HE);
 const EN_VERB = new Set<string>(IMPERATIVE_VERBS_EN);
 const HE_PARTICLE = new Set(PARTICLES_HE);
@@ -319,6 +324,16 @@ export function imperativeCandidates(raw: string): ImperativeCandidate[] {
   };
   push(after); // particles stripped — the tightest reading
   push(1); // the verb alone removed, in case a "particle" was really part of the sentence
+  // #2390 (ADR-AG-314) — the exam's sketch frame: «סרטטו במערכת צירים אחת סקיצה של X ושל Y» draws X and Y. The figure
+  // already holds X (the givens), so Y is the sentence to teach; «X ו-Y» is offered after it. Candidates only: the
+  // submit decision keeps whichever records (ADR-AG-206), with the exam register's already-known rule.
+  for (const c of [...out]) {
+    const sketch = SKETCH_FRAME.exec(c.remainder);
+    if (!sketch) continue;
+    for (const remainder of [sketch[2], `${sketch[1]} ו-${sketch[2]}`]) {
+      if (!out.some((o) => o.remainder === remainder)) out.push({ verb: head, remainder, exam: true });
+    }
+  }
   return out;
 }
 

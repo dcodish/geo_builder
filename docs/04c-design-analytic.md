@@ -723,6 +723,20 @@ x-axis, strict through `sideOfBound` ([ADR-AG-313](06c-decisions-analytic.md#adr
 
 *Identifiers:* `types.ts` · `CIRCLE_SLOT_SENTINELS` · `touchedCircleFacts(src, id, r?)` · `circle-new<k>` · `circle-pair<k>-1` · `-2` · `tangent-of { circleId, at }` · `beyond` · `toolLetters.ts` · `apart` · `inside` · `larger` · `cross` · `centres-side { a, b, p, q }` · `params { e }` · `circlePairQuantity` · `coord` · `θ_<id>.k/s/g/m` · `θ_<id>.r` · `circleToName` · `interchangeable` · `twoCircleCrossing` · `pluralCircleCrossing` · `readCircleSubject` · `common-tangent` · `touchPointOf` · `earlierOnCommonTangents` · `onLine` · `name-line` · `lineOverPair` · `replaceId` · `axis-cut` · `lineTriple` · `namedCommonTangent` · `parseNameLine` · `parseAxisCut`
 
+### Common tangents ([ADR-AG-314](06c-decisions-analytic.md#adr-ag-314), #2390)
+
+`common-tangent { circles, family, name }` is a closed-form line from two circles (`engine/commonTangents.ts`,
+`commonTangentLine`): unit normal n with n·u = (r₂ − r₁)/d (external) or −(r₁ + r₂)/d (internal), family `a` the tangent left
+of the directed line of centres, `b` the right; `touch` the double root of a tangent pair within `TOUCH_TOLERANCE` (1e-6,
+relative). 0 DOF, deps the two circles; a family a configuration lacks is a vacancy. M1 reads how the pair sits
+(`pairPositionOf`: the stated `circles` selectors and `tangent-circle` branches, else two determined circles measured by
+`positionOfCircles`, else `null`) and lowers `common-tangents` to `FAMILIES_OF[position]` and `common-touch-tangent` to
+one `touch` (`statedTangent` admits a tangency of unstated kind). Names: the student's or `freeLineNames` (l1, l2, …, a
+numeral taken in any notation by `nameReading`). The ask lane resolves the touch tangent by `touchTangentNoun`; the exam's
+sketch line is `SKETCH_FRAME` in `scopeAnalytic.ts`.
+
+*Identifiers:* `commonTangents.ts` · `common-tangent` · `CommonTangentFamily` · `commonTangentLine` · `TOUCH_TOLERANCE` · `FAMILIES_OF` · `PairPosition` · `positionOfCircles` · `pairPositionOf` · `statedTangent` · `circleAtProbe` · `freeLineNames` · `common-tangents` · `common-touch-tangent` · `commonTangentSet` · `touchTangentNoun` · `SKETCH_FRAME` · `no-common-tangent` · `errNoCommonTangent`
+
 ### The two tangents meet; the meet verbs; a floor that does not collapse with the figure ([ADR-AG-213](06c-decisions-analytic.md#adr-ag-213), #1620 S7)
 
 Every spelling lowers to the canonical crossing of two tangent nouns (`readTangentNoun`, `tangentsMeet`,

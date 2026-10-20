@@ -205,6 +205,8 @@ export type InputError =
   | { key: 'ambiguous-side'; detail: string }
   /** «משובע ABCDEFG» — a polygon noun built only when regular (#1622, ADR-AG-217; 2-D's #835). */
   | { key: 'polygon-not-supported'; detail: string }
+  /** #2390 (ADR-AG-314) — «כל המשיקים המשותפים» about a circle inside the other: 2-D's `input.tangentsExhaustedContained`. */
+  | { key: 'no-common-tangent'; detail: string }
   /**
    * A naming of something that already has a name (#1153) — carrying WHO holds it.
    *

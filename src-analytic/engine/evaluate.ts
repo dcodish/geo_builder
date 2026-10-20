@@ -17,6 +17,7 @@ import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
 import { evalLengthExpr, type LengthExpr } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
+import { commonTangentLine } from './commonTangents';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
 import { angleAt, dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type Direction, type SolveResult } from './solve';
@@ -615,6 +616,18 @@ function lineAtCurve(
   return n ? { kind: 'line', ...n } : null;
 }
 
+/**
+ * A COMMON TANGENT as the line it is in this configuration (#2390, ADR-AG-314) — `commonTangentLine` over the two
+ * circles `curveAtOf` resolves, so the line drawn is the line the crossings and the panel read. A circle not placed,
+ * or a family this configuration lacks, is a vacancy.
+ */
+function commonTangentAt(c: Construction, env: Env, at: (id: Id) => Pt | null, o: Extract<GeoObject, { kind: 'common-tangent' }>): NumCurve | null {
+  const curves = curveAtOf(c, env, at);
+  const p = curves(o.circles[0]);
+  const q = curves(o.circles[1]);
+  return p?.kind === 'circle' && q?.kind === 'circle' ? commonTangentLine(p, q, o.family) : null;
+}
+
 /** Carrier freedom left after the constraints — `carriers − rank(J)`, so dependent givens do not
  *  over-count (see `freeRank`). */
 /**
@@ -653,6 +666,8 @@ export function curveAtOf(c: Construction, env: Env, at?: (id: Id) => Pt | null)
     // A line CONSTRUCTED through a point is a curve to every constraint that names one (#1319) — the
     // exam's «A נקודת החיתוך של הישר l4 עם הישר 1» is an incidence on a `line-at`.
     if (o.kind === 'line-at') return at ? lineAtCurve(c, env, at, o) : null;
+    // A common tangent of two circles (#2390, ADR-AG-314): closed form from the two circles of this configuration.
+    if (o.kind === 'common-tangent') return at ? commonTangentAt(c, env, at, o) : null;
     // A circle computed from points (#1464): a curve to every constraint and crossing that names one.
     if (o.kind === 'circle-thru') return at ? circleThruCurve(o, at) : null;
     if (o.kind !== 'curve') return null;
@@ -3146,6 +3161,14 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
         if (curve) {
           curves.push({ id: o.id, label: { name: o.name ?? '', kind: 'line' }, curve, stated: o.drawn !== false });
         } else vacant.push({ id: o.id, reason: 'vacant' });
+        break;
+      }
+
+      /** A common tangent of two circles (#2390, ADR-AG-314), named by the student or the tool — listed by that name. */
+      case 'common-tangent': {
+        const curve = commonTangentAt(c, env, at, o);
+        if (curve) curves.push({ id: o.id, label: { name: o.name, kind: 'line' }, curve, stated: true });
+        else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
 

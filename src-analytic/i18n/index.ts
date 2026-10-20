@@ -347,6 +347,8 @@ const he = {
   errMeasureContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errMeasureContradictsAlone: 'לא ניתן: «{{detail}}» סותר נתון קודם — אי אפשר לקיים את שניהם יחד. הסיבה: {{what}}.',
   errRadiusContradicts: 'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד.',
+  // #2390 (ADR-AG-314) — 2-D's input.tangentsExhaustedContained, byte for byte.
+  errNoCommonTangent: 'למעגל המוכל בתוך מעגל אין אף משיק משותף.',
   // #1963 (ADR-AG-296; operator ruling 2026-10-14) — a circle through three points a statement puts on one line.
   errForcedCollinear:
     'לא ניתן: «{{detail}}» סותר את «{{declared}}» — אי אפשר לקיים את שניהם יחד. ' +
@@ -928,6 +930,7 @@ const en: typeof he = {
   errMeasureContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold. The reason: {{what}}.',
   errMeasureContradictsAlone: 'Can\'t do that: «{{detail}}» contradicts an earlier given — they can\'t both hold. The reason: {{what}}.',
   errRadiusContradicts: 'Can\'t do that: «{{detail}}» contradicts «{{declared}}» — they can\'t both hold.',
+  errNoCommonTangent: 'A circle contained inside another has no common tangent at all.',
   errForcedCollinear:
     "Can't do that: «{{detail}}» contradicts «{{declared}}» — they can't both hold. " +
     'The reason: {{points}} lie on one line, and no circle passes through three points on one line.',

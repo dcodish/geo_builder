@@ -15,6 +15,7 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'name-taken': [{ detail: '∠ABC = 40°', nameOf: 'ABC', nameKind: 'angle' }, { detail: 'AB = 3', nameOf: 'AB', nameKind: 'length' }],
   'measure-contradicts': [{ detail: '∠ABC = 40°', what: '∠ABC = 40°' }],
   'radius-contradicts': [{ detail: 'מעגל O ברדיוס 4', declared: 'מעגל O ברדיוס 3' }, { detail: 'מעגל O ברדיוס 4' }], // #2119 (ADR-684)
+  'no-common-tangent': [{ detail: 'כל המשיקים המשותפים לשני המעגלים' }], // #2390 (ADR-AG-314)
   'forced-collinear': [{ detail: 'מעגל שעובר דרך A, D ו-B', declaredLines: ['D על AB'], collinear: ['A', 'D', 'B'] }, { detail: 'מעגל שעובר דרך A, D ו-E', declaredLines: ['D על AB', 'E על AB'], collinear: ['A', 'D', 'E'] }], // #1963 (ADR-AG-296)
   'split-statements': [{ parts: ['משולש ABC', 'ישר זווית ב-B'] }, { parts: ['משולש ABC', 'ישר זווית ב-B'], teach: { triangle: 'משולש ABC', angle: '∠ABC = 90°' } }],
   'bad-equation': [{}],

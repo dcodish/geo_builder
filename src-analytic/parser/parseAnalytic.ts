@@ -3637,6 +3637,9 @@ function parseCircleFamilies(raw: string): RuleOutcome {
   // «הישר l משיק למעגלים N1 ו-N2 בנקודות P ו-Q בהתאמה» — the same common tangent, its line named l (#2392).
   const namedTangent = namedCommonTangent(g, line);
   if (namedTangent) return namedTangent;
+  // «כל המשיקים המשותפים לשני המעגלים», «המשיק העובר בנקודה המשותפת לשני המעגלים» — the set and the touch tangent (#2390).
+  const tangentSet = commonTangentSet(g, line);
+  if (tangentSet) return tangentSet;
 
   // «מנקודה A יוצאים שני משיקים לשני המעגלים» — the two common tangents through A (2-D's B, C and D, E their touches).
   const fromA =
@@ -6559,6 +6562,52 @@ function parseAxisCut(line: string): RuleOutcome {
   if (!side || side.of !== ofRaw.toLowerCase() || side.of === axis) return null;
   if (name.length === 2 && name[0] === name[1]) return refuse('repeated-vertex', line);
   return made([{ t: 'selector', sel: { kind: 'axis-cut', line: axisCutLine(name), axis, greater: side.greater }, src: line }]);
+}
+
+/**
+ * «כל המשיקים המשותפים לשני המעגלים» · «המשיקים המשותפים למעגלים O ו-P» · «… המשותפים l1, l2 ו-l3 …» · "(all) (the)
+ * common tangents of the two circles" — EVERY COMMON TANGENT OF THE PAIR (#2390, ADR-AG-314). How many, and which, is
+ * M1's question (`common-tangents`, read off how the pair sits); the names are the student's, or the tool's l1, l2, ….
+ */
+const LINE_NAMES_HE = `(${FREE_LINE_NAME}(?:\\s*,\\s*${FREE_LINE_NAME})*${AND_HE}${FREE_LINE_NAME})`;
+const LINE_NAMES_EN = `(${FREE_LINE_NAME}(?:\\s*,\\s*${FREE_LINE_NAME})*${AND_ANY}${FREE_LINE_NAME})`;
+const TANGENT_SET_HE = new RegExp(`^(?:כל\\s+)?ה?משיקים\\s+ה?משותפים(?:\\s+${LINE_NAMES_HE})?\\s+(ל.+)$`);
+const TANGENT_SET_EN = new RegExp(`^(?:all\\s+)?(?:the\\s+)?common\\s+tangents(?:\\s+${LINE_NAMES_EN})?\\s+((?:of|to)\\s+.+)$`, 'i');
+/**
+ * «המשיק העובר בנקודה המשותפת לשני המעגלים» · «המשיק בנקודת ההשקה של המעגלים» · «המשיק המשותף בנקודת ההשקה» · "the
+ * tangent through the common point of the two circles" · "the common tangent at the touch point" — THE TANGENT AT THE
+ * TOUCHING CIRCLES' COMMON POINT (#2390, ADR-AG-314), with an optional name («המשיק l …»). For a pair that does not touch,
+ * M1 leaves it to the model, as before.
+ */
+const TOUCH_TANGENT_HE = new RegExp(
+  `^ה?משיק(?:\\s+ה?משותף)?(?:\\s+(${FREE_LINE_NAME}))?\\s+(?:ה?עובר\\s+)?ב(?:נקודה\\s+ה?משותפת|נקודת\\s+ההשקה)(?:\\s+(ל(?:שני\\s+)?ה?מעגלים.*|של\\s+(?:שני\\s+)?ה?מעגלים.*))?$`,
+);
+const TOUCH_TANGENT_EN = new RegExp(
+  `^(?:the\\s+)?(?:common\\s+)?tangent(?:\\s+(${FREE_LINE_NAME}))?\\s+(?:(?:that\\s+)?(?:passes\\s+|passing\\s+)?through|at)\\s+the\\s+(?:common|touch(?:ing)?|tangency)\\s+point(?:\\s+((?:of|to)\\s+(?:the\\s+)?(?:two\\s+|both\\s+)?circles.*))?$`,
+  'i',
+);
+/** Does `phrase` name the tangent at the touching circles' common point — the ask lane's noun (#2390)? Its optional name, or ''. */
+export function touchTangentNoun(phrase: string): string | null {
+  const m = TOUCH_TANGENT_HE.exec(trim(phrase)) ?? TOUCH_TANGENT_EN.exec(trim(phrase));
+  return m ? (m[1] ?? '') : null;
+}
+
+function commonTangentSet(g: string, line: string): RuleOutcome {
+  const set = TANGENT_SET_HE.exec(g) ?? TANGENT_SET_EN.exec(g);
+  if (set) {
+    const slots = twoCircleSlots(set[2]);
+    if (!slots) return null;
+    const names = set[1] ? set[1].split(new RegExp(`\\s*,\\s*|${AND_ANY}`)).map(trim).filter(Boolean) : undefined;
+    if (names && new Set(names).size !== names.length) return refuse('repeated-vertex', line);
+    return aboutCircles(slots, [{ t: 'common-tangents', circles: [SLOT1, SLOT2], ...(names ? { names } : {}), src: line }], line);
+  }
+  const touch = TOUCH_TANGENT_HE.exec(g) ?? TOUCH_TANGENT_EN.exec(g);
+  if (!touch) return null;
+  const target = touch[2] ? trim(touch[2]) : undefined;
+  const slots: CircleSlot[] | null =
+    !target || /^(?:ל|של\s+)(?:שני\s+)?ה?מעגלים$|^(?:of|to)\s+(?:the\s+)?(?:two\s+|both\s+)?circles$/i.test(target) ? [{ k: 'the' }, { k: 'the' }] : twoCircleSlots(target);
+  if (!slots) return null;
+  return aboutCircles(slots, [{ t: 'common-touch-tangent', circles: [SLOT1, SLOT2], ...(touch[1] ? { name: touch[1] } : {}), src: line }], line);
 }
 
 function parseThroughLine(line: string): RuleOutcome {

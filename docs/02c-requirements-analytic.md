@@ -454,6 +454,14 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «הישר l חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x» keeps the configurations whose crossing is there and adds no point; likewise «מתחת ל…», «… ציר ה-x … מימין / משמאל לציר ה-y», «… חותך את החלק החיובי / השלילי של ציר ה-y / x», English. A side no configuration has is refused «לא נמצאה תצורה…»; a line parallel to that axis meets it nowhere; «… בנקודה B» still names the crossing B
 - Sources: ADR-AG-313, #2392, #2390, #2379.
 
+**R181 — every common tangent of two circles in one sentence, each named; the tangent at the touching circles' common point**. *(Operator ruling 2026-10-20 on #2390: "we should name them so the user can refer to them later"; #2379.)*
+- «כל המשיקים המשותפים לשני המעגלים» (also «המשיקים המשותפים …», «… למעגלים M ו-N», English) draws every common tangent by how the circles sit: 4 apart, 3 externally tangent, 2 crossing, 1 internally tangent. Each is a full line with its equation row. Q2: l1: x − 2.83y + 5 = 0, l2: x + 2.83y + 5 = 0, l3: x − 7 = 0
+- the names are the student's («המשיקים המשותפים l1, l2 ו-l3 לשני המעגלים»), else the next free l1, l2, … external first («l1», «ישר 1» and «I» count as one name); they are on screen from the start, so a later «הישר l2 …» means that tangent and a new «הישר l1: …» is refused as a name already taken; a count of names that does not match is refused «לא נמצאה תצורה…»
+- a circle inside the other is refused «למעגל המוכל בתוך מעגל אין אף משיק משותף.» (2-D's sentence); when the givens do not say how the circles sit («שני מעגלים», «המעגלים משיקים» with no מבחוץ / מבפנים) the sentence goes to the AI, as before
+- «המשיק העובר בנקודה המשותפת לשני המעגלים», «המשיק בנקודת ההשקה של המעגלים», «המשיק המשותף בנקודת ההשקה» (English too, optionally named «המשיק l …») draw the tangent at the touching circles' common point; for circles that cross or are apart, the AI as before. The ask «משוואת המשיק העובר בנקודה המשותפת לשני המעגלים» answers its equation
+- the exam's «סרטטו במערכת צירים אחת סקיצה של שני המעגלים ושל כל המשיקים המשותפים לשני המעגלים», and «סרטטו …» spelled with ס, are taught as the sentence they wrap
+- Sources: ADR-AG-314, #2390, #2379.
+
 **R163 — arcs, sectors, semicircles and the diameter from a point build as they do in the 2-D tool**. *(Operator ruling: analytic gives 2-D's verdict, and the arc rows are ported.)* An arc's measure is its central angle.
 - «קשת AB = 40 במעגל O», «⌢{AC} = 60°»
 - «חצי מעגל שקוטרו AB», «גזרה AOB בזווית 80»
