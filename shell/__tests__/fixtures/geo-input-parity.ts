@@ -300,6 +300,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2415': 'open', // #2391 (ADR-AG-315): 2-D does not read «M מקיימת …», the centres' distance by role, or the distributed named circle pair
   '#2420': 'open', // #2391 (ADR-AG-315): 3-D does not read «M מקיימת …» or an underscore index «N_2»
   '#2421': 'open', // #2388 (ADR-AG-307): 2-D does not read «R = 2r», «r:R = 1:2» or the unnamed ratio of two radii
+  '#2430': 'open', // #2418 (ADR-AG-321): 2-D refuses «T על AB» typed after «AB משיק משותף …» (the reverse order), awaiting the cross-tool ruling
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1694,6 +1695,17 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2385 (ADR-AG-312): a common tangent through the circles' stated touch point is the tangent at it ──
   { id: 'common-tangent-through-touch-2385', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'T על AB', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', note: '2-D builds it since ADR-740 (#2407); analytic since ADR-AG-312 (#2385)' },
+
+  // ── #2418 (ADR-AG-321): the common tangent reads a LATER line that pins it to the touch point; the pair's only tangent ──
+  { id: 'common-tangent-later-pin-2418', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'AB משיק משותף למעגלים M ו-N', 'T על AB'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2430' }], note: 'the reverse order of #2385; 2-D refuses it (over-constrained), its twin #2430 awaits the cross-tool ruling' },
+  { id: 'common-tangent-internal-touch-alone-2418', family: 'tangents', steps: ['מעגל O', 'מעגל K', 'מעגל O ומעגל K משיקים מבפנים בנקודה T', 'AB משיק משותף למעגלים O ו-K'], expect: 'builds', exception: 'X8', note: '2-D draws tan-T (ADR-740); analytic did not before ADR-AG-321' },
+
+  // ── #2397 (ADR-AG-322): two circles introduced before they are described — the pair a tangency sentence draws ──
+  { id: 'pair-tangent-first-2397', family: 'circles', steps: ['נתונים שני מעגלים המשיקים זה לזה מבחוץ'], expect: 'builds', exception: 'X8', note: 'analytic refused it on an empty canvas before ADR-AG-322' },
+  { id: 'pair-tangent-internal-first-2397', family: 'circles', steps: ['שני מעגלים משיקים מבפנים'], expect: 'builds', exception: 'X8', note: 'analytic refused it on an empty canvas before ADR-AG-322' },
+  { id: 'the-circles-tangent-empty-2397', family: 'circles', steps: ['המעגלים משיקים מבחוץ'], expect: 'builds', exception: 'X8', note: 'analytic refused it on an empty canvas before ADR-AG-322' },
+  { id: 'pair-tangent-named-by-order-2397', family: 'circles', steps: ['שני מעגלים משיקים מבחוץ', 'O מרכז המעגל', 'P מרכז המעגל'], expect: 'builds', exception: 'X8', note: 'a tangent pair is named by order (the #1688 ruling); analytic asked which before ADR-AG-322' },
+  { id: 'pair-internal-asks-2397', family: 'circles', steps: ['שני מעגלים משיקים מבפנים', 'O מרכז המעגל'], expect: 'asks', exception: 'X8', note: 'circles touching from inside are told apart (one inside the other): both builders ask which' },
 
   // ── #2390 (ADR-AG-314): every common tangent in one sentence; the tangent at the touching circles' common point ──
   { id: 'all-common-tangents-2390', family: 'tangents', steps: ['שני מעגלים זרים', 'כל המשיקים המשותפים לשני המעגלים'], expect: 'builds', exception: 'X8', note: 'the verdicts agree; the drawing does not: 2-D draws ONE tangent (found work, filed with #2390), analytic draws the four' },

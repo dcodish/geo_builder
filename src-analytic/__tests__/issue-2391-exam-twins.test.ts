@@ -69,9 +69,10 @@ const ROWS: Row[] = [
   { row: '8', needs: PAIR, exam: 'נתונים שני מעגלים המשיקים זה לזה מבחוץ', twins: ['המעגלים משיקים מבחוץ'] },
   { row: '8', needs: PAIR, exam: 'the two circles touch each other externally', twins: ['the two circles are externally tangent'] },
   // Row 10 — A2: a circle with no name, named by its centre and stated by its equation.
-  { row: '10', needs: [], exam: 'מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא (x − a)² + y² = r²', twins: ['M מרכז המעגל (x − a)² + y² = r²'] },
-  { row: '10', needs: [], exam: 'מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא (x − a)² + y² = r², a הוא פרמטר חיובי.', twins: ['M מרכז המעגל (x − a)² + y² = r²', 'a הוא פרמטר חיובי'] },
-  { row: '10', needs: [], exam: 'מרכזו של המעגל האחר הוא בנקודה N ומשוואתו היא (x − 13)² + y² = r²', twins: ['N מרכז המעגל (x − 13)² + y² = r²'] },
+  // Row 10's ordinal rides the fact as `ofPair` (#2397, ADR-AG-322): its facts differ by that mark, its verdict and figure do not.
+  { row: '10', needs: [], exam: 'מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא (x − a)² + y² = r²', twins: ['M מרכז המעגל (x − a)² + y² = r²'], factsDiffer: true },
+  { row: '10', needs: [], exam: 'מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא (x − a)² + y² = r², a הוא פרמטר חיובי.', twins: ['M מרכז המעגל (x − a)² + y² = r²', 'a הוא פרמטר חיובי'], factsDiffer: true },
+  { row: '10', needs: [], exam: 'מרכזו של המעגל האחר הוא בנקודה N ומשוואתו היא (x − 13)² + y² = r²', twins: ['N מרכז המעגל (x − 13)² + y² = r²'], factsDiffer: true },
   { row: '10', needs: [], exam: 'נתון מעגל שמרכזו M ומשוואתו (x-a)^2+y^2=r^2', twins: ['M מרכז המעגל (x-a)^2+y^2=r^2'] },
   // Row 11 — B1: the measure between the centres. The segment spelling draws the segment (it names it); the distance
   // spelling names nothing (operator ruling 2026-10-02, ADR-AG-200), so its twin is the distance sentence.
@@ -227,8 +228,13 @@ describe('#2391 — controls: what the rewrites must NOT read', () => {
     expect(factsOf('נתונים שני מעגלים המשיקים זה לזה מבחוץ')).toEqual(factsOf('שני מעגלים המשיקים זה לזה מבחוץ'));
   });
 
-  it('the twin of an empty-canvas «נתונים שני מעגלים …» is refused alike (introducing the pair is #2397)', () => {
-    expect(decideSubmit('נתונים שני מעגלים המשיקים זה לזה מבחוץ', [], 0)).toMatchObject({ kind: 'refused', error: { key: 'ambiguous-shape' } });
-    expect(decideSubmit('המעגלים משיקים מבחוץ', [], 0)).toMatchObject({ kind: 'refused', error: { key: 'ambiguous-shape' } });
+  // Re-based by #2397 (ADR-AG-322; operator ruling 2026-10-20, "it should be accepted as a first sentance too"): on an empty
+  // canvas the sentence and its twin both DRAW the pair. The old refusal is kept where it still holds: beside one circle.
+  it('the twin of an empty-canvas «נתונים שני מעגלים …» draws the pair alike (#2397); beside one circle both are refused', () => {
+    expect(decideSubmit('נתונים שני מעגלים המשיקים זה לזה מבחוץ', [], 0)).toMatchObject({ kind: 'record' });
+    expect(decideSubmit('המעגלים משיקים מבחוץ', [], 0)).toMatchObject({ kind: 'record' });
+    const one = ['נתון מעגל שמרכזו M ורדיוסו 3'];
+    expect(decideSubmit('נתונים שני מעגלים המשיקים זה לזה מבחוץ', one, 0)).toMatchObject({ kind: 'refused', error: { key: 'ambiguous-shape' } });
+    expect(decideSubmit('המעגלים משיקים מבחוץ', one, 0)).toMatchObject({ kind: 'refused', error: { key: 'ambiguous-shape' } });
   });
 });

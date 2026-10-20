@@ -1191,6 +1191,8 @@ const CENTRE_EN = new RegExp(
 const CENTRE_CTX_HE = new RegExp(
   `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מרכז\\s+(?:של\\s+)?ה?מעגל(?:\\s+(?:${HE_EQ_OF}${HE_IS}\\s*:?\\s*)?(.+))?$`,
 );
+/** «המעגל האחד / האחר / הראשון / השני» — one circle of a pair (#2397, ADR-AG-322), before the equation it is described by. */
+const PAIR_ORDINAL = /^ה?(?:אחד|אחר|ראשון|שני)\s+(?=\S)/;
 const CENTRE_CTX_EN = new RegExp(
   `^(?:[Tt]he\\s+)?(?:[Pp]oint\\s+)?(${NAME})\\s+is\\s+the\\s+cent(?:re|er)\\s+of\\s+the\\s+circle(?:\\s+(?:whose\\s+equation\\s+is\\s+)?(.+))?$`,
 );
@@ -1215,12 +1217,14 @@ function centreOfCircle(line: string): RuleOutcome {
   // it describes a circle the figure must already have, so it creates nothing.
   if (readDescribedCircle(trim(tail))) return made([{ t: 'centre-of', id, circle: trim(tail), src: line }]);
   // A tail must be the circle's EQUATION (in the plane's variables) — anything else is not this sentence.
-  const src = trim(tail);
+  // An ordinal before it says the circle is one of a pair the figure drew (#2397): it rides the fact as `ofPair`.
+  const ordinal = PAIR_ORDINAL.exec(trim(tail));
+  const src = trim(ordinal ? trim(tail).slice(ordinal[0].length) : tail);
   if (!src.includes('=')) return null;
   const eq = equationExpr(src);
   if (!eq || !symbolsOf(eq).some((s) => RESERVED_SYMBOLS.has(s))) return null;
   const create = created(`נתון מעגל ${id} שמשוואתו ${src}`);
-  return made([{ t: 'centre-of', id, eq, ...(create ? { create } : {}), src: line }]);
+  return made([{ t: 'centre-of', id, eq, ...(create ? { create } : {}), ...(ordinal ? { ofPair: true as const } : {}), src: line }]);
 }
 
 /**
@@ -3422,7 +3426,7 @@ const touchAt = (slot: string, at: Id, a: Id, b: Id, src: string): Fact => ({
 function commonTangentFacts(a: Id, b: Id, s1: string, s2: string, kind: 'external' | 'internal' | undefined, src: string, name?: string): Fact[] {
   return [
     ...declareAll([a, b], src),
-    { t: 'common-tangent', a, b, circles: [s1, s2], ...(name !== undefined ? { name } : {}), src },
+    { t: 'common-tangent', a, b, circles: [s1, s2], ...(name !== undefined ? { name } : {}), ...(kind ? { kind } : {}), src },
     { t: 'selector', sel: { kind: 'distinct', ids: [a, b] }, src },
     ...(kind ? [{ t: 'selector' as const, sel: { kind: 'sign' as const, q: { k: 'centres-side' as const, a: s1, b: s2, p: a, q: b }, positive: kind === 'external' }, src }] : []),
   ];
@@ -3970,6 +3974,29 @@ function circleSubjectFacts(subject: CircleSubject, objectText: string | null, m
   }
   // «המעגלים (O ו-M) משיקים (זה לזה) (מבחוץ) (בנקודה T)» — the two circles touch each other.
   const [a, b] = subject.names;
+  /*
+   * THE UNNAMED PAIR (#2397, ADR-AG-322): «(נתונים) (שני) (ה)מעגלים (ה)משיקים …» lowers as the plural crossing does
+   * (ADR-AG-300) — over the two `the` slots of `circles-about`, the one resolver for "the two circles": two bind, none
+   * are DRAWN (the pair a first-line sentence introduces), any other count asks which.
+   */
+  if (a === undefined && b === undefined) {
+    return [
+      {
+        t: 'circles-about',
+        slots: [{ k: 'the' }, { k: 'the' }],
+        about: [
+          {
+            t: 'tangent-circles',
+            circles: [SLOT1, SLOT2],
+            ...(mods.branch ? { branch: mods.branch } : {}),
+            ...(mods.at ? { at: mods.at } : {}),
+            src: line,
+          },
+        ],
+        src: line,
+      },
+    ];
+  }
   return [
     ...introduce(NO_TARGETS),
     {

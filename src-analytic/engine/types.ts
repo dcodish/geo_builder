@@ -466,15 +466,19 @@ export type Fact =
    * point on the line ab (one of its letters, or a point the figure places on ab), the line is the tangent AT that point;
    * otherwise `a` touches the first circle and `b` the second (the lowering every common tangent had before).
    *
-   * `onLine` is written by the fold, never the parser: the points the student's EARLIER lines put on the line ab. The
-   * fold applies such a line AFTER this one when this one is what declares a and b («T על AB» typed first waits, in the
-   * deferral fixpoint, for the line that defines A and B), so the figure M1 holds here cannot show it.
+   * `onLine` is written by the fold, never the parser: the points the student's OTHER lines put on the line ab, in any
+   * order (#2418, ADR-AG-321; it was only the earlier lines under ADR-AG-312). The fold applies an earlier such line
+   * AFTER this one when this one is what declares a and b («T על AB» typed first waits, in the deferral fixpoint, for
+   * the line that defines A and B), and a later one after it by position, so the figure M1 holds here cannot show it.
+   *
+   * `kind` (#2418) is the stated kind («חיצוני» / «פנימי»): M1 reads it with how the pair sits — circles touching from
+   * inside, or the internal tangent of circles touching from outside, have only the tangent at the touch point.
    *
    * `name` (#2392, ADR-AG-313) is the line's own name when the sentence gave one («הישר l משיק למעגלים N1 ו-N2 בנקודות
    * P ו-Q»). The common tangent is a LINE: M1 draws it as the `line-at` through a along a→b, named `name` or the pair,
    * and a name the figure already holds as a line is that line (the touches are stated on it, no second line).
    */
-  | (FactBase & { t: 'common-tangent'; a: Id; b: Id; circles: [Id, Id]; onLine?: Id[]; name?: string })
+  | (FactBase & { t: 'common-tangent'; a: Id; b: Id; circles: [Id, Id]; onLine?: Id[]; name?: string; kind?: 'external' | 'internal' })
   /**
    * «נסמן את הישר PQ ב-l» — THE LINE THROUGH a AND b TAKES THE NAME `name` (#2392, ADR-AG-313), the line twin of «נסמן
    * את שטח ABCD ב-S». Which line is M1's question: the figure's line through the pair (it is re-named), or, when the
@@ -535,7 +539,12 @@ export type Fact =
    * the apply boundary lowers to a `choice` over both (#1049, ADR-052). `at` names the touch
    * point when the sentence did («…בנקודה T») — a `touch-point` derived point (amendment 1).
    */
-  | (FactBase & { t: 'tangent-circles'; a?: string; b?: string; branch?: 'external' | 'internal'; at?: Id })
+  /**
+   * `circles` (#2397, ADR-AG-322): the two circles BY ID, written over the circle-slot sentinels inside `circles-about`
+   * — the plural subject «(שני) המעגלים משיקים …» resolves its pair through the one slot resolver (two bind, none are
+   * drawn), as the plural crossing does. `a` / `b` are the names a sentence wrote.
+   */
+  | (FactBase & { t: 'tangent-circles'; a?: string; b?: string; circles?: [Id, Id]; branch?: 'external' | 'internal'; at?: Id })
   /**
    * «היחס בין אורכי הרדיוסים של המעגלים (M ו-N) הוא p:q» — the ratio of two circles' radii (#2388, ADR-AG-307), `k` = p/q.
    * Which circles is M1's question (`circleByName`, or the figure's exactly two); named circles are ORDERED (r(a) = k·r(b)),
@@ -595,7 +604,12 @@ export type Fact =
    * `circle` (#1663, ADR-AG-203) — the circle by NAME, through the one name chain (`circleByName`): a numeral, a
    * centre letter, or a described circle («⊙ABC», «○ABC» — «X מרכז המעגל החוסם את המשולש ABC»).
    */
-  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[]; circleId?: Id; circle?: string })
+  /**
+   * `ofPair` (#2397, ADR-AG-322): the sentence said «המעגל האחד / האחר / הראשון / השני» — the circle it describes is one
+   * of a pair the figure drew. With no curve of that equation, M1 names the centre on the drawn circle by order and gives
+   * it the equation; with no drawn circles it creates the circle, as without the ordinal.
+   */
+  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[]; circleId?: Id; circle?: string; ofPair?: true })
   /**
    * A sentence that uses «מרכז המעגל» as a POINT (#1619 B1) — «CD עובר דרך מרכז המעגל». The parser lowers
    * the sentence with `CENTRE_SENTINEL` in the centre's place; M1 resolves which point the centre IS and
