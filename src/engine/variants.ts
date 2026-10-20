@@ -32,7 +32,8 @@ export function variantCountOf(cmd: AnyCommand): number {
   // #2200 (ADR-712): the cases are the ones the sentence admits — equal radii admit no containment.
   if (cmd.type === 'set-circle-position') return cmd.relation === 'any' ? (cmd.admits?.length ?? 3) : 1;
   // A common tangent's UNSTATED basin (#197 Am.): all 4 tangents; a stated kind keeps its 2.
-  if (cmd.type === 'common-tangent') return cmd.kind ? 2 : 4;
+  // #2407 (ADR-740): the tangent AT the touch point is ONE line — its record has no basin to cycle.
+  if (cmd.type === 'common-tangent') return cmd.at !== undefined ? 1 : cmd.kind ? 2 : 4;
   // A stated angle value that fits several angles — the acute and obtuse root of a sine (#1711).
   const roots = angleRoots(cmd);
   if (roots) return roots.length;

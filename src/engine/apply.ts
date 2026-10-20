@@ -2763,6 +2763,66 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // then polishes via the radius-⟂-tangent constraints). A kind-less first tangent (no avoid) is left
       // to the solver exactly as before — byte-identical behaviour for the existing ADR-239 form.
       // (#197 Am.) ALWAYS seat — a kind-less tangent's basin is the cyclable VARIANT (all 4).
+      if (cmd.at !== undefined) {
+        // #2407 (ADR-740) — the tangent AT the pair's touch point, named by EXISTING letters on a line through it
+        // («T על AB» · «AB משיק משותף…», or «TB …»). Each FREE letter (a free point, or one solved only by the stated
+        // collinearity through T) becomes a rider ON the drawn tangent at T (`on-line`, exactly as the named-touch
+        // form's fresh letters are — «AB משיק משותף … בנקודה T»), at its signed distance from T along the stated line,
+        // so |TA|, |TB| and a stated A–T–B order survive and the radius ⟂ holds by construction at every sample.
+        // Measured: a free carrier solving the ⟂ collapsed onto T at samples whose stated line ran along the centre
+        // line, and the generic carrier choice took the circle's free centre and moved the circles. A letter something
+        // else places is not moved, and the ⟂ (centre1·T ⟂ a·b) is then the plain M1 statement. One configuration
+        // (variants.ts); no kind, no avoid.
+        const at = cmd.at;
+        const circ = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle1);
+        if (!circ) break; // a dangling circle — the verifier/pending machinery reports it
+        const line = objects.find((o): o is Extract<GeoObject, { kind: 'line' }> => o.kind === 'line' && o.spec.via === 'tangent' && o.spec.at === at);
+        const lineCircle = line && line.spec.via === 'tangent' ? objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === (line.spec as { circle: Id }).circle) : undefined;
+        const T = pos.get(at);
+        const C = lineCircle && pos.get(lineCircle.center);
+        const pa = cmd.a === at ? T : pos.get(cmd.a);
+        const pb = pos.get(cmd.b);
+        let seatedAll = false;
+        let seatedAny = false;
+        if (line && T && C && pa && pb && dist(T, C) > 1e-9 && dist(pa, pb) > 1e-9) {
+          const rl = dist(T, C);
+          const d = { x: -(T.y - C.y) / rl, y: (T.x - C.x) / rl }; // the line's own direction (rot90 of the radius)
+          const el = dist(pa, pb);
+          const e = { x: (pb.x - pa.x) / el, y: (pb.y - pa.y) / el }; // the stated line's direction, a → b
+          const flip = e.x * d.x + e.y * d.y < 0 ? -1 : 1; // turn e onto the nearer of ±d (a tie keeps +d)
+          const seatable = (o: GeoObject | undefined): o is Extract<GeoObject, { kind: 'free-point' }> => {
+            if (o?.kind !== 'free-point' || o.pinned || o.rigid) return false;
+            const k = o.solve?.constraint;
+            return !k || (k.type === 'collinear' && [k.a, k.b, k.c].includes(at)) || (k.type === 'collinear-order' && k.points.includes(at));
+          };
+          seatedAll = true;
+          for (const id of [cmd.a, cmd.b]) {
+            if (id === at) continue;
+            const i = objects.findIndex((o) => o.id === id);
+            const o = objects[i];
+            const p = pos.get(id);
+            if (!seatable(o) || !p || wouldInvertDependency(objects, id, [line.id])) {
+              seatedAll = false;
+              continue;
+            }
+            const t = (p.x - T.x) * e.x + (p.y - T.y) * e.y; // signed distance from T along the stated line
+            objects[i] = { kind: 'on-line', id, line: line.id, offset: flip * t };
+            seatedAny = true;
+          }
+          // The seats are read off the DRAWN touch. A free radius whose solved value differs from its seed (a region
+          // given recruited it — «T על AB» over default endpoints) is re-seeded at the drawn value, as the two-touch
+          // basin seats its θs: still a free DOF, but the solve starts where the student sees the figure, so T and the
+          // radii stay put instead of relaxing toward the old seed once the region given holds by construction.
+          if (seatedAny) for (const id of [cmd.circle1, cmd.circle2]) {
+            const ci = objects.findIndex((o) => o.kind === 'circle' && o.id === id);
+            const cc = objects[ci] as Extract<GeoObject, { kind: 'circle' }> | undefined;
+            const cp = cc && pos.get(cc.center);
+            if (cc && cp && cc.radius.via === 'free') objects[ci] = { ...cc, radius: { via: 'free', value: dist(cp, T) } };
+          }
+        }
+        if (!seatedAll) driveOrCheck(objects, constraints, { type: 'perpendicular', a: circ.center, b: at, c: cmd.a, d: cmd.b });
+        break;
+      }
       const c1 = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle1);
       const c2 = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle2);
       const p1 = c1 && pos.get(c1.center);

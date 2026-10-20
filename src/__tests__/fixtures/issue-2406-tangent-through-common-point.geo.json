@@ -1,0 +1,82 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-20T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "5BrNJ8OzMaYMGDWptu3wp",
+      "utterance": "מעגל O",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "yQR62LWwP1JYigk_oLkTY",
+      "utterance": "מעגל P",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "Sl5PV7rFnm9X9OnvQfVDf",
+      "utterance": "המעגלים משיקים בנקודה T",
+      "cmd": {
+        "type": "circles-tangent",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "at": "T",
+        "external": true,
+        "kindStated": false
+      },
+      "enabled": true
+    },
+    {
+      "id": "yuEhtfyXH5PwgboKDW8Ax",
+      "utterance": "המשיק העובר בנקודה המשותפת לשני המעגלים",
+      "group": "L4N9tJblDAcWXl-qJIj3A",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "T",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "yTZFUVYVCAMqJaRvtIVfq",
+      "utterance": "המשיק העובר בנקודה המשותפת לשני המעגלים",
+      "group": "L4N9tJblDAcWXl-qJIj3A",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "T",
+        "circle": "circle-P"
+      },
+      "enabled": true
+    },
+    {
+      "id": "fRU2fylyp7ET8S7mdUQG5",
+      "utterance": "המשיק העובר בנקודה המשותפת לשני המעגלים",
+      "group": "L4N9tJblDAcWXl-qJIj3A",
+      "cmd": {
+        "type": "tangent",
+        "id": "tan-T",
+        "circle": "circle-O",
+        "at": "T",
+        "visible": true
+      },
+      "enabled": true
+    }
+  ]
+}

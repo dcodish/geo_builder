@@ -1294,7 +1294,7 @@ export type Command =
   // common tangents of the same pair (the #142 repetition pattern: a repeated «משיק משותף חיצוני» takes
   // the OTHER tangent) — the new touches must stay distinct from each avoided one, and apply seeds the
   // touch riders' θ into an untaken analytic tangent basin so the default lands right.
-  | { type: 'common-tangent'; a: Id; b: Id; circle1: Id; circle2: Id; kind?: 'external' | 'internal'; avoid?: Id[]; variant?: number }; // variant: WHICH tangent basin — kind-less cycles all 4, kind-stated cycles the 2 of its kind (ADR-052/M4)
+  | { type: 'common-tangent'; a: Id; b: Id; circle1: Id; circle2: Id; kind?: 'external' | 'internal'; avoid?: Id[]; variant?: number; at?: Id }; // variant: WHICH tangent basin — kind-less cycles all 4, kind-stated cycles the 2 of its kind (ADR-052/M4). at (#2407, ADR-740): the tangent AT the pair's touch point — the letters a, b are existing points on a line through it, seated onto the tangent there; ONE configuration
 
 /**
  * A measure's value: either a literal number, or `coef · var` where `var` is a

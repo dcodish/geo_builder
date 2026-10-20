@@ -18874,3 +18874,73 @@ Fixtures `regular-pentagon-definite-2265` and `regular-pentagon-named-2265` hold
 **Locks.** Fixtures `chord-tangent-other-circle-2197`, `diameter-tangent-other-circle-2197`; class test `src/app/__tests__/issue-2197-role-pair-two-circles.test.ts` (every spelling at seeds 0–3 on the replayed positions, the one line = the two lines seed for seed, the diameter through its centre, row 9, the 24-seed whole-rate, the named-touch forms, the role-pair rows never green with a role dropped, the controls, Net A's predicate, the shared verdict, and the ✎ rows); scenario `compound-line-all-or-none-1798` re-based to assert the geometry.
 
 **Behaviour change for a student:** «AB מיתר במעגל O ומשיק למעגל P» (and its spellings, the English and the swapped circles) now draws the chord AB of circle O touching circle P inside AB — the unsized circle P grows to touch, as with the two lines — where before AB was missing and a tangent from P to circle O was drawn. «AB קוטר במעגל O ומשיק למעגל P» draws a diameter of O touching P (before: A and B on one point), and «… בנקודה B» builds (before: refused). The ✎ editor checks the same clauses.
+
+## ADR-740 — A common tangent through the circles' touch point is the tangent AT the touch: one resolver (a named point, the role phrase, the line's own letters through the touch) and one lowering for every at-touch exit; existing letters are seated before the ⟂; a presupposed pair's letters name a drawn unnamed pair (#2407, #2406)
+
+**Status:** accepted · 2026-10-20 · bug (P1, 2-D) · fix round #2414, stream G · branch `fix/2407-2d-common-tangent-at-touch` off `main` @ 3cae7f25 · plan: the 2026-10-20 fix plan on #2407 (covers #2406) · **Amends** [ADR-359](#adr-359) Am. 5 (the role lexicon; the touch read from the stated tangency) and Am. 7/8 (their exit drops nothing) · cites [ADR-347](#adr-347) and [ADR-565](#adr-565) decision 7 (interchangeable circles name by order), [ADR-672](#adr-672) (#2188's memberships at the stated touch), [ADR-735](#adr-735) (the label accountant's rule 3) · LADDER stage: parse (`commonTangent`'s decomposition — docs/17 §4, "a better decomposition when it knows the target exists") and the existing `common-tangent` apply seat (#197 Am. 4's seat-before-⟂ position); no new stage
+
+**Operator:** 2026-10-20 on #2385: *"running this on 2d the behavior is wrong and is a P1 in itself since it draws the wrong line and says its impossible. so we need this fixed in this session for 2d"*. Scope (the same ruling's transcription): the ruled case is an existing letter that is the circles' touch point; other existing points keep 2-D's behaviour (they are pulled onto the circles as touches).
+
+**Requirements:** [02](02-requirements.md) **FR-EN-3** (a common tangent through the pair's touch point is the tangent at it) · **FR-RN-8** (a common tangent's circle letters name a drawn unnamed pair, in order) · **Design:** [04](04-design.md) §*The common tangent at the touch* · [docs/17](17-design-rules.md) §3b (`collinearWith` joins the semantic fields)
+
+**Measured before** (`3cae7f25`, `decideDeterministic2D` → `commitVerdict` → `replay`, model mocked; "tangent" = |dist(centre, line) − r| < 1e-3, computed in the probe):
+- the operator's «שני מעגלים» · «המעגלים משיקים בנקודה T» · «T על AB» · «AB משיק משותף למעגלים M ו-N» committed green with **four** circles: M and N new, AB tangent to them and **cutting** the drawn pair at T. In a real browser at the same commit (`scripts/lib/browser-harness.mjs`, model stubbed) the state was the same — four circles, every row ✓; the operator's ✗ and «לא נמצאה תצורה…» did not reproduce;
+- with lettered circles, «… לשני המעגלים», «T על הישר AB», «… חיצוני …» and «TB משיק משותף …» were refused (`over-constrained: T, A, B collinear cannot hold`, `MT ⟂ TB cannot hold`, ~20 s each); «… פנימי …», an internally tangent pair, the named touch after «T על AB», and the lettered «משיק משותף למעגלים M ו-N» on an internally tangent pair (or as the third tangent of a touching pair) went to the AI;
+- #2406's «המשיק העובר בנקודה המשותפת לשני המעגלים» (and the English, «AB משיק העובר בנקודה המשותפת…», the auto-named touch) drew a green **two-touch** tangent through neither circle's touch point.
+
+**Root cause / class (docs/17 §1).** *`commonTangent` had three separate exits to the tangent at the touch, each with its own partial lowering, and it missed the touch referent in two ways.*
+- **R2 (#2407).** Nothing asked whether the line's own letters pass through the touch (T on AB, or T a letter of the line). The two-touch lowering then demanded two distinct touches on a line through T. Only the tangent at T passes through T, and its two touches coincide.
+- **R2' (#2406).** The role lexicon was a closed list («בנקודת ההשקה|בנקודת המגע|at the touch point»), so «(העובר) בנקודה המשותפת…» and "the common point" fell to the label-less two-touch path.
+- **R3.** The role and capacity exits lowered `tangent tan-T` on circle 1 alone and dropped the letters, so the label accountant (rule 3, ADR-735) found circle N, A and B unread and declined. The named-touch exit dropped existing letters.
+- **R1.** `commonTangent` alone resolves its pair with `presupposes: true` (its letters are a reference) but created the named circles without ADR-347's `implied` tag, so `impliedCircleBinding` never named the drawn unnamed pair by them.
+
+**Decision.**
+1. **One resolver, asked before the two-touch path** (`commonTangent`):
+   - (a) a named «בנקודה X»: today's arm;
+   - (b) the touch by ROLE (`ROLE_TOUCH`): «(ה)עובר ב/דרך הנקודה המשותפת (לשני המעגלים / למעגלים X ו-Y)», «בנקודה המשותפת…», «בנקודת ההשקה/המגע», "(passing) through / at the common point", "at the touch/tangency/contact point", "at the point of tangency/contact";
+   - (c) the line's letters reach the touch: T is one of them, or both exist and are STATED collinear with T.
+
+   T is read from `statedTangencies` (semantic, docs/17 §3b law 2). Am. 5's deictic common point answers (b) only for a pair with no stated record, and only when the pair is DRAWN tangent: a point on two crossing circles is one of two common points (measured: the fallback otherwise drew the tangent at one crossing). No touch with (b) → `'stop'` (escalate whole, as Am. 5); with (c) → the two-touch path, as before. A stated kind that is not the touch tangent's (Am. 8: internal for an externally tangent pair, external for an internally tangent one) keeps the two-touch reading for (c), so «… חיצוני …» through an external touch keeps its refusal; for (b) it escalates.
+2. **A new semantic `ParseContext` field, `collinearWith`** (`buildParseCtx`): for each point, the point pairs the construction states it collinear with, from `collinear` / `collinear-order` constraints and on-segment / on-line riders. «T על AB» over a placed T leaves `collinear {T, A, B}` + `collinear-order [A, T, B]`, which no existing field carried. It is a ctx field because the choice between the two lowerings is the parser's.
+3. **One at-touch lowering (`touchTangent`) for all four exits** (the class fix for R3):
+   - T's two memberships when it is the stated touch (#2188's shape);
+   - the drawn `tangent tan-T` (one identity, so Am. 3/4/7's capacity reader and Am. 6's meets keep working);
+   - FRESH naming letters as markers on it (the at-variant, byte for byte);
+   - EXISTING letters through T as a seat record `{ type: 'common-tangent', a, b, circle1, circle2, at: T }`.
+
+   An existing letter that does not reach T is not lowered, so the accountant declines the line as before («נקודה A» · «נקודה B» · «AB משיק משותף … בנקודה T» stays with the AI).
+4. **The seat arm** (`engine/apply.ts`, `case 'common-tangent'` with `at`). Each FREE letter (a free point, or one whose only solve is the stated collinearity through T) becomes a rider on the drawn tangent `tan-T` (`on-line`, as the named-touch form's fresh letters are), at its signed distance from T along the stated line, so |TA|, |TB| and the A–T–B order survive and the radius ⟂ holds by construction at every sample. The circles' free radius seeds are re-seeded at the drawn touch (they stay free DOFs). A letter something else places is not moved, and the radius ⟂ (centre1·T ⟂ a·b) is then the plain M1 statement. An `at` record has ONE configuration (`variantCountOf`). It carries no `kind` or `avoid`, so the verifier asks neither of it, and `commonTangents` (paired radius-⟂s) does not count it as a two-touch tangent.
+5. **R1.** `commonTangent`'s creations of named circles that do not exist carry `implied: true` (ADR-347). `impliedCircleBinding` decides through ADR-565's order: an interchangeable unnamed pair binds by order (M → the first drawn circle, N → the second); a non-interchangeable pair asks (`input.unknownCircle`); an empty figure binds nothing, and the creation stands.
+
+**Deviations from the plan, measured.**
+- *No separate `set-perpendicular`: the seated letters ride the tangent line.* Emitted after the seat, the generic carrier choice (`driveOrCheck`: "a free vertex no other constraint references") took circle M's free CENTRE and moved the circles, T and the radii (T 5.355 → 5.152 on H3). With a seated letter as the ⟂'s free carrier instead, sampled configurations (seeds 1 and 5 of «ישר AB» · «T על הישר AB», whose sampled line runs along the centre line) projected the letter onto T (`T coincides …`). As riders on `tan-T` the letters are on the tangent by construction at every sample.
+- *The radius seeds are re-seeded.* On a prefix where «T על AB» already recruited the radii (found work, below), the solve relaxed T toward the old seed against the seated letters (T 5.355 → 5.152). Re-seeded at the drawn touch, T, the centres and the radii move by |Δ| = 0.
+- *A seated line does not re-assert the stated touch's memberships.* The record names both circles for the accountant, and on that prefix each membership re-ran the whole solve (~0.65 s). The named-touch arm (a) keeps its memberships, unchanged.
+- *H8* («שני מעגלים» · «המעגלים משיקים מבפנים בנקודה T» · «T על AB» · «AB משיק משותף למעגלים M ו-N»): the internal pair is not interchangeable (`autosInterchangeable` is false; the internal lowering aims its witness at the touch point), so ADR-565's order asks «which circle is M?» (`input.unknownCircle`) where the plan predicted a bind. Before: four circles, green. The unnamed «… לשני המעגלים» on the same prefix builds the tangent at T.
+- *The common-point phrase on crossing circles* escalates as `'stop'`, and the parser's last-resort ask then answers `input.ambiguousCircleRef` (ADR-477). No tangent is drawn.
+- *Stability is locked on the shown configuration*, not at seeds 0–3: once the line adds structure, a sampled seed draws a different sample of the free DOFs (the centres move by 3–6 units at seed 1 for any added line), so only the configuration the student is looking at is a stability witness. The tangency itself is locked at seeds 0–3.
+- *Catalog:* the role form is described on the «CD משיק משותף … בנקודה M» row, and the «AB משיק משותף …» row gains "through the touch point: the tangent at it", instead of a new row: the role form needs circles already tangent, and a catalog example must parse on an empty figure (phase4).
+
+**Measured after** (same probe, this branch):
+- H1–H4, H6, H7, H9 and H12 draw `tan-T` with the letters on it, tangent to both circles at seeds 0–3, green. H1 ends with two circles, M and N. T, the centres and both radii move by |Δ| = 0 across the line.
+- H13–H17 (#2406's spellings) draw the tangent at the touch only.
+- H18 and H19 (lettered; internally tangent, and the third tangent) build `tan-T`.
+- H5 is refused as before.
+- The controls are unchanged: disjoint AB + CD, free A and B pulled onto the circles, fresh letters' two-touch tangent, the one-letter bind, the named touch with fresh letters.
+- Per line at the decision: 5–300 ms, except H1 (~1.5 s for the two binds and their re-reads; ~3.8 s before) and H19 (~1.4 s for the memberships on a two-tangent figure; before, it went to the AI).
+
+**Why not a patch (docs/17 §2).** No spelling or figure is special-cased. One resolver decides every at-touch reading from what the construction states (the tangency record, the stated collinearity), and every exit lowers through one function, so no exit can drop a circle or a letter again.
+
+**Found work (filed by the round):**
+1. «T על AB» with two fresh endpoints after «המעגלים משיקים בנקודה T» moves T and the radii (T 5 → 5.355): a region given recruits the circles instead of seating the endpoints.
+2. «AB משיק למעגל M בנקודה T» / «AB ⟂ MT» over a segment through a placed point recruits the circle's free centre (the generic carrier choice measured in the first deviation).
+3. Creation-shaped pair sentences beside an unnamed pair («מעגל M משיק למעגל N» after «שני מעגלים») draw two new circles. This is a product question.
+4. «המשיק בנקודת ההשקה של המעגלים» (no «משותף») asks «לאיזה מעגל…».
+
+**Locks.**
+- Fixtures `issue-2407-tangent-at-touch` (the operator's four lines) and `issue-2406-tangent-through-common-point` (#2406's four lines).
+- Class test `src/__tests__/issue-2407-common-tangent-at-touch.test.ts`: every at-touch row at seeds 0–3, with the tangency computed from the resolved circles; the binding; stability of T, the centres, the radii, |TA|, |TB| and the order; the one configuration; a later two-touch tangent; `collinearWith`; the crossing escalation; the controls.
+- Scenario `common-tangent-external-through-touch-refused-2407` (H5's refusal).
+- Parity rows `tangent-through-common-point-2406` and `common-tangent-through-touch-internal-2407`.
+
+**Behaviour change for a student:** «שני מעגלים» · «המעגלים משיקים בנקודה T» · «T על AB» · «AB משיק משותף למעגלים M ו-N» now draws AB as the common tangent at T, green, on the two drawn circles (named M and N). So do «… לשני המעגלים», «… פנימי …», «T על הישר AB», «TB משיק משותף …», internally tangent circles, and the named touch after «T על AB». «המשיק העובר בנקודה המשותפת לשני המעגלים» and its spellings draw the tangent at the touch (before: a different tangent through two other points, green). With lettered circles, the only common tangent of internally touching circles and the third common tangent of externally touching ones build at the touch (before: the AI).
