@@ -1328,11 +1328,15 @@ wearing a rule's clothes, and would also be wrong on a parameter the locus happe
 
 #### The set can be a UNION, and the tracer covers every component ([ADR-AG-166](06c-decisions-analytic.md#adr-ag-166), #1500)
 
-`locusOf` discovers every component from the sampled configurations (`2·COMPARE_TRIES` probes); `LocusResult` is a list,
-`Answer.locus` one curve each, the gate compares unions (`agreeingUnion`), and `fitLine` / `normalized` do not
-out-claim the data.
+`locusOf` discovers every component in CARRIER space, never only through the sampler
+([ADR-AG-308](06c-decisions-analytic.md#adr-ag-308), #2384): the sampled configurations (`2·COMPARE_TRIES` probes), then
+`SCATTER_PROBES` deterministic carrier-space starts, then `CURVE_PROBES` per held curve on the stretch of its fitted
+curve (`curveOfTrace`, `conicPointsIn`) no walk covers — a `solveLM` each, a walk only off every held walk. A walk
+closes when its carrier vector returns, not its image. A component is ONE carrier curve: a walk on a held curve
+(`distToConic`) joins it as more pieces. `LocusResult` is a list, `Answer.locus` one curve each, the gate compares
+unions (`agreeingUnion`), and `fitLine` / `normalized` do not out-claim the data.
 
-*Identifiers:* `\n` · `√(lo/hi)` · `1e-9` · `x + 64029472y = 0` · `y = 0`
+*Identifiers:* `\n` · `√(lo/hi)` · `1e-9` · `x + 64029472y = 0` · `y = 0` · `SCATTER_PROBES` · `CURVE_PROBES`
 
 #### The fit is a claim, so it is checked — against the trace, not against a student
 

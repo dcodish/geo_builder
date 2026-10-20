@@ -32,7 +32,8 @@
  * outward in both directions, to the view box or to closure.
  */
 import { admissibleAt, carrierSystem, choiceSeedOf, drawableAt, resolvedAt, viewBox, type CarrierSystem } from './evaluate';
-import { agreeingUnion, shapeOfTrace, type LocusShape } from './locusFit';
+import { agreeingUnion, conicPointsIn, curveOfTrace, distToConic, shapeOfTrace, type LocusShape } from './locusFit';
+import type { Conic } from './conic';
 import { solveLM, SOLVE_TOL } from './solve';
 import type { Env } from './expr';
 import type { Pt } from './derived';
@@ -287,9 +288,18 @@ export function traceLocus(
 
       const { p, ok } = judge(x);
       if (!p) break;
-      // CLOSURE: the walk came back to where it started. Checked against the ORIGIN only, and only
-      // after enough steps that the first few cannot trigger it.
-      if (i > 3 && Math.hypot(p.x - origin.x, p.y - origin.y) < step * 0.75) {
+      /**
+       * CLOSURE: the walk came back to where it started — IN CARRIER SPACE (#2384, ADR-AG-308), and only after
+       * enough steps that the first few cannot trigger it.
+       *
+       * The step is taken in carrier space, so that is where "back at the start" is decided. The traced point is the
+       * carriers' IMAGE, and an image can pass its own start while the carriers are far from theirs: measured on Q1
+       * (tangents at A and B meet at M, with an area given), M ran out to the fold where A's two tangent choices
+       * merge, turned back along the SAME line with A on its other branch, and passed its own start after 33 steps —
+       * an image-space test called that closed, and the backward walk never ran. A genuinely closed locus closes
+       * here too: its carriers come back with its point.
+       */
+      if (i > 3 && Math.hypot(...x.map((v, k) => v - x0[k])) < step * 0.75) {
         return { pts, closed: true };
       }
       /**
@@ -470,6 +480,52 @@ export interface LocusResult {
 /** How much of a candidate trace may overlap the components already held before it is a duplicate. */
 const DISCOVERY_OVERLAP = 0.5;
 
+/**
+ * The discovery budgets (#2384, ADR-AG-308; docs/17 §7) — fixed and stated, never an open sweep. Each probe is one
+ * `solveLM`; a walk runs only for a probe that lands off every held walk.
+ *
+ * - `SCATTER_PROBES`: carrier-space starts per configuration. Their job is to reach every CURVE; the curve probes
+ *   below complete each curve's rays. Measured on Q1's area locus over 24 configurations: at 32 starts each line
+ *   is reached ≥ 9 times (at 16, as few as 3), while a far ray alone can be reached once — which is why a ray is
+ *   never left to the scatter.
+ * - `CURVE_PROBES`: probes per held curve, spread over the stretch of it no walk covers.
+ * - `CURVE_GRID`: the grid lines a curve is sampled on to find that stretch.
+ */
+const SCATTER_PROBES = 32;
+const CURVE_PROBES = 8;
+const CURVE_GRID = 48;
+
+/** One component under discovery: its walks (one or more carrier components) and its fitted carrier curve. */
+interface Comp {
+  walks: LocusTrace[];
+  curve: Conic | null;
+}
+
+/**
+ * A component as the trace the rest of the lane reads: every walk's positions (the fit's data — order-free), closed
+ * only when it is one walk that closed, and every walk's pieces (what is drawn).
+ */
+function asTrace(cp: Comp): LocusTrace {
+  if (cp.walks.length === 1) return cp.walks[0];
+  return {
+    points: cp.walks.flatMap((w) => w.points),
+    closed: false,
+    pieces: cp.walks.flatMap((w) => w.pieces),
+  };
+}
+
+/** A small deterministic generator for the scatter probes (mulberry32), seeded by the configuration. */
+function probeRandom(seed: number): () => number {
+  let a = (Math.imul(seed + 1, 0x9e3779b1) ^ 0x2384) >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /** The distance from `p` to the nearest point of the polyline `pts` (segment-wise). */
 function distToPolyline(p: Pt, pts: readonly Pt[]): number {
   if (pts.length === 0) return Infinity;
@@ -593,11 +649,50 @@ function walkedLocusOf(
     const room = roomOf(f);
     const first = traceLocus(c, f.env, id, start, { bounds: room, seed });
     if (!first || first.points.length < 2) return null;
-    const comps = [first];
+    /**
+     * ONE COMPONENT PER CARRIER CURVE (#2384, ADR-AG-308) — its pieces are every reachable stretch of it.
+     *
+     * A walk covers one connected piece of the CARRIER space, and one curve of the traced point can be the image of
+     * several: on Q1 each tangent-meet ray is its own carrier component, because the two tangents turn parallel as M
+     * runs to infinity. So a component holds its WALKS, and a walk lying on a held component's curve joins it as more
+     * pieces — before this it became a second component, and one line printed «שני ישרים: 4x + y + 3 = 0 /
+     * 4x + y + 3 = 0».
+     */
+    const comps: Comp[] = [{ walks: [first], curve: curveOfTrace(first.points) }];
     const resolved: Construction = resolvedAt(c, seed, choiceSeedOf(c, seed));
     const sys = carrierSystem(resolved, f.env, { params: 'fixed' });
-    if (sys.ids.length === 0) return comps;
+    if (sys.ids.length === 0) return comps.map(asTrace);
     const near = Math.hypot(room.maxX - room.minX, room.maxY - room.minY) / 100;
+    const covered = (p: Pt) => comps.some((cp) => cp.walks.some((w) => distToPolyline(p, w.points) < near));
+    const finite = (p: Pt | undefined): p is Pt => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+
+    /** A corrected carrier vector: walk it when its traced point lands off every held walk, and file the walk. */
+    const discover = (values: number[]) => {
+      const pos = sys.positionsAt(values);
+      const p = pos.get(id);
+      if (!finite(p) || covered(p)) return;
+      const start2 = new Map<Id, Pt>();
+      for (const key of start.keys()) {
+        const q = pos.get(key);
+        if (!finite(q)) return;
+        start2.set(key, { x: q.x, y: q.y });
+      }
+      const extra = traceLocus(c, f.env, id, start2, { bounds: room, seed });
+      if (!extra || extra.points.length < 2) return;
+      // The same component reached from farther out walks back into view and re-traces it — drop it.
+      const overlapping = extra.points.filter(covered).length;
+      if (overlapping > extra.points.length * DISCOVERY_OVERLAP) return;
+      // A walk on a held curve is more of that component; only a NEW curve is a new component.
+      const home = comps.find((cp) => cp.curve && extra.points.every((q) => distToConic(cp.curve!, q) < near));
+      if (home) {
+        home.walks.push(extra);
+        home.curve = curveOfTrace(home.walks.flatMap((w) => w.points)) ?? home.curve;
+      } else {
+        comps.push({ walks: [extra], curve: curveOfTrace(extra.points) });
+      }
+    };
+
+    // The other sampled configurations (#1500): where else the figure's own sampler puts the point.
     for (const s of discoverySeeds) {
       if (s === seed) continue;
       const st = freeStart(figAt(s));
@@ -605,30 +700,64 @@ function walkedLocusOf(
       const x = sys.toVec(st);
       if (x.some((v) => !Number.isFinite(v))) continue;
       const sol = solveLM(x, sys.residualsAt, 40);
-      if (!sol.ok) continue;
-      const pos = sys.positionsAt(sol.values);
-      const p = pos.get(id);
-      if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
-      if (comps.some((t) => distToPolyline(p, t.points) < near)) continue;
-      const start2 = new Map<Id, Pt>();
-      let complete = true;
-      for (const key of start.keys()) {
-        const q = pos.get(key);
-        if (!q || !Number.isFinite(q.x) || !Number.isFinite(q.y)) {
-          complete = false;
-          break;
-        }
-        start2.set(key, { x: q.x, y: q.y });
-      }
-      if (!complete) continue;
-      const extra = traceLocus(c, f.env, id, start2, { bounds: room, seed });
-      if (!extra || extra.points.length < 2) continue;
-      // The same component reached from farther out walks back into view and re-traces it — drop it.
-      const overlapping = extra.points.filter((q) => comps.some((t) => distToPolyline(q, t.points) < near)).length;
-      if (overlapping > extra.points.length * DISCOVERY_OVERLAP) continue;
-      comps.push(extra);
+      if (sol.ok) discover(sol.values);
     }
-    return comps;
+
+    /**
+     * (b) CARRIER-SPACE SCATTER (#2384, ADR-AG-308) — starts spread over the walk room, independent of the sampler.
+     *
+     * The sampler places the carriers the way the figure is DRAWN, and that can almost never land on a component:
+     * measured over 48 configurations of Q1's area locus, the four rays were reached 39 / 8 / 1 / 0 times. A fixed
+     * number of deterministic starts (seeded by the configuration), each corrected by one `solveLM`, reaches each
+     * ray by the constraints alone. A walk runs only for a start that lands off every held walk.
+     */
+    const rnd = probeRandom(seed);
+    for (let k = 0; k < SCATTER_PROBES; k += 1) {
+      const x = sys.ids.flatMap(() => [
+        room.minX + rnd() * (room.maxX - room.minX),
+        room.minY + rnd() * (room.maxY - room.minY),
+      ]);
+      const sol = solveLM(x, sys.residualsAt, 40);
+      if (sol.ok) discover(sol.values);
+    }
+
+    /**
+     * (a) CURVE PROBES (#2384, ADR-AG-308) — every held curve, completed where no walk has been.
+     *
+     * A fitted carrier curve says where the rest of its component may be. Points of it inside the room that no
+     * walk covers are probed: the shown configuration with the traced point moved onto the curve point, corrected
+     * by `solveLM`. A probe inside a stretch the givens forbid falls back onto a held walk and is dropped as a
+     * duplicate; one that lands on an unreached stretch walks it. A traced point that is not a carrier (a derived
+     * point, #1138) is pulled there by two extra residual rows, then re-corrected on the plain residuals.
+     */
+    const x0 = sys.toVec(start);
+    const slot = sys.ids.indexOf(id);
+    const pull = 1 / Math.max(near, 1e-9);
+    for (let ci = 0; ci < comps.length; ci += 1) {
+      const curve = comps[ci].curve;
+      if (!curve) continue;
+      const open = conicPointsIn(curve, room, CURVE_GRID).filter((p) => !covered(p));
+      const stride = Math.max(1, Math.ceil(open.length / CURVE_PROBES));
+      for (let k = 0; k < open.length; k += stride) {
+        const target = open[k];
+        if (covered(target)) continue;
+        let probe: number[];
+        if (slot >= 0) {
+          probe = [...x0];
+          probe[2 * slot] = target.x;
+          probe[2 * slot + 1] = target.y;
+        } else {
+          const towards = (v: number[]) => {
+            const q = sys.positionsAt(v).get(id);
+            return [...sys.residualsAt(v), ...(finite(q) ? [pull * (q.x - target.x), pull * (q.y - target.y)] : [1e6, 1e6])];
+          };
+          probe = solveLM(x0, towards, 40).values;
+        }
+        const sol = solveLM(probe, sys.residualsAt, 40);
+        if (sol.ok) discover(sol.values);
+      }
+    }
+    return comps.map(asTrace);
   };
 
   const primary = componentsAt(seeds[0]);

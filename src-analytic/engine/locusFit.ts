@@ -500,3 +500,53 @@ export function agreeingShape(a: readonly LocusPt[], b: readonly LocusPt[]): Loc
   const u = agreeingUnion([sa], [sb]);
   return u ? u[0] : null;
 }
+
+/**
+ * THE CARRIER CURVE OF A WALK, unsnapped (#2384, ADR-AG-308) — the lowest-degree fit, normalised, with no verdict
+ * attached. Discovery reads it to ask two GEOMETRIC questions the printed equation cannot answer: does another walk
+ * lie on the same curve (one component, more pieces), and where on that curve has no walk been yet (the probes).
+ * Never printed: what the student reads is still `shapeOfTrace`'s snapped, self-checked equation.
+ */
+export function curveOfTrace(pts: readonly LocusPt[]): Conic | null {
+  const raw = fitLine(pts) ?? fitTrace(pts);
+  return raw ? normalized(raw) : null;
+}
+
+/** The first-order distance from `p` to the conic `k`: `|f(p)| / |∇f(p)|` — exact for a line. */
+export function distToConic(k: Conic, p: LocusPt): number {
+  const gx = 2 * k.A * p.x + k.B * p.y + k.D;
+  const gy = k.B * p.x + 2 * k.C * p.y + k.E;
+  const g = Math.hypot(gx, gy);
+  return g > 1e-12 ? Math.abs(evalConic(k, p)) / g : Infinity;
+}
+
+/**
+ * Points of the conic `k` inside `box` (#2384): the equation solved on `n` vertical and `n` horizontal grid lines,
+ * each a quadratic (or linear) in one unknown. Kind-free, so a line, a circle, a parabola and an ellipse are sampled
+ * by the same arithmetic; ordered by grid line, so a stride through the list spreads over the curve.
+ */
+export function conicPointsIn(
+  k: Conic,
+  box: { minX: number; minY: number; maxX: number; maxY: number },
+  n: number,
+): LocusPt[] {
+  const roots = (a: number, b: number, c: number): number[] => {
+    const big = Math.max(Math.abs(a), Math.abs(b), Math.abs(c));
+    if (big < 1e-300) return [];
+    if (Math.abs(a) <= 1e-9 * big) return Math.abs(b) > 1e-12 * big ? [-c / b] : [];
+    const disc = b * b - 4 * a * c;
+    if (disc < 0) return [];
+    const s = Math.sqrt(disc);
+    return [(-b - s) / (2 * a), (-b + s) / (2 * a)];
+  };
+  const inBox = (p: LocusPt) => p.x >= box.minX && p.x <= box.maxX && p.y >= box.minY && p.y <= box.maxY;
+  const out: LocusPt[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const t = (i + 0.5) / n;
+    const x = box.minX + t * (box.maxX - box.minX);
+    for (const y of roots(k.C, k.B * x + k.E, k.A * x * x + k.D * x + k.F)) out.push({ x, y });
+    const y = box.minY + t * (box.maxY - box.minY);
+    for (const xx of roots(k.A, k.B * y + k.D, k.C * y * y + k.E * y + k.F)) out.push({ x: xx, y });
+  }
+  return out.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y) && inBox(p));
+}
