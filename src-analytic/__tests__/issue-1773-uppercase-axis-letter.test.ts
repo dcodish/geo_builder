@@ -75,10 +75,12 @@ describe('#1773 — the fold, at the one boundary every rule reads', () => {
     expect(orthography('Y_A2 = 5')).toBe('y_A2 = 5');
   });
 
+  // Re-based by #2391 (ADR-AG-315): a point label's digit index is now written as the glyph the exam prints (`X_1` ≡ `X₁`).
+  // What this lock guards is unchanged — the AXIS fold never lowercases a point label's capital.
   it('never touches a point label: its subscript is digits', () => {
-    expect(orthography('X_1(2,3)')).toBe('X_1(2,3)');
-    expect(orthography('X_{12} על הישר y=x')).toBe('X_{12} על הישר y=x');
-    expect(orthography('A_1B_2 = 5')).toBe('A_1B_2 = 5');
+    expect(orthography('X_1(2,3)')).toBe('X₁(2,3)');
+    expect(orthography('X_{12} על הישר y=x')).toBe('X₁₂ על הישר y=x');
+    expect(orthography('A_1B_2 = 5')).toBe('A₁B₂ = 5');
   });
 
   it('never touches a bare run: «XB» is a segment, not a coordinate', () => {

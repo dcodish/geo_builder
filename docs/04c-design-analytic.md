@@ -240,6 +240,21 @@ constraints (`Derivation.constraintLine`) must hold across the pool (`evaluate.h
 *Identifiers:* `poolScheduler`
 *ADRs:* ADR-AG-119.
 
+**The exam's circle-and-centre sentences** ([ADR-AG-315](06c-decisions-analytic.md#adr-ag-315), #2391) are frame readings
+that rewrite to the twin's own text, so no second lowering exists: `circleCentreClauses` (a circle with its centre, or
+named by its centre with an equation), `centresRespectivelyClauses` (two namings paired by the shared `respectively`
+helper), `namedCirclesClauses` (a plural subject distributed over its named members), the copula/construct forms in
+`centreClauses` and `diameterClauses`, and `satisfiesClause` (taken in `readLine` only when the statement's facts name
+the point; the point is then declared). `orthography` folds a capital's underscored digit index into the subscript
+glyph (`SUB_INDEX`), and `unwrap`'s glued «ש-» after a given-word never takes the first letter of a cardinal
+(`CARDINAL_SHIN`). Two forms are not text: «… מרכזי המעגלים …» is the `centres-distance` fact (`parseCentresDistance`,
+its lettered twin over `CENTRES_SENTINELS`), which M1 resolves through `circlePairOf` — the pair resolver
+`tangent-circles` uses — writing the two centres in (`centreIdOf`; a centre with no letter is `unknown-reference`, as
+`via-centre`); and «דרך P עובר משיק למעגל» is `tangent-through`, which M1 lowers to `tangent-line-at` when the figure
+puts P on that circle (`onCurveByConstruction`) and to the #1430 from-point construction otherwise. The trailing
+«דרך …» of the construction register is `TRAILING_THROUGH` in `constructionCandidates`, which also splits conjoined
+tangent phrases and pairs «משיקים למעגלים … בנקודות … בהתאמה», joining the canonicals with the top-level «;».
+
 ### An imperative wrapper is TAUGHT ([ADR-AG-150](06c-decisions-analytic.md#adr-ag-150))
 
 `imperativeCandidates()` (`scopeAnalytic.ts`) proposes `{verb, remainder}` from a closed verb lexicon (2-D
@@ -1365,6 +1380,24 @@ cluster within `SOLVE_RESOLUTION` (`solve.ts`) is one point (`knownOptions`, `is
 `apart()` ask a different question.
 
 *Identifiers:* `fact` · `value: null` · `10·√SOLVE_TOL`
+
+#### The exam's questions ([ADR-AG-316](06c-decisions-analytic.md#adr-ag-316), #2393)
+
+The exam's question forms are read in front of the existing arms. Each new spelling resolves to the arm that already answered its twin:
+- `COORDS_OF` (a point by «שיעורי») rewrites to the bare name;
+- `PARAM_ASK` answers a symbol the register holds and reads, through `knownValue` → `valueText` (the panel's parameter row);
+- `CIRCLE_CENTRED_AT` finds the circle whose centre is X (`centreIdOf`);
+- `THE_CURVE` takes the one host of its kind (`hostsOf`, the radius role's rule);
+- `EQUATION_OF` admits the English noun;
+- a tangent is read by the parser's own `readTangentNoun`.
+
+Every arm that resolves a curve object answers through `curveAnswer` → `curveEquationOf` (`app/curveText.ts`): the known equation, else the options, else null. The panel's curve row (`panelKnowledge`) calls the same function, so «משוואת l1» and the row cannot disagree.
+
+`ask` wraps `askOne`. A question that did not read whole is split by `splitAsk` (enumerated joiners, and a plural noun over named members) into `Answer.parts`. `App.tsx` renders each part through the extracted `answerBody`.
+
+`SET_FORMER` reads «כל הנקודות M (המקיימות S)». With S, the trial `derive([...d.lines, S])` is traced (`Derivation.lines`, carried like `seed`), and a fault there is `Answer.refused`, worded by `errorText`. A measure of the locus (`LOCUS_PHRASE`) is `Answer.unsupported`, worded by `errOutOfScope`. Yes/no questions are not read (the operator's ruling of 2026-10-20).
+
+*Identifiers:* `curveEquationOf` · `askOne` · `splitAsk` · `answerBody` · `Answer.parts` · `Answer.refused` · `Answer.unsupported`
 
 ### Measuring by clicking
 

@@ -297,6 +297,8 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
 
   '#2344': 'open', // #2344 (ADR-W-146): 2-D draws a green sliver for a triangle whose givens hold only flat in the limit (the tangent root)
   '#2417': 'open', // #2395 (ADR-AG-311): 2-D does not read a stated distinctness («P ≠ Q», «המעגלים N1 ו-N2 שונים»)
+
+  '#2415': 'open', // #2391 (ADR-AG-315): 2-D does not read «M מקיימת …», the centres' distance by role, or the distributed named circle pair
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1701,6 +1703,18 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'named-common-tangent-2392', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'הישר l משיק למעגלים O ו-P בנקודות A ו-B בהתאמה'], expect: 'builds', exception: 'X4', only: ['analytic'], note: '2-D names no line (X4); analytic did not read it before ADR-AG-313' },
   { id: 'name-line-2392', family: 'topic', steps: ['נקודה A', 'נקודה B', 'AB', 'נסמן את הישר AB ב-l'], expect: 'builds', exception: 'X4', only: ['analytic'], note: 'analytic did not read it before ADR-AG-313' },
   { id: 'axis-cut-2392', family: 'topic', steps: ['נקודה A', 'נקודה B', 'הישר AB', 'הישר AB חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x'], expect: 'builds', exception: 'X1', only: ['analytic'], note: 'the axis side of a crossing, no point made; analytic did not read it before ADR-AG-313' },
+
+  // ── #2391 (ADR-AG-315): the exam's own two-circle and centre sentences, each read as its canonical twin ──
+  { id: 'satisfies-2391', family: 'lengths', steps: ['נקודה A', 'נקודה B', 'M מקיימת MA = MB'], expect: 'builds', knownGap: [{ product: '2d', issue: '#2415' }], note: 'analytic did not read «מקיימת» before ADR-AG-315; 2-D escalates it to the model' },
+  { id: 'underscore-index-2391', family: 'points-incidence', steps: ['נקודה N_2'], expect: 'builds', note: 'analytic did not read `N_2` before ADR-AG-315 (it is `N₂` there; 2-D reads it as `N2`)' },
+  { id: 'two-tangents-meet-2391', family: 'tangents', steps: ['מעגל O', 'המשיק למעגל O בנקודה A', 'המשיק למעגל O בנקודה C', 'שני המשיקים נחתכים בנקודה D'], expect: 'builds', exception: 'X8' },
+  { id: 'centres-distance-2391', family: 'circles', steps: ['מעגל M ברדיוס 3', 'מעגל N ברדיוס 6', 'המרחק בין מרכזי המעגלים הוא 9'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2415' }], note: '2-D asks which circle (input.ambiguousCircleRef)' },
+  { id: 'centres-segment-2391', family: 'circles', steps: ['מעגל M ברדיוס 3', 'מעגל N ברדיוס 6', 'אורכו של הקטע המחבר את מרכזי המעגלים הוא 9'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2415' }], note: '2-D asks which circle (input.ambiguousCircleRef)' },
+  { id: 'given-pair-tangent-2391', family: 'circles', steps: ['מעגל M ברדיוס 3', 'מעגל N ברדיוס 6', 'נתונים שני מעגלים המשיקים זה לזה מבחוץ'], expect: 'builds', exception: 'X8' },
+  { id: 'named-pair-distributed-2391', family: 'circles', steps: ['מעגל M ברדיוס 5', 'שני מעגלים שמרכזיהם בנקודות N₁ ו-N₂ והרדיוס של כל אחד מהם הוא 10, משיקים למעגל M בנקודה A'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2415' }], note: '2-D escalates it to the model' },
+  { id: 'diameter-construct-2391', family: 'circles', steps: ['מעגל M', 'N₂A הוא קוטר המעגל M'], expect: 'builds', exception: 'X8' },
+  { id: 'centre-after-circle-2391', family: 'circles', steps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'מרכז המעגל I הוא K'], expect: 'builds', exception: 'X8', only: ['analytic'], note: 'a numeral circle is named by its equation (#1257), so only analytic can state the context' },
+  { id: 'centres-respectively-2391', family: 'circles', steps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1', 'K ו-L מרכזי המעגלים I ו-II בהתאמה'], expect: 'builds', exception: 'X8', only: ['analytic'], note: 'as centre-after-circle-2391' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

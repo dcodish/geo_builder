@@ -675,7 +675,24 @@ export type Fact =
    * - `the` is «המעגל» / «שני המעגלים»: the figure's circles when it holds exactly that many, drawn when it holds
    *   none, refused as ambiguous otherwise (ADR-AG-196's none → create, one → bind, several → ask).
    */
-  | (FactBase & { t: 'circles-about'; slots: CircleSlot[]; about: Fact[] });
+  | (FactBase & { t: 'circles-about'; slots: CircleSlot[]; about: Fact[] })
+  /**
+   * «אורכו של הקטע המחבר את מרכזי המעגלים הוא 9» · «המרחק בין מרכזי המעגלים הוא 9» — A MEASURE BETWEEN THE CENTRES OF TWO
+   * CIRCLES the sentence names by role (#2391 B1, ADR-AG-315). `facts` is the lettered twin («Z₆Z₇ = 9», «המרחק בין Z₆
+   * ל-Z₇ הוא 9») over {@link CENTRES_SENTINELS}; M1 resolves the two circles through the one pair resolver
+   * `tangent-circles` uses (named, or the figure's exactly two) and writes their centres in.
+   */
+  | (FactBase & { t: 'centres-distance'; circles?: [string, string]; facts: Fact[] })
+  /**
+   * «דרך הנקודה A עובר משיק למעגל I» · "the tangent to circle I through A" — A TANGENT THROUGH A POINT (#2391, ADR-AG-315,
+   * the found-work note). Which tangent depends on where the point is, and only the figure knows: a point the figure puts
+   * ON that circle is the touch point (the tangent AT it, «המשיק למעגל I בנקודה A»); any other point is the from-point
+   * construction `facts` carries (#1430, a free-direction line through it, tangent to the circle). M1 decides.
+   */
+  | (FactBase & { t: 'tangent-through'; at: Id; circle?: string; facts: Fact[] });
+
+/** The stand-ins a `centres-distance` sentence carries for the two centres (#2391, ADR-AG-315) — names no student writes. */
+export const CENTRES_SENTINELS = ['Z₆', 'Z₇'] as const;
 
 /** One circle a `circles-about` sentence speaks of (ADR-AG-219). */
 export type CircleSlot = { k: 'new'; r?: Expr } | { k: 'named'; name: string } | { k: 'the' };
@@ -733,7 +750,10 @@ export const factsWithin = (f: Fact): Fact[] =>
       : // #1737 (ADR-AG-265): the trapezoid a height sentence introduces by its letters.
         f.t === 'height-of' && f.declare
         ? [f, ...f.declare.flatMap(factsWithin)]
-        : [f];
+        : // #2391 (ADR-AG-315): a tangent-through applies the tangent AT its point, or the from-point construction.
+          f.t === 'tangent-through'
+          ? [f, { t: 'tangent-line-at', at: f.at, ...(f.circle !== undefined ? { circle: f.circle } : {}), src: f.src }, ...f.facts.flatMap(factsWithin)]
+          : [f];
 
 // ---------------------------------------------------------------------------
 // Construction — the fold of the fact list

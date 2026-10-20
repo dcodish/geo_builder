@@ -13042,3 +13042,137 @@ No other sequence moved.
 **Behaviour change for a student:** in analytic, «כל המשיקים המשותפים לשני המעגלים» draws every common tangent, named l1, l2, … with their equation rows; «המשיק העובר בנקודה המשותפת לשני המעגלים» (and its twins) draws the tangent at the touching circles' common point; «סרטטו …» is taught like «שרטטו …»; the Q2 ב sentence is taught as «כל המשיקים המשותפים לשני המעגלים»; the ask answers the touch tangent's equation (each was sent to the AI, or answered missing, before). A circle inside the other is refused «למעגל המוכל בתוך מעגל אין אף משיק משותף.».
 
 **Consequences.** `engine/commonTangents.ts` (new), `engine/types.ts` (`common-tangent` object, `CommonTangentFamily`, `common-tangents`, `common-touch-tangent`, `curveByName`), `engine/apply.ts` (both facts, `pairPositionOf`, `statedTangent`, `circleAtProbe`, `freeLineNames`, `no-common-tangent`), `engine/evaluate.ts`, `engine/carriers.ts`, `parser/parseAnalytic.ts` (`commonTangentSet`, `touchTangentNoun`), `parser/scopeAnalytic.ts` (ס verbs, `SKETCH_FRAME`), `parser/catalogAnalytic.ts`, `app/ask.ts`, `app/errorText.ts`, `i18n/index.ts`, `store/useAnalyticStore.ts`; `shell/__tests__/fixtures/geo-input-parity.ts`; docs 02c R181, 04c.
+
+## ADR-AG-315 — The exam's two-circle and centre sentences read as their canonical twins (#2391)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream F); branch `feat/2391-analytic-exam-sentences` from `main` @ `3cae7f25`. Parts A and B of the #2391 plan; Part C (two circles introduced before they are described) is #2397, not built. LADDER stage: none (the sentence frame and the M1 boundary; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) F5 (§3a, the new forms) and R124 (the exam's circle-and-centre sentences), R114 (the trailing through-phrase taught). · **Design:** [04c](04c-design-analytic.md), «The sentence frame» (the exam's circle-and-centre sentences) and «The exam's construction register».
+
+**Context.** The operator gives his students three analytic exam questions (#2379). Measured on `3cae7f25` through `decideSubmit` (model mocked), most of the exam's own sentences were `not-handled` while a canonical twin recorded. Examples: «נתון מעגל I שמשוואתו … , ומרכזו בנקודה K», «מרכז המעגל I הוא K», «K ו-L מרכזי המעגלים I ו-II בהתאמה», «שני המשיקים נחתכים בנקודה M», «M מקיימת MA = MB», «מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא …», «אורכו של הקטע המחבר את מרכזי המעגלים הוא 9», «שני מעגלים שמרכזיהם בנקודות N₁ ו-N₂ … כל אחד מהם …», «הקטע N₂A הוא קוטר המעגל M», `N_2`, and «מעבירים משיק למעגל I דרך הנקודה A ומשיק …». The full table is on #2391.
+
+**Class.** An exam sentence that says a canonical sentence in another ORDER, or with another CONNECTIVE, is unread. The forms: the centre named after its circle; «שני» or a given-word before a plural subject; a predicate wrapped in «מקיימת»; a plural subject distributed over named members; a construct «קוטר המעגל»; a through-adverbial after the noun.
+
+**Decision.**
+1. **Frame rewrites, each to the twin's own text** (`parser/frameAnalytic.ts`, the ADR-AG-187 mechanism). Because each form is rewritten to its twin's text, it cannot lower differently from the twin ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)).
+   - `circleCentreClauses` (A1, A2): a circle with its centre gives the circle, then «K מרכז המעגל I». A circle named only by its centre, with an equation, gives «M מרכז המעגל EQ». The equation slot stops at a top-level comma, so «…, a הוא פרמטר חיובי» is the comma partition's second clause. «האחד/האחר» carries no meaning while no pair has been introduced (#2397).
+   - `centreClauses` (A3): «(ה)מרכז / מרכזו (של) (ה)מעגל C (הוא|ב…) K» gives «K מרכז המעגל C». The slot after «המעגל» reads a numeral first (`CIRCLE_REF`), so «מעגל II» is never the point I.
+   - `centresRespectivelyClauses` (A4): two such namings, paired by the shared `respectively` helper, which #2392 reuses.
+   - `satisfiesClause` (A6, 2-D's sentence): «X מקיימת S» is read as S, but `readLine` takes it only when S's facts name X. The point is then declared, as «נקודה M» declares it, so «M מקיימת AB = CD» is not read and M is never dropped.
+   - `namedCirclesClauses` (A7): each named circle is stated on its centre with the shared radius, and the predicate is said of each. The parenthetical aside is the existing aside reading's clause.
+   - `diameterClauses` (A8): «… קוטר (של) המעגל C» gives «… הוא קוטר במעגל C».
+2. **Two orthography and unwrap folds.**
+   - `SUB_INDEX` (A9): a CAPITAL with an underscored digit index is folded into the subscript glyph the exam prints, so `N_2` and `N_{2}` become `N₂`. A lowercase base (`x_B`, `r_M`), a letter index (`S_ABC`) and the axis forms of ADR-AG-274 are untouched. The stored line keeps the raw text.
+   - `unwrap`'s glued «ש-» after a given-word no longer takes the first letter of a cardinal (`CARDINAL_SHIN`, derived from the number words). This was the real cause of «נתונים שני מעגלים …» being unread: it reached every rule as «ני מעגלים …». The plan had placed the fix in the plural subject; the subject already read the sentence (A5).
+3. **«שני» before the plural tangents** (`TANGENTS_BARE`, `TANGENTS_AT_*`), and the English verb "touch each other" (A5). Both lower to their twins' facts.
+4. **B1, the measure between the centres** (`centres-distance`). The parser reads it as its lettered twin over `CENTRES_SENTINELS`. The segment spelling's twin is «Z₆Z₇ = 9»: it names the segment, so it draws it. The distance spelling's twin is «המרחק בין Z₆ ל-Z₇ הוא 9»: it names nothing (operator ruling 2026-10-02, ADR-AG-200). M1 finds the circles through `circlePairOf`, the pair resolver now shared with `tangent-circles`: named circles, or the figure's exactly two, else `ambiguous-shape` with the host count. It then writes the centres in. A centre with no letter is `unknown-reference`, as `via-centre` refuses «מרכז המעגל». The length layer's distance operand now reads a subscripted name (`N₁`) as `IS_POINT` already did. That was found here: «המרחק בין N₁ ל-N₂ הוא 9» was `not-handled`.
+5. **B2, the trailing through-adverbial** (`constructionCandidates`):
+   - «… משיק למעגל I דרך הנקודה A» is the register's existing «דרך … העבירו משיק» reading, so it teaches «המשיק למעגל I בנקודה A»;
+   - two conjoined tangent phrases are each composed;
+   - «משיקים למעגלים I ו-II בנקודות A ו-B בהתאמה» is paired.
+
+   The lesson joins the canonicals with the top-level «;» that `readLine` splits. The verdict stays `teach`, and the taught line records on the next Enter.
+6. **A tangent THROUGH a point on the circle is the tangent AT it** (found-work note on #2391). «דרך הנקודה A עובר משיק למעגל I» and "the tangent to circle I through A" are now `tangent-through`. M1 lowers it to `tangent-line-at` when the figure puts A on that circle (`onCurveByConstruction`, the one answer). Otherwise it is the #1430 from-point construction, unchanged. Before, Q1 built two free-direction lines tangent to their circles, «המשיקים נפגשים בנקודה M» was `ambiguous-shape`, and M's locus lost its equation.
+
+**Sibling audit.**
+- **2-D.** 2-D's deterministic lane (`decideDeterministic2D`, measured on this branch) escalates «M מקיימת MA = MB» and the distributed named pair, and asks which circle for the centres' distance. It already reads «שני המשיקים נחתכים», «נתונים שני מעגלים המשיקים …», «הקטע AB הוא קוטר המעגל M» and `N_2`. Known-gap rows name **#2415** (the 2-D port, `needs-operator`).
+- **The plan's account of 2-D.** The plan tagged A6 `[2-D]`, but 2-D at the student's entry point does not read it. The reading stands on the plan's `[asked]` line.
+- **3-D.** 3-D has no circle grammar for these sentences (X8). Complex has no plane circles.
+- **Analytic.** The from-point reading «מנקודה P יוצא משיק למעגל» keeps its from-point meaning, which is what it says.
+
+**Not built.**
+
+| Item | Why |
+|---|---|
+| Part C — «נתונים שני מעגלים …» before any circle, and «האחד/האחר» promoting it | #2397 |
+| the `N2` / `N₂` identity | a product change, not ruled |
+| an implicit origin O | no exam sentence writes it |
+
+**Locks.**
+- `src-analytic/__tests__/issue-2391-exam-twins.test.ts`, the class lock. Every spelling of the #2391 table, He and En. Each row asserts that its facts equal the twins' facts (src stripped), that its verdict is the twins', and that its drawn figure equals the twins' at seeds 0 and 1.
+- The same file holds B2's teach rows: each taught line records at seeds 0 and 1, and the taught pair draws the canonical figure.
+- It also holds the found-work rows: the tangents meet, and the locus is 4x + y + 3 = 0. A control checks that an off-circle point keeps the from-point tangent.
+- Its controls:
+  - «M מקיימת AB = KL» is not-handled;
+  - the twin's refusal with no circle I;
+  - three circles give `ambiguous-shape`, and a named pair is taken;
+  - A9 leaves `x_B`, `r_M`, `S_ABC` untouched;
+  - «מעגל II» is never the point I;
+  - the given-word's glued «ש-» still works;
+  - the empty-canvas pair is refused alike (#2397).
+- `src-analytic/__tests__/issue-2391-exam-fixtures.test.ts` runs four fixtures:
+  - `issue-2391-q1-exam-wording` (Q1 verbatim, line 4 as taught; the locus);
+  - `-q2-centres`;
+  - `-q2-exam-wording`, pending #2387 and #2388;
+  - `-q3-two-circles`, pending #2381. Its aside is refused `unsatisfiable` until the two circles' choices can differ.
+- Catalog: ten F5/F17 rows, He and En.
+- Parity: eight plain rows and two analytic-only rows; four of them are known gaps for 2-D (#2415).
+- `issue-1773-uppercase-axis-letter.test.ts` is re-based: `X_1` is now `X₁`. The capital is still never lowercased.
+
+**Behaviour change for a student.** Every exam sentence above reads as its canonical twin, builds the same figure, and refuses with the same message where the twin refuses. «מעבירים משיק … דרך הנקודה A ומשיק …» pre-fills «המשיק למעגל I בנקודה A; המשיק למעגל II בנקודה B». A tangent «דרך» a point on its circle is drawn as the tangent at that point. «המרחק בין N₁ ל-N₂ הוא 9» now reads.
+
+**Consequences.** `parser/frameAnalytic.ts`, `parser/parseAnalytic.ts` (`readLine`, `parseCentresDistance`, `tangent-through`, the tangent subjects), `parser/scopeAnalytic.ts`, `engine/types.ts` (`centres-distance`, `tangent-through`, `CENTRES_SENTINELS`), `engine/apply.ts` (`circlePairOf`, the two cases), `engine/lengths.ts` (the distance operand), `parser/catalogAnalytic.ts`, `shell/__tests__/fixtures/geo-input-parity.ts`.
+
+## ADR-AG-316 — The ask lane reads the exam's questions: coordinates, a parameter, a curve by centre, by «THE» noun and by tangent noun, conjunctions, the set-former (#2393)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream F); branch `feat/2393-analytic-ask-lane`, stacked on `feat/2391-analytic-exam-sentences` (ADR-AG-315). **Phase R only.** Phase Y (yes/no questions) is dropped by the operator's ruling of 2026-10-20 on #2393: *«the tool doesnt answer such questions. its a drawing tool and not a solver per se»*. Such a question keeps the lane's existing «לא הבנתי את השאלה». It also takes #2389's honesty item («שיפוע המקום הגיאומטרי של M»), per the ruling on #2389. LADDER stage: none (the ask lane; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R69a (new: the exam's own questions are askable). · **Design:** [04c](04c-design-analytic.md), «The ask lane» → «The exam's questions».
+
+**Context.** Measured on `3cae7f25` (`derive` → `ask`, model mocked) over the three exam figures:
+- «מצאו את שיעורי הנקודה M», «a», «מצאו את m ואת n» and the set-former's «… של כל הנקודות M המקיימות MA = MB» answered `unreadable`, or named the noun phrase as a missing point;
+- «משוואת המעגל שמרכזו N», «משוואת המעגל», "the equation of circle M" and «משוואת המשיק» answered `missing` curve;
+- «משוואת l1» answered null while the panel row beside it listed two equations, and «שיפוע l1» answered «±0.35»;
+- «שיפוע המקום הגיאומטרי של M» answered «אין בשרטוט ישר או מעגל בשם המקום הגיאומטרי של M».
+
+**Class.** The rule of 02c R23 is "sayable ⇒ askable, through the parser's own readers". Each gap was a reference form the lane did not resolve, or a question shape it did not frame. The «משוואת l1» defect had its own cause: **two curve resolvers for one question**. The by-name branch asked `knownCurve` alone, while the two-point-line branch and the panel row also fell back to the configurations' options (#1433, #1716).
+
+**Decision** (`app/ask.ts` unless named).
+1. **R1** `COORDS_OF`: «שיעורי (הנקודה) M», «הקואורדינטות של M» and "the coordinates of (point) M" rewrite to «M», so the answer is the point arm's (`pointText`, the panel's own decision).
+2. **R2** `PARAM_ASK`: «(הערך של) a» and "the value of a" are read only for a symbol the figure's register holds and reads (`paramRegister`, `usedSymbols`, never a direction symbol). The answer goes through the panel row's gate and spelling, `knownValue` → `valueText` (ADR-AG-270). Any other letter (`x`, or `m` before a line uses it) falls through unchanged.
+3. **R3** `CIRCLE_CENTRED_AT`: the circle whose centre is X (`centreIdOf`: `circle-at-X`, or an equation circle whose named centre is X). X not a point gives `missing` point. A point that is no circle's centre keeps `missing` curve.
+4. **R4** `THE_CURVE`: «משוואת המעגל / הפרבולה / האליפסה» takes the one host of that kind (`hostsOf`, the radius role's rule). None, or several, gives the existing `host` answer. «הישר» is not included: it has no host message.
+5. **R5**: `EQUATION_OF`'s English branch admits the noun ("the equation of circle M").
+6. **R6**: a tangent by its noun goes through the parser's exported `readTangentNoun`. It resolves to the tangent at T, or to the figure's one tangent object; none or several keeps `missing`. When #2390 adds a noun to that reader, this arm reads it with no change here.
+7. **R7, the root cause**: `curveEquationOf(c, id)` (`app/curveText.ts`) returns the known equation, else the options, else null. Callers:
+   - every ask arm that resolves a curve object (`curveAnswer`, which also keeps the two-point trace);
+   - the panel's curve row (`panelKnowledge`).
+
+   So «משוואת l1» now answers the row's two equations.
+8. **R8**: «(את) שתי / כל האפשרויות ל-…» is a second opener in `normaliseAsk`, and a trailing «(שתי אפשרויות)» is dropped. Both are enumerated.
+9. **R9** `splitAsk`:
+   - `ask` now wraps `askOne`. A question that did not read whole (unreadable or missing) is split at an enumerated joiner («… ואת …», «… ו-…», "… and …"), or at a plural noun over named members («משוואות המעגלים M ו-N»).
+   - The split is kept only when every part reads. When the whole was unreadable, one readable part is enough («מצאו את m ואת z» gives m's value, and z unread).
+   - The answer carries `parts`. `App.tsx` renders the question once, then each part through the extracted `answerBody`. There is no new wording.
+10. **R10** `SET_FORMER`:
+    - «(כל) (ה)נקודות M (המקיימות / ש- / such that S)» names M;
+    - with a condition S, the set is traced on the trial `derive([...d.lines, S])`, which is discarded after (02c R24). `Derivation.lines` is carried as `seed` is (#1176), and the trial's trace is its own;
+    - a condition the figure refuses is `Answer.refused`, worded by the input's own `errorText` (for example `errUnsatisfiable`).
+11. **#2389's honesty item.** The locus's slope («שיפוע המקום הגיאומטרי (של M)», "the slope of the locus") is `Answer.unsupported`, worded by the existing `errOutOfScope`. Per the operator's ruling of 2026-10-20 on #2389, the locus is an answer read from the panel, not an object.
+
+**Not built.** Phase Y (ruled out). The pairing of m with n (#2394).
+
+**Sibling audit.** 2-D, 3-D and complex have no ask lane with these arms. 3-D's ask box reads none of these forms; filing them is not this item's.
+
+**Measured cost.** One extra `derive` and one trace only for a set-former question with a condition (measured on Q1 with the condition unstated: 76 ms, against 0 ms for the cached plain locus ask). Every other arm is a regex in front of an existing arm.
+
+**Locks.**
+- `src-analytic/__tests__/issue-2393-exam-asks.test.ts` runs on the #2391 fixtures' own lines (`issue-2391-q1-exam-wording`, `-q2-centres`) and Q3's head. It checks:
+  - R1: each answer equals the bare name's;
+  - R2: `a` is 4 and equals `valueText(knownValue)`; `x`, and `m` before l1, are unchanged;
+  - R3–R5: each answer equals «משוואת מעגל X»; Q3 א gives (x - 8)² + (y + 3)² = 25; several circles give `host`; Z gives `missing` point;
+  - R6: Q2 ג gives x - 7 = 0 in five spellings;
+  - R7: «משוואת l1» equals the panel row's options, and «שיפוע l1» is unchanged;
+  - R8/R9: parts for Q2 א as printed, m and n, the plural noun, the «m ואת z» control, and a whole question that is never split;
+  - R10: four set-former spellings equal «המקום הגיאומטרי של M»; an unstated condition is traced, with the figure untouched; ML = MK gives `refused unsatisfiable`; a missing Q is named;
+  - #2389: three spellings give `unsupported`;
+  - the ruling: four yes/no questions stay `unreadable`.
+
+**Behaviour change for a student.**
+- The exam's «מצאו …» questions answer with the panel's values.
+- «משוואת l1» lists the row's two equations.
+- A conjoined question shows one answer per part under the question.
+- The set-former answers the locus it names.
+- «שיפוע המקום הגיאומטרי של M» says «המשפט מובן, אך אינו נתמך בכלי הזה» instead of "no such curve".
+
+**Consequences.** `app/ask.ts`, `app/curveText.ts` (`curveEquationOf`), `app/panelRows.ts`, `engine/derive.ts` (`Derivation.lines`), `parser/parseAnalytic.ts` (`readTangentNoun` exported), `App.tsx` (`answerBody`, the parts rows).

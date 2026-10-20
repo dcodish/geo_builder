@@ -33,6 +33,7 @@ import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts,
 import { followObjects, isoscelesKeys, roleVertexOf } from './roles';
 import {
   CENTRE_SENTINEL,
+  CENTRES_SENTINELS,
   ROLE_SIDE_SENTINELS,
   CIRCLE_SENTINEL,
   CIRCLE_SLOT_SENTINELS,
@@ -809,6 +810,45 @@ function centreRuleOf(o: GeoObject): DerivedRule | null {
 }
 
 /** The POINT the figure already holds at this circle's centre, by its id — null when the centre is unnamed. */
+/**
+ * THE TWO CIRCLES A SENTENCE SPEAKS OF — named (by the one name chain, `circleByName`), or the figure's own: «המעגל משיק
+ * למעגל K» is the one OTHER circle, «המעגלים משיקים» / «מרכזי המעגלים» the exactly two. Anything else is a genuine "which
+ * circles?", refused with the host count (#1432 am. 1). Written once (#2391, ADR-AG-315) for `tangent-circles` and
+ * `centres-distance`, so the two readings of «the two circles» cannot drift.
+ */
+function circlePairOf(
+  c: Construction,
+  nameA: string | undefined,
+  nameB: string | undefined,
+  src: string,
+): { ok: true; pair: [GeoObject, GeoObject] } | { ok: false; error: ApplyError } {
+  const named = (name: string): GeoObject | { error: ApplyError } => {
+    const o = circleByName(c, name);
+    return o && curveKindOf(o) === 'circle' ? o : { error: unknownRef(c, numeralCurveId('circle', name)) };
+  };
+  let a: GeoObject | undefined;
+  let b: GeoObject | undefined;
+  if (nameA !== undefined) {
+    const r = named(nameA);
+    if ('error' in r) return { ok: false, error: r.error };
+    a = r;
+  }
+  if (nameB !== undefined) {
+    const r = named(nameB);
+    if ('error' in r) return { ok: false, error: r.error };
+    b = r;
+  }
+  if (!a || !b) {
+    const rest = c.objects.filter((o) => curveKindOf(o) === 'circle' && o !== a && o !== b);
+    const need = (a ? 0 : 1) + (b ? 0 : 1);
+    // One name missing its partner is the circle none/many remedy; the unnamed pair over the wrong count is the PAIR's.
+    if (rest.length !== need) return { ok: false, error: noHost(src, 'circle', rest.length, need === 2 ? 2 : undefined) };
+    if (!a) a = rest.shift();
+    if (!b) b = rest.shift();
+  }
+  return { ok: true, pair: [a!, b!] };
+}
+
 export function centreIdOf(c: Construction, o: GeoObject): Id | null {
   if (o.kind === 'circle-at') return o.centre;
   const rule = centreRuleOf(o);
@@ -3918,32 +3958,42 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       return applyFact(c, { t: 'constraint', k: { t: 'length-eq', left, right: { expr: f.value, terms: [] } }, src: f.src });
     }
 
-    case 'tangent-circles': {
-      // The same name→circle chain as `tangent-of`/`diameter-of`: a numeral id, a centre-letter
-      // id, or the student's own name — one chain, so the family cannot drift (#1504).
-      const byName = (name: string): GeoObject | undefined => circleByName(c, name);
+    /**
+     * «אורכו של הקטע המחבר את מרכזי המעגלים הוא 9» (#2391 B1, ADR-AG-315) — the two circles by the one pair resolver
+     * (`tangent-circles`' own), and the lettered twin applied with their centres written in. A circle whose centre has no
+     * letter (an equation circle nobody named the centre of) is refused as `via-centre` refuses «מרכז המעגל», by phrase.
+     */
+    case 'centres-distance': {
+      const pair = circlePairOf(c, f.circles?.[0], f.circles?.[1], f.src);
+      if (!pair.ok) return pair;
+      const [a, b] = pair.pair;
+      if (a === b) return { ok: false, error: { code: 'unsatisfiable', detail: f.src } };
+      const centres = [centreIdOf(c, a), centreIdOf(c, b)];
+      if (centres.some((x) => x === null)) return { ok: false, error: { code: 'unknown-reference', detail: 'מרכזי המעגלים', expected: 'point' } };
+      const [z1, z2] = CENTRES_SENTINELS;
+      const text = JSON.stringify(f.facts).split(z1).join(centres[0]!).split(z2).join(centres[1]!);
+      return applyAll(c, (JSON.parse(text) as Fact[]).map((g) => ({ ...g, src: f.src })));
+    }
+
+    /**
+     * «דרך הנקודה A עובר משיק למעגל I» (#2391, ADR-AG-315) — through a point the figure puts ON that circle
+     * (`onCurveByConstruction`, the one answer), the tangent is the one AT the point: «המשיק למעגל I בנקודה A», its
+     * object and its 0-DOF closed form. Any other point keeps the from-point construction (#1430), whose two tangents
+     * are the solve's two roots.
+     */
+    case 'tangent-through': {
       const circles = c.objects.filter((o) => curveKindOf(o) === 'circle');
-      let a: GeoObject | undefined;
-      let b: GeoObject | undefined;
-      if (f.a !== undefined) {
-        a = byName(f.a);
-        if (!a || curveKindOf(a) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.a)) };
+      const host = f.circle !== undefined ? circleByName(c, f.circle) : circles.length === 1 ? circles[0] : undefined;
+      if (host && curveKindOf(host) === 'circle' && onCurveByConstruction(c, host, f.at)) {
+        return applyFact(c, { t: 'tangent-line-at', at: f.at, ...(f.circle !== undefined ? { circle: f.circle } : {}), src: f.src });
       }
-      if (f.b !== undefined) {
-        b = byName(f.b);
-        if (!b || curveKindOf(b) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.b)) };
-      }
-      if (!a || !b) {
-        // The contextual readings: «המעגל משיק למעגל K» means the one OTHER circle; «המעגלים
-        // משיקים» means the exactly two. Anything else is a genuine "which circles?".
-        const rest = circles.filter((o) => o !== a && o !== b);
-        const need = (a ? 0 : 1) + (b ? 0 : 1);
-        // The host rides the refusal (#1432 am. 1): one name missing its partner is the circle none/many
-        // remedy; «המעגלים משיקים» over the wrong count is the unnamed-PAIR remedy.
-        if (rest.length !== need) return { ok: false, error: noHost(f.src, 'circle', rest.length, need === 2 ? 2 : undefined) };
-        if (!a) a = rest.shift();
-        if (!b) b = rest.shift();
-      }
+      return applyAll(c, f.facts);
+    }
+
+    case 'tangent-circles': {
+      const pair = circlePairOf(c, f.a, f.b, f.src);
+      if (!pair.ok) return pair;
+      const [a, b] = pair.pair;
       // A circle is not tangent to itself — one circle named twice (or the contextual reading
       // landing back on the named one) has no configuration.
       if (a === b) return { ok: false, error: { code: 'unsatisfiable', detail: f.src } };

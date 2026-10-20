@@ -36,7 +36,8 @@ import { fmtAnalytic, fmtCoefficient, fractionClearingFactor } from '../format';
 import { ellipseFoci, parabolaDirectrix, parabolaFocus } from '../engine/curves';
 import { isVerticalLine } from '../engine/lines';
 import { evalExpr, exprText, isConstant, symbolsOf, type Expr } from '../engine/expr';
-import type { NumCurve } from '../engine/types';
+import type { Construction, Id, NumCurve } from '../engine/types';
+import { knownCurve, knownCurveOptions } from '../engine/evaluate';
 import type { LocusShape } from '../engine/locusFit';
 
 /**
@@ -611,4 +612,18 @@ export function locusEquation(shape: LocusShape, fmt: (v: number) => string): st
     case 'ellipse':
       return `x²/${fmt(c.a * c.a)} + y²/${fmt(c.b * c.b)} = 1`;
   }
+}
+
+/**
+ * WHAT A CURVE'S EQUATION IS, AS FAR AS THE GIVENS FIX IT (#2393 R7, ADR-AG-316) — the one decision the panel row and every
+ * ask arm print from: the known equation (every coefficient invariant, `knownCurve`), else the finite set the
+ * configurations give (`knownCurveOptions`, #1716), else nothing. «משוואת l1» answered null while the panel row listed
+ * two options because the ask's by-name branch asked only the first half; one function, so they cannot disagree again.
+ */
+export type CurveEquation = { known: NumCurve } | { options: NumCurve[] } | null;
+export function curveEquationOf(c: Construction, id: Id): CurveEquation {
+  const known = knownCurve(c, id);
+  if (known) return { known };
+  const options = knownCurveOptions(c, id);
+  return options ? { options } : null;
 }

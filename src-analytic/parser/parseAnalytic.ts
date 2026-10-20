@@ -58,7 +58,7 @@ function unreadable(src: string): RuleOutcome {
 }
 import { angleLabelSymbol, constantLengthExpr, namedLengthPairs, planeLetterLength, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
-import { CENTRE_SENTINEL, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
+import { CENTRE_SENTINEL, CENTRES_SENTINELS, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow, BARE_POLYGON_NOT_BUILT } from '../engine/shapes';
 import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
@@ -66,7 +66,11 @@ import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
 import {
   centreClauses,
+  centresRespectivelyClauses,
+  circleCentreClauses,
   describedCircles,
+  namedCirclesClauses,
+  satisfiesClause,
   diameterClauses,
   distributeClauses,
   elidedSubjectClauses,
@@ -2948,7 +2952,7 @@ const TANGENT_NOUN_HE = new RegExp(
 const TANGENT_NOUN_EN = new RegExp(
   `^(?:[Tt]he\\s+)?[Tt]angent(?:\\s+line)?(?:${TANGENT_CIRCLE_EN})?(?:\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME}))?(${TANGENT_CIRCLE_EN})?$`,
 );
-function readTangentNoun(text: string): { circle?: string; at?: Id } | null {
+export function readTangentNoun(text: string): { circle?: string; at?: Id } | null {
   const m = TANGENT_NOUN_HE.exec(text) ?? TANGENT_NOUN_EN.exec(text);
   if (!m) return null;
   // Groups: [1] a leading circle's name, [2] the point, [3] a TRAILING circle phrase ([4] its name). One circle
@@ -2995,18 +2999,20 @@ function sharedCircle(a: string, b: string): [string, string] {
  * (`sharedCircle`).
  */
 const PAIR_JOIN_TAN = '\\s+ו[-־]?\\s*';
+/** «שני המשיקים» — the numeral counting a plural subject: the same two tangents (#2391 A5, ADR-AG-315). */
+const TWO_HE = '(?:שני\\s+)?';
 const TANGENTS_AT_HE = new RegExp(
-  `^${HE_GIVEN}ה?משיקים(${TANGENT_CIRCLE_HE})?\\s+ב(?:נקודות\\s+|-\\s*)?(${NAME})${PAIR_JOIN_TAN}(${NAME})(${TANGENT_CIRCLE_HE})?\\s+(?:ה|ש)?${MEET_VERB_HE}\\s+${AT_POINT_HE}(${NAME})$`,
+  `^${HE_GIVEN}${TWO_HE}ה?משיקים(${TANGENT_CIRCLE_HE})?\\s+ב(?:נקודות\\s+|-\\s*)?(${NAME})${PAIR_JOIN_TAN}(${NAME})(${TANGENT_CIRCLE_HE})?\\s+(?:ה|ש)?${MEET_VERB_HE}\\s+${AT_POINT_HE}(${NAME})$`,
 );
 const TANGENTS_AT_EN = new RegExp(
-  `^(?:[Tt]he\\s+)?[Tt]angents(${TANGENT_CIRCLE_EN})?\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})\\s+and\\s+(${NAME})(${TANGENT_CIRCLE_EN})?\\s+(?:meet|intersect|cross)\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`,
+  `^(?:[Tt]he\\s+)?(?:two\\s+)?[Tt]angents(${TANGENT_CIRCLE_EN})?\\s+at\\s+(?:the\\s+)?(?:points\\s+)?(${NAME})\\s+and\\s+(${NAME})(${TANGENT_CIRCLE_EN})?\\s+(?:meet|intersect|cross)\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`,
 );
 // Case written into the words, never an `i` flag: it would read a lowercase letter as a point and a lowercase
 // `i` as the numeral I in a circle's name (the [IVX] trap, ADR-AG-006).
 const TANGENTS_BARE = [
-  new RegExp(`^${HE_GIVEN}ה?משיקים\\s+(?:ה|ש)?${MEET_VERB_HE}\\s+${AT_POINT_HE}(${NAME})$`),
+  new RegExp(`^${HE_GIVEN}${TWO_HE}ה?משיקים\\s+(?:ה|ש)?${MEET_VERB_HE}\\s+${AT_POINT_HE}(${NAME})$`),
   new RegExp(`^${HE_POINT}(${NAME})${HE_IS}\\s*(?:ה?נקודת\\s+)?ה?(?:חיתוך|מפגש)\\s+(?:של\\s+)?ה?משיקים$`),
-  new RegExp(`^(?:[Tt]he\\s+)?[Tt]angents\\s+(?:meet|intersect|cross)\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`),
+  new RegExp(`^(?:[Tt]he\\s+)?(?:two\\s+)?[Tt]angents\\s+(?:meet|intersect|cross)\\s+at\\s+(?:the\\s+)?(?:point\\s+)?(${NAME})$`),
   new RegExp(`^(?:[Pp]oint\\s+)?(${NAME})\\s+is\\s+the\\s+(?:intersection|meeting\\s+point)\\s+of\\s+the\\s+tangents$`),
 ];
 
@@ -3094,19 +3100,66 @@ function parseTangentObject(line: string): RuleOutcome {
     if (!through.ok) return null;
     const lineAt = through.facts.find((x) => x.t === 'line-at');
     if (!lineAt || lineAt.t !== 'line-at') return null;
+    // WHICH tangent is the figure's question (#2391, ADR-AG-315): through a point ON the circle it is the tangent there.
     return made([
-      ...through.facts.map((x) => ({ ...x, src: line })),
       {
-        t: 'tangent-of',
-        axes: [],
-        lines: [{ kind: 'curve', id: lineAt.id, label: `משיק דרך ${p}` }],
+        t: 'tangent-through',
+        at: p,
         ...(circle ? { circle } : {}),
+        facts: [
+          ...through.facts.map((x) => ({ ...x, src: line })),
+          {
+            t: 'tangent-of',
+            axes: [],
+            lines: [{ kind: 'curve', id: lineAt.id, label: `משיק דרך ${p}` }],
+            ...(circle ? { circle } : {}),
+            src: line,
+          },
+        ],
         src: line,
       },
     ]);
   }
   const built = tangentObjectFacts(trim(bare), line);
   return built.length > 0 ? made(built) : null;
+}
+
+/**
+ * THE MEASURE BETWEEN TWO CIRCLES' CENTRES, NAMED BY ROLE (#2391 B1, ADR-AG-315) — «אורכו של הקטע המחבר את מרכזי המעגלים
+ * הוא 9», «אורך הקטע המחבר את מרכזי המעגלים I ו-II הוא 9», «המרחק בין מרכזי המעגלים הוא 9», "the distance between the
+ * centres (of the circles) is 9", "the (length of the) segment joining the centres is 9".
+ *
+ * Read as its LETTERED twin over two sentinel centres, so every value spelling and every refusal is that sentence's own:
+ * the segment spelling is «Z₆Z₇ = 9» (it names the segment, so it draws it) and the distance spelling «המרחק בין Z₆ ל-Z₇
+ * הוא 9» (it names nothing — the operator's ruling of 2026-10-02, ADR-AG-200). Which two circles is M1's question.
+ */
+const CENTRES_VALUE_HE = '\\s+(?:(?:הוא|היא)\\s+|=\\s*|שווה\\s+(?:ל-?\\s*)?)?(.+)$';
+const CENTRES_OF_HE = `מרכזי\\s+(?:שני\\s+)?ה?מעגלים(?:\\s+(${CIRCLE_NAME})\\s+ו-?\\s*(${CIRCLE_NAME}))?`;
+const CENTRES_SEGMENT_HE = new RegExp(`^${HE_GIVEN}(?:ה?אורך|אורכו\\s+של)\\s+ה?קטע\\s+ה?מחבר\\s+(?:את\\s+)?(?:בין\\s+)?${CENTRES_OF_HE}${CENTRES_VALUE_HE}`);
+const CENTRES_DISTANCE_HE = new RegExp(`^${HE_GIVEN}ה?מרחק\\s+(?:בין\\s+)?${CENTRES_OF_HE}${CENTRES_VALUE_HE}`);
+const CENTRES_OF_EN = `the\\s+cent(?:re|er)s(?:\\s+of\\s+(?:the\\s+)?(?:two\\s+)?circles(?:\\s+(${CIRCLE_NAME})\\s+and\\s+(${CIRCLE_NAME}))?)?`;
+const CENTRES_VALUE_EN = '\\s+(?:is|=|equals)\\s+(.+)$';
+const CENTRES_SEGMENT_EN = new RegExp(`^(?:[Tt]he\\s+)?(?:length\\s+of\\s+(?:the\\s+)?)?segment\\s+(?:joining|connecting)\\s+${CENTRES_OF_EN}${CENTRES_VALUE_EN}`);
+const CENTRES_DISTANCE_EN = new RegExp(`^(?:[Tt]he\\s+)?distance\\s+between\\s+${CENTRES_OF_EN}${CENTRES_VALUE_EN}`);
+function parseCentresDistance(line: string): RuleOutcome {
+  const seg = CENTRES_SEGMENT_HE.exec(line) ?? CENTRES_SEGMENT_EN.exec(line);
+  const dist = seg ? null : CENTRES_DISTANCE_HE.exec(line) ?? CENTRES_DISTANCE_EN.exec(line);
+  const m = seg ?? dist;
+  if (!m) return null;
+  const [, c1, c2, value] = m;
+  if (c1 !== undefined && c1 === c2) return refuse('repeated-vertex', line);
+  const [z1, z2] = CENTRES_SENTINELS;
+  const twin = parseClause(seg ? `${z1}${z2} = ${trim(value)}` : `המרחק בין ${z1} ל-${z2} הוא ${trim(value)}`);
+  // The value is the twin's to judge: a refusal it owns refuses this line, quoting the student's words.
+  if (!twin.ok) return twin.code === 'not-handled' ? null : ({ ...twin, detail: line } as ParseResult);
+  return made([
+    {
+      t: 'centres-distance',
+      ...(c1 !== undefined && c2 !== undefined ? { circles: [c1, c2] as [string, string] } : {}),
+      facts: twin.facts.map((x) => ({ ...x, src: line })),
+      src: line,
+    },
+  ]);
 }
 
 /** «דרך (הנקודה) P עובר משיק למעגל» / "a tangent to the circle passes through P" (#1430). */
@@ -3701,7 +3754,11 @@ function parseCircleAt(line: string): RuleOutcome {
    * respectively", read here since the integration): one verb list, so the two verbs cannot drift.
    */
   const listed = peelTouchList(
-    line.replace(/^נתו(?:ן|נה|נים|נות)\s+/, '').replace(/\s+touch(?:es)?\s+(?=(?:the\s+)?(?:circle|[xy][- ]axis|line)\b)/i, ' tangent to '),
+    line
+      .replace(/^נתו(?:ן|נה|נים|נות)\s+/, '')
+      .replace(/\s+touch(?:es)?\s+(?=(?:the\s+)?(?:circle|[xy][- ]axis|line)\b)/i, ' tangent to ')
+      // "the two circles touch each other externally" (#2391 A5, ADR-AG-315) — the reciprocal verb is the same tangency.
+      .replace(/\s+touch\s+(?=(?:each\s+other|one\s+another)\b)/i, ' are tangent to '),
   );
   if (listed.ats) mods.ats = listed.ats;
   const body = peelMods(listed.rest, 'tail', mods);
@@ -7819,6 +7876,10 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
       pointClauses(s),
       sideClauses(s),
       centreClauses(s),
+      // The exam's circle-and-centre sentences (#2391, ADR-AG-315): each the twin's own text.
+      circleCentreClauses(s),
+      centresRespectivelyClauses(s),
+      namedCirclesClauses(s),
       sharedSubjectClauses(s),
       elidedSubjectClauses(s),
       diameterClauses(s),
@@ -7829,6 +7890,17 @@ function readLine(text: string, depth: number): { result: ParseResult; framed: b
     ]) {
       const r = reading && attempt(reading);
       if (r) return { result: r, framed: true };
+    }
+    /*
+     * «M מקיימת MA = MB» (#2391 A6, ADR-AG-315; 2-D's reading) — the statement, taken only when its facts NAME the point:
+     * «M מקיימת AB = CD» is not this sentence, and reading it so would drop M without a word.
+     */
+    const satisfies = satisfiesClause(s);
+    const said = satisfies && attempt([satisfies.clause]);
+    if (said && said.ok && said.facts.some((f) => JSON.stringify(f).includes(JSON.stringify(satisfies.subject)))) {
+      // The subject is NAMED, as «נקודה M» names it (a no-op for a point the figure has): the sentence is about M.
+      const named = said.facts.some((f) => f.t === 'declare' && f.id === satisfies.subject);
+      return { result: named ? said : made([{ t: 'declare', id: satisfies.subject, src: s }, ...said.facts]), framed: true };
     }
     /*
      * A chain IS its pairs: a pair refused with an OWNED reason refuses the chain with it, quoting the whole line —
@@ -8754,6 +8826,10 @@ function parseClauseRules(raw: string): ParseResult {
   // noun reader would take «משיק למעגל» as the reference «המשיק», and before `parseCircleAt`'s subject reader.
   const circleFamilies = parseCircleFamilies(line);
   if (circleFamilies) return circleFamilies;
+  // «אורכו של הקטע המחבר את מרכזי המעגלים הוא 9» (#2391 B1, ADR-AG-315) — before the length rules, which would read
+  // «מרכזי» as nothing and refuse the line as an operand.
+  const centres = parseCentresDistance(line);
+  if (centres) return centres;
   // The tangent as an object and chords (#1619 B3) — before `parseCircleAt`, whose verb split would
   // read «משוואת המשיק …» as a subject «משוואת» before the verb «המשיק».
   const tangentObject = parseTangentObject(line) ?? parseChord(line);
