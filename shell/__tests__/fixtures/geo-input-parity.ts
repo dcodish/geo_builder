@@ -296,7 +296,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2357': 'open', // #2234 (ADR-737): analytic sends the same spellings to the model
 
   '#2344': 'open', // #2344 (ADR-W-146): 2-D draws a green sliver for a triangle whose givens hold only flat in the limit (the tangent root)
-  '#2407': 'open', // #2385 (ADR-AG-312): 2-D refuses the common tangent through the circles' touch point (the P1 port)
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1683,7 +1682,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'knee-named-crossing-2103', family: 'parallel-perpendicular', steps: ['ריבוע ABCD', 'O נקודת חיתוך האלכסונים', 'AC ⟂ BD'], expect: 'builds', note: 'the knee at O (∠COD) is locked per tool in issue-1946-knee-at-named-foot.test.ts (2-D and 3-D)' },
 
   // ── #2385 (ADR-AG-312): a common tangent through the circles' stated touch point is the tangent at it ──
-  { id: 'common-tangent-through-touch-2385', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'T על AB', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2407' }], note: '2-D refuses it over-constrained (T, A, B collinear): the P1 port #2407; analytic was unsatisfiable before ADR-AG-312' },
+  { id: 'common-tangent-through-touch-2385', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'T על AB', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', note: '2-D builds it since ADR-740 (#2407); analytic since ADR-AG-312 (#2385)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
