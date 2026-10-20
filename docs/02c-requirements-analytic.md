@@ -670,6 +670,10 @@ a sentence the tool parsed.
 - A name already in the figure that the sentence never wrote counts too *(operator, 2026-10-16: "1 - yes")*: «ישר l» answered «דרך P עובר ישר l» → «כדי לבנות את זה הייתי צריך לקשר את המשפט ל-P, שלא מופיע בו — לא רשמתי כלום. …», nothing recorded
 - Sources: ADR-AG-279, ADR-AG-280, ADR-AG-281, #1355, #2225.
 
+**R194 — a sentence the fallback answers with several lines shows one row per line, worded as that line**. *(Operator ruling (c), 2026-10-20, on #2424: "the part where an input is separated into 2 is not clear to users since they just see the same line twice".)* As 2-D does; each row keeps its own tick, ✕ and ✎. An answer of ONE line still shows the student's own sentence (#1297). The shape warning and the narrowing note name such a row by the same text. «הורידו שאלה» still prints the student's sentence once.
+- «נתון מעגל I שמשוואתו (x − 3)² + (y − 4)² = 9 , ומרכזו בנקודה K .» answered with two lines → «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9» · «מרכז המעגל I הוא K», never the sentence twice with «(1/2)», «(2/2)»
+- Sources: ADR-AG-326, #2424.
+
 **R111 — a word the tool does not know is REFUSED in a value slot, never absorbed as parameters**. **A stated magnitude is never silently reinterpreted**; juxtaposed parameters (`2a`, `25k²`) are kept.
 - «שיפוע הישר l1 הוא tan(30)» → refused, never `t·a·n·30`
 - «5 1/2» typed with a space, in any number → refused, teaching 5.5, 5+1/2 or 5*1/2; never 5·½. The symbol «5½» reads 5.5
@@ -932,7 +936,7 @@ a sentence the tool parsed.
 - «הזווית בין הישר l1 לציר ה-x» → α, with m = tan α
 - Sources: ADR-AG-154, #1322.
 
-**R136 — the data panel's option rows read in order, and a loaded figure keeps the student's own words**. *(Operator: "the −2 is not shown correctly".)* A loaded file shows every row as saved, an AI-built row as the student's sentence.
+**R136 — the data panel's option rows read in order, and a loaded figure keeps the student's own words**. *(Operator: "the −2 is not shown correctly".)* A loaded file shows every row as saved, an AI-built row as the student's sentence (a part of a split answer as its own line, R194).
 - `A = [(3/5, 4/5)] או (4, -2)`, never `(2- ,4)`
 - `AB: 2 · זווית עם ציר ה-x: 63.43°`
 - Sources: ADR-AG-199, #1644, #1632, #1637.

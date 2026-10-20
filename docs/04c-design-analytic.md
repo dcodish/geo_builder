@@ -994,7 +994,12 @@ admitted figures of `drawableAt(c, 0..POOL_SIZE-1)`, only once `configurationPoo
 reports pending and returns nothing, so `poolScheduler`'s re-render brings the note. Subset trials re-derive the
 anchors plus the chosen lines, settled "not forced" at the first counterexample. `App.tsx` computes it in a passive
 effect after paint (never in render) and shows one `Banner kind="notice"` per note under the shape warnings; the
-given text is the line as the page shows it (`spokenFor`).
+given text is the line as the page shows it (`rowShownText`, below).
+
+**A row's shown text** ([ADR-AG-326](06c-decisions-analytic.md#adr-ag-326), #2424). `rowShownText(line, spokenFor[i])` in
+`store/useAnalyticStore.ts`, beside the marker's writer `spokenPart` and reader `spokenSentence`: the stored sentence
+when it carries no part marker (a one-line fallback answer, #1297), else the machine line itself. The givens list, the
+shape warning and the narrowing note all read it; the marker stays stored for the export, rename and saves.
 
 ### Only valid configurations are evidence ([ADR-AG-197](06c-decisions-analytic.md#adr-ag-197), #1642, #1638, #1635, #1634, #1539)
 
