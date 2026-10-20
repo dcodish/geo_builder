@@ -28,6 +28,24 @@
 
 import { formatMeasure } from '@/format';
 import { hasEngineToken } from '../../shell/studentText';
+import { TANGENTS_EXHAUSTED } from '@/engine/radiusFeasibility';
+
+/**
+ * #197 Am. 8 — THE tangents-exhausted sentence for a pair's mutual position and the asked kind (disjoint 4, externally
+ * tangent 3, intersecting 2, internally tangent 1, contained 0). One mapping for both seats that refuse a common tangent
+ * beyond what the pair has: the parser's deterministic refusal (`decideDeterministic`) and, since #2428
+ * ([ADR-741](../../docs/06-decisions.md#adr-741)), the engine's stage-0 guard (`commonTangentCapacityError`).
+ */
+export function tangentsExhaustedKey(kind: 'external' | 'internal' | 'any', position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained', hint?: 'at-touch'): string {
+  return hint === 'at-touch' ? 'input.tangentsExhaustedTouch'
+    : position === 'contained' ? 'input.tangentsExhaustedContained'
+    : position === 'int-tangent' ? (kind === 'internal' ? 'input.tangentsExhaustedNoInternal' : 'input.tangentsExhaustedIntTangent')
+    : position === 'intersecting' ? (kind === 'internal' ? 'input.tangentsExhaustedNoInternal' : 'input.tangentsExhaustedIntersecting')
+    : position === 'ext-tangent' ? (kind === 'external' ? 'input.tangentsExhaustedExternal' : kind === 'internal' ? 'input.tangentsExhaustedTouchTaken' : 'input.tangentsExhaustedExtTangent')
+    : kind === 'external' ? 'input.tangentsExhaustedExternal'
+    : kind === 'internal' ? 'input.tangentsExhaustedInternal'
+    : 'input.tangentsExhaustedAny';
+}
 
 /** The subset of i18next's `t` we need — a key plus interpolation params → string. */
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -388,6 +406,15 @@ export const PATTERNS: Pattern[] = [
     nested: (m) => ({ what: { key: `errors.equalNestedReason.${m[2]}`, params: {} } }),
     saysSubject: true,
     namesOther: true,
+  },
+  // radiusFeasibility.ts commonTangentCapacityError (#2428, ADR-741) — `tangents-exhausted: common tangent AB of kind any
+  // on int-tangent circles`: a two-touch common tangent the pair's stated position does not have. The parser's own
+  // refusal sentence for the same position and kind (one mapping, `tangentsExhaustedKey`), so both seats read alike.
+  {
+    re: TANGENTS_EXHAUSTED,
+    key: 'input.tangentsExhaustedIntTangent',
+    keyOf: (m) => tangentsExhaustedKey(m[2] as 'external' | 'internal' | 'any', m[3] as 'int-tangent' | 'ext-tangent' | 'contained'),
+    keys: ['input.tangentsExhaustedIntTangent', 'input.tangentsExhaustedNoInternal', 'input.tangentsExhaustedTouchTaken', 'input.tangentsExhaustedContained'],
   },
   // engine/lower.ts letterSystem (#2165 + #2119, ADR-681) — `over-constrained: radius of O = 4 cannot hold [vs #i]`: a
   // second, different size for a circle whose size a statement already gave (a radius letter's value, a reserved r, a

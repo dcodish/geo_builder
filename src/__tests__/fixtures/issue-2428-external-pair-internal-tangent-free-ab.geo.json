@@ -1,0 +1,100 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-20T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "MX1Miwba7sqhqcJH_o0TV",
+      "utterance": "מעגל M",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-M",
+        "center": "M",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "-Eq_rdClf8ilkbmbl5OsZ",
+      "utterance": "מעגל N",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-N",
+        "center": "N",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "mjYr9yREAXEJFq1v8kgYw",
+      "utterance": "המעגלים משיקים בנקודה T",
+      "cmd": {
+        "type": "circles-tangent",
+        "circle1": "circle-M",
+        "circle2": "circle-N",
+        "at": "T",
+        "external": true,
+        "kindStated": false
+      },
+      "enabled": true
+    },
+    {
+      "id": "8_O47ZwaNfOvSgjEY-Exk",
+      "utterance": "נקודה A",
+      "cmd": {
+        "type": "free-point",
+        "id": "A",
+        "x": 3,
+        "y": 2,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "X5Mrvu0YioEb2zMS9_nYT",
+      "utterance": "נקודה B",
+      "cmd": {
+        "type": "free-point",
+        "id": "B",
+        "x": 3,
+        "y": 2,
+        "free": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "i6H2vtbzpTjlR-hxj5vPg",
+      "utterance": "AB משיק משותף פנימי למעגלים M ו-N",
+      "group": "OAl3rDH5_2a5YpCHrAQr0",
+      "cmd": {
+        "type": "tangent",
+        "id": "tan-T",
+        "circle": "circle-M",
+        "at": "T",
+        "visible": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "P4KCd-2I-YXrkpVyGW2Go",
+      "utterance": "AB משיק משותף פנימי למעגלים M ו-N",
+      "group": "OAl3rDH5_2a5YpCHrAQr0",
+      "cmd": {
+        "type": "common-tangent",
+        "a": "A",
+        "b": "B",
+        "circle1": "circle-M",
+        "circle2": "circle-N",
+        "at": "T"
+      },
+      "enabled": true
+    }
+  ]
+}

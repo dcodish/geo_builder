@@ -7,7 +7,7 @@ import { collapsedPolygonError, diagonalClaimRefusal } from '@/engine/step';
 import { collinearCircleError, notCyclicImpossibilityError } from '@/engine/cyclicFeasibility';
 import { diagonalHeightError } from '@/engine/heightFeasibility';
 
-import { equalNestedMessage } from '@/engine/radiusFeasibility';
+import { equalNestedMessage, tangentsExhaustedMessage } from '@/engine/radiusFeasibility';
 import type { Constraint } from '@/engine/types';
 import { stripFormatControls } from '../../../shell/bidi';
 import { reservedAmbiguity } from '@/engine/lower';
@@ -103,6 +103,11 @@ const CASES: { raw: string; contains: string[] }[] = [
   { raw: `${equalNestedMessage('circle-P', 'int-tangent')} [vs #1]`, contains: ['משיקים מבפנים', 'אותו מעגל'] },
   { raw: equalNestedMessage('circle-P', 'contained'), contains: ['מוכלים זה בזה', 'קטן ממנו'] },
   { raw: equalNestedMessage('circle-O-2', 'concentric'), contains: ['ומרכזם משותף', 'אותו מעגל'] },
+  // radiusFeasibility.ts commonTangentCapacityError (#2428, ADR-741) — the parser's own tangents-exhausted sentences
+  { raw: tangentsExhaustedMessage('A', 'B', 'any', 'int-tangent'), contains: ['משיקים מבפנים', 'בנקודת ההשקה'] },
+  { raw: tangentsExhaustedMessage('A', 'B', 'internal', 'int-tangent'), contains: ['אין משיק משותף פנימי'] },
+  { raw: tangentsExhaustedMessage('A', 'B', 'internal', 'ext-tangent'), contains: ['המשיק הפנימי היחיד'] },
+  { raw: tangentsExhaustedMessage('A', 'B', 'external', 'contained'), contains: ['אין אף משיק משותף'] },
   // replay/core.ts (#2023, ADR-661) — a second letter for an angle or a segment that already has one
   { raw: 'name-taken: angle ABC is already named α [vs #1]', contains: ['ABC', 'α'] },
   { raw: 'name-taken: segment AB is already named 2a', contains: ['AB', '2a'] },

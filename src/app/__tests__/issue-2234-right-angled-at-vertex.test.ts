@@ -225,7 +225,7 @@ describe('an AI answer carrying the phrase is not built ("not even through AI")'
   it('a model step «משולש ABC ישר זווית ב-B» is dropped; the answer’s other steps are unchanged', async () => {
     const { llmParse } = await vi.importActual<typeof import('@/parser/llm')>('@/parser/llm');
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ steps: ['משולש ABC ישר זווית ב-B', 'AB = 4'] }) })));
-    const out = await llmParse('anything', {} as never, {});
+    const out = await llmParse('anything', {} as never, () => ({}));
     expect(out?.dropped).toEqual(['משולש ABC ישר זווית ב-B']);
     expect(out?.built.map((b) => b.step)).toEqual(['AB = 4']);
   });

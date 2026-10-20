@@ -77,6 +77,7 @@ import { findProofTarget } from '../../shell/proofTarget';
 import { findRadianAngle } from '../../shell/radianAngle';
 import { unreadScript } from '../../shell/inputScript';
 import { honestyGateReport } from './honestyGates';
+import { tangentsExhaustedKey } from '@/i18n/humanizeError';
 import { honoursConstruct, roleReadings, thalesReadings } from './roleReadings';
 import { vertexPairVerdict } from './vertexPairCevian';
 import { solveBudget, work, withWorkBudget, withWorkEpoch } from '@/engine/solveBudget';
@@ -655,15 +656,8 @@ export async function decideFromParse(
   if (!r.ok && r.reason === 'tangents-exhausted') {
     // Position-accurate refusal (#197 Am. 8): the true tangent count depends on the pair's mutual
     // position — disjoint 4, externally tangent 3, intersecting 2, internally tangent 1, contained 0.
-    const msgKey =
-      r.hint === 'at-touch' ? 'input.tangentsExhaustedTouch'
-      : r.position === 'contained' ? 'input.tangentsExhaustedContained'
-      : r.position === 'int-tangent' ? (r.kind === 'internal' ? 'input.tangentsExhaustedNoInternal' : 'input.tangentsExhaustedIntTangent')
-      : r.position === 'intersecting' ? (r.kind === 'internal' ? 'input.tangentsExhaustedNoInternal' : 'input.tangentsExhaustedIntersecting')
-      : r.position === 'ext-tangent' ? (r.kind === 'external' ? 'input.tangentsExhaustedExternal' : r.kind === 'internal' ? 'input.tangentsExhaustedTouchTaken' : 'input.tangentsExhaustedExtTangent')
-      : r.kind === 'external' ? 'input.tangentsExhaustedExternal'
-      : r.kind === 'internal' ? 'input.tangentsExhaustedInternal'
-      : 'input.tangentsExhaustedAny';
+    // #2428 (ADR-741): one mapping, shared with the engine guard's humanized refusal.
+    const msgKey = tangentsExhaustedKey(r.kind, r.position, r.hint);
     return refuse('guided', { source: 'parser', result: `tangents-exhausted:${r.kind}` }, { key: msgKey });
   }
   // Analytic / coordinate-geometry input (axes, coordinates, slope, line equations — and, since #1245, a

@@ -892,6 +892,22 @@ something else places is not moved; the radius ⟂ (centre1·T ⟂ a·b) is then
 `avoid`, and is not a two-touch entry of `ctx.commonTangents`. The rule's creations of named circles carry
 `implied: true`, so `impliedCircleBinding` names a drawn unnamed pair by them (ADR-347, ADR-565 d7).
 
+The capacity exit calls `touchTangent` with `only` ([ADR-741](06-decisions.md#adr-741)): the tangent at T is then the only
+common tangent the sentence can name, so two existing letters that are both in `ctx.freePoints` are seated by the same
+`at` record even with no stated collinearity (`freeSeat`). A placed letter is not seated. Stage 0a″
+(`commonTangentCapacityError`, `engine/radiusFeasibility.ts`) is the engine's half: a `common-tangent` without `at` over a
+pair whose `circle-position` records state it internally tangent, externally tangent with kind internal, or contained is
+refused before the solve; `tangentsExhaustedKey` (`i18n/humanizeError.ts`) gives it the parser's sentence.
+
+### The AI lane's context ([ADR-741](06-decisions.md#adr-741))
+
+`llmParse` re-parses each canonical line through `parse(step, ctxFor(built))`, where `built` is the commands of the lines
+before it, and builds no `ParseContext` itself (a source guard in `issue-2428-internal-pair-tangent-at-t.test.ts`). The
+pipeline passes `laneContext(first, now)` (`src/app/laneContext.ts`): `first` is the context the deterministic path read
+(`parseCtxNow()`, or the bound view's), so a line the model echoes decides exactly as the typed one; a later line gets
+`buildParseCtx` of `replay(trialFacts(facts, built), seed)` with the store read after the model answered, memoised by the
+built count. The trial is the same `trialFacts` the post-model dry run folds, so the context and the judged figure agree.
+
 ### A fixed-run rule consumes the whole label body ([ADR-601](06-decisions.md#adr-601))
 
 `labelRun(body, n)` returns the first run of exactly n labels and nothing about the rest of the body, so a rule

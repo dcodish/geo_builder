@@ -8,7 +8,29 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { llmParse } from '../llm';
-import { restoreStatedSequences } from '../parse';
+import { restoreStatedSequences, parse, type ParseContext } from '../parse';
+import { buildParseCtx } from '../context';
+import { laneContext } from '@/app/laneContext';
+import { replay, trialFacts, type Fact } from '@/store/geoStore';
+
+/** A real figure, line by line through the grammar — the facts a lane context replays (#2428, ADR-741). */
+function figure(lines: string[]): Fact[] {
+  let facts: Fact[] = [];
+  for (const l of lines) {
+    const d = replay(facts, 0);
+    const r = parse(l, buildParseCtx(d.construction, d.positions));
+    if (!r.ok) throw new Error(`«${l}» does not parse`);
+    facts = trialFacts(facts, r.commands);
+  }
+  return facts;
+}
+/** The lane's context on that figure, as the pipeline builds it. */
+function laneOn(lines: string[]) {
+  const facts = figure(lines);
+  const d = replay(facts, 0);
+  return laneContext(buildParseCtx(d.construction, d.positions), () => ({ facts, seed: 0 }));
+}
+const fixed = (ctx: ParseContext) => () => ctx;
 
 // #1359 — `buildLlmRequest` and `extractSteps` moved to `server/llm/harness.ts`, the one composer
 // for all three products. Their cases moved with them to `server/__tests__/issue-1359-prompt-lane.test.ts`:
@@ -49,7 +71,7 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
     expect(without!.built).toEqual([]);
     // With the figure context (A exists, circle O present) → it builds the secant.
     mockFetch([step]);
-    const withCtx = await llmParse('AC cuts circle O at D', '', { points: ['A', 'B'], circles: ['O'] });
+    const withCtx = await llmParse('AC cuts circle O at D', '', fixed({ points: ['A', 'B'], circles: ['O'] }));
     expect(withCtx!.dropped).toEqual([]);
     expect(withCtx!.built.flatMap((b) => b.commands).map((c) => c.type)).toEqual([
       'point-on-circle', 'line-through', 'line-circle-intersection', 'segment',
@@ -59,7 +81,7 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
   it('accumulates context across steps — a later step sees a point an earlier step introduced', async () => {
     // Step 1 creates C on circle P; step 2 ("another secant from C") must see C as existing.
     mockFetch(['C על מעגל P', 'מנקודה C ישר חותך את המעגל O בנקודות E ו-F']);
-    const r = await llmParse('a secant from C', '', { points: ['A', 'B'], circles: ['O', 'P'] });
+    const r = await llmParse('a secant from C', '', laneOn(['מעגל O', 'מעגל P', 'נקודה A', 'נקודה B']));
     expect(r!.dropped).toEqual([]); // step 2 no longer drops — C is now in context
     expect(r!.built.map((b) => b.step)).toHaveLength(2);
   });
@@ -69,7 +91,7 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
     // THAT circle. Before R9(b), circleMembers was frozen at the (empty) pre-escalation figure, so step 2
     // could not find the circle holding B,C and was dropped.
     mockFetch(['circle through A B C', 'M is the midpoint of arc BC']);
-    const r = await llmParse('circumscribe ABC then take the arc-midpoint of BC', '');
+    const r = await llmParse('circumscribe ABC then take the arc-midpoint of BC', '', laneOn([]));
     expect(r!.dropped).toEqual([]); // step 2 no longer drops
     expect(r!.built.flatMap((b) => b.commands).map((c) => c.type)).toEqual(['circumcircle', 'arc-midpoint']);
   });
@@ -79,12 +101,7 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
     // creates E ON AC; step 2 ("EG קטע אמצעים") needs ctx.onSegment[E] + ctx.neighbors to resolve the
     // triangle — hints that used to be DROPPED here, so step 2 silently degraded to a bare segment EG.
     mockFetch(['נקודה E על AC', 'EG קטע אמצעים']);
-    const r = await llmParse('midsegment decomposition', '', {
-      points: ['A', 'B', 'C'],
-      circles: [],
-      // the caller's real-figure hints (triangle ABC drawn earlier)
-      neighbors: { A: ['B', 'C'], B: ['A', 'C'], C: ['A', 'B'] },
-    });
+    const r = await llmParse('midsegment decomposition', '', laneOn(['משולש ABC'])); // the caller's real figure (#2428)
     expect(r!.dropped).toEqual([]);
     const kinds = r!.built.flatMap((b) => b.commands).map((c) => c.type);
     // step 2 must parse as the midsegment macro (shape-variant), NOT a bare segment
@@ -97,7 +114,7 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
     // «ישר ABD» — the NEGATION of the stated betweenness — and the seam committed it green. The
     // sequence gate restores the student's spelling before the re-parse.
     mockFetch(['ישר ABD']);
-    const r = await llmParse('ADB', '', { points: ['A', 'B', 'D'] });
+    const r = await llmParse('ADB', '', fixed({ points: ['A', 'B', 'D'] }));
     expect(r!.built.map((b) => b.step)).toEqual(['ישר ADB']);
     expect(r!.built[0].commands).toEqual([{ type: 'set-line', points: ['A', 'D', 'B'] }]);
     expect(r!.restored).toEqual(['ABD→ADB']);
@@ -119,7 +136,7 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     const controller = new AbortController();
-    const p = llmParse('square', '', {}, { signal: controller.signal });
+    const p = llmParse('square', '', fixed({}), { signal: controller.signal });
     controller.abort(); // the App's 15 s timeout / the student's cancel
     expect(await p).toBeNull(); // resolves (not hangs), with the null the caller maps to "service busy"
     expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal);

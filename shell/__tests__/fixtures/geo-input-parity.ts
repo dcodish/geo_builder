@@ -272,6 +272,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2060': 'open', // #2024 (ADR-668): 3-D does not read a single-letter angle given a symbol («זוית B=b», «זוית B=α»)
 
   '#2140': 'open',
+  '#2437': 'open', // #2428 (ADR-741): analytic refuses «AB משיק משותף» with free A, B on circles touching from the inside
   '#2218': 'open', // #2197 (ADR-736): analytic does not read a chord / diameter of one circle tangent to another in its relative and diameter forms
   '#2190': 'open', // #2198 / #2216 (ADR-677), #2149 (ADR-671) and #2217 (ADR-691): analytic does not read one «ברדיוס N» for a circle pair, nor the named two-circle sentences (centre segment, equal radii, touch point), nor a fresh equal-radii pair
   '#2236': 'open', // #2205 (ADR-685): analytic does not read a definite unnamed shape noun with a predicate
@@ -1060,6 +1061,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2407 + #2406 (ADR-740): a common tangent through the circles' touch point is the tangent AT the touch ──
   { id: 'tangent-through-common-point-2406', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'המעגלים משיקים בנקודה T', 'המשיק העובר בנקודה המשותפת לשני המעגלים'], expect: 'builds', exception: 'X8', note: '2-D drew a two-touch tangent through neither touch, green, before ADR-740; analytic reads it since ADR-AG-314 (#2390)' },
   { id: 'common-tangent-through-touch-internal-2407', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים מבפנים בנקודה T', 'T על AB', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', note: '2-D sent it to the AI before ADR-740 (the figure is locked in src/__tests__/issue-2407-common-tangent-at-touch.test.ts); analytic builds it since ADR-AG-312 (#2385 D1 reads the internal pair too)' },
+  // ── #2428 (ADR-741): the only common tangent of circles touching from the inside, named by two free points ──
+  { id: 'common-tangent-inside-pair-free-ab-2428', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים מבפנים בנקודה T', 'נקודה A', 'נקודה B', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2437' }], note: '2-D sent it to the AI before ADR-741, which drew A, B and T crowded at the touch; the figure is locked in src/__tests__/issue-2428-internal-pair-tangent-at-t.test.ts' },
   { id: 'circle-inside-the-circle-1622', family: 'circles', steps: ['מעגל O', 'מעגל מוכל בתוך המעגל'], expect: 'builds', exception: 'X8' },
   { id: 'circle-by-circumference', family: 'circles', steps: ['מעגל O שהיקפו 6π'], expect: 'builds', exception: 'X8' },
   // ── #1621 D2 (ADR-AG-215): an angle named by a Greek letter, the «נסמן» lead-in, the pin, and tan/cos of an angle ──
