@@ -10,9 +10,9 @@
  * The domain is honoured HERE, at sampling time, which is D7 kind 1: a value outside it was never
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
-import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, narrowedDomain, objectDeps, paramRegister, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
+import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, narrowedDomain, objectDeps, paramRegister, reachedByGivens, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
 import { curveParentsOf } from './derived';
-import { pinReach, walkPins, type Pin } from './pinRoots';
+import { pinReach, statedScale, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
@@ -252,7 +252,7 @@ function pointAtId(c: Construction, env: Env, id: Id): Pt | null {
   return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
-function searchSpan(c: Construction, env: Env): Span {
+function searchSpan(c: Construction, env: Env, floor = 6): Span {
   const xs: number[] = [];
   const ys: number[] = [];
   for (const o of c.objects) {
@@ -268,7 +268,7 @@ function searchSpan(c: Construction, env: Env): Span {
   const axis = (vs: number[]) => {
     const lo = Math.min(...vs);
     const hi = Math.max(...vs);
-    const grow = Math.max((hi - lo) / 2, 6);
+    const grow = Math.max((hi - lo) / 2, floor);
     return { lo: lo - grow, hi: hi + grow };
   };
   return { x: axis(xs), y: axis(ys) };
@@ -330,8 +330,16 @@ function jitter(seed: number, salt: number): number {
  * A value strictly inside the domain. The bounded case takes an interior point; a half-bounded
  * domain steps away from its bound; unbounded lands near 1..4. Excluded values are stepped over.
  */
-export function sampleParam(d: Domain, seed: number, salt: number, reach = 1): number {
+export function sampleParam(d: Domain, seed: number, salt: number, reach = 1, scale = 1): number {
   const u = jitter(seed, salt);
+  /*
+   * IN THE FIGURE'S OWN UNITS (#2426, ADR-AG-324; operator ruling 2026-10-20: up to 1.5× the largest number stated,
+   * 2-D's ADR-526 rule). A half-bounded or unbounded magnitude ranges over [1, max(4, 1.5·scale)) — never below 1
+   * (ADR-AG-022: off the degenerate 0), and never narrower than the [1, 4) it always had. Seed 0 keeps [1, 4)
+   * exactly (ADR-AG-022: the first draw stays as it was); a figure whose numbers are all ≤ 8/3 is unchanged at
+   * every seed.
+   */
+  const span = seed === 0 ? 3 : Math.max(4, 1.5 * scale) - 1;
   let v: number;
   if (d.min !== undefined && d.max !== undefined) {
     // Stay off both ends so an OPEN bound is never hit and a closed one is never sat on. A widened reach (#1939)
@@ -339,9 +347,9 @@ export function sampleParam(d: Domain, seed: number, salt: number, reach = 1): n
     v = reach > 1 ? d.min + (0.02 + 0.96 * u) * (d.max - d.min) : d.min + (0.2 + 0.6 * u) * (d.max - d.min);
   } else if (d.min !== undefined) {
     // reach 1 keeps the exact arithmetic it always had: a last-bit change moves a solve's basin
-    v = reach === 1 ? d.min + 1 + 3 * u : d.min + (1 + 3 * u) * reach;
+    v = reach === 1 ? d.min + 1 + span * u : d.min + (1 + span * u) * reach;
   } else if (d.max !== undefined) {
-    v = reach === 1 ? d.max - 1 - 3 * u : d.max - (1 + 3 * u) * reach;
+    v = reach === 1 ? d.max - 1 - span * u : d.max - (1 + span * u) * reach;
   } else {
     /**
      * UNBOUNDED — the only branch that was inventing a bound (#1019).
@@ -364,7 +372,7 @@ export function sampleParam(d: Domain, seed: number, salt: number, reach = 1): n
      * where `y²=2px` collapses to a doubled axis — the documented `vacant`, and the one value that
      * would be reported as "not at this value" rather than drawn.
      */
-    const magnitude = (1 + 3 * u) * reach;
+    const magnitude = (1 + span * u) * reach;
     const negative = seed !== 0 && jitter(seed + SIGN_STREAM, salt) < 0.5;
     v = negative ? -magnitude : magnitude;
   }
@@ -382,11 +390,20 @@ export function sampleParam(d: Domain, seed: number, salt: number, reach = 1): n
  * unstated magnitude is a free DOF ([ADR-052](../../docs/06-decisions.md#adr-052)), so it is
  * sampled; a declaration narrows its domain rather than granting it existence.
  */
-export function sampleEnv(c: Construction, seed = 0, reach = 1): Env {
+export function sampleEnv(c: Construction, seed = 0, reach = 1, wide = seed !== 0): Env {
   const env: Record<string, number> = {};
+  /*
+   * #2426 (ADR-AG-324): a parameter NO GIVEN REACHES ranges over the figure's stated scale, except at configuration 0
+   * (its restarts `seed + 1000·salt` and its `drawableAt` walk keep the first draw's range). A parameter a given
+   * reaches is solved, and its sample is the solve's starting point: it keeps the window the solve was tuned on. A
+   * free line's direction is an angle, not a figure unit.
+   */
+  const scale = wide ? statedScale(c.objects, c.constraints) : 1;
+  const reached = scale > 1 ? reachedByGivens(c).syms : null;
   paramRegister(c).forEach((p, i) => {
+    const units = !reached || reached.has(p.sym) || (isDirectionSymbol(p.sym) && shapedObjectOf(p.sym) === null) ? 1 : scale;
     // #1621 (ADR-AG-215): a symbol a stated angle holds is sampled inside the range that angle allows.
-    env[p.sym] = sampleParam(narrowedDomain(p.domain, impliedRange(c, p.sym)), seed, i + 1, reach);
+    env[p.sym] = sampleParam(narrowedDomain(p.domain, impliedRange(c, p.sym)), seed, i + 1, reach, units);
   });
   return env;
 }
@@ -1885,16 +1902,21 @@ export const evaluateStats = { uncached: 0 };
  * coordinate, a stated ratio's unknown) past the default window (`sampleParam`'s 1..4). 1 is every ordinary
  * configuration; only `drawableAt`'s ring search asks for more.
  */
-export function evaluate(raw: Construction, seed = 0, reach = 1): Figure {
+/**
+ * `wide` — sample in the figure's own units (#2426, ADR-AG-324). Every configuration but the first does; the walk
+ * `drawableAt` makes from configuration 0 to the seeds after it does not, so the first drawing is exactly the one it
+ * always was (ADR-AG-022), however far that walk looks for a well-spread neighbour.
+ */
+export function evaluate(raw: Construction, seed = 0, reach = 1, wide = seed !== 0): Figure {
   let perSeed = evaluateMemo.get(raw);
   if (!perSeed) {
     perSeed = new Map();
     evaluateMemo.set(raw, perSeed);
   }
-  const key = reach === 1 ? seed : `${seed}@${reach}`;
+  const key = (reach === 1 ? `${seed}` : `${seed}@${reach}`) + (wide === (seed !== 0) ? '' : '~first');
   const hit = perSeed.get(key);
   if (hit) return hit;
-  const out = evaluateTryingChoices(raw, seed, reach);
+  const out = evaluateTryingChoices(raw, seed, reach, wide);
   perSeed.set(key, out);
   return out;
 }
@@ -1929,9 +1951,9 @@ function choiceOptions(c: Construction, choiceSeed: number): string {
 function admittedFigure(f: Figure): boolean {
   return f.unsatisfied.length === 0 && f.selectorsOk && hardRingFaults(f).length === 0;
 }
-function evaluateTryingChoices(raw: Construction, seed: number, reach = 1): Figure {
+function evaluateTryingChoices(raw: Construction, seed: number, reach = 1, wide = seed !== 0): Figure {
   evaluateStats.uncached += 1;
-  const first = evaluateUncached(raw, seed, seed, reach);
+  const first = evaluateUncached(raw, seed, seed, reach, wide);
   if (admittedFigure(first)) return first;
   // Never fewer tries than one axis has options: a single choice of n options still walks all n (as before), and
   // the cap only bounds the walk over a PRODUCT of axes.
@@ -1939,7 +1961,7 @@ function evaluateTryingChoices(raw: Construction, seed: number, reach = 1): Figu
   const n = Math.max(Math.min(total, CHOICE_TRIES), ...radices);
   for (let k = 1; k < n; k += 1) {
     evaluateStats.uncached += 1;
-    const f = evaluateUncached(raw, seed, seed + k, reach);
+    const f = evaluateUncached(raw, seed, seed + k, reach, wide);
     if (admittedFigure(f)) return f;
   }
   return first;
@@ -2082,7 +2104,7 @@ interface CreatedFit {
   dead: boolean;
 }
 
-function fitCreatedShapes(raw: Construction, c: Construction, env: Env, seeded: Map<Id, Pt>, seed: number, choiceSeed: number, reach = 1): CreatedFit | null {
+function fitCreatedShapes(raw: Construction, c: Construction, env: Env, seeded: Map<Id, Pt>, seed: number, choiceSeed: number, reach = 1, wide = seed !== 0): CreatedFit | null {
   const syms = paramRegister(c)
     .map((q) => q.sym)
     .filter((sym) => shapedObjectOf(sym) !== null && env[sym] !== undefined);
@@ -2104,10 +2126,10 @@ function fitCreatedShapes(raw: Construction, c: Construction, env: Env, seeded: 
    * 150–500 ms per dead seat, against 20–40 ms for the figure alone. The post-hoc check still judges every given.
    */
   const memo = priorOf(raw, removed);
-  const key = reach === 1 ? `${seed}:${choiceSeed}` : `${seed}:${choiceSeed}@${reach}`;
+  const key = (reach === 1 ? `${seed}:${choiceSeed}` : `${seed}:${choiceSeed}@${reach}`) + (wide ? '' : '~first');
   let before = memo.figures.get(key);
   if (!before) {
-    before = evaluateUncached(memo.prior, seed, choiceSeed, reach);
+    before = evaluateUncached(memo.prior, seed, choiceSeed, reach, wide);
     memo.figures.set(key, before);
   }
   const dead = !admittedFigure(before);
@@ -2297,7 +2319,7 @@ function seedPinRoots(raw: Construction, c: Construction, env: Env, seed: number
   return { env: out, pins };
 }
 
-function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramReach = 1): Figure {
+function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramReach = 1, wide = seed !== 0): Figure {
   /**
    * DISCRETE freedom is resolved HERE, once, before anything measures a constraint (#1049).
    *
@@ -2316,7 +2338,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    */
   const c: Construction = resolvedAt(raw, seed, choiceSeed);
   // `paramReach`, never `reach`: this body has locals of that name (a span), and the parameter must not be shadowed
-  let env = foldSignSelectors(c, sampleEnv(c, seed, paramReach));
+  let env = foldSignSelectors(c, sampleEnv(c, seed, paramReach, wide));
   // #2380 (ADR-AG-303): a parameter a given pins starts AT one of its roots — found by scan, chosen by the seed.
   const pinned = seedPinRoots(raw, c, env, seed, choiceSeed);
   env = pinned.env;
@@ -2344,12 +2366,22 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
    * several valid configurations it is what chooses between them.
    */
   const ids = freeIds(c);
+  /*
+   * #2426 (ADR-AG-324): past configuration 0 a free vertex NO GIVEN REACHES is seeded in the figure's own units too, at
+   * least 1.5× the largest stated number a side (operator ruling 2026-10-20), so it reaches the origin's side of a far
+   * stated point. A vertex a given reaches is solved from its seed, which keeps the span the solve was tuned on. Seeding
+   * only: the residuals' scale (`residualScale`) keeps the ruled span.
+   */
   const span = searchSpan(c, env);
+  const stated = wide ? Math.max(6, 1.5 * statedScale(c.objects, c.constraints)) : 6;
+  const wideSpan = stated > 6 ? searchSpan(c, env, stated) : span;
+  const reachedIds = wideSpan !== span ? reachedByGivens(c).ids : null;
   const seeded = new Map<Id, Pt>(
     // #1631: hashed from the vertex's SEED NAME — its own letter unless a letter change carried another
     ids.map((id) => {
       const name = c.seedNames?.[id] ?? id;
-      return [id, { x: freeCoord(seed, name, 0, span), y: freeCoord(seed, name, 1, span) }];
+      const box = reachedIds && !reachedIds.has(id) ? wideSpan : span;
+      return [id, { x: freeCoord(seed, name, 0, box), y: freeCoord(seed, name, 1, box) }];
     }),
   );
   /**
@@ -2694,7 +2726,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   }
 
   // A circle the tool created starts fitted to the figure it joins (#1647) — a start, never a verdict.
-  const fitted = fitCreatedShapes(raw, c, env, seeded, seed, choiceSeed, paramReach);
+  const fitted = fitCreatedShapes(raw, c, env, seeded, seed, choiceSeed, paramReach, wide);
   if (fitted) {
     env = fitted.env;
     for (const [id, p] of fitted.seeded) seeded.set(id, p);
@@ -2951,7 +2983,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
        */
       const attempts: Env[] = [env];
       for (let salt = 1; salt <= 3; salt += 1) {
-        attempts.push(foldSignSelectors(c, { ...env, ...sampleEnv(c, seed + 1000 * salt, paramReach) }));
+        attempts.push(foldSignSelectors(c, { ...env, ...sampleEnv(c, seed + 1000 * salt, paramReach, wide) }));
       }
       /**
        * THE BEST EFFORT IS ALWAYS INSIDE THE DECLARED DOMAINS (#1493, ADR-AG-162).
@@ -3746,7 +3778,7 @@ export function drawableAt(
   let crossSeparated: Figure | null = null;
   if (!preferred(first)) {
     for (let extra = 1; extra <= budget; extra += 1) {
-      const candidate = evaluate(c, seed + extra);
+      const candidate = evaluate(c, seed + extra, 1, seed !== 0);
       if (!sameChoices(candidate, seed + extra)) {
         if (mayCross && !crossSeparated && wholeOn(candidate) && separated(candidate)) crossSeparated = candidate;
         continue;
@@ -3788,7 +3820,7 @@ export function drawableAt(
       if (unproven.length > 0 && paramRegister(c).length > 0) {
         search: for (const reach of RING_REACHES) {
           for (let extra = 0; extra < RING_REACH_TRIES; extra += 1) {
-            const candidate = evaluate(c, seed + extra, reach);
+            const candidate = evaluate(c, seed + extra, reach, seed !== 0);
             noteRings(candidate);
             if (whole(candidate)) {
               chosen = candidate;

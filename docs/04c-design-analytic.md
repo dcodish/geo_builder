@@ -57,6 +57,14 @@ beside `radiusLetterClash`: `sizeContradiction` (a `linear` letter whose stated 
 the statement `out-of-domain`, and a declaration the role already implies is `known`. `emptyDomain` is the one
 emptiness test, shared with `admitStated`.
 
+**The sampler works in the figure's units** ([ADR-AG-324](06c-decisions-analytic.md#adr-ag-324), #2426): `statedScale`
+(`pinRoots.ts`, the largest stated literal, ≥ 1; `pinReach` is 64× it) sets the half-bounded / unbounded magnitude of
+`sampleParam` to [1, max(4, 1.5·S)) and the free-vertex seeding box to at least 1.5·S a side — only for what
+`reachedByGivens` (`carriers.ts`: every symbol and object a constraint touches, through `inputsOf`) leaves
+unreached; a solved parameter or vertex keeps the old start. Configuration 0 never widens: `evaluate(c, seed, reach,
+wide)` carries the flag through the choice walk, the created-shape fit, the restarts and `drawableAt`'s walk from 0.
+`residualScale` keeps the ruled span.
+
 **The freedom count has one rank** ([ADR-AG-309](06c-decisions-analytic.md#adr-ag-309), #2383): `solve.ts`
 `jacobianRank` — the central-difference Jacobian, rows equilibrated to unit length, a one-sided Jacobi SVD, a singular
 value counted above `RANK_REL_TOL · σ_max` (`10 · SOLVE_TOL`, the residue a dependent row keeps at an accepted solve).

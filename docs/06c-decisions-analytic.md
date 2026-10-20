@@ -1403,7 +1403,7 @@ the closed-endpoint ruling and a scale check at 1000×.
 
 ## ADR-AG-022 — An unbounded parameter varies in SIGN; seed 0 may still be the familiar draw (#1019)
 
-**Status:** accepted, 2026-09-15 · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056)
+**Status:** accepted, 2026-09-15 · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056) · **Amended by [ADR-AG-324](#adr-ag-324) (2026-10-20, #2426):** past configuration 0 the magnitude is in the figure's own units, [1, max(4, 1.5·S)), for a parameter no given reaches; seed 0 keeps [1, 4)
 
 **Requirements:** [02c](02c-requirements-analytic.md) §9 R46. **Design:** none (internal to
 `engine/evaluate.ts`'s sampler).
@@ -13357,3 +13357,52 @@ No other sequence moved.
 - `issue-2388-parameter-relations.test.ts`: the exam-form case flipped to one equation per circle (circle I (4,0) r 3, circle II (13,0) r 6 at 12 seeds); in the equation-circle ratio case, «c>0» is now already known.
 
 **Consequences.** `engine/carriers.ts` (`sizeLetters`, `sizeDomain`, `sizeContradiction`, `impliesPositive`, `emptyDomain`, `positivePart`; `paramRegister`), `engine/apply.ts` (`applyFact`'s size question, `sameRegisterDomain`, `admitStated` on `emptyDomain`); docs 02c, 04c.
+
+## ADR-AG-324 — A free parameter, and a free vertex, are sampled in the figure's own units (#2426)
+
+**Date:** 2026-10-20 · **Status:** accepted · bug (P2, analytic), fix round #2436 (stream C); branch `fix/2426-param-figure-units`, stacked on `feat/2419-size-letters-positive` ([ADR-AG-323](#adr-ag-323)). **Amends** [ADR-AG-022](#adr-ag-022) (the half-bounded and unbounded magnitude is no longer the fixed [1, 4) past configuration 0) and R46. LADDER stage: the solve's seeding (the sampler and the free-vertex box), before stage one.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R192 (new: the range of a free parameter and a free vertex in the figure's units, the first drawing unchanged), R46 (amended: "in the figure's own units") · **Design:** [04c](04c-design-analytic.md) § "The model — objects, and the register that makes them free" (`statedScale`, `sampleParam`'s scale, `reachedByGivens`, `evaluate`'s `wide`)
+
+**Report.** Operator, round #2414 T9: *"before i write MN = 9, all different configs have a<13"*. With «a הוא פרמטר חיובי» · «M(a,0)» · «N(13,0)», 30 presses drew a only in [1.16, 3.95]. «M(a,0)» · «N(130,0)» drew the same values. A free M beside N(13,0) stayed in x ∈ [7.3, 18.6].
+
+**Ruling.** Operator, 2026-10-20 ("accept recommendations"): a half-bounded or unbounded free parameter ranges up to 1.5× the largest number stated in the construction (2-D's [ADR-526](06-decisions.md#adr-526)), and a free point's sampling box follows the same rule. Mechanism (the round orchestrator, on this item's escalation, 2026-10-20): widen only what no given reaches. A parameter a constraint solves keeps today's window as the solve's starting point.
+
+**Class.** *A free degree of freedom that nothing bounds is drawn at a magnitude that ignores the figure's scale.* The parameter sampler (`sampleParam`) used a constant [1, 4), and the free-vertex box used a constant "at least 6 a side". The engine already knew the figure's scale for the pin scan (`pinReach`, ADR-AG-303) and for the residuals (`residualScale`, ADR-AG-231). Sampling [1, 4) beside N(13,0) asserts M ∈ [1, 4), a given the question never stated (the ADR-052 smell).
+
+**Decision.**
+1. **One scale.** `statedScale(…)` (`engine/pinRoots.ts`) is the construction's largest numeric literal, at least 1. It is read off what the student stated, never off a position a parameter moves. `pinReach` is `64 · statedScale`.
+2. **The magnitude** of a half-bounded or unbounded parameter is drawn from [1, max(4, 1.5·S)). It never goes below 1 (ADR-AG-022: away from the degenerate 0) and is never narrower than the [1, 4) it had, so a figure whose numbers are all ≤ 8/3 is unchanged at every seed. `reach > 1` (ADR-AG-256's ring search) multiplies the new base. The bounded branch is unchanged. A free line's direction is an angle, not a figure unit, and keeps [1, 4).
+3. **Only what no given reaches widens** (`reachedByGivens`, `engine/carriers.ts`). A symbol or an object is reached when a constraint touches it, directly or through what it names: the curve a tangency names, the points a length names, and everything those are made of (`inputsOf`). The walk is structural, so a later constraint kind is covered. A reached parameter is solved, and its sample is only where the solve starts. **Measured, the plan's blanket widening broke this:** Q2 ד's tangent lines `mx−y+n=0` started at |m| up to 19.5 chased the circles' third, vertical common tangent (x = 7), which the form cannot hold. 15 of 24 configurations were unsatisfied, and the panel read «m = √2/4» as known at seed 0, because the pool lost the other tangent.
+4. **The free-vertex box** grows by at least 1.5·S a side for an unreached free vertex, past configuration 0. This is seeding only: `residualScale` keeps the span ADR-AG-231 ruled.
+5. **Seed 0 is the first drawing it always was** (ADR-AG-022). `sampleParam` at seed 0 ignores the scale. Configuration 0's restarts (`seed + 1000·salt`) and its `drawableAt` walk (which evaluates seeds 1…24 to prefer a well-spread neighbour) evaluate at the old range: `evaluate(c, seed, reach, wide)`, memoized under its own key. Without the walk's half, `exam-2379-q2-two-tangents` changed its first figure.
+
+**Measured after.**
+- T9's three lines over 30 presses: a ∈ [2.0, 19.2], with a > 13 at 12 presses.
+- «M(a,0)» · «N(130,0)»: |a| ∈ [11.5, 191.5].
+- A free M beside N(13,0): x ∈ [−5.6, 31.2].
+- With «MN = 9» added, a = 4 and a = 22 are both still reached.
+- Q2 ד holds at seeds 0–23.
+- Seed 0 is byte-identical on all 45 sets measured (39 analytic fixtures plus 6 probes). At seeds 1–2 only the three unconstrained probes moved, and no fixture did.
+- `test:fast` green with **no lock re-based**.
+
+**Sibling audit.** 2-D already samples in the figure's units (ADR-526, the reference). 3-D and complex have no coordinate-parameter sampler (grepped `sampleParam` / `paramRegister`). Class not present there.
+
+**Behaviour change for a student.**
+- «הציגו תצורה אחרת» on a figure with a free parameter or a free point now reaches values and positions across the stated figure. With N(13,0), M can be drawn beyond N or on the origin's side.
+- The first drawing does not change.
+- Anything a given solves is drawn as before.
+
+**Locks.** `src-analytic/__tests__/issue-2426-param-figure-units.test.ts` (10 tests):
+- T9 through `anotherConfiguration`;
+- the 130 scale;
+- the free vertex;
+- seed 0 and the ≤ 8/3 identity of `sampleParam`;
+- seed 0 in [1, 4) on three probes;
+- `reachedByGivens` on a lone, a pinned and a tangency-solved parameter;
+- Q2 ד at seeds 0–23 with the panel's m still open;
+- «MN = 9» reaching both roots.
+
+`issue-2419-size-letters` keeps the half-bounded / unbounded equality, which this change preserves (both branches use one span).
+
+**Consequences.** `engine/pinRoots.ts` (`statedScale`), `engine/carriers.ts` (`reachedByGivens`), `engine/evaluate.ts` (`sampleParam`'s `scale`, `sampleEnv`'s `wide`, the seeding box, `evaluate` / `evaluateTryingChoices` / `evaluateUncached` / `fitCreatedShapes` threading `wide`, `drawableAt`'s walk). Docs: 02c, 04c. The issue named ADR-AG-019 as the sign ADR; it is ADR-AG-022.

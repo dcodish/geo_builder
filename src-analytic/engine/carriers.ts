@@ -529,6 +529,40 @@ export function sizeContradiction(c: Construction): string | null {
 }
 
 /**
+ * WHAT NO GIVEN REACHES (#2426, ADR-AG-324) — the symbols and the objects that no constraint touches, directly (a symbol
+ * in its expressions, an id it names) or through what it names (the curve a tangency names, the point a length names,
+ * and everything those are made of: `inputsOf`). Their sampled value IS the drawn value, so they are the ones the
+ * sampler ranges over the figure's own units. Everything a constraint reaches is solved, and its sample is only the
+ * solve's starting point: it keeps the window the solve was tuned on (a slope started far out chases a tangent the
+ * line's form cannot hold — measured on Q2 ד). Structural, so a constraint kind added later is covered. Memoized.
+ */
+const reachedCache = new WeakMap<Construction, { syms: ReadonlySet<string>; ids: ReadonlySet<Id> }>();
+export function reachedByGivens(c: Construction): { syms: ReadonlySet<string>; ids: ReadonlySet<Id> } {
+  const hit = reachedCache.get(c);
+  if (hit) return hit;
+  const syms = new Set<string>(constraintSymbols(c.constraints));
+  const ids = new Set<Id>();
+  const known = new Set(c.objects.map((o) => o.id));
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') {
+      if (known.has(v) && !ids.has(v)) {
+        ids.add(v);
+        const inputs = inputsOf(c, v);
+        inputs.points.forEach((p) => ids.add(p));
+        inputs.syms.forEach((s) => syms.add(s));
+      }
+      return;
+    }
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') Object.values(v as Record<string, unknown>).forEach(walk);
+  };
+  walk(c.constraints);
+  const out = { syms, ids };
+  reachedCache.set(c, out);
+  return out;
+}
+
+/**
  * THE SYMBOLS THE FIGURE USES — by an object's expressions OR by a constraint's (#1343, amending ADR-AG-144).
  *
  * `symbolDeps` walks objects, and that is the right register for SAMPLING: a symbol an equation holds is
