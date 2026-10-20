@@ -372,7 +372,14 @@ export type Fact =
   | (FactBase & { t: 'diagonal-eq'; principal: boolean; eq: Expr })
   /** «נתון מעגל O» — a circle on a centre point, with a radius parameter (#1060). */
   /** `hidden` (#1622 E4, ADR-AG-220): the circle a SECTOR is cut from — it carries the arc's ends, and only the arc is drawn. */
-  | (FactBase & { t: 'circle-at'; id: Id; centre: Id; r: Expr; hidden?: true })
+  /**
+   * `r` ABSENT (#2382, ADR-AG-305): "the circle on this centre" — a REFERENCE first. M1 finds the circle the figure
+   * already has on the centre (by id, else through `circleByName`, so a centre named «M מרכז מעגל I» is circle I) and
+   * creates nothing; only when there is none does it create `id` and mint its radius `radiusSymbol(centre)` > 0 in the
+   * same step (`stateCircleOn`). A sentence about a circle never mints that radius again. `r` PRESENT: a creation with
+   * its own id and radius (the concentric `circle-at-O-2`), never an identity lookup.
+   */
+  | (FactBase & { t: 'circle-at'; id: Id; centre: Id; r?: Expr; hidden?: true })
   /**
    * «דרך P עובר ישר מקביל ל AB» — a line through a point, with a copied direction (#1093).
    *

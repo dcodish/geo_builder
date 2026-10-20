@@ -591,8 +591,18 @@ The foot is `DerivedRule { t: 'foot'; from; onto: FootLine }` (`engine/derived.t
 
 ### A circle on a point ([ADR-AG-045](06c-decisions-analytic.md#adr-ag-045))
 
-«נתון מעגל O» → declare O, `param r_O > 0`, `circle-at O r_O`: a curve whose shape depends on a point, evaluated
+«נתון מעגל O» → declare O, `circle-at O` (no radius): a curve whose shape depends on a point, evaluated
 into the same `NumCurve`. Tangency to an axis is one unsigned equation.
+
+**The radius is minted where the circle is created, once** ([ADR-AG-305](06c-decisions-analytic.md#adr-ag-305), #2382). A
+`circle-at` fact with no `r` is a REFERENCE: M1 (`apply.ts`) looks the circle up by its id, else through `circleByName`
+(so a centre named «M מרכז מעגל I» is circle I), and creates nothing when one exists. Only a centre with no circle
+reaches `stateCircleOn(c, X, id)`, which adds the object and `param r_X > 0` in one step; `statingNamedCircle` and a
+sector's hidden circle go through the same fact. A `circle-at` with an explicit `r` (the concentric `circle-at-O-2`)
+is a creation with its own id and never looks anything up. `circleAtFacts` therefore emits `declare X · circle-at X`
+and then the sentence's relations BY NAME — `tangent-of {circle: X}` for axes and lines, `tangent-circles {a: X}` for a
+circle, a stated radius as `radius-of {circle: X}` last — each read off the resolved circle. `radiusSymbolsRead`
+(`carriers.ts`) is the lock-facing invariant: every `r_X` in the register is read by something.
 
 #### Tangent to a line ([ADR-AG-165](06c-decisions-analytic.md#adr-ag-165))
 

@@ -81,7 +81,8 @@ describe('#1464 — the circle through three points, in every spelling the exam 
     const iii = parseLine('מעגל III');
     expect(iii.ok && iii.facts.some((f) => f.t === 'circle-thru')).toBe(false);
     const o = parseLine('נתון מעגל O');
-    expect(o.ok && o.facts.map((f) => f.t)).toEqual(['declare', 'param', 'circle-at']);
+    // The radius is minted where M1 creates the circle, never by the sentence (#2382, ADR-AG-305).
+    expect(o.ok && o.facts.map((f) => f.t)).toEqual(['declare', 'circle-at']);
   });
 
   it('adds NO freedom and moves nothing — the stability invariant', () => {

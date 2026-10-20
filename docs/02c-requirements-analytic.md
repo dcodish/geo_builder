@@ -9,7 +9,7 @@ objects a student can state, refusals and honesty, configurations, the canvas an
 session and chrome, the teacher lane; open rulings and the corpus evidence close it. Each requirement is its bold
 promise, at most one ruling quote, up to three examples and a Sources line; the history is in the ADRs cited
 (`ADR-AG-NNN` in [06c](06c-decisions-analytic.md)). R numbers are creation order; §1–§9 keep their old numbers so
-links resolve. R59, R60, R61, R92 and R122 are each defined more than once, and each set is kept together.
+links resolve. R59, R60, R61 and R92 are each defined more than once, and each set is kept together (R122's second definition is R180 since #2404).
 
 ---
 
@@ -378,17 +378,17 @@ From the «lines and points» corpus (§8), numbered onward.
 - «BD קוטר במעגל», «נתון מעגל שקוטרו BD»
 - Sources: ADR-AG-160, #1464, #1324.
 
-**R120 — a circle can be pinned by tangency to a LINE, in every order**. The distance from the centre to the line is the radius; «לצלע» bounds the touch to the side, and the side the circle sits on is not asserted. Equation-only circles and circle-to-circle tangency are refused by name.
+**R120 — a circle can be pinned by tangency to a LINE, in every order**. The distance from the centre to the line is the radius; «לצלע» bounds the touch to the side, and the side the circle sits on is not asserted. Equation-only circles and circle-to-circle tangency are refused by name. A tangency about a circle whose radius is given uses that radius, whichever words name the circle («מעגל M משיק…» or «המעגל משיק…»); a radius that does not fit is refused as contradictory, never drawn (ADR-AG-305).
 - **⚠ Superseded by R122 (ADR-AG-167) and R132 (ADR-AG-195):** the last sentence, in part — two circles stated by their centres can be tangent, and a line can touch an equation-only or computed circle (`tangent-curve`); still refused by name: such a circle touching an axis, or in a circle-to-circle tangency.
 - «מעגל M משיק לישרים l1 ו-l2», «הישר l1 משיק למעגל M»
 - Sources: ADR-AG-165, #1501, #1503.
 
-**R122 — Radius, focus, directrix and perimeter are sayable and askable in the exam's spellings, and a stated value outside its quantity's range is refused.** Every role is askable in the same words; a radius ≤ 0 is refused («חייב להיות גדול מ-0»); «R=5» is not a radius given.
+**R180 — Radius, focus, directrix and perimeter are sayable and askable in the exam's spellings, and a stated value outside its quantity's range is refused.** Every role is askable in the same words; a radius ≤ 0 is refused («חייב להיות גדול מ-0»); «R=5» is not a radius given.
 - «נתון מעגל O שרדיוסו 5», «היקף המשולש ABC הוא 12»
 - «מוקד הפרבולה הוא (2,0)» → pins the parabola
-- Sources: #1432, ADR-AG-169.
+- Sources: #1432, ADR-AG-169. Numbered R122 until #2404 (the id was defined twice).
 
-**R122 — two circles can be stated tangent, and which touch is a configuration until the student says**. Sum or difference of radii, cycled by «הציגו תצורה אחרת» until «מבחוץ»/«מבפנים» pins it; concentric circles are never tangent (operator ruling).
+**R122 — two circles can be stated tangent, and which touch is a configuration until the student says**. Sum or difference of radii, cycled by «הציגו תצורה אחרת» until «מבחוץ»/«מבפנים» pins it; concentric circles are never tangent (operator ruling). A circle named by its centre letter is the circle the figure already has on that centre: its given radius stays its radius, and no free radius is added beside it (ADR-AG-305).
 - «מעגל M משיק למעגל K», «מעגל O ומעגל M משיקים מבחוץ»
 - Sources: ADR-AG-167, #1504.
 

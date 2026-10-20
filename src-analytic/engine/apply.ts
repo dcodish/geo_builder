@@ -1001,6 +1001,20 @@ function circleNamed(
   return { ok: true, o: circles[0] };
 }
 
+/**
+ * THE ONE PLACE A CIRCLE ON A CENTRE IS CREATED WITH A FREE RADIUS (#2382, ADR-AG-305): the object and its radius
+ * parameter `radiusSymbol(centre)` > 0, in one step. Every mint site — a sentence that names a circle by its centre
+ * (`circle-at` with no `r`), a reference that states the circle it names (`statingNamedCircle`, #1670), a sector's hidden
+ * circle — reaches it through that fact, so no third copy of «param + circle» can mint a radius the circle does not read.
+ */
+function stateCircleOn(c: Construction, centre: Id, id: Id, src: string, hidden?: true): ApplyOutcome {
+  const sym = radiusSymbol(centre);
+  const withParam = applyFact(c, { t: 'param', sym, domain: { min: 0, minOpen: true }, src });
+  if (!withParam.ok) return withParam;
+  const circle: GeoObject = { kind: 'circle-at', id, centre, r: { kind: 'sym', name: sym }, ...(hidden ? { hidden: true as const } : {}) };
+  return { ok: true, effect: 'created', next: { ...withParam.next, objects: [...withParam.next.objects, circle] } };
+}
+
 /** A name a student writes for a POINT (a capital letter, an optional index) that is not a circle numeral («I», «II»). */
 const POINT_LETTER = /^[A-Z][0-9₀-₉]?$/;
 
@@ -1044,11 +1058,10 @@ function statingNamedCircle(c: Construction, name: string, f: Fact): ApplyOutcom
     if (pick?.t === 'name') return namingByOrder(c, pick.host, name, f);
     if (pick?.t === 'ask') return { ok: false, error: noHost(f.src, 'circle', pick.circles) };
   }
-  const r = radiusSymbol(name);
+  // The circle on that centre, its radius minted where it is created (`stateCircleOn`, #2382) — never a second copy here.
   const created = applyAll(c, [
     { t: 'declare', id: name, src: f.src },
-    { t: 'param', sym: r, domain: { min: 0, minOpen: true }, src: f.src },
-    { t: 'circle-at', id: `circle-at-${name}`, centre: name, r: { kind: 'sym', name: r }, src: f.src },
+    { t: 'circle-at', id: `circle-at-${name}`, centre: name, src: f.src },
   ]);
   if (!created.ok) return created;
   const out = applyFact(created.next, f);
@@ -2621,6 +2634,24 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (!centre || !isPositional(centre)) {
         return { ok: false, error: unknownRef(c, f.centre) };
       }
+      /**
+       * «THE CIRCLE ON M» — A REFERENCE BEFORE IT IS A CREATION (#2382, ADR-AG-305). A sentence that names a circle by its
+       * centre letter («מעגל N משיק למעגל M», «נתון מעגל M» restated, «מעגל M משיק לציר ה-x») carries this fact with no
+       * radius: when the figure already has a circle on that centre — by id, or through the one name chain, which knows a
+       * centre named after its circle («M מרכז מעגל I») — the sentence is about THAT circle and creates nothing (M1). Only a
+       * centre with no circle gets one, its radius minted in the same step. The relations the sentence carries then read
+       * that circle's own centre and radius, so a stated radius is never re-declared as a phantom free parameter.
+       */
+      if (f.r === undefined) {
+        const held = objectById(c, f.id) ?? circleByName(c, f.centre);
+        if (held && curveKindOf(held) === 'circle') {
+          // A sector's hidden circle STATED by the student (#1622 E4): the same circle, now drawn.
+          if (held.kind === 'circle-at' && held.hidden && !f.hidden) return { ok: true, effect: 'created', next: unhidden(c, held.id) };
+          return { ok: true, effect: 'known', next: c };
+        }
+        if (held && held.id === f.id) return { ok: false, error: { code: 'name-kind-clash', detail: f.src, existing: existingKindOf(held) } };
+        return stateCircleOn(c, f.centre, f.id, f.src, f.hidden);
+      }
       const prior = objectById(c, f.id);
       if (prior) {
         if (prior.kind !== 'circle-at') {
@@ -2861,11 +2892,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       let host = circleByName(declared.next, v);
       if (host && curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', v)) };
       if (!host) {
-        const r = radiusSymbol(v);
-        lead.push(
-          { t: 'param', sym: r, domain: { min: 0, minOpen: true }, src: f.src },
-          { t: 'circle-at', id: `circle-at-${v}`, centre: v, r: { kind: 'sym', name: r }, hidden: true, src: f.src },
-        );
+        lead.push({ t: 'circle-at', id: `circle-at-${v}`, centre: v, hidden: true, src: f.src });
         const made = applyAll(c, lead);
         if (!made.ok) return made;
         host = objectById(made.next, `circle-at-${v}`)!;
