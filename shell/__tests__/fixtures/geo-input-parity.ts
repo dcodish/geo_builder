@@ -295,6 +295,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2357': 'open', // #2234 (ADR-737): analytic sends the same spellings to the model
 
   '#2344': 'open', // #2344 (ADR-W-146): 2-D draws a green sliver for a triangle whose givens hold only flat in the limit (the tangent root)
+  '#2415': 'open', // #2391 (ADR-AG-315): 2-D does not read «M מקיימת …», the centres' distance by role, or the distributed named circle pair
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1676,6 +1677,18 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #1946 + #2103 (ADR-731, ADR-3D-366): a ⟂ at a NAMED foot / crossing draws one knee at rest, in the corner the statement names ──
   { id: 'perp-knee-named-foot-1946', family: 'parallel-perpendicular', steps: ['משולש ABC', 'D על BC', 'AD ⟂ BC'], expect: 'builds', note: 'the knee at D (∠ADC) is locked per tool in issue-1946-knee-at-named-foot.test.ts (2-D and 3-D)' },
   { id: 'knee-named-crossing-2103', family: 'parallel-perpendicular', steps: ['ריבוע ABCD', 'O נקודת חיתוך האלכסונים', 'AC ⟂ BD'], expect: 'builds', note: 'the knee at O (∠COD) is locked per tool in issue-1946-knee-at-named-foot.test.ts (2-D and 3-D)' },
+
+  // ── #2391 (ADR-AG-315): the exam's own two-circle and centre sentences, each read as its canonical twin ──
+  { id: 'satisfies-2391', family: 'lengths', steps: ['נקודה A', 'נקודה B', 'M מקיימת MA = MB'], expect: 'builds', knownGap: [{ product: '2d', issue: '#2415' }], note: 'analytic did not read «מקיימת» before ADR-AG-315; 2-D escalates it to the model' },
+  { id: 'underscore-index-2391', family: 'points-incidence', steps: ['נקודה N_2'], expect: 'builds', note: 'analytic did not read `N_2` before ADR-AG-315 (it is `N₂` there; 2-D reads it as `N2`)' },
+  { id: 'two-tangents-meet-2391', family: 'tangents', steps: ['מעגל O', 'המשיק למעגל O בנקודה A', 'המשיק למעגל O בנקודה C', 'שני המשיקים נחתכים בנקודה D'], expect: 'builds', exception: 'X8' },
+  { id: 'centres-distance-2391', family: 'circles', steps: ['מעגל M ברדיוס 3', 'מעגל N ברדיוס 6', 'המרחק בין מרכזי המעגלים הוא 9'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2415' }], note: '2-D asks which circle (input.ambiguousCircleRef)' },
+  { id: 'centres-segment-2391', family: 'circles', steps: ['מעגל M ברדיוס 3', 'מעגל N ברדיוס 6', 'אורכו של הקטע המחבר את מרכזי המעגלים הוא 9'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2415' }], note: '2-D asks which circle (input.ambiguousCircleRef)' },
+  { id: 'given-pair-tangent-2391', family: 'circles', steps: ['מעגל M ברדיוס 3', 'מעגל N ברדיוס 6', 'נתונים שני מעגלים המשיקים זה לזה מבחוץ'], expect: 'builds', exception: 'X8' },
+  { id: 'named-pair-distributed-2391', family: 'circles', steps: ['מעגל M ברדיוס 5', 'שני מעגלים שמרכזיהם בנקודות N₁ ו-N₂ והרדיוס של כל אחד מהם הוא 10, משיקים למעגל M בנקודה A'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2415' }], note: '2-D escalates it to the model' },
+  { id: 'diameter-construct-2391', family: 'circles', steps: ['מעגל M', 'N₂A הוא קוטר המעגל M'], expect: 'builds', exception: 'X8' },
+  { id: 'centre-after-circle-2391', family: 'circles', steps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'מרכז המעגל I הוא K'], expect: 'builds', exception: 'X8', only: ['analytic'], note: 'a numeral circle is named by its equation (#1257), so only analytic can state the context' },
+  { id: 'centres-respectively-2391', family: 'circles', steps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1', 'K ו-L מרכזי המעגלים I ו-II בהתאמה'], expect: 'builds', exception: 'X8', only: ['analytic'], note: 'as centre-after-circle-2391' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

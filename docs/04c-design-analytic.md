@@ -233,6 +233,21 @@ constraints (`Derivation.constraintLine`) must hold across the pool (`evaluate.h
 *Identifiers:* `poolScheduler`
 *ADRs:* ADR-AG-119.
 
+**The exam's circle-and-centre sentences** ([ADR-AG-315](06c-decisions-analytic.md#adr-ag-315), #2391) are frame readings
+that rewrite to the twin's own text, so no second lowering exists: `circleCentreClauses` (a circle with its centre, or
+named by its centre with an equation), `centresRespectivelyClauses` (two namings paired by the shared `respectively`
+helper), `namedCirclesClauses` (a plural subject distributed over its named members), the copula/construct forms in
+`centreClauses` and `diameterClauses`, and `satisfiesClause` (taken in `readLine` only when the statement's facts name
+the point; the point is then declared). `orthography` folds a capital's underscored digit index into the subscript
+glyph (`SUB_INDEX`), and `unwrap`'s glued «ש-» after a given-word never takes the first letter of a cardinal
+(`CARDINAL_SHIN`). Two forms are not text: «… מרכזי המעגלים …» is the `centres-distance` fact (`parseCentresDistance`,
+its lettered twin over `CENTRES_SENTINELS`), which M1 resolves through `circlePairOf` — the pair resolver
+`tangent-circles` uses — writing the two centres in (`centreIdOf`; a centre with no letter is `unknown-reference`, as
+`via-centre`); and «דרך P עובר משיק למעגל» is `tangent-through`, which M1 lowers to `tangent-line-at` when the figure
+puts P on that circle (`onCurveByConstruction`) and to the #1430 from-point construction otherwise. The trailing
+«דרך …» of the construction register is `TRAILING_THROUGH` in `constructionCandidates`, which also splits conjoined
+tangent phrases and pairs «משיקים למעגלים … בנקודות … בהתאמה», joining the canonicals with the top-level «;».
+
 ### An imperative wrapper is TAUGHT ([ADR-AG-150](06c-decisions-analytic.md#adr-ag-150))
 
 `imperativeCandidates()` (`scopeAnalytic.ts`) proposes `{verb, remainder}` from a closed verb lexicon (2-D
