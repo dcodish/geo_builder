@@ -135,28 +135,30 @@ describe('#1938 — the false-refusal net', () => {
 
   /**
    * The rows that MEASURE the net rather than assume it: a free circle (#1893) and a free parabola (#1909)
-   * whose crossing lands exactly on a point the student named, with the separation still free (`separationDof`
-   * 2 — the carriers can move it off). This arm must not accuse them, and their own refusal is a different,
+   * whose crossing lands exactly on a point the student named (`separationDof` read
+   * 2 at seed 0 until #2383; the one rank of ADR-AG-309 reads 0, the structural truth). This arm must not accuse them, and their own refusal is a different,
    * better sentence («AC כבר חותך את המעגל ב-A וב-C …», #1834) that belongs to those issues.
    *
    * RE-BASED by #1893 (ADR-AG-271): the circle's chord now carries that sentence — `third-crossing`, the structural
    * arm — and still never this arm's `crossing-already-named`. RE-BASED again by #1909 (ADR-AG-292): the parabola's
    * chord carries the same sentence with «הפרבולה».
    */
-  it('#1893 — a free circle’s chord: E lands on A, the pair is still free, and this arm stays silent (the third-crossing arm refuses it)', () => {
+  it('#1893 — a free circle’s chord: E lands on A and this arm stays silent (the third-crossing arm refuses it)', () => {
     const lines = ['מעגל O', 'A על מעגל O', 'C על מעגל O', 'AC חותך את המעגל בנקודה E'];
     const d = derive(lines);
     const a = d.figure.points.find((p) => p.id === 'A')!;
     const e = d.figure.points.find((p) => p.id === 'E')!;
     expect(Math.hypot(a.x - e.x, a.y - e.y)).toBeLessThan(1e-3); // the coincidence is really there
-    expect(d.figure.separationDof?.('E', 'A')).toBeGreaterThan(0); // …and really not forced
+    // RE-BASED by #2383 (ADR-AG-309): the separation rows lie in the equations' row space (σ falls 1.0 → 3.4e-8), so the
+    // one rank reads the pair forced — the structural truth the seed-3 row below already recorded. The fault is unchanged.
+    expect(d.figure.separationDof?.('E', 'A')).toBe(0);
     expect(d.faults).toMatchObject([{ index: 3, code: 'third-crossing', line: 'AC', a: 'A', b: 'C' }]);
   });
 
   it('#1909 — a free parabola’s chord does the same', () => {
     const lines = ['y^2=4x', 'A על הפרבולה', 'C על הפרבולה', 'AC חותך את הפרבולה בנקודה E'];
     const d = derive(lines);
-    expect(d.figure.separationDof?.('E', 'C')).toBeGreaterThan(0);
+    expect(d.figure.separationDof?.('E', 'C')).toBe(0); // RE-BASED by #2383 (ADR-AG-309), as the circle row above
     expect(d.faults).toMatchObject([{ index: 3, code: 'third-crossing', line: 'AC', a: 'A', b: 'C', curve: 'parabola' }]);
   });
 

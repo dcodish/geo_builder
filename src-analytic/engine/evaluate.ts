@@ -21,7 +21,7 @@ import { evalLengthExpr, type LengthExpr } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
-import { angleAt, dirVector, equalityResidual, freeRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
+import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { withinSegment } from './extent';
 import { assignmentAt } from './discreteAxes';
@@ -859,9 +859,14 @@ function tangentFreedomOf(
     }
     return rows;
   };
-  const E = jac(sys.equalitiesAt);
   const R = jac((v) => read(sys.positionsAt(v), sys.envAt(v)));
   if (unplaced) return null;
+  /**
+   * The equations' row space is the complement of their NULL space, read from the one rank chokepoint (#2383,
+   * ADR-AG-309) rather than a Gram–Schmidt of its own at 1e-9: a read row's residue beyond the row space is its
+   * component along the null basis, and that basis is orthonormal, so the norms below are unchanged.
+   */
+  const N = sys.equalitiesAt(x).length === 0 ? null : jacobianRank(x, sys.equalitiesAt).nullBasis;
   const dot = (a: number[], b: number[]) => a.reduce((s, ai, i) => s + ai * b[i], 0);
   /** Modified Gram–Schmidt: the orthonormal basis of `rows` beyond `basis`, keeping a row whose residue exceeds `tol`. */
   const extend = (basis: number[][], rows: number[][], tol: number): number => {
@@ -870,7 +875,7 @@ function tangentFreedomOf(
       const v = [...row];
       for (const q of basis) {
         const k = dot(v, q);
-        for (let i = 0; i < n; i += 1) v[i] -= k * q[i];
+        for (let i = 0; i < v.length; i += 1) v[i] -= k * q[i];
       }
       const norm = Math.sqrt(dot(v, v));
       if (norm > tol) {
@@ -881,9 +886,9 @@ function tangentFreedomOf(
     return added;
   };
   const scale = (rows: number[][]) => Math.max(1e-12, ...rows.map((row) => Math.sqrt(dot(row, row))));
+  const onNull = N ? R.map((row) => N.map((q) => dot(row, q))) : R;
   const basis: number[][] = [];
-  extend(basis, E, 1e-9 * scale(E));
-  return extend(basis, R, 1e-6 * Math.max(unit, scale(R)));
+  return extend(basis, onNull, 1e-6 * Math.max(unit, scale(R)));
 }
 
 /** The three vertices (indices) spanning the largest triangle — the ring's own affine frame; `null` when flat. */
