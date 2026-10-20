@@ -10,7 +10,9 @@
  * The domain is honoured HERE, at sampling time, which is D7 kind 1: a value outside it was never
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
-import { impliedRange, isDirectionSymbol, narrowedDomain, paramRegister, shapedObjectOf, toolSymbol, usedSymbols } from './carriers';
+import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, narrowedDomain, objectDeps, paramRegister, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
+import { curveParentsOf } from './derived';
+import { pinReach, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
@@ -181,6 +183,11 @@ export interface Figure {
    * same samples. Absent on a figure built by hand (read as the seed).
    */
   choiceSeed?: number;
+  /**
+   * WHICH ROOT each parameter pin took (#2380, ADR-AG-303) — the pins' root indices, in walk order; absent on a figure
+   * with no pin. Part of the configuration's discrete assignment: `drawableAt`'s preference never crosses it.
+   */
+  rootKey?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -2043,6 +2050,101 @@ function fitCreatedShapes(raw: Construction, c: Construction, env: Env, seeded: 
   return fallback ?? (dead ? { env, seeded: base, dead } : null);
 }
 
+/**
+ * THE PINS' ROOTS SEED THE SOLVE (#2380, [ADR-AG-303](../../docs/06c-decisions-analytic.md#adr-ag-303)) — `pinRoots.ts`
+ * finds every 1-DOF pin of an in-scope parameter and its roots by scan; here each configuration takes one. Seed 0 takes
+ * the root nearest its own sample (the root the descent reached before this, so the first drawing does not move);
+ * every other seed draws the root from an independent stream (`ROOT_STREAM`, the `SIGN_STREAM` pattern), so the
+ * pool misses one of two roots with probability 2⁻²³ and never rides the choice odometer, whose period a root count
+ * known only after the scan could not join. The scans are memoised per (construction, assignment, earlier roots):
+ * every seed reuses them, and no evaluation is added.
+ */
+const ROOT_STREAM = 200017;
+const pinMemo = new WeakMap<Construction, Map<string, Map<string, number[] | 'identity'>>>();
+function seedPinRoots(raw: Construction, c: Construction, env: Env, seed: number, choiceSeed: number): { env: Env; pins: Pin[] } {
+  const register = paramRegister(c);
+  const scope = new Map(register.filter((p) => !isDirectionSymbol(p.sym)).map((p) => [p.sym, narrowedDomain(p.domain, impliedRange(c, p.sym))] as const));
+  if (scope.size === 0 || c.constraints.length === 0) return { env, pins: [] };
+  const salt = new Map(register.map((p, i) => [p.sym, i + 1] as const));
+  let perRaw = pinMemo.get(raw);
+  if (!perRaw) {
+    perRaw = new Map();
+    pinMemo.set(raw, perRaw);
+  }
+  const akey = assignmentAt(raw, choiceSeed).key;
+  let cache = perRaw.get(akey);
+  if (!cache) {
+    cache = new Map();
+    perRaw.set(akey, cache);
+  }
+  // What a constraint reads: every object it names (by id, or a curve by name), everything those are built from, and
+  // the symbols on that walk and in its own expressions. A free vertex or rider anywhere on it makes it no pin.
+  const closureOf = (k: Constraint): Set<Id> => {
+    const seen = new Set<Id>();
+    const visit = (id: Id) => {
+      if (seen.has(id)) return;
+      const o = objectById(c, id);
+      if (!o) return;
+      seen.add(id);
+      for (const d of o.kind === 'derived' ? [...objectDeps(o), ...curveParentsOf(o.rule)] : objectDeps(o)) visit(d);
+    };
+    const walk = (v: unknown): void => {
+      if (typeof v === 'string') {
+        const o = objectById(c, v) ?? curveByName(c, v);
+        if (o) visit(o.id);
+        return;
+      }
+      if (!v || typeof v !== 'object') return;
+      if (Array.isArray(v)) v.forEach(walk);
+      else Object.values(v as Record<string, unknown>).forEach(walk);
+    };
+    walk(k);
+    return seen;
+  };
+  const closures = new Map<Constraint, Set<Id>>();
+  const closure = (k: Constraint) => {
+    let s = closures.get(k);
+    if (!s) closures.set(k, (s = closureOf(k)));
+    return s;
+  };
+  const scale = residualScale(c, sampleEnv(c, 0));
+  const { env: out, pins } = walkPins(
+    {
+      constraints: c.constraints,
+      scope,
+      depsOf: (k) => {
+        const ids = closure(k);
+        const objs = c.objects.filter((o) => ids.has(o.id));
+        const syms = new Set<string>(constraintSymbols([k]));
+        for (const o of objs) for (const sym of symbolDeps(o)) syms.add(sym);
+        return { syms: [...syms], free: objs.some((o) => carrierOf(o) !== null) };
+      },
+      residualAt: (k, e) => {
+        const ids = closure(k);
+        const sub: Construction = { ...c, objects: c.objects.filter((o) => ids.has(o.id)) };
+        const pos = place(sub, e, new Map());
+        const at = (id: Id) => pos.get(id) ?? null;
+        return residual(k, at, e, curveAtOf(sub, e, at), lineAtOf(sub, e, at), scale);
+      },
+      L: pinReach(c.objects, c.constraints),
+      choose: (sym, roots, sample) => {
+        if (roots.length === 1) return 0;
+        if (seed === 0) {
+          let best = 0;
+          roots.forEach((r, i) => {
+            if (Math.abs(r - sample) < Math.abs(roots[best] - sample)) best = i;
+          });
+          return best;
+        }
+        return Math.min(roots.length - 1, Math.floor(jitter(seed + ROOT_STREAM, salt.get(sym) ?? 1) * roots.length));
+      },
+      cache,
+    },
+    env,
+  );
+  return { env: out, pins };
+}
+
 function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramReach = 1): Figure {
   /**
    * DISCRETE freedom is resolved HERE, once, before anything measures a constraint (#1049).
@@ -2063,6 +2165,9 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const c: Construction = resolvedAt(raw, seed, choiceSeed);
   // `paramReach`, never `reach`: this body has locals of that name (a span), and the parameter must not be shadowed
   let env = foldSignSelectors(c, sampleEnv(c, seed, paramReach));
+  // #2380 (ADR-AG-303): a parameter a given pins starts AT one of its roots — found by scan, chosen by the seed.
+  const pinned = seedPinRoots(raw, c, env, seed, choiceSeed);
+  env = pinned.env;
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];
   const segments: FigureSegment[] = [];
@@ -3202,6 +3307,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     ...(collapsedRings.length > 0 ? { collapsedRings } : {}),
     usedSymbols: [...usedSymbols(c)],
     ...(choiceSeed !== seed ? { choiceSeed } : {}),
+    ...(pinned.pins.length > 0 ? { rootKey: pinned.pins.map((q) => q.index).join(',') } : {}),
     provenance: Object.fromEntries(
       points.map((p) => [p.id, provenanceOf(c, p.id, env, curves) ?? { x: { known: false }, y: { known: false } }]),
     ),
@@ -3439,8 +3545,10 @@ export function drawableAt(
     }
   };
   noteRings(first);
-  const firstOptions = choiceOptions(c, first.choiceSeed ?? seed);
-  const sameChoices = (f: Figure, s: number) => !whole(first) || choiceOptions(c, f.choiceSeed ?? s) === firstOptions;
+  // #2380 (ADR-AG-303): a pin's root is part of the assignment, so the preference never crosses one either.
+  const assignmentOf = (f: Figure, s: number) => `${choiceOptions(c, f.choiceSeed ?? s)}#${f.rootKey ?? ''}`;
+  const firstOptions = assignmentOf(first, seed);
+  const sameChoices = (f: Figure, s: number) => !whole(first) || assignmentOf(f, s) === firstOptions;
   /**
    * …EXCEPT TO SEPARATE TWO STACKED NAMED POINTS (#2381, ADR-AG-302, amending ADR-AG-227's rule above). R61 (operator,
    * #1273): two distinct named points are never opened on top of each other, *"it should automatically look for a

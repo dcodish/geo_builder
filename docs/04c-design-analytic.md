@@ -910,7 +910,11 @@ A configuration the givens contradict is never knowledge. Every static discrete 
 construction order (nested ones depth first on the chosen branch), then region `choice`s, then the `crossing-nth { both }`
 pairs, radix 2 and slowest; `resolvedAt` resolves all three from it. `evaluateTryingChoices` walks the next
 combinations at the same samples (`Figure.choiceSeed`, `choiceSeedOf(c, seed)`; `max(min(total, CHOICE_TRIES), largest n)`
-of them); `resampledInside` frees a
+of them). A parameter pin's roots are a DYNAMIC axis ([ADR-AG-303](06c-decisions-analytic.md#adr-ag-303)): `engine/pinRoots.ts`
+`walkPins` finds each vertex-free 1-DOF pin in application order (triangular), `scanRoots` brackets its residual over
+the sampler's domain clipped to ±`pinReach` (`GRID` points uniform in asinh; sign change or touching minimum, kept at
+`ROOT_EPS`), and `evaluateUncached`'s `seedPinRoots` seeds the chosen root before stage one — seed 0 the root nearest
+its sample, other seeds `ROOT_STREAM`; `Figure.rootKey` joins `drawableAt`'s assignment comparison; `resampledInside` frees a
 stalled parameter; `admittedToPool(f)` (`selectorsOk`, no `hardRingFaults`) feeds `admittedOf(c, seeds)`, and
 `starved(figs)` (fewer than `MIN_WITNESSES` pictures, `sameConfiguration`, `signatureParts`) withholds a value;
 `derive` refuses failing selectors after the search.
