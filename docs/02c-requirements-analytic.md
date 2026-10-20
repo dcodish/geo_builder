@@ -719,6 +719,8 @@ a sentence the tool parsed.
 
 **R14 — Every unstated choice is a DOF, discrete or continuous.** *(Operator ruling, on «אחד המוקדים».)* Continuous ones resample, discrete ones cycle — one mechanism (ADR-481).
 - «אחד המוקדים», which axis crossing is `A` → discrete; «E נקודה על האליפסה» → continuous
+- **Every COMBINATION of discrete choices is reachable** (#2381, ADR-AG-302): two or more choices (two circles' tangencies, two right triangles' seats, a choice and a pair of named crossings) cycle independently, so «הציגו תצורה אחרת» reaches each combination and a given that needs one («N1 משמאל ל-N2») builds.
+- **A parameter a given pins has ALL its roots as options** (#2380, ADR-AG-303): «M(a,0) · N(13,0) · MN = 9» draws a = 4 first and «הציגו תצורה אחרת» reaches a = 22; the panel lists «a = 4 או a = 22». A declared domain filters the roots («a < 13» → a = 4 known), and a pin whose only admissible root is far from the sampler's start («N(5,0)», a > 0 → a = 14) builds.
 - **A discrete choice the tool made is SAID, for as long as it is unstated** (02 FR-HS-13, B10, #1864, ADR-AG-267): a note under the row that opened it, in 2-D's words, naming what is drawn now, a line that pins it, and «הציגו תצורה אחרת»; a cue «בחירות שהכלי עשה במקומכם — עד שתכתבו אותן» beside the button while any note is up. Said for: which pair is equal («משולש שווה שוקיים», «אורך השוק AB הוא 5» on a plain triangle), which pair is parallel (the trapezoid family, legs named when they are equal), which angle is obtuse («משולש קהה זווית»), which vertex is on which axis («קודקודי המשולש מונחים על הצירים»). Not said: a right angle's seat (ADR-556), a tangency, a sine's two angles, an inscribed shape's placement. The kite's pair is #2006.
 - The note goes when the student states the choice in any spelling («AC=AB», «זווית BAC קהה», «זווית A קהה», «A על ציר ה-x» narrows the axes choice), and comes back if that line is muted.
 - **"Unstated" means the drawable configurations still differ** (#2233, ADR-AG-290): the note also goes when the givens settle the choice without naming it — signs («x_A > 0»), an axis side, coordinates, or the geometry forcing the rest — matching the data panel; the axes note teaches only a vertex whose axis still differs. Until the configurations are all read, the note stays as it was. Not yet for the trapezoid's assumed pair (#2284).
@@ -823,11 +825,11 @@ a sentence the tool parsed.
 - «המקום הגיאומטרי של M» on a determined M → «נקודה · (4, 0)»
 - Sources: ADR-AG-136, #1259, #1227.
 
-**R61 — a value is called KNOWN only if it holds across configurations that actually DIFFER**. A value the student GAVE stays known; a determined figure keeps reporting.
-- Sources: ADR-AG-126.
+**R61 — a value is called KNOWN only if it holds across configurations that actually DIFFER**. A value the student GAVE stays known; a determined figure keeps reporting. A pinned parameter with two admissible roots is never known: both are configurations (#2380).
+- Sources: ADR-AG-126, ADR-AG-303.
 
-**R61 — two distinct named points are never opened on top of each other**. *(Operator: "It should automatically look for a different config and show them differently".)* A preference below validity; closer than a hundredth of the frame counts as stacked.
-- Sources: ADR-W-072, ADR-AG-138, #1254, #1526, ADR-AG-181.
+**R61 — two distinct named points are never opened on top of each other**. *(Operator: "It should automatically look for a different config and show them differently".)* A preference below validity; closer than a hundredth of the frame counts as stacked. When the coincidence comes from a combination of discrete choices (two circles tangent to M at A on the same side), the opening drawing takes another combination (#2381).
+- Sources: ADR-W-072, ADR-AG-138, #1254, #1526, ADR-AG-181, ADR-AG-302.
 
 **R61 — a circle marks its centre**. Its value shows only when the givens fix it; the centre owns no letter (amended by R123).
 - Sources: ADR-AG-036.

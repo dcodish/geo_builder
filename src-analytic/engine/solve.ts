@@ -23,6 +23,7 @@
  * figure that violates its own givens is the defect this whole product is built to avoid.
  */
 import { evalExpr, exprText, symbolsOf, type Env } from './expr';
+import { Odometer, resolveConstraintChoices } from './discreteAxes';
 import type { Id, NumCurve } from './types';
 import { residual as curveResidual } from './curves';
 import { SEGMENT_EXTENT_TOL, segmentParam } from './extent';
@@ -390,8 +391,8 @@ export type Constraint =
   | { t: 'choice'; options: Constraint[] }
   /**
    * ONE OPTION THAT IS SEVERAL STATEMENTS (#1620, ADR-AG-208) — «every vertex on some axis» chooses an axis for
-   * EACH vertex, and the choices are not independent options of separate `choice`s (those cycle together, on one
-   * seed index): the option is the whole assignment. Only ever an option of a `choice`, and flattened with it by
+   * EACH vertex, and the choices are not independent options of separate `choice`s (those cycle independently, one
+   * odometer digit each — #2381): the option is the whole assignment, one digit. Only ever an option of a `choice`, and flattened with it by
    * {@link resolveChoices}, so nothing downstream measures one.
    */
   | { t: 'all'; of: Constraint[] };
@@ -421,13 +422,12 @@ export function sineAngle(at: AngleRef, value: Expr): Constraint {
   return single ? acute : { t: 'choice', options: [acute, { ...acute, obtuse: true }] };
 }
 
+/**
+ * Each choice takes its OWN digit of the choice seed (#2381, ADR-AG-302 — `discreteAxes.ts`), never `seed % n` for
+ * all of them at once: two independent choices then reach every combination, not only the diagonal.
+ */
 export function resolveChoices(ks: readonly Constraint[], seed: number): Constraint[] {
-  return ks.flatMap((k) => {
-    if (k.t === 'all') return resolveChoices(k.of, seed);
-    if (k.t !== 'choice') return [k];
-    if (k.options.length === 0) return [];
-    return resolveChoices([k.options[((seed % k.options.length) + k.options.length) % k.options.length]], seed);
-  });
+  return resolveConstraintChoices(ks, new Odometer(seed));
 }
 
 /** Which points a constraint references — the solver's map from constraints to movable carriers. */

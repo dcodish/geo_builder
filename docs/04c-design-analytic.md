@@ -791,7 +791,7 @@ sentences; unlettered shapes take `toolPoint('vertex', …)`; regular polygons a
 to `coord-compare`; `Selector` gains `{ kind: 'choice'; options: Selector[] }` for «משולש קהה זווית ABC»
 (`obtuseChoice(ring)`); `asideClauses` reads asides.
 
-*Identifiers:* `cevian-of` · `?? []` · `footOnPair` · `positionMeaning` · `resolveSelectorChoices` · `choiceCount` · `OBTUSE_HE` · `OBTUSE_EN` · `ANGLE_ADJECTIVE_HE` · `POSITION_AXIS_HE` · `segmentsOf` · `errLengthXY`
+*Identifiers:* `cevian-of` · `?? []` · `footOnPair` · `positionMeaning` · `assignmentAt` · `CHOICE_TRIES` · `OBTUSE_HE` · `OBTUSE_EN` · `ANGLE_ADJECTIVE_HE` · `POSITION_AXIS_HE` · `segmentsOf` · `errLengthXY`
 
 ### A trig given is an angle; sin is a choice between two roots ([ADR-AG-227](06c-decisions-analytic.md#adr-ag-227), #1719)
 
@@ -869,7 +869,10 @@ ADR-AG-181), **whole** (selectors hold, nothing vacant, `ringViolation` clean, e
 (only `derive`), so `isKnowledge` and `knownOptions` read what the tool would admit; `minInteriorAngleOf` decides
 nothing. The best effort stays inside the domains ([ADR-AG-162](06c-decisions-analytic.md#adr-ag-162), `admissible`),
 and `solvePreferring` prefers what the selectors accept ([ADR-AG-159](06c-decisions-analytic.md#adr-ag-159):
-`separationMoves`, 2-D's `solutionAccepted` in `multiStartSolve`).
+`separationMoves`, 2-D's `solutionAccepted` in `multiStartSolve`). The walk compares candidates' discrete assignments
+(`choiceOptions`, the `assignmentAt` key): a preference never crosses one (ADR-AG-227), except that a whole first figure
+which stacks two named points may open on a whole, separated candidate of another assignment (`crossSeparated`, below
+the same-assignment separated tier; [ADR-AG-302](06c-decisions-analytic.md#adr-ag-302)).
 
 *Identifiers:* `crossings.apart()` · `a > 0`
 *ADRs:* ADR-486.
@@ -902,8 +905,16 @@ given text is the line as the page shows it (`spokenFor`).
 
 ### Only valid configurations are evidence ([ADR-AG-197](06c-decisions-analytic.md#adr-ag-197), #1642, #1638, #1635, #1634, #1539)
 
-A configuration the givens contradict is never knowledge. `evaluateTryingChoices` tries a seed's `choice` options
-(`Figure.choiceSeed`, `choiceSeedOf(c, seed)`; `cycledPairs` for `crossing-nth { both }`); `resampledInside` frees a
+A configuration the givens contradict is never knowledge. Every static discrete axis is one digit of one odometer
+(`engine/discreteAxes.ts` `assignmentAt`, [ADR-AG-302](06c-decisions-analytic.md#adr-ag-302)): constraint `choice`s in
+construction order (nested ones depth first on the chosen branch), then region `choice`s, then the `crossing-nth { both }`
+pairs, radix 2 and slowest; `resolvedAt` resolves all three from it. `evaluateTryingChoices` walks the next
+combinations at the same samples (`Figure.choiceSeed`, `choiceSeedOf(c, seed)`; `max(min(total, CHOICE_TRIES), largest n)`
+of them). A parameter pin's roots are a DYNAMIC axis ([ADR-AG-303](06c-decisions-analytic.md#adr-ag-303)): `engine/pinRoots.ts`
+`walkPins` finds each vertex-free 1-DOF pin in application order (triangular), `scanRoots` brackets its residual over
+the sampler's domain clipped to ±`pinReach` (`GRID` points uniform in asinh; sign change or touching minimum, kept at
+`ROOT_EPS`), and `evaluateUncached`'s `seedPinRoots` seeds the chosen root before stage one — seed 0 the root nearest
+its sample, other seeds `ROOT_STREAM`; `Figure.rootKey` joins `drawableAt`'s assignment comparison; `resampledInside` frees a
 stalled parameter; `admittedToPool(f)` (`selectorsOk`, no `hardRingFaults`) feeds `admittedOf(c, seeds)`, and
 `starved(figs)` (fewer than `MIN_WITNESSES` pictures, `sameConfiguration`, `signatureParts`) withholds a value;
 `derive` refuses failing selectors after the search.

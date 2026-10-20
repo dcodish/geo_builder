@@ -18,7 +18,8 @@ import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
 import { isCanonicalCircle } from './conic';
 import { EMPTY_CONSTRUCTION, diameterCircleId, factsWithin, namesObject, objectById, type Construction, type Fact } from './types';
-import { SOLVE_RESOLUTION, SOLVE_TOL, resolveChoices, sameConstraint, type Constraint } from './solve';
+import { SOLVE_RESOLUTION, SOLVE_TOL, sameConstraint, type Constraint } from './solve';
+import { assignmentAt, flattenPicked } from './discreteAxes';
 import { followObjects } from './roles';
 import { NO_STATED_MEASURES, statedMeasures, type StatedMeasures } from './statedMeasures';
 import { incidenceWords } from './crossings';
@@ -998,9 +999,11 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   const constraintLine = construction.constraints.map((_, at) => (constraintFact[at] === undefined ? -1 : owner[constraintFact[at]]));
   // WHICH option the drawn figure took (#1719): the first that holds on it, read off the figure — `drawableAt` may
   // have drawn another seed's configuration, so the seed alone does not say. None holding (a faulted figure): the seed's.
+  // #2381 (ADR-AG-302): the seed's fallback is THIS choice's own digit of the drawn assignment, never slot 0's.
+  const drawnAssignment = assignmentAt(construction, figure.choiceSeed ?? seed);
   const drawnOption = (k: Extract<Constraint, { t: 'choice' }>): Constraint[] => {
     const held = k.options.find((o) => holdsOn(construction, o, figure));
-    return resolveChoices([held ?? k], figure.choiceSeed ?? seed);
+    return flattenPicked(held ?? k, drawnAssignment);
   };
   /**
    * THE OBJECTS AS THE CANVAS LETTERS THEM (#2018, ADR-AG-298). An object bound to a role («תיכון לבסיס»'s foot M and

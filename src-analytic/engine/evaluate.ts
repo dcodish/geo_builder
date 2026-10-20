@@ -10,7 +10,9 @@
  * The domain is honoured HERE, at sampling time, which is D7 kind 1: a value outside it was never
  * a candidate, so `a > 0` never produces a negative sample and never has to report a failure.
  */
-import { impliedRange, isDirectionSymbol, narrowedDomain, paramRegister, shapedObjectOf, toolSymbol, usedSymbols } from './carriers';
+import { carrierOf, constraintSymbols, impliedRange, isDirectionSymbol, narrowedDomain, objectDeps, paramRegister, shapedObjectOf, symbolDeps, toolSymbol, usedSymbols } from './carriers';
+import { curveParentsOf } from './derived';
+import { pinReach, walkPins, type Pin } from './pinRoots';
 import { circumcentre, constructionOf, evalRule, footOn, incircleCentre, type Construction as RuleConstruction, type Pt } from './derived';
 import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
@@ -19,9 +21,10 @@ import { evalLengthExpr, type LengthExpr } from './lengths';
 import { lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
-import { angleAt, dirVector, equalityResidual, freeRank, residual, resolveChoices, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
+import { angleAt, dirVector, equalityResidual, freeRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { withinSegment } from './extent';
+import { assignmentAt } from './discreteAxes';
 import { carryingLines } from './carryingLines';
 import { segmentIdOf } from './cevian';
 import { followObjects } from './roles';
@@ -180,6 +183,11 @@ export interface Figure {
    * same samples. Absent on a figure built by hand (read as the seed).
    */
   choiceSeed?: number;
+  /**
+   * WHICH ROOT each parameter pin took (#2380, ADR-AG-303) — the pins' root indices, in walk order; absent on a figure
+   * with no pin. Part of the configuration's discrete assignment: `drawableAt`'s preference never crosses it.
+   */
+  rootKey?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1751,77 +1759,38 @@ export function evaluate(raw: Construction, seed = 0, reach = 1): Figure {
  *
  * So a seed whose option yields no valid figure tries the next option AT THE SAME SAMPLES before the seed is
  * declared invalid. A figure whose every option is valid draws exactly what it drew (the seed's option is
- * tried first and accepted); one whose seed lands on a dead option draws a live one instead of nothing. The
- * options are enumerated in seed order (`seed + k`), so the cycle still reaches every live option.
+ * tried first and accepted); one whose seed lands on a dead option draws a live one instead of nothing.
+ *
+ * **The retry walks the ODOMETER** (#2381, ADR-AG-302, amending this rule): the choice seed is one mixed-radix number
+ * over every discrete axis (`discreteAxes.ts`), so `seed + k` is the next COMBINATION, and the walk runs over
+ * `max(min(total, CHOICE_TRIES), largest n)` of them — not `k < max n` alone, which over two 2-way choices only ever retried the diagonal
+ * and refused a given that needed the other two combinations at every seed. Successive seeds start at successive
+ * assignments, so the pool's 24 seeds cover every combination of a figure whose axes span ≤ 24 + 7.
  */
-function choiceCount(c: Construction): number {
-  let n = 1;
-  for (const k of c.constraints) if (k.t === 'choice' && k.options.length > 1) n = Math.max(n, k.options.length);
-  // A region choice («משולש קהה זווית», #1708) is a discrete choice too: tried at the same samples, in seed order.
-  for (const s of c.selectors) if (s.kind === 'choice' && s.options.length > 1) n = Math.max(n, s.options.length);
-  return n;
-}
+const CHOICE_TRIES = 8;
 
-/**
- * THE REGION CHOICE RESOLVED (#1708, ADR-AG-222) — `resolveChoices`' rule for a selector `choice`: the option the
- * choice seed indexes, so every later stage (validity, seeding, `drawableAt`) sees one ordinary selector.
- */
-/** WHICH OPTION each discrete choice takes at a choice seed — constraint and region choices alike (#1719). */
+/** WHICH OPTION each discrete axis takes at a choice seed — the assignment's spelling, compared by `drawableAt`. */
 function choiceOptions(c: Construction, choiceSeed: number): string {
-  const pick = (n: number) => ((choiceSeed % n) + n) % n;
-  const ks = c.constraints.filter((k) => k.t === 'choice' && k.options.length > 1).map((k) => pick((k as { options: unknown[] }).options.length));
-  const ss = c.selectors.filter((s) => s.kind === 'choice' && s.options.length > 1).map((s) => pick((s as { options: unknown[] }).options.length));
-  return `${ks.join(',')}|${ss.join(',')}`;
+  return assignmentAt(c, choiceSeed).key;
 }
 
-export function resolveSelectorChoices(selectors: readonly Selector[], seed: number): Selector[] {
-  if (!selectors.some((s) => s.kind === 'choice')) return selectors as Selector[];
-  return selectors.flatMap((s) => {
-    if (s.kind !== 'choice') return [s];
-    if (s.options.length === 0) return [];
-    return resolveSelectorChoices([s.options[((seed % s.options.length) + s.options.length) % s.options.length]], seed);
-  });
-}
 function admittedFigure(f: Figure): boolean {
   return f.unsatisfied.length === 0 && f.selectorsOk && hardRingFaults(f).length === 0;
 }
 function evaluateTryingChoices(raw: Construction, seed: number, reach = 1): Figure {
   evaluateStats.uncached += 1;
   const first = evaluateUncached(raw, seed, seed, reach);
-  const n = choiceCount(raw);
-  if (n <= 1 || admittedFigure(first)) return first;
+  if (admittedFigure(first)) return first;
+  // Never fewer tries than one axis has options: a single choice of n options still walks all n (as before), and
+  // the cap only bounds the walk over a PRODUCT of axes.
+  const { total, radices } = assignmentAt(raw, seed);
+  const n = Math.max(Math.min(total, CHOICE_TRIES), ...radices);
   for (let k = 1; k < n; k += 1) {
     evaluateStats.uncached += 1;
     const f = evaluateUncached(raw, seed, seed + k, reach);
     if (admittedFigure(f)) return f;
   }
   return first;
-}
-
-/**
- * TWO CROSSINGS NAMED IN ONE SENTENCE ARE A DISCRETE CHOICE, AND IT CYCLES (#1539 — operator ruling 2026-10-01,
- * superseding ADR-AG-185's fixed order).
- *
- * «הישר l1 חותך את המעגל I בנקודות A ו-B» lowers to two ordinals (`crossing-nth` with `both`): A the first root,
- * B the second. ADR-AG-185 fixed that order and ruled it never cycled; the operator has since ruled that
- * «הציגו תצורה אחרת» *"should always swap if there are more than 1 option"*. Which letter takes which root is
- * then exactly a `choice` (#1049): resolved per configuration, here, before anything measures a selector. The
- * stated order is configuration 0's (the first drawing is unchanged); the k-th pair of one figure swaps on bit
- * k of the seed, so successive configurations reach every assignment. `both`'s own promise — the pair MEETS
- * twice — is unchanged and still judged in every configuration.
- */
-function cycledPairs(selectors: readonly Selector[], seed: number): Selector[] {
-  const pairIndex = new Map<string, number>();
-  let changed = false;
-  const out = selectors.map((s) => {
-    if (s.kind !== 'crossing-nth' || !s.both) return s;
-    const key = JSON.stringify(s.pair.map((k) => ({ ...k, id: '' })));
-    if (!pairIndex.has(key)) pairIndex.set(key, pairIndex.size);
-    if (((seed >> pairIndex.get(key)!) & 1) === 0) return s;
-    changed = true;
-    return { ...s, nth: (1 - s.nth) as 0 | 1 };
-  });
-  return changed ? out : (selectors as Selector[]);
 }
 
 /** The seed this configuration resolved its discrete choices at (#1642) — what the locus walk must resolve them at too. */
@@ -1873,11 +1842,13 @@ export function choiceSeedOf(c: Construction, seed: number): number {
  * the SAME selector set the canvas was judged with — never a second reading of which option a seed takes.
  */
 export function resolvedAt(raw: Construction, seed: number, choiceSeed = seed): Construction {
-  const constraints = resolveChoices(raw.constraints, choiceSeed);
+  // #2381 (ADR-AG-302): ONE assignment resolves all three kinds — the crossing pairs read the choice seed too, as the
+  // slowest digits of the same odometer (a pair-only figure reads bit k for pair k, #1539's rule unchanged).
+  const { constraints, selectors } = assignmentAt(raw, choiceSeed ?? seed);
   return {
     ...raw,
     constraints,
-    selectors: resolveSelectorChoices(cycledPairs(raw.selectors, seed), choiceSeed),
+    selectors,
     // #2018 (ADR-AG-298): an object bound to a role («תיכון לבסיס»'s foot and segment) is lettered by the option this
     // configuration took — resolved here with the constraints, so nothing downstream reads another option's letters.
     objects: followObjects(raw.objects, constraints),
@@ -2079,6 +2050,101 @@ function fitCreatedShapes(raw: Construction, c: Construction, env: Env, seeded: 
   return fallback ?? (dead ? { env, seeded: base, dead } : null);
 }
 
+/**
+ * THE PINS' ROOTS SEED THE SOLVE (#2380, [ADR-AG-303](../../docs/06c-decisions-analytic.md#adr-ag-303)) — `pinRoots.ts`
+ * finds every 1-DOF pin of an in-scope parameter and its roots by scan; here each configuration takes one. Seed 0 takes
+ * the root nearest its own sample (the root the descent reached before this, so the first drawing does not move);
+ * every other seed draws the root from an independent stream (`ROOT_STREAM`, the `SIGN_STREAM` pattern), so the
+ * pool misses one of two roots with probability 2⁻²³ and never rides the choice odometer, whose period a root count
+ * known only after the scan could not join. The scans are memoised per (construction, assignment, earlier roots):
+ * every seed reuses them, and no evaluation is added.
+ */
+const ROOT_STREAM = 200017;
+const pinMemo = new WeakMap<Construction, Map<string, Map<string, number[] | 'identity'>>>();
+function seedPinRoots(raw: Construction, c: Construction, env: Env, seed: number, choiceSeed: number): { env: Env; pins: Pin[] } {
+  const register = paramRegister(c);
+  const scope = new Map(register.filter((p) => !isDirectionSymbol(p.sym)).map((p) => [p.sym, narrowedDomain(p.domain, impliedRange(c, p.sym))] as const));
+  if (scope.size === 0 || c.constraints.length === 0) return { env, pins: [] };
+  const salt = new Map(register.map((p, i) => [p.sym, i + 1] as const));
+  let perRaw = pinMemo.get(raw);
+  if (!perRaw) {
+    perRaw = new Map();
+    pinMemo.set(raw, perRaw);
+  }
+  const akey = assignmentAt(raw, choiceSeed).key;
+  let cache = perRaw.get(akey);
+  if (!cache) {
+    cache = new Map();
+    perRaw.set(akey, cache);
+  }
+  // What a constraint reads: every object it names (by id, or a curve by name), everything those are built from, and
+  // the symbols on that walk and in its own expressions. A free vertex or rider anywhere on it makes it no pin.
+  const closureOf = (k: Constraint): Set<Id> => {
+    const seen = new Set<Id>();
+    const visit = (id: Id) => {
+      if (seen.has(id)) return;
+      const o = objectById(c, id);
+      if (!o) return;
+      seen.add(id);
+      for (const d of o.kind === 'derived' ? [...objectDeps(o), ...curveParentsOf(o.rule)] : objectDeps(o)) visit(d);
+    };
+    const walk = (v: unknown): void => {
+      if (typeof v === 'string') {
+        const o = objectById(c, v) ?? curveByName(c, v);
+        if (o) visit(o.id);
+        return;
+      }
+      if (!v || typeof v !== 'object') return;
+      if (Array.isArray(v)) v.forEach(walk);
+      else Object.values(v as Record<string, unknown>).forEach(walk);
+    };
+    walk(k);
+    return seen;
+  };
+  const closures = new Map<Constraint, Set<Id>>();
+  const closure = (k: Constraint) => {
+    let s = closures.get(k);
+    if (!s) closures.set(k, (s = closureOf(k)));
+    return s;
+  };
+  const scale = residualScale(c, sampleEnv(c, 0));
+  const { env: out, pins } = walkPins(
+    {
+      constraints: c.constraints,
+      scope,
+      depsOf: (k) => {
+        const ids = closure(k);
+        const objs = c.objects.filter((o) => ids.has(o.id));
+        const syms = new Set<string>(constraintSymbols([k]));
+        for (const o of objs) for (const sym of symbolDeps(o)) syms.add(sym);
+        return { syms: [...syms], free: objs.some((o) => carrierOf(o) !== null) };
+      },
+      residualAt: (k, e) => {
+        const ids = closure(k);
+        const sub: Construction = { ...c, objects: c.objects.filter((o) => ids.has(o.id)) };
+        const pos = place(sub, e, new Map());
+        const at = (id: Id) => pos.get(id) ?? null;
+        return residual(k, at, e, curveAtOf(sub, e, at), lineAtOf(sub, e, at), scale);
+      },
+      L: pinReach(c.objects, c.constraints),
+      choose: (sym, roots, sample) => {
+        if (roots.length === 1) return 0;
+        if (seed === 0) {
+          let best = 0;
+          roots.forEach((r, i) => {
+            if (Math.abs(r - sample) < Math.abs(roots[best] - sample)) best = i;
+          });
+          return best;
+        }
+        return Math.min(roots.length - 1, Math.floor(jitter(seed + ROOT_STREAM, salt.get(sym) ?? 1) * roots.length));
+      },
+      cache,
+    },
+    env,
+  );
+  return { env: out, pins };
+}
+
 function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramReach = 1): Figure {
   /**
    * DISCRETE freedom is resolved HERE, once, before anything measures a constraint (#1049).
@@ -2099,6 +2165,9 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
   const c: Construction = resolvedAt(raw, seed, choiceSeed);
   // `paramReach`, never `reach`: this body has locals of that name (a span), and the parameter must not be shadowed
   let env = foldSignSelectors(c, sampleEnv(c, seed, paramReach));
+  // #2380 (ADR-AG-303): a parameter a given pins starts AT one of its roots — found by scan, chosen by the seed.
+  const pinned = seedPinRoots(raw, c, env, seed, choiceSeed);
+  env = pinned.env;
   const points: FigurePoint[] = [];
   const curves: FigureCurve[] = [];
   const segments: FigureSegment[] = [];
@@ -3238,6 +3307,7 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     ...(collapsedRings.length > 0 ? { collapsedRings } : {}),
     usedSymbols: [...usedSymbols(c)],
     ...(choiceSeed !== seed ? { choiceSeed } : {}),
+    ...(pinned.pins.length > 0 ? { rootKey: pinned.pins.map((q) => q.index).join(',') } : {}),
     provenance: Object.fromEntries(
       points.map((p) => [p.id, provenanceOf(c, p.id, env, curves) ?? { x: { known: false }, y: { known: false } }]),
     ),
@@ -3475,12 +3545,30 @@ export function drawableAt(
     }
   };
   noteRings(first);
-  const firstOptions = choiceOptions(c, first.choiceSeed ?? seed);
-  const sameChoices = (f: Figure, s: number) => !whole(first) || choiceOptions(c, f.choiceSeed ?? s) === firstOptions;
+  // #2380 (ADR-AG-303): a pin's root is part of the assignment, so the preference never crosses one either.
+  const assignmentOf = (f: Figure, s: number) => `${choiceOptions(c, f.choiceSeed ?? s)}#${f.rootKey ?? ''}`;
+  const firstOptions = assignmentOf(first, seed);
+  const sameChoices = (f: Figure, s: number) => !whole(first) || assignmentOf(f, s) === firstOptions;
+  /**
+   * …EXCEPT TO SEPARATE TWO STACKED NAMED POINTS (#2381, ADR-AG-302, amending ADR-AG-227's rule above). R61 (operator,
+   * #1273): two distinct named points are never opened on top of each other, *"it should automatically look for a
+   * different config"*. When the coincidence comes from the choice COMBINATION itself — two radius-10 circles tangent
+   * to M at A take the same side, so N₁ = N₂ — no drawing of that combination can honour the ruling; only another
+   * combination can. So a whole first figure that STACKS may open on a whole, separated candidate of another
+   * assignment — remembered below the same-assignment tiers, so a figure whose own assignment separates somewhere in
+   * the walk is drawn exactly as before. The spread preference still never crosses (ADR-AG-227's class stays closed:
+   * a legitimately narrow option is still drawn), and nor does anything for the knowledge gates (`preferSpread`
+   * false never reaches this tier).
+   */
+  const mayCross = preferSpread && whole(first) && !separated(first);
+  let crossSeparated: Figure | null = null;
   if (!preferred(first)) {
     for (let extra = 1; extra <= budget; extra += 1) {
       const candidate = evaluate(c, seed + extra);
-      if (!sameChoices(candidate, seed + extra)) continue;
+      if (!sameChoices(candidate, seed + extra)) {
+        if (mayCross && !crossSeparated && wholeOn(candidate) && separated(candidate)) crossSeparated = candidate;
+        continue;
+      }
       noteRings(candidate);
       if (preferred(candidate)) {
         chosen = candidate;
@@ -3497,7 +3585,7 @@ export function drawableAt(
       // figure with a vacancy still beats one that fails a selector outright.
       if (!fallback && candidate.selectorsOk) fallback = candidate;
     }
-    if (!preferred(chosen)) chosen = wholeSeparated ?? wholeFallback ?? wholeExtended ?? fallback ?? chosen;
+    if (!preferred(chosen)) chosen = wholeSeparated ?? crossSeparated ?? wholeFallback ?? wholeExtended ?? fallback ?? chosen;
     /**
      * SEARCH FIRST, REFUSE LAST (#1927 / #1939, ADR-AG-256; the operator's ruling of 2026-10-09: *"When a letter in the
      * sentence can move the shape, hunt for a value that makes it valid and DRAW it. Refuse only when nothing the
