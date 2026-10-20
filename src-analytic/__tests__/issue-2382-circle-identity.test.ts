@@ -140,7 +140,9 @@ describe('#2382 (2) — C5: a centre named after an equation circle names THAT c
     const { d, register, pk } = panel(lines);
     expect(d.construction.objects.some((o) => o.kind === 'circle-at')).toBe(false);
     expect(register).toEqual(['k']);
-    expect(pk.params.find((p) => p.sym === 'k')!.k.known).toBe(true);
+    // #2380 (ADR-AG-303, same batch): the line y = k touches circle I at k = 0 and at k = 8; both are reached, so k is two
+    // options, not one known value (the old "known" was the pin losing its distant root).
+    expect(pk.params.find((p) => p.sym === 'k')!.k.known).toBe(false);
   });
   it('«נתון מעגל M שרדיוסו 4» is a statement about circle I (already known), 5 a contradiction', () => {
     expect(lastVerdict([...CIRCLE_I, 'נתון מעגל M שרדיוסו 4']).kind).toBe('already-known');

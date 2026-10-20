@@ -64,10 +64,12 @@ function expectTangentAtT(b: { pts: Pt[] }, a: string, c: string, o: string, ro:
 describe('#2385 — the saved question (the operator’s exact sequence) builds green and verifies', () => {
   it('the fixture records line by line; AB is x = 7, the tangent at T(7,0)', () => {
     const b = built(saved.lines, saved.seed);
-    expect(at(b, 'T').x).toBeCloseTo(7, 6);
-    expect(at(b, 'T').y).toBeCloseTo(0, 6);
-    expect(at(b, 'A').x).toBeCloseTo(7, 6);
-    expect(at(b, 'B').x).toBeCloseTo(7, 6);
+    // Q2's M(a, 0) is a solved parameter (a = 4 from «MN = 9» and «a < 13»), so these are numeric: since #2380 seeds the
+    // pin from its enumerated root the solve lands within ~1e-6 (solver tolerance), not 5e-7. Fixed centres keep 1e-9 below.
+    expect(at(b, 'T').x).toBeCloseTo(7, 5);
+    expect(at(b, 'T').y).toBeCloseTo(0, 5);
+    expect(at(b, 'A').x).toBeCloseTo(7, 5);
+    expect(at(b, 'B').x).toBeCloseTo(7, 5);
     expectTangentAtT(b, 'A', 'B', 'M', 3, 'N', 6);
   });
 });
