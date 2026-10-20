@@ -78,10 +78,13 @@ describe('#1701 — the reported line and its sweep decline, as in 2-D', () => {
     ['tan∢ABC = A'],
     ['AB = A1'],
     ['AB = 2A'],
-    ['AB = AC + D'],
     ['AB < C'],
   ])('«%s» declines', (line) => {
     expect(play(['משולש ABC', line])).toEqual(['record', 'refused:not-handled']);
+  });
+  // #2427 (ADR-AG-325): D is no point of the figure, so it is a capital SIZE — refused with the lowercase lesson
+  it('«AB = AC + D» — D is no point of the figure: refused as a capital size (#2427)', () => {
+    expect(play(['משולש ABC', 'AB = AC + D'])).toEqual(['record', 'refused:capital-magnitude']);
   });
 
   it('a Greek alias pinned to a point name declines', () => {

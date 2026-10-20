@@ -13321,3 +13321,39 @@ No other sequence moved.
 - `message-floor-2028` registers the new key.
 
 **Consequences.** `engine/carriers.ts` (`RADIUS_CAPITALS`), `engine/lengths.ts`, `engine/types.ts` (`radius-ratio` fact), `engine/solve.ts` (`param-rel`, `radius-ratio`), `engine/apply.ts` (the clash, `letterReadings`, the `param-rel` use check, the `radius-ratio` arm), `engine/derive.ts` (`letterAgainst`), `parser/parseAnalytic.ts` (`equationExpr`, `roleScalar`, `radiusOfSize`, `circleSubjectGate`, `parseParamRelation`), `parser/catalogAnalytic.ts`, `app/submit.ts`, `app/errorText.ts`, `store/useAnalyticStore.ts`, `i18n/index.ts`; docs 02c, 04c.
+
+## ADR-AG-325 — A capital letter used as a size is refused, teaching the lowercase letter; R for a radius and an area's label stay sizes (#2427)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2436 (stream D); branch `feat/2427-capital-size-refusal`, for the operator's play-and-approve. **Amends** [ADR-AG-307](#adr-ag-307) (its WITHDRAWN line: «שרדיוסו K» is now an owned refusal, not "not understood") and [ADR-AG-238](#adr-ag-238) ("Not changed": a coordinate, a declaration and a slope no longer read a capital as a parameter). LADDER stage: none (the submit decision; LADDER describes 2-D's ladder).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R193 (new: the refusal, its wording and its exceptions); R183's «שרדיוסו K» clause now points to it. · **Design:** [04c](04c-design-analytic.md) "A value never mentions the plane" (the capital-size step, `app/capitalSize.ts`).
+
+**Rulings.**
+- Operator, on the #2414 play sheet (T38, «נתון מעגל O שרדיוסו K»): *"Need a message to user saying that sizes are small letters except for R"*.
+- Operator 2026-10-20 on #2427: *"accept syntax and recommendations"* — the wording «אות גדולה היא שם של נקודה, ולכן {{letter}} לא יכולה לסמן גודל. גדלים מסמנים באות קטנה (r, a, k…), מלבד R לרדיוס. נסו: "{{corrected}}"» and its English twin; the capitals still accepted as sizes («M(K,0)», «K הוא פרמטר חיובי», «שיפוע AB הוא M») refused with the same message; **S for an area stays accepted**; "only R" stays analytic-only, recorded as an `EXCEPTIONS` family in the parity table.
+
+**Re-measurement at pickup** (`main` @ `17168818`, `decideSubmit`, model never called). The plan's table held exactly: the four radius spellings, «circle O with radius K», «AB = K», «AB = 2K», «אורך AB הוא K», «y = Kx + 1», «x² + y² = K²» and «זווית ABC = K» were `not-handled` with `reachesFallback` true; «M(K,0)», «M(2K,1)», «K הוא פרמטר חיובי», «שטח המשולש ABC הוא S» and «שיפוע AB הוא M» recorded a capital parameter. One more measured: «K(1,1)» · «M(K,0)» recorded (K a point and a parameter) — the plan's "a capital that is a point of the figure is left alone".
+
+**Class.** One question asked two ways: *does this line use a capital letter that is not a point of the figure as a size?* (a) No reader read it: every value reader DECLINES a capital (ADR-AG-307), so the line fell to `not-handled`, the one code that reaches the model. (b) A reader read it as a parameter (coordinates, a declaration, a slope, a bound). Both need the figure — whether the capital is one of its points — so both are asked at the submit decision, not in the context-free `parseLine`.
+
+**Decision.**
+1. **(a) A why-not step for an unread line** (`capitalSizeRetry`, 2-D's `input.scope.lowercase-labels` pattern). On `not-handled`, each distinct LONE capital (no Latin letter before it, no capital, digit, index or prime after it; not R; not a point of the figure) is lowercased in turn. When the corrected line parses AND one of its facts reads the lowercased letter as a symbol, the line is refused `capital-magnitude` `{ letter, corrected }`. The symbol check is what keeps a capital NAME («הישר L: …») out: the letter must have become a size.
+2. **(b) A capital the line added to the register** (`capitalParamOf`): the register before and after the trial fold (`paramRegister`, #1014 — a symbol is a parameter because it is used), so every family is one question. A single capital that is new to the register — not R, not the label of an area (inside the fact that states the area), not a point of the figure — is refused the same way, when the corrected line parses. **The area label is any capital, as before** («שטח ABC = T», #2031): the ruling refused the three families it named and kept the area, so narrowing the area to S alone would withdraw an accepted sentence nobody ruled on — that question is put to the operator in the round report. A capital the figure already registered (a session saved before this ruling) is not new and is not refused.
+3. **Owned.** `capital-magnitude` is not `not-handled`, so `reachesFallback` is false: the model is never asked to rewrite K → k.
+4. **Both seams** (ADR-W-006): `decideOnce` and `decideEdit`. A refused edit is refused, as before, with no text.
+5. **Wording.** `errCapitalMagnitude`, He and En, the operator's sentence verbatim.
+6. **Parity: X11**, "a capital letter as a size in analytic" — products 2-D and 3-D, must-refuse analytic. 2-D builds «נתון מעגל O שרדיוסו K» and «מעגל שמרכזו O ורדיוסו K» (radius symbol K) and declines «AB = K» and «AB = AC + D»; analytic refuses all four. docs/22 §10 says a new family is an ADR-W decision: the operator's ruling on #2427 names this family explicitly; the round orchestrator records the ADR-W number if one is wanted.
+
+**Behaviour change for a student.**
+- Every line in the class above is refused with the ruled sentence and the lowercase line to try; none reaches the model.
+- **WITHDRAWN:** «M(K,0)», «M(2K,1)», «K הוא פרמטר חיובי», «שיפוע AB הוא M» and «K > 0» no longer record.
+- «AB = AC + D» on triangle ABC (D no point) was not understood; it is now refused, teaching «AB = AC + d».
+- Unchanged: R as a radius or in an equation, a capital area label («שטח המשולש ABC הוא S», «נסמן את שטח ABCD ב-S», «שטח ABC = T»), lowercase letters, a capital that is a point of the figure («K(1,1)» · «M(K,0)» records; «∠ABC = A» declines), the R clash.
+
+**Locks.**
+- `src-analytic/__tests__/issue-2427-capital-size.test.ts`: T38 with the He and En text; 16 members of the class (radius ×5 spellings, length ×3, equation ×2, angle, coordinate ×2, declaration, slope, the #1701 sum), each `capital-magnitude` with its letter and corrected line, `reachesFallback` false, and the corrected line RECORDING; controls (R ×3, lowercase ×3, area labels ×3 and the area exemption kept to its own fact, a figure point ×2 recording and ×4 declining, the R clash, a saved-session capital); the edit seam; a catalog guard (every He and En entry in its context).
+- `issue-2388-parameter-relations`: the withdrawal and «x^2+y^2=K^2» now assert `capital-magnitude`. `issue-1701-point-value`: «AB = AC + D» moves to its own case.
+- Parity: X11 and three rows (`capital-radius-2427`, `capital-radius-centre-2427`, `capital-length-2427`); `point-value-length-sum-1701` joins X11.
+- `message-floor-2028` registers the key.
+
+**Consequences.** `app/capitalSize.ts` (new), `app/submit.ts` (`decideOnce`, `decideEdit`), `app/errorText.ts`, `store/useAnalyticStore.ts`, `i18n/index.ts`; `shell/__tests__/fixtures/geo-input-parity.ts` (X11); docs 02c R183, R193; 04c; 22 §10.
