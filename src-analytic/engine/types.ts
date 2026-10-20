@@ -1050,6 +1050,19 @@ export type Selector =
    */
   | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr } }
   /**
+   * «M מעל הישר KL» · «M מתחת לישר KL» · «M מימין לישר l» · «M משמאל לישר l» — A POINT'S SIDE OF A STRAIGHT LINE
+   * (#2386, ADR-AG-310). Operator ruling 2026-10-20: *"above means the y of the point is higher than the y of the other
+   * line at that point"* — `axis: 'y'` is y_P − y_ℓ(x_P) with the sign of `greater`; and *"for right and left - yes"* —
+   * `axis: 'x'` is x_P − x_ℓ(y_P). `coord-compare`'s family (ADR-AG-161), with the line's value at the point as the
+   * bound: D7's kind 2, it consumes no freedom, judged strictly at the figure's resolution, and seeded.
+   *
+   * `line` is a line through two points or a named straight line (`points` / `curve`). A line VERTICAL in the
+   * configuration has no y at a given x, so a y-side selector fails there; a HORIZONTAL one fails an x-side selector —
+   * and when the figure drawn has that line, `derive` refuses with the ruled sentence (`side-of-vertical` /
+   * `side-of-horizontal`) rather than «unsatisfiable».
+   */
+  | { kind: 'line-compare'; id: Id; line: Extract<Direction, { k: 'points' | 'curve' }>; axis: 'x' | 'y'; greater: boolean }
+  /**
    * «משולש חד זוויות ABC» — EVERY ANGLE OF THE TRIANGLE IS ACUTE (#1619 B2, ADR-AG-194).
    *
    * The exam's adjective is a stated given (it may not vanish) and an INEQUALITY, so it is D7's kind 2: it

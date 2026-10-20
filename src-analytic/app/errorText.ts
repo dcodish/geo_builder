@@ -178,6 +178,9 @@ const polygonNounKey = (kind: string | undefined): string => (kind && POLYGON_NO
 /** 2-D's one-fact-per-line list format (`src/app/unreadParts.ts` `numbered`): «(n) part», two-space separators. */
 const numbered = (parts: readonly string[], from = 1): string => parts.map((p, i) => `(${i + from}) ${p}`).join('  ');
 
+/** The position words a side-of-line refusal quotes (#2386, ADR-AG-310). */
+const SIDE_WORD_KEY = { above: 'sideWordAbove', below: 'sideWordBelow', right: 'sideWordRight', left: 'sideWordLeft' } as const;
+
 /** The sentence a student reads for `error`, in the locale `t` speaks. */
 export function errorText(error: InputError, t: Translate): string {
   const kind: RefKind | undefined = 'expected' in error ? error.expected : undefined;
@@ -203,6 +206,9 @@ export function errorText(error: InputError, t: Translate): string {
     'reserved-coordinate': 'errReservedCoordinate',
     'bad-arity': 'errBadArity',
     'repeated-vertex': 'errRepeatedVertex',
+    // #2386 (ADR-AG-310) — the operator's ruled sentence (2026-10-20, option (a)) and its horizontal mirror
+    'side-of-vertical': 'errSideOfVertical',
+    'side-of-horizontal': 'errSideOfHorizontal',
     'degenerate-role': 'errDegenerateRole',
     'apex-not-a-vertex': 'errApexNotAVertex',
     'bisector-wrong-apex': 'errBisectorWrongApex',
@@ -364,5 +370,7 @@ export function errorText(error: InputError, t: Translate): string {
     side: error.key === 'bisector-is-side' ? (error.pair ?? '') : '',
     vertex: error.key === 'bisector-is-side' ? (error.vertex ?? '') : '',
     polygonNoun: error.key === 'bisector-is-side' ? t(polygonNounKey(error.polygonKind)) : '',
+    // #2386: the position word the student used, in the locale's spelling
+    word: (error.key === 'side-of-vertical' || error.key === 'side-of-horizontal') && error.side ? t(SIDE_WORD_KEY[error.side]) : '',
   }) + near;
 }

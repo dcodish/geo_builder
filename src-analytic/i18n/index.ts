@@ -472,6 +472,13 @@ const he = {
   errBadOperand:
     'הבנתי את היחס במשפט "{{detail}}", אבל לא זיהיתי את אחד האגפים. אפשר לציין שני קודקודים (AB), ' +
     'צלע (הצלע AB), ישר (הישר l1) או ציר (ציר ה-x).',
+  // #2386 (ADR-AG-310) — the operator's ruled sentence (2026-10-20, option (a)); the horizontal one is its mirror
+  errSideOfVertical: 'לישר אנכי אין "{{word}}" — נסו "מימין ל-" או "משמאל ל-"',
+  errSideOfHorizontal: 'לישר אופקי אין "{{word}}" — נסו "מעל" או "מתחת"',
+  sideWordAbove: 'מעל',
+  sideWordBelow: 'מתחת',
+  sideWordRight: 'מימין ל-',
+  sideWordLeft: 'משמאל ל-',
   // What a taken name already holds, for errNameClash — the construct's own corpus noun.
   kindObject: 'עצם אחר בשרטוט',
   kindPoint: 'נקודה שהוגדרה בשיעורים',
@@ -1028,6 +1035,12 @@ const en: typeof he = {
   errBadOperand:
     'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +
     'a side (side AB), a line (line l1) or an axis (the x-axis).',
+  errSideOfVertical: 'A vertical line has no "{{word}}" — try "to the right of" or "to the left of"',
+  errSideOfHorizontal: 'A horizontal line has no "{{word}}" — try "above" or "below"',
+  sideWordAbove: 'above',
+  sideWordBelow: 'below',
+  sideWordRight: 'to the right of',
+  sideWordLeft: 'to the left of',
   // What a taken name already holds, for errNameClash — the construct's own corpus noun.
   kindObject: 'another object in the figure',
   kindPoint: 'a point given by coordinates',

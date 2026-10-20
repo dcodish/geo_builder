@@ -551,8 +551,10 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 **R165 — the equation of a median keeps the median; position words between points choose the configuration; an obtuse triangle is obtuse at one vertex, any of the three**. *(Operator rulings.)* Screen directions are the analytic tool's own reading, because its axes are fixed.
 - «משוואת התיכון AD היא y=x» → the line and the median
 - «A ו-D על ציר ה-y (D מעל A)», «C מימין ל-B»
+- **A position word against a straight line** (ADR-AG-310): «M מעל הישר KL» → y_M above the line's y at x_M; «M מתחת לישר KL» below it; «M מימין לישר l» / «M משמאל לישר l» → x_M against the line's x at y_M. The line is two letters («KL», «הישר KL») or a named line («הישר l»). A point on the line is on neither side; a side the figure cannot take is refused, naming the sentence
+- **A side the line does not have is refused**: «מעל / מתחת» a vertical line (a stated `x=3`, two letters with one x, the y-axis) → «לישר אנכי אין "מעל" — נסו "מימין ל-" או "משמאל ל-"»; «מימין / משמאל» a horizontal line (`y=2`, the x-axis) → «לישר אופקי אין "מימין ל-" — נסו "מעל" או "מתחת"». A line vertical only in some configurations is never refused this way
 - «משולש קהה זווית ABC» → obtuse at one vertex, cycled
-- Sources: ADR-AG-222, #1662, #1706, #1707, #1708.
+- Sources: ADR-AG-222, #1662, #1706, #1707, #1708; ADR-AG-310, #2386 and the operator rulings of 2026-10-20.
 
 ### Measures, angles and ratios
 

@@ -4055,6 +4055,9 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
               : sel.kind === 'coord-compare'
                 ? // Both points of «x_B > x_D» must exist (#1462); a value names none.
                   [sel.id, ...('point' in sel.rhs ? [sel.rhs.point] : [])]
+                : sel.kind === 'line-compare'
+                ? // #2386 (ADR-AG-310): the subject and the line's two points; a named line is a curve ref, checked below.
+                  [sel.id, ...dirRefs(sel.line)]
                 : sel.kind === 'angle-side'
                   ? [sel.id, sel.v, sel.a, sel.b]
                   : sel.kind === 'segments-cross'
@@ -4077,6 +4080,11 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (f.sel.kind === 'sign' && f.sel.q.k === 'slope' && f.sel.q.u.k === 'curve') {
         const o = objectById(c, f.sel.q.u.id);
         if (!o || !CURVE_BEARING.has(o.kind)) return { ok: false, error: unknownRef(c, f.sel.q.u.id) };
+      }
+      // A side of a NAMED line (#2386, ADR-AG-310) names a STRAIGHT line the figure holds — a circle has no «מעל הישר».
+      if (f.sel.kind === 'line-compare' && f.sel.line.k === 'curve') {
+        const o = objectById(c, f.sel.line.id);
+        if (!o || !CURVE_BEARING.has(o.kind) || curveKindOf(o) !== 'line') return { ok: false, error: unknownRef(c, f.sel.line.id) };
       }
       // A circle region names the circle M1 resolved (#1619 B1) — it must still be one.
       if (f.sel.kind === 'sign' && (f.sel.q.k === 'power' || f.sel.q.k === 'arc-side')) {
@@ -4388,6 +4396,10 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
  */
 function selectorIdentity(sel: Selector): string {
   if (sel.kind === 'distinct') return JSON.stringify({ ...sel, ids: [...sel.ids].sort() });
+  // The line through K and L is the line through L and K (#2386): «M מעל הישר LK» restates «M מעל הישר KL».
+  if (sel.kind === 'line-compare' && sel.line.k === 'points') {
+    return JSON.stringify({ ...sel, line: { k: 'points', a: [sel.line.a, sel.line.b].sort()[0], b: [sel.line.a, sel.line.b].sort()[1] } });
+  }
   /*
    * An ORDER BETWEEN MEASURES names an angle by its vertex and two rays, and the rays are UNORDERED (#1864, ADR-AG-267):
    * «זווית BAC קהה» is «זווית CAB קהה» — canonicalConstraint's `ray` rule, for the region twin. Without it the

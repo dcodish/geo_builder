@@ -218,7 +218,17 @@ export type ParseFailure =
    */
   | { code: 'ambiguous-side'; detail: string }
   /** «משובע ABCDEFG» — a polygon noun 2-D builds only when regular (#835), refused by name (#1622, ADR-AG-217). */
-  | { code: 'polygon-not-supported'; detail: string };
+  | { code: 'polygon-not-supported'; detail: string }
+  /**
+   * «M מעל ציר ה-y» · «M מעל הישר l» with l: x=3 — «מעל / מתחת» a VERTICAL line, which has no y at a given x; and its
+   * mirror, «מימין / משמאל» a HORIZONTAL line (#2386, operator ruling 2026-10-20, option (a): *"saying its above a
+   * different line will mean nothing"*; ADR-AG-310). `side` is the student's word, so the refusal quotes it and points
+   * to the pair of words that does mean something there.
+   */
+  | { code: 'side-of-vertical' | 'side-of-horizontal'; detail: string; side: SideWord };
+
+/** The four position words, as the refusal quotes them (#2386). */
+export type SideWord = 'above' | 'below' | 'right' | 'left';
 
 export type ParseResult = { ok: true; facts: Fact[] } | ({ ok: false } & ParseFailure);
 
@@ -4498,6 +4508,31 @@ function positionMeaning(word: string): { axis: 'x' | 'y'; greater: boolean } {
   return { axis: 'x', greater: false };
 }
 
+/**
+ * A POSITION WORD AGAINST A STRAIGHT LINE — «M מעל הישר KL», «M נמצאת מתחת לישר KL», «M מימין לישר l», «M משמאל ל-KL»,
+ * "M is above the line KL" (#2386, ADR-AG-310). Operator ruling 2026-10-20: *"above means the y of the point is higher
+ * than the y of the other line at that point"*, and right / left likewise in x. The subject, the verb and the word are
+ * `POSITION_WORD_*`'s exactly; the operand is the slope rule's `direction()`, so «הישר KL», «KL» and «הישר l1» mean what
+ * they mean there. Runs after the point and axis forms, which keep «D מעל A» and «M מעל ציר ה-x». An operand that is no
+ * direction is this rule's only when the line noun says it is a line (`bad-operand`); otherwise the sentence is not this
+ * rule's (`null`), as it was before.
+ */
+const POSITION_LINE_HE = new RegExp(
+  `^${HE_GIVEN}${HE_POINT}(${NAME})\\s+(?:(?:נמצא|נמצאת|נמצאים|נמצאות|מונח|מונחת)\\s+)?(מעל|מתחת|מימין|משמאל)(?:\\s*ל)?-?\\s*(.+)$`,
+);
+const POSITION_LINE_EN = new RegExp(
+  `^(?:the\\s+)?(?:point\\s+)?(${NAME})\\s+(?:(?:is|lies)\\s+)?(above|below|to\\s+the\\s+right\\s+of|to\\s+the\\s+left\\s+of)\\s+(.+)$`,
+  'i',
+);
+/** The line noun in front of an operand — what makes a non-direction operand this rule's refusal. */
+const LINE_NOUN_LEAD = /^(?:ה?ישר|(?:the\s+)?line)\s/i;
+
+/** The word a refusal quotes, from the student's own spelling of it. */
+function sideWordOf(word: string): SideWord {
+  const { axis, greater } = positionMeaning(word);
+  return axis === 'y' ? (greater ? 'above' : 'below') : greater ? 'right' : 'left';
+}
+
 function parseCompare(line: string): RuleOutcome {
   const pos = POSITION_WORD_HE.exec(line) ?? POSITION_WORD_EN.exec(line);
   if (pos) {
@@ -4507,9 +4542,25 @@ function parseCompare(line: string): RuleOutcome {
   const side = POSITION_AXIS_HE.exec(line) ?? POSITION_AXIS_EN.exec(line);
   if (side) {
     const { axis, greater } = positionMeaning(side[2]);
-    // The x-axis has sides above and below (y); the y-axis right and left (x). Any other pairing names no side.
-    if (axis === side[3].toLowerCase()) return null;
+    /*
+     * The x-axis has sides above and below (y); the y-axis right and left (x). The other pairing names no side, and is
+     * refused with the ruled sentence (#2386, option (a)): the y-axis is a vertical line, the x-axis a horizontal one.
+     */
+    if (axis === side[3].toLowerCase()) {
+      return { ok: false, code: axis === 'y' ? 'side-of-vertical' : 'side-of-horizontal', detail: line, side: sideWordOf(side[2]) };
+    }
     return compareFacts(side[1], axis, greater, { value: { kind: 'num', value: 0 } }, line);
+  }
+  const against = POSITION_LINE_HE.exec(line) ?? POSITION_LINE_EN.exec(line);
+  if (against) {
+    const operand = trim(against[3]);
+    const claims: ClaimSink = { out: [], src: line };
+    const u = direction(operand.replace(/^the\s+(?=line\s)/i, ''), claims);
+    if (!u || (u.k !== 'points' && u.k !== 'curve')) return LINE_NOUN_LEAD.test(operand) ? refuse('bad-operand', line) : null;
+    const id = against[1];
+    if (u.k === 'points' && (u.a === id || u.b === id)) return refuse('repeated-vertex', line);
+    const { axis, greater } = positionMeaning(against[2]);
+    return made([{ t: 'selector', sel: { kind: 'line-compare', id, line: u, axis, greater }, src: line }, ...claims.out]);
   }
   const sym = COMPARE_SYM.exec(line);
   if (sym) {

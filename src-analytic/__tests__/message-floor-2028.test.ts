@@ -27,6 +27,8 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'reserved-coordinate': [{}],
   'bad-arity': [{}],
   'repeated-vertex': [{}],
+  'side-of-vertical': [{ side: 'above' }, { side: 'below' }], // #2386 (ADR-AG-310)
+  'side-of-horizontal': [{ side: 'right' }, { side: 'left' }],
   'degenerate-role': [{}],
   'apex-not-a-vertex': [{}],
   'bisector-wrong-apex': [{}],
