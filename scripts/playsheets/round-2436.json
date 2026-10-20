@@ -1,0 +1,763 @@
+{
+ "name": "round-2436",
+ "title": "Round #2436 — exam completion",
+ "cases": [
+  {
+   "id": "T1",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Exam Q2 typed in its printed order (#2397)",
+   "class": "play",
+   "lines": [
+    "נתונים שני מעגלים המשיקים זה לזה מבחוץ .",
+    "מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא (x − a)² + y² = r² , a הוא פרמטר חיובי .",
+    "מרכזו של המעגל האחר הוא בנקודה N ומשוואתו היא (x − 13)² + y² = R² .",
+    "אורכו של הקטע המחבר את מרכזי המעגלים הוא 9 , והיחס בין אורכי הרדיוסים של המעגלים הוא 1:2 , r < R .",
+    "נתון כי a < 13 ."
+   ],
+   "lookFor": "Every line ✓; exactly two circles touching at (7, 0); M(4, 0), N(13, 0); r = 3, R = 6.",
+   "before": "The first line refused; later lines drew extra circles and the tangency was lost while showing green."
+  },
+  {
+   "id": "T2",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Exam Q2 in its equation form: one radius each (#2419)",
+   "class": "play",
+   "lines": [
+    "נתון מעגל I שמשוואתו (x−a)²+y²=r²",
+    "a הוא פרמטר חיובי",
+    "נתון מעגל II שמשוואתו (x−13)²+y²=R²",
+    "M מרכז מעגל I",
+    "N מרכז מעגל II",
+    "המעגלים משיקים מבחוץ",
+    "MN = 9",
+    "היחס בין אורכי הרדיוסים של המעגלים הוא 1:2",
+    "r < R"
+   ],
+   "cycles": 2,
+   "lookFor": "a = 4, r = 3, R = 6 in the panel, one equation per circle; «הציגו תצורה אחרת» keeps radii 3 and 6.",
+   "before": "Each circle listed with two options; r and R «?»."
+  },
+  {
+   "id": "T3",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Exam Q1 ב(1): the named line ⟂ KL (#2431)",
+   "class": "play",
+   "lines": [
+    "נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9",
+    "K מרכז המעגל I",
+    "נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1",
+    "L מרכז המעגל II",
+    "A על המעגל I",
+    "B על המעגל II",
+    "המשיק למעגל I בנקודה A",
+    "המשיק למעגל II בנקודה B",
+    "המשיקים נפגשים בנקודה M",
+    "MA = MB",
+    "M על הישר 4x+y+3=0",
+    "נתון הישר l1: 4x+y+3=0",
+    "הישר l1 מאונך ל-KL"
+   ],
+   "lookFor": "Every line records; one line on the figure labelled l1.",
+   "before": "The last line refused: «אין בשרטוט ישר l1»."
+  },
+  {
+   "id": "T4",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Refusal: the same figure, the wrong relation (#2431)",
+   "class": "verified",
+   "lines": [
+    "נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9",
+    "K מרכז המעגל I",
+    "נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1",
+    "L מרכז המעגל II",
+    "A על המעגל I",
+    "B על המעגל II",
+    "המשיק למעגל I בנקודה A",
+    "המשיק למעגל II בנקודה B",
+    "המשיקים נפגשים בנקודה M",
+    "MA = MB",
+    "M על הישר 4x+y+3=0",
+    "נתון הישר l1: 4x+y+3=0",
+    "הישר l1 מקביל ל-KL"
+   ],
+   "expectRefusal": "לא נמצאה תצורה",
+   "lookFor": "The last line refused: «לא נמצאה תצורה שבה מתקיים: \"הישר l1 מקביל ל-KL\"».",
+   "before": "Refused, but with «אין בשרטוט ישר l1»."
+  },
+  {
+   "id": "T5",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "T27: the common tangent mx−y+n=0 is drawn (#2425, riskiest)",
+   "class": "play",
+   "lines": [
+    "a הוא פרמטר חיובי",
+    "נתון מעגל שמרכזו M(a,0) ורדיוסו r",
+    "נתון מעגל שמרכזו N(13,0) ורדיוסו 2r",
+    "המעגלים משיקים מבחוץ",
+    "MN = 9",
+    "a < 13",
+    "הישר mx-y+n=0 משיק למעגל M",
+    "הישר mx-y+n=0 משיק למעגל N"
+   ],
+   "cycles": 2,
+   "lookFor": "A line l1 is drawn as the common tangent; «הציגו תצורה אחרת» switches between its two positions; the paired (m, n) row is unchanged. (After line 7 alone, l1 touches M and moves with the button.)",
+   "before": "No line at any stage."
+  },
+  {
+   "id": "T6",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "T14: the tangency line is drawn and labelled l1 (#2425)",
+   "class": "play",
+   "lines": [
+    "מעגל שמרכזו M(8,−3) משיק לישר 4x+3y+2=0 בנקודה A"
+   ],
+   "lookFor": "The line drawn and labelled l1; the row «l1: 4x + 3y + 2 = 0»; A = (4, −6).",
+   "before": "Only the circle."
+  },
+  {
+   "id": "T7",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "The next free l-number (#2425)",
+   "class": "look",
+   "lines": [
+    "נתון הישר l1: y=x",
+    "מעגל שמרכזו M(8,−3) משיק לישר 4x+3y+2=0 בנקודה A"
+   ],
+   "lookFor": "The tangency line is labelled l2.",
+   "before": "Not drawn."
+  },
+  {
+   "id": "T8",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "A declared line gets l1; the student’s name replaces it (#2425 Q3/Q4)",
+   "class": "look",
+   "lines": [
+    "נתון ישר 4x+3y+2=0",
+    "נתון הישר l5: 4x+3y+2=0"
+   ],
+   "lookFor": "One line, labelled l5 (it was l1 after the first line).",
+   "before": "No label, then l5."
+  },
+  {
+   "id": "T9",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "«עובר דרך» draws its line (#2425 Q1)",
+   "class": "look",
+   "lines": [
+    "A(2,3)",
+    "הישר y=mx+1 עובר דרך A"
+   ],
+   "lookFor": "The line drawn through A, labelled l1.",
+   "before": "Not drawn."
+  },
+  {
+   "id": "T10",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "A point on a line still does not draw it (ruled 2026-10-20)",
+   "class": "verified",
+   "lines": [
+    "M על הישר 4x+y+3=0"
+   ],
+   "lookFor": "No line on the figure.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T11",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Not asked for: a bare «y=x» also gets an l-number",
+   "class": "play",
+   "lines": [
+    "y=x"
+   ],
+   "lookFor": "The line labelled l1. Judge it: your Q4 ruling named «נתון ישר <equation>»; the stream read a bare equation as the same declaration.",
+   "before": "Drawn with no label."
+  },
+  {
+   "id": "T12",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Refusal (not asked for): a name already in use",
+   "class": "play",
+   "lines": [
+    "נתון ישר 4x+3y+2=0",
+    "נתון הישר l1: x+y=1"
+   ],
+   "expectRefusal": "סותר",
+   "lookFor": "The second line refused: l1 is already the first line’s name. Judge it.",
+   "before": "Two lines, both called l1."
+  },
+  {
+   "id": "T13",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "A line through A parallel to a renamed line (#2431, the P1)",
+   "class": "play",
+   "lines": [
+    "A(1,2)",
+    "נתון ישר 2x-y+3=0",
+    "נתון הישר l3: 2x-y+3=0",
+    "ישר דרך A מקביל לישר l3"
+   ],
+   "lookFor": "A second line through A, parallel to l3.",
+   "before": "Recorded with ✓ and nothing drawn."
+  },
+  {
+   "id": "T14",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Refusal: a direction that does not exist (#2431)",
+   "class": "verified",
+   "lines": [
+    "A(1,2)",
+    "ישר דרך A מקביל לישר l7"
+   ],
+   "expectRefusal": "l7",
+   "lookFor": "Refused: «אין בשרטוט ישר l7».",
+   "before": "Recorded, nothing drawn."
+  },
+  {
+   "id": "T15",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "The tangent’s equation is an existing line (#2432)",
+   "class": "look",
+   "lines": [
+    "נתון מעגל שמרכזו M(0,0) ורדיוסו r",
+    "נתון הישר l: 3x+4y=25",
+    "משוואת המשיק היא 3x+4y=25"
+   ],
+   "lookFor": "Records; r = 5; one line l. No internal id anywhere.",
+   "before": "Refused with «curve-anon…»."
+  },
+  {
+   "id": "T16",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "«T על AB» after the common tangent redraws AB at T (#2418)",
+   "class": "play",
+   "lines": [
+    "נתון מעגל שמרכזו M(4,0) ורדיוסו 3",
+    "נתון מעגל שמרכזו N(13,0) ורדיוסו 6",
+    "המעגלים משיקים בנקודה T",
+    "AB משיק משותף למעגלים M ו-N",
+    "T על AB"
+   ],
+   "lookFor": "AB redrawn as x = 7 through T; the last line ✓; M, N and T do not move.",
+   "before": "«לא נמצאה תצורה…»."
+  },
+  {
+   "id": "T17",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "The same with «T על הישר AB» (#2418)",
+   "class": "look",
+   "lines": [
+    "נתון מעגל שמרכזו M(4,0) ורדיוסו 3",
+    "נתון מעגל שמרכזו N(13,0) ורדיוסו 6",
+    "המעגלים משיקים בנקודה T",
+    "AB משיק משותף למעגלים M ו-N",
+    "T על הישר AB"
+   ],
+   "lookFor": "Recorded (not «already known»), AB at x = 7.",
+   "before": "Refused."
+  },
+  {
+   "id": "T18",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "An inside pair: the common tangent is the tangent at the touch (#2418)",
+   "class": "look",
+   "lines": [
+    "נתון מעגל שמרכזו O(0,0) ורדיוסו 5",
+    "נתון מעגל שמרכזו K(3,0) ורדיוסו 2",
+    "מעגל O ומעגל K משיקים בנקודה T",
+    "AB משיק משותף למעגלים O ו-K"
+   ],
+   "lookFor": "AB is x = 5.",
+   "before": "Refused."
+  },
+  {
+   "id": "T19",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Analytic: your T5 lines build too (#2437, via #2418)",
+   "class": "look",
+   "lines": [
+    "מעגל M",
+    "מעגל N",
+    "המעגלים משיקים מבפנים בנקודה T",
+    "נקודה A",
+    "נקודה B",
+    "AB משיק משותף למעגלים M ו-N"
+   ],
+   "lookFor": "AB the tangent at T with A and B on it, every row ✓.",
+   "before": "The last line refused."
+  },
+  {
+   "id": "T20",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Refusal: «חיצוני» then «T על AB» (#2418)",
+   "class": "verified",
+   "lines": [
+    "נתון מעגל שמרכזו M(4,0) ורדיוסו 3",
+    "נתון מעגל שמרכזו N(13,0) ורדיוסו 6",
+    "המעגלים משיקים בנקודה T",
+    "AB משיק משותף חיצוני למעגלים M ו-N",
+    "T על AB"
+   ],
+   "expectRefusal": "T על AB",
+   "lookFor": "The last line refused, naming «T על AB»; the tangent stays ✓.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T21",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Two circles drawn from one line (#2397)",
+   "class": "look",
+   "lines": [
+    "שני מעגלים משיקים מבפנים"
+   ],
+   "lookFor": "Two circles touching from the inside; centres not lettered.",
+   "before": "«which circles?»."
+  },
+  {
+   "id": "T22",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "A tangent pair named by order (#2397)",
+   "class": "look",
+   "lines": [
+    "שני מעגלים משיקים מבחוץ",
+    "O מרכז המעגל",
+    "P מרכז המעגל"
+   ],
+   "lookFor": "O and P on the two different circles.",
+   "before": "Refused."
+  },
+  {
+   "id": "T23",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Refusal: an inside pair asks which circle (#2397)",
+   "class": "verified",
+   "lines": [
+    "שני מעגלים משיקים מבפנים",
+    "O מרכז המעגל"
+   ],
+   "expectRefusal": "מעגל",
+   "lookFor": "Asks which circle.",
+   "before": "Refused (the first line already failed)."
+  },
+  {
+   "id": "T24",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "A drawn circle takes its equation (#2397)",
+   "class": "look",
+   "lines": [
+    "נתון מעגל",
+    "משוואת המעגל היא (x-1)^2+y^2=4"
+   ],
+   "lookFor": "Circle centred (1, 0), radius 2, ✓.",
+   "before": "Refused as a contradiction."
+  },
+  {
+   "id": "T25",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Refusal: an equation that clashes with a stated radius (#2397)",
+   "class": "verified",
+   "lines": [
+    "שני מעגלים",
+    "O מרכז המעגל",
+    "רדיוס המעגל O הוא 5",
+    "משוואת המעגל O היא (x-1)^2+y^2=16"
+   ],
+   "expectRefusal": "סותר",
+   "lookFor": "The last line refused as contradicting.",
+   "before": "Refused, for the wrong reason."
+  },
+  {
+   "id": "T26",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "A radius squared in an equation is positive (#2419)",
+   "class": "look",
+   "lines": [
+    "x²+y²=r²",
+    "A(3,4)",
+    "A על המעגל"
+   ],
+   "lookFor": "«r = 5».",
+   "before": "«r = −5 או 5»."
+  },
+  {
+   "id": "T27",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "A radius 2r and a length k show «0 <» (#2419)",
+   "class": "verified",
+   "lines": [
+    "M(1,2)",
+    "נתון מעגל M שרדיוסו 2r",
+    "A(0,0)",
+    "נקודה B",
+    "AB = k"
+   ],
+   "lookFor": "The rows read «0 < r» and «0 < k».",
+   "before": "Bare «r», «k»."
+  },
+  {
+   "id": "T28",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Refusal: a negative letter used as a length (#2419)",
+   "class": "verified",
+   "lines": [
+    "a הוא פרמטר",
+    "a < 0",
+    "A(0,0)",
+    "נקודה B",
+    "AB = a"
+   ],
+   "expectRefusal": "AB = a",
+   "lookFor": "Refused with the out-of-range message naming «AB = a».",
+   "before": "«לא נמצאה תצורה»."
+  },
+  {
+   "id": "T29",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Refusal: the same, bound last (#2419)",
+   "class": "verified",
+   "lines": [
+    "A(0,0)",
+    "נקודה B",
+    "AB = a",
+    "a < 0"
+   ],
+   "expectRefusal": "a < 0",
+   "lookFor": "Refused, naming «a < 0».",
+   "before": "«לא נמצאה תצורה»."
+  },
+  {
+   "id": "T30",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Guard: a letter that is both centre and radius keeps its sign (#2419)",
+   "class": "verified",
+   "lines": [
+    "(x−a)²+y²=a²",
+    "A(-2,2)",
+    "A על המעגל"
+   ],
+   "lookFor": "a = −2, circle centred (−2, 0).",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T31",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Your T9: a free «a» now reaches beyond N (#2426)",
+   "class": "play",
+   "lines": [
+    "a הוא פרמטר חיובי",
+    "M(a,0)",
+    "N(13,0)"
+   ],
+   "cycles": 10,
+   "lookFor": "Within ~10 presses M appears right of N (a > 13) and also between O and N. The first drawing is as today.",
+   "before": "a always below 4."
+  },
+  {
+   "id": "T32",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "A free point reaches the far side (#2426)",
+   "class": "look",
+   "lines": [
+    "N(13,0)",
+    "נקודה M"
+   ],
+   "cycles": 10,
+   "lookFor": "Some press puts M left of the y-axis.",
+   "before": "M stayed at x 7–19."
+  },
+  {
+   "id": "T33",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Guard: Q2 ד’s two tangents stay valid at every press (#2426)",
+   "class": "verified",
+   "lines": [
+    "נתון מעגל שמרכזו M(4,0) ורדיוסו 3",
+    "נתון מעגל שמרכזו N(13,0) ורדיוסו 6",
+    "נתון הישר l1: mx-y+n=0",
+    "הישר l1 משיק למעגל M",
+    "הישר l1 משיק למעגל N",
+    "נתון הישר l2: px-y+q=0",
+    "הישר l2 משיק למעגל M",
+    "הישר l2 משיק למעגל N",
+    "הישרים l1 ו-l2 שונים"
+   ],
+   "cycles": 3,
+   "lookFor": "No refusal at any press; the (m, n) row still the paired two-option row.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T34",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Your T38: a capital radius gets the teaching message (#2427)",
+   "class": "play",
+   "lines": [
+    "נתון מעגל O שרדיוסו K"
+   ],
+   "expectRefusal": "אות גדולה",
+   "lookFor": "«אות גדולה היא שם של נקודה, ולכן K לא יכולה לסמן גודל… נסו: \"נתון מעגל O שרדיוסו k\"»; the AI is not called.",
+   "before": "«לא הצלחתי להבין», sent to the AI."
+  },
+  {
+   "id": "T35",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "The taught line builds (#2427)",
+   "class": "verified",
+   "lines": [
+    "נתון מעגל O שרדיוסו k"
+   ],
+   "lookFor": "Circle O with radius k.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T36",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Refusal: a capital length (#2427)",
+   "class": "verified",
+   "lines": [
+    "A(0,0)",
+    "B(3,1)",
+    "AB = 2K"
+   ],
+   "expectRefusal": "אות גדולה",
+   "lookFor": "The message, «נסו: \"AB = 2k\"».",
+   "before": "Not understood, sent to the AI."
+  },
+  {
+   "id": "T37",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Withdrawn: a capital coordinate «M(K,0)» (#2427)",
+   "class": "play",
+   "lines": [
+    "M(K,0)"
+   ],
+   "expectRefusal": "אות גדולה",
+   "lookFor": "The message, «נסו: \"M(k,0)\"».",
+   "before": "Drew M with parameter K."
+  },
+  {
+   "id": "T38",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Withdrawn: «K הוא פרמטר חיובי» (#2427)",
+   "class": "verified",
+   "lines": [
+    "K הוא פרמטר חיובי"
+   ],
+   "expectRefusal": "אות גדולה",
+   "lookFor": "The message, «נסו: \"k הוא פרמטר חיובי\"».",
+   "before": "Recorded."
+  },
+  {
+   "id": "T39",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "S for an area still builds (#2427)",
+   "class": "verified",
+   "lines": [
+    "A(0,0)",
+    "B(3,1)",
+    "C(1,4)",
+    "שטח המשולש ABC הוא S"
+   ],
+   "lookFor": "Recorded; S solved from the area.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T40",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "A capital that is already a point is left alone (#2427, riskiest)",
+   "class": "verified",
+   "lines": [
+    "K(1,1)",
+    "M(K,0)"
+   ],
+   "lookFor": "Both lines record; no capital message.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T41",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Not asked for: «AB = AC + D» teaches «d» (#2427)",
+   "class": "play",
+   "lines": [
+    "משולש ABC",
+    "AB = AC + D"
+   ],
+   "expectRefusal": "אות גדולה",
+   "lookFor": "The message, «נסו: \"AB = AC + d\"». Judge it.",
+   "before": "Sent to the AI."
+  },
+  {
+   "id": "T42",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Your T21: a sentence the AI splits shows one row per part (#2424)",
+   "class": "play",
+   "lines": [
+    "קחו מעגל I שמשוואתו (x-3)^2+(y-4)^2=9 ושמרכזו K"
+   ],
+   "llm": {
+    "קחו מעגל I שמשוואתו (x-3)^2+(y-4)^2=9 ושמרכזו K": [
+     "נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9",
+     "מרכז המעגל I הוא K"
+    ]
+   },
+   "lookFor": "Two rows, «נתון מעגל I שמשוואתו (x−3)²+(y−4)²=9» and «מרכז המעגל I הוא K»; no «(1/2)», «(2/2)». (On the play server the AI is stubbed with these two lines; on prod a real model answers.)",
+   "before": "The same sentence twice, marked (1/2), (2/2)."
+  },
+  {
+   "id": "T43",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "product": "2d",
+   "title": "2-D, your T5: an inside pair with free A, B (#2428, riskiest)",
+   "class": "play",
+   "lines": [
+    "מעגל M",
+    "מעגל N",
+    "המעגלים משיקים מבפנים בנקודה T",
+    "נקודה A",
+    "נקודה B",
+    "AB משיק משותף למעגלים M ו-N"
+   ],
+   "lookFor": "Answers at once; AB is the tangent at T with A and B two separate points on it; every row ✓, no amber note. B lands near T — judge whether that is fine.",
+   "before": "~13 s «חושב», then A, B, T crowded at the touch, no visible line, all ✓ with an amber note."
+  },
+  {
+   "id": "T44",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "product": "2d",
+   "title": "2-D: «פנימי» on circles touching from outside (#2428)",
+   "class": "play",
+   "lines": [
+    "מעגל M",
+    "מעגל N",
+    "המעגלים משיקים בנקודה T",
+    "נקודה A",
+    "נקודה B",
+    "AB משיק משותף פנימי למעגלים M ו-N"
+   ],
+   "lookFor": "AB is the tangent at T, between the circles, with A and B on it; green.",
+   "before": "Sent to the AI, which resized the circles."
+  },
+  {
+   "id": "T45",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "product": "2d",
+   "title": "2-D: a third common tangent of an outside pair (#2428)",
+   "class": "look",
+   "lines": [
+    "מעגל M",
+    "מעגל N",
+    "המעגלים משיקים בנקודה T",
+    "CD משיק משותף למעגלים M ו-N",
+    "EF משיק משותף למעגלים M ו-N",
+    "נקודה A",
+    "נקודה B",
+    "AB משיק משותף למעגלים M ו-N"
+   ],
+   "lookFor": "AB is the tangent at T; CD and EF stay the outer tangents; green.",
+   "before": "Sent to the AI; looked like a copy of an outer tangent."
+  },
+  {
+   "id": "T46",
+   "base": "http://localhost:5174",
+   "path": "/",
+   "product": "2d",
+   "title": "2-D control: free points beside an outside pair still become the touch points",
+   "class": "verified",
+   "lines": [
+    "מעגל M",
+    "מעגל N",
+    "המעגלים משיקים בנקודה T",
+    "נקודה A",
+    "נקודה B",
+    "AB משיק משותף למעגלים M ו-N"
+   ],
+   "lookFor": "A on M, B on N, AB an outer tangent not through T; green.",
+   "before": "Unchanged."
+  }
+ ]
+}
