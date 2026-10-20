@@ -416,12 +416,24 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
      */
     const drawnAt = new Map(figure.points.map((p) => [p.id, { x: p.x, y: p.y }]));
     const noSide = new Map<number, LineFault>();
+    /*
+     * The selector AS APPLIED, by the fact that added it (#2431, ADR-AG-317): M1 resolves a line named by its label to
+     * the line's own id, so the fact's selector and the applied one can differ — compared as written, a failing
+     * «שיפוע הישר l1 שלילי» on a line named by restatement was blamed on no sentence and the figure drew green.
+     */
+    const appliedOf = new Map<number, Construction['selectors'][number]>();
+    construction.selectors.forEach((s, at) => {
+      const fact = selectorFact[at];
+      if (fact !== undefined && !appliedOf.has(fact)) appliedOf.set(fact, s);
+    });
     facts.forEach((f, i) => {
-      if (f.t === 'selector' && (failing.size === 0 || failing.has(JSON.stringify(f.sel)))) {
+      const applied = appliedOf.get(i);
+      if (f.t === 'selector' && (failing.size === 0 || failing.has(JSON.stringify(f.sel)) || (applied !== undefined && failing.has(JSON.stringify(applied))))) {
         blamed.add(owner[i]);
-        if (f.sel.kind !== 'line-compare') return;
-        const none = lineCompareNoSide(construction, f.sel, drawnAt, figure.env);
-        const side = f.sel.axis === 'y' ? (f.sel.greater ? 'above' : 'below') : f.sel.greater ? 'right' : 'left';
+        const sel = applied ?? f.sel;
+        if (sel.kind !== 'line-compare') return;
+        const none = lineCompareNoSide(construction, sel, drawnAt, figure.env);
+        const side = sel.axis === 'y' ? (sel.greater ? 'above' : 'below') : sel.greater ? 'right' : 'left';
         if (none) noSide.set(owner[i], { index: owner[i], code: none === 'vertical' ? 'side-of-vertical' : 'side-of-horizontal', detail: lines[owner[i]], side });
       }
     });

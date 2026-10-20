@@ -22,7 +22,7 @@ import { FAMILIES_OF, positionOfCircles, type PairPosition } from './commonTange
 import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule, type FootLine } from './derived';
 import { sameDerivation } from './sameDerivation';
-import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
+import { constraintCurveRefs, constraintRefs, dirCurveRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
@@ -2158,7 +2158,40 @@ export function maxCrossings(a: string | null, b: string | null): number | null 
  * named line is minted by several arms (a stated equation, a line through a point) and each one's
  * answer is the same question.
  */
-export function applyFact(c: Construction, f: Fact): ApplyOutcome {
+/**
+ * A LINE REFERRED TO BY ITS NAME IS THE LINE THAT CARRIES THE NAME (#2431, [ADR-AG-317](../../docs/06c-decisions-analytic.md#adr-ag-317)).
+ *
+ * The parser is context-free, so «הישר l1» in a slot that takes a line reaches M1 as the id `lineIdOf('l1')`. A line
+ * that got its name by RESTATEMENT («נתון ישר 4x+y+3=0», then «נתון הישר l1: 4x+y+3=0» — the #1342 narrowing), or
+ * from the tool (ADR-AG-314), keeps its content-derived id: only its label carries the name, and the id is never
+ * rewritten because constraints already hold it. So every slot that looks a line up BY ID — ∥/⊥, «על», tangency,
+ * slope, crossings, position words, a line through a point — found nothing, while the by-name slots (a distance)
+ * found the line. One reading of one name, per slot.
+ *
+ * Resolved here, once, for every fact that reaches the boundary: each line-id reference (never the id the fact
+ * itself introduces) that names no object, while a LINE carries that name, is re-pointed at that line. A reference
+ * to a line that does not exist is left as it is, so its slot refuses it `unknown-reference`, naming what was typed.
+ */
+function resolveLineRefs(c: Construction, f: Fact): Fact {
+  const own = 'id' in f ? f.id : undefined;
+  const moves = new Map<Id, Id>();
+  const scan = (v: unknown): void => {
+    if (typeof v === 'string') {
+      if (v === own || moves.has(v) || refKindOf(v) !== 'line' || objectById(c, v)) return;
+      const named = curveByName(c, statedName(v));
+      if (named && named.id !== v && curveKindOf(named) === 'line') moves.set(v, named.id);
+    } else if (Array.isArray(v)) v.forEach(scan);
+    else if (v && typeof v === 'object') Object.values(v as Record<string, unknown>).forEach(scan);
+  };
+  for (const [k, v] of Object.entries(f)) if (k !== 'id' && k !== 'src') scan(v);
+  if (moves.size === 0) return f;
+  let out = f;
+  for (const [from, to] of moves) out = replaceId(out, from, to);
+  return own === undefined ? out : ({ ...out, id: own } as Fact);
+}
+
+export function applyFact(c: Construction, f0: Fact): ApplyOutcome {
+  const f = resolveLineRefs(c, f0);
   const out = applyStatement(c, f);
   if (!out.ok || out.effect === 'known') return out;
   // A POINT NAMED BY AN ANGLE'S LABEL (#1622 E5, ADR-AG-221) — «נסמן זוית BAM כ-A1» then «נקודה A1»: the name is
@@ -2935,6 +2968,21 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (!through || !isPositional(through)) {
         return { ok: false, error: unknownRef(c, f.through) };
       }
+      /*
+       * THE DIRECTION MUST NAME SOMETHING THE FIGURE HAS (#2431, ADR-AG-317). «ישר דרך A מקביל לישר l1» on a figure
+       * with no l1 used to be CREATED, with a `dir` pointing at nothing: the row recorded with no fault and nothing was
+       * drawn — a stated construction that vanished. The same references a relation's operand is held to (#1150).
+       */
+      const missingDir =
+        dirRefs(f.dir).find((id) => {
+          const o = objectById(c, id);
+          return !o || !isPositional(o);
+        }) ??
+        dirCurveRefs(f.dir).find((id) => {
+          const o = objectById(c, id);
+          return !o || !CURVE_BEARING.has(o.kind);
+        });
+      if (missingDir !== undefined) return { ok: false, error: unknownRef(c, missingDir) };
       const prior = objectById(c, f.id);
       /**
        * «הישר l3 עובר דרך N» — an EXISTING line through a point is an incidence, not a second line (#1281, M1).

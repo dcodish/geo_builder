@@ -866,6 +866,11 @@ a sentence the tool parsed.
 - «A(1,2) · B(1,2) · A ≠ B» → refused, naming «A ≠ B»; «N1 ≠ N1» → the same letter twice
 - Sources: ADR-AG-311, #2395 (#2379, the operator's exam questions).
 
+**R185 — a line named by restatement is that line to every sentence that takes a line, and a sentence about a line the figure does not have is refused**. *(2-D: a named line resolves everywhere; honesty invariant: a stated given never vanishes.)* «נתון ישר 4x+y+3=0» then «נתון הישר l1: 4x+y+3=0» names the one line, and every slot reads l1 as that line.
+- «הישר AB מקביל לישר l1», «C על הישר l1», «שיפוע הישר l1 שלילי», «C נקודת החיתוך של הישר l1 עם ציר ה-x», «A מעל הישר l1», «המעגל M משיק לישר l1» → about that line
+- «ישר דרך A מקביל לישר l1» → the line through A is drawn; with no l1 (or no C in «… ל-CD») → refused, naming it
+- Sources: ADR-AG-317, #2431 (exam Q1 ב(1), #2379).
+
 **R61 — a circle marks its centre**. Its value shows only when the givens fix it; the centre owns no letter (amended by R123).
 - Sources: ADR-AG-036.
 

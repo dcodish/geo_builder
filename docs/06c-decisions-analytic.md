@@ -13321,3 +13321,38 @@ No other sequence moved.
 - `message-floor-2028` registers the new key.
 
 **Consequences.** `engine/carriers.ts` (`RADIUS_CAPITALS`), `engine/lengths.ts`, `engine/types.ts` (`radius-ratio` fact), `engine/solve.ts` (`param-rel`, `radius-ratio`), `engine/apply.ts` (the clash, `letterReadings`, the `param-rel` use check, the `radius-ratio` arm), `engine/derive.ts` (`letterAgainst`), `parser/parseAnalytic.ts` (`equationExpr`, `roleScalar`, `radiusOfSize`, `circleSubjectGate`, `parseParamRelation`), `parser/catalogAnalytic.ts`, `app/submit.ts`, `app/errorText.ts`, `store/useAnalyticStore.ts`, `i18n/index.ts`; docs 02c, 04c.
+
+## ADR-AG-317 — A line named by restatement is that line to every slot; a line through a point names a direction the figure has (#2431)
+
+**Date:** 2026-10-20 · **Status:** accepted · bug (P1), fix round #2436 (stream A); branch `fix/2431-line-name-resolves`. Step 0 of the #2429 plan, shared with #2425. LADDER stage: none (the M1 boundary; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R185 (new). · **Design:** [04c](04c-design-analytic.md), "Curve identity at the M1 boundary" (a line referred to by its name).
+
+**Context.** Measured on main `17168818` (`decideSubmit` → `derive`, no model call). After «נתון ישר 2x-y+3=0» · «נתון הישר l1: 2x-y+3=0» the line keeps its content-derived id (`curve-anon…`, the #1342 narrowing, ADR-AG-147) and only `label.name` says l1. Then:
+- «הישר AB מקביל לישר l1», «C על הישר l1», «שיפוע הישר l1 שלילי», «C נקודת החיתוך של הישר l1 עם ציר ה-x», «A מעל הישר l1» and «המעגל M משיק לישר l1» were refused `unknown-reference l1`;
+- «ישר דרך A מקביל לישר l1» RECORDED with no fault and drew nothing: its `dir` held `line-l1`, which no object has;
+- exam Q1 ב(1) in its named spelling («M על הישר 4x+y+3=0» · «נתון הישר l1: 4x+y+3=0» · «הישר l1 מאונך ל-KL») was refused.
+
+The distance slot (`curveByName`) found the line.
+
+**Class.** *A line operand named by the label of a line whose id is content-derived does not resolve in the slots that look a line up by id*, and *a line through a point is created with a direction that names nothing*. One name had two readings, depending on the slot.
+
+**Decision.**
+1. **`resolveLineRefs` (`engine/apply.ts`), the first step of `applyFact`.** Take every string in the fact that is a line id (`refKindOf` = line), names no object, and is the name of a LINE (`curveByName` → a curve of kind line, a `line-at`, a common tangent). It is replaced, structurally (`replaceId`), by that line's id.
+   - The id the fact itself introduces (`f.id`) and its `src` are never touched, so a restatement still meets its own id's handling (`already-named`, the twin scan).
+   - Ids are never rewritten on objects: the narrowing rule stands.
+   - A reference to a line nobody has is left as written, so the slot's own `unknownRef` names what the student typed.
+2. **`line-at` checks its direction.** The points (`dirRefs`) must be placed and the curves (`dirCurveRefs`, now exported from `solve.ts` and used by `constraintCurveRefs`) must exist, exactly as a relation's operands are held (#1150). «ישר דרך A מקביל לישר l7» with no l7, or «… ל-CD» with no C, is refused `unknown-reference`. It is never created and dropped.
+3. **`derive` blames a failing selector as applied.** The selector fault compared the fact's selector, as written, with the failing applied one. Once M1 re-points a reference they differ, so a failing «שיפוע הישר l1 שלילי» on the restated line was blamed on no sentence and the figure drew green. The blame now also matches the fact's applied selector (`selectorFact`), and the no-such-side reading (ADR-AG-310) reads the applied line.
+
+**Not changed.** The by-name slots (distances, the ask lane) already resolved the label. English "the line l1 is perpendicular to …" / "the line AB is parallel to the line l1" is refused `bad-operand` for a line named directly too. That is the English relation frame, not this class; it belongs with #2429, whose equation arm reads the same "the line" operand.
+
+**Sibling audit.** Grepped `apply.ts` for id-based line lookups (`lineIdOf(`, `objectById` on a direction's id): every one reads ids carried by the fact, so the one step at the top of `applyFact` covers them all. The selector blame in `derive.ts` was the only consumer comparing a fact's content with the applied construction (`JSON.stringify(f.sel)`). 2-D and 3-D have no content-derived line ids (no equations, docs/22 §10 X2): a 2-D named line's id is its name. The class is not present there.
+
+**Tests.** `src-analytic/__tests__/issue-2431-line-name-resolves.test.ts` (23 cases, 18 fail before), through `decideSubmit` → `derive`, He and En:
+- every slot above, each with its geometry: AB's slope 2, C on l1, the crossing (−1.5, 0), A above l1, r = 3/√5, the line through A drawn with slope 2;
+- the slope sign judged, and the vertical-line side refusal;
+- the refusals for l7 and CD; a line named directly is unchanged;
+- fixture `exam-2379-q1-named-perpendicular-2431.analytic.json` (exam Q1 ב(1)): one line named l1, and the wrong «מקביל» refused `unsatisfiable`.
+
+**Consequences.** `engine/apply.ts` (`resolveLineRefs`, the `line-at` direction check), `engine/solve.ts` (`dirCurveRefs`), `engine/derive.ts` (the selector blame); docs 02c, 04c.

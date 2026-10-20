@@ -365,6 +365,13 @@ reading** ([ADR-AG-183](06c-decisions-analytic.md#adr-ag-183)): `nameReading` (`
 
 *Identifiers:* `\|cos\|` · `III`
 
+**A line referred to by its name** ([ADR-AG-317](06c-decisions-analytic.md#adr-ag-317)). A narrowed line keeps its
+id, so `applyFact` first runs `resolveLineRefs`: every line-id reference in the fact (never the id the fact introduces)
+that names no object, while a line carries that name (`curveByName`), is re-pointed at that line's id. Every slot that
+holds a line id reads it through this one step, and a reference to no line is left for the slot's `unknownRef`.
+`line-at` holds its `dir` to the same reference check as a relation (`dirRefs` + `dirCurveRefs`). `derive` blames a
+failing selector by the selector AS APPLIED (`selectorFact`), not as written.
+
 ### Curve identity and the promotion path ([ADR-AG-090](06c-decisions-analytic.md#adr-ag-090))
 
 Content-derived ids make a later «y=x» PROMOTE the carrier of «נקודה B על הישר y=x» (#1076): the carrier is minted

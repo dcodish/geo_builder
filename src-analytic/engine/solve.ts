@@ -741,8 +741,11 @@ export function describeConstraint(k: Constraint): string {
  * resolve to something with a shape. Merging them would have made the apply check reject every curve
  * reference as "not a point", which is the opposite defect.
  */
+/** The CURVES a direction names — a named line, a radius's circle; `dirRefs` is its points half. */
+export const dirCurveRefs = (d: Direction): Id[] => (d.k === 'curve' ? [d.id] : d.k === 'radius' ? [d.circle] : []);
+
 export function constraintCurveRefs(k: Constraint): Id[] {
-  const ofDir = (d: Direction): Id[] => (d.k === 'curve' ? [d.id] : d.k === 'radius' ? [d.circle] : []);
+  const ofDir = dirCurveRefs;
   switch (k.t) {
     case 'on-curve':
       return [k.curve];
