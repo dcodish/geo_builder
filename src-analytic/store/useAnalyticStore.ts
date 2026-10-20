@@ -220,6 +220,8 @@ export type InputError =
   | { key: 'measure-contradicts'; detail: string; what?: string; declared?: string }
   /** #2119 (ADR-684) — a second, different radius for a circle: the line that sized it. */
   | { key: 'radius-contradicts'; detail: string; declared?: string }
+  /** #2388 (ADR-AG-307): R is a point and the radius parameter — `holder` the letter, `reading` the first, `declared` its line. */
+  | { key: 'radius-letter-taken'; detail: string; holder?: string; reading?: 'point' | 'radius'; declared?: string }
   /** #1963 (ADR-AG-296) — a circle through three points a statement puts on one line: the other lines, the three letters. */
   | { key: 'forced-collinear'; detail: string; declaredLines?: string[]; collinear?: string[] }
   /**

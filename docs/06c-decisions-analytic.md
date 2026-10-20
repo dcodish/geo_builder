@@ -7943,7 +7943,7 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 
 ## ADR-AG-163 — A value never mentions the plane, and a capital is never a parameter (#1496)
 
-**Status:** accepted · 2026-09-27 · P1, operator fix-now in session (built with #1495, #1281)
+**Status:** accepted · 2026-09-27 · P1, operator fix-now in session (built with #1495, #1281) · **⚠ Amended by [ADR-AG-307](#adr-ag-307) (2026-10-20, operator ruling on #2388):** the radius capital R is the one capital that may be a parameter.
 
 **Requirements:** none (internal) — the honesty invariant already promises that a given parses to a constraint, escalates or errors, and never vanishes. · **Design:** [04c](04c-design-analytic.md#the-parsers-rule-contract-adr-ag-017), "A value never mentions the plane"
 
@@ -7960,6 +7960,8 @@ Corpus sweep (every 4+-line sequence in `src-analytic/__tests__`, 114 figures ×
 **Sibling audit.** *Analytic:* above. *Products:* 2-D and 3-D have no juxtaposition-product expression grammar over free letters (lengths and angles there are numbers or named symbols), so the class cannot occur. Nothing to file. #1495 is the English spelling that should BUILD «the side BC lies on the line y=x-4»; it is a different sentence from «side AB is y=x-4», which stays not understood.
 
 **Consequences.** `engine/carriers.ts` (`mentionsPlane`), `engine/lengths.ts`, `parser/parseAnalytic.ts` (`valueExpr`, `equationExpr`). Lock: `issue-1496-value-never-mentions-plane.test.ts`.
+
+**Amendment (ADR-AG-307, 2026-10-20).** Operator ruling on #2388, option (b): *"R can be an exception"*. Inside an equation and as a radius, R is a radius parameter («(x−13)²+y²=R²», «ורדיוסו R»), read through `RADIUS_CAPITALS`; every other capital stays a point's name. A point R beside the parameter R is refused (`radius-letter-taken`).
 
 ## ADR-AG-164 — Incidence in every order and over every operand: the line first, a side as subject, a point by its coordinates (named by the tool) (#1281, #1495)
 
@@ -11304,6 +11306,8 @@ Merged onto `main` @ 59037001, which carries #1717 (ADR-AG-223, `placeLengthLabe
 
 **Consequences.** `engine/carriers.ts` (`mentionsPointName`, `LENGTH_CAPITALS`, `POINT_TOKEN`); `engine/lengths.ts` (`constantLengthExpr`, `readLength`); `parser/parseAnalytic.ts` (`measureValue` and its six callers, the length rule's `ofArea`); `shell/__tests__/fixtures/geo-input-parity.ts` (`expect: Verdict`, the rows).
 
+**Amendment (ADR-AG-307, 2026-10-20).** `LENGTH_CAPITALS` is now `RADIUS_CAPITALS`, and it is used by every reader that takes a size or an equation (`equationExpr`, `roleScalar`, `radiusOfSize`, the length), per the operator's ruling on #2388. A measure (angle) value still admits no capital.
+
 ## ADR-AG-239 — The spaced «ו-» conjunction is folded once, in `shell/`, at every builder's parser boundary (#1691)
 
 **Date:** 2026-10-05 · **Status:** accepted · fix-round #1776 (bug item). #1691 `auto-ok` 2026-10-05 (/status-update pass, ADR-W-014 Am. 1). **The mechanism is SHARED** — `shell/conjunction.ts`, called by 2-D, 3-D and analytic — and is logged here because the reported defect is analytic's; the 2-D and 3-D lanes were run too.
@@ -12791,3 +12795,89 @@ No other sequence moved.
   - `issue-1271-1336-conic-naming`: «מעגל 1 ומעגל II משיקים» over `x²+y²=4` and `(x−5)²+y²=9`, which already touch, is now `already-follows` (it was `out-of-scope`). The numeral-notation refusals beside it are unchanged.
 
 **Consequences.** `engine/solve.ts` (`CircleSide`, the `tangent-circle` type, refs, curve refs, canonical, describe, residual), `engine/apply.ts` (`tangent-circles`, `centresAlwaysCoincide`); docs 02c R120, R122; 04c.
+
+## ADR-AG-307 — Relations between parameters; R is the one capital that names a size (#2388)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream B); branch `feat/2388-analytic-param-relations`, stacked on ADR-AG-306's branch, for the operator's play-and-approve. **Amends** [ADR-AG-163](#adr-ag-163) (a capital is never a parameter, except R) and [ADR-AG-238](#adr-ag-238) (`LENGTH_CAPITALS` → `RADIUS_CAPITALS`, now used by every reader). LADDER stage: none (analytic's joint solve; LADDER describes 2-D's ladder).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R181 (new: relations and proportions between parameters, the radius ratio, R as the radius capital, the clash refusal); R164 notes R's wider reading. · **Design:** [04c](04c-design-analytic.md) "A value never mentions the plane" (the R exception), "A Greek angle name is a parameter" (the Latin relation), "Arcs, sectors and the diameter from a point" (`radius-ratio` reads the resolved circle's radius).
+
+**Rulings.**
+- Operator (#2379): *"this is an exam I give my students and i want the tool to support it"* (the relations).
+- Operator 2026-10-20 on #2388, option (b): *"it is very common to use R and r for radiuses of different circles so R can be an exception"*. R is a radius parameter inside an equation and in «ורדיוסו R»; *"Every other capital letter stays a point name"*; *"Detect the clash and refuse, naming both readings"*.
+- R14, the operator's ruling that every unstated choice is a DOF: the unordered ratio.
+
+**Re-measurement at pickup** (ADR-AG-306's tip, `decideSubmit`, model mocked). Both of the plan's tables held:
+- The five relation spellings were `not-handled`; «r < R» recorded a sign selector.
+- `(x-13)^2+y^2=R^2` was `not-handled`. «מעגל N: …=R²» and «ורדיוסו R» gave `bad-equation`, and «רדיוס המעגל O הוא R» was `not-handled`.
+- «שרדיוסו R» and «שרדיוסו K» both recorded a parameter.
+- A point R (or «PQRS», or «K(1,1)» with «שרדיוסו K») recorded silently beside the parameter of the same name.
+
+**Class.**
+1. *No parameter-to-parameter relation existed for Latin symbols*: any equation in parameters only, any proportion «X:Y = p:q» between them, and the ratio of two circles' radii had no reader and no constraint.
+2. *"Which capital is a size" was decided four ways in four readers* (`equationExpr` none, `roleScalar` none, `radiusOfSize` any, `lengths.ts` R only), and nothing checked that a letter is not both a point and a parameter.
+
+**Decision.**
+1. **One radius capital, one predicate.** `RADIUS_CAPITALS = {R}` (`carriers.ts`, renamed from `LENGTH_CAPITALS`) is used by every value or equation reader:
+   - `equationExpr` declines any other capital;
+   - `roleScalar` reads R and declines a point name;
+   - `radiusOfSize` takes a lowercase letter or R;
+   - a circle-subject radius that names a point («ורדיוסו K») now declines (`not-handled`) instead of answering `bad-equation`.
+   - Coordinates and slopes are unchanged. ADR-AG-238's "Not changed": analytic's own families, outside the ruling's two places.
+2. **The clash, at the chokepoint** (`applyFact`, beside the `alias-taken` check). The test is asked of the construction:
+   - *Clash:* the figure holds a positional object R and something reads the symbol R, and this statement introduced one of the two. That covers every naming path, in both orders. The line is refused `radius-letter-taken`, carrying `holder`, `reading` (the reading held first) and `declared`.
+   - *`declared`:* `derive` folds line by line on the refusal path to find the earlier line.
+   - *Wording:* two sentences in 02c's refusal style (He and En, with and without the earlier line), naming both readings and the statement.
+   - *The taught remedy, «שנה שם R ל-T»,* is locked to work.
+3. **Two constraint kinds** (`solve.ts`; NO CAS, each residual is evaluated, never rearranged):
+   - `param-rel {left, right}`: (L − R) / max(1, |L|, |R|). It has no point refs, and its symbols are registered by the structural walk (#1343).
+   - `radius-ratio {a, b, k}`: r(a) − k·r(b), each radius read off the resolved circle (`curveAt`, the `arc-sum` discipline). A circle given by centre, by equation or by points is one operand.
+4. **The readers** (`parseParamRelation`, after the Greek pin).
+   - *Equations.* An equation of parameter expressions (no plane letter, no point name but R) naming at least two symbols becomes a `param-rel`. A one-symbol pin («a = 5», «r=5») keeps its refusal.
+   - *Proportions.* «X:Y = p:q», «היחס בין X ל-Y הוא p:q» and "the ratio of/between X to/and Y is p:q" lower by their definition, q·X = p·Y. A slash «r/R=1/2» is kept as typed.
+   - *Radii.* «היחס בין (אורכי) (ה)רדיוסים של המעגלים …», «היחס בין רדיוסי המעגלים (M ו-N) …» and "the ratio of the radii of the circles (M and N) is p:q" become a `radius-ratio` fact. At M1:
+     - named circles are ordered;
+     - «המעגלים» unnamed means the figure's exactly two circles, else `ambiguous-shape`;
+     - the unstated order is a `choice` over both (R14), and «r < R» picks it.
+   - *Unused symbols.* A relation over a symbol the figure does not use is `not-handled` at M1, HEAD's verdict.
+5. **Catalog.** Four non-featured relation rows and the R equation row, in He and En.
+
+**Pickup checks.**
+- (1) Both tables re-measured as above. #2380, #2381 and #2391 are not on this stack. The issue-1496 and issue-1701 locks assert nothing about R in an equation, so neither needed amending.
+- (2) The readers that can now see R are the equation, the radius readers and the length. Coordinates still read any capital as a parameter (ADR-AG-238, "Not changed"), and stay as they were.
+- (3) The tool's letter resolver treats a used R as taken, because its `used` set reads every quoted capital in earlier facts. Locked: with M, N, P and Q taken, a median's foot is S, not R.
+- (4) A rename onto R while R is the radius is refused `rename-unsafe` (the re-derive faults), and nothing changes.
+- (5) Q2 is a, r, R against MN = 9, the touch and the relation. MN pins a alone, and the touch and the relation pin r and R jointly: no 3-DOF joint pin.
+- (6) «המעגלים משיקים» (a choice) with the unordered ratio (a choice) and «r < R» is not refused on this stack. It builds r = 3, R = 6 in the canonical route, without #2381.
+
+**The exam's equation form: measured, not inferred.** With both circles by equation (`(x−a)²+y²=r²`, `(x−13)²+y²=R²`), the ratio sentence and «r < R», the radii appear only as r² and R². «r < R» therefore does not make them positive: (r, R) = (3, 6) and (−6, 3) both satisfy every given.
+- The panel prints a = 4 and lists each equation with its two options.
+- With «R = 2r» instead of the ratio, r = 3 and R = 6 are known.
+- No `r > 0` is inferred. That is the #2382/#2387 plan's pickup check 4, and whether a radius parameter written in an equation is positive is a question for the operator (#2419, `needs-operator`).
+
+**Parity.** None. 2-D reads R and r as ONE radius symbol (ADR-034), so «R = 2r» means nothing there; 3-D and complex have no radius parameters. The divergence is deliberate (the exam uses both letters). No port issue.
+
+**Sibling audit.** The four capital readers above are every reader that takes a radius, a length or an equation (grepped `parseExpr`/`valueExpr` call sites). `measureValue` keeps declining R for an angle. 3-D and complex have no letter-parameter grammar.
+
+**Behaviour change for a student.**
+- «R = 2r», «r:R = 1:2», «r/R=1/2», «היחס בין R ל-r הוא 2:1» and «היחס בין אורכי הרדיוסים של המעגלים הוא 1:2» are read, and Q2 shows r = 3, R = 6.
+- The unordered ratio cycles both orders until «r < R».
+- R reads in «(x−13)²+y²=R²», «ורדיוסו R» and «רדיוס המעגל O הוא R».
+- A point R beside the radius R is refused in either order.
+- **WITHDRAWN:** «נתון מעגל O שרדיוסו K» (any capital but R) is no longer accepted (not understood), and «ורדיוסו K» says so too, where it said `bad-equation`.
+
+**Locks.**
+- `src-analytic/__tests__/issue-2388-parameter-relations.test.ts`:
+  - seven relation spellings (He and En) give r = 3, R = 6 at 12 seeds;
+  - the colon and slash lowerings;
+  - four unnamed radii spellings with «r < R»; the unordered ratio reaching both orders; the named ratio ordered; the ratio on equation circles; three circles `ambiguous-shape`;
+  - «k = 2t» and «a = b + 1» hold at every seed and consume one DOF; an unused letter is `not-handled`;
+  - every R reader registers R;
+  - the clash matrix: three point paths × five radius paths, and the radius first × three point paths, each with both readings and the earlier line in He and En; the rename onto R; the taught remedy; the tool letter;
+  - controls: «a = 5», «r=5», «AB is y=x-4», «x²+y²=K²», «α = 30», «α = 2β», «PQRS» / «AB = RS», «R > r»;
+  - the withdrawal;
+  - both fixtures.
+- Fixtures: `issue-2388-q2-relations` (Q2 canonical + «R = 2r» + «r < R»: a = 4, r = 3, R = 6) and `issue-2388-q2-exam-equations` (the exam's equation form with «R²», the ratio sentence and «r < R»: a = 4, each equation with its two options).
+- `message-floor-2028` registers the new key.
+
+**Consequences.** `engine/carriers.ts` (`RADIUS_CAPITALS`), `engine/lengths.ts`, `engine/types.ts` (`radius-ratio` fact), `engine/solve.ts` (`param-rel`, `radius-ratio`), `engine/apply.ts` (the clash, `letterReadings`, the `param-rel` use check, the `radius-ratio` arm), `engine/derive.ts` (`letterAgainst`), `parser/parseAnalytic.ts` (`equationExpr`, `roleScalar`, `radiusOfSize`, `circleSubjectGate`, `parseParamRelation`), `parser/catalogAnalytic.ts`, `app/submit.ts`, `app/errorText.ts`, `store/useAnalyticStore.ts`, `i18n/index.ts`; docs 02c, 04c.

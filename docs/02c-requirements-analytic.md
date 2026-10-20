@@ -615,6 +615,12 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «sin∢ABC = 0.5» → «30° או 150°», cycled
 - Sources: ADR-AG-227, #1719.
 
+**R181 — a relation between parameters, a proportion, and the ratio of two circles' radii are givens; R is the one capital that names a size**. *(Operator ruling 2026-10-20: "it is very common to use R and r for radiuses of different circles so R can be an exception".)* An equation in the figure's own parameters relates them; a proportion means q·X = p·Y; the radii's ratio of «המעגלים» unnamed leaves the order to the configuration until a given («r < R») picks it. R is a radius parameter inside an equation and as a radius; every other capital is a point's name, and «שרדיוסו K» is not understood. A point R together with the radius R is refused in either order, naming both and the earlier line.
+- «R = 2r», «r:R = 1:2», «r/R=1/2», «היחס בין R ל-r הוא 2:1», «היחס בין אורכי הרדיוסים של המעגלים הוא 1:2» → r = 3, R = 6 in Q2
+- «(x−13)²+y²=R²», «ורדיוסו R», «רדיוס המעגל O הוא R»
+- «R(1,2)» · «נתון מעגל N שרדיוסו R» → refused, naming «R(1,2)»
+- Sources: ADR-AG-307, #2388, #2379.
+
 ---
 
 ## Givens and honesty
@@ -687,6 +693,7 @@ a sentence the tool parsed.
 - Not a second name: a letter naming another quantity («AB=a» · «BC=a», «CB=c» · «AB=a» · «AB=c»), a number, a shared-letter equation («AB=2a» · «AB=a+3»), a trig measure, an angle label.
 - Sources: #2054, #2061, ADR-AG-277.
 - **A second, different NUMBER for the same segment or angle, or the same letter with another constant, contradicts the first line** in the same frame (2-D's verdict, [ADR-AG-295](06c-decisions-analytic.md#adr-ag-295), #2105; operator ruling 2026-10-15): «AB=4» · «AB=5» → «לא ניתן: «AB=5» סותר את «AB=4» — אי אפשר לקיים את שניהם יחד. הסיבה: |AB| = 5.»; «∠ABC=40» · «∠CBA=50» → «… הסיבה: ∠CBA = 50°.»; «∠ABC = α» · «∠ABC = α + 40» → «… הסיבה: ∠ABC = α + 40.» The same value in another spelling is known; a letter whose coefficient AND constant change («AB=2a» · «AB=a+3») is an equation.
+- **One letter, one thing: a point R beside the radius parameter R is refused** ([ADR-AG-307](06c-decisions-analytic.md#adr-ag-307), #2388; operator ruling 2026-10-20): in either order, naming both readings and the earlier line, and teaching «שנה שם R ל-T».
 - **A second, different radius for a circle is refused in 2-D's sentence** ([ADR-684](06-decisions.md#adr-684), #2119; operator ruling 2026-10-15, every builder): «מעגל O ברדיוס 4» after «מעגל O ברדיוס 3», and «רדיוס המעגל O הוא 3» after «מעגל O ברדיוס 5», say «לא ניתן: «…» סותר את «…» — אי אפשר לקיים את שניהם יחד.», naming the line that sized the circle. The same radius again is known.
 
 **R55 — an object that cannot exist is REPORTED once the figure has no freedom left**. Silent while another configuration may yet have it (ADR-AG-008).

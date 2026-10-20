@@ -392,6 +392,19 @@ export type Constraint =
    */
   | { t: 'param-eq'; sym: Extract<Expr, { kind: 'sym' }>; value: Expr }
   /**
+   * «R = 2r» · «r:R = 1:2» · «k = 2t» — A RELATION BETWEEN PARAMETERS (#2388, ADR-AG-307). Two parameter expressions that
+   * must be equal; the residual is EVALUATED, never rearranged (NO CAS, ADR-AG-001 D1). Like `param-eq` it names no
+   * point: the freedom it consumes is the register's, and its symbols reach the register by the structural walk
+   * (`constraintSymbols`, #1343) every value uses. A colon proportion arrives already as its definition, q·X = p·Y.
+   */
+  | { t: 'param-rel'; left: Expr; right: Expr }
+  /**
+   * «היחס בין אורכי הרדיוסים של המעגלים הוא 1:2» — THE RATIO OF TWO CIRCLES' RADII (#2388, ADR-AG-307): r(a) = k·r(b), each
+   * radius read off the RESOLVED circle at the iterate (`curveAt`), the `arc-sum` discipline (ADR-AG-220): a circle by
+   * centre and radius, by equation, or computed from points is one operand.
+   */
+  | { t: 'radius-ratio'; a: Id; b: Id; k: Expr }
+  /**
    * Σ kᵢ·⌢(aᵢbᵢ) = value — ARC MEASURES, in degrees (#1622 E4, ADR-AG-220; 2-D's ADR-116 identity: an arc's measure IS
    * its central angle). Each arc is the unsigned angle at the CENTRE of its resolved circle between the radii to its
    * two ends — read off the circle, so a circle stated by an equation, by a centre letter or computed from points is
@@ -588,6 +601,10 @@ export function constraintRefs(k: Constraint): Id[] {
       return [k.id, ...parentsOf(k.rule)];
     // A parameter's value names no point: its freedom lives in the register.
     case 'param-eq':
+    case 'param-rel':
+      return [];
+    // Two circles' radii: each circle is a CURVE ref (`constraintCurveRefs`); no point moves.
+    case 'radius-ratio':
       return [];
     // The arcs' ends; each circle is a CURVE ref (`constraintCurveRefs`), as the radius direction's is.
     case 'arc-sum':
@@ -656,6 +673,10 @@ export function describeConstraint(k: Constraint): string {
       return `${k.measure ?? ''}∠${k.at.a}${k.at.v}${k.at.b} = ${exprText(k.value)}${k.obtuse ? ' (∠ > 90°)' : ''}`;
     case 'param-eq':
       return `${k.sym.name} = ${exprText(k.value)}`;
+    case 'param-rel':
+      return `${exprText(k.left)} = ${exprText(k.right)}`;
+    case 'radius-ratio':
+      return `r(${k.a.replace(/^circle-(?:at-)?/, '')}) = ${exprText(k.k)}·r(${k.b.replace(/^circle-(?:at-)?/, '')})`;
     case 'angle-ratio':
       return `∠${k.left.a}${k.left.v}${k.left.b} = ${exprText(k.k) === '1' ? '' : exprText(k.k)}∠${k.right.a}${k.right.v}${k.right.b}`;
     case 'relation':
@@ -742,6 +763,8 @@ export function constraintCurveRefs(k: Constraint): Id[] {
       return curveParentsOf(k.rule);
     case 'arc-sum':
       return [...new Set(k.terms.map((t) => t.circle))];
+    case 'radius-ratio':
+      return [k.a, k.b];
     case 'choice':
       return [...new Set(k.options.flatMap(constraintCurveRefs))];
     case 'all':
@@ -1021,6 +1044,20 @@ export function residualRows(
       if (have === undefined || !Number.isFinite(have) || !Number.isFinite(want)) return null;
       // Relative to the value, like the area and length rows, so «α = 30» and «k = 0.5» converge alike.
       return { eq: [(have - want) / Math.max(1, Math.abs(want))] };
+    }
+    case 'param-rel': {
+      const l = evalExpr(k.left, env);
+      const r = evalExpr(k.right, env);
+      if (!Number.isFinite(l) || !Number.isFinite(r)) return null; // an unbound symbol judges nothing
+      // Relative to the sides' own size, so «R = 2r» and «k = 2t» converge alike whatever the scale.
+      return { eq: [(l - r) / Math.max(1, Math.abs(l), Math.abs(r))] };
+    }
+    case 'radius-ratio': {
+      const ca = curveAt?.(k.a) ?? null;
+      const cb = curveAt?.(k.b) ?? null;
+      const ratio = evalExpr(k.k, env);
+      if (!ca || ca.kind !== 'circle' || !cb || cb.kind !== 'circle' || !Number.isFinite(ratio)) return null;
+      return { eq: [(ca.r - ratio * cb.r) / Math.max(1, ca.r, Math.abs(ratio * cb.r))] };
     }
     case 'angle-ratio': {
       const [v1, a1, b1, v2, a2, b2] = p;

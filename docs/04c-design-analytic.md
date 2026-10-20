@@ -91,7 +91,10 @@ or an unread name, at every claiming site including `matchCurve` (ADR-AG-114); t
 through `mentionsPlane` (`carriers.ts`), and `equationExpr` refuses a capital as a symbol. A measure value naming a
 point DECLINES ([ADR-AG-238](06c-decisions-analytic.md#adr-ag-238): `mentionsPointName`, `measureValue`,
 `POINT_TOKEN`), and an indexed name declines on `INDEXED_TOKEN` ([ADR-AG-244](06c-decisions-analytic.md#adr-ag-244)).
-A length admits the radius `R` (2-D ADR-034, `LENGTH_CAPITALS`).
+The radius capital `R` is the one exception, in every reader that takes a size or an equation — a length (2-D ADR-034),
+`equationExpr`, `roleScalar`, `radiusOfSize` — through one set, `RADIUS_CAPITALS` ([ADR-AG-307](06c-decisions-analytic.md#adr-ag-307));
+a radius naming any other capital declines. A point R beside a used symbol R is refused at `applyFact`
+(`radiusLetterClash`, `letterReadings`; `radius-letter-taken`, its first reading's line found by `derive`).
 
 **A parameter is never a plane coordinate** ([ADR-AG-246](06c-decisions-analytic.md#adr-ag-246)):
 A `param` fact (an F11 domain) that names `x` or `y` (`RESERVED_SYMBOLS`) is refused at the apply boundary (`applyStatement`, `engine/apply.ts`) with `coordinate-restriction`, whatever produced it.
@@ -754,7 +757,9 @@ A letter in a length is a free length, never x or y (`planeLetterLength` → `le
 ### A Greek angle name is a parameter; tan and cos are measures of the angle ([ADR-AG-215](06c-decisions-analytic.md#adr-ag-215), #1621)
 
 A Greek letter is a `SYMBOL_RE` symbol, free through `paramRegister`, its sample narrowed by `impliedRange`; «α = 30» is
-`param-eq`; tan and cos ride the `angle` row as `measure?: 'tan' | 'cos'`.
+`param-eq`. A relation between parameters the figure uses («R = 2r», «k = 2t», «r:R = 1:2» as q·X = p·Y) is `param-rel
+{left, right}`, evaluated (L − R)/max(1, |L|, |R|), read by `parseParamRelation` after the Greek pin; a symbol nothing
+uses is `not-handled` at M1 ([ADR-AG-307](06c-decisions-analytic.md#adr-ag-307)); tan and cos ride the `angle` row as `measure?: 'tan' | 'cos'`.
 
 *Identifiers:* `sampleEnv` · `value: α` · `measure-angle` · `narrowedDomain` · `(env[sym] − value)` · `parseParamValue` · `vertex-angle.rhs.measure` · `(sin θ − t·cos θ)/√(1+t²)` · `(cos θ − c)/2` · `frameAnalytic` · `UNWRAP`
 
@@ -768,6 +773,9 @@ A value `p:q` becomes `q·X = p·Y`; any other value `r` becomes `X = r·Y`. The
 ### Arcs, sectors and the diameter from a point ([ADR-AG-220](06c-decisions-analytic.md#adr-ag-220), #1622 E4)
 
 `arc-sum` (`engine/solve.ts`) is one constraint for every arc measure, Σ kᵢ·⌢(aᵢbᵢ) = value, on the RESOLVED circle.
+The second reader of a resolved circle's radius is `radius-ratio {a, b, k}` — r(a) − k·r(b), «היחס בין רדיוסי המעגלים … הוא
+p:q» ([ADR-AG-307](06c-decisions-analytic.md#adr-ag-307)): a circle by centre, by equation or by points is one operand; the
+unnamed «המעגלים» is a `choice` over both orders.
 The parser's `arc-of { circle?, terms, value }` (`parseArcMeasure`) reads a copula as `=`, each side split into `k·arc` terms and at most one number.
 **A drawn arc is an object.** `GeoObject` `arc { def: ArcDef }`, `ArcDef = { circle, from, to, pick: 'ccw' | 'minor' | 'major', away?, toward?, radii? }`. No freedom (`carrierOf` null, `symbolDeps` []), `objectDeps` its circle, ends and side point. `evaluate`'s `arcOf` reads the resolved `NumCurve` and the placed ends: `start` the angle of `from`, `sweep` the counter-clockwise turn to `to`, or the shorter / longer one, or — with `away` / `toward` — the half whose middle is on the far / near side of the chord from that point.
 Circles under arcs are `hidden` (`stated: false`).

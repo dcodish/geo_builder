@@ -6,7 +6,7 @@
  * that fails is reported with its own index and its own words — never dropped, and never blamed on
  * a different line (the honesty invariant: an error message names the conflicting STATEMENT).
  */
-import { centreIdOf, circleByName, curveKindOf, fold, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
+import { centreIdOf, circleByName, curveKindOf, fold, letterReadings, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
 import { forcedCollinear } from './collinear';
 import { collapsedByGivens, completingStatement, curveAtOf, drawableAt, hardRingFaults, holdsOn, viewBox, type Figure } from './evaluate';
@@ -56,6 +56,8 @@ export interface LineFault {
   polygon?: string;
   shape?: string;
   declared?: string;
+  /** For `radius-letter-taken` (#2388, ADR-AG-307): the reading of the radius capital the figure held first. */
+  reading?: 'point' | 'radius';
   /** For a circle through a ring its noun forbids (#1918, ADR-AG-252): the noun the circle would force (registry key). */
   forced?: string;
   /** For a ring re-declared as a shape its noun excludes (#1926, ADR-AG-260): the ring's noun and the refused one (registry keys). */
@@ -244,13 +246,27 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     for (let j = i - 1; j >= 0; j--) if (owner[j] < owner[i] && !errors[j] && sizes(facts[j])) return { declared: lines[owner[j]] };
     return {};
   };
+  /**
+   * #2388 (ADR-AG-307): the line that gave the radius capital its FIRST reading — the earliest line after which the folded
+   * figure holds it as a point (or as the radius parameter). Folded line by line, on the refusal path only.
+   */
+  const letterAgainst = (e: ApplyError, i: number): Partial<LineFault> => {
+    if (e.code !== 'radius-letter-taken' || !e.holder || !e.reading) return { reading: e.reading };
+    for (let k = 0; k < owner[i]; k++) {
+      const upTo = facts.flatMap((f, j) => (owner[j] <= k && !errors[j] ? [{ f, g: owner[j] }] : []));
+      const held = fold(upTo.map((x) => x.f), upTo.map((x) => x.g)).construction;
+      const r = letterReadings(held, e.holder);
+      if (e.reading === 'point' ? r.point : r.radius) return { reading: e.reading, declared: lines[k] };
+    }
+    return { reading: e.reading };
+  };
   const reported = new Set<string>();
   errors.forEach((e, i) => {
     if (!e) return;
     const key = JSON.stringify([owner[i], e.code, e.detail, e.existing ?? null, e.expected ?? null, e.holder ?? null, e.example ?? null, e.host ?? null, e.options ?? null]);
     if (reported.has(key)) return;
     reported.add(key);
-    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'ambiguous-role-side' && e.role ? { role: e.role } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e), ...radiusAgainst(e, i) });
+    faults.push({ index: owner[i], code: e.code, detail: e.detail, existing: e.existing, expected: e.expected, holder: e.holder, example: e.example, host: e.host, domain: e.domain, ...(e.options ? { options: e.options } : {}), ...(e.code === 'ambiguous-role-side' && e.role ? { role: e.role } : {}), ...(e.code === 'shape-excluded' ? { actual: e.actual, stated: e.stated } : {}), ...inscribedAgainst(e, owner[i]), ...roleClaimFields(e), ...restatedAgainst(e), ...radiusAgainst(e, i), ...(e.code === 'radius-letter-taken' ? letterAgainst(e, i) : {}) });
   });
 
   /**
