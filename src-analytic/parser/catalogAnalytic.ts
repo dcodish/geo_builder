@@ -1353,6 +1353,14 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'shapes', family: 'F17', he: 'משולש קהה זווית ABC', en: 'obtuse triangle ABC' },
   { category: 'relations', family: 'F17', he: 'D מעל A', en: 'D is above A', needs: ['נקודה A', 'נקודה D'] },
   { category: 'relations', family: 'F17', he: 'C מימין ל-B', en: 'C is to the right of B', needs: ['נקודה B', 'נקודה C'] },
+  // #2386 (ADR-AG-310) — a position word against a straight line: y against the line's y at the point («מעל»), x against
+  // its x («מימין»), operator rulings of 2026-10-20
+  { category: 'relations', family: 'F17', he: 'M מעל הישר KL', en: 'M is above the line KL', needs: ['K(3,4)', 'L(-5,2)', 'נקודה M'] },
+  { category: 'relations', family: 'F17', he: 'M מימין לישר l', en: 'M is to the right of the line l', needs: ['נתון ישר l: y=2x', 'נקודה M'] },
+  // #2395 (ADR-AG-311) — a stated distinctness: two points, two circles or two lines kept apart
+  { category: 'relations', family: 'F17', he: 'P ≠ Q', en: 'P ≠ Q', needs: ['נקודה P', 'נקודה Q'] },
+  { category: 'relations', family: 'F17', he: 'המעגלים N1 ו-N2 שונים', en: 'the circles N1 and N2 are distinct', needs: ['נתון מעגל שמרכזו N1 ורדיוסו 2', 'נתון מעגל שמרכזו N2 ורדיוסו 3'] },
+  { category: 'relations', family: 'F17', he: 'הישרים l1 ו-l2 שונים', en: 'the lines l1 and l2 are distinct', needs: ['נתון ישר l1: y=2x+1', 'נתון ישר l2: y=-x'] },
   // #1622 E5 (ADR-AG-221) — an order between angle aliases (2-D's measure-order / measure-bound), an angle named by a
   // label (2-D's angle-alias), and an area label that introduces the region it names
   { category: 'relations', family: 'F17', he: 'α < β', en: 'α < β', needs: ['משולש ABC', '∢ABC = α', '∢BAC = β'] },

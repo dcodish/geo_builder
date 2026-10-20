@@ -91,13 +91,13 @@ export interface ExceptionFamily {
  */
 export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
   X1: {
-    title: 'coordinates, the origin, the axes, quadrants, position words between points',
+    title: 'coordinates, the origin, the axes, quadrants, position words between points, or against a line',
     reason:
-      "the coordinate frame: 2-D is coordinate-free by design and sends these to the analytic builder. A position word between two points («D מעל A», «C מימין ל-B») is the frame too: analytic's axes are fixed, so it compares coordinates there (#1706, operator ruling 2026-10-03), while 2-D refuses screen orientation (input.scope.orientation) — those rows carry only: ['analytic']",
+      "the coordinate frame: 2-D is coordinate-free by design and sends these to the analytic builder. A position word between two points («D מעל A», «C מימין ל-B») is the frame too: analytic's axes are fixed, so it compares coordinates there (#1706, operator ruling 2026-10-03), while 2-D refuses screen orientation (input.scope.orientation) — those rows carry only: ['analytic']. A position word against a LINE («M מעל הישר KL», «M מימין לישר l») is the same frame: y against the line's y at the point, x against its x (#2386, operator rulings 2026-10-20, ADR-AG-310) — analytic's alone, only: ['analytic']",
     products: ['analytic', '3d'],
     mustRefuse: ['2d'],
     topic: true,
-    patterns: [/\(\s*[-\w√.+ ]+,/, /ציר ה-?\s?[xyz]/, /ראשית/, /רביע/, /הצירים/, /(?:^|\()[A-Z]\d?\s+(?:מעל|מתחת|מימין|משמאל)\s*ל?-?\s*[A-Z]\d?(?:$|\))/],
+    patterns: [/\(\s*[-\w√.+ ]+,/, /ציר ה-?\s?[xyz]/, /ראשית/, /רביע/, /הצירים/, /(?:^|\()[A-Z]\d?\s+(?:מעל|מתחת|מימין|משמאל)\s*ל?-?\s*[A-Z]\d?(?:$|\))/, /(?:מעל|מתחת|מימין|משמאל)\s*ל?-?\s*ה?ישר/, /(?:above|below|to the (?:right|left) of) (?:the )?line/i],
   },
   X2: {
     title: 'equations of lines, circles and conics; slopes; focus and directrix',
@@ -296,6 +296,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2357': 'open', // #2234 (ADR-737): analytic sends the same spellings to the model
 
   '#2344': 'open', // #2344 (ADR-W-146): 2-D draws a green sliver for a triangle whose givens hold only flat in the limit (the tangent root)
+  '#2417': 'open', // #2395 (ADR-AG-311): 2-D does not read a stated distinctness («P ≠ Q», «המעגלים N1 ו-N2 שונים»)
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1151,6 +1152,13 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'ex-position-below-1706', family: 'topic', steps: ['נקודה A', 'נקודה D', 'D מתחת ל-A'], expect: 'builds', exception: 'X1', only: ['analytic'] },
   { id: 'ex-position-right-1706', family: 'topic', steps: ['נקודה B', 'נקודה C', 'C מימין ל-B'], expect: 'builds', exception: 'X1', only: ['analytic'], note: '2-D refuses it as input.scope.orientation' },
   { id: 'ex-position-left-1706', family: 'topic', steps: ['נקודה B', 'נקודה C', 'C משמאל ל-B'], expect: 'builds', exception: 'X1', only: ['analytic'] },
+  { id: 'ex-position-above-line-2386', family: 'topic', steps: ['נקודה K', 'נקודה L', 'נקודה M', 'M מעל הישר KL'], expect: 'builds', exception: 'X1', only: ['analytic'], note: "#2386 (ADR-AG-310): y_M above the line's y at x_M; 2-D does not read screen orientation" },
+  { id: 'ex-position-below-line-2386', family: 'topic', steps: ['נקודה K', 'נקודה L', 'נקודה M', 'M מתחת לישר KL'], expect: 'builds', exception: 'X1', only: ['analytic'] },
+  { id: 'ex-position-right-line-2386', family: 'topic', steps: ['נקודה K', 'נקודה L', 'נקודה M', 'M מימין לישר KL'], expect: 'builds', exception: 'X1', only: ['analytic'] },
+  { id: 'distinct-points-2395', family: 'points-incidence', steps: ['נקודה P', 'נקודה Q', 'P ≠ Q'], expect: 'builds', exception: 'X9', knownGap: [{ product: '2d', issue: '#2417' }], note: '#2395 (ADR-AG-311): a stated distinctness of two points; 2-D does not read it yet (#2417)' },
+  { id: 'distinct-circles-2395', family: 'circles', steps: ['נתון מעגל שמרכזו N1 ורדיוסו 2', 'נתון מעגל שמרכזו N2 ורדיוסו 3', 'המעגלים N1 ו-N2 שונים'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2417' }], note: '#2395 (ADR-AG-311): two circles stated different; 2-D does not read it yet (#2417)' },
+  { id: 'ex-distinct-lines-2395', family: 'topic', steps: ['נתון ישר l1: y=2x+1', 'נתון ישר l2: y=-x', 'הישרים l1 ו-l2 שונים'], contextFor: { '2d': [] }, expect: 'builds', exception: 'X4', only: ['analytic'], note: '#2395 (ADR-AG-311): two named lines stated different' },
+  { id: 'ex-position-left-line-2386', family: 'topic', steps: ['נקודה K', 'נקודה L', 'נקודה M', 'M משמאל לישר KL'], expect: 'builds', exception: 'X1', only: ['analytic'] },
   { id: 'ex-position-aside-1706', family: 'topic', steps: ['A ו-D על ציר ה-y (D מעל A), B ו-C על ציר ה-x (C מימין ל-B)'], expect: 'builds', exception: 'X1', only: ['analytic'], note: 'corpus 6/5 line 3: the position words inside the asides' },
   { id: 'ex-median-equation-1662', family: 'topic', steps: ['משולש ABC', 'משוואת התיכון AD היא y=x'], expect: 'builds', exception: 'X2', note: '#1662: the median claim is kept — D is the midpoint of BC' },
   { id: 'ex-altitude-equation-ask-1662', family: 'topic', steps: ['משולש ABC', 'משולש ABE', 'משוואת הגובה AD היא y=x'], expect: 'asks', exception: 'X2', note: '#1662: two triangles have the vertex A and neither side holds D' },

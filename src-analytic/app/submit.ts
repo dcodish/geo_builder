@@ -165,7 +165,10 @@ const collapseFields = (f: Derivation['faults'][number]) =>
                           : // #1963 (ADR-AG-296) — three points a statement puts on one line: the other lines and the letters
                             f.code === 'forced-collinear'
                             ? { declaredLines: f.declaredLines, collinear: f.collinear }
-                            : {};
+                            : // #2386 (ADR-AG-310) — a side the line does not have: the word the refusal quotes
+                              f.code === 'side-of-vertical' || f.code === 'side-of-horizontal'
+                              ? { side: f.side }
+                              : {};
 
 /** #1423 — the student's own line that DEFINES `id`: the earliest accepted line introducing it. */
 const definingLineOf = (lines: readonly string[], id: string): string | null => {

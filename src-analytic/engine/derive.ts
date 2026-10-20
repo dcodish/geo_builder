@@ -9,10 +9,10 @@
 import { centreIdOf, circleByName, curveKindOf, fold, maxCrossings, existingKindOf, onCurveByConstruction, type ApplyError, type ApplyNotice } from './apply';
 import { inputsOf, noFreedomReaches, reportedDof } from './carriers';
 import { forcedCollinear } from './collinear';
-import { collapsedByGivens, completingStatement, curveAtOf, drawableAt, hardRingFaults, holdsOn, viewBox, type Figure } from './evaluate';
+import { collapsedByGivens, completingStatement, curveAtOf, drawableAt, hardRingFaults, holdsOn, lineCompareNoSide, viewBox, type Figure } from './evaluate';
 import { conicSize, straightWalkOf, touchPointOf } from './crossing-order';
 import { resolveCurve, type Box } from './curves';
-import { MINT_PREFIX, parseLine, type ParseFailure } from '../parser/parseAnalytic';
+import { MINT_PREFIX, parseLine, type ParseFailure, type SideWord } from '../parser/parseAnalytic';
 import { resolveToolLetters } from './toolLetters';
 import { segmentIdOf } from './cevian';
 import { evalExpr } from './expr';
@@ -90,6 +90,8 @@ export interface LineFault {
    */
   declaredLines?: string[];
   collinear?: string[];
+  /** For a position word against a line with no such side (#2386, ADR-AG-310): the word, as the refusal quotes it. */
+  side?: SideWord;
 }
 
 /** The curves a line meets at most twice (`maxCrossings('line', kind) === 2`) — the second-crossing arms' reach. */
@@ -171,7 +173,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
   lines.forEach((line, index) => {
     const r = parseLine(line);
     if (!r.ok) {
-      faults.push({ index, code: r.code, detail: r.detail });
+      faults.push({ index, code: r.code, detail: r.detail, ...('side' in r ? { side: r.side } : {}) });
       return;
     }
     for (const f of r.facts) {
@@ -383,8 +385,23 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
     // Only the sentences whose selector FAILED (#1268): a triangle's `distinct` did not make a crossing's
     // ordinal impossible. Without the per-selector verdict, every selector line, as before.
     const failing = new Set((figure.selectorsFailing ?? []).map((s) => JSON.stringify(s)));
+    /**
+     * A SIDE THE LINE DOES NOT HAVE (#2386, operator ruling 2026-10-20 option (a); ADR-AG-310). A failing «M מעל הישר l»
+     * whose line is VERTICAL in the figure drawn («מימין» and a HORIZONTAL one) failed because the line has no such
+     * side, not because the search missed — so the refusal says that, with the ruled sentence. Read off the drawn
+     * figure: a line vertical only in some configurations is never refused this way, those configurations are just
+     * not valid, and every other failure keeps «unsatisfiable».
+     */
+    const drawnAt = new Map(figure.points.map((p) => [p.id, { x: p.x, y: p.y }]));
+    const noSide = new Map<number, LineFault>();
     facts.forEach((f, i) => {
-      if (f.t === 'selector' && (failing.size === 0 || failing.has(JSON.stringify(f.sel)))) blamed.add(owner[i]);
+      if (f.t === 'selector' && (failing.size === 0 || failing.has(JSON.stringify(f.sel)))) {
+        blamed.add(owner[i]);
+        if (f.sel.kind !== 'line-compare') return;
+        const none = lineCompareNoSide(construction, f.sel, drawnAt, figure.env);
+        const side = f.sel.axis === 'y' ? (f.sel.greater ? 'above' : 'below') : f.sel.greater ? 'right' : 'left';
+        if (none) noSide.set(owner[i], { index: owner[i], code: none === 'vertical' ? 'side-of-vertical' : 'side-of-horizontal', detail: lines[owner[i]], side });
+      }
     });
     // A selector M1 BUILT from a contextual sentence («B נמצאת מחוץ למעגל», #1619 B1) has no `selector`
     // fact of its own — it is blamed on the line the fold recorded as adding it.
@@ -394,7 +411,7 @@ export function derive(lines: readonly string[], seed = 0, seedNames: Readonly<R
       if (failing.size === 0 || failing.has(JSON.stringify(s))) blamed.add(owner[fact]);
     });
     for (const index of blamed) {
-      faults.push({ index, code: 'unsatisfiable', detail: lines[index] });
+      faults.push(noSide.get(index) ?? { index, code: 'unsatisfiable', detail: lines[index] });
     }
   }
 

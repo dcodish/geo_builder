@@ -18,7 +18,7 @@ import { resolveCurve, curveExtent, type Box } from './curves';
 import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
 import { evalLengthExpr, type LengthExpr } from './lengths';
-import { lineByName, normalizedLine, type NamedLine } from './lines';
+import { isHorizontal, isVerticalLine, lineByName, normalizedLine, type NamedLine } from './lines';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
 import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
@@ -971,6 +971,83 @@ function rhsOf(cmp: CoordCompare, at: (id: Id) => Pt | null, env: Env): number |
   return Number.isFinite(v) ? v : null;
 }
 
+/** A point's side of a straight line (#2386, ADR-AG-310). */
+export type LineCompare = Extract<Selector, { kind: 'line-compare' }>;
+
+/**
+ * THE LINE a side-of-line selector is measured against, in this configuration (#2386, ADR-AG-310) — through its two
+ * points, or the named straight line's own equation (`curveAtOf`, the resolver every constraint reads). `null` while an
+ * operand is unplaced, when the two points coincide (no line), or when the curve is not a line.
+ */
+export function lineCompareLine(
+  s: LineCompare,
+  at: (id: Id) => Pt | null,
+  curveAt: (id: Id) => NumCurve | null,
+): NamedLine | null {
+  if (s.line.k === 'curve') {
+    const k = curveAt(s.line.id);
+    return k && k.kind === 'line' ? normalizedLine(k.a, k.b, k.c) : null;
+  }
+  const p = at(s.line.a);
+  const q = at(s.line.b);
+  if (!p || !q) return null;
+  return normalizedLine(q.y - p.y, -(q.x - p.x), (q.x - p.x) * p.y - (q.y - p.y) * p.x);
+}
+
+/**
+ * THE LINE HAS NO SUCH SIDE (#2386, operator ruling 2026-10-20 option (a)): a VERTICAL line has no y at a given x, so
+ * «מעל / מתחת» means nothing against it; a HORIZONTAL one has no x at a given y, so «מימין / משמאל» means nothing. Read
+ * through the one verticality answer (`isVerticalLine`, #1276) and its mirror, so the judge, the seeding and the refusal
+ * agree on what "vertical" is.
+ */
+export function lineHasNoSide(s: Pick<LineCompare, 'axis'>, line: NamedLine): 'vertical' | 'horizontal' | null {
+  if (s.axis === 'y') return isVerticalLine(line.a, line.b) ? 'vertical' : null;
+  return isHorizontal(-line.b, line.a) ? 'horizontal' : null;
+}
+
+/** The line's value at the point — y_ℓ(x_P) for a y-side, x_ℓ(y_P) for an x-side; `null` where the line has no such side. */
+function lineBoundAt(s: LineCompare, line: NamedLine, p: Pt): number | null {
+  if (lineHasNoSide(s, line)) return null;
+  return s.axis === 'y' ? -(line.a * p.x + line.c) / line.b : -(line.b * p.y + line.c) / line.a;
+}
+
+/**
+ * Which drawn side-of-line selector has NO SUCH SIDE in the figure shown (#2386) — what `derive` asks before it blames a
+ * failing selector, so the refusal says "a vertical line has no above" only when the line drawn really is vertical.
+ */
+export function lineCompareNoSide(c: Construction, s: LineCompare, at: Map<Id, Pt>, env: Env): 'vertical' | 'horizontal' | null {
+  const atFn = (id: Id) => at.get(id) ?? null;
+  const line = lineCompareLine(s, atFn, curveAtOf(c, env, atFn));
+  return line ? lineHasNoSide(s, line) : null;
+}
+
+/**
+ * DO TWO CURVES DRAW AS ONE (#2395, ADR-AG-311) — the `distinct-curves` judge, at the figure's visible resolution so it
+ * states no magnitude (ADR-052). Two LINES coincide when their unit normals agree within `SOLVE_RESOLUTION` and the foot
+ * of the figure's centre on one lies within `apart` of the other; two CIRCLES when their centres and their radii are
+ * within `apart`. Curves of different kinds (or conics this does not compare) never coincide.
+ */
+export function curvesCoincide(p: NumCurve, q: NumCurve, at: Map<Id, Pt>, apart: number): boolean {
+  if (p.kind === 'line' && q.kind === 'line') {
+    const np = Math.hypot(p.a, p.b);
+    const nq = Math.hypot(q.a, q.b);
+    if (!(np > 0) || !(nq > 0)) return false;
+    if (Math.abs((p.a / np) * (q.b / nq) - (p.b / np) * (q.a / nq)) > SOLVE_RESOLUTION) return false;
+    const pts = [...at.values()];
+    const cx = pts.length ? (Math.min(...pts.map((t) => t.x)) + Math.max(...pts.map((t) => t.x))) / 2 : 0;
+    const cy = pts.length ? (Math.min(...pts.map((t) => t.y)) + Math.max(...pts.map((t) => t.y))) / 2 : 0;
+    // The foot of the centre on p, then its distance to q.
+    const d = (p.a * cx + p.b * cy + p.c) / (np * np);
+    const fx = cx - p.a * d;
+    const fy = cy - p.b * d;
+    return Math.abs(q.a * fx + q.b * fy + q.c) / nq < apart;
+  }
+  if (p.kind === 'circle' && q.kind === 'circle') {
+    return Math.hypot(p.cx - q.cx, p.cy - q.cy) < apart && Math.abs(p.r - q.r) < apart;
+  }
+  return false;
+}
+
 /**
  * WHICH selectors fail here (#1268) — so a refusal blames the sentence whose selector failed, not every
  * sentence that happens to carry one. `derive` blamed every selector line when any failed, which named
@@ -1404,6 +1481,19 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       return true;
     }
     /**
+     * TWO CURVES ARE DIFFERENT CURVES (#2395, ADR-AG-311) — `distinct`'s twin, at the same visible resolution.
+     */
+    if (s.kind === 'distinct-curves') {
+      const atFn = (id: Id) => at.get(id) ?? null;
+      const curveAt = curveAtOf(c, env, atFn);
+      const ks = s.ids.map((id) => curveAt(id));
+      if (ks.some((k) => !k)) return true; // an unplaced curve judges nothing, as below
+      for (let i = 0; i < ks.length; i += 1) {
+        for (let j = i + 1; j < ks.length; j += 1) if (curvesCoincide(ks[i]!, ks[j]!, at, apart)) return false;
+      }
+      return true;
+    }
+    /**
      * WHICH SIDE OF A LINE (#1622, ADR-AG-217) — a subject within the visible resolution of the line is ON it, which
      * is neither side, so it fails both readings (2-D's `points-line-side`).
      */
@@ -1461,6 +1551,20 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
     if (s.kind === 'crossing-nth') {
       const atFn = (id: Id) => at.get(id) ?? null;
       return nthHolds(p, s.nth, s.pair, atFn, curveAtOf(c, env, atFn), s.both === true);
+    }
+    /**
+     * A POINT'S SIDE OF A STRAIGHT LINE (#2386, ADR-AG-310) — the point's coordinate against the line's value at the
+     * point, strict at the figure's resolution like `coord-compare` (#2230): a point ON the line is on neither side. A
+     * line with no such side here (vertical for «מעל», horizontal for «מימין») fails — false, never "cannot judge": the
+     * slope precedent (#1323).
+     */
+    if (s.kind === 'line-compare') {
+      const atFn = (id: Id) => at.get(id) ?? null;
+      const line = lineCompareLine(s, atFn, curveAtOf(c, env, atFn));
+      if (!line) return true; // an operand not placed (or no line) judges nothing, as above
+      const bound = lineBoundAt(s, line, p);
+      if (bound === null) return false;
+      return sideOfBound(s.axis === 'x' ? p.x : p.y, bound, spanOf(at)) === (s.greater ? 1 : -1);
     }
     const cmp = compareOf(s);
     if (cmp) {
@@ -2366,6 +2470,28 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
     const mag = Math.abs(d) < 1e-6 ? 1 : Math.abs(d);
     const want = v + (sel.greater ? mag : -mag);
     seeded.set(sel.id, sel.axis === 'x' ? { x: want, y: at0.y } : { x: at0.x, y: want });
+  }
+  /**
+   * …and a SIDE OF A STRAIGHT LINE seeds its point onto that side (#2386, ADR-AG-310) — `coord-compare`'s against-a-value
+   * rule with the line's value at the point as the bound: a free subject on the wrong side is folded across it, keeping
+   * its offset. A line with no such side is left alone. A start, never a verdict.
+   */
+  {
+    const posOf = (id: Id): Pt | null => seeded.get(id) ?? pointAtId(c, env, id);
+    for (const s0 of c.selectors) {
+      if (s0.kind !== 'line-compare') continue;
+      const at0 = seeded.get(s0.id);
+      if (!at0) continue;
+      const line = lineCompareLine(s0, posOf, curveAtOf(c, env, posOf));
+      const bound = line ? lineBoundAt(s0, line, at0) : null;
+      if (bound === null || !Number.isFinite(bound)) continue;
+      const coord = s0.axis === 'x' ? at0.x : at0.y;
+      if (s0.greater ? coord > bound : coord < bound) continue;
+      const d = coord - bound;
+      const mag = Math.abs(d) < 1e-6 ? 1 : Math.abs(d);
+      const want = bound + (s0.greater ? mag : -mag);
+      seeded.set(s0.id, s0.axis === 'x' ? { x: want, y: at0.y } : { x: at0.x, y: want });
+    }
   }
   /**
    * …and an ORDER seeds its measure INTO ITS REGION (#1621 D3, ADR-AG-216) — the #1071 lesson for a measure.

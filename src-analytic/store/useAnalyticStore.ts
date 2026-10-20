@@ -104,6 +104,8 @@ export type InputError =
   | { key: 'bad-arity'; detail: string }
   /** One label used for two vertices of the same figure (#1042). */
   | { key: 'repeated-vertex'; detail: string }
+  /** #2386 (ADR-AG-310) — a position word against a line that has no such side; `side` is the word, as quoted. */
+  | { key: 'side-of-vertical' | 'side-of-horizontal'; detail: string; side?: 'above' | 'below' | 'right' | 'left' }
   /** A cevian whose apex lies on the side it is drawn to, or is its own foot (#1231). */
   | { key: 'degenerate-role'; detail: string }
   /** A cevian named by its triangle whose apex is not a vertex of that triangle (#1165). */

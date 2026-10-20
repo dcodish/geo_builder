@@ -552,8 +552,10 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 **R165 — the equation of a median keeps the median; position words between points choose the configuration; an obtuse triangle is obtuse at one vertex, any of the three**. *(Operator rulings.)* Screen directions are the analytic tool's own reading, because its axes are fixed.
 - «משוואת התיכון AD היא y=x» → the line and the median
 - «A ו-D על ציר ה-y (D מעל A)», «C מימין ל-B»
+- **A position word against a straight line** (ADR-AG-310): «M מעל הישר KL» → y_M above the line's y at x_M; «M מתחת לישר KL» below it; «M מימין לישר l» / «M משמאל לישר l» → x_M against the line's x at y_M. The line is two letters («KL», «הישר KL») or a named line («הישר l»). A point on the line is on neither side; a side the figure cannot take is refused, naming the sentence
+- **A side the line does not have is refused**: «מעל / מתחת» a vertical line (a stated `x=3`, two letters with one x, the y-axis) → «לישר אנכי אין "מעל" — נסו "מימין ל-" או "משמאל ל-"»; «מימין / משמאל» a horizontal line (`y=2`, the x-axis) → «לישר אופקי אין "מימין ל-" — נסו "מעל" או "מתחת"». A line vertical only in some configurations is never refused this way
 - «משולש קהה זווית ABC» → obtuse at one vertex, cycled
-- Sources: ADR-AG-222, #1662, #1706, #1707, #1708.
+- Sources: ADR-AG-222, #1662, #1706, #1707, #1708; ADR-AG-310, #2386 and the operator rulings of 2026-10-20.
 
 ### Measures, angles and ratios
 
@@ -831,6 +833,12 @@ a sentence the tool parsed.
 
 **R61 — two distinct named points are never opened on top of each other**. *(Operator: "It should automatically look for a different config and show them differently".)* A preference below validity; closer than a hundredth of the frame counts as stacked. When the coincidence comes from a combination of discrete choices (two circles tangent to M at A on the same side), the opening drawing takes another combination (#2381).
 - Sources: ADR-W-072, ADR-AG-138, #1254, #1526, ADR-AG-181, ADR-AG-302.
+
+**R180 — a stated distinctness excludes every configuration where the two coincide; one that cannot hold is refused naming the sentence**. Two points, two circles or two lines, by name.
+- «N1 ≠ N2», «הנקודות P ו-Q שונות», «P ו-Q הן נקודות שונות» → two points (a name that is a point is read as one first)
+- «המעגלים N1 ו-N2 שונים» → two circles; «הישרים l1 ו-l2 שונים», «l1 ≠ l2» → two lines
+- «A(1,2) · B(1,2) · A ≠ B» → refused, naming «A ≠ B»; «N1 ≠ N1» → the same letter twice
+- Sources: ADR-AG-311, #2395 (#2379, the operator's exam questions).
 
 **R61 — a circle marks its centre**. Its value shows only when the givens fix it; the centre owns no letter (amended by R123).
 - Sources: ADR-AG-036.

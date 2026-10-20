@@ -222,6 +222,12 @@ export type Fact =
    */
   | (FactBase & { t: 'selector'; sel: Selector })
   /**
+   * «N1 ≠ N2» · «המעגלים N1 ו-N2 שונים» · «הישרים l1 ו-l2 שונים» — A STATED DISTINCTNESS between named objects of one
+   * kind (#2395, ADR-AG-311). The parser cannot know what a name denotes, so the noun (when written) rides along and
+   * M1 resolves: points → `distinct`, circles or lines → `distinct-curves`.
+   */
+  | (FactBase & { t: 'distinct-of'; names: string[]; noun?: 'point' | 'circle' | 'line' })
+  /**
    * INTRODUCE a point without placing it — the declaration half of the distinction #1017 draws.
    *
    * «AD תיכון לצלע BC» names `D` for the first time, so the sentence introduces it; the constraint
@@ -991,6 +997,12 @@ export type Selector =
    */
   | { kind: 'distinct'; ids: Id[] }
   /**
+   * TWO CURVES ARE DIFFERENT CURVES (#2395, ADR-AG-311) — «המעגלים N1 ו-N2 שונים», «הישרים l1 ו-l2 שונים». `distinct`'s
+   * twin for curves: a region, D7's kind 2, consuming no freedom; judged at the figure's visible resolution (`apartOf`),
+   * so it states no magnitude (ADR-052). `ids` are the curve ids M1 resolved.
+   */
+  | { kind: 'distinct-curves'; ids: Id[] }
+  /**
    * TWO CROSSINGS OF THE SAME PAIR ARE TWO POINTS (#1113).
    *
    * An intersection is not a derived point — it is a `declare` plus two incidences, and the joint
@@ -1068,6 +1080,19 @@ export type Selector =
    * the data, never a third sign rule. `rhs` is another point or a value; a value may carry a parameter.
    */
   | { kind: 'coord-compare'; id: Id; axis: 'x' | 'y'; greater: boolean; rhs: { point: Id } | { value: Expr } }
+  /**
+   * «M מעל הישר KL» · «M מתחת לישר KL» · «M מימין לישר l» · «M משמאל לישר l» — A POINT'S SIDE OF A STRAIGHT LINE
+   * (#2386, ADR-AG-310). Operator ruling 2026-10-20: *"above means the y of the point is higher than the y of the other
+   * line at that point"* — `axis: 'y'` is y_P − y_ℓ(x_P) with the sign of `greater`; and *"for right and left - yes"* —
+   * `axis: 'x'` is x_P − x_ℓ(y_P). `coord-compare`'s family (ADR-AG-161), with the line's value at the point as the
+   * bound: D7's kind 2, it consumes no freedom, judged strictly at the figure's resolution, and seeded.
+   *
+   * `line` is a line through two points or a named straight line (`points` / `curve`). A line VERTICAL in the
+   * configuration has no y at a given x, so a y-side selector fails there; a HORIZONTAL one fails an x-side selector —
+   * and when the figure drawn has that line, `derive` refuses with the ruled sentence (`side-of-vertical` /
+   * `side-of-horizontal`) rather than «unsatisfiable».
+   */
+  | { kind: 'line-compare'; id: Id; line: Extract<Direction, { k: 'points' | 'curve' }>; axis: 'x' | 'y'; greater: boolean }
   /**
    * «משולש חד זוויות ABC» — EVERY ANGLE OF THE TRIANGLE IS ACUTE (#1619 B2, ADR-AG-194).
    *

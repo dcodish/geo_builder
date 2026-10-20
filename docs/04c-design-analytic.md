@@ -648,6 +648,30 @@ measured, and `signHolds` reads their sign.
 
 *Identifiers:* `failingSelectors` · `sideOfBound` · `signHolds`
 
+**A point's side of a straight line** ([ADR-AG-310](06c-decisions-analytic.md#adr-ag-310), #2386) is `coord-compare`'s
+family with the line's value at the point as the bound: `line-compare {id, line: points | curve, axis, greater}`.
+`parseCompare` reads it after the point and axis forms (`POSITION_LINE_HE` / `_EN`, the operand through `direction()`).
+`lineCompareLine` resolves the line in the configuration (two points, or `curveAtOf` for a named line); the judge
+compares y_P with −(a·x_P + c)/b (axis `y`) or x_P with −(b·y_P + c)/a (axis `x`) through `sideOfBound` at `spanOf`.
+`lineHasNoSide` (on `isVerticalLine` / `isHorizontal`) makes a y-side selector false on a vertical line and an x-side one
+false on a horizontal line. The seeding loop folds a free subject to the named side, keeping its offset. In `derive`'s
+selector arm, a failing `line-compare` whose line has no such side IN THE DRAWN FIGURE (`lineCompareNoSide`) is refused
+`side-of-vertical` / `side-of-horizontal`, carrying the word (`side`); the parser refuses the same for an axis. M1
+checks the subject, the line's points, and that a named operand is a straight line (`curveKindOf`); `selectorIdentity`
+sorts a two-letter line's ends.
+
+**A stated distinctness** ([ADR-AG-311](06c-decisions-analytic.md#adr-ag-311), #2395). `parseDistinct` (after the
+parameter domains, before `parseCompare`) emits `distinct-of {names, noun?}`; M1 (`case 'distinct-of'`) resolves the
+names: a written noun decides, else a name that is a point reads them all as points, else the first curve's kind.
+Points lower to the existing `distinct`; circles and lines to `distinct-curves {ids}`, judged in `failingSelectors` by
+`curvesCoincide` at `apartOf` (lines: unit normals within `SOLVE_RESOLUTION` and the figure centre's foot on one within
+`apart` of the other; circles: centres and radii within `apart`). No mover: `drawableAt`'s walk finds the other roots.
+`selectorIdentity` sorts both kinds' ids.
+
+*Identifiers:* `distinct-of` · `distinct-curves` · `parseDistinct` · `curvesCoincide`
+
+*Identifiers:* `line-compare` · `lineCompareLine` · `lineHasNoSide` · `lineCompareNoSide` · `POSITION_LINE_HE` · `side-of-vertical` · `side-of-horizontal` · `SideWord`
+
 #### An order between measures ([ADR-AG-216](06c-decisions-analytic.md#adr-ag-216), #1621 D3)
 
 An order lowers to `sign {q: {k: 'order', left, right}, positive, closed?}` (`OrderSide`); `parseOrder` reads it,
