@@ -539,7 +539,12 @@ export type Fact =
    * the apply boundary lowers to a `choice` over both (#1049, ADR-052). `at` names the touch
    * point when the sentence did («…בנקודה T») — a `touch-point` derived point (amendment 1).
    */
-  | (FactBase & { t: 'tangent-circles'; a?: string; b?: string; branch?: 'external' | 'internal'; at?: Id })
+  /**
+   * `circles` (#2397, ADR-AG-322): the two circles BY ID, written over the circle-slot sentinels inside `circles-about`
+   * — the plural subject «(שני) המעגלים משיקים …» resolves its pair through the one slot resolver (two bind, none are
+   * drawn), as the plural crossing does. `a` / `b` are the names a sentence wrote.
+   */
+  | (FactBase & { t: 'tangent-circles'; a?: string; b?: string; circles?: [Id, Id]; branch?: 'external' | 'internal'; at?: Id })
   /**
    * «היחס בין אורכי הרדיוסים של המעגלים (M ו-N) הוא p:q» — the ratio of two circles' radii (#2388, ADR-AG-307), `k` = p/q.
    * Which circles is M1's question (`circleByName`, or the figure's exactly two); named circles are ORDERED (r(a) = k·r(b)),
@@ -599,7 +604,12 @@ export type Fact =
    * `circle` (#1663, ADR-AG-203) — the circle by NAME, through the one name chain (`circleByName`): a numeral, a
    * centre letter, or a described circle («⊙ABC», «○ABC» — «X מרכז המעגל החוסם את המשולש ABC»).
    */
-  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[]; circleId?: Id; circle?: string })
+  /**
+   * `ofPair` (#2397, ADR-AG-322): the sentence said «המעגל האחד / האחר / הראשון / השני» — the circle it describes is one
+   * of a pair the figure drew. With no curve of that equation, M1 names the centre on the drawn circle by order and gives
+   * it the equation; with no drawn circles it creates the circle, as without the ordinal.
+   */
+  | (FactBase & { t: 'centre-of'; id: Id; eq?: Expr; create?: Fact[]; circleId?: Id; circle?: string; ofPair?: true })
   /**
    * A sentence that uses «מרכז המעגל» as a POINT (#1619 B1) — «CD עובר דרך מרכז המעגל». The parser lowers
    * the sentence with `CENTRE_SENTINEL` in the centre's place; M1 resolves which point the centre IS and

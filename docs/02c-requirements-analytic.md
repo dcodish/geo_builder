@@ -440,7 +440,7 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «D על המעגל החוסם את המשולש ABC», «A על המעגל שמרכזו M»
 - Sources: ADR-AG-203, #1659, #1665, #1663.
 
-**R140 — a chord, diameter or radius sentence introduces the points it names, and a chord or diameter typed before any circle draws the circle**. *(Operator ruling: as the 2-D tool does.)* New points join the circle free; a diameter's ends are antipodal; with no circle, the circle is drawn.
+**R140 — a chord, diameter or radius sentence introduces the points it names, and a chord or diameter typed before any circle draws the circle**. *(Operator ruling: as the 2-D tool does.)* New points join the circle free; a diameter's ends are antipodal; with no circle, the circle is drawn. Every circle the tool drew («נתון מעגל», «שני מעגלים», a touch's) takes a later «משוואת המעגל (O) היא …», keeping what was already stated about it (ADR-AG-322).
 - after «A(3,4)» on x²+y²=25: «AB קוטר במעגל» → B at (−3,−4)
 - Sources: ADR-AG-204, #1669, #1670.
 
@@ -449,7 +449,15 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «שני מעגלים נחתכים בנקודות A ו-B», «AB משיק משותף חיצוני / פנימי לשני המעגלים»
 - the plural subject crosses too: «המעגלים O ו-P נחתכים בנקודות X ו-Y» (the stated radii kept), «המעגלים O ו-P נחתכים» (the crossings take the tool's letters), «(שני) המעגלים נחתכים …» (the two circles the figure holds), "circles O and P intersect at X and Y" (ADR-AG-300, #2108)
 - a common tangent through the circles' stated touch point is the tangent there: «המעגלים משיקים בנקודה T» · «T על AB» · «AB משיק משותף למעגלים M ו-N» draws AB as the tangent at T (also «TB משיק משותף …»), in either order (R189); other letters are still its two touches, and «… חיצוני …» through T is refused (ADR-AG-312, #2385)
-- Sources: ADR-AG-219, #1622, #1693, #1688, #2108, #2385, #2418.
+- a sentence about the two circles typed before any circle draws them; «המעגל האחד / האחר» with an equation describes one of them (R190)
+- Sources: ADR-AG-219, #1622, #1693, #1688, #2108, #2385, #2418, #2397.
+
+**R190 — two circles can be introduced before they are described**. *(Operator ruling 2026-10-20 on #2397: "it should be accepted as a first sentance too".)*
+- «נתונים שני מעגלים המשיקים זה לזה מבחוץ» on an empty canvas draws two circles touching from outside, their centres unlettered; so do «שני מעגלים משיקים מבחוץ / מבפנים», «המעגלים משיקים מבחוץ», «… בנקודה T» (T drawn) and "two circles are externally tangent". Beside one circle, or three, it asks which circles
+- after it, «מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא …» gives one of the two drawn circles that equation and names its centre M; «מרכזו של המעגל האחר … N …» does the same for the other; the exam's Q2 builds in its printed order
+- on two drawn circles touching from outside (or with no side stated), «O מרכז המעגל» names the first and the next letter the other; on circles touching from inside it asks which, as in the 2-D tool
+- without an ordinal («נתון מעגל שמרכזו M ומשוואתו …») the sentence is still a third circle
+- Sources: ADR-AG-322, #2397, #2379.
 
 **R189 — a common tangent through the circles' touch point is the same figure in any order, and a pair with only the touch tangent draws it**. *(Operator ruling 2026-10-20 on #2418: «AB משיק משותף…» first, then «T על AB»: AB is redrawn as the common tangent at T, the same figure as the other order.)*
 - after two touching circles and «AB משיק משותף למעגלים M ו-N», a later «T על AB» redraws AB as the common tangent at T; so do «T על הישר AB», «T נמצאת על AB», «הישר AB עובר דרך הנקודה T», «AB עובר דרך T», «AB משיק למעגל M בנקודה T» and «AB משיק משותף למעגלים M ו-N בנקודה T». Each is recorded in the givens list, never answered «already known»

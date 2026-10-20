@@ -1312,6 +1312,111 @@ function createdParts(o: CurveObject): { a: Expr; b: Expr; r: Expr } | null {
 }
 
 /**
+ * A STANDARD-FORM CIRCLE EQUATION'S CENTRE AND RADIUS, READ STRUCTURALLY (#2397, ADR-AG-322) — `createdParts`
+ * generalised to what a student writes: (x − p)², x², (x + p)², (p + x)², the same in y, either order, and a right
+ * side s² or a non-negative number (its square root). Anything else is `null`: no CAS (CLAUDE.md hard boundary 2) — a
+ * caller that needs the parts then reads a constant circle at the probes, or keeps its existing answer.
+ */
+function standardCircleParts(eq: Expr): { a: Expr; b: Expr; r: Expr } | null {
+  if (eq.kind !== 'sub' || eq.a.kind !== 'add') return null;
+  const free = (e: Expr) => !symbolsOf(e).some((n) => n === 'x' || n === 'y');
+  const square = (e: Expr): Expr | null => (e.kind === 'pow' && e.b.kind === 'num' && e.b.value === 2 ? e.a : null);
+  const shift = (e: Expr, v: 'x' | 'y'): Expr | null => {
+    const base = square(e);
+    if (!base) return null;
+    if (base.kind === 'sym' && base.name === v) return { kind: 'num', value: 0 };
+    if (base.kind === 'sub' && base.a.kind === 'sym' && base.a.name === v && free(base.b)) return base.b;
+    if (base.kind === 'add' && base.a.kind === 'sym' && base.a.name === v && free(base.b)) return { kind: 'neg', a: base.b };
+    if (base.kind === 'add' && base.b.kind === 'sym' && base.b.name === v && free(base.a)) return { kind: 'neg', a: base.a };
+    return null;
+  };
+  const [u, w] = [eq.a.a, eq.a.b];
+  const a = shift(u, 'x') ?? shift(w, 'x');
+  const b = shift(u, 'y') ?? shift(w, 'y');
+  if (!a || !b) return null;
+  if (!free(eq.b)) return null;
+  const r = square(eq.b) ?? (eq.b.kind === 'num' && eq.b.value >= 0 ? ({ kind: 'num', value: Math.sqrt(eq.b.value) } as Expr) : null);
+  return r ? { a, b, r } : null;
+}
+
+/**
+ * A DRAWN CIRCLE TAKES A STATED EQUATION (#2397, ADR-AG-322; ADR-AG-204 generalised) — «שני מעגלים» · «מרכזו של המעגל
+ * האחד … ומשוואתו …», «נתון מעגל» · «משוואת המעגל היא …», a touch's circle · its equation. The circle keeps its id and
+ * its place (every relation stated about it refers to it by id, so the relation holds of the described circle); its
+ * equation becomes the stated one; its own free symbols leave the figure.
+ *
+ * PARTS ALREADY SPOKEN FOR ARE CARRIED, NEVER DROPPED. A part of the old equation that is not the circle's own bare
+ * symbol was put there by a statement — the radius by `radius-of`, the centre or radius of a placed «זרים / מוכל» pair
+ * by `relateCircles` — and is re-stated about the described circle through the seam that owns it: a constant radius as
+ * `radius-of` (a conflict is its existing `conflicting-restatement`), a radius in the figure's symbols as the
+ * `param-rel` it now is, the centre as a `coord` on its centre point. The circle's own bare symbols that still occur
+ * elsewhere (a sibling placed relative to it) are substituted by the stated centre and radius.
+ *
+ * `null` when the description cannot be carried without a CAS — the parts are needed and the stated equation is
+ * neither in standard form nor a constant circle, or a placed centre has no point to state it on — and the caller keeps
+ * its existing answer. Nothing is ever carried wrong.
+ */
+function describeDrawnCircle(c: Construction, host: CurveObject, eq: Expr, src: string): ApplyOutcome | null {
+  const old = createdParts(host);
+  if (!old) return null;
+  const own = (part: string) => toolSymbol(host.id, part);
+  const bare = (e: Expr, part: string) => e.kind === 'sym' && e.name === own(part);
+  const spoken = { a: !bare(old.a, 'a'), b: !bare(old.b, 'b'), r: !bare(old.r, 'r') };
+  const restText = JSON.stringify({ objects: c.objects.filter((o) => o.id !== host.id), constraints: c.constraints, selectors: c.selectors });
+  const usedElsewhere = ['a', 'b', 'r'].some((part) => restText.includes(`"${own(part)}"`));
+  let stated = standardCircleParts(eq);
+  if (!stated && (spoken.a || spoken.b || spoken.r || usedElsewhere)) {
+    // A circle with constant centre and radius needs no algebra: its parts are read at the probes.
+    const fits = PROBE_ENVS.map((env) => resolveCurve({ eq } as Curve, env));
+    const first = fits[0];
+    if (!first.ok || first.curve.kind !== 'circle') return null;
+    const { cx, cy, r } = first.curve;
+    const close = (v: number, w: number) => Math.abs(v - w) <= 1e-9 * Math.max(1, Math.abs(v), Math.abs(w));
+    const constant = fits.every((fit) => fit.ok && fit.curve.kind === 'circle' && close(fit.curve.cx, cx) && close(fit.curve.cy, cy) && close(fit.curve.r, r));
+    if (!constant) return null;
+    stated = { a: { kind: 'num', value: cx }, b: { kind: 'num', value: cy }, r: { kind: 'num', value: r } };
+  }
+  const centre = spoken.a || spoken.b ? centreIdOf(c, host) : null;
+  if ((spoken.a || spoken.b) && centre === null) return null;
+  let next: Construction = { ...c, objects: c.objects.map((o) => (o.id === host.id ? { ...host, curve: { kind: 'circle', eq } } : o)) };
+  let carried = { a: old.a, b: old.b, r: old.r };
+  if (stated) {
+    // The circle's own bare symbols, wherever they still stand, become the stated parts.
+    for (const part of ['a', 'b', 'r'] as const) {
+      if (spoken[part]) continue;
+      const sym = own(part);
+      const value = stated[part];
+      next = {
+        ...next,
+        objects: next.objects.map((o) => (o.id === host.id ? o : substituteSym(o, sym, value))),
+        constraints: substituteSym(next.constraints, sym, value),
+        selectors: substituteSym(next.selectors, sym, value),
+      };
+      carried = { a: substituteSym(carried.a, sym, value), b: substituteSym(carried.b, sym, value), r: substituteSym(carried.r, sym, value) };
+    }
+  }
+  const carriedFacts: Fact[] = [];
+  if (spoken.r) {
+    const at = PROBE_ENVS.map((env) => evalExpr(carried.r as Parameters<typeof evalExpr>[0], env));
+    const constant = at.every((v) => Number.isFinite(v) && v === at[0]);
+    carriedFacts.push(
+      constant || !stated
+        ? { t: 'radius-of', circleId: host.id, value: carried.r, src }
+        : { t: 'constraint', k: { t: 'param-rel', left: carried.r, right: stated.r }, src },
+    );
+  }
+  if (spoken.a || spoken.b) {
+    carriedFacts.push({ t: 'constraint', k: { t: 'coord', id: centre!, ...(spoken.a ? { x: carried.a } : {}), ...(spoken.b ? { y: carried.b } : {}) }, src });
+  }
+  // Its own symbols leave the figure — every one nothing reads any more (a placement's g, m, s, k stay while a carried part reads them).
+  const readText = JSON.stringify({ objects: next.objects, constraints: next.constraints, selectors: next.selectors, carriedFacts });
+  next = { ...next, params: next.params.filter((p) => !p.sym.startsWith(own('')) || readText.includes(`"${p.sym}"`)) };
+  const out = applyAll(next, carriedFacts);
+  if (!out.ok) return out.error.code === 'radius-contradicts' ? { ok: false, error: { code: 'conflicting-restatement', detail: src } } : out;
+  return { ok: true, next: out.next, effect: 'narrowed' };
+}
+
+/**
  * TWO CIRCLES' STATED POSITION, DRAWN BY CONSTRUCTION (#1622 E3, ADR-AG-219) — «מוכל» (`inside`: `b` strictly inside
  * `a`) and «זרים» (`apart`). Each is a thin region of a random draw once points ride the circles
  * (measured: «מעגל P מוכל בתוך מעגל O» held at 1 seed of 24; «שני מעגלים זרים» · «C על מעגל P» · «D על מעגל O» at none),
@@ -1435,11 +1540,48 @@ function interchangeable(c: Construction, a: Id, b: Id): boolean {
   return JSON.stringify(bag(all, false)) === JSON.stringify(bag(all, true));
 }
 
-/** A symmetric statement written in one order: `apart` / `cross` between two circles read the same either way round. */
+/**
+ * A SYMMETRIC STATEMENT WRITTEN IN ONE ORDER — the relations between two circles that say the same thing either way round
+ * (ADR-AG-219; #2397, ADR-AG-322 adds the tangency):
+ *  - `apart` / `cross` (a `circles` sign selector);
+ *  - an EXTERNAL tangency (`tangent-circle`, branch `external`): each circle touches the other from outside;
+ *  - a tangency of UNSTATED kind (the `choice` of both branches): neither order is said;
+ *  - the circles' common point (the `touch-point` derived rule).
+ * An INTERNAL tangency is not symmetric: it tells the circles apart, one inside the other (2-D's `autosInterchangeable`
+ * asks there too). Read structurally — a semantic property of the relation, never a list of sentences.
+ */
 function normaliseSymmetric(text: string): string {
-  const m = /^\{"kind":"sign","q":\{"k":"circles","a":"([^"]+)","b":"([^"]+)","rel":"(?:apart|cross)"\}/.exec(text);
-  if (!m || m[1] <= m[2]) return text;
-  return text.replace(`"a":"${m[1]}","b":"${m[2]}"`, `"a":"${m[2]}","b":"${m[1]}"`);
+  const pairOf = (a: unknown, b: unknown): [unknown, unknown] => (JSON.stringify(a) <= JSON.stringify(b) ? [a, b] : [b, a]);
+  const tangency = (k: Record<string, unknown>): Record<string, unknown> => {
+    const [a, b] = pairOf(k.a, k.b);
+    return { ...k, a, b };
+  };
+  const isTangency = (k: unknown, branch?: string): boolean =>
+    !!k && typeof k === 'object' && (k as { t?: unknown }).t === 'tangent-circle' && (branch === undefined || (k as { branch?: unknown }).branch === branch);
+  let v: Record<string, unknown>;
+  try {
+    v = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return text;
+  }
+  if (v.kind === 'sign' && v.q && typeof v.q === 'object') {
+    const q = v.q as Record<string, unknown>;
+    if (q.k === 'circles' && (q.rel === 'apart' || q.rel === 'cross')) {
+      const [a, b] = pairOf(q.a, q.b);
+      return JSON.stringify({ ...v, q: { ...q, a, b } });
+    }
+    return text;
+  }
+  if (isTangency(v, 'external')) return JSON.stringify(tangency(v));
+  if (v.t === 'choice' && Array.isArray(v.options) && v.options.length === 2 && v.options.every((o) => isTangency(o))) {
+    const branches = (v.options as Array<{ branch?: unknown }>).map((o) => o.branch).sort().join();
+    if (branches === 'external,internal') return JSON.stringify({ ...v, options: (v.options as Array<Record<string, unknown>>).map(tangency) });
+    return text;
+  }
+  if (v.kind === 'derived' && v.rule && typeof v.rule === 'object' && (v.rule as { t?: unknown }).t === 'touch-point') {
+    return JSON.stringify({ ...v, rule: tangency(v.rule as Record<string, unknown>) });
+  }
+  return text;
 }
 
 /**
@@ -3480,14 +3622,14 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * already on it keeps its referent — and its free symbols leave the figure: the incircle sentence's treatment of
        * the same circle (`the-circle`, above). Corpus 11/5 types its chords first and its equation second.
        */
-      if (host.kind === 'curve' && host.id === TOUCHED_CIRCLE_ID) {
-        const own = (sym: string) => sym.startsWith(toolSymbol(TOUCHED_CIRCLE_ID, ''));
-        const defined: Construction = {
-          ...c,
-          params: c.params.filter((p) => !own(p.sym)),
-          objects: c.objects.map((o) => (o.id === TOUCHED_CIRCLE_ID && o.kind === 'curve' ? { ...o, curve: { kind: 'circle', eq: f.eq } } : o)),
-        };
-        return { ok: true, next: defined, effect: 'narrowed' };
+      /*
+       * #2397 (ADR-AG-322): EVERY CIRCLE THE TOOL DREW — asked of the expression (`isCreatedCircle`, ADR-AG-219), never of
+       * the id. A pair «שני מעגלים» drew, «נתון מעגל»'s, the touch's: each takes the stated equation the same way, and
+       * what a statement already said about it is carried, never dropped (`describeDrawnCircle`).
+       */
+      if (isCreatedCircle(host)) {
+        const described = describeDrawnCircle(c, host, f.eq, f.src);
+        if (described) return described;
       }
       // An equation circle IS its equation: the same one is known, another is a contradiction.
       if (host.kind === 'curve') {
@@ -3543,6 +3685,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
       } else if (f.eq !== undefined) {
         const id = resolveCurveByEq(c, f.eq);
+        /*
+         * «מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא …» (#2397, ADR-AG-322) — one of the pair the figure drew: the
+         * first of an interchangeable pair (or the one whose sibling is named, «האחר») has its centre named M by order
+         * (ADR-AG-219), then takes the equation (`describeDrawnCircle`). A pair a statement tells apart asks which. No
+         * drawn circle: the circle is created, as the sentence without the ordinal creates it.
+         */
+        if (!id && f.ofPair && !objectById(c, f.id)) {
+          const pick = circleToName(c);
+          if (pick?.t === 'ask') return { ok: false, error: noHost(f.src, 'circle', pick.circles) };
+          if (pick?.t === 'name') {
+            const named = namingByOrder(c, pick.host, f.id, f);
+            if (!named.ok) return named;
+            const described = applyFact(named.next, { t: 'circle-eq', circleId: pick.host.id, eq: f.eq, src: f.src });
+            return described.ok ? { ...described, effect: 'created' } : described;
+          }
+        }
         if (!id) return create();
         host = objectById(c, id);
         if (host && curveKindOf(host) !== 'circle') {
@@ -4095,7 +4253,12 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'tangent-circles': {
-      const pair = circlePairOf(c, f.a, f.b, f.src);
+      const byId = f.circles?.map((id) => objectById(c, id));
+      const pair: ReturnType<typeof circlePairOf> = byId
+        ? byId.every((o) => o && curveKindOf(o) === 'circle')
+          ? { ok: true, pair: [byId[0]!, byId[1]!] }
+          : { ok: false, error: unknownRef(c, f.circles![byId[0] ? 1 : 0]) }
+        : circlePairOf(c, f.a, f.b, f.src);
       if (!pair.ok) return pair;
       const [a, b] = pair.pair;
       // A circle is not tangent to itself — one circle named twice (or the contextual reading

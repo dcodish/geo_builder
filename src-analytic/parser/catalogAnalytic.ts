@@ -487,7 +487,14 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     family: 'F5',
     he: 'נתונים שני מעגלים המשיקים זה לזה מבחוץ',
     en: 'the two circles touch each other externally',
-    needs: ['נתון מעגל שמרכזו M ורדיוסו 3', 'נתון מעגל שמרכזו N ורדיוסו 6'],
+  },
+  // Two circles introduced before they are described (#2397, ADR-AG-322): «המעגל האחד / האחר» describes one of the pair.
+  {
+    category: 'circles',
+    family: 'F5',
+    he: 'מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא (x-4)^2+y^2=9',
+    en: 'one of the circles is centred at M with equation (x-4)^2+y^2=9',
+    needs: ['נתונים שני מעגלים המשיקים זה לזה מבחוץ'],
   },
   {
     category: 'circles',
