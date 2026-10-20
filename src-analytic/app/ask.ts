@@ -48,7 +48,7 @@ import { traceDistance2pt, traceLine2pt, tracePointLine } from '../engine/techni
 import { isVerticalLine } from '../engine/lines';
 import { asPair, lineNamed, lineNamesOf } from './lines';
 import { pointText, scalarText } from './pointText';
-import { readAngleAsk, readRoleRef, type RoleRef } from '../parser/parseAnalytic';
+import { readAngleAsk, readRoleRef, touchTangentNoun, type RoleRef } from '../parser/parseAnalytic';
 import { angleAt } from '../engine/solve';
 import { angleText, lineAngleOf } from './lineAngle';
 import { curveParts, directrixText, locusEquation } from './curveText';
@@ -564,6 +564,18 @@ export function ask(
   if (role) return roleAnswer(d, role, question, fmt, kindWord);
 
   // --- a curve, by name: its equation ---
+  /**
+   * «משוואת המשיק העובר בנקודה המשותפת לשני המעגלים» (#2390, ADR-AG-314) — the tangent named by its DESCRIPTION: the
+   * drawn common tangent at the touching circles' common point (its `touch` object), asked by the name it carries. None
+   * drawn falls through to the name lookup below, which answers «missing» as before; several is not this noun's.
+   */
+  const described = /^(?:ה?משוואת|[Tt]he\s+equation\s+of)\s+(.+)$/.exec(text);
+  if (described && touchTangentNoun(described[1]) !== null) {
+    const touches = d.construction.objects.filter((o) => o.kind === 'common-tangent' && o.family === 'touch');
+    const named = touchTangentNoun(described[1]);
+    const one = named ? touches.filter((o) => o.kind === 'common-tangent' && o.name === named) : touches;
+    if (one.length === 1 && one[0].kind === 'common-tangent') text = `משוואת הישר ${one[0].name}`;
+  }
   const eq = EQUATION_OF.exec(text);
   if (eq) {
     const name = eq[1].trim();

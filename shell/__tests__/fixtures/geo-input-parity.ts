@@ -1691,6 +1691,16 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2385 (ADR-AG-312): a common tangent through the circles' stated touch point is the tangent at it ──
   { id: 'common-tangent-through-touch-2385', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'T על AB', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', note: '2-D builds it since ADR-740 (#2407); analytic since ADR-AG-312 (#2385)' },
+
+  // ── #2390 (ADR-AG-314): every common tangent in one sentence; the tangent at the touching circles' common point ──
+  { id: 'all-common-tangents-2390', family: 'tangents', steps: ['שני מעגלים זרים', 'כל המשיקים המשותפים לשני המעגלים'], expect: 'builds', exception: 'X8', note: 'the verdicts agree; the drawing does not: 2-D draws ONE tangent (found work, filed with #2390), analytic draws the four' },
+  { id: 'touch-tangent-2390', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'המשיק המשותף בנקודת ההשקה'], expect: 'builds', exception: 'X8', note: 'analytic did not read it before ADR-AG-314' },
+  { id: 'touch-tangent-through-2390', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'המשיק העובר בנקודה המשותפת לשני המעגלים'], expect: 'builds', exception: 'X8', note: 'the verdicts agree; 2-D draws a two-touch tangent there, not the tangent at T (found work); analytic did not read it before ADR-AG-314' },
+
+  // ── #2392 (ADR-AG-313): the common tangent named by its line, a line named after, the axis side of a crossing — analytic's ──
+  { id: 'named-common-tangent-2392', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'הישר l משיק למעגלים O ו-P בנקודות A ו-B בהתאמה'], expect: 'builds', exception: 'X4', only: ['analytic'], note: '2-D names no line (X4); analytic did not read it before ADR-AG-313' },
+  { id: 'name-line-2392', family: 'topic', steps: ['נקודה A', 'נקודה B', 'AB', 'נסמן את הישר AB ב-l'], expect: 'builds', exception: 'X4', only: ['analytic'], note: 'analytic did not read it before ADR-AG-313' },
+  { id: 'axis-cut-2392', family: 'topic', steps: ['נקודה A', 'נקודה B', 'הישר AB', 'הישר AB חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x'], expect: 'builds', exception: 'X1', only: ['analytic'], note: 'the axis side of a crossing, no point made; analytic did not read it before ADR-AG-313' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

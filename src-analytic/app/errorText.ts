@@ -280,6 +280,8 @@ export function errorText(error: InputError, t: Translate): string {
     'radius-contradicts': error.key === 'radius-contradicts' && error.declared ? 'errRadiusContradicts' : 'errConflict',
     // #1963 (ADR-AG-296) — the operator's ruled refusal, in 2-D's «X» סותר את «Y» frame (#1868), naming the statements
     'forced-collinear': 'errForcedCollinear',
+    // #2390 (ADR-AG-314) — 2-D's input.tangentsExhaustedContained, byte for byte
+    'no-common-tangent': 'errNoCommonTangent',
     // #1154 — a rename understood and declined, each naming what the student wrote
     'rename-bad-name': 'errRenameBadName',
     'rename-same': 'errRenameSame',

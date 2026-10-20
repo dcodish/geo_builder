@@ -154,6 +154,9 @@ export function carrierOf(o: GeoObject): Carrier | null {
     // A DRAWN ARC (#1622 E4): which part of a circle is inked — its circle and ends are counted where they live.
     case 'arc':
       return null;
+    // A COMMON TANGENT (#2390, ADR-AG-314): a closed form of two circles, whose freedom is counted where it lives.
+    case 'common-tangent':
+      return null;
     default: {
       const unclassified: never = o;
       throw new Error(`object kind carries no DOF classification: ${JSON.stringify(unclassified)}`);
@@ -196,6 +199,7 @@ export function symbolDeps(o: GeoObject): string[] {
       // Defined by reference alone (#1464): no expression, nothing to register. So is a drawn arc (#1622 E4).
       case 'circle-thru':
       case 'arc':
+      case 'common-tangent': // its two circles, by reference (#2390)
         return [];
       default: {
         const unwalked: never = o;
@@ -242,6 +246,9 @@ export function objectDeps(o: GeoObject): Id[] {
     // Its circle and its ends — and the point it bulges away from (#1622 E4) — all placed before it is drawn.
     case 'arc':
       return [o.def.circle, o.def.from, o.def.to, ...[o.def.away, o.def.toward].filter((x): x is Id => x !== undefined)];
+    // Its two circles, both placed before it is drawn (#2390, ADR-AG-314).
+    case 'common-tangent':
+      return [...o.circles];
     default: {
       const undeclared: never = o;
       throw new Error(`object kind declares no dependencies: ${JSON.stringify(undeclared)}`);

@@ -19,9 +19,10 @@ import type { ClassifyResult } from './conic';
 import { evalExpr, type Env } from './expr';
 import { evalLengthExpr, type LengthExpr } from './lengths';
 import { isHorizontal, isVerticalLine, lineByName, normalizedLine, type NamedLine } from './lines';
+import { commonTangentLine } from './commonTangents';
 import { provenanceOf, type PointProvenance } from './carriers';
 import { minInteriorAngleOf, ringFaultsOf, SPREAD_MIN_DEG, thinRingsOf, type RingFault } from './rings';
-import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type SolveResult } from './solve';
+import { angleAt, dirVector, equalityResidual, freeRank, jacobianRank, residual, solveLM, solveMultiStart, solvePreferring, SOLVE_RESOLUTION, TIGHT_TOLERANCE_FACTOR, withToleranceFactor, type Constraint, type Direction, type SolveResult } from './solve';
 import { nthHolds, orderedCrossings } from './crossing-order';
 import { withinSegment } from './extent';
 import { assignmentAt } from './discreteAxes';
@@ -623,6 +624,18 @@ function lineAtCurve(
   return n ? { kind: 'line', ...n } : null;
 }
 
+/**
+ * A COMMON TANGENT as the line it is in this configuration (#2390, ADR-AG-314) — `commonTangentLine` over the two
+ * circles `curveAtOf` resolves, so the line drawn is the line the crossings and the panel read. A circle not placed,
+ * or a family this configuration lacks, is a vacancy.
+ */
+function commonTangentAt(c: Construction, env: Env, at: (id: Id) => Pt | null, o: Extract<GeoObject, { kind: 'common-tangent' }>): NumCurve | null {
+  const curves = curveAtOf(c, env, at);
+  const p = curves(o.circles[0]);
+  const q = curves(o.circles[1]);
+  return p?.kind === 'circle' && q?.kind === 'circle' ? commonTangentLine(p, q, o.family) : null;
+}
+
 /** Carrier freedom left after the constraints — `carriers − rank(J)`, so dependent givens do not
  *  over-count (see `freeRank`). */
 /**
@@ -661,6 +674,8 @@ export function curveAtOf(c: Construction, env: Env, at?: (id: Id) => Pt | null)
     // A line CONSTRUCTED through a point is a curve to every constraint that names one (#1319) — the
     // exam's «A נקודת החיתוך של הישר l4 עם הישר 1» is an incidence on a `line-at`.
     if (o.kind === 'line-at') return at ? lineAtCurve(c, env, at, o) : null;
+    // A common tangent of two circles (#2390, ADR-AG-314): closed form from the two circles of this configuration.
+    if (o.kind === 'common-tangent') return at ? commonTangentAt(c, env, at, o) : null;
     // A circle computed from points (#1464): a curve to every constraint and crossing that names one.
     if (o.kind === 'circle-thru') return at ? circleThruCurve(o, at) : null;
     if (o.kind !== 'curve') return null;
@@ -1383,6 +1398,20 @@ function seedOrder(
   }
 }
 
+/** A line operand as its `ax + by + c = 0` triple in this configuration (#2392, ADR-AG-313); `null` while unplaced. */
+function lineTriple(d: Direction, at: (id: Id) => Pt | null, curveAt: (id: Id) => NumCurve | null): { a: number; b: number; c: number } | null {
+  if (d.k === 'axis') return d.axis === 'x' ? { a: 0, b: 1, c: 0 } : { a: 1, b: 0, c: 0 };
+  if (d.k === 'curve') {
+    const k = curveAt(d.id);
+    return k && k.kind === 'line' ? { a: k.a, b: k.b, c: k.c } : null;
+  }
+  if (d.k !== 'points') return null;
+  const p = at(d.a);
+  const q = at(d.b);
+  if (!p || !q || Math.hypot(q.x - p.x, q.y - p.y) < 1e-12) return null;
+  return { a: q.y - p.y, b: p.x - q.x, c: (q.x - p.x) * p.y - (q.y - p.y) * p.x };
+}
+
 function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[] {
   const apart = apartOf(at);
 
@@ -1511,6 +1540,20 @@ function failingSelectors(c: Construction, at: Map<Id, Pt>, env: Env): Selector[
       }
       if (sides.some((x) => x === 0)) return false;
       return s.same ? sides.every((x) => x === sides[0]) : sides[0] !== sides[1];
+    }
+    /**
+     * WHERE A LINE CROSSES AN AXIS (#2392, ADR-AG-313) — «הישר l חותך את ציר ה-y בנקודה הנמצאת מעל ציר ה-x». The line's
+     * own triple in this configuration (the one line resolver's normal form, `lineTriple`): the y-axis cut is −c/b, the
+     * x-axis cut −c/a. Strict at the figure's resolution, as `coord-compare`; a line parallel to that axis (within the
+     * resolution of its own direction) meets it nowhere, so neither reading holds.
+     */
+    if (s.kind === 'axis-cut') {
+      const atFn = (id: Id) => at.get(id) ?? null;
+      const t = lineTriple(s.line, atFn, curveAtOf(c, env, atFn));
+      if (!t) return true; // a line not placed yet judges nothing, as below
+      const across = s.axis === 'y' ? t.b : t.a;
+      if (Math.abs(across) <= SOLVE_RESOLUTION * Math.hypot(t.a, t.b)) return false;
+      return sideOfBound(-t.c / across, 0, spanOf(at)) === (s.greater ? 1 : -1);
     }
     const p = at.get(s.id);
     if (!p) return true; // a selector about an absent point judges nothing
@@ -3318,6 +3361,14 @@ function evaluateUncached(raw: Construction, seed = 0, choiceSeed = seed, paramR
         if (curve) {
           curves.push({ id: o.id, label: { name: o.name ?? '', kind: 'line' }, curve, stated: o.drawn !== false });
         } else vacant.push({ id: o.id, reason: 'vacant' });
+        break;
+      }
+
+      /** A common tangent of two circles (#2390, ADR-AG-314), named by the student or the tool — listed by that name. */
+      case 'common-tangent': {
+        const curve = commonTangentAt(c, env, at, o);
+        if (curve) curves.push({ id: o.id, label: { name: o.name, kind: 'line' }, curve, stated: true });
+        else vacant.push({ id: o.id, reason: 'vacant' });
         break;
       }
 

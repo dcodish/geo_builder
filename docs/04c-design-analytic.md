@@ -755,8 +755,28 @@ stated touch point (`touchPointOf`, the `touch-point` derived point) is a letter
 (`footOnPair`), or an earlier line puts it there (`onLine`, written by `earlierOnCommonTangents` in `fold`, because the
 deferral fixpoint lands «T על AB» after the line that declares A and B), it lowers as the tangent at that point;
 otherwise `a` touches the first circle and `b` the second ([ADR-AG-312](06c-decisions-analytic.md#adr-ag-312), #2385).
+The common tangent is a LINE: M1 draws it through `name-line { a, b, name }` (the sentence's name, «הישר l משיק …»
+`namedCommonTangent`, or the pair's), the `line-at` through a along a→b, listed by its name. `name-line` («נסמן את הישר
+PQ ב-l», `parseNameLine`) re-names the figure's line over the pair (`lineOverPair`), re-identifying it as `lineIdOf(name)`
+with its references (`replaceId`), or draws the line on a segment. The `axis-cut { line, axis, greater }` selector
+(`parseAxisCut`) is judged in `failingSelectors` from the line's triple (`lineTriple`): −c/b on the y-axis, −c/a on the
+x-axis, strict through `sideOfBound` ([ADR-AG-313](06c-decisions-analytic.md#adr-ag-313), #2392).
 
-*Identifiers:* `types.ts` · `CIRCLE_SLOT_SENTINELS` · `touchedCircleFacts(src, id, r?)` · `circle-new<k>` · `circle-pair<k>-1` · `-2` · `tangent-of { circleId, at }` · `beyond` · `toolLetters.ts` · `apart` · `inside` · `larger` · `cross` · `centres-side { a, b, p, q }` · `params { e }` · `circlePairQuantity` · `coord` · `θ_<id>.k/s/g/m` · `θ_<id>.r` · `circleToName` · `interchangeable` · `twoCircleCrossing` · `pluralCircleCrossing` · `readCircleSubject` · `common-tangent` · `touchPointOf` · `earlierOnCommonTangents` · `onLine`
+*Identifiers:* `types.ts` · `CIRCLE_SLOT_SENTINELS` · `touchedCircleFacts(src, id, r?)` · `circle-new<k>` · `circle-pair<k>-1` · `-2` · `tangent-of { circleId, at }` · `beyond` · `toolLetters.ts` · `apart` · `inside` · `larger` · `cross` · `centres-side { a, b, p, q }` · `params { e }` · `circlePairQuantity` · `coord` · `θ_<id>.k/s/g/m` · `θ_<id>.r` · `circleToName` · `interchangeable` · `twoCircleCrossing` · `pluralCircleCrossing` · `readCircleSubject` · `common-tangent` · `touchPointOf` · `earlierOnCommonTangents` · `onLine` · `name-line` · `lineOverPair` · `replaceId` · `axis-cut` · `lineTriple` · `namedCommonTangent` · `parseNameLine` · `parseAxisCut`
+
+### Common tangents ([ADR-AG-314](06c-decisions-analytic.md#adr-ag-314), #2390)
+
+`common-tangent { circles, family, name }` is a closed-form line from two circles (`engine/commonTangents.ts`,
+`commonTangentLine`): unit normal n with n·u = (r₂ − r₁)/d (external) or −(r₁ + r₂)/d (internal), family `a` the tangent left
+of the directed line of centres, `b` the right; `touch` the double root of a tangent pair within `TOUCH_TOLERANCE` (1e-6,
+relative). 0 DOF, deps the two circles; a family a configuration lacks is a vacancy. M1 reads how the pair sits
+(`pairPositionOf`: the stated `circles` selectors and `tangent-circle` branches, else two determined circles measured by
+`positionOfCircles`, else `null`) and lowers `common-tangents` to `FAMILIES_OF[position]` and `common-touch-tangent` to
+one `touch` (`statedTangent` admits a tangency of unstated kind). Names: the student's or `freeLineNames` (l1, l2, …, a
+numeral taken in any notation by `nameReading`). The ask lane resolves the touch tangent by `touchTangentNoun`; the exam's
+sketch line is `SKETCH_FRAME` in `scopeAnalytic.ts`.
+
+*Identifiers:* `commonTangents.ts` · `common-tangent` · `CommonTangentFamily` · `commonTangentLine` · `TOUCH_TOLERANCE` · `FAMILIES_OF` · `PairPosition` · `positionOfCircles` · `pairPositionOf` · `statedTangent` · `circleAtProbe` · `freeLineNames` · `common-tangents` · `common-touch-tangent` · `commonTangentSet` · `touchTangentNoun` · `SKETCH_FRAME` · `no-common-tangent` · `errNoCommonTangent`
 
 ### The two tangents meet; the meet verbs; a floor that does not collapse with the figure ([ADR-AG-213](06c-decisions-analytic.md#adr-ag-213), #1620 S7)
 
