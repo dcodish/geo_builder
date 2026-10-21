@@ -410,9 +410,20 @@ anchor: all three for a coordinate point or the #639/#803 frame reasons, otherwi
 point pin gives a value (a null component, lettered or not, anchors nothing). `translationKnown3` is its
 `size === 3` and `vectorFramePinned3` its `size > 0`. Every translation-dependent knowledge surface reads it:
 the points loop judges an axis only when it is anchored or the point's own stated component, the two-configuration
-row and a plane's parametric form need all three, and a plane's d-term needs every axis its normal has a
+row needs all three, and a plane's d-term needs every axis its normal has a
 component along (`planeOffsetAnchored3`, shared by the panel and the query lane). The resolver does not read it:
 the figure is unchanged.
+
+**A plane's two forms are one derivation from its equation** (#2367, [ADR-3D-376](06b-decisions-3d.md#adr-3d-376)).
+`parametricPlaneForm(eq, { run, positions, pointKnown }, symbol)` (`dataView.ts`) returns a row whenever the
+canonical equation `eq` is knowledge: the base point is `run[0]` when the panel's own `pointComps` call it fully
+known and it is stable, else `planePointAndSpan(eq)`'s point (two coordinates 0, the third solved on the axis
+whose value is an integer, then the largest |coefficient|); the directions are the run's two edges when stable,
+else the two smallest gcd-reduced members of (b, −a, 0), (c, 0, −a), (0, c, −b) over `planeIntCoefs(eq)` (the
+integer scaling `planeEqStr` prints). Every piece is checked (on the plane, in it, independent) or the row is
+withheld. The panel's planes block and the query lane's plane branch call it wherever they print the equation —
+no other gate — and the panel also lists every non-free equation-given plane on the equation's agreement alone
+(absolute, so no translation anchor).
 
 **The read-back samples the placement's leftover rigid freedom** (#2368, [ADR-3D-375](06b-decisions-3d.md#adr-3d-375)).
 Every knowledge gate decides "fixed" by agreement across resolves, so it sees only what the resolver varies; the

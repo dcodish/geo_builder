@@ -762,7 +762,11 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
         ([, ids]) => run !== undefined && ids.length === run.length && ids.every((id) => run.includes(id)),
       )?.[0];
     const symbol = (byRun !== undefined ? symbols.get(byRun) : undefined) ?? 'π';
-    const par = anchoredAxes.size === 3 ? parametricPlaneForm(run, resolvedPer.map((r) => r.positions), symbol) : null;
+    // #2367 (ADR-3D-376): the second form rides wherever the equation does, from the panel's one seam; a vertex
+    // is its base point only when the panel's own decision calls that vertex fully known
+    const comps = run && run.length >= 3 ? dataView(c, seed).pointComps : {};
+    const pointKnown = (id: Id): boolean => !!comps[id] && comps[id].every((v) => !v.includes('?'));
+    const par = parametricPlaneForm(eq, { run, positions: resolvedPer.map((r) => r.positions), pointKnown }, symbol);
     const standard = planeEqStr(eq);
     // one representation per ROW — never joined by `|` (operator, 2026-08-30)
     return par ? { text, answer: standard, rows: [standard, par] } : { text, answer: standard };

@@ -103,23 +103,28 @@ describe('#317 — a PLANE answers its canonical equation', () => {
     expect(answerQuery(c, 'מישור ABC', seed).rows![1]).toBe(panelPar!.replace('ABC: ', ''));
   });
 
-  it('"if possible" is honest — no run, or an unstable one, yields NO parametric form', () => {
-    // The rule tested at its own seam rather than through an utterance that happens to exercise it:
-    // a plane given by EQUATION has no run at all, and a run whose anchor or spanning edge moves with
-    // the seed is a drawing, not knowledge. Neither may be filled in with a sampled parametrisation.
+  it('#2367 (ADR-3D-376): the second form comes from the EQUATION — run evidence only refines it', () => {
+    // Was: no run, or an unstable one, yielded NO parametric form ("if possible"). The operator ruled both forms
+    // are always shown (2026-10-20), so the seam derives the point and directions from the equation, and a
+    // stable known vertex and stable edges, when present, are preferred as before.
     const v = (x: number, y: number, z: number) => ({ x, y, z });
+    const Z0 = { x: 0, y: 0, z: 1, d: 0 };
+    const known = () => true;
     const stable: Map<string, { x: number; y: number; z: number }>[] = [
       new Map([['A', v(0, 0, 0)], ['B', v(1, 0, 0)], ['C', v(0, 1, 0)]]),
       new Map([['A', v(0, 0, 0)], ['B', v(1, 0, 0)], ['C', v(0, 1, 0)]]),
     ];
-    expect(parametricPlaneForm(['A', 'B', 'C'], stable)).toBe('π = (0, 0, 0) + t·(1, 0, 0) + s·(0, 1, 0)');
-    expect(parametricPlaneForm(undefined, stable), 'no run (an equation-given plane)').toBeNull();
+    const ROW = 'π = (0, 0, 0) + t·(1, 0, 0) + s·(0, 1, 0)';
+    expect(parametricPlaneForm(Z0, { run: ['A', 'B', 'C'], positions: stable, pointKnown: known })).toBe(ROW);
+    expect(parametricPlaneForm(Z0, { positions: stable, pointKnown: known }), 'no run (an equation-given plane)').toBe(ROW);
+    expect(parametricPlaneForm(null, { run: ['A', 'B', 'C'], positions: stable, pointKnown: known }), 'no equation, no row').toBeNull();
 
-    const slidingAnchor = [stable[0], new Map([['A', v(9, 9, 9)], ['B', v(1, 0, 0)], ['C', v(0, 1, 0)]])];
-    expect(parametricPlaneForm(['A', 'B', 'C'], slidingAnchor), 'anchor varies by seed').toBeNull();
-
+    const slidingAnchor = [stable[0], new Map([['A', v(9, 9, 0)], ['B', v(10, 9, 0)], ['C', v(9, 10, 0)]])];
+    expect(parametricPlaneForm(Z0, { run: ['A', 'B', 'C'], positions: slidingAnchor, pointKnown: known }), 'anchor varies: the equation’s point').toBe(ROW);
+    const doubled = [new Map([['A', v(0, 0, 0)], ['B', v(2, 0, 0)], ['C', v(0, 3, 0)]]), new Map([['A', v(0, 0, 0)], ['B', v(2, 0, 0)], ['C', v(0, 3, 0)]])];
+    expect(parametricPlaneForm(Z0, { run: ['A', 'B', 'C'], positions: doubled, pointKnown: () => false }), 'a vertex not known is never the base point').toBe('π = (0, 0, 0) + t·(2, 0, 0) + s·(0, 3, 0)');
     const slidingEdge = [stable[0], new Map([['A', v(0, 0, 0)], ['B', v(5, 0, 0)], ['C', v(0, 1, 0)]])];
-    expect(parametricPlaneForm(['A', 'B', 'C'], slidingEdge), 'spanning edge varies by seed').toBeNull();
+    expect(parametricPlaneForm(Z0, { run: ['A', 'B', 'C'], positions: slidingEdge, pointKnown: known }), 'edge varies: the equation’s directions').toBe(ROW);
   });
 
   it('the exam phrasing and the English mirror agree with it (both forms)', () => {

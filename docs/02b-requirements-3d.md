@@ -43,7 +43,12 @@ hours, the largest י"ב topic):
 3. **The dot product**: `u·v = |u||v|cos α`, angles and lengths, and vector arguments for space theorems
    (a line ⟂ a plane iff it is ⟂ two non-parallel lines in it; three perpendiculars).
 4. **Algebraic R³**: coordinates, ratio division, the parametric line, the plane in both parametric and
-   `ax + by + cz + d = 0` form, mutual positions, every distance and every angle.
+   `ax + by + cz + d = 0` form, mutual positions, every distance and every angle. Whenever one of a plane's two
+   forms is shown — in the data panel or in an answer — both are: «ABCD: z - 2 = 0» comes with «ABCD: π1 =
+   (0, 0, 2) + t·(1, 0, 0) + s·(0, 1, 0)», whose point is a known vertex of the plane or else the simplest point
+   of the equation (never a vertex only drawn there), and whose directions are the plane's known edges or else
+   the nicest integer pair the equation allows. A plane typed as an equation («המישור π1: z - 2.5 = 0») is listed
+   in the data panel with both forms too ([ADR-3D-376](06b-decisions-3d.md#adr-3d-376), #2367).
 5. **Solid-geometry applications**: cylinder, cone, sphere, prism and pyramid; their angles, lengths,
    areas and volumes. In scope by the operator's ruling D4 (2026-07-06).
 
