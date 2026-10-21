@@ -309,6 +309,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2420': 'open', // #2391 (ADR-AG-315): 3-D does not read «M מקיימת …» or an underscore index «N_2»
   '#2421': 'open', // #2388 (ADR-AG-307): 2-D does not read «R = 2r», «r:R = 1:2» or the unnamed ratio of two radii
   '#2376': 'open', // #2362 (ADR-748): analytic answers the tool's circumcircle letter to the student's «מעגל O» (refuses the arc third-crossing)
+  '#2449': 'open', // #2398 (ADR-747): analytic refuses a circle centre's second letter (unknown-reference O); 2-D asks (names the holder, or «מעגל O לא הוגדר»)
   '#2448': 'open', // #2405 (ADR-751): analytic does not read «כל המשיקים המשותפים» on externally tangent circles (not-handled)
   '#2442': 'open', // #2405 (ADR-751): «כל המשיקים המשותפים» on a pair whose position was never stated: 2-D asks (interim), analytic does not read it; the permanent answer awaits the operator
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
@@ -1757,8 +1758,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
 
   // ── #2362 (ADR-748): the tool's centre letter of a circle drawn through drawn points is not the student's «O» ──
   // ── #2398 (ADR-747): a circle's centre given a second letter is refused in both builders ──
-  { id: 'second-centre-letter-2398', family: 'circles', steps: ['מרכז המעגל O הוא K'], expect: 'refused', exception: 'X8' },
-  { id: 'second-centre-letter-drawn-2398', family: 'circles', steps: ['מעגל O', 'מרכז המעגל O הוא K'], expect: 'refused', exception: 'X8', note: 'analytic refuses with unknown-reference O; the message port is #2449' },
+  { id: 'second-centre-letter-2398', family: 'circles', steps: ['מרכז המעגל O הוא K'], expect: 'asks', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2449' }], note: '2-D answers errors.unknownCircle as a clarify note (asks); analytic refuses unknown-reference O' },
+  { id: 'second-centre-letter-drawn-2398', family: 'circles', steps: ['מעגל O', 'מרכז המעגל O הוא K'], expect: 'asks', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2449' }], note: '2-D names the holder (input.centreAlreadyNamed, a clarify note: asks); analytic refuses with unknown-reference O — the port is #2449' },
   { id: 'arc-on-minted-circle-name-2362', family: 'circles', steps: ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל', 'F אמצע הקשת BC במעגל O'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2376' }], note: 'analytic refuses the last line third-crossing (measured on the #2362 plan, 8a5372be)' },
 ];
 
