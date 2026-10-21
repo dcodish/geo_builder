@@ -18988,3 +18988,58 @@ Fixtures `regular-pentagon-definite-2265` and `regular-pentagon-named-2265` hold
 - Parity row `common-tangent-inside-pair-free-ab-2428`, with analytic's known gap [#2437](https://github.com/dcodish/geo_builder/issues/2437) (analytic refuses the line «unsatisfiable»; filed, not fixed here).
 
 **Behaviour change for a student:** after two circles touching from the inside at T and two free points A and B, «AB משיק משותף למעגלים M ו-N» draws AB as the common tangent at T, with A and B on it, at once. Before, it took about 13 s, and A, B and T ended up crowded together at the touch with every row ✓. The same holds for «AB משיק משותף פנימי …» on circles touching from the outside, and for a third common tangent after the two outside ones. A line the AI answers is read exactly as the same line typed.
+
+## ADR-750 — An inscribed 3-/4-gon STATES its noun's shape: the inscription is the standalone shape plus circle membership, held and verified whether the vertices are new or already drawn (#2355)
+
+**Status:** accepted · 2026-10-21 · bug (P1, 2-D, honesty class) · branch `fix/2355-inscribed-shape-stated` off `main` @ 37800b85 · fix round #2441, stream I · amends [ADR-117](#adr-117) (named inscribed shapes) and [ADR-156](#adr-156) (re-entry) · cites [ADR-739](#adr-739) (the same class, n ≥ 5), [ADR-595](#adr-595) (`lowerShape`, the one lowering), [ADR-616](#adr-616) (the simple-ring floor)
+
+**Operator:** the fix plan of 2026-10-21 (issue #2355), `auto-ok` under ADR-W-014 / ADR-W-117: every student-visible line is `[2-D]` at `37800b85`, with ADR-739's ruling (*"מחומש משוכלל means all sides are equal"*) as the class precedent.
+
+**Requirements:** [02](02-requirements.md) **FR-EN-14** (an inscribed square, rectangle, rhombus or right triangle is that shape, held and verified, whether its vertices are new, already drawn, already on the circle or on an existing circle; a contradicting statement is refused naming the earlier statement, as the standalone noun is) · **Design:** [04](04-design.md) §*The inscribed 3-/4-gon states its shape by the standalone lowering*
+
+**LADDER stage:** none — the parser (`inscribedPolygon`). `docs/LADDER.md` needs no edit.
+
+**Class (docs/17 §1).** A shape stated by an inscription is expressed by **placement alone**, with no constraint the solver must hold or the verifier can check, so it is silently dropped whenever the inscription does not create the vertices on its own fresh circle: existing vertices, a ring already on its circle, an existing circle, a single pre-existing letter. ADR-739 fixed it for n ≥ 5 at `ringOnCircle`; this is the 3-/4-gon chokepoint its sibling audit found.
+
+**Root cause.** `inscribedPolygon` stated a **rigid** kind's shape (square, rhombus, rectangle, right triangle) only by the pinned θ of `INSCRIBED_ANGLES`, exactly the kinds `freeAngles` leaves pinned. Its private shape ladder (`shapeCmds`, `basePlusShape`) had relations for the equilateral, isosceles, trapezoid and kite only; for the four rigid kinds it emitted the bare ring (`quadrilateral {declaredAs}`, a label with no constraint, or `triangle`). The θ place NEW vertices on the rule's fresh circle. Every other branch had no shape at all: the bound branch emits `point-on-circle` without θ; the ADR-156 re-entry emitted idempotent memberships, so the gate answered «כבר קיים»; the all-exist branches emit `circumcircle` / `set-concyclic` and the labelled ring; and a θ over an existing id is membership (M1). The step was green with nothing stated.
+
+**Decision.**
+1. **One predicate, read once.** `freeAngles` (the rule's existing rigid/free decision) is hoisted above both uses; `statedShape = phrase && !freeAngles ? phrase.kind : null`.
+2. **A rigid kind states `lowerShape(phrase.kind, ids)`** (shapePhrase.ts, the standalone lowering «ABCD ריבוע» emits) on every branch: `basePlusShape` returns it (the typed `square` / `rectangle` / `rhombus` / `right-triangle` declares the ring itself, so the `quadrilateral {declaredAs}` row goes), and the `isTri && allExist` branch appends it. «ריבוע ABCD חסום במעגל» now means «ריבוע ABCD» + «ABCD חסום במעגל» (ADR-W-118 B1). The pinned θ stay as the SEED for new vertices.
+3. **On the all-exist QUAD branch the typed shape goes first**, before `circumcircle` / `set-concyclic`. This deviates from the plan's "order unchanged", on a measurement: with the circle first, «מרובע ABCD» · «AB = 3» · «BC = 4» · «ריבוע ABCD חסום במעגל» is refused `over-constrained: AB ⟂ BC cannot hold [vs #3]`, a fragment that is in fact satisfiable on that circle, where the standalone «ABCD ריבוע» says `|AB| = |BC| cannot hold [vs #3]`. Shape-first gives the standalone's message, and the circle then passes through a ring that is already the shape. The fresh and bound branches keep memberships first (the typed shape lands on existing ids); the re-entry branch already had the shape first, and its refusal equals «ABCD ריבוע» over the same givens.
+4. **The free kinds are not routed through `lowerShape`.** Prototype B (every kind) left the equilateral and isosceles figures identical but cost the trapezoid and isosceles trapezoid 1–3 displayable seeds of 24 (the typed `trapezoid` replaces `set-parallel`), and moved the isosceles from a soft `set-equal` to the `shape-variant`, which «הציגו תצורה אחרת» would show (rule 7). They already hold on every branch, so they are not in the class; their lowered commands are byte-identical to `37800b85` (measured on eleven sequences).
+
+**Measured before / after** (`driveThroughGate` → `replay`, model mocked, cold replay caches; before = `37800b85`):
+
+| sequence | before | after |
+|---|---|---|
+| «מרובע ABCD» · «ריבוע ABCD חסום במעגל» | 6.000 / 5.099 / 4.564 / 4.579, ∠ 84 / 79 / 96 / 101, green | a square, 24/24 displayable |
+| «מרובע ABCD חסום במעגל» · «ריבוע ABCD חסום במעגל» (re-entry) | «זה כבר קיים באיור», the ring stays 95 / 97.5 / 85 / 82.5 | the ring becomes the square on its circle |
+| «מעגל O» · «ריבוע ABCD חסום במעגל O» (fresh letters) | crossed at seed 0, none a square | a square, 24/24 |
+| «נקודה A» · «ריבוע ABCD חסום במעגל» | ∠ 90 / 35.8 / 90 / 35.8 | a square |
+| the same rows with «מלבן», «מעוין», English, «בר חסימה» | not the shape | the shape (a cyclic rhombus is a square), ≥ 22/24 |
+| «משולש ABC» · «משולש ישר זווית ABC חסום במעגל» | ∠ 77.07 / 41.99 / 60.95 | ∠C = 90, 24/24 on every branch |
+| «מרובע ABCD» · «AB = 3» · «BC = 4» · «ריבוע ABCD חסום במעגל» (and «מעוין») | green, not a square | refused `over-constrained: \|AB\| = \|BC\| cannot hold [vs #3]`, as «ABCD ריבוע» |
+| the same with «מלבן» | green, not a rectangle | the 3×4 rectangle on its circle |
+| «משולש ABC» · 3 / 4 / 6 · «משולש ישר זווית ABC חסום במעגל» | green | refused with the verdict «ABC משולש ישר זווית» gets |
+| one-line fresh «ריבוע/מלבן/מעוין/משולש ישר זווית … חסום במעגל» | the shape | identical positions at seeds 0–23 |
+| «ריבוע ABCD חסום במעגל» twice | «כבר קיים» | unchanged (the exact duplicate folds, FR-EN-9) |
+| «משולש ABC בר חסימה» · «משולש ABC חסום במעגל» | reveals the circle (ADR-624) | unchanged |
+
+Pickups (docs/17 §9): «אלכסוני הריבוע» / «אלכסוני המלבן» resolve after the all-exist, re-entry, bound and «בר חסימה» branches (#770: the typed shape declares the noun); a stated «זווית A = 90» moves the right angle to A (M4); the definite «ריבוע ABCD» · «הריבוע חסום במעגל» (ADR-685) and «מעגל O חוסם את הריבוע ABCD» commit green.
+
+**Why not a patch (docs/17 §2).** No spelling, noun or figure is special-cased, and no list grows: the predicate is the rule's own rigid/free decision, and the shape is the ONE standalone lowering. The new capability: an inscribed rigid shape is a constraint the solver holds and the verifier checks, never only a placement.
+
+**Sibling audit.**
+- **2-D:** equilateral, isosceles, kite, trapezoid and isosceles trapezoid hold on every branch. n ≥ 5 is ADR-739. Polygon-in-polygon (`inscribedInPolygon` → engine `inscribe`) is a different chokepoint (#2257).
+- **Analytic** (`decideSubmit` → `derive`): the square / rectangle over a drawn ring and the inscribed right triangle are correct; re-entry builds the square. Not present.
+- **3-D** (`decideDeterministic3` → `derive3`): correct over existing vertices; the re-entry «מרובע ABCD חסום במעגל» · «ריבוע ABCD חסום במעגל» is refused `already-defined`, an honest refusal and a reading gap against 2-D. Known-gap parity row `square-inscribed-reentry-2355`, issue [#2451](https://github.com/dcodish/geo_builder/issues/2451) (P3, 3d).
+- **Complex** has no polygon lowering. Not present.
+
+**Findings (not in this fix).** (1) The replay fold-memo is order-dependent within one process: the facts of «משולש ABC» · «משולש ישר זווית ABC חסום במעגל» replayed with ∠C = 90 after the standalone row had run, and 60.95 cold. The round files it as its own issue; the locks here clear the caches per row and assert on the lowered commands. (2) A fresh inscribed rectangle / right triangle has one fixed shape across configurations (the pinned θ; the ADR-052 smell). Freeing the θ now that the shape is a constraint changes what «הציגו תצורה אחרת» shows, so it is a separate `needs-operator` item. (3) The bound-circle trapezoid with fresh letters is 8/24 displayable (no θ seed on the bound branch), P3.
+
+**Risk.** The stored commands of every inscribed rigid 3-/4-gon line change: the `quadrilateral {declaredAs}` / `triangle` row becomes the typed shape, and the all-exist quad order changes. An old save loads through its stored commands as before. Fixture `inscription-voices-1975-named-square` («ריבוע ABCD» · «מעגל O חוסם את הריבוע ABCD») goes through the all-exist branch and gains a `square` row (an exact duplicate of its first fact, folded idempotent); it is re-lowered with every earlier fact byte-identical. Decide-parity goldens with an inscribed rigid line move by the typed command.
+
+**Locks.** `src/app/__tests__/issue-2355-inscribed-shape-stated.test.ts`: {square, rectangle, rhombus, right triangle} × {all exist, re-entry, named O + existing, named O + fresh, one letter drawn, English, «בר חסימה»} at 24 seeds: the shape (angles to 1e-4°, sides to 1e-6), concyclic, convex, every step `ok`, verifier clean, at least 22/24 displayable, and the typed shape in the lowered commands; the one-line forms unchanged at every seed; the free kinds keep their relations; the three refusal rows and the 3×4 rectangle; the restatement and reveal rows. Every row clears the replay caches. Fixtures `square-inscribed-existing-2355`, `rectangle-inscribed-existing-2355`, `right-triangle-inscribed-existing-2355`. Parity rows `square-inscribed-existing-2355` and `square-inscribed-reentry-2355`.
+
+**Behaviour change for a student:** «מרובע ABCD» · «ריבוע ABCD חסום במעגל» now draws a square on its circle, and so do the rectangle, the rhombus (a square), the right triangle (right angle at C), a ring already on its circle (no longer «כבר קיים»), a named existing circle, and one letter already drawn. A side given that contradicts the noun is refused as the standalone noun is.

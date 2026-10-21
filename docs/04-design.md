@@ -367,6 +367,20 @@ branch (the ring already on the circle, ADR-156) appends `regularRingSides`, and
 already rides one circle onto that circle (`reusedInscribeCircle` → `existing`) instead of minting a second
 hidden one whose auto-centre the equal sides leave undetermined; a stated radius keeps the minted circle.
 
+### The inscribed 3-/4-gon states its shape by the standalone lowering (#2355, [ADR-750](06-decisions.md#adr-750))
+
+`inscribedPolygon` (parse.ts) pins the vertex θ of a RIGID kind (square, rectangle, rhombus, right triangle — the
+kinds `freeAngles` leaves pinned) and, for exactly those kinds, states the noun's shape by the ONE standalone
+lowering, `lowerShape(phrase.kind, ids)` (shapePhrase.ts, ADR-595): the typed `square` / `rectangle` / `rhombus` /
+`right-triangle` replaces the labelled `quadrilateral {declaredAs}` / `triangle` row on every branch (fresh circle,
+bound circle, the ADR-156 re-entry, the all-exist circumcircle, «בר חסימה»). The θ are only the SEED that places new
+vertices on the rule's own fresh circle; on every other branch the vertices already exist when the typed shape
+applies, so M1 lowers it to constraints the solver holds and the verifier checks. On the all-exist quad branch the
+typed shape comes BEFORE the circumcircle and `set-concyclic`, so a contradicting given is judged in the noun's own
+frame (the standalone's refusal). The free kinds (general, equilateral, isosceles, kite, trapezoid) keep their own
+relations (`shapeCmds` / the kite `shape-variant`) and order: they already hold on every branch, and the typed
+lowering would cost the trapezoid displayable seeds and change the isosceles's variant reading.
+
 ### Addressing an angle: one reader, many value kinds (#967, [ADR-496](06-decisions.md#adr-496))
 
 An angle statement has two halves: **which angle** is named and **what is said about it**. **`angleArms` is the

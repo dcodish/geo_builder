@@ -1744,14 +1744,14 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-on-circle",
       "point-on-circle",
       "point-on-circle",
-      "triangle",
+      "right-triangle",
     ],
     "he": [
       "circle",
       "point-on-circle",
       "point-on-circle",
       "point-on-circle",
-      "triangle",
+      "right-triangle",
     ],
   },
   "sector AOB with angle 80": {
