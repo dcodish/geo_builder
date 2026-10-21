@@ -343,6 +343,10 @@ export interface RadialTowardPoint {
   id: Id;
   circle: Id;
   toward: Id;
+  /** #2339 ([ADR-743](../../docs/06-decisions.md#adr-743)): the point on `circle` AWAY from `toward` —
+   *  centre − r·unit(toward − centre). The internal-tangency witness on the INNER circle, pointing away from the outer
+   *  centre, so its coincidence with the outer touch holds only when |c₁c₂| = r_out − r_in (never at an external touch). */
+  away?: true;
 }
 
 /**

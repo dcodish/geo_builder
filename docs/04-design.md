@@ -871,6 +871,14 @@ changes, so the source of truth stays `(facts, seed)`), and the memo signature c
 point and operand order come from the first record (ADR-703). The verifier's containment check is closed
 (`d + r_b ≤ r_a + tol`) when the same pair is stated internally tangent, and strict otherwise.
 
+The free-radius device encodes its KIND ([ADR-743](06-decisions.md#adr-743), #2339). External: the touch M on circle 1
+toward circle 2's centre and a witness on circle 2 toward circle 1's centre. Internal: M on the outer circle (larger by
+seed) toward the inner centre and a witness on the inner circle AWAY from the outer centre (`radial-toward` with
+`away: true`), so the coincidence holds only at |c₁c₂| = r_out − r_in and never at an external touch. The witness id
+carries the kind (`~touch-M-ext` / `~touch-M-int`), so a second line stating the other kind at the same touch point adds
+its own device and the existing over-constrained path refuses it before commit; a restated kind (or an unkinded line
+the fold resolves to the same kind) reuses the device.
+
 ### Which circle of a pair moves: the newer one ([ADR-742](06-decisions.md#adr-742))
 
 Every circle-pair relation's apply-time seat (LADDER stage 2a) asks one chooser, `seatMover(objects, a, b)` in

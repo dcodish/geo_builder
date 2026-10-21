@@ -5505,6 +5505,23 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.violations).toEqual([]);
     },
   },
+  {
+    id: 'tangency-kind-contradiction-refused-2339',
+    title: '«מעגל O» · «מעגל P» · «המעגלים O ו-P משיקים מבפנים», then «המעגלים O ו-P משיקים מבחוץ» is refused before commit (#2339, ADR-743)',
+    guards:
+      "#2339, operator round #2291 T10 (2026-10-17): *\"the first error tells the story - the last input contradicts the prior one.\"* At 97f6364a the fourth line was COMMITTED, every row green, and only the ⚠ panel objected. Root cause: the internal free-radius device's witness pointed at the touch M, which an external touch satisfies too, and the second kind at the same M reused the witness id, so addObj dropped it. ADR-743: the witness points away from the outer centre and its id carries the kind; the existing over-constrained path refuses the line. The class test is src/app/__tests__/issue-2339-tangency-kind-refused.test.ts.",
+    steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים מבפנים'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const facts = factsOf(['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים מבפנים']);
+      const v = gateVerdict(facts, 'המעגלים O ו-P משיקים מבחוץ');
+      expect(v.kind, JSON.stringify(v)).toBe('refused');
+      expect(v.kind === 'refused' && v.reason, 'refused by the engine, before commit').toBe('error');
+      const [a, b] = [...fig.circles.values()];
+      expect(Math.abs(dist(a.center, b.center) - Math.abs(a.r - b.r)), 'the internal tangency stands').toBeLessThan(1e-4);
+    },
+  },
 ];
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */

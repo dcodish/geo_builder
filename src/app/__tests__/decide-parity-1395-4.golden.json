@@ -262,6 +262,7 @@
  "scenario:english-words-not-labels-2195": "bc2ee590fd453753",
  "scenario:common-tangent-external-through-touch-refused-2407": "32a209772e206a26",
  "scenario:circle-tangent-moves-newer-2237": "27623dab0300a788",
+ "scenario:tangency-kind-contradiction-refused-2339": "e083eea22fa2dc76",
  "fixture:2022-summer-a-issue59.geo.json": "f05c887649d5b2c5",
  "fixture:arc-endpoints-2037.geo.json": "9e0c1471e4805cef",
  "fixture:catalog-tangent-drawn-2209.geo.json": "d4ab46aee9ee80e1",

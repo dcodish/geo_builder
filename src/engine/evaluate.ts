@@ -2217,7 +2217,7 @@ function tryEval(
       if (!c || !t) return 'pending';
       const d = sub(t, c.center);
       if (len(d) < 1e-9) return `cannot place ${p.id}: ${p.toward} is at the centre of ${p.circle}`;
-      return add(c.center, scale(unit(d), c.r)); // on the circle, toward `toward`
+      return add(c.center, scale(unit(d), p.away ? -c.r : c.r)); // on the circle, toward `toward` (or away, #2339)
     }
   }
 }

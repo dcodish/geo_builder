@@ -171,7 +171,7 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
         if (p?.kind !== 'radial-toward' || q?.kind !== 'radial-toward') continue;
         const pc = centreOf.get(p.circle);
         const qc = centreOf.get(q.circle);
-        if (!pc || !qc || p.toward !== qc || q.toward !== pc) continue;
+        if (!pc || !qc || p.toward !== qc || q.toward !== pc || p.away || q.away) continue; // #2339: an internal witness points away
         for (const t of [p, q]) if (!t.id.startsWith('~')) out.push({ point: t.id, a: pc, b: qc });
       }
       for (const o of construction.objects) {

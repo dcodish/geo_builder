@@ -11,7 +11,7 @@
 import type { CirclePositionCase, Command, Constraint, Construction, GeoObject, Id, SideRequirement, SolveDirective, Vec } from './types';
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
-import { ringOnOneCircle } from './structure';
+import { circlesStatedTangent, ringOnOneCircle } from './structure';
 import { referencesCircle } from './lower';
 import { add, circleCircleIntersect, circumcenter, dist, footOnLine, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringKey, ringSimple, scale, sub } from './geometry';
 import { isQuadKind, QUAD_IMPLIES, quadAfter, quadImpliesInEveryReading, quadRelation, quadsExclude, type QuadKind } from './shapeKinds';
@@ -2525,12 +2525,15 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // pattern, circle edition — ADR-358): with the #196 `apart` seat, two bare circles default
       // DISJOINT, so «נקודת החיתוך של המעגלים» must pull them back together — re-seat a movable free
       // centre so the seed configs genuinely intersect (a better default, never a drive; the centres
-      // stay free sampled DOFs). Already-intersecting pairs are untouched (stability).
+      // stay free sampled DOFs). Already-intersecting pairs are untouched (stability). #2339 (ADR-743): so is a pair
+      // the construction STATES tangent — it already meets, at its touch point; re-seating it overlapping broke the
+      // stated tangency (which the kind-encoding internal device no longer absorbs as an external touch), and the
+      // second crossing's own refusal (stage 0j, «X מתלכדת עם Y») is the honest answer.
       const ca = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle1);
       const cb = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle2);
       const pa = ca && pos.get(ca.center);
       const pb = cb && pos.get(cb.center);
-      if (ca && cb && pa && pb) {
+      if (ca && cb && pa && pb && !circlesStatedTangent(prev, ca.id, cb.id)) {
         const ra = seedRadiusOf(ca, pos);
         const rb = seedRadiusOf(cb, pos);
         const gap = dist(pa, pb);
@@ -2621,18 +2624,22 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
             const gap = cmd.external ? r1 + r2 : Math.abs(r1 - r2);
             objects[movJ] = { ...movC, x: ancP.x + ux * gap, y: ancP.y + uy * gap };
           }
-          const wit = `~touch-${cmd.at}`;
+          // #2339 (ADR-743): the witness id carries the KIND, so a second line stating the other kind at the same touch
+          // point adds its own device instead of being swallowed by `addObj` (the stated «מבחוץ» silently lost).
+          const wit = `~touch-${cmd.at}-${cmd.external ? 'ext' : 'int'}`;
           if (cmd.external) {
             // M on circle 1 toward c2; the witness on circle 2 toward c1. coincide ⇒ |OP| = r1+r2.
             addObj(objects, { kind: 'radial-toward', id: cmd.at, circle: c1.id, toward: c2.center });
             addObj(objects, { kind: 'radial-toward', id: wit, circle: c2.id, toward: c1.center });
           } else {
-            // Internal: the larger (by seed) circle is OUTER; M on the outer toward the inner; the witness
-            // on the inner toward M (so the touch lands on the far side of the inner centre). coincide ⇒ |OP| = |r1−r2|.
+            // Internal: the larger (by seed) circle is OUTER; M on the outer toward the inner; the witness on the inner
+            // AWAY from the outer centre (#2339, ADR-743), so the touch lands on the far side of the inner centre and the
+            // coincidence holds only when |OP| = r_out − r_in. (The witness used to point at M, which an EXTERNAL touch
+            // satisfies too, so a contradicting «מבחוץ» was committed green and only the verifier objected.)
             const outer = r1 >= r2 ? c1 : c2;
             const inner = r1 >= r2 ? c2 : c1;
             addObj(objects, { kind: 'radial-toward', id: cmd.at, circle: outer.id, toward: inner.center });
-            addObj(objects, { kind: 'radial-toward', id: wit, circle: inner.id, toward: cmd.at });
+            addObj(objects, { kind: 'radial-toward', id: wit, circle: inner.id, toward: outer.center, away: true });
           }
           const tcon: Constraint = { type: 'coincide', p: cmd.at, q: wit };
           // Mark each FREE radius as a PERMANENT driver of the tangency (like length-radius / ADR-071): the
