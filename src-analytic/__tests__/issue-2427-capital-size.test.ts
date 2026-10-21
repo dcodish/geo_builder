@@ -5,7 +5,9 @@
  * Operator, on the #2414 play sheet (T38, «נתון מעגל O שרדיוסו K»): *"Need a message to user saying that sizes are small
  * letters except for R"*. Ruling 2026-10-20 on #2427 (*"accept syntax and recommendations"*): the wording ending with the
  * corrected sentence; the capitals still accepted as sizes («M(K,0)», «K הוא פרמטר חיובי», «שיפוע AB הוא M») refused with
- * the same message; S for an area stays accepted; "only R" stays analytic-only (an EXCEPTIONS family, X11).
+ * the same message; S for an area stays accepted; "only R" stays analytic-only (an EXCEPTIONS family, X11). Ruling
+ * 2026-10-21 on #2440 (*"area letter only capital S"*, ADR-AG-325 Amendment 1): an area labelled with any other capital
+ * is refused the same way.
  *
  * Every assertion calls the decision the app calls: `decideSubmit`, `reachesFallback`, `decideEdit`, `errorText`.
  */
@@ -68,6 +70,12 @@ const CLASS: readonly { steps: readonly string[]; letter: string; corrected: str
   { steps: ['A(0,0)', 'B(3,1)', 'שיפוע AB הוא M'], letter: 'M', corrected: 'שיפוע AB הוא m' },
   // a capital left over in a length (the #1701 row)
   { steps: ['משולש ABC', 'AB = AC + D'], letter: 'D', corrected: 'AB = AC + d' },
+  // #2440: an area's label is S and only S — every other capital, in every spelling of a stated area
+  { steps: ['משולש ABC', 'שטח ABC = T'], letter: 'T', corrected: 'שטח ABC = t' },
+  { steps: ['משולש ABC', 'שטח המשולש ABC הוא K'], letter: 'K', corrected: 'שטח המשולש ABC הוא k' },
+  { steps: ['משולש ABC', 'שטח ABC = 2T'], letter: 'T', corrected: 'שטח ABC = 2t' },
+  { steps: ['משולש ABC', 'נסמן את שטח ABC ב-T'], letter: 'T', corrected: 'נסמן את שטח ABC ב-t' },
+  { steps: ['משולש ABC', 'area of ABC is T'], letter: 'T', corrected: 'area of ABC is t' },
 ];
 
 describe('#2427 — T38, the operator\'s line', () => {
@@ -103,11 +111,13 @@ describe('#2427 — controls: what stays as it was', () => {
     [['(x-13)²+y²=R²']],
     [['y = kx + 1']],
     [[...TRI, 'זווית ABC = k']],
-    // S for an area stays accepted (the ruling), in both spellings
+    // S for an area stays accepted (the rulings), in every spelling
     [[...TRI, 'שטח המשולש ABC הוא S']],
     [['A(0,0)', 'B(3,1)', 'C(1,4)', 'D(0,4)', 'מרובע ABCD', 'נסמן את שטח ABCD ב-S']],
-    // …and an area's label in another capital is left as it was (the ruling kept the area; #2031's «שטח ABC = T»)
-    [['משולש ABC', 'שטח ABC = T']],
+    [['משולש ABC', 'שטח ABC = S']],
+    [['משולש ABC', 'area of ABC is S']],
+    // …and a lowercase area label, the remedy #2440 teaches
+    [['משולש ABC', 'שטח ABC = t']],
     // a capital that is a POINT of the figure is the student naming it — left exactly as it was
     [['K(1,1)', 'M(K,0)']],
     [['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'מרכז המעגל I הוא K']],
@@ -136,8 +146,10 @@ describe('#2427 — controls: what stays as it was', () => {
   });
 
   it('an area label is exempt only inside the area fact: a coordinate capital on the same figure is still asked', () => {
-    const v = last(['משולש ABC', 'שטח ABC = T', 'M(K,0)']);
+    const v = last(['משולש ABC', 'שטח ABC = S', 'M(K,0)']);
     expect(capitalError(v)).toMatchObject({ letter: 'K', corrected: 'M(k,0)' });
+    // and S itself is a size only as the area's label: «M(S,0)» is asked like any other capital
+    expect(capitalError(last(['משולש ABC', 'M(S,0)']))).toMatchObject({ letter: 'S', corrected: 'M(s,0)' });
   });
 
   it('the edit seam asks the same question (ADR-W-006)', () => {

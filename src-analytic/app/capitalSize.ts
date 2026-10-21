@@ -5,8 +5,9 @@
  * equation or a coordinate) is a lowercase letter, with the one exception R for a radius (`RADIUS_CAPITALS`,
  * ADR-AG-307). Operator, on the #2414 play sheet: *"Need a message to user saying that sizes are small letters
  * except for R"*; ruling 2026-10-20 on #2427: the wording, the corrected sentence, and the capitals the grammar
- * still accepted («M(K,0)», «K הוא פרמטר חיובי», «שיפוע AB הוא M») refused the same way — **S for an area stays**
- * (and so does any capital area label, as before: the ruling refused the three families it named, and kept the area).
+ * still accepted («M(K,0)», «K הוא פרמטר חיובי», «שיפוע AB הוא M») refused the same way — **S for an area stays**.
+ * Ruling 2026-10-21 on #2440: *"area letter only capital S"* — an area labelled with any other capital («שטח ABC = T»)
+ * is refused the same way (ADR-AG-325 Amendment 1).
  *
  * Two readings of one question, both asked at the submit decision because both need the figure (a capital that is
  * already a POINT of the figure is the student naming that point, and is left exactly as it was):
@@ -54,7 +55,7 @@ function usesSymbol(node: unknown, sym: string): boolean {
   return Object.values(o).some((v) => usesSymbol(v, sym));
 }
 
-/** Does the fact state an AREA — the one place a capital stays a size (the 2026-10-20 ruling keeps «S»)? */
+/** Does the fact state an AREA — the one place S stays a size (the 2026-10-20 ruling keeps «S»)? */
 function statesArea(node: unknown): boolean {
   if (Array.isArray(node)) return node.some(statesArea);
   if (!node || typeof node !== 'object') return false;
@@ -63,13 +64,16 @@ function statesArea(node: unknown): boolean {
   return o.t === 'area' || o.kind === 'area' || Object.values(o).some(statesArea);
 }
 
+/** The one capital that may label an area (ruling 2026-10-21 on #2440: *"area letter only capital S"*). */
+const AREA_CAPITALS: ReadonlySet<string> = new Set(['S']);
+
 /**
- * The capitals that may be a size: R everywhere (ADR-AG-307), and an AREA's label — the ruling keeps «S» for an area
- * (2-D's grammar labels an area with a capital too, «שטח ABC = S»); a letter is exempt only inside the fact that states
- * the area, so «M(K,0)» beside it is still asked.
+ * The capitals that may be a size: R everywhere (ADR-AG-307), and S as an AREA's label — the rulings keep «S» for an
+ * area and only S (2-D's grammar labels an area «שטח ABC = S» too); S is exempt only inside the fact that states the
+ * area, so «M(S,0)» beside it is still asked. Any other capital labelling an area («שטח ABC = T») is asked like the rest.
  */
 const mayBeSize = (letter: string, facts: readonly Fact[]): boolean =>
-  RADIUS_CAPITALS.has(letter) || facts.some((f) => statesArea(f) && usesSymbol(f, letter));
+  RADIUS_CAPITALS.has(letter) || (AREA_CAPITALS.has(letter) && facts.some((f) => statesArea(f) && usesSymbol(f, letter)));
 
 /**
  * A line no rule read (`not-handled`): the first lone capital — not R, not a point of the figure — whose lowercase
@@ -89,7 +93,7 @@ export function capitalSizeRetry(line: string, figureLabels: readonly string[]):
 const registered = (c: Construction): Set<string> => new Set(paramRegister(c).map((p) => p.sym));
 
 /**
- * A line the grammar read: the first capital it ADDED to the parameter register — not R, not an area's label, not a
+ * A line the grammar read: the first capital it ADDED to the parameter register — not R, not S labelling an area, not a
  * point of the figure — whose corrected line still parses. `null` when the line added none.
  */
 export function capitalParamOf(

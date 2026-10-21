@@ -125,7 +125,7 @@ a radius naming any other capital declines. A point R beside a used symbol R is 
 asked by `decideOnce` and `decideEdit` because both readings need the figure (a capital that is a point of the figure is
 left as it was). A `not-handled` line is read again with one lone capital lowercased (`capitalSizeRetry`, 2-D's
 lowercase-labels pattern); a parsed line is asked whether it ADDED a capital to the parameter register (`capitalParamOf`,
-`paramRegister` before and after the trial fold). R, and a capital inside the fact that states an area, are sizes. Either answer is `capital-magnitude`
+`paramRegister` before and after the trial fold). R, and S inside the fact that states an area (`AREA_CAPITALS`, ADR-AG-325 Am. 1), are sizes. Either answer is `capital-magnitude`
 `{ letter, corrected }`, never `not-handled`, so it never reaches the model.
 
 **A parameter is never a plane coordinate** ([ADR-AG-246](06c-decisions-analytic.md#adr-ag-246)):
