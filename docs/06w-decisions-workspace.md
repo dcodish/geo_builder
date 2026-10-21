@@ -6059,9 +6059,9 @@ The 2026-10-08 plan update asked analytic for every reader of an angle measure. 
 3. Sound one way only: a re-solve that keeps the ring open changes nothing.
 4. The code is per product. The judgement reasons about points and constraints, which is the engine layer, and `BOUNDARIES.json` keeps engines "copied, never shared"; the three solvers also differ in kind. What is shared is this semantic and one lock.
 
-**The shared lock.** Parity rows in `shell/__tests__/fixtures/geo-input-parity.ts`, run by every builder's thin lock: `impossible-right-isosceles-2292-perp` («AC ⊥ BC»), `-angle` («∠ACB = 90»), `-other-leg` («AB ⊥ AC»), each `expect: 'refused'`; 3-D types the context «|BA| = |BC|», because it reads «AB = BC» as a vector question. The control `thin-right-triangle-2292-control` («AB = 2 · BC = 1 · AC ⊥ BC») builds in all three. 2-D carries `knownGap #2344` on the three refused rows until #2344 lands and removes it.
+**The shared lock.** Parity rows in `shell/__tests__/fixtures/geo-input-parity.ts`, run by every builder's thin lock: `impossible-right-isosceles-2292-perp` («AC ⊥ BC»), `-angle` («∠ACB = 90»), `-other-leg` («AB ⊥ AC»), each `expect: 'refused'`; 3-D types the context «|BA| = |BC|», because it reads «AB = BC» as a vector question. The control `thin-right-triangle-2292-control` («AB = 2 · BC = 1 · AC ⊥ BC») builds in all three. 2-D carried `knownGap #2344` on the three refused rows until #2344 landed (ADR-746) and removed it.
 
-**Adoption.** 3-D: ADR-3D-372 (the sliver release of ADR-3D-310 / ADR-3D-358 becomes the tightened re-solve). Analytic: ADR-AG-143, measured refusing all three rows. 2-D: ADR-537 already has the test; #2344 extends its reach to the ⊥ spellings.
+**Adoption.** 3-D: ADR-3D-372 (the sliver release of ADR-3D-310 / ADR-3D-358 becomes the tightened re-solve). Analytic: ADR-AG-143, measured refusing all three rows. 2-D: ADR-537 already has the test; #2344 extends its reach to the ⊥ spellings — landed, [ADR-746](06-decisions.md#adr-746) (the length family joins the re-solve, the no-room prover reads an equal pair's base angles, and both refuse with ADR-602's flat-triangle message).
 
 ## ADR-W-147 — One vulgar-fraction reader for 2-D and 3-D: `spellVulgarFractions` moves to `shell/` (#2255)
 

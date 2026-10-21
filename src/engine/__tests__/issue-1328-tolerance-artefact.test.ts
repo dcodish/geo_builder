@@ -14,7 +14,8 @@
 import { describe, expect, it } from 'vitest';
 import { factsOf } from '../../__tests__/scenario-pipeline';
 import { COLLAPSED_VS, findValidConfig, firstSatisfyingSeed, meetsRequirements, replay } from '@/replay/core';
-import { applyStep, buildSymTab, degeneratePolygons, lowerOne, residualTolerance, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, withToleranceFactor } from '@/engine';
+import { applyStep, buildSymTab, degeneratePolygons, LENGTH_TIGHT_FACTOR, lowerOne, residualTolerance, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, withToleranceFactor } from '@/engine';
+import { gateVerdict } from '../../__tests__/submit-gate';
 import type { Command } from '@/engine';
 import { buildParseCtx, parse } from '@/parser';
 
@@ -29,10 +30,13 @@ const flatnessOf = (fig: ReturnType<typeof replay>) => degeneratePolygons(fig.co
 describe('#1328 — a contradiction satisfiable only in the degenerate limit is REFUSED, never drawn within tolerance', () => {
   const T3 = ['משולש ABC', 'AB = AC', '∠ABC = ∠ACB'];
 
-  it("the operator's sequence: the fourth line is refused as over-constrained naming «∠ABC = 90», and it is a hard error, not a pending state", () => {
+  it("the operator's sequence: the fourth line is refused as the triangle's collapse naming «∠ABC = 90», and it is a hard error, not a pending state", () => {
     const facts = factsOf([...T3, '∠ABC = 90']);
     const fig = replay(facts, firstSatisfyingSeed(facts));
-    expect(fig.lastError).toMatch(/^over-constrained: ∠ABC = 90° cannot hold/);
+    // #2344 (ADR-746): an isosceles pair with a base right angle is the limit class — ADR-602's flat refusal (it was
+    // `over-constrained` while the tolerance-artefact gate was the only thing that saw it)
+    expect(fig.lastError).toMatch(COLLAPSED_VS);
+    expect(fig.lastError).toMatch(/^collapsed: polygon A, B, C would be flat — ∠ABC = 90° cannot hold/);
     expect(fig.pending, 'a contradiction is never «add the remaining givens»').toBe(false);
     // the T3 figure before it is untouched: every earlier row green, the triangle a real one
     for (const [id, s] of Object.entries(fig.status)) {
@@ -108,17 +112,27 @@ describe('#1328 — the other direction, byte-identical: thin figures that are E
 });
 
 describe('#1328 — the mechanism, on its own', () => {
-  it('the tightened tolerance reaches the degree family only, and is always restored', () => {
+  it('the tightened tolerance is PER FAMILY (amended by #2344, ADR-746): degree × 0.02, length × LENGTH_TIGHT_FACTOR, ∥/⟂ untouched; always restored', () => {
+    // Was: "the degree family only" — the length family was taken to sit below the coincidence floor. That premise is
+    // false at a tangent root, where a length residual vanishes to second order (#2344); the length family has its own factor.
     const angle = { type: 'angle', vertex: 'B', ray1: 'A', ray2: 'C', value: 90 } as const;
     const length = { type: 'distance', a: 'A', b: 'B', value: 5 } as const;
     const perp = { type: 'perpendicular', a: 'A', b: 'B', c: 'B', d: 'C' } as const;
     const base = { angle: residualTolerance(angle), length: residualTolerance(length, 10), perp: residualTolerance(perp) };
     withToleranceFactor(TIGHT_TOLERANCE_FACTOR, () => {
       expect(residualTolerance(angle)).toBeCloseTo(base.angle * TIGHT_TOLERANCE_FACTOR, 12);
-      expect(residualTolerance(length, 10), 'the length family sits below the coincidence floor already').toBe(base.length);
-      expect(residualTolerance(perp), 'so does ∥/⟂/collinear').toBe(base.perp);
-    });
+      expect(residualTolerance(length, 10), 'the length family, at its own factor').toBeCloseTo(base.length * LENGTH_TIGHT_FACTOR, 15);
+      expect(residualTolerance(perp), '∥/⟂/collinear are never tightened').toBe(base.perp);
+    }, LENGTH_TIGHT_FACTOR);
     expect(residualTolerance(angle), 'restored').toBe(base.angle);
+    expect(residualTolerance(length, 10), 'restored').toBe(base.length);
+  });
+
+  it('#2344: the door-level ADR-537 figure «AB = AC» · «∠ABC = 90» (no restating line) is refused too — it was a green sliver', async () => {
+    const facts = factsOf(['משולש ABC', 'AB = AC']);
+    const v = gateVerdict(facts, '∠ABC = 90');
+    expect(v.kind === 'refused' && v.reason).toBe('error');
+    expect(v.kind === 'refused' ? v.detail : '').toMatch(COLLAPSED_VS);
   });
 
   it('the seat tier still rescues a figure whose DEFAULT seat admits only the needle (ADR-445): the corpus arc-equality figure builds honestly at seat B', () => {

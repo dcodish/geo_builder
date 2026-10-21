@@ -153,6 +153,14 @@ export function metricImpossibilityError(m: MetricImpossibility): string {
  *    excess); equality there is the flat-polygon gates' concern.
  * `kind` tells the two verdicts apart: an `excess` keeps the curriculum sentence; `no-room` is refused as the
  * new statement's over-constraint, and the fold's drop-one search names the statement it contradicts.
+ *
+ * #2344 ([ADR-746](../../docs/06-decisions.md#adr-746)) — THE BASE ANGLES A STATED EQUAL PAIR FORCES. In a declared
+ * triangle VPQ a stated |VP| = |VQ| (an `equal`, or two `distance`s of one value) makes the interior angles at P
+ * and Q equal (the isosceles base-angle theorem), so a pinned angle at one base vertex is pinned at the other too.
+ * «AB = BC» · «∠ACB = 90» then puts a second right angle at A, and the apex B has no room: the givens hold only in
+ * the limit A = C. That verdict is `limit-collapse` — the triangle would collapse — refused with ADR-602's flat
+ * refusal, never as a stated pair's over-constraint. Read only when it reaches the bound exactly (a base angle of
+ * 90°): one-way sound like every reading here, and a base angle past 90° is left to the ladder unchanged.
  */
 export interface AngleSumImpossibility {
   /** the polygon, as its vertex run */
@@ -163,8 +171,12 @@ export interface AngleSumImpossibility {
   sum: number;
   /** (n − 2)·180 */
   bound: number;
-  /** #1936: `excess`, the stated angles sum past the bound; `no-room`, they reach it with an angle still owed */
-  kind: 'excess' | 'no-room';
+  /** #1936: `excess`, the stated angles sum past the bound; `no-room`, they reach it with an angle still owed;
+   *  #2344 (ADR-746) `limit-collapse`: they reach it only with a base angle a stated equal pair forces (`angles`
+   *  lists the stated ones; `inferred` the forced ones) */
+  kind: 'excess' | 'no-room' | 'limit-collapse';
+  /** #2344: the base angles read off a stated equal pair (only on a `limit-collapse`) */
+  inferred?: { vertex: Id; ray1: Id; ray2: Id; value: number }[];
 }
 
 /**
@@ -197,11 +209,37 @@ function perpendicularCorner(con: { a: Id; b: Id; c: Id; d: Id }): { v: Id; p: I
   return p !== v && q !== v && p !== q ? { v, p, q } : null;
 }
 
+/**
+ * #2344 ([ADR-746](../../docs/06-decisions.md#adr-746)) — the APEX PAIRS of the stated equal lengths: |VP| = |VQ| with
+ * V the one shared endpoint, from an `equal` over two segments that meet at one point, or from two `distance`s of
+ * the same value that do. Every pair is a length the figure must hold, so the base-angle reading is sound.
+ */
+export function equalApexPairs(constraints: readonly Constraint[]): { v: Id; p: Id; q: Id }[] {
+  const out: { v: Id; p: Id; q: Id }[] = [];
+  const meet = (a: Id, b: Id, c: Id, d: Id): void => {
+    const corner = perpendicularCorner({ a, b, c, d });
+    if (corner) out.push(corner);
+  };
+  const dists: { a: Id; b: Id; value: number }[] = [];
+  for (const con of constraints) {
+    if (con.type === 'equal') meet(con.a, con.b, con.c, con.d);
+    else if (con.type === 'distance' && Number.isFinite(con.value) && con.value > 0) dists.push(con);
+  }
+  for (let i = 0; i < dists.length; i++)
+    for (let j = i + 1; j < dists.length; j++)
+      if (Math.abs(dists[i]!.value - dists[j]!.value) <= TOL * Math.max(dists[i]!.value, dists[j]!.value)) meet(dists[i]!.a, dists[i]!.b, dists[j]!.a, dists[j]!.b);
+  return out;
+}
+
 export function angleSumImpossibility(
   objects: readonly GeoObject[],
   constraints: readonly Constraint[],
+  /** #2344: where the stated equal pairs are read — the caller passes the solve directives too (a stated length
+   *  may have become a carrier's drive); defaults to `constraints` */
+  lengths: readonly Constraint[] = constraints,
 ): AngleSumImpossibility | null {
   const wedges = pinnedAngleWedges(constraints);
+  let apexes: { v: Id; p: Id; q: Id }[] | null = null;
   for (const o of objects) {
     if (o.kind !== 'polygon' || o.vertices.length < 3) continue;
     const n = o.vertices.length;
@@ -225,6 +263,22 @@ export function angleSumImpossibility(
     if (sum > bound * (1 + TOL) + TOL) return { polygon: [...o.vertices], angles, sum, bound, kind: 'excess' };
     // #1936: an angle still unstated is strictly positive, so stated angles that reach the bound leave it no room
     if (angles.length < n && sum >= bound - NO_ROOM_TOL) return { polygon: [...o.vertices], angles, sum, bound, kind: 'no-room' };
+    // #2344 (ADR-746): a triangle's base angles a stated equal pair forces — read only when they leave no room
+    if (n !== 3) continue;
+    apexes ??= equalApexPairs(lengths);
+    const inferred: AngleSumImpossibility['angles'] = [];
+    for (const { v, p, q } of apexes) {
+      if (!o.vertices.includes(v) || !o.vertices.includes(p) || !o.vertices.includes(q)) continue;
+      for (const [from, to] of [[p, q], [q, p]] as const) {
+        const known = angles.find((a) => a.vertex === from);
+        if (!known || angles.some((a) => a.vertex === to) || inferred.some((a) => a.vertex === to)) continue;
+        inferred.push({ vertex: to, ray1: v, ray2: from, value: known.value });
+      }
+    }
+    if (!inferred.length) continue;
+    const forced = sum + inferred.reduce((s, a) => s + a.value, 0);
+    if (angles.length + inferred.length < n && Math.abs(forced - bound) <= NO_ROOM_TOL)
+      return { polygon: [...o.vertices], angles, sum: forced, bound, kind: 'limit-collapse', inferred };
   }
   return null;
 }
