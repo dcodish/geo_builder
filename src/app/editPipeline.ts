@@ -20,7 +20,7 @@
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { buildParseCtx, impliedCircleBinding, impliedPointBinding, lowercaseLabelFold, parse, typedLabels } from '@/parser';
 import { autoNamedLabels, groupKey, impliedIdentityBinding, mergeFacts, nameByUseCommands, nameCentreFacts, renameFacts, replay, resolveBinds, stepAsideFacts, trialFacts, useGeoStore, type Fact } from '@/store/geoStore';
-import { ambiguousDefiniteShapeNote, roleReadingConfig, type DecideBind } from './decideDeterministic';
+import { ambiguousDefiniteShapeNote, lettersOnScreen, roleReadingConfig, type DecideBind } from './decideDeterministic';
 import { vertexPairVerdict } from './vertexPairCevian';
 import { honestyGateReport } from './honestyGates';
 import { rightAngleVertexNote } from './unreadParts';
@@ -50,6 +50,9 @@ export interface EditDeps {
    * the path being worked on. See #1132 for the mechanism that makes that inventory checkable.
    */
   resolveAfterCommit(): void;
+  /** #2362 (ADR-748): «הציגו מרכזי מעגלים» is on NOW — an edit's text is typed now, so it is decided with the toggle as
+   *  it is at edit time. Optional: absent = off (the product default). */
+  centresShown?(): boolean;
 }
 
 /**
@@ -103,10 +106,16 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
     setInputNote(t(`input.scope.unread-${unread.kind}`, { detail: unread.detail }));
     return false;
   }
-  // #1673 (ADR-565): a hidden circle token the edit types steps aside first, exactly as at submit
-  const aside = stepAsideFacts(work, typedLabels(editText));
+  // #1673 (ADR-565): a hidden circle token the edit types steps aside first, exactly as at submit — and #2362 (ADR-748):
+  // a minted circumcircle letter on screen as the edit is typed is adopted, one off screen steps aside
+  const onScreen = (() => {
+    const d = replay(raw, store().seed);
+    return lettersOnScreen({ construction: d.construction, positions: d.positions }, deps.centresShown?.());
+  })();
+  const aside = stepAsideFacts(work, typedLabels(editText), onScreen);
   work = aside.facts;
   for (const m of aside.moves) binds.push({ op: 'step-aside', from: m.from, to: m.to });
+  for (const a of aside.adopted) binds.push({ op: 'adopt', from: a, to: a });
   let ectx = prefixCtx();
   let r = parse(editText, ectx);
   // #186: an edit referencing a circle by a name that matches no circle binds an UNNAMED circle the

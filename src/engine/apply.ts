@@ -1948,7 +1948,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         pos,
       );
       addObj(objects, { kind: 'circumcenter', id: cmd.center, a: cmd.a, b: cmd.b, c: cmd.c });
-      addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.a }, autoCenter: true, ...(cmd.hidden ? { hidden: true } : {}) }); // circumcentre is auto, hidden unless used; `hidden` for a cyclic (בר-חסימה) figure
+      addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.a }, ...(cmd.autoCenter !== false ? { autoCenter: true } : {}), ...(cmd.hidden ? { hidden: true } : {}) }); // a MINTED circumcentre is auto, hidden unless used; a centre the student named is drawn (FR-RN-8, #2369 / ADR-748: the fact carries its provenance, a legacy fact without it reads as minted); `hidden` for a cyclic (בר-חסימה) figure
       break;
 
     case 'point-circle-side': {

@@ -155,7 +155,7 @@ describe('trailing inscribe predicate — a lax rule must not swallow "… חו�
     const c = cmds('משולש שווה שוקיים ABC שבו AB=AC חוסם במעגל');
     expect(c[0]).toMatchObject({ type: 'shape-variant', shape: 'isosceles', ids: ['A', 'B', 'C'] });
     expect(c).toContainEqual({ type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'C' });
-    expect(c).toContainEqual({ type: 'circumcircle', id: 'circle-O', center: 'O', a: 'A', b: 'B', c: 'C' });
+    expect(c).toContainEqual({ type: 'circumcircle', id: 'circle-O', center: 'O', a: 'A', b: 'B', c: 'C', autoCenter: true }); // #2362 (ADR-748): the minted letter's provenance
   });
 
   it('English mirror: "isosceles triangle ABC in which AB=AC inscribed in a circle"', () => {

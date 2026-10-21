@@ -73,6 +73,12 @@ export interface SubmitDeps {
   view(): { construction: Construction; positions: Map<Id, Vec> };
   /** A submit is already in flight (E3) — chips/enter can't race a second one. */
   isBusy(): boolean;
+  /**
+   * #2362 ([ADR-748](../../docs/06-decisions.md#adr-748)): «הציגו מרכזי מעגלים» is on as the line is typed — the store's
+   * display preference (ADR-059), read at the seam and written into the line's facts, never read by replay. Optional:
+   * absent = off, the product default.
+   */
+  centresShown?(): boolean;
   /** Two animation frames so the spinner paints before a heavy synchronous solve. */
   nextPaint(): Promise<void>;
   /** The post-commit auto-resolve (worker config search + view rewrite, one undo entry). A paragraph's chain
@@ -185,7 +191,7 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
       ? deps.explainError(n.explain, utterance, otherUtteranceForError(store().facts, n.explain))
       : n.also ? `${t(n.key, resolveParams(n.params))} ${noteText(n.also)}` : t(n.key, resolveParams(n.params));
 
-  const pre = decidePreParse(utterance, deps.view());
+  const pre = decidePreParse(utterance, deps.view(), deps.centresShown?.());
   if (pre?.kind === 'store-op') {
     // A store operation is not geometry: it runs here, before the parser, and never enters the figure.
     const { op, from, to } = pre;
@@ -221,7 +227,7 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
   ui.setBusy(true);
   await deps.nextPaint();
   const st0 = store();
-  const verdict = await decideFromParse({ facts: st0.facts, seed: st0.seed, view: deps.view() }, utterance, locale, {
+  const verdict = await decideFromParse({ facts: st0.facts, seed: st0.seed, view: deps.view(), centresShown: deps.centresShown?.() }, utterance, locale, {
     // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
     // the commit, and every later replay of this content then run at TAIL speed on the main thread.
     prefold: async (trial, seed) => {

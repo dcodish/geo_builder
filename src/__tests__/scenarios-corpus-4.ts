@@ -62,6 +62,7 @@ import { rowNouns } from '@/store/rowNouns';
 import { narrowingText } from '@/app/narrowingText';
 import { valueRowText } from '@/render/valueRowText';
 import { clausesOf } from '@/app/independence';
+import { SCENARIOS_3 } from './scenarios-corpus-3';
 
 export const SCENARIOS_4: Scenario[] = [
   {
@@ -526,10 +527,11 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'triangle-circumscribes-existing-circle',
     title: '"משולש DEF חוסם את המעגל O" where O already exists — incircle CONSTRAINT (sides tangent), not a fresh circle that re-radiuses O',
     guards:
-      'audit sibling of corner-tangent-on-existing-circle (same root cause, different rule). Circle O is the circumcircle of an earlier triangle ABC; then "triangle DEF circumscribes circle O" made O the incircle of DEF. The `incircle` rule re-DERIVED the incentre (bisector∩bisector) + a `circle-through` the foot, RE-RADIUSING the existing O so A,B,C fell off it (verifier amber). Fix (ADR-115): when circle O already exists, emit a tangency CONSTRAINT — for each side, the FOOT of ⟂ from O onto it is forced ONTO the circle (distance(O,side)=radius ⇒ tangent); the triangle flexes around the fixed circle. Same existing-circle guard as the corner case.',
+      'audit sibling of corner-tangent-on-existing-circle (same root cause, different rule). Circle O is the circumcircle of an earlier triangle ABC; then "triangle DEF circumscribes circle O" made O the incircle of DEF. The `incircle` rule re-DERIVED the incentre (bisector∩bisector) + a `circle-through` the foot, RE-RADIUSING the existing O so A,B,C fell off it (verifier amber). Fix (ADR-115): when circle O already exists, emit a tangency CONSTRAINT — for each side, the FOOT of ⟂ from O onto it is forced ONTO the circle (distance(O,side)=radius ⇒ tangent); the triangle flexes around the fixed circle. Same existing-circle guard as the corner case. #2362 (ADR-748, operator ruling 2026-10-20 Q1): the tool’s centre letter of a circle drawn through drawn points is not a name the student can use while it is not shown, so the sequence names it first («O מרכז המעגל», just before the line that uses it); the operator’s exact sequence, typed with «הציגו מרכזי מעגלים» on, is the twin `triangle-circumscribes-existing-circle-centres-shown-2362` in scenarios-corpus-4.',
     steps: [
       'משולש ABC',
       'מעגל חוסם את משולש ABC',
+      'O מרכז המעגל',
       'משולש DEF חוסם את המעגל O',
     ],
     check(fig) {
@@ -980,7 +982,7 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'extension-cuts-bare-segment-keeps-on-segment-default',
     title: '"המשך FO חותך את AC בנקודה E" keeps E ON segment AC (the bare operand\'s on-segment default survives the other operand\'s המשך)',
     guards:
-      'operator prod test 2026-07-10, saved figure `figure-2026-07-10.geo (6).json` (issue #22, P1): on the tangent-quad-in-right-triangle figure, "המשך FO חותך את AC בנקודה E" placed E on the CONTINUATION of AC (t = 1.139, beyond C) with every row ✓ and zero violations — the stated given ("חותך את AC", a bare segment reference = the segment, ADR-077) silently violated. Root cause (class): per-operand reference semantics (bare pair = SEGMENT; המשך = directional extension; הישר = infinite line) were computed UTTERANCE-GLOBALLY in lineLineIntersection — `extend` tested the whole string, so המשך on the FIRST operand stripped the on-segment default from the SECOND, bare operand (`onSeg = !extend && !infinite`). Fix: per-operand classification in all three phrasing forms (cut-form by verb side; conjunction forms by pre-operand spans, with a leading המשך distributing over the conjoined pair) → the bare operand emits onSeg1/onSeg2, lowered in the engine to a collinear-order [X,E,Y] (the ADR-077/ADR-127 within mechanism) that flexes the figure to bring the crossing onto the segment; the joint both-bare case keeps the sampled ADR-166 onSeg requirement byte-identical. The bare operand also draws WHOLE (A–C), no longer an overshooting A–E stub.',
+      'operator prod test 2026-07-10, saved figure `figure-2026-07-10.geo (6).json` (issue #22, P1): on the tangent-quad-in-right-triangle figure, "המשך FO חותך את AC בנקודה E" placed E on the CONTINUATION of AC (t = 1.139, beyond C) with every row ✓ and zero violations — the stated given ("חותך את AC", a bare segment reference = the segment, ADR-077) silently violated. Root cause (class): per-operand reference semantics (bare pair = SEGMENT; המשך = directional extension; הישר = infinite line) were computed UTTERANCE-GLOBALLY in lineLineIntersection — `extend` tested the whole string, so המשך on the FIRST operand stripped the on-segment default from the SECOND, bare operand (`onSeg = !extend && !infinite`). Fix: per-operand classification in all three phrasing forms (cut-form by verb side; conjunction forms by pre-operand spans, with a leading המשך distributing over the conjoined pair) → the bare operand emits onSeg1/onSeg2, lowered in the engine to a collinear-order [X,E,Y] (the ADR-077/ADR-127 within mechanism) that flexes the figure to bring the crossing onto the segment; the joint both-bare case keeps the sampled ADR-166 onSeg requirement byte-identical. The bare operand also draws WHOLE (A–C), no longer an overshooting A–E stub. #2362 (ADR-748, operator ruling 2026-10-20 Q1): the tool’s centre letter of a circle drawn through drawn points is not a name the student can use while it is not shown, so the sequence names it first («O מרכז המעגל», just before the line that uses it); the operator’s exact sequence, typed with «הציגו מרכזי מעגלים» on, is the twin `extension-cuts-bare-segment-keeps-on-segment-default-centres-shown-2362` in scenarios-corpus-4.',
     steps: [
       'ABC משולש ישר זווית',
       'F על AB',
@@ -991,6 +993,7 @@ export const SCENARIOS_4: Scenario[] = [
       'AB משיק למעגל בנקודה F',
       'AB מקביל ל GH',
       'CF',
+      'O מרכז המעגל',
       'המשך FO חותך את AC בנקודה E',
     ],
     check(fig) {
@@ -1015,7 +1018,7 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'bare-diameter-from-point',
     title: '"קוטר מנקודה F" draws the diameter from the tangency point (auto-named antipode), then "המשך FO חותך את AC בנקודה E" lands E on AC',
     guards:
-      'operator prod test 2026-07-10 (issue #21): on the tangent-quad-in-right-triangle figure the operator wanted the diameter of circle O from the tangency point F, but every bare form ("קוטר מנקודה F" / "diameter from F") was not-handled → LLM escalation; they had to fall back to the cut-compound workaround. Fix: a `diameterFromPoint` rule — diameter word + a from-marker + exactly ONE label + no cut verb → resolve the circle (named or implicit, ADR-029), assert F\'s membership idempotently (M1), auto-name the antipode as a fresh label (the ADR-263 auto-foot precedent) and emit the existing `diameter` command. No theft: the cut compound stays with diameterCutsSegment (INTERSECT_KW defer), the two-label "FD קוטר" stays with `diameter`. This scenario is the operator\'s exact saved sequence with the workaround replaced by the bare form + the follow-up cut.',
+      'operator prod test 2026-07-10 (issue #21): on the tangent-quad-in-right-triangle figure the operator wanted the diameter of circle O from the tangency point F, but every bare form ("קוטר מנקודה F" / "diameter from F") was not-handled → LLM escalation; they had to fall back to the cut-compound workaround. Fix: a `diameterFromPoint` rule — diameter word + a from-marker + exactly ONE label + no cut verb → resolve the circle (named or implicit, ADR-029), assert F\'s membership idempotently (M1), auto-name the antipode as a fresh label (the ADR-263 auto-foot precedent) and emit the existing `diameter` command. No theft: the cut compound stays with diameterCutsSegment (INTERSECT_KW defer), the two-label "FD קוטר" stays with `diameter`. This scenario is the operator\'s exact saved sequence with the workaround replaced by the bare form + the follow-up cut. #2362 (ADR-748, operator ruling 2026-10-20 Q1): the tool’s centre letter of a circle drawn through drawn points is not a name the student can use while it is not shown, so the sequence names it first («O מרכז המעגל», just before the line that uses it); the operator’s exact sequence, typed with «הציגו מרכזי מעגלים» on, is the twin `bare-diameter-from-point-centres-shown-2362` in scenarios-corpus-4.',
     steps: [
       'ABC משולש ישר זווית',
       'F על AB',
@@ -1027,6 +1030,7 @@ export const SCENARIOS_4: Scenario[] = [
       'AB מקביל ל GH',
       'CF',
       'קוטר מנקודה F',
+      'O מרכז המעגל',
       'המשך FO חותך את AC בנקודה E',
     ],
     check(fig) {
@@ -5536,7 +5540,73 @@ export const SCENARIOS_4: Scenario[] = [
       expect(folded.pending, 'never «waiting for more givens»').toBe(false);
     },
   },
+  {
+    id: 'named-circumcircle-centre-drawn-2369',
+    title: '«ריבוע ABCD» · «מעגל O חוסם את הריבוע ABCD» draws the centre O at rest — a centre the student named is always drawn (#2369, ADR-748)',
+    guards:
+      "#2369 (FR-RN-8: *\"A centre the student named … is always drawn\"*): a circle drawn through points already on the figure (`circumcircle`) had no record of whether its centre letter was the student's, and the engine marked every one auto-hidden, so «מעגל O חוסם את הריבוע ABCD» drew no O while «מעגל O חסום בריבוע ABCD» did. The fact now carries its provenance (`autoCenter: false` for a named centre). The matrix (four spellings, the incircle controls, a legacy file without the field) is src/app/__tests__/issue-2362-minted-circle-letter.test.ts.",
+    steps: ['ריבוע ABCD', 'מעגל O חוסם את הריבוע ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const drawn = buildScene(fig.construction, fig.positions).points.map((q) => q.id);
+      expect(drawn, 'the named centre O is drawn with the toggle off').toContain('O');
+      const O = at(fig, 'O');
+      for (const id of ['A', 'B', 'C', 'D']) expect(dist(O, at(fig, id)), `${id} on circle O`).toBeCloseTo(dist(O, at(fig, 'A')), 6);
+    },
+  },
+  {
+    id: 'second-centre-letter-refused-2398',
+    title: '«מרכז המעגל O הוא K» on an empty figure is refused «מעגל O לא הוגדר» and draws nothing (#2398, ADR-747)',
+    guards:
+      "#2398 (P1): a sentence giving a circle's centre a SECOND letter had no reader for the pair — it was read as «מעגל O» and K was dropped (escalated `weak: dropped`; the AI lane's plausible answer built two circles, green). With no circle O the student can see, it is refused with the existing `errors.unknownCircle` (the P1 exception of ADR-W-117), and leaves no fact. The matrix is src/app/__tests__/issue-2398-second-centre-letter.test.ts.",
+    steps: ['מרכז המעגל O הוא K'],
+    refusedSteps: [{ step: 1, reason: 'unknown-circle', with: { center: 'O' }, why: '#2398 (ADR-747): no circle O is drawn — one point never gets two names' }],
+    check(fig) {
+      expect(fig.construction.objects, 'nothing is drawn').toEqual([]);
+    },
+  },
+  {
+    id: 'second-centre-letter-names-holder-2398',
+    title: '«מעגל O» · «מרכז המעגל O הוא K» is refused naming the holder O — the figure keeps one circle O (#2398, ADR-747)',
+    guards:
+      '#2398 (P1), ruled on #1153 / #1164 (operator 2026-09-17: "the second naming REFUSES and names the holder … Nothing changes silently"): the centre of circle O is already named O, so the line answers «מרכז המעגל כבר נקרא O. כדי לשנות את השם, הקלידו «שנה שם O ל-K».» and changes nothing.',
+    steps: ['מעגל O', 'מרכז המעגל O הוא K'],
+    refusedSteps: [{ step: 2, reason: 'centre-already-named', with: { holder: 'O', to: 'K' }, why: '#2398 (ADR-747, #1153 / #1164 rulings): naming an already-named centre refuses and names the holder' }],
+    check(fig) {
+      allStepsOk(fig);
+      expect([...fig.circles.keys()]).toEqual(['circle-O']);
+      expect(fig.positions.has('K'), 'no point K').toBe(false);
+    },
+  },
 ];
+
+/**
+ * #2362 ([ADR-748](../../docs/06-decisions.md#adr-748), operator ruling 2026-10-20 Q2): the operator's EXACT sequences of the
+ * five scenarios that use the tool's centre letter of a circle drawn through drawn points, typed with «הציגו מרכזי מעגלים»
+ * ON. The letter was on screen, so it counts as the student's: the line that uses it adopts it and binds the centre. The
+ * originals insert «O מרכז המעגל» (the letter is not shown there); the twin drops that line and must stay green with the
+ * originals' own checks.
+ */
+const NAMES_THE_CENTRE = 'O מרכז המעגל';
+const CENTRES_SHOWN_TWINS = [
+  'symbolic-2alpha-drives-shape-not-the-fixed-point',
+  'collinear-flexes-redundant-carrier-kite-tangents',
+  'extension-cuts-bare-segment-keeps-on-segment-default',
+  'bare-diameter-from-point',
+  'triangle-circumscribes-existing-circle',
+];
+SCENARIOS_4.push(
+  ...[...SCENARIOS_3, ...SCENARIOS_4]
+    .filter((sc) => CENTRES_SHOWN_TWINS.includes(sc.id))
+    .map((sc): Scenario => ({
+      ...sc,
+      id: `${sc.id}-centres-shown-2362`,
+      title: `${sc.title} — the operator's exact sequence, typed with the circle centres shown (#2362)`,
+      guards: `#2362 (ADR-748, operator ruling 2026-10-20 Q2: "if the user presses show centers, he knows what the centers are so its as if he defined them"). The twin of \`${sc.id}\` without its «${NAMES_THE_CENTRE}» line: the centre letter is on screen, so the line that uses it adopts it.`,
+      steps: sc.steps.filter((st) => st !== NAMES_THE_CENTRE),
+      centresShown: true,
+    })),
+);
 
 /** #1996: the forced-narrowing notes a student sees after `steps`, in Hebrew, bidi isolates removed. */
 function narrowNotes(steps: string[]): string[] {

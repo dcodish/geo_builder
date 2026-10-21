@@ -236,13 +236,25 @@ describe('#2185 — an arc named on a circle lives on that circle; a named circl
   // The scenario `arc-resolves-to-circle-holding-both-endpoints`' prefix: circle O through A, B, E, D; circle P through
   // A, B, C. C is NOT on O. Before ADR-735 the arc rule redrew «… במעגל O» on circle P (the ADR-042 override), green.
   const ARC = ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל'];
+  // #2362 (ADR-748, operator 2026-10-20: "the only way to satisfy this is to define the 2nd circle as O and then its
+  // green"): both circles are UNNAMED — O is the tool's hidden letter, never shown — so «במעגל O» is the student's fresh
+  // name, and it names the circle that holds both ends (P) by use. "Never swap a named circle" means a circle the
+  // STUDENT named: that case is the next test, still not committed.
   for (const line of ['F אמצע הקשת BC במעגל O', 'F על הקשת BC במעגל O'])
-    it(`«${line}» (C not on O) is never committed — it goes to the AI, never redrawn on P`, async () => {
-      const r = await play(ARC, line);
-      expect(r.kind).not.toBe('commit');
-      expect(r.added).toBe(0);
-      expect(llmParseMock).not.toHaveBeenCalled();
+    it(`«${line}» (both circles unnamed) names the circle through B and C «O» and builds F on it`, async () => {
+      expect((await play(ARC, line)).kind).toBe('commit');
+      for (const seed of [0, 1, 2, 3]) {
+        expect(onCircle('F', 'O', seed), `F on the circle now named O, seed ${seed}`).toBe(true);
+        expect(onCircle('C', 'O', seed), `that circle is the one through C, seed ${seed}`).toBe(true);
+      }
+      green();
     });
+  it('a circle the STUDENT named that does not hold both ends is still never swapped (ADR-735)', async () => {
+    const r = await play(['מעגל O', 'מעגל P', 'A ו-B על מעגל O', 'C על מעגל P'], 'F אמצע הקשת BC במעגל O');
+    expect(r.kind).not.toBe('commit');
+    expect(r.added).toBe(0);
+    expect(llmParseMock).not.toHaveBeenCalled();
+  });
   for (const line of ['F אמצע הקשת BC', 'F אמצע הקשת BC במעגל P'])
     it(`«${line}» commits on circle P (F on P at seeds 0–3)`, async () => {
       expect((await play(ARC, line)).kind).toBe('commit');

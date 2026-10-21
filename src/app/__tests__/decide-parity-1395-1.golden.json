@@ -33,7 +33,7 @@
  "scenario:sector-DCE-angle-style-in-right-triangle": "62600b77fe8109e4",
  "scenario:quarter-circle-in-right-triangle-any-end-order": "801466c50bcbbdf8",
  "scenario:diameter-through-point-imperative": "6891d67fd8ea8838",
- "scenario:polygon-noun-binds-existing-quad": "621eadcf9a3a0108",
+ "scenario:polygon-noun-binds-existing-quad": "b820a3dc20849039",
  "scenario:point-on-the-definite-line": "7e344f1ee36f8626",
  "scenario:line-with-point-creates-the-line": "20e7ba21990c20db",
  "scenario:parallel-to-the-bases": "4b0c7321840c964e",

@@ -28,6 +28,7 @@
 import {
   buildParseCtx,
   classifyOutOfScope,
+  doubleCentreNaming,
   fractionTeachCandidate,
   impliedCircleBinding,
   impliedPointBinding,
@@ -81,6 +82,7 @@ import { tangentsExhaustedKey } from '@/i18n/humanizeError';
 import { honoursConstruct, roleReadings, thalesReadings } from './roleReadings';
 import { vertexPairVerdict } from './vertexPairCevian';
 import { solveBudget, work, withWorkBudget, withWorkEpoch } from '@/engine/solveBudget';
+import { drawnPointIds } from '@/engine/inkCrossings';
 
 /**
  * #1584 ([ADR-583](../../docs/06-decisions.md#adr-583)) — a ROLE RE-READING is a re-attempt of a line that
@@ -105,6 +107,24 @@ export interface DecideState {
   readonly facts: readonly Fact[];
   readonly seed: number;
   readonly view: DecideView;
+  /**
+   * #2362 ([ADR-748](../../docs/06-decisions.md#adr-748), operator ruling 2026-10-20 Q2): «הציגו מרכזי מעגלים» was ON when
+   * the line was typed. A display preference (ADR-059), read HERE and never at replay: a minted centre letter the
+   * student could see is adopted as theirs, one they could not steps aside — and the answer is written into the line's
+   * facts. Absent = off, the product default (headless callers).
+   */
+  readonly centresShown?: boolean;
+}
+
+/**
+ * #2362 (ADR-748): the point letters drawn WITH THEIR LABEL on this view — the scene's own visibility rule
+ * (`drawnPointIds`, shared since #228): a centre shows when centres are shown or something is drawn from it. An
+ * `@`-id (an unnamed circle's token, an anonymous construction point) is never a letter the student read.
+ */
+export function lettersOnScreen(view: DecideView, centresShown: boolean | undefined): Set<string> {
+  const out = new Set<string>();
+  for (const id of drawnPointIds(view.construction, view.positions, { showCenters: !!centresShown })) if (!id.startsWith('@')) out.add(id);
+  return out;
 }
 
 /** A note for the input line: an i18n key + params, or a raw engine error the display layer humanizes. */
@@ -127,8 +147,9 @@ export type DecideLog = Readonly<Record<string, unknown>>;
 /** An auto-bind the parse loop made (#186 circle / #539 point / #1673 step-aside). #1697 (ADR-588): the caller commits it
  *  as a `name-by-use` fact in the line's own group (`nameByUseCommands`) — never as a store rename no line owns. */
 export interface DecideBind {
-  /** `step-aside` (#1673, ADR-565): a hidden circle token re-lettered out of the student's way — still unnamed */
-  readonly op: 'name-centre' | 'rename' | 'merge' | 'step-aside';
+  /** `step-aside` (#1673, ADR-565): a hidden circle token re-lettered out of the student's way — still unnamed.
+   *  `adopt` (#2362, ADR-748): a minted circumcircle letter the student could SEE when typing — theirs from now on */
+  readonly op: 'name-centre' | 'rename' | 'merge' | 'step-aside' | 'adopt';
   readonly from: Id;
   readonly to: Id;
 }
@@ -195,13 +216,35 @@ export interface DecideHooks {
   prefold?(trial: Fact[], seed: number): Promise<void>;
 }
 
+/**
+ * #2398 ([ADR-747](../../docs/06-decisions.md#adr-747)) — the circle letters the student can see as NAMES: a circle whose
+ * centre is named (or adopted), or whose minted letter is on screen (#2362's provenance, ADR-748). A hidden token or a
+ * minted letter the student never saw is not one (ADR-565, ruling 2026-10-20).
+ */
+function answerableCircleLetters(view: DecideView, centresShown: boolean | undefined): Set<string> {
+  const ctx = buildParseCtx(view.construction, view.positions);
+  const autos = new Set((ctx.autoCenters ?? []).map((c) => c.toUpperCase()));
+  const onScreen = lettersOnScreen(view, centresShown);
+  return new Set((ctx.circles ?? []).map((c) => c.toUpperCase()).filter((c) => !c.startsWith('~') && (!autos.has(c) || onScreen.has(c))));
+}
+
 /** The instant half: store operations and the pre-parse FORMAT guards. `null` = go on and parse. */
-export function decidePreParse(utterance: string, view: DecideView): Verdict2D | null {
+export function decidePreParse(utterance: string, view: DecideView, centresShown?: boolean): Verdict2D | null {
   // A swap ("swap C and D" / "החלף בין C ל-D") EXCHANGES two existing labels — a store
   // operation, handled before the parser (and before rename, whose taken-target guard would
   // otherwise reject it). Lets the student flip which end of a chord is C vs D (ADR-122).
   const swp = parseSwap(utterance);
   if (swp) return { kind: 'store-op', op: 'swap', from: swp.a, to: swp.b };
+  // #2398 (ADR-747, the #1153 / #1164 rulings): a sentence giving a circle's centre a SECOND letter («מרכז המעגל O הוא K»,
+  // «K מרכז המעגל O», «מעגל O שמרכזו K») is refused before any naming runs — it names the holder when circle O is one the
+  // student can see, and says no such circle is drawn otherwise. The figure is untouched (no store op, no step-aside).
+  const dc = doubleCentreNaming(utterance, answerableCircleLetters(view, centresShown));
+  if (dc?.kind === 'holder') {
+    return { kind: 'refuse', category: 'clarify', preParse: true, binds: [], logs: [{ source: 'name-center', result: `centre-already-named:${dc.holder}>${dc.to}` }], note: { key: 'input.centreAlreadyNamed', params: { holder: dc.holder, to: dc.to } } };
+  }
+  if (dc) {
+    return { kind: 'refuse', category: 'clarify', preParse: true, binds: [], logs: [{ source: 'name-center', result: `unknown-circle:${dc.center}` }], note: { key: 'errors.unknownCircle', params: { center: dc.center } } };
+  }
   // NAME an auto-assigned circle centre ("מרכז המעגל הוא P" / "the centre of the circle is P") — the
   // student drew an unnamed circle (hidden auto-centre) and now names it. A store-level RENAME of the
   // hidden centre + a reveal, NOT a second circle (issue #112). Before the parser (whose `circle` rule
@@ -307,11 +350,14 @@ export async function decideFromParse(
   // #1673 / #1688 (ADR-565, operator ruling 2026-10-02): a letter the student types is THEIRS. An unnamed circle's
   // hidden token that happens to be that letter is re-lettered first (still hidden), so «BO = 5» draws a free O,
   // «מעגל O» declares a new circle O, and nothing the student never saw answers to their letter.
-  const aside = stepAsideFacts(facts, typedLabels(utterance));
-  if (aside.moves.length) {
+  // #2362 (ADR-748, ruling 2026-10-20): the minted letter of a circle drawn through drawn points takes part too — stepping
+  // aside when the student could not see it, ADOPTED (theirs from now on) when it was on screen as they typed.
+  const aside = stepAsideFacts(facts, typedLabels(utterance), lettersOnScreen(state.view, state.centresShown));
+  if (aside.moves.length || aside.adopted.length) {
     facts = aside.facts;
     for (const m of aside.moves) binds.push({ op: 'step-aside', from: m.from, to: m.to });
-    logs.push({ source: 'step-aside', moves: aside.moves, intermediate: true });
+    for (const a of aside.adopted) binds.push({ op: 'adopt', from: a, to: a });
+    logs.push({ source: 'step-aside', moves: aside.moves, ...(aside.adopted.length ? { adopted: aside.adopted } : {}), intermediate: true });
     const d0 = replay(facts, seed);
     viewNow = () => ({ construction: d0.construction, positions: d0.positions });
     pctx = buildParseCtx(d0.construction, d0.positions);
@@ -1066,7 +1112,7 @@ export async function decideFromParse(
   if (!opts.teaching) {
     const cand = fractionTeachCandidate(utterance, pctx);
     if (cand) {
-      const proof = await decideFromParse({ facts, seed, view: viewNow() }, cand.line, locale, hooks, { teaching: true });
+      const proof = await decideFromParse({ facts, seed, view: viewNow(), centresShown: state.centresShown }, cand.line, locale, hooks, { teaching: true });
       if (proof.kind === 'commit' && !proof.deferred) {
         return {
           kind: 'refuse', category: 'guided', preParse: false, binds,
@@ -1143,5 +1189,5 @@ export async function decideDeterministic2D(
   locale: 'he' | 'en',
   hooks: DecideHooks = {},
 ): Promise<Verdict2D> {
-  return decidePreParse(utterance, state.view) ?? decideFromParse(state, utterance, locale, hooks);
+  return decidePreParse(utterance, state.view, state.centresShown) ?? decideFromParse(state, utterance, locale, hooks);
 }

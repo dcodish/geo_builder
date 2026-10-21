@@ -609,6 +609,31 @@ compared, ADR-567, #1709; an equality of two lengths — a `ratio` with k = 1 an
 circle), exposed through `ctx.freePoints` to `parseNameCenter`, the `nameCenter` rule and `impliedCircleBinding`; a
 radius sentence whose centre end is such a letter emits the implied circle (`radiusNamesCentre`).
 
+**A circle drawn through drawn points carries its centre's provenance** ([ADR-748](06-decisions.md#adr-748), #2362 / #2369).
+A `circumcircle` keeps its real centre letter (`O`), so the hidden-token form does not cover it. Every parser emitter
+sets `autoCenter`: `true` when it minted the letter, `false` when the student typed it; the engine reads it
+(`autoCenter: cmd.autoCenter !== false`), so a named centre is drawn (FR-RN-8). A fact saved without the field is
+migrated at load (`figureFile.ts` `withCentreProvenance`: the letter is the student's when their own sentence typed it).
+`mintedCentreLetters` (`replay/naming.ts`) is the one list the naming core asks: the hidden tokens plus the minted
+circumcircle letters not promoted, not adopted and typed in no line; `isCircleCreation` is the one creation predicate.
+**Visibility is read at the seam, never at replay.** `DecideState.centresShown` (filled from the store's `showCenters`
+by `SubmitDeps.centresShown`; `EditDeps.centresShown` for the ✎ seam, read at edit time) and `lettersOnScreen` — the
+scene's own `drawnPointIds` rule — decide each typed minted letter: one the student could not see steps aside
+(`renameInCommand` across the commands; the utterances never hold it), one on screen is **adopted**: a
+`name-by-use {op: 'adopt'}` row in the line's group sets `autoCenter: false`. Both rows carry the `@ctr-` form (a
+token and a real letter never share a circle id) and apply only while the letter is still minted, so undo, mute, edit
+and save carry the decision with the line. The binding (`bindingFor`) intersects the unnamed circles the sentence's
+subjects ride; an empty intersection over a non-empty union asks. `arcMidpoint` emits the by-member candidate for a
+fresh circle letter beside an arc whose ends ride an unnamed circle.
+
+**A centre given a second letter is refused at the door** ([ADR-747](06-decisions.md#adr-747), #2398). `circleWithOtherCentre`
+(`parse.ts`, beside `circleCenter`) is the one two-slot reader of «מרכז המעגל O הוא K» and its spellings (the whole
+sentence is the pattern; non-null only for two different letters). `decidePreParse` calls `doubleCentreNaming` before
+every naming and before the step-aside, with the circle letters the student can see as names — a non-auto centre, or a
+minted one `lettersOnScreen` shows (`centresShown` reaches `decidePreParse` too): the holder is named
+(`input.centreAlreadyNamed`), any other letter is `errors.unknownCircle`. The `circle` rule bows out on the same reader,
+so no re-parse (the AI lane, ✎, the load refresh) builds `circle O` from it. The scenario mirror calls `decidePreParse`.
+
 **A rule's own circle for a fresh letter is a naming candidate** (ADR-599, #1694): when the sentence names a point
 riding an unnamed circle (`namesUnnamedCircleMember`), the circle a rule introduces carries `implied: 'by-member'`
 beside `withImplicitCircles`' `implied: true` — `resolveOrIntroduceCircle`'s named branch and `circleOnDiameter`,

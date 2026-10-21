@@ -109,6 +109,7 @@
     "ambiguousDefiniteShape": "\"{{sentence}}\" — the figure has several {{plural}} ({{shapes}}), so it isn't clear which one you mean. Name it, e.g. \"{{example}}\".",
     "ambiguousConstruct": "There is more than one \"{{noun}}\" here ({{options}}), and the givens do not choose between them — you do. Say which, e.g. \"{{first}}\".",
     "unknownCircle": "There is no circle named {{center}}. More than one unnamed circle is drawn — name one first, e.g.: the centre of the right circle is {{center}}.",
+    "centreAlreadyNamed": "The circle's centre is already named {{holder}}. To change the name, type \"rename {{holder}} to {{to}}\".",
     "partial": "Couldn't draw this part",
     "labelsDropped": "I only partly understood — I couldn't place {{labels}}. Rephrase the step (e.g. split it in two).",
     "labelsInvented": "I wasn't sure which point you meant — building this needs a name for {{labels}}. Give it a name of your own (e.g. “the intersection point is M”) and try again.",
