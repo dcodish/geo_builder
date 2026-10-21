@@ -1,0 +1,135 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-21T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "4GP4eaUMCxW4N9Jm4Bfvo",
+      "utterance": "משולש ABC",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "gH7HYWDK-mdbieE2vSka4",
+      "utterance": "מעגל O משיק ל-AB ו-AC",
+      "group": "GZrkG2hZWFf4WP8Mmm4Hx",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true,
+        "ifAbsent": true,
+        "implied": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "pqr1q-x3oKpa00qE_QKSD",
+      "utterance": "מעגל O משיק ל-AB ו-AC",
+      "group": "GZrkG2hZWFf4WP8Mmm4Hx",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "jAikJZ831GjWbecga3jiK",
+      "utterance": "מעגל O משיק ל-AB ו-AC",
+      "group": "GZrkG2hZWFf4WP8Mmm4Hx",
+      "cmd": {
+        "type": "foot",
+        "id": "@tang-O-A-B",
+        "from": "O",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "tPf5_JE-fHgBwYaljzpFK",
+      "utterance": "מעגל O משיק ל-AB ו-AC",
+      "group": "GZrkG2hZWFf4WP8Mmm4Hx",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "@tang-O-A-B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "Up9llPB9t_ZbYKkKDb8XR",
+      "utterance": "מעגל O משיק ל-AB ו-AC",
+      "group": "GZrkG2hZWFf4WP8Mmm4Hx",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "A",
+          "@tang-O-A-B",
+          "B"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "wVLRCmShkjROco-Nj06Mk",
+      "utterance": "מעגל O משיק ל-AB ו-AC",
+      "group": "GZrkG2hZWFf4WP8Mmm4Hx",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "jL7Y7b2jG9uWyqvS7FmOq",
+      "utterance": "מעגל O משיק ל-AB ו-AC",
+      "group": "GZrkG2hZWFf4WP8Mmm4Hx",
+      "cmd": {
+        "type": "foot",
+        "id": "@tang-O-A-C",
+        "from": "O",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "GQ3SPgMktyc5Eie-6SnxY",
+      "utterance": "מעגל O משיק ל-AB ו-AC",
+      "group": "GZrkG2hZWFf4WP8Mmm4Hx",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "@tang-O-A-C",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "3MXYC0oRVo-tRocaTOVCn",
+      "utterance": "מעגל O משיק ל-AB ו-AC",
+      "group": "GZrkG2hZWFf4WP8Mmm4Hx",
+      "cmd": {
+        "type": "set-line",
+        "points": [
+          "A",
+          "@tang-O-A-C",
+          "C"
+        ]
+      },
+      "enabled": true
+    }
+  ]
+}

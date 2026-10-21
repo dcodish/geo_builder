@@ -766,6 +766,21 @@ the whole-line rules and all or nothing (a clause that does not read gives `not-
 so the coverage gate sees each incidence. `withOnCircleMembership` binds each «X על [ה]מעגל K» to its own named
 circle K («A על מעגל O ו-B על מעגל P» puts B on P), and an unnamed «X על המעגל» to the resolved definite circle.
 
+**A relation stated to a list of objects holds for each** ([ADR-744](06-decisions.md#adr-744), #2211, #2219). The same module's
+second shape, `objectListShape`: one subject at the sentence opening (a circle «(ה)מעגל X» / "(the) circle X", a label
+pair with an optional segment noun, or one label), a predicate that names no label, and an object list of two or more
+objects of ONE kind to the end of the line — circle names (only after a circle subject: a circle list after a segment or
+point subject is another sentence, «AB משיק משותף למעגלים O ו-P», «A נמצאת על המעגלים O ו-P») or two-letter segment
+names — as a plural head («למעגלים O ו-P», «לקטעים BC ו-AB», "circles O and P", "to both BC and AB") or one object per
+item («ל-BC ו-AB», «ול-», «וגם ל-», «,», "and (to/segment)"). The list head's preposition rides every clause and a plural
+head becomes its singular. `distributedClauses(s, ctx)` (parse.ts) is the one entry both readers call: the incidence
+list first, then the object list, which is kept only when its first two clauses each read ALONE through `parseClause`
+(every net) and their lowering names the subject and that clause's object — so a collective predicate whose head says
+nothing alone («O חיתוך של AC ו-BD») keeps its own reader. A recognised list is final: its clauses go through the clause
+path all or nothing, and no `splitStatements` fallback turns its objects into draws. No tail is read after the list (a
+tail means the line is not this shape). `namedCircleRefs` returns the UNION of the per-circle and plural-list names in
+order of appearance, and `resolveCirclePair` resolves exactly two names (more than two → no pair).
+
 **An arc named on a circle lives on that circle.** `arcMidpoint` (both the fixed midpoint and the free point on the
 arc): when the sentence names a circle, that circle is the arc's; if an end is a member of another circle and not of
 the named one, the rule returns null (the line is `not-handled` and goes to the model). With no circle named, the

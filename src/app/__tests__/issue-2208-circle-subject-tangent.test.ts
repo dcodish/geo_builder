@@ -199,9 +199,13 @@ describe('#2208 — controls (unchanged at ef78f15c)', () => {
   // #2211: a circle subject OUTSIDE the named pair is not this mechanism. Re-based knowingly by #2185 (ADR-735): the
   // label accountant no longer excuses the named circle Q because O and P were touched, so the line that drew a common
   // tangent of O and P with Q dropped, green, now escalates whole — never drawn with Q missing. #2211 builds it.
-  it('K4 (#2211): «מעגל Q משיק מבחוץ למעגלים O ו-P» is never committed with Q dropped', async () => {
+  // #2211 (ADR-744) re-bases K4 knowingly: the line is read as its distribution, Q externally tangent to O and to P.
+  it('K4 (#2211): «מעגל Q משיק מבחוץ למעגלים O ו-P» makes Q externally tangent to both — never Q dropped, no tangent line', async () => {
     const r = await play([...PAIR, 'מעגל Q'], 'מעגל Q משיק מבחוץ למעגלים O ו-P');
-    expect(r.kind).toBe('escalate');
-    expect(r.added).toEqual([]);
+    expect(r.kind).toBe('commit');
+    const tang = r.added.filter((c): c is Extract<AnyCommand, { type: 'circles-tangent' }> => c.type === 'circles-tangent');
+    expect(tang.map((c) => [c.circle1, c.circle2].sort().join('|')).sort()).toEqual(['circle-O|circle-Q', 'circle-P|circle-Q']);
+    expect(tang.every((c) => c.external)).toBe(true);
+    expect(r.added.some((c) => c.type === 'common-tangent' || c.type === 'segment')).toBe(false);
   });
 });

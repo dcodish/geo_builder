@@ -4,7 +4,8 @@
  * clause-coverage trace (2) (the same id is a trace only when its definition names the clause's carrier too).
  */
 import { describe, expect, it } from 'vitest';
-import { incidenceList, buildParseCtx } from '@/parser';
+import { incidenceList, buildParseCtx, distributedClauses } from '@/parser';
+import { objectListShape } from '@/parser/incidenceList';
 import { unaccountedLabels } from '@/parser/labelAccounting';
 import { droppedClause } from '@/app/clauseCoverage';
 import { clausesOf } from '@/app/independence';
@@ -62,6 +63,57 @@ describe('incidenceList — a subject run on two or more carriers', () => {
     // the operand-pair rows keep their reading
     expect(clausesOf('O - חיתוך של AC ו-BD')).toEqual(['O - חיתוך של AC ו-BD']);
     expect(clausesOf('D ו-E על BC')).toEqual(['D ו-E על BC']);
+  });
+});
+
+describe('#2211 / #2219 (ADR-744) — objectListShape: one subject, a predicate, an object list of one kind', () => {
+  const texts = (s: string) => objectListShape(s)?.clauses.map((c) => c.text) ?? null;
+  const POSITIVE: [string, string[]][] = [
+    ['DE מקביל ל-BC ו-AB', ['DE מקביל ל-BC', 'DE מקביל ל-AB']],
+    ['DE מקביל ל-BC ול-AB', ['DE מקביל ל-BC', 'DE מקביל ל-AB']],
+    ['DE מקביל ל-BC וגם ל-AB', ['DE מקביל ל-BC', 'DE מקביל ל-AB']],
+    ['DE מקביל לקטע BC ולקטע AB', ['DE מקביל לקטע BC', 'DE מקביל לקטע AB']],
+    ['DE מקביל לקטעים BC ו-AB', ['DE מקביל לקטע BC', 'DE מקביל לקטע AB']],
+    ['DE מקביל ל-BC, AB', ['DE מקביל ל-BC', 'DE מקביל ל-AB']],
+    ['DE ∥ BC ו-AB', ['DE ∥ BC', 'DE ∥ AB']],
+    ['DE is parallel to BC and segment AB', ['DE is parallel to BC', 'DE is parallel to segment AB']],
+    ['AF is perpendicular to BC and DE', ['AF is perpendicular to BC', 'AF is perpendicular to DE']],
+    ['DE is parallel to both BC and AB', ['DE is parallel to BC', 'DE is parallel to AB']],
+    ['DE is parallel to segments BC and AB', ['DE is parallel to segment BC', 'DE is parallel to segment AB']],
+    ['מעגל O משיק ל-AB, BC ו-AC', ['מעגל O משיק ל-AB', 'מעגל O משיק ל-BC', 'מעגל O משיק ל-AC']],
+    ['מעגל O משיק לצלעות AB ו-AC', ['מעגל O משיק לצלע AB', 'מעגל O משיק לצלע AC']],
+    ['M אמצע AC ו-BD', ['M אמצע AC', 'M אמצע BD']],
+    ['EF = AD ו-AE', ['EF = AD', 'EF = AE']],
+    ['מעגל Q משיק למעגלים O ו-P', ['מעגל Q משיק למעגל O', 'מעגל Q משיק למעגל P']],
+    ['מעגל Q משיק לשני המעגלים O ו-P', ['מעגל Q משיק למעגל O', 'מעגל Q משיק למעגל P']],
+    ['מעגל Q משיק מבחוץ למעגל O ולמעגל P', ['מעגל Q משיק מבחוץ למעגל O', 'מעגל Q משיק מבחוץ למעגל P']],
+    ['מעגל Q מוכל במעגל O ובמעגל P', ['מעגל Q מוכל במעגל O', 'מעגל Q מוכל במעגל P']],
+    ['circle Q is tangent to circles O and P', ['circle Q is tangent to circle O', 'circle Q is tangent to circle P']],
+    ['circle Q is tangent to circle O and to circle P', ['circle Q is tangent to circle O', 'circle Q is tangent to circle P']],
+  ];
+  for (const [s, want] of POSITIVE) it(`«${s}»`, () => expect(texts(s)).toEqual(want));
+  it('not a list: mixed kinds, a draw list, a subject list, a second clause, a tail, a circle list after a segment or point', () => {
+    for (const s of [
+      'AB קוטר במעגל O ו-CD', // a circle and a segment
+      'ריבוע ABCD ו-AC',
+      'מעגל O ומעגל P', // no predicate
+      'circle O and circle P',
+      'AB ו-AC משיקים למעגל O',
+      'DE ו-AF מקבילים ל-BC',
+      'DE מקביל ל-BC ו-AF מאונך ל-BC',
+      'מעגל Q משיק למעגלים O ו-P בנקודות A ו-B', // a tail: not this shape
+      'מעגל Q משיק למעגלים O ו-P מבחוץ',
+      'AB משיק משותף למעגלים O ו-P', // a common tangent of the pair
+      'A נמצאת על המעגלים O ו-P',
+      'A ו-B על AB ו-AC',
+    ])
+      expect(texts(s), s).toBeNull();
+  });
+  it('a recognised shape is kept only when its head clauses read alone (the grammar decides)', () => {
+    expect(objectListShape('O חיתוך של AC ו-BD')).not.toBeNull();
+    expect(distributedClauses('O חיתוך של AC ו-BD')).toBeNull(); // «O חיתוך של AC» says nothing alone: a collective predicate
+    expect(distributedClauses('DE מקביל ל-BC ו-AB')).toEqual(['DE מקביל ל-BC', 'DE מקביל ל-AB']);
+    expect(distributedClauses('A על מעגל O ועל מעגל P')).toEqual(['A על מעגל O', 'A על מעגל P']); // the incidence list, first
   });
 });
 
