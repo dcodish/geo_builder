@@ -21,7 +21,9 @@ vi.mock('@/engine/metricFeasibility', async (importOriginal) => {
     angleSumImpossibility: (...a: Parameters<typeof real.angleSumImpossibility>) => {
       calls++;
       const m = real.angleSumImpossibility(...a);
-      if (m?.kind === 'no-room') noRoom.push({ at: current, polygon: m.polygon.join(''), angles: m.angles.map((x) => `${x.ray1}${x.vertex}${x.ray2}=${x.value}`).join(',') });
+      // #2344 (ADR-746): the limit-collapse verdict (a base angle an equal pair forces) is the same refusal, so it is netted too
+      if (m?.kind === 'no-room' || m?.kind === 'limit-collapse')
+        noRoom.push({ at: current, polygon: m.polygon.join(''), angles: [...m.angles, ...(m.inferred ?? [])].map((x) => `${x.ray1}${x.vertex}${x.ray2}=${x.value}`).join(',') });
       return m;
     },
   };
@@ -35,9 +37,11 @@ import { replay } from '@/replay/core';
 
 const fixtures = import.meta.glob('../../__tests__/fixtures/*.geo.json', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>;
 
-/** Rows whose FOLDED facts may meet the verdict. Empty: the class's own scenario drives its refused line through
- *  the gate in `check` (a refused line never becomes a fact), so no committed step of the corpus is a member. */
-const CLASS_ROWS = new Set<string>();
+/** Rows whose FOLDED facts may meet the verdict. The #1936 and #2344 scenarios drive their refused line through the
+ *  gate in `check` (a refused line never becomes a fact), so they are no members. ADR-537's own figure is
+ *  («AB = AC» · «∠ABC = ∠ACB» · «∠ABC = 90», its last line a fact by construction): an isosceles pair with a base
+ *  right angle, refused by the prover's limit-collapse reading since #2344 (ADR-746). */
+const CLASS_ROWS = new Set<string>(['contradictory-right-angles-refused-not-drawn-1328']);
 
 describe('#1936 — the no-room verdict fires only on the class, across the whole corpus and every fixture', () => {
   it('every scenario and fixture folds; the prover is exercised > 1000 times; no-room fires only on class rows', () => {

@@ -456,35 +456,65 @@ export function constraintScale(con: Constraint, get: (id: Id) => Vec): number {
  * own accept refuses it. Set only through {@link withToleranceFactor}, which always restores it (the
  * `withSolveBudget` shape); nothing else may write it.
  */
-export const toleranceScale = { factor: 1 };
+export const toleranceScale = { factor: 1, length: 1 };
 
-/** Run `fn` with every residual tolerance multiplied by `factor` (nested calls keep the tighter one). */
-export function withToleranceFactor<T>(factor: number, fn: () => T): T {
-  const prev = toleranceScale.factor;
-  toleranceScale.factor = Math.min(prev, factor);
+/**
+ * Run `fn` with the residual tolerances tightened PER FAMILY (nested calls keep the tighter one): the degree
+ * family multiplied by `factor`, the length family by `lengthFactor` (#2344, ADR-746; 1 leaves it untouched).
+ */
+export function withToleranceFactor<T>(factor: number, fn: () => T, lengthFactor = 1): T {
+  const prev = { ...toleranceScale };
+  toleranceScale.factor = Math.min(prev.factor, factor);
+  toleranceScale.length = Math.min(prev.length, lengthFactor);
   try {
     return fn();
   } finally {
-    toleranceScale.factor = prev;
+    toleranceScale.factor = prev.factor;
+    toleranceScale.length = prev.length;
   }
 }
 
 export function residualTolerance(con: Constraint, scale = 1): number {
   const base = baseResidualTolerance(con, scale);
-  return toleranceScale.factor < 1 && isDegreeTolerance(con) ? base * toleranceScale.factor : base;
+  const family = toleranceFamily(con);
+  if (family === 'degree' && toleranceScale.factor < 1) return base * toleranceScale.factor;
+  if (family === 'length' && toleranceScale.length < 1) return base * toleranceScale.length;
+  return base;
 }
 
 /**
- * The tolerances the tightening reaches: the ones stated in DEGREES. A tolerance can buy a degenerate
- * figure only when its slack exceeds the solvers' coincidence floor (1e-3 of the figure's extent, the
- * `solutionAccepted` bar): `ANGLE_EPS` = 0.5° is 8.7e-3 in radians and does; the length family's
- * 2e-4·scale and the ∥/⟂/collinear family's 1e-6 sit below it and cannot. Tightening those would only
- * put the re-solve on a bar the derivative-free solves were never asked to reach (measured on the #830
- * crossing figure, whose chord∩circle construction fails under a uniformly tightened length tolerance
- * while its triangle is perfectly honest). A region/bound is never tightened: it holds or it does not.
+ * The tolerance FAMILY the tightened re-solve scales (#1328 ADR-537, amended by #2344
+ * [ADR-746](../../docs/06-decisions.md#adr-746)). A tolerance buys a degenerate figure when the slack it admits
+ * reaches the solvers' coincidence floor (1e-3 of the figure's extent, the `solutionAccepted` bar):
+ *  - `degree`: `ANGLE_EPS` = 0.5° is 8.7e-3 in radians — a needle's apex buys it at FIRST order;
+ *  - `length`: 2e-4·scale was once taken to sit below the floor and to be unable to buy one. That holds only at
+ *    a TRANSVERSAL root. At a TANGENT root — «AB = BC» · «AC ⊥ BC»: the circle about B through A and the Thales
+ *    circle on AB touch at A — the length residual vanishes to SECOND order (|AB| − |BC| ≈ |AC|²/2|BC|), so a
+ *    relative tolerance τ admits a sliver of √(2τ) ≈ 2e-2 of the extent. It is tightened by its own factor
+ *    (`LENGTH_TIGHT_FACTOR`, sized for the quadratic contact in `degeneracy.ts`);
+ *  - `other`: the ∥/⟂/collinear family's 1e-6 and every region/bound (it holds or it does not) are never
+ *    tightened. `length-product` (a log residual) stays outside the length family.
  */
-function isDegreeTolerance(con: Constraint): boolean {
-  return con.type === 'angle' || con.type === 'angle-ratio' || (con.type === 'measure-sum' && con.unit === 'angle');
+function toleranceFamily(con: Constraint): 'degree' | 'length' | 'other' {
+  switch (con.type) {
+    case 'angle':
+    case 'angle-ratio':
+      return 'degree';
+    case 'measure-sum':
+      return con.unit === 'angle' ? 'degree' : 'length';
+    case 'distance':
+    case 'equal':
+    case 'ratio':
+    case 'length-radius':
+    case 'concyclic':
+    case 'area':
+    case 'area-ratio':
+    case 'perimeter':
+    case 'perimeter-ratio':
+      return 'length';
+    default:
+      return 'other';
+  }
 }
 
 function baseResidualTolerance(con: Constraint, scale = 1): number {

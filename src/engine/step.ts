@@ -36,7 +36,7 @@ import { sideImpossibility, sideImpossibilityError } from './sideFeasibility';
 import { collinearCircleError, collinearCircleImpossibility, notCyclicImpossibility, notCyclicImpossibilityError } from './cyclicFeasibility';
 import { recordRequirement, requirementsField } from './requirements';
 import { circlesTangentError, commonTangentCapacityError, equalNestedPair } from './radiusFeasibility';
-import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, polygonDefects, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, type PolygonDefect } from './degeneracy';
+import { DEGENERATE_EXTENT_RATIO, degeneratePolygons, polygonDefects, THIN_POLYGON_RATIO, TIGHT_TOLERANCE_FACTOR, LENGTH_TIGHT_FACTOR, type PolygonDefect } from './degeneracy';
 import { allConstraints, applySeed, freeDofs, movableIds } from './sample';
 import { impliedByFigure } from './dofRank';
 import { collapsibleTermPairs, constraintKey, constraintRefs, describeConstraint, isSatisfied, solvedOnSegmentCandidates } from './solve';
@@ -444,8 +444,24 @@ const COLLAPSED_POLYGON_RATIO = DEGENERATE_EXTENT_RATIO;
  * needle may be on an earlier given as easily as on this step's. See `toleranceArtefacts`.
  */
 function toleranceArtefactPolygon(c: Construction, positions: Map<Id, Vec>): boolean {
-  if (degeneratePolygons(c, positions, THIN_POLYGON_RATIO).length === 0) return false; // the trigger: an ordinary figure pays nothing
-  return !evaluateTightened(c, TIGHT_TOLERANCE_FACTOR).ok;
+  const known = artefactSeen.get(positions);
+  if (known && known.c === c) return known.defect !== null;
+  const thin = degeneratePolygons(c, positions, THIN_POLYGON_RATIO); // the trigger: an ordinary figure pays nothing
+  // #2344 (ADR-746): the re-solve tightens the length family too, at a factor sized for a tangent root's quadratic residual
+  const defect = thin.length && !evaluateTightened(c, TIGHT_TOLERANCE_FACTOR, LENGTH_TIGHT_FACTOR).ok ? { id: thin[0].id, vertices: [...thin[0].vertices], kind: 'flat' as const } : null;
+  artefactSeen.set(positions, { c, defect });
+  return defect !== null;
+}
+/**
+ * #2344 ([ADR-746](../../docs/06-decisions.md#adr-746)) — the polygon the tolerance-artefact gate refused, keyed by the
+ * solve it judged. A needle bought with slack is a COLLAPSE the givens force in the limit, so the ladder's refusal
+ * reports it as ADR-602's flat polygon (the 2-D twin of 3-D's and analytic's `polygon-collapsed`), not as an
+ * over-constraint. Read back, never recomputed: the re-solve runs once per judged solve.
+ */
+const artefactSeen = new WeakMap<Map<Id, Vec>, { c: Construction; defect: PolygonDefect | null }>();
+function toleranceArtefactDefect(c: Construction, positions: Map<Id, Vec>): PolygonDefect | undefined {
+  const known = artefactSeen.get(positions);
+  return known && known.c === c ? known.defect ?? undefined : undefined;
 }
 
 /**
@@ -733,7 +749,7 @@ function runFailureLadder(
     const ok = stepAccepted(c, pos, newCons);
     if (!ok) {
       refusedAsNotAFigure = true;
-      const d = gateDefects(c, pos)[0];
+      const d = gateDefects(c, pos)[0] ?? toleranceArtefactDefect(c, pos);
       if (!collapsedSeen || (collapsedSeen.kind === 'point' && d && d.kind !== 'point')) collapsedSeen = d ?? collapsedSeen;
     }
     return ok;
@@ -841,7 +857,7 @@ function runFailureLadder(
   // #2064 (ADR-643): a stage that found the polygon FLAT (not merely squashed to a point) shows the statement flattens the
   // declared shape, and ADR-602's refusal names it; the «כבר מוגדרת» wording is for a step whose degenerate solution is
   // only ever the one point («ריבוע ABCD» · «B אמצע CD»). «מלבן ABCD» · «B אמצע CD» keeps its flat refusal.
-  const primaryDefect = primary.ok ? gateDefects(next, primary.positions)[0] : undefined;
+  const primaryDefect = primary.ok ? gateDefects(next, primary.positions)[0] ?? toleranceArtefactDefect(next, primary.positions) : undefined;
   const flatPoly = [primaryDefect, collapsedSeen].find((d) => d && d.kind !== 'point') ?? primaryDefect ?? collapsedSeen;
   const flatErr = flatPoly ? polygonDefectError(flatPoly, blameCons) : null;
   // #1328 (ADR-537): when the PRIMARY solve succeeded and the step-accept gate refused it — a vacuous
@@ -1251,7 +1267,14 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
   // are as impossible as an excess. That verdict is the NEW statement's over-constraint, so the fold's drop-one
   // search names the statement it contradicts («לא ניתן: «AC ⊥ BC» סותר את «AB ⊥ BC»…»); an excess keeps the
   // curriculum sentence.
-  const angleErr = angleSumImpossibility(probed.objects, probed.constraints);
+  // #2344 (ADR-746): the equal pairs are read from every enforced length (a stated one may have become a drive), and a
+  // verdict that needed a base angle such a pair forces is the triangle's COLLAPSE — ADR-602's flat refusal.
+  const angleErr = angleSumImpossibility(probed.objects, probed.constraints, [...probed.constraints, ...drivenConstraintsOf(probed)]);
+  if (angleErr?.kind === 'limit-collapse') {
+    const added = addedConstraints(prev, probed);
+    const error = collapsedPolygonError(angleErr.polygon, added.length ? describeConstraint(describeNewStatement(added)) : null);
+    return { ok: false, error, construction: prev, positions: prevPositions, ladder: ['pre:impossible'], degenerate: true };
+  }
   if (angleErr) {
     // A line that adds no constraint of its own (the polygon declared over corners already stated) names the angles.
     const newCons = probed.constraints.slice(prev.constraints.length);

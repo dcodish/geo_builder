@@ -1388,14 +1388,14 @@ export function resolveDrivenMemo(c: Construction): Construction {
 }
 
 /**
- * #1328 (ADR-537): the figure re-solved under a TIGHTENED tolerance — every residual tolerance multiplied by
- * `factor` — with no memo on either side (the memos hold the ordinary-tolerance bake). The step-accept gate
- * asks this of a figure whose declared polygon came out thin: a real thin triangle re-solves to the same
+ * #1328 (ADR-537): the figure re-solved under a TIGHTENED tolerance — the degree family multiplied by `factor`, the
+ * length family by `lengthFactor` (#2344, ADR-746) — with no memo on either side (the memos hold the
+ * ordinary-tolerance bake). The step-accept gate asks this of a figure whose declared polygon came out thin: a real thin triangle re-solves to the same
  * shape; a needle the slack bought cannot satisfy the tighter bar without collapsing past the coincidence
  * floor, where `solutionAccepted` refuses it, so this comes back `ok: false`.
  */
-export function evaluateTightened(c: Construction, factor: number): EvalResult {
-  return withToleranceFactor(factor, () => evaluateUncached(c, resolveDriven));
+export function evaluateTightened(c: Construction, factor: number, lengthFactor = 1): EvalResult {
+  return withToleranceFactor(factor, () => evaluateUncached(c, resolveDriven), lengthFactor);
 }
 
 function evaluateUncached(c: Construction, resolve: (c: Construction) => Construction = resolveDrivenMemo): EvalResult {

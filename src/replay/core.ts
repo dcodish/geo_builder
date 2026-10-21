@@ -2129,8 +2129,20 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
         const prefix = facts.slice(0, Math.max(gEnd, end) + 1);
         const trial = prefix.filter((x) => groupKey(x) !== gk);
         const at = (i: number) => i - prefix.slice(0, i).filter((x) => groupKey(x) === gk).length;
+        const holds = (node: ReturnType<typeof foldForSearch>): boolean => members.every((i) => node.statusByIndex[at(i)] === 'ok');
         const node = foldForSearch(trial);
-        if (!members.every((i) => node.statusByIndex[at(i)] === 'ok')) continue;
+        // #2344 (ADR-746): a trial the DEFAULT right-angle seat collapses is judged with that unstated seat yielding, as
+        // the submit gate's dry run judges a line (`seatRotations`, ADR-551 Am. 1): «had this never been said» asks
+        // about the givens, never about the tool's default seat. «ABC משולש ישר זוית · AC=15 · BC=10 · גזרה ABC»
+        // without «BC=10» is a right isosceles only at seat B; at the default seat C it is #2344's collapse — accepted
+        // as a green sliver before ADR-746, refused since. Only a COLLAPSE reopens the seat: those are exactly the
+        // trials ADR-746 turned from holding to failing, so every other blame is judged as before and the search's
+        // cost (folded inside the gate's work-capped seat sweep) does not grow. Indices are unchanged by a rotation
+        // (it rewrites one fact's command in place).
+        if (!holds(node)) {
+          const collapsed = members.some((i) => COLLAPSED_VS.test(String(node.statusByIndex[at(i)])));
+          if (!collapsed || !seatRotations(trial).some((t) => holds(foldForSearch(t)))) continue;
+        }
         const otherIdx = facts.findIndex((x) => groupKey(x) === gk);
         const tagged = `${st} [vs #${otherIdx}]`;
         // every row that carries this very string (the group's siblings share it) gets the tail, so the
@@ -2517,7 +2529,8 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   // #1329 (ADR-538): the angle twin — «∠ABC = 100» · «∠ACB = 100» on a triangle. The residual moves
   // across seeds (the free apex changes both angles), which is not whether it can reach zero; the
   // polygon's own angle sum proves it cannot.
-  if (angleSumImpossibility(probe.objects, probe.constraints)) return false;
+  // #2344 (ADR-746): and the base angles a stated equal pair forces, read from every enforced length (the gate's reading)
+  if (angleSumImpossibility(probe.objects, probe.constraints, [...probe.constraints, ...drivenConstraintsOf(probe)])) return false;
   // #1849 (ADR-602): a declared polygon the length givens PROVE flat — no later given can unflatten it.
   if (forcedFlatPolygon(probe.objects, [...probe.constraints, ...drivenConstraintsOf(probe)])) return false;
   // #1335 (ADR-540): the bound twin — «BC > 10» · «BC = 4». The residual moves (the triangle is

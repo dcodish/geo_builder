@@ -2181,7 +2181,9 @@ export const SCENARIOS_4: Scenario[] = [
       // without the view search. What this lock still holds is #546's own claim: the anonymous references
       // BIND the circumcircle rather than minting a third circle — the four binding rows are green and the
       // arc row is refused ON the circumcircle's arcs (∠AOB = ∠BOC), never handed to the LLM.
-      expect(fig.lastError, 'the default seat admits only the needle — refused, not drawn').toMatch(/^over-constrained: ∠AOB = 1·∠BOC cannot hold/);
+      // #2344 (ADR-746): the needle the tolerance-artefact gate refuses is reported as the triangle's collapse (ADR-602's
+      // flat refusal), naming the same statement — it was `over-constrained` while the gate kept no record of the polygon
+      expect(fig.lastError, 'the default seat admits only the needle — refused, not drawn').toMatch(/^collapsed: polygon A, B, C would be flat — ∠AOB = 1·∠BOC cannot hold/);
       expect(fig.pending, 'a contradiction at this seat, not an incomplete figure').toBe(false);
       for (const [id, s] of Object.entries(fig.status)) {
         if (id.startsWith('g4')) expect(s, id).not.toBe('ok');
@@ -2667,7 +2669,9 @@ export const SCENARIOS_4: Scenario[] = [
       "The operator's exact sequence (2026-09-21, playing T4 of the #1264 sheet on T3's figure). Both base angles right and a 0° apex: the givens hold only in the limit B = C, and the solver satisfied them WITHIN ANGLE_EPS (0.5°) with a 0.35° apex — a needle at flatness 6e-3, above both the ADR-413 collapse floor (1e-4) and the ADR-513 notice band (5e-4) — drawn with every row green and «נקבע במלואו». ADR-537: the accept gate re-solves a figure whose declared polygon came out thin under a tightened degree tolerance; a needle cannot survive it, so the step is refused as over-constrained naming the statement, and — because a solution EXISTED and was not a figure — the refusal is a hard error, never a pending 'add the remaining givens'. The T3 prefix stays exactly as it was. The direct control «∠ABC = 90» · «∠ACB = 90», the legitimate thin triangles (89° + 90°, a stated 1°) and the ADR-513 notice figures are locked in src/engine/__tests__/issue-1328-tolerance-artefact.test.ts.",
     steps: ['משולש ABC', 'AB = AC', '∠ABC = ∠ACB', '∠ABC = 90'],
     check(fig) {
-      expect(fig.lastError, 'refused, naming the statement').toMatch(/^over-constrained: ∠ABC = 90° cannot hold/);
+      // #2344 (ADR-746): refused as the triangle's COLLAPSE (ADR-602's flat refusal) — an isosceles pair with a base right
+      // angle is the limit class, proven before the ladder; the refusal still names the statement
+      expect(fig.lastError, 'refused, naming the statement').toMatch(/^collapsed: polygon A, B, C would be flat — ∠ABC = 90° cannot hold/);
       expect(fig.pending, 'a contradiction, not an incomplete figure').toBe(false);
       for (const [id, s] of Object.entries(fig.status)) {
         if (id.startsWith('g3')) expect(s, id).not.toBe('ok');
@@ -5476,6 +5480,60 @@ export const SCENARIOS_4: Scenario[] = [
       expect(v.kind === 'refused' && v.reason, 'refused by the engine, before commit').toBe('error');
       expect(v.kind === 'refused' && v.detail, 'names the collinearity the external tangent cannot keep').toContain('T, A, B collinear cannot hold');
       expect(gateVerdict(facts, 'AB משיק משותף פנימי למעגלים M ו-N').kind, 'the touch tangent\'s own kind builds').toBe('commit');
+    },
+  },
+  {
+    id: 'impossible-right-isosceles-refused-2344',
+    title: '#2344 P1: «AB = BC» · «AC ⊥ BC» is refused as a collapsed triangle, never drawn as a green sliver (ADR-746)',
+    guards:
+      "#2344 (P1), the operator's exact lines («משולש ABC» · «AB = BC» · «AC ⊥ BC», filed 2026-10-18 as the 2-D sibling of #2292). AC ⊥ BC puts the right angle at C, so AB is the hypotenuse and AB = BC holds only in the limit C = A. Measured at 37800b85 through decideDeterministic2D: every line committed and the figure was drawn green with C almost on A (|AC| ≈ 1e-3 of the sides). ADR-746: the tightened re-solve (ADR-537) reaches the length family at a factor sized for a tangent root's quadratic residual, and the no-room prover (ADR-658) reads the base angles a stated equal pair forces; both refuse with ADR-602's flat-triangle message, marked degenerate, so the fold never files the line as pending. The prior isosceles triangle stays. The class matrix is src/__tests__/issue-2344-impossible-right-isosceles.test.ts.",
+    steps: ['משולש ABC', 'AB = BC'],
+    check(fig) {
+      allStepsOk(fig);
+      const pre = factsOf(['משולש ABC', 'AB = BC']);
+      const v = gateVerdict(pre, 'AC ⊥ BC');
+      expect(v.kind === 'refused' && v.reason, 'refused by the engine, before it becomes a fact').toBe('error');
+      const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+      expect(detail, 'the collapse of the declared triangle (ADR-602), never an over-constraint').toMatch(COLLAPSED_VS);
+      const he = i18n.getFixedT('he');
+      const said = humanizeError(detail, he as never, 'AC ⊥ BC', otherUtteranceForError(pre, detail)).replace(/[⁦-⁩]/g, '');
+      expect(said, 'the flat-triangle sentence, naming the statement').toContain('«AC ⊥ BC»');
+      expect(said).toContain('וקו ישר אינו משולש');
+      // the prior figure is a real isosceles triangle
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(Math.abs(dist(A, B) - dist(B, C))).toBeLessThan(1e-6 * dist(A, B));
+      expect(dist(A, C) / dist(A, B), 'not a sliver').toBeGreaterThan(0.1);
+      // typed past the gate (a loaded file), the fold refuses it too, as a contradiction — never pending
+      const folded = replay(factsOf(['משולש ABC', 'AB = BC', 'AC ⊥ BC']));
+      expect(folded.lastError).toMatch(COLLAPSED_VS);
+      expect(folded.pending, 'never «waiting for more givens»').toBe(false);
+    },
+  },
+  {
+    id: 'impossible-right-isosceles-angle-refused-2344',
+    title: '#2344 P1: «AB = BC» · «∠ACB = 90» is refused at the door as a collapsed triangle, never committed as waiting for more givens (ADR-746)',
+    guards:
+      "#2344 (P1), the operator's exact lines («משולש ABC» · «AB = BC» · «AC ⊥ BC», filed 2026-10-18 as the 2-D sibling of #2292). AC ⊥ BC puts the right angle at C, so AB is the hypotenuse and AB = BC holds only in the limit C = A. Measured at 37800b85 through decideDeterministic2D: the angle spelling committed as a deferred constraint (pending, «waiting for more givens») though no later given can rescue it. ADR-746: the tightened re-solve (ADR-537) reaches the length family at a factor sized for a tangent root's quadratic residual, and the no-room prover (ADR-658) reads the base angles a stated equal pair forces; both refuse with ADR-602's flat-triangle message, marked degenerate, so the fold never files the line as pending. The prior isosceles triangle stays. The class matrix is src/__tests__/issue-2344-impossible-right-isosceles.test.ts.",
+    steps: ['משולש ABC', 'AB = BC'],
+    check(fig) {
+      allStepsOk(fig);
+      const pre = factsOf(['משולש ABC', 'AB = BC']);
+      const v = gateVerdict(pre, '∠ACB = 90');
+      expect(v.kind === 'refused' && v.reason, 'refused by the engine, before it becomes a fact').toBe('error');
+      const detail = v.kind === 'refused' ? (v.detail ?? '') : '';
+      expect(detail, 'the collapse of the declared triangle (ADR-602), never an over-constraint').toMatch(COLLAPSED_VS);
+      const he = i18n.getFixedT('he');
+      const said = humanizeError(detail, he as never, '∠ACB = 90', otherUtteranceForError(pre, detail)).replace(/[⁦-⁩]/g, '');
+      expect(said, 'the flat-triangle sentence, naming the statement').toContain('«∠ACB = 90»');
+      expect(said).toContain('וקו ישר אינו משולש');
+      // the prior figure is a real isosceles triangle
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(Math.abs(dist(A, B) - dist(B, C))).toBeLessThan(1e-6 * dist(A, B));
+      expect(dist(A, C) / dist(A, B), 'not a sliver').toBeGreaterThan(0.1);
+      // typed past the gate (a loaded file), the fold refuses it too, as a contradiction — never pending
+      const folded = replay(factsOf(['משולש ABC', 'AB = BC', '∠ACB = 90']));
+      expect(folded.lastError).toMatch(COLLAPSED_VS);
+      expect(folded.pending, 'never «waiting for more givens»').toBe(false);
     },
   },
 ];

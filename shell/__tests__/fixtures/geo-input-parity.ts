@@ -303,7 +303,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2356': 'open', // #2234 (ADR-737): 3-D sends «ישר זווית ב-X» / "right-angled at X" (definite, bare, English) to the LLM lane
   '#2357': 'open', // #2234 (ADR-737): analytic sends the same spellings to the model
 
-  '#2344': 'open', // #2344 (ADR-W-146): 2-D draws a green sliver for a triangle whose givens hold only flat in the limit (the tangent root)
   '#2417': 'open', // #2395 (ADR-AG-311): 2-D does not read a stated distinctness («P ≠ Q», «המעגלים N1 ו-N2 שונים»)
 
   '#2415': 'open', // #2391 (ADR-AG-315): 2-D does not read «M מקיימת …», the centres' distance by role, or the distributed named circle pair
@@ -822,9 +821,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // #2292 / #2344 (ADR-W-146; 3-D ADR-3D-372) — givens that hold only in the LIMIT where a declared polygon collapses
   // (the tangent root: |BA| = |BC| with a right angle at C forces C = A) are refused like any forced collapse, never
   // drawn as a sliver. 3-D reads «AB = BC» as a vector question, so its context spells the lengths «|BA| = |BC|».
-  { id: 'impossible-right-isosceles-2292-perp', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB = BC', 'AC ⊥ BC'], contextFor: { '3d': ['משולש ABC', '|BA| = |BC|'] }, expect: 'refused', knownGap: [{ product: '2d', issue: '#2344' }], note: 'a right angle at C makes BC a leg and AB the hypotenuse, so AB = BC only if C = A' },
-  { id: 'impossible-right-isosceles-2292-angle', family: 'angles', steps: ['משולש ABC', 'AB = BC', '∠ACB = 90'], contextFor: { '3d': ['משולש ABC', '|BA| = |BC|'] }, expect: 'refused', knownGap: [{ product: '2d', issue: '#2344' }] },
-  { id: 'impossible-right-isosceles-2292-other-leg', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB = BC', 'AB ⊥ AC'], contextFor: { '3d': ['משולש ABC', '|BA| = |BC|'] }, expect: 'refused', knownGap: [{ product: '2d', issue: '#2344' }] },
+  { id: 'impossible-right-isosceles-2292-perp', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB = BC', 'AC ⊥ BC'], contextFor: { '3d': ['משולש ABC', '|BA| = |BC|'] }, expect: 'refused', note: 'a right angle at C makes BC a leg and AB the hypotenuse, so AB = BC only if C = A' },
+  { id: 'impossible-right-isosceles-2292-angle', family: 'angles', steps: ['משולש ABC', 'AB = BC', '∠ACB = 90'], contextFor: { '3d': ['משולש ABC', '|BA| = |BC|'] }, expect: 'refused' },
+  { id: 'impossible-right-isosceles-2292-other-leg', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB = BC', 'AB ⊥ AC'], contextFor: { '3d': ['משולש ABC', '|BA| = |BC|'] }, expect: 'refused' },
   { id: 'thin-right-triangle-2292-control', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB = 2', 'BC = 1', 'AC ⊥ BC'], expect: 'builds', note: 'a real right triangle — the control' },
   { id: 'incircle-in', family: 'inscribed', steps: ['משולש ABC', 'במשולש ABC חסום מעגל'], expect: 'builds', exception: 'X8' },
   { id: 'length-noun-q2', family: 'lengths', steps: ['משולש ABC', 'אורך AB=BC'], expect: 'builds', note: "3-D's own spelling of an equal length (Q2): builds in all three" },

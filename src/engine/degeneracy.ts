@@ -159,7 +159,8 @@ export function polygonDefects(c: Construction, positions: Map<Id, Vec>, flatTol
  * tolerance admits a nearly-degenerate figure, and the accept gate asks whether the residuals are small,
  * never whether the tolerance is what made them small.* The predicate lives in `step.ts`
  * (`toleranceArtefactPolygon`): a declared polygon below `THIN_POLYGON_RATIO` triggers a RE-SOLVE under a
- * tolerance tightened by `TIGHT_TOLERANCE_FACTOR` (`evaluateTightened`). A genuine thin triangle (89° + 90°,
+ * tolerance tightened by `TIGHT_TOLERANCE_FACTOR` (degrees) and `LENGTH_TIGHT_FACTOR` (lengths, #2344 ADR-746)
+ * (`evaluateTightened`). A genuine thin triangle (89° + 90°,
  * a stated 1°) is an EXACT solution and re-solves to the same shape at any tightening; a needle bought with
  * slack can only meet the tighter bar by collapsing past the solvers' coincidence floor (1e-3 of the
  * figure's extent), where their own accept refuses it — so the re-solve fails, and the step is refused as
@@ -180,6 +181,17 @@ export const THIN_POLYGON_RATIO = 5e-2;
  * The factor the re-solve tightens every tolerance by. The needle can meet an angle tolerance τ only with an
  * apex of ~2τ, i.e. a short side of ~2τ·(long side); the solvers' coincidence floor is 1e-3 of the extent,
  * so refusal needs 2τ < 1e-3 rad — τ below 0.029°. 0.02 × ANGLE_EPS (0.5°) = 0.01°, a margin of ~3; on the
- * length family it is 4e-6·scale, which the polished solves (LM to 1e-12 cost) sit far below.
+ * DEGREE family only: the length family has its own factor below (#2344, ADR-746).
  */
 export const TIGHT_TOLERANCE_FACTOR = 0.02;
+/**
+ * #2344 ([ADR-746](../../docs/06-decisions.md#adr-746)) — the factor the re-solve tightens the LENGTH family by.
+ * A length equality that meets a right angle at a TANGENT root («AB = BC» · «AC ⊥ BC»: the circle about B through A
+ * touches the Thales circle on AB at A) has a residual that vanishes to SECOND order in the sliver's short side s:
+ * |AB| − |BC| ≈ s²/2|BC|. A relative tolerance τ = 2e-4·f therefore admits s/extent up to √(2τ), and refusal needs
+ * that below the coincidence floor (1e-3 of the extent): √(2·2e-4·f) < 1e-3 ⇔ f < 2.5e-3. Swept over 24 seeds on
+ * every member and control of the class (docs/17 §9; the table is in the ADR) and the LARGEST factor that refused
+ * every member 24/24 with every control 24/24 green was kept. Read only behind the thin-polygon trigger, so an
+ * ordinary figure never meets it.
+ */
+export const LENGTH_TIGHT_FACTOR = 1e-3;
