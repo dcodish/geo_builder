@@ -924,6 +924,30 @@ common tangent the sentence can name, so two existing letters that are both in `
 pair whose `circle-position` records state it internally tangent, externally tangent with kind internal, or contained is
 refused before the solve; `tangentsExhaustedKey` (`i18n/humanizeError.ts`) gives it the parser's sentence.
 
+**The whole set** ([ADR-751](06-decisions.md#adr-751)). `ALL_COMMON_TANGENTS` («כל המשיקים המשותפים», the definite plural with
+no count word, "(all) the common tangents") is matched before the fixed-count `plural`, and only with no `at` or apex; a stated
+kind narrows the set to that kind (#2447: the touch tangent is internal for an outside touch, external for an inside one;
+an empty set is the position's `tangents-exhausted` clarify). `allCommonTangents` reads `ctx.statedPairPositions[pairKey]` — filled by `buildParseCtx` from the engine's
+`statedCirclePosition(construction, c1, c2)` (`engine/requirements.ts`: a `circle-position` contained / tangent / disjoint
+record, in that precedence, the tangent's kind from its first STATED record else external; else a `circle-circle` point of
+the pair → crossing; else undefined) — and lowers the set: two-touch tangents by kind (apart: 2 external + 2 internal;
+crossing and touching outside: 2 external), each the ordinary two-touch group with `kind` stated and the earlier touches
+of its kind as `avoid`, plus `touchTangent(T, [], …, true)` when the pair touches. Prior members (`ctx.commonTangents` by
+kind, `tan-T` in `ctx.lines`) are subtracted; none missing → the position's `tangents-exhausted` clarify. Letters: none →
+`autoVertexLabels`; exactly two per missing two-touch tangent → in order; otherwise `'stop'`. An undefined position →
+`ambiguous-construct` with the three statements that settle it (letters from `freeLabel`). `commonTangentCapacityError`
+reads the same `statedCirclePosition`, so the parser's count and the engine's guard share one reader.
+
+**Either order** ([ADR-752](06-decisions.md#adr-752)). Exit (c) reads only the lines typed before the tangent. The fold's
+pre-pass `statedOnCommonTangents` (`src/replay/statedOnCommonTangents.ts`, called from `replay/core.ts` beside the ADR-704
+and ADR-239 pre-scans) closes the other order: for each two-touch `common-tangent` record (no `at`) it collects the points
+the OTHER enabled facts put on line AB (`set-collinear`, `set-line`, `point-on-segment`); when the pair's stated touch
+(its `circles-tangent` `at`, kind resolved by ADR-704) is among them, `pinnedLowering` re-decides the record's group:
+`tangent tan-T` on circle 1, each letter the group introduces a `point-on-line` marker at ±5 from T (the at-variant's
+markers), an existing letter seated by the `at` record, the soft memberships and radius ⟂s retired, the segment kept.
+Excluded (today's refusal stands): a stated kind that is not the touch tangent's, and a `tangent` at T already drawn.
+The re-decision is part of the fold's pre-scan signature (`pin`), so a prefix memo is reused only when it agrees.
+
 ### The AI lane's context ([ADR-741](06-decisions.md#adr-741))
 
 `llmParse` re-parses each canonical line through `parse(step, ctxFor(built))`, where `built` is the commands of the lines

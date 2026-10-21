@@ -330,6 +330,10 @@ export interface ParseContext {
    *  tangency kind — the deictic `circlePairPositions` never decides it (docs/17 §3b law 2). #2209
    *  ([ADR-703](../../docs/06-decisions.md#adr-703)): `a`/`b` are the record's circles in the order first stated. */
   statedTangencies?: Record<string, { at: string; external?: boolean; a: string; b: string }>;
+  /** #2405 ([ADR-751](../../docs/06-decisions.md#adr-751)) — SEMANTIC: each circle pair's STATED mutual position (the
+   *  engine's `statedCirclePosition`: circle-position records and crossing points, never coordinates), keyed by the sorted
+   *  pair of circle ids; absent when nobody stated it. Decides how many tangents «כל המשיקים המשותפים» names. */
+  statedPairPositions?: Record<string, 'disjoint' | 'crossing' | 'ext-tangent' | 'int-tangent' | 'contained'>;
   /** #2407 ([ADR-740](../../docs/06-decisions.md#adr-740)) — SEMANTIC: for each point, the point pairs the construction
    *  states it collinear with (`collinear` / `collinear-order` constraints, on-line / on-segment riders). Lets a common
    *  tangent whose own letters pass through the circles' touch («T על AB» · «AB משיק משותף…») read as the tangent AT it. */
@@ -9665,6 +9669,115 @@ const circleSubjectOfTangent = (s: string): string | null => {
   return m ? up(m[1] ?? m[2]) : null;
 };
 
+/**
+ * #2405 ([ADR-751](../../docs/06-decisions.md#adr-751)) — the set quantifier over a pair's common tangents: «כל המשיקים
+ * המשותפים», the definite plural «המשיקים המשותפים» (no count word before it — «שני המשיקים המשותפים» states a count),
+ * "(all) the common tangents". Composed from the lexicon's word helpers; no label or number fragment. A kind word on the
+ * set («… החיצוניים», "all the external common tangents") narrows it to that kind (#2447, folded into #2405).
+ */
+const ALL_COMMON_TANGENTS = rx(
+  String.raw`(?<![א-ת])(?<!(?:שני|שתי|שלושה|שלושת|ארבעה|ארבעת)\s+)(?:כל\s+)?המשיקים\s+המשותפים(?![א-ת])|${enWord(String.raw`(?:all\s+(?:of\s+)?(?:the\s+)?|the\s+)(?:(?:external|internal)\s+)?common\s+tangent`, 's')}`,
+);
+
+/** What `commonTangent` hands the set reading: the resolved pair and its one at-touch lowering. */
+type CommonTangentSet = {
+  ctx: ParseContext;
+  pairKey: string;
+  id1: Id;
+  id2: Id;
+  c1: string;
+  c2: string;
+  naming: string[];
+  /** the stated kind narrowing the set («החיצוניים» / «הפנימיים»), or undefined for every common tangent */
+  kind: 'external' | 'internal' | undefined;
+  stated: { at: string; external?: boolean; a: string; b: string } | undefined;
+  touchTangent: (T: string, letters: string[], membership: AnyCommand[], only?: boolean) => AnyCommand[];
+  touchMembership: (T: string) => AnyCommand[];
+  equal: (cmds: AnyCommand[]) => AnyCommand[];
+};
+
+/**
+ * #2405 ([ADR-751](../../docs/06-decisions.md#adr-751)) — EVERY COMMON TANGENT OF THE PAIR, by its STATED position.
+ *
+ * The set is the pair's: apart → 2 external + 2 internal two-touch tangents; crossing → 2 external; touching from
+ * outside → 2 external + the tangent at the touch T; touching from inside → the tangent at T alone; one inside the other
+ * → none (the existing refusal). Tangents the pair already has (`commonTangents`, and `tan-T` among the lines) are
+ * members of the set: only the missing ones are drawn, and when none is missing the answer is the existing
+ * «already drawn» refusal for that position. Each two-touch tangent is the ordinary two-touch lowering with its kind
+ * stated and the earlier ones of its kind as `avoid`; the touch tangent is the one at-touch lowering, unlettered.
+ *
+ * A pair whose position nobody stated has no set to draw — how many tangents it has IS the unstated choice — so the
+ * line asks with the existing `ambiguousConstruct` sentence, teaching the three statements that settle it (the interim
+ * answer under the P1 exception; the permanent one is #2442). Letters in the sentence name the two-touch tangents in
+ * order when there are exactly two per tangent; any other count escalates whole, never a partial build.
+ *
+ * #2447 (folded into #2405 under its honesty ruling): a stated KIND narrows the set to the tangents of that kind — apart:
+ * 2 external / 2 internal; crossing: 2 external / none internal; touching from outside: 2 external / the line at T (the
+ * internal one); touching from inside: the line at T (external) / none internal. An empty set is the existing
+ * «אין משיק משותף …» refusal for that position and kind, never one tangent drawn green.
+ */
+function allCommonTangents(phrase: string, t: CommonTangentSet): AnyCommand[] | 'stop' | Clarify {
+  const { ctx, pairKey, id1, id2, c1, c2, naming, stated, kind } = t;
+  const position = ctx.statedPairPositions?.[pairKey];
+  if (position === undefined) {
+    const used = [...(ctx.points ?? []), ...(ctx.circles ?? []), c1, c2];
+    const e = freeLabel(used, ['E', 'F', 'G', 'H']);
+    const f = freeLabel([...used, e], ['F', 'G', 'H', 'K']);
+    const touch = freeLabel(used, ['T', 'K', 'S']);
+    const he = /[א-ת]/.test(phrase);
+    const options = he
+      ? ['המעגלים זרים', `המעגלים נחתכים בנקודות ${e} ו-${f}`, `המעגלים משיקים בנקודה ${touch}`]
+      : ['the circles are disjoint', `the circles intersect at ${e} and ${f}`, `the circles are tangent at ${touch}`];
+    return { clarify: 'ambiguous-construct', noun: phrase, options };
+  }
+  const shown = position === 'crossing' ? 'intersecting' : position;
+  if (position === 'contained') return { clarify: 'tangents-exhausted', kind: kind ?? 'any', position: 'contained' };
+  // The pair's two-touch tangents by kind, and whether the tangent at the touch belongs to the set (its kind by geometry:
+  // internal for circles touching from outside, external for circles touching from inside — ADR-359 Am. 8).
+  const kinds = (
+    position === 'disjoint' ? ['external', 'external', 'internal', 'internal'] : position === 'int-tangent' ? [] : ['external', 'external']
+  ).filter((k) => !kind || k === kind) as ('external' | 'internal')[];
+  const touchKind = position === 'ext-tangent' ? 'internal' : 'external';
+  const touchy = position === 'ext-tangent' || position === 'int-tangent';
+  const T = touchy && (!kind || kind === touchKind) ? stated?.at : undefined;
+  // a kind the pair has none of (an internal tangent of crossing or inside-touching circles): the existing refusal
+  if (!kinds.length && !(touchy && (!kind || kind === touchKind))) return { clarify: 'tangents-exhausted', kind: kind ?? 'any', position: shown };
+  if (touchy && (!kind || kind === touchKind) && !T) return 'stop'; // a tangency with no touch point — never a guess
+  // Members already drawn: each prior two-touch tangent fills one slot of its kind (an unclassified one, any slot).
+  const prior = ctx.commonTangents?.[pairKey] ?? [];
+  const missing = [...kinds];
+  for (const e of prior) {
+    const i = e.kind ? missing.indexOf(e.kind) : missing.length - 1;
+    if (i >= 0) missing.splice(i, 1);
+  }
+  const touchMissing = T !== undefined && !(ctx.lines ?? []).includes(`tan-${up(T)}`);
+  if (!missing.length && !touchMissing) return { clarify: 'tangents-exhausted', kind: kind ?? 'any', position: shown };
+  // Letters: none → auto touch letters; exactly two per missing two-touch tangent → they name them in order.
+  let names = naming;
+  if (names.length && names.length !== missing.length * 2) return 'stop';
+  if (!names.length) names = autoVertexLabels(missing.length * 2, [c1, c2, ...(ctx.points ?? [])]);
+  const out: AnyCommand[] = [];
+  const touches: Record<'external' | 'internal', string[]> = {
+    external: prior.filter((e) => e.kind !== 'internal').flatMap((e) => e.pair),
+    internal: prior.filter((e) => e.kind !== 'external').flatMap((e) => e.pair),
+  };
+  missing.forEach((kind, p) => {
+    const [A, B] = [names[p * 2], names[p * 2 + 1]];
+    const avoid = touches[kind].filter((x) => x !== A && x !== B);
+    out.push(
+      { type: 'point-on-circle', id: A, circle: id1, softPair: true },
+      { type: 'point-on-circle', id: B, circle: id2, softPair: true },
+      { type: 'common-tangent', a: A, b: B, circle1: id1, circle2: id2, variant: 0, kind, ...(avoid.length ? { avoid } : {}) } as AnyCommand,
+      { type: 'set-perpendicular', a: centrePt(ctx, c1), b: A, c: A, d: B, implicit: true },
+      { type: 'set-perpendicular', a: centrePt(ctx, c2), b: B, c: A, d: B, implicit: true },
+      { type: 'segment', a: A, b: B },
+    );
+    touches[kind].push(A, B);
+  });
+  // the tangent at T through the one at-touch lowering (which states the pair's equal size itself, when given)
+  return touchMissing ? [...out, ...t.touchTangent(up(T!), [], t.touchMembership(up(T!)), true)] : t.equal(out);
+}
+
 const commonTangent: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   // The stated KIND (hoisted — it doubles as a TRIGGER, #212): a kind adjective on a SINGULAR tangent
@@ -9825,6 +9938,15 @@ const commonTangent: Rule = (s, ctx) => {
     if (kind && tk && kind !== tk) return 'stop'; // a kind the touch tangent is not names no line — escalate, never a two-touch one
     return touchTangent(up(touch), lineLetters, touchMembership(up(touch)));
   }
+  // #2405 ([ADR-751](../../docs/06-decisions.md#adr-751)) — THE WHOLE SET. «כל המשיקים המשותפים», the definite plural with no
+  // count word «המשיקים המשותפים», "(all) the common tangents" quantify over EVERY common tangent of the pair, so how
+  // many lines the sentence names is the pair's STATED position (`statedPairPositions`, the engine's one reader — never
+  // the drawn seed, docs/17 §3b law 2): apart 4, crossing 2, touching from outside 3 (2 + the tangent at T), touching
+  // from inside 1 (at T), one inside the other 0. Tangents already drawn for the pair count toward the set; only the
+  // missing ones are drawn. Checked BEFORE the fixed-count plural, which read the definite form as ONE tangent and
+  // dropped «כל». A kind word narrows the set to that kind (#2447): «כל המשיקים המשותפים החיצוניים».
+  const setM = !at && !apex ? s.match(ALL_COMMON_TANGENTS) : null;
+  if (setM) return allCommonTangents(setM[0].trim(), { ctx, pairKey, id1, id2, c1, c2, naming, kind, stated, touchTangent, touchMembership, equal });
   // (c) THE LINE'S OWN LETTERS REACH THE TOUCH — «T על AB» · «AB משיק משותף…», or «TB משיק משותף…»: only the tangent at T
   // passes through T, so the two-touch construction (two DISTINCT touches on one line through T) cannot hold. A stated
   // kind that is not the touch tangent's keeps the two-touch reading and its honest refusal.

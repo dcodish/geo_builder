@@ -5578,6 +5578,30 @@ export const SCENARIOS_4: Scenario[] = [
       expect(fig.positions.has('K'), 'no point K').toBe(false);
     },
   },
+  {
+    id: 'all-common-tangents-unstated-position-refused-2405',
+    title: '«שני מעגלים» · «כל המשיקים המשותפים לשני המעגלים» is refused, naming the three statements that settle how many tangents the pair has (#2405, ADR-751)',
+    guards:
+      "#2405 (P1): «כל המשיקים המשותפים» drew ONE common tangent, green, whatever the pair's position (4 apart, 2 crossing, 3 touching). ADR-751 draws the whole set by the pair's STATED position (`statedCirclePosition`, `statedPairPositions`). A pair whose position nobody stated has no set to draw (the count IS the unstated choice), so the line is refused with the existing `input.ambiguousConstruct` sentence (the P1 exception; the permanent answer is #2442, needs-operator), teaching «המעגלים זרים» / «המעגלים נחתכים בנקודות E ו-F» / «המעגלים משיקים בנקודה T». The figure keeps the two circles and draws no tangent. The class test is src/__tests__/issue-2405-all-common-tangents.test.ts.",
+    steps: ['שני מעגלים', 'כל המשיקים המשותפים לשני המעגלים'],
+    refusedSteps: [
+      {
+        step: 2,
+        reason: 'ambiguous-construct',
+        with: { noun: 'כל המשיקים המשותפים', options: ['המעגלים זרים', 'המעגלים נחתכים בנקודות E ו-F', 'המעגלים משיקים בנקודה T'] },
+        why: "ADR-751 (#2405): the pair's position was never stated, so how many common tangents it has is the student's to say: the interim refusal reusing input.ambiguousConstruct (#2442 is the permanent answer)",
+      },
+    ],
+    check(fig) {
+      expect(fig.construction.objects.filter((o) => o.kind === 'circle')).toHaveLength(2);
+      expect(fig.construction.objects.some((o) => o.kind === 'segment' || (o.kind === 'line' && o.spec.via === 'tangent')), 'no tangent drawn').toBe(false);
+      const facts = factsOf(['שני מעגלים']);
+      for (const option of ['המעגלים זרים', 'המעגלים נחתכים בנקודות E ו-F', 'המעגלים משיקים בנקודה T']) {
+        expect(gateVerdict(facts, option).kind, `the taught «${option}» commits`).toBe('commit');
+        expect(gateVerdict(factsOf(['שני מעגלים', option]), 'כל המשיקים המשותפים לשני המעגלים').kind, `after «${option}» the set builds`).toBe('commit');
+      }
+    },
+  },
 ];
 
 /**

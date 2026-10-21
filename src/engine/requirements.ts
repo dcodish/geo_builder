@@ -197,3 +197,34 @@ export function sidesShortfall(c: Construction, positions: Map<Id, Vec>, circles
   for (const r of sideRecordsOf(c)) s += sideShortfall(r, positions, circles, aim);
   return s;
 }
+
+/** A circle pair's mutual position as the construction STATES it ({@link statedCirclePosition}). */
+export type StatedCirclePosition = 'disjoint' | 'crossing' | 'ext-tangent' | 'int-tangent' | 'contained';
+
+/**
+ * #2405 ([ADR-751](../../docs/06-decisions.md#adr-751)) — THE ONE READER OF A CIRCLE PAIR'S STATED POSITION.
+ *
+ * What the construction SAYS about circles `a` and `b` (either order), never where they are drawn (docs/17 §3b law 2):
+ *  - a `circle-position` record: `contained` (either circle inside the other), `tangent` (with its kind: the first
+ *    record whose kind was STATED, else the default — external, FR-EN-3; ADR-704 lets a later stated kind win), `disjoint`;
+ *  - a `circle-circle` crossing point of the pair: `crossing`;
+ *  - nothing (or only the cyclable bare-pair `set-circle-position any`, which records nothing): `undefined`.
+ * A stated containment outranks a stated tangency, which outranks «זרים», which outranks a drawn crossing point — the
+ * order the common-tangent capacity needs (fewest tangents first). The engine's `commonTangentCapacityError` and the
+ * parser's `statedPairPositions` both read this, so the two can never disagree.
+ */
+export function statedCirclePosition(c: Pick<Construction, 'objects' | 'requirements'>, a: Id, b: Id): StatedCirclePosition | undefined {
+  const pair = (x: Id, y: Id) => (x === a && y === b) || (x === b && y === a);
+  let tangent: Extract<SideRequirement, { relation: 'tangent' }> | undefined;
+  let disjoint = false;
+  for (const r of c.requirements ?? []) {
+    if (r.kind !== 'circle-position' || !pair(r.a, r.b)) continue;
+    if (r.relation === 'contained') return 'contained';
+    if (r.relation === 'disjoint') disjoint = true;
+    else if (r.relation === 'tangent' && (tangent === undefined || (tangent.kindStated === false && r.kindStated !== false))) tangent = r;
+  }
+  if (tangent) return tangent.external === false ? 'int-tangent' : 'ext-tangent';
+  if (disjoint) return 'disjoint';
+  if (c.objects.some((o) => o.kind === 'circle-circle' && pair(o.circle1, o.circle2))) return 'crossing';
+  return undefined;
+}

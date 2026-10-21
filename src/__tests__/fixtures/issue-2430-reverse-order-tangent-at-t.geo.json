@@ -1,0 +1,136 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-21T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "QNA4xjYGaXV3aTLQaNUN_",
+      "utterance": "מעגל M",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-M",
+        "center": "M",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "w4kHodzFqRP4QKXU0oJW2",
+      "utterance": "מעגל N",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-N",
+        "center": "N",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "KUzAEKHOJixzg4rMDMF7Z",
+      "utterance": "המעגלים משיקים בנקודה T",
+      "cmd": {
+        "type": "circles-tangent",
+        "circle1": "circle-M",
+        "circle2": "circle-N",
+        "at": "T",
+        "external": true,
+        "kindStated": false
+      },
+      "enabled": true
+    },
+    {
+      "id": "3pXBDjGhjCEaPrmN8_ldc",
+      "utterance": "AB משיק משותף למעגלים M ו-N",
+      "group": "LYdfaFIntM0Vz8UsrSYyD",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-M",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "zxgFtgPRXJBd2uv-5p8qR",
+      "utterance": "AB משיק משותף למעגלים M ו-N",
+      "group": "LYdfaFIntM0Vz8UsrSYyD",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-N",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "6V8HvXrtMuI6w3r5eJao4",
+      "utterance": "AB משיק משותף למעגלים M ו-N",
+      "group": "LYdfaFIntM0Vz8UsrSYyD",
+      "cmd": {
+        "type": "common-tangent",
+        "a": "A",
+        "b": "B",
+        "circle1": "circle-M",
+        "circle2": "circle-N",
+        "variant": 0
+      },
+      "enabled": true
+    },
+    {
+      "id": "uFMhA9a12kcW4tHiubhgH",
+      "utterance": "AB משיק משותף למעגלים M ו-N",
+      "group": "LYdfaFIntM0Vz8UsrSYyD",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "M",
+        "b": "A",
+        "c": "A",
+        "d": "B",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "rpozCBsDBs92eVhVkaaFR",
+      "utterance": "AB משיק משותף למעגלים M ו-N",
+      "group": "LYdfaFIntM0Vz8UsrSYyD",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "N",
+        "b": "B",
+        "c": "A",
+        "d": "B",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "zIaQD9mpMwAHISIHclpOt",
+      "utterance": "AB משיק משותף למעגלים M ו-N",
+      "group": "LYdfaFIntM0Vz8UsrSYyD",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "ZxZ_N4ZdKMJfMfhUjXuPG",
+      "utterance": "T על AB",
+      "group": "fgZJyN4Y1IxNzTbw0H1Eo",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "T",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    }
+  ]
+}

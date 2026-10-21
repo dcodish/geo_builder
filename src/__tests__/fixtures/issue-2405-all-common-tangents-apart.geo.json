@@ -1,0 +1,371 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-21T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "BX55la7TZSdCLcg52paTD",
+      "utterance": "שני מעגלים זרים",
+      "group": "BPOg5v8TP3yDQp-Qzwill",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "@ctr-O",
+        "radius": 5,
+        "freeRadius": true,
+        "ifAbsent": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "X-OMwWayr7zPJr1C1qeLy",
+      "utterance": "שני מעגלים זרים",
+      "group": "BPOg5v8TP3yDQp-Qzwill",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "@ctr-P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "ifAbsent": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "OvQ0ZfvHycw_5vdCcidz1",
+      "utterance": "שני מעגלים זרים",
+      "group": "BPOg5v8TP3yDQp-Qzwill",
+      "cmd": {
+        "type": "set-circle-position",
+        "relation": "disjoint",
+        "a": "circle-O",
+        "b": "circle-P"
+      },
+      "enabled": true
+    },
+    {
+      "id": "XAHh2_m4ilDNxF9oCBu5d",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "HpFBglsKt9vw9nCUuyClb",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-P",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "SxBFhu75NFkJuDAXX898a",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "common-tangent",
+        "a": "A",
+        "b": "B",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "variant": 0,
+        "kind": "external"
+      },
+      "enabled": true
+    },
+    {
+      "id": "HwAPlQufZW17B4m7NdWbH",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "@ctr-O",
+        "b": "A",
+        "c": "A",
+        "d": "B",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "ObR4Noy-DM9fLHfFeOavs",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "@ctr-P",
+        "b": "B",
+        "c": "A",
+        "d": "B",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "8LwmgPli-ohNWO8dLriZS",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "1FbOBjRw15R7o7ore9aDP",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "FpSq34VQjFwlrUH1HfnhN",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-P",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "68siWtSJvMEuQIR5C8YVU",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "common-tangent",
+        "a": "C",
+        "b": "D",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "variant": 0,
+        "kind": "external",
+        "avoid": [
+          "A",
+          "B"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "8cD8gsZB6zCYxvakHOiXo",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "@ctr-O",
+        "b": "C",
+        "c": "C",
+        "d": "D",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "iQK0KoNL7mJ7QX87HJ2Rq",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "@ctr-P",
+        "b": "D",
+        "c": "C",
+        "d": "D",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "WTJeMLP90_wiEPIIdjTdQ",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "Wu4WzNkByD5Nhe3ch4n7W",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "E",
+        "circle": "circle-O",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "y6SKBOD7NePydmqYYmMwe",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "F",
+        "circle": "circle-P",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "rEx9cezSg1NJiGTTEk8tv",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "common-tangent",
+        "a": "E",
+        "b": "F",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "variant": 0,
+        "kind": "internal"
+      },
+      "enabled": true
+    },
+    {
+      "id": "e8-dCorl-5_598xC1iJZ-",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "@ctr-O",
+        "b": "E",
+        "c": "E",
+        "d": "F",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "O5VgSNZO6r9fwPxtPKta2",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "@ctr-P",
+        "b": "F",
+        "c": "E",
+        "d": "F",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "9iKxd6vlN2cjGV-Hsz12B",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "segment",
+        "a": "E",
+        "b": "F"
+      },
+      "enabled": true
+    },
+    {
+      "id": "B8db8mpeFZQt3EW-DRl2t",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "G",
+        "circle": "circle-O",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "P5XBXA06p9YsJvlrgfLkE",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "H",
+        "circle": "circle-P",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "BE0jsXvD0pJYUkEmM02HA",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "common-tangent",
+        "a": "G",
+        "b": "H",
+        "circle1": "circle-O",
+        "circle2": "circle-P",
+        "variant": 0,
+        "kind": "internal",
+        "avoid": [
+          "E",
+          "F"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "2WNn6yIoJzK3VU3sHj0JJ",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "@ctr-O",
+        "b": "G",
+        "c": "G",
+        "d": "H",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "fSnZM_A9-pgXB5WnpAyZI",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "@ctr-P",
+        "b": "H",
+        "c": "G",
+        "d": "H",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "8lA9fp_aJr5ktnGlkkZvd",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "518fPZVrIVzWa71gC0qoE",
+      "cmd": {
+        "type": "segment",
+        "a": "G",
+        "b": "H"
+      },
+      "enabled": true
+    }
+  ]
+}

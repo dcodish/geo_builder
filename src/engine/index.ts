@@ -59,6 +59,7 @@ export type { AltitudeOption, StatedRightAngle } from './altitudeChoice';
 export { computeValuesPanel, queryLabel, rowOptions, valueText } from './valuesPanel';
 export { circleRefs, isDrawnCircle } from './circleRef';
 export type { CircleRef } from './circleRef';
+export { statedCirclePosition, type StatedCirclePosition } from './requirements';
 export type { QueryInput, QueryNote, QueryRow, ValueQuery } from './valuesPanel';
 export type { ValueRow, AreaClassRow, ValuesPanelResult } from './valuesPanel';
 

@@ -2130,3 +2130,7 @@ over all four (ADR-041).
 ### `second-centre-letter-names-holder-2398` — «מעגל O» · «מרכז המעגל O הוא K» is refused naming the holder O (#2398, ADR-747)
 
 **Guards against:** the second naming of a named centre being dropped or silently re-lettered (the #1153 / #1164 rulings: *"the second naming REFUSES and names the holder"*). **Asserts** step 2 is refused `input.centreAlreadyNamed` {holder O, to K} and the figure keeps one circle O and no K.
+
+### `all-common-tangents-unstated-position-refused-2405` — «שני מעגלים» · «כל המשיקים המשותפים לשני המעגלים» is refused, naming the three statements that settle how many tangents the pair has (#2405, ADR-751)
+
+**Guards against:** «כל המשיקים המשותפים» drawn as one tangent (or as a guessed set) on a pair whose position nobody stated. **Asserts** step 2 is refused `ambiguous-construct` with the noun «כל המשיקים המשותפים» and the options «המעגלים זרים» / «המעגלים נחתכים בנקודות E ו-F» / «המעגלים משיקים בנקודה T»; no tangent is drawn; each taught option commits, and «כל…» then builds. The per-position matrix (apart 4, crossing 2, touching 3, inside-touching 1, contained refused, three spellings) is `src/__tests__/issue-2405-all-common-tangents.test.ts`.

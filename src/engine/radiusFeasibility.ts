@@ -13,6 +13,7 @@
  * Pure readings of the construction (its objects and its stated circle-position records), never of coordinates.
  */
 import type { Command, Construction, GeoObject, Id } from './types';
+import { statedCirclePosition } from './requirements';
 
 type Circle = Extract<GeoObject, { kind: 'circle' }>;
 
@@ -132,14 +133,10 @@ export const TANGENTS_EXHAUSTED = /^tangents-exhausted: common tangent (\S+) of 
  */
 export function commonTangentCapacityError(prev: Construction, cmd: Command): string | null {
   if (cmd.type !== 'common-tangent' || cmd.at !== undefined) return null;
-  const pair = (r: { a: Id; b: Id }) => (r.a === cmd.circle1 && r.b === cmd.circle2) || (r.a === cmd.circle2 && r.b === cmd.circle1);
+  // #2405 (ADR-751): the pair's position through the ONE stated-position reader the parser's count also reads
   const kind = cmd.kind ?? 'any';
-  for (const r of prev.requirements ?? []) {
-    if (r.kind !== 'circle-position' || !pair(r)) continue;
-    if (r.relation === 'contained') return tangentsExhaustedMessage(cmd.a, cmd.b, kind, 'contained');
-    if (r.relation !== 'tangent') continue;
-    if (r.external === false) return tangentsExhaustedMessage(cmd.a, cmd.b, kind, 'int-tangent');
-    if (cmd.kind === 'internal') return tangentsExhaustedMessage(cmd.a, cmd.b, kind, 'ext-tangent');
-  }
+  const position = statedCirclePosition(prev, cmd.circle1, cmd.circle2);
+  if (position === 'contained' || position === 'int-tangent') return tangentsExhaustedMessage(cmd.a, cmd.b, kind, position);
+  if (position === 'ext-tangent' && cmd.kind === 'internal') return tangentsExhaustedMessage(cmd.a, cmd.b, kind, 'ext-tangent');
   return null;
 }
