@@ -10,7 +10,8 @@
 import { describe, it, expect } from 'vitest';
 import { parse } from '../parse';
 import { PROMPT_EXAMPLES, PROMPT_SPEC_2D } from '../llmShared';
-import { absorb } from '../llm';
+import { laneContext } from '@/app/laneContext';
+import type { ParseContext } from '../parse';
 import { COMMAND_CATALOG } from '../catalog';
 import type { AnyCommand } from '@/engine';
 
@@ -25,14 +26,18 @@ const promptText = (s: { rules: string[]; vocabulary: () => string; examples: { 
 describe('PAR-10 (a) — every PROMPT_EXAMPLES step parses (the prompt teaches only readable canonical forms)', () => {
   for (const ex of PROMPT_EXAMPLES) {
     it(`"${ex.freeform}" → all steps parse`, () => {
-      // Thread context exactly as llmParse does: seed from the example's assumed ctx, then absorb each
-      // step's introduced points/circles so a later step can reference them.
-      const points = new Set(ex.ctx?.points ?? []);
-      const circles = new Set(ex.ctx?.circles ?? []);
+      // Thread context as llmParse does (#2428, ADR-741): each later step reads the context of the figure the earlier
+      // steps built (the lane's own `laneContext`). The example's ASSUMED figure exists only as its ctx, so its
+      // points and circles are kept beside the built figure's.
+      const assumed: ParseContext = { points: ex.ctx?.points ?? [], circles: ex.ctx?.circles ?? [] };
+      const lane = laneContext(assumed, () => ({ facts: [], seed: 0 }));
+      const built: AnyCommand[] = [];
       for (const step of ex.steps) {
-        const r = parse(step, { points: [...points], circles: [...circles] });
+        const c = lane(built);
+        const ctx = { ...c, points: [...new Set([...(c.points ?? []), ...assumed.points!])], circles: [...new Set([...(c.circles ?? []), ...assumed.circles!])] };
+        const r = parse(step, ctx);
         expect(r.ok, `step "${step}" must parse (drifted prompt example)`).toBe(true);
-        if (r.ok) for (const c of r.commands) absorb(c, points, circles);
+        if (r.ok) built.push(...r.commands);
       }
     });
   }
@@ -64,23 +69,20 @@ describe('PAR-10 (b) — supported catalog examples parse to stable command type
 });
 
 // ── (d) cross-step context carries SUBSCRIPTED labels ────────────────────────
-describe('PAR-10 (d) — absorb folds subscripted labels (O1/O2) into the running context', () => {
-  it('a command introducing O1/O2 puts BOTH into the points set (was /^[A-Z]$/ → dropped)', () => {
-    const points = new Set<string>();
-    const circles = new Set<string>();
-    absorb({ type: 'point-on-segment', id: 'O2', a: 'O1', b: 'X' } as AnyCommand, points, circles);
-    expect(points.has('O1')).toBe(true);
-    expect(points.has('O2')).toBe(true);
-    expect(points.has('X')).toBe(true);
-  });
-
-  it("a subscripted circle centre enters the circles set via its command", () => {
-    const points = new Set<string>();
-    const circles = new Set<string>();
-    absorb({ type: 'circle-through', id: 'circle-O1', center: 'O1', through: 'A' } as AnyCommand, points, circles);
-    expect(circles.has('O1')).toBe(true);
-    expect(points.has('A')).toBe(true);
-    expect(points.has('circle-O1'), 'the structured id is NOT a point').toBe(false);
+// #2428 (ADR-741): the lane reads the context of the built figure, so a later step sees O1/O2 because the figure has
+// them — no label-shape fold (the retired `absorb`) decides what enters the context.
+describe('PAR-10 (d) — a later step sees the subscripted labels an earlier step introduced', () => {
+  it('O1 from step 1 is a point and a circle in the context of step 2', () => {
+    const lane = laneContext({}, () => ({ facts: [], seed: 0 }));
+    const cmds = ['נקודה A', 'circle O1 through A'].flatMap((l) => {
+      const r = parse(l, { points: ['A'] });
+      expect(r.ok, l).toBe(true);
+      return r.ok ? r.commands : [];
+    });
+    const ctx = lane(cmds);
+    expect(ctx.points).toEqual(expect.arrayContaining(['O1', 'A']));
+    expect(ctx.circles).toContain('O1');
+    expect(ctx.points, 'the structured id is NOT a point').not.toContain('circle-O1');
   });
 });
 

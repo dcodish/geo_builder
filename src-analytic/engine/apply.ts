@@ -22,12 +22,12 @@ import { FAMILIES_OF, positionOfCircles, type PairPosition } from './commonTange
 import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule, type FootLine } from './derived';
 import { sameDerivation } from './sameDerivation';
-import { constraintCurveRefs, constraintRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
+import { constraintCurveRefs, constraintRefs, dirCurveRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
 import { displacedAssumption, isGenericNoun, namesOption, normalizeShapeNoun, nounOfKind, nounsExclude, quadKindOf, promisesOneParallelPair, rightAngleAt, ringsNamed, sameStatementUnder, shapeRow } from './shapes';
 import { evalExpr, symbolsOf, type Env, type Expr } from './expr';
 import { declaredKindOf, kindImpliesInEveryReading, kindRelation, type NarrowKind } from '../../shell/narrowing';
 import { measureRestatement } from './statedMeasures';
-import { RADIUS_CAPITALS, RESERVED_SYMBOLS, radiusSymbol, toolSymbol, usedSymbols } from './carriers';
+import { RADIUS_CAPITALS, RESERVED_SYMBOLS, emptyDomain, paramRegister, positivePart, radiusSymbol, sizeContradiction, sizeLetters, toolSymbol, usedSymbols } from './carriers';
 import { drawnPieceOver, isPolygonSide } from './extent';
 import { cevianFacts, measureFacts, onBisectorFacts, segmentIdOf, toolFootFacts, toolFootRule } from './cevian';
 import { followObjects, isoscelesKeys, roleVertexOf } from './roles';
@@ -53,6 +53,7 @@ import {
   type Curve,
   type CurveObject,
   type Domain,
+  type EqOperand,
   type Fact,
   type Selector,
   type ArcDef,
@@ -436,11 +437,7 @@ function admitStated(
     const r = applyFact(c, { t: 'param', sym: value.name, domain, src });
     if (!r.ok) return r;
     const merged = r.next.params.find((p) => p.sym === value.name)?.domain;
-    const empty =
-      merged?.min !== undefined &&
-      merged.max !== undefined &&
-      (merged.min > merged.max || (merged.min === merged.max && (merged.minOpen || merged.maxOpen)));
-    return empty ? refuse : { ok: true, next: r.next };
+    return merged && emptyDomain(merged) ? refuse : { ok: true, next: r.next };
   }
   const somewhere = PROBE_ENVS.some((env) => inDomain(domain, evalExpr(value, env)));
   return somewhere ? { ok: true, next: c } : refuse;
@@ -734,8 +731,12 @@ export type ApplyOutcome =
   /**
    * `restates` (#2169, ADR-W-131): a shape noun the ring's own nouns already IMPLY («ריבוע ABCD» · «דלתון ABCD») — the
    * fold takes the rest of that sentence's noun definition as already held, so the whole line is «already known».
+   *
+   * `touchByOnLine` (#2418, ADR-AG-321): a common tangent was lowered at the circles' touch point ONLY because a line the
+   * fold told it of (`onLine`) puts the touch point on it — not one of its letters, not the figure, not the pair's
+   * position. The fold then records that line's own statement as `narrowed`, never `known`: it re-decided the tangent.
    */
-  | { ok: true; next: Construction; effect: LineEffect; notice?: ApplyNotice; restates?: true }
+  | { ok: true; next: Construction; effect: LineEffect; notice?: ApplyNotice; restates?: true; touchByOnLine?: true }
   | { ok: false; error: ApplyError };
 
 /**
@@ -1024,6 +1025,42 @@ function resolveCurveByEq(c: Construction, eq: unknown): Id | null {
 }
 
 /**
+ * A CURVE OPERAND GIVEN BY ITS EQUATION, RESOLVED TO THE OBJECT IT DENOTES (#2432, [ADR-AG-318](../../docs/06c-decisions-analytic.md#adr-ag-318)).
+ *
+ * The one place an equation written inside another sentence becomes a curve. The parser only reads it (`EqOperand`);
+ * here, against the figure:
+ *  1. **The figure's own curve with that equation IS the operand** (`resolveCurveByEq`): a named `l`, a declared
+ *     `נתון ישר <eq>`, a carrier. A `stated` role promotes a carrier it finds (the #1076/#1149 path, the label kept).
+ *  2. **Otherwise the curve is minted** under the operand's content id: drawn for `stated`, a carrier for `carrier`
+ *     (ADR-AG-032, unchanged). A stated mint still meets the twin scan (#1342), which may absorb it into a line the
+ *     probe identity did not match (a scaled spelling) — the operand is then the line that absorbed it.
+ *
+ * Before this, the `tangent-eq` arm and the parser's tangency readers minted a `curve` fact and then referred to
+ * it by id; when the twin scan absorbed the mint the reference dangled, and the student read `curve-anon…`.
+ * `minted` says the figure changed, so the statement that carries the operand is never «כבר ידוע» for it.
+ */
+function equationOperand(
+  c: Construction,
+  op: EqOperand,
+  src: string,
+): { ok: true; next: Construction; id: Id; minted: boolean } | { ok: false; error: ApplyError } {
+  const curve: Curve = { ...(op.line ? { kind: 'line' as const } : {}), eq: op.eq as Curve['eq'] };
+  const label = { name: '', eqSrc: op.eqSrc, ...(op.line ? { kind: 'line' as const } : {}) };
+  const found = resolveCurveByEq(c, op.eq);
+  if (found !== null) {
+    const held = objectById(c, found) as CurveObject;
+    if (op.role !== 'stated' || held.stated) return { ok: true, next: c, id: found, minted: false };
+    const promoted = applyFact(c, { t: 'curve', id: found, label, curve: { ...curve, ...held.curve }, stated: true, src });
+    return promoted.ok ? { ok: true, next: promoted.next, id: found, minted: promoted.next !== c } : promoted;
+  }
+  const mint = applyFact(c, { t: 'curve', id: op.id, label, curve, stated: op.role === 'stated', src });
+  if (!mint.ok) return mint;
+  if (objectById(mint.next, op.id)) return { ok: true, next: mint.next, id: op.id, minted: mint.next !== c };
+  const twin = mint.next.objects.find((o): o is CurveObject => o.kind === 'curve' && identicalCurve(o.curve, curve));
+  return twin ? { ok: true, next: mint.next, id: twin.id, minted: mint.next !== c } : { ok: false, error: { code: 'not-handled', detail: src } };
+}
+
+/**
  * Do two expressions denote the same value? Compared NUMERICALLY at several parameter probes
  * rather than structurally, because `2a` and `a+a` are the same given written two ways and a
  * student who restates a fact in different words has not contradicted anything. Two probes make an
@@ -1308,6 +1345,111 @@ function createdParts(o: CurveObject): { a: Expr; b: Expr; r: Expr } | null {
 }
 
 /**
+ * A STANDARD-FORM CIRCLE EQUATION'S CENTRE AND RADIUS, READ STRUCTURALLY (#2397, ADR-AG-322) — `createdParts`
+ * generalised to what a student writes: (x − p)², x², (x + p)², (p + x)², the same in y, either order, and a right
+ * side s² or a non-negative number (its square root). Anything else is `null`: no CAS (CLAUDE.md hard boundary 2) — a
+ * caller that needs the parts then reads a constant circle at the probes, or keeps its existing answer.
+ */
+function standardCircleParts(eq: Expr): { a: Expr; b: Expr; r: Expr } | null {
+  if (eq.kind !== 'sub' || eq.a.kind !== 'add') return null;
+  const free = (e: Expr) => !symbolsOf(e).some((n) => n === 'x' || n === 'y');
+  const square = (e: Expr): Expr | null => (e.kind === 'pow' && e.b.kind === 'num' && e.b.value === 2 ? e.a : null);
+  const shift = (e: Expr, v: 'x' | 'y'): Expr | null => {
+    const base = square(e);
+    if (!base) return null;
+    if (base.kind === 'sym' && base.name === v) return { kind: 'num', value: 0 };
+    if (base.kind === 'sub' && base.a.kind === 'sym' && base.a.name === v && free(base.b)) return base.b;
+    if (base.kind === 'add' && base.a.kind === 'sym' && base.a.name === v && free(base.b)) return { kind: 'neg', a: base.b };
+    if (base.kind === 'add' && base.b.kind === 'sym' && base.b.name === v && free(base.a)) return { kind: 'neg', a: base.a };
+    return null;
+  };
+  const [u, w] = [eq.a.a, eq.a.b];
+  const a = shift(u, 'x') ?? shift(w, 'x');
+  const b = shift(u, 'y') ?? shift(w, 'y');
+  if (!a || !b) return null;
+  if (!free(eq.b)) return null;
+  const r = square(eq.b) ?? (eq.b.kind === 'num' && eq.b.value >= 0 ? ({ kind: 'num', value: Math.sqrt(eq.b.value) } as Expr) : null);
+  return r ? { a, b, r } : null;
+}
+
+/**
+ * A DRAWN CIRCLE TAKES A STATED EQUATION (#2397, ADR-AG-322; ADR-AG-204 generalised) — «שני מעגלים» · «מרכזו של המעגל
+ * האחד … ומשוואתו …», «נתון מעגל» · «משוואת המעגל היא …», a touch's circle · its equation. The circle keeps its id and
+ * its place (every relation stated about it refers to it by id, so the relation holds of the described circle); its
+ * equation becomes the stated one; its own free symbols leave the figure.
+ *
+ * PARTS ALREADY SPOKEN FOR ARE CARRIED, NEVER DROPPED. A part of the old equation that is not the circle's own bare
+ * symbol was put there by a statement — the radius by `radius-of`, the centre or radius of a placed «זרים / מוכל» pair
+ * by `relateCircles` — and is re-stated about the described circle through the seam that owns it: a constant radius as
+ * `radius-of` (a conflict is its existing `conflicting-restatement`), a radius in the figure's symbols as the
+ * `param-rel` it now is, the centre as a `coord` on its centre point. The circle's own bare symbols that still occur
+ * elsewhere (a sibling placed relative to it) are substituted by the stated centre and radius.
+ *
+ * `null` when the description cannot be carried without a CAS — the parts are needed and the stated equation is
+ * neither in standard form nor a constant circle, or a placed centre has no point to state it on — and the caller keeps
+ * its existing answer. Nothing is ever carried wrong.
+ */
+function describeDrawnCircle(c: Construction, host: CurveObject, eq: Expr, src: string): ApplyOutcome | null {
+  const old = createdParts(host);
+  if (!old) return null;
+  const own = (part: string) => toolSymbol(host.id, part);
+  const bare = (e: Expr, part: string) => e.kind === 'sym' && e.name === own(part);
+  const spoken = { a: !bare(old.a, 'a'), b: !bare(old.b, 'b'), r: !bare(old.r, 'r') };
+  const restText = JSON.stringify({ objects: c.objects.filter((o) => o.id !== host.id), constraints: c.constraints, selectors: c.selectors });
+  const usedElsewhere = ['a', 'b', 'r'].some((part) => restText.includes(`"${own(part)}"`));
+  let stated = standardCircleParts(eq);
+  if (!stated && (spoken.a || spoken.b || spoken.r || usedElsewhere)) {
+    // A circle with constant centre and radius needs no algebra: its parts are read at the probes.
+    const fits = PROBE_ENVS.map((env) => resolveCurve({ eq } as Curve, env));
+    const first = fits[0];
+    if (!first.ok || first.curve.kind !== 'circle') return null;
+    const { cx, cy, r } = first.curve;
+    const close = (v: number, w: number) => Math.abs(v - w) <= 1e-9 * Math.max(1, Math.abs(v), Math.abs(w));
+    const constant = fits.every((fit) => fit.ok && fit.curve.kind === 'circle' && close(fit.curve.cx, cx) && close(fit.curve.cy, cy) && close(fit.curve.r, r));
+    if (!constant) return null;
+    stated = { a: { kind: 'num', value: cx }, b: { kind: 'num', value: cy }, r: { kind: 'num', value: r } };
+  }
+  const centre = spoken.a || spoken.b ? centreIdOf(c, host) : null;
+  if ((spoken.a || spoken.b) && centre === null) return null;
+  let next: Construction = { ...c, objects: c.objects.map((o) => (o.id === host.id ? { ...host, curve: { kind: 'circle', eq } } : o)) };
+  let carried = { a: old.a, b: old.b, r: old.r };
+  if (stated) {
+    // The circle's own bare symbols, wherever they still stand, become the stated parts.
+    for (const part of ['a', 'b', 'r'] as const) {
+      if (spoken[part]) continue;
+      const sym = own(part);
+      const value = stated[part];
+      next = {
+        ...next,
+        objects: next.objects.map((o) => (o.id === host.id ? o : substituteSym(o, sym, value))),
+        constraints: substituteSym(next.constraints, sym, value),
+        selectors: substituteSym(next.selectors, sym, value),
+      };
+      carried = { a: substituteSym(carried.a, sym, value), b: substituteSym(carried.b, sym, value), r: substituteSym(carried.r, sym, value) };
+    }
+  }
+  const carriedFacts: Fact[] = [];
+  if (spoken.r) {
+    const at = PROBE_ENVS.map((env) => evalExpr(carried.r as Parameters<typeof evalExpr>[0], env));
+    const constant = at.every((v) => Number.isFinite(v) && v === at[0]);
+    carriedFacts.push(
+      constant || !stated
+        ? { t: 'radius-of', circleId: host.id, value: carried.r, src }
+        : { t: 'constraint', k: { t: 'param-rel', left: carried.r, right: stated.r }, src },
+    );
+  }
+  if (spoken.a || spoken.b) {
+    carriedFacts.push({ t: 'constraint', k: { t: 'coord', id: centre!, ...(spoken.a ? { x: carried.a } : {}), ...(spoken.b ? { y: carried.b } : {}) }, src });
+  }
+  // Its own symbols leave the figure — every one nothing reads any more (a placement's g, m, s, k stay while a carried part reads them).
+  const readText = JSON.stringify({ objects: next.objects, constraints: next.constraints, selectors: next.selectors, carriedFacts });
+  next = { ...next, params: next.params.filter((p) => !p.sym.startsWith(own('')) || readText.includes(`"${p.sym}"`)) };
+  const out = applyAll(next, carriedFacts);
+  if (!out.ok) return out.error.code === 'radius-contradicts' ? { ok: false, error: { code: 'conflicting-restatement', detail: src } } : out;
+  return { ok: true, next: out.next, effect: 'narrowed' };
+}
+
+/**
  * TWO CIRCLES' STATED POSITION, DRAWN BY CONSTRUCTION (#1622 E3, ADR-AG-219) — «מוכל» (`inside`: `b` strictly inside
  * `a`) and «זרים» (`apart`). Each is a thin region of a random draw once points ride the circles
  * (measured: «מעגל P מוכל בתוך מעגל O» held at 1 seed of 24; «שני מעגלים זרים» · «C על מעגל P» · «D על מעגל O» at none),
@@ -1431,11 +1573,48 @@ function interchangeable(c: Construction, a: Id, b: Id): boolean {
   return JSON.stringify(bag(all, false)) === JSON.stringify(bag(all, true));
 }
 
-/** A symmetric statement written in one order: `apart` / `cross` between two circles read the same either way round. */
+/**
+ * A SYMMETRIC STATEMENT WRITTEN IN ONE ORDER — the relations between two circles that say the same thing either way round
+ * (ADR-AG-219; #2397, ADR-AG-322 adds the tangency):
+ *  - `apart` / `cross` (a `circles` sign selector);
+ *  - an EXTERNAL tangency (`tangent-circle`, branch `external`): each circle touches the other from outside;
+ *  - a tangency of UNSTATED kind (the `choice` of both branches): neither order is said;
+ *  - the circles' common point (the `touch-point` derived rule).
+ * An INTERNAL tangency is not symmetric: it tells the circles apart, one inside the other (2-D's `autosInterchangeable`
+ * asks there too). Read structurally — a semantic property of the relation, never a list of sentences.
+ */
 function normaliseSymmetric(text: string): string {
-  const m = /^\{"kind":"sign","q":\{"k":"circles","a":"([^"]+)","b":"([^"]+)","rel":"(?:apart|cross)"\}/.exec(text);
-  if (!m || m[1] <= m[2]) return text;
-  return text.replace(`"a":"${m[1]}","b":"${m[2]}"`, `"a":"${m[2]}","b":"${m[1]}"`);
+  const pairOf = (a: unknown, b: unknown): [unknown, unknown] => (JSON.stringify(a) <= JSON.stringify(b) ? [a, b] : [b, a]);
+  const tangency = (k: Record<string, unknown>): Record<string, unknown> => {
+    const [a, b] = pairOf(k.a, k.b);
+    return { ...k, a, b };
+  };
+  const isTangency = (k: unknown, branch?: string): boolean =>
+    !!k && typeof k === 'object' && (k as { t?: unknown }).t === 'tangent-circle' && (branch === undefined || (k as { branch?: unknown }).branch === branch);
+  let v: Record<string, unknown>;
+  try {
+    v = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return text;
+  }
+  if (v.kind === 'sign' && v.q && typeof v.q === 'object') {
+    const q = v.q as Record<string, unknown>;
+    if (q.k === 'circles' && (q.rel === 'apart' || q.rel === 'cross')) {
+      const [a, b] = pairOf(q.a, q.b);
+      return JSON.stringify({ ...v, q: { ...q, a, b } });
+    }
+    return text;
+  }
+  if (isTangency(v, 'external')) return JSON.stringify(tangency(v));
+  if (v.t === 'choice' && Array.isArray(v.options) && v.options.length === 2 && v.options.every((o) => isTangency(o))) {
+    const branches = (v.options as Array<{ branch?: unknown }>).map((o) => o.branch).sort().join();
+    if (branches === 'external,internal') return JSON.stringify({ ...v, options: (v.options as Array<Record<string, unknown>>).map(tangency) });
+    return text;
+  }
+  if (v.kind === 'derived' && v.rule && typeof v.rule === 'object' && (v.rule as { t?: unknown }).t === 'touch-point') {
+    return JSON.stringify({ ...v, rule: tangency(v.rule as Record<string, unknown>) });
+  }
+  return text;
 }
 
 /**
@@ -1833,6 +2012,19 @@ function freeLineNames(c: Construction, n: number): string[] {
   return out;
 }
 
+/**
+ * A DRAWN LINE THE STUDENT DID NOT NAME TAKES THE NEXT FREE l-NUMBER (#2425, [ADR-AG-319](../../docs/06c-decisions-analytic.md#adr-ag-319);
+ * operator 2026-10-20: *"i want the line to also be drawn and named with l1 or l2 or whatever number is free"*, and Q4:
+ * «נתון ישר <eq>» too). Given at M1, the one place with figure context, when the line becomes stated — minted stated,
+ * or a carrier promoted — and marked `auto`, so a name the student gives the same line later replaces it (Q3). The id is
+ * never rewritten (the narrowing rule): the name rides the label, and `resolveLineRefs` (ADR-AG-317) makes every slot
+ * read it. Allocated in fold order, so undo, the seed and «הציגו תצורה אחרת» never renumber a line.
+ */
+function toolNamed(c: Construction, o: CurveObject): CurveObject {
+  if (!o.stated || o.label.name !== '' || curveKindOf(o) !== 'line') return o;
+  return { ...o, label: { ...o.label, name: freeLineNames(c, 1)[0], auto: true } };
+}
+
 /** `value` with every string equal to `from` replaced by `to`, structurally — an object's references re-pointed. */
 function replaceId<T>(value: T, from: Id, to: Id): T {
   if (value === from) return to as T;
@@ -2095,14 +2287,16 @@ function anonOf(curve: unknown): string {
 function applyAll(c: Construction, facts: readonly Fact[]): ApplyOutcome {
   let next = c;
   let effect: LineEffect = 'known';
+  let touchByOnLine = false;
   for (const f of facts) {
     const out = applyFact(next, f);
     if (!out.ok) return out;
     next = out.next;
     if (out.effect === 'created') effect = 'created';
     else if (out.effect === 'narrowed' && effect !== 'created') effect = 'narrowed';
+    if (out.touchByOnLine) touchByOnLine = true;
   }
-  return { ok: true, next, effect };
+  return { ok: true, next, effect, ...(touchByOnLine ? { touchByOnLine: true as const } : {}) };
 }
 
 /**
@@ -2158,7 +2352,40 @@ export function maxCrossings(a: string | null, b: string | null): number | null 
  * named line is minted by several arms (a stated equation, a line through a point) and each one's
  * answer is the same question.
  */
-export function applyFact(c: Construction, f: Fact): ApplyOutcome {
+/**
+ * A LINE REFERRED TO BY ITS NAME IS THE LINE THAT CARRIES THE NAME (#2431, [ADR-AG-317](../../docs/06c-decisions-analytic.md#adr-ag-317)).
+ *
+ * The parser is context-free, so «הישר l1» in a slot that takes a line reaches M1 as the id `lineIdOf('l1')`. A line
+ * that got its name by RESTATEMENT («נתון ישר 4x+y+3=0», then «נתון הישר l1: 4x+y+3=0» — the #1342 narrowing), or
+ * from the tool (ADR-AG-314), keeps its content-derived id: only its label carries the name, and the id is never
+ * rewritten because constraints already hold it. So every slot that looks a line up BY ID — ∥/⊥, «על», tangency,
+ * slope, crossings, position words, a line through a point — found nothing, while the by-name slots (a distance)
+ * found the line. One reading of one name, per slot.
+ *
+ * Resolved here, once, for every fact that reaches the boundary: each line-id reference (never the id the fact
+ * itself introduces) that names no object, while a LINE carries that name, is re-pointed at that line. A reference
+ * to a line that does not exist is left as it is, so its slot refuses it `unknown-reference`, naming what was typed.
+ */
+function resolveLineRefs(c: Construction, f: Fact): Fact {
+  const own = 'id' in f ? f.id : undefined;
+  const moves = new Map<Id, Id>();
+  const scan = (v: unknown): void => {
+    if (typeof v === 'string') {
+      if (v === own || moves.has(v) || refKindOf(v) !== 'line' || objectById(c, v)) return;
+      const named = curveByName(c, statedName(v));
+      if (named && named.id !== v && curveKindOf(named) === 'line') moves.set(v, named.id);
+    } else if (Array.isArray(v)) v.forEach(scan);
+    else if (v && typeof v === 'object') Object.values(v as Record<string, unknown>).forEach(scan);
+  };
+  for (const [k, v] of Object.entries(f)) if (k !== 'id' && k !== 'src') scan(v);
+  if (moves.size === 0) return f;
+  let out = f;
+  for (const [from, to] of moves) out = replaceId(out, from, to);
+  return own === undefined ? out : ({ ...out, id: own } as Fact);
+}
+
+export function applyFact(c: Construction, f0: Fact): ApplyOutcome {
+  const f = resolveLineRefs(c, f0);
   const out = applyStatement(c, f);
   if (!out.ok || out.effect === 'known') return out;
   // A POINT NAMED BY AN ANGLE'S LABEL (#1622 E5, ADR-AG-221) — «נסמן זוית BAM כ-A1» then «נקודה A1»: the name is
@@ -2176,8 +2403,26 @@ export function applyFact(c: Construction, f: Fact): ApplyOutcome {
    */
   const clash = radiusLetterClash(c, out.next);
   if (clash) return { ok: false, error: { code: 'radius-letter-taken', detail: f.src, holder: clash.letter, reading: clash.first } };
+  /*
+   * A LETTER THAT STANDS FOR A SIZE IS POSITIVE (#2419, ADR-AG-323). Asked of the CONSTRUCTION, here where every
+   * statement lands, so every family and both orders are one question: «a < 0» · «AB = a» and «AB = a» · «a < 0» are
+   * the same contradiction, refused naming the statement that completed it, as «a < 0» · «שרדיוסו a» already is.
+   */
+  if (sizeContradiction(out.next) !== null) {
+    return { ok: false, error: { code: 'out-of-domain', detail: f.src, domain: positivePart({}) } };
+  }
+  // A declaration a letter's size role already implies («r > 0» after «x²+y²=r²») adds nothing: already known.
+  if (f.t === 'param' && sizeLetters(c).has(f.sym) && sameRegisterDomain(c, out.next, f.sym)) return { ok: true, effect: 'known', next: c };
   const notice = readingTwin(c, f);
   return notice ? { ...out, notice } : out;
+}
+
+/** The register gives `sym` the same domain before and after (the role-implied one, #2419). */
+function sameRegisterDomain(before: Construction, after: Construction, sym: string): boolean {
+  const d = (k: Construction) => paramRegister(k).find((p) => p.sym === sym)?.domain;
+  const a = d(before);
+  const b = d(after);
+  return !!a && !!b && JSON.stringify(normalizeDomain(a)) === JSON.stringify(normalizeDomain(b));
 }
 
 /** Which readings the figure gives a radius capital: a positional object by that id, and a symbol something reads. */
@@ -2396,12 +2641,13 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
              * student's own and cannot be erased by an anonymous restatement.
              */
             const label = { ...prior.label, ...f.label, name: prior.label.name || f.label.name };
+            const promoted = toolNamed(c, { ...prior, label, stated: true });
             return {
               ok: true,
               effect: 'created',
               next: {
                 ...c,
-                objects: c.objects.map((o) => (o.id === f.id ? { ...prior, label, stated: true } : o)),
+                objects: c.objects.map((o) => (o.id === f.id ? promoted : o)),
               },
             };
           }
@@ -2462,6 +2708,16 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (twin) {
         const incoming = f.label.name;
         const held = twin.label.name;
+        // The TOOL's l-number yields to the student's own name for the same line (#2425 Q3, ADR-AG-319).
+        if (incoming && held && incoming !== held && twin.label.auto) {
+          const { auto: _tool, ...own } = twin.label;
+          const label = { ...own, ...f.label, name: incoming };
+          return {
+            ok: true,
+            effect: 'narrowed',
+            next: { ...c, objects: c.objects.map((o) => (o.id === twin.id ? { ...twin, label, stated: twin.stated || f.stated } : o)) },
+          };
+        }
         if (incoming && held && incoming !== held) {
           return { ok: false, error: { code: 'already-named', detail: f.src, holder: held } };
         }
@@ -2472,14 +2728,15 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
          */
         if ((incoming && !held) || (f.stated && !twin.stated)) {
           const label = { ...twin.label, ...f.label, name: held || incoming };
+          // The student's name is his own, never the tool's (a held tool name is kept only when he gave none).
+          if (incoming && !held) delete label.auto;
+          const merged = toolNamed(c, { ...twin, label, stated: twin.stated || f.stated });
           return {
             ok: true,
             effect: incoming && !held ? 'narrowed' : 'created',
             next: {
               ...c,
-              objects: c.objects.map((o) =>
-                o.id === twin.id ? { ...twin, label, stated: twin.stated || f.stated } : o,
-              ),
+              objects: c.objects.map((o) => (o.id === twin.id ? merged : o)),
             },
           };
         }
@@ -2504,12 +2761,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        */
       const inheritedStated =
         f.inheritExtent && segmentOverSameEnds(c, f.id) ? false : f.stated;
+      /*
+       * A NAME ANOTHER CURVE ALREADY CARRIES (#2425, ADR-AG-319): «נתון הישר l1: <eq>» where l1 is the label of a different
+       * line — named by restatement (#1342) or by the tool — would draw a second «l1». It is the same restatement as
+       * «הישר l1» given twice with two equations, and refused the same way.
+       */
+      if (f.label.name) {
+        const holder = curveByName(c, f.label.name);
+        if (holder && holder.id !== f.id) return { ok: false, error: { code: 'conflicting-restatement', detail: f.src } };
+      }
+      const made = toolNamed(c, { kind: 'curve', id: f.id, label: f.label, curve: f.curve, stated: inheritedStated });
       return {
         ok: true,
         effect: 'created',
         next: {
           ...c,
-          objects: [...c.objects, { kind: 'curve', id: f.id, label: f.label, curve: f.curve, stated: inheritedStated }],
+          objects: [...c.objects, made],
         },
       };
     }
@@ -2542,22 +2809,16 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * `curve-anon…` `unknown-reference` leak (#1145's class): the id now always exists.
        */
       if (f.k.t === 'on-curve' && f.k.eqSrc !== undefined) {
-        const { eqSrc, eq, ...bare } = f.k;
-        const resolved = resolveCurveByEq(c, eq) ?? f.k.curve;
-        let host = c;
-        if (resolved === f.k.curve && !objectById(c, resolved) && eq) {
-          const mint = applyFact(c, {
-            t: 'curve',
-            id: resolved,
-            label: { name: '', eqSrc },
-            curve: { eq: eq as Parameters<typeof resolveCurve>[0]['eq'] },
-            stated: false,
-            src: f.src,
-          });
-          if (!mint.ok) return mint;
-          host = mint.next;
-        }
-        return applyFact(host, { t: 'constraint', k: { ...bare, curve: resolved }, src: f.src });
+        const { eqSrc, eq, stated, ...bare } = f.k;
+        if (!eq) return applyFact(c, { t: 'constraint', k: bare, src: f.src });
+        /*
+         * The one equation-operand resolver (#2432, ADR-AG-318). A point placed on an equation holds a CARRIER (ADR-AG-032,
+         * the #2423 ruling); a sentence ABOUT the curve («הישר <eq> עובר דרך A», #2425 Q1) states it.
+         */
+        const role = stated ? 'stated' : 'carrier';
+        const op = equationOperand(c, { kind: 'eq', id: f.k.curve, label: eqSrc, eqSrc, eq: eq as Expr, role }, f.src);
+        if (!op.ok) return op;
+        return applyFact(op.next, { t: 'constraint', k: { ...bare, curve: op.id }, src: f.src });
       }
       /*
        * AN ANGLE LABEL NAMES ONE ANGLE (#1622 E5, ADR-AG-221; 2-D's ADR-386 `alias-taken`). «נסמן זוית BAM כ-A1» binds the
@@ -2935,6 +3196,21 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       if (!through || !isPositional(through)) {
         return { ok: false, error: unknownRef(c, f.through) };
       }
+      /*
+       * THE DIRECTION MUST NAME SOMETHING THE FIGURE HAS (#2431, ADR-AG-317). «ישר דרך A מקביל לישר l1» on a figure
+       * with no l1 used to be CREATED, with a `dir` pointing at nothing: the row recorded with no fault and nothing was
+       * drawn — a stated construction that vanished. The same references a relation's operand is held to (#1150).
+       */
+      const missingDir =
+        dirRefs(f.dir).find((id) => {
+          const o = objectById(c, id);
+          return !o || !isPositional(o);
+        }) ??
+        dirCurveRefs(f.dir).find((id) => {
+          const o = objectById(c, id);
+          return !o || !CURVE_BEARING.has(o.kind);
+        });
+      if (missingDir !== undefined) return { ok: false, error: unknownRef(c, missingDir) };
       const prior = objectById(c, f.id);
       /**
        * «הישר l3 עובר דרך N» — an EXISTING line through a point is an incidence, not a second line (#1281, M1).
@@ -3474,14 +3750,14 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * already on it keeps its referent — and its free symbols leave the figure: the incircle sentence's treatment of
        * the same circle (`the-circle`, above). Corpus 11/5 types its chords first and its equation second.
        */
-      if (host.kind === 'curve' && host.id === TOUCHED_CIRCLE_ID) {
-        const own = (sym: string) => sym.startsWith(toolSymbol(TOUCHED_CIRCLE_ID, ''));
-        const defined: Construction = {
-          ...c,
-          params: c.params.filter((p) => !own(p.sym)),
-          objects: c.objects.map((o) => (o.id === TOUCHED_CIRCLE_ID && o.kind === 'curve' ? { ...o, curve: { kind: 'circle', eq: f.eq } } : o)),
-        };
-        return { ok: true, next: defined, effect: 'narrowed' };
+      /*
+       * #2397 (ADR-AG-322): EVERY CIRCLE THE TOOL DREW — asked of the expression (`isCreatedCircle`, ADR-AG-219), never of
+       * the id. A pair «שני מעגלים» drew, «נתון מעגל»'s, the touch's: each takes the stated equation the same way, and
+       * what a statement already said about it is carried, never dropped (`describeDrawnCircle`).
+       */
+      if (isCreatedCircle(host)) {
+        const described = describeDrawnCircle(c, host, f.eq, f.src);
+        if (described) return described;
       }
       // An equation circle IS its equation: the same one is known, another is a contradiction.
       if (host.kind === 'curve') {
@@ -3537,6 +3813,22 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         if (!host || curveKindOf(host) !== 'circle') return { ok: false, error: unknownRef(c, numeralCurveId('circle', f.circle)) };
       } else if (f.eq !== undefined) {
         const id = resolveCurveByEq(c, f.eq);
+        /*
+         * «מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא …» (#2397, ADR-AG-322) — one of the pair the figure drew: the
+         * first of an interchangeable pair (or the one whose sibling is named, «האחר») has its centre named M by order
+         * (ADR-AG-219), then takes the equation (`describeDrawnCircle`). A pair a statement tells apart asks which. No
+         * drawn circle: the circle is created, as the sentence without the ordinal creates it.
+         */
+        if (!id && f.ofPair && !objectById(c, f.id)) {
+          const pick = circleToName(c);
+          if (pick?.t === 'ask') return { ok: false, error: noHost(f.src, 'circle', pick.circles) };
+          if (pick?.t === 'name') {
+            const named = namingByOrder(c, pick.host, f.id, f);
+            if (!named.ok) return named;
+            const described = applyFact(named.next, { t: 'circle-eq', circleId: pick.host.id, eq: f.eq, src: f.src });
+            return described.ok ? { ...described, effect: 'created' } : described;
+          }
+        }
         if (!id) return create();
         host = objectById(c, id);
         if (host && curveKindOf(host) !== 'circle') {
@@ -3673,6 +3965,29 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'tangent-of': {
+      /*
+       * A LINE GIVEN BY ITS EQUATION is resolved before anything reads the lines (#2432, ADR-AG-318): the figure's own
+       * line with that equation, or a curve minted in the operand's role. The tangency below then reads only ids.
+       */
+      if (f.lines?.some((l) => l.kind === 'eq')) {
+        let cur = c;
+        let minted = false;
+        const lines: TangentLineRef[] = [];
+        for (const l of f.lines) {
+          if (l.kind !== 'eq') {
+            lines.push(l);
+            continue;
+          }
+          const op = equationOperand(cur, l, f.src);
+          if (!op.ok) return op;
+          cur = op.next;
+          minted ||= op.minted;
+          lines.push({ kind: 'curve', id: op.id, label: l.label });
+        }
+        const out = applyFact(cur, { ...f, lines });
+        return out.ok && minted && out.effect === 'known' ? { ...out, effect: 'created' } : out;
+      }
+      const tangentLines = (f.lines ?? []) as TangentLineRef[];
       let host: GeoObject | undefined;
       if (f.circleId !== undefined) {
         host = objectById(c, f.circleId);
@@ -3722,7 +4037,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         host = circles[0];
       }
       // THE TOUCH POINT NAMED (#1619 B3, ADR-AG-195): any circle — the radius reads the resolved one.
-      if (f.at !== undefined) return applyTouchAt(c, host, f.at, f.axes, f.lines ?? [], f.src);
+      if (f.at !== undefined) return applyTouchAt(c, host, f.at, f.axes, tangentLines, f.src);
       /**
        * A circle the figure DETERMINES — stated by its equation, or computed from points (#1430 step 1,
        * ADR-AG-195): the distance from ITS centre to the line is ITS radius, both read off the resolved
@@ -3735,7 +4050,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         const circleId = host.id;
         return applyAll(
           c,
-          (f.lines ?? []).map((line) => ({ t: 'constraint' as const, k: { t: 'tangent-curve' as const, circle: circleId, line }, src: f.src })),
+          tangentLines.map((line) => ({ t: 'constraint' as const, k: { t: 'tangent-curve' as const, circle: circleId, line }, src: f.src })),
         );
       }
       const circle = host;
@@ -3745,7 +4060,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           k: { t: 'tangent-axis' as const, centre: circle.centre, r: circle.r, axis },
           src: f.src,
         })),
-        ...(f.lines ?? []).map((line) => ({
+        ...tangentLines.map((line) => ({
           t: 'constraint' as const,
           k: { t: 'tangent-line' as const, centre: circle.centre, r: circle.r, line },
           src: f.src,
@@ -3781,9 +4096,19 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       }
       const line: TangentLineRef = { kind: 'points', a: f.a, b: f.b };
       const touch = touchPointOf(c, c1, c2);
+      /*
+       * THE PAIR HAS ONLY THE TOUCH TANGENT (#2418, ADR-AG-321): circles touching from inside have one common tangent, the
+       * line through their common point; circles touching from outside have one INTERNAL common tangent, the same line.
+       * Either way the two-touch lowering has no configuration in any order, so the line is the tangent at the stated
+       * touch point — how the pair sits read off the figure as stated (`pairPositionOf`, ADR-AG-314), 2-D's capacity exit.
+       */
+      const position = touch !== null ? pairPositionOf(c, c1, c2) : null;
+      const onlyTouch = (position === 'int-tangent' && f.kind !== 'internal') || (position === 'ext-tangent' && f.kind === 'internal');
+      const figureSays = touch !== null && (touch === f.a || touch === f.b || onlyTouch || footOnPair(c, touch, f.a, f.b));
+      const linesSay = touch !== null && !figureSays && f.onLine?.includes(touch) === true;
       const touches: Fact[] =
-        touch !== null && (touch === f.a || touch === f.b || f.onLine?.includes(touch) || footOnPair(c, touch, f.a, f.b))
-          ? [{ t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: touch, src: f.src }]
+        figureSays || linesSay
+          ? [{ t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: touch!, src: f.src }]
           : [
               { t: 'tangent-of', axes: [], lines: [line], circleId: c1, at: f.a, src: f.src },
               { t: 'tangent-of', axes: [], lines: [line], circleId: c2, at: f.b, src: f.src },
@@ -3791,7 +4116,7 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
       const touched = applyAll(c, touches);
       if (!touched.ok) return touched;
       const drawn = applyFact(touched.next, { t: 'name-line', a: f.a, b: f.b, name: f.name ?? `${f.a}${f.b}`, src: f.src });
-      return drawn.ok ? { ...drawn, effect: 'created' } : drawn;
+      return drawn.ok ? { ...drawn, effect: 'created', ...(linesSay ? { touchByOnLine: true as const } : {}) } : drawn;
     }
 
     /**
@@ -3891,19 +4216,26 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     case 'tangent-eq': {
       const tangents = c.objects.filter(isTangentObject);
       if (tangents.length > 1) return { ok: false, error: noHost(f.src, 'line', tangents) };
-      const id = f.id;
+      /*
+       * The stated line is an EQUATION OPERAND (#2432, ADR-AG-318): when the figure already holds a line with that
+       * equation, the tangent IS that line. With a tangent object it is a carrier of the object's equation (one line is
+       * never drawn twice, ADR-AG-195); with none it is the line the sentence states, drawn.
+       */
+      const operand = (role: EqOperand['role']): EqOperand => ({
+        kind: 'eq',
+        id: f.id,
+        label: f.eqSrc,
+        eqSrc: f.eqSrc,
+        eq: f.eq,
+        role,
+        ...(role === 'stated' ? { line: true as const } : {}),
+      });
       if (tangents.length === 1) {
         const t = tangents[0] as Extract<GeoObject, { kind: 'line-at' }>;
         const circleId = t.dir.k === 'radius' ? t.dir.circle : undefined;
-        return applyAll(c, [
-          { t: 'curve', id, label: { name: '', eqSrc: f.eqSrc }, curve: { eq: f.eq }, stated: false, src: f.src },
-          { t: 'tangent-of', axes: [], lines: [{ kind: 'curve', id, label: f.eqSrc }], ...(circleId ? { circleId } : {}), at: t.through, src: f.src },
-        ]);
+        return applyFact(c, { t: 'tangent-of', axes: [], lines: [operand('carrier')], ...(circleId ? { circleId } : {}), at: t.through, src: f.src });
       }
-      return applyAll(c, [
-        { t: 'curve', id, label: { name: '', eqSrc: f.eqSrc, kind: 'line' }, curve: { kind: 'line', eq: f.eq }, stated: true, src: f.src },
-        { t: 'tangent-of', axes: [], lines: [{ kind: 'curve', id, label: f.eqSrc }], ...(f.circle !== undefined ? { circle: f.circle } : {}), src: f.src },
-      ]);
+      return applyFact(c, { t: 'tangent-of', axes: [], lines: [operand('stated')], ...(f.circle !== undefined ? { circle: f.circle } : {}), src: f.src });
     }
 
     case 'radius-of': {
@@ -4079,7 +4411,12 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
     }
 
     case 'tangent-circles': {
-      const pair = circlePairOf(c, f.a, f.b, f.src);
+      const byId = f.circles?.map((id) => objectById(c, id));
+      const pair: ReturnType<typeof circlePairOf> = byId
+        ? byId.every((o) => o && curveKindOf(o) === 'circle')
+          ? { ok: true, pair: [byId[0]!, byId[1]!] }
+          : { ok: false, error: unknownRef(c, f.circles![byId[0] ? 1 : 0]) }
+        : circlePairOf(c, f.a, f.b, f.src);
       if (!pair.ok) return pair;
       const [a, b] = pair.pair;
       // A circle is not tangent to itself — one circle named twice (or the contextual reading
@@ -5075,32 +5412,52 @@ function declaredRingSpelling(facts: readonly Fact[], group: readonly number[]):
 }
 
 /**
- * #2385 ([ADR-AG-312](../../docs/06c-decisions-analytic.md#adr-ag-312)) — WHAT THE EARLIER LINES PUT ON A COMMON
- * TANGENT'S LINE. «T על AB» · «AB משיק משותף למעגלים M ו-N»: the first line names A and B before anything defines them,
- * so the fold DEFERS it (the deferral fixpoint, ADR-AG-133) and the common tangent's own line is what declares A and
- * B. Its M1 lowering therefore sees a figure without T on AB, though the student stated it first and saw it drawn. Each
- * `common-tangent` is told here, as `onLine`, the points an earlier admitted line puts on its pair's line, so its
- * lowering reads the prefix the student stated, whatever order the fold lands it in. Only EARLIER lines: a later
- * «T על AB» is a statement about a common tangent already drawn. Positional, like `declaredRingSpelling`.
+ * #2385 ([ADR-AG-312](../../docs/06c-decisions-analytic.md#adr-ag-312)), #2418 ([ADR-AG-321](../../docs/06c-decisions-analytic.md#adr-ag-321))
+ * — WHAT THE STATED LINES PUT ON A COMMON TANGENT'S LINE. Each `common-tangent` is told here, as `onLine`, the points any
+ * OTHER admitted line puts on its pair's line, so where it touches is decided by the whole list, never by the order
+ * the lines were typed in. «T על AB» · «AB משיק משותף …»: the first line names A and B before anything defines them, so
+ * the fold defers it and the tangent's lowering sees a figure without T on AB. «AB משיק משותף …» · «T על AB»: the later
+ * line is the one that pins the line to the touch point (the operator's 2026-10-20 ruling on #2418: the same figure as
+ * the other order). Two shapes put a point on the pair's line: the `on-line-2pt` incidence («T על AB», «הישר AB עובר
+ * דרך T»), and a `tangent-of` over the points a, b at a touch («AB משיק למעגל M בנקודה T»), which gives its `at`.
+ * A faulted line is excluded by `include`, so its contribution drops with it (the fold's fixpoint re-runs this).
+ *
+ * `from` records, per common-tangent fact index, the LINES (groups) that contributed — `fold` reads it to record a
+ * later contributing line as `narrowed` (see `fold`). Positional, like `declaredRingSpelling`.
  */
-function earlierOnCommonTangents(facts: readonly Fact[], group: readonly number[], include: (i: number) => boolean): readonly Fact[] {
-  if (!facts.some((f) => f.t === 'circles-about' && f.about.some((g) => g.t === 'common-tangent'))) return facts;
+function statedOnCommonTangents(
+  facts: readonly Fact[],
+  group: readonly number[],
+  include: (i: number) => boolean,
+): { facts: readonly Fact[]; from: Map<number, Map<Id, Set<number>>> } {
+  const from = new Map<number, Map<Id, Set<number>>>();
+  if (!facts.some((f) => f.t === 'circles-about' && f.about.some((g) => g.t === 'common-tangent'))) return { facts, from };
   const pair = (u: Id, v: Id, a: Id, b: Id) => (u === a && v === b) || (u === b && v === a);
-  return facts.map((f, i) => {
+  const out = facts.map((f, i) => {
     if (f.t !== 'circles-about' || !f.about.some((g) => g.t === 'common-tangent')) return f;
     const about = f.about.map((g) => {
       if (g.t !== 'common-tangent') return g;
-      const on = new Set<Id>();
+      const on = new Map<Id, Set<number>>();
+      const put = (id: Id, j: number) => {
+        if (!on.has(id)) on.set(id, new Set());
+        on.get(id)!.add(group[j]);
+      };
       facts.forEach((h, j) => {
-        if (group[j] >= group[i] || !include(j)) return;
+        if (group[j] === group[i] || !include(j)) return;
         for (const k of factsWithin(h)) {
-          if (k.t === 'constraint' && k.k.t === 'on-line-2pt' && pair(k.k.a, k.k.b, g.a, g.b)) on.add(k.k.id);
+          if (k.t === 'constraint' && k.k.t === 'on-line-2pt' && pair(k.k.a, k.k.b, g.a, g.b)) put(k.k.id, j);
+          if (k.t === 'tangent-of' && k.at !== undefined && (k.lines ?? []).some((l) => l.kind === 'points' && pair(l.a, l.b, g.a, g.b))) put(k.at, j);
         }
       });
-      return on.size > 0 ? { ...g, onLine: [...on] } : g;
+      if (on.size === 0) return g;
+      const prior = from.get(i) ?? new Map<Id, Set<number>>();
+      on.forEach((lines, id) => prior.set(id, new Set([...(prior.get(id) ?? []), ...lines])));
+      from.set(i, prior);
+      return { ...g, onLine: [...on.keys()] };
     });
     return { ...f, about };
   });
+  return { facts: out, from };
 }
 
 export interface FoldResult {
@@ -5159,7 +5516,9 @@ export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldR
   const excluded = new Map<number, ApplyError>(); // line → the error that faulted it
   for (;;) {
     const include = (i: number) => !excluded.has(group[i]);
-    const r = foldPass(earlierOnCommonTangents(facts, group, include), include, group);
+    const stated = statedOnCommonTangents(facts, group, include);
+    const r = foldPass(stated.facts, include, group);
+    reDecidedBy(r, stated.from, group);
     let newly = 0;
     r.errors.forEach((e, i) => {
       if (e && !excluded.has(group[i])) {
@@ -5184,7 +5543,7 @@ export function fold(facts: readonly Fact[], groupOf?: readonly number[]): FoldR
 }
 
 /** One fold over the facts `include` admits: the in-order pass, then the deferral fixpoint. */
-function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group?: readonly number[]): FoldResult {
+function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group?: readonly number[]): FoldResult & { touchByOnLine?: boolean[] } {
   let c = EMPTY_CONSTRUCTION;
   const errors: Array<ApplyError | null> = facts.map(() => null);
   const effects: Array<LineEffect | null> = facts.map(() => null);
@@ -5206,7 +5565,9 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
   // The same attribution for SELECTORS (#1619 B1): a region («מחוץ למעגל») is a selector M1 builds from a
   // contextual fact, so the line that stated it can only be found from the construction, as for constraints.
   const selectorFact: number[] = [];
-  const commit = (i: number, next: Construction, effect: LineEffect, notice?: ApplyNotice) => {
+  const touchByOnLine: boolean[] = facts.map(() => false);
+  const commit = (i: number, next: Construction, effect: LineEffect, notice?: ApplyNotice, byOnLine?: true) => {
+    touchByOnLine[i] = byOnLine === true;
     const before = c.constraints;
     const beforeSel = c.selectors;
     c = next;
@@ -5243,7 +5604,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
     }
     const out = applyFact(c, f);
     if (out.ok) {
-      commit(i, out.next, out.effect, out.notice);
+      commit(i, out.next, out.effect, out.notice, out.touchByOnLine);
       if (out.restates) restated.add(lineOfFact(i));
     } else errors[i] = out.error;
   });
@@ -5259,7 +5620,7 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
         if (failedOn.get(i) === c) return;
         const out = applyFact(c, f);
         if (out.ok) {
-          commit(i, out.next, out.effect, out.notice);
+          commit(i, out.next, out.effect, out.notice, out.touchByOnLine);
           progressed = true;
         } else {
           errors[i] = out.error;
@@ -5319,13 +5680,36 @@ function foldPass(facts: readonly Fact[], include: (i: number) => boolean, group
         next = out.next;
       }
       if (landed.length !== failing.length) continue;
-      for (const { j, out } of landed) commit(j, out.next, j === landed[0].j ? 'created' : out.effect, out.notice);
+      for (const { j, out } of landed) commit(j, out.next, j === landed[0].j ? 'created' : out.effect, out.notice, out.touchByOnLine);
       minted = true;
     }
     if (!minted) break;
     fixpoint();
   }
-  return { construction: c, errors, effects, constraintFact, selectorFact, notices };
+  return { construction: c, errors, effects, constraintFact, selectorFact, notices, touchByOnLine };
+}
+
+/**
+ * A LINE THAT RE-DECIDED AN EARLIER COMMON TANGENT IS NARROWED, NOT KNOWN (#2418, ADR-AG-321). «AB משיק משותף …» ·
+ * «T על הישר AB»: the later line is the only reason the tangent is lowered at T (`touchByOnLine`), and once it is, the
+ * tangent entails the line — so the line's own facts come out `known`, and `decideSubmit` would answer «already known»
+ * and drop the one line that changed the figure. A contributing line AFTER the tangent's line, whose facts the tangent
+ * absorbed, is therefore `narrowed` (it records). A line that genuinely follows — the tangent already at T for its
+ * letters, the figure, or the pair's position — is not marked, and keeps `known` (ADR-AG-020).
+ */
+function reDecidedBy(r: FoldResult & { touchByOnLine?: boolean[] }, from: Map<number, Map<Id, Set<number>>>, group: readonly number[]): void {
+  const by = r.touchByOnLine;
+  delete r.touchByOnLine;
+  if (!by || from.size === 0) return;
+  const later = new Set<number>();
+  from.forEach((points, i) => {
+    if (!by[i] || r.errors[i]) return;
+    points.forEach((lines) => lines.forEach((g) => g > group[i] && later.add(g)));
+  });
+  if (later.size === 0) return;
+  r.effects.forEach((e, j) => {
+    if (e === 'known' && later.has(group[j])) r.effects[j] = 'narrowed';
+  });
 }
 
 /**

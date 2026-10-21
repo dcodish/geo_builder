@@ -201,8 +201,13 @@ function liveRoots(
   return live.length > 0 ? live : scanned;
 }
 
-/** The scan's reach: 64 × the construction's largest numeric literal (at least 1). */
-export function pinReach(...parts: unknown[]): number {
+/**
+ * THE FIGURE'S STATED SCALE — the construction's largest numeric literal, at least 1 (#2426, ADR-AG-324). Read off
+ * what the student STATED (every number in the objects' and constraints' expressions), never off a position a
+ * parameter moves, so it cannot grow with the value it scales. One function: the pin scan's reach and the free
+ * parameter's sampling range ({@link pinReach}, `sampleParam`) and the free vertex's seeding box all read it.
+ */
+export function statedScale(...parts: unknown[]): number {
   let s = 1;
   const walk = (v: unknown): void => {
     if (typeof v === 'number') {
@@ -214,5 +219,10 @@ export function pinReach(...parts: unknown[]): number {
     else Object.values(v as Record<string, unknown>).forEach(walk);
   };
   parts.forEach(walk);
-  return 64 * s;
+  return s;
+}
+
+/** The scan's reach: 64 × the construction's largest numeric literal (at least 1). */
+export function pinReach(...parts: unknown[]): number {
+  return 64 * statedScale(...parts);
 }

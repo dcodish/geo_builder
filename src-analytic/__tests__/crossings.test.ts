@@ -138,8 +138,9 @@ describe('#1092 — an equation is a name the grammar can use', () => {
     it(`offers both rings for ${JSON.stringify(spelling)}`, () => {
       const { crossings } = at([...T, spelling]);
       expect(crossings).toHaveLength(2);
-      // Both rings name the SAME line, by the equation the student actually typed.
-      const expected = `הישר ${spelling.replace(/^(?:נתון הישר |the line )/, '')}`;
+      // Both rings name the SAME line. Since #2425 (ADR-AG-319, operator ruling 2026-10-20 Q4) a declared line the
+      // student did not name carries the tool's next free l-number, and the ring names it by that name.
+      const expected = 'הישר l1';
       expect(crossings.map((k) => k.second)).toEqual([expected, expected]);
       // ...and the other side is the triangle's own sides, not the line again. #1269/ADR-AG-124: those
       // sides are edges of a declared polygon, so they name themselves «הצלע» — the stated LINE keeps

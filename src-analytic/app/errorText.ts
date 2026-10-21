@@ -204,6 +204,8 @@ export function errorText(error: InputError, t: Translate): string {
     // #1888 / #1889 (ADR-AG-251) — a line that loses a part: its parts listed, or the right angle's two lines taught
     'split-statements': error.key === 'split-statements' && error.teach ? 'errRightAngleVertex' : 'errSplitStatements',
     'reserved-coordinate': 'errReservedCoordinate',
+    // #2427 (ADR-AG-325) — the operator's ruled sentence (2026-10-20), with the corrected line
+    'capital-magnitude': 'errCapitalMagnitude',
     'bad-arity': 'errBadArity',
     'repeated-vertex': 'errRepeatedVertex',
     // #2386 (ADR-AG-310) — the operator's ruled sentence (2026-10-20, option (a)) and its horizontal mirror
@@ -372,6 +374,8 @@ export function errorText(error: InputError, t: Translate): string {
     decimal: error.key === 'mixed-number' ? (error.decimal ?? '') : '',
     sum: error.key === 'mixed-number' ? error.sum : '',
     product: error.key === 'mixed-number' ? error.product : '',
+    letter: error.key === 'capital-magnitude' ? error.letter : '',
+    corrected: error.key === 'capital-magnitude' ? error.corrected : '',
     role: error.key === 'ambiguous-role-side' ? t(error.role === 'leg' ? 'roleWordLeg' : 'roleWordBase') : '',
     side: error.key === 'bisector-is-side' ? (error.pair ?? '') : '',
     vertex: error.key === 'bisector-is-side' ? (error.vertex ?? '') : '',

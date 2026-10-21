@@ -65,7 +65,7 @@ export interface StepVerdict {
  */
 export type StepRunner = (steps: readonly string[]) => readonly StepVerdict[] | Promise<readonly StepVerdict[]>;
 
-export type ExceptionId = 'X1' | 'X2' | 'X3' | 'X4' | 'X5' | 'X6' | 'X7' | 'X8' | 'X9' | 'X10';
+export type ExceptionId = 'X1' | 'X2' | 'X3' | 'X4' | 'X5' | 'X6' | 'X7' | 'X8' | 'X9' | 'X10' | 'X11';
 
 export interface ExceptionFamily {
   title: string;
@@ -181,6 +181,15 @@ export const EXCEPTIONS: Readonly<Record<ExceptionId, ExceptionFamily>> = {
     mustRefuse: ['analytic'],
     topic: false,
     patterns: [/[A-Z]{2}\s*=\s*(?:[A-Z]{2}\s*=\s*)?[\d√]*\s*[xy](?![A-Za-z])/],
+  },
+  X11: {
+    title: 'a capital letter as a size in analytic («נתון מעגל O שרדיוסו K», «AB = AC + D»)',
+    reason:
+      "operator ruling 2026-10-20 on #2427 (ADR-AG-325, amending ADR-AG-307's \"only R\"): in analytic a capital letter is a point's name, so a size written with one — a radius, a length, an angle, a parameter — is refused with a teaching message (sizes are lowercase, except R for a radius and an area's label); \"Only R\" stays analytic-only, so 2-D keeps reading a capital radius («שרדיוסו K») and declines «AB = AC + D». Every other spelling is a plain parity row",
+    products: ['2d', '3d'],
+    mustRefuse: ['analytic'],
+    topic: false,
+    patterns: [/(?:רדיוס\S*|radius)\s+[A-QS-Z](?![A-Za-z0-9₀-₉_'])/, /[=+−-]\s*\d*[A-QS-Z](?![A-Za-z0-9₀-₉_'])\s*$/],
   },
 };
 
@@ -300,6 +309,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2415': 'open', // #2391 (ADR-AG-315): 2-D does not read «M מקיימת …», the centres' distance by role, or the distributed named circle pair
   '#2420': 'open', // #2391 (ADR-AG-315): 3-D does not read «M מקיימת …» or an underscore index «N_2»
   '#2421': 'open', // #2388 (ADR-AG-307): 2-D does not read «R = 2r», «r:R = 1:2» or the unnamed ratio of two radii
+  '#2430': 'open', // #2418 (ADR-AG-321): 2-D refuses «T על AB» typed after «AB משיק משותף …» (the reverse order), awaiting the cross-tool ruling
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1060,6 +1070,8 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2407 + #2406 (ADR-740): a common tangent through the circles' touch point is the tangent AT the touch ──
   { id: 'tangent-through-common-point-2406', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'המעגלים משיקים בנקודה T', 'המשיק העובר בנקודה המשותפת לשני המעגלים'], expect: 'builds', exception: 'X8', note: '2-D drew a two-touch tangent through neither touch, green, before ADR-740; analytic reads it since ADR-AG-314 (#2390)' },
   { id: 'common-tangent-through-touch-internal-2407', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים מבפנים בנקודה T', 'T על AB', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', note: '2-D sent it to the AI before ADR-740 (the figure is locked in src/__tests__/issue-2407-common-tangent-at-touch.test.ts); analytic builds it since ADR-AG-312 (#2385 D1 reads the internal pair too)' },
+  // ── #2428 (ADR-741): the only common tangent of circles touching from the inside, named by two free points ──
+  { id: 'common-tangent-inside-pair-free-ab-2428', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים מבפנים בנקודה T', 'נקודה A', 'נקודה B', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', note: 'analytic builds it via ADR-AG-321 (#2418, the touch tangent of an inside pair); 2-D sent it to the AI before ADR-741, which drew A, B and T crowded at the touch; the figure is locked in src/__tests__/issue-2428-internal-pair-tangent-at-t.test.ts' },
   { id: 'circle-inside-the-circle-1622', family: 'circles', steps: ['מעגל O', 'מעגל מוכל בתוך המעגל'], expect: 'builds', exception: 'X8' },
   { id: 'circle-by-circumference', family: 'circles', steps: ['מעגל O שהיקפו 6π'], expect: 'builds', exception: 'X8' },
   // ── #1621 D2 (ADR-AG-215): an angle named by a Greek letter, the «נסמן» lead-in, the pin, and tan/cos of an angle ──
@@ -1236,7 +1248,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'point-value-angle-order-1701', family: 'angles', steps: ['משולש ABC', '∢ABC < A'], expect: 'not-handled' },
   { id: 'point-value-length-1701', family: 'lengths', steps: ['משולש ABC', 'AB = A1'], expect: 'not-handled' },
   { id: 'point-value-length-coef-1701', family: 'lengths', steps: ['משולש ABC', 'AB = 2A'], expect: 'not-handled' },
-  { id: 'point-value-length-sum-1701', family: 'lengths', steps: ['משולש ABC', 'AB = AC + D'], expect: 'not-handled', note: 'a capital left over after the pairs were read' },
+  { id: 'point-value-length-sum-1701', family: 'lengths', steps: ['משולש ABC', 'AB = AC + D'], expect: 'not-handled', exception: 'X11', note: 'a capital left over after the pairs were read; D is no point of the figure, so analytic refuses it as a capital size (#2427, ADR-AG-325)' },
   { id: 'point-value-length-order-1701', family: 'lengths', steps: ['משולש ABC', 'AB < C'], expect: 'not-handled' },
   { id: 'radius-value-length-1701', family: 'lengths', steps: ['משולש ABC', 'AB = 1.6R'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'control — the radius R is the one capital a length value admits (2-D ADR-034)' },
   { id: 'area-label-capital-1701', family: 'area-perimeter', steps: ['משולש ABC', 'שטח המשולש ABC = S'], expect: 'builds', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: 'control — an area label is a capital in 2-D (parseAreaExpr)' },
@@ -1695,6 +1707,17 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2385 (ADR-AG-312): a common tangent through the circles' stated touch point is the tangent at it ──
   { id: 'common-tangent-through-touch-2385', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'T על AB', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', note: '2-D builds it since ADR-740 (#2407); analytic since ADR-AG-312 (#2385)' },
 
+  // ── #2418 (ADR-AG-321): the common tangent reads a LATER line that pins it to the touch point; the pair's only tangent ──
+  { id: 'common-tangent-later-pin-2418', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'AB משיק משותף למעגלים M ו-N', 'T על AB'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2430' }], note: 'the reverse order of #2385; 2-D refuses it (over-constrained), its twin #2430 awaits the cross-tool ruling' },
+  { id: 'common-tangent-internal-touch-alone-2418', family: 'tangents', steps: ['מעגל O', 'מעגל K', 'מעגל O ומעגל K משיקים מבפנים בנקודה T', 'AB משיק משותף למעגלים O ו-K'], expect: 'builds', exception: 'X8', note: '2-D draws tan-T (ADR-740); analytic did not before ADR-AG-321' },
+
+  // ── #2397 (ADR-AG-322): two circles introduced before they are described — the pair a tangency sentence draws ──
+  { id: 'pair-tangent-first-2397', family: 'circles', steps: ['נתונים שני מעגלים המשיקים זה לזה מבחוץ'], expect: 'builds', exception: 'X8', note: 'analytic refused it on an empty canvas before ADR-AG-322' },
+  { id: 'pair-tangent-internal-first-2397', family: 'circles', steps: ['שני מעגלים משיקים מבפנים'], expect: 'builds', exception: 'X8', note: 'analytic refused it on an empty canvas before ADR-AG-322' },
+  { id: 'the-circles-tangent-empty-2397', family: 'circles', steps: ['המעגלים משיקים מבחוץ'], expect: 'builds', exception: 'X8', note: 'analytic refused it on an empty canvas before ADR-AG-322' },
+  { id: 'pair-tangent-named-by-order-2397', family: 'circles', steps: ['שני מעגלים משיקים מבחוץ', 'O מרכז המעגל', 'P מרכז המעגל'], expect: 'builds', exception: 'X8', note: 'a tangent pair is named by order (the #1688 ruling); analytic asked which before ADR-AG-322' },
+  { id: 'pair-internal-asks-2397', family: 'circles', steps: ['שני מעגלים משיקים מבפנים', 'O מרכז המעגל'], expect: 'asks', exception: 'X8', note: 'circles touching from inside are told apart (one inside the other): both builders ask which' },
+
   // ── #2390 (ADR-AG-314): every common tangent in one sentence; the tangent at the touching circles' common point ──
   { id: 'all-common-tangents-2390', family: 'tangents', steps: ['שני מעגלים זרים', 'כל המשיקים המשותפים לשני המעגלים'], expect: 'builds', exception: 'X8', note: 'the verdicts agree; the drawing does not: 2-D draws ONE tangent (found work, filed with #2390), analytic draws the four' },
   { id: 'touch-tangent-2390', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'המשיק המשותף בנקודת ההשקה'], expect: 'builds', exception: 'X8', note: 'analytic did not read it before ADR-AG-314' },
@@ -1722,6 +1745,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'diameter-construct-2391', family: 'circles', steps: ['מעגל M', 'N₂A הוא קוטר המעגל M'], expect: 'builds', exception: 'X8' },
   { id: 'centre-after-circle-2391', family: 'circles', steps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'מרכז המעגל I הוא K'], expect: 'builds', exception: 'X8', only: ['analytic'], note: 'a numeral circle is named by its equation (#1257), so only analytic can state the context' },
   { id: 'centres-respectively-2391', family: 'circles', steps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1', 'K ו-L מרכזי המעגלים I ו-II בהתאמה'], expect: 'builds', exception: 'X8', only: ['analytic'], note: 'as centre-after-circle-2391' },
+  // ── #2427 (ADR-AG-325): a capital letter as a size — analytic refuses it with the lowercase lesson; "only R" is analytic's ──
+  { id: 'capital-radius-2427', family: 'circles', steps: ['נתון מעגל O שרדיוסו K'], expect: 'builds', exception: 'X11', only: ['2d'], note: 'the T38 line (#2414); 2-D reads K as its radius symbol' },
+  { id: 'capital-radius-centre-2427', family: 'circles', steps: ['מעגל שמרכזו O ורדיוסו K'], expect: 'builds', exception: 'X11', only: ['2d'] },
+  { id: 'capital-length-2427', family: 'lengths', steps: ['משולש ABC', 'AB = K'], expect: 'not-handled', exception: 'X11', note: '2-D and 3-D hand it to the model; analytic refuses it, teaching «AB = k» (#2427)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

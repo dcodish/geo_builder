@@ -1403,7 +1403,7 @@ the closed-endpoint ruling and a scale check at 1000×.
 
 ## ADR-AG-022 — An unbounded parameter varies in SIGN; seed 0 may still be the familiar draw (#1019)
 
-**Status:** accepted, 2026-09-15 · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056)
+**Status:** accepted, 2026-09-15 · **Round:** [#1056](https://github.com/dcodish/geo_builder/issues/1056) · **Amended by [ADR-AG-324](#adr-ag-324) (2026-10-20, #2426):** past configuration 0 the magnitude is in the figure's own units, [1, max(4, 1.5·S)), for a parameter no given reaches; seed 0 keeps [1, 4)
 
 **Requirements:** [02c](02c-requirements-analytic.md) §9 R46. **Design:** none (internal to
 `engine/evaluate.ts`'s sampler).
@@ -2171,7 +2171,7 @@ which is a mechanism rather than a rule. [#1060](https://github.com/dcodish/geo_
 ## ADR-AG-032 — A CARRIER is not a stated object (#1076)
 
 **Status:** accepted, 2026-09-15 · **Amends:** [ADR-AG-029](#adr-ag-029) (#1073) ·
-**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067) · **⚠ Partly superseded by [ADR-AG-041](#adr-ag-041) (2026-09-15):** the panel half is reversed: the data panel shows slopes, not the carrier.
+**Round:** [#1067](https://github.com/dcodish/geo_builder/issues/1067) · **⚠ Partly superseded by [ADR-AG-041](#adr-ag-041) (2026-09-15):** the panel half is reversed: the data panel shows slopes, not the carrier. · **⚠ Amended by [ADR-AG-319](#adr-ag-319) (2026-10-20, operator ruling on #2425):** a carrier is a curve minted to hold a POINT, not every inline curve; a curve the sentence is about is drawn and named.
 
 **Requirements:** [02c](02c-requirements-analytic.md) §9 R56. **Design:**
 [04c](04c-design-analytic.md) "A point on an object".
@@ -8096,7 +8096,7 @@ The pre-played sheet (20 cases, 8 red) and the operator ruling of the same day. 
 
 ### ADR-AG-169 Am. 1 — the pre-played sheet: one role reader, one ask normaliser, one substitution seam (2026-09-29 pre-play)
 
-**Status:** accepted · 2026-09-29 · the pre-played sheet on PR #1513 (20 cases, 10 red) and the operator's go-ahead to fix the five open PRs the same day.
+**Status:** accepted · 2026-09-29 · the pre-played sheet on PR #1513 (20 cases, 10 red) and the operator's go-ahead to fix the five open PRs the same day. **Amended by [ADR-AG-323](#adr-ag-323) (2026-10-20, #2419):** the domain of a positive multiple («שרדיוסו 2a») is now carried back onto `a` (a > 0) through the size-letter role, not through this seam.
 
 **Requirements:** [02c](02c-requirements-analytic.md) R180 (new; numbered R122 until #2404) · **Design:** [04c](04c-design-analytic.md#measure-roles-one-reader-one-ask-normaliser-one-substitution-seam-adr-ag-169-am-1)
 
@@ -8192,6 +8192,8 @@ The pre-played sheet (20 cases, 8 red) and the operator ruling of the same day. 
 **Measured.** 7 merge locks in `issue-1271-1336-conic-naming.test.ts`; the #1511 and #1513 sheets replayed on the merged server.
 
 ## ADR-AG-172 — The fallback teaches the session's language: a one-locale prompt, and rows that show the student's own sentence (#1297)
+
+**⚠ Partly superseded by [ADR-AG-326](#adr-ag-326) (2026-10-20):** a row that is one PART of a split answer shows its own line, not the sentence. A one-line answer still shows the sentence, and the stored annotation stands.
 
 **Status:** accepted · 2026-09-28 · operator rulings 2026-09-24 (*"nothing should be in english if data was entered in hebrew"*) and 2026-09-27 (*"student's words now, form later"* — the proper-form-beside split to #1468) · round #1510. Numbered 172 beside the round's parallel branches.
 
@@ -9868,7 +9870,7 @@ Recommendation: (c) when the figure has a length variable x, else (b). Option (a
 - **2-D names a circle of a NON-interchangeable pair by order** — «מעגל מוכל בתוך המעגל הגדול» · «C על מעגל P» names the outer circle P in 2-D, against the ruling's "circles that are not interchangeable still ask which" (its `autosInterchangeable` does not read `set-circle-position`). Analytic asks, as the ruling says. Reported for the operator; no parity row.
 - **A lone unnamed circle**: 2-D names it by use («AB קוטר» · «C על מעגל O» names the diameter circle O, ADR-347); analytic keeps ADR-AG-210's lock (a new circle O). Ruled on #1670/#1686 for analytic; reported as a remaining disparity.
 - **«מרכז המעגל» does not letter the centre**: 2-D's `name-center` reveals its hidden centre; here the centre stays unnamed (#1673 / ADR-AG-210) and the sentence binds the circle.
-- **«AD חותך את מעגל O»** (the secant with only the far point named) and **«R = 1.5r»** (a ratio between radius letters) are not read; **«שני מעגלים משיקים מבחוץ»** stays `ambiguous-shape` (the tangency of two created circles needs centre points, `out-of-scope` there).
+- **«AD חותך את מעגל O»** (the secant with only the far point named) and **«R = 1.5r»** (a ratio between radius letters) are not read; **«שני מעגלים משיקים מבחוץ»** stays `ambiguous-shape` (the tangency of two created circles needs centre points, `out-of-scope` there). **⚠ Amended by [ADR-AG-322](#adr-ag-322) (2026-10-20, operator ruling on #2397): it draws the pair.**
 - **«AB מיתר במעגל O ומשיק למעגל P» on an empty canvas** builds here (its two sentences each state their circle, ADR-AG-210) where 2-D refuses it; beside two circles both build (parity row `chord-tangent-other-circle-1622`).
 
 **Consequences.** `engine/types.ts` (`circles-about`, `CircleSlot`, `CIRCLE_SLOT_SENTINELS`, three `Quantity` members, `factsWithin`), `engine/apply.ts` (the `circles-about` arm, `touchedCircleFacts(src, id, r)`, `isCreatedCircle`, `freshCircleIds`, `relateCircles`, `createdParts`, `interchangeable`, `circleToName`, `namingByOrder`; `statingNamedCircle`, `centre-of`, `radius-of`, the selector refs), `engine/evaluate.ts` (`circlePairQuantity`, the `params` sign), `engine/toolLetters.ts` (four roles), `parser/parseAnalytic.ts` (`parseCircleFamilies`), `parser/catalogAnalytic.ts` (28 rows — the LLM vocabulary grows by them; diff the built proxy before deploy). Sibling check (docs/17 §1): 2-D is the reference (above); 3-D has no circles of this kind (X8).
@@ -12882,14 +12884,14 @@ No other sequence moved.
 **Decision.**
 1. **A new fact `common-tangent { a, b, circles, onLine? }`**, written over the circle-slot sentinels inside `circles-about`. `commonTangentFacts` emits it in place of the two `touchAt`s; the declarations, `distinct [a, b]`, the stated kind's `centres-side` selector and the segment stay as they were.
 2. **M1 decides where it touches** (`apply.ts`, `case 'common-tangent'`). When the figure STATES the two circles touch at a point (`touchPointOf`: the `touch-point` derived point of «המעגלים משיקים בנקודה T») and that point is one of the letters, or the figure puts it on the pair's line (`footOnPair`), or an earlier line does (`onLine`), the line is lowered as the tangent to the first circle AT that point: the at-form's own lowering («… בנקודה T»), which the second circle shares. Otherwise `a` touches the first circle and `b` the second, byte for byte the old facts.
-3. **`onLine` is the prefix the student stated** (`earlierOnCommonTangents`, run by `fold` before each pass over the admitted lines). Each `common-tangent` is told the points an EARLIER admitted line puts on its pair's line (`on-line-2pt`). Only earlier lines: a later «T על AB» is a statement about a tangent already drawn, and it keeps today's answer. Positional, like `declaredRingSpelling`.
+3. **⚠ Amended by [ADR-AG-321](#adr-ag-321) (2026-10-20, operator ruling on #2418): "only earlier lines" is withdrawn; the pre-pass is `statedOnCommonTangents` and reads every admitted line.** **`onLine` is the prefix the student stated** (`earlierOnCommonTangents`, run by `fold` before each pass over the admitted lines). Each `common-tangent` is told the points an EARLIER admitted line puts on its pair's line (`on-line-2pt`). Only earlier lines: a later «T על AB» is a statement about a tangent already drawn, and it keeps today's answer. Positional, like `declaredRingSpelling`.
 4. **Not changed.** Existing letters that are not the touch point, letters on the circles, and fresh letters are still the two touches (the scope ruling). «… חיצוני …» through T stays `unsatisfiable`: no external common tangent passes through T (the centres lie on opposite sides of the tangent there). The `fromA` common tangents keep their tool letters.
 
 **Pickup check 3 (corpus).** Every analytic fixture, test literal, catalog row and parity row with «משיק משותף» / "common tangent" was grepped. None states a touch point before its tangent, so each lowers through the unchanged arm (`issue-1622-e3-circles-tangents.test.ts` green, the catalog rows parse).
 
 **Measured after.** The operator's sequence builds AB as x = 7 through T(7,0) (seeds 0–3). «לשני המעגלים», «פנימי», the English sentence, the internally tangent pair (x = 5), fixed centres, free circles (2-D's spelling: AB ⟂ MN at T), and the touch point as a letter («TB …», «BT …») build likewise. «חיצוני» through T is refused. The existing free letters, the on-circle letters and the fresh Q3F letters give the same touches as before (P(−10,−4), Q(6,8) at seed 0). M, N and T do not move (fixed centres 1e-9; Q2's solved centre within 1e-6).
 
-**Found work, not built.** The reverse order, «AB משיק משותף …» · «T על AB», is still refused `unsatisfiable`: A and B are drawn as touches first. Building it would re-read an earlier line from a later one, so it is a question for the operator, recorded in the round report. The plan's found items (repeated letter-tangents collapsing, the nested-pair message) are unchanged.
+**Found work, not built.** **⚠ Amended by [ADR-AG-321](#adr-ag-321): the reverse order builds (the operator's ruling on #2418).** The reverse order, «AB משיק משותף …» · «T על AB», is still refused `unsatisfiable`: A and B are drawn as touches first. Building it would re-read an earlier line from a later one, so it is a question for the operator, recorded in the round report. The plan's found items (repeated letter-tangents collapsing, the nested-pair message) are unchanged.
 
 **Sibling audit.** 2-D refuses the same sequence (`over-constrained`): the P1 port #2407 (operator ruling 2026-10-20). The parity row carries 2-D's known gap naming it. 3-D: X8 (no plane circles; the ruling: not needed). Complex: no common-tangent grammar, so the class is not present.
 
@@ -13059,7 +13061,7 @@ No other sequence moved.
 
 **Decision.**
 1. **Frame rewrites, each to the twin's own text** (`parser/frameAnalytic.ts`, the ADR-AG-187 mechanism). Because each form is rewritten to its twin's text, it cannot lower differently from the twin ([ADR-W-053](06w-decisions-workspace.md#adr-w-053)).
-   - `circleCentreClauses` (A1, A2): a circle with its centre gives the circle, then «K מרכז המעגל I». A circle named only by its centre, with an equation, gives «M מרכז המעגל EQ». The equation slot stops at a top-level comma, so «…, a הוא פרמטר חיובי» is the comma partition's second clause. «האחד/האחר» carries no meaning while no pair has been introduced (#2397).
+   - `circleCentreClauses` (A1, A2): a circle with its centre gives the circle, then «K מרכז המעגל I». A circle named only by its centre, with an equation, gives «M מרכז המעגל EQ». The equation slot stops at a top-level comma, so «…, a הוא פרמטר חיובי» is the comma partition's second clause. «האחד/האחר» carries no meaning while no pair has been introduced (#2397). **⚠ Amended by [ADR-AG-322](#adr-ag-322): the ordinal is kept and describes a drawn pair.**
    - `centreClauses` (A3): «(ה)מרכז / מרכזו (של) (ה)מעגל C (הוא|ב…) K» gives «K מרכז המעגל C». The slot after «המעגל» reads a numeral first (`CIRCLE_REF`), so «מעגל II» is never the point I.
    - `centresRespectivelyClauses` (A4): two such namings, paired by the shared `respectively` helper, which #2392 reuses.
    - `satisfiesClause` (A6, 2-D's sentence): «X מקיימת S» is read as S, but `readLine` takes it only when S's facts name X. The point is then declared, as «נקודה M» declares it, so «M מקיימת AB = CD» is not read and M is never dropped.
@@ -13088,7 +13090,7 @@ No other sequence moved.
 
 | Item | Why |
 |---|---|
-| Part C — «נתונים שני מעגלים …» before any circle, and «האחד/האחר» promoting it | #2397 |
+| Part C — «נתונים שני מעגלים …» before any circle, and «האחד/האחר» promoting it | #2397 — **built by [ADR-AG-322](#adr-ag-322)** |
 | the `N2` / `N₂` identity | a product change, not ruled |
 | an implicit origin O | no exam sentence writes it |
 
@@ -13238,7 +13240,7 @@ No other sequence moved.
 
 ## ADR-AG-307 — Relations between parameters; R is the one capital that names a size (#2388)
 
-**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream B); branch `feat/2388-analytic-param-relations`, stacked on ADR-AG-306's branch, for the operator's play-and-approve. **Amends** [ADR-AG-163](#adr-ag-163) (a capital is never a parameter, except R) and [ADR-AG-238](#adr-ag-238) (`LENGTH_CAPITALS` → `RADIUS_CAPITALS`, now used by every reader). LADDER stage: none (analytic's joint solve; LADDER describes 2-D's ladder).
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2414 (stream B); branch `feat/2388-analytic-param-relations`, stacked on ADR-AG-306's branch, for the operator's play-and-approve. **⚠ Partly superseded by [ADR-AG-323](#adr-ag-323) (2026-10-20, #2419):** its line "No `r > 0` is inferred" no longer holds: a radius written squared in an equation is positive, so Q2 in the exam's form shows one equation per circle. **Amends** [ADR-AG-163](#adr-ag-163) (a capital is never a parameter, except R) and [ADR-AG-238](#adr-ag-238) (`LENGTH_CAPITALS` → `RADIUS_CAPITALS`, now used by every reader). LADDER stage: none (analytic's joint solve; LADDER describes 2-D's ladder).
 
 **Requirements:** [02c](02c-requirements-analytic.md) R183 (new: relations and proportions between parameters, the radius ratio, R as the radius capital, the clash refusal); R164 notes R's wider reading. · **Design:** [04c](04c-design-analytic.md) "A value never mentions the plane" (the R exception), "A Greek angle name is a parameter" (the Latin relation), "Arcs, sectors and the diameter from a point" (`radius-ratio` reads the resolved circle's radius).
 
@@ -13293,7 +13295,7 @@ No other sequence moved.
 **The exam's equation form: measured, not inferred.** With both circles by equation (`(x−a)²+y²=r²`, `(x−13)²+y²=R²`), the ratio sentence and «r < R», the radii appear only as r² and R². «r < R» therefore does not make them positive: (r, R) = (3, 6) and (−6, 3) both satisfy every given.
 - The panel prints a = 4 and lists each equation with its two options.
 - With «R = 2r» instead of the ratio, r = 3 and R = 6 are known.
-- No `r > 0` is inferred. That is the #2382/#2387 plan's pickup check 4, and whether a radius parameter written in an equation is positive is a question for the operator (#2419, `needs-operator`).
+- **⚠ Superseded by [ADR-AG-323](#adr-ag-323):** ~~No `r > 0` is inferred.~~ That is the #2382/#2387 plan's pickup check 4, and whether a radius parameter written in an equation is positive is a question for the operator (#2419, `needs-operator`).
 
 **Parity.** None. 2-D reads R and r as ONE radius symbol (ADR-034), so «R = 2r» means nothing there; 3-D and complex have no radius parameters. The divergence is deliberate (the exam uses both letters). No port issue.
 
@@ -13321,3 +13323,314 @@ No other sequence moved.
 - `message-floor-2028` registers the new key.
 
 **Consequences.** `engine/carriers.ts` (`RADIUS_CAPITALS`), `engine/lengths.ts`, `engine/types.ts` (`radius-ratio` fact), `engine/solve.ts` (`param-rel`, `radius-ratio`), `engine/apply.ts` (the clash, `letterReadings`, the `param-rel` use check, the `radius-ratio` arm), `engine/derive.ts` (`letterAgainst`), `parser/parseAnalytic.ts` (`equationExpr`, `roleScalar`, `radiusOfSize`, `circleSubjectGate`, `parseParamRelation`), `parser/catalogAnalytic.ts`, `app/submit.ts`, `app/errorText.ts`, `store/useAnalyticStore.ts`, `i18n/index.ts`; docs 02c, 04c.
+
+## ADR-AG-321 — A common tangent reads every line that pins it to the touch point, in any order; the pair's position decides the only tangent (#2418)
+
+**Date:** 2026-10-20 · **Status:** accepted · bug (P3, analytic) · fix round #2436, stream B · branch `fix/2418-reverse-order-touch-tangent` from `main` @ `17168818` · LADDER stage: none (an M1 lowering decision and the fold's pre-pass; no solver change)
+**Requirements:** [02c](02c-requirements-analytic.md) R189 (new), R162 (the common-tangent bullet: in either order) · **Design:** [04c](04c-design-analytic.md) § "Circles a sentence draws; two circles named by order" (`statedOnCommonTangents`, `onLine` from any line, `touchByOnLine` / `reDecidedBy`, the position exit) · **Builds on:** [ADR-AG-312](#adr-ag-312), [ADR-AG-314](#adr-ag-314) · **Cites:** [ADR-AG-020](#adr-ag-020) · **Sibling:** #2430 (the 2-D twin, `needs-operator`)
+
+**The ruling.** Operator, 2026-10-20 ([#2418](https://github.com/dcodish/geo_builder/issues/2418#issuecomment-6299198115), «2418 - accept recommendations»): «AB משיק משותף…» first, then «T על AB»: AB is redrawn as the common tangent at T, the same figure as the other order. The existing-letters line of the plan carries #2428's ruling (*"there is an option for drawing AB correctly … we should draw correctly"*).
+
+**Re-measured at pickup** (`17168818`, `decideSubmit` → `derive`, model mocked, 0 calls). The plan's table held row for row: on Q2 and on fixed circles M(4,0) r 3 / N(13,0) r 6 touching at T, after «AB משיק משותף למעגלים M ו-N» each of «T על AB», «T על הישר AB», «T נמצאת על AB», «הישר AB עובר דרך הנקודה T», «AB עובר דרך T», «AB משיק למעגל M בנקודה T» and the at-form was `unsatisfiable` (2.8 s on Q2, ~0.55 s fixed), A(3, −2.83), B(11, −5.66). The internal pair O(0,0) r 5 / K(3,0) r 2 refused «AB משיק משותף …» on its own, and «… פנימי …» on the external pair likewise.
+
+**The class.** *Whether a common tangent touches at the circles' stated touch point was decided from the lines typed before it, so a fact pinning the line to the touch point was read when it came first and was a contradiction when it came later.* The order of the lines decided whether they could be satisfied, which a fold over the whole list must never allow. Three roots:
+- **R1, the pre-pass read only earlier lines** (`earlierOnCommonTangents`, ADR-AG-312 decision 3, deliberately, pending this ruling), and only the `on-line-2pt` shape: «AB משיק למעגל M בנקודה T» lowers to a `tangent-of` over A, B at T, which reached the forward order only through `footOnPair`.
+- **R2, the known verdict.** A later line that re-decides the tangent came out of the fold `known` (the re-decided tangent entails it), so `decideSubmit` answered «already known» and dropped the one line that changed the figure (measured with R1 alone: «T על הישר AB» and «הישר AB עובר דרך הנקודה T»).
+- **R3, the pair's position was not asked.** Circles touching from inside have one common tangent, the line through the touch point; the INTERNAL common tangent of circles touching from outside is that same line. For both, the two-touch lowering has no configuration in any order. 2-D answers this from the position (ADR-740's capacity exit); the case did not read `pairPositionOf`.
+
+**Decision.**
+1. **The pre-pass reads every admitted line** (`statedOnCommonTangents`, renamed): every line other than the tangent's own, `include`d (a faulted line's contribution drops with it at the fold's next pass). Two shapes put a point on the pair's line: `on-line-2pt`, and a `tangent-of` whose `lines` hold `points {a, b}`, which gives its `at`. It records which lines contributed each point.
+2. **A re-deciding line is narrowed, not known.** `case 'common-tangent'` returns `touchByOnLine` when `onLine` was the ONLY reason it lowered at the touch (not a letter, not `footOnPair`, not item 3); `applyAll` carries it out of `circles-about`. `fold` (`reDecidedBy`) turns each `known` fact of a contributing line AFTER the tangent's line into `narrowed`, which `decideSubmit` records (neither the #1045 nor the #1063 gate can drop it). A line that genuinely follows keeps `known` (ADR-AG-020): «T על הישר AB» after the inside pair's tangent, which item 3 already draws at T.
+3. **The pair has only the touch tangent.** `common-tangent` carries the stated `kind` (`parseAnalytic.ts` `commonTangentFacts` passes the one it already had). With a stated touch point it lowers at the touch when `pairPositionOf` is `int-tangent` and the kind is not internal, or `ext-tangent` and the kind is internal. «חיצוני» through T on an external pair keeps the two-touch reading (its refusal unchanged); with no stated touch point nothing changes.
+4. **Unchanged, and asserted.** Fresh or existing letters beside a touch point that nothing puts on AB are still the two touches (ADR-AG-312's scope ruling); «T אמצע AB» stays refused in both orders (it redefines T; not this class); the `fromA` tangents keep their letters.
+
+**docs/17 §2.** Tripwire 1: no chokepoint list grew; the pre-pass reads the shapes that state an incidence, and item 3 reads a semantic property (how the pair sits). Tripwire 3: one statement, one semantics; «AB משיק משותף» is "the common tangent of the stated kind", whichever line pins it. Tripwire 7, the capability: a common tangent's touch is decided by the whole fact list, and a stated position with one tangent draws it.
+
+**Measured after.** The operator's nine lines record line by line at seeds 0–3; AB is x = 7 through T(7, 0), the forward order's line. Every later spelling records (`record`, never `already-known`) and draws x = 7, also with «לשני המעגלים», an unrelated line in between, existing free A and B, and free circles (the same figure as the forward order). Stability: M, N, T and both radii |Δ| < 1e-9 (fixed) and < 1e-6 (Q2); only A and B move, the free touches the tangent had declared. «T על AB» on Q2 records in ~280 ms (before: a 2.8 s refusal); ~34 ms on fixed circles. The internal pair draws x = 5 (fresh letters; existing free A, B distinct on it); a later «T על AB» records, a later «T על הישר AB» is `already-known`. «פנימי» on its own on the external pair draws x = 7. Refusals kept: «חיצוני» then «T על AB» (`unsatisfiable`, naming «T על AB»; the earlier line stays and the figure keeps A(3, −2.83)); the inside pair with no stated touch point; «T אמצע AB» in both orders.
+
+**Sibling audit.** Grepped every `common-tangent` reader in `src-analytic/` (the parser's `commonTangentFacts`, the two named arms that pass no kind, the pre-pass, the M1 case); each is covered. **2-D** (`decideDeterministic2D` at `17168818`, the plan's measurement): the external reverse order is refused (`over-constrained`, ~20 s) or commits deferred with T off AB. That is #2430, `needs-operator` (does this ruling reach 2-D?); the parity row carries 2-D's known gap naming it. The internal pair alone draws `tan-T` in 2-D already (parity). Existing free A, B on the internal pair: 2-D's #2428. **3-D:** X8 (no plane circles). **Complex:** no common-tangent grammar; the class is not present.
+
+**Locks.** `src-analytic/__tests__/issue-2418-common-tangent-later-pin.test.ts` (the fixture at seeds 0–3 against the forward order; stability; the seven later spellings; Q2 at seeds 0–2; «לשני המעגלים», a line in between, existing letters, free circles; the internal pair; «פנימי»; the three refusals; the Q2 two-touch control) and the fixture `src-analytic/__tests__/fixtures/issue-2418-reverse-order.analytic.json` (the issue's nine lines). `issue-2385-common-tangent-letters.test.ts` is unchanged and green. Parity rows `common-tangent-later-pin-2418` (`builds`, X8, 2-D known gap #2430) and `common-tangent-internal-touch-alone-2418` (`builds`, X8, parity with 2-D).
+
+**Behaviour change for a student:** after two touching circles and «AB משיק משותף למעגלים M ו-N», a later «T על AB» (or any spelling that puts T on AB) redraws AB as the common tangent at T and is recorded (before: «לא נמצאה תצורה…»); on circles touching from inside at T, «AB משיק משותף …» draws the tangent at T (before: refused), as does «… פנימי …» on circles touching from outside.
+
+**Consequences.** `engine/apply.ts` (`statedOnCommonTangents`, `reDecidedBy`, `fold`, `foldPass`'s `touchByOnLine`, `applyAll`, `case 'common-tangent'`, `ApplyOutcome.touchByOnLine`), `engine/types.ts` (`common-tangent.kind`), `parser/parseAnalytic.ts` (`commonTangentFacts`); `shell/__tests__/fixtures/geo-input-parity.ts` (two rows, `#2430` in `GAP_ISSUES`); docs 02c R189 + R162, 04c; ADR-AG-312 decision 3 and its found work stamped.
+
+## ADR-AG-322 — Two circles introduced before they are described: the pair a tangency sentence draws, and «המעגל האחד / האחר» describing it (#2397)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature (analytic) · fix round #2436, stream B · branch `feat/2397-pair-first`, stacked on `fix/2418-reverse-order-touch-tangent` (`main` @ `17168818`) · LADDER stage: parse and M1 (no solver change)
+**Requirements:** [02c](02c-requirements-analytic.md) R190 (new), R162 (amended), R140 (amended) · **Design:** [04c](04c-design-analytic.md) § "Circles a sentence draws; two circles named by order", § "A role sentence introduces its ends", § "The sentence frame" (the A2 ordinal) · **Builds on:** [ADR-AG-219](#adr-ag-219), [ADR-AG-204](#adr-ag-204), [ADR-AG-300](#adr-ag-300), [ADR-AG-306](#adr-ag-306), [ADR-AG-315](#adr-ag-315)
+
+**The ruling.** Operator, 2026-10-20 ([#2397](https://github.com/dcodish/geo_builder/issues/2397#issuecomment-6299197200)): *"it should be accepted as a first sentance too"*. «נתונים שני מעגלים המשיקים זה לזה מבחוץ» is accepted as the first line, before the circles are described; the circles described later are those two. The order is the exam's printed order (Q2, summer 2022): the tangency line, «מרכזו של המעגל האחד … M …», «מרכזו של המעגל האחר … N …», the length and ratio, «a < 13». Also cited: the #1688 ruling (*"first mention names one"*), the #1669 ruling and R140 (*"a later equation of that circle is honoured"*).
+
+**Re-measured at pickup** (`f22a9fd9`, the #2418 tip; `decideSubmit` → `derive`, model mocked). The plan's table held row for row: the printed order refused line 1 `ambiguous-shape` (found 0, need 2) and drew D1 and D2 as two new anonymous circles with the tangency lost (constraints `length-eq`, `choice` only), drawn green; every first-line pair spelling was `ambiguous-shape`; «שני מעגלים» · «המעגלים משיקים מבחוץ» recorded; D1 · D2 after it drew a third and a fourth circle; «M מרכז המעגל» on a tangent pair asked; «שני מעגלים» · «O מרכז המעגל» · «משוואת המעגל O היא …» and «נתון מעגל» · «משוואת המעגל היא …» were refused `conflicting-restatement`; the touch-drawn circle took its equation.
+
+**Two classes.**
+1. *A sentence whose subject is "the two circles", typed before any circle exists, was refused, because each plural circle subject resolved its pair through its own resolver.* The plural crossing (ADR-AG-300) lowers to `circles-about` with `the` slots (two bind, none are drawn, else ask); the plural tangency emitted a bare `tangent-circles`, resolved by `circlePairOf`, which has no "none → draw" arm.
+2. *A statement describing a circle the tool drew with its centre unnamed did not make that drawn circle the described one.* Three seams: `circle-eq` took an equation only for the id `TOUCHED_CIRCLE_ID`, though ADR-AG-219 asks a created circle "of the expression, never of the id"; the A2 frame rewrite dropped «האחד / האחר», so D1 reached M1 as «M מרכז המעגל EQ» and created a circle; and `interchangeable` read only `apart` / `cross` as symmetric, so a tangent pair asked instead of naming by order.
+
+**The model.** A drawn circle is an equation curve over its own tool symbols θ_id.a, θ_id.b, θ_id.r: free degrees of freedom, sampled and moved by «הציגו תצורה אחרת», kept out of the parameter rows (ADR-052, ADR-AG-198). Describing it is ADR-AG-204's operation, generalised: the curve takes the stated equation under the same id, in its place; every relation already stated about it refers to it by id, so the relation holds of the described circle; its own free symbols leave the figure. Nothing else moves except what the description itself defines.
+
+**Decision.**
+- **C1 — the plural tangency lowers as the plural crossing does** (`parseAnalytic.ts` `circleSubjectFacts`, the unnamed-pair arm): `circles-about { slots: [the, the], about: [tangent-circles { circles: [slot1, slot2], branch, at }] }`. `tangent-circles` gains `circles` (the pair by id; `circlePairOf` is not widened). Two circles bind (T23 and #2391 row 8 keep their meaning), none are drawn (`circle-pair<k>-1/-2`), any other count is the existing `ambiguous-shape` with the host count. The named pair and the one-name arm are untouched.
+- **C2 — a drawn circle takes a stated equation, every way it was drawn** (`apply.ts` `circle-eq` → `describeDrawnCircle`, keyed on `isCreatedCircle`). Parts already spoken for are carried through the seam that owns them: a constant radius as `radius-of` (a conflict is its existing `conflicting-restatement`), a radius in the figure's symbols as `param-rel`, a placed centre (`relateCircles`'s «זרים / מוכל») as `coord` on its centre point. The circle's own bare symbols still read elsewhere (a sibling placed relative to it) are substituted by the stated parts, read structurally by `standardCircleParts` ((x−p)², x², (x+p)², the same in y, a right side s² or a number) or, for a constant circle, at the probes. No CAS. When the parts are needed and neither reader applies, or a placed centre has no point, the arm keeps its existing answer: nothing is carried wrong.
+- **C3 — the A2 ordinal reaches M1** (`frameAnalytic.ts` `circleCentreClauses`, `parseAnalytic.ts` `centreOfCircle` / `PAIR_ORDINAL`, `types.ts`): the rewrite keeps «האחד / האחר / הראשון / השני» («M מרכז המעגל האחד EQ»; English "one of the circles is centred at M with equation …", "the other circle …"), read as `centre-of { eq, ofPair: true }`. On an empty canvas it folds to the twin's figure (#2391 row 10: verdict and figure equal; its facts differ by the mark).
+- **C4 — M1 for `centre-of { eq, ofPair }`**: a curve with that equation → today's reading; else `circleToName` → `name`: the centre is named on that drawn circle by order (`namingByOrder`), then C2 gives it the equation; `ask` → the existing `ambiguous-shape`; none → `create()`, as without the ordinal.
+- **C5 — the tangency is a symmetric statement** (`normaliseSymmetric`): an external `tangent-circle`, a `choice` of both branches (no side stated) and the `touch-point` rule read the same either way round. An internal `tangent-circle` does not: it tells the circles apart (one inside the other), and 2-D's `autosInterchangeable` asks there too. This is a semantic property of the relation, structurally read; docs/17 §2.1 (a chokepoint list) does not fire, because the normaliser decides by what the relation says, not by sentence.
+
+**Measured after.** The printed order records line by line; M (4, 0), N (13, 0), the circles tangent from outside, no third circle; 24/24 seeds on the printed-order fixture and 24/24 on the fixture order (control). One `derive` of the printed order: 4 ms (the fixture order: 5 ms, before and after); per-line submit 12–61 ms. Each first-line spelling draws the pair at 24 seeds (external, internal, «בנקודה T» on both, English); it equals «שני מעגלים» + «המעגלים משיקים …» in constraints and drawn circles. Order independence: printed = fixture order = pair · D2 · D1 = «נתונים שני מעגלים» · D1 · D2 · «המעגלים משיקים מבחוץ»; a crossing pair described keeps A and B on both described circles. Carry-over: a stated radius agrees (records) or conflicts (`conflicting-restatement`); «שני מעגלים זרים» described stays apart at 24 seeds, and overlapping descriptions are refused; «נתון מעגל» · its equation records (R140). Naming by order on an external or unstated-side pair; the internal pair asks. A free «נקודה Q» does not move through D1 and D2.
+
+**Sibling audit.** **2-D** (measured at `17168818` in the plan): commits every first-line spelling except "touch each other" (escalates), names a tangent pair by order, asks on an internal pair and on «מרכזו של המעגל האחד הוא בנקודה M» (no equations in 2-D: the A2 form is X2). 2-D letters the touch point («M»); analytic does not, unchanged, and is not added here. Found in 2-D by the plan: «שני מעגלים משיקים מבחוץ» · «M מרכז המעגל» draws a third circle on the auto-lettered touch point (filed by the orchestrator). **3-D:** no circles of this kind (X8). **Complex:** no plane circles.
+
+**Not built, said out loud.** The touch point's letter (above). «נתונים שני מעגלים אחרים המשיקים …» (Q2 ה) stays not-handled. «נתונים שני מעגלים שמרכזיהם M ו-N» is a found feature. A description without an ordinal beside the pair stays a third circle (ADR-AG-219). A description whose equation is neither standard form nor a constant circle, of a drawn circle a statement already placed, keeps the old `conflicting-restatement` (no CAS).
+
+**Locks.** `src-analytic/__tests__/issue-2397-pair-first.test.ts` (30 cases); the fixture `src-analytic/__tests__/fixtures/exam-2379-q2-printed-order-2397.analytic.json` (the exam's five lines, printed order). Re-based: `issue-2391-exam-twins.test.ts` (the empty-canvas pair now draws, both spellings; beside one circle both stay refused; row 10 compares verdict and figure). Catalog: the «נתונים שני מעגלים המשיקים …» row needs nothing; a new «מרכזו של המעגל האחד …» row. Parity rows `pair-tangent-first-2397`, `pair-tangent-internal-first-2397`, `the-circles-tangent-empty-2397`, `pair-tangent-named-by-order-2397` (`builds`) and `pair-internal-asks-2397` (`asks`), all X8 and green in both builders.
+
+**Behaviour change for a student:** «נתונים שני מעגלים המשיקים זה לזה מבחוץ» (and its siblings) on an empty canvas draws two tangent circles with unlettered centres (before: «which circles?»); «מרכזו של המעגל האחד / האחר …» then describes them (before: a third and fourth circle, tangency lost); «O מרכז המעגל» names a tangent pair by order (before: asked); a drawn circle takes a later «משוואת המעגל …» (before: refused as a contradiction).
+
+**Consequences.** `engine/apply.ts` (`describeDrawnCircle`, `standardCircleParts`, `normaliseSymmetric`, `circle-eq`, `centre-of`, `tangent-circles`), `engine/types.ts` (`tangent-circles.circles`, `centre-of.ofPair`), `parser/parseAnalytic.ts` (`circleSubjectFacts`, `centreOfCircle`, `PAIR_ORDINAL`), `parser/frameAnalytic.ts` (`circleCentreClauses`), `parser/catalogAnalytic.ts`; `shell/__tests__/fixtures/geo-input-parity.ts`; docs 02c R190, R162, R140; 04c; ADR-AG-219 and ADR-AG-315 stamped.
+
+## ADR-AG-323 — A letter that stands for a size is positive (#2419)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature (P2, analytic), fix round #2436 (stream C); branch `feat/2419-size-letters-positive`, for the operator's play-and-approve. **Partly supersedes** [ADR-AG-307](#adr-ag-307) ("No `r > 0` is inferred"); **amends** [ADR-AG-169](#adr-ag-169) Am. 1 (the domain of `2a`, "not built", is built) and R46 ([ADR-AG-022](#adr-ag-022): sign included, except a size). LADDER stage: none (a parameter domain read from the construction; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R191 (new: the class, what is not in it, the refusal, «r > 0» already known), R46 (amended: except a letter that stands for a size) · **Design:** [04c](04c-design-analytic.md) § "The model — objects, and the register that makes them free" (`sizeLetters`, `sizeDomain` in the register, `sizeContradiction` at the apply boundary, `emptyDomain`)
+
+**Ruling.** Operator, 2026-10-20 on #2419: *"r for radius like any letter represending size needs to be positive"*. Option (a), and wider: a letter that stands for a size (a radius, including one squared in a circle's equation, a length, a distance) is positive, as «שרדיוסו r» already is.
+
+**Class.** *A letter whose role in the figure is a size is sampled and solved over both signs.* Positivity was inferred in one statement family only (`radius-of`, through `admitStated`'s lone-symbol merge). A radius written inside an equation (`(x−a)²+y²=r²`, `R²`, `4r²`), a positive multiple (`שרדיוסו 2r`) and a length, distance, perimeter or area valued by a letter (`length-eq`, `area`) never asked. Q2 in the exam's form listed each circle with two options ((r, R) = (3, 6) and (−6, 3) both satisfy every given); «x²+y²=r²» · A(3,4) on it read «r = −5 או 5».
+
+**Decision.**
+1. **`sizeLetters(c)`** (`engine/carriers.ts`, the DOF contract) reads each letter's role numerically (no CAS). `linear`: a circle-at radius, or a length-eq / area constraint whose one side is a positive measure (no parameter, positive at three probe term assignments) and whose other side is `m·t`, m > 0 (three evaluations, the `impliedRange` device; only a constraint that holds, top level or inside `all`, never a `choice` option). `even`: an equation circle whose radius is `m·|t|` at t ∈ {1, 2, −1.5} with the centre fixed. A letter that moves the centre in the same equation (`(x−a)²+y²=a²`) is not a size. The tool's own symbols (`r_O`, `θ_…`) carry their own domains and are skipped. Memoized on the (immutable) construction.
+2. **The register applies it in place.** `paramRegister` intersects each role letter's stated domain with (0, ∞) (`sizeDomain`). Every reader (the sampler, the pin-root scan, `admissible`, the panel's `domainText`) reads the register, so all see one domain. **Deviation from the plan, mechanism only:** the plan stored the narrowing as a `params` entry through the `param` merge. A stored entry moves the letter into the declared block of the register, which re-orders it, and with it every sampler salt. Measured, it would have moved seed 0 of an undeclared `(x−a)²+y²=r²` (a's salt 1 → 2). Derived in place, the order and every salt are unchanged, and a role can never be lost (roles only grow as facts are added).
+3. **One question at the apply boundary**, beside `radiusLetterClash` in `applyFact` (every statement lands there, in both orders). `sizeContradiction` (a `linear` letter whose stated domain has no positive value) refuses the statement `out-of-domain` with the radius's own message (range «> 0»), naming the statement: «a < 0» · «AB = a» names «AB = a»; «AB = a» · «a < 0» names «a < 0» (both were `unsatisfiable`). An `even` letter declared negative is accepted: `x²+y²=a²` reads a² only and contradicts nothing (a circle of radius |a|).
+4. **A declaration the role already implies is `known`**: «r > 0», «k > 0» or «r הוא פרמטר» after the size answers «already known», as after «שרדיוסו r». A bound that narrows further («r < 4») records.
+5. `emptyDomain` is the one emptiness test; `admitStated` uses it.
+
+**Stability.** `sampleParam({min: 0, minOpen: true})` is exactly `|sampleParam({})|` at every seed and reach (locked), so a squared-radius circle is drawn identically at every seed. The configurations that leave are the negative-radius ones the ruling removes: the exam's seeds 1–5 solved (r, R) = (−6, −3) or (−6, 3), drawn as radii 6 and 3; now every seed is 3 and 6. Seed 0 is unchanged. A `linear` letter that a solve pins (`AB = k` on a free B, an area letter) now always starts the solve from a positive value, so at the seeds whose start was negative the descent can land another basin. One lock re-based for this: `issue-1622-e5-last-rows`, where «נסמן את שטח ABCD ב-S» reaches a second drawable quadrilateral at seed 10 (it did at seed 3), so its window is sixteen seeds. Perf: the exam corpus (13 fixtures × 3 seeds × 3 repeats) derived in the same time with and without the reader, within machine noise (17.5 s vs 19.2 s, then 31.9 s vs 31.6 s, alternated on a loaded machine).
+
+**Not in the class** (kept, by the ruling's "stands for a size"): a coordinate, slope or intercept (`M(a,0)`, `y=mx+n` keep both signs); a squared radius that also places the centre in its equation; a ratio (`radius-ratio`, `angle-ratio`); an angle (`impliedRange`). A letter-valued point-to-line distance does not parse today; it joins the class when it lowers to a `length-eq`.
+
+**Sibling audit.** Grepped `paramRegister` / `sampleParam` / `minOpen` in `src/`, `src3d/`, `src-complex/`: no free letter domains exist there (2-D's sizes are magnitudes by construction; complex's modulus is positive, #2078). Class not present.
+
+**Behaviour change for a student.**
+- Q2 written as the exam writes it shows r = 3, R = 6, one equation per circle.
+- «x²+y²=r²» · A(3,4) on it shows «r = 5»; the row of an open size letter reads «0 < r».
+- «שרדיוסו 2r», «AB = k», «אורך AB הוא k», «המרחק בין A ל-B הוא d», «שטח/היקף המשולש ABC הוא k» read the letter as positive.
+- «a < 0» with «AB = a», in either order, is refused with the out-of-range message naming the later sentence.
+- «r > 0» after such a size answers «already known».
+
+**Locks.**
+- `src-analytic/__tests__/issue-2419-size-letters.test.ts` (30 tests): the role table (the plan's 14 rows); r = 5 known; six size spellings positive at 12 seeds; the refusal in both orders, with the radius route as control; the guards (a negative squared radius accepted, `(x−a)²+y²=a²` → a = −2, a coordinate and two line coefficients keep both signs over 30 seeds); «already known» four ways and the narrowing control; the `sampleParam` equality (s 0..30, reach 1 and 2); the equation circle's radius equal to the unbounded draw at 12 seeds; both Q2 exam fixtures (`issue-2388-q2-exam-equations`, `issue-2391-q2-exam-wording`) with r = 3, R = 6 known at 12 seeds.
+- `issue-2388-parameter-relations.test.ts`: the exam-form case flipped to one equation per circle (circle I (4,0) r 3, circle II (13,0) r 6 at 12 seeds); in the equation-circle ratio case, «c>0» is now already known.
+
+**Consequences.** `engine/carriers.ts` (`sizeLetters`, `sizeDomain`, `sizeContradiction`, `impliesPositive`, `emptyDomain`, `positivePart`; `paramRegister`), `engine/apply.ts` (`applyFact`'s size question, `sameRegisterDomain`, `admitStated` on `emptyDomain`); docs 02c, 04c.
+
+## ADR-AG-324 — A free parameter, and a free vertex, are sampled in the figure's own units (#2426)
+
+**Date:** 2026-10-20 · **Status:** accepted · bug (P2, analytic), fix round #2436 (stream C); branch `fix/2426-param-figure-units`, stacked on `feat/2419-size-letters-positive` ([ADR-AG-323](#adr-ag-323)). **Amends** [ADR-AG-022](#adr-ag-022) (the half-bounded and unbounded magnitude is no longer the fixed [1, 4) past configuration 0) and R46. LADDER stage: the solve's seeding (the sampler and the free-vertex box), before stage one.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R192 (new: the range of a free parameter and a free vertex in the figure's units, the first drawing unchanged), R46 (amended: "in the figure's own units") · **Design:** [04c](04c-design-analytic.md) § "The model — objects, and the register that makes them free" (`statedScale`, `sampleParam`'s scale, `reachedByGivens`, `evaluate`'s `wide`)
+
+**Report.** Operator, round #2414 T9: *"before i write MN = 9, all different configs have a<13"*. With «a הוא פרמטר חיובי» · «M(a,0)» · «N(13,0)», 30 presses drew a only in [1.16, 3.95]. «M(a,0)» · «N(130,0)» drew the same values. A free M beside N(13,0) stayed in x ∈ [7.3, 18.6].
+
+**Ruling.** Operator, 2026-10-20 ("accept recommendations"): a half-bounded or unbounded free parameter ranges up to 1.5× the largest number stated in the construction (2-D's [ADR-526](06-decisions.md#adr-526)), and a free point's sampling box follows the same rule. Mechanism (the round orchestrator, on this item's escalation, 2026-10-20): widen only what no given reaches. A parameter a constraint solves keeps today's window as the solve's starting point.
+
+**Class.** *A free degree of freedom that nothing bounds is drawn at a magnitude that ignores the figure's scale.* The parameter sampler (`sampleParam`) used a constant [1, 4), and the free-vertex box used a constant "at least 6 a side". The engine already knew the figure's scale for the pin scan (`pinReach`, ADR-AG-303) and for the residuals (`residualScale`, ADR-AG-231). Sampling [1, 4) beside N(13,0) asserts M ∈ [1, 4), a given the question never stated (the ADR-052 smell).
+
+**Decision.**
+1. **One scale.** `statedScale(…)` (`engine/pinRoots.ts`) is the construction's largest numeric literal, at least 1. It is read off what the student stated, never off a position a parameter moves. `pinReach` is `64 · statedScale`.
+2. **The magnitude** of a half-bounded or unbounded parameter is drawn from [1, max(4, 1.5·S)). It never goes below 1 (ADR-AG-022: away from the degenerate 0) and is never narrower than the [1, 4) it had, so a figure whose numbers are all ≤ 8/3 is unchanged at every seed. `reach > 1` (ADR-AG-256's ring search) multiplies the new base. The bounded branch is unchanged. A free line's direction is an angle, not a figure unit, and keeps [1, 4).
+3. **Only what no given reaches widens** (`reachedByGivens`, `engine/carriers.ts`). A symbol or an object is reached when a constraint touches it, directly or through what it names: the curve a tangency names, the points a length names, and everything those are made of (`inputsOf`). The walk is structural, so a later constraint kind is covered. A reached parameter is solved, and its sample is only where the solve starts. **Measured, the plan's blanket widening broke this:** Q2 ד's tangent lines `mx−y+n=0` started at |m| up to 19.5 chased the circles' third, vertical common tangent (x = 7), which the form cannot hold. 15 of 24 configurations were unsatisfied, and the panel read «m = √2/4» as known at seed 0, because the pool lost the other tangent.
+4. **The free-vertex box** grows by at least 1.5·S a side for an unreached free vertex, past configuration 0. This is seeding only: `residualScale` keeps the span ADR-AG-231 ruled.
+5. **Seed 0 is the first drawing it always was** (ADR-AG-022). `sampleParam` at seed 0 ignores the scale. Configuration 0's restarts (`seed + 1000·salt`) and its `drawableAt` walk (which evaluates seeds 1…24 to prefer a well-spread neighbour) evaluate at the old range: `evaluate(c, seed, reach, wide)`, memoized under its own key. Without the walk's half, `exam-2379-q2-two-tangents` changed its first figure.
+
+**Measured after.**
+- T9's three lines over 30 presses: a ∈ [2.0, 19.2], with a > 13 at 12 presses.
+- «M(a,0)» · «N(130,0)»: |a| ∈ [11.5, 191.5].
+- A free M beside N(13,0): x ∈ [−5.6, 31.2].
+- With «MN = 9» added, a = 4 and a = 22 are both still reached.
+- Q2 ד holds at seeds 0–23.
+- Seed 0 is byte-identical on all 45 sets measured (39 analytic fixtures plus 6 probes). At seeds 1–2 only the three unconstrained probes moved, and no fixture did.
+- `test:fast` green with **no lock re-based**.
+
+**Sibling audit.** 2-D already samples in the figure's units (ADR-526, the reference). 3-D and complex have no coordinate-parameter sampler (grepped `sampleParam` / `paramRegister`). Class not present there.
+
+**Behaviour change for a student.**
+- «הציגו תצורה אחרת» on a figure with a free parameter or a free point now reaches values and positions across the stated figure. With N(13,0), M can be drawn beyond N or on the origin's side.
+- The first drawing does not change.
+- Anything a given solves is drawn as before.
+
+**Locks.** `src-analytic/__tests__/issue-2426-param-figure-units.test.ts` (10 tests):
+- T9 through `anotherConfiguration`;
+- the 130 scale;
+- the free vertex;
+- seed 0 and the ≤ 8/3 identity of `sampleParam`;
+- seed 0 in [1, 4) on three probes;
+- `reachedByGivens` on a lone, a pinned and a tangency-solved parameter;
+- Q2 ד at seeds 0–23 with the panel's m still open;
+- «MN = 9» reaching both roots.
+
+`issue-2419-size-letters` keeps the half-bounded / unbounded equality, which this change preserves (both branches use one span).
+
+**Consequences.** `engine/pinRoots.ts` (`statedScale`), `engine/carriers.ts` (`reachedByGivens`), `engine/evaluate.ts` (`sampleParam`'s `scale`, `sampleEnv`'s `wide`, the seeding box, `evaluate` / `evaluateTryingChoices` / `evaluateUncached` / `fitCreatedShapes` threading `wide`, `drawableAt`'s walk). Docs: 02c, 04c. The issue named ADR-AG-019 as the sign ADR; it is ADR-AG-022.
+
+## ADR-AG-325 — A capital letter used as a size is refused, teaching the lowercase letter; R for a radius and an area's label stay sizes (#2427)
+
+**Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2436 (stream D); branch `feat/2427-capital-size-refusal`, for the operator's play-and-approve. **Amends** [ADR-AG-307](#adr-ag-307) (its WITHDRAWN line: «שרדיוסו K» is now an owned refusal, not "not understood") and [ADR-AG-238](#adr-ag-238) ("Not changed": a coordinate, a declaration and a slope no longer read a capital as a parameter). LADDER stage: none (the submit decision; LADDER describes 2-D's ladder).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R193 (new: the refusal, its wording and its exceptions); R183's «שרדיוסו K» clause now points to it. · **Design:** [04c](04c-design-analytic.md) "A value never mentions the plane" (the capital-size step, `app/capitalSize.ts`).
+
+**Rulings.**
+- Operator, on the #2414 play sheet (T38, «נתון מעגל O שרדיוסו K»): *"Need a message to user saying that sizes are small letters except for R"*.
+- Operator 2026-10-20 on #2427: *"accept syntax and recommendations"* — the wording «אות גדולה היא שם של נקודה, ולכן {{letter}} לא יכולה לסמן גודל. גדלים מסמנים באות קטנה (r, a, k…), מלבד R לרדיוס. נסו: "{{corrected}}"» and its English twin; the capitals still accepted as sizes («M(K,0)», «K הוא פרמטר חיובי», «שיפוע AB הוא M») refused with the same message; **S for an area stays accepted**; "only R" stays analytic-only, recorded as an `EXCEPTIONS` family in the parity table.
+
+**Re-measurement at pickup** (`main` @ `17168818`, `decideSubmit`, model never called). The plan's table held exactly: the four radius spellings, «circle O with radius K», «AB = K», «AB = 2K», «אורך AB הוא K», «y = Kx + 1», «x² + y² = K²» and «זווית ABC = K» were `not-handled` with `reachesFallback` true; «M(K,0)», «M(2K,1)», «K הוא פרמטר חיובי», «שטח המשולש ABC הוא S» and «שיפוע AB הוא M» recorded a capital parameter. One more measured: «K(1,1)» · «M(K,0)» recorded (K a point and a parameter) — the plan's "a capital that is a point of the figure is left alone".
+
+**Class.** One question asked two ways: *does this line use a capital letter that is not a point of the figure as a size?* (a) No reader read it: every value reader DECLINES a capital (ADR-AG-307), so the line fell to `not-handled`, the one code that reaches the model. (b) A reader read it as a parameter (coordinates, a declaration, a slope, a bound). Both need the figure — whether the capital is one of its points — so both are asked at the submit decision, not in the context-free `parseLine`.
+
+**Decision.**
+1. **(a) A why-not step for an unread line** (`capitalSizeRetry`, 2-D's `input.scope.lowercase-labels` pattern). On `not-handled`, each distinct LONE capital (no Latin letter before it, no capital, digit, index or prime after it; not R; not a point of the figure) is lowercased in turn. When the corrected line parses AND one of its facts reads the lowercased letter as a symbol, the line is refused `capital-magnitude` `{ letter, corrected }`. The symbol check is what keeps a capital NAME («הישר L: …») out: the letter must have become a size.
+2. **(b) A capital the line added to the register** (`capitalParamOf`): the register before and after the trial fold (`paramRegister`, #1014 — a symbol is a parameter because it is used), so every family is one question. A single capital that is new to the register — not R, not the label of an area (inside the fact that states the area), not a point of the figure — is refused the same way, when the corrected line parses. **The area label is any capital, as before** («שטח ABC = T», #2031): the ruling refused the three families it named and kept the area, so narrowing the area to S alone would withdraw an accepted sentence nobody ruled on — that question is put to the operator in the round report. A capital the figure already registered (a session saved before this ruling) is not new and is not refused.
+3. **Owned.** `capital-magnitude` is not `not-handled`, so `reachesFallback` is false: the model is never asked to rewrite K → k.
+4. **Both seams** (ADR-W-006): `decideOnce` and `decideEdit`. A refused edit is refused, as before, with no text.
+5. **Wording.** `errCapitalMagnitude`, He and En, the operator's sentence verbatim.
+6. **Parity: X11**, "a capital letter as a size in analytic" — products 2-D and 3-D, must-refuse analytic. 2-D builds «נתון מעגל O שרדיוסו K» and «מעגל שמרכזו O ורדיוסו K» (radius symbol K) and declines «AB = K» and «AB = AC + D»; analytic refuses all four. docs/22 §10 says a new family is an ADR-W decision: the operator's ruling on #2427 names this family explicitly; the round orchestrator records the ADR-W number if one is wanted.
+
+**Behaviour change for a student.**
+- Every line in the class above is refused with the ruled sentence and the lowercase line to try; none reaches the model.
+- **WITHDRAWN:** «M(K,0)», «M(2K,1)», «K הוא פרמטר חיובי», «שיפוע AB הוא M» and «K > 0» no longer record.
+- «AB = AC + D» on triangle ABC (D no point) was not understood; it is now refused, teaching «AB = AC + d».
+- Unchanged: R as a radius or in an equation, a capital area label («שטח המשולש ABC הוא S», «נסמן את שטח ABCD ב-S», «שטח ABC = T»), lowercase letters, a capital that is a point of the figure («K(1,1)» · «M(K,0)» records; «∠ABC = A» declines), the R clash.
+
+**Locks.**
+- `src-analytic/__tests__/issue-2427-capital-size.test.ts`: T38 with the He and En text; 16 members of the class (radius ×5 spellings, length ×3, equation ×2, angle, coordinate ×2, declaration, slope, the #1701 sum), each `capital-magnitude` with its letter and corrected line, `reachesFallback` false, and the corrected line RECORDING; controls (R ×3, lowercase ×3, area labels ×3 and the area exemption kept to its own fact, a figure point ×2 recording and ×4 declining, the R clash, a saved-session capital); the edit seam; a catalog guard (every He and En entry in its context).
+- `issue-2388-parameter-relations`: the withdrawal and «x^2+y^2=K^2» now assert `capital-magnitude`. `issue-1701-point-value`: «AB = AC + D» moves to its own case.
+- Parity: X11 and three rows (`capital-radius-2427`, `capital-radius-centre-2427`, `capital-length-2427`); `point-value-length-sum-1701` joins X11.
+- `message-floor-2028` registers the key.
+
+**Consequences.** `app/capitalSize.ts` (new), `app/submit.ts` (`decideOnce`, `decideEdit`), `app/errorText.ts`, `store/useAnalyticStore.ts`, `i18n/index.ts`; `shell/__tests__/fixtures/geo-input-parity.ts` (X11); docs 02c R183, R193; 04c; 22 §10.
+
+## ADR-AG-326 — A sentence the fallback splits into parts shows one row per part, worded as the part (#2424)
+
+**Status:** accepted · 2026-10-20 · operator report playing round #2414 T21 (*"the part where an input is separated into 2 is not clear to users since they just see the same line twice. so it looks like a bug"*), ruling **(c)** the same day · round #2436.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R194 (new), R136 (one clause) · **Design:** [04c](04c-design-analytic.md) — a row's shown text
+
+**Context.** [ADR-AG-172](#adr-ag-172) made every fallback-built row display the student's sentence over the machine line, with a part marker «(k/n)» past one line. When the model split one sentence into n lines, the student saw the same sentence n times, told apart only by the marker, which does not say what each row holds. Every surface that names a row by its text read `spokenFor[i] ?? line`: the givens list, the shape warning and the narrowing note.
+
+**Decision.** One function, `rowShownText(line, spoken)`, in `store/useAnalyticStore.ts` beside the marker's writer (`spokenPart`) and reader (`spokenSentence`): the sentence when it carries no part marker, else the row's own machine line, through the same `MathText` and bidi isolation as a typed line. All three surfaces read it. The marker is still written by `recordLlmLines` and stored, because the question export (#1872, ADR-AG-269), rename and saves read it; the export still prints the sentence once. Old saves carry the same markers and load unchanged.
+
+**Rejected.** (a) one row per sentence and (b) one row with its parts beneath — the operator chose (c). Dropping the marker from the store — the export groups a split answer by it.
+
+**Parity.** 2-D and 3-D show the model's own lines one per row, so this converges on them. Complex has no `spokenFor` (grepped). No port issue.
+
+**Behaviour change for a student.** A sentence the AI answers with several lines lists each line as its own row; a one-line AI answer still shows the student's sentence. The shape warning and the narrowing note, when they name such a row, name its line.
+
+**Locks.** `src-analytic/__tests__/issue-2424-split-answer-rows.test.tsx` — the rule; the real App's givens list for a 2- and a 3-part answer (own lines, no sentence, no marker), a one-line answer (the sentence), a mixed list; the fixture `issue-2424-split-answer-t21.analytic.json` (the oracle's two lines for T21's first sentence, with the markers an old save carries) builds K = (3, 4), loads with no failure and lists the two lines; the export prints the sentence once; a source lock that App.tsx names no row through `spokenFor[...] ??`. `issue-1297-hebrew-fact` and `question-export-1872` unchanged and green.
+
+**Consequences.** `store/useAnalyticStore.ts` (`rowShownText`), `App.tsx` (three call sites); docs 02c, 04c.
+
+## ADR-AG-317 — A line named by restatement is that line to every slot; a line through a point names a direction the figure has (#2431)
+
+**Date:** 2026-10-20 · **Status:** accepted · bug (P1), fix round #2436 (stream A); branch `fix/2431-line-name-resolves`. Step 0 of the #2429 plan, shared with #2425. LADDER stage: none (the M1 boundary; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R185 (new). · **Design:** [04c](04c-design-analytic.md), "Curve identity at the M1 boundary" (a line referred to by its name).
+
+**Context.** Measured on main `17168818` (`decideSubmit` → `derive`, no model call). After «נתון ישר 2x-y+3=0» · «נתון הישר l1: 2x-y+3=0» the line keeps its content-derived id (`curve-anon…`, the #1342 narrowing, ADR-AG-147) and only `label.name` says l1. Then:
+- «הישר AB מקביל לישר l1», «C על הישר l1», «שיפוע הישר l1 שלילי», «C נקודת החיתוך של הישר l1 עם ציר ה-x», «A מעל הישר l1» and «המעגל M משיק לישר l1» were refused `unknown-reference l1`;
+- «ישר דרך A מקביל לישר l1» RECORDED with no fault and drew nothing: its `dir` held `line-l1`, which no object has;
+- exam Q1 ב(1) in its named spelling («M על הישר 4x+y+3=0» · «נתון הישר l1: 4x+y+3=0» · «הישר l1 מאונך ל-KL») was refused.
+
+The distance slot (`curveByName`) found the line.
+
+**Class.** *A line operand named by the label of a line whose id is content-derived does not resolve in the slots that look a line up by id*, and *a line through a point is created with a direction that names nothing*. One name had two readings, depending on the slot.
+
+**Decision.**
+1. **`resolveLineRefs` (`engine/apply.ts`), the first step of `applyFact`.** Take every string in the fact that is a line id (`refKindOf` = line), names no object, and is the name of a LINE (`curveByName` → a curve of kind line, a `line-at`, a common tangent). It is replaced, structurally (`replaceId`), by that line's id.
+   - The id the fact itself introduces (`f.id`) and its `src` are never touched, so a restatement still meets its own id's handling (`already-named`, the twin scan).
+   - Ids are never rewritten on objects: the narrowing rule stands.
+   - A reference to a line nobody has is left as written, so the slot's own `unknownRef` names what the student typed.
+2. **`line-at` checks its direction.** The points (`dirRefs`) must be placed and the curves (`dirCurveRefs`, now exported from `solve.ts` and used by `constraintCurveRefs`) must exist, exactly as a relation's operands are held (#1150). «ישר דרך A מקביל לישר l7» with no l7, or «… ל-CD» with no C, is refused `unknown-reference`. It is never created and dropped.
+3. **`derive` blames a failing selector as applied.** The selector fault compared the fact's selector, as written, with the failing applied one. Once M1 re-points a reference they differ, so a failing «שיפוע הישר l1 שלילי» on the restated line was blamed on no sentence and the figure drew green. The blame now also matches the fact's applied selector (`selectorFact`), and the no-such-side reading (ADR-AG-310) reads the applied line.
+
+**Not changed.** The by-name slots (distances, the ask lane) already resolved the label. English "the line l1 is perpendicular to …" / "the line AB is parallel to the line l1" is refused `bad-operand` for a line named directly too. That is the English relation frame, not this class; it belongs with #2429, whose equation arm reads the same "the line" operand.
+
+**Sibling audit.** Grepped `apply.ts` for id-based line lookups (`lineIdOf(`, `objectById` on a direction's id): every one reads ids carried by the fact, so the one step at the top of `applyFact` covers them all. The selector blame in `derive.ts` was the only consumer comparing a fact's content with the applied construction (`JSON.stringify(f.sel)`). 2-D and 3-D have no content-derived line ids (no equations, docs/22 §10 X2): a 2-D named line's id is its name. The class is not present there.
+
+**Tests.** `src-analytic/__tests__/issue-2431-line-name-resolves.test.ts` (23 cases, 18 fail before), through `decideSubmit` → `derive`, He and En:
+- every slot above, each with its geometry: AB's slope 2, C on l1, the crossing (−1.5, 0), A above l1, r = 3/√5, the line through A drawn with slope 2;
+- the slope sign judged, and the vertical-line side refusal;
+- the refusals for l7 and CD; a line named directly is unchanged;
+- fixture `exam-2379-q1-named-perpendicular-2431.analytic.json` (exam Q1 ב(1)): one line named l1, and the wrong «מקביל» refused `unsatisfiable`.
+
+**Consequences.** `engine/apply.ts` (`resolveLineRefs`, the `line-at` direction check), `engine/solve.ts` (`dirCurveRefs`), `engine/derive.ts` (the selector blame); docs 02c, 04c.
+
+## ADR-AG-318 — An equation written as an operand is resolved against the figure at M1, never minted by the parser (#2432)
+
+**Date:** 2026-10-20 · **Status:** accepted · bug, fix round #2436 (stream A); branch `fix/2432-eq-operand-at-m1`, stacked on `fix/2431-line-name-resolves` (ADR-AG-317). Step 1 of the #2429 plan; #2425 and #2429 reuse the resolver. LADDER stage: none (the M1 boundary; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R186 (new). · **Design:** [04c](04c-design-analytic.md), "Curve identity at the M1 boundary" (the equation operand).
+
+**Context.** Measured on main `17168818` (`decideSubmit` → `derive`, no model call):
+- «נתון הישר l: 3x+4y=25» · «משוואת המשיק היא 3x+4y=25» was refused `unknown-reference curve-anonex0oaz`, an internal id in a student message. The `tangent-eq` arm minted a stated `curve` under the content id, the twin scan (#1342) absorbed it into l, and the `tangent-of` that followed named the absorbed id.
+- «הישר 3x+4y=25 משיק למעגל M», «המעגל M משיק לישר 3x+4y=25 …» and «משוואת המשיק למעגל בנקודה A היא 3x+4y=25» after l recorded, but against a SECOND, hidden carrier with l's equation: the parser's tangency readers (`tangentTargets`, `parseTangentObject`) emitted their own `curve` fact, and carriers do not join the twin scan.
+
+**Class.** *An equation written as an operand is turned into a curve before the figure is consulted*, so it is a new object (or a dangling id) where the figure already holds the curve it denotes. The `on-curve` arm already resolved first (#1429); the tangency operands did not.
+
+**Decision.**
+1. **`EqOperand`** (`engine/types.ts`): `{ kind: 'eq', id, label, eqSrc, eq, role, line? }`. The parser only reads the operand: the content-derived id a mint would take, and the role the sentence gives the curve (`stated`: drawn; `carrier`: holds something, ADR-AG-032). It rides `tangent-of.lines` and never reaches a constraint.
+2. **`equationOperand(c, op, src)`** (`engine/apply.ts`), the one resolver:
+   - the figure's own curve with that equation (`resolveCurveByEq`) IS the operand; a `stated` role promotes a carrier it finds (the #1076/#1149 path);
+   - otherwise the curve is minted in its role under the content id. A stated mint may still be absorbed by the twin scan (a scaled spelling, `identicalCurve`); the operand is then the line that absorbed it;
+   - it reports `minted`, so the statement carrying it is `created`, never «כבר ידוע», when only the operand changed the figure.
+3. **Callers.** `tangent-of` resolves every `eq` line first, then reads only ids. `tangent-eq` lowers to one `tangent-of` whose operand is `stated` (no tangent object: the sentence states its line, drawn, as before) or `carrier` (one tangent object: one line is never drawn twice, ADR-AG-195). The #1429 `on-curve` arm calls it with `carrier`, unchanged in behaviour. The parser's two `curve` mints are gone.
+
+**Roles are unchanged here.** Every operand keeps the role it had: the tangency readers' operands are carriers until #2425 gives them `stated`. The student-visible effect is the identity: a sentence about a line the figure holds is about THAT line. When that makes the sentence already true («משוואת המשיק היא 3x+4y=25» on a circle of radius 5 at distance 5), it is «כבר נובע» rather than recorded beside a hidden twin.
+
+**Sibling audit.** Grepped `parseAnalytic.ts` for `t: 'curve'` facts emitted beside a reference: the two tangency sites were the only operand mints (the `inheritExtent` declaration and the bounded-noun segment are declarations, not operands). `apply.ts`'s other `curve` mints are declarations. 2-D and 3-D have no equation operands (docs/22 §10 X2). The class is not present there.
+
+**Tests.** `src-analytic/__tests__/issue-2432-equation-operand-m1.test.ts`, through `decideSubmit` → `derive`:
+- the reported two lines (no refusal; the tangency already holds), and on a free radius He/En and a scaled spelling: r = 5 at seeds 0–3 and l stays the one line;
+- the three tangency spellings after l are about l; the tangent at A after l puts A at (3, 4);
+- the carrier role kept: an unresolved tangency operand and «A על הישר …» stay undrawn, one object;
+- a guard over 5 setups × 8 sentences: no refusal text or payload contains `curve-anon`.
+
+**Consequences.** `engine/types.ts` (`EqOperand`, `tangent-of.lines`), `engine/apply.ts` (`equationOperand`, the `tangent-of`, `tangent-eq` and #1429 arms), `parser/parseAnalytic.ts` (`tangentTargets`, `parseTangentObject`); docs 02c, 04c.
+
+## ADR-AG-319 — A curve given inline in a sentence ABOUT it is drawn; a drawn line the student did not name takes the next free l-number (#2425)
+
+**Date:** 2026-10-20 · **Status:** accepted · bug, fix round #2436 (stream A); branch `fix/2425-inline-curve-drawn`, stacked on `fix/2432-eq-operand-at-m1` (ADR-AG-318). **Amends** [ADR-AG-032](#adr-ag-032). Operator: round #2414 T27 (*"the line should have been drawn with dof"*), T14 (*"i want the line to also be drawn and named with l1 or l2 or whatever number is free"*), the ruling of 2026-10-20 on #2425 (Q1–Q4 yes) and #2423's ruling («P על הישר <eq>» stays undrawn). LADDER stage: none (the M1 boundary and the submit gate; no solver change).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R187 (new); R56's scope note. · **Design:** [04c](04c-design-analytic.md), "A point on an object, and the carrier that holds it" (the role of an inline curve, the tool's l-number).
+
+**Context.** Measured on main `17168818` and on #2432's tip (`decideSubmit` → `derive`, no model call):
+- T27 («הישר mx-y+n=0 משיק למעגל M», then «… N»): the engine solved m, n and cycled the two roots, but the line was a carrier (`stated: false`) and never drawn.
+- The class: «הישר 3x+4y=25 משיק למעגל M», «המעגל M משיק לישר y=mx+10», «מעגל שמרכזו M(8,−3) משיק לישר 4x+3y+2=0 בנקודה A», «מעגל O משיק לישר y=2 ולציר ה-x», «הישר y=mx+1 עובר דרך A», «המעגל (x-a)^2+y^2=4 עובר דרך A»: none drawn.
+- «נתון ישר 4x+3y+2=0» drew a line with no name.
+
+**Root cause.** An inline-equation curve was minted as a CARRIER whatever role it played in the sentence. ADR-AG-032's ruling is about a curve that exists to HOLD A POINT; the tangency readers and the converse «<eq> עובר דרך A» copied its `stated: false`.
+
+**Decision.**
+1. **The role is the sentence's** (`EqOperand.role`, ADR-AG-318). A tangency's line is `stated` (`tangentTargets`, every tangency order). «הישר/המעגל <eq> עובר דרך A» marks its `on-curve` operand `stated` (`statedOperands`), so `equationOperand` mints it drawn or promotes the carrier it finds. «P על <eq>» keeps `carrier` (ADR-AG-032, the #2423 ruling).
+2. **`toolNamed` in the `curve` arm**, the one place every stated curve passes: a curve that becomes stated as a LINE with no name, minted or promoted, takes `freeLineNames(c, 1)[0]` (ADR-AG-314's allocator) and `label.auto`. This covers every line this issue draws, «נתון ישר <eq>» (Q4) and a bare equation, which R6/R51 read as the same declaration. The id is never rewritten; `resolveLineRefs` (ADR-AG-317) makes every slot read the name. Names are allocated in fold order, so the seed and «הציגו תצורה אחרת» never renumber a line, and undoing a line renames nothing before it.
+3. **Q3: the student's name replaces the tool's.** In the twin scan an `auto` name yields to an incoming one («נתון הישר l5: <same eq>» → `narrowed`, l5). A student's own name is never replaced (`already-named`, unchanged).
+4. **A name another curve carries is refused.** «נתון הישר l1: <another equation>» while l1 is the label of a different line (the tool's, or one named by restatement) is `conflicting-restatement`, the refusal «הישר l1» given twice already gets. It used to draw a second «l1».
+5. **A promotion is never «כבר נובע»** (`app/submit.ts`): `objectsGained` counts a curve newly drawn. So «A על הישר 3x+4y=25» then «הישר 3x+4y=25 משיק למעגל M» (already at that distance) records and draws the line.
+
+**Q2 (crossings and the «משוואות» row)** needs no code. A drawn, named line is listed (`panelListsCurve`) and offered in crossings like any stated line. The row prints its equation only as knowledge (`knownCurve`).
+
+**Sibling audit.** 2-D and 3-D have no equation curves (docs/22 §10 X2). The nearest 2-D rule, "a sentence draws what it names", already holds for two-point lines in analytic (ADR-AG-264). Class not present elsewhere.
+
+**Re-based locks** (the ruled change, measured): `crossings.test.ts` #1092 (the ring names «הישר l1»), `curve-display-2238` (the menu is titled l1), `engine.test.ts` namespaces (the named line is l7, since l1 is taken by the tool), the #2431 tests (the narrowing renames the tool's l1 to l3), and two #2432 rows (the tangency operand is drawn).
+
+**Tests.** `src-analytic/__tests__/issue-2425-inline-curve-drawn.test.ts` (29 cases), with fixture `issue-2425-t27-common-tangent.analytic.json` (the operator's 8 lines, verbatim):
+- T27: the line drawn and named l1 after line 7 at seeds 0–3 with m varying; after line 8, both signs of m across seeds 0–7; the #2394 row unchanged; a, r, M and N unmoved;
+- T14: l1 with its row and A = (4, −6); l2 after «נתון הישר l1: y=x»; names stable across seeds; the circle-subject constant line;
+- the class rows He/En; the circle through A drawn, with no l-number;
+- the carrier guards: «A על הישר y=mx+1», «A על המעגל …» and «M על הישר 4x+y+3=0» stay undrawn; the promotion records;
+- Q4, Q3, the refused second «l1», the tool's name in «ישר דרך A מקביל לישר l1», and undo.
+
+Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and on the #2431 exam fixture.
+
+**Consequences.** `engine/types.ts` (`CurveLabel.auto`), `engine/solve.ts` (`on-curve.stated`), `engine/apply.ts` (`toolNamed`, the `curve` arm's name checks, the `on-curve` role), `parser/parseAnalytic.ts` (`tangentTargets`' role, `statedOperands`), `app/submit.ts` (`objectsGained`); docs 02c, 04c.

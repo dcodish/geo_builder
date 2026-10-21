@@ -683,7 +683,9 @@ const AT_POINT = '(?:(?:הוא|היא)\\s+)?(?:ב-?\\s*)?(?:ה?נקודה\\s+)?'
  *   («K מרכז המעגל I»).
  * - «מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא (x − a)² + y² = r²», «נתון מעגל שמרכזו M ומשוואתו …» (A2) — a circle
  *   with no name of its own, named by its centre and stated by its equation: «M מרכז המעגל (x − a)² + y² = r²», which
- *   states the circle and names its centre. «האחד / האחר» carries no meaning while no pair has been introduced (#2397).
+ *   states the circle and names its centre. «האחד / האחר / הראשון / השני» is kept («M מרכז המעגל האחד …»): it says the
+ *   circle is one of a pair the figure drew, which it then describes (#2397, ADR-AG-322); with no pair drawn it is the
+ *   same circle the sentence without it creates.
  *
  * Each is a rewrite to the twin's own text, so it cannot lower differently from it (ADR-W-053).
  */
@@ -700,13 +702,18 @@ export function circleCentreClauses(line: string): string[] | null {
     new RegExp(`^(?:[Tt]he\\s+|[Aa]\\s+)?[Cc]ircle\\s+(${CIRCLE_REF})\\s+(?:with|whose)\\s+(?:its\\s+)?cent(?:re|er)\\s+(?:is\\s+)?(?:at\\s+)?(?:the\\s+point\\s+)?(${NAME})\\s*,?\\s+and\\s+(?:with\\s+)?(?:its\\s+)?equation\\s+(?:is\\s+)?([^,]+)$`).exec(line);
   if (enRev) return [`circle ${enRev[1]}: ${enRev[3].trim()}`, `${enRev[2]} is the centre of circle ${enRev[1]}`];
   const unnamed = new RegExp(
-    `^(?:ה?מעגל\\s+ש?מרכזו|מרכזו\\s+של\\s+ה?מעגל(?:\\s+ה?(?:אחד|אחר|ראשון|שני))?)\\s+${AT_POINT}(${NAME})\\s*,?\\s+ו?משוואתו\\s+(?:(?:היא|הוא)\\s+)?([^,]+)$`,
+    `^(?:ה?מעגל\\s+ש?מרכזו|מרכזו\\s+של\\s+ה?מעגל(?:\\s+(ה?(?:אחד|אחר|ראשון|שני)))?)\\s+${AT_POINT}(${NAME})\\s*,?\\s+ו?משוואתו\\s+(?:(?:היא|הוא)\\s+)?([^,]+)$`,
   ).exec(line);
-  if (unnamed) return [`${unnamed[1]} מרכז המעגל ${unnamed[2].trim()}`];
+  if (unnamed) return [`${unnamed[2]} מרכז המעגל ${unnamed[1] ? `${unnamed[1].replace(/^(?!ה)/, 'ה')} ` : ''}${unnamed[3].trim()}`];
+  // English: "the centre of one of the circles is M and its equation is …", "the other circle is centred at N …" (#2397).
   const unnamedEn = new RegExp(
-    `^(?:[Tt]he\\s+|[Aa]\\s+)?[Cc]ircle\\s+(?:(?:centred|centered)\\s+at|with\\s+(?:its\\s+)?cent(?:re|er)(?:\\s+at)?)\\s+(?:the\\s+point\\s+)?(${NAME})\\s*,?\\s+(?:and\\s+)?(?:with\\s+)?(?:its\\s+)?equation\\s+(?:is\\s+)?([^,]+)$`,
+    `^(?:(?:[Tt]he\\s+|[Aa]\\s+)?[Cc]ircle|(one)\\s+of\\s+the\\s+circles|[Tt]he\\s+(other|first|second)\\s+circle)\\s+(?:(?:centred|centered)\\s+at|with\\s+(?:its\\s+)?cent(?:re|er)(?:\\s+at)?|(?:is\\s+)?(?:centred|centered)\\s+at)\\s+(?:the\\s+point\\s+)?(${NAME})\\s*,?\\s+(?:and\\s+)?(?:with\\s+)?(?:its\\s+)?equation\\s+(?:is\\s+)?([^,]+)$`,
   ).exec(line);
-  if (unnamedEn) return [`${unnamedEn[1]} מרכז המעגל ${unnamedEn[2].trim()}`];
+  const EN_ORDINAL: Record<string, string> = { one: 'האחד', other: 'האחר', first: 'הראשון', second: 'השני' };
+  if (unnamedEn) {
+    const word = unnamedEn[1] ?? unnamedEn[2]?.toLowerCase();
+    return [`${unnamedEn[3]} מרכז המעגל ${word ? `${EN_ORDINAL[word]} ` : ''}${unnamedEn[4].trim()}`];
+  }
   return null;
 }
 

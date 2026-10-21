@@ -305,6 +305,7 @@ From the «lines and points» corpus (§8), numbered onward.
 **R56 — a curve minted to CARRY a point is not drawn**. Stating the curve on its own line draws it, as a recorded change; the carrier stays in the data panel.
 - **⚠ Superseded by R66 (ADR-AG-041):** the panel clause only — an anonymous carrier gets no data-panel row (`panelListsCurve`); its dependency shows on the point, `B = (x_B, x_B)`. It is still not drawn.
 - «נקודה B על הישר y=x» → B is (t,t); no line drawn
+- **Scope (R187, ADR-AG-319):** only a curve that holds a POINT is a carrier. A curve the sentence is about («הישר <eq> משיק …», «הישר <eq> עובר דרך A») is drawn.
 - Sources: ADR-AG-032.
 
 **R80 — a line can be CONSTRUCTED through a point**. The direction is copied from AB, a named line or an axis; no freedom is added, and a missing anchor is introduced with its DOF.
@@ -440,7 +441,7 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «D על המעגל החוסם את המשולש ABC», «A על המעגל שמרכזו M»
 - Sources: ADR-AG-203, #1659, #1665, #1663.
 
-**R140 — a chord, diameter or radius sentence introduces the points it names, and a chord or diameter typed before any circle draws the circle**. *(Operator ruling: as the 2-D tool does.)* New points join the circle free; a diameter's ends are antipodal; with no circle, the circle is drawn.
+**R140 — a chord, diameter or radius sentence introduces the points it names, and a chord or diameter typed before any circle draws the circle**. *(Operator ruling: as the 2-D tool does.)* New points join the circle free; a diameter's ends are antipodal; with no circle, the circle is drawn. Every circle the tool drew («נתון מעגל», «שני מעגלים», a touch's) takes a later «משוואת המעגל (O) היא …», keeping what was already stated about it (ADR-AG-322).
 - after «A(3,4)» on x²+y²=25: «AB קוטר במעגל» → B at (−3,−4)
 - Sources: ADR-AG-204, #1669, #1670.
 
@@ -448,8 +449,22 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «מעגל סביב O רדיוס 5», «מעגל O שהיקפו 6π» (radius 3)
 - «שני מעגלים נחתכים בנקודות A ו-B», «AB משיק משותף חיצוני / פנימי לשני המעגלים»
 - the plural subject crosses too: «המעגלים O ו-P נחתכים בנקודות X ו-Y» (the stated radii kept), «המעגלים O ו-P נחתכים» (the crossings take the tool's letters), «(שני) המעגלים נחתכים …» (the two circles the figure holds), "circles O and P intersect at X and Y" (ADR-AG-300, #2108)
-- a common tangent through the circles' stated touch point is the tangent there: «המעגלים משיקים בנקודה T» · «T על AB» · «AB משיק משותף למעגלים M ו-N» draws AB as the tangent at T (also «TB משיק משותף …»); other letters are still its two touches, and «… חיצוני …» through T is refused (ADR-AG-312, #2385)
-- Sources: ADR-AG-219, #1622, #1693, #1688, #2108, #2385.
+- a common tangent through the circles' stated touch point is the tangent there: «המעגלים משיקים בנקודה T» · «T על AB» · «AB משיק משותף למעגלים M ו-N» draws AB as the tangent at T (also «TB משיק משותף …»), in either order (R189); other letters are still its two touches, and «… חיצוני …» through T is refused (ADR-AG-312, #2385)
+- a sentence about the two circles typed before any circle draws them; «המעגל האחד / האחר» with an equation describes one of them (R190)
+- Sources: ADR-AG-219, #1622, #1693, #1688, #2108, #2385, #2418, #2397.
+
+**R190 — two circles can be introduced before they are described**. *(Operator ruling 2026-10-20 on #2397: "it should be accepted as a first sentance too".)*
+- «נתונים שני מעגלים המשיקים זה לזה מבחוץ» on an empty canvas draws two circles touching from outside, their centres unlettered; so do «שני מעגלים משיקים מבחוץ / מבפנים», «המעגלים משיקים מבחוץ», «… בנקודה T» (T drawn) and "two circles are externally tangent". Beside one circle, or three, it asks which circles
+- after it, «מרכזו של המעגל האחד הוא בנקודה M ומשוואתו היא …» gives one of the two drawn circles that equation and names its centre M; «מרכזו של המעגל האחר … N …» does the same for the other; the exam's Q2 builds in its printed order
+- on two drawn circles touching from outside (or with no side stated), «O מרכז המעגל» names the first and the next letter the other; on circles touching from inside it asks which, as in the 2-D tool
+- without an ordinal («נתון מעגל שמרכזו M ומשוואתו …») the sentence is still a third circle
+- Sources: ADR-AG-322, #2397, #2379.
+
+**R189 — a common tangent through the circles' touch point is the same figure in any order, and a pair with only the touch tangent draws it**. *(Operator ruling 2026-10-20 on #2418: «AB משיק משותף…» first, then «T על AB»: AB is redrawn as the common tangent at T, the same figure as the other order.)*
+- after two touching circles and «AB משיק משותף למעגלים M ו-N», a later «T על AB» redraws AB as the common tangent at T; so do «T על הישר AB», «T נמצאת על AB», «הישר AB עובר דרך הנקודה T», «AB עובר דרך T», «AB משיק למעגל M בנקודה T» and «AB משיק משותף למעגלים M ו-N בנקודה T». Each is recorded in the givens list, never answered «already known»
+- on circles touching from inside at T, «AB משיק משותף …» draws AB as the tangent at T, with existing A and B on it; so does «AB משיק משותף פנימי …» on circles touching from outside at T
+- a line that truly follows, such as «T על הישר AB» after the inside pair's tangent, is «already known»; «AB משיק משותף חיצוני …» then «T על AB» is still refused, naming «T על AB»
+- Sources: ADR-AG-321, #2418, ADR-AG-312.
 
 **R182 — a common tangent is a named line, a line can be named after the fact, and a line's axis crossing can be placed without a point**. *(Operator, on #2379: "things that are missing, i need to add to the tool since this is an exam I give my students"; the «מתחת» / «מימין / משמאל» twins per the #2386 rulings.)*
 - a common tangent is drawn as a full line with its equation row; while the givens leave two candidate lines, the row lists both («3x − 4y + 14 = 0 או 3x − 4y − 86 = 0»)
@@ -635,11 +650,16 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «sin∢ABC = 0.5» → «30° או 150°», cycled
 - Sources: ADR-AG-227, #1719.
 
-**R183 — a relation between parameters, a proportion, and the ratio of two circles' radii are givens; R is the one capital that names a size**. *(Operator ruling 2026-10-20: "it is very common to use R and r for radiuses of different circles so R can be an exception".)* An equation in the figure's own parameters relates them; a proportion means q·X = p·Y; the radii's ratio of «המעגלים» unnamed leaves the order to the configuration until a given («r < R») picks it. R is a radius parameter inside an equation and as a radius; every other capital is a point's name, and «שרדיוסו K» is not understood. A point R together with the radius R is refused in either order, naming both and the earlier line.
+**R183 — a relation between parameters, a proportion, and the ratio of two circles' radii are givens; R is the one capital that names a size**. *(Operator ruling 2026-10-20: "it is very common to use R and r for radiuses of different circles so R can be an exception".)* An equation in the figure's own parameters relates them; a proportion means q·X = p·Y; the radii's ratio of «המעגלים» unnamed leaves the order to the configuration until a given («r < R») picks it. R is a radius parameter inside an equation and as a radius; every other capital is a point's name, and «שרדיוסו K» is refused (R193). A point R together with the radius R is refused in either order, naming both and the earlier line.
 - «R = 2r», «r:R = 1:2», «r/R=1/2», «היחס בין R ל-r הוא 2:1», «היחס בין אורכי הרדיוסים של המעגלים הוא 1:2» → r = 3, R = 6 in Q2
 - «(x−13)²+y²=R²», «ורדיוסו R», «רדיוס המעגל O הוא R»
 - «R(1,2)» · «נתון מעגל N שרדיוסו R» → refused, naming «R(1,2)»
 - Sources: ADR-AG-307, #2388, #2379.
+
+**R193 — a capital letter used as a size is refused with a sentence that teaches the lowercase letter; R for a radius and an area's label are sizes**. *(Operator: "Need a message to user saying that sizes are small letters except for R".)* A radius, a length, an angle, a parameter in an equation, a coordinate, a declaration or a slope written with a capital that is not a point of the figure is refused — never handed to the model — with «אות גדולה היא שם של נקודה, ולכן K לא יכולה לסמן גודל. גדלים מסמנים באות קטנה (r, a, k…), מלבד R לרדיוס. נסו: "…"», the student's line with the letter lowercased. A capital that is a point of the figure is the student naming that point, and is read as before. 2-D keeps reading a capital radius (ruled analytic-only).
+- «נתון מעגל O שרדיוסו K», «AB = 2K», «y = Kx + 1», «זווית ABC = K», «M(K,0)», «K הוא פרמטר חיובי», «שיפוע AB הוא M» → refused, teaching «…k» / «…m»
+- «שטח המשולש ABC הוא S», «נסמן את שטח ABCD ב-S», «שטח ABC = T», «שרדיוסו R» → accepted; «K(1,1)» · «M(K,0)» → as before
+- Sources: ADR-AG-325, #2427, ADR-AG-307.
 
 ---
 
@@ -669,6 +689,10 @@ a sentence the tool parsed.
 - «גובה מנקודה M לצלע OG» answered «MH גובה לצלע OG» → «כדי לבנות את זה צריך לתת שם למשהו שלא נתתם לו שם — תנו לו שם משלכם ונסו שוב.»
 - A name already in the figure that the sentence never wrote counts too *(operator, 2026-10-16: "1 - yes")*: «ישר l» answered «דרך P עובר ישר l» → «כדי לבנות את זה הייתי צריך לקשר את המשפט ל-P, שלא מופיע בו — לא רשמתי כלום. …», nothing recorded
 - Sources: ADR-AG-279, ADR-AG-280, ADR-AG-281, #1355, #2225.
+
+**R194 — a sentence the fallback answers with several lines shows one row per line, worded as that line**. *(Operator ruling (c), 2026-10-20, on #2424: "the part where an input is separated into 2 is not clear to users since they just see the same line twice".)* As 2-D does; each row keeps its own tick, ✕ and ✎. An answer of ONE line still shows the student's own sentence (#1297). The shape warning and the narrowing note name such a row by the same text. «הורידו שאלה» still prints the student's sentence once.
+- «נתון מעגל I שמשוואתו (x − 3)² + (y − 4)² = 9 , ומרכזו בנקודה K .» answered with two lines → «נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9» · «מרכז המעגל I הוא K», never the sentence twice with «(1/2)», «(2/2)»
+- Sources: ADR-AG-326, #2424.
 
 **R111 — a word the tool does not know is REFUSED in a value slot, never absorbed as parameters**. **A stated magnitude is never silently reinterpreted**; juxtaposed parameters (`2a`, `25k²`) are kept.
 - «שיפוע הישר l1 הוא tan(30)» → refused, never `t·a·n·30`
@@ -768,8 +792,19 @@ a sentence the tool parsed.
 
 ### Choosing and cycling configurations
 
-**R46 — a free magnitude is sampled across everything the student left open, SIGN INCLUDED**. Later configurations reach the other sign within a few presses; degenerate values are avoided (ADR-052).
-- Sources: ADR-AG-022, ADR-052.
+**R46 — a free magnitude is sampled across everything the student left open, SIGN INCLUDED**. Later configurations reach the other sign within a few presses; degenerate values are avoided (ADR-052). **Except a letter that stands for a size** (R191): it is positive, so it has no other sign to reach. The magnitude is in the figure's own units (R192).
+- Sources: ADR-AG-022, ADR-052, ADR-AG-323, ADR-AG-324.
+
+**R192 — a free parameter and a free point range across the stated figure**. *(Operator ruling 2026-10-20 on #2426: up to 1.5× the largest number stated, 2-D's rule.)* A parameter or a free point that no given reaches is drawn, over «הציגו תצורה אחרת», up to 1.5× the largest number the construction states (never less than today's 1 to 4); the first drawing is the one it always was, and anything a given solves is drawn as before.
+- «a הוא פרמטר חיובי» · «M(a,0)» · «N(13,0)» → M is drawn beyond N (a > 13) and before it; «M(a,0)» · «N(130,0)» → |a| up to about 195
+- «N(13,0)» · «נקודה M» → M reaches the origin's side
+- Sources: ADR-AG-324, #2426 (round #2414 T9).
+
+**R191 — a letter that stands for a size is positive**. *(Operator ruling 2026-10-20 on #2419: "r for radius like any letter represending size needs to be positive".)* A circle's radius however it is written (by its centre «שרדיוסו r», a positive multiple «שרדיוסו 2r», squared in its equation «(x−a)²+y²=r²», «x²+y²=4r²», «R²»), and a length, a distance, a perimeter or an area valued by a letter or a positive multiple of one («AB = k», «אורך AB הוא k», «המרחק בין A ל-B הוא d», «היקף המשולש ABC הוא k», «שטח המשולש ABC הוא k»): the letter's row reads «0 < r» while it is open, and only its positive values are configurations. «r > 0» typed after it is already known.
+- «x²+y²=r²» · «A(3,4)» · «A על המעגל» → «r = 5» (not «r = −5 או 5»); Q2 in the exam's own form → r = 3, R = 6, one equation per circle
+- «a < 0» then «AB = a», or «AB = a» then «a < 0» → refused, naming the later sentence, with the radius's out-of-range message
+- Not a size, and unchanged: a coordinate or a slope («M(a,0)», «y=mx+n») keeps both signs; a squared radius that also places the centre («(x−a)²+y²=a²» with A(−2,2) on it draws a = −2); a squared radius declared negative («a < 0» · «x²+y²=a²») is accepted, a circle of radius |a|; a ratio and an angle
+- Sources: ADR-AG-323, #2419 (#2379, the operator's exam questions).
 
 **R118 — a comparison of coordinates chooses the configuration**. It consumes no freedom; an unsatisfiable comparison is refused, naming the sentence.
 - «שיעור ה-x של B גדול משיעור ה-x של D», `x_B > 3`, «שיעור ה-x של B חיובי»
@@ -866,6 +901,22 @@ a sentence the tool parsed.
 - «A(1,2) · B(1,2) · A ≠ B» → refused, naming «A ≠ B»; «N1 ≠ N1» → the same letter twice
 - Sources: ADR-AG-311, #2395 (#2379, the operator's exam questions).
 
+**R185 — a line named by restatement is that line to every sentence that takes a line, and a sentence about a line the figure does not have is refused**. *(2-D: a named line resolves everywhere; honesty invariant: a stated given never vanishes.)* «נתון ישר 4x+y+3=0» then «נתון הישר l1: 4x+y+3=0» names the one line, and every slot reads l1 as that line.
+- «הישר AB מקביל לישר l1», «C על הישר l1», «שיפוע הישר l1 שלילי», «C נקודת החיתוך של הישר l1 עם ציר ה-x», «A מעל הישר l1», «המעגל M משיק לישר l1» → about that line
+- «ישר דרך A מקביל לישר l1» → the line through A is drawn; with no l1 (or no C in «… ל-CD») → refused, naming it
+- Sources: ADR-AG-317, #2431 (exam Q1 ב(1), #2379).
+
+**R186 — an equation written inside a sentence denotes the figure's own curve with that equation, and no message ever shows an internal id**. *(Honesty invariant: an error names the statement, never internal state.)*
+- «נתון הישר l: 3x+4y=25» · «משוואת המשיק היא 3x+4y=25» → about l (on a circle of radius 5 at distance 5, «כבר נובע»)
+- «הישר 3x+4y=25 משיק למעגל M», «המעגל M משיק לישר 3x+4y=25» after l → about l, no second line
+- Sources: ADR-AG-318, #2432.
+
+**R187 — a curve given inline in a sentence ABOUT it is drawn, and a drawn line the student did not name carries the next free l-number**. *(Operator, round #2414 T27/T14 and ruling 2026-10-20 Q1–Q4: "the line should have been drawn with dof"; "named with l1 or l2 or whatever number is free".)* The line keeps its freedom, which «הציגו תצורה אחרת» samples; the name is on the figure and in «משוואות» from creation, and every sentence can use it.
+- «הישר mx-y+n=0 משיק למעגל M», «מעגל שמרכזו M(8,−3) משיק לישר 4x+3y+2=0 בנקודה A», «הישר y=mx+1 עובר דרך A», «המעגל (x-a)^2+y^2=4 עובר דרך A» → drawn (a line as l1, or l2 when l1 is taken)
+- «נתון ישר 4x+3y+2=0» → l1; a later «נתון הישר l5: …» of the same line replaces the tool's name; «נתון הישר l1: <another equation>» → refused
+- «A על הישר y=mx+1», «M על הישר 4x+y+3=0» → still undrawn (R56, the #2423 ruling)
+- Sources: ADR-AG-319, #2425, #2423.
+
 **R61 — a circle marks its centre**. Its value shows only when the givens fix it; the centre owns no letter (amended by R123).
 - Sources: ADR-AG-036.
 
@@ -932,7 +983,7 @@ a sentence the tool parsed.
 - «הזווית בין הישר l1 לציר ה-x» → α, with m = tan α
 - Sources: ADR-AG-154, #1322.
 
-**R136 — the data panel's option rows read in order, and a loaded figure keeps the student's own words**. *(Operator: "the −2 is not shown correctly".)* A loaded file shows every row as saved, an AI-built row as the student's sentence.
+**R136 — the data panel's option rows read in order, and a loaded figure keeps the student's own words**. *(Operator: "the −2 is not shown correctly".)* A loaded file shows every row as saved, an AI-built row as the student's sentence (a part of a split answer as its own line, R194).
 - `A = [(3/5, 4/5)] או (4, -2)`, never `(2- ,4)`
 - `AB: 2 · זווית עם ציר ה-x: 63.43°`
 - Sources: ADR-AG-199, #1644, #1632, #1637.

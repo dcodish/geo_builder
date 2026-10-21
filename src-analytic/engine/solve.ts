@@ -262,6 +262,11 @@ export type Constraint =
        */
       eqSrc?: string;
       eq?: unknown;
+      /**
+       * The sentence is ABOUT the curve — «הישר <eq> עובר דרך A» (#2425 Q1, ADR-AG-319) — so M1 mints it drawn; absent,
+       * the curve only carries the point (ADR-AG-032). Stripped at M1 with the equation.
+       */
+      stated?: true;
     }
   /**
    * `D` is collinear with `a` and `b` — «D על הישר BC», «D על הצלע BC» (#1069, #1073).
@@ -741,8 +746,11 @@ export function describeConstraint(k: Constraint): string {
  * resolve to something with a shape. Merging them would have made the apply check reject every curve
  * reference as "not a point", which is the opposite defect.
  */
+/** The CURVES a direction names — a named line, a radius's circle; `dirRefs` is its points half. */
+export const dirCurveRefs = (d: Direction): Id[] => (d.k === 'curve' ? [d.id] : d.k === 'radius' ? [d.circle] : []);
+
 export function constraintCurveRefs(k: Constraint): Id[] {
-  const ofDir = (d: Direction): Id[] => (d.k === 'curve' ? [d.id] : d.k === 'radius' ? [d.circle] : []);
+  const ofDir = dirCurveRefs;
   switch (k.t) {
     case 'on-curve':
       return [k.curve];

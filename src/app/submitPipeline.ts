@@ -35,6 +35,7 @@ import {
   lowercaseLabelFold,
 } from '@/parser';
 import { llmParse } from '@/parser/llm';
+import { laneContext } from './laneContext';
 import { droppedPropertyWords } from '@/parser/propertyWords';
 import { mergeWordItems } from '../../shell/llm/honestyCore';
 import { figureContext } from '@/parser/llmShared';
@@ -292,7 +293,10 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
   const timeout = setTimeout(() => controller.abort(), 15_000);
   let out: Awaited<ReturnType<typeof llmParse>>;
   try {
-    out = await llmParse(utterance, ctx, bindCmds.length ? buildParseCtx(v.construction, v.positions) : parseCtxNow(), { signal: controller.signal });
+    // #2428 (ADR-741): each canonical line re-parses with the FULL context of its figure — the first with the context
+    // the deterministic path read, a later one with the trial figure the earlier lines built (`laneContext`).
+    const first = bindCmds.length ? buildParseCtx(v.construction, v.positions) : parseCtxNow();
+    out = await llmParse(utterance, ctx, laneContext(first, () => ({ facts: withBinds(store().facts), seed: store().seed })), { signal: controller.signal });
   } finally {
     clearTimeout(timeout);
     deps.llmAbortRef.current = null;

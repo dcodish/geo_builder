@@ -58,7 +58,7 @@ function unreadable(src: string): RuleOutcome {
 }
 import { angleLabelSymbol, constantLengthExpr, namedLengthPairs, planeLetterLength, parseLengthExpr, type LengthExpr } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
-import { CENTRE_SENTINEL, CENTRES_SENTINELS, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
+import { CENTRE_SENTINEL, CENTRES_SENTINELS, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type EqOperand, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow, BARE_POLYGON_NOT_BUILT } from '../engine/shapes';
 import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
@@ -1191,6 +1191,8 @@ const CENTRE_EN = new RegExp(
 const CENTRE_CTX_HE = new RegExp(
   `^${HE_POINT}(${NAME})${HE_IS}\\s*(?:נקודת\\s+)?מרכז\\s+(?:של\\s+)?ה?מעגל(?:\\s+(?:${HE_EQ_OF}${HE_IS}\\s*:?\\s*)?(.+))?$`,
 );
+/** «המעגל האחד / האחר / הראשון / השני» — one circle of a pair (#2397, ADR-AG-322), before the equation it is described by. */
+const PAIR_ORDINAL = /^ה?(?:אחד|אחר|ראשון|שני)\s+(?=\S)/;
 const CENTRE_CTX_EN = new RegExp(
   `^(?:[Tt]he\\s+)?(?:[Pp]oint\\s+)?(${NAME})\\s+is\\s+the\\s+cent(?:re|er)\\s+of\\s+the\\s+circle(?:\\s+(?:whose\\s+equation\\s+is\\s+)?(.+))?$`,
 );
@@ -1215,12 +1217,14 @@ function centreOfCircle(line: string): RuleOutcome {
   // it describes a circle the figure must already have, so it creates nothing.
   if (readDescribedCircle(trim(tail))) return made([{ t: 'centre-of', id, circle: trim(tail), src: line }]);
   // A tail must be the circle's EQUATION (in the plane's variables) — anything else is not this sentence.
-  const src = trim(tail);
+  // An ordinal before it says the circle is one of a pair the figure drew (#2397): it rides the fact as `ofPair`.
+  const ordinal = PAIR_ORDINAL.exec(trim(tail));
+  const src = trim(ordinal ? trim(tail).slice(ordinal[0].length) : tail);
   if (!src.includes('=')) return null;
   const eq = equationExpr(src);
   if (!eq || !symbolsOf(eq).some((s) => RESERVED_SYMBOLS.has(s))) return null;
   const create = created(`נתון מעגל ${id} שמשוואתו ${src}`);
-  return made([{ t: 'centre-of', id, eq, ...(create ? { create } : {}), src: line }]);
+  return made([{ t: 'centre-of', id, eq, ...(create ? { create } : {}), ...(ordinal ? { ofPair: true as const } : {}), src: line }]);
 }
 
 /**
@@ -2358,14 +2362,14 @@ function peelMods(text: string, where: 'head' | 'tail', mods: TangencyMods): str
  *  inline equations mint. */
 interface TangentTargets {
   axes: Array<'x' | 'y'>;
-  lines: TangentLineRef[];
+  lines: Array<TangentLineRef | EqOperand>;
   /** CIRCLE targets (#1504) — the other circle by the name the sentence used (letter or
    *  numeral; a numeral names an equation circle, which the apply boundary refuses by name),
    *  with the touch branch when the student said it on the piece itself. */
   circles: Array<{ name?: string; branch?: 'external' | 'internal' }>;
   facts: Fact[];
   /** The axis and line targets IN THE STUDENT'S ORDER — what «בנקודות A ו-C בהתאמה» pairs with (#1619 B3). */
-  ordered: Array<{ axis: 'x' | 'y' } | { line: TangentLineRef }>;
+  ordered: Array<{ axis: 'x' | 'y' } | { line: TangentLineRef | EqOperand }>;
   /** Each two-point target with the noun it was written with (#1639): the piece the sentence draws. */
   pieces: Array<{ a: Id; b: Id; noun: PieceNoun }>;
 }
@@ -2384,7 +2388,7 @@ interface TangentTargets {
  * piece this grammar cannot read still declines the WHOLE sentence (`null`) — guessing half a
  * target list would build half the student's given.
  */
-function tangentTargets(tail: string, src: string): TangentTargets | null {
+function tangentTargets(tail: string): TangentTargets | null {
   const out: TangentTargets = { axes: [], lines: [], circles: [], facts: [], ordered: [], pieces: [] };
   /*
    * A PLURAL noun heads the whole list — «הצלעות AO, BO ו-AB», "the sides AB, BC and CA" (#1619 B2's touch
@@ -2453,9 +2457,10 @@ function tangentTargets(tail: string, src: string): TangentTargets | null {
     if (bare.includes('=')) {
       const eq = equationExpr(bare);
       if (eq && symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym))) {
-        const cid = `curve-${anonIndex(bare)}`;
-        out.facts.push({ t: 'curve', id: cid, label: { name: '', eqSrc: trim(bare) }, curve: { eq }, stated: false, src });
-        const ref: TangentLineRef = { kind: 'curve', id: cid, label: trim(bare) };
+        // The operand is READ here and resolved at M1 (#2432, ADR-AG-318): the figure's own line with this equation,
+        // or a carrier minted there — never a `curve` fact referred to by an id the twin scan may absorb.
+        // A tangency's line is what the sentence is ABOUT (#2425, ADR-AG-319): drawn, and named by M1.
+        const ref: EqOperand = { kind: 'eq', id: `curve-${anonIndex(bare)}`, label: trim(bare), eqSrc: trim(bare), eq, role: 'stated' };
         out.lines.push(ref);
         out.ordered.push({ line: ref });
         continue;
@@ -3092,11 +3097,11 @@ function parseTangentObject(line: string): RuleOutcome {
     if (!noun.at) return made([{ t: 'tangent-eq', id, eq, eqSrc, ...(noun.circle ? { circle: noun.circle } : {}), src: line }]);
     return made([
       ...tangentObjectFacts(trim(eqm[1]), line),
-      { t: 'curve', id, label: { name: '', eqSrc }, curve: { eq }, stated: false, src: line },
       {
         t: 'tangent-of',
         axes: [],
-        lines: [{ kind: 'curve', id, label: eqSrc }],
+        // The equation is resolved at M1 (#2432, ADR-AG-318): an existing line with it IS the tangent's line.
+        lines: [{ kind: 'eq', id, label: eqSrc, eqSrc, eq, role: 'carrier' }],
         ...(noun.circle ? { circle: noun.circle } : {}),
         at: noun.at,
         src: line,
@@ -3422,7 +3427,7 @@ const touchAt = (slot: string, at: Id, a: Id, b: Id, src: string): Fact => ({
 function commonTangentFacts(a: Id, b: Id, s1: string, s2: string, kind: 'external' | 'internal' | undefined, src: string, name?: string): Fact[] {
   return [
     ...declareAll([a, b], src),
-    { t: 'common-tangent', a, b, circles: [s1, s2], ...(name !== undefined ? { name } : {}), src },
+    { t: 'common-tangent', a, b, circles: [s1, s2], ...(name !== undefined ? { name } : {}), ...(kind ? { kind } : {}), src },
     { t: 'selector', sel: { kind: 'distinct', ids: [a, b] }, src },
     ...(kind ? [{ t: 'selector' as const, sel: { kind: 'sign' as const, q: { k: 'centres-side' as const, a: s1, b: s2, p: a, q: b }, positive: kind === 'external' }, src }] : []),
   ];
@@ -3821,10 +3826,10 @@ function parseCircleAt(line: string): RuleOutcome {
 
   // THE LINE-FIRST ORDER — the subject is a target list, the object ONE circle (named or contextual),
   // both read by the one target reader.
-  const object = tangentTargets(objectText, line);
+  const object = tangentTargets(objectText);
   if (!object || object.circles.length !== 1 || object.axes.length + object.lines.length + object.facts.length > 0) return null;
   if (object.circles[0].branch) return null;
-  const targets = tangentTargets(subjectText, line);
+  const targets = tangentTargets(subjectText);
   if (!targets) return null;
   // «הישר BC משיק למעגל בנקודה B», «AB ו-BC משיקים למעגל בנקודות A ו-C בהתאמה» (#1619 B3, #1430).
   if (touchApplies(targets, mods)) {
@@ -3883,7 +3888,7 @@ function withSentenceMods(
 
 /** The facts for a sentence whose subject is a CIRCLE (or two) — `null` when it is not this reading. */
 function circleSubjectFacts(subject: CircleSubject, objectText: string | null, mods: TangencyMods, line: string): Fact[] | null {
-  const targets = objectText === null ? null : tangentTargets(objectText, line);
+  const targets = objectText === null ? null : tangentTargets(objectText);
   if (objectText !== null && !targets) return null;
 
   if (subject.kind === 'one') {
@@ -3970,6 +3975,29 @@ function circleSubjectFacts(subject: CircleSubject, objectText: string | null, m
   }
   // «המעגלים (O ו-M) משיקים (זה לזה) (מבחוץ) (בנקודה T)» — the two circles touch each other.
   const [a, b] = subject.names;
+  /*
+   * THE UNNAMED PAIR (#2397, ADR-AG-322): «(נתונים) (שני) (ה)מעגלים (ה)משיקים …» lowers as the plural crossing does
+   * (ADR-AG-300) — over the two `the` slots of `circles-about`, the one resolver for "the two circles": two bind, none
+   * are DRAWN (the pair a first-line sentence introduces), any other count asks which.
+   */
+  if (a === undefined && b === undefined) {
+    return [
+      {
+        t: 'circles-about',
+        slots: [{ k: 'the' }, { k: 'the' }],
+        about: [
+          {
+            t: 'tangent-circles',
+            circles: [SLOT1, SLOT2],
+            ...(mods.branch ? { branch: mods.branch } : {}),
+            ...(mods.at ? { at: mods.at } : {}),
+            src: line,
+          },
+        ],
+        src: line,
+      },
+    ];
+  }
   return [
     ...introduce(NO_TARGETS),
     {
@@ -9570,16 +9598,26 @@ function parseIncidence(line: string): RuleOutcome {
      * resolved by the one rule that owns a point on a circle (contextual, by numeral, or by centre letter).
      * Three listed points are the computed circle's sentence (`parseCircleThru`), which answers first.
      */
-    if (obj.k === 'curve') return viaCanonical(line, slot, (p) => [`${p} על ${trim(conv[1])}`]);
+    if (obj.k === 'curve') return statedOperands(viaCanonical(line, slot, (p) => [`${p} על ${trim(conv[1])}`]));
     if (obj.k === 'pair') {
       const on = viaCanonical(line, slot, (p) => [`${p} על ${pairText(obj)}`]);
       return on?.ok ? made([...on.facts, ...pieceFacts(pieceNounOf(obj.noun), obj.a, obj.b, line)]) : on;
     }
     // A NAMED line: «דרך P עובר ישר l3» — M1 decides whether it is an incidence on the existing line or a new one.
     if (obj.k === 'named') return viaCanonical(line, slot, (p) => [`דרך ${p} עובר ישר ${obj.name}`]);
-    return viaCanonical(line, slot, (p) => [`${p} על הישר ${obj.src}`]);
+    return statedOperands(viaCanonical(line, slot, (p) => [`${p} על הישר ${obj.src}`]));
   }
   return null;
+}
+
+/**
+ * «הישר <eq> עובר דרך A» · «המעגל <eq> עובר דרך A» — the converse of «A על <eq>», but ABOUT the curve (#2425 Q1, operator
+ * ruling 2026-10-20; ADR-AG-319): the equation operand it lowers to is marked `stated`, so M1 draws the curve. «A על
+ * <eq>» itself keeps its carrier (ADR-AG-032, the #2423 ruling).
+ */
+function statedOperands(r: RuleOutcome): RuleOutcome {
+  if (!r || !r.ok) return r;
+  return made(r.facts.map((f) => (f.t === 'constraint' && f.k.t === 'on-curve' && f.k.eqSrc !== undefined ? { ...f, k: { ...f.k, stated: true as const } } : f)));
 }
 
 /**

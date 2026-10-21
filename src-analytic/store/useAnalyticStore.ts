@@ -100,6 +100,11 @@ export type InputError =
   | { key: 'mixed-number'; detail: string; decimal?: string; sum: string; product: string }
   /** `x` or `y` used as a point's unknown — they are the plane's own variables (#1039). */
   | { key: 'reserved-coordinate'; detail: string }
+  /**
+   * #2427 (ADR-AG-325) — a capital letter used as a size («שרדיוסו K», «AB = K», «M(K,0)»): a capital is a point's name,
+   * sizes are lowercase except R. `letter` is the capital, `corrected` the student's line with it lowercased.
+   */
+  | { key: 'capital-magnitude'; detail: string; letter: string; corrected: string }
   /** A shape noun and a vertex count that disagree (#1042). */
   | { key: 'bad-arity'; detail: string }
   /** One label used for two vertices of the same figure (#1042). */
@@ -417,6 +422,15 @@ interface AnalyticState {
  */
 export const spokenPart = (spoken: string, k: number, n: number): string => (n > 1 ? `${spoken} (${k + 1}/${n})` : spoken);
 export const spokenSentence = (label: string): string => label.replace(/ \(\d+\/\d+\)$/, '');
+/**
+ * THE TEXT A ROW SHOWS (#2424, ADR-AG-326 — the operator's ruling (c), 2026-10-20): the student's sentence when the
+ * model answered it with ONE line (#1297, unchanged), and the row's OWN machine line when the model split it into
+ * parts — a marked label is a part, and showing the same sentence on every part read as a duplicate. The marker
+ * stays in the store: the question export (#1872), rename and saves read it. Every surface that names a row by
+ * its text (the givens list, the shape warning, the narrowing note) reads it through here.
+ */
+export const rowShownText = (line: string, spoken: string | undefined): string =>
+  spoken !== undefined && spokenSentence(spoken) === spoken ? spoken : line;
 
 /** One letter change, as one set — lines, ask rows, display sentences, seed names (#1154, #1631). */
 const letterCommit = ({ lines, queries, spokenFor, seedNames, segStyle, curveStyle }: LetterCommit) => ({
