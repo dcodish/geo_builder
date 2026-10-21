@@ -12,6 +12,7 @@
  */
 
 import type { Construction, Id, Vec } from '@/engine';
+import { statedCirclePosition, type StatedCirclePosition } from '@/engine';
 import { isGeoPoint, nounOfKind, circleMembers, pointNeighbors, parallelEdgePairs, roleSidesOf, openRightTriangles } from '@/engine';
 import type { ParseContext } from './parse';
 
@@ -271,6 +272,20 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
         if (!out[key]) out[key] = { at: r.at, a: r.a, b: r.b };
         if (out[key].external === undefined && r.kindStated !== false) out[key].external = r.external !== false;
       }
+      return out;
+    })(),
+    // #2405 ([ADR-751](../../docs/06-decisions.md#adr-751)) — SEMANTIC: each circle pair's STATED mutual position, keyed by
+    // the sorted pair of circle ids, through the engine's one reader (`statedCirclePosition`: the circle-position records
+    // and the pair's crossing points, never coordinates). A pair whose position nobody stated has no entry. It is how
+    // «כל המשיקים המשותפים» learns how many common tangents the pair has (the deictic `circlePairPositions` may not, §3b law 2).
+    statedPairPositions: (() => {
+      const out: Record<string, StatedCirclePosition> = {};
+      const ids = construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.id] : []));
+      for (let i = 0; i < ids.length; i++)
+        for (let j = i + 1; j < ids.length; j++) {
+          const p = statedCirclePosition(construction, ids[i], ids[j]);
+          if (p) out[[ids[i], ids[j]].sort().join('|')] = p;
+        }
       return out;
     })(),
     // #2407 ([ADR-740](../../docs/06-decisions.md#adr-740)) — SEMANTIC: for each point, the point pairs the construction

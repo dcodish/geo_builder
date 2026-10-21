@@ -899,6 +899,19 @@ common tangent the sentence can name, so two existing letters that are both in `
 pair whose `circle-position` records state it internally tangent, externally tangent with kind internal, or contained is
 refused before the solve; `tangentsExhaustedKey` (`i18n/humanizeError.ts`) gives it the parser's sentence.
 
+**The whole set** ([ADR-751](06-decisions.md#adr-751)). `ALL_COMMON_TANGENTS` («כל המשיקים המשותפים», the definite plural with
+no count word, "(all) the common tangents") is matched before the fixed-count `plural`, and only with no `at`, apex or
+kind. `allCommonTangents` reads `ctx.statedPairPositions[pairKey]` — filled by `buildParseCtx` from the engine's
+`statedCirclePosition(construction, c1, c2)` (`engine/requirements.ts`: a `circle-position` contained / tangent / disjoint
+record, in that precedence, the tangent's kind from its first STATED record else external; else a `circle-circle` point of
+the pair → crossing; else undefined) — and lowers the set: two-touch tangents by kind (apart: 2 external + 2 internal;
+crossing and touching outside: 2 external), each the ordinary two-touch group with `kind` stated and the earlier touches
+of its kind as `avoid`, plus `touchTangent(T, [], …, true)` when the pair touches. Prior members (`ctx.commonTangents` by
+kind, `tan-T` in `ctx.lines`) are subtracted; none missing → the position's `tangents-exhausted` clarify. Letters: none →
+`autoVertexLabels`; exactly two per missing two-touch tangent → in order; otherwise `'stop'`. An undefined position →
+`ambiguous-construct` with the three statements that settle it (letters from `freeLabel`). `commonTangentCapacityError`
+reads the same `statedCirclePosition`, so the parser's count and the engine's guard share one reader.
+
 ### The AI lane's context ([ADR-741](06-decisions.md#adr-741))
 
 `llmParse` re-parses each canonical line through `parse(step, ctxFor(built))`, where `built` is the commands of the lines

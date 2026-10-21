@@ -18988,3 +18988,55 @@ Fixtures `regular-pentagon-definite-2265` and `regular-pentagon-named-2265` hold
 - Parity row `common-tangent-inside-pair-free-ab-2428`, with analytic's known gap [#2437](https://github.com/dcodish/geo_builder/issues/2437) (analytic refuses the line «unsatisfiable»; filed, not fixed here).
 
 **Behaviour change for a student:** after two circles touching from the inside at T and two free points A and B, «AB משיק משותף למעגלים M ו-N» draws AB as the common tangent at T, with A and B on it, at once. Before, it took about 13 s, and A, B and T ended up crowded together at the touch with every row ✓. The same holds for «AB משיק משותף פנימי …» on circles touching from the outside, and for a third common tangent after the two outside ones. A line the AI answers is read exactly as the same line typed.
+
+## ADR-751 — «כל המשיקים המשותפים» draws every common tangent of the pair, by the pair's STATED position: one reader of that position (`statedCirclePosition`) shared by the parser's count and the engine's capacity guard; an unstated position asks (#2405)
+
+**Status:** accepted · 2026-10-21 · bug (P1, 2-D) · fix round #2441, stream G · branch `fix/2405-all-common-tangents` off `main` @ 37800b85 · plan: the 2026-10-21 fix plan on #2405 · **Amends** [ADR-741](#adr-741) (stage 0a″ `commonTangentCapacityError` now reads the shared reader) · cites [ADR-359](#adr-359) Am. 3/4/8 (the pair's capacity by position), [ADR-740](#adr-740) (`touchTangent`, the one at-touch lowering), [ADR-704](#adr-704) (a defaulted tangency kind yields), [ADR-567](#adr-567) / [ADR-645](#adr-645) (the stated circle-position records), [ADR-AG-314](06c-decisions-analytic.md#adr-ag-314) (analytic draws the set) · LADDER stage: parse (`commonTangent`'s decomposition); no new stage
+
+**Operator:** the honesty invariant (CLAUDE.md, as transcribed on #2405: *"every common tangent is drawn, or the line is refused naming why"*); ADR-W-118 B1 with analytic's ADR-AG-314 as the measured twin; the #2390 ruling's naming (*"a visible name the student can refer to in later lines"*). The unstated-position answer is the P1 exception (an honest refusal reusing an existing message); the permanent answer is [#2442](https://github.com/dcodish/geo_builder/issues/2442) (needs-operator).
+
+**Requirements:** [02](02-requirements.md) **FR-EN-3** (every common tangent of the pair in one sentence, by the stated position; the unstated position refused) · **Design:** [04](04-design.md) §*The common tangent at the touch* ("The whole set") · [docs/17](17-design-rules.md) §3b (`statedPairPositions` joins the semantic fields)
+
+**Measured before** (`main` @ 37800b85, `decideDeterministic2D` → `commitVerdict` → `replay`, model mocked; "tangent" = a drawn line tangent to both resolved circles, computed in the probe). For «כל המשיקים המשותפים לשני המעגלים», «המשיקים המשותפים לשני המעגלים» and "all the common tangents of the two circles", row for row:
+- «שני מעגלים זרים»: commit, **1** tangent (AB), green (4 exist);
+- «שני מעגלים נחתכים»: commit, **1** (2 exist);
+- «מעגל M» · «מעגל N» · «המעגלים משיקים בנקודה T»: commit, **1** two-touch AB (3 exist);
+- «… משיקים מבפנים בנקודה T»: `tan-T` only (1, correct by ADR-741's capacity exit);
+- «מעגל N מוכל בתוך מעגל M»: refused `input.tangentsExhaustedContained` (0, correct);
+- «שני מעגלים» (position unstated): commit, **1**.
+- «שני המשיקים המשותפים …» drew 2 (AB, CD), correct.
+
+**Root cause / class (docs/17 §1).** *A common-tangent sentence that quantifies over the whole set («כל», the definite plural, "all the") is lowered as a fixed count of 1 or 2, so a statement about every tangent is drawn as fewer than it says, green.*
+- **R1.** `commonTangent` knew 1 or 2 tangents (`wantPairs`), never "as many as the pair has". «המשיקים המשותפים» did not match its plural regex (the «ה» sits between «משיקים» and «משותפ»), so the line read as the singular and «כל» was dropped silently: a stated quantity vanished.
+- **R2.** The only capacity reader the parser had was the deictic `circlePairPositions` (the drawn seed, 3% tolerance), which docs/17 §3b law 2 forbids from deciding what a statement means. The engine read the stated position from the `circle-position` records (ADR-741's 0a″), so parser and engine had two readers of one fact.
+
+**Decision.**
+1. **One reader of the pair's STATED position**, `statedCirclePosition(construction, a, b)` (`engine/requirements.ts`, exported from `@/engine`): `'contained' | 'ext-tangent' | 'int-tangent' | 'disjoint' | 'crossing' | undefined`, in that precedence. A `circle-position` contained record → contained; a tangent record → its kind, from the first record whose kind was STATED, else the default external (FR-EN-3; ADR-704 lets a later stated kind win); a disjoint record → disjoint; a `circle-circle` point of the pair → crossing; nothing (or only the cyclable `set-circle-position any`) → undefined. `commonTangentCapacityError` (0a″) is re-based on it: contained or int-tangent refuses any two-touch record, ext-tangent refuses an internal one, as before.
+2. **A semantic `ParseContext` field, `statedPairPositions`** (`buildParseCtx`), the reader over every circle pair, keyed by the sorted pair of circle ids; absent when unstated. A §3b registry addition: the count and the touch letters are a parse-time decomposition (the same rationale as ADR-740's `collinearWith`), and apply-time M1 cannot own it because the sentence's command list — how many records, which letters — IS the decision.
+3. **The set reading** (`ALL_COMMON_TANGENTS` + `allCommonTangents`, `parser/parse.ts`). It matches «כל המשיקים המשותפים», «המשיקים המשותפים» with no count word before it, and "(all) the common tangents", composed from the lexicon's `enWord`/`rx` (no label or number fragment); it is checked BEFORE the fixed-count plural, after the at-touch exits (a), (b), and only with no `at`, apex or kind. By the stated position:
+   - disjoint: 2 external + 2 internal two-touch tangents; crossing: 2 external; ext-tangent: 2 external + the tangent at T; int-tangent: the tangent at T; contained: the existing `tangents-exhausted` clarify (`input.tangentsExhaustedContained`).
+   - Each two-touch tangent is the ordinary two-touch group (`point-on-circle`s with `softPair`, `common-tangent` with `kind` stated and the earlier touches of its kind as `avoid`, the two implicit radius ⟂s, the segment). The tangent at T is `touchTangent(T, [], touchMembership(T), true)`, unlettered.
+   - **Members already drawn** count: each `ctx.commonTangents` entry fills a slot of its kind, `tan-T` in `ctx.lines` fills the touch slot; only the missing ones are drawn, and with none missing the answer is the position's existing `tangents-exhausted` sentence.
+   - **Letters:** none → auto touch letters (`autoVertexLabels`: AB, CD, EF, GH), the convention «שני המשיקים המשותפים» already uses; exactly two per missing two-touch tangent → they name them in order; any other count → `'stop'` (escalate whole, never a partial build).
+   - **Unstated position** → `{ clarify: 'ambiguous-construct', noun: <the student's phrase>, options }` with «המעגלים זרים», «המעגלים נחתכים בנקודות E ו-F», «המעגלים משיקים בנקודה T» (English: "the circles are disjoint / intersect at E and F / are tangent at T"), letters from `freeLabel`. It renders the EXISTING `input.ambiguousConstruct`.
+4. **Catalog:** the «AB משיק משותף חיצוני לשני המעגלים» row's descriptions (He, En) gain the set form. A contextual form, so no example row (a catalog example must parse on an empty figure).
+
+**Deviations from the plan, measured.**
+- *A kind-qualified set* («כל המשיקים המשותפים החיצוניים») keeps today's fixed-count reading: the plan's set reading and its student-visible lines name no kind, so the subset reading is a product question, filed as found work ([#2447](https://github.com/dcodish/geo_builder/issues/2447)).
+- *The class test checks the shown configuration and three presses of «הציגו תצורה אחרת»* (`cycleVariant`), not raw seeds 0–3: a raw seed on «שני מעגלים זרים» is an unadmitted sample (measured: `@ctr-O is still free` at seed 1, and the pre-existing «שני המשיקים המשותפים» is not green there either), so only views the store shows are witnesses.
+
+**Sibling audit (docs/17 §1).** `grep` for `wantPairs` / `plural` readers of a tangent count: `commonTangent` is the one site; the apex form («מנקודה A יוצאים המשיקים») keeps its two-tangent reading (excluded from the set reading). **Analytic:** draws the set on apart and crossing pairs since ADR-AG-314; measured not-handled on an externally tangent pair (#2448, filed) and on the unstated pair (known gap #2442). **3-D:** X8, no plane circles. **Complex:** no common-tangent grammar.
+
+**Measured after** (same probe, this branch; per-line time at the decision, cold first line):
+- apart: 4 tangents (AB, CD, EF, GH), green, 1.9 s cold / ≤ 6 ms warm; crossing: 2, ~0.2 s; touching outside (stated or default): AB, CD and `tan-T`, 1.4 s cold; touching inside: `tan-T`; contained: the refusal; unstated: `input.ambiguousConstruct` with the three options, each of which commits and lets «כל…» build (4 / 2 / 3).
+- «שני המשיקים המשותפים …» still draws 2. AB first, then «כל…» → 3 more; a repeated «כל…» → `input.tangentsExhaustedAny`. The circles and T do not move across the line. A lying `circlePairPositions` changes no parse.
+
+**Why not a patch (docs/17 §2).** No spelling or figure is special-cased: the count is a function of what the construction states about the pair, read once, by the same reader the engine's guard uses.
+
+**Locks.**
+- Class test `src/__tests__/issue-2405-all-common-tangents.test.ts`: five positions × three spellings, the contained refusal, the naming, prior members (two-touch and `tan-T`), the repeat, stability, the count control, letters (in order; wrong count escalates), the unstated refusal with every taught option through the real door (He and En), the one reader against 0a″, and the deictic-lie guard.
+- Fixtures `issue-2405-all-common-tangents-apart` and `issue-2405-all-common-tangents-ext-touch`.
+- Scenario `all-common-tangents-unstated-position-refused-2405`.
+- Parity: `all-common-tangents-2390` re-noted; rows `all-common-tangents-crossing-2405`, `all-common-tangents-ext-touch-2405` (analytic known gap [#2448](https://github.com/dcodish/geo_builder/issues/2448): measured not-handled on a touching pair, filed, not fixed here), `all-common-tangents-unstated-2405` (analytic known gap #2442).
+
+**Behaviour change for a student:** «כל המשיקים המשותפים לשני המעגלים» (or «המשיקים המשותפים …», "all the common tangents …") now draws every common tangent: four for circles stated apart, two for crossing circles, three for circles touching from outside, one for circles touching from inside, named AB, CD, EF, GH. Before, it drew one. On two circles whose position was never stated, the line now asks the student to say whether they are apart, crossing or touching (before: one tangent).

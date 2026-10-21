@@ -1,0 +1,242 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-21T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "oRTDPVQNBgSC7IaoTWE64",
+      "utterance": "מעגל M",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-M",
+        "center": "M",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g66tiu4SqqUFjuKxaXr9I",
+      "utterance": "מעגל N",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-N",
+        "center": "N",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "-gTpoIqlNFkbM3eMmckEE",
+      "utterance": "המעגלים משיקים בנקודה T",
+      "cmd": {
+        "type": "circles-tangent",
+        "circle1": "circle-M",
+        "circle2": "circle-N",
+        "at": "T",
+        "external": true,
+        "kindStated": false
+      },
+      "enabled": true
+    },
+    {
+      "id": "D8mBAdYRbuXaYQVnBqtvF",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-M",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "KVoxlw3ksenatha3wBpWl",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-N",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "IGYUVbmXaOyJaXaB0PU9G",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "common-tangent",
+        "a": "A",
+        "b": "B",
+        "circle1": "circle-M",
+        "circle2": "circle-N",
+        "variant": 0,
+        "kind": "external"
+      },
+      "enabled": true
+    },
+    {
+      "id": "fel9oXVXDG0ZJjx0kAa5L",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "M",
+        "b": "A",
+        "c": "A",
+        "d": "B",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "0Nl4GlFiKK-mg6rz3tqD6",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "N",
+        "b": "B",
+        "c": "A",
+        "d": "B",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "PWZ_RQQT6taLB0j8Xv544",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "tkJE4D_dpDvcjPKELNgPW",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-M",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "MaeiYRpSfMHYQ_54xwOVk",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-N",
+        "softPair": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "Xon2Uqz1eWqS7ryaAI9ft",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "common-tangent",
+        "a": "C",
+        "b": "D",
+        "circle1": "circle-M",
+        "circle2": "circle-N",
+        "variant": 0,
+        "kind": "external",
+        "avoid": [
+          "A",
+          "B"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "Tv-k2KAYxjrFL5BBWycwb",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "M",
+        "b": "C",
+        "c": "C",
+        "d": "D",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "XYcFKJdjt4biAGncOfu04",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "N",
+        "b": "D",
+        "c": "C",
+        "d": "D",
+        "implicit": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "N0aRIr-5lhSHsBZZlZ3ze",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "m_mZhKMRCc7r3oyF70hl6",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "T",
+        "circle": "circle-M"
+      },
+      "enabled": true
+    },
+    {
+      "id": "UYT4Ra34RlOlo8EvmWkMo",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "T",
+        "circle": "circle-N"
+      },
+      "enabled": true
+    },
+    {
+      "id": "AoNgXbL09oF3bNLkE1rZP",
+      "utterance": "כל המשיקים המשותפים לשני המעגלים",
+      "group": "MwVRCcz6FDIoG6jAGQ9X8",
+      "cmd": {
+        "type": "tangent",
+        "id": "tan-T",
+        "circle": "circle-M",
+        "at": "T",
+        "visible": true
+      },
+      "enabled": true
+    }
+  ]
+}
