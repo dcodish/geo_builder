@@ -594,6 +594,179 @@
    "expectRefusal": "לא",
    "lookFor": "Still refused, as you ruled.",
    "before": "Unchanged."
+  },
+  {
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "A new circle touching two drawn circles moves only itself (#2237, riskiest)",
+   "class": "play",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "מעגל Q משיק למעגל O",
+    "מעגל Q משיק למעגל P"
+   ],
+   "lookFor": "O and P never move or resize; Q touches both; every row green.",
+   "before": "O jumped next to P, and O and P ended up internally tangent.",
+   "id": "T38"
+  },
+  {
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Your #2237 line builds at every configuration",
+   "class": "verified",
+   "lines": [
+    "מעגל O",
+    "מעגל P משיק למעגל O"
+   ],
+   "cycles": 6,
+   "lookFor": "A figure at every press — never a blank one.",
+   "before": "(On the first batch tip) one configuration in 24 did not build.",
+   "id": "T39"
+  },
+  {
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "A circle stated inside a newer circle stays put (#2237)",
+   "class": "play",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "מעגל Q",
+    "מעגל O מוכל במעגל Q"
+   ],
+   "lookFor": "O keeps its place and size; Q grows around it.",
+   "before": "O moved into Q and shrank.",
+   "id": "T40"
+  },
+  {
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Points on a circle stay with it (#2237)",
+   "class": "look",
+   "lines": [
+    "מעגל O",
+    "AB קוטר במעגל O",
+    "מעגל Q משיק למעגל O"
+   ],
+   "lookFor": "O, A and B do not move.",
+   "before": "O and AB jumped.",
+   "id": "T41"
+  },
+  {
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Refusal: a contradicting tangency kind (#2339)",
+   "class": "verified",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "המעגלים O ו-P משיקים מבפנים",
+    "המעגלים O ו-P משיקים מבחוץ"
+   ],
+   "expectRefusal": "סותר",
+   "lookFor": "The last line stays in the box: «לא ניתן: «…מבחוץ» סותר את «…מבפנים»…»; nothing changes.",
+   "before": "Committed, with the ⚠ panel.",
+   "id": "T42"
+  },
+  {
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "A circle tangent to two circles in one line (#2211, P1)",
+   "class": "look",
+   "lines": [
+    "מעגל O",
+    "מעגל P",
+    "מעגל Q",
+    "מעגל Q משיק למעגלים O ו-P"
+   ],
+   "lookFor": "Q touches both; O and P unmoved; green.",
+   "before": "Sent to the AI.",
+   "id": "T43"
+  },
+  {
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "The English split form keeps the second circle (#2211, P1)",
+   "class": "verified",
+   "lines": [
+    "circle O",
+    "circle P",
+    "circle Q",
+    "circle Q is tangent to circle O and circle P"
+   ],
+   "lookFor": "Q touches both.",
+   "before": "Q touched O only, P dropped, green.",
+   "id": "T44"
+  },
+  {
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Your #2219 line is refused (P1)",
+   "class": "play",
+   "lines": [
+    "משולש ABC",
+    "D אמצע AB",
+    "E אמצע AC",
+    "F אמצע BC",
+    "DE is parallel to BC and segment AB"
+   ],
+   "lookFor": "Refused: \"A, B, C would be on one line\"; nothing drawn.",
+   "before": "Green, with DE ∥ BC and AB a plain segment.",
+   "id": "T45",
+   "expectRefusal": "לא ניתן"
+  },
+  {
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Perpendicular to two segments builds both (#2219)",
+   "class": "look",
+   "lines": [
+    "משולש ABC",
+    "D אמצע AB",
+    "E אמצע AC",
+    "F אמצע BC",
+    "AF מאונך ל-BC ול-DE"
+   ],
+   "lookFor": "Two ⊥ givens; both angles 90°.",
+   "before": "Sent to the AI.",
+   "id": "T46"
+  },
+  {
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "A circle tangent to two sides (#2219)",
+   "class": "look",
+   "lines": [
+    "משולש ABC",
+    "מעגל O משיק ל-AB ו-AC"
+   ],
+   "lookFor": "O touches both AB and AC.",
+   "before": "It touched AB only, green.",
+   "id": "T47"
+  },
+  {
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Not as planned: the #2219 sentence on an empty figure builds (judge it)",
+   "class": "play",
+   "lines": [
+    "DE is parallel to BC and segment AB"
+   ],
+   "lookFor": "Three parallel lines, with A, B, C on one line — exactly what its two lines build. The plan said it would go to the AI.",
+   "before": "Sent to the AI.",
+   "id": "T48"
   }
  ]
 }
