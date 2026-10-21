@@ -2,7 +2,7 @@
 
 export { parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, impliedPointBinding, droppedNewLabels, droppedGivenNumbers, statedNumberOccurrences, droppedGivenRelations, droppedWordRelations, droppedCompoundRelation, droppedGivenVerbs,
   droppedComparison, droppedRadiusSymbol, introducedNewLabels, droppedRegionSubject, droppedMidsegment, droppedConstructNoun, normalizeUtterance,
-  statedLabelTokens, typedLabels, circleWithOtherCentre, doubleCentreNaming, lowercaseLabelFold, latinProseLabels, liftTeachable, definedLabels, lowercaseMeasureLetters, latinAngleLetters, upperCasedLabelCandidate, hebrewLabelCandidate, VERB_GATES, augmentParseCtx, cevianPairReadings } from './parse';
+  statedLabelTokens, distributedClauses, typedLabels, circleWithOtherCentre, doubleCentreNaming, lowercaseLabelFold, latinProseLabels, liftTeachable, definedLabels, lowercaseMeasureLetters, latinAngleLetters, upperCasedLabelCandidate, hebrewLabelCandidate, VERB_GATES, augmentParseCtx, cevianPairReadings } from './parse';
 export type { ParseResult, ParseContext, CevianPairSegment } from './parse';
 export { buildParseCtx } from './context';
 export { incidenceList } from './incidenceList';

@@ -285,6 +285,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2190': 'open', // #2198 / #2216 (ADR-677), #2149 (ADR-671) and #2217 (ADR-691): analytic does not read one «ברדיוס N» for a circle pair, nor the named two-circle sentences (centre segment, equal radii, touch point), nor a fresh equal-radii pair
   '#2236': 'open', // #2205 (ADR-685): analytic does not read a definite unnamed shape noun with a predicate
 
+  '#2223': 'open', // #2219 (ADR-744): analytic and 3-D do not read a relation stated to a list of objects («AF מאונך ל-BC ול-DE»)
   '#2244': 'open', // #2242 (ADR-690): analytic reads no circle area or circumference, so «מעגל O · שטח המעגל הוא 9π» is not-handled
 
   '#2067': 'open', // #2065 (ADR-700): analytic and 3-D read no similarity ratio, «ביחס p ל-q» included
@@ -1764,6 +1765,12 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // records it on a figure that lost the second circle, so the row would pass vacuously. The gap row ends where analytic differs;
   // 2-D's last line is locked by the fixture src/__tests__/fixtures/arc-on-minted-circle-name-2362.geo.json.
   { id: 'second-unnamed-circumcircle-2362', family: 'circles', steps: ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2376' }], note: 'analytic refuses «משולש ABC חסום במעגל» third-crossing (line CD meets ONE circle at C, D and A: it reads the second unnamed circle as the first); measured at 37800b85, 8a5372be and the round tip' },
+  // ── #2211 + #2219 (ADR-744): a relation stated to a LIST of objects holds for each — the distributor's object-list shape ──
+  { id: 'circle-tangent-to-two-circles-2211', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל Q', 'מעגל Q משיק למעגל O ולמעגל P'], expect: 'builds', exception: 'X8', note: '2-D committed Q tangent to O with P dropped before ADR-744 (then escalated after ADR-735); analytic already distributes it' },
+  { id: 'circle-tangent-to-pair-2211', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל Q', 'מעגל Q משיק למעגלים O ו-P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: '2-D drew O and P tangent with Q dropped before ADR-735; analytic answers not-handled' },
+  { id: 'pair-tangent-to-circle-2211', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל Q', 'המעגלים O ו-P משיקים למעגל Q'], expect: 'not-handled', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: 'the pair-subject form is not read in 2-D (it named [O, P] and dropped Q before ADR-735); analytic reads it, Q tangent to both' },
+  { id: 'perpendicular-to-two-2219', family: 'parallel-perpendicular', steps: ['משולש ABC', 'D אמצע AB', 'E אמצע AC', 'F אמצע BC', 'AF מאונך ל-BC ול-DE'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2223' }, { product: '3d', issue: '#2223' }], note: '2-D escalated it before ADR-744; analytic refuses it bad-operand, 3-D not-understood' },
+  { id: 'parallel-to-two-conflict-2219', family: 'parallel-perpendicular', steps: ['משולש ABC', 'D אמצע AB', 'E אמצע AC', 'F אמצע BC', 'DE מקביל ל-BC ול-AB'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2223' }], note: '2-D escalated it before ADR-744 (and drew «…ו-AB» green with AB a plain segment); analytic refuses it; 3-D does not read it' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

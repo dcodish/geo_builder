@@ -30,7 +30,7 @@ import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
 import { foreignGiven, rightAngledAtVertex } from './scope';
-import { incidenceList } from './incidenceList';
+import { incidenceList, objectListShape } from './incidenceList';
 import { readFrame } from './frame';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
 import { nameAccounting } from '../../shell/llm/honestyCore';
@@ -8723,19 +8723,24 @@ const nestedPairRadius = (s: string): { clarify: 'nested-pair-radius'; parts: [s
 
 /**
  * #2149 ([ADR-671](../../docs/06-decisions.md#adr-671)) — the circles a sentence NAMES: the per-circle «מעגל X» /
- * "circle X" names, else the plural-list form «(ה)מעגלים X ו-Y» / "circles X and Y" (ADR-228 Am.). ONE reader, shared
+ * "circle X" names and the plural-list form «(ה)מעגלים X ו-Y» / "circles X and Y" (ADR-228 Am.). ONE reader, shared
  * by the pair resolver, the last-resort «which circle?» ask and the named-pair readers, so a sentence that names its
  * circles is never treated as an anonymous reference. Readers of a PAIR test exactly two names.
+ *
+ * #2211 ([ADR-744](../../docs/06-decisions.md#adr-744)): the UNION of both forms, de-duplicated, in order of appearance.
+ * The plural list used to REPLACE the per-circle names when there were fewer than two, so «מעגל Q משיק למעגלים O ו-P»
+ * named [O, P] and Q vanished from the sentence; a sentence naming three circles is now three names.
  */
 const namedCircleRefs = (s: string): string[] => {
-  let named = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
-  if (named.length < 2) {
-    // PLURAL-list form: "circles O1 and O2" / «מעגלים O1 ו-O2» — the names follow the plural noun,
-    // which the per-circle «מעגל X» regex misses (ADR-228 Am.).
-    const pl = s.match(/(?:circles|מעגלים|מעגלי)\s+([A-Za-z]\d*)\s*(?:ו-?|\band\b|,)\s*([A-Za-z]\d*)/i);
-    if (pl) named = [up(pl[1]), up(pl[2])];
+  const at: { i: number; name: string }[] = [];
+  for (const m of s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)) at.push({ i: m.index!, name: up(m[1]) });
+  // PLURAL-list form: "circles O1 and O2" / «מעגלים O1 ו-O2» — the names follow the plural noun,
+  // which the per-circle «מעגל X» regex misses (ADR-228 Am.).
+  for (const pl of s.matchAll(/(?:circles|מעגלים|מעגלי)\s+([A-Za-z]\d*)\s*(?:ו-?|\band\b|,)\s*([A-Za-z]\d*)/gi)) {
+    at.push({ i: pl.index!, name: up(pl[1]) }, { i: pl.index! + 1, name: up(pl[2]) });
   }
-  return named;
+  at.sort((a, b) => a.i - b.i);
+  return [...new Set(at.map((x) => x.name))];
 };
 
 /** #2188 ([ADR-672](../../docs/06-decisions.md#adr-672)) — the tangency KIND the construction already states for the
@@ -8764,7 +8769,10 @@ const resolveCirclePair = (
   opts?: { presupposes?: boolean },
 ): { kind: 'named' | 'existing' | 'complete'; centres: [string, string] } | 'introduce' | null => {
   const named = namedCircleRefs(s);
-  if (named.length >= 2) return named[0] === named[1] ? null : { kind: 'named', centres: [named[0], named[1]] };
+  // #2211 (ADR-744): the "3+ → defer" rule below, applied to the circles the SENTENCE names — a sentence naming three
+  // circles is never resolved to one pair (the third circle would vanish green)
+  if (named.length > 2) return null;
+  if (named.length === 2) return { kind: 'named', centres: [named[0], named[1]] };
   if (named.length === 1) return null; // a half-named pair — ambiguous which circle is the other; defer
   const plural = /\bcircles\b|מעגלים|שני\s+מעגל|שתי\s+מעגל/i.test(s);
   if (!plural && !opts?.presupposes) return null;
@@ -14434,6 +14442,34 @@ function droppedLabelSpan(s: string, commands: AnyCommand[], ctx: ParseContext):
   return labels.some((l) => existing.has(l));
 }
 
+/**
+ * #2185 ([ADR-735](../../docs/06-decisions.md#adr-735)) + #2211 / #2219 ([ADR-744](../../docs/06-decisions.md#adr-744)) —
+ * THE DISTRIBUTOR: the clauses a line means when it is a list — an incidence list («A על מעגל O ועל מעגל P»), or a
+ * relation from one subject to an object list («DE מקביל ל-BC ו-AB», «מעגל Q משיק למעגלים O ו-P», "AF is perpendicular
+ * to BC and DE"). Shared by the parser (`parseResolved`, ahead of the whole-line rules) and the clause splitter
+ * `clausesOf` (the coverage gate sees each clause) — one helper, never forked.
+ *
+ * The object-list shape (`objectListShape`) is only a candidate: the line IS that relation when its first two clauses
+ * each read ALONE through the clause path (every net) and their lowering names the subject and that clause's object.
+ * So a collective predicate («O חיתוך של AC ו-BD» — «O חיתוך של AC» says nothing alone) and a draw list keep their own
+ * readers. Returns the clauses, or null when the line is not a list.
+ */
+export function distributedClauses(s: string, ctx: ParseContext = NO_CONTEXT): string[] | null {
+  const inc = incidenceList(s);
+  if (inc && inc.length >= 2) return inc;
+  const shape = objectListShape(s);
+  if (!shape) return null;
+  const names = (cmds: AnyCommand[], labels: readonly string[]): boolean => {
+    const text = JSON.stringify(cmds);
+    return labels.every((l) => new RegExp(String.raw`(?<![A-Za-z\d])${l}(?![a-z\d])`).test(text));
+  };
+  for (const c of shape.clauses.slice(0, 2)) {
+    const cmds = parseClause(c.text, ctx);
+    if (!cmds || !names(cmds, shape.subject) || !names(cmds, c.labels)) return null;
+  }
+  return shape.clauses.map((c) => c.text);
+}
+
 /** The parse body AFTER normalization + size-qualifier resolution (the pre-#102 `parse`). */
 function parseResolved(s: string, ctx: ParseContext): ParseResult {
   // #2234 / #2143 (ADR-737): «ישר זווית ב-X» / "right-angled at X" is refused by its words, before any rule reads it
@@ -14443,8 +14479,10 @@ function parseResolved(s: string, ctx: ParseContext): ParseResult {
   // distribution — every subject on every carrier, or paired — read through the clause path all-or-nothing, ahead
   // of the whole-line rules (which read the first carrier and dropped the rest green). A clause that does not read
   // alone leaves the line unread, never the first-carrier half (parser precedence, the ADR-024 discipline).
-  const dist = incidenceList(s);
-  if (dist && dist.length >= 2) return parseClauses(dist, ctx) ?? { ok: false, reason: 'not-handled' };
+  // #2211 + #2219 (ADR-744): so does a relation stated to an OBJECT LIST («DE מקביל ל-BC ו-AB», «מעגל Q משיק למעגלים
+  // O ו-P») — one distributor, two shapes. A recognised line is final: no split fallback turns its objects into draws.
+  const dist = distributedClauses(s, ctx);
+  if (dist) return parseClauses(dist, ctx) ?? { ok: false, reason: 'not-handled' };
   const whole = runRules(s, ctx);
   // ADR-264 Am. 1 / issue #33: a winning parse (or a rule's clarification) that silently DROPPED something
   // the student stated — a shape NOUN left unmaterialized, a circle predicate, a radius symbol, a REGION

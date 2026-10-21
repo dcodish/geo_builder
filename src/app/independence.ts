@@ -37,7 +37,7 @@
  * clause form) therefore never reaches it. See ADR-460 for the four residual false positives this
  * property covers, and `independence.test.ts` for the net that fails if the property stops holding.
  */
-import { CLAUSE_CONNECTIVES, CLAUSE_RELATIVES, incidenceList, parse } from '@/parser';
+import { CLAUSE_CONNECTIVES, CLAUSE_RELATIVES, distributedClauses, parse } from '@/parser';
 import type { ScopeMatch } from '@/parser';
 import { RESPECTIVELY } from '@/parser/lexicon';
 import { replay } from '@/store/geoStore';
@@ -82,9 +82,10 @@ const BARE_LABELS = new RegExp(
  */
 export const clausesOf = (utterance: string): string[] => {
   // #2185 (ADR-735): an incidence list («A על מעגל O ועל מעגל P») is its distribution — one clause per incidence,
-  // through the parser's own distributor, so the coverage gate sees each carrier. Shared, never forked.
-  const dist = incidenceList(utterance);
-  if (dist && dist.length >= 2) return dist;
+  // through the parser's own distributor, so the coverage gate sees each carrier. Shared, never forked. #2211 / #2219
+  // (ADR-744): the same distributor reads a relation over an object list («DE מקביל ל-BC ו-AB» → two clauses).
+  const dist = distributedClauses(utterance);
+  if (dist) return dist;
   const bits = utterance.split(SEPARATORS);
   const clean = (p: string) => p.replace(/^\s*[ו]?-?\s*/, '').trim();
   const continues = (prev: string, piece: string): boolean => {

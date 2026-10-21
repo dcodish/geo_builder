@@ -165,11 +165,13 @@ describe('#2188 — controls', () => {
     await play(PAIR, 'המעגלים O ו-P משיקים בנקודה X');
     expect(kindAt(0).kind).toBe('EXT');
   });
-  it('an explicit «מבחוץ» on the restatement still wins (the earlier internal row reads red)', async () => {
+  // #2339 (ADR-743) re-based: an explicit «מבחוץ» against the stated internal kind is a contradiction, refused before
+  // commit (it used to commit EXT with the earlier internal row red); the explicit word is still read, never inherited over.
+  it('an explicit «מבחוץ» on the restatement is read — and refused as contradicting the internal kind', async () => {
     const r = await play(INT, 'המעגלים O ו-P משיקים מבחוץ בנקודה X');
-    expect(r.kind).toBe('commit');
-    expect(kindAt(0).kind).toBe('EXT');
-    expect(kindAt(0).r.violations.map((v) => v.relation)).toEqual(['tangent']);
+    expect(r.kind).toBe('refuse');
+    expect(kindAt(0).kind).toBe('INT');
+    expect(kindAt(0).r.violations).toEqual([]);
   });
   it('the two-line membership form «X על מעגל O» · «X על מעגל P» after INT is unchanged (INT, X only)', async () => {
     await play([...INT, 'X על מעגל O'], 'X על מעגל P');

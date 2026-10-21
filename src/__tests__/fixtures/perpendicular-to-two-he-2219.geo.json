@@ -1,0 +1,114 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-21T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "xTdKzA4YJR3deeR1celo1",
+      "utterance": "משולש ABC",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "NozHmXcFcIDOZMmjDhWP8",
+      "utterance": "D אמצע AB",
+      "cmd": {
+        "type": "midpoint",
+        "id": "D",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "peGHrVxyX9eiBPtknQFft",
+      "utterance": "E אמצע AC",
+      "cmd": {
+        "type": "midpoint",
+        "id": "E",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "P8bJgdnkZ2EP7iYCDyJP1",
+      "utterance": "F אמצע BC",
+      "cmd": {
+        "type": "midpoint",
+        "id": "F",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "JTYn1X2lAX2Q3d05YNBXz",
+      "utterance": "AF מאונך ל-BC ול-DE",
+      "group": "6-mSGDYOM1NFas6Xl33_v",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "F"
+      },
+      "enabled": true
+    },
+    {
+      "id": "bvWjkzmBMGIuCyUnDHGZM",
+      "utterance": "AF מאונך ל-BC ול-DE",
+      "group": "6-mSGDYOM1NFas6Xl33_v",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "PrKcBij8yK2PgJOXOBhLl",
+      "utterance": "AF מאונך ל-BC ול-DE",
+      "group": "6-mSGDYOM1NFas6Xl33_v",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "A",
+        "b": "F",
+        "c": "B",
+        "d": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "PTBbdlnKa6aGaF6y3j17h",
+      "utterance": "AF מאונך ל-BC ול-DE",
+      "group": "6-mSGDYOM1NFas6Xl33_v",
+      "cmd": {
+        "type": "segment",
+        "a": "D",
+        "b": "E"
+      },
+      "enabled": true
+    },
+    {
+      "id": "AZSIrSSLoosOYw-PnILRQ",
+      "utterance": "AF מאונך ל-BC ול-DE",
+      "group": "6-mSGDYOM1NFas6Xl33_v",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "A",
+        "b": "F",
+        "c": "D",
+        "d": "E"
+      },
+      "enabled": true
+    }
+  ]
+}

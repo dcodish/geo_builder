@@ -11,7 +11,7 @@
 import type { CirclePositionCase, Command, Constraint, Construction, GeoObject, Id, SideRequirement, SolveDirective, Vec } from './types';
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
-import { ringOnOneCircle } from './structure';
+import { circlesStatedTangent, ringOnOneCircle } from './structure';
 import { referencesCircle } from './lower';
 import { add, circleCircleIntersect, circumcenter, dist, footOnLine, lineLineIntersect, pointInPolygon, pointOutsidePolygon, reflectAcross, ringKey, ringSimple, scale, sub } from './geometry';
 import { isQuadKind, QUAD_IMPLIES, quadAfter, quadImpliesInEveryReading, quadRelation, quadsExclude, type QuadKind } from './shapeKinds';
@@ -302,6 +302,32 @@ function keepTangencyDriven(objects: GeoObject[], con: Constraint): void {
   };
   if (objects.some((o) => o.kind === 'free-point' && drives(o))) return; // a centre already drives it
   const circs = wit.map((w) => objects.find((o) => o.id === w.circle && o.kind === 'circle')) as (Extract<GeoObject, { kind: 'circle' }> | undefined)[];
+  // #2237 (ADR-742): the tangency is carried by the NEWER circle's own DOFs (`seatMover`'s order), so re-home newest
+  // first. When the pin orphaned the device (no radius drives it any more), the newer circle's free centre takes it
+  // alone; only when that centre is busy does the older circle's free radius carry it with a free centre — exactly the
+  // carriers the ADR-071 "both radii" device had in that case (the plan's fallback: the mover has no free DOF left).
+  const idx = (c: Extract<GeoObject, { kind: 'circle' }> | undefined) => (c ? objects.findIndex((o) => o.id === c.id) : -1);
+  circs.sort((a, b) => idx(b) - idx(a));
+  const radiusDrives = circs.some((c) => c && drives(objects[idx(c)]));
+  const freeCentre = (c: Extract<GeoObject, { kind: 'circle' }> | undefined) =>
+    c
+      ? objects.findIndex(
+          (o) => o.id === c.center && o.kind === 'free-point' && !(o as Extract<GeoObject, { kind: 'free-point' }>).pinned && (o as { solve?: unknown }).solve === undefined,
+        )
+      : -1;
+  if (!radiusDrives) {
+    const nc = freeCentre(circs[0]);
+    if (nc >= 0) {
+      objects[nc] = { ...(objects[nc] as Extract<GeoObject, { kind: 'free-point' }>), solve: { constraint: con, branch: 0 } };
+      return;
+    }
+    const older = circs[1];
+    const oi = idx(older);
+    const oc = oi >= 0 ? objects[oi] : undefined;
+    if (oc && oc.kind === 'circle' && oc.radius.via === 'free' && (oc as { solve?: unknown }).solve === undefined) {
+      objects[oi] = { ...oc, solve: { constraint: con, branch: 0 } };
+    }
+  }
   // Mark a free, unpinned, not-yet-driving CENTRE as the coincide's carrier (the gap DOF).
   for (const c of circs) {
     if (!c) continue;
@@ -1477,6 +1503,30 @@ function seedRadiusOf(circ: Extract<GeoObject, { kind: 'circle' }>, pos: Map<Id,
   return 'value' in circ.radius ? circ.radius.value : 5;
 }
 
+type CircleObj = Extract<GeoObject, { kind: 'circle' }>;
+
+/**
+ * #2237 ([ADR-742](../../docs/06-decisions.md#adr-742)) — the ONE chooser for every circle-pair apply-time seat
+ * (tangency, containment, crossing, apart, the unstated position): which circle of the pair moves. The mover is the
+ * NEWER circle — the one later in `objects` (creation order, ADR-231's newest-first) — when its centre is a movable
+ * free point; else the older one when its centre can move; else none (the solver and the verifier decide). A relation
+ * between two circles is information about the circle the step introduces, so an older, already-drawn circle (and
+ * everything on it) keeps its place (FR-EN-7). No seat keeps its own slot logic: the command's slot order is the
+ * sentence's grammar, never the answer to "which circle moves".
+ */
+function seatMover(objects: GeoObject[], a: CircleObj, b: CircleObj): { mover: CircleObj; anchor: CircleObj } | null {
+  const movable = (c: CircleObj): boolean => {
+    const o = objects.find((x) => x.id === c.center);
+    return !!o && o.kind === 'free-point' && !o.pinned && !o.rigid;
+  };
+  const ia = objects.findIndex((o) => o.id === a.id);
+  const ib = objects.findIndex((o) => o.id === b.id);
+  const [newer, older] = ib >= ia ? [b, a] : [a, b];
+  if (movable(newer)) return { mover: newer, anchor: older };
+  if (movable(older)) return { mover: older, anchor: newer };
+  return null;
+}
+
 /** A general-position spot at distance `rad` around `centre` — golden-angle spins, off existing points and
  *  off lines through the centre and an existing point (the ADR-253/ADR-254 seeding discipline), with an
  *  extra per-candidate acceptance test. Returns the first passing spot, or the θ=0 fallback. */
@@ -2475,20 +2525,21 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // pattern, circle edition — ADR-358): with the #196 `apart` seat, two bare circles default
       // DISJOINT, so «נקודת החיתוך של המעגלים» must pull them back together — re-seat a movable free
       // centre so the seed configs genuinely intersect (a better default, never a drive; the centres
-      // stay free sampled DOFs). Already-intersecting pairs are untouched (stability).
+      // stay free sampled DOFs). Already-intersecting pairs are untouched (stability). #2339 (ADR-743): so is a pair
+      // the construction STATES tangent — it already meets, at its touch point; re-seating it overlapping broke the
+      // stated tangency (which the kind-encoding internal device no longer absorbs as an external touch), and the
+      // second crossing's own refusal (stage 0j, «X מתלכדת עם Y») is the honest answer.
       const ca = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle1);
       const cb = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle2);
       const pa = ca && pos.get(ca.center);
       const pb = cb && pos.get(cb.center);
-      if (ca && cb && pa && pb) {
+      if (ca && cb && pa && pb && !circlesStatedTangent(prev, ca.id, cb.id)) {
         const ra = seedRadiusOf(ca, pos);
         const rb = seedRadiusOf(cb, pos);
         const gap = dist(pa, pb);
         if (gap > (ra + rb) * 0.95 || gap < Math.abs(ra - rb) * 1.05) {
-          const mv = [cb, ca].find((c) => {
-            const o = objects.find((x) => x.id === c.center);
-            return !!o && o.kind === 'free-point' && !o.pinned;
-          });
+          // #2237 (ADR-742): the NEWER circle moves onto the older one (one chooser, never the second slot).
+          const mv = seatMover(objects, ca, cb)?.mover;
           if (mv) {
             const around = mv === cb ? pa : pb;
             const target = (ra + rb) * 0.62; // an overlapping gap: |r1−r2| < d < r1+r2
@@ -2541,45 +2592,89 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         // Both radii STATED ⇒ fall through to the fixed path below, where |OP| is genuinely rigid.
         if (c1.radius.via === 'free' || c2.radius.via === 'free') {
           const rseed = (r: typeof c1.radius): number => (r.via === 'free' || r.via === 'length' ? r.value : 5);
-          const r1 = rseed(c1.radius);
-          const r2 = rseed(c2.radius);
-          // Seed c2's centre at the exact touching distance so the DEFAULT figure is already tangent (the
+          let r1 = rseed(c1.radius);
+          let r2 = rseed(c2.radius);
+          // Seed the MOVER's centre at the exact touching distance so the DEFAULT figure is already tangent (the
           // solver re-engages only when a later constraint moves a radius / |OP|). External: r1+r2; internal: |r1−r2|.
-          const c1c = objects.find((o) => o.id === c1.center && o.kind === 'free-point') as Extract<GeoObject, { kind: 'free-point' }> | undefined;
-          const c2j = objects.findIndex((o) => o.id === c2.center && o.kind === 'free-point');
-          const c2c = c2j >= 0 ? (objects[c2j] as Extract<GeoObject, { kind: 'free-point' }>) : undefined;
-          if (c1c && c2c && !c2c.pinned) {
-            const dx = c2c.x - c1c.x, dy = c2c.y - c1c.y;
+          // #2237 (ADR-742): the mover is the NEWER circle (`seatMover`), never the command's second slot — «מעגל Q
+          // משיק למעגל O» writes the older O into `circle2`, and seating it moved O (and everything on it).
+          const seat = seatMover(objects, c1, c2);
+          // An internal pair whose radius SEEDS are equal seats as two coincident circles (|r1−r2| = 0), which no solve
+          // can separate without moving the older circle. The mover's FREE radius seed is re-seeded by the ADR-244
+          // concentric split (0.55) on the side the tie already gives it — the tie makes `circle1` the OUTER circle (the
+          // `r1 >= r2` pick below), so a mover in slot 1 grows to contain the anchor and one in slot 2 shrinks inside it.
+          // The roles are exactly today's; only the coincident seat is avoided. A better default, never a drive.
+          if (!cmd.external && seat && seat.mover.radius.via === 'free' && (seat.mover as { solve?: unknown }).solve === undefined && Math.abs(r1 - r2) <= 1e-6 * Math.max(r1, r2, 1)) {
+            const mi = objects.findIndex((o) => o.id === seat.mover.id && o.kind === 'circle');
+            const ra = seat.mover === c1 ? r2 : r1;
+            const rm = seat.mover === c1 ? ra / 0.55 : ra * 0.55;
+            objects[mi] = { ...(objects[mi] as CircleObj), radius: { via: 'free', value: rm } };
+            if (seat.mover === c1) r1 = rm;
+            else r2 = rm;
+          }
+          const ancC = seat ? objects.find((o) => o.id === seat.anchor.center && o.kind === 'free-point') : undefined;
+          const movJ = seat ? objects.findIndex((o) => o.id === seat.mover.center && o.kind === 'free-point') : -1;
+          const movC = movJ >= 0 ? (objects[movJ] as Extract<GeoObject, { kind: 'free-point' }>) : undefined;
+          const ancP = ancC?.kind === 'free-point' ? { x: ancC.x, y: ancC.y } : undefined;
+          if (ancP && movC) {
+            const dx = movC.x - ancP.x, dy = movC.y - ancP.y;
             const L = Math.hypot(dx, dy) > 1e-6 ? Math.hypot(dx, dy) : 1;
             const ux = Math.hypot(dx, dy) > 1e-6 ? dx / L : 1;
             const uy = Math.hypot(dx, dy) > 1e-6 ? dy / L : 0;
             const gap = cmd.external ? r1 + r2 : Math.abs(r1 - r2);
-            objects[c2j] = { ...c2c, x: c1c.x + ux * gap, y: c1c.y + uy * gap };
+            objects[movJ] = { ...movC, x: ancP.x + ux * gap, y: ancP.y + uy * gap };
           }
-          const wit = `~touch-${cmd.at}`;
+          // #2339 (ADR-743): the witness id carries the KIND, so a second line stating the other kind at the same touch
+          // point adds its own device instead of being swallowed by `addObj` (the stated «מבחוץ» silently lost).
+          const wit = `~touch-${cmd.at}-${cmd.external ? 'ext' : 'int'}`;
           if (cmd.external) {
             // M on circle 1 toward c2; the witness on circle 2 toward c1. coincide ⇒ |OP| = r1+r2.
             addObj(objects, { kind: 'radial-toward', id: cmd.at, circle: c1.id, toward: c2.center });
             addObj(objects, { kind: 'radial-toward', id: wit, circle: c2.id, toward: c1.center });
           } else {
-            // Internal: the larger (by seed) circle is OUTER; M on the outer toward the inner; the witness
-            // on the inner toward M (so the touch lands on the far side of the inner centre). coincide ⇒ |OP| = |r1−r2|.
+            // Internal: the larger (by seed) circle is OUTER; M on the outer toward the inner; the witness on the inner
+            // AWAY from the outer centre (#2339, ADR-743), so the touch lands on the far side of the inner centre and the
+            // coincidence holds only when |OP| = r_out − r_in. (The witness used to point at M, which an EXTERNAL touch
+            // satisfies too, so a contradicting «מבחוץ» was committed green and only the verifier objected.)
             const outer = r1 >= r2 ? c1 : c2;
             const inner = r1 >= r2 ? c2 : c1;
             addObj(objects, { kind: 'radial-toward', id: cmd.at, circle: outer.id, toward: inner.center });
-            addObj(objects, { kind: 'radial-toward', id: wit, circle: inner.id, toward: cmd.at });
+            addObj(objects, { kind: 'radial-toward', id: wit, circle: inner.id, toward: outer.center, away: true });
           }
           const tcon: Constraint = { type: 'coincide', p: cmd.at, q: wit };
           // Mark each FREE radius as a PERMANENT driver of the tangency (like length-radius / ADR-071): the
           // touch points carry no DOF themselves, so without this the coincide is only a CHECK, satisfied at
           // build but never re-flexed — and recruitFreeDofs widens DOFs only for a step's OWN new constraint,
           // so a later "OP=4" (which moves a centre) would break the build-time tangency and over-constrain.
-          // Marking both radii makes them carriers in every joint solve, so |OP| changes RESHAPE the radii
-          // (proportionally) to keep r1+r2 = |OP|. (The reported "two tangent circles then OP=4" bug.)
-          for (const ix of [idx1, idx2]) {
-            const oc = objects[ix];
-            if (oc.kind === 'circle' && oc.radius.via === 'free' && (oc as { solve?: unknown }).solve === undefined) {
-              objects[ix] = { ...oc, solve: { constraint: tcon, branch: 0 } };
+          // A permanent carrier makes |OP| changes RESHAPE the tangency (the reported "two tangent circles then OP=4"
+          // bug). #2237 (ADR-742, amending ADR-037/ADR-071's "both radii"): the carrier is the MOVER's own DOF only —
+          // M2 least ownership (ADR-281) — its free radius if unclaimed, else its free centre. The anchor's radius
+          // carried the newer circle's relation, so a later solve or sampled seed resized the OLDER circle (r → 0.2)
+          // and drew a relation nobody stated. Only when the mover has no free DOF left does the anchor's free radius
+          // carry it (today's fallback — the pair stays solvable and honest). No seat (neither centre movable): the
+          // free radii carry it, as before.
+          const unclaimedRadius = (c: CircleObj): number => {
+            const ix = objects.findIndex((o) => o.id === c.id && o.kind === 'circle');
+            const oc = ix >= 0 ? objects[ix] : undefined;
+            return oc && oc.kind === 'circle' && oc.radius.via === 'free' && (oc as { solve?: unknown }).solve === undefined ? ix : -1;
+          };
+          const claim = (ix: number): void => {
+            objects[ix] = { ...(objects[ix] as GeoObject), solve: { constraint: tcon, branch: 0 } } as GeoObject;
+          };
+          if (seat) {
+            const mr = unclaimedRadius(seat.mover);
+            const mc = objects.findIndex((o) => o.id === seat.mover.center && o.kind === 'free-point');
+            const mco = mc >= 0 ? (objects[mc] as Extract<GeoObject, { kind: 'free-point' }>) : undefined;
+            if (mr >= 0) claim(mr);
+            else if (mco && !mco.pinned && !mco.rigid && mco.solve === undefined) claim(mc);
+            else {
+              const ar = unclaimedRadius(seat.anchor);
+              if (ar >= 0) claim(ar);
+            }
+          } else {
+            for (const c of [c1, c2]) {
+              const ix = unclaimedRadius(c);
+              if (ix >= 0) claim(ix);
             }
           }
           constraints.push(tcon);
@@ -2691,11 +2786,6 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       if (!ca || !cb) break; // structural probes run on an empty construction — the verifier owns the rest
       const pa = pos.get(ca.center);
       const pb = pos.get(cb.center);
-      const centreObj = (c: Extract<GeoObject, { kind: 'circle' }>) => objects.find((o) => o.id === c.center);
-      const movable = (c: Extract<GeoObject, { kind: 'circle' }>): boolean => {
-        const o = centreObj(c);
-        return !!o && o.kind === 'free-point' && !o.pinned;
-      };
       const moveCentre = (c: Extract<GeoObject, { kind: 'circle' }>, p: Vec): void => {
         const i = objects.findIndex((o) => o.id === c.center);
         objects[i] = { ...(objects[i] as Extract<GeoObject, { kind: 'free-point' }>), x: p.x, y: p.y };
@@ -2715,12 +2805,25 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         const cases: CirclePositionCase[] = cmd.admits?.length ? cmd.admits : ['meet', 'disjoint', 'contained'];
         const pick = cases[(((cmd.variant ?? 0) % cases.length) + cases.length) % cases.length];
         const v = pick === 'meet' ? 0 : pick === 'disjoint' ? 1 : 2;
-        const mv = movable(cb) ? cb : movable(ca) ? ca : null;
+        // #2237 (ADR-742): the NEWER circle moves (one chooser for every circle-pair seat).
+        const mv = seatMover(objects, ca, cb)?.mover ?? null;
         if (!mv) break;
-        if (v === 2 && cb.radius.via === 'free' && rb >= ra * 0.8) {
+        if (v === 2 && rb >= ra * 0.8) {
+          // b inside a: re-seed the MOVER's free radius (a newer inner shrinks, a newer container grows); the other
+          // circle's only when the mover's size is stated.
           const ib = objects.findIndex((o) => o.id === cb.id);
-          rb = ra * 0.45;
-          objects[ib] = { ...cb, radius: { via: 'free', value: rb } };
+          const ia = objects.findIndex((o) => o.id === ca.id);
+          if (mv === ca && ca.radius.via === 'free') {
+            const ra2 = Math.max(ra, rb / 0.45);
+            objects[ia] = { ...ca, radius: { via: 'free', value: ra2 } };
+            const gapG = Math.max(0.1, ra2 - rb) * 0.4;
+            moveCentre(mv, seedSpotAround(pb, gapG, otherPts(mv.center)));
+            break;
+          }
+          if (cb.radius.via === 'free') {
+            rb = ra * 0.45;
+            objects[ib] = { ...cb, radius: { via: 'free', value: rb } };
+          }
         }
         const around = mv === cb ? pa : pb;
         const gapT = v === 0 ? (ra + rb) * 0.62 : v === 1 ? (ra + rb) * 1.45 : Math.max(0.1, ra - rb) * 0.4;
@@ -2729,28 +2832,35 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       }
       if (cmd.relation === 'disjoint') {
         if (d > (ra + rb) * 1.05) break; // already clearly apart — keep the drawing still (stability)
-        const mv = movable(cb) ? cb : movable(ca) ? ca : null;
+        const mv = seatMover(objects, ca, cb)?.mover ?? null;
         if (!mv) break; // both centres pinned/derived — the verifier reports the contradiction
         const around = mv === cb ? pa : pb;
         moveCentre(mv, seedSpotAround(around, (ra + rb) * 1.45, otherPts(mv.center)));
       } else {
         // contained: b strictly inside a — b needs a smaller radius seed AND a centre near a's.
         if (d + rb < ra * 0.98) break; // already inside — keep the drawing still
+        // #2237 (ADR-742): the NEWER circle moves, and the radius re-seed follows it — a newer inner b shrinks
+        // (ra·0.45), a newer container a grows (rb/0.45). The other circle's free seed is re-seeded only when the
+        // mover's size is stated. Before, b always moved and shrank, so «מעגל O מוכל במעגל Q» with O drawn first
+        // moved the older O into Q and shrank it.
+        const mv = seatMover(objects, ca, cb)?.mover ?? null;
         if (rb >= ra * 0.8) {
           // Free radius SEEDS may be re-seeded (the concentric pair's 0.55 split, ADR-244) — still free DOFs.
           const ib = objects.findIndex((o) => o.id === cb.id);
           const ia = objects.findIndex((o) => o.id === ca.id);
-          if (cb.radius.via === 'free') {
+          const grow = () => (objects[ia] = { ...ca, radius: { via: 'free', value: Math.max(ra, rb / 0.45) } });
+          const shrink = () => {
             rb = ra * 0.45;
             objects[ib] = { ...cb, radius: { via: 'free', value: rb } };
-          } else if (ca.radius.via === 'free') {
-            objects[ia] = { ...ca, radius: { via: 'free', value: Math.max(ra, rb / 0.45) } };
-          }
+          };
+          if (mv === ca && ca.radius.via === 'free') grow();
+          else if (cb.radius.via === 'free') shrink();
+          else if (ca.radius.via === 'free') grow();
         }
         const raNow = seedRadiusOf(objects.find((o) => o.id === ca.id) as Extract<GeoObject, { kind: 'circle' }>, pos);
         const gap = Math.max(0.1, raNow - rb);
-        if (movable(cb)) moveCentre(cb, seedSpotAround(pa, gap * 0.4, otherPts(cb.center)));
-        else if (movable(ca)) moveCentre(ca, seedSpotAround(pb, gap * 0.4, otherPts(ca.center)));
+        if (mv === cb) moveCentre(cb, seedSpotAround(pa, gap * 0.4, otherPts(cb.center)));
+        else if (mv === ca) moveCentre(ca, seedSpotAround(pb, gap * 0.4, otherPts(ca.center)));
       }
       break;
     }

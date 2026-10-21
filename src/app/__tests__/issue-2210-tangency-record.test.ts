@@ -183,9 +183,13 @@ describe('#2210 item 2 — a stated containment makes a defaulted tangency inter
 });
 
 describe('#2210 — controls', () => {
-  it('C1: two explicit kinds that disagree stay the later line\'s contradiction, red', async () => {
-    await playAll([...PAIR, 'המעגלים O ו-P משיקים מבפנים', 'המעגלים O ו-P משיקים מבחוץ']);
-    expect(kindOf().r.violations.map((v) => v.relation)).toContain('tangent');
+  // #2339 (ADR-743) amends C1: the later contradicting kind is no longer committed red — it is refused before commit
+  // (`issue-2339-tangency-kind-refused.test.ts` holds the wording); the figure keeps the earlier kind, green.
+  it('C1: two explicit kinds that disagree — the later line is refused, the earlier kind stands', async () => {
+    await playAll([...PAIR, 'המעגלים O ו-P משיקים מבפנים']);
+    expect((await submit('המעגלים O ו-P משיקים מבחוץ')).kind).toBe('refuse');
+    expect(kindOf().kind).toBe('INT');
+    expect(kindOf().r.violations).toEqual([]);
   });
   it('C2: «…משיקים» · «…משיקים מבחוץ» stays external, green, touch M', async () => {
     await playAll([...PAIR, 'המעגלים O ו-P משיקים', 'המעגלים O ו-P משיקים מבחוץ']);

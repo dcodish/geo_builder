@@ -5602,6 +5602,50 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'circle-tangent-moves-newer-2237',
+    title: '«מעגל O» · «מעגל P» · «מעגל Q משיק למעגל O» · «מעגל Q משיק למעגל P» — Q moves, O and P stay exactly where they were (#2237, ADR-742)',
+    guards:
+      "#2237, operator ruling 2026-10-16 (card g2237-jump A): *\"Q moves, O and P stay where they are, and no unstated relation is drawn between them\"*. At 37800b85 line 3 moved the OLDER O from (0, 0) to (6.47, 0) and line 4 moved P, leaving O and P exactly internally tangent (|OP| = 1.40 = 5 − 3.6). Root cause: every circle-pair apply-time seat moved the command's second slot (the sentence's object), and the free-radius tangency made both radii its carriers. ADR-742: one chooser `seatMover` (the newer movable circle moves) and the tangency carried by the mover's own DOFs. The class matrix is src/engine/__tests__/issue-2237-circle-seat-newer-moves.test.ts.",
+    steps: ['מעגל O', 'מעגל P', 'מעגל Q משיק למעגל O', 'מעגל Q משיק למעגל P'],
+    check(fig) {
+      allStepsOk(fig);
+      // Positions are compared at the drawn seed 0: a sampled seed re-samples the whole free cluster when a circle is
+      // added (the plan's out-of-class finding E), so step-to-step stability is a seed-0 promise. The relations hold at
+      // every seed the sweep shows (below, on `fig`).
+      const before = replay(factsOf(['מעגל O', 'מעגל P']), 0);
+      const after = replay(factsOf(['מעגל O', 'מעגל P', 'מעגל Q משיק למעגל O', 'מעגל Q משיק למעגל P']), 0);
+      for (const id of ['circle-O', 'circle-P']) {
+        const b = before.circles.get(id)!;
+        const a = after.circles.get(id)!;
+        expect(dist(a.center, b.center), `${id} keeps its centre`).toBeLessThan(1e-9);
+        expect(Math.abs(a.r - b.r), `${id} keeps its radius`).toBeLessThan(1e-9);
+      }
+      const q = fig.circles.get('circle-Q')!;
+      for (const id of ['circle-O', 'circle-P']) {
+        const c = fig.circles.get(id)!;
+        expect(Math.abs(dist(q.center, c.center) - (q.r + c.r)), `Q–${id} externally tangent`).toBeLessThan(1e-6);
+      }
+      expect(fig.violations).toEqual([]);
+    },
+  },
+  {
+    id: 'tangency-kind-contradiction-refused-2339',
+    title: '«מעגל O» · «מעגל P» · «המעגלים O ו-P משיקים מבפנים», then «המעגלים O ו-P משיקים מבחוץ» is refused before commit (#2339, ADR-743)',
+    guards:
+      "#2339, operator round #2291 T10 (2026-10-17): *\"the first error tells the story - the last input contradicts the prior one.\"* At 97f6364a the fourth line was COMMITTED, every row green, and only the ⚠ panel objected. Root cause: the internal free-radius device's witness pointed at the touch M, which an external touch satisfies too, and the second kind at the same M reused the witness id, so addObj dropped it. ADR-743: the witness points away from the outer centre and its id carries the kind; the existing over-constrained path refuses the line. The class test is src/app/__tests__/issue-2339-tangency-kind-refused.test.ts.",
+    steps: ['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים מבפנים'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const facts = factsOf(['מעגל O', 'מעגל P', 'המעגלים O ו-P משיקים מבפנים']);
+      const v = gateVerdict(facts, 'המעגלים O ו-P משיקים מבחוץ');
+      expect(v.kind, JSON.stringify(v)).toBe('refused');
+      expect(v.kind === 'refused' && v.reason, 'refused by the engine, before commit').toBe('error');
+      const [a, b] = [...fig.circles.values()];
+      expect(Math.abs(dist(a.center, b.center) - Math.abs(a.r - b.r)), 'the internal tangency stands').toBeLessThan(1e-4);
+    },
+  },
 ];
 
 /**

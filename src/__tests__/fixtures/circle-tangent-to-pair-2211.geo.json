@@ -1,0 +1,75 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-21T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "PiU7dxKi1tgKDEoBGor2k",
+      "utterance": "מעגל O",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "qnLfH8JFz__575Q-ua9te",
+      "utterance": "מעגל P",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 3.5999999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "MS2UWFu6N7kTSUwyRRy9y",
+      "utterance": "מעגל Q",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-Q",
+        "center": "Q",
+        "radius": 2.5919999999999996,
+        "freeRadius": true,
+        "apart": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "tiX087JgbDg6lzbaBXszz",
+      "utterance": "מעגל Q משיק למעגלים O ו-P",
+      "group": "nJUBRRuAHFk2BG1bGiar3",
+      "cmd": {
+        "type": "circles-tangent",
+        "circle1": "circle-Q",
+        "circle2": "circle-O",
+        "at": "M",
+        "external": true,
+        "kindStated": false
+      },
+      "enabled": true
+    },
+    {
+      "id": "d8uXT3mlRSIiR5AhYa5z5",
+      "utterance": "מעגל Q משיק למעגלים O ו-P",
+      "group": "nJUBRRuAHFk2BG1bGiar3",
+      "cmd": {
+        "type": "circles-tangent",
+        "circle1": "circle-Q",
+        "circle2": "circle-P",
+        "at": "T",
+        "external": true,
+        "kindStated": false
+      },
+      "enabled": true
+    }
+  ]
+}

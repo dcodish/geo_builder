@@ -2134,3 +2134,11 @@ over all four (ADR-041).
 ### `all-common-tangents-unstated-position-refused-2405` — «שני מעגלים» · «כל המשיקים המשותפים לשני המעגלים» is refused, naming the three statements that settle how many tangents the pair has (#2405, ADR-751)
 
 **Guards against:** «כל המשיקים המשותפים» drawn as one tangent (or as a guessed set) on a pair whose position nobody stated. **Asserts** step 2 is refused `ambiguous-construct` with the noun «כל המשיקים המשותפים» and the options «המעגלים זרים» / «המעגלים נחתכים בנקודות E ו-F» / «המעגלים משיקים בנקודה T»; no tangent is drawn; each taught option commits, and «כל…» then builds. The per-position matrix (apart 4, crossing 2, touching 3, inside-touching 1, contained refused, three spellings) is `src/__tests__/issue-2405-all-common-tangents.test.ts`.
+
+### `circle-tangent-moves-newer-2237` — «מעגל O» · «מעגל P» · «מעגל Q משיק למעגל O» · «מעגל Q משיק למעגל P» — Q moves, O and P stay exactly where they were (#2237, ADR-742)
+
+**Guards against:** a circle-pair relation moving the OLDER circle (the command's second slot) and making the older radii carry the newer circle's tangency — O jumped next to P and the two ended internally tangent, a relation nobody stated (operator ruling 2026-10-16, card `g2237-jump` A). **Asserts** O and P keep the centre and radius they had after line 2 (1e-9), Q is externally tangent to both, and the figure is green.
+
+### `tangency-kind-contradiction-refused-2339` — «מעגל O» · «מעגל P» · «המעגלים O ו-P משיקים מבפנים», then «… משיקים מבחוץ» is refused before commit (#2339, ADR-743)
+
+**Guards against:** a contradicting tangency kind committed green with only the ⚠ panel objecting (operator, round #2291 T10: *"the first error tells the story - the last input contradicts the prior one."*). **Asserts** the fourth line is refused by the engine before commit (`over-constrained`), the internal tangency stands and the figure is green.

@@ -1,0 +1,114 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "en",
+  "savedAt": "2026-10-21T00:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "pgdIfRgM02S14pHnkvPXf",
+      "utterance": "משולש ABC",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "gK36Fyn4v1aC4fdmP09D-",
+      "utterance": "D אמצע AB",
+      "cmd": {
+        "type": "midpoint",
+        "id": "D",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "Chs5xwsJcTQ8XFIeDf83U",
+      "utterance": "E אמצע AC",
+      "cmd": {
+        "type": "midpoint",
+        "id": "E",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "M5IfQlklrsyruZ9RMwCow",
+      "utterance": "F אמצע BC",
+      "cmd": {
+        "type": "midpoint",
+        "id": "F",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "8yUFJF_E867FcOJOVXOhQ",
+      "utterance": "AF is perpendicular to BC and DE",
+      "group": "kslpkCw4Ay6LRvlMSzrQ0",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "F"
+      },
+      "enabled": true
+    },
+    {
+      "id": "BroLKV9twIZAqIja80J6D",
+      "utterance": "AF is perpendicular to BC and DE",
+      "group": "kslpkCw4Ay6LRvlMSzrQ0",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "5ZVvE_Smm1ilrXuucIhPg",
+      "utterance": "AF is perpendicular to BC and DE",
+      "group": "kslpkCw4Ay6LRvlMSzrQ0",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "A",
+        "b": "F",
+        "c": "B",
+        "d": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "w9h1gftV6wHx02rlHFE-U",
+      "utterance": "AF is perpendicular to BC and DE",
+      "group": "kslpkCw4Ay6LRvlMSzrQ0",
+      "cmd": {
+        "type": "segment",
+        "a": "D",
+        "b": "E"
+      },
+      "enabled": true
+    },
+    {
+      "id": "EzM6gRKYkzfC_S1HdGWYU",
+      "utterance": "AF is perpendicular to BC and DE",
+      "group": "kslpkCw4Ay6LRvlMSzrQ0",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "A",
+        "b": "F",
+        "c": "D",
+        "d": "E"
+      },
+      "enabled": true
+    }
+  ]
+}

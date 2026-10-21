@@ -126,6 +126,7 @@ export const SEED_SWEEP_EXEMPT: Record<string, string> = {
   'point-on-arc-no-midpoint-word': 'a FREE point on the arc — its position varies by design (ADR-042); no fixed arc coordinate is an invariant',
   'perp-constraint-keeps-quad-convex': 'the convex-gap threshold (15°) is stricter than the app’s displayable-convexity gate; a valid ~12° corner appears at some seeds',
   'tangent-chord-bisector': 'same convex-gap threshold vs the displayable gate — a valid tight corner at one seed',
+  'apex-common-tangents-single-ink-run': 'its last assertion (covered = 2) holds only when the second circle is the smaller one — a free radius ratio. Measured on main @ 37800b85: the displayed seeds 6 and 7 already draw it uncovered; #2237 (ADR-742) makes seed 2 such a view. The defect is #2452; the no-double-ink invariant holds every seed',
   'tangent-secant-detection-honours-valid-configs': 'the check runs detectRelations/detectShapes, which sample the figure internally across their own seeds — the ground-truth relations it asserts are seed-invariant by construction, so a per-display-seed re-run only repeats the same internal detection',
 };
 

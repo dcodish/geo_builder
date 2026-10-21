@@ -791,6 +791,21 @@ the whole-line rules and all or nothing (a clause that does not read gives `not-
 so the coverage gate sees each incidence. `withOnCircleMembership` binds each «X על [ה]מעגל K» to its own named
 circle K («A על מעגל O ו-B על מעגל P» puts B on P), and an unnamed «X על המעגל» to the resolved definite circle.
 
+**A relation stated to a list of objects holds for each** ([ADR-744](06-decisions.md#adr-744), #2211, #2219). The same module's
+second shape, `objectListShape`: one subject at the sentence opening (a circle «(ה)מעגל X» / "(the) circle X", a label
+pair with an optional segment noun, or one label), a predicate that names no label, and an object list of two or more
+objects of ONE kind to the end of the line — circle names (only after a circle subject: a circle list after a segment or
+point subject is another sentence, «AB משיק משותף למעגלים O ו-P», «A נמצאת על המעגלים O ו-P») or two-letter segment
+names — as a plural head («למעגלים O ו-P», «לקטעים BC ו-AB», "circles O and P", "to both BC and AB") or one object per
+item («ל-BC ו-AB», «ול-», «וגם ל-», «,», "and (to/segment)"). The list head's preposition rides every clause and a plural
+head becomes its singular. `distributedClauses(s, ctx)` (parse.ts) is the one entry both readers call: the incidence
+list first, then the object list, which is kept only when its first two clauses each read ALONE through `parseClause`
+(every net) and their lowering names the subject and that clause's object — so a collective predicate whose head says
+nothing alone («O חיתוך של AC ו-BD») keeps its own reader. A recognised list is final: its clauses go through the clause
+path all or nothing, and no `splitStatements` fallback turns its objects into draws. No tail is read after the list (a
+tail means the line is not this shape). `namedCircleRefs` returns the UNION of the per-circle and plural-list names in
+order of appearance, and `resolveCirclePair` resolves exactly two names (more than two → no pair).
+
 **An arc named on a circle lives on that circle.** `arcMidpoint` (both the fixed midpoint and the free point on the
 arc): when the sentence names a circle, that circle is the arc's; if an end is a member of another circle and not of
 the named one, the rule returns null (the line is `not-handled` and goes to the model). With no circle named, the
@@ -895,6 +910,36 @@ changes, so the source of truth stays `(facts, seed)`), and the memo signature c
 (`requirementOf`) keeps `kindStated`, so the parser's `statedTangencies` inherits only a stated kind, while its touch
 point and operand order come from the first record (ADR-703). The verifier's containment check is closed
 (`d + r_b ≤ r_a + tol`) when the same pair is stated internally tangent, and strict otherwise.
+
+The free-radius device encodes its KIND ([ADR-743](06-decisions.md#adr-743), #2339). External: the touch M on circle 1
+toward circle 2's centre and a witness on circle 2 toward circle 1's centre. Internal: M on the outer circle (larger by
+seed) toward the inner centre and a witness on the inner circle AWAY from the outer centre (`radial-toward` with
+`away: true`), so the coincidence holds only at |c₁c₂| = r_out − r_in and never at an external touch. The witness id
+carries the kind (`~touch-M-ext` / `~touch-M-int`), so a second line stating the other kind at the same touch point adds
+its own device and the existing over-constrained path refuses it before commit; a restated kind (or an unkinded line
+the fold resolves to the same kind) reuses the device.
+
+### Which circle of a pair moves: the newer one ([ADR-742](06-decisions.md#adr-742))
+
+Every circle-pair relation's apply-time seat (LADDER stage 2a) asks one chooser, `seatMover(objects, a, b)` in
+`engine/apply.ts`: the mover is the circle created LATER in `objects` when its centre is a movable free point (not
+pinned, not rigid), else the older one when its centre can move, else none (the solver and the verifier decide). The
+seats that read it: the free-radius `circles-tangent` (the mover's centre is placed at the touching distance from the
+anchor), `set-circle-position` (`contained`, `disjoint`, the unstated `any`), and the stated-crossing re-seat of
+`circle-circle-intersection` (ADR-358). The command's slot order is the sentence's grammar and never decides which
+circle moves. For `contained`, the radius re-seed follows the mover (a newer inner shrinks to `ra·0.45`, a newer
+container grows to `rb/0.45`); an internal tangency whose radius seeds are equal re-seeds the mover's free seed by the
+`0.55` split on the side the tie gives it (slot 1 is the outer circle), so the default is never two coincident circles. The free-radius tangency is carried by the
+MOVER's own DOF only (M2 least ownership, ADR-281): its free radius if unclaimed, else its free centre; the anchor's
+free radius only when the mover has none left. So «מעגל Q משיק למעגל O» · «מעגל Q משיק למעגל P» puts both tangencies
+on Q (radius, then centre) and never moves or resizes O or P.
+
+**Sampling a one-carrier tangency** (ADR-742 Am. 1). With one radius carrying the tangency, the other circle's free
+radius stays a sampled DOF, so ADR-476's precondition clamp (`clampToPlacementPreconditions`, `engine/sample.ts`) has a
+second clause, read off the `coincide` of two `radial-toward` witnesses: when exactly one circle's radius carries it
+and the other's free radius is unconsumed, an external device caps that radius at `0.95·d` (the carrier is `d − r`),
+and an internal device whose INNER circle carries it floors the outer radius at `d / 0.95` (the carrier is `r − d`); an
+outer or centre carrier imposes nothing. A floor above a cap leaves the sample as drawn (the honest refusal).
 
 ### The common tangent at the touch ([ADR-740](06-decisions.md#adr-740))
 
@@ -1556,7 +1601,11 @@ A construction needing a free operand on one side of a circle (a tangent's or se
 the ADR-254 side record `point-circle-side` after the operand's placement; its apply case (`engine/apply.ts`) seeds
 or re-seats a non-pinned point on that side. The sampling half — `applySeed` (`engine/sample.ts`) re-seating
 wrong-side samples, seed 0 never sampled — now reads the requirement record (ADR-594), which retired
-`FreePoint.region: { circle, side }[]`. The verifier reports a contradicted side and `meetsRequirements` gates the
+`FreePoint.region: { circle, side }[]`. A circle or polygon seat is **confirmed on the figure it makes** (ADR-742
+Am. 1): the move is re-judged (one evaluate) and must pass the verifier's own `sideShortfall`, because the region can
+be driven by a solve that reads the subject (a circle centre carrying «ישר ADB» through the apex re-solves when the apex
+moves); a move the re-solved figure breaks asks for the next seeded proposal (`SEAT_ATTEMPTS` = 12), and the first
+proposal stands when none holds. A line-side seat is not confirmed. The verifier reports a contradicted side and `meetsRequirements` gates the
 button on it.
 
 ### An unstated choice is SAID (#973, [ADR-502](06-decisions.md#adr-502))
