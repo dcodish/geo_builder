@@ -1760,7 +1760,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2398 (ADR-747): a circle's centre given a second letter is refused in both builders ──
   { id: 'second-centre-letter-2398', family: 'circles', steps: ['מרכז המעגל O הוא K'], expect: 'asks', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2449' }], note: '2-D answers errors.unknownCircle as a clarify note (asks); analytic refuses unknown-reference O' },
   { id: 'second-centre-letter-drawn-2398', family: 'circles', steps: ['מעגל O', 'מרכז המעגל O הוא K'], expect: 'asks', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2449' }], note: '2-D names the holder (input.centreAlreadyNamed, a clarify note: asks); analytic refuses with unknown-reference O — the port is #2449' },
-  { id: 'arc-on-minted-circle-name-2362', family: 'circles', steps: ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל', 'F אמצע הקשת BC במעגל O'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2376' }], note: 'analytic refuses the last line third-crossing (measured on the #2362 plan, 8a5372be)' },
+  // The report's last line («F אמצע הקשת BC במעגל O») cannot be a row for analytic while the gap sits in its context: analytic
+  // records it on a figure that lost the second circle, so the row would pass vacuously. The gap row ends where analytic differs;
+  // 2-D's last line is locked by the fixture src/__tests__/fixtures/arc-on-minted-circle-name-2362.geo.json.
+  { id: 'second-unnamed-circumcircle-2362', family: 'circles', steps: ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2376' }], note: 'analytic refuses «משולש ABC חסום במעגל» third-crossing (line CD meets ONE circle at C, D and A: it reads the second unnamed circle as the first); measured at 37800b85, 8a5372be and the round tip' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
