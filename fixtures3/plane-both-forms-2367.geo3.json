@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 2,
+  "app": "3d-builder",
+  "savedAt": "2026-10-21T10:53:31.365Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "תיבה ABCDA'B'C'D'",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "box",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AB=(1,0,0)",
+      "cmds": [
+        {
+          "type": "inject-pair",
+          "a": "A",
+          "b": "B",
+          "x": 1,
+          "y": 0,
+          "z": 0,
+          "srcs": [
+            "1",
+            "0",
+            "0"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AD=(0,1,0)",
+      "cmds": [
+        {
+          "type": "inject-pair",
+          "a": "A",
+          "b": "D",
+          "x": 0,
+          "y": 1,
+          "z": 0,
+          "srcs": [
+            "0",
+            "1",
+            "0"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AA'=(0,0,2)",
+      "cmds": [
+        {
+          "type": "inject-pair",
+          "a": "A",
+          "b": "A'",
+          "x": 0,
+          "y": 0,
+          "z": 2,
+          "srcs": [
+            "0",
+            "0",
+            "2"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "z_A=2",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": null,
+          "y": null,
+          "z": 2
+        }
+      ]
+    },
+    {
+      "utterance": "מישור ABCD",
+      "cmds": [
+        {
+          "type": "plane-through",
+          "name": "ABCD",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מישור ABB'A'",
+      "cmds": [
+        {
+          "type": "plane-through",
+          "name": "ABB'A'",
+          "ids": [
+            "A",
+            "B",
+            "B'",
+            "A'"
+          ]
+        }
+      ]
+    }
+  ]
+}

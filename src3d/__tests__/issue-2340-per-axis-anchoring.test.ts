@@ -120,11 +120,13 @@ describe('#2340 — a plane equation: its d-term needs the axes along its normal
   it('the base (normal z, z anchored) prints «z − 2 = 0»; the side (normal y, y not anchored) does not', () => {
     const st = build(FIG);
     const p = panel(st);
-    expect(p.planes).toEqual(['ABCD: z - 2 = 0']); // no parametric form: its anchor is a full point
+    // #2367 (ADR-3D-376): the parametric form rides wherever the equation does, from the equation's own point —
+    // never the drawn-but-unknown A (operator 2026-10-20: «π1 = (0, 0, 2) + t·(1, 0, 0) + s·(0, 1, 0) is perfect»)
+    expect(p.planes).toEqual(['ABCD: z - 2 = 0', 'ABCD: π1 = (0, 0, 2) + t·(1, 0, 0) + s·(0, 1, 0)']);
     expect(p.points).toContain('A(?, ?, 2)');
     expect(p.points).toContain("A'(?, ?, 4)");
     expect(ask(st, 'מישור ABCD')).toMatchObject({ answer: 'z - 2 = 0' });
-    expect(ask(st, 'מישור ABCD').rows).toBeUndefined();
+    expect(ask(st, 'מישור ABCD').rows).toEqual(['z - 2 = 0', 'π1 = (0, 0, 2) + t·(1, 0, 0) + s·(0, 1, 0)']);
     expect(ask(st, "מישור ABB'A'").note).toBe('noFrame');
   });
 

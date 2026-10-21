@@ -398,6 +398,11 @@ const SEEDED: SeededCorpus = {
   // edge of 10.5, green). The edge 2.5, the coordinates, the palette and the vector coefficients are asserted in
   // vulgar-fraction-2255.test.ts; this is the build + drift net.
   'mixed-fraction-2255.geo3.json': ["קובייה ABCDA'B'C'D'", 'AB = 2½'],
+
+  // #2367 (ADR-3D-376) — the operator's T45 sequence: a plane whose equation shows gets its parametric form too,
+  // from the equation's own point. Both rows, both surfaces and the class are asserted in plane-two-forms-2367.test.ts;
+  // this is the build + drift net.
+  'plane-both-forms-2367.geo3.json': ["תיבה ABCDA'B'C'D'", 'AB=(1,0,0)', 'AD=(0,1,0)', "AA'=(0,0,2)", 'z_A=2', 'מישור ABCD', "מישור ABB'A'"],
 };
 
 // #916: MISSING-only by default; the blanket rebuild needs its own flag, so it cannot happen as a side

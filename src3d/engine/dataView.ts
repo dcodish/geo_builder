@@ -18,7 +18,7 @@
 import { DISPLAY_DECIMALS, fmtNum } from '../../shell/format';
 import { realValueOptions, valueOptionsText } from '../../shell/valueOptions';
 import { knowledgeSamples3, scaleKnown3, translationAnchoredAxes3, vectorFramePinned3, type Axis3 } from './evaluate';
-import { cross3, dot3, norm3, runNormal, sub3, type Vec3 } from './vec3';
+import { cross3, dot3, norm3, runNormal, sub3, v3, type Vec3 } from './vec3';
 import { angleMarkText, evalAffine, figureSymbolsOf, symbolOwnersOf } from './types';
 import { COMBINING_ARROW } from '../lexicon/marks3';
 import { angleBetweenOperands, componentValue, containmentDeviation, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
@@ -195,7 +195,9 @@ export const coordStr = (v: Vec3): string => `(${cleanMag(v.x)}, ${cleanMag(v.y)
 
 /** Render a UNIT-normalized plane (lead coefficient positive) as `20x - y + 2z - 5 = 0`:
  *  find the smallest integer scaling (the book form); fall back to the 2-decimal unit form. */
-export function planeEqStr(u: { x: number; y: number; z: number; d: number }): string {
+/** The smallest integer scaling of a plane's [a, b, c, d] (the book form), or null when none exists below 1000.
+ *  The one scaling: `planeEqStr` prints it and `planePointAndSpan` (#2367) derives the parametric form from it. */
+export function planeIntCoefs(u: { x: number; y: number; z: number; d: number }): number[] | null {
   const vals = [u.x, u.y, u.z, u.d];
   const minAbs = Math.min(...vals.filter((v) => Math.abs(v) > 1e-6).map(Math.abs));
   let ints: number[] | null = null;
@@ -206,6 +208,12 @@ export function planeEqStr(u: { x: number; y: number; z: number; d: number }): s
       ints = scaled.map(Math.round);
     }
   }
+  return ints;
+}
+
+export function planeEqStr(u: { x: number; y: number; z: number; d: number }): string {
+  const vals = [u.x, u.y, u.z, u.d];
+  const ints = planeIntCoefs(u);
   const co = ints ?? vals;
   const num = (v: number) => (ints ? String(Math.abs(v)) : cleanNum(Math.abs(v)));
   const parts: string[] = [];
@@ -271,24 +279,101 @@ export function planeOffsetAnchored3(eq: { x: number; y: number; z: number }, an
  * An anchor that slides or an edge that changes with the seed is a drawing, not a consequence of the
  * givens, and prints nothing (the #371/#481 rule) — which is what "if possible" resolves to.
  */
-export function parametricPlaneForm(run: Id[] | undefined, positions: Positions3[], symbol = 'π'): string | null {
-  if (!run || run.length < 3 || positions.length < 2) return null;
-  const anchors = positions.map((pos) => pos.get(run[0]));
-  if (!anchors.every((p): p is Vec3 => !!p)) return null;
-  if (!anchors.every((p) => sameVec(p, anchors[0]))) return null;
-  const stableEdge = (a: Id, b: Id): Vec3 | null => {
-    const ds = positions.map((pos) => {
-      const p = pos.get(a);
-      const q = pos.get(b);
-      return p && q ? sub3(q, p) : null;
-    });
-    if (!ds.every((d): d is Vec3 => !!d)) return null;
-    return ds.every((d) => sameVec(d, ds[0])) ? ds[0] : null;
+export function parametricPlaneForm(
+  eq: { x: number; y: number; z: number; d: number } | null,
+  evidence: {
+    /** the plane's point run, when it has one (an equation-given or free plane has none) */
+    run?: readonly Id[];
+    /** every sampled configuration's positions — the run's edges are used only when identical in all */
+    positions: readonly Positions3[];
+    /** is this vertex FULLY knowledge (all three coordinates values)? The panel's own `pointComps` decision. */
+    pointKnown: (id: Id) => boolean;
+  },
+  symbol = 'π',
+): string | null {
+  if (!eq) return null;
+  const n = v3(eq.x, eq.y, eq.z);
+  const nn = norm3(n);
+  if (nn < EPS) return null;
+  // the check every piece passes: the point is ON the plane, both directions lie IN it, independently
+  const onPlane = (p: Vec3) => Math.abs(dot3(n, p) + eq.d) / nn <= 1e-6 * Math.max(1, norm3(p), Math.abs(eq.d) / nn);
+  const inPlane = (e: Vec3) => Math.abs(dot3(n, e)) / nn <= 1e-6 * Math.max(1, norm3(e));
+  const spans = (a: Vec3, b: Vec3) => inPlane(a) && inPlane(b) && norm3(cross3(a, b)) > 1e-6 * norm3(a) * norm3(b);
+  const span = planePointAndSpan(eq);
+  let p0 = span?.p0 ?? null;
+  let e1 = span?.e1 ?? null;
+  let e2 = span?.e2 ?? null;
+  const { run, positions } = evidence;
+  if (run && run.length >= 3 && positions.length >= 2) {
+    // a vertex of the plane is the base point only when it is itself knowledge — never one the figure is
+    // merely drawn at (T45: A is (?, ?, 2) and drawn at (0, 0, 2): the row must not name it)
+    const anchors = positions.map((pos) => pos.get(run[0]));
+    const a0 = anchors[0];
+    if (a0 && evidence.pointKnown(run[0]) && anchors.every((p) => !!p && sameVec(p, a0)) && onPlane(a0)) p0 = a0;
+    const stableEdge = (a: Id, b: Id): Vec3 | null => {
+      const ds = positions.map((pos) => {
+        const p = pos.get(a);
+        const q = pos.get(b);
+        return p && q ? sub3(q, p) : null;
+      });
+      if (!ds.every((d): d is Vec3 => !!d)) return null;
+      return ds.every((d) => sameVec(d, ds[0])) ? ds[0] : null;
+    };
+    // a vector is a difference (translation cancels), so the edges are knowledge on their own terms
+    const r1 = stableEdge(run[0], run[1]);
+    const r2 = stableEdge(run[0], run[run.length - 1]);
+    if (r1 && r2 && spans(r1, r2)) {
+      e1 = r1;
+      e2 = r2;
+    }
+  }
+  if (!p0 || !e1 || !e2 || !onPlane(p0) || !spans(e1, e2)) return null;
+  return `${symbol} = ${coordStr(p0)} + t·${coordStr(e1)} + s·${coordStr(e2)}`;
+}
+
+/**
+ * #2367 (ADR-3D-376) — a point and two spanning directions of a plane, from its EQUATION alone, written in the
+ * nicest numbers it allows (operator 2026-10-20: *"we should look for nicer numbers if we can but even if we
+ * dont, those are fine"*).
+ *  - **The point:** two coordinates 0 and the third solved, on the axis whose value is an integer, then the
+ *    largest |coefficient| (`z - 2 = 0` → (0, 0, 2); `2z - 5 = 0` → (0, 0, 5/2); `x + y + z - 1 = 0` → (1, 0, 0)).
+ *  - **The directions:** over the integerised normal (a, b, c), the non-zero members of (b, −a, 0), (c, 0, −a),
+ *    (0, c, −b), each divided by its gcd and signed with a positive lead, the smallest (by |·|₁) first, then
+ *    the next one independent of it (`z = 2` → (1, 0, 0), (0, 1, 0)).
+ * A normal with no integer form keeps its unit coefficients (correct, only less round).
+ */
+export function planePointAndSpan(eq: { x: number; y: number; z: number; d: number }): { p0: Vec3; e1: Vec3; e2: Vec3 } | null {
+  const ints = planeIntCoefs(eq);
+  const [a, b, c, d] = ints ?? [eq.x, eq.y, eq.z, eq.d];
+  const coef = [a, b, c];
+  const isInt = (v: number) => Math.abs(v - Math.round(v)) < 1e-9;
+  const axes = [0, 1, 2]
+    .filter((i) => Math.abs(coef[i]) > 1e-9)
+    .map((i) => ({ i, v: -d / coef[i], k: Math.abs(coef[i]) }))
+    .sort((p, q) => Number(isInt(q.v)) - Number(isInt(p.v)) || q.k - p.k || p.i - q.i);
+  if (axes.length === 0) return null;
+  const pt = [0, 0, 0];
+  pt[axes[0].i] = Math.abs(axes[0].v) < 1e-12 ? 0 : axes[0].v;
+  const gcd = (x: number, y: number): number => (y === 0 ? x : gcd(y, x % y));
+  const tidy = (e: number[]): number[] | null => {
+    if (e.every((v) => Math.abs(v) < 1e-9)) return null;
+    let out = e;
+    if (ints) {
+      const g = e.reduce((acc, v) => gcd(acc, Math.abs(Math.round(v))), 0);
+      if (g > 1) out = e.map((v) => v / g);
+    }
+    const lead = out.find((v) => Math.abs(v) > 1e-9)!;
+    return out.map((v) => (lead < 0 ? -v : v) + 0);
   };
-  const e1 = stableEdge(run[0], run[1]);
-  const e2 = stableEdge(run[0], run[run.length - 1]);
-  if (!e1 || !e2) return null;
-  return `${symbol} = ${coordStr(anchors[0])} + t·${coordStr(e1)} + s·${coordStr(e2)}`;
+  const cands = [[b, -a, 0], [c, 0, -a], [0, c, -b]]
+    .map(tidy)
+    .filter((e): e is number[] => e !== null)
+    .sort((p, q) => p.reduce((s, v) => s + Math.abs(v), 0) - q.reduce((s, v) => s + Math.abs(v), 0));
+  if (cands.length === 0) return null;
+  const e1 = v3(cands[0][0], cands[0][1], cands[0][2]);
+  const second = cands.slice(1).find((e) => norm3(cross3(e1, v3(e[0], e[1], e[2]))) > 1e-9 * norm3(e1) * Math.hypot(e[0], e[1], e[2]));
+  if (!second) return null;
+  return { p0: v3(pt[0], pt[1], pt[2]), e1, e2: v3(second[0], second[1], second[2]) };
 }
 
 /**
@@ -641,14 +726,19 @@ export function statedLengths(c: Construction3): Map<string, number> {
   return out;
 }
 
-/** The panel's base seeds — the GAUGE sample; #1474: `knowledgeSamples3` adds every parameter branch at each. */
+/**
+ * The panel's base seeds — the GAUGE sample; #1474: `knowledgeSamples3` adds every parameter branch at each,
+ * and (#2368, ADR-3D-375) with `{ readback: true }` the image along any measured leftover placement freedom.
+ * The ask lane keeps its own four (`querySeeds3`): merging them added one full resolve per panel (+130 % on the
+ * fixture corpus), and with the leftover freedom sampled the fourth seed no longer decides that class.
+ */
 export const panelSeeds3 = (seed: number): number[] => [seed, seed + 1013, seed + 2027];
 
 export function dataView(c: Construction3, seed: number): DataPanel {
   const seeds = panelSeeds3(seed);
   // #1474 (ADR-3D-283): the seeds cover the gauge, `knowledgeSamples3` every parameter branch at each —
   // so every agreement gate below reads ALL of `resolved`, never a fixed [0]/[1]/[2].
-  const resolved = knowledgeSamples3(c, seeds);
+  const resolved = knowledgeSamples3(c, seeds, { readback: true }); // #2368: + the leftover placement freedom's image
   const positions = resolved.map((r) => r.positions);
   /**
    * #827 — the VECTOR lane needs the same branch guard the point lane got, for the same reason.
@@ -1245,25 +1335,36 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // 2026-07-09: `מישור ABB'A'` should surface its equation, the exam's מצאו את משוואת
   // המישור). An equation-plane was GIVEN by equation — nothing to derive.
   const planes: string[] = [];
+  // #2367 (ADR-3D-376): a plane's second form is derived from its EQUATION, so it rides wherever the equation
+  // prints; a vertex is its base point only when that vertex is itself knowledge (the points loop above).
+  const symbols = planeSymbols(c); // #823 — one enumeration, shared with the query lane
+  const pointKnown = (id: Id): boolean => !!pointComps[id] && pointComps[id].every((v) => !v.includes('?'));
+  const planeRows = (name: string, eq: { x: number; y: number; z: number; d: number }): void => {
+    planes.push(`${name}: ${planeEqStr(eq)}`);
+    const par = parametricPlaneForm(eq, { run: c.pointPlanes.get(name), positions, pointKnown }, symbols.get(name) ?? 'π');
+    if (par) planes.push(`${name}: ${par}`);
+  };
   if (anchoredAxes.size > 0) { // #315: a plane equation's d-term is translation-dependent — same anchor requirement, per axis (#2340)
     // #487 (ADR-3D-124): a FREE plane joins the same multi-sample gate — while unpinned it RESAMPLES,
     // so the agreement check drops it (a sampled equation is not knowledge, the #371/#481 rule); once
     // pinned it is identical in every configuration and its forced equation surfaces, which is exactly
     // the exam's «מצאו את משוואת המישור» moment.
-    const symbols = planeSymbols(c); // #823 — one enumeration, shared with the query lane
     const freeNames = [...c.planes.keys()].filter((n) => c.planes.get(n)!.free);
     for (const name of [...c.pointPlanes.keys(), ...c.relPlanes.keys(), ...freeNames]) {
       const per = resolved.map((r) => r.planes.get(name));
       if (per.some((p) => !p)) continue;
       const eq = canonicalPlaneEq(per);
       if (!eq || !planeOffsetAnchored3(eq, anchoredAxes)) continue;
-      planes.push(`${name}: ${planeEqStr(eq)}`);
-      // the parametric form rides when the run's anchor point and spanning edges are stable. Shared
-      // with the query lane (#317) so a plane's two representations are derived once, never twice.
-      // #2340: the parametric ANCHOR is a full point, so it needs every axis anchored
-      const par = translationPinned ? parametricPlaneForm(c.pointPlanes.get(name), positions, symbols.get(name) ?? 'π') : null;
-      if (par) planes.push(`${name}: ${par}`);
+      planeRows(name, eq);
     }
+  }
+  // #2367 (operator ruling 2026-10-20, Q1: "yes"): a plane the student GAVE by equation is listed with both
+  // forms like a plane through vertices. It is absolute — no translation anchor is involved — so it passes on
+  // the equation's agreement across the samples alone (a free parameter in it still withholds the row).
+  for (const [name, def] of c.planes) {
+    if (def.free) continue;
+    const eq = canonicalPlaneEq(resolved.map((r) => r.planes.get(name)));
+    if (eq) planeRows(name, eq);
   }
 
   // #325 (ADR-3D-079 Am. 2): the pins' open symbols — determined values print, free ones read

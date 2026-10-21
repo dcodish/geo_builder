@@ -209,6 +209,9 @@ export interface PivotResult {
    *  rank of the scalar residuals' response to a perturbation of each dim. Lazy and memoised — the cue is
    *  the only reader, so the residual evaluations happen on the display path, never on a submit. */
   scalarConsumed?: () => { dims: number; block: number };
+  /** #2368 (ADR-3D-375) — lazy: the placement's LEFTOVER rigid freedom at this solution (set by the
+   *  measuring / walking probes only — see {@link PlacementFreedom3}). */
+  placementFreedom?: () => PlacementFreedom3;
   err: number;
   /** The solved parameter vector [t, w, logScale, dims…] — the warm-start vehicle: a
    *  later DRIVE (ADR-3D-033) perturbs the pinned figure from here, so it lands in the
@@ -408,6 +411,103 @@ export function numericRank(cols: number[][], floor = 1e-6): number {
   return rank;
 }
 
+/** Axis-angle → unit quaternion [w, x, y, z]. */
+function quatOf(w: Vec3): number[] {
+  const th = norm3(w);
+  if (th < 1e-15) return [1, 0, 0, 0];
+  const k = Math.sin(th / 2) / th;
+  return [Math.cos(th / 2), w.x * k, w.y * k, w.z * k];
+}
+/** Unit quaternion → axis-angle (the short way round). */
+function axisAngleOf(q0: number[]): Vec3 {
+  const q = q0[0] < 0 ? q0.map((v) => -v) : q0;
+  const sn = Math.hypot(q[1], q[2], q[3]);
+  if (sn < 1e-15) return v3(0, 0, 0);
+  const th = 2 * Math.atan2(sn, q[0]);
+  return v3((q[1] / sn) * th, (q[2] / sn) * th, (q[3] / sn) * th);
+}
+function quatMul(a: number[], b: number[]): number[] {
+  return [
+    a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3],
+    a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2],
+    a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1],
+    a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0],
+  ];
+}
+/**
+ * #2368 — the RIGID-MOTION CHART around a placement `x`: the gauge of the placed figure moved by the
+ * world rotation R(ω) about the origin, then translated by s·τ (s = the figure's scale), as a new gauge
+ * vector. Differentiating in (τ, ω) instead of the raw (t, w) keeps the rank probe away from the axis-angle
+ * map's singularity at |w| = 2π, where two raw columns vanish and a rigid figure read two false freedoms.
+ */
+export function rigidChart(x: readonly number[], z: readonly number[]): number[] {
+  const s = Math.exp(x[6]);
+  const om = v3(z[3], z[4], z[5]);
+  const t0 = rotate(v3(x[0], x[1], x[2]), om);
+  const w = axisAngleOf(quatMul(quatOf(om), quatOf(v3(x[3], x[4], x[5]))));
+  return [t0.x + s * z[0], t0.y + s * z[1], t0.z + s * z[2], w.x, w.y, w.z, ...x.slice(6)];
+}
+
+/**
+ * #2368 (ADR-3D-375) — the placement's LEFTOVER RIGID FREEDOM at an exact solution: the null space of the
+ * primary residuals' Jacobian over the six rigid gauge unknowns (translation t, axis-angle w; the scale is
+ * excluded — #518 samples it — and the dims are held, because their freedom is seed-sampled already).
+ * `dim` is `6 − rank` (the rank by {@link numericRank}, the floor `scalarConsumed` uses), and each
+ * generator is a unit direction in the {@link rigidChart}'s coordinates (τ, ω) — a world translation in
+ * units of the figure's scale and a world rotation about the origin — so a step along it is dimensionless
+ * at any figure size. A structural read of the constraint system, never a
+ * sampling outcome: the cube with «A(0,0,0)» · «AB=(2,0,0)» has dim 1 (the turn about AB).
+ */
+export interface PlacementFreedom3 {
+  dim: number;
+  generators: number[][];
+}
+
+/** #2368 — the eigenvectors of a small symmetric matrix by cyclic Jacobi, sorted by ascending eigenvalue. */
+export function symmetricEigen(a0: readonly (readonly number[])[]): { values: number[]; vectors: number[][] } {
+  const n = a0.length;
+  const a = a0.map((r) => [...r]);
+  const v: number[][] = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j): number => (i === j ? 1 : 0)));
+  for (let sweep = 0; sweep < 60; sweep++) {
+    let off = 0;
+    let diag = 0;
+    for (let p = 0; p < n; p++) {
+      diag += a[p][p] * a[p][p];
+      for (let q = p + 1; q < n; q++) off += a[p][q] * a[p][q];
+    }
+    if (off <= 1e-30 * Math.max(diag, 1e-300)) break;
+    for (let p = 0; p < n; p++) {
+      for (let q = p + 1; q < n; q++) {
+        if (a[p][q] === 0) continue;
+        const theta = (a[q][q] - a[p][p]) / (2 * a[p][q]);
+        const t = (theta >= 0 ? 1 : -1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+        const cs = 1 / Math.sqrt(t * t + 1);
+        const sn = t * cs;
+        for (let k = 0; k < n; k++) {
+          const akp = a[k][p];
+          const akq = a[k][q];
+          a[k][p] = cs * akp - sn * akq;
+          a[k][q] = sn * akp + cs * akq;
+        }
+        for (let k = 0; k < n; k++) {
+          const apk = a[p][k];
+          const aqk = a[q][k];
+          a[p][k] = cs * apk - sn * aqk;
+          a[q][k] = sn * apk + cs * aqk;
+        }
+        for (let k = 0; k < n; k++) {
+          const vkp = v[k][p];
+          const vkq = v[k][q];
+          v[k][p] = cs * vkp - sn * vkq;
+          v[k][q] = sn * vkp + cs * vkq;
+        }
+      }
+    }
+  }
+  const order = Array.from({ length: n }, (_, i) => i).sort((i, j) => a[i][i] - a[j][j]);
+  return { values: order.map((i) => a[i][i]), vectors: order.map((i) => v.map((row) => row[i])) };
+}
+
 export function solvePivot(
   c: Construction3,
   evalCanonical: (dims: number[], symbolOverride?: Map<string, number>, riderTs?: ReadonlyMap<Id, number>) => Positions3,
@@ -427,7 +527,19 @@ export function solvePivot(
    * pattern on the gauge's translation. Returns the slid solution when the placement had that
    * freedom, `[]` when translation is pinned (the walk snaps back) or `x` is not exact.
    */
-  probe?: { x: number[]; mirror: boolean; flip?: boolean },
+  probe?: {
+    x: number[];
+    mirror: boolean;
+    flip?: boolean;
+    /**
+     * #2368 (ADR-3D-375) — `'measure'`: return `x` itself (when exact) carrying its lazy
+     * {@link PlacementFreedom3} under THIS call's residual set. A number: the GENERATOR WALK — the #803
+     * slide generalised from "the translation's projection" to "the projection on a seeded combination of
+     * the leftover generators" (the number seeds the combination); returns the walked exact solution, or
+     * `[]` when nothing is free or the walk snaps back.
+     */
+    freedom?: 'measure' | number;
+  },
 ): PivotPool {
   const pointPins = c.pins;
   const vecPins = c.vectorPins;
@@ -646,6 +758,31 @@ export function solvePivot(
       const allCols = [...dimCols, ...blockIdx.map(colAt)];
       const rankAll = blockIdx.length ? numericRank(allCols) : rankDims;
       return (memo = { dims: rankDims, block: Math.max(0, rankAll - rankDims) });
+    };
+  };
+  /** #2368 (ADR-3D-375): the rank probe over the six rigid gauge unknowns — see {@link PlacementFreedom3}. */
+  const placementFreedomAt = (x: number[], mirror: boolean): (() => PlacementFreedom3) => {
+    let memo: PlacementFreedom3 | null = null;
+    return () => {
+      if (memo !== null) return memo;
+      const f = residualsFor(mirror);
+      // central differences in the rigid chart (τ, ω): dimensionless, and regular at every placement
+      const colAt = (at: number): number[] => {
+        const h = 1e-4;
+        const zp = [0, 0, 0, 0, 0, 0];
+        zp[at] = h;
+        const zm = [0, 0, 0, 0, 0, 0];
+        zm[at] = -h;
+        const rp = f(rigidChart(x, zp));
+        const rm = f(rigidChart(x, zm));
+        return rp.map((v, i) => (v - rm[i]) / (2 * h));
+      };
+      const cols = [0, 1, 2, 3, 4, 5].map(colAt);
+      const rank = cols[0].length === 0 ? 0 : numericRank(cols);
+      const dim = 6 - rank;
+      if (dim === 0) return (memo = { dim: 0, generators: [] });
+      const jtj = cols.map((ci) => cols.map((cj) => ci.reduce((a, v, r) => a + v * cj[r], 0)));
+      return (memo = { dim, generators: symmetricEigen(jtj).vectors.slice(0, dim) });
     };
   };
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
@@ -1880,6 +2017,51 @@ export function solvePivot(
       return gaugeFramePoint3(c, c.points.get(id)) ? applyGauge(p, g) : p;
     };
   };
+  if (probe && probe.freedom !== undefined) {
+    // #2368 (ADR-3D-375): the read-back's placement probe. An anchored placement may keep a RIGID freedom
+    // (the turn about AB once A and AB are pinned) that the multi-start never varies: its eight starts are a
+    // fixed set, so the orbit lands in the same handful of basins at every seed and every agreement gate
+    // reads it as fact. The rank probe MEASURES it; the walk produces an exact image along it, for read-back.
+    if (probe.x.length !== 7 + nDims + nSym + nPinSym + nRider) return [];
+    const mirror = probe.mirror;
+    const fP = residualsFor(mirror);
+    const pErr = (x: number[]): number => fP(x).reduce((a, v) => a + v * v, 0);
+    if (degenerate(probe.x) || pErr(probe.x) >= ACCEPT) return [];
+    const resultAt = (xr: number[]): PivotResult => {
+      const g = { ...unpack(xr), mirror };
+      return {
+        transform: (q) => applyGauge(q, g), mirror, dims: xr.slice(7, 7 + nDims),
+        symbols: coupled ? xr.slice(7 + nDims, 7 + nDims + nSym) : undefined, pinSymbols: pinSymbolsAt(xr),
+        riderTs: nRider > 0 ? Object.fromEntries(riders.map((r, i) => [r.id, xr[riderBase + i]])) : undefined,
+        scalarConsumed: scalarConsumedAt(xr, mirror), placementFreedom: placementFreedomAt(xr, mirror),
+        err: pErr(xr), x: [...xr],
+      };
+    };
+    if (probe.freedom === 'measure') return [resultAt(probe.x)];
+    const fr = placementFreedomAt(probe.x, mirror)();
+    if (fr.dim === 0) return [];
+    const k0 = probe.freedom;
+    const h = (k: number) => (Math.abs(Math.sin((seed + 1) * 12.9898 + (k + 7 * k0) * 78.233)) * 43758.5453) % 1;
+    // ONE seeded unit COMBINATION of the generators: a value that any generator moves changes along it (a
+    // combination orthogonal to its gradient is measure-zero), so one image per sample serves every gate
+    const coef = fr.generators.map((_, i) => h(11 + i) - 0.5);
+    const cn = Math.hypot(...coef) || 1;
+    const dir = [0, 1, 2, 3, 4, 5].map((j) => fr.generators.reduce((a, gv, i) => a + (coef[i] / cn) * gv[j], 0));
+    const dn = Math.hypot(...dir) || 1;
+    for (let j = 0; j < 6; j++) dir[j] /= dn;
+    const step = (0.4 + 0.8 * h(4)) * (probe.flip ? -1 : 1); // dimensionless: radians, or figure scales
+    // a PLACEMENT question, exactly as the slide below: only the rigid chart moves; scale, dims and symbols
+    // stay at the solution's values. Hard-pin the projection on the combination, then release.
+    const at = (z: number[]): number[] => rigidChart(probe.x, z);
+    const proj = (z: number[]): number => z.reduce((a, v, j) => a + v * dir[j], 0);
+    const fZ = (z: number[]) => fP(at(z));
+    const fPin = (z: number[]) => [...fZ(z), 1e3 * (proj(z) - step)];
+    const rp = leastSquares(fPin, dir.map((d) => d * step), 40);
+    const rr = leastSquares(fZ, rp.x);
+    const xr = at(rr.x);
+    if (degenerate(xr) || pErr(xr) >= ACCEPT || Math.abs(proj(rr.x)) < 1e-3) return [];
+    return [resultAt(xr)];
+  }
   if (probe) {
     // #803 (ADR-3D-180): a driven placement's LEFTOVER translation freedom (the slide along a line a
     // vertex was put on, the slide within a plane) is sampled by walking the exact solution — hard-pin

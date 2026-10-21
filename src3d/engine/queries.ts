@@ -607,6 +607,9 @@ function framelessPlane(c: Construction3, text: string, q: Extract<Query, { kind
  */
 export const querySeeds3 = (seed: number): number[] => [seed, seed + 1013, seed + 2027, seed + 3041];
 
+/** #2368 (ADR-3D-375): every ask-lane gate reads back, so it samples the leftover placement freedom too. */
+const RB = { readback: true } as const;
+
 export function answerQuery(c: Construction3, text: string, seed: number): QueryResult {
   const q = parseQuery(c, text);
   if (!q) return { text, answer: null, note: 'notUnderstood', echo: 'plain' };
@@ -650,7 +653,7 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
   }
 
   if (q.kind === 'vector') {
-    const posArr = knowledgeSamples3(c, seeds).map((r) => r.positions);
+    const posArr = knowledgeSamples3(c, seeds, RB).map((r) => r.positions);
     if (atomVec(c, q.a, posArr[0]) === null) return { text, answer: null, note: 'unavailable' };
     const forms = vectorForms(c, q.a, posArr, seeds);
     if (forms.length) return { text, answer: forms.join('  =  ') };
@@ -674,7 +677,7 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
     }
     // undetermined — but does it settle once a free named parameter α is fixed? Then «depends on α».
     const pin = pinFreeMeasures(c);
-    if (pin && vectorForms(pin.c, q.a, knowledgeSamples3(pin.c, seeds).map((r) => r.positions), seeds).length) {
+    if (pin && vectorForms(pin.c, q.a, knowledgeSamples3(pin.c, seeds, RB).map((r) => r.positions), seeds).length) {
       return { text, answer: null, note: 'depends', param: pin.params };
     }
     return { text, answer: null, note: 'undetermined' };
@@ -720,7 +723,7 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
     // only when no normal component lies along an axis the givens leave at the frozen gauge.
     const anchoredAxes = translationAnchoredAxes3(c);
     if (anchoredAxes.size === 0) return framelessPlane(c, text, q, seed);
-    const resolvedPer = knowledgeSamples3(c, seeds);
+    const resolvedPer = knowledgeSamples3(c, seeds, RB);
     const per = resolvedPer.map((r) => {
       if (q.name) return r.planes.get(q.name);
       const pts = q.ids!.map((id) => r.positions.get(id));
@@ -729,6 +732,11 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
       const n = runNormal(ring);
       return norm3(n) < 1e-9 ? undefined : { n, d: -dot3(n, ring[0]) };
     });
+    // #2368 (ADR-3D-375): the NORMAL decides the frame question first. The read-back now samples the leftover
+    // translation on an unanchored axis, so the d-term varies there; that is the missing frame (#813's note),
+    // not an undetermined plane — exactly what the frozen gauge used to reach through the offset check below.
+    const normal = canonicalPlaneEq(per.map((p) => (p ? { n: p.n, d: 0 } : undefined)));
+    if (normal && !planeOffsetAnchored3(normal, anchoredAxes)) return framelessPlane(c, text, q, seed);
     const eq = canonicalPlaneEq(per);
     if (!eq) return { text, answer: null, note: 'undetermined' };
     if (!planeOffsetAnchored3(eq, anchoredAxes)) return framelessPlane(c, text, q, seed);
@@ -754,7 +762,11 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
         ([, ids]) => run !== undefined && ids.length === run.length && ids.every((id) => run.includes(id)),
       )?.[0];
     const symbol = (byRun !== undefined ? symbols.get(byRun) : undefined) ?? 'π';
-    const par = anchoredAxes.size === 3 ? parametricPlaneForm(run, resolvedPer.map((r) => r.positions), symbol) : null;
+    // #2367 (ADR-3D-376): the second form rides wherever the equation does, from the panel's one seam; a vertex
+    // is its base point only when the panel's own decision calls that vertex fully known
+    const comps = run && run.length >= 3 ? dataView(c, seed).pointComps : {};
+    const pointKnown = (id: Id): boolean => !!comps[id] && comps[id].every((v) => !v.includes('?'));
+    const par = parametricPlaneForm(eq, { run, positions: resolvedPer.map((r) => r.positions), pointKnown }, symbol);
     const standard = planeEqStr(eq);
     // one representation per ROW — never joined by `|` (operator, 2026-08-30)
     return par ? { text, answer: standard, rows: [standard, par] } : { text, answer: standard };
@@ -769,7 +781,7 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
     return v === null ? { text, answer: null, note: 'undetermined' } : { text, answer: piMultiple(v) };
   }
 
-  const vals = knowledgeSamples3(c, seeds).map((r) => evalQuery(c, q, r.positions, { lines: r.lines, planes: r.planes }));
+  const vals = knowledgeSamples3(c, seeds, RB).map((r) => evalQuery(c, q, r.positions, { lines: r.lines, planes: r.planes }));
   if (vals.some((v) => v === null || !Number.isFinite(v)))
     // #1450: a SYMBOL that cannot be measured is 'undetermined' — 'unavailable' is worded about
     // points («הנקודות האלו אינן בציור»), which is how asking «k» blamed letters that were fine.
@@ -780,7 +792,7 @@ function answerParsed(c: Construction3, text: string, q: Query, seed: number): A
   if (val0 === null) {
     // undetermined — but does it settle once a free named parameter α is fixed? Then «depends on α».
     const pin = pinFreeMeasures(c);
-    if (pin && stableNums(knowledgeSamples3(pin.c, seeds).map((r) => evalQuery(pin.c, q, r.positions, { lines: r.lines, planes: r.planes }))) !== null) {
+    if (pin && stableNums(knowledgeSamples3(pin.c, seeds, RB).map((r) => evalQuery(pin.c, q, r.positions, { lines: r.lines, planes: r.planes }))) !== null) {
       return { text, answer: null, note: 'depends', param: pin.params };
     }
     return { text, answer: null, note: 'undetermined' };

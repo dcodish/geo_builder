@@ -40,7 +40,7 @@ import {
   resolveOperand,
   symMemberDrives,
 } from './operands';
-import { applyGauge, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult } from './solve3';
+import { applyGauge, scalePinned, solvePivot, type InventedCollapse3, type MemberPin, type PivotPool, type PivotResult, type PlacementFreedom3 } from './solve3';
 import { scaleGivenActive, scaleGivenMagnitude, scaleGivenPower, scaleGivenValue } from './scaleGiven';
 import { decompose3 } from './vecExpr';
 import { absolutePointCount, freeCoordKey, gaugeFramePoint3, hasFreePoint3, openPinSymsOf, symbolValueOf, vecDefOfSymbol } from './types';
@@ -449,7 +449,7 @@ export interface Resolved3 {
    *  the pool holds more than one solution, since that is the only case where a coordinate can be a
    *  branch choice. A coordinate is knowledge only when these agree; without it, a deterministic
    *  branch pick reads seed-stable and prints as fact. */
-  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this). */ scalarConsumed?: () => { dims: number; block: number }; /** #1815 (ADR-3D-309): no solution because every one collapsed a flat ring that only a rider's incidence forced. */ collapse?: InventedCollapse3 } | null;
+  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number>; symRoots?: Record<string, number[]>; pointRoots?: Record<string, Vec3[]>; /** #820: the rider parameters the pivot DROVE — no longer free (the cue reads this). */ riderTs?: Record<Id, number>; /** #990 (ADR-3D-248): lazy — the shape dims the scalar pins CONSUME at the chosen solution (the cue reads this). */ scalarConsumed?: () => { dims: number; block: number }; /** #1815 (ADR-3D-309): no solution because every one collapsed a flat ring that only a rider's incidence forced. */ collapse?: InventedCollapse3; /** #2368 (ADR-3D-375): lazy — the applied placement's LEFTOVER rigid freedom, measured under every placement given (the read-back sampler reads this). */ placementFreedom?: () => PlacementFreedom3 } | null;
   /** #930 (ADR-3D-236) — each vec-def RATIO symbol's solved value («SN = k·SC» → k), so a consumer can
    *  read what the branch pick actually chose. The sign verifier needs it: without it a correctly
    *  honoured «k חיובי» reported `sign-unsatisfiable`, because the verifier knew how to read a figure
@@ -1632,7 +1632,9 @@ export function pivotFamilies3(c: Construction3): PivotFamily3[] {
 
 /** #863 (ADR-3D-304) — the resolve counter: `uncached` counts real resolves, `hits` memo answers. A lock
  *  asserts these by COUNT, never by clock. */
-export const resolveStats3 = { uncached: 0, hits: 0 };
+/** `uncached` counts plain resolves (each a full pivot solve); `images` the #2368 read-back images, which replay
+ *  their plain resolve's pivot pools and pay only the walk — so the #863 solve-count locks keep their meaning. */
+export const resolveStats3 = { uncached: 0, hits: 0, images: 0 };
 
 /**
  * #863 (ADR-3D-304) — THE RESOLVE MEMO. `resolve3` is a pure function of (construction, seed, paramValue):
@@ -1647,10 +1649,12 @@ export const resolveStats3 = { uncached: 0, hits: 0 };
  */
 const resolveMemo3 = new WeakMap<Construction3, Map<string, Resolved3>>();
 const RESOLVE_MEMO_PER_FIGURE = 64;
+/** #2368 (ADR-3D-375): a plain resolve's pivot pools, in call order — replayed by its read-back image only. */
+const pivotStageMemo3 = new WeakMap<Construction3, Map<string, PivotPool[]>>();
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
-export function resolve3(c: Construction3, seed: number, opts: { paramValue?: number } = {}): Resolved3 {
-  const key = opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`;
+export function resolve3(c: Construction3, seed: number, opts: Resolve3Opts = {}): Resolved3 {
+  const key = (opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`) + (opts.placementImage ? '|img' : '');
   let per = resolveMemo3.get(c);
   const hit = per?.get(key);
   if (hit) {
@@ -1664,8 +1668,22 @@ export function resolve3(c: Construction3, seed: number, opts: { paramValue?: nu
   return out;
 }
 
-function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: number }): Resolved3 {
-  resolveStats3.uncached++;
+/** What a configuration is resolved at. */
+export interface Resolve3Opts {
+  /** #1474: an explicit parameter branch. */
+  paramValue?: number;
+  /**
+   * #2368 (ADR-3D-375): the READ-BACK IMAGE of this configuration — the chosen placement walked along a
+   * seeded combination of its measured leftover rigid freedom (`pivot.placementFreedom`). For the
+   * knowledge gates only (`knowledgeSamples3({ readback: true })`), never for a drawing. Memoised under
+   * its own key; a placement with no leftover freedom resolves exactly as the plain configuration.
+   */
+  placementImage?: boolean;
+}
+
+function resolve3Uncached(c: Construction3, seed: number, opts: Resolve3Opts): Resolved3 {
+  if (opts.placementImage) resolveStats3.images++;
+  else resolveStats3.uncached++;
   const pos: Positions3 = new Map<Id, Vec3>();
 
   // coordinate points don't depend on anything — place them first (membership branch-selection reads them)
@@ -1907,6 +1925,21 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
     const EC = (dims: number[], override?: Map<string, number>, riderTs?: ReadonlyMap<Id, number>) =>
       evalCanonical(dims, true, override, riderTs);
 
+    /**
+     * #2368 (ADR-3D-375) — the pivot's solves are a pure function of (construction, seed, branch) and the
+     * call order, so the read-back IMAGE replays the base configuration's pools instead of repeating them
+     * (the solves are the whole cost of a resolve: 680 k residual evaluations on the #863 figure). Only an
+     * image READS the record; a plain resolve only writes it, so the drawing's path is unchanged.
+     */
+    const baseKey = opts.paramValue === undefined ? String(seed) : `${seed}|${opts.paramValue}`;
+    const replay = opts.placementImage ? pivotStageMemo3.get(c)?.get(baseKey) : undefined;
+    const record: PivotPool[] = [];
+    const solveStage = (run: () => PivotPool): PivotPool => {
+      const n = record.length;
+      const pool = replay && n < replay.length ? replay[n] : run();
+      record.push(pool);
+      return pool;
+    };
     const applySolutions = (solutions: PivotPool): void => {
       const satisfiesSigns = (sol: PivotResult): boolean => {
         const p2 = evalCanonical(sol.dims, false, overrideOf(sol), ridersOf(sol));
@@ -2011,7 +2044,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
     const hasOtherPins = laneRows('anchor').length > 0;
 
     // 1) the normal solve — no symbol unknowns, so bit-identical to the pre-V8-c path.
-    if (hasOtherPins) applySolutions(solvePivot(cNoPlanes, EC, dims0, seed, undefined, undefined, undefined, lines));
+    if (hasOtherPins) applySolutions(solveStage(() => solvePivot(cNoPlanes, EC, dims0, seed, undefined, undefined, undefined, lines)));
 
     // 2) failure-path retry (V8-c): a ⟂/∥-pinned symbol whose point could NOT be placed
     //    (no root-find value exists at the pivot's chosen dims) is COUPLED to a free dim —
@@ -2021,7 +2054,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
       return def >= 0 && !pos.has(c.vecDefs[def].unknown);
     });
     if (unplaced && coupledSyms.length > 0 && dims0.length > 0) {
-      const retry = solvePivot(cNoPlanes, EC, dims0, seed, { syms: coupledSyms, pins: coupledPins }, undefined, undefined, lines);
+      const retry = solveStage(() => solvePivot(cNoPlanes, EC, dims0, seed, { syms: coupledSyms, pins: coupledPins }, undefined, undefined, lines));
       if (retry.length > 0) applySolutions(retry);
     }
 
@@ -2039,7 +2072,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
         });
       });
       if (!hasOtherPins || unmet) {
-        const retry = solvePivot(c, EC, dims0, seed, undefined, undefined, undefined, lines);
+        const retry = solveStage(() => solvePivot(c, EC, dims0, seed, undefined, undefined, undefined, lines));
         if (retry.length > 0) applySolutions(retry);
         else if (!hasOtherPins) pivot = { solutions: 0, chosen: -1, err: Infinity };
       }
@@ -2086,7 +2119,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
       };
       const unmet = frameRows.some((f) => frameUnmet[f.key]());
       if ((!hasOtherPins && frameRows.some((f) => f.drivesAlone)) || unmet) {
-        const retry = solvePivot(c, EC, dims0, seed, undefined, undefined, undefined, lines);
+        const retry = solveStage(() => solvePivot(c, EC, dims0, seed, undefined, undefined, undefined, lines));
         if (retry.length > 0) applySolutions(retry);
         else if (!hasOtherPins) pivot = { solutions: 0, chosen: -1, err: Infinity };
       }
@@ -2185,7 +2218,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
           const signsBefore = signsHold();
           // warm-started from the pinned figure's own solution so the drive PERTURBS it
           // (branch choices preserved, minimal movement) instead of re-rolling the basins
-          const retry = solvePivot(c, EC, dims0, seed, undefined, members, warm.x, lines);
+          const retry = solveStage(() => solvePivot(c, EC, dims0, seed, undefined, members, warm.x, lines));
           // several basins converge (mirrors, rotations) and not every one satisfies the
           // membership on FINAL positions — validate each candidate and keep the first
           // fully-good one (membership + signs + the param root-find), never seed-modulo
@@ -2241,7 +2274,7 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
       // one stage over): the seeded direction first, its opposite if that side breaks a sign — and if
       // neither holds every sign and the parameter, the placement stays where the drive left it.
       const attempt = (flip: boolean): boolean => {
-        const slid = solvePivot(c, EC, dims0, seed, undefined, members, undefined, lines, { x: x0, mirror, flip });
+        const slid = solveStage(() => solvePivot(c, EC, dims0, seed, undefined, members, undefined, lines, { x: x0, mirror, flip }));
         if (slid.length === 0) return false;
         applySolutions(slid);
         pinParam();
@@ -2257,6 +2290,69 @@ function resolve3Uncached(c: Construction3, seed: number, opts: { paramValue?: n
       if (pivot !== pivotBefore && pivotBefore) {
         // the slide is a re-placement of the CHOSEN configuration, not a new pool
         pivot = { ...pivot!, solutions: pivotBefore.solutions, chosen: pivotBefore.chosen };
+      }
+    }
+
+    if (!opts.placementImage) {
+      let per = pivotStageMemo3.get(c);
+      if (!per) pivotStageMemo3.set(c, (per = new Map()));
+      per.set(baseKey, record);
+      if (per.size > RESOLVE_MEMO_PER_FIGURE) per.delete(per.keys().next().value as string);
+    }
+
+    // 6) #2368 (ADR-3D-375): the applied placement's LEFTOVER RIGID FREEDOM, measured for read-back. The
+    //    funnel freezes rotation about a pinned point or axis (the ADR-3D-101 deferral) and the multi-start's
+    //    eight rotations do not depend on the seed, so a turn the givens leave free («A(0,0,0)» · «AB=(2,0,0)»:
+    //    the turn about AB) is varied by NOTHING and every agreement gate read it as fact. The probe measures
+    //    it under EVERY placement given (the full construction — plane pins included — plus the member pins,
+    //    the residual set stage 5 walks), lazily, over a snapshot of this moment's resolved planes and lines.
+    //    The drawing is untouched: only `opts.placementImage` (the read-back's image) walks along it.
+    if (pivot && pivot.solutions > 0 && warm.x) {
+      const members = buildMemberPins();
+      const planesAt = new Map(planes);
+      const linesAt = new Map(lines);
+      const ECat = (dims: number[], override?: Map<string, number>, riderTs?: ReadonlyMap<Id, number>): Positions3 => {
+        const p2: Positions3 = new Map<Id, Vec3>();
+        for (const [id, def] of c.points) if (def.kind === 'coord') p2.set(id, v3(def.x, def.y, def.z));
+        evaluateSolidsAndPoints(c, seed, p2, planesAt, linesAt, dims, true, override, undefined, undefined, riderTs, undefined, perSolidDims);
+        return p2;
+      };
+      const xAt = [...warm.x];
+      const mirrorAt = warm.mirror ?? false;
+      let measured: PlacementFreedom3 | null = null;
+      const placementFreedom = (): PlacementFreedom3 =>
+        (measured ??=
+          solvePivot(c, ECat, dims0, seed, undefined, members, undefined, linesAt, { x: xAt, mirror: mirrorAt, freedom: 'measure' })[0]
+            ?.placementFreedom?.() ?? { dim: 0, generators: [] });
+      pivot = { ...pivot, placementFreedom };
+      if (opts.placementImage && placementFreedom().dim > 0) {
+        // transactional, exactly as stage 5: an image that breaks a sign given or the parameter is no image
+        const posBefore = new Map(pos);
+        const paramBefore = paramOut;
+        const pivotBefore = pivot;
+        const restore = (): void => {
+          pos.clear();
+          for (const [id, q] of posBefore) pos.set(id, q);
+          paramOut = paramBefore;
+          pivot = pivotBefore;
+          resolveLatePlanes();
+          resolveSymObjects();
+        };
+        const attempt = (flip: boolean): boolean => {
+          const walked = solvePivot(c, ECat, dims0, seed, undefined, members, undefined, linesAt, { x: xAt, mirror: mirrorAt, flip, freedom: 0 });
+          if (walked.length === 0) return false;
+          applySolutions(walked); // a ONE-entry pool: the image is a moved copy of the chosen configuration, not a root set
+          pinParam();
+          resolveLatePlanes();
+          const paramBroke =
+            paramBefore !== null && Number.isFinite(paramBefore.value) && !(paramOut !== null && Number.isFinite(paramOut.value));
+          return !paramBroke && signsHold();
+        };
+        if (!attempt(false)) {
+          restore();
+          if (!attempt(true)) restore();
+        }
+        if (pivot !== pivotBefore) pivot = { ...pivot!, placementFreedom };
       }
     }
   }
@@ -2861,12 +2957,22 @@ export function paramConfigValues3(c: Construction3, seed: number, r: Resolved3 
  * moves the branch and nothing else. The one sampler for the ask lane, the panel and the claim verifier
  * (docs/17 M3): do not reach configurations any other way.
  */
-export function knowledgeSamples3(c: Construction3, baseSeeds: readonly number[]): Resolved3[] {
+export function knowledgeSamples3(c: Construction3, baseSeeds: readonly number[], opts: { readback?: boolean } = {}): Resolved3[] {
   return baseSeeds.flatMap((s) => {
     const r0 = resolve3(c, s);
     const vals = paramConfigValues3(c, s, r0);
-    if (vals.length <= 1) return [r0];
-    return vals.map((v) => (v === r0.param!.value ? r0 : resolve3(c, s, { paramValue: v })));
+    const confs: { r: Resolved3; paramValue?: number }[] =
+      vals.length <= 1 ? [{ r: r0 }] : vals.map((v) => (v === r0.param!.value ? { r: r0 } : { r: resolve3(c, s, { paramValue: v }), paramValue: v }));
+    if (!opts.readback) return confs.map((k) => k.r);
+    // #2368 (ADR-3D-375): READ-BACK adds, per configuration whose placement keeps a measured leftover rigid
+    // freedom, its exact IMAGE along it — agreement can only see what is varied, and the multi-start never
+    // varies that freedom. The image's one-entry pool keeps the «או» rows and `branchAgrees` honest (a
+    // moved point is not a second configuration). Claims and narrowing stay on the plain samples.
+    return confs.flatMap(({ r, paramValue }) =>
+      (r.pivot?.placementFreedom?.().dim ?? 0) > 0
+        ? [r, resolve3(c, s, { ...(paramValue !== undefined ? { paramValue } : {}), placementImage: true })]
+        : [r],
+    );
   });
 }
 
