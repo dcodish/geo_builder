@@ -641,14 +641,19 @@ export function statedLengths(c: Construction3): Map<string, number> {
   return out;
 }
 
-/** The panel's base seeds — the GAUGE sample; #1474: `knowledgeSamples3` adds every parameter branch at each. */
+/**
+ * The panel's base seeds — the GAUGE sample; #1474: `knowledgeSamples3` adds every parameter branch at each,
+ * and (#2368, ADR-3D-375) with `{ readback: true }` the image along any measured leftover placement freedom.
+ * The ask lane keeps its own four (`querySeeds3`): merging them added one full resolve per panel (+130 % on the
+ * fixture corpus), and with the leftover freedom sampled the fourth seed no longer decides that class.
+ */
 export const panelSeeds3 = (seed: number): number[] => [seed, seed + 1013, seed + 2027];
 
 export function dataView(c: Construction3, seed: number): DataPanel {
   const seeds = panelSeeds3(seed);
   // #1474 (ADR-3D-283): the seeds cover the gauge, `knowledgeSamples3` every parameter branch at each —
   // so every agreement gate below reads ALL of `resolved`, never a fixed [0]/[1]/[2].
-  const resolved = knowledgeSamples3(c, seeds);
+  const resolved = knowledgeSamples3(c, seeds, { readback: true }); // #2368: + the leftover placement freedom's image
   const positions = resolved.map((r) => r.positions);
   /**
    * #827 — the VECTOR lane needs the same branch guard the point lane got, for the same reason.

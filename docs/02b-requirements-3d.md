@@ -453,7 +453,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   pinned parameter has several roots, an answer (the ask lane), a data-panel row, a verified claim and an
   offered crossing dot are each judged against **every root the student can cycle** with «הציגו תצורה
   אחרת» — never against a subset — so pressing the button can never turn a withheld value into a fact.
-  - Sources: ADR-3D-283, #1474.
+  A value that a rigid motion the givens still allow would change is not shown either: after «קובייה
+  ABCDA'B'C'D'» · «A(0,0,0)» · «AB=(2,0,0)» the cube may still turn about AB, so the panel reads
+  «C(2, ?, ?)», «D(0, ?, ?)», «A'(0, ?, ?)» (x is fixed, the turn keeps it), no «או» row and no equation for
+  the plane ABCD, and asking for the plane, D or z_D answers that it is not determined — at every
+  configuration, whichever orientation happens to be drawn.
+  - Sources: ADR-3D-283, #1474, [ADR-3D-375](06b-decisions-3d.md#adr-3d-375), #2368.
 - **FR-EQ-4a (Should)** — **A point with EXACTLY TWO configurations lists both in the data panel.** When
   the givens leave a point exactly two admissible positions — the same two at every sampled configuration
   (S above or below the plane, «SM⊥ABC» + «|SM| = 4») — the panel prints one row per configuration,

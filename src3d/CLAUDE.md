@@ -60,7 +60,9 @@ Deployed at `themathbible.com/3d-builder/` (admin dashboard at `/admin3`).
   the landing funnel classifies which gauge components are provably free. **What the canvas carries** is the
   student's inputs ([ADR-W-047](../docs/06w-decisions-workspace.md#adr-w-047)), plus one recorded 3-D
   exception: computed coordinates while the data panel is open (ADR-3D-014 Am. 3, ADR-W-118 B7). A number
-  drawn must also be seed-invariant knowledge — one drawing's values are not a given.
+  drawn must also be seed-invariant knowledge — one drawing's values are not a given. Agreement only sees
+  what the resolver varies: the read-back samples the placement's MEASURED leftover rigid freedom
+  (`knowledgeSamples3({ readback: true })`, [ADR-3D-375](../docs/06b-decisions-3d.md#adr-3d-375)).
 - **Under-determination is welcome.** An unstated dimension stays a free, resampled DOF while the pinned
   parts stand still.
 

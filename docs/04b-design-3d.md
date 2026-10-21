@@ -414,6 +414,24 @@ row and a plane's parametric form need all three, and a plane's d-term needs eve
 component along (`planeOffsetAnchored3`, shared by the panel and the query lane). The resolver does not read it:
 the figure is unchanged.
 
+**The read-back samples the placement's leftover rigid freedom** (#2368, [ADR-3D-375](06b-decisions-3d.md#adr-3d-375)).
+Every knowledge gate decides "fixed" by agreement across resolves, so it sees only what the resolver varies; the
+funnel freezes rotation about a pinned point or axis (the ADR-3D-101 deferral) and the pivot's eight starts are
+seed-independent, so a turn the givens leave free landed in the same few basins at every seed. Stage 6 of the
+pivot block (`resolve3`) publishes `pivot.placementFreedom()`: lazily, `solvePivot`'s measuring probe takes the
+central-difference Jacobian of the primary residuals — the full construction, plane pins and member pins included,
+over a snapshot of the resolved planes and lines — with respect to the six rigid unknowns in `rigidChart`'s
+coordinates (a world translation in figure scales, a world rotation about the origin; regular everywhere, unlike
+raw axis-angle at |w| = 2π), and returns `6 − numericRank` with the null space (`symmetricEigen` of JᵀJ). Scale is
+excluded (#518 samples it) and dims are held (seed-sampled). `resolve3(c, s, { placementImage: true })` replays the
+plain resolve's pivot pools (`pivotStageMemo3`, read by the image only) and then walks the chosen solution along a
+seeded unit combination of the generators — the #803 slide pattern: hard-pin the projection, release on the primary
+residuals, keep it only if exact, non-degenerate and moved; transactional on signs and the parameter. The image
+carries a one-entry pool, so `twoConfigurations3` and `branchAgrees` never read a moved point as a second
+configuration. `knowledgeSamples3(c, seeds, { readback: true })` adds one image per sample whose freedom is
+non-zero; `dataView` and every `answerQuery` lane read back, claims and narrowing keep the plain samples, and the
+drawing never walks.
+
 ### Who may introduce a point: the drawing registers (#1184, [ADR-3D-253](06b-decisions-3d.md#adr-3d-253))
 
 A **carrier** («נסמן: AB = u») never introduces its own subject (`v7-t1`); only a **drawing register** —
@@ -675,7 +693,9 @@ ADR-3D-259, #1339); red rows only, so ADR-104's stranding hazard cannot occur (A
 **Knowledge samples — seeds cover the gauge, enumeration covers the branches ([ADR-3D-283](06b-decisions-3d.md#adr-3d-283), #1474).**
 `answerQuery`, `dataView` and `verifyClaim` all sample through `knowledgeSamples3(c, baseSeeds)`
 (`evaluate.ts`): each base seed × every value of `paramConfigValues3`, via
-`resolve3(c, s, { paramValue })`. `querySeeds3`, `panelSeeds3` and `claimSeeds` sample only the gauge;
+`resolve3(c, s, { paramValue })`; with `{ readback: true }` (the panel and the ask lane) also the image along a
+measured leftover placement freedom (#2368, see *The read-back samples the placement's leftover rigid freedom*).
+`querySeeds3`, `panelSeeds3` and `claimSeeds` sample only the gauge;
 branch coverage never rides seed offsets (`chooseParam` picks `pool[seed % n]`), and agreement gates read
 `every` sample, never `[0]/[1]/[2]`. `paramIsKnowledge` answers only for m's own value. `openCrossings3`
 asks per crossing at `Resolved3.seed`, with `openParamProbes3` for an unpinned m.
