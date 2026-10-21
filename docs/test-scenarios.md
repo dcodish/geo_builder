@@ -2106,3 +2106,7 @@ over all four (ADR-041).
 ### `common-tangent-external-through-touch-refused-2407` — «T על AB» through the touch of two externally tangent circles, then «AB משיק משותף חיצוני …» is refused — no external common tangent passes through T (#2407, ADR-740)
 
 **Guards against:** the at-touch reading (ADR-740) taken for a stated kind the touch tangent is not, which would draw an "external" tangent that is internal. **Asserts** the external line is refused by the engine before commit, naming `T, A, B collinear cannot hold` (as at 3cae7f25), and the touch tangent's own kind («פנימי») commits.
+
+### `circle-tangent-moves-newer-2237` — «מעגל O» · «מעגל P» · «מעגל Q משיק למעגל O» · «מעגל Q משיק למעגל P» — Q moves, O and P stay exactly where they were (#2237, ADR-742)
+
+**Guards against:** a circle-pair relation moving the OLDER circle (the command's second slot) and making the older radii carry the newer circle's tangency — O jumped next to P and the two ended internally tangent, a relation nobody stated (operator ruling 2026-10-16, card `g2237-jump` A). **Asserts** O and P keep the centre and radius they had after line 2 (1e-9), Q is externally tangent to both, and the figure is green.

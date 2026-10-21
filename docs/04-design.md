@@ -871,6 +871,21 @@ changes, so the source of truth stays `(facts, seed)`), and the memo signature c
 point and operand order come from the first record (ADR-703). The verifier's containment check is closed
 (`d + r_b ≤ r_a + tol`) when the same pair is stated internally tangent, and strict otherwise.
 
+### Which circle of a pair moves: the newer one ([ADR-742](06-decisions.md#adr-742))
+
+Every circle-pair relation's apply-time seat (LADDER stage 2a) asks one chooser, `seatMover(objects, a, b)` in
+`engine/apply.ts`: the mover is the circle created LATER in `objects` when its centre is a movable free point (not
+pinned, not rigid), else the older one when its centre can move, else none (the solver and the verifier decide). The
+seats that read it: the free-radius `circles-tangent` (the mover's centre is placed at the touching distance from the
+anchor), `set-circle-position` (`contained`, `disjoint`, the unstated `any`), and the stated-crossing re-seat of
+`circle-circle-intersection` (ADR-358). The command's slot order is the sentence's grammar and never decides which
+circle moves. For `contained`, the radius re-seed follows the mover (a newer inner shrinks to `ra·0.45`, a newer
+container grows to `rb/0.45`); an internal tangency whose radius seeds are equal re-seeds the mover's free seed by the
+`0.55` split on the side the tie gives it (slot 1 is the outer circle), so the default is never two coincident circles. The free-radius tangency is carried by the
+MOVER's own DOF only (M2 least ownership, ADR-281): its free radius if unclaimed, else its free centre; the anchor's
+free radius only when the mover has none left. So «מעגל Q משיק למעגל O» · «מעגל Q משיק למעגל P» puts both tangencies
+on Q (radius, then centre) and never moves or resizes O or P.
+
 ### The common tangent at the touch ([ADR-740](06-decisions.md#adr-740))
 
 `commonTangent` asks one resolver before its two-touch path, in this order: (a) a named «בנקודה X»; (b) the touch by

@@ -286,10 +286,34 @@ function degenerateConstraintError(cmd: Command): string | null {
  * driving constraint does NOT reference (N ≡ O) — is untouched; pairs a declared `coincide` merges are
  * exempt.
  */
+/** The two circle centres of a free-radius tangency device (`coincide` of two `radial-toward` witnesses), else null. */
+function tangencyDeviceCentres(c: Construction, con: Extract<Constraint, { type: 'coincide' }>): [Id, Id] | null {
+  const wit = [con.p, con.q].map((id) => c.objects.find((o) => o.id === id));
+  if (!wit.every((o) => o?.kind === 'radial-toward')) return null;
+  const centres = wit.map((o) => {
+    const circ = c.objects.find((x) => x.kind === 'circle' && x.id === (o as Extract<GeoObject, { kind: 'radial-toward' }>).circle);
+    return circ && circ.kind === 'circle' ? circ.center : undefined;
+  });
+  return centres[0] && centres[1] && centres[0] !== centres[1] ? [centres[0], centres[1]] : null;
+}
+
 function newConstraintsNonVacuous(c: Construction, positions: Map<Id, Vec>, newCons: Constraint[]): boolean {
   const merged = new Set(c.constraints.filter((k) => k.type === 'coincide').map((k) => [k.p, k.q].sort().join('|')));
   for (const con of newCons) {
-    if (con.type === 'coincide') continue;
+    if (con.type === 'coincide') {
+      // #2237 (ADR-742): the free-radius TANGENCY device (a coincide of two `radial-toward` witnesses) holds
+      // vacuously when its two circles' centres collapse — two coincident circles, not a tangency (the internal
+      // device's residual |d − |r₁ − r₂|| is 0 at d = 0 when the radii are equal). Judged on the device's own
+      // measured term, the centre pair, exactly as any other new constraint's collapsed terms are.
+      const centres = tangencyDeviceCentres(c, con);
+      if (centres) {
+        const [p, q] = centres.map((id) => positions.get(id));
+        let ext = 1;
+        for (const v of [p, q]) if (v) ext = Math.max(ext, Math.abs(v.x), Math.abs(v.y));
+        if (p && q && Math.hypot(p.x - q.x, p.y - q.y) < 1e-3 * ext) return false;
+      }
+      continue;
+    }
     const refs = [...new Set(constraintRefs(con))];
     let ext = 1;
     for (const id of refs) {

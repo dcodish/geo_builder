@@ -89,16 +89,17 @@ describe('#2208 — a circle subject with a kind word: the circles are tangent',
       const r = await play(PAIR, line);
       expectTangency(r, 'INT');
       // Stability: the figure is the one the 2-D reference spelling draws. A tangency of two free circles moves one
-      // of them (the `circles-tangent` device seats the OBJECT circle), so "both unmoved" is not satisfiable — the
-      // measured bar is that the Hebrew verb moves exactly what the English twin moves, and nothing else.
+      // of them, so "both unmoved" is not satisfiable — the measured bar is that the Hebrew verb moves exactly what the
+      // English twin moves, and nothing else. #2237 (ADR-742) re-based: the device moves the NEWER circle P (one
+      // chooser, `seatMover`), whichever circle the sentence names first, so the OLDER O stays put in every spelling.
       const ours = replay(st().facts, st().seed).positions;
-      const subj = /[OP]/.exec(line)![0]; // the first-named circle is `circle1`, the one the device leaves in place
+      const subj = /[OP]/.exec(line)![0];
       const obj = subj === 'O' ? 'P' : 'O';
       await play(PAIR_EN, `circle ${subj} is internally tangent to circle ${obj}`, 'en');
       const twin = replay(st().facts, st().seed).positions;
       for (const id of ['O', 'P']) expect(Math.hypot(ours.get(id)!.x - twin.get(id)!.x, ours.get(id)!.y - twin.get(id)!.y), id).toBeLessThan(1e-9);
-      const S0 = r.before.get(subj)!;
-      expect(Math.hypot(S0.x - ours.get(subj)!.x, S0.y - ours.get(subj)!.y), `the first-named ${subj} stays put`).toBeLessThan(1e-9);
+      const O0 = r.before.get('O')!;
+      expect(Math.hypot(O0.x - ours.get('O')!.x, O0.y - ours.get('O')!.y), 'the older O stays put').toBeLessThan(1e-9);
     });
 
   for (const line of ['מעגל P משיק למעגל O מבחוץ', 'מעגל P משיק מבחוץ למעגל O', 'מעגל P משיק למעגל O חיצונית'])
