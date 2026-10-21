@@ -912,6 +912,16 @@ kind, `tan-T` in `ctx.lines`) are subtracted; none missing → the position's `t
 `ambiguous-construct` with the three statements that settle it (letters from `freeLabel`). `commonTangentCapacityError`
 reads the same `statedCirclePosition`, so the parser's count and the engine's guard share one reader.
 
+**Either order** ([ADR-752](06-decisions.md#adr-752)). Exit (c) reads only the lines typed before the tangent. The fold's
+pre-pass `statedOnCommonTangents` (`src/replay/statedOnCommonTangents.ts`, called from `replay/core.ts` beside the ADR-704
+and ADR-239 pre-scans) closes the other order: for each two-touch `common-tangent` record (no `at`) it collects the points
+the OTHER enabled facts put on line AB (`set-collinear`, `set-line`, `point-on-segment`); when the pair's stated touch
+(its `circles-tangent` `at`, kind resolved by ADR-704) is among them, `pinnedLowering` re-decides the record's group:
+`tangent tan-T` on circle 1, each letter the group introduces a `point-on-line` marker at ±5 from T (the at-variant's
+markers), an existing letter seated by the `at` record, the soft memberships and radius ⟂s retired, the segment kept.
+Excluded (today's refusal stands): a stated kind that is not the touch tangent's, and a `tangent` at T already drawn.
+The re-decision is part of the fold's pre-scan signature (`pin`), so a prefix memo is reused only when it agrees.
+
 ### The AI lane's context ([ADR-741](06-decisions.md#adr-741))
 
 `llmParse` re-parses each canonical line through `parse(step, ctxFor(built))`, where `built` is the commands of the lines

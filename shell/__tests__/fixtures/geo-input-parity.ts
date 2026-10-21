@@ -311,7 +311,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2421': 'open', // #2388 (ADR-AG-307): 2-D does not read «R = 2r», «r:R = 1:2» or the unnamed ratio of two radii
   '#2448': 'open', // #2405 (ADR-751): analytic does not read «כל המשיקים המשותפים» on externally tangent circles (not-handled)
   '#2442': 'open', // #2405 (ADR-751): «כל המשיקים המשותפים» on a pair whose position was never stated: 2-D asks (interim), analytic does not read it; the permanent answer awaits the operator
-  '#2430': 'open', // #2418 (ADR-AG-321): 2-D refuses «T על AB» typed after «AB משיק משותף …» (the reverse order), awaiting the cross-tool ruling
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1710,7 +1709,7 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'common-tangent-through-touch-2385', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'T על AB', 'AB משיק משותף למעגלים M ו-N'], expect: 'builds', exception: 'X8', note: '2-D builds it since ADR-740 (#2407); analytic since ADR-AG-312 (#2385)' },
 
   // ── #2418 (ADR-AG-321): the common tangent reads a LATER line that pins it to the touch point; the pair's only tangent ──
-  { id: 'common-tangent-later-pin-2418', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'AB משיק משותף למעגלים M ו-N', 'T על AB'], expect: 'builds', exception: 'X8', knownGap: [{ product: '2d', issue: '#2430' }], note: 'the reverse order of #2385; 2-D refuses it (over-constrained), its twin #2430 awaits the cross-tool ruling' },
+  { id: 'common-tangent-later-pin-2418', family: 'tangents', steps: ['מעגל M', 'מעגל N', 'המעגלים משיקים בנקודה T', 'AB משיק משותף למעגלים M ו-N', 'T על AB'], expect: 'builds', exception: 'X8', note: 'the reverse order of #2385; 2-D builds it since ADR-752 (#2430, the fold re-decides AB as the tangent at T), analytic since ADR-AG-321' },
   { id: 'common-tangent-internal-touch-alone-2418', family: 'tangents', steps: ['מעגל O', 'מעגל K', 'מעגל O ומעגל K משיקים מבפנים בנקודה T', 'AB משיק משותף למעגלים O ו-K'], expect: 'builds', exception: 'X8', note: '2-D draws tan-T (ADR-740); analytic did not before ADR-AG-321' },
 
   // ── #2397 (ADR-AG-322): two circles introduced before they are described — the pair a tangency sentence draws ──

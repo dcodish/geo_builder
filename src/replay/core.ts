@@ -20,6 +20,7 @@ import { NOT_CYCLIC_VS, collinearCircleImpossibility, notCyclicImpossibility, sp
 import { DIAGONAL_HEIGHT_VS, diagonalHeightError, diagonalHeightImpossibility } from '@/engine/heightFeasibility';
 import { EQUAL_NESTED_CANNOT_HOLD, equalNestedPair, type NestedRelation } from '@/engine/radiusFeasibility';
 import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
+import { pinnedLowering, statedOnCommonTangents } from './statedOnCommonTangents';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
@@ -1201,6 +1202,18 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
         ]),
       );
   }
+  // #2430 (ADR-752): a two-touch common tangent that ANOTHER line pins to the pair's stated touch point («T על AB» typed
+  // after «AB משיק משותף…») is re-decided as the tangent at T — the lowering the forward order produces — so the figure
+  // no longer depends on entry order (the 2-D twin of ADR-AG-321 d1). Pure over the enabled facts, as the fold lowers them.
+  const pinnedTangents = statedOnCommonTangents(
+    facts
+      .filter((f) => f.enabled)
+      .map((f) => {
+        const tk = tangentKind.get(f.id);
+        const cmds = (lowerOne(f.cmd, symtab) as Command[]).map((c) => (c.type === 'circles-tangent' && tk !== undefined ? { ...c, external: tk } : c));
+        return { id: f.id, group: groupKey(f), cmds };
+      }),
+  );
   // Explicit `set-equal`s the student/LLM gave (NOT a shape-variant macro's own pairs) — they PIN the matching
   // variant of a kite/isosceles `shape-variant` and suppress re-emitting that pair ([ADR-138](docs/06-decisions.md#adr-138)).
   const explicitEqs = facts
@@ -1280,6 +1293,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       ctr: [...centrePromotions].sort(),
       tk: [...tangentKind].filter(([id]) => inPrefix(id)).map(([id, v]) => [factIdxById.get(id), v]),
       pair: [...pairSwapByGroup].filter(([g]) => prefixGroups.has(g)).map(([g, m]) => [groupPartition.get(g), [...m].sort()]),
+      pin: [...pinnedTangents].filter(([g]) => prefixGroups.has(g)).map(([g, m]) => [groupPartition.get(g), [...m.values()].map((p) => [p.a, p.b, p.at, p.fresh])]),
       eqs: explicitEqs,
       ons: explicitOnSegs,
       rt90: explicitRightAngles,
@@ -1418,6 +1432,9 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
         return ec;
       });
     }
+    // Re-decide a two-touch common tangent pinned to the pair's touch point as the tangent at it (#2430, ADR-752 pre-pass).
+    const pins = pinnedTangents.get(groupKey(f));
+    if (pins) engineCmds = pinnedLowering(engineCmds as Command[], pins);
     return engineCmds as Command[];
   };
   /**
