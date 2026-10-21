@@ -158,6 +158,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     needs: ['נתון מעגל שמרכזו M(7,6) ורדיוסו 5', 'C(4,10)', 'המשיק למעגל בנקודה C', 'B(1,14)', 'האנך מהנקודה B לציר ה-x'],
   },
   { category: 'lines', family: 'F3', he: 'ישר דרך P מאונך ל-AB', en: 'line through P perpendicular to AB', needs: ['A(0,0)', 'B(4,3)', 'נקודה P'] },
+  { category: 'lines', family: 'F3', he: 'ישר דרך P מאונך לישר y=2x', en: 'a line through P perpendicular to y=2x', needs: ['נקודה P'] },
   { category: 'lines', family: 'F3', he: 'F רגל האנך מ-C ל-AD', en: 'F is the foot of the perpendicular from C to AD', needs: ['מרובע ABCD'] },
   { category: 'lines', family: 'F3', he: 'אנך אמצעי ל-AB', en: 'the perpendicular bisector of AB', needs: ['A(0,0)', 'B(4,3)'] },
   /**
@@ -725,6 +726,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'AB is perpendicular to line l1',
     needs: ['נתון הישר l1: y=x', 'משולש ABC'],
   },
+  // A line given by its EQUATION is a direction operand (#2429, ADR-AG-328), drawn and named l1; 2-D has no equations (X2).
+  { category: 'relations', family: 'F18', he: 'הישר AB מקביל לישר 2x-y+3=0', en: 'the line AB is parallel to the line 2x-y+3=0', needs: ['נקודה A', 'נקודה B'] },
 
   // --- F19 · slope as a GIVEN (#1051) ---
   // The same direction algebra as F18 — parallel IS equal slope — so the two share one definition
@@ -1365,6 +1368,7 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
   { category: 'relations', family: 'F17', he: 'AB = AC = 3a', en: 'AB = AC = 3a', needs: ['משולש ABC'] },
   { category: 'relations', family: 'F17', he: 'AD = 12√a', en: 'AD = 12√a' },
   { category: 'relations', family: 'F17', he: 'המרחק בין AB לבין CD הוא 3', en: 'the distance between AB and CD = 3', needs: ['טרפז ABCD'] },
+  { category: 'relations', family: 'F17', he: 'המרחק של A מהישר 3x+4y=25 הוא 5', en: 'the distance from A to the line 3x+4y=25 = 5', needs: ['נקודה A'] },
   { category: 'lines', family: 'F17', he: 'CD חוצה את AB', en: 'CD bisects AB' },
   { category: 'lines', family: 'F17', he: 'CD חותך את AB', en: 'CD cuts AB' },
   { category: 'lines', family: 'F17', he: 'AC ו-BD נחתכים', en: 'AC and BD intersect', needs: ['מרובע ABCD'] },

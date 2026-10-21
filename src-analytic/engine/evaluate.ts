@@ -718,8 +718,9 @@ export function lineAtOf(c: Construction, env: Env, at: (id: Id) => Pt | null): 
     lineByName(
       name,
       (n: string) => {
-        // The ONE by-name lookup (ADR-AG-144): a constructed line answers to its name here too.
-        const o = curveByName(c, n);
+        // The ONE by-name lookup (ADR-AG-144): a constructed line answers to its name here too. A term resolved at M1
+        // holds the curve's ID (#2429, ADR-AG-328), found after the names, so a later rename cannot strand it.
+        const o = curveByName(c, n) ?? objectById(c, n);
         return o ? curves(o.id) : null;
       },
       at,

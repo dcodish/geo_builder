@@ -291,7 +291,7 @@ From the «lines and points» corpus (§8), numbered onward.
 - «הישר x-y+2=0» and «x-y+2=0» → one line
 - Sources: ADR-AG-019.
 
-**R47 — a relation is between two DIRECTIONS, and one definition serves them all**. Between a segment, a side, a named line or an axis, either way round; a stated slope is the same algebra, refused over a vertical segment.
+**R47 — a relation is between two DIRECTIONS, and one definition serves them all**. Between a segment, a side, a named line, a line given by its equation (R195) or an axis, either way round; a stated slope is the same algebra, refused over a vertical segment.
 - Sources: ADR-AG-024.
 
 **R50 — a NAME can be a geometric claim, and the tool honours it**. Giving the equation of «הישר AB» puts A and B on it (introducing them, free along it, if new); «הישר ℓ1» asserts nothing about any point.
@@ -308,11 +308,11 @@ From the «lines and points» corpus (§8), numbered onward.
 - **Scope (R187, ADR-AG-319):** only a curve that holds a POINT is a carrier. A curve the sentence is about («הישר <eq> משיק …», «הישר <eq> עובר דרך A») is drawn.
 - Sources: ADR-AG-032.
 
-**R80 — a line can be CONSTRUCTED through a point**. The direction is copied from AB, a named line or an axis; no freedom is added, and a missing anchor is introduced with its DOF.
+**R80 — a line can be CONSTRUCTED through a point**. The direction is copied from AB, a named line, a line given by its equation (R195) or an axis; no freedom is added, and a missing anchor is introduced with its DOF.
 - «דרך P עובר ישר מקביל ל AB»
 - Sources: ADR-AG-057, ADR-052.
 
-**R95 — a name that denotes a line denotes it to every question, and to every surface**. Its equation, slope and the distance from a point to it can all be asked, whether it was drawn as a line, a segment or a side.
+**R95 — a name that denotes a line denotes it to every question, and to every surface**. Its equation, slope and the distance from a point to it can all be asked, whether it was drawn as a line, a segment or a side. The distance to a line given by its equation is a given only (R196).
 - Sources: #1148, #1139.
 
 **R107 — a line may be created through a point with its direction UNKNOWN**. One degree of freedom, its equation withheld until a later given pins the direction; a named one is crossed and referred to like any line.
@@ -916,6 +916,19 @@ a sentence the tool parsed.
 - «נתון ישר 4x+3y+2=0» → l1; a later «נתון הישר l5: …» of the same line replaces the tool's name; «נתון הישר l1: <another equation>» → refused
 - «A על הישר y=mx+1», «M על הישר 4x+y+3=0» → still undrawn (R56, the #2423 ruling)
 - Sources: ADR-AG-319, #2425, #2423.
+
+**R195 — a line given by its equation can be the line of ∥, ⊥ and of a line through a point, as subject or as object; the operand line is drawn and named**. *(Operator rulings 2026-10-20 on #2429, "2429 accept recommendations", and 2026-10-21, "2429 - no. dont accept", which keeps the other slots refusing.)* The sentence means what it means with a named line: the relation holds, pins a parameter, or is refused as contradictory naming the sentence. The equation line is drawn and takes the next free l-number (R187); when the figure already holds that line (named, declared, or a carrier from «M על הישר …»), the sentence is about it — no second line, an existing name kept.
+- «הישר AB מקביל לישר 2x-y+3=0», «הישר AB מאונך לישר 2x-y+3=0», «AB ∥ 2x-y+3=0», «AB מקביל ל-y=2x», "the line AB is parallel to the line 2x-y+3=0" → AB ∥ that line, drawn as l1
+- «הישר 4x+y+3=0 מאונך ל-KL» (exam Q1 ב(1)) → the carrier of «M על הישר 4x+y+3=0» is drawn as l1; «הישר 4x-y+3=0 מאונך ל-KL» → refused, naming it
+- «הישר y=mx+1 מקביל לישר 2x-y+3=0» → m = 2; «הישר 2x-y+3=0 מקביל לישר y=2x» → l1 and l2
+- «ישר דרך A מקביל לישר y=2x», «דרך A עובר ישר מאונך לישר y=2x», "a line through A parallel to y=2x" → the line through A (unnamed), and y=2x drawn as l1
+- «AB ∥ x^2+y^2=9» (a circle) → refused as before; slope («שיפוע הישר y=mx+1 הוא 2»), «A מעל הישר y=2x» and «האנך מ-A לישר y=2x» → still refused
+- Sources: ADR-AG-328, #2429.
+
+**R196 — the distance from a point to a line given by its equation can be stated as a given; the line is drawn and named, and the distance question with an equation stays refused**. *(Operator rulings 2026-10-20 and 2026-10-21 on #2429.)* The given is the same constraint as with a named line (R95), its line drawn and named as in R195. A later name for that line («נתון הישר l5: …», R187) keeps the given.
+- «המרחק של A מהישר 3x+4y=25 הוא 5», «המרחק בין הנקודה A לישר 3x+4y=25 הוא 5», «המרחק מ-A לישר 3x+4y=25 = 5», "the distance from A to the line 3x+4y=25 = 5" → A at distance 5 from it, the line drawn as l1
+- the question «המרחק של A מהישר 3x+4y=25» and «המרחק בין הישר 3x+4y=0 לישר 3x+4y=25 הוא 5» → still not understood, as before
+- Sources: ADR-AG-328, #2429.
 
 **R61 — a circle marks its centre**. Its value shows only when the givens fix it; the centre owns no letter (amended by R123).
 - Sources: ADR-AG-036.
