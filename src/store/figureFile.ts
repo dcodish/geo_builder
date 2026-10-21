@@ -26,6 +26,7 @@ import { ingestTypedText } from '../../shell/bidi';
 import { displayModeToIndexed } from '../../shell/displayMode';
 import { figureTooLarge } from '../../shell/save';
 import type { AnyCommand, Id } from '@/engine';
+import { typedLabels } from '@/parser';
 import type { Fact, GeoState } from './geoStore';
 
 /** Bump when the file shape changes incompatibly; keep loading every older version. */
@@ -172,11 +173,23 @@ function sanitizeFactOut(f: Fact): Fact {
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
+/**
+ * #2362 / #2369 ([ADR-748](../../docs/06-decisions.md#adr-748)) — a `circumcircle` saved before its centre carried its
+ * provenance: the letter is the student's exactly when their own sentence typed it (a minted letter never appears in the
+ * line that minted it). With no sentence it stays minted, which is how it replayed before.
+ */
+function withCentreProvenance(cmd: Record<string, unknown>, utterance: unknown): Record<string, unknown> {
+  if (cmd.type !== 'circumcircle' || typeof cmd.autoCenter === 'boolean' || typeof cmd.center !== 'string') return cmd;
+  const named = typeof utterance === 'string' && typedLabels(utterance).includes(cmd.center);
+  return { ...cmd, autoCenter: !named };
+}
+
 /** A fact from disk, reduced to the known fields — or null when it can't be one. */
 function sanitizeFactIn(v: unknown): Fact | null {
   if (!isRecord(v)) return null;
-  const cmd = v.cmd;
-  if (!isRecord(cmd) || typeof cmd.type !== 'string') return null;
+  const raw = v.cmd;
+  if (!isRecord(raw) || typeof raw.type !== 'string') return null;
+  const cmd = withCentreProvenance(raw, v.utterance);
   return {
     id: typeof v.id === 'string' && v.id ? v.id : nanoid(),
     // #751 (ADR-W-029): a file saved before the ingest invariant carries the app's display

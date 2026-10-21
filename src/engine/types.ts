@@ -1201,7 +1201,7 @@ export type Command =
   // Phase 5c — circles and the points they produce.
   | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean; autoCenter?: boolean; freeRadius?: boolean; ifAbsent?: boolean; implied?: boolean | 'by-member'; apart?: boolean } // freeRadius: radius is a DOF (ADR-051); ifAbsent: a parser-injected implicit circle — skip if it already exists (don't clobber a real one); implied: minted by withImplicitCircles for a NAMED reference that matched no circle (#186 — the App may BIND that name to an unnamed circle instead of committing this creation); 'by-member' (#1694): a rule's own creation for a fresh letter beside unnamed circles — bound ONLY on a membership signal, else it stands; apart: a STANDALONE bare circle («מעגל O2» alone) seeds its NEW centre clear of every existing circle (#196 — an overlapping default silently draws intersections the student never stated; ADR-253 general position, circle edition). Placement only — the centre stays a free sampled DOF, no requirement is recorded.
   | { type: 'circle-through'; id: Id; center: Id; through: Id; hidden?: boolean; autoCenter?: boolean }
-  | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id; hidden?: boolean } // circle through a,b,c (centre = circumcentre); hidden for a cyclic (בר-חסימה) figure
+  | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id; hidden?: boolean; autoCenter?: boolean } // circle through a,b,c (centre = circumcentre); hidden for a cyclic (בר-חסימה) figure. autoCenter (#2362/#2369, ADR-748): the centre's PROVENANCE — true when the tool minted the letter, false when the student named it (then it is always drawn, FR-RN-8). Every parser emitter sets it; a legacy fact without it reads as minted (today's behaviour), and the load migrates it
   | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number; free?: boolean; between?: [Id, Id]; major?: boolean; softPair?: boolean } // theta = a STARTING angle; free:true keeps it a samplable/drivable DOF even with a start angle (ADR-097); between = a free point on the arc from-to (ADR-042), major = the far/reflex arc (#90); softPair: a common-tangent macro's DEFAULT touch↔circle pairing — the store swaps the pair when a later explicit membership states the opposite assignment (ADR-239, the M4 shape)
   // "M מחוץ למעגל / בתוך המעגל" (ADR-254): a NEW id is created as a FREE point (2 DOF) seeded on the
   // stated side; an EXISTING id is a statement about that point (M1) — a non-pinned free point on the
@@ -1347,7 +1347,10 @@ export type SymbolicCommand =
   // hidden circle token out of its way (`step-aside`, #1673), or an auto-named point took the letter of a student point a
   // line made it identical to (`merge`, #2122 / ADR-653). Owned by the line's group and applied by `replay`
   // (`resolveBinds`) to the facts BEFORE it — never a store rewrite no line owns. Lowers to nothing.
-  | { type: 'name-by-use'; op: 'centre' | 'point' | 'step-aside' | 'merge'; from: Id; to: Id }
+  // #2362 (ADR-748): `adopt` — the line typed a tool-minted circumcircle centre letter WHILE IT WAS SHOWN, so the letter
+  // is the student's from then on (its centre drawn at rest); `from` = `to` = `@ctr-<letter>`. A `step-aside` of a minted
+  // circumcircle letter carries the same `@ctr-` form: the circle ids make a token and a real letter never coexist.
+  | { type: 'name-by-use'; op: 'centre' | 'point' | 'step-aside' | 'merge' | 'adopt'; from: Id; to: Id }
   // An ordering between two named measures — "α < β" / "x > y" (ADR-039). Lowered (lower.ts) to a
   // `set-angle-order`/`set-length-order` once the symbol table says which measure each variable names.
   | { type: 'measure-order'; left: string; op: '<' | '>' | '<=' | '>='; right: string }

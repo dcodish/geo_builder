@@ -1,0 +1,172 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-21T12:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "gmqbDsO9iJscDlmAUrn-D",
+      "utterance": "משולש CDE",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "C",
+          "D",
+          "E"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "5BMJd86EC0KfaCURGOl-r",
+      "utterance": "A על CD",
+      "group": "sixYrwF7Z-J4uDHpRSXxh",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "8K2dJZbXMN_DS4937h-aQ",
+      "utterance": "A על CD",
+      "group": "sixYrwF7Z-J4uDHpRSXxh",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "A",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "a8PQ_G_EVjj7Bxr5G8Ads",
+      "utterance": "B על CE",
+      "group": "xSlwjNFAZHek2QGUKuHb0",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "E"
+      },
+      "enabled": true
+    },
+    {
+      "id": "XImmXnqLw9VZFVltGKrU5",
+      "utterance": "B על CE",
+      "group": "xSlwjNFAZHek2QGUKuHb0",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "B",
+        "a": "C",
+        "b": "E"
+      },
+      "enabled": true
+    },
+    {
+      "id": "7IJgqAIEeOXCbC8RGEfCB",
+      "utterance": "מרובע ABED חסום במעגל",
+      "group": "mnnlRIwzzfU1kBN2exwDM",
+      "cmd": {
+        "type": "circumcircle",
+        "id": "circle-O",
+        "center": "O",
+        "a": "A",
+        "b": "B",
+        "c": "E",
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "_ZC7YYUXSzUpy_Abkh8Qw",
+      "utterance": "מרובע ABED חסום במעגל",
+      "group": "mnnlRIwzzfU1kBN2exwDM",
+      "cmd": {
+        "type": "set-concyclic",
+        "points": [
+          "A",
+          "B",
+          "E",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "CgpelemrIJM9D3F01fSmZ",
+      "utterance": "מרובע ABED חסום במעגל",
+      "group": "mnnlRIwzzfU1kBN2exwDM",
+      "cmd": {
+        "type": "quadrilateral",
+        "ids": [
+          "A",
+          "B",
+          "E",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "_XVlD4UvJyXhPQJVTU1a6",
+      "utterance": "משולש ABC חסום במעגל",
+      "cmd": {
+        "type": "circumcircle",
+        "id": "circle-P",
+        "center": "P",
+        "a": "A",
+        "b": "B",
+        "c": "C",
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "bRYZ39v6zByvFFbssjq5c",
+      "utterance": "F אמצע הקשת BC במעגל O",
+      "group": "1BPd08CkINhEkdoh5s9Qq",
+      "cmd": {
+        "type": "name-by-use",
+        "op": "step-aside",
+        "from": "@ctr-O",
+        "to": "@ctr-Q"
+      },
+      "enabled": true
+    },
+    {
+      "id": "TnYUD5rAIgCGiU7RFofud",
+      "utterance": "F אמצע הקשת BC במעגל O",
+      "group": "1BPd08CkINhEkdoh5s9Qq",
+      "cmd": {
+        "type": "name-by-use",
+        "op": "centre",
+        "from": "P",
+        "to": "O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "jNpgONHXSu0c0cJ13uwGA",
+      "utterance": "F אמצע הקשת BC במעגל O",
+      "group": "1BPd08CkINhEkdoh5s9Qq",
+      "cmd": {
+        "type": "arc-midpoint",
+        "id": "F",
+        "circle": "circle-O",
+        "from": "B",
+        "to": "C"
+      },
+      "enabled": true
+    }
+  ],
+  "display": {
+    "hidden": [],
+    "segStyle": {},
+    "hiddenCircles": [],
+    "showMeasures": true,
+    "showCenters": false,
+    "displayMode": {}
+  }
+}

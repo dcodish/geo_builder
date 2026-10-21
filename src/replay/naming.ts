@@ -180,6 +180,68 @@ export function reletterHiddenFacts(facts: Fact[], from: Id, to: Id): Fact[] {
   return facts.map((f) => ({ ...f, cmd: Object.fromEntries(Object.entries(f.cmd).map(([k, v]) => [k, k === 'expr' ? v : map(v)])) as AnyCommand }));
 }
 
+/**
+ * #2362 / #2369 ([ADR-748](../../docs/06-decisions.md#adr-748)) — the commands that CREATE a circle with a centre letter:
+ * the free circle, the circle through a point, and the circle through three drawn points. One predicate, shared by the
+ * naming cores, so a fourth creation can never be left out of one of them again (the `circumcircle` was).
+ */
+export function isCircleCreation(cmd: AnyCommand): boolean {
+  return cmd.type === 'circle' || cmd.type === 'circle-through' || cmd.type === 'circumcircle';
+}
+
+/** The letters the student TYPED somewhere in the list: every Latin word that is a run of labels («BO» → B, O), so an
+ *  English word («Triangle») contributes nothing — the parser's `typedLabels` reading, which this layer cannot import. */
+function typedInFacts(facts: Fact[]): Set<string> {
+  const typed = new Set<string>();
+  for (const f of facts) {
+    if (!f.enabled || !f.utterance) continue;
+    for (const word of f.utterance.match(/[A-Za-z0-9]+/g) ?? []) {
+      const w = word.replace(/^\d+/, '');
+      if (/^(?:[A-Z]\d*)+$/.test(w)) for (const l of w.match(/[A-Z]\d*/g) ?? []) typed.add(l);
+    }
+  }
+  return typed;
+}
+
+/**
+ * The real centre letters of circles drawn through drawn points (`circumcircle`) that the TOOL minted and the student
+ * has not made theirs: no `autoCenter: false` (named in the sentence, or adopted while shown), no `name-center`
+ * promotion, and typed in no line (a legacy file whose later line used the letter as the centre keeps that meaning).
+ */
+function mintedCircumLetters(facts: Fact[]): string[] {
+  const promoted = new Set(facts.flatMap((f) => (f.cmd.type === 'name-center' ? [(f.cmd as { center: string }).center.toUpperCase()] : [])));
+  const typed = typedInFacts(facts);
+  const out: string[] = [];
+  for (const f of facts) {
+    const c = f.cmd as { type?: string; center?: string; autoCenter?: boolean };
+    if (c.type !== 'circumcircle' || !c.center || c.autoCenter === false || c.center.startsWith('@')) continue;
+    if (!promoted.has(c.center) && !typed.has(c.center) && !out.includes(c.center)) out.push(c.center);
+  }
+  return out;
+}
+
+/**
+ * #2362 (ADR-748, operator ruling 2026-10-20) — EVERY centre letter the tool picked that the student has not made theirs:
+ * the hidden tokens of unnamed circles ({@link hiddenCentreTokens}) and the minted letters of circles drawn through drawn
+ * points. Such a letter is not a name the student can bind to unless it was on screen when the line was typed.
+ */
+export function mintedCentreLetters(facts: Fact[]): string[] {
+  return [...hiddenCentreTokens(facts), ...mintedCircumLetters(facts)];
+}
+
+/** Re-letter a MINTED circumcircle centre `from` → `to` across the commands (its centre, its circle id, anything the
+ *  parser derived from it). The utterances never contain a minted letter, so they stay as typed. */
+function reletterMintedFacts(facts: Fact[], from: Id, to: Id): Fact[] {
+  return facts.map((f) => ({ ...f, cmd: renameInCommand(f.cmd, from, to) }));
+}
+
+/** ADOPT a minted circumcircle centre: the student typed it while it was shown, so it is theirs (drawn at rest). */
+function adoptCentreFacts(facts: Fact[], letter: Id): Fact[] {
+  return facts.map((f) =>
+    f.cmd.type === 'circumcircle' && f.cmd.center === letter && f.cmd.autoCenter !== false ? { ...f, cmd: { ...f.cmd, autoCenter: false } } : f,
+  );
+}
+
 /** Every letter the fact list already spends — point ids and circle tokens, hidden or not. */
 function spentLetters(facts: Fact[]): Set<string> {
   const out = new Set<string>(facts.flatMap((f) => commandPointIds(f.cmd)));
@@ -195,22 +257,39 @@ function spentLetters(facts: Fact[]): Set<string> {
  * Move every hidden token the student is about to use (`letters`) to a fresh letter. Returns the new facts and
  * the moves made (empty when nothing collides). Deterministic: the fresh letter is the first of O, P, Q, K, then
  * A–Z, then A1… that no fact spends and `letters` does not name.
+ *
+ * #2362 (ADR-748): given `visible` — the letters drawn WITH THEIR LABEL when the line was typed (the scene's own
+ * `drawnPointIds` rule, centres shown or not) — the minted letters of circles drawn through drawn points take part
+ * too: one the student could see is ADOPTED (`adopted`; it is theirs from then on), one they could not steps aside
+ * like a token. Without `visible` (the rename and naming cores, which have no view) only the tokens move, as before.
  */
-export function stepAsideFacts(facts: Fact[], letters: Iterable<string>): { facts: Fact[]; moves: { from: Id; to: Id }[] } {
+export function stepAsideFacts(
+  facts: Fact[],
+  letters: Iterable<string>,
+  visible?: ReadonlySet<string>,
+): { facts: Fact[]; moves: { from: Id; to: Id }[]; adopted: Id[] } {
   const want = new Set([...letters].map((l) => l.toUpperCase()));
-  const hits = hiddenCentreTokens(facts).filter((t) => want.has(t));
-  if (!hits.length) return { facts, moves: [] };
+  const tokens = hiddenCentreTokens(facts);
+  const hits = (visible ? mintedCentreLetters(facts) : tokens).filter((t) => want.has(t));
+  if (!hits.length) return { facts, moves: [], adopted: [] };
   const moves: { from: Id; to: Id }[] = [];
+  const adopted: Id[] = [];
   let out = facts;
   for (const from of hits) {
+    const token = tokens.includes(from);
+    if (!token && visible?.has(from)) {
+      out = adoptCentreFacts(out, from);
+      adopted.push(from);
+      continue;
+    }
     const avoid = new Set([...spentLetters(out), ...want]);
     const order = ['O', 'P', 'Q', 'K', ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))];
     let to = order.find((l) => !avoid.has(l));
     for (let cycle = 1; !to; cycle++) to = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i) + cycle).find((l) => !avoid.has(l));
-    out = reletterHiddenFacts(out, from, to);
+    out = token ? reletterHiddenFacts(out, from, to) : reletterMintedFacts(out, from, to);
     moves.push({ from, to });
   }
-  return { facts: out, moves };
+  return { facts: out, moves, adopted };
 }
 
 /**
@@ -219,7 +298,7 @@ export function stepAsideFacts(facts: Fact[], letters: Iterable<string>): { fact
  * circle exists, so the renamed centre is defined before every fact that refers to it.
  */
 function absorbablePoint(facts: Fact[], T: Id, centre: Id): boolean {
-  const createdAt = facts.findIndex((f) => (f.cmd as { center?: string }).center === centre && (f.cmd.type === 'circle' || f.cmd.type === 'circle-through'));
+  const createdAt = facts.findIndex((f) => (f.cmd as { center?: string }).center === centre && isCircleCreation(f.cmd));
   const firstUse = facts.findIndex((f) => commandPointIds(f.cmd).includes(T));
   if (createdAt < 0 || firstUse < 0 || firstUse < createdAt) return false;
   return facts.every((f) => {
@@ -248,9 +327,12 @@ export function nameCentreFacts(
   let facts = facts0;
   let source: string | null = null;
   let letter: string | null = null; // the circle-id letter half (`circle-<letter>`)
+  // #2362 (ADR-748): naming a MINTED circumcircle centre — its own letter included («מרכז המעגל הוא O» on the hidden O)
+  // — is a real change: the letter becomes the student's and the centre is drawn
+  const minted = new Set(mintedCircumLetters(facts));
   for (const f of facts) {
     const c = f.cmd as { type?: string; center?: string };
-    if ((c.type !== 'circle' && c.type !== 'circle-through') || !c.center) continue;
+    if (!isCircleCreation(f.cmd) || !c.center) continue;
     const tok = c.center.startsWith('@ctr-') ? c.center.slice(5) : c.center;
     if (tok === F || c.center === F) {
       source = c.center;
@@ -269,8 +351,8 @@ export function nameCentreFacts(
     source = F;
     letter = F;
   }
-  if (source === T) return { ok: false, reason: 'same' }; // promoting a token to its OWN letter ('@ctr-O'→'O') is a real change
-  if (all.has(T)) {
+  if (source === T && !minted.has(source)) return { ok: false, reason: 'same' }; // promoting a token to its OWN letter ('@ctr-O'→'O') is a real change
+  if (all.has(T) && source !== T) {
     // #1673 (ADR-565): «BO = 5» drew a FREE point O; «O מרכז המעגל» then PLACES that O at the centre — the free
     // point is absorbed (its bare `free-point`, if any, dropped) and every fact that used O now uses the centre.
     if (!source.startsWith('@') || !absorbablePoint(facts, T, source)) return { ok: false, reason: 'target-taken', holder: letterHolder(facts, T) };
@@ -295,8 +377,11 @@ export function nameCentreFacts(
     // untouched; the concentric inner `circle-<letter>-2` follows by prefix).
     if (anon && letter && letter !== T) cmd = followCircleId(cmd, `circle-${letter}`, `circle-${T}`);
     // reveal the renamed circle's centre: the circle command whose centre is now T drops autoCenter
+    // #2369 (ADR-748): a circumcircle's provenance is explicit — absent reads as minted — so its reveal writes `false`
     const revealed =
-      (cmd.type === 'circle' || cmd.type === 'circle-through') && (cmd as { center?: string }).center === T && (cmd as { autoCenter?: boolean }).autoCenter
+      cmd.type === 'circumcircle' && cmd.center === T && cmd.autoCenter !== false
+        ? ({ ...cmd, autoCenter: false } as AnyCommand)
+        : (cmd.type === 'circle' || cmd.type === 'circle-through') && (cmd as { center?: string }).center === T && (cmd as { autoCenter?: boolean }).autoCenter
         ? (() => {
             const { autoCenter: _drop, ...rest } = cmd as Record<string, unknown>;
             return rest as AnyCommand;
@@ -339,7 +424,14 @@ export function applyNameByUse(prefix: Fact[], b: NameByUse): Fact[] {
       // only a token that is still HIDDEN steps aside — once it is gone (already moved, or named) there is nothing
       // to move, and `circle-<letter>` may by then be a circle the student named that letter
       const from = hiddenLetter(b.from);
-      return hiddenCentreTokens(prefix).includes(from) ? reletterHiddenFacts(prefix, from, hiddenLetter(b.to)) : prefix;
+      if (hiddenCentreTokens(prefix).includes(from)) return reletterHiddenFacts(prefix, from, hiddenLetter(b.to));
+      // #2362 (ADR-748): a minted circumcircle letter steps aside the same way, while it is still minted
+      return mintedCircumLetters(prefix).includes(from) ? reletterMintedFacts(prefix, from, hiddenLetter(b.to)) : prefix;
+    }
+    case 'adopt': {
+      // #2362 (ADR-748): the letter was shown when the line was typed — it is the student's from here on
+      const letter = hiddenLetter(b.from);
+      return mintedCircumLetters(prefix).includes(letter) ? adoptCentreFacts(prefix, letter) : prefix;
     }
   }
 }
@@ -382,10 +474,10 @@ export function resolveBinds(facts: Fact[]): Fact[] {
 }
 
 /** The `name-by-use` facts a line's naming produced — prepended to the line's own commands, one group. */
-export function nameByUseCommands(binds: readonly { op: 'name-centre' | 'rename' | 'merge' | 'step-aside'; from: Id; to: Id }[]): NameByUse[] {
+export function nameByUseCommands(binds: readonly { op: 'name-centre' | 'rename' | 'merge' | 'step-aside' | 'adopt'; from: Id; to: Id }[]): NameByUse[] {
   return binds.map((b) =>
-    b.op === 'step-aside'
-      ? { type: 'name-by-use', op: 'step-aside', from: `@ctr-${hiddenLetter(b.from)}`, to: `@ctr-${hiddenLetter(b.to)}` }
+    b.op === 'step-aside' || b.op === 'adopt'
+      ? { type: 'name-by-use', op: b.op, from: `@ctr-${hiddenLetter(b.from)}`, to: `@ctr-${hiddenLetter(b.to)}` }
       : { type: 'name-by-use', op: b.op === 'name-centre' ? 'centre' : b.op === 'merge' ? 'merge' : 'point', from: b.from, to: b.to },
   );
 }

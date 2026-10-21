@@ -209,7 +209,7 @@ describe('#1675 — the signature skip changes no status (differential, memo on 
     ] as const) lists.push([name, factsOf([...prefix, line])]);
     // the last corpus chunk's conflict / refusal / deferral scenarios — where failed facts are re-attempted
     const RED = /conflict|contradict|refus|over-constrained|names|impossible|blame|other-side|deferr|pending|sizes-last|1411/;
-    for (const sc of SCENARIOS_4.filter((x) => RED.test(x.id))) lists.push([sc.id, factsOf(sc.steps, sc.refusedSteps)]);
+    for (const sc of SCENARIOS_4.filter((x) => RED.test(x.id))) lists.push([sc.id, factsOf(sc.steps, sc.refusedSteps, { centresShown: sc.centresShown })]);
     const hits0 = reattemptStats.memoHits;
     for (const [name, facts] of lists) {
       reattemptConfig.memo = false;

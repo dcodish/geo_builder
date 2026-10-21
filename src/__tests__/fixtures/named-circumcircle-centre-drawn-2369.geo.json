@@ -1,0 +1,77 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-21T12:00:00.000Z",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "e4rLhgLABfZqxUxm7KKsA",
+      "utterance": "ריבוע ABCD",
+      "cmd": {
+        "type": "square",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "F2jUpQ6DjZlJswGY-cBac",
+      "utterance": "מעגל O חוסם את הריבוע ABCD",
+      "group": "3q_5r8QWXv8D1Wwtaq-zF",
+      "cmd": {
+        "type": "circumcircle",
+        "id": "circle-O",
+        "center": "O",
+        "a": "A",
+        "b": "B",
+        "c": "C",
+        "autoCenter": false
+      },
+      "enabled": true
+    },
+    {
+      "id": "9vsLRKx9uXmFZI-OZxnuv",
+      "utterance": "מעגל O חוסם את הריבוע ABCD",
+      "group": "3q_5r8QWXv8D1Wwtaq-zF",
+      "cmd": {
+        "type": "set-concyclic",
+        "points": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "6N9WBfX6eQ4ZwrxnPj28K",
+      "utterance": "מעגל O חוסם את הריבוע ABCD",
+      "group": "3q_5r8QWXv8D1Wwtaq-zF",
+      "cmd": {
+        "type": "quadrilateral",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "declaredAs": "square"
+      },
+      "enabled": true
+    }
+  ],
+  "display": {
+    "hidden": [],
+    "segStyle": {},
+    "hiddenCircles": [],
+    "showMeasures": true,
+    "showCenters": false,
+    "displayMode": {}
+  }
+}

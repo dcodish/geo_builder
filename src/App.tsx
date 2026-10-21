@@ -336,7 +336,7 @@ export default function App() {
   function commitEdit(key: string, editText: string): boolean {
     // #1041: the edit seam launches the post-commit search too — the SAME closure `runSubmit` is given
     // below, so the two commit paths cannot drift again.
-    return runEditCommit(key, editText, { t, setInputNote, resolveAfterCommit });
+    return runEditCommit(key, editText, { t, setInputNote, resolveAfterCommit, centresShown: () => useGeoStore.getState().showCenters });
   }
 
   // The text → command[] path: the deterministic parser runs first; anything it
@@ -770,6 +770,8 @@ export default function App() {
       },
       view: () => ({ construction, positions }),
       isBusy: () => busyRef.current,
+      // #2362 (ADR-748): whether the centre letters are on screen as the line is typed
+      centresShown: () => useGeoStore.getState().showCenters,
       nextPaint,
       resolveAfterCommit,
       llmAbortRef,

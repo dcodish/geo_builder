@@ -515,7 +515,7 @@ Operator dev session `disb4ebn` (2026-07-13). `המעגל חותך את BO בנ�
 **Guards against:** two tangents meeting at a point escalating to the LLM and building nothing (no tangent∩tangent rule). Fix (ADR-066): `twoTangentsMeet` builds the tangent at each on-circle point + their `line-intersection`. **Asserts:** all steps OK; DA ⟂ OA and DC ⟂ OC (each line through D is a genuine tangent).
 
 ### `symbolic-2alpha-drives-shape-not-the-fixed-point` — "2α" drives the free shape, not a fixed point (ADR-064)
-**Steps**: `משולש שווה שוקיים ABC שבו AB=AC חוסם במעגל` · `נקודה D על המשך BC` · `BD` · `DA` · `∠CAD=α` · `∠BOC=2α`
+**Steps**: `משולש שווה שוקיים ABC שבו AB=AC חוסם במעגל` · `O מרכז המעגל` (#2362: the tool’s letter is not a name until shown or named) · `נקודה D על המשך BC` · `BD` · `DA` · `∠CAD=α` · `∠BOC=2α`
 **Guards against:** the operator's real α/2α bug (with the glyph): a central angle `∠BOC=2α` ERRORED "cannot place D on segment BC…" because `driveOrCheck` drove D (placed on the extension, t=1.3) to satisfy the relation. Fix (ADR-064): only a FREE on-segment point is driveable; a stated-ratio/extension point is a given, so the relation drives the triangle's free shape and D stays put. **Ground-truth correction (ADR-264 Am. 2):** step 1 used to half-parse to a bare circumcircle (the isosceles + stated pair silently dropped); with the full parse, ∠BAC=∠CAD is unsatisfiable at the seeded t with AB=AC, so the unstated extension t is legitimately driven. **Asserts:** all steps OK; ∠BOC = 2·∠CAD; |AB|=|AC| holds; D beyond C on the extension (t>1).
 
 ### `spelled-out-alpha-then-2alpha` — "alpha" / "2alpha" read as α / 2α, not 2° (ADR-063)
@@ -909,7 +909,7 @@ over all four (ADR-041).
 **Asserts:** all steps OK; |OB|=|OC|=|OD| (O keeps all three members); OB⟂AB and OD⟂AD (tangent at the tips).
 
 ### `triangle-circumscribes-existing-circle` — "משולש DEF חוסם את המעגל O" where O already exists (ADR-115)
-**Steps:** `משולש ABC` · `מעגל חוסם את משולש ABC` · `משולש DEF חוסם את המעגל O`
+**Steps:** `משולש ABC` · `מעגל חוסם את משולש ABC` · `O מרכז המעגל` (#2362) · `משולש DEF חוסם את המעגל O`
 **Guards against:** the audit sibling — the `incircle` rule re-deriving the incentre (bisector∩bisector + `circle-through` the foot) on an existing circle O, re-radiusing it so A,B,C fell off. Fix (ADR-115): build the DUAL — three free touch points on O, a tangent at each, the named vertices as the pairwise tangent intersections (deterministic; the foot-on-circle alternative over-constrains the third side).
 **Asserts:** all steps OK; |OA|=|OB|=|OC| (O keeps the original triangle's vertices); each side of DEF is at distance = radius from O (tangent).
 
@@ -934,7 +934,7 @@ over all four (ADR-041).
 **Asserts:** all steps OK; area(ABF) = 2·area(BFE).
 
 ### `collinear-flexes-redundant-carrier-kite-tangents` — a redundant constraint lends its hoarded DOF so a collinearity solves (ADR-130)
-**Steps:** `דלתון ABCD` · `משולש BCD חסום במעגל` · `AD ו AB משיקים למעגל` · `E על קשת BC` · `קשת BE שווה פעמיים קשת EC` (→LLM: `set-angle-ratio ∠BOE = 2∠EOC`) · `AC` · `E נמצאת על המשך DO`
+**Steps:** `דלתון ABCD` · `משולש BCD חסום במעגל` · `O מרכז המעגל` (#2362) · `AD ו AB משיקים למעגל` · `E על קשת BC` · `קשת BE שווה פעמיים קשת EC` (→LLM: `set-angle-ratio ∠BOE = 2∠EOC`) · `AC` · `E נמצאת על המשך DO`
 **Guards against:** the greedy one-carrier-per-constraint solver falsely reporting `over-constrained` (and misclassifying it as a "pending — add givens" red message) on a fully-determined, solvable figure. The two tangencies claimed A,B, the kite's AB=AD/CB=CD claimed C,D, the arc-ratio claimed E — every DOF busy when the collinear `D,O,E` arrived, and the recruiter's steal only fired for an over-subscribed (≥2-carrier) constraint. The figure is solvable because the kite's AB=AD is REDUNDANT (implied by the two equal tangents from A). Fix (ADR-130): case (E) in `recruitFreeDofs` lends a reachable claimed carrier to the new constraint and accepts the first lend under which the WHOLE system evaluates valid (self-verifying).
 **Asserts:** all steps OK; D,O,E collinear (E is the antipode of D); B,C,D,E all on circle O (equal radii); arc BE = 2·arc EC (∠BOE = 2∠EOC) still holds.
 
@@ -1215,7 +1215,7 @@ over all four (ADR-041).
 **Guards against:** operator session `eew5ezi5` (2026-07-10, the ADR-124/#6 source question re-typed correctly with the NEW point E): every step showed ✓ but E landed BETWEEN C and A (t = 0.64), amber `orderBeyond` — "fails to create the C-A-E sequence". Root cause (issue #19): ADR-142's shared-endpoint either-side semantics lived only behind `extensionsClear`'s `relax` flag (set solely by `firstSatisfyingSeed`'s fallback pass), so the strict primary sweep demanded the geometrically-impossible "beyond C" at every seed (CB tangent to P pins C outside P), burned the app's 2500ms wall budget before the fallback, and `meetsRequirements`/`findValidConfig` rejected the very seed the fallback found. Fix (ADR-267): a PREFERENCE LADDER — strict letter order wins wherever achievable (the ADR-098 free-DOF family is untouched), the ADR-142 either-side bar is the acceptance tier, and `firstSatisfyingSeed` searches BOTH in one interleaved budget-safe sweep (a fallback bar must ride the same loop, never a second pass); `meetsRequirements`/`findValidConfig`/`resample`/the sample filter all honour the ladder. A companion test locks the search under the app's REAL 2500ms budget (the suite's Infinity budget is what masked this). **#1694 ([ADR-599](06-decisions.md#adr-596)):** the operator's exact sequence again (ADR-565's «O מרכז המעגל» · «P מרכז המעגל» lines removed); asserts exactly two circles, centres O and P, with A and B structural crossings of both. Before the fix «AD מיתר במעגל P» minted a third circle P through A and D.
 
 ### `extension-cuts-bare-segment-keeps-on-segment-default` — "המשך FO חותך את AC בנקודה E" keeps E ON segment AC (issue #22, ADR-268)
-**Steps**: `ABC משולש ישר זווית` · `F על AB` · `G על AC` · `H על CB` · `GCHF מרובע` · `הGCHF חסום במעגל` · `AB משיק למעגל בנקודה F` · `AB מקביל ל GH` · `CF` · `המשך FO חותך את AC בנקודה E`
+**Steps**: `ABC משולש ישר זווית` · `F על AB` · `G על AC` · `H על CB` · `GCHF מרובע` · `הGCHF חסום במעגל` · `AB משיק למעגל בנקודה F` · `AB מקביל ל GH` · `CF` · `O מרכז המעגל` (#2362) · `המשך FO חותך את AC בנקודה E`
 **Guards against:** operator prod test 2026-07-10 (saved `figure-2026-07-10.geo (6).json`, P1): E was placed on the CONTINUATION of AC (t = 1.139, beyond C), every row ✓, zero violations — the stated bare-segment given silently violated. Root cause (ADR-268): per-operand reference semantics computed utterance-globally in `lineLineIntersection` — המשך on the FIRST operand stripped the on-segment default from the SECOND, bare operand. Now per-operand `onSeg1`/`onSeg2` (the within twin of `dir1`/`dir2`) lowers to `collinear-order [X,E,Y]`; asserts E within AC, E beyond O (F-O-E), verifier clean.
 
 ### `q4-chord-cuts-radius-textbook-nouns` — the bagrut Q4 circle figure in textbook wording (issue #17, ADR-269)
@@ -1223,7 +1223,7 @@ over all four (ADR-041).
 **Guards against:** operator prod session `wtgzh6v2` (2026-07-10): the two noun-marked cut steps failed the deterministic parse (המיתר/הרדיוס/הקטע made every cut/meet rule miss — the ADR-119 class one seam earlier) and the LLM fallback dropped the chord. Now `lineLineIntersection` stops only on diameter/tangent nouns, `withCarrierMembership` restores the chord/radius memberships (centre-ref bail scoped to diameter utterances; scaffolding segments to the new crossing excluded), and `CUT_FILLER` tolerates the nouns. Asserts E on radius AO and chord CK, P on chord CB beyond O (K-O-P), C/K/B on circle O, ∠EKO=∠ABK, |PO|=4, r=4.8.
 
 ### `bare-diameter-from-point` — "קוטר מנקודה F" with an auto-named antipode (issue #21, ADR-270)
-**Steps**: the `extension-cuts-bare-segment…` figure with the workaround replaced: … `CF` · `קוטר מנקודה F` · `המשך FO חותך את AC בנקודה E`
+**Steps**: the `extension-cuts-bare-segment…` figure with the workaround replaced: … `CF` · `קוטר מנקודה F` · `O מרכז המעגל` (#2362) · `המשך FO חותך את AC בנקודה E`
 **Guards against:** operator prod test 2026-07-10: every bare "diameter from F" form was not-handled → LLM escalation; the operator fell back to the cut-compound workaround. The `diameterFromPoint` rule (diameter word + from-marker + exactly ONE label + no cut verb) resolves the circle, asserts F's membership (M1), auto-names the antipode and emits the existing `diameter` command. Asserts D is F's antipode (|OD|=|OF|, F-O-D collinear) and the follow-up cut still lands E within AC.
 
 ### `narrow-angle-class-pickable` — the stated ∠EKO=∠ABK class is detected AND hover-pickable at the K wedge (issue #18, ADR-271)
@@ -2106,3 +2106,11 @@ over all four (ADR-041).
 ### `common-tangent-external-through-touch-refused-2407` — «T על AB» through the touch of two externally tangent circles, then «AB משיק משותף חיצוני …» is refused — no external common tangent passes through T (#2407, ADR-740)
 
 **Guards against:** the at-touch reading (ADR-740) taken for a stated kind the touch tangent is not, which would draw an "external" tangent that is internal. **Asserts** the external line is refused by the engine before commit, naming `T, A, B collinear cannot hold` (as at 3cae7f25), and the touch tangent's own kind («פנימי») commits.
+
+### `named-circumcircle-centre-drawn-2369` — «ריבוע ABCD» · «מעגל O חוסם את הריבוע ABCD» draws the centre O at rest (#2369, ADR-748)
+
+**Guards against:** a centre the student named on a circle drawn through drawn points being hidden like a minted one (FR-RN-8: *"A centre the student named … is always drawn"*). **Asserts** the two lines build green, O is among the drawn points of `buildScene` with the toggle off, and A–D lie on circle O. The matrix (four spellings, the incircle controls, a legacy file without the provenance field) is `src/app/__tests__/issue-2362-minted-circle-letter.test.ts`.
+
+### `symbolic-2alpha-drives-shape-not-the-fixed-point-centres-shown-2362` · `collinear-flexes-redundant-carrier-kite-tangents-centres-shown-2362` · `extension-cuts-bare-segment-keeps-on-segment-default-centres-shown-2362` · `bare-diameter-from-point-centres-shown-2362` · `triangle-circumscribes-existing-circle-centres-shown-2362` — the operator's exact sequences, typed with «הציגו מרכזי מעגלים» on (#2362, ADR-748)
+
+**Guards against:** the ruling of 2026-10-20 (Q2) — *"if the user presses show centers, he knows what the centers are so its as if he defined them"* — being lost: with the centres shown, the line that uses the tool's centre letter («∠BOC=2α», «E נמצאת על המשך DO», «המשך FO …», «משולש DEF חוסם את המעגל O») adopts it and binds the centre. Each twin is its original without the «O מרכז המעגל» line the original now needs (Q1: a letter that is not shown is not a name), and asserts the original's own check. Built in `scenarios-corpus-4.ts` from the originals, so the two can never drift.

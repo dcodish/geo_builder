@@ -54,7 +54,7 @@ export function factsFor(id: string): Fact[] {
   if (id.startsWith('sc:')) {
     const sc = scenarios.get(id.slice(3));
     if (!sc) throw new Error(`snapshot names a scenario that no longer exists: ${id}`);
-    return factsOf(sc.steps, sc.refusedSteps); // #1288: its declared refusals asserted
+    return factsOf(sc.steps, sc.refusedSteps, { centresShown: sc.centresShown }); // #1288: its declared refusals asserted
   }
   const text = fixtures[`./fixtures/${id.slice(3)}`];
   if (!text) throw new Error(`snapshot names a fixture that no longer exists: ${id}`);

@@ -9,7 +9,8 @@
  * is a LAYERING split, not a second implementation (the ADR-346 no-mirrors rule).
  */
 import { parse, buildParseCtx, impliedCircleBinding, impliedPointBinding, parseNameCenter, typedLabels } from '@/parser';
-import { autoNamedLabels, impliedIdentityBinding, mergeFacts, replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, renameFacts, stepAsideFacts } from '@/store/geoStore';
+import { autoNamedLabels, impliedIdentityBinding, mergeFacts, mintedCentreLetters, replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, renameFacts, stepAsideFacts } from '@/store/geoStore';
+import { lettersOnScreen } from '@/app/decideDeterministic';
 import type { Derived, Fact } from '@/store/geoStore';
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import type { AnyCommand } from '@/engine';
@@ -74,11 +75,24 @@ export function ctxOf(facts: Fact[]) {
   return buildParseCtx(construction, positions);
 }
 
+/**
+ * #2362 (ADR-748) mirror of the submit seam's step-aside: a hidden token, or a minted circumcircle letter the student
+ * could not see, steps aside; a minted letter on screen as the line is typed (`centresShown`, or something drawn from
+ * it) is adopted. The same core and the same visibility rule as `decideFromParse`.
+ */
+function stepAside(facts: Fact[], text: string, centresShown: boolean): Fact[] {
+  const typed = typedLabels(text);
+  if (!mintedCentreLetters(facts).some((l) => typed.includes(l))) return facts;
+  const { construction, positions } = replay(facts);
+  return stepAsideFacts(facts, typed, lettersOnScreen({ construction, positions }, centresShown)).facts;
+}
+
 /** Build the ordered fact list for a scenario through the real parse→fact path (no replay yet). Shared by
  *  `run`, the seed-sweep oracle, and the E7 round-trip properties (all via the harness — importing a
  *  .test.ts from another test would double-register every scenario), so all drive the exact pipeline the
  *  app does. */
-export function factsOf(steps: Step[], refused: readonly RefusedStep[] = []): Fact[] {
+export function factsOf(steps: Step[], refused: readonly RefusedStep[] = [], opts: { centresShown?: boolean } = {}): Fact[] {
+  const centresShown = !!opts.centresShown;
   let facts: Fact[] = [];
   let g = 0;
   // #1288: the declared refusals, by 1-based step position. A row beyond `steps` is ignored HERE so a
@@ -111,7 +125,7 @@ export function factsOf(steps: Step[], refused: readonly RefusedStep[] = []): Fa
       if (start < 0) throw new Error(`edit step: no step group ${key} to edit`);
       let end = start;
       while (end < facts.length && facts[end].group === key) end++;
-      facts = stepAsideFacts(facts, typedLabels(step.edit.to)).facts; // #1673 mirror (ADR-565): the hidden token steps aside
+      facts = stepAside(facts, step.edit.to, centresShown); // #1673 / #2362 mirror (ADR-565, ADR-748): the hidden letter steps aside
       let er = parse(step.edit.to, ctxOf(facts.slice(0, start)));
       // #186 mirror (the App's commitEdit auto-bind): a fresh circle name in an edit binds an unnamed
       // circle via the shared decision helper + fact core, then re-parses against the renamed prefix.
@@ -162,7 +176,7 @@ export function factsOf(steps: Step[], refused: readonly RefusedStep[] = []): Fa
         continue;
       }
       // #1673 mirror (decideFromParse, ADR-565): a hidden circle token the student types steps aside first
-      facts = stepAsideFacts(facts, typedLabels(step)).facts;
+      facts = stepAside(facts, step, centresShown); // #2362 (ADR-748): minted circumcircle letters too, by visibility
       let r = parse(step, ctxOf(facts));
       // #186 mirror (App.submit's auto-bind): a circle named by a fresh name, with unnamed circles in
       // the figure, binds one of them (shared decision helper + fact core) and re-parses.

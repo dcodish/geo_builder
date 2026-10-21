@@ -310,6 +310,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2420': 'open', // #2391 (ADR-AG-315): 3-D does not read «M מקיימת …» or an underscore index «N_2»
   '#2421': 'open', // #2388 (ADR-AG-307): 2-D does not read «R = 2r», «r:R = 1:2» or the unnamed ratio of two radii
   '#2430': 'open', // #2418 (ADR-AG-321): 2-D refuses «T על AB» typed after «AB משיק משותף …» (the reverse order), awaiting the cross-tool ruling
+  '#2376': 'open', // #2362 (ADR-748): analytic answers the tool's circumcircle letter to the student's «מעגל O» (refuses the arc third-crossing)
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1749,6 +1750,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'capital-radius-2427', family: 'circles', steps: ['נתון מעגל O שרדיוסו K'], expect: 'builds', exception: 'X11', only: ['2d'], note: 'the T38 line (#2414); 2-D reads K as its radius symbol' },
   { id: 'capital-radius-centre-2427', family: 'circles', steps: ['מעגל שמרכזו O ורדיוסו K'], expect: 'builds', exception: 'X11', only: ['2d'] },
   { id: 'capital-length-2427', family: 'lengths', steps: ['משולש ABC', 'AB = K'], expect: 'not-handled', exception: 'X11', note: '2-D and 3-D hand it to the model; analytic refuses it, teaching «AB = k» (#2427)' },
+
+  // ── #2362 (ADR-748): the tool's centre letter of a circle drawn through drawn points is not the student's «O» ──
+  { id: 'arc-on-minted-circle-name-2362', family: 'circles', steps: ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל', 'F אמצע הקשת BC במעגל O'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2376' }], note: 'analytic refuses the last line third-crossing (measured on the #2362 plan, 8a5372be)' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */

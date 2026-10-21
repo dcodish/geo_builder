@@ -61,6 +61,9 @@ export interface Scenario {
    *  each with the refusal it must produce. Asserted, never skipped: a listed step that parses, or is refused
    *  for another reason, fails the scenario; an unlisted refusal fails it as before. See `RefusedStep`. */
   refusedSteps?: RefusedStep[];
+  /** #2362 ([ADR-748](../../docs/06-decisions.md#adr-748)): «הציגו מרכזי מעגלים» was ON while the sequence was typed —
+   *  a minted centre letter the student could see is adopted, not stepped aside. Default off, the product default. */
+  centresShown?: boolean;
 }
 
 /**
@@ -69,18 +72,18 @@ export interface Scenario {
  * `factsOf(sc.steps)` (which would, correctly, fail on a refused step it was not told about). A row that
  * points past the end of the sequence is a typo, and is refused here.
  */
-export function scenarioFacts(sc: Pick<Scenario, 'id' | 'steps' | 'refusedSteps'>): Fact[] {
+export function scenarioFacts(sc: Pick<Scenario, 'id' | 'steps' | 'refusedSteps' | 'centresShown'>): Fact[] {
   for (const row of sc.refusedSteps ?? []) {
     if (!Number.isInteger(row.step) || row.step < 1 || row.step > sc.steps.length) {
       throw new Error(`[${sc.id}] refusedSteps: step ${row.step} is outside the sequence (1..${sc.steps.length})`);
     }
   }
-  return factsOf(sc.steps, sc.refusedSteps);
+  return factsOf(sc.steps, sc.refusedSteps, { centresShown: sc.centresShown });
 }
 
 /** Replay a scenario through the real parse→fact→replay path and return the derived figure. */
-export function run(steps: Step[]): Derived {
-  return replayFacts(factsOf(steps));
+export function run(steps: Step[], opts: { centresShown?: boolean } = {}): Derived {
+  return replayFacts(factsOf(steps, [], opts));
 }
 
 // ── the seed-sweep oracle ──────────────────────────────────────────────────

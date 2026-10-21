@@ -6699,11 +6699,13 @@ const inscribedPolygon: Rule = (s, ctx) => {
     ];
   }
   if (isTri && allExist) {
-    return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2] }, ...shapeCmds(ids)];
+    // #2362 / #2369 (ADR-748): the fact records whether the student named the centre — a minted letter answers to no
+    // student letter unless it was shown, a named one is always drawn (FR-RN-8)
+    return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2], autoCenter: named == null }, ...shapeCmds(ids)];
   }
   if (allExist) {
     return [
-      { type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2], ...(hidden ? { hidden: true } : {}) },
+      { type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2], autoCenter: named == null, ...(hidden ? { hidden: true } : {}) },
       { type: 'set-concyclic', points: ids },
       ...basePlusShape(ids), // a trapezoid keeps AB ∥ CD (a kite its equal pairs) even from existing points
     ];
@@ -8138,6 +8140,27 @@ const arcMidpoint: Rule = (s, ctx) => {
   // circle that does hold both ends (the ADR-042 override, withdrawn). With no circle named, the arc lives on the
   // circle holding both ends, which also disambiguates when two circles exist; else the single circle.
   const named = circleCenter(s);
+  const isMidpoint = /midpoint|אמצע/i.test(m[2]);
+  // #2362 (ADR-748, FR-RN-8): a FRESH circle letter — no drawn circle and no placed point carries it («במעגל K», or «O»
+  // once the tool's hidden O stepped aside) — beside an arc whose ends ride an UNNAMED circle names that circle by use.
+  // The `circleOnDiameter` shape: the shared naming-by-use CANDIDATE (`'by-member'`) with both ends on it, so
+  // `impliedCircleBinding` alone decides (the circle both ends ride binds; circles a statement tells apart ask).
+  if (
+    named && /^[A-Z]/.test(named) &&
+    !(ctx.circles ?? []).map(up).includes(up(named)) &&
+    !(ctx.points ?? []).map(up).includes(up(named)) &&
+    namesUnnamedCircleMember(`${from} ${to}`, ctx)
+  ) {
+    const X = up(named);
+    return [
+      { ...impliedCentreCircle(X), implied: 'by-member' },
+      { type: 'point-on-circle', id: from, circle: circleId(X) },
+      { type: 'point-on-circle', id: to, circle: circleId(X) },
+      isMidpoint
+        ? { type: 'arc-midpoint', id, circle: circleId(X), from, to, ...(major ? { branch: 1 } : {}) }
+        : { type: 'point-on-circle', id, circle: circleId(X), between: [from, to], ...(major ? { major: true } : {}) },
+    ];
+  }
   const elsewhere = (p: string): boolean =>
     !!named && !membersOfCenter(ctx, named).has(p) && (ctx.circleMembers ?? []).some((e) => e.points.some((q) => up(q) === p));
   if (named && (elsewhere(from) || elsewhere(to))) return null;
@@ -8145,7 +8168,7 @@ const arcMidpoint: Rule = (s, ctx) => {
   if (!center) return null;
   // arc-midpoint: minor = branch 0 (the u1+u2 bisector), major = branch 1 (the antipodal midpoint — the
   // engine already flips on odd branch). point-on-arc (a FREE point): `major` picks the far/reflex arc.
-  return /midpoint|אמצע/i.test(m[2])
+  return isMidpoint
     ? [{ type: 'arc-midpoint', id, circle: circleId(center), from, to, ...(major ? { branch: 1 } : {}) }]
     : [{ type: 'point-on-circle', id, circle: circleId(center), between: [from, to], ...(major ? { major: true } : {}) }];
 };
@@ -10513,7 +10536,7 @@ const circumcircleMeetsSegment: Rule = (s, ctx) => {
     // Created HIDDEN (issue #86): the cut sentence uses the circle only to place D — the same scaffolding
     // semantics as `בר חסימה`. An explicit later "the circle circumscribing CEFO" (the `circumcircle` rule)
     // reveals it via `show-circle`; the cut sentence alone never draws it.
-    { type: 'circumcircle', id: circId, center, a, b, c, hidden: true },
+    { type: 'circumcircle', id: circId, center, a, b, c, hidden: true, autoCenter: true }, // #2362 (ADR-748): a minted letter
     ...(tri.length === 4 ? [{ type: 'set-concyclic', points: tri } as AnyCommand] : []),
     { type: 'line-through', id: lineId, a: p, b: q },
     // D = the OTHER crossing (avoid the shared vertex), constrained to lie ON segment CE (order C→D→E),
@@ -10557,7 +10580,7 @@ const circumcircle: Rule = (s, ctx) => {
   if (four && four.every((id) => (ctx.points ?? []).includes(id))) {
     const center = freeLabel([...four, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
     return [
-      { type: 'circumcircle', id: circleId(center), center, a: four[0], b: four[1], c: four[2] },
+      { type: 'circumcircle', id: circleId(center), center, a: four[0], b: four[1], c: four[2], autoCenter: true }, // #2362 (ADR-748): minted
       { type: 'set-concyclic', points: four },
     ];
   }
@@ -10565,7 +10588,7 @@ const circumcircle: Rule = (s, ctx) => {
   if (!ids) return null;
   // Avoid clashing with an existing centre (a second circle gets a fresh label, not a reused 'O').
   const center = freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
-  return [{ type: 'circumcircle', id: circleId(center), center, a: ids[0], b: ids[1], c: ids[2] }];
+  return [{ type: 'circumcircle', id: circleId(center), center, a: ids[0], b: ids[1], c: ids[2], autoCenter: true }]; // #2362 (ADR-748): minted
 };
 
 /** The apex-binding clause shared by the altitude/median rules: "from [the] [point/vertex] X" /
@@ -12667,8 +12690,18 @@ function bindingFor(
   const subjects = commands.flatMap((c) =>
     consumedCircleId(c) === implied.id && 'id' in c && typeof (c as { id?: unknown }).id === 'string' ? [up((c as { id: string }).id)] : [],
   );
-  const signal = new Set(subjects.filter((p) => points.has(p)).flatMap((p) => autos.filter((tok) => members.get(circleId(tok))?.has(p))));
+  // #2362 (ADR-748, amends ADR-347): the sentence puts EVERY subject on the one circle, so the signal is the INTERSECTION
+  // of the unnamed circles each subject rides (the ADR-443 `anonymousCircleTieBreak` reading) — a subject on none is
+  // skipped. «BC מיתר במעגל O» with B on both circles and C on one names the circle through both, never asks.
+  const hostSets = subjects
+    .filter((p) => points.has(p))
+    .map((p) => new Set(autos.filter((tok) => members.get(circleId(tok))?.has(p))))
+    .filter((h) => h.size > 0);
+  const union = new Set(hostSets.flatMap((h) => [...h]));
+  const signal = new Set([...union].filter((tok) => hostSets.every((h) => h.has(tok))));
   if (signal.size === 1) return { from: [...signal][0], to: X };
+  // the subjects ride unnamed circles but no ONE circle holds them all — ask, never a new circle beside them
+  if (union.size > 0 && signal.size === 0) return { clarify: 'unknown-circle', center: X };
   if (implied.implied === 'by-member') {
     if (signal.size === 0) return null; // nothing the sentence places rides an unnamed circle — a new circle, as declared
     // the subjects ride BOTH unnamed circles (their crossing A) — interchangeable ones name by order (ruling (b), #1688)
