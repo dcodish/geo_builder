@@ -9,6 +9,7 @@
  * is a LAYERING split, not a second implementation (the ADR-346 no-mirrors rule).
  */
 import { parse, buildParseCtx, impliedCircleBinding, impliedPointBinding, parseNameCenter, typedLabels } from '@/parser';
+import { decidePreParse } from '@/app/decideDeterministic';
 import { autoNamedLabels, impliedIdentityBinding, mergeFacts, mintedCentreLetters, replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, renameFacts, stepAsideFacts } from '@/store/geoStore';
 import { lettersOnScreen } from '@/app/decideDeterministic';
 import type { Derived, Fact } from '@/store/geoStore';
@@ -35,8 +36,8 @@ export type Refusal = Exclude<Extract<ParseResult, { ok: false }>, { reason: 'no
 export interface RefusedStep {
   /** 1-based position of the step in the scenario's `steps` array; it must be a STRING step. */
   step: number;
-  /** The refusal the parser must return. */
-  reason: Refusal['reason'];
+  /** The refusal the parser must return — or (#2398, ADR-747) the door's pre-parse refusal of a centre given a second letter. */
+  reason: Refusal['reason'] | 'centre-already-named' | 'unknown-circle';
   /** Optional: fields of the refusal payload that must match exactly (e.g. `{ holder: 'B', id: 'D' }`). */
   with?: Record<string, unknown>;
   /** The ruling that makes this a refusal (readable record; required so a row always says why). */
@@ -166,6 +167,24 @@ export function factsOf(steps: Step[], refused: readonly RefusedStep[] = [], opt
     if (typeof step === 'string') {
       // The app's store-op naming (decidePreParse → `nameCentre`): «מרכז המעגל הימני הוא O» renames a hidden centre and
       // adds no fact of its own (a size qualifier also locks the order, #178). Mirrored so a scenario can name its circles.
+      // #2398 mirror (ADR-747): a centre given a second letter is refused at the door, before any naming — the app's
+      // own pre-parse decision, called (not re-implemented). It must be DECLARED (`refusedSteps`, reason
+      // `centre-already-named` / `unknown-circle`), exactly like a parse refusal.
+      {
+        const v0 = replay(facts);
+        const pre = decidePreParse(step, { construction: v0.construction, positions: v0.positions }, centresShown);
+        if (pre?.kind === 'refuse' && 'key' in pre.note && (pre.note.key === 'input.centreAlreadyNamed' || pre.note.key === 'errors.unknownCircle')) {
+          const reason = pre.note.key === 'input.centreAlreadyNamed' ? 'centre-already-named' : 'unknown-circle';
+          const row = refusedAt.get(index);
+          if (!row) throw new Error(`scenario step was REFUSED at the door (${reason}): ${JSON.stringify(step)} — declare it in refusedSteps`);
+          if (row.reason !== reason) throw new Error(`refusedSteps row for step ${row.step} «${step}»: expected reason ${row.reason}, got ${reason}`);
+          for (const [k, v] of Object.entries(row.with ?? {})) {
+            const got = (pre.note.params as Record<string, unknown> | undefined)?.[k];
+            if (JSON.stringify(got) !== JSON.stringify(v)) throw new Error(`refusedSteps row for step ${row.step}: expected ${k} = ${JSON.stringify(v)}, got ${JSON.stringify(got)}`);
+          }
+          continue;
+        }
+      }
       const nc = parseNameCenter(step, ctxOf(facts));
       if (nc) {
         const res = nameCentreFacts(facts, nc.from, nc.to);

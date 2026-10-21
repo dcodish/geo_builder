@@ -28,6 +28,7 @@
 import {
   buildParseCtx,
   classifyOutOfScope,
+  doubleCentreNaming,
   fractionTeachCandidate,
   impliedCircleBinding,
   impliedPointBinding,
@@ -215,13 +216,35 @@ export interface DecideHooks {
   prefold?(trial: Fact[], seed: number): Promise<void>;
 }
 
+/**
+ * #2398 ([ADR-747](../../docs/06-decisions.md#adr-747)) — the circle letters the student can see as NAMES: a circle whose
+ * centre is named (or adopted), or whose minted letter is on screen (#2362's provenance, ADR-748). A hidden token or a
+ * minted letter the student never saw is not one (ADR-565, ruling 2026-10-20).
+ */
+function answerableCircleLetters(view: DecideView, centresShown: boolean | undefined): Set<string> {
+  const ctx = buildParseCtx(view.construction, view.positions);
+  const autos = new Set((ctx.autoCenters ?? []).map((c) => c.toUpperCase()));
+  const onScreen = lettersOnScreen(view, centresShown);
+  return new Set((ctx.circles ?? []).map((c) => c.toUpperCase()).filter((c) => !c.startsWith('~') && (!autos.has(c) || onScreen.has(c))));
+}
+
 /** The instant half: store operations and the pre-parse FORMAT guards. `null` = go on and parse. */
-export function decidePreParse(utterance: string, view: DecideView): Verdict2D | null {
+export function decidePreParse(utterance: string, view: DecideView, centresShown?: boolean): Verdict2D | null {
   // A swap ("swap C and D" / "החלף בין C ל-D") EXCHANGES two existing labels — a store
   // operation, handled before the parser (and before rename, whose taken-target guard would
   // otherwise reject it). Lets the student flip which end of a chord is C vs D (ADR-122).
   const swp = parseSwap(utterance);
   if (swp) return { kind: 'store-op', op: 'swap', from: swp.a, to: swp.b };
+  // #2398 (ADR-747, the #1153 / #1164 rulings): a sentence giving a circle's centre a SECOND letter («מרכז המעגל O הוא K»,
+  // «K מרכז המעגל O», «מעגל O שמרכזו K») is refused before any naming runs — it names the holder when circle O is one the
+  // student can see, and says no such circle is drawn otherwise. The figure is untouched (no store op, no step-aside).
+  const dc = doubleCentreNaming(utterance, answerableCircleLetters(view, centresShown));
+  if (dc?.kind === 'holder') {
+    return { kind: 'refuse', category: 'clarify', preParse: true, binds: [], logs: [{ source: 'name-center', result: `centre-already-named:${dc.holder}>${dc.to}` }], note: { key: 'input.centreAlreadyNamed', params: { holder: dc.holder, to: dc.to } } };
+  }
+  if (dc) {
+    return { kind: 'refuse', category: 'clarify', preParse: true, binds: [], logs: [{ source: 'name-center', result: `unknown-circle:${dc.center}` }], note: { key: 'errors.unknownCircle', params: { center: dc.center } } };
+  }
   // NAME an auto-assigned circle centre ("מרכז המעגל הוא P" / "the centre of the circle is P") — the
   // student drew an unnamed circle (hidden auto-centre) and now names it. A store-level RENAME of the
   // hidden centre + a reveal, NOT a second circle (issue #112). Before the parser (whose `circle` rule
@@ -1166,5 +1189,5 @@ export async function decideDeterministic2D(
   locale: 'he' | 'en',
   hooks: DecideHooks = {},
 ): Promise<Verdict2D> {
-  return decidePreParse(utterance, state.view) ?? decideFromParse(state, utterance, locale, hooks);
+  return decidePreParse(utterance, state.view, state.centresShown) ?? decideFromParse(state, utterance, locale, hooks);
 }

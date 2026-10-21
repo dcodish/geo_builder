@@ -5496,6 +5496,30 @@ export const SCENARIOS_4: Scenario[] = [
       for (const id of ['A', 'B', 'C', 'D']) expect(dist(O, at(fig, id)), `${id} on circle O`).toBeCloseTo(dist(O, at(fig, 'A')), 6);
     },
   },
+  {
+    id: 'second-centre-letter-refused-2398',
+    title: '«מרכז המעגל O הוא K» on an empty figure is refused «מעגל O לא הוגדר» and draws nothing (#2398, ADR-747)',
+    guards:
+      "#2398 (P1): a sentence giving a circle's centre a SECOND letter had no reader for the pair — it was read as «מעגל O» and K was dropped (escalated `weak: dropped`; the AI lane's plausible answer built two circles, green). With no circle O the student can see, it is refused with the existing `errors.unknownCircle` (the P1 exception of ADR-W-117), and leaves no fact. The matrix is src/app/__tests__/issue-2398-second-centre-letter.test.ts.",
+    steps: ['מרכז המעגל O הוא K'],
+    refusedSteps: [{ step: 1, reason: 'unknown-circle', with: { center: 'O' }, why: '#2398 (ADR-747): no circle O is drawn — one point never gets two names' }],
+    check(fig) {
+      expect(fig.construction.objects, 'nothing is drawn').toEqual([]);
+    },
+  },
+  {
+    id: 'second-centre-letter-names-holder-2398',
+    title: '«מעגל O» · «מרכז המעגל O הוא K» is refused naming the holder O — the figure keeps one circle O (#2398, ADR-747)',
+    guards:
+      '#2398 (P1), ruled on #1153 / #1164 (operator 2026-09-17: "the second naming REFUSES and names the holder … Nothing changes silently"): the centre of circle O is already named O, so the line answers «מרכז המעגל כבר נקרא O. כדי לשנות את השם, הקלידו «שנה שם O ל-K».» and changes nothing.',
+    steps: ['מעגל O', 'מרכז המעגל O הוא K'],
+    refusedSteps: [{ step: 2, reason: 'centre-already-named', with: { holder: 'O', to: 'K' }, why: '#2398 (ADR-747, #1153 / #1164 rulings): naming an already-named centre refuses and names the holder' }],
+    check(fig) {
+      allStepsOk(fig);
+      expect([...fig.circles.keys()]).toEqual(['circle-O']);
+      expect(fig.positions.has('K'), 'no point K').toBe(false);
+    },
+  },
 ];
 
 /**

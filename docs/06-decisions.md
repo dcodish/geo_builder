@@ -4486,6 +4486,8 @@ Operator building bagrut 2023-קיץ-א Q4 ("a line from B cuts the circle at E 
 
 ## ADR-306 — Name an auto-assigned circle centre after the fact (issue #112)
 
+> **⚠ Ruled to change** (#1164, operator 2026-09-17 / 2026-09-19: *"make 2-D refuse too … nothing renamed silently anywhere"*, *"agree. it should refuse."*): re-lettering an already-NAMED centre («מרכז המעגל הוא K» after «מעגל O») is to refuse and name the holder, not rename. Not built here; [ADR-747](#adr-747) refuses only the two-letter sentence («מרכז המעגל O הוא K»).
+
 **Status:** Accepted (2026-07-13; issue #112). *Files: `src/parser/context.ts` (`autoCenters`), `src/parser/parse.ts` (`ParseContext.autoCenters`, `parseNameCenter`), `src/store/geoStore.ts` (`nameCentre` action), `src/App.tsx` (interception + hook); `src/store/__tests__/name-centre.test.ts`.*
 
 **Class.** A student draws an UNNAMED circle — the system auto-picks a hidden centre letter (O). Later they want to name/refer to it ("circle P"), but there was NO path to name an auto-assigned centre after the fact: «מרכז המעגל הוא P» / "the centre of the circle is P" / "circle P" all minted a SECOND circle (circle-P), and once a stray circle existed, further attempts hit "already exists". The student can't rename by the hidden letter either (they can't see it's O). Operator report 2026-07-13 (raised twice — the general form of the size-qualifier resize bug).
@@ -19042,3 +19044,34 @@ Fixtures `regular-pentagon-definite-2265` and `regular-pentagon-named-2265` hold
 - Parity row `arc-on-minted-circle-name-2362` (`expect: 'builds'`, X8, analytic gap #2376).
 
 **Behaviour change for a student:** after two circles the tool drew through points already on the figure, «F אמצע הקשת BC במעגל O» names the circle through B and C «O» and builds F on it. With the centres not shown, the tool's own letter is no longer a name: «מעגל O» draws a new circle, «D על מעגל O» names the drawn circle, «זווית BOC = 100» makes O a new point (write «O מרכז המעגל» first to mean the centre). With «הציגו מרכזי מעגלים» on, a line that uses a shown letter means that centre, which is then drawn. «מעגל O חוסם את הריבוע ABCD» and its spellings draw O.
+
+## ADR-747 — A sentence that gives a circle's centre a second letter is refused: it names the holder when the circle is drawn, and says no such circle is drawn otherwise (#2398)
+
+**Status:** accepted · 2026-10-21 · bug (P1, 2-D) · fix round #2441, stream F · branch `fix/2398-double-centre-naming`, stacked on `fix/2362-2369-centre-letter-provenance` ([ADR-748](#adr-748)) · plan: the 2026-10-21 plan on #2398 (armed; Q1 non-blocking, option A ships) · cites [ADR-306](#adr-306), [ADR-347](#adr-347), [ADR-565](#adr-565), the #1153 / #1164 rulings, and [ADR-W-117](06w-decisions-workspace.md#adr-w-117)'s P1 exception (the no-circle branch reuses `errors.unknownCircle`) · LADDER stage: none (a parser reader and the pre-parse naming seam; no solver change)
+
+**Operator:** #1153, 2026-09-17: *"the second naming REFUSES and names the holder, with renaming offered as an explicit action the student takes. Nothing changes silently"* (sketch: «מרכז המעגל כבר נקרא P»); #1164: *"Ruled: make 2-D refuse too. One behaviour in both tools, nothing renamed silently anywhere."*, re-confirmed 2026-09-19: *"agree. it should refuse."*
+
+**Requirements:** [02](02-requirements.md) **FR-RN-8** (a sentence that gives a circle's centre a second letter is refused: it names the holder when the circle is drawn, and says the circle is not defined otherwise) · **Design:** [04](04-design.md) §*The hidden centre letter steps aside* — "A centre given a second letter is refused at the door"
+
+**Measured before** (`main` @ 37800b85, `decideDeterministic2D`, model mocked; the plan's §1 re-run). «מרכז המעגל O הוא K» on an empty figure and after «מעגל O» escalates (`weak: dropped`: the parse is `circle O`, K gone); after «מעגל O» · «K על מעגל O» it is a noop «כבר קיים» — the stated centre K vanishes. The AI lane's plausible answer «מעגל O» + «K מרכז המעגל» would build two circles and pass the label gate: a false figure, green. Hence P1.
+
+**Root cause / class (docs/17 §1).** *A sentence that gives a circle's centre a second letter — the circle's own letter O (in 2-D a circle is named by its centre) and a different stated centre K — in any naming or creation spelling has no reader for the pair; it is read as the one-letter «מעגל O» and the stated centre is dropped, escalated, or reported as already drawn.* `circleCenter` (`parse.ts`) is the one shared reader of a circle's centre letter and returns ONE letter; `parseNameCenter` and the `nameCenter` rule took O and bowed out on the leftover K, and the `circle` rule (no leftover check) built `circle O`.
+
+**Decision.**
+1. **One two-slot reader**, `circleWithOtherCentre(s)` beside `circleCenter`: the whole sentence is the pattern (circle-first, centre-first, the creation «מעגל O שמרכזו K», three English shapes), composed from the lexicon's `ULABEL`; non-null only when the two letters differ. A richer sentence («… הוא אמצע AB», «מעגל שמרכזו O ורדיוסו K», «… עובר דרך K», «… בהתאמה», «II») is never read.
+2. **The pre-parse decision** `doubleCentreNaming(raw, answerable)`, called by `decidePreParse` before every naming (`parseNameCenter`, rename, merge) and before #2362's step-aside. `answerable` = the circle letters the student can see as names: a circle whose centre is not auto, or whose minted letter is on screen (`lettersOnScreen`, with `centresShown` now routed into `decidePreParse`). C answerable → refuse `clarify` with the new `input.centreAlreadyNamed {holder: C, to: K}` (whatever K is); otherwise → refuse with the existing `errors.unknownCircle {center: C}`. The figure is untouched.
+3. **The `circle` rule bows out** when the reader fires, so `parse()` of any member is `not-handled` — the AI lane's re-parse, the ✎ seam and the load refresh can never build `circle O` from it.
+4. **Mirrors.** The scenario pipeline calls `decidePreParse` itself (not a copy) and requires such a step to be declared in `refusedSteps` (reasons `centre-already-named` / `unknown-circle`). The log-triage verifier already decides through `decideDeterministic2D`.
+5. **Locale** `input.centreAlreadyNamed`: he «מרכז המעגל כבר נקרא {{holder}}. כדי לשנות את השם, הקלידו «שנה שם {{holder}} ל-{{to}}».» (the first sentence is the operator's own, #1153), en "The circle's centre is already named {{holder}}. To change the name, type "rename {{holder}} to {{to}}"." The taught rename is 2-D's typed `parseRename`, measured: «מעגל O» · «שנה שם O ל-K» leaves one circle centred K.
+
+**Measured after** (this branch): every §1 spelling (16, He and En) on every §1 figure (13 rows, including a minted circumcircle shown and not shown, and a named one) is refused at the door with the expected key and params, the facts byte-identical, `parse()` `not-handled`, the model never called. Controls unchanged: «מרכז המעגל O הוא O», «O מרכז המעגל», the one-letter «מרכז המעגל הוא K», «מעגל K», «שנה שם O ל-K».
+
+**Deviations from the plan.** None in substance. The category of the no-circle refusal is `clarify` too (the plan named only the holder's).
+
+**Sibling audit (docs/17 §1).** `circleCenter`'s other readers take one letter by design (`parseNameCenter`'s qualifier branches, the inscribe and `circle` rules); a sentence with two different letters in the circle and centre slots reaches none of them now. **Analytic** refuses the class already (`unknown-reference O`, its «מעגל M» reads the centre) — its message after a drawn «מעגל O» says no circle O is drawn, filed as found work. **3-D:** X8. **Complex:** no grammar.
+
+**Why not a patch (docs/17 §2).** The reader is a statement about what the sentence says (two letters in two slots, the whole sentence read), not a word test; the decision sits at the one naming door every typed line passes.
+
+**Locks.** `src/parser/__tests__/circle-with-other-centre-2398.test.ts` (every spelling, the nulls); `src/app/__tests__/issue-2398-second-centre-letter.test.ts` (the matrix, `parse()` per cell, the controls, the remedy); scenarios `second-centre-letter-refused-2398` and `second-centre-letter-names-holder-2398` (corpus-4); parity rows `second-centre-letter-2398` and `second-centre-letter-drawn-2398` (`refused`, X8).
+
+**Behaviour change for a student:** «מרכז המעגל O הוא K» (and «K מרכז המעגל O», «מעגל O שמרכזו K», …) after «מעגל O» now says «מרכז המעגל כבר נקרא O. כדי לשנות את השם, הקלידו «שנה שם O ל-K».» and changes nothing; with no circle O on screen it says «מעגל O לא הוגדר …». Before, it went to the AI, or answered «כבר קיים» with K lost.

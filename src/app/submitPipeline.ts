@@ -191,7 +191,7 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
       ? deps.explainError(n.explain, utterance, otherUtteranceForError(store().facts, n.explain))
       : n.also ? `${t(n.key, resolveParams(n.params))} ${noteText(n.also)}` : t(n.key, resolveParams(n.params));
 
-  const pre = decidePreParse(utterance, deps.view());
+  const pre = decidePreParse(utterance, deps.view(), deps.centresShown?.());
   if (pre?.kind === 'store-op') {
     // A store operation is not geometry: it runs here, before the parser, and never enters the figure.
     const { op, from, to } = pre;

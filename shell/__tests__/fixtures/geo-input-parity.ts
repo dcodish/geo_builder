@@ -1752,6 +1752,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'capital-length-2427', family: 'lengths', steps: ['משולש ABC', 'AB = K'], expect: 'not-handled', exception: 'X11', note: '2-D and 3-D hand it to the model; analytic refuses it, teaching «AB = k» (#2427)' },
 
   // ── #2362 (ADR-748): the tool's centre letter of a circle drawn through drawn points is not the student's «O» ──
+  // ── #2398 (ADR-747): a circle's centre given a second letter is refused in both builders ──
+  { id: 'second-centre-letter-2398', family: 'circles', steps: ['מרכז המעגל O הוא K'], expect: 'refused', exception: 'X8' },
+  { id: 'second-centre-letter-drawn-2398', family: 'circles', steps: ['מעגל O', 'מרכז המעגל O הוא K'], expect: 'refused', exception: 'X8', note: 'analytic refuses with unknown-reference O; the message port is #2449' },
   { id: 'arc-on-minted-circle-name-2362', family: 'circles', steps: ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל', 'F אמצע הקשת BC במעגל O'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2376' }], note: 'analytic refuses the last line third-crossing (measured on the #2362 plan, 8a5372be)' },
 ];
 

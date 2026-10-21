@@ -626,6 +626,14 @@ and save carry the decision with the line. The binding (`bindingFor`) intersects
 subjects ride; an empty intersection over a non-empty union asks. `arcMidpoint` emits the by-member candidate for a
 fresh circle letter beside an arc whose ends ride an unnamed circle.
 
+**A centre given a second letter is refused at the door** ([ADR-747](06-decisions.md#adr-747), #2398). `circleWithOtherCentre`
+(`parse.ts`, beside `circleCenter`) is the one two-slot reader of «מרכז המעגל O הוא K» and its spellings (the whole
+sentence is the pattern; non-null only for two different letters). `decidePreParse` calls `doubleCentreNaming` before
+every naming and before the step-aside, with the circle letters the student can see as names — a non-auto centre, or a
+minted one `lettersOnScreen` shows (`centresShown` reaches `decidePreParse` too): the holder is named
+(`input.centreAlreadyNamed`), any other letter is `errors.unknownCircle`. The `circle` rule bows out on the same reader,
+so no re-parse (the AI lane, ✎, the load refresh) builds `circle O` from it. The scenario mirror calls `decidePreParse`.
+
 **A rule's own circle for a fresh letter is a naming candidate** (ADR-599, #1694): when the sentence names a point
 riding an unnamed circle (`namesUnnamedCircleMember`), the circle a rule introduces carries `implied: 'by-member'`
 beside `withImplicitCircles`' `implied: true` — `resolveOrIntroduceCircle`'s named branch and `circleOnDiameter`,

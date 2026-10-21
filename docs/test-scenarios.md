@@ -2114,3 +2114,11 @@ over all four (ADR-041).
 ### `symbolic-2alpha-drives-shape-not-the-fixed-point-centres-shown-2362` · `collinear-flexes-redundant-carrier-kite-tangents-centres-shown-2362` · `extension-cuts-bare-segment-keeps-on-segment-default-centres-shown-2362` · `bare-diameter-from-point-centres-shown-2362` · `triangle-circumscribes-existing-circle-centres-shown-2362` — the operator's exact sequences, typed with «הציגו מרכזי מעגלים» on (#2362, ADR-748)
 
 **Guards against:** the ruling of 2026-10-20 (Q2) — *"if the user presses show centers, he knows what the centers are so its as if he defined them"* — being lost: with the centres shown, the line that uses the tool's centre letter («∠BOC=2α», «E נמצאת על המשך DO», «המשך FO …», «משולש DEF חוסם את המעגל O») adopts it and binds the centre. Each twin is its original without the «O מרכז המעגל» line the original now needs (Q1: a letter that is not shown is not a name), and asserts the original's own check. Built in `scenarios-corpus-4.ts` from the originals, so the two can never drift.
+
+### `second-centre-letter-refused-2398` — «מרכז המעגל O הוא K» on an empty figure is refused «מעגל O לא הוגדר» (#2398, ADR-747)
+
+**Guards against:** a circle's centre given a second letter read as «מעגל O» with K dropped (it escalated; the AI lane's plausible answer drew two circles, green). **Asserts** the operator's exact line is refused at the door with `errors.unknownCircle` (O) and leaves no fact. The matrix (16 spellings × 13 figures, `parse()` per cell, the controls, the remedy) is `src/app/__tests__/issue-2398-second-centre-letter.test.ts`.
+
+### `second-centre-letter-names-holder-2398` — «מעגל O» · «מרכז המעגל O הוא K» is refused naming the holder O (#2398, ADR-747)
+
+**Guards against:** the second naming of a named centre being dropped or silently re-lettered (the #1153 / #1164 rulings: *"the second naming REFUSES and names the holder"*). **Asserts** step 2 is refused `input.centreAlreadyNamed` {holder O, to K} and the figure keeps one circle O and no K.

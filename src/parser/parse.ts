@@ -474,6 +474,56 @@ const orderlessCenter = (s: string): RegExpMatchArray | null => {
   );
 };
 /**
+ * #2398 ([ADR-747](../../docs/06-decisions.md#adr-747)) — a sentence that gives a circle's centre a SECOND letter: the
+ * circle's own letter (in 2-D a circle is named by its centre) AND a different stated centre. «מרכז המעגל O הוא K»,
+ * «K מרכז המעגל O», «מעגל O שמרכזו K», "the centre of circle O is K", "circle O centred at K" and their spellings.
+ * `circleCenter` answers ONE letter, so no reader saw the pair: the naming readers bowed out on the leftover K and the
+ * `circle` rule built `circle O`, dropping K. This is the only place that knows the shape. The WHOLE sentence is the
+ * pattern, so a richer one («… הוא אמצע AB», «מעגל שמרכזו O ורדיוסו K», «… בהתאמה», a numeral pair «II») is never
+ * read; null unless the two letters differ.
+ */
+export function circleWithOtherCentre(raw: string): { circle: string; centre: string } | null {
+  const s = normalizeUtterance(raw);
+  const L = String.raw`(${ULABEL})(?![A-Za-z\d])`;
+  const END = String.raw`\s*[.!]?\s*$`;
+  const AT = String.raw`(?:(?:הוא|היא|הינו|הינה)\s+)?(?:ה?נקודה\s+|ב-?\s*(?:ה?נקודה\s+)?)?`;
+  const EN_PT = String.raw`(?:(?:the\s+)?point\s+)?`;
+  const forms: [RegExp, 'circle-first' | 'centre-first'][] = [
+    // «מרכז המעגל O הוא K» · «מרכז מעגל O הוא K» · «מרכזו של המעגל O הוא K» · «המרכז של מעגל O הוא K» · «… בנקודה K»
+    [new RegExp(String.raw`^\s*ה?מרכז(?:ו)?(?:\s+של)?\s+ה?מעגל\s+${L}\s+${AT}${L}${END}`, 'i'), 'circle-first'],
+    // «K מרכז המעגל O» · «K הוא מרכז המעגל O» · «הנקודה K היא מרכז המעגל O»
+    [new RegExp(String.raw`^\s*(?:ה?נקודה\s+)?${L}\s+(?:(?:הוא|היא|הינו|הינה)\s+)?מרכז\s+ה?מעגל\s+${L}${END}`, 'i'), 'centre-first'],
+    // «מעגל O שמרכזו K» · «נתון מעגל O שמרכזו בנקודה K»
+    [new RegExp(String.raw`^\s*(?:נתון\s+)?ה?מעגל\s+${L}\s+(?:ש|אשר\s+)מרכזו\s+${AT}${L}${END}`, 'i'), 'circle-first'],
+    // "the centre of circle O is K"
+    [new RegExp(String.raw`^\s*(?:the\s+)?cent(?:er|re)\s+of\s+(?:the\s+)?circle\s+${L}\s+is\s+${EN_PT}${L}${END}`, 'i'), 'circle-first'],
+    // "K is the centre of circle O"
+    [new RegExp(String.raw`^\s*${EN_PT}${L}\s+is\s+the\s+cent(?:er|re)\s+of\s+(?:the\s+)?circle\s+${L}${END}`, 'i'), 'centre-first'],
+    // "circle O centred at K" · "circle O with centre K"
+    [new RegExp(String.raw`^\s*(?:(?:a|the)\s+)?circle\s+${L}\s+(?:cent(?:er|re)d\s+at|with\s+(?:the\s+)?cent(?:er|re))\s+${EN_PT}${L}${END}`, 'i'), 'circle-first'],
+  ];
+  for (const [rxp, order] of forms) {
+    const m = s.match(rxp);
+    if (!m) continue;
+    const [circle, centre] = order === 'circle-first' ? [m[1], m[2]] : [m[2], m[1]];
+    return circle === centre ? null : { circle, centre };
+  }
+  return null;
+}
+
+/**
+ * #2398 (ADR-747) — the pre-parse decision for {@link circleWithOtherCentre}: the line is refused, the figure untouched.
+ * `answerable` is the set of circle letters the student can SEE as names (a named or adopted centre, or a minted one on
+ * screen — #2362's provenance): naming that circle's centre again names the holder (`holder`, the #1153 / #1164 ruling);
+ * any other circle letter is no circle in the figure (`unknown`).
+ */
+export function doubleCentreNaming(raw: string, answerable: ReadonlySet<string>): { kind: 'holder'; holder: string; to: string } | { kind: 'unknown'; center: string } | null {
+  const pair = circleWithOtherCentre(raw);
+  if (!pair) return null;
+  return answerable.has(pair.circle) ? { kind: 'holder', holder: pair.circle, to: pair.centre } : { kind: 'unknown', center: pair.circle };
+}
+
+/**
  * The incentre letter a student NAMES as the SUBJECT of an incircle phrasing — "M מרכז המעגל החסום
  * במשולש BDC" / "M is the centre of the circle inscribed in triangle ABC" / "incentre M of …". This
  * label sits BEFORE the centre word (or right after "incentre"), so `circleCenter` ("circle M" /
@@ -5546,6 +5596,9 @@ const lowerSizeReference = (s: string, ctx: ParseContext, r: ReturnType<typeof p
 /** "circle centered at O radius 5" / "circle O radius R" / "מעגל שמרכזו O רדיוסו 5". */
 const circle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
+  // #2398 (ADR-747): «מרכז המעגל O הוא K» / «מעגל O שמרכזו K» gives one centre two letters — refused before the parse
+  // (`doubleCentreNaming`); read here it built `circle O` and dropped K. Never read as a circle.
+  if (circleWithOtherCentre(s)) return null;
   // A "circle inscribed in a polygon" (incircle) names a centre too ("O מרכז המעגל החסום בטרפז"); now that
   // `circleCenter` is order-independent it would resolve O here and create a PLAIN circle, stealing the
   // incircle utterance. Defer the incircle phrasing to the `incircle` rule.
