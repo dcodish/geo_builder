@@ -117,8 +117,9 @@ const CORPUS: BQuestion[] = [
       'AK perpendicular to CL',
       'quadrilateral ALKC inscribed in circle M',
     ],
-    expect: [22, 28, 91, 2, 10, 87, 15, 16, 17, 24],
-    gaps: [99],
+    // #2369 (ADR-748): the student NAMED the circle's centre M, so it is a given centre (no `autoCenter`), and 99
+    // (inscribed = half the central angle, ground truth's key step-tier id for ג1) fires — moved from `gaps`.
+    expect: [22, 28, 91, 2, 10, 87, 15, 16, 17, 24, 99],
     never: [69],
     note: '84 is ground-truth background but its premise is genuinely unmet (△ABC is not the inscribed shape) — omitted, not a gap.',
   },
