@@ -1,0 +1,599 @@
+{
+ "name": "round-2441",
+ "title": "Round #2441 — P1s and bundles",
+ "cases": [
+  {
+   "id": "T1",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Your #2344 lines are refused, never a green sliver (P1, riskiest)",
+   "class": "play",
+   "lines": [
+    "משולש ABC",
+    "AB = BC",
+    "AC ⊥ BC"
+   ],
+   "expectRefusal": "לא ניתן",
+   "lookFor": "The third line refused with the flat-triangle sentence («… וקו ישר אינו משולש»); the triangle stays as it was.",
+   "before": "A green sliver with C on A."
+  },
+  {
+   "id": "T2",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "The angle spelling is refused at once (#2344)",
+   "class": "verified",
+   "lines": [
+    "משולש ABC",
+    "AB = BC",
+    "∠ACB = 90"
+   ],
+   "expectRefusal": "לא ניתן",
+   "lookFor": "The same refusal naming «∠ACB = 90»; no \"waiting for more givens\".",
+   "before": "Recorded as waiting, with ∠ACB not 90."
+  },
+  {
+   "id": "T3",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "The other leg is refused (#2344)",
+   "class": "verified",
+   "lines": [
+    "משולש ABC",
+    "AB = BC",
+    "AB ⊥ AC"
+   ],
+   "expectRefusal": "לא ניתן",
+   "lookFor": "The flat-triangle refusal.",
+   "before": "A green sliver."
+  },
+  {
+   "id": "T4",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Control: a thin real right triangle still builds (#2344)",
+   "class": "look",
+   "lines": [
+    "משולש ABC",
+    "AB = 10",
+    "BC = 9.99",
+    "AC ⊥ BC"
+   ],
+   "lookFor": "A green, very thin right triangle with the knee at C.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T5",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Control: a valid right isosceles builds (#2344)",
+   "class": "verified",
+   "lines": [
+    "משולש ABC",
+    "AB = BC",
+    "AB ⊥ BC"
+   ],
+   "lookFor": "A green right isosceles with the knee at B.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T6",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Not asked for: the isosceles noun settles on a real triangle (#2344)",
+   "class": "play",
+   "lines": [
+    "משולש שווה שוקיים ABC",
+    "∠ACB = 90"
+   ],
+   "lookFor": "A real right isosceles triangle with the knee at C — not a sliver. Judge it: the tool moved its own default equal sides to fit your right angle.",
+   "before": "A green sliver."
+  },
+  {
+   "id": "T7",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "An arc names the circle through B and C (#2362, riskiest)",
+   "class": "play",
+   "lines": [
+    "משולש CDE",
+    "A על CD",
+    "B על CE",
+    "מרובע ABED חסום במעגל",
+    "משולש ABC חסום במעגל",
+    "F אמצע הקשת BC במעגל O"
+   ],
+   "lookFor": "F on the circle through A, B, C; that circle’s centre shows, labelled O; green; nothing moves.",
+   "before": "Sent to the AI."
+  },
+  {
+   "id": "T8",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Refusal: an ambiguous circle letter asks (#2362)",
+   "class": "verified",
+   "lines": [
+    "משולש CDE",
+    "A על CD",
+    "B על CE",
+    "מרובע ABED חסום במעגל",
+    "משולש ABC חסום במעגל",
+    "X על מעגל O"
+   ],
+   "expectRefusal": "O",
+   "lookFor": "The \"which circle?\" note; nothing drawn.",
+   "before": "X landed silently on the first circle."
+  },
+  {
+   "id": "T9",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "The tool’s hidden centre letter is not a name (#2362)",
+   "class": "play",
+   "lines": [
+    "משולש ABC",
+    "משולש ABC חסום במעגל",
+    "מעגל O"
+   ],
+   "lookFor": "A second, new circle O is drawn. (To mean the tool’s centre, write «O מרכז המעגל» first.)",
+   "before": "«כבר קיים»."
+  },
+  {
+   "id": "T10",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "A named circumcircle centre is drawn (#2369)",
+   "class": "look",
+   "lines": [
+    "ריבוע ABCD",
+    "מעגל O חוסם את הריבוע ABCD"
+   ],
+   "lookFor": "O drawn at the centre.",
+   "before": "O not drawn."
+  },
+  {
+   "id": "T11",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Not asked for: a tangent at C on the report’s figure asks which circle (#2362)",
+   "class": "play",
+   "lines": [
+    "משולש CDE",
+    "A על CD",
+    "B על CE",
+    "מרובע ABED חסום במעגל",
+    "משולש ABC חסום במעגל",
+    "משיק למעגל O בנקודה C"
+   ],
+   "expectRefusal": "O",
+   "lookFor": "«which circle?» — judge it.",
+   "before": "Committed with a violated given."
+  },
+  {
+   "id": "T12",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "A second centre letter on a drawn circle is refused (#2398, P1)",
+   "class": "play",
+   "lines": [
+    "מעגל O",
+    "מרכז המעגל O הוא K"
+   ],
+   "expectRefusal": "כבר נקרא",
+   "lookFor": "«מרכז המעגל כבר נקרא O. כדי לשנות את השם, הקלידו «שנה שם O ל-K».»; the figure unchanged.",
+   "before": "Sent to the AI."
+  },
+  {
+   "id": "T13",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "The stated centre is no longer lost (#2398)",
+   "class": "verified",
+   "lines": [
+    "מעגל O",
+    "K על מעגל O",
+    "מרכז המעגל O הוא K"
+   ],
+   "expectRefusal": "כבר נקרא",
+   "lookFor": "The same refusal.",
+   "before": "«כבר קיים» — \"K is the centre\" silently lost."
+  },
+  {
+   "id": "T14",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Refusal: the same with no circle O (#2398, P1 exception)",
+   "class": "verified",
+   "lines": [
+    "מרכז המעגל O הוא K"
+   ],
+   "expectRefusal": "לא הוגדר",
+   "lookFor": "«מעגל O לא הוגדר …» (an existing message); nothing drawn.",
+   "before": "Sent to the AI."
+  },
+  {
+   "id": "T15",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Every common tangent of circles stated apart: 4 (#2405, P1)",
+   "class": "look",
+   "lines": [
+    "שני מעגלים זרים",
+    "כל המשיקים המשותפים לשני המעגלים"
+   ],
+   "lookFor": "4 tangents AB, CD, EF, GH, all ✓.",
+   "before": "Only AB."
+  },
+  {
+   "id": "T16",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Crossing circles: 2 (#2405)",
+   "class": "look",
+   "lines": [
+    "שני מעגלים נחתכים",
+    "המשיקים המשותפים לשני המעגלים"
+   ],
+   "lookFor": "2 tangents CD and EF (A and B are the crossings), ✓.",
+   "before": "One."
+  },
+  {
+   "id": "T17",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Circles touching from outside: 3 (#2405)",
+   "class": "play",
+   "lines": [
+    "מעגל M",
+    "מעגל N",
+    "המעגלים משיקים בנקודה T",
+    "כל המשיקים המשותפים לשני המעגלים"
+   ],
+   "lookFor": "AB, CD and the unlettered line at T, ✓.",
+   "before": "AB only."
+  },
+  {
+   "id": "T18",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Refusal: the pair’s position never stated (#2405, P1 exception)",
+   "class": "play",
+   "lines": [
+    "שני מעגלים",
+    "כל המשיקים המשותפים לשני המעגלים"
+   ],
+   "expectRefusal": "כמה אפשרויות",
+   "lookFor": "The «כמה אפשרויות» question listing «המעגלים זרים / נחתכים בנקודות E ו-F / משיקים בנקודה T»; no tangent drawn. (Interim until your #2442 ruling.)",
+   "before": "One tangent, green."
+  },
+  {
+   "id": "T19",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Refusal: one circle inside the other (#2405)",
+   "class": "verified",
+   "lines": [
+    "מעגל M",
+    "מעגל N",
+    "מעגל N מוכל בתוך מעגל M",
+    "כל המשיקים המשותפים לשני המעגלים"
+   ],
+   "expectRefusal": "אין אף משיק",
+   "lookFor": "«למעגל המוכל בתוך מעגל אין אף משיק משותף.»",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T20",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "All the internal tangents of an outside-touching pair (#2447)",
+   "class": "look",
+   "lines": [
+    "מעגל M",
+    "מעגל N",
+    "המעגלים משיקים בנקודה T",
+    "כל המשיקים המשותפים הפנימיים לשני המעגלים"
+   ],
+   "lookFor": "Exactly one line, the tangent at T, unlettered, ✓.",
+   "before": "A two-touch tangent AB — the wrong line."
+  },
+  {
+   "id": "T21",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "Refusal: crossing circles have no internal tangent (#2447)",
+   "class": "verified",
+   "lines": [
+    "שני מעגלים נחתכים",
+    "כל המשיקים המשותפים הפנימיים לשני המעגלים"
+   ],
+   "expectRefusal": "אין משיק משותף פנימי",
+   "lookFor": "«למעגלים בתצורה זו אין משיק משותף פנימי.»",
+   "before": "One tangent, green."
+  },
+  {
+   "id": "T22",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "A count is still a count (#2405)",
+   "class": "verified",
+   "lines": [
+    "שני מעגלים זרים",
+    "שני המשיקים המשותפים לשני המעגלים"
+   ],
+   "lookFor": "Exactly 2 tangents.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T23",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "2-D: «T על AB» after the common tangent redraws AB at T (#2430)",
+   "class": "play",
+   "lines": [
+    "מעגל M",
+    "מעגל N",
+    "המעגלים משיקים בנקודה T",
+    "AB משיק משותף למעגלים M ו-N",
+    "T על AB"
+   ],
+   "lookFor": "AB redrawn as the tangent at T, all ✓, in under a second; M, N, T unmoved.",
+   "before": "Refused after ~20 s."
+  },
+  {
+   "id": "T24",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "product": "2d",
+   "title": "The same with «AB משיק למעגל M בנקודה T» (#2430)",
+   "class": "look",
+   "lines": [
+    "מעגל M",
+    "מעגל N",
+    "המעגלים משיקים בנקודה T",
+    "AB משיק משותף למעגלים M ו-N",
+    "AB משיק למעגל M בנקודה T"
+   ],
+   "lookFor": "AB the tangent at T, ✓, fast.",
+   "before": "✗ deferred after ~27 s."
+  },
+  {
+   "id": "T25",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "product": "3d",
+   "title": "A cube free to turn about AB shows only what is fixed (#2368, P1, riskiest)",
+   "class": "play",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "A(0,0,0)",
+    "AB=(2,0,0)",
+    "מישור ABCD"
+   ],
+   "cycles": 3,
+   "lookFor": "The panel reads C(2, ?, ?), D(0, ?, ?), A'(0, ?, ?) — no «או» row and no ABCD: row, at every press.",
+   "before": "«C(2, 2, 0) או (2, -2, 0)» and «ABCD: z = 0»."
+  },
+  {
+   "id": "T26",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "product": "3d",
+   "title": "A truly fixed cube keeps all its data (#2368)",
+   "class": "verified",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "A(0,0,0)",
+    "AB=(2,0,0)",
+    "AD=(0,2,0)",
+    "מישור ABCD"
+   ],
+   "lookFor": "D(0, 2, 0), «A'(0, 0, 2) או (0, 0, -2)», «ABCD: z = 0» with its π row.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T27",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "product": "3d",
+   "title": "A box’s base plane shows both forms (#2367)",
+   "class": "look",
+   "lines": [
+    "תיבה ABCDA'B'C'D'",
+    "AB=(1,0,0)",
+    "AD=(0,1,0)",
+    "AA'=(0,0,2)",
+    "z_A=2",
+    "מישור ABCD"
+   ],
+   "lookFor": "«ABCD: π1 = (0, 0, 2) + t·(1, 0, 0) + s·(0, 1, 0)» under «ABCD: z - 2 = 0».",
+   "before": "The equation alone."
+  },
+  {
+   "id": "T28",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "product": "3d",
+   "title": "A plane typed as an equation appears with both forms (#2367)",
+   "class": "play",
+   "lines": [
+    "המישור π1: z - 2.5 = 0"
+   ],
+   "lookFor": "«π1: 2z - 5 = 0» and «π1: π1 = (0, 0, 5/2) + t·(1, 0, 0) + s·(0, 1, 0)». The name repeats — keep it, or drop the label when it is the symbol?",
+   "before": "No panel rows."
+  },
+  {
+   "id": "T29",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "product": "3d",
+   "title": "A general plane gets neat directions (#2367)",
+   "class": "look",
+   "lines": [
+    "המישור π1: 20x - y + 2z - 5 = 0"
+   ],
+   "lookFor": "«π1 = (0, -5, 0) + t·(0, 2, 1) + s·(1, 0, -10)».",
+   "before": "No panel rows."
+  },
+  {
+   "id": "T30",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "An area named S still builds (#2440)",
+   "class": "verified",
+   "lines": [
+    "משולש ABC",
+    "שטח המשולש ABC הוא S"
+   ],
+   "lookFor": "Records; «S» inside the triangle.",
+   "before": "Unchanged."
+  },
+  {
+   "id": "T31",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "Your ruling: another capital for an area is refused (#2440)",
+   "class": "play",
+   "lines": [
+    "משולש ABC",
+    "שטח ABC = T"
+   ],
+   "expectRefusal": "אות גדולה",
+   "lookFor": "The capital-letter message ending «נסו: \"שטח ABC = t\"».",
+   "before": "Recorded, T a parameter."
+  },
+  {
+   "id": "T32",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "PR: AB parallel to a line given by its equation (#2429)",
+   "class": "look",
+   "lines": [
+    "נקודה A",
+    "נקודה B",
+    "הישר AB מקביל לישר 2x-y+3=0"
+   ],
+   "lookFor": "AB ∥ 2x−y+3=0; that line drawn, named l1.",
+   "before": "Refused."
+  },
+  {
+   "id": "T33",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "PR: exam Q1 ב(1), the equation as the subject (#2429, riskiest)",
+   "class": "play",
+   "lines": [
+    "נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9",
+    "K מרכז המעגל I",
+    "נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1",
+    "L מרכז המעגל II",
+    "A על המעגל I",
+    "B על המעגל II",
+    "המשיק למעגל I בנקודה A",
+    "המשיק למעגל II בנקודה B",
+    "המשיקים נפגשים בנקודה M",
+    "MA = MB",
+    "M על הישר 4x+y+3=0",
+    "הישר 4x+y+3=0 מאונך ל-KL"
+   ],
+   "lookFor": "The last line records; the line M sits on is now drawn, named l1 (one line), M still on it.",
+   "before": "Refused."
+  },
+  {
+   "id": "T34",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "PR refusal: the wrong line ⟂ KL (#2429)",
+   "class": "verified",
+   "lines": [
+    "נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9",
+    "K מרכז המעגל I",
+    "נתון מעגל II שמשוואתו (x+5)^2+(y-2)^2=1",
+    "L מרכז המעגל II",
+    "A על המעגל I",
+    "B על המעגל II",
+    "המשיק למעגל I בנקודה A",
+    "המשיק למעגל II בנקודה B",
+    "המשיקים נפגשים בנקודה M",
+    "MA = MB",
+    "M על הישר 4x+y+3=0",
+    "הישר 4x-y+3=0 מאונך ל-KL"
+   ],
+   "expectRefusal": "לא",
+   "lookFor": "A contradiction naming this sentence.",
+   "before": "Refused, operand not understood."
+  },
+  {
+   "id": "T35",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "PR: a line through A parallel to an equation line (#2429)",
+   "class": "look",
+   "lines": [
+    "A(1,2)",
+    "ישר דרך A מקביל לישר y=2x"
+   ],
+   "lookFor": "A line through A with slope 2; y=2x drawn as l1.",
+   "before": "Refused."
+  },
+  {
+   "id": "T36",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "PR: a distance from an equation line, as a given (#2429)",
+   "class": "play",
+   "lines": [
+    "נקודה A",
+    "המרחק של A מהישר 3x+4y=25 הוא 5"
+   ],
+   "cycles": 2,
+   "lookFor": "The line drawn as l1; A at distance 5 from it at every press.",
+   "before": "Sent to the AI."
+  },
+  {
+   "id": "T37",
+   "base": "http://localhost:5174",
+   "path": "/analytic.html",
+   "product": "analytic",
+   "title": "PR refusal kept: slope with an equation (#2429, as ruled)",
+   "class": "verified",
+   "lines": [
+    "A(1,2)",
+    "שיפוע הישר y=mx+1 הוא 2"
+   ],
+   "expectRefusal": "לא",
+   "lookFor": "Still refused, as you ruled.",
+   "before": "Unchanged."
+  }
+ ]
+}
