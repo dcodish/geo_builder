@@ -13475,7 +13475,7 @@ No other sequence moved.
 
 **Consequences.** `engine/pinRoots.ts` (`statedScale`), `engine/carriers.ts` (`reachedByGivens`), `engine/evaluate.ts` (`sampleParam`'s `scale`, `sampleEnv`'s `wide`, the seeding box, `evaluate` / `evaluateTryingChoices` / `evaluateUncached` / `fitCreatedShapes` threading `wide`, `drawableAt`'s walk). Docs: 02c, 04c. The issue named ADR-AG-019 as the sign ADR; it is ADR-AG-022.
 
-## ADR-AG-325 — A capital letter used as a size is refused, teaching the lowercase letter; R for a radius and an area's label stay sizes (#2427)
+## ADR-AG-325 — A capital letter used as a size is refused, teaching the lowercase letter; R for a radius and S for an area stay sizes (#2427, #2440)
 
 **Date:** 2026-10-20 · **Status:** accepted · feature, fix round #2436 (stream D); branch `feat/2427-capital-size-refusal`, for the operator's play-and-approve. **Amends** [ADR-AG-307](#adr-ag-307) (its WITHDRAWN line: «שרדיוסו K» is now an owned refusal, not "not understood") and [ADR-AG-238](#adr-ag-238) ("Not changed": a coordinate, a declaration and a slope no longer read a capital as a parameter). LADDER stage: none (the submit decision; LADDER describes 2-D's ladder).
 
@@ -13510,6 +13510,22 @@ No other sequence moved.
 - `message-floor-2028` registers the key.
 
 **Consequences.** `app/capitalSize.ts` (new), `app/submit.ts` (`decideOnce`, `decideEdit`), `app/errorText.ts`, `store/useAnalyticStore.ts`, `i18n/index.ts`; `shell/__tests__/fixtures/geo-input-parity.ts` (X11); docs 02c R183, R193; 04c; 22 §10.
+
+### ADR-AG-325 Amendment 1 — 2026-10-21: an area is labelled with S only (#2440)
+
+**Ruling.** Operator 2026-10-21 on #2440, answering the question Decision 2 above put to him: *"area letter only capital S"*. **Supersedes** Decision 2's sentence "The area label is any capital, as before" and the "Unchanged" line's «שטח ABC = T». Round #2441, branch `fix/2440-area-letter-only-s`.
+
+**Requirements:** [02c](02c-requirements-analytic.md) R193 (the area clause: S only). · **Design:** [04c](04c-design-analytic.md) "A value never mentions the plane" (`AREA_CAPITALS`).
+
+**Re-measurement at pickup** (`main` @ `37800b85`, `decideSubmit`, no model call). On «משולש ABC»: «שטח ABC = T», «שטח המשולש ABC הוא K», «שטח ABC = 2T», «נסמן את שטח ABC ב-T» and "area of ABC is T" all recorded, the capital a parameter; «שטח ABC = S» and «שטח המשולש ABC הוא S» recorded. The issue's account held.
+
+**Decision.** `mayBeSize` (`app/capitalSize.ts`) exempts an area's label only when the letter is in `AREA_CAPITALS` = {S}, still only inside the fact that states the area. Every other capital an area fact adds to the register meets `capitalParamOf` like any other family: `capital-magnitude` with the line lowercased («נסו: "שטח ABC = t"»). One set, one predicate, every spelling of a stated area (the copula, «=», the label form «נסמן … ב-», the English copula) — no per-spelling rule. A capital that is a point of the figure («שטח המשולש ABC = B», #1785) is still the student naming that point and builds, as before.
+
+**Behaviour change for a student.** **WITHDRAWN:** an area labelled with a capital other than S («שטח ABC = T», «שטח המשולש ABC הוא K», «נסמן את שטח ABC ב-T», "area of ABC is T») no longer records; it is refused with the capital-letter message and the lowercase line to try. «…הוא S» and «נסמן … ב-S» build unchanged.
+
+**Parity.** 2-D reads any capital as an area label; this narrowing joins X11 (analytic-only, the #2427 family). No new parity row: X11 already covers it.
+
+**Locks.** `issue-2427-capital-size.test.ts`: five new class rows (T through «=», K through the copula, «2T», the label form, English), the «שטח ABC = T» control replaced by «שטח ABC = S», "area of ABC is S" and the remedy «שטח ABC = t»; the area-scope case also asserts «M(S,0)» is refused. `issue-2031-area-label.test.ts`: the lone-letter «=» row re-based to «שטח ABC = S» → «S» and «שטח ABC = t» → «t».
 
 ## ADR-AG-326 — A sentence the fallback splits into parts shows one row per part, worded as the part (#2424)
 

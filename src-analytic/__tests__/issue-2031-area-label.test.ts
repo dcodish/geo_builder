@@ -74,8 +74,11 @@ describe('#2031 — the class: every spelling of a stated area', () => {
     expectAreaLabels(['משולש ABC', 'שטח המשולש ABC הוא S'], ['S']);
   });
 
-  it('a lone letter through «=» → the letter: «שטח ABC = T» → «T»', () => {
-    expectAreaLabels(['משולש ABC', 'שטח ABC = T'], ['T']);
+  it('a lone letter through «=» → the letter: «שטח ABC = S» → «S», «שטח ABC = t» → «t»', () => {
+    // re-based by #2440 (ADR-AG-325 Am. 1, *"area letter only capital S"*): «שטח ABC = T» is now refused
+    // capital-magnitude (issue-2427-capital-size), so the lone-letter row reads S and a lowercase letter
+    expectAreaLabels(['משולש ABC', 'שטח ABC = S'], ['S']);
+    expectAreaLabels(['משולש ABC', 'שטח ABC = t'], ['t']);
   });
 
   it('a number or an expression through «=» keeps the ruled «S=…» form', () => {
