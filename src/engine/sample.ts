@@ -21,7 +21,7 @@ import { isGeoPoint, isOrderConstraint } from './types';
 import { carrierOf, isShapeCarrier } from './carriers';
 import { constraintRefs } from './solve';
 import { evaluate } from './evaluate';
-import { lineOffset, polygonMargin, sideRecordsOf, type SideRecord } from './requirements';
+import { lineOffset, polygonMargin, sideRecordsOf, sideShortfall, type SideRecord } from './requirements';
 import { pointInPolygon, pointOutsidePolygon } from './geometry';
 import { constraintRank } from './dofRank';
 import { chargeHit, computeWithCell, solveBudget, type WorkCell } from './solveBudget';
@@ -184,13 +184,51 @@ function clampToPlacementPreconditions(c: Construction, objects: GeoObject[]): G
       cap.set(circ.id, Math.min(cap.get(circ.id) ?? Infinity, bound));
     }
   }
-  if (!cap.size) return objects;
+  /** The largest lower bound on each free radius (the internal-tangency clause below). */
+  const floor = new Map<Id, number>();
+
+  // #2237 ([ADR-742](../../docs/06-decisions.md#adr-742) Am. 1) — a TWO-CIRCLE TANGENCY carried by ONE radius. The
+  // free-radius tangency is a `coincide` of two `radial-toward` witnesses (|O1O2| = r1 ± r2), and ADR-742 makes the
+  // newer circle's own radius its only carrier, so the OTHER circle's free radius is not consumed and is sampled
+  // (0.45×–1.6×) independently of the spun, jittered centres. The carrier's value is then a function of that sample —
+  // external r_c = d − r_o, internal inner r_c = r_o − d — and a sample that makes it non-positive is a figure the
+  // student's tangency cannot have at that seed alone («M coincides with its constructed target»). The bound is
+  // derived from the device's own geometry: external ⇒ r_o < d (a cap); the inner circle carrying an internal one ⇒
+  // r_o > d (a floor); the outer circle carrying it (r_c = r_o + d) imposes nothing. Strict by the same 0.95 margin,
+  // so the carrier keeps a genuine size. A centre carrier (d itself flexes) imposes nothing either.
+  for (const con of c.constraints) {
+    if (con.type !== 'coincide') continue;
+    const p = byId.get(con.p);
+    const q = byId.get(con.q);
+    if (!p || !q || p.kind !== 'radial-toward' || q.kind !== 'radial-toward') continue;
+    const cp = byId.get(p.circle);
+    const cq = byId.get(q.circle);
+    if (!cp || !cq || cp.kind !== 'circle' || cq.kind !== 'circle' || cp.id === cq.id) continue;
+    const carries = (o: GeoObject) => (o as { solve?: { constraint?: Constraint } }).solve?.constraint === con;
+    const [carrier, other] = carries(cp) && !carries(cq) ? [cp, cq] : carries(cq) && !carries(cp) ? [cq, cp] : [undefined, undefined];
+    if (!carrier || !other || other.radius.via !== 'free' || !notConsumed(other as { solve?: unknown })) continue;
+    const oc = coordOf(other.center);
+    const cc = coordOf(carrier.center);
+    if (!oc || !cc) continue;
+    const d = Math.hypot(oc.x - cc.x, oc.y - cc.y);
+    if (d < 1e-9) continue;
+    // A witness aimed at the OTHER circle's centre (not `away`): both are, externally; internally only the outer's is.
+    const atCentre = (w: typeof p, circ: typeof cp) => w.toward === (circ === cp ? cq : cp).center && !(w as { away?: boolean }).away;
+    const external = atCentre(p, cp) && atCentre(q, cq);
+    if (external) cap.set(other.id, Math.min(cap.get(other.id) ?? Infinity, d * 0.95));
+    else {
+      const outerIsCarrier = atCentre(carrier === cp ? p : q, carrier);
+      if (!outerIsCarrier) floor.set(other.id, Math.max(floor.get(other.id) ?? 0, d / 0.95));
+    }
+  }
+  if (!cap.size && !floor.size) return objects;
   return objects.map((o) => {
-    if (o.kind !== 'circle') return o;
-    const lim = cap.get(o.id);
-    return lim !== undefined && o.radius.via === 'free' && o.radius.value > lim
-      ? { ...o, radius: { via: 'free' as const, value: lim } }
-      : o;
+    if (o.kind !== 'circle' || o.radius.via !== 'free') return o;
+    const hi = cap.get(o.id) ?? Infinity;
+    const lo = floor.get(o.id) ?? 0;
+    // A floor above a cap is a sample no single radius can rescue: leave it to the honest refusal, never bend it.
+    const v = lo > hi ? o.radius.value : Math.min(hi, Math.max(lo, o.radius.value));
+    return v !== o.radius.value ? { ...o, radius: { via: 'free' as const, value: v } } : o;
   });
 }
 
@@ -571,6 +609,8 @@ export function applySeed(c: Construction, seed: number): Construction {
 /** #556: the sampler's circle bars — an 'outside' sample must clear 1.05·r, an 'inside' one stay under 0.95·r. */
 const REGION_MARGIN_OUT = 1.05;
 const REGION_MARGIN_IN = 0.95;
+/** #2237 (ADR-742 Am. 1): how many proposals a region seat may try before its first one stands. */
+const SEAT_ATTEMPTS = 12;
 /** #1739: the sampler's polygon and line bars, as fractions of the region's span (the apply seat's 6 %). */
 const REGION_MARGIN_POLY = 0.06;
 const REGION_MARGIN_LINE = 0.05;
@@ -612,19 +652,49 @@ function seatStatedSides(c: Construction, objects: GeoObject[], seed: number): G
   /** Positions already re-seated in this pass win over the (stale) judged figure. */
   const moved = new Map<Id, Vec>();
   const posOf = (e: { positions: Map<Id, Vec> }, id: Id): Vec | undefined => moved.get(id) ?? e.positions.get(id);
-  /** Re-seat `id` so `ok` holds: a free point takes `propose()`, a free rider the first θ round its circle that does. */
-  const reseat = (id: Id, e: ReturnType<typeof evaluate> & { ok: true }, ok: (p: Vec) => boolean, propose: () => Vec | null): void => {
+  /**
+   * #2237 ([ADR-742](../../docs/06-decisions.md#adr-742) Am. 1) — THE SEAT IS CONFIRMED ON THE FIGURE IT MAKES. A
+   * proposal is tested against the region of the JUDGED figure, but the region can itself be driven by a solve that
+   * reads the subject: «ישר ADB» through a tangent apex B makes the circle's centre a carrier of the collinearity, so
+   * re-seating B re-solves the circle, and the solve landed it back beside B (|BO2| = 1.004·r — the side broken
+   * again, the view discarded). So when `rec` is given, an accepted move is re-judged (one evaluate, the one the
+   * next record would run anyway) and must hold by the VERIFIER's own test (`sideShortfall`, the predicate
+   * `meetsRequirements` reads); a move the re-solved figure breaks asks for the next proposal, at most
+   * {@link SEAT_ATTEMPTS}. None holds ⇒ the first proposal stands (today's seat), so a seat whose first proposal
+   * already holds — every seed whose region does not move with its subject — is bit-identical.
+   */
+  const confirmed = (id: Id, rec: SideRecord | undefined): boolean => {
+    if (!rec) return true;
+    const e2 = judge(id);
+    return !e2 || !e2.ok || sideShortfall(rec, e2.positions, e2.circles) === 0;
+  };
+  /** Re-seat `id` so `ok` holds: a free point takes `propose(attempt)` (attempt 0 is the original seat), a free
+   *  rider the first θ round its circle that does — confirmed on the re-solved figure when `rec` is given. */
+  const reseat = (id: Id, e: ReturnType<typeof evaluate> & { ok: true }, ok: (p: Vec) => boolean, propose: (attempt: number) => Vec | null, rec?: SideRecord): void => {
     const i = out.findIndex((o) => o.id === id);
     const o = out[i];
     const p = posOf(e, id);
     if (!o || !p || ok(p)) return;
+    let first: { obj: GeoObject; q: Vec } | null = null;
+    const tryMove = (obj: GeoObject, q: Vec): boolean => {
+      out[i] = obj;
+      moved.set(id, q);
+      full = null;
+      first ??= { obj, q };
+      return confirmed(id, rec);
+    };
+    const settleFirst = (): void => {
+      if (!first) return;
+      out[i] = first.obj;
+      moved.set(id, first.q);
+      full = null;
+    };
     if (o.kind === 'free-point') {
-      const q = propose();
-      if (q && ok(q)) {
-        out[i] = { ...o, x: q.x, y: q.y };
-        moved.set(id, q);
-        full = null;
+      for (let a = 0; a < (rec ? SEAT_ATTEMPTS : 1); a++) {
+        const q = propose(a);
+        if (q && ok(q) && tryMove({ ...o, x: q.x, y: q.y }, q)) return;
       }
+      settleFirst();
       return;
     }
     if (o.kind !== 'on-circle') return;
@@ -632,17 +702,18 @@ function seatStatedSides(c: Construction, objects: GeoObject[], seed: number): G
     if (!circ || !(circ.r > 0)) return;
     const jr = mulberry32((seed ^ hashId(id) ^ 0x5bd1e995) >>> 0);
     const start = o.theta + jr() * 2 * Math.PI;
+    let tries = 0;
     for (let k = 0; k < 72; k++) {
       const th = start + (k * Math.PI * 2) / 72;
       const q = { x: circ.center.x + circ.r * Math.cos(th), y: circ.center.y + circ.r * Math.sin(th) };
-      if (ok(q)) {
-        out[i] = { ...o, theta: th };
-        moved.set(id, q);
-        full = null;
-        return;
-      }
+      if (!ok(q)) continue;
+      if (tryMove({ ...o, theta: th }, q) || !rec) return;
+      if (++tries >= SEAT_ATTEMPTS) break;
     }
+    settleFirst();
   };
+  /** The proposal rng: attempt 0 is the original seat's stream, a retry takes its own. */
+  const seatRng = (id: Id, attempt: number) => mulberry32((seed ^ hashId(id) ^ 0x5bd1e995 ^ Math.imul(attempt, 0x9e3779b9)) >>> 0);
   for (const r of sides) {
     if (r.kind === 'circle-side') {
       if (!seatable(r.id)) continue;
@@ -652,13 +723,14 @@ function seatStatedSides(c: Construction, objects: GeoObject[], seed: number): G
       if (!circ || !(circ.r > 0)) continue;
       const d = (p: Vec) => Math.hypot(p.x - circ.center.x, p.y - circ.center.y);
       const ok = (p: Vec) => (r.side === 'outside' ? d(p) > circ.r * REGION_MARGIN_OUT : d(p) < circ.r * REGION_MARGIN_IN);
-      reseat(r.id, e, ok, () => {
-        const p = posOf(e, r.id)!;
-        const jr = mulberry32((seed ^ hashId(r.id) ^ 0x5bd1e995) >>> 0);
-        const th: number = d(p) > 1e-9 ? Math.atan2(p.y - circ.center.y, p.x - circ.center.x) : jr() * 2 * Math.PI;
+      const p0 = posOf(e, r.id)!;
+      reseat(r.id, e, ok, (attempt) => {
+        const jr = seatRng(r.id, attempt);
+        // attempt 0: radially, along the point's own direction (ADR-511); a retry: a seeded direction of its own.
+        const th: number = attempt === 0 && d(p0) > 1e-9 ? Math.atan2(p0.y - circ.center.y, p0.x - circ.center.x) : jr() * 2 * Math.PI;
         const k = r.side === 'outside' ? 1.15 + jr() * 0.65 : 0.25 + jr() * 0.45; // outside: [1.15, 1.8]·r (the textbook apex, close to the circle) · inside: [0.25, 0.7]·r
         return { x: circ.center.x + circ.r * k * Math.cos(th), y: circ.center.y + circ.r * k * Math.sin(th) };
-      });
+      }, r);
     } else if (r.kind === 'polygon-side') {
       if (!seatable(r.id)) continue;
       const e = judge(r.id);
@@ -669,9 +741,10 @@ function seatStatedSides(c: Construction, objects: GeoObject[], seed: number): G
       const { cx, cy, rspan } = polygonMargin(vs);
       const m = rspan * REGION_MARGIN_POLY;
       const ok = (p: Vec) => (r.side === 'inside' ? pointInPolygon(p, vs, m) : pointOutsidePolygon(p, vs, m));
-      reseat(r.id, e, ok, () => {
-        const p = posOf(e, r.id)!;
-        const jr = mulberry32((seed ^ hashId(r.id) ^ 0x5bd1e995) >>> 0);
+      const p0 = posOf(e, r.id)!;
+      reseat(r.id, e, ok, (attempt) => {
+        const p = p0;
+        const jr = seatRng(r.id, attempt);
         const away = Math.hypot(p.x - cx, p.y - cy) > 1e-9 ? { x: p.x - cx, y: p.y - cy } : { x: Math.cos(jr() * 2 * Math.PI) * rspan, y: Math.sin(jr() * 2 * Math.PI) * rspan };
         const at = (k: number): Vec => ({ x: cx + k * away.x, y: cy + k * away.y });
         // The extreme scale that clears along the point's own ray from the centroid, then a seeded fraction of
@@ -690,7 +763,7 @@ function seatStatedSides(c: Construction, objects: GeoObject[], seed: number): G
           return ok(q) ? q : at(k);
         }
         return null;
-      });
+      }, r);
     } else {
       const e0 = judge(r.subjects[r.subjects.length - 1]);
       if (!e0 || !e0.ok) continue;

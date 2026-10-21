@@ -886,6 +886,13 @@ MOVER's own DOF only (M2 least ownership, ADR-281): its free radius if unclaimed
 free radius only when the mover has none left. So «מעגל Q משיק למעגל O» · «מעגל Q משיק למעגל P» puts both tangencies
 on Q (radius, then centre) and never moves or resizes O or P.
 
+**Sampling a one-carrier tangency** (ADR-742 Am. 1). With one radius carrying the tangency, the other circle's free
+radius stays a sampled DOF, so ADR-476's precondition clamp (`clampToPlacementPreconditions`, `engine/sample.ts`) has a
+second clause, read off the `coincide` of two `radial-toward` witnesses: when exactly one circle's radius carries it
+and the other's free radius is unconsumed, an external device caps that radius at `0.95·d` (the carrier is `d − r`),
+and an internal device whose INNER circle carries it floors the outer radius at `d / 0.95` (the carrier is `r − d`); an
+outer or centre carrier imposes nothing. A floor above a cap leaves the sample as drawn (the honest refusal).
+
 ### The common tangent at the touch ([ADR-740](06-decisions.md#adr-740))
 
 `commonTangent` asks one resolver before its two-touch path, in this order: (a) a named «בנקודה X»; (b) the touch by
@@ -1522,7 +1529,11 @@ A construction needing a free operand on one side of a circle (a tangent's or se
 the ADR-254 side record `point-circle-side` after the operand's placement; its apply case (`engine/apply.ts`) seeds
 or re-seats a non-pinned point on that side. The sampling half — `applySeed` (`engine/sample.ts`) re-seating
 wrong-side samples, seed 0 never sampled — now reads the requirement record (ADR-594), which retired
-`FreePoint.region: { circle, side }[]`. The verifier reports a contradicted side and `meetsRequirements` gates the
+`FreePoint.region: { circle, side }[]`. A circle or polygon seat is **confirmed on the figure it makes** (ADR-742
+Am. 1): the move is re-judged (one evaluate) and must pass the verifier's own `sideShortfall`, because the region can
+be driven by a solve that reads the subject (a circle centre carrying «ישר ADB» through the apex re-solves when the apex
+moves); a move the re-solved figure breaks asks for the next seeded proposal (`SEAT_ATTEMPTS` = 12), and the first
+proposal stands when none holds. A line-side seat is not confirmed. The verifier reports a contradicted side and `meetsRequirements` gates the
 button on it.
 
 ### An unstated choice is SAID (#973, [ADR-502](06-decisions.md#adr-502))

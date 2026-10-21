@@ -8913,6 +8913,9 @@ and `A`, and the stated radius never bent), plus the fixture
 `src/__tests__/fixtures/issue-855-tangency-sampled-seat.geo.json` — the operator's exact sequence saved
 **at seed 17**, so the fixture net replays the very configuration the bug was filed on.
 
+
+**Amendment 1 (2026-10-21, #2237) — a second precondition kind: a tangency carried by ONE radius.** [ADR-742](#adr-742) made the newer circle's radius the only carrier of a free-radius two-circle tangency, so the older circle's free radius is sampled independently of the centres, and a sample at or beyond the centre gap left the figure with no tangent drawing. The clamp gains the clause its contract above provides for, derived from the device's geometry (the `coincide` of two `radial-toward` witnesses): external ⇒ the uncarried free radius is capped at `0.95·d`; internal with the INNER circle carrying ⇒ the outer free radius is floored at `d / 0.95`; an outer or centre carrier imposes nothing. The clamp now writes a floor as well as a cap; a floor above a cap leaves the sample as drawn. Still a no-op on every feasible sample. **Requirements:** none (internal) · **Design:** [04](04-design.md) §*Which circle of a pair moves* · measured and locked in ADR-742 Am. 1.
+
 ## ADR-477 — a recognized ambiguity ASKS; and a rule's `stop` may not outrank a typed question (#519)
 
 **Status:** accepted, 2026-09-02 · **Ports:** [ADR-3D-131](06b-decisions-3d.md#adr-3d-131) (#516) to 2-D · **Round:** #878
@@ -19025,3 +19028,33 @@ No parser change and no new command field. No chokepoint list grows (docs/17 §3
 - `issue-2208-circle-subject-tangent.test.ts` re-based: its stability row asserted "the first-named circle stays put" (the slot-blind seat); it now asserts the OLDER O stays put, and the Hebrew still equals its English twin.
 
 **Behaviour change for a student:** after «מעגל O» · «מעגל P», the line «מעגל Q משיק למעגל O» draws Q touching O and leaves O and P exactly where they were; «מעגל Q משיק למעגל P» then moves and resizes only Q. Before, O jumped next to P and the two ended up internally tangent. The same holds for «המעגלים Q ו-O משיקים [מבפנים]», for points on O, and with Q drawn first. «מעגל O מוכל במעגל Q» with O drawn first now grows Q around O, where before O moved inside Q and shrank; «המעגלים Q ו-O נחתכים» moves Q onto O instead of O onto Q.
+
+**Amendment 1 (2026-10-21) — the sampler stays inside a one-carrier tangency's feasible set, and a region seat is confirmed on the figure it makes.** Found by the round's batch `test:full` (24-seed sweep, docs/17 §9; the ADR above measured seeds 0–3 only).
+
+**Requirements:** none (internal — restores the configurations «הציגו תצורה אחרת» offered before this ADR) · **Design:** [04](04-design.md) §*Which circle of a pair moves* (*Sampling a one-carrier tangency*) and §*A free point's admissible region rides on the point* (the confirmed seat) · [LADDER](LADDER.md) stage 5 (the per-seed tail's sample)
+
+*Measured* (`replay` per seed, model mocked, 0 calls), seeds whose figure fails to build, 0–23:
+
+| sequence | `main` @ 37800b85 | this ADR (97f6364a) | Am. 1 |
+| --- | --- | --- | --- |
+| «שני מעגלים משיקים מבחוץ» | none | 6, 21 | none |
+| «שני מעגלים משיקים» | none | 6, 21 | none |
+| «מעגל O» · «מעגל P משיק למעגל O» | none | 22 | none |
+| «מעגל O» · «מעגל P» · «המעגלים O ו-P משיקים מבחוץ» | none | 17, 22 | none |
+| the #556 figure (`issue-556-apex-region`) | none | 9, 14 | none |
+
+and the #556 figure with «ישר ADB», views meeting `meetsRequirements`: `main` 18 of 24 (6 of seeds 0–7), this ADR 15 (4 of 0–7, the lock needs 5), Am. 1 **22** (7 of 0–7). Internal tangency built at every seed throughout.
+
+*Root cause 1 (the build failures).* Decision 2 made the newer circle's radius the tangency's only carrier, so the older circle's free radius is no longer consumed and `applySeed` samples it (0.45×–1.6×) independently of the spun, jittered centres. The carrier's value is a function of that sample (external: `d − r_o`): a sample `r_o ≥ d` has no tangent figure at that seed, and the build failed with «not determined: M coincides with its constructed target». Before this ADR the older radius was a carrier too, so it was never sampled.
+
+*Fix 1* — a clause of [ADR-476](#adr-476)'s precondition clamp (`clampToPlacementPreconditions`, whose contract is "a second precondition kind joins by adding a clause here"), derived from the device's own geometry: for a `coincide` of two `radial-toward` witnesses carried by exactly one circle's radius, the other circle's free, unconsumed radius is capped at `0.95·d` when the device is external, and floored at `d / 0.95` when the INNER circle carries an internal one (`r_c = r_o − d`). An outer carrier (`r_c = r_o + d`) and a centre carrier (`d` flexes) impose nothing. A no-op on every feasible sample.
+
+*Root cause 2 (the «ישר ADB» views).* In the #556 figure «למעגל O2» is a third circle, and the collinearity's carriers are the rider A and **O2's centre**. The apex B has the side record «B outside O2»; the sampler's region seat (ADR-594) judged B against O2 on the sampled figure, re-seated it radially at 1.15–1.8·r, and accepted the move against that STALE circle. But O2 is driven by a solve that reads B, so the final evaluate re-solved O2 from its seed and landed it back beside B (|BO2| = 1.004–1.011·r, under the verifier's 2 % bar): the view was discarded. The side steer (ADR-594) cannot cure it inside the solve, because the subject B is not a carrier and the region (O2) is held. Before this ADR the older O1's radius flexed in that solve as a tangency carrier (seed 6: O1 shrank from 5 to 1.91 to put A on the line), which found other roots — the very resize of an older circle this ADR's ruling forbids. Restoring it was not an option. The defect is pre-existing (`main` seed 5 failed exactly this way); this ADR only widened it. Measured on the sampled figure at seeds 4–6: 85–113 of 120 grid positions for B make the re-solved figure hold its side.
+
+*Fix 2* — **a seat is confirmed on the figure it makes** (`seatStatedSides`, `engine/sample.ts`). A circle-side or polygon-side move is re-judged (one evaluate, the one the next record would run anyway) and must pass the verifier's own `sideShortfall`; a move the re-solved figure breaks asks for the next seeded proposal (a circle seat: a seeded direction of its own; at most `SEAT_ATTEMPTS` = 12), and the first proposal stands when none holds. A rider's 72-θ round is confirmed the same way. Attempt 0 is the original seat with the original rng stream, so every seat whose first proposal holds is bit-identical, and seed 0 is never sampled. A line-side seat is not confirmed (its anchor push and subjects are judged as a set; not measured to fail).
+
+No carrier choice changes, no seat in `apply.ts` changes, and nothing at seed 0 changes. The ruling is untouched: O1 keeps its radius in every solve.
+
+**Locks.** `src/engine/__tests__/issue-2237-tangency-sample-feasible.test.ts`: the 24-seed build sweep over the five external sequences above plus the operator's A2 and three internal spellings, and the #556 figure; the clamp bound at every seed; seed 0 untouched; the «ישר ADB» sweep (≥ 18 of 24, `main`'s count) with B clear of O2 and D a true touch in every displayed view. `issue-556-apex-region.test.ts` is unchanged and green (its rider sweep: 7 of 8).
+
+**Behaviour change for a student:** none at the first drawing. «הציגו תצורה אחרת» no longer lands on a blank figure for two tangent circles (seeds where it did after this ADR), and the #556 figure with «ישר ADB» offers more valid views than before (22 of 24 sampled, `main` 18).
