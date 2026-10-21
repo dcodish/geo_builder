@@ -185,7 +185,7 @@ export async function refusals(page) {
       // read those too, filtered by the prefix so benign live-region text never reads as a refusal
       // (round #1510, the mechanism's first real round).
       // a product may DECLARE a refusal surface outright (2-D's gate notes carry data-refusal)
-      ...[...document.querySelectorAll('[data-refusal]')].map((n) => (n.textContent || '').replace(/s+/g, ' ').trim()),
+      ...[...document.querySelectorAll('[data-refusal]')].map((n) => (n.textContent || '').replace(/\s+/g, ' ').trim()),
       ...[...document.querySelectorAll('[role=status]')]
         .map((n) => (n.textContent || '').replace(/\s+/g, ' ').trim())
         .filter((t) => t.startsWith('⚠')),
