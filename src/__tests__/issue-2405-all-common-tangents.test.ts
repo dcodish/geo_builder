@@ -176,6 +176,60 @@ describe('#2405 — every common tangent of a pair whose position is stated', ()
   });
 });
 
+/** The kind of each common tangent drawn now, by geometry: external = both centres on the same side of it. */
+function drawnKinds(): ('external' | 'internal')[] {
+  const r = replay(st().facts, st().seed);
+  const cs = [...r.circles.values()];
+  return commonTangentLines().map((l) => {
+    const side = (c: { center: Vec }) => (c.center.x - l.p.x) * l.d.y - (c.center.y - l.p.y) * l.d.x;
+    return side(cs[0]) * side(cs[1]) > 0 ? 'external' : 'internal';
+  }).sort();
+}
+
+describe('#2405 / #2447 — a set with a kind stated is every tangent of that kind, or the existing refusal', () => {
+  const EXT_SET = 'כל המשיקים המשותפים החיצוניים לשני המעגלים';
+  const INT_SET = 'כל המשיקים המשותפים הפנימיים לשני המעגלים';
+  const BUILDS: [string, string[], string, ('external' | 'internal')[]][] = [
+    ['apart, external', APART, EXT_SET, ['external', 'external']],
+    ['apart, internal', APART, INT_SET, ['internal', 'internal']],
+    ['apart, English external', APART, 'all the external common tangents of the two circles', ['external', 'external']],
+    ['crossing, external', CROSSING, EXT_SET, ['external', 'external']],
+    ['touching from outside, external', EXT, EXT_SET, ['external', 'external']],
+    ['touching from outside, internal = the line at T', EXT, INT_SET, ['internal']],
+    ['touching from inside, external = the line at T', INT, EXT_SET, ['external']],
+  ];
+  for (const [name, prefix, line, kinds] of BUILDS)
+    it(`${name} → exactly ${kinds.length} tangent(s) of that kind, green in the shown and cycled configurations`, async () => {
+      const { v } = await play([...prefix, line]);
+      expect(v.kind).toBe('commit');
+      expectSet(kinds.length);
+      expect(drawnKinds()).toEqual(kinds);
+      expect(llmParseMock).not.toHaveBeenCalled();
+    });
+
+  const REFUSED: [string, string[], string, string][] = [
+    ['crossing, internal: there is none', CROSSING, INT_SET, 'input.tangentsExhaustedNoInternal'],
+    ['touching from inside, internal: there is none', INT, INT_SET, 'input.tangentsExhaustedNoInternal'],
+    ['one inside the other, external', CONTAINED, EXT_SET, 'input.tangentsExhaustedContained'],
+    ['apart, both externals already drawn', [...APART, EXT_SET], EXT_SET, 'input.tangentsExhaustedExternal'],
+    ['touching from outside, the line at T already drawn', [...EXT, INT_SET], INT_SET, 'input.tangentsExhaustedTouchTaken'],
+    ['position never stated', UNSTATED, EXT_SET, 'input.ambiguousConstruct'],
+  ];
+  for (const [name, prefix, line, key] of REFUSED)
+    it(`${name} → refused with the existing ${key}, nothing drawn`, async () => {
+      const { v, before } = await play([...prefix, line]);
+      expect(v.kind).toBe('refuse');
+      expect(noteKey(v)).toBe(key);
+      expect(st().facts.length).toBe(before.length);
+    });
+
+  it('a count is still a count: «שני המשיקים המשותפים החיצוניים» draws two externals', async () => {
+    const { v } = await play([...APART, 'שני המשיקים המשותפים החיצוניים לשני המעגלים']);
+    expect(v.kind).toBe('commit');
+    expect(drawnKinds()).toEqual(['external', 'external']);
+  });
+});
+
 describe('#2405 — a pair whose position nobody stated: the interim refusal (P1 exception; #2442 is the permanent answer)', () => {
   it('«שני מעגלים» · «כל…» → the existing ambiguousConstruct sentence, naming the three statements that settle it', async () => {
     const { v } = await play([...UNSTATED, SPELLINGS[0]]);

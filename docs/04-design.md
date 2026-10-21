@@ -900,8 +900,9 @@ pair whose `circle-position` records state it internally tangent, externally tan
 refused before the solve; `tangentsExhaustedKey` (`i18n/humanizeError.ts`) gives it the parser's sentence.
 
 **The whole set** ([ADR-751](06-decisions.md#adr-751)). `ALL_COMMON_TANGENTS` («כל המשיקים המשותפים», the definite plural with
-no count word, "(all) the common tangents") is matched before the fixed-count `plural`, and only with no `at`, apex or
-kind. `allCommonTangents` reads `ctx.statedPairPositions[pairKey]` — filled by `buildParseCtx` from the engine's
+no count word, "(all) the common tangents") is matched before the fixed-count `plural`, and only with no `at` or apex; a stated
+kind narrows the set to that kind (#2447: the touch tangent is internal for an outside touch, external for an inside one;
+an empty set is the position's `tangents-exhausted` clarify). `allCommonTangents` reads `ctx.statedPairPositions[pairKey]` — filled by `buildParseCtx` from the engine's
 `statedCirclePosition(construction, c1, c2)` (`engine/requirements.ts`: a `circle-position` contained / tangent / disjoint
 record, in that precedence, the tangent's kind from its first STATED record else external; else a `circle-circle` point of
 the pair → crossing; else undefined) — and lowers the set: two-touch tangents by kind (apart: 2 external + 2 internal;
