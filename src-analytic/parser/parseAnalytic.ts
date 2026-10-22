@@ -6585,8 +6585,9 @@ function direction(phrase: string, claims?: ClaimSink, eqs?: EqSink): Direction 
  * "the line y=2x", or the bare equation.
  *
  * Read only by a caller that passes an `EqSink` (the `ClaimSink` pattern, #1651): the rulings of 2026-10-20/21 opened
- * ∥, ⊥ and a line through a point copying a direction, and kept slope, the position words, the perpendicular foot and
- * the distance between two lines refusing — those callers pass none, and an equation there stays `bad-operand`. The
+ * ∥, ⊥ and a line through a point copying a direction, and 2026-10-22 opened the slope VALUE («שיפוע הישר y=mx+1 הוא
+ * 2»); the slope SIGN, the position words, the perpendicular foot and the distance between two lines stay refusing —
+ * those callers pass none, and an equation there stays `bad-operand`. The
  * operand is only READ here; the M1 boundary resolves it to the curve it denotes (`equationOperand`, ADR-AG-318) and
  * gives a new line its name (ADR-AG-319). The reserved-symbol guard is `incidenceOn`'s (#1068), and a curve that is
  * not a LINE — a circle's equation in «מקביל ל-…» — is no direction (`bad-operand`): it is judged by the equation's
@@ -7380,7 +7381,8 @@ function parseConstraint(raw: string): RuleOutcome {
   const slope = SLOPE_HE.exec(line) ?? SLOPE_EN.exec(line);
   if (slope && claimable(slope[2])) {
     const claims: ClaimSink = { out: [], src: line };
-    const u = direction(slope[1], claims);
+    // The line may be given by its EQUATION, its parameter pinned by the stated slope (#2429, ADR-AG-328 Am. 1).
+    const u = direction(slope[1], claims, EQ_LINES);
     if (!u) return refuse('bad-operand', line);
     const value = valueExpr(slope[2]);
     if (!value) return unreadable(trim(slope[2]));

@@ -109,8 +109,8 @@ folds noun variants ([ADR-AG-155](06c-decisions-analytic.md#adr-ag-155), ADR-405
 **An equation operand is read only where a sink asks for it** ([ADR-AG-328](06c-decisions-analytic.md#adr-ag-328)).
 `direction()` reads «(ה)ישר <eq>» / "the line <eq>" / a bare equation of a LINE (`lineEquationOperand`: the
 reserved-symbol guard, and `isLinearInPlane`, a numeric first-degree check at probe values) only for a caller that
-passes `EQ_LINES` (an `EqSink`, the `ClaimSink` pattern): the relation handler (both operands) and
-`parseThroughLine`. Slope, slope sign, position words and the foot pass none. A distance given lifts each
+passes `EQ_LINES` (an `EqSink`, the `ClaimSink` pattern): the relation handler (both operands),
+`parseThroughLine` and the slope-value rule (ADR-AG-328 Am. 1). The slope sign, position words and the foot pass none. A distance given lifts each
 «ישר <eq>» into a token before `LENGTH_EQ` splits on «=» (`liftDistanceLines`); `parseLengthExpr(src, lines)` reads
 a token only as the line of a point-to-line frame, and a caller with no `lines` (the ask lane) leaves it unread.
 
@@ -414,9 +414,9 @@ operand (a `stated` role promotes a carrier it finds); otherwise the curve is mi
 `carrier` per ADR-AG-032), and a stated mint absorbed by the twin scan resolves to its absorber. `tangent-of`
 resolves its `eq` lines first; `tangent-eq` and the #1429 `on-curve` arm call the same function.
 
-**A line operand given by its equation** ([ADR-AG-328](06c-decisions-analytic.md#adr-ag-328)). Three more slots carry
+**A line operand given by its equation** ([ADR-AG-328](06c-decisions-analytic.md#adr-ag-328)). Four more slots carry
 an equation to M1, each in the `stated` role through `lineOperand` (→ `equationOperand`, `line: true`): a relation's
-`u`/`v` and a `line-at`'s `dir` as `Direction` `{ k: 'curve', id, eqSrc, eq }`, and a `length-eq`'s `point-line`
+`u`/`v`, a `slope`'s `u` (the relation arm, one operand; Am. 1) and a `line-at`'s `dir` as `Direction` `{ k: 'curve', id, eqSrc, eq }`, and a `length-eq`'s `point-line`
 term as `{ line: eqSrc, eq, curve: id }`. Each is resolved in written order (a second new line is l2), the spelling
 stripped, the resolved id written back, and the statement re-applied; a statement that minted or promoted its line is
 never `known` (`mintedEffect`). `lineAtOf` finds a term's line by name, then by id, so a resolved term survives a

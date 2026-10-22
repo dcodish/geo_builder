@@ -4,7 +4,8 @@
  *
  * Rulings: 2026-10-20 (*"2429 accept recommendations"*: ∥, ⊥ and «המרחק של A מהישר <eq>» accept a line given by its
  * equation, drawn and named under #2425); 2026-10-21 (*"2429 - no. dont accept"*: the distance ASK, slope, «מעל», the
- * perpendicular foot and the line–line distance keep refusing an equation operand). Measured before (main `37800b85`,
+ * perpendicular foot and the line–line distance keep refusing an equation operand); 2026-10-22, on T37 (*"we should
+ * know from this, that m=2 and draw the line"*: the slope VALUE accepts one; the slope sign is not covered and stays). Measured before (main `37800b85`,
  * `decideSubmit`, no model call): every accepted row below was `bad-operand` (∥/⊥, the line through a point) or
  * `not-handled` (the distance given).
  *
@@ -207,10 +208,66 @@ describe('#2429 — the distance GIVEN to a line given by its equation', () => {
   });
 });
 
-describe('#2429 — what stays refused (the 2026-10-21 ruling)', () => {
+describe('#2429 — the slope given to a line given by its equation (ruling 2026-10-22, ADR-AG-328 Am. 1)', () => {
+  /** The line l1's slope and y-intercept, from its drawn coefficients. */
+  const l1 = (d: ReturnType<typeof derive>) => {
+    const l = d.figure.curves.find((c) => c.label.name === 'l1')!.curve as unknown as { a: number; b: number; c: number };
+    return { slope: -l.a / l.b, intercept: -l.c / l.b };
+  };
+  it('the play case, exactly: «A(1,2)» · «שיפוע הישר y=mx+1 הוא 2» → m = 2; y = 2x + 1 is drawn and named l1', () => {
+    const d = built(['A(1,2)', 'שיפוע הישר y=mx+1 הוא 2']);
+    expect(d.figure.env.m).toBeCloseTo(2, 9);
+    expect(drawnLines(d)).toEqual(['l1']);
+    expect(d.figure.curves.find((c) => c.label.name === 'l1')!.label.eqSrc).toBe('y=mx+1');
+    expect(l1(d).slope).toBeCloseTo(2, 9);
+    expect(l1(d).intercept).toBeCloseTo(1, 9);
+  });
+  it('the parameter pin holds at every one of 24 seeds', () => {
+    for (let seed = 0; seed < 24; seed++) {
+      const d = built(['A(1,2)', 'שיפוע הישר y=mx+1 הוא 2'], seed);
+      expect(d.figure.env.m, `seed ${seed}`).toBeCloseTo(2, 6);
+      expect(l1(d).slope, `seed ${seed}`).toBeCloseTo(2, 6);
+      expect(l1(d).intercept, `seed ${seed}`).toBeCloseTo(1, 6);
+    }
+  });
   it.each([
-    [['A(1,2)', 'שיפוע הישר y=mx+1 הוא 2'], 'refused:bad-operand'],
+    ['שיפוע הישר y=mx+1 הוא 2'],
+    ['השיפוע של הישר y=mx+1 הוא 2'],
+    ['שיפוע y=mx+1 הוא 2'],
+    ['שיפוע הישר y = mx + 1 שווה ל-2'],
+    ['the slope of the line y=mx+1 is 2'],
+    ['the slope of y=mx+1 is 2'],
+  ])('«%s» pins m = 2 and draws l1 (the spellings the named-line slope reads)', (line) => {
+    const d = built([line]);
+    expect(d.figure.env.m).toBeCloseTo(2, 9);
+    expect(drawnLines(d)).toEqual(['l1']);
+  });
+  it('on a named line, the equation spelling refers to it: no second line', () => {
+    const d = built(['נתון הישר l: y=mx+1', 'שיפוע הישר y=mx+1 הוא 2']);
+    expect(d.figure.env.m).toBeCloseTo(2, 9);
+    expect(drawnLines(d)).toEqual(['l']);
+  });
+  it('the same slope twice is «כבר ידוע»', () => {
+    expect(last(['שיפוע הישר y=mx+1 הוא 2', 'שיפוע הישר y=mx+1 הוא 2']).v.kind).toBe('already-known');
+  });
+  it('a slope that contradicts the equation is refused, nothing drawn', () => {
+    expect(key(last(['A(1,2)', 'שיפוע הישר y=2x+1 הוא 3']).v)).toBe('refused:unsatisfiable');
+  });
+  it('stability: stating it moves no existing point', () => {
+    const before = derive(['A(1,2)', 'נקודה B'], 0).figure;
+    const after = built(['A(1,2)', 'נקודה B', 'שיפוע הישר y=mx+1 הוא 2']).figure;
+    for (const id of ['A', 'B']) {
+      const [p, q] = [before.points.find((x) => x.id === id)!, after.points.find((x) => x.id === id)!];
+      expect(q.x).toBeCloseTo(p.x, 9);
+      expect(q.y).toBeCloseTo(p.y, 9);
+    }
+  });
+});
+
+describe('#2429 — what stays refused (the 2026-10-21 ruling; the slope SIGN is not covered by 2026-10-22)', () => {
+  it.each([
     [['A(1,2)', 'שיפוע הישר y=mx+1 חיובי'], 'refused:bad-operand'],
+    [['A(1,2)', 'שיפוע הישר x^2+y^2=9 הוא 2'], 'refused:bad-operand'],
     [['A(1,2)', 'A מעל הישר y=2x'], 'refused:bad-operand'],
     [['A(1,2)', 'האנך מ-A לישר y=2x'], 'refused:bad-operand'],
     [['המרחק בין הישר 3x+4y=0 לישר 3x+4y=25 הוא 5'], 'refused:not-handled'],

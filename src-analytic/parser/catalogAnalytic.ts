@@ -748,6 +748,8 @@ export const COMMAND_CATALOG_ANALYTIC: CatalogEntryAnalytic[] = [
     en: 'the slope of line l1 is 4',
     needs: ['A(2,3)', 'דרך A עובר ישר l1'],
   },
+  // A line given by its EQUATION (#2429, ADR-AG-328 Am. 1): the slope pins its parameter; drawn and named l1 (X2).
+  { category: 'relations', family: 'F19', he: 'שיפוע הישר y=mx+1 הוא 2', en: 'the slope of the line y=mx+1 is 2', needs: ['A(1,2)'] },
   /**
    * The SIGN of a slope (#1323, ADR-AG-144) — the exam's «ושיפועו שלילי», which picks between two
    * configurations. A selector inside validity, never a value keyword in the slope rule.

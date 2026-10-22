@@ -2844,11 +2844,15 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
        * resolved in written order (so a second new line is l2), and the relation is then the same statement the named
        * spelling makes.
        */
-      if (f.k.t === 'relation' && (isEqDirection(f.k.u) || isEqDirection(f.k.v))) {
+      /*
+       * A SLOPE GIVEN TO A LINE GIVEN BY ITS EQUATION (ADR-AG-328 Am. 1, ruling 2026-10-22) is the same one-operand
+       * shape: «שיפוע הישר y=mx+1 הוא 2» resolves the line, then states the slope of that line, which pins m.
+       */
+      if ((f.k.t === 'relation' && (isEqDirection(f.k.u) || isEqDirection(f.k.v))) || (f.k.t === 'slope' && isEqDirection(f.k.u))) {
         let cur = c;
         let minted = false;
         const dirs: Direction[] = [];
-        for (const d of [f.k.u, f.k.v]) {
+        for (const d of f.k.t === 'relation' ? [f.k.u, f.k.v] : [f.k.u]) {
           if (!isEqDirection(d)) {
             dirs.push(d);
             continue;
@@ -2859,7 +2863,8 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
           minted ||= op.minted;
           dirs.push({ k: 'curve', id: op.id });
         }
-        return mintedEffect(applyFact(cur, { ...f, k: { ...f.k, u: dirs[0], v: dirs[1] } }), minted);
+        const k: Constraint = f.k.t === 'relation' ? { ...f.k, u: dirs[0], v: dirs[1] } : { ...f.k, u: dirs[0] };
+        return mintedEffect(applyFact(cur, { ...f, k }), minted);
       }
       /*
        * A DISTANCE GIVEN TO A LINE GIVEN BY ITS EQUATION (#2429, ADR-AG-328): the term's line is resolved like any line
