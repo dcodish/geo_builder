@@ -585,15 +585,14 @@
    "base": "http://localhost:5174",
    "path": "/analytic.html",
    "product": "analytic",
-   "title": "PR refusal kept: slope with an equation (#2429, as ruled)",
-   "class": "verified",
+   "title": "PR: a slope given with an equation pins m and draws the line (#2429, your T37 ruling)",
+   "class": "play",
    "lines": [
     "A(1,2)",
     "שיפוע הישר y=mx+1 הוא 2"
    ],
-   "expectRefusal": "לא",
-   "lookFor": "Still refused, as you ruled.",
-   "before": "Unchanged."
+   "lookFor": "m = 2 in the parameters; the line y = 2x + 1 drawn and named l1 («l1: -2x + y - 1 = 0»).",
+   "before": "Refused (the 2026-10-21 ruling), which you failed on 2026-10-22."
   },
   {
    "base": "http://localhost:5173",
