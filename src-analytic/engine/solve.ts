@@ -61,8 +61,14 @@ export type Direction =
   | { k: 'points'; a: Id; b: Id }
   /** An axis. Carries no point, and needs none: its direction is fixed. */
   | { k: 'axis'; axis: 'x' | 'y' }
-  /** A named line — `ℓ1`, `AC`. Its direction comes from the resolved equation. */
-  | { k: 'curve'; id: Id }
+  /**
+   * A named line — `ℓ1`, `AC`. Its direction comes from the resolved equation.
+   *
+   * `eqSrc`/`eq`: the line was written as its EQUATION («מקביל לישר y=2x», #2429, ADR-AG-328). Carried, like the
+   * `on-curve` operand's (#1429), only as far as the M1 boundary, which resolves it to the curve it denotes
+   * (`equationOperand`) and STRIPS both, so an applied direction is always a plain id.
+   */
+  | { k: 'curve'; id: Id; eqSrc?: string; eq?: unknown }
   /**
    * A FREE direction — «דרך N עובר ישר» (#1319, ADR-AG-144): the angle is a parameter in the register,
    * read from the environment. Sampled like any unstated magnitude and SOLVED like any parameter once

@@ -19,7 +19,7 @@ import { fitConic } from './conic';
 import { bareLineName, isNumeralName, lineIdOf, nameReading, numeralCurveId, numeralTwin, readDescribedCircle, refKindOf, statedName, type DescribedCircle, type RefKind } from './names';
 import { parabolaDirectrix, resolveCurve } from './curves';
 import { FAMILIES_OF, positionOfCircles, type PairPosition } from './commonTangents';
-import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr } from './lengths';
+import { angleLabelName, isTermPlaceholder, lengthRefs, parseLengthExpr, type LengthExpr, type MeasureTerm } from './lengths';
 import { curveParentsOf, parentsOf, type DerivedRule, type FootLine } from './derived';
 import { sameDerivation } from './sameDerivation';
 import { constraintCurveRefs, constraintRefs, dirCurveRefs, dirRefs, isAngleRef, resolveChoices, sameConstraint, sineAngle, type AngleName, type AngleRef, type CircleSide, type Constraint, type Direction, type TangentLineRef } from './solve';
@@ -1059,6 +1059,25 @@ function equationOperand(
   const twin = mint.next.objects.find((o): o is CurveObject => o.kind === 'curve' && identicalCurve(o.curve, curve));
   return twin ? { ok: true, next: mint.next, id: twin.id, minted: mint.next !== c } : { ok: false, error: { code: 'not-handled', detail: src } };
 }
+
+/** A direction written as a line's EQUATION, not yet resolved (#2429, ADR-AG-328). */
+type EqDirection = Extract<Direction, { k: 'curve' }> & { eqSrc: string; eq: unknown };
+const isEqDirection = (d: Direction): d is EqDirection => d.k === 'curve' && d.eqSrc !== undefined && d.eq !== undefined;
+
+/**
+ * A LINE OPERAND GIVEN BY ITS EQUATION, in a slot that takes a line (#2429, [ADR-AG-328](../../docs/06c-decisions-analytic.md#adr-ag-328))
+ * — a relation's direction («הישר AB מקביל לישר 2x-y+3=0», «הישר 4x+y+3=0 מאונך ל-KL»), the direction a line through
+ * a point copies («ישר דרך A מקביל לישר y=2x»), the line of a distance given («המרחק של A מהישר 3x+4y=25 הוא 5»).
+ * The sentence is ABOUT that line, so its role is `stated`: the figure's own line with that equation, or one minted
+ * drawn and named with the next free l-number (ADR-AG-319) — through the one resolver, `equationOperand` (ADR-AG-318).
+ */
+function lineOperand(c: Construction, op: { id: Id; eqSrc: string; eq: unknown }, src: string) {
+  return equationOperand(c, { kind: 'eq', id: op.id, label: op.eqSrc, eqSrc: op.eqSrc, eq: op.eq as Expr, role: 'stated', line: true }, src);
+}
+
+/** A statement that minted its operand line changed the figure, so it is never «כבר ידוע» for it. */
+const mintedEffect = (out: ApplyOutcome, minted: boolean): ApplyOutcome =>
+  out.ok && minted && out.effect === 'known' ? { ...out, effect: 'created' } : out;
 
 /**
  * Do two expressions denote the same value? Compared NUMERICALLY at several parameter probes
@@ -2821,6 +2840,59 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
         return applyFact(op.next, { t: 'constraint', k: { ...bare, curve: op.id }, src: f.src });
       }
       /*
+       * A RELATION WITH A LINE GIVEN BY ITS EQUATION (#2429, ADR-AG-328), as subject or object: each such operand is
+       * resolved in written order (so a second new line is l2), and the relation is then the same statement the named
+       * spelling makes.
+       */
+      /*
+       * A SLOPE GIVEN TO A LINE GIVEN BY ITS EQUATION (ADR-AG-328 Am. 1, ruling 2026-10-22) is the same one-operand
+       * shape: «שיפוע הישר y=mx+1 הוא 2» resolves the line, then states the slope of that line, which pins m.
+       */
+      if ((f.k.t === 'relation' && (isEqDirection(f.k.u) || isEqDirection(f.k.v))) || (f.k.t === 'slope' && isEqDirection(f.k.u))) {
+        let cur = c;
+        let minted = false;
+        const dirs: Direction[] = [];
+        for (const d of f.k.t === 'relation' ? [f.k.u, f.k.v] : [f.k.u]) {
+          if (!isEqDirection(d)) {
+            dirs.push(d);
+            continue;
+          }
+          const op = lineOperand(cur, d, f.src);
+          if (!op.ok) return op;
+          cur = op.next;
+          minted ||= op.minted;
+          dirs.push({ k: 'curve', id: op.id });
+        }
+        const k: Constraint = f.k.t === 'relation' ? { ...f.k, u: dirs[0], v: dirs[1] } : { ...f.k, u: dirs[0] };
+        return mintedEffect(applyFact(cur, { ...f, k }), minted);
+      }
+      /*
+       * A DISTANCE GIVEN TO A LINE GIVEN BY ITS EQUATION (#2429, ADR-AG-328): the term's line is resolved like any line
+       * operand, and the term then holds that curve's id (`curve`), its equation stripped.
+       */
+      if (f.k.t === 'length-eq' && [...f.k.left.terms, ...f.k.right.terms].some((t) => t.kind === 'point-line' && t.eq !== undefined)) {
+        let cur = c;
+        let minted = false;
+        const sides: LengthExpr[] = [];
+        for (const le of [f.k.left, f.k.right]) {
+          const terms: MeasureTerm[] = [];
+          for (const t of le.terms) {
+            if (t.kind !== 'point-line' || t.eq === undefined || t.curve === undefined) {
+              terms.push(t);
+              continue;
+            }
+            const op = lineOperand(cur, { id: t.curve, eqSrc: t.line, eq: t.eq }, f.src);
+            if (!op.ok) return op;
+            cur = op.next;
+            minted ||= op.minted;
+            const { eq: _eq, ...term } = t;
+            terms.push({ ...term, curve: op.id });
+          }
+          sides.push({ ...le, terms });
+        }
+        return mintedEffect(applyFact(cur, { ...f, k: { ...f.k, left: sides[0], right: sides[1] } }), minted);
+      }
+      /*
        * AN ANGLE LABEL NAMES ONE ANGLE (#1622 E5, ADR-AG-221; 2-D's ADR-386 `alias-taken`). «נסמן זוית BAM כ-A1» binds the
        * label to the angle as a free parameter of its own (`angleLabelSymbol`). The SAME label on a DIFFERENT angle would
        * read as «∢BAM = ∢MAC» through the shared symbol — an equality nobody stated — and a label that is already a
@@ -3192,6 +3264,12 @@ function applyStatement(c: Construction, f: Fact): ApplyOutcome {
      * cannot exist without it) and its radius symbol (resolved at evaluate time).
      */
     case 'line-at': {
+      // The copied direction may be a line given by its EQUATION (#2429, ADR-AG-328): resolved first, then the same line.
+      if (isEqDirection(f.dir)) {
+        const op = lineOperand(c, f.dir, f.src);
+        if (!op.ok) return op;
+        return mintedEffect(applyFact(op.next, { ...f, dir: { k: 'curve', id: op.id } }), op.minted);
+      }
       const through = objectById(c, f.through);
       if (!through || !isPositional(through)) {
         return { ok: false, error: unknownRef(c, f.through) };

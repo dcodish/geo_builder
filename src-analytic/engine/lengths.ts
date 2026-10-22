@@ -47,7 +47,18 @@ export type MeasureTerm =
    * tell them apart. Resolving it here would mean this module knowing about objects, which is the
    * layering the rest of the file is careful to avoid.
    */
-  | { kind: 'point-line'; p: Id; line: string }
+  | {
+      kind: 'point-line';
+      p: Id;
+      line: string;
+      /**
+       * The line was written as its EQUATION — «המרחק של A מהישר 3x+4y=25 הוא 5» (#2429, ADR-AG-328). `line` is then the
+       * equation as written; the M1 boundary resolves `eq` to the curve it denotes, strips it, and records that curve's
+       * id in `curve`, which the evaluator reads before the name (a later rename cannot strand the term).
+       */
+      eq?: unknown;
+      curve?: Id;
+    }
   /**
    * «המרחק בין AB ל-l1» — the distance between two LINES (#1205).
    *
@@ -180,8 +191,28 @@ const LENGTH_TOKEN = /(?<![A-Za-z])([A-Z][0-9₀-₉]?)([A-Z][0-9₀-₉]?)(?![A
  * being able to come back: a frame that matches hands over exactly two operands, and the roles are
  * decided in one place for all of them.
  */
+/**
+ * A LINE GIVEN BY ITS EQUATION inside a distance given — «המרחק של A מהישר 3x+4y=25 הוא 5» (#2429, ADR-AG-328).
+ *
+ * The equation holds an `=` of its own, so the sentence cannot be split into its two sides until the operand is out of
+ * the way: the PARSER (which reads equations) lifts each one into a token from this range before the split, and hands
+ * the lifted equations to the reader here. A token is a LINE operand of the frames below and nothing else; a reader
+ * given no equations (the ask lane, the named-pair pass) leaves it unread, so the line declines as before.
+ */
+export interface LineEquation {
+  /** The content id the operand is minted under at M1 when the figure has no such line. */
+  id: Id;
+  eqSrc: string;
+  eq: unknown;
+}
+const LINE_EQ_BASE = 0xe900;
+/** The token that stands for the `i`-th lifted equation. */
+export const lineEqToken = (i: number): string => String.fromCharCode(LINE_EQ_BASE + i);
+const lineEqIndex = (s: string): number | null => (s.length === 1 && s.charCodeAt(0) >= LINE_EQ_BASE && s.charCodeAt(0) < LINE_EQ_BASE + 0x100 ? s.charCodeAt(0) - LINE_EQ_BASE : null);
+
 // A point name carries its index in either spelling — «N1», «N₁» (#2391, ADR-AG-315: `IS_POINT` below already did).
-const OPERAND = String.raw`[A-Za-zℓ][0-9₀-₉]?[A-Z]?[0-9₀-₉]?`;
+// A lifted line equation is one token (#2429).
+const OPERAND = String.raw`[A-Za-zℓ][0-9₀-₉]?[A-Z]?[0-9₀-₉]?|[\uE900-\uE9FF]`;
 /** An optional noun before either operand -- «המרחק מ-C לישר AB». */
 // #1431: the POINT nouns join the slot — «המרחק של הנקודה A מהישר l1» is the same sentence with
 // the optional subject noun (`הנקודה A ≡ A`, the #1134/#1151 shape), for the ask and the given alike.
@@ -304,8 +335,8 @@ const IS_POINT = /^[A-Z][0-9₀-₉]?$/;
 // multiplied as t·h·e — the #1321 trap the distance noun already closes for «the distance».
 const AREA_TOKEN = /(?:(?:[Tt]he\s+)?[Aa]rea\s+of|שטח)\s+(?:ה?[א-ת]+(?:[- ][א-ת]+){0,2}\s+|(?:the\s+)?[a-z]+\s+)?((?:[A-Z][0-9₀-₉]?){3,})/g;
 
-export function parseLengthExpr(src: string): LengthExpr | null {
-  return readLength(src);
+export function parseLengthExpr(src: string, lines?: readonly LineEquation[]): LengthExpr | null {
+  return readLength(src, undefined, lines);
 }
 
 /**
@@ -336,7 +367,7 @@ const DISTANCE_NOUN = new RegExp(
   'g',
 );
 
-function readLength(src: string, named?: Set<number>): LengthExpr | null {
+function readLength(src: string, named?: Set<number>, lines?: readonly LineEquation[]): LengthExpr | null {
   const terms: MeasureTerm[] = [];
   // Areas first — see AREA_TOKEN. Each becomes a placeholder before any length token is looked for.
   // Point-to-line first: its tail contains a name that LENGTH_TOKEN would otherwise claim (#1048).
@@ -356,6 +387,23 @@ function readLength(src: string, named?: Set<number>): LengthExpr | null {
         const at = terms.findIndex(same);
         return String.fromCharCode(PLACEHOLDER_BASE + (at >= 0 ? at : terms.push(t) - 1));
       };
+      /*
+       * A LINE GIVEN BY ITS EQUATION (#2429, ADR-AG-328): only against a POINT — the ruling opened the distance from a
+       * point to such a line as a given, and nothing else; two lines, or a reader given no equations, leave the frame
+       * unread (the line declines, as before).
+       */
+      const xi = lineEqIndex(x);
+      const yi = lineEqIndex(y);
+      if (xi !== null || yi !== null) {
+        const pt = xi === null ? x : yi === null ? y : null;
+        const op = lines?.[(xi ?? yi)!];
+        if (!pt || !IS_POINT.test(pt) || !op) return _m;
+        const key = `${pt}|${op.id}`;
+        return push(
+          { kind: 'point-line', p: pt, line: op.eqSrc, eq: op.eq, curve: op.id },
+          (t) => t.kind === 'point-line' && `${t.p}|${t.curve ?? t.line}` === key,
+        );
+      }
       // Two points are a plain distance -- the SAME term «AB» produces, so «המרחק בין A ל-B» and
       // «AB» are one question with one answer instead of a point-line term naming a line called «B».
       if (IS_POINT.test(x) && IS_POINT.test(y)) {
@@ -512,7 +560,8 @@ export function evalLengthExpr(
       value = Math.abs(lu.c / nu - (flip * lv.c) / nv);
     } else if (term.kind === 'point-line') {
       const p = at(term.p);
-      const l = lineAt?.(term.line) ?? null;
+      // A line resolved at M1 is read by its id (#2429): a rename cannot strand the term.
+      const l = lineAt?.(term.curve ?? term.line) ?? null;
       if (!p || !l) return null;
       const n = Math.hypot(l.a, l.b);
       if (n < 1e-12) return null; // not a line at all

@@ -56,7 +56,7 @@ function measureValue(src: string): Expr | 'declined' | null {
 function unreadable(src: string): RuleOutcome {
   return INDEXED_TOKEN.test(src) ? null : refuse('bad-equation', src);
 }
-import { angleLabelSymbol, constantLengthExpr, namedLengthPairs, planeLetterLength, parseLengthExpr, type LengthExpr } from '../engine/lengths';
+import { angleLabelSymbol, constantLengthExpr, lineEqToken, namedLengthPairs, planeLetterLength, parseLengthExpr, type LengthExpr, type LineEquation } from '../engine/lengths';
 import { DESCRIBED_CIRCLE_ALT, NUMERAL_ALT, ROMAN_ALT, isNumeralName, lineIdOf, lineNameOf, numeralCurveId, readDescribedCircle, type NumeralKind } from '../engine/names';
 import { CENTRE_SENTINEL, CENTRES_SENTINELS, CEVIAN_MEASURE_SENTINELS, CIRCLE_SENTINEL, ROLE_SIDE_SENTINELS, CIRCLE_SLOT_SENTINELS, UNBOUNDED, type CircleSlot, circleDefPoints, diameterCircleId, factsWithin, incircleId, tangentLineId, type CurveKind, type Domain, type EqOperand, type Fact, type Id, type OrderSide, type PerpRef, type Selector } from '../engine/types';
 import { ANGLE_STEM_HE, ANY_POLYGON_NOUN, EN_SHAPE, SHAPES, normalizeShapeNoun, rightAngleAt, shapeRow, BARE_POLYGON_NOT_BUILT } from '../engine/shapes';
@@ -6561,8 +6561,13 @@ const NAMED_LINE = new RegExp(`^(?:ה?ישר\\s+|[Ll]ine\\s+)?([ℓl][0-9]?)$|^(
  * AD», «the chord BC» are directions exactly as «הצלע BC» is. A noun that CLAIMS something is read only by a caller
  * that passes a `ClaimSink` to state the claim into; without one it is not a direction (`bad-operand`, never a drop).
  */
-function direction(phrase: string, claims?: ClaimSink): Direction | null {
+function direction(phrase: string, claims?: ClaimSink, eqs?: EqSink): Direction | null {
   const p = trim(phrase);
+  // A line given by its EQUATION — only for a caller that reads one (#2429, ADR-AG-328).
+  if (eqs) {
+    const op = lineEquationOperand(p);
+    if (op) return { k: 'curve', id: op.id, eqSrc: op.eqSrc, eq: op.eq };
+  }
   const axis = AXIS_HE.exec(p) ?? AXIS_EN.exec(p);
   if (axis) return { k: 'axis', axis: axis[1].toLowerCase() === 'x' ? 'x' : 'y' };
   const named = NAMED_LINE.exec(p);
@@ -6573,6 +6578,49 @@ function direction(phrase: string, claims?: ClaimSink): Direction | null {
   // sentence means the same thing before and after the line is given a name.
   if (pts && (!pts.noun || pts.row) && stateClaim(pts.row, pts.a, pts.b, claims)) return { k: 'points', a: pts.a, b: pts.b };
   return null;
+}
+
+/**
+ * A LINE GIVEN BY ITS EQUATION, AS AN OPERAND THAT TAKES A LINE (#2429, ADR-AG-328) — «לישר 2x-y+3=0», «הישר y=2x»,
+ * "the line y=2x", or the bare equation.
+ *
+ * Read only by a caller that passes an `EqSink` (the `ClaimSink` pattern, #1651): the rulings of 2026-10-20/21 opened
+ * ∥, ⊥ and a line through a point copying a direction, and 2026-10-22 opened the slope VALUE («שיפוע הישר y=mx+1 הוא
+ * 2»); the slope SIGN, the position words, the perpendicular foot and the distance between two lines stay refusing —
+ * those callers pass none, and an equation there stays `bad-operand`. The
+ * operand is only READ here; the M1 boundary resolves it to the curve it denotes (`equationOperand`, ADR-AG-318) and
+ * gives a new line its name (ADR-AG-319). The reserved-symbol guard is `incidenceOn`'s (#1068), and a curve that is
+ * not a LINE — a circle's equation in «מקביל ל-…» — is no direction (`bad-operand`): it is judged by the equation's
+ * own degree, a numeric check at probe values (no CAS).
+ */
+type EqSink = { readonly eq: true };
+const EQ_LINES: EqSink = { eq: true };
+
+function lineEquationOperand(phrase: string): { id: Id; eqSrc: string; eq: Expr } | null {
+  const bare = trim(phrase.replace(/^(?:ה?ישר|(?:the\s+)?line)\s+/i, ''));
+  if (!bare.includes('=')) return null;
+  const eq = equationExpr(bare);
+  if (!eq || !symbolsOf(eq).some((sym) => RESERVED_SYMBOLS.has(sym)) || !isLinearInPlane(eq)) return null;
+  return { id: `curve-${anonIndex(bare)}`, eqSrc: bare, eq };
+}
+
+/**
+ * Is `f(x, y) = 0` a LINE — first degree in x and y, at two probe values of every other symbol? The residual of a
+ * line is affine, so its value at (1,1) is fixed by the values at (0,0), (1,0) and (0,1), and at (2,3) likewise; a
+ * circle or a conic breaks one of the two. Numeric, at probe points (ADR-AG-001 D1: no CAS).
+ */
+function isLinearInPlane(eq: Expr): boolean {
+  const params = symbolsOf(eq).filter((s) => !RESERVED_SYMBOLS.has(s));
+  return [0.37, 1.91].every((v) => {
+    const env = Object.fromEntries(params.map((s) => [s, v]));
+    const f = (x: number, y: number) => evalExpr(eq, { ...env, x, y });
+    const c = f(0, 0);
+    const a = f(1, 0) - c;
+    const b = f(0, 1) - c;
+    const tol = 1e-9 * Math.max(1, Math.abs(a), Math.abs(b), Math.abs(c));
+    if (![a, b, c].every(Number.isFinite) || Math.hypot(a, b) <= tol) return false;
+    return [[1, 1], [2, 3], [-3, 5]].every(([x, y]) => Math.abs(f(x, y) - (a * x + b * y + c)) <= 1e-7 * Math.max(1, Math.abs(a), Math.abs(b), Math.abs(c)) * (1 + Math.abs(x) + Math.abs(y)));
+  });
 }
 
 /**
@@ -6855,7 +6903,8 @@ function parseThroughLine(line: string): RuleOutcome {
   const cut = THROUGH_CUT_HE.exec(tail) ?? THROUGH_CUT_EN.exec(tail);
   const dirSrc = cut ? cut[1] : tail;
   const claims: ClaimSink = { out: [], src: line };
-  const dir = direction(trim(dirSrc), claims);
+  // The copied direction may be a line given by its equation (#2429, ADR-AG-328).
+  const dir = direction(trim(dirSrc), claims, EQ_LINES);
   // The verb was understood and the operand was not — an OWNED refusal about this sentence, naming
   // what a direction may be, rather than a fall-through to "I did not understand you" (ADR-AG-017).
   if (!dir) return refuse('bad-operand', line);
@@ -7188,6 +7237,31 @@ function ratioAsEquation(line: string): string | null {
   return null;
 }
 
+/**
+ * A DISTANCE TO A LINE GIVEN BY ITS EQUATION, LIFTED OUT BEFORE THE SPLIT (#2429, ADR-AG-328).
+ *
+ * «המרחק של A מהישר 3x+4y=25 הוא 5»: `LENGTH_EQ` splits a given on its FIRST «=» or copula, which here is the
+ * equation's own — «…3x+4y» = «25 הוא 5». So each «(ה)ישר <eq>» / "line <eq>" in a sentence that speaks of a distance
+ * is replaced by a token (`lineEqToken`) and handed to the length reader beside it, which reads the token as a line
+ * operand of a distance frame and nothing else. The operand ends where the equation does: before the copula or a word
+ * («הוא», «מ-A», "is"), or before the value's «=». A span that is not exactly one plane equation of a LINE is not
+ * lifted, so the sentence reads (and declines) as it did. The ask lane never calls this: the distance QUESTION with an
+ * equation stays refused (ruling 2026-10-21).
+ */
+const DISTANCE_WORD = /(?:מרחק|[Dd]istance)/;
+const LINE_EQ_SPAN = /((?:^|\s)(?:[מל]-?)?ה?ישר\s+|\b[Ll]ine\s+)([^=א-ת]*=[^=א-ת]*?)(?=\s*=|\s*$|\s+[א-ת]|\s+(?:is|equals|from|to|and)\b)/g;
+function liftDistanceLines(line: string): { text: string; lines: LineEquation[] } | null {
+  if (!DISTANCE_WORD.test(line)) return null;
+  const lines: LineEquation[] = [];
+  const text = line.replace(LINE_EQ_SPAN, (m, noun: string, span: string) => {
+    const op = lineEquationOperand(span);
+    if (!op || lines.length >= 0x100) return m;
+    lines.push(op);
+    return `${noun}${lineEqToken(lines.length - 1)}`;
+  });
+  return lines.length > 0 ? { text, lines } : null;
+}
+
 /** The line as an EQUATION, when it was written as a comparison. `null` leaves it untouched. */
 function asEquation(line: string): string | null {
   const ratio = ratioAsEquation(line);
@@ -7250,8 +7324,9 @@ function parseConstraint(raw: string): RuleOutcome {
     const [, left, word, right] = rel;
     // A role noun's claim is stated beside the relation (#1651, ADR-AG-200): «המיתר BC ∥ ציר ה-x» is also «B, C על המעגל».
     const claims: ClaimSink = { out: [], src: line };
-    const u = direction(left, claims);
-    const v = direction(right, claims);
+    // Either operand may be a line given by its equation, as subject or as object (#2429, ADR-AG-328).
+    const u = direction(left, claims, EQ_LINES);
+    const v = direction(right, claims, EQ_LINES);
     // The verb was understood; if an operand was not, that is an OWNED refusal about this sentence
     // rather than a fall-through to "I did not understand you" (ADR-AG-017).
     if (!u || !v) return refuse('bad-operand', line);
@@ -7306,7 +7381,8 @@ function parseConstraint(raw: string): RuleOutcome {
   const slope = SLOPE_HE.exec(line) ?? SLOPE_EN.exec(line);
   if (slope && claimable(slope[2])) {
     const claims: ClaimSink = { out: [], src: line };
-    const u = direction(slope[1], claims);
+    // The line may be given by its EQUATION, its parameter pinned by the stated slope (#2429, ADR-AG-328 Am. 1).
+    const u = direction(slope[1], claims, EQ_LINES);
     if (!u) return refuse('bad-operand', line);
     const value = valueExpr(slope[2]);
     if (!value) return unreadable(trim(slope[2]));
@@ -7331,13 +7407,15 @@ function parseConstraint(raw: string): RuleOutcome {
    */
   const areaGiven = AREA_HE.exec(line) ?? AREA_EN.exec(line);
   const areaGivenValue = areaGiven ? valueExpr(areaGiven[3]) : null;
-  const lengthEq = areaGivenValue ? null : LENGTH_EQ.exec(line);
+  // A distance to a line given by its EQUATION is lifted out before the split on «=» (#2429, ADR-AG-328).
+  const lifted = liftDistanceLines(line);
+  const lengthEq = areaGivenValue ? null : LENGTH_EQ.exec(lifted?.text ?? line);
   if (lengthEq) {
     // A role noun in front of a pair («אורך השוק BC», «המיתר BC») states its claim and leaves the pair (#1651).
     const roles: ClaimSink = { out: [], src: line };
     const leftSrc = lengthRoles(lengthEq[1], roles);
     const rightSrc = lengthRoles(lengthEq[2], roles);
-    const left = leftSrc === null ? null : parseLengthExpr(leftSrc);
+    const left = leftSrc === null ? null : parseLengthExpr(leftSrc, lifted?.lines);
     /*
      * x AND y ARE NEVER A LENGTH HERE (operator ruling 2026-10-03 on #1622; ADR-AG-222's amendment withdraws ADR-AG-218's
      * length variable). «AB = 3x» is refused with a teaching message — the plane's letters are coordinates — while every
@@ -7347,7 +7425,7 @@ function parseConstraint(raw: string): RuleOutcome {
     const lengthOnly = !!left && left.terms.every((t) => t.kind === undefined || t.kind === 'length');
     if (lengthOnly && rightSrc !== null && !parseLengthExpr(rightSrc) && planeLetterLength(rightSrc)) return refuse('length-xy', line);
     const ofArea = !!left && left.terms.some((t) => t.kind === 'area');
-    const right = rightSrc === null ? null : parseLengthExpr(rightSrc) ?? constantLengthExpr(rightSrc, ofArea);
+    const right = rightSrc === null ? null : parseLengthExpr(rightSrc, lifted?.lines) ?? constantLengthExpr(rightSrc, ofArea);
     // At least ONE side must mention a length, or this is an ordinary equation (`y=2x`) that the
     // bare-equation branch reads far better than we would.
     /*
