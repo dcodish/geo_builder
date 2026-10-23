@@ -350,6 +350,7 @@ working tree**, and an uncommitted change in it belongs to whoever commits next.
 | Regression lock | fixture first (the product's fixtures folder, §9); a hand-authored scenario only for a bespoke assertion, indexed in [test-scenarios.md](test-scenarios.md) (CLAUDE.md rule 4) |
 | Deploy | tag `prod/…` + [DEPLOY-LOG.md](DEPLOY-LOG.md) entry, per [RUNBOOK.md](RUNBOOK.md) |
 | Status | the issue queue, open PRs, the ADR-log tails and DEPLOY-LOG ([ADR-W-002](06w-decisions-workspace.md#adr-w-002)); never a narrative log, never CLAUDE.md |
+| A sentence the student reads | `npm run find-message -- "<text, key or engine code>"` (#2201): every locale table — 2-D `src/i18n/locales`, 3-D `src3d/i18n/locales`, suite `shell/locales`, the analytic and complex TS tables (they stay TS) — plus the inline-Hebrew ratchet's allowed files and the 2-D error bank's code → keys; prints `file · key · value`, substring matches included |
 
 ## 9. The multi-product workspace (product registry — ADR-266)
 

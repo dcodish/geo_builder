@@ -200,12 +200,13 @@ by `tool:`, never forked). Boundaries are declared in `BOUNDARIES.json` and enfo
 
 - `npm run dev` — Vite dev server: 2-D at `/`, 3-D at `/3d.html`, complex at `/complex.html`, analytic at `/analytic.html`
 - `npm run build` — `tsc -b` then `vite build`; `build:3d` / `build:complex` / `build:analytic` for the siblings
-- `npm test` — Vitest (watch). Single file: `npx vitest run <path>`. By name: `npx vitest run -t "<name>"`
+- `npm test` — Vitest (watch); one file or name: `npx vitest run <path>` / `-t "<name>"`
 - **`npm run test:full`** — the FULL suite (~10 min) — **the bar before any commit and any deploy**. Claim green by READING `reports/suite-verdict.json`, never an exit code ([ADR-W-033](docs/06w-decisions-workspace.md#adr-w-033)); on red read `failingFiles`, `collectErrors`, `missingFiles` ([ADR-W-128](docs/06w-decisions-workspace.md#adr-w-128)).
 - **`npm run test:fast`** — every file outside the measured slow tier, all products (~2 min) — the development loop and a fix round's per-item check, **never a commit or deploy gate** ([ADR-W-113](docs/06w-decisions-workspace.md#adr-w-113)).
 - **`npm run test:docs`** — the doc gate (~2 s) — the correct bar for a **doc-only** change; anything touching `.ts`/`.tsx` pays `test:full` ([ADR-W-041](docs/06w-decisions-workspace.md#adr-w-041)).
-- `npm run test:tiers` — which slow files have actually caught a regression the fast tier missed.
-- `npm run test:run:2d` / `test:run:3d` / `test:run:complex` / `test:run:analytic` — per-product slice (tree + `server/`, plus `shell/` for complex and analytic); CI mirrors the split. The same names without `run:` start watch mode and never exit.
+- `npm run test:tiers` — which slow files caught what the fast tier missed.
+- `npm run find-message -- "<text|key|code>"` — where a message lives (docs/22 §8).
+- `npm run test:run:2d` / `test:run:3d` / `test:run:complex` / `test:run:analytic` — per-product slice (tree + `server/`, + `shell/` for complex and analytic); CI mirrors it. Without `run:` they watch and never exit.
 - Test runs **queue on one lock across all worktrees** — `test:fast`, `test:full` and `test:run:*` take it themselves; an ad-hoc run uses `npm run test:locked -- npx vitest run <files>` ([ADR-W-114](docs/06w-decisions-workspace.md#adr-w-114)).
 - Tier mechanics and the fold-memo rule: [docs/08](docs/08-testing-strategy.md). The `@/` alias is 2-D-only; that hazard and every import edge: [`BOUNDARIES.json`](BOUNDARIES.json).
 
