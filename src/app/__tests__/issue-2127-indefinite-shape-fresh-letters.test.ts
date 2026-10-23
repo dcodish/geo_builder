@@ -100,11 +100,25 @@ describe('#2127 — the operator\'s lines: the indefinite «משולש …» is 
     for (const id of ['O', 'A', 'B', 'C']) expect(dist(r.positions.get(id)!, g.before.get(id)!), id).toBeLessThan(1e-9);
   });
 
-  it('the square: around, then «ריבוע חסום במעגל O» draws a second square (was a false «כבר קיים»)', async () => {
+  // #2355 (ADR-753): the inscribed square now STATES its shape. Before, this row committed a ring EFGH on O labelled a
+  // square that was not one (#2355's own class, bound branch). With the shape stated, the replay fold over the outer
+  // square's deferred circle refuses it — a pre-existing replay defect (#2454) whose wording names circle O as undefined.
+  // Operator ruling 2026-10-23 (#2355, card d02, answer A): ship, the refusal is the accepted interim until #2454 lands.
+  // The lock is the honesty half: never a non-square drawn green — a square on O, or refused with nothing added.
+  it('the square: around, then «ריבוע חסום במעגל O» is a second square on O, or refused — never a non-square (#2355, #2454)', async () => {
     const g = await play([O, 'ריבוע חוסם את מעגל O', 'ריבוע חסום במעגל O']);
+    if (g.last.kind === 'refuse') {
+      expect(polys()).toEqual(['ABCD']);
+      return;
+    }
     expect(g.last.kind).toBe('commit');
     expect(polys()).toEqual(['ABCD', 'EFGH']);
     onCircle('EFGH');
+    const r = replay(st().facts, st().seed);
+    const v = [...'EFGH'].map((id) => r.positions.get(id)!);
+    const sides = v.map((a, i) => dist(a, v[(i + 1) % 4]));
+    for (const s of sides) expect(Math.abs(s - sides[0]) / sides[0], 'EFGH has equal sides').toBeLessThan(1e-6);
+    expect(Math.abs(dist(v[0], v[2]) - dist(v[1], v[3])) / sides[0], 'EFGH has equal diagonals').toBeLessThan(1e-6);
   });
 
   it('English: "a triangle circumscribes circle O" · "a triangle inscribed in circle O"', async () => {

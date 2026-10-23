@@ -6649,6 +6649,24 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // geometry-significant should remain — a constraint/extra construct means a
   // compound ("inscribed … with AB = 6") → escalate, don't half-parse.
   if (shapeLeftover(removeClaimed(rest, ids))) return 'stop';
+  // A GENERAL quad's vertex angles are UNSTATED (ADR-052) — the convex spread is only a STARTING
+  // position, so the vertices stay FREE (samplable + drivable to a convex constraint-satisfying figure).
+  // A RIGID cyclic shape (square/rect/rhombus) has angles INTRINSIC to the shape → fixed. A TRAPEZOID is
+  // NOT rigid (its base ratio / height are unstated DOFs, ADR-052) and its only fixed property — AB ∥ CD —
+  // is now carried by a `set-parallel` constraint (shapeCmds), so its vertices are FREE too: they keep the
+  // isosceles starting angles but can flex to satisfy later givens while the parallel constraint persists.
+  // A general TRIANGLE is also free (any triangle is cyclic — its 3 vertex angles are unstated DOFs, ADR-052);
+  // a RIGHT-triangle inscribed stays fixed (its angles are pinned by Thales, kind 'right-triangle').
+  const freeAngles = kind === 'quad' || kind === 'trapezoid' || kind === 'kite' || kind === 'triangle';
+  // #2355 (ADR-753): a RIGID kind (square, rectangle, rhombus, right triangle — exactly the kinds whose vertices
+  // the pinned θ place) STATES its noun's shape by the ONE standalone lowering (`lowerShape`, ADR-595), so
+  // «ריבוע ABCD חסום במעגל» means «ריבוע ABCD» + «ABCD חסום במעגל». The pinned θ only place NEW vertices on
+  // this rule's own fresh circle; over existing vertices, an existing circle, or a ring already on its circle
+  // they say nothing (a `point-on-circle` over an existing id is membership, M1), so the shape used to be
+  // silently dropped there. The θ stay as the starting position (ADR-739's pattern for n ≥ 5). The free kinds
+  // keep their own relations below: they already hold on every branch, and the typed lowering would change
+  // their seeds (measured in ADR-753).
+  const statedShape = phrase && !freeAngles ? phrase.kind : null;
   // The equal-side relations for a named inscribed triangle shape (ADR-117), appended to whichever branch
   // builds the figure. Equilateral = both adjacent pairs equal; isosceles = a SOFT default |AB|=|AC| that
   // yields to an explicit pair (ADR-114), matching the standalone macros. Empty for a plain/quad inscribe.
@@ -6673,7 +6691,9 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // DROPPED — "kite ABCD inscribed in circle O" drew a GENERIC inscribed quad (the ADR-117 class, quad
   // edition: "kite"/"דלתון" is not a SHAPE_LEFTOVER token, so it neither constrained nor escalated).
   const basePlusShape = (v: Id[]): AnyCommand[] =>
-    kind === 'kite'
+    statedShape
+      ? lowerShape(statedShape, v) // the typed shape declares the ring itself (and its noun, #770)
+      : kind === 'kite'
       ? [{ type: 'shape-variant', shape: 'kite', ids: [v[0], v[1], v[2], v[3]], variant: 0 }]
       : [
           isTri
@@ -6758,14 +6778,19 @@ const inscribedPolygon: Rule = (s, ctx) => {
   if (isTri && allExist) {
     // #2362 / #2369 (ADR-748): the fact records whether the student named the centre — a minted letter answers to no
     // student letter unless it was shown, a named one is always drawn (FR-RN-8)
-    return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2], autoCenter: named == null }, ...shapeCmds(ids)];
+    return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2], autoCenter: named == null }, ...(statedShape ? lowerShape(statedShape, ids) : shapeCmds(ids))];
   }
   if (allExist) {
-    return [
+    const ring: AnyCommand[] = [
       { type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2], autoCenter: named == null, ...(hidden ? { hidden: true } : {}) },
       { type: 'set-concyclic', points: ids },
-      ...basePlusShape(ids), // a trapezoid keeps AB ∥ CD (a kite its equal pairs) even from existing points
     ];
+    // #2355 (ADR-753): a stated shape goes FIRST over the existing ring, so a given that contradicts the noun is
+    // judged in the noun's own frame — refused as «ABCD ריבוע» is over the same givens — and the circle then
+    // passes through a ring that is already the shape (a square/rectangle is cyclic). The free kinds keep
+    // their order: their relations are judged after the concyclic DOF is spent.
+    if (statedShape) return [...lowerShape(statedShape, ids), ...ring];
+    return [...ring, ...basePlusShape(ids)]; // a trapezoid keeps AB ∥ CD (a kite its equal pairs) even from existing points
   }
   // A cyclic (hidden-circle) quad needs CONVEX vertex order for the opposite-angles theorem;
   // the default general-quad spread (golden angle) would interleave the vertices into a
@@ -6777,15 +6802,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // radius DOF (ADR-071); only a NUMERIC radius is fixed. (Matches the bare-`circle` rule.)
   const freeRadius = !r.numeric;
   const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, ...piDeclared(r), ...(freeRadius ? { freeRadius: true } : {}), ...(hidden ? { hidden: true } : {}), ...(named ? {} : { autoCenter: true }) }];
-  // A GENERAL quad's vertex angles are UNSTATED (ADR-052) — the convex spread is only a STARTING
-  // position, so the vertices stay FREE (samplable + drivable to a convex constraint-satisfying figure).
-  // A RIGID cyclic shape (square/rect/rhombus) has angles INTRINSIC to the shape → fixed. A TRAPEZOID is
-  // NOT rigid (its base ratio / height are unstated DOFs, ADR-052) and its only fixed property — AB ∥ CD —
-  // is now carried by a `set-parallel` constraint (shapeCmds), so its vertices are FREE too: they keep the
-  // isosceles starting angles but can flex to satisfy later givens while the parallel constraint persists.
-  // A general TRIANGLE is also free (any triangle is cyclic — its 3 vertex angles are unstated DOFs, ADR-052);
-  // a RIGHT-triangle inscribed stays fixed (its angles are pinned by Thales, kind 'right-triangle').
-  const freeAngles = kind === 'quad' || kind === 'trapezoid' || kind === 'kite' || kind === 'triangle';
+  // (`freeAngles` — which kinds' angles are pinned — is decided above, beside `statedShape`.)
   ids.forEach((id, i) => {
     // specific angle for a shaped cyclic polygon (square/rect/rhombus/trapezoid) or the general quad's
     // convex-default start; omit for triangle so it spreads evenly via nextTheta.
@@ -6795,7 +6812,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
         : { type: 'point-on-circle', id, circle: circ },
     );
   });
-  // The edges connect the on-circle vertices; the SHAPE is set by the angles (+ the named-shape relations).
+  // The edges connect the on-circle vertices; the angles seed the shape, the named-shape relations state it.
   cmds.push(...basePlusShape(ids));
   return cmds;
 };

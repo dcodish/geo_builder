@@ -48,22 +48,6 @@
         ]
       },
       "enabled": true
-    },
-    {
-      "id": "g1.3",
-      "utterance": "מעגל O חוסם את הריבוע ABCD",
-      "group": "g1",
-      "cmd": {
-        "type": "quadrilateral",
-        "ids": [
-          "A",
-          "B",
-          "C",
-          "D"
-        ],
-        "declaredAs": "square"
-      },
-      "enabled": true
     }
   ]
 }

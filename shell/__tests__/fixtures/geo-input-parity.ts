@@ -313,6 +313,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2449': 'open', // #2398 (ADR-747): analytic refuses a circle centre's second letter (unknown-reference O); 2-D asks (names the holder, or «מעגל O לא הוגדר»)
   '#2448': 'open', // #2405 (ADR-751): analytic does not read «כל המשיקים המשותפים» on externally tangent circles (not-handled)
   '#2442': 'open', // #2405 (ADR-751): «כל המשיקים המשותפים» on a pair whose position was never stated: 2-D asks (interim), analytic does not read it; the permanent answer awaits the operator
+  '#2451': 'open', // #2355 (ADR-753): 3-D refuses «ריבוע ABCD חסום במעגל» over a ring already inscribed (already-defined); 2-D builds the square
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
 
@@ -1771,6 +1772,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'pair-tangent-to-circle-2211', family: 'circles', steps: ['מעגל O', 'מעגל P', 'מעגל Q', 'המעגלים O ו-P משיקים למעגל Q'], expect: 'not-handled', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2190' }], note: 'the pair-subject form is not read in 2-D (it named [O, P] and dropped Q before ADR-735); analytic reads it, Q tangent to both' },
   { id: 'perpendicular-to-two-2219', family: 'parallel-perpendicular', steps: ['משולש ABC', 'D אמצע AB', 'E אמצע AC', 'F אמצע BC', 'AF מאונך ל-BC ול-DE'], expect: 'builds', knownGap: [{ product: 'analytic', issue: '#2223' }, { product: '3d', issue: '#2223' }], note: '2-D escalated it before ADR-744; analytic refuses it bad-operand, 3-D not-understood' },
   { id: 'parallel-to-two-conflict-2219', family: 'parallel-perpendicular', steps: ['משולש ABC', 'D אמצע AB', 'E אמצע AC', 'F אמצע BC', 'DE מקביל ל-BC ול-AB'], expect: 'refused', knownGap: [{ product: '3d', issue: '#2223' }], note: '2-D escalated it before ADR-744 (and drew «…ו-AB» green with AB a plain segment); analytic refuses it; 3-D does not read it' },
+  // ── #2355 (ADR-753): an inscribed rigid 3-/4-gon states its noun's shape over existing vertices ──
+  { id: 'square-inscribed-existing-2355', family: 'inscribed', steps: ['מרובע ABCD', 'ריבוע ABCD חסום במעגל'], expect: 'builds', note: 'a square in all three builders; 2-D drew a non-square green before ADR-753 (the figure is locked in src/app/__tests__/issue-2355-inscribed-shape-stated.test.ts)' },
+  { id: 'square-inscribed-reentry-2355', family: 'inscribed', steps: ['מרובע ABCD חסום במעגל', 'ריבוע ABCD חסום במעגל'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2451' }], note: '2-D answered «כבר קיים» before ADR-753 and now draws the square; analytic builds it; 3-D refuses it already-defined' },
 ];
 
 /** Catalog sentences that predate the rule and have no row yet — a ratchet: it may only shrink. */
