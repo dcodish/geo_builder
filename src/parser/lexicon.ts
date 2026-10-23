@@ -126,7 +126,21 @@ export function readWordFraction(s: string): { p: number; q: number; at: number;
  *  #267 is how «∠ABC = α1» read as 1°). Only the atoms the grammar consumes are re-exported (#361). */
 export { GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED } from '../../shell/indexedName';
 
-// ── Keywords (bilingual, morphology handled ONCE) ────────────────────────────────────────────────
+// ── Circle roles (ADR-244, #2459 ADR-754) ─────────────────────────────────────────────────────────
+/**
+ * The ROLE of one circle of a concentric pair, as the student names it: the Hebrew adjective FOLLOWS the
+ * circle noun («המעגל החיצוני/הפנימי/הגדול/הקטן»), the English one PRECEDES it ("the outer/inner/larger/smaller
+ * circle"). ADJACENCY to the circle noun is required — a bare «חיצוני» also appears in «נקודה חיצונית» (an
+ * external POINT). One spelling, read by the parser's concentric post-pass (`circleQualifier`) and by every
+ * per-span reader that names a pair's circle inside a sentence (the radius ratio, #2459). Capture 1 is the adjective.
+ */
+export const CIRCLE_ROLE_HE = String.raw`מעגל(?:ים)?\s+ה?(חיצוני|פנימי|גדול|קטן)`;
+export const CIRCLE_ROLE_EN = String.raw`\b(outer|external|inner|internal|larg(?:er|est)?|small(?:er|est)?|big(?:ger|gest)?)\s+circles?\b`;
+/** The role a {@link CIRCLE_ROLE_HE} / {@link CIRCLE_ROLE_EN} adjective names. */
+export const circleRole = (adj: string): 'outer' | 'inner' =>
+  /^(?:פנימי|קטן|inner|internal|small)/i.test(adj) ? 'inner' : 'outer';
+
+// ── Keywords (bilingual, morphology handled ONCE)────────────────────────────────────────────────
 /** Hebrew kaf in both positional forms — the ADR-3D-035 recorded trap (`מאונ[ךכ]` — a final-ך-only
  *  gate silently rejects the plural `מאונכים`, where kaf is medial). */
 export const KAF = String.raw`[כך]`;

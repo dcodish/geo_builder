@@ -165,3 +165,27 @@ describe('ADR-453 — the enforcing verdict', () => {
     expect(unaccountedSpans('AB ∥ CD', [{ type: 'set-parallel', a: 'A', b: 'B', c: 'C', d: 'D' } as AnyCommand])).toEqual([]);
   });
 });
+
+// #2459 (ADR-754) — a FACTOR («פי N», «N פעמים», "N times") is paid only by a ratio coefficient or a declared
+// consumed number, never by a size value that happens to equal it.
+describe('span accounting — the factor token (#2459)', () => {
+  const C = (x: Record<string, unknown>) => x as unknown as AnyCommand;
+  it('a factor lowered to a SIZE is a hard span, on any spelling', () => {
+    for (const [s, v] of [['רדיוס המעגל החיצוני גדול פי 2', 2], ['רדיוס מעגל O 2 פעמים', 2], ['the radius of circle O is 3 times larger', 3]] as const) {
+      expect(unaccountedSpans(s, [C({ type: 'set-radius', circle: 'circle-O', value: v })]).map((x) => x.kind), s).toEqual(['number']);
+    }
+  });
+  it('a factor is paid by the ratio coefficient k', () => {
+    expect(unaccountedSpans('רדיוס מעגל O גדול פי 2 מרדיוס מעגל P', [C({ type: 'set-radius-ratio', c1: 'circle-O', c2: 'circle-P', k: 2 })])).toEqual([]);
+    expect(unaccountedSpans('AB גדול פי 2 מ-AC', [C({ type: 'set-ratio', a: 'A', b: 'B', c: 'A', d: 'C', k: 2 })])).toEqual([]);
+  });
+  it('an inverted factor is paid by k = 1/n only together with its declared consumed number', () => {
+    const s = 'רדיוס מעגל O קטן פי 2 מרדיוס מעגל P';
+    expect(unaccountedSpans(s, [C({ type: 'set-radius-ratio', c1: 'circle-O', c2: 'circle-P', k: 0.5, consumed: { numbers: [2] } })])).toEqual([]);
+    expect(unaccountedSpans(s, [C({ type: 'set-radius-ratio', c1: 'circle-O', c2: 'circle-P', k: 0.5 })]).map((x) => x.kind)).toEqual(['number']);
+  });
+  it('a count and a plain size are not factors — unaffected', () => {
+    expect(unaccountedSpans('רדיוס 5', [C({ type: 'set-radius', circle: 'circle-O', value: 5 })])).toEqual([]);
+    expect(unaccountedSpans('רדיוס מעגל O הוא 3', [C({ type: 'set-radius', circle: 'circle-O', value: 3 })])).toEqual([]);
+  });
+});

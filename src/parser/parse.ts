@@ -20,7 +20,7 @@
  */
 
 import { MIDSEGMENT_SHAPES, nounOfKind, RADIUS_VAR, seedFields, rightAngleAtFoot, type RoleSideBinding, type AnyCommand, type CirclePositionCase, type Consumed, type Command, type Id, type MeasureExpr, type RoundOperand, type SymbolicCommand, symbolsConsumedBy } from '@/engine';
-import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP } from './lexicon';
+import { CEVIAN_NOUNS_HE, CEVIAN_NOUNS_EN, CEVIAN_SUBJECT, NUM, LABEL, ULABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx, heWord, enWord, KAF, MEET_KW, ANGLE_KW, ANGLE_EN, BISECT_KW, PARALLEL_KW, GREEK_LETTER, NAME_LETTER, INDEX, UNGLUED, spellVulgarFractions, readWordFraction, RATIO_SEP, CIRCLE_ROLE_HE, CIRCLE_ROLE_EN, circleRole } from './lexicon';
 import { restoreStatedSequences as restoreStatedSequencesShared } from '../../shell/llm/sequenceGate';
 import { rivalRoleGoverns, roleOperands, type RoleOperand } from './roleNouns';
 import { stripFormatControls } from '../../shell/bidi';
@@ -3772,6 +3772,27 @@ const numexprVal = (g: Record<string, string | undefined>, p: string): { value: 
 };
 
 /**
+ * #2459 ([ADR-754](../../docs/06-decisions.md#adr-754)) — THE FACTOR slot: «פי N», «N פעמים», "N times" — a number
+ * that MULTIPLIES another measure, never a size of its own. One spelling over the shared NUMEXPR atom, composed by
+ * every multiplicative reader (`measureRatioK`, `radiusRatio`) and read by the span accountant
+ * ({@link factorSpans}), where a factor is paid only by a ratio coefficient. Two patterns, not one alternation,
+ * because each carries the NUMEXPR named groups.
+ */
+const FACTOR_PI = (p: string) => String.raw`(?<![א-ת])פי\s*${NUMEXPR(p)}`;
+const FACTOR_TIMES = (p: string) => String.raw`${UNGLUED}${NUMEXPR(p)}\s*(?:(?<![א-ת])פעמים(?![א-ת])|\btimes\b)`;
+/** Every factor the sentence states, with its value — the span accountant's FACTOR token (#2459, ADR-754). */
+export function factorSpans(s: string): { at: number; end: number; value: number; text: string }[] {
+  const out: { at: number; end: number; value: number; text: string }[] = [];
+  for (const re of [new RegExp(FACTOR_PI('f'), 'gi'), new RegExp(FACTOR_TIMES('f'), 'gi')]) {
+    for (const m of s.matchAll(re)) {
+      const v = numexprVal(m.groups!, 'f');
+      if (v) out.push({ at: m.index!, end: m.index! + m[0].length, value: v.value, text: v.text });
+    }
+  }
+  return out;
+}
+
+/**
  * #2008 ([ADR-635](../../docs/06-decisions.md#adr-635)) — the COEFFICIENT written right before a measure keyword
  * («= 2∠DEF», «= 1/2 קשת CD», «= ½∠B» once the boundary has spelled the glyph), read through the shared NUMEXPR
  * atom so a quotient is ONE value. The legacy decimal atom stopped at the slash («1/2∠B» read 2), and a glyph
@@ -4426,8 +4447,8 @@ function measureRatioK(s: string): MeasureRatio | null {
   // (1) a factor — «גדול פי 2 מ», «קטנה פי √(3)», «פי 2 קטן», «2 פעמים», "3 times smaller than"; the shared NUMEXPR
   // atom (ADR-298), so a radical factor or the √() toolbar form parses too (issue #114).
   const fac =
-    s.match(new RegExp(String.raw`(?:(?<pre>${RATIO_CMP})\s+)?(?<![א-ת])פי\s*${NUMEXPR('pi')}(?:\s+(?<post>${RATIO_CMP}))?`, 'i')) ??
-    s.match(new RegExp(String.raw`(?:(?<pre>${RATIO_CMP})\s+)?${NUMEXPR('pi')}\s*(?:(?<![א-ת])פעמים(?![א-ת])|\btimes\b)(?:\s+(?<post>${RATIO_CMP}))?`, 'i'));
+    s.match(new RegExp(String.raw`(?:(?<pre>${RATIO_CMP})\s+)?${FACTOR_PI('pi')}(?:\s+(?<post>${RATIO_CMP}))?`, 'i')) ??
+    s.match(new RegExp(String.raw`(?:(?<pre>${RATIO_CMP})\s+)?${FACTOR_TIMES('pi')}(?:\s+(?<post>${RATIO_CMP}))?`, 'i'));
   if (fac) {
     const v = numexprVal(fac.groups!, 'pi');
     if (!v || !(v.value > 0)) return null;
@@ -5765,8 +5786,38 @@ const sizeStatementLeftover = (s: string): boolean =>
  * bare «רדיוס O» is not read here.
  */
 const RADIUS_REF = new RegExp(String.raw`(?:רדיוס(?:\s+של)?\s+ה?מעגל\s+|\bradius\s+of\s+(?:the\s+)?circle\s+)(${LABEL})(?![A-Za-z\d])`, 'gi');
-const radiusReferences = (s: string): { label: string; at: number; end: number }[] =>
-  [...s.matchAll(RADIUS_REF)].map((m) => ({ label: up(m[1]), at: m.index!, end: m.index! + m[0].length }));
+/** #2459 ([ADR-754](../../docs/06-decisions.md#adr-754)) — a radius reference by the circle's ROLE in a concentric
+ *  pair: «רדיוס (של)? (ה)מעגל החיצוני/הפנימי/הגדול/הקטן», "the radius of the outer/inner circle" (the ADR-244 roles,
+ *  the lexicon's one spelling). */
+const RADIUS_ROLE_REF = new RegExp(String.raw`רדיוס(?:\s+של)?\s+ה?${CIRCLE_ROLE_HE}|\bradius\s+of\s+the\s+${CIRCLE_ROLE_EN}`, 'gi');
+
+/** The circle a ROLE names in the pair — the one role→id mapping, shared by the ADR-244 post-pass
+ *  (`withConcentricResolution`) and the per-span reader `radiusReferences` (#2459). */
+const pairCircle = (pair: { outer: string; inner: string }, role: 'outer' | 'inner'): string => (role === 'outer' ? pair.outer : pair.inner);
+
+/** One radius reference, RESOLVED per span (#2459, ADR-754): a circle id; `ambiguous` — a letter that is a concentric
+ *  pair's shared centre (ADR-244's ask); or `unresolved` — a role with no single pair to name a circle of. */
+type RadiusRef = { at: number; end: number } & ({ circle: string } | { ambiguous: string } | { unresolved: true });
+/**
+ * Every radius reference in the sentence, each resolved where it stands. The ADR-244 post-pass holds ONE role per
+ * utterance, so a sentence that names BOTH circles of a pair by role («רדיוס המעגל החיצוני גדול פי 2 מרדיוס המעגל
+ * הפנימי») cannot be resolved there: a relation between two circles is resolved per span, by its reader (#2459).
+ * A letter that is not a drawn circle's centre resolves to its would-be id; the caller checks it is drawn.
+ */
+const radiusReferences = (s: string, ctx: ParseContext): RadiusRef[] => {
+  const pairs = ctx.concentric ?? [];
+  const letter = [...s.matchAll(RADIUS_REF)].map((m): RadiusRef => {
+    const label = up(m[1]);
+    const span = { at: m.index!, end: m.index! + m[0].length };
+    return pairs.some((p) => up(p.center) === label) ? { ...span, ambiguous: label } : { ...span, circle: circleId(label) };
+  });
+  const role = [...s.matchAll(RADIUS_ROLE_REF)].map((m): RadiusRef => {
+    const span = { at: m.index!, end: m.index! + m[0].length };
+    const adj = m[1] ?? m[2];
+    return pairs.length === 1 ? { ...span, circle: pairCircle(pairs[0], circleRole(adj)) } : { ...span, unresolved: true };
+  });
+  return [...letter, ...role].sort((a, b) => a.at - b.at);
+};
 
 /**
  * #2100 ([ADR-649](../../docs/06-decisions.md#adr-649)) — A RATIO BETWEEN TWO RADII is a relation, never a size.
@@ -5783,43 +5834,55 @@ const radiusReferences = (s: string): { label: string; at: number; end: number }
  * a smaller-word inverts it and declares the number it consumed (ADR-636 / ADR-462). What is left once the two
  * references, the factor and the comparative are read must be ratio connectives only ({@link onlyRatioWords}), else
  * the line escalates — never a half-read. Both circles must already be drawn: a reference to no circle escalates.
+ *
+ * #2459 ([ADR-754](../../docs/06-decisions.md#adr-754)) — a reference may name a circle by its ROLE in a concentric
+ * pair («רדיוס המעגל החיצוני גדול פי 2 מרדיוס המעגל הפנימי»), resolved per span by {@link radiusReferences}: the
+ * emitted `c1`/`c2` stay outside the post-pass's `CIRCLE_REF_KEYS` on purpose, because that post-pass holds one role
+ * per utterance. The pair's shared centre letter is asked about (`ambiguous-circle`); the pair's two circles at
+ * k = 1 are refused with ADR-713's equal-concentric sentence.
  */
 const radiusRatio: Rule = (s, ctx) => {
-  const refs = radiusReferences(s);
+  const refs = radiusReferences(s, ctx);
   if (refs.length < 2) return null;
-  const fac =
-    s.match(new RegExp(String.raw`(?<![א-ת])פי\s*${NUMEXPR('k')}`, 'i')) ??
-    s.match(new RegExp(String.raw`${UNGLUED}${NUMEXPR('k')}\s*(?:(?<![א-ת])פעמים(?![א-ת])|\btimes\b)`, 'i'));
+  const fac = s.match(new RegExp(FACTOR_PI('k'), 'i')) ?? s.match(new RegExp(FACTOR_TIMES('k'), 'i'));
+  let k = 1;
+  let smaller = false;
+  let rest = s;
+  for (const sp of [...refs].sort((x, y) => y.at - x.at)) rest = rest.slice(0, sp.at) + ' ' + rest.slice(sp.end);
   if (!fac) {
     // #2149 (ADR-671, card 6): no factor — an EQUALITY of the two radii is the ratio k = 1 («רדיוס מעגל O שווה לרדיוס
     // מעגל P», «… = …», «רדיוס מעגל O ורדיוס מעגל P שווים», "the radius of circle O equals / is equal to the radius of
     // circle P"). The same guards: two references to two drawn circles, and nothing left but ratio connectives.
     if (refs.length !== 2) return null;
-    let rest = s;
-    for (const sp of [...refs].sort((x, y) => y.at - x.at)) rest = rest.slice(0, sp.at) + ' ' + rest.slice(sp.end);
     if (!/=|(?<![א-ת])ו?(?:שווה|שווים|שוות|זהה|זהים)(?![א-ת])|\bequals?\b|\bequal\b/i.test(rest)) return null;
-    const known = new Set((ctx.circles ?? []).map(up));
-    const [a, b] = refs;
-    if (a.label === b.label || !known.has(a.label) || !known.has(b.label)) return 'stop';
-    if (!onlyRatioWords(rest)) return 'stop';
-    return [{ type: 'set-radius-ratio', c1: circleId(a.label), c2: circleId(b.label), k: 1 }];
+  } else {
+    const kv = numexprVal(fac.groups!, 'k');
+    if (refs.length !== 2 || !kv || !(kv.value > 0)) return 'stop';
+    k = kv.value;
+    // blank the two references and the factor, then read the comparative from what remains
+    const spans = [...refs, { at: fac.index!, end: fac.index! + fac[0].length }].sort((x, y) => y.at - x.at);
+    rest = s;
+    for (const sp of spans) rest = rest.slice(0, sp.at) + ' ' + rest.slice(sp.end);
+    const cmps = [...rest.matchAll(new RegExp(RATIO_CMP, 'gi'))];
+    if (cmps.length > 1) return 'stop';
+    smaller = cmps.length === 1 && isSmaller(cmps[0][0]);
+    if (cmps.length === 1) rest = rest.slice(0, cmps[0].index!) + ' ' + rest.slice(cmps[0].index! + cmps[0][0].length);
   }
-  const k = numexprVal(fac.groups!, 'k');
-  const known = new Set((ctx.circles ?? []).map(up));
-  if (refs.length !== 2 || !k || !(k.value > 0)) return 'stop';
-  const [a, b] = refs;
-  if (a.label === b.label || !known.has(a.label) || !known.has(b.label)) return 'stop';
-  // blank the two references and the factor, then read the comparative from what remains
-  const spans = [...refs, { at: fac.index!, end: fac.index! + fac[0].length }].sort((x, y) => y.at - x.at);
-  let rest = s;
-  for (const sp of spans) rest = rest.slice(0, sp.at) + ' ' + rest.slice(sp.end);
-  const cmps = [...rest.matchAll(new RegExp(RATIO_CMP, 'gi'))];
-  if (cmps.length > 1) return 'stop';
-  const smaller = cmps.length === 1 && isSmaller(cmps[0][0]);
-  if (cmps.length === 1) rest = rest.slice(0, cmps[0].index!) + ' ' + rest.slice(cmps[0].index! + cmps[0][0].length);
   if (!onlyRatioWords(rest)) return 'stop';
-  const ratio = { type: 'set-radius-ratio', c1: circleId(a.label), c2: circleId(b.label) } as const;
-  return [smaller ? { ...ratio, k: 1 / k.value, consumed: { numbers: [k.value] } } : { ...ratio, k: k.value }];
+  // #2459 (ADR-754): each reference was resolved where it stands — a pair's shared centre letter is ASKED about
+  // (ADR-244's ask, never a silent pick of the outer), a role with no single pair names no circle (escalate).
+  const amb = refs.find((r): r is RadiusRef & { ambiguous: string } => 'ambiguous' in r);
+  if (amb) return { clarify: 'ambiguous-circle', center: amb.ambiguous };
+  const known = new Set((ctx.circles ?? []).map((c) => circleId(up(c))));
+  for (const p of ctx.concentric ?? []) known.add(p.outer).add(p.inner);
+  const [a, b] = refs.map((r) => ('circle' in r ? r.circle : null));
+  if (!a || !b || a === b || !known.has(a) || !known.has(b)) return 'stop';
+  // the two circles of ONE concentric pair at k = 1: equal circles on one centre cannot both be drawn (#2206, ADR-713)
+  if (k === 1 && (ctx.concentric ?? []).some((p) => (p.outer === a && p.inner === b) || (p.outer === b && p.inner === a)))
+    return { clarify: 'equal-circles-nested', relation: 'concentric' };
+  const ratio = { type: 'set-radius-ratio', c1: a, c2: b } as const;
+  if (!fac) return [{ ...ratio, k: 1 }];
+  return [smaller ? { ...ratio, k: 1 / k, consumed: { numbers: [k] } } : { ...ratio, k }];
 };
 
 /**
@@ -5837,7 +5900,7 @@ const radiusRatio: Rule = (s, ctx) => {
 const setRadius: Rule = (s, ctx) => {
   if (!/radius|רדיוס/i.test(s)) return null;
   if (sizeStatementLeftover(s)) return null; // a construction carrying a size clause — not a size statement
-  if (radiusReferences(s).length >= 2) return null; // two radii named: a RELATION between them (`radiusRatio`, #2100), never a size
+  if (radiusReferences(s, ctx).length >= 2) return null; // two radii named: a RELATION between them (`radiusRatio`, #2100), never a size
   // The value, with circle labels (e.g. P1) stripped first. #2008 (ADR-635): the COPULA's value, read through the
   // shared NUMEXPR atom — «רדיוס המעגל O הוא 1/2» used to take the first bare number of the sentence (1) and drop
   // the «/2» with every gate quiet; a quotient is one value. No copula → the first value, as before.
@@ -12975,10 +13038,10 @@ export function impliedPointBinding(
  * as a circle qualifier.
  */
 const circleQualifier = (s: string): 'outer' | 'inner' | null => {
-  const he = s.match(/מעגל(?:ים)?\s+ה?(חיצוני|פנימי|גדול|קטן)/);
-  if (he) return he[1] === 'חיצוני' || he[1] === 'גדול' ? 'outer' : 'inner';
-  const en = s.match(/\b(outer|external|inner|internal|larg(?:er|est)?|small(?:er|est)?|big(?:ger|gest)?)\s+circles?\b/i);
-  if (en) return /^(inner|internal|small)/i.test(en[1]) ? 'inner' : 'outer';
+  const he = s.match(new RegExp(CIRCLE_ROLE_HE));
+  if (he) return circleRole(he[1]);
+  const en = s.match(new RegExp(CIRCLE_ROLE_EN, 'i'));
+  if (en) return circleRole(en[1]);
   return null;
 };
 
@@ -13022,7 +13085,7 @@ function withConcentricResolution(
   const targets = new Map<AnyCommand, Map<string, string>>();
   for (const { cmd, key } of refs) {
     const pair = pairByOuter.get((cmd as unknown as Record<string, string>)[key])!;
-    let target: string | null = qual ? (qual === 'outer' ? pair.outer : pair.inner) : null;
+    let target: string | null = qual ? pairCircle(pair, qual) : null;
     if (!target) {
       // No qualifier — stated membership picks: every point the command names that is ALREADY a member
       // of one of the pair must side with the SAME circle.
