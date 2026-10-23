@@ -1,0 +1,69 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-21T12:00:00.000Z",
+  "name": "rectangle-inscribed-existing-2355",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מרובע ABCD",
+      "group": "g0",
+      "cmd": {
+        "type": "quadrilateral",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "מלבן ABCD חסום במעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "rectangle",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "utterance": "מלבן ABCD חסום במעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "circumcircle",
+        "id": "circle-O",
+        "center": "O",
+        "a": "A",
+        "b": "B",
+        "c": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.3",
+      "utterance": "מלבן ABCD חסום במעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "set-concyclic",
+        "points": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    }
+  ]
+}
