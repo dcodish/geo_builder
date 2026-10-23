@@ -37,7 +37,7 @@ const textOf = (v: Verdict2D, lng: 'he' | 'en') => {
   const params = Object.fromEntries(Object.entries(v.note.params ?? {}).map(([k, x]) => [k, x && typeof x === 'object' && 't' in x ? i18n.t((x as { t: string }).t, { lng }) : x]));
   return plain(i18n.t(v.note.key, { ...params, lng }) as string);
 };
-const TRI = (side: string, v: string) => `${side} היא צלע של המשולש ולכן אינה יכולה לחצות את זווית ${v} — חוצה זווית יוצא מקודקוד אל הצלע שמולו.`;
+const TRI = (side: string, v: string) => `${side} היא צלע של המשולש ולכן אינה יכולה לחצות את זווית ${v}. חוצה זווית יוצא מקודקוד אל הצלע שמולו — תנו לקצה השני שלו אות חדשה.`;
 
 beforeEach(() => {
   st().clear();
@@ -75,7 +75,7 @@ describe('#2066 — a bisector named by a side of the triangle is refused as a s
 
   it('the English locale', async () => {
     await drive(['משולש ABC']);
-    expect(textOf(await decideHere('AB חוצה זווית'), 'en')).toBe('AB is a side of the triangle, so it cannot bisect angle A — an angle bisector runs from a vertex to the opposite side.');
+    expect(textOf(await decideHere('AB חוצה זווית'), 'en')).toBe('AB is a side of the triangle, so it cannot bisect angle A. An angle bisector runs from a vertex to the opposite side — give its other end a new letter.');
   });
 });
 
@@ -89,22 +89,22 @@ describe('#2085 item 3 — the same predicate on every other declared polygon, n
     ['מעוין ABCD', 'המעוין'],
     ['דלתון ABCD', 'הדלתון'],
     ['מחומש ABCDE', 'המחומש'],
-  ])('«%s» · «AB חוצה זווית» → «AB היא צלע של %s ולכן אינה יכולה לחצות את זווית A.»', async (shape, noun) => {
+  ])('«%s» · «AB חוצה זווית» → «AB היא צלע של %s ולכן אינה יכולה לחצות את זווית A. תנו לקצה השני…»', async (shape, noun) => {
     await drive([shape]);
     const n = st().facts.length;
     const v = await decideHere('AB חוצה זווית');
     expect(v.kind).toBe('refuse');
-    expect(textOf(v, 'he')).toBe(`AB היא צלע של ${noun} ולכן אינה יכולה לחצות את זווית A.`);
+    expect(textOf(v, 'he')).toBe(`AB היא צלע של ${noun} ולכן אינה יכולה לחצות את זווית A. תנו לקצה השני של חוצה הזווית אות חדשה.`);
     commitVerdict(v, 'AB חוצה זווית');
     expect(st().facts.length).toBe(n);
   });
   it('both letter orders: «מרובע ABCD» · «BA חוצה זווית» → the angle at B', async () => {
     await drive(['מרובע ABCD']);
-    expect(textOf(await decideHere('BA חוצה זווית'), 'he')).toBe('BA היא צלע של המרובע ולכן אינה יכולה לחצות את זווית B.');
+    expect(textOf(await decideHere('BA חוצה זווית'), 'he')).toBe('BA היא צלע של המרובע ולכן אינה יכולה לחצות את זווית B. תנו לקצה השני של חוצה הזווית אות חדשה.');
   });
   it('English: "AB is a side of the rectangle, so it cannot bisect angle A."', async () => {
     await drive(['מלבן ABCD']);
-    expect(textOf(await decideHere('AB חוצה זווית'), 'en')).toBe('AB is a side of the rectangle, so it cannot bisect angle A.');
+    expect(textOf(await decideHere('AB חוצה זווית'), 'en')).toBe('AB is a side of the rectangle, so it cannot bisect angle A. Give the other end of the bisector a new letter.');
   });
 });
 

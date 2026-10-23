@@ -30,7 +30,7 @@ const decide = (prefix: readonly string[], line: string): SubmitVerdict => {
   return decideSubmit(line, prefix, 0);
 };
 const textOf = (v: SubmitVerdict, t: T): string | null => (v.kind === 'refused' ? errorText(v.error, t) : null);
-const TRI = (side: string, v: string) => `${side} היא צלע של המשולש ולכן אינה יכולה לחצות את זווית ${v} — חוצה זווית יוצא מקודקוד אל הצלע שמולו.`;
+const TRI = (side: string, v: string) => `${side} היא צלע של המשולש ולכן אינה יכולה לחצות את זווית ${v}. חוצה זווית יוצא מקודקוד אל הצלע שמולו — תנו לקצה השני שלו אות חדשה.`;
 
 describe('#2115 — a bisector named by a side of the triangle is refused as a side', () => {
   it('the fixture (the operator’s sequence): its last line is refused with the side sentence', () => {
@@ -70,7 +70,7 @@ describe('#2115 — a bisector named by a side of the triangle is refused as a s
 
   it('the English locale', () => {
     expect(textOf(decide(['משולש ABC'], 'AB חוצה זווית'), en)).toBe(
-      'AB is a side of the triangle, so it cannot bisect angle A — an angle bisector runs from a vertex to the opposite side.',
+      'AB is a side of the triangle, so it cannot bisect angle A. An angle bisector runs from a vertex to the opposite side — give its other end a new letter.',
     );
   });
 
@@ -89,22 +89,22 @@ describe('#2115 — the same predicate on every other declared polygon, naming i
     ['מעוין ABCD', 'המעוין'],
     ['דלתון ABCD', 'הדלתון'],
     ['מחומש ABCDE', 'המחומש'],
-  ])('«%s» · «AB חוצה זווית» → «AB היא צלע של %s ולכן אינה יכולה לחצות את זווית A.»', (shape, noun) => {
+  ])('«%s» · «AB חוצה זווית» → «AB היא צלע של %s ולכן אינה יכולה לחצות את זווית A. תנו לקצה השני…»', (shape, noun) => {
     const v = decide([shape], 'AB חוצה זווית');
     expect(v.kind).toBe('refused');
-    expect(textOf(v, he)).toBe(`AB היא צלע של ${noun} ולכן אינה יכולה לחצות את זווית A.`);
+    expect(textOf(v, he)).toBe(`AB היא צלע של ${noun} ולכן אינה יכולה לחצות את זווית A. תנו לקצה השני של חוצה הזווית אות חדשה.`);
   });
   it('both letter orders: «מרובע ABCD» · «BA חוצה זווית» → the angle at B', () => {
-    expect(textOf(decide(['מרובע ABCD'], 'BA חוצה זווית'), he)).toBe('BA היא צלע של המרובע ולכן אינה יכולה לחצות את זווית B.');
+    expect(textOf(decide(['מרובע ABCD'], 'BA חוצה זווית'), he)).toBe('BA היא צלע של המרובע ולכן אינה יכולה לחצות את זווית B. תנו לקצה השני של חוצה הזווית אות חדשה.');
   });
   it('the closing side: «ריבוע ABCD» · «AD חוצה זווית» → the square, the angle at A', () => {
-    expect(textOf(decide(['ריבוע ABCD'], 'AD חוצה זווית'), he)).toBe('AD היא צלע של הריבוע ולכן אינה יכולה לחצות את זווית A.');
+    expect(textOf(decide(['ריבוע ABCD'], 'AD חוצה זווית'), he)).toBe('AD היא צלע של הריבוע ולכן אינה יכולה לחצות את זווית A. תנו לקצה השני של חוצה הזווית אות חדשה.');
   });
   it('a regular pentagon is a pentagon: «מחומש משוכלל ABCDE» → המחומש', () => {
-    expect(textOf(decide(['מחומש משוכלל ABCDE'], 'AB חוצה זווית'), he)).toBe('AB היא צלע של המחומש ולכן אינה יכולה לחצות את זווית A.');
+    expect(textOf(decide(['מחומש משוכלל ABCDE'], 'AB חוצה זווית'), he)).toBe('AB היא צלע של המחומש ולכן אינה יכולה לחצות את זווית A. תנו לקצה השני של חוצה הזווית אות חדשה.');
   });
   it('English: "AB is a side of the rectangle, so it cannot bisect angle A."', () => {
-    expect(textOf(decide(['מלבן ABCD'], 'AB חוצה זווית'), en)).toBe('AB is a side of the rectangle, so it cannot bisect angle A.');
+    expect(textOf(decide(['מלבן ABCD'], 'AB חוצה זווית'), en)).toBe('AB is a side of the rectangle, so it cannot bisect angle A. Give the other end of the bisector a new letter.');
   });
 });
 
