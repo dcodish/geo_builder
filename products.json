@@ -6,7 +6,9 @@
     "(a product tree with no entry FAILS the suite), and server/__tests__/registry-consistency.test.ts",
     "asserts ci.yml's classifier and the docs/22 §9 table stay in step with it.",
     "Adding builder N+1 means editing THIS file — the guards name every other place that must follow.",
-    "labelKey is resolved by EACH consuming product's own i18n resources; url is the prod path,",
+    "labelKey is resolved by EACH consuming product's own i18n instance. A name that is byte-identical in every",
+    "builder is a `suite.*` key in shell/locales (ONE copy, #2201 phase 1 / ADR-W-148); 3-D's name is still",
+    "per product (its English differs between builders, an unruled wording question). url is the prod path,",
     "devUrl is where `npm run dev` serves the same app."
   ],
   "version": 1,
@@ -17,7 +19,7 @@
   "products": [
     {
       "id": "2d",
-      "labelKey": "switcher2d",
+      "labelKey": "suite.product.2d",
       "icon": "📐",
       "url": "/geo-builder/",
       "devUrl": "/",
@@ -37,7 +39,7 @@
     },
     {
       "id": "complex",
-      "labelKey": "switcherComplex",
+      "labelKey": "suite.product.complex",
       "icon": "ℂ",
       "url": "/complex-builder/",
       "devUrl": "/complex.html",
@@ -54,7 +56,7 @@
         "is now inert here and stays as the mechanism for whichever builder is held back NEXT."
       ],
       "id": "analytic",
-      "labelKey": "switcherAnalytic",
+      "labelKey": "suite.product.analytic",
       "icon": "📈",
       "url": "/analytic-builder/",
       "devUrl": "/analytic.html",

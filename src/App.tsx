@@ -1113,7 +1113,7 @@ export default function App() {
        About), tool row (title + session actions), one look across the builders. The product's
        header, its own language toggle, its dir effect and its footer all retire here. */
     <AppFrame
-      title={t('app.title')}
+      title={t('suite.product.2d')}
       subtitle={t('app.subtitle')}
       utilityActions={orderToolActions([
         /* The ORDER is shell/frame/toolRow's (#1376) — this list may read in any order; what
@@ -1177,7 +1177,7 @@ export default function App() {
           id: 'manual',
           node: (
             <ToolButton key="manual" onClick={() => setManualOpen(true)}>
-              {t('manualButton')}
+              {t('suite.guide.button')}
             </ToolButton>
           ),
         },
@@ -1186,7 +1186,7 @@ export default function App() {
       activeProductId="2d"
       switcherLabel={t('switcherAria')}
       about={{
-        label: t('header.about'),
+        label: t('suite.about.label'),
         title: t('about.title'),
         content: about,
         privacy: privacyDeclaration(t),
@@ -2192,9 +2192,9 @@ export default function App() {
         closeLabel={t('manualClose')}
         tryHint={t('manualTry')}
         sectionCap={6}
-        showAllLabel={t('manualShowAll')}
-        showLessLabel={t('manualShowLess')}
-        moreNote={t('manualMore')}
+        showAllLabel={t('suite.guide.showAll')}
+        showLessLabel={t('suite.guide.showLess')}
+        moreNote={t('suite.guide.more')}
         sections={CATEGORY_ORDER.map((cat) => ({
           key: cat,
           title: he ? CATEGORY_LABELS[cat].he : CATEGORY_LABELS[cat].en,

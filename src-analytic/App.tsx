@@ -1132,7 +1132,7 @@ export function App() {
   // product's own `language` key. Passing a toggle here put two «English» buttons on the suite bar.
   return (
     <AppFrame
-      title={t('title')}
+      title={t('suite.product.analytic')}
       subtitle={t('subtitle')}
       /**
        * ONE look and ONE ORDER for the session actions in every builder (#1087).
@@ -1195,7 +1195,7 @@ export function App() {
           id: 'manual',
           node: (
             <ToolButton key="manual" onClick={() => setManualOpen(true)}>
-              {t('manualButton')}
+              {t('suite.guide.button')}
             </ToolButton>
           ),
         },
@@ -1254,8 +1254,8 @@ export function App() {
       switcherMoreLabel={t('switcherMore')}
       buildStamp={typeof __BUILD__ === 'string' ? __BUILD__ : undefined}
       about={{
-        label: t('about'),
-        title: t('aboutTitle'),
+        label: t('suite.about.label'),
+        title: t('suite.product.analytic'),
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
         closeLabel: t('close'),
@@ -2296,9 +2296,9 @@ export function App() {
         closeLabel={t('close')}
         tryHint={t('manualTry')}
         sectionCap={6}
-        showAllLabel={t('manualShowAll')}
-        showLessLabel={t('manualShowLess')}
-        moreNote={t('manualMore')}
+        showAllLabel={t('suite.guide.showAll')}
+        showLessLabel={t('suite.guide.showLess')}
+        moreNote={t('suite.guide.more')}
         sections={MANUAL_SECTIONS.map((section) => ({
           key: section.key,
           title: t(section.titleKey),

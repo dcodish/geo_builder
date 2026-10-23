@@ -41,7 +41,7 @@ The layering `engine ← replay ← store` is mechanically enforced by
 | `src3d/` | The 3-D Space Builder: see [`src3d/CLAUDE.md`](src3d/CLAUDE.md) |
 | `src-complex/` | The complex-numbers Builder: see [`src-complex/CLAUDE.md`](src-complex/CLAUDE.md) |
 | `src-analytic/` | The analytic-geometry Builder: see [`src-analytic/CLAUDE.md`](src-analytic/CLAUDE.md) |
-| `shell/` | The shared chrome tree ([ADR-W-016](docs/06w-decisions-workspace.md#adr-w-016), [ADR-W-019](docs/06w-decisions-workspace.md#adr-w-019)): design tokens, bidi core, i18n bootstrap, save envelope + naming + load audit, symbol-palette core, app frame (header, About/privacy modal, banners, product switcher). Parameterized by the caller — no strings, no product knowledge, no `if (product === …)`. Consumed by all four products (docs/28 §5a) |
+| `shell/` | The shared chrome tree ([ADR-W-016](docs/06w-decisions-workspace.md#adr-w-016), [ADR-W-019](docs/06w-decisions-workspace.md#adr-w-019)): design tokens, bidi core, i18n bootstrap, save envelope + naming + load audit, symbol-palette core, app frame (header, About/privacy modal, banners, product switcher). Parameterized by the caller — no strings in code (suite-wide text lives in `shell/locales/`), no product knowledge, no `if (product === …)`. Consumed by all four products (docs/28 §5a) |
 | `server/` | The shared LLM proxy + admin dashboard, parameterized by `tool:` — never forked per product |
 
 ## Where the current state lives

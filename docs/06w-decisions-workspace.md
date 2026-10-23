@@ -571,6 +571,8 @@ is verified, not when the operator plays it.
 
 **Status:** accepted, 2026-08-15 · **Amends:** [ADR-W-003](#adr-w-003) · **Operator ruling**
 
+**⚠ Amended by [ADR-W-148](#adr-w-148) (2026-10-23, operator ruling 2026-10-16):** rule 2's "shell holds no strings" keeps holding for shell CODE. `shell/locales/{he,en}.json` is the one exception: the suite-wide text every builder shows byte for byte, under `suite.*`, merged by each product and never redefined by one.
+
 **Context.** ADR-W-003 deferred whether a non-`engine` layer may be physically shared, with a named
 trigger: *"when `src-analytic/` starts. That is when there are genuinely three products, the shell
 duplication triples, and the boundary can be drawn against real demand instead of two files."* The
@@ -6077,3 +6079,25 @@ The 2026-10-08 plan update asked analytic for every reader of an angle measure. 
 **Locks.** 2-D `src/parser/__tests__/vulgar-fraction-2008.test.ts` (unchanged); 3-D `src3d/__tests__/vulgar-fraction-2255.test.ts`; parity row `vulgar-mixed-length-2255` (builds in every builder).
 
 **Behaviour change for a student:** none in 2-D; 3-D's is ADR-3D-374's.
+
+## ADR-W-148 — Suite-wide text lives once, in `shell/locales`: the narrow exception to "shell holds no strings" (#2201 phase 1; amends ADR-W-016)
+
+**Status:** accepted · 2026-10-23 · debt (P3, workspace) · fix round #2466, stream C · branch `fix/2201-p1-suite-locales` · **Amends:** [ADR-W-016](#adr-w-016) rule 2 · **Operator ruling** 2026-10-16
+**Requirements:** none (internal) · **Design:** [04w](04w-design-shell.md) § *Suite-wide text*
+
+**Context.** The operator asked (2026-10-16): *"let's say there's a message I want to change. Is there one place I can change that message, or do I have to look around the code to find where that message exists?"* For text every builder shows, the answer was "four places": ADR-W-016's rule that `shell/` holds no strings made `products.json`'s `labelKey` resolve in EACH product's i18n, so every builder carried every builder's name, and the About credit and guide chrome were copied four times under four key spellings (`footer.by` / `creditBy`, `manualMore` / `manual.more`). Asked in session whether to keep the rule, add a drift test, or allow a narrow exception, the operator chose **"Narrow exception (Recommended)"**: `shell/` may hold ONE product-neutral file of suite-wide text, each builder merges it and may not redefine its keys, and shell **code** stays string-free.
+
+**Decision.**
+1. **`shell/locales/{he,en}.json`, one namespace `suite.*`.** Each builder's `i18n/index.ts` imports both files and passes `{ ...suite, ...own }` to `createProductI18n` (phase 0's shared bootstrap). `shell/i18n.ts` is unchanged: it still holds no strings and knows no product. No import edge is added; every product already imports `shell/`.
+2. **What enters: only text whose Hebrew AND English are byte-identical in every builder that shows it**, and that names no product-specific concept. Measured at 5daeaa8d, twelve keys qualify and moved: `suite.product.{2d,complex,analytic}` (the builder names), `suite.about.{label,tryTitle,developedBy,author,contact}`, `suite.guide.{button,more,showAll,showLess}`. 54 product keys were deleted per language (2-D 14, 3-D 12, complex 13, analytic 15; 2-D's `help.guideTab` copy was also dead). The header titles of 2-D, complex and analytic and analytic's About title read the builder-name key, since they were the same text.
+3. **What stayed, measured:**
+   - **3-D's name.** Every builder says «הנדסת המרחב», but analytic's English is "Solid Geometry" where the others say "Space Geometry", and the frame's language toggle makes English reachable. That is a wording question, so `switcher3d` stays in each product table and `products.json` keeps it as 3-D's `labelKey`.
+   - **The floor sentence** (`errors.floor`) exists in 2-D only, so it is not suite text.
+   - **The ruled wordings of #2202** (About title and close, the share prompt, the empty-canvas title, the guide intro) are that issue's next commit. This phase moves byte-identical text only.
+4. **`products.json`'s `labelKey` names the suite key** (`suite.product.<id>`) for the three moved names. Nested references follow: 2-D's and 3-D's scope pointers interpolate `$t(suite.product.analytic)`.
+5. **Locks.**
+   - `shell/__tests__/suite-locale.test.ts`: (a) he/en key parity of the suite file; (b) no product table defines a `suite.*` key; (c) no product key holds a Hebrew AND English pair byte-identical to a suite key's, so a copy cannot return under a new name. It is a pair, because a Hebrew homonym is not a copy (analytic's parabola «מדריך» is "directrix"). The product tables are read by file, the TS ones through the TypeScript compiler API, with a non-vacuity check and a meta case that feeds the checker broken stubs.
+   - (d) `<tree>/__tests__/suite-text-2201.test.tsx` in each of the four trees, with the assertions shared in `shell/__tests__/fixtures/suite-text-rows.tsx` (the message-floor pattern): every builder's rendered `ProductSwitcher`, in both languages, shows the names it showed at the base, and every moved string reads as before through that builder's instance. It is split per tree because `shell/` may not import a product and `server/` may not import `shell/` (BOUNDARIES.json).
+   - The 2-D and 3-D literal-key audits (`i18n-keys-1372`, `src3d/__tests__/i18n-parity`) resolve against the merged resources. `suite-vocabulary.test.ts` drops its `about` row, which is held by construction now.
+
+**Behaviour change for a student:** none. Every moved string is byte-identical in every builder, held by lock (d).

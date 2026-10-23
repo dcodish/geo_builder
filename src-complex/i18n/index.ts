@@ -9,15 +9,18 @@
  */
 import { makeBidi } from '../../shell/bidi';
 import { createProductI18n } from '../../shell/i18n';
+// #2201 phase 1 (ADR-W-148): the suite-wide text (builder names, About credit, guide chrome) is ONE
+// file in shell/locales, merged under this product's own table. A `suite.*` key is never redefined here.
+import suiteEn from '../../shell/locales/en.json';
+import suiteHe from '../../shell/locales/he.json';
 
 /** The bidi kit — exported for composed (non-`t()`) strings and for the palette drift lock. */
 // #525: `_` joins the expression core — the d_{…} distance form must isolate as one LTR run
 export const complexBidi = makeBidi({ extraCore: '_' });
 
 const he = {
-  // The suite's display names are the CURRICULUM's subject names (operator ruling 2026-08-17):
-  // הנדסת המישור · הנדסת המרחב · מספרים מרוכבים — not "בונה X".
-  title: 'מספרים מרוכבים',
+  // The title is `suite.product.complex` (shell/locales): the suite's display names are the
+  // CURRICULUM's subject names (operator ruling 2026-08-17) — not "בונה X".
   subtitle: 'מישור גאוס: הקלידו נתונים שורה-שורה והתבוננו בנקודות',
   inputPlaceholder: 'למשל: z1 = 3+4i או w = z1*z2 או z^3 = 8',
   add: 'הוסף',
@@ -112,7 +115,6 @@ const he = {
   calcPlaceholder: 'הקלידו ביטוי לחישוב, למשל |z1-z2|',
   calcCurrent: 'בדגימה הנוכחית: {{value}}',
   // The shared frame (shell/, #673): the suite bar's visible buttons and the privacy note (NFR-SE-3).
-  menuAbout: 'אודות',
   aboutTitle: 'על הכלי',
   aboutLead:
     'כלי לבניית הציור של שאלת מספרים מרוכבים: מקלידים את הנתונים שורה-שורה, והציור נבנה ומתעדכן תוך כדי. הכלי מצייר ובודק את הנתונים — הוא אינו פותר את השאלה.',
@@ -123,11 +125,7 @@ const he = {
     'כשהנתונים מאפשרים יותר מציור אחד, «הציגו תצורה אחרת» מציג ציור אחר שגם הוא מקיים את כל הנתונים.',
     'הכלי מצייר את הציור לפי מה שתיארתם ובודק את הנתונים — טענה שאינה מתקיימת מסומנת, והכלי אינו פותר שאלות.',
   ],
-  aboutTryTitle: 'הזינו את נתוני השאלה כפי שמופיעים בשאלה:',
   aboutTrySteps: ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2'],
-  creditBy: 'פותח על־ידי',
-  creditName: 'ד"ר דוד קודיש',
-  creditContact: 'לשאלות',
   aboutClose: 'סגירה',
   privacy:
     'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. לצורך שיפור הכלי נשמרים המשפטים שהקלדתם (טקסט מתמטי בלבד) עם מזהה מבקר אנונימי — ללא כתובת ה-IP — עד 30 יום. העבודה נשמרת בדפדפן שלכם ובקבצים שאתם בוחרים לשמור.' +
@@ -135,11 +133,9 @@ const he = {
   // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
   loadAuditTitle: 'הקובץ נטען חלקית: {{restored}} מתוך {{total}} שורות נוספו. שורות שלא נוספו:',
   loadAuditDismiss: 'סגור',
-  // A2 (#661): the switcher renders products.json's roster; its labelKeys resolve HERE, per product.
-  switcher2d: 'הנדסת המישור',
+  // A2 (#661): the switcher renders products.json's roster; its labelKeys resolve through this instance —
+  // `suite.product.*` from shell/locales, and 3-D's name (not yet one wording across the suite) here.
   switcher3d: 'הנדסת המרחב',
-  switcherComplex: 'מספרים מרוכבים',
-  switcherAnalytic: 'גאומטריה אנליטית',
   switcherAria: 'מעבר בין הבונים',
   // B2 (#667): the opt-in data column (D1) — values/knowledge only; refusals stay on the canvas strip.
   dataShow: 'נתונים',
@@ -157,15 +153,11 @@ const he = {
   factEdit: 'עריכה במקום',
   factDelete: 'מחיקה',
   // A6 (D9): the manual SCREEN — catalog-backed, a click submits the example.
-  manualButton: 'מדריך',
   manualTitle: 'המדריך — מספרים מרוכבים',
   manualIntro:
     'זהו מדריך חלקי — מוצגות דוגמאות מייצגות מכל סוג, כדי להראות אילו מיני משפטים אפשר להקליד. לחצו על דוגמה כדי לראות אותה נבנית, או נסחו חופשי משלכם — ואם הכלי לא הבין, נסו ניסוח אחר: אוצר המשפטים של הכלי הולך וגדל.',
   manualClose: 'חזרה לכלי',
   manualTry: 'לחצו כדי לנסות — הדוגמה תיבנה על הציור',
-  manualMore: '…ואלו רק דוגמאות — לכלי יש כאן פקודות נוספות, לא רק ניסוחים אחרים של אלו',
-  manualShowAll: 'הצג הכול',
-  manualShowLess: 'הצג פחות',
   // B6 (D8): the data-panel skeleton — same sections, same order, in every builder.
   secPoints: 'נקודות',
   secMeasures: 'מדידות',
@@ -278,7 +270,6 @@ const he = {
 // raw key printed to a student. The analytic tree already did this; this one did not, and its 147 keys
 // happened to agree. src3d/ gets the same guarantee via a parity TEST, its locales being JSON.
 const en: typeof he = {
-  title: 'Complex Numbers',
   subtitle: 'The Gauss plane: enter givens line by line and watch the points',
   inputPlaceholder: 'e.g. z1 = 3+4i or w = z1*z2 or z^3 = 8',
   add: 'Add',
@@ -358,7 +349,6 @@ const en: typeof he = {
   calcPlaceholder: 'type an expression to calculate, e.g. |z1-z2|',
   calcCurrent: 'at the current sample: {{value}}',
   // The shared frame (shell/, #673): the suite bar's visible buttons and the privacy note (NFR-SE-3).
-  menuAbout: 'About',
   aboutTitle: 'About this tool',
   aboutLead:
     'A tool for building the figure of a complex-numbers question: enter the givens line by line and the figure forms and adapts as you go. It draws and verifies the givens — it never solves the question.',
@@ -369,11 +359,7 @@ const en: typeof he = {
     'When the givens allow more than one figure, “Show another configuration” draws a different one that also satisfies every given.',
     'It draws the figure from what you describe and checks the givens — a claim that does not hold is marked, and it does not solve problems.',
   ],
-  aboutTryTitle: 'Enter the given data exactly as it appears in the question:',
   aboutTrySteps: ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2'],
-  creditBy: 'Developed by',
-  creditName: 'Dr. David Codish',
-  creditContact: 'Questions',
   aboutClose: 'Close',
   privacy:
     'Privacy: no registration, and no personal data is collected. To improve the tool, the statements you type (math text only) are kept for up to 30 days with an anonymous visitor id — your IP address is never stored. Your work is stored in your browser and in files you choose to save.' +
@@ -381,11 +367,9 @@ const en: typeof he = {
   // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
   loadAuditTitle: 'The file loaded partially: {{restored}} of {{total}} lines were added. Lines not added:',
   loadAuditDismiss: 'Dismiss',
-  // A2 (#661): the switcher renders products.json's roster; its labelKeys resolve HERE, per product.
-  switcher2d: 'Plane Geometry',
+  // A2 (#661): the switcher renders products.json's roster; its labelKeys resolve through this instance —
+  // `suite.product.*` from shell/locales, and 3-D's name (not yet one wording across the suite) here.
   switcher3d: 'Space Geometry',
-  switcherComplex: 'Complex Numbers',
-  switcherAnalytic: 'Analytic Geometry',
   switcherAria: 'Switch between builders',
   // B2 (#667): the opt-in data column (D1) — values/knowledge only; refusals stay on the canvas strip.
   dataShow: 'Data',
@@ -403,15 +387,11 @@ const en: typeof he = {
   factEdit: 'Edit in place',
   factDelete: 'Delete',
   // A6 (D9): the manual SCREEN — catalog-backed, a click submits the example.
-  manualButton: 'Guide',
   manualTitle: 'The Guide — Complex Numbers',
   manualIntro:
     "This is a partial guide — representative examples of each kind, to show what sorts of sentences can be typed. Click one to watch it build, or phrase your own freely — and if the tool didn't understand, try different wording: its vocabulary keeps growing.",
   manualClose: 'Back to the tool',
   manualTry: 'Click to try — the example builds on the figure',
-  manualMore: '…and these are only examples — the tool has more COMMANDS here, not just other phrasings of these',
-  manualShowAll: 'Show all',
-  manualShowLess: 'Show fewer',
   // B6 (D8): the data-panel skeleton — same sections, same order, in every builder.
   secPoints: 'Points',
   secMeasures: 'Measures',
@@ -513,6 +493,6 @@ const en: typeof he = {
 };
 
 export const complexI18n = createProductI18n({
-  resources: { he, en },
+  resources: { he: { ...suiteHe, ...he }, en: { ...suiteEn, ...en } },
   postProcessors: [complexBidi.postProcessor('bidiIsolateCx')],
 });

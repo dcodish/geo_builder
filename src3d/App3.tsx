@@ -680,7 +680,7 @@ export default function App3() {
           id: 'manual',
           node: (
             <ToolButton key="manual" onClick={() => setManualOpen(true)}>
-              {t('manual.button')}
+              {t('suite.guide.button')}
             </ToolButton>
           ),
         },
@@ -689,7 +689,7 @@ export default function App3() {
       activeProductId="3d"
       switcherLabel={t('switcherAria')}
       about={{
-        label: t('aboutLabel'),
+        label: t('suite.about.label'),
         title: t('aboutTitle'),
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
@@ -1290,9 +1290,9 @@ export default function App3() {
         closeLabel={t('manual.close')}
         tryHint={t('manual.try')}
         sectionCap={6}
-        showAllLabel={t('manual.showAll')}
-        showLessLabel={t('manual.showLess')}
-        moreNote={t('manual.more')}
+        showAllLabel={t('suite.guide.showAll')}
+        showLessLabel={t('suite.guide.showLess')}
+        moreNote={t('suite.guide.more')}
         sections={(['solids', 'points', 'vectors', 'planesLines', 'claims', 'drawing'] as const).map((cat) => ({
           key: cat,
           title: t(`catalog.${cat}`),

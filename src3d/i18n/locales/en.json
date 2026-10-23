@@ -4,11 +4,7 @@
   "privacy": "Privacy: no sign-up and no personal details are collected; typed instructions (math text only) are kept for up to 30 days with an anonymous visitor id — your IP address is never stored. Statements the tool does not understand are sent for processing to an external AI service. When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.",
   "language": "עברית",
   "switcherAria": "Switch between builders",
-  "switcher2d": "Plane Geometry",
   "switcher3d": "Space Geometry",
-  "switcherComplex": "Complex Numbers",
-  "switcherAnalytic": "Analytic Geometry",
-  "aboutLabel": "About",
   "aboutTitle": "About this tool",
   "aboutLead": "A tool for building the figure of a space-geometry question: enter the givens line by line — solids, points, vectors — and the figure builds and orbits in front of you. It draws and verifies the givens; it never solves the question.",
   "aboutPoints": [
@@ -17,15 +13,11 @@
     "When the givens allow more than one figure, “Show another configuration” draws a different one that also satisfies every given.",
     "It draws the figure from what you describe and checks the givens — it does not solve problems."
   ],
-  "aboutTryTitle": "Enter the given data exactly as it appears in the question:",
   "aboutTrySteps": [
     "cube ABCDA'B'C'D'",
     "M is the midpoint of BB'",
     "O is the intersection of the diagonals of face ABCD"
   ],
-  "creditBy": "Developed by",
-  "creditName": "Dr. David Codish",
-  "creditContact": "Questions",
   "aboutClose": "Close",
   "input": {
     "placeholder": "Type a given, e.g.: cube ABCD",
@@ -208,14 +200,10 @@
     "ex4": "plane π1: z - 3 = 0"
   },
   "manual": {
-    "button": "Guide",
     "title": "The Guide — Space Geometry",
     "intro": "This is a partial guide — only representative examples are shown, so you can see what sorts of sentences can be typed. Click one to watch it build, or phrase freely — if the tool didn't understand, try different wording; unsupported sentences are collected and reviewed by the project team for future support.",
     "close": "Back to the tool",
-    "try": "Click to try — the example builds on the figure",
-    "more": "…and these are only examples — the tool has more COMMANDS here, not just other phrasings of these",
-    "showAll": "Show all",
-    "showLess": "Show fewer"
+    "try": "Click to try — the example builds on the figure"
   },
   "emptyTitle": "What are we building today?",
   "emptyHintChips": "Click an example given — or type your own, and the figure builds in front of you",
@@ -248,7 +236,7 @@
   "scope": {
     "unrelated": "No geometric construction detected here. Describe a solid or a given — e.g. \"box ABCDA'B'C'D'\" or \"point M midpoint of AB\".",
     "valueless-query": "This tool draws and verifies givens — it does not solve. To act on an angle, state a value: e.g. \"the angle between line AC' and plane ABCD is 30\", and it will be enforced or verified.",
-    "coordinate-point": "Placing a point by its coordinates is done in the \"$t(switcherAnalytic)\" tool — click \"$t(switcherAnalytic)\" at the top of the screen. There you write E(-1,7). Here, describe the figure itself — e.g. \"triangle ABC\" or \"point D on AB\".",
+    "coordinate-point": "Placing a point by its coordinates is done in the \"$t(suite.product.analytic)\" tool — click \"$t(suite.product.analytic)\" at the top of the screen. There you write E(-1,7). Here, describe the figure itself — e.g. \"triangle ABC\" or \"point D on AB\".",
     "cross-app": "Plane geometry (circle, rectangle, rhombus, inscribed-in-circle…) is built in the 2-D tool: themathbible.com/geo-builder. A circle IN SPACE is supported here in the form \"circle centered at O tangent to line AB at B\".",
     "bare-solid": "A pyramid or prism needs its base: e.g. \"pyramid SABCD with a square base\" or \"right triangular prism ABC\". A cube, box or tetrahedron builds without details.",
     "ui-command": "Marks appear automatically from the givens — instead of asking for a mark, state the given itself: e.g. \"angle D = 90\".",

@@ -574,7 +574,7 @@ export function App() {
    */
   return (
     <AppFrame
-      title={t('title')}
+      title={t('suite.product.complex')}
       subtitle={t('subtitle')}
       utilityActions={orderToolActions([
         {
@@ -634,7 +634,7 @@ export function App() {
           id: 'manual',
           node: (
             <ToolButton key="manual" onClick={() => setManualOpen(true)}>
-              {t('manualButton')}
+              {t('suite.guide.button')}
             </ToolButton>
           ),
         },
@@ -643,7 +643,7 @@ export function App() {
       activeProductId="complex"
       switcherLabel={t('switcherAria')}
       about={{
-        label: t('menuAbout'),
+        label: t('suite.about.label'),
         title: t('aboutTitle'),
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
@@ -1124,9 +1124,9 @@ export function App() {
         closeLabel={t('manualClose')}
         tryHint={t('manualTry')}
         sectionCap={6}
-        showAllLabel={t('manualShowAll')}
-        showLessLabel={t('manualShowLess')}
-        moreNote={t('manualMore')}
+        showAllLabel={t('suite.guide.showAll')}
+        showLessLabel={t('suite.guide.showLess')}
+        moreNote={t('suite.guide.more')}
         sections={manualSections(i18n.language === 'he' ? 'he' : 'en').map((s) => ({
           key: s.family,
           title: s.title,

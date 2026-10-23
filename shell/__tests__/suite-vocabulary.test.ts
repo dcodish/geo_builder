@@ -55,7 +55,8 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   redo: { '2d': ['actions.redo'], '3d': ['actions.redo'], complex: ['redo'], analytic: ['redo'] },
   clearAll: { '2d': ['actions.clear'], '3d': ['actions.clear'], complex: ['clearAll'], analytic: ['clearAll'] },
   showAnother: { '2d': ['actions.another'], '3d': ['actions.another'], complex: ['anotherConfig'], analytic: ['another'] },
-  about: { '2d': ['header.about'], '3d': ['aboutLabel'], complex: ['menuAbout'], analytic: ['about'] },
+  // `about` (the suite bar's «אודות») left this table in #2201 phase 1 (ADR-W-148): it is ONE key now,
+  // `suite.about.label` in shell/locales, so it cannot differ — suite-locale.test.ts forbids a product copy.
   // #1864 (ADR-AG-267, B10): a choice the tool made for an unstated given — 2-D's notes, ported to analytic word for
   // word. 3-D and complex hold no such choice (n/a in 02w's row).
   unstatedEqualPair: { '2d': ['steps.unstatedEqualPair'], '3d': null, complex: null, analytic: ['unstatedEqualPair'] },

@@ -1,30 +1,18 @@
 {
   "app": {
-    "title": "Plane Geometry",
     "subtitle": "Build geometry step by step"
   },
   "language": "עברית",
   "dataTitle": "Data",
   "panelShow": "Show",
   "panelHide": "Hide",
-  "manualButton": "Guide",
   "manualTitle": "The Guide — Plane Geometry",
   "manualClose": "Back to the tool",
   "manualTry": "Click to try — the example builds on the figure",
   "manualPartial": "This is a partial guide — only representative examples are shown, so you can see what sorts of sentences can be typed. If the tool didn't understand a sentence, try different wording — unsupported sentences are collected and reviewed by the project team for future support.",
-  "manualMore": "…and these are only examples — the tool has more COMMANDS here, not just other phrasings of these",
-  "switcher2d": "Plane Geometry",
   "switcher3d": "Space Geometry",
-  "switcherComplex": "Complex Numbers",
-  "switcherAnalytic": "Analytic Geometry",
   "switcherAria": "Switch between builders",
-  "footer": {
-    "by": "Developed by",
-    "name": "Dr. David Codish",
-    "contact": "Questions"
-  },
   "header": {
-    "about": "About",
     "help": "Help"
   },
   "about": {
@@ -35,7 +23,6 @@
       "Add one fact at a time — the figure adapts as the givens accumulate.",
       "It draws the figure from what you describe — it does not solve problems."
     ],
-    "tryTitle": "Enter the given data exactly as it appears in the question:",
     "trySteps": [
       "square ABCD",
       "point G on AD",
@@ -57,8 +44,8 @@
       "split-roles": "One given per line — that way the tool can build and verify each one separately. Write each role on its own line: «{{first}}», and then «{{second}}».",
       "right-angle-vertex": "One given per line — that way the tool can build and verify each one separately. Write them on separate lines: (1) triangle {{triangle}}  (2) ∠{{angle}} = 90°{{more}}",
       "split-advisory": "We drew both givens you wrote on one line: {{all}}. Better to enter one given per line — the tool then builds and verifies each one separately, and a single step is easier to fix.",
-      "analytic": "This tool builds geometric constructions on a free canvas, not graphs on a coordinate system. Axes, coordinates, slopes and line equations are built in the \"$t(switcherAnalytic)\" tool — click \"$t(switcherAnalytic)\" at the top of the screen. Here, describe the figure itself — e.g. \"triangle ABC\" or \"point D on AB\".",
-      "coordinate-point": "Placing a point by its coordinates is done in the \"$t(switcherAnalytic)\" tool — click \"$t(switcherAnalytic)\" at the top of the screen. There you write E(-1,7). Here, describe the figure itself — e.g. \"triangle ABC\" or \"point D on AB\".",
+      "analytic": "This tool builds geometric constructions on a free canvas, not graphs on a coordinate system. Axes, coordinates, slopes and line equations are built in the \"$t(suite.product.analytic)\" tool — click \"$t(suite.product.analytic)\" at the top of the screen. Here, describe the figure itself — e.g. \"triangle ABC\" or \"point D on AB\".",
+      "coordinate-point": "Placing a point by its coordinates is done in the \"$t(suite.product.analytic)\" tool — click \"$t(suite.product.analytic)\" at the top of the screen. There you write E(-1,7). Here, describe the figure itself — e.g. \"triangle ABC\" or \"point D on AB\".",
       "angle-relation": "That's an angle relationship the tool highlights for you once you draw the figure (e.g. two parallel lines and a transversal) — not something to type. Draw the figure and the relationships appear on their own.",
       "proof-target": "That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: \"{{sentence}}\"",
       "radian-angle": "In plane geometry, angles are written in degrees — for example ∠ABC = 90",
@@ -228,7 +215,6 @@
     "comingSoon": "Coming soon",
     "wired": "✓ available",
     "soon": "○ coming",
-    "guideTab": "Guide",
     "commandsTab": "Commands",
     "guideLead": "How to use the tool:",
     "guidePoints": [
@@ -743,8 +729,6 @@
     "isoTrapezoid": "isosceles trapezoid",
     "midsegment": "midsegment"
   },
-  "manualShowAll": "Show all",
-  "manualShowLess": "Show fewer",
   "session": {
     "offer": "Unsaved work from your last session was found.",
     "continue": "Continue where you left off",

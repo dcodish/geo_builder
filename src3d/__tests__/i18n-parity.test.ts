@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { i18nKeyAudit } from '../../shell/__tests__/fixtures/i18n-keys';
 import he from '../i18n/locales/he.json';
 import en from '../i18n/locales/en.json';
+import suiteHe from '../../shell/locales/he.json';
 
 /** Every leaf path, so a nested key cannot hide a mismatch behind a matching parent. */
 const paths = (obj: unknown, prefix = ''): string[] => {
@@ -52,7 +53,8 @@ describe('3-D i18n — key parity (he ⇄ en)', () => {
  * where a sentence belongs.
  */
 describe('3-D i18n — every literal key resolves', () => {
-  const audit = i18nKeyAudit(join(__dirname, '..', '..'), ['src3d'], he);
+  // #2201 phase 1 (ADR-W-148): a key resolves against the MERGED resources — the suite text plus 3-D's own.
+  const audit = i18nKeyAudit(join(__dirname, '..', '..'), ['src3d'], { ...suiteHe, ...he });
 
   it('checks a real surface (the guard is not vacuous)', () => {
     expect(audit.checked).toBeGreaterThan(100);

@@ -44,7 +44,7 @@ describe('#1954 — the coordinate-point pointer is one sentence in every builde
   it('it names the analytic builder through the shared switcher label, never a hard-coded name', () => {
     for (const cfg of Object.values(SAYS_IT)) {
       for (const lng of ['he', 'en'] as const) {
-        expect(at(readJson(cfg[lng]), cfg.at) as unknown as string).toContain('$t(switcherAnalytic)');
+        expect(at(readJson(cfg[lng]), cfg.at) as unknown as string).toContain('$t(suite.product.analytic)');
       }
     }
   });

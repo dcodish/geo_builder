@@ -6,12 +6,14 @@
  * sentence can never reverse `y = -2x + 8` inside a refusal — the mechanism each sibling had to
  * learn separately, adopted here from the first line of the product.
  *
- * NOTE the `switcher*` keys: `products.json`'s `labelKey` is resolved by EACH CONSUMING product's
- * i18n, so every builder needs a name for every builder. A missing key here is a blank chip in
- * THIS tool; a missing `switcherAnalytic` in a sibling is a blank chip THERE (ADR-AG-004 §2 — the
- * checklist item whose failure surfaces in the wrong product).
+ * NOTE the builder names: `products.json`'s `labelKey` is resolved by EACH CONSUMING product's
+ * i18n. Since #2201 phase 1 (ADR-W-148) the names are `suite.*` keys in `shell/locales`, merged
+ * below, so a new builder's name is added ONCE; only a name whose wording still differs between
+ * builders (`switcher3d`) stays per product, and a missing one is a blank chip in THIS tool.
  */
 import { createProductI18n } from '../../shell/i18n';
+import suiteEn from '../../shell/locales/en.json';
+import suiteHe from '../../shell/locales/he.json';
 
 // #1191: the kit itself lives in ./bidi so the RENDERER can reach it without importing this bootstrap.
 // Re-exported here because every existing caller imports it from './i18n' — one instance, two doors.
@@ -19,8 +21,8 @@ export { analyticBidi } from './bidi';
 import { analyticBidi } from './bidi';
 
 const he = {
-  // The suite's display names are the CURRICULUM's subject names (operator ruling 2026-08-17).
-  title: 'גאומטריה אנליטית',
+  // The title is `suite.product.analytic` (shell/locales): the suite's display names are the
+  // CURRICULUM's subject names (operator ruling 2026-08-17).
   subtitle: 'מערכת צירים: הקלידו נתונים שורה-שורה והתבוננו בשרטוט',
   inputPlaceholder: 'למשל: נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9',
   add: 'הוסף',
@@ -156,8 +158,6 @@ const he = {
   paramUnused: '(לא בשימוש בשרטוט)',
   freeDof: 'דרגות חופש: {{count}}',
   pinned: '✓ הציור נקבע במלואו על ידי הנתונים',
-  about: 'אודות',
-  aboutTitle: 'גאומטריה אנליטית',
   aboutLead:
     'כלי לשרטוט שאלות גאומטריה אנליטית: מקלידים את הנתונים כלשונם, והכלי משרטט את הצורה. הכלי אינו פותר את השאלה.',
   // #1477 (ADR-W-091): the About DECLARATION's parts — the same sections as 2-D's About.
@@ -167,11 +167,7 @@ const he = {
     'כשהנתונים מאפשרים יותר משרטוט אחד, «הציגו תצורה אחרת» מציג שרטוט אחר שגם הוא מקיים את כל הנתונים.',
     'הכלי משרטט את הצורה לפי מה שתיארתם — הוא אינו פותר שאלות.',
   ],
-  aboutTryTitle: 'הזינו את נתוני השאלה כפי שמופיעים בשאלה:',
   aboutTrySteps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'נתונה הנקודה A(2,6)', 'נתון הישר l1: y=x'],
-  creditBy: 'פותח על־ידי',
-  creditName: 'ד"ר דוד קודיש',
-  creditContact: 'לשאלות',
   privacy:
     'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. לצורך שיפור הכלי נשמרים המשפטים שהקלדתם (טקסט מתמטי בלבד) עם מזהה מבקר אנונימי — ללא כתובת ה-IP — עד 30 יום.' +
     ' משפטים שהכלי לא הבין נשלחים לעיבוד בשירות בינה מלאכותית חיצוני.' +
@@ -179,11 +175,8 @@ const he = {
   close: 'סגור',
   switcherLabel: 'בחירת כלי',
   switcherMore: 'עוד',
-  // Every builder's name, resolved through THIS product's i18n (see the note above).
-  switcher2d: 'הנדסת המישור',
+  // 3-D's name, resolved through THIS product's i18n (see the note above); the rest are `suite.product.*`.
   switcher3d: 'הנדסת המרחב',
-  switcherComplex: 'מספרים מרוכבים',
-  switcherAnalytic: 'גאומטריה אנליטית',
   // Refusals name the STATEMENT, never internal state.
   errNotHandled: 'לא הצלחתי להבין את המשפט: "{{detail}}"',
   errBadEquation: 'לא הצלחתי לקרוא את המשוואה: "{{detail}}"',
@@ -624,15 +617,11 @@ const he = {
   saveQuestion: 'הורידו שאלה',
   questionGiven: 'נתון:',
   copied: 'הועתק',
-  manualButton: 'מדריך',
   manualTitle: 'המדריך — גאומטריה אנליטית',
   manualIntro:
     'זהו מדריך חלקי — מוצגות דוגמאות מייצגות בלבד, כדי להראות אילו מיני משפטים אפשר להקליד. ' +
     'לחצו על דוגמה כדי לנסות אותה על השרטוט.',
   manualTry: 'לחצו כדי לנסות — הדוגמה תיבנה על השרטוט',
-  manualMore: '…ואלו רק דוגמאות — לכלי יש כאן פקודות נוספות, לא רק ניסוחים אחרים של אלו',
-  manualShowAll: 'הצג הכול',
-  manualShowLess: 'הצג פחות',
   manualPoints: 'נקודות',
   manualLines: 'ישרים',
   manualCircles: 'מעגלים',
@@ -685,7 +674,6 @@ const he = {
 };
 
 const en: typeof he = {
-  title: 'Analytic Geometry',
   subtitle: 'A coordinate plane: type the givens line by line and watch the figure',
   inputPlaceholder: 'e.g. circle I: (x-3)^2+(y-4)^2=9',
   add: 'Add',
@@ -786,8 +774,6 @@ const en: typeof he = {
   paramUnused: '(not used by the figure)',
   freeDof: 'Degrees of freedom: {{count}}',
   pinned: '✓ The figure is fully determined by the givens',
-  about: 'About',
-  aboutTitle: 'Analytic Geometry',
   aboutLead:
     'A tool for drawing analytic-geometry questions: type the givens as the exam words them and the tool draws the figure. It does not solve the question.',
   // #1477 (ADR-W-091): the About DECLARATION's parts — the same sections as 2-D's About.
@@ -797,11 +783,7 @@ const en: typeof he = {
     'When the givens allow more than one figure, “Show another configuration” draws a different one that also satisfies every given.',
     'It draws the figure from what you describe — it does not solve problems.',
   ],
-  aboutTryTitle: 'Enter the given data exactly as it appears in the question:',
   aboutTrySteps: ['circle I: (x-3)^2+(y-4)^2=9', 'point A(2,6)', 'line l1: y=x'],
-  creditBy: 'Developed by',
-  creditName: 'Dr. David Codish',
-  creditContact: 'Questions',
   privacy:
     'Privacy: no sign-up and no personal details are collected. To improve the tool, the statements you type (math text only) are kept for up to 30 days with an anonymous visitor id — your IP address is never stored.' +
     ' Statements the tool does not understand are sent for processing to an external AI service.' +
@@ -809,10 +791,7 @@ const en: typeof he = {
   close: 'Close',
   switcherLabel: 'Choose a tool',
   switcherMore: 'More',
-  switcher2d: 'Plane Geometry',
   switcher3d: 'Solid Geometry',
-  switcherComplex: 'Complex Numbers',
-  switcherAnalytic: 'Analytic Geometry',
   errNotHandled: 'I could not understand the statement: "{{detail}}"',
   errBadEquation: 'I could not read the equation: "{{detail}}"',
   errOutOfScope: 'Understood, but not supported in this tool: "{{detail}}"',
@@ -1182,15 +1161,11 @@ const en: typeof he = {
   saveQuestion: 'Download question',
   questionGiven: 'Given:',
   copied: 'Copied',
-  manualButton: 'Guide',
   manualTitle: 'The guide — analytic geometry',
   manualIntro:
     'A partial guide — representative examples only, to show what kinds of sentence you can type. ' +
     'Click an example to try it on the figure.',
   manualTry: 'Click to try — the example will be built on the figure',
-  manualMore: '…and these are only examples — the tool has more COMMANDS here, not just other phrasings of these',
-  manualShowAll: 'Show all',
-  manualShowLess: 'Show fewer',
   manualPoints: 'Points',
   manualLines: 'Lines',
   manualCircles: 'Circles',
@@ -1232,6 +1207,6 @@ const en: typeof he = {
 };
 
 export const analyticI18n = createProductI18n({
-  resources: { he, en },
+  resources: { he: { ...suiteHe, ...he }, en: { ...suiteEn, ...en } },
   postProcessors: [analyticBidi.postProcessor('bidiIsolateAg')],
 });

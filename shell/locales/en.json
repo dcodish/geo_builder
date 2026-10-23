@@ -1,0 +1,22 @@
+{
+  "suite": {
+    "product": {
+      "2d": "Plane Geometry",
+      "complex": "Complex Numbers",
+      "analytic": "Analytic Geometry"
+    },
+    "about": {
+      "label": "About",
+      "tryTitle": "Enter the given data exactly as it appears in the question:",
+      "developedBy": "Developed by",
+      "author": "Dr. David Codish",
+      "contact": "Questions"
+    },
+    "guide": {
+      "button": "Guide",
+      "more": "…and these are only examples — the tool has more COMMANDS here, not just other phrasings of these",
+      "showAll": "Show all",
+      "showLess": "Show fewer"
+    }
+  }
+}
