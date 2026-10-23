@@ -1527,6 +1527,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'radius-letter-value-upper-2101', family: 'circles', steps: ['מעגל O ברדיוס R', 'R = 3'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }] },
   { id: 'radius-ratio-2100', family: 'circles', steps: ['מעגל O', 'מעגל P', 'רדיוס מעגל O גדול פי 2 מרדיוס מעגל P'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }] },
   { id: 'radius-ratio-after-2100', family: 'circles', steps: ['מעגל O', 'מעגל P', 'רדיוס מעגל O גדול מרדיוס מעגל P פי 2'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }] },
+  // ── #2459 (ADR-754): the same ratio between the circles of a concentric pair, named by their roles ──
+  { id: 'radius-ratio-role-2459', family: 'circles', steps: ['שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל פנימי 1.5', 'רדיוס המעגל החיצוני גדול פי 2 מרדיוס המעגל הפנימי'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }], note: '2-D drew the outer radius as 2 (the factor), green, before ADR-754' },
+  { id: 'radius-ratio-role-smaller-2459', family: 'circles', steps: ['שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל חיצוני 3', 'רדיוס המעגל הפנימי קטן פי 2 מרדיוס המעגל החיצוני'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2110' }], note: '2-D refused it (read as the inner radius 2) before ADR-754' },
   // ── #2066 (ADR-643): a side of the triangle is never its bisector — 2-D refuses with a sentence ──
   { id: 'bisector-on-a-side-2066', family: 'cevians-centres', steps: ['משולש ABC', 'AB חוצה זווית'], expect: 'refused', knownGap: [{ product: '3d', issue: '#1679', parked: true }], note: '2-D: «AB היא צלע של המשולש ולכן אינה יכולה לחצות את זווית A…»' },
   // #2115 (ADR-AG-299): the same predicate on a quadrilateral, and the vertex-less verb that builds over a non-side

@@ -40,7 +40,7 @@
  * bucket, never silently treated as filler.
  */
 import type { AnyCommand } from '@/engine';
-import { normalizeUtterance } from './parse';
+import { factorSpans, normalizeUtterance } from './parse';
 import { unaccountedLabels, type LabelAccountCtx } from './labelAccounting';
 import { GREEK_LETTER, INDEX, RATIO_SEP } from './lexicon';
 
@@ -237,9 +237,29 @@ export function accountUtterance(utterance: string, commands: AnyCommand[], actx
       ratioPairs.add(m[2]);
     }
   }
+  // #2459 (ADR-754) — a FACTOR («פי N», «N פעמים», "N times") MULTIPLIES another measure. It is paid only by a ratio
+  // coefficient a command carries (`k`; a measure's `coef` / `coefs`) or by a number a rule DECLARES it consumed
+  // (`consumed.numbers`, ADR-462) — never by a size `value` that happens to equal it: «רדיוס המעגל החיצוני גדול פי 2
+  // מרדיוס המעגל הפנימי» lowered to `set-radius 2` passed every gate, its «2» "paid" by the wrong field. This NARROWS
+  // what may pay for a number (ADR-566's "values, not field names" stands); it never widens it.
+  const factors = factorSpans(s);
+  const coefVals: number[] = [];
+  const collectCoefs = (v: unknown, key: string): void => {
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      if (key === 'k' || key === 'coef' || key === 'coefs' || key === 'numbers') coefVals.push(v);
+    } else if (Array.isArray(v)) v.forEach((x) => collectCoefs(x, key));
+    else if (v && typeof v === 'object') for (const [k2, x] of Object.entries(v)) collectCoefs(x, k2);
+  };
+  commands.forEach((c) => collectCoefs(c, ''));
+  for (const f of factors) {
+    if (!coefVals.some((c) => Math.abs(Math.abs(c) - f.value) < 1e-9)) out.push({ kind: 'number', text: f.text });
+  }
+  const inFactor = (at: number): boolean => factors.some((f) => at >= f.at && at < f.end);
   // A digit glued to a NAME letter is that name's index (#1814): «O1» is the label pass's, «α1» the symbol
   // pass's — never a stated number the bogus value «1» could pay for.
-  for (const n of s.match(/(?<![֐-׿A-Za-zΑ-Ωα-ω_])-?\d+(?:\.\d+)?/g) ?? []) {
+  for (const nm of s.matchAll(/(?<![֐-׿A-Za-zΑ-Ωα-ω_])-?\d+(?:\.\d+)?/g)) {
+    const n = nm[0];
+    if (inFactor(nm.index!)) continue; // a factor's number is the factor pass's (#2459)
     if (ratioPairs.has(n.replace(/^-/, ''))) continue;
     const v = Math.abs(Number(n));
     const hit = cmdNumbers.some(

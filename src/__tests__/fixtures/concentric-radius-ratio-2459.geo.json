@@ -1,0 +1,73 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-23T12:00:00.000Z",
+  "name": "concentric-radius-ratio-2459",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "Wj53IMWtrMC1IeXv7nMDy",
+      "utterance": "שני מעגלים בעלי מרכז משותף O",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "1GmXus949iFyew4cKh10h",
+      "utterance": "שני מעגלים בעלי מרכז משותף O",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O-2",
+        "center": "O",
+        "radius": 2.75,
+        "freeRadius": true,
+        "ifAbsent": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "AZKCzW8d4OnkFamDLG9o_",
+      "utterance": "שני מעגלים בעלי מרכז משותף O",
+      "group": "g0",
+      "cmd": {
+        "type": "set-radius-order",
+        "outer": "circle-O",
+        "inner": "circle-O-2"
+      },
+      "enabled": true
+    },
+    {
+      "id": "_p2mvuYGbZDVN37kx41EL",
+      "utterance": "רדיוס מעגל פנימי 1.5",
+      "group": "g3",
+      "cmd": {
+        "type": "set-radius",
+        "circle": "circle-O-2",
+        "value": 1.5
+      },
+      "enabled": true
+    },
+    {
+      "id": "g3-j_XJwepYUJLB2iz-rM",
+      "utterance": "רדיוס המעגל החיצוני גדול פי 2 מרדיוס המעגל הפנימי",
+      "group": "g4",
+      "cmd": {
+        "type": "set-radius-ratio",
+        "c1": "circle-O",
+        "c2": "circle-O-2",
+        "k": 2
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}
