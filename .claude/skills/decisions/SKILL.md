@@ -24,6 +24,7 @@ rulings, never the goal: a pass that arms plans he has not seen has failed (CLAU
 
 - **Not a fix session.** It rules and it plans; it never implements. Fixes go to `/fix-round` after.
 - **Not triage.** It does not file new issues from operator reports — that is standing rule 3's job.
+- **Not a wording ballot for single sentences.** A new refusal or status sentence written under the one-next-step rule gets no card: it is approved by his play of the sheet (operator ruling 2026-10-15 on #1995, [ADR-W-154](../../../docs/06w-decisions-workspace.md#adr-w-154)). A sentence that cannot follow the rule does come here.
 - **Not a status report.** `/status-update` describes the queue; this one *empties the blocking half* of it.
 
 ---

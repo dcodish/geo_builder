@@ -10,10 +10,12 @@
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import he from '../i18n/locales/he.json';
+import suiteHe from '../../shell/locales/he.json';
 import { i18nKeyAudit } from '../../shell/__tests__/fixtures/i18n-keys';
 
 const ROOT = join(__dirname, '..', '..');
-const audit = i18nKeyAudit(ROOT, ['src'], he);
+// #2201 phase 1 (ADR-W-148): a key resolves against the MERGED resources — the suite text plus 2-D's own.
+const audit = i18nKeyAudit(ROOT, ['src'], { ...suiteHe, ...he });
 
 describe('2-D i18n — every literal key resolves', () => {
   it('checks a real surface (the guard is not vacuous)', () => {

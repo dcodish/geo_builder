@@ -78,7 +78,7 @@ describe('#1963 exact arm — nothing the object is built from can move', () => 
 
   it('the refusal text is the existing sentence', () => {
     const r = play(['נקודה Q', ...PINNED, CIRCLE]);
-    expect(errorText(r!.error, he)).toContain('"מעגל שעובר דרך A, B ו-C"');
+    expect(errorText(r!.error, he)).toContain('«מעגל שעובר דרך A, B ו-C»');
     expect(errorText(r!.error, he)).toBe(errorText(play([...PINNED, CIRCLE])!.error, he));
   });
 

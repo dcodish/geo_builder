@@ -49,14 +49,14 @@ describe('#1919 — complex names the letters it cannot read', () => {
   it('a complex statement with such a letter is refused by name, not by «I did not understand»', () => {
     expect(submitLine('ДЖФ = 2 + i')).toBe(false);
     expect(store().lastError).toEqual({ key: 'unread-name', detail: 'ДЖФ' });
-    expect(errorText(store().lastError!, t)).toBe('"ДЖФ" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.');
+    expect(errorText(store().lastError!, t)).toBe('«ДЖФ» אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.');
     expect(errorText(store().lastError!, tEn)).toContain('is not a point name');
   });
 
   it('a word in another language gets the Hebrew-and-English sentence', () => {
     expect(submitLine('треугольник ABC')).toBe(false);
     expect(store().lastError).toEqual({ key: 'unread-word', detail: 'треугольник' });
-    expect(errorText(store().lastError!, t)).toBe('הכלי קורא עברית ואנגלית בלבד — "треугольник" אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.');
+    expect(errorText(store().lastError!, t)).toBe('הכלי קורא עברית ואנגלית בלבד — «треугольник» אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.');
   });
 
   it('nothing is recorded, and the figure is untouched', () => {

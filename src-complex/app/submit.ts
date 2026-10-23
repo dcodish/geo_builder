@@ -47,7 +47,7 @@ import { trigAngleMismatch } from '../parser/normalize';
 import { complexScopeOf, parseAsk } from './deriveLines';
 import { type ComplexScope, gluedISpelledOut, juxtaposedNumbersSpelledOut } from '../parser/exprParse';
 import type { Derived2 } from '../replay/derive2';
-import { type InputError, type SavedSession, useComplexStore } from '../store/useComplexStore';
+import { type InputError, type InputNote, type SavedSession, useComplexStore } from '../store/useComplexStore';
 import { deriveLines, lineEntailed } from './deriveLines';
 
 /** This product's save-file envelope (shell/save): the marker `serialize()` writes, and the
@@ -374,11 +374,84 @@ export function submitQuery(raw: string): boolean {
  * recorded. One helper for both gate entry points (`submitLine`, `editLine`); the load path replays
  * through `submitLine`, so an old file's proof line is reported in the load audit, not silently ✓.
  */
-function refusedAsProofTarget(line: string): boolean {
+function proofTargetRefusal(line: string): InputError | null {
   const proof = findProofTarget(line);
-  if (!proof) return false;
-  useComplexStore.getState().setError({ key: 'proof-target', detail: proof.sentence });
-  return true;
+  return proof ? { key: 'proof-target', detail: proof.sentence } : null;
+}
+function refusedAsProofTarget(line: string): boolean {
+  const e = proofTargetRefusal(line);
+  if (e) useComplexStore.getState().setError(e);
+  return e !== null;
+}
+
+/** The figure a submit is decided against: the line list, which of its rows are muted, and the seed. */
+export interface SubmitStateCx {
+  readonly lines: readonly string[];
+  readonly disabled: readonly number[];
+  readonly seed: number;
+}
+
+/**
+ * What submitting one line DOES — decided, not done (#2241, the analytic shape of #1102).
+ *
+ * `submitLine` used to decide and write the store in one body, so the only way to learn what a line
+ * would do was to run it against the live store. `/log-triage` needs that answer for a PRODUCTION session
+ * replayed in a script, and a replay calling `acceptLine` alone would be a mirror of this function
+ * (ADR-346's drift class: the proof-target, unread-script, ask-lane and parse refusals sit above it). So
+ * the whole decision lives here, pure over `(state, raw)`, and `submitLine` dispatches on it. A new
+ * verdict kind cannot be added without both the dispatcher and the triage replay's switch seeing it.
+ */
+export type SubmitVerdictCx =
+  /** accepted — the caller records the line, adopting the configuration the gate found for it */
+  | { readonly kind: 'record'; readonly line: string; readonly seed: number }
+  /** a question typed in the givens box — routed to the ask lane (#789) */
+  | { readonly kind: 'ask'; readonly line: string }
+  /** a statement the exact solve already entails — no row, 2-D's noop sentence (#2268) */
+  | { readonly kind: 'known'; readonly note: InputNote }
+  | { readonly kind: 'refuse'; readonly error: InputError };
+
+export function decideSubmitCx(state: SubmitStateCx, raw: string, replaying = false): SubmitVerdictCx {
+  const line = raw.trim();
+  const active = activeOf(state.lines, state.disabled);
+
+  // #1870 (ADR-CX-083, ADR-W-107; ruling B14) — a claim to PROVE, refused first: before the ask routing and
+  // before the grammar, the 2-D placement, so no partial reading records half of a mixed line
+  // («נתון z1 = 3+4i. הוכיחו כי |z1| = 5») and no rule reads the claim inside the sentence («prove that w is
+  // real» once recorded a ✓ claim about a number named "prove"). A BARE statement («w ממשי») has no proof
+  // verb and keeps its claim check (D3).
+  const proof = proofTargetRefusal(line);
+  if (proof) return { kind: 'refuse', error: proof };
+
+  // #1919 (ADR-626): a letter this tool cannot read, refused before the ask routing and before the
+  // grammar — the shared rule all four builders call (`shell/inputScript`). Complex folds no glyphs (a
+  // superscript digit is an exponent here, #1912), and it does not need to: the rule folds the look-alike
+  // LETTERS itself, so «КМО» reads as KMO and only a letter with no Latin twin is named.
+  const unread = unreadScript(line);
+  if (unread) return { kind: 'refuse', error: { key: `unread-${unread.kind}`, detail: unread.detail } };
+
+  /**
+   * #789 — a QUESTION typed in the givens box is routed to the ask lane, never recorded as a fact.
+   * One entry point stays true: every utterance the student can type still works here — what moved
+   * is where a question LIVES. This routing is also the load-path migration: old save files carry
+   * ask lines in `lines`, and replaying them through this very function files them in the lane.
+   */
+  // #1405: read against the figure's declared letters — a bare `u` is a question about a real
+  // parameter, and a statement once u is declared complex
+  const ask = readAsk(line, scopeOf(active)).kind;
+  if (ask !== 'statement' && ask !== 'unreadable') return { kind: 'ask', line };
+
+  // #1437 amendment: the question is read FIRST, because a framed question («מהו |w|», «|w|?») is
+  // not a statement the grammar reads — refusing it here as unparseable would never reach the lane
+  const parsed = parseInFigure(line, active);
+  if (!parsed.ok) return { kind: 'refuse', error: unreadRefusal(parsed, line, active) };
+
+  // #2268 (ADR-CX-084, LADDER-CX stage 0e′) — a statement the exact solve already entails adds nothing:
+  // no row, 2-D's noop sentence. Seed-free, so a value that merely holds in this drawing is still recorded.
+  if (!replaying && lineEntailed(active, line)) return { kind: 'known', note: { key: 'already-known', detail: line } };
+
+  // the gate reads the ACTIVE figure — a muted line must not veto a new statement (B5)
+  const verdict = acceptLine(active, line, state.seed);
+  return verdict.ok ? { kind: 'record', line, seed: verdict.seed } : { kind: 'refuse', error: verdict.error };
 }
 
 /**
@@ -399,63 +472,23 @@ export function submitLine(
   replaying = false,
 ): boolean {
   const st = () => useComplexStore.getState();
-  const line = raw.trim();
-
-  // #1870 (ADR-CX-083, ADR-W-107; ruling B14) — a claim to PROVE, refused first: before the ask routing and
-  // before the grammar, the 2-D placement, so no partial reading records half of a mixed line
-  // («נתון z1 = 3+4i. הוכיחו כי |z1| = 5») and no rule reads the claim inside the sentence («prove that w is
-  // real» once recorded a ✓ claim about a number named "prove"). A BARE statement («w ממשי») has no proof
-  // verb and keeps its claim check (D3).
-  if (refusedAsProofTarget(line)) return false;
-
-  // #1919 (ADR-626): a letter this tool cannot read, refused before the ask routing and before the
-  // grammar — the shared rule all four builders call (`shell/inputScript`). Complex folds no glyphs (a
-  // superscript digit is an exponent here, #1912), and it does not need to: the rule folds the look-alike
-  // LETTERS itself, so «КМО» reads as KMO and only a letter with no Latin twin is named.
-  const unread = unreadScript(line);
-  if (unread) {
-    st().setError({ key: `unread-${unread.kind}`, detail: unread.detail });
-    return false;
+  const { lines, disabled, seed } = st();
+  const v = decideSubmitCx({ lines, disabled, seed }, raw, replaying);
+  switch (v.kind) {
+    case 'refuse':
+      st().setError(v.error);
+      return false;
+    case 'ask':
+      st().addQuery(v.line);
+      st().clearError();
+      return true;
+    case 'known':
+      st().setNote(v.note);
+      return true;
+    case 'record':
+      st().recordLine(v.line, v.seed);
+      return true;
   }
-
-  /**
-   * #789 — a QUESTION typed in the givens box is routed to the ask lane, never recorded as a fact.
-   * One entry point stays true: every utterance the student can type still works here — what moved
-   * is where a question LIVES. This routing is also the load-path migration: old save files carry
-   * ask lines in `lines`, and replaying them through this very function files them in the lane.
-   */
-  // #1405: read against the figure's declared letters — a bare `u` is a question about a real
-  // parameter, and a statement once u is declared complex
-  const ask = readAsk(line, scopeOf(activeLines())).kind;
-  if (ask !== 'statement' && ask !== 'unreadable') {
-    st().addQuery(line);
-    st().clearError();
-    return true;
-  }
-
-  // #1437 amendment: the question is read FIRST, because a framed question («מהו |w|», «|w|?») is
-  // not a statement the grammar reads — refusing it here as unparseable would never reach the lane
-  const parsed = parseInFigure(line, activeLines());
-  if (!parsed.ok) {
-    st().setError(unreadRefusal(parsed, line, activeLines()));
-    return false;
-  }
-
-  // #2268 (ADR-CX-084, LADDER-CX stage 0e′) — a statement the exact solve already entails adds nothing:
-  // no row, 2-D's noop sentence. Seed-free, so a value that merely holds in this drawing is still recorded.
-  if (!replaying && lineEntailed(activeLines(), line)) {
-    st().setNote({ key: 'already-known', detail: line });
-    return true;
-  }
-
-  // the gate reads the ACTIVE figure — a muted line must not veto a new statement (B5)
-  const verdict = acceptLine(activeLines(), line, st().seed);
-  if (!verdict.ok) {
-    st().setError(verdict.error);
-    return false;
-  }
-  st().recordLine(line, verdict.seed);
-  return true;
 }
 
 /**

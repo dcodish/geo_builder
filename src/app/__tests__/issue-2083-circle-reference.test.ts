@@ -115,7 +115,7 @@ describe('#2083 — unchanged (measured at 939b160a)', () => {
   it('a bare «מעגל O» after «ברדיוס 3» still answers «כבר קיים»', async () => {
     const g = await play(['מעגל O ברדיוס 3', 'מעגל O']);
     expect(g.last.kind).toBe('noop');
-    expect(g.last.note?.key).toBe('input.alreadyDrawn');
+    expect(g.last.note?.key).toBe('suite.notice.alreadyDrawn');
     expect(g.radius('O')!.radius).toEqual({ via: 'length', value: 3 });
   });
 

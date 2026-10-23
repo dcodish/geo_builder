@@ -6,7 +6,9 @@
 import { analyticI18n as i18nA } from '../i18n';
 import { errorText as analyticErrorText } from '../app/errorText';
 import type { InputError as AnalyticError } from '../store/useAnalyticStore';
-import { lockMessageFloor, type Fixed, type Payload } from '../../shell/__tests__/fixtures/message-floor';
+import { lockMessageFloor, type Fixed, type Payload, drive } from '../../shell/__tests__/fixtures/message-floor';
+import { lockRefusalStyle } from '../../shell/__tests__/fixtures/refusal-style';
+import { flatten } from '../../shell/__tests__/fixtures/locale-tables';
 
 // ─── analytic: `errorText` over `InputError` ────────────────────────────────────────────────────────────────────
 
@@ -100,11 +102,27 @@ const ANALYTIC: Record<AnalyticError['key'], Payload[]> = {
   'load-unreadable': [{ detail: 'קובץ.json' }],
 };
 
-lockMessageFloor(
-  'analytic (errorText)',
-  i18nA,
-  Object.entries(ANALYTIC).flatMap(([key, variants]) =>
-    variants.map((p, i) => ({ label: `${key} #${i + 1}`, render: (t: Fixed) => analyticErrorText({ key, detail: 'P על AB', ...p } as unknown as AnalyticError, t) })),
-  ),
+const ROWS = Object.entries(ANALYTIC).flatMap(([key, variants]) =>
+  variants.map((p, i) => ({ label: `${key} #${i + 1}`, key, render: (t: Fixed) => analyticErrorText({ key, detail: 'P על AB', ...p } as unknown as AnalyticError, t) })),
 );
+
+lockMessageFloor('analytic (errorText)', i18nA, ROWS);
+
+// #1995 stage 5 (ADR-W-154): the same rows, rendered in Hebrew, hold the one-next-step rule.
+/**
+ * The ask lane's non-union refusals (App.tsx renders each through `t` after the student's question): a missing or
+ * unnamed object, an unreadable question, crossing lines, a value the givens do not fix, and every `askHost.*`.
+ */
+const ASK_KEYS = [
+  'askMissingPoint', 'askMissingCurve', 'askNumeralNotation', 'askContextualPoint', 'askContextualLine', 'askContextualBoth',
+  'askUnreadable', 'askLinesCross', 'askOpen', 'askNoValue',
+  ...Object.keys(flatten(i18nA.getResourceBundle('he', 'translation'))).filter((k) => k.startsWith('askHost.')),
+];
+const ASK_PARAMS = { name: 'P', used: 'P1', points: 2, lines: 2 };
+
+// #1995 stage 5 (ADR-W-154): the same rows, rendered in Hebrew, hold the one-next-step rule.
+lockRefusalStyle('analytic', () => [
+  ...ROWS.map((r) => ({ label: r.label, key: r.key, he: drive(i18nA, 'he', r.render).text ?? '' })),
+  ...ASK_KEYS.map((key) => ({ label: `ask ${key}`, key, he: i18nA.getFixedT('he')(key, ASK_PARAMS) })),
+]);
 

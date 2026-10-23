@@ -7,7 +7,8 @@ import { complexI18n as i18nC } from '../i18n';
 import { errorText as complexErrorText } from '../app/errorText';
 import type { InputError as ComplexError } from '../store/useComplexStore';
 import type { Why } from '../model/why';
-import { lockMessageFloor, type Fixed, type Payload } from '../../shell/__tests__/fixtures/message-floor';
+import { lockMessageFloor, type Fixed, type Payload, drive } from '../../shell/__tests__/fixtures/message-floor';
+import { lockRefusalStyle } from '../../shell/__tests__/fixtures/refusal-style';
 
 // ─── complex: `errorText` over `InputError`, and `whyText` over every `Why` a refusal can carry ─────────────────
 
@@ -68,13 +69,19 @@ const COMPLEX: Record<ComplexError['key'], Payload[]> = {
   'reserved-constant': [{ constant: 'i' }, { constant: 'o' }],
 };
 
-lockMessageFloor(
-  'complex (errorText + whyText)',
-  i18nC,
-  Object.entries(COMPLEX).flatMap(([key, variants]) =>
-    variants.map((p, i) => ({
-      label: `${key} #${i + 1}${'why' in p ? ` (${(p.why as { code: string }).code})` : ''}`,
-      render: (t: Fixed) => complexErrorText({ key, detail: 'z1 = 3+4i', ...p } as unknown as ComplexError, t),
-    })),
-  ),
+const ROWS = Object.entries(COMPLEX).flatMap(([key, variants]) =>
+  variants.map((p, i) => ({
+    label: `${key} #${i + 1}${'why' in p ? ` (${(p.why as { code: string }).code})` : ''}`,
+    key: 'why' in p ? `refused/${(p.why as { code: string }).code}` : key,
+    render: (t: Fixed) => complexErrorText({ key, detail: 'z1 = 3+4i', ...p } as unknown as ComplexError, t),
+  })),
 );
+
+lockMessageFloor('complex (errorText + whyText)', i18nC, ROWS);
+
+// #1995 stage 5 (ADR-W-154): the same rows, rendered in Hebrew, hold the one-next-step rule.
+// The ask lane's two refusals (App.tsx renders them through `t` after the student's question).
+lockRefusalStyle('complex', () => [
+  ...ROWS.map((r) => ({ label: r.label, key: r.key, he: drive(i18nC, 'he', r.render).text ?? '' })),
+  ...['askUnreadable', 'askIsStatement'].map((key) => ({ label: `ask ${key}`, key, he: i18nC.getFixedT('he')(key) })),
+]);

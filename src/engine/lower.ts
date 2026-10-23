@@ -15,6 +15,7 @@
  * finer-grained pieces so it can attach a status/label to each originating fact.
  */
 
+import { engineErrorDebugText } from './errors';
 import type { AnyCommand, Command, Id, MeasureExpr, RoundOperand, SymbolicCommand } from './types';
 import { formatMeasure } from '@/format';
 import { expandShapeVariant } from './shapeVariants';
@@ -186,12 +187,12 @@ export function measureRestatement(cmd: AnyCommand, prior: readonly AnyCommand[]
 export function measureRestatementStatus(cmd: RestatedNaming, r: MeasureRestatement, tab: SymTab): string | null {
   if (cmd.type === 'angle-alias' || r.earlier.type === 'angle-alias') {
     if (r.kind !== 'name-taken' || cmd.type !== 'angle-alias' || r.earlier.type !== 'angle-alias') return null;
-    return `name-taken: angle ${cmd.ray1}${cmd.vertex}${cmd.ray2} is already named ${r.earlier.name}`;
+    return engineErrorDebugText({ code: 'name-taken', measure: 'angle', name: `${cmd.ray1}${cmd.vertex}${cmd.ray2}`, symbol: r.earlier.name });
   }
   const angle = cmd.type === 'measure-angle';
   const name = cmd.type === 'measure-angle' ? `${cmd.ray1}${cmd.vertex}${cmd.ray2}` : `${cmd.a}${cmd.b}`;
-  if (r.kind === 'coef-conflict') return `over-constrained: ${angle ? `∠${name}` : `|${name}|`} = ${measureLabelText(cmd, tab)} cannot hold`;
-  if (r.kind === 'name-taken') return `name-taken: ${angle ? 'angle' : 'segment'} ${name} is already named ${measureLabelText(r.earlier, tab)}`;
+  if (r.kind === 'coef-conflict') return engineErrorDebugText({ code: 'over-constrained', what: `${angle ? `∠${name}` : `|${name}|`} = ${measureLabelText(cmd, tab)}` });
+  if (r.kind === 'name-taken') return engineErrorDebugText({ code: 'name-taken', measure: angle ? 'angle' : 'segment', name, symbol: measureLabelText(r.earlier, tab) });
   return null;
 }
 
@@ -341,7 +342,9 @@ export function letterSystem(
   const admissible = (t: Target, v: number) => (t.kind === 'ang' ? v > 1e-9 && v < 360 - 1e-9 : v > 1e-9);
   const whatOf = (t: Target, v: number) =>
     t.kind === 'radius' ? `radius of ${t.circle} = ${formatMeasure(v)}` : t.kind === 'ang' ? `∠${t.name} = ${formatMeasure(v)}°` : `|${t.name}| = ${formatMeasure(v)}`;
-  const overConstrained = (what: string) => `over-constrained: ${what} cannot hold`;
+  const overConstrained = (what: string) => engineErrorDebugText({ code: 'over-constrained', what });
+  /** a target refused at value `v`: a circle's second size is the restated-size variant (#2119), anything else over-constrained */
+  const refusedAt = (t: Target, v: number) => (t.kind === 'radius' ? engineErrorDebugText({ code: 'restated-size', circle: `${t.circle}`, value: formatMeasure(v) }) : overConstrained(whatOf(t, v)));
   /** the refused measure in its own letters — ADR-661's coef-conflict frame («|AB| = 3a cannot hold») */
   const ownText = (t: Target, row: number): string => {
     const c = cmds[row];
@@ -355,7 +358,7 @@ export function letterSystem(
   const reasonFor = (name: string, v: number): string => {
     const bs = bindings.get(name) ?? [];
     const b = bs.find((x) => x.t.kind === 'radius') ?? bs[0];
-    return overConstrained(b ? whatOf(b.t, at(b.lin, v)) : `${name} = ${formatMeasure(v)}`);
+    return b ? refusedAt(b.t, at(b.lin, v)) : overConstrained(`${name} = ${formatMeasure(v)}`);
   };
   const bind = (t: Target, lin: Lin) => {
     const bs = bindings.get(lin.var) ?? [];
@@ -404,13 +407,13 @@ export function letterSystem(
         // a circle (a restated radius, circumference or area, a radius letter's value) is refused here (#2119, ADR-683).
         if (t.kind !== 'radius') return record();
         const other = 'lin' in e ? provenance(e) : provenance(fixed);
-        return { status: overConstrained(whatOf(t, mine)), at: other === i ? provenance(fixed) : other };
+        return { status: refusedAt(t, mine), at: other === i ? provenance(fixed) : other };
       }
       // an unknown letter against a known target: solve it
       const l = (e as { lin: Lin }).lin;
       if (l.pow !== 1) return record();
       const v = (tv - l.konst) / l.coef;
-      if (!admissibleFor(l.var, v, [{ t, lin: l }])) return { status: overConstrained(whatOf(t, tv)), at: provenance(fixed) };
+      if (!admissibleFor(l.var, v, [{ t, lin: l }])) return { status: refusedAt(t, tv), at: provenance(fixed) };
       determine(l.var, v, 'num' in fixed ? fixed.row : i);
       return record();
     }
@@ -421,7 +424,7 @@ export function letterSystem(
       // a number (or a known letter) against an unknown expression: solve the expression's letter
       if (f.pow !== 1) return record();
       const v = (mine - f.konst) / f.coef;
-      if (!admissibleFor(f.var, v, [])) return { status: overConstrained(whatOf(t, mine)), at: first.row };
+      if (!admissibleFor(f.var, v, [])) return { status: refusedAt(t, mine), at: first.row };
       determine(f.var, v, 'num' in e ? e.row : i);
       return record();
     }
@@ -547,7 +550,7 @@ export function reservedAmbiguity(cmds: readonly AnyCommand[], i: number, radius
   const sizedIds = [...circles.keys()].filter((id) => sized.has(id));
   if (sizedIds.length === 0) return null;
   const named = sizedIds.length >= 2 ? sizedIds : [...circles.keys()];
-  return `reserved radius ambiguous: ${letter} names no one circle of ${named.map((id) => circles.get(id)).join(', ')} (${sizedIds.length >= 2 ? 'stated sizes' : 'circles'})`;
+  return engineErrorDebugText({ code: 'reserved-radius-ambiguous', letter, circles: named.map((id) => circles.get(id)!), sized: sizedIds.length >= 2 });
 }
 
 /**

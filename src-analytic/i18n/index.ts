@@ -6,12 +6,14 @@
  * sentence can never reverse `y = -2x + 8` inside a refusal — the mechanism each sibling had to
  * learn separately, adopted here from the first line of the product.
  *
- * NOTE the `switcher*` keys: `products.json`'s `labelKey` is resolved by EACH CONSUMING product's
- * i18n, so every builder needs a name for every builder. A missing key here is a blank chip in
- * THIS tool; a missing `switcherAnalytic` in a sibling is a blank chip THERE (ADR-AG-004 §2 — the
- * checklist item whose failure surfaces in the wrong product).
+ * NOTE the builder names: `products.json`'s `labelKey` is resolved by EACH CONSUMING product's
+ * i18n. Since #2201 phase 1 (ADR-W-148) the names are `suite.*` keys in `shell/locales`, merged
+ * below, so a new builder's name is added ONCE; only a name whose wording still differs between
+ * builders (`switcher3d`) stays per product, and a missing one is a blank chip in THIS tool.
  */
 import { createProductI18n } from '../../shell/i18n';
+import suiteEn from '../../shell/locales/en.json';
+import suiteHe from '../../shell/locales/he.json';
 
 // #1191: the kit itself lives in ./bidi so the RENDERER can reach it without importing this bootstrap.
 // Re-exported here because every existing caller imports it from './i18n' — one instance, two doors.
@@ -19,14 +21,13 @@ export { analyticBidi } from './bidi';
 import { analyticBidi } from './bidi';
 
 const he = {
-  // The suite's display names are the CURRICULUM's subject names (operator ruling 2026-08-17).
-  title: 'גאומטריה אנליטית',
+  // The title is `suite.product.analytic` (shell/locales): the suite's display names are the
+  // CURRICULUM's subject names (operator ruling 2026-08-17).
   subtitle: 'מערכת צירים: הקלידו נתונים שורה-שורה והתבוננו בשרטוט',
   inputPlaceholder: 'למשל: נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9',
   add: 'הוסף',
   clearAll: 'נקה הכל',
   language: 'English',
-  emptyTitle: 'התחילו לשרטט',
   emptyHint: 'הבחינה לא מדפיסה שרטוט — הקלידו את הנתונים והכלי ישרטט אותם',
   // #1281 — the name the tool gave a point stated only by its coordinates (the #1263 ruling: say so).
   mintedNote: 'הכלי קרא לנקודה {{name}}',
@@ -156,8 +157,6 @@ const he = {
   paramUnused: '(לא בשימוש בשרטוט)',
   freeDof: 'דרגות חופש: {{count}}',
   pinned: '✓ הציור נקבע במלואו על ידי הנתונים',
-  about: 'אודות',
-  aboutTitle: 'גאומטריה אנליטית',
   aboutLead:
     'כלי לשרטוט שאלות גאומטריה אנליטית: מקלידים את הנתונים כלשונם, והכלי משרטט את הצורה. הכלי אינו פותר את השאלה.',
   // #1477 (ADR-W-091): the About DECLARATION's parts — the same sections as 2-D's About.
@@ -167,11 +166,7 @@ const he = {
     'כשהנתונים מאפשרים יותר משרטוט אחד, «הציגו תצורה אחרת» מציג שרטוט אחר שגם הוא מקיים את כל הנתונים.',
     'הכלי משרטט את הצורה לפי מה שתיארתם — הוא אינו פותר שאלות.',
   ],
-  aboutTryTitle: 'הזינו את נתוני השאלה כפי שמופיעים בשאלה:',
   aboutTrySteps: ['נתון מעגל I שמשוואתו (x-3)^2+(y-4)^2=9', 'נתונה הנקודה A(2,6)', 'נתון הישר l1: y=x'],
-  creditBy: 'פותח על־ידי',
-  creditName: 'ד"ר דוד קודיש',
-  creditContact: 'לשאלות',
   privacy:
     'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. לצורך שיפור הכלי נשמרים המשפטים שהקלדתם (טקסט מתמטי בלבד) עם מזהה מבקר אנונימי — ללא כתובת ה-IP — עד 30 יום.' +
     ' משפטים שהכלי לא הבין נשלחים לעיבוד בשירות בינה מלאכותית חיצוני.' +
@@ -179,25 +174,21 @@ const he = {
   close: 'סגור',
   switcherLabel: 'בחירת כלי',
   switcherMore: 'עוד',
-  // Every builder's name, resolved through THIS product's i18n (see the note above).
-  switcher2d: 'הנדסת המישור',
+  // 3-D's name, resolved through THIS product's i18n (see the note above); the rest are `suite.product.*`.
   switcher3d: 'הנדסת המרחב',
-  switcherComplex: 'מספרים מרוכבים',
-  switcherAnalytic: 'גאומטריה אנליטית',
   // Refusals name the STATEMENT, never internal state.
-  errNotHandled: 'לא הצלחתי להבין את המשפט: "{{detail}}"',
-  errBadEquation: 'לא הצלחתי לקרוא את המשוואה: "{{detail}}"',
-  errOutOfScope: 'המשפט מובן, אך אינו נתמך בכלי הזה: "{{detail}}"',
+  errBadEquation: 'לא הצלחתי לקרוא את המשוואה: «{{detail}}»',
+  errOutOfScope: 'המשפט מובן, אך אינו נתמך בכלי הזה: «{{detail}}»',
   // #1888 / #1889 (ADR-AG-251) — 2-D's text (`input.scope.split-statements`, `right-angle-vertex`), ADR-W-118 B1
   errSplitStatements: 'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. זיהינו כאן שני נתונים — נסו להקליד אותם בשני שלבים: {{all}}',
   // #1947 (ADR-AG-301) — 2-D's `input.scope.right-angle-vertex`, byte for byte (ADR-611 / ADR-3D-331); locked by
   // shell/__tests__/one-fact-per-line-parity-1962.test.ts
   errRightAngleVertex: 'בכל שורה נתון אחד — כך הכלי יוכל לבנות ולאמת כל נתון בנפרד. כתבו בשורות נפרדות: (1) משולש {{triangle}}  (2) ∠{{angle}} = 90°{{more}}',
   errProofTarget:
-    'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "{{detail}}"',
-  errConflict: 'המשפט לא נוסף — הוא סותר את מה שכבר נקבע: "{{detail}}"',
+    'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «{{detail}}»',
+  errConflict: 'המשפט לא נוסף — הוא סותר את מה שכבר נקבע: «{{detail}}»',
   errNameClash:
-    'השם הזה כבר תפוס בשרטוט — הוא {{existing}}. אי אפשר לתת לו משמעות שנייה במשפט "{{detail}}". ' +
+    'השם הזה כבר תפוס בשרטוט — הוא {{existing}}. אי אפשר לתת לו משמעות שנייה במשפט «{{detail}}». ' +
     'אפשר לבחור אות אחרת, או למחוק את ההגדרה הקודמת ולכתוב אותה מחדש.',
   // #1179 — one sentence per KIND, written out rather than templated: Hebrew gender carries through
   // the whole clause («הנקודה … הוגדרה» vs «הישר … הוגדר»), so a noun slotted into one sentence would
@@ -214,36 +205,36 @@ const he = {
   listAnd: ' ו-',
   // 02c R7 (#1514 pre-play) — the noun and the equation name different families; never drawn.
   errKindMismatch:
-    'המשוואה במשפט "{{detail}}" מתארת {{existing}}, לא {{claimed}}. בדקו את המשוואה, או כתבו את שם הצורה שהיא מתארת.',
+    'המשוואה במשפט «{{detail}}» מתארת {{existing}}, לא {{claimed}}. בדקו את המשוואה, או כתבו את שם הצורה שהיא מתארת.',
   // Several NAMED candidates for a contextual reference (#1514 + #1432, chosen by hostKey): the sentence
   // names them and shows the student's own line with the first name in it.
   'errHost.named':
-    'בשרטוט יש יותר מעצם אחד מהסוג הזה ({{candidates}}), ולכן לא ברור לאיזה מהם הכוונה ב-"{{detail}}". כתבו את השם, למשל «{{example}}».',
+    'בשרטוט יש יותר מעצם אחד מהסוג הזה ({{candidates}}), ולכן לא ברור לאיזה מהם הכוונה ב-«{{detail}}». כתבו את השם, למשל «{{example}}».',
   // Operator ruling 2026-09-29 — a digit and a Roman numeral are one name; the notations are not mixed.
   errNumeralNotation:
     '{{numNoun}} {{holder}} ו{{numNoun}} {{detail}} הם אותו שם — הכלי קורא ספרה ומספר רומי כשם אחד. כדי לא לערבב שתי כתיבות, כתבו {{numNoun}} {{holder}}, כמו בשורות הקודמות.',
   errAlreadyNamed: 'כבר יש שם לנקודה הזו: {{holder}}. כדי לשנות את השם, מחקו את השורה של {{holder}} וכתבו אותה מחדש.',
   errAliasTaken: 'השם {{holder}} כבר תפוס בציור — שם אחד מסמן דבר אחד, נקודה או זווית. בחרו שם אחר, למשל אות עם ספרה אחרת.',
   // #1154 — the rename's refusals, each naming what the student wrote
-  errRenameBadName: '"{{detail}}" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
+  errRenameBadName: '«{{detail}}» אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
   // #1919 — a WORD in another script: the operator's Hebrew-and-English sentence, the same in every builder.
   // #1837 (ADR-W-142) — an angle in radians: 2-D's ruled sentence (operator, 2026-10-07)
   errRadianAngle: 'בגאומטריה של המישור זוויות נכתבות במעלות — למשל ∠ABC = 90',
-  errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — "{{detail}}" אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
+  errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — «{{detail}}» אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
   // #2222 (ADR-AG-284, operator ruling 2026-10-16) — an ASCII mixed number: a decimal, the sum, or the product.
-  errMixedNumber: 'לא ברור אם "{{detail}}" הוא מספר מעורב או מכפלה. כתבו {{decimal}} (מספר עשרוני) או {{sum}} למספר המעורב, או {{product}} למכפלה.',
-  errMixedNumberNoDecimal: 'לא ברור אם "{{detail}}" הוא מספר מעורב או מכפלה. כתבו {{sum}} למספר המעורב, או {{product}} למכפלה.',
+  errMixedNumber: 'לא ברור אם «{{detail}}» הוא מספר מעורב או מכפלה. כתבו {{decimal}} (מספר עשרוני) או {{sum}} למספר המעורב, או {{product}} למכפלה.',
+  errMixedNumberNoDecimal: 'לא ברור אם «{{detail}}» הוא מספר מעורב או מכפלה. כתבו {{sum}} למספר המעורב, או {{product}} למכפלה.',
   errRenameSame: 'האות {{detail}} כבר נקראת {{detail}} — אין מה לשנות.',
   errRenameUnknown: 'אין בשרטוט נקודה בשם {{detail}}, ולכן אין מה לשנות.',
-  errRenameTaken: 'האות {{detail}} כבר תפוסה: "{{holder}}". בחרו אות פנויה.',
+  errRenameTaken: 'האות {{detail}} כבר תפוסה: «{{holder}}». בחרו אות פנויה.',
   errRenameTakenTool: 'האות {{detail}} כבר תפוסה בשרטוט. בחרו אות פנויה.',
   errRenameNotTyped: 'את האות {{detail}} בחר הכלי, ואין דרך לכתוב אותה במשפט שלכם בלי לשנות את משמעותו — לכן היא לא שונתה.',
-  errRenameUnsafe: 'לא הצלחתי לשנות את {{holder}} בשורה "{{detail}}" בלי לשנות את משמעותה. ערכו את השורה ידנית.',
+  errRenameUnsafe: 'לא הצלחתי לשנות את {{holder}} בשורה «{{detail}}» בלי לשנות את משמעותה. ערכו את השורה ידנית.',
   errRenameUnsafeFigure: 'שינוי האות {{holder}} היה משנה גם שם שהכלי בחר בשרטוט, ולכן הוא לא בוצע.',
   // #1303 / #1631 — the swap's refusals, each naming what the student wrote
   errSwapSame: 'אי אפשר להחליף את {{detail}} בעצמה — בחרו שתי אותיות שונות.',
   errSwapUnknown: 'אין בשרטוט נקודה בשם {{detail}}, ולכן אין עם מה להחליף.',
-  errSwapUnsafe: 'לא הצלחתי להחליף בין {{holder}} ל-{{other}} בשורה "{{detail}}" בלי לשנות את משמעותה. ערכו את השורה ידנית.',
+  errSwapUnsafe: 'לא הצלחתי להחליף בין {{holder}} ל-{{other}} בשורה «{{detail}}» בלי לשנות את משמעותה. ערכו את השורה ידנית.',
   errSwapUnsafeFigure: 'החלפת {{holder}} ו-{{other}} הייתה משנה גם שם שהכלי בחר בשרטוט, ולכן היא לא בוצעה.',
   // #1154 — the click menu's entry (the sentence it starts is grammar, composed in app/rename.ts)
   // The letter popover (#1631, ADR-W-105) — 2-D's pointMenu wording, so the three builders say the same thing.
@@ -260,9 +251,9 @@ const he = {
   segSolid: 'רציף',
   // #1598 — the letter popover opened on an unnamed circle's centre
   centreTitle: 'מרכז המעגל',
-  errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: "{{detail}}"',
+  errUnsatisfiable: 'לא נמצאה תצורה שבה מתקיים: «{{detail}}»',
   // #1423 — the letter is the problem, named with the student's own defining sentence and the remedy
-  errUnsatisfiableReused: '{{reusedId}} כבר מוגדרת: "{{definedBy}}". המשפט "{{detail}}" סותר את ההגדרה הקיימת — לנקודה חדשה בחרו אות אחרת.',
+  errUnsatisfiableReused: '{{reusedId}} כבר מוגדרת: «{{definedBy}}». המשפט «{{detail}}» סותר את ההגדרה הקיימת — לנקודה חדשה בחרו אות אחרת.',
   // The locus families (#1137) — keyed by the engine's own kind, so a family added later shows its
   // internal name rather than nothing at all.
   'locus.line': 'ישר',
@@ -280,33 +271,33 @@ const he = {
   errDiagonalIsSide: '{{pair}} אינו אלכסון של {{polygon}} — הוא צלע שלו. אלכסון מחבר שני קדקודים שאינם סמוכים.',
   errDiagonalNoneHere: '{{pair}} אינו אלכסון — ל-{{polygon}} אין אלכסונים כלל (כל זוג קדקודים שלו הוא צלע).',
   errAmbiguousHeight:
-    'ל"גובה" כאן יש כמה אפשרויות ({{options}}), והבחירה ביניהן היא שלכם — היא לא נובעת מהנתונים. כתבו איזו מהן, למשל "{{first}}".',
-  errShapeNotFound: 'באיור אין {{shapeHe}} — בדקו את שם הצורה, או הגדירו אותה קודם (למשל "{{shapeHe}} ABCD").',
+    'ל«גובה» כאן יש כמה אפשרויות ({{options}}), והבחירה ביניהן היא שלכם — היא לא נובעת מהנתונים. כתבו איזו מהן, למשל «{{first}}».',
+  errShapeNotFound: 'באיור אין {{shapeHe}} — בדקו את שם הצורה, או הגדירו אותה קודם (למשל «{{shapeHe}} ABCD»).',
   errNotADiagonal:
-    'האותיות האלה הן צלעות של המרובע, לא אלכסונים שלו: "{{detail}}". אלכסון מחבר שני קודקודים שאינם סמוכים, למשל «האלכסונים AC ו-BD נפגשים בנקודה E» במרובע ABCD.',
+    'האותיות האלה הן צלעות של המרובע, לא אלכסונים שלו: «{{detail}}». אלכסון מחבר שני קודקודים שאינם סמוכים, למשל «האלכסונים AC ו-BD נפגשים בנקודה E» במרובע ABCD.',
   errNoPrincipalDiagonal:
-    'בצורה הזאת אין אלכסון ראשי ואלכסון משני — ההבחנה הזאת קיימת רק בצורות כמו דלתון: "{{detail}}". אפשר לציין את האלכסון לפי הקודקודים, למשל «משוואת האלכסון AC היא y=2x».',
+    'בצורה הזאת אין אלכסון ראשי ואלכסון משני — ההבחנה הזאת קיימת רק בצורות כמו דלתון: «{{detail}}». אפשר לציין את האלכסון לפי הקודקודים, למשל «משוואת האלכסון AC היא y=2x».',
   errAmbiguousShape:
-    'בשרטוט הזה אין צורה אחת שאפשר לקרוא לה כך: "{{detail}}". אפשר לציין את הקודקודים, למשל «שטח הדלתון ABCD הוא 24».',
+    'בשרטוט הזה אין צורה אחת שאפשר לקרוא לה כך: «{{detail}}». אפשר לציין את הקודקודים, למשל «שטח הדלתון ABCD הוא 24».',
   // #1432 am. 1 — a contextual reference with no host, or several: the remedy follows the HOST the
   // sentence needed (name the circle, draw the parabola first), never the kite-area example above,
   // which stays for the polygon-noun sentences it was written for.
-  'errHost.none.circle': 'אין בשרטוט מעגל שהמשפט יכול להתייחס אליו: "{{detail}}". הגדירו קודם מעגל, למשל «נתון מעגל O».',
-  'errHost.many.circle': 'יש בשרטוט יותר ממעגל אחד, ולא ברור לאיזה מהם המשפט מתייחס: "{{detail}}". כתבו במשפט את שם המעגל, למשל «המעגל I».',
-  'errHost.none.parabola': 'אין בשרטוט פרבולה שהמשפט יכול להתייחס אליה: "{{detail}}". הגדירו קודם את הפרבולה, למשל «נתונה פרבולה שמשוואתה y^2=8x».',
-  'errHost.many.parabola': 'יש בשרטוט יותר מפרבולה אחת, ולא ברור לאיזו מהן המשפט מתייחס: "{{detail}}".',
-  'errHost.none.ellipse': 'אין בשרטוט אליפסה שהמשפט יכול להתייחס אליה: "{{detail}}". הגדירו קודם את האליפסה, למשל «נתונה אליפסה שמשוואתה x^2/25+y^2/9=1».',
-  'errHost.many.ellipse': 'יש בשרטוט יותר מאליפסה אחת, ולא ברור לאיזו מהן המשפט מתייחס: "{{detail}}".',
-  'errHost.none.line': 'אין בשרטוט ישר שהמשפט יכול להתייחס אליו: "{{detail}}". הגדירו קודם את הישר, למשל «הישר l1: y=2x+1».',
-  'errHost.many.line': 'יש בשרטוט יותר מישר אחד, ולא ברור לאיזה מהם המשפט מתייחס: "{{detail}}". כתבו במשפט את שם הישר, למשל «הישר l1».',
-  'errHost.none.perpendicular': 'אין בשרטוט אנך שהמשפט יכול להתייחס אליו: "{{detail}}". הורידו קודם את האנך, למשל «האנך מהנקודה B לציר ה-x».',
-  'errHost.many.perpendicular': 'יש בשרטוט יותר מאנך אחד, ולא ברור לאיזה מהם המשפט מתייחס: "{{detail}}". כתבו מאיזו נקודה ואל איזה ישר, למשל «האנך מהנקודה B לציר ה-x».',
-  'errHost.none.polygon': 'אין בשרטוט מצולע שהמשפט יכול להתייחס אליו: "{{detail}}". כתבו את הקודקודים, למשל «היקף המשולש ABC הוא 12».',
-  'errHost.many.polygon': 'יש בשרטוט יותר ממצולע אחד כזה, ולא ברור לאיזה מהם המשפט מתייחס: "{{detail}}". כתבו את הקודקודים, למשל «היקף המשולש ABC הוא 12».',
-  'errHost.pair.line': 'המשפט מתייחס לשני ישרים בלי לתת להם שמות, ובשרטוט יש {{found}}: "{{detail}}". כתבו את שמות הישרים, למשל «E נקודת החיתוך של הישרים l1 ו-l2».',
-  'errHost.pair.circle': 'המשפט מתייחס לשני מעגלים בלי לתת להם שמות, ובשרטוט יש {{found}}: "{{detail}}". כתבו את שמות המעגלים, למשל «E נקודת החיתוך של המעגלים I ו-II».',
+  'errHost.none.circle': 'אין בשרטוט מעגל שהמשפט יכול להתייחס אליו: «{{detail}}». הגדירו קודם מעגל, למשל «נתון מעגל O».',
+  'errHost.many.circle': 'יש בשרטוט יותר ממעגל אחד, ולא ברור לאיזה מהם המשפט מתייחס: «{{detail}}». כתבו במשפט את שם המעגל, למשל «המעגל I».',
+  'errHost.none.parabola': 'אין בשרטוט פרבולה שהמשפט יכול להתייחס אליה: «{{detail}}». הגדירו קודם את הפרבולה, למשל «נתונה פרבולה שמשוואתה y^2=8x».',
+  'errHost.many.parabola': 'יש בשרטוט יותר מפרבולה אחת, ולא ברור לאיזו מהן המשפט מתייחס: «{{detail}}».',
+  'errHost.none.ellipse': 'אין בשרטוט אליפסה שהמשפט יכול להתייחס אליה: «{{detail}}». הגדירו קודם את האליפסה, למשל «נתונה אליפסה שמשוואתה x^2/25+y^2/9=1».',
+  'errHost.many.ellipse': 'יש בשרטוט יותר מאליפסה אחת, ולא ברור לאיזו מהן המשפט מתייחס: «{{detail}}».',
+  'errHost.none.line': 'אין בשרטוט ישר שהמשפט יכול להתייחס אליו: «{{detail}}». הגדירו קודם את הישר, למשל «הישר l1: y=2x+1».',
+  'errHost.many.line': 'יש בשרטוט יותר מישר אחד, ולא ברור לאיזה מהם המשפט מתייחס: «{{detail}}». כתבו במשפט את שם הישר, למשל «הישר l1».',
+  'errHost.none.perpendicular': 'אין בשרטוט אנך שהמשפט יכול להתייחס אליו: «{{detail}}». הורידו קודם את האנך, למשל «האנך מהנקודה B לציר ה-x».',
+  'errHost.many.perpendicular': 'יש בשרטוט יותר מאנך אחד, ולא ברור לאיזה מהם המשפט מתייחס: «{{detail}}». כתבו מאיזו נקודה ואל איזה ישר, למשל «האנך מהנקודה B לציר ה-x».',
+  'errHost.none.polygon': 'אין בשרטוט מצולע שהמשפט יכול להתייחס אליו: «{{detail}}». כתבו את הקודקודים, למשל «היקף המשולש ABC הוא 12».',
+  'errHost.many.polygon': 'יש בשרטוט יותר ממצולע אחד כזה, ולא ברור לאיזה מהם המשפט מתייחס: «{{detail}}». כתבו את הקודקודים, למשל «היקף המשולש ABC הוא 12».',
+  'errHost.pair.line': 'המשפט מתייחס לשני ישרים בלי לתת להם שמות, ובשרטוט יש {{found}}: «{{detail}}». כתבו את שמות הישרים, למשל «E נקודת החיתוך של הישרים l1 ו-l2».',
+  'errHost.pair.circle': 'המשפט מתייחס לשני מעגלים בלי לתת להם שמות, ובשרטוט יש {{found}}: «{{detail}}». כתבו את שמות המעגלים, למשל «E נקודת החיתוך של המעגלים I ו-II».',
   // #1432 am. 1 — a stated value outside the range its quantity allows («רדיוס המעגל הוא -3»).
-  errOutOfDomain: 'הערך במשפט "{{detail}}" אינו אפשרי כאן — הוא חייב להיות {{range}}.',
+  errOutOfDomain: 'הערך במשפט «{{detail}}» אינו אפשרי כאן — הוא חייב להיות {{range}}.',
   'range.gt': 'גדול מ-{{v}}',
   'range.ge': 'לפחות {{v}}',
   'range.lt': 'קטן מ-{{v}}',
@@ -323,20 +314,20 @@ const he = {
   'askHost.none.polygon': 'אין בשרטוט מצולע כזה — כתבו את הקודקודים, למשל «היקף ABC»',
   'askHost.many.polygon': 'יש בשרטוט יותר ממצולע אחד כזה — כתבו את הקודקודים, למשל «היקף ABC»',
   errAmbiguousAngle:
-    'האות אחת לא מספיקה כדי לדעת באיזו זווית מדובר: "{{detail}}". אפשר לכתוב את שלוש האותיות, והקודקוד באמצע, למשל «זווית ABC», או לציין קודם את הצורה שבה הקודקוד נמצא.',
+    'האות אחת לא מספיקה כדי לדעת באיזו זווית מדובר: «{{detail}}». אפשר לכתוב את שלוש האותיות, והקודקוד באמצע, למשל «זווית ABC», או לציין קודם את הצורה שבה הקודקוד נמצא.',
   errAmbiguousAngleOptions:
-    'בקודקוד הזה יש כמה זוויות — {{options}} — ואות אחת לא אומרת לאיזו מהן התכוונתם: "{{detail}}". כתבו את הזווית בשלוש אותיות, והקודקוד באמצע — למשל «זווית {{example}}».',
+    'בקודקוד הזה יש כמה זוויות — {{options}} — ואות אחת לא אומרת לאיזו מהן התכוונתם: «{{detail}}». כתבו את הזווית בשלוש אותיות, והקודקוד באמצע — למשל «זווית {{example}}».',
   errAmbiguousAngleArms:
-    'בקודקוד הזה נפגשות יותר משתי צלעות, ולכן יש בו כמה זוויות ואות אחת לא אומרת באיזו מהן מדובר: "{{detail}}". כתבו את הזווית בשלוש אותיות, והקודקוד באמצע — למשל «זווית {{example}}».',
+    'בקודקוד הזה נפגשות יותר משתי צלעות, ולכן יש בו כמה זוויות ואות אחת לא אומרת באיזו מהן מדובר: «{{detail}}». כתבו את הזווית בשלוש אותיות, והקודקוד באמצע — למשל «זווית {{example}}».',
   errDoesNotExist:
     'בשרטוט הזה {{existing}} לא קיים — הנתונים כבר קובעים את כל הנקודות, ואין תצורה אחרת שבה הוא ' +
-    'היה קיים. המשפט "{{detail}}" לא נוסף.',
+    'היה קיים. המשפט «{{detail}}» לא נוסף.',
   // #1170 — about the RING, never about a failed search: on a figure whose points are all pinned
   // there was only ever one configuration, so «לא נמצאה תצורה» would be a false sentence. Names
   // the student's own statement (#1145) and points at the two things they can actually change.
   // #1554 ruling 1 (ADR-AG-198) — המשפט סותר את שם הצורה שלו; שני השמות נאמרים, והתיקון מוצע.
   errInscribedContradictsNoun:
-    '{{shapeHe}} לא יכול להיות חסום במעגל: "{{detail}}". מעגל שעובר דרך ארבעת הקודקודים הופך אותו ל{{forcedHe}}, ' +
+    '{{shapeHe}} לא יכול להיות חסום במעגל: «{{detail}}». מעגל שעובר דרך ארבעת הקודקודים הופך אותו ל{{forcedHe}}, ' +
     'ו{{forcedHe}} אינו {{shapeHe}}. אם הצורה היא {{forcedHe}}, כתבו «{{forcedHe}} ABCD חסום במעגל».',
   // #1918 (ADR-AG-252; operator ruling 2026-10-08) — the noun and the inscription in TWO sentences, either order. 2-D's
   // over-constrained frame (#1868) naming both statements, with #1554's reason clause (B1: copied, never imported).
@@ -367,44 +358,44 @@ const he = {
   // #1849 (ADR-AG-247, ADR-W-115) — the givens flatten a declared polygon. Names the refused sentence, the polygon
   // and the sentence that declared it, and says WHY: a flat figure is not that noun. Never «לא נמצאה תצורה».
   errPolygonCollapsed:
-    '"{{detail}}" משטיח את {{polygon}}: יחד עם הנתונים הקודמים הוא מחייב שהקודקודים ייפלו על ישר אחד, ' +
-    'וצורה שטוחה אינה {{shapeHe}} — כפי שקובע "{{declared}}". "{{detail}}" לא נוסף.',
+    '«{{detail}}» משטיח את {{polygon}}: יחד עם הנתונים הקודמים הוא מחייב שהקודקודים ייפלו על ישר אחד, ' +
+    'וצורה שטוחה אינה {{shapeHe}} — כפי שקובע «{{declared}}». «{{detail}}» לא נוסף.',
   errRingContradictsNoun:
-    'הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "{{detail}}". אפשר לשנות את סדר האותיות ' +
+    'הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: «{{detail}}». אפשר לשנות את סדר האותיות ' +
     'כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.',
   errReservedCoordinate:
-    'האותיות x ו-y שמורות לצירי מערכת הצירים, ולכן אי אפשר להשתמש בהן כנעלם בשיעורי נקודה: "{{detail}}". ' +
+    'האותיות x ו-y שמורות לצירי מערכת הצירים, ולכן אי אפשר להשתמש בהן כנעלם בשיעורי נקודה: «{{detail}}». ' +
     'אפשר להשתמש באות אחרת, למשל M(3,t).',
   // #2427 (ADR-AG-325) — operator ruling 2026-10-20: a capital is a point's name; sizes are lowercase, except R.
   errCapitalMagnitude:
     'אות גדולה היא שם של נקודה, ולכן {{letter}} לא יכולה לסמן גודל. גדלים מסמנים באות קטנה (r, a, k…), מלבד R לרדיוס. ' +
-    'נסו: "{{corrected}}"',
+    'נסו: «{{corrected}}»',
   errBadArity:
-    'מספר הקודקודים אינו מתאים לשם הצורה במשפט "{{detail}}" — במשולש שלושה קודקודים ובמרובע ארבעה.',
-  errRepeatedVertex: 'באותו משפט אותה אות מופיעה יותר מפעם אחת: "{{detail}}". לכל קודקוד צריך שם משלו.',
+    'מספר הקודקודים אינו מתאים לשם הצורה במשפט «{{detail}}» — במשולש שלושה קודקודים ובמרובע ארבעה.',
+  errRepeatedVertex: 'באותו משפט אותה אות מופיעה יותר מפעם אחת: «{{detail}}». לכל קודקוד צריך שם משלו.',
   // #1231 — names the STATEMENT and the reason, never internal state, and shows what a correct
   // sentence looks like: a median or an altitude runs from a vertex to the side facing it.
   errDegenerateRole:
-    'תיכון, גובה וחוצה זווית יוצאים מקודקוד אל הצלע שמולו, ובמשפט "{{detail}}" הקודקוד עצמו נמצא על הצלע הזאת ' +
-    '(או שהוא גם הקודקוד וגם הרגל). אפשר לכתוב למשל "AD תיכון לצלע BC".',
+    'תיכון, גובה וחוצה זווית יוצאים מקודקוד אל הצלע שמולו, ובמשפט «{{detail}}» הקודקוד עצמו נמצא על הצלע הזאת ' +
+    '(או שהוא גם הקודקוד וגם הרגל). אפשר לכתוב למשל «AD תיכון לצלע BC».',
   // #1165 — «XD תיכון במשולש ABC». The triangle spelling works by removing the apex from the ring,
   // so an apex outside it leaves three candidate sides and nothing to choose between them.
   errApexNotAVertex:
-    'תיכון, גובה או חוצה זווית יוצאים מקודקוד של המשולש, ובמשפט "{{detail}}" הקודקוד שנכתב אינו אחד מקודקודי ' +
-    'המשולש. אפשר לכתוב את הקודקוד שבמשולש, למשל "AD תיכון במשולש ABC", או לציין את הצלע במפורש.',
+    'תיכון, גובה או חוצה זווית יוצאים מקודקוד של המשולש, ובמשפט «{{detail}}» הקודקוד שנכתב אינו אחד מקודקודי ' +
+    'המשולש. אפשר לכתוב את הקודקוד שבמשולש, למשל «AD תיכון במשולש ABC», או לציין את הצלע במפורש.',
   // #1284 (ADR-AG-209) — the bisector runs FROM the vertex of the angle it bisects.
   // Operator ruling 2026-10-03 on #1622 (ADR-AG-222) — x and y are the plane's coordinates, never a length.
   errLengthXY:
-    'בכלי הגיאומטריה האנליטית x ו-y הם שיעורי המישור, ולכן הם לא יכולים לסמן אורך ב-"{{detail}}". ' +
-    'סמנו את האורך באות אחרת, למשל "AB = 3a" או "AB = 3k".',
+    'בכלי הגיאומטריה האנליטית x ו-y הם שיעורי המישור, ולכן הם לא יכולים לסמן אורך ב-«{{detail}}». ' +
+    'סמנו את האורך באות אחרת, למשל «AB = 3a» או «AB = 3k».',
   // #1832 (ADR-AG-246) — a domain on x or y restricts the CURVE; the tool cannot draw part of a curve yet, and says so.
   errCoordinateRestriction:
-    'בכלי הגיאומטריה האנליטית x ו-y הם שיעורי המישור, ולא פרמטרים, ולכן ההגבלה ב-"{{detail}}" מגבילה את הקו שהמשוואה מתארת. ' +
+    'בכלי הגיאומטריה האנליטית x ו-y הם שיעורי המישור, ולא פרמטרים, ולכן ההגבלה ב-«{{detail}}» מגבילה את הקו שהמשוואה מתארת. ' +
     'הכלי עדיין לא יודע לצייר רק חלק ממנו (למשל רק את החלק שבו x > 0). כתבו את המשוואה בלי ההגבלה; ' +
-    'ואם התכוונתם לפרמטר, סמנו אותו באות אחרת, למשל "a > 0".',
+    'ואם התכוונתם לפרמטר, סמנו אותו באות אחרת, למשל «a > 0».',
   errBisectorWrongApex:
-    'חוצה זווית יוצא מקודקוד הזווית שהוא חוצה, ובמשפט "{{detail}}" הקטע אינו יוצא מהקודקוד הזה. ' +
-    'כתבו קטע שמתחיל בקודקוד הזווית, למשל "AD חוצה את הזווית BAC".',
+    'חוצה זווית יוצא מקודקוד הזווית שהוא חוצה, ובמשפט «{{detail}}» הקטע אינו יוצא מהקודקוד הזה. ' +
+    'כתבו קטע שמתחיל בקודקוד הזווית, למשל «AD חוצה את הזווית BAC».',
   // #2115 (ADR-AG-299; operator ruling 2026-10-15) — 2-D's `input.cevianBisectorIsSide` / `…IsPolygonSide`, verbatim (B1).
   errBisectorIsSide: '{{side}} היא צלע של המשולש ולכן אינה יכולה לחצות את זווית {{vertex}} — חוצה זווית יוצא מקודקוד אל הצלע שמולו.',
   errBisectorIsPolygonSide: '{{side}} היא צלע של {{polygonNoun}} ולכן אינה יכולה לחצות את זווית {{vertex}}.',
@@ -425,38 +416,38 @@ const he = {
   shapeTheNounPolygon: 'המצולע',
   // #1240 (ADR-AG-209) — a cevian whose target the figure does not determine: ask, never guess.
   errAmbiguousCevian:
-    'הקודקוד או הצלע במשפט "{{detail}}" שייכים ליותר ממשולש אחד בשרטוט, ולכן לא ברור לאיזו צלע הוא יורד. ' +
-    'אפשר לציין את הצלע או את המשולש, למשל "AD גובה לצלע BC" או "AD גובה במשולש ABC".',
+    'הקודקוד או הצלע במשפט «{{detail}}» שייכים ליותר ממשולש אחד בשרטוט, ולכן לא ברור לאיזו צלע הוא יורד. ' +
+    'אפשר לציין את הצלע או את המשולש, למשל «AD גובה לצלע BC» או «AD גובה במשולש ABC».',
   // #1222 (ADR-AG-211) — the hypotenuse is the side facing a STATED right angle; an open one is asked, never assumed.
   errAmbiguousSide:
-    'בצורה הזאת הצלעות אינן שוות זו לזו, ולכן לא ידוע לאיזו צלע הכוונה: "{{detail}}". ' +
-    'כתבו את הצלע עצמה, למשל "מלבן ABCD" ואחר כך "AB = 4", או את שתי המידות, למשל "מלבן ABCD במידות 4*6".',
+    'בצורה הזאת הצלעות אינן שוות זו לזו, ולכן לא ידוע לאיזו צלע הכוונה: «{{detail}}». ' +
+    'כתבו את הצלע עצמה, למשל «מלבן ABCD» ואחר כך «AB = 4», או את שתי המידות, למשל «מלבן ABCD במידות 4*6».',
   errPolygonNotSupported:
-    'מצולע כזה נבנה רק כשהוא משוכלל: "{{detail}}". אפשר לכתוב אותו כמשוכלל (למשל "משובע משוכלל ABCDEFG"), ' +
+    'מצולע כזה נבנה רק כשהוא משוכלל: «{{detail}}». אפשר לכתוב אותו כמשוכלל (למשל «משובע משוכלל ABCDEFG»), ' +
     'או להשתמש במחומש, משושה או מתומן.',
   // #2018 (ADR-AG-298) — 2-D's input.roleSideUnresolved, verbatim (ADR-W-118 B1: status wording follows 2-D)
   errRoleSideUnresolved:
-    'אין בסרטוט צלע יחידה שמתאימה ל"{{role}}" — הצהירו קודם על המשולש המתאים (למשל "משולש ישר זווית ABC" בשביל היתר, ' +
-    '"משולש שווה שוקיים ABC" בשביל הבסיס), או ציינו את הצלע באותיות (למשל "תיכון לצלע AB").',
+    'אין בסרטוט צלע יחידה שמתאימה ל«{{role}}» — הצהירו קודם על המשולש המתאים (למשל «משולש ישר זווית ABC» בשביל היתר, ' +
+    '«משולש שווה שוקיים ABC» בשביל הבסיס), או ציינו את הצלע באותיות (למשל «תיכון לצלע AB»).',
   roleWordBase: 'בסיס',
   roleWordLeg: 'שוק',
   errAmbiguousHypotenuse:
-    'לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: "{{detail}}". ' +
-    'כתבו איזו צלע היא היתר, למשל "תיכון ליתר AB", או איזו זווית ישרה, למשל "זווית C ישרה".',
+    'לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: «{{detail}}». ' +
+    'כתבו איזו צלע היא היתר, למשל «תיכון ליתר AB», או איזו זווית ישרה, למשל «זווית C ישרה».',
   errCevianNoRightAngle:
-    'במשפט "{{detail}}" אין בשרטוט משולש ישר-זווית, ולכן אין יתר. ' +
-    'אפשר לציין קודם זווית ישרה, למשל "זווית C ישרה", או לכתוב את הצלע במפורש, למשל "תיכון לצלע AB".',
+    'במשפט «{{detail}}» אין בשרטוט משולש ישר-זווית, ולכן אין יתר. ' +
+    'אפשר לציין קודם זווית ישרה, למשל «זווית C ישרה», או לכתוב את הצלע במפורש, למשל «תיכון לצלע AB».',
   errCevianNoTriangle:
-    'במשפט "{{detail}}" אין בשרטוט משולש שהקודקוד או הצלע שייכים לו, ולכן אין צלע שאליה הוא יורד. ' +
-    'אפשר להגדיר קודם את המשולש, או לכתוב את הצלע במפורש, למשל "AD גובה לצלע BC".',
+    'במשפט «{{detail}}» אין בשרטוט משולש שהקודקוד או הצלע שייכים לו, ולכן אין צלע שאליה הוא יורד. ' +
+    'אפשר להגדיר קודם את המשולש, או לכתוב את הצלע במפורש, למשל «AD גובה לצלע BC».',
   // #1175 — the refusal's job is to tell them WHICH point is already there. It names the holder and
   // the reason, so a student who mis-read their own figure learns the thing they got wrong.
   errCrossingAlreadyNamed:
-    'הישרים האלה נפגשים ב-{{holder}}, ולנקודה הזאת כבר יש שם. המשפט "{{detail}}" היה נותן לה שם שני. אם התכוונתם לנקודה אחרת, בדקו אילו שני ישרים נחתכים בה.',
+    'הישרים האלה נפגשים ב-{{holder}}, ולנקודה הזאת כבר יש שם. המשפט «{{detail}}» היה נותן לה שם שני. אם התכוונתם לנקודה אחרת, בדקו אילו שני ישרים נחתכים בה.',
   // #1416 — the operands named as the grammar says them, so two circles are never called «הישרים». Built on the
   // sentence's own construct («נקודת החיתוך של … עם …»), which needs no gender or number agreement.
   errCrossingAlreadyNamedOperands:
-    'נקודת החיתוך של {{first}} עם {{second}} היא {{holder}}, ולנקודה הזאת כבר יש שם. המשפט "{{detail}}" היה נותן לה שם שני. אם התכוונתם לנקודה אחרת, בדקו לאיזו נקודת חיתוך שלהם עדיין אין שם.',
+    'נקודת החיתוך של {{first}} עם {{second}} היא {{holder}}, ולנקודה הזאת כבר יש שם. המשפט «{{detail}}» היה נותן לה שם שני. אם התכוונתם לנקודה אחרת, בדקו לאיזו נקודת חיתוך שלהם עדיין אין שם.',
   // #1893 (ADR-AG-271) — #1834's ruled sentence (2-D gets it as errors.thirdCrossing under #1834): a line through two points already on the
   // circle has no third crossing with it. The letters are the student's, never an object id.
   errThirdCrossing: '{{line}} כבר חותך את {{curve}} ב-{{a}} וב-{{b}} — לישר אין נקודת חיתוך שלישית עם {{curve}}.',
@@ -465,14 +456,14 @@ const he = {
   // #1255 — one line written twice has no crossing with itself. Says what the sentence failed to
   // define and shows the sentence that says what they may have meant, per the operator's ruling.
   errSelfCrossing:
-    'שני הישרים במשפט "{{detail}}" הם אותו ישר, ולישר אין נקודת חיתוך עם עצמו, ולכן המשפט אינו מגדיר נקודה. אם התכוונתם לנקודה כלשהי על הישר, אפשר לכתוב למשל "P על הישר AB".',
+    'שני הישרים במשפט «{{detail}}» הם אותו ישר, ולישר אין נקודת חיתוך עם עצמו, ולכן המשפט אינו מגדיר נקודה. אם התכוונתם לנקודה כלשהי על הישר, אפשר לכתוב למשל «P על הישר AB».',
   // #1251 — a THROTTLE is not a misunderstanding. The student is told the service is busy, never
   // that their sentence was wrong: the tool did not get as far as looking at it.
   errLlmBusy:
-    'השירות עמוס כרגע ולא הצלחתי לבדוק את המשפט "{{detail}}". אפשר לנסות שוב בעוד רגע, או לנסח אותו באחת הצורות שמופיעות ברשימת הפקודות.',
+    'השירות עמוס כרגע ולא הצלחתי לבדוק את המשפט «{{detail}}». אפשר לנסות שוב בעוד רגע, או לנסח אותו באחת הצורות שמופיעות ברשימת הפקודות.',
   // #1336: the escape ran and the tool declined its completion — the sentence WAS understood.
   errLlmUnderstood:
-    'הבנתי את המשפט "{{detail}}", אבל הכלי עדיין לא תומך במהלך הזה. אפשר לנסח אחרת, או להיעזר ברשימת הפקודות.',
+    'הבנתי את המשפט «{{detail}}», אבל הכלי עדיין לא תומך במהלך הזה. אפשר לנסח אחרת, או להיעזר ברשימת הפקודות.',
   // #1355 (ADR-AG-279) — 2-D's input.labelsDropped, word for word.
   errLlmDropped: 'הבנתי רק חלקית — לא הצלחתי למקם את {{labels}}. נסחו את הצעד מחדש (למשל פרקו אותו לשני צעדים).',
   // #1355 — 2-D's input.labelsInvented without the model's letter (ADR-W-096: the student never typed it).
@@ -481,11 +472,11 @@ const he = {
   errLlmInventedExisting: 'כדי לבנות את זה הייתי צריך לקשר את המשפט ל-{{labels}}, שלא מופיע בו — לא רשמתי כלום. אם התכוונתם ל-{{labels}}, כתבו זאת במשפט ונסו שוב.',
   thinking: 'חושב…',
   errBadOperand:
-    'הבנתי את היחס במשפט "{{detail}}", אבל לא זיהיתי את אחד האגפים. אפשר לציין שני קודקודים (AB), ' +
+    'הבנתי את היחס במשפט «{{detail}}», אבל לא זיהיתי את אחד האגפים. אפשר לציין שני קודקודים (AB), ' +
     'צלע (הצלע AB), ישר (הישר l1) או ציר (ציר ה-x).',
   // #2386 (ADR-AG-310) — the operator's ruled sentence (2026-10-20, option (a)); the horizontal one is its mirror
-  errSideOfVertical: 'לישר אנכי אין "{{word}}" — נסו "מימין ל-" או "משמאל ל-"',
-  errSideOfHorizontal: 'לישר אופקי אין "{{word}}" — נסו "מעל" או "מתחת"',
+  errSideOfVertical: 'לישר אנכי אין «{{word}}» — נסו «מימין ל-» או «משמאל ל-»',
+  errSideOfHorizontal: 'לישר אופקי אין «{{word}}» — נסו «מעל» או «מתחת»',
   sideWordAbove: 'מעל',
   sideWordBelow: 'מתחת',
   sideWordRight: 'מימין ל-',
@@ -537,7 +528,7 @@ const he = {
   noticeOnlyConfiguration: 'זו התצורה היחידה שמצאתי — הנתונים שכתבתם קובעים את השרטוט.',
   // #1627 (ADR-AG-189 Am. 1, operator ruling 2026-10-01; 2-D ADR-165): drawn, with this warning while it holds.
   warnTrapezoidIsParallelogram:
-    'הטרפז {{shape}} כבר אינו טרפז: עם "{{line}}" שני זוגות הצלעות הנגדיות שלו מקבילים, ולכן הוא מקבילית (או מלבן). ' +
+    'הטרפז {{shape}} כבר אינו טרפז: עם «{{line}}» שני זוגות הצלעות הנגדיות שלו מקבילים, ולכן הוא מקבילית (או מלבן). ' +
     'השרטוט מוצג כפי שהנתונים קובעים. כדי לחזור לטרפז, אפשר לערוך את המשפט הזה, למחוק אותו או לבטל את «כלול בציור».',
   // #1996 (ADR-AG-276, ADR-W-129): the forced-narrowing note — one sentence family, word for word in every builder
   // (`shell/narrowing.ts` narrowingSentence; rows in shell/__tests__/fixtures/narrowing-note-rows.ts).
@@ -607,7 +598,7 @@ const he = {
       'right-isosceles-triangle': 'משולש ישר זווית שווה שוקיים הוא סוג של {{from}}',
     },
   },
-  noticeAlreadyKnown: 'זה כבר ידוע מהנתונים שכתבתם, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
+  // #1990 (ADR-AG-330): a restated or already-following line reads 2-D's sentence, `suite.notice.alreadyDrawn`
   // #1350 (operator ruling 2026-09-22) — the line IS recorded; this is about identity, never an error.
   noticeAngleReadAs: 'הובן כ-{{holder}} — הזווית של הצורה בקודקוד הזה. לזווית אחרת שם, כתבו את שלוש האותיות שלה.',
   noticeNameReadsAs: 'שימו לב: הישר {{detail}} והישר {{holder}} הם שני ישרים שונים — השמות נקראים דומה, אבל כל שם מתייחס לישר שלו.',
@@ -624,15 +615,7 @@ const he = {
   saveQuestion: 'הורידו שאלה',
   questionGiven: 'נתון:',
   copied: 'הועתק',
-  manualButton: 'מדריך',
   manualTitle: 'המדריך — גאומטריה אנליטית',
-  manualIntro:
-    'זהו מדריך חלקי — מוצגות דוגמאות מייצגות בלבד, כדי להראות אילו מיני משפטים אפשר להקליד. ' +
-    'לחצו על דוגמה כדי לנסות אותה על השרטוט.',
-  manualTry: 'לחצו כדי לנסות — הדוגמה תיבנה על השרטוט',
-  manualMore: '…ואלו רק דוגמאות — לכלי יש כאן פקודות נוספות, לא רק ניסוחים אחרים של אלו',
-  manualShowAll: 'הצג הכול',
-  manualShowLess: 'הצג פחות',
   manualPoints: 'נקודות',
   manualLines: 'ישרים',
   manualCircles: 'מעגלים',
@@ -646,16 +629,14 @@ const he = {
   loadRestored: 'טענתי את השרטוט — {{total}} נתונים.',
   loadPartial:
     'טענתי {{restored}} נתונים מתוך {{total}}. את אלה לא הצלחתי לקרוא מחדש: {{lines}}',
-  errLoadForeign: 'הקובץ "{{detail}}" שייך לכלי אחר בסדרה — פתחו אותו שם.',
-  errLoadNewer: 'הקובץ "{{detail}}" נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב.',
-  errLoadTooLarge: 'הקובץ "{{detail}}" גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{max}} משפטים.',
-  errLoadUnreadable: 'הקובץ "{{detail}}" אינו קובץ שרטוט שמור.',
+  errLoadForeign: 'הקובץ «{{detail}}» שייך לכלי אחר בסדרה — פתחו אותו שם.',
+  errLoadNewer: 'הקובץ «{{detail}}» נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב.',
+  errLoadTooLarge: 'הקובץ «{{detail}}» גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{max}} משפטים.',
+  errLoadUnreadable: 'הקובץ «{{detail}}» אינו קובץ שרטוט שמור.',
   // The under-canvas row's session ops (#1098) — the suite's words, so «בטל» means here what it
   // means in הנדסת המישור.
   undo: 'בטל',
   redo: 'בצע שוב',
-  noticeAlreadyFollows:
-    'זה כבר נובע מהנתונים שכתבתם — השרטוט מקיים את זה ממילא, ולכן לא הוספתי שורה נוספת: "{{detail}}"',
   /**
    * #1353 / ADR-W-030 — the teaching line for an imperative wrapper.
    *
@@ -663,7 +644,7 @@ const he = {
    * sentence is already in the input box when this appears, so «לחצו Enter» is literally true.
    */
   noticeTeachCanonical:
-    'בספר לא כותבים "{{verb}}" — כותבים את הנתון עצמו. כתבתי לכם את המשפט בשורת הקלט: "{{canonical}}" — לחצו Enter כדי לשרטט.',
+    'בספר לא כותבים «{{verb}}» — כותבים את הנתון עצמו. כתבתי לכם את המשפט בשורת הקלט: «{{canonical}}» — לחצו Enter כדי לשרטט.',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
   sessionOffer: 'נמצאה עבודה מהפעם הקודמת שלא נשמרה.',
   sessionContinue: 'המשך מהמקום שבו הפסקת',
@@ -674,7 +655,6 @@ const he = {
   shareTooLong: 'הקישור ארוך מדי לשיתוף — שמרו את השרטוט כקובץ ושלחו אותו',
   shareBadLink: 'הקישור אינו תקין — בקשו מהשולח לשלוח אותו שוב',
   shareTooLarge: 'הקישור גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{max}} משפטים. בקשו מהשולח לשלוח את השרטוט כקובץ',
-  shareArrived: 'הקישור שפתחתם מכיל שרטוט. לפתוח אותו במקום מה שבניתם?',
   shareOpenIt: 'פתח את השרטוט מהקישור',
   shareKeepMine: 'השאר את שלי',
   sharePreparing: 'מכין קישור…',
@@ -685,13 +665,11 @@ const he = {
 };
 
 const en: typeof he = {
-  title: 'Analytic Geometry',
   subtitle: 'A coordinate plane: type the givens line by line and watch the figure',
   inputPlaceholder: 'e.g. circle I: (x-3)^2+(y-4)^2=9',
   add: 'Add',
   clearAll: 'Clear all',
   language: 'עברית',
-  emptyTitle: 'Start drawing',
   emptyHint: 'The exam prints no figure — type the givens and the tool draws them',
   // #1281 — the name the tool gave a point stated only by its coordinates (the #1263 ruling: say so).
   mintedNote: 'named {{name}} by the tool',
@@ -786,8 +764,6 @@ const en: typeof he = {
   paramUnused: '(not used by the figure)',
   freeDof: 'Degrees of freedom: {{count}}',
   pinned: '✓ The figure is fully determined by the givens',
-  about: 'About',
-  aboutTitle: 'Analytic Geometry',
   aboutLead:
     'A tool for drawing analytic-geometry questions: type the givens as the exam words them and the tool draws the figure. It does not solve the question.',
   // #1477 (ADR-W-091): the About DECLARATION's parts — the same sections as 2-D's About.
@@ -797,11 +773,7 @@ const en: typeof he = {
     'When the givens allow more than one figure, “Show another configuration” draws a different one that also satisfies every given.',
     'It draws the figure from what you describe — it does not solve problems.',
   ],
-  aboutTryTitle: 'Enter the given data exactly as it appears in the question:',
   aboutTrySteps: ['circle I: (x-3)^2+(y-4)^2=9', 'point A(2,6)', 'line l1: y=x'],
-  creditBy: 'Developed by',
-  creditName: 'Dr. David Codish',
-  creditContact: 'Questions',
   privacy:
     'Privacy: no sign-up and no personal details are collected. To improve the tool, the statements you type (math text only) are kept for up to 30 days with an anonymous visitor id — your IP address is never stored.' +
     ' Statements the tool does not understand are sent for processing to an external AI service.' +
@@ -809,21 +781,17 @@ const en: typeof he = {
   close: 'Close',
   switcherLabel: 'Choose a tool',
   switcherMore: 'More',
-  switcher2d: 'Plane Geometry',
   switcher3d: 'Solid Geometry',
-  switcherComplex: 'Complex Numbers',
-  switcherAnalytic: 'Analytic Geometry',
-  errNotHandled: 'I could not understand the statement: "{{detail}}"',
-  errBadEquation: 'I could not read the equation: "{{detail}}"',
-  errOutOfScope: 'Understood, but not supported in this tool: "{{detail}}"',
+  errBadEquation: 'I could not read the equation: «{{detail}}»',
+  errOutOfScope: 'Understood, but not supported in this tool: «{{detail}}»',
   errSplitStatements: 'One given per line — that way the tool can build and verify each one separately. We spotted two givens here; try entering them as two steps: {{all}}',
   errRightAngleVertex: 'One given per line — that way the tool can build and verify each one separately. Write them on separate lines: (1) triangle {{triangle}}  (2) ∠{{angle}} = 90°{{more}}',
   errProofTarget:
-    'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "{{detail}}"',
-  errConflict: 'Not added — it contradicts what is already fixed: "{{detail}}"',
+    'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{detail}}»',
+  errConflict: 'Not added — it contradicts what is already fixed: «{{detail}}»',
   errNameClash:
     'That name is already taken in this figure — it is {{existing}}. It cannot take a second ' +
-    'meaning in "{{detail}}". Either choose another letter, or delete the earlier definition and ' +
+    'meaning in «{{detail}}». Either choose another letter, or delete the earlier definition and ' +
     'restate it.',
   errUnknownRef: 'There is no object called {{detail}} in the figure. Define it first, then you can refer to it.',
   errUnknownRefPoint: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
@@ -834,28 +802,28 @@ const en: typeof he = {
   errNearMiss: 'The figure has {{names}}. Did you mean {{suggest}}?',
   listAnd: ' and ',
   errKindMismatch:
-    'The equation in "{{detail}}" describes {{existing}}, not {{claimed}}. Check the equation, or name the shape it describes.',
+    'The equation in «{{detail}}» describes {{existing}}, not {{claimed}}. Check the equation, or name the shape it describes.',
   'errHost.named':
-    'The figure has more than one of these ({{candidates}}), so it is not clear which one "{{detail}}" means. Write its name — for example "{{example}}".',
+    'The figure has more than one of these ({{candidates}}), so it is not clear which one «{{detail}}» means. Write its name — for example «{{example}}».',
   errNumeralNotation:
-    '"{{numNoun}} {{holder}}" and "{{numNoun}} {{detail}}" are the same name — the tool reads a digit and a Roman numeral as one name. To keep one notation, write "{{numNoun}} {{holder}}", as in the earlier lines.',
+    '«{{numNoun}} {{holder}}» and «{{numNoun}} {{detail}}» are the same name — the tool reads a digit and a Roman numeral as one name. To keep one notation, write «{{numNoun}} {{holder}}», as in the earlier lines.',
   errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
   errAliasTaken: 'The name {{holder}} is already taken on this figure — one name marks one thing, a point or an angle. Pick another name, e.g. a letter with a different digit.',
-  errRenameBadName: '"{{detail}}" is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
+  errRenameBadName: '«{{detail}}» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
   errRadianAngle: 'In plane geometry, angles are written in degrees — for example ∠ABC = 90',
-  errUnreadWord: 'This tool reads Hebrew and English only — "{{detail}}" is in neither. Try writing the line in Hebrew or English.',
-  errMixedNumber: '"{{detail}}" could be a mixed number or a product. Write {{decimal}} (a decimal) or {{sum}} for the mixed number, or {{product}} for the product.',
-  errMixedNumberNoDecimal: '"{{detail}}" could be a mixed number or a product. Write {{sum}} for the mixed number, or {{product}} for the product.',
+  errUnreadWord: 'This tool reads Hebrew and English only — «{{detail}}» is in neither. Try writing the line in Hebrew or English.',
+  errMixedNumber: '«{{detail}}» could be a mixed number or a product. Write {{decimal}} (a decimal) or {{sum}} for the mixed number, or {{product}} for the product.',
+  errMixedNumberNoDecimal: '«{{detail}}» could be a mixed number or a product. Write {{sum}} for the mixed number, or {{product}} for the product.',
   errRenameSame: '{{detail}} is already called {{detail}} — nothing to change.',
   errRenameUnknown: 'The figure has no point named {{detail}}, so there is nothing to rename.',
-  errRenameTaken: 'The letter {{detail}} is already taken: "{{holder}}". Pick a free letter.',
+  errRenameTaken: 'The letter {{detail}} is already taken: «{{holder}}». Pick a free letter.',
   errRenameTakenTool: 'The letter {{detail}} is already taken in the figure. Pick a free letter.',
   errRenameNotTyped: 'The letter {{detail}} was chosen by the tool, and it cannot be written into your sentence without changing what it says, so it was not changed.',
-  errRenameUnsafe: 'I could not rename {{holder}} in "{{detail}}" without changing what it says. Edit that line by hand.',
+  errRenameUnsafe: 'I could not rename {{holder}} in «{{detail}}» without changing what it says. Edit that line by hand.',
   errRenameUnsafeFigure: 'Renaming {{holder}} would also change a name the tool chose in the figure, so it was not done.',
   errSwapSame: '{{detail}} cannot be swapped with itself — pick two different letters.',
   errSwapUnknown: 'The figure has no point named {{detail}}, so there is nothing to swap with.',
-  errSwapUnsafe: 'I could not swap {{holder}} and {{other}} in "{{detail}}" without changing what it says. Edit that line by hand.',
+  errSwapUnsafe: 'I could not swap {{holder}} and {{other}} in «{{detail}}» without changing what it says. Edit that line by hand.',
   errSwapUnsafeFigure: 'Swapping {{holder}} and {{other}} would also change a name the tool chose in the figure, so it was not done.',
   letterPlaceholder: 'letter',
   letterApply: 'Apply',
@@ -868,8 +836,8 @@ const en: typeof he = {
   segDashed: 'Dashed',
   segSolid: 'Solid',
   centreTitle: 'Circle centre',
-  errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
-  errUnsatisfiableReused: '{{reusedId}} is already defined: "{{definedBy}}". "{{detail}}" contradicts that definition — pick another letter for a new point.',
+  errUnsatisfiable: 'No configuration satisfies: «{{detail}}»',
+  errUnsatisfiableReused: '{{reusedId}} is already defined: «{{definedBy}}». «{{detail}}» contradicts that definition — pick another letter for a new point.',
   'locus.line': 'line',
   'locus.circle': 'circle',
   'locus.parabola': 'parabola',
@@ -883,32 +851,32 @@ const en: typeof he = {
   errDiagonalIsSide: '{{pair}} is not a diagonal of {{polygon}} — it is a side of it. A diagonal joins two corners that are not next to each other.',
   errDiagonalNoneHere: '{{pair}} is not a diagonal — {{polygon}} has no diagonals at all (every pair of its corners is a side).',
   errAmbiguousHeight:
-    'There is more than one "height" here ({{options}}), and the givens do not choose between them — you do. Say which, e.g. "{{first}}".',
-  errShapeNotFound: 'There is no {{shapeEn}} in this figure — check the shape name, or declare it first (e.g. "{{shapeEn}} ABCD").',
+    'There is more than one «height» here ({{options}}), and the givens do not choose between them — you do. Say which, e.g. «{{first}}».',
+  errShapeNotFound: 'There is no {{shapeEn}} in this figure — check the shape name, or declare it first (e.g. «{{shapeEn}} ABCD»).',
   errNotADiagonal:
-    'Those letters name sides of the quadrilateral, not its diagonals: "{{detail}}". A diagonal joins two ' +
-    'vertices that are not adjacent, for example "the diagonals AC and BD meet at E" in quadrilateral ABCD.',
+    'Those letters name sides of the quadrilateral, not its diagonals: «{{detail}}». A diagonal joins two ' +
+    'vertices that are not adjacent, for example «the diagonals AC and BD meet at E» in quadrilateral ABCD.',
   errNoPrincipalDiagonal:
     'This shape has no principal and secondary diagonal — that distinction exists only for shapes ' +
-    'like a kite: "{{detail}}". Name the diagonal by its vertices instead, for example "the ' +
-    'equation of diagonal AC is y=2x".',
+    'like a kite: «{{detail}}». Name the diagonal by its vertices instead, for example «the ' +
+    'equation of diagonal AC is y=2x».',
   errAmbiguousShape:
-    'No single shape in this figure answers to that: "{{detail}}". Name its vertices — for example "the area of kite ABCD is 24".',
-  'errHost.none.circle': 'There is no circle in your figure for this sentence to refer to: "{{detail}}". Define a circle first, e.g. "circle O".',
-  'errHost.many.circle': 'Your figure has more than one circle, so it is unclear which one this sentence means: "{{detail}}". Name the circle, e.g. "circle I".',
-  'errHost.none.parabola': 'There is no parabola in your figure for this sentence to refer to: "{{detail}}". Define the parabola first, e.g. "parabola y^2=8x".',
-  'errHost.many.parabola': 'Your figure has more than one parabola, so it is unclear which one this sentence means: "{{detail}}".',
-  'errHost.none.ellipse': 'There is no ellipse in your figure for this sentence to refer to: "{{detail}}". Define the ellipse first, e.g. "ellipse x^2/25+y^2/9=1".',
-  'errHost.many.ellipse': 'Your figure has more than one ellipse, so it is unclear which one this sentence means: "{{detail}}".',
-  'errHost.none.line': 'There is no line in your figure for this sentence to refer to: "{{detail}}". Define the line first, e.g. "line l1: y=2x+1".',
-  'errHost.many.line': 'Your figure has more than one line, so it is unclear which one this sentence means: "{{detail}}". Name the line, e.g. "line l1".',
-  'errHost.none.perpendicular': 'There is no perpendicular in your figure for this sentence to refer to: "{{detail}}". Drop the perpendicular first, e.g. "the perpendicular from B to the x-axis".',
-  'errHost.many.perpendicular': 'Your figure has more than one perpendicular, so it is unclear which one this sentence means: "{{detail}}". Say from which point and onto which line, e.g. "the perpendicular from B to the x-axis".',
-  'errHost.none.polygon': 'There is no polygon in your figure for this sentence to refer to: "{{detail}}". Write its vertices, e.g. "the perimeter of triangle ABC is 12".',
-  'errHost.many.polygon': 'Your figure has more than one such polygon, so it is unclear which one this sentence means: "{{detail}}". Write its vertices, e.g. "the perimeter of triangle ABC is 12".',
-  'errHost.pair.line': 'This sentence refers to two unnamed lines, and your figure has {{found}}: "{{detail}}". Name the lines, e.g. "E is the intersection of lines l1 and l2".',
-  'errHost.pair.circle': 'This sentence refers to two unnamed circles, and your figure has {{found}}: "{{detail}}". Name the circles, e.g. "E is the intersection of circles I and II".',
-  errOutOfDomain: 'The value in "{{detail}}" is not possible here — it must be {{range}}.',
+    'No single shape in this figure answers to that: «{{detail}}». Name its vertices — for example «the area of kite ABCD is 24».',
+  'errHost.none.circle': 'There is no circle in your figure for this sentence to refer to: «{{detail}}». Define a circle first, e.g. «circle O».',
+  'errHost.many.circle': 'Your figure has more than one circle, so it is unclear which one this sentence means: «{{detail}}». Name the circle, e.g. «circle I».',
+  'errHost.none.parabola': 'There is no parabola in your figure for this sentence to refer to: «{{detail}}». Define the parabola first, e.g. «parabola y^2=8x».',
+  'errHost.many.parabola': 'Your figure has more than one parabola, so it is unclear which one this sentence means: «{{detail}}».',
+  'errHost.none.ellipse': 'There is no ellipse in your figure for this sentence to refer to: «{{detail}}». Define the ellipse first, e.g. «ellipse x^2/25+y^2/9=1».',
+  'errHost.many.ellipse': 'Your figure has more than one ellipse, so it is unclear which one this sentence means: «{{detail}}».',
+  'errHost.none.line': 'There is no line in your figure for this sentence to refer to: «{{detail}}». Define the line first, e.g. «line l1: y=2x+1».',
+  'errHost.many.line': 'Your figure has more than one line, so it is unclear which one this sentence means: «{{detail}}». Name the line, e.g. «line l1».',
+  'errHost.none.perpendicular': 'There is no perpendicular in your figure for this sentence to refer to: «{{detail}}». Drop the perpendicular first, e.g. «the perpendicular from B to the x-axis».',
+  'errHost.many.perpendicular': 'Your figure has more than one perpendicular, so it is unclear which one this sentence means: «{{detail}}». Say from which point and onto which line, e.g. «the perpendicular from B to the x-axis».',
+  'errHost.none.polygon': 'There is no polygon in your figure for this sentence to refer to: «{{detail}}». Write its vertices, e.g. «the perimeter of triangle ABC is 12».',
+  'errHost.many.polygon': 'Your figure has more than one such polygon, so it is unclear which one this sentence means: «{{detail}}». Write its vertices, e.g. «the perimeter of triangle ABC is 12».',
+  'errHost.pair.line': 'This sentence refers to two unnamed lines, and your figure has {{found}}: «{{detail}}». Name the lines, e.g. «E is the intersection of lines l1 and l2».',
+  'errHost.pair.circle': 'This sentence refers to two unnamed circles, and your figure has {{found}}: «{{detail}}». Name the circles, e.g. «E is the intersection of circles I and II».',
+  errOutOfDomain: 'The value in «{{detail}}» is not possible here — it must be {{range}}.',
   'range.gt': 'greater than {{v}}',
   'range.ge': 'at least {{v}}',
   'range.lt': 'less than {{v}}',
@@ -924,21 +892,21 @@ const en: typeof he = {
   'askHost.none.polygon': 'there is no such polygon in your figure — write its vertices, e.g. "perimeter of ABC"',
   'askHost.many.polygon': 'your figure has more than one such polygon — write its vertices, e.g. "perimeter of ABC"',
   errAmbiguousAngle:
-    'One letter is not enough to say which angle is meant: "{{detail}}". Write all three letters, the vertex ' +
-    'in the middle — for example "angle ABC" — or state the shape the vertex belongs to first.',
+    'One letter is not enough to say which angle is meant: «{{detail}}». Write all three letters, the vertex ' +
+    'in the middle — for example «angle ABC» — or state the shape the vertex belongs to first.',
   errAmbiguousAngleOptions:
-    'That vertex has several angles — {{options}} — and one letter does not say which you mean: "{{detail}}". ' +
-    'Write the angle with three letters, the vertex in the middle — for example "angle {{example}}".',
+    'That vertex has several angles — {{options}} — and one letter does not say which you mean: «{{detail}}». ' +
+    'Write the angle with three letters, the vertex in the middle — for example «angle {{example}}».',
   errAmbiguousAngleArms:
-    'More than two sides meet at that vertex, so it has several angles and one letter does not say which is meant: "{{detail}}". ' +
-    'Write the angle with three letters, the vertex in the middle — for example "angle {{example}}".',
+    'More than two sides meet at that vertex, so it has several angles and one letter does not say which is meant: «{{detail}}». ' +
+    'Write the angle with three letters, the vertex in the middle — for example «angle {{example}}».',
   errDoesNotExist:
     'In this figure {{existing}} does not exist — the givens already fix every point, and there is ' +
-    'no other configuration where it would. "{{detail}}" was not added.',
+    'no other configuration where it would. «{{detail}}» was not added.',
   // #1554 ruling 1 (ADR-AG-198) — the sentence contradicts its own noun; both nouns named, the remedy offered.
   errInscribedContradictsNoun:
-    'A {{shapeEn}} cannot be inscribed in a circle: "{{detail}}". A circle around it would make it a {{forcedEn}}, ' +
-    'and a {{forcedEn}} is not a {{shapeEn}}. If the shape is a {{forcedEn}}, write "{{forcedEn}} ABCD is inscribed in a circle".',
+    'A {{shapeEn}} cannot be inscribed in a circle: «{{detail}}». A circle around it would make it a {{forcedEn}}, ' +
+    'and a {{forcedEn}} is not a {{shapeEn}}. If the shape is a {{forcedEn}}, write «{{forcedEn}} ABCD is inscribed in a circle».',
   errAngleNameTaken: 'Angle {{nameOf}} already has a name: {{holder}}. An angle has one name — keep using {{holder}}.',
   errAngleNameTaken_vs: 'Angle {{nameOf}} already has a name: {{holder}} (in the line «{{declared}}»). An angle has one name — keep using {{holder}}.',
   errLengthNameTaken: 'Segment {{nameOf}} already has a name: {{holder}}. A segment has one name — keep using {{holder}}.',
@@ -959,40 +927,40 @@ const en: typeof he = {
     'The reason: a circle through the four vertices would make a {{shapeEn}} a {{forcedEn}}, and a {{forcedEn}} is not a {{shapeEn}}.',
   errShapeExcluded: 'The figure is already known to be a {{actualEn}}, so it is not called a {{statedEn}}. Remove the earlier given if you meant {{statedEn}}.',
   errPolygonCollapsed:
-    '"{{detail}}" flattens {{polygon}}: together with the earlier givens it forces the vertices onto one line, ' +
-    'and a flat figure is not the {{shapeEn}} that "{{declared}}" declares. "{{detail}}" was not added.',
+    '«{{detail}}» flattens {{polygon}}: together with the earlier givens it forces the vertices onto one line, ' +
+    'and a flat figure is not the {{shapeEn}} that «{{declared}}» declares. «{{detail}}» was not added.',
   errRingContradictsNoun:
-    'The points you gave do not form that shape in this order: "{{detail}}". Reorder the letters so ' +
+    'The points you gave do not form that shape in this order: «{{detail}}». Reorder the letters so ' +
     'the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.',
   errReservedCoordinate:
-    'The letters x and y name the axes, so they cannot be a point\'s unknown: "{{detail}}". ' +
+    'The letters x and y name the axes, so they cannot be a point\'s unknown: «{{detail}}». ' +
     'Use another letter — for example M(3,t).',
   errCapitalMagnitude:
     'A capital letter is a point\'s name, so {{letter}} cannot mark a size. Sizes are marked with a lowercase letter (r, a, k…), except R for a radius. ' +
-    'Try: "{{corrected}}"',
+    'Try: «{{corrected}}»',
   errBadArity:
-    'The number of vertices does not match the shape named in "{{detail}}" — a triangle has three ' +
+    'The number of vertices does not match the shape named in «{{detail}}» — a triangle has three ' +
     'vertices and a quadrilateral four.',
   errRepeatedVertex:
-    'The same letter appears more than once in "{{detail}}". Each vertex needs its own name.',
+    'The same letter appears more than once in «{{detail}}». Each vertex needs its own name.',
   errDegenerateRole:
-    'A median, an altitude or an angle bisector runs from a vertex to the side OPPOSITE it, and in "{{detail}}" that ' +
+    'A median, an altitude or an angle bisector runs from a vertex to the side OPPOSITE it, and in «{{detail}}» that ' +
     'vertex lies on the side itself (or is its own foot). Write it as, for example, ' +
-    '"AD is the median to side BC".',
+    '«AD is the median to side BC».',
   errApexNotAVertex:
-    'A median, an altitude or an angle bisector starts at a VERTEX of the triangle, and in "{{detail}}" the point ' +
+    'A median, an altitude or an angle bisector starts at a VERTEX of the triangle, and in «{{detail}}» the point ' +
     'written is not one of that triangle’s vertices. Use a vertex of the triangle — for ' +
-    'example "AD is the median in triangle ABC" — or name the side outright.',
+    'example «AD is the median in triangle ABC» — or name the side outright.',
   errLengthXY:
-    'In the analytic tool x and y are the coordinates of the plane, so they cannot name a length in "{{detail}}". ' +
-    'Name the length with another letter, e.g. "AB = 3a" or "AB = 3k".',
+    'In the analytic tool x and y are the coordinates of the plane, so they cannot name a length in «{{detail}}». ' +
+    'Name the length with another letter, e.g. «AB = 3a» or «AB = 3k».',
   errCoordinateRestriction:
-    'In the analytic tool x and y are the coordinates of the plane, not parameters, so the condition in "{{detail}}" restricts the curve itself. ' +
+    'In the analytic tool x and y are the coordinates of the plane, not parameters, so the condition in «{{detail}}» restricts the curve itself. ' +
     'The tool cannot yet draw only part of a curve (e.g. only where x > 0). Write the equation without the condition; ' +
-    'if you meant a parameter, use another letter, e.g. "a > 0".',
+    'if you meant a parameter, use another letter, e.g. «a > 0».',
   errBisectorWrongApex:
-    'An angle bisector starts at the VERTEX of the angle it bisects, and the segment in "{{detail}}" does not. ' +
-    'Start the segment at the angle’s vertex — for example "AD bisects angle BAC".',
+    'An angle bisector starts at the VERTEX of the angle it bisects, and the segment in «{{detail}}» does not. ' +
+    'Start the segment at the angle’s vertex — for example «AD bisects angle BAC».',
   // #2115 (ADR-AG-299) — 2-D's sentences, verbatim.
   errBisectorIsSide: '{{side}} is a side of the triangle, so it cannot bisect angle {{vertex}} — an angle bisector runs from a vertex to the opposite side.',
   errBisectorIsPolygonSide: '{{side}} is a side of {{polygonNoun}}, so it cannot bisect angle {{vertex}}.',
@@ -1012,50 +980,50 @@ const en: typeof he = {
   shapeTheNounN10: 'the decagon',
   shapeTheNounPolygon: 'the polygon',
   errAmbiguousCevian:
-    'The vertex or side in "{{detail}}" belongs to more than one triangle in your figure, so it is unclear which side it is drawn to. ' +
-    'Name the side or the triangle — for example "AD is the altitude to side BC" or "AD is the altitude in triangle ABC".',
+    'The vertex or side in «{{detail}}» belongs to more than one triangle in your figure, so it is unclear which side it is drawn to. ' +
+    'Name the side or the triangle — for example «AD is the altitude to side BC» or «AD is the altitude in triangle ABC».',
   errAmbiguousSide:
-    'This shape\'s sides are not all equal, so it is unclear which side you mean: "{{detail}}". ' +
-    'Name the side itself — for example "rectangle ABCD" and then "AB = 4" — or both dimensions, for example "rectangle ABCD 4 by 6".',
+    'This shape\'s sides are not all equal, so it is unclear which side you mean: «{{detail}}». ' +
+    'Name the side itself — for example «rectangle ABCD» and then «AB = 4» — or both dimensions, for example «rectangle ABCD 4 by 6».',
   errPolygonNotSupported:
-    'A polygon with this many sides is built only when it is regular: "{{detail}}". Write it as regular ' +
-    '(for example "regular heptagon ABCDEFG"), or use a pentagon, hexagon or octagon.',
+    'A polygon with this many sides is built only when it is regular: «{{detail}}». Write it as regular ' +
+    '(for example «regular heptagon ABCDEFG»), or use a pentagon, hexagon or octagon.',
   // #2018 (ADR-AG-298) — 2-D's input.roleSideUnresolved, verbatim
   errRoleSideUnresolved:
-    'The figure has no single side matching "{{role}}" — declare the matching triangle first (e.g. "right triangle ABC" for the hypotenuse, ' +
-    '"isosceles triangle ABC" for the base), or name the side by its letters (e.g. "median to side AB").',
+    'The figure has no single side matching «{{role}}» — declare the matching triangle first (e.g. «right triangle ABC» for the hypotenuse, ' +
+    '«isosceles triangle ABC» for the base), or name the side by its letters (e.g. «median to side AB»).',
   roleWordBase: 'base',
   roleWordLeg: 'leg',
   errAmbiguousHypotenuse:
-    'Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: "{{detail}}". ' +
-    'Name the hypotenuse — for example "the median to the hypotenuse AB" — or the right angle, for example "angle C is right".',
+    'Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: «{{detail}}». ' +
+    'Name the hypotenuse — for example «the median to the hypotenuse AB» — or the right angle, for example «angle C is right».',
   errCevianNoRightAngle:
-    'In "{{detail}}" there is no right triangle in your figure, so there is no hypotenuse. ' +
-    'State a right angle first, for example "angle C is right", or name the side outright, for example "the median to side AB".',
+    'In «{{detail}}» there is no right triangle in your figure, so there is no hypotenuse. ' +
+    'State a right angle first, for example «angle C is right», or name the side outright, for example «the median to side AB».',
   errCevianNoTriangle:
-    'In "{{detail}}" the vertex or side belongs to no triangle in your figure, so there is no side to draw it to. ' +
-    'Define the triangle first, or name the side outright — for example "AD is the altitude to side BC".',
+    'In «{{detail}}» the vertex or side belongs to no triangle in your figure, so there is no side to draw it to. ' +
+    'Define the triangle first, or name the side outright — for example «AD is the altitude to side BC».',
   errCrossingAlreadyNamed:
-    'Those lines meet at {{holder}}, and that point already has a name. "{{detail}}" would give it a second one. If you meant a different point, check which two lines cross there.',
+    'Those lines meet at {{holder}}, and that point already has a name. «{{detail}}» would give it a second one. If you meant a different point, check which two lines cross there.',
   errThirdCrossing: '{{line}} already crosses {{curve}} at {{a}} and {{b}} — a line has no third crossing with {{aCurve}}.',
   errTangentNoSecondCrossing: "Can't place {{id}}: the line is tangent {{toCurve}} (touches at one point) — there's no second crossing to extend onto.",
   errCrossingAlreadyNamedOperands:
-    'The two things "{{detail}}" crosses meet at {{holder}}, and that point already has a name. The sentence would give it a second one. If you meant a different point, check which of their intersections has no name yet.',
+    'The two things «{{detail}}» crosses meet at {{holder}}, and that point already has a name. The sentence would give it a second one. If you meant a different point, check which of their intersections has no name yet.',
   errSelfCrossing:
-    'The two lines in "{{detail}}" are the same line, and a line has no intersection with itself, so the sentence defines no point. If you meant some point on that line, write for example "P on line AB".',
+    'The two lines in «{{detail}}» are the same line, and a line has no intersection with itself, so the sentence defines no point. If you meant some point on that line, write for example «P on line AB».',
   errLlmBusy:
-    'The service is busy, so I could not check "{{detail}}". Try again in a moment, or write it in one of the forms listed in the commands panel.',
+    'The service is busy, so I could not check «{{detail}}». Try again in a moment, or write it in one of the forms listed in the commands panel.',
   errLlmUnderstood:
-    'I understood "{{detail}}", but the tool does not support this move yet. Try another phrasing, or the commands panel.',
+    'I understood «{{detail}}», but the tool does not support this move yet. Try another phrasing, or the commands panel.',
   errLlmDropped: "I only partly understood — I couldn't place {{labels}}. Rephrase the step (e.g. split it in two).",
   errLlmInvented: 'Building this needs a name for something you did not name — give it a name of your own and try again.',
   errLlmInventedExisting: 'Building this would tie your sentence to {{labels}}, which it does not mention — nothing was recorded. If you meant {{labels}}, say so in the sentence and try again.',
   thinking: 'Working…',
   errBadOperand:
-    'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +
+    'I understood the relation in «{{detail}}», but not one of its sides. Name two vertices (AB), ' +
     'a side (side AB), a line (line l1) or an axis (the x-axis).',
-  errSideOfVertical: 'A vertical line has no "{{word}}" — try "to the right of" or "to the left of"',
-  errSideOfHorizontal: 'A horizontal line has no "{{word}}" — try "above" or "below"',
+  errSideOfVertical: 'A vertical line has no «{{word}}» — try «to the right of» or «to the left of»',
+  errSideOfHorizontal: 'A horizontal line has no «{{word}}» — try «above» or «below»',
   sideWordAbove: 'above',
   sideWordBelow: 'below',
   sideWordRight: 'to the right of',
@@ -1102,7 +1070,7 @@ const en: typeof he = {
   kindDiagonalMeet: 'the intersection of the diagonals',
   noticeOnlyConfiguration: 'This is the only configuration I found — your givens fix the figure.',
   warnTrapezoidIsParallelogram:
-    'Trapezoid {{shape}} is no longer a trapezoid: with "{{line}}" both pairs of its opposite sides are parallel, so it is a parallelogram (or a rectangle). ' +
+    'Trapezoid {{shape}} is no longer a trapezoid: with «{{line}}» both pairs of its opposite sides are parallel, so it is a parallelogram (or a rectangle). ' +
     'The figure is drawn as your givens fix it. To get a trapezoid back, edit or delete that statement, or untick «Include in the figure».',
   // #1996 (ADR-AG-276, ADR-W-129): the forced-narrowing note — one sentence family, word for word in every builder
   // (`shell/narrowing.ts` narrowingSentence; rows in shell/__tests__/fixtures/narrowing-note-rows.ts).
@@ -1171,7 +1139,6 @@ const en: typeof he = {
       'right-isosceles-triangle': 'a right isosceles triangle is a kind of {{from}}',
     },
   },
-  noticeAlreadyKnown: 'That is already known from what you have written, so I did not add another row: "{{detail}}"',
   noticeAngleReadAs: "Read as {{holder}} — the shape's angle at that vertex. For another angle there, write its three letters.",
   noticeNameReadsAs: 'Note: line {{detail}} and line {{holder}} are two different lines — the names read alike, but each one refers to its own line.',
   save: 'Save',
@@ -1182,15 +1149,7 @@ const en: typeof he = {
   saveQuestion: 'Download question',
   questionGiven: 'Given:',
   copied: 'Copied',
-  manualButton: 'Guide',
   manualTitle: 'The guide — analytic geometry',
-  manualIntro:
-    'A partial guide — representative examples only, to show what kinds of sentence you can type. ' +
-    'Click an example to try it on the figure.',
-  manualTry: 'Click to try — the example will be built on the figure',
-  manualMore: '…and these are only examples — the tool has more COMMANDS here, not just other phrasings of these',
-  manualShowAll: 'Show all',
-  manualShowLess: 'Show fewer',
   manualPoints: 'Points',
   manualLines: 'Lines',
   manualCircles: 'Circles',
@@ -1201,16 +1160,14 @@ const en: typeof he = {
   manualParameters: 'Parameters and inequalities',
   loadRestored: 'Figure loaded — {{total}} givens.',
   loadPartial: 'Loaded {{restored}} of {{total}} givens. These could not be read again: {{lines}}',
-  errLoadForeign: 'The file "{{detail}}" belongs to another builder in the suite — open it there.',
-  errLoadNewer: 'The file "{{detail}}" was saved by a newer version of the tool — refresh and try again.',
-  errLoadTooLarge: 'The file "{{detail}}" is too large to open — a figure can hold up to {{max}} statements.',
-  errLoadUnreadable: 'The file "{{detail}}" is not a saved figure.',
+  errLoadForeign: 'The file «{{detail}}» belongs to another builder in the suite — open it there.',
+  errLoadNewer: 'The file «{{detail}}» was saved by a newer version of the tool — refresh and try again.',
+  errLoadTooLarge: 'The file «{{detail}}» is too large to open — a figure can hold up to {{max}} statements.',
+  errLoadUnreadable: 'The file «{{detail}}» is not a saved figure.',
   undo: 'Undo',
   redo: 'Redo',
-  noticeAlreadyFollows:
-    'That already follows from what you have written — the figure satisfies it anyway, so I did not add another row: "{{detail}}"',
   noticeTeachCanonical:
-    'A textbook does not say "{{verb}}" — it states the given itself. I have put the sentence in the input box for you: "{{canonical}}" — press Enter to draw it.',
+    'A textbook does not say «{{verb}}» — it states the given itself. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
   sessionOffer: 'Unsaved work from your last session was found.',
   sessionContinue: 'Continue where you left off',
@@ -1221,7 +1178,6 @@ const en: typeof he = {
   shareTooLong: 'This link is too long to share — save the figure as a file and send that instead',
   shareBadLink: 'This link is not valid — ask the sender to send it again',
   shareTooLarge: 'This link is too large to open — a figure can hold up to {{max}} statements. Ask the sender to send the figure as a file',
-  shareArrived: 'The link you opened contains a figure. Open it instead of what you built?',
   shareOpenIt: 'Open the shared figure',
   shareKeepMine: 'Keep mine',
   sharePreparing: 'Preparing link…',
@@ -1232,6 +1188,6 @@ const en: typeof he = {
 };
 
 export const analyticI18n = createProductI18n({
-  resources: { he, en },
+  resources: { he: { ...suiteHe, ...he }, en: { ...suiteEn, ...en } },
   postProcessors: [analyticBidi.postProcessor('bidiIsolateAg')],
 });

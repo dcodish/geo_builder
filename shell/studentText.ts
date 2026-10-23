@@ -20,6 +20,13 @@ export interface StudentVocabulary {
   typed: string;
   /** Every name the figure shows (points, lines, planes, vectors, symbols). */
   names: Iterable<string>;
+  /**
+   * #2201 phase 3b (ADR-W-130 Am. 1): the ids of the objects the figure DRAWS, and of the ones it holds but never
+   * draws (a hidden scaffold, a hidden circle). A product that names objects by id fills them, so a value the tool
+   * made is told from one the student can see by provenance, not by its shape.
+   */
+  shownIds?: Iterable<string>;
+  hiddenIds?: Iterable<string>;
 }
 
 const ID_SHAPED = /[~@#][\p{L}\p{N}_-]+|\b[a-z]+-[\p{L}\p{N}_]+/gu;
@@ -51,5 +58,48 @@ export function studentFacingViolations(values: readonly string[], vocab: Studen
       }
     }
   }
+  return out;
+}
+
+/**
+ * #2201 phase 3b ([ADR-W-130](../docs/06w-decisions-workspace.md#adr-w-130) Am. 1) — the point labels a text spells,
+ * case-sensitive: «OR=r» → O, R; «S_{ABC}» → S, A, B, C. A message may name a label the student TYPED even before the
+ * figure draws it.
+ */
+export function labelsIn(text: string): string[] {
+  const out: string[] = [];
+  for (const run of text.matchAll(LABEL_RUN)) for (const l of run[0].matchAll(LABEL)) out.push(l[0]);
+  return out;
+}
+
+/** The numbers a text spells («AD:DB = 1:2» → 1, 2): a coefficient a message shows must be one of them. */
+export function numbersIn(text: string): string[] {
+  return [...text.matchAll(/\d+(?:\.\d+)?/g)].map((m) => m[0]);
+}
+
+const FORMAT_CONTROLS = /[⁦-⁩‎‏]/g;
+const REPEATED_VERTEX = /∠([A-Z]\d*['′]*)([A-Z]\d*['′]*)([A-Z]\d*['′]*)/g;
+const COEFFICIENT = /(\d+(?:\.\d+)?)·/g;
+
+/**
+ * #2201 phase 3b — THE LEAK PREDICATE over a RENDERED message: what in it the student neither typed nor can see.
+ * The student's own sentences (`said`, `other`) appear quoted «…»; they are removed first, since a student's words are
+ * never judged. A violation is one of {@link studentFacingViolations}' (an id-shaped token, an untyped English word, a
+ * label neither drawn nor typed), or the engine's own reasoning: an angle with a repeated vertex («∠AAB») the
+ * sentences do not contain, or a coefficient («0.5·») they do not spell. `englishProse`: the message is the English
+ * locale, whose words are the product's own.
+ */
+export function internalTextViolations(text: string, vocab: StudentVocabulary, said?: string, other?: string, opts: { englishProse?: boolean } = {}): string[] {
+  const own = [said, other].filter((x): x is string => !!x?.trim()).map((x) => x.trim());
+  let body = text.replace(FORMAT_CONTROLS, '');
+  for (const o of own) body = body.split(`«${o}»`).join('«»');
+  // an English message is English prose: its words are the product's, so only a Hebrew message is judged for them
+  const out = studentFacingViolations([body], { ...vocab, typed: [vocab.typed, ...own].join(' ') }).filter((v) => !(opts.englishProse && v.startsWith('untyped word')));
+  const sentences = own.join(' ');
+  for (const m of body.matchAll(REPEATED_VERTEX)) {
+    if ((m[1] === m[2] || m[2] === m[3]) && !sentences.includes(m[0].slice(1))) out.push(`untyped repeated-vertex angle «${m[0]}» in «${body}»`);
+  }
+  const nums = new Set(numbersIn(sentences));
+  for (const m of body.matchAll(COEFFICIENT)) if (!nums.has(m[1])) out.push(`untyped coefficient «${m[0]}» in «${body}»`);
   return out;
 }

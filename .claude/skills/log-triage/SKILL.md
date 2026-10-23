@@ -1,11 +1,11 @@
 ---
 name: log-triage
-description: Triage the PRODUCTION usage logs of the Geo Builder (2-D) and the 3-D Space Builder — pull the real user utterances from the server, bucket them by outcome, RE-RUN each candidate against the current code so already-fixed items drop off automatically, then cluster the surviving failures by intent and produce a ranked "what should we add" recommendation for the operator to approve. Use when the operator asks to analyze/triage prod logs, see what users are typing, find missing input support, or decide what construct to build next.
+description: Triage the PRODUCTION usage logs of every builder (2-D, 3-D, analytic, complex) — pull the real user utterances from the server, bucket them by outcome, RE-RUN each candidate against the current code so already-fixed items drop off automatically, then cluster the surviving failures by intent and produce a ranked "what should we add" recommendation for the operator to approve. Use when the operator asks to analyze/triage prod logs, see what users are typing, find missing input support, or decide what construct to build next.
 ---
 
 # Log triage — what are prod users typing, and what's genuinely still missing?
 
-Turn the raw prod usage log into a **ranked, HEAD-verified list of things to build**, for the operator to approve. One pipeline serves every registered product that posts events (2-D Geo Builder `events.jsonl`, 3-D Space Builder `events-3d.jsonl`, Analytic Builder `events-analytic.jsonl`, #1362) with an identical report shape. The list comes from `products.json` (`apps.ts`); a registered product with nothing to read (complex posts no events yet) is **reported as NOT TRIAGED / NO DATA**, which is not the same as "no failures".
+Turn the raw prod usage log into a **ranked, HEAD-verified list of things to build**, for the operator to approve. One pipeline serves every registered product that posts events (2-D Geo Builder `events.jsonl`, 3-D Space Builder `events-3d.jsonl`, Analytic Builder `events-analytic.jsonl`, #1362; Complex Builder `events-complex.jsonl`, #2241) with an identical report shape. The list comes from `products.json` (`apps.ts`); a registered product with no adapter, or with no file to read, is **reported as NOT TRIAGED / NO DATA**, which is not the same as "no failures".
 
 ## What the data is
 
@@ -19,6 +19,7 @@ Prod events live on the server at `/var/www/geo-proxy/events.jsonl` (2-D) and `e
 npx vite-node .claude/skills/log-triage/triage.mjs                   # every registered product (--app all)
 npx vite-node .claude/skills/log-triage/triage.mjs --app both        # 2-D + 3-D only (the old default)
 npx vite-node .claude/skills/log-triage/triage.mjs --app analytic    # analytic: taxonomy per the 2026-09-24 ruling (ADR-W-083)
+npx vite-node .claude/skills/log-triage/triage.mjs --app complex     # complex: ADR-W-083's reading for unruled codes (ADR-W-150)
 npx vite-node .claude/skills/log-triage/triage.mjs --app 3d          # one app
 npx vite-node .claude/skills/log-triage/triage.mjs --app 2d --days 30 # recent window
 npx vite-node .claude/skills/log-triage/triage.mjs --app 3d --no-fetch # reuse local cache
@@ -51,7 +52,7 @@ A first run on a machine reports `previous triage: none (first run — every row
 
 > **The one blind spot — don't paper over it.** When our grammar can't reproduce a step, the harness replays **what the LLM actually committed** (the `commands` field, issue #84), so the prefix stays faithful and the rest of the session remains real evidence. Where that isn't available — 2-D LLM steps logged before 2026-07-14, 3-D ones before 2026-07-17 (#182 closed the gap: the 3-D sink now logs the LLM's canonical lines and session3d re-parses them), or a store `action` the replay cannot reproduce (edit / delete / show-another / slider / load; `clear`/`undo`/`redo` ARE followed in both apps) — our figure is genuinely missing objects the student had, so any later failure may be *our artifact*. Those verdicts are marked `degraded`, never become LIVE rows, and land in **? UNVERIFIED**. If a `?` row matters to a recommendation, re-check it by hand (build the prefix yourself) — never promote it to a gap on the strength of the report alone.
 
-> **No mirror left to keep honest ([ADR-346](../../../docs/06-decisions.md#adr-346), #1395, #1692).** The verify path used to mirror each App's submit by hand, and that mirror drifted five times, each time silently converting the instrument into confident false signal (issue #35; the last was #1692, a 3-D proof target listed as a LIVE gap). Every product's replay now CALLS its App's own pre-LLM decision: 2-D `session2d` → `decideDeterministic2D` (`src/app/`), 3-D `replay3dSession` → `decideDeterministic3` (`src3d/app/triageReplay3.ts`), analytic `replayAnalyticSession` → `decideSubmit` (`src-analytic/app/triageReplay.ts`). **A new gate belongs in that decision function, never in `triage.mjs` or the App component** — `src/parser/__tests__/triage-mirror.test.ts` fails if a copy reappears.
+> **No mirror left to keep honest ([ADR-346](../../../docs/06-decisions.md#adr-346), #1395, #1692).** The verify path used to mirror each App's submit by hand, and that mirror drifted five times, each time silently converting the instrument into confident false signal (issue #35; the last was #1692, a 3-D proof target listed as a LIVE gap). Every product's replay now CALLS its App's own pre-LLM decision: 2-D `session2d` → `decideDeterministic2D` (`src/app/`), 3-D `replay3dSession` → `decideDeterministic3` (`src3d/app/triageReplay3.ts`), analytic `replayAnalyticSession` → `decideSubmit` (`src-analytic/app/triageReplay.ts`), complex `replayComplexSession` → `decideSubmitCx` (`src-complex/app/triageReplayCx.ts`). **A new gate belongs in that decision function, never in `triage.mjs` or the App component** — `src/parser/__tests__/triage-mirror.test.ts` fails if a copy reappears.
 
 ## Step 2 — cluster the LIVE gaps by intent
 
@@ -62,8 +63,9 @@ Group the surviving utterances into **intent clusters** — the construct or phr
 ## Step 3 — cross-reference coverage
 
 For each cluster, check what already exists so the recommendation is precise and root-cause (docs/17 — a construct, not a one-off patch):
-- Catalogs — **the live coverage map**, one per product: `src3d/parser/catalog3.ts` (3-D), `src/parser/catalog.ts` (2-D), `src-analytic/parser/catalogAnalytic.ts` (analytic).
+- Catalogs — **the live coverage map**, one per product: `src3d/parser/catalog3.ts` (3-D), `src/parser/catalog.ts` (2-D), `src-analytic/parser/catalogAnalytic.ts` (analytic), `src-complex/parser/catalog.ts` (complex).
 - **Analytic buckets (ADR-W-083):** `not-handled` → ▶ LIVE; `out-of-scope` → ⊘ declined; every other refusal (the ruled `bad-equation` / `unknown-reference` / `bad-arity` and the unruled codes) → ⚠ review. The first analytic report should COUNT how the review codes distribute — that is the ruling's revisit trigger.
+- **Complex buckets (ADR-W-150):** `ok` → parsed; `not-handled` → ▶ LIVE; every other refusal code → ⚠ review (ADR-W-083's reading for unruled codes; complex has no LLM seam and no out-of-scope code). A session from a build that logged only submits (prod/2026-09-29 until #2241) replays **degraded from its first row**: its undo/delete/clear were never logged, so its rows land in **? UNVERIFIED**, never as LIVE gaps. Whether a build logged actions is read from its `rel` commit (`git fetch` first, or a fresh build reads as "not logged").
 - 3-D: `docs/02b-requirements-3d.md`, `docs/06b-decisions-3d.md`; the 2026-07 corpus sweep (docs/21) and the build plan's §14 (docs/20) are archived history (what was planned then; see the archive table in docs/README.md), never current coverage. 2-D: `docs/02-requirements.md`, `docs/06-decisions.md`.
 - Say whether a gap is a planned slice, a documented deferral, or genuinely new, and which existing rule/pattern a fix would mirror.
 

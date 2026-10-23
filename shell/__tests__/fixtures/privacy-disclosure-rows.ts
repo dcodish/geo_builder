@@ -30,7 +30,10 @@
  *  - the note's text exists in every locale and no two sentences are glued together (the
  *    `'…שלכם.' + 'כשאתם…'` join both analytic and complex shipped);
  *  - the scan was EXERCISED: it reached the product's own tree beyond its entry. A scanner that
- *    silently resolves nothing would otherwise pass every product with an empty wired set.
+ *    silently resolves nothing would otherwise pass every product with an empty wired set;
+ *  - the TEXT matches the list (#2203, ADR-W-090 Am. 1): every declared sink has its sentence in the
+ *    note, per locale, and no note carries the sentence of a sink it does not declare. The sentence
+ *    is recognised by `SINK_SENTENCE`, one row per sink beside `SINK_OF_ENDPOINT`.
  */
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -50,6 +53,42 @@ export const SINK_OF_ENDPOINT: Readonly<Record<string, DataSink | null>> = {
   share: 'share-store', // «העתק קישור» — the figure and its picture are stored for the short link
   config: null, // GET the operator's per-tool config; sends only the tool id
 };
+
+/**
+ * THE SENTENCE TABLE (#2203, ADR-W-090 Am. 1) — how each sink's sentence is recognised in a note, per
+ * locale. A sink is described when EVERY pattern of its row matches the note (bidi isolates removed:
+ * the notes wrap numbers in U+2066…U+2069). Typed by `DataSink`, so a new sink cannot reach
+ * `DATA_SINKS` without its row here: like `SINK_OF_ENDPOINT`, it lands here first.
+ *
+ * Patterns are as narrow as still matches all four measured notes. The usage-log row asks only that
+ * the retention sentence is THERE; its number is ADR-W-110's lock (`retention-disclosure-1672`).
+ * Hebrew is matched without `\b`, which does not bound Hebrew letters.
+ */
+export const SINK_SENTENCE: Readonly<Record<DataSink, Readonly<Record<'he' | 'en', ReadonlyArray<RegExp>>>>> = {
+  'usage-log': {
+    he: [/נשמר(?:ים|ות)[^.]*עד \d+ יום/],
+    en: [/kept for up to \d+ days/i],
+  },
+  llm: {
+    he: [/בשירות בינה מלאכותית/],
+    en: [/\bexternal AI service\b/i],
+  },
+  'share-store': {
+    he: [/«העתק קישור»/, /נשמרים בשרת/],
+    en: [/“Copy link”|"Copy link"/, /stored on the server/i],
+  },
+};
+
+/** Bidi isolates and marks — invisible, and inside the notes' numbers. */
+const BIDI_CONTROLS = /[\u200e\u200f\u2066-\u2069]/g;
+
+/** Does `text` (in `locale`) carry `sink`'s sentence? `undefined` = no recogniser for that locale. */
+export function describesSink(text: string, sink: DataSink, locale: string): boolean | undefined {
+  const row = (SINK_SENTENCE[sink] as Record<string, ReadonlyArray<RegExp>>)[locale];
+  if (!row) return undefined;
+  const plain = text.replace(BIDI_CONTROLS, '');
+  return row.every((re) => re.test(plain));
+}
 
 /** A server endpoint as it appears in a literal: `api/x` at the start or after a `/`. */
 const ENDPOINT = /(?:^|\/)api\/([A-Za-z][\w-]*)/g;
@@ -197,6 +236,17 @@ export function privacyDisclosureFaults(s: PrivacySubject): string[] {
     if (glued) {
       const at = glued.index ?? 0;
       faults.push(`[${loc}] two sentences are glued with no space: «…${d.text.slice(Math.max(0, at - 12), at + 12)}…»`);
+    }
+    // the text matches the list, both ways (#2203)
+    for (const sink of DATA_SINKS) {
+      const says = describesSink(d.text, sink, loc);
+      if (says === undefined) {
+        faults.push(`[${loc}] SINK_SENTENCE has no recogniser for this locale — the note's text was not checked`);
+        break;
+      }
+      const declared = d.discloses.includes(sink);
+      if (declared && !says) faults.push(`[${loc}] DECLARES '${sink}' but the note has no sentence about it`);
+      if (!declared && says) faults.push(`[${loc}] the note describes '${sink}', which this product does not declare`);
     }
   }
   return faults;

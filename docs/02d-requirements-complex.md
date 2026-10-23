@@ -161,7 +161,7 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   parameter — no point is drawn, a is listed under parameters (with its value once stated: «r = 2 · r
   ממשי» shows r = 2 in the panel only), and the line keeps its ✓ claim row ("a is real"), checked by the
   type. A real-parameter letter in a quadrant, argument, conjugates or pure-imaginary sentence is refused
-  («לא הצלחתי להבין את המשפט»); each reads once the letter is declared complex.
+  (the not-understood sentence, «לא הבנתי את הבקשה…», [ADR-W-151](06w-decisions-workspace.md#adr-w-151)); each reads once the letter is declared complex.
   **And only a name the figure reads as a number may be a sentence's SUBJECT at all**
   ([ADR-CX-062](06d-decisions-complex.md#adr-cx-062), #1948): a z/w name, a point label, or a
   one-letter (optionally indexed) parameter that is not `i` or `o` — the same floor the declaration
@@ -172,7 +172,7 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   ([ADR-CX-063](06d-decisions-complex.md#adr-cx-063), #1974): the tool knows what `i` and `o` are, so
   «i ממשי» answers «i הוא מספר מדומה» and «o ממשי» answers «o מסמן את ראשית הצירים — אפשר לבחור שם
   אחר», in every sentence that takes a subject («i ברביע הראשון», «arg i = 45», …) and never
-  «לא הצלחתי להבין את המשפט» — that message is reserved for a line the tool genuinely cannot read,
+  the not-understood sentence («לא הבנתי את הבקשה…») — that message is reserved for a line the tool genuinely cannot read,
   which is what a word that is no name («foo ממשי», and the indexed `i2`/`o3`, which mean nothing
   here) still is.
   - Sources: [ADR-CX-047](06d-decisions-complex.md#adr-cx-047), #1405 (operator proposal)
@@ -290,8 +290,8 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   span accounting — and **no `dropped*` gate is ever added**. A sentence that finds a keyword claims only
   the words it read, never the whole line: a negation, a sign («החיובי», "positive"), «שונה מאפס» or a
   second statement after a property word is refused, naming those words. A refused **negation** is worded
-  with 2-D's sentence: «עדיין אי אפשר לקלוט שלילה ("אינו"). ניתן לציין מה כן נתון — למשל "z1 מדומה טהור"
-  או "arg(z1) = 30°".» — any other unread word keeps «הבנתי חלק מהשורה, אבל לא את: …». **An accepted
+  with 2-D's sentence: «עדיין אי אפשר לקלוט שלילה («אינו»). ניתן לציין מה כן נתון — למשל «z1 מדומה טהור»
+  או «arg(z1) = 30°».» — any other unread word keeps «הבנתי חלק מהשורה, אבל לא את: …». **An accepted
   object is drawn**: a circle whose radius is not a positive real number («ורדיוסו -2», «0», «2i»), or a
   circumscribed circle through collinear numbers, is refused with the existing sentence, naming the
   statement that blocks it or else the line itself. Three numbers on one line, to a scale-free

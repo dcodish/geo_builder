@@ -18,6 +18,8 @@ import { DATA_SINKS, type DataSink, type PrivacyDeclaration } from '../frame/pri
 import {
   REPO_ROOT,
   SINK_OF_ENDPOINT,
+  SINK_SENTENCE,
+  describesSink,
   entryOf,
   privacyDisclosureFaults,
   registryProducts,
@@ -34,9 +36,28 @@ function fakeScan(sinks: DataSink[], extra: Partial<WiringScan> = {}): WiringSca
   }
   return { files: ['stub/main.tsx', 'stub/App.tsx'], endpoints, sinks: new Set(sinks), unclassified: [], ...extra };
 }
-const note = (discloses: DataSink[], text = 'A note. Another sentence.'): Record<string, PrivacyDeclaration> => ({
-  he: { text, discloses },
-  en: { text, discloses },
+/**
+ * One sentence per sink, per locale, in the shipped notes' words (2-D's, at 77992ff8), with the bidi
+ * isolates the real notes carry around the number. A synthetic note is these sentences, so the
+ * #1426 rows below see a note whose text matches its list (#2203).
+ */
+const SENTENCE: Record<'he' | 'en', Record<DataSink, string>> = {
+  he: {
+    'usage-log': 'לצורך שיפור הכלי נשמרות ההוראות שהוקלדו (טקסט מתמטי בלבד) עם מזהה מבקר אנונימי — ללא כתובת ה-\u2066IP\u2069 — עד \u206630\u2069 יום.',
+    llm: 'משפטים שהכלי לא הבין נשלחים לעיבוד בשירות בינה מלאכותית חיצוני.',
+    'share-store': 'כשאתם לוחצים «העתק קישור», השרטוט ותמונה שלו נשמרים בשרת כדי שהקישור יעבוד.',
+  },
+  en: {
+    'usage-log': 'To improve the tool, typed instructions (math text only) are kept for up to 30 days with an anonymous visitor id.',
+    llm: 'Statements the tool does not understand are sent for processing to an external AI service.',
+    'share-store': 'When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work.',
+  },
+};
+const noteText = (loc: 'he' | 'en', sinks: ReadonlyArray<DataSink>) =>
+  [loc === 'he' ? 'פרטיות: אין הרשמה.' : 'Privacy: no sign-up.', ...sinks.map((x) => SENTENCE[loc][x])].join(' ');
+const note = (discloses: DataSink[], text?: string): Record<string, PrivacyDeclaration> => ({
+  he: { text: text ?? noteText('he', discloses), discloses },
+  en: { text: text ?? noteText('en', discloses), discloses },
 });
 
 describe('#1426 — the privacy rows really check', () => {
@@ -78,6 +99,66 @@ describe('#1426 — the privacy rows really check', () => {
 
   it('every sink has at least one endpoint in the table — no sink is undetectable by construction', () => {
     for (const s of DATA_SINKS) expect(Object.values(SINK_OF_ENDPOINT), s).toContain(s);
+  });
+});
+
+describe('#2203 — the note TEXT is held to the sinks it declares, both ways (ADR-W-090 Am. 1)', () => {
+  const all = [...DATA_SINKS];
+  const faultsOf = (declarations: Record<string, PrivacyDeclaration>, wired: DataSink[]) =>
+    privacyDisclosureFaults({ declarations, scan: fakeScan(wired), tree: 'stub' });
+
+  it('a note with one sentence per declared sink, and no other, reports no faults (every subset)', () => {
+    for (let mask = 0; mask < 1 << all.length; mask++) {
+      const sinks = all.filter((_, i) => mask & (1 << i));
+      expect(faultsOf(note(sinks), sinks), sinks.join(',') || '(none)').toEqual([]);
+    }
+  });
+
+  for (const sink of DATA_SINKS) {
+    it(`CATCHES a note that declares '${sink}' but has no sentence about it — in each locale`, () => {
+      for (const loc of ['he', 'en'] as const) {
+        const d = note(all);
+        d[loc] = { text: noteText(loc, all.filter((x) => x !== sink)), discloses: all };
+        expect(faultsOf(d, all)).toEqual([`[${loc}] DECLARES '${sink}' but the note has no sentence about it`]);
+      }
+    });
+
+    it(`CATCHES a note that describes '${sink}' without declaring it (an over-claiming text)`, () => {
+      const rest = all.filter((x) => x !== sink);
+      for (const loc of ['he', 'en'] as const) {
+        const d = note(rest);
+        d[loc] = { text: noteText(loc, all), discloses: rest };
+        expect(faultsOf(d, rest)).toEqual([`[${loc}] the note describes '${sink}', which this product does not declare`]);
+      }
+    });
+  }
+
+  it("CATCHES complex's note with an AI sentence added — complex declares no 'llm'", () => {
+    const complexHe =
+      'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. ' + SENTENCE.he['usage-log'] + ' העבודה נשמרת בדפדפן שלכם ובקבצים שאתם בוחרים לשמור. ' + SENTENCE.he['share-store'];
+    const sinks: DataSink[] = ['usage-log', 'share-store'];
+    const ok = { he: { text: complexHe, discloses: sinks }, en: note(sinks).en };
+    expect(faultsOf(ok, sinks)).toEqual([]);
+    const added = { ...ok, he: { text: `${complexHe} ${SENTENCE.he.llm}`, discloses: sinks } };
+    expect(faultsOf(added, sinks)).toEqual(["[he] the note describes 'llm', which this product does not declare"]);
+  });
+
+  it('half a sentence is not the sentence: «העתק קישור» without «נשמרים בשרת» does not describe the share store', () => {
+    expect(describesSink('כשאתם לוחצים «העתק קישור», הקישור מועתק.', 'share-store', 'he')).toBe(false);
+  });
+
+  it('the bidi isolates around the number do not hide the retention sentence', () => {
+    expect(SENTENCE.he['usage-log']).toMatch(/\u2066/);
+    expect(describesSink(SENTENCE.he['usage-log'], 'usage-log', 'he')).toBe(true);
+  });
+
+  it('CATCHES a locale with no recogniser — an unchecked text must not pass as checked', () => {
+    const f = faultsOf({ fr: { text: 'Une note.', discloses: [] } }, []);
+    expect(f).toEqual(['[fr] SINK_SENTENCE has no recogniser for this locale — the note\'s text was not checked']);
+  });
+
+  it('every sink has a recogniser in both locales — the table is complete by type and by value', () => {
+    for (const s of DATA_SINKS) for (const loc of ['he', 'en'] as const) expect(SINK_SENTENCE[s][loc].length, `${s}/${loc}`).toBeGreaterThan(0);
   });
 });
 

@@ -31,6 +31,12 @@ export interface GivenViolation {
   /** i18n key + params so the UI renders the message in the active language (the engine has no locale). */
   messageKey: string;
   params: Record<string, string>;
+  /**
+   * #2305 ([ADR-755](../../docs/06-decisions.md#adr-755)): the params that name a CIRCLE, each mapped to that circle's
+   * id. The display layer words them through `circleRefs` → `circleText` (`violationText`), so one of a concentric
+   * pair reads «המעגל הפנימי», never its id's mint suffix «O-2». The param itself keeps the bare letter (logs, `message`).
+   */
+  circleSlots?: Record<string, Id>;
 }
 
 /**
@@ -172,6 +178,7 @@ export function checkGivens(
         message: `${point} should lie on ${circleLabel(circle)} (radius ${c.r.toFixed(2)}) but is ${d.toFixed(2)} from its centre`,
         messageKey: 'figure.v.onCircle',
         params: { point, circle: circleName(circle), radius: c.r.toFixed(2), dist: d.toFixed(2) },
+        circleSlots: { circle },
       });
     }
   }
@@ -189,6 +196,7 @@ export function checkGivens(
         message: `tangency point ${cmd.at} should lie on ${circleLabel(cmd.circle)} (radius ${c.r.toFixed(2)}) but is ${d.toFixed(2)} from its centre`,
         messageKey: 'figure.v.tangent',
         params: { point: cmd.at, circle: circleName(cmd.circle), radius: c.r.toFixed(2), dist: d.toFixed(2) },
+        circleSlots: { circle: cmd.circle },
       });
     }
   }
@@ -212,6 +220,7 @@ export function checkGivens(
         message: `circles ${circleName(cmd.circle1)} and ${circleName(cmd.circle2)} should be ${cmd.external ? 'externally' : 'internally'} tangent (centres ${target.toFixed(2)} apart) but they are ${d.toFixed(2)} apart`,
         messageKey: 'figure.v.circlesTangent',
         params: { c1: circleName(cmd.circle1), c2: circleName(cmd.circle2), kind: cmd.external ? 'external' : 'internal', target: target.toFixed(2), dist: d.toFixed(2) },
+        circleSlots: { c1: cmd.circle1, c2: cmd.circle2 },
       });
       continue; // the centres are wrong — a touch-point miss is a redundant second flag for the same fault
     }
@@ -226,6 +235,7 @@ export function checkGivens(
           message: `the touch point ${cmd.at} should lie on both tangent circles (radius ${c.r.toFixed(2)}) but is ${off.toFixed(2)} from a centre`,
           messageKey: 'figure.v.tangent',
           params: { point: cmd.at, circle: circleName(c === a ? cmd.circle1 : cmd.circle2), radius: c.r.toFixed(2), dist: off.toFixed(2) },
+          circleSlots: { circle: c === a ? cmd.circle1 : cmd.circle2 },
         });
         break;
       }
@@ -271,6 +281,7 @@ export function checkGivens(
         message: `${cmd.id} should lie ${cmd.side} ${circleLabel(cmd.circle)} (radius ${c.r.toFixed(2)}) but is ${d.toFixed(2)} from its centre`,
         messageKey: cmd.side === 'outside' ? 'figure.v.outsideCircle' : 'figure.v.insideCircle',
         params: { point: cmd.id, circle: circleName(cmd.circle), radius: c.r.toFixed(2), dist: d.toFixed(2) },
+        circleSlots: { circle: cmd.circle },
       });
     }
   }
@@ -327,6 +338,7 @@ export function checkGivens(
           message: `${circleLabel(cmd.a)} and ${circleLabel(cmd.b)} should be disjoint (centre gap ${d.toFixed(2)} ≤ r₁+r₂ = ${(a.r + b.r).toFixed(2)})`,
           messageKey: 'figure.v.circlesDisjoint',
           params: { c1: circleName(cmd.a), c2: circleName(cmd.b), d: d.toFixed(2), sum: (a.r + b.r).toFixed(2) },
+          circleSlots: { c1: cmd.a, c2: cmd.b },
         });
       }
     } else if (
@@ -340,6 +352,7 @@ export function checkGivens(
         message: `${circleLabel(cmd.b)} should lie strictly inside ${circleLabel(cmd.a)} (centre gap ${d.toFixed(2)} + r = ${(d + b.r).toFixed(2)} ≥ R = ${a.r.toFixed(2)})`,
         messageKey: 'figure.v.circleContained',
         params: { inner: circleName(cmd.b), outer: circleName(cmd.a), reach: (d + b.r).toFixed(2), ro: a.r.toFixed(2) },
+        circleSlots: { inner: cmd.b, outer: cmd.a },
       });
     }
   }
@@ -407,6 +420,7 @@ export function checkGivens(
         message: `radius of ${circleLabel(cmd.c1)} (${a.r.toFixed(2)}) should be ${cmd.k} × radius of ${circleLabel(cmd.c2)} (${b.r.toFixed(2)})`,
         messageKey: 'figure.v.radiusRatio',
         params: { c1: circleName(cmd.c1), c2: circleName(cmd.c2), k: String(cmd.k), r1: a.r.toFixed(2), r2: b.r.toFixed(2) },
+        circleSlots: { c1: cmd.c1, c2: cmd.c2 },
       });
     }
   }
@@ -431,6 +445,7 @@ export function checkGivens(
         message: `the radius of ${circleLabel(id)} should be ${formatMeasure(value)} but is drawn ${c.r.toFixed(2)}`,
         messageKey: 'figure.v.radius',
         params: { circle: circleName(id), value: formatMeasure(value), drawn: c.r.toFixed(2) },
+        circleSlots: { circle: id },
       });
     }
   }
@@ -825,6 +840,7 @@ function auditDrawnArcs(
       message: `${o.id} should lie on the drawn part of ${circleLabel(o.circle)}, but sits ${off}° beyond it`,
       messageKey: 'figure.v.pointOffArc',
       params: { point: o.id, circle: circleName(o.circle), off },
+      circleSlots: { circle: o.circle },
     });
   }
   return { violations, forced };

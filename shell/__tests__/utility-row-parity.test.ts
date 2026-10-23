@@ -45,7 +45,8 @@ const MATCH: ReadonlyArray<[(typeof ORDER)[number], (key: string) => boolean]> =
   ['saveQuestion', (k) => k.includes('savequestion')],
   ['saveImage', (k) => k.includes('saveimage')],
   ['copyImage', (k) => k.includes('copyimage')],
-  ['manual', (k) => k.includes('manual')],
+  // #2201 phase 1 (ADR-W-148): the guide button is the suite key `suite.guide.button` in every builder
+  ['manual', (k) => k.includes('manual') || k === 'suite.guide.button'],
   ['save', (k) => k === 'save' || k.endsWith('.save')],
   ['load', (k) => k === 'load' || k.endsWith('.load')],
 ];

@@ -9,11 +9,13 @@
  *   npx vite-node .claude/skills/log-triage/triage.mjs --app 3d
  *   npx vite-node .claude/skills/log-triage/triage.mjs --app 2d --days 30
  *   npx vite-node .claude/skills/log-triage/triage.mjs --app analytic
+ *   npx vite-node .claude/skills/log-triage/triage.mjs --app complex
  *   npx vite-node .claude/skills/log-triage/triage.mjs --no-fetch          (--app all is the default)
  *
  * Prod events (ADR-3D-016, #1243): /var/www/geo-proxy/events.jsonl (2-D), events-<id>.jsonl for every other
  * product — the list and the filenames come from products.json via ./apps.ts (#1362), never a literal.
- * A registered product with no adapter below (complex: it posts no events yet) is REPORTED as such.
+ * A registered product with no adapter below is REPORTED as such. Every product has one since #2241 (complex
+ * posted events from prod/2026-09-29 while this header said it posted none — ADR-W-150).
  * Each `submit` line: { serverTs, iph(hashed IP), ev, sid, rel, utterance, locale, source, result }.
  * Outcome classification MIRRORS server/admin.ts (outcomeOf2D / outcomeOf3D).
  *
@@ -79,6 +81,9 @@ import { replay3dSession } from '../../../src3d/app/triageReplay3.ts';
 // product's own replay, which calls the App's `decideSubmit` rather than mirroring it.
 import { outcomeOfAnalytic } from '../../../server/admin.ts';
 import { replayAnalyticSession } from '../../../src-analytic/app/triageReplay.ts';
+// #2241 — complex: the same pair, its own classifier beside analytic's and the replay over `decideSubmitCx`.
+import { outcomeOfComplex } from '../../../server/admin.ts';
+import { replayComplexSession } from '../../../src-complex/app/triageReplayCx.ts';
 import { triagePlan, remoteEventsFile, localEventsFile } from './apps.ts';
 
 // ---- args ----------------------------------------------------------------
@@ -134,8 +139,35 @@ const ADAPTERS = {
   '2d': { name: 'Geo Builder (2-D)', classify: outcome2D, session: async (evs) => session2d(evs) },
   '3d': { name: 'Space Builder (3-D)', classify: outcome3D, session: (evs) => replay3dSession(evs, sessionBudgetMs) },
   analytic: { name: 'Analytic Builder', classify: outcomeOfAnalytic, session: (evs) => replayAnalyticSession(evs, sessionBudgetMs) },
+  complex: {
+    name: 'Complex Builder',
+    classify: outcomeOfComplex,
+    session: (evs) => replayComplexSession(evs, { actionsLogged: complexLogsActions(evs), budgetMs: sessionBudgetMs }),
+  },
 };
 const classify = (a, e) => ADAPTERS[a].classify(e);
+
+/**
+ * #2241 — did the complex build these events came from LOG its store actions? Complex logged only submits from
+ * prod/2026-09-29 until #2241, so an older session's undo/delete/clear never reached the log, and its replay
+ * is degraded from the first row (the rows land in UNVERIFIED, never as LIVE gaps). Read from the build itself:
+ * `rel` is "<short hash> · <date>", and the answer is whether that commit's App logs an undo. A hash this
+ * clone does not have (`git fetch` first) or a `dev` build reads as "not logged" — the honest default.
+ */
+const actionsLoggedAt = new Map();
+function complexLogsActions(evs) {
+  const hash = (evs.find((e) => e.rel)?.rel ?? '').split(' ')[0];
+  if (!/^[0-9a-f]{7,40}$/.test(hash)) return false;
+  if (!actionsLoggedAt.has(hash)) {
+    let yes = false;
+    try {
+      const src = execFileSync('git', ['show', `${hash}:src-complex/App.tsx`], { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+      yes = src.includes("logAction('undo'");
+    } catch { /* unknown commit */ }
+    actionsLoggedAt.set(hash, yes);
+  }
+  return actionsLoggedAt.get(hash);
+}
 // buckets that carry a "what's missing" signal, in priority order. `review` is analytic's ruled third
 // bucket (#1362): neither auto-filed nor discarded — listed so it is READ.
 const INTERESTING = ['not-understood', 'llm-built', 'refused', 'review', 'out-of-scope'];

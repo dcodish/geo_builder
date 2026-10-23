@@ -175,7 +175,7 @@ describe('#1349 — the operator\'s exact sequence now answers «כבר קיים
     const { deps, notes } = makeDeps();
     await runSubmit('AB ⟂ BC', deps);
     expect(useGeoStore.getState().facts, 'not added to the steps').toBe(before);
-    expect(notes()).toContain('input.alreadyDrawn');
+    expect(notes()).toContain('suite.notice.alreadyDrawn');
     expect(llmParseMock).not.toHaveBeenCalled();
   });
 });

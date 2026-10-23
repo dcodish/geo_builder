@@ -886,11 +886,14 @@ export function App() {
         if (reachesFallback(verdict)) return (await tryFallback(raw, verdict.error, act, live.seed)) ? 'consumed' : 'kept';
         setError(verdict.error);
         return sentenceOutcome(verdict);
+      /**
+       * #1990 (ADR-AG-330, operator ruling 2026-10-10: every builder uses 2-D's note). A restated line and a line the
+       * figure already satisfies in every configuration are both 2-D's no-op (`noop-exists` / `implied-restatement`),
+       * and 2-D answers both with the one sentence, `suite.notice.alreadyDrawn`.
+       */
       case 'already-known':
-        setNotice(t('noticeAlreadyKnown', { detail: verdict.line }));
-        return sentenceOutcome(verdict);
       case 'already-follows':
-        setNotice(t('noticeAlreadyFollows', { detail: verdict.line }));
+        setNotice(t('suite.notice.alreadyDrawn'));
         return sentenceOutcome(verdict);
       case 'record':
         // #1350 — the notice rides IN the commit that records the line: `recordLine` clears the
@@ -1132,7 +1135,7 @@ export function App() {
   // product's own `language` key. Passing a toggle here put two «English» buttons on the suite bar.
   return (
     <AppFrame
-      title={t('title')}
+      title={t('suite.product.analytic')}
       subtitle={t('subtitle')}
       /**
        * ONE look and ONE ORDER for the session actions in every builder (#1087).
@@ -1195,7 +1198,7 @@ export function App() {
           id: 'manual',
           node: (
             <ToolButton key="manual" onClick={() => setManualOpen(true)}>
-              {t('manualButton')}
+              {t('suite.guide.button')}
             </ToolButton>
           ),
         },
@@ -1222,7 +1225,7 @@ export function App() {
         ) : pendingLink ? (
           /* #1373: a link arrived on a canvas that is NOT empty — ask, never replace silently. */
           <ResumeOffer
-            message={t('shareArrived')}
+            message={t('suite.share.arrived')}
             continueLabel={t('shareOpenIt')}
             restartLabel={t('shareKeepMine')}
             onContinue={acceptPendingLink}
@@ -1254,11 +1257,11 @@ export function App() {
       switcherMoreLabel={t('switcherMore')}
       buildStamp={typeof __BUILD__ === 'string' ? __BUILD__ : undefined}
       about={{
-        label: t('about'),
-        title: t('aboutTitle'),
+        label: t('suite.about.label'),
+        title: t('suite.about.title'),
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
-        closeLabel: t('close'),
+        closeLabel: t('suite.about.close'),
         autoOpenKey: 'analytic_intro_seen', // #1453 (ADR-W-098): first visit opens About, in every builder
       }}
     >
@@ -1277,7 +1280,7 @@ export function App() {
         emptyOverlay={
           lines.length === 0 ? (
             <QuickChips
-              title={t('emptyTitle')}
+              title={t('suite.canvas.emptyTitle')}
               hint={t('emptyHint')}
               commands={QUICK_COMMANDS}
               onPick={submit}
@@ -2292,13 +2295,13 @@ export function App() {
         open={manualOpen}
         onClose={() => setManualOpen(false)}
         title={t('manualTitle')}
-        intro={t('manualIntro')}
+        intro={t('suite.guide.intro')}
         closeLabel={t('close')}
-        tryHint={t('manualTry')}
+        tryHint={t('suite.guide.try')}
         sectionCap={6}
-        showAllLabel={t('manualShowAll')}
-        showLessLabel={t('manualShowLess')}
-        moreNote={t('manualMore')}
+        showAllLabel={t('suite.guide.showAll')}
+        showLessLabel={t('suite.guide.showLess')}
+        moreNote={t('suite.guide.more')}
         sections={MANUAL_SECTIONS.map((section) => ({
           key: section.key,
           title: t(section.titleKey),

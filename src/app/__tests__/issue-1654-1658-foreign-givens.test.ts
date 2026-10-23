@@ -92,7 +92,7 @@ describe('#1654–#1657 — the operator-audit sentences are refused, naming the
     expect(r.refused, 'the text stays in the box').toBe(true);
     expect(r.added, 'nothing of the sentence was committed').toBe(0);
     expect(r.notes).toHaveLength(1);
-    expect(r.notes[0], 'names the student’s own word').toContain(`"${word}"`);
+    expect(r.notes[0], 'names the student’s own word').toContain(`«${word}»`);
     expect(r.notes[0].endsWith(POINTER[family].he), 'then the family’s pointer, unchanged').toBe(true);
     expect(llmParseMock, 'never escalated — the model could only re-absorb the operand').not.toHaveBeenCalled();
   });
@@ -100,7 +100,7 @@ describe('#1654–#1657 — the operator-audit sentences are refused, naming the
   it('the English note names the word too', async () => {
     const r = await play(['triangle ABC', 'the slope of AB is 3/4'], 'en');
     expect(r.refused).toBe(true);
-    expect(r.notes[0]).toContain('"slope"');
+    expect(r.notes[0]).toContain('«slope»');
     expect(r.notes[0].endsWith(POINTER.analytic.en)).toBe(true);
   });
 
@@ -229,7 +229,7 @@ describe('#1658 — a bound on a letter is kept, marked while nothing binds it, 
     const r = await play(['משולש ABC', '0 < k < 6']);
     expect(r.refused).toBe(false);
     expect(r.added, 'the bound is a row in the list').toBe(1);
-    expect(r.notes.join(' '), 'never told it is already drawn').not.toContain(i18n.t('input.alreadyDrawn', { lng: 'he' }) as string);
+    expect(r.notes.join(' '), 'never told it is already drawn').not.toContain(i18n.t('suite.notice.alreadyDrawn', { lng: 'he' }) as string);
     expect(lastStatus(r.fig)).toMatch(/^variable k is not defined by any statement/);
     expect(llmParseMock).not.toHaveBeenCalled();
   });

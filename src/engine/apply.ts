@@ -8,6 +8,7 @@
  * existing points is fitted to them, instead of keeping absolute defaults.
  */
 
+import { engineErrorDebugText } from './errors';
 import type { CirclePositionCase, Command, Constraint, Construction, GeoObject, Id, SideRequirement, SolveDirective, Vec } from './types';
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
@@ -758,7 +759,7 @@ export function shapeExclusion(prev: Construction, cmd: Command): { actual: Quad
 
 /** The wire message `humanizeError` renders as the ruled sentence («הצורה כבר ידועה כ־… — ולכן אינה נקראת …»). */
 export function shapeExclusionError(m: { actual: QuadKind; stated: QuadKind }): string {
-  return `shape-excluded: the figure is already known to be a ${m.actual}, so it is not a ${m.stated}`;
+  return engineErrorDebugText({ code: 'shape-excluded', actual: m.actual, stated: m.stated });
 }
 
 /**

@@ -33,9 +33,9 @@ import { humanizeError } from '@/i18n/humanizeError';
 
 const strip = (s: string) => s.replace(/[⁦-⁩‎‏]/g, '');
 const HE = (line: string) =>
-  `הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "${line}". אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`;
+  `הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: «${line}». אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`;
 const EN = (line: string) =>
-  `The points you gave do not form that shape in this order: "${line}". Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.`;
+  `The points you gave do not form that shape in this order: «${line}». Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.`;
 const NO_CONFIG_HE = () => strip(i18n.t('figure.noValidConfig', { lng: 'he' }) as string);
 
 /** Play `lines` through the submit door with the App's resolve wiring; the notes the student saw on the LAST line. */
@@ -199,7 +199,7 @@ describe('#1927 — controls commit exactly as before', () => {
   // never refused here and adds no row — it answers «כבר קיים» (was: committed as a second row).
   it('the square read in a simple order is never refused — it is a restatement (#1953)', async () => {
     const r = await play(['ריבוע ABCD', 'מרובע ADCB']);
-    expect(r.notes).toEqual([strip(i18n.t('input.alreadyDrawn', { lng: 'he' }) as string)]);
+    expect(r.notes).toEqual([strip(i18n.t('suite.notice.alreadyDrawn', { lng: 'he' }) as string)]);
     expect(r.facts.length, 'no new row').toBe(r.before.facts.length);
   });
 

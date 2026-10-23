@@ -42,7 +42,7 @@ describe('#1927 — the operator’s rows are refused with the ring message', ()
     expect(r?.at).toBe(1);
     expect(r?.error).toMatchObject({ key: 'ring-contradicts-noun', detail: 'מרובע ACBD' });
     expect(errorText(r!.error, t)).toBe(
-      'הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "מרובע ACBD". אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.',
+      'הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: «מרובע ACBD». אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.',
     );
     expect(errorText(r!.error, tEn)).toContain('מרובע ACBD');
     // Nothing is committed: the prior figure is the square alone, unchanged.

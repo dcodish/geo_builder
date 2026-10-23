@@ -53,7 +53,7 @@ const gate: ProofGate = (line) => {
 };
 
 const REFUSAL = (sentence: string) =>
-  `זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "${sentence}"`;
+  `זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «${sentence}»`;
 
 beforeEach(() => st().resetSession());
 
@@ -81,7 +81,7 @@ describe('#1870 — complex refuses a proof target at the submit gate (the share
   it('the English refusal is 2-D\'s English sentence', () => {
     verdict('prove that w is real');
     expect(errorText(st().lastError!, tEn)).toBe(
-      'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "prove that w is real"',
+      'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «prove that w is real»',
     );
   });
 

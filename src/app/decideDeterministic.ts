@@ -436,7 +436,7 @@ export async function decideFromParse(
   {
     const vp = vertexPairVerdict(utterance, pctx, facts, seed, roleReadingConfig.cap);
     if (vp?.kind === 'implied') {
-      return { kind: 'noop', binds, logs: [...logs, { source: 'parser', result: 'implied-restatement', detail: 'vertex-pair' }], note: { key: 'input.alreadyDrawn' } };
+      return { kind: 'noop', binds, logs: [...logs, { source: 'parser', result: 'implied-restatement', detail: 'vertex-pair' }], note: { key: 'suite.notice.alreadyDrawn' } };
     }
     if (vp?.kind === 'adopt') {
       const v = await decideFromParse(state, vp.reading, locale, hooks, opts);
@@ -952,7 +952,7 @@ export async function decideFromParse(
         return refuse(
           'conflict',
           { source: 'parser', result: `self-conflict:${redefined}`, detail: outcome.detail, commands: r.commands },
-          { key: 'input.sentenceSelfConflict', params: { sentence: utterance.trim(), id: redefined.replace(/^[a-z]+-(?=[A-Z])/, '') } }, // 'poly-ABCD' → ABCD
+          { key: 'input.sentenceSelfConflict', params: { sentence: utterance.trim(), id: redefined } }, // 'poly-ABCD': `renderNote` names it ABCD (#2201 3b)
         );
       }
       if (outcome.reason === 'error') {
@@ -985,7 +985,7 @@ export async function decideFromParse(
         return { kind: 'commit', deferred: false, binds, commands: r.commands, logs: [...logs, { source: 'parser', result: 'bound-point-name', commands: r.commands }], note: null };
       }
       if (outcome.reason === 'implied') {
-        return { kind: 'noop', binds, logs: [...logs, { source: 'parser', result: 'implied-restatement', commands: r.commands }], note: { key: 'input.alreadyDrawn' } };
+        return { kind: 'noop', binds, logs: [...logs, { source: 'parser', result: 'implied-restatement', commands: r.commands }], note: { key: 'suite.notice.alreadyDrawn' } };
       }
       if (outcome.reason === 'empty') {
         // A #186 auto-bind ALREADY changed the figure (an unnamed circle took the student's name and
@@ -997,7 +997,7 @@ export async function decideFromParse(
         const existing = new Set((pctx.points ?? []).map((p) => p.toUpperCase()));
         const newLabels = statedLabelTokens(utterance).filter((l) => !existing.has(l)); // case-blind (#779)
         if (newLabels.length === 0) {
-          return { kind: 'noop', binds, logs: [...logs, { source: 'parser', result: 'noop-exists', commands: r.commands }], note: { key: 'input.alreadyDrawn' } };
+          return { kind: 'noop', binds, logs: [...logs, { source: 'parser', result: 'noop-exists', commands: r.commands }], note: { key: 'suite.notice.alreadyDrawn' } };
         }
       }
       weak = outcome.reason; // parsed but produced nothing → fall through to the LLM second attempt

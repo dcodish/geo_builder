@@ -249,7 +249,7 @@ describe('#1435 A1 — the word «שורש» (2-D #105 reads it; #246 teaches th
     expect(msg).toContain('z1 = √3');
     expect(msg).toContain('√');
     expect(msg).toContain('סמלים');
-    expect(msg).not.toContain('לא הצלחתי להבין');
+    expect(msg).not.toContain('לא הבנתי את הבקשה');
   });
 
   it('the taught spelling DRIVES: the suggestion is accepted', () => {

@@ -233,6 +233,12 @@ Seams recorded against the layout:
   through `circleRef` (ADR-552, #1442) — drawn circles only, a visible centre by its letter, an unnamed one as
   "the circle" or its ADR-342 token; two drawn circles on one centre, ordered by `innerOf`, by their role
   (`via: 'role'`, ADR-714, #2264); `render/valueRowText` words every row label.
+- **A circle in a sentence (ADR-755, #2305)** is worded by `src/i18n/circleText.ts`, `circleRef`'s twin for text: a
+  template's circle slot takes a noun phrase (`{{circle}}` «מעגל O», `{{circleThe}}` «המעגל O», `{{circleTo}}` «למעגל O»,
+  `{{circlePair}}` «המעגלים O ו-P»), a role reads «המעגל הפנימי», and every other circle keeps its letter. Circle slots
+  carry IDS to the display: `GivenViolation.circleSlots` (rendered by `i18n/violationText`), a `humanizeError`
+  wording's declared `circleParams` (resolved by the figure's `circleResolver`), the menu title (`circleMenuTitle`);
+  `inkCrossings.crossingUtterance` reads `circleRef` itself (the parser's canonical «המעגל הפנימי»).
 - **The clarification family (ADR-490, ADR-494).** A rule may return a `Clarify`, which `refusalOf` maps to a
   refusal reason of the same name and `submitPipeline` renders as a note that keeps the text; `not-handled` is the
   escalation seam. `isAmbiguityQuestion` is the explicit whitelist `parseResolved` may not turn back into an
@@ -254,6 +260,11 @@ Seams recorded against the layout:
   and `translateConstraintWords` renders «רדיוס מעגל O» (a `DESC_WORDS` entry whose capture group is a param); when the
   drop-one search names no other side, the fold tags the latest statement that sized c₁ (else c₂) by provenance
   (`statedSizeCircles` over the fact's lowering) — a stated radius owns no constraint, so the search never tries it.
+- **The 2-D error bank (ADR-756, #2201 phase 3a).** Every refusal the engine or the fold writes is an `EngineError`
+  variant (`src/engine/errors.ts`): `engineErrorDebugText` writes its English wire (the status string, the debug log),
+  `parseEngineError` is the one inverse, `withAttribution` the one writer of the `[vs #i]` tail, and `PARAM_KINDS` declares
+  each field's kind (`id`, `composite`, `fragment`, …). `humanizeError`'s `wordingOf` is a `switch (e.code)` over a static
+  `WORDINGS` table; a variant with no ruled sentence is the floor. Locks: `humanize-golden.test.ts`, `engine-error-total.test.ts`.
 - **Which row owns a refusal (ADR-492, #956).** `computeFold`'s attribution pass moves a refusal from the row that
   shaped a constraint to a later row that valued its symbol — attribution only. `symbolsConsumedBy`
   (`engine/lower.ts`) is derived from `lowerOne`'s own call sites.
@@ -1142,7 +1153,7 @@ the triangle the line names, else the definite noun's (ADR-685's `definiteShapeV
 `ambiguous-definite-shape`), else the angle at X by the one lone-vertex resolver (`ambiguous-angle` for none or
 several; one angle held by a figure triangle → that triangle; held by none → no triangle). Every caller of `parse` gets
 the same answer: the submit seam refuses `guided` (`scope:right-angle-vertex`) with `rightAngleVertexNote`
-(`src/app/unreadParts.ts` — the two lines, `rest` cut by `clausesOf` and numbered from (3); `input.notUnderstood` with no
+(`src/app/unreadParts.ts` — the two lines, `rest` cut by `clausesOf` and numbered from (3); `suite.refusal.notUnderstood` with no
 triangle); the ✎ seam shows the same note; the LLM lane's re-parse drops a model step carrying the phrase; the clause
 readers see a clause that does not read.
 

@@ -9,6 +9,7 @@ import { errorText3 } from '../i18n/errorText3';
 import type { StoreError3 } from '../store/store3';
 import { studentFacingViolations } from '../../shell/studentText';
 import { drive, lockMessageFloor, TYPED, type Fixed, type Payload } from '../../shell/__tests__/fixtures/message-floor';
+import { lockRefusalStyle } from '../../shell/__tests__/fixtures/refusal-style';
 
 // ─── 3-D: `errorText3` over `StoreError3` ───────────────────────────────────────────────────────────────────────
 
@@ -103,13 +104,14 @@ const ERRORS3: Record<Code3, Payload[]> = {
   'too-large': [{}],
 };
 
-lockMessageFloor(
-  '3-D (errorText3)',
-  i18n3d,
-  Object.entries(ERRORS3).flatMap(([code, variants]) =>
-    variants.map((p, i) => ({ label: `${code} #${i + 1}`, render: (t: Fixed) => errorText3(t, { code, ...p } as unknown as StoreError3) })),
-  ),
+const ROWS = Object.entries(ERRORS3).flatMap(([code, variants]) =>
+  variants.map((p, i) => ({ label: `${code} #${i + 1}`, key: code, render: (t: Fixed) => errorText3(t, { code, ...p } as unknown as StoreError3) })),
 );
+
+lockMessageFloor('3-D (errorText3)', i18n3d, ROWS);
+
+// #1995 stage 5 (ADR-W-154): the same rows, rendered in Hebrew, hold the one-next-step rule.
+lockRefusalStyle('3d', () => ROWS.map((r) => ({ label: r.label, key: r.key, he: drive(i18n3d, 'he', r.render).text ?? '' })));
 
 
 describe('#2028 — the lock can fail', () => {

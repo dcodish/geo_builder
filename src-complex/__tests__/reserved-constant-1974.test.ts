@@ -74,7 +74,7 @@ describe('#1974 — the operator\'s own line', () => {
     for (const line of ['i ממשי', 'o ממשי']) {
       store().resetSession();
       play(line);
-      expect(shown('he')).not.toContain('לא הצלחתי להבין');
+      expect(shown('he')).not.toContain('לא הבנתי את הבקשה');
     }
   });
 
@@ -193,7 +193,7 @@ describe('#1974 — nothing else moved', () => {
       store().resetSession();
       expect(play(line)).toBe(false);
       expect(store().lastError?.key).toBe('not-handled');
-      expect(shown('he')).toContain('לא הצלחתי להבין');
+      expect(shown('he')).toContain('לא הבנתי את הבקשה');
     }
   });
 

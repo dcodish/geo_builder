@@ -189,8 +189,9 @@ describe('REFUSAL — a letter used as a size (or an angle) cannot be declared c
 
   it('the refusal message names the statement, in both languages', () => {
     const e = { detail: '|z1| = 9r', letter: 'r' };
-    expect(complexI18n.getFixedT('he')('errComplexAsReal', e)).toContain('"|z1| = 9r"');
-    expect(complexI18n.getFixedT('en')('errComplexAsReal', e)).toContain('"|z1| = 9r"');
+    // #2202: the Hebrew quotes the statement in «…», outside its bidi isolate (format controls stripped)
+    expect(complexI18n.getFixedT('he')('errComplexAsReal', e).replace(/[⁦-⁩]/g, '')).toContain('«|z1| = 9r»');
+    expect(complexI18n.getFixedT('en')('errComplexAsReal', e)).toContain('«|z1| = 9r»');
   });
 
   it('editing a line into the conflict is refused the same way', () => {

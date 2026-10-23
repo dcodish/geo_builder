@@ -9,15 +9,18 @@
  */
 import { makeBidi } from '../../shell/bidi';
 import { createProductI18n } from '../../shell/i18n';
+// #2201 phase 1 (ADR-W-148): the suite-wide text (builder names, About credit, guide chrome) is ONE
+// file in shell/locales, merged under this product's own table. A `suite.*` key is never redefined here.
+import suiteEn from '../../shell/locales/en.json';
+import suiteHe from '../../shell/locales/he.json';
 
 /** The bidi kit — exported for composed (non-`t()`) strings and for the palette drift lock. */
 // #525: `_` joins the expression core — the d_{…} distance form must isolate as one LTR run
 export const complexBidi = makeBidi({ extraCore: '_' });
 
 const he = {
-  // The suite's display names are the CURRICULUM's subject names (operator ruling 2026-08-17):
-  // הנדסת המישור · הנדסת המרחב · מספרים מרוכבים — not "בונה X".
-  title: 'מספרים מרוכבים',
+  // The title is `suite.product.complex` (shell/locales): the suite's display names are the
+  // CURRICULUM's subject names (operator ruling 2026-08-17) — not "בונה X".
   subtitle: 'מישור גאוס: הקלידו נתונים שורה-שורה והתבוננו בנקודות',
   inputPlaceholder: 'למשל: z1 = 3+4i או w = z1*z2 או z^3 = 8',
   add: 'הוסף',
@@ -27,42 +30,40 @@ const he = {
   viewPolar: 'תצוגה קוטבית',
   language: 'English',
   emptyHint: 'אין עדיין נתונים. נסו את הדוגמה, או הקלידו: z1 = 3+4i',
-  errNotHandled: 'לא הצלחתי להבין את המשפט: "{{detail}}"',
   // #1919 — a script this tool does not read: the operator's two sentences, identical in every builder
-  errUnreadName: '"{{detail}}" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
+  errUnreadName: '«{{detail}}» אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
   // #1870 (ADR-CX-083, B14) — a claim to prove is refused, in 2-D's words
   errProofTarget:
-    'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "{{detail}}"',
-  errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — "{{detail}}" אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
-  errParse: 'שגיאת ניסוח בביטוי: "{{detail}}"',
-  errDuplicate: 'השם כבר הוגדר במשפט: "{{detail}}"',
+    'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «{{detail}}»',
+  errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — «{{detail}}» אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
+  errParse: 'שגיאת ניסוח בביטוי: «{{detail}}»',
+  errDuplicate: 'השם כבר הוגדר במשפט: «{{detail}}»',
   errUnknownRef: 'המשפט מפנה לשם שלא הוגדר: {{detail}}',
-  errRootsOfZero: 'לא ניתן לחלץ שורשים של אפס: "{{detail}}"',
-  errIncompatible: 'המשפט לא נוסף — אינו מתיישב עם: "{{detail}}"',
-  errImpossible: 'המשפט לא נוסף — הוא לא יכול להתקיים: "{{detail}}"',
-  // #2268 (ADR-CX-084) — a true restatement adds nothing: 2-D's noop sentence verbatim (`input.alreadyDrawn`)
-  noteAlreadyKnown: 'זה כבר קיים באיור — אין מה להוסיף.',
+  errRootsOfZero: 'לא ניתן לחלץ שורשים של אפס: «{{detail}}»',
+  errIncompatible: 'המשפט לא נוסף — אינו מתיישב עם: «{{detail}}»',
+  errImpossible: 'המשפט לא נוסף — הוא לא יכול להתקיים: «{{detail}}»',
+  // #2268 (ADR-CX-084) — a true restatement adds nothing: 2-D's noop sentence, one suite key since #1990 (`suite.notice.alreadyDrawn`)
   errUnaccounted: 'הבנתי חלק מהשורה, אבל לא את: {{detail}}',
   // #1890 (W20) — 2-D's negation sentence (input.scope.negation), with examples that read in this tool
-  errNegation: 'עדיין אי אפשר לקלוט שלילה ("{{word}}"). ניתן לציין מה כן נתון — למשל "z1 מדומה טהור" או "arg(z1) = 30°".',
+  errNegation: 'עדיין אי אפשר לקלוט שלילה («{{word}}»). ניתן לציין מה כן נתון — למשל «z1 מדומה טהור» או «arg(z1) = 30°».',
   // #1405 — a letter declared complex, used where only a real number can stand
-  errComplexAsReal: 'המשפט לא נוסף — {{letter}} הוגדר כמספר מרוכב, אבל "{{detail}}" משתמש בו כמספר ממשי (גודל או זווית)',
+  errComplexAsReal: 'המשפט לא נוסף — {{letter}} הוגדר כמספר מרוכב, אבל «{{detail}}» משתמש בו כמספר ממשי (גודל או זווית)',
   // #1428 — a statement the figure cannot use, with the reason the fold knows (whyText)
-  errRefused: 'המשפט "{{detail}}" לא נוסף — {{reason}}',
+  errRefused: 'המשפט «{{detail}}» לא נוסף — {{reason}}',
   // #1435 — the 2-D #246 guidance (input.scope.word-root), in this tool's words: the √ spelling, and the button
-  errWordRoot: 'כתבו את השורש עם הסמל √ — יש כפתור √ בלוח «סמלים». למשל "{{suggestion}}" במקום "{{detail}}".',
+  errWordRoot: 'כתבו את השורש עם הסמל √ — יש כפתור √ בלוח «סמלים». למשל «{{suggestion}}» במקום «{{detail}}».',
   // #1365 — «zi» glues a complex number to i: z·i, or a name? Asked, with the product spelled out
-  errGluedI: 'לא ברור אם הכוונה לכפל — אם כן, כתבו את הכפל במפורש: "{{suggestion}}" במקום "{{detail}}".',
+  errGluedI: 'לא ברור אם הכוונה לכפל — אם כן, כתבו את הכפל במפורש: «{{suggestion}}» במקום «{{detail}}».',
   // #2247 (ADR-CX-081) — an ASCII mixed number «2 1/2»: analytic's sentence (ADR-AG-284), byte for byte
-  errMixedNumber: 'לא ברור אם "{{detail}}" הוא מספר מעורב או מכפלה. כתבו {{decimal}} (מספר עשרוני) או {{sum}} למספר המעורב, או {{product}} למכפלה.',
-  errMixedNumberNoDecimal: 'לא ברור אם "{{detail}}" הוא מספר מעורב או מכפלה. כתבו {{sum}} למספר המעורב, או {{product}} למכפלה.',
+  errMixedNumber: 'לא ברור אם «{{detail}}» הוא מספר מעורב או מכפלה. כתבו {{decimal}} (מספר עשרוני) או {{sum}} למספר המעורב, או {{product}} למכפלה.',
+  errMixedNumberNoDecimal: 'לא ברור אם «{{detail}}» הוא מספר מעורב או מכפלה. כתבו {{sum}} למספר המעורב, או {{product}} למכפלה.',
   // #1974 (ADR-CX-063) — a RESERVED CONSTANT as the subject: the tool knows what the name is, so it
   // says so instead of «לא הצלחתי להבין». The operator's two sentences (2026-10-10); their shapes
   // differ on purpose — `i` IS a number, `o` MARKS a position and the student may pick another name.
   errReservedI: '{{constant}} הוא מספר מדומה',
   errReservedO: '{{constant}} מסמן את ראשית הצירים — אפשר לבחור שם אחר',
   // #1534 — r(cosθ + i·sinθ) with two different angles is not a cis of anything: both are named
-  errTrigMismatch: 'בשורה "{{detail}}" הזווית של cos ({{cos}}) שונה מהזווית של sin ({{sin}}) — בצורה r(cosθ + i·sinθ) זו אותה זווית בשני המקומות.',
+  errTrigMismatch: 'בשורה «{{detail}}» הזווית של cos ({{cos}}) שונה מהזווית של sin ({{sin}}) — בצורה r(cosθ + i·sinθ) זו אותה זווית בשני המקומות.',
   errWrongApp: 'הקובץ שייך לכלי אחר ({{detail}}) — כאן נטענים קבצים של בונה המרוכבים בלבד',
   errNewerVersion: 'הקובץ נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב',
   errTooLarge: 'הקובץ גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{detail}} משפטים',
@@ -111,9 +112,8 @@ const he = {
   calc: 'חשב',
   calcPlaceholder: 'הקלידו ביטוי לחישוב, למשל |z1-z2|',
   calcCurrent: 'בדגימה הנוכחית: {{value}}',
-  // The shared frame (shell/, #673): the suite bar's visible buttons and the privacy note (NFR-SE-3).
-  menuAbout: 'אודות',
-  aboutTitle: 'על הכלי',
+  // The shared frame (shell/, #673): the suite bar's visible buttons and the privacy note (NFR-SE-3). The About
+  // box's title and close button are suite text (shell/locales suite.about.*, #2202 / ADR-W-149).
   aboutLead:
     'כלי לבניית הציור של שאלת מספרים מרוכבים: מקלידים את הנתונים שורה-שורה, והציור נבנה ומתעדכן תוך כדי. הכלי מצייר ובודק את הנתונים — הוא אינו פותר את השאלה.',
   // #1477 (ADR-W-091): the About DECLARATION's parts — the same sections as 2-D's About.
@@ -123,23 +123,16 @@ const he = {
     'כשהנתונים מאפשרים יותר מציור אחד, «הציגו תצורה אחרת» מציג ציור אחר שגם הוא מקיים את כל הנתונים.',
     'הכלי מצייר את הציור לפי מה שתיארתם ובודק את הנתונים — טענה שאינה מתקיימת מסומנת, והכלי אינו פותר שאלות.',
   ],
-  aboutTryTitle: 'הזינו את נתוני השאלה כפי שמופיעים בשאלה:',
   aboutTrySteps: ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2'],
-  creditBy: 'פותח על־ידי',
-  creditName: 'ד"ר דוד קודיש',
-  creditContact: 'לשאלות',
-  aboutClose: 'סגירה',
   privacy:
     'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. לצורך שיפור הכלי נשמרים המשפטים שהקלדתם (טקסט מתמטי בלבד) עם מזהה מבקר אנונימי — ללא כתובת ה-IP — עד 30 יום. העבודה נשמרת בדפדפן שלכם ובקבצים שאתם בוחרים לשמור.' +
     ' כשאתם לוחצים «העתק קישור», השרטוט ותמונה שלו נשמרים בשרת כדי שהקישור יעבוד — בלי שם ובלי פרטים אישיים, ומי שיש לו את הקישור יכול לפתוח אותו.',
   // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
   loadAuditTitle: 'הקובץ נטען חלקית: {{restored}} מתוך {{total}} שורות נוספו. שורות שלא נוספו:',
   loadAuditDismiss: 'סגור',
-  // A2 (#661): the switcher renders products.json's roster; its labelKeys resolve HERE, per product.
-  switcher2d: 'הנדסת המישור',
+  // A2 (#661): the switcher renders products.json's roster; its labelKeys resolve through this instance —
+  // `suite.product.*` from shell/locales, and 3-D's name (not yet one wording across the suite) here.
   switcher3d: 'הנדסת המרחב',
-  switcherComplex: 'מספרים מרוכבים',
-  switcherAnalytic: 'גאומטריה אנליטית',
   switcherAria: 'מעבר בין הבונים',
   // B2 (#667): the opt-in data column (D1) — values/knowledge only; refusals stay on the canvas strip.
   dataShow: 'נתונים',
@@ -149,23 +142,15 @@ const he = {
   panelShow: 'הצגה',
   panelHide: 'הסתרה',
   namePlaceholder: 'שם השרטוט (לא חובה)',
-  // B4 (D9b): the empty-canvas quick chips — the inviting first click.
-  emptyTitle: 'מה בונים היום?',
+  // B4 (D9b): the empty-canvas quick chips — the inviting first click. Their title is suite.canvas.emptyTitle.
   emptyHintChips: 'לחצו נתון לדוגמה — או הקלידו משלכם, והציור ייבנה מולכם',
   // B5 (D6): the fact-list operations — disable answers "מה אם לא הייתי אומר זאת?"
   factToggle: 'כלול בציור',
   factEdit: 'עריכה במקום',
   factDelete: 'מחיקה',
   // A6 (D9): the manual SCREEN — catalog-backed, a click submits the example.
-  manualButton: 'מדריך',
   manualTitle: 'המדריך — מספרים מרוכבים',
-  manualIntro:
-    'זהו מדריך חלקי — מוצגות דוגמאות מייצגות מכל סוג, כדי להראות אילו מיני משפטים אפשר להקליד. לחצו על דוגמה כדי לראות אותה נבנית, או נסחו חופשי משלכם — ואם הכלי לא הבין, נסו ניסוח אחר: אוצר המשפטים של הכלי הולך וגדל.',
   manualClose: 'חזרה לכלי',
-  manualTry: 'לחצו כדי לנסות — הדוגמה תיבנה על הציור',
-  manualMore: '…ואלו רק דוגמאות — לכלי יש כאן פקודות נוספות, לא רק ניסוחים אחרים של אלו',
-  manualShowAll: 'הצג הכול',
-  manualShowLess: 'הצג פחות',
   // B6 (D8): the data-panel skeleton — same sections, same order, in every builder.
   secPoints: 'נקודות',
   secMeasures: 'מדידות',
@@ -264,7 +249,6 @@ const he = {
   shareTooLong: 'הקישור ארוך מדי לשיתוף — שמרו את השרטוט כקובץ ושלחו אותו',
   shareBadLink: 'הקישור אינו תקין — בקשו מהשולח לשלוח אותו שוב',
   shareTooLarge: 'הקישור גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{max}} משפטים. בקשו מהשולח לשלוח את השרטוט כקובץ',
-  shareArrived: 'הקישור שפתחתם מכיל שרטוט. לפתוח אותו במקום מה שבניתם?',
   shareOpenIt: 'פתח את השרטוט מהקישור',
   shareKeepMine: 'השאר את שלי',
   sharePreparing: 'מכין קישור…',
@@ -278,7 +262,6 @@ const he = {
 // raw key printed to a student. The analytic tree already did this; this one did not, and its 147 keys
 // happened to agree. src3d/ gets the same guarantee via a parity TEST, its locales being JSON.
 const en: typeof he = {
-  title: 'Complex Numbers',
   subtitle: 'The Gauss plane: enter givens line by line and watch the points',
   inputPlaceholder: 'e.g. z1 = 3+4i or w = z1*z2 or z^3 = 8',
   add: 'Add',
@@ -288,30 +271,28 @@ const en: typeof he = {
   viewPolar: 'Polar view',
   language: 'עברית',
   emptyHint: 'No givens yet. Try the example, or type: z1 = 3+4i',
-  errNotHandled: 'I could not understand the statement: "{{detail}}"',
-  errUnreadName: '"{{detail}}" is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
+  errUnreadName: '«{{detail}}» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
   errProofTarget:
-    'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "{{detail}}"',
-  errUnreadWord: 'This tool reads Hebrew and English only — "{{detail}}" is in neither. Try writing the line in Hebrew or English.',
-  errParse: 'Could not parse the expression: "{{detail}}"',
-  errDuplicate: 'This name is already defined by: "{{detail}}"',
+    'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{detail}}»',
+  errUnreadWord: 'This tool reads Hebrew and English only — «{{detail}}» is in neither. Try writing the line in Hebrew or English.',
+  errParse: 'Could not parse the expression: «{{detail}}»',
+  errDuplicate: 'This name is already defined by: «{{detail}}»',
   errUnknownRef: 'The statement refers to an undefined name: {{detail}}',
-  errRootsOfZero: 'Cannot extract roots of zero: "{{detail}}"',
-  errIncompatible: 'Statement not added — it cannot hold together with: "{{detail}}"',
-  errImpossible: 'Statement not added — it cannot hold at all: "{{detail}}"',
-  noteAlreadyKnown: "That's already on the figure — nothing to add.",
+  errRootsOfZero: 'Cannot extract roots of zero: «{{detail}}»',
+  errIncompatible: 'Statement not added — it cannot hold together with: «{{detail}}»',
+  errImpossible: 'Statement not added — it cannot hold at all: «{{detail}}»',
   errUnaccounted: 'I read part of the line, but not: {{detail}}',
-  errNegation: 'Negation ("{{word}}") is not supported yet. State what IS given instead — e.g. "z1 is pure imaginary" or "arg(z1) = 30°".',
-  errComplexAsReal: 'Statement not added — {{letter}} is declared a complex number, but "{{detail}}" uses it as a real number (a size or an angle)',
-  errRefused: 'Statement "{{detail}}" not added — {{reason}}',
-  errWordRoot: 'Write the root with the √ symbol — there is a √ button under «Symbols». E.g. "{{suggestion}}" instead of "{{detail}}".',
-  errGluedI: 'Is this a product? If so, write it explicitly: "{{suggestion}}" instead of "{{detail}}".',
-  errMixedNumber: '"{{detail}}" could be a mixed number or a product. Write {{decimal}} (a decimal) or {{sum}} for the mixed number, or {{product}} for the product.',
-  errMixedNumberNoDecimal: '"{{detail}}" could be a mixed number or a product. Write {{sum}} for the mixed number, or {{product}} for the product.',
+  errNegation: 'Negation («{{word}}») is not supported yet. State what IS given instead — e.g. «z1 is pure imaginary» or «arg(z1) = 30°».',
+  errComplexAsReal: 'Statement not added — {{letter}} is declared a complex number, but «{{detail}}» uses it as a real number (a size or an angle)',
+  errRefused: 'Statement «{{detail}}» not added — {{reason}}',
+  errWordRoot: 'Write the root with the √ symbol — there is a √ button under «Symbols». E.g. «{{suggestion}}» instead of «{{detail}}».',
+  errGluedI: 'Is this a product? If so, write it explicitly: «{{suggestion}}» instead of «{{detail}}».',
+  errMixedNumber: '«{{detail}}» could be a mixed number or a product. Write {{decimal}} (a decimal) or {{sum}} for the mixed number, or {{product}} for the product.',
+  errMixedNumberNoDecimal: '«{{detail}}» could be a mixed number or a product. Write {{sum}} for the mixed number, or {{product}} for the product.',
   // #1974 — the Hebrew sentences are the operator's; these are their English readings
   errReservedI: '{{constant}} is an imaginary number',
   errReservedO: '{{constant}} marks the origin — you may choose another name',
-  errTrigMismatch: 'In "{{detail}}" the cos angle ({{cos}}) differs from the sin angle ({{sin}}) — in the form r(cosθ + i·sinθ) both angles are the same.',
+  errTrigMismatch: 'In «{{detail}}» the cos angle ({{cos}}) differs from the sin angle ({{sin}}) — in the form r(cosθ + i·sinθ) both angles are the same.',
   errWrongApp: 'This file belongs to another tool ({{detail}}) — only Complex Builder files load here',
   errNewerVersion: 'This file was saved by a newer version of the tool — refresh the page and try again',
   errTooLarge: 'This file is too large to open — a figure can hold up to {{detail}} statements',
@@ -357,9 +338,8 @@ const en: typeof he = {
   calc: 'Calc',
   calcPlaceholder: 'type an expression to calculate, e.g. |z1-z2|',
   calcCurrent: 'at the current sample: {{value}}',
-  // The shared frame (shell/, #673): the suite bar's visible buttons and the privacy note (NFR-SE-3).
-  menuAbout: 'About',
-  aboutTitle: 'About this tool',
+  // The shared frame (shell/, #673): the suite bar's visible buttons and the privacy note (NFR-SE-3). The About
+  // box's title and close button are suite text (shell/locales suite.about.*, #2202 / ADR-W-149).
   aboutLead:
     'A tool for building the figure of a complex-numbers question: enter the givens line by line and the figure forms and adapts as you go. It draws and verifies the givens — it never solves the question.',
   // #1477 (ADR-W-091): the About DECLARATION's parts — the same sections as 2-D's About.
@@ -369,23 +349,16 @@ const en: typeof he = {
     'When the givens allow more than one figure, “Show another configuration” draws a different one that also satisfies every given.',
     'It draws the figure from what you describe and checks the givens — a claim that does not hold is marked, and it does not solve problems.',
   ],
-  aboutTryTitle: 'Enter the given data exactly as it appears in the question:',
   aboutTrySteps: ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2'],
-  creditBy: 'Developed by',
-  creditName: 'Dr. David Codish',
-  creditContact: 'Questions',
-  aboutClose: 'Close',
   privacy:
     'Privacy: no registration, and no personal data is collected. To improve the tool, the statements you type (math text only) are kept for up to 30 days with an anonymous visitor id — your IP address is never stored. Your work is stored in your browser and in files you choose to save.' +
     ' When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.',
   // The load audit (ADR-242 arriving here): the load REPORTS what it could not restore.
   loadAuditTitle: 'The file loaded partially: {{restored}} of {{total}} lines were added. Lines not added:',
   loadAuditDismiss: 'Dismiss',
-  // A2 (#661): the switcher renders products.json's roster; its labelKeys resolve HERE, per product.
-  switcher2d: 'Plane Geometry',
+  // A2 (#661): the switcher renders products.json's roster; its labelKeys resolve through this instance —
+  // `suite.product.*` from shell/locales, and 3-D's name (not yet one wording across the suite) here.
   switcher3d: 'Space Geometry',
-  switcherComplex: 'Complex Numbers',
-  switcherAnalytic: 'Analytic Geometry',
   switcherAria: 'Switch between builders',
   // B2 (#667): the opt-in data column (D1) — values/knowledge only; refusals stay on the canvas strip.
   dataShow: 'Data',
@@ -395,23 +368,15 @@ const en: typeof he = {
   panelShow: 'Show',
   panelHide: 'Hide',
   namePlaceholder: 'Figure name (optional)',
-  // B4 (D9b): the empty-canvas quick chips — the inviting first click.
-  emptyTitle: 'What are we building today?',
+  // B4 (D9b): the empty-canvas quick chips — the inviting first click. Their title is suite.canvas.emptyTitle.
   emptyHintChips: 'Click an example given — or type your own, and the figure builds in front of you',
   // B5 (D6): the fact-list operations — disable answers "what if I hadn't said this?"
   factToggle: 'Include in the figure',
   factEdit: 'Edit in place',
   factDelete: 'Delete',
   // A6 (D9): the manual SCREEN — catalog-backed, a click submits the example.
-  manualButton: 'Guide',
   manualTitle: 'The Guide — Complex Numbers',
-  manualIntro:
-    "This is a partial guide — representative examples of each kind, to show what sorts of sentences can be typed. Click one to watch it build, or phrase your own freely — and if the tool didn't understand, try different wording: its vocabulary keeps growing.",
   manualClose: 'Back to the tool',
-  manualTry: 'Click to try — the example builds on the figure',
-  manualMore: '…and these are only examples — the tool has more COMMANDS here, not just other phrasings of these',
-  manualShowAll: 'Show all',
-  manualShowLess: 'Show fewer',
   // B6 (D8): the data-panel skeleton — same sections, same order, in every builder.
   secPoints: 'Points',
   secMeasures: 'Measures',
@@ -502,7 +467,6 @@ const en: typeof he = {
   shareTooLong: 'This link is too long to share — save the figure as a file and send that instead',
   shareBadLink: 'This link is not valid — ask the sender to send it again',
   shareTooLarge: 'This link is too large to open — a figure can hold up to {{max}} statements. Ask the sender to send the figure as a file',
-  shareArrived: 'The link you opened contains a figure. Open it instead of what you built?',
   shareOpenIt: 'Open the shared figure',
   shareKeepMine: 'Keep mine',
   sharePreparing: 'Preparing link…',
@@ -513,6 +477,6 @@ const en: typeof he = {
 };
 
 export const complexI18n = createProductI18n({
-  resources: { he, en },
+  resources: { he: { ...suiteHe, ...he }, en: { ...suiteEn, ...en } },
   postProcessors: [complexBidi.postProcessor('bidiIsolateCx')],
 });

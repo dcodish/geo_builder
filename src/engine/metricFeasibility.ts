@@ -25,6 +25,7 @@
  * beyond a relative tolerance is impossible.
  */
 
+import { engineErrorDebugText } from './errors';
 import type { Constraint, GeoObject, Id } from './types';
 import { describeConstraint } from './solve';
 
@@ -111,7 +112,7 @@ export function metricImpossibility(constraints: Constraint[]): MetricImpossibil
  * longer cycle and pick the wording the curriculum uses for each.
  */
 export function metricImpossibilityError(m: MetricImpossibility): string {
-  return `impossible: |${m.a}${m.b}| = ${m.value} exceeds ${m.sum}, the distance from ${m.a} to ${m.b} via ${m.via.join(', ')}`;
+  return engineErrorDebugText({ code: 'metric-impossible', a: m.a, b: m.b, value: `${m.value}`, sum: `${m.sum}`, via: [...m.via] });
 }
 
 /**
@@ -291,7 +292,7 @@ export function angleSumImpossibility(
 export function angleSumImpossibilityError(m: AngleSumImpossibility): string {
   const deg = (v: number) => `${Number(v.toFixed(2))}°`;
   const list = m.angles.map((a) => `∠${a.ray1}${a.vertex}${a.ray2} = ${deg(a.value)}`).join(', ');
-  return `impossible: the angles of ${m.polygon.join('')} sum to ${deg(m.sum)}, exceeding ${deg(m.bound)}: ${list}`;
+  return engineErrorDebugText({ code: 'angle-sum-impossible', polygon: m.polygon.join(''), sum: deg(m.sum), bound: deg(m.bound), angles: list });
 }
 
 /**
@@ -401,7 +402,7 @@ export function boundImpossibility(constraints: Constraint[]): BoundImpossibilit
 
 /** The wire message. Both halves are the student's own statements, which is the point. */
 export function boundImpossibilityError(m: BoundImpossibility): string {
-  return `impossible: ${m.value} contradicts ${m.bound}`;
+  return engineErrorDebugText({ code: 'bound-impossible', value: m.value, bound: m.bound });
 }
 
 /**
@@ -494,10 +495,7 @@ export function obtuseSideImpossibility(
 
 /** The wire message; `humanizeError` maps it to the student's language (#413/ADR-416). */
 export function obtuseSideImpossibilityError(m: ObtuseSideImpossibility): string {
-  return (
-    `impossible: the angle at ${m.vertex} is ${numText(m.deg)}°, so |${m.hypA}${m.hypB}| must be the longest side, ` +
-    `but |${m.hypA}${m.hypB}| = ${numText(m.hypLen)} and |${m.legA}${m.legB}| = ${numText(m.legLen)}`
-  );
+  return engineErrorDebugText({ code: 'obtuse-side-impossible', vertex: m.vertex, deg: numText(m.deg), hyp: `${m.hypA}${m.hypB}`, hypVal: numText(m.hypLen), leg: `${m.legA}${m.legB}`, legVal: numText(m.legLen) });
 }
 
 /**
@@ -586,9 +584,7 @@ export function measureRangeImpossibility(constraints: readonly Constraint[]): M
 
 /** The wire message; `humanizeError` maps it to the student's language. The statement is the student's own. */
 export function measureRangeImpossibilityError(m: MeasureRangeImpossibility): string {
-  return m.unit === 'angle'
-    ? `impossible: ${m.statement} — an angle measures between 0° and 180°`
-    : `impossible: ${m.statement} — a length is never negative`;
+  return engineErrorDebugText({ code: 'measure-out-of-range', given: m.statement, measure: m.unit === 'angle' ? 'angle' : 'length' });
 }
 
 /**

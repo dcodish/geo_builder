@@ -88,7 +88,7 @@ describe('submit pipeline — grammar path', () => {
     const { deps, calls, notes } = makeDeps();
     await runSubmit('ריבוע ABCD', deps);
     expect(useGeoStore.getState().facts.length).toBe(before);
-    expect(notes()).toEqual(['input.alreadyDrawn']);
+    expect(notes()).toEqual(['suite.notice.alreadyDrawn']);
     expect(calls.busy[calls.busy.length - 1]).toBe(false); // spinner cleared
     expect(llmParseMock).not.toHaveBeenCalled();
   });
@@ -125,7 +125,7 @@ describe('submit pipeline — LLM second attempt', () => {
     const { deps, notes } = makeDeps();
     await runSubmit('CD חותך את המעגל', deps);
     expect(llmParseMock).toHaveBeenCalledTimes(1);
-    expect(notes()).toEqual(['input.notUnderstood']);
+    expect(notes()).toEqual(['suite.refusal.notUnderstood']);
     expect(useGeoStore.getState().facts.length).toBe(0);
   });
 
@@ -410,7 +410,7 @@ describe('submit pipeline — a restated fact succeeds, adds no row, and says so
     const { deps, calls, notes } = makeDeps();
     await runSubmit('ריבוע ABCD', deps);
     expect(useGeoStore.getState().facts, 'the fact list is untouched').toBe(before);
-    expect(notes()[0], 'the success is legible, not silent').toContain('input.alreadyDrawn');
+    expect(notes()[0], 'the success is legible, not silent').toContain('suite.notice.alreadyDrawn');
     expect(calls.cleared, 'the input is cleared — this SUCCEEDED').toBe(1);
     expect(llmParseMock, 'never a paid call for a repeat').not.toHaveBeenCalled();
   });

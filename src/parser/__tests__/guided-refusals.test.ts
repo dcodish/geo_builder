@@ -35,7 +35,7 @@ describe('#109 — the wrong-product and wrong-frame classes', () => {
     expect(i18n.t('input.scope.cross-app'), 'names the 3-D tool').toContain(i18n.t('switcher3d') as string);
     // #1162 (ADR-553): this row used to assert the message PROMISED a future tool («מתוכנן לעתיד»); the
     // analytic Builder is live, so the promise was false in prod. The message now names the tool.
-    expect(i18n.t('input.scope.analytic'), 'names the live analytic tool').toContain(i18n.t('switcherAnalytic') as string);
+    expect(i18n.t('input.scope.analytic'), 'names the live analytic tool').toContain(i18n.t('suite.product.analytic') as string);
     expect(i18n.t('input.scope.analytic'), 'no longer calls it planned').not.toMatch(/לעתיד|מתוכנן/);
   });
 

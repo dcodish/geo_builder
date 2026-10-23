@@ -414,6 +414,29 @@ export const PROFILE_ANALYTIC: DashboardProfile = {
   verdictsFile: 'verdicts-analytic.json',
 };
 
+// ── the complex classifier (#2241) — triage today, a dashboard profile later ──
+
+/**
+ * The complex outcome TAXONOMY (#2241, ADR-W-150). Complex has posted `submit` events since prod/2026-09-29
+ * (#1243) with `result` = `ok` or the refusal's `InputError` key; nothing read them until `/log-triage`
+ * gained this adapter. ADR-W-083's standing reading for codes nobody has ruled on applies:
+ *
+ *  - `ok` — **parsed** (recorded, filed in the ask lane, or answered «already known»);
+ *  - `not-handled` — **a capability to build** (no rule read the line, and no taught spelling exists);
+ *  - every OTHER code — **review**: neither auto-filed nor discarded. Complex has no LLM seam and no ruled
+ *    out-of-scope code, so a split chosen before the first report would be reasoning about refusals nobody
+ *    has counted. The first report counts how the review codes distribute — the trigger for revisiting.
+ *
+ * Operator tooling, not student-facing. Exported because `/log-triage` classifies with THIS function
+ * rather than a copy (ADR-W-053), and a dashboard profile can reuse it unchanged.
+ */
+export function outcomeOfComplex(e: UsageEvent): string {
+  const r = e.result ?? 'ok';
+  if (r === 'ok') return 'parsed';
+  if (r === 'not-handled') return 'not-understood';
+  return 'review';
+}
+
 /**
  * One step of a session timeline (#470) — a `submit` or a store `action`, in LOG order.
  *
@@ -1363,8 +1386,8 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
 
   // ── the operator config page (A3, #662) — curation bounded by choose-among-what-exists ──────
   // One page curates EVERY tool (?tool=<registry id>; default: this dashboard's own tool) —
-  // complex has no dashboard mount of its own yet (it does not log), but its curation must not
-  // wait for one.
+  // complex has no dashboard mount of its own yet (it logs, and `/log-triage` reads it since #2241,
+  // but no profile shows it), and its curation must not wait for one.
   if (path.endsWith('/config')) {
     const configDir = dirname(opts.logPath ?? eventsLogPath());
     const q0 = new URLSearchParams((req.url ?? '').split('?')[1] ?? '');

@@ -53,7 +53,7 @@ describe('#1991 — the reported rows carry the shared ring message', () => {
     if (v.kind !== 'refused') return;
     expect(v.error).toMatchObject({ key: 'ring-contradicts-noun', detail: line });
     expect(plain(errorText(v.error as InputError, he))).toBe(
-      `הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "${line}". אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`,
+      `הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: «${line}». אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`,
     );
     expect(plain(errorText(v.error as InputError, he)), 'never «לא נמצאה תצורה»').not.toMatch(/לא נמצאה תצורה/);
     expect(plain(errorText(v.error as InputError, en))).toContain('do not form that shape in this order');

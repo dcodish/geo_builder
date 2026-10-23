@@ -147,7 +147,7 @@ describe('#1914 — a noun that narrows the ring refines it (no notice: the stud
   it('the other order is a restatement: «מלבן ABCD» · «מקבילית ABCD» is «כבר קיים» (ADR-619, unchanged)', async () => {
     const r = await play(['מלבן ABCD', 'מקבילית ABCD']);
     expect(r.committed).toBe(false);
-    expect(r.notes).toEqual([stripFormatControls(he('input.alreadyDrawn'))]);
+    expect(r.notes).toEqual([stripFormatControls(he('suite.notice.alreadyDrawn'))]);
   }, 60_000);
 });
 

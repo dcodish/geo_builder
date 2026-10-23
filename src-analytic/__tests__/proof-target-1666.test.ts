@@ -39,7 +39,7 @@ describe('#1666 — analytic refuses a proof target at the submit gate (the shar
   it('the mixed line quotes only the claim', () => {
     const v = decideSubmit('נתון B(4,0). הוכיחו כי AB ⊥ AC', LINES, 0, current);
     expect(v.kind).toBe('refused');
-    if (v.kind === 'refused') expect(errorText(v.error, t)).toBe('זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "הוכיחו כי AB ⊥ AC"');
+    if (v.kind === 'refused') expect(errorText(v.error, t)).toBe('זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «הוכיחו כי AB ⊥ AC»');
   });
 
   it('no line of the analytic catalog reads as a proof target', () => {

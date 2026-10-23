@@ -15,8 +15,8 @@ export function aboutContent(t: TFunction): AboutContent {
   return {
     lead: t('aboutLead'),
     points: list('aboutPoints'),
-    tryTitle: t('aboutTryTitle'),
+    tryTitle: t('suite.about.tryTitle'),
     trySteps: list('aboutTrySteps'),
-    credit: { by: t('creditBy'), name: t('creditName'), contact: t('creditContact'), email: registry.contact.email },
+    credit: { by: t('suite.about.developedBy'), name: t('suite.about.author'), contact: t('suite.about.contact'), email: registry.contact.email },
   };
 }

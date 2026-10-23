@@ -44,9 +44,9 @@ describe('#2268 — the operator\'s cases (T85, T86): already known, nothing rec
   it('T86 · «z1 = 5cis(π/7)» · «z2 = 15cis(π/7)» → «z2 = 3z1»', () =>
     expectAlreadyKnown(['z1 = 5cis(π/7)', 'z2 = 15cis(π/7)'], 'z2 = 3z1'));
 
-  it('the sentence is 2-D\'s noop sentence (`input.alreadyDrawn`), in both languages', () => {
-    expect(complexI18n.t('noteAlreadyKnown', { lng: 'he' })).toBe('זה כבר קיים באיור — אין מה להוסיף.');
-    expect(complexI18n.t('noteAlreadyKnown', { lng: 'en' })).toBe("That's already on the figure — nothing to add.");
+  it('the sentence is 2-D\'s noop sentence (`suite.notice.alreadyDrawn`), in both languages', () => {
+    expect(complexI18n.t('suite.notice.alreadyDrawn', { lng: 'he' })).toBe('זה כבר קיים באיור — אין מה להוסיף.');
+    expect(complexI18n.t('suite.notice.alreadyDrawn', { lng: 'en' })).toBe("That's already on the figure — nothing to add.");
   });
 
   it('the figure is unchanged by the noop, and the next line clears the note', () => {

@@ -8,6 +8,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { RETIRED_ALREADY_THERE_KEYS, RULED_ALREADY_DRAWN } from './fixtures/already-drawn-1990';
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/^﻿/, '');
@@ -55,7 +56,8 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   redo: { '2d': ['actions.redo'], '3d': ['actions.redo'], complex: ['redo'], analytic: ['redo'] },
   clearAll: { '2d': ['actions.clear'], '3d': ['actions.clear'], complex: ['clearAll'], analytic: ['clearAll'] },
   showAnother: { '2d': ['actions.another'], '3d': ['actions.another'], complex: ['anotherConfig'], analytic: ['another'] },
-  about: { '2d': ['header.about'], '3d': ['aboutLabel'], complex: ['menuAbout'], analytic: ['about'] },
+  // `about` (the suite bar's «אודות») left this table in #2201 phase 1 (ADR-W-148): it is ONE key now,
+  // `suite.about.label` in shell/locales, so it cannot differ — suite-locale.test.ts forbids a product copy.
   // #1864 (ADR-AG-267, B10): a choice the tool made for an unstated given — 2-D's notes, ported to analytic word for
   // word. 3-D and complex hold no such choice (n/a in 02w's row).
   unstatedEqualPair: { '2d': ['steps.unstatedEqualPair'], '3d': null, complex: null, analytic: ['unstatedEqualPair'] },
@@ -90,9 +92,9 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   vertexAngleReadAs: { '2d': ['input.vertexAngleReadAs'], '3d': ['notice.vertexAngleReadAs'], complex: null, analytic: null },
 
   // #1870 (ADR-CX-083, ADR-W-107; ruling B14, wording B13): a claim to prove is refused in every builder, in 2-D's
-  // sentence. 3-D HAS this surface (`err.proofTarget`) but quotes the sentence with «…» where the other three use
-  // "…" — a known gap owned by #1868 (one refusal voice), so it is left out here until that lands, not excused.
-  proofTarget: { '2d': ['input.scope.proof-target'], '3d': null, complex: ['errProofTarget'], analytic: ['errProofTarget'] },
+  // sentence. 3-D's quote marks differed until #2202 / #2241 (ADR-W-149, ADR-W-150) made «…» the rule in both
+  // languages; #1868 (ADR-W-151) closes the gap it owned by putting 3-D's key in the row.
+  proofTarget: { '2d': ['input.scope.proof-target'], '3d': ['err.proofTarget'], complex: ['errProofTarget'], analytic: ['errProofTarget'] },
 };
 
 /** The ruled wording (the "Explicit set", 2026-09-27) — the lock's anchor, not just "all equal". */
@@ -122,8 +124,9 @@ const RULED: Record<string, Record<Lang, string>> = {
     en: 'Segment {{N}} already has a name: {{N}} (in the line «{{N}}»). A segment has one name — keep using {{N}}.',
   },
   proofTarget: {
-    he: 'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "{{N}}"',
-    en: 'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "{{N}}"',
+    // #2202 (ADR-W-149, ruling d1 2026-10-16): a quoted value is «…» in Hebrew; in English too since #2241 (ADR-W-150)
+    he: 'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «{{N}}»',
+    en: 'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{N}}»',
   },
   measureContradicts: {
     he: 'לא ניתן: «{{N}}» סותר את «{{N}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{N}}.',
@@ -154,8 +157,84 @@ describe('#1453 — one wording per role, in every builder', () => {
   }
 
   it('the reader is not vacuous: it finds a known key in each locale form', () => {
+    expect(valueOf('3d', 'he', 'err.proofTarget')).toContain('זו טענה להוכחה');
     expect(valueOf('complex', 'he', 'undo')).toBe('בטל');
     expect(valueOf('analytic', 'en', 'undo')).toBe('Undo');
     expect(valueOf('2d', 'he', 'actions.undo')).toBe('בטל');
+  });
+});
+
+/**
+ * #1868 (ADR-W-151; operator rulings 2026-10-07 B13 choices 1–2, wording amended 2026-10-17 on #2329). Two refusal roles:
+ * - **notUnderstood** is ONE suite key, so it cannot differ; what is locked is its ruled text and that no builder keeps a
+ *   key of its own for it (the four retired keys) — `<tree>/__tests__/not-understood-1868.test.ts` holds each builder's
+ *   refusal path rendering it.
+ * - **toolsLimit** is a FRAME, not a string (each limit names its own action): any message in any table that says the
+ *   failure is the tool's limit opens «הכלי עדיין לא יודע» and closes «— זו מגבלה של הכלי». 3-D's size sentence, re-worded
+ *   «…נמצאת בפיתוח» by the operator's later ruling (#2076, ADR-3D-363, 2026-10-14), does not claim a limit and is outside it.
+ */
+const suiteTable = (lang: Lang): Record<string, unknown> => JSON.parse(read(`shell/locales/${lang}.json`)) as Record<string, unknown>;
+const suiteValue = (lang: Lang, key: string): unknown => key.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], suiteTable(lang));
+
+/** Every Hebrew/English message of one product table, flattened. */
+function allMessages(p: Product, lang: Lang): string[] {
+  if (p === '2d' || p === '3d') {
+    const out: string[] = [];
+    const walk = (o: unknown) => {
+      if (typeof o === 'string') out.push(o);
+      else if (o && typeof o === 'object') for (const v of Object.values(o)) walk(v);
+    };
+    walk(JSON.parse(read(`${p === '2d' ? 'src' : 'src3d'}/i18n/locales/${lang}.json`)));
+    return out;
+  }
+  const src = read(`${p === 'complex' ? 'src-complex' : 'src-analytic'}/i18n/index.ts`);
+  const heAt = src.indexOf('const he = {');
+  const enAt = src.indexOf('const en: typeof he = {');
+  const block = lang === 'he' ? src.slice(heAt, enAt) : src.slice(enAt);
+  return [...block.matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1].replace(/\\(.)/g, '$1'));
+}
+
+const PRODUCTS: Product[] = ['2d', '3d', 'complex', 'analytic'];
+
+describe('#1868 — one refusal voice', () => {
+  it('notUnderstood: the suite key carries the ruled sentence, Hebrew and English', () => {
+    expect(suiteValue('he', 'suite.refusal.notUnderstood')).toBe('לא הבנתי את הבקשה — נסו לנסח אחרת, או פתחו את «מדריך» לדוגמאות.');
+    expect(suiteValue('en', 'suite.refusal.notUnderstood')).toBe("I didn't understand the request — try rephrasing it, or open «Guide» for examples.");
+  });
+
+  it('notUnderstood: no builder keeps a key of its own for it', () => {
+    const retired: Record<Product, string> = { '2d': 'input.notUnderstood', '3d': 'err.notUnderstood', complex: 'errNotHandled', analytic: 'errNotHandled' };
+    for (const p of PRODUCTS) for (const lang of ['he', 'en'] as const) expect(valueOf(p, lang, retired[p]), `${p} ${lang} ${retired[p]}`).toBeUndefined();
+    // and no table keeps the forbidden «לא הצלחתי להבין» opening for an unread line (docs/10 §5.8)
+    for (const p of PRODUCTS) expect(allMessages(p, 'he').filter((m) => m.startsWith('לא הצלחתי להבין')), p).toEqual([]);
+  });
+
+  it('toolsLimit: every "limit of the tool" message speaks one frame', () => {
+    let seen = 0;
+    for (const p of PRODUCTS) {
+      for (const m of allMessages(p, 'he').filter((x) => x.includes('מגבלה של הכלי'))) {
+        seen++;
+        expect(m.startsWith('הכלי עדיין לא יודע'), `${p}: ${m}`).toBe(true);
+        expect(/— זו מגבלה של הכלי\.?$/.test(m), `${p}: ${m}`).toBe(true);
+      }
+      for (const m of allMessages(p, 'en').filter((x) => x.includes('limit of the tool'))) expect(/— this is a limit of the tool\.?$/.test(m), `${p}: ${m}`).toBe(true);
+    }
+    expect(seen, 'the frame is not vacuous').toBeGreaterThanOrEqual(3);
+  });
+});
+
+// #1990 (ADR-W-152; operator ruling 2026-10-10, option A): the already-there note is 2-D's sentence in every builder, one suite key
+describe('#1990 — one already-there note', () => {
+  it('alreadyDrawn: the suite key carries 2-D\'s sentence, Hebrew and English', () => {
+    expect(suiteValue('he', 'suite.notice.alreadyDrawn')).toBe(RULED_ALREADY_DRAWN.he);
+    expect(suiteValue('en', 'suite.notice.alreadyDrawn')).toBe(RULED_ALREADY_DRAWN.en);
+  });
+
+  it('alreadyDrawn: no builder keeps a key of its own for it', () => {
+    for (const p of PRODUCTS) {
+      for (const k of RETIRED_ALREADY_THERE_KEYS[p]) for (const lang of ['he', 'en'] as const) expect(valueOf(p, lang, k), `${p} ${lang} ${k}`).toBeUndefined();
+      // nor its old wordings under another name
+      expect(allMessages(p, 'he').filter((m) => /כבר נאמר \(|כבר ידוע מהנתונים|כבר נובע מהנתונים/.test(m)), p).toEqual([]);
+    }
   });
 });

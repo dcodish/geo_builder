@@ -155,7 +155,7 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   const vp = vertexPairVerdict(editText, ectx, prefixRaw, store().seed, roleReadingConfig.cap);
   if (vp?.kind === 'implied') {
     logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-implied-restatement', detail: 'vertex-pair' });
-    setInputNote(t('input.alreadyDrawn'));
+    setInputNote(t('suite.notice.alreadyDrawn'));
     return false;
   }
   if (vp?.kind === 'adopt') r = parse(vp.reading, ectx);
@@ -240,7 +240,7 @@ export function runEditCommit(key: string, editText: string, deps: EditDeps): bo
   // #2122 (ADR-653): a MERGE naming made the statement true by construction — the submit seam's rule: a success, kept
   if (!identityBound && impliedByPrior(prefixFacts, r.commands, store().seed)) {
     logDebug({ kind: 'input', utterance: editText, source: 'parser', result: 'edit-implied-restatement', commands: r.commands });
-    setInputNote(t('input.alreadyDrawn'));
+    setInputNote(t('suite.notice.alreadyDrawn'));
     return false;
   }
   const wasOk = replay(store().facts, store().seed).status;

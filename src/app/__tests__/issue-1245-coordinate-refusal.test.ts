@@ -154,11 +154,11 @@ describe('#1245 — the message the operator approved', () => {
   });
   it.each(['he', 'en'] as const)('%s: names the switcher button by the words the switcher renders, and no URL', (lng) => {
     const msg = lng === 'he' ? COORD_HE : COORD_EN;
-    expect(msg).toContain(i18n.t('switcherAnalytic', { lng }) as string);
+    expect(msg).toContain(i18n.t('suite.product.analytic', { lng }) as string);
     expect(msg).not.toMatch(/themathbible|https?:|\.com\b/);
   });
   it('he: the interpolated button words are student-facing (ADR-W-096) — nothing id-shaped, nothing untranslated', () => {
-    const values = ['switcherAnalytic', 'switcher3d'].map((k) => i18n.t(k, { lng: 'he' }) as string);
+    const values = ['suite.product.analytic', 'switcher3d'].map((k) => i18n.t(k, { lng: 'he' }) as string);
     expect(studentFacingViolations(values, { typed: '', names: [] })).toEqual([]);
   });
 });
@@ -181,7 +181,7 @@ describe('#1162 — the analytic register points at the LIVE tool', () => {
     expect(llmParseMock).not.toHaveBeenCalled();
   });
   it('the message names the analytic Builder switcher button and no longer calls it planned', () => {
-    expect(ANALYTIC_HE).toContain(`«${i18n.t('switcherAnalytic', { lng: 'he' })}»`);
+    expect(ANALYTIC_HE).toContain(`«${i18n.t('suite.product.analytic', { lng: 'he' })}»`);
     expect(ANALYTIC_HE).not.toMatch(/themathbible|https?:/);
     expect(ANALYTIC_HE).not.toMatch(/מתוכנן|לעתיד|בינתיים/);
   });

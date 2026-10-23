@@ -26,6 +26,7 @@ import type { Command, Construction, Id, Vec } from './types';
 import { isGeoPoint } from './types';
 import { add, dist, lineCircleIntersect, circleCircleIntersect, scale, sub } from './geometry';
 import { isScaffoldId } from './relations';
+import { circleRefs } from './circleRef';
 import { resolveLine } from './evaluate';
 import type { ResolvedCircle } from './evaluate';
 
@@ -428,7 +429,12 @@ export function crossingCommands(x: CrossingRef, id: Id): Command[] {
  */
 export function crossingUtterance(x: CrossingRef, id: Id, lang: 'he' | 'en', c: Construction): string {
   const he = lang === 'he';
+  const refs = circleRefs(c);
   const circleName = (cid: Id): string => {
+    // #2305 (ADR-755): one of a concentric pair is named by its ROLE, in the parser's own canonical spelling — «מעגל O»
+    // named the OUTER circle (its sibling), so the recorded step, typed back, built the crossing on the wrong circle.
+    const ref = refs.get(cid);
+    if (ref?.via === 'role') return ref.role === 'outer' ? (he ? 'המעגל החיצוני' : 'the outer circle') : he ? 'המעגל הפנימי' : 'the inner circle';
     const circ = c.objects.find((o) => o.kind === 'circle' && o.id === cid);
     const center = circ?.kind === 'circle' ? circ.center : cid.replace(/^circle-/, '');
     return he ? `מעגל ${center}` : `circle ${center}`;

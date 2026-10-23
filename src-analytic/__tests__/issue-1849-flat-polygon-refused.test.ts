@@ -71,13 +71,13 @@ describe('#1849 — the family is refused as a collapse, at every seed, naming b
     expect(v.kind).toBe('refused');
     if (v.kind !== 'refused') return;
     const h = errorText(v.error, he);
-    expect(h).toContain('"AC = 8"');
+    expect(h).toContain('«AC = 8»');
     expect(h).toContain('ABC');
-    expect(h).toContain('"משולש ABC"');
+    expect(h).toContain('«משולש ABC»');
     expect(h).toContain('צורה שטוחה אינה משולש');
     expect(h).not.toContain('לא נמצאה תצורה');
     const e = errorText(v.error, en);
-    expect(e).toContain('"AC = 8"');
+    expect(e).toContain('«AC = 8»');
     expect(e).toContain('a flat figure is not the triangle');
     expect(e).not.toContain('No configuration');
   });

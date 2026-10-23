@@ -86,7 +86,7 @@ describe('#1689 → #2074 — the right-triangle noun alone: the hypotenuse is t
   it('a named pair that is no side of the open triangle still asks, with analytic’s question (ADR-AG-211)', async () => {
     const r = await decide([RT, 'נקודה D'], 'תיכון ליתר AD');
     expect(r.key).toBe('input.ambiguousHypotenuse');
-    expect(r.text).toBe('לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: "תיכון ליתר AD". כתבו איזו צלע היא היתר, למשל "תיכון ליתר AB", או איזו זווית ישרה, למשל "זווית C ישרה".');
+    expect(r.text).toBe('לא נאמר איזו זווית במשולש ישרה, ולכן לא ידוע איזו צלע היא היתר: «תיכון ליתר AD». כתבו איזו צלע היא היתר, למשל «תיכון ליתר AB», או איזו זווית ישרה, למשל «זווית C ישרה».');
   });
 
   it('the named answers still build: «תיכון ליתר AB» (the right angle at C, stated by the claim) and «זווית C ישרה»', async () => {

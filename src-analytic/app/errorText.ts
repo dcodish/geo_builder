@@ -190,7 +190,8 @@ export function errorText(error: InputError, t: Translate): string {
   const nounKind: RefKind = host && host.kind !== 'polygon' ? (host.kind === 'perpendicular' ? 'line' : (host.kind as RefKind)) : (kind ?? 'curve');
   const theNoun = t(THE_NOUN_KEY[nounKind]);
   const key: string = {
-    'not-handled': 'errNotHandled',
+    // #1868 (ADR-W-151) — the one ruled sentence, in every builder, with no echo of the line: a suite key
+    'not-handled': 'suite.refusal.notUnderstood',
     'bad-equation': 'errBadEquation',
     'out-of-scope': 'errOutOfScope',
     'proof-target': 'errProofTarget',

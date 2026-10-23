@@ -8,7 +8,8 @@
  * tests need it), no HTML escaping (the strings carry math, not markup).
  *
  * The RESOURCES and any post-processors (bidi isolation, `shell/bidi.ts`) are the caller's — this
- * module holds no strings and knows no product.
+ * module holds no strings and knows no product. The suite-wide text (`shell/locales`, ADR-W-148) is data
+ * too: each caller merges it under its own table before passing `resources`.
  */
 import i18next, { type i18n } from 'i18next';
 import { initReactI18next } from 'react-i18next';

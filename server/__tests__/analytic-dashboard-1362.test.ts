@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ANALYTIC_REVIEW_RULED, PROFILE_ANALYTIC, aggregate, outcomeOfAnalytic } from '../admin';
+import { ANALYTIC_REVIEW_RULED, PROFILE_ANALYTIC, aggregate, outcomeOfAnalytic, outcomeOfComplex } from '../admin';
 import type { UsageEvent } from '../eventLog';
 import { PRODUCT_IDS } from '../toolRouting';
 import { TRIAGE_ADAPTED, localEventsFile, remoteEventsFile, triagePlan } from '../../.claude/skills/log-triage/apps';
@@ -109,9 +109,16 @@ describe('#1362 — /log-triage reads its product list from the registry', () =>
     expect(plan.apps).toContain('analytic');
   });
 
-  it('complex has no events yet, so it is reported silent rather than triaged or dropped', () => {
-    expect(triagePlan('all').silent).toEqual(PRODUCT_IDS.filter((id) => !TRIAGE_ADAPTED.includes(id)));
-    expect(triagePlan('complex')).toEqual({ apps: [], silent: ['complex'] });
+  it('#2241: complex is triaged — every registered product has an adapter, so none is silent', () => {
+    expect(triagePlan('complex')).toEqual({ apps: ['complex'], silent: [] });
+    expect(triagePlan('all').silent).toEqual([]);
+    expect([...TRIAGE_ADAPTED].sort()).toEqual([...PRODUCT_IDS].sort());
+  });
+
+  it('a registered product with no adapter is reported silent rather than triaged or dropped', () => {
+    const registered = [...PRODUCT_IDS, 'fake-product'];
+    expect(triagePlan('all', registered).silent).toEqual(['fake-product']);
+    expect(triagePlan('fake-product', registered)).toEqual({ apps: [], silent: ['fake-product'] });
   });
 
   it('an unknown --app throws instead of falling back to 2-D; `both` keeps its old meaning', () => {
@@ -140,5 +147,16 @@ describe('#1362 — /log-triage reads its product list from the registry', () =>
     const code = src.split('\n').filter((l) => !/^\s*(\/\/|\*)/.test(l)).join('\n');
     expect(code).not.toMatch(/a === '2d' \?/);
     expect(code).not.toMatch(/\['2d', '3d'\]/);
+  });
+});
+
+describe('#2241 — outcomeOfComplex: ADR-W-083’s reading for unruled codes', () => {
+  const ev = (result?: string) => ({ ev: 'submit', source: 'grammar', utterance: 'x', ...(result ? { result } : {}) }) as UsageEvent;
+  it('ok → parsed; not-handled → a gap; every other refusal → review', () => {
+    expect(outcomeOfComplex(ev('ok'))).toBe('parsed');
+    expect(outcomeOfComplex(ev())).toBe('parsed');
+    expect(outcomeOfComplex(ev('not-handled'))).toBe('not-understood');
+    for (const code of ['incompatible', 'impossible', 'proof-target', 'unread-name', 'mixed-number', 'glued-i'])
+      expect(outcomeOfComplex(ev(code)), code).toBe('review');
   });
 });

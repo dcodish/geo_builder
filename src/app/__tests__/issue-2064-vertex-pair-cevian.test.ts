@@ -288,7 +288,7 @@ describe('#2064 — the ✎ edit seam asks the same question (ADR-W-006)', () =>
     await submit('ריבוע ABCD');
     const key = await submit('AB = 5');
     expect(runEditCommit(key, 'AB גובה', deps)).toBe(false);
-    expect(notes.at(-1)).toBe('input.alreadyDrawn');
+    expect(notes.at(-1)).toBe('suite.notice.alreadyDrawn');
   });
   it('editing a row into «AC גובה» on a quadrilateral builds the right angle (ADR-644)', async () => {
     st().clear();

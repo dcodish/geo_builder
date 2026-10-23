@@ -33,6 +33,7 @@
  * spelling that lowers to the same command («E על המעגל», «המעגל עובר דרך E», "E on the circle"), are
  * one case.
  */
+import { engineErrorDebugText } from './errors';
 import { applyCommand } from './apply';
 import { circleName, pairKey, Structure } from './structure';
 import { isSideRecord, type SideRecord } from './requirements';
@@ -130,5 +131,5 @@ export function sideImpossibilityError(m: SideImpossibility): string {
   // Quoted («»): unlike ADR-540's symbolic halves (`|BC| = 4`), these are worded statements, and a
   // sentence joining two unquoted ones reads as one run-on clause.
   const [first, second] = m.sideIsNew ? [m.side, m.placed] : [m.placed, m.side];
-  return `impossible: «${first}» contradicts «${second}»`;
+  return engineErrorDebugText({ code: 'bound-impossible', value: `«${first}»`, bound: `«${second}»` });
 }

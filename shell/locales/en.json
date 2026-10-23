@@ -1,0 +1,38 @@
+{
+  "suite": {
+    "product": {
+      "2d": "Plane Geometry",
+      "complex": "Complex Numbers",
+      "analytic": "Analytic Geometry"
+    },
+    "about": {
+      "label": "About",
+      "tryTitle": "Enter the given data exactly as it appears in the question:",
+      "developedBy": "Developed by",
+      "author": "Dr. David Codish",
+      "contact": "Questions",
+      "title": "About this tool",
+      "close": "Got it — let's start"
+    },
+    "guide": {
+      "button": "Guide",
+      "more": "…and these are only examples — the tool has more COMMANDS here, not just other phrasings of these",
+      "showAll": "Show all",
+      "showLess": "Show fewer",
+      "try": "Click to try — the example will be built on the figure",
+      "intro": "This is a partial guide — only representative examples are shown, so you can see what sorts of sentences can be typed. Click one to watch it build, or phrase freely — if the tool didn't understand, try different wording; unsupported sentences are collected and reviewed by the project team for future support."
+    },
+    "share": {
+      "arrived": "The link you opened contains a figure. Open it instead of what you built?"
+    },
+    "canvas": {
+      "emptyTitle": "What are we building today?"
+    },
+    "refusal": {
+      "notUnderstood": "I didn't understand the request — try rephrasing it, or open «Guide» for examples."
+    },
+    "notice": {
+      "alreadyDrawn": "That's already on the figure — nothing to add."
+    }
+  }
+}

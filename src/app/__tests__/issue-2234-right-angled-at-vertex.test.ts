@@ -141,8 +141,8 @@ describe('when no triangle can be named — the message 2-D gives that vertex to
     [SQUARE, 'המשולש ישר זווית ב-B'],
     [SEGS, 'right-angled at B'],
     [SEGS, 'ישר זווית ב-B'],
-  ] as [string[], string][])('one angle no triangle holds (%j · «%s»): «לא הצלחתי לקרוא את זה עדיין…» (rule 7 P1 reuse)', async (prefix, line) => {
-    await expectRefused(prefix, line, { key: 'input.notUnderstood' }, TAUGHT_LOG);
+  ] as [string[], string][])('one angle no triangle holds (%j · «%s»): the not-understood sentence (rule 7 P1 reuse; #1868 suite key)', async (prefix, line) => {
+    await expectRefused(prefix, line, { key: 'suite.refusal.notUnderstood' }, TAUGHT_LOG);
   });
 });
 

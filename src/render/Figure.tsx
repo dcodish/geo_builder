@@ -150,7 +150,8 @@ export interface FigureProps {
   /** Hide/show a circle (clicked on the canvas) — the host wires the store's `toggleCircleHidden`. */
   onToggleCircleHidden?: (id: Id) => void;
   /** Localised strings for the on-canvas circle menu. */
-  circleMenuText?: { hide: string; show: string };
+  /** `title` (#2305, ADR-755): the circle's name in the menu header, worded by the App through `circleRefs` → `circleText`. */
+  circleMenuText?: { hide: string; show: string; title?: (circleId: string) => string };
   /** Localised strings for the figure's own controls (rotate/flip/align + the corner cluster's reset).
    *  Optional — falls back to English so the renderer stays usable standalone (tests).
    *  #742: the export strings left with the export buttons — they live in the host's top tool row now
@@ -1144,7 +1145,7 @@ export function Figure({
           x={menu.x}
           y={menu.y}
           bounds={{ width: vw, height: vh }}
-          title={menu.id.replace(/^circle-/, '⊙ ')}
+          title={circleMenuText?.title ? circleMenuText.title(menu.id) : menu.id.replace(/^circle-/, '⊙ ')}
           state={{ hidden: circHidden(menu.id) }}
           onToggleHidden={onToggleCircleHidden ? () => onToggleCircleHidden(menu.id) : undefined}
           strings={{ hide: circleMenuText?.hide ?? 'hide', show: circleMenuText?.show ?? 'show', dashed: '', solid: '' }}

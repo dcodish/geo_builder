@@ -386,7 +386,7 @@ describe('Am. 1 · a curve named by its noun alone — the refusal names the can
     const e = refusal(['נתונה פרבולה I שמשוואתה y^2=8x', 'נתונה פרבולה II שמשוואתה y^2=2x', 'P is on the parabola']);
     const text = errorText(e, en).replace(/[⁦-⁩]/g, '');
     expect(text).toContain('the parabola I, the parabola II');
-    expect(text).toContain('"P is on the parabola I"');
+    expect(text).toContain('«P is on the parabola I»');
   });
 });
 

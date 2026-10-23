@@ -4,12 +4,7 @@
   "privacy": "Privacy: no sign-up and no personal details are collected; typed instructions (math text only) are kept for up to 30 days with an anonymous visitor id — your IP address is never stored. Statements the tool does not understand are sent for processing to an external AI service. When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.",
   "language": "עברית",
   "switcherAria": "Switch between builders",
-  "switcher2d": "Plane Geometry",
   "switcher3d": "Space Geometry",
-  "switcherComplex": "Complex Numbers",
-  "switcherAnalytic": "Analytic Geometry",
-  "aboutLabel": "About",
-  "aboutTitle": "About this tool",
   "aboutLead": "A tool for building the figure of a space-geometry question: enter the givens line by line — solids, points, vectors — and the figure builds and orbits in front of you. It draws and verifies the givens; it never solves the question.",
   "aboutPoints": [
     "For high-school students preparing for the solid-geometry matriculation (bagrut), and for teachers who need to sketch a solid quickly and simply.",
@@ -17,16 +12,11 @@
     "When the givens allow more than one figure, “Show another configuration” draws a different one that also satisfies every given.",
     "It draws the figure from what you describe and checks the givens — it does not solve problems."
   ],
-  "aboutTryTitle": "Enter the given data exactly as it appears in the question:",
   "aboutTrySteps": [
     "cube ABCDA'B'C'D'",
     "M is the midpoint of BB'",
     "O is the intersection of the diagonals of face ABCD"
   ],
-  "creditBy": "Developed by",
-  "creditName": "Dr. David Codish",
-  "creditContact": "Questions",
-  "aboutClose": "Close",
   "input": {
     "placeholder": "Type a given, e.g.: cube ABCD",
     "add": "Add",
@@ -96,7 +86,6 @@
     "swapLetters": "Swap {{a}} and {{b}}"
   },
   "err": {
-    "notUnderstood": "I couldn't understand that given (this version: solids, points on segments, vector naming, and claims to verify)",
     "shapeLessSpecific": "The figure is already known to be a {{actual}}, so it is not called a {{stated}}. Remove the earlier given if you meant {{stated}}.",
     "alreadyDefined": "«{{id}}» is already defined in the figure",
     "rename": {
@@ -170,7 +159,7 @@
     "ambiguousVectorLength": "vector or length? write vector AB = vector CD (or AB→ = CD→), or |AB| = |CD|",
     "paramRolesConflated": "the letter {{letter}} is used both as the running parameter (outside the parentheses) and as a component inside them — it isn't clear which you meant. Pick a different letter for the running parameter, e.g. x=t({{letter}}-1, 5-{{letter}}, -2)",
     "componentSymbolic": "A single coordinate with a letter value («{{component}}») is not supported yet — give it a number, e.g. {{component}} = 3",
-    "inscribedContradictsNoun": "A {{shape}} cannot be inscribed in a circle: «{{sentence}}». A circle through every vertex would make it a {{forced}}, and a {{forced}} is not a {{shape}}. If the shape is a {{forced}}, write \"{{forced}}\" instead of \"{{shape}}\".",
+    "inscribedContradictsNoun": "A {{shape}} cannot be inscribed in a circle: «{{sentence}}». A circle through every vertex would make it a {{forced}}, and a {{forced}} is not a {{shape}}. If the shape is a {{forced}}, write «{{forced}}» instead of «{{shape}}».",
     "inscribedContradictsNounVs": "Can't do that: «{{sentence}}» contradicts «{{other}}» — they can't both hold. The reason: a circle through the four vertices would make a {{shape}} a {{forced}}, and a {{forced}} is not a {{shape}}.",
     "ringContradictsNoun": "The points you gave do not form that shape in this order: «{{detail}}». Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.",
     "proofTarget": "That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{sentence}}»",
@@ -190,8 +179,8 @@
     "givenNotDrivablePoint": "The tool can't yet move point {{id}} so that this given holds, so it wasn't added — this is a limit of the tool",
     "givenNotDrivableSize": "The tool can't yet set the {{solid}}'s size from a given like this — this capability is in development, so the step wasn't added.",
     "lineNotDetermined": "Line {{id}} has no determined direction or position yet — this statement needs a determined line. Pin it with two points on it, a parametric form, or a ∥/⊥ relation",
-    "ambiguousAngleVertex": "More than one angle meets at {{vertex}}: {{angles}}. Name all three letters of the one you mean (e.g. \"AD bisects angle {{angles}}\" — using one of those).",
-    "ambiguousAngleVertexBare": "More than one angle can meet at {{vertex}}, so \"angle {{vertex}}\" does not say which. Name all three letters of the angle you mean.",
+    "ambiguousAngleVertex": "More than one angle meets at {{vertex}}: {{angles}}. Name all three letters of the one you mean (e.g. «AD bisects angle {{angles}}» — using one of those).",
+    "ambiguousAngleVertexBare": "More than one angle can meet at {{vertex}}, so «angle {{vertex}}» does not say which. Name all three letters of the angle you mean.",
     "ambiguousMainDiagonal": "The solid has several main diagonals: {{pairs}}. Name the letters of the one you mean (e.g. \"diagonal AC'\").",
     "ambiguousMainDiagonalBare": "Name the letters of the main diagonal you mean (e.g. \"diagonal AC'\").",
     "notADiagonal": "«{{pair}}» is not a diagonal of the solid — it is an edge. A diagonal joins non-adjacent vertices.",
@@ -208,16 +197,9 @@
     "ex4": "plane π1: z - 3 = 0"
   },
   "manual": {
-    "button": "Guide",
     "title": "The Guide — Space Geometry",
-    "intro": "This is a partial guide — only representative examples are shown, so you can see what sorts of sentences can be typed. Click one to watch it build, or phrase freely — if the tool didn't understand, try different wording; unsupported sentences are collected and reviewed by the project team for future support.",
-    "close": "Back to the tool",
-    "try": "Click to try — the example builds on the figure",
-    "more": "…and these are only examples — the tool has more COMMANDS here, not just other phrasings of these",
-    "showAll": "Show all",
-    "showLess": "Show fewer"
+    "close": "Back to the tool"
   },
-  "emptyTitle": "What are we building today?",
   "emptyHintChips": "Click an example given — or type your own, and the figure builds in front of you",
   "dataPanel": {
     "title": "Data",
@@ -248,7 +230,7 @@
   "scope": {
     "unrelated": "No geometric construction detected here. Describe a solid or a given — e.g. \"box ABCDA'B'C'D'\" or \"point M midpoint of AB\".",
     "valueless-query": "This tool draws and verifies givens — it does not solve. To act on an angle, state a value: e.g. \"the angle between line AC' and plane ABCD is 30\", and it will be enforced or verified.",
-    "coordinate-point": "Placing a point by its coordinates is done in the \"$t(switcherAnalytic)\" tool — click \"$t(switcherAnalytic)\" at the top of the screen. There you write E(-1,7). Here, describe the figure itself — e.g. \"triangle ABC\" or \"point D on AB\".",
+    "coordinate-point": "Placing a point by its coordinates is done in the \"$t(suite.product.analytic)\" tool — click \"$t(suite.product.analytic)\" at the top of the screen. There you write E(-1,7). Here, describe the figure itself — e.g. \"triangle ABC\" or \"point D on AB\".",
     "cross-app": "Plane geometry (circle, rectangle, rhombus, inscribed-in-circle…) is built in the 2-D tool: themathbible.com/geo-builder. A circle IN SPACE is supported here in the form \"circle centered at O tangent to line AB at B\".",
     "bare-solid": "A pyramid or prism needs its base: e.g. \"pyramid SABCD with a square base\" or \"right triangular prism ABC\". A cube, box or tetrahedron builds without details.",
     "ui-command": "Marks appear automatically from the givens — instead of asking for a mark, state the given itself: e.g. \"angle D = 90\".",
@@ -359,7 +341,7 @@
       "cyclicQuad": "cyclic quadrilateral",
       "rightTrapezoid": "right trapezoid"
     },
-    "lineCalledPlane": "Note: {{line}} is a line, not a plane. Read as \"plane {{ids}} is perpendicular to line {{line}}\".",
+    "lineCalledPlane": "Note: {{line}} is a line, not a plane. Read as «plane {{ids}} is perpendicular to line {{line}}».",
     "lineRelNoun": "Note: {{line}} is a line, not a plane — the relation was built against line {{line}}.",
     "lineAutoNamed": "The name {{requested}} is already taken, so the intersection line was named {{assigned}}.",
     "alreadyKnown": "{{statement}} — true and verified ✓, but {{why}}, so this given adds no new information.",
@@ -377,7 +359,6 @@
       "perp": "it already follows from the solid you defined",
       "parallel": "it already follows from the solid you defined"
     },
-    "alreadyStated": "That is already stated («{{utterance}}») — the figure is unchanged and no row was added",
     "vertexAngleReadAs": "Read as {{angles}} — the polygon's angle at that vertex. For another angle there, write its three letters."
   },
   "display": {
@@ -400,7 +381,6 @@
     "tooLong": "This link is too long to share — save the figure as a file and send that instead",
     "badLink": "This link is not valid — ask the sender to send it again",
     "tooLarge": "This link is too large to open — a figure can hold up to {{max}} statements. Ask the sender to send the figure as a file",
-    "arrived": "The link you opened contains a figure. Open it instead of what you built?",
     "openIt": "Open the shared figure",
     "keepMine": "Keep mine",
     "dismiss": "Dismiss",

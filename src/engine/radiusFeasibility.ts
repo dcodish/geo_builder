@@ -12,6 +12,7 @@
  *
  * Pure readings of the construction (its objects and its stated circle-position records), never of coordinates.
  */
+import { engineErrorDebugText } from './errors';
 import type { Command, Construction, GeoObject, Id } from './types';
 import { statedCirclePosition } from './requirements';
 
@@ -30,7 +31,7 @@ export function circlesTangentError(prev: Construction, cmd: Command): string | 
   const c2 = circleIn(prev, cmd.circle2);
   if (!c1 || !c2) return null; // a missing circle is handled by the normal flow
   if (c1.radius.via === 'through' || c2.radius.via === 'through') {
-    return 'tangent circles need a fixed radius (a radius-through-a-point circle is not supported yet)';
+    return engineErrorDebugText({ code: 'tangent-needs-fixed-radius' });
   }
   return null;
 }
@@ -48,7 +49,7 @@ const statedRadius = (c: Circle | undefined): number | undefined => (c && c.radi
  */
 export type NestedRelation = 'contained' | 'int-tangent' | 'concentric';
 /** The engine message of {@link equalNestedPair}; the fold and the humanizer read it back (`EQUAL_NESTED_CANNOT_HOLD`). */
-export const equalNestedMessage = (circle: Id, relation: NestedRelation): string => `over-constrained: equal circles ${circle} nested ${relation} cannot hold`;
+export const equalNestedMessage = (circle: Id, relation: NestedRelation): string => engineErrorDebugText({ code: 'equal-nested', circle, relation });
 export const EQUAL_NESTED_CANNOT_HOLD = /^over-constrained: equal circles (\S+) nested (contained|int-tangent|concentric) cannot hold$/;
 
 /**
@@ -115,7 +116,7 @@ export function equalNestedPair(prev: Construction, next: Construction, cmds: re
 
 /** The engine message of {@link commonTangentCapacityError}; the humanizer reads it back (`TANGENTS_EXHAUSTED`). */
 export const tangentsExhaustedMessage = (a: Id, b: Id, kind: 'external' | 'internal' | 'any', position: 'int-tangent' | 'ext-tangent' | 'contained'): string =>
-  `tangents-exhausted: common tangent ${a}${b} of kind ${kind} on ${position} circles`;
+  engineErrorDebugText({ code: 'tangents-exhausted', pair: `${a}${b}`, kind, position });
 export const TANGENTS_EXHAUSTED = /^tangents-exhausted: common tangent (\S+) of kind (external|internal|any) on (int-tangent|ext-tangent|contained) circles$/;
 
 /**

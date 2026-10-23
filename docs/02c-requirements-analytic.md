@@ -587,7 +587,7 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «משוואת התיכון AD היא y=x» → the line and the median
 - «A ו-D על ציר ה-y (D מעל A)», «C מימין ל-B»
 - **A position word against a straight line** (ADR-AG-310): «M מעל הישר KL» → y_M above the line's y at x_M; «M מתחת לישר KL» below it; «M מימין לישר l» / «M משמאל לישר l» → x_M against the line's x at y_M. The line is two letters («KL», «הישר KL») or a named line («הישר l»). A point on the line is on neither side; a side the figure cannot take is refused, naming the sentence
-- **A side the line does not have is refused**: «מעל / מתחת» a vertical line (a stated `x=3`, two letters with one x, the y-axis) → «לישר אנכי אין "מעל" — נסו "מימין ל-" או "משמאל ל-"»; «מימין / משמאל» a horizontal line (`y=2`, the x-axis) → «לישר אופקי אין "מימין ל-" — נסו "מעל" או "מתחת"». A line vertical only in some configurations is never refused this way
+- **A side the line does not have is refused**: «מעל / מתחת» a vertical line (a stated `x=3`, two letters with one x, the y-axis) → «לישר אנכי אין «מעל» — נסו «מימין ל-» או «משמאל ל-»»; «מימין / משמאל» a horizontal line (`y=2`, the x-axis) → «לישר אופקי אין «מימין ל-» — נסו «מעל» או «מתחת»». A line vertical only in some configurations is never refused this way
 - «משולש קהה זווית ABC» → obtuse at one vertex, cycled
 - Sources: ADR-AG-222, #1662, #1706, #1707, #1708; ADR-AG-310, #2386 and the operator rulings of 2026-10-20.
 
@@ -656,7 +656,7 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 - «R(1,2)» · «נתון מעגל N שרדיוסו R» → refused, naming «R(1,2)»
 - Sources: ADR-AG-307, #2388, #2379.
 
-**R193 — a capital letter used as a size is refused with a sentence that teaches the lowercase letter; R for a radius and S for an area are sizes**. *(Operator: "Need a message to user saying that sizes are small letters except for R".)* A radius, a length, an angle, a parameter in an equation, a coordinate, a declaration or a slope written with a capital that is not a point of the figure is refused — never handed to the model — with «אות גדולה היא שם של נקודה, ולכן K לא יכולה לסמן גודל. גדלים מסמנים באות קטנה (r, a, k…), מלבד R לרדיוס. נסו: "…"», the student's line with the letter lowercased. An area is labelled with S and only S *(operator 2026-10-21: "area letter only capital S")*: «שטח המשולש ABC הוא S» and «נסמן את שטח ABC ב-S» build; «שטח ABC = T» and «שטח המשולש ABC הוא K» are refused the same way, teaching «שטח ABC = t». A capital that is a point of the figure is the student naming that point, and is read as before. 2-D keeps reading a capital radius (ruled analytic-only).
+**R193 — a capital letter used as a size is refused with a sentence that teaches the lowercase letter; R for a radius and S for an area are sizes**. *(Operator: "Need a message to user saying that sizes are small letters except for R".)* A radius, a length, an angle, a parameter in an equation, a coordinate, a declaration or a slope written with a capital that is not a point of the figure is refused — never handed to the model — with «אות גדולה היא שם של נקודה, ולכן K לא יכולה לסמן גודל. גדלים מסמנים באות קטנה (r, a, k…), מלבד R לרדיוס. נסו: «…»», the student's line with the letter lowercased. An area is labelled with S and only S *(operator 2026-10-21: "area letter only capital S")*: «שטח המשולש ABC הוא S» and «נסמן את שטח ABC ב-S» build; «שטח ABC = T» and «שטח המשולש ABC הוא K» are refused the same way, teaching «שטח ABC = t». A capital that is a point of the figure is the student naming that point, and is read as before. 2-D keeps reading a capital radius (ruled analytic-only).
 - «נתון מעגל O שרדיוסו K», «AB = 2K», «y = Kx + 1», «זווית ABC = K», «M(K,0)», «K הוא פרמטר חיובי», «שיפוע AB הוא M» → refused, teaching «…k» / «…m»
 - «שטח המשולש ABC הוא S», «נסמן את שטח ABCD ב-S», «שטח ABC = T», «שרדיוסו R» → accepted; «K(1,1)» · «M(K,0)» → as before
 - Sources: ADR-AG-325, #2427, ADR-AG-307.
@@ -705,15 +705,15 @@ a sentence the tool parsed.
 - Sources: ADR-AG-246, #1832, #1846.
 
 **R45 — a statement that adds nothing is SAID, not silently swallowed or silently duplicated**. Informational, never an error; a restatement that NARROWS is recorded. A shape noun the ring's nouns already IMPLY («ריבוע ABCD» · «דלתון ABCD», «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD») is «already known», no row, in any reading it holds in — 2-D's answer ([ADR-W-133](06w-decisions-workspace.md#adr-w-133), #2169).
-- a repeated given → «זה כבר ידוע…», no second row
-- a polygon restated with its letters rotated or reversed («ריבוע ABCD» · «מרובע ADCB») → «זה כבר ידוע…», no second row ([ADR-AG-259](06c-decisions-analytic.md#adr-ag-259))
+- a repeated given → «זה כבר קיים באיור — אין מה להוסיף.» (2-D's note, quoting nothing; [ADR-AG-330](06c-decisions-analytic.md#adr-ag-330)), no second row
+- a polygon restated with its letters rotated or reversed («ריבוע ABCD» · «מרובע ADCB») → the same note, no second row ([ADR-AG-259](06c-decisions-analytic.md#adr-ag-259))
 - …and with its OWN noun, in every reading that noun says the same thing in («ריבוע ABCD» · «ריבוע BCDA»; «מעוין», «מלבן», «מקבילית», «משולש», a bare polygon) → the same answer. A reading that says something ELSE records: «טרפז ABCD» · «טרפז BCDA» names the other pair of parallel sides, and a kite's axis, an isosceles triangle's apex and a right triangle's seat move with the letters ([ADR-AG-262](06c-decisions-analytic.md#adr-ag-262))
 - «a הוא פרמטר» then «a<13» → recorded
 - Sources: ADR-AG-020.
 
 **R54 — a given the figure already ENTAILS is said, not recorded**. A given true only at the current sample is not this case.
-- a given a determined figure satisfies → «זה כבר נובע מהנתונים שכתבתם», no row
-- Sources: ADR-AG-030.
+- a given a determined figure satisfies → «זה כבר קיים באיור — אין מה להוסיף.», no row — 2-D's answer to a restatement its figure entails ([ADR-AG-330](06c-decisions-analytic.md#adr-ag-330))
+- Sources: ADR-AG-030, ADR-AG-330.
 
 **R125 — "already follows" is said only about a given that is true in EVERY configuration of the figure**. *(Narrows R54.)* A given true in one drawing and false in another chooses between them and is recorded; when unsure, the tool records.
 - the square of exam 15 Q5: «שיפוע הצלע BC הוא -1/2» → B(2,4), C(10,0); «…הוא 1/2» → the mirror

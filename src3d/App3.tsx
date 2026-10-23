@@ -680,7 +680,7 @@ export default function App3() {
           id: 'manual',
           node: (
             <ToolButton key="manual" onClick={() => setManualOpen(true)}>
-              {t('manual.button')}
+              {t('suite.guide.button')}
             </ToolButton>
           ),
         },
@@ -689,11 +689,11 @@ export default function App3() {
       activeProductId="3d"
       switcherLabel={t('switcherAria')}
       about={{
-        label: t('aboutLabel'),
-        title: t('aboutTitle'),
+        label: t('suite.about.label'),
+        title: t('suite.about.title'),
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
-        closeLabel: t('aboutClose'),
+        closeLabel: t('suite.about.close'),
         autoOpenKey: 'geo3d_intro_seen', // #1453 (ADR-W-098): first visit opens About, in every builder
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
@@ -719,7 +719,7 @@ export default function App3() {
         ) : pendingLink ? (
           /* #1373: a link arrived on a canvas that is NOT empty — ask, never replace silently. */
           <ResumeOffer
-            message={t('share.arrived')}
+            message={t('suite.share.arrived')}
             continueLabel={t('share.openIt')}
             restartLabel={t('share.keepMine')}
             onContinue={acceptPendingLink}
@@ -745,7 +745,7 @@ export default function App3() {
           /* #751 (ADR-W-029): RAW commands (`postProcess: []` = the value BEFORE the
              bidi-isolate post-processor); the chip isolates for DISPLAY only. */
           <QuickChips
-            title={t('emptyTitle')}
+            title={t('suite.canvas.emptyTitle')}
             hint={t('emptyHintChips')}
             commands={emptyStateChips3(t)}
             display={isolateLtrRuns3}
@@ -861,7 +861,7 @@ export default function App3() {
           {lastNotice && !lastError && !busy && (
             <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {lastNotice.code === 'already-stated'
-                ? t('notice.alreadyStated', { utterance: lastNotice.utterance })
+                ? t('suite.notice.alreadyDrawn') /* #1990 (ADR-3D-377): 2-D's sentence, one suite key */
                 : t('notice.vertexAngleReadAs', { angles: lastNotice.angles }) /* #1942: 2-D's «הובן כ-∠CAB» */}
             </div>
           )}
@@ -1286,13 +1286,13 @@ export default function App3() {
       <ManualScreen
         open={manualOpen}
         title={t('manual.title')}
-        intro={t('manual.intro')}
+        intro={t('suite.guide.intro')}
         closeLabel={t('manual.close')}
-        tryHint={t('manual.try')}
+        tryHint={t('suite.guide.try')}
         sectionCap={6}
-        showAllLabel={t('manual.showAll')}
-        showLessLabel={t('manual.showLess')}
-        moreNote={t('manual.more')}
+        showAllLabel={t('suite.guide.showAll')}
+        showLessLabel={t('suite.guide.showLess')}
+        moreNote={t('suite.guide.more')}
         sections={(['solids', 'points', 'vectors', 'planesLines', 'claims', 'drawing'] as const).map((cat) => ({
           key: cat,
           title: t(`catalog.${cat}`),

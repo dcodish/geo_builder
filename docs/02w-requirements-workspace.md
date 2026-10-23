@@ -81,8 +81,14 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   «משהו השתבש בבניית השורה הזאת. נסו לנסח אותה אחרת, או לפרק אותה לשני צעדים.» ("Something went wrong building
   this line. Try wording it differently, or split it into two steps."), alone, without the retry hint; so does a
   message whose explanation would name something the tool made up. Engine text is never shown raw in English and
-  never spliced into a mixed-language line (operator ruling 2026-10-13).
-  - Sources: [ADR-W-096](06w-decisions-workspace.md#adr-w-096), #1522, [ADR-W-130](06w-decisions-workspace.md#adr-w-130), #2028.
+  never spliced into a mixed-language line (operator ruling 2026-10-13). A value the tool MADE never shows — a hidden
+  helper object, a point it minted that the student neither typed nor sees, an angle it derived, its own arithmetic
+  («1·R», «0.5·|DB|»): such a message reads the floor sentence, except a true sentence about a point that is not
+  defined yet, which keeps its words and names the missing point(s) instead («…שעדיין לא הוגדרה (R)…», operator
+  ruling 2026-10-23, d20 A; [ADR-W-130](06w-decisions-workspace.md#adr-w-130) Am. 1).
+  A refusal names the student's statement and gives one next step, or says plainly there is none (operator
+  rulings 2026-10-13, 2026-10-15) — a new sentence as much as a rewritten one.
+  - Sources: [ADR-W-096](06w-decisions-workspace.md#adr-w-096), #1522, [ADR-W-130](06w-decisions-workspace.md#adr-w-130), #2028, [ADR-W-154](06w-decisions-workspace.md#adr-w-154), #1995.
 - **FR-SU-7 (Should)** — **A manual screen per builder, in one chrome.** Each builder documents its own
   language; the frame around that documentation is identical. **A section shows a SAMPLE, and the sample is
   chosen rather than sliced:** the guide caps each section so it teaches rather than inventories, the entries
@@ -129,8 +135,8 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
     ADR-299 (#45), ADR-381 (#237), ADR-318 (#105), [ADR-AG-187](06c-decisions-analytic.md#adr-ag-187) (#1555).
 - **FR-SU-18 (Must)** — **The tool reads Hebrew and English, and a letter it cannot read is refused by
   name — never replaced.** A letter or a word in any other script is rejected in all four builders, with the
-  letters the student typed quoted back: as a point name, «"ДЖФ" אינו שם של נקודה. שם נקודה הוא אות לטינית
-  גדולה, אפשר עם ספרה — למשל G או A1.», and otherwise «הכלי קורא עברית ואנגלית בלבד — "…" אינו באחת מהן.
+  letters the student typed quoted back: as a point name, ««ДЖФ» אינו שם של נקודה. שם נקודה הוא אות לטינית
+  גדולה, אפשר עם ספרה — למשל G או A1.», and otherwise «הכלי קורא עברית ואנגלית בלבד — «…» אינו באחת מהן.
   נסו לכתוב את השורה בעברית או באנגלית.». It is never drawn under substituted names and never sent to the
   model. Two things stay readable: **Greek is mathematics** (α, β, γ, π, θ as measure names, «ΔABC»), and a
   **look-alike letter folds silently** to its Latin twin (FR-SU-17's table: «משולש КМО» is the triangle
@@ -325,10 +331,11 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | Note for a choice the tool made | yes | n/a | yes (equal pair, parallel pair, obtuse vertex, axes) | n/a | **Ruled** — ported to analytic (B10, #1864, ADR-AG-267); the analytic kite's pair is #2006 |
 | «הציגו תצורה אחרת» wording | locked | same | same | same | **Same** (ADR-W-098) |
 | Two possible values | «x = ±a» / «x = a או x = b» | same | same | same | **Same** — one spelling, `shell/valueOptions` (B12, W1, #1867, [ADR-634](06-decisions.md#adr-634)). Three or more: no value shown; the student cycles configurations (operator, 2026-10-07) |
-| "Not understood" refusal | «לא הצלחתי לקרוא את זה עדיין — נסו…» | «לא הצלחתי להבין את הנתון…» | «לא הצלחתי להבין את המשפט» | as analytic | **Ruled change** — 2-D's wording everywhere (B13, #1868) |
+| "Not understood" refusal | «לא הבנתי את הבקשה — נסו לנסח אחרת, או פתחו את «מדריך» לדוגמאות.» | same | same | same | **Same** — one suite key, `suite.refusal.notUnderstood`, with no echo of the line (B13, #1868, wording ruled 2026-10-17 on #2329; [ADR-W-151](06w-decisions-workspace.md#adr-w-151)). The ask lane's own "not recognised" texts are a separate kind (#1538) |
 | "The tool's limit, not your mistake" | no | yes | no | no | **Ruled change** — everywhere (B13, #1868) |
 | Student-text check (ADR-W-096) | no | yes | no | no | **Gap** — #1522 (icebox) |
-| Restated fact «כבר נובע…» | yes | yes | yes | no | **Gap** — #1565 |
+| Already-there note (a line that adds nothing) | «זה כבר קיים באיור — אין מה להוסיף.» | same | same | same | **Same** — ruled 2026-10-10 (#1990, B13); one suite key, `suite.notice.alreadyDrawn`, quoting nothing ([ADR-W-152](06w-decisions-workspace.md#adr-w-152)) |
+| Restated fact said (an entailed given, no row) | yes | yes | yes | no | **Gap** — #1565 |
 | A one-line compound that loses a part («משולש ABC ישר זווית ב-B», «…בנקודה E שהיא אמצע BD») | refused whole, parts listed; the right-angle syntax taught (ADR-603) | refused whole, parts listed; the right-angle syntax taught (ADR-3D-316); «…בנקודה E…» not read (#1679) | refused whole, parts listed; the right-angle syntax taught; «…שהיא אמצע BD» reads both parts and builds (ADR-AG-251) | n/a | **Ruled change** — refused in every builder (2026-10-08, #1888/#1889, ADR-W-120); a dropped ROLE word the same way (#1904: 2-D ADR-604, 3-D ADR-3D-317) |
 | Two points on one spot | refused or redrawn | same | same | not measured | **Same** for 2-D/3-D/analytic (ADR-W-066/072); complex **Open** |
 | A declared polygon forced flat | refused | refused | refused | n/a | **Same** (ADR-W-115) |
@@ -345,7 +352,9 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | Save, load, share link | shared | same | same | same | **Same** |
 | Image export | yes | yes | yes | yes | **Same** |
 | Question export «הורידו שאלה» | yes | yes | yes | yes | **Same** (B16, #1872: ADR-W-126) — each list per its ruling: analytic follows 2-D (W5), complex leaves the claims out (W6) |
-| Empty state | «מה בונים היום?» | same | its own title and hint | same as 2-D | **Ruled change** — shared title, analytic keeps its hint (B15, #1871) |
+| Empty state | «מה בונים היום?» | same | same title, its own hint | same as 2-D | **Same** — one title, analytic keeps its hint (B15, #1871; landed #2202, [ADR-W-149](06w-decisions-workspace.md#adr-w-149)) |
+| The suite's shared wordings: About title «על הכלי» and close «הבנתי — אפשר להתחיל», the share-link prompt «…במקום מה שבנית?», the guide intro, the try hint «…על השרטוט» ("Click to try — the example will be built on the figure") | one key each in `shell/locales`, Hebrew and English | same | same | same | **Same** — ruled 2026-10-16 (#2202, [ADR-W-149](06w-decisions-workspace.md#adr-w-149)); the English twins follow (#2241, [ADR-W-150](06w-decisions-workspace.md#adr-w-150)) |
+| A value quoted in a message (a refusal naming the student's line), Hebrew and English | «…» | same | same | same | **Same** — ruled 2026-10-16 (#2202, ADR-W-149); English follows the Hebrew ruling (#2241, ADR-W-150) |
 | Hide a segment | menu, not undoable | no menu | menu, undoable | n/a | **Ruled change** — 2-D becomes undoable (B15, #1871); 3-D **Ruled** n/a |
 | Header, suite bar, About | shared frame | same | same | same | **Same** |
 | Language toggle and RTL | shared | same | same | same | **Same** (bidi: three kits held by one fixture) |

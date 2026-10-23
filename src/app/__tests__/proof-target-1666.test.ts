@@ -81,7 +81,7 @@ describe('#1666 — 2-D refuses a proof target at the submit gate', () => {
     expect(useGeoStore.getState().facts).toBe(before);
     expect(llmParseMock).not.toHaveBeenCalled();
     expect(d.calls.notes.filter(Boolean).map(plain)).toEqual([
-      'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "הוכיחו כי AB ⊥ AC"',
+      'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «הוכיחו כי AB ⊥ AC»',
     ]);
   });
 
@@ -98,7 +98,7 @@ describe('#1666 — 2-D refuses a proof target at the submit gate', () => {
 
   it('English: the refusal is in English', () => {
     expect(plain(i18n.t('input.scope.proof-target', { sentence: 'prove that AB ⊥ AC', lng: 'en' }) as string)).toBe(
-      'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "prove that AB ⊥ AC"',
+      'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «prove that AB ⊥ AC»',
     );
   });
 

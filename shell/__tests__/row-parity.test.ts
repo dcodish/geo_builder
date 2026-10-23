@@ -147,16 +147,17 @@ describe('#739 — the 3-D distance-witness toggle lives in the נתונים pan
 
 describe('#742 / ADR-W-024 — the canvas chrome is contracted', () => {
   it('ONE empty-state copy: title and hint identical in every builder (he)', () => {
+    // The TITLE is one suite key (#2202, ADR-W-149: the operator's 2026-10-16 ruling, «מה בונים היום?» as the one
+    // title everywhere), read by EVERY builder: analytic included, which ends ADR-AG-058's «התחילו לשרטט».
     const TITLE = 'מה בונים היום?';
     const HINT = 'לחצו נתון לדוגמה — או הקלידו משלכם, והציור ייבנה מולכם';
+    expect(JSON.parse(read('shell/locales/he.json')).suite.canvas.emptyTitle, 'suite title').toBe(TITLE);
+    for (const app of APPS) expect(read(app).includes("title={t('suite.canvas.emptyTitle')}"), `${app} title`).toBe(true);
     const he2d = JSON.parse(read('src/i18n/locales/he.json'));
-    expect(he2d.canvas.emptyTitle, '2-D title').toBe(TITLE);
     expect(he2d.canvas.emptyHint, '2-D hint').toBe(HINT);
     const he3d = JSON.parse(read('src3d/i18n/locales/he.json'));
-    expect(valuesOfKey(he3d, 'emptyTitle'), '3-D title').toContain(TITLE);
     expect(valuesOfKey(he3d, 'emptyHintChips'), '3-D hint').toContain(HINT);
     const cx = read('src-complex/i18n/index.ts');
-    expect(cx.includes(`emptyTitle: '${TITLE}'`), 'complex title').toBe(true);
     expect(cx.includes(`emptyHintChips: '${HINT}'`), 'complex hint').toBe(true);
   });
 
