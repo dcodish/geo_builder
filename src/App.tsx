@@ -1187,10 +1187,10 @@ export default function App() {
       switcherLabel={t('switcherAria')}
       about={{
         label: t('suite.about.label'),
-        title: t('about.title'),
+        title: t('suite.about.title'),
         content: about,
         privacy: privacyDeclaration(t),
-        closeLabel: t('about.close'),
+        closeLabel: t('suite.about.close'),
         autoOpenKey: 'geo_intro_seen', // #1453 (ADR-W-098): first visit opens About, in every builder
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
@@ -1217,7 +1217,7 @@ export default function App() {
           /* #1373: a link arrived on a canvas that is NOT empty. Opening it would discard work the
              student can no longer get back, so it asks — the same shape as the session offer. */
           <ResumeOffer
-            message={t('share.arrived')}
+            message={t('suite.share.arrived')}
             continueLabel={t('share.openIt')}
             restartLabel={t('share.keepMine')}
             onContinue={acceptPendingLink}
@@ -1240,7 +1240,7 @@ export default function App() {
         emptyOverlay={
           facts.length === 0 ? (
             <QuickChips
-              title={t('canvas.emptyTitle')}
+              title={t('suite.canvas.emptyTitle')}
               hint={t('canvas.emptyHint')}
               commands={examples.slice(0, 4)}
               display={isolateLtrRuns}
@@ -2185,8 +2185,9 @@ export default function App() {
             </ul>
             {/* the partial-list framing + the honest collection note (TRUE here: prod inputs are
                 logged and triaged — the log-triage loop is how unsupported phrasings become
-                features) */}
-            <span style={{ display: 'block', marginTop: 10 }}>{t('manualPartial')}</span>
+                features). The suite's ONE guide intro (#2202, ADR-W-149: 3-D's text in every builder;
+                its «click an example to watch it build» holds here — `onTry` below submits) */}
+            <span style={{ display: 'block', marginTop: 10 }}>{t('suite.guide.intro')}</span>
           </>
         }
         closeLabel={t('manualClose')}

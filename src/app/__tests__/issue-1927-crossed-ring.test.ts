@@ -33,7 +33,7 @@ import { humanizeError } from '@/i18n/humanizeError';
 
 const strip = (s: string) => s.replace(/[⁦-⁩‎‏]/g, '');
 const HE = (line: string) =>
-  `הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "${line}". אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`;
+  `הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: «${line}». אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`;
 const EN = (line: string) =>
   `The points you gave do not form that shape in this order: "${line}". Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.`;
 const NO_CONFIG_HE = () => strip(i18n.t('figure.noValidConfig', { lng: 'he' }) as string);

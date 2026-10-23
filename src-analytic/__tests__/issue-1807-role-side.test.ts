@@ -175,7 +175,7 @@ describe('#1807 — no shape gives the role a content: the contextual refusal, n
       expect(v.kind).toBe('refused');
       if (v.kind !== 'refused') return;
       expect(v.error.key).toBe('ambiguous-shape');
-      expect(errorText(v.error, t)).toContain(`"משוואת הבסיס היא ${LINE}"`);
+      expect(errorText(v.error, t)).toContain(`«משוואת הבסיס היא ${LINE}»`);
     });
   }
   it('two isosceles triangles: which base is not said — refused, never a pick', () => {

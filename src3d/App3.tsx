@@ -690,10 +690,10 @@ export default function App3() {
       switcherLabel={t('switcherAria')}
       about={{
         label: t('suite.about.label'),
-        title: t('aboutTitle'),
+        title: t('suite.about.title'),
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
-        closeLabel: t('aboutClose'),
+        closeLabel: t('suite.about.close'),
         autoOpenKey: 'geo3d_intro_seen', // #1453 (ADR-W-098): first visit opens About, in every builder
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
@@ -719,7 +719,7 @@ export default function App3() {
         ) : pendingLink ? (
           /* #1373: a link arrived on a canvas that is NOT empty — ask, never replace silently. */
           <ResumeOffer
-            message={t('share.arrived')}
+            message={t('suite.share.arrived')}
             continueLabel={t('share.openIt')}
             restartLabel={t('share.keepMine')}
             onContinue={acceptPendingLink}
@@ -745,7 +745,7 @@ export default function App3() {
           /* #751 (ADR-W-029): RAW commands (`postProcess: []` = the value BEFORE the
              bidi-isolate post-processor); the chip isolates for DISPLAY only. */
           <QuickChips
-            title={t('emptyTitle')}
+            title={t('suite.canvas.emptyTitle')}
             hint={t('emptyHintChips')}
             commands={emptyStateChips3(t)}
             display={isolateLtrRuns3}
@@ -1286,7 +1286,7 @@ export default function App3() {
       <ManualScreen
         open={manualOpen}
         title={t('manual.title')}
-        intro={t('manual.intro')}
+        intro={t('suite.guide.intro')}
         closeLabel={t('manual.close')}
         tryHint={t('manual.try')}
         sectionCap={6}

@@ -66,7 +66,7 @@ describe('#2247 — an ASCII mixed number is refused in every complex slot, with
   it('the report, worded (he + en): the decimal, the sum and the product', () => {
     submitLine('z = 2 1/2 + i');
     const e = store().lastError!;
-    expect(errorText(e, he)).toBe('לא ברור אם "2 1/2" הוא מספר מעורב או מכפלה. כתבו 2.5 (מספר עשרוני) או 2+1/2 למספר המעורב, או 2*1/2 למכפלה.');
+    expect(errorText(e, he)).toBe('לא ברור אם «2 1/2» הוא מספר מעורב או מכפלה. כתבו 2.5 (מספר עשרוני) או 2+1/2 למספר המעורב, או 2*1/2 למכפלה.');
     expect(errorText(e, en)).toBe('"2 1/2" could be a mixed number or a product. Write 2.5 (a decimal) or 2+1/2 for the mixed number, or 2*1/2 for the product.');
   });
 
@@ -74,7 +74,7 @@ describe('#2247 — an ASCII mixed number is refused in every complex slot, with
     submitLine('z = 2 1/3 + i');
     const e = store().lastError!;
     expect(e).toEqual({ key: 'mixed-number', detail: '2 1/3', sum: '2+1/3', product: '2*1/3' });
-    expect(errorText(e, he)).toBe('לא ברור אם "2 1/3" הוא מספר מעורב או מכפלה. כתבו 2+1/3 למספר המעורב, או 2*1/3 למכפלה.');
+    expect(errorText(e, he)).toBe('לא ברור אם «2 1/3» הוא מספר מעורב או מכפלה. כתבו 2+1/3 למספר המעורב, או 2*1/3 למכפלה.');
   });
 
   it('after an operator the sum is parenthesised, so it reads the same in place', () => {
@@ -113,7 +113,7 @@ describe('#2247 — any other number–space–number is refused (the second-pas
     expect(submitLine(line)).toBe(false);
     const e = store().lastError!;
     expect(e).toEqual({ key: 'juxtaposed-numbers', detail: line, suggestion });
-    expect(errorText(e, he)).toBe(`לא ברור אם הכוונה לכפל — אם כן, כתבו את הכפל במפורש: "${suggestion}" במקום "${line}".`);
+    expect(errorText(e, he)).toBe(`לא ברור אם הכוונה לכפל — אם כן, כתבו את הכפל במפורש: «${suggestion}» במקום «${line}».`);
     expect(store().lines).toEqual([]);
     // the taught spelling drives (#1156)
     expect(submitLine(suggestion)).toBe(true);

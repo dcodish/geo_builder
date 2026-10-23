@@ -93,6 +93,8 @@ const ROLES: Record<string, Record<Product, string[] | null>> = {
   // #1870 (ADR-CX-083, ADR-W-107; ruling B14, wording B13): a claim to prove is refused in every builder, in 2-D's
   // sentence. 3-D HAS this surface (`err.proofTarget`) but quotes the sentence with «…» where the other three use
   // "…" — a known gap owned by #1868 (one refusal voice), so it is left out here until that lands, not excused.
+  // Since #2202 (ADR-W-149) the HEBREW is equal in all four (d1: «…» everywhere); the English quotes still differ
+  // (3-D «…», the others "…"), which is #2241's, so 3-D stays out of this two-language row.
   proofTarget: { '2d': ['input.scope.proof-target'], '3d': null, complex: ['errProofTarget'], analytic: ['errProofTarget'] },
 };
 
@@ -123,7 +125,8 @@ const RULED: Record<string, Record<Lang, string>> = {
     en: 'Segment {{N}} already has a name: {{N}} (in the line «{{N}}»). A segment has one name — keep using {{N}}.',
   },
   proofTarget: {
-    he: 'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "{{N}}"',
+    // #2202 (ADR-W-149, ruling d1 2026-10-16): a quoted value is «…» in Hebrew; the English is not ruled
+    he: 'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «{{N}}»',
     en: 'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "{{N}}"',
   },
   measureContradicts: {

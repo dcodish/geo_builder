@@ -69,7 +69,7 @@ describe('#1428 — a second equation on a reserved letter is refused with the r
       why: { code: 'reserved-letter', letter: 'z', equation: 'z^3 = 1' },
     });
     expect(strip()).toBe(
-      'המשפט "z^3 = 8" לא נוסף — z מסמן את פתרונות המשוואה «z^3 = 1» — התייחסו לפתרונות עצמם',
+      'המשפט «z^3 = 8» לא נוסף — z מסמן את פתרונות המשוואה «z^3 = 1» — התייחסו לפתרונות עצמם',
     );
     // keep-prior, and no phantom fourth point named z
     expect(store().lines).toEqual(['z^3 = 1']);
@@ -105,7 +105,7 @@ describe('#1428 arm 2 — the strip never claims a contradiction that does not e
     expect(play(['z^2 = 2i', 'z = 1+i'])).toEqual([true, false]);
     expect(store().lastError?.key).toBe('refused');
     expect(strip()).toBe(
-      'המשפט "z = 1+i" לא נוסף — z מסמן את פתרונות המשוואה «z^2 = 2i» — התייחסו לפתרונות עצמם',
+      'המשפט «z = 1+i» לא נוסף — z מסמן את פתרונות המשוואה «z^2 = 2i» — התייחסו לפתרונות עצמם',
     );
     expect(strip()).not.toContain('אינו מתיישב');
   });
@@ -113,7 +113,7 @@ describe('#1428 arm 2 — the strip never claims a contradiction that does not e
   it('«z^3 = 1 · |z| = 2» — the shape that was already refused — now reads the same sentence', () => {
     expect(play(['z^3 = 1', '|z| = 2'])).toEqual([true, false]);
     expect(strip()).toBe(
-      'המשפט "|z| = 2" לא נוסף — z מסמן את פתרונות המשוואה «z^3 = 1» — התייחסו לפתרונות עצמם',
+      'המשפט «|z| = 2» לא נוסף — z מסמן את פתרונות המשוואה «z^3 = 1» — התייחסו לפתרונות עצמם',
     );
   });
 

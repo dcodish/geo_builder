@@ -39,7 +39,7 @@ const play = (...lines: string[]): boolean => {
 };
 
 const NEG_HE = (word: string) =>
-  `עדיין אי אפשר לקלוט שלילה ("${word}"). ניתן לציין מה כן נתון — למשל "z1 מדומה טהור" או "arg(z1) = 30°".`;
+  `עדיין אי אפשר לקלוט שלילה («${word}»). ניתן לציין מה כן נתון — למשל «z1 מדומה טהור» או «arg(z1) = 30°».`;
 const UNREAD_HE = (detail: string) => `הבנתי חלק מהשורה, אבל לא את: ${detail}`;
 
 describe('#1890 — the issue\'s exact sequences are refused, never recorded as the opposite', () => {

@@ -18,86 +18,12 @@
  * Shell may not import a product tree, so the product tables are read by FILE: JSON for 2-D and 3-D, and
  * the `const he = {…}` / `const en: typeof he = {…}` object literals of analytic and complex through the
  * TypeScript compiler API (the row-parity / suite-vocabulary pattern, with a real parser in place of a regex).
+ * That reader is shared with #2202's locks: `fixtures/locale-tables.ts`.
  */
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import { PRODUCTS, productTable, suiteTable, unreadableCount, type Lang, type Product, type Table } from './fixtures/locale-tables';
 
-const ROOT = path.resolve(__dirname, '..', '..');
-const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/^﻿/, '');
-
-type Lang = 'he' | 'en';
-type Table = Record<string, string>;
-const PRODUCTS = ['2d', '3d', 'complex', 'analytic'] as const;
-type Product = (typeof PRODUCTS)[number];
-
-/** Every string leaf, dotted (array elements by index). */
-function flatten(o: unknown, prefix = '', out: Table = {}): Table {
-  if (typeof o === 'string') out[prefix] = o;
-  else if (o && typeof o === 'object')
-    for (const [k, v] of Object.entries(o as Record<string, unknown>)) flatten(v, prefix ? `${prefix}.${k}` : k, out);
-  return out;
-}
-
-/** The value of a locale-literal node: strings, `'a' + 'b'`, arrays and nested objects. Anything else is
- *  computed and cannot be read statically; it is counted so the reader cannot go quietly blind. */
-let unreadable = 0;
-function literalValue(node: ts.Expression): unknown {
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
-  if (ts.isParenthesizedExpression(node)) return literalValue(node.expression);
-  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
-    const l = literalValue(node.left);
-    const r = literalValue(node.right);
-    if (typeof l === 'string' && typeof r === 'string') return l + r;
-  }
-  if (ts.isArrayLiteralExpression(node)) return node.elements.map((e) => literalValue(e));
-  if (ts.isObjectLiteralExpression(node)) {
-    const o: Record<string, unknown> = {};
-    for (const p of node.properties) {
-      if (!ts.isPropertyAssignment(p)) {
-        unreadable++;
-        continue;
-      }
-      const name = ts.isIdentifier(p.name) || ts.isStringLiteral(p.name) || ts.isNumericLiteral(p.name) ? p.name.text : undefined;
-      if (name === undefined) {
-        unreadable++;
-        continue;
-      }
-      o[name] = literalValue(p.initializer);
-    }
-    return o;
-  }
-  unreadable++;
-  return undefined;
-}
-
-/** A TS-object locale: the initializer of the top-level `const he` / `const en`. */
-function tsTable(rel: string, lang: Lang): Table {
-  const sf = ts.createSourceFile(rel, read(rel), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  for (const st of sf.statements) {
-    if (!ts.isVariableStatement(st)) continue;
-    for (const d of st.declarationList.declarations) {
-      if (ts.isIdentifier(d.name) && d.name.text === lang && d.initializer && ts.isObjectLiteralExpression(d.initializer))
-        return flatten(literalValue(d.initializer));
-    }
-  }
-  throw new Error(`${rel}: no top-level \`const ${lang} = {…}\``);
-}
-
-const TABLE_FILE: Record<Product, (lang: Lang) => string> = {
-  '2d': (l) => `src/i18n/locales/${l}.json`,
-  '3d': (l) => `src3d/i18n/locales/${l}.json`,
-  complex: () => 'src-complex/i18n/index.ts',
-  analytic: () => 'src-analytic/i18n/index.ts',
-};
-
-function productTable(p: Product, lang: Lang): Table {
-  const rel = TABLE_FILE[p](lang);
-  return rel.endsWith('.json') ? flatten(JSON.parse(read(rel))) : tsTable(rel, lang);
-}
-
-const suite = { he: flatten(JSON.parse(read('shell/locales/he.json'))), en: flatten(JSON.parse(read('shell/locales/en.json'))) };
+const suite = { he: suiteTable('he'), en: suiteTable('en') };
 
 /** The (b) and (c) faults of one product's own tables against the suite file — the function the meta-lock
  *  below feeds broken stubs, so the claim that it bites is exercised, not assumed. */
@@ -134,7 +60,7 @@ describe('#2201 phase 1 — suite-wide text lives once, in shell/locales', () =>
   });
 
   it('every builder table is read completely (the reader is not blind)', () => {
-    expect(unreadable, 'a locale entry the static reader could not evaluate').toBe(0);
+    expect(unreadableCount(), 'a locale entry the static reader could not evaluate').toBe(0);
     for (const p of PRODUCTS) {
       expect(Object.keys(tables[p].he).length, `${p} he`).toBeGreaterThan(100);
       expect(Object.keys(tables[p].en).length, `${p} en`).toBeGreaterThan(100);

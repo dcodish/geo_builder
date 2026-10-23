@@ -129,8 +129,8 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
     ADR-299 (#45), ADR-381 (#237), ADR-318 (#105), [ADR-AG-187](06c-decisions-analytic.md#adr-ag-187) (#1555).
 - **FR-SU-18 (Must)** — **The tool reads Hebrew and English, and a letter it cannot read is refused by
   name — never replaced.** A letter or a word in any other script is rejected in all four builders, with the
-  letters the student typed quoted back: as a point name, «"ДЖФ" אינו שם של נקודה. שם נקודה הוא אות לטינית
-  גדולה, אפשר עם ספרה — למשל G או A1.», and otherwise «הכלי קורא עברית ואנגלית בלבד — "…" אינו באחת מהן.
+  letters the student typed quoted back: as a point name, ««ДЖФ» אינו שם של נקודה. שם נקודה הוא אות לטינית
+  גדולה, אפשר עם ספרה — למשל G או A1.», and otherwise «הכלי קורא עברית ואנגלית בלבד — «…» אינו באחת מהן.
   נסו לכתוב את השורה בעברית או באנגלית.». It is never drawn under substituted names and never sent to the
   model. Two things stay readable: **Greek is mathematics** (α, β, γ, π, θ as measure names, «ΔABC»), and a
   **look-alike letter folds silently** to its Latin twin (FR-SU-17's table: «משולש КМО» is the triangle
@@ -345,7 +345,9 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | Save, load, share link | shared | same | same | same | **Same** |
 | Image export | yes | yes | yes | yes | **Same** |
 | Question export «הורידו שאלה» | yes | yes | yes | yes | **Same** (B16, #1872: ADR-W-126) — each list per its ruling: analytic follows 2-D (W5), complex leaves the claims out (W6) |
-| Empty state | «מה בונים היום?» | same | its own title and hint | same as 2-D | **Ruled change** — shared title, analytic keeps its hint (B15, #1871) |
+| Empty state | «מה בונים היום?» | same | same title, its own hint | same as 2-D | **Same** — one title, analytic keeps its hint (B15, #1871; landed #2202, [ADR-W-149](06w-decisions-workspace.md#adr-w-149)) |
+| The suite's shared wordings: About title «על הכלי» and close «הבנתי — אפשר להתחיל», the share-link prompt «…במקום מה שבנית?», the guide intro, the try hint «…על השרטוט» | one key each in `shell/locales` (the try hint per product) | same | same | same | **Same** — ruled 2026-10-16 (#2202, [ADR-W-149](06w-decisions-workspace.md#adr-w-149)); English twins are #2241 |
+| A value quoted in a Hebrew message (a refusal naming the student's line) | «…» | same | same | same | **Same** — ruled 2026-10-16 (#2202, ADR-W-149); English quotes not ruled |
 | Hide a segment | menu, not undoable | no menu | menu, undoable | n/a | **Ruled change** — 2-D becomes undoable (B15, #1871); 3-D **Ruled** n/a |
 | Header, suite bar, About | shared frame | same | same | same | **Same** |
 | Language toggle and RTL | shared | same | same | same | **Same** (bidi: three kits held by one fixture) |

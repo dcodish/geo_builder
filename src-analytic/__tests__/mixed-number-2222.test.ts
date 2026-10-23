@@ -70,7 +70,7 @@ describe('#2222 — an ASCII mixed number is refused in every analytic slot, bef
     const v = decideSubmit('שיעור ה-y של P הוא 5 1/2', [], 0);
     expect(v.kind).toBe('refused');
     if (v.kind !== 'refused') return;
-    expect(errorText(v.error, t)).toBe('לא ברור אם "5 1/2" הוא מספר מעורב או מכפלה. כתבו 5.5 (מספר עשרוני) או 5+1/2 למספר המעורב, או 5*1/2 למכפלה.');
+    expect(errorText(v.error, t)).toBe('לא ברור אם «5 1/2» הוא מספר מעורב או מכפלה. כתבו 5.5 (מספר עשרוני) או 5+1/2 למספר המעורב, או 5*1/2 למכפלה.');
     expect(errorText(v.error, tEn)).toBe('"5 1/2" could be a mixed number or a product. Write 5.5 (a decimal) or 5+1/2 for the mixed number, or 5*1/2 for the product.');
   });
 
@@ -78,7 +78,7 @@ describe('#2222 — an ASCII mixed number is refused in every analytic slot, bef
     const v = decideSubmit('A(2 1/3, 3)', [], 0);
     expect(v.kind).toBe('refused');
     if (v.kind !== 'refused') return;
-    expect(errorText(v.error, t)).toBe('לא ברור אם "2 1/3" הוא מספר מעורב או מכפלה. כתבו 2+1/3 למספר המעורב, או 2*1/3 למכפלה.');
+    expect(errorText(v.error, t)).toBe('לא ברור אם «2 1/3» הוא מספר מעורב או מכפלה. כתבו 2+1/3 למספר המעורב, או 2*1/3 למכפלה.');
   });
 
   it('after an operator the sum is parenthesised, so it reads the same in place', () => {

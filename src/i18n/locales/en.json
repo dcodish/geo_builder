@@ -9,14 +9,12 @@
   "manualTitle": "The Guide — Plane Geometry",
   "manualClose": "Back to the tool",
   "manualTry": "Click to try — the example builds on the figure",
-  "manualPartial": "This is a partial guide — only representative examples are shown, so you can see what sorts of sentences can be typed. If the tool didn't understand a sentence, try different wording — unsupported sentences are collected and reviewed by the project team for future support.",
   "switcher3d": "Space Geometry",
   "switcherAria": "Switch between builders",
   "header": {
     "help": "Help"
   },
   "about": {
-    "title": "About this tool",
     "lead": "An intuitive tool for building geometry diagrams — describe a construction in plain language and watch the figure build, step by step.",
     "points": [
       "For high-school students preparing for the geometry matriculation (bagrut), and for teachers who need to sketch a figure quickly and simply.",
@@ -28,8 +26,7 @@
       "point G on AD",
       "angle GBA = 37°"
     ],
-    "privacy": "Privacy: no sign-up and no personal details are collected. To improve the tool, typed instructions (math text only) are kept for up to 30 days with an anonymous visitor id — your IP address is never stored. Statements the tool does not understand are sent for processing to an external AI service. When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.",
-    "close": "Got it — let's start"
+    "privacy": "Privacy: no sign-up and no personal details are collected. To improve the tool, typed instructions (math text only) are kept for up to 30 days with an anonymous visitor id — your IP address is never stored. Statements the tool does not understand are sent for processing to an external AI service. When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it."
   },
   "input": {
     "placeholder": "Describe a step — e.g. \"square ABCD\" or \"point G on AD\"",
@@ -524,7 +521,6 @@
     "reset": "Reset view",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
-    "emptyTitle": "What are we building today?",
     "emptyHint": "Click an example given — or type your own, and the figure builds in front of you",
     "rotate90": "Rotate 90°",
     "rotate180": "Rotate 180°",
@@ -740,7 +736,6 @@
     "tooLong": "This link is too long to share — save the figure as a file and send that instead",
     "badLink": "This link is not valid — ask the sender to send it again",
     "tooLarge": "This link is too large to open — a figure can hold up to {{max}} statements. Ask the sender to send the figure as a file",
-    "arrived": "The link you opened contains a figure. Open it instead of what you built?",
     "openIt": "Open the shared figure",
     "keepMine": "Keep mine",
     "preparing": "Preparing link…",

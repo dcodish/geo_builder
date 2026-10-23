@@ -68,7 +68,7 @@ const allGreen = () => {
   expect(fig.lastError).toBeNull();
   for (const f of st.facts) expect(fig.status[f.id], f.utterance).toBe('ok');
 };
-const ASK_HE = 'יש כמה מעגלים בסרטוט (O, P), ולא ברור לאיזה מהם הכוונה. ציינו את המעגל בשמו — למשל "מעגל O".';
+const ASK_HE = 'יש כמה מעגלים בסרטוט (O, P), ולא ברור לאיזה מהם הכוונה. ציינו את המעגל בשמו — למשל «מעגל O».';
 
 describe('#2242 — one circle drawn: a size about «המעגל» sizes it, exactly as the named line does', () => {
   // [prefix, the definite line, its named twin, the stated radius, locale]

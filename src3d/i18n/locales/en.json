@@ -5,7 +5,6 @@
   "language": "עברית",
   "switcherAria": "Switch between builders",
   "switcher3d": "Space Geometry",
-  "aboutTitle": "About this tool",
   "aboutLead": "A tool for building the figure of a space-geometry question: enter the givens line by line — solids, points, vectors — and the figure builds and orbits in front of you. It draws and verifies the givens; it never solves the question.",
   "aboutPoints": [
     "For high-school students preparing for the solid-geometry matriculation (bagrut), and for teachers who need to sketch a solid quickly and simply.",
@@ -18,7 +17,6 @@
     "M is the midpoint of BB'",
     "O is the intersection of the diagonals of face ABCD"
   ],
-  "aboutClose": "Close",
   "input": {
     "placeholder": "Type a given, e.g.: cube ABCD",
     "add": "Add",
@@ -201,11 +199,9 @@
   },
   "manual": {
     "title": "The Guide — Space Geometry",
-    "intro": "This is a partial guide — only representative examples are shown, so you can see what sorts of sentences can be typed. Click one to watch it build, or phrase freely — if the tool didn't understand, try different wording; unsupported sentences are collected and reviewed by the project team for future support.",
     "close": "Back to the tool",
     "try": "Click to try — the example builds on the figure"
   },
-  "emptyTitle": "What are we building today?",
   "emptyHintChips": "Click an example given — or type your own, and the figure builds in front of you",
   "dataPanel": {
     "title": "Data",
@@ -388,7 +384,6 @@
     "tooLong": "This link is too long to share — save the figure as a file and send that instead",
     "badLink": "This link is not valid — ask the sender to send it again",
     "tooLarge": "This link is too large to open — a figure can hold up to {{max}} statements. Ask the sender to send the figure as a file",
-    "arrived": "The link you opened contains a figure. Open it instead of what you built?",
     "openIt": "Open the shared figure",
     "keepMine": "Keep mine",
     "dismiss": "Dismiss",

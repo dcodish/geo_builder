@@ -1001,6 +1001,9 @@ that hid on empty in one builder and showed in two.
    complex gain the missing disabled states; the empty complex view-toggle disables (a blank canvas
    has no view to toggle).
 
+**Amended by [ADR-W-149](#adr-w-149) (#2202, operator ruling 2026-10-16):** clause 1's title is one suite key,
+`suite.canvas.emptyTitle`, and analytic now shows it too (its «התחילו לשרטט» ends; its hint stays its own).
+
 ## ADR-W-025 — The `-next` channel is retired: the unified interface IS the baseline (#747)
 
 **Status:** accepted, 2026-08-18 · **Issue:** [#747](https://github.com/dcodish/geo_builder/issues/747) ·
@@ -6101,3 +6104,38 @@ The 2026-10-08 plan update asked analytic for every reader of an angle measure. 
    - The 2-D and 3-D literal-key audits (`i18n-keys-1372`, `src3d/__tests__/i18n-parity`) resolve against the merged resources. `suite-vocabulary.test.ts` drops its `about` row, which is held by construction now.
 
 **Behaviour change for a student:** none. Every moved string is byte-identical in every builder, held by lock (d).
+
+## ADR-W-149 — The seven ruled suite wordings: five shared keys in `shell/locales`, «…» around a quoted value in every Hebrew table (#2202)
+
+**Status:** accepted · 2026-10-23 · debt (P3, workspace) · fix round #2466, stream C · branch `fix/2202-shared-wordings` (stacked on #2201 phase 1) · **Operator rulings** 2026-10-16 (ballot card 8, rows d2202-d1 … d7; decisions round 3, card g2202-2d-intro) · **Amends:** [ADR-W-024](#adr-w-024) clause 1 · **Extends:** [ADR-W-148](#adr-w-148)
+**Requirements:** [02w](02w-requirements-workspace.md) the cross-builder rows *Empty state*, *The suite's shared wordings* and *A value quoted in a Hebrew message*; the verbatim refusals quoted in [02](02-requirements.md) FR-EN-3, [02c](02c-requirements-analytic.md) (the side-of-line refusal, R193), [02d](02d-requirements-complex.md) (negation) and 02w (an unread script) now quote with «…» · **Design:** [04w](04w-design-shell.md) § *Suite-wide text* (the ruled wordings, the quote style)
+
+**Context.** The same message, shown by several builders, was held in one copy per builder, and the copies had drifted (#2201's class): «מה שבנית» / «מה שבניתם», «הציור» / «השרטוט», four guide intros, «הבנתי — אפשר להתחיל» / «סגירה» / «סגור», «על הכלי» / «גאומטריה אנליטית», «מה בונים היום?» / «התחילו לשרטט». The quote marks around a value the message inserts were the same class over a convention: no single statement of the style, so each table chose («"…"» in most of analytic and complex, «…» in 3-D, both in 2-D). The operator ruled each on 2026-10-16:
+
+| Row | Ruling |
+|---|---|
+| d1 quote marks | A — «…» everywhere |
+| d2 address | B — singular everywhere: «מה שבנית» |
+| d3 the figure's word | B — one word everywhere: «השרטוט» |
+| d4 guide intro | A — 3-D's full text in every tool; 2-D too, *"The pickup first checks that clicking a 2-D example builds it; if not, 2-D keeps its own"* |
+| d5 close button | A — «הבנתי — אפשר להתחיל» everywhere |
+| d6 About title | A — «על הכלי» everywhere |
+| d7 empty-canvas title | B — one title everywhere: «מה בונים היום?» |
+
+**Measured at pickup (894cbe65).** d2–d7 as the plan recorded. d1 had grown since the plan (e2e30076): 120 Hebrew messages carried a straight-quoted span around an interpolation (2-D 26, 3-D 1, analytic 76, complex 17), not 117. The d4 condition held: a browser probe opened 2-D's guide, clicked its first example («משולש ABC»), and the guide closed and the figure went from 0 to 12 drawn shapes. The plan's three contradictions with the issue body stand (2-D also had straight quotes; 2-D already had the empty title; 2-D had a fourth guide intro).
+
+**Decision.**
+1. **Five suite keys** join `shell/locales/{he,en}.json` with the ruled Hebrew, and as English the existing English twin of the builder whose Hebrew was ruled: `suite.share.arrived`, `suite.about.title`, `suite.about.close`, `suite.canvas.emptyTitle`, `suite.guide.intro`. Every App reads them at the surface (the About frame's `title` / `closeLabel`, the share-arrived `ResumeOffer`, the empty-canvas `QuickChips`, the `ManualScreen` intro). 2-D shows the intro after its own lead and bullet points, in place of its `manualPartial`. The per-product copies are deleted (2-D 5, 3-D 5, complex 5, analytic 3 keys per language). Analytic's About close stops reading the generic `close` key; its banners and the guide keep «סגור».
+2. **d3 stays per builder.** The try hint is «לחצו כדי לנסות — הדוגמה תיבנה על השרטוט» in all four tables, but it does not move, because its English is two strings (analytic "…will be built on the figure"). The English twins are #2241's.
+3. **d1 is a convention, held by a lock.** In every Hebrew table, a message with a straight-quoted span around an inserted value has all its straight-quoted spans turned into «…», so no message mixes the two. A message that quotes only fixed words («"מעל"» in 3-D's `err.planeSideUndefined`, 2-D's `input.ambiguousCircle`) has no inserted value and is outside the ruling, so it is untouched. English is not ruled and is untouched. A side effect, by the bidi kits' design: «…» sit outside the LTR isolate of a quoted Latin line, where "…" sat inside it.
+4. **Locks.**
+   - `shell/__tests__/quote-style.test.ts`: no straight-quoted span around an interpolation (and no unpaired straight quote in a message that inserts a value) in any Hebrew table, with a non-vacuity floor per builder and a meta case.
+   - `shell/__tests__/suite-wordings-2202.test.ts`: the suite file carries the ruled text; each App reads every ruled key at its surface (source scan, with a bite case); no retired per-product key is defined or read; the four try hints are equal and ruled; analytic's banners keep `close`.
+   - `<tree>/__tests__/ruled-wordings-2202.test.ts` in each tree (assertions in `shell/__tests__/fixtures/ruled-wordings-2202.ts`): each builder's own i18n instance resolves every ruled key to the ruled text, in both languages.
+   - `row-parity.test.ts`'s ADR-W-024 empty-state row reads the suite key and includes analytic. `suite-vocabulary.test.ts`'s `proofTarget` anchor quotes with «…».
+   - The shell locks share one reader of the four tables, `shell/__tests__/fixtures/locale-tables.ts` (moved out of `suite-locale.test.ts`).
+   - 29 test files that asserted a Hebrew refusal verbatim were re-based to «…», and so was the 2-D scenario `crossed-ring-over-placed-points-1927`. None of those strings was ruled before.
+
+**Not done here.** The English twins (#2241). The Hebrew straight quotes around fixed words, and 2-D's empty-canvas hint «…והציור ייבנה מולכם» (the figure's word outside the try hint): not in the ruled scope, reported to the round as found work.
+
+**Behaviour change for a student:** in Hebrew, every refusal or notice that quotes the student's own words shows them in «…» in all four builders; analytic and complex ask «…במקום מה שבנית?»; the guide's try hint says «השרטוט» in 2-D, 3-D and complex; analytic, complex and 2-D show 3-D's guide intro; the About box closes with «הבנתי — אפשר להתחיל» in 3-D, analytic and complex; analytic's About box is titled «על הכלי» and its empty canvas «מה בונים היום?». In English, analytic's About title, About close and empty title, and the analytic, complex and 2-D guide intros, read as the other builders' English.

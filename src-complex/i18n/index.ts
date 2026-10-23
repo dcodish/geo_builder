@@ -30,42 +30,42 @@ const he = {
   viewPolar: 'תצוגה קוטבית',
   language: 'English',
   emptyHint: 'אין עדיין נתונים. נסו את הדוגמה, או הקלידו: z1 = 3+4i',
-  errNotHandled: 'לא הצלחתי להבין את המשפט: "{{detail}}"',
+  errNotHandled: 'לא הצלחתי להבין את המשפט: «{{detail}}»',
   // #1919 — a script this tool does not read: the operator's two sentences, identical in every builder
-  errUnreadName: '"{{detail}}" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
+  errUnreadName: '«{{detail}}» אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
   // #1870 (ADR-CX-083, B14) — a claim to prove is refused, in 2-D's words
   errProofTarget:
-    'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "{{detail}}"',
-  errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — "{{detail}}" אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
-  errParse: 'שגיאת ניסוח בביטוי: "{{detail}}"',
-  errDuplicate: 'השם כבר הוגדר במשפט: "{{detail}}"',
+    'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «{{detail}}»',
+  errUnreadWord: 'הכלי קורא עברית ואנגלית בלבד — «{{detail}}» אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.',
+  errParse: 'שגיאת ניסוח בביטוי: «{{detail}}»',
+  errDuplicate: 'השם כבר הוגדר במשפט: «{{detail}}»',
   errUnknownRef: 'המשפט מפנה לשם שלא הוגדר: {{detail}}',
-  errRootsOfZero: 'לא ניתן לחלץ שורשים של אפס: "{{detail}}"',
-  errIncompatible: 'המשפט לא נוסף — אינו מתיישב עם: "{{detail}}"',
-  errImpossible: 'המשפט לא נוסף — הוא לא יכול להתקיים: "{{detail}}"',
+  errRootsOfZero: 'לא ניתן לחלץ שורשים של אפס: «{{detail}}»',
+  errIncompatible: 'המשפט לא נוסף — אינו מתיישב עם: «{{detail}}»',
+  errImpossible: 'המשפט לא נוסף — הוא לא יכול להתקיים: «{{detail}}»',
   // #2268 (ADR-CX-084) — a true restatement adds nothing: 2-D's noop sentence verbatim (`input.alreadyDrawn`)
   noteAlreadyKnown: 'זה כבר קיים באיור — אין מה להוסיף.',
   errUnaccounted: 'הבנתי חלק מהשורה, אבל לא את: {{detail}}',
   // #1890 (W20) — 2-D's negation sentence (input.scope.negation), with examples that read in this tool
-  errNegation: 'עדיין אי אפשר לקלוט שלילה ("{{word}}"). ניתן לציין מה כן נתון — למשל "z1 מדומה טהור" או "arg(z1) = 30°".',
+  errNegation: 'עדיין אי אפשר לקלוט שלילה («{{word}}»). ניתן לציין מה כן נתון — למשל «z1 מדומה טהור» או «arg(z1) = 30°».',
   // #1405 — a letter declared complex, used where only a real number can stand
-  errComplexAsReal: 'המשפט לא נוסף — {{letter}} הוגדר כמספר מרוכב, אבל "{{detail}}" משתמש בו כמספר ממשי (גודל או זווית)',
+  errComplexAsReal: 'המשפט לא נוסף — {{letter}} הוגדר כמספר מרוכב, אבל «{{detail}}» משתמש בו כמספר ממשי (גודל או זווית)',
   // #1428 — a statement the figure cannot use, with the reason the fold knows (whyText)
-  errRefused: 'המשפט "{{detail}}" לא נוסף — {{reason}}',
+  errRefused: 'המשפט «{{detail}}» לא נוסף — {{reason}}',
   // #1435 — the 2-D #246 guidance (input.scope.word-root), in this tool's words: the √ spelling, and the button
-  errWordRoot: 'כתבו את השורש עם הסמל √ — יש כפתור √ בלוח «סמלים». למשל "{{suggestion}}" במקום "{{detail}}".',
+  errWordRoot: 'כתבו את השורש עם הסמל √ — יש כפתור √ בלוח «סמלים». למשל «{{suggestion}}» במקום «{{detail}}».',
   // #1365 — «zi» glues a complex number to i: z·i, or a name? Asked, with the product spelled out
-  errGluedI: 'לא ברור אם הכוונה לכפל — אם כן, כתבו את הכפל במפורש: "{{suggestion}}" במקום "{{detail}}".',
+  errGluedI: 'לא ברור אם הכוונה לכפל — אם כן, כתבו את הכפל במפורש: «{{suggestion}}» במקום «{{detail}}».',
   // #2247 (ADR-CX-081) — an ASCII mixed number «2 1/2»: analytic's sentence (ADR-AG-284), byte for byte
-  errMixedNumber: 'לא ברור אם "{{detail}}" הוא מספר מעורב או מכפלה. כתבו {{decimal}} (מספר עשרוני) או {{sum}} למספר המעורב, או {{product}} למכפלה.',
-  errMixedNumberNoDecimal: 'לא ברור אם "{{detail}}" הוא מספר מעורב או מכפלה. כתבו {{sum}} למספר המעורב, או {{product}} למכפלה.',
+  errMixedNumber: 'לא ברור אם «{{detail}}» הוא מספר מעורב או מכפלה. כתבו {{decimal}} (מספר עשרוני) או {{sum}} למספר המעורב, או {{product}} למכפלה.',
+  errMixedNumberNoDecimal: 'לא ברור אם «{{detail}}» הוא מספר מעורב או מכפלה. כתבו {{sum}} למספר המעורב, או {{product}} למכפלה.',
   // #1974 (ADR-CX-063) — a RESERVED CONSTANT as the subject: the tool knows what the name is, so it
   // says so instead of «לא הצלחתי להבין». The operator's two sentences (2026-10-10); their shapes
   // differ on purpose — `i` IS a number, `o` MARKS a position and the student may pick another name.
   errReservedI: '{{constant}} הוא מספר מדומה',
   errReservedO: '{{constant}} מסמן את ראשית הצירים — אפשר לבחור שם אחר',
   // #1534 — r(cosθ + i·sinθ) with two different angles is not a cis of anything: both are named
-  errTrigMismatch: 'בשורה "{{detail}}" הזווית של cos ({{cos}}) שונה מהזווית של sin ({{sin}}) — בצורה r(cosθ + i·sinθ) זו אותה זווית בשני המקומות.',
+  errTrigMismatch: 'בשורה «{{detail}}» הזווית של cos ({{cos}}) שונה מהזווית של sin ({{sin}}) — בצורה r(cosθ + i·sinθ) זו אותה זווית בשני המקומות.',
   errWrongApp: 'הקובץ שייך לכלי אחר ({{detail}}) — כאן נטענים קבצים של בונה המרוכבים בלבד',
   errNewerVersion: 'הקובץ נשמר בגרסה חדשה יותר של הכלי — רעננו את הדף ונסו שוב',
   errTooLarge: 'הקובץ גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{detail}} משפטים',
@@ -114,8 +114,8 @@ const he = {
   calc: 'חשב',
   calcPlaceholder: 'הקלידו ביטוי לחישוב, למשל |z1-z2|',
   calcCurrent: 'בדגימה הנוכחית: {{value}}',
-  // The shared frame (shell/, #673): the suite bar's visible buttons and the privacy note (NFR-SE-3).
-  aboutTitle: 'על הכלי',
+  // The shared frame (shell/, #673): the suite bar's visible buttons and the privacy note (NFR-SE-3). The About
+  // box's title and close button are suite text (shell/locales suite.about.*, #2202 / ADR-W-149).
   aboutLead:
     'כלי לבניית הציור של שאלת מספרים מרוכבים: מקלידים את הנתונים שורה-שורה, והציור נבנה ומתעדכן תוך כדי. הכלי מצייר ובודק את הנתונים — הוא אינו פותר את השאלה.',
   // #1477 (ADR-W-091): the About DECLARATION's parts — the same sections as 2-D's About.
@@ -126,7 +126,6 @@ const he = {
     'הכלי מצייר את הציור לפי מה שתיארתם ובודק את הנתונים — טענה שאינה מתקיימת מסומנת, והכלי אינו פותר שאלות.',
   ],
   aboutTrySteps: ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2'],
-  aboutClose: 'סגירה',
   privacy:
     'פרטיות: אין הרשמה ולא נאספים פרטים אישיים. לצורך שיפור הכלי נשמרים המשפטים שהקלדתם (טקסט מתמטי בלבד) עם מזהה מבקר אנונימי — ללא כתובת ה-IP — עד 30 יום. העבודה נשמרת בדפדפן שלכם ובקבצים שאתם בוחרים לשמור.' +
     ' כשאתם לוחצים «העתק קישור», השרטוט ותמונה שלו נשמרים בשרת כדי שהקישור יעבוד — בלי שם ובלי פרטים אישיים, ומי שיש לו את הקישור יכול לפתוח אותו.',
@@ -145,8 +144,7 @@ const he = {
   panelShow: 'הצגה',
   panelHide: 'הסתרה',
   namePlaceholder: 'שם השרטוט (לא חובה)',
-  // B4 (D9b): the empty-canvas quick chips — the inviting first click.
-  emptyTitle: 'מה בונים היום?',
+  // B4 (D9b): the empty-canvas quick chips — the inviting first click. Their title is suite.canvas.emptyTitle.
   emptyHintChips: 'לחצו נתון לדוגמה — או הקלידו משלכם, והציור ייבנה מולכם',
   // B5 (D6): the fact-list operations — disable answers "מה אם לא הייתי אומר זאת?"
   factToggle: 'כלול בציור',
@@ -154,10 +152,8 @@ const he = {
   factDelete: 'מחיקה',
   // A6 (D9): the manual SCREEN — catalog-backed, a click submits the example.
   manualTitle: 'המדריך — מספרים מרוכבים',
-  manualIntro:
-    'זהו מדריך חלקי — מוצגות דוגמאות מייצגות מכל סוג, כדי להראות אילו מיני משפטים אפשר להקליד. לחצו על דוגמה כדי לראות אותה נבנית, או נסחו חופשי משלכם — ואם הכלי לא הבין, נסו ניסוח אחר: אוצר המשפטים של הכלי הולך וגדל.',
   manualClose: 'חזרה לכלי',
-  manualTry: 'לחצו כדי לנסות — הדוגמה תיבנה על הציור',
+  manualTry: 'לחצו כדי לנסות — הדוגמה תיבנה על השרטוט',
   // B6 (D8): the data-panel skeleton — same sections, same order, in every builder.
   secPoints: 'נקודות',
   secMeasures: 'מדידות',
@@ -256,7 +252,6 @@ const he = {
   shareTooLong: 'הקישור ארוך מדי לשיתוף — שמרו את השרטוט כקובץ ושלחו אותו',
   shareBadLink: 'הקישור אינו תקין — בקשו מהשולח לשלוח אותו שוב',
   shareTooLarge: 'הקישור גדול מדי ולא ייפתח — שרטוט יכול להכיל עד {{max}} משפטים. בקשו מהשולח לשלוח את השרטוט כקובץ',
-  shareArrived: 'הקישור שפתחתם מכיל שרטוט. לפתוח אותו במקום מה שבניתם?',
   shareOpenIt: 'פתח את השרטוט מהקישור',
   shareKeepMine: 'השאר את שלי',
   sharePreparing: 'מכין קישור…',
@@ -348,8 +343,8 @@ const en: typeof he = {
   calc: 'Calc',
   calcPlaceholder: 'type an expression to calculate, e.g. |z1-z2|',
   calcCurrent: 'at the current sample: {{value}}',
-  // The shared frame (shell/, #673): the suite bar's visible buttons and the privacy note (NFR-SE-3).
-  aboutTitle: 'About this tool',
+  // The shared frame (shell/, #673): the suite bar's visible buttons and the privacy note (NFR-SE-3). The About
+  // box's title and close button are suite text (shell/locales suite.about.*, #2202 / ADR-W-149).
   aboutLead:
     'A tool for building the figure of a complex-numbers question: enter the givens line by line and the figure forms and adapts as you go. It draws and verifies the givens — it never solves the question.',
   // #1477 (ADR-W-091): the About DECLARATION's parts — the same sections as 2-D's About.
@@ -360,7 +355,6 @@ const en: typeof he = {
     'It draws the figure from what you describe and checks the givens — a claim that does not hold is marked, and it does not solve problems.',
   ],
   aboutTrySteps: ['z1 = 3+4i', 'z2 = 2cis150', 'w = z1*z2'],
-  aboutClose: 'Close',
   privacy:
     'Privacy: no registration, and no personal data is collected. To improve the tool, the statements you type (math text only) are kept for up to 30 days with an anonymous visitor id — your IP address is never stored. Your work is stored in your browser and in files you choose to save.' +
     ' When you press “Copy link”, the figure and a picture of it are stored on the server so the link can work — with no name and no personal details, and anyone holding the link can open it.',
@@ -379,8 +373,7 @@ const en: typeof he = {
   panelShow: 'Show',
   panelHide: 'Hide',
   namePlaceholder: 'Figure name (optional)',
-  // B4 (D9b): the empty-canvas quick chips — the inviting first click.
-  emptyTitle: 'What are we building today?',
+  // B4 (D9b): the empty-canvas quick chips — the inviting first click. Their title is suite.canvas.emptyTitle.
   emptyHintChips: 'Click an example given — or type your own, and the figure builds in front of you',
   // B5 (D6): the fact-list operations — disable answers "what if I hadn't said this?"
   factToggle: 'Include in the figure',
@@ -388,8 +381,6 @@ const en: typeof he = {
   factDelete: 'Delete',
   // A6 (D9): the manual SCREEN — catalog-backed, a click submits the example.
   manualTitle: 'The Guide — Complex Numbers',
-  manualIntro:
-    "This is a partial guide — representative examples of each kind, to show what sorts of sentences can be typed. Click one to watch it build, or phrase your own freely — and if the tool didn't understand, try different wording: its vocabulary keeps growing.",
   manualClose: 'Back to the tool',
   manualTry: 'Click to try — the example builds on the figure',
   // B6 (D8): the data-panel skeleton — same sections, same order, in every builder.
@@ -482,7 +473,6 @@ const en: typeof he = {
   shareTooLong: 'This link is too long to share — save the figure as a file and send that instead',
   shareBadLink: 'This link is not valid — ask the sender to send it again',
   shareTooLarge: 'This link is too large to open — a figure can hold up to {{max}} statements. Ask the sender to send the figure as a file',
-  shareArrived: 'The link you opened contains a figure. Open it instead of what you built?',
   shareOpenIt: 'Open the shared figure',
   shareKeepMine: 'Keep mine',
   sharePreparing: 'Preparing link…',

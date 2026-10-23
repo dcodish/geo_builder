@@ -3268,6 +3268,8 @@ the file exists. Fixing complex here would have meant a sibling edit inside an a
 **Left for a ruling:** the empty state. «מה בונים היום?» is the siblings' wording; this product says
 «התחילו לשרטט — הבחינה לא מדפיסה שרטוט», which is a thing only this tool needs to say. Changing a
 voice is not a parity defect, so it waits.
+→ **Ruled 2026-10-16** ([ADR-W-149](06w-decisions-workspace.md#adr-w-149), #2202): «מה בונים היום?» is the one title
+in every builder, this one included; the hint below it keeps «הבחינה לא מדפיסה שרטוט — …».
 
 **Consequences.** `src-analytic` +10 tests (the history, and what it deliberately does not record);
 `shell` +4 (the widened parity lock and the sibling gap it found). Verified in a real browser, not

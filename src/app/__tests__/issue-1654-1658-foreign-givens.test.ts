@@ -92,7 +92,7 @@ describe('#1654–#1657 — the operator-audit sentences are refused, naming the
     expect(r.refused, 'the text stays in the box').toBe(true);
     expect(r.added, 'nothing of the sentence was committed').toBe(0);
     expect(r.notes).toHaveLength(1);
-    expect(r.notes[0], 'names the student’s own word').toContain(`"${word}"`);
+    expect(r.notes[0], 'names the student’s own word').toContain(`«${word}»`);
     expect(r.notes[0].endsWith(POINTER[family].he), 'then the family’s pointer, unchanged').toBe(true);
     expect(llmParseMock, 'never escalated — the model could only re-absorb the operand').not.toHaveBeenCalled();
   });

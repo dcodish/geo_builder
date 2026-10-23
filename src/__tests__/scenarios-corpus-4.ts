@@ -3822,7 +3822,7 @@ export const SCENARIOS_4: Scenario[] = [
         const v = gateVerdict(facts, line);
         expect(v.kind === 'refused' && v.reason, `«${prefix} · ${line}»: the last line is refused before it becomes a fact`).toBe('crossed-ring');
         expect(replay(facts).positions, 'the prior figure does not move').toEqual(shown);
-        expect(he(line)).toBe(`הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: "${line}". אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`);
+        expect(he(line)).toBe(`הנקודות שציינת לא יוצרות את הצורה הזאת בסדר הזה: «${line}». אפשר לשנות את סדר האותיות כך שהצלעות לא ייחתכו, או לשנות את מקומות הנקודות — בסדר הנוכחי הקודקודים נופלים על ישר אחד או שהצורה מתקפלת על עצמה.`);
         expect(en(line)).toBe(`The points you gave do not form that shape in this order: "${line}". Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.`);
       }
       // the control: the square's own points in a simple order are never refused — since #1953 (ADR-618) they are

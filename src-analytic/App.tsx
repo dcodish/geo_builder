@@ -1222,7 +1222,7 @@ export function App() {
         ) : pendingLink ? (
           /* #1373: a link arrived on a canvas that is NOT empty — ask, never replace silently. */
           <ResumeOffer
-            message={t('shareArrived')}
+            message={t('suite.share.arrived')}
             continueLabel={t('shareOpenIt')}
             restartLabel={t('shareKeepMine')}
             onContinue={acceptPendingLink}
@@ -1255,10 +1255,10 @@ export function App() {
       buildStamp={typeof __BUILD__ === 'string' ? __BUILD__ : undefined}
       about={{
         label: t('suite.about.label'),
-        title: t('suite.product.analytic'),
+        title: t('suite.about.title'),
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
-        closeLabel: t('close'),
+        closeLabel: t('suite.about.close'),
         autoOpenKey: 'analytic_intro_seen', // #1453 (ADR-W-098): first visit opens About, in every builder
       }}
     >
@@ -1277,7 +1277,7 @@ export function App() {
         emptyOverlay={
           lines.length === 0 ? (
             <QuickChips
-              title={t('emptyTitle')}
+              title={t('suite.canvas.emptyTitle')}
               hint={t('emptyHint')}
               commands={QUICK_COMMANDS}
               onPick={submit}
@@ -2292,7 +2292,7 @@ export function App() {
         open={manualOpen}
         onClose={() => setManualOpen(false)}
         title={t('manualTitle')}
-        intro={t('manualIntro')}
+        intro={t('suite.guide.intro')}
         closeLabel={t('close')}
         tryHint={t('manualTry')}
         sectionCap={6}

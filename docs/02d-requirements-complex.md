@@ -290,8 +290,8 @@ behind it; their history is in [06d](06d-decisions-complex.md).
   span accounting — and **no `dropped*` gate is ever added**. A sentence that finds a keyword claims only
   the words it read, never the whole line: a negation, a sign («החיובי», "positive"), «שונה מאפס» or a
   second statement after a property word is refused, naming those words. A refused **negation** is worded
-  with 2-D's sentence: «עדיין אי אפשר לקלוט שלילה ("אינו"). ניתן לציין מה כן נתון — למשל "z1 מדומה טהור"
-  או "arg(z1) = 30°".» — any other unread word keeps «הבנתי חלק מהשורה, אבל לא את: …». **An accepted
+  with 2-D's sentence: «עדיין אי אפשר לקלוט שלילה («אינו»). ניתן לציין מה כן נתון — למשל «z1 מדומה טהור»
+  או «arg(z1) = 30°».» — any other unread word keeps «הבנתי חלק מהשורה, אבל לא את: …». **An accepted
   object is drawn**: a circle whose radius is not a positive real number («ורדיוסו -2», «0», «2i»), or a
   circumscribed circle through collinear numbers, is refused with the existing sentence, naming the
   statement that blocks it or else the line itself. Three numbers on one line, to a scale-free

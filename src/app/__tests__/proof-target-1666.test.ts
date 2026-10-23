@@ -81,7 +81,7 @@ describe('#1666 — 2-D refuses a proof target at the submit gate', () => {
     expect(useGeoStore.getState().facts).toBe(before);
     expect(llmParseMock).not.toHaveBeenCalled();
     expect(d.calls.notes.filter(Boolean).map(plain)).toEqual([
-      'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: "הוכיחו כי AB ⊥ AC"',
+      'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «הוכיחו כי AB ⊥ AC»',
     ]);
   });
 

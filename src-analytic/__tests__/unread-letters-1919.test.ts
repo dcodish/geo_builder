@@ -39,13 +39,13 @@ describe('#1919 — analytic gives 2-D’s verdict on a letter the tool cannot r
     const name = decideSubmit('משולש ДЖФ', [], 0);
     expect(name.kind).toBe('refused');
     if (name.kind === 'refused') {
-      expect(errorText(name.error, t)).toBe('"ДЖФ" אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.');
+      expect(errorText(name.error, t)).toBe('«ДЖФ» אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.');
       expect(errorText(name.error, tEn)).toContain('is not a point name');
     }
     const word = decideSubmit('треугольник ABC', [], 0);
     expect(word.kind).toBe('refused');
     if (word.kind === 'refused') {
-      expect(errorText(word.error, t)).toBe('הכלי קורא עברית ואנגלית בלבד — "треугольник" אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.');
+      expect(errorText(word.error, t)).toBe('הכלי קורא עברית ואנגלית בלבד — «треугольник» אינו באחת מהן. נסו לכתוב את השורה בעברית או באנגלית.');
     }
   });
 

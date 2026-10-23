@@ -644,10 +644,10 @@ export function App() {
       switcherLabel={t('switcherAria')}
       about={{
         label: t('suite.about.label'),
-        title: t('aboutTitle'),
+        title: t('suite.about.title'),
         content: aboutContent(t),
         privacy: privacyDeclaration(t),
-        closeLabel: t('aboutClose'),
+        closeLabel: t('suite.about.close'),
         autoOpenKey: 'complex_intro_seen', // #1453 (ADR-W-098): first visit opens About, in every builder
       }}
       buildStamp={typeof __BUILD__ !== 'undefined' ? __BUILD__ : undefined}
@@ -673,7 +673,7 @@ export function App() {
         ) : pendingLink ? (
           /* #1373: a link arrived on a canvas that is NOT empty — ask, never replace silently. */
           <ResumeOffer
-            message={t('shareArrived')}
+            message={t('suite.share.arrived')}
             continueLabel={t('shareOpenIt')}
             restartLabel={t('shareKeepMine')}
             onContinue={acceptPendingLink}
@@ -711,7 +711,7 @@ export function App() {
               /* #751 (ADR-W-029): these were already RAW (config / EXAMPLE_LINES, never `t()`);
                  the shared contract now also isolates them for display, as the siblings do. */
               <QuickChips
-                title={t('emptyTitle')}
+                title={t('suite.canvas.emptyTitle')}
                 hint={t('emptyHintChips')}
                 commands={quickCommands}
                 display={(c) => complexBidi.inputPreview(c) ?? c}
@@ -1120,7 +1120,7 @@ export function App() {
       <ManualScreen
         open={manualOpen}
         title={t('manualTitle')}
-        intro={t('manualIntro')}
+        intro={t('suite.guide.intro')}
         closeLabel={t('manualClose')}
         tryHint={t('manualTry')}
         sectionCap={6}

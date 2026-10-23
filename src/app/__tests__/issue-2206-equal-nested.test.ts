@@ -88,7 +88,10 @@ describe('#2206 words — an equal pair stated internally tangent or concentric 
       const last = out[out.length - 1];
       expect(last.kind).toBe('refuse');
       expect(last.key).toBe(`input.equalCirclesNested.${rel}`);
-      expect(last.text!.startsWith(`"${line}": `), 'the message quotes the line').toBe(true);
+      // #2202 (ruling d1): a Hebrew message quotes the line in «…»; an English line gets the English message, whose
+      // quotes are not ruled and stay "…"
+      const quoted = /[א-ת]/.test(line) ? `«${line}»: ` : `"${line}": `;
+      expect(last.text!.startsWith(quoted), 'the message quotes the line').toBe(true);
       expect(useGeoStore.getState().facts.filter((f) => f.utterance === line)).toEqual([]);
       expect(llmParseMock).not.toHaveBeenCalled();
     });
@@ -96,10 +99,10 @@ describe('#2206 words — an equal pair stated internally tangent or concentric 
 
   it('the two new sentences, word for word, in Hebrew and English', () => {
     expect(stripFormatControls(he('input.equalCirclesNested.int-tangent', { detail: 'X' }))).toBe(
-      '"X": שני מעגלים שרדיוסיהם שווים אינם יכולים להיות משיקים מבפנים, כי שני מעגלים כאלה הם אותו מעגל. כתבו רק אחד מהשניים: "משיקים מבפנים" או "ברדיוסים שווים".',
+      '«X»: שני מעגלים שרדיוסיהם שווים אינם יכולים להיות משיקים מבפנים, כי שני מעגלים כאלה הם אותו מעגל. כתבו רק אחד מהשניים: «משיקים מבפנים» או «ברדיוסים שווים».',
     );
     expect(stripFormatControls(he('input.equalCirclesNested.concentric', { detail: 'X' }))).toBe(
-      '"X": שני מעגלים שרדיוסיהם שווים ומרכזם משותף הם אותו מעגל. כתבו רק אחד מהשניים: "בעלי מרכז משותף" או "ברדיוסים שווים".',
+      '«X»: שני מעגלים שרדיוסיהם שווים ומרכזם משותף הם אותו מעגל. כתבו רק אחד מהשניים: «בעלי מרכז משותף» או «ברדיוסים שווים».',
     );
     expect(en('input.equalCirclesNested.int-tangent', { detail: 'X' })).toContain('cannot be internally tangent');
     expect(en('input.equalCirclesNested.concentric', { detail: 'X' })).toContain('a common centre are the same circle');

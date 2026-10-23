@@ -156,14 +156,14 @@ describe('#1154 — refusals name what the student wrote', () => {
   it('a TAKEN letter is refused, naming the line that holds it', () => {
     const e = refusal('שנה שם A ל-B', session(FIGURE));
     expect(e).toEqual({ key: 'rename-taken', detail: 'B', holder: 'נתונה הנקודה B(8,2)' });
-    expect(errorText(e, t)).toBe('האות B כבר תפוסה: "נתונה הנקודה B(8,2)". בחרו אות פנויה.');
+    expect(errorText(e, t)).toBe('האות B כבר תפוסה: «נתונה הנקודה B(8,2)». בחרו אות פנויה.');
     expect(errorText(e, tEn)).toContain('already taken');
   });
 
   it('a letter the TOOL holds (the canonical centre O) is taken too — and its holder is the circle’s line (#1631)', () => {
     const e = refusal('שנה שם P ל-O', session(['נתון מעגל שמשוואתו x^2+y^2=9', 'נקודה P']));
     expect(e).toEqual({ key: 'rename-taken', detail: 'O', holder: 'נתון מעגל שמשוואתו x^2+y^2=9' });
-    expect(errorText(e, t)).toBe('האות O כבר תפוסה: "נתון מעגל שמשוואתו x^2+y^2=9". בחרו אות פנויה.');
+    expect(errorText(e, t)).toBe('האות O כבר תפוסה: «נתון מעגל שמשוואתו x^2+y^2=9». בחרו אות פנויה.');
   });
 
   it('an UNKNOWN point is refused by name', () => {
@@ -177,7 +177,7 @@ describe('#1154 — refusals name what the student wrote', () => {
       const e = refusal(`שנה שם A ל-${bad}`, session(FIGURE));
       expect(e).toEqual({ key: 'rename-bad-name', detail: bad });
     }
-    expect(errorText({ key: 'rename-bad-name', detail: 'AB' }, t)).toContain('"AB" אינו שם של נקודה');
+    expect(errorText({ key: 'rename-bad-name', detail: 'AB' }, t)).toContain('«AB» אינו שם של נקודה');
   });
 
   it('the same letter is refused as nothing to change', () => {

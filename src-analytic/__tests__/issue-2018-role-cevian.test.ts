@@ -257,7 +257,7 @@ describe('#2018 — every reader reads the letters of the configuration DRAWN', 
 
 describe('#2018 — no single isosceles triangle: 2-D’s question, 2-D’s sentence', () => {
   const HE_BASE =
-    'אין בסרטוט צלע יחידה שמתאימה ל"בסיס" — הצהירו קודם על המשולש המתאים (למשל "משולש ישר זווית ABC" בשביל היתר, "משולש שווה שוקיים ABC" בשביל הבסיס), או ציינו את הצלע באותיות (למשל "תיכון לצלע AB").';
+    'אין בסרטוט צלע יחידה שמתאימה ל«בסיס» — הצהירו קודם על המשולש המתאים (למשל «משולש ישר זווית ABC» בשביל היתר, «משולש שווה שוקיים ABC» בשביל הבסיס), או ציינו את הצלע באותיות (למשל «תיכון לצלע AB»).';
   for (const [noun, line] of [
     ['משולש ABC', 'תיכון לבסיס'],
     ['משולש שווה צלעות ABC', 'תיכון לבסיס'],
@@ -275,7 +275,7 @@ describe('#2018 — no single isosceles triangle: 2-D’s question, 2-D’s sent
 
   it('the leg names its own role, and the English sentence is 2-D’s English', () => {
     const [, v] = submit(['משולש ABC', 'תיכון לשוק']);
-    expect(v.kind === 'refused' && errorText(v.error, he)).toContain('ל"שוק"');
+    expect(v.kind === 'refused' && errorText(v.error, he)).toContain('ל«שוק»');
     const [, w] = submit(['triangle ABC', 'the median to the base']);
     expect(w.kind === 'refused' && errorText(w.error, en)).toBe(
       'The figure has no single side matching "base" — declare the matching triangle first (e.g. "right triangle ABC" for the hypotenuse, "isosceles triangle ABC" for the base), or name the side by its letters (e.g. "median to side AB").',
