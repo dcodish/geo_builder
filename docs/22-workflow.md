@@ -62,6 +62,8 @@ The operator raises issues **while testing**, often several per pass. If the rep
 3. **Write the analysis into the issue** (a comment or the body): root cause, the class it belongs to, a concrete fix plan (mechanism, files, tests, blast radius), open questions for the operator — and a closing **`## What the student will see`** section: one line per student-visible change, tagged `[asked]` (quote the operator), `[ruled]` (link the ruling), `[2-D]` (2-D's behaviour measured at a named commit) or `[proposed]`; "none" for a mechanism-only plan. Never describe what 2-D or another builder does without measuring it. A `[proposed]` line is an open question: the issue is `needs-operator` (CLAUDE.md rule 7, [ADR-W-117](06w-decisions-workspace.md#adr-w-117)).
 4. **STOP — do not implement.** No branch, no code, no "it's a one-liner" exceptions. Reply to the operator with the classification + plan and move to the next report.
 
+**A plan that adds or rewrites a refusal or status sentence writes it under the one-next-step rule** (operator rulings 2026-10-13 and 2026-10-15, [ADR-W-154](06w-decisions-workspace.md#adr-w-154)): name the student's statement and give one next step, or say plainly there is none. No ballot card per sentence: the sentence is shown in full on the play sheet, and his play is the approval.
+
 **Search and read before filing a plan, or presenting anything as open.**
 - **Search for the capability, not only the symptom.** Search open and closed issues (`icebox` included, `--limit 200`) for his sentence AND for the capability it sits on, and read the "not built" tables of the ADRs they link. A re-report is often a parked arm, and an armed prerequisite may already hold a ruling the new plan would contradict (#1284; #1303 vs #1154). He cannot correct a contradiction with a ruling he is not shown. A claimed filing ("filed and fixed next") is checked the same way: it may never have been opened (#1119).
 - **Read the issue, not the body.** Bodies and titles are written once. The ruling may sit in a comment, or on a sibling issue the plan names, and the work may already have shipped. Read the whole comment run and `git log -- <module>` before listing it as open, adding `needs-operator`, or shipping past it (#509, #659, #1279, #1590). When the code and the body disagree, the code wins; when the scope has moved, retitle the issue to the work that is left and say why in a comment.
@@ -201,6 +203,8 @@ fold's summary. A single-issue fix session can use the same recipe with its own 
 (bugs direct-to-main vs one-PR-per-round) wait on Phase 1's measured escalation rate ([ADR-W-012](06w-decisions-workspace.md)).
 [ADR-W-028](06w-decisions-workspace.md) spent that data on the *cap* only — every round measured so far had
 a human at the keyboard, so unattended running remains a separate risk argument.
+
+**A round item that adds or rewrites a student-facing refusal or status sentence** writes it under the one-next-step rule (rulings 2026-10-13 and 2026-10-15, [ADR-W-154](06w-decisions-workspace.md#adr-w-154)); the refusal-style ratchet checks it, and the batch play sheet shows the sentence in full: his play is its approval, with no ballot card per sentence.
 
 ## 3. The bug route (operator reports something broken)
 

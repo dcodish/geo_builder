@@ -41,6 +41,7 @@ A case is a claim about the product, so it is measured before it goes on the she
   and read the string (`[role="status"]` texts), because a line refused before commit never becomes a fact
   and fact-keyed wiring never fires (#943). Enumerate the surfaces by how far the input got: refused at
   parse, refused before commit, committed then failed.
+- **A new or rewritten refusal or status sentence is shown IN FULL** in its case (operator ruling 2026-10-15 on #1995, [ADR-W-154](../../../docs/06w-decisions-workspace.md#adr-w-154)): his play of it is the approval, so the sheet quotes the whole Hebrew sentence, never a paraphrase.
 - **Class every case.** 🎮 play (needs his hands or judgment) · 👁 look (he judges the embedded screenshot)
   · ✅ verified (record only). **Anything beyond what he asked for is always 🎮** and is named in the
   Heads-up ([ADR-W-117](../../../docs/06w-decisions-workspace.md#adr-w-117)).

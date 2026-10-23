@@ -1,0 +1,625 @@
+{
+ "queuedCap": {
+  "2d": 13,
+  "3d": 34,
+  "analytic": 36,
+  "complex": 31
+ },
+ "entries": {
+  "2d:note input.cevianBisectorIsPolygonSide": {
+   "key": "input.cevianBisectorIsPolygonSide",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "2d:note input.cevianBisectorIsSide": {
+   "key": "input.cevianBisectorIsSide",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "2d:note input.cevianWrongSide": {
+   "key": "input.cevianWrongSide",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "2d:note input.merge_no-source": {
+   "key": "input.merge_no-source",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "2d:note input.merge_same": {
+   "key": "input.merge_same",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "2d:note input.rename_no-source": {
+   "key": "input.rename_no-source",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "2d:note input.rename_same": {
+   "key": "input.rename_same",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "2d:note input.roleClaim.centre-end": {
+   "key": "input.roleClaim.centre-end",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "2d:note input.roleClaim.no-centre-end": {
+   "key": "input.roleClaim.no-centre-end",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "2d:note input.sentenceSelfConflict": {
+   "key": "input.sentenceSelfConflict",
+   "reason": "ruled",
+   "note": "#1994, operator 2026-10-15: \"leave the message\" (ADR-W-130)"
+  },
+  "2d:note input.swap_no-source": {
+   "key": "input.swap_no-source",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "2d:note input.swap_same": {
+   "key": "input.swap_same",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "2d:note input.trigGiven.form": {
+   "key": "input.trigGiven.form",
+   "reason": "heuristic-miss",
+   "note": "teaches the one form the tool reads: «בצורה «sin∢ABC = 1/2»»"
+  },
+  "2d:note input.trigGiven.out-of-range": {
+   "key": "input.trigGiven.out-of-range",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "2d:note input.trigGiven.sine-out-of-range": {
+   "key": "input.trigGiven.sine-out-of-range",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:already-defined #1": {
+   "key": "already-defined",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:already-defined #2": {
+   "key": "already-defined",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:ambiguous-prism #1": {
+   "key": "ambiguous-prism",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:angle-coef-conflict #1": {
+   "key": "angle-coef-conflict",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:bad-file #1": {
+   "key": "bad-file",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:bad-solid #1": {
+   "key": "bad-solid",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:bound-unsatisfiable #1": {
+   "key": "bound-unsatisfiable",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:crossing-off-segment #1": {
+   "key": "crossing-off-segment",
+   "reason": "plain-none",
+   "note": "says there is none in words the regex does not parse: «המישור חוצה את הישר שדרכו, אך לא את הקטע עצמו»"
+  },
+  "3d:dependents-broken #1": {
+   "key": "dependents-broken",
+   "reason": "plain-none",
+   "note": "says there is none in words the regex does not parse: «השורה נשארת ברשימה ותחזור לתוקף כשההגדרה תחזור»"
+  },
+  "3d:givens-contradict #1": {
+   "key": "givens-contradict",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:givens-contradict #2": {
+   "key": "givens-contradict",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:inscribed-contradicts-noun #1": {
+   "key": "inscribed-contradicts-noun",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:line-misses-plane #1": {
+   "key": "line-misses-plane",
+   "reason": "plain-none",
+   "note": "says there is none in words the regex does not parse: «אין נקודת חיתוך»"
+  },
+  "3d:no-roots #1": {
+   "key": "no-roots",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:no-roots #2": {
+   "key": "no-roots",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:no-solution #1": {
+   "key": "no-solution",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:no-such-solid #1": {
+   "key": "no-such-solid",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:no-such-solid #2": {
+   "key": "no-such-solid",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:not-a-diagonal #1": {
+   "key": "not-a-diagonal",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:not-a-diagonal #2": {
+   "key": "not-a-diagonal",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:not-on-segment #1": {
+   "key": "not-on-segment",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:plane-side-undefined #1": {
+   "key": "plane-side-undefined",
+   "reason": "plain-none",
+   "note": "says there is none in words the regex does not parse: «אין לו \"מעל\" ו\"מתחת\"»"
+  },
+  "3d:polygon-collapsed #1": {
+   "key": "polygon-collapsed",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:polygon-collapsed #2": {
+   "key": "polygon-collapsed",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:polygon-collapsed #3": {
+   "key": "polygon-collapsed",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:polygon-collapsed #4": {
+   "key": "polygon-collapsed",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:rename-refused #2": {
+   "key": "rename-refused",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:ring-not-flat #1": {
+   "key": "ring-not-flat",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:ring-not-flat #2": {
+   "key": "ring-not-flat",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:segments-do-not-meet #1": {
+   "key": "segments-do-not-meet",
+   "reason": "plain-none",
+   "note": "says there is none in words the regex does not parse: «אין להם נקודת מפגש»"
+  },
+  "3d:sign-unsatisfiable #1": {
+   "key": "sign-unsatisfiable",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:swap-refused #2": {
+   "key": "swap-refused",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:symbolic-new-point #1": {
+   "key": "symbolic-new-point",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:two-unknowns #1": {
+   "key": "two-unknowns",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:unknown-line #1": {
+   "key": "unknown-line",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:unknown-plane #1": {
+   "key": "unknown-plane",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:unknown-point #1": {
+   "key": "unknown-point",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:unknown-symbol #1": {
+   "key": "unknown-symbol",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "3d:vacuous-relation #1": {
+   "key": "vacuous-relation",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:ask askHost.many.ellipse": {
+   "key": "askHost.many.ellipse",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:ask askHost.many.parabola": {
+   "key": "askHost.many.parabola",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:ask askHost.none.circle": {
+   "key": "askHost.none.circle",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:ask askHost.none.ellipse": {
+   "key": "askHost.none.ellipse",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:ask askHost.none.parabola": {
+   "key": "askHost.none.parabola",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:ask askMissingCurve": {
+   "key": "askMissingCurve",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:ask askMissingPoint": {
+   "key": "askMissingPoint",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:ask askNoValue": {
+   "key": "askNoValue",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:ask askOpen": {
+   "key": "askOpen",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:ask askUnreadable": {
+   "key": "askUnreadable",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:bad-arity #1": {
+   "key": "bad-arity",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:bad-equation #1": {
+   "key": "bad-equation",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:bisector-is-side #1": {
+   "key": "bisector-is-side",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:bisector-is-side #2": {
+   "key": "bisector-is-side",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:bisector-is-side #3": {
+   "key": "bisector-is-side",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:conflicting-restatement #1": {
+   "key": "conflicting-restatement",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:diagonal-is-side #1": {
+   "key": "diagonal-is-side",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:diagonal-none-here #1": {
+   "key": "diagonal-none-here",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:does-not-exist #1": {
+   "key": "does-not-exist",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:forced-collinear #1": {
+   "key": "forced-collinear",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:forced-collinear #2": {
+   "key": "forced-collinear",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:inscribed-contradicts-declared #1": {
+   "key": "inscribed-contradicts-declared",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:load-unreadable #1": {
+   "key": "load-unreadable",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:measure-contradicts #1": {
+   "key": "measure-contradicts",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:no-common-tangent #1": {
+   "key": "no-common-tangent",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:out-of-domain #1": {
+   "key": "out-of-domain",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:polygon-collapsed #1": {
+   "key": "polygon-collapsed",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:radius-contradicts #1": {
+   "key": "radius-contradicts",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:radius-contradicts #2": {
+   "key": "radius-contradicts",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:rename-not-typed #1": {
+   "key": "rename-not-typed",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:rename-unsafe #2": {
+   "key": "rename-unsafe",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:repeated-vertex #1": {
+   "key": "repeated-vertex",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:swap-not-typed #1": {
+   "key": "swap-not-typed",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:swap-unknown #1": {
+   "key": "swap-unknown",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:swap-unsafe #2": {
+   "key": "swap-unsafe",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "analytic:tangent-no-second-crossing #1": {
+   "key": "tangent-no-second-crossing",
+   "reason": "plain-none",
+   "note": "says there is none in words the regex does not parse: «אין נקודת חיתוך נוספת להמשיך אליה»"
+  },
+  "analytic:third-crossing #1": {
+   "key": "third-crossing",
+   "reason": "plain-none",
+   "note": "says there is none in words the regex does not parse: «לישר אין נקודת חיתוך שלישית»"
+  },
+  "analytic:unsatisfiable #1": {
+   "key": "unsatisfiable",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:complex-as-real #1": {
+   "key": "complex-as-real",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:duplicate-name #1": {
+   "key": "duplicate-name",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:impossible #1": {
+   "key": "impossible",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:incompatible #1": {
+   "key": "incompatible",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:parse-error #1": {
+   "key": "parse-error",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #1 (undecided-arg)": {
+   "key": "refused/undecided-arg",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #10 (args-not-opposite)": {
+   "key": "refused/args-not-opposite",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #11 (forall-holds)": {
+   "key": "refused/forall-holds",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #12 (forall-refuted)": {
+   "key": "refused/forall-refuted",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #13 (minimal-none)": {
+   "key": "refused/minimal-none",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #14 (minimal-holds)": {
+   "key": "refused/minimal-holds",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #15 (minimal-refuted)": {
+   "key": "refused/minimal-refuted",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #18 (undetermined)": {
+   "key": "refused/undetermined",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #2 (undecided-mod-pair)": {
+   "key": "refused/undecided-mod-pair",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #21 (arg-of-zero)": {
+   "key": "refused/arg-of-zero",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #22 (measure-uncomputable)": {
+   "key": "refused/measure-uncomputable",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #23 (measure-holds)": {
+   "key": "refused/measure-holds",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #24 (measure-violated)": {
+   "key": "refused/measure-violated",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #25 (line-unaccounted)": {
+   "key": "refused/line-unaccounted",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #28 (declared-complex-real)": {
+   "key": "refused/declared-complex-real",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #3 (undecided-arg-pair)": {
+   "key": "refused/undecided-arg-pair",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #4 (undecided-arg-irrational)": {
+   "key": "refused/undecided-arg-irrational",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #5 (undecided-arg-pair-irrational)": {
+   "key": "refused/undecided-arg-pair-irrational",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #6 (prop-holds)": {
+   "key": "refused/prop-holds",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #7 (prop-refuted)": {
+   "key": "refused/prop-refuted",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #8 (conjugates-hold)": {
+   "key": "refused/conjugates-hold",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:refused #9 (moduli-differ)": {
+   "key": "refused/moduli-differ",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:reserved-constant #1": {
+   "key": "reserved-constant",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:trig-mismatch #1": {
+   "key": "trig-mismatch",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:unaccounted #1": {
+   "key": "unaccounted",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  },
+  "complex:wrong-app #1": {
+   "key": "wrong-app",
+   "reason": "queued",
+   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+  }
+ }
+}

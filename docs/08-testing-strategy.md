@@ -123,6 +123,8 @@ are 2-D unless stated; the **structure** around them is workspace-wide:
 ### i18n
 
 - Every translation key exists in both `he` and `en` (a key-parity test).
+- **Inline Hebrew only shrinks** ([ADR-W-153](06w-decisions-workspace.md#adr-w-153), #2201 phase 2). `shell/__tests__/inline-hebrew-ratchet.test.ts` counts, per file, the Hebrew string literals (string, template, JSX text — never a comment) in every tree `BOUNDARIES.json` declares, outside `__tests__/`, `parser/`, `lexicon/` and `i18n/`, read with the TypeScript compiler API. A count that rises, or a new file with Hebrew, fails: put the sentence in the product's locale table (or `shell/locales` for suite text). A count that drops prints a reminder; `UPDATE_BASELINE=1 npx vitest run shell/__tests__/inline-hebrew-ratchet.test.ts` lowers `fixtures/inline-hebrew-baseline.json`.
+- **Every refusal gives one next step or says there is none** ([ADR-W-154](06w-decisions-workspace.md#adr-w-154), #1995 stage 5). The same ratchet mechanics (the shared walker `shell/__tests__/fixtures/ts-literals.ts`, the same `UPDATE_BASELINE=1` switch) over the RENDERED refusals of all four builders: 2-D `src/i18n/__tests__/refusal-style.test.ts`, the others one call in their `message-floor-2028.test.ts`; the meta-lock is `shell/__tests__/refusal-style-meta.test.ts`. A new refusal that fails it is reworded, not baselined; the baseline (`fixtures/refusal-style-baseline.json`) only shrinks, and its `queued` count is capped per product.
 
 ## The submit GATE vs. the fact list ([ADR-495](06-decisions.md#adr-495), #960)
 
