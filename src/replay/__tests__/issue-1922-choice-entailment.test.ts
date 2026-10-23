@@ -193,8 +193,8 @@ describe('#1922 — what the student sees (decide → commit → post-commit vie
     const r = await play(lines);
     const last = r.verdicts[r.verdicts.length - 1];
     expect(last.kind).toBe('noop');
-    expect(last.note?.key).toBe('input.alreadyDrawn');
-    expect(he('input.alreadyDrawn')).toBe('זה כבר קיים באיור — אין מה להוסיף.');
+    expect(last.note?.key).toBe('suite.notice.alreadyDrawn');
+    expect(he('suite.notice.alreadyDrawn')).toBe('זה כבר קיים באיור — אין מה להוסיף.');
   });
 });
 
@@ -239,7 +239,7 @@ describe('#1922 — stability and the ✎ edit seam', () => {
     const notes: string[] = [];
     const deps: EditDeps = { t: (k) => k, setInputNote: (m) => notes.push(m), resolveAfterCommit: () => {} };
     expect(runEditCommit(key, 'AB ∥ DC', deps)).toBe(true);
-    expect(notes).not.toContain('input.alreadyDrawn');
+    expect(notes).not.toContain('suite.notice.alreadyDrawn');
     expect(st().facts.some((f) => f.cmd.type === 'set-parallel')).toBe(true);
   });
 });

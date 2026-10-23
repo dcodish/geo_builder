@@ -42,8 +42,7 @@ const he = {
   errRootsOfZero: 'לא ניתן לחלץ שורשים של אפס: «{{detail}}»',
   errIncompatible: 'המשפט לא נוסף — אינו מתיישב עם: «{{detail}}»',
   errImpossible: 'המשפט לא נוסף — הוא לא יכול להתקיים: «{{detail}}»',
-  // #2268 (ADR-CX-084) — a true restatement adds nothing: 2-D's noop sentence verbatim (`input.alreadyDrawn`)
-  noteAlreadyKnown: 'זה כבר קיים באיור — אין מה להוסיף.',
+  // #2268 (ADR-CX-084) — a true restatement adds nothing: 2-D's noop sentence, one suite key since #1990 (`suite.notice.alreadyDrawn`)
   errUnaccounted: 'הבנתי חלק מהשורה, אבל לא את: {{detail}}',
   // #1890 (W20) — 2-D's negation sentence (input.scope.negation), with examples that read in this tool
   errNegation: 'עדיין אי אפשר לקלוט שלילה («{{word}}»). ניתן לציין מה כן נתון — למשל «z1 מדומה טהור» או «arg(z1) = 30°».',
@@ -282,7 +281,6 @@ const en: typeof he = {
   errRootsOfZero: 'Cannot extract roots of zero: «{{detail}}»',
   errIncompatible: 'Statement not added — it cannot hold together with: «{{detail}}»',
   errImpossible: 'Statement not added — it cannot hold at all: «{{detail}}»',
-  noteAlreadyKnown: "That's already on the figure — nothing to add.",
   errUnaccounted: 'I read part of the line, but not: {{detail}}',
   errNegation: 'Negation («{{word}}») is not supported yet. State what IS given instead — e.g. «z1 is pure imaginary» or «arg(z1) = 30°».',
   errComplexAsReal: 'Statement not added — {{letter}} is declared a complex number, but «{{detail}}» uses it as a real number (a size or an angle)',

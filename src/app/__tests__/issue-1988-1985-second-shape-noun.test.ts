@@ -86,7 +86,7 @@ describe('#1988 — a noun the declared shape already IMPLIES is a restatement, 
   ])('«%s» · «%s» answers «כבר קיים» and adds no row', async (a, b) => {
     const r = await play([a, b]);
     expect(r.kind).toBe('noop');
-    expect(r.noteKey).toBe('input.alreadyDrawn');
+    expect(r.noteKey).toBe('suite.notice.alreadyDrawn');
     expect(he(r.noteKey!)).toBe('זה כבר קיים באיור — אין מה להוסיף.');
     expect(r.rowsAdded, 'it states nothing new').toBe(0);
   });
@@ -100,7 +100,7 @@ describe('#1988 — a noun the declared shape already IMPLIES is a restatement, 
   ])('«%s» · «%s» — every reading of the same ring gives that answer', async (a, b) => {
     const r = await play([a, b]);
     expect(r.kind).toBe('noop');
-    expect(r.noteKey).toBe('input.alreadyDrawn');
+    expect(r.noteKey).toBe('suite.notice.alreadyDrawn');
     expect(r.rowsAdded).toBe(0);
   });
 

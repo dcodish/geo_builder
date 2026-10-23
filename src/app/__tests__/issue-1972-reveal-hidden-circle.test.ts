@@ -89,7 +89,7 @@ describe('#1972 — the operator’s sequence: the stated circle is DRAWN, never
   it('«מחומש משוכלל ABCDE» · «מחומש ABCDE חסום במעגל» commits and the circle is drawn', async () => {
     const { kind, note, fig } = await play(['מחומש משוכלל ABCDE', 'מחומש ABCDE חסום במעגל']);
     expect(kind, 'the second line is accepted, not answered «already there»').toBe('commit');
-    expect(note?.key).not.toBe('input.alreadyDrawn');
+    expect(note?.key).not.toBe('suite.notice.alreadyDrawn');
     expect(circleOf(fig)?.hidden, 'circle-O is DRAWN').toBeFalsy();
     expect(circleCount(fig), 'one circle — the scaffold revealed, never a second one minted').toBe(1);
     allStepsOk(fig);
@@ -186,7 +186,7 @@ describe('#1972 — the honest «כבר קיים» is untouched', () => {
   ])('%s answers «זה כבר קיים באיור» and adds no row', async (lines, stillHidden) => {
     const { kind, note, fig } = await play(lines as string[]);
     expect(kind).toBe('noop');
-    expect(note?.key).toBe('input.alreadyDrawn');
+    expect(note?.key).toBe('suite.notice.alreadyDrawn');
     expect(!!circleOf(fig)?.hidden, `the circle's visibility is unchanged (hidden=${stillHidden})`).toBe(stillHidden);
     expect(circleCount(fig)).toBe(1);
   });

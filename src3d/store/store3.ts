@@ -1538,8 +1538,11 @@ export interface Geo3State {
    * Not an error: the student is not wrong, they repeated themselves, and a refusal for something that
    * is not a mistake reads harshly (option (a), rejected by the operator's ruling). Cleared by every
    * other submit, so it never lingers over an unrelated line.
+   * #1990 (ADR-3D-377, operator ruling 2026-10-10): it reads 2-D's sentence, `suite.notice.alreadyDrawn`, so it no
+   * longer carries the earlier line; a MUTED twin re-ticked by the line was not on the figure, and 2-D re-ticks it
+   * silently, so that case sets no notice.
    */
-  lastNotice: { code: 'already-stated'; utterance: string } | { code: 'vertex-angle-read-as'; angles: string } | null;
+  lastNotice: { code: 'already-stated' } | { code: 'vertex-angle-read-as'; angles: string } | null;
   submit: (utterance: string) => void;
   /** #1692 (ADR-3D-305): DISPATCH a verdict already decided by `decideSubmit3` (or by the App's
    *  `decideDeterministic3`, which wraps it). `submit` is exactly `dispatchVerdict(decideSubmit3(...))`; the App
@@ -2090,7 +2093,9 @@ export const useGeo3 = create<Geo3State>()(
             set({ lastError: v.error }); // keep-prior: the refused statement is not added
             return;
           case 'already-stated':
-            set({ facts: v.facts, lastError: null, lastNotice: { code: 'already-stated', utterance: v.twin.utterance } });
+            // #1990 (ADR-3D-377): «זה כבר קיים באיור» is true only of a twin that was ON the figure; a muted twin the
+            // line re-ticks is 2-D's silent re-enable (FR-EN-9, `foldCommand`), never "already on the figure".
+            set({ facts: v.facts, lastError: null, lastNotice: v.twin.enabled ? { code: 'already-stated' } : null });
             return;
           case 'record':
             set({

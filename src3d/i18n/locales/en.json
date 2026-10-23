@@ -359,7 +359,6 @@
       "perp": "it already follows from the solid you defined",
       "parallel": "it already follows from the solid you defined"
     },
-    "alreadyStated": "That is already stated («{{utterance}}») — the figure is unchanged and no row was added",
     "vertexAngleReadAs": "Read as {{angles}} — the polygon's angle at that vertex. For another angle there, write its three letters."
   },
   "display": {

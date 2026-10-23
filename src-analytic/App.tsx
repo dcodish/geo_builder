@@ -886,11 +886,14 @@ export function App() {
         if (reachesFallback(verdict)) return (await tryFallback(raw, verdict.error, act, live.seed)) ? 'consumed' : 'kept';
         setError(verdict.error);
         return sentenceOutcome(verdict);
+      /**
+       * #1990 (ADR-AG-330, operator ruling 2026-10-10: every builder uses 2-D's note). A restated line and a line the
+       * figure already satisfies in every configuration are both 2-D's no-op (`noop-exists` / `implied-restatement`),
+       * and 2-D answers both with the one sentence, `suite.notice.alreadyDrawn`.
+       */
       case 'already-known':
-        setNotice(t('noticeAlreadyKnown', { detail: verdict.line }));
-        return sentenceOutcome(verdict);
       case 'already-follows':
-        setNotice(t('noticeAlreadyFollows', { detail: verdict.line }));
+        setNotice(t('suite.notice.alreadyDrawn'));
         return sentenceOutcome(verdict);
       case 'record':
         // #1350 — the notice rides IN the commit that records the line: `recordLine` clears the

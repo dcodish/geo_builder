@@ -8,6 +8,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { RETIRED_ALREADY_THERE_KEYS, RULED_ALREADY_DRAWN } from './fixtures/already-drawn-1990';
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/^﻿/, '');
@@ -219,5 +220,21 @@ describe('#1868 — one refusal voice', () => {
       for (const m of allMessages(p, 'en').filter((x) => x.includes('limit of the tool'))) expect(/— this is a limit of the tool\.?$/.test(m), `${p}: ${m}`).toBe(true);
     }
     expect(seen, 'the frame is not vacuous').toBeGreaterThanOrEqual(3);
+  });
+});
+
+// #1990 (ADR-W-152; operator ruling 2026-10-10, option A): the already-there note is 2-D's sentence in every builder, one suite key
+describe('#1990 — one already-there note', () => {
+  it('alreadyDrawn: the suite key carries 2-D\'s sentence, Hebrew and English', () => {
+    expect(suiteValue('he', 'suite.notice.alreadyDrawn')).toBe(RULED_ALREADY_DRAWN.he);
+    expect(suiteValue('en', 'suite.notice.alreadyDrawn')).toBe(RULED_ALREADY_DRAWN.en);
+  });
+
+  it('alreadyDrawn: no builder keeps a key of its own for it', () => {
+    for (const p of PRODUCTS) {
+      for (const k of RETIRED_ALREADY_THERE_KEYS[p]) for (const lang of ['he', 'en'] as const) expect(valueOf(p, lang, k), `${p} ${lang} ${k}`).toBeUndefined();
+      // nor its old wordings under another name
+      expect(allMessages(p, 'he').filter((m) => /כבר נאמר \(|כבר ידוע מהנתונים|כבר נובע מהנתונים/.test(m)), p).toEqual([]);
+    }
   });
 });

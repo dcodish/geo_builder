@@ -141,7 +141,7 @@ describe('#2127 — unchanged (measured at b0ef3240)', () => {
   it.each([[INSIDE], [AROUND], ['ריבוע חסום במעגל O']])('«%s» typed twice still answers «כבר קיים»', async (line) => {
     const g = await play([O, line, line]);
     expect(g.last.kind).toBe('noop');
-    expect(g.last.note?.key).toBe('input.alreadyDrawn');
+    expect(g.last.note?.key).toBe('suite.notice.alreadyDrawn');
     expect(polys()).toHaveLength(1);
   });
 

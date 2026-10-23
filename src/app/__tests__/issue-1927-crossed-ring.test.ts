@@ -199,7 +199,7 @@ describe('#1927 — controls commit exactly as before', () => {
   // never refused here and adds no row — it answers «כבר קיים» (was: committed as a second row).
   it('the square read in a simple order is never refused — it is a restatement (#1953)', async () => {
     const r = await play(['ריבוע ABCD', 'מרובע ADCB']);
-    expect(r.notes).toEqual([strip(i18n.t('input.alreadyDrawn', { lng: 'he' }) as string)]);
+    expect(r.notes).toEqual([strip(i18n.t('suite.notice.alreadyDrawn', { lng: 'he' }) as string)]);
     expect(r.facts.length, 'no new row').toBe(r.before.facts.length);
   });
 

@@ -229,7 +229,7 @@ describe('#1658 — a bound on a letter is kept, marked while nothing binds it, 
     const r = await play(['משולש ABC', '0 < k < 6']);
     expect(r.refused).toBe(false);
     expect(r.added, 'the bound is a row in the list').toBe(1);
-    expect(r.notes.join(' '), 'never told it is already drawn').not.toContain(i18n.t('input.alreadyDrawn', { lng: 'he' }) as string);
+    expect(r.notes.join(' '), 'never told it is already drawn').not.toContain(i18n.t('suite.notice.alreadyDrawn', { lng: 'he' }) as string);
     expect(lastStatus(r.fig)).toMatch(/^variable k is not defined by any statement/);
     expect(llmParseMock).not.toHaveBeenCalled();
   });

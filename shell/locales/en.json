@@ -30,6 +30,9 @@
     },
     "refusal": {
       "notUnderstood": "I didn't understand the request — try rephrasing it, or open «Guide» for examples."
+    },
+    "notice": {
+      "alreadyDrawn": "That's already on the figure — nothing to add."
     }
   }
 }

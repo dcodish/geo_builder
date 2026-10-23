@@ -598,7 +598,7 @@ const he = {
       'right-isosceles-triangle': 'משולש ישר זווית שווה שוקיים הוא סוג של {{from}}',
     },
   },
-  noticeAlreadyKnown: 'זה כבר ידוע מהנתונים שכתבתם, ולכן לא הוספתי שורה נוספת: «{{detail}}»',
+  // #1990 (ADR-AG-330): a restated or already-following line reads 2-D's sentence, `suite.notice.alreadyDrawn`
   // #1350 (operator ruling 2026-09-22) — the line IS recorded; this is about identity, never an error.
   noticeAngleReadAs: 'הובן כ-{{holder}} — הזווית של הצורה בקודקוד הזה. לזווית אחרת שם, כתבו את שלוש האותיות שלה.',
   noticeNameReadsAs: 'שימו לב: הישר {{detail}} והישר {{holder}} הם שני ישרים שונים — השמות נקראים דומה, אבל כל שם מתייחס לישר שלו.',
@@ -637,8 +637,6 @@ const he = {
   // means in הנדסת המישור.
   undo: 'בטל',
   redo: 'בצע שוב',
-  noticeAlreadyFollows:
-    'זה כבר נובע מהנתונים שכתבתם — השרטוט מקיים את זה ממילא, ולכן לא הוספתי שורה נוספת: «{{detail}}»',
   /**
    * #1353 / ADR-W-030 — the teaching line for an imperative wrapper.
    *
@@ -1141,7 +1139,6 @@ const en: typeof he = {
       'right-isosceles-triangle': 'a right isosceles triangle is a kind of {{from}}',
     },
   },
-  noticeAlreadyKnown: 'That is already known from what you have written, so I did not add another row: «{{detail}}»',
   noticeAngleReadAs: "Read as {{holder}} — the shape's angle at that vertex. For another angle there, write its three letters.",
   noticeNameReadsAs: 'Note: line {{detail}} and line {{holder}} are two different lines — the names read alike, but each one refers to its own line.',
   save: 'Save',
@@ -1169,8 +1166,6 @@ const en: typeof he = {
   errLoadUnreadable: 'The file «{{detail}}» is not a saved figure.',
   undo: 'Undo',
   redo: 'Redo',
-  noticeAlreadyFollows:
-    'That already follows from what you have written — the figure satisfies it anyway, so I did not add another row: «{{detail}}»',
   noticeTeachCanonical:
     'A textbook does not say «{{verb}}» — it states the given itself. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.

@@ -861,7 +861,7 @@ export default function App3() {
           {lastNotice && !lastError && !busy && (
             <div role="note" className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               {lastNotice.code === 'already-stated'
-                ? t('notice.alreadyStated', { utterance: lastNotice.utterance })
+                ? t('suite.notice.alreadyDrawn') /* #1990 (ADR-3D-377): 2-D's sentence, one suite key */
                 : t('notice.vertexAngleReadAs', { angles: lastNotice.angles }) /* #1942: 2-D's «הובן כ-∠CAB» */}
             </div>
           )}

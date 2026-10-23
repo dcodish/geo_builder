@@ -120,7 +120,7 @@ describe('#2205 — with one shape of that size, the definite line is its named 
   });
 
   it('A8 answers «כבר קיים», A9 is refused, as their named twins are', async () => {
-    expect((await play(['משולש ישר זווית ABC', 'המשולש ישר זווית'])).last.note?.key).toBe('input.alreadyDrawn');
+    expect((await play(['משולש ישר זווית ABC', 'המשולש ישר זווית'])).last.note?.key).toBe('suite.notice.alreadyDrawn');
     expect((await play(['משולש שווה צלעות ABC', 'המשולש ישר זווית'])).last.kind).toBe('refuse');
     expect(polys()).toEqual(['ABC']);
   });
@@ -187,7 +187,7 @@ describe('#2205 — unchanged (measured at ef78f15c)', () => {
     expect((await play(['ריבוע ABCD', 'המשולש ישר זווית'])).last.commands).toEqual([{ type: 'right-triangle', ids: ['E', 'F', 'G'] }]);
   });
   it('D3 one triangle: «המשולש חסום במעגל O» binds it (ADR-029)', async () => {
-    expect((await play(['מעגל O', 'משולש חסום במעגל O', 'המשולש חסום במעגל O'])).last.note?.key).toBe('input.alreadyDrawn');
+    expect((await play(['מעגל O', 'משולש חסום במעגל O', 'המשולש חסום במעגל O'])).last.note?.key).toBe('suite.notice.alreadyDrawn');
   });
   it('D4 the ב-prefixed «מעגל חסום במשולש» and «ריבוע חסום במשולש» with two triangles still draw a new one', async () => {
     await play([T, 'משולש DEF', 'מעגל O', 'מעגל חסום במשולש']);

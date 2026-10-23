@@ -12470,7 +12470,7 @@ A crossing order has another ring key and is never a twin (#1927's refusal); a l
 
 **Measured after** (the same path): every row above answers `already-stated` with no row and the restatement note naming the line that declared the ring. «מלבן ABCD» · «ריבוע ABCD» still drives (ADR-052 — specialising is new information). «מקבילית ABCD» · «טרפז ABCD» is still `shape-disjoint` in the ruled words. «טרפז ABCD» · «טרפז BCDA» still records.
 
-**Not changed, deliberately: the WORDING.** The ruling quotes 2-D's «זה כבר קיים באיור — אין מה להוסיף.», but measured at HEAD each builder has its own already-there note (3-D: «הנתון הזה כבר נאמר («…») — הציור לא השתנה ולא נוספה שורה»; analytic: «זה כבר ידוע מהנתונים שכתבתם…»), and whether 3-D's note — for **every** restated fact, not only polygons — becomes 2-D's is the open question **#1990**, which this item's own plan points at for it. Changing it here for polygons alone would split 3-D's own voice and pre-empt that ruling. So this ADR routes the verdict and leaves the sentence to #1990.
+**Not changed, deliberately: the WORDING.** *(Changed by [ADR-3D-377](#adr-3d-377), #1990.)* The ruling quotes 2-D's «זה כבר קיים באיור — אין מה להוסיף.», but measured at HEAD each builder has its own already-there note (3-D: «הנתון הזה כבר נאמר («…») — הציור לא השתנה ולא נוספה שורה»; analytic: «זה כבר ידוע מהנתונים שכתבתם…»), and whether 3-D's note — for **every** restated fact, not only polygons — becomes 2-D's is the open question **#1990**, which this item's own plan points at for it. Changing it here for polygons alone would split 3-D's own voice and pre-empt that ruling. So this ADR routes the verdict and leaves the sentence to #1990.
 
 **Sibling audit.** 2-D had the mirror defect — no hierarchy at all, so both directions leaked the engine's redefinition throw: [ADR-619](06-decisions.md#adr-619), this item's other arm. Analytic already answers «כבר ידוע» here (ADR-AG-259); its one measured gap, «ריבוע ABCD» · «דלתון ABCD» recording because its table does not derive square ⇒ kite, is reported, not built (the ruling leaves analytic unchanged).
 
@@ -13478,3 +13478,22 @@ The cube's «המישור ABC מתלכד עם המישור A'B'C'» stays `claim
 **Behaviour change for a student:** in 3-D, every plane whose equation the data panel or an answer shows now shows its parametric form under it — after T45, «ABCD: π1 = (0, 0, 2) + t·(1, 0, 0) + s·(0, 1, 0)» under «ABCD: z - 2 = 0» — and a plane typed as an equation («המישור π1: z - 2.5 = 0») now appears in the data panel with both forms.
 
 **Slow-tier goldens that may drift:** `decide-submit3-parity-1394` records submit verdicts, not panel rows; `decide-parity-1395-*` the cross-builder verdicts — none expected.
+
+
+## ADR-3D-377 — A restated fact answers 2-D's note, «זה כבר קיים באיור — אין מה להוסיף.»; a re-ticked muted twin says nothing (#1990)
+
+**Status:** accepted · 2026-10-23 · debt (P3, 3d; filed `feature`, landed as ruled wording) · fix round #2466, stream C · branch `fix/1990-already-drawn-note` (stacked on #1868's) · **Operator ruling** 2026-10-10 (#1990, option A: "every builder uses 2-D's note", ADR-W-118 B1/B13 applied literally; rejected: keeping 3-D's note as an exception, a richer note in all builders) · **Amends:** [ADR-3D-324](#adr-3d-324) ("Not changed, deliberately: the WORDING" — now changed), #613's notice text ([ADR-W-031](06w-decisions-workspace.md#adr-w-031)) · **With:** [ADR-W-152](06w-decisions-workspace.md#adr-w-152) (the suite key)
+**Requirements:** [02b](02b-requirements-3d.md) FR-SP-19 (the note's wording; the re-ticked twin) · **Design:** none (internal) — the key is described in [04w](04w-design-shell.md) § *Suite-wide text*
+
+**Measured at pickup** (abc0c5a9, `decideSubmit3` / `useGeo3.submit`): unchanged since the issue. «ריבוע ABCD» · «ריבוע ABCD» → `already-stated`, no row, App3 renders `notice.alreadyStated` = «הנתון הזה כבר נאמר («ריבוע ABCD») — הציור לא השתנה ולא נוספה שורה». 2-D at the same commit answers its no-ops (`noop-exists`, `implied-restatement`) with `input.alreadyDrawn` = «זה כבר קיים באיור — אין מה להוסיף.»; and re-typing an UNTICKED row's statement re-ticks it with **no note** (`issue-1748-untick-retype.test.ts`: "no refusal note", the commit's `foldCommand`). 3-D showed its note on that re-tick too.
+
+**Decision.**
+1. **The `already-stated` notice reads `suite.notice.alreadyDrawn`** (ADR-W-152), 2-D's sentence. `notice.alreadyStated` is deleted in both languages, and `lastNotice`'s `already-stated` member no longer carries the earlier line's utterance: the ruled note does not quote it.
+2. **A muted twin the line re-ticks sets no notice.** «זה כבר קיים באיור» would be false of a row that was not on the figure, and 2-D re-ticks it silently (measured above). The verdict is unchanged (`already-stated`, the twin re-enabled, no row); only `dispatchVerdict` reads `twin.enabled` before choosing the notice. *[2-D]* measured at abc0c5a9.
+3. **Not changed:** 3-D's per-render `already-known` notices («… — נכון ואומת ✓, אך …», ADR-3D-209) are a different case — the line IS recorded as a row and the note explains why it adds nothing. 2-D has no such state (it would not record the line), so the ruling's sentence does not fit it; reported as found work.
+
+**Locks.** `src3d/__tests__/already-drawn-1990.test.ts` (four restatements → the notice and no row; a muted twin → re-ticked, no notice; the shared four-builder assertions: App3 reads the suite key, the instance resolves 2-D's sentence in he/en). `restate-dedupe-613.test.ts` re-based (the notice no longer names the row; the muted twin is silent).
+
+**Expected golden drift.** `decide-submit3-parity-1394` records `lastNotice`: every sequence whose last line is a restatement drops the `utterance` field; a re-ticked muted twin records `null`. The batch's to re-record (#1990's plan).
+
+**Behaviour change for a student:** in 3-D, typing a given that is already on the figure («ריבוע ABCD» · «ריבוע ABCD») answers «זה כבר קיים באיור — אין מה להוסיף.» (English: "That's already on the figure — nothing to add.") instead of «הנתון הזה כבר נאמר («ריבוע ABCD») — הציור לא השתנה ולא נוספה שורה»; re-typing the statement of an unticked row ticks it again with no note, as in 2-D.

@@ -35,14 +35,13 @@ describe('#613 — a restated fact adds no row', () => {
     expect(st().facts.length).toBe(rows);
   });
 
-  it('the restatement SUCCEEDS and is noticed, naming what it repeats', () => {
+  // #1990 (ADR-3D-377, operator ruling 2026-10-10): the notice is 2-D's sentence and no longer names the row it repeats
+  it('the restatement SUCCEEDS and is noticed', () => {
     submit('פירמידה SABC');
     submit('משולש ABC');
     submit('משולש ABC');
     expect(st().lastError).toBeNull();
-    expect(st().lastNotice?.code).toBe('already-stated');
-    const notice = st().lastNotice; // #1942: the notice is a union; this one is the restatement
-    expect(notice?.code === 'already-stated' ? notice.utterance : null, 'the notice names the row it repeats').toBe('משולש ABC');
+    expect(st().lastNotice).toEqual({ code: 'already-stated' });
   });
 
   it('the notice is CLEARED by the next ordinary statement', () => {
@@ -64,6 +63,7 @@ describe('#613 — a restated fact adds no row', () => {
     submit('משולש ABC');
     expect(st().facts.length, 'no new row').toBe(2);
     expect(st().facts.find((f) => f.id === twin.id)!.enabled, 're-enabled instead').toBe(true);
+    expect(st().lastNotice, '#1990: it was not on the figure, so 2-D re-ticks it silently').toBeNull();
   });
 
   it('a DIFFERENT statement still appends — the rule is structural, not "looks similar"', () => {

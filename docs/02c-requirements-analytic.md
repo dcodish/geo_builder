@@ -705,15 +705,15 @@ a sentence the tool parsed.
 - Sources: ADR-AG-246, #1832, #1846.
 
 **R45 — a statement that adds nothing is SAID, not silently swallowed or silently duplicated**. Informational, never an error; a restatement that NARROWS is recorded. A shape noun the ring's nouns already IMPLY («ריבוע ABCD» · «דלתון ABCD», «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD») is «already known», no row, in any reading it holds in — 2-D's answer ([ADR-W-133](06w-decisions-workspace.md#adr-w-133), #2169).
-- a repeated given → «זה כבר ידוע…», no second row
-- a polygon restated with its letters rotated or reversed («ריבוע ABCD» · «מרובע ADCB») → «זה כבר ידוע…», no second row ([ADR-AG-259](06c-decisions-analytic.md#adr-ag-259))
+- a repeated given → «זה כבר קיים באיור — אין מה להוסיף.» (2-D's note, quoting nothing; [ADR-AG-330](06c-decisions-analytic.md#adr-ag-330)), no second row
+- a polygon restated with its letters rotated or reversed («ריבוע ABCD» · «מרובע ADCB») → the same note, no second row ([ADR-AG-259](06c-decisions-analytic.md#adr-ag-259))
 - …and with its OWN noun, in every reading that noun says the same thing in («ריבוע ABCD» · «ריבוע BCDA»; «מעוין», «מלבן», «מקבילית», «משולש», a bare polygon) → the same answer. A reading that says something ELSE records: «טרפז ABCD» · «טרפז BCDA» names the other pair of parallel sides, and a kite's axis, an isosceles triangle's apex and a right triangle's seat move with the letters ([ADR-AG-262](06c-decisions-analytic.md#adr-ag-262))
 - «a הוא פרמטר» then «a<13» → recorded
 - Sources: ADR-AG-020.
 
 **R54 — a given the figure already ENTAILS is said, not recorded**. A given true only at the current sample is not this case.
-- a given a determined figure satisfies → «זה כבר נובע מהנתונים שכתבתם», no row
-- Sources: ADR-AG-030.
+- a given a determined figure satisfies → «זה כבר קיים באיור — אין מה להוסיף.», no row — 2-D's answer to a restatement its figure entails ([ADR-AG-330](06c-decisions-analytic.md#adr-ag-330))
+- Sources: ADR-AG-030, ADR-AG-330.
 
 **R125 — "already follows" is said only about a given that is true in EVERY configuration of the figure**. *(Narrows R54.)* A given true in one drawing and false in another chooses between them and is recorded; when unsure, the tool records.
 - the square of exam 15 Q5: «שיפוע הצלע BC הוא -1/2» → B(2,4), C(10,0); «…הוא 1/2» → the mirror

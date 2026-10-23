@@ -64,7 +64,7 @@ describe('#1953 — the operator’s lines: a restated ring answers «כבר ק�
   ])('«%s» · «%s»', async (a, b) => {
     const r = await play([a, b]);
     expect(r.kind).toBe('noop');
-    expect(r.note?.key).toBe('input.alreadyDrawn');
+    expect(r.note?.key).toBe('suite.notice.alreadyDrawn');
     expect(r.after, 'no new row').toBe(r.before);
     expect(llmParseMock).not.toHaveBeenCalled();
   });
@@ -72,7 +72,7 @@ describe('#1953 — the operator’s lines: a restated ring answers «כבר ק�
   it('the declared spelling answers exactly the same (the unchanged control)', async () => {
     for (const [a, b] of [['ריבוע ABCD', 'מרובע ABCD'], ['ריבוע ABCD', 'ריבוע ABCD'], ['משולש ABC', 'משולש ABC']]) {
       const r = await play([a, b]);
-      expect([r.kind, r.note?.key, r.after - r.before], `${a} · ${b}`).toEqual(['noop', 'input.alreadyDrawn', 0]);
+      expect([r.kind, r.note?.key, r.after - r.before], `${a} · ${b}`).toEqual(['noop', 'suite.notice.alreadyDrawn', 0]);
     }
   });
 });
@@ -88,7 +88,7 @@ describe('#1953 — the class: the same shape in any reading it is symmetric und
     ['טרפז ABCD', 'טרפז DCBA'],
   ])('«%s» · «%s» is the no-op its declared spelling is', async (a, b) => {
     const r = await play([a, b]);
-    expect([r.kind, r.note?.key, r.after - r.before]).toEqual(['noop', 'input.alreadyDrawn', 0]);
+    expect([r.kind, r.note?.key, r.after - r.before]).toEqual(['noop', 'suite.notice.alreadyDrawn', 0]);
   });
 
   it('a trapezoid read so the OTHER pair is named is a different statement — never re-spelled', () => {

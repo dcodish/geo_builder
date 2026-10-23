@@ -327,7 +327,9 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
 - **FR-SP-19 (Must)** — **A polygon restated is the polygon already there.** A line that only declares a ring the
   figure already declares — the same letters read from another vertex or the other way round («ריבוע ABCD» ·
   «מרובע ADCB», «משולש ABC» · «משולש ACB»), or the generic word over a named shape («מרובע ABCD» over a square) —
-  adds no row and shows the restatement note, exactly as the same line in the same spelling does (#613). A
+  adds no row and shows the restatement note, exactly as the same line in the same spelling does (#613). The note is
+  2-D's «זה כבר קיים באיור — אין מה להוסיף.» and quotes nothing; re-typing the statement of an UNTICKED row ticks it
+  again with no note, as in 2-D ([ADR-3D-377](06b-decisions-3d.md#adr-3d-377), operator ruling 2026-10-10). A
   reading that changes what a shape says (a trapezoid read so its OTHER pair is named) is a new statement, and a
   crossing order is a different ring (#1927 refuses it). The generic word is only the extreme case: **any** noun the
   declared one IMPLIES — «ריבוע ABCD» · «מלבן ABCD» / «מעוין» / «מקבילית» / «דלתון», «מלבן ABCD» · «מקבילית ABCD» —
@@ -338,7 +340,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   «מלבן» · «דלתון», «מקבילית» · «דלתון», either order) build with 2-D's one note, «ABCD הוא כעת ריבוע, שהוא גם מלבן וגם
   מעוין.» ([ADR-3D-345](06b-decisions-3d.md#adr-3d-345)); and the restatement is judged against what EVERY enabled noun
   makes the ring together — «מלבן ABCD» · «מעוין ABCD» · «ריבוע ABCD» adds no row ([ADR-3D-346](06b-decisions-3d.md#adr-3d-346), #2180).
-  - Sources: ADR-3D-324, ADR-3D-326, ADR-3D-345, ADR-3D-346; #1953, #1988, #2171, #2180.
+  - Sources: ADR-3D-324, ADR-3D-326, ADR-3D-345, ADR-3D-346, ADR-3D-377; #1953, #1988, #1990, #2171, #2180.
 - **FR-SP-24 (Must)** — **An unnamed shape noun is read against the figure: a definite one is the drawn shape, an
   indefinite one a new shape.** A definite noun with no letters («המשולש ישר זווית», «המשולש», «המשולש שווה שוקיים»,
   "the triangle is isosceles", «הריבוע») with ONE flat polygon of that size declared does exactly what the same
