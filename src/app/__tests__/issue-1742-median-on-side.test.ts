@@ -69,7 +69,7 @@ describe('#1742 — a median named by a side is refused, as the long form is', (
 
   it('the student reads the ruled sentence, word for word — the long form\'s', async () => {
     const v = await decide(['משולש ABC'], 'התיכון AB = 5');
-    expect(textOf(v, 'he')).toBe('אמצע הצלע BC אינו יכול להיות B — לשם כך BC הייתה צריכה להיות באורך אפס.');
+    expect(textOf(v, 'he')).toBe('אמצע הצלע BC אינו יכול להיות B — לשם כך BC הייתה צריכה להיות באורך אפס. תיכון יוצא מהקודקוד שמול הצלע — תנו לאמצע הצלע אות חדשה.');
     expect(textOf(v, 'he')).toBe(textOf(await decide(['משולש ABC'], 'AB תיכון לצלע BC'), 'he'));
   });
 

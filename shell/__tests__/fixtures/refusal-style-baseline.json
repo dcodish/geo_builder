@@ -1,38 +1,13 @@
 {
  "queuedCap": {
-  "2d": 13,
-  "3d": 34,
-  "analytic": 36,
-  "complex": 31
+  "2d": 7,
+  "3d": 16,
+  "analytic": 31,
+  "complex": 30
  },
  "entries": {
-  "2d:note input.cevianBisectorIsPolygonSide": {
-   "key": "input.cevianBisectorIsPolygonSide",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "2d:note input.cevianBisectorIsSide": {
-   "key": "input.cevianBisectorIsSide",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "2d:note input.cevianWrongSide": {
-   "key": "input.cevianWrongSide",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "2d:note input.merge_no-source": {
-   "key": "input.merge_no-source",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
   "2d:note input.merge_same": {
    "key": "input.merge_same",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "2d:note input.rename_no-source": {
-   "key": "input.rename_no-source",
    "reason": "queued",
    "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
   },
@@ -56,11 +31,6 @@
    "reason": "ruled",
    "note": "#1994, operator 2026-10-15: \"leave the message\" (ADR-W-130)"
   },
-  "2d:note input.swap_no-source": {
-   "key": "input.swap_no-source",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
   "2d:note input.swap_same": {
    "key": "input.swap_same",
    "reason": "queued",
@@ -78,16 +48,6 @@
   },
   "2d:note input.trigGiven.sine-out-of-range": {
    "key": "input.trigGiven.sine-out-of-range",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:already-defined #1": {
-   "key": "already-defined",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:already-defined #2": {
-   "key": "already-defined",
    "reason": "queued",
    "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
   },
@@ -111,15 +71,10 @@
    "reason": "queued",
    "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
   },
-  "3d:bound-unsatisfiable #1": {
-   "key": "bound-unsatisfiable",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
   "3d:crossing-off-segment #1": {
    "key": "crossing-off-segment",
    "reason": "plain-none",
-   "note": "says there is none in words the regex does not parse: «המישור חוצה את הישר שדרכו, אך לא את הקטע עצמו»"
+   "note": "#1995 batch 1 (ADR-W-155): says there is none in words the regex does not parse: «ולכן אין על הקטע נקודת חיתוך»"
   },
   "3d:dependents-broken #1": {
    "key": "dependents-broken",
@@ -144,7 +99,7 @@
   "3d:line-misses-plane #1": {
    "key": "line-misses-plane",
    "reason": "plain-none",
-   "note": "says there is none in words the regex does not parse: «אין נקודת חיתוך»"
+   "note": "#1995 batch 1 (ADR-W-155): says there is none in words the regex does not parse: «ולכן אין להם נקודת חיתוך»"
   },
   "3d:no-roots #1": {
    "key": "no-roots",
@@ -153,36 +108,6 @@
   },
   "3d:no-roots #2": {
    "key": "no-roots",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:no-solution #1": {
-   "key": "no-solution",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:no-such-solid #1": {
-   "key": "no-such-solid",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:no-such-solid #2": {
-   "key": "no-such-solid",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:not-a-diagonal #1": {
-   "key": "not-a-diagonal",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:not-a-diagonal #2": {
-   "key": "not-a-diagonal",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:not-on-segment #1": {
-   "key": "not-on-segment",
    "reason": "queued",
    "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
   },
@@ -211,11 +136,6 @@
    "reason": "queued",
    "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
   },
-  "3d:rename-refused #2": {
-   "key": "rename-refused",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
   "3d:ring-not-flat #1": {
    "key": "ring-not-flat",
    "reason": "queued",
@@ -226,50 +146,15 @@
    "reason": "queued",
    "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
   },
-  "3d:segments-do-not-meet #1": {
-   "key": "segments-do-not-meet",
-   "reason": "plain-none",
-   "note": "says there is none in words the regex does not parse: «אין להם נקודת מפגש»"
-  },
   "3d:sign-unsatisfiable #1": {
    "key": "sign-unsatisfiable",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:swap-refused #2": {
-   "key": "swap-refused",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:symbolic-new-point #1": {
-   "key": "symbolic-new-point",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:two-unknowns #1": {
-   "key": "two-unknowns",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:unknown-line #1": {
-   "key": "unknown-line",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:unknown-plane #1": {
-   "key": "unknown-plane",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "3d:unknown-point #1": {
-   "key": "unknown-point",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+   "reason": "plain-none",
+   "note": "#1995 batch 1 (ADR-W-155): says there is none in words the regex does not parse: «הנתונים כבר קובעים אותו אחרת, ולכן הנתון לא נוסף»"
   },
   "3d:unknown-symbol #1": {
    "key": "unknown-symbol",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
+   "reason": "ruled",
+   "note": "#1995 batch 1 (ADR-W-155) leaves it: the sentence is false in a measured case («AB = k» → «k חיובי»), a 3-D reading bug folded into #2253 (operator rulings d03/d16, 2026-10-23); its wording comes back with that fix"
   },
   "3d:vacuous-relation #1": {
    "key": "vacuous-relation",
@@ -301,16 +186,6 @@
    "reason": "queued",
    "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
   },
-  "analytic:ask askMissingCurve": {
-   "key": "askMissingCurve",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "analytic:ask askMissingPoint": {
-   "key": "askMissingPoint",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
   "analytic:ask askNoValue": {
    "key": "askNoValue",
    "reason": "queued",
@@ -333,21 +208,6 @@
   },
   "analytic:bad-equation #1": {
    "key": "bad-equation",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "analytic:bisector-is-side #1": {
-   "key": "bisector-is-side",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "analytic:bisector-is-side #2": {
-   "key": "bisector-is-side",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "analytic:bisector-is-side #3": {
-   "key": "bisector-is-side",
    "reason": "queued",
    "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
   },
@@ -463,11 +323,6 @@
   },
   "analytic:unsatisfiable #1": {
    "key": "unsatisfiable",
-   "reason": "queued",
-   "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
-  },
-  "complex:complex-as-real #1": {
-   "key": "complex-as-real",
    "reason": "queued",
    "note": "#1995 stages 3–4 review queue (batch 1 rewrites or reasons it)"
   },

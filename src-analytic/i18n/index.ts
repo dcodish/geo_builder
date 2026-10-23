@@ -115,8 +115,8 @@ const he = {
   askContextualLine: 'יש {{lines}} ישרים בציור — כתבו את שם הישר (למשל «המרחק של הנקודה מהישר l1»)',
   askContextualBoth: 'בציור {{points}} נקודות ו-{{lines}} ישרים — כתבו את השמות (למשל «המרחק של A מהישר l1»)',
   /** #1111 — the sentence was understood; the figure has no such object. The LETTER is the point. */
-  askMissingPoint: 'אין בשרטוט נקודה בשם {{name}}',
-  askMissingCurve: 'אין בשרטוט ישר או מעגל בשם {{name}}',
+  askMissingPoint: 'אין בשרטוט נקודה בשם {{name}}. הוסיפו אותה לשרטוט, למשל «{{name}}(1,2)», ושאלו שוב.',
+  askMissingCurve: 'אין בשרטוט ישר או מעגל בשם {{name}}. הגדירו אותו קודם, ושאלו שוב.',
   // Ruling 2026-09-29 — a numeral asked in the notation the figure does not use.
   askNumeralNotation: '{{name}} ו-{{used}} הם אותו שם — בשרטוט הזה הוא נכתב {{used}}. כתבו {{used}}, כדי לא לערבב שתי כתיבות.',
   paletteShow: 'סמלים',
@@ -397,8 +397,8 @@ const he = {
     'חוצה זווית יוצא מקודקוד הזווית שהוא חוצה, ובמשפט «{{detail}}» הקטע אינו יוצא מהקודקוד הזה. ' +
     'כתבו קטע שמתחיל בקודקוד הזווית, למשל «AD חוצה את הזווית BAC».',
   // #2115 (ADR-AG-299; operator ruling 2026-10-15) — 2-D's `input.cevianBisectorIsSide` / `…IsPolygonSide`, verbatim (B1).
-  errBisectorIsSide: '{{side}} היא צלע של המשולש ולכן אינה יכולה לחצות את זווית {{vertex}} — חוצה זווית יוצא מקודקוד אל הצלע שמולו.',
-  errBisectorIsPolygonSide: '{{side}} היא צלע של {{polygonNoun}} ולכן אינה יכולה לחצות את זווית {{vertex}}.',
+  errBisectorIsSide: '{{side}} היא צלע של המשולש ולכן אינה יכולה לחצות את זווית {{vertex}}. חוצה זווית יוצא מקודקוד אל הצלע שמולו — תנו לקצה השני שלו אות חדשה.',
+  errBisectorIsPolygonSide: '{{side}} היא צלע של {{polygonNoun}} ולכן אינה יכולה לחצות את זווית {{vertex}}. תנו לקצה השני של חוצה הזווית אות חדשה.',
   // The host polygon's definite noun for that sentence — 2-D's `input.shapeNounDefinite`, verbatim (the trapezoid kinds share one).
   shapeTheNounSquare: 'הריבוע',
   shapeTheNounRectangle: 'המלבן',
@@ -727,8 +727,8 @@ const en: typeof he = {
   askContextualPoint: 'the figure has {{points}} points — name the point (e.g. "המרחק של A מהישר")',
   askContextualLine: 'the figure has {{lines}} lines — name the line (e.g. "המרחק של הנקודה מהישר l1")',
   askContextualBoth: 'the figure has {{points}} points and {{lines}} lines — name them (e.g. "המרחק של A מהישר l1")',
-  askMissingPoint: 'there is no point {{name}} in your figure',
-  askMissingCurve: 'there is no line or circle named {{name}} in your figure',
+  askMissingPoint: 'there is no point {{name}} in your figure. Add it to the figure, for example «{{name}}(1,2)», and ask again.',
+  askMissingCurve: 'there is no line or circle named {{name}} in your figure. Define it first, and ask again.',
   askNumeralNotation: '{{name}} and {{used}} are the same name — this figure writes it {{used}}. Write {{used}}, to keep one notation.',
   paletteShow: 'Symbols',
   symSq: 'squared',
@@ -962,8 +962,8 @@ const en: typeof he = {
     'An angle bisector starts at the VERTEX of the angle it bisects, and the segment in «{{detail}}» does not. ' +
     'Start the segment at the angle’s vertex — for example «AD bisects angle BAC».',
   // #2115 (ADR-AG-299) — 2-D's sentences, verbatim.
-  errBisectorIsSide: '{{side}} is a side of the triangle, so it cannot bisect angle {{vertex}} — an angle bisector runs from a vertex to the opposite side.',
-  errBisectorIsPolygonSide: '{{side}} is a side of {{polygonNoun}}, so it cannot bisect angle {{vertex}}.',
+  errBisectorIsSide: '{{side}} is a side of the triangle, so it cannot bisect angle {{vertex}}. An angle bisector runs from a vertex to the opposite side — give its other end a new letter.',
+  errBisectorIsPolygonSide: '{{side}} is a side of {{polygonNoun}}, so it cannot bisect angle {{vertex}}. Give the other end of the bisector a new letter.',
   // The host polygon's definite noun for that sentence — 2-D's `input.shapeNounDefinite`, verbatim (the trapezoid kinds share one).
   shapeTheNounSquare: 'the square',
   shapeTheNounRectangle: 'the rectangle',

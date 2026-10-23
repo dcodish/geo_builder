@@ -6277,3 +6277,58 @@ The operator accepted both on 2026-10-16: *"The English versions of today's word
 **Locks.** The four thin locks above, and `shell/__tests__/refusal-style-meta.test.ts`: a row with an engine token, a step-less row off the baseline, an entry whose row now passes, a stale entry, a grown queue and a vacuous product are each caught; the heuristic's positive and negative cases and the four false passes are pinned. No operator utterance is involved, so no scenario or fixture.
 
 **Behaviour change for a student:** none (a test and its baseline; no string, verdict or figure changes).
+
+## ADR-W-155 — #1995 batch 1: the refusals that named an object and gave nothing to do now give one next step, or say there is none
+
+**Status:** accepted · 2026-10-23 · debt (P3, workspace — all four builders) · fix round #2466, stream C · branch `fix/1995-batch1-next-step` (stacked on #2201 phase 3b's) · plan armed `auto-ok` 2026-10-23 (#1995, ADR-W-014 Am. 1) · **Operator rulings** 2026-10-13 (#1995, ballot card 18 B — sessions rewrite under the rule; the operator approves a sampled page per batch) and 2026-10-15 (card 3b A) · **First batch under** [ADR-W-154](#adr-w-154) (the ratchet it tightens) · **Follows** [ADR-W-150](#adr-w-150) (the English twins take the Hebrew shape)
+**Requirements:** [02w](02w-requirements-workspace.md) FR-SU-5 (sources line +ADR; no new promise) · **Design:** none (internal)
+
+**Context.** *A refusal written from the solver's view states what could not be placed and stops.* The engine knows the object, so the sentence names it; it does not know what the student should do next, so the sentence says nothing. 3-D is the worst case because its `err.*` table renders bare (`errorText3` appends no hint, unlike 2-D's `errors.retryHint`). Selection (the #1995 batch-1 plan, re-measured at pickup on `f445720e`): a refusal key that interpolates an object name, has no next step after display, and does not already say there is none. 2-D's `humanizeError` keys are out (their golden is #2201 phase 3's lock), and so are `input.sentenceSelfConflict`/`errors.mutedRowOwns` (#1994), `errors.alreadyDefined` (#1993) and the `diagonalIsSide` pair (batch 2). All 29 batch strings measured byte-unchanged since `050c04a9`; every taught line still builds.
+
+**Decision — per string** (S = the name is one the student typed; "verified" = the taught line was submitted after the refusal and taken):
+
+| # | builder · key | verdict | the next step, and how it was verified |
+| --- | --- | --- | --- |
+| 1 | 3-D `err.alreadyDefined` | rewrite (S) | edit or delete the row that defined it — 2-D's own step (B1); a UI step, no line |
+| 2 | 3-D `err.rename.no-source` | rewrite, plain none (S) | «…ולכן אין מה לשנות.»; «שנה שם A ל-Q» taken |
+| 3 | 3-D `err.swap.no-source` | rewrite, plain none (S) | «…אפשר להחליף רק בין שתי נקודות שבציור.»; «החלף בין A ל-B» taken |
+| 4 | 3-D `err.unknownPoint` | rewrite (S) | define it first (2-D's step); «E אמצע XC» ✗ → «נקודה X(0,0,5)» → «E אמצע XC» ✓ |
+| 5 | 3-D `err.noSolution` | rewrite (S in the measured case) | check the values; «t = 2» ✗ → «t = 1/2» ✓. Can still name an ENGINE id (F1, below) — the rewrite does not paper over it |
+| 6 | 3-D `err.notOnSegment` | rewrite (S) | check the segment and the condition. **Reached at pickup** (the plan had it unreached): cube + basis u, v, w, «M אמצע AA'», «N אמצע BB'», «R אמצע NB'», «P על הקטע AM כך ש-RP = αu + βv» ✗ → «…על הקטע AA'…» ✓. The plan's «בדקו את הערכים שנתתם לה» was replaced, since this construction has no values |
+| 7 | 3-D `err.unknownPlane` | rewrite (S) | «למשל «מישור π3»» — read out of the sentence and submitted ✓; English «plane π3» ✓ |
+| 8 | 3-D `err.unknownLine` | rewrite (S) | «למשל «ישר k»» ✓, then the refused line ✓; English «line k» ✓ |
+| 9 | 3-D `err.planeSideUndefined` | unchanged | already says there is none (baseline `plain-none`) |
+| 10 | 3-D `err.symbolicNewPoint` | rewrite (S) | «למשל «N(1,2,3)»» ✓ |
+| 11 | 3-D `err.signUnsatisfiable` | rewrite, plain none (S) | «…הנתונים כבר קובעים אותו אחרת, ולכן הנתון לא נוסף.» — baseline `plain-none` |
+| 12 | 3-D `err.noSuchSolid` | rewrite (S) | write the claim about a solid in the figure, with its letters; «נפח הפירמידה SABCD = 11» ✓. **Keeps "exactly one"**, unlike the plan: the bare «הבסיס» path refuses with this code when the figure has two solids (measured), so «there is no solid» would be false (F5) |
+| 13 | 3-D `err.twoUnknowns` | rewrite (S) | define the second point first; «PQ = 2AB» ✗ → «Q(0,0,0)» → «PQ = 2AB» ✓ |
+| 14 | 3-D `err.lineMissesPlane` | rewrite, plain none (S) | drops «בערך הפרמטר שנבחר», measured false («(1, m, 0)» is parallel to «z − 3 = 0» for every m) — baseline `plain-none` |
+| 15 | 3-D `err.segmentsDoNotMeet` | rewrite (S) | check the letters; «…AC ו-BD נפגשים בנקודה E» ✓ |
+| 16 | 3-D `err.crossingOffSegment` | rewrite, plain none (S) | no spelling taught: «הישר AA' חותך את π…» is refused the same way (F3) — baseline `plain-none` |
+| 17 | 3-D `err.boundUnsatisfiable` | rewrite | check the bounds; «60 < ∠SAB < 90» ✓. Drops `{{id}}`, which the store path passes empty («הזווית ב- נמצאת») |
+| 18 | 3-D `err.unknownSymbol` | **not rewritten** | false in a measured case («AB = k» → «k חיובי»); folded into #2253 — baseline `ruled` |
+| 19 | 3-D `err.notADiagonal` | rewrite (S) | write two non-adjacent vertices; «אלכסון AC» ✓ |
+| 20 | 3-D `err.notASpaceDiagonal` | rewrite (S) | write two opposite vertices; «אלכסון ראשי AC'» ✓ |
+| 21 | 2-D `input.rename_no-source` | rewrite, plain none (S) | «…ולכן אין מה לשנות.» (analytic's existing sentence) |
+| 22 | 2-D `input.swap_no-source` | rewrite, plain none (S) | as #3 |
+| 23 | 2-D `input.merge_no-source` | rewrite, plain none (S) | «…ולכן אין מה למזג.» |
+| 24 | 2-D `input.cevianBisectorIsSide` | rewrite (S) | give its other end a new letter; «AD חוצה זווית A» ✓ |
+| 25 | 2-D `input.cevianBisectorIsPolygonSide` | rewrite (S) | the same; «AE חוצה זווית A» ✓ (no letter hard-coded: «D» is a vertex of a quadrilateral) |
+| 26 | 2-D `input.cevianMedianFootAtEnd` | rewrite (S) | a median runs from the opposite vertex — a new letter for the midpoint; «AD תיכון לצלע BC» ✓ |
+| 27 | 2-D `input.cevianApexOnSide` | rewrite (S) | write it from the vertex opposite the side. **Reached at pickup**: «BD גובה לצלע AB» ✗ → «CD גובה לצלע AB» ✓ |
+| 28 | 2-D `input.cevianApexIsFoot` | rewrite (S) | a new letter for the point on the side; «AA גובה לצלע BC» ✗ → «AD גובה לצלע BC» ✓ |
+| 29 | 2-D `input.cevianWrongSide` | rewrite (S) | «כתבו BC במקום AB»; «AD חוצה זווית A לצלע BC» ✓ |
+| 30 | analytic `askMissingPoint` | rewrite (S) | «למשל «D(1,2)»» — read out of the sentence, recorded, and the question is then answered |
+| 31 | analytic `askMissingCurve` | rewrite (S) | define it first, and ask again (no spelling taught) |
+| 32 | analytic `errBisectorIsSide` | rewrite | 2-D #24, byte-equal (B1) |
+| 33 | analytic `errBisectorIsPolygonSide` | rewrite | 2-D #25, byte-equal with the noun slot aligned |
+| 34–35 | analytic `errThirdCrossing`, `errDiagonalNoneHere` | unchanged | already plain none |
+| 36 | complex `errComplexAsReal` | rewrite (S) | choose another letter; «w מספר מרוכב» ✓. The old «הוגדר כמספר מרוכב» was false when the refused line IS the declaration |
+
+Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer, parser or engine changes; no parameter is added (`errorText3` still passes `id` to `err.boundUnsatisfiable`; the template stops using it).
+
+**Findings, not fixed here** (for the round to file): **F1** an engine id reaches the student — «מנסרה ישרה משולשת» · «אלכסוני הבסיס» renders «…«diagonals»…» (`resolveQuadRing`, `src3d/engine/apply.ts`); **F2** = #18; **F3** «הישר AA' חותך את המישור π בנקודה P» is refused as off the SEGMENT; **F5** 3-D's bare «הבסיס» with zero or two solids answers `no-such-solid` with the id «בסיס» — `err.baseNeedsOneSolid`, which says exactly this, is only reached from `unknown-plane`; **F6** 2-D's refusal-style rows do not see `cevianApexOnSide`, `cevianMedianFootAtEnd` or `cevianApexIsFoot` (chosen in a ternary, not a `{ key: '…' }` literal), so the ratchet is blind to those three.
+
+**Locks.** `refusal-batch1-1995.test.ts` in each tree (`src/app/`, `src3d/`, `src-analytic/`, `src-complex/` `__tests__/`): the refusing sequence through each tree's real decision (2-D `runSubmit`; 3-D `decideDeterministic3` → `dispatchVerdict` → `errorText3`; analytic `decideSubmit`/`ask`; complex `submitLine`), the rendered sentence asserted verbatim, then the taught step submitted and taken — where the sentence carries a spelling, it is read out of the sentence. `shell/__tests__/cevian-side-wording-parity.test.ts`: the bisector pair byte-equal in 2-D and analytic, both languages. The refusal-style baseline loses 29 batch entries (queued caps 2-D 13→7, 3-D 34→16, analytic 36→31, complex 31→30); #11 joins #14/#16 as `plain-none`, #15's `plain-none` entry goes (it now passes), #18 becomes `ruled`. Six existing tests re-based (#2066, #2085 item 3, #2115, #1742). The rule-4 lock is the new tests: no operator utterance is involved.
+
+**Behaviour change for a student:** 32 refusals read differently in four builders — each now says what to do next, or says plainly there is nothing to do; every verdict and figure is unchanged. The sampled page on the round's play sheet is the operator's approval (card 18 B).

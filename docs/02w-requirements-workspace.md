@@ -88,7 +88,7 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   ruling 2026-10-23, d20 A; [ADR-W-130](06w-decisions-workspace.md#adr-w-130) Am. 1).
   A refusal names the student's statement and gives one next step, or says plainly there is none (operator
   rulings 2026-10-13, 2026-10-15) — a new sentence as much as a rewritten one.
-  - Sources: [ADR-W-096](06w-decisions-workspace.md#adr-w-096), #1522, [ADR-W-130](06w-decisions-workspace.md#adr-w-130), #2028, [ADR-W-154](06w-decisions-workspace.md#adr-w-154), #1995.
+  - Sources: [ADR-W-096](06w-decisions-workspace.md#adr-w-096), #1522, [ADR-W-130](06w-decisions-workspace.md#adr-w-130), #2028, [ADR-W-154](06w-decisions-workspace.md#adr-w-154), #1995, [ADR-W-155](06w-decisions-workspace.md#adr-w-155) (batch 1).
 - **FR-SU-7 (Should)** — **A manual screen per builder, in one chrome.** Each builder documents its own
   language; the frame around that documentation is identical. **A section shows a SAMPLE, and the sample is
   chosen rather than sliced:** the guide caps each section so it teaches rather than inventories, the entries
