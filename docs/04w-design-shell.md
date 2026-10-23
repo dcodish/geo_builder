@@ -57,6 +57,14 @@ reading, with one implementation and two consumers.
 
 The primitives layer is the one a product can adopt without changing its layout.
 
+**One i18n bootstrap ([#2201](https://github.com/dcodish/geo_builder/issues/2201) phase 0).** All four
+builders boot their i18n through `shell/i18n.ts` `createProductI18n`, each passing only its own resources
+and its own bidi post-processor, so each gets its own i18next instance under one policy (Hebrew default and
+fallback, `he`/`en`, no escaping). 2-D was the last to leave the global i18next singleton; its
+`src/i18n` default export is that instance, so callers did not change.
+`shell/__tests__/i18n-bootstrap-adoption.test.ts` reads every enabled builder's `<tree>/i18n/index.ts`
+from the `products.json` roster and fails if one stops calling the bootstrap or inits i18next itself.
+
 ### Adoption order, and why it was staggered
 
 Every product tree consumes `shell/`, each through its own tracked edge in
