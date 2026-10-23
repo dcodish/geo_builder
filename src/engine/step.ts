@@ -7,6 +7,7 @@
  * the Phase-1 gate needs.)
  */
 
+import { engineErrorDebugText } from './errors';
 import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Polygon, SideChoice, SolveDirective, Vec } from './types';
 import { LEN_EPS, edgeSideToward, isGeoPoint, isOrderConstraint } from './types';
 import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, refinesDeclaredRing, riderPerpendicularAsFoot, shapeExclusion, shapeExclusionError, shapeLowersToConstraints, trapezoidDerivedSlot, wouldInvertDependency } from './apply';
@@ -114,8 +115,8 @@ export function diagonalClaimRefusal(prev: Construction, cmd: Command): string |
   if (!holders.length) return null; // nothing to check against yet — the verifier has the last word
   if (holders.some((r) => isRingDiagonal(r, cmd.a, cmd.b))) return null; // it IS a diagonal of one of them
   const ring = holders[0];
-  if (ring.length < 4) return `${cmd.a}${cmd.b} is not a diagonal — ${ring.join('')} has no diagonals`;
-  return `${cmd.a}${cmd.b} is not a diagonal of ${ring.join('')} — it is a side`;
+  if (ring.length < 4) return engineErrorDebugText({ code: 'diagonal-none', pair: `${cmd.a}${cmd.b}`, shape: ring.join('') });
+  return engineErrorDebugText({ code: 'diagonal-is-side', pair: `${cmd.a}${cmd.b}`, shape: ring.join('') });
 }
 
 /**
@@ -191,7 +192,7 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     // («מרובע»/an inscribed ring → «דלתון») or meets it in a third kind is a statement about the ring, never a
     // redefinition of it; apply's `refineRingKind` gives the polygon the narrower kind.
     if (o.kind === 'polygon' && existing.kind === 'polygon' && (isSupertypeRestatement(cmd, existing) || refinesDeclaredRing(prev, cmd))) continue;
-    return `'${o.id}' is already defined — it can't be redefined as something different`;
+    return engineErrorDebugText({ code: 'already-defined', id: o.id });
   }
   return null;
 }
@@ -216,14 +217,14 @@ function degenerateConstraintError(cmd: Command): string | null {
       if (cmd.a !== cmd.b && cmd.c !== cmd.d) return null;
       const rel = cmd.type === 'set-perpendicular' ? '⟂' : '∥';
       const degenerate = cmd.a === cmd.b ? `${cmd.a}${cmd.b}` : `${cmd.c}${cmd.d}`;
-      return `${rel} needs two distinct points on each side — "${degenerate}" is a single point, not a segment`;
+      return engineErrorDebugText({ code: 'degenerate-segment', rel, seg: degenerate });
     }
     // An angle's ray must leave its vertex — vertex === ray ⇒ a zero ray ⇒ angleDeg is NaN.
     case 'set-angle':
     case 'set-angle-acuteness':
     case 'set-angle-bound':
       return cmd.vertex === cmd.ray1 || cmd.vertex === cmd.ray2
-        ? `an angle needs three distinct points — "∠${cmd.ray1}${cmd.vertex}${cmd.ray2}" repeats its vertex`
+        ? engineErrorDebugText({ code: 'degenerate-angle', angle: `∠${cmd.ray1}${cmd.vertex}${cmd.ray2}` })
         : null;
     case 'set-angle-ratio':
     case 'set-angle-order': {
@@ -233,16 +234,16 @@ function degenerateConstraintError(cmd: Command): string | null {
           : cmd.v2 === cmd.a2 || cmd.v2 === cmd.b2
             ? `∠${cmd.a2}${cmd.v2}${cmd.b2}`
             : null;
-      return bad ? `an angle needs three distinct points — "${bad}" repeats its vertex` : null;
+      return bad ? engineErrorDebugText({ code: 'degenerate-angle', angle: bad }) : null;
     }
     // Collinearity through a repeated point has a collapsed ray (NaN residual, see solve.ts `collinear`).
     case 'set-collinear':
       return cmd.a === cmd.b || cmd.a === cmd.c
-        ? `collinear points must be distinct — "${cmd.a}" is named twice`
+        ? engineErrorDebugText({ code: 'degenerate-collinear', id: cmd.a })
         : null;
     case 'set-line': {
       const dup = cmd.points.find((p, i) => cmd.points.indexOf(p) !== i);
-      return dup !== undefined ? `collinear points must be distinct — "${dup}" is named twice` : null;
+      return dup !== undefined ? engineErrorDebugText({ code: 'degenerate-collinear', id: dup }) : null;
     }
     // A measure-sum's ANGLE term with vertex === ray is a zero ray (NaN, the set-angle case); a
     // repeated-id LENGTH pair "AA" is honestly 0 there, but in a length-PRODUCT a zero factor makes
@@ -251,19 +252,19 @@ function degenerateConstraintError(cmd: Command): string | null {
       if (cmd.unit === 'length') {
         for (let i = 0; i + 1 < cmd.points.length; i += 2)
           if (cmd.points[i] === cmd.points[i + 1])
-            return `a length needs two distinct points — "${cmd.points[i]}${cmd.points[i + 1]}" is a single point, not a segment`;
+            return engineErrorDebugText({ code: 'degenerate-length', seg: `${cmd.points[i]}${cmd.points[i + 1]}` });
         return null;
       }
       for (let i = 0; i + 2 < cmd.points.length; i += 3)
         if (cmd.points[i + 1] === cmd.points[i] || cmd.points[i + 1] === cmd.points[i + 2])
-          return `an angle needs three distinct points — "∠${cmd.points[i]}${cmd.points[i + 1]}${cmd.points[i + 2]}" repeats its vertex`;
+          return engineErrorDebugText({ code: 'degenerate-angle', angle: `∠${cmd.points[i]}${cmd.points[i + 1]}${cmd.points[i + 2]}` });
       return null;
     }
     case 'set-length-product': {
       for (const side of [cmd.lhs, cmd.rhs])
         for (let i = 0; i + 1 < side.length; i += 2)
           if (side[i] === side[i + 1])
-            return `a length needs two distinct points — "${side[i]}${side[i + 1]}" is a single point, not a segment`;
+            return engineErrorDebugText({ code: 'degenerate-length', seg: `${side[i]}${side[i + 1]}` });
       return null;
     }
     default:
@@ -352,7 +353,7 @@ function newConstraintsNonVacuous(c: Construction, positions: Map<Id, Vec>, newC
 export function collapsedPolygonError(vertices: readonly Id[], what: string | null, corner?: readonly Id[]): string {
   // #2064 B2 (ADR-643): a straight corner names its three vertices (`would be flat at B, C, D`), which the humaniser
   // reads as the points on one line — the n-gon would lose a corner, not become a line
-  return `collapsed: polygon ${vertices.join(', ')} would be flat${corner ? ` at ${corner.join(', ')}` : ''}${what ? ` — ${what} cannot hold` : ''}`;
+  return engineErrorDebugText({ code: 'polygon-collapsed', vertices: [...vertices], ...(corner ? { corner: [...corner] } : {}), ...(what ? { what } : {}) });
 }
 /**
  * #2064 ([ADR-643](../../docs/06-decisions.md#adr-643)) — the refusal for a declared polygon the step's figure
@@ -364,7 +365,7 @@ export function collapsedPolygonError(vertices: readonly Id[], what: string | nu
 function polygonDefectError(d: PolygonDefect, added: Constraint[]): string {
   if (d.kind === 'point') {
     const redefined = added.flatMap((k) => (k.type !== 'coincide' ? [] : k.q.startsWith('~') ? [k.p] : k.p.startsWith('~') ? [k.q] : [])).find((v) => d.vertices.includes(v));
-    if (redefined) return `'${redefined}' is already defined — it can't be redefined as something different`;
+    if (redefined) return engineErrorDebugText({ code: 'already-defined', id: redefined });
   }
   return collapsedPolygonError(d.vertices, added.length ? describeConstraint(describeNewStatement(added)) : null, d.kind === 'corner' ? d.corner : undefined);
 }
@@ -572,7 +573,7 @@ function describeNewStatement(newCons: Constraint[], violated?: Constraint[]): C
 
 function blameNewStatement(error: string, newCons: Constraint[], violated?: Constraint[]): string {
   if (!newCons.length || !error.startsWith('over-constrained')) return error;
-  return `over-constrained: ${describeConstraint(describeNewStatement(newCons, violated))} cannot hold`;
+  return engineErrorDebugText({ code: 'over-constrained', what: describeConstraint(describeNewStatement(newCons, violated)) });
 }
 
 /**
@@ -872,7 +873,7 @@ function runFailureLadder(
   // #920 (ADR-493): blame from what the step ACTUALLY added — a macro whose constraints all became
   // solve directives lists none, and both messages below were being built from an empty set.
   const blameCons = addedConstraints(prev, next);
-  const vacuousErr = blameCons.length ? `over-constrained: ${describeConstraint(describeNewStatement(blameCons))} cannot hold` : 'over-constrained';
+  const vacuousErr = engineErrorDebugText(blameCons.length ? { code: 'over-constrained', what: describeConstraint(describeNewStatement(blameCons)) } : { code: 'over-constrained-unnamed' });
   // #1849 (ADR-602): when the solution that EXISTED flattened a DECLARED polygon, the refusal says so — the
   // student's statement cannot hold because the polygon would be a line, and a line is not a triangle (the
   // operator's ruling, 2026-10-07). One shape for every collapse the gate refuses: forced by lengths
@@ -1012,7 +1013,7 @@ function danglingCircleError(prev: Construction, cmd: Command): string | null {
     if (typeof v !== 'string' || v === own) continue;
     if (!prev.objects.some((o) => o.kind === 'circle' && o.id === v)) {
       const letter = v.startsWith('circle-') ? v.slice('circle-'.length) : v;
-      return `circle '${letter}' is not defined`;
+      return engineErrorDebugText({ code: 'unknown-circle', center: letter });
     }
   }
   return null;
@@ -1305,7 +1306,7 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
     const what = newCons.length
       ? describeConstraint(describeNewStatement(newCons))
       : angleErr.angles.map((a) => `∠${a.ray1}${a.vertex}${a.ray2} = ${Number(a.value.toFixed(2))}°`).join(' and ');
-    const error = angleErr.kind === 'no-room' ? `over-constrained: ${what} cannot hold` : angleSumImpossibilityError(angleErr);
+    const error = angleErr.kind === 'no-room' ? engineErrorDebugText({ code: 'over-constrained', what }) : angleSumImpossibilityError(angleErr);
     // A no-room proof answers before the ladder, which used to reach the same verdict by finding the degenerate needle
     // and refusing it as not a figure (#1328, ADR-537). It must carry that standing: `degenerate` is what files the
     // fact in the fold's RIGID set (a contradiction no later given clears), as stage 0h's flat proof does.
@@ -1450,7 +1451,7 @@ function applyStepLadder(prev: Construction, cmd: Command): StepResult {
     // default collisions; a constraint-DRIVEN coincidence is allowed below, not here). Otherwise fall
     // through to report the default's genuine error.
     const stack = (res.ok && res.coincidences?.length ? res.coincidences : alt.ok && alt.coincidences?.length ? alt.coincidences : null);
-    if (stack) return { ok: false, error: `${stack[0][0]} and ${stack[0][1]} would be at the same point`, construction: prev, positions: prevPositions, ladder: ['main:stack-refuse'] };
+    if (stack) return { ok: false, error: engineErrorDebugText({ code: 'same-spot', a: stack[0][0], b: stack[0][1] }), construction: prev, positions: prevPositions, ladder: ['main:stack-refuse'] };
   }
 
   // A primary solve that "passed" only VACUOUSLY (a new constraint's own referenced points collapsed —

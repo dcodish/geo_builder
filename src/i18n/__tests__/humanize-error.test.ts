@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import i18n from '@/i18n';
-import { humanizeError, humanizeErrorOutcome, PATTERNS, sanitizeIds, translateConstraintWords, translateParams, type Translate } from '@/i18n/humanizeError';
+import { humanizeError, humanizeErrorOutcome, sanitizeIds, translateConstraintWords, translateParams, WORDINGS, wordingOf, type Translate } from '@/i18n/humanizeError';
+import { parseEngineError } from '@/engine/errors';
 import { describeConstraint } from '@/engine/solve';
 import { applyCommand } from '@/engine/apply';
 import { diagonalClaimRefusal } from '@/engine/step';
@@ -166,14 +167,14 @@ describe('#413 — no English word survives in a student-facing message', () => 
  * are invisible without this gate.
  */
 describe('#983 — every humanize pattern is exercised by a real engine message', () => {
-  /** Which table entries a raw message reaches — the same scan `humanizeError` itself performs. */
-  const firstMatching = (raw: string) => PATTERNS.findIndex((p) => sanitizeIds(raw.trim()).match(p.re) !== null);
+  /** Which wording a raw message reaches — the same parse and switch `humanizeError` itself performs (phase 3a, ADR-756). */
+  const firstMatching = (raw: string): string | undefined => wordingOf(parseEngineError(raw))?.wording;
 
   it('the CASES corpus covers EVERY pattern in the table', () => {
-    const covered = new Set(CASES.map(({ raw }) => firstMatching(raw)).filter((i) => i >= 0));
-    const dead = PATTERNS.map((p, i) => ({ i, key: p.key }))
-      .filter(({ i }) => !covered.has(i))
-      .map(({ i, key }) => `#${i} ${key}`);
+    const covered = new Set(CASES.map(({ raw }) => firstMatching(raw)));
+    const dead = Object.entries(WORDINGS)
+      .filter(([id]) => !covered.has(id))
+      .map(([id, w]) => `${id} ${w.key}`);
     expect(
       dead,
       `these patterns match no message in CASES — either the regex is wrong (it will silently render ` +
@@ -182,13 +183,13 @@ describe('#983 — every humanize pattern is exercised by a real engine message'
   });
 
   it('every CASES row reaches a pattern (no row silently falls through)', () => {
-    const missed = CASES.filter(({ raw }) => firstMatching(raw) < 0).map(({ raw }) => raw);
+    const missed = CASES.filter(({ raw }) => firstMatching(raw) === undefined).map(({ raw }) => raw);
     expect(missed, `no pattern matches:\n${missed.join('\n')}`).toEqual([]);
   });
 
   it('the gate is measuring something (an empty table or corpus would pass by checking nothing)', () => {
     // The #909/#174 lesson: a lock whose subject can be empty passes green while asserting nothing.
-    expect(PATTERNS.length).toBeGreaterThan(20);
+    expect(Object.keys(WORDINGS).length).toBeGreaterThan(20);
     expect(CASES.length).toBeGreaterThan(20);
   });
 

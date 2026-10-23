@@ -5,6 +5,7 @@
  * non-finite coords, or a contradicted constraint = over-constraint, FR-EN-8).
  */
 
+import { engineErrorDebugText } from './errors';
 import type { Circle, Constraint, Construction, GeoObject, GeoPoint, Id, Line, Vec } from './types';
 import { LEN_EPS, TANGENT_COS, isGeoPoint, isOrderConstraint, objectParents } from './types';
 import { isShapeCarrier } from './carriers';
@@ -1408,7 +1409,7 @@ function evaluateUncached(c: Construction, resolve: (c: Construction) => Constru
   for (const con of driven) {
     for (const id of constraintRefs(con)) {
       if (!c.objects.some((o) => o.id === id)) {
-        return { ok: false, error: `${describeConstraint(con)} references an unknown point`, violated: [con] };
+        return { ok: false, error: engineErrorDebugText({ code: 'unknown-point', what: describeConstraint(con) }), violated: [con] };
       }
     }
   }
@@ -1430,7 +1431,7 @@ function evaluateUncached(c: Construction, resolve: (c: Construction) => Constru
   const seenDesc = new Set<string>();
   for (const con of driven) {
     for (const id of constraintRefs(con)) {
-      if (!res.positions.has(id)) return { ok: false, error: `${describeConstraint(con)} references an unknown point`, violated: [con] };
+      if (!res.positions.has(id)) return { ok: false, error: engineErrorDebugText({ code: 'unknown-point', what: describeConstraint(con) }), violated: [con] };
     }
     if (!isSatisfied(con, (id) => res.positions.get(id)!)) {
       violatedCons.push(con);
@@ -1438,7 +1439,7 @@ function evaluateUncached(c: Construction, resolve: (c: Construction) => Constru
       if (!seenDesc.has(d)) { seenDesc.add(d); violated.push(d); }
     }
   }
-  if (violated.length) return { ok: false, error: `over-constrained: ${violated.join(' and ')} cannot hold`, violated: violatedCons };
+  if (violated.length) return { ok: false, error: engineErrorDebugText({ code: 'over-constrained', what: violated.join(' and ') }), violated: violatedCons };
   return res;
 }
 
@@ -1528,12 +1529,12 @@ export function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean
       if (!o) continue;
       for (const p of objectParents(o)) if (/^[A-Z]\d*$/.test(p) && !present.has(p) && !missing.includes(p)) missing.push(p);
     }
-    if (missing.length) return { ok: false, error: `undefined point: ${missing.join(', ')}`, stuckIds: stuck };
-    return { ok: false, error: `unresolved dependencies for: ${stuck.join(', ')}`, stuckIds: stuck };
+    if (missing.length) return { ok: false, error: engineErrorDebugText({ code: 'undefined-points', ids: missing }), stuckIds: stuck };
+    return { ok: false, error: engineErrorDebugText({ code: 'unresolved-deps', ids: stuck }), stuckIds: stuck };
   }
 
   for (const v of pos.values()) {
-    if (!isFinite(v.x) || !isFinite(v.y)) return { ok: false, error: 'non-finite position computed' };
+    if (!isFinite(v.x) || !isFinite(v.y)) return { ok: false, error: engineErrorDebugText({ code: 'non-finite' }) };
   }
 
   // During a driven trial ([ADR-028](docs/06-decisions.md#adr-028)) we only need
@@ -1586,11 +1587,11 @@ export function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean
 
   for (const con of c.constraints) {
     for (const id of constraintRefs(con)) {
-      if (!pos.get(id)) return { ok: false, error: `${describeConstraint(con)} references an unknown point`, violated: [con] };
+      if (!pos.get(id)) return { ok: false, error: engineErrorDebugText({ code: 'unknown-point', what: describeConstraint(con) }), violated: [con] };
     }
     const get = (id: Id) => pos.get(id)!;
     if (!isSatisfied(con, get)) {
-      return { ok: false, error: `over-constrained: ${describeConstraint(con)} cannot hold`, violated: [con] };
+      return { ok: false, error: engineErrorDebugText({ code: 'over-constrained', what: describeConstraint(con) }), violated: [con] };
     }
   }
 
@@ -1602,13 +1603,13 @@ export function resolveCircle(c: Circle, pos: Map<Id, Vec>): ResolvedCircle | 'p
   const center = pos.get(c.center);
   if (!center) return 'pending';
   if (c.radius.via === 'length' || c.radius.via === 'free') {
-    if (c.radius.value <= 0) return `circle ${c.id}: radius must be positive`;
+    if (c.radius.value <= 0) return engineErrorDebugText({ code: 'radius-not-positive', circle: c.id });
     return { center, r: c.radius.value };
   }
   const p = pos.get(c.radius.point);
   if (!p) return 'pending';
   const r = len(sub(p, center));
-  if (r < 1e-9) return `circle ${c.id}: the point on it coincides with the centre`;
+  if (r < 1e-9) return engineErrorDebugText({ code: 'radius-point-at-centre', circle: c.id });
   return { center, r };
 }
 
@@ -1621,7 +1622,7 @@ export function resolveLine(l: Line, pos: Map<Id, Vec>, circles: Map<Id, Resolve
       const b = pos.get(s.b);
       if (!a || !b) return 'pending';
       const dir = sub(b, a);
-      if (len(dir) < 1e-9) return `cannot build line ${l.id}: ${s.a} and ${s.b} coincide`;
+      if (len(dir) < 1e-9) return engineErrorDebugText({ code: 'line-points-coincide', line: l.id, a: s.a, b: s.b });
       return { anchor: a, dir: unit(dir) };
     }
     case 'bisector': {
@@ -1632,7 +1633,7 @@ export function resolveLine(l: Line, pos: Map<Id, Vec>, circles: Map<Id, Resolve
       const u1 = unit(sub(p, v));
       const u2 = unit(sub(q, v));
       const bis = add(u1, u2); // the internal-bisector direction
-      if (len(bis) < 1e-9) return `cannot bisect ∠${s.p}${s.vertex}${s.q}: the rays are opposite`;
+      if (len(bis) < 1e-9) return engineErrorDebugText({ code: 'bisect-opposite', angle: `∠${s.p}${s.vertex}${s.q}` });
       return { anchor: v, dir: unit(bis) };
     }
     case 'perpendicular':
@@ -1642,7 +1643,7 @@ export function resolveLine(l: Line, pos: Map<Id, Vec>, circles: Map<Id, Resolve
       const b = pos.get(s.b);
       if (!t || !a || !b) return 'pending';
       const base = sub(b, a);
-      if (len(base) < 1e-9) return `cannot build line ${l.id}: ${s.a} and ${s.b} coincide`;
+      if (len(base) < 1e-9) return engineErrorDebugText({ code: 'line-points-coincide', line: l.id, a: s.a, b: s.b });
       const dir = unit(base);
       return { anchor: t, dir: s.via === 'perpendicular' ? rot90(dir) : dir };
     }
@@ -1651,7 +1652,7 @@ export function resolveLine(l: Line, pos: Map<Id, Vec>, circles: Map<Id, Resolve
       const at = pos.get(s.at);
       if (!c || !at) return 'pending';
       const radial = sub(at, c.center);
-      if (len(radial) < 1e-9) return `cannot take a tangent at the centre of ${s.circle}`;
+      if (len(radial) < 1e-9) return engineErrorDebugText({ code: 'tangent-at-centre', circle: s.circle });
       return { anchor: at, dir: unit(rot90(radial)) }; // ⟂ to the radius at `at`
     }
   }
@@ -1730,7 +1731,7 @@ export function tangentTouch(line: ResolvedLine, circle: ResolvedCircle, pos: Ma
 
 /** The engine's one sentence for "a crossing asked of a tangent" (`humanizeError` → `errors.tangentNoSecondCrossing`). */
 function tangentNoSecondCrossing(pointId: Id, lineName: string, circleId: Id, touch: Id): string {
-  return `cannot place ${pointId}: line ${lineName} is tangent to circle ${circleId} at ${touch} — it has no second crossing to extend onto`;
+  return engineErrorDebugText({ code: 'tangent-no-second-crossing', id: pointId, line: lineName, circle: circleId, touch });
 }
 
 /**
@@ -1754,7 +1755,7 @@ export function chordCrossings(sols: Vec[], pos: Map<Id, Vec>, line: ResolvedLin
 
 /** #1834 (ADR-729): the engine's sentence for "a third crossing asked of a chord" (`humanizeError` → `errors.thirdCrossing`). */
 function thirdCrossingError(pointId: Id, [a, b]: [Id, Id], circleId: Id): string {
-  return `cannot place ${pointId}: line ${a}${b} already crosses circle ${circleId} at ${a} and ${b} — a line has no third crossing with a circle`;
+  return engineErrorDebugText({ code: 'third-crossing', id: pointId, a, b, circle: circleId });
 }
 
 /**
@@ -1844,7 +1845,7 @@ export function circlesTouch(c1: ResolvedCircle, c2: ResolvedCircle): boolean {
  *  over-constrained coincide shape (`describeConstraint`'s own `coincide` wording), so the student reads
  *  «הסיבה: X מתלכדת עם Y» and the fold's attribution names the other statement. */
 export function oneCommonPointError(first: Id, second: Id): string {
-  return `over-constrained: ${first} coincides with ${second} cannot hold`;
+  return engineErrorDebugText({ code: 'over-constrained', what: `${first} coincides with ${second}` });
 }
 
 /** #1931 (ADR-640): `tryEval`'s tagged refusal for a crossing asked of a tangent (`EvalErr.tangent`). */
@@ -1991,7 +1992,7 @@ function tryEval(
       if (!c1 || !c2) return 'pending';
       const sols = circleCircleIntersect(c1, p.radius1, c2, p.radius2);
       if (sols.length === 0) {
-        return `cannot construct ${p.id}: the two distance circles do not intersect`;
+        return engineErrorDebugText({ code: 'distance-circles-miss', id: p.id });
       }
       return sols[p.branch % sols.length];
     }
@@ -2011,7 +2012,7 @@ function tryEval(
       const d = pos.get(p.d);
       if (!a || !b || !c || !d) return 'pending';
       const hit = lineLineIntersect(a, b, c, d);
-      if (!hit) return `cannot construct ${p.id}: lines ${p.a}${p.b} and ${p.c}${p.d} are parallel`;
+      if (!hit) return engineErrorDebugText({ code: 'lines-parallel', id: p.id, l1: `${p.a}${p.b}`, l2: `${p.c}${p.d}` });
       return hit;
     }
 
@@ -2043,7 +2044,7 @@ function tryEval(
       const ts = solvedOnSegmentCandidates(p, pos);
       if (ts === 'pending') return 'pending';
       if (ts.length === 0) {
-        return `cannot place ${p.id} on segment ${p.a}${p.b} so that ${describeConstraint(p.constraint)}`;
+        return engineErrorDebugText({ code: 'cannot-place-on-segment', id: p.id, seg: `${p.a}${p.b}`, what: describeConstraint(p.constraint) });
       }
       const t = ts[p.branch % ts.length];
       const a = pos.get(p.a)!;
@@ -2056,7 +2057,7 @@ function tryEval(
       const l2 = lines.get(p.line2);
       if (!l1 || !l2) return 'pending';
       const hit = lineLineIntersect(l1.anchor, add(l1.anchor, l1.dir), l2.anchor, add(l2.anchor, l2.dir));
-      if (!hit) return `cannot construct ${p.id}: lines ${p.line1} and ${p.line2} are parallel`;
+      if (!hit) return engineErrorDebugText({ code: 'lines-parallel', id: p.id, l1: p.line1, l2: p.line2 });
       return hit;
     }
 
@@ -2071,7 +2072,7 @@ function tryEval(
       const a = pos.get(p.a);
       const b = pos.get(p.b);
       if (!from || !a || !b) return 'pending';
-      if (len(sub(b, a)) < 1e-9) return `cannot drop a perpendicular to ${p.a}${p.b}: they coincide`;
+      if (len(sub(b, a)) < 1e-9) return engineErrorDebugText({ code: 'perp-foot-coincide', seg: `${p.a}${p.b}` });
       return footOnLine(from, a, b);
     }
 
@@ -2088,7 +2089,7 @@ function tryEval(
       const c = pos.get(p.c);
       if (!a || !b || !c) return 'pending';
       const o = circumcenter(a, b, c);
-      if (!o) return `cannot construct ${p.id}: ${p.a}, ${p.b}, ${p.c} are collinear (no circumscribed circle)`;
+      if (!o) return engineErrorDebugText({ code: 'circumcircle-collinear', id: p.id, a: p.a, b: p.b, c: p.c });
       return o;
     }
 
@@ -2165,7 +2166,7 @@ function tryEval(
       const c = circles.get(p.circle);
       if (!l || !c) return 'pending';
       const sols = lineCircleIntersect(l.anchor, l.dir, c.center, c.r);
-      if (sols.length === 0) return `cannot construct ${p.id}: line ${p.line} does not meet circle ${p.circle}`;
+      if (sols.length === 0) return engineErrorDebugText({ code: 'line-misses-circle', id: p.id, line: p.line, circle: p.circle });
       // #1931 (ADR-640): a line tangent at a placed point meets the circle there only — however the tangency
       // was stated. Asked before the choice, whose `LEN_EPS` ruler a relation-held tangency can game.
       const touch = tangentTouch(l, c, pos);
@@ -2202,13 +2203,13 @@ function tryEval(
         return trial ? at : { tangentRefusal: oneCommonPointError(p.avoid!, p.id) };
       }
       const sols = circleCircleIntersect(c1.center, c1.r, c2.center, c2.r);
-      if (sols.length === 0) return `cannot construct ${p.id}: circles ${p.circle1} and ${p.circle2} do not meet`;
+      if (sols.length === 0) return engineErrorDebugText({ code: 'circles-dont-meet', id: p.id, c1: p.circle1, c2: p.circle2 });
       // "The second intersection" (`avoid` set, the other crossing already placed): keep the root that
       // isn't it — geometric, so it doesn't flip with branch order as the circles move (R8). Shared with the
       // branch count (#1600, ADR-593) — see {@link crossingChoice}.
       const choice = crossingChoice(p, sols, pos);
       if (choice) return choice.pick;
-      return `cannot construct ${p.id}: circles ${p.circle1} and ${p.circle2} meet only at ${p.avoid} (they are tangent)`;
+      return engineErrorDebugText({ code: 'circles-tangent-only', id: p.id, c1: p.circle1, c2: p.circle2, avoid: p.avoid! });
     }
 
     case 'radial-toward': {
@@ -2216,7 +2217,7 @@ function tryEval(
       const t = pos.get(p.toward);
       if (!c || !t) return 'pending';
       const d = sub(t, c.center);
-      if (len(d) < 1e-9) return `cannot place ${p.id}: ${p.toward} is at the centre of ${p.circle}`;
+      if (len(d) < 1e-9) return engineErrorDebugText({ code: 'toward-at-centre', id: p.id, toward: p.toward, circle: p.circle });
       return add(c.center, scale(unit(d), p.away ? -c.r : c.r)); // on the circle, toward `toward` (or away, #2339)
     }
   }

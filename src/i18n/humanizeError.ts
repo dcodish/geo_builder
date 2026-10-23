@@ -28,7 +28,7 @@
 
 import { formatMeasure } from '@/format';
 import { hasEngineToken } from '../../shell/studentText';
-import { TANGENTS_EXHAUSTED } from '@/engine/radiusFeasibility';
+import { parseEngineError, type EngineError } from '@/engine/errors';
 import type { CircleRef } from '@/engine';
 import { circleTokenResolver, wordCircleSlots, type CircleRefs } from './circleText';
 
@@ -61,7 +61,6 @@ export function tangentsExhaustedKey(kind: 'external' | 'internal' | 'any', posi
 /** The subset of i18next's `t` we need — a key plus interpolation params → string. */
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
-const EMDASH = '—'; // — , used literally in two engine messages
 
 /**
  * Turn INTERNAL object ids + raw floats into student-facing text (#200, ADR-393). Engine errors embed
@@ -166,14 +165,17 @@ export function translateParams(params: Record<string, string> | undefined, t: T
   return Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t, circles)]));
 }
 
-/** One mapping: a regex over the raw error and how to build the translation from its groups. */
-interface Pattern {
-  re: RegExp;
+/**
+ * #2201 phase 3a ([ADR-756](../../docs/06-decisions.md#adr-756)) — ONE WORDING of an engine refusal: its key (the
+ * representative one, and every key a variant can pick), and how it treats the student's own sentences. The table is
+ * the static half the ratchets read; {@link wordingOf}'s `switch (e.code)` is the dynamic half that picks a wording
+ * and fills its params from the variant's fields. Before phase 3a both halves were one regex table over the engine's
+ * English (`PATTERNS`); the regexes now live with the engine that writes the sentence (`src/engine/errors.ts`).
+ */
+export interface Wording {
   key: string;
-  /** Pick the key from the match when one shape has several wordings (see the metric-impossibility entry). */
-  keyOf?: (m: RegExpMatchArray) => string;
-  /** Map the regex match groups to interpolation params for the i18n key. */
-  params?: (m: RegExpMatchArray) => Record<string, string>;
+  /** Every key the variant can pick, when it picks among several (read by the ratchets). */
+  keys?: readonly string[];
   /**
    * #943 — this refusal's honest SUBJECT is the student's own sentence, not the engine fragment.
    *
@@ -207,22 +209,6 @@ interface Pattern {
    * every `_said_vs` quotes BOTH statements — stays exact, and its own ratchet (`OTHER_LINE_KEYS`) holds `{{other}}`.
    */
   namesOtherLine?: true;
-  /** Every key `keyOf` can pick, when it picks among several (read by the ratchets). */
-  keys?: readonly string[];
-  /**
-   * #1918 (ADR-607) — a param that is itself a TRANSLATED sentence: `key` rendered with each of `params` resolved as
-   * a translation key. Lets a refusal reuse a ruled frame (`errors.overConstrained_said_vs`) with a ruled reason
-   * clause, instead of a second copy of the frame. `letters` (#2099, ADR-651) are params interpolated AS-IS — the
-   * student's own point letters, which are not translation keys.
-   */
-  nested?: (m: RegExpMatchArray) => Record<string, { key: string; params: Record<string, string>; letters?: Record<string, string> }>;
-  /**
-   * #1985 ([ADR-619](../../docs/06-decisions.md#adr-619)) — a param that is a WORD the engine names in English
-   * and the student must read in Hebrew (a shape noun). Each value is a translation KEY, resolved with `t`, so
-   * the noun comes from the one place the app already names shapes (`shapes.name.*`) instead of a second list.
-   * Unlike {@link nested} it interpolates a word into this template, not a whole sentence.
-   */
-  paramKeys?: (m: RegExpMatchArray) => Record<string, string>;
   /**
    * #2177 ([ADR-733](../../docs/06-decisions.md#adr-733)) — the sentence already ends with its ONE next step (#1995 3b:
    * name the statement, give one next step), so {@link explainError} does not append the generic retry hint after it —
@@ -238,333 +224,242 @@ interface Pattern {
   circleParams?: readonly string[];
 }
 
-// Order matters only where one pattern's text is a prefix of another's; each regex below is
-// anchored and specific enough that the first match is the right one.
+/** The wording table — one entry per sentence family the student can read. Exported for the coverage gate (#983). */
+export const WORDINGS = {
+  // lower.ts reservedAmbiguity (#2177, ADR-733): names the circles and the one next step, never a pick.
+  reservedRadius: { key: 'errors.reservedRadiusAmbiguous', keys: ['errors.reservedRadiusAmbiguousSized', 'errors.reservedRadiusAmbiguous'], saysSubject: true, nextStep: true },
+  // metricFeasibility.ts (#420, ADR-417): TWO wordings — the curriculum's triangle sentence («סכום שתי צלעות תמיד גדול
+  // מהצלע השלישית», operator 2026-07-29) for one intermediate point, the straight-segment principle for a longer cycle.
+  metric: { key: 'errors.metricImpossible', keys: ['errors.metricImpossibleTriangle', 'errors.metricImpossiblePath'] },
+  // metricFeasibility.ts (#1329, ADR-538): the triangle's 180° sentence, or a longer ring's own bound.
+  angleSum: { key: 'errors.angleSumImpossible', keys: ['errors.angleSumImpossibleTriangle', 'errors.angleSumImpossiblePolygon'] },
+  // metricFeasibility.ts (#1712, ADR-587): a stated measure outside its range — the statement is the student's own.
+  outOfRange: { key: 'errors.angleOutOfRange', keys: ['errors.angleOutOfRange', 'errors.lengthNegative'] },
+  // metricFeasibility.ts (#1335, ADR-540) and sideFeasibility.ts (#1470, ADR-549): both halves are the student's own.
+  bound: { key: 'errors.boundImpossible' },
+  // metricFeasibility.ts (#1441): the hypotenuse («היתר») at 90°, the longest-side principle for an obtuse angle.
+  hypotenuse: { key: 'errors.hypotenuseImpossible', keys: ['errors.hypotenuseImpossible', 'errors.obtuseSideImpossible'] },
+  unknownCircle: { key: 'errors.unknownCircle' }, // step.ts danglingCircleError (#186)
+  unresolvedDeps: { key: 'errors.unresolvedDeps' },
+  undefinedPoints: { key: 'errors.undefinedPoints' }, // #1411 (ADR-577): the absent operands, never the row's own new point
+  nonFinite: { key: 'errors.nonFinite', saysSubject: true },
+  unknownPoint: { key: 'errors.unknownPoint', saysSubject: true },
+  // step.ts collapsedPolygonError (#2085 item 2, ADR-643): a straight corner of a pentagon or more — the n-gon would
+  // become an (n−1)-gon, the two nouns from one table in the locale (operator ruling 2026-10-14).
+  polygonCorner: { key: 'errors.polygonCornerStraight', saysSubject: true },
+  // step.ts collapsedPolygonError (#1849, ADR-602; #2064 B2): the line contradicts «משולש ABC», because a flat line is
+  // not a triangle (operator ruling 2026-10-07) — the noun is the polygon's own, counted from the vertex list.
+  polygonFlat: { key: 'errors.polygonFlatTriangle', keys: ['errors.polygonFlatTriangle', 'errors.polygonFlatQuad', 'errors.polygonFlatPolygon'], saysSubject: true, namesOther: true },
+  // the over-constrained frame (the #1868 ruled «X» סותר את «Y») with a ruled REASON sentence: cyclicFeasibility.ts
+  // (#1918 ADR-607; #2099 ADR-651), heightFeasibility.ts (#2117 ADR-718), radiusFeasibility.ts (#2239 ADR-692, #2206
+  // ADR-713).
+  overConstrainedReason: { key: 'errors.overConstrained', saysSubject: true, namesOther: true },
+  // evaluate.ts circumcentre backstop (#2099, ADR-651): the same frame and reason, but the fold names no other side for it
+  circumcircleReason: { key: 'errors.overConstrained', saysSubject: true },
+  // apply.ts shapeExclusionError (#1985, ADR-619): the figure's own noun and the stated one — it identifies itself.
+  shapeExcluded: { key: 'errors.shapeExcluded' },
+  // replay/core.ts (#2023, ADR-661): the operator's verbatim «כבר יש שם» sentences (2026-10-13).
+  nameTaken: { key: 'errors.angleNameTaken', keys: ['errors.angleNameTaken', 'errors.lengthNameTaken'], namesOtherLine: true },
+  // radiusFeasibility.ts commonTangentCapacityError (#2428, ADR-741): the parser's own tangents-exhausted sentences.
+  tangentsExhausted: { key: 'input.tangentsExhaustedIntTangent', keys: ['input.tangentsExhaustedIntTangent', 'input.tangentsExhaustedNoInternal', 'input.tangentsExhaustedTouchTaken', 'input.tangentsExhaustedContained'] },
+  // lower.ts letterSystem (#2165 + #2119, ADR-681): the over-constrained frame WITHOUT a reason clause (2026-10-15).
+  restatedSize: { key: 'errors.restatedSize', saysSubject: true, namesOther: true, circleParams: ['circle'] },
+  // evaluate.ts — `over-constrained: |AC| = 9 cannot hold`, with the fold's optional `[vs #i]` (#943 half B)
+  overConstrained: { key: 'errors.overConstrained', saysSubject: true, namesOther: true },
+  // replay/core.ts (#855, ADR-476): the SAMPLED-VALUE degradation — the conflict is with a placement the tool invented.
+  notDetermined: { key: 'errors.notDeterminedHere' },
+  notDeterminedBare: { key: 'errors.notDeterminedHereBare' },
+  thirdCrossing: { key: 'errors.thirdCrossing' }, // #1834 (ADR-729): the line by its two crossings' letters
+  tangentNoSecondCrossing: { key: 'errors.tangentNoSecondCrossing' },
+  towardAtCentre: { key: 'errors.towardAtCentre' },
+  cannotPlaceOnSegment: { key: 'errors.cannotPlaceOnSegment' },
+  tangentAtCentre: { key: 'errors.tangentAtCentre', circleParams: ['circle'] },
+  circlesDontMeet: { key: 'errors.circlesDontMeet', circleParams: ['c1', 'c2'] },
+  sameSpot: { key: 'errors.sameSpot' },
+  // step.ts — #966 (ADR-499): naming a SIDE, and naming a diagonal of a shape that has none.
+  diagonalIsSide: { key: 'errors.diagonalIsSide' },
+  diagonalNone: { key: 'errors.diagonalNoneHere' },
+  alreadyDefined: { key: 'errors.alreadyDefined' },
+  tangentNeedsFixedRadius: { key: 'errors.tangentNeedsFixedRadius' },
+  noLongerAvailable: { key: 'errors.noLongerAvailable' },
+  // core.ts (#1748 ADR-578; #1994 ADR-667, ruled 2026-10-11): names the ROW and the action, never the reserved points.
+  mutedRowOwns: { key: 'errors.mutedRowOwns' },
+  unboundVariable: { key: 'errors.unboundVariable' }, // core.ts (#926)
+  unenforceableRelation: { key: 'errors.unenforceableRelation' }, // core.ts (#1658, ADR-562)
+  // step.ts degenerateConstraintError (ADR-202 + Am.) — the whole NaN-by-id class
+  degenerateSegment: { key: 'errors.degenerateSegment' },
+  degenerateAngle: { key: 'errors.degenerateAngle' },
+  degenerateCollinear: { key: 'errors.degenerateCollinear' },
+} as const satisfies Record<string, Wording>;
+export type WordingId = keyof typeof WORDINGS;
+
+/** A wording chosen for one variant: which one, the key it renders, and the params from the variant's fields. */
+export interface Worded {
+  wording: WordingId;
+  key: string;
+  params?: Record<string, string>;
+  /**
+   * #1918 (ADR-607) — a param that is itself a TRANSLATED sentence: `key` rendered with each of `params` resolved as
+   * a translation key. Lets a refusal reuse a ruled frame (`errors.overConstrained_said_vs`) with a ruled reason
+   * clause, instead of a second copy of the frame. `letters` (#2099, ADR-651) are params interpolated AS-IS — the
+   * student's own point letters, which are not translation keys.
+   */
+  nested?: Record<string, { key: string; params: Record<string, string>; letters?: Record<string, string> }>;
+  /**
+   * #1985 ([ADR-619](../../docs/06-decisions.md#adr-619)) — a param that is a WORD the engine names in English
+   * and the student must read in Hebrew (a shape noun). Each value is a translation KEY, resolved with `t`, so
+   * the noun comes from the one place the app already names shapes (`shapes.name.*`) instead of a second list.
+   */
+  paramKeys?: Record<string, string>;
+}
+
+const one = (wording: WordingId, rest: Omit<Worded, 'wording' | 'key'> & { key?: string } = {}): Worded => ({ wording, key: rest.key ?? WORDINGS[wording].key, ...rest });
+const joined = (ids: readonly string[]) => ids.join(', ');
+
 /**
- * #983: EXPORTED for `humanize-error.test.ts`'s coverage gate — every entry must be exercised by a
- * real engine message in that file's `CASES`. A pattern nothing matches is a dead entry, and a dead
- * entry is English on a Hebrew screen; that is exactly how the two diagonal refusals shipped broken.
+ * THE SWITCH: a parsed engine refusal → its wording and params, or `null` for the floor (a variant no ruled sentence
+ * says honestly — before phase 3a those were the strings no pattern matched). Total over {@link EngineError}: a new
+ * variant without an arm fails `tsc` at the `never` below (`engine-error-total.test.ts` asserts it too).
  */
-export const PATTERNS: Pattern[] = [
-  // lower.ts reservedAmbiguity (#2177, ADR-733) — `reserved radius ambiguous: r names no one circle of O, P (stated sizes)`:
-  // the reserved R/r valued or used on a figure with several circles. Names the circles and the one next step (the
-  // binding sentence on the circle stated last), never a pick.
-  {
-    re: /^reserved radius ambiguous: ([Rr]) names no one circle of (.+) \((stated sizes|circles)\)$/,
-    key: 'errors.reservedRadiusAmbiguous',
-    keyOf: (m) => (m[3] === 'stated sizes' ? 'errors.reservedRadiusAmbiguousSized' : 'errors.reservedRadiusAmbiguous'),
-    keys: ['errors.reservedRadiusAmbiguousSized', 'errors.reservedRadiusAmbiguous'],
-    params: (m) => ({ letter: m[1], circles: m[2], next: m[2].split(', ').pop()! }),
-    saysSubject: true,
-    nextStep: true,
-  },
-  // metricFeasibility.ts (#420, ADR-417) — `impossible: |AC| = 9 exceeds 8, the distance from A to C via B`
-  //
-  // TWO wordings, because the message must state the geometry that actually applies. With exactly one
-  // intermediate point the figure is a TRIANGLE and the curriculum's own sentence is the right one
-  // («סכום שתי צלעות תמיד גדול מהצלע השלישית», operator 2026-07-29) — and the two sides can be named from
-  // a, b and the intermediate. With a longer cycle (a pinned quadrilateral) that sentence would be false,
-  // so the general principle is stated instead: a straight segment is shorter than any other path between
-  // its endpoints.
-  {
-    re: /^impossible: \|(\S+?)\| = (\S+) exceeds (\S+), the distance from (\S+) to (\S+) via (.*)$/,
-    key: 'errors.metricImpossible',
-    keyOf: (m) => (m[6].includes(',') ? 'errors.metricImpossiblePath' : 'errors.metricImpossibleTriangle'),
-    params: (m) => ({
-      seg: m[1],
-      value: m[2],
-      sum: m[3],
-      a: m[4],
-      b: m[5],
-      via: m[6],
-      sides: `|${m[4]}${m[6]}| + |${m[6]}${m[5]}|`,
-    }),
-  },
-  // metricFeasibility.ts (#1329, ADR-538) — `impossible: the angles of ABC sum to 200°, exceeding 180°: ∠ABC = 100°, ∠ACB = 100°`
-  // The triangle wording is the curriculum's own sentence («סכום הזוויות במשולש הוא 180°»); a longer
-  // ring states its own bound instead.
-  {
-    re: /^impossible: the angles of (\S+) sum to (\S+), exceeding (\S+): (.*)$/,
-    key: 'errors.angleSumImpossible',
-    keyOf: (m) => (m[3] === '180°' ? 'errors.angleSumImpossibleTriangle' : 'errors.angleSumImpossiblePolygon'),
-    params: (m) => ({ poly: m[1], sum: m[2], bound: m[3], angles: m[4] }),
-  },
-  // metricFeasibility.ts (#1712, ADR-587) — `impossible: ∠ABC = -2° — an angle measures between 0° and 180°`
-  // / `impossible: |AB| = -3 — a length is never negative`. The statement is the student's own given.
-  {
-    re: new RegExp(`^impossible: (.+) ${EMDASH} (an angle measures between 0° and 180°|a length is never negative)$`),
-    key: 'errors.angleOutOfRange',
-    keyOf: (m) => (m[2].startsWith('an angle') ? 'errors.angleOutOfRange' : 'errors.lengthNegative'),
-    params: (m) => ({ given: m[1] }),
-  },
-  // metricFeasibility.ts (#1335, ADR-540) — `impossible: |BC| = 4 contradicts |BC| > 10`
-  // Both halves are the student's own statements, so the sentence names what they said and nothing
-  // internal — there is no geometry principle to cite here, only the two givens.
-  {
-    re: /^impossible: (.+) contradicts (.+)$/,
-    key: 'errors.boundImpossible',
-    params: (m) => ({ value: m[1], bound: m[2] }),
-  },
-  // metricFeasibility.ts (#1441) — `impossible: the angle at C is 90°, so |AB| must be the longest side, but |AB| = 3 and |CB| = 4`
-  // The right angle gets the curriculum's own word («היתר», the hypotenuse); an obtuse angle states
-  // the general principle — the side opposite the largest angle is the longest.
-  {
-    re: /^impossible: the angle at (\S+) is (\S+)°, so \|(\S+?)\| must be the longest side, but \|\S+?\| = (\S+) and \|(\S+?)\| = (\S+)$/,
-    key: 'errors.hypotenuseImpossible',
-    keyOf: (m) => (m[2] === '90' ? 'errors.hypotenuseImpossible' : 'errors.obtuseSideImpossible'),
-    params: (m) => ({ v: m[1], deg: m[2], hyp: m[3], hypVal: m[4], leg: m[5], legVal: m[6] }),
-  },
-  // step.ts danglingCircleError (#186) — `circle 'O2' is not defined`
-  { re: /^circle '(.+)' is not defined$/, key: 'errors.unknownCircle', params: (m) => ({ center: m[1] }) },
+export function wordingOf(e: EngineError): Worded | null {
+  switch (e.code) {
+    case 'reserved-radius-ambiguous':
+      return one('reservedRadius', { key: e.sized ? 'errors.reservedRadiusAmbiguousSized' : 'errors.reservedRadiusAmbiguous', params: { letter: e.letter, circles: joined(e.circles), next: e.circles[e.circles.length - 1] } });
+    case 'metric-impossible': {
+      const via = joined(e.via);
+      return one('metric', { key: e.via.length > 1 ? 'errors.metricImpossiblePath' : 'errors.metricImpossibleTriangle', params: { seg: `${e.a}${e.b}`, value: e.value, sum: e.sum, a: e.a, b: e.b, via, sides: `|${e.a}${via}| + |${via}${e.b}|` } });
+    }
+    case 'angle-sum-impossible':
+      return one('angleSum', { key: e.bound === '180°' ? 'errors.angleSumImpossibleTriangle' : 'errors.angleSumImpossiblePolygon', params: { poly: e.polygon, sum: e.sum, bound: e.bound, angles: e.angles } });
+    case 'measure-out-of-range':
+      return one('outOfRange', { key: e.measure === 'angle' ? 'errors.angleOutOfRange' : 'errors.lengthNegative', params: { given: e.given } });
+    case 'bound-impossible':
+      return one('bound', { params: { value: e.value, bound: e.bound } });
+    case 'obtuse-side-impossible':
+      return one('hypotenuse', { key: e.deg === '90' ? 'errors.hypotenuseImpossible' : 'errors.obtuseSideImpossible', params: { v: e.vertex, deg: e.deg, hyp: e.hyp, hypVal: e.hypVal, leg: e.leg, legVal: e.legVal } });
+    case 'unknown-circle':
+      return one('unknownCircle', { params: { center: e.center } });
+    case 'unresolved-deps':
+      return one('unresolvedDeps', { params: { ids: joined(e.ids) } });
+    case 'undefined-points':
+      return one('undefinedPoints', { params: { ids: joined(e.ids) } });
+    case 'non-finite':
+      return one('nonFinite');
+    case 'unknown-point':
+      return one('unknownPoint', { params: { what: e.what } });
+    case 'polygon-collapsed': {
+      const n = e.vertices.length;
+      const poly = e.vertices.join('');
+      // #2064 B2: a straight corner of a quadrilateral keeps the flat sentence, with its three vertices as the points
+      if (e.corner && n >= 5 && n <= 12)
+        return one('polygonCorner', { params: { poly, points: joined(e.corner), what: e.what ?? '' }, paramKeys: { polyNoun: `errors.ngonDefinite.${n}`, lessNoun: `errors.ngonIndefinite.${n - 1}` } });
+      return one('polygonFlat', { key: n === 3 ? 'errors.polygonFlatTriangle' : n === 4 ? 'errors.polygonFlatQuad' : 'errors.polygonFlatPolygon', params: { poly, points: joined(e.corner ?? e.vertices), what: e.what ?? '' } });
+    }
+    case 'not-cyclic':
+      return one('overConstrainedReason', { nested: { what: { key: 'errors.notCyclicReason', params: { shape: `input.shapeNoun.${e.shape}`, forced: `input.shapeNoun.${e.forced}` } } } });
+    case 'diagonal-height':
+      return one('overConstrainedReason', { nested: { what: { key: 'errors.diagonalNoSideReason', params: { shape: `input.shapeNounDefinite.${e.shape}` }, letters: { d: e.diagonal } } } });
+    case 'collinear-circle': {
+      const [a, b, c] = e.points;
+      return one('overConstrainedReason', { nested: { what: { key: 'errors.collinearCircleReason', params: {}, letters: { a, b, c } } } });
+    }
+    case 'circumcircle-collinear':
+      // the NUMERIC backstop behind the structural prover above: the same ruled reason; the fold names no other side
+      return one('circumcircleReason', { nested: { what: { key: 'errors.collinearCircleReason', params: {}, letters: { a: e.a, b: e.b, c: e.c } } } });
+    case 'shape-excluded':
+      return one('shapeExcluded', { paramKeys: { actual: `input.shapeNoun.${e.actual}`, stated: `input.shapeNoun.${e.stated}` } });
+    case 'name-taken':
+      return one('nameTaken', { key: e.measure === 'angle' ? 'errors.angleNameTaken' : 'errors.lengthNameTaken', params: { name: e.name, symbol: e.symbol } });
+    case 'equal-nested':
+      return one('overConstrainedReason', { nested: { what: { key: `errors.equalNestedReason.${e.relation}`, params: {} } } });
+    case 'tangents-exhausted':
+      return one('tangentsExhausted', { key: tangentsExhaustedKey(e.kind, e.position) });
+    case 'restated-size':
+      return one('restatedSize', { params: { circle: e.circle, value: e.value } });
+    case 'over-constrained':
+      return one('overConstrained', { params: { what: e.what } });
+    case 'not-determined':
+      return e.who ? one('notDetermined', { params: { who: joined(e.who), what: e.what } }) : one('notDeterminedBare', { params: { what: e.what } });
+    case 'third-crossing':
+      // the point being placed is not named (it may be an internal id); the line is the two crossings' own letters
+      return one('thirdCrossing', { params: { line: `${e.a}${e.b}`, a: e.a, b: e.b } });
+    case 'tangent-no-second-crossing':
+      return one('tangentNoSecondCrossing', { params: { id: e.id } });
+    case 'toward-at-centre':
+      return one('towardAtCentre', { params: { id: e.id, toward: e.toward } });
+    case 'cannot-place-on-segment':
+      return one('cannotPlaceOnSegment', { params: { id: e.id, seg: e.seg, what: e.what } });
+    case 'tangent-at-centre':
+      return one('tangentAtCentre', { params: { circle: e.circle } });
+    case 'circles-dont-meet':
+      return one('circlesDontMeet', { params: { id: e.id, c1: e.c1, c2: e.c2 } });
+    case 'same-spot':
+      return one('sameSpot', { params: { a: e.a, b: e.b } });
+    case 'diagonal-is-side':
+      return one('diagonalIsSide', { params: { pair: e.pair, shape: e.shape } });
+    case 'diagonal-none':
+      return one('diagonalNone', { params: { pair: e.pair, shape: e.shape } });
+    case 'already-defined':
+      return one('alreadyDefined', { params: { id: e.id } });
+    case 'tangent-needs-fixed-radius':
+      return one('tangentNeedsFixedRadius');
+    case 'no-longer-available':
+      return one('noLongerAvailable', { params: { ids: joined(e.ids) } });
+    case 'muted-row-owns':
+      // #1994 (ADR-667): the refusal names the ROW and the action — the point list is dropped
+      return one('mutedRowOwns', { params: { row: e.row } });
+    case 'unbound-variable':
+      return one('unboundVariable', { params: { name: e.name } });
+    case 'unenforceable-relation':
+      return one('unenforceableRelation', { params: { names: joined(e.names) } });
+    case 'degenerate-segment':
+      return one('degenerateSegment', { params: { rel: e.rel, seg: e.seg } });
+    case 'degenerate-angle':
+      return one('degenerateAngle', { params: { angle: e.angle } });
+    case 'degenerate-collinear':
+      return one('degenerateCollinear', { params: { id: e.id } });
+    // No ruled sentence says these honestly (none ever had one): the floor (#2028, ADR-W-130).
+    case 'over-constrained-unnamed':
+    case 'circles-tangent-only':
+    case 'line-misses-circle':
+    case 'distance-circles-miss':
+    case 'lines-parallel':
+    case 'perp-foot-coincide':
+    case 'line-points-coincide':
+    case 'bisect-opposite':
+    case 'radius-not-positive':
+    case 'radius-point-at-centre':
+    case 'cant-build-yet':
+    case 'degenerate-length':
+    case 'raw':
+      return null;
+    default: {
+      const unhandled: never = e;
+      return unhandled;
+    }
+  }
+}
 
-  // evaluate.ts:851 — `unresolved dependencies for: A, B, circle-O`
-  { re: /^unresolved dependencies for: (.+)$/, key: 'errors.unresolvedDeps', params: (m) => ({ ids: m[1] }) },
-
-  // evaluate.ts stuck branch (#1411, ADR-577) — `undefined point: A, B` (points the statement relies on that
-  // nothing in the figure defines; the row's own new point is never named)
-  { re: /^undefined point: (.+)$/, key: 'errors.undefinedPoints', params: (m) => ({ ids: m[1] }) },
-
-  // evaluate.ts:855 — `non-finite position computed`
-  { re: /^non-finite position computed$/, key: 'errors.nonFinite', saysSubject: true },
-
-  // evaluate.ts:887 — `|AB| = |AD| references an unknown point`
-  { re: /^(.+) references an unknown point$/, key: 'errors.unknownPoint', params: (m) => ({ what: m[1] }), saysSubject: true },
-
-  // step.ts collapsedPolygonError (#1849, ADR-602) — `collapsed: polygon A, B, C would be flat — |AC| = 8 cannot hold`,
-  // with the fold's optional `[vs #i]` naming the statement that DECLARED the polygon. The operator's ruling
-  // (2026-10-07) is the sentence: the line contradicts «משולש ABC», because a flat line is not a triangle — so the
-  // noun is the polygon's own (a triangle, a quadrilateral, a polygon), counted from the vertex list.
-  // #2085 item 2 (ADR-643): a STRAIGHT CORNER on a polygon of five or more vertices — `collapsed: polygon A, B, C, D, E
-  // would be flat at B, C, D — …`. The operator's ruling of 2026-10-14: «…הנקודות B, C, D היו על ישר אחד, והמחומש
-  // ABCDE היה נעשה מרובע.» — the n-gon would become an (n−1)-gon, the two nouns from one table in the locale.
-  {
-    re: /^collapsed: polygon ((?:[^,]+, ){4,11}[^,]+) would be flat at (.+?)(?: — (.+) cannot hold)?(?: \[vs #\d+\])?$/,
-    key: 'errors.polygonCornerStraight',
-    params: (m) => ({ poly: m[1].split(', ').join(''), points: m[2], what: m[3] ?? '' }),
-    paramKeys: (m) => {
-      const n = m[1].split(', ').length;
-      return { polyNoun: `errors.ngonDefinite.${n}`, lessNoun: `errors.ngonIndefinite.${n - 1}` };
-    },
-    saysSubject: true,
-  },
-  {
-    // #2064 B2 (ADR-643): `… would be flat at B, C, D` on a quadrilateral — the ruled existing flat message, with the
-    // three vertices on one line as its points
-    re: /^collapsed: polygon (.+?) would be flat(?: at (.+?))?(?: — (.+) cannot hold)?(?: \[vs #\d+\])?$/,
-    key: 'errors.polygonFlatTriangle',
-    keyOf: (m) => {
-      const n = m[1].split(', ').length;
-      return n === 3 ? 'errors.polygonFlatTriangle' : n === 4 ? 'errors.polygonFlatQuad' : 'errors.polygonFlatPolygon';
-    },
-    params: (m) => ({ poly: m[1].split(', ').join(''), points: m[2] ?? m[1], what: m[3] ?? '' }),
-    saysSubject: true,
-    namesOther: true,
-  },
-  // cyclicFeasibility.ts (#1918, ADR-607) — `over-constrained: a circle through the vertices of right-trapezoid ABCD
-  // forces a rectangle cannot hold`: the over-constrained frame (the #1868 ruled «X» סותר את «Y»), its reason the
-  // #1554 ruled explanation, built from the shape-noun names ADR-595's one-line refusal already uses.
-  {
-    re: /^over-constrained: a circle through the vertices of (\S+) \S+ forces a (\S+) cannot hold(?: \[vs #\d+\])?$/,
-    key: 'errors.overConstrained',
-    nested: (m) => ({ what: { key: 'errors.notCyclicReason', params: { shape: `input.shapeNoun.${m[1]}`, forced: `input.shapeNoun.${m[2]}` } } }),
-    saysSubject: true,
-    namesOther: true,
-  },
-  // heightFeasibility.ts (#2117, ADR-718) — `over-constrained: diagonal AC of square ABCD is perpendicular to no side
-  // cannot hold`: the operator's 2026-10-15 ruling — the over-constrained frame naming the declaring statement (the
-  // fold's `[vs #i]`), its reason «האלכסון AC אינו מאונך לאף צלע של הריבוע», the kind the student's own noun.
-  {
-    re: /^over-constrained: diagonal (\S+) of (\S+) \S+ is perpendicular to no side cannot hold(?: \[vs #\d+\])?$/,
-    key: 'errors.overConstrained',
-    nested: (m) => ({ what: { key: 'errors.diagonalNoSideReason', params: { shape: `input.shapeNounDefinite.${m[2]}` }, letters: { d: m[1] } } }),
-    saysSubject: true,
-    namesOther: true,
-  },
-  // cyclicFeasibility.ts (#2099, ADR-651) — `over-constrained: a circle through A, D, B on one line cannot hold`: the
-  // operator's 2026-10-14 ruling — the over-constrained frame naming the statement that put the points on the line
-  // (the fold's `[vs #i]`), its reason «A, D ו-B על ישר אחד, ואין מעגל שעובר דרך שלוש נקודות על ישר אחד».
-  {
-    re: /^over-constrained: a circle through ([^,\s]+), ([^,\s]+), ([^,\s]+) on one line cannot hold(?: \[vs #\d+\])?$/,
-    key: 'errors.overConstrained',
-    nested: (m) => ({ what: { key: 'errors.collinearCircleReason', params: {}, letters: { a: m[1], b: m[2], c: m[3] } } }),
-    saysSubject: true,
-    namesOther: true,
-  },
-  // evaluate.ts circumcenter (#2099, ADR-651) — `cannot construct O: A, D, B are collinear (no circumscribed circle)`:
-  // the NUMERIC backstop behind the structural prover above (three points no stated incidence puts on one line but
-  // the solve lands there). The same ruled reason in the same frame; the fold names no other side for it.
-  {
-    re: /^cannot construct \S+: ([^,\s]+), ([^,\s]+), ([^,\s]+) are collinear \(no circumscribed circle\)$/,
-    key: 'errors.overConstrained',
-    nested: (m) => ({ what: { key: 'errors.collinearCircleReason', params: {}, letters: { a: m[1], b: m[2], c: m[3] } } }),
-    saysSubject: true,
-  },
-  // apply.ts shapeExclusionError (#1985, ADR-619) — `shape-excluded: the figure is already known to be a
-  // parallelogram, so it is not a trapezoid`. The operator's 2026-10-10 ruling: the sentence he chose for
-  // analytic on 2026-10-08 (ADR-AG-260) and 3-D uses for `shape-disjoint` (ADR-3D-313). The subject is the
-  // FIGURE's own noun and the noun the line stated — both things the student can see — so it identifies
-  // itself and takes neither `saysSubject` nor `namesOther`.
-  {
-    re: /^shape-excluded: the figure is already known to be a (\S+), so it is not a (\S+)$/,
-    key: 'errors.shapeExcluded',
-    paramKeys: (m) => ({ actual: `input.shapeNoun.${m[1]}`, stated: `input.shapeNoun.${m[2]}` }),
-  },
-
-  // replay/core.ts (#2023, ADR-661) — `name-taken: angle ABC is already named α [vs #i]`: a second letter for an angle
-  // or a segment that already has one. The operator's verbatim sentences (2026-10-13): «לזווית ABC כבר יש שם: α
-  // (בשורה «זוית B=α»). לכל זווית שם אחד — המשיכו עם α.» and «לקטע AB כבר יש שם: a (בשורה «AB=a»). לכל קטע שם אחד —
-  // המשיכו עם a.» The subject is the angle or segment itself, so it takes no `saysSubject`; the earlier line is the
-  // `[vs #i]` tail resolved by the display layer.
-  {
-    re: /^name-taken: (angle|segment) (\S+) is already named (.+?)(?: \[vs #\d+\])?$/,
-    key: 'errors.angleNameTaken',
-    keyOf: (m) => (m[1] === 'angle' ? 'errors.angleNameTaken' : 'errors.lengthNameTaken'),
-    keys: ['errors.angleNameTaken', 'errors.lengthNameTaken'],
-    params: (m) => ({ name: m[2], symbol: m[3] }),
-    namesOtherLine: true,
-  },
-  // radiusFeasibility.ts equalNestedPair (#2239 ADR-692, #2206 ADR-713) — `over-constrained: equal circles P nested
-  // int-tangent cannot hold [vs #i]`: two circles of equal radius by statement that a statement nests. The over-constrained
-  // frame naming both statements (the #2119 ruled «X» סותר את «Y»), its reason #2200's ruled sentence for the relation
-  // (operator ruling 2026-10-16 on #2206: «refused with #2200's sentence»). Before the generic entry.
-  {
-    re: /^over-constrained: equal circles (\S+) nested (contained|int-tangent|concentric) cannot hold(?: \[vs #\d+\])?$/,
-    key: 'errors.overConstrained',
-    nested: (m) => ({ what: { key: `errors.equalNestedReason.${m[2]}`, params: {} } }),
-    saysSubject: true,
-    namesOther: true,
-  },
-  // radiusFeasibility.ts commonTangentCapacityError (#2428, ADR-741) — `tangents-exhausted: common tangent AB of kind any
-  // on int-tangent circles`: a two-touch common tangent the pair's stated position does not have. The parser's own
-  // refusal sentence for the same position and kind (one mapping, `tangentsExhaustedKey`), so both seats read alike.
-  {
-    re: TANGENTS_EXHAUSTED,
-    key: 'input.tangentsExhaustedIntTangent',
-    keyOf: (m) => tangentsExhaustedKey(m[2] as 'external' | 'internal' | 'any', m[3] as 'int-tangent' | 'ext-tangent' | 'contained'),
-    keys: ['input.tangentsExhaustedIntTangent', 'input.tangentsExhaustedNoInternal', 'input.tangentsExhaustedTouchTaken', 'input.tangentsExhaustedContained'],
-  },
-  // engine/lower.ts letterSystem (#2165 + #2119, ADR-681) — `over-constrained: radius of O = 4 cannot hold [vs #i]`: a
-  // second, different size for a circle whose size a statement already gave (a radius letter's value, a reserved r, a
-  // restated radius). The operator's 2026-10-15 ruling on #2119, verbatim: «לא ניתן: «X» סותר את «Y» — אי אפשר לקיים
-  // את שניהם יחד.» — the over-constrained frame WITHOUT a reason clause. Before the generic entry, whose `what` would
-  // carry the English «radius of».
-  {
-    re: /^over-constrained: radius of (\S+) = (.+) cannot hold(?: \[vs #\d+\])?$/,
-    key: 'errors.restatedSize',
-    params: (m) => ({ circle: m[1], value: m[2] }),
-    circleParams: ['circle'],
-    saysSubject: true,
-    namesOther: true,
-  },
-  // evaluate.ts:891 — `over-constrained: |AC| = 9 cannot hold`; #943 half B: the fold may append the
-  // structured tail ` [vs #<fact index>]` naming the conflicting earlier statement — matched here so
-  // `what` stays the bare reason, and resolved to words by the display layer (`otherUtteranceForError`).
-  { re: /^over-constrained: (.+) cannot hold(?: \[vs #\d+\])?$/, key: 'errors.overConstrained', params: (m) => ({ what: m[1] }), saysSubject: true, namesOther: true },
-
-  // replay/core.ts (#855, ADR-476) — the SAMPLED-VALUE degradation of the row above. The conflict is with
-  // a placement the tool invented, so the message must not read as «your given contradicts an earlier
-  // one»; it says which objects are still free and points at "show another configuration".
-  {
-    re: /^not determined: (.+) (?:is|are) still free, so (.+) cannot be judged in this configuration$/,
-    key: 'errors.notDeterminedHere',
-    params: (m) => ({ who: m[1], what: m[2] }),
-  },
-  { re: /^not determined: (.+) cannot be judged in this configuration$/, key: 'errors.notDeterminedHereBare', params: (m) => ({ what: m[1] }) },
-
-  // #1834 (ADR-729) — evaluate.ts `thirdCrossingError`: `cannot place E: line AC already crosses circle circle-O at A
-  // and C — a line has no third crossing with a circle`. The point being placed is not named (it may be an internal
-  // id); `line` is the two crossings' own letters, never the engine's line id.
-  {
-    re: new RegExp(`^cannot place \\S+: line \\S+ already crosses circle \\S+ at (\\S+) and (\\S+) ${EMDASH} a line has no third crossing with a circle$`),
-    key: 'errors.thirdCrossing',
-    params: (m) => ({ line: `${m[1]}${m[2]}`, a: m[1], b: m[2] }),
-  },
-
-  // evaluate.ts:1183 — `cannot place E: line line-CA is tangent to circle circle-O at A — it has no second crossing to extend onto`
-  {
-    re: new RegExp(`^cannot place (\\S+): line .+ is tangent to circle .+ at .+ ${EMDASH} it has no second crossing to extend onto$`),
-    key: 'errors.tangentNoSecondCrossing',
-    params: (m) => ({ id: m[1] }),
-  },
-
-  // evaluate.ts:1211 — `cannot place E: B is at the centre of circle-O`
-  { re: /^cannot place (\S+): (\S+) is at the centre of (\S+)$/, key: 'errors.towardAtCentre', params: (m) => ({ id: m[1], toward: m[2] }) },
-
-  // evaluate.ts:1077 — `cannot place F on segment AB so that |AC| = 9`
-  { re: /^cannot place (\S+) on segment (\S+) so that (.+)$/, key: 'errors.cannotPlaceOnSegment', params: (m) => ({ id: m[1], seg: m[2], what: m[3] }) },
-
-  // evaluate.ts:959 — `cannot take a tangent at the centre of circle-O`
-  { re: /^cannot take a tangent at the centre of (\S+)$/, key: 'errors.tangentAtCentre', params: (m) => ({ circle: m[1] }), circleParams: ['circle'] },
-
-  // evaluate.ts:1195 — `cannot construct A: circles circle-O and circle-P do not meet`
-  { re: /^cannot construct (\S+): circles (\S+) and (\S+) do not meet$/, key: 'errors.circlesDontMeet', params: (m) => ({ id: m[1], c1: m[2], c2: m[3] }), circleParams: ['c1', 'c2'] },
-
-  // step.ts:167 — `C and E would be at the same point`
-  { re: /^(\S+) and (\S+) would be at the same point$/, key: 'errors.sameSpot', params: (m) => ({ a: m[1], b: m[2] }) },
-
-  // step.ts — #966 (ADR-499) the diagonal ROLE CLAIM refusals. Two messages, because they are two
-  // different mistakes: naming a SIDE, and naming a diagonal of a shape that has none.
-  //
-  // #983 — these two shipped with a SINGLE backslash inside the template literal, which JavaScript
-  // collapses to a literal "S" before RegExp ever sees it, so both patterns matched nothing and a
-  // Hebrew-first student read the raw English. A template-literal regex needs the escape DOUBLED; the neighbouring
-  // tangent pattern above already spells it that way. Guarded now by `regex-escape-hygiene.test.ts`
-  // (the collapse, workspace-wide) and by the PATTERNS-coverage gate below (a pattern no message
-  // exercises).
-  { re: new RegExp(`^(\\S+) is not a diagonal of (\\S+) ${EMDASH} it is a side$`), key: 'errors.diagonalIsSide', params: (m) => ({ pair: m[1], shape: m[2] }) },
-  { re: new RegExp(`^(\\S+) is not a diagonal ${EMDASH} (\\S+) has no diagonals$`), key: 'errors.diagonalNoneHere', params: (m) => ({ pair: m[1], shape: m[2] }) },
-
-  // step.ts:91 — `'O' is already defined — it can't be redefined as something different`
-  { re: new RegExp(`^'(.+)' is already defined ${EMDASH} it can't be redefined as something different$`), key: 'errors.alreadyDefined', params: (m) => ({ id: m[1] }) },
-
-  // step.ts:112 — `tangent circles need a fixed radius (a radius-through-a-point circle is not supported yet)`
-  { re: /^tangent circles need a fixed radius/, key: 'errors.tangentNeedsFixedRadius' },
-
-  // geoStore.ts:190 — `can't build: D is no longer available (an earlier step it relies on was removed or failed)`
-  { re: /^can't build: (.+) is no longer available/, key: 'errors.noLongerAvailable', params: (m) => ({ ids: m[1] }) },
-
-  // core.ts (#1748, ADR-578) — `can't build: A, B, C belong to the unticked row «משולש ABC» — tick it again or delete it`
-  // #1994 (ADR-667, ruled 2026-10-11): the refusal names the ROW and the action, never the points the engine reserved —
-  // so the point list is matched and dropped.
-  { re: /^can't build: (.+) belong to the unticked row «(.+)» — tick it again or delete it$/, key: 'errors.mutedRowOwns', params: (m) => ({ row: m[2] }) },
-
-  // core.ts (#926) — `variable α is not defined by any statement (the step that defined it was removed, muted or failed)`
-  { re: /^variable (\S+) is not defined by any statement/, key: 'errors.unboundVariable', params: (m) => ({ name: m[1] }) },
-
-  // core.ts (#1658, ADR-562) — `relation on k cannot be enforced (a letter is used in a form this statement cannot follow)`
-  { re: /^relation on (.+) cannot be enforced/, key: 'errors.unenforceableRelation', params: (m) => ({ names: m[1] }) },
-
-  // step.ts degenerateConstraintError (ADR-202) — `⟂ needs two distinct points on each side — "BB" is a single point, not a segment`
-  {
-    re: new RegExp(`^(⟂|∥) needs two distinct points on each side ${EMDASH} "(.+)" is a single point, not a segment$`),
-    key: 'errors.degenerateSegment',
-    params: (m) => ({ rel: m[1], seg: m[2] }),
-  },
-  // step.ts degenerateConstraintError (ADR-202 Am.) — `an angle needs three distinct points — "∠ABB" repeats its vertex`
-  { re: new RegExp(`^an angle needs three distinct points ${EMDASH} "(.+)" repeats its vertex$`), key: 'errors.degenerateAngle', params: (m) => ({ angle: m[1] }) },
-  // step.ts degenerateConstraintError (ADR-202 Am.) — `collinear points must be distinct — "A" is named twice`
-  { re: new RegExp(`^collinear points must be distinct ${EMDASH} "(.+)" is named twice$`), key: 'errors.degenerateCollinear', params: (m) => ({ id: m[1] }) },
-];
-
+const flagged = (f: keyof Wording) => Object.values(WORDINGS as Record<string, Wording>).filter((w) => w[f]);
 /**
  * The refusal keys whose honest SUBJECT is the student's own sentence (#943) — DERIVED from
- * {@link Pattern.saysSubject}, never re-listed. Exported for the ratchet in
+ * {@link Wording.saysSubject}, never re-listed. Exported for the ratchet in
  * `__tests__/humanize-error-said.test.ts`, which asserts each one has a `_said` variant in BOTH
  * locales: flagging a new template without writing its strings then fails the suite instead of
  * rendering a raw i18n key at a student.
  */
-export const SAID_SUBJECT_KEYS: readonly string[] = [...new Set(PATTERNS.filter((p) => p.saysSubject).map((p) => p.key))];
+export const SAID_SUBJECT_KEYS: readonly string[] = [...new Set(flagged('saysSubject').map((w) => w.key))];
 /** #943 half B: the keys that can name the OTHER side — each must have a `_said_vs` variant in both locales (the same ratchet). */
-export const OTHER_SUBJECT_KEYS: readonly string[] = [...new Set(PATTERNS.filter((p) => p.namesOther).map((p) => p.key))];
-/** #2023 (ADR-661): the keys that name the earlier LINE only — each must have a `_vs` variant carrying `{{other}}` (every key `keyOf` can pick). */
-export const OTHER_LINE_KEYS: readonly string[] = [...new Set(PATTERNS.filter((p) => p.namesOtherLine).flatMap((p) => p.keys ?? [p.key]))];
+export const OTHER_SUBJECT_KEYS: readonly string[] = [...new Set(flagged('namesOther').map((w) => w.key))];
+/** #2023 (ADR-661): the keys that name the earlier LINE only — each must have a `_vs` variant carrying `{{other}}` (every key the wording can pick). */
+export const OTHER_LINE_KEYS: readonly string[] = [...new Set(flagged('namesOtherLine').flatMap((w) => w.keys ?? [w.key]))];
 
 /** #2028 (ADR-W-130): what {@link humanizeErrorOutcome} produced — the text, and whether it is the floor sentence. */
 export interface Humanized {
   text: string;
-  /** True when no ruled message could say this honestly: no pattern matched, or a matched value carried an engine token. */
+  /** True when no ruled message could say this honestly: no variant has a wording, or a value carried an engine token. */
   floor: boolean;
-  /** True when the message gives its own next step (a pattern's `nextStep`, #2177): no retry hint follows it. */
+  /** True when the message gives its own next step (a wording's `nextStep`, #2177): no retry hint follows it. */
   nextStep?: boolean;
 }
 
@@ -592,51 +487,48 @@ export function explainError(raw: string | null | undefined, t: Translate, said?
 export function humanizeErrorOutcome(raw: string | null | undefined, t: Translate, said?: string, other?: string, circles: CircleResolver = NO_CIRCLES): Humanized {
   if (!raw) return { text: '', floor: false };
   const floor: Humanized = { text: t('errors.floor'), floor: true };
-  // Sanitize FIRST (#200): the patterns then match a clean string and every extracted param (`circle: m[1]`)
-  // is already the student's letter — no internal id can reach the message, and a token sanitizeIds does not know sends the message to the floor (#2028).
-  const s = sanitizeIds(raw.trim());
-  for (const p of PATTERNS) {
-    const m = s.match(p.re);
-    if (!m) continue;
-    const params = p.params?.(m);
-    // #2028 (ADR-W-130): a value the ENGINE handed over (never `said`/`other`, the student's own sentences)
-    // that still carries an engine token — an anonymous touch point `@f-AB`, a `kind-Id` sanitizeIds does not
-    // know — cannot be shown, so the ruled frame around it cannot be either.
-    const engineValues = [...Object.values(params ?? {}), ...Object.values(p.nested?.(m) ?? {}).flatMap((n) => Object.values(n.letters ?? {}))];
-    if (engineValues.some(hasEngineToken)) return floor;
-    // Translate the constraint vocabulary AFTER matching, never before: several wrapper patterns key on
-    // the very same English words («collinear points must be distinct …»), so translating first would
-    // stop them matching. Every param goes through the pass — it only touches known fragment words, so a
-    // non-fragment param (a circle letter, an id) is untouched.
-    const nested = p.nested?.(m);
-    const paramKeys = p.paramKeys?.(m);
-    const translatedRaw =
-      params || nested || paramKeys
-        ? {
-            ...(params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t, circles)])) : {}),
-            // #1918: a sentence param — its own key, each inner param a translation key
-            ...(nested ? Object.fromEntries(Object.entries(nested).map(([k, n]) => [k, t(n.key, { ...Object.fromEntries(Object.entries(n.params).map(([pk, pv]) => [pk, t(pv)])), ...n.letters })])) : {}),
-            // #1985: a WORD param — the value is a translation key (a shape noun)
-            ...(paramKeys ? Object.fromEntries(Object.entries(paramKeys).map(([k, v]) => [k, t(v)])) : {}),
-          }
-        : undefined;
-    // #2305 (ADR-755): the declared circle slots, worded through circleText (a role, or today's letter).
-    const translated = translatedRaw && p.circleParams ? wordCircleSlots(translatedRaw, p.circleParams, (k) => circles(translatedRaw[k]), t) : translatedRaw;
-    const key = p.keyOf ? p.keyOf(m) : p.key;
-    // #943: the student's own sentence becomes the SUBJECT where the template's own subject cannot
-    // identify which statement was refused. Still a pure mapping (ADR-228 Am.6) — the sentence is an
-    // argument, not something this layer looks up. A missing/blank `said` renders the base key, which
-    // is byte-identical to today, so a fact with no recorded utterance never yields an empty «».
-    const sub = said?.trim();
-    const oth = other?.trim();
-    // #943 half B: both sides known ⇒ the sentence AND the earlier given it contradicts are the subject.
-    if (p.namesOther && sub && oth) return { text: t(`${key}_said_vs`, { ...translated, said: sub, other: oth }), floor: false, ...(p.nextStep ? { nextStep: true } : {}) };
-    if (p.namesOtherLine && oth) return { text: t(`${key}_vs`, { ...translated, other: oth }), floor: false, ...(p.nextStep ? { nextStep: true } : {}) };
-    if (p.saysSubject && sub) return { text: t(`${key}_said`, { ...translated, said: sub }), floor: false, ...(p.nextStep ? { nextStep: true } : {}) };
-    return { text: t(key, translated), floor: false, ...(p.nextStep ? { nextStep: true } : {}) };
-  }
-  // #2028 (ADR-W-130): no known shape. The floor sentence, never the engine's English — and never a partial
+  // Parse the RAW wire into its variant (phase 3a): the engine's own inverse, over its own text — no regex here.
+  const worded = wordingOf(parseEngineError(raw));
+  if (!worded) return floor;
+  const w: Wording = WORDINGS[worded.wording];
+  // Then sanitize each VALUE (#200): every extracted param (`circle: circle-O`) becomes the student's letter, and a
+  // token sanitizeIds does not know sends the message to the floor (#2028).
+  const params = worded.params && Object.fromEntries(Object.entries(worded.params).map(([k, v]) => [k, sanitizeIds(v)]));
+  const nested = worded.nested && Object.fromEntries(Object.entries(worded.nested).map(([k, n]) => [k, { ...n, ...(n.letters ? { letters: Object.fromEntries(Object.entries(n.letters).map(([lk, lv]) => [lk, sanitizeIds(lv)])) } : {}) }]));
+  // #2028 (ADR-W-130): a value the ENGINE handed over (never `said`/`other`, the student's own sentences)
+  // that still carries an engine token — an anonymous touch point `@f-AB`, a `kind-Id` sanitizeIds does not
+  // know — cannot be shown, so the ruled frame around it cannot be either.
+  const engineValues = [...Object.values(params ?? {}), ...Object.values(nested ?? {}).flatMap((n) => Object.values(n.letters ?? {}))];
+  if (engineValues.some(hasEngineToken)) return floor;
+  // Translate the constraint vocabulary AFTER parsing, never before: the engine's own sentences key on the very
+  // same English words («collinear points must be distinct …»). Every param goes through the pass — it only touches
+  // known fragment words, so a non-fragment param (a circle letter, an id) is untouched.
+  const paramKeys = worded.paramKeys;
+  const translatedRaw =
+    params || nested || paramKeys
+      ? {
+          ...(params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t, circles)])) : {}),
+          // #1918: a sentence param — its own key, each inner param a translation key
+          ...(nested ? Object.fromEntries(Object.entries(nested).map(([k, n]) => [k, t(n.key, { ...Object.fromEntries(Object.entries(n.params).map(([pk, pv]) => [pk, t(pv)])), ...n.letters })])) : {}),
+          // #1985: a WORD param — the value is a translation key (a shape noun)
+          ...(paramKeys ? Object.fromEntries(Object.entries(paramKeys).map(([k, v]) => [k, t(v)])) : {}),
+        }
+      : undefined;
+  // #2305 (ADR-755): the declared circle slots, worded through circleText (a role, or today's letter).
+  const translated = translatedRaw && w.circleParams ? wordCircleSlots(translatedRaw, w.circleParams, (k) => circles(translatedRaw[k]), t) : translatedRaw;
+  const key = worded.key;
+  // #943: the student's own sentence becomes the SUBJECT where the template's own subject cannot
+  // identify which statement was refused. Still a pure mapping (ADR-228 Am.6) — the sentence is an
+  // argument, not something this layer looks up. A missing/blank `said` renders the base key, which
+  // is byte-identical to today, so a fact with no recorded utterance never yields an empty «».
+  const sub = said?.trim();
+  const oth = other?.trim();
+  const done = (text: string): Humanized => ({ text, floor: false, ...(w.nextStep ? { nextStep: true } : {}) });
+  // #943 half B: both sides known ⇒ the sentence AND the earlier given it contradicts are the subject.
+  if (w.namesOther && sub && oth) return done(t(`${key}_said_vs`, { ...translated, said: sub, other: oth }));
+  if (w.namesOtherLine && oth) return done(t(`${key}_vs`, { ...translated, other: oth }));
+  if (w.saysSubject && sub) return done(t(`${key}_said`, { ...translated, said: sub }));
+  // #2028 (ADR-W-130): no variant with a ruled sentence — the floor, never the engine's English and never a partial
   // translation of it, which spliced Hebrew vocabulary into an English sentence («cannot place point על הקטע»).
-  return floor;
+  return done(t(key, translated));
 }
-

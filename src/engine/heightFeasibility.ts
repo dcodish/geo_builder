@@ -13,6 +13,7 @@
  * pair a diagonal of that ring. One option the theorem does not cover (a side of another polygon the pair also
  * spans) and the prover proves nothing — the choice is the fold's to try.
  */
+import { engineErrorDebugText } from './errors';
 import { DIAGONAL_NEVER_PERPENDICULAR } from './shapeKinds';
 import type { Construction, Id } from './types';
 
@@ -51,7 +52,7 @@ export function diagonalHeightImpossibility(c: Construction, cmd: { type: string
 
 /** The wire message — the over-constrained family's shape, so the fold tags the declaring statement (`[vs #i]`). */
 export function diagonalHeightError(m: DiagonalHeightImpossibility): string {
-  return `over-constrained: diagonal ${m.diagonal.join('')} of ${m.shape} ${m.ring.join('')} is perpendicular to no side cannot hold`;
+  return engineErrorDebugText({ code: 'diagonal-height', diagonal: m.diagonal.join(''), shape: m.shape, ring: m.ring.join('') });
 }
 
 /** The wire shape above, with the fold's optional `[vs #<fact index>]` tail: 1 the diagonal, 2 the kind, 3 the ring, 4 the index. */

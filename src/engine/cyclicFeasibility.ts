@@ -19,6 +19,7 @@
  * The ring is a vertex SET: «מעגל חוסם את BCDA» is the same circle through the same four points. The incoming
  * command's own claim rides the probe (its record and its asserted objects), so both orders are one case.
  */
+import { engineErrorDebugText } from './errors';
 import { drivenConstraintsOf } from './evaluate';
 import { forcedFlatPolygon } from './metricFeasibility';
 import { NOT_CYCLIC } from './shapeKinds';
@@ -53,7 +54,7 @@ export function notCyclicImpossibility(probed: Construction, cmd?: Command): Not
  * (humanizeError, `errors.overConstrained_said_vs` + `errors.notCyclicReason`).
  */
 export function notCyclicImpossibilityError(m: NotCyclicImpossibility): string {
-  return `over-constrained: a circle through the vertices of ${m.shape} ${m.ring.join('')} forces a ${m.forced} cannot hold`;
+  return engineErrorDebugText({ code: 'not-cyclic', shape: m.shape, ring: m.ring.join(''), forced: m.forced });
 }
 
 /** The wire shape above, with the fold's optional `[vs #<fact index>]` tail: 1 the phrase, 2 the ring, 3 the forced noun, 4 the index. */
@@ -115,7 +116,7 @@ export function collinearCircleImpossibility(prev: Construction, probed: Constru
 
 /** The wire message — the over-constrained family's shape, so the fold names the OTHER statement (`[vs #i]`). */
 export function collinearCircleError(m: CollinearCircle): string {
-  return `over-constrained: a circle through ${m.points.join(', ')} on one line cannot hold`;
+  return engineErrorDebugText({ code: 'collinear-circle', points: [...m.points] });
 }
 
 /** The wire shape above, with the fold's optional `[vs #<fact index>]` tail: 1–3 the points, 4 the index. */

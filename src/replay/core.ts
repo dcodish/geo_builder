@@ -13,6 +13,7 @@
  * The store re-exports this module's surface, so existing consumers are untouched.
  */
 
+import { engineErrorDebugText, withAttribution } from '@/engine/errors';
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Constraint, Construction, DegeneratePolygon, ForcedOffArc, GivenViolation, Id, RelationsResult, ResolvedCircle, RoundOperand, ShapesResult, Vec } from '@/engine';
 import { angleSumImpossibility, boundImpossibility, forcedFlatPolygon, measureRangeImpossibility, metricImpossibility, obtuseSideImpossibility } from '@/engine/metricFeasibility';
 import { sideImpossibility } from '@/engine/sideFeasibility';
@@ -1025,7 +1026,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     for (const [fi, f] of facts.entries()) if (f.enabled) enabledAt.push(fi);
     const tailed = (f: Fact, j: number, st: string) => {
       const first = facts.findIndex((g) => groupKey(g) === groupKey(facts[j]));
-      restated.set(f.id, groupKey(facts[j]) === groupKey(f) ? st : `${st} [vs #${first}]`);
+      restated.set(f.id, groupKey(facts[j]) === groupKey(f) ? st : withAttribution(st, first));
     };
     let ei = -1;
     for (const [fi, f] of facts.entries()) {
@@ -1462,7 +1463,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
   /** The status of a role-bound fact whose role nothing in the figure declares yet (#1810). */
   const roleNotInForce = (f: Fact): string => {
     const b = f.cmd.roleSide!;
-    return `can't build yet: no ${b.role} is declared in triangle ${b.ring.join('')} at this point`;
+    return engineErrorDebugText({ code: 'cant-build-yet', role: b.role, ring: b.ring.join('') });
   };
   const runBuild = (forced: Map<string, string>, start: { node: FoldNode; count: number } | null = null) => {
     let cur = start ? start.node.cur : emptyConstruction();
@@ -1603,21 +1604,21 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       // «already drawn» and the bound vanished. It now waits, marked, exactly as a value does.
       const unboundName = unboundSubjectOf(f.cmd, symtab, enabledCmds);
       if (unboundName) {
-        status[f.id] = `variable ${unboundName} is not defined by any statement (the step that defined it was removed, muted or failed)`;
+        status[f.id] = engineErrorDebugText({ code: 'unbound-variable', name: unboundName });
         continue;
       }
       // #1658: a relation whose letters ARE bound but in a form it cannot follow («k²», an angle letter
       // against a length letter, an area letter) also lowers to nothing — it is refused, never a silent ✓.
       const unenforced = unenforceableRelation(f.cmd, symtab, enabledCmds);
       if (unenforced) {
-        status[f.id] = `relation on ${unenforced.join(', ')} cannot be enforced (a letter is used in a form this statement cannot follow)`;
+        status[f.id] = engineErrorDebugText({ code: 'unenforceable-relation', names: unenforced });
         continue;
       }
       // A point a lowered command would (re)create that an earlier fact owns but which
       // isn't in the figure now ⇒ its definition is gone, so this fact can't build either.
       const broken = intro.filter((id) => owned.has(id) && !cur.objects.some((o) => o.id === id));
       if (broken.length) {
-        status[f.id] = `can't build: ${broken.join(', ')} is no longer available (an earlier step it relies on was removed or failed)`;
+        status[f.id] = engineErrorDebugText({ code: 'no-longer-available', ids: broken });
         claimDefined();
         continue;
       }
@@ -1979,7 +1980,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       const poly = cur.objects.find((o) => o.kind === 'polygon' && o.vertices.join(', ') === m[1]);
       const declared = poly ? ownerByObjId.get(poly.id) : undefined;
       if (declared === undefined || !facts[declared]?.enabled || groupKey(facts[declared]) === groupKey(f)) continue;
-      const tagged = `${st} [vs #${declared}]`;
+      const tagged = withAttribution(st, declared);
       for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
     }
   }
@@ -1997,7 +1998,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       if (!m || m[4] !== undefined) continue;
       const declared = facts.findIndex((g) => g.enabled && g.cmd.type === 'trapezoid' && g.cmd.kind === m[1] && spellsRing(g.cmd.ids, m[2]));
       if (declared < 0 || groupKey(facts[declared]) === groupKey(f)) continue;
-      const tagged = `${st} [vs #${declared}]`;
+      const tagged = withAttribution(st, declared);
       for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
     }
   }
@@ -2016,7 +2017,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       const poly = cur.objects.find((o) => o.kind === 'polygon' && o.vertices.join('') === m[3]);
       const declared = poly ? ownerByObjId.get(poly.id) : undefined;
       if (declared === undefined || !facts[declared]?.enabled || groupKey(facts[declared]) === groupKey(f)) continue;
-      const tagged = `${st} [vs #${declared}]`;
+      const tagged = withAttribution(st, declared);
       for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
     }
   }
@@ -2040,7 +2041,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       const declared = ownerByObjId.get(y.id);
       if (declared === undefined || !facts[declared]?.enabled || groupKey(facts[declared]) === groupKey(f)) continue;
       const first = facts.findIndex((g) => groupKey(g) === groupKey(facts[declared]));
-      const tagged = `${st} [vs #${first}]`;
+      const tagged = withAttribution(st, first);
       for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
     }
   }
@@ -2089,7 +2090,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       }
       if (declared < 0) continue;
       const first = facts.findIndex((g) => groupKey(g) === groupKey(facts[declared]));
-      const tagged = `${st} [vs #${first}]`;
+      const tagged = withAttribution(st, first);
       for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
     }
   };
@@ -2161,7 +2162,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
           if (!collapsed || !seatRotations(trial).some((t) => holds(foldForSearch(t)))) continue;
         }
         const otherIdx = facts.findIndex((x) => groupKey(x) === gk);
-        const tagged = `${st} [vs #${otherIdx}]`;
+        const tagged = withAttribution(st, otherIdx);
         // every row that carries this very string (the group's siblings share it) gets the tail, so the
         // banner and the row statuses stay ONE string (ADR-398)
         for (const h of facts) if (status[h.id] === st) status[h.id] = tagged;
@@ -2196,7 +2197,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
       const j = [r[1], r[2]].map(sizer).find((x) => x >= 0);
       if (j === undefined) continue;
       const first = facts.findIndex((g) => groupKey(g) === groupKey(facts[j]));
-      const tagged = `${st} [vs #${first}]`;
+      const tagged = withAttribution(st, first);
       for (const h of facts) if (status[h.id] === st) status[h.id] = tagged; // banner and rows stay ONE string (ADR-398)
     }
   }
@@ -2987,8 +2988,8 @@ function sampledConfigError(error: string, violated: Constraint[] | undefined, f
   for (const con of violated ?? [])
     for (const id of constraintRefs(con)) if (sampled.has(id) && !names.includes(id)) names.push(id);
   return names.length
-    ? `not determined: ${names.join(', ')} ${names.length > 1 ? 'are' : 'is'} still free, so ${m[1]} cannot be judged in this configuration`
-    : `not determined: ${m[1]} cannot be judged in this configuration`;
+    ? engineErrorDebugText({ code: 'not-determined', who: names, what: m[1] })
+    : engineErrorDebugText({ code: 'not-determined', what: m[1] });
 }
 
 /**
@@ -3981,7 +3982,7 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0): 
   // make re-ticking the row conflict (#1748). The message is unchanged, and still names the row.
   const holding = mutedRowHolding(facts, all, before.construction);
   if (holding)
-    return { produced: false, reason: 'error', detail: `can't build: ${holding.ids.join(', ')} belong to the unticked row «${holding.utterance}» — tick it again or delete it` };
+    return { produced: false, reason: 'error', detail: engineErrorDebugText({ code: 'muted-row-owns', ids: [...holding.ids], row: holding.utterance }) };
   const after = replay(all, seed);
   // #926: a `set-var` whose letter nothing binds YET is marked in the fold (a pending row with its reason,
   // never a silent ✓) but is still data the student may state first — it commits as data-only below.
