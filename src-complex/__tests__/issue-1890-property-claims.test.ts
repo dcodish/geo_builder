@@ -61,7 +61,7 @@ describe('#1890 — the issue\'s exact sequences are refused, never recorded as 
     expect(play('z1 is not real')).toBe(false);
     expect(store().lastError?.key).toBe('negation');
     expect(shown('en')).toBe(
-      'Negation ("not") is not supported yet. State what IS given instead — e.g. "z1 is pure imaginary" or "arg(z1) = 30°".',
+      'Negation («not») is not supported yet. State what IS given instead — e.g. «z1 is pure imaginary» or «arg(z1) = 30°».',
     );
   });
 

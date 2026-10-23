@@ -233,3 +233,11 @@ declined, everything else REVIEW.
 
 **Analytic's replay is the product's own** (`src-analytic/app/triageReplay.ts`) and calls `decideSubmit`,
 the function the App dispatches on, so there is no hand mirror to drift.
+
+**Complex has the same pair** ([ADR-W-150](06w-decisions-workspace.md#adr-w-150), #2241): `outcomeOfComplex`
+in `admin.ts` (`ok` parsed, `not-handled` a gap, every other code REVIEW, ADR-W-083's reading for unruled
+codes) and `src-complex/app/triageReplayCx.ts` over `decideSubmitCx`. Its App logs the store actions the replay
+follows (clear, delete, mute, show-another, and undo/redo with the fingerprint of the state they landed on);
+a session from a build that logged no actions is degraded from its first row, decided per session from its
+`rel` commit. No product is silent today; the silent rule stays, locked with an injected registry. Complex
+has no dashboard profile yet.

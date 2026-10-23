@@ -2191,7 +2191,7 @@ export default function App() {
           </>
         }
         closeLabel={t('manualClose')}
-        tryHint={t('manualTry')}
+        tryHint={t('suite.guide.try')}
         sectionCap={6}
         showAllLabel={t('suite.guide.showAll')}
         showLessLabel={t('suite.guide.showLess')}

@@ -67,7 +67,7 @@ describe('#2247 — an ASCII mixed number is refused in every complex slot, with
     submitLine('z = 2 1/2 + i');
     const e = store().lastError!;
     expect(errorText(e, he)).toBe('לא ברור אם «2 1/2» הוא מספר מעורב או מכפלה. כתבו 2.5 (מספר עשרוני) או 2+1/2 למספר המעורב, או 2*1/2 למכפלה.');
-    expect(errorText(e, en)).toBe('"2 1/2" could be a mixed number or a product. Write 2.5 (a decimal) or 2+1/2 for the mixed number, or 2*1/2 for the product.');
+    expect(errorText(e, en)).toBe('«2 1/2» could be a mixed number or a product. Write 2.5 (a decimal) or 2+1/2 for the mixed number, or 2*1/2 for the product.');
   });
 
   it('no decimal is offered when the fraction does not terminate («2 1/3»)', () => {

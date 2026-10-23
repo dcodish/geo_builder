@@ -100,7 +100,7 @@ describe('#1654–#1657 — the operator-audit sentences are refused, naming the
   it('the English note names the word too', async () => {
     const r = await play(['triangle ABC', 'the slope of AB is 3/4'], 'en');
     expect(r.refused).toBe(true);
-    expect(r.notes[0]).toContain('"slope"');
+    expect(r.notes[0]).toContain('«slope»');
     expect(r.notes[0].endsWith(POINTER.analytic.en)).toBe(true);
   });
 

@@ -278,7 +278,7 @@ describe('#2018 — no single isosceles triangle: 2-D’s question, 2-D’s sent
     expect(v.kind === 'refused' && errorText(v.error, he)).toContain('ל«שוק»');
     const [, w] = submit(['triangle ABC', 'the median to the base']);
     expect(w.kind === 'refused' && errorText(w.error, en)).toBe(
-      'The figure has no single side matching "base" — declare the matching triangle first (e.g. "right triangle ABC" for the hypotenuse, "isosceles triangle ABC" for the base), or name the side by its letters (e.g. "median to side AB").',
+      'The figure has no single side matching «base» — declare the matching triangle first (e.g. «right triangle ABC» for the hypotenuse, «isosceles triangle ABC» for the base), or name the side by its letters (e.g. «median to side AB»).',
     );
   });
 

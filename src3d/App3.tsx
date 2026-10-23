@@ -1288,7 +1288,7 @@ export default function App3() {
         title={t('manual.title')}
         intro={t('suite.guide.intro')}
         closeLabel={t('manual.close')}
-        tryHint={t('manual.try')}
+        tryHint={t('suite.guide.try')}
         sectionCap={6}
         showAllLabel={t('suite.guide.showAll')}
         showLessLabel={t('suite.guide.showLess')}

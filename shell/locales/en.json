@@ -19,6 +19,7 @@
       "more": "…and these are only examples — the tool has more COMMANDS here, not just other phrasings of these",
       "showAll": "Show all",
       "showLess": "Show fewer",
+      "try": "Click to try — the example will be built on the figure",
       "intro": "This is a partial guide — only representative examples are shown, so you can see what sorts of sentences can be typed. Click one to watch it build, or phrase freely — if the tool didn't understand, try different wording; unsupported sentences are collected and reviewed by the project team for future support."
     },
     "share": {

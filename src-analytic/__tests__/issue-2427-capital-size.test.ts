@@ -88,7 +88,7 @@ describe('#2427 — T38, the operator\'s line', () => {
       'אות גדולה היא שם של נקודה, ולכן K לא יכולה לסמן גודל. גדלים מסמנים באות קטנה (r, a, k…), מלבד R לרדיוס. נסו: «נתון מעגל O שרדיוסו k»',
     );
     expect(errorText(v.error, tEn)).toBe(
-      'A capital letter is a point\'s name, so K cannot mark a size. Sizes are marked with a lowercase letter (r, a, k…), except R for a radius. Try: "נתון מעגל O שרדיוסו k"',
+      'A capital letter is a point\'s name, so K cannot mark a size. Sizes are marked with a lowercase letter (r, a, k…), except R for a radius. Try: «נתון מעגל O שרדיוסו k»',
     );
   });
 });

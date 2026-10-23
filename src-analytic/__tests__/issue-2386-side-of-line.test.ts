@@ -150,7 +150,7 @@ describe('#2386 — refusals, each its own case', () => {
     const e = refusalOf(['נתון ישר l: x=3', 'נקודה M', 'M מעל הישר l']);
     expect(e?.key).toBe('side-of-vertical');
     expect(errorText(e!, t)).toBe(VERTICAL_HE);
-    expect(errorText(e!, tEn)).toBe('A vertical line has no "above" — try "to the right of" or "to the left of"');
+    expect(errorText(e!, tEn)).toBe('A vertical line has no «above» — try «to the right of» or «to the left of»');
   });
 
   it('K(3,4) · L(3,−2) · «M מעל הישר KL» — a vertical line through two letters', () => {
@@ -173,7 +173,7 @@ describe('#2386 — refusals, each its own case', () => {
     const e = refusalOf(['נתון ישר l: y=2', 'נקודה M', 'M מימין לישר l']);
     expect(e?.key).toBe('side-of-horizontal');
     expect(errorText(e!, t)).toBe('לישר אופקי אין «מימין ל-» — נסו «מעל» או «מתחת»');
-    expect(errorText(e!, tEn)).toBe('A horizontal line has no "to the right of" — try "above" or "below"');
+    expect(errorText(e!, tEn)).toBe('A horizontal line has no «to the right of» — try «above» or «below»');
   });
 
   it('«M משמאל לציר ה-x» — the x-axis is a horizontal line', () => {

@@ -71,7 +71,7 @@ describe('#2222 — an ASCII mixed number is refused in every analytic slot, bef
     expect(v.kind).toBe('refused');
     if (v.kind !== 'refused') return;
     expect(errorText(v.error, t)).toBe('לא ברור אם «5 1/2» הוא מספר מעורב או מכפלה. כתבו 5.5 (מספר עשרוני) או 5+1/2 למספר המעורב, או 5*1/2 למכפלה.');
-    expect(errorText(v.error, tEn)).toBe('"5 1/2" could be a mixed number or a product. Write 5.5 (a decimal) or 5+1/2 for the mixed number, or 5*1/2 for the product.');
+    expect(errorText(v.error, tEn)).toBe('«5 1/2» could be a mixed number or a product. Write 5.5 (a decimal) or 5+1/2 for the mixed number, or 5*1/2 for the product.');
   });
 
   it('a fraction that does not terminate offers no decimal', () => {

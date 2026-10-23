@@ -217,7 +217,7 @@ describe('#1737 — a triangle’s or a parallelogram’s height is ASKED, and e
       expect(e.key).toBe('ambiguous-height');
       expect(e.key === 'ambiguous-height' && e.options).toEqual(a.options);
       expect(errorText(e, t)).toBe(`ל«גובה» כאן יש כמה אפשרויות (${a.options.join(', ')}), והבחירה ביניהן היא שלכם — היא לא נובעת מהנתונים. כתבו איזו מהן, למשל «${a.options[0]}».`);
-      expect(errorText(e, tEn)).toContain('There is more than one "height" here');
+      expect(errorText(e, tEn)).toContain('There is more than one «height» here');
       for (const option of a.options) {
         const v = submit([a.shape, option]);
         expect(v[1].kind, `${option} → ${JSON.stringify(v[1])}`).toBe('record');
@@ -249,7 +249,7 @@ describe('#1737 — what is refused, in 2-D’s words', () => {
     const e = refusal(['משולש ABC', 'גובה הטרפז 4']);
     expect(e.key).toBe('shape-not-found');
     expect(errorText(e, t)).toBe('באיור אין טרפז — בדקו את שם הצורה, או הגדירו אותה קודם (למשל «טרפז ABCD»).');
-    expect(errorText(e, tEn)).toBe('There is no trapezoid in this figure — check the shape name, or declare it first (e.g. "trapezoid ABCD").');
+    expect(errorText(e, tEn)).toBe('There is no trapezoid in this figure — check the shape name, or declare it first (e.g. «trapezoid ABCD»).');
   });
   it('«AB ∥ CD» on a plain quadrilateral does not make it a trapezoid — shape-not-found, as 2-D', () => {
     expect(refusal(['מרובע ABCD', 'AB ∥ CD', 'גובה הטרפז 4']).key).toBe('shape-not-found');

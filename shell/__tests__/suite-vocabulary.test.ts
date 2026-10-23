@@ -125,9 +125,9 @@ const RULED: Record<string, Record<Lang, string>> = {
     en: 'Segment {{N}} already has a name: {{N}} (in the line «{{N}}»). A segment has one name — keep using {{N}}.',
   },
   proofTarget: {
-    // #2202 (ADR-W-149, ruling d1 2026-10-16): a quoted value is «…» in Hebrew; the English is not ruled
+    // #2202 (ADR-W-149, ruling d1 2026-10-16): a quoted value is «…» in Hebrew; in English too since #2241 (ADR-W-150)
     he: 'זו טענה להוכחה, לא נתון — הכלי משרטט את הנתונים ואינו בודק הוכחות. הקלידו רק את מה שנתון בשאלה: «{{N}}»',
-    en: 'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "{{N}}"',
+    en: 'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{N}}»',
   },
   measureContradicts: {
     he: 'לא ניתן: «{{N}}» סותר את «{{N}}» — אי אפשר לקיים את שניהם יחד. הסיבה: {{N}}.',

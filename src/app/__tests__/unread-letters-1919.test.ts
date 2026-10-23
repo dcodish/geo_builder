@@ -112,10 +112,10 @@ describe('#1919 — 2-D refuses a letter it cannot read, naming it', () => {
 
   it('English: both refusals are in English', () => {
     expect(plain(i18n.t('input.scope.unread-name', { detail: 'ДЖФ', lng: 'en' }) as string)).toBe(
-      '"ДЖФ" is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
+      '«ДЖФ» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
     );
     expect(plain(i18n.t('input.scope.unread-word', { detail: 'треугольник', lng: 'en' }) as string)).toBe(
-      'This tool reads Hebrew and English only — "треугольник" is in neither. Try writing the line in Hebrew or English.',
+      'This tool reads Hebrew and English only — «треугольник» is in neither. Try writing the line in Hebrew or English.',
     );
   });
 

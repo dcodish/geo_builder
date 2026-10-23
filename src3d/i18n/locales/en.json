@@ -160,7 +160,7 @@
     "ambiguousVectorLength": "vector or length? write vector AB = vector CD (or AB→ = CD→), or |AB| = |CD|",
     "paramRolesConflated": "the letter {{letter}} is used both as the running parameter (outside the parentheses) and as a component inside them — it isn't clear which you meant. Pick a different letter for the running parameter, e.g. x=t({{letter}}-1, 5-{{letter}}, -2)",
     "componentSymbolic": "A single coordinate with a letter value («{{component}}») is not supported yet — give it a number, e.g. {{component}} = 3",
-    "inscribedContradictsNoun": "A {{shape}} cannot be inscribed in a circle: «{{sentence}}». A circle through every vertex would make it a {{forced}}, and a {{forced}} is not a {{shape}}. If the shape is a {{forced}}, write \"{{forced}}\" instead of \"{{shape}}\".",
+    "inscribedContradictsNoun": "A {{shape}} cannot be inscribed in a circle: «{{sentence}}». A circle through every vertex would make it a {{forced}}, and a {{forced}} is not a {{shape}}. If the shape is a {{forced}}, write «{{forced}}» instead of «{{shape}}».",
     "inscribedContradictsNounVs": "Can't do that: «{{sentence}}» contradicts «{{other}}» — they can't both hold. The reason: a circle through the four vertices would make a {{shape}} a {{forced}}, and a {{forced}} is not a {{shape}}.",
     "ringContradictsNoun": "The points you gave do not form that shape in this order: «{{detail}}». Reorder the letters so the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.",
     "proofTarget": "That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{sentence}}»",
@@ -180,8 +180,8 @@
     "givenNotDrivablePoint": "The tool can't yet move point {{id}} so that this given holds, so it wasn't added — this is a limit of the tool",
     "givenNotDrivableSize": "The tool can't yet set the {{solid}}'s size from a given like this — this capability is in development, so the step wasn't added.",
     "lineNotDetermined": "Line {{id}} has no determined direction or position yet — this statement needs a determined line. Pin it with two points on it, a parametric form, or a ∥/⊥ relation",
-    "ambiguousAngleVertex": "More than one angle meets at {{vertex}}: {{angles}}. Name all three letters of the one you mean (e.g. \"AD bisects angle {{angles}}\" — using one of those).",
-    "ambiguousAngleVertexBare": "More than one angle can meet at {{vertex}}, so \"angle {{vertex}}\" does not say which. Name all three letters of the angle you mean.",
+    "ambiguousAngleVertex": "More than one angle meets at {{vertex}}: {{angles}}. Name all three letters of the one you mean (e.g. «AD bisects angle {{angles}}» — using one of those).",
+    "ambiguousAngleVertexBare": "More than one angle can meet at {{vertex}}, so «angle {{vertex}}» does not say which. Name all three letters of the angle you mean.",
     "ambiguousMainDiagonal": "The solid has several main diagonals: {{pairs}}. Name the letters of the one you mean (e.g. \"diagonal AC'\").",
     "ambiguousMainDiagonalBare": "Name the letters of the main diagonal you mean (e.g. \"diagonal AC'\").",
     "notADiagonal": "«{{pair}}» is not a diagonal of the solid — it is an edge. A diagonal joins non-adjacent vertices.",
@@ -199,8 +199,7 @@
   },
   "manual": {
     "title": "The Guide — Space Geometry",
-    "close": "Back to the tool",
-    "try": "Click to try — the example builds on the figure"
+    "close": "Back to the tool"
   },
   "emptyHintChips": "Click an example given — or type your own, and the figure builds in front of you",
   "dataPanel": {
@@ -343,7 +342,7 @@
       "cyclicQuad": "cyclic quadrilateral",
       "rightTrapezoid": "right trapezoid"
     },
-    "lineCalledPlane": "Note: {{line}} is a line, not a plane. Read as \"plane {{ids}} is perpendicular to line {{line}}\".",
+    "lineCalledPlane": "Note: {{line}} is a line, not a plane. Read as «plane {{ids}} is perpendicular to line {{line}}».",
     "lineRelNoun": "Note: {{line}} is a line, not a plane — the relation was built against line {{line}}.",
     "lineAutoNamed": "The name {{requested}} is already taken, so the intersection line was named {{assigned}}.",
     "alreadyKnown": "{{statement}} — true and verified ✓, but {{why}}, so this given adds no new information.",

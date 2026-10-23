@@ -98,7 +98,7 @@ describe('#1666 — 2-D refuses a proof target at the submit gate', () => {
 
   it('English: the refusal is in English', () => {
     expect(plain(i18n.t('input.scope.proof-target', { sentence: 'prove that AB ⊥ AC', lng: 'en' }) as string)).toBe(
-      'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "prove that AB ⊥ AC"',
+      'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «prove that AB ⊥ AC»',
     );
   });
 

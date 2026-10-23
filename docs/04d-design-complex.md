@@ -373,6 +373,13 @@ in `editLine` (a muted row too), before the ask routing and before the grammar, 
 «נתון … . הוכיחו כי …» included. The load path replays through `submitLine`, so a saved proof line lands in the
 load audit. A bare statement has no proof verb and reaches the claim pipeline unchanged.
 
+**The submit decision is pure** (#2241, [ADR-W-150](06w-decisions-workspace.md#adr-w-150)): `decideSubmitCx({ lines,
+disabled, seed }, raw)` in `app/submit.ts` returns `record` / `ask` / `known` / `refuse`, and `submitLine` only
+dispatches on it into the store (the analytic shape of #1102). The proof-target, unread-script, ask-lane and parse
+refusals below all live in it. `/log-triage` replays a production session through the same function
+(`app/triageReplayCx.ts`), so it mirrors nothing; the App logs the list actions that replay follows (`App.tsx`,
+beside `submitCounted`; an undo/redo carries `app/stateFingerprint.ts`'s fingerprint of the state it landed on).
+
 **A letter this tool cannot read** (#1919, [ADR-626](06-decisions.md#adr-626)) is refused in `submitLine`,
 before the ask routing and before the grammar, by the shared rule `unreadScript` (`shell/inputScript.ts`) —
 with the same two sentences the other builders use (`errUnreadName`, `errUnreadWord`), quoting the letters as

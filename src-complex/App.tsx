@@ -34,6 +34,7 @@ import { askRowsOf } from './app/askLane';
 import { COMPLEX_SESSION, editLine, hydrateSession, submitLine, submitQuery, toggleLine } from './app/submit';
 import { submitTyped } from '../shell/sentences';
 import { logComplex } from './debug/sessionLogComplex';
+import { stateFingerprintCx } from './app/stateFingerprint';
 // #1238 (ADR-W-068): the session is mirrored to storage and OFFERED back — never restored silently.
 // This tree is why the rule exists: #919 removed a seam here that re-submitted stored lines on every load.
 import { forgetSessionCx, offeredSessionCx, restoreSessionCx, startSessionPersistCx } from './app/sessionPersistCx';
@@ -85,6 +86,37 @@ export function App() {
     redo,
   } = useComplexStore();
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  /**
+   * #2241 (ADR-W-150) — the store ACTIONS, logged at the App boundary beside `submitCounted`, in the
+   * siblings' vocabulary. Without them `/log-triage` cannot replay a complex session: an undo, a delete or
+   * a clear is invisible, and the replay would thread a line the student had removed. No new student text:
+   * a deleted or edited line is quoted by index and text (its text was logged when it was typed), a load by
+   * its line count, an undo/redo by the fingerprint of the state it landed on.
+   */
+  const logAction = (action: string, detail?: string, result?: string) =>
+    logComplex({ kind: 'action', action, ...(detail !== undefined ? { detail } : {}), ...(result !== undefined ? { result } : {}) });
+  const fingerprintNow = () => {
+    const s = useComplexStore.getState();
+    return stateFingerprintCx(s.lines, s.disabled, s.seed);
+  };
+  /** A load REPLACES the figure, so a replay that misses it continues from the wrong one. */
+  const logLoad = (ok: boolean) => {
+    const s = useComplexStore.getState();
+    logAction('load', `${s.lines.length} lines`, ok ? (s.loadAudit ? `${s.loadAudit.failed.length} failed` : 'ok') : 'refused');
+  };
+  const undoLogged = () => {
+    undo();
+    logAction('undo', fingerprintNow());
+  };
+  const redoLogged = () => {
+    redo();
+    logAction('redo', fingerprintNow());
+  };
+  const showAnotherLogged = () => {
+    nextConfig();
+    logAction('show-another');
+  };
 
   const saveFile = () => {
     const blob = new Blob([JSON.stringify(serialize(), null, 2)], { type: 'application/json' });
@@ -204,8 +236,9 @@ export function App() {
         useComplexStore.setState({ lastError: { key, detail } });
         return;
       }
-      if (!hydrateSession(parsed))
-        useComplexStore.setState({ lastError: { key: 'parse-error', detail: file.name } });
+      const loaded = hydrateSession(parsed);
+      logLoad(loaded);
+      if (!loaded) useComplexStore.setState({ lastError: { key: 'parse-error', detail: file.name } });
       // the FILENAME names the figure (the #42 rule) — any name embedded in the file is provenance
       else useComplexStore.getState().setName(figureNameFromFileName(file.name, 'complex'));
     });
@@ -223,6 +256,7 @@ export function App() {
 
   const openLinkCx = (payload: string) => {
     const r = openSharedComplex(payload);
+    logLoad(r === true);
     if (r !== true) setShareError(r);
   };
 
@@ -310,6 +344,7 @@ export function App() {
   const acceptOffer = () => {
     if (!offer) return;
     const ok = restoreSessionCx(offer.payload);
+    logLoad(ok);
     setOffer(null);
     // Refused: name it in this product's own error voice, then stop offering what cannot open.
     if (!ok) {
@@ -412,6 +447,7 @@ export function App() {
    */
   const clearSession = () => {
     clearAll();
+    logAction('clear');
     setInput('');
     setAskText('');
   };
@@ -813,12 +849,25 @@ export function App() {
               }))}
               textDir={complexBidi.textDir}
               emptyHint={t('emptyHint')}
-              onToggle={(id) => toggleLine(Number(id))}
+              onToggle={(id) => {
+                const i = Number(id);
+                const unmuting = disabled.includes(i);
+                const ok = toggleLine(i);
+                logAction('toggle', `${i}:${unmuting ? 'on' : 'off'}`, ok ? undefined : (useComplexStore.getState().lastError?.key ?? 'refused'));
+              }}
               toggleLabel={t('factToggle')}
               editValueOf={(id) => lines[Number(id)]}
-              onEditCommit={(id, next) => editLine(Number(id), next)}
+              onEditCommit={(id, next) => {
+                const ok = editLine(Number(id), next);
+                // an edit rewrites a line in place, so a replay without it diverges silently
+                if (ok) logAction('edit', `${id}:${next}`);
+                return ok;
+              }}
               editLabel={t('factEdit')}
-              onDelete={(id) => removeLine(Number(id))}
+              onDelete={(id) => {
+                logAction('delete', `${id}:${lines[Number(id)] ?? ''}`);
+                removeLine(Number(id));
+              }}
               deleteLabel={t('factDelete')}
               symbols={SYMBOLS}
               symbolTitle={(sy) => (sy.titleKey ? t(sy.titleKey) : sy.label)}
@@ -950,7 +999,7 @@ export function App() {
                 spacer before the session ops), replacing this tree's bare buttons. */}
             <div className="figure-actions" style={figureRowStyle}>
               {/* nothing to cycle when the givens determine the figure completely (ADR-CX-020) */}
-              <button style={(derived2 ? !derived2.canCycle : false) ? rowAccentOffStyle : rowAccentStyle} onClick={nextConfig} disabled={derived2 ? !derived2.canCycle : false}>
+              <button style={(derived2 ? !derived2.canCycle : false) ? rowAccentOffStyle : rowAccentStyle} onClick={showAnotherLogged} disabled={derived2 ? !derived2.canCycle : false}>
                 {t('anotherConfig')}
               </button>
               {/* #742: the row's buttons DISABLE on an empty figure, never hide (operator ruling —
@@ -986,10 +1035,10 @@ export function App() {
               {/* #739: the row carries clear-all in every tool (undo/redo await store temporal —
                   the named feature gap on the issue) */}
               {/* #1099: the row's missing members. Order matches the siblings — undo · redo · clear-all. */}
-              <button type="button" style={canUndo ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canUndo} onClick={undo}>
+              <button type="button" style={canUndo ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canUndo} onClick={undoLogged}>
                 {t('undo')}
               </button>
-              <button type="button" style={canRedo ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canRedo} onClick={redo}>
+              <button type="button" style={canRedo ? rowSubtleStyle : rowSubtleOffStyle} disabled={!canRedo} onClick={redoLogged}>
                 {t('redo')}
               </button>
               <button style={lines.length > 0 ? { ...rowSubtleStyle, color: rowDangerInk } : rowSubtleOffStyle} disabled={lines.length === 0} onClick={clearSession}>{t('clearAll')}</button>
@@ -1122,7 +1171,7 @@ export function App() {
         title={t('manualTitle')}
         intro={t('suite.guide.intro')}
         closeLabel={t('manualClose')}
-        tryHint={t('manualTry')}
+        tryHint={t('suite.guide.try')}
         sectionCap={6}
         showAllLabel={t('suite.guide.showAll')}
         showLessLabel={t('suite.guide.showLess')}

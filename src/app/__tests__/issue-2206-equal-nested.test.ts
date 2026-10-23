@@ -88,9 +88,8 @@ describe('#2206 words — an equal pair stated internally tangent or concentric 
       const last = out[out.length - 1];
       expect(last.kind).toBe('refuse');
       expect(last.key).toBe(`input.equalCirclesNested.${rel}`);
-      // #2202 (ruling d1): a Hebrew message quotes the line in «…»; an English line gets the English message, whose
-      // quotes are not ruled and stay "…"
-      const quoted = /[א-ת]/.test(line) ? `«${line}»: ` : `"${line}": `;
+      // #2202 (ruling d1) and #2241: the message quotes the line in «…», in Hebrew and in English alike
+      const quoted = `«${line}»: `;
       expect(last.text!.startsWith(quoted), 'the message quotes the line').toBe(true);
       expect(useGeoStore.getState().facts.filter((f) => f.utterance === line)).toEqual([]);
       expect(llmParseMock).not.toHaveBeenCalled();

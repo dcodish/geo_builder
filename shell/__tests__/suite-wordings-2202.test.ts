@@ -2,17 +2,17 @@
  * #2202 ([ADR-W-149](../../docs/06w-decisions-workspace.md#adr-w-149)) — the seven wordings the operator ruled on
  * 2026-10-16 (ballot card 8, rows d2202-d1 … d7) are held ONCE, and every builder shows them.
  *
- * Five of them (d2 share prompt, d4 guide intro, d5 About close, d6 About title, d7 empty-canvas title) are suite
- * text: one key each in `shell/locales`, and each App reads that key at the surface. d3 («השרטוט» in the guide's
- * try hint) stays per builder because its English is not one string yet (#2241), so its four Hebrew values are
- * held equal here. d1 (quote marks) is `quote-style.test.ts`. The per-builder RESOLUTION (each instance merges
+ * Six of them (d2 share prompt, d3 guide try hint, d4 guide intro, d5 About close, d6 About title, d7 empty-canvas
+ * title) are suite text: one key each in `shell/locales`, and each App reads that key at the surface. d3 joined
+ * when #2241 made its English one string ([ADR-W-150](../../docs/06w-decisions-workspace.md#adr-w-150)). d1 (quote
+ * marks) is `quote-style.test.ts`. The per-builder RESOLUTION (each instance merges
  * the suite file) is `<tree>/__tests__/ruled-wordings-2202.test.ts`.
  *
  * The Apps are read as source (the row-parity pattern): shell may not import a product tree.
  */
 import { describe, expect, it } from 'vitest';
 import { PRODUCTS, productTable, read, suiteTable, type Product } from './fixtures/locale-tables';
-import { RULED_SUITE, RULED_TRY_HINT_HE, TRY_HINT_KEY } from './fixtures/ruled-wordings-2202';
+import { RULED_SUITE } from './fixtures/ruled-wordings-2202';
 
 const APP: Record<Product, string> = {
   '2d': 'src/App.tsx',
@@ -28,14 +28,15 @@ const SITES: Record<string, RegExp> = {
   'suite.share.arrived': /<ResumeOffer\s+message=\{t\('suite\.share\.arrived'\)\}/,
   'suite.canvas.emptyTitle': /<QuickChips\s+title=\{t\('suite\.canvas\.emptyTitle'\)\}/,
   'suite.guide.intro': /<ManualScreen[\s\S]*?\{t\('suite\.guide\.intro'\)\}/,
+  'suite.guide.try': /<ManualScreen[\s\S]*?\btryHint=\{t\('suite\.guide\.try'\)\}/,
 };
 
-/** The per-product keys the five replaced. None may come back: a second copy is how the wordings drifted. */
+/** The per-product keys the six replaced. None may come back: a second copy is how the wordings drifted. */
 const RETIRED: Record<Product, string[]> = {
-  '2d': ['about.title', 'about.close', 'share.arrived', 'canvas.emptyTitle', 'manualPartial'],
-  '3d': ['aboutTitle', 'aboutClose', 'share.arrived', 'emptyTitle', 'manual.intro'],
-  complex: ['aboutTitle', 'aboutClose', 'shareArrived', 'emptyTitle', 'manualIntro'],
-  analytic: ['aboutTitle', 'aboutClose', 'shareArrived', 'emptyTitle', 'manualIntro'],
+  '2d': ['about.title', 'about.close', 'share.arrived', 'canvas.emptyTitle', 'manualPartial', 'manualTry'],
+  '3d': ['aboutTitle', 'aboutClose', 'share.arrived', 'emptyTitle', 'manual.intro', 'manual.try'],
+  complex: ['aboutTitle', 'aboutClose', 'shareArrived', 'emptyTitle', 'manualIntro', 'manualTry'],
+  analytic: ['aboutTitle', 'aboutClose', 'shareArrived', 'emptyTitle', 'manualIntro', 'manualTry'],
 };
 
 describe('#2202 — the ruled wordings, held once', () => {
@@ -64,9 +65,6 @@ describe('#2202 — the ruled wordings, held once', () => {
     });
   }
 
-  it('d3: the guide try hint says «השרטוט» in every builder', () => {
-    for (const p of PRODUCTS) expect(productTable(p, 'he')[TRY_HINT_KEY[p]], p).toBe(RULED_TRY_HINT_HE);
-  });
 
   it('analytic keeps its generic «סגור» for the banners and the guide — only the About box moved', () => {
     expect(productTable('analytic', 'he').close).toBe('סגור');
@@ -80,5 +78,6 @@ describe('#2202 — the ruled wordings, held once', () => {
     expect(SITES['suite.about.title'].test(stale)).toBe(false);
     expect(SITES['suite.about.close'].test(stale)).toBe(false);
     expect(SITES['suite.share.arrived'].test("<ResumeOffer message={t('shareArrived')}")).toBe(false);
+    expect(SITES['suite.guide.try'].test("<ManualScreen intro={t('suite.guide.intro')} tryHint={t('manualTry')}")).toBe(false);
   });
 });

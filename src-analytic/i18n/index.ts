@@ -617,7 +617,6 @@ const he = {
   questionGiven: 'נתון:',
   copied: 'הועתק',
   manualTitle: 'המדריך — גאומטריה אנליטית',
-  manualTry: 'לחצו כדי לנסות — הדוגמה תיבנה על השרטוט',
   manualPoints: 'נקודות',
   manualLines: 'ישרים',
   manualCircles: 'מעגלים',
@@ -786,17 +785,17 @@ const en: typeof he = {
   switcherLabel: 'Choose a tool',
   switcherMore: 'More',
   switcher3d: 'Solid Geometry',
-  errNotHandled: 'I could not understand the statement: "{{detail}}"',
-  errBadEquation: 'I could not read the equation: "{{detail}}"',
-  errOutOfScope: 'Understood, but not supported in this tool: "{{detail}}"',
+  errNotHandled: 'I could not understand the statement: «{{detail}}»',
+  errBadEquation: 'I could not read the equation: «{{detail}}»',
+  errOutOfScope: 'Understood, but not supported in this tool: «{{detail}}»',
   errSplitStatements: 'One given per line — that way the tool can build and verify each one separately. We spotted two givens here; try entering them as two steps: {{all}}',
   errRightAngleVertex: 'One given per line — that way the tool can build and verify each one separately. Write them on separate lines: (1) triangle {{triangle}}  (2) ∠{{angle}} = 90°{{more}}',
   errProofTarget:
-    'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: "{{detail}}"',
-  errConflict: 'Not added — it contradicts what is already fixed: "{{detail}}"',
+    'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{detail}}»',
+  errConflict: 'Not added — it contradicts what is already fixed: «{{detail}}»',
   errNameClash:
     'That name is already taken in this figure — it is {{existing}}. It cannot take a second ' +
-    'meaning in "{{detail}}". Either choose another letter, or delete the earlier definition and ' +
+    'meaning in «{{detail}}». Either choose another letter, or delete the earlier definition and ' +
     'restate it.',
   errUnknownRef: 'There is no object called {{detail}} in the figure. Define it first, then you can refer to it.',
   errUnknownRefPoint: 'The point {{detail}} has not been defined yet. Define it first, then you can refer to it.',
@@ -807,28 +806,28 @@ const en: typeof he = {
   errNearMiss: 'The figure has {{names}}. Did you mean {{suggest}}?',
   listAnd: ' and ',
   errKindMismatch:
-    'The equation in "{{detail}}" describes {{existing}}, not {{claimed}}. Check the equation, or name the shape it describes.',
+    'The equation in «{{detail}}» describes {{existing}}, not {{claimed}}. Check the equation, or name the shape it describes.',
   'errHost.named':
-    'The figure has more than one of these ({{candidates}}), so it is not clear which one "{{detail}}" means. Write its name — for example "{{example}}".',
+    'The figure has more than one of these ({{candidates}}), so it is not clear which one «{{detail}}» means. Write its name — for example «{{example}}».',
   errNumeralNotation:
-    '"{{numNoun}} {{holder}}" and "{{numNoun}} {{detail}}" are the same name — the tool reads a digit and a Roman numeral as one name. To keep one notation, write "{{numNoun}} {{holder}}", as in the earlier lines.',
+    '«{{numNoun}} {{holder}}» and «{{numNoun}} {{detail}}» are the same name — the tool reads a digit and a Roman numeral as one name. To keep one notation, write «{{numNoun}} {{holder}}», as in the earlier lines.',
   errAlreadyNamed: 'that point already has a name: {{holder}}. To change it, delete the line that named {{holder}} and write it again.',
   errAliasTaken: 'The name {{holder}} is already taken on this figure — one name marks one thing, a point or an angle. Pick another name, e.g. a letter with a different digit.',
-  errRenameBadName: '"{{detail}}" is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
+  errRenameBadName: '«{{detail}}» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
   errRadianAngle: 'In plane geometry, angles are written in degrees — for example ∠ABC = 90',
-  errUnreadWord: 'This tool reads Hebrew and English only — "{{detail}}" is in neither. Try writing the line in Hebrew or English.',
-  errMixedNumber: '"{{detail}}" could be a mixed number or a product. Write {{decimal}} (a decimal) or {{sum}} for the mixed number, or {{product}} for the product.',
-  errMixedNumberNoDecimal: '"{{detail}}" could be a mixed number or a product. Write {{sum}} for the mixed number, or {{product}} for the product.',
+  errUnreadWord: 'This tool reads Hebrew and English only — «{{detail}}» is in neither. Try writing the line in Hebrew or English.',
+  errMixedNumber: '«{{detail}}» could be a mixed number or a product. Write {{decimal}} (a decimal) or {{sum}} for the mixed number, or {{product}} for the product.',
+  errMixedNumberNoDecimal: '«{{detail}}» could be a mixed number or a product. Write {{sum}} for the mixed number, or {{product}} for the product.',
   errRenameSame: '{{detail}} is already called {{detail}} — nothing to change.',
   errRenameUnknown: 'The figure has no point named {{detail}}, so there is nothing to rename.',
-  errRenameTaken: 'The letter {{detail}} is already taken: "{{holder}}". Pick a free letter.',
+  errRenameTaken: 'The letter {{detail}} is already taken: «{{holder}}». Pick a free letter.',
   errRenameTakenTool: 'The letter {{detail}} is already taken in the figure. Pick a free letter.',
   errRenameNotTyped: 'The letter {{detail}} was chosen by the tool, and it cannot be written into your sentence without changing what it says, so it was not changed.',
-  errRenameUnsafe: 'I could not rename {{holder}} in "{{detail}}" without changing what it says. Edit that line by hand.',
+  errRenameUnsafe: 'I could not rename {{holder}} in «{{detail}}» without changing what it says. Edit that line by hand.',
   errRenameUnsafeFigure: 'Renaming {{holder}} would also change a name the tool chose in the figure, so it was not done.',
   errSwapSame: '{{detail}} cannot be swapped with itself — pick two different letters.',
   errSwapUnknown: 'The figure has no point named {{detail}}, so there is nothing to swap with.',
-  errSwapUnsafe: 'I could not swap {{holder}} and {{other}} in "{{detail}}" without changing what it says. Edit that line by hand.',
+  errSwapUnsafe: 'I could not swap {{holder}} and {{other}} in «{{detail}}» without changing what it says. Edit that line by hand.',
   errSwapUnsafeFigure: 'Swapping {{holder}} and {{other}} would also change a name the tool chose in the figure, so it was not done.',
   letterPlaceholder: 'letter',
   letterApply: 'Apply',
@@ -841,8 +840,8 @@ const en: typeof he = {
   segDashed: 'Dashed',
   segSolid: 'Solid',
   centreTitle: 'Circle centre',
-  errUnsatisfiable: 'No configuration satisfies: "{{detail}}"',
-  errUnsatisfiableReused: '{{reusedId}} is already defined: "{{definedBy}}". "{{detail}}" contradicts that definition — pick another letter for a new point.',
+  errUnsatisfiable: 'No configuration satisfies: «{{detail}}»',
+  errUnsatisfiableReused: '{{reusedId}} is already defined: «{{definedBy}}». «{{detail}}» contradicts that definition — pick another letter for a new point.',
   'locus.line': 'line',
   'locus.circle': 'circle',
   'locus.parabola': 'parabola',
@@ -856,32 +855,32 @@ const en: typeof he = {
   errDiagonalIsSide: '{{pair}} is not a diagonal of {{polygon}} — it is a side of it. A diagonal joins two corners that are not next to each other.',
   errDiagonalNoneHere: '{{pair}} is not a diagonal — {{polygon}} has no diagonals at all (every pair of its corners is a side).',
   errAmbiguousHeight:
-    'There is more than one "height" here ({{options}}), and the givens do not choose between them — you do. Say which, e.g. "{{first}}".',
-  errShapeNotFound: 'There is no {{shapeEn}} in this figure — check the shape name, or declare it first (e.g. "{{shapeEn}} ABCD").',
+    'There is more than one «height» here ({{options}}), and the givens do not choose between them — you do. Say which, e.g. «{{first}}».',
+  errShapeNotFound: 'There is no {{shapeEn}} in this figure — check the shape name, or declare it first (e.g. «{{shapeEn}} ABCD»).',
   errNotADiagonal:
-    'Those letters name sides of the quadrilateral, not its diagonals: "{{detail}}". A diagonal joins two ' +
-    'vertices that are not adjacent, for example "the diagonals AC and BD meet at E" in quadrilateral ABCD.',
+    'Those letters name sides of the quadrilateral, not its diagonals: «{{detail}}». A diagonal joins two ' +
+    'vertices that are not adjacent, for example «the diagonals AC and BD meet at E» in quadrilateral ABCD.',
   errNoPrincipalDiagonal:
     'This shape has no principal and secondary diagonal — that distinction exists only for shapes ' +
-    'like a kite: "{{detail}}". Name the diagonal by its vertices instead, for example "the ' +
-    'equation of diagonal AC is y=2x".',
+    'like a kite: «{{detail}}». Name the diagonal by its vertices instead, for example «the ' +
+    'equation of diagonal AC is y=2x».',
   errAmbiguousShape:
-    'No single shape in this figure answers to that: "{{detail}}". Name its vertices — for example "the area of kite ABCD is 24".',
-  'errHost.none.circle': 'There is no circle in your figure for this sentence to refer to: "{{detail}}". Define a circle first, e.g. "circle O".',
-  'errHost.many.circle': 'Your figure has more than one circle, so it is unclear which one this sentence means: "{{detail}}". Name the circle, e.g. "circle I".',
-  'errHost.none.parabola': 'There is no parabola in your figure for this sentence to refer to: "{{detail}}". Define the parabola first, e.g. "parabola y^2=8x".',
-  'errHost.many.parabola': 'Your figure has more than one parabola, so it is unclear which one this sentence means: "{{detail}}".',
-  'errHost.none.ellipse': 'There is no ellipse in your figure for this sentence to refer to: "{{detail}}". Define the ellipse first, e.g. "ellipse x^2/25+y^2/9=1".',
-  'errHost.many.ellipse': 'Your figure has more than one ellipse, so it is unclear which one this sentence means: "{{detail}}".',
-  'errHost.none.line': 'There is no line in your figure for this sentence to refer to: "{{detail}}". Define the line first, e.g. "line l1: y=2x+1".',
-  'errHost.many.line': 'Your figure has more than one line, so it is unclear which one this sentence means: "{{detail}}". Name the line, e.g. "line l1".',
-  'errHost.none.perpendicular': 'There is no perpendicular in your figure for this sentence to refer to: "{{detail}}". Drop the perpendicular first, e.g. "the perpendicular from B to the x-axis".',
-  'errHost.many.perpendicular': 'Your figure has more than one perpendicular, so it is unclear which one this sentence means: "{{detail}}". Say from which point and onto which line, e.g. "the perpendicular from B to the x-axis".',
-  'errHost.none.polygon': 'There is no polygon in your figure for this sentence to refer to: "{{detail}}". Write its vertices, e.g. "the perimeter of triangle ABC is 12".',
-  'errHost.many.polygon': 'Your figure has more than one such polygon, so it is unclear which one this sentence means: "{{detail}}". Write its vertices, e.g. "the perimeter of triangle ABC is 12".',
-  'errHost.pair.line': 'This sentence refers to two unnamed lines, and your figure has {{found}}: "{{detail}}". Name the lines, e.g. "E is the intersection of lines l1 and l2".',
-  'errHost.pair.circle': 'This sentence refers to two unnamed circles, and your figure has {{found}}: "{{detail}}". Name the circles, e.g. "E is the intersection of circles I and II".',
-  errOutOfDomain: 'The value in "{{detail}}" is not possible here — it must be {{range}}.',
+    'No single shape in this figure answers to that: «{{detail}}». Name its vertices — for example «the area of kite ABCD is 24».',
+  'errHost.none.circle': 'There is no circle in your figure for this sentence to refer to: «{{detail}}». Define a circle first, e.g. «circle O».',
+  'errHost.many.circle': 'Your figure has more than one circle, so it is unclear which one this sentence means: «{{detail}}». Name the circle, e.g. «circle I».',
+  'errHost.none.parabola': 'There is no parabola in your figure for this sentence to refer to: «{{detail}}». Define the parabola first, e.g. «parabola y^2=8x».',
+  'errHost.many.parabola': 'Your figure has more than one parabola, so it is unclear which one this sentence means: «{{detail}}».',
+  'errHost.none.ellipse': 'There is no ellipse in your figure for this sentence to refer to: «{{detail}}». Define the ellipse first, e.g. «ellipse x^2/25+y^2/9=1».',
+  'errHost.many.ellipse': 'Your figure has more than one ellipse, so it is unclear which one this sentence means: «{{detail}}».',
+  'errHost.none.line': 'There is no line in your figure for this sentence to refer to: «{{detail}}». Define the line first, e.g. «line l1: y=2x+1».',
+  'errHost.many.line': 'Your figure has more than one line, so it is unclear which one this sentence means: «{{detail}}». Name the line, e.g. «line l1».',
+  'errHost.none.perpendicular': 'There is no perpendicular in your figure for this sentence to refer to: «{{detail}}». Drop the perpendicular first, e.g. «the perpendicular from B to the x-axis».',
+  'errHost.many.perpendicular': 'Your figure has more than one perpendicular, so it is unclear which one this sentence means: «{{detail}}». Say from which point and onto which line, e.g. «the perpendicular from B to the x-axis».',
+  'errHost.none.polygon': 'There is no polygon in your figure for this sentence to refer to: «{{detail}}». Write its vertices, e.g. «the perimeter of triangle ABC is 12».',
+  'errHost.many.polygon': 'Your figure has more than one such polygon, so it is unclear which one this sentence means: «{{detail}}». Write its vertices, e.g. «the perimeter of triangle ABC is 12».',
+  'errHost.pair.line': 'This sentence refers to two unnamed lines, and your figure has {{found}}: «{{detail}}». Name the lines, e.g. «E is the intersection of lines l1 and l2».',
+  'errHost.pair.circle': 'This sentence refers to two unnamed circles, and your figure has {{found}}: «{{detail}}». Name the circles, e.g. «E is the intersection of circles I and II».',
+  errOutOfDomain: 'The value in «{{detail}}» is not possible here — it must be {{range}}.',
   'range.gt': 'greater than {{v}}',
   'range.ge': 'at least {{v}}',
   'range.lt': 'less than {{v}}',
@@ -897,21 +896,21 @@ const en: typeof he = {
   'askHost.none.polygon': 'there is no such polygon in your figure — write its vertices, e.g. "perimeter of ABC"',
   'askHost.many.polygon': 'your figure has more than one such polygon — write its vertices, e.g. "perimeter of ABC"',
   errAmbiguousAngle:
-    'One letter is not enough to say which angle is meant: "{{detail}}". Write all three letters, the vertex ' +
-    'in the middle — for example "angle ABC" — or state the shape the vertex belongs to first.',
+    'One letter is not enough to say which angle is meant: «{{detail}}». Write all three letters, the vertex ' +
+    'in the middle — for example «angle ABC» — or state the shape the vertex belongs to first.',
   errAmbiguousAngleOptions:
-    'That vertex has several angles — {{options}} — and one letter does not say which you mean: "{{detail}}". ' +
-    'Write the angle with three letters, the vertex in the middle — for example "angle {{example}}".',
+    'That vertex has several angles — {{options}} — and one letter does not say which you mean: «{{detail}}». ' +
+    'Write the angle with three letters, the vertex in the middle — for example «angle {{example}}».',
   errAmbiguousAngleArms:
-    'More than two sides meet at that vertex, so it has several angles and one letter does not say which is meant: "{{detail}}". ' +
-    'Write the angle with three letters, the vertex in the middle — for example "angle {{example}}".',
+    'More than two sides meet at that vertex, so it has several angles and one letter does not say which is meant: «{{detail}}». ' +
+    'Write the angle with three letters, the vertex in the middle — for example «angle {{example}}».',
   errDoesNotExist:
     'In this figure {{existing}} does not exist — the givens already fix every point, and there is ' +
-    'no other configuration where it would. "{{detail}}" was not added.',
+    'no other configuration where it would. «{{detail}}» was not added.',
   // #1554 ruling 1 (ADR-AG-198) — the sentence contradicts its own noun; both nouns named, the remedy offered.
   errInscribedContradictsNoun:
-    'A {{shapeEn}} cannot be inscribed in a circle: "{{detail}}". A circle around it would make it a {{forcedEn}}, ' +
-    'and a {{forcedEn}} is not a {{shapeEn}}. If the shape is a {{forcedEn}}, write "{{forcedEn}} ABCD is inscribed in a circle".',
+    'A {{shapeEn}} cannot be inscribed in a circle: «{{detail}}». A circle around it would make it a {{forcedEn}}, ' +
+    'and a {{forcedEn}} is not a {{shapeEn}}. If the shape is a {{forcedEn}}, write «{{forcedEn}} ABCD is inscribed in a circle».',
   errAngleNameTaken: 'Angle {{nameOf}} already has a name: {{holder}}. An angle has one name — keep using {{holder}}.',
   errAngleNameTaken_vs: 'Angle {{nameOf}} already has a name: {{holder}} (in the line «{{declared}}»). An angle has one name — keep using {{holder}}.',
   errLengthNameTaken: 'Segment {{nameOf}} already has a name: {{holder}}. A segment has one name — keep using {{holder}}.',
@@ -932,40 +931,40 @@ const en: typeof he = {
     'The reason: a circle through the four vertices would make a {{shapeEn}} a {{forcedEn}}, and a {{forcedEn}} is not a {{shapeEn}}.',
   errShapeExcluded: 'The figure is already known to be a {{actualEn}}, so it is not called a {{statedEn}}. Remove the earlier given if you meant {{statedEn}}.',
   errPolygonCollapsed:
-    '"{{detail}}" flattens {{polygon}}: together with the earlier givens it forces the vertices onto one line, ' +
-    'and a flat figure is not the {{shapeEn}} that "{{declared}}" declares. "{{detail}}" was not added.',
+    '«{{detail}}» flattens {{polygon}}: together with the earlier givens it forces the vertices onto one line, ' +
+    'and a flat figure is not the {{shapeEn}} that «{{declared}}» declares. «{{detail}}» was not added.',
   errRingContradictsNoun:
-    'The points you gave do not form that shape in this order: "{{detail}}". Reorder the letters so ' +
+    'The points you gave do not form that shape in this order: «{{detail}}». Reorder the letters so ' +
     'the sides do not cross, or move the points — as written the vertices fall on one line or the shape folds over itself.',
   errReservedCoordinate:
-    'The letters x and y name the axes, so they cannot be a point\'s unknown: "{{detail}}". ' +
+    'The letters x and y name the axes, so they cannot be a point\'s unknown: «{{detail}}». ' +
     'Use another letter — for example M(3,t).',
   errCapitalMagnitude:
     'A capital letter is a point\'s name, so {{letter}} cannot mark a size. Sizes are marked with a lowercase letter (r, a, k…), except R for a radius. ' +
-    'Try: "{{corrected}}"',
+    'Try: «{{corrected}}»',
   errBadArity:
-    'The number of vertices does not match the shape named in "{{detail}}" — a triangle has three ' +
+    'The number of vertices does not match the shape named in «{{detail}}» — a triangle has three ' +
     'vertices and a quadrilateral four.',
   errRepeatedVertex:
-    'The same letter appears more than once in "{{detail}}". Each vertex needs its own name.',
+    'The same letter appears more than once in «{{detail}}». Each vertex needs its own name.',
   errDegenerateRole:
-    'A median, an altitude or an angle bisector runs from a vertex to the side OPPOSITE it, and in "{{detail}}" that ' +
+    'A median, an altitude or an angle bisector runs from a vertex to the side OPPOSITE it, and in «{{detail}}» that ' +
     'vertex lies on the side itself (or is its own foot). Write it as, for example, ' +
-    '"AD is the median to side BC".',
+    '«AD is the median to side BC».',
   errApexNotAVertex:
-    'A median, an altitude or an angle bisector starts at a VERTEX of the triangle, and in "{{detail}}" the point ' +
+    'A median, an altitude or an angle bisector starts at a VERTEX of the triangle, and in «{{detail}}» the point ' +
     'written is not one of that triangle’s vertices. Use a vertex of the triangle — for ' +
-    'example "AD is the median in triangle ABC" — or name the side outright.',
+    'example «AD is the median in triangle ABC» — or name the side outright.',
   errLengthXY:
-    'In the analytic tool x and y are the coordinates of the plane, so they cannot name a length in "{{detail}}". ' +
-    'Name the length with another letter, e.g. "AB = 3a" or "AB = 3k".',
+    'In the analytic tool x and y are the coordinates of the plane, so they cannot name a length in «{{detail}}». ' +
+    'Name the length with another letter, e.g. «AB = 3a» or «AB = 3k».',
   errCoordinateRestriction:
-    'In the analytic tool x and y are the coordinates of the plane, not parameters, so the condition in "{{detail}}" restricts the curve itself. ' +
+    'In the analytic tool x and y are the coordinates of the plane, not parameters, so the condition in «{{detail}}» restricts the curve itself. ' +
     'The tool cannot yet draw only part of a curve (e.g. only where x > 0). Write the equation without the condition; ' +
-    'if you meant a parameter, use another letter, e.g. "a > 0".',
+    'if you meant a parameter, use another letter, e.g. «a > 0».',
   errBisectorWrongApex:
-    'An angle bisector starts at the VERTEX of the angle it bisects, and the segment in "{{detail}}" does not. ' +
-    'Start the segment at the angle’s vertex — for example "AD bisects angle BAC".',
+    'An angle bisector starts at the VERTEX of the angle it bisects, and the segment in «{{detail}}» does not. ' +
+    'Start the segment at the angle’s vertex — for example «AD bisects angle BAC».',
   // #2115 (ADR-AG-299) — 2-D's sentences, verbatim.
   errBisectorIsSide: '{{side}} is a side of the triangle, so it cannot bisect angle {{vertex}} — an angle bisector runs from a vertex to the opposite side.',
   errBisectorIsPolygonSide: '{{side}} is a side of {{polygonNoun}}, so it cannot bisect angle {{vertex}}.',
@@ -985,50 +984,50 @@ const en: typeof he = {
   shapeTheNounN10: 'the decagon',
   shapeTheNounPolygon: 'the polygon',
   errAmbiguousCevian:
-    'The vertex or side in "{{detail}}" belongs to more than one triangle in your figure, so it is unclear which side it is drawn to. ' +
-    'Name the side or the triangle — for example "AD is the altitude to side BC" or "AD is the altitude in triangle ABC".',
+    'The vertex or side in «{{detail}}» belongs to more than one triangle in your figure, so it is unclear which side it is drawn to. ' +
+    'Name the side or the triangle — for example «AD is the altitude to side BC» or «AD is the altitude in triangle ABC».',
   errAmbiguousSide:
-    'This shape\'s sides are not all equal, so it is unclear which side you mean: "{{detail}}". ' +
-    'Name the side itself — for example "rectangle ABCD" and then "AB = 4" — or both dimensions, for example "rectangle ABCD 4 by 6".',
+    'This shape\'s sides are not all equal, so it is unclear which side you mean: «{{detail}}». ' +
+    'Name the side itself — for example «rectangle ABCD» and then «AB = 4» — or both dimensions, for example «rectangle ABCD 4 by 6».',
   errPolygonNotSupported:
-    'A polygon with this many sides is built only when it is regular: "{{detail}}". Write it as regular ' +
-    '(for example "regular heptagon ABCDEFG"), or use a pentagon, hexagon or octagon.',
+    'A polygon with this many sides is built only when it is regular: «{{detail}}». Write it as regular ' +
+    '(for example «regular heptagon ABCDEFG»), or use a pentagon, hexagon or octagon.',
   // #2018 (ADR-AG-298) — 2-D's input.roleSideUnresolved, verbatim
   errRoleSideUnresolved:
-    'The figure has no single side matching "{{role}}" — declare the matching triangle first (e.g. "right triangle ABC" for the hypotenuse, ' +
-    '"isosceles triangle ABC" for the base), or name the side by its letters (e.g. "median to side AB").',
+    'The figure has no single side matching «{{role}}» — declare the matching triangle first (e.g. «right triangle ABC» for the hypotenuse, ' +
+    '«isosceles triangle ABC» for the base), or name the side by its letters (e.g. «median to side AB»).',
   roleWordBase: 'base',
   roleWordLeg: 'leg',
   errAmbiguousHypotenuse:
-    'Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: "{{detail}}". ' +
-    'Name the hypotenuse — for example "the median to the hypotenuse AB" — or the right angle, for example "angle C is right".',
+    'Your figure does not say which angle of the triangle is right, so it is unclear which side is the hypotenuse: «{{detail}}». ' +
+    'Name the hypotenuse — for example «the median to the hypotenuse AB» — or the right angle, for example «angle C is right».',
   errCevianNoRightAngle:
-    'In "{{detail}}" there is no right triangle in your figure, so there is no hypotenuse. ' +
-    'State a right angle first, for example "angle C is right", or name the side outright, for example "the median to side AB".',
+    'In «{{detail}}» there is no right triangle in your figure, so there is no hypotenuse. ' +
+    'State a right angle first, for example «angle C is right», or name the side outright, for example «the median to side AB».',
   errCevianNoTriangle:
-    'In "{{detail}}" the vertex or side belongs to no triangle in your figure, so there is no side to draw it to. ' +
-    'Define the triangle first, or name the side outright — for example "AD is the altitude to side BC".',
+    'In «{{detail}}» the vertex or side belongs to no triangle in your figure, so there is no side to draw it to. ' +
+    'Define the triangle first, or name the side outright — for example «AD is the altitude to side BC».',
   errCrossingAlreadyNamed:
-    'Those lines meet at {{holder}}, and that point already has a name. "{{detail}}" would give it a second one. If you meant a different point, check which two lines cross there.',
+    'Those lines meet at {{holder}}, and that point already has a name. «{{detail}}» would give it a second one. If you meant a different point, check which two lines cross there.',
   errThirdCrossing: '{{line}} already crosses {{curve}} at {{a}} and {{b}} — a line has no third crossing with {{aCurve}}.',
   errTangentNoSecondCrossing: "Can't place {{id}}: the line is tangent {{toCurve}} (touches at one point) — there's no second crossing to extend onto.",
   errCrossingAlreadyNamedOperands:
-    'The two things "{{detail}}" crosses meet at {{holder}}, and that point already has a name. The sentence would give it a second one. If you meant a different point, check which of their intersections has no name yet.',
+    'The two things «{{detail}}» crosses meet at {{holder}}, and that point already has a name. The sentence would give it a second one. If you meant a different point, check which of their intersections has no name yet.',
   errSelfCrossing:
-    'The two lines in "{{detail}}" are the same line, and a line has no intersection with itself, so the sentence defines no point. If you meant some point on that line, write for example "P on line AB".',
+    'The two lines in «{{detail}}» are the same line, and a line has no intersection with itself, so the sentence defines no point. If you meant some point on that line, write for example «P on line AB».',
   errLlmBusy:
-    'The service is busy, so I could not check "{{detail}}". Try again in a moment, or write it in one of the forms listed in the commands panel.',
+    'The service is busy, so I could not check «{{detail}}». Try again in a moment, or write it in one of the forms listed in the commands panel.',
   errLlmUnderstood:
-    'I understood "{{detail}}", but the tool does not support this move yet. Try another phrasing, or the commands panel.',
+    'I understood «{{detail}}», but the tool does not support this move yet. Try another phrasing, or the commands panel.',
   errLlmDropped: "I only partly understood — I couldn't place {{labels}}. Rephrase the step (e.g. split it in two).",
   errLlmInvented: 'Building this needs a name for something you did not name — give it a name of your own and try again.',
   errLlmInventedExisting: 'Building this would tie your sentence to {{labels}}, which it does not mention — nothing was recorded. If you meant {{labels}}, say so in the sentence and try again.',
   thinking: 'Working…',
   errBadOperand:
-    'I understood the relation in "{{detail}}", but not one of its sides. Name two vertices (AB), ' +
+    'I understood the relation in «{{detail}}», but not one of its sides. Name two vertices (AB), ' +
     'a side (side AB), a line (line l1) or an axis (the x-axis).',
-  errSideOfVertical: 'A vertical line has no "{{word}}" — try "to the right of" or "to the left of"',
-  errSideOfHorizontal: 'A horizontal line has no "{{word}}" — try "above" or "below"',
+  errSideOfVertical: 'A vertical line has no «{{word}}» — try «to the right of» or «to the left of»',
+  errSideOfHorizontal: 'A horizontal line has no «{{word}}» — try «above» or «below»',
   sideWordAbove: 'above',
   sideWordBelow: 'below',
   sideWordRight: 'to the right of',
@@ -1075,7 +1074,7 @@ const en: typeof he = {
   kindDiagonalMeet: 'the intersection of the diagonals',
   noticeOnlyConfiguration: 'This is the only configuration I found — your givens fix the figure.',
   warnTrapezoidIsParallelogram:
-    'Trapezoid {{shape}} is no longer a trapezoid: with "{{line}}" both pairs of its opposite sides are parallel, so it is a parallelogram (or a rectangle). ' +
+    'Trapezoid {{shape}} is no longer a trapezoid: with «{{line}}» both pairs of its opposite sides are parallel, so it is a parallelogram (or a rectangle). ' +
     'The figure is drawn as your givens fix it. To get a trapezoid back, edit or delete that statement, or untick «Include in the figure».',
   // #1996 (ADR-AG-276, ADR-W-129): the forced-narrowing note — one sentence family, word for word in every builder
   // (`shell/narrowing.ts` narrowingSentence; rows in shell/__tests__/fixtures/narrowing-note-rows.ts).
@@ -1144,7 +1143,7 @@ const en: typeof he = {
       'right-isosceles-triangle': 'a right isosceles triangle is a kind of {{from}}',
     },
   },
-  noticeAlreadyKnown: 'That is already known from what you have written, so I did not add another row: "{{detail}}"',
+  noticeAlreadyKnown: 'That is already known from what you have written, so I did not add another row: «{{detail}}»',
   noticeAngleReadAs: "Read as {{holder}} — the shape's angle at that vertex. For another angle there, write its three letters.",
   noticeNameReadsAs: 'Note: line {{detail}} and line {{holder}} are two different lines — the names read alike, but each one refers to its own line.',
   save: 'Save',
@@ -1156,7 +1155,6 @@ const en: typeof he = {
   questionGiven: 'Given:',
   copied: 'Copied',
   manualTitle: 'The guide — analytic geometry',
-  manualTry: 'Click to try — the example will be built on the figure',
   manualPoints: 'Points',
   manualLines: 'Lines',
   manualCircles: 'Circles',
@@ -1167,16 +1165,16 @@ const en: typeof he = {
   manualParameters: 'Parameters and inequalities',
   loadRestored: 'Figure loaded — {{total}} givens.',
   loadPartial: 'Loaded {{restored}} of {{total}} givens. These could not be read again: {{lines}}',
-  errLoadForeign: 'The file "{{detail}}" belongs to another builder in the suite — open it there.',
-  errLoadNewer: 'The file "{{detail}}" was saved by a newer version of the tool — refresh and try again.',
-  errLoadTooLarge: 'The file "{{detail}}" is too large to open — a figure can hold up to {{max}} statements.',
-  errLoadUnreadable: 'The file "{{detail}}" is not a saved figure.',
+  errLoadForeign: 'The file «{{detail}}» belongs to another builder in the suite — open it there.',
+  errLoadNewer: 'The file «{{detail}}» was saved by a newer version of the tool — refresh and try again.',
+  errLoadTooLarge: 'The file «{{detail}}» is too large to open — a figure can hold up to {{max}} statements.',
+  errLoadUnreadable: 'The file «{{detail}}» is not a saved figure.',
   undo: 'Undo',
   redo: 'Redo',
   noticeAlreadyFollows:
-    'That already follows from what you have written — the figure satisfies it anyway, so I did not add another row: "{{detail}}"',
+    'That already follows from what you have written — the figure satisfies it anyway, so I did not add another row: «{{detail}}»',
   noticeTeachCanonical:
-    'A textbook does not say "{{verb}}" — it states the given itself. I have put the sentence in the input box for you: "{{canonical}}" — press Enter to draw it.',
+    'A textbook does not say «{{verb}}» — it states the given itself. I have put the sentence in the input box for you: «{{canonical}}» — press Enter to draw it.',
   // #1238 (ADR-W-068) — the continue-or-start-fresh offer. The builder still opens EMPTY.
   sessionOffer: 'Unsaved work from your last session was found.',
   sessionContinue: 'Continue where you left off',

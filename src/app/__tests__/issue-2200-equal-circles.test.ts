@@ -149,7 +149,7 @@ describe('#2200 (iii) — a contained pair stated equal is refused from the word
     const he = i18n.getFixedT('he')('input.equalCirclesNested.contained', { detail: line });
     expect(he).toBe(`«${line}»: שני מעגלים שרדיוסיהם שווים אינם יכולים להיות מוכלים זה בזה, כי מעגל שמוכל במעגל אחר קטן ממנו. כתבו רק אחד מהשניים: «מוכלים» או «ברדיוסים שווים».`);
     const en = i18n.getFixedT('en')('input.equalCirclesNested.contained', { detail: 'two contained circles with equal radii' });
-    expect(en).toContain('"two contained circles with equal radii": two circles with equal radii cannot be contained');
+    expect(en).toContain('«two contained circles with equal radii»: two circles with equal radii cannot be contained');
   });
 
   it('each taught next step builds: «שני מעגלים מוכלים» and «שני מעגלים ברדיוסים שווים»', () => {
