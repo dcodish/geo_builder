@@ -30,7 +30,6 @@ const he = {
   viewPolar: 'תצוגה קוטבית',
   language: 'English',
   emptyHint: 'אין עדיין נתונים. נסו את הדוגמה, או הקלידו: z1 = 3+4i',
-  errNotHandled: 'לא הצלחתי להבין את המשפט: «{{detail}}»',
   // #1919 — a script this tool does not read: the operator's two sentences, identical in every builder
   errUnreadName: '«{{detail}}» אינו שם של נקודה. שם נקודה הוא אות לטינית גדולה, אפשר עם ספרה — למשל G או A1.',
   // #1870 (ADR-CX-083, B14) — a claim to prove is refused, in 2-D's words
@@ -273,7 +272,6 @@ const en: typeof he = {
   viewPolar: 'Polar view',
   language: 'עברית',
   emptyHint: 'No givens yet. Try the example, or type: z1 = 3+4i',
-  errNotHandled: 'I could not understand the statement: «{{detail}}»',
   errUnreadName: '«{{detail}}» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.',
   errProofTarget:
     'That is a claim to prove, not a given — this tool draws the givens; it does not check proofs. Type only what the question gives: «{{detail}}»',

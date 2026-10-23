@@ -113,7 +113,8 @@ export function errorText3(t: (k: string, o?: Record<string, unknown>) => string
     case 'dependents-broken':
       return t('err.dependentsBroken', { cause: err.cause, items: err.items });
     case 'not-understood':
-      return t('err.notUnderstood');
+      // #1868 (ADR-W-151) — the one ruled sentence, in every builder: a suite key
+      return t('suite.refusal.notUnderstood');
     case 'bad-file':
       return t('err.badFile');
     case 'newer-schema':

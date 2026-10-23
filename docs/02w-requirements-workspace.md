@@ -325,7 +325,7 @@ Before building anything a student sees in a non-2-D builder, find its row. A ne
 | Note for a choice the tool made | yes | n/a | yes (equal pair, parallel pair, obtuse vertex, axes) | n/a | **Ruled** — ported to analytic (B10, #1864, ADR-AG-267); the analytic kite's pair is #2006 |
 | «הציגו תצורה אחרת» wording | locked | same | same | same | **Same** (ADR-W-098) |
 | Two possible values | «x = ±a» / «x = a או x = b» | same | same | same | **Same** — one spelling, `shell/valueOptions` (B12, W1, #1867, [ADR-634](06-decisions.md#adr-634)). Three or more: no value shown; the student cycles configurations (operator, 2026-10-07) |
-| "Not understood" refusal | «לא הצלחתי לקרוא את זה עדיין — נסו…» | «לא הצלחתי להבין את הנתון…» | «לא הצלחתי להבין את המשפט» | as analytic | **Ruled change** — 2-D's wording everywhere (B13, #1868) |
+| "Not understood" refusal | «לא הבנתי את הבקשה — נסו לנסח אחרת, או פתחו את «מדריך» לדוגמאות.» | same | same | same | **Same** — one suite key, `suite.refusal.notUnderstood`, with no echo of the line (B13, #1868, wording ruled 2026-10-17 on #2329; [ADR-W-151](06w-decisions-workspace.md#adr-w-151)). The ask lane's own "not recognised" texts are a separate kind (#1538) |
 | "The tool's limit, not your mistake" | no | yes | no | no | **Ruled change** — everywhere (B13, #1868) |
 | Student-text check (ADR-W-096) | no | yes | no | no | **Gap** — #1522 (icebox) |
 | Restated fact «כבר נובע…» | yes | yes | yes | no | **Gap** — #1565 |

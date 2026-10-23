@@ -1127,7 +1127,7 @@ the triangle the line names, else the definite noun's (ADR-685's `definiteShapeV
 `ambiguous-definite-shape`), else the angle at X by the one lone-vertex resolver (`ambiguous-angle` for none or
 several; one angle held by a figure triangle → that triangle; held by none → no triangle). Every caller of `parse` gets
 the same answer: the submit seam refuses `guided` (`scope:right-angle-vertex`) with `rightAngleVertexNote`
-(`src/app/unreadParts.ts` — the two lines, `rest` cut by `clausesOf` and numbered from (3); `input.notUnderstood` with no
+(`src/app/unreadParts.ts` — the two lines, `rest` cut by `clausesOf` and numbered from (3); `suite.refusal.notUnderstood` with no
 triangle); the ✎ seam shows the same note; the LLM lane's re-parse drops a model step carrying the phrase; the clause
 readers see a clause that does not read.
 

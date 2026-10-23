@@ -371,7 +371,7 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
     logDebug({ kind: 'input', utterance, locale, source: 'llm', result: out && out.built.length ? 'built-nothing' : 'not-understood' });
     // "produced nothing even after a retry" gets the explicit problem message; pure out-of-grammar
     // (the grammar never matched) keeps the gentler "couldn't read that — try an example".
-    ui.setInputNote(t(weak ? 'input.producedNothing' : 'input.notUnderstood'));
+    ui.setInputNote(t(weak ? 'input.producedNothing' : 'suite.refusal.notUnderstood'));
     ui.setBusy(false);
     return;
   }

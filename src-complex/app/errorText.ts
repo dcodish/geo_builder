@@ -13,7 +13,8 @@ import type { InputError } from '../store/useComplexStore';
 
 /** Every refusal but the reserved constants, which choose between two sentences below. */
 const ERROR_KEY: Record<Exclude<InputError['key'], 'reserved-constant' | 'mixed-number'>, string> = {
-  'not-handled': 'errNotHandled',
+  // #1868 (ADR-W-151) — the one ruled sentence, in every builder, with no echo of the line: a suite key
+  'not-handled': 'suite.refusal.notUnderstood',
   // #1919 — the two ruled sentences for a script this tool does not read, 2-D's wording verbatim
   'unread-name': 'errUnreadName',
   'unread-word': 'errUnreadWord',

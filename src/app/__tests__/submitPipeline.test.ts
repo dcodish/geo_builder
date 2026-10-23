@@ -125,7 +125,7 @@ describe('submit pipeline — LLM second attempt', () => {
     const { deps, notes } = makeDeps();
     await runSubmit('CD חותך את המעגל', deps);
     expect(llmParseMock).toHaveBeenCalledTimes(1);
-    expect(notes()).toEqual(['input.notUnderstood']);
+    expect(notes()).toEqual(['suite.refusal.notUnderstood']);
     expect(useGeoStore.getState().facts.length).toBe(0);
   });
 

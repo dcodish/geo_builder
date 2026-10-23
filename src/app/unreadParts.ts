@@ -74,7 +74,7 @@ const TAUGHT_LINES = 2;
  * reuses an existing message (CLAUDE.md rule 7's P1 exception), never the AI.
  */
 export function rightAngleVertexNote(r: { triangle?: string; angle?: string; rest: string }, utterance?: string): { key: string; params?: Record<string, string> } {
-  if (!r.triangle || !r.angle) return { key: 'input.notUnderstood' };
+  if (!r.triangle || !r.angle) return { key: 'suite.refusal.notUnderstood' };
   // the further parts in the student's own characters (the parser read the normalized line: «∢» → «∠»)
   const raw = utterance === undefined ? null : rightAngledAtVertex(utterance);
   const restText = raw ? raw.rest : r.rest;

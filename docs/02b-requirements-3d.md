@@ -211,7 +211,7 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
 - **FR-SP-23 (Must)** — **A point given with TWO coordinates sends the student to the analytic Builder, in
   2-D's words.** «A(0,0)», «A = (1, 2)», «נקודה A(1,2)», «הנקודה E נמצאת ב-(-1,7)», «A(2;10)» and «A = 3,4»
   are a point in the PLANE, which is the analytic Builder's construct — so the answer is the pointer, not
-  «לא הצלחתי להבין את הנתון», and it is given before any model call: «מיקום נקודה לפי שיעורים נעשה בכלי
+  the not-understood sentence ([ADR-W-151](06w-decisions-workspace.md#adr-w-151)), and it is given before any model call: «מיקום נקודה לפי שיעורים נעשה בכלי
   «גאומטריה אנליטית» …», the same sentence 2-D gives ([FR-SU-5](02w-requirements-workspace.md),
   ADR-W-118 B1). A point with THREE coordinates is this tool's own sentence and is untouched, as are plane
   and line equations. Nothing is added to the figure.

@@ -115,7 +115,7 @@ describe('#1534 — REFUSAL: two different angles are named, never read as one',
     const msg = stripFormatControls(errorText(e, (k, p) => tHe(k, p)));
     expect(msg).toContain(cos);
     expect(msg).toContain(sin);
-    expect(msg).not.toContain('לא הצלחתי להבין');
+    expect(msg).not.toContain('לא הבנתי את הבקשה');
   });
 
   it('an agreeing form is never a mismatch', () => {

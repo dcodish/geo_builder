@@ -32,7 +32,6 @@
     "send": "Add",
     "loading": "Working…",
     "cancel": "cancel",
-    "notUnderstood": "I couldn't read that yet — try one of the examples below.",
     "tooManyParts": "That looks like several instructions in one line. Try adding them one at a time — e.g. the shape first, then each point, then each angle or length. Smaller steps are read far more reliably.",
     "serviceBusy": "The parsing service is busy right now — please try again in a little while.",
     "scope": {

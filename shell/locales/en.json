@@ -27,6 +27,9 @@
     },
     "canvas": {
       "emptyTitle": "What are we building today?"
+    },
+    "refusal": {
+      "notUnderstood": "I didn't understand the request — try rephrasing it, or open «Guide» for examples."
     }
   }
 }

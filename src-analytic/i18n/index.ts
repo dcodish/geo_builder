@@ -177,7 +177,6 @@ const he = {
   // 3-D's name, resolved through THIS product's i18n (see the note above); the rest are `suite.product.*`.
   switcher3d: 'הנדסת המרחב',
   // Refusals name the STATEMENT, never internal state.
-  errNotHandled: 'לא הצלחתי להבין את המשפט: «{{detail}}»',
   errBadEquation: 'לא הצלחתי לקרוא את המשוואה: «{{detail}}»',
   errOutOfScope: 'המשפט מובן, אך אינו נתמך בכלי הזה: «{{detail}}»',
   // #1888 / #1889 (ADR-AG-251) — 2-D's text (`input.scope.split-statements`, `right-angle-vertex`), ADR-W-118 B1
@@ -785,7 +784,6 @@ const en: typeof he = {
   switcherLabel: 'Choose a tool',
   switcherMore: 'More',
   switcher3d: 'Solid Geometry',
-  errNotHandled: 'I could not understand the statement: «{{detail}}»',
   errBadEquation: 'I could not read the equation: «{{detail}}»',
   errOutOfScope: 'Understood, but not supported in this tool: «{{detail}}»',
   errSplitStatements: 'One given per line — that way the tool can build and verify each one separately. We spotted two givens here; try entering them as two steps: {{all}}',
