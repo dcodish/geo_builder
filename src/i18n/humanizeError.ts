@@ -27,8 +27,8 @@
  */
 
 import { formatMeasure } from '@/format';
-import { hasEngineToken } from '../../shell/studentText';
-import { parseEngineError, type EngineError } from '@/engine/errors';
+import { hasEngineToken, labelsIn, numbersIn, type StudentVocabulary } from '../../shell/studentText';
+import { PARAM_KINDS, parseEngineError, type EngineError, type ParamKind } from '@/engine/errors';
 import type { CircleRef } from '@/engine';
 import { circleTokenResolver, wordCircleSlots, type CircleRefs } from './circleText';
 
@@ -467,10 +467,11 @@ export interface Humanized {
  * Translate a raw engine error to a student-facing message. `said` is the student's refused sentence;
  * `other` (#943 half B) the earlier statement it conflicts with, when the fold could name one — both are
  * arguments, never looked up here (ADR-228 Am.6). Returns the text only; {@link humanizeErrorOutcome} says
- * whether it is the floor.
+ * whether it is the floor. `vocab` (#2201 phase 3b) is the figure's — what the student can see and typed
+ * (`app/studentVocabulary`); with it every shown value is checked by provenance, without it the text is phase 3a's.
  */
-export function humanizeError(raw: string | null | undefined, t: Translate, said?: string, other?: string, circles?: CircleResolver): string {
-  return humanizeErrorOutcome(raw, t, said, other, circles).text;
+export function humanizeError(raw: string | null | undefined, t: Translate, said?: string, other?: string, circles?: CircleResolver, vocab?: StudentVocabulary): string {
+  return humanizeErrorOutcome(raw, t, said, other, circles, vocab).text;
 }
 
 /**
@@ -478,18 +479,31 @@ export function humanizeError(raw: string | null | undefined, t: Translate, said
  * «אפשר לנסות סדר אחר…» hint (ADR-228 Am.6) — except after the floor sentence, which already gives its own
  * next step and is ruled as the whole message. Both the banner and the submit pipeline render through this.
  */
-export function explainError(raw: string | null | undefined, t: Translate, said?: string, other?: string, circles?: CircleResolver): string {
-  const { text, floor, nextStep } = humanizeErrorOutcome(raw, t, said, other, circles);
+export function explainError(raw: string | null | undefined, t: Translate, said?: string, other?: string, circles?: CircleResolver, vocab?: StudentVocabulary): string {
+  const { text, floor, nextStep } = humanizeErrorOutcome(raw, t, said, other, circles, vocab);
   return text && !floor && !nextStep ? `${text} ${t('errors.retryHint')}` : text;
 }
 
 /** {@link humanizeError}, reporting whether the result is the floor sentence (#2028). */
-export function humanizeErrorOutcome(raw: string | null | undefined, t: Translate, said?: string, other?: string, circles: CircleResolver = NO_CIRCLES): Humanized {
+export function humanizeErrorOutcome(raw: string | null | undefined, t: Translate, said?: string, other?: string, circles: CircleResolver = NO_CIRCLES, vocab?: StudentVocabulary): Humanized {
   if (!raw) return { text: '', floor: false };
   const floor: Humanized = { text: t('errors.floor'), floor: true };
   // Parse the RAW wire into its variant (phase 3a): the engine's own inverse, over its own text — no regex here.
-  const worded = wordingOf(parseEngineError(raw));
+  const e = parseEngineError(raw);
+  let worded = wordingOf(e);
   if (!worded) return floor;
+  // #2201 phase 3b (ADR-W-130 Am. 1): with the figure's vocabulary, every value the message would SHOW is checked by
+  // provenance — the floor, or (c′) the missing point names in place of the engine's arithmetic.
+  if (vocab) {
+    const checked = provenance(e, worded, vocab, t, said, other);
+    if (!checked) return floor;
+    worded = checked;
+  }
+  return render(worded, t, said, other, circles) ?? floor;
+}
+
+/** A wording with its params, rendered: the frame the student's sentences pick, or `null` when a value carries an engine token. */
+function render(worded: Worded, t: Translate, said: string | undefined, other: string | undefined, circles: CircleResolver): Humanized | null {
   const w: Wording = WORDINGS[worded.wording];
   // Then sanitize each VALUE (#200): every extracted param (`circle: circle-O`) becomes the student's letter, and a
   // token sanitizeIds does not know sends the message to the floor (#2028).
@@ -499,7 +513,7 @@ export function humanizeErrorOutcome(raw: string | null | undefined, t: Translat
   // that still carries an engine token — an anonymous touch point `@f-AB`, a `kind-Id` sanitizeIds does not
   // know — cannot be shown, so the ruled frame around it cannot be either.
   const engineValues = [...Object.values(params ?? {}), ...Object.values(nested ?? {}).flatMap((n) => Object.values(n.letters ?? {}))];
-  if (engineValues.some(hasEngineToken)) return floor;
+  if (engineValues.some(hasEngineToken)) return null;
   // Translate the constraint vocabulary AFTER parsing, never before: the engine's own sentences key on the very
   // same English words («collinear points must be distinct …»). Every param goes through the pass — it only touches
   // known fragment words, so a non-fragment param (a circle letter, an id) is untouched.
@@ -528,7 +542,99 @@ export function humanizeErrorOutcome(raw: string | null | undefined, t: Translat
   if (w.namesOther && sub && oth) return done(t(`${key}_said_vs`, { ...translated, said: sub, other: oth }));
   if (w.namesOtherLine && oth) return done(t(`${key}_vs`, { ...translated, other: oth }));
   if (w.saysSubject && sub) return done(t(`${key}_said`, { ...translated, said: sub }));
-  // #2028 (ADR-W-130): no variant with a ruled sentence — the floor, never the engine's English and never a partial
-  // translation of it, which spliced Hebrew vocabulary into an English sentence («cannot place point על הקטע»).
   return done(t(key, translated));
+}
+
+// ── #2201 phase 3b: provenance at the switch ──────────────────────────────────────────────────────────────────────
+const SENTINEL = /(\d+)/g;
+const FORMAT_CONTROLS = /[⁦-⁩‎‏]/g;
+const COEFFICIENT = /(\d+(?:\.\d+)?)·/g;
+
+/**
+ * The fields of `e` the chosen frame actually SHOWS. Each value of a field the check judges is replaced by a sentinel,
+ * the variant is worded again (the same arm, the same params) and rendered with the REAL key and frame; a field whose
+ * sentinel reaches the text is shown. A field the frame drops (`muted-row-owns`' point list, the `_said_vs` frame's
+ * fragment of a collapsed polygon) is never judged: the student does not read it.
+ */
+function shownFields(e: EngineError, worded: Worded, t: Translate, said: string | undefined, other: string | undefined): Set<string> {
+  const kinds = PARAM_KINDS[e.code] as Record<string, ParamKind>;
+  const owner: string[] = [];
+  const mark = (field: string) => `${owner.push(field) - 1}`;
+  const marked: Record<string, unknown> = { ...e };
+  for (const [f, k] of Object.entries(kinds)) {
+    const v = (e as unknown as Record<string, unknown>)[f];
+    if (v === undefined || k === 'key') continue;
+    marked[f] = Array.isArray(v) ? v.map(() => mark(f)) : typeof v === 'string' ? mark(f) : v;
+  }
+  const again = wordingOf(marked as unknown as EngineError);
+  const out = new Set<string>();
+  if (!again) return out;
+  const text = render({ ...again, key: worded.key, wording: worded.wording }, t, said, other, NO_CIRCLES)?.text ?? '';
+  for (const m of text.replace(FORMAT_CONTROLS, '').matchAll(SENTINEL)) out.add(owner[Number(m[1])]);
+  return out;
+}
+
+/**
+ * THE PROVENANCE CHECK (ADR-W-130 Am. 1). Every value the message shows is judged by where it came from, never by its
+ * shape alone:
+ *   (a) an `id` names an object the student can see under that name, or a label they typed — a hidden scaffold
+ *       (`tanaux-…`) or a minted point nobody typed or saw (#2151's T) fails, and so does an id whose letters are not a
+ *       name (a mint suffix, «O-2», #2461); a declared circle slot passes when the circle is drawn (it is worded by role);
+ *   (b) a `composite` angle with a repeated vertex («∠AAB») passes only if the student's sentences contain it (#2345);
+ *   (c) a `fragment`'s coefficients («0.5·», «1·») must be numbers the sentences spell, and its labels drawn or typed.
+ * (b) and (c) judge only when a sentence is known. A failure is the floor (`null`) — except (c′), the operator's d20
+ * ruling (2026-10-23, answer A): the unknown-point sentence is TRUE about the figure, so it keeps its frame and the
+ * bracket names the missing point(s) instead of the engine's arithmetic, each one a label the student typed.
+ */
+function provenance(e: EngineError, worded: Worded, vocab: StudentVocabulary, t: Translate, said: string | undefined, other: string | undefined): Worded | null {
+  const sentences = [said, other].filter((x): x is string => !!x?.trim()).join(' ');
+  const typedLabels = new Set(labelsIn(`${vocab.typed} ${sentences}`));
+  const names = new Set(vocab.names);
+  const shown = new Set(vocab.shownIds ?? []);
+  const hidden = new Set(vocab.hiddenIds ?? []);
+  const spelled = new Set(numbersIn(sentences));
+  const w: Wording = WORDINGS[worded.wording];
+  const kinds = PARAM_KINDS[e.code] as Record<string, ParamKind>;
+  const fields = e as unknown as Record<string, unknown>;
+  const idOk = (v: string, circleSlot: boolean): boolean => {
+    if (hidden.has(v)) return false;
+    if (circleSlot && shown.has(v)) return true;
+    const d = sanitizeIds(v);
+    return names.has(d) || typedLabels.has(d);
+  };
+  const failed: { field: string; check: 'a' | 'b' | 'c' }[] = [];
+  for (const f of shownFields(e, worded, t, said, other)) {
+    const v = fields[f];
+    const values = (Array.isArray(v) ? v : [v]).filter((x): x is string => typeof x === 'string');
+    switch (kinds[f]) {
+      case 'id':
+      case 'ids':
+        if (values.some((x) => !idOk(x, !!w.circleParams?.includes(f)))) failed.push({ field: f, check: 'a' });
+        break;
+      case 'composite':
+        if (!sentences) break;
+        for (const x of values) {
+          const ls = labelsIn(x);
+          if (x.includes('∠') && ls.length === 3 && (ls[0] === ls[1] || ls[1] === ls[2]) && !sentences.includes(ls.join(''))) failed.push({ field: f, check: 'b' });
+        }
+        break;
+      case 'fragment':
+        if (!sentences) break;
+        for (const x of values) {
+          const untypedCoefficient = [...x.matchAll(COEFFICIENT)].some((m) => !spelled.has(m[1]));
+          const unseenLabel = labelsIn(sanitizeIds(x)).some((l) => !names.has(l) && !typedLabels.has(l));
+          if (untypedCoefficient || unseenLabel) failed.push({ field: f, check: 'c' });
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  if (!failed.length) return worded;
+  // (c′) the unknown-point frame is a true sentence: keep it, and name the missing points (each typed by the student)
+  if (e.code === 'unknown-point' && failed.every((x) => x.check === 'c')) {
+    const missing = [...new Set(labelsIn(sanitizeIds(e.what)).filter((l) => !names.has(l)))];
+    if (missing.length && missing.every((l) => typedLabels.has(l))) return { ...worded, params: { what: missing.join(', ') } };
+  }
+  return null;
 }

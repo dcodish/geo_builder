@@ -90,10 +90,10 @@ import { runEditCommit, runSetGroupEnabled } from '@/app/editPipeline';
 import { subscribeFigureNotes } from '@/app/figureNotes';
 import { anonPointDescriptor, visibleCoincidences } from '@/render/pointDescriptions';
 import { valueRowText } from '@/render/valueRowText';
-import { circleResolver, explainError as explainRefusal } from '@/i18n/humanizeError';
 import { offArcNoticeText, violationText } from '@/i18n/violationText';
 import { circleMenuTitle } from '@/i18n/circleText';
 import { otherUtteranceForError, utteranceForError } from '@/app/errorSubject';
+import { figureExplainer } from '@/app/studentVocabulary';
 /**
  * Resolve AFTER the browser has had a chance to paint. A just-set React state (e.g. a "thinking"
  * spinner) is only committed to the DOM on the next frame; a blocking SYNCHRONOUS solve started in
@@ -126,8 +126,10 @@ export default function App() {
   // sentence — one function the banner, the row tooltip and the submit pipeline all render through.
   // #2305 (ADR-755): a refusal's circle slots are worded through the displayed figure's `circleRefs` (`displayCircleRefs`,
   // below) — the inner circle of a concentric pair reads «המעגל הפנימי», never «O-2».
+  // #2201 phase 3b (ADR-W-130 Am. 1): and every value it shows is checked by provenance against what the student can see
+  // and typed (`figureVocabulary` of the displayed figure) — a scaffold, a minted point or the tool's arithmetic never shows.
   const explainError = (raw: string | null | undefined, said?: string, other?: string): string =>
-    explainRefusal(raw, t, said, other, circleResolver(displayCircleRefs));
+    figureExplainer(t, construction, facts)(raw, said, other);
   const facts = useGeoStore((s) => s.facts);
   const selectedId = useGeoStore((s) => s.selectedId);
   const removeGroup = useGeoStore((s) => s.removeGroup);

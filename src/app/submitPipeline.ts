@@ -48,6 +48,8 @@ import { type DecideLog, type DecideNote, type Verdict2D, decideFromParse, decid
 import { unreadItems } from './honestyGates';
 import { logDebug } from '@/debug/sessionLog';
 import { otherUtteranceForError } from './errorSubject';
+import { renderNote } from './renderNote';
+import { studentVocabulary } from './studentVocabulary';
 import { splitSentences, submitSentences, type SentenceOutcome } from '../../shell/sentences';
 
 export interface SubmitUi {
@@ -177,19 +179,19 @@ async function runSentence(utterance: string, deps: SubmitDeps): Promise<void> {
    * with the decision now.
    */
   const log = (e: DecideLog) => logDebug({ kind: 'input', utterance, locale, ...e });
-  const resolveParams = (p?: Record<string, unknown>) =>
-    p &&
-    Object.fromEntries(
-      Object.entries(p).map(([k, v]) => [k, v && typeof v === 'object' && 't' in v ? t((v as { t: string }).t) : v]),
-    );
   // #1849 (ADR-602): a refusal at the door names the OTHER side too, when the fold could name one. The dry run's
   // status carries the same `[vs #i]` tail the banner resolves (ADR-508), indexed into the committed facts the
   // trial array shares — so the note says «AC = 8» סותר את «משולש ABC» instead of «AC = 8» against "an earlier given".
   // #2173 (ADR-726): a step's second tip (`also`) is shown after the first, on the same line.
+  // #2201 phase 3b (ADR-W-130 Am. 1): one rendering for both kinds of note (`renderNote`), and the key note's params
+  // pass the same provenance check as a refusal's values, against the figure the student is looking at.
   const noteText = (n: DecideNote): string =>
-    'explain' in n
-      ? deps.explainError(n.explain, utterance, otherUtteranceForError(store().facts, n.explain))
-      : n.also ? `${t(n.key, resolveParams(n.params))} ${noteText(n.also)}` : t(n.key, resolveParams(n.params));
+    renderNote(n, {
+      t,
+      said: utterance,
+      explain: (raw) => deps.explainError(raw, utterance, otherUtteranceForError(store().facts, raw)),
+      vocab: studentVocabulary(deps.view().construction, [...store().facts.filter((f) => f.enabled).map((f) => f.utterance), utterance]),
+    });
 
   const pre = decidePreParse(utterance, deps.view(), deps.centresShown?.());
   if (pre?.kind === 'store-op') {

@@ -952,7 +952,7 @@ export async function decideFromParse(
         return refuse(
           'conflict',
           { source: 'parser', result: `self-conflict:${redefined}`, detail: outcome.detail, commands: r.commands },
-          { key: 'input.sentenceSelfConflict', params: { sentence: utterance.trim(), id: redefined.replace(/^[a-z]+-(?=[A-Z])/, '') } }, // 'poly-ABCD' → ABCD
+          { key: 'input.sentenceSelfConflict', params: { sentence: utterance.trim(), id: redefined } }, // 'poly-ABCD': `renderNote` names it ABCD (#2201 3b)
         );
       }
       if (outcome.reason === 'error') {

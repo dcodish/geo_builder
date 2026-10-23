@@ -81,7 +81,11 @@ not yet; "Withdrawn" = out of scope, with the reason and new owner named.
   «משהו השתבש בבניית השורה הזאת. נסו לנסח אותה אחרת, או לפרק אותה לשני צעדים.» ("Something went wrong building
   this line. Try wording it differently, or split it into two steps."), alone, without the retry hint; so does a
   message whose explanation would name something the tool made up. Engine text is never shown raw in English and
-  never spliced into a mixed-language line (operator ruling 2026-10-13).
+  never spliced into a mixed-language line (operator ruling 2026-10-13). A value the tool MADE never shows — a hidden
+  helper object, a point it minted that the student neither typed nor sees, an angle it derived, its own arithmetic
+  («1·R», «0.5·|DB|»): such a message reads the floor sentence, except a true sentence about a point that is not
+  defined yet, which keeps its words and names the missing point(s) instead («…שעדיין לא הוגדרה (R)…», operator
+  ruling 2026-10-23, d20 A; [ADR-W-130](06w-decisions-workspace.md#adr-w-130) Am. 1).
   A refusal names the student's statement and gives one next step, or says plainly there is none (operator
   rulings 2026-10-13, 2026-10-15) — a new sentence as much as a rewritten one.
   - Sources: [ADR-W-096](06w-decisions-workspace.md#adr-w-096), #1522, [ADR-W-130](06w-decisions-workspace.md#adr-w-130), #2028, [ADR-W-154](06w-decisions-workspace.md#adr-w-154), #1995.
