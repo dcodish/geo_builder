@@ -2142,3 +2142,7 @@ over all four (ADR-041).
 ### `tangency-kind-contradiction-refused-2339` — «מעגל O» · «מעגל P» · «המעגלים O ו-P משיקים מבפנים», then «… משיקים מבחוץ» is refused before commit (#2339, ADR-743)
 
 **Guards against:** a contradicting tangency kind committed green with only the ⚠ panel objecting (operator, round #2291 T10: *"the first error tells the story - the last input contradicts the prior one."*). **Asserts** the fourth line is refused by the engine before commit (`over-constrained`), the internal tangency stands and the figure is green.
+
+### `concentric-circle-names-sentences-2305` — the #2264 pair: a refusal, the menu titles and a crossing step name each circle by its role (#2305, ADR-755)
+
+**Guards against:** a sentence about one of a concentric pair spelling the circle's id or its sibling's letter — «לא ניתן לצייר משיק במרכז המעגל O-2.», «⊙ O-2», a clicked crossing of the inner circle recorded as «K = חיתוך מעגל O ו-AB» (the outer circle's name). **Asserts** the operator's three #2264 lines build green; «משיק למעגל הפנימי בנקודה O» is refused «לא ניתן לצייר משיק במרכז המעגל הפנימי.»; the menu titles read «⊙ המעגל החיצוני» / «⊙ המעגל הפנימי»; the inner circle's crossing with a diameter AB is recorded «K = חיתוך המעגל הפנימי ו-AB». The class matrix (every template with a circle slot, three spellings, both locales, the crossing round-trip) is `src/__tests__/issue-2305-circle-names-every-surface.test.ts`; the byte-identity golden for every other circle is `src/i18n/__tests__/circle-text-golden-2305.test.ts`.

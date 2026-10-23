@@ -232,6 +232,12 @@ Seams recorded against the layout:
   through `circleRef` (ADR-552, #1442) — drawn circles only, a visible centre by its letter, an unnamed one as
   "the circle" or its ADR-342 token; two drawn circles on one centre, ordered by `innerOf`, by their role
   (`via: 'role'`, ADR-714, #2264); `render/valueRowText` words every row label.
+- **A circle in a sentence (ADR-755, #2305)** is worded by `src/i18n/circleText.ts`, `circleRef`'s twin for text: a
+  template's circle slot takes a noun phrase (`{{circle}}` «מעגל O», `{{circleThe}}` «המעגל O», `{{circleTo}}` «למעגל O»,
+  `{{circlePair}}` «המעגלים O ו-P»), a role reads «המעגל הפנימי», and every other circle keeps its letter. Circle slots
+  carry IDS to the display: `GivenViolation.circleSlots` (rendered by `i18n/violationText`), a `humanizeError`
+  pattern's declared `circleParams` (resolved by the figure's `circleResolver`), the menu title (`circleMenuTitle`);
+  `inkCrossings.crossingUtterance` reads `circleRef` itself (the parser's canonical «המעגל הפנימי»).
 - **The clarification family (ADR-490, ADR-494).** A rule may return a `Clarify`, which `refusalOf` maps to a
   refusal reason of the same name and `submitPipeline` renders as a note that keeps the text; `not-handled` is the
   escalation seam. `isAmbiguityQuestion` is the explicit whitelist `parseResolved` may not turn back into an

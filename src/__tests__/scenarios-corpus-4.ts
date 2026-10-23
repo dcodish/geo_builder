@@ -41,7 +41,7 @@
 
 import { expect } from 'vitest';
 import { replay } from '@/store/geoStore';
-import { isGeoPoint, freeDofCount, detectRelations, detectShapes, ringSimple } from '@/engine';
+import { isGeoPoint, freeDofCount, detectRelations, detectShapes, ringSimple, circleRefs, crossingUtterance } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 
 import type { Scenario } from './scenarios-harness';
@@ -49,7 +49,8 @@ import { at, dist, angle, allStepsOk, convexQuad, factsOf } from './scenarios-ha
 import { ctxOf } from './scenario-pipeline';
 import { gateVerdict } from './submit-gate';
 import i18n from '@/i18n';
-import { humanizeError } from '@/i18n/humanizeError';
+import { circleResolver, humanizeError } from '@/i18n/humanizeError';
+import { circleMenuTitle } from '@/i18n/circleText';
 import { otherUtteranceForError } from '@/app/errorSubject';
 import { latinAngleLetters, latinProseLabels, parse } from '@/parser';
 import { COLLINEAR_CIRCLE_VS } from '@/engine/cyclicFeasibility';
@@ -5644,6 +5645,28 @@ export const SCENARIOS_4: Scenario[] = [
       expect(v.kind === 'refused' && v.reason, 'refused by the engine, before commit').toBe('error');
       const [a, b] = [...fig.circles.values()];
       expect(Math.abs(dist(a.center, b.center) - Math.abs(a.r - b.r)), 'the internal tangency stands').toBeLessThan(1e-4);
+    },
+  },
+  {
+    id: 'concentric-circle-names-sentences-2305',
+    title: "The #2264 pair (radii 10 and 9): «משיק למעגל הפנימי בנקודה O» is refused naming «המעגל הפנימי», never «O-2»; the pair's menu titles and a crossing step name each circle by its role (#2305, ADR-755)",
+    guards:
+      "#2305 (P3), the operator's #2264 ruling A (2026-10-16): two circles that share a centre are named by their role, applied to every sentence that names a circle. Measured at 8784daef through decideDeterministic2D: the tangent refused «לא ניתן לצייר משיק במרכז המעגל O-2.», the context-menu titles read «⊙ O» / «⊙ O-2», and a clicked crossing of the inner circle with AB was recorded as «K = חיתוך מעגל O ו-AB» (the OUTER circle's name). Root cause: each of those sentences spelled the circle's name from its id or its centre letter instead of through the naming seam circleRefs. Fix (ADR-755): one wording function, src/i18n/circleText.ts, behind every circle slot (verifier lines, notices, refusals, menu title); crossingUtterance reads circleRefs. Asserts the three lines build green, the refusal names the inner circle by role with no id suffix, the titles, and the crossing step. The class test is src/__tests__/issue-2305-circle-names-every-surface.test.ts.",
+    steps: ['שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל חיצוני הוא 10', 'רדיוס מעגל פנימי 9'],
+    check(fig) {
+      allStepsOk(fig);
+      const he = i18n.getFixedT('he');
+      const facts = factsOf(['שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל חיצוני הוא 10', 'רדיוס מעגל פנימי 9']);
+      const refs = circleRefs(replay(facts).construction);
+      const line = 'משיק למעגל הפנימי בנקודה O';
+      const v = gateVerdict(facts, line);
+      expect(v.kind, JSON.stringify(v)).toBe('refused');
+      const raw = (v as { detail?: string }).detail;
+      const text = stripFormatControls(humanizeError(raw, he as never, line, undefined, circleResolver(refs)));
+      expect(text).toBe('לא ניתן לצייר משיק במרכז המעגל הפנימי.');
+      expect([circleMenuTitle('circle-O', refs, he as never), circleMenuTitle('circle-O-2', refs, he as never)]).toEqual(['⊙ המעגל החיצוני', '⊙ המעגל הפנימי']);
+      const withDiameter = replay(factsOf(['שני מעגלים בעלי מרכז משותף O', 'רדיוס מעגל חיצוני הוא 10', 'רדיוס מעגל פנימי 9', 'קוטר AB במעגל החיצוני'])).construction;
+      expect(crossingUtterance({ circle1: 'circle-O-2', c: 'A', d: 'B' } as never, 'K', 'he', withDiameter)).toBe('K = חיתוך המעגל הפנימי ו-AB');
     },
   },
 ];

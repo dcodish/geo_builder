@@ -34,7 +34,7 @@ import { freeDofs, freeDofCount, isGeoPoint, unstatedChoices } from '@/engine';
 import { unstatedChoiceText } from '@/ui/unstatedChoice';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, stepLabel } from '@/parser';
 import { Figure } from '@/render';
-import { crossingCommands, crossingUtterance } from '@/engine';
+import { circleRefs, crossingCommands, crossingUtterance } from '@/engine';
 import { independentConstructs } from '@/app/independence';
 import type { Crossing } from '@/engine';
 import { MathText, hasMath } from '../shell/math';
@@ -90,7 +90,9 @@ import { runEditCommit, runSetGroupEnabled } from '@/app/editPipeline';
 import { subscribeFigureNotes } from '@/app/figureNotes';
 import { anonPointDescriptor, visibleCoincidences } from '@/render/pointDescriptions';
 import { valueRowText } from '@/render/valueRowText';
-import { explainError as explainRefusal, translateParams } from '@/i18n/humanizeError';
+import { circleResolver, explainError as explainRefusal } from '@/i18n/humanizeError';
+import { offArcNoticeText, violationText } from '@/i18n/violationText';
+import { circleMenuTitle } from '@/i18n/circleText';
 import { otherUtteranceForError, utteranceForError } from '@/app/errorSubject';
 /**
  * Resolve AFTER the browser has had a chance to paint. A just-set React state (e.g. a "thinking"
@@ -122,7 +124,10 @@ export default function App() {
   // the submit path, which has no fact yet, keeps calling with one argument.
   // #2028 (ADR-W-130): the hint is decided in `explainError` (humanizeError.ts), which leaves it off the floor
   // sentence — one function the banner, the row tooltip and the submit pipeline all render through.
-  const explainError = (raw: string | null | undefined, said?: string, other?: string): string => explainRefusal(raw, t, said, other);
+  // #2305 (ADR-755): a refusal's circle slots are worded through the displayed figure's `circleRefs` (`displayCircleRefs`,
+  // below) — the inner circle of a concentric pair reads «המעגל הפנימי», never «O-2».
+  const explainError = (raw: string | null | undefined, said?: string, other?: string): string =>
+    explainRefusal(raw, t, said, other, circleResolver(displayCircleRefs));
   const facts = useGeoStore((s) => s.facts);
   const selectedId = useGeoStore((s) => s.selectedId);
   const removeGroup = useGeoStore((s) => s.removeGroup);
@@ -802,6 +807,8 @@ export default function App() {
   // GEOMETRY from the displayable state; STATUS/ERROR from the real current state (the step list and the
   // error banner must tell the truth about what just happened).
   const { construction, positions, circles, labels: builtLabels, angleMarks, violations, coincidences, forcedOffArc, degeneracies } = display;
+  /** #2305 (ADR-755): how every sentence names a circle of the displayed figure (`circleRefs` → `circleText`). */
+  const displayCircleRefs = useMemo(() => circleRefs(construction), [construction]);
   /**
    * #948 ([ADR-W-047](docs/06w-decisions-workspace.md#adr-w-047)) — the PARAMETER DISPLAY chips.
    *
@@ -1324,7 +1331,7 @@ export default function App() {
             }}
             hiddenCircles={hiddenCircleSet}
             onToggleCircleHidden={toggleCircleHidden}
-            circleMenuText={{ hide: t('segMenu.hide'), show: t('segMenu.show') }}
+            circleMenuText={{ hide: t('segMenu.hide'), show: t('segMenu.show'), title: (id: string) => circleMenuTitle(id, displayCircleRefs, t) }}
             toolbarText={{
               rotate90: t('canvas.rotate90'),
               rotate180: t('canvas.rotate180'),
@@ -1520,7 +1527,7 @@ export default function App() {
               {/* ADR-423 tier 3 (#433): the departure is FORCED by the construction, so this states a
                   fact rather than reporting an error — the amber `figure.v.pointOffArc` violation stays
                   the channel for a point that merely happens to be driven off the ink. */}
-              ⓘ {forcedOffArc.map((f) => t('figure.offArcNotice', { point: f.point, circle: f.circle.replace(/^circle-/, '') })).join(' ')}
+              ⓘ {forcedOffArc.map((f) => offArcNoticeText(f, t, displayCircleRefs)).join(' ')}
             </div>
           )}
 
@@ -1549,7 +1556,8 @@ export default function App() {
                   // The verifier's `figure.v.constraint` embeds a `describeConstraint` fragment in its
                   // `desc` param, so it needs the same vocabulary pass as the error banner (#413) —
                   // otherwise an amber notice says «… collinear אינו מתקיים בציור».
-                  <li key={`${v.relation}-${v.ids.join('-')}`}>{t(v.messageKey, translateParams(v.params, t))}</li>
+                  // #2305 (ADR-755): and its circle slots are worded through `circleRefs` (`violationText`).
+                  <li key={`${v.relation}-${v.ids.join('-')}`}>{violationText(v, t, displayCircleRefs)}</li>
                 ))}
               </ul>
             </div>

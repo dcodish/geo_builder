@@ -29,6 +29,17 @@
 import { formatMeasure } from '@/format';
 import { hasEngineToken } from '../../shell/studentText';
 import { TANGENTS_EXHAUSTED } from '@/engine/radiusFeasibility';
+import type { CircleRef } from '@/engine';
+import { circleTokenResolver, wordCircleSlots, type CircleRefs } from './circleText';
+
+/**
+ * #2305 ([ADR-755](../../docs/06-decisions.md#adr-755)): a circle's TEXT TOKEN (its id, or the letters {@link sanitizeIds}
+ * leaves of it) → its reference, so a circle slot is worded through `circleText`. Absent ⇒ every circle keeps its letter.
+ */
+export type CircleResolver = (token: string) => CircleRef | undefined;
+const NO_CIRCLES: CircleResolver = () => undefined;
+/** The resolver for a figure's `circleRefs` — what a caller holding the construction passes to {@link explainError}. */
+export const circleResolver = (refs: CircleRefs | undefined): CircleResolver => circleTokenResolver(refs, sanitizeIds);
 
 /**
  * #197 Am. 8 — THE tangents-exhausted sentence for a pair's mutual position and the asked kind (disjoint 4, externally
@@ -89,7 +100,8 @@ export function sanitizeIds(s: string): string {
  * Longest-first: `coincides with its constructed target` must be tried before `coincides with`.
  *
  * An entry may name the PARAMS its capture groups fill (#2112, ADR-698): `radius(O)` → «רדיוס מעגל O», the circle's
- * letter interpolated into the word, since Hebrew puts the noun phrase around it.
+ * letter interpolated into the word, since Hebrew puts the noun phrase around it. Since #2305 (ADR-755) every such param
+ * is a CIRCLE SLOT, worded through `circleText` («רדיוס המעגל הפנימי» for one of a concentric pair).
  */
 const DESC_WORDS: [RegExp, string, string[]?][] = [
   [/\bradius\(([^()]+)\)/g, 'errors.desc.radiusOf', ['circle']],
@@ -110,15 +122,16 @@ const DESC_WORDS: [RegExp, string, string[]?][] = [
  * and the same #413 property holds: no English word survives (`humanize-error.test.ts`). Longest-first
  * where one phrase could begin another.
  */
-const STATEMENT_WORDS: [RegExp, string][] = [
-  [/\bis the centre of circle\b/g, 'errors.stmt.centreOfCircle'],
+const STATEMENT_WORDS: [RegExp, string, string[]?][] = [
+  // #2305 (ADR-755): a circle statement captures the circle's token as a CIRCLE SLOT — «על המעגל הפנימי», not «על המעגל O-2».
+  [/\bis the centre of circle (\S+)/g, 'errors.stmt.centreOfCircle', ['circle']],
   [/\bis the midpoint of\b/g, 'errors.stmt.midpointOf'],
   [/\bis a vertex of\b/g, 'errors.stmt.vertexOf'],
   [/\bon different sides of\b/g, 'errors.stmt.differentSidesOf'],
   [/\bon the same side of\b/g, 'errors.stmt.sameSideOf'],
-  [/\boutside circle\b/g, 'errors.stmt.outsideCircle'],
-  [/\binside circle\b/g, 'errors.stmt.insideCircle'],
-  [/\bon circle\b/g, 'errors.stmt.onCircle'],
+  [/\boutside circle (\S+)/g, 'errors.stmt.outsideCircle', ['circle']],
+  [/\binside circle (\S+)/g, 'errors.stmt.insideCircle', ['circle']],
+  [/\bon circle (\S+)/g, 'errors.stmt.onCircle', ['circle']],
   [/\boutside triangle\b/g, 'errors.stmt.outsideTriangle'],
   [/\binside triangle\b/g, 'errors.stmt.insideTriangle'],
   [/\boutside polygon\b/g, 'errors.stmt.outsidePolygon'],
@@ -127,12 +140,19 @@ const STATEMENT_WORDS: [RegExp, string][] = [
   [/\bon line\b/g, 'errors.stmt.onLine'],
 ];
 
-/** Replace every English word of the constraint (and side-statement) vocabulary with its translation. Pure; unknown text passes through. */
-export function translateConstraintWords(s: string, t: Translate): string {
+/** Replace every English word of the constraint (and side-statement) vocabulary with its translation. Pure; unknown text passes through.
+ *  `circles` (#2305) words each captured circle slot; without it every circle keeps its letter. */
+export function translateConstraintWords(s: string, t: Translate, circles: CircleResolver = NO_CIRCLES): string {
   let out = s;
-  for (const [re, key, names] of DESC_WORDS)
-    out = out.replace(re, (...g: string[]) => t(key, names ? Object.fromEntries(names.map((n, i) => [n, g[i + 1]])) : undefined));
-  for (const [re, key] of STATEMENT_WORDS) out = out.replace(re, () => t(key));
+  const slotted = (names: string[] | undefined, g: string[]) => {
+    if (!names) return undefined;
+    const ps = Object.fromEntries(names.map((n, i) => [n, g[i + 1]]));
+    return wordCircleSlots(ps, names, (slot) => circles(ps[slot]), t);
+  };
+  for (const [re, key, names] of DESC_WORDS) out = out.replace(re, (...g: string[]) => t(key, slotted(names, g)));
+  // A statement phrase is a FRAGMENT of the sentence the caller renders: no bidi pass of its own (circleText's rule),
+  // so the sentence's single pass still isolates its letters (#464 — an isolate in a fragment switches the outer pass off).
+  for (const [re, key, names] of STATEMENT_WORDS) out = out.replace(re, (...g: string[]) => t(key, { ...slotted(names, g), applyPostProcessor: false }));
   return out;
 }
 
@@ -141,9 +161,9 @@ export function translateConstraintWords(s: string, t: Translate): string {
  * fragment in `params.desc` and are rendered directly with `t(messageKey, params)` rather than through
  * {@link humanizeError}. Values that contain no fragment vocabulary come back identical.
  */
-export function translateParams(params: Record<string, string> | undefined, t: Translate): Record<string, string> | undefined {
+export function translateParams(params: Record<string, string> | undefined, t: Translate, circles: CircleResolver = NO_CIRCLES): Record<string, string> | undefined {
   if (!params) return params;
-  return Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t)]));
+  return Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t, circles)]));
 }
 
 /** One mapping: a regex over the raw error and how to build the translation from its groups. */
@@ -209,6 +229,13 @@ interface Pattern {
    * the rule the floor sentence already follows (#2028).
    */
   nextStep?: true;
+  /**
+   * #2305 ([ADR-755](../../docs/06-decisions.md#adr-755)) — the params that name ONE circle (its token: the id, or what
+   * {@link sanitizeIds} leaves of it). Each is worded through `circleText` — the template takes the noun phrase
+   * (`{{circle}}` «מעגל O», `{{circleThe}}` «המעגל O», `{{circleTo}}` «למעגל O»; slots `c1`+`c2` also give `{{circlePair}}`) — so
+   * one of a concentric pair reads «המעגל הפנימי». Only a DECLARED slot resolves: a point letter is never renamed.
+   */
+  circleParams?: readonly string[];
 }
 
 // Order matters only where one pattern's text is a prefix of another's; each regex below is
@@ -425,6 +452,7 @@ export const PATTERNS: Pattern[] = [
     re: /^over-constrained: radius of (\S+) = (.+) cannot hold(?: \[vs #\d+\])?$/,
     key: 'errors.restatedSize',
     params: (m) => ({ circle: m[1], value: m[2] }),
+    circleParams: ['circle'],
     saysSubject: true,
     namesOther: true,
   },
@@ -466,10 +494,10 @@ export const PATTERNS: Pattern[] = [
   { re: /^cannot place (\S+) on segment (\S+) so that (.+)$/, key: 'errors.cannotPlaceOnSegment', params: (m) => ({ id: m[1], seg: m[2], what: m[3] }) },
 
   // evaluate.ts:959 — `cannot take a tangent at the centre of circle-O`
-  { re: /^cannot take a tangent at the centre of (\S+)$/, key: 'errors.tangentAtCentre', params: (m) => ({ circle: m[1] }) },
+  { re: /^cannot take a tangent at the centre of (\S+)$/, key: 'errors.tangentAtCentre', params: (m) => ({ circle: m[1] }), circleParams: ['circle'] },
 
   // evaluate.ts:1195 — `cannot construct A: circles circle-O and circle-P do not meet`
-  { re: /^cannot construct (\S+): circles (\S+) and (\S+) do not meet$/, key: 'errors.circlesDontMeet', params: (m) => ({ id: m[1], c1: m[2], c2: m[3] }) },
+  { re: /^cannot construct (\S+): circles (\S+) and (\S+) do not meet$/, key: 'errors.circlesDontMeet', params: (m) => ({ id: m[1], c1: m[2], c2: m[3] }), circleParams: ['c1', 'c2'] },
 
   // step.ts:167 — `C and E would be at the same point`
   { re: /^(\S+) and (\S+) would be at the same point$/, key: 'errors.sameSpot', params: (m) => ({ a: m[1], b: m[2] }) },
@@ -546,8 +574,8 @@ export interface Humanized {
  * arguments, never looked up here (ADR-228 Am.6). Returns the text only; {@link humanizeErrorOutcome} says
  * whether it is the floor.
  */
-export function humanizeError(raw: string | null | undefined, t: Translate, said?: string, other?: string): string {
-  return humanizeErrorOutcome(raw, t, said, other).text;
+export function humanizeError(raw: string | null | undefined, t: Translate, said?: string, other?: string, circles?: CircleResolver): string {
+  return humanizeErrorOutcome(raw, t, said, other, circles).text;
 }
 
 /**
@@ -555,13 +583,13 @@ export function humanizeError(raw: string | null | undefined, t: Translate, said
  * «אפשר לנסות סדר אחר…» hint (ADR-228 Am.6) — except after the floor sentence, which already gives its own
  * next step and is ruled as the whole message. Both the banner and the submit pipeline render through this.
  */
-export function explainError(raw: string | null | undefined, t: Translate, said?: string, other?: string): string {
-  const { text, floor, nextStep } = humanizeErrorOutcome(raw, t, said, other);
+export function explainError(raw: string | null | undefined, t: Translate, said?: string, other?: string, circles?: CircleResolver): string {
+  const { text, floor, nextStep } = humanizeErrorOutcome(raw, t, said, other, circles);
   return text && !floor && !nextStep ? `${text} ${t('errors.retryHint')}` : text;
 }
 
 /** {@link humanizeError}, reporting whether the result is the floor sentence (#2028). */
-export function humanizeErrorOutcome(raw: string | null | undefined, t: Translate, said?: string, other?: string): Humanized {
+export function humanizeErrorOutcome(raw: string | null | undefined, t: Translate, said?: string, other?: string, circles: CircleResolver = NO_CIRCLES): Humanized {
   if (!raw) return { text: '', floor: false };
   const floor: Humanized = { text: t('errors.floor'), floor: true };
   // Sanitize FIRST (#200): the patterns then match a clean string and every extracted param (`circle: m[1]`)
@@ -582,16 +610,18 @@ export function humanizeErrorOutcome(raw: string | null | undefined, t: Translat
     // non-fragment param (a circle letter, an id) is untouched.
     const nested = p.nested?.(m);
     const paramKeys = p.paramKeys?.(m);
-    const translated =
+    const translatedRaw =
       params || nested || paramKeys
         ? {
-            ...(params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t)])) : {}),
+            ...(params ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t, circles)])) : {}),
             // #1918: a sentence param — its own key, each inner param a translation key
             ...(nested ? Object.fromEntries(Object.entries(nested).map(([k, n]) => [k, t(n.key, { ...Object.fromEntries(Object.entries(n.params).map(([pk, pv]) => [pk, t(pv)])), ...n.letters })])) : {}),
             // #1985: a WORD param — the value is a translation key (a shape noun)
             ...(paramKeys ? Object.fromEntries(Object.entries(paramKeys).map(([k, v]) => [k, t(v)])) : {}),
           }
         : undefined;
+    // #2305 (ADR-755): the declared circle slots, worded through circleText (a role, or today's letter).
+    const translated = translatedRaw && p.circleParams ? wordCircleSlots(translatedRaw, p.circleParams, (k) => circles(translatedRaw[k]), t) : translatedRaw;
     const key = p.keyOf ? p.keyOf(m) : p.key;
     // #943: the student's own sentence becomes the SUBJECT where the template's own subject cannot
     // identify which statement was refused. Still a pure mapping (ADR-228 Am.6) — the sentence is an
@@ -609,3 +639,4 @@ export function humanizeErrorOutcome(raw: string | null | undefined, t: Translat
   // translation of it, which spliced Hebrew vocabulary into an English sentence («cannot place point על הקטע»).
   return floor;
 }
+
