@@ -503,9 +503,11 @@ fails, and so does a scan that never entered the tree. Each tree has a thin lock
 (`<tree>/__tests__/privacy-disclosure-1426.test.ts`). `shell/__tests__/privacy-disclosure.test.ts` is
 the §5c meta-lock plus a roster net that fails a registered builder with no lock.
 
-What the lock does not check: whether the TEXT describes each declared sink. That stays reviewed prose,
-per product and per locale. The lock guarantees that wiring a sink forces the declaration to change, and
-that change is where the text gets reviewed.
+The text is held to the list too ([ADR-W-090](06w-decisions-workspace.md#adr-w-090) Am. 1, #2203).
+`SINK_SENTENCE`, beside `SINK_OF_ENDPOINT`, recognises each sink's sentence per locale (typed by
+`DataSink`, so a new sink lands in both tables first). Every declared sink must have its sentence, and
+no note may describe a sink it does not declare. What the lock still does not check is whether the words
+are good: that stays reviewed prose, per product and per locale.
 
 ### The letter popover ([ADR-W-105](06w-decisions-workspace.md#adr-w-105))
 
