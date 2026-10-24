@@ -1,0 +1,50 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-25T00:00:00.000Z",
+  "name": "inscribe-square-in-quad-2257",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מרובע ABCD",
+      "group": "g0",
+      "cmd": {
+        "type": "quadrilateral",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "הריבוע חסום במרובע ABCD",
+      "group": "g1",
+      "cmd": {
+        "type": "inscribe",
+        "shape": "square",
+        "ids": [
+          "E",
+          "F",
+          "G",
+          "H"
+        ],
+        "container": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "containerKind": "quad",
+        "variant": 0
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

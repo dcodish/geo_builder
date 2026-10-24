@@ -50,7 +50,7 @@ export type { MeasureLabelForms } from './lower';
 export type { SymTab } from './lower';
 export { expandShapeVariant, eqMatchesPair, MIDSEGMENT_SHAPES, pinsSoftVariant, statedShapeEqualities, trapezoidLegs, trapezoidRingInForce, unstatedChoices, UNSTATED_CHOICE_KINDS, VARIANT_COUNT } from './shapeVariants';
 export type { ChoiceFact, StatedShapeEquality, UnstatedChoice, UnstatedChoiceKind, VariantShape } from './shapeVariants';
-export { expandInscribe, inscribePlacements, inscribeVariantCount } from './inscribe';
+export { expandInscribe, innerDrawn, inscribePlacements, inscribeVariantCount } from './inscribe';
 export type { InscribeShape, InscribeCmd } from './inscribe';
 export { roleSidesOf, openRightTriangles, bindRoleSide, resolveRoleSide, type RoleSide } from './roleSides';
 export { variantCountOf, cyclableVariant, withVariant, variantVertices } from './variants';

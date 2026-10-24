@@ -1,0 +1,63 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-25T00:00:00.000Z",
+  "name": "inscribe-existing-square-named-2257",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "ריבוע ABCD",
+      "group": "g0",
+      "cmd": {
+        "type": "square",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "משולש EFG",
+      "group": "g1",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "E",
+          "F",
+          "G"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.2",
+      "utterance": "הריבוע ABCD חסום במשולש EFG",
+      "group": "g2",
+      "cmd": {
+        "type": "inscribe",
+        "shape": "square",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "container": [
+          "E",
+          "F",
+          "G"
+        ],
+        "containerKind": "triangle",
+        "variant": 0
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

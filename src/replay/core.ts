@@ -23,13 +23,14 @@ import { EQUAL_NESTED_CANNOT_HOLD, equalNestedPair, type NestedRelation } from '
 import { sideRecordsOf, sideShortfall } from '@/engine/requirements';
 import { pinnedLowering, statedOnCommonTangents } from './statedOnCommonTangents';
 import { computeValuesPanel, declaredLengthUnit, symbolBindings, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
-import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
+import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities, isShapeCarrier } from '@/engine';
+import { carrierParams, setCarrierVals } from '@/engine/evaluate';
 import { formatMeasure } from '@/format';
 import { DISPLAY_ONLY, circleDefinedBy, isSizelessCircle, referencesCircle, statedSizeCircles } from '@/engine';
 import { chargeHit, computeWithCell, flatLedger, ledgerTotal, work, withExecutedCap, withWorkBudget, withWorkEpoch, type WorkCell } from '@/engine/solveBudget';
 import { allDrivableAncestors } from '@/engine/step';
 import { objectParents, type MeasureExpr } from '@/engine/types';
-import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, resolveRoleSide, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, checkLabels, forcedOffArcs, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, residualTolerance, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, innerDrawn, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, isVariableStatement, unboundSubjectOf, unenforceableRelation, lowerOne, measureLabelForms, measureRestatement, measureRestatementStatus, symbolsConsumedBy, circleMembers, unstatedChoices, cyclableBranch, edgeSideToward, lower, cyclableVariant, degeneratePolygons, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, scalePinned, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringKey, ringSimple, trapezoidLegs, trapezoidRingInForce, eqMatchesPair, variantCountOf, variantVertices, warmStartCarriers, wellSpread, tightestWedge, withVariant, withReflectMask, expandAltitudeChoice, statedRightAngles, pinnedAltitudeOption } from '@/engine';
 import { resolveBinds } from './naming';
 import { narrowingNotes2D, type RowNouns } from './narrowing';
 import type { RingNote } from '../../shell/narrowing';
@@ -946,7 +947,7 @@ function computeFold(facts: Fact[], hoistDepth = 0, attribute = true): FoldNode 
  * #1675/#1584 (ADR-583): apply a fact's commands inside the attempt scope — the failure memo first, the
  * re-attempt cap on any attempt at commands that already failed, the first attempt unarmed.
  */
-function attemptFact(cur: Construction, cmds: Command[]): ReturnType<typeof tryApplyFact> {
+function attemptFact(cur: Construction, cmds: Command[], seat?: () => Construction | null): ReturnType<typeof tryApplyFact> {
   const scope = attemptScope!;
   reattemptStats.attempts++;
   const key = JSON.stringify(cmds);
@@ -965,9 +966,9 @@ function attemptFact(cur: Construction, cmds: Command[]): ReturnType<typeof tryA
   let exhausted = false;
   const e0 = work.executed;
   const { value, cell } = computeWithCell(() => {
-    if (!first) return tryApplyFact(cur, cmds);
+    if (!first) return tryApplyFactSeated(cur, cmds, seat);
     reattemptStats.capped++;
-    const out = withExecutedCap(reattemptConfig.cap, () => tryApplyFact(cur, cmds));
+    const out = withExecutedCap(reattemptConfig.cap, () => tryApplyFactSeated(cur, cmds, seat));
     exhausted = out.exhausted;
     if (exhausted) scope.cut = true; // #1770 (ADR-586): the fold now holds a verdict the cap cut short
     return out.value;
@@ -1458,7 +1459,8 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
    */
   const boundCmdsOf = (f: Fact, cur: Construction): Command[] | null => {
     // #1921 (ADR-657): a kite whose ring is already on one circle lowers to the right kite it is forced to be
-    const lowered = engineCmdsOf(f);
+    // #2257 (ADR-767): an inscription whose inner shape is already a figure of `cur` is lowered over the drawn vertices
+    const lowered = f.cmd.type === 'inscribe' && innerDrawn(f.cmd, pointIdsOf(cur)) ? expandInscribe(f.cmd, explicitOnSegs, pointIdsOf(cur), drawnTurn(cur, f.cmd)) : engineCmdsOf(f);
     const cmds = f.cmd.type === 'shape-variant' && f.cmd.shape === 'kite' && ringOnOneCircle(cur, f.cmd.ids) ? cyclicKiteCommands(lowered) : lowered;
     const binding = f.cmd.roleSide;
     if (!binding) return cmds;
@@ -1470,6 +1472,9 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
     }
     return out;
   };
+  /** #2257 (ADR-767): the seat of an inscription over a drawn inner shape, offered to the fact's attempt (else none). */
+  const inscribedSeat = (f: Fact, cur: Construction): (() => Construction | null) | undefined =>
+    f.cmd.type === 'inscribe' && innerDrawn(f.cmd, pointIdsOf(cur)) ? () => seatInscribedShape(cur, f.cmd as InscribeFactCmd, explicitOnSegs) : undefined;
   /** The status of a role-bound fact whose role nothing in the figure declares yet (#1810). */
   const roleNotInForce = (f: Fact): string => {
     const b = f.cmd.roleSide!;
@@ -1660,7 +1665,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
         claimDefined();
         continue;
       }
-      const r = attemptFact(cur, engineCmds);
+      const r = attemptFact(cur, engineCmds, inscribedSeat(f, cur));
       if (r.ok) {
         cur = r.construction;
         status[f.id] = 'ok';
@@ -1721,7 +1726,7 @@ function computeFoldInScope(facts: Fact[], hoistDepth = 0, attribute = true): Fo
           failedWith.set(f.id, cur); // #2117: still refuted by the theorem on this figure
           continue;
         }
-        const r = attemptFact(cur, engineCmds);
+        const r = attemptFact(cur, engineCmds, inscribedSeat(f, cur));
         if (r.ok) {
           cur = r.construction;
           status[f.id] = 'ok';
@@ -2512,6 +2517,116 @@ function tryApplyFact(cur: Construction, cmds: Command[]): { ok: true; construct
     trial = r.construction;
   }
   return { ok: true, construction: trial };
+}
+
+type InscribeFactCmd = Extract<AnyCommand, { type: 'inscribe' }>;
+
+/**
+ * #2257 (ADR-767): which way a DRAWN inner ring turns relative to its container — +1 the same way, −1 the other — read
+ * off the figure as it stands. A drawn shape cannot be turned over by the inscription (a square macro's corners are
+ * derived on one side of its base), so only the placements walked that way can hold it. Undefined when either ring is
+ * not fully placed or is flat.
+ */
+function drawnTurn(cur: Construction, cmd: InscribeFactCmd): 1 | -1 | undefined {
+  const e = evaluate(cur);
+  if (!e.ok) return undefined;
+  const area = (ids: Id[]): number => {
+    const P = ids.map((id) => e.positions.get(id));
+    if (P.some((p) => !p)) return 0;
+    return P.reduce((acc, p, i) => { const q = P[(i + 1) % P.length]!; return acc + p!.x * q.y - q.x * p!.y; }, 0);
+  };
+  const a = area(cmd.ids), b = area(cmd.container);
+  if (Math.abs(a) < 1e-9 || Math.abs(b) < 1e-9) return undefined;
+  return Math.sign(a) === Math.sign(b) ? 1 : -1;
+}
+
+/** The ids of every point of a construction — what "already drawn" means to an inscription (ADR-767). */
+function pointIdsOf(c: Construction): Set<Id> {
+  return new Set(c.objects.filter(isGeoPoint).map((o) => o.id));
+}
+
+/**
+ * #2257 ([ADR-767](docs/06-decisions.md#adr-767)) — THE SEAT of an inscription whose inner shape is already drawn
+ * (LADDER stage F-seat): the canonical inscription as a START. The same inscription is solved FRESH on the same
+ * figure — the same container, the same placement, scratch ids, today's expansion (which builds where the drawn
+ * shape's own start does not: the side memberships of a drawn square in a triangle leave one solution per placement,
+ * and the projection start of each rider lands in the flat basin) — and the drawn shape's free carriers are started
+ * at the fresh solution's matching vertices. Only the inner shape's own unpinned free vertices move: the container and
+ * every other point keep their places, a typed (pinned) point is never moved, and nothing is written into a fact.
+ * Fixed work: one fresh fold of the fact and one evaluate (M3). Null when the fresh inscription itself does not build
+ * or there is nothing to move.
+ */
+function seatInscribedShape(cur: Construction, cmd: InscribeFactCmd, explicitOnSegs: { id: Id; a: Id; b: Id }[]): Construction | null {
+  const scratch = (id: Id): Id => (cmd.container.includes(id) ? id : `~seat${id}`);
+  const ons = explicitOnSegs.map((o) => (cmd.ids.includes(o.id) ? { ...o, id: scratch(o.id) } : o));
+  const fresh = tryApplyFact(cur, expandInscribe({ ...cmd, ids: cmd.ids.map(scratch) }, ons, undefined, drawnTurn(cur, cmd)));
+  if (!fresh.ok) return null;
+  const e = evaluate(fresh.construction);
+  if (!e.ok) return null;
+  const target = (id: Id): Vec | undefined => (cmd.ids.includes(id) && !cmd.container.includes(id) ? e.positions.get(scratch(id)) : undefined);
+  let moved = false;
+  const objects = cur.objects.map((o) => {
+    const t = target(o.id);
+    if (!t || o.kind !== 'free-point' || o.pinned || (o as { rigid?: boolean }).rigid) return o;
+    moved = true;
+    return { ...o, x: t.x, y: t.y };
+  });
+  let seated: Construction = { ...cur, objects };
+  // An inner vertex carried by its own SHAPE SCALAR (a rectangle's height, a rhombus's angle) is started at the value
+  // that puts it on its target: a few secant steps on that one parameter, in construction order (a scalar vertex sits
+  // on the free vertices placed above). Fixed work: ≤ SEAT_SCALAR_STEPS evaluates per such vertex.
+  for (const o of cur.objects) {
+    const t = target(o.id);
+    const v0 = t && isShapeCarrier(o) && (o as { solve?: unknown }).solve === undefined ? carrierParams(o) : null;
+    if (!t || !v0 || v0.length !== 1) continue;
+    const miss = (v: number): { at: Vec; d: number } | null => {
+      const r = evaluate(setCarrierVals(seated, new Map([[o.id, [v]]])));
+      const p = r.ok ? r.positions.get(o.id) : undefined;
+      return p ? { at: p, d: Math.hypot(p.x - t.x, p.y - t.y) } : null;
+    };
+    let best = v0[0];
+    let bestMiss = miss(best);
+    if (!bestMiss) continue;
+    for (let k = 0, h = Math.max(Math.abs(best) * 1e-3, 1e-3); k < SEAT_SCALAR_STEPS && bestMiss.d > 1e-9; k++) {
+      const probe = miss(best + h);
+      if (!probe) break;
+      // the vertex moves along a curve in its parameter: step to the nearest point of the tangent line through it
+      const dv = { x: (probe.at.x - bestMiss.at.x) / h, y: (probe.at.y - bestMiss.at.y) / h };
+      const n2 = dv.x * dv.x + dv.y * dv.y;
+      if (n2 < 1e-18) break;
+      const next = best + ((t.x - bestMiss.at.x) * dv.x + (t.y - bestMiss.at.y) * dv.y) / n2;
+      const m = miss(next);
+      if (!m || m.d >= bestMiss.d) break;
+      best = next;
+      bestMiss = m;
+    }
+    if (best !== v0[0]) {
+      seated = setCarrierVals(seated, new Map([[o.id, [best]]]));
+      moved = true;
+    }
+  }
+  return moved ? seated : null;
+}
+
+/** #2257 (ADR-767): the secant steps the seat takes on one inner shape scalar — a fixed work bound (M3). */
+const SEAT_SCALAR_STEPS = 6;
+
+/**
+ * #2257 ([ADR-767](docs/06-decisions.md#adr-767)) — a fact offered a `seat` (an inscription over a drawn shape:
+ * {@link seatInscribedShape}) is tried FROM THE SEAT first, then from the figure's own start. Seat first because the
+ * seat is the figure the student means: the drawn shape slides onto the sides and the container stays where he saw it,
+ * where the figure's own start can still succeed by bending the container toward the shape (measured: «מרובע ABCD» ·
+ * «ריבוע EFGH» · «הריבוע EFGH חסום במרובע ABCD» moved A). One attempt, so the re-attempt memo and cap see both starts
+ * as one. When neither builds, the verdict is the figure's own start's failure: a seat is a START, and where it fails
+ * says nothing the student stated.
+ */
+function tryApplyFactSeated(cur: Construction, cmds: Command[], seat?: () => Construction | null): ReturnType<typeof tryApplyFact> {
+  const seated = seat?.();
+  if (seated) {
+    const s = tryApplyFact(seated, cmds);
+    if (s.ok) return s;
+  }
+  return tryApplyFact(cur, cmds);
 }
 
 function applyUnits(cmds: Command[]): Command[][] {

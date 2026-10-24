@@ -313,6 +313,7 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2449': 'open', // #2398 (ADR-747): analytic refuses a circle centre's second letter (unknown-reference O); 2-D asks (names the holder, or «מעגל O לא הוגדר»)
   '#2448': 'open', // #2405 (ADR-751): analytic does not read «כל המשיקים המשותפים» on externally tangent circles (not-handled)
   '#2442': 'open', // #2405 (ADR-751): «כל המשיקים המשותפים» on a pair whose position was never stated: 2-D asks (interim), analytic does not read it; the permanent answer awaits the operator
+  '#2509': 'open', // #2257 (ADR-767): analytic reads no unnamed polygon-in-polygon inscription («הריבוע חסום במשולש EFG»); 2-D moves the drawn square
   '#2451': 'open', // #2355 (ADR-753): 3-D refuses «ריבוע ABCD חסום במעגל» over a ring already inscribed (already-defined); 2-D builds the square
   '#2460': 'open', // #2464 / #2470 (ADR-760): analytic does not read «המעגל החיצוני/הפנימי» as a reference (not-handled)
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
@@ -1788,6 +1789,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   // ── #2477 (ADR-761): a diameter stated about «המעגל» is drawn on the drawn circle, and beside two it asks which ──
   { id: 'diameter-of-the-circle-2477', family: 'chords-arcs', steps: ['מעגל O', 'AB הוא קוטר של המעגל'], expect: 'builds', exception: 'X8', note: '2-D drew a second circle P on AB beside O, green, before ADR-761; analytic already drew AB on O' },
   { id: 'diameter-of-the-circle-two-asks-2477', family: 'chords-arcs', steps: ['מעגל O', 'מעגל P', 'AB הוא קוטר של המעגל'], expect: 'asks', exception: 'X8', note: '2-D drew a third circle M, green, before ADR-761; analytic already asked' },
+  // ── #2257 (ADR-767): an inscription whose inner shape is already drawn moves THAT shape into the container ──
+  { id: 'inscribe-existing-square-named-2257', family: 'inscribed', steps: ['ריבוע ABCD', 'משולש EFG', 'הריבוע ABCD חסום במשולש EFG'], expect: 'builds', exception: 'X8', note: '2-D refused «would be flat» before ADR-767; analytic already put A–D on the sides' },
+  { id: 'inscribe-existing-square-definite-2257', family: 'inscribed', steps: ['ריבוע ABCD', 'משולש EFG', 'הריבוע חסום במשולש EFG'], expect: 'builds', exception: 'X8', knownGap: [{ product: 'analytic', issue: '#2509' }], note: '2-D drew a second square HIJK, green, before ADR-767; analytic does not read the unnamed inscription (not-handled)' },
   { id: 'square-inscribed-reentry-2355', family: 'inscribed', steps: ['מרובע ABCD חסום במעגל', 'ריבוע ABCD חסום במעגל'], expect: 'builds', knownGap: [{ product: '3d', issue: '#2451' }], note: '2-D answered «כבר קיים» before ADR-753 and now draws the square; analytic builds it; 3-D refuses it already-defined' },
 ];
 

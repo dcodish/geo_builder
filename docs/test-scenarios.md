@@ -2203,3 +2203,15 @@ over all four (ADR-041).
 
 **Guards against:** the #1012 re-reader teaching a spelling that the parser reads back as a different centre. «רבע מעגל ODC» on «ABC משולש ישר זוית · AC=15 · BC=10 · O על AC · D על CB» reads O; the re-reader tries C first and spells it «רבע מעגל DCO» with `spellArcRun`, the inverse of the one reader. **Asserts** the re-reader's first reading is centre C spelt «רבע מעגל DCO», and that sentence, typed as the last step, builds centre C with ∠OCD = 90° at seeds 0–2 (docs/17 §9).
 
+
+### `inscribe-existing-square-no-second-2257` — «ריבוע ABCD» · «משולש EFG» · «הריבוע חסום במשולש EFG» moves THAT square into the triangle (#2257, ADR-767)
+
+**Guards against:** a definite inner noun minting a second square beside the drawn one (the operator's 2026-10-19 ruling, Q1 = A). **Asserts** one 4-gon (ABCD), no new letter, A–D each on a side of EFG, ABCD still a square, the triangle unmoved, and «הציגו תצורה אחרת» keeping all of it.
+
+### `inscribe-two-squares-asks-2257` — two squares drawn: «הריבוע חסום במשולש EFG» asks which, and the example builds (#2257, ADR-767)
+
+**Guards against:** a third square drawn beside two, and a taught example that does not build (docs/17 §9). **Asserts** the question names ABCD and HIJK and offers «הריבוע ABCD חסום במשולש EFG», which commits through the gate and puts A–D on EFG's side lines.
+
+### `inscribe-existing-square-refused-named-2257` — a square too big for a sized triangle is refused naming «AB = 10» (#2257, ADR-767)
+
+**Guards against:** a seat failure reaching the student as ADR-602's flat-shape text. **Asserts** «הריבוע ABCD חסום במשולש EFG» after «AB = 10» and an equilateral EFG of side 2 is refused as over-constrained, never «collapsed … flat», and the earlier rows stand.
