@@ -833,9 +833,9 @@ export async function decideFromParse(
         /**
          * A ROLE-ASSIGNED LETTER RUN IS RE-READ BEFORE IT IS REFUSED (#1012).
          *
-         * «רבע מעגל OAB» means *centre O, ends A and B* — a convention the catalog never taught. So
-         * «רבע מעגל ODC» was refused after ~17 s, blaming the student's «O על AC», while «רבע מעגל CDO»
-         * built the very same figure in one second.
+         * «רבע מעגל AOB» means *centre O, ends A and B* (the arc family's one reader, #2486). On 2026-09-15,
+         * under the then centre-first reading, «רבע מעגל ODC» was refused after ~17 s, blaming the student's
+         * «O על AC», while «רבע מעגל CDO» built the very same figure in one second.
          *
          * The run is re-read over the other role assignments and the first that BUILDS is adopted, then
          * taught below through the canonical-hint seam that already exists. Ordered by a probe over the

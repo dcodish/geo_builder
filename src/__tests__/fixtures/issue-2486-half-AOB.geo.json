@@ -1,0 +1,62 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-24T12:00:00.000Z",
+  "name": "issue-2486-half-AOB",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "חצי מעגל AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true,
+        "hidden": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "חצי מעגל AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "diameter",
+        "id1": "B",
+        "id2": "A",
+        "circle": "circle-O",
+        "theta": 0
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "חצי מעגל AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "arc",
+        "id": "arc-BA",
+        "center": "O",
+        "from": "B",
+        "to": "A",
+        "spanDeg": 180
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.3",
+      "utterance": "חצי מעגל AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    }
+  ]
+}

@@ -76,11 +76,13 @@ beforeEach(() => {
   llmParseMock.mockResolvedValue({ built: [], dropped: [] });
 });
 
-/** The figures of the measured matrix, each with what it states. Centre-first for the quarter and the half (#171). */
+/** The figures of the measured matrix, each with what it states. The MIDDLE letter is the centre (#2486, ADR-759); an O-family first letter too. */
 const FIGURES: { prefix: string[]; held: Held[] }[] = [
-  { prefix: ['רבע מעגל AOB'], held: [{ centre: 'A', a: 'O', b: 'B', deg: 90 }] },
+  { prefix: ['רבע מעגל AOB'], held: [{ centre: 'O', a: 'A', b: 'B', deg: 90 }] },
+  { prefix: ['רבע מעגל BAO'], held: [{ centre: 'A', a: 'B', b: 'O', deg: 90 }] },
   { prefix: ['רבע מעגל OAB'], held: [{ centre: 'O', a: 'A', b: 'B', deg: 90 }] },
-  { prefix: ['חצי מעגל AOB'], held: [{ centre: 'A', a: 'O', b: 'B', deg: 180 }] },
+  { prefix: ['חצי מעגל AOB'], held: [{ centre: 'O', a: 'A', b: 'B', deg: 180 }] },
+  { prefix: ['חצי מעגל BAO'], held: [{ centre: 'A', a: 'B', b: 'O', deg: 180 }] },
   { prefix: ['חצי מעגל OAB'], held: [{ centre: 'O', a: 'A', b: 'B', deg: 180 }] },
   { prefix: ['גזרה OAB בזווית 90'], held: [{ centre: 'O', a: 'A', b: 'B', deg: 90 }] },
   { prefix: ['גזרה AOB'], held: [] },
@@ -97,7 +99,8 @@ describe('#2483 — no arc line bends a construct’s stated angle (the class)',
       }, 60_000);
 
   it.each([
-    [['quarter circle AOB'], 'arc BO = 40', [{ centre: 'A', a: 'O', b: 'B', deg: 90 }]],
+    [['quarter circle AOB'], 'arc BO = 40', [{ centre: 'O', a: 'A', b: 'B', deg: 90 }]],
+    [['quarter circle BAO'], 'arc BO = 40', [{ centre: 'A', a: 'B', b: 'O', deg: 90 }]],
     [['quarter circle OAB'], 'arc AB = 40', [{ centre: 'O', a: 'A', b: 'B', deg: 90 }]],
   ] as [string[], string, Held[]][])('English: %j · «%s»', async (prefix, line, held) => {
     expectHonest(await decide(prefix, line, 'en'), prefix, line, held);
@@ -125,7 +128,7 @@ describe('#2483 — the other readers that move an end are refused too', () => {
     const v = await decide(['רבע מעגל AOB'], 'קשת BO=40');
     expect(v.kind).toBe('refuse');
     const fig = replay(useGeoStore.getState().facts, useGeoStore.getState().seed);
-    expect(angleAt(fig.positions, { centre: 'A', a: 'O', b: 'B', deg: 90 })).toBeCloseTo(90, 6);
+    expect(angleAt(fig.positions, { centre: 'O', a: 'A', b: 'B', deg: 90 })).toBeCloseTo(90, 6); // centre O since #2486
   }, 60_000);
 
   it('a point ON the quarter’s arc carries the arc value: C moves, the quarter stays 90°', async () => {
@@ -148,11 +151,13 @@ describe('#2345 — an arc end that is the circle’s centre is refused naming t
   const he = (k: string, o: Record<string, string>) => (i18n.getFixedT('he')(k, o) as string).replace(/[⁦-⁩]/g, '');
 
   it.each([
-    [['רבע מעגל AOB'], 'קשת AB = 40'],
-    [['חצי מעגל AOB'], 'קשת AB = 40'],
-    [['רבע מעגל AOB'], 'קשת AB = 90'],
+    // letters re-based to the middle-letter centre (#2486): A is the centre of «… BAO», O of «… AOB»
+    [['רבע מעגל BAO'], 'קשת AB = 40'],
+    [['חצי מעגל BAO'], 'קשת AB = 40'],
+    [['רבע מעגל BAO'], 'קשת AB = 90'],
+    [['רבע מעגל AOB'], 'קשת AO = 40'],
     [['רבע מעגל OAB'], 'קשת BO = 40'],
-    [['רבע מעגל AOB'], 'קשת AB = 2 קשת BO'],
+    [['רבע מעגל BAO'], 'קשת AB = 2 קשת BO'],
   ])('%j · «%s»: refused, the point named, no step (none builds)', async (prefix, line) => {
     const v = await decide(prefix, line);
     expect(v.kind).toBe('refuse');

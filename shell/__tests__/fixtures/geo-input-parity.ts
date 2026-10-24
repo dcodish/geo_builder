@@ -1480,6 +1480,10 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'chord-third-crossing-1893', family: 'chords-arcs', steps: ['מעגל O', 'A על מעגל O', 'C על מעגל O', 'AC חותך את המעגל בנקודה E'], expect: 'refused', exception: 'X8', note: 'analytic drew E on A, green; 2-D refuses (its sentence is #1834’s to reword) — the verdict, not the text, is the row' },
   // ── #1924 (ADR-AG-272): a crossing asked of a tangent at a named point — 2-D's errors.tangentNoSecondCrossing ──
   { id: 'tangent-no-second-crossing-1924', family: 'tangents', steps: ['מעגל O', 'A על מעגל O', 'מנקודה P משיק נוגע במעגל O בנקודה A', 'PA חותך את המעגל בנקודה E'], expect: 'refused', exception: 'X8' },
+  // ── #2486 (ADR-759 / ADR-AG-331): an arc's three letters are read by one reader — the MIDDLE letter is the centre. The row
+  //    judges builds/refused only; the centre is locked per builder (issue-2486-arc-run-centre tests) and by the shared reader ──
+  { id: 'quarter-AOB-2486', family: 'chords-arcs', steps: ['רבע מעגל AOB'], expect: 'builds', exception: 'X8' },
+  { id: 'sector-OAB-2486', family: 'chords-arcs', steps: ['גזרה OAB'], expect: 'builds', exception: 'X8' },
 
   // ── #1827 (ADR-3D-337): a stated magnitude may be a RADICAL in every slot, not only «|AD| = …» ──
   // 3-D read «|AD| = √7» and refused the bare «AD = √7» (the operator's line), the area and the `sqrt` spelling.

@@ -203,13 +203,16 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 - **FR-HS-7 (Should)** — **Relabel** a point everywhere (`rename E to G` / `שנה שם E ל-G`) so the lettering can match a textbook figure, without changing the geometry. Undoable; refuses a letter in use. See [12-letter-placement.md](12-letter-placement.md). Sources: ADR-035.
 - **FR-HS-8 (Should)** — **Merge** two *existing* points into one (`merge F into E` / `מזג F ל-E`) — the explicit fold the rename deliberately refuses. The target survives, references are rewritten, collapsed facts removed; one undoable step. Refuses a shape vertex or a missing point.
 
-**A letter run that encodes a ROLE is read from the figure, not from the typing order.** «רבע מעגל OAB» means
-*centre O, ends A and B*; a run that does not build is re-read over the other role assignments and the one that
-builds honestly (its radii equal, its angle 90°) is adopted, the step showing the spelling it used; else the step
-refuses. The whole arc family («רבע מעגל», «גזרה», «חצי מעגל») reads a run the same way, a semicircle's centre
-being the midpoint of its ends. **On three vertices of a shape**, «חצי מעגל ABC» passes through all three and the
+**A letter run that encodes a ROLE is read like an angle, and re-read from the figure when it cannot be drawn.**
+The MIDDLE letter is the centre: «רבע מעגל AOB», «חצי מעגל AOB» and «גזרה AOB» all mean *centre O, ends A and B*, as
+in ∠AOB (operator ruling 2026-10-24); an O/P/Q letter written first is the centre too («רבע מעגל OAB» is centre O).
+The whole arc family reads a run the same way, in the 2-D and the analytic tool, a semicircle's centre being the
+midpoint of its ends. A run that does not build is re-read over the other role assignments and the one that builds
+honestly (its radii equal, its angle 90°) is adopted, the step showing the spelling it used, written the same way
+(the centre in the middle: «רבע מעגל DCO» for centre C); else the step refuses. A figure saved before 2026-10-24
+re-opens with this reading and the existing "updated" note. **On three vertices of a shape**, «חצי מעגל ABC» passes through all three and the
 figure picks the diameter (Thales), teaching «חצי מעגל שקוטרו AB העובר דרך C» (a stated diameter is honoured as stated); three loose points keep
-the centre-first reading, with no possible diameter the step is refused, and «C על חצי המעגל» reads like «C על המעגל». Sources: ADR-521, #1012, ADR-534, #1204, ADR-589, #1771.
+the middle-letter reading, with no possible diameter the step is refused, and «C על חצי המעגל» reads like «C על המעגל». Sources: ADR-521, #1012, ADR-534, #1204, ADR-589, #1771, ADR-759, #2486.
 
 ## Alternative configurations
 

@@ -7,15 +7,15 @@
  *
  * ## The class
  *
- * A construct whose letter run encodes a ROLE assignment — «רבע מעגל OAB» means *centre O, ends A and
+ * A construct whose letter run encodes a ROLE assignment — «רבע מעגל AOB» means *centre O, ends A and
  * B* — fixes that assignment by POSITION. A student who writes the same three letters in a different
  * order gets an unsatisfiable figure, and a refusal that blames their geometry rather than our
- * reading. The convention is real and was recorded only in a code comment: the catalog row says *"a
- * 90° arc with its two bounding radii"* and never mentions that the first letter is the centre. So the
- * tool asserted a spelling rule it never taught, which is the ADR-W-030 line.
+ * reading. Which letter is the centre is read by ONE reader, `arcRunRoles` (shell/arcRun.ts): the
+ * MIDDLE letter, as in ∠AOB, or an O-family letter written first (operator ruling 2026-10-24, #2486).
  *
  * Measured on the operator's own figure — «ABC משולש ישר זוית» · «AC=15» · «BC=10» · «O על AC» ·
- * «D על CB» — all six spellings of one drawable quarter:
+ * «D על CB» — all six spellings of one drawable quarter, under the CENTRE-FIRST reading of 2026-09-15
+ * (the run's centre letter is what matters; under #2486 the same centres are spelt in the middle):
  *
  * ```
  * ODC  centre O   refused   16.6 s        DOC  centre D   refused   19.5 s
@@ -29,7 +29,9 @@
  * ## The mechanism: re-read, adopt, and TEACH
  *
  * This module answers one question — *what else could that run have meant?* — by **rewriting the
- * utterance** and handing it back to the same parser. Nothing here knows how a quarter circle is
+ * utterance** and handing it back to the same parser. The rewrite is `spellArcRun`, the exact inverse of
+ * the parser's reader, so the sentence tried is the sentence taught and it reads back as the centre it was
+ * built for; a reading no bare run can spell (two O-family ends around another centre) is not tried. Nothing here knows how a quarter circle is
  * built, and no rule grows a second convention; the alternative spelling is a sentence the student
  * could have typed, which is also exactly what we then teach them (ADR-428 obligation 2).
  *
@@ -59,10 +61,11 @@
  * where nothing is satisfiable — close to the cost it has today instead of trebling it.
  */
 import type { AnyCommand, Id } from '@/engine';
+import { spellArcRun } from '../../shell/arcRun';
 
 /** One alternative reading: the sentence to try, and which letter it makes the centre. */
 export interface RoleReading {
-  /** The utterance rewritten so a different letter leads the run — a sentence a student could type. */
+  /** The utterance rewritten so the run names a different centre — a sentence a student could type. */
   utterance: string;
   /** The centre this reading proposes. */
   centre: Id;
@@ -174,11 +177,14 @@ export function roleReadings(
      */
     if (s !== null && stated !== null && !(s < stated)) continue;
     const [a, b] = roles.filter((r) => r !== centre);
+    // #2486: spelt by the inverse of the one reader, so the parser reads it back as THIS centre. A centre
+    // no bare run can name is not a sentence the student could type, and is not tried.
+    const spelt = spellArcRun(centre, a, b);
+    if (!spelt) continue;
     out.push({
       centre,
       score: s,
-      utterance:
-        utterance.slice(0, run.at) + `${centre}${a}${b}` + utterance.slice(run.at + run.text.length),
+      utterance: utterance.slice(0, run.at) + spelt + utterance.slice(run.at + run.text.length),
     });
   }
   // Best first: a scored reading beats an unscored one, and a lower score beats a higher one.

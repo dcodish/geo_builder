@@ -1579,7 +1579,7 @@ over all four (ADR-041).
 
 ### `quarter-circle-conflict-names-no-innocent-given-1203` — the operator's quarter circles on a right triangle with AC=15, BC=10 (#1203, ADR-554)
 
-**Guards against:** the reported banner «BC=10» סותר את «AC=15» on «רבע מעגל ABC», and a quarter with two unequal pinned radii being drawn. «רבע מעגל CAB» is refused as the quarter's own statement with the three givens standing; «רבע מעגל ABC» is flagged by the obtuse-side proof (ADR-551), which states the right angle at A, and never names «AC=15» as the counterpart.
+**Guards against:** the reported banner «BC=10» סותר את «AC=15» on «רבע מעגל ABC», and a quarter with two unequal pinned radii being drawn. Re-based for #2486 (ADR-759, the middle letter is the centre; sequences unchanged): «רבע מעגל CAB», now centred at A, is flagged by the obtuse-side proof (ADR-551), which states the right angle at A, and never names «AC=15» as the counterpart; «רבע מעגל ABC», now centred at B, is refused as the quarter's own statement with the three givens standing.
 
 ### `shared-endpoint-crossing-refused-944` — «D = חיתוך AB ו-BC» is refused naming B, and the corpus says so (#944 → ADR-531, #1288 / ADR-555)
 
@@ -2149,7 +2149,7 @@ over all four (ADR-041).
 
 ### `quarter-arc-contradicts-span-2483` — «רבע מעגל AOB», then «קשת BO=40» is refused and the quarter keeps its 90° (#2483, ADR-758)
 
-**Guards against:** a quarter circle whose 90° held only by where its new ends started, so «קשת BO=40» redrew it as 40° with every row green (operator, round #2466 T35: *"it draws the 40 which contradicts the first line"*). **Asserts** the quarter builds green at 90° and both spellings «קשת BO=40» / «קשת BO = 40» are refused before commit. Refusal and the kept angle only, not one sentence (#2486 re-bases the letters). The class matrix (quarter and half in both letter orders, sectors, a plain circle, every arc spelling, the central/base angle, arc ratio and sum readers, English) is `src/app/__tests__/issue-2483-arc-never-contradicts.test.ts`.
+**Guards against:** a quarter circle whose 90° held only by where its new ends started, so «קשת BO=40» redrew it as 40° with every row green (operator, round #2466 T35: *"it draws the 40 which contradicts the first line"*). **Asserts** the quarter builds green at 90° and both spellings «קשת BO=40» / «קשת BO = 40» are refused before commit. Refusal and the kept angle only, not one sentence. Since #2486 the quarter is centred at O, so the line is refused as an arc end at the centre; still refused, the quarter still 90° at O. The class matrix (quarter and half in both letter orders, sectors, a plain circle, every arc spelling, the central/base angle, arc ratio and sum readers, English) is `src/app/__tests__/issue-2483-arc-never-contradicts.test.ts`.
 
 ### `half-circle-holds-180-2483` — «חצי מעגל OAB», then «∠AOB = 100» and «קשת AB = 40» are refused (#2483, ADR-758)
 
@@ -2157,4 +2157,21 @@ over all four (ADR-041).
 
 ### `arc-end-is-centre-2345` — «רבע מעגל AOB», then «קשת AB = 40» is refused as a statement about the centre (#2345, ADR-758)
 
-**Guards against:** an arc end that is its circle's centre lowered to «∠AAB» and refused by the engine with an internal sentence (shown as the floor). **Asserts** the line is refused, no repeated-vertex angle appears in the verdict, and the quarter keeps its 90°.
+**Guards against:** an arc end that is its circle's centre lowered to «∠AAB» and refused by the engine with an internal sentence (shown as the floor). **Asserts** the line is refused, no repeated-vertex angle appears in the verdict, and the quarter keeps its 90°. Since #2486 the quarter is centred at O and AB is a real arc of it, so the line is refused as over-constrained; the centre-end sentence is locked with re-based letters in `issue-2483-arc-never-contradicts.test.ts`.
+
+### `issue-2486-quarter-AOB-middle-centre` — «רבע מעגל AOB» is the quarter about O (#2486, ADR-759)
+
+**Guards against:** the quarter reading its FIRST letter as the centre (centre A) while «גזרה AOB» reads O. Operator ruling 2026-10-24 (e8 A): the middle letter is the centre, as in ∠AOB. **Asserts** the arc's centre is O, |OA| = |OB| and ∠AOB = 90° at seeds 0–2.
+
+### `issue-2486-half-AOB-middle-centre` — «חצי מעגל AOB» is the half circle about O (#2486, ADR-759)
+
+**Guards against:** the loose-points half circle reading centre A. **Asserts** the arc's centre is O with a 180° span and O the midpoint of AB at seeds 0–2.
+
+### `issue-2486-quarter-AOB-existing-ends` — «נקודה A» · «נקודה B» · «רבע מעגל AOB» (#2486, ADR-759)
+
+**Guards against:** the middle-letter reading depending on whether the ends already exist. **Asserts** centre O, ∠AOB = 90° at seeds 0–2, and that the line commits through the submit gate.
+
+### `issue-2486-reread-teaches-middle-spelling` — the bagrut quarter's taught spelling «רבע מעגל DCO» builds as typed (#2486, #1012)
+
+**Guards against:** the #1012 re-reader teaching a spelling that the parser reads back as a different centre. «רבע מעגל ODC» on «ABC משולש ישר זוית · AC=15 · BC=10 · O על AC · D על CB» reads O; the re-reader tries C first and spells it «רבע מעגל DCO» with `spellArcRun`, the inverse of the one reader. **Asserts** the re-reader's first reading is centre C spelt «רבע מעגל DCO», and that sentence, typed as the last step, builds centre C with ∠OCD = 90° at seeds 0–2 (docs/17 §9).
+

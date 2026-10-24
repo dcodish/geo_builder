@@ -122,11 +122,15 @@ describe('#2201 3b — (1) the four leak issues’ exact sequences', () => {
   const CASES: { issue: string; lines: string[]; after: string }[] = [
     { issue: '#2151', lines: ['מעגל שמרכזו O', 'הנקודה P בתוך המעגל', 'מהנקודה P העבירו משיקים למעגל'], after: FLOOR.he },
     { issue: '#2132', lines: ['מעגל O ברדיוס r', 'OR=r'], after: `הנתון «OR=r» מתייחס לנקודה שעדיין לא הוגדרה (R). הגדירו אותה תחילה. ${HINT_HE}` },
-    // #2345 (ADR-758): the arc's end A is the circle's centre — refused naming the statement and the point, no longer
-    // the floor. Read from the locale table (one source); the end letter follows the centre convention in force.
-    { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AB = 40'], after: plain(T.he('input.arcEndIsCentreNoStep', { detail: 'קשת AB = 40', end: 'A' })) },
-    { issue: '#2345', lines: ['חצי מעגל AOB', 'קשת AB = 40'], after: plain(T.he('input.arcEndIsCentreNoStep', { detail: 'קשת AB = 40', end: 'A' })) },
-    { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AB = 90'], after: plain(T.he('input.arcEndIsCentreNoStep', { detail: 'קשת AB = 90', end: 'A' })) },
+    // #2345 (ADR-758) under #2486 (ADR-759): «רבע מעגל AOB» is centred at O (the middle letter), so AB is a real arc of
+    // the quarter — «קשת AB = 40» contradicts its 90° and is refused as over-constrained (#2483), «קשת AB = 90» is
+    // already true. Never the floor, never ∠AAB. Read from the locale table (one source).
+    { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AB = 40'], after: plain(T.he('errors.overConstrained_said', { said: 'קשת AB = 40', what: '∠AOB = 40°' })) + ' ' + HINT_HE },
+    { issue: '#2345', lines: ['חצי מעגל AOB', 'קשת AB = 40'], after: plain(T.he('errors.overConstrained_said', { said: 'קשת AB = 40', what: '∠AOB = 40°' })) + ' ' + HINT_HE },
+    { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AB = 90'], after: plain(T.he('suite.notice.alreadyDrawn', {})) },
+    // The arc-end-is-centre sentence itself, its letters re-based to the middle-letter centre (#2486): O is the centre.
+    { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AO = 40'], after: plain(T.he('input.arcEndIsCentreNoStep', { detail: 'קשת AO = 40', end: 'O' })) },
+    { issue: '#2345', lines: ['רבע מעגל BAO', 'קשת AB = 40'], after: plain(T.he('input.arcEndIsCentreNoStep', { detail: 'קשת AB = 40', end: 'A' })) },
     { issue: '#2048', lines: ['AD:DB = 1:2'], after: `הנתון «AD:DB = 1:2» מתייחס לנקודה שעדיין לא הוגדרה (A, D, B). הגדירו אותה תחילה. ${HINT_HE}` },
   ];
   for (const c of CASES) {

@@ -13715,3 +13715,21 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 **Locks.** `src-analytic/__tests__/already-drawn-1990.test.ts`: the four lines above reach their verdicts; one App branch reads the suite key for both; the shared four-builder assertions (the instance resolves 2-D's sentence in he/en; no retired key in the App).
 
 **Behaviour change for a student:** in analytic, a line that restates a given or that the figure already satisfies answers «זה כבר קיים באיור — אין מה להוסיף.» (English: "That's already on the figure — nothing to add."), instead of «זה כבר ידוע מהנתונים שכתבתם…» / «זה כבר נובע מהנתונים שכתבתם…» with the line quoted. Still no row.
+
+## ADR-AG-331 — Analytic reads an arc's three letters with 2-D's one reader (#2486)
+
+**Status:** accepted · 2026-10-24 · feature (ruled port) · fix round #2501, the analytic half of [ADR-759](06-decisions.md#adr-759) · branch `fix/2486-middle-letter-centre`
+
+**Operator:** #2486, 2026-10-24, e8 A: *"The middle letter is the centre, for the whole family … as in ∠AOB."* With R163 (*analytic gives 2-D's verdict, and the arc rows are ported*).
+
+**Requirements:** [02c](02c-requirements-analytic.md) R163 (examples only; the promise is unchanged) · **Design:** [04c](04c-design-analytic.md) "Sector (`sector` fact, M1)".
+
+**Measured before** (`decideSubmit` → `derive`, main 1944d866): «רבע מעגל AOB» → centre A (first letter); «גזרה OAB» → centre **A** (middle letter, no O-family exception; 2-D draws O); «גזרה APB» → A (2-D: P). Points placed first did not change the reading.
+
+**Decision.** `parseSector` reads both its `QUARTER_*` and `SECTOR_*` 3-run captures through `arcRunRoles` (`shell/arcRun.ts`), the reader 2-D's rules call. The quarter now reads the middle letter, the sector gains the O-family exception, so every run lands on 2-D's centre. Measured after: AOB/OAB → O, ABO → B, ABC → B, DCE → C, APB/PAB → P, POA → O, for «רבע מעגל», «גזרה» and their English spellings.
+
+**Known gap.** A loose «חצי מעגל AOB» 3-run is still not read in analytic (`not-handled`); 2-D reads it. #1796 covers only the Thales form; a separate issue is owed (found work), and its parity row waits for it.
+
+**Locks.** `src-analytic/__tests__/issue-2486-arc-run-centre.test.ts` (seven runs × four nouns, «גזרה OAB» → O, placed points, the quarter's equal arms and 90° at three seeds); parity rows `quarter-AOB-2486`, `sector-OAB-2486`.
+
+**Behaviour change for a student:** «רבע מעגל AOB» is drawn around O and «גזרה OAB» around O, as in the 2-D tool.

@@ -64,6 +64,7 @@ import { inscribePlacements } from '../engine/inscribe';
 import { findProofTarget } from '../../shell/proofTarget';
 import { unreadScript } from '../../shell/inputScript';
 import { findRadianAngle } from '../../shell/radianAngle';
+import { arcRunRoles } from '../../shell/arcRun';
 import {
   centreClauses,
   centresRespectivelyClauses,
@@ -8824,10 +8825,10 @@ function parseSemicircle(line: string): RuleOutcome {
   return made([...shape.facts, ...semicircleFacts(a, b, side, line)]);
 }
 
-/** «רבע מעגל» · «רבע מעגל OAB» (the FIRST letter is the centre) · "quarter circle". */
+/** «רבע מעגל» · «רבע מעגל AOB» (the centre by 2-D's one arc-run reader, `arcRunRoles`, #2486) · "quarter circle". */
 const QUARTER_HE = new RegExp(`^${HE_GIVEN}(?:ה)?רבע\\s+(?:ה)?מעגל(?:\\s+(${NAME})(${NAME})(${NAME}))?$`);
 const QUARTER_EN = new RegExp(`^(?:a\\s+|the\\s+)?quarter[\\s-]+circle(?:\\s+(${NAME})(${NAME})(${NAME}))?$`, 'i');
-/** «גזרה AOB בזווית 80» · «הגזרה AOB» · "sector AOB with angle 80" — the MIDDLE letter is the centre. */
+/** «גזרה AOB בזווית 80» · «הגזרה AOB» · "sector AOB with angle 80" — the centre by `arcRunRoles` (#2486). */
 const SECTOR_HE = new RegExp(`^${HE_GIVEN}(?:ה)?גזרה(?:\\s+(?:ה)?(?:עגולה|מעגלית))?\\s+(${NAME})(${NAME})(${NAME})${CENTRAL_VALUE}$`);
 const SECTOR_EN = new RegExp(`^(?:a\\s+|the\\s+)?(?:circular\\s+)?sector\\s+(${NAME})(${NAME})(${NAME})${CENTRAL_VALUE}$`, 'i');
 
@@ -8839,18 +8840,20 @@ const SECTOR_EN = new RegExp(`^(?:a\\s+|the\\s+)?(?:circular\\s+)?sector\\s+(${N
 function parseSector(line: string): RuleOutcome {
   const q = QUARTER_HE.exec(line) ?? QUARTER_EN.exec(line);
   if (q) {
-    const [, v, a, b] = q;
+    const [, x, y, z] = q;
     const ninety: Expr = { kind: 'num', value: 90 };
-    if (v) {
-      if (new Set([v, a, b]).size < 3) return refuse('repeated-vertex', line);
+    if (x) {
+      if (new Set([x, y, z]).size < 3) return refuse('repeated-vertex', line);
+      const { centre: v, ends: [a, b] } = arcRunRoles([x, y, z]);
       return made([{ t: 'sector', v, a, b, value: ninety, src: line }]);
     }
     return made([{ t: 'sector', a: toolPoint('end', 'quarter-1'), b: toolPoint('end', 'quarter-2'), value: ninety, src: line }]);
   }
   const s = SECTOR_HE.exec(line) ?? SECTOR_EN.exec(line);
   if (!s) return null;
-  const [, a, v, b, val] = s;
-  if (new Set([v, a, b]).size < 3) return refuse('repeated-vertex', line);
+  const [, x, y, z, val] = s;
+  if (new Set([x, y, z]).size < 3) return refuse('repeated-vertex', line);
+  const { centre: v, ends: [a, b] } = arcRunRoles([x, y, z]);
   return made([{ t: 'sector', v, a, b, ...(val !== undefined ? { value: { kind: 'num', value: Number(val) } as Expr } : {}), src: line }]);
 }
 

@@ -484,7 +484,8 @@ circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשו
 **R163 — arcs, sectors, semicircles and the diameter from a point build as they do in the 2-D tool**. *(Operator ruling: analytic gives 2-D's verdict, and the arc rows are ported.)* An arc's measure is its central angle.
 - «קשת AB = 40 במעגל O», «⌢{AC} = 60°»
 - «חצי מעגל שקוטרו AB», «גזרה AOB בזווית 80»
-- Sources: ADR-AG-220, #1622.
+- «רבע מעגל AOB» and «גזרה AOB» are centred at O, «גזרה OAB» too: the middle letter is the centre, or an O/P/Q letter written first, read as 2-D reads it
+- Sources: ADR-AG-220, #1622, ADR-AG-331, #2486.
 
 **R74 — a conic is named by its KIND**. A figure holding two of a kind refuses the reference rather than inventing an ordinal.
 - «הנקודה A נמצאת על האליפסה», «P על הפרבולה»
