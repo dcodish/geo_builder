@@ -1064,8 +1064,16 @@ export async function decideFromParse(
       if (lost) {
         return refuse('guided', { source: 'scope', result: 'scope:split-statements:unread-part', commands: r.commands }, lost);
       }
+      // #2532 (ADR-765): an INCIDENCE CLAUSE the reading never read («AB מיתר העובר דרך מרכז המעגל» lowered to the chord
+      // alone) — ADR-603's class, a fourth token kind — refuses the whole line with the same one-input-per-line message,
+      // the line cut at the phrase. After the label refusal, so a line both members see («…העובר דרך O», a fresh O)
+      // keeps the parts it had; only where nothing older fired (W21), like its siblings.
+      const lostThrough = gates.unreadThrough?.cut && !aiPath ? lostPartNote(gates.unreadThrough.cut) : null;
+      if (lostThrough) {
+        return refuse('guided', { source: 'scope', result: 'scope:split-statements:unread-through', commands: r.commands }, lostThrough);
+      }
       weak = 'dropped'; // a typo dropped a stated label/number/relation/verb/compound-structure/object → escalate rather than commit the partial parse
-      logs.push({ source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct, ...unaccounted.map((x) => `${x.kind}:${x.text}`), ...gates.latinProse.map((x) => `latin-prose:${x}`), ...(gates.unread?.items ?? []).map((x) => `unread:${x}`), ...(gates.unreadRole?.items ?? []).map((x) => `unread-role:${x}`)].join(',')}`, commands: r.commands, intermediate: true });
+      logs.push({ source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct, ...unaccounted.map((x) => `${x.kind}:${x.text}`), ...gates.latinProse.map((x) => `latin-prose:${x}`), ...(gates.unread?.items ?? []).map((x) => `unread:${x}`), ...(gates.unreadRole?.items ?? []).map((x) => `unread-role:${x}`), ...(gates.unreadThrough?.items ?? []).map((x) => `unread-through:${x}`)].join(',')}`, commands: r.commands, intermediate: true });
       // #1798 / #553 (ADR-598): the dropped content belongs to a COMPOUND whose every clause reads on its own —
       // «F אמצע DO, O - חיתוך של AC ו-BD». All or nothing: refused whole with the shared message listing the
       // clauses, instead of a paid call that would re-read the compound the ruling says to type line by line.

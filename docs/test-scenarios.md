@@ -2203,3 +2203,7 @@ over all four (ADR-041).
 
 **Guards against:** the #1012 re-reader teaching a spelling that the parser reads back as a different centre. «רבע מעגל ODC» on «ABC משולש ישר זוית · AC=15 · BC=10 · O על AC · D על CB» reads O; the re-reader tries C first and spells it «רבע מעגל DCO» with `spellArcRun`, the inverse of the one reader. **Asserts** the re-reader's first reading is centre C spelt «רבע מעגל DCO», and that sentence, typed as the last step, builds centre C with ∠OCD = 90° at seeds 0–2 (docs/17 §9).
 
+### `chord-through-centre-two-lines-2532` — a chord through the centre, one given per line: «מעגל O» · «AB מיתר» · «O על AB» (#2532, ADR-765)
+
+**Guards against:** the honest two-line form breaking now that the one-line «AB מיתר העובר דרך מרכז המעגל» is refused (it committed the chord alone, green, with O off AB). **Asserts** every step is green and dist(O, AB) < 1e-6 at seeds 0–3. The refusals (every measured spelling, both locales, the ✎ seam) are locked in `src/app/__tests__/issue-2532-unread-through.test.ts`.
+

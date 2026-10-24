@@ -5945,6 +5945,23 @@ export const SCENARIOS_4: Scenario[] = [
       for (const seed of [0, 1, 2]) expect(angle(at(replay(facts, seed), 'O'), at(replay(facts, seed), 'C'), at(replay(facts, seed), 'D')), `∠OCD = 90 @${seed}`).toBeCloseTo(90, 4);
     },
   },
+  {
+    id: 'chord-through-centre-two-lines-2532',
+    title: '#2532 (ADR-765): a chord through the centre, typed one given per line — «מעגל O» · «AB מיתר» · «O על AB» builds with O on AB at every seed',
+    guards:
+      "#2532 (P1): «מעגל O» · «AB מיתר העובר דרך מרכז המעגל» committed the chord alone, green, the centre up to 3.7 units off AB (seeds 0–3 at 045a8546). Root cause: no carrier rule reads a through-clause, and every gate missed it — the accountants count «מרכז»/«המעגל» as vocabulary, #1888's label probe sees a clause only through a fresh letter, #1904's word probe covers cevian nouns only. Fix (ADR-765): an incidence-phrase member of the read-extent battery (deletion of the phrase, and of its verb opener) refuses the line whole with the one-input-per-line message, «(1) AB מיתר  (2) העובר דרך מרכז המעגל» (FR-IN-4g, ADR-603). This scenario locks the honest two-line form the student can type today. The refusals (decision verdicts at the submit seam, every measured spelling, the ✎ seam) are src/app/__tests__/issue-2532-unread-through.test.ts.",
+    steps: ['מעגל O', 'AB מיתר', 'O על AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const facts = factsOf(['מעגל O', 'AB מיתר', 'O על AB']);
+      for (const seed of [0, 1, 2, 3]) {
+        const f = replay(facts, seed);
+        const [A, B, O] = ['A', 'B', 'O'].map((k) => at(f, k));
+        const off = Math.abs((B.x - A.x) * (O.y - A.y) - (B.y - A.y) * (O.x - A.x)) / dist(A, B);
+        expect(off, `dist(O, AB) @${seed}`).toBeLessThan(1e-6);
+      }
+    },
+  },
 ];
 
 /** #2477: the shared record of what the three ADR-761 scenarios guard (a hoisted function — the array reads it at load). */
