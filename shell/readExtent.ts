@@ -41,6 +41,12 @@
  * נפגשים בנקודה E») has no such cut: that is not a lost part but a lost operand, and the caller keeps its
  * own path for it.
  *
+ * ## The phrase (#2532, ADR-765)
+ *
+ * A fourth token kind: an incidence PHRASE with no fresh letter («העובר דרך מרכז המעגל»), measured by deletion
+ * ({@link readWords}) in the builder, and cut here as one unit — an {@link Occurrence} with `phrase: true`: the cut is at
+ * its start, and labels inside it are not read ({@link cutAtReading}).
+ *
  * ## Why it is in `shell/`
  *
  * It would otherwise be the third copy (2-D, 3-D, analytic). It knows no product and returns no strings:
@@ -58,6 +64,12 @@ export interface Occurrence {
   readonly end: number;
   /** the labels of a label run («AB» → A, B); the word itself for a word token */
   readonly parts: readonly string[];
+  /**
+   * #2532 (ADR-765): an occurrence that is a PHRASE — an opener through to the clause end («העובר דרך מרכז המעגל»).
+   * An unread phrase is one unit for {@link cutAtReading}: the cut is made at its start, and labels inside it do not
+   * count as read (a letter the phrase names, «…מרכז מעגל O», is read only as part of the phrase the reading dropped).
+   */
+  readonly phrase?: boolean;
 }
 
 /** How a builder reads a line — its own grammar, in its own context. */
@@ -219,14 +231,19 @@ export function cutAtReading<L>(
   const lost: string[] = [];
   const cuts: Cut<L>[] = [];
   const within = (from: number, to: number) => (o: Occurrence) => o.at >= from && o.end <= to;
+  // #2532 (ADR-765): an unread PHRASE is placed by overlap (a clitic «ו» before it may sit between two clauses), and a
+  // label inside one is not read
+  const phrases = occ.unread.filter((o) => o.phrase);
+  const readOcc = occ.read.filter((o) => !phrases.some((p) => o.at >= p.at && o.end <= p.end));
+  const unreadIn = (from: number, to: number) => occ.unread.filter((o) => (o.phrase ? o.at < to && o.end > from : within(from, to)(o)));
   for (const [i, c] of clauses.entries()) {
-    const unread = occ.unread.filter(within(c.at, c.end));
+    const unread = unreadIn(c.at, c.end);
     if (unread.length === 0) {
       parts.push(c.text);
       plain.push(i);
       continue;
     }
-    if (occ.read.filter(within(c.at, c.end)).length === 0 && readerFor(i).read(c.text) !== null) {
+    if (readOcc.filter(within(c.at, c.end)).length === 0 && readerFor(i).read(c.text) !== null) {
       // nothing of this clause was read, and it is a statement of its own: the whole clause is the lost part.
       // (One that does not read alone — «ואת AB» — is a fragment of the statement before it: cut below.)
       parts.push(c.text);
@@ -239,9 +256,33 @@ export function cutAtReading<L>(
       if (j < i && plain[plain.length - (i - j)] !== j) break; // only clauses that lost nothing are read with it
       const from = clauses[j].at;
       const span = text.slice(from, c.end);
-      const read = occ.read.filter(within(from, c.end));
+      const read = readOcc.filter(within(from, c.end));
       const lastRead = Math.max(...read.map((o) => o.end)) - from;
-      const firstUnread = Math.min(...occ.unread.filter(within(from, c.end)).map((o) => o.at)) - from;
+      const spanUnread = unreadIn(from, c.end);
+      const firstUnread = Math.min(...spanUnread.map((o) => o.at)) - from;
+      if (spanUnread.every((o) => o.phrase)) {
+        // #2532 (ADR-765): THE PHRASE CUT — the head is everything before the first unread phrase (its trailing comma
+        // dropped), and it must read as the span does with the phrases deleted: what the reading actually read
+        if (firstUnread <= 0) continue; // the phrase opens before this span (its clitic sits in the clause before)
+        if (firstUnread < lastRead) return null; // a read label after the phrase: a lost operand, not a lost part
+        const reader = readerFor(j);
+        const head = span.slice(0, firstUnread).replace(/[\s,;]+$/, '');
+        const lowering = head ? reader.read(head) : null;
+        if (lowering === null) continue;
+        let rest = span;
+        for (const p of [...spanUnread].sort((a, b) => b.at - a.at)) rest = `${rest.slice(0, Math.max(0, p.at - from))} ${rest.slice(p.end - from)}`;
+        const without = reader.read(rest.replace(/\s{2,}/g, ' ').replace(/[\s,;]+$/, '').trim());
+        if (without === null || !reader.same(without, lowering)) continue;
+        const tail = span.slice(firstUnread).trim();
+        parts.splice(parts.length - (i - j));
+        plain.splice(plain.length - (i - j));
+        cuts.push({ part: parts.length, lowering, tail });
+        parts.push(head.trim(), tail);
+        plain.push(-1, -1);
+        lost.push(tail);
+        done = true;
+        continue;
+      }
       if (firstUnread < lastRead) return null; // a lost operand inside the statement, not a lost part
       const reader = readerFor(j);
       const lowering = reader.read(span);

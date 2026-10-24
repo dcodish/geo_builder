@@ -4,7 +4,7 @@ _Slice S0.2 of [docs/24](archive/24-foundation-hardening-plan.md). This is the c
 
 _Instrumentation: `StepResult.ladder` (an ordered string trace of the stages traversed, ending with the stage that accepted or refused) — attached by `applyStep`/`applyCoupledStep`, asserted by `src/engine/__tests__/ladder-contract.test.ts`. Diagnostic metadata only; never semantics._
 
-> **Before stage 0 — the submit decision's honesty battery** (`honestyGateReport`, both 2-D commit seams). Not a ladder stage: it decides whether a parse may reach the ladder at all. Its read-extent members ([ADR-603](06-decisions.md#adr-603), #1888; [ADR-604](06-decisions.md#adr-604), #1904) refuse a line whose reading did not read a part of it, or a role word.
+> **Before stage 0 — the submit decision's honesty battery** (`honestyGateReport`, both 2-D commit seams). Not a ladder stage: it decides whether a parse may reach the ladder at all. Its read-extent members ([ADR-603](06-decisions.md#adr-603), #1888; [ADR-604](06-decisions.md#adr-604), #1904; [ADR-765](06-decisions.md#adr-765), #2532) refuse a line whose reading did not read a part of it, a role word, or an incidence clause («…העובר דרך מרכז המעגל»).
 
 ## Stage 0 — pre-gates (`applyStep`, before anything mutates)
 

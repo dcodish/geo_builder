@@ -1227,6 +1227,28 @@ together is a co-reference. At submit, when only the read-extent members fired (
 parse in turn — else the parts cut before the later role word. Where an older gate fired too, the line keeps its
 weak path (W21). The ⟂ verb row reads «אנך»; the existing-segment ⊥-bisector declares `VERB_PERPENDICULAR`.
 
+#### An incidence clause the reading never read ([ADR-765](06-decisions.md#adr-765))
+
+The phrase sibling, `unreadThrough` (`src/app/unreadThrough.ts`, in the battery): a fourth token kind of ADR-603's
+class, the LABEL-FREE incidence phrase («AB מיתר העובר דרך מרכז המעגל», «…במעגל O העובר דרך O», "through the
+centre"), which no other member sees — its words are circle vocabulary to the accountants, it has no fresh letter for
+the label probe, and a letter it does name is a co-reference. The openers are lexicon atoms (`THROUGH_OPEN_HE/_EN`,
+`THROUGH_VERB_HE/_EN`). Two deletions per occurrence, through `readWords` (ADR-604's rule): the whole phrase (opener
+to the clause end), and the verb opener alone (never a bare «דרך» / "through", a fronted locative a rule may tolerate).
+The occurrence is unread when EITHER leaves the lowering unchanged — the whole phrase alone misses a phrase whose words
+a rule reads for another reason (a secant's «המעגל»), the verb alone misses a tangent. The verb-only finding is the weaker one: it stands only when the
+lowering references no point label the line never typed, because a reading that resolved a role-named point
+(«המשיק העובר בנקודה המשותפת…» → the tangent at T) read the phrase, and the verb was a connective. An unread occurrence is
+reported as its whole phrase, clipped to its clause. **The phrase cut** (`cutAtReading`, an `Occurrence` with
+`phrase: true`): the phrase is one unit, placed in a clause by overlap (its clitic «ו» may sit between two clauses);
+labels inside it do not count as read; the head is everything before it (trailing comma dropped), and must read as the
+span does with the phrase deleted — «(1) AB קטע  (2) העובר דרך מרכז המעגל», never «(1) AB  (2) קטע…». At submit, after
+the label refusal (a line both members see keeps the label member's parts) and only where nothing older fired,
+`lostPartNote` refuses with `input.scope.split-statements` (`scope:split-statements:unread-through`); a line with no
+cut (the secant, whose circle is read from inside the phrase) takes the weak path. The ✎ seam names the phrase
+through `GateReport.items`. Cost: two parses per opener occurrence, plus the label probe and the cut, only on lines
+holding an opener.
+
 #### A number the reading never read ([ADR-677](06-decisions.md#adr-677), [ADR-678](06-decisions.md#adr-678))
 
 The number gate (`droppedGivenNumbers`, ADR-250 / ADR-437) accounts a stated number by VALUE, so any equal payload

@@ -2219,3 +2219,8 @@ over all four (ADR-041).
 ### `impossible-isosceles-quad-numeric-refused-2443` — «מרובע ABCD» · «AB = 5» · «BC = 5» · «AC ⊥ BC» is refused naming «AC ⊥ BC», never a straight corner at D (#2443 P1, ADR-764)
 
 **Guards against:** the numeric twin committing green at some seeds, and a refusal that names a straight corner at D (a rescue stage's collateral defect) instead of the student's statement. **Asserts** the refusal is `over-constrained: AC ⟂ BC cannot hold`, never mentions the ring A, B, C, D, and the prior figure keeps C off A.
+
+### `chord-through-centre-two-lines-2532` — a chord through the centre, one given per line: «מעגל O» · «AB מיתר» · «O על AB» (#2532, ADR-765)
+
+**Guards against:** the honest two-line form breaking now that the one-line «AB מיתר העובר דרך מרכז המעגל» is refused (it committed the chord alone, green, with O off AB). **Asserts** every step is green and dist(O, AB) < 1e-6 at seeds 0–3. The refusals (every measured spelling, both locales, the ✎ seam) are locked in `src/app/__tests__/issue-2532-unread-through.test.ts`.
+

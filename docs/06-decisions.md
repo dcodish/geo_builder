@@ -19732,3 +19732,76 @@ Pickups (docs/17 §9): «אלכסוני הריבוע» / «אלכסוני המל
 **Locks.** `src/engine/__tests__/issue-2443-limit-collapse-undeclared.test.ts` (the prover's undeclared triples read and not read, the declared triangle; every member through `decideDeterministic2D` at 8 seeds with the Hebrew naming both statements; the report at 24 seeds; arm A alone at 24 seeds; arm A′; the triangle twins; every control and coincidence at 24 seeds — 24 of 39 red at 045a8546). Scenarios `impossible-isosceles-quad-refused-2443`, `impossible-isosceles-quad-angle-refused-2443`, `impossible-isosceles-quad-numeric-refused-2443` (corpus 4). Not a fixture: the essence is a refusal. Parity rows above.
 
 **Behaviour change for a student:** «מרובע ABCD» · «AB = BC» · «AC ⊥ BC» (and every spelling, order, the other leg, a diagonal, a pentagon, loose points, the numeric twin) is refused with «לא ניתן: «AC ⊥ BC» סותר את «AB = BC» …», and the previous figure stays — before, a green quadrilateral with C drawn on A; the angle form «∠ACB = 90» is refused at once instead of "waiting for more givens".
+
+
+## ADR-765 — A through-clause the reading never read refuses the line: the incidence-phrase class of the read-extent battery (#2532)
+
+**Status:** accepted · 2026-10-24 · bug (P1, 2-D, prod honesty) · fix round #2543, stream C · branch `fix/2532-through-clause-refused` · **amends** [ADR-603](#adr-603) (a fourth token kind: the label-free incidence phrase, the member ADR-603 named as #1904's and left open) · **extends** [ADR-604](#adr-604) (deletion, now over a phrase span) and [ADR-W-120](06w-decisions-workspace.md#adr-w-120) (`shell/readExtent.ts`: the phrase cut)
+**Requirements:** [02](02-requirements.md) FR-IN-4g (its list of dropped parts gains the incidence clause on a point named by its role or by a letter the line already names; the promise, refused whole even when the drawing happens to satisfy the unread part, is unchanged) · **Design:** [04](04-design.md) § "An incidence clause the reading never read" · **LADDER stage:** before stage 0, the submit decision's honesty battery ([LADDER](LADDER.md))
+
+**Measured before** (`main` @ 045a8546, `decideDeterministic2D` → the store → `replay`, the model mocked and never called). «מעגל O» · «AB מיתר העובר דרך מרכז המעגל» committed `point-on-circle A, point-on-circle B, segment AB`, every fact green, dist(O, AB) = 0.97 / 0.00 / 3.69 / 0.92 at seeds 0–3. The plan's matrix committed green with the clause unread: «שעובר», «המיתר AB …», «מיתר AB …», «…מרכז מעגל O», «…במרכז המעגל», «…דרך המרכז», «במעגל העובר דרך מרכזו», «במעגל O העובר דרך O», «…מרכזו», the main verb «המיתר AB עובר …», «ועובר», «, העובר», «AB מיתר במרכז המעגל», the empty canvas, an unnamed circle, two circles, four English spellings, a segment (both locales), a secant, a tangent, an altitude, a median, «…מרכז המעגל החוסם», «CD מיתר העובר דרך אמצע AB», and «AB קוטר העובר דרך מרכז המעגל». The per-fix test has 32 of its 44 cases red at 045a8546.
+
+**Class (docs/17 §1).** *An incidence clause («[ה|ש|ו]עובר דרך/ב X», «דרך X», «במרכז …», "passing / that passes / through X") on a segment-carrier declaration (chord, segment, secant, tangent, altitude, median, diameter) is never read, yet the line commits green, whenever its point X carries no fresh letter: X is named by its role («מרכז המעגל», «מרכזו», «המרכז», "the centre", «אמצע AB», «מרכז המעגל החוסם») or by a letter the line already reads («במעגל O … דרך O»).*
+
+**Root cause.** No carrier rule reads a through-clause, and every gate on the commit path is blind to this one:
+- the token accountants (`honestyGateReport`) count «מרכז» and «המעגל» as circle vocabulary;
+- ADR-603's label probe sees a clause only through a fresh letter: «מרכז המעגל» has none, and «דרך O» after «במעגל O» is a co-reference;
+- ADR-604's word probe covers the cevian nouns only, and ADR-678's covers digits only;
+- ADR-598's clause gate does not cut at «העובר».
+
+This is ADR-603's own class, *"a stated part the winning reading never looks at is dropped while the line commits green"*, in a fourth token kind.
+
+**Decision.**
+1. **Refuse the line whole, as FR-IN-4g / ADR-603 rule** (operator rulings 2026-10-08 on #1888/#1889: *"a line that loses a part gets the existing one-input-per-line message"*, and *"Refuse it too"*). The refusal reuses the existing message (CLAUDE.md rule 7's P1 exception). Reading the clause is not this ADR's: the operator ruled it at P2 on 2026-10-24 (#2541), to follow this refusal.
+2. **The member** `unreadThrough` (`src/app/unreadThrough.ts`) sits in `honestyGateReport`, so the submit and the ✎ seams both have it.
+   - The openers are new lexicon atoms (`THROUGH_OPEN_HE/_EN`, `THROUGH_VERB_HE/_EN`). There is no inline fragment, and no ceiling rises.
+   - Each occurrence is deleted two ways through `readWords`: the whole phrase (opener to the clause end), and the verb opener alone (never a bare «דרך» / "through"). **It is unread when EITHER deletion leaves the lowering unchanged.**
+   - Measured by the plan's probes: the whole phrase alone flags 24 of 26 (it misses the secant, whose «המעגל» is its circle, and «…אמצע AB», whose «AB» the chord list reads). Any opener alone flags 25, and falsely flags 1 corpus line («דרך הנקודה C העבירו משיק…», a fronted locative). The union flags 26 of 26, with 0 false.
+   - **Refinement found in the gates (a deviation from the plan).** `test:fast` caught one false flag the plan's evidence missed. After «המעגלים משיקים מבפנים בנקודה T», the line «המשיק העובר בנקודה המשותפת לשני המעגלים» (#2406, H16) escalated where it should commit the tangent at T.
+     - The verb there is a pure connective: «המשיק בנקודה המשותפת…» reads the same, because the tangent at T is the tangent through T.
+     - The two deletions cannot tell this apart from the secant: in both, the whole deletion fails the read and the verb deletion changes nothing.
+     - What separates them is that this reading resolved a point the line never typed (T, from «הנקודה המשותפת»). A dropped incidence point is never resolved. So **a verb-only finding stands only when the lowering references no untyped point label**.
+     - This only removes flags, so it falls back to the pre-fix behaviour and never adds a refusal. Every class line (all of them name typed letters only) is still caught.
+3. **The phrase cut** (`cutAtReading`, generic, in `shell/`). An unread occurrence is reported as its whole phrase, clipped to its clause, with `phrase: true`. The phrase is one unit:
+   - it is placed in a clause by overlap, because the clitic «ו» of «ועובר» sits between two of `clausesOf`'s clauses;
+   - labels inside it are not read (the O of «…מרכז מעגל O»);
+   - the head is everything before it, with its trailing comma dropped, and it must read as the span does with the phrase deleted.
+
+   So the parts are «(1) AB קטע  (2) העובר דרך מרכז המעגל», never «(1) AB  (2) קטע…». ADR-603's shortest prefix is kept for label runs.
+4. **The wiring.**
+   - **Submit** (`decideFromParse`, the `!gates.clean` branch). The refusal comes after the label refusal: a line both members see («AB מיתר העובר דרך O», with a fresh O) keeps the parts and the `unread-part` result it had. It fires only where nothing older fired (W21, `onlyReadExtent`), and refuses `guided` with `input.scope.split-statements`, result `scope:split-statements:unread-through`. A line with no cut takes the weak path (`weak: dropped`, logged `unread-through:<phrase>`), never a commit.
+   - **✎ edit.** The phrase joins `GateReport.items`, so `steps.editDropped` names it.
+
+**Measured after.**
+- Every class line is refused with the parts «(1) <head>  (2) <the phrase as typed>», in both locales. Nothing is committed and the model is not called.
+- **The one exception is the secant**, «AB חותך העובר דרך מרכז המעגל». Its rule reads its circle from inside the phrase, so no prefix of the line reads («AB חותך» alone is not read). It has no parts to show, and it escalates `weak: dropped` (the plan's own fallback). It is never committed.
+- The controls read unchanged: «AB קוטר», «AB קוטר במעגל O», «AB קוטר העובר דרך C», «מעגל העובר דרך A», «המעגל עובר דרך A», «קוטר העובר בנקודה A במעגל O», «AB עובר דרך מרכזי המעגלים», «AB מיתר» · «O על AB» (dist 0 at seeds 0–7), and «AB מיתר» · «AB קוטר». «AB מיתר העובר דרך C» still escalates.
+- **False-flag evidence:**
+  - the corpus net (scenarios and fixtures): 0 flagged of 2059 committed steps, 17 of them holding a phrase opener;
+  - the catalog sweep (both locales): no catalog example refused;
+  - **the parity rows' 2-D phrase lines** (the audit's gate): every row of the fixture at 045a8546 was run through 2-D with its context. Its 19 phrase steps (16 distinct lines, among them `cat-2d-130`, `cat-2d-152`, `tangent-through-common-point-2406`, `touch-tangent-through-2390`, `an-1620-perp-05` and the four `collinear-circle-2099-*`) keep their verdicts, and the member flags none of them. The plan's "38" is this set counted twice. The 2-D and analytic parity locks are green.
+- **Perf** (docs/17 §7, 30-run means after warm-up): the reported line's decide is 2.5 ms, of which the member is 1.1 ms (≈ 1.4 ms before). «AB קוטר העובר דרך C», a read phrase, is 1.5 ms (member 0.3 ms). A line with no opener pays nothing (the member returns on one regex test: «AB מיתר», 0.9 ms either way).
+
+**Behaviour change for a student (heads-up).** «AB קוטר העובר דרך מרכז המעגל» drew a correct diameter, and it is refused too: «(1) AB קוטר  (2) העובר דרך מרכז המעגל». That is FR-IN-4g's "even when the drawing happens to satisfy the unread part". Every other class line moves from a wrong green figure to the refusal.
+
+**Sibling audit (ADR-W-157).**
+- **Analytic:** no drop. Every class line is `not-handled` (handed to the model), which is its ruled behaviour (02c R124: *"a rest that says something … is still the model's"*). The exception is «AB מיתר במעגל O העובר דרך O», which is refused `split-statements`. Analytic already reads the main-verb forms (ADR-AG-193).
+  - **Port: out, as a known-gap row.** The prerequisite is an operator ruling that changes R124 for this rest: #2547 (filed, `needs-operator`). #2541 already rules its end state, a read in both builders. No 06c entry.
+- **3-D:** every member is `not-understood` (handed on), and circle geometry is exception X8. Nothing to port.
+
+**Locks.**
+- `src/app/__tests__/issue-2532-unread-through.test.ts`:
+  - 29 refusal rows with their exact parts;
+  - the secant's escalation;
+  - the letter-named twin keeping `unread-part`;
+  - nine controls, and one unchanged escalation;
+  - the two-line remedy at seeds 0–7;
+  - the ✎ seam on a chord and on a diameter.
+- The corpus net, `issue-1888-unread-corpus-net.test.ts`, runs the member, with an exercised floor of `withThrough ≥ 15`.
+- The catalog sweep, `issue-1888-qualifier-sweep.test.ts`, counts an `unread-through` refusal of a catalog example as a fault.
+- Scenario `chord-through-centre-two-lines-2532` (corpus 4).
+- Parity rows, family `chords-arcs`, X8: `chord-through-centre-2532-01` (refused; analytic gap #2547) and `-03` (the two-line control, builds). The plan's English twin `-02` is not a row: X8 is matched in Hebrew and the fixture has no English circle rows, so the English spellings are locked in the unit test.
+
+**Found items.**
+- #2545 (P1, 2-D): «משולש ABC» · «DE מיתר במעגל החוסם» draws a fresh free circle, with «החוסם» dropped green. The through-twin now refuses.
+- #2546 (debt, P3): the chord's plural distribution reads every capital in the body as a chord.
