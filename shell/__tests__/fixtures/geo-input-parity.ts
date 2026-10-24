@@ -315,7 +315,6 @@ export const GAP_ISSUES: Readonly<Record<GapIssue, 'open' | 'closed' | 'icebox'>
   '#2442': 'open', // #2405 (ADR-751): «כל המשיקים המשותפים» on a pair whose position was never stated: 2-D asks (interim), analytic does not read it; the permanent answer awaits the operator
   '#2451': 'open', // #2355 (ADR-753): 3-D refuses «ריבוע ABCD חסום במעגל» over a ring already inscribed (already-defined); 2-D builds the square
   '#2460': 'open', // #2464 / #2470 (ADR-760): analytic does not read «המעגל החיצוני/הפנימי» as a reference (not-handled)
-  '#2503': 'open', // #2443 (ADR-764): 3-D accepts «מרובע ABCD · |AB| = |BC| · AC ⊥ BC» green (C on A)
   '#2506': 'open', // #2443 (ADR-764): analytic draws three loose points with «AB = BC · AC ⊥ BC» green
   '#2069': 'open', // #2069 (ADR-3D-369): analytic's polygon declaration does not read the triangle sign «△ABC» (its parser is in PR #2299)
 };
@@ -833,9 +832,9 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'impossible-right-isosceles-2292-angle', family: 'angles', steps: ['משולש ABC', 'AB = BC', '∠ACB = 90'], contextFor: { '3d': ['משולש ABC', '|BA| = |BC|'] }, expect: 'refused' },
   { id: 'impossible-right-isosceles-2292-other-leg', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB = BC', 'AB ⊥ AC'], contextFor: { '3d': ['משולש ABC', '|BA| = |BC|'] }, expect: 'refused' },
   { id: 'thin-right-triangle-2292-control', family: 'parallel-perpendicular', steps: ['משולש ABC', 'AB = 2', 'BC = 1', 'AC ⊥ BC'], expect: 'builds', note: 'a real right triangle — the control' },
-  // #2443 (ADR-764): the same impossible givens with NO declared triangle — two vertices of a quadrilateral, or loose points, would meet
-  { id: 'impossible-isosceles-quad-2443-perp', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB = BC', 'AC ⊥ BC'], contextFor: { '3d': ['מרובע ABCD', '|AB| = |BC|'] }, expect: 'refused', knownGap: [{ product: '3d', issue: '#2503' }], note: 'AB = BC holds only where C meets A; D keeps the quadrilateral wide, so no ring is flat' },
-  { id: 'impossible-isosceles-quad-2443-angle', family: 'angles', steps: ['מרובע ABCD', 'AB = BC', '∠ACB = 90'], contextFor: { '3d': ['מרובע ABCD', '|AB| = |BC|'] }, expect: 'refused', knownGap: [{ product: '3d', issue: '#2503' }] },
+  // #2443 (ADR-764) / #2503 (ADR-3D-378): the same impossible givens with NO declared triangle — two vertices of a quadrilateral, or loose points, would meet
+  { id: 'impossible-isosceles-quad-2443-perp', family: 'parallel-perpendicular', steps: ['מרובע ABCD', 'AB = BC', 'AC ⊥ BC'], contextFor: { '3d': ['מרובע ABCD', '|AB| = |BC|'] }, expect: 'refused', note: 'AB = BC holds only where C meets A; D keeps the quadrilateral wide, so no ring is flat' },
+  { id: 'impossible-isosceles-quad-2443-angle', family: 'angles', steps: ['מרובע ABCD', 'AB = BC', '∠ACB = 90'], contextFor: { '3d': ['מרובע ABCD', '|AB| = |BC|'] }, expect: 'refused' },
   { id: 'impossible-isosceles-loose-2443', family: 'parallel-perpendicular', steps: ['נקודה A', 'נקודה B', 'נקודה C', 'AB = BC', 'AC ⊥ BC'], expect: 'refused', exception: 'X9', knownGap: [{ product: 'analytic', issue: '#2506' }], note: 'three loose points: no polygon at all' },
   { id: 'incircle-in', family: 'inscribed', steps: ['משולש ABC', 'במשולש ABC חסום מעגל'], expect: 'builds', exception: 'X8' },
   { id: 'length-noun-q2', family: 'lengths', steps: ['משולש ABC', 'אורך AB=BC'], expect: 'builds', note: "3-D's own spelling of an equal length (Q2): builds in all three" },

@@ -551,7 +551,12 @@ point–plane distance, the distance between parallel planes, `sin β = |n·u| /
   ∠ACB = 90°», or «AC ⊥ BC» / «CA ⊥ CB», in either order, or «משולש ישר זווית שווה שוקיים ABC · ∠ACB = 90°»: the right angle
   at C makes BA the hypotenuse, so the lengths agree only when C = A). The completing line is refused with the same words,
   never drawn as a sliver (#2292, ADR-3D-372, ADR-W-146); a thin but real triangle («|AB| = 2 · |BC| = 1 · AC ⊥ BC»)
-  builds. **A declared polygon over points fixed by coordinates is never drawn crossed:** when its ring, in the
+  builds. **The same givens are refused when the points that would meet are NOT a declared ring** — two vertices of a
+  quadrilateral or a pentagon («מרובע ABCD · |AB| = |BC| · AC ⟂ BC» would put C on A), or a triangle declared over existing
+  points — and so is a stated angle that holds only because its arm has no length («ריבוע ABCD · E על AB · |DE| = |DA| ·
+  DE ⊥ AE», E on A): the completing line is refused as the statements' contradiction («הנתונים סותרים זה את זה — אין גוף
+  שמקיים את «AC ⟂ BC» יחד עם «|AB| = |BC|»»), never with a flat-polygon sentence (#2503, ADR-3D-378). A length-only
+  coincidence (FR-EN-20: «D על BC · |BD| = |BC|» puts D on C) still builds. **A declared polygon over points fixed by coordinates is never drawn crossed:** when its ring, in the
   order named, crosses itself («A(0,0,0) · B(4,0,0) · C(1,3,0) · D(3,3,0) · טרפז ABCD»), the line that completed it
   — the declaration, or the coordinate typed last — is refused in analytic's words. **The same holds for points a
   SHAPE placed** («ריבוע ABCD · מרובע ACBD», a cube's «מרובע ACBD», the midpoint ring «מרובע ABED», and the ring
