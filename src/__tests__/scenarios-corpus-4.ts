@@ -40,7 +40,8 @@
  */
 
 import { expect } from 'vitest';
-import { replay } from '@/store/geoStore';
+import { replay, useGeoStore, groupKey } from '@/store/geoStore';
+import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { isGeoPoint, freeDofCount, detectRelations, detectShapes, ringSimple, circleRefs, crossingUtterance } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 
@@ -5669,7 +5670,79 @@ export const SCENARIOS_4: Scenario[] = [
       expect(crossingUtterance({ circle1: 'circle-O-2', c: 'A', d: 'B' } as never, 'K', 'he', withDiameter)).toBe('K = חיתוך המעגל הפנימי ו-AB');
     },
   },
+  {
+    id: 'later-line-keeps-earlier-row-2480',
+    title: '«מעגל O» · «ריבוע חוסם את מעגל O» · «ריבוע חסום במעגל O» — three rows, verbatim; both squares on the one circle O (#2480, ADR-757)',
+    guards:
+      "#2480 (P1), the operator's round #2466 T5 (2026-10-24): *\"after adding the second line, the first one disappears … I cannot think of a case we want to change a user input that previously passed\"*. At 1944d866 line 2's commit rewrote fact #0 in place (its utterance became line 2's, its command a circle-through depending on letters line 2 defines later), so the list showed line 2 twice and line 3 was refused «מעגל O לא הוגדר». Root cause: foldCommand's two collapse-in-place rules (471da348's standalone-circle resize, ADR-011's free-point move) rewrote a committed fact; and the incircle rule re-derived an existing circle for a quadrilateral (ADR-115's dual covered triangles only). ADR-757: a committed fact is immutable to later lines, and a quadrilateral around an existing circle is built on it. Asserts, through the store's own commit, three rows in order with the typed text; line 3 builds; one circle; the outer square's sides tangent to it and the inner square's corners on it. The class matrix (78 sequences, the fold unit tests, every quadrilateral phrase around a sized circle) is src/__tests__/issue-2480-row-immutability.test.ts.",
+    steps: ['מעגל O', 'ריבוע חוסם את מעגל O', 'ריבוע חסום במעגל O'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const lines = ['מעגל O', 'ריבוע חוסם את מעגל O', 'ריבוע חסום במעגל O'];
+      expect(committedRows(lines), 'three rows, each with the line the student typed').toEqual(lines);
+      expect([...fig.circles.keys()]).toEqual(['circle-O']);
+      const c = fig.circles.get('circle-O')!;
+      const quads = fig.construction.objects.filter((o) => o.kind === 'polygon' && o.vertices.length === 4).map((o) => (o.kind === 'polygon' ? o.vertices : []));
+      expect(quads).toHaveLength(2);
+      const onCircle = (ids: Id[]) => ids.every((v) => Math.abs(dist(at(fig, v), c.center) - c.r) < 1e-6);
+      const tangent = (ids: Id[]) => ids.every((v, i) => {
+        const a = at(fig, v), b = at(fig, ids[(i + 1) % 4]);
+        return Math.abs(Math.abs((c.center.x - a.x) * (b.y - a.y) - (c.center.y - a.y) * (b.x - a.x)) / dist(a, b) - c.r) < 1e-6;
+      });
+      expect(quads.filter(tangent), 'one square around O').toHaveLength(1);
+      expect(quads.filter(onCircle), 'one square inside O').toHaveLength(1);
+    },
+  },
+  {
+    id: 'square-in-circle-after-square-around-2454',
+    title: '«מעגל O» · «ריבוע ABCD חוסם את מעגל O» · «מרובע EFGH חסום במעגל O» · «EFGH ריבוע» — every line builds (#2454, absorbed by #2480, ADR-757)',
+    guards:
+      "#2454, the operator's sequencing note of 2026-10-23 (accept the wording only \"until this issue is fixed\"). At 1944d866 the fourth line was refused «E, F, G, H is no longer available»: line 2 had rewritten «מעגל O» into a circle-through placed ahead of the letters it depends on, so a later shape over the circle's riders re-folded a prefix in which circle O did not exist yet. Without line 1 the same lines built. Root cause and fix as #2480 (ADR-757). Asserts four rows through the store's own commit, the figure green, EFGH a square on circle O and ABCD tangent to it.",
+    steps: ['מעגל O', 'ריבוע ABCD חוסם את מעגל O', 'מרובע EFGH חסום במעגל O', 'EFGH ריבוע'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const lines = ['מעגל O', 'ריבוע ABCD חוסם את מעגל O', 'מרובע EFGH חסום במעגל O', 'EFGH ריבוע'];
+      expect(committedRows(lines)).toEqual(lines);
+      const c = fig.circles.get('circle-O')!;
+      const E = ['E', 'F', 'G', 'H'].map((v) => at(fig, v));
+      for (const p of E) expect(Math.abs(dist(p, c.center) - c.r)).toBeLessThan(1e-6);
+      for (let i = 0; i < 4; i++) expect(Math.abs(dist(E[i], E[(i + 1) % 4]) - dist(E[0], E[1]))).toBeLessThan(1e-6);
+      expect(Math.abs(dist(E[0], E[2]) - dist(E[1], E[3])), 'equal diagonals: a square').toBeLessThan(1e-6);
+      const A = ['A', 'B', 'C', 'D'].map((v) => at(fig, v));
+      for (let i = 0; i < 4; i++) {
+        const a = A[i], b = A[(i + 1) % 4];
+        expect(Math.abs(Math.abs((c.center.x - a.x) * (b.y - a.y) - (c.center.y - a.y) * (b.x - a.x)) / dist(a, b) - c.r)).toBeLessThan(1e-6);
+      }
+    },
+  },
 ];
+
+/**
+ * #2480 (ADR-757): the ROWS the store shows after committing `lines` one at a time through its own commit
+ * (`executeMany`, what the pipeline's `commitVerdict` calls) — each line read against the figure the store holds,
+ * as the app reads it. Asserts after every line that no row an earlier line committed was rewritten.
+ */
+function committedRows(lines: string[]): string[] {
+  const st = () => useGeoStore.getState();
+  st().clear();
+  try {
+    for (const line of lines) {
+      const ctx = ctxOf(st().facts);
+      const r = indefiniteShapeReading(parse(line, ctx), line, ctx, st().facts, 0);
+      expect(r.ok, `«${line}» parses`).toBe(true);
+      if (!r.ok) break;
+      const before = st().facts;
+      st().executeMany(r.commands, line);
+      before.forEach((b, i) => expect(st().facts[i], `«${line}» kept row fact #${i} («${b.utterance}»)`).toBe(b));
+    }
+    const facts = st().facts;
+    return facts.flatMap((f, i) => (i === 0 || groupKey(f) !== groupKey(facts[i - 1]) ? [f.utterance ?? ''] : []));
+  } finally {
+    st().clear();
+  }
+}
 
 /**
  * #2362 ([ADR-748](../../docs/06-decisions.md#adr-748), operator ruling 2026-10-20 Q2): the operator's EXACT sequences of the

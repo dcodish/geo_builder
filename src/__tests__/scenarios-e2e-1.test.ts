@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SCENARIOS, scenarioFacts, replayFacts, sweepSeeds, roundTripProps, newRoundTripCounters, gateProps, dofHonesty, degeneracyHonesty } from './scenarios-corpus';
+import { SCENARIOS, scenarioFacts, replayFacts, sweepSeeds, roundTripProps, newRoundTripCounters, gateProps, dofHonesty, degeneracyHonesty, rowImmutability } from './scenarios-corpus';
 
 // Slice 1/8 of the end-to-end scenario corpus (issue #60): membership is index % 8 === 0.
 // Same tests, same assertions as the old single-file loop — sharded so vitest's per-FILE parallelism
@@ -39,6 +39,8 @@ describe('reported scenarios — end-to-end replay of real bug reports (slice 1/
       // The honesty-gate false-positive net (#456/ADR-430): every committed step of a reported-bug
       // scenario is input that must keep working, so the corpus IS the generosity net.
       gateProps(sc, facts, gc);
+      // #2480 (ADR-757): committing the steps one by one never rewrites a row an earlier step committed.
+      rowImmutability(facts, `[${sc.id}]`);
     });
   }
 

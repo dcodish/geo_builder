@@ -33,6 +33,7 @@ import { parse, buildParseCtx } from '@/parser';
 import type { AnyCommand } from '@/engine';
 import { indefiniteShapeReading } from '@/store/indefiniteShape';
 import { canonicalStepCommands, lowersAsSaved } from '@/store/loadAudit';
+import { rowImmutability } from './scenarios-harness';
 
 const files = import.meta.glob('./fixtures/*.geo.json', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>;
 
@@ -115,6 +116,10 @@ describe('figure-file fixtures net', () => {
         const fig = replay(built, builtSeed);
         const want = [...(FIXTURE_DEGENERATE[name] ?? [])].sort();
         expect(fig.degeneracies.map((d) => d.object).sort(), `degeneracy notices of ${name} (ratios ${fig.degeneracies.map((d) => d.ratio.toExponential(2)).join(', ')})`).toEqual(want);
+      });
+
+      it('committing its steps one by one never rewrites an earlier row (#2480, ADR-757)', () => {
+        rowImmutability(facts, name);
       });
 
       it('its utterances still lower to the same commands (parser drift)', () => {

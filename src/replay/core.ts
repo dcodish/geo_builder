@@ -552,12 +552,19 @@ export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
  *
  * - an exact duplicate of an existing fact is idempotent: an ENABLED twin leaves the list unchanged, a
  *   DISABLED twin (an unticked row) is re-enabled in place — re-typing never stacks a second copy;
- * - a free point re-stated by id is moved in place (ADR-011);
+ * - **a committed fact is never rewritten by a later line** (#2480, [ADR-757](docs/06-decisions.md#adr-757); the
+ *   operator's principle, [ADR-W-156](docs/06w-decisions-workspace.md#adr-w-156): "I cannot think of a case we want to
+ *   change a user input that previously passed"). A fact below `committed` — the list as it stood before THIS batch —
+ *   keeps its utterance, group, command and list position whatever a later line emits. The two collapse-in-place
+ *   rules below apply only to a fact the SAME batch appended; over a committed fact they append instead (the
+ *   later line's own row), and the engine's upsert decides the figure exactly as before;
+ * - a free point re-stated by id is moved — in place within one batch (ADR-011), as an appended move fact across
+ *   lines; an `ifAbsent` ensure-exists over an existing free point changes nothing (apply skips it, ADR-236);
  * - a circle statement that states NO size (`freeRadius` / `ifAbsent`) over a circle an enabled fact
  *   already defines (same centre, or any for an ensure-exists) is a reference and leaves the list unchanged
  *   (#2083, ADR-646);
- * - a re-stated STANDALONE circle is resized in place (a circle inside a bigger step falls through to an
- *   append, keeping that step's label intact) — but only when its fact states NO size or the SAME size: a
+ * - a re-stated STANDALONE circle of the same batch is resized in place (a circle inside a bigger step, or a
+ *   committed one, falls through to an append, keeping that step's label intact) — but only when its fact states NO size or the SAME size: a
  *   second, DIFFERENT stated size is appended, so the letter system judges it against the first and the fold
  *   refuses it naming that statement (#2119, [ADR-683](docs/06-decisions.md#adr-683); the operator's ruling of
  *   2026-10-15 — to change a radius the student edits or mutes the old row);
@@ -566,12 +573,15 @@ export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
  * Returns the SAME array when nothing changed, and never mutates: a changed fact is a new object, so
  * {@link trialChanges} can name exactly what a candidate step touched.
  */
-export function foldCommand(facts: Fact[], cmd: AnyCommand, mint: (cmd: AnyCommand) => Fact, utterance?: string): Fact[] {
+export function foldCommand(facts: Fact[], cmd: AnyCommand, mint: (cmd: AnyCommand) => Fact, utterance?: string, committed = facts.length): Fact[] {
   const dup = facts.find((f) => deepEqual(f.cmd, cmd));
   if (dup) return dup.enabled ? facts : facts.map((f) => (f.id === dup.id ? { ...f, enabled: true } : f));
+  // #2480 (ADR-757): only a fact THIS batch appended may be rewritten in place; a committed row is immutable
+  const ownBatch = (f: Fact) => facts.indexOf(f) >= committed;
   if (cmd.type === 'free-point') {
     const prev = facts.find((f) => f.cmd.type === 'free-point' && f.cmd.id === cmd.id);
-    if (prev) return facts.map((f) => (f === prev ? { ...f, cmd, utterance, enabled: true } : f));
+    if (prev && ownBatch(prev)) return facts.map((f) => (f === prev ? { ...f, cmd, utterance, enabled: true } : f));
+    if (prev && cmd.ifAbsent) return facts; // an ensure-exists over a point a row already places: nothing to record
   }
   // #2083 (ADR-646): a circle statement that states NO size over a circle an enabled fact already defines
   // is a REFERENCE — the list is unchanged. Only a stated size re-states a circle (the resize below). Read over
@@ -585,13 +595,13 @@ export function foldCommand(facts: Fact[], cmd: AnyCommand, mint: (cmd: AnyComma
     const prev = facts.find((f) => (f.cmd.type === 'circle' || f.cmd.type === 'circle-through') && f.cmd.id === cmd.id);
     // #2119 (ADR-683): two stated sizes that differ are two statements, never an overwrite
     const restatesOtherSize = !!prev && statedSizeCircles([prev.cmd]).size > 0 && statedSizeCircles([cmd]).size > 0 && prev.cmd.type === 'circle' && cmd.type === 'circle' && prev.cmd.radius !== cmd.radius;
-    if (prev && !restatesOtherSize && !facts.some((f) => f.id !== prev.id && groupKey(f) === groupKey(prev)))
+    if (prev && ownBatch(prev) && !restatesOtherSize && !facts.some((f) => f.id !== prev.id && groupKey(f) === groupKey(prev)))
       return facts.map((f) => (f === prev ? { ...f, cmd, utterance, enabled: true } : f));
   }
   return [...facts, mint(cmd)];
 }
 
-/** The facts of a folded list that the fold CHANGED — appended, re-enabled, moved or resized (by object
+/** The facts of a folded list that the fold CHANGED — appended, re-enabled, or moved / resized within the batch (by object
  *  identity: {@link foldCommand} never reuses a changed fact's object). What a dry run judges. */
 export function trialChanges(facts: Fact[], all: Fact[]): Fact[] {
   const prior = new Set(facts);
@@ -611,7 +621,7 @@ export function trialChanges(facts: Fact[], all: Fact[]): Fact[] {
 export function trialFacts(facts: Fact[], commands: AnyCommand[]): Fact[] {
   let n = 0;
   const mint = (cmd: AnyCommand): Fact => ({ id: `~try.${n++}`, group: '~try', enabled: true, cmd });
-  return commands.reduce((all, c) => foldCommand(all, c, mint), facts.slice());
+  return commands.reduce((all, c) => foldCommand(all, c, mint, undefined, facts.length), facts.slice());
 }
 
 /** The POINT letters an `AnyCommand` would introduce (created or auto-created) OUTSIDE the fold — the

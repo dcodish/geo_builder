@@ -62,10 +62,14 @@ describe('store — replay pipeline', () => {
 });
 
 describe('store — repositioning a free point is a move (ADR-011)', () => {
-  it('re-placing an existing free point updates its fact in place (no new row) and moves it', () => {
+  // #2480 (ADR-757): the move is the later line's own fact — the row that placed A is never rewritten — and the
+  // engine applies a later free point as the move (ADR-011), exactly as the separate move fact below.
+  it('re-placing an existing free point appends a move fact (the first row untouched) and moves it', () => {
     s().execute({ type: 'free-point', id: 'A', x: 0, y: 0 });
+    const first = s().facts[0];
     s().execute({ type: 'free-point', id: 'A', x: 4, y: 1 }); // move A
-    expect(s().facts).toHaveLength(1); // updated in place, not stacked
+    expect(s().facts).toHaveLength(2);
+    expect(s().facts[0]).toBe(first);
     expect(replay(s().facts).positions.get('A')).toEqual({ x: 4, y: 1 });
   });
 
@@ -366,10 +370,10 @@ describe('circle restatement — a second, different stated radius is refused, n
     expect(d.status[s().facts[1].id]).toMatch(/^over-constrained: radius of circle-O = 8 cannot hold \[vs #0\]$/);
   });
 
-  it('a size for a sizeless circle still sizes it in place', () => {
+  it('a size for a sizeless circle still sizes it — as the later row, the first row untouched (#2480, ADR-757)', () => {
     s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true }, 'circle O', 'g1');
     s().execute(CIRCLE(8), 'circle O radius 8', 'g2');
-    expect(s().facts).toHaveLength(1);
+    expect(s().facts.map((f) => f.utterance)).toEqual(['circle O', 'circle O radius 8']);
     expect(replay(s().facts).construction.objects.find((o) => o.id === 'circle-O')).toMatchObject({ radius: { via: 'length', value: 8 } });
   });
 
