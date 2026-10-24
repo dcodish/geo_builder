@@ -5816,7 +5816,9 @@ export const SCENARIOS_4: Scenario[] = [
     check(fig) {
       allStepsOk(fig);
       expect(fig.circles.size, 'two circles, no third').toBe(2);
-
+    },
+  },
+  {
     id: 'quarter-arc-contradicts-span-2483',
     title: '«רבע מעגל AOB», then «קשת BO=40» (and «קשת BO = 40») is refused and the quarter keeps its 90° (#2483, ADR-758)',
     guards:

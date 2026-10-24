@@ -1,0 +1,1232 @@
+{
+ "name": "round-2466",
+ "title": "Round #2466 — the messaging framework + two P1s",
+ "cases": [
+  {
+   "id": "T1",
+   "title": "An inscribed square over a drawn quadrilateral is a square (#2355)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "ריבוע ABCD חסום במעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». ABCD is a square with all 4 vertices on the circle",
+   "before": "green quadrilateral 84/79/96/101°"
+  },
+  {
+   "id": "T2",
+   "title": "The right angle holds for an inscribed right triangle (#2355)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "משולש ישר זווית ABC חסום במעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». ∠C = 90°, AB a diameter",
+   "before": "angles 77/42/61"
+  },
+  {
+   "id": "T3",
+   "title": "A quadrilateral already on its circle becomes a square (#2355)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD חסום במעגל",
+    "ריבוע ABCD חסום במעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». the ring turns into a square on the same circle",
+   "before": "«זה כבר קיים באיור», ring unchanged",
+   "expectAbsent": [
+    "זה כבר קיים באיור"
+   ]
+  },
+  {
+   "id": "T4",
+   "title": "REFUSAL: a square contradicting stated sides is refused (#2355)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "AB = 3",
+    "BC = 4",
+    "ריבוע ABCD חסום במעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». refused with the same message «ABCD ריבוע» gets; nothing drawn (Pre-played by a timed probe: the refusal lands about 7.8 s after Enter, after «חושב…» — the control «ABCD ריבוע» takes 3.8 s; the driver reads too early, so its screenshot shows «חושב…». Measured sentence: «לא ניתן: «ריבוע ABCD חסום במעגל» סותר את «BC = 4» — אי אפשר לקיים את שניהם יחד. הסיבה: |AB| = |BC|. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.»; the control gives the same sentence quoting «ABCD ריבוע».)",
+   "before": "green, not a square",
+   "_probe": "verified-by-probe 7.8 s"
+  },
+  {
+   "id": "T5",
+   "title": "REFUSAL (known wording defect #2454): a square inscribed in a circle inside a square (#2355)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O",
+    "ריבוע חוסם את מעגל O",
+    "ריבוע חסום במעגל O"
+   ],
+   "lookFor": "Start: press «נקה הכל». refused, no second ring; the wording «מעגל O לא הוגדר» is false (accepted until #2454) Measured sentence in full: «מעגל O לא הוגדר — אין מעגל בשם הזה בציור. אפשר לקרוא למעגל קיים בשם, למשל: מרכז המעגל הוא O. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.»",
+   "before": "a ring on O labelled a square but not one",
+   "expectRefusal": "מעגל O לא הוגדר"
+  },
+  {
+   "id": "T6",
+   "title": "The outer circle stated as twice the inner (#2459)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים בעלי מרכז משותף O",
+    "רדיוס מעגל פנימי 1.5",
+    "רדיוס המעגל החיצוני גדול פי 2 מרדיוס המעגל הפנימי"
+   ],
+   "lookFor": "Start: press «נקה הכל». outer radius 3, inner 1.5, green",
+   "before": "outer radius 2, green and wrong"
+  },
+  {
+   "id": "T7",
+   "title": "The inner circle stated as half the outer (#2459)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים בעלי מרכז משותף O",
+    "רדיוס מעגל חיצוני 3",
+    "רדיוס המעגל הפנימי קטן פי 2 מרדיוס המעגל החיצוני"
+   ],
+   "lookFor": "Start: press «נקה הכל». inner radius 1.5, green",
+   "before": "refused as a contradiction"
+  },
+  {
+   "id": "T8",
+   "title": "ASK: a ratio naming the shared centre letter (#2459)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים בעלי מרכז משותף O",
+    "מעגל P",
+    "רדיוס מעגל O גדול פי 2 מרדיוס מעגל P"
+   ],
+   "lookFor": "Start: press «נקה הכל». asks which circle around O (outer/inner); nothing drawn Measured sentence in full: «יש שני מעגלים סביב O, אז אי אפשר לדעת לאיזה מהם התכוונתם. ציינו \"המעגל החיצוני\" או \"המעגל הפנימי\".»",
+   "before": "silently took the outer circle",
+   "expectRefusal": "יש שני מעגלים סביב O"
+  },
+  {
+   "id": "T9",
+   "title": "REFUSAL: a factor with nothing to compare to is never drawn as a radius (#2459)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים בעלי מרכז משותף O",
+    "רדיוס מעגל פנימי 1.5",
+    "רדיוס המעגל החיצוני גדול פי 2"
+   ],
+   "lookFor": "Start: press «נקה הכל». goes to the AI; if the AI drops «פי 2», the «הבנתי רק חלקית» note; the outer circle is never radius 2 (Pre-played keyless — the driver never reaches the model: the line is refused with «הבנתי את זה אבל זה לא יצר שום דבר באיור — ניסיתי גם לנסח מחדש. בדקו את השמות/היחסים, או נסחו אחרת.»; the outer circle stays at its default size, not radius 2. The partial-understanding note needs the live model and is for the operator to see on prod.)",
+   "before": "outer radius 2, green",
+   "expectRefusal": "לא יצר שום דבר באיור"
+  },
+  {
+   "id": "T10",
+   "title": "The builder strip and buttons are unchanged in all four builders (#2201p1)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC"
+   ],
+   "lookFor": "Start: press «נקה הכל». Open each of / , /3d.html , /complex.html , /analytic.html (the triangle line only drives the page): strip reads הנדסת המישור · הנדסת המרחב · מספרים מרוכבים · גאומטריה אנליטית; «אודות» and «מדריך» buttons",
+   "before": "unchanged",
+   "expect": [
+    "הנדסת המישור",
+    "הנדסת המרחב",
+    "מספרים מרוכבים",
+    "גאומטריה אנליטית",
+    "אודות",
+    "מדריך"
+   ]
+  },
+  {
+   "id": "T11",
+   "title": "The About box credit is unchanged (#2201p1)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)"
+   ],
+   "lookFor": "Start: press «נקה הכל». Click «אודות»: «פותח על־ידי ד\"ר דוד קודיש», «לשאלות», title «גאומטריה אנליטית»",
+   "before": "unchanged"
+  },
+  {
+   "id": "T12",
+   "title": "REFUSAL: 2-D quotes your refused line in «…» (#2202)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "הוכיחו כי AB ⊥ AC"
+   ],
+   "lookFor": "Start: press «נקה הכל». ends «…הקלידו רק את מה שנתון בשאלה: «הוכיחו כי AB ⊥ AC»»",
+   "before": "quoted in \"…\"",
+   "expectAbsent": [
+    "\"הוכיחו כי"
+   ],
+   "expectRefusal": "«הוכיחו כי AB ⊥ AC»"
+  },
+  {
+   "id": "T13",
+   "title": "REFUSAL: analytic quotes your refused line in «…» (#2202)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "הוכיחו כי AB ⊥ AC"
+   ],
+   "lookFor": "Start: press «נקה הכל». «…בשאלה: «הוכיחו כי AB ⊥ AC»»",
+   "before": "\"…\"",
+   "expectAbsent": [
+    "\"הוכיחו כי"
+   ],
+   "expectRefusal": "«הוכיחו כי AB ⊥ AC»"
+  },
+  {
+   "id": "T14",
+   "title": "REFUSAL: complex quotes your refused line in «…» (#2202)",
+   "class": "play",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "path": "/complex.html",
+   "lines": [
+    "הוכיחו כי |z1| = 5"
+   ],
+   "lookFor": "Start: press «נקה הכל». «…בשאלה: «הוכיחו כי |z1| = 5»»",
+   "before": "\"…\"",
+   "expectAbsent": [
+    "\"הוכיחו כי"
+   ],
+   "expectRefusal": "«הוכיחו כי |z1| = 5»"
+  },
+  {
+   "id": "T15",
+   "title": "The About box reads the same in 3-D, complex, analytic (3 checks) (#2202)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCD"
+   ],
+   "lookFor": "Start: press «נקה הכל». In each of /3d.html, /complex.html, /analytic.html click «אודות»: title «על הכלי», close «הבנתי — אפשר להתחיל»",
+   "before": "3-D/complex close «סגירה»; analytic title «גאומטריה אנליטית», button «סגור»"
+  },
+  {
+   "id": "T16",
+   "title": "Analytic's empty canvas title (#2202)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נקה הכל"
+   ],
+   "lookFor": "Press the «נקה הכל» button under the canvas, type nothing (the driver typed the words, which are refused, only to drive an empty canvas): «מה בונים היום?» above the chips",
+   "before": "«התחילו לשרטט»",
+   "expectAbsent": [
+    "התחילו לשרטט"
+   ],
+   "expectRefusal": "לא הבנתי את הבקשה"
+  },
+  {
+   "id": "T17",
+   "title": "The guide intro and its try hint, all four builders (#2202)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC"
+   ],
+   "lookFor": "Start: press «נקה הכל». In each builder (/ , /3d.html , /complex.html , /analytic.html): click «מדריך», hover an example, click it. intro «זהו מדריך חלקי … לחצו על דוגמה כדי לראות אותה נבנית…»; hint «…הדוגמה תיבנה על השרטוט»; the click builds",
+   "before": "2-D intro lacked «לחצו על דוגמה…»; hint said «הציור»"
+  },
+  {
+   "id": "T18",
+   "title": "REFUSAL (English): 2-D quotes your letters in «…» (#2241)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "ДЖФ"
+   ],
+   "lookFor": "Start: press «נקה הכל». Press the language button (English), then type ДЖФ. «ДЖФ» is not a point name… (Pre-played by a probe that pressed the English button; measured: \"«ДЖФ» is not a point name. A point is named by one capital Latin letter, optionally with a digit — e.g. G or A1.\")",
+   "before": "\"ДЖФ\" is not a point name…",
+   "expectRefusal": "«ДЖФ»"
+  },
+  {
+   "id": "T19",
+   "title": "REFUSAL (English): complex's not-understood quotes your line in «…» (#2241)",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "path": "/complex.html",
+   "lines": [
+    "blah blah foo"
+   ],
+   "lookFor": "Start: press «נקה הכל». Press the language button (English), then type blah blah foo. I didn't understand the request — try rephrasing it, or open «Guide» for examples. (No echo of the line: #1868 in this round replaced the sentence this case was written for, \"I could not understand the statement: «blah blah foo»\".) (Pre-played by a probe that pressed the English button; measured: exactly that sentence.)",
+   "before": "\"blah blah foo\"",
+   "expectRefusal": "לא הבנתי את הבקשה"
+  },
+  {
+   "id": "T20",
+   "title": "The guide's English try hint is one sentence (#2241)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCD"
+   ],
+   "lookFor": "Start: press «נקה הכל». Press the language button (English), open Guide, hover an example. \"Click to try — the example will be built on the figure\"",
+   "before": "\"…the example builds on the figure\""
+  },
+  {
+   "id": "T21",
+   "title": "The complex privacy note is unchanged (no AI sentence) (#2203)",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = 3+4i"
+   ],
+   "lookFor": "Start: press «נקה הכל». Click «אודות»: 30-day sentence and «העתק קישור» sentence, no AI sentence",
+   "before": "unchanged"
+  },
+  {
+   "id": "T22",
+   "title": "REFUSAL: 2-D, a line the tool can't read (#1868)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "AB גרבלדגוק CD"
+   ],
+   "lookFor": "Start: press «נקה הכל». «לא הבנתי את הבקשה — נסו לנסח אחרת, או פתחו את «מדריך» לדוגמאות.»",
+   "before": "«לא הצלחתי לקרוא את זה עדיין — נסו אחת מהדוגמאות למטה.»",
+   "expectAbsent": [
+    "לא הצלחתי לקרוא"
+   ],
+   "expectRefusal": "לא הבנתי את הבקשה — נסו לנסח אחרת, או פתחו את «מדריך» לדוגמאות."
+  },
+  {
+   "id": "T23",
+   "title": "REFUSAL: 3-D, same (#1868)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "AB גרבלדגוק CD"
+   ],
+   "lookFor": "Start: press «נקה הכל». the same sentence, no «(בגרסה זו…)»",
+   "before": "«לא הצלחתי להבין את הנתון (בגרסה זו: …)»",
+   "expectAbsent": [
+    "בגרסה זו"
+   ],
+   "expectRefusal": "לא הבנתי את הבקשה — נסו לנסח אחרת, או פתחו את «מדריך» לדוגמאות."
+  },
+  {
+   "id": "T24",
+   "title": "REFUSAL: analytic, same, the line is not echoed (#1868)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "נקודה E היא גרבלדגוק של AB"
+   ],
+   "lookFor": "Start: press «נקה הכל». the same sentence, without the line quoted back",
+   "before": "«לא הצלחתי להבין את המשפט: «…»»",
+   "expectAbsent": [
+    "לא הצלחתי להבין את המשפט"
+   ],
+   "expectRefusal": "לא הבנתי את הבקשה — נסו לנסח אחרת, או פתחו את «מדריך» לדוגמאות."
+  },
+  {
+   "id": "T25",
+   "title": "REFUSAL: complex, same (#1868)",
+   "class": "play",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "path": "/complex.html",
+   "lines": [
+    "AB גרבלדגוק CD"
+   ],
+   "lookFor": "Start: press «נקה הכל». the same sentence, no echo",
+   "before": "«לא הצלחתי להבין את המשפט: «AB גרבלדגוק CD»»",
+   "expectAbsent": [
+    "לא הצלחתי להבין את המשפט"
+   ],
+   "expectRefusal": "לא הבנתי את הבקשה — נסו לנסח אחרת, או פתחו את «מדריך» לדוגמאות."
+  },
+  {
+   "id": "T26",
+   "title": "3-D: retyping a shape you already gave (#1990)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "ריבוע ABCD",
+    "ריבוע ABCD"
+   ],
+   "lookFor": "Start: press «נקה הכל». blue note «זה כבר קיים באיור — אין מה להוסיף.», no second row",
+   "before": "«הנתון הזה כבר נאמר («ריבוע ABCD») — הציור לא השתנה ולא נוספה שורה»",
+   "expect": [
+    "זה כבר קיים באיור — אין מה להוסיף."
+   ],
+   "expectAbsent": [
+    "הנתון הזה כבר נאמר"
+   ]
+  },
+  {
+   "id": "T27",
+   "title": "3-D: retyping an unticked row ticks it back with no note (#1990)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "פירמידה SABC",
+    "משולש ABC"
+   ],
+   "lookFor": "Start: press «נקה הכל». row re-ticked, still two rows, no note (The driver photographs the untick; the final re-tick was pre-played by a probe: after retyping, both rows are ticked, two rows, no note.)",
+   "before": "re-ticked with «הנתון הזה כבר נאמר…»",
+   "expectAbsent": [
+    "הנתון הזה כבר נאמר",
+    "זה כבר קיים באיור"
+   ],
+   "after": [
+    {
+     "toggle": 2
+    },
+    {
+     "type": "משולש ABC"
+    }
+   ]
+  },
+  {
+   "id": "T28",
+   "title": "Analytic: retyping a given (#1990)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "ריבוע ABCD",
+    "ריבוע ABCD"
+   ],
+   "lookFor": "Start: press «נקה הכל». «זה כבר קיים באיור — אין מה להוסיף.», no second row",
+   "before": "«זה כבר ידוע מהנתונים שכתבתם…»",
+   "expect": [
+    "זה כבר קיים באיור — אין מה להוסיף."
+   ],
+   "expectAbsent": [
+    "זה כבר ידוע מהנתונים"
+   ]
+  },
+  {
+   "id": "T29",
+   "title": "Analytic: a given the figure already satisfies (#1990)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "AB",
+    "AB = 4"
+   ],
+   "lookFor": "Start: press «נקה הכל». «זה כבר קיים באיור — אין מה להוסיף.», no row for AB = 4",
+   "before": "«זה כבר נובע מהנתונים שכתבתם…»",
+   "expect": [
+    "זה כבר קיים באיור — אין מה להוסיף."
+   ],
+   "expectAbsent": [
+    "זה כבר נובע מהנתונים"
+   ]
+  },
+  {
+   "id": "T30",
+   "title": "REFUSAL: a tangent at the centre names the inner circle (#2305)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים בעלי מרכז משותף O",
+    "רדיוס מעגל חיצוני הוא 10",
+    "רדיוס מעגל פנימי 9",
+    "משיק למעגל הפנימי בנקודה O"
+   ],
+   "lookFor": "Start: press «נקה הכל». «לא ניתן לצייר משיק במרכז המעגל הפנימי.», no «O-2» Measured sentence in full: «לא ניתן לצייר משיק במרכז המעגל הפנימי. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.»",
+   "before": "«…במרכז המעגל O-2.»",
+   "expectAbsent": [
+    "O-2"
+   ],
+   "expectRefusal": "לא ניתן לצייר משיק במרכז המעגל הפנימי."
+  },
+  {
+   "id": "T31",
+   "title": "Right-click menu titles (#2305)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים בעלי מרכז משותף O",
+    "רדיוס מעגל חיצוני הוא 10",
+    "רדיוס מעגל פנימי 9"
+   ],
+   "lookFor": "Start: press «נקה הכל». Then right-click each circle: «⊙ המעגל החיצוני» / «⊙ המעגל הפנימי»",
+   "before": "«⊙ O» / «⊙ O-2»"
+  },
+  {
+   "id": "T32",
+   "title": "A clicked crossing names the circle it is on (#2305)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "שני מעגלים בעלי מרכז משותף O",
+    "רדיוס מעגל חיצוני הוא 10",
+    "רדיוס מעגל פנימי 9",
+    "קוטר AB במעגל החיצוני"
+   ],
+   "lookFor": "Start: press «נקה הכל». Then click where the inner circle crosses AB: the step row reads «… = חיתוך המעגל הפנימי ו-AB»",
+   "before": "«… = חיתוך מעגל O ו-AB» (named the outer circle)"
+  },
+  {
+   "id": "T33",
+   "title": "REFUSAL: tangents from a point inside the circle are refused cleanly (#2201p3)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל שמרכזו O",
+    "הנקודה P בתוך המעגל",
+    "מהנקודה P העבירו משיקים למעגל"
+   ],
+   "lookFor": "Start: press «נקה הכל». «משהו השתבש בבניית השורה הזאת. נסו לנסח אותה אחרת, או לפרק אותה לשני צעדים.», no hint",
+   "before": "«לא ניתן לבנות את T: המעגלים O ו-OP אינם נחתכים…»",
+   "expectRefusal": "משהו השתבש בבניית השורה הזאת. נסו לנסח אותה אחרת, או לפרק אותה לשני צעדים."
+  },
+  {
+   "id": "T34",
+   "title": "REFUSAL: «OR=r» names the missing point (#2201p3)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מעגל O ברדיוס r",
+    "OR=r"
+   ],
+   "lookFor": "Start: press «נקה הכל». «הנתון «OR=r» מתייחס לנקודה שעדיין לא הוגדרה (R). הגדירו אותה תחילה.» Measured sentence in full: «הנתון «OR=r» מתייחס לנקודה שעדיין לא הוגדרה (R). הגדירו אותה תחילה. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.» (Line 1 commits with the note «האות r נקראה כסמל מידה (רדיוס) — אותיות קטנות משמשות למידות, ושמות נקודות נכתבים באות גדולה.»)",
+   "before": "«…(|OR| = 1·R)…»",
+   "expectAbsent": [
+    "1·R"
+   ],
+   "expectRefusal": "הנתון «OR=r» מתייחס לנקודה שעדיין לא הוגדרה (R). הגדירו אותה תחילה."
+  },
+  {
+   "id": "T35",
+   "title": "REFUSAL: an arc value on a quarter circle is refused cleanly (#2201p3)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "רבע מעגל AOB",
+    "קשת AB = 40"
+   ],
+   "lookFor": "Start: press «נקה הכל». the floor sentence Measured sentence in full: «משהו השתבש בבניית השורה הזאת. נסו לנסח אותה אחרת, או לפרק אותה לשני צעדים.»",
+   "before": "«זווית דורשת שלוש נקודות שונות — ב-«∠AAB» הקודקוד חוזר על עצמו.»",
+   "expectAbsent": [
+    "∠AAB"
+   ],
+   "expectRefusal": "משהו השתבש בבניית השורה הזאת. נסו לנסח אותה אחרת, או לפרק אותה לשני צעדים."
+  },
+  {
+   "id": "T36",
+   "title": "REFUSAL: a ratio on a blank page names its missing points (#2201p3)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "AD:DB = 1:2"
+   ],
+   "lookFor": "Start: press «נקה הכל». «…שעדיין לא הוגדרה (A, D, B). הגדירו אותה תחילה.» Measured sentence in full: «הנתון «AD:DB = 1:2» מתייחס לנקודה שעדיין לא הוגדרה (A, D, B). הגדירו אותה תחילה. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.»",
+   "before": "«…(|AD| = 0.5·|DB|)…»",
+   "expectAbsent": [
+    "0.5·|DB|"
+   ],
+   "expectRefusal": "שעדיין לא הוגדרה (A, D, B). הגדירו אותה תחילה."
+  },
+  {
+   "id": "T37",
+   "title": "Regression: an ordinary refusal reads the same (#2201p3)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "AB = 2 AD"
+   ],
+   "lookFor": "Start: press «נקה הכל». «הנתון «AB = 2 AD» מתייחס לנקודה שעדיין לא הוגדרה (|AB| = 2·|AD|). הגדירו אותה תחילה.» Measured sentence in full: «הנתון «AB = 2 AD» מתייחס לנקודה שעדיין לא הוגדרה (|AB| = 2·|AD|). הגדירו אותה תחילה. אפשר לנסות סדר אחר (להזין קודם את הנתונים), לנסח מחדש, או לבנות את זה בכמה צעדים קטנים.»",
+   "before": "unchanged",
+   "expectRefusal": "(|AB| = 2·|AD|)"
+  },
+  {
+   "id": "T38",
+   "title": "3-D: a letter already used (#1995b1)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "פירמידה ABCDS"
+   ],
+   "lookFor": "Start: press «נקה הכל». «A» כבר מוגדר בציור, ולא ניתן להגדיר אותו מחדש. כדי לשנות אותו, ערכו או מחקו את השורה שהגדירה אותו.",
+   "before": "«A» כבר מוגדר בציור",
+   "expectRefusal": "«A» כבר מוגדר בציור, ולא ניתן להגדיר אותו מחדש. כדי לשנות אותו, ערכו או מחקו את השורה שהגדירה אותו."
+  },
+  {
+   "id": "T39",
+   "title": "3-D: renaming a missing point (#1995b1)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCD",
+    "שנה שם Z ל-Q"
+   ],
+   "lookFor": "Start: press «נקה הכל». אין בציור נקודה בשם «Z», ולכן אין מה לשנות.",
+   "before": "אין בציור נקודה בשם «Z»",
+   "expectRefusal": "אין בציור נקודה בשם «Z», ולכן אין מה לשנות."
+  },
+  {
+   "id": "T40",
+   "title": "3-D: swapping with a missing point (#1995b1)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCD",
+    "החלף בין Z ל-B"
+   ],
+   "lookFor": "Start: press «נקה הכל». «Z» או «B» אינה בציור, ולכן אין מה להחליף — אפשר להחליף רק בין שתי נקודות שבציור.",
+   "before": "כדי להחליף, שתי הנקודות צריכות להיות בציור — «Z» או «B» אינה קיימת",
+   "expectRefusal": "«Z» או «B» אינה בציור, ולכן אין מה להחליף — אפשר להחליף רק בין שתי נקודות שבציור."
+  },
+  {
+   "id": "T41",
+   "title": "3-D: an undefined point — define it, and the line builds (#1995b1)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "E אמצע XC",
+    "נקודה X(0,0,5)",
+    "E אמצע XC"
+   ],
+   "lookFor": "Start: press «נקה הכל». line 2: «הנקודה «X» עדיין לא הוגדרה. הגדירו אותה תחילה, ואז כתבו את השורה שוב.»; line 4 builds",
+   "before": "הנקודה «X» לא מוגדרת עדיין",
+   "expectRefusal": "הנקודה «X» עדיין לא הוגדרה. הגדירו אותה תחילה, ואז כתבו את השורה שוב."
+  },
+  {
+   "id": "T42",
+   "title": "3-D: no position fits the value (#1995b1)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "פירמידה SABCD",
+    "E על SA כך ש-SE = t·SA",
+    "t = 2",
+    "t = 1/2"
+   ],
+   "lookFor": "Start: press «נקה הכל». «t = 2»: «לא נמצא מיקום ל-«E» שמקיים את הנתון הזה. בדקו את הערכים בשורה ובנתונים שהיא נשענת עליהם.»; «t = 1/2» builds",
+   "before": "אין מיקום של «E» שמקיים את התנאי",
+   "expectRefusal": "לא נמצא מיקום ל-«E» שמקיים את הנתון הזה. בדקו את הערכים בשורה ובנתונים שהיא נשענת עליהם."
+  },
+  {
+   "id": "T43",
+   "title": "3-D: a point that falls off its segment (#1995b1)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "נסמן AB = u, AD = v, AA' = w",
+    "M אמצע AA'",
+    "N אמצע BB'",
+    "R אמצע NB'",
+    "P על הקטע AM כך ש-RP = αu + βv"
+   ],
+   "lookFor": "Start: press «נקה הכל». «P» יוצאת אל מחוץ לקטע, ולכן הנתון לא מתקיים על הקטע עצמו. בדקו את הקטע ואת התנאי שבשורה.",
+   "before": "«P» יוצא אל מחוץ לקטע — התנאי לא מתקיים על הקטע עצמו",
+   "expectRefusal": "«P» יוצאת אל מחוץ לקטע, ולכן הנתון לא מתקיים על הקטע עצמו. בדקו את הקטע ואת התנאי שבשורה."
+  },
+  {
+   "id": "T44",
+   "title": "3-D: an undefined plane teaches «מישור π3», which builds (#1995b1)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "הישר AC' מאונך למישור π3",
+    "מישור π3"
+   ],
+   "lookFor": "Start: press «נקה הכל». «המישור «π3» עדיין לא הוגדר. הגדירו אותו תחילה — למשל «מישור π3» — ואז כתבו את השורה שוב.»; «מישור π3» builds",
+   "before": "המישור «π3» לא הוגדר עדיין",
+   "expectRefusal": "המישור «π3» עדיין לא הוגדר. הגדירו אותו תחילה — למשל «מישור π3» — ואז כתבו את השורה שוב."
+  },
+  {
+   "id": "T45",
+   "title": "3-D: an undefined line teaches «ישר k» (#1995b1)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCD",
+    "הישר k מאונך למישור ABC",
+    "ישר k",
+    "הישר k מאונך למישור ABC"
+   ],
+   "lookFor": "Start: press «נקה הכל». «הישר «k» עדיין לא הוגדר. הגדירו אותו תחילה — למשל «ישר k» — ואז כתבו את השורה שוב.»; lines 3–4 build",
+   "before": "הישר «k» לא הוגדר עדיין",
+   "expectRefusal": "הישר «k» עדיין לא הוגדר. הגדירו אותו תחילה — למשל «ישר k» — ואז כתבו את השורה שוב."
+  },
+  {
+   "id": "T46",
+   "title": "3-D: a new point with letter coordinates gets an example (#1995b1)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "פירמידה SABCD",
+    "B(2t, t, k)",
+    "N(k,p,3)",
+    "N(1,2,3)"
+   ],
+   "lookFor": "Start: press «נקה הכל». «נקודה חדשה «N» צריכה שיעורים מספריים, למשל «N(1,2,3)». אותיות מותרות רק בשיעורים של נקודה שכבר קיימת בציור.»; N(1,2,3) builds",
+   "before": "…צריכה שיעורים מספריים — אותיות מותרות רק לנקודה שכבר קיימת בציור",
+   "expectRefusal": "נקודה חדשה «N» צריכה שיעורים מספריים, למשל «N(1,2,3)». אותיות מותרות רק בשיעורים של נקודה שכבר קיימת בציור."
+  },
+  {
+   "id": "T47",
+   "title": "3-D: an impossible coordinate sign says plainly there is nothing to do (#1995b1)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "A(0,0,0)",
+    "AB=(2,0,0)",
+    "AD=(0,2,0)",
+    "AA'=(0,0,2)",
+    "שיעור ה-x של C שלילי"
+   ],
+   "lookFor": "Start: press «נקה הכל». אף תצורה של הנתונים אינה נותנת לשיעור של «C» את הסימן הזה — הנתונים כבר קובעים אותו אחרת, ולכן הנתון לא נוסף.",
+   "before": "אף פתרון אינו מקיים את סימן השיעור של «C»",
+   "expectRefusal": "אף תצורה של הנתונים אינה נותנת לשיעור של «C» את הסימן הזה — הנתונים כבר קובעים אותו אחרת, ולכן הנתון לא נוסף."
+  },
+  {
+   "id": "T48",
+   "title": "3-D: a volume claim about a solid that is not there (#1995b1)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "פירמידה SABCD",
+    "נפח הפירמידה WXYZ = 11",
+    "נפח הפירמידה SABCD = 11"
+   ],
+   "lookFor": "Start: press «נקה הכל». «אין בציור גוף «WXYZ» אחד בדיוק, ולכן לא ברור על איזה גוף הטענה. כתבו את הטענה על גוף שבציור, עם האותיות שלו.»; line 3 builds",
+   "before": "אין בציור בדיוק גוף אחד מסוג «WXYZ» — הטענה לא ברורה",
+   "expectRefusal": "אין בציור גוף «WXYZ» אחד בדיוק, ולכן לא ברור על איזה גוף הטענה. כתבו את הטענה על גוף שבציור, עם האותיות שלו."
+  },
+  {
+   "id": "T49",
+   "title": "3-D: two new points in a vector relation — define one first (#1995b1)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCD",
+    "PQ = 2AB",
+    "Q(0,0,0)",
+    "PQ = 2AB"
+   ],
+   "lookFor": "Start: press «נקה הכל». «בקשר וקטורי מותרת נקודה חדשה אחת בלבד, ו-«Q» היא נקודה חדשה שנייה. הגדירו תחילה את «Q», ואז כתבו את הקשר שוב.»; line 4 builds",
+   "before": "…מותרת נקודה לא-מוגדרת אחת בלבד («Q» היא שנייה)",
+   "expectRefusal": "בקשר וקטורי מותרת נקודה חדשה אחת בלבד, ו-«Q» היא נקודה חדשה שנייה. הגדירו תחילה את «Q», ואז כתבו את הקשר שוב."
+  },
+  {
+   "id": "T50",
+   "title": "3-D: a line parallel to a plane (the false clause is gone) (#1995b1)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "המישור π1: z - 3 = 0",
+    "הישר ℓ: x = (0,0,0) + t(1, m, 0)",
+    "ℓ חותך את π1 בנקודה A"
+   ],
+   "lookFor": "Start: press «נקה הכל». הישר מקביל למישור, ולכן אין להם נקודת חיתוך «A».",
+   "before": "…מקביל למישור בערך הפרמטר שנבחר — אין נקודת חיתוך «A»",
+   "expectRefusal": "הישר מקביל למישור, ולכן אין להם נקודת חיתוך «A»."
+  },
+  {
+   "id": "T51",
+   "title": "3-D: segments that do not meet (#1995b1)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "האלכסונים AC ו-B'D' נפגשים בנקודה E",
+    "האלכסונים AC ו-BD נפגשים בנקודה E"
+   ],
+   "lookFor": "Start: press «נקה הכל». «הקטעים «AC» ו-«B'D'» אינם נפגשים, ולכן אין להם נקודת מפגש «E». בדקו את אותיות הקטעים.»; line 3 builds",
+   "before": "…אינם נפגשים בציור — אין להם נקודת מפגש «E»",
+   "expectRefusal": "הקטעים «AC» ו-«B'D'» אינם נפגשים, ולכן אין להם נקודת מפגש «E». בדקו את אותיות הקטעים."
+  },
+  {
+   "id": "T52",
+   "title": "3-D: the plane crosses outside the segment (#1995b1)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "A(0,0,0)",
+    "AB=(2,0,0)",
+    "AD=(0,2,0)",
+    "AA'=(0,0,2)",
+    "המישור π: z = 5",
+    "הקטע AA' חותך את π בנקודה P"
+   ],
+   "lookFor": "Start: press «נקה הכל». המישור חוצה את הישר מחוץ לקטע שציינתם, ולכן אין על הקטע נקודת חיתוך «P».",
+   "before": "נקודת החיתוך «P» יוצאת מהקטע שצוין — …",
+   "expectRefusal": "המישור חוצה את הישר מחוץ לקטע שציינתם, ולכן אין על הקטע נקודת חיתוך «P»."
+  },
+  {
+   "id": "T53",
+   "title": "3-D: an impossible angle range (the broken «ב- » is gone) (#1995b1)",
+   "class": "play",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "פירמידה SABCD",
+    "179 < ∠SAB < 180",
+    "60 < ∠SAB < 90"
+   ],
+   "lookFor": "Start: press «נקה הכל». «אין תצורה של הציור שבה הזווית נמצאת בתחום הזה, ולכן הנתון לא נוסף. בדקו את גבולות התחום.»; line 3 builds",
+   "before": "אין תצורה של הציור שבה הזווית ב- נמצאת בתחום שנאמר",
+   "expectAbsent": [
+    "ב- נמצאת"
+   ],
+   "expectRefusal": "אין תצורה של הציור שבה הזווית נמצאת בתחום הזה, ולכן הנתון לא נוסף. בדקו את גבולות התחום."
+  },
+  {
+   "id": "T54",
+   "title": "3-D: an edge called a diagonal (#1995b1)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "אלכסון AB",
+    "אלכסון AC"
+   ],
+   "lookFor": "Start: press «נקה הכל». ««AB» הוא צלע של הגוף, לא אלכסון. אלכסון מחבר שני קודקודים שאינם שכנים — כתבו שני קודקודים כאלה.»; line 3 builds",
+   "before": "«AB» אינו אלכסון של הגוף — הוא צלע. …",
+   "expectRefusal": "«AB» הוא צלע של הגוף, לא אלכסון. אלכסון מחבר שני קודקודים שאינם שכנים — כתבו שני קודקודים כאלה."
+  },
+  {
+   "id": "T55",
+   "title": "3-D: a face diagonal called a main diagonal (#1995b1)",
+   "class": "look",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "אלכסון ראשי AC",
+    "אלכסון ראשי AC'"
+   ],
+   "lookFor": "Start: press «נקה הכל». ««AC» הוא אלכסון של פאה, לא אלכסון ראשי. אלכסון ראשי מחבר שני קודקודים נגדיים דרך פנים הגוף — כתבו שני קודקודים כאלה.»; line 3 builds",
+   "before": "«AC» אינו אלכסון ראשי — הוא אלכסון של פאה. …",
+   "expectRefusal": "«AC» הוא אלכסון של פאה, לא אלכסון ראשי. אלכסון ראשי מחבר שני קודקודים נגדיים דרך פנים הגוף — כתבו שני קודקודים כאלה."
+  },
+  {
+   "id": "T56",
+   "title": "3-D (English): the taught «plane π3» builds (#1995b1)",
+   "class": "verified",
+   "product": "3d",
+   "base": "http://localhost:5173",
+   "path": "/3d.html",
+   "lines": [
+    "קובייה ABCDA'B'C'D'",
+    "הישר AC' מאונך למישור π3",
+    "plane π3"
+   ],
+   "lookFor": "Start: press «נקה הכל». Press the language button (English) first. \"Plane «π3» is not defined yet. Define it first — for example «plane π3» — then type the line again.\"; plane π3 builds (Pre-played by a probe that pressed the English button; measured: line 2 \"Plane «π3» is not defined yet. Define it first — for example «plane π3» — then type the line again.\"; «plane π3» built.)",
+   "before": "\"Plane «π3» is not defined yet\"",
+   "expectRefusal": "המישור «π3» עדיין לא הוגדר"
+  },
+  {
+   "id": "T57",
+   "title": "2-D: renaming a missing point (#1995b1)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "שנה שם Z ל-Q"
+   ],
+   "lookFor": "Start: press «נקה הכל». אין בשרטוט נקודה בשם Z, ולכן אין מה לשנות.",
+   "before": "אין נקודה Z לשנות.",
+   "expectRefusal": "אין בשרטוט נקודה בשם Z, ולכן אין מה לשנות."
+  },
+  {
+   "id": "T58",
+   "title": "2-D: swapping with a missing point (#1995b1)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "החלף בין Z ל-B"
+   ],
+   "lookFor": "Start: press «נקה הכל». Z או B אינה בשרטוט, ולכן אין מה להחליף — אפשר להחליף רק בין שתי נקודות שבשרטוט.",
+   "before": "כדי להחליף, גם Z וגם B צריכות להתקיים.",
+   "expectRefusal": "Z או B אינה בשרטוט, ולכן אין מה להחליף — אפשר להחליף רק בין שתי נקודות שבשרטוט."
+  },
+  {
+   "id": "T59",
+   "title": "2-D: merging a missing point (#1995b1)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "מזג את Z עם B"
+   ],
+   "lookFor": "Start: press «נקה הכל». אין בשרטוט נקודה בשם Z, ולכן אין מה למזג.",
+   "before": "אין נקודה Z למזג.",
+   "expectRefusal": "אין בשרטוט נקודה בשם Z, ולכן אין מה למזג."
+  },
+  {
+   "id": "T60",
+   "title": "2-D: a side called a bisector — a new end letter, and it builds (#1995b1)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AB חוצה זווית",
+    "AD חוצה זווית A"
+   ],
+   "lookFor": "Start: press «נקה הכל». «AB היא צלע של המשולש ולכן אינה יכולה לחצות את זווית A. חוצה זווית יוצא מקודקוד אל הצלע שמולו — תנו לקצה השני שלו אות חדשה.»; line 3 builds",
+   "before": "…— חוצה זווית יוצא מקודקוד אל הצלע שמולו.",
+   "expectRefusal": "AB היא צלע של המשולש ולכן אינה יכולה לחצות את זווית A. חוצה זווית יוצא מקודקוד אל הצלע שמולו — תנו לקצה השני שלו אות חדשה."
+  },
+  {
+   "id": "T61",
+   "title": "2-D: a quadrilateral side called a bisector (#1995b1)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "מרובע ABCD",
+    "AB חוצה זווית",
+    "AE חוצה זווית A"
+   ],
+   "lookFor": "Start: press «נקה הכל». «AB היא צלע של המרובע ולכן אינה יכולה לחצות את זווית A. תנו לקצה השני של חוצה הזווית אות חדשה.»; line 3 builds",
+   "before": "AB היא צלע של המרובע ולכן אינה יכולה לחצות את זווית A.",
+   "expectRefusal": "AB היא צלע של המרובע ולכן אינה יכולה לחצות את זווית A. תנו לקצה השני של חוצה הזווית אות חדשה."
+  },
+  {
+   "id": "T62",
+   "title": "2-D: a median whose midpoint would be a vertex (#1995b1)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AC תיכון לצלע BC",
+    "AD תיכון לצלע BC"
+   ],
+   "lookFor": "Start: press «נקה הכל». «…באורך אפס. תיכון יוצא מהקודקוד שמול הצלע — תנו לאמצע הצלע אות חדשה.»; line 3 builds Measured sentence in full: «אמצע הצלע BC אינו יכול להיות C — לשם כך BC הייתה צריכה להיות באורך אפס. תיכון יוצא מהקודקוד שמול הצלע — תנו לאמצע הצלע אות חדשה.»",
+   "before": "…באורך אפס.",
+   "expectRefusal": "באורך אפס. תיכון יוצא מהקודקוד שמול הצלע — תנו לאמצע הצלע אות חדשה."
+  },
+  {
+   "id": "T63",
+   "title": "2-D: an altitude from a vertex on its own side (#1995b1)",
+   "class": "play",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "BD גובה לצלע AB",
+    "CD גובה לצלע AB"
+   ],
+   "lookFor": "Start: press «נקה הכל». «…הגובה נמתח מקודקוד אל הצלע שמולו. כתבו אותו מהקודקוד שמול AB.»; line 3 builds Measured sentence in full: «B נמצאת על הצלע AB, ולכן הגובה מ-B אל AB הוא באורך אפס. הגובה נמתח מקודקוד אל הצלע שמולו. כתבו אותו מהקודקוד שמול AB.»",
+   "before": "…הגובה נמתח מקודקוד אל הצלע שמולו.",
+   "expectRefusal": "הגובה נמתח מקודקוד אל הצלע שמולו. כתבו אותו מהקודקוד שמול AB."
+  },
+  {
+   "id": "T64",
+   "title": "2-D: an altitude from a vertex to itself (#1995b1)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AA גובה לצלע BC",
+    "AD גובה לצלע BC"
+   ],
+   "lookFor": "Start: press «נקה הכל». «AA אינו קטע — הגובה נמתח מקודקוד אל נקודה אחרת. תנו לנקודה שעל הצלע אות חדשה.»; line 3 builds",
+   "before": "AA אינו קטע — הגובה נמתח מקודקוד אל נקודה אחרת.",
+   "expectRefusal": "AA אינו קטע — הגובה נמתח מקודקוד אל נקודה אחרת. תנו לנקודה שעל הצלע אות חדשה."
+  },
+  {
+   "id": "T65",
+   "title": "2-D: a bisector sent to the wrong side (#1995b1)",
+   "class": "look",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AD חוצה זווית A לצלע AB",
+    "AD חוצה זווית A לצלע BC"
+   ],
+   "lookFor": "Start: press «נקה הכל». «חוצה הזווית מ-A פוגש את הצלע BC, לא את AB. כתבו BC במקום AB.»; line 3 builds",
+   "before": "חוצה הזווית מ-A פוגש את הצלע BC, לא את AB.",
+   "expectRefusal": "חוצה הזווית מ-A פוגש את הצלע BC, לא את AB. כתבו BC במקום AB."
+  },
+  {
+   "id": "T66",
+   "title": "2-D (English): the wrong-side bisector (#1995b1)",
+   "class": "verified",
+   "product": "2d",
+   "base": "http://localhost:5173",
+   "path": "/",
+   "lines": [
+    "משולש ABC",
+    "AD חוצה זווית A לצלע AB"
+   ],
+   "lookFor": "Start: press «נקה הכל». Press the language button (English) first. \"The bisector from A meets side BC, not AB. Write BC instead of AB.\" (Pre-played by a probe that pressed the English button; measured: \"The bisector from A meets side BC, not AB. Write BC instead of AB.\")",
+   "before": "\"…meets side BC, not AB.\"",
+   "expectRefusal": "כתבו BC במקום AB."
+  },
+  {
+   "id": "T67",
+   "title": "Analytic: asking about a missing point teaches how to add it (#1995b1)",
+   "class": "play",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(6,0)",
+    "C(3,5)",
+    "משולש ABC"
+   ],
+   "lookFor": "Start: press «נקה הכל». «…אין בשרטוט נקודה בשם D. הוסיפו אותה לשרטוט, למשל «D(1,2)», ושאלו שוב.»; then answered Then type D(1,2) and ask the same question again: it is answered. (Second half pre-played by a probe: after D(1,2) the same question answers «המרחק מ-D לישר AB = 2».)",
+   "before": "…אין בשרטוט נקודה בשם D",
+   "expect": [
+    "אין בשרטוט נקודה בשם D. הוסיפו אותה לשרטוט, למשל «D(1,2)», ושאלו שוב."
+   ],
+   "asks": [
+    "המרחק מ-D לישר AB"
+   ]
+  },
+  {
+   "id": "T68",
+   "title": "Analytic: asking about a missing line (#1995b1)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(6,0)",
+    "C(3,5)",
+    "משולש ABC"
+   ],
+   "lookFor": "Start: press «נקה הכל». …אין בשרטוט ישר או מעגל בשם l9. הגדירו אותו קודם, ושאלו שוב.",
+   "before": "…אין בשרטוט ישר או מעגל בשם l9",
+   "expect": [
+    "אין בשרטוט ישר או מעגל בשם l9. הגדירו אותו קודם, ושאלו שוב."
+   ],
+   "asks": [
+    "משוואת הישר l9"
+   ]
+  },
+  {
+   "id": "T69",
+   "title": "Analytic: a side called a bisector (same sentence as 2-D) (#1995b1)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "C(1,3)",
+    "משולש ABC",
+    "AB חוצה זווית",
+    "AD חוצה זווית A"
+   ],
+   "lookFor": "Start: press «נקה הכל». the 2-D sentence word for word; the last line builds",
+   "before": "the 2-D \"before\"",
+   "expectRefusal": "AB היא צלע של המשולש ולכן אינה יכולה לחצות את זווית A. חוצה זווית יוצא מקודקוד אל הצלע שמולו — תנו לקצה השני שלו אות חדשה."
+  },
+  {
+   "id": "T70",
+   "title": "Analytic: a quadrilateral side called a bisector (#1995b1)",
+   "class": "look",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(4,0)",
+    "C(5,3)",
+    "D(0,3)",
+    "מרובע ABCD",
+    "AB חוצה זווית",
+    "AE חוצה זווית A"
+   ],
+   "lookFor": "Start: press «נקה הכל». the 2-D quadrilateral sentence; the last line builds",
+   "before": "the 2-D \"before\"",
+   "expectRefusal": "AB היא צלע של המרובע ולכן אינה יכולה לחצות את זווית A. תנו לקצה השני של חוצה הזווית אות חדשה."
+  },
+  {
+   "id": "T71",
+   "title": "Analytic (English): the ask box (#1995b1)",
+   "class": "verified",
+   "product": "analytic",
+   "base": "http://localhost:5173",
+   "path": "/analytic.html",
+   "lines": [
+    "A(0,0)",
+    "B(6,0)",
+    "C(3,5)",
+    "משולש ABC"
+   ],
+   "lookFor": "Start: press «נקה הכל». Press the language button (English), build the T67 figure, ask \"the distance from D to line AB\" in the ask box. \"… — there is no point D in your figure. Add it to the figure, for example «D(1,2)», and ask again.\" (Pre-played by a probe that pressed the English button; measured: \"המרחק מ-D לישר AB — there is no point D in your figure. Add it to the figure, for example «D(1,2)», and ask again.\")",
+   "before": "\"… — there is no point D in your figure\"",
+   "expect": [
+    "אין בשרטוט נקודה בשם D"
+   ],
+   "asks": [
+    "המרחק מ-D לישר AB"
+   ]
+  },
+  {
+   "id": "T72",
+   "title": "Complex: a letter used as a size cannot be declared complex (#1995b1)",
+   "class": "play",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = 3+4i",
+    "|z1| = 9r",
+    "r מספר מרוכב",
+    "w מספר מרוכב"
+   ],
+   "lookFor": "Start: press «נקה הכל». ««|z1| = 9r» משתמש ב-r כמספר ממשי (גודל או זווית), ולכן r אינו יכול להיות גם מספר מרוכב — המשפט לא נוסף. בחרו אות אחרת לאחד מהם.»; «w מספר מרוכב» builds",
+   "before": "המשפט לא נוסף — r הוגדר כמספר מרוכב, אבל…",
+   "expectRefusal": "משתמש ב-r כמספר ממשי (גודל או זווית), ולכן r אינו יכול להיות גם מספר מרוכב — המשפט לא נוסף. בחרו אות אחרת לאחד מהם."
+  },
+  {
+   "id": "T73",
+   "title": "Complex (English): same (#1995b1)",
+   "class": "verified",
+   "product": "complex",
+   "base": "http://localhost:5173",
+   "path": "/complex.html",
+   "lines": [
+    "z1 = 3+4i",
+    "|z1| = 9r",
+    "r מספר מרוכב",
+    "w מספר מרוכב"
+   ],
+   "lookFor": "Start: press «נקה הכל». Press the language button (English) first, then type the T72 lines. \"«|z1| = 9r» uses r as a real number (a size or an angle), so r cannot also be a complex number — the statement was not added. Choose a different letter for one of them.\" (Pre-played by a probe that pressed the English button; measured: line 3 \"«|z1| = 9r» uses r as a real number (a size or an angle), so r cannot also be a complex number — the statement was not added. Choose a different letter for one of them.\"; «w מספר מרוכב» built.)",
+   "before": "\"Statement not added — r is declared a complex number, but…\"",
+   "expectRefusal": "משתמש ב-r כמספר ממשי"
+  }
+ ]
+}
