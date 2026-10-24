@@ -122,13 +122,15 @@ describe('#2201 3b — (1) the four leak issues’ exact sequences', () => {
   const CASES: { issue: string; lines: string[]; after: string }[] = [
     { issue: '#2151', lines: ['מעגל שמרכזו O', 'הנקודה P בתוך המעגל', 'מהנקודה P העבירו משיקים למעגל'], after: FLOOR.he },
     { issue: '#2132', lines: ['מעגל O ברדיוס r', 'OR=r'], after: `הנתון «OR=r» מתייחס לנקודה שעדיין לא הוגדרה (R). הגדירו אותה תחילה. ${HINT_HE}` },
-    { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AB = 40'], after: FLOOR.he },
-    { issue: '#2345', lines: ['חצי מעגל AOB', 'קשת AB = 40'], after: FLOOR.he },
-    { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AB = 90'], after: FLOOR.he },
+    // #2345 (ADR-758): the arc's end A is the circle's centre — refused naming the statement and the point, no longer
+    // the floor. Read from the locale table (one source); the end letter follows the centre convention in force.
+    { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AB = 40'], after: plain(T.he('input.arcEndIsCentreNoStep', { detail: 'קשת AB = 40', end: 'A' })) },
+    { issue: '#2345', lines: ['חצי מעגל AOB', 'קשת AB = 40'], after: plain(T.he('input.arcEndIsCentreNoStep', { detail: 'קשת AB = 40', end: 'A' })) },
+    { issue: '#2345', lines: ['רבע מעגל AOB', 'קשת AB = 90'], after: plain(T.he('input.arcEndIsCentreNoStep', { detail: 'קשת AB = 90', end: 'A' })) },
     { issue: '#2048', lines: ['AD:DB = 1:2'], after: `הנתון «AD:DB = 1:2» מתייחס לנקודה שעדיין לא הוגדרה (A, D, B). הגדירו אותה תחילה. ${HINT_HE}` },
   ];
   for (const c of CASES) {
-    it(`${c.issue} ${c.lines.join(' · ')} → ${c.after === FLOOR.he ? 'the floor' : 'the missing point names'}`, async () => {
+    it(`${c.issue} ${c.lines.join(' · ')} → ${c.after === FLOOR.he ? 'the floor' : 'the named refusal'}`, async () => {
       const { notes } = await play(c.lines);
       const last = notes.filter((n) => n.said === c.lines[c.lines.length - 1]);
       expect(last.map((n) => plain(n.text))).toContain(c.after);

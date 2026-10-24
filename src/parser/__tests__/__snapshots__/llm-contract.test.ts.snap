@@ -1603,6 +1603,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle",
       "point-on-circle",
       "point-on-circle",
+      "set-angle",
       "arc",
       "segment",
       "segment",
@@ -1611,6 +1612,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle",
       "point-on-circle",
       "point-on-circle",
+      "set-angle",
       "arc",
       "segment",
       "segment",
@@ -1785,15 +1787,13 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   "semicircle on side AB outside triangle ABC": {
     "en": [
       "circle",
-      "point-on-circle",
-      "point-on-circle",
+      "diameter",
       "arc",
       "segment",
     ],
     "he": [
       "circle",
-      "point-on-circle",
-      "point-on-circle",
+      "diameter",
       "arc",
       "segment",
     ],
@@ -1801,15 +1801,13 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   "semicircle with diameter AB": {
     "en": [
       "circle",
-      "point-on-circle",
-      "point-on-circle",
+      "diameter",
       "arc",
       "segment",
     ],
     "he": [
       "circle",
-      "point-on-circle",
-      "point-on-circle",
+      "diameter",
       "arc",
       "segment",
     ],

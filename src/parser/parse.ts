@@ -136,6 +136,10 @@ export type ParseResult =
   // outer/inner qualifier and no disambiguating stated membership — WHICH circle is meant is the
   // student's to say ("המעגל החיצוני"/"the inner circle"), never a silent pick or an LLM guess.
   | { ok: false; reason: 'ambiguous-circle'; center: string }
+  // #2345 (ADR-758): an arc statement one of whose ENDS is its circle's centre («קשת AB = 40» on a circle centred at A).
+  // A centre is not a point ON its circle, so there is no such arc: refused naming the statement and the point, never
+  // lowered into an angle with a repeated vertex. `circle` is the circle's id (the message names no circle).
+  | { ok: false; reason: 'arc-end-is-centre'; end: string; circle: Id }
   // #546 (ADR-443): an ANONYMOUS circle reference («המעגל» with no centre named) in a circle-construct
   // statement, beside ≥2 circles, that even the membership tie-break could not bind — WHICH circle is
   // the student's to say (ADR-052), never a silent pick, never a paid LLM guess. `centers` are the
@@ -388,8 +392,9 @@ const membersOfCenter = (ctx: ParseContext, center: string): Set<string> => {
 /**
  * A point the sentence states is ON the circle centred at `center` (an arc's endpoint, a diameter's end —
  * [ADR-663](docs/06-decisions.md#adr-663)): `point-on-circle` unless the figure already knows it there. A new point
- * is created on the circle; an existing one off it is lowered to the membership (M1). The centre is never on it.
- * THE predicate for "already a member" — the arc post-pass and both diameter rules call it, never re-spell it.
+ * is created on the circle; an existing one off it is lowered to the membership (M1). The centre is never on it:
+ * an ARC end that is the centre is refused upstream by `withArcEndpoints` (#2345, ADR-758); the guard here keeps the
+ * diameter rules' own calls total. THE predicate for "already a member" — the arc post-pass and both diameter rules call it, never re-spell it.
  */
 const circleMembership = (ctx: ParseContext, center: string, id: Id): AnyCommand[] =>
   up(id) === up(center) || membersOfCenter(ctx, center).has(up(id)) ? [] : [{ type: 'point-on-circle', id: up(id), circle: circleId(center) }];
@@ -432,7 +437,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-definite-shape'; shapes: string[]; sides: number; example: string } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number } | { clarify: 'nested-pair-radius'; parts: [string, string] } | { clarify: 'equal-circles-nested'; relation: NestedPairRelation };
+type Clarify = { clarify: 'tangents-ambiguous'; points: string[] } | { clarify: 'shape-not-found'; noun: string } | { clarify: 'ambiguous-shape'; noun: string; shapes: string[] } | { clarify: 'ambiguous-definite-shape'; shapes: string[]; sides: number; example: string } | { clarify: 'ambiguous-construct'; noun: string; options: string[] } | { clarify: 'ambiguous-angle'; vertex: string; options?: string[] } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string } | { clarify: 'role-side-unresolved'; role: string } | { clarify: 'ambiguous-hypotenuse' } | { clarify: 'role-claim'; why: RoleClaimWhy; noun: string; a: string; b: string; other?: string; options?: string[] } | { clarify: 'polygon-not-supported'; noun: string } | { clarify: 'side-unspecified'; noun: string; value: string } | { clarify: 'incomplete-comparative'; subject: string; factor: string } | { clarify: 'angle-sides-disjoint'; s1: string; s2: string } | { clarify: 'cevian-degenerate'; role: 'median' | 'altitude' | 'bisector'; why: 'apex-on-side' | 'apex-is-foot' | 'median-foot-at-end' | 'bisector-is-side'; apex: Id; foot: Id; side: [Id, Id]; host?: string } | { clarify: 'cevian-redefines-vertex'; apex: Id; foot: Id; side: [Id, Id] } | { clarify: 'cevian-wrong-side'; apex: Id; stated: [Id, Id]; actual: [Id, Id] } | { clarify: 'bisector-wrong-apex'; apex: Id; stated: Id } | { clarify: 'ambiguous-cevian'; role: 'median' | 'altitude'; apex: Id; shapes: string[]; side: string } | { clarify: 'crossing-already-named'; holder: Id; id: Id; s1: [Id, Id]; s2: [Id, Id] } | { clarify: 'arc-copula'; a: string; b: string } | { clarify: 'arc-value-ambiguous'; value: string; a: string; b: string; center: string } | { clarify: 'inscribed-contradicts-noun'; shape: string; forced: string } | { clarify: 'incircle-not-drawn'; sides: number } | { clarify: 'nested-pair-radius'; parts: [string, string] } | { clarify: 'equal-circles-nested'; relation: NestedPairRelation } | { clarify: 'arc-end-is-centre'; end: string; circle: Id };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -7344,18 +7349,26 @@ const semicircle: Rule = (s, ctx) => {
   ];
   if (r.varCmd) cmds.push(r.varCmd);
   const members = membersOfCenter(ctx, center);
-  const anyExisting = exists(a) || exists(b);
-  // Endpoints: an EXISTING one is asserted a MEMBER (idempotent, M1); a NEW one is created with pinned θ (gauge).
-  for (const [p, theta] of [[a, Math.PI], [b, 0]] as const) {
-    if (exists(p)) {
-      if (!members.has(up(p))) cmds.push({ type: 'point-on-circle', id: up(p), circle: circ });
-    } else {
-      cmds.push({ type: 'point-on-circle', id: up(p), circle: circ, theta });
+  if (!exists(a) && !exists(b)) {
+    // #2483 (ADR-758): the 180° is a GIVEN, never a placement. BOTH ends new ⇒ the half is a DIAMETER by
+    // construction: `b` at the gauge θ = 0 and `a` its antipode, so no later line can bend the half (one that
+    // tries to move an end now moves both and is refused as over-constrained), and `a` can never collapse onto
+    // `b`. Before, two pinned θs (π and 0) carried the 180° only by where they started, and «קשת AB = 40» or
+    // «∠AOB = 100» re-shaped it green. The first figure is unchanged (B = (r, 0), A = (−r, 0) exactly).
+    cmds.push({ type: 'diameter', id1: up(b), id2: up(a), circle: circ, theta: 0 });
+  } else {
+    // Endpoints: an EXISTING one is asserted a MEMBER (idempotent, M1); a NEW one is created with pinned θ.
+    for (const [p, theta] of [[a, Math.PI], [b, 0]] as const) {
+      if (exists(p)) {
+        if (!members.has(up(p))) cmds.push({ type: 'point-on-circle', id: up(p), circle: circ });
+      } else {
+        cmds.push({ type: 'point-on-circle', id: up(p), circle: circ, theta });
+      }
     }
+    // The diameter property with an EXISTING endpoint: the through-centre collinearity DRIVES the free
+    // centre/radius to the stated side (the ADR-137 lowering).
+    cmds.push({ type: 'set-collinear', a: up(a), b: up(center), c: up(b) });
   }
-  // The diameter property: NEW antipodal θs carry it by construction; with any EXISTING endpoint the
-  // through-centre collinearity DRIVES the free centre/radius to the stated side (the ADR-137 lowering).
-  if (anyExisting) cmds.push({ type: 'set-collinear', a: up(a), b: up(center), c: up(b) });
   cmds.push(
     { type: 'arc', id: `arc-${up(b)}${up(a)}`, center: up(center), from: up(b), to: up(a), spanDeg: 180, ...bulge }, // the 180° half (bulge = outside/inside)
     { type: 'segment', a: up(a), b: up(b) }, // the diameter
@@ -7406,7 +7419,6 @@ const quarterCircle: Rule = (s, ctx) => {
   if (r.varCmd) cmds.push(r.varCmd);
   const exists = (p: string) => (ctx.points ?? []).some((q) => up(q) === up(p));
   const members = membersOfCenter(ctx, center);
-  const anyExisting = exists(a) || exists(b);
   for (const [p, theta] of [[a, 0], [b, Math.PI / 2]] as const) {
     if (exists(p)) {
       if (!members.has(up(p))) cmds.push({ type: 'point-on-circle', id: up(p), circle: circ });
@@ -7414,9 +7426,11 @@ const quarterCircle: Rule = (s, ctx) => {
       cmds.push({ type: 'point-on-circle', id: up(p), circle: circ, theta });
     }
   }
-  // NEW ends carry the quarter (90° apart) by their pinned θs; an EXISTING end makes it a CONSTRAINT
-  // on the driven circle — the central angle at the centre is 90°.
-  if (anyExisting) cmds.push({ type: 'set-angle', vertex: up(center), ray1: up(a), ray2: up(b), value: 90 });
+  // The quarter's 90° is a GIVEN whatever existed before (#2483, ADR-758): the central angle at the centre is
+  // stated by the noun, so it is lowered as a constraint EVERY time — the stated-angle sector's lowering.
+  // NEW ends still seed it by their pinned θs (the gauge — the first figure is unchanged), so it is satisfied
+  // as built; a later line that would bend it is now refused as over-constrained instead of re-shaping it green.
+  cmds.push({ type: 'set-angle', vertex: up(center), ray1: up(a), ray2: up(b), value: 90 });
   cmds.push(
     { type: 'arc', id: `arc-${up(a)}${up(b)}`, center: up(center), from: up(a), to: up(b), spanDeg: 90 }, // the 90° quarter
     { type: 'segment', a: up(center), b: up(a) }, // a bounding radius
@@ -13424,12 +13438,21 @@ function withOnCircleMembership(commands: AnyCommand[], s: string, ctx: ParseCon
  * it (the `arc-midpoint` discipline, apply.ts, moved to the parse seam so every arc reader is covered at once),
  * an existing one off it is put on it (M1 lowering of `point-on-circle`). PREPENDED, once per point.
  */
-function withArcEndpoints(commands: AnyCommand[], ctx: ParseContext): AnyCommand[] {
+function withArcEndpoints(commands: AnyCommand[], ctx: ParseContext): AnyCommand[] | Clarify {
   const done = new Set(commands.flatMap((c) => (c.type === 'point-on-circle' ? [`${c.circle}|${up(c.id)}`] : [])));
   const add: AnyCommand[] = [];
+  let centreEnd = null as Clarify | null; // assigned inside `put` — the cast keeps TS from narrowing it to null
   const put = (circ: Id, ends: Id[]) => {
     const center = circ.slice('circle-'.length);
+    // #2345 (ADR-758): an end that IS the circle's centre (by its letter, or the point an anonymous centre's token
+    // names) is not a point on the circle, so the arc does not exist. Refused here, once, for every arc reader —
+    // before, `circleMembership` skipped it in silence and the engine refused «∠AAB repeats its vertex».
+    const centres = new Set([up(center), up(center.replace(/^@ctr-/, '')), up(centrePt(ctx, up(center.replace(/^@ctr-/, ''))))]);
     for (const e of ends) {
+      if (centres.has(up(e))) {
+        centreEnd ??= { clarify: 'arc-end-is-centre', end: up(e), circle: circ };
+        continue;
+      }
       if (done.has(`${circ}|${up(e)}`)) continue;
       done.add(`${circ}|${up(e)}`);
       add.push(...circleMembership(ctx, center, e));
@@ -13441,6 +13464,7 @@ function withArcEndpoints(commands: AnyCommand[], ctx: ParseContext): AnyCommand
     else if (c.type === 'set-measure-sum' && c.arcOf && c.arcTerms)
       put(c.arcOf, c.arcTerms.flatMap((i) => [c.points[3 * i], c.points[3 * i + 2]]));
   }
+  if (centreEnd) return centreEnd;
   return add.length ? [...add, ...commands] : commands;
 }
 
@@ -15081,7 +15105,9 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
       const claimed = withRoleClaims(withCarrierSegments(res), s, ctx);
       if (claimed === 'unread') continue; // a role noun this winner read bare — let a later rule try, never commit the drop
       if (!Array.isArray(claimed)) return refusalOf(claimed);
-      const resolved = withConcentricResolution(withImplicitCircles(withArcEndpoints(withOnCircleMembership(claimed, s, ctx), ctx), ctx), s, ctx);
+      const arcked = withArcEndpoints(withOnCircleMembership(claimed, s, ctx), ctx);
+      if (!Array.isArray(arcked)) return refusalOf(arcked); // #2345 (ADR-758): an arc end that is its circle's centre
+      const resolved = withConcentricResolution(withImplicitCircles(arcked, ctx), s, ctx);
       if (Array.isArray(resolved)) return { ok: true, commands: withStatedConvexity(withAnonymousAutoCentres(withRadiusSymbolBinding(resolved, s, ctx), ctx), s) };
       return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
     }
@@ -15136,6 +15162,7 @@ function refusalOf(res: Clarify): ParseResult {
   if (res.clarify === 'incircle-not-drawn') return { ok: false, reason: 'incircle-not-drawn', sides: res.sides };
   if (res.clarify === 'nested-pair-radius') return { ok: false, reason: 'nested-pair-radius', parts: res.parts };
   if (res.clarify === 'equal-circles-nested') return { ok: false, reason: 'equal-circles-nested', relation: res.relation };
+  if (res.clarify === 'arc-end-is-centre') return { ok: false, reason: 'arc-end-is-centre', end: res.end, circle: res.circle };
   return { ok: false, reason: 'ambiguous-circle', center: res.center };
 }
 

@@ -2146,3 +2146,15 @@ over all four (ADR-041).
 ### `concentric-circle-names-sentences-2305` — the #2264 pair: a refusal, the menu titles and a crossing step name each circle by its role (#2305, ADR-755)
 
 **Guards against:** a sentence about one of a concentric pair spelling the circle's id or its sibling's letter — «לא ניתן לצייר משיק במרכז המעגל O-2.», «⊙ O-2», a clicked crossing of the inner circle recorded as «K = חיתוך מעגל O ו-AB» (the outer circle's name). **Asserts** the operator's three #2264 lines build green; «משיק למעגל הפנימי בנקודה O» is refused «לא ניתן לצייר משיק במרכז המעגל הפנימי.»; the menu titles read «⊙ המעגל החיצוני» / «⊙ המעגל הפנימי»; the inner circle's crossing with a diameter AB is recorded «K = חיתוך המעגל הפנימי ו-AB». The class matrix (every template with a circle slot, three spellings, both locales, the crossing round-trip) is `src/__tests__/issue-2305-circle-names-every-surface.test.ts`; the byte-identity golden for every other circle is `src/i18n/__tests__/circle-text-golden-2305.test.ts`.
+
+### `quarter-arc-contradicts-span-2483` — «רבע מעגל AOB», then «קשת BO=40» is refused and the quarter keeps its 90° (#2483, ADR-758)
+
+**Guards against:** a quarter circle whose 90° held only by where its new ends started, so «קשת BO=40» redrew it as 40° with every row green (operator, round #2466 T35: *"it draws the 40 which contradicts the first line"*). **Asserts** the quarter builds green at 90° and both spellings «קשת BO=40» / «קשת BO = 40» are refused before commit. Refusal and the kept angle only, not one sentence (#2486 re-bases the letters). The class matrix (quarter and half in both letter orders, sectors, a plain circle, every arc spelling, the central/base angle, arc ratio and sum readers, English) is `src/app/__tests__/issue-2483-arc-never-contradicts.test.ts`.
+
+### `half-circle-holds-180-2483` — «חצי מעגל OAB», then «∠AOB = 100» and «קשת AB = 40» are refused (#2483, ADR-758)
+
+**Guards against:** the half circle's twin of #2483 — two new ends carried the 180° by their starting angles, so «∠AOB = 100» bent it green. **Asserts** the half is 180° at O and both lines are refused before commit.
+
+### `arc-end-is-centre-2345` — «רבע מעגל AOB», then «קשת AB = 40» is refused as a statement about the centre (#2345, ADR-758)
+
+**Guards against:** an arc end that is its circle's centre lowered to «∠AAB» and refused by the engine with an internal sentence (shown as the floor). **Asserts** the line is refused, no repeated-vertex angle appears in the verdict, and the quarter keeps its 90°.

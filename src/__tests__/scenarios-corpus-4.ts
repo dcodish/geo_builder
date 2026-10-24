@@ -5669,6 +5669,54 @@ export const SCENARIOS_4: Scenario[] = [
       expect(crossingUtterance({ circle1: 'circle-O-2', c: 'A', d: 'B' } as never, 'K', 'he', withDiameter)).toBe('K = חיתוך המעגל הפנימי ו-AB');
     },
   },
+  {
+    id: 'quarter-arc-contradicts-span-2483',
+    title: '«רבע מעגל AOB», then «קשת BO=40» (and «קשת BO = 40») is refused and the quarter keeps its 90° (#2483, ADR-758)',
+    guards:
+      "#2483 (P1), the operator playing round #2466 T35 (2026-10-24): *\"if I write on second line קשת BO=40 it draws the 40 which contradicts the first line\"*. At 1944d866 line 2 committed ∠BAO = 40 on the quarter's own circle with every row green: the quarter's 90° held only by where its new ends started, never as a constraint. ADR-758: the quarter states its 90° (the half its 180°, as a diameter) whatever existed before — the stated-angle sector's lowering — so a line that bends it is refused as over-constrained. Asserts refusal and the kept angle, not one sentence (#2486 re-bases the letters). The class matrix is src/app/__tests__/issue-2483-arc-never-contradicts.test.ts.",
+    steps: ['רבע מעגל AOB'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(angle(at(fig, 'O'), at(fig, 'A'), at(fig, 'B')), 'the quarter is 90° at its centre').toBeCloseTo(90, 6);
+      const facts = factsOf(['רבע מעגל AOB']);
+      for (const line of ['קשת BO=40', 'קשת BO = 40']) {
+        const v = gateVerdict(facts, line);
+        expect(v.kind, `«${line}» is refused: ${JSON.stringify(v)}`).toBe('refused');
+      }
+    },
+  },
+  {
+    id: 'half-circle-holds-180-2483',
+    title: '«חצי מעגל OAB», then «∠AOB = 100» and «קשת AB = 40» are refused; the half stays a diameter (#2483, ADR-758)',
+    guards:
+      "#2483's half-circle twin. At 1944d866 «חצי מעגל OAB» · «∠AOB = 100» committed green with ∠AOB bent from 180° to 100°, and «קשת AB = 40» to 40°: two new ends carried the 180° by their starting angles alone. ADR-758: two new ends are one diameter (an end and its antipode), so no later line can bend it. Asserts both lines refused and A, O, B collinear with O the midpoint.",
+    steps: ['חצי מעגל OAB'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(angle(at(fig, 'A'), at(fig, 'O'), at(fig, 'B')), 'the half is 180° at its centre').toBeCloseTo(180, 6);
+      const facts = factsOf(['חצי מעגל OAB']);
+      for (const line of ['∠AOB = 100', 'קשת AB = 40']) {
+        const v = gateVerdict(facts, line);
+        expect(v.kind, `«${line}» is refused: ${JSON.stringify(v)}`).toBe('refused');
+      }
+    },
+  },
+  {
+    id: 'arc-end-is-centre-2345',
+    title: '«רבע מעגל AOB», then «קשת AB = 40» is refused as a statement about the centre, never «∠AAB», and the quarter keeps its 90° (#2345, ADR-758)',
+    guards:
+      "#2345: at b7d6223c (and 1944d866) «קשת AB = 40» on the quarter centred at A lowered ∠AAB and the engine refused «an angle needs three distinct points» — shown as the floor sentence after #2201. ADR-758: `withArcEndpoints` refuses an arc end that is its circle's centre, naming the statement and the point (`input.arcEndIsCentre[NoStep]`). Asserts refusal, no repeated-vertex angle anywhere in the verdict, and the kept angle — not one sentence (#2486 re-bases the letters). The class matrix is src/app/__tests__/issue-2483-arc-never-contradicts.test.ts.",
+    steps: ['רבע מעגל AOB'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'O'), at(fig, 'A'), at(fig, 'B')), 'the quarter is 90° at its centre').toBeCloseTo(90, 6);
+      const v = gateVerdict(factsOf(['רבע מעגל AOB']), 'קשת AB = 40');
+      expect(v.kind, JSON.stringify(v)).toBe('refused');
+      expect(JSON.stringify(v)).not.toMatch(/repeats its vertex|∠AAB/);
+    },
+  },
 ];
 
 /**
