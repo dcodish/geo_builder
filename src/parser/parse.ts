@@ -6339,8 +6339,11 @@ function ringOnCircle(opts: {
   /** An EXISTING circle to put the ring on: no `circle` command is emitted, so a radius already stated on
    *  it is not silently reset to a free one (§6 honesty — the 3-/4-gon path's `bound` branch). */
   existing?: Id;
+  /** How many points already ride `existing` ({@link ridersOn}); 0 when the circle is minted here. */
+  riders?: number;
 }): AnyCommand[] {
   const { ids, center, r, named, regular, hidden, existing } = opts;
+  const riders = existing ? (opts.riders ?? 0) : 0;
   const n = ids.length;
   const circ = circleId(existing ?? center);
   const cmds: AnyCommand[] = existing
@@ -6357,7 +6360,12 @@ function ringOnCircle(opts: {
           ...(named ? {} : { autoCenter: true }),
         },
       ];
-  const degs = regular ? Array.from({ length: n }, (_, i) => 90 + (360 * i) / n) : cyclicSpread(n);
+  // #2512 ([ADR-762](../../docs/06-decisions.md#adr-762)): on an EXISTING circle the ring starts turned by what the
+  // circle already carries (`riders` × the golden angle), so a second ring — or a point / diameter already there —
+  // is never under one of its vertices. 0 on a circle this line mints: a lone ring draws exactly as before. The
+  // regular ring's θ stay pinned (ADR-610); sampling that turn is #2528.
+  const turn = (riders * GOLDEN_TURN * 180) / Math.PI;
+  const degs = (regular ? Array.from({ length: n }, (_, i) => 90 + (360 * i) / n) : cyclicSpread(n)).map((d) => d + turn);
   ids.forEach((id, i) => {
     cmds.push({ type: 'point-on-circle', id, circle: circ, theta: (degs[i] * Math.PI) / 180, ...(regular ? {} : { free: true }) });
   });
@@ -6567,7 +6575,7 @@ function inscribedNgon(s: string, ctx: ParseContext, hidden: boolean): AnyComman
     // «חסום במעגל» line committed green with its circle still hidden («משולש ABC בר חסימה» · «מרובע ABCD
     // חסום במעגל»), which is the very outcome ADR-610's ruling forbids.
     ...(existing ? revealReusedCircle(ctx, circleId(existing), hidden) : []),
-    ...ringOnCircle({ ids, center, r, named: named != null, regular, hidden, existing }),
+    ...ringOnCircle({ ids, center, r, named: named != null, regular, hidden, existing, riders: existing ? ridersOn(ctx, existing) : 0 }),
   ];
 }
 
@@ -7050,7 +7058,7 @@ const regularPolygon: Rule = (s, ctx) => {
   // there left its auto-centre undetermined («@ctr-P is still free») once the sides had to hold. A stated radius
   // keeps the minted circle (binding would drop it, §6 honesty), as `boundInscribeCircle` does.
   const onto = r.numeric || r.symbolic ? null : reusedInscribeCircle(ctx, ids, named);
-  return ringOnCircle({ ids, center, r, named: named != null, regular: true, hidden: true, existing: onto ?? undefined });
+  return ringOnCircle({ ids, center, r, named: named != null, regular: true, hidden: true, existing: onto ?? undefined, riders: onto ? ridersOn(ctx, onto) : 0 });
 };
 
 /**
@@ -7620,26 +7628,17 @@ const incircle: Rule = (s, ctx) => {
     // The dual's vertices are tangent-line meets with no free DOF a shape property could flex, so a refined
     // triangle (right / isosceles / equilateral) around an existing circle escalates (#1790).
     if (phrase.kind !== 'triangle') return 'stop';
-    const O = up(namedCenter);
-    const circ = circleId(O);
-    // The three tangency touch points are SCAFFOLDING the student didn't name (#32) — anonymous promotable
-    // dots (`@t-O0…`), deterministic per (circle, index), so they never occupy a student letter.
-    const touch: Id[] = [anonId('t', O, '0'), anonId('t', O, '1'), anonId('t', O, '2')];
-    const verts: [Id, Id, Id] = [A, B, C]; // the student's named vertices = pairwise tangent intersections
-    return [
-      ...touch.map((t, i): AnyCommand => ({ type: 'point-on-circle', id: t, circle: circ, free: true, theta: 0.4 + (i * 2 * Math.PI) / 3 })),
-      ...touch.map((t): AnyCommand => ({ type: 'tangent', id: `tan-${t}`, circle: circ, at: t })), // scaffolding lines
-      ...verts.map((v, i): AnyCommand => ({ type: 'line-intersection', id: v, line1: `tan-${touch[i]}`, line2: `tan-${touch[(i + 1) % 3]}` })),
-      { type: 'triangle', ids: [A, B, C] }, // the drawn sides DE, EF, FD (each tangent to O)
-    ];
+    // #2512 ([ADR-762](docs/06-decisions.md#adr-762)): THE one tangential-ring emitter, shared with the quadrilateral —
+    // touch points keyed by circle AND ring, started turned by the circle's riders, so a second triangle around O is
+    // its own triangle and never the first one redrawn.
+    return tangentialRingAround('triangle', [A, B, C], up(namedCenter), ridersOn(ctx, namedCenter));
   }
   // #2480 ([ADR-757](docs/06-decisions.md#adr-757)): the same DUAL for a quadrilateral around an existing circle —
   // the ADR-115 defect left open for n = 4. Re-deriving the circle from the ring re-centres and re-radiuses the
   // circle the student already has (a stated «ברדיוס 3» silently lost). Only for a NEW ring: vertices that already
   // exist are another statement (tangency between two existing objects) and keep the generic construction.
   if (n === 4 && namedCenter && (ctx.circles ?? []).some((c) => up(c) === up(namedCenter)) && !ids.some((id) => taken.includes(id))) {
-    const riders = (ctx.circleMembers ?? []).find((m) => m.id === circleId(namedCenter) || up(m.center) === up(namedCenter))?.points.length ?? 0;
-    return tangentialQuadAround(phrase.kind, ids, up(namedCenter), riders);
+    return tangentialRingAround(phrase.kind, ids, up(namedCenter), ridersOn(ctx, namedCenter));
   }
   // The incentre: the student's named one — "circle M" (circleCenter) OR the subject form "M [is the] centre
   // of the inscribed circle" (incenterLabel) — else an auto label. A named incentre dodges the polygon's vertices.
@@ -7686,8 +7685,10 @@ const incircle: Rule = (s, ctx) => {
 };
 
 /**
- * #2480 ([ADR-757](docs/06-decisions.md#adr-757)) — A QUADRILATERAL BUILT AROUND AN EXISTING CIRCLE: ADR-115's dual,
- * generalised from the triangle. The circle is GIVEN, so nothing here defines it: four touch points ride it, the
+ * #2480 ([ADR-757](docs/06-decisions.md#adr-757)) — A RING BUILT AROUND AN EXISTING CIRCLE: ADR-115's dual, ONE
+ * emitter for the triangle and every quadrilateral kind (#2512, [ADR-762](docs/06-decisions.md#adr-762): the triangle
+ * had a private copy keyed by the circle alone, so a second triangle around O re-used the first one's touch points
+ * and was drawn exactly on top of it). The circle is GIVEN, so nothing here defines it: n touch points ride it, the
  * tangent at each is a scaffolding line, and the student's vertices are the meets of consecutive tangents —
  * `v[i] = tan(t[i]) ∩ tan(t[i+1])`, so side `v[i]v[i+1]` lies on `tan(t[i+1])`. The circle keeps its centre, its stated
  * radius and its riders, and every side is tangent to it by construction (no coupled solve).
@@ -7708,10 +7709,11 @@ const incircle: Rule = (s, ctx) => {
  * the phrase states it (`declaredAs`), never as the forced shape, and a stated right angle or equal pair also
  * travels as its own relation (true by construction), so it is marked and listed as the standalone shape's is.
  */
-const tangentialQuadAround = (kind: ShapeKind, v: Id[], O: Id, riders: number): AnyCommand[] => {
+const tangentialRingAround = (kind: ShapeKind, v: Id[], O: Id, riders: number): AnyCommand[] => {
   const circ = circleId(O);
   const ring = v.join('');
-  const t = [0, 1, 2, 3].map((i) => anonId('t', O, ring, String(i)));
+  const n = v.length;
+  const t = v.map((_, i) => anonId('t', O, ring, String(i)));
   const turn = riders * GOLDEN_TURN;
   const cmds: AnyCommand[] = [];
   const free = (i: number, theta: number) => cmds.push({ type: 'point-on-circle', id: t[i], circle: circ, free: true, theta: theta + turn });
@@ -7729,6 +7731,9 @@ const tangentialQuadAround = (kind: ShapeKind, v: Id[], O: Id, riders: number): 
   const variant: AnyCommand[] = [];
   const relations: AnyCommand[] = [];
   switch (kind) {
+    case 'triangle': // ADR-115's dual: three free touch angles, 120° apart to start
+      [0, 1, 2].forEach((i) => free(i, 0.4 + (i * 2 * Math.PI) / 3));
+      break;
     case 'square':
     case 'rectangle':
       free(0, 0.4); antipode(2, 0); quarter(1, 0, 0); quarter(3, 0, 1);
@@ -7758,13 +7763,23 @@ const tangentialQuadAround = (kind: ShapeKind, v: Id[], O: Id, riders: number): 
   }
   cmds.push(
     ...t.map((ti): AnyCommand => ({ type: 'tangent', id: `tan-${ti}`, circle: circ, at: ti })),
-    ...v.map((vi, i): AnyCommand => ({ type: 'line-intersection', id: vi, line1: `tan-${t[i]}`, line2: `tan-${t[(i + 1) % 4]}` })),
+    ...v.map((vi, i): AnyCommand => ({ type: 'line-intersection', id: vi, line1: `tan-${t[i]}`, line2: `tan-${t[(i + 1) % n]}` })),
   );
+  if (n === 3) return [...cmds, { type: 'triangle', ids: [v[0], v[1], v[2]] }];
   if (variant.length) return [...cmds, ...variant];
   return [...cmds, { type: 'quadrilateral', ids: [v[0], v[1], v[2], v[3]], ...(declaredAs !== 'quadrilateral' ? { declaredAs } : {}) }, ...relations];
 };
 /** The golden angle — successive rings around one circle start on well-spread touch angles. */
 const GOLDEN_TURN = Math.PI * (3 - Math.sqrt(5));
+
+/**
+ * #2512 ([ADR-762](../../docs/06-decisions.md#adr-762)) — how many points already RIDE the circle centred at
+ * `center` (named points, touch points, ring vertices), read from the construction's membership. A ring built on
+ * an existing circle starts turned by this count × {@link GOLDEN_TURN}, so it never STARTS on what the circle
+ * already carries. 0 for a circle the line itself mints, so a lone ring draws exactly as before.
+ */
+const ridersOn = (ctx: ParseContext, center: string): number =>
+  (ctx.circleMembers ?? []).find((m) => m.id === circleId(center) || up(m.center) === up(center))?.points.length ?? 0;
 
 /**
  * The INCIRCLE of the ring `v` (a triangle, or a quadrilateral the construction flexes to be tangential —

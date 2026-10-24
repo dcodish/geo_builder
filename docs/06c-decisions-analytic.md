@@ -13733,3 +13733,21 @@ Seed sweep: 24/24 seeds green on the T27 fixture (195 ms for the 24 derives) and
 **Locks.** `src-analytic/__tests__/issue-2486-arc-run-centre.test.ts` (seven runs × four nouns, «גזרה OAB» → O, placed points, the quarter's equal arms and 90° at three seeds); parity rows `quarter-AOB-2486`, `sector-OAB-2486`.
 
 **Behaviour change for a student:** «רבע מעגל AOB» is drawn around O and «גזרה OAB» around O, as in the 2-D tool.
+
+## ADR-AG-333 — A second ring around one circle starts on the dual, so it builds whatever its letters (#2512)
+
+**Status:** accepted · 2026-10-24 · bug (P1, the analytic half of [ADR-762](06-decisions.md#adr-762), ADR-W-157) · fix round #2543, stream A · branch `fix/2512-ring-offset`
+
+**Requirements:** [02c](02c-requirements-analytic.md) R131 amendment "a second ring around one circle" · **Design:** [04c](04c-design-analytic.md) § "Tangent to a line" ("A second ring around one circle starts on the dual").
+
+**Measured before** (`decideSubmit` → `derive`, main 045a8546): «מעגל O ברדיוס 3» · «משולש ABC חוסם את מעגל O» · «משולש DEF חוסם את מעגל O» refused «polygon-collapsed» on line 3 (also after a bare «מעגל O», in the circle voice, for ABC + XYZ, and a third triangle); two squares around O «unsatisfiable»; a triangle then a square refused; ABC + PQR and two general quadrilaterals built but faulted at seeds 6–8. A lone ring built at every seed.
+
+**Root cause.** Analytic's lowering is right: the ring's vertices are free unknowns held by bounded `tangent-line` rows (#1503), so nothing is shared or pinned as in 2-D. But the joint LM descent of a second ring around the same circle started from the letters' hashed sample (`freeCoord(seed, name)`) and fell into a basin it could not leave; which letters failed was decided by where the sampler put their names.
+
+**Decision.** In `evaluateUncached`'s seeding (`src-analytic/engine/evaluate.ts`), a triangle or quadrilateral every side of which is a bounded `tangent-line` to one centre, stated after another such ring around that centre, seeds its free vertices on 2-D's construction: uneven touch angles (no shape asserted, ADR-052), turned by the touches the earlier rings put on the circle × the golden angle, varied per configuration past 0 (a whole-ring turn and ±0.3 rad per touch, every gap kept under a half turn), each vertex at the meet of its two sides' tangents. That start is an exact solution, so the descent converges at once. A lone ring keeps its sampled start, so its drawing is unchanged (pinned). A start, never a verdict: the judge still has the last word.
+
+**Measured after:** every row above builds at seeds 0–8 with no fault, every side tangent within the side, no vertex on an earlier ring's vertex; ABC + PQR and two quadrilaterals no longer fault at seeds 6–8. A lone triangle, a lone square, and a triangle around O after one inside it draw the seed-0 positions they had.
+
+**Locks.** `src-analytic/__tests__/issue-2512-second-ring-around-circle.test.ts`; parity row `second-ring-around-circle-2512`.
+
+**Behaviour change for a student:** in analytic, a second triangle or square around a circle is drawn instead of being refused.

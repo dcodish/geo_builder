@@ -422,6 +422,10 @@ circumscribes triangle ABC" as «… חסום במעגל (O)»; "triangle ABC ci
 circle" as «מעגל (O) חסום ב-…»; «מעגל שחוסם את המשולש ABC» (the circle the subject) as «מעגל חוסם את המשולש ABC»;
 «מעגל ש-ABC חוסם» / «מעגל שהמשולש ABC חוסם» (the ring the subject) as the incircle. n ≥ 5 waits for #1969.
 - «מעגל שחוסם את המשולש ABC», «מעגל ש-ABC חוסם», "the circle O circumscribes triangle ABC"
+
+**R131 amendment — a second ring around one circle (#2512, ADR-AG-333, ADR-W-157)**. A triangle or quadrilateral stated around a circle that already has a ring around it builds as 2-D builds it: tangent to every side within the side, its own figure, at every configuration, whatever its letters.
+- «מעגל O ברדיוס 3» · «משולש ABC חוסם את מעגל O» · «משולש DEF חוסם את מעגל O»; two squares around O
+- Sources: ADR-AG-333, #2512.
 - Sources: ADR-AG-275, #1975, ADR-W-108.
 
 **R132 — a tangent at a named point, the tangent as an object, tangency to any circle, and chords**. *(Operator, #1616 ruling 4: "Chord: yes.")* The touch is perpendicular to the radius at every configuration; «המשיק» refers to the drawn tangent.
