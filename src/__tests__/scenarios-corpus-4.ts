@@ -58,6 +58,7 @@ import { COLLINEAR_CIRCLE_VS } from '@/engine/cyclicFeasibility';
 import { stripFormatControls } from '../../shell/bidi';
 import { COLLAPSED_VS, computeValues, detectAll, figureDeterminacy, findValidConfig, firstSatisfyingSeed, meetsRequirements, searchAnotherView, sharedSamples, type Fact } from '@/replay/core';
 import { figureStatus } from '@/app/figureStatus';
+import { roleReadings } from '@/app/roleReadings';
 import { drivenSolveStats } from '@/engine/evaluate';
 import { buildScene } from '@/render/scene';
 import { rowNouns } from '@/store/rowNouns';
@@ -2941,22 +2942,25 @@ export const SCENARIOS_4: Scenario[] = [
   },
   {
     id: 'quarter-circle-conflict-names-no-innocent-given-1203',
-    title: '#1203: the operator’s quarter circles on «ABC משולש ישר זוית · AC=15 · BC=10» — CAB is refused as its own statement; ABC names no innocent earlier given',
+    title: '#1203: the operator’s quarter circles on «ABC משולש ישר זוית · AC=15 · BC=10» — neither names an innocent earlier given (CAB centred at A since #2486, ABC refused as its own statement)',
     guards:
-      "The operator's exact sequences from #1203. «רבע מעגל CAB» (two unequal pinned radii) is refused, and the refusal's subject is the quarter's own statement — every row carrying the banner string is the quarter's (group g3), the three givens stay green. «רבע מעגל ABC» commits and the banner used to read «BC=10» סותר את «AC=15» — two of his own consistent givens, with the quarter green. Re-measured at pickup (2026-09-29): since ADR-551 (#1441) the committed case is caught by the obtuse-side proof, which states the right angle at A and the two lengths and names no counterpart; this lock holds that it never regresses to naming «AC=15». The later-statement attribution itself is locked by overconstrained-names-the-completing-statement-1203.",
+      "The operator's exact sequences from #1203. «רבע מעגל CAB» (two unequal pinned radii) is refused, and the refusal's subject is the quarter's own statement — every row carrying the banner string is the quarter's (group g3), the three givens stay green. «רבע מעגל ABC» commits and the banner used to read «BC=10» סותר את «AC=15» — two of his own consistent givens, with the quarter green. Re-measured at pickup (2026-09-29): since ADR-551 (#1441) the committed case is caught by the obtuse-side proof, which states the right angle at A and the two lengths and names no counterpart; this lock holds that it never regresses to naming «AC=15». The later-statement attribution itself is locked by overconstrained-names-the-completing-statement-1203. Re-based 2026-10-24 for #2486 (ADR-759, the middle letter is the centre): CAB is now centred at A and draws the proof verdict ABC drew before; ABC is centred at B and is refused as the quarter statement's own. Sequences unchanged.",
     steps: ['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'רבע מעגל CAB'],
     check(fig) {
-      expect(fig.lastError).toMatch(/^over-constrained: .+ cannot hold/);
-      const owners = Object.entries(fig.status).filter(([, st]) => st === fig.lastError).map(([id]) => id);
+      // #2486 (ADR-759): the MIDDLE letter is the centre, so «רבע מעגל CAB» is centred at A and «רבע מעגל ABC» at B —
+      // the two sequences swapped verdicts (re-measured at pickup). The lock's intent is unchanged: neither names an
+      // innocent earlier given. CAB is caught by the obtuse-side proof (the right angle at A and the two lengths, no
+      // counterpart); ABC is refused as its own statement.
+      expect(fig.lastError, '«רבע מעגל CAB» is flagged').not.toBeNull();
+      expect(fig.lastError as string, 'never «BC=10» contradicts «AC=15»').not.toMatch(/\[vs #1\]$/);
+      expect(fig.lastError as string).toMatch(/^impossible: the angle at A is 90°/);
+
+      const abc = replay(factsOf(['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'רבע מעגל ABC']));
+      expect(abc.lastError).toMatch(/^over-constrained: .+ cannot hold/);
+      const owners = Object.entries(abc.status).filter(([, st]) => st === abc.lastError).map(([id]) => id);
       expect(owners.length).toBeGreaterThan(0);
       expect(owners.every((id) => id.startsWith('g3.')), 'the refusal is the quarter statement’s own').toBe(true);
-      expect(Object.entries(fig.status).filter(([id]) => !id.startsWith('g3.')).every(([, st]) => st === 'ok'), 'the three givens stand').toBe(true);
-
-      const facts = factsOf(['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'רבע מעגל ABC']);
-      const abc = replay(facts);
-      expect(abc.lastError, '«רבע מעגל ABC» is flagged').not.toBeNull();
-      expect(abc.lastError as string, 'never «BC=10» contradicts «AC=15»').not.toMatch(/\[vs #1\]$/);
-      expect(abc.lastError as string).toMatch(/^impossible: the angle at A is 90°/);
+      expect(Object.entries(abc.status).filter(([id]) => !id.startsWith('g3.')).every(([, st]) => st === 'ok'), 'the three givens stand').toBe(true);
     },
   },
   {
@@ -5812,6 +5816,131 @@ export const SCENARIOS_4: Scenario[] = [
     check(fig) {
       allStepsOk(fig);
       expect(fig.circles.size, 'two circles, no third').toBe(2);
+
+    id: 'quarter-arc-contradicts-span-2483',
+    title: '«רבע מעגל AOB», then «קשת BO=40» (and «קשת BO = 40») is refused and the quarter keeps its 90° (#2483, ADR-758)',
+    guards:
+      "#2483 (P1), the operator playing round #2466 T35 (2026-10-24): *\"if I write on second line קשת BO=40 it draws the 40 which contradicts the first line\"*. At 1944d866 line 2 committed ∠BAO = 40 on the quarter's own circle with every row green: the quarter's 90° held only by where its new ends started, never as a constraint. ADR-758: the quarter states its 90° (the half its 180°, as a diameter) whatever existed before — the stated-angle sector's lowering — so a line that bends it is refused as over-constrained. Asserts refusal and the kept angle, not one sentence. Since #2486 (ADR-759) the quarter is centred at O, so «קשת BO=40» is refused as an arc end at the centre; still refused, the quarter still 90°. The class matrix is src/app/__tests__/issue-2483-arc-never-contradicts.test.ts.",
+    steps: ['רבע מעגל AOB'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(angle(at(fig, 'A'), at(fig, 'O'), at(fig, 'B')), 'the quarter is 90° at its centre O (the middle letter, #2486)').toBeCloseTo(90, 6);
+      const facts = factsOf(['רבע מעגל AOB']);
+      for (const line of ['קשת BO=40', 'קשת BO = 40']) {
+        const v = gateVerdict(facts, line);
+        expect(v.kind, `«${line}» is refused: ${JSON.stringify(v)}`).toBe('refused');
+      }
+    },
+  },
+  {
+    id: 'half-circle-holds-180-2483',
+    title: '«חצי מעגל OAB», then «∠AOB = 100» and «קשת AB = 40» are refused; the half stays a diameter (#2483, ADR-758)',
+    guards:
+      "#2483's half-circle twin. At 1944d866 «חצי מעגל OAB» · «∠AOB = 100» committed green with ∠AOB bent from 180° to 100°, and «קשת AB = 40» to 40°: two new ends carried the 180° by their starting angles alone. ADR-758: two new ends are one diameter (an end and its antipode), so no later line can bend it. Asserts both lines refused and A, O, B collinear with O the midpoint.",
+    steps: ['חצי מעגל OAB'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(angle(at(fig, 'A'), at(fig, 'O'), at(fig, 'B')), 'the half is 180° at its centre').toBeCloseTo(180, 6);
+      const facts = factsOf(['חצי מעגל OAB']);
+      for (const line of ['∠AOB = 100', 'קשת AB = 40']) {
+        const v = gateVerdict(facts, line);
+        expect(v.kind, `«${line}» is refused: ${JSON.stringify(v)}`).toBe('refused');
+      }
+    },
+  },
+  {
+    id: 'arc-end-is-centre-2345',
+    title: '«רבע מעגל AOB», then «קשת AB = 40» is refused as a statement about the centre, never «∠AAB», and the quarter keeps its 90° (#2345, ADR-758)',
+    guards:
+      "#2345: at b7d6223c (and 1944d866) «קשת AB = 40» on the quarter centred at A lowered ∠AAB and the engine refused «an angle needs three distinct points» — shown as the floor sentence after #2201. ADR-758: `withArcEndpoints` refuses an arc end that is its circle's centre, naming the statement and the point (`input.arcEndIsCentre[NoStep]`). Asserts refusal, no repeated-vertex angle anywhere in the verdict, and the kept angle — not one sentence. Since #2486 (ADR-759) the quarter is centred at O and AB is a real arc of it, so «קשת AB = 40» is refused as over-constrained (it would bend the 90°); the arc-end-is-centre sentence is locked with re-based letters in issue-2483-arc-never-contradicts.test.ts. The class matrix is src/app/__tests__/issue-2483-arc-never-contradicts.test.ts.",
+    steps: ['רבע מעגל AOB'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'A'), at(fig, 'O'), at(fig, 'B')), 'the quarter is 90° at its centre O (the middle letter, #2486)').toBeCloseTo(90, 6);
+      const v = gateVerdict(factsOf(['רבע מעגל AOB']), 'קשת AB = 40');
+      expect(v.kind, JSON.stringify(v)).toBe('refused');
+      expect(JSON.stringify(v)).not.toMatch(/repeats its vertex|∠AAB/);
+    },
+  },
+  {
+    id: 'issue-2486-quarter-AOB-middle-centre',
+    title: '«רבע מעגל AOB» is the quarter about O — the middle letter is the centre, as in ∠AOB (#2486, ADR-759)',
+    guards:
+      "Operator ruling 2026-10-24 (e8 A): *\"The middle letter is the centre, for the whole family. «רבע מעגל AOB», «חצי מעגל AOB» and «גזרה AOB» all have centre O, as in ∠AOB.\"* At 1944d866 the quarter read the FIRST letter (centre A, ends O and B) while «גזרה AOB» read O. Asserts the arc's centre is O, the arms equal and the 90° at O at seeds 0–2. The class matrix is src/app/__tests__/issue-2486-arc-run-centre.test.ts; the reader is shell/arcRun.ts.",
+    steps: ['רבע מעגל AOB'],
+    check(fig) {
+      allStepsOk(fig);
+      const arc = fig.construction.objects.find((o) => o.kind === 'arc');
+      expect(arc && arc.kind === 'arc' ? arc.center : null, 'the quarter is centred at O').toBe('O');
+      const facts = factsOf(['רבע מעגל AOB']);
+      for (const seed of [0, 1, 2]) {
+        const f = replay(facts, seed);
+        expect(f.violations).toEqual([]);
+        expect(dist(at(f, 'O'), at(f, 'A')), `|OA| = |OB| @${seed}`).toBeCloseTo(dist(at(f, 'O'), at(f, 'B')), 6);
+        expect(angle(at(f, 'A'), at(f, 'O'), at(f, 'B')), `∠AOB = 90 @${seed}`).toBeCloseTo(90, 6);
+      }
+    },
+  },
+  {
+    id: 'issue-2486-half-AOB-middle-centre',
+    title: '«חצי מעגל AOB» is the half circle about O — O is the midpoint of the diameter AB (#2486, ADR-759)',
+    guards:
+      "Operator ruling 2026-10-24 (e8 A), the half circle: at 1944d866 «חצי מעגל AOB» on loose points read centre A (diameter OB). Now centre O, so O is the midpoint of AB (the ADR-534 / ADR-758 diameter lowering is unchanged; only which letter is the centre changed). Asserts the arc's centre, the midpoint and the 180° span at seeds 0–2.",
+    steps: ['חצי מעגל AOB'],
+    check(fig) {
+      allStepsOk(fig);
+      const arc = fig.construction.objects.find((o) => o.kind === 'arc');
+      expect(arc && arc.kind === 'arc' ? [arc.center, arc.spanDeg] : null).toEqual(['O', 180]);
+      const facts = factsOf(['חצי מעגל AOB']);
+      for (const seed of [0, 1, 2]) {
+        const f = replay(facts, seed);
+        expect(f.violations).toEqual([]);
+        const [A, B, O] = [at(f, 'A'), at(f, 'B'), at(f, 'O')];
+        expect(O.x, `O is the midpoint of AB @${seed}`).toBeCloseTo((A.x + B.x) / 2, 6);
+        expect(O.y).toBeCloseTo((A.y + B.y) / 2, 6);
+      }
+    },
+  },
+  {
+    id: 'issue-2486-quarter-AOB-existing-ends',
+    title: '«נקודה A» · «נקודה B» · «רבע מעגל AOB» — existing ends, centre O (#2486, ADR-759)',
+    guards:
+      "The ruled reading with the ends already placed: the quarter is still centred at O (the middle letter), A and B become members of circle O and the stated 90° (#2483, ADR-758) drives the free centre. Asserts the centre, equal arms and the 90° at seeds 0–2, and that the line commits through the submit gate as the student typed it.",
+    steps: ['נקודה A', 'נקודה B', 'רבע מעגל AOB'],
+    check(fig) {
+      allStepsOk(fig);
+      const arc = fig.construction.objects.find((o) => o.kind === 'arc');
+      expect(arc && arc.kind === 'arc' ? arc.center : null).toBe('O');
+      const facts = factsOf(['נקודה A', 'נקודה B', 'רבע מעגל AOB']);
+      for (const seed of [0, 1, 2]) {
+        const f = replay(facts, seed);
+        expect(f.violations).toEqual([]);
+        expect(angle(at(f, 'A'), at(f, 'O'), at(f, 'B')), `∠AOB = 90 @${seed}`).toBeCloseTo(90, 6);
+      }
+      expect(gateVerdict(factsOf(['נקודה A', 'נקודה B']), 'רבע מעגל AOB').kind).toBe('commit');
+    },
+  },
+  {
+    id: 'issue-2486-reread-teaches-middle-spelling',
+    title: 'the bagrut quarter: «רבע מעגל ODC» is re-read to centre C and the taught spelling «רבע מעגל DCO» builds as typed (#2486, #1012)',
+    guards:
+      "#1012 (ADR-521, operator 2026-09-15: \"it should propose that one\") under #2486's reading: on «ABC משולש ישר זוית · AC=15 · BC=10 · O על AC · D על CB» only a quarter centred at C is drawable. «רבע מעגל ODC» reads centre O (an O-family first letter); the re-reader tries C first and spells it with `spellArcRun`, the inverse of the parser's own reader — «רבע מעגל DCO». docs/17 §9 taught-remedy lock: the hint and the accepted set come from one source, so the taught sentence, submitted as typed (the steps), builds centre C with a 90° there at seeds 0–2. The submit-path adoption and hint are locked in src/__tests__/issue-1012-role-readings.test.ts.",
+    steps: ['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'O על AC', 'D על CB', 'רבע מעגל DCO'],
+    check(fig) {
+      allStepsOk(fig);
+      const arc = fig.construction.objects.find((o) => o.kind === 'arc');
+      expect(arc && arc.kind === 'arc' ? arc.center : null, 'the taught spelling reads centre C').toBe('C');
+      const setup = factsOf(['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'O על AC', 'D על CB']);
+      const stated = parse('רבע מעגל ODC', ctxOf(setup));
+      expect(stated.ok).toBe(true);
+      if (!stated.ok) return;
+      const readings = roleReadings('רבע מעגל ODC', stated.commands, (s) => replay(setup, s).positions);
+      expect(readings?.[0]?.centre, 'the re-reader tries C first').toBe('C');
+      expect(readings?.[0]?.utterance, 'and teaches the middle-letter spelling these steps typed').toBe('רבע מעגל DCO');
+      const facts = factsOf(['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'O על AC', 'D על CB', 'רבע מעגל DCO']);
+      for (const seed of [0, 1, 2]) expect(angle(at(replay(facts, seed), 'O'), at(replay(facts, seed), 'C'), at(replay(facts, seed), 'D')), `∠OCD = 90 @${seed}`).toBeCloseTo(90, 4);
     },
   },
 ];

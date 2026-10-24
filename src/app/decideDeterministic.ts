@@ -590,6 +590,23 @@ export async function decideFromParse(
   if (!r.ok && r.reason === 'arc-value-ambiguous') {
     return refuse('guided', { source: 'parser', result: `arc-value-ambiguous:${r.a}${r.b}=${r.value}` }, { key: 'input.arcValueAmbiguous', params: { value: r.value, a: r.a, b: r.b, center: r.center } });
   }
+  /**
+   * #2345 ([ADR-758](../../docs/06-decisions.md#adr-758)): an arc statement whose end is its circle's centre — there is no
+   * such arc. Refused naming the statement and the point (wording delegated, #1995 2026-10-15; one next step or none,
+   * ADR-W-154). The step is COMPUTED, never listed: the same sentence with the centre letter replaced by another point
+   * the figure holds on that circle, PROVED through this very decision (the #1611 proof run) and offered only if it
+   * commits. When none does, the sentence says plainly that there is nothing to draw.
+   */
+  if (!r.ok && r.reason === 'arc-end-is-centre') {
+    const step = opts.teaching ? null : await arcEndStep(r, utterance, pctx, (line) =>
+      decideFromParse({ facts, seed, view: viewNow(), centresShown: state.centresShown }, line, locale, hooks, { teaching: true }));
+    const detail = utterance.trim();
+    return refuse(
+      'conflict',
+      { source: 'parser', result: `arc-end-is-centre:${r.end}` },
+      step ? { key: 'input.arcEndIsCentre', params: { detail, end: r.end, step } } : { key: 'input.arcEndIsCentreNoStep', params: { detail, end: r.end } },
+    );
+  }
   if (!r.ok && r.reason === 'cevian-wrong-side') {
     return refuse('guided', { source: 'parser', result: `cevian-wrong-side:${r.apex}:${r.stated.join('')}/${r.actual.join('')}` }, { key: 'input.cevianWrongSide', params: { apex: r.apex, stated: r.stated.join(''), actual: r.actual.join('') } });
   }
@@ -836,9 +853,9 @@ export async function decideFromParse(
         /**
          * A ROLE-ASSIGNED LETTER RUN IS RE-READ BEFORE IT IS REFUSED (#1012).
          *
-         * «רבע מעגל OAB» means *centre O, ends A and B* — a convention the catalog never taught. So
-         * «רבע מעגל ODC» was refused after ~17 s, blaming the student's «O על AC», while «רבע מעגל CDO»
-         * built the very same figure in one second.
+         * «רבע מעגל AOB» means *centre O, ends A and B* (the arc family's one reader, #2486). On 2026-09-15,
+         * under the then centre-first reading, «רבע מעגל ODC» was refused after ~17 s, blaming the student's
+         * «O על AC», while «רבע מעגל CDO» built the very same figure in one second.
          *
          * The run is re-read over the other role assignments and the first that BUILDS is adopted, then
          * taught below through the canonical-hint seam that already exists. Ordered by a probe over the
@@ -1145,6 +1162,32 @@ export async function decideFromParse(
   }
   // out of grammar, OR a deterministic parse that built nothing → the caller asks the model
   return { kind: 'escalate', binds, logs, weak, parseReason: r.ok ? null : r.reason };
+}
+
+/**
+ * #2345 ([ADR-758](../../docs/06-decisions.md#adr-758)) — the one next step for an arc whose end is its circle's centre:
+ * the student's own sentence with that letter replaced by a point the figure holds ON the circle (one the sentence
+ * does not already name), in letter order, the first whose proof run COMMITS (not deferred). Null when none does.
+ * The letter is replaced as a label token only (never inside a longer index such as A1).
+ */
+async function arcEndStep(
+  r: { end: string; circle: string },
+  utterance: string,
+  pctx: ReturnType<typeof buildParseCtx>,
+  prove: (line: string) => Promise<Verdict2D>,
+): Promise<string | null> {
+  const named = new Set((utterance.match(/[A-Z]\d*/g) ?? []).map((l) => l.toUpperCase()));
+  const members = [...new Set((pctx.circleMembers ?? []).filter((e) => e.id === r.circle).flatMap((e) => e.points))]
+    .filter((p) => /^[A-Z]\d*$/.test(p) && !named.has(p))
+    .sort();
+  const token = new RegExp(String.raw`(?<![a-z])${r.end}(?![a-z\d])`, 'g');
+  for (const m of members) {
+    const line = utterance.trim().replace(token, m);
+    if (line === utterance.trim()) continue;
+    const proof = await prove(line);
+    if (proof.kind === 'commit' && !proof.deferred) return line;
+  }
+  return null;
 }
 
 /**

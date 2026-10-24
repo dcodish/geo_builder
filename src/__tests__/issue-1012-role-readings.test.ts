@@ -18,6 +18,11 @@
  * Only the CENTRE matters — the arms are interchangeable — so there are three readings, not six, and
  * the refusal blamed the student's «O על AC» for a figure that was perfectly drawable.
  *
+ * #2486 (ADR-759, operator ruling 2026-10-24): the MIDDLE letter is the centre (an O-family first letter too), so the
+ * spelling that reads centre C directly is now «DCO» (the table above is the centre-first reading of 2026-09-15; «OCD»
+ * reads O because O is written first). «ODC» still reads O, is still re-read to C, and the taught spelling is the
+ * middle-letter one, produced by the inverse of the one reader (`spellArcRun`).
+ *
  * Two things are locked, and they are different. The run must be **re-read and adopted** so the
  * figure builds; and the adoption must be **taught**, because a silent re-reading is the #778
  * violation this fix is not allowed to commit in the course of fixing a refusal.
@@ -116,8 +121,8 @@ beforeEach(() => {
 });
 
 describe('#1012 — the figure decides the roles, not the typing order', () => {
-  it('«רבע מעגל ODC» builds the SAME figure «רבע מעגל CDO» builds', { timeout: 300000 }, async () => {
-    await build([...SETUP, 'רבע מעגל CDO']);
+  it('«רבע מעגל ODC» builds the SAME figure «רבע מעגל DCO» builds', { timeout: 300000 }, async () => {
+    await build([...SETUP, 'רבע מעגל DCO']);
     const canonical = figureShape();
     expect(canonical.arms[0], 'the canonical spelling builds at all').not.toBeNull();
 
@@ -141,13 +146,14 @@ describe('#1012 — the figure decides the roles, not the typing order', () => {
     const h = await build([...SETUP, 'רבע מעגל ODC']);
     const hint = h.notes().find((n) => n.startsWith('input.canonicalHint'));
     expect(hint, 'a silent re-reading is the #778 violation').toBeDefined();
-    // The CENTRE leads the run it taught — which arm is written first is not the point, and
-    // pinning one would lock in this implementation's rotation rather than the promise.
-    expect(hint).toMatch(/רבע מעגל C[OD][OD]/);
+    // The CENTRE sits in the MIDDLE of the run it taught (#2486) — which arm is written first is not the point,
+    // and pinning one would lock in this implementation's rotation rather than the promise.
+    expect(hint).toMatch(/רבע מעגל [OD]C[OD]/);
   });
 
   it('a spelling that was ALREADY right is not re-read, and is not taught', { timeout: 300000 }, async () => {
-    const h = await build([...SETUP, 'רבע מעגל CDO']);
+    // «DCO» is the taught spelling (#2486): submitted as typed it builds directly, with no hint (docs/17 §9).
+    const h = await build([...SETUP, 'רבע מעגל DCO']);
     expect(h.notes().find((n) => n.startsWith('input.canonicalHint'))).toBeUndefined();
   });
 
@@ -172,7 +178,7 @@ describe('#1012 — the figure decides the roles, not the typing order', () => {
     expect(readings![0].centre).toBe('C');
     expect(readings![0].score).toBeCloseTo(0, 6);
     expect(readings!.map((x) => x.centre)).not.toContain('O'); // never re-tries what was stated
-    expect(readings![0].utterance).toMatch(/^רבע מעגל C[OD][OD]$/);
+    expect(readings![0].utterance).toMatch(/^רבע מעגל [OD]C[OD]$/);
   });
 
   it('an utterance with NO role run costs nothing — the probe declines', () => {
@@ -198,7 +204,8 @@ describe('#1012 — the figure decides the roles, not the typing order', () => {
      * mechanism's to fix, but it is precisely what this mechanism must not spread.)
      */
     const { facts, fig } = buildSync(SETUP);
-    const cab = parse('רבע מעגל CAB', buildParseCtx(fig.construction, fig.positions));
+    // the centre-C quarter with ends A and B — «רבע מעגל CAB» under the 2026-09-15 reading, «ACB» since #2486
+    const cab = parse('רבע מעגל ACB', buildParseCtx(fig.construction, fig.positions));
     expect(cab.ok).toBe(true);
     if (!cab.ok) return;
     const after = replay(trialFacts(facts, cab.commands), 0);

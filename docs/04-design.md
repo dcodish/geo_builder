@@ -519,6 +519,21 @@ on that circle — a new point is created on it, an existing one is lowered onto
 one helper, `circleMembership(ctx, centre, id)`, which `diameterCutsSegment` and `diameterFromPoint` call for a
 diameter's from-point too.
 
+The pass VALIDATES before it asserts ([ADR-758](06-decisions.md#adr-758)): an endpoint that is the arc's circle's centre
+(its letter, or the point an anonymous centre's token names) is not on the circle, so the pass returns the clarify
+`arc-end-is-centre` and the line is refused (`input.arcEndIsCentre` with one computed next step — the sentence with the
+centre letter replaced by another member of that circle, proved through `decideFromParse`'s #1611 proof run — or
+`input.arcEndIsCentreNoStep` when none commits). Which circle an anonymous arc names is read by
+`anonymousCircleTieBreak` over `ctx.circleMembers`, and `engine/step.ts:circleMembers` lists stated memberships as
+well as structural ones: a circle's through-point, and the constraint forms a membership of an existing point lowers to
+(`length-radius` k = 1, `equal` |centre·X| = |centre·M| for a member M, `distance` against a stated radius). The
+engine's own `pointOnCircle` stays structural, because it decides graph rewrites.
+
+**A partial circle states its angle** ([ADR-758](06-decisions.md#adr-758)). `quarterCircle` emits `set-angle 90` at its
+centre whether its ends are new or already drawn — the stated-angle sector's lowering; new ends still seed it by their
+θ gauge, so it is satisfied as built and held as a check. `semicircle`'s general branch makes two NEW ends one
+`diameter` (the end at θ = 0 and its antipode), and keeps `set-collinear(a, centre, b)` when an end already exists.
+
 ### A role noun is a claim, lowered once ([ADR-563](06-decisions.md#adr-563))
 
 `src/parser/roleNouns.ts` is the one vocabulary of role nouns (chord, diameter, radius, tangent, leg, base,
@@ -1342,7 +1357,11 @@ row's own red riders, which claim what they define (`introducedDefinedPointIds`)
 Between the dry run and the refusal, the decision (`app/decideDeterministic.ts`) asks `app/roleReadings.ts` what
 else the letter run could mean, by **rewriting the utterance** and re-parsing it, so no rule grows a second
 convention and the alternative is a sentence the student could type. It keys off the `arc` a construct emits,
-covering the family (`רבע מעגל`, `גזרה`). `roleReadings` returns `null` with no role run; readings are ordered by a
+covering the family (`רבע מעגל`, `גזרה`, `חצי מעגל`). Which letter of a 3-run is the centre is ONE reader,
+`arcRunRoles` in `shell/arcRun.ts` (the middle letter, or an O/P/Q letter written first; [ADR-759](06-decisions.md#adr-759)),
+called by the parser's `quarterCircle`, `semicircle` and `sector` rules and by analytic's `parseSector`; the
+rewrite is its exact inverse, `spellArcRun`, so a re-reading re-parses to the centre it was built for, and a
+reading no bare run can spell (two O/P/Q ends around another centre) is not tried. `roleReadings` returns `null` with no role run; readings are ordered by a
 probe of the construct's pinned central angle over configurations already sampled, so a reading that builds costs
 one dry run. `produced` is not the adoption test: `honoursConstruct` checks equal radii and the pinned angle.
 

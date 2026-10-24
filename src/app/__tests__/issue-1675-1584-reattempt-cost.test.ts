@@ -97,10 +97,12 @@ describe('#1675 — the operator\'s refusals cost one failed solve, not six (exe
 });
 
 describe('#1584 — the refusals the round measured, bounded', () => {
-  it('«רבע מעגל CAB»: ≤ 3.2M executed (was 8.72M), the same refusal', async () => {
+  // #2486 (ADR-759): the measured quarter is centred at C with ends A and B; under the middle-letter reading that
+  // quarter is spelt «ACB» (the operator's «CAB» is now centred at A). Same lowering, same refusal, same work.
+  it('«רבע מעגל ACB» (the measured centre-C quarter): ≤ 3.2M executed (was 8.72M), the same refusal', async () => {
     clearReplayCaches();
-    const cold = await measure(RIGHT_15_10, 'רבע מעגל CAB');
-    const warm = await measure(RIGHT_15_10, 'רבע מעגל CAB');
+    const cold = await measure(RIGHT_15_10, 'רבע מעגל ACB');
+    const warm = await measure(RIGHT_15_10, 'רבע מעגל ACB');
     expect(cold.accepted).toBe(false);
     expect(cold.note).toMatch(/AC\| = 15 cannot hold \[vs #3\]/);
     expect(warm.note).toBe(cold.note);
@@ -205,7 +207,7 @@ describe('#1675 — the signature skip changes no status (differential, memo on 
     for (const [name, prefix, line] of [
       ['chord', MIDPOINT_B, 'המיתר AB מקביל ל-CD'],
       ['hypotenuse', RIGHT_AT_C, 'היתר AC = 5'],
-      ['quarter', RIGHT_15_10, 'רבע מעגל CAB'],
+      ['quarter', RIGHT_15_10, 'רבע מעגל ACB'], // the centre-C quarter, spelt by the middle letter (#2486)
     ] as const) lists.push([name, factsOf([...prefix, line])]);
     // the last corpus chunk's conflict / refusal / deferral scenarios — where failed facts are re-attempted
     const RED = /conflict|contradict|refus|over-constrained|names|impossible|blame|other-side|deferr|pending|sizes-last|1411/;

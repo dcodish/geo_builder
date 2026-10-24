@@ -2488,7 +2488,14 @@ export function build(cmds: AnyCommand[], start: Construction = emptyConstructio
  * circles and correcting a wrongly-named one. Keyed by id (not centre letter) so a CONCENTRIC pair
  * ([ADR-244](../../docs/06-decisions.md#adr-244)) keeps its two member sets apart — the outer's
  * chord endpoints must not read as members of the inner. Membership comes from the object graph
- * (on-circle, circumcentre vertices, antipode/arc/line∩circle/circle∩circle outputs), not constraints.
+ * (on-circle, circumcentre vertices, antipode/arc/line∩circle/circle∩circle outputs, the through-point that
+ * defines a radius) AND from the membership CONSTRAINTS a stated «X על המעגל» lowers to when X already exists
+ * and cannot be re-parented (#2483/#2345, [ADR-758](../../docs/06-decisions.md#adr-758)): `|centre·X| = R`
+ * witnessed by a member (`length-radius`), `|centre·X| = |centre·M|` for a member M (`equal`), and
+ * `|centre·X| = r` against a stated radius r (`distance`). Before, those memberships were invisible here, so a
+ * point stated on TWO circles read as a member of one, and «קשת AB» silently picked that one instead of asking.
+ * Engine-side `pointOnCircle` (apply.ts) stays STRUCTURAL on purpose: it decides graph rewrites (a line∩circle
+ * re-definition), which only an exact, by-construction membership may trigger.
  */
 export function circleMembers(c: Construction): { id: Id; center: string; points: Id[] }[] {
   const entries = new Map<Id, { center: string; points: Set<Id> }>();
@@ -2515,6 +2522,47 @@ export function circleMembers(c: Construction): { id: Id; center: string; points
       case 'arc-midpoint': add(o.circle, o.id, o.from, o.to); break;
       case 'line-circle': add(o.circle, o.id); break;
       case 'circle-circle': add(o.circle1, o.id); add(o.circle2, o.id); break;
+    }
+  }
+  // #2483/#2345 (ADR-758): stated memberships held as constraints. The through-point first (it IS on the circle),
+  // then the constraint forms, to a fixpoint (an `equal` chain names its member through an earlier member).
+  const circleObjs = c.objects.filter((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle');
+  for (const circ of circleObjs) if (circ.radius.via === 'through' && circ.radius.point !== circ.center) put(circ.id, circ.center, circ.radius.point);
+  const cons: Constraint[] = [
+    ...c.constraints,
+    ...c.objects.flatMap((o) => {
+      const con = (o as { solve?: { constraint?: Constraint } }).solve?.constraint;
+      return con ? [con] : [];
+    }),
+  ];
+  /** The far end of a radius-shaped pair `{x, y}` from `centre`, or null. */
+  const farEnd = (x: Id, y: Id, centre: Id): Id | null => (x === centre && y !== centre ? y : y === centre && x !== centre ? x : null);
+  for (let changed = true; changed; ) {
+    changed = false;
+    const gain = (circ: Extract<GeoObject, { kind: 'circle' }>, p: Id | null) => {
+      if (!p || p === circ.center) return;
+      const e = entries.get(circ.id);
+      if (e?.points.has(p)) return;
+      put(circ.id, circ.center, p);
+      changed = true;
+    };
+    for (const con of cons) {
+      if (con.type === 'length-radius') {
+        const circ = circleObjs.find((o) => o.id === con.circle);
+        if (circ && con.k === 1 && !con.add) gain(circ, farEnd(con.a, con.b, circ.center));
+        continue;
+      }
+      for (const circ of circleObjs) {
+        const members = entries.get(circ.id)?.points;
+        if (con.type === 'equal') {
+          const x = farEnd(con.a, con.b, circ.center);
+          const y = farEnd(con.c, con.d, circ.center);
+          if (x && y && members?.has(y)) gain(circ, x);
+          if (x && y && members?.has(x)) gain(circ, y);
+        } else if (con.type === 'distance' && circ.radius.via === 'length' && Math.abs(con.value - circ.radius.value) <= 1e-9 * Math.max(1, con.value)) {
+          gain(circ, farEnd(con.a, con.b, circ.center));
+        }
+      }
     }
   }
   return [...entries].map(([id, e]) => ({ id, center: e.center, points: [...e.points] }));

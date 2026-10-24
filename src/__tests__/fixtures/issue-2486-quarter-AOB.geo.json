@@ -1,0 +1,97 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-24T12:00:00.000Z",
+  "name": "issue-2486-quarter-AOB",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "רבע מעגל AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true,
+        "hidden": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "רבע מעגל AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O",
+        "theta": 0
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "רבע מעגל AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-O",
+        "theta": 1.5707963267948966
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.3",
+      "utterance": "רבע מעגל AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "set-angle",
+        "vertex": "O",
+        "ray1": "A",
+        "ray2": "B",
+        "value": 90
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.4",
+      "utterance": "רבע מעגל AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "arc",
+        "id": "arc-AB",
+        "center": "O",
+        "from": "A",
+        "to": "B",
+        "spanDeg": 90
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.5",
+      "utterance": "רבע מעגל AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "segment",
+        "a": "O",
+        "b": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.6",
+      "utterance": "רבע מעגל AOB",
+      "group": "g0",
+      "cmd": {
+        "type": "segment",
+        "a": "O",
+        "b": "B"
+      },
+      "enabled": true
+    }
+  ]
+}

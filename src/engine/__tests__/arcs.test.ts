@@ -217,7 +217,8 @@ describe('#433 (ADR-423 tier 3) — a STRUCTURALLY forced departure is allowed, 
     // tier 3. Re-label the antipode as a driven on-circle point and the very same position must flip
     // channels: a violation, and no notice.
     const fig = replay(facts(), 0);
-    const anti = fig.construction.objects.find((o) => o.kind === 'antipode')!;
+    // the DIAMETER's far end D — not the semicircle's own end, which is an antipode too since #2483 (ADR-758)
+    const anti = fig.construction.objects.find((o) => o.kind === 'antipode' && o.id === 'D')!;
     const driven = {
       ...fig.construction,
       objects: fig.construction.objects.map((o) =>

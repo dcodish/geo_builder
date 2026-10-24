@@ -66,11 +66,19 @@ describe('issue #53 — a dropped radius-symbol clause blocks the parse (never a
       if (r.ok) {
         // consumed in the parse — or (the numeric sibling on a circumcircle, whose radius is DERIVED from
         // its three points) caught by the number honesty gate at the commit seam. Either way: never silent.
-        const consumed = r.commands.some((c) => c.type === 'radius-symbol' || c.type === 'set-radius');
+        // #2483 (ADR-758): stated memberships now count, so the re-type is read as the EXISTING circle P (A is its
+        // through-point, D and O are stated on it) — and P already carries «r», so the clause is honoured by the
+        // binding it restates (`withRadiusSymbolBinding`'s idempotent branch). A DIFFERENT symbol still emits one.
+        const referenced = r.commands.flatMap((c) => (c.type === 'point-on-circle' ? [c.circle] : []));
+        const alreadyBound = (ctx.radiusSymbols ?? []).some((b) => b.name === 'r' && referenced.includes(b.circle)) && /שרדיוסו r$/.test(u);
+        const consumed = alreadyBound || r.commands.some((c) => c.type === 'radius-symbol' || c.type === 'set-radius');
         const flagged = droppedGivenNumbers(u, r.commands).length > 0;
         expect(consumed || flagged, `the radius clause must be CONSUMED or FLAGGED, never silently dropped: ${u}`).toBe(true);
       }
     }
+    // the idempotent reading never swallows a NEW symbol: «s» on the circle that carries «r» is stated, not dropped
+    const other = parse('משולש ADO חסום במעגל שרדיוסו s', ctx);
+    if (other.ok) expect(other.commands.some((c) => c.type === 'radius-symbol' && c.name === 's')).toBe(true);
   });
 
   it('the FRESH inscription still builds the second circle (both the He forms and the En mirror)', () => {

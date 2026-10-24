@@ -91,7 +91,12 @@ describe('#1204 — the 3-run parses, and the family agrees', () => {
     // The shared skeleton: a hidden circle at the named centre, both ends on it, and an arc. What differs
     // is the SPAN and how each construct pins it (90° angle vs. through-centre collinearity), so those are
     // excluded rather than asserted equal.
-    const skeleton = (u: string) => cmdsFor(u)!.map((c) => c.type).filter((t) => t === 'circle' || t === 'point-on-circle' || t === 'arc');
+    // #2483 (ADR-758): with both ends new the semicircle states them as ONE `diameter` (an end and its antipode) — two
+    // memberships, read as such here — so the 180° is held by construction rather than by where the ends start.
+    const skeleton = (u: string) =>
+      cmdsFor(u)!
+        .flatMap((c) => (c.type === 'diameter' ? ['point-on-circle', 'point-on-circle'] : [c.type]))
+        .filter((t) => t === 'circle' || t === 'point-on-circle' || t === 'arc');
     expect(skeleton('חצי מעגל ODC')).toEqual(skeleton('רבע מעגל ODC'));
   });
 
@@ -107,11 +112,13 @@ describe('#1204 — the 3-run parses, and the family agrees', () => {
    * pre-change tree in this same empty-figure context: with D and C absent the rule takes its general
    * branch (a free-radius circle driven by the constraints) rather than the closed form it uses when both
    * ends already exist. Both branches are untouched here; only the run READING changed.
+   * #2483 (ADR-758) re-based the general branch on purpose: two NEW ends are one `diameter` (an end and its antipode),
+   * so a later line can no longer bend the 180°. Every spelling still lowers alike.
    */
   it.each([
-    ['חצי מעגל DC', 'circle+point-on-circle+point-on-circle+arc+segment'],
-    ['חצי מעגל שמרכזו O', 'circle+point-on-circle+point-on-circle+arc+segment'],
-    ['חצי מעגל שקוטרו DC', 'circle+point-on-circle+point-on-circle+arc+segment'],
+    ['חצי מעגל DC', 'circle+diameter+arc+segment'],
+    ['חצי מעגל שמרכזו O', 'circle+diameter+arc+segment'],
+    ['חצי מעגל שקוטרו DC', 'circle+diameter+arc+segment'],
   ])('«%s» is unchanged', (utterance, expected) => {
     expect(cmdsFor(utterance)!.map((c) => c.type).join('+')).toBe(expected);
   });
