@@ -59,7 +59,8 @@ function stepsOf(facts: Fact[]): { utterance?: string; cmds: AnyCommand[]; start
  * {@link foldCommand} rule the store's commit uses (ADR-578), keeping what it APPENDS. A command that
  * duplicates an earlier fact — «PD חותך את AC בנקודה E» re-mentions `segment AC` after «AC⊥DB» drew it —
  * is dropped exactly as the commit dropped it, and a command repeated inside the step folds once.
- * In-place effects on earlier rows (re-enabling, a free-point move) belong to those rows, not this one.
+ * The one in-place effect on an earlier row (re-enabling an unticked twin) belongs to that row, not this one; a
+ * later line never rewrites an earlier row (#2480, ADR-757), so its re-statements are kept here as its own.
  *
  * A saved step and a fresh parse are compared THROUGH this, on both sides: the question a load asks is
  * "would committing today's reading store what the save stored?", never "is the raw parse byte-equal to
@@ -68,8 +69,8 @@ function stepsOf(facts: Fact[]): { utterance?: string; cmds: AnyCommand[]; start
 export function committedStepCommands(prefix: Fact[], cmds: AnyCommand[]): AnyCommand[] {
   let n = 0;
   const mint = (cmd: AnyCommand): Fact => ({ id: `~load.${n++}`, group: '~load', enabled: true, cmd });
-  const all = cmds.reduce((acc, c) => foldCommand(acc, c, mint), prefix);
-  return all.slice(prefix.length).map((f) => f.cmd); // foldCommand only maps in place or appends
+  const all = cmds.reduce((acc, c) => foldCommand(acc, c, mint, undefined, prefix.length), prefix);
+  return all.slice(prefix.length).map((f) => f.cmd); // foldCommand only maps in place (re-enable, or within the step) or appends
 }
 
 /**

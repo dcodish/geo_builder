@@ -35,7 +35,7 @@
 
 import { expect } from 'vitest';
 import { CONTEXT_FREE_GATES } from '@/app/honestyGates';
-import { replay, meetsRequirements, useGeoStore } from '@/store/geoStore';
+import { replay, meetsRequirements, useGeoStore, foldCommand, groupKey } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { freeDofs, freeDofCount } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
@@ -79,6 +79,29 @@ export function scenarioFacts(sc: Pick<Scenario, 'id' | 'steps' | 'refusedSteps'
     }
   }
   return factsOf(sc.steps, sc.refusedSteps, { centresShown: sc.centresShown });
+}
+
+/**
+ * #2480 ([ADR-757](../../docs/06-decisions.md#adr-757)) — AN ADDED LINE NEVER REWRITES A COMMITTED ROW, over real data.
+ * The stability regression's sibling for the fact list: the scenario's steps (or a saved figure's) are committed one
+ * at a time through the commit's own fold rule (`foldCommand`, what `commitCommands` folds every batch through), and
+ * after each step every fact an earlier step committed is still there — the same object, at the same index — apart
+ * from ADR-578's ruled re-enable of an unticked twin. Pure over the fact list: no parse, no replay.
+ */
+export function rowImmutability(facts: Fact[], label = ''): void {
+  const steps: Fact[][] = [];
+  facts.forEach((f, i) => (i > 0 && groupKey(f) === groupKey(facts[i - 1]) ? steps[steps.length - 1].push(f) : steps.push([f])));
+  let list: Fact[] = [];
+  for (const step of steps) {
+    const committed = list.slice();
+    for (const f of step) list = foldCommand(list, { ...f.cmd }, (cmd) => ({ ...f, cmd }), f.utterance, committed.length);
+    committed.forEach((b, i) => {
+      const a = list[i];
+      if (a === b) return;
+      expect({ ...a, enabled: b.enabled }, `${label} «${step[0].utterance}» rewrote committed fact #${i} («${b.utterance}»)`).toEqual(b);
+      expect(!b.enabled && a.enabled, `${label} fact #${i}: only an unticked twin may change, by re-enabling (ADR-578)`).toBe(true);
+    });
+  }
 }
 
 /** Replay a scenario through the real parse→fact→replay path and return the derived figure. */

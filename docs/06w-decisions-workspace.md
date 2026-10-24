@@ -6332,3 +6332,17 @@ Every rewritten key's English twin takes the same shape (ADR-W-150). No renderer
 **Locks.** `refusal-batch1-1995.test.ts` in each tree (`src/app/`, `src3d/`, `src-analytic/`, `src-complex/` `__tests__/`): the refusing sequence through each tree's real decision (2-D `runSubmit`; 3-D `decideDeterministic3` → `dispatchVerdict` → `errorText3`; analytic `decideSubmit`/`ask`; complex `submitLine`), the rendered sentence asserted verbatim, then the taught step submitted and taken — where the sentence carries a spelling, it is read out of the sentence. `shell/__tests__/cevian-side-wording-parity.test.ts`: the bisector pair byte-equal in 2-D and analytic, both languages. The refusal-style baseline loses 29 batch entries (queued caps 2-D 13→7, 3-D 34→16, analytic 36→31, complex 31→30); #11 joins #14/#16 as `plain-none`, #15's `plain-none` entry goes (it now passes), #18 becomes `ruled`. Six existing tests re-based (#2066, #2085 item 3, #2115, #1742). The rule-4 lock is the new tests: no operator utterance is involved.
 
 **Behaviour change for a student:** 32 refusals read differently in four builders — each now says what to do next, or says plainly there is nothing to do; every verdict and figure is unchanged. The sampled page on the round's play sheet is the operator's approval (card 18 B).
+
+## ADR-W-156 — A committed row is the student's: a later line never changes it, in any builder (#2480)
+
+**Status:** accepted · 2026-10-24 · principle (workspace) · fix round #2501 · the 2-D mechanism is [ADR-757](06-decisions.md#adr-757)
+
+**Operator:** 2026-10-24, playing round #2466 T5 — *"I cannot think of a case we want to change a user input that previously passed."*
+
+**Requirements:** [02](02-requirements.md) FR-EN-9 (2-D, extended by ADR-757) · **Design:** none (internal) — each builder's store, below.
+
+**Decision.** A row the student committed — its text, and the givens it owns — is immutable to every later line. A later line adds its own row, or is a no-op («כבר קיים»), or is refused; it never rewrites, absorbs or moves an earlier one. Only an explicit act of the student on that row changes it: edit (✎), delete, tick or untick, and the naming verbs (rename, swap, merge, promote). Re-typing an unticked row's statement ticks it again (2-D [ADR-578](06-decisions.md#adr-578), 3-D's twin re-enable) — the student's own row coming back, not a takeover.
+
+**Measured compliance (2026-10-24).** 2-D rebuilt its rows from a fact list and folded later commands into earlier facts: the defect ADR-757 fixes, now enforced by the fold (`foldCommand`'s `committed` bound) and locked by a class test plus a corpus invariant over every scenario and fixture. 3-D (`store3.ts`: one `Fact3` appended per line), analytic (`recordLine` appends the typed line) and complex (`lines: [...lines, line]`) are structurally immune — a row IS the typed line — and need no code.
+
+**Behaviour change for a student:** none beyond ADR-757's (2-D). This records the rule a future builder, store or fold must keep.

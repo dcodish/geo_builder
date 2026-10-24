@@ -73,9 +73,18 @@ describe('#2083 — foldCommand: a sizeless restatement leaves the list unchange
     expect((out[0].cmd as { radius: number }).radius).toBe((stated as { radius: number }).radius);
   });
 
-  it('a size given to a sizeless circle still resizes it in place (ADR-011)', () => {
+  // #2480 (ADR-757): a later line never rewrites a committed row — the size is the later line's own fact, and the
+  // engine's upsert (ADR-011) gives the circle that size. Only within ONE batch does the in-place resize remain.
+  it('a size given to a committed sizeless circle is appended; the earlier fact is untouched (ADR-757)', () => {
     const facts = [fact(free)];
     const out = foldCommand(facts, { ...stated, radius: 4 }, mint);
+    expect(out).toHaveLength(2);
+    expect(out[0]).toBe(facts[0]);
+    expect((out[1].cmd as { radius: number }).radius).toBe(4);
+  });
+  it('within one batch a size given to the sizeless circle it just added still resizes it in place (ADR-011)', () => {
+    const facts = [fact(free)];
+    const out = foldCommand(facts, { ...stated, radius: 4 }, mint, undefined, 0);
     expect(out).toHaveLength(1);
     expect((out[0].cmd as { radius: number }).radius).toBe(4);
   });

@@ -34,7 +34,7 @@ import { incidenceList, objectListShape } from './incidenceList';
 import { readFrame } from './frame';
 import { NOTATION_WORDS, UNIT_WORDS, nounReferencedLabels, unaccountedLabels, type NounRefCtx } from './labelAccounting';
 import { nameAccounting } from '../../shell/llm/honestyCore';
-import { readShapePhrase, lowerShape, shapeNounIsDefinite, shapeNounSpan, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapePhrase } from './shapePhrase';
+import { readShapePhrase, lowerShape, shapeNounIsDefinite, shapeNounSpan, SHAPE_ADJ_WORDS, SHAPE_NOUN_WORDS, type ShapeKind, type ShapePhrase } from './shapePhrase';
 
 export type ParseResult =
   // `indefiniteShape` (#2127, ADR-654): the vertices of the existing polygon an INDEFINITE unnamed shape noun
@@ -7621,6 +7621,14 @@ const incircle: Rule = (s, ctx) => {
       { type: 'triangle', ids: [A, B, C] }, // the drawn sides DE, EF, FD (each tangent to O)
     ];
   }
+  // #2480 ([ADR-757](docs/06-decisions.md#adr-757)): the same DUAL for a quadrilateral around an existing circle —
+  // the ADR-115 defect left open for n = 4. Re-deriving the circle from the ring re-centres and re-radiuses the
+  // circle the student already has (a stated «ברדיוס 3» silently lost). Only for a NEW ring: vertices that already
+  // exist are another statement (tangency between two existing objects) and keep the generic construction.
+  if (n === 4 && namedCenter && (ctx.circles ?? []).some((c) => up(c) === up(namedCenter)) && !ids.some((id) => taken.includes(id))) {
+    const riders = (ctx.circleMembers ?? []).find((m) => m.id === circleId(namedCenter) || up(m.center) === up(namedCenter))?.points.length ?? 0;
+    return tangentialQuadAround(phrase.kind, ids, up(namedCenter), riders);
+  }
   // The incentre: the student's named one — "circle M" (circleCenter) OR the subject form "M [is the] centre
   // of the inscribed circle" (incenterLabel) — else an auto label. A named incentre dodges the polygon's vertices.
   const namedInc = (() => {
@@ -7664,6 +7672,87 @@ const incircle: Rule = (s, ctx) => {
     return [...shapeCmds, { type: 'point-on-circle', id: anonId('f', `${v[0]}${v[1]}`), circle: circleId(I) }];
   return [...shapeCmds, ...incircleConstruction(v, I, !namedInc, (e) => anonId('f', `${v[e]}${v[(e + 1) % n]}`))];
 };
+
+/**
+ * #2480 ([ADR-757](docs/06-decisions.md#adr-757)) — A QUADRILATERAL BUILT AROUND AN EXISTING CIRCLE: ADR-115's dual,
+ * generalised from the triangle. The circle is GIVEN, so nothing here defines it: four touch points ride it, the
+ * tangent at each is a scaffolding line, and the student's vertices are the meets of consecutive tangents —
+ * `v[i] = tan(t[i]) ∩ tan(t[i+1])`, so side `v[i]v[i+1]` lies on `tan(t[i+1])`. The circle keeps its centre, its stated
+ * radius and its riders, and every side is tangent to it by construction (no coupled solve).
+ *
+ * The shape is a relation between the touch points, each derived from what the phrase states:
+ *  - two opposite sides are parallel ⟺ their touch points are ANTIPODAL (the line through the centre);
+ *  - two adjacent sides are perpendicular ⟺ their touch points are a QUARTER turn apart (the ⟂ diameter);
+ *  - two sides mirror about the axis through the centre ⟺ their touch points are mirror images on the circle.
+ * A square (and a rectangle: only a square is tangential) has one free touch angle; a rhombus (and a
+ * parallelogram: only a rhombus is tangential) two; a trapezoid touches its bases at antipodes and its legs
+ * freely; a right trapezoid puts a leg a quarter turn from a base; an isosceles one mirrors the legs across the
+ * bases' diameter. A kite keeps its cyclable axis (ADR-138): its `shape-variant` lowers the variant's equal pairs
+ * onto the four free touch angles. A general quadrilateral leaves all four free.
+ *
+ * Touch points are anonymous scaffolding (#32) keyed by the circle AND the ring, so a second ring around the same
+ * circle has its own; their starting angles turn by the circle's rider count so it does not START on another
+ * ring's touch points (placement only — every free angle stays a sampled DOF, ADR-052). The ring is declared as
+ * the phrase states it (`declaredAs`), never as the forced shape, and a stated right angle or equal pair also
+ * travels as its own relation (true by construction), so it is marked and listed as the standalone shape's is.
+ */
+const tangentialQuadAround = (kind: ShapeKind, v: Id[], O: Id, riders: number): AnyCommand[] => {
+  const circ = circleId(O);
+  const ring = v.join('');
+  const t = [0, 1, 2, 3].map((i) => anonId('t', O, ring, String(i)));
+  const turn = riders * GOLDEN_TURN;
+  const cmds: AnyCommand[] = [];
+  const free = (i: number, theta: number) => cmds.push({ type: 'point-on-circle', id: t[i], circle: circ, free: true, theta: theta + turn });
+  // the point of the circle across the line `line` from `from` (the line's second crossing)
+  const across = (i: number, line: AnyCommand & { id: Id }, from: Id) => cmds.push({ ...line, visible: false } as AnyCommand, { type: 'line-circle-intersection', id: t[i], line: line.id, circle: circ, avoid: from });
+  const antipode = (i: number, of: number) => across(i, { type: 'line-through', id: `dia-${t[of]}`, a: O, b: t[of] }, t[of]);
+  const quarter = (i: number, of: number, branch: number) => {
+    const line = { type: 'perpendicular-line' as const, id: `qdia-${t[of]}`, through: O, a: O, b: t[of] };
+    if (!cmds.some((c) => 'id' in c && c.id === line.id)) cmds.push({ ...line, visible: false });
+    cmds.push({ type: 'line-circle-intersection', id: t[i], line: line.id, circle: circ, branch });
+  };
+  const mirror = (i: number, of: number, axisA: number, axisB: number) =>
+    across(i, { type: 'perpendicular-line', id: `mir-${t[of]}`, through: t[of], a: t[axisA], b: t[axisB] }, t[of]);
+  let declaredAs: string = kind === 'quad' ? 'quadrilateral' : kind;
+  const variant: AnyCommand[] = [];
+  const relations: AnyCommand[] = [];
+  switch (kind) {
+    case 'square':
+    case 'rectangle':
+      free(0, 0.4); antipode(2, 0); quarter(1, 0, 0); quarter(3, 0, 1);
+      break;
+    case 'rhombus':
+    case 'parallelogram':
+      free(0, 0.4); free(1, 1.6); antipode(2, 0); antipode(3, 1);
+      break;
+    case 'trapezoid': // AB ∥ DC: AB lies on tan(t1), CD on tan(t3)
+      free(1, -Math.PI / 2); antipode(3, 1); free(0, Math.PI - 0.45); free(2, 0.6);
+      break;
+    case 'right-trapezoid': // AD ⟂ AB (the standalone lowering's right angles at A and D): tan(t0) ⟂ tan(t1)
+      free(1, -Math.PI / 2); antipode(3, 1); quarter(0, 1, 0); free(2, 0.6);
+      relations.push({ type: 'set-perpendicular', a: v[0], b: v[3], c: v[0], d: v[1] });
+      break;
+    case 'isosceles-trapezoid': // the legs DA (tan t0) and BC (tan t2) mirror across the bases' diameter t1t3
+      free(1, -Math.PI / 2); antipode(3, 1); free(0, Math.PI - 0.45); mirror(2, 0, 1, 3);
+      relations.push({ type: 'set-equal', a: v[0], b: v[3], c: v[1], d: v[2] });
+      break;
+    case 'kite':
+      [0.5, 1.9, 3.6, 5.0].forEach((th, i) => free(i, th));
+      declaredAs = '';
+      variant.push({ type: 'shape-variant', shape: 'kite', ids: [v[0], v[1], v[2], v[3]], variant: 0 });
+      break;
+    default: // a general quadrilateral: four free touch angles, deliberately uneven (ADR-052)
+      [0.3, 1.75, 3.5, 4.9].forEach((th, i) => free(i, th));
+  }
+  cmds.push(
+    ...t.map((ti): AnyCommand => ({ type: 'tangent', id: `tan-${ti}`, circle: circ, at: ti })),
+    ...v.map((vi, i): AnyCommand => ({ type: 'line-intersection', id: vi, line1: `tan-${t[i]}`, line2: `tan-${t[(i + 1) % 4]}` })),
+  );
+  if (variant.length) return [...cmds, ...variant];
+  return [...cmds, { type: 'quadrilateral', ids: [v[0], v[1], v[2], v[3]], ...(declaredAs !== 'quadrilateral' ? { declaredAs } : {}) }, ...relations];
+};
+/** The golden angle — successive rings around one circle start on well-spread touch angles. */
+const GOLDEN_TURN = Math.PI * (3 - Math.sqrt(5));
 
 /**
  * The INCIRCLE of the ring `v` (a triangle, or a quadrilateral the construction flexes to be tangential —

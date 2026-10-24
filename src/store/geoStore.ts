@@ -319,13 +319,15 @@ const cleanUtterance = (u: string | undefined): string | undefined =>
 
 /**
  * Fold ONE command into the fact list per the execute policy — the shared {@link foldCommand} rule
- * (idempotent duplicate re-enabling a deselected twin, free-point move, standalone-circle resize), the SAME
+ * (idempotent duplicate re-enabling a deselected twin; a free-point move or standalone-circle resize only
+ * within this batch — a committed row is never rewritten by a later line, #2480 / ADR-757), the SAME
  * decision the submit dry run (`trialFacts`, #1748) and the load refresh (#1604) fold through, so none of
- * them can model a list the commit would not save. Returns the same array when nothing changed.
+ * them can model a list the commit would not save. `committed` is the list's length before this batch.
+ * Returns the same array when nothing changed.
  */
-function foldFact(facts: Fact[], cmd: AnyCommand, utterance?: string, group?: string): Fact[] {
+function foldFact(facts: Fact[], cmd: AnyCommand, committed: number, utterance?: string, group?: string): Fact[] {
   utterance = cleanUtterance(utterance);
-  return foldCommand(facts, cmd, (c) => ({ id: nanoid(), cmd: c, utterance, group, enabled: true }), utterance);
+  return foldCommand(facts, cmd, (c) => ({ id: nanoid(), cmd: c, utterance, group, enabled: true }), utterance, committed);
 }
 
 /**
@@ -343,7 +345,7 @@ function commitCommands(
 ): void {
   const facts = get().facts;
   let next = facts;
-  for (const cmd of cmds) next = foldFact(next, cmd, utterance, group);
+  for (const cmd of cmds) next = foldFact(next, cmd, facts.length, utterance, group);
   if (next === facts) return; // every command was an idempotent duplicate — nothing to record
   // Settle a NEWLY-appended cyclable variant's default configuration (ADR-339) before the seed search,
   // in the same transaction — one undo restores the pre-step state whole.
