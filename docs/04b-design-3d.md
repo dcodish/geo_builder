@@ -434,7 +434,7 @@ central-difference Jacobian of the primary residuals — the full construction, 
 over a snapshot of the resolved planes and lines — with respect to the six rigid unknowns in `rigidChart`'s
 coordinates (a world translation in figure scales, a world rotation about the origin; regular everywhere, unlike
 raw axis-angle at |w| = 2π), and returns `6 − numericRank` with the null space (`symmetricEigen` of JᵀJ). Scale is
-excluded (#518 samples it) and dims are held (seed-sampled). `resolve3(c, s, { placementImage: true })` replays the
+excluded from `dim` (#518 samples it) and dims are held (seed-sampled); a seventh column, the size, gives `counted` (turn + size, a pure slide excluded), `rotation` and `scaleFree`, which the cue and the drawn walks read (ADR-3D-379). `resolve3(c, s, { placementImage: true })` replays the
 plain resolve's pivot pools (`pivotStageMemo3`, read by the image only) and then walks the chosen solution along a
 seeded unit combination of the generators — the #803 slide pattern: hard-pin the projection, release on the primary
 residuals, keep it only if exact, non-degenerate and moved; transactional on signs and the parameter. The image
@@ -502,6 +502,16 @@ and every trigger read that list, so no family (`coordPlanePins` among them) lac
 says whether presence alone triggers the lane; `false` means FAILURE PATH ONLY. The coordinate-frame row's
 unmet test is the claim's own predicate (`coordPlaneRelHolds`) at `CLAIM_REL_TOL`. `issue-1550.test.ts`
 locks totality: every `c.*Pins` / `figure*(c)` family `solve3.ts` reads is a row.
+
+**The leftover turn and size are measured, then drawn (#2378, #2504, [ADR-3D-379](06b-decisions-3d.md#adr-3d-379)).**
+The funnel still decides what the SOLVE may move and freezes a partial rotation (a turn about a pinned point or
+axis). After the solve, resolve stage 6 reads the rank probe (`pivot.placementFreedom()`, below) for any solid whose
+rotation is anchored (`rotationAnchored3`: an absolute-frame object or a stated vector) and whose placement is not
+already sampled: it parks a free size at the seed's target (`freedom: 'size'`), then turns the figure by a seeded
+angle over the full turn about a seeded axis of the leftover turn (`freedom: 'turn'`), both in `originChart` (about
+the figure's gauge origin), kept only when as exact as the base solution and every sign given holds. The cue adds
+the same probe's `counted` (`leftoverPlacement3`): one source for the count and the drawing. A pure slide is
+neither counted nor walked here (stage 5 owns the slide).
 
 **The #512 frame verdict is per placement COMPONENT.** `placementSampledParts` publishes translation and
 rotation separately (`placementSampled` is their disjunction); a frame claim softens to

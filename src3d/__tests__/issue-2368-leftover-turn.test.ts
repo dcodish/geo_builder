@@ -11,7 +11,8 @@
  *
  * The fix measures the freedom (the rank of the primary residuals over the six rigid gauge unknowns) and
  * `knowledgeSamples3({ readback: true })` adds, per sample that keeps one, an exact image walked along it.
- * No gate is rewritten. The drawing is untouched (asserted below).
+ * No gate is rewritten. The drawing was untouched here; #2378 (ADR-3D-379) then turned it along the same
+ * probe, by the operator's ruling, and the drawing lock below was re-based to that.
  */
 import { describe, expect, it } from 'vitest';
 import { dataView } from '../engine/dataView';
@@ -57,11 +58,16 @@ describe('#2368 — the operator’s four lines', () => {
     });
   }
 
-  it('the FIGURE is unchanged: the drawing lands where it always did (seed 0 flat, seed 1 tilted)', () => {
-    const d0 = derive3(st.facts, 0).positions.get('D')!;
-    expect([d0.x, d0.y, d0.z].map((v) => +v.toFixed(3))).toEqual([0, 2, 0]);
-    const d1 = derive3(st.facts, 1).positions.get('D')!;
-    expect([d1.x, d1.y, d1.z].map((v) => +v.toFixed(3))).toEqual([0, -0.907, -1.782]);
+  // #2378 (ADR-3D-379) re-base, by design: the operator's ruling of 2026-10-23 (#2378, card d04 A) — "\"Another
+  // configuration\" turns the cube. Each press turns the cube about AB to a new angle. The first drawing may no
+  // longer sit square on the floor." This lock used to assert the drawing unchanged (D at (0,2,0) at seed 0).
+  it('the FIGURE turns about AB (#2378): D stays on the circle x = 0, |AD| = 2, at a new angle per seed', () => {
+    const ds = [0, 1, 2].map((s) => derive3(st.facts, s).positions.get('D')!);
+    for (const d of ds) {
+      expect(Math.abs(d.x)).toBeLessThan(1e-6);
+      expect(Math.hypot(d.y, d.z)).toBeCloseTo(2, 6);
+    }
+    expect(new Set(ds.map((d) => Math.atan2(d.z, d.y).toFixed(2))).size).toBe(3);
   });
 
   it('the plain sampler (claims, narrowing, the drawing) gains nothing: the image is read-back only', () => {
