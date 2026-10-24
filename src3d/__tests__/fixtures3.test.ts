@@ -29,6 +29,12 @@ const DIR = join(__dirname, '..', '..', 'fixtures3');
 
 /** The corpus sessions the net is seeded with (the three gate figures). */
 const SEEDED: SeededCorpus = {
+  // #2378 (ADR-3D-379) — the operator's exact four lines: a cube free to turn about AB. The cue («דרגות חופש: 1») and
+  // the sampled turn are asserted in issue-2378-leftover-turn-sampled.test.ts; this is the build + drift net.
+  'cube-turn-about-ab-2378.geo3.json': ["קובייה ABCDA'B'C'D'", 'A(0,0,0)', 'AB=(2,0,0)', 'מישור ABCD'],
+  // #2504 (ADR-3D-379, bundled into #2378) — the operator's exact lines: a cube pinned by one vertex, its size free
+  // («דרגות חופש: 4»). The cue and the resampled size are asserted in the same unit file.
+  'cube-free-size-2504.geo3.json': ["קובייה ABCDA'B'C'D'", 'A(0,0,0)'],
   // #2091 (ADR-3D-360) — the operator's exact sequence: two segments stated ⟂ crossing at an unnamed point. The knee
   // withdrawal (and every spelling/host) is asserted in issue-2091-unnamed-crossing-knee.test.ts; this is the build + drift net.
   'no-knee-unnamed-crossing-2091.geo3.json': ['ריבוע ABCD', 'AC ⟂ BD'],

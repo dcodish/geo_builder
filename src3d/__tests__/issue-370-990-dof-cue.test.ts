@@ -116,9 +116,12 @@ describe('#370 — the 6 sampled placement DOFs are counted', () => {
     expect(cueAt(0)).toBe(0);
   });
 
-  it('a cube with a plane membership still reads 0', () => {
+  // #2378 / #2504 (ADR-3D-379) re-base: the cube is still free to turn about A (3) and to resize (1) — the
+  // operator's rulings: 2026-10-23 (#2378 d04 A) "Each press turns the cube … to a new angle", 2026-10-24
+  // (#2504 d03a A) "three for turning, one for size". Its slide within π is not counted (#2505 e23 A).
+  it('a cube with a plane membership reads 4: the turn about A and the size, never the slide in π', () => {
     build(["קובייה ABCDA'B'C'D'", 'מישור π: x+y+z-6=0', 'A על המישור π']);
-    expect(cueAt(0)).toBe(0);
+    expect(cueAt(0)).toBe(4);
   });
 });
 

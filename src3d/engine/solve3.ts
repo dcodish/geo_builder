@@ -439,13 +439,27 @@ function quatMul(a: number[], b: number[]): number[] {
  * world rotation R(ω) about the origin, then translated by s·τ (s = the figure's scale), as a new gauge
  * vector. Differentiating in (τ, ω) instead of the raw (t, w) keeps the rank probe away from the axis-angle
  * map's singularity at |w| = 2π, where two raw columns vanish and a rigid figure read two false freedoms.
+ * #2378 (ADR-3D-379): an optional seventh chart coordinate z[6] is the log-scale step σ (the figure's size,
+ * scaled about its gauge origin), so the probe measures the size with the same columns.
  */
 export function rigidChart(x: readonly number[], z: readonly number[]): number[] {
   const s = Math.exp(x[6]);
   const om = v3(z[3], z[4], z[5]);
   const t0 = rotate(v3(x[0], x[1], x[2]), om);
   const w = axisAngleOf(quatMul(quatOf(om), quatOf(v3(x[3], x[4], x[5]))));
-  return [t0.x + s * z[0], t0.y + s * z[1], t0.z + s * z[2], w.x, w.y, w.z, ...x.slice(6)];
+  return [t0.x + s * z[0], t0.y + s * z[1], t0.z + s * z[2], w.x, w.y, w.z, x[6] + (z[6] ?? 0), ...x.slice(7)];
+}
+
+/**
+ * #2378 (ADR-3D-379) — the same chart about the figure's GAUGE ORIGIN (its canonical first vertex) instead of
+ * the world origin: (τ, ω, σ) turn and resize the placed figure about the point the gauge puts its first vertex
+ * at, then translate it by s·τ. The drawing's walks (`freedom: 'turn' | 'size'`) move in this chart, so a turn
+ * or a resize never drags along a translation the givens leave free, and a vertex pinned there stays exact.
+ */
+export function originChart(x: readonly number[], z: readonly number[]): number[] {
+  const s = Math.exp(x[6]);
+  const w = axisAngleOf(quatMul(quatOf(v3(z[3], z[4], z[5])), quatOf(v3(x[3], x[4], x[5]))));
+  return [x[0] + s * z[0], x[1] + s * z[1], x[2] + s * z[2], w.x, w.y, w.z, x[6] + (z[6] ?? 0), ...x.slice(7)];
 }
 
 /**
@@ -457,11 +471,29 @@ export function rigidChart(x: readonly number[], z: readonly number[]): number[]
  * units of the figure's scale and a world rotation about the origin — so a step along it is dimensionless
  * at any figure size. A structural read of the constraint system, never a
  * sampling outcome: the cube with «A(0,0,0)» · «AB=(2,0,0)» has dim 1 (the turn about AB).
+ *
+ * #2378 / #2504 (ADR-3D-379): the probe has a SEVENTH column, the log-scale σ (the figure's size), and
+ * reports three more numbers, all ranks of the same columns:
+ *  - `counted`: the rank of the 7-column null space's projection onto (ω, σ), i.e. the leftover freedoms
+ *    that change a measurable quantity (a turn, a size). A pure translation of the whole figure projects to
+ *    zero and is excluded (the operator's e23 ruling on #2505). Computed exactly as
+ *    `(7 − rank J) − (3 − rank J_τ)`: the null space minus its translation-only part, which is `null J_τ`.
+ *    The freedom cue adds it (`leftoverPlacement3`).
+ *  - `rotation`: an orthonormal basis of the leftover TURN (the ω-projection of the rigid null space, size
+ *    held): the directions the drawing's turn walk samples (`freedom: 'turn'`). Empty when no turn is left.
+ *  - `scaleFree`: σ is in the null space (rank J₇ = rank J₆): the size is free at this placement, so #518's
+ *    park may move it (ADR-3D-133's gate, now the probe's verdict instead of "the scale never left 0").
+ * `dim` and `generators` keep their ADR-3D-375 meaning (rigid only), so the read-back image is unchanged.
  */
 export interface PlacementFreedom3 {
   dim: number;
   generators: number[][];
+  counted: number;
+  rotation: number[][];
+  scaleFree: boolean;
 }
+/** A placement with no leftover freedom at all (no probe ran, or nothing is free). */
+export const NO_PLACEMENT_FREEDOM3: PlacementFreedom3 = { dim: 0, generators: [], counted: 0, rotation: [], scaleFree: false };
 
 /** #2368 — the eigenvectors of a small symmetric matrix by cyclic Jacobi, sorted by ascending eigenvalue. */
 export function symmetricEigen(a0: readonly (readonly number[])[]): { values: number[]; vectors: number[][] } {
@@ -537,8 +569,15 @@ export function solvePivot(
      * slide generalised from "the translation's projection" to "the projection on a seeded combination of
      * the leftover generators" (the number seeds the combination); returns the walked exact solution, or
      * `[]` when nothing is free or the walk snaps back.
+     * #2378 (ADR-3D-379) — `'turn'`: the DRAWING's walk. The placement turns along a seeded unit direction of
+     * its measured leftover turn ({@link PlacementFreedom3}`.rotation`) by a seeded angle over the full turn
+     * (−π, π] (`flip` negates it): hard-pin the turn's projection, release on the primary residuals, keep only
+     * when exact, non-degenerate and still at the pinned angle. `[]` when no turn is left or the walk fails.
+     * #2504 (ADR-3D-379) — `'size'`: the drawing's size park, #518's park gated by the probe (`scaleFree`):
+     * the size moves to the seed's target, the placement chart follows. `[]` when the size is not free, is
+     * already at the target, or the park is not exact.
      */
-    freedom?: 'measure' | number;
+    freedom?: 'measure' | 'turn' | 'size' | number;
   },
 ): PivotPool {
   const pointPins = c.pins;
@@ -769,20 +808,34 @@ export function solvePivot(
       // central differences in the rigid chart (τ, ω): dimensionless, and regular at every placement
       const colAt = (at: number): number[] => {
         const h = 1e-4;
-        const zp = [0, 0, 0, 0, 0, 0];
+        const zp = [0, 0, 0, 0, 0, 0, 0];
         zp[at] = h;
-        const zm = [0, 0, 0, 0, 0, 0];
+        const zm = [0, 0, 0, 0, 0, 0, 0];
         zm[at] = -h;
         const rp = f(rigidChart(x, zp));
         const rm = f(rigidChart(x, zm));
         return rp.map((v, i) => (v - rm[i]) / (2 * h));
       };
-      const cols = [0, 1, 2, 3, 4, 5].map(colAt);
+      const cols7 = [0, 1, 2, 3, 4, 5, 6].map(colAt);
+      const cols = cols7.slice(0, 6);
       const rank = cols[0].length === 0 ? 0 : numericRank(cols);
       const dim = 6 - rank;
-      if (dim === 0) return (memo = { dim: 0, generators: [] });
+      // #2378 (ADR-3D-379): the translation-only part of the null space is null(J_τ); the size column is the 7th
+      const rankT = cols[0].length === 0 ? 0 : numericRank(cols.slice(0, 3));
+      const rank7 = cols[0].length === 0 ? 0 : numericRank(cols7);
+      const counted = Math.max(0, 7 - rank7 - (3 - rankT));
+      const scaleFree = rank7 === rank;
+      if (dim === 0) return (memo = { dim: 0, generators: [], counted, rotation: [], scaleFree });
       const jtj = cols.map((ci) => cols.map((cj) => ci.reduce((a, v, r) => a + v * cj[r], 0)));
-      return (memo = { dim, generators: symmetricEigen(jtj).vectors.slice(0, dim) });
+      const generators = symmetricEigen(jtj).vectors.slice(0, dim);
+      // the leftover TURN: the ω-parts of the rigid null space span it (a translation generator has none)
+      const rotRank = Math.max(0, dim - (3 - rankT));
+      let rotation: number[][] = [];
+      if (rotRank > 0) {
+        const gram = [3, 4, 5].map((i) => [3, 4, 5].map((j) => generators.reduce((a, g) => a + g[i] * g[j], 0)));
+        rotation = symmetricEigen(gram).vectors.slice(3 - rotRank);
+      }
+      return (memo = { dim, generators, counted, rotation, scaleFree });
     };
   };
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
@@ -1931,8 +1984,9 @@ export function solvePivot(
   // full-suite failures). A genuinely determining given overrides the 1e-4 pull, exactly as it
   // overrides dims0 and the symbol anchors.
   const logScale0 = -0.3 + 0.7 * ((Math.abs(Math.sin((seed + 1) * 12.9898 + 39.425)) * 43758.5453) % 1);
-  // deterministic multi-start: several initial rotations, seed-rotated so "show
-  // another configuration" explores different manifold points when under-determined
+  // deterministic multi-start: one fixed set of eight initial rotations, REORDERED by the seed (never rotated
+  // by it), so an under-determined placement lands in the same handful of basins at every seed. It is not a
+  // sample: a leftover turn or size is sampled after the solve, by the resolver's stage 6 (#2378, ADR-3D-379).
   const starts: number[][] = [];
   const angles = [0, 1.1, 2.3, 4.1, 0.6, 3.1, 5.2, 1.9];
   const axes = [
@@ -2038,6 +2092,61 @@ export function solvePivot(
       };
     };
     if (probe.freedom === 'measure') return [resultAt(probe.x)];
+    // #2378 (ADR-3D-379): a DRAWN walk must be as exact as the solution it moved — ACCEPT alone admits a
+    // residual of ~1e-5 per row, which a stated coordinate's own check then refuses. Polish the release, then
+    // demand the base's own exactness (10× slack, floored where the base is machine-exact).
+    const drawnAccept = Math.min(ACCEPT, Math.max(1e-20, 10 * pErr(probe.x)));
+    const polish = (f: (z: number[]) => number[], z0: number[]): number[] => {
+      let r = leastSquares(f, z0);
+      for (let k = 0; k < 3 && r.err > 1e-24; k++) {
+        const r2 = leastSquares(f, r.x);
+        if (r2.err >= r.err * 0.99) break;
+        r = r2;
+      }
+      return r.x;
+    };
+    if (probe.freedom === 'size') {
+      // #2504 (ADR-3D-379): #518's park (ADR-3D-133), gated by the probe's verdict instead of "the scale never
+      // left its start". That symptom gate froze the size at edge 1 wherever LM nudged an undriven scale by
+      // 1e-10 – 5e-9, and the paths that never call `parkScale` (a placement settled with no solve, Stage A's
+      // placement-only solve) never sampled it at all. Here the size moves to the seed's target `logScale0`
+      // about the gauge origin, only the placement chart follows (dims and symbols held), and the result is
+      // kept only when exact: a size the givens drive cannot pass, so a determined figure never resizes.
+      if (!placementFreedomAt(probe.x, mirror)().scaleFree) return [];
+      const dS = logScale0 - probe.x[6];
+      if (Math.abs(dS) < 1e-9) return [];
+      const atS = (z: number[]): number[] => originChart(probe.x, z);
+      const fZS = (z: number[]) => fP(atS(z));
+      const fPinS = (z: number[]) => [...fZS(z), 1e3 * (z[6] - dS)];
+      const zS = polish(fPinS, [0, 0, 0, 0, 0, 0, dS]);
+      const xS = atS(zS);
+      if (degenerate(xS) || pErr(xS) >= drawnAccept || Math.abs(zS[6] - dS) > 1e-6) return [];
+      return [resultAt(xS)];
+    }
+    if (probe.freedom === 'turn') {
+      // #2378 (ADR-3D-379): the operator's 2026-10-23 ruling, "each press turns the cube about AB to a new
+      // angle". A turn by θ about the seeded axis u of the leftover turn, in {@link originChart}: only the
+      // placement moves (translation follows, so a turn about an axis off the first vertex keeps its pins); the
+      // size, the dims and the symbols are held.
+      const rot = placementFreedomAt(probe.x, mirror)().rotation;
+      if (rot.length === 0) return [];
+      const hT = (k: number) => (Math.abs(Math.sin((seed + 1) * 12.9898 + (k + 131) * 78.233)) * 43758.5453) % 1;
+      const coefT = rot.map((_, i) => hT(i) - 0.5);
+      const u = [0, 1, 2].map((j) => rot.reduce((a, b, i) => a + coefT[i] * b[j], 0));
+      const un = Math.hypot(...u);
+      if (!(un > 1e-9)) return [];
+      for (let j = 0; j < 3; j++) u[j] /= un;
+      const theta = Math.PI * (2 * hT(7) - 1) * (probe.flip ? -1 : 1);
+      const atT = (z: number[]): number[] => originChart(probe.x, z);
+      const projT = (z: number[]): number => z[3] * u[0] + z[4] * u[1] + z[5] * u[2];
+      const fZT = (z: number[]) => fP(atT(z));
+      const fPinT = (z: number[]) => [...fZT(z), 1e3 * (projT(z) - theta)];
+      const rpT = leastSquares(fPinT, [0, 0, 0, theta * u[0], theta * u[1], theta * u[2]], 40);
+      const zT = polish(fZT, rpT.x);
+      const xT = atT(zT);
+      if (degenerate(xT) || pErr(xT) >= drawnAccept || Math.abs(projT(zT) - theta) > 1e-3) return [];
+      return [resultAt(xT)];
+    }
     const fr = placementFreedomAt(probe.x, mirror)();
     if (fr.dim === 0) return [];
     const k0 = probe.freedom;
