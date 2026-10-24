@@ -204,13 +204,20 @@ branch (last).
 
 *Identifiers:* `A·B` · `|PQ|` · `AB + BC = 10`
 
-### Measure roles: one reader, one ask normaliser, one substitution seam ([ADR-AG-169](06c-decisions-analytic.md#adr-ag-169) Am. 1)
+### Measure roles: one reader, one ask normaliser, one substitution seam ([ADR-AG-169](06c-decisions-analytic.md#adr-ag-169) Am. 1, [ADR-AG-332](06c-decisions-analytic.md#adr-ag-332))
 
 `readRoleRef` (`parser/parseAnalytic.ts`) reads a role once: the given is `<role> <copula>? <value>` (`roleSplits`),
 the ask is the phrase after `normaliseAsk` (`app/ask.ts`) strips openers. M1 resolves `radius-of`, `focus-of`,
 `directrix-eq`, `perimeter-of`; a missing or ambiguous host refuses with `host: {kind, found, need?}`
-(`app/hostKey.ts`, `errHost.*`, `askHost.*`). A stated value replacing a domained symbol (`r_O`) passes `admitStated`
-(`out-of-domain`) and `substituteSym`; the directrix prints through `roleLineText`/`directrixText`; `ringsNamed`
+(`app/hostKey.ts`, `errHost.*`, `askHost.*`). A stated value replacing a free symbol (`r_O`, a student's radius letter
+`r`, a tool symbol) goes through ONE seam, `bindSymbol` (ADR-AG-332): `admitStated` (`out-of-domain`), then one
+structural substitution over every expression-bearing field of the construction (all but `params` / `seedNames` /
+`bound`), retirement of the parameter when no `{kind:'sym'}` node of it remains (a structural scan, never a text
+search), the record `Construction.bound[sym] = value`, and `normalizeParamOrder` on each `sign / params` selector it
+rewrote (no symbol left: judged now, `unsatisfiable` when false; one linear symbol: also lowered to that symbol's domain
+through the `param` merge). `applyFact` reads `bound` at its entry (`readBound`), so a later fact naming a bound letter
+reads the value, and a `param` fact on a bound letter is judged against it (`judgeBoundParam`). `substituteSym` is
+private to those two functions (a guard test holds it); the directrix prints through `roleLineText`/`directrixText`; `ringsNamed`
 resolves a noun-only perimeter.
 
 *Identifiers:* `engine/apply.ts`

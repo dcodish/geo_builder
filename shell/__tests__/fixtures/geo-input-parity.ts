@@ -1065,6 +1065,11 @@ export const PARITY_ROWS: readonly ParityRow[] = [
   { id: 'circle-by-area-1622', family: 'circles', steps: ['מעגל O ששטחו 9π'], expect: 'builds', exception: 'X8' },
   { id: 'circle-by-radius-unnamed-1622', family: 'circles', steps: ['מעגל שרדיוסו 5'], expect: 'builds', exception: 'X8' },
   { id: 'radius-letters-order-1622', family: 'circles', steps: ['מעגל O שרדיוסו R', 'מעגל P שרדיוסו r', 'R > r'], expect: 'builds', exception: 'X8' },
+  // ── #2521 (ADR-AG-332): a stated radius binds the circle's radius letter — a relation over the letter reads the value ──
+  { id: 'radius-letters-order-then-value-2521', family: 'circles', steps: ['מעגל O שרדיוסו R', 'מעגל P שרדיוסו r', 'R > r', 'רדיוס מעגל P הוא 9'], expect: 'builds', exception: 'X8', note: 'analytic drew O (3.46) smaller than P (9), green, before ADR-AG-332; the drawing is locked in src-analytic/__tests__/issue-2521-stated-radius-binds-letter.test.ts' },
+  { id: 'radius-letters-value-then-order-2521', family: 'circles', steps: ['מעגל O שרדיוסו R', 'מעגל P שרדיוסו r', 'רדיוס מעגל P הוא 9', 'R > r'], expect: 'builds', exception: 'X8', note: 'analytic refused «R > r» as naming a point r before ADR-AG-332' },
+  { id: 'radius-letter-value-then-ratio-2521', family: 'circles', steps: ['מעגל O שרדיוסו R', 'מעגל P שרדיוסו r', 'רדיוס מעגל P הוא 3', 'R = 2r'], expect: 'builds', exception: 'X8', note: 'analytic answered not-handled before ADR-AG-332' },
+  { id: 'radius-letter-value-then-bound-2521', family: 'circles', steps: ['מעגל O שרדיוסו R', 'מעגל P שרדיוסו r', 'רדיוס מעגל P הוא 9', 'r < 5'], expect: 'refused', exception: 'X8', note: 'analytic built it green (P drawn at 9, «r < 5» narrowing a ghost) before ADR-AG-332' },
   { id: 'common-tangent-internal-1622', family: 'tangents', steps: ['מעגל O', 'מעגל P', 'AB משיק משותף פנימי לשני המעגלים'], expect: 'builds', exception: 'X8' },
   { id: 'centre-of-given-circle-1622', family: 'circles', steps: ['נתון מעגל', 'מרכז המעגל'], expect: 'builds', exception: 'X8' },
   { id: 'radius-of-created-circle-1622', family: 'circles', steps: ['A על המעגל', 'רדיוס המעגל הוא 5'], expect: 'builds', exception: 'X8' },
