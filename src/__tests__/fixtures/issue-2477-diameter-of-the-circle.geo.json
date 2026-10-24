@@ -1,0 +1,36 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-10-24T00:00:00.000Z",
+  "name": "issue-2477-diameter-of-the-circle",
+  "seed": 0,
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "AB הוא קוטר של המעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "diameter",
+        "id1": "A",
+        "id2": "B",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    }
+  ],
+  "display": {}
+}

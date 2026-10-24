@@ -5526,6 +5526,10 @@ const DEFINITE_CIRCLE = /(?<![א-ת])[וש]?המעגל(?![א-ת])|\bthe\s+circle
  * 9π», «המעגל ברדיוס 3», "the area of the circle is 9π" — by `circleSizeExisting` and by the `circle`
  * definition rule ({@link lowerSizeReference}). It used to be asked only inside the through branch, so a size
  * about «המעגל» minted a second circle beside the drawn one (and a third beside two).
+ *
+ * #2477 ([ADR-761](../../docs/06-decisions.md#adr-761)): the third caller is `circleOnDiameter` — «AB הוא קוטר של
+ * המעגל» / "AB is a diameter of the circle" over a drawn circle steps aside to `diameter` (bind, ask, tie-break)
+ * instead of defining a new circle on AB.
  */
 const definiteCircleReference = (s: string, ctx: ParseContext, named: string | null): { center: string } | Clarify | null => {
   const circles = (ctx.circles ?? []).filter((c) => !c.startsWith('~'));
@@ -8015,6 +8019,11 @@ const chord: Rule = (s, ctx) => {
   ];
 };
 
+/** #2477 — a relative clause that DEFINES the circle by its diameter («[ה]מעגל שקוטרו AB», «מעגל שבו AB קוטר», "the
+ *  circle with diameter AB", "whose diameter"): kept a definition whatever the article, exactly as before ADR-761.
+ *  Whether a definite noun with a defining clause is a reference is a separate open question (#2498), not this rule's. */
+const DEFINING_CLAUSE = /שקוטר|שבו|circle\s+with\b|whose/i;
+
 /**
  * A circle DEFINED BY its diameter AB (Thales circle) — "circle with diameter AB" / "AB is the diameter of
  * circle O" / "מעגל שקוטרו AB" / "AB קוטר של מעגל [O]" / "מעגל שבו AB קוטר" (ADR-090). The circle's centre is
@@ -8023,6 +8032,9 @@ const chord: Rule = (s, ctx) => {
  * AB. Fires only when the circle does NOT already exist (a named-and-existing circle → `diameter` adds to it).
  * Built from primitives: midpoint = centre, then circle-through that centre and A (radius |centre·A|; B is on
  * it by the midpoint relation). Works whether A,B are new (created by `midpoint`) or pre-existing.
+ * #2477 ([ADR-761](../../docs/06-decisions.md#adr-761), amends ADR-090): a definite «המעגל» / "the circle" over a drawn
+ * circle is a REFERENCE (ADR-548/ADR-690), never a define marker — the phrasing discriminator applies only once
+ * {@link definiteCircleReference} has answered "not a reference".
  */
 const circleOnDiameter: Rule = (s, ctx) => {
   if (!/diameter|קוטר/i.test(s)) return null;
@@ -8046,6 +8058,8 @@ const circleOnDiameter: Rule = (s, ctx) => {
   // exists yet — "AB קוטר במעגל" / "קוטר במעגל AB" / "AB קוטר במעגל O" as an opening statement means "make a
   // circle whose diameter is AB" even when A,B are NEW (the common bagrut opener). An EXISTING circle (named
   // and present, or the single unnamed one) → `diameter` adds the diameter to it.
+  // (#2477: with the reference question answered above, the definite «של המעגל» / "of the circle" alternatives here
+  // fire only when no circle is drawn — FR-IN-12's "with none drawn the words introduce one".)
   const DEFINE = /של\s*ה?מעגל|שקוטר|מעגל\s+שבו|שמרכז|רדיוסו|circle\s+with\b|with\s+(?:a\s+|the\s+)?diameter|diameter\s+of|is\s+(?:a\s+|the\s+)?diameter|cent(?:er|re)d|radius/i;
   const endpointsExist = ids.every((p) => (ctx.points ?? []).some((q) => up(q) === up(p)));
   // #152: an endpoint that IS the would-be host circle's own CENTRE can never lie ON that circle, so
@@ -8057,7 +8071,9 @@ const circleOnDiameter: Rule = (s, ctx) => {
   const implicitHost = !named ? resolveCenter(s, ctx) : null;
   const hostIsEndpoint =
     implicitHost !== null && !centrePt(ctx, up(implicitHost)).startsWith('@') && ids.some((p) => up(p) === up(implicitHost));
-  const explicitNew = /מעגל\s+חדש|\bnew\s+circle\b/i.test(s);
+  // #2477: the definite «המעגל החדש» is a create signal too — it names a NEW circle, so the reference guard below
+  // must never bind it to the drawn one.
+  const explicitNew = /ה?מעגל\s+ה?חדש|\bnew\s+circle\b/i.test(s);
   // #221 (the #152 class, membership edition): the endpoints are members of DIFFERENT circles with NO
   // common host — «ED קוטר» where E rides one circle and D the other. The pair cannot be a diameter of
   // any existing circle without moving a stated membership, so the statement introduces the NEW circle
@@ -8088,6 +8104,13 @@ const circleOnDiameter: Rule = (s, ctx) => {
       { type: 'set-collinear', a: up(ids[0]), b: X, c: up(ids[1]) },
     ];
   }
+  // #2477 (ADR-761), the #1438 family's third member: a definite «המעגל» / "the circle" over a drawn circle is a
+  // REFERENCE (ADR-029, FR-IN-12), so the rule asks the shared question (`definiteCircleReference`, ADR-548/ADR-690)
+  // BEFORE the phrasing test and steps aside to `diameter`, which owns the bind, the ask and the membership tie-break
+  // (`resolveCenter`). Only "is this a reference?" is read here — the predicate's own answer is never returned (a
+  // second resolver would ask where `diameter`'s tie-break already knows). The create guards keep their meaning: a
+  // named circle, «המעגל החדש», #152's endpoint-is-centre, #221's cross members, and a defining clause.
+  if (!named && !explicitNew && !hostIsEndpoint && !crossMembers && !DEFINING_CLAUSE.test(s) && definiteCircleReference(s, ctx, null)) return null;
   const referencedCircleMissing = named ? true : circles.length === 0 || hostIsEndpoint || explicitNew || crossMembers; // (a named-and-existing circle already returned above)
   // DEFINE-from-new signal (vs the ADD phrasing "diameter DE in circle O"): the diameter LABELS come
   // BEFORE the keyword ("AB קוטר") — the student says "AB is a/the diameter" — OR the circle is referred

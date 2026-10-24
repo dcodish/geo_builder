@@ -5669,7 +5669,65 @@ export const SCENARIOS_4: Scenario[] = [
       expect(crossingUtterance({ circle1: 'circle-O-2', c: 'A', d: 'B' } as never, 'K', 'he', withDiameter)).toBe('K = חיתוך המעגל הפנימי ו-AB');
     },
   },
+  // ── #2477 (ADR-761): a diameter stated about «המעגל» / "the circle" is drawn on the drawn circle, or asks which ──
+  {
+    id: 'issue-2477-diameter-of-the-drawn-circle',
+    title: '«מעגל O» · «AB הוא קוטר של המעגל» makes AB a diameter of circle O — one circle, O the midpoint of AB (#2477, ADR-761)',
+    guards: guards2477(),
+    steps: ['מעגל O', 'AB הוא קוטר של המעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      diameterOfO2477(fig);
+      for (const seed of [1, 2]) diameterOfO2477(replay(factsOf(['מעגל O', 'AB הוא קוטר של המעגל']), seed));
+    },
+  },
+  {
+    id: 'issue-2477-diameter-of-the-circle-en',
+    title: '"circle O" · "AB is a diameter of the circle" makes AB a diameter of circle O — one circle (#2477, ADR-761)',
+    guards: guards2477(),
+    steps: ['circle O', 'AB is a diameter of the circle'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      diameterOfO2477(fig);
+      for (const seed of [1, 2]) diameterOfO2477(replay(factsOf(['circle O', 'AB is a diameter of the circle']), seed));
+    },
+  },
+  {
+    id: 'issue-2477-diameter-of-the-circle-two-circles-asks',
+    title: '«מעגל O» · «מעגל P» · «AB הוא קוטר של המעגל» asks which circle (ambiguous-circle-ref); the figure keeps exactly two circles (#2477, ADR-761)',
+    guards: guards2477(),
+    steps: ['מעגל O', 'מעגל P', 'AB הוא קוטר של המעגל'],
+    refusedSteps: [
+      {
+        step: 3,
+        reason: 'ambiguous-circle-ref',
+        with: { centers: ['O', 'P'] },
+        why: 'FR-IN-12 / ADR-548: «המעגל» beside several circles asks which — never a silent pick and never a third circle (#2477, ADR-761)',
+      },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.circles.size, 'two circles, no third').toBe(2);
+    },
+  },
 ];
+
+/** #2477: the shared record of what the three ADR-761 scenarios guard (a hoisted function — the array reads it at load). */
+function guards2477(): string {
+  return "#2477 (P1), FR-IN-12: «המעגל» means the circle already drawn, and beside several it asks which. Measured at 1944d866 through decideDeterministic2D: «מעגל O · AB הוא קוטר של המעגל» (every copula/possessive spelling, English \"AB is a diameter of the circle\", an unnamed circle, a circumcircle, ends already on O) committed `segment` + `midpoint @ctr-P` + `circle-through circle-P` — a SECOND circle on AB, green; beside two circles a THIRD. Root cause: `circleOnDiameter` (ADR-090) decided define-vs-add by phrasing alone, and its DEFINE marker matched the definite «של המעגל» / \"of the circle\" — a reference. Fix (ADR-761, the #1438 family's third member after ADR-548 and ADR-690): the rule asks the shared `definiteCircleReference` predicate first and steps aside to `diameter`, which binds, asks, or applies the membership tie-break. The class matrix is src/app/__tests__/issue-2477-definite-diameter.test.ts; the one-circle build is the fixture issue-2477-diameter-of-the-circle.geo.json.";
+}
+/** #2477: exactly one circle, A and B on it, its centre their midpoint. */
+function diameterOfO2477(fig: ReturnType<typeof replay>) {
+  expect(fig.circles.size, 'no second circle').toBe(1);
+  const c = fig.circles.get('circle-O')!;
+  const A = at(fig, 'A');
+  const B = at(fig, 'B');
+  expect(dist(A, c.center)).toBeCloseTo(c.r, 6);
+  expect(dist(B, c.center)).toBeCloseTo(c.r, 6);
+  expect(dist({ x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 }, c.center), 'O is the midpoint of AB').toBeLessThan(1e-6);
+}
 
 /**
  * #2362 ([ADR-748](../../docs/06-decisions.md#adr-748), operator ruling 2026-10-20 Q2): the operator's EXACT sequences of the

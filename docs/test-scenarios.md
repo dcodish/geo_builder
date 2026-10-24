@@ -2146,3 +2146,15 @@ over all four (ADR-041).
 ### `concentric-circle-names-sentences-2305` — the #2264 pair: a refusal, the menu titles and a crossing step name each circle by its role (#2305, ADR-755)
 
 **Guards against:** a sentence about one of a concentric pair spelling the circle's id or its sibling's letter — «לא ניתן לצייר משיק במרכז המעגל O-2.», «⊙ O-2», a clicked crossing of the inner circle recorded as «K = חיתוך מעגל O ו-AB» (the outer circle's name). **Asserts** the operator's three #2264 lines build green; «משיק למעגל הפנימי בנקודה O» is refused «לא ניתן לצייר משיק במרכז המעגל הפנימי.»; the menu titles read «⊙ המעגל החיצוני» / «⊙ המעגל הפנימי»; the inner circle's crossing with a diameter AB is recorded «K = חיתוך המעגל הפנימי ו-AB». The class matrix (every template with a circle slot, three spellings, both locales, the crossing round-trip) is `src/__tests__/issue-2305-circle-names-every-surface.test.ts`; the byte-identity golden for every other circle is `src/i18n/__tests__/circle-text-golden-2305.test.ts`.
+
+### `issue-2477-diameter-of-the-drawn-circle` — a diameter stated about «המעגל» is a diameter of the drawn circle (#2477, ADR-761)
+
+**Guards against:** «מעגל O · AB הוא קוטר של המעגל» drawing a SECOND circle P on AB beside O, green (`circleOnDiameter` read the definite «של המעגל» as a define marker). **Asserts** the operator's two lines build green with no violations, exactly one circle, A and B on circle O and O the midpoint of AB, at seeds 0–2. The class matrix (every copula/possessive spelling in both locales, an unnamed circle, a circumcircle, ends already on O, the compounds, the two-circle ask and tie-break, the controls that still create) is `src/app/__tests__/issue-2477-definite-diameter.test.ts`; the one-circle build is the fixture `issue-2477-diameter-of-the-circle.geo.json`.
+
+### `issue-2477-diameter-of-the-circle-en` — the English twin: "AB is a diameter of the circle" (#2477, ADR-761)
+
+**Guards against:** "circle O" · "AB is a diameter of the circle" drawing a second circle on AB. **Asserts** the same as `issue-2477-diameter-of-the-drawn-circle`: one circle, AB a diameter of O at seeds 0–2, green.
+
+### `issue-2477-diameter-of-the-circle-two-circles-asks` — beside two circles, a diameter of «המעגל» asks which (#2477, ADR-761)
+
+**Guards against:** «מעגל O · מעגל P · AB הוא קוטר של המעגל» drawing a THIRD circle M, green. **Asserts** the third step is refused by the parser with `ambiguous-circle-ref` (centres O, P — the existing «יש כמה מעגלים בסרטוט…» question) and the figure keeps exactly two circles.
