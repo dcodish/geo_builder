@@ -713,6 +713,13 @@ With an equation side, concentric is judged structurally at M1 (`centresAlwaysCo
 `TANGENT_BRANCH` and `peelMods` read the sentence; `touch-point {a, b}` names the touch; `inDomain(d, v, floor)` with
 `openBoundFloor` keeps a forced-zero radius off the bound.
 
+**A second ring around one circle starts on the dual** ([ADR-AG-333](06c-decisions-analytic.md#adr-ag-333), #2512). In
+`evaluateUncached`'s seeding, a triangle or quadrilateral every side of which is a bounded `tangent-line` to one centre,
+stated after another such ring around that centre, seeds its free vertices at 2-D's construction: uneven touch angles
+turned by the touches already on the circle × the golden angle (varied per configuration past 0), each vertex at the meet
+of its two sides' tangents — an exact solution, so the joint descent does not depend on where the letters were sampled.
+A lone ring keeps its sampled start. A start, never a verdict.
+
 *Identifiers:* `line-l1` · `bounded: true` · `bound` · `tangent-circles {a, b, branch?}` · `parseCircleAt` · `one` · `pair` · `K ± r_K·û` · `r > 0` · `floor = 0`
 *ADRs:* ADR-AG-167.
 

@@ -2203,3 +2203,7 @@ over all four (ADR-041).
 
 **Guards against:** the #1012 re-reader teaching a spelling that the parser reads back as a different centre. «רבע מעגל ODC» on «ABC משולש ישר זוית · AC=15 · BC=10 · O על AC · D על CB» reads O; the re-reader tries C first and spells it «רבע מעגל DCO» with `spellArcRun`, the inverse of the one reader. **Asserts** the re-reader's first reading is centre C spelt «רבע מעגל DCO», and that sentence, typed as the last step, builds centre C with ∠OCD = 90° at seeds 0–2 (docs/17 §9).
 
+
+### `second-triangle-around-circle-2512` — «מעגל O ברדיוס 3» · «משולש ABC חוסם את מעגל O» · «משולש DEF חוסם את מעגל O»: the second triangle is its own triangle (#2512, ADR-762)
+
+**Guards against:** the triangle dual keyed by the circle alone, which drew D, E, F exactly on A, B, C, green, at every seed and every «הציגו תצורה אחרת» (the operator's report). **Asserts** one circle of the stated radius 3 (its unmoved centre is the class test's stability row), every side of each triangle tangent to O, no vertex of DEF on a vertex of ABC, and no recorded coincidence. The class matrix (every spelling, both orders, three triangles, regular and plain n-gons, a point or diameter first, presses, stability, the lone-ring pins) is `src/__tests__/issue-2512-second-ring-on-circle.test.ts`.

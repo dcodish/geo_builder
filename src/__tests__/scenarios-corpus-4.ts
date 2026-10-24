@@ -5945,6 +5945,31 @@ export const SCENARIOS_4: Scenario[] = [
       for (const seed of [0, 1, 2]) expect(angle(at(replay(facts, seed), 'O'), at(replay(facts, seed), 'C'), at(replay(facts, seed), 'D')), `∠OCD = 90 @${seed}`).toBeCloseTo(90, 4);
     },
   },
+  {
+    id: 'second-triangle-around-circle-2512',
+    title: '«מעגל O ברדיוס 3» · «משולש ABC חוסם את מעגל O» · «משולש DEF חוסם את מעגל O» — the second triangle is its own triangle, never drawn on the first (#2512, ADR-762)',
+    guards:
+      "#2512 (P1): measured at 045a8546 through decideDeterministic2D, DEF was drawn exactly on ABC (D = A, E = B, F = C), green, at every seed and every «הציגו תצורה אחרת». ADR-115's triangle dual keyed its touch points by the circle alone (`@t-O-0..2`), so the second triangle re-used the first one's touch points; the engine recorded the pairs as a FORCED coincidence, which `pointsDistinct` admits. Fix (ADR-762): one tangential-ring emitter (`tangentialRingAround`) for the triangle and the quadrilateral, touch points keyed by circle AND ring and started turned by the circle's rider count. Asserts one circle of the stated radius 3, every side of each triangle tangent to O (that each touch lies within its side, in every view, is #2538's lock), no vertex of DEF on a vertex of ABC, and no recorded coincidence. The class matrix (spellings, orders, three triangles, regular rings, presses) is src/__tests__/issue-2512-second-ring-on-circle.test.ts.",
+    steps: ['מעגל O ברדיוס 3', 'משולש ABC חוסם את מעגל O', 'משולש DEF חוסם את מעגל O'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.circles.size, 'one circle').toBe(1);
+      const c = fig.circles.get('circle-O')!;
+      expect(c.r, 'the stated radius holds').toBeCloseTo(3, 9); // the centre's stability is the class test's (seed 0)
+      for (const tri of [['A', 'B', 'C'], ['D', 'E', 'F']]) {
+        const P = tri.map((k) => at(fig, k));
+        P.forEach((p, i) => {
+          const q = P[(i + 1) % 3];
+          const L = dist(p, q);
+          const t = ((c.center.x - p.x) * (q.x - p.x) + (c.center.y - p.y) * (q.y - p.y)) / (L * L);
+          const foot = { x: p.x + t * (q.x - p.x), y: p.y + t * (q.y - p.y) };
+          expect(dist(foot, c.center), `${tri[i]}${tri[(i + 1) % 3]} is tangent to O`).toBeCloseTo(3, 6);
+        });
+      }
+      for (const a of ['D', 'E', 'F']) for (const b of ['A', 'B', 'C']) expect(dist(at(fig, a), at(fig, b)), `${a} is not on ${b}`).toBeGreaterThan(1e-3);
+      expect(fig.coincidences ?? [], 'no coincidence recorded').toEqual([]);
+    },
+  },
 ];
 
 /** #2477: the shared record of what the three ADR-761 scenarios guard (a hoisted function — the array reads it at load). */
